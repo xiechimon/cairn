@@ -156,6 +156,47 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(rows[0]?.history.map((h) => h.content)).toEqual(['使用 npm', '使用 pnpm']);
     });
 
+    test('update_memory 改成同口径另一条的正文返回 409 并指出那条 id，跨项目或他人不算', async () => {
+      const otherProject = await postProject(H.s.app, 'other');
+      const local = (await save({ title: '包管理器', content: '使用 npm' })) as { id: string };
+      const global = (await relay('save_memory', {
+        title: '界面配色',
+        content: '按钮采用蓝色',
+      })) as { id: string };
+      const target = (await save({ title: '部署', content: '部署使用容器', force: true })) as {
+        id: string;
+      };
+      await relay('save_memory', {
+        title: '别仓',
+        content: '别仓使用 yarn',
+        projectId: otherProject,
+        force: true,
+      });
+      await relay(
+        'save_memory',
+        { title: '他人', content: '他人使用 bun', projectId: H.projectId },
+        { chiefAgentId: AGENT2_ID },
+      );
+      for (const [content, id] of [
+        ['使用 npm', local.id],
+        ['按钮采用蓝色', global.id],
+      ] as const) {
+        const rejected = invoke('update_memory', { memoryId: target.id, content });
+        await expect(rejected).rejects.toMatchObject({ status: 409 });
+        await expect(rejected).rejects.toThrow(id);
+      }
+      for (const content of ['别仓使用 yarn', '他人使用 bun', '部署使用容器']) {
+        expect(await invoke('update_memory', { memoryId: target.id, content })).toMatchObject({
+          id: target.id,
+          content,
+        });
+      }
+      const contents = ((await invoke('memories', {})) as { content: string }[]).map(
+        (row) => row.content,
+      );
+      expect(new Set(contents).size).toBe(contents.length);
+    });
+
     test('更新不存在或其他 Agent 的记忆返回 404', async () => {
       const other = (await relay(
         'save_memory',

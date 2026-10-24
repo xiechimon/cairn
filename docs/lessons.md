@@ -51,3 +51,4 @@
 | 新脚本把只调用一次的查询拆成独立私有函数，`single-use-helper-gate` 报 5 处 | 派活查重 #1569/#1578 (2026-10-24) | 2 | `scripts/single-use-helper-gate.mjs`（`pnpm prepush` 与 CI 共用） | 1 | 0 | 负对照：首版 `scripts/dispatch-agent.mjs` 的 tempWorkdirs 等 5 个单次调用函数报红；收进导出的 `collectTicketSources` 后为 0 |
 | 记忆重试指纹包含标题，或只在候选分支查指纹，改标题后同正文能再次写入 | #1574 (2026-10-24) | 2 | `memory-dedupe.test.ts` 同时覆盖改标题仍命中候选和不再命中候选的两种重试；指纹只含 Agent、团队、项目与正文，并在候选匹配前检查 | 2 | 0 | 真实负对照：首版改标题仍返回 candidates，收窄指纹后无重叠标题仍新增；两种旧实现均先红，提前查正文指纹后转绿；请求是否同正文属行为约束，由集成测试检查 |
 | 记忆历史已落库，但 REST 显式投影漏带新字段 | #1574 (2026-10-24) | 2 | `m4b-memory.test.ts` 经真实 worker HTTP relay 更新，再由 REST 列表读取旧正文 | 1 | 0 | 真实负对照：旧 toMemoryRecord 无 history，HTTP 集成断言变红；投影补齐后转绿；shared history 为兼容旧服务端保持可选，由边界测试约束新服务端 |
+| 长测（`vitest run --changed` 实测 1598s）没接 `tee` 落日志，红了看不到哪些文件挂、只能重跑一整轮 | pi 线程 #1574 (2026-10-24) | 3 | 全局 AGENTS.md 测试规则 4：长测用 `... 2>&1 \| tee /tmp/<lane>.log` | 0 | 1 | pi 没有 PreToolUse 钩子，命令形态无法机器拦；同轮还把 macOS 没有的 `timeout` 用进命令，失败后去掉 |

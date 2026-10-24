@@ -35,6 +35,28 @@ function overlaps(left: string, right: string): boolean {
   return shared >= 2 && shared / Math.min(aGrams.size, bGrams.size) >= 0.5;
 }
 
+type MemoryTx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+function memoriesInScope(
+  tx: MemoryTx,
+  scope: { agentId: string; teamId: string; projectId: string | null },
+) {
+  return tx
+    .select()
+    .from(agentMemory)
+    .where(
+      and(
+        eq(agentMemory.agentId, scope.agentId),
+        eq(agentMemory.teamId, scope.teamId),
+        scope.projectId === null
+          ? isNull(agentMemory.projectId)
+          : or(eq(agentMemory.projectId, scope.projectId), isNull(agentMemory.projectId)),
+      ),
+    )
+    .orderBy(asc(agentMemory.createdAt), asc(agentMemory.id))
+    .all();
+}
+
 export function saveMemoryEntry(
   db: Db,
   input: {
@@ -58,20 +80,7 @@ export function saveMemoryEntry(
     if ((count?.n ?? 0) >= MEMORY_QUOTA_PER_AGENT) {
       throw new HttpError(409, `memory quota exceeded (${MEMORY_QUOTA_PER_AGENT}/agent)`);
     }
-    const rows = tx
-      .select()
-      .from(agentMemory)
-      .where(
-        and(
-          eq(agentMemory.agentId, input.agentId),
-          eq(agentMemory.teamId, input.teamId),
-          input.projectId === null
-            ? isNull(agentMemory.projectId)
-            : or(eq(agentMemory.projectId, input.projectId), isNull(agentMemory.projectId)),
-        ),
-      )
-      .orderBy(asc(agentMemory.createdAt), asc(agentMemory.id))
-      .all();
+    const rows = memoriesInScope(tx, input);
     if (rows.some((row) => row.content === input.content)) {
       throw new HttpError(409, 'memory already exists; use update_memory');
     }
@@ -136,6 +145,12 @@ export function updateMemoryEntry(
     if (!row) throw new HttpError(404, `memory ${input.memoryId}`);
     validateMemoryText(row.title, input.content);
     if (row.content === input.content) return row;
+    const duplicate = memoriesInScope(tx, row).find(
+      (other) => other.id !== row.id && other.content === input.content,
+    );
+    if (duplicate) {
+      throw new HttpError(409, `memory ${duplicate.id} already has this content`);
+    }
     return tx
       .update(agentMemory)
       .set({
