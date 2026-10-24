@@ -24,6 +24,7 @@ import type {
   RequiredCapabilities,
   SkillInjectionRecord,
   StepKind,
+  TodoOutputKind,
   TodoSourceKind,
   TriggerSource,
 } from '@cairn/shared';
@@ -119,6 +120,7 @@ export const todo = sqliteTable('todo', {
   /** 外部引用（#446）：形如 `github:owner/repo#123`（shared
    * githubIssueSourceRef 单源）；无来源 = null。 */
   sourceRef: text('sourceRef'),
+  output: text('output').$type<TodoOutputKind>().notNull().default('code'),
 });
 
 // tag record 三位补全（#309，r9 §3.4 实测 wire {id, projectId, name, color,
@@ -173,6 +175,7 @@ export const build = sqliteTable('build', {
   diffHash: text('diffHash'),
   baseSha: text('baseSha'),
   harnessHash: text('harnessHash'),
+  reportAttachmentId: text('reportAttachmentId'),
   createdAt: epochMs('createdAt').notNull(),
 });
 

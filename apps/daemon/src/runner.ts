@@ -10,7 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -38,6 +38,7 @@ import {
   appendBlockerHandoff,
   appendConfirmedPlanNote,
   appendPlanLocationNote,
+  appendReportLocationNote,
   appendWorkBranchNote,
   BRAND,
   buildPlanFirstRoundInstruction,
@@ -50,6 +51,7 @@ import {
   composeTaskPromptWithInstruction,
   conversationBranch,
   FIXED_TAGS,
+  INFO_REPORT_MAX_BYTES,
   isBackendRuntimeId,
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
@@ -59,6 +61,7 @@ import {
   parseRetryAfterMs,
   parseReviewPromptMeta,
   REMOTE_TOOL_RETRY_DELAYS_MS,
+  REPORT_FILE_NAME,
   type ReviewGate,
   SESSION_FILE_NAME,
   STREAM_TIMEOUTS_MS,
@@ -282,6 +285,12 @@ function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
   }
   return `本机找不到会话 ${sessionId}，无法续接。已改开新会话，按原任务继续。`;
 }
+
+const READONLY_GIT_ENV: Record<string, string> = {
+  GIT_CONFIG_COUNT: '1',
+  GIT_CONFIG_KEY_0: 'url.cairn-readonly-workspace-denied:.pushInsteadOf',
+  GIT_CONFIG_VALUE_0: '',
+};
 
 /** 本机交接位上的非空 plan.md。plan 步写在 `<plansDir>/<convId>/plan.md`。
  *  文件不在这台机器上，或内容为空白，返回 null。 */
@@ -569,10 +578,15 @@ async function runClaimedStep(
   // （journal/wire 行与投递内容同串——recover 面 resume prompt 已含注记时
   // appendPlanLocationNote 幂等不双注）。plan 步一律附注（含续轮/重启轮：
   // new session 上下文真空时注记是 agent 唯一知道「写哪里」的通道）。
+  const isInfoBuild = claimed.step.kind === 'build' && claimed.todo?.output === 'info';
+  const readonlyWorkspace = !isChief && claimed.todo?.output === 'info';
+  const reportFile = join(deps.paths.reportsDir, convId, REPORT_FILE_NAME);
   const promptWithPlanNote =
     basePrompt !== null && claimed.step.kind === 'plan'
       ? appendPlanLocationNote(basePrompt, join(deps.paths.plansDir, convId, PLAN_FILE_NAME))
-      : basePrompt;
+      : basePrompt !== null && isInfoBuild
+        ? appendReportLocationNote(basePrompt, reportFile)
+        : basePrompt;
   // #1195 工作分支注记：repo 绑定的交付步（build/merge/verify）prompt 尾部
   // 追加「只在会话分支提交」硬约束——事故形（mea 2026-10-11）是 agent 自建
   // 分支交付后产物闸按会话分支计数判零。分支名对 agent 是执行机本地事实
@@ -584,6 +598,7 @@ async function runClaimedStep(
   const prompt =
     promptWithPlanNote !== null &&
     promptWithPlanNote.trim() !== '' &&
+    !isInfoBuild &&
     (claimed.step.kind === 'build' ||
       claimed.step.kind === 'merge' ||
       claimed.step.kind === 'verify') &&
@@ -592,6 +607,10 @@ async function runClaimedStep(
       : promptWithPlanNote;
   if (claimed.step.kind === 'plan') {
     mkdirSync(join(deps.paths.plansDir, convId), { recursive: true });
+  }
+  if (isInfoBuild) {
+    mkdirSync(dirname(reportFile), { recursive: true });
+    if (!opts.resume) rmSync(reportFile, { force: true });
   }
 
   // journal：claimed（recover 面即时落盘，02 §5.4）。
@@ -769,6 +788,7 @@ async function runClaimedStep(
         // 执行机本机 git 凭据）；hosted 走 server per-step key 恒关、local 无
         // 凭据面恒关。
         machineCredentialFallback: repo.kind === 'github',
+        ...(readonlyWorkspace ? { readonly: true } : {}),
       });
     } catch (err) {
       clearCredentials(creds);
@@ -795,7 +815,7 @@ async function runClaimedStep(
   // 捕获（#1195 分支扫描的「步窗口」下界）。
   const stepStartMs = Date.now();
   let headAtStart: string | null = null;
-  if (ws !== null && deps.workspace) {
+  if (ws !== null && ws.readonly !== true && deps.workspace) {
     try {
       headAtStart = await deps.workspace.headCommit(ws.cwd);
     } catch {
@@ -1077,7 +1097,9 @@ async function runClaimedStep(
     // 对检出造成的任何写入在收尾被丢弃（见下「审核步收尾」）。
     ...(isReview ? { readOnly: true } : {}),
     // #1148 步级 env（端口基座）：machine-loop 按槽位构造，跨缝透传 backend。
-    ...(opts.env !== undefined ? { env: opts.env } : {}),
+    ...(opts.env !== undefined || readonlyWorkspace
+      ? { env: { ...opts.env, ...(readonlyWorkspace ? READONLY_GIT_ENV : {}) } }
+      : {}),
   };
 
   // continue 解析键：journal 快照（recover 面）优先，其次 claim 载荷携带的
@@ -1501,7 +1523,9 @@ async function runClaimedStep(
         createdAt: now(),
       });
       if (!opts.resume) {
-        const fresh = degradedFreshPrompt(claimed, deps.paths.plansDir, convId);
+        const fresh = isInfoBuild
+          ? appendReportLocationNote(buildTaskPrompt(claimed), reportFile)
+          : degradedFreshPrompt(claimed, deps.paths.plansDir, convId);
         journal.update(stepId, {
           prompt: fresh,
           sessionAction: 'new',
@@ -1986,6 +2010,7 @@ async function runClaimedStep(
    * 返回失败原因，null = 回退成功或不适用（无检出/无起点）。回退失败意味着
    * 本轮写入可能残留——调用方按各自语义报出去，不静默。 */
   const rewindToStepStart = async (): Promise<string | null> => {
+    if (ws?.readonly === true) return null;
     if (ws === null || !deps.workspace || headAtStart === null) return '步起点 commit 不可得';
     try {
       await deps.workspace.restoreCheckpoint(ws.cwd, headAtStart);
@@ -2045,8 +2070,10 @@ async function runClaimedStep(
   // 简报擦除失败即挡住提交（#958 闸 1）：有仓库的 worktree 里擦不干净不可存活
   // ——提交闸一旦放行，`git add -A` 会把残留扫进提交并推送（Multica daemon.go
   // 的 AbortWithReason 同律）。擦除失败已在 cleanupBriefOnce 里落过 transcript 行。
+  if (readonlyWorkspace) hasChanges = false;
   if (
     ws !== null &&
+    ws.readonly !== true &&
     deps.workspace &&
     lastError === null &&
     !stopped &&
@@ -2189,6 +2216,16 @@ async function runClaimedStep(
     lastError = '运行简报未能从工作区擦除——本轮未提交未推送（详见 transcript 的简报行）';
   }
 
+  let report: string | null = null;
+  if (isInfoBuild && !stopped && lastError === null && existsSync(reportFile)) {
+    const content = readFileSync(reportFile, 'utf8');
+    if (Buffer.byteLength(content, 'utf8') > INFO_REPORT_MAX_BYTES) {
+      lastError = `${REPORT_FILE_NAME} 超过上限 ${INFO_REPORT_MAX_BYTES} 字节，请压缩报告后重试`;
+    } else if (content.trim() !== '') {
+      report = content;
+    }
+  }
+
   const status = stopped ? 'stopped' : lastError === null ? 'success' : 'failed';
   if (!stopped && lastError !== null) logger.step(`step failed: ${lastError}`);
   journal.update(stepId, { state: 'awaiting-upload' });
@@ -2201,7 +2238,14 @@ async function runClaimedStep(
   // = 缺席（面板分支名在、PR 槽留空，不失败不重试——失败方式 ④）。——
   let prProbe: { number: number; url: string } | null = null;
   let changesDiff: string | null = null;
-  if (ws !== null && repo !== null && lastError === null && !stopped && !isReview) {
+  if (
+    ws !== null &&
+    ws.readonly !== true &&
+    repo !== null &&
+    lastError === null &&
+    !stopped &&
+    !isReview
+  ) {
     const ghRef = repo.kind === 'github' ? githubRepoRefOf(repo.cloneUrl) : null;
     if (ghRef !== null) {
       // #1195 探测 head 集：会话分支先行（现行语义），未命中且有偏离/候选
@@ -2314,6 +2358,7 @@ async function runClaimedStep(
     // 普通失败，混版本零破坏）。
     ...(quotaBlock !== null ? { quotaBlock } : {}),
     ...(skillInjection.facts !== null ? { skillInjectionFacts: skillInjection.facts } : {}),
+    ...(report !== null ? { report } : {}),
     // #1493 无输出信号：成功收尾但 transcript 零 assistant 消息（server「0 token
     // 静默失败」判据的前提——单看 usage 会误判不回 usage 的 relay）。
     ...(status === 'success' && !messages.some((m) => m.role === 'assistant')

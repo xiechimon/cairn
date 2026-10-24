@@ -28,6 +28,7 @@ export const blockerHandoffEntrySchema = z.object({
   changedFiles: z.array(z.string()),
   omittedFiles: z.number().int().nonnegative(),
   summary: z.string().nullable(),
+  report: z.object({ attachmentId: z.string(), content: z.string() }).optional(),
 });
 export type BlockerHandoffEntry = z.infer<typeof blockerHandoffEntrySchema>;
 

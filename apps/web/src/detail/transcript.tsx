@@ -96,6 +96,7 @@ function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): stri
     case 'fail':
     case 'streaming':
     case 'review':
+    case 'report':
       return endsWithAgentRow(prev) ? 'mt-3' : 'mt-5';
     case 'chief':
       return 'mt-1';
@@ -463,6 +464,18 @@ function Row({
           {item.footer != null && (
             <ActionRow seconds={item.footer.seconds} copy={robotCopyText(item)} t={t} />
           )}
+        </div>
+      );
+    case 'report':
+      return (
+        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+          <AgentRowAvatar agent={agent} />
+          <span
+            className="chat-text -mt-px ml-3 max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)"
+            data-testid="info-report"
+          >
+            <ChatMarkdown text={item.markdown} />
+          </span>
         </div>
       );
     case 'thinking':

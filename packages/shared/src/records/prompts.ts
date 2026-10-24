@@ -12,6 +12,7 @@
 
 import { chiefThreadTitle } from './chief.js';
 import { PLAN_FILE_NAME } from './plan.js';
+import { REPORT_FILE_NAME } from './report.js';
 import { parseReviewPromptMeta } from './review.js';
 import type { StepKind } from './step.js';
 import { parseGithubIssueSourceRef } from './todo.js';
@@ -415,6 +416,15 @@ export function appendConfirmedPlanNote(prompt: string, planFile: string): strin
   return prompt === '' ? note : `${prompt}\n${note}`;
 }
 
+const REPORT_NOTE_HEAD = `${REPORT_FILE_NAME} 交接位置：`;
+const REPORT_NOTE_TAIL = `。该位置在仓库检出之外——本步的交付物是这份报告：把完整报告写入此文件再结束本步；不要在仓库工作区里创建它，也不要把它 git add 或提交。`;
+
+export function appendReportLocationNote(prompt: string, reportFile: string): string {
+  if (prompt.includes(REPORT_NOTE_HEAD)) return prompt;
+  const note = `${REPORT_NOTE_HEAD}${reportFile}${REPORT_NOTE_TAIL}`;
+  return prompt === '' ? note : `${prompt}\n${note}`;
+}
+
 /** 尾部已确认方案位置行剥离（过滤侧）：prompt 以 '\n' + 注记行收尾时剥掉
  *  注记，余段走模板比对。非注记收尾 = 原文返回。 */
 export function stripConfirmedPlanNote(text: string): string {
@@ -456,7 +466,14 @@ export function stripBlockerHandoff(text: string): string {
 function stripTaskDeliveryNotes(text: string): string {
   let cur = text;
   for (;;) {
-    const next = stripConfirmedPlanNote(stripWorkBranchNote(cur));
+    const reportIdx = cur.lastIndexOf(`\n${REPORT_NOTE_HEAD}`);
+    const withoutReport =
+      reportIdx === -1
+        ? cur
+        : wrappedBy(cur.slice(reportIdx + 1), REPORT_NOTE_HEAD, REPORT_NOTE_TAIL)
+          ? cur.slice(0, reportIdx)
+          : cur;
+    const next = stripConfirmedPlanNote(stripWorkBranchNote(withoutReport));
     if (next === cur) return cur;
     cur = next;
   }

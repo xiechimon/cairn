@@ -725,6 +725,8 @@ export const EN: Record<string, string> = {
   // #1313：已上报且文件集为空时完成弹层不提供合并勾选。
   '本轮没有文件改动，完成不会合并分支。':
     'This round has no file changes. Completing will not merge the branch.',
+  '信息卡的产出是报告附件，不进合并。':
+    'An info card delivers a report attachment and is never merged.',
   // XMON-89 合并被拒的可见化：前置缺项行（{tools} = 1~2 个开关名的顿号串；
   // 开关名本身是 shared AGENT_TOOL_SWITCHES 的 zh 值域词，locate 后仍按 zh
   // 出现——与权限 tab 的开关行一致，不另开一份 en 词表）＋ 5xx/网络失败的

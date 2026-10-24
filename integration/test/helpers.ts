@@ -37,6 +37,7 @@ export interface RealServer {
   db: ReturnType<typeof openMemoryDb>;
   /** 托管 bare repo 存储根（M3b git 面断言用）。 */
   reposDir: string;
+  attachmentsDir: string;
   /** server 侧团队技能库根（spec 13 #367 现扫面 / #920 分发清单的来源目录）。
    *  隔离空目录——需要团队技能的用例显式往里写 `<dirName>/SKILL.md`（#919
    *  行为验收的远端分发面）。 */
@@ -213,6 +214,7 @@ export async function bootRealServer(opts: {
     apiKey: issuedKey.plaintext,
     db,
     reposDir,
+    attachmentsDir,
     skillsDir,
     claimCount: () => claims,
     todoPhase(todoId: string) {
