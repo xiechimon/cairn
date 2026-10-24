@@ -83,7 +83,7 @@ update_code() {
   fi
   run "git -C '$REPO' checkout -q --detach origin/main"
   if [ "$OS" = Darwin ]; then
-    run "(cd '$REPO' && pnpm install --frozen-lockfile)"
+    run "(cd '$REPO' && pnpm install --frozen-lockfile && pnpm --filter ./apps/web build)"
   else
     run "(export PATH=\"\$HOME/.local/share/mise/shims:\$PATH\"; cd '$REPO' && pnpm install --frozen-lockfile && pnpm --filter @xiechimon/cairn-cli build)"
   fi
