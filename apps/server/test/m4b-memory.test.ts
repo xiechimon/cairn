@@ -115,6 +115,38 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     s.dispose();
   });
 
+  test('候选重试返回 HTTP 409，更新历史可从 REST 读取', async () => {
+    const { s, token, step } = await world();
+    try {
+      const first = await relay(s.app, token, step.step.id, 'save_memory', {
+        title: '包管理器',
+        content: '本仓使用 npm',
+      });
+      expect(first.status).toBe(200);
+      const { id } = JSON.parse(((await first.json()) as { text: string }).text) as { id: string };
+      const params = { title: '包管理器', content: '本仓使用 pnpm' };
+      const conflict = await relay(s.app, token, step.step.id, 'save_memory', params);
+      expect(conflict.status).toBe(200);
+      expect(JSON.parse(((await conflict.json()) as { text: string }).text)).toMatchObject({
+        status: 'candidates',
+        candidates: [{ id }],
+      });
+      const retry = await relay(s.app, token, step.step.id, 'save_memory', params);
+      expect(retry.status).toBe(409);
+      const update = await relay(s.app, token, step.step.id, 'update_memory', {
+        memoryId: id,
+        content: params.content,
+      });
+      expect(update.status).toBe(200);
+      const list = await call(s.app, 'GET', `/api/teams/${s.team.id}/agents/${AGENT_ID}/memories`);
+      expect(await list.json()).toMatchObject([
+        { id, content: '本仓使用 pnpm', history: [{ content: '本仓使用 npm' }] },
+      ]);
+    } finally {
+      s.dispose();
+    }
+  });
+
   test('显式 sourceTodoId/projectId 参数优先（跨任务记录经验 [设计]）', async () => {
     const { s, token, step } = await world();
     // 显式值须是本队真实行（#1470 团队归属）：另建一个本队项目与任务。
