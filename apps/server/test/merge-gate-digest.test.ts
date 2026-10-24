@@ -21,18 +21,22 @@
 // 测试目录里是因为摘要不计 docs/verify/，测试读的夹具不能落在摘要之外。夹具的
 // 摘要绑的是占位文本的 patchSha，不是真实补丁的。
 
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type CompareFile, compareFileSchema, GATE_LIMITS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   compareFilesFromResponse,
+  computeLocalPatchDigest,
   computePatchDigest,
   isEvidencePath,
 } from '../src/services/merge-gate/digest.js';
 
 /** 单测里直接给的 patchSha（computePatchDigest 不重算它）；真实值见夹具的测试。 */
+const LOCAL_PATCH = 'same local patch';
 const PATCH_SHA = 'c'.repeat(64);
+const LOCAL_PATCH_SHA = createHash('sha256').update(LOCAL_PATCH, 'utf8').digest('hex');
 
 const file = (over: Partial<CompareFile> & { filename: string }): CompareFile => ({
   status: 'modified',
@@ -57,6 +61,33 @@ const base: CompareFile[] = [
 ];
 
 describe('computePatchDigest', () => {
+  test('本地 git diff 与 GitHub compare 的同一补丁摘要一致，且沿用证据排除规则', () => {
+    const githubFiles = [
+      file({
+        filename: 'apps/server/src/local.ts',
+        sha: '1'.repeat(40),
+        patchSha: LOCAL_PATCH_SHA,
+      }),
+      file({
+        filename: 'docs/verify/1625/run.txt',
+        status: 'added',
+        sha: '2'.repeat(40),
+        additions: 20,
+        deletions: 0,
+      }),
+    ];
+    const localFiles = githubFiles.map((entry) => ({
+      ...entry,
+      patch: entry.patchSha === null ? null : LOCAL_PATCH,
+    }));
+    const local = computeLocalPatchDigest(localFiles);
+    const github = computePatchDigest(githubFiles);
+    expect(local.patchDigest).toBe(github.patchDigest);
+    expect(local.countedFiles).toBe(github.countedFiles);
+    expect(local.countedLines).toBe(github.countedLines);
+    expect(local.excluded.map((entry) => entry.filename)).toEqual(['docs/verify/1625/run.txt']);
+  });
+
   test('带版本前缀，同一组文件任意顺序算出同一个摘要', () => {
     const a = computePatchDigest(base);
     const b = computePatchDigest([...base].reverse());

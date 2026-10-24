@@ -6826,7 +6826,22 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > project > 
     "id": {
       "type": "string",
     },
+    "localChecks": {
+      "items": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "type": "array",
+    },
     "localPath": {
+      "type": "string",
+    },
+    "mergePolicy": {
+      "enum": [
+        "human",
+        "shadow",
+        "autonomous",
+      ],
       "type": "string",
     },
     "name": {

@@ -17,6 +17,7 @@ import type {
   ModelRef,
   PersonaRole,
   Phase,
+  ProjectMergeConfig,
   ProjectRepoKind,
   ProviderApi,
   ProviderCompat,
@@ -78,7 +79,7 @@ export const project = sqliteTable('project', {
    * `~` 展开 + 三态校验后的规范化值，daemon 镜像 clone 同源消费）。 */
   localPath: text('localPath'),
   /** 后台自动任务的闸设置（#1491）：null = 用 shared DEFAULT_AUTONOMY_SETTINGS。 */
-  autonomy: json<AutonomySettings | null>('autonomy'),
+  autonomy: json<(AutonomySettings & Partial<ProjectMergeConfig>) | null>('autonomy'),
 });
 
 // —— todo（02 §4.1 字段表全量；tagIds/buildHistory/agent 为派生面不存列）——————

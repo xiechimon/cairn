@@ -548,6 +548,17 @@ const classesOf = (i: GateInputs) =>
   mergeReadiness(i).blockers.map((b) => [b.code, b.class, ...b.detail]);
 
 describe('mergeReadiness：每个 blocker 一真一假', () => {
+  test('local 项目复用同一闸判法，默认 human 仍拦住自治路径', () => {
+    const input = green();
+    input.build = { ...input.build, isGithubPr: false, repoKind: 'local' };
+    input.pr = null;
+    input.evidence = [];
+    input.policy = { ...input.policy, mergePolicy: 'human' };
+    const result = mergeReadiness(input);
+    expect(result.blockers.map((blocker) => blocker.code)).toContain('policy-human');
+    expect(result.blockers.map((blocker) => blocker.code)).not.toContain('not-applicable');
+    expect(result.headSha).toBe(HEAD);
+  });
   test('基线全绿：ready，没有 blocker（每个 blocker 的假腿）', () => {
     const r = mergeReadiness(green());
     expect(r.blockers).toEqual([]);

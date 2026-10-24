@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import { recordId } from './common.js';
 import { diffFileSchema } from './document-diff.js';
+import { mergePolicySchema } from './merge-gate.js';
 
 /** repo 形态（02 §3/A4 双形态 + spec 12 local 三形态）：托管 = server 自带
  * 本地 bare repo（git http-backend）；接入 = GitHub（PR/CI 面）；local =
@@ -40,12 +41,22 @@ export const projectRecordSchema = z.object({
    * 存在性与 git 仓判定在 daemon 侧（路径可能活在执行机上，server 看不见），
    * 失格静默回落 GitHub clone。 */
   localPath: z.string().optional(),
+  mergePolicy: mergePolicySchema.optional(),
+  localChecks: z.array(z.string().min(1)).optional(),
   /** clone URL（「Git 复制检出命令」卡数据源，02 §9.3）。托管 = 本地主机代位
    * （02 §5.8 gitHostDomain 槽）；github = github.com 派生 [设计]；local 形态
    * 无远端 URL 面（daemon 直接 clone localPath，spec 12）。 */
   cloneUrl: z.string().optional(),
 });
 export type ProjectRecord = z.infer<typeof projectRecordSchema>;
+
+export const projectMergeConfigSchema = z.object({
+  mergePolicy: mergePolicySchema.default('human'),
+  localChecks: z.array(z.string().min(1)).default([]),
+});
+export type ProjectMergeConfig = z.infer<typeof projectMergeConfigSchema>;
+export const patchProjectMergeConfigSchema = projectMergeConfigSchema.partial().strict();
+export type PatchProjectMergeConfig = z.infer<typeof patchProjectMergeConfigSchema>;
 
 /** GitHub 仓库引用对象面（spec 12 数据契约：picker 单选回填 {owner,repo}；
  * 手动兜底入口仍出 `owner/repo` 字符串面——server 归一为同一列值）。 */

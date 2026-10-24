@@ -24,6 +24,16 @@ import {
  * （没有可绑定的补丁）。 */
 export type DigestUnavailable = 'truncated' | 'count-mismatch' | 'null-sha' | 'empty';
 
+export interface LocalDiffFile {
+  status: CompareFile['status'];
+  filename: string;
+  previousFilename: string | null;
+  sha: string | null;
+  additions: number;
+  deletions: number;
+  patch: string | null;
+}
+
 export interface PatchDigestResult {
   /** `pd2:<sha256 hex>`；不可得时为 null（调用方一律按留人处理）。 */
   patchDigest: string | null;
@@ -87,6 +97,25 @@ export function computePatchDigest(
     .sort();
   const hex = createHash('sha256').update(tuples.join('\n')).digest('hex');
   return result(`${PATCH_DIGEST_VERSION}:${hex}`, null);
+}
+
+export function computeLocalPatchDigest(
+  files: readonly LocalDiffFile[],
+  opts: { expectedFileCount?: number | null } = {},
+): PatchDigestResult {
+  const compareFiles: CompareFile[] = files.map((file) => ({
+    status: file.status,
+    filename: file.filename,
+    previousFilename: file.previousFilename,
+    sha: file.sha,
+    additions: file.additions,
+    deletions: file.deletions,
+    patchSha:
+      file.patch === null || file.patch === ''
+        ? null
+        : createHash('sha256').update(file.patch, 'utf8').digest('hex'),
+  }));
+  return computePatchDigest(compareFiles, opts);
 }
 
 const STATUSES: readonly string[] = COMPARE_FILE_STATUSES;

@@ -61,7 +61,13 @@ export interface GateCompareCommit {
 
 export interface GateInputs {
   policy: { mergePolicy: MergePolicy; autonomyPaused: boolean; dailyCapReached: boolean };
-  build: { isGithubPr: boolean; isCurrent: boolean; phase: Phase; stepsInFlight: number };
+  build: {
+    isGithubPr: boolean;
+    repoKind?: 'github' | 'local';
+    isCurrent: boolean;
+    phase: Phase;
+    stepsInFlight: number;
+  };
   repo: { owner: string; name: string; defaultBranch: string | null };
   ticketRef: string;
   /** 任务来源解出的同仓 issue 号（D2 的 `closes #N` 靠它）；解不出为 null。 */
@@ -226,11 +232,13 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     found.set(code, [...(found.get(code) ?? []), ...detail]);
   };
 
+  const isLocal = i.build.repoKind === 'local';
+
   // 策略与车道
   if (i.policy.mergePolicy === 'human') block('policy-human');
   if (i.policy.autonomyPaused) block('autonomy-paused');
   if (i.policy.dailyCapReached) block('daily-cap');
-  if (!i.build.isGithubPr) block('not-applicable');
+  if (!i.build.isGithubPr && !isLocal) block('not-applicable');
   if (!i.build.isCurrent) block('not-current-build');
   if (i.build.phase !== 'review') block('phase-not-review', i.build.phase);
   if (i.build.stepsInFlight > 0) block('work-in-flight', `${i.build.stepsInFlight} step(s)`);
@@ -238,10 +246,16 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   // PR。head 不是 40 位小写 SHA：只少了 head（按读不到记，没有 head 可对、结果不报
   // head），PR 自己的 blocker 照常判，不被吞掉。
   const pr = i.pr;
-  const head = pr !== null && isFullSha(pr.headSha) ? pr.headSha : null;
-  if (pr === null) {
+  const localCompare = typeof i.compare === 'object' ? i.compare : null;
+  const head =
+    pr !== null && isFullSha(pr.headSha)
+      ? pr.headSha
+      : isLocal && localCompare !== null && isFullSha(localCompare.headSha)
+        ? localCompare.headSha
+        : null;
+  if (pr === null && !isLocal) {
     block('pr-unreadable');
-  } else {
+  } else if (pr !== null) {
     if (head === null) block('pr-unreadable', 'head SHA not 40 lowercase hex');
     if (pr.state !== 'open' || pr.merged) block('pr-not-open', pr.merged ? 'merged' : pr.state);
     if (pr.draft) block('pr-draft');
@@ -334,7 +348,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
         ];
   const ownNotPassing =
     checks?.statuses.some((s) => s.state !== 'success' && isOwnStatus(s)) ?? false;
-  if (pr !== null) {
+  if (pr !== null && !isLocal) {
     const state = pr.mergeableState;
     if (state === null || state === 'unknown') {
       block('mergeable-state', 'GitHub still computing');
@@ -427,7 +441,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   // evidence 输入，raw 404 的链接打不开）。compare 不可得时上面已拦，这里判不了，不再重复
   // 列出；没有 PR 的 head 可对时 compare 的提交可能是别的提交的，也不判（pr-unreadable 已拦）。
   if (i.issueNumber === null) block('issue-ref-missing');
-  if (pr !== null && head !== null && compare !== null) {
+  if (!isLocal && pr !== null && head !== null && compare !== null) {
     const args = { owner: i.repo.owner, repo: i.repo.name, ticketRef: i.ticketRef };
     const qualifying = qualifyingEvidenceLinks(pr.body, args, compare);
     // 没有对应项（外壳没查这一条）按不存在算；null（读不到）照留，详情里说明。
