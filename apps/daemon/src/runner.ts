@@ -1329,6 +1329,8 @@ async function runClaimedStep(
   // 在案（数值独立可配；将来 idle 重置面收窄时它仍是兜底）。
   const armBodyTimeout = () => {
     if (bodyTimeout) clearTimeout(bodyTimeout);
+    bodyTimeout = null;
+    if (runningToolCalls.size > 0) return;
     bodyTimeout = setTimeout(() => tripTimeout('body'), streamTimeouts.body);
     bodyTimeout.unref?.();
   };

@@ -453,6 +453,17 @@ describe('runner 工具执行存活（#1591）', () => {
     expect(observations).toEqual({ completedTools: 1, stoppedDuringTool: false });
   });
 
+  test('静默工具超过 body 阈值仍完成', async () => {
+    const { backend, observations } = toolExecutionBackend({ finish: 'done' });
+    const body = await run({
+      backend,
+      timeouts: { first: WIDE, idle: 80, body: 120 },
+      durationCapMs: WIDE,
+    });
+    expect(body.status).toBe('success');
+    expect(observations).toEqual({ completedTools: 1, stoppedDuringTool: false });
+  });
+
   test('工具结束后静默超过 idle 阈值仍失败', async () => {
     const { backend, observations } = toolExecutionBackend({ finish: 'silent' });
     const body = await run({
