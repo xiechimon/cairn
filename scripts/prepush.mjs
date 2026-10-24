@@ -10,12 +10,12 @@ export function prepushPlan(paths, mode = 'local') {
   const required = [
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
-    ['node', 'scripts/ci-job-structure-gate.mjs'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
   ];
   const localOnly = [
+    ['node', 'scripts/ci-job-structure-gate.mjs'],
     ['node', 'scripts/comment-discipline-gate.mjs'],
     ['node', 'scripts/single-use-helper-gate.mjs'],
   ];
