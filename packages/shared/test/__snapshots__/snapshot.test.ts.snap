@@ -4736,6 +4736,34 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
             "title": {
               "type": "string",
             },
+            "usageCost": {
+              "additionalProperties": false,
+              "properties": {
+                "cacheRead": {
+                  "type": "number",
+                },
+                "cacheWrite": {
+                  "type": "number",
+                },
+                "input": {
+                  "type": "number",
+                },
+                "output": {
+                  "type": "number",
+                },
+                "total": {
+                  "type": "number",
+                },
+              },
+              "required": [
+                "input",
+                "output",
+                "cacheRead",
+                "cacheWrite",
+                "total",
+              ],
+              "type": "object",
+            },
             "v": {
               "maximum": 9007199254740991,
               "minimum": -9007199254740991,
@@ -7053,6 +7081,34 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > tod
     },
     "title": {
       "type": "string",
+    },
+    "usageCost": {
+      "additionalProperties": false,
+      "properties": {
+        "cacheRead": {
+          "type": "number",
+        },
+        "cacheWrite": {
+          "type": "number",
+        },
+        "input": {
+          "type": "number",
+        },
+        "output": {
+          "type": "number",
+        },
+        "total": {
+          "type": "number",
+        },
+      },
+      "required": [
+        "input",
+        "output",
+        "cacheRead",
+        "cacheWrite",
+        "total",
+      ],
+      "type": "object",
     },
     "v": {
       "maximum": 9007199254740991,
