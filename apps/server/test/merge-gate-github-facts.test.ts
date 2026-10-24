@@ -221,6 +221,7 @@ const GREEN_PR = {
   headRepoFullName: 'xiechimon/cairn',
   body: `evidence: ${link(HEAD)}`,
   changedFiles: 3,
+  baseBehindBy: 0,
 };
 
 describe('readGateGithubFacts: the honest read', () => {
@@ -1013,7 +1014,7 @@ describe('readGateGithubFacts: rate limits, throws, concurrency (F18)', () => {
     const f = await readGateGithubFacts(throwing, REQ, newGateReadCache());
     expect(f.checks).toBeNull();
     expect(f.compare).toBe('unreadable');
-    expect(f.pr).toEqual(GREEN_PR);
+    expect(f.pr).toEqual({ ...GREEN_PR, baseBehindBy: null });
   });
 });
 
@@ -1027,7 +1028,7 @@ describe('readGateGithubFacts into mergeReadiness: a truncated compare (pr-gate 
     expect((f.compare as { files: unknown[] }).files).toHaveLength(300);
     expect(f.pr?.changedFiles).toBe(301);
     const r = mergeReadiness({
-      policy: { mergePolicy: 'autonomous', autonomyPaused: false },
+      policy: { mergePolicy: 'autonomous', autonomyPaused: false, dailyCapReached: false },
       build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
       repo: { owner: REQ.owner, name: REQ.repo, defaultBranch: f.defaultBranch },
       ticketRef: REQ.ticketRef,
@@ -1046,5 +1047,14 @@ describe('readGateGithubFacts into mergeReadiness: a truncated compare (pr-gate 
       class: 'human',
       detail: ['truncated'],
     });
+  });
+});
+
+describe('readGateGithubFacts P4-0 base freshness', () => {
+  test.each([0, 3, null, -1, '0'])('projects behind_by %s into the PR', async (behind) => {
+    const f = await read({
+      compare: comparePages(chain(EARLIER, HEAD), FILES, { behind_by: behind }),
+    });
+    expect(f.pr?.baseBehindBy).toBe(behind === 0 || behind === 3 ? behind : null);
   });
 });

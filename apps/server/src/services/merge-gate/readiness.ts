@@ -5,6 +5,7 @@
 // MERGE_BLOCKERS 的固定顺序；blocking 与 chief 的 go 各自独立判，blocking 永远
 // 拦得住。ready ⇔ blockers 为空。
 
+import type { Phase } from '@cairn/shared';
 import {
   type CompareFile,
   EVIDENCE_PREFIX,
@@ -15,8 +16,7 @@ import {
   type MergeBlockerCode,
   type MergePolicy,
   type MergeReadiness,
-  type Phase,
-} from '@cairn/shared';
+} from '@cairn/shared/merge-gate';
 import { computePatchDigest } from './digest.js';
 import { parseRawEvidenceLinks, qualifyingEvidenceLinks } from './evidence-link.js';
 import { classifyPaths } from './paths.js';
@@ -60,7 +60,7 @@ export interface GateCompareCommit {
 }
 
 export interface GateInputs {
-  policy: { mergePolicy: MergePolicy; autonomyPaused: boolean };
+  policy: { mergePolicy: MergePolicy; autonomyPaused: boolean; dailyCapReached: boolean };
   build: { isGithubPr: boolean; isCurrent: boolean; phase: Phase; stepsInFlight: number };
   repo: { owner: string; name: string; defaultBranch: string | null };
   ticketRef: string;
@@ -81,6 +81,7 @@ export interface GateInputs {
     headRepoFullName: string | null;
     body: string;
     changedFiles: number;
+    baseBehindBy: number | null;
   } | null;
   /** PR head 的检查；null = 读不到。三处 SHA 说这份结果是在哪个提交上读的：headSha =
    * 外壳请求的提交（check run 与 commit status 都按这一个 SHA 读，不按分支名）；
@@ -228,6 +229,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   // 策略与车道
   if (i.policy.mergePolicy === 'human') block('policy-human');
   if (i.policy.autonomyPaused) block('autonomy-paused');
+  if (i.policy.dailyCapReached) block('daily-cap');
   if (!i.build.isGithubPr) block('not-applicable');
   if (!i.build.isCurrent) block('not-current-build');
   if (i.build.phase !== 'review') block('phase-not-review', i.build.phase);
@@ -243,6 +245,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     if (head === null) block('pr-unreadable', 'head SHA not 40 lowercase hex');
     if (pr.state !== 'open' || pr.merged) block('pr-not-open', pr.merged ? 'merged' : pr.state);
     if (pr.draft) block('pr-draft');
+    if (pr.baseBehindBy !== 0) block('pr-behind-base');
     if (
       pr.headRepoFullName === null ||
       pr.headRepoFullName.toLowerCase() !== pr.baseRepoFullName.toLowerCase()

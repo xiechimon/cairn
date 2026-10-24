@@ -137,7 +137,7 @@ const v = (
 
 function green(): GateInputs {
   return {
-    policy: { mergePolicy: 'autonomous', autonomyPaused: false },
+    policy: { mergePolicy: 'autonomous', autonomyPaused: false, dailyCapReached: false },
     build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
     repo: { owner: 'xiechimon', name: 'cairn', defaultBranch: 'main' },
     ticketRef: '1404',
@@ -147,6 +147,7 @@ function green(): GateInputs {
       merged: false,
       draft: false,
       mergeableState: 'clean',
+      baseBehindBy: 0,
       headSha: HEAD,
       baseRef: 'main',
       baseRepoFullName: 'xiechimon/cairn',
@@ -205,6 +206,7 @@ const setFiles = (i: GateInputs, files: CompareFile[]) => {
 const CLASS: Record<MergeBlockerCode, BlockerClass> = {
   'policy-human': 'policy',
   'autonomy-paused': 'policy',
+  'daily-cap': 'policy',
   'not-applicable': 'policy',
   'not-current-build': 'transient',
   'phase-not-review': 'transient',
@@ -212,6 +214,7 @@ const CLASS: Record<MergeBlockerCode, BlockerClass> = {
   'pr-unreadable': 'transient',
   'pr-not-open': 'human',
   'pr-draft': 'transient',
+  'pr-behind-base': 'transient',
   'pr-from-fork': 'human',
   'base-not-default': 'human',
   'mergeable-state': 'transient',
@@ -256,6 +259,18 @@ const CLASS: Record<MergeBlockerCode, BlockerClass> = {
 };
 
 const ROWS: Row[] = [
+  [
+    'daily-cap',
+    (i) => {
+      i.policy.dailyCapReached = true;
+    },
+  ],
+  [
+    'pr-behind-base',
+    (i) => {
+      pr(i).baseBehindBy = 1;
+    },
+  ],
   [
     'policy-human',
     (i) => {
@@ -1657,5 +1672,17 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     checks(c).statuses = [{ context: 'cairn/merge-gate', state: 'pending' }];
     checks(c).runs.push(run('check', 'completed', 'failure'));
     expect(classesOf(c)).toEqual([['mergeable-state', 'transient', 'unstable: "check"']]);
+  });
+});
+
+describe('mergeReadiness P4-0 base freshness', () => {
+  test.each([0, 1, 3, null])('baseBehindBy %s', (behind) => {
+    const i = green();
+    pr(i).baseBehindBy = behind;
+    const r = mergeReadiness(i);
+    expect(r.ready).toBe(behind === 0);
+    expect(r.blockers.map((b) => [b.code, b.class])).toEqual(
+      behind === 0 ? [] : [['pr-behind-base', 'transient']],
+    );
   });
 });
