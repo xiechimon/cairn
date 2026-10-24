@@ -15,6 +15,7 @@ export function prepushPlan(paths, mode = 'local') {
     ['pnpm', 'spec:parse'],
   ];
   const localOnly = [
+    ['node', 'scripts/ci-job-structure-gate.mjs'],
     ['node', 'scripts/comment-discipline-gate.mjs'],
     ['node', 'scripts/single-use-helper-gate.mjs'],
   ];
