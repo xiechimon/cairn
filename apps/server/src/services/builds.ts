@@ -663,6 +663,7 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
     // #1106 注入选择记录（详情面回查正本）：null = 未计算（chief 步/旧
     // 数据），hits=[] = 已计算零命中。
     skillInjection: r.skillInjection ?? null,
+    ...(r.blockerHandoff !== null ? { blockerHandoff: r.blockerHandoff } : {}),
     // #1261 配额挂起投影（waiting_quota 行携带——详情页「等额度」进度行
     // 数据源；投影单源 = services/quota-wait.ts toQuotaWait）。
     ...(r.status === 'waiting_quota' && r.quotaBlock !== null

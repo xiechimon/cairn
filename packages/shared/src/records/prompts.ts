@@ -371,6 +371,31 @@ export function stripConfirmedPlanNote(text: string): string {
     : text;
 }
 
+export const BLOCKER_HANDOFF_OPEN = '【前置卡交付';
+const BLOCKER_HANDOFF_CLOSE_PREFIX = `${BLOCKER_HANDOFF_OPEN}结束`;
+export const BLOCKER_HANDOFF_CLOSE = `${BLOCKER_HANDOFF_CLOSE_PREFIX}】`;
+const QUOTED_LINE = /^>( |$)/;
+
+export function stripBlockerHandoff(text: string): string {
+  const lines = text.split('\n');
+  const open = lines.findIndex(
+    (line, i) =>
+      i > 0 &&
+      lines[i - 1] === '' &&
+      line.startsWith(BLOCKER_HANDOFF_OPEN) &&
+      !line.startsWith(BLOCKER_HANDOFF_CLOSE_PREFIX),
+  );
+  if (open === -1) return text;
+  for (let i = open + 1; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    if (line === BLOCKER_HANDOFF_CLOSE) {
+      return [...lines.slice(0, open - 1), ...lines.slice(i + 1)].join('\n');
+    }
+    if (!QUOTED_LINE.test(line)) return text;
+  }
+  return text;
+}
+
 /** 任务文本的投递附加行（工作分支注记、已确认方案位置行）剥到稳定。两行
  *  叠在一起时顺序不定，每轮只剥当前尾巴，缩短即停。 */
 function stripTaskDeliveryNotes(text: string): string {
@@ -492,9 +517,10 @@ function isSyntheticInstruction(text: string): boolean {
 export type UserTextKind = 'task-prompt' | 'synthetic' | 'user';
 
 export function classifyUserText(
-  text: string,
+  rawText: string,
   task: { title: string; spec: string } & TaskSource,
 ): UserTextKind {
+  const text = stripBlockerHandoff(rawText);
   // wire 行经呈现层 trim 后比对（daemon 记录的是未 trim 原文）。#1406：GitHub
   // issue 导入任务的投递形是围栏形；改动前落库的行是原文形，两形都认。
   const raw = buildTaskPromptText(task.title, task.spec).trim();
