@@ -377,6 +377,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         projectId: str('Project id.'),
         title: str('Todo title (verb phrase).'),
         spec: str('Structured spec markdown.'),
+        output: str(
+          'Optional deliverable kind: "code" (default, changes the repository through the build→review→merge pipeline) or "info" (research/report card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment).',
+        ),
       },
       ['projectId', 'title', 'spec'],
     ),
@@ -402,6 +405,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
               blockedBy: arr(
                 { type: 'number' },
                 'Optional 1-based indices of prerequisite sub-cards in this array (e.g. [1, 2] = waits for the 1st and 2nd).',
+              ),
+              output: str(
+                'Optional deliverable kind of this sub-card: "code" (default) or "info" (research/report card: read-only workspace, deliverable is a report attachment, never merged).',
               ),
             },
             ['title', 'spec', 'agentId'],

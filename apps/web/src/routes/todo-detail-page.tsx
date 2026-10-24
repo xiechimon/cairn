@@ -1146,6 +1146,7 @@ export function TodoDetailPage() {
         rejectReason={mergeReject}
         substantiveChanges={live ? substantiveChangesOf(changesQ.data, changesQ.isSuccess) : null}
         mergeLocked={phase === 'failed'}
+        infoOutput={wireTodo?.output === 'info'}
         confirming={mutations.mergeBuild.isPending || donePatchPending}
         onConfirm={
           live

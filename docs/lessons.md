@@ -20,16 +20,16 @@
 ## 台账
 
 | 类别 | 首次来源 | 级别 | 防护 | 拦截 | 复发 | 备注 |
-|---|---|---|---|---|---|---|
+|---|---|---:|---|---:|---:|---|
 | web PR 推送前漏跑 ui-debt 与 dead-class 两道闸，CI 红两轮 | PR #1523 (2026-10-22) | 2 | `pnpm prepush` 与 CI 共用 `scripts/prepush.mjs`，`scripts/prepush.test.mjs` 检查入口一致 | 1 | 0 | #1533：`mt-[3px]` 负对照触发 D5，移除后静态检查转绿；dead-class 在 CI 保持咨询性 |
 | 误称 e2e 本地跑不了，其实记忆里已有绕法 | Claude 线程 (2026-10-22) | 5 | 记忆：先查记忆再说做不了 | 0 | 0 | 机器检查做不到，属判断错误 |
 | 只把图放进文件库、没有直接附在回复里 | Claude 线程 (2026-10-22) | 5 | 记忆 | 0 | 0 | 机器检查做不到 |
 | 开 PR 后挂着等 CI，不收工 | Claude 线程 (2026-10-22) | 3 | 项目指令：开 PR 打开 auto-merge 后收工 | 0 | 0 | 行为类，CI 不看线程动作 |
 | 等 ian 排优先级而停住 | Claude 线程 (2026-10-22) | 5 | 记忆：自己选顺序直接做 | 0 | 0 | 机器检查做不到，属判断错误 |
-| 新写入的注释（pi 实测会加注释） | #1520 | 2 | PR #1539：`scripts/comment-discipline-gate.mjs`（CI 咨询性检查）加派活提示 `docs/agent-dispatch-prompts.md` | 0 | 0 | 另有 `.husky/banned.txt` 禁词检查拦特定词 |
+| 新写入的注释（pi 实测会加注释） | #1520 | 2 | PR #1539：`scripts/comment-discipline-gate.mjs`（CI 咨询性检查）加派活提示 `docs/agent-dispatch-prompts.md` | 1 | 0 | 另有 `.husky/banned.txt` 禁词检查拦特定词 |
 | 驱动脚本断言前没等元素出现就 `count()`，掩码行还没渲染就判 0 行，随后先猜「截图 mask 参数导致」改了一轮才隔离出真因 | #1478 (2026-10-24) | 2 | `drive.mjs` api-key 探针先 `waitFor` 掩码行再计数；不等就数的写法在全新栈上 10 次跑红 4 次（偶发），加等待后 5 次全 PASS；偶发失误做不成确定的负对照 | 0 | 0 | 猜因先改属判断错误，机器拦不住；可拦的半边是探针不等就数 |
 | 后台长任务用 `( ... & )` 或 nohup 起，工具调用一返回就被杀，随后还告诉 ian 任务在跑 | Claude 线程 (2026-10-22) | 2 | `scripts/dispatch-agent.mjs` start 脱离进程组启动并立即核对进程写状态文件，汇报前 `check` 读状态文件；负对照在 `scripts/dispatch-agent.test.mjs`（CI 独立 job）：旧写法直起的任务 check 报进程不存在 | 0 | 1 | 复发 1（先 pi，后 codex）后由 #1556 升级到级别 2 |
-| 解 `ci.yml` 冲突后，新步骤落在了另一个 job 里，推送前没看 hunk 所在 job | PR #1540 (2026-10-23) | 2 | `scripts/ci-job-structure-gate.mjs` 对照 `scripts/ci-job-structure-baseline.json` 钉住每个 job 的命名步骤，CI check job 装机前一步与 `pnpm prepush` 共用；负对照 = #1540 错误 hunk（freshness 步落进 comment-discipline-gate）在 `scripts/ci-job-structure-gate.test.mjs` 变红 | 1 | 0 | #1557 落地，级别 5 升 2；首拦：rebase 后 baseline 漏跟上游步骤迁移，闸拦下后才补 |
+| 解 ci.yml 冲突后，新步骤落在了另一个 job 里，推送前没看 hunk 所在 job | PR #1540 (2026-10-23) | 2 | `scripts/ci-job-structure-gate.mjs` 对照 `scripts/ci-job-structure-baseline.json` 钉住每个 job 的命名步骤，CI check job 装机前一步与 `pnpm prepush` 共用；负对照 = #1540 错误 hunk（freshness 步落进 comment-discipline-gate）在 `scripts/ci-job-structure-gate.test.mjs` 变红 | 1 | 0 | #1557 落地，级别 5 升 2；首拦：rebase 后 baseline 漏跟上游步骤迁移，闸拦下后才补 |
 | 写文件前没查目标是否已存在，覆盖了已有的 `retro` 技能（从 git 恢复） | Claude 线程 (2026-10-22) | 5 | 记忆：新建技能先 `ls` 目标目录 | 0 | 0 | 本次靠 git 里的历史救回；机器检查做不到 |
 | 规则文字里写进了禁词，被提交前禁词检查拦下 | PR #1539 (2026-10-23) | 2 | `.husky/banned.txt` 提交前检查 | 1 | 0 | 检查生效，无需追加防护 |
 | 评审里反复出现的同类问题 | #1528 | 2 | #1528 盘点后逐类开子票 | 0 | 0 | 盘点清单出来后并入本表 |
@@ -42,8 +42,8 @@
 | shared 新导出追加在文件末尾，未遵循字母排序 | #1511 (2026-10-23) | 2 | Biome organizeExports 与从 shared 包入口导入的 trajectory-pack 测试 | 1 | 0 | 真实负例为 trajectory-pack 导出排在 webhook 后；移动导出时匹配了错误的冒号，曾漏掉导出，由包入口测试拦住；改用实际文本锚点后复验 |
 | 测试夹具把 persona 显示名当成持久化枚举值 | #1511 (2026-10-23) | 1 | trajectory-pack 正向夹具使用 `satisfies TrajectoryPack` 及其 input 类型 | 1 | 0 | 原值 CodeReviewer 被运行时 schema 拒绝；改为 code_reviewer，并以类型约束提前拦截相同错误 |
 | 用 `pkill -f <模式>` 收后台 vite，模式命中自己所在的 shell 命令行，把整条命令连同后续步骤一起杀掉 | Claude 线程 (2026-10-23) | 5 | 记忆：起后台进程时记 PID（`echo $! > pidfile`），按 PID 收，不用 `pkill -f`；直接起 `node_modules/.bin/vite`，不经 pnpm 包一层 | 0 | 0 | 属 agent 自身 shell 操作，仓库闸看不到 |
-| 云端容器的 Playwright 缺 `chromium_headless_shell-1243`，integration 的浏览器用例在 pre-push 全红，看着像代码坏了 | Claude 线程 (2026-10-23) | 2 | `#1395` 的 SessionStart 钩子（`.claude/hooks/session-start.sh`）在云端容器把缺失的浏览器修订自动软链到预装版 | 0 | 0 | 原备注称钩子自动化属未完成，实际 #1395（2026-10-20）早已落地，随 #1630 修正并升到级别 2；旧版 chromium 上视觉断言以 CI 为准这半边属判断错误，机器检查做不到 |
-| 本地 `origin/main` 引用过期，`pnpm prepush` 把几百个别人的改动算进本次差异，纯文档推送也跑了全量测试并失败 | PR #1566 (2026-10-23) | 2 | `scripts/prepush.mjs` 的 `changedPaths()` 在基线为 `origin/main` 时先 `git fetch origin main`，失败退回本地 ref 并提示可能过期，`scripts/prepush.test.mjs` 钉住 | 0 | 0 | #1630 落地，级别 5 升 2；负对照：本地 origin/main 停在他人改动合并前，旧实现把该改动算进差异跑全量检查（测试先红），fetch 后只剩本分支改动转绿 |
+| 云端容器的 Playwright 缺 chromium_headless_shell-1243，integration 的浏览器用例在 pre-push 全红，看着像代码坏了 | Claude 线程 (2026-10-23) | 2 | `#1395` 的 SessionStart 钩子（`.claude/hooks/session-start.sh`）在云端容器把缺失的浏览器修订自动软链到预装版 | 0 | 0 | 原备注称钩子自动化属未完成，实际 #1395（2026-10-20）早已落地，随 #1630 修正并升到级别 2；旧版 chromium 上视觉断言以 CI 为准这半边属判断错误，机器检查做不到 |
+| 本地 origin/main 引用过期，`pnpm prepush` 把几百个别人的改动算进本次差异，纯文档推送也跑了全量检查并失败 | PR #1566 (2026-10-23) | 2 | `scripts/prepush.mjs` 的 `changedPaths()` 在基线为 `origin/main` 时先 `git fetch origin main`，失败退回本地 ref 并提示可能过期，`scripts/prepush.test.mjs` 钉住 | 0 | 0 | #1630 落地，级别 5 升 2；负对照：本地 origin/main 停在他人改动合并前，旧实现把该改动算进本次差异跑全量检查（测试先红），fetch 后只剩本分支改动转绿 |
 | 新颜色值写进 tokens.css，ui-drift 闸只在 CI 跑，推上去才红 | PR #1580 (2026-10-23) | 2 | `scripts/prepush.mjs` 共用清单加入 `ui-drift-gate.mjs`，本地 pre-push 与 CI（`pnpm prepush --ci`）同一入口，`scripts/prepush.test.mjs` 钉住 | 0 | 0 | 负对照：#1580 首版 tokens.css 四行 hex 在该闸下报 G2 红，挪进 shadcn.css 后转绿 |
 | 官网和文档写了 npm 上不存在的包名（`npx @xiechimon/cairn` 返回 404），访客照抄直接报错 | PR #1568 (2026-10-23) | 2 | `scripts/npm-command-gate.mjs` 在 CI 里查 README、site/、web 界面里 npx / npm i 用到的包名，npm 404 即红 | 0 | 0 | 负对照：对含 `npx @xiechimon/cairn` 的 site/index.html 跑闸为红，改回 `@xiechimon/pacman` 后为绿；闸自身首版的 pathspec 漏扫 site/ 根目录文件，也由这次负对照发现 |
 | 改看板列样式后只跑了 board-dnd 一条 spec，首版修复打破 cds-board 的「列静止无圆角」断言；查下去发现 board.tsx 的 e2e:affected 家族表根本不含 cds-board 等 4 条看板 spec，prepush 也拦不住 | 拖拽列直角修复 (2026-10-24) | 2 | `scripts/e2e-affected.mjs` BOARD 家族补 cds-board / paper-board- / paper-card / quota-wait-board | 0 | 0 | 负对照：`--dry-run -- apps/web/src/board/board.tsx` 旧表选中这 4 条为 0，新表为 4；`--check-coverage` 仍报 32 条无家族的 spec，待升：#1599 补全并把 coverage 检查接进 prepush |
@@ -54,3 +54,6 @@
 | 开票前只搜了 issue，没查 spec：#1617 园丁巡检与 spec 28 P6「园丁」重复，#1618 没对上 P5a 进料入口 | #1617/#1618 (2026-10-24) | 5 | 记忆：给自举闭环相关的事开票前先 grep `docs/spec/28-*.md` 与 ADR 0021；两票已补评论改为 P6 园丁段、挂到 P5a 入口 | 0 | 0 | `scripts/dispatch-dedupe.mjs` 只查分支、PR、进程，不读 spec 正文；按关键词查 spec 误报太多，暂不做成闸 |
 | 分支上一张 PR 已合并，从 main 重切同名分支后用 `git push -f` 推送，违反 AGENTS.md「永远别 --force push」 | Claude 线程「学习 poteto 高产 PR 的方法」(2026-10-24) | 5 | 记忆：已合并分支重用时换新分支名推送，不强推 | 0 | 0 | 这次被覆盖的只有已 squash 进 main 的提交，没丢东西；pre-push 钩子能判非快进推送，留作升级候选 |
 | 新写的脚本测试把 cwd 设成真仓（`process.env.PWD`）去 `git rm` 基线文件，真仓的 `scripts/lint-warning-baseline.json` 被删出暂存区 | #1617 (2026-10-24) | 2 | `scripts/baseline-ratchet-gate.test.mjs` 在 before/after 钩子比较真仓 `git status --porcelain -- scripts`，测试只许碰自建的一次性仓 | 1 | 0 | 负对照：先加一条在真仓 `git rm` 基线的用例，after 钩子报 tests must only touch their own throwaway repos 变红；去掉该用例后恢复文件并转绿 |
+| 本机全局 git 配了 `http.proxy`，跑 `vitest run --changed` 时 integration 里 daemon 对回环 server 的 git clone 走代理得 502，一批全链测试假红，等满 20 分钟才查到原因；重跑时又用了 macOS 没有的 `timeout` 命令，退出码 127 | #1624 (2026-10-25) | 3 | 本机跑 integration 前先 `git config --global --get http.proxy`，有值就带 `NO_PROXY=127.0.0.1,localhost`；长测按 AGENTS.md 用 `tee` 盯完成标记，不套 `timeout` | 0 | 0 | 可升到级别 1：daemon 已对 undici 合并回环 `NO_PROXY`（`apps/daemon/src/proxy.ts` 的 `loopbackNoProxy`），git 子进程环境还没有，用户本机同样会撞；改动在 #1624 范围之外，需另开票。负对照：不带 `NO_PROXY` 时 `m5-web-e2e` 主时序脊柱 clone 得 502，带上后通过 |
+| 新增 shared 记录文件后只改了导出，未同步落文件，Vitest 与 typecheck 都先因缺模块失败 | #1626 (2026-10-25) | 2 | shared 入口变更与文件存在性由 typecheck、受影响 Vitest 一起检查；负对照：缺少 `packages/shared/src/records/report.ts` 时两者均红，补文件后转绿 | 1 | 0 | 机器检查已拦 |
+| 新增私有 helper 只调用一次，single-use-helper-gate 先红 | #1626 (2026-10-25) | 2 | `scripts/single-use-helper-gate.mjs`；负对照：`stripReportLocationNote` 独立存在时闸报 1，内联后转绿 | 1 | 0 | 机器检查已拦 |

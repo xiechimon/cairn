@@ -90,6 +90,7 @@ import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { newMachineToken } from '../lib/keys.js';
 import { readAttachmentMeta } from './attachments.js';
+import { blockerHandoffForClaim } from './blocker-handoff.js';
 import {
   applyStepFailure,
   applyStoppedStep,
@@ -1099,6 +1100,7 @@ async function tryClaim(
       cand.stepRow.kind === 'plan' || cand.stepRow.kind === 'build'
         ? await mergedPrElsewhere(deps, cand.todoRow.id, cand.stepRow.buildId)
         : null;
+    const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
     // 原子领取：仅当仍 pending 时置 claimed（单进程 better-sqlite3 同步写）。
     const claimedAt = nowMs();
     const res = db
@@ -1109,6 +1111,7 @@ async function tryClaim(
         claimedAt,
         lastHeartbeatAt: claimedAt,
         skillInjection,
+        blockerHandoff,
         // #1257 挂起位清零：领取即不再是挂起态（holdCount 保留——退避档位
         // 在同一挂起系列内递进，重领后再挂起按次数升级）。
         holdReason: null,
@@ -1209,6 +1212,8 @@ async function tryClaim(
         // 原文围栏、不在 systemPrompt 里写标题（ADR 0021 D5）。
         sourceKind: cand.todoRow.sourceKind,
         sourceRef: cand.todoRow.sourceRef,
+        ...(blockerHandoff !== null ? { blockerHandoff } : {}),
+        output: cand.todoRow.output,
       },
       project: { id: cand.todoRow.projectId, name: projectRow?.name ?? '', repo },
       agent: {
@@ -2131,6 +2136,7 @@ export async function finishStep(
       ...(outcome.verifyVerdictError !== undefined
         ? { verifyVerdictError: outcome.verifyVerdictError }
         : {}),
+      ...(outcome.report !== undefined ? { report: outcome.report } : {}),
     });
     publishStepStatus(deps, stepId);
     return;

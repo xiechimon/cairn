@@ -192,6 +192,7 @@ export function svcOf(ctx: AppContext) {
     convHub: ctx.convHub,
     // #511 审核关口材料：变更面计算位（与人的变更面同源）
     reposDir: ctx.reposDir,
+    attachmentsDir: ctx.attachmentsDir,
     box: ctx.secretBox,
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
   };

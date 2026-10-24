@@ -13,6 +13,7 @@
 // - 确认派发与波次推进不在此文件（builds.ts confirmSplitParent /
 //   advanceSplitWaves——它们要 startBuilds，本文件不 import builds）。
 
+import type { TodoOutputKind } from '@cairn/shared';
 import { SPLIT_ANNOUNCEMENT, type UserRecord } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -31,6 +32,7 @@ export interface SplitSubtodoInput {
   agentId: string;
   /** 1-based 兄弟序号（工具层约定）；server 解析为子卡 id。 */
   blockedBy?: number[];
+  output?: TodoOutputKind;
 }
 
 export interface SplitDeps {
@@ -126,6 +128,7 @@ export function createSplitTodo(
     spec: string;
     agentId: string;
     blockedBy: string[];
+    output?: TodoOutputKind;
   }[] = [];
   for (const item of items) {
     const record = createTodo(
@@ -138,6 +141,7 @@ export function createSplitTodo(
         createdBy: input.chiefAgentId,
         ownerId: parent.ownerId,
         orchestration: { threadId: input.threadId },
+        ...(item.output !== undefined ? { output: item.output } : {}),
       },
     );
     // 拆卡专属位：sourceTodo（父指针）+ blockedBy（依赖边，索引→id）+
@@ -163,6 +167,7 @@ export function createSplitTodo(
       spec: item.spec,
       agentId: item.agentId,
       blockedBy: blockerIds,
+      ...(item.output !== undefined ? { output: item.output } : {}),
     });
   }
 
@@ -230,7 +235,14 @@ export function createSplitTodo(
 function renderSplitPlan(
   db: Db,
   parentTitle: string,
-  children: { id: string; title: string; spec: string; agentId: string; blockedBy: string[] }[],
+  children: {
+    id: string;
+    title: string;
+    spec: string;
+    agentId: string;
+    blockedBy: string[];
+    output?: TodoOutputKind;
+  }[],
 ): string {
   const names = new Map(
     db
@@ -258,6 +270,7 @@ function renderSplitPlan(
       `### 子卡 ${i + 1}：${child.title}`,
       `- 执行 agent：${agentName(child.agentId)}`,
       `- 依赖：${deps}`,
+      ...(child.output === 'info' ? ['- 产出：信息类（报告附件交付，不进合并）'] : []),
       '',
       child.spec,
       '',

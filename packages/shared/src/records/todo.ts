@@ -100,6 +100,10 @@ export function parseOrchestrationSourceRef(ref: string): { threadId: string } |
   return { threadId: `${CHIEF_THREAD_ID_PREFIX}${m[1]}` };
 }
 
+export const DELIVERABLE_OUTPUT_KINDS = ['code', 'info'] as const;
+export const todoOutputSchema = z.enum(DELIVERABLE_OUTPUT_KINDS);
+export type TodoOutputKind = z.infer<typeof todoOutputSchema>;
+
 export const todoRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
@@ -145,6 +149,7 @@ export const todoRecordSchema = z.object({
   /** 来源引用（`github:owner/repo#123` 形 = githubIssueSourceRef 单源；
    * `chief:<uuid>` 形 = orchestrationSourceRef 单源，#640）；无来源 = null。 */
   sourceRef: z.string().nullable(),
+  output: todoOutputSchema.default('code'),
   /** #1257 板面挂起态（server 读侧派生，不落列）：在飞 todo 的当前步挂起时
    *  透出——`quota` = 等额度（retryAt = 退避到期/下次尝试时刻，null = 不适用）；
    *  `machine` = 等机器（#1259 起语义 = 归属机不在线/团队零在线）。缺席 = 未挂
@@ -173,5 +178,6 @@ export const createTodoBodySchema = z.object({
   title: z.string(),
   spec: z.string(),
   tagIds: z.array(recordId).optional(),
+  output: todoOutputSchema.optional(),
 });
 export type CreateTodoBody = z.infer<typeof createTodoBodySchema>;

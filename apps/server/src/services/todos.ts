@@ -10,6 +10,7 @@ import type {
   GithubRepoRef,
   Phase,
   SecretBox,
+  TodoOutputKind,
   TodoRecord,
   TodoSourceKind,
   UserRecord,
@@ -157,6 +158,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     sourceBuildId: row.sourceBuildId,
     sourceKind: row.sourceKind,
     sourceRef: row.sourceRef,
+    output: row.output,
     // #1257 板面挂起态（读侧派生；缺省不带键）。
     ...(waitingOn !== undefined ? { waitingOn } : {}),
     // #1261 等额度投影（null 时也带键——web 面以 null 清态，SSE 全量文档
@@ -283,6 +285,7 @@ export function createTodo(
      * 答「哪次请求拆的」）。至多一个来源：GitHub 接入项目的自建 issue 写向
      * 优先占槽（#452 出站零回归；r14 §5.7 GitHub 镜像面开放问题）。 */
     orchestration?: { threadId: string };
+    output?: TodoOutputKind;
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -366,6 +369,7 @@ export function createTodo(
         (selfIssue === null && input.orchestration !== undefined
           ? orchestrationSourceRef(input.orchestration.threadId)
           : null),
+      output: input.output ?? 'code',
     })
     .run();
   for (const tagId of tagIds) {

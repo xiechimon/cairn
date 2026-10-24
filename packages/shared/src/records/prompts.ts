@@ -12,6 +12,7 @@
 
 import { chiefThreadTitle } from './chief.js';
 import { PLAN_FILE_NAME } from './plan.js';
+import { REPORT_FILE_NAME } from './report.js';
 import { parseReviewPromptMeta } from './review.js';
 import type { StepKind } from './step.js';
 import { parseGithubIssueSourceRef } from './todo.js';
@@ -362,6 +363,15 @@ export function appendConfirmedPlanNote(prompt: string, planFile: string): strin
 
 /** 尾部已确认方案位置行剥离（过滤侧）：prompt 以 '\n' + 注记行收尾时剥掉
  *  注记，余段走模板比对。非注记收尾 = 原文返回。 */
+const REPORT_NOTE_HEAD = `${REPORT_FILE_NAME} 交接位置：`;
+const REPORT_NOTE_TAIL = `。该位置在仓库检出之外——本步的交付物是这份报告：把完整报告写入此文件再结束本步；不要在仓库工作区里创建它，也不要把它 git add 或提交。`;
+
+export function appendReportLocationNote(prompt: string, reportFile: string): string {
+  if (prompt.includes(REPORT_NOTE_HEAD)) return prompt;
+  const note = `${REPORT_NOTE_HEAD}${reportFile}${REPORT_NOTE_TAIL}`;
+  return prompt === '' ? note : `${prompt}\n${note}`;
+}
+
 export function stripConfirmedPlanNote(text: string): string {
   const idx = text.lastIndexOf(`\n${CONFIRMED_PLAN_NOTE_HEAD}`);
   if (idx === -1) return text;
@@ -371,12 +381,44 @@ export function stripConfirmedPlanNote(text: string): string {
     : text;
 }
 
+export const BLOCKER_HANDOFF_OPEN = '【前置卡交付';
+const BLOCKER_HANDOFF_CLOSE_PREFIX = `${BLOCKER_HANDOFF_OPEN}结束`;
+export const BLOCKER_HANDOFF_CLOSE = `${BLOCKER_HANDOFF_CLOSE_PREFIX}】`;
+const QUOTED_LINE = /^>( |$)/;
+
+export function stripBlockerHandoff(text: string): string {
+  const lines = text.split('\n');
+  const open = lines.findIndex(
+    (line, i) =>
+      i > 0 &&
+      lines[i - 1] === '' &&
+      line.startsWith(BLOCKER_HANDOFF_OPEN) &&
+      !line.startsWith(BLOCKER_HANDOFF_CLOSE_PREFIX),
+  );
+  if (open === -1) return text;
+  for (let i = open + 1; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    if (line === BLOCKER_HANDOFF_CLOSE) {
+      return [...lines.slice(0, open - 1), ...lines.slice(i + 1)].join('\n');
+    }
+    if (!QUOTED_LINE.test(line)) return text;
+  }
+  return text;
+}
+
 /** 任务文本的投递附加行（工作分支注记、已确认方案位置行）剥到稳定。两行
  *  叠在一起时顺序不定，每轮只剥当前尾巴，缩短即停。 */
 function stripTaskDeliveryNotes(text: string): string {
   let cur = text;
   for (;;) {
-    const next = stripConfirmedPlanNote(stripWorkBranchNote(cur));
+    const reportIdx = cur.lastIndexOf(`\n${REPORT_NOTE_HEAD}`);
+    const withoutReport =
+      reportIdx === -1
+        ? cur
+        : wrappedBy(cur.slice(reportIdx + 1), REPORT_NOTE_HEAD, REPORT_NOTE_TAIL)
+          ? cur.slice(0, reportIdx)
+          : cur;
+    const next = stripConfirmedPlanNote(stripWorkBranchNote(withoutReport));
     if (next === cur) return cur;
     cur = next;
   }
@@ -492,9 +534,10 @@ function isSyntheticInstruction(text: string): boolean {
 export type UserTextKind = 'task-prompt' | 'synthetic' | 'user';
 
 export function classifyUserText(
-  text: string,
+  rawText: string,
   task: { title: string; spec: string } & TaskSource,
 ): UserTextKind {
+  const text = stripBlockerHandoff(rawText);
   // wire 行经呈现层 trim 后比对（daemon 记录的是未 trim 原文）。#1406：GitHub
   // issue 导入任务的投递形是围栏形；改动前落库的行是原文形，两形都认。
   const raw = buildTaskPromptText(task.title, task.spec).trim();

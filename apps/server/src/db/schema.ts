@@ -9,6 +9,7 @@ import type {
   AutonomyGateReason,
   AutonomyKind,
   AutonomySettings,
+  BlockerHandoffRecord,
   ChiefWatch,
   ClaudeCodeReport,
   DocumentDiffFile,
@@ -23,6 +24,7 @@ import type {
   RequiredCapabilities,
   SkillInjectionRecord,
   StepKind,
+  TodoOutputKind,
   TodoSourceKind,
   TriggerSource,
 } from '@cairn/shared';
@@ -118,6 +120,7 @@ export const todo = sqliteTable('todo', {
   /** 外部引用（#446）：形如 `github:owner/repo#123`（shared
    * githubIssueSourceRef 单源）；无来源 = null。 */
   sourceRef: text('sourceRef'),
+  output: text('output').$type<TodoOutputKind>().notNull().default('code'),
 });
 
 // tag record 三位补全（#309，r9 §3.4 实测 wire {id, projectId, name, color,
@@ -172,6 +175,7 @@ export const build = sqliteTable('build', {
   diffHash: text('diffHash'),
   baseSha: text('baseSha'),
   harnessHash: text('harnessHash'),
+  reportAttachmentId: text('reportAttachmentId'),
   createdAt: epochMs('createdAt').notNull(),
 });
 
@@ -255,6 +259,7 @@ export const step = sqliteTable('step', {
    * agent.injectedSkills 透传 daemon 收窄目录注入；本列 = 任务详情面的
    * 回查正本（「本任务注入了哪些技能、为何选中」）。 */
   skillInjection: json<SkillInjectionRecord>('skillInjection'),
+  blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
   /** [内部] #1257 额度挂起面：done(failed) 分类为 quota 时步不判死，挂起
    *  等额度（重领退避）。holdReason = 挂起原因（现值 'quota'）；null = 未
    *  挂起。重领成功即清位（挂起是退避态不是持久属性）。 */
