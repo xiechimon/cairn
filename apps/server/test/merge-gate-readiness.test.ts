@@ -1685,4 +1685,45 @@ describe('mergeReadiness P4-0 base freshness', () => {
       behind === 0 ? [] : [['pr-behind-base', 'transient']],
     );
   });
+
+  test.each([
+    ['unreadable', 'patch-unavailable'],
+    ['malformed', 'compare-malformed'],
+  ] as const)('compare %s and baseBehindBy null: only %s, no pr-behind-base', (state, code) => {
+    const i = green();
+    pr(i).baseBehindBy = null;
+    i.compare = state;
+    const codes = codesOf(i);
+    expect(codes).toContain(code);
+    expect(codes).not.toContain('pr-behind-base');
+  });
+
+  test('compare rejected by the gate (SHA malformed, commits incomplete, read elsewhere) and baseBehindBy null: no pr-behind-base', () => {
+    const badSha = green();
+    compare(badSha).headSha = 'HEAD';
+    const incomplete = green();
+    compare(incomplete).totalCommits += 1;
+    const elsewhere = green();
+    compare(elsewhere).headSha = OTHER;
+    for (const [i, code] of [
+      [badSha, 'compare-malformed'],
+      [incomplete, 'patch-unavailable'],
+      [elsewhere, 'patch-unavailable'],
+    ] as const) {
+      pr(i).baseBehindBy = null;
+      const codes = codesOf(i);
+      expect(codes).toContain(code);
+      expect(codes).not.toContain('pr-behind-base');
+    }
+  });
+
+  test.each(['unreadable', 'malformed'] as const)(
+    'compare %s and baseBehindBy positive: pr-behind-base still',
+    (state) => {
+      const i = green();
+      pr(i).baseBehindBy = 2;
+      i.compare = state;
+      expect(codesOf(i)).toContain('pr-behind-base');
+    },
+  );
 });

@@ -245,7 +245,6 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     if (head === null) block('pr-unreadable', 'head SHA not 40 lowercase hex');
     if (pr.state !== 'open' || pr.merged) block('pr-not-open', pr.merged ? 'merged' : pr.state);
     if (pr.draft) block('pr-draft');
-    if (pr.baseBehindBy !== 0) block('pr-behind-base');
     if (
       pr.headRepoFullName === null ||
       pr.headRepoFullName.toLowerCase() !== pr.baseRepoFullName.toLowerCase()
@@ -386,6 +385,9 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   ) {
     block('patch-unavailable', 'compare not read at the PR head');
     compare = null;
+  }
+  if (pr !== null && (pr.baseBehindBy === null ? compare !== null : pr.baseBehindBy !== 0)) {
+    block('pr-behind-base');
   }
   let D: string | null = null;
   if (compare !== null) {

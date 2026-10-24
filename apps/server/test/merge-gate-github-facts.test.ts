@@ -5,8 +5,10 @@
 // bodies, pages them by the requested page and per_page, and logs every call.
 
 import { type CompareFile, MERGE_GATE_STATUS_CONTEXT } from '@cairn/shared';
+import { MERGE_BLOCKERS } from '@cairn/shared/merge-gate';
 import { describe, expect, test } from 'vitest';
 import { compareFilesFromResponse } from '../src/services/merge-gate/digest.js';
+import { gateStatusFor } from '../src/services/merge-gate/gate-status.js';
 import {
   type GateGithubFacts,
   type GateReadCache,
@@ -1056,5 +1058,83 @@ describe('readGateGithubFacts P4-0 base freshness', () => {
       compare: comparePages(chain(EARLIER, HEAD), FILES, { behind_by: behind }),
     });
     expect(f.pr?.baseBehindBy).toBe(behind === 0 || behind === 3 ? behind : null);
+  });
+});
+
+describe('readGateGithubFacts into mergeReadiness and gateStatusFor: an unusable compare names its own cause', () => {
+  const MANY = chain(
+    ...Array.from({ length: 119 }, (_, k) => k.toString(16).padStart(40, '0')),
+    HEAD,
+  );
+  const pageTwo =
+    (second: () => GateRaw) =>
+    (b: string, h: string, o: { page: number; perPage: number }): GateRaw =>
+      o.page === 1 ? comparePages(MANY)(b, h, o) : second();
+
+  const statusOf = async (over: Partial<Fake>) => {
+    const f = await read(over);
+    const r = mergeReadiness({
+      policy: { mergePolicy: 'autonomous', autonomyPaused: false, dailyCapReached: false },
+      build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
+      repo: { owner: REQ.owner, name: REQ.repo, defaultBranch: f.defaultBranch },
+      ticketRef: REQ.ticketRef,
+      issueNumber: 1404,
+      pr: f.pr,
+      checks: f.checks,
+      compare: f.compare,
+      evidence: f.evidence,
+      verdicts: [],
+      round: null,
+      availability: { reviewerPerspectives: ['correctness'], verifier: true, decider: true },
+    });
+    return { f, codes: r.blockers.map((b) => b.code), status: gateStatusFor(r) };
+  };
+  const labelOf = (code: string) => MERGE_BLOCKERS.find((b) => b.code === code)?.label;
+
+  test.each([
+    ['page 2 is a 404', 'patch-unavailable', 'unreadable', pageTwo(() => NOT_FOUND)],
+    ['page 2 is an empty array', 'compare-malformed', 'malformed', pageTwo(() => ok([]))],
+    [
+      'page 1 is malformed',
+      'compare-malformed',
+      'malformed',
+      (b: string, h: string, o: { page: number; perPage: number }) =>
+        comparePages(MANY, FILES, { total_commits: '120' })(b, h, o),
+    ],
+  ] as const)(
+    '%s: status leads with %s, no pr-behind-base',
+    async (_name, code, shape, compare) => {
+      const { f, codes, status } = await statusOf({ compare });
+      expect(f.compare).toBe(shape);
+      expect(f.baseBehindBy).toBeNull();
+      expect(codes).toContain(code);
+      expect(codes).not.toContain('pr-behind-base');
+      expect(status.description.startsWith(`${labelOf(code)} (${code})`)).toBe(true);
+    },
+  );
+
+  test('page 2 lists no commits: patch-unavailable leads, behind_by 0 stays a pass', async () => {
+    const { f, codes, status } = await statusOf({
+      compare: pageTwo(() =>
+        ok({ status: 'ahead', behind_by: 0, total_commits: 120, commits: [] }),
+      ),
+    });
+    expect(f.baseBehindBy).toBe(0);
+    expect(codes).not.toContain('pr-behind-base');
+    expect(
+      status.description.startsWith(`${labelOf('patch-unavailable')} (patch-unavailable)`),
+    ).toBe(true);
+  });
+
+  test('a readable compare without behind_by: pr-behind-base still blocks (fail closed)', async () => {
+    const { f, codes, status } = await statusOf({
+      compare: comparePages(chain(EARLIER, HEAD), FILES, { behind_by: undefined }),
+    });
+    expect(typeof f.compare).toBe('object');
+    expect(f.baseBehindBy).toBeNull();
+    expect(codes).toContain('pr-behind-base');
+    expect(status.description.startsWith(`${labelOf('pr-behind-base')} (pr-behind-base)`)).toBe(
+      true,
+    );
   });
 });
