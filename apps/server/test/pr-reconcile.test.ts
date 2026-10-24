@@ -127,11 +127,11 @@ import { githubBranchPulls, githubCompareStatus, githubPull } from '../src/lib/g
 import {
   applyBuildStepAction,
   completeStep,
-  DONE_ROW,
   finishTodoDone,
   requestMerge,
 } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
+import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { updateTodo } from '../src/services/todos.js';
 import { bootServer, type TestServer } from './helpers.js';
