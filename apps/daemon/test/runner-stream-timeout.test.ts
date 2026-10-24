@@ -240,6 +240,56 @@ function streamingBackend(opts: {
   return { backend };
 }
 
+function toolExecutionBackend(opts: { finish: 'done' | 'silent'; parallel?: boolean }) {
+  let stopped = false;
+  let releaseStop: () => void = () => {};
+  const observations = { completedTools: 0, stoppedDuringTool: false };
+  const backend: AgentBackend = {
+    capabilities: PI_CAPABILITIES,
+    async createSession() {
+      const gate = new Promise<void>((resolve) => {
+        releaseStop = resolve;
+      });
+      const call: ToolCallRecord = { id: 'long-tool', name: 'bash', arguments: {} };
+      return {
+        sessionId: 'tool-timeout-session',
+        events: (async function* (): AsyncGenerator<StepEvent> {
+          yield { type: 'toolcall_end', call };
+          if (opts.parallel) {
+            yield { type: 'toolcall_end', call: { ...call, id: 'parallel-tool' } };
+            yield { type: 'toolcall_end', call: { ...call, result: '' } };
+          }
+          await Promise.race([sleep(240), gate]);
+          if (stopped) {
+            observations.stoppedDuringTool = true;
+            return;
+          }
+          observations.completedTools += 1;
+          yield {
+            type: 'toolcall_end',
+            call: { ...call, id: opts.parallel ? 'parallel-tool' : call.id, result: '' },
+          };
+          if (opts.finish === 'done') {
+            yield { type: 'done', usage: [] };
+          } else {
+            await gate;
+          }
+        })(),
+        async steer() {},
+        async stop() {
+          stopped = true;
+          releaseStop();
+        },
+        usage: () => [],
+      };
+    },
+    async continueSession() {
+      throw new Error('unused');
+    },
+  };
+  return { backend, observations };
+}
+
 /** 全部超时面放宽（不干扰被测臂）。 */
 const WIDE = 4_000;
 
@@ -388,5 +438,42 @@ describe('runner 流超时护栏（#699）', () => {
   test('上界缺省 = 3600000（env 未设时回落默认墙）', () => {
     expect(STREAM_DURATION_CAP_DEFAULT_MS).toBe(3_600_000);
     // env 缺省/非法值回落默认值由 runStep 内部判定；此处钉默认值本身。
+  });
+});
+
+describe('runner 工具执行存活（#1591）', () => {
+  test.each([false, true])('静默工具超过 idle 阈值仍完成（parallel=%s）', async (parallel) => {
+    const { backend, observations } = toolExecutionBackend({ finish: 'done', parallel });
+    const body = await run({
+      backend,
+      timeouts: { first: WIDE, idle: 80, body: WIDE },
+      durationCapMs: WIDE,
+    });
+    expect(body.status).toBe('success');
+    expect(observations).toEqual({ completedTools: 1, stoppedDuringTool: false });
+  });
+
+  test('工具结束后静默超过 idle 阈值仍失败', async () => {
+    const { backend, observations } = toolExecutionBackend({ finish: 'silent' });
+    const body = await run({
+      backend,
+      timeouts: { first: WIDE, idle: 80, body: WIDE },
+      durationCapMs: WIDE,
+    });
+    expect(observations.completedTools).toBe(1);
+    expect(body.status).toBe('failed');
+    expect(body.errorMessage).toBe('stream timeout (arm=idle, idle=80ms)');
+  });
+
+  test('工具仍在执行时总时长上限生效', async () => {
+    const { backend, observations } = toolExecutionBackend({ finish: 'done' });
+    const body = await run({
+      backend,
+      timeouts: { first: WIDE, idle: 80, body: WIDE },
+      durationCapMs: 160,
+    });
+    expect(observations.stoppedDuringTool).toBe(true);
+    expect(body.status).toBe('failed');
+    expect(body.errorMessage).toBe('stream timeout (arm=duration, cap=160ms)');
   });
 });
