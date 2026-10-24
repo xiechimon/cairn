@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 
 const selector = 'scripts/e2e-affected.mjs';
+const selectorDeps = ['scripts/heavy-slots.mjs'];
 for (const [file, code] of [
   ['apps/web/e2e/unmapped-reach.spec.ts', 1],
   ['apps/web/e2e/board-reach.spec.ts', 0],
@@ -49,12 +50,12 @@ test('discovers committed, staged and untracked additions from the base', () => 
   const check = () => run(process.execPath, [gate, '--check-reach'], { VP_REACH_BASE_SHA: base });
   let base;
   try {
-    for (const file of [selector, gate, registry]) {
+    for (const file of [selector, ...selectorDeps, gate, registry]) {
       mkdirSync(dirname(join(root, file)), { recursive: true });
       cpSync(resolve(file), join(root, file));
     }
     git('init', '-q');
-    git('add', selector, gate, registry);
+    git('add', selector, ...selectorDeps, gate, registry);
     git('-c', 'user.name=test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'base');
     base = git('rev-parse', 'HEAD');
     mkdirSync(join(root, 'apps/web/e2e'), { recursive: true });

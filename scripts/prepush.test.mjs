@@ -191,8 +191,9 @@ test('a stale local origin/main is refreshed by fetch before computing changes',
     gitIn(directory, ['clone', remote, upstream]);
     mkdirSync(join(upstream, 'scripts'));
     copyFileSync('scripts/prepush.mjs', join(upstream, 'scripts/prepush.mjs'));
+    copyFileSync('scripts/heavy-slots.mjs', join(upstream, 'scripts/heavy-slots.mjs'));
     writeFileSync(join(upstream, 'README.md'), 'first\n');
-    gitIn(upstream, ['add', 'README.md', 'scripts/prepush.mjs']);
+    gitIn(upstream, ['add', 'README.md', 'scripts/prepush.mjs', 'scripts/heavy-slots.mjs']);
     gitIn(upstream, ['commit', '-m', 'initial']);
     gitIn(upstream, ['push', 'origin', 'HEAD:main']);
     mkdirSync(join(upstream, 'apps'));
@@ -222,8 +223,9 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
     gitIn(directory, ['init', work]);
     mkdirSync(join(work, 'scripts'));
     copyFileSync('scripts/prepush.mjs', join(work, 'scripts/prepush.mjs'));
+    copyFileSync('scripts/heavy-slots.mjs', join(work, 'scripts/heavy-slots.mjs'));
     writeFileSync(join(work, 'README.md'), 'first\n');
-    gitIn(work, ['add', 'README.md', 'scripts/prepush.mjs']);
+    gitIn(work, ['add', 'README.md', 'scripts/prepush.mjs', 'scripts/heavy-slots.mjs']);
     gitIn(work, ['commit', '-m', 'initial']);
     gitIn(work, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
     writeFileSync(join(work, 'README.md'), 'second\n');
