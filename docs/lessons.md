@@ -52,6 +52,6 @@
 | 总管任务列表把所有 spec 原文放进单次工具结果，撑爆上下文 | #1586 (2026-10-24) | 2 | `chief-todos-cap.test.ts` 通过真实数据库与工具执行面验证 32 KiB UTF-8 序列化预算、分页取全和按 id 取全文 | 1 | 0 | 负对照：旧实现输出 32369783 字节，超过 32768；摘要分页后同一用例转绿。动态序列化大小不能只靠静态类型约束 |
 | 总管失败只写会话消息，卡片没有失败原因读面 | #1586 (2026-10-24) | 2 | `chief-context-failure.test.ts` 覆盖 finishStep 到线程 API 与团队通知；`chief-orchestration-failure.test.ts` 验证真实卡片渲染失败原因及重试 | 1 | 0 | 负对照：context_length_exceeded 回报后 API 缺 lastTurnError、卡片缺编排失败；补齐投影后转绿，运行态与失败态共用线程数据源；面板最小化不订阅会话流，失败必须经团队通知刷新卡片 |
 | React 渲染测试把必填 children 仅放在 createElement 的第三参数 | #1586 (2026-10-24) | 1 | provider 的 children 显式写入受类型检查的 props；线程与任务夹具使用完整类型声明 | 1 | 0 | 原调用在 pnpm typecheck 报 TS2769；显式 children 后通过，保留组件原本的必填类型 |
-| 复制依赖目录时沿用其他 clone 的 pnpm 工作区绝对路径，执行检查触发重新安装 | #1586 (2026-10-24) | 3 | 离线复用依赖先比对锁文件，再校正复制目录中的工作区状态路径并核实直接工具可运行 | 1 | 0 | 本轮已校正临时 node_modules 状态后成功执行 pnpm 检查；仓库代码不拥有临时依赖恢复操作，新增仓内闸无法阻止复制前的外部命令 |
+| 复制依赖目录时沿用其他 clone 的 pnpm 工作区绝对路径，执行检查触发重新安装 | #1586 (2026-10-24) | 3 | 离线复用依赖先比对锁文件，再校正复制目录中的工作区状态路径并核实直接工具可运行 | 1 | 0 | 本轮已校正复制来的 node_modules 状态后成功执行 pnpm 检查；仓库代码不拥有复制依赖的恢复操作，新增仓内闸无法阻止复制前的外部命令 |
 | 新 UI 文案漏加英文词条 | #1586 (2026-10-24) | 2 | 既有 `i18n-coverage.test.ts` 扫描所有 t 字面量并核对 EN | 1 | 0 | 真实负对照：编排失败缺词条时 coverage 报红；补词条后转绿，不另建重复闸 |
 | chief 工具 schema 新增 integer 参数，daemon 转换词表只支持 number | #1586 (2026-10-24) | 2 | 既有 `claude-t4-tools.test.ts` 全量转换 CHIEF_REMOTE_TOOLS，服务端保留 safe integer 校验 | 1 | 0 | 真实负对照：offset type=integer 抛 not in vocabulary；沿用 number 词表并在执行侧校验后转绿，无需改 provider 声明 |
