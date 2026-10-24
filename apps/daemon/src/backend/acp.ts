@@ -1,4 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
+import { Readable, Writable } from 'node:stream';
 import {
   client,
   methods,
@@ -75,15 +76,6 @@ export function mapAcpUpdate(update: SessionUpdate | { kind: 'cancelled' }): Ste
     };
   }
   return null;
-}
-
-function protocolError(error: unknown): Error {
-  const message = error instanceof Error ? error.message : String(error);
-  const mapped = acpErrorMessage(error);
-  if (mapped !== message) return new Error(mapped);
-  return new Error(
-    `ACP initialize failed (protocolVersion client=${PROTOCOL_VERSION}, agent=${message})`,
-  );
 }
 
 class GeminiSession implements AgentSessionHandle {
@@ -214,8 +206,8 @@ export class GeminiBackend implements AgentBackend {
       session?.onAcpUpdate(params.update),
     );
     const stream = ndJsonStream(
-      WritableStreamFromNode(child.stdin),
-      ReadableStreamFromNode(child.stdout),
+      Writable.toWeb(child.stdin),
+      Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
     );
     const connection = app.connect(stream);
     child.once('error', (error) => connection.close(error));
@@ -237,37 +229,17 @@ export class GeminiBackend implements AgentBackend {
       return session;
     } catch (error) {
       child.kill();
-      throw protocolError(error);
+      const message = error instanceof Error ? error.message : String(error);
+      const mapped = acpErrorMessage(error);
+      throw new Error(
+        mapped !== message
+          ? mapped
+          : `ACP initialize failed (protocolVersion client=${PROTOCOL_VERSION}, agent=${message})`,
+      );
     }
   }
 }
 
 export function createGeminiBackend(options?: GeminiBackendOptions): AgentBackend {
   return new GeminiBackend(options);
-}
-
-function WritableStreamFromNode(stream: NodeJS.WritableStream): WritableStream<Uint8Array> {
-  return new WritableStream({
-    write(chunk) {
-      return new Promise((resolve, reject) =>
-        stream.write(chunk, (error) => (error ? reject(error) : resolve())),
-      );
-    },
-    close() {
-      stream.end();
-    },
-  });
-}
-
-function ReadableStreamFromNode(stream: NodeJS.ReadableStream): ReadableStream<Uint8Array> {
-  return new ReadableStream({
-    start(controller) {
-      stream.on('data', (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
-      stream.on('end', () => controller.close());
-      stream.on('error', (error) => controller.error(error));
-    },
-    cancel() {
-      stream.removeAllListeners();
-    },
-  });
 }

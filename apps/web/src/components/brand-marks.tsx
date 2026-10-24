@@ -33,7 +33,6 @@ export function PiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGEle
   );
 }
 
-/** Claude 官方 mark（claude.ai favicon 原路径，星芒）。 */
 export function GeminiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg aria-hidden="true" width={width} height={height} viewBox="0 0 16 16" {...props}>
@@ -46,6 +45,7 @@ export function GeminiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSV
   );
 }
 
+/** Claude 官方 mark（claude.ai favicon 原路径，星芒）。 */
 export function ClaudeMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg aria-hidden="true" width={width} height={height} viewBox="6.2 6.2 235.6 235.6" {...props}>
