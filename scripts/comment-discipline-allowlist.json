@@ -1538,5 +1538,15 @@
     "path": "packages/shared/src/protocol/chief-tools.ts",
     "line": " * 5）、键集 = CHIEF_TOOL_NAMES、读侧全 replaySafe。 */",
     "reason": "既有注释仅更正工具件数文字，与 CHIEF_TOOL_COUNT 对齐"
+  },
+  {
+    "path": "apps/daemon/src/git.ts",
+    "line": " * 路的独有语义，见 gitCredentialEnv 注），代理变量原样透传，只由 runGit 给",
+    "reason": "既有注释更正：#1635 后 runGit 给回环地址补 NO_PROXY，旧句「不碰代理变量」已不成立"
+  },
+  {
+    "path": "apps/daemon/src/git.ts",
+    "line": " * 回环地址补进 NO_PROXY（#1635：全局 http.proxy 不能拦本机 server）。只补 TTY 守卫：无凭据时 git 快速失败而不是挂等不存在的终端。",
+    "reason": "既有注释更正：#1635 后 runGit 给回环地址补 NO_PROXY，旧句「不碰代理变量」已不成立"
   }
 ]
