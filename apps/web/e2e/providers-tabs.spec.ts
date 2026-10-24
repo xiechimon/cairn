@@ -30,16 +30,19 @@ const CANON_HOST = 'xmonsMac-3574.local'; // fixtures.ts MACHINE_NAME（pi 段 =
 // 远端机的 hostname。
 const CANON_CC_HOST = 'mea-wsl'; // fixtures.ts MACHINE_REMOTE_NAME
 
-test('tablist = 恰 pi / Claude Code 两 tab，默认选中 pi', async ({ page }) => {
+test('tablist = 恰 pi / Claude Code / Gemini 三 tab，默认选中 pi', async ({ page }) => {
   await page.goto(PAGE);
   const tabs = page.locator(`${SHELL} [role="tablist"] [role="tab"]`);
-  await expect(tabs).toHaveCount(2);
+  await expect(tabs).toHaveCount(3);
   await expect(tabs.nth(0)).toHaveAttribute('data-runtime', 'pi');
   await expect(tabs.nth(0)).toHaveText('pi');
   await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
   await expect(tabs.nth(1)).toHaveAttribute('data-runtime', 'claude-code');
   await expect(tabs.nth(1)).toHaveText('Claude Code');
   await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'false');
+  await expect(tabs.nth(2)).toHaveAttribute('data-runtime', 'gemini');
+  await expect(tabs.nth(2)).toHaveText('Gemini');
+  await expect(tabs.nth(2)).toHaveAttribute('aria-selected', 'false');
 });
 
 test('pi tab：fixture 模型行 + facade/38 项负向 + 无可点感装饰', async ({ page }) => {

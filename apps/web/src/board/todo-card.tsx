@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
+import { formatUsd, NO_PRICE_REASON } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
@@ -212,6 +213,15 @@ export function TodoCard({
               <Glyph icon={Clock} className="size-3 text-content-dim" />
               {relativeTime(todo.phaseAt, now, t)}
             </span>
+            {todo.usageCost !== undefined && (
+              <span
+                data-testid="card-cost"
+                title={todo.usageCost.total > 0 ? undefined : t(NO_PRICE_REASON)}
+                className={`${META_ITEM} tabular-nums`}
+              >
+                {todo.usageCost.total > 0 ? formatUsd(todo.usageCost.total) : '—'}
+              </span>
+            )}
             {face.kind === 'done' && face.canceled && (
               <span data-todo-canceled="" className={META_ITEM}>
                 <Glyph icon={Ban} className="size-3 text-content-dim" />

@@ -57,6 +57,7 @@ const BOARD = [
   'paper-board-',
   'paper-card',
   'quota-wait-board',
+  'ticket-cost',
   'accent-typo',
   'attachment-title',
   'branch-button',
@@ -106,6 +107,7 @@ const DETAIL = [
   'queued-action',
   // #1428: one ring per edge — the user menu and the composer are probed there.
   'elevation-',
+  'ticket-cost',
   'accent-typo',
   'attachment-strip',
   'branch-button',

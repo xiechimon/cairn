@@ -11,7 +11,7 @@ import { machineCapabilitiesSchema } from './machine-capabilities.js';
 /** per-runtime 开关词表（spec 11 A8/A9 单源：machine.enabledRuntimes 元素、
  * PATCH body、machines 页 switch data-runtime、providers tab runtime 同词表；
  * Codex 后续票再扩，spec 11 A1）。 */
-export const MACHINE_RUNTIMES = ['pi', 'claude-code'] as const;
+export const MACHINE_RUNTIMES = ['pi', 'claude-code', 'gemini'] as const;
 export type MachineRuntime = (typeof MACHINE_RUNTIMES)[number];
 
 export const machineRecordSchema = z.object({
