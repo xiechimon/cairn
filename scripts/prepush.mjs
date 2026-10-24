@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -62,9 +63,14 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     args[0] === '--e2e-shard'
       ? [['pnpm', '--filter', '@cairn/web', 'e2e', `--shard=${args[1]}`]]
       : prepushPlan(changedPaths(), args[0]?.slice(2) ?? 'local');
+  const lease = plan.length > 0 ? await acquireSlot() : null;
   for (const [command, ...commandArgs] of plan) {
     console.log(`[prepush] ${command} ${commandArgs.join(' ')}`);
-    const result = spawnSync(command, commandArgs, { cwd: root, stdio: 'inherit' });
+    const result = spawnSync(command, commandArgs, {
+      cwd: root,
+      stdio: 'inherit',
+      env: leaseEnv(lease),
+    });
     if (result.status !== 0) process.exit(result.status ?? 1);
   }
   console.log(`[prepush] PASS (${plan.length} checks)`);

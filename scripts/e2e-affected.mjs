@@ -29,6 +29,7 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { acquireSlot, leaseEnv, writeSlotPlaywrightConfig } from './heavy-slots.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const WEB_DIR = join(REPO_ROOT, 'apps/web');
@@ -359,12 +360,27 @@ function runPlaywright(specs, full) {
   // concurrent chromiums (vs the default 4 on an 8-core) halve the peak.
   // The full-suite fallback keeps playwright's default — its throughput
   // is the point.
-  const args = ['exec', 'playwright', 'test', ...specs];
+  const args = ['exec', 'playwright', 'test'];
+  const env = { ...leaseEnv(lease), E2E_PORT: PORT };
+  if (lease !== null) {
+    const slotRun = writeSlotPlaywrightConfig({
+      slot: lease.slot,
+      env: process.env,
+      webDir: WEB_DIR,
+    });
+    args.push('--config', slotRun.path);
+    env.E2E_PORT = String(slotRun.port);
+    env.E2E_DIST_DIR = slotRun.distDir;
+    console.log(
+      `[e2e:affected] slot ${lease.slot}: E2E_PORT=${slotRun.port}, build output ${slotRun.distDir}`,
+    );
+  }
+  args.push(...specs);
   if (!full) args.push('--workers', process.env.E2E_AFFECTED_WORKERS ?? '2');
   const res = spawnSync('pnpm', args, {
     cwd: WEB_DIR,
     stdio: 'inherit',
-    env: { ...process.env, E2E_PORT: PORT },
+    env,
   });
   process.exit(res.status ?? 1);
 }
@@ -431,4 +447,5 @@ console.log(
 console.log(`  ${selection.join(' ')}`);
 
 if (dryRun) process.exit(0);
+const lease = await acquireSlot();
 runPlaywright(selection, full);
