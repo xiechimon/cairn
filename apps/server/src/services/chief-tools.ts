@@ -193,6 +193,10 @@ function requireTeamTodo(db: Db, todoId: string, teamId: string) {
  * （omitted），模型可再发一趟接着读。 */
 const DOCS_MAX_PATHS = 24;
 
+export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
+export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
+export const CHIEF_TASK_LIST_SUMMARY_MAX_CHARS = 240;
+
 function requireTeamAgent(db: Db, agentId: string, teamId: string) {
   const row = db
     .select()
@@ -264,12 +268,39 @@ export async function executeChiefTool(
       );
     }
     case 'todos': {
+      const todoId = optStr(params, 'todoId');
+      if (todoId !== undefined) {
+        requireTeamTodo(db, todoId, ctx.teamId);
+        return json(getTodo(svc, todoId));
+      }
+      const offset = num(params, 'offset') ?? 0;
+      if (!Number.isSafeInteger(offset) || offset < 0) {
+        throw new HttpError(400, 'invalid params.offset: expected non-negative safe integer');
+      }
       const projectId = optStr(params, 'projectId');
       const phase = optStr(params, 'phase');
       // 团队过滤恒在（#1466）：他队 projectId 与不存在的 id 同回 []。
       let records = listTodos(svc, { teamId: ctx.teamId, ...(projectId ? { projectId } : {}) });
       if (phase) records = records.filter((t) => t.phase === phase);
-      return json(records);
+      const todos: { id: string; seqNum: number; title: string; phase: string; summary: string }[] =
+        [];
+      const response = { todos, total: records.length, nextOffset: null as number | null };
+      for (const record of records.slice(offset)) {
+        todos.push({
+          id: record.id,
+          seqNum: record.seqNum,
+          title: record.title.slice(0, CHIEF_TASK_LIST_TITLE_MAX_CHARS),
+          phase: record.phase,
+          summary: record.spec.slice(0, CHIEF_TASK_LIST_SUMMARY_MAX_CHARS),
+        });
+        response.nextOffset = offset + todos.length < records.length ? offset + todos.length : null;
+        if (Buffer.byteLength(json(response), 'utf8') > CHIEF_TASK_LIST_MAX_OUTPUT_BYTES) {
+          todos.pop();
+          response.nextOffset = offset + todos.length;
+          break;
+        }
+      }
+      return json(response);
     }
     case 'agents': {
       const rows = db.select().from(agent).where(eq(agent.teamId, ctx.teamId)).all();

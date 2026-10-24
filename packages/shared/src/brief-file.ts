@@ -27,7 +27,7 @@ export const BRIEF_MANAGED_SEPARATOR = '\n\n';
 /** 简报落点的后端身份（= AgentBackend 现有两实现）。未来若加第三个后端而它不
  * 读上下文文件，就不该进本表——那种后端保留 system prompt 通道（`briefTarget`
  * 返回 null 的逃生口，daemon 侧）。 */
-export const BRIEF_BACKEND_IDS = ['pi', 'claude-code'] as const;
+export const BRIEF_BACKEND_IDS = ['pi', 'claude-code', 'gemini'] as const;
 export type BriefBackendId = (typeof BRIEF_BACKEND_IDS)[number];
 
 /** 各引擎**真实的**同目录候选序，first-wins。pi 这份是从
@@ -38,12 +38,14 @@ export type BriefBackendId = (typeof BRIEF_BACKEND_IDS)[number];
 export const BRIEF_CANDIDATES: Record<BriefBackendId, readonly string[]> = {
   pi: ['AGENTS.override.md', 'AGENTS.md', 'AGENTS.MD', 'CLAUDE.md', 'CLAUDE.MD'],
   'claude-code': ['CLAUDE.md'],
+  gemini: ['GEMINI.md'],
 };
 
 /** 候选全落空时新建的文件名（= 该引擎候选序里最标准的那个）。 */
 export const BRIEF_CREATE_NAME: Record<BriefBackendId, string> = {
   pi: 'AGENTS.md',
   'claude-code': 'CLAUDE.md',
+  gemini: 'GEMINI.md',
 };
 
 /** 对账用的**全后端候选名并集**（按后端序去重拼接）。
@@ -68,6 +70,7 @@ export interface BriefTarget {
  * A3 唯一分叉点）：runtime 身份词表命中 → claude-code，其余（custom provider id /
  * null / undefined）→ pi。两处判定必须同源，否则简报会写进一个引擎不读的文件。 */
 export function briefBackendForProvider(provider: string | null | undefined): BriefBackendId {
+  if (provider === 'gemini') return 'gemini';
   return isBackendRuntimeId(provider) ? 'claude-code' : 'pi';
 }
 

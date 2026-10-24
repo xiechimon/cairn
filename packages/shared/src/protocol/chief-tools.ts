@@ -245,8 +245,13 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'todos',
     description:
-      'List todos. Filter by project or phase; returns full todo docs including spec, phase, seqNum and assignment.',
+      'List todo summaries within 32 KiB: {todos:[{id,seqNum,title,phase,summary}],total,nextOffset}. Continue with offset=nextOffset until null. Pass todoId separately to fetch one full todo including spec and assignment.',
     parameters: obj({
+      todoId: str('Optional todo id: return this full todo instead of the summary list.'),
+      offset: {
+        type: 'number',
+        description: 'Non-negative integer list offset; use nextOffset to continue.',
+      },
       projectId: str('Optional project id filter.'),
       phase: str(
         'Optional phase filter (todo/queued/planning/confirm/building/review/done/failed/closed).',

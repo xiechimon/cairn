@@ -199,6 +199,7 @@ describe('H6 轨迹包 input 记录注入内容', () => {
     process: { steps: [], plans: [], token_usage: [] },
     judgments: { plan: [], diff: [], gate_verdict: [], ciFixRounds: 0 },
     outcome: null,
+    attribution: null,
   } satisfies TrajectoryPack;
 
   test('注入内容原样进 input', () => {

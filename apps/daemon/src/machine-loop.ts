@@ -20,6 +20,7 @@ import {
   isBackendRuntimeId,
   ORPHAN_WORKTREE_TTL_MS,
 } from '@cairn/shared';
+import { createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import { type ClaudeCodeAuthProbe, probeClaudeCodeAuth } from './claude-code-auth.js';
@@ -57,6 +58,7 @@ export interface MachineLoopOpts {
   /** claude-code 后端测试注入面（spec 17 A3；缺省 = 首个 runtime 步惰性
    * 构造，canon 行 `Loading claude-code runtime…` 与 pi 行对仗）。 */
   claudeCodeBackend?: AgentBackend;
+  geminiBackend?: AgentBackend;
   /** claude-code 凭据预检注入面（#867 T6；缺省 = 真探针
    * `claude auth status`。测试注入固定三态，免得 CI 上真探成「未登录」）。 */
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
@@ -226,9 +228,19 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   // `Loading claude-code runtime…` 与 pi 启动行对仗、恰一条。注入面
   // （测试）预置即免构造，canon 行仍在首解析时落（行为面统一）。
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
+  let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
   let claudeAnnounced = false;
+  let geminiAnnounced = false;
   const backendFor = (agentProviderId: string | null | undefined): AgentBackend => {
-    if (!isBackendRuntimeId(agentProviderId)) return backend; // 默认支（pi）
+    if (agentProviderId === 'gemini') {
+      if (!geminiAnnounced) {
+        logger.raw('Loading gemini runtime…');
+        geminiAnnounced = true;
+      }
+      if (geminiBackend === null) geminiBackend = createGeminiBackend();
+      return geminiBackend;
+    }
+    if (!isBackendRuntimeId(agentProviderId)) return backend;
     if (!claudeAnnounced) {
       logger.raw('Loading claude-code runtime…');
       claudeAnnounced = true;

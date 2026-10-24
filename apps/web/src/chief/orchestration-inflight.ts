@@ -58,12 +58,24 @@ export function orchestrationWait(thread: ChiefThread): OrchestrationWait | null
 export interface CardOrchestration {
   threadId: string;
   wait: OrchestrationWait | null;
+  error?: string;
 }
 
 export function cardOrchestration(
   threads: readonly ChiefThread[] | undefined,
   seqNum: number,
 ): CardOrchestration | null {
-  const thread = inflightOrchestrationFor(threads, seqNum);
-  return thread === null ? null : { threadId: thread.id, wait: orchestrationWait(thread) };
+  const inflight = inflightOrchestrationFor(threads, seqNum);
+  if (inflight !== null) return { threadId: inflight.id, wait: orchestrationWait(inflight) };
+  const title = orchestrateThreadTitle(seqNum);
+  const thread = threads
+    ?.filter((item) => item.title === title)
+    .reduce<ChiefThread | null>(
+      (best, item) => (best === null || item.createdAt > best.createdAt ? item : best),
+      null,
+    );
+  if (thread == null) return null;
+  return thread.lastTurnError
+    ? { threadId: thread.id, wait: null, error: thread.lastTurnError }
+    : null;
 }

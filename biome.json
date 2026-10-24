@@ -84,6 +84,14 @@
                   "@anthropic-ai/claude-agent-sdk/*/*"
                 ],
                 "message": "缝纪律（spec 17 T1/01 §5）：claude-agent-sdk 只许经 AgentBackend 缝消费——实现唯一落点 apps/daemon/src/backend/claude-code.ts（与 @earendil-works/* 同律，backend/ 目录覆写豁免）。"
+              },
+              {
+                "group": [
+                  "@agentclientprotocol/sdk",
+                  "@agentclientprotocol/sdk/*",
+                  "@agentclientprotocol/sdk/*/*"
+                ],
+                "message": "缝纪律（ACP）：@agentclientprotocol/sdk 只许经 AgentBackend 缝消费——实现唯一落点 apps/daemon/src/backend/acp.ts。"
               }
             ],
             "paths": {

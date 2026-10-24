@@ -16,12 +16,14 @@ export * from './blocker-handoff-record.js';
 export * from './brand.js';
 // #958：运行简报落 worktree 上下文文件的词表与落点判定（spec 24）。
 export * from './brief-file.js';
+export * from './failure-attribution.js';
 export * from './git-ops.js';
 export * from './phase.js';
 export * from './protocol/index.js';
 export * from './records/index.js';
 export * from './scheduler.js';
 export * from './secret-box.js';
+export * from './secret-redaction.js';
 // #918：技能事实分类单源（daemon 活行 + web 详情页汇总共用）。
 export * from './skill-facts.js';
 // #1106：派发技能注入的纯选择层（server claim 消费；hits 记录进 step 行）。
