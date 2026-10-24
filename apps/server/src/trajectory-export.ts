@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
+  type BackendRuntimeId,
   CONFIRM_ANNOUNCEMENT,
   MERGE_ANNOUNCEMENT,
   redactSecrets,
@@ -33,6 +34,50 @@ import {
 
 export class TrajectoryExportError extends Error {}
 
+const CLAUDE_CODE_PROVIDER: BackendRuntimeId = 'claude-code';
+
+type SkipReason = 'session_missing';
+
+class SkippedBuild extends TrajectoryExportError {
+  constructor(readonly reason: SkipReason) {
+    super('Step session missing');
+  }
+}
+
+function readStepSession(path: string) {
+  if (!existsSync(path)) throw new SkippedBuild('session_missing');
+  const transcript: unknown[] = [];
+  const runtimeModels: string[] = [];
+  for (const line of readFileSync(path, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim() !== '')) {
+    const entry: unknown = JSON.parse(line);
+    if (
+      typeof entry !== 'object' ||
+      entry === null ||
+      !('type' in entry) ||
+      !['message', 'assistant', 'user', 'system'].includes(String(entry.type)) ||
+      !('message' in entry)
+    )
+      continue;
+    const raw = entry.message;
+    if (typeof raw !== 'object' || raw === null || !('role' in raw)) {
+      transcript.push(raw);
+      continue;
+    }
+    transcript.push(raw.role === 'toolResult' ? { ...raw, role: 'system' } : raw);
+    if (raw.role !== 'assistant' || !('model' in raw) || typeof raw.model !== 'string') continue;
+    const provider =
+      'provider' in raw && typeof raw.provider === 'string'
+        ? raw.provider
+        : entry.type === 'assistant'
+          ? CLAUDE_CODE_PROVIDER
+          : undefined;
+    if (provider !== undefined) runtimeModels.push(`${provider}/${raw.model}`);
+  }
+  return { transcript, runtimeModels };
+}
+
 export interface TrajectoryExportOptions {
   buildId?: string;
   since?: number;
@@ -55,6 +100,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
   const db = drizzle(sqlite);
   try {
     let redacted = 0;
+    const skipped: Partial<Record<SkipReason, number>> = {};
     const lines = db.transaction(() => {
       const builds = db
         .select()
@@ -71,7 +117,16 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
         .all();
       if (options.buildId !== undefined && builds.length === 0)
         throw new TrajectoryExportError('Build not found');
-      return builds.map((b) => {
+      return builds.flatMap((b) => {
+        try {
+          return [exportBuild(b)];
+        } catch (error) {
+          if (!(error instanceof SkippedBuild) || options.buildId !== undefined) throw error;
+          skipped[error.reason] = (skipped[error.reason] ?? 0) + 1;
+          return [];
+        }
+      });
+      function exportBuild(b: typeof build.$inferSelect) {
         const task = db.select().from(todo).where(eq(todo.id, b.todoId)).get();
         const steps = db
           .select()
@@ -101,7 +156,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
             side: f.side,
             at: f.createdAt,
             id: f.id,
-            action: f.side === 'plan' ? 'revision' : 'restart',
+            action: f.kind,
             reason: f.feedback,
           })),
           ...db
@@ -123,54 +178,17 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
               reason: null,
             })),
         ].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
-        const processSteps = steps.map((s) => {
-          const path = join(config.dataDir, 'attachments/step-sessions', `${s.id}.jsonl`);
-          const transcript: unknown[] = [];
-          if (existsSync(path)) {
-            for (const line of readFileSync(path, 'utf8')
-              .split('\n')
-              .filter((line) => line.trim() !== '')) {
-              const entry: unknown = JSON.parse(line);
-              if (
-                typeof entry === 'object' &&
-                entry !== null &&
-                'type' in entry &&
-                ['message', 'assistant', 'user', 'system'].includes(String(entry.type)) &&
-                'message' in entry
-              ) {
-                const raw = entry.message;
-                transcript.push(
-                  typeof raw === 'object' &&
-                    raw !== null &&
-                    'role' in raw &&
-                    raw.role === 'toolResult'
-                    ? { ...raw, role: 'system' }
-                    : raw,
-                );
-              }
-            }
-          } else {
-            throw new TrajectoryExportError('Step session missing');
-          }
-          return {
-            stepId: s.id,
-            kind: s.kind,
-            transcript,
-            checkpointCommit: s.checkpointCommit,
-          };
-        });
-        const runtimeModel = processSteps[0]?.transcript.flatMap((row) =>
-          typeof row === 'object' &&
-          row !== null &&
-          'role' in row &&
-          row.role === 'assistant' &&
-          'provider' in row &&
-          typeof row.provider === 'string' &&
-          'model' in row &&
-          typeof row.model === 'string'
-            ? [`${row.provider}/${row.model}`]
-            : [],
-        )[0];
+        const sessions = steps.map((s) => ({
+          step: s,
+          ...readStepSession(join(config.dataDir, 'attachments/step-sessions', `${s.id}.jsonl`)),
+        }));
+        const processSteps = sessions.map(({ step: s, transcript }) => ({
+          stepId: s.id,
+          kind: s.kind,
+          transcript,
+          checkpointCommit: s.checkpointCommit,
+        }));
+        const runtimeModel = sessions[0]?.runtimeModels[0];
         const pack = trajectoryPackSchema.parse({
           buildId: b.id,
           input: {
@@ -219,7 +237,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
         const cleaned = redactSecrets(pack);
         redacted += cleaned.count;
         return JSON.stringify(trajectoryPackSchema.parse(cleaned.value));
-      });
+      }
     });
     mkdirSync(dirname(out), { recursive: true });
     const temporary = `${out}.${randomUUID()}.tmp`;
@@ -232,7 +250,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
     } finally {
       rmSync(temporary, { force: true });
     }
-    return { out, exported: lines.length, redacted };
+    return { out, exported: lines.length, redacted, skipped };
   } finally {
     sqlite.close();
   }

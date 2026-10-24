@@ -40,7 +40,7 @@ export const trajectoryPackSchema = z.object({
     ),
     diff: z.array(
       z.object({
-        action: z.enum(['approve', 'restart']),
+        action: z.enum(['approve', 'revision', 'restart']),
         reason: z.string().nullable(),
       }),
     ),
