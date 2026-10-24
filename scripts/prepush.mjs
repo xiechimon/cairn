@@ -13,6 +13,8 @@ export function prepushPlan(paths, mode = 'local') {
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
+    ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
+    ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
   ];
   const localOnly = [
     ['node', 'scripts/ci-job-structure-gate.mjs'],
