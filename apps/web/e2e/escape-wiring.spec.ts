@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { pressUntil } from './helpers.js';
+import { pressAndExpect } from './helpers.js';
 
 // #462 symptom 2 (Escape 关层竞态) 的回归钉：**开着的层，其 Escape 接线必须
 // 在整个开启期保持稳定**——重渲染（URL 写回、数据提交、SSE 失效）不得把它
@@ -129,8 +129,8 @@ test('确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后�
   await installEscapeTap(page);
   // 根组件级重渲染往返：⌘K 开搜索面板（commit 1）、⌘K 关（commit 2）——
   // 每次 commit 都重建确认层吃到的内联 onClose 箭头
-  await pressUntil(page, 'Meta+k', searchPanel(page));
-  await pressUntil(page, 'Meta+k', searchPanel(page), 'hidden');
+  await pressAndExpect(page, 'Meta+k', searchPanel(page));
+  await pressAndExpect(page, 'Meta+k', searchPanel(page), 'hidden');
   // 开层期零重挂（旧实现：⌘K 往返每次 commit 重挂一次，实测 win adds:2/rems:3）
   // ——同 popover 钉，**关层之前读**，只钉律（重挂）不钉实现的 teardown 条数。
   //

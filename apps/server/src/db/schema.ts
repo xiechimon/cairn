@@ -9,6 +9,7 @@ import type {
   AutonomyGateReason,
   AutonomyKind,
   AutonomySettings,
+  BlockerHandoffRecord,
   ChiefWatch,
   ClaudeCodeReport,
   DocumentDiffFile,
@@ -257,6 +258,7 @@ export const step = sqliteTable('step', {
    * agent.injectedSkills 透传 daemon 收窄目录注入；本列 = 任务详情面的
    * 回查正本（「本任务注入了哪些技能、为何选中」）。 */
   skillInjection: json<SkillInjectionRecord>('skillInjection'),
+  blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
   /** [内部] #1257 额度挂起面：done(failed) 分类为 quota 时步不判死，挂起
    *  等额度（重领退避）。holdReason = 挂起原因（现值 'quota'）；null = 未
    *  挂起。重领成功即清位（挂起是退避态不是持久属性）。 */

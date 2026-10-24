@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "57d49183-e731-4e46-9ab9-4d5383c42359",
+  "id": "1fe87657-3e7a-4f21-9211-4aed5c693a2c",
   "prevId": "d926b5e3-1954-4896-9cf7-b66a7cd4b497",
   "tables": {
     "agent": {
@@ -1988,14 +1988,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "splitPolicy": {
-          "name": "splitPolicy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'human'"
-        },
         "description": {
           "name": "description",
           "type": "text",
@@ -2626,6 +2618,13 @@
         },
         "skillInjection": {
           "name": "skillInjection",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "blockerHandoff": {
+          "name": "blockerHandoff",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

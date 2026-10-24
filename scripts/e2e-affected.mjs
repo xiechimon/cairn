@@ -125,6 +125,7 @@ const DETAIL = [
   'skill-inject',
   'spec-flow',
   'thinking-row-truncate',
+  'hotkeys-ready',
 ];
 // #1428: one ring per edge — the chief window and the FAB are probed there.
 const CHIEF = [
@@ -136,6 +137,7 @@ const CHIEF = [
   'shadcn-primitives',
   'storage-unavailable',
   'z-ladder',
+  'hotkeys-ready',
 ];
 const AGENT = ['agent-', 'team-create-agent', 'registry-focus-ring', 'resource-back-spa'];
 const LIVE_SERVER = ['token-gate', 'live-server-', 'split-autostart'];
