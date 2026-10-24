@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { pressUntil } from './helpers.js';
+import { pressAndExpect } from './helpers.js';
 import { decodePng, type DecodedPng } from './png.js';
 
 // Issue #137 acceptance: ⌘K opens the panel with the input *already*
@@ -68,11 +68,10 @@ function tallestRun(img: DecodedPng, x0: number, y0: number, x1: number, y1: num
   return best;
 }
 
-/** ⌘K until the panel answers (retry rules: pressUntil in helpers.ts). */
 async function openPanel(page: Page) {
   // expanded rows OR rail rows — both live inside the complementary landmark
   await expect(page.getByRole('complementary')).toBeVisible();
-  await pressUntil(page, 'Meta+k', panel(page));
+  await pressAndExpect(page, 'Meta+k', panel(page));
 }
 
 test('⌘K focuses the input — direct typing produces results', async ({ page }) => {
