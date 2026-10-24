@@ -351,13 +351,6 @@
       "when": 1792730000000,
       "tag": "0049_split_policy",
       "breakpoints": true
-    },
-    {
-      "idx": 50,
-      "version": "6",
-      "when": 1792730001000,
-      "tag": "0050_team_autonomy_paused",
-      "breakpoints": true
     }
   ]
 }

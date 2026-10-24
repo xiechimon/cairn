@@ -95,6 +95,13 @@ describe('split_todo checker', () => {
     ).toEqual(expect.arrayContaining([expect.stringContaining('.github/')]));
   });
 
+  test('falls back to human review while autonomy is paused', () => {
+    expect(checkSplitPlan(base({ autonomyPaused: true }))).toEqual({
+      ok: false,
+      reasons: ['团队自治已暂停'],
+    });
+  });
+
   test('passes a valid plan', () => {
     expect(checkSplitPlan(base())).toEqual({ ok: true, reasons: [] });
   });

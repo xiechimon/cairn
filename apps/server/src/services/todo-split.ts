@@ -16,7 +16,7 @@
 import { SPLIT_ANNOUNCEMENT, type UserRecord } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, build, machine, plan as planTable, project, team, todo } from '../db/schema.js';
+import { agent, build, machine, plan as planTable, project, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -40,6 +40,7 @@ export interface SplitDeps {
   machineHub?: MachineWakeHub;
   user: UserRecord;
   convHub?: ConversationStreamHub;
+  isAutonomyPaused?: (teamId: string) => boolean;
 }
 
 /** 执行拆解：建子卡 + 依赖边 + 父方案文档 + 父停 confirm。返回子卡行（chief
@@ -81,7 +82,6 @@ export function createSplitTodo(
   }
   const items = input.subtodos;
   const projectRow = db.select().from(project).where(eq(project.id, parent.projectId)).get();
-  const teamRow = db.select().from(team).where(eq(team.id, parent.teamId)).get();
   const splitPolicy = projectRow?.splitPolicy ?? 'human';
   let checkerPassed = false;
   let checkerReasons: string[] = [];
@@ -105,13 +105,13 @@ export function createSplitTodo(
       .where(eq(agent.teamId, parent.teamId))
       .all()
       .map((row) => ({ ...row, machine: row.machine?.online === undefined ? null : row.machine }));
-    const checked = checkSplitPlan({ subtodos: items, agents: checkerAgents });
+    const checked = checkSplitPlan({
+      subtodos: items,
+      agents: checkerAgents,
+      autonomyPaused: deps.isAutonomyPaused?.(parent.teamId) ?? false,
+    });
     checkerPassed = checked.ok;
     checkerReasons = checked.reasons;
-    if (splitPolicy === 'auto' && teamRow?.autonomyPaused === true) {
-      checkerPassed = false;
-      checkerReasons = ['团队自治已暂停'];
-    }
   }
   if (items.length < 2) {
     throw new HttpError(400, 'subtodos 至少两张：单卡诉求不是拆解，直接派发或改写 spec');
