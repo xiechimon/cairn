@@ -406,7 +406,7 @@ export function BoardSurface({
                      档）；drop 染色是列盒的状态层，随列几何。 */
                   className={cn(
                     'board-column group/column relative flex h-full flex-col bg-background',
-                    isValidDropTarget(column.id) && 'bg-(--drop-tint-base)',
+                    isValidDropTarget(column.id) && 'rounded-(--radius-card) bg-(--drop-tint-base)',
                     dropColumnId === column.id && 'bg-(--drop-tint-hover)',
                   )}
                   aria-label={t(column.name)}

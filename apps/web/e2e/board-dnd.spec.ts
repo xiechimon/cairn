@@ -210,6 +210,29 @@ test('待开始 → 执行中: the drop fires orchestration directly — no dial
   await expect(page.locator('[data-column="building"]').getByTestId('column-count')).toHaveText('0');
 });
 
+test('drop-tinted column keeps the card-family corner radius', async ({ page }) => {
+  await page.goto('/app?scenario=22');
+  const list = await page.locator('[data-column-list="building"]').boundingBox();
+  if (list == null) throw new Error('building list missing');
+
+  await dragTo(page, '[data-column="todo"] [data-todo-id]', {
+    x: list.x + list.width / 2,
+    y: list.y + 60,
+  });
+  await settleDrag(page);
+  const column = page.locator('[data-column="building"]');
+  await expect(column).toHaveAttribute('data-drop', 'true');
+  const cardRadius = await page
+    .locator('[data-column="todo"] .todo-card')
+    .first()
+    .evaluate((el) => getComputedStyle(el).borderTopLeftRadius);
+  expect(cardRadius).not.toBe('0px');
+  await expect(column).toHaveCSS('border-top-left-radius', cardRadius);
+  await expect(column).toHaveCSS('border-bottom-right-radius', cardRadius);
+  await page.mouse.up();
+  await settleDrop(page);
+});
+
 // ---- the per-source target matrix (#753, todos.dev 2026-10-03/04 live 重测;
 // rewrites 「待处理 never a target (#351)」— 待开始→待处理 stays invalid, but
 // validity is now per source card, not a column-level constant) ----
