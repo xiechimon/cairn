@@ -917,7 +917,7 @@ describe('mergeReadiness：看不到 diff 的文件留人，上限按整张补�
 
 describe('mergeReadiness：纯文档补丁（#1621）在 shadow 下判 go，混进保护的文档留人', () => {
   const docsOnly = [
-    file('docs/lessons.md'),
+    file('docs/ops/langfuse.md'),
     file('docs/research/r9.md', { status: 'added', additions: 40, deletions: 0 }),
   ];
 

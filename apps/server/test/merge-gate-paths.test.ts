@@ -88,6 +88,8 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     ['CLAUDE 变体', 'CLAUDE.local.md', 'apps/web/src/claude-md.ts'],
     ['AGENTS 变体', 'AGENTS.override.md', 'apps/web/src/agents.ts'],
     ['评审口径', 'docs/pr-review.md', 'docs/pr-review-notes/x.md'],
+    ['错误台账', 'docs/lessons.md', 'docs/lessons-archive.md'],
+    ['派活模板', 'docs/agent-dispatch-prompts.md', 'docs/agent-dispatch.md'],
     ['ADR', 'docs/adr/0021-x.md', 'docs/adrs.md'],
     ['设计决定', 'docs/spec/28-x.md', 'docs/specs.md'],
     ['闸脚本', 'apps/server/scripts/db-check.mjs', 'apps/server/src/scriptsx.ts'],
@@ -351,7 +353,7 @@ describe('默认拒绝：可自动合并集之外一律留人', () => {
 
 describe('纯文档（#1621）：docs 下的 Markdown 在集内，设计决定、ADR 与评审口径仍留人', () => {
   test('docs 下任意层级的 Markdown 在集内', () => {
-    const files = ['docs/lessons.md', 'docs/README.md', 'docs/a3/x.md', 'docs/research/r1.MD'];
+    const files = ['docs/ops/langfuse.md', 'docs/README.md', 'docs/a3/x.md', 'docs/research/r1.MD'];
     const r = classify(files.map((p) => f(p)));
     expect(r.protected).toEqual([]);
     expect(r.outsideAutoMerge).toEqual([]);
