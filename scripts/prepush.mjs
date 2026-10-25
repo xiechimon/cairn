@@ -62,6 +62,9 @@ export function prepushPlan(paths, mode = 'local') {
           ? [['node', '--test', ...selfTests]]
           : []),
         ['node', 'scripts/prepush-vitest.mjs'],
+        ...(paths.some((path) => path.startsWith('apps/web/'))
+          ? [['pnpm', '--filter', '@cairn/web', 'test']]
+          : []),
         ...advisory,
         ['pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', ...paths],
       ];

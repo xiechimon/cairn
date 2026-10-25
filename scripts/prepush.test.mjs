@@ -82,6 +82,20 @@ test('every single-script CI step also runs in local prepush or is listed as CI-
   for (const script of Object.keys(ciOnlyScripts)) assert.ok(ciScripts.includes(script), script);
 });
 
+test('a web change runs the whole web unit suite, which catches tests that read sources instead of importing them', () => {
+  const webSuite = 'pnpm --filter @cairn/web test';
+  assert.ok(
+    prepushPlan(['apps/web/src/components/ui/skeleton.tsx'])
+      .map((args) => args.join(' '))
+      .includes(webSuite),
+  );
+  assert.ok(
+    !prepushPlan(['apps/server/src/index.ts'])
+      .map((args) => args.join(' '))
+      .includes(webSuite),
+  );
+});
+
 test('local gates default their base to the merge-base, not the moving origin/main tip', () => {
   for (const file of readdirSync('scripts').filter((name) => /-gate\.mjs$/.test(name)))
     assert.doesNotMatch(
@@ -129,9 +143,15 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
   const paths = ['apps/web/src/main.tsx'];
   assert.deepEqual(
     prepushPlan(paths, 'ci'),
-    prepushPlan(paths)
-      .slice(0, -3)
-      .filter((args) => !localOnly.some((local) => local.join(' ') === args.join(' '))),
+    prepushPlan(paths).filter(
+      (args) =>
+        !localOnly.some((local) => local.join(' ') === args.join(' ')) &&
+        !['node scripts/prepush-vitest.mjs', 'pnpm --filter @cairn/web test'].includes(
+          args.join(' '),
+        ) &&
+        !args.includes('e2e:affected') &&
+        !args.includes('--compile'),
+    ),
   );
   assert.deepEqual(prepushPlan(paths, 'advisory'), [
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],
