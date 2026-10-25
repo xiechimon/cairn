@@ -1,19 +1,3 @@
-// Todo detail route (issue #56): app shell sidebar + dhead + phase-driven
-// body. #366 re-lays the route out as the todos.dev 3-pane grid — 240
-// sidebar | fluid thread column | 488 right pane (docs/design/todos.dev.md):
-// the 文档|聊天 tab group is gone, the thread (or the fresh block, 23/23d)
-// owns the center column with the composer as its only card, and the right
-// pane hosts the doc surface (16/17 family) plus the former token/branch/
-// history head-icon overlays as static sections (RightPane). #66 adds the
-// 更多/删除 overlays; #75 adds the deep dynamic states: the version dropdown /
-// compare submenu / plan-version diff surface of the doc pane, the rerun
-// dialog + 复用方案 sub-panel (r8 56/74/75) and the interactive reject chain
-// (请求修改 → replan streaming → v(N+1) → diff → 确认, AC3) walked
-// client-side over the fixture script.
-// #83 (M5): live 数据源分支——无 `?scenario=` 时详情页走真 API + 真 SSE
-// （transcript 实时流/步进度/plan 版本/变更 diff/overlay 三件），关口动作
-// 接真端点（开始/确认/驳回/合并/重跑/删除）；fixture 分支（含 chain 脚本）
-// 保持 #56–#75 行为字节不变。
 import { canOrchestrate } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import {

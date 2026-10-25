@@ -1,6 +1,6 @@
 # 详情页 3-pane 结构与右 pane 视图(detail-right-pane,#366)
 
-详情路由 `/app/todo/:id` 是三栏贴合布局:240 侧栏 | fluid 线程列 | 488 右 pane(docs/design/todos.dev.md 网格)。右 pane 头部型选钮(方案▾/变更▾ 家族)在四个视图间切换:文档面(DocPane plan/changes/diff)与三个静止 section——分支与 PR / Token 用量 / 运行历史(原 #68 头部图标弹层退役为 pane 内容,不再弹模态)。fresh 相位(todo/queued/closed)右栏整栏不渲染——488 让给中心列任务简报(XMON-55 P0 #563)。detail-head 只留 更多 单图标 + 相位主钮;composer 是中心列唯一 12px 圆角卡片。
+The detail route `/app/todo/:id` is a three-pane abutting layout: 240 sidebar | fluid thread column | 488 right pane. The right pane's head type select (the `方案▾`/`变更▾` family) switches between four views: the doc surface (DocPane plan/changes/diff) and three static sections, `分支与 PR` / `Token 用量` / `运行历史` (the #68 head-icon popovers became pane content and no longer open modals). Fresh phases (todo/queued/closed) render no right pane at all, and the 488 goes to the center column's task brief (XMON-55 P0 #563). detail-head keeps only the `更多` icon plus the phase primary button; the composer is the center column's only 12px rounded card.
 
 ## Sub-features
 

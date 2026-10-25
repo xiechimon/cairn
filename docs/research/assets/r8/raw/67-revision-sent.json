@@ -1,4 +1,0 @@
-{
-  "chip": "规划中",
-  "tail": "（如 docs(readme): append r7 rebaseline probe line），本次 commit message 使用 docs(readme): append r8 dynamic probe line。 验证 执行 cat README.md 或 tail -1 README.md，确认最后一行为 r8 dynamic probe。 执行 git diff README.md，确认只新增了一行 +r8 dynamic probe，没有改动其他内容。\n完成 29s\n请把追加行的文案改为「r8 probe manual-revision」，其余不变\n1s\n处理中...\n1"
-}

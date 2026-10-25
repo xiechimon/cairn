@@ -20,7 +20,6 @@ import { chromium } from '@playwright/test';
 
 const BASE_URL = process.argv[2] ?? 'http://127.0.0.1:8392';
 // fileURLToPath, not .pathname — percent-decodes spaces in the checkout path
-// (same idiom as scripts/generate-icons.mjs)
 const OUT_DIR = resolve(fileURLToPath(new URL('../apps/web/public/screenshots', import.meta.url)));
 const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
 mkdirSync(OUT_DIR, { recursive: true });

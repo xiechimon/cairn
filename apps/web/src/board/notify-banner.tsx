@@ -13,9 +13,6 @@ import { useCallback, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 
-/** The 铃铛 glyph (r2 01/28: indigo bell on the tinted disc). Inline because
- *  apps/web/src/icons is generated (scripts/generate-icons.mjs) from the r7
- *  icon dump, which has no bell — the banner predates that capture batch. */
 function Bell() {
   return (
     <svg

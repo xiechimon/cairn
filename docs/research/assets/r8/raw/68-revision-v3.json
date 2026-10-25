@@ -1,4 +1,0 @@
-{
-  "chip": "确认",
-  "tail": "件末尾新增一行文字，文件以换行符结尾。本次任务按同样的惯例，在文件末尾追加一行 r8 probe manual-revision。 改动 README.md：在文件末尾追加新的一行 r8 probe manual-revision，保持文件以换行符结尾（与现有各行格式一致），不修改任何已有内容。 提交：改动完成后需创建一次 commit，遵循仓库历史惯例（如 docs(readme): append r7 rebaseline probe line），本次 commit message 使用 docs(readme): append r8 probe manual-revision line。 验证 执行 cat README.md 或 tail -1 README.md，确认最后一行为 r8 probe manual-revision。 执行 git diff README.md，确认只新增了一行 +r8 probe manual-revision，没有改动其他内容。\n完成 49s\n1"
-}

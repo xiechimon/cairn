@@ -1,3 +1,0 @@
-{
-  "tail": "readme): append r7 rebaseline probe line),但计划的\"改动\"和\"验证\"部分只字未提是否要创建对应的 commit、以及 commit message 应遵循什么格式。请在计划中补充：追加该行后是否需要提交，若需要，commit message 按照惯例应为类似 docs(readme): append r8 dynamic probe line 的格式。(blocking)\nREADME.md：在文件末尾追加新的一行 r8 dynamic probe，保持文件以换行符结尾（与现有各行格式一致），不修改任何已有内容。\n除此之外,计划本身与现有文件内容、格式惯例(每行探针记录、文件以换行符结尾)完全吻合,没有其他问题。\n完成 53s\n4s\n处理中...\n1"
-}
