@@ -4,6 +4,7 @@ import {
   classifyAgentFailure,
   classifyStepFailure,
   isProviderAuthFailure,
+  noVisionSignalOf,
   parseRetryAfterMs,
   STEP_FAILURE_KINDS,
 } from '../src/task-failure.js';
@@ -149,6 +150,28 @@ describe('classifyAgentFailure (#1261 four buckets, F1-F4)', () => {
 
   test('vocabulary closed (enum single source)', () => {
     expect(AGENT_FAILURE_KINDS).toEqual(['quota', 'capacity', 'provider_network', 'other']);
+  });
+});
+
+describe('noVisionSignalOf (#1671 tight-capability signal)', () => {
+  test.each([
+    '400: {"error":{"message":"GLM-5.3-BF16-W4A8 is not a multimodal model","code":"1006"}}',
+    'this model does not support image input',
+    'the endpoint does not support images',
+  ])('matches: %s', (msg) => {
+    expect(noVisionSignalOf(msg)).toBe(true);
+  });
+
+  test.each([
+    '',
+    '不支持的图片格式',
+    'image too large',
+    'unsupported image format',
+    'unsupported file type: image/heic',
+    '402 insufficient credits',
+    'model not found',
+  ])('does not match (per-image errors are not capability signals): %s', (msg) => {
+    expect(noVisionSignalOf(msg)).toBe(false);
   });
 });
 

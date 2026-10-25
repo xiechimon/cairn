@@ -125,6 +125,10 @@ export function isProviderAuthFailure(rawError: string): boolean {
   return httpAuthCodeRe.test(lower) && containsAny(lower, ['api key', 'api_key', 'x-api-key']);
 }
 
+export function noVisionSignalOf(message: string): boolean {
+  return /not a multimodal model/i.test(message) || /does not support images?/i.test(message);
+}
+
 export const AGENT_FAILURE_KINDS = ['quota', 'capacity', 'provider_network', 'other'] as const;
 export type AgentFailureKind = (typeof AGENT_FAILURE_KINDS)[number];
 
