@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "a9f4e77191043a9aa5ad07b9bca3b7d09f056ea6",
-    "date": "2026-10-23"
+    "sha": "78b3b8273877361d110c2d8a5b57905ec36ce284",
+    "date": "2026-10-25"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -147,8 +147,8 @@
     },
     "seeded-avatar.tsx": {
       "kind": "adapter",
-      "reason": "XMON-14/#387: dicebear Lorelei seeding + fallback-image semantics composed on the registry avatar item; Root is a fixed-size box per the #983 verdict (#1003) — the upstream after: hairline ring needs a real containing block, geometry rides the Root via consumer className.",
-      "hash": "b71176f67b5f70ff0e27e58976c7daa12ee2ccbec3daa604a5169ab6ea5c01e8"
+      "reason": "XMON-14/#387/#1429: local spiral-seal seeding (lib/spiral-avatar, busy variant spins) + fallback-image semantics composed on the registry avatar item; Root is a fixed-size box per the #983 verdict (#1003) — the upstream after: hairline ring needs a real containing block, geometry rides the Root via consumer className.",
+      "hash": "6344ed5a11086d51e55d83670eb5f2f9e4601a402dd8309d67df78dfce01b03f"
     },
     "select.tsx": {
       "kind": "registry",

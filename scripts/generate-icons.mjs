@@ -126,13 +126,6 @@ const EXTRA_ICONS = [
     trace: 'a 1:1 trace of the r5 100 bitmap diagonal-arrows glyph',
   },
   {
-    name: 'ChiefFaceDashed',
-    size: [24, 24],
-    svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3"></circle><circle cx="9" cy="10" r="1.7" fill="currentColor" stroke="none"></circle><circle cx="15" cy="10" r="1.7" fill="currentColor" stroke="none"></circle><line x1="9" y1="15" x2="15" y2="15"></line></svg>',
-    contexts: ['chief 设置 Agent row unbound face (traced from r5 101)'],
-    trace: 'a 1:1 trace of the r5 101 bitmap dashed-circle face',
-  },
-  {
     name: 'ChiefUserPlus',
     size: [16, 16],
     svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" x2="19" y1="8" y2="14"></line><line x1="22" x2="16" y1="11" y2="11"></line></svg>',

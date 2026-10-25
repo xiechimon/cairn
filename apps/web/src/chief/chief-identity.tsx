@@ -28,9 +28,10 @@ const IDENTITY_CLS = 'inline-flex items-center gap-1.5 self-start text-inherit n
 
 interface ChiefIdentityProps {
   agent: NonNullable<ChiefContent['agent']>;
+  busy?: boolean;
 }
 
-export function ChiefIdentity({ agent }: ChiefIdentityProps) {
+export function ChiefIdentity({ agent, busy = false }: ChiefIdentityProps) {
   // #121 Link law: the scenario param rides along so fixture-mode clicks
   // land on a detail page that resolves the same corpus (team-page agent
   // card recipe). Live URLs carry no scenario — search is empty there.
@@ -43,6 +44,7 @@ export function ChiefIdentity({ agent }: ChiefIdentityProps) {
           name={agent.displayName}
           src={agent.avatarUrl}
           fallback="/avatar-robot-1.svg"
+          busy={busy}
         />
       </span>
       {/* 名字 12px = 参考站实测值（12px/14px、weight 400、次级墨）；行高抬到

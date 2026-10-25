@@ -12,7 +12,6 @@ export { ChevronLeft } from './ChevronLeft.js';
 export { ChevronRight } from './ChevronRight.js';
 export { ChiefExpand } from './ChiefExpand.js';
 export { ChiefFab } from './ChiefFab.js';
-export { ChiefFaceDashed } from './ChiefFaceDashed.js';
 export { ChiefFolder } from './ChiefFolder.js';
 export { ChiefGear } from './ChiefGear.js';
 export { ChiefHash } from './ChiefHash.js';

@@ -18,6 +18,7 @@ import { describe, expect, test } from 'vitest';
 import { ChiefIdentity } from '../src/chief/chief-identity.js';
 import { AVATAR_IMG_CLS } from '../src/chief/recipes.js';
 import type { ChiefContent } from '../src/fixtures/records.js';
+import { spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
 
 type BoundAgent = NonNullable<ChiefContent['agent']>;
 
@@ -68,6 +69,6 @@ describe('chief robot 行身份 chip（#741）', () => {
     // 静态标记里 `[&_img]` 的 & 被转义成 &amp;，按转义形比对）。
     expect(markup).toContain(AVATAR_IMG_CLS.replaceAll('&', '&amp;'));
     expect(markup).toContain('<img');
-    expect(markup).toContain('api.dicebear.com');
+    expect(markup).toContain(spiralAvatarUrl(WITH_ID.displayName).replaceAll('&', '&amp;'));
   });
 });
