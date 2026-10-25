@@ -6,19 +6,17 @@ import {
   DONE_ANNOUNCEMENT,
   filterAgentTools,
   IN_PROGRESS_PHASES,
-  isChiefConversationId,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
   todoOutputSchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
   build,
   chief,
-  chiefMessage,
   chiefThread,
   machine,
   message,
@@ -39,6 +37,7 @@ import {
 } from './builds.js';
 import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from './chief.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
+import { readConversationPage } from './conversation-page.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
@@ -390,25 +389,7 @@ export async function executeChiefTool(
     }
     case 'conversation': {
       const conversationId = str(params, 'conversationId');
-      if (isChiefConversationId(conversationId)) {
-        const rows = db
-          .select()
-          .from(chiefMessage)
-          .where(eq(chiefMessage.threadId, conversationId))
-          .orderBy(asc(chiefMessage.createdAt))
-          .all();
-        return json(
-          rows.map((r) => ({ id: r.id, role: r.role, content: r.content, createdAt: r.createdAt })),
-        );
-      }
-      const rows = db
-        .select()
-        .from(message)
-        .where(eq(message.conversationId, conversationId))
-        .all();
-      return json(
-        rows.map((r) => ({ id: r.id, role: r.role, content: r.content, createdAt: r.createdAt })),
-      );
+      return json(readConversationPage(db, conversationId, optStr(params, 'before')));
     }
 
     case 'create_todo': {

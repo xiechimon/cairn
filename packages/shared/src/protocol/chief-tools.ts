@@ -298,10 +298,14 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'conversation',
     description:
-      'Read the full conversation (transcript messages and tool calls) of a build or chief thread.',
-    parameters: obj({ conversationId: str('Conversation id (buildId or chief-<threadId>).') }, [
-      'conversationId',
-    ]),
+      'Read a build or chief conversation newest first within 60000 characters, with tool payloads summarised. Returns messages, truncated and nextBefore; pass nextBefore as before to read older messages. An oversized message is clipped.',
+    parameters: obj(
+      {
+        conversationId: str('Conversation id (buildId or chief-<threadId>).'),
+        before: str('Optional message id: return messages older than this message, exclusively.'),
+      },
+      ['conversationId'],
+    ),
     replaySafe: true,
   },
   {

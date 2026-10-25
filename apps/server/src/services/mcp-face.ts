@@ -8,13 +8,12 @@ import {
 } from '@cairn/shared';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import {
   agent,
   build,
-  chiefMessage,
   chiefThread,
   machine,
   message,
@@ -28,6 +27,7 @@ import { verifyApiKey } from './api-keys.js';
 import { cancelBuild, startBuilds } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
 import { confirmBuild, transitionTodos } from './chief-tools.js';
+import { readConversationPage } from './conversation-page.js';
 import { executeGithubReadTool } from './github-reads.js';
 import { isChiefConversation } from './machines.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
@@ -46,7 +46,7 @@ const sArr = z.array(z.string());
 const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   todos: { projectId: s.optional(), phase: s.optional() },
   projects: {},
-  conversation: { conversationId: s },
+  conversation: { conversationId: s, before: s.optional() },
   agents: {},
   schedules: {},
   attachment: { attachmentId: s },
@@ -193,25 +193,10 @@ export async function executeMcpTool(
           .where(and(eq(chiefThread.id, conversationId), eq(chiefThread.teamId, ctx.teamId)))
           .get();
         if (!thread) throw new HttpError(404, `conversation ${conversationId}`);
-        const rows = db
-          .select()
-          .from(chiefMessage)
-          .where(eq(chiefMessage.threadId, conversationId))
-          .orderBy(asc(chiefMessage.createdAt))
-          .all();
-        return json(
-          rows.map((r) => ({ id: r.id, role: r.role, content: r.content, createdAt: r.createdAt })),
-        );
+      } else {
+        requireTeamBuild(db, conversationId, ctx.teamId);
       }
-      requireTeamBuild(db, conversationId, ctx.teamId);
-      const rows = db
-        .select()
-        .from(message)
-        .where(eq(message.conversationId, conversationId))
-        .all();
-      return json(
-        rows.map((r) => ({ id: r.id, role: r.role, content: r.content, createdAt: r.createdAt })),
-      );
+      return json(readConversationPage(db, conversationId, optStr(args, 'before')));
     }
     case 'agents': {
       const rows = db.select().from(agent).where(eq(agent.teamId, ctx.teamId)).all();
