@@ -187,7 +187,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto(`${DETAIL}?scenario=detail-unread`);
       const fab = await surfaceShadow(page, '.chief-fab');
       expect(rings(fab)).toBe(1);
-      expect(fab).toContain(edgeRing);
+      expect(fab.endsWith(await slot(page, 'e2'))).toBe(true);
 
       // e2: the menu rings once
       await page.goto(`${DETAIL}?scenario=17`);
