@@ -1,12 +1,6 @@
-// 派发技能注入的纯选择层（#1106）——selectSkillsForTask 契约。粗分发 = 规则
-// 匹配（关键词/域分组起步，不引向量检索）：显式点名（任务文本报出已授予技能
-// 的 id/name，精度最高）+ 域分组双信号（任务文本与技能 id/name/description
-// 命中同一域的关键词）。第一失败方式 = 无关技能混进任务 brief（噪声回到
-// 「全注入」的老病）；第二失败方式 = 零命中任务被当成故障（必须 [] 不抛）。
 import { describe, expect, it } from 'vitest';
 import { type SkillInjectCandidate, selectSkillsForTask } from '../src/index.js';
 
-/** 20+ 技能的授予集（验收 1 的量级）：跨域各若干 + 明确无关若干。 */
 const granted: SkillInjectCandidate[] = [
   {
     id: 'tdd',
@@ -71,56 +65,54 @@ const granted: SkillInjectCandidate[] = [
   },
 ];
 
-describe('零命中（第一出口：[] 不抛，零注入不是故障）', () => {
-  it('空任务文本 / 空白 = 零命中', () => {
+describe('zero hits (first exit: [] no throw, zero injection is not a failure)', () => {
+  it('empty task text / whitespace = zero hits', () => {
     expect(selectSkillsForTask('', granted)).toEqual([]);
     expect(selectSkillsForTask('   \n\t ', granted)).toEqual([]);
   });
-  it('候选集为空 = 零命中', () => {
+  it('empty candidate set = zero hits', () => {
     expect(selectSkillsForTask('给登录页补 e2e 测试', [])).toEqual([]);
   });
-  it('文本与任何授予技能既不同域也无点名 = 零命中', () => {
+  it('text sharing no domain and no mention with any granted skill = zero hits', () => {
     expect(selectSkillsForTask('把首页轮播图换成静态图', granted)).toEqual([]);
   });
-  it('description 为 null 的技能不炸、不因空描述误配', () => {
+  it('skills with null description do not throw and do not false-match on empty description', () => {
     expect(
       selectSkillsForTask('修一个 bug', [{ id: 'bare', name: 'bare', description: null }]),
     ).toEqual([]);
   });
 });
 
-describe('显式点名（精度最高，优先于域规则）', () => {
-  it('任务文本报出技能 id/name = 命中该技能', () => {
+describe('explicit mention (highest precision, wins over domain rules)', () => {
+  it('task text naming a skill id/name = that skill hits', () => {
     const hits = selectSkillsForTask('用 tdd 技能给购物车模块补测试', granted);
     expect(hits.map((h) => h.id)).toContain('tdd');
     const tdd = hits.find((h) => h.id === 'tdd');
     expect(tdd?.rule).toBe('explicit-mention');
     expect(tdd?.reason).toContain('tdd');
   });
-  it('中文名同样命中（含 frontmatter name 为中文的技能）', () => {
+  it('Chinese names match too (including skills whose frontmatter name is Chinese)', () => {
     const zh = [{ id: 's1', name: '周报助手', description: '帮你写周报' }];
     const hits = selectSkillsForTask('喊周报助手出来写一下本周周报', zh);
     expect(hits.map((h) => h.id)).toEqual(['s1']);
     expect(hits[0]?.rule).toBe('explicit-mention');
   });
-  it('单字名不参与点名（防单字误配，#823 同律）', () => {
+  it('single-character names do not participate in mention matching (prevents single-char false matches, same rule as #823)', () => {
     const one = [{ id: 'x', name: 'x', description: '占位' }];
     expect(selectSkillsForTask('x 是什么', one)).toEqual([]);
   });
-  it('点名未授予的名字不命中（不编造，授予集是候选边界）', () => {
+  it('mentioning a name not granted does not hit (no fabrication; the granted set is the candidate boundary)', () => {
     expect(selectSkillsForTask('用 pdf-polish 排一下版', granted).map((h) => h.id)).not.toContain(
       'pdf-polish',
     );
   });
 });
 
-describe('域分组双信号（任务与技能命中同一域）', () => {
-  it('前端域任务 = 前端域技能注入，求职/知识库等无关技能零注入', () => {
+describe('domain-grouping dual signal (task and skill hit the same domain)', () => {
+  it('frontend-domain task = frontend-domain skills injected; unrelated skills (job-hunt, knowledge-base, etc.) zero injection', () => {
     const hits = selectSkillsForTask('修复看板卡片的字号过小与换行溢出问题', granted);
     const ids = hits.map((h) => h.id);
     expect(ids).toContain('better-typography');
-    // 域粒度 = 同域技能都进（better-colors 是前端域：颜色/对比度）——
-    // 「无关」的裁决单位是域，不是技能内子主题。
     expect(ids).toContain('better-colors');
     for (const id of ['great-resume', 'offer', 'wiki', 'interview', 'job-apply', 'aihot']) {
       expect(ids).not.toContain(id);
@@ -130,25 +122,24 @@ describe('域分组双信号（任务与技能命中同一域）', () => {
     expect(typo?.reason).toContain('前端');
     expect(typo?.reason).toContain('字号');
   });
-  it('英文任务文本同样走域匹配（token 级，子串不算）', () => {
+  it('English task text follows the same domain matching (token level, substring does not count)', () => {
     const hits = selectSkillsForTask('Add vitest coverage for the claim API endpoint', granted);
     const ids = hits.map((h) => h.id);
     expect(ids).toContain('tdd');
     expect(ids).not.toContain('better-typography');
-    // contest 之类子串不得当 test 命中：这里借 skill id 名确保 token 匹配不误配。
     expect(
       selectSkillsForTask('run the contest', [
         { id: 'tdd', name: 'tdd', description: 'Test-driven development' },
       ]),
     ).toEqual([]);
   });
-  it('测试域中文任务（验收 1 同形）', () => {
+  it('Chinese task in the test domain (same shape as acceptance 1)', () => {
     const hits = selectSkillsForTask('给购物车结算流程补单测与回归断言', granted);
     const ids = hits.map((h) => h.id);
     expect(ids).toContain('tdd');
     expect(ids).not.toContain('ask-matt');
   });
-  it('多域命中 = 并集（任务跨域时各域技能都注入）', () => {
+  it('multi-domain hit = union (skills of each domain injected when the task spans domains)', () => {
     const hits = selectSkillsForTask('给部署脚本补安全扫描的单元测试', granted);
     const ids = hits.map((h) => h.id);
     expect(ids).toContain('tdd');
@@ -156,26 +147,26 @@ describe('域分组双信号（任务与技能命中同一域）', () => {
   });
 });
 
-describe('输出形状（确定性 + 可解释）', () => {
-  it('确定性：同输入两次调用逐字节等价，按 id 字典序', () => {
+describe('output shape (determinism + explainability)', () => {
+  it('determinism: two calls with the same input byte-identical, ordered by id', () => {
     const a = selectSkillsForTask('用 tdd 给字号问题补测试', granted);
     const b = selectSkillsForTask('用 tdd 给字号问题补测试', granted);
     expect(a).toEqual(b);
     const ids = a.map((h) => h.id);
     expect([...ids].sort((x, y) => x.localeCompare(y))).toEqual(ids);
   });
-  it('同一技能只出一条（显式点名优先于域，不重复）', () => {
+  it('the same skill emits only one entry (explicit mention wins over domain, no duplicates)', () => {
     const hits = selectSkillsForTask('用 tdd 技能给购物车模块补单元测试', granted);
     expect(hits.filter((h) => h.id === 'tdd').length).toBe(1);
   });
-  it('每条命中都带规则与 reason（验收 4：至少规则命中原因一条）', () => {
+  it('every hit carries rule and reason (acceptance 4: at least one rule-hit reason)', () => {
     const hits = selectSkillsForTask('修复看板卡片的字号过小', granted);
     for (const h of hits) {
       expect(['explicit-mention', 'domain']).toContain(h.rule);
       expect(h.reason.length).toBeGreaterThan(0);
     }
   });
-  it('全半角标点/大小写归一后同样命中（NFKC 同律）', () => {
+  it('fullwidth/halfwidth punctuation and case normalized, still matches (same NFKC rule)', () => {
     expect(selectSkillsForTask('修复看板卡片的字号过小', granted).map((h) => h.id)).toEqual(
       selectSkillsForTask('修复看板卡片（字号）过小！！', granted).map((h) => h.id),
     );
@@ -185,8 +176,8 @@ describe('输出形状（确定性 + 可解释）', () => {
   });
 });
 
-describe('20+ 技能噪声闸（票面验收 1 的负例清单）', () => {
-  it('求职/知识库/导学族技能在任何工程任务里零注入', () => {
+describe('20+ skill noise gate (negative-case list from ticket acceptance 1)', () => {
+  it('job-hunt / knowledge-base / tutorial-family skills zero injection in any engineering task', () => {
     const engineering = [
       '重构 dispatch 模块并补 vitest 覆盖',
       '修复 claim 端点报错：404 排查',

@@ -14,11 +14,11 @@ const valid = {
 };
 
 describe('harnessRegressionResultSchema', () => {
-  test('接受完整结果', () => {
+  test('accepts a complete result', () => {
     expect(harnessRegressionResultSchema.parse(valid)).toEqual(valid);
   });
 
-  test('缺 harness_sha、摘要或阈值字段则拒', () => {
+  test('missing harness_sha, summary, or threshold field -> rejected', () => {
     const { harness_sha: _h, ...noSha } = valid;
     const { patchDigest: _p, ...noDigest } = valid;
     const { decision_ok: _d, ...noRate } = valid;
@@ -35,7 +35,7 @@ describe('harnessRegressionResultSchema', () => {
 });
 
 describe('CHIEF_DISPATCH_HARNESS_PATHS', () => {
-  test('含总管提示词、工具描述与 worker 相关路径', () => {
+  test('contains the chief prompt, tool descriptions, and worker-related paths', () => {
     expect(CHIEF_DISPATCH_HARNESS_PATHS).toContain('apps/server/src/services/chief.ts');
     expect(CHIEF_DISPATCH_HARNESS_PATHS).toContain('packages/shared/src/protocol/chief-tools.ts');
     expect(CHIEF_DISPATCH_HARNESS_PATHS).toContain('apps/daemon/src/backend/pi.ts');

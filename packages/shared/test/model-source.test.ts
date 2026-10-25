@@ -1,7 +1,3 @@
-// parseClaudeCodeModelSource 对拍（#707 纯函数：server 与 daemon 共吃——
-// 谁读谁机器的 settings.json）。语义 = 旧 server 端 fs 直读的解析面（model +
-// env.ANTHROPIC_*_MODEL 槽，中段小写化；缺失/非法 → installed:false）。
-
 import { describe, expect, test } from 'vitest';
 import {
   claudeCodeReportSchema,
@@ -10,7 +6,7 @@ import {
 } from '../src/records/model-source.js';
 
 describe('parseClaudeCodeModelSource', () => {
-  test('model + env 槽解析（中段小写化，非槽键跳过）', () => {
+  test('model + env slot parsing (mid-segment lowercasing, non-slot keys skipped)', () => {
     const source = parseClaudeCodeModelSource(
       {
         model: 'claude-opus-4-5',
@@ -34,13 +30,13 @@ describe('parseClaudeCodeModelSource', () => {
     });
   });
 
-  test('JSON 字符串输入同律（daemon 读文件原文直喂）', () => {
+  test('JSON string input follows the same rule (daemon feeds the raw file content)', () => {
     const source = parseClaudeCodeModelSource(JSON.stringify({ model: 'm-1' }), 'exec-1');
     expect(source.installed).toBe(true);
     expect(source.models).toEqual([{ id: 'm-1', name: 'm-1', slot: 'default' }]);
   });
 
-  test('缺失/非法/非对象 → installed:false（不抛）', () => {
+  test('missing/invalid/non-object -> installed:false (no throw)', () => {
     for (const raw of [null, undefined, '{ not json', '["m-1"]', '42', '']) {
       const source = parseClaudeCodeModelSource(raw, 'exec-1');
       expect(source).toEqual({
@@ -52,7 +48,7 @@ describe('parseClaudeCodeModelSource', () => {
     }
   });
 
-  test('槽值非字符串/空串跳过该槽，installed 仍 true', () => {
+  test('non-string/empty slot values skip that slot, installed still true', () => {
     const source = parseClaudeCodeModelSource(
       { model: '', env: { ANTHROPIC_OPUS_MODEL: 42, ANTHROPIC_SONNET_MODEL: 'claude-sonnet-5' } },
       'exec-1',
@@ -63,7 +59,7 @@ describe('parseClaudeCodeModelSource', () => {
     ]);
   });
 
-  test('model 别名经 ANTHROPIC_DEFAULT_*_MODEL 映射解析成真名（#1287）', () => {
+  test('model alias resolved to a real name via ANTHROPIC_DEFAULT_*_MODEL (#1287)', () => {
     const source = parseClaudeCodeModelSource(
       {
         model: 'fable',
@@ -76,12 +72,12 @@ describe('parseClaudeCodeModelSource', () => {
     ]);
   });
 
-  test('model 别名无映射 → 回落裸值（#1287）', () => {
+  test('model alias without mapping -> falls back to the raw value (#1287)', () => {
     const source = parseClaudeCodeModelSource({ model: 'fable' }, 'exec-1');
     expect(source.models).toEqual([{ id: 'fable', name: 'fable', slot: 'default' }]);
   });
 
-  test('别名解析结果与槽位条目同 id → 去重只留 default 行（#1287）', () => {
+  test('alias resolution and slot entry with the same id -> dedup keeps only the default row (#1287)', () => {
     const source = parseClaudeCodeModelSource(
       {
         model: 'fable',
@@ -97,7 +93,7 @@ describe('parseClaudeCodeModelSource', () => {
     ]);
   });
 
-  test('model 直写真名无别名 → 原样保留、env 槽照常（#1287）', () => {
+  test('model written as a real name without alias -> kept verbatim, env slots as usual (#1287)', () => {
     const source = parseClaudeCodeModelSource(
       {
         model: 'claude-opus-4-5',
@@ -111,7 +107,7 @@ describe('parseClaudeCodeModelSource', () => {
     ]);
   });
 
-  test('多个 env 槽映同一 id → 按 id 去重（#1287）', () => {
+  test('multiple env slots mapping to the same id -> dedup by id (#1287)', () => {
     const source = parseClaudeCodeModelSource(
       {
         env: {
@@ -128,7 +124,7 @@ describe('parseClaudeCodeModelSource', () => {
     ]);
   });
 
-  test('上报载荷 round-trip：report → 段（hostname/模型原样）', () => {
+  test('report payload round-trip: report -> segments (hostname/model verbatim)', () => {
     const source = parseClaudeCodeModelSource({ model: 'm-1' }, 'exec-1');
     const report = claudeCodeReportSchema.parse({
       installed: source.installed,

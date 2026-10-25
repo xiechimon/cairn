@@ -15,8 +15,8 @@ const ITEMS = [
   { text: '查 pi 模型上下文是不是都 1M', state: 'done' },
 ] as const;
 
-describe('agent todo wire 三面', () => {
-  it('机器面上报形进 tool/{stepId} union（第七形）', () => {
+describe("agent todo wire's three surfaces", () => {
+  it('machine-surface reported shape enters the tool/{stepId} union (seventh shape)', () => {
     const parsed = machineToolBodySchema.safeParse({
       kind: 'agent_todo',
       todo: { items: ITEMS },
@@ -24,7 +24,7 @@ describe('agent todo wire 三面', () => {
     expect(parsed.success).toBe(true);
   });
 
-  it('会话流事件 = 上报形 + server 盖章（stepId/at）', () => {
+  it('conversation-stream events = reported shape + server stamping (stepId/at)', () => {
     const parsed = conversationStreamEventSchema.safeParse({
       type: 'agent_todo',
       todo: { items: ITEMS, stepId: 'step-0199', at: 1760000000000 },
@@ -38,7 +38,7 @@ describe('agent todo wire 三面', () => {
     }
   });
 
-  it('todo 调用行携带 cairn 投影位；非 todo 调用缺省不变', () => {
+  it('todo call lines carry the cairn projection bits; non-todo calls unchanged by default', () => {
     const withTodo = toolCallRecordSchema.parse({
       id: 'toolu_1',
       name: 'TodoWrite',
@@ -54,7 +54,7 @@ describe('agent todo wire 三面', () => {
     expect(without.todo).toBeUndefined();
   });
 
-  it('state 词表外拒绝；空 text 拒绝；超上限拒绝（fail-closed）', () => {
+  it('state outside vocabulary rejected; empty text rejected; over-limit rejected (fail-closed)', () => {
     expect(
       agentTodoReportSchema.safeParse({ items: [{ text: 'a', state: 'later' }] }).success,
     ).toBe(false);
@@ -69,7 +69,7 @@ describe('agent todo wire 三面', () => {
     expect(agentTodoSchema.safeParse({ items: ITEMS }).success).toBe(false);
   });
 
-  it('行文法 marker 词表与状态映射单源：x/X=done，空格=todo，~/=doing', () => {
+  it('line-syntax marker vocabulary and state mapping single source: x/X=done, space=todo, ~/=doing', () => {
     expect(Object.keys(AGENT_TODO_MARKER_STATES).sort()).toEqual([' ', '/', 'X', 'x', '~']);
     const line = AGENT_TODO_LINE_RE.exec('- [x] 查 pi 模型上下文');
     expect(line?.[1]).toBe('x');

@@ -1523,5 +1523,10 @@
     "path": "apps/daemon/src/git.ts",
     "line": " * 回环地址补进 NO_PROXY（#1635：全局 http.proxy 不能拦本机 server）。只补 TTY 守卫：无凭据时 git 快速失败而不是挂等不存在的终端。",
     "reason": "既有注释更正：#1635 后 runGit 给回环地址补 NO_PROXY，旧句「不碰代理变量」已不成立"
+  },
+  {
+    "path": "packages/shared/src/ansi.ts",
+    "line": "  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL are the literal bytes of CSI/OSC sequences; there is no alternative spelling.",
+    "reason": "biome noControlCharactersInRegex: stripping ANSI escapes requires matching the literal ESC/BEL control bytes; no alternative spelling exists"
   }
 ]

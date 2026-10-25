@@ -1,8 +1,3 @@
-// Vocabulary invariants: counts and exact sets pinned against the canonical
-// tables (02 §4.1/§5/§6/§7, r3, r5, 素材替换计划 §2). These assertions are
-// the human-readable half of the CI gate; the snapshot test freezes the full
-// surface (01 §7.4 协议对拍: shared 词表 schema 快照 vs 02 §5/§6 表).
-
 import { describe, expect, it } from 'vitest';
 import {
   API_KEY_PATTERN,
@@ -57,7 +52,7 @@ import {
   WORKER_MEMORY_REMOTE_TOOLS,
 } from '../src/index.js';
 
-describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
+describe('phase nine values authoritative single source (02 §4.1, locked)', () => {
   it('is exactly the nine docs-ordered values', () => {
     expect(PHASE_VALUES).toEqual([
       'todo',
@@ -77,26 +72,22 @@ describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
   });
 
   it('column mapping is the #351 single-key fold (no hasChanges param)', () => {
-    expect(boardColumnFor).toHaveLength(1); // 单键签名钉：无 hasChanges 第二参
+    expect(boardColumnFor).toHaveLength(1);
     expect(boardColumnFor('todo')).toBe('待开始');
-    expect(boardColumnFor('queued')).toBe('执行中'); // #1447：已开始，住它将要跑的那一步（参考站 2026-09-12）
+    expect(boardColumnFor('queued')).toBe('执行中');
     expect(boardColumnFor('planning')).toBe('执行中');
     expect(boardColumnFor('building')).toBe('执行中');
     expect(boardColumnFor('confirm')).toBe('待处理');
-    expect(boardColumnFor('review')).toBe('待处理'); // awaitingReply 同列（钉顶为渲染行为）
+    expect(boardColumnFor('review')).toBe('待处理');
     expect(boardColumnFor('failed')).toBe('待处理');
     expect(boardColumnFor('done')).toBe('已完成');
-    expect(boardColumnFor('closed')).toBe('已完成'); // #1247 canceled 同列
+    expect(boardColumnFor('closed')).toBe('已完成');
   });
 
   it('manual drop targets are the four writable columns (#753)', () => {
-    // #753（todos.dev 2026-10-03/04 live 重测）推翻 #351「待处理不作落点」：
-    // 已完成(有变更)→待处理 = 重开落位，落点正名 review。
     expect(BOARD_DROP_PHASES).toEqual(['todo', 'building', 'review', 'done']);
   });
 
-  // #1457：raw PATCH 进执行中与开始门同吃 orchestrate 的相位集——两条入口
-  // 不得各自放宽。
   it('canBoardDrop → building only for phases orchestrate accepts (#1457)', () => {
     expect(ORCHESTRATE_PHASES).toEqual(['todo', 'failed']);
     for (const phase of PHASE_VALUES) {
@@ -105,37 +96,30 @@ describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
   });
 
   it('canBoardDrop is the per-source manual matrix (#753)', () => {
-    // 待开始 源：执行中（开始意图）+ 已完成；待处理 恒非法（实测）
     expect(canBoardDrop('todo', 'building')).toBe(true);
     expect(canBoardDrop('todo', 'done')).toBe(true);
     expect(canBoardDrop('todo', 'review')).toBe(false);
-    // 待处理 源：待开始 + 已完成；执行中 恒非法（实测）
     expect(canBoardDrop('confirm', 'todo')).toBe(true);
     expect(canBoardDrop('review', 'todo')).toBe(true);
     expect(canBoardDrop('confirm', 'done')).toBe(true);
     expect(canBoardDrop('review', 'done')).toBe(true);
     expect(canBoardDrop('confirm', 'building')).toBe(false);
     expect(canBoardDrop('review', 'building')).toBe(false);
-    // failed 源：待开始 ✓；已完成 ✓（#1247 手动关边。系统漏斗仍拒这条边）
     expect(canBoardDrop('failed', 'todo')).toBe(true);
     expect(canBoardDrop('failed', 'done')).toBe(true);
-    // 已完成 源：待开始 + 待处理（重开回 review；hasChanges 数据闸在 server
-    // updateTodo / web canDropOnColumn，相位级此处放行）；执行中 恒非法（实测）
     expect(canBoardDrop('done', 'todo')).toBe(true);
     expect(canBoardDrop('done', 'review')).toBe(true);
     expect(canBoardDrop('done', 'building')).toBe(false);
-    // 执行中 源（未测行，沿用既有语义 [设计]）：待开始 + 已完成；queued 同列（#1447）
     expect(canBoardDrop('queued', 'todo')).toBe(true);
     expect(canBoardDrop('queued', 'done')).toBe(true);
     expect(canBoardDrop('queued', 'building')).toBe(false);
     expect(canBoardDrop('building', 'todo')).toBe(true);
     expect(canBoardDrop('building', 'done')).toBe(true);
     expect(canBoardDrop('building', 'review')).toBe(false);
-    // 同列 / closed / 非落点相 恒非法
     expect(canBoardDrop('todo', 'todo')).toBe(false);
     expect(canBoardDrop('confirm', 'review')).toBe(false);
     expect(canBoardDrop('planning', 'building')).toBe(false);
-    expect(canBoardDrop('closed', 'todo')).toBe(true); // #1247 reopen from canceled
+    expect(canBoardDrop('closed', 'todo')).toBe(true);
     expect(canBoardDrop('done', 'failed')).toBe(false);
     expect(canBoardDrop('done', 'confirm')).toBe(false);
   });
@@ -162,15 +146,15 @@ describe('machine protocol (02 §5, r3 §1.6)', () => {
   });
 
   it('pins the observed cadence and retry budgets', () => {
-    expect(CLAIM_POLL_INTERVAL_MS).toBe(75_000); // ~75–76s (r3 §1.5)
-    expect(CLAIM_BACKOFF_CAP_MS).toBe(30_000); // 指数退避封顶 (r3 §1.5)
+    expect(CLAIM_POLL_INTERVAL_MS).toBe(75_000);
+    expect(CLAIM_BACKOFF_CAP_MS).toBe(30_000);
     expect(STREAM_TIMEOUTS_MS).toEqual({
       streamFirstEvent: 300_000,
       streamIdle: 480_000,
       streamBodyTimeout: 540_000,
-    }); // r3 bundle 原文
-    expect(ORPHAN_WORKTREE_TTL_MS).toBe(7 * 24 * 60 * 60 * 1000); // r3 §1.4
-    expect(MEMORY_QUOTA_PER_AGENT).toBe(100); // 02 §4.4/r5 §6
+    });
+    expect(ORPHAN_WORKTREE_TTL_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(MEMORY_QUOTA_PER_AGENT).toBe(100);
   });
 
   it('pi stream event vocabulary is the 17-item bundle extraction (02 §5.6)', () => {
@@ -201,7 +185,7 @@ describe('machine protocol (02 §5, r3 §1.6)', () => {
     expect(MACHINE_CUSTOM_TOOLS).toEqual(['web_fetch', 'remote_shell', 'push_branch']);
   });
 
-  it('CLI command face照抄 (02 §5.1)', () => {
+  it('CLI command face copied verbatim (02 §5.1)', () => {
     expect(CLI_COMMANDS).toEqual([
       'start',
       'stop',
@@ -277,8 +261,6 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
       ['POST', '/api/teams/{id}/mcp-servers'],
       ['POST', '/api/teams/{id}/agents'],
       ['POST', '/api/schedules'],
-      // POST /api/skills 已除名（spec 13 #367：技能改本地目录现扫只读投影；
-      // divergence 登记 = NON_REPLICATED_ENDPOINTS，下方 exclusion 断言钉）。
       ['POST', '/api/analytics/first-touch'],
       ['PATCH', '/api/teams/{id}/providers/{pid}'],
       ['PATCH', '/api/teams/{id}/agents/{aid}'],
@@ -301,18 +283,18 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
     expect(q('/api/search')).toEqual(['q']);
   });
 
-  it('excludes /api/push — Web Push 不进 spec (R1 终裁, 02 §9.1/04 §5)', () => {
+  it('excludes /api/push -- Web Push stays out of spec (R1 final ruling, 02 §9.1/04 §5)', () => {
     expect(has('POST', '/api/push')).toBe(false);
   });
 
-  it('skills 写面回摆（XMON-109 spec 13 回摆：POST /api/skills + PUT teams/{id}/skills/{sid}）；scan 面仍无', () => {
+  it('skills write surface rolled back (XMON-109 spec 13 rollback: POST /api/skills + PUT teams/{id}/skills/{sid}); scan surface still absent', () => {
     expect(has('POST', '/api/skills')).toBe(true);
     expect(has('PUT', '/api/teams/{id}/skills/{sid}')).toBe(true);
     expect(has('POST', '/api/skills/scan')).toBe(false);
   });
 });
 
-describe('SSE channels (02 §1.2, 全 SSE 无 WS)', () => {
+describe('SSE channels (02 §1.2, all SSE, no WS)', () => {
   it('has exactly the three channels', () => {
     expect(SSE_CHANNELS.map((c) => c.endpoint)).toEqual([
       '/api/teams/{id}/stream',
@@ -356,7 +338,7 @@ describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
     ]);
   });
 
-  it('capability groups are the six docs原文 (02 §7.2)', () => {
+  it('capability groups are the six docs verbatim (02 §7.2)', () => {
     expect(MCP_CAPABILITY_GROUPS).toEqual([
       'Read the workspace',
       'Read the repo',
@@ -367,39 +349,34 @@ describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
     ]);
   });
 
-  it('tool registry = 24 件 grant↔name 单源，白名单标签 1:1（02/A10 保形）', () => {
+  it('tool registry = 24 grant<->name single source, whitelist labels 1:1 (02/A10 shape-preserving)', () => {
     const read = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'read');
     const write = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'write');
     expect(read.map((t) => t.grant)).toEqual([...MCP_TOOLS_READ]);
     expect(write.map((t) => t.grant)).toEqual([...MCP_TOOLS_WRITE]);
     expect(MCP_TOOL_REGISTRY).toHaveLength(24);
-    // 工具名唯一、snake_case（wire 名 [推断] = chief 词表同族投影，r5 §3.1
-    // 「与 docs MCP server 面六能力组同构」）。
     const names = MCP_TOOL_REGISTRY.map((t) => t.name);
     expect(new Set(names).size).toBe(24);
     for (const name of names) expect(name).toMatch(/^[a-z][a-z0-9_]*$/);
     expect(MCP_REGISTRY_BY_NAME.size).toBe(24);
   });
 
-  it('executor 最低版本门形状（02 §7.1：数值随复刻版本线自定 [设计]）', () => {
+  it('executor minimum-version gate shape (02 §7.1: value self-determined per replica version line [design])', () => {
     expect(MCP_MIN_CLI_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
-    // 观测值留档不改（r3 文案 0.1.45 = 官方版本线）。
     expect(MCP_MIN_CLI_VERSION_GATE_OBSERVED).toBe('0.1.45');
   });
 });
 
-describe('worker memory tools (02 §4.4/r5 §6：worker 步 remoteTools 记忆三件套)', () => {
-  it('三件 = MEMORY_TOOLS 同族，形状过 remoteToolDefSchema', () => {
+describe('worker memory tools (02 §4.4/r5 §6: worker-step remoteTools memory trio)', () => {
+  it('the trio = MEMORY_TOOLS family, shapes pass remoteToolDefSchema', () => {
     expect(WORKER_MEMORY_REMOTE_TOOLS.map((t) => t.name)).toEqual([...MEMORY_TOOLS]);
     for (const def of WORKER_MEMORY_REMOTE_TOOLS) {
       expect(remoteToolDefSchema.safeParse(def).success).toBe(true);
     }
-    // 读工具幂等可重放；写工具单发（r5 §3.1 retry 预算纪律同族）。
     expect(WORKER_MEMORY_REMOTE_TOOLS.find((t) => t.name === 'memories')?.replaySafe).toBe(true);
     expect(WORKER_MEMORY_REMOTE_TOOLS.find((t) => t.name === 'save_memory')?.replaySafe).toBe(
       undefined,
     );
-    // save_memory 带 sourceTodoId 可选溯源位（缺省 = server 从步上下文补齐）。
     const save = WORKER_MEMORY_REMOTE_TOOLS.find((t) => t.name === 'save_memory');
     expect(save).toBeDefined();
     const props = (save as { parameters: { properties: Record<string, unknown> } }).parameters
@@ -414,7 +391,7 @@ describe('worker memory tools (02 §4.4/r5 §6：worker 步 remoteTools 记忆�
   });
 });
 
-describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)', () => {
+describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical replacement values)', () => {
   it('covers every 02 §5.8 slot row', () => {
     expect(Object.keys(BRAND_SLOTS)).toEqual([
       'cliCommandName',
@@ -436,20 +413,18 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
     ]);
   });
 
-  it('live values are the replacement cairn family (D3 已触发 2026-09-23, #109)', () => {
+  it('live values are the replacement cairn family (D3 triggered 2026-09-23, #109)', () => {
     expect(BRAND.cliCommandName).toBe('cairn');
     expect(BRAND.envPrefix).toBe('CAIRN_');
     expect(BRAND.homeDirName).toBe('.cairn');
     expect(BRAND.branchPrefix).toBe('cairn/conv-');
     expect(BRAND.apiKeyPrefix).toBe('cairn_');
     expect(BRAND.manifestName).toBe('Cairn');
-    // 非品牌槽保持项:
     expect(BRAND.remoteMcpPath).toBe('/api/mcp');
-    // 自有包名 (02 §5.8 复刻处置: 自发包名; 06 册 W2-D1: npm 公发改名):
     expect(BRAND.cliPackageName).toBe('@xiechimon/cairn-cli');
   });
 
-  it('BRAND live values = BRAND_SLOTS replacement column (单源纪律, 素材替换计划 §2)', () => {
+  it('BRAND live values = BRAND_SLOTS replacement column (single-source discipline, replacement plan §2)', () => {
     expect(BRAND.cliCommandName).toBe(BRAND_SLOTS.cliCommandName.replacement);
     expect(BRAND.envPrefix).toBe(BRAND_SLOTS.envPrefix.replacement);
     expect(BRAND.branchPrefix).toBe(BRAND_SLOTS.branchPrefix.replacement);
@@ -457,14 +432,7 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
     expect(BRAND.sessionCookieName).toBe(BRAND_SLOTS.sessionCookie.replacement);
   });
 
-  it('env vars are the CAIRN_ same-shape replacement (素材替换计划 §2; r3 §1.1 观测原名 TDS_*)', () => {
-    // 替换相位 = CAIRN_ 同形（观测五件原名 r3 §1.1 = TDS_*，登记在
-    // BRAND_SLOTS.envPrefix.todosDev）；复刻增量位（webDir = M5 SPA 静态托管
-    // 覆写 [设计]；githubOauth 两件 = #231 握手面 client 凭证 [设计]；
-    // token = #251 可选鉴权自有面 [设计]；mcpConfig = spec 13/#368 本地 MCP
-    // config 覆写 [设计]；skillsDir = 技能根覆写（spec 13 #367 来源面 +
-    // spec 14 #371 daemon 扫描根）[设计]；customModelReasoning = 自定义端点
-    // 推理档位 opt-in 开关 [设计]，均非观测 canon）单独断言，两组不混判。
+  it('env vars are the CAIRN_ same-shape replacement (replacement plan §2; r3 §1.1 observed original names TDS_*)', () => {
     const {
       webDir,
       githubOauthClientId,
@@ -492,27 +460,18 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
     expect(token).toBe('CAIRN_TOKEN');
     expect(requireToken).toBe('CAIRN_REQUIRE_TOKEN');
     expect(mcpConfig).toBe('CAIRN_MCP_CONFIG');
-    // spec 13 #367 / spec 14 #371 自有面 [设计]：技能根目录覆写（缺省
-    // SKILLS_DIR_DEFAULT）
     expect(skillsDir).toBe('CAIRN_SKILLS_DIR');
-    // 自有面 [设计]：=1 时 materializeProvider 给自定义端点写 reasoning:true，
-    // pi 才下发 reasoning_effort（opt-in，后端容忍度不一，默认关）
     expect(customModelReasoning).toBe('CAIRN_CUSTOM_MODEL_REASONING');
-    // 自有面 [设计]（#927，spec 26）：pi 提示缓存保留档——long 才长保留
-    // （pi 适配器落 ttl 1h / prompt_cache_retention 24h）；缺省 short 显式化
     expect(piCacheRetention).toBe('CAIRN_PI_CACHE_RETENTION');
-    // 自有面 [设计]（#1149）：环境钩子超时 ms 覆写（缺省 20min，票面钉死）
     expect(hookTimeoutMs).toBe('CAIRN_HOOK_TIMEOUT_MS');
-    // 自有面 [设计]（#1406）：issue 进料轮询 opt-in（1 / true / yes 才开，默认关）
     expect(issueIntake).toBe('CAIRN_ISSUE_INTAKE');
   });
 
-  it('credential formats match the observed shapes (key prefix 随 BRAND 槽)', () => {
+  it('credential formats match the observed shapes (key prefix follows the BRAND slot)', () => {
     expect(API_KEY_PATTERN.test('cairn_0123456789abcdef0123456789abcdef0123456789abcdef')).toBe(
       true,
     );
     expect(API_KEY_PATTERN.test('cairn_short')).toBe(false);
-    // 复刻相位前缀已切换——原站前缀 key 不再匹配（D3 已触发，#109）。
     expect(API_KEY_PATTERN.test('tds_0123456789abcdef0123456789abcdef0123456789abcdef')).toBe(
       false,
     );
@@ -521,8 +480,6 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
   });
 
   it('API-key list-row mask follows the r3 §6 display rule', () => {
-    // 展示规则原形（r3 §6 样例 `tds_afe07565…`）：品牌前缀 + 前 8 hex +
-    // 省略号；前缀随 BRAND.apiKeyPrefix 槽（替换相位 = cairn_）。
     const plaintext = `cairn_afe07565${'0'.repeat(40)}`;
     expect(API_KEY_PATTERN.test(plaintext)).toBe(true);
     expect(maskApiKey(plaintext)).toBe('cairn_afe07565…');
@@ -545,22 +502,17 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(DB_TABLES).toContain('branch_sync');
     expect(DB_TABLES).toContain('stop_pending');
     expect(DB_TABLES).toContain('github_connection');
-    // XMON-108 R1：shell_command 审计表（内部表无 record 投影）
     expect(DB_TABLES).toContain('shell_command');
-    // spec 13 #367：skill 表退役（技能 = 本地目录现扫只读投影，不入库）
     expect(DB_TABLES).not.toContain('skill');
-    // XMON-109 S1：技能写审计行（REST/relay 三入口同表；internal-only 无 record）
     expect(DB_TABLES).toContain('skill_audit');
-    // #1137：GitHub webhook 入口路径 token（内部凭证表，无 record 投影）
     expect(DB_TABLES).toContain('webhook_token');
-    // #1404：合并就绪闸四表（内部表，readiness 经构建记录展示，无 record 投影）
     for (const t of ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state']) {
       expect(DB_TABLES).toContain(t);
       expect(INTERNAL_ONLY_TABLES).toContain(t);
     }
   });
 
-  it('record shapes cover exactly the 22 wire tables (todo_tag join + steer/stop_pending internal + attachment binary + github_connection credential + webhook_token credential have none; skill = 磁盘投影无表位 #367, mcp_server = config 投影无表位 #368, document_diff = 死 schema 退役 #1029 但 wire 形状仍在 document-diff.js)', () => {
+  it('record shapes cover exactly the 22 wire tables (todo_tag join + steer/stop_pending internal + attachment binary + github_connection credential + webhook_token credential have none; skill = disk projection with no table slot #367, mcp_server = config projection with no table slot #368, document_diff = dead schema retired #1029 but wire shape still lives in document-diff.js)', () => {
     expect(Object.keys(RECORD_SCHEMAS)).toHaveLength(22);
     expect(Object.keys(RECORD_SCHEMAS)).toEqual(
       DB_TABLES.filter(
@@ -572,56 +524,46 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
   });
 });
 
-describe('AgentBackend seam (01 §5, 00/D1 缝)', () => {
+describe('AgentBackend seam (01 §5, 00/D1 seam)', () => {
   it('StepEvent types = 02 §5.6 pi vocabulary session-facing 15 items, 1:1 no rename', () => {
-    // PI_STREAM_EVENTS 17 件 = 会话内 15 件 + 机器控制 wake/shutdown（走机器
-    // stream 通道，protocol/sse.ts）；缝事件面锁定前 15 件（01 §5）。
     expect(STEP_EVENT_TYPES).toHaveLength(15);
     expect(STEP_EVENT_TYPES).toEqual(PI_STREAM_EVENTS.slice(0, 15));
   });
 
-  it('BACKEND_RUNTIME_IDS 收 claude-code 与 gemini，pi 仍不是 backend 身份', () => {
-    // 与 MODEL_SOURCE_RUNTIMES（含 pi）语义分立各自单源：pi agent 的
-    // provider 值是 custom provider id / preset id，不是 'pi'——'pi' 进本表
-    // 会让 resolver 把所有 pi agent 步误派给不存在的 pi-backend-id。
+  it('BACKEND_RUNTIME_IDS accepts claude-code and gemini; pi is still not a backend identity', () => {
     expect(BACKEND_RUNTIME_IDS).toEqual(['claude-code', 'gemini']);
     expect(BACKEND_RUNTIME_IDS).not.toContain('pi');
-    // backend 身份 ⊆ 模型源 runtime（claude-code 既是模型源也是 backend）。
     for (const id of BACKEND_RUNTIME_IDS) {
       expect(MODEL_SOURCE_RUNTIMES).toContain(id);
     }
   });
 
-  it('isBackendRuntimeId：词表外（custom provider id / pi / null / undefined）一律 false', () => {
-    // spec 17 A3 默认支零回归的判定面：resolver 据此把非 runtime 身份恒走 pi。
+  it('isBackendRuntimeId: outside the vocabulary (custom provider id / pi / null / undefined) always false', () => {
     expect(isBackendRuntimeId('claude-code')).toBe(true);
     expect(isBackendRuntimeId('gemini')).toBe(true);
-    expect(isBackendRuntimeId('stub-gw')).toBe(false); // custom provider id
-    expect(isBackendRuntimeId('pi')).toBe(false); // 模型源词 ≠ backend 身份
-    expect(isBackendRuntimeId('anthropic')).toBe(false); // preset provider id
+    expect(isBackendRuntimeId('stub-gw')).toBe(false);
+    expect(isBackendRuntimeId('pi')).toBe(false);
+    expect(isBackendRuntimeId('anthropic')).toBe(false);
     expect(isBackendRuntimeId(null)).toBe(false);
     expect(isBackendRuntimeId(undefined)).toBe(false);
   });
 });
 
-describe('思考强度能力读面（XMON-16 / #499 B3 裁决 A）', () => {
-  it('THINKING_LEVELS = pi ThinkingLevel 七档原样', () => {
-    // 期望值来源 = 上游类型（独立真值，不重算）：
-    // node_modules/.pnpm/@earendil-works+pi-agent-core@0.86.0/…/dist/types.d.ts:267
-    // `export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";`
+describe('thinking-level capability read surface (XMON-16 / #499 B3 ruling A)', () => {
+  it('THINKING_LEVELS = pi ThinkingLevel seven tiers verbatim', () => {
     expect(THINKING_LEVELS).toEqual(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
   });
 
-  it('能力读面封套只认词表内的档位（词表外一律拒）', () => {
+  it('capability read-surface envelope accepts only in-vocabulary tiers (out-of-vocabulary always rejected)', () => {
     expect(capabilitiesResponseSchema.parse({ thinkingLevels: ['off', 'max'] })).toEqual({
       thinkingLevels: ['off', 'max'],
     });
     expect(capabilitiesResponseSchema.safeParse({ thinkingLevels: ['ultra'] }).success).toBe(false);
-    expect(capabilitiesResponseSchema.safeParse({ thinkingLevels: [] }).success).toBe(true); // 空集合法（后端可无档位）
+    expect(capabilitiesResponseSchema.safeParse({ thinkingLevels: [] }).success).toBe(true);
   });
 });
 
-describe('machine wire (02 §5 canonical, wire 层进 CI)', () => {
+describe('machine wire (02 §5 canonical, wire layer enters CI)', () => {
   it('MACHINE_WIRE covers exactly the 13 endpoint paths (single source)', () => {
     expect(MACHINE_WIRE).toHaveLength(13);
     expect(MACHINE_WIRE.map((w) => w.path)).toEqual(MACHINE_ENDPOINTS.map((e) => e.path));
@@ -629,15 +571,15 @@ describe('machine wire (02 §5 canonical, wire 层进 CI)', () => {
 
   it('claim/stream verbs match observed evidence (long-poll claim + SSE stream)', () => {
     const byPath = Object.fromEntries(MACHINE_WIRE.map((w) => [w.path, w.method]));
-    expect(byPath['/api/machine/tasks/claim']).toBe('POST'); // 长轮询（r3 §1.5）
-    expect(byPath['/api/machine/stream']).toBe('GET'); // SSE wake（02 §1.2）
+    expect(byPath['/api/machine/tasks/claim']).toBe('POST');
+    expect(byPath['/api/machine/stream']).toBe('GET');
     expect(byPath['/api/machine/me']).toBe('GET');
     expect(byPath['/api/machine/token/{stepId}']).toBe('GET');
   });
 });
 
 describe('PUBLISHED_PACKAGES', () => {
-  it('安装命令和启动命令来自同一个已发布的包（包名与命令名成对）', () => {
+  it('install command and start command come from the same published package (package name and command name paired)', () => {
     const pairs: Record<string, string> = {
       '@xiechimon/cairn-cli': 'cairn',
     };
