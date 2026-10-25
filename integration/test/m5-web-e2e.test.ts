@@ -150,7 +150,7 @@ beforeAll(async () => {
     }
   }, 30_000);
   browser = await chromium.launch();
-  page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
+  page = await browser.newPage({ viewport: { width: 1440, height: 732 }, locale: 'zh-CN' });
 }, 300_000);
 
 afterAll(async () => {

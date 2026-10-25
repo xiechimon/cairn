@@ -26,6 +26,7 @@ const todo: TodoRecord = {
 function render(threads: ChiefThread[]) {
   return renderToStaticMarkup(
     createElement(MemoryRouter, {}, createElement(I18nProvider, {
+      initialLocale: 'zh',
       children: createElement(TodoCard, { todo, now: 0, orchestration: cardOrchestration(threads, 1586) }),
     })),
   );

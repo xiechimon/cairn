@@ -9,7 +9,6 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_LOCALE,
   LOCALE_STORAGE_KEYS,
   htmlLangFor,
   persistLocale,
@@ -32,25 +31,34 @@ const DICT: Record<string, string> = {
 };
 
 describe('readStoredLocale', () => {
-  it('defaults to zh (zh-CN is the authoritative locale)', () => {
-    expect(DEFAULT_LOCALE).toBe('zh');
-    expect(readStoredLocale(fakeStorage())).toBe('zh');
+  it('follows the browser language when nothing is stored', () => {
+    expect(readStoredLocale(fakeStorage(), 'zh-CN')).toBe('zh');
+    expect(readStoredLocale(fakeStorage(), 'zh-TW')).toBe('zh');
+    expect(readStoredLocale(fakeStorage(), 'en-US')).toBe('en');
+    expect(readStoredLocale(fakeStorage(), 'fr-FR')).toBe('en');
+    expect(readStoredLocale(fakeStorage(), undefined)).toBe('en');
+    expect(readStoredLocale(null, 'zh-CN')).toBe('zh');
+  });
+
+  it('prefers the stored choice over the browser language', () => {
+    expect(readStoredLocale(fakeStorage({ 'cairn-locale': 'zh' }), 'en-US')).toBe('zh');
+    expect(readStoredLocale(fakeStorage({ 'cairn-locale': 'en' }), 'zh-CN')).toBe('en');
   });
 
   it('reads the observed dual keys (r2 §1.5, cairn 同形替换)', () => {
     expect(LOCALE_STORAGE_KEYS).toEqual(['cairn.locale', 'cairn-locale']);
-    expect(readStoredLocale(fakeStorage({ 'cairn.locale': 'en', 'cairn-locale': 'en' }))).toBe(
-      'en',
-    );
+    expect(
+      readStoredLocale(fakeStorage({ 'cairn.locale': 'en', 'cairn-locale': 'en' }), 'zh-CN'),
+    ).toBe('en');
     // either key alone is enough — the official app writes both, but a
     // partially-migrated profile must still resolve
-    expect(readStoredLocale(fakeStorage({ 'cairn-locale': 'en' }))).toBe('en');
+    expect(readStoredLocale(fakeStorage({ 'cairn-locale': 'en' }), 'zh-CN')).toBe('en');
   });
 
-  it('ignores unknown values (future locale codes fall back to zh)', () => {
-    expect(
-      readStoredLocale(fakeStorage({ 'cairn.locale': 'zh-TW', 'cairn-locale': 'zh-TW' })),
-    ).toBe('zh');
+  it('ignores unknown stored values and falls back to the browser language', () => {
+    const storage = fakeStorage({ 'cairn.locale': 'zh-TW', 'cairn-locale': 'zh-TW' });
+    expect(readStoredLocale(storage, 'zh-CN')).toBe('zh');
+    expect(readStoredLocale(storage, 'en-US')).toBe('en');
   });
 });
 
