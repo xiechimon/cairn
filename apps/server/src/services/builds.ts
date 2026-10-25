@@ -2019,7 +2019,9 @@ export function completeStep(
       stepFailed: false,
       extracted: outcome.findings !== undefined,
       blocked: outcome.findings !== undefined && hasBlockingFinding(outcome.findings),
-      report: outcome.verdictReport ?? reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),
+      report:
+        outcome.verdictReport ??
+        reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),
     });
     if (hasBlockingFinding(verdict)) {
       const revisionInFlight = deps.db
@@ -2090,7 +2092,9 @@ export function completeStep(
       stepFailed: false,
       extracted: outcome.verifyVerdict !== undefined,
       blocked: outcome.verifyVerdict !== undefined && !verdict.passed,
-      report: outcome.verdictReport ?? reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),
+      report:
+        outcome.verdictReport ??
+        reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),
     });
     return;
   }

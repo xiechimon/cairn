@@ -123,7 +123,7 @@ describe('buildReviewStepPrompt gate branching (#511)', () => {
     expect(prompt.indexOf('## 本轮变更')).toBeLessThan(prompt.indexOf('## 用户关注点'));
   });
 
-  test('#1404 S5a：派步时写下的 expectedHeadSha 进 meta，缺省不写', () => {
+  test('#1404 S5a: the expectedHeadSha written at dispatch lands in the meta; absent when unset', () => {
     const sha = 'ab'.repeat(20);
     const withSha = buildReviewStepPrompt({
       agentId: 'a1',

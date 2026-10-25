@@ -144,7 +144,7 @@ function attachGithubRepo(w: World, buildId: string) {
   );
 }
 
-const PASS_FINDINGS = { conclusion: '通过', findings: [] as [] };
+const PASS_FINDINGS = { conclusion: 'pass', findings: [] as [] };
 
 async function call(
   app: Hono,
@@ -220,7 +220,7 @@ async function setup(opts: { githubFetch?: FetchLike } = {}) {
   bindAllAgents(s);
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
-    body: { title: '判定绑定探针', spec: 'S5a' },
+    body: { title: 'verdict binding probe', spec: 'S5a' },
   });
   const { id: todoId } = (await todoRes.json()) as { id: string };
 
@@ -309,8 +309,8 @@ async function reachVerify(w: World): Promise<string> {
   });
 }
 
-describe('#1404 S5a 判定绑定', () => {
-  test('审核关口派步的 meta 写 expectedHeadSha；抽取失败入库为 extraction_failed 并能读回', async () => {
+describe('#1404 S5a verdict binding', () => {
+  test('the review gate dispatch meta carries expectedHeadSha; extraction failure lands as extraction_failed and reads back', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -330,7 +330,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(claimed.kind).toBe('review');
     await w.done(claimed.stepId, {
       status: 'success',
-      findingsError: '审核步输出中未找到 verdict JSON',
+      findingsError: 'no verdict JSON found in the review step output',
     });
 
     const row = w.verdictOf(claimed.stepId);
@@ -343,7 +343,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.buildId).toBe(buildId);
   });
 
-  test('verify 抽取失败入库为 extraction_failed，expectedHeadSha 能从库读回', async () => {
+  test('verify extraction failure lands as extraction_failed, expectedHeadSha reads back from the database', async () => {
     world = await setup();
     const w = world;
     const verifierId =
@@ -362,13 +362,13 @@ describe('#1404 S5a 判定绑定', () => {
     expect(verifyStep).toBeDefined();
     const meta = parseVerifyPromptMeta(verifyStep?.prompt ?? null);
     expect(meta?.expectedHeadSha).toBe(HEAD);
-    expect(verifyStep?.prompt ?? '').toContain('代码只读');
+    expect(verifyStep?.prompt ?? '').toContain('the code is read-only');
 
     const claimed = await w.claim();
     expect(claimed.kind).toBe('verify');
     await w.done(claimed.stepId, {
       status: 'success',
-      verifyVerdictError: '验证步输出中未找到 verdict JSON',
+      verifyVerdictError: 'no verdict JSON found in the verify step output',
     });
 
     const row = w.verdictOf(claimed.stepId);
@@ -380,7 +380,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.kind).toBe('verify');
   });
 
-  test('抽出的通过判定入库为 pass，带 expectedHeadSha', async () => {
+  test('an extracted passing verdict lands as pass, with expectedHeadSha', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -402,7 +402,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.patchDigest).toBeNull();
   });
 
-  test('确认关口没有代码 head 时不写 gate_verdict', async () => {
+  test('no gate_verdict row when the confirm gate has no code head', async () => {
     world = await setup();
     const w = world;
     const buildId = await w.startBuild(
@@ -433,12 +433,12 @@ describe('#1404 S5a 判定绑定', () => {
     const claimed = await w.claim();
     await w.done(claimed.stepId, {
       status: 'success',
-      findingsError: '审核步输出中未找到 verdict JSON',
+      findingsError: 'no verdict JSON found in the review step output',
     });
     expect(w.verdictOf(claimed.stepId)).toBeUndefined();
   });
 
-  test('最近一条 checkpoint 不是小写 SHA 时，派步仍绑上一条交付 SHA', async () => {
+  test('when the latest checkpoint is not a lowercase SHA, dispatch still binds the previous delivery SHA', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -468,7 +468,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(meta?.expectedHeadSha).toBe(HEAD);
   });
 
-  test('审核 blocking 入库为 block，不报 commit 也绑 expectedHeadSha', async () => {
+  test('a review blocking verdict lands as block; with no reported commit it still binds expectedHeadSha', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -479,8 +479,8 @@ describe('#1404 S5a 判定绑定', () => {
     await w.done(stepId, {
       status: 'success',
       findings: {
-        conclusion: '要改',
-        findings: [{ id: '1', severity: 'blocking', summary: '缺测试' }],
+        conclusion: 'changes needed',
+        findings: [{ id: '1', severity: 'blocking', summary: 'missing tests' }],
       },
     });
     const row = w.verdictOf(stepId);
@@ -489,7 +489,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.expectedHeadSha).toBe(HEAD);
   });
 
-  test('审核步失败走收尾入库为 step_failed，head 用 expectedHeadSha', async () => {
+  test('a failed review step lands through the failure funnel as step_failed, head from expectedHeadSha', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -497,14 +497,14 @@ describe('#1404 S5a 判定绑定', () => {
       build: { agentId: BUILDER_ID },
     });
     const stepId = await claimReview(w, buildId);
-    await w.done(stepId, { status: 'failed', errorMessage: '审核进程退出' });
+    await w.done(stepId, { status: 'failed', errorMessage: 'review process exited' });
     const row = w.verdictOf(stepId);
     expect(row?.outcome).toBe('step_failed');
     expect(row?.headSha).toBe(HEAD);
     expect(row?.expectedHeadSha).toBe(HEAD);
   });
 
-  test('verify 通过入库为 pass，没报 head 时 headSha 为空', async () => {
+  test('a verify pass lands as pass; with no reported head, headSha is null', async () => {
     world = await setup();
     const w = world;
     await reachVerify(w);
@@ -512,13 +512,13 @@ describe('#1404 S5a 判定绑定', () => {
     expect(claimed.kind).toBe('verify');
     await w.done(claimed.stepId, {
       status: 'success',
-      verifyVerdict: { passed: true, conclusion: '过了', evidence: [] },
+      verifyVerdict: { passed: true, conclusion: 'passed', evidence: [] },
     });
     expect(w.verdictOf(claimed.stepId)?.outcome).toBe('pass');
     expect(w.verdictOf(claimed.stepId)?.headSha).toBeNull();
   });
 
-  test('verify 未通过入库为 block，没报 head 时 headSha 为空', async () => {
+  test('a failed verify lands as block; with no reported head, headSha is null', async () => {
     world = await setup();
     const w = world;
     await reachVerify(w);
@@ -526,13 +526,13 @@ describe('#1404 S5a 判定绑定', () => {
     expect(claimed.kind).toBe('verify');
     await w.done(claimed.stepId, {
       status: 'success',
-      verifyVerdict: { passed: false, conclusion: '没过', evidence: [] },
+      verifyVerdict: { passed: false, conclusion: 'failed', evidence: [] },
     });
     expect(w.verdictOf(claimed.stepId)?.outcome).toBe('block');
     expect(w.verdictOf(claimed.stepId)?.headSha).toBeNull();
   });
 
-  test('head 一致时按 GitHub compare 把交付摘要写入判定', async () => {
+  test('with the head matching, the delivery digest is written into the verdict from the GitHub compare', async () => {
     const ranges: Record<string, unknown> = { [`${BASE}...${HEAD}`]: deliveryCompare() };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
@@ -549,7 +549,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.patchDigest).toBe(deliveryDigest());
   });
 
-  test('verify 只在证据目录追加提交时，摘要绑派步时的交付 head', async () => {
+  test('when verify only appends commits inside the evidence directory, the digest binds the delivery head from dispatch time', async () => {
     const ranges: Record<string, unknown> = { [`${BASE}...${HEAD}`]: deliveryCompare() };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
@@ -562,7 +562,7 @@ describe('#1404 S5a 判定绑定', () => {
     await w.done(claimed.stepId, {
       status: 'success',
       commit: EVIDENCE,
-      verifyVerdict: { passed: true, conclusion: '过了', evidence: [] },
+      verifyVerdict: { passed: true, conclusion: 'passed', evidence: [] },
     });
     await flushVerdictDigests();
     const row = w.verdictOf(claimed.stepId);
@@ -572,7 +572,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.patchDigest).toBe(deliveryDigest());
   });
 
-  test('verify 的后续提交改了代码时，摘要不绑定', async () => {
+  test('when verify follow-up commits change code, no digest binding', async () => {
     const ranges: Record<string, unknown> = { [`${BASE}...${HEAD}`]: deliveryCompare() };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
@@ -587,13 +587,13 @@ describe('#1404 S5a 判定绑定', () => {
     await w.done(claimed.stepId, {
       status: 'success',
       commit: EVIDENCE,
-      verifyVerdict: { passed: true, conclusion: '过了', evidence: [] },
+      verifyVerdict: { passed: true, conclusion: 'passed', evidence: [] },
     });
     expect(w.verdictOf(claimed.stepId)?.headSha).toBe(EVIDENCE);
     expect(w.verdictOf(claimed.stepId)?.patchDigest).toBeNull();
   });
 
-  test('verify 把代码改名进证据目录时，摘要不绑定', async () => {
+  test('when verify renames code into the evidence directory, no digest binding', async () => {
     const ranges: Record<string, unknown> = { [`${BASE}...${HEAD}`]: deliveryCompare() };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
@@ -607,14 +607,14 @@ describe('#1404 S5a 判定绑定', () => {
     await w.done(claimed.stepId, {
       status: 'success',
       commit: OTHER,
-      verifyVerdict: { passed: false, conclusion: '没过', evidence: [] },
+      verifyVerdict: { passed: false, conclusion: 'failed', evidence: [] },
     });
     expect(w.verdictOf(claimed.stepId)?.outcome).toBe('block');
     expect(w.verdictOf(claimed.stepId)?.headSha).toBe(OTHER);
     expect(w.verdictOf(claimed.stepId)?.patchDigest).toBeNull();
   });
 
-  test('证据目录的 compare 顶满文件上限时不把没读全的列表当成只改了证据', async () => {
+  test('when the evidence-directory compare hits the file cap, the not fully read list does not count as evidence-only changes', async () => {
     const ranges: Record<string, unknown> = { [`${BASE}...${HEAD}`]: deliveryCompare() };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
@@ -632,13 +632,13 @@ describe('#1404 S5a 判定绑定', () => {
     await w.done(claimed.stepId, {
       status: 'success',
       commit: EVIDENCE,
-      verifyVerdict: { passed: true, conclusion: '过了', evidence: [] },
+      verifyVerdict: { passed: true, conclusion: 'passed', evidence: [] },
     });
     expect(w.verdictOf(claimed.stepId)?.headSha).toBe(EVIDENCE);
     expect(w.verdictOf(claimed.stepId)?.patchDigest).toBeNull();
   });
 
-  test('gateHeadSha 是另一枚 SHA 时记下它，不拿 expected 顶上', async () => {
+  test('when gateHeadSha is another SHA, record it; expected is not substituted', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -656,7 +656,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.patchDigest).toBeNull();
   });
 
-  test('gateHeadSha 不是闸认的 SHA 时忽略，审核仍绑 expectedHeadSha', async () => {
+  test('a gateHeadSha the gate does not recognise is ignored; review still binds expectedHeadSha', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -672,7 +672,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(w.verdictOf(stepId)?.headSha).toBe(HEAD);
   });
 
-  test('gateHeadSha 等于 expected 但 commit 是后来的代码提交时，摘要不绑定', async () => {
+  test('when gateHeadSha equals expected but commit is a later code commit, no digest binding', async () => {
     const ranges: Record<string, unknown> = {
       [`${BASE}...${HEAD}`]: deliveryCompare(),
       [`${HEAD}...${OTHER}`]: comparePayload(OTHER, HEAD, [DELIVERY_FILE]),
@@ -696,7 +696,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.patchDigest).toBeNull();
   });
 
-  test('三视角 fan-out 各写一条判定，perspective 是各自的角色', async () => {
+  test('the three-perspective fan-out writes one verdict each, perspective being each role', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -720,7 +720,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(perspectives).toEqual([...REVIEW_FANOUT_ROLES].sort());
   });
 
-  test('同一步的判定已入库时再收尾不抛错，保留先写的那条', async () => {
+  test('finishing again after the verdict row exists does not throw; the first-written row stays', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -747,7 +747,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(w.verdictOf(stepId)?.createdAt).toBe(1);
   });
 
-  test('GitHub 挂住时 /done 不等它，判定照样入库、摘要留空', async () => {
+  test('when GitHub hangs, /done does not wait for it; the verdict still lands, the digest stays null', async () => {
     const released = new Promise<void>((resolve) => {
       releaseHungGithub = resolve;
     });
@@ -781,7 +781,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(w.verdictOf(stepId)?.patchDigest).toBeNull();
   });
 
-  test('GitHub 不可达时摘要保持未绑定', async () => {
+  test('the digest stays unbound when GitHub is unreachable', async () => {
     world = await setup({ githubFetch: unreachableGithub });
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -798,7 +798,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.patchDigest).toBeNull();
   });
 
-  test('verify 报了两个漂移 head 时取后报的 commit，GitHub 不可达也一样', async () => {
+  test('when verify reports two drifted heads, the later-reported commit wins, also when GitHub is unreachable', async () => {
     world = await setup({ githubFetch: unreachableGithub });
     const w = world;
     const buildId = await reachVerify(w);
@@ -809,14 +809,14 @@ describe('#1404 S5a 判定绑定', () => {
       status: 'success',
       gateHeadSha: OTHER,
       commit: EVIDENCE,
-      verifyVerdict: { passed: true, conclusion: '过了', evidence: [] },
+      verifyVerdict: { passed: true, conclusion: 'passed', evidence: [] },
     });
     await flushVerdictDigests();
     expect(w.verdictOf(claimed.stepId)?.headSha).toBe(EVIDENCE);
     expect(w.verdictOf(claimed.stepId)?.patchDigest).toBeNull();
   });
 
-  test('verify 报了两个漂移 head、都只碰证据目录时，摘要绑交付 head', async () => {
+  test('when verify reports two drifted heads that both only touch the evidence directory, the digest binds the delivery head', async () => {
     const ranges: Record<string, unknown> = { [`${BASE}...${HEAD}`]: deliveryCompare() };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
@@ -833,14 +833,14 @@ describe('#1404 S5a 判定绑定', () => {
       status: 'success',
       gateHeadSha: OTHER,
       commit: EVIDENCE,
-      verifyVerdict: { passed: true, conclusion: '过了', evidence: [] },
+      verifyVerdict: { passed: true, conclusion: 'passed', evidence: [] },
     });
     await flushVerdictDigests();
     expect(w.verdictOf(claimed.stepId)?.headSha).toBe(EVIDENCE);
     expect(w.verdictOf(claimed.stepId)?.patchDigest).toBe(deliveryDigest());
   });
 
-  test('verify 步失败时判定记下证据提交的 head，只碰证据目录的漂移仍绑交付摘要', async () => {
+  test('a failed verify step records the evidence commit head; an evidence-only drift still binds the delivery digest', async () => {
     const ranges: Record<string, unknown> = { [`${BASE}...${HEAD}`]: deliveryCompare() };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
@@ -851,7 +851,7 @@ describe('#1404 S5a 判定绑定', () => {
     const claimed = await w.claim();
     await w.done(claimed.stepId, {
       status: 'failed',
-      errorMessage: '验证进程退出',
+      errorMessage: 'verify process exited',
       gateHeadSha: HEAD,
       commit: EVIDENCE,
     });
@@ -863,7 +863,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.patchDigest).toBe(deliveryDigest());
   });
 
-  test('审核步失败且报了另一枚 head 时，判定记下它、摘要不绑定', async () => {
+  test('a failed review step that reported another head: the verdict records it, no digest binding', async () => {
     const ranges: Record<string, unknown> = { [`${BASE}...${HEAD}`]: deliveryCompare() };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
@@ -873,7 +873,11 @@ describe('#1404 S5a 判定绑定', () => {
     });
     attachGithubRepo(w, buildId);
     const stepId = await claimReview(w, buildId);
-    await w.done(stepId, { status: 'failed', errorMessage: '审核进程退出', gateHeadSha: OTHER });
+    await w.done(stepId, {
+      status: 'failed',
+      errorMessage: 'review process exited',
+      gateHeadSha: OTHER,
+    });
     await flushVerdictDigests();
     const row = w.verdictOf(stepId);
     expect(row?.outcome).toBe('step_failed');
@@ -881,7 +885,7 @@ describe('#1404 S5a 判定绑定', () => {
     expect(row?.patchDigest).toBeNull();
   });
 
-  test('verify 回报形如 0 token 静默成功时仍按判定收尾，记下报来的 head', async () => {
+  test('a zero-token silent-success verify still finishes by its verdict, recording the reported head', async () => {
     world = await setup({ githubFetch: unreachableGithub });
     const w = world;
     const buildId = await reachVerify(w);
@@ -893,7 +897,7 @@ describe('#1404 S5a 判定绑定', () => {
       commit: EVIDENCE,
       noOutput: true,
       usage: [{ model: 'stub-gw/stub-model', input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }],
-      verifyVerdict: { passed: true, conclusion: '过了', evidence: [] },
+      verifyVerdict: { passed: true, conclusion: 'passed', evidence: [] },
     });
     await flushVerdictDigests();
     const row = w.verdictOf(claimed.stepId);

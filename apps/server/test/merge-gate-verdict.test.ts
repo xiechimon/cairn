@@ -31,8 +31,8 @@ const base = {
   blocked: false,
 };
 
-describe('bindGateVerdict：抽取失败不计为通过', () => {
-  test('抽出的空判定是 pass', () => {
+describe('bindGateVerdict: extraction failure does not count as pass', () => {
+  test('an extracted empty verdict is pass', () => {
     const bound = bindGateVerdict(base);
     expect(bound).not.toBeNull();
     expect(bound?.outcome).toBe('pass');
@@ -40,7 +40,7 @@ describe('bindGateVerdict：抽取失败不计为通过', () => {
     expect(bound?.headSha).toBe(HEAD);
   });
 
-  test('抽取失败是 extraction_failed，不是 pass', () => {
+  test('extraction failure is extraction_failed, not pass', () => {
     const bound = bindGateVerdict({ ...base, extracted: false });
     expect(bound).not.toBeNull();
     expect(bound?.outcome).toBe('extraction_failed');
@@ -48,7 +48,7 @@ describe('bindGateVerdict：抽取失败不计为通过', () => {
     expect(bound?.expectedHeadSha).toBe(HEAD);
   });
 
-  test('verify 抽取失败同样不是 pass', () => {
+  test('a verify extraction failure is likewise not pass', () => {
     const bound = bindGateVerdict({
       ...base,
       kind: 'verify',
@@ -60,23 +60,23 @@ describe('bindGateVerdict：抽取失败不计为通过', () => {
     expect(bound?.outcome).toBe('extraction_failed');
   });
 
-  test('抽出的 blocking 是 block', () => {
+  test('an extracted blocking verdict is block', () => {
     expect(bindGateVerdict({ ...base, blocked: true })?.outcome).toBe('block');
   });
 
-  test('步失败优先于抽取结果，记 step_failed', () => {
+  test('step failure takes precedence over the extraction result, recorded as step_failed', () => {
     expect(
       bindGateVerdict({ ...base, stepFailed: true, extracted: true, blocked: false })?.outcome,
     ).toBe('step_failed');
   });
 
-  test('expectedHeadSha 不是闸认的 SHA 则不绑定', () => {
+  test('no binding when expectedHeadSha is not a SHA the gate recognises', () => {
     expect(isFullSha('HEAD')).toBe(false);
     expect(bindGateVerdict({ ...base, expectedHeadSha: 'HEAD' })).toBeNull();
     expect(bindGateVerdict({ ...base, expectedHeadSha: HEAD.toUpperCase() })).toBeNull();
   });
 
-  test('reported head 与 expected 不一致：记下 reported，patchDigest 为空', () => {
+  test('reported head differs from expected: record the reported head, patchDigest stays null', () => {
     const bound = bindGateVerdict({ ...base, reportedHeadSha: OTHER, compareFiles: delivery });
     expect(bound?.headSha).toBe(OTHER);
     expect(bound?.expectedHeadSha).toBe(HEAD);
@@ -84,7 +84,7 @@ describe('bindGateVerdict：抽取失败不计为通过', () => {
     expect(bound?.outcome).toBe('pass');
   });
 
-  test('审核没报 head：用 expectedHeadSha，摘要按这份交付补丁算', () => {
+  test('review reports no head: use expectedHeadSha, the digest comes from this delivery patch', () => {
     expect(deliveryDigest).toMatch(/^pd2:[0-9a-f]{64}$/);
     const bound = bindGateVerdict({ ...base, reportedHeadSha: null, compareFiles: delivery });
     expect(bound?.headSha).toBe(HEAD);
@@ -92,7 +92,7 @@ describe('bindGateVerdict：抽取失败不计为通过', () => {
     expect(bound?.patchDigest).toBe(deliveryDigest);
   });
 
-  test('verify 没报 head：不拿 expected 顶上，摘要不绑定', () => {
+  test('verify reports no head: expected is not substituted, no digest binding', () => {
     const bound = bindGateVerdict({
       ...base,
       kind: 'verify',
@@ -105,20 +105,20 @@ describe('bindGateVerdict：抽取失败不计为通过', () => {
     expect(bound?.patchDigest).toBeNull();
   });
 
-  test('head 一致且给了 compare 文件：patchDigest 是这份交付补丁的摘要', () => {
+  test('head matches and compare files given: patchDigest is the digest of this delivery patch', () => {
     const bound = bindGateVerdict({ ...base, compareFiles: delivery });
     expect(bound?.headSha).toBe(HEAD);
     expect(bound?.patchDigest).toBe(deliveryDigest);
     expect(bound?.outcome).toBe('pass');
   });
 
-  test('head 一致但 compare 读不到：patchDigest 为空', () => {
+  test('head matches but compare unavailable: patchDigest stays null', () => {
     const bound = bindGateVerdict({ ...base, compareFiles: null });
     expect(bound?.headSha).toBe(HEAD);
     expect(bound?.patchDigest).toBeNull();
   });
 
-  test('步失败或抽取失败，head 对齐时摘要照样绑定', () => {
+  test('step failure or extraction failure still binds the digest when the head aligns', () => {
     expect(
       bindGateVerdict({ ...base, stepFailed: true, compareFiles: delivery })?.patchDigest,
     ).toBe(deliveryDigest);
@@ -127,7 +127,7 @@ describe('bindGateVerdict：抽取失败不计为通过', () => {
     ).toBe(deliveryDigest);
   });
 
-  test('verify 在 expected 之后只改了本票证据目录：摘要绑交付 head，headSha 记证据提交', () => {
+  test('verify only touched this ticket evidence directory after expected: the digest binds the delivery head, headSha records the evidence commit', () => {
     const bound = bindGateVerdict({
       ...base,
       kind: 'verify',
@@ -142,7 +142,7 @@ describe('bindGateVerdict：抽取失败不计为通过', () => {
     expect(bound?.outcome).toBe('pass');
   });
 
-  test('verify 的后续提交碰了证据目录外、空列表、或目录不是本票：摘要不绑定，head 仍记下', () => {
+  test('verify follow-up commits touch outside the evidence directory, give an empty list, or the directory belongs to another ticket: no digest binding, the head is still recorded', () => {
     const verify = {
       ...base,
       kind: 'verify' as const,
