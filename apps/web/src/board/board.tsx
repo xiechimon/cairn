@@ -320,7 +320,7 @@ export function BoardSurface({
                           className="h-auto w-full justify-start gap-2 rounded-(--radius-card) border border-dashed border-border bg-transparent px-3.5 py-3 text-left text-ui font-normal text-content-tertiary transition-colors duration-150 ease-out hover:border-content-dim hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent"
                         >
                           <Plus aria-hidden strokeWidth={1.75} className="size-3.5 flex-none" />
-                          <span className="min-w-0 flex-1">{t('写下想做的事')}</span>
+                          <span className="min-w-0 flex-1 truncate">{t('写下想做的事')}</span>
                           <Kbd>C</Kbd>
                         </Button>
                       ) : (

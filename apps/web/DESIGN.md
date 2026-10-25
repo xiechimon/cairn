@@ -248,7 +248,8 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
 |---|---|---|---|---|
 | 微交互 | 行 / 卡 / 按钮的 hover 与 press 染色、分段控件、折叠箭头 | 150ms（`--dur-fast`） | `--ease-standard`（tw `ease-out` 同档） | `background-color` / `color` / `box-shadow` / `transform` |
 | 微交互 | 任务卡 hover 抬升与投影 | 200ms | `--ease-out-expo` | `box-shadow` / `translate` |
-| 弹层进出 | 弹窗、确认面、⌘K、总管窗 | 进出各 200ms（`--dur-overlay` / `duration-200`） | tw 缺省 `ease` | `opacity` + `scale(.95→1)` |
+| 弹层进出 | 弹窗、确认面、⌘K | 进出各 200ms（`--dur-overlay` / `duration-200`） | tw 缺省 `ease` | `opacity` + `scale(.95→1)` |
+| 弹层进出 | 总管窗（从右下角圆钮长出、收回） | 进 320ms（`--dur-window`）、出 200ms（`--dur-overlay`） | `--ease-drawer`（vaul 同款 `cubic-bezier(.32,.72,0,1)`） | `opacity` + `scale(.4→1)`，原点在圆钮中心 |
 | 弹层进出 | 菜单、弹层、Select | 进出各 100ms | tw 缺省 `ease` | `opacity` + `scale(.95→1)` + 8px 位移 |
 | 弹层进出 | Tooltip | 进出各 150ms（tw-animate 缺省） | tw 缺省 `ease` | `opacity` + `scale(.95→1)` + 8px 位移 |
 | 弹层进出 | 内联小弹层（提及、斜杠、chip） | 进 100ms，无出场 | tw 缺省 `ease` | `opacity` + `scale(.98→1)` |
