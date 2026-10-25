@@ -50,7 +50,7 @@ interface TodoCardProps {
 
 type AttentionNeed = Extract<CardFace, { kind: 'attention' }>['need'];
 
-const ATTENTION: Record<
+export const ATTENTION: Record<
   AttentionNeed,
   { icon: LucideIcon; label: string; action: string; actionIcon: LucideIcon }
 > = {

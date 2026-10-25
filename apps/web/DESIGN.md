@@ -248,8 +248,8 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
 |---|---|---|---|---|
 | 微交互 | 行 / 卡 / 按钮的 hover 与 press 染色、分段控件、折叠箭头 | 150ms（`--dur-fast`） | `--ease-standard`（tw `ease-out` 同档） | `background-color` / `color` / `box-shadow` / `transform` |
 | 微交互 | 任务卡 hover 抬升与投影 | 200ms | `--ease-out-expo` | `box-shadow` / `translate` |
-| 弹层进出 | 弹窗、确认面、⌘K | 进出各 200ms（`--dur-overlay` / `duration-200`） | tw 缺省 `ease` | `opacity` + `scale(.95→1)` |
-| 弹层进出 | 总管窗（从右下角圆钮长出、收回） | 进 320ms（`--dur-window`）、出 200ms（`--dur-overlay`） | `--ease-drawer`（vaul 同款 `cubic-bezier(.32,.72,0,1)`） | `opacity` + `scale(.4→1)`，原点在圆钮中心 |
+| Overlay motion | Dialog, confirmation surface, ⌘K | 200ms in and out (`--dur-overlay` / `duration-200`) | Default tw `ease` | `opacity` + `scale(.95→1)` |
+| Chief window motion | Chief window grows from and returns to the lower-right launcher | 320ms in (`--dur-window`), 200ms out (`--dur-overlay`) | `--ease-drawer` (`cubic-bezier(.32,.72,0,1)`) | `opacity` + `scale(.4→1)`, origin at the launcher center |
 | 弹层进出 | 菜单、弹层、Select | 进出各 100ms | tw 缺省 `ease` | `opacity` + `scale(.95→1)` + 8px 位移 |
 | 弹层进出 | Tooltip | 进出各 150ms（tw-animate 缺省） | tw 缺省 `ease` | `opacity` + `scale(.95→1)` + 8px 位移 |
 | 弹层进出 | 内联小弹层（提及、斜杠、chip） | 进 100ms，无出场 | tw 缺省 `ease` | `opacity` + `scale(.98→1)` |
@@ -304,3 +304,11 @@ Cairn UI rules (source: apps/web/DESIGN.md):
 ## 迁移状态
 
 代码里的现状与本文件不一致的地方，按 `apps/web/docs/paper-redesign-plan.md` 的顺序逐步落地。新写的代码直接按本文件取值。
+
+## Current shell and board surface
+
+The application shell is edge-to-edge: the main surface has no sheet margin, rounded corners, ring, or shadow overlay. The sidebar keeps `--surface-1` and is separated from the main surface by one `border-border` hairline. Expanded sidebar rows are 36px tall, use 14px UI text, 1.5px icon strokes, and a flat `--hover-1` selected state. The new-task row uses a filled `--card-button` circle for its plus icon and does not display a keyboard badge; the `C` shortcut remains active.
+
+The board top bar has no bottom rule. Its primary action is a centered new-task bar with the spiral brand mark, the translated prompt `新任务：接下来让 agent 做什么？`, and a `C` key badge. The bar opens the existing new-task surface. When attention cards exist, the `needs-you-strip` appears below it, capped at five rows. Each row exposes the task title, project and sequence metadata, the attention label, the same primary action as the task card, and an `打开` link. A last-seen summary uses `cairn.board.lastSeenAt` and only renders when completion or failure transitions occurred since that timestamp.
+
+On phones up to 640px, board columns become one vertical list, empty columns and the old empty start ghost are hidden, and horizontal board scrolling is disabled. The new-task bar is fixed above the safe-area inset at the bottom of the viewport, with the chief launcher above it. The needs-you strip remains before the board list.

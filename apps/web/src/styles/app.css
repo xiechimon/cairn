@@ -302,6 +302,43 @@
     min-height: 44px;
   }
 
+  .board-new-task-bar {
+    position: fixed;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: 56px;
+    z-index: var(--z-docked);
+    margin: 0;
+    width: auto;
+    max-width: none;
+  }
+
+  .board-scroller {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-bottom: 72px;
+  }
+
+  .board-column[data-empty="true"] {
+    display: none;
+  }
+
+  .board-column {
+    height: auto;
+    min-height: 0;
+  }
+
+  .board-column [data-column-list] {
+    flex: none;
+    overflow: visible;
+  }
+
+  .board-column [data-column-empty-new] {
+    display: none;
+  }
+
   [data-testid="page-topbar"] :is(button, a) {
     min-height: 44px;
   }
@@ -321,7 +358,7 @@
     min-width: 44px;
     min-height: 44px;
     right: max(0.5rem, env(safe-area-inset-right));
-    bottom: max(0.5rem, env(safe-area-inset-bottom));
+    bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + 60px);
   }
   .chief-drawer {
     right: max(0.5rem, env(safe-area-inset-right));

@@ -104,7 +104,22 @@ function readGroupCollapsed(storage: Storage | null): Record<GroupId, boolean> {
 }
 
 const ICON = 'size-4 flex-none';
-const STROKE = 1.75;
+const STROKE = 1.5;
+
+export function BrandMark({ className = 'size-4' }: { className?: string }) {
+  return (
+    <span
+      data-testid="brand-mark"
+      aria-hidden="true"
+      className={`sidebar-brand-mark block flex-none ${className}`}
+      style={{
+        backgroundColor: 'currentColor',
+        WebkitMask: 'url("/logo-mark.svg") center / 100% no-repeat',
+        mask: 'url("/logo-mark.svg") center / 100% no-repeat',
+      }}
+    />
+  );
+}
 
 const FOCUS =
   'outline-none focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2';
@@ -112,9 +127,9 @@ const FOCUS =
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
 
-const ROW = `flex h-8 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui text-content-secondary no-underline transition-[background-color,box-shadow,color] duration-150 ease-out ${FOCUS}`;
+const ROW = `flex h-9 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui text-content-secondary no-underline transition-[background-color,color] duration-150 ease-out ${FOCUS}`;
 const ROW_IDLE = 'hover:bg-sidebar-hover hover:text-foreground [&>svg:first-child]:text-icon';
-const ROW_ACTIVE = `bg-background font-medium text-foreground shadow-xs ring-1 ring-border [&>svg:first-child]:text-(--card-button) ${SEARCH_OPEN_DIM}`;
+const ROW_ACTIVE = `bg-(--hover-1) font-medium text-foreground [&>svg:first-child]:text-(--card-button) ${SEARCH_OPEN_DIM}`;
 
 const ROW_BTN =
   'justify-start border-none font-normal dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0';
@@ -122,7 +137,7 @@ const ROW_BTN =
 const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--radius-control) border-none bg-transparent p-0 text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0 ${FOCUS}`;
 
 const RAIL_ROW = `rail-row relative flex size-8 flex-none items-center justify-center rounded-(--cds-radius-lg) text-content-tertiary no-underline transition-[background-color,box-shadow,color] duration-150 ease-out hover:bg-sidebar-hover hover:text-foreground ${FOCUS}`;
-const RAIL_ACTIVE = `bg-background text-(--card-button) shadow-xs ring-1 ring-border hover:bg-background hover:text-(--card-button) ${SEARCH_OPEN_DIM}`;
+const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button) hover:bg-(--hover-1) hover:text-(--card-button) ${SEARCH_OPEN_DIM}`;
 const RAIL_BTN =
   'cursor-pointer border-none bg-transparent p-0 dark:hover:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-content-tertiary aria-expanded:hover:bg-sidebar-hover aria-expanded:hover:text-foreground active:not-aria-[haspopup]:translate-y-0';
 
@@ -230,7 +245,7 @@ export function BoardSidebar({
       'aria-label': label,
     });
     return (
-      <aside className="board-sidebar board-sidebar--collapsed relative z-(--z-docked) flex w-10 flex-none flex-col items-center gap-px bg-(--surface-1) pt-2 pb-2">
+      <aside className="board-sidebar board-sidebar--collapsed relative z-(--z-docked) flex w-10 flex-none flex-col items-center gap-px border-r border-border bg-(--surface-1) pt-2 pb-2">
         <Button
           variant="ghost"
           className={`rail-toggle ${RAIL_ROW} ${RAIL_BTN}`}
@@ -371,7 +386,7 @@ export function BoardSidebar({
   });
 
   return (
-    <aside className="board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden bg-(--surface-1) px-3 pt-3 pb-2.5">
+    <aside className="board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden border-r border-border bg-(--surface-1) px-3 pt-3 pb-2.5">
       <div
         data-testid="team-row"
         className="sidebar-team-row flex h-10 flex-none items-center gap-0.5 text-foreground"
@@ -385,16 +400,7 @@ export function BoardSidebar({
           to={{ pathname: '/app/team', search: plain }}
           aria-current={selected === 'team' ? 'page' : undefined}
         >
-          <span
-            data-testid="brand-mark"
-            aria-hidden="true"
-            className="sidebar-brand-mark block size-4 flex-none"
-            style={{
-              backgroundColor: 'currentColor',
-              WebkitMask: 'url("/logo-mark.svg") center / 100% no-repeat',
-              mask: 'url("/logo-mark.svg") center / 100% no-repeat',
-            }}
-          />
+          <BrandMark />
           <span className="truncate font-heading text-heading font-semibold">
             {BRAND.manifestName}
           </span>
@@ -433,12 +439,13 @@ export function BoardSidebar({
 
       <Button
         variant="ghost"
-        className={`sidebar-new-task mt-2 mb-3 h-8.5 flex-none cursor-pointer justify-start gap-2 rounded-(--cds-radius-lg) border-none bg-background px-3 text-ui font-medium text-foreground shadow-xs ring-1 ring-border transition-[box-shadow] duration-150 ease-out hover:bg-background hover:text-foreground hover:shadow-sm hover:ring-input dark:hover:bg-background ${FOCUS}`}
+        className={`sidebar-new-task mt-2 mb-3 h-9 flex-none cursor-pointer justify-start gap-2 rounded-(--cds-radius-lg) border-none bg-transparent px-3 text-ui font-medium text-foreground transition-colors duration-150 ease-out hover:bg-(--hover-1) hover:text-foreground dark:hover:bg-(--hover-1) ${FOCUS}`}
         onClick={onNewTask}
       >
-        <Plus className="size-4 flex-none text-(--card-button)" strokeWidth={STROKE} />
+        <span className="flex size-5 flex-none items-center justify-center rounded-full bg-(--card-button) text-(--text-on-accent)">
+          <Plus className="size-3.5" strokeWidth={1.5} />
+        </span>
         <span className="truncate">{t('新任务')}</span>
-        <Kbd className="sidebar-kbd ml-auto">C</Kbd>
       </Button>
 
       <nav

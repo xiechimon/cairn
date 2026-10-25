@@ -21,11 +21,12 @@ import { Skeleton } from '../components/ui/skeleton.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { safeSessionStorage } from '../safe-storage.js';
+import { safeLocalStorage, safeSessionStorage, safeSetItem } from '../safe-storage.js';
 import {
   type BoardColumnDef,
   COLUMNS,
   canDropOnColumn,
+  cardFace,
   needsDoneGate,
   needsResetGate,
   sortColumnTodos,
@@ -38,10 +39,11 @@ import {
   FilterChips,
   type FilterDimension,
   FilterPanel,
-  TOPBAR_PRIMARY_BUTTON,
   TOPBAR_TEXT_BUTTON,
 } from './filter-panel.js';
+import { BrandMark } from './sidebar.js';
 import { cardTag } from './tag-filter.js';
+import { ATTENTION } from './todo-card.js';
 
 export interface BoardFilters {
   dimensions: readonly FilterDimension[];
@@ -110,6 +112,82 @@ function NeedsYouSummary({ count }: { count: number }) {
   );
 }
 
+function SinceLastSeen({ done, failed }: { done: number; failed: number }) {
+  const { t } = useI18n();
+  if (done === 0 && failed === 0) return null;
+  return (
+    <span data-testid="board-since-last-seen" className="text-meta text-content-tertiary">
+      {t('上次查看后：{done} 个完成，{failed} 个新失败', { done, failed })}
+    </span>
+  );
+}
+
+function NeedsYouStrip({
+  todos,
+  projectNames,
+  onAction,
+}: {
+  todos: TodoRecord[];
+  projectNames?: Record<string, string>;
+  onAction?: (todo: TodoRecord) => void;
+}) {
+  const { t } = useI18n();
+  const attentionTodos = todos.filter((todo) => cardFace(todo).kind === 'attention');
+  if (attentionTodos.length === 0) return null;
+  return (
+    <section data-testid="needs-you-strip" className="mx-auto w-full max-w-190 px-4 pt-3">
+      <div className="mb-1.5 flex items-center gap-2 text-ui font-medium text-foreground">
+        <span className="size-2 rounded-full bg-(--card-button)" />
+        <span>
+          {t('等你处理')} · {attentionTodos.length}
+        </span>
+      </div>
+      <div className="divide-y divide-border rounded-(--radius-card) bg-(--hover-1)">
+        {attentionTodos.slice(0, 5).map((todo) => {
+          const face = cardFace(todo);
+          if (face.kind !== 'attention') return null;
+          const attention = ATTENTION[face.need];
+          return (
+            <div key={todo.id} className="flex min-h-14 items-center gap-3 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-ui text-foreground">{todo.title}</div>
+                <div className="truncate text-meta text-content-tertiary">
+                  {projectNames?.[todo.projectId] ?? t('项目')} · #{todo.seqNum} ·{' '}
+                  {t(attention.label)}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="xs"
+                className="flex-none text-(--card-button)"
+                onClick={() => onAction?.(todo)}
+              >
+                {t(attention.action)}
+              </Button>
+              <Button
+                variant="ghost"
+                size="xs"
+                className="flex-none text-content-secondary"
+                render={<Link to={`/app/todo/${todo.id}`} />}
+              >
+                {t('打开')}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+      {todos.filter((todo) => cardFace(todo).kind === 'attention').length > 5 && (
+        <Link
+          className="mt-1.5 block text-right text-meta text-(--card-button)"
+          to="?column=pending"
+        >
+          {t('查看全部')}
+        </Link>
+      )}
+    </section>
+  );
+}
+
 export function BoardSurface({
   fixture,
   onAction,
@@ -145,7 +223,33 @@ export function BoardSurface({
     [filters.active, filters.matches],
   );
   const visibleTodos = narrow(fixture.todos);
+  const attentionTodos = visibleTodos.filter((todo) => cardFace(todo).kind === 'attention');
   const visibleColumns = onlyColumn == null ? COLUMNS : COLUMNS.filter((c) => c.id === onlyColumn);
+  const [lastSeenAt] = useState(() => {
+    const stored = safeLocalStorage()?.getItem('cairn.board.lastSeenAt');
+    const parsed = stored == null ? Number.NaN : Number(stored);
+    return Number.isFinite(parsed) ? parsed : Date.now();
+  });
+  const sinceLastSeen = fixture.todos.reduce(
+    (counts, todo) => {
+      if (todo.phaseAt <= lastSeenAt) return counts;
+      if (todo.phase === 'done' || todo.phase === 'closed') counts.done += 1;
+      if (todo.phase === 'failed') counts.failed += 1;
+      return counts;
+    },
+    { done: 0, failed: 0 },
+  );
+  useEffect(() => {
+    const markSeen = () => safeSetItem('cairn.board.lastSeenAt', String(Date.now()));
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') markSeen();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      markSeen();
+    };
+  }, []);
   useEffect(() => {
     if (onlyColumn != null) return;
     const cols = COLUMNS.map(
@@ -210,11 +314,11 @@ export function BoardSurface({
 
   return (
     <div className="board-main relative flex min-w-0 flex-1 flex-col">
-      <header className="board-topbar flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap">
+      <header className="board-topbar flex h-14 flex-none items-center gap-3 px-6 whitespace-nowrap">
         <h1 className="board-topbar-title flex-none font-heading text-page font-medium text-foreground">
           {t('工作台')}
         </h1>
-        <NeedsYouSummary count={viewTodos('pending').length} />
+        <NeedsYouSummary count={attentionTodos.length} />
         <FilterChips chips={filters.chips} onClearAll={filters.onClear} />
         <div className="board-topbar-actions ml-auto flex flex-none items-center gap-0.5">
           <FilterPanel
@@ -231,16 +335,30 @@ export function BoardSurface({
             <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
             {t('定时')}
           </Button>
-          {onNewTask != null && (
-            <Button className={TOPBAR_PRIMARY_BUTTON} onClick={onNewTask}>
-              <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
-              {t('新任务')}
-            </Button>
-          )}
         </div>
       </header>
 
       {banner != null && <div className="flex-none px-[17px] pt-3">{banner}</div>}
+      {onNewTask != null && (
+        <button
+          type="button"
+          data-testid="board-new-task-bar"
+          className="board-new-task-bar mx-auto mt-3 flex h-11 w-full max-w-190 items-center gap-3 rounded-(--radius-control) border border-border bg-card px-3.5 text-left text-ui text-content-tertiary shadow-(--panel-shadow)"
+          onClick={onNewTask}
+        >
+          <BrandMark className="size-5 text-(--card-button)" />
+          <span className="min-w-0 flex-1 truncate">{t('新任务：接下来让 agent 做什么？')}</span>
+          <Kbd>C</Kbd>
+        </button>
+      )}
+      <div className="mx-auto flex w-full max-w-190 justify-end px-4 pt-2">
+        <SinceLastSeen done={sinceLastSeen.done} failed={sinceLastSeen.failed} />
+      </div>
+      <NeedsYouStrip
+        todos={attentionTodos}
+        projectNames={fixture.projectNames}
+        onAction={onAction}
+      />
 
       <DndContext
         sensors={desktop ? sensors : []}
@@ -280,6 +398,7 @@ export function BoardSurface({
                   )}
                   aria-label={t(column.name)}
                   data-column={column.id}
+                  data-empty={todos.length === 0 && !loading ? 'true' : undefined}
                   data-drop-valid={isValidDropTarget(column.id) ? 'true' : undefined}
                   data-drop={dropColumnId === column.id ? 'true' : undefined}
                 >

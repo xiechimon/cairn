@@ -53,14 +53,9 @@ test('legacy scenario (no projectNames) renders no repo section; top bar two but
 
   await expect(chipsBar(page)).toHaveCount(0);
   const banner = page.getByRole('banner');
-  await expect(banner.getByRole('button')).toHaveCount(2);
+  await expect(banner.getByRole('button')).toHaveCount(1);
   await expect(typeBtn(page)).toBeVisible();
-
-  await expect(banner.getByRole('button', { name: /任务/ })).toHaveCount(1);
-  await expect(banner.getByRole('button', { name: '新任务' })).toHaveAttribute(
-    'data-variant',
-    'default',
-  );
+  await expect(page.getByTestId('board-new-task-bar')).toBeVisible();
 
   await expect(typeBtn(page)).toHaveAttribute('data-variant', 'ghost');
   const bg = await typeBtn(page).evaluate((el) => getComputedStyle(el).backgroundColor);

@@ -131,7 +131,7 @@ test('selected row keeps its sheet fill under hover', async ({ page }) => {
   const board = page.getByRole('link', { name: '工作台' });
   await expect(board).toHaveAttribute('aria-current', 'page');
 
-  const sheet = await tokenBg(page, '--background');
+  const sheet = await tokenBg(page, '--hover-1');
   await board.hover();
 
   await page.waitForTimeout(250);
