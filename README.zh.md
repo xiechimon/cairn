@@ -1,7 +1,8 @@
 <div align="center">
-  <img src="apps/web/public/logo.svg" alt="Cairn 应用图标" width="112" height="112">
-
-  <h1>Cairn</h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/img/banner-dark.webp">
+    <img alt="Cairn：agent 在山路上垒石堆，人在山门口把关" src="site/img/banner-light.webp" width="100%">
+  </picture>
 
   <p><b>你写票，agent 在你自己的机器上干活，合不合由你把关。</b></p>
 
@@ -26,6 +27,39 @@
 </picture>
 
 ## 亮点
+
+<table align="center">
+  <tr>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-chief-dark.webp">
+        <img alt="chief agent" src="site/img/crew-chief-light.webp" width="120" height="120">
+      </picture>
+      <br><sub><b>chief</b> 派活</sub>
+    </td>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-coder-dark.webp">
+        <img alt="coder agent" src="site/img/crew-coder-light.webp" width="120" height="120">
+      </picture>
+      <br><sub><b>coder</b> 实现</sub>
+    </td>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-reviewer-dark.webp">
+        <img alt="reviewer agent" src="site/img/crew-reviewer-light.webp" width="120" height="120">
+      </picture>
+      <br><sub><b>reviewer</b> 审改动</sub>
+    </td>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-you-dark.webp">
+        <img alt="你" src="site/img/crew-you-light.webp" width="120" height="120">
+      </picture>
+      <br><sub><b>你</b>来把关</sub>
+    </td>
+  </tr>
+</table>
 
 - **多 agent 编排。** 每个 agent 有自己的模型、职责、技能、MCP、密钥和记忆。负责调度的 chief 只派活不写代码，上下文保持干净；写代码和审代码交给 coder、reviewer。
 - **人工关卡是硬的。** 每次运行停两次等你：计划一次，diff 一次。AI 审核者能直接拦下合并，不只是留评论。
