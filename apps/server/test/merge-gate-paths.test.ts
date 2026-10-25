@@ -219,6 +219,53 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     }
   });
 
+  const EVAL_SURFACE_PATHS = [
+    'integration/eval/adoption/judge.mts',
+    'integration/eval/chief-dispatch/grade.mts',
+    'integration/eval/memory-regression/grade.mts',
+    '.claude/hillclimb/chief-dispatch/cases.json',
+    '.claude/hillclimb/memory-regression/_state.json',
+    'apps/server/src/trajectory-export.ts',
+    'apps/server/src/trajectory-export-cli.ts',
+    'apps/server/src/trajectory-outcome.ts',
+    'packages/shared/src/trajectory-pack.ts',
+  ];
+  test('⑥ eval ruler surface: every path is protected and never in gateSource', () => {
+    for (const p of EVAL_SURFACE_PATHS) {
+      const r = classify([f(p)]);
+      expect(r.protected, p).toEqual([p]);
+      expect(r.gateSource, p).toEqual([]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
+  test('⑥ is case-insensitive like the other protect globs', () => {
+    for (const p of ['Integration/Eval/X.Mts', '.Claude/Hillclimb/X.json']) {
+      expect(classify([f(p)]).protected, p).toEqual([p]);
+    }
+  });
+
+  test('⑥ lookalikes outside the eval dirs stay in the auto-merge set', () => {
+    for (const p of [
+      'packages/hillclimb/src/cases.json',
+      'apps/server/src/trajectory.ts',
+      'apps/server/src/trajectory-attribution.ts',
+      'packages/shared/src/trajectory.ts',
+    ]) {
+      const r = classify([f(p)]);
+      expect(r.protected, p).toEqual([]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
+  test('⑥ same-named dirs outside the protected surface are not protected but still leave the auto-merge set', () => {
+    for (const p of ['integration/evalx/judge.mts', 'hillclimb/cases.json']) {
+      const r = classify([f(p)]);
+      expect(r.protected, p).toEqual([]);
+      expect(r.outsideAutoMerge, p).toEqual([p]);
+    }
+  });
+
   test('a copy entry original name is classified too: copied out of a protected file counts as a hit', () => {
     const r = classify([
       f('apps/web/src/ci.yml', { status: 'copied', previousFilename: '.github/workflows/ci.yml' }),
@@ -276,14 +323,8 @@ describe('default deny: anything outside the auto-merge set is left to a human',
     expect(r.protected).toEqual([]);
   });
 
-  test('out-of-set paths (docs, root files, public, eval) are each listed', () => {
-    const files = [
-      'docs/spec/28-x.md',
-      'README.md',
-      'CONTEXT.md',
-      'apps/web/public/x.svg',
-      'integration/eval/x.ts',
-    ];
+  test('out-of-set paths (docs, root files, public) are each listed', () => {
+    const files = ['docs/spec/28-x.md', 'README.md', 'CONTEXT.md', 'apps/web/public/x.svg'];
     expect(classify(files.map((p) => f(p))).outsideAutoMerge).toEqual(files);
   });
 

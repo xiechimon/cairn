@@ -91,6 +91,12 @@ const PROTECTED = [
   'apps/server/src/services/mcp-servers.ts',
   'apps/server/src/routes-webhook.ts',
   'apps/server/src/db/client.ts',
+  'integration/eval/**',
+  '.claude/hillclimb/**',
+  'apps/server/src/trajectory-export.ts',
+  'apps/server/src/trajectory-export-cli.ts',
+  'apps/server/src/trajectory-outcome.ts',
+  'packages/shared/src/trajectory-pack.ts',
   // the merge readiness gate's own source (D4 4, P3 #1404)
   'apps/server/src/services/merge-gate/**',
   'packages/shared/src/records/merge-gate.ts',
