@@ -91,7 +91,7 @@ test.describe('on a 2x screen', () => {
   });
 });
 
-test('the sheet carries no ring overlay above its children', async ({ page }) => {
+test('the sheet isolates its stacking context and carries no ring overlay above its children', async ({ page }) => {
   await page.goto(BOARD);
   const probe = await page.locator('.board-sheet').evaluate((el) => {
     const after = getComputedStyle(el, '::after');
@@ -103,7 +103,7 @@ test('the sheet carries no ring overlay above its children', async ({ page }) =>
     };
   });
   expect(probe).toEqual({
-    isolated: 'auto',
+    isolated: 'isolate',
     content: 'none',
     position: 'static',
     shadow: 'none',

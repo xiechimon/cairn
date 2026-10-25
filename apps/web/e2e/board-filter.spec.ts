@@ -448,3 +448,16 @@ test('task card tag = vocab-colored tag icon + name: no solid chip, no placehold
   expect(await metaH('tagfilter-bug')).toBeCloseTo(20, 0);
   expect(await metaH('tagfilter-plain')).toBeCloseTo(20, 0);
 });
+
+test('two type picks in the same frame both land in the URL (no stale selection)', async ({
+  page,
+}) => {
+  await page.goto(TAGS);
+  await openTypePopover(page);
+  await expect(typeOption(page, 'bug')).toBeVisible();
+  await page.evaluate(() => {
+    for (const name of ['bug', 'docs'])
+      document.querySelector<HTMLElement>(`[data-tag="${name}"]`)?.click();
+  });
+  await expect(page).toHaveURL(/[?&]tags=bug,docs(&|$)/);
+});
