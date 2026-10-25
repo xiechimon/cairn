@@ -34,6 +34,7 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
 import { SessionNotResumableError } from './errors.js';
+import { probeModelImageSupport, rememberNoVision } from './image-support.js';
 import { connectFailedLine } from './mcp-config.js';
 import { PI_RETRY_SETTINGS } from './pi-retry.js';
 import {
@@ -740,6 +741,14 @@ export class PiBackend implements AgentBackend {
 
   adaptProviderCompat(provider: ProviderConfig, errorMessage: string): ProviderConfig | null {
     return adaptProviderCompat(provider, errorMessage);
+  }
+
+  async modelSupportsImages(provider: ProviderConfig, modelId: string): Promise<boolean | null> {
+    return probeModelImageSupport(this.opts.agentDir, provider, modelId);
+  }
+
+  rememberNoVision(provider: ProviderConfig, modelId: string): void {
+    rememberNoVision(provider.providerId, modelId);
   }
 
   private async open(opts: SessionOpts, resumeFile: string | null): Promise<AgentSessionHandle> {

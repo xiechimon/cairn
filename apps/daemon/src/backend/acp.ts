@@ -13,6 +13,7 @@ import type {
   AgentSessionHandle,
   AgentTokenUsage,
   BriefChannel,
+  ProviderConfig,
   SessionOpts,
   StepEvent,
 } from '@cairn/shared';
@@ -176,6 +177,10 @@ export class GeminiBackend implements AgentBackend {
   };
 
   constructor(private readonly options: GeminiBackendOptions = {}) {}
+
+  async modelSupportsImages(_provider: ProviderConfig, _modelId: string): Promise<boolean | null> {
+    return false;
+  }
 
   async createSession(opts: SessionOpts): Promise<AgentSessionHandle> {
     return this.open(opts, undefined);
