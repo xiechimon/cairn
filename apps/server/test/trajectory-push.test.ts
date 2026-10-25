@@ -181,6 +181,12 @@ function writePacks(packs: TrajectoryPack[]) {
   return file;
 }
 
+function newHome() {
+  const home = mkdtempSync(join(tmpdir(), 'cairn-push-home-'));
+  homes.push(home);
+  return home;
+}
+
 function push(args: string[], env: Record<string, string | undefined>) {
   return new Promise<{ status: number | null; stdout: string; stderr: string }>((done) => {
     const child = spawn(
@@ -192,6 +198,7 @@ function push(args: string[], env: Record<string, string | undefined>) {
           ...process.env,
           CAIRN_OTEL_ENDPOINT: undefined,
           CAIRN_OTEL_HEADERS: undefined,
+          CAIRN_HOME: newHome(),
           ...env,
         },
       },
@@ -450,4 +457,97 @@ test('an unreachable endpoint fails the run without printing credentials in the 
   expect(result.status).toBe(1);
   expect(result.stderr).not.toContain('hunter2');
   expect(result.stdout).not.toContain('hunter2');
+});
+
+test('a second push of the same traces to the same endpoint sends nothing and reports the skip', async () => {
+  const { received, endpoint } = await receiver();
+  const file = writePacks([piPack(), { ...piPack(), buildId: 'build-2' }]);
+  const env = { CAIRN_OTEL_ENDPOINT: endpoint, CAIRN_HOME: newHome() };
+  const first = await push([file], env);
+  expect(first.status, first.stderr).toBe(0);
+  expect(first.stdout).toMatch(/pushed=2 spans=16 .*skipped_already_pushed=0\b/);
+  expect(received).toHaveLength(2);
+
+  const second = await push([file], env);
+  expect(second.status, second.stderr).toBe(0);
+  expect(second.stdout).toMatch(/pushed=0 spans=0 .*skipped_already_pushed=2\b/);
+  expect(received).toHaveLength(2);
+});
+
+test('only traces not yet pushed are sent when a later file adds a build', async () => {
+  const { received, endpoint } = await receiver();
+  const env = { CAIRN_OTEL_ENDPOINT: endpoint, CAIRN_HOME: newHome() };
+  await push([writePacks([piPack()])], env);
+  const next = await push([writePacks([piPack(), { ...piPack(), buildId: 'build-2' }])], env);
+  expect(next.status, next.stderr).toBe(0);
+  expect(next.stdout).toMatch(/pushed=1 .*skipped_already_pushed=1\b/);
+  expect(received).toHaveLength(2);
+  expect(text(received[1]?.spans[0] as OtlpSpan, 'cairn.build_id')).toBe('build-2');
+});
+
+test('--force pushes every span again', async () => {
+  const { received, endpoint } = await receiver();
+  const file = writePacks([piPack()]);
+  const env = { CAIRN_OTEL_ENDPOINT: endpoint, CAIRN_HOME: newHome() };
+  await push([file], env);
+  const forced = await push(['--force', file], env);
+  expect(forced.status, forced.stderr).toBe(0);
+  expect(forced.stdout).toMatch(/pushed=1 spans=8 .*skipped_already_pushed=0\b/);
+  expect(received).toHaveLength(2);
+  expect(received[1]?.spans).toHaveLength(8);
+  const after = await push([file], env);
+  expect(after.stdout).toMatch(/pushed=0 .*skipped_already_pushed=1\b/);
+  expect(received).toHaveLength(2);
+});
+
+test('a different endpoint is a different target and gets the full push', async () => {
+  const one = await receiver();
+  const two = await receiver();
+  const file = writePacks([piPack()]);
+  const home = newHome();
+  await push([file], { CAIRN_OTEL_ENDPOINT: one.endpoint, CAIRN_HOME: home });
+  const other = await push([file], { CAIRN_OTEL_ENDPOINT: two.endpoint, CAIRN_HOME: home });
+  expect(other.status, other.stderr).toBe(0);
+  expect(other.stdout).toMatch(/pushed=1 .*skipped_already_pushed=0\b/);
+  expect(two.received).toHaveLength(1);
+  expect(one.received).toHaveLength(1);
+});
+
+test('the record is keyed without credentials, so rotating the key does not repush', async () => {
+  const { received, endpoint } = await receiver();
+  const file = writePacks([piPack()]);
+  const home = newHome();
+  const withUser = endpoint.replace('http://', 'http://pk:sk1@');
+  await push([file], { CAIRN_OTEL_ENDPOINT: withUser, CAIRN_HOME: home });
+  const rotated = await push([file], {
+    CAIRN_OTEL_ENDPOINT: endpoint.replace('http://', 'http://pk:sk2@'),
+    CAIRN_HOME: home,
+  });
+  expect(rotated.stdout).toMatch(/skipped_already_pushed=1\b/);
+  expect(received).toHaveLength(1);
+});
+
+test('traces delivered before a failure stay recorded and are skipped on retry', async () => {
+  const { received, endpoint } = await receiver();
+  const flaky = createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.statusCode = flakyReplies.shift() ?? 200;
+      res.end('{}');
+    });
+  });
+  const flakyReplies = [200, 500];
+  servers.push(flaky);
+  await new Promise<void>((done) => flaky.listen(0, '127.0.0.1', done));
+  const flakyEndpoint = `http://127.0.0.1:${(flaky.address() as AddressInfo).port}/otel`;
+  const file = writePacks([piPack(), { ...piPack(), buildId: 'build-2' }]);
+  const home = newHome();
+  const failed = await push([file], { CAIRN_OTEL_ENDPOINT: flakyEndpoint, CAIRN_HOME: home });
+  expect(failed.status).toBe(1);
+  const retry = await push([file], { CAIRN_OTEL_ENDPOINT: endpoint, CAIRN_HOME: home });
+  expect(retry.stdout).toMatch(/pushed=2 .*skipped_already_pushed=0\b/);
+  const retrySame = await push([file], { CAIRN_OTEL_ENDPOINT: flakyEndpoint, CAIRN_HOME: home });
+  expect(retrySame.status, retrySame.stderr).toBe(0);
+  expect(retrySame.stdout).toMatch(/pushed=1 .*skipped_already_pushed=1\b/);
+  expect(received).toHaveLength(2);
 });

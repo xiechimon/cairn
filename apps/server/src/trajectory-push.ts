@@ -1,3 +1,5 @@
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { redactSecrets, type TrajectoryPack, trajectoryPackSchema } from '@cairn/shared';
 import { type OtlpTracesRequest, packToOtlp } from './trajectory-otlp.js';
 
@@ -48,13 +50,45 @@ export interface PushResult {
   pushed: number;
   spans: number;
   redacted: number;
+  skippedAlreadyPushed: number;
 }
 
-export async function pushPacks(packs: TrajectoryPack[], target: OtlpTarget): Promise<PushResult> {
-  const result: PushResult = { pushed: 0, spans: 0, redacted: 0 };
+export interface PushOptions {
+  ledgerPath: string;
+  force: boolean;
+}
+
+export async function pushPacks(
+  packs: TrajectoryPack[],
+  target: OtlpTarget,
+  options: PushOptions,
+): Promise<PushResult> {
+  const result: PushResult = { pushed: 0, spans: 0, redacted: 0, skippedAlreadyPushed: 0 };
+  const endpoint = `${target.url.origin}${target.url.pathname}`;
+  const alreadyPushed = new Set<string>();
+  let ledger = '';
+  try {
+    ledger = readFileSync(options.ledgerPath, 'utf8');
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+  }
+  for (const line of ledger.split('\n')) {
+    try {
+      const entry = JSON.parse(line) as { endpoint?: string; traceId?: string };
+      if (entry.endpoint === endpoint && entry.traceId) alreadyPushed.add(entry.traceId);
+    } catch {}
+  }
   for (const pack of packs) {
     const cleaned = redactSecrets(packToOtlp(pack));
     const request = cleaned.value as OtlpTracesRequest;
+    const spans = request.resourceSpans.flatMap((resource) =>
+      resource.scopeSpans.flatMap((scope) => scope.spans),
+    );
+    const traceId = spans[0]?.traceId ?? '';
+    if (!options.force && alreadyPushed.has(traceId)) {
+      result.skippedAlreadyPushed++;
+      continue;
+    }
     let response: Response;
     try {
       response = await fetch(target.url, {
@@ -69,12 +103,15 @@ export async function pushPacks(packs: TrajectoryPack[], target: OtlpTarget): Pr
       throw new TrajectoryPushError(
         `Endpoint replied HTTP ${response.status} after ${result.pushed} pushed`,
       );
+    mkdirSync(dirname(options.ledgerPath), { recursive: true });
+    appendFileSync(
+      options.ledgerPath,
+      `${JSON.stringify({ endpoint, traceId, pushedAt: new Date().toISOString() })}\n`,
+    );
+    alreadyPushed.add(traceId);
     result.pushed++;
     result.redacted += cleaned.count;
-    result.spans += request.resourceSpans.reduce(
-      (sum, resource) => sum + resource.scopeSpans.reduce((n, scope) => n + scope.spans.length, 0),
-      0,
-    );
+    result.spans += spans.length;
   }
   return result;
 }
