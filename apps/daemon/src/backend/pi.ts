@@ -1002,6 +1002,7 @@ export function materializeProvider(modelsPath: string, provider: ProviderConfig
       ...(m.cost !== undefined ? { cost: m.cost } : {}),
       ...(m.contextWindow !== undefined ? { contextWindow: m.contextWindow } : {}),
       ...(m.maxTokens !== undefined ? { maxTokens: m.maxTokens } : {}),
+      ...(m.input !== undefined ? { input: m.input } : {}),
       ...customModelReasoning(),
     })),
   };
