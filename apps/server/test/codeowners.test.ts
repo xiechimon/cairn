@@ -121,6 +121,6 @@ describe('docs/ops/agent-bot-identity.md', () => {
 
   test('states that Code Owners review turns on only after the bot pushes the PR', () => {
     expect(doc).toContain('Require review from Code Owners');
-    expect(doc).toMatch(/不能批准自己的 PR/);
+    expect(doc).toMatch(/cannot approve his own PR/);
   });
 });

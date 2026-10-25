@@ -7,7 +7,7 @@
 ## Language
 
 - **Everything committed to this repository is English**: code comments, docs, specs, ADRs, skills, scripts' messages, test titles, commit messages, PR titles and bodies, issue text. Do not mix Chinese into English text, and do not add English lines to a Chinese document as a stopgap; translate the section you touch.
-- Exceptions: product UI text and its translations (Chinese source strings passed to `t()` and the i18n locale files), agent-facing prompt strings in product code, Chinese test fixtures and selectors that match that UI text, `README.zh.md`, and the generated `docs/feature-map.md` until its generator is translated. When prose has to name a Chinese UI label or a Chinese file path, quote it in backticks.
+- Exceptions: product UI text and its translations (Chinese source strings passed to `t()` and the i18n locale files), agent-facing prompt strings in product code, Chinese test fixtures and selectors that match that UI text, `README.zh.md`. When prose has to name a Chinese UI label or a Chinese file path, quote it in backticks.
 - Conversation with the user follows the user's language; only repository content is English.
 - Machine check: `node scripts/english-only-gate.mjs` reds Chinese on added lines (prose in `.md` / `.yml`, comments in code files) and in commit messages of the branch, against `origin/main`. It runs in `pnpm prepush` for every change, including docs-only ones, and the `pr-evidence` check runs it on the PR body (`--text <file>`). Text inside backticks, fenced code blocks and HTML comments is not checked.
 - Legacy Chinese content is being translated in batches; until a file is translated, edits to it follow the rule above.
