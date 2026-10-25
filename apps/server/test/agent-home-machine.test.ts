@@ -1,19 +1,3 @@
-// #1259 agent 归属机：创建必填 + 换绑校验（模型/runtime 闸）。
-// 失败方式（先于实现固化）：
-// 1. POST 缺 machineId → 必须 400（契约必填），否则浮动 agent 形态复活。
-// 2. POST 带他团队/不存在 machineId → 必须当 404，否则跨团队绑定他队机器。
-// 3. runtime 闸：pi agent 绑到只开 claude-code 的机器 → 必须 400，否则
-//    出生即死（步永远领不走）。
-// 4. 模型闸：claude-code agent 的 modelId 不在归属机上报清单 → 必须 400
-//    且点名缺的模型，否则「选到的模型必 400」的洞从创建面溜回。
-// 5. 未上报过模型清单的机器（老 daemon）→ 必须 400（无法证明配了模型），
-//    否则闸对老 daemon 形同虚设。
-// 6. 默认槽豁免：claude-code agent 不带 modelId → 必须 201（跟随机器默认
-//    槽，恒可用）。
-// 7. 换绑：PATCH machineId 到缺模型的机器 → 必须 400 且原值不动；到合格
-//    机器 → 200 且落库。
-// 8. patch 后门：不换绑只改 modelId 到归属机没有的模型 → 必须 400。
-
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';
@@ -25,8 +9,8 @@ const REPORT_WITH_GLM = {
   models: [{ id: 'glm-5.3', name: 'glm-5.3', slot: 'default' }],
 };
 
-describe('agent 归属机（#1259）', () => {
-  test('POST 缺 machineId → 400（归属机必填）', async () => {
+describe('agent home machine (#1259)', () => {
+  test('POST without machineId -> 400 (home machine required)', async () => {
     const s = bootServer();
     const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
       displayName: '无机探针',
@@ -35,7 +19,7 @@ describe('agent 归属机（#1259）', () => {
     s.dispose();
   });
 
-  test('POST 带不存在的 machineId → 404', async () => {
+  test('POST with a nonexistent machineId -> 404', async () => {
     const s = bootServer();
     const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
       displayName: '幽灵机探针',
@@ -45,7 +29,7 @@ describe('agent 归属机（#1259）', () => {
     s.dispose();
   });
 
-  test('runtime 闸：pi agent 绑只开 claude-code 的机器 → 400', async () => {
+  test('runtime gate: a pi agent bound to a claude-code-only machine -> 400', async () => {
     const s = bootServer();
     const mid = insertMachine(s, { name: 'cc-only', enabledRuntimes: ['claude-code'] });
     const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
@@ -57,7 +41,7 @@ describe('agent 归属机（#1259）', () => {
     s.dispose();
   });
 
-  test('模型闸：modelId 不在归属机上报清单 → 400 点名模型', async () => {
+  test('model gate: modelId not in the home machine reported list -> 400 naming the model', async () => {
     const s = bootServer();
     const mid = insertMachine(s, { name: 'no-glm', claudeCodeReport: REPORT_WITH_GLM });
     const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
@@ -71,7 +55,7 @@ describe('agent 归属机（#1259）', () => {
     s.dispose();
   });
 
-  test('模型闸：机器从未上报清单（老 daemon）→ 400', async () => {
+  test('model gate: machine never reported a list (legacy daemon) -> 400', async () => {
     const s = bootServer();
     const mid = insertMachine(s, { name: 'old-daemon' });
     const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
@@ -84,7 +68,7 @@ describe('agent 归属机（#1259）', () => {
     s.dispose();
   });
 
-  test('默认槽豁免 + 合格创建：claude-code 无 modelId → 201；清单命中 → 201 且记录带 machineId', async () => {
+  test('default-slot exemption + valid creation: claude-code without modelId -> 201; list hit -> 201 and record carries machineId', async () => {
     const s = bootServer();
     const mid = insertMachine(s, { claudeCodeReport: REPORT_WITH_GLM });
     const defaultSlot = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
@@ -105,10 +89,10 @@ describe('agent 归属机（#1259）', () => {
     s.dispose();
   });
 
-  test('换绑：到缺模型的机器 → 400 原值不动；到合格机器 → 200 落库', async () => {
+  test('rebind: to a machine missing the model -> 400 and the old value stays; to a valid machine -> 200 persisted', async () => {
     const s = bootServer();
     const home = insertMachine(s, { name: 'home', claudeCodeReport: REPORT_WITH_GLM });
-    const bad = insertMachine(s, { name: 'bad' }); // 从未上报
+    const bad = insertMachine(s, { name: 'bad' });
     const create = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
       displayName: '换绑探针',
       provider: 'claude-code',
@@ -130,7 +114,7 @@ describe('agent 归属机（#1259）', () => {
     s.dispose();
   });
 
-  test('patch 后门：不改绑、只把 modelId 换成归属机没有的模型 → 400', async () => {
+  test('patch backdoor: keeping the binding but swapping modelId to a model the home machine lacks -> 400', async () => {
     const s = bootServer();
     const home = insertMachine(s, { name: 'home', claudeCodeReport: REPORT_WITH_GLM });
     const create = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {

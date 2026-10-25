@@ -1,11 +1,3 @@
-// #1491 后台自动任务的触发闸：纯函数 evaluateAutonomyGates。测试先于实现
-// （AGENTS.md 测试规则）。每个原因一条正例 + 一条刚好放行的边界；判定顺序
-// 钉住（首个不过即返回）。失败方式对位票面：
-//  1 花费读不到 → 不放行（budget-unreadable）。
-//  2 跨日 → 日预算按 UTC 日切。
-//  3 休眠判定读失败（main 头读不到）→ 不休眠，交给后面的闸。
-//  4 被拦只是本轮不开：函数无副作用，同一输入重判结果不变。
-
 import {
   AUTONOMY_GATE_REASONS,
   type AutonomySettings,
@@ -28,7 +20,6 @@ const SETTINGS: AutonomySettings = {
   dailyBudgetUsd: 5,
 };
 
-/** 全部放行的输入；各用例只改一处。 */
 function input(over: Partial<AutonomyGateInput> = {}): AutonomyGateInput {
   return {
     now: NOW,
@@ -80,7 +71,6 @@ describe('evaluateAutonomyGates', () => {
       expect(
         evaluateAutonomyGates(input({ dormancy: { baselineSha: sha, currentSha: null } })).ok,
       ).toBe(true);
-      // 交给后面的闸：冷却仍会拦。
       expect(
         evaluateAutonomyGates(
           input({ dormancy: { baselineSha: sha, currentSha: null }, lastStartedAt: NOW - MIN }),
@@ -204,7 +194,6 @@ describe('evaluateAutonomyGates', () => {
       spentTodayUsd: null,
     });
     const seen: string[] = [];
-    // 逐个把最前面那道放开，原因按固定顺序往后走。
     let cur = allFail;
     const unblock: Array<(i: AutonomyGateInput) => AutonomyGateInput> = [
       (i) => ({ ...i, settings: { ...i.settings, enabled: true } }),

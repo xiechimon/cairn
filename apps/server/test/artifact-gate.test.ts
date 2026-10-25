@@ -1,28 +1,3 @@
-// #703 产物闸（B-C10/B-C11/B-C14）：两道闸各自有物可看——方案步没写出方案
-// 文档，进不了 confirm 闸；构建步零改动 / 假完成，进不了 review 闸。无物即
-// 无闸（spec 18 §3.1）。完成判据 = 契约产物存在，不是会话结束（#519「每步
-// 产物可核」的代码化）。
-// 失败方式清单（票面五条，先固化再实现）：
-//  1. 空方案进 confirm（B-C10）：plan 步 done 无方案文档 → 首轮 #113 补写轮
-//     重试一次；补写轮仍无 → 按失败收尾（step failed + todo failed +
-//     build.errorMessage「规划未产出方案」），confirm 不可达。
-//  2. 零改动进 review（B-C11）：build 步 done success + hasChanges=false
-//     （daemon worktree git 真值）→ 失败收尾「构建零改动」，review 不可达。
-//  3. 假完成（B-C14 形状）：流中断 + auto_retry + 零产出 → done success 无
-//     errorMessage —— plan 形落闸 1、build 形（零产出 ⇒ hasChanges false）落
-//     闸 2，不当 done。
-//  4. 误伤合法空产物：判定钉「本步该产什么」——review 步 hasChanges 恒 false
-//     （只读收尾，#511）不受闸 2 影响；hasChanges 缺省（老 daemon 版本墙）
-//     fail-open 照常过闸；有方案 / 有改动的步照常过闸。
-//  5. 判定读错真值源：闸只读 daemon 侧真值（plan 行 = 产物上传通道；done
-//     载荷 hasChanges = runner worktree git 判定），不读服务端 changes 投影
-//     （readBuildChanges 对非 hosted 项目恒空——读它会把手动项目全拦死，
-//     #704 地界）。本 harness 项目即无 repo 绑定：hasChanges=true 照常进
-//     review = 投影恒空没有参与判定。
-// 另钉：#113 补写触发条件从「prompt===null」改判「本 build 首个 plan 步」
-//     ——失败重启轮（新 build 首步、prompt 带 restart 指令）同样享一次补写
-//     重试，否则重启即硬失败。
-
 import type { ClaimedStep } from '@cairn/shared';
 import {
   claimedStepSchema,
@@ -64,8 +39,6 @@ async function call(
 
 const AGENT_ID = 'agent-ag-1';
 
-/** plan-handoff 同款引导裁剪面：provider/agent + enroll + 项目/todo 就位。项目
- * 不绑 repo（#704 投影恒空形态 = 失败方式 5 的判定素材）。 */
 async function setupWorld() {
   const s = bootServer({ claimHoldMs: 200 });
   const key = await issueApiKey(s);
@@ -102,7 +75,7 @@ async function setupWorld() {
     body: { teamId: s.team.id, name: 'ag-mbp', cliVersion: '0.1.0' },
   });
 
-  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+  bindAllAgents(s);
   const { token } = (await enrollRes.json()) as { token: string };
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -174,13 +147,10 @@ async function setupWorld() {
 
 type World = Awaited<ReturnType<typeof setupWorld>>;
 
-/** 过结构闸的方案（#1492：Verification 每项都有可执行锚点）。 */
 const GOOD_PLAN =
   '# 方案\nContext: x\n\n## Verification\n- `pnpm exec vitest run README.test.ts` 通过\n';
-/** 交了 plan.md 但 Verification 只有空话。 */
 const VAGUE_PLAN = '# 方案\nContext: x\n\n## Verification\n- 确认没问题\n';
 
-/** withPlan 链路走两轮空方案 plan 步（B-C10 形状：首轮 + 补写轮都不写 plan.md）。 */
 async function runTwoEmptyPlanRounds(w: World): Promise<{ buildId: string; secondStepId: string }> {
   const buildId = await w.startBuild(true);
   const first = await w.claim();
@@ -192,23 +162,21 @@ async function runTwoEmptyPlanRounds(w: World): Promise<{ buildId: string; secon
   return { buildId, secondStepId: second.step.id };
 }
 
-describe('闸 1（B-C10）：plan 步无方案文档 → confirm 不可达', () => {
-  test('补写轮仍无 plan.md → 失败收尾：step failed + todo failed + errorMessage「规划未产出方案」', async () => {
+describe('gate 1 (B-C10): plan step with no plan document -> confirm unreachable', () => {
+  test('completion round still has no plan.md -> failure wrap-up: step failed + todo failed + errorMessage "no plan produced"', async () => {
     const w = await setupWorld();
     try {
       const { buildId, secondStepId } = await runTwoEmptyPlanRounds(w);
-      // 不进 confirm（闸上无物）——按失败收尾，UI 失败行数据源 = build.errorMessage。
       expect(w.todoRow().phase).toBe('failed');
       expect(w.buildRow(buildId).errorMessage).toBe('规划未产出方案');
       expect(w.stepRow(secondStepId).status).toBe('failed');
-      // 有界：两轮 plan 步封顶，失败收尾不追加第三补写步。
       expect(w.stepsOf(buildId).filter((st) => st.kind === 'plan')).toHaveLength(2);
     } finally {
       w.s.dispose();
     }
   });
 
-  test('首轮无 plan.md 仍走 #113 补写轮（重试一次，不是直接失败）', async () => {
+  test('first round without plan.md still goes through the #113 completion round (one retry, not an immediate failure)', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(true);
@@ -226,7 +194,7 @@ describe('闸 1（B-C10）：plan 步无方案文档 → confirm 不可达', () 
     }
   });
 
-  test('负例：补写轮写出 plan.md → 照常过闸进 confirm（hasPlan 置位）', async () => {
+  test('counterexample: completion round writes plan.md -> passes the gate into confirm (hasPlan set)', async () => {
     const w = await setupWorld();
     try {
       await w.startBuild(true);
@@ -242,14 +210,11 @@ describe('闸 1（B-C10）：plan 步无方案文档 → confirm 不可达', () 
     }
   });
 
-  test('失败重启轮（新 build 首个 plan 步、prompt 带 restart 指令）→ 同样享一次补写重试', async () => {
+  test('failed-restart round (first plan step of a new build, prompt carries the restart instruction) -> gets the same one completion retry', async () => {
     const w = await setupWorld();
     try {
       const { buildId } = await runTwoEmptyPlanRounds(w);
       expect(w.todoRow().phase).toBe('failed');
-      // failed 面带反馈重启（#320）：新 build（withPlan 承接）+ 首步 prompt 带
-      // restart 指令——prompt 非 null，但仍是本 build 首个 plan 步 → 补写重试
-      // 而非直接硬失败（重启语义 = 再给一轮，不是即死）。
       const res = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
         body: {
           action: 'restart',
@@ -262,12 +227,10 @@ describe('闸 1（B-C10）：plan 步无方案文档 → confirm 不可达', () 
       const first = await w.claim();
       expect(first.step.kind).toBe('plan');
       await w.done(first.step.id, { status: 'success', sessionId: 'pi-restart' });
-      // 首轮（本 build 无其它 plan 步）→ 补写步入队，todo 留 planning 不 failed。
       expect(w.todoRow().phase).toBe('planning');
       expect(
         w.stepsOf(first.step.buildId).filter((st) => st.kind === 'plan' && st.status === 'pending'),
       ).toHaveLength(1);
-      // 补写轮仍无产物 → 失败收尾（同 build 的第二次 plan 完成 = 闸拦）。
       const rewrite = await w.claim();
       await w.done(rewrite.step.id, { status: 'success', sessionId: 'pi-restart' });
       expect(w.todoRow().phase).toBe('failed');
@@ -278,14 +241,14 @@ describe('闸 1（B-C10）：plan 步无方案文档 → confirm 不可达', () 
   });
 });
 
-describe('闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达', () => {
-  test('done success + hasChanges=false → 失败收尾「构建零改动」', async () => {
+describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -> review unreachable', () => {
+  test('done success + hasChanges=false -> failure wrap-up "build produced zero changes"', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
       const buildStep = await w.claim();
       expect(buildStep.step.kind).toBe('build');
-      expect(w.todoRow().phase).toBe('building'); // claim 已进 building
+      expect(w.todoRow().phase).toBe('building');
       await w.done(buildStep.step.id, {
         status: 'success',
         hasChanges: false,
@@ -299,7 +262,7 @@ describe('闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不
     }
   });
 
-  test('负例：hasChanges=true → 照常进 review（有物过闸）', async () => {
+  test('counterexample: hasChanges=true -> proceeds to review as usual (an artifact passes the gate)', async () => {
     const w = await setupWorld();
     try {
       await w.startBuild(false);
@@ -316,7 +279,7 @@ describe('闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不
     }
   });
 
-  test('版本墙负例：老 daemon 不携带 hasChanges → fail-open 照常 review', async () => {
+  test('version-wall counterexample: legacy daemon does not carry hasChanges -> fail-open, review as usual', async () => {
     const w = await setupWorld();
     try {
       await w.startBuild(false);
@@ -328,13 +291,11 @@ describe('闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不
     }
   });
 
-  test('失败方式 3（B-C14 假完成形状）：done success 零产出零 errorMessage → 按失败收尾', async () => {
+  test('failure mode 3 (B-C14 fake-completion shape): done success with zero artifact and zero errorMessage -> wrapped up as failure', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
       const buildStep = await w.claim();
-      // 流中断 + auto_retry + 零产出的机器回报形状：success、无 errorMessage、
-      // 无产物（hasChanges=false）——不当 done，闸 2 拦下。
       await w.done(buildStep.step.id, {
         status: 'success',
         hasChanges: false,
@@ -348,7 +309,7 @@ describe('闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不
     }
   });
 
-  test('失败方式 4（不误伤）：review 步 hasChanges=false 照常收 verdict，不落 failed', async () => {
+  test('failure mode 4 (no collateral damage): review step with hasChanges=false records a verdict as usual, not failed', async () => {
     const w = await setupWorld();
     try {
       await w.startBuild(false);
@@ -365,8 +326,6 @@ describe('闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不
       expect(res.status).toBe(202);
       const reviewStep = await w.claim();
       expect(reviewStep.step.kind).toBe('review');
-      // 审核步只读收尾恒报 hasChanges=false（#511 设计）——闸 2 只钉 build 步，
-      // review 步零「改动」是合法空产物，不落 failed。
       await w.done(reviewStep.step.id, {
         status: 'success',
         hasChanges: false,
@@ -380,12 +339,9 @@ describe('闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不
     }
   });
 
-  test('失败方式 5（真值源）：无 repo 项目 hasChanges=true 照常 review——闸不读恒空投影', async () => {
+  test('failure mode 5 (source of truth): repo-less project with hasChanges=true proceeds to review -- the gate does not read the always-empty projection', async () => {
     const w = await setupWorld();
     try {
-      // 本 harness 项目不绑 repo：服务端 changes 投影（readBuildChanges）对该
-      // 形态恒 files:[]。若闸读投影，这里会被「零改动」误拦——真值 = done
-      // 载荷 hasChanges（daemon 侧 worktree 判定）。
       await w.startBuild(false);
       const buildStep = await w.claim();
       await w.done(buildStep.step.id, {
@@ -400,24 +356,13 @@ describe('闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不
   });
 });
 
-// #1195 闸 2 的偏离点名面：agent 在自建分支交付（PR 已开）而收尾计数按会话
-// 分支判零时，「构建零改动」把失败原因彻底说反（看起来像 agent 没干活）。
-// daemon 收尾上报 workBranchDrift（expected=契约分支 / actual=实际 HEAD 分支）。
-// #1277：偏离即硬失败，不再只在 hasChanges=false 时拒绝。失败方式：
-//  6. hasChanges=false + drift → errorMessage 点名两分支且说明步窗口内无提交，
-//     step/todo failed、review 不可达
-//  7. hasChanges=true + drift → 同样硬失败（#1275 并集面：过闸进 review +
-//     保留 PR 回填，在此反转）。原因点名两分支，不套用「未见任何提交」，
-//     review 不可达，done 携带的 PR 不留在 build 行
-//  8. hasChanges=false 无 drift → 「构建零改动」逐字不变（现状钉扎）
-//  9. 版本墙：老 daemon 载荷（无 drift 字段）→ 行为与现状逐字一致
-describe('闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」', () => {
+describe('gate 2 drift naming (#1195): branch drift is no longer "build produced zero changes"', () => {
   const DRIFT = {
     expected: 'cairn/conv-0198f6c0-0000-7000-8000-000000000000',
     actual: 'dogfood/tracer-1153-verification-note',
   };
 
-  test('失败方式 6：hasChanges=false + workBranchDrift → 失败原因点名分支偏离', async () => {
+  test('failure mode 6: hasChanges=false + workBranchDrift -> failure reason names the branch drift', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -439,7 +384,7 @@ describe('闸 2 偏离点名（#1195）：分支偏离不再是「构建零改�
     }
   });
 
-  test('失败方式 7：hasChanges=true + workBranchDrift → 硬失败，点名两分支，不保留 PR', async () => {
+  test('failure mode 7: hasChanges=true + workBranchDrift -> hard failure naming both branches, PR not kept', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -466,7 +411,7 @@ describe('闸 2 偏离点名（#1195）：分支偏离不再是「构建零改�
     }
   });
 
-  test('失败方式 9：老 daemon 载荷（无 drift 字段）→「构建零改动」不变', async () => {
+  test('failure mode 9: legacy daemon payload (no drift field) -> "build produced zero changes" unchanged', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -483,15 +428,8 @@ describe('闸 2 偏离点名（#1195）：分支偏离不再是「构建零改�
   });
 });
 
-// #1492 plan 结构闸：plan 步交了 plan.md 但 Verification 不合格（缺节 / 空话）
-// → 不进 confirm，走一次结构补写轮；补写轮仍不合格 → 按失败收尾。失败方式：
-// 10. 空话方案直接进 confirm（票面现状：只要写了就算过）。
-// 11. 补写轮无限循环：补写轮仍不合格必须失败收尾，plan 步封顶两轮。
-// 12. 补写提示不点名问题 → agent 不知道改哪里。
-// 13. 补写轮没重新上传方案也被放进 confirm（旧版不合格方案混过去）。
-// 14. 合格方案被误拦（校验太严）。
-describe('plan 结构闸（#1492）：Verification 不合格 → confirm 不可达', () => {
-  test('失败方式 10、12：首轮空话方案 → 留 planning，入队点名问题的结构补写轮', async () => {
+describe('plan structure gate (#1492): invalid Verification -> confirm unreachable', () => {
+  test('failure modes 10 and 12: first round has a fluff plan -> stays planning, enqueues a structure completion round naming the problem', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(true);
@@ -511,7 +449,7 @@ describe('plan 结构闸（#1492）：Verification 不合格 → confirm 不可�
     }
   });
 
-  test('失败方式 11：结构补写轮仍不合格 → 失败收尾，原因点名，plan 步封顶两轮', async () => {
+  test('failure mode 11: structure completion round still invalid -> failure wrap-up naming the reason, plan step capped at two rounds', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(true);
@@ -531,7 +469,7 @@ describe('plan 结构闸（#1492）：Verification 不合格 → confirm 不可�
     }
   });
 
-  test('失败方式 13：结构补写轮没重新上传 → 按旧版判，仍不合格即失败', async () => {
+  test('failure mode 13: structure completion round not re-uploaded -> judged on the old version, still invalid so it fails', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(true);
@@ -547,7 +485,7 @@ describe('plan 结构闸（#1492）：Verification 不合格 → confirm 不可�
     }
   });
 
-  test('结构补写轮补齐 Verification → 进 confirm', async () => {
+  test('structure completion round fills in Verification -> proceeds to confirm', async () => {
     const w = await setupWorld();
     try {
       await w.startBuild(true);
@@ -564,7 +502,7 @@ describe('plan 结构闸（#1492）：Verification 不合格 → confirm 不可�
     }
   });
 
-  test('失败方式 14：首轮合格方案直接进 confirm，不多跑补写轮', async () => {
+  test('failure mode 14: a valid first-round plan proceeds straight to confirm, no extra completion round', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(true);
@@ -579,13 +517,8 @@ describe('plan 结构闸（#1492）：Verification 不合格 → confirm 不可�
   });
 });
 
-// #1492 build 步异常结束的兜底报告：失败收尾时会话里必须有一条系统写的报告，
-// 卡片上不留空白。失败方式：
-// 15. build 步失败后会话里只有错误横幅的数据源，没有可读的收尾报告。
-// 16. 失败原因是空字符串 → 失败横幅（errorMessage 非空才显示）整块消失。
-// 17. 报告误伤：plan / review 步失败不该落构建报告。
-describe('build 步兜底报告（#1492）', () => {
-  test('失败方式 15：build 步机器报失败 → 落兜底报告，含失败原因', async () => {
+describe('build step fallback report (#1492)', () => {
+  test('failure mode 15: machine reports the build step failed -> writes a fallback report with the failure reason', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -606,7 +539,7 @@ describe('build 步兜底报告（#1492）', () => {
     }
   });
 
-  test('产物闸失败（构建零改动）同样落兜底报告', async () => {
+  test('artifact-gate failure (build produced zero changes) also writes a fallback report', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -621,7 +554,7 @@ describe('build 步兜底报告（#1492）', () => {
     }
   });
 
-  test('失败方式 16：失败原因为空串 → errorMessage 补成说明文字', async () => {
+  test('failure mode 16: empty failure reason -> errorMessage filled with an explanatory text', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -633,7 +566,7 @@ describe('build 步兜底报告（#1492）', () => {
     }
   });
 
-  test('失败方式 17：plan 步失败不落构建兜底报告', async () => {
+  test('failure mode 17: plan step failure does not write the build fallback report', async () => {
     const w = await setupWorld();
     try {
       const { buildId } = await runTwoEmptyPlanRounds(w);

@@ -1,10 +1,3 @@
-// #1241 机器推荐并发：公式与优先级（用户 > 推荐 > 保守估算）。失败方式（先于实现固化，仓测试纪律）：
-// F1 公式越界：核数 / 内存 / 下沿 1 / 上沿 16 任一项失守 → 推荐值错。
-// F2 缺指纹不给估算标：无指纹或坏指纹没落 estimate（3），或误标 measured。
-// F3 用户值被心跳覆盖：overridden 行的 maxConcurrent 随推荐值漂移（用户值不持久）。
-// F4 清除覆盖不回推荐：PATCH null 后数字不跟当前硬件重算。
-// F5 心跳缺 hardware 把已测推荐打回估算：一次探测失败掉回保守默认。
-
 import { machineRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -45,8 +38,8 @@ const weak = {
   diskFreeMb: 50_000,
 };
 
-describe('#1241 公式（推荐并发 = clamp(min(核, round(总内存 / 2GiB)), 1, 16)）', () => {
-  test('F1 核数与内存各自作上界：核少取核，内存少取 round(GiB/2)', () => {
+describe('#1241 formula (recommended concurrency = clamp(min(cores, round(total memory / 2GiB)), 1, 16))', () => {
+  test('F1 cores and memory each set an upper bound: fewer cores takes cores, less memory takes round(GiB/2)', () => {
     expect(
       recommendMachineConcurrency({ ...modest, cpuCores: 4, memoryTotalMb: 32 * MIB_PER_GIB }),
     ).toMatchObject({
@@ -56,12 +49,12 @@ describe('#1241 公式（推荐并发 = clamp(min(核, round(总内存 / 2GiB)),
     expect(recommendMachineConcurrency(modest)).toMatchObject({ value: 3, source: 'measured' });
   });
 
-  test('F1 上沿 16：64 GiB 32 核不超写域', () => {
+  test('F1 upper edge 16: 64 GiB 32 cores does not exceed the write domain', () => {
     expect(recommendMachineConcurrency(roomy)).toMatchObject({ value: 16, source: 'measured' });
     expect(CONCURRENCY_CEILING).toBe(16);
   });
 
-  test('F1 下沿 1：总内存不足 2 GiB 仍给 1 槽', () => {
+  test('F1 lower edge 1: total memory under 2 GiB still gives 1 slot', () => {
     expect(recommendMachineConcurrency({ ...weak, memoryTotalMb: 1500 })).toMatchObject({
       value: 1,
       source: 'measured',
@@ -69,14 +62,14 @@ describe('#1241 公式（推荐并发 = clamp(min(核, round(总内存 / 2GiB)),
     expect(CONCURRENCY_FLOOR).toBe(1);
   });
 
-  test('F1 内存只看总量：运行中的步吃掉可用内存，推荐值不缩', () => {
+  test('F1 memory looks only at the total: running steps eating available memory do not shrink the recommendation', () => {
     expect(recommendMachineConcurrency({ ...roomy, memoryAvailableMb: 512 })).toMatchObject({
       value: 16,
       source: 'measured',
     });
   });
 
-  test('F2 无指纹 / 坏指纹 / 缺 memoryTotalMb → 保守默认 3，标 estimate', () => {
+  test('F2 no fingerprint / bad fingerprint / missing memoryTotalMb -> conservative default 3, marked estimate', () => {
     expect(recommendMachineConcurrency(undefined)).toMatchObject({ value: 3, source: 'estimate' });
     expect(recommendMachineConcurrency(null)).toMatchObject({ value: 3, source: 'estimate' });
     expect(recommendMachineConcurrency({ ...weak, cpuCores: 0 })).toMatchObject({
@@ -88,7 +81,7 @@ describe('#1241 公式（推荐并发 = clamp(min(核, round(总内存 / 2GiB)),
     expect(CONSERVATIVE_CONCURRENCY).toBe(3);
   });
 
-  test('F3 可选区间 = 1..clamp(round(总内存 / 1GiB), 1, 16)；无指纹 = 1..8', () => {
+  test('F3 valid range = 1..clamp(round(total memory / 1GiB), 1, 16); no fingerprint = 1..8', () => {
     const hw = (cpuCores: number, memoryTotalMb: number) => ({
       cpuCores,
       memoryTotalMb,
@@ -184,8 +177,8 @@ async function patchMaxConcurrent(w: World, maxConcurrent: number | null): Promi
   expect(res.status).toBe(200);
 }
 
-describe('#1241 优先级：用户 > 推荐 > 保守估算（写点 + 读面）', () => {
-  test('F2 注册未带指纹 → maxConcurrent 3，source estimate', async () => {
+describe('#1241 priority: user > recommendation > conservative estimate (write point + read surface)', () => {
+  test('F2 register without fingerprint -> maxConcurrent 3, source estimate', async () => {
     const w = await setupWorld();
     const r = await recordOf(w);
     expect(r).toMatchObject({
@@ -196,7 +189,7 @@ describe('#1241 优先级：用户 > 推荐 > 保守估算（写点 + 读面）'
     });
   });
 
-  test('心跳带指纹 → 未覆盖的数跟随推荐值；source measured', async () => {
+  test('heartbeat carrying a fingerprint -> uncovered numbers follow the recommendation; source measured', async () => {
     const w = await setupWorld();
     expect((await presence(w, { mcpServers: [], skills: [], hardware: roomy })).status).toBe(200);
     expect(await recordOf(w)).toMatchObject({
@@ -208,7 +201,7 @@ describe('#1241 优先级：用户 > 推荐 > 保守估算（写点 + 读面）'
     expect(await recordOf(w)).toMatchObject({ maxConcurrent: 1, recommendedConcurrent: 1 });
   });
 
-  test('F3 用户覆盖后心跳不改数，推荐值照常显示；source manual', async () => {
+  test('F3 after user override the heartbeat does not change the number, recommendation still shown; source manual', async () => {
     const w = await setupWorld();
     await presence(w, { mcpServers: [], skills: [], hardware: roomy });
     await patchMaxConcurrent(w, 5);
@@ -221,7 +214,7 @@ describe('#1241 优先级：用户 > 推荐 > 保守估算（写点 + 读面）'
     });
   });
 
-  test('F4 清除覆盖（PATCH null）→ 回到当前指纹的推荐值', async () => {
+  test('F4 clearing the override (PATCH null) -> back to the current fingerprint recommendation', async () => {
     const w = await setupWorld();
     await presence(w, { mcpServers: [], skills: [], hardware: roomy });
     await patchMaxConcurrent(w, 5);
@@ -233,7 +226,7 @@ describe('#1241 优先级：用户 > 推荐 > 保守估算（写点 + 读面）'
     });
   });
 
-  test('F5 心跳缺 hardware 沿用上一拍指纹，推荐不被打回估算', async () => {
+  test('F5 heartbeat without hardware reuses the previous tick fingerprint, recommendation not knocked back to estimate', async () => {
     const w = await setupWorld();
     await presence(w, { mcpServers: [], skills: [], hardware: roomy });
     await presence(w, { mcpServers: ['figma'], skills: [] });

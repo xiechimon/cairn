@@ -1,10 +1,3 @@
-// #1186 finishStep 旁路：done 携带的实际注入名集落成 system 行，步结果不变。
-// 失败方式：
-//   S1 授权且注入、transcript 没有该技能事实 → level yellow，step 仍 failed。
-//   S2 skillsAllowlist []（#1169 历史形）→ level red allowlist-closed，
-//      injected 名集在行上，step 仍 failed。
-//   S3 同 S1 但已有 SKILL.md toolcall → level ok（事实命中，不黄）。
-
 import type { MachineDoneBody, SkillInjectionRecord } from '@cairn/shared';
 import { SKILL_INJECTION_CHECK_KIND } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -181,8 +174,8 @@ function checkRow(w: World): {
   };
 }
 
-describe('finishStep 技能注入断言（#1186）', () => {
-  test('S1 注入了但没读 → yellow，步仍 failed', async () => {
+describe('the finishStep skill-injection assertion (#1186)', () => {
+  test('S1 injected but never read -> yellow, the step still failed', async () => {
     const w = makeWorld({
       skillsAllowlist: ['demo-skill'],
       skillInjection: {
@@ -205,7 +198,7 @@ describe('finishStep 技能注入断言（#1186）', () => {
     expect(step?.status).toBe('failed');
   });
 
-  test('S2 allowlist [] → red allowlist-closed，步仍 failed', async () => {
+  test('S2 allowlist [] -> red allowlist-closed, the step still failed', async () => {
     const w = makeWorld({
       skillsAllowlist: [],
       skillInjection: { hits: [] },
@@ -224,7 +217,7 @@ describe('finishStep 技能注入断言（#1186）', () => {
     expect(step?.status).toBe('failed');
   });
 
-  test('S3 已读 SKILL.md → ok', async () => {
+  test('S3 SKILL.md read -> ok', async () => {
     const w = makeWorld({
       skillsAllowlist: ['demo-skill'],
       skillInjection: {

@@ -1,19 +1,3 @@
-// #1470：#1466 之后剩下的团队归属缺口。单团队部署下不可触发；本文件直插
-// 第二个团队造出触发面（project-team-guard.test.ts 同法）。
-// 失败方式（先于实现固化）：
-//  U1 MCP run_builds：本队任务指向他队项目——build 建在他队项目上，claim 载荷
-//     带他队仓库 + 本队 GitHub 凭证。混合列表里排在前面的本队任务先被派出。
-//  U2 MCP schedule_todo：同一种行建出一条指向他队项目的定时。
-//  U3 MCP conversation：任意 build id / chief thread id 都读得到全文。
-//  U4 chief usage：读到全部 token_usage 行（他队 build、他队 chief 回合）。
-//  U5 chief / worker save_memory：projectId / sourceTodoId 指向他队或不存在的
-//     行照样落库。
-//  U6 clone URL：存量 githubRepo 不合法（`../user`）时仍拼出
-//     `https://github.com/../user.git`，claim 载荷与项目记录都带它。
-//  U7 同团队路径不变。
-//  U8 MCP run_builds：assignment 指派他队 Agent——他队机器领到本队仓库与凭证。
-//  U9 chief 信封 context.tokens：累加全部 `chief-%` 行（他队 chief 回合也算）。
-
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
@@ -45,7 +29,6 @@ const TASK_B = 'todo-b-1470';
 const BUILD_B = 'build-b-1470';
 const THREAD_B = 'chief-b-1470';
 const MISSING = 'missing-1470';
-/** 本队任务、他队项目（#1466 前 create_todo 可造的存量异常行）。 */
 const CROSS = 'todo-cross-1470';
 const OWN_TASK = 'todo-own-1470';
 const OWN_BUILD = 'build-own-1470';
@@ -162,7 +145,6 @@ async function rejection(p: Promise<unknown>): Promise<HttpError> {
   return err as HttpError;
 }
 
-/** schedules 只收整刻钟分钟位（0/15/30/45）。 */
 function nextQuarter(): number {
   return Math.ceil((nowMs() + 3_600_000) / 900_000) * 900_000;
 }
@@ -179,17 +161,17 @@ function memoryCount(): number {
   return H.s.db.select().from(agentMemory).all().length;
 }
 
-describe('#1470 MCP run_builds / schedule_todo：任务所指项目也核团队', () => {
+describe('#1470 MCP run_builds / schedule_todo: the project a todo points at is team-checked too', () => {
   const assignment = { build: { agentId: AGENT_ID } };
 
-  test('U1 run_builds：本队任务指向他队项目 → 404 project，一个 build 都不建', async () => {
+  test('U1 run_builds: an own-team todo pointing at another team project -> 404 project, not one build created', async () => {
     const err = await rejection(mcp('run_builds', { todoIds: [CROSS], assignment }));
     expect(err.status).toBe(404);
     expect(err.message).toBe(`project ${PROJ_B}`);
     expect(buildsOf(CROSS)).toBe(0);
   });
 
-  test('U1 run_builds 混合列表：排在前面的本队任务也不先派出', async () => {
+  test('U1 run_builds mixed list: the own-team todo at the front is not dispatched first either', async () => {
     const own = H.s.db.select().from(todoTable).where(eq(todoTable.id, OWN_TASK)).get();
     const before = buildsOf(OWN_TASK);
     const err = await rejection(mcp('run_builds', { todoIds: [OWN_TASK, CROSS], assignment }));
@@ -200,7 +182,7 @@ describe('#1470 MCP run_builds / schedule_todo：任务所指项目也核团队'
     );
   });
 
-  test('U8 run_builds：指派他队 Agent → 404 agent，一个 build 都不建', async () => {
+  test('U8 run_builds: assigning another team agent -> 404 agent, not one build created', async () => {
     H.s.db
       .insert(agentTable)
       .values({ id: 'agent-b-1470', teamId: TEAM_B, displayName: 'b', provider: 'p', modelId: 'm' })
@@ -217,7 +199,7 @@ describe('#1470 MCP run_builds / schedule_todo：任务所指项目也核团队'
     expect(buildsOf(OWN_TASK)).toBe(before);
   });
 
-  test('U2 schedule_todo：本队任务指向他队项目 → 404 project，不建定时', async () => {
+  test('U2 schedule_todo: an own-team todo pointing at another team project -> 404 project, no schedule created', async () => {
     const err = await rejection(
       mcp('schedule_todo', { todoId: CROSS, kind: 'once', at: nextQuarter() }),
     );
@@ -226,7 +208,7 @@ describe('#1470 MCP run_builds / schedule_todo：任务所指项目也核团队'
     expect(schedulesOf(CROSS)).toBe(0);
   });
 
-  test('U7 同团队路径不变：run_builds 与 schedule_todo 照常', async () => {
+  test('U7 same-team paths unchanged: run_builds and schedule_todo work as usual', async () => {
     const res = (await mcp('run_builds', { todoIds: [OWN_TASK], assignment })) as {
       builds: unknown[];
     };
@@ -236,7 +218,7 @@ describe('#1470 MCP run_builds / schedule_todo：任务所指项目也核团队'
   });
 });
 
-describe('#1470 MCP conversation：跨团队与不存在同 404', () => {
+describe('#1470 MCP conversation: cross-team and nonexistent are both 404', () => {
   test.each([
     ['build 对话', BUILD_B],
     ['chief 对话', THREAD_B],
@@ -249,7 +231,7 @@ describe('#1470 MCP conversation：跨团队与不存在同 404', () => {
     expect(cross.message).toBe(missing.message.replace(missingId, id));
   });
 
-  test('U7 本队 build / chief 对话照常读', async () => {
+  test('U7 own-team build / chief conversations read as usual', async () => {
     const own = (await mcp('conversation', { conversationId: OWN_BUILD })) as { content: string }[];
     expect(own.map((m) => m.content)).toEqual(['本队对话']);
     const chief = (await mcp('conversation', { conversationId: H.threadId })) as {
@@ -259,13 +241,13 @@ describe('#1470 MCP conversation：跨团队与不存在同 404', () => {
   });
 });
 
-describe('#1470 chief usage：只回本队 build 与本队 chief 回合的行', () => {
-  test('U4 全量：不含他队 build / 他队 chief 回合', async () => {
+describe('#1470 chief usage: only own-team builds and own-team chief turns are returned', () => {
+  test('U4 full listing: no other-team builds / other-team chief turns', async () => {
     const rows = (await relay('usage', {})) as { buildId: string }[];
     expect(rows.map((r) => r.buildId).sort()).toEqual([OWN_BUILD, H.threadId].sort());
   });
 
-  test('U4 按 buildId：他队 build 回 []，本队 build 照回', async () => {
+  test('U4 by buildId: another team build returns [], an own-team build returns as usual', async () => {
     expect(await relay('usage', { buildId: BUILD_B })).toEqual([]);
     expect(await relay('usage', { buildId: THREAD_B })).toEqual([]);
     const own = (await relay('usage', { buildId: OWN_BUILD })) as { input: number }[];
@@ -273,14 +255,14 @@ describe('#1470 chief usage：只回本队 build 与本队 chief 回合的行', 
   });
 });
 
-describe('#1470 chief 信封 context.tokens：只计本 chief 的 thread', () => {
-  test('U9 他队 chief 回合不进读数', () => {
+describe('#1470 the chief envelope context.tokens: only this chief own threads are counted', () => {
+  test('U9 another team chief turns do not enter the reading', () => {
     const svc = { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user };
     expect(getChiefEnvelope(svc, H.teamId).context?.tokens).toBe(2);
   });
 });
 
-describe('#1470 save_memory：projectId / sourceTodoId 核团队', () => {
+describe('#1470 save_memory: projectId / sourceTodoId are team-checked', () => {
   test.each([
     ['projectId 他队', { projectId: PROJ_B }, `project ${PROJ_B}`],
     ['projectId 不存在', { projectId: MISSING }, `project ${MISSING}`],
@@ -319,7 +301,7 @@ describe('#1470 save_memory：projectId / sourceTodoId 核团队', () => {
     expect(memoryCount()).toBe(before);
   });
 
-  test('U7 本队项目照常落库（chief 显式 projectId、worker 缺省上下文）', async () => {
+  test('U7 own-team projects store as usual (chief explicit projectId, worker default context)', async () => {
     const chief = (await relay('save_memory', {
       title: 't',
       content: 'c',
@@ -337,7 +319,7 @@ describe('#1470 save_memory：projectId / sourceTodoId 核团队', () => {
   });
 });
 
-describe('#1470 clone URL：存量 githubRepo 经 githubRepoOfProject 同一道闸', () => {
+describe('#1470 clone URL: legacy githubRepo goes through the same githubRepoOfProject gate', () => {
   function githubRow(githubRepo: string) {
     return {
       id: `proj-${newUuidv7()}`,
@@ -351,16 +333,15 @@ describe('#1470 clone URL：存量 githubRepo 经 githubRepoOfProject 同一道�
     };
   }
 
-  test.each(['../user', 'a/..', 'no-slash'])('U6 %s：无 clone URL、无 repo 绑定', (value) => {
+  test.each(['../user', 'a/..', 'no-slash'])('U6 %s: no clone URL, no repo binding', (value) => {
     const row = githubRow(value) as Parameters<typeof projectRepoRef>[0] & object;
     expect(projectRepoRef(row, 'http://h')).toBeNull();
     expect(hasRepoBinding(row)).toBe(false);
     expect(toProjectRecord(row, 'http://h').cloneUrl).toBeUndefined();
-    // 存量值仍原样回显（设置页能看见并改掉它）。
     expect(toProjectRecord(row, 'http://h').githubRepo).toBe(value);
   });
 
-  test('U7 合法 owner/repo：clone URL 与加速位不变', () => {
+  test('U7 a legal owner/repo: the clone URL and the accelerator unchanged', () => {
     const row = githubRow('octo/alpha') as Parameters<typeof projectRepoRef>[0] & object;
     expect(projectRepoRef(row, 'http://h')).toEqual({
       kind: 'github',

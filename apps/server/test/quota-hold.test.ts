@@ -1,21 +1,3 @@
-// #1257 额度挂起（等额度）：relay 配额打满（402/usage limit 族错误）是配额
-// 事件不是任务失败——done(failed) 面 classifyStepFailure → quota 时挂起步子
-// 而非判死：步回 pending（认领位复位、sessionId 续接面在位、holdUntil 退避），
-// todo 不落 failed，额度恢复后经既有 claim 循环自动续跑。挂起/续跑闭环 +
-// waitingOn 板面派生（「等机器」/「等额度」与失败红态的区分）。
-// 失败方式（先于实现固化）：
-//  1. quota 失败 → 挂起：pending + 机位清 + sessionId ← done 载荷 + holdUntil
-//     = now+首档退避；todo/build 不落失败痕迹；会话流 step pending 事件 +
-//     等额度 system 行。
-//  2. 挂起期间（holdUntil 未到）claim 不到该步。
-//  3. holdUntil 过后可领：session 载荷 continue + 挂起步自己的 sessionId。
-//  4. 续跑再失败 quota → 退避升级（第二档 5 分钟）。
-//  5. 第三档起退避封顶（15 分钟）。
-//  6. 非 quota 失败（network 文案）→ 走既有失败漏斗（step/todo failed +
-//     build.errorMessage）。
-//  7. waitingOn 派生：quota 挂起 → {on:'quota'}；归属机离线 / 团队零在线 →
-//     {on:'machine'}；机器健康可领 → 缺席（正常排队）；非在飞相位 → 缺席。
-
 import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -57,8 +39,6 @@ async function call(
 
 const AGENT_ID = 'agent-quota-1';
 
-/** provider/agent + enroll + 项目/todo 就位（项目不绑 repo：本测试只走 claim →
- * done 面，不产物件）。直执行 build 步（withPlan=false）简化相位链。 */
 async function setupWorld() {
   const s = bootServer({ claimHoldMs: 200 });
   const key = await issueApiKey(s);
@@ -97,7 +77,6 @@ async function setupWorld() {
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = s.db.select().from(machineTable).limit(1).all()[0]!.id;
   s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, machineId)).run();
-  // #1259 归属机绑定：quota 世界可领的缺省形态（agent 绑到唯一机器）。
   s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, AGENT_ID)).run();
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -149,8 +128,8 @@ async function setupWorld() {
   };
 }
 
-describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
-  test('失败方式 1：quota 失败 → 挂起（pending + 机位清 + sessionId 续接面 + holdUntil 首档；零失败痕迹 + step pending 事件 + 等额度行）', async () => {
+describe('#1257 quota hold (done-surface classification + the hold/resume loop)', () => {
+  test('failure mode 1: a quota failure -> held (pending + machine slot cleared + the sessionId resume surface + holdUntil at the first tier; zero failure traces + a step pending event + a waiting-for-quota row)', async () => {
     const w = await setupWorld();
     const buildId = await w.startBuild();
     const events: object[] = [];
@@ -174,24 +153,20 @@ describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
     const row = w.stepRow(step.step.id);
     expect(row.status).toBe('pending');
     expect(row.machineId).toBeNull();
-    expect(row.sessionId).toBe('pi-sess-quota-1'); // 续接面：重领时 continue
+    expect(row.sessionId).toBe('pi-sess-quota-1');
     expect(row.holdReason).toBe('quota');
     expect(row.holdCount).toBe(1);
     expect(row.holdUntil).not.toBeNull();
     expect(row.holdUntil! - before).toBeGreaterThanOrEqual(QUOTA_HOLD_BACKOFF_MS[0]! - 1_000);
     expect(row.holdUntil! - before).toBeLessThanOrEqual(QUOTA_HOLD_BACKOFF_MS[0]! + 5_000);
-    // 零失败痕迹：todo 不落 failed、build.errorMessage 空。
     expect(w.todoRow().phase).not.toBe('failed');
     expect(w.buildRow(buildId).errorMessage).toBeNull();
-    // 会话流：step pending 事件（挂起面与释放同形；订阅先于 claim，取最后
-    // 一条 step 事件 = 挂起事件）。
     const stepEvents = events.filter(
       (e): e is { type: string; step: { status: string; id: string } } =>
         (e as { type?: string }).type === 'step',
     );
     const stepEv = stepEvents[stepEvents.length - 1];
     expect(stepEv?.step.status).toBe('pending');
-    // 会话流 + 落库：等额度 system 行（可见态：原因 + 下次尝试）。
     const holdRows = w.messagesOf(buildId).filter((m) => m.id === `quota-hold-${step.step.id}`);
     expect(holdRows).toHaveLength(1);
     expect(holdRows[0]!.role).toBe('system');
@@ -201,7 +176,7 @@ describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
     untap();
   });
 
-  test('失败方式 2：挂起期间 claim 不到（holdUntil 未到）', async () => {
+  test('failure mode 2: nothing claims while held (holdUntil not reached)', async () => {
     const w = await setupWorld();
     await w.startBuild();
     const step = (await w.claim())!;
@@ -213,10 +188,10 @@ describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
     expect(w.stepRow(step.step.id).status).toBe('pending');
 
     const claimed = await w.claim();
-    expect(claimed).toBeNull(); // 退避期内不可领
+    expect(claimed).toBeNull();
   });
 
-  test('失败方式 3：holdUntil 过后可领，session 载荷 continue + 挂起步自己的 sessionId（额度回来即自动续跑）', async () => {
+  test('failure mode 3: claimable once holdUntil passes, the session payload continue + the held step own sessionId (auto-resumes when the quota returns)', async () => {
     const w = await setupWorld();
     await w.startBuild();
     const step = (await w.claim())!;
@@ -225,7 +200,6 @@ describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
       errorMessage: QUOTA_ERROR,
       sessionId: 'pi-sess-quota-1',
     });
-    // 退避到期（时间旅行：直写 holdUntil 到过去）。
     w.s.db
       .update(stepTable)
       .set({ holdUntil: Date.now() - 1 })
@@ -239,7 +213,7 @@ describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
     expect(reclaimed!.session.sessionId).toBe('pi-sess-quota-1');
   });
 
-  test('失败方式 4：续跑再失败 quota → 退避升级第二档', async () => {
+  test('failure mode 4: the resume fails with quota again -> backoff raised to the second tier', async () => {
     const w = await setupWorld();
     await w.startBuild();
     const step = (await w.claim())!;
@@ -267,11 +241,10 @@ describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
     expect(row.holdUntil! - before).toBeLessThanOrEqual(QUOTA_HOLD_BACKOFF_MS[1]! + 5_000);
   });
 
-  test('失败方式 5：第三档起退避封顶', async () => {
+  test('failure mode 5: backoff caps from the third tier on', async () => {
     const w = await setupWorld();
     await w.startBuild();
     const step = (await w.claim())!;
-    // 直写第二档起点（两轮已耗）：再失败应落第三档（= 封顶值）。
     w.s.db
       .update(stepTable)
       .set({ holdReason: 'quota', holdCount: 2, holdUntil: Date.now() - 1 })
@@ -293,7 +266,6 @@ describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
     expect(row.holdCount).toBe(3);
     expect(row.holdUntil! - before).toBeGreaterThanOrEqual(QUOTA_HOLD_BACKOFF_MS[2]! - 1_000);
     expect(row.holdUntil! - before).toBeLessThanOrEqual(QUOTA_HOLD_BACKOFF_MS[2]! + 5_000);
-    // 第四次同样封顶（不无限增长）。
     w.s.db
       .update(stepTable)
       .set({ holdCount: 9, holdUntil: Date.now() - 1, status: 'claimed', machineId: w.machineId })
@@ -309,7 +281,7 @@ describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
     expect(capped.holdUntil! - before).toBeLessThanOrEqual(QUOTA_HOLD_BACKOFF_MS[2]! + 5_000);
   });
 
-  test('失败方式 6：非 quota 失败（network 文案）→ 走既有失败漏斗（step/todo failed + errorMessage）', async () => {
+  test('failure mode 6: a non-quota failure (network text) -> the existing failure funnel (step/todo failed + errorMessage)', async () => {
     const w = await setupWorld();
     const buildId = await w.startBuild();
     const step = (await w.claim())!;
@@ -325,13 +297,13 @@ describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
     expect(w.buildRow(buildId).errorMessage).toContain('upstream stream disconnected');
   });
 
-  test('退避档位单源（60s → 5min → 15min 封顶）', () => {
+  test('the backoff tiers have a single source (60s -> 5min -> capped at 15min)', () => {
     expect(QUOTA_HOLD_BACKOFF_MS).toEqual([60_000, 300_000, 900_000]);
   });
 });
 
-describe('#1257 waitingOn 板面派生（「等机器」/「等额度」与失败红态的区分）', () => {
-  test('quota 挂起 → waitingOn {on:"quota", retryAt=holdUntil}', async () => {
+describe('#1257 the waitingOn board derivation (waiting-for-machine / waiting-for-quota distinguished from the failed red state)', () => {
+  test('a quota hold -> waitingOn {on:"quota", retryAt=holdUntil}', async () => {
     const w = await setupWorld();
     const buildId = await w.startBuild();
     const step = (await w.claim())!;
@@ -349,7 +321,7 @@ describe('#1257 waitingOn 板面派生（「等机器」/「等额度」与失�
     expect(buildId).not.toBeNull();
   });
 
-  test('归属机离线 → waitingOn {on:"machine"}', async () => {
+  test('the owning machine offline -> waitingOn {on:"machine"}', async () => {
     const w = await setupWorld();
     await w.startBuild();
     w.s.db
@@ -362,7 +334,7 @@ describe('#1257 waitingOn 板面派生（「等机器」/「等额度」与失�
     expect(record.waitingOn).toEqual({ on: 'machine', retryAt: null });
   });
 
-  test('团队零在线机器 → waitingOn {on:"machine"}', async () => {
+  test('the team has zero online machines -> waitingOn {on:"machine"}', async () => {
     const w = await setupWorld();
     await w.startBuild();
     w.s.db
@@ -375,7 +347,7 @@ describe('#1257 waitingOn 板面派生（「等机器」/「等额度」与失�
     expect(record.waitingOn).toEqual({ on: 'machine', retryAt: null });
   });
 
-  test('机器健康可领 → waitingOn 缺席（正常排队，不是挂起态）', async () => {
+  test('the machine healthy and claimable -> waitingOn absent (ordinary queuing, not a hold)', async () => {
     const w = await setupWorld();
     await w.startBuild();
 
@@ -383,9 +355,8 @@ describe('#1257 waitingOn 板面派生（「等机器」/「等额度」与失�
     expect(record.waitingOn).toBeUndefined();
   });
 
-  test('非在飞相位 → waitingOn 缺席（派生只答在飞卡的挂起态）', async () => {
+  test('a non-in-flight phase -> waitingOn absent (the derivation answers only holds of in-flight cards)', async () => {
     const w = await setupWorld();
-    // todo 卡在 todo 相位（未启动）：即便机器全灭也不产 waitingOn。
     w.s.db
       .update(machineTable)
       .set({ online: false })

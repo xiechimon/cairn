@@ -1,7 +1,3 @@
-// #1491 触发闸的设置面与「人的写操作」记账：GET / PATCH
-// /api/projects/{id}/autonomy、member_activity 中间件。闸本身见
-// autonomy-gates.test.ts，进料接入见 issue-intake.test.ts 26 组。
-
 import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { countsAsMemberWrite, lastMemberWriteAt } from '../src/services/autonomy-gates.js';
@@ -84,7 +80,6 @@ describe('member_activity: only a member’s successful writes count', () => {
     expect(lastMemberWriteAt(s.db)).toBeNull();
     await req(s.app, 'GET', '/api/projects');
     expect(lastMemberWriteAt(s.db)).toBeNull();
-    // 400：body 形坏。
     expect((await req(s.app, 'POST', '/api/projects', {})).status).toBe(400);
     expect(lastMemberWriteAt(s.db)).toBeNull();
     const before = Date.now();

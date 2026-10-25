@@ -54,13 +54,13 @@ describe('.github/CODEOWNERS', () => {
       return [{ pattern, owners, line: index + 1 }];
     });
 
-  test('评测路径下已跟踪的每个文件都由 @xiechimon 持有', () => {
+  test('every tracked file under an evaluation path is owned by @xiechimon', () => {
     expect(evalFiles.length).toBeGreaterThan(0);
     const unowned = evalFiles.filter((p) => ownersOf(rules, p)?.join(' ') !== OWNER);
     expect(unowned).toEqual([]);
   });
 
-  test('合并闸判给人的评测路径都有 code owner', () => {
+  test('every evaluation path the merge gate hands to a human has a code owner', () => {
     const routedToHuman = evalFiles.filter((p) => {
       const found = classifyPaths(
         [
@@ -81,7 +81,7 @@ describe('.github/CODEOWNERS', () => {
     expect(routedToHuman).toEqual(evalFiles);
   });
 
-  test('每条规则只写 GitHub 认的语法：一个模式加至少一个 @xiechimon', () => {
+  test('every rule uses only GitHub-recognized syntax: one pattern plus at least one @xiechimon', () => {
     expect(rules.length).toBeGreaterThan(0);
     for (const rule of rules) {
       expect(rule.pattern, `line ${rule.line}`).not.toMatch(GITHUB_UNSUPPORTED_PATTERN);
@@ -89,7 +89,7 @@ describe('.github/CODEOWNERS', () => {
     }
   });
 
-  test('每条规则都至少命中一个已跟踪文件，写错路径不会静默失效', () => {
+  test('every rule hits at least one tracked file, a wrong path does not silently go dead', () => {
     for (const rule of rules) {
       const re = patternRegExp(rule.pattern);
       expect(
@@ -99,7 +99,7 @@ describe('.github/CODEOWNERS', () => {
     }
   });
 
-  test('CODEOWNERS 自身也由 @xiechimon 持有，去掉条目要过人审', () => {
+  test('CODEOWNERS itself is also owned by @xiechimon, removing an entry needs human review', () => {
     expect(ownersOf(rules, '.github/CODEOWNERS')).toEqual([OWNER]);
   });
 });
@@ -107,11 +107,11 @@ describe('.github/CODEOWNERS', () => {
 describe('docs/ops/agent-bot-identity.md', () => {
   const doc = read('docs/ops/agent-bot-identity.md');
 
-  test('不含令牌值', () => {
+  test('contains no token values', () => {
     for (const shape of TOKEN_SHAPES) expect(doc).not.toMatch(shape);
   });
 
-  test('点名的仓内脚本与文件都存在', () => {
+  test('the named in-repo scripts and files all exist', () => {
     const named = doc.match(
       /(?:scripts|docs|\.github)\/[\w./-]+\.(?:mjs|md|ts)|\.github\/CODEOWNERS/g,
     );
@@ -119,7 +119,7 @@ describe('docs/ops/agent-bot-identity.md', () => {
     for (const path of new Set(named)) expect(existsSync(join(REPO_ROOT, path)), path).toBe(true);
   });
 
-  test('写明 Code Owners 审核要在机器人推过 PR 之后才打开', () => {
+  test('states that Code Owners review turns on only after the bot pushes the PR', () => {
     expect(doc).toContain('Require review from Code Owners');
     expect(doc).toMatch(/不能批准自己的 PR/);
   });

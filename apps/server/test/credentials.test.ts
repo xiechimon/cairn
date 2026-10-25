@@ -1,14 +1,3 @@
-// per-step 凭证下发接口面对拍（02 §8 运行时层 + 02 §5.4 token/{stepId} 挂接，
-// HTTP 端点归 M3；载荷细形 [推断]）。
-// - 解析链：step → build → todo → assignment 执行侧槽 → agent → provider
-//   → SecretBox 解密（明文只进返回值）
-// - secrets = agent.secrets 授权集（per-Agent 授权，r2 权限 tab）∩ 本步 kind
-//   的取用面（plan/review/chief 恒空，records/step.ts stepTakesSecrets）；
-//   未指派 = 无取用面
-// - 明文不铺进 agent 进程环境（wire 槽名 = secrets，非 env）
-// - git 槽恒 null（托管 repo 面归 M2b）
-// - 护栏：keyfile 丢失（换 box）→ SecretBoxError = 存量报废口径（02 §8）
-
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { agent, step as stepTable } from '../src/db/schema.js';
@@ -51,10 +40,10 @@ async function withAgentStack(opts: { secretsGranted?: boolean; withPlan?: boole
       teamId: s.team.id,
       displayName: '小林',
       status: 'active',
-      provider: 'r3-gw', // providerId 寻址（r3 §1.5 model 串同源）
+      provider: 'r3-gw',
       modelId: 'claude-sonnet-5',
       tools: [],
-      secrets: opts.secretsGranted === false ? [] : [secret.id], // 授权集 [推断] = secret id
+      secrets: opts.secretsGranted === false ? [] : [secret.id],
       defaultSkill: null,
       skillsAllowlist: null,
       mcpServers: [],
@@ -75,14 +64,11 @@ async function withAgentStack(opts: { secretsGranted?: boolean; withPlan?: boole
   );
   const buildId = builds[0]?.id;
   if (!buildId) throw new Error('no build');
-  // withPlan:true 入队的是规划步；执行步在确认回路里——本面对拍直接补一条同
-  // build 的步行（解析链只读 step.kind/buildId）。review/chief kind 同法。
   const stepRow = s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all()[0];
   if (!stepRow) throw new Error('no step');
   return { ...s, keysvc, stepId: stepRow.id, buildId, todoId: todoDoc.id, projectId };
 }
 
-/** 同 build 的另一步行（测 kind 收窄用；解析链单源 = step.kind）。 */
 function addStep(
   s: { db: ReturnType<typeof bootServer>['db'] },
   buildId: string,
@@ -105,8 +91,8 @@ function addStep(
   return id;
 }
 
-describe('resolveStepCredentials（per-step 下发接口面）', () => {
-  test('执行步全链解析：provider 明文 + secrets 取用面 + git null 槽', async () => {
+describe('resolveStepCredentials (per-step dispatch interface surface)', () => {
+  test('execution step full-chain resolution: provider plaintext + secrets access surface + git null slot', async () => {
     const s = await withAgentStack();
     const buildStepId = addStep(s, s.buildId, 'build');
     const bundle = resolveStepCredentials(s.keysvc, buildStepId);
@@ -115,36 +101,32 @@ describe('resolveStepCredentials（per-step 下发接口面）', () => {
       baseUrl: 'https://api.example.com/v1',
       api: 'anthropic-messages',
       authHeader: true,
-      apiKey: RELAY_KEY, // 明文只进返回值（内存 only，02 §8）
+      apiKey: RELAY_KEY,
       modelId: 'claude-sonnet-5',
     });
     expect(bundle.secrets).toEqual({ STRIPE_API_KEY: STRIPE_VALUE });
-    expect(bundle.git).toBeNull(); // M2b 托管 repo 面槽位
+    expect(bundle.git).toBeNull();
   });
 
-  test('按步收窄：规划 / 审核 / 总管探索步的取用面恒空', async () => {
+  test('per-step narrowing: planning / review / chief-exploration step access surfaces are always empty', async () => {
     const s = await withAgentStack();
-    // 入队首步即规划步（withPlan:true）。
     expect(resolveStepCredentials(s.keysvc, s.stepId).secrets).toEqual({});
     expect(resolveStepCredentials(s.keysvc, addStep(s, s.buildId, 'review')).secrets).toEqual({});
-    // chief 走独立解析链（无 build/todo 行）；恒空是硬规则。
     expect(resolveStepCredentials(s.keysvc, addStep(s, s.buildId, 'chief')).secrets).toEqual({});
-    // 对照组：同一 Agent、同一授权集，执行步非空。
     expect(resolveStepCredentials(s.keysvc, addStep(s, s.buildId, 'build')).secrets).toEqual({
       STRIPE_API_KEY: STRIPE_VALUE,
     });
   });
 
-  test('secrets 开关未授权 = 空取用面（per-Agent 授权，r2 权限 tab）', async () => {
+  test('secrets switch not granted = empty access surface (per-Agent grant, r2 permission tab)', async () => {
     const s = await withAgentStack({ secretsGranted: false });
     const bundle = resolveStepCredentials(s.keysvc, addStep(s, s.buildId, 'build'));
     expect(bundle.secrets).toEqual({});
     expect(bundle.provider?.apiKey).toBe(RELAY_KEY);
   });
 
-  test('未指派 Agent = provider null + 空取用面；未知 step 404', async () => {
+  test('no Agent assigned = provider null + empty access surface; unknown step 404', async () => {
     const s = await withAgentStack();
-    // 另建一条未指派 todo（首条已 queued，重跑边仅自 failed 合法）。
     const second = (await (
       await req(s.app, 'POST', `/api/projects/${s.projectId}/todos`, { title: '裸跑', spec: '' })
     ).json()) as { id: string };
@@ -169,10 +151,10 @@ describe('resolveStepCredentials（per-step 下发接口面）', () => {
     expect(() => resolveStepCredentials(s.keysvc, 'nope')).toThrowError(/not found/);
   });
 
-  test('keyfile 丢失（换 box）→ SecretBoxError = 存量报废口径（02 §8 护栏）', async () => {
+  test('keyfile lost (box swapped) -> SecretBoxError = legacy-scrap cutover (02 section 8 guardrail)', async () => {
     const s = await withAgentStack();
     const buildStepId = addStep(s, s.buildId, 'build');
-    const orphaned = { db: s.db, box: createEphemeralSecretBox() }; // 模拟丢失后再生成
+    const orphaned = { db: s.db, box: createEphemeralSecretBox() };
     expect(() => resolveStepCredentials(orphaned, buildStepId)).toThrow(SecretBoxError);
   });
 });

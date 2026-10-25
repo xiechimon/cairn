@@ -1,31 +1,3 @@
-// 合并就绪闸 S1（#1404）：ADR 0021 D4 路径判定。
-// 与 .claude/workflows/pr-gate.js 同一套口径：默认拒绝（只有产品源码、测试与
-// docs/verify 可不经人），其中再排除保护类别；按类、任意层级。大小写折叠按方向分
-// （与 pr-gate.js 一致）：放行的一侧（可自动合并集）只折 ASCII，ſrc 不算 src、落在
-// 集外；收紧的一侧（保护类别、闸源码、测试目录与后缀、判别票与可执行用的证据前缀与
-// 扩展名）按 Unicode 折叠（ſ 与 s、K 与 k）。globToRegExp 的 protect 同时带 iu 与
-// 末尾 /** 的目录项本身。没有 patch 的条目 patchSha 为 null。
-// 失败方式先行：
-// - 保护：改名把保护文件移出保护路径（复制条目的原名也判类）、大小写变体、嵌套的
-//   scripts/ 与配置（biome.json、.gitattributes）、daemon 的闸源码；名字里带换行或
-//   空格时 `.` 跨不过去，保护 glob 落空而集内 glob 命中（名字里只多一个空格也算保护）；
-//   保护 glob 末尾的 /** 不认同名的目录项本身（指向别处的符号链接 .claude、scripts），
-//   可自动合并集却认了；gateSource 收了普通的保护路径；保护类别 ⑤（AGENTS.md 要
-//   /security-review 的文件与跑迁移的 DB 引导）漏判，它是锚定的原路径清单，与
-//   pr-gate.js 的 PROTECTED 同一份。
-// - 删测试：靠改名删测试（在测试目录里改名成不被收集的名字）；删测试的目录与后缀分
-//   大小写；漏掉 e2e/ tests/ __tests__/ 目录、.test.mts 与仓根 test/ 下的文件。
-// - 证据目录：往别的票的证据目录写（含改名的原名）；证据目录前缀换大小写绕开别票 /
-//   可执行检查；票号是另一票号的前缀；证据目录里夹带可执行文件（每种可执行扩展名，含
-//   shell、PowerShell、Windows 批处理与 HTML 四族）。
-// - 看不到 diff 的条目：证据目录之外的二进制、diff 过大与纯改名（compare 都不给
-//   patch，分不出来，一并留人，严的一侧）被放过。opaque 的证据豁免与摘要同一条
-//   （isEvidencePath），前缀大小写敏感：Docs/Verify/ 在 GitHub 的树里不是证据目录，
-//   其中没有 patch 的条目列进 opaque。
-// - 漂移：仓里 .claude/workflows/pr-gate.js 的 AUTO_MERGE 与 PROTECTED 两个数组须与
-//   词表逐项同序（PROTECTED 对 PROTECTED_PATH_GLOBS 加 MERGE_GATE_SOURCE_GLOBS），两份
-//   清单漂移即红。
-
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -52,7 +24,7 @@ const f = (filename: string, over: Partial<CompareFile> = {}): CompareFile => ({
 const classify = (files: CompareFile[], ticketRef = '1404') => classifyPaths(files, ticketRef);
 
 describe('globToRegExp', () => {
-  test('**/ 含仓根，* 不跨目录，不分大小写', () => {
+  test('**/ covers the repo root, * does not cross directories, case-insensitive', () => {
     expect(globToRegExp('**/scripts/**').test('scripts/a.mjs')).toBe(true);
     expect(globToRegExp('**/scripts/**').test('apps/server/scripts/db-check.mjs')).toBe(true);
     expect(globToRegExp('apps/*/src/**').test('apps/server/src/a/b.ts')).toBe(true);
@@ -60,7 +32,7 @@ describe('globToRegExp', () => {
     expect(globToRegExp('**/CLAUDE*.md').test('apps/web/Claude.md')).toBe(true);
   });
 
-  test('protect：末尾的 /** 也认目录项本身，不认同名前缀；不带时不认', () => {
+  test('protect: a trailing /** also matches the directory entry itself, not same-named prefixes; without it, no match', () => {
     const dir = globToRegExp('**/scripts/**', { protect: true });
     expect(dir.test('apps/server/src/scripts')).toBe(true);
     expect(dir.test('apps/server/src/scripts/a.sh')).toBe(true);
@@ -69,16 +41,15 @@ describe('globToRegExp', () => {
     expect(globToRegExp('**/*.config.*', { protect: true }).test('vite.config.ts')).toBe(true);
   });
 
-  test('protect 按 Unicode 折叠，不带时只折 ASCII', () => {
+  test('protect folds by Unicode, without it only ASCII folds', () => {
     expect(globToRegExp('**/scripts/**', { protect: true }).test('\u{17F}cripts/a.sh')).toBe(true);
     expect(globToRegExp('**/scripts/**').test('\u{17F}cripts/a.sh')).toBe(false);
     expect(globToRegExp('**/scripts/**').test('SCRIPTS/a.sh')).toBe(true);
   });
 });
 
-describe('保护类别：任意层级、不分大小写，各一真一假', () => {
+describe('protected categories: any depth, case-insensitive, one true and one false each', () => {
   const cases: [string, string, string][] = [
-    // [类别, 命中, 不命中]
     ['CI', '.github/workflows/ci.yml', 'apps/web/src/github.ts'],
     ['钩子', 'apps/x/.husky/pre-commit', 'apps/web/src/husky.ts'],
     ['agent 设置', 'apps/web/.claude/skills/x/SKILL.md', 'apps/web/src/claude.ts'],
@@ -121,7 +92,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     });
   }
 
-  test('大小写变体照样命中', () => {
+  test('case variants still hit', () => {
     for (const p of [
       '.Claude/settings.json',
       '.Husky/pre-commit',
@@ -133,7 +104,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     }
   });
 
-  test('名字里有换行、回车、空格或其它白名单外字符：一律算保护（与 pr-gate SAFE_PATH 同一白名单）', () => {
+  test('names containing newlines, carriage returns, spaces or other characters outside the whitelist: always protected (same whitelist as pr-gate SAFE_PATH)', () => {
     for (const p of [
       'apps/x\ny/src/CLAUDE.md',
       'apps/x\ny/src/.claude/skills/foo/SKILL.md',
@@ -147,14 +118,14 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     }
   });
 
-  test('只多一个空格就算保护：集内源码路径本身不命中任何保护 glob', () => {
+  test('one extra space already counts as protected: in-set source paths themselves hit no protect glob', () => {
     expect(classify([f('apps/server/src/ab.ts')]).protected).toEqual([]);
     const r = classify([f('apps/server/src/a b.ts', { status: 'added' })]);
     expect(r.protected).toEqual(['apps/server/src/a b.ts']);
     expect(r.outsideAutoMerge).toEqual([]);
   });
 
-  test('不分大小写按 Unicode 折叠：ſ（U+017F）同 s、K（U+212A）同 k', () => {
+  test('case-insensitivity folds by Unicode: ſ (U+017F) matches s, K (U+212A) matches k', () => {
     for (const p of [
       'apps/web/src/AGENT\u{17F}.md',
       'packages/x/src/pac\u{212A}age.json',
@@ -166,7 +137,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     }
   });
 
-  test('保护 glob 末尾的 /** 也认同名的目录项本身（指向别处的符号链接，与 pr-gate.js 的 protect 一致）', () => {
+  test('a trailing /** on a protect glob also matches the same-named directory entry itself (a symlink pointing elsewhere, consistent with pr-gate.js protect)', () => {
     for (const p of [
       'apps/web/src/.claude',
       'apps/server/src/scripts',
@@ -187,8 +158,6 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     }
   });
 
-  // 清单在这里照抄一份（ADR 0021 D4 ⑤，#1410 第 12 轮），不从 @cairn/shared 引：从词表里
-  // 删掉一项时这条要红。machine*.ts 是 glob，下一条另测。
   const SECURITY_SURFACES = [
     'apps/server/src/lib/secret-box.ts',
     'apps/server/src/lib/keys.ts',
@@ -210,7 +179,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     'apps/server/src/routes-webhook.ts',
     'apps/server/src/db/client.ts',
   ];
-  test('⑤ 安全敏感面与跑迁移的 DB 引导：清单里每个文件都算保护，不进 gateSource', () => {
+  test('⑤ security-sensitive surfaces and the migration-running DB bootstrap: every file in the list is protected, never in gateSource', () => {
     for (const p of SECURITY_SURFACES) {
       const r = classify([f(p)]);
       expect(r.protected, p).toEqual([p]);
@@ -219,13 +188,13 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     }
   });
 
-  test('⑤ 与其它保护 glob 同样不分大小写', () => {
+  test('⑤ is case-insensitive like the other protect globs', () => {
     for (const p of ['Apps/Server/src/lib/Secret-Box.ts', 'apps/server/src/DB/Client.ts']) {
       expect(classify([f(p)]).protected, p).toEqual([p]);
     }
   });
 
-  test('⑤ 的 machine*.ts：machines.ts、machine-relay.ts 命中；* 不跨目录，machine/x.ts 不命中', () => {
+  test('⑤ machine*.ts: machines.ts and machine-relay.ts hit; * does not cross directories, machine/x.ts misses', () => {
     for (const p of [
       'apps/server/src/services/machines.ts',
       'apps/server/src/services/machine-relay.ts',
@@ -237,7 +206,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     expect(r.outsideAutoMerge).toEqual([]);
   });
 
-  test('⑤ 锚定在原路径：近邻与别处的同名文件仍可自动合并', () => {
+  test('⑤ is anchored at the original path: same-named files nearby or elsewhere can still auto-merge', () => {
     for (const p of [
       'apps/server/src/services/todos.ts',
       'apps/web/src/db/client.ts',
@@ -250,14 +219,14 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     }
   });
 
-  test('复制条目的原名也判类：从保护文件复制出来算命中', () => {
+  test('a copy entry original name is classified too: copied out of a protected file counts as a hit', () => {
     const r = classify([
       f('apps/web/src/ci.yml', { status: 'copied', previousFilename: '.github/workflows/ci.yml' }),
     ]);
     expect(r.protected).toEqual(['.github/workflows/ci.yml']);
   });
 
-  test('改名把保护文件移走：按原路径命中', () => {
+  test('a rename moving a protected file away: hits by the original path', () => {
     const r = classify([
       f('apps/web/src/moved.yml', {
         status: 'renamed',
@@ -267,7 +236,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     expect(r.protected).toEqual(['.github/workflows/ci.yml']);
   });
 
-  test('闸源码另列一份（D4 ④）', () => {
+  test('gate sources are listed separately (D4 iv)', () => {
     expect(classify([f('apps/server/src/services/merge-gate/readiness.ts')]).gateSource).toEqual([
       'apps/server/src/services/merge-gate/readiness.ts',
     ]);
@@ -276,7 +245,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     ]);
   });
 
-  test('普通的保护路径不进 gateSource', () => {
+  test('ordinary protected paths do not enter gateSource', () => {
     const r = classify([
       f('.github/workflows/ci.yml'),
       f('apps/server/scripts/db-check.mjs'),
@@ -291,8 +260,8 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
   });
 });
 
-describe('默认拒绝：可自动合并集之外一律留人', () => {
-  test('产品源码、测试、e2e 与本票证据在集内', () => {
+describe('default deny: anything outside the auto-merge set is left to a human', () => {
+  test('product sources, tests, e2e and this ticket evidence are in the set', () => {
     const files = [
       'apps/server/src/services/ci-loop.ts',
       'apps/server/test/ci-loop.test.ts',
@@ -307,7 +276,7 @@ describe('默认拒绝：可自动合并集之外一律留人', () => {
     expect(r.protected).toEqual([]);
   });
 
-  test('集外路径（文档、根文件、public、eval）各自列出', () => {
+  test('out-of-set paths (docs, root files, public, eval) are each listed', () => {
     const files = [
       'docs/spec/28-x.md',
       'README.md',
@@ -318,7 +287,7 @@ describe('默认拒绝：可自动合并集之外一律留人', () => {
     expect(classify(files.map((p) => f(p))).outsideAutoMerge).toEqual(files);
   });
 
-  test('可自动合并集的 glob 不认目录项本身：docs/verify、apps/web/src 单独出现算集外', () => {
+  test('auto-merge set globs do not match directory entries themselves: docs/verify or apps/web/src alone counts as out of set', () => {
     for (const p of ['docs/verify', 'apps/web/src', 'apps/server/test', 'integration/test']) {
       const r = classify([f(p, { status: 'added' })]);
       expect(r.protected, p).toEqual([]);
@@ -326,7 +295,7 @@ describe('默认拒绝：可自动合并集之外一律留人', () => {
     }
   });
 
-  test('可自动合并集只折 ASCII 大小写：只靠 Unicode 折叠才像集内的名字（\u{17F}rc、pac\u{212A}ages）落在集外', () => {
+  test('the auto-merge set folds ASCII case only: names that only look in-set after Unicode folding (\u{17F}rc, pac\u{212A}ages) fall outside', () => {
     for (const p of ['apps/web/\u{17F}rc/x.ts', 'pac\u{212A}ages/x/src/a.ts']) {
       const r = classify([f(p, { status: 'added' })]);
       expect(r.protected, p).toEqual([]);
@@ -335,12 +304,12 @@ describe('默认拒绝：可自动合并集之外一律留人', () => {
     expect(classify([f('Apps/Web/SRC/x.ts')]).outsideAutoMerge).toEqual([]);
   });
 
-  test('保护路径不重复记进集外', () => {
+  test('protected paths are not double-recorded as out of set', () => {
     const r = classify([f('.github/workflows/ci.yml')]);
     expect(r.outsideAutoMerge).toEqual([]);
   });
 
-  test('改名从集外移进集内：按原路径记集外', () => {
+  test('a rename from out of set into the set: recorded out of set by the original path', () => {
     const r = classify([
       f('apps/web/src/x.ts', { status: 'renamed', previousFilename: 'docs/spec/x.md' }),
     ]);
@@ -348,8 +317,8 @@ describe('默认拒绝：可自动合并集之外一律留人', () => {
   });
 });
 
-describe('删测试', () => {
-  test('删除测试目录下的文件，或删除 .test / .spec 文件', () => {
+describe('test deletions', () => {
+  test('deleting files under test directories, or deleting .test / .spec files', () => {
     const r = classify([
       f('integration/test/helpers.ts', { status: 'removed' }),
       f('apps/web/src/x.test.tsx', { status: 'removed' }),
@@ -358,7 +327,7 @@ describe('删测试', () => {
     expect(r.deletedTests).toEqual(['integration/test/helpers.ts', 'apps/web/src/x.test.tsx']);
   });
 
-  test('e2e/、tests/、__tests__/ 目录下删掉的文件都算，不必带 .test 后缀', () => {
+  test('deleted files under e2e/, tests/ and __tests__/ all count, no .test suffix needed', () => {
     const removed = [
       'apps/web/e2e/fixtures/board-helpers.ts',
       'apps/server/tests/helpers.ts',
@@ -368,7 +337,7 @@ describe('删测试', () => {
     expect(r.deletedTests).toEqual(removed);
   });
 
-  test('.test.mts / .spec.cts 与仓根 test/、e2e/ 目录下删掉的文件都算', () => {
+  test('.test.mts / .spec.cts and deletions under repo-root test/ and e2e/ all count', () => {
     const removed = [
       'apps/server/src/x.test.mts',
       'packages/shared/src/y.spec.cts',
@@ -379,13 +348,13 @@ describe('删测试', () => {
     expect(r.deletedTests).toEqual(removed);
   });
 
-  test('测试目录与后缀按 Unicode 折叠（收紧的一侧）：te\u{17F}t/ 是测试目录，.te\u{17F}t.ts 是测试文件', () => {
+  test('test directories and suffixes fold by Unicode (the stricter side): te\u{17F}t/ is a test directory, .te\u{17F}t.ts is a test file', () => {
     const removed = ['apps/server/te\u{17F}t/helpers.ts', 'apps/web/src/x.te\u{17F}t.ts'];
     const r = classify(removed.map((p) => f(p, { status: 'removed' })));
     expect(r.deletedTests).toEqual(removed);
   });
 
-  test('测试目录与 .test / .spec 后缀不分大小写（ADR 0021 D4，与 pr-gate 的 /i 一致）', () => {
+  test('test directories and .test / .spec suffixes are case-insensitive (ADR 0021 D4, consistent with pr-gate /i)', () => {
     const r = classify([
       f('apps/server/Tests/helpers.ts', { status: 'removed' }),
       f('apps/web/src/Foo.Test.tsx', { status: 'removed' }),
@@ -400,7 +369,7 @@ describe('删测试', () => {
     ]);
   });
 
-  test('把测试改名成非测试路径也算删测试', () => {
+  test('renaming a test to a non-test path also counts as a test deletion', () => {
     const r = classify([
       f('apps/server/src/foo.ts', {
         status: 'renamed',
@@ -410,7 +379,7 @@ describe('删测试', () => {
     expect(r.deletedTests).toEqual(['apps/server/test/foo.test.ts']);
   });
 
-  test('改测试、加测试都不算', () => {
+  test('modifying or adding tests does not count', () => {
     const r = classify([
       f('apps/server/test/a.test.ts'),
       f('apps/server/test/b.test.ts', { status: 'added' }),
@@ -418,7 +387,7 @@ describe('删测试', () => {
     expect(r.deletedTests).toEqual([]);
   });
 
-  test('测试的任何改名都算删了原测试（与 pr-gate 的 --no-renames 一致），含测试目录里改成不被收集的名字', () => {
+  test('any rename of a test counts as deleting the original (consistent with pr-gate --no-renames), including renames inside test directories to names not collected', () => {
     const r = classify([
       f('apps/server/test/foo.ts', {
         status: 'renamed',
@@ -441,8 +410,8 @@ describe('删测试', () => {
   });
 });
 
-describe('证据目录', () => {
-  test('写本票目录可以，写别的票的目录列出（含删除）', () => {
+describe('evidence directories', () => {
+  test('writing this ticket directory is fine, writes into other ticket directories are listed (deletions included)', () => {
     const r = classify([
       f('docs/verify/1404/a.png', { status: 'added' }),
       f('docs/verify/926/convergence-evidence.json'),
@@ -454,7 +423,7 @@ describe('证据目录', () => {
     ]);
   });
 
-  test('本 PR 新增或改动的可执行证据列出，删除的不算', () => {
+  test('executables added or changed by this PR are listed, deletions are not', () => {
     const r = classify([
       f('docs/verify/1404/probe.mjs', { status: 'added' }),
       f('docs/verify/1404/run.SH'),
@@ -464,7 +433,6 @@ describe('证据目录', () => {
     expect(r.executableEvidence).toEqual(['docs/verify/1404/probe.mjs', 'docs/verify/1404/run.SH']);
   });
 
-  // 清单在这里照抄一份，不从 @cairn/shared 引：从词表里删掉一项时这条要红。
   const EXECUTABLE = [
     '.mjs',
     '.cjs',
@@ -486,7 +454,7 @@ describe('证据目录', () => {
     '.html',
     '.htm',
   ];
-  test('每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出', () => {
+  test('every executable extension: added, changed, or renamed onto it inside the evidence directory, all listed', () => {
     for (const ext of EXECUTABLE) {
       const files = [
         f(`docs/verify/1404/new${ext}`, { status: 'added' }),
@@ -500,7 +468,7 @@ describe('证据目录', () => {
     }
   });
 
-  test('改名把别票的证据移进本票目录：按原名列出', () => {
+  test('a rename moving another ticket evidence into this ticket directory: listed by the original name', () => {
     const r = classify([
       f('docs/verify/1404/x.json', {
         status: 'renamed',
@@ -510,7 +478,7 @@ describe('证据目录', () => {
     expect(r.otherTicketEvidence).toEqual(['docs/verify/926/convergence-evidence.json']);
   });
 
-  test('证据目录前缀换大小写也照样检查别票与可执行文件；.tsx / .jsx 算可执行', () => {
+  test('a case-changed evidence prefix still checks other tickets and executables; .tsx / .jsx count as executable', () => {
     const r = classify([
       f('Docs/Verify/926/x.json'),
       f('DOCS/verify/1404/probe.MJS', { status: 'added' }),
@@ -525,7 +493,7 @@ describe('证据目录', () => {
     ]);
   });
 
-  test('判别票与可执行用的证据前缀按 Unicode 折叠（收紧的一侧）：doc\u{17F}/verify/1405/x.sh 列进别票与可执行，同时落在可自动合并集外', () => {
+  test('the evidence prefix used for other-ticket and executable checks folds by Unicode (the stricter side): doc\u{17F}/verify/1405/x.sh is listed as other-ticket and executable, and falls outside the auto-merge set', () => {
     const name = 'doc\u{17F}/verify/1405/x.sh';
     const r = classify([f(name, { status: 'added' })]);
     expect(r.outsideAutoMerge).toEqual([name]);
@@ -535,32 +503,30 @@ describe('证据目录', () => {
     expect(own.otherTicketEvidence).toEqual([]);
   });
 
-  test('单独的 docs/verify 条目（顶替证据目录的符号链接）列进别票：票号段为空', () => {
+  test('a lone docs/verify entry (a symlink standing in for the evidence directory) is listed as other-ticket: empty ticket segment', () => {
     const r = classify([f('docs/verify', { status: 'added' })]);
     expect(r.otherTicketEvidence).toEqual(['docs/verify']);
     expect(r.outsideAutoMerge).toEqual(['docs/verify']);
   });
 
-  test('可执行扩展名同样按 Unicode 折叠：.\u{17F}h、.j\u{17F} 算可执行', () => {
+  test('executable extensions fold by Unicode too: .\u{17F}h and .j\u{17F} count as executable', () => {
     const files = ['docs/verify/1404/x.\u{17F}h', 'docs/verify/1404/y.j\u{17F}'];
     expect(classify(files.map((p) => f(p, { status: 'added' }))).executableEvidence).toEqual(files);
   });
 
-  test('票号是另一票号的前缀：14040 不是 1404 的目录', () => {
+  test('one ticket number a prefix of another: 14040 is not the directory of 1404', () => {
     const r = classify([f('docs/verify/14040/a.txt', { status: 'added' })]);
     expect(r.otherTicketEvidence).toEqual(['docs/verify/14040/a.txt']);
   });
 
-  test('票号段大小写敏感匹配之外不做猜测：XMON-104 与 xmon-104 是两个目录', () => {
+  test('beyond exact case-sensitive matching of the ticket segment there is no guessing: XMON-104 and xmon-104 are two directories', () => {
     const r = classify([f('docs/verify/xmon-104/a.txt', { status: 'added' })], 'XMON-104');
     expect(r.otherTicketEvidence).toEqual(['docs/verify/xmon-104/a.txt']);
   });
 });
 
-describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名）', () => {
-  // Docs/Verify/1404/b.png 不在证据目录里（前缀大小写敏感，与摘要的 isEvidencePath
-  // 同一条），没有 patch 即列进 opaque。
-  test('证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀大小写敏感（与摘要同一条）', () => {
+describe('entries compare leaves without a patch (binary, oversized diff, pure rename)', () => {
+  test('those outside the evidence directory are listed as opaque, deletions included; inside the evidence directory they do not count, the prefix is case-sensitive (same clause as the digest)', () => {
     const r = classify([
       f('apps/web/public/logo.png', { status: 'added', additions: 0, patchSha: null }),
       f('apps/server/src/big.ts', { additions: 4000, patchSha: null }),
@@ -577,7 +543,7 @@ describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名�
     ]);
   });
 
-  test('改名没有 patch：两头里落在证据目录之外的名字都列出', () => {
+  test('a rename without a patch: both ends falling outside the evidence directory are listed', () => {
     const r = classify([
       f('apps/server/src/new.ts', {
         status: 'renamed',
@@ -607,7 +573,7 @@ describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名�
   });
 });
 
-describe('可执行扩展名：shell、PowerShell、Windows 批处理与 HTML 四族', () => {
+describe('executable extensions: the shell, PowerShell, Windows batch and HTML families', () => {
   const families: [string, string[]][] = [
     ['shell', ['.bash', '.zsh', '.fish']],
     ['PowerShell', ['.ps1', '.psm1']],
@@ -615,7 +581,7 @@ describe('可执行扩展名：shell、PowerShell、Windows 批处理与 HTML �
     ['HTML（浏览器打开即跑脚本）', ['.html', '.htm']],
   ];
   for (const [family, exts] of families) {
-    test(`${family}：${exts.join(' ')} 新增即列出，扩展名换大小写也算`, () => {
+    test(`${family}: ${exts.join(' ')} listed when added, extension case changes count too`, () => {
       const files = exts.flatMap((ext) => [
         `docs/verify/1404/run${ext}`,
         `docs/verify/1404/RUN${ext.toUpperCase()}`,
@@ -626,8 +592,6 @@ describe('可执行扩展名：shell、PowerShell、Windows 批处理与 HTML �
   }
 });
 
-/** pr-gate.js 里 `const NAME = [` 那一行到其后第一行 `]` 之间的字符串字面量，一行一个；
- * 空行与注释行跳过，别的形状一律报错，找不到数组也报错，免得解析悄悄少读。 */
 function prGateArray(source: string, name: string): string[] {
   const lines = source.split('\n');
   const start = lines.indexOf(`const ${name} = [`);
@@ -643,8 +607,8 @@ function prGateArray(source: string, name: string): string[] {
   });
 }
 
-describe('chief-dispatch harness 路径', () => {
-  test('_state.json.harness_paths 与 CHIEF_DISPATCH_HARNESS_PATHS 逐项同序', () => {
+describe('chief-dispatch harness paths', () => {
+  test('_state.json.harness_paths and CHIEF_DISPATCH_HARNESS_PATHS item-for-item in the same order', () => {
     const st = JSON.parse(
       readFileSync(
         join(import.meta.dirname, '../../../.claude/hillclimb/chief-dispatch/_state.json'),
@@ -654,7 +618,7 @@ describe('chief-dispatch harness 路径', () => {
     expect(st.harness_paths).toEqual([...CHIEF_DISPATCH_HARNESS_PATHS]);
   });
 
-  test('touchesHarness：清单内为真，清单外为假', () => {
+  test('touchesHarness: true inside the list, false outside', () => {
     expect(touchesHarness([f('apps/server/src/services/chief.ts')])).toBe(true);
     expect(touchesHarness([f('packages/shared/src/protocol/chief-tools.ts')])).toBe(true);
     expect(touchesHarness([f('apps/daemon/src/backend/pi.ts')])).toBe(true);
@@ -670,22 +634,22 @@ describe('chief-dispatch harness 路径', () => {
   });
 });
 
-describe('与 .claude/workflows/pr-gate.js 同一份清单', () => {
+describe('the same lists as .claude/workflows/pr-gate.js', () => {
   const prGate = () =>
     readFileSync(join(import.meta.dirname, '../../../.claude/workflows/pr-gate.js'), 'utf8');
 
-  test('AUTO_MERGE 与 AUTO_MERGE_PATH_GLOBS 逐项同序', () => {
+  test('AUTO_MERGE and AUTO_MERGE_PATH_GLOBS item-for-item in the same order', () => {
     expect(prGateArray(prGate(), 'AUTO_MERGE')).toEqual([...AUTO_MERGE_PATH_GLOBS]);
   });
 
-  test('PROTECTED 与 PROTECTED_PATH_GLOBS 加 MERGE_GATE_SOURCE_GLOBS 逐项同序', () => {
+  test('PROTECTED and PROTECTED_PATH_GLOBS plus MERGE_GATE_SOURCE_GLOBS item-for-item in the same order', () => {
     expect(prGateArray(prGate(), 'PROTECTED')).toEqual([
       ...PROTECTED_PATH_GLOBS,
       ...MERGE_GATE_SOURCE_GLOBS,
     ]);
   });
 
-  test('解析器找不到数组、找不到收尾的 ]、遇到不认识的行都报错', () => {
+  test('the parser errors on a missing array, a missing closing ] and unrecognized lines', () => {
     expect(() => prGateArray("const X = [\n  'a/**',\n]", 'AUTO_MERGE')).toThrow(/not found/);
     expect(() => prGateArray("const AUTO_MERGE = [\n  'a/**',\n", 'AUTO_MERGE')).toThrow(/closing/);
     expect(() => prGateArray("const AUTO_MERGE = [\n  'a/**', 'b/**',\n]", 'AUTO_MERGE')).toThrow(

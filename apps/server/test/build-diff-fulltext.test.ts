@@ -1,16 +1,3 @@
-// #224 diff 全文读面：GET /api/builds/{id}/changes/file?path= —— conv 分支
-// 历史态单文件全文按需取（#219 裁决 A：独立于 changes 列表，列表面不被全文
-// 撑爆；docpane「显示完整文件」数据源，web 接线归 #225）。
-// 失败方式清单（先固化，代码是让场景通过的手段）：
-// ① build 不存在 → 404；项目非托管（无本地 bare 读面）→ 404；conv 分支
-//    未推 → 404。
-// ② query 缺 path / 空 path → 400；路径穿越（`..` 段 / 绝对路径 / NUL）→ 400。
-// ③ path 在 conv ref 不存在 → 404；path 命中目录（非 blob）→ 404。
-// ④ 文本 → 200 utf-8 全文 = conv 分支历史态（≠ main 旧版）；ref/commit/
-//    path/size 回显，封套过 shared diffFileContentSchema。
-// ⑤ 二进制（首 8KB 含 NUL）→ 200 encoding:base64，可解码回原字节。
-// ⑥ 超 1 MiB 闸门 → 413（闸门前置 `cat-file -s`，超限 blob 不载内存）。
-
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,7 +26,7 @@ const MAIN_PLAN = '# plan\n\nbase 版（main）。\n';
 const CONV_PLAN = '# plan\n\nconv 分支历史态全文。\n';
 const NEW_TS = 'export const x = 1;\n';
 const BIN_BYTES = Buffer.from([0x00, 0x01, 0x02, 0xff, 0x00, 0xfe]);
-const BIG_BYTES = 1024 * 1024 + 1; // 闸门 = 1 MiB（实现侧 DIFF_FILE_MAX_BYTES）；+1 越界
+const BIG_BYTES = 1024 * 1024 + 1;
 
 async function git(args: string[], cwd: string) {
   const r = await runGit(args, { cwd, env: GIT_ENV, timeoutMs: 60_000 });
@@ -60,7 +47,6 @@ function insertBuild(s: Server, projectId: string, buildId: string, todoId: stri
     .run();
 }
 
-/** 托管项目 + build 行 + conv 分支文件史（main 基线 → conv 改动 → file 传输 push）。 */
 async function setupWorld() {
   const s = bootServer();
   const res = await req(s.app, 'POST', '/api/projects', {
@@ -70,7 +56,7 @@ async function setupWorld() {
   expect(res.status).toBe(201);
   const { id: projectId } = (await res.json()) as { id: string };
   insertBuild(s, projectId, BUILD_ID, 'todo-full');
-  insertBuild(s, projectId, NO_BRANCH_BUILD_ID, 'todo-nobranch'); // conv 分支永不推
+  insertBuild(s, projectId, NO_BRANCH_BUILD_ID, 'todo-nobranch');
 
   const dir = mkdtempSync(join(tmpdir(), 'cairn-diff-full-'));
   dirs.push(dir);
@@ -82,11 +68,11 @@ async function setupWorld() {
   await git(['commit', '-m', 'base'], repoDir);
   await git(['push', 'origin', 'main'], repoDir);
   await git(['checkout', '-B', CONV_BRANCH], repoDir);
-  writeFileSync(join(repoDir, 'plan.md'), CONV_PLAN); // 改
+  writeFileSync(join(repoDir, 'plan.md'), CONV_PLAN);
   mkdirSync(join(repoDir, 'src'));
-  writeFileSync(join(repoDir, 'src', 'new.ts'), NEW_TS); // 增（嵌套路径）
-  writeFileSync(join(repoDir, 'bin.dat'), BIN_BYTES); // 二进制
-  writeFileSync(join(repoDir, 'big.txt'), Buffer.alloc(BIG_BYTES, 0x61)); // 超闸门
+  writeFileSync(join(repoDir, 'src', 'new.ts'), NEW_TS);
+  writeFileSync(join(repoDir, 'bin.dat'), BIN_BYTES);
+  writeFileSync(join(repoDir, 'big.txt'), Buffer.alloc(BIG_BYTES, 0x61));
   await git(['add', '-A'], repoDir);
   await git(['commit', '-m', 'conv round'], repoDir);
   await git(['push', 'origin', CONV_BRANCH], repoDir);
@@ -106,8 +92,8 @@ async function expectErrorShape(res: Response, status: number) {
   expect(typeof body.error).toBe('string');
 }
 
-describe('GET /api/builds/{id}/changes/file（#224 diff 全文读面）', () => {
-  test('文本 = conv 分支历史态全文（≠ main 旧版）；封套过 shared schema；嵌套路径同面', async () => {
+describe('GET /api/builds/{id}/changes/file (#224 diff full-text read surface)', () => {
+  test('text = conv branch history state full text (not main old version); envelope passes the shared schema; nested paths same surface', async () => {
     const { s, bareDir } = await setupWorld();
     try {
       const res = await req(s.app, 'GET', changesFileUrl(BUILD_ID, 'plan.md'));
@@ -115,7 +101,7 @@ describe('GET /api/builds/{id}/changes/file（#224 diff 全文读面）', () => 
       const file = diffFileContentSchema.parse(await res.json());
       expect(file.path).toBe('plan.md');
       expect(file.encoding).toBe('utf-8');
-      expect(file.content).toBe(CONV_PLAN); // 历史态语义核心：非 MAIN_PLAN
+      expect(file.content).toBe(CONV_PLAN);
       expect(file.size).toBe(Buffer.byteLength(CONV_PLAN));
       expect(file.ref).toBe(CONV_BRANCH);
       const head = await runGit(['rev-parse', CONV_BRANCH], { cwd: bareDir });
@@ -129,7 +115,7 @@ describe('GET /api/builds/{id}/changes/file（#224 diff 全文读面）', () => 
     }
   });
 
-  test('二进制 → 200 base64 可解码回原字节；超 1 MiB 闸门 → 413', async () => {
+  test('binary -> 200 base64 decodes back to the original bytes; over the 1 MiB gate -> 413', async () => {
     const { s } = await setupWorld();
     try {
       const bin = diffFileContentSchema.parse(
@@ -145,7 +131,7 @@ describe('GET /api/builds/{id}/changes/file（#224 diff 全文读面）', () => 
     }
   });
 
-  test('404 面：未知 build / 非托管项目 / conv 分支未推 / 文件不存在 / 目录路径', async () => {
+  test('404 surface: unknown build / non-managed project / conv branch not pushed / file missing / directory path', async () => {
     const { s } = await setupWorld();
     try {
       await expectErrorShape(await req(s.app, 'GET', changesFileUrl('nope', 'plan.md')), 404);
@@ -155,7 +141,6 @@ describe('GET /api/builds/{id}/changes/file（#224 diff 全文读面）', () => 
       );
       await expectErrorShape(await req(s.app, 'GET', changesFileUrl(BUILD_ID, 'ghost.md')), 404);
       await expectErrorShape(await req(s.app, 'GET', changesFileUrl(BUILD_ID, 'src')), 404);
-      // 非托管项目（无 repoKind → 无本地 bare 读面）。
       const plain = await req(s.app, 'POST', '/api/projects', { name: 'plain' });
       const { id: plainId } = (await plain.json()) as { id: string };
       insertBuild(s, plainId, 'build-plain', 'todo-plain');
@@ -165,7 +150,7 @@ describe('GET /api/builds/{id}/changes/file（#224 diff 全文读面）', () => 
     }
   });
 
-  test('400 面：缺 path / 空 path / `..` 段 / 绝对路径 / NUL', async () => {
+  test('400 surface: missing path / empty path / `..` segment / absolute path / NUL', async () => {
     const { s } = await setupWorld();
     try {
       await expectErrorShape(await req(s.app, 'GET', changesFileUrl(BUILD_ID)), 400);

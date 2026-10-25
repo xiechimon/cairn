@@ -1,17 +1,3 @@
-// steer 写面（W3 #278，06 册 D9）：POST /api/conversations/{id}/messages 的
-// build 会话分支 = steer 语义（claimed 步门 409 + 单槽 pending + 拉取-确认投递
-// + machine stream steer 信号）。失败方式枚举先于实现固化（票 #278 AC／
-// spec #277 Testing Decisions）：
-//   1. 无 claimed 步发送 → 409 不静默
-//   2. 未知会话 → 404；空 body → 400（{content} min 1）
-//   3. 双发竞态 → 单槽覆盖（pending 只余后发）
-//   4. 拉取-确认：首次 {content}、二次 {content:null}
-//   5. 无凭证/坏凭证拉取 → 401；他机不投递（pending 不清）
-//   6. 旧步 pending（步收尾换新步）→ fetch 空 + 丢弃
-//   7. steer 信号 → machine stream 收 {type:'steer', stepId}（hub 单元面）
-//   8. GET messages 面 steerPending 透出 pending 内容
-//   9. chief 会话 POST 分支零回归（既有 chief 行为不变）
-
 import { type ClaimedStep, claimedStepSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
@@ -85,7 +71,7 @@ async function setupWorld(opts: { claimHoldMs?: number } = {}): Promise<World> {
     body: { teamId: s.team.id, name: 'test-mbp', cliVersion: '0.1.0' },
   });
 
-  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+  bindAllAgents(s);
   expect(enrollRes.status).toBe(200);
   const machineJson = (await enrollRes.json()) as { token: string; machineId: string };
   const projectId = await postProject(s.app);
@@ -121,13 +107,13 @@ async function setupWorld(opts: { claimHoldMs?: number } = {}): Promise<World> {
   };
 }
 
-describe('steer 服务端写面（W3 #278）', () => {
+describe('the steer server write surface (W3 #278)', () => {
   let w: World;
   beforeEach(async () => {
     w = await setupWorld();
   });
 
-  test('失败方式 1/2：无 claimed 步 409 不静默；未知会话 404；空 body 400', async () => {
+  test('failure modes 1/2: no claimed step 409 not silent; an unknown conversation 404; an empty body 400', async () => {
     const { buildId } = await w.startBuild(true);
     const pending = await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, {
       content: '补充一句',
@@ -144,7 +130,7 @@ describe('steer 服务端写面（W3 #278）', () => {
     expect(step).not.toBeNull();
   });
 
-  test('happy path：claimed 步发送 → 201 + 消息行进 transcript + steerPending 透出', async () => {
+  test('happy path: sending to a claimed step -> 201 + the message row enters the transcript + steerPending exposed', async () => {
     const { buildId } = await w.startBuild(true);
     await w.claim();
     const res = await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, {
@@ -165,7 +151,7 @@ describe('steer 服务端写面（W3 #278）', () => {
     expect(face.steerPending).toEqual(['顺便把测试也补上']);
   });
 
-  test('失败方式 3：双发竞态 → 单槽覆盖', async () => {
+  test('failure mode 3: a double-send race -> single-slot overwrite', async () => {
     const { buildId } = await w.startBuild(true);
     await w.claim();
     await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, { content: '第一条' });
@@ -175,7 +161,7 @@ describe('steer 服务端写面（W3 #278）', () => {
     expect(face.steerPending).toEqual(['第二条']);
   });
 
-  test('失败方式 4/5：拉取-确认；无凭证 401', async () => {
+  test('failure modes 4/5: fetch-acknowledge; no credential 401', async () => {
     const { buildId } = await w.startBuild(true);
     const { step: claimed } = await w.claim();
     const stepId = claimed?.step.id ?? '';
@@ -192,7 +178,7 @@ describe('steer 服务端写面（W3 #278）', () => {
     expect(await second.json()).toEqual({ content: null });
   });
 
-  test('失败方式 6：旧步 pending → 新步 fetch 空 + 丢弃', async () => {
+  test('failure mode 6: the old step pending -> the new step fetch gets empty + discard', async () => {
     const { buildId } = await w.startBuild(true);
     const { step: claimed } = await w.claim();
     const oldStepId = claimed?.step.id ?? '';
@@ -214,21 +200,18 @@ describe('steer 服务端写面（W3 #278）', () => {
     expect(face.steerPending).toEqual([]);
   });
 
-  test('失败方式 7：steer 信号 = machine stream {type:"steer", stepId}（hub 单元面）', () => {
+  test('failure mode 7: the steer signal = machine stream {type:"steer", stepId} (the hub unit surface)', () => {
     const hub = new MachineWakeHub();
     const events: unknown[] = [];
     hub.subscribe('team-1', (ev) => events.push(ev));
     hub.steerSignal('team-1', 'step-9');
     expect(events).toEqual([{ type: 'steer', stepId: 'step-9' }]);
-    // 不触发 claim 长轮询 wake（steer 不入队）：等待者不被唤醒。
     const waiter = hub.waitWake('team-1', 30);
     hub.steerSignal('team-1', 'step-9');
     return waiter.then((woken) => expect(woken).toBe(false));
   });
 
-  test('失败方式 9：chief 会话 POST 分支零回归（既有行为不变）', async () => {
-    // chief 会话发送走 chief 分支（本票不动）：非 chief- 前缀外的会话才进 steer。
-    // chief 面回归 = chief.test.ts 既有覆盖；此处只钉分流不误伤 chief 形状。
+  test('failure mode 9: zero regression on the chief conversation POST branch (the existing behavior unchanged)', async () => {
     const res = await req(w.s.app, 'POST', `/api/conversations/chief-nope/messages`, {
       content: 'x',
     });

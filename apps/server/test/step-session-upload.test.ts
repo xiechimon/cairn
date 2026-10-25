@@ -103,8 +103,8 @@ async function putSession(w: World, content: string): Promise<Response> {
   });
 }
 
-describe('会话 JSONL 上传与按步取回（#1512）', () => {
-  test('失败方式 1：PUT 后服务函数与 GET 都能按 stepId 取回原文', async () => {
+describe('session JSONL upload and per-step retrieval (#1512)', () => {
+  test('failure mode 1: after PUT both the service function and GET retrieve the original text by stepId', async () => {
     const w = await setupWorld();
     const body = '{"type":"assistant","stopReason":"length","rawStopReason":"max_tokens"}\n';
     const put = await putSession(w, body);
@@ -120,7 +120,7 @@ describe('会话 JSONL 上传与按步取回（#1512）', () => {
     expect(parsed.content).toBe(body);
   });
 
-  test('失败方式 2：超过上限 → 不落盘，取回 404', async () => {
+  test('failure mode 2: over the cap -> nothing written, retrieval 404', async () => {
     const w = await setupWorld();
     const put = await putSession(w, 'x'.repeat(SESSION_JSONL_MAX_BYTES + 1));
     expect(put.status).toBe(413);
@@ -132,7 +132,7 @@ describe('会话 JSONL 上传与按步取回（#1512）', () => {
     expect(get.status).toBe(404);
   });
 
-  test('失败方式 3：未上传 → 取回 404', async () => {
+  test('failure mode 3: never uploaded -> retrieval 404', async () => {
     const w = await setupWorld();
     const get = await w.s.app.request(`/api/machine/session/${w.stepId}`, {
       method: 'GET',
@@ -142,7 +142,7 @@ describe('会话 JSONL 上传与按步取回（#1512）', () => {
     expect(readStepSession(w.s.attachmentsDir, w.stepId)).toBeNull();
   });
 
-  test('失败方式 4：步行在则留；步删且超 grace 才收', async () => {
+  test('failure mode 4: kept while the step lives; collected only after the step is deleted and past grace', async () => {
     const w = await setupWorld();
     const body = '{"kept":true}\n';
     expect((await putSession(w, body)).status).toBe(200);

@@ -1,15 +1,3 @@
-// spec 12 / #362 G2-T2 server 半：claim 载荷 repo 绑定位扩 local 形态 +
-// github 执行凭证 per-step 下发（github_connection token → GitCredentials
-// {username:'x-access-token'}）。失败方式枚举先于实现固化（仓测试纪律）：
-//   1. local 项目 claim → repo {kind:'local', cloneUrl = 规范化 localPath}；
-//      token 响应 git 槽 = null（本地路径 clone/push 无需凭证）
-//   2. github 项目（connection 行在位）→ token git = {x-access-token, token}；
-//      claim repo {kind:'github', cloneUrl = https 派生}；不发行 hosted 族
-//      一次性 gitAccess apiKey（凭证生命周期 = 连接行，非 per-step key）
-//   3. github 项目无 connection 行 → git null（匿名面自然失败归 daemon 步
-//      reason，不在 token 端点造错）
-//   4. token 明文不进 wire 其它位（响应 JSON 全文 token 仅现于 git.password）
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -75,7 +63,7 @@ async function setupWorld(projectBody: Record<string, unknown>): Promise<WireWor
     .insert(agentTable)
     .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'g2t2-builder', modelId: 'm' })
     .run();
-  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+  bindAllAgents(s);
 
   const projRes = await call(s.app, 'POST', '/api/projects', { body: projectBody });
   expect(projRes.status).toBe(201);
@@ -88,7 +76,7 @@ async function setupWorld(projectBody: Record<string, unknown>): Promise<WireWor
     body: {
       todoIds: [todoBody.id],
       assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: false, // build 步直达（claim/token 面断言不需 plan 关）
+      withPlan: false,
     },
   });
   expect(buildRes.status).toBe(201);
@@ -114,15 +102,14 @@ async function setupWorld(projectBody: Record<string, unknown>): Promise<WireWor
   };
 }
 
-/** 真 git 工作树仓（validateLocalRepoPath 的 isGitRepo 闸要真仓）。 */
 async function seedUserRepo(): Promise<string> {
   const dir = join(mkdtempSync(join(tmpdir(), 'cairn-g2t2-user-')), 'repo');
   await runGit(['init', '-b', 'main', dir]);
   return dir;
 }
 
-describe('G2-T2 claim/token 执行面接线（spec 12）', () => {
-  test('失败方式 1：local 项目 → claim repo {kind:local, cloneUrl=localPath}；token git null', async () => {
+describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
+  test('failure mode 1: local project -> claim repo {kind:local, cloneUrl=localPath}; token git null', async () => {
     const userRepo = await seedUserRepo();
     const w = await setupWorld({ name: 'g2t2-local', kind: 'local', localPath: userRepo });
     const claimed = await w.claim();
@@ -131,7 +118,7 @@ describe('G2-T2 claim/token 执行面接线（spec 12）', () => {
     expect(git).toBeNull();
   });
 
-  test('失败方式 2：github 项目 + connection 行 → token git {x-access-token, token}；不发 gitAccess key', async () => {
+  test('failure mode 2: github project + connection row -> token git {x-access-token, token}; no gitAccess key sent', async () => {
     const w = await setupWorld({ name: 'g2t2-gh', kind: 'github', githubRepo: 'octo/alpha' });
     upsertGithubConnection(
       { db: w.s.db, box: w.s.secretBox },
@@ -144,19 +131,18 @@ describe('G2-T2 claim/token 执行面接线（spec 12）', () => {
     });
     const { git } = await w.tokenOf(claimed.step.id);
     expect(git).toEqual({ username: GITHUB_ACCESS_TOKEN_USERNAME, password: GH_TOKEN });
-    // hosted 族一次性凭证不发行（github 凭证生命周期 = connection 行）。
     const gitKeys = w.s.db.select().from(apiKeyTable).where(eq(apiKeyTable.gitAccess, true)).all();
     expect(gitKeys).toHaveLength(0);
   });
 
-  test('失败方式 3：github 项目无 connection 行 → token git null', async () => {
+  test('failure mode 3: github project with no connection row -> token git null', async () => {
     const w = await setupWorld({ name: 'g2t2-gh-anon', kind: 'github', githubRepo: 'octo/beta' });
     const claimed = await w.claim();
     const { git } = await w.tokenOf(claimed.step.id);
     expect(git).toBeNull();
   });
 
-  test('失败方式 4：token 明文仅现于 git.password 位（wire 其它位不泄漏）', async () => {
+  test('failure mode 4: token plaintext appears only in the git.password slot (no leak on other wire slots)', async () => {
     const w = await setupWorld({ name: 'g2t2-gh-leak', kind: 'github', githubRepo: 'octo/gamma' });
     upsertGithubConnection(
       { db: w.s.db, box: w.s.secretBox },
@@ -164,8 +150,7 @@ describe('G2-T2 claim/token 执行面接线（spec 12）', () => {
     );
     const claimed = await w.claim();
     const { raw } = await w.tokenOf(claimed.step.id);
-    expect(raw.split(GH_TOKEN)).toHaveLength(2); // 恰好一次
-    // claim 载荷不携凭证（凭证只走 token 端点，02 §5.4）。
+    expect(raw.split(GH_TOKEN)).toHaveLength(2);
     expect(JSON.stringify(claimed)).not.toContain(GH_TOKEN);
   });
 });

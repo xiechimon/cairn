@@ -1,28 +1,3 @@
-// #902/#900/#901 过闸 actor 审计 + chief 闸禁 + 手动 done 落地审计行。
-// 失败方式清单（先固化，代码是让场景通过的手段）：
-//  #902（过闸动作记 actor）：
-//   1. steps {action:'confirm'} 后 transcript 无确认行——闸被按过零痕迹，
-//      「人强制在场」只能是推断；
-//   2. 行在但 actor 空/不可读——库里答不出「在场的是谁」；
-//   3. chief 发起的过闸动作记成用户名——审计撒谎（chief confirm_builds /
-//      complete_todos 与人的动作在库里不可分 = #892 实证 #14 的病灶）；
-//   4. GET messages wire 丢 actor——落了库但呈现层拿不到（路由显式列映射）；
-//   5. 旧行（actor 列 NULL）过 wire 校验崩——nullish 兼容，存量部署可读。
-//  #900（chief 不得自过 review 闸）：
-//   6. chief complete_todos 把 review 卡直接推 done——无 merge 步、无人到场，
-//      8 秒自过闸（#892 #14 铁证）必须拒；
-//   7. 拒了但 chief 拿不到原因——LLM 无法转而唤醒人（拒因要进 tool 回执）；
-//   8. MCP 面（key 属主 = 用户身份）complete_todos review→done 被误拒——
-//      合法写面收窄（身份语义差：chief = agent，MCP key = user）；
-//   9. close_todos / reopen_todos 被闸误伤——闸只咬 done 落地，closed/todo
-//      不是过闸动作。
-//  #901（手动 confirm/review→done 审计行，server 面；弹层在 web e2e）：
-//   10. PATCH phase confirm/review→done 零审计行——88% done 落地通道
-//       （#892 15/17）继续无痕（raw PATCH 绕过弹层也必须有行）；
-//   11. 非闸相位拖 done（todo→done 测试卡清理）也落行——「其余拖拽不变」，
-//       行只挂闸相位来源；
-//   12. 闸相位卡无 latestBuildId——行无处落但不得 500（改相本身要成功）。
-
 import { CONFIRM_ANNOUNCEMENT, DONE_ANNOUNCEMENT, MERGE_ANNOUNCEMENT } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
@@ -38,8 +13,6 @@ import { executeChiefTool, transitionTodos } from '../src/services/chief-tools.j
 import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, postProject, req, type TestServer } from './helpers.js';
 
-/** 服务面直驱到 confirm（phase-funnel.test 同款）：startBuilds → planning →
- *  confirm；返回带 todoId/buildId 的栈。 */
 async function withConfirmTodo(): Promise<TestServer & { todoId: string; buildId: string }> {
   const s = bootServer();
   const projectId = await postProject(s.app);
@@ -58,8 +31,6 @@ async function withConfirmTodo(): Promise<TestServer & { todoId: string; buildId
   return { ...s, todoId: todoDoc.id, buildId: row.latestBuildId! };
 }
 
-/** 直驱到 review 关口（db 直改相位 + hasChanges——漏斗无 confirm→review 边，
- *  manual-drop-matrix.test 同款手法）；build 会话在（startBuilds 已建）。 */
 async function withReviewTodo(): Promise<TestServer & { todoId: string; buildId: string }> {
   const s = await withConfirmTodo();
   s.db
@@ -118,8 +89,8 @@ async function runChiefTool(
   return JSON.parse(text);
 }
 
-describe('#902 过闸动作记 actor（announcement 行）', () => {
-  test('失败方式 1/2：steps confirm → transcript 落确认行，actor = 用户 displayName', async () => {
+describe('#902 gate-passing action records the actor (announcement row)', () => {
+  test('failure modes 1/2: steps confirm -> transcript lands the confirm row, actor = user displayName', async () => {
     const s = await withConfirmTodo();
     try {
       const res = await req(s.app, 'POST', `/api/builds/${s.buildId}/steps`, {
@@ -127,7 +98,7 @@ describe('#902 过闸动作记 actor（announcement 行）', () => {
       });
       expect(res.status).toBe(202);
       const row = rowsOf(s, s.buildId).find((m) => m.content === CONFIRM_ANNOUNCEMENT);
-      expect(row, '确认行必须存在').toBeDefined();
+      expect(row, 'confirm row must exist').toBeDefined();
       expect(row?.role).toBe('user');
       expect(row?.actor).toBe(s.user.displayName);
     } finally {
@@ -135,7 +106,7 @@ describe('#902 过闸动作记 actor（announcement 行）', () => {
     }
   });
 
-  test('失败方式 3：chief confirm_builds → 确认行 actor = chief Agent displayName（不记成用户名）', async () => {
+  test('failure mode 3: chief confirm_builds -> confirm row actor = chief Agent displayName (not recorded as the user name)', async () => {
     const s = await withConfirmTodo();
     try {
       const agentId = seedChiefAgent(s, '总管甲');
@@ -144,7 +115,7 @@ describe('#902 过闸动作记 actor（announcement 行）', () => {
       })) as Record<string, unknown>;
       expect(out).toBeDefined();
       const row = rowsOf(s, s.buildId).find((m) => m.content === CONFIRM_ANNOUNCEMENT);
-      expect(row, '确认行必须存在').toBeDefined();
+      expect(row, 'confirm row must exist').toBeDefined();
       expect(row?.actor).toBe('总管甲');
       expect(row?.actor).not.toBe(s.user.displayName);
     } finally {
@@ -152,23 +123,22 @@ describe('#902 过闸动作记 actor（announcement 行）', () => {
     }
   });
 
-  test('失败方式 2：REST merge → 合并宣告行带 actor（既有行族补齐）', async () => {
+  test('failure mode 2: REST merge -> merge announcement row carries the actor (existing row family filled in)', async () => {
     const s = await withReviewTodo();
     try {
       const res = await req(s.app, 'POST', `/api/builds/${s.buildId}/merge`);
       expect(res.status).toBe(202);
       const row = rowsOf(s, s.buildId).find((m) => m.content === MERGE_ANNOUNCEMENT);
-      expect(row, '合并宣告行必须存在').toBeDefined();
+      expect(row, 'merge announcement row must exist').toBeDefined();
       expect(row?.actor).toBe(s.user.displayName);
     } finally {
       s.dispose();
     }
   });
 
-  test('失败方式 4/5：GET messages wire 透出 actor；旧行（actor NULL）兼容为 null', async () => {
+  test('failure modes 4/5: GET messages wire exposes the actor; old rows (actor NULL) compatible as null', async () => {
     const s = await withConfirmTodo();
     try {
-      // 造一条无 actor 的存量行（迁移前的旧数据形态）。
       s.db
         .insert(messageTable)
         .values({
@@ -195,8 +165,8 @@ describe('#902 过闸动作记 actor（announcement 行）', () => {
   });
 });
 
-describe('#900 chief 不得自过 review 闸（complete_todos）', () => {
-  test('失败方式 6/7：chief complete_todos review→done 被拒——相位不动、回执带拒因', async () => {
+describe('#900 chief may not self-pass the review gate (complete_todos)', () => {
+  test('failure modes 6/7: chief complete_todos review->done refused -- phase unchanged, receipt carries the refusal reason', async () => {
     const s = await withReviewTodo();
     try {
       const agentId = seedChiefAgent(s);
@@ -205,17 +175,19 @@ describe('#900 chief 不得自过 review 闸（complete_todos）', () => {
       })) as { transitioned: string[]; skipped: string[]; reasons?: Record<string, string> };
       expect(out.transitioned).not.toContain(s.todoId);
       expect(out.skipped).toContain(s.todoId);
-      expect(out.reasons?.[s.todoId], '拒因必须可读（chief 据此唤醒人）').toBeTruthy();
+      expect(
+        out.reasons?.[s.todoId],
+        'refusal reason must be readable (the chief uses it to wake a human)',
+      ).toBeTruthy();
       const row = s.db.select().from(todoTable).where(eq(todoTable.id, s.todoId)).get()!;
       expect(row.phase).toBe('review');
-      // 被拒的落地不得留审计行（没有发生的事不进时间线）。
       expect(rowsOf(s, s.buildId).find((m) => m.content === DONE_ANNOUNCEMENT)).toBeUndefined();
     } finally {
       s.dispose();
     }
   });
 
-  test('失败方式 8：用户身份（MCP key 属主同语义）complete_todos review→done 放行 + 落 actor 行', async () => {
+  test('failure mode 8: user identity (same semantics as MCP key owner) complete_todos review->done allowed + actor row landed', async () => {
     const s = await withReviewTodo();
     try {
       const out = transitionTodos(chiefDeps(s), s.team.id, [s.todoId], 'done', {
@@ -226,17 +198,16 @@ describe('#900 chief 不得自过 review 闸（complete_todos）', () => {
       const row = s.db.select().from(todoTable).where(eq(todoTable.id, s.todoId)).get()!;
       expect(row.phase).toBe('done');
       const doneRow = rowsOf(s, s.buildId).find((m) => m.content === DONE_ANNOUNCEMENT);
-      expect(doneRow, 'done 落地审计行必须存在').toBeDefined();
+      expect(doneRow, 'done audit row must exist').toBeDefined();
       expect(doneRow?.actor).toBe(s.user.displayName);
     } finally {
       s.dispose();
     }
   });
 
-  test('失败方式 9：chief close_todos 照常放行（闸只咬 done；close 走漏斗合法边 todo→closed）', async () => {
+  test('failure mode 9: chief close_todos allowed as usual (the gate only bites done; close takes the legal funnel edge todo->closed)', async () => {
     const s = await withConfirmTodo();
     try {
-      // 漏斗里 closed 只从 todo/failed 可达（PHASE_TRANSITIONS），先落回 todo。
       s.db.update(todoTable).set({ phase: 'todo' }).where(eq(todoTable.id, s.todoId)).run();
       const agentId = seedChiefAgent(s);
       const out = (await runChiefTool(s, agentId, 'close_todos', {
@@ -250,7 +221,7 @@ describe('#900 chief 不得自过 review 闸（complete_todos）', () => {
     }
   });
 
-  test('chief complete_todos 跨团队 id 仍记 skipped（既有纵深防御不因闸漂移）', async () => {
+  test('chief complete_todos with a cross-team id still records skipped (existing defense-in-depth does not drift with the gate)', async () => {
     const s = await withReviewTodo();
     try {
       const agentId = seedChiefAgent(s);
@@ -265,35 +236,34 @@ describe('#900 chief 不得自过 review 闸（complete_todos）', () => {
   });
 });
 
-describe('#901 手动改相 confirm/review→done 审计行（server 面）', () => {
-  test('失败方式 10：PATCH review→done → 200 + done 行带 actor（raw PATCH 同样有痕）', async () => {
+describe('#901 manual phase change confirm/review->done audit rows (server surface)', () => {
+  test('failure mode 10: PATCH review->done -> 200 + done row carries the actor (raw PATCH also has a trace)', async () => {
     const s = await withReviewTodo();
     try {
       const res = await req(s.app, 'PATCH', `/api/todos/${s.todoId}`, { phase: 'done' });
       expect(res.status).toBe(200);
       const row = rowsOf(s, s.buildId).find((m) => m.content === DONE_ANNOUNCEMENT);
-      expect(row, 'done 审计行必须存在').toBeDefined();
+      expect(row, 'done audit row must exist').toBeDefined();
       expect(row?.actor).toBe(s.user.displayName);
     } finally {
       s.dispose();
     }
   });
 
-  test('失败方式 10：PATCH confirm→done 同样落行（两道闸都咬）', async () => {
+  test('failure mode 10: PATCH confirm->done also lands a row (both gates bite)', async () => {
     const s = await withConfirmTodo();
     try {
-      // confirm→done 是手动矩阵合法边（canBoardDrop），漏斗非法但 PATCH 面放行。
       const res = await req(s.app, 'PATCH', `/api/todos/${s.todoId}`, { phase: 'done' });
       expect(res.status).toBe(200);
       const row = rowsOf(s, s.buildId).find((m) => m.content === DONE_ANNOUNCEMENT);
-      expect(row, 'done 审计行必须存在').toBeDefined();
+      expect(row, 'done audit row must exist').toBeDefined();
       expect(row?.actor).toBe(s.user.displayName);
     } finally {
       s.dispose();
     }
   });
 
-  test('失败方式 11：PATCH todo→done（非闸相位清理）不落行——其余拖拽不变', async () => {
+  test('failure mode 11: PATCH todo->done (non-gate phase cleanup) lands no row -- other drags unchanged', async () => {
     const s = await withConfirmTodo();
     try {
       s.db.update(todoTable).set({ phase: 'todo' }).where(eq(todoTable.id, s.todoId)).run();
@@ -305,7 +275,7 @@ describe('#901 手动改相 confirm/review→done 审计行（server 面）', ()
     }
   });
 
-  test('失败方式 12：review 卡无 latestBuildId → PATCH done 成功、无行、不 500', async () => {
+  test('failure mode 12: review card without latestBuildId -> PATCH done succeeds, no row, no 500', async () => {
     const s = await withReviewTodo();
     try {
       s.db.update(todoTable).set({ latestBuildId: null }).where(eq(todoTable.id, s.todoId)).run();
@@ -321,12 +291,8 @@ describe('#901 手动改相 confirm/review→done 审计行（server 面）', ()
   });
 });
 
-// #1403 G9（spec 28 §2.2）：confirm 动作在 review 关口上曾先落「通过了确认」行，再在
-// setTodoPhase（review → building 不是相位机的边）上 409——审计里多出一行没发生的过闸。
-// 拒绝要在落行之前；已在 building 的第二次确认同样拒（不多落行、不多排执行步）；confirm
-// 关口照常落行并进 building（上文失败方式 1/3）。
 describe('#1403 G9 confirm on a build that is not at the confirm gate', () => {
-  test('G4 chief confirm_builds on a review build → refused, no 通过了确认 row, phase unchanged', async () => {
+  test('G4 chief confirm_builds on a review build -> refused, no passed-confirm row, phase unchanged', async () => {
     const s = await withReviewTodo();
     try {
       const agentId = seedChiefAgent(s);
@@ -390,7 +356,7 @@ describe('#1403 G9 confirm on a build that is not at the confirm gate', () => {
     }
   });
 
-  test('G4 REST steps confirm on a review build → 409, no 通过了确认 row', async () => {
+  test('G4 REST steps confirm on a review build -> 409, no passed-confirm row', async () => {
     const s = await withReviewTodo();
     try {
       const res = await req(s.app, 'POST', `/api/builds/${s.buildId}/steps`, {

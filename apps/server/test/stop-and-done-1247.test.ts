@@ -1,4 +1,3 @@
-// #1247 stop-then-done + canceled（closed）结局。
 import { STOP_MESSAGE, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
@@ -50,7 +49,7 @@ async function seedBuildingWithPendingStep(s: TestServer): Promise<{
 }
 
 describe('#1247 stop-and-done', () => {
-  test('pending：stop-and-done 同步停步并落 done，相位不经 gate 回落', async () => {
+  test('pending: stop-and-done stops the step synchronously and lands done, the phase falls back without the gate', async () => {
     const s = bootServer();
     const { todoId, stepId, buildId } = await seedBuildingWithPendingStep(s);
     const res = await req(s.app, 'POST', `/api/todos/${todoId}/stop-and-done`, {});
@@ -64,11 +63,10 @@ describe('#1247 stop-and-done', () => {
     expect(
       s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!.errorMessage,
     ).toBe(STOP_MESSAGE);
-    // 不是普通 stop 的 gate 回落（todo/confirm/review）
     expect(s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!.phase).toBe('done');
   });
 
-  test('prepareStopForDone pending 保相位，供调用方再写 done', async () => {
+  test('prepareStopForDone keeps the pending phase for the caller to then write done', async () => {
     const s = bootServer();
     const { todoId, stepId } = await seedBuildingWithPendingStep(s);
     const prep = prepareStopForDone(s.svc, todoId);
@@ -82,8 +80,8 @@ describe('#1247 stop-and-done', () => {
   });
 });
 
-describe('#1247 canceled（closed）', () => {
-  test('failed→closed = 200；不占成功（settle 只认 done）', async () => {
+describe('#1247 canceled (closed)', () => {
+  test('failed->closed = 200; it does not count as success (settle accepts only done)', async () => {
     const s = bootServer();
     const projectId = await postProject(s.app);
     const created = todoRecordSchema.parse(
@@ -97,7 +95,7 @@ describe('#1247 canceled（closed）', () => {
     expect(todoRecordSchema.parse(await res.json()).phase).toBe('closed');
   });
 
-  test('confirm→closed = 200（#1247 手动取消边）', async () => {
+  test('confirm->closed = 200 (the #1247 manual cancel edge)', async () => {
     const s = bootServer();
     const projectId = await postProject(s.app);
     const created = todoRecordSchema.parse(

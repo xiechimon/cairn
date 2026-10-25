@@ -1,10 +1,8 @@
-import { eq } from 'drizzle-orm';
-// 测试引导：内存库 + migration + seed + app（wire 对拍面，04 §3）。
-
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { createApp } from '../src/app.js';
 import type { AppContext } from '../src/context.js';
@@ -23,27 +21,15 @@ export function bootServer(
     claimHoldMs?: number;
     reposDir?: string;
     attachmentsDir?: string;
-    /** 技能根目录（spec 13 #367 现扫面）；缺省 = 自建隔离空目录（空集语义；
-     * 要技能行的测试显式建目录传参）。 */
     skillsDir?: string;
-    /** #1170 导入来源登记文件；缺省 = 自建隔离文件路径（同 skillsDir 纪律：
-     * 测试间零串扰；跨「重启」持久用例显式传同一路径两次 boot）。 */
     skillSourcesPath?: string;
-    /** #1170 URL 分支出站 mock（GitHub API + raw 面）。 */
     skillImportFetch?: AppContext['skillImportFetch'];
-    /** #1170 单请求超时（钉 504 面用短超时）。 */
     skillImportTimeoutMs?: number;
     webDir?: string | null;
-    /** GitHub 出站 mock（spec 12/#359 repo picker 代理面；#223 skills scan
-     *  曾用同一位，随 spec 13 #367 退役）。 */
     githubFetch?: AppContext['githubFetch'];
-    /** #231 OAuth 面：client 凭证对（默认 null = 未配置）+ 出站 mock。 */
     oauthClient?: AppContext['oauthClient'];
     oauthFetch?: AppContext['oauthFetch'];
-    /** #251 可选 token 鉴权（缺省 = 关，全量既有测试零改动）。 */
     authToken?: string | null;
-    /** spec 13（#368）：MCP 本地 config 读路径。缺省 = 唯一不存在路径
-     *  （空列表语义，与旧「空 mcp_server 表」行为一致，既有测试零改动）。 */
     mcpConfigPath?: string;
   } = {},
 ) {
@@ -52,17 +38,13 @@ export function bootServer(
   const hub = new TeamStreamHub();
   const machineHub = new MachineWakeHub();
   const convHub = new ConversationStreamHub();
-  // 随机 key 驻内存（keyfile 落盘面 = test/secret-box.test.ts 专测）。
   const secretBox = createEphemeralSecretBox();
-  // 自建隔离 reposDir（git 托管面实走用）；显式传入时由调用方管理生命周期。
   const ownReposDir = opts.reposDir === undefined;
   const reposDir = opts.reposDir ?? mkdtempSync(join(tmpdir(), 'cairn-server-repos-'));
   const ownAttDir = opts.attachmentsDir === undefined;
   const attachmentsDir = opts.attachmentsDir ?? mkdtempSync(join(tmpdir(), 'cairn-att-'));
   const ownSkillsDir = opts.skillsDir === undefined;
   const skillsDir = opts.skillsDir ?? mkdtempSync(join(tmpdir(), 'cairn-skills-'));
-  // #1170：来源登记文件缺省 = 隔离目录内（目录级清理，文件自身不预建——
-  // 首次导入时由 store 创建）。
   const ownSkillSourcesDir = opts.skillSourcesPath === undefined;
   const skillSourcesPath =
     opts.skillSourcesPath ??
@@ -76,9 +58,7 @@ export function bootServer(
     secretBox,
     user,
     team,
-    // 默认拉长 ping 间隔，避免噪音；SSE 测试显式缩短。
     pingIntervalMs: opts.pingIntervalMs ?? 3_600_000,
-    // claim 长轮询 hold 默认缩短，时序测试显式给值。
     claimHoldMs: opts.claimHoldMs ?? 250,
     uploads: new Map(),
     enrollments: new Map(),
@@ -121,8 +101,6 @@ export function bootServer(
   };
 }
 
-/** 机器注册用 API key：走 M2c 发行端点（POST /api/teams/{id}/api-keys，
- * 一次性明文语义，02 §8/r3 §6）。 */
 export async function issueApiKey(s: ReturnType<typeof bootServer>): Promise<string> {
   const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/api-keys`, {
     name: 'machine-bootstrap',
@@ -160,8 +138,6 @@ export async function postProject(app: Hono, name = 'demo'): Promise<string> {
   return body.id;
 }
 
-/** 直插 gitAccess api_key 行（存哈希不存可逆值，02 §8；key 发行端点归 M2c，
- * git 面测试用本 helper 供凭证）。 */
 export function insertGitApiKey(s: TestServer, secret: string): string {
   const id = newRecordId();
   s.db
@@ -181,13 +157,10 @@ export function insertGitApiKey(s: TestServer, secret: string): string {
   return id;
 }
 
-/** SSE 连接读取器：帧 = `data: <json>\n\n`（team stream 无 event 名，
- * 类型在载荷 type 字段，r3 §8.1/r5 §7.2 原样）。 */
 export async function openStream(app: Hono, teamId: string) {
   return openSse(app, `/api/teams/${teamId}/stream`);
 }
 
-/** conversation stream 读取器（M5 live streaming 面；帧形同 team stream）。 */
 export async function openConvStream(app: Hono, conversationId: string) {
   return openSse(app, `/api/conversations/${conversationId}/stream`);
 }
@@ -220,7 +193,6 @@ async function openSse(app: Hono, path: string) {
   }
 
   return {
-    /** 读取直到 match 命中的事件（丢弃不匹配帧），超时抛错。 */
     async next(
       match: (ev: Record<string, unknown>) => boolean,
       timeoutMs = 3000,
@@ -245,8 +217,6 @@ async function openSse(app: Hono, path: string) {
   };
 }
 
-/** #1259 归属机供给：创建 agent 的 API 契约要求 machineId（归属机必填）。
- *  直插 machine 行（默认双 runtime 全开 + 在线），返回机器 id。 */
 export function insertMachine(
   s: TestServer,
   opts: {
@@ -272,8 +242,6 @@ export function insertMachine(
   return id;
 }
 
-/** #1259 测试世界绑定器：把团队全部 agent 绑到指定机器（缺省 = 团队首台）。
- *  绑定模型下「可领」的缺省形态——世界工厂在 agent 插行后调用一次。 */
 export function bindAllAgents(s: TestServer, machineId?: string): void {
   const mid =
     machineId ??
@@ -282,21 +250,16 @@ export function bindAllAgents(s: TestServer, machineId?: string): void {
   s.db.update(agentTable).set({ machineId: mid }).run();
 }
 
-/** #1260 单 agent 绑定器：chief 绑定 Agent 的归属机 = chief 步去处——chief
- *  语义测试在 enroll 认领机后调一次（bindAllAgents 的逐机变体）。 */
 export function bindAgentHome(s: TestServer, agentId: string, machineId: string): void {
   s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, agentId)).run();
 }
 
-/** 按名字取本队机器 id（enroll 后读本队机器行）。 */
 export function machineIdByName(s: TestServer, name: string): string {
   const row = s.db.select().from(machineTable).where(eq(machineTable.name, name)).get();
   if (row === undefined) throw new Error(`machineIdByName: ${name} 不在库里`);
   return row.id;
 }
 
-/** #1492 plan 结构闸：测试方案样本补一段合格的 Verification（每项带可执行
- *  锚点），否则 plan 步会被留在规划中走结构补写轮，进不了 confirm。 */
 export function withVerification(plan: string): string {
   return `${plan}\n\n## Verification\n- \`pnpm test\` 通过\n`;
 }

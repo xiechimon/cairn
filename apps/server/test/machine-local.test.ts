@@ -1,12 +1,3 @@
-// machines 本地化（spec 11 A8/A9，#357）：本机行 = server 启动 seed +
-// hostname 匹配的 enroll 同律；PATCH /api/machines/{id} 写 enabledRuntimes。
-// 失败方式先于实现枚举（仓测试规则 3）：
-// 1. 二次 seed 建 duplicate 行（幂等破）
-// 2. 已 enroll 的 hostname 行 seed 时不补 kind='local'
-// 3. daemon loopback enroll（name=hostname）落 remote / 与 seed 行重复
-// 4. PATCH 走不通 / GET 回显不一致 / 未知 id 非 404 / 词表外 runtime 非 400
-// 5. GET 记录缺 kind / enabledRuntimes 字段（schema 投影漏位）
-
 import { hostname } from 'node:os';
 import { machineRecordSchema } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
@@ -18,7 +9,6 @@ import { bootServer, issueApiKey, req } from './helpers.js';
 
 const HOST = hostname();
 
-/** enroll 要 Bearer apiKey——req helper 无 header 位，machine-wire 同款 call。 */
 function call(
   app: Hono,
   method: string,
@@ -46,23 +36,21 @@ function localRows(db: ReturnType<typeof bootServer>['db'], teamId: string) {
     .filter((r) => r.name === HOST);
 }
 
-describe('本机行 seed（spec 11 A8：server 启动 seed，idempotent）', () => {
-  test('seed 建 kind=local 行（name=os.hostname()，enabledRuntimes 缺省 [pi]）', () => {
+describe('local-machine row seed (spec 11 A8: server boot seed, idempotent)', () => {
+  test('seed creates kind=local row (name=os.hostname(), enabledRuntimes default [pi])', () => {
     const s = bootServer();
     try {
       seedLocalMachine(s.db, s.team.id);
       const rows = localRows(s.db, s.team.id);
       expect(rows).toHaveLength(1);
       expect(rows[0]?.kind).toBe('local');
-      // #682：开关是 claim 真闸后缺省 []（全关）= 新装机一步领不到——
-      // seed/enroll 缺省改 ['pi']（bootstrap 不空转），claude-code opt-in。
       expect(rows[0]?.enabledRuntimes).toEqual(['pi']);
     } finally {
       s.dispose();
     }
   });
 
-  test('二次 seed 不建 duplicate 行（验收：二次启动 server）', () => {
+  test('second seed does not create a duplicate row (acceptance: second server boot)', () => {
     const s = bootServer();
     try {
       seedLocalMachine(s.db, s.team.id);
@@ -73,14 +61,12 @@ describe('本机行 seed（spec 11 A8：server 启动 seed，idempotent）', () 
     }
   });
 
-  test('本机行已改名（name 漂移离 hostname）：再 seed 按 kind 唯一性定位，不建 duplicate', () => {
+  test('local-machine row renamed (name drifted from hostname): reseed locates it by kind uniqueness, no duplicate', () => {
     const s = bootServer();
     try {
       seedLocalMachine(s.db, s.team.id);
       const row = localRows(s.db, s.team.id)[0];
       expect(row).toBeDefined();
-      // 改名漂移：daemon 显式 --name 重注册后行 name 离开 hostname
-      // （feature map machines-local-row.md gotcha：不重复建行）。
       s.db
         .update(machineTable)
         .set({ name: 'renamed-box' })
@@ -93,13 +79,13 @@ describe('本机行 seed（spec 11 A8：server 启动 seed，idempotent）', () 
         .where(and(eq(machineTable.teamId, s.team.id), eq(machineTable.kind, 'local')))
         .all();
       expect(locals).toHaveLength(1);
-      expect(locals[0]?.id).toBe(row?.id); // 复用同一行，不另建 placeholder
+      expect(locals[0]?.id).toBe(row?.id);
     } finally {
       s.dispose();
     }
   });
 
-  test('已 enroll 的 hostname 行：seed 补 kind=local，不另建行', async () => {
+  test('an enrolled hostname row: seed adds kind=local, no separate row', async () => {
     const s = bootServer();
     try {
       const key = await issueApiKey(s);
@@ -108,21 +94,20 @@ describe('本机行 seed（spec 11 A8：server 启动 seed，idempotent）', () 
         body: { teamId: s.team.id, name: HOST, cliVersion: '0.1.0' },
       });
       expect(res.status).toBe(200);
-      // enroll 同律：name=hostname 即落 kind='local'（无需等 seed）
       expect(localRows(s.db, s.team.id)[0]?.kind).toBe('local');
       seedLocalMachine(s.db, s.team.id);
       const rows = localRows(s.db, s.team.id);
       expect(rows).toHaveLength(1);
       expect(rows[0]?.kind).toBe('local');
-      expect(rows[0]?.tokenHash).not.toBeNull(); // enroll 凭证保留
+      expect(rows[0]?.tokenHash).not.toBeNull();
     } finally {
       s.dispose();
     }
   });
 });
 
-describe('enroll hostname 同律（spec 11 A9：loopback enroll 落 kind=local）', () => {
-  test('enroll name=hostname → kind=local；seed 行被复用（无 duplicate）', async () => {
+describe('enroll hostname same law (spec 11 A9: loopback enroll lands kind=local)', () => {
+  test('enroll name=hostname -> kind=local; seed row reused (no duplicate)', async () => {
     const s = bootServer();
     try {
       seedLocalMachine(s.db, s.team.id);
@@ -133,7 +118,7 @@ describe('enroll hostname 同律（spec 11 A9：loopback enroll 落 kind=local�
       });
       expect(res.status).toBe(200);
       const rows = localRows(s.db, s.team.id);
-      expect(rows).toHaveLength(1); // seed 行被 enroll 复用，不另建
+      expect(rows).toHaveLength(1);
       expect(rows[0]?.kind).toBe('local');
       expect(rows[0]?.tokenHash).not.toBeNull();
     } finally {
@@ -141,7 +126,7 @@ describe('enroll hostname 同律（spec 11 A9：loopback enroll 落 kind=local�
     }
   });
 
-  test('enroll 异名机器 → kind=remote（默认律不破）', async () => {
+  test('enroll with a different-name machine -> kind=remote (default law unbroken)', async () => {
     const s = bootServer();
     try {
       const key = await issueApiKey(s);
@@ -156,7 +141,6 @@ describe('enroll hostname 同律（spec 11 A9：loopback enroll 落 kind=local�
         .all()
         .find((r) => r.name === 'lan-box');
       expect(row?.kind).toBe('remote');
-      // #682：enroll 缺省 ['pi']（claim 真闸下的 bootstrap 不空转，同 seed）。
       expect(row?.enabledRuntimes).toEqual(['pi']);
     } finally {
       s.dispose();
@@ -164,8 +148,8 @@ describe('enroll hostname 同律（spec 11 A9：loopback enroll 落 kind=local�
   });
 });
 
-describe('PATCH /api/machines/{id}（spec 11 A8/A9：enabledRuntimes 写回）', () => {
-  test('PATCH 走通、GET 回显一致（验收）', async () => {
+describe('PATCH /api/machines/{id} (spec 11 A8/A9: enabledRuntimes write-back)', () => {
+  test('PATCH succeeds, GET echoes back consistent (acceptance)', async () => {
     const s = bootServer();
     try {
       seedLocalMachine(s.db, s.team.id);
@@ -182,7 +166,6 @@ describe('PATCH /api/machines/{id}（spec 11 A8/A9：enabledRuntimes 写回）',
       ).json()) as unknown[];
       const record = machineRecordSchema.parse(list.find((m) => (m as { id: string }).id === id));
       expect(record.enabledRuntimes).toEqual(['pi', 'claude-code']);
-      // 覆写 = 全量替换语义（词表内二次 PATCH 收敛）
       const off = await req(s.app, 'PATCH', `/api/machines/${id}`, { enabledRuntimes: [] });
       expect(off.status).toBe(200);
       expect(localRows(s.db, s.team.id)[0]?.enabledRuntimes).toEqual([]);
@@ -191,7 +174,7 @@ describe('PATCH /api/machines/{id}（spec 11 A8/A9：enabledRuntimes 写回）',
     }
   });
 
-  test('未知 id → 404 {error}', async () => {
+  test('unknown id -> 404 {error}', async () => {
     const s = bootServer();
     try {
       const res = await req(s.app, 'PATCH', '/api/machines/nope', {
@@ -204,7 +187,7 @@ describe('PATCH /api/machines/{id}（spec 11 A8/A9：enabledRuntimes 写回）',
     }
   });
 
-  test('词表外 runtime / 形状错 body → 400', async () => {
+  test('out-of-vocabulary runtime / wrong-shape body -> 400', async () => {
     const s = bootServer();
     try {
       seedLocalMachine(s.db, s.team.id);
@@ -217,7 +200,6 @@ describe('PATCH /api/machines/{id}（spec 11 A8/A9：enabledRuntimes 写回）',
         enabledRuntimes: 'pi',
       });
       expect(shape.status).toBe(400);
-      // 拒写不动存量值（#682 起 seed 缺省 ['pi']，同字段拒绝位零改动）。
       expect(localRows(s.db, s.team.id)[0]?.enabledRuntimes).toEqual(['pi']);
     } finally {
       s.dispose();

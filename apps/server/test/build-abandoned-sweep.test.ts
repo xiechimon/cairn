@@ -1,12 +1,3 @@
-// #706 失联扫尾 + #862 T1 跨机续跑 + #1257 无人认领挂起：sweepAbandoned
-// BuildSteps——失联 claimed 步释放回 pending 供归属机重领（new-session 降级由
-// daemon 侧 transcript 标记）；无人认领的 pending 步挂起等机器（#1257：infra
-// 事件，机器回来走既有 claim 循环自动续跑，板面「等机器」chip 由 todos.ts
-// waitingOnOf 派生），不再判死 build。#1259 起步的机器去处 = agent 归属机
-// （钉选退役）。判定（超龄 × 在线态 × 步状态 × 步 kind）+ 落账面 + 事件面
-// （会话流 step 事件，不另起通知面）。机器在线位直写 DB（生产置位路径 wake
-// SSE 断连面归 machine-wire 测试）。
-
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -38,9 +29,6 @@ interface BuildWorld {
   base: number;
 }
 
-/** 直插 world：project + building 相 todo + build + build 步 + 一台机器。
- * withAgent = 指派带模型的 Agent（认领路径用：tryClaim 要求 assignment 槽有
- * 模型位；机器开 pi runtime）。 */
 function makeWorld(step: {
   status: 'pending' | 'claimed';
   kind?: 'plan' | 'build' | 'merge' | 'review' | 'chief' | 'verify';
@@ -48,15 +36,8 @@ function makeWorld(step: {
   heartbeatAgo?: number | null;
   machineOnline?: boolean;
   withAgent?: boolean;
-  /** #881：Agent provider（缺省 null = pi 档；'claude-code' = 闸判用的
-   *  runtime 反例位——机器没开对应 runtime 才构成「钉选在线但被挡」）。 */
   agentProvider?: string;
-  /** #881：本机 enabledRuntimes 覆写（缺省维持 withAgent ? ['pi'] : 列缺省）。 */
   machineRuntimes?: string[];
-  /** #1259：pin 选项改写为 **agent 归属机**绑定（'self' = 本 world 机器、
-   *  'ghost' = 团队里不存在的 id、其它字符串 = 原样落 agent.machineId）。
-   *  归属机在 agent 上——pin 给出时强制带 agent；withAgent 未给 pin = 绑
-   *  本 world 机器（绑定模型下可领的缺省形态）。 */
   pin?: 'self' | 'ghost' | (string & {});
 }): BuildWorld {
   const s = bootServer();
@@ -127,7 +108,6 @@ function makeWorld(step: {
     .run();
   const createdAt = base - step.createdAgo;
   const claimedAt = step.status === 'claimed' ? createdAt : null;
-  // 缺省心跳 = claim 置位值（生产 claim 面同形）；B-C7 形态即此值 + 机器在线。
   const heartbeat =
     step.heartbeatAgo === undefined
       ? claimedAt
@@ -166,7 +146,6 @@ function buildRowOf(w: BuildWorld) {
   return w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()!;
 }
 
-/** 会话流 step 事件捕获桩（钉 web SSE 契约：step 事件携带终态行）。 */
 function tapConvStream(s: TestServer, conversationId: string): { events: object[] } {
   const events: object[] = [];
   s.convHub.subscribe(conversationId, {
@@ -188,15 +167,12 @@ function stepEventOf(events: object[], stepId: string): { status: string } {
   return ev.step as { status: string };
 }
 
-/** 追加一台在线机器（#864：「团队有别的在线机器、但钉的那台不在」这一形态的
- *  另一半——没有它就无法把「零在线」与「钉选离线」两条判据分开）。 */
 function addOnlineMachine(w: BuildWorld, name = 'mea'): string {
   const id = `machine-${Math.random().toString(36).slice(2)}`;
   w.s.db.insert(machineTable).values({ id, teamId: w.teamId, name, online: true }).run();
   return id;
 }
 
-/** claim 面要 MachineDeps（svc 只有 BuildDeps 位，box/目录面补齐）。 */
 function machineDepsOf(w: BuildWorld) {
   return {
     ...w.s.svc,
@@ -206,8 +182,8 @@ function machineDepsOf(w: BuildWorld) {
   };
 }
 
-describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () => {
-  test('claimed 心跳停更超阈值 + 机器离线：释放回 pending（机位清空、相位不动、无失败痕迹）+ 会话流 step 事件 + wake 唤醒认领循环', async () => {
+describe('#862 T1 release of lost-contact claimed steps (sweepAbandonedBuildSteps)', () => {
+  test('claimed heartbeat stale past threshold + machine offline: released back to pending (machine slot cleared, phase unchanged, no failure trace) + conversation-stream step event + wake rouses the claim loop', async () => {
     const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 300_000 });
     const { events } = tapConvStream(w.s, w.buildId);
     const woken = w.s.svc.machineHub.waitWake(w.teamId, 50);
@@ -217,16 +193,13 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     const row = stepRowOf(w);
     expect(row.status).toBe('pending');
     expect(row.machineId).toBeNull();
-    // 非失败路径：todo 相位不动、build 无 errorMessage（与机器报失败同漏斗不混）。
     expect(todoRowOf(w).phase).toBe('building');
     expect(buildRowOf(w).errorMessage).toBeNull();
     expect(stepEventOf(events, w.stepId).status).toBe('pending');
-    // 他机 75s 长轮询不等满：释放即 wake，同队等待者立即重认领。
     await expect(woken).resolves.toBe(true);
   });
 
-  test('B-C7：claimed 自领取零心跳进展超阈值 + 机器在线：同样释放（server 标了 claimed 但机器侧零执行，步可被他机/本机重领）', () => {
-    // heartbeat 缺省 = claim 置位值（从未推进）+ 机器在线 = B-C7 移交竞态形。
+  test('B-C7: claimed with zero heartbeat progress past threshold + machine online: also released (server marked claimed but the machine executed nothing, step can be reclaimed by another machine or this machine)', () => {
     const w = makeWorld({
       status: 'claimed',
       createdAgo: 300_000,
@@ -241,7 +214,7 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('释放后归属机可重领：别机空手（#1259 归属机闸）、归属机上线后领到同一步', async () => {
+  test('after release the home machine can reclaim: another machine comes up empty (#1259 home-machine gate), the home machine claims the same step once online', async () => {
     const w = makeWorld({
       status: 'claimed',
       createdAgo: 300_000,
@@ -257,10 +230,8 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     sweepAbandonedBuildSteps(w.s.svc, w.base);
     expect(stepRowOf(w).status).toBe('pending');
 
-    // 归属机闸：别机（mea）领不到归属机是 w.machineId 的步。
     const other = await claimStep(machineDepsOf(w), meaId, w.teamId, 10, 'http://localhost');
     expect(other).toBeNull();
-    // 归属机（上线后）重领同一步。
     w.s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, w.machineId)).run();
     const claimed = await claimStep(
       machineDepsOf(w),
@@ -272,18 +243,16 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     if (claimed === null) throw new Error('released step was not reclaimable by home machine');
     expect(claimed.step.id).toBe(w.stepId);
     expect(claimed.step.machineId).toBe(w.machineId);
-    // 会话面：无历史 session → 新会话开工；daemon 侧回退标记见 runner-resume-note 测试。
     expect(claimed.session.action).toBe('new');
   });
 
-  test('释放后认领带历史会话：prior session 在位 → continue 载荷（#1259 归属机恒同机，会话文件恒在——回退标记成历史）', async () => {
+  test('reclaim after release carries the prior session: prior session present -> continue payload (#1259 home machine is always the same machine, session file always present -- fallback marked as history)', async () => {
     const w = makeWorld({
       status: 'claimed',
       createdAgo: 300_000,
       heartbeatAgo: 300_000,
       withAgent: true,
     });
-    // 同 build 更早的 done 步带 sessionId = 历史会话（server 侧 continue 判定源）。
     w.s.db
       .insert(stepTable)
       .values({
@@ -310,7 +279,7 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     expect(claimed.session).toEqual({ action: 'continue', sessionId: 'sess-old' });
   });
 
-  test('pending 超龄 + 团队零在线机器：挂起等机器（#1257：无人认领是 infra 事件，不进 failed）', () => {
+  test('pending past age + team has zero online machines: suspended waiting for a machine (#1257: nobody claiming is an infra event, not failed)', () => {
     const w = makeWorld({ status: 'pending', createdAgo: 300_000 });
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
@@ -320,7 +289,7 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     expect(todoRowOf(w).phase).toBe('building');
   });
 
-  test('释放后仍无在线机器 → 挂起（#1257：释放不是无期等待的失败收尾，机器回来即续跑）', () => {
+  test('still no online machine after release -> suspended (#1257: release is not a failure wrap-up of endless waiting, a returning machine resumes it)', () => {
     const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 300_000 });
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
@@ -331,7 +300,7 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('释放后有在线机器 → 继续排队不杀', () => {
+  test('online machine present after release -> keeps queueing, not killed', () => {
     const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 300_000 });
     w.s.db
       .insert(machineTable)
@@ -350,7 +319,7 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     expect(todoRowOf(w).phase).toBe('building');
   });
 
-  test('负例：心跳新鲜的 claimed 步不动（在线/离线皆可）', () => {
+  test('counterexample: fresh-heartbeat claimed step untouched (online or offline)', () => {
     const online = makeWorld({
       status: 'claimed',
       createdAgo: 300_000,
@@ -366,13 +335,12 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     sweepAbandonedBuildSteps(online.s.svc, online.base);
     sweepAbandonedBuildSteps(offline.s.svc, offline.base);
 
-    // 心跳年龄是活判据：新鲜 = 长步仍在跑，不命中任何判据。
     expect(stepRowOf(online).status).toBe('claimed');
     expect(stepRowOf(offline).status).toBe('claimed');
     expect(buildRowOf(online).errorMessage).toBeNull();
   });
 
-  test('负例：pending 且团队有在线机器 = 合法排队不碰', () => {
+  test('counterexample: pending with a team online machine = legal queueing, not touched', () => {
     const w = makeWorld({ status: 'pending', createdAgo: 300_000, machineOnline: true });
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
@@ -381,7 +349,7 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     expect(todoRowOf(w).phase).toBe('building');
   });
 
-  test('负例：pending 未超龄 → 不动', () => {
+  test('counterexample: pending not past age -> untouched', () => {
     const w = makeWorld({ status: 'pending', createdAgo: 10_000 });
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
@@ -389,8 +357,7 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     expect(stepRowOf(w).status).toBe('pending');
   });
 
-  test('负例：在线机器上曾有心跳后停更的 claimed 步 = 歧义态不动', () => {
-    // 执行/推送通道部分存活的楔子态：不动，等 presence 过期走离线判据。
+  test('counterexample: claimed step on an online machine that had heartbeats then went stale = ambiguous state, untouched', () => {
     const w = makeWorld({
       status: 'claimed',
       createdAgo: 600_000,
@@ -403,7 +370,7 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     expect(stepRowOf(w).status).toBe('claimed');
   });
 
-  test('幂等：终态步跳过；chief 步不在本面', () => {
+  test('idempotent: terminal steps skipped; chief steps not in this surface', () => {
     const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 300_000 });
     w.s.db
       .insert(stepTable)
@@ -426,14 +393,14 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
       .from(stepTable)
       .where(eq(stepTable.id, 'step-chief-other'))
       .get()!;
-    expect(chief.status).toBe('claimed'); // chief 面归 chief.ts 扫尾
+    expect(chief.status).toBe('claimed');
   });
 
-  test('阈值与 #684 同节奏（120 秒，不自造新节奏）', () => {
+  test('threshold at the same cadence as #684 (120 seconds, no new cadence invented)', () => {
     expect(BUILD_ABANDONED_STEP_MS).toBe(120_000);
   });
 
-  test('scheduler tick 接线：tick(now) 驱动 sweep（真实宿主路径）', () => {
+  test('scheduler tick wiring: tick(now) drives the sweep (real host path)', () => {
     const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 300_000 });
     const scheduler = createScheduler(w.s.svc, { tickMs: 60_000 });
 
@@ -443,8 +410,8 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
   });
 });
 
-describe('#1257 归属机离线的无人认领挂起（sweepAbandonedBuildSteps 的归属机形态）', () => {
-  test('归属机离线 + 团队有别的在线机器：宽限内不碰（合法等待）', () => {
+describe('#1257 unclaimed suspension when the home machine is offline (home-machine form of sweepAbandonedBuildSteps)', () => {
+  test('home machine offline + team has another online machine: untouched within the grace period (legal wait)', () => {
     const w = makeWorld({ status: 'pending', createdAgo: 90_000, pin: 'self' });
     addOnlineMachine(w);
 
@@ -455,7 +422,7 @@ describe('#1257 归属机离线的无人认领挂起（sweepAbandonedBuildSteps 
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('归属机离线 + 别的机器在线 + 超龄：挂起等机器（#1257：不按失败收尾，归属机回来自动续跑——板面「等机器」chip 透出）', () => {
+  test('home machine offline + another machine online + past age: suspended waiting for a machine (#1257: no failure wrap-up, home machine returning auto-resumes -- board surfaces the "waiting for machine" chip)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 600_000 + 1_000,
@@ -465,20 +432,16 @@ describe('#1257 归属机离线的无人认领挂起（sweepAbandonedBuildSteps 
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
-    // 挂起不是失败：步留 pending、todo 相位不动、build 无 errorMessage。
     expect(stepRowOf(w).status).toBe('pending');
     expect(buildRowOf(w).errorMessage).toBeNull();
     expect(todoRowOf(w).phase).toBe('building');
-    // 归属绑定在位（不静默改派：归属的语义就是确定性，#1259）。
     expect(agentRowOf(w).machineId).toBe(w.machineId);
-    // 持续挂起：再扫一轮仍不动。
     sweepAbandonedBuildSteps(w.s.svc, w.base + 60_000);
     expect(stepRowOf(w).status).toBe('pending');
-    // 别的在线机器本可跑这条步——归属机闸恒拒（换机不可见），等机器是真等。
     expect(otherId).not.toBe(w.machineId);
   });
 
-  test('归属机离线 + 团队零在线机器：同样挂起（可见性由「等机器」chip 承担，不进 failed）', () => {
+  test('home machine offline + team has zero online machines: also suspended (visibility carried by the "waiting for machine" chip, not failed)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 600_000 + 1_000,
@@ -491,14 +454,13 @@ describe('#1257 归属机离线的无人认领挂起（sweepAbandonedBuildSteps 
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('未设归属机：同样挂起（补设即解锁；板面「等机器」chip 透出，无期静默不成立）', () => {
+  test('no home machine set: also suspended (setting one unlocks; board surfaces the "waiting for machine" chip, no indefinite silence)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 600_000 + 1_000,
       withAgent: true,
       machineOnline: true,
     });
-    // 归属机置空 = 迁移漏网/手工清库形态：claim 面恒拒（归属机闸），等补设。
     w.s.db.update(agentTable).set({ machineId: null }).where(eq(agentTable.id, w.agentId!)).run();
     addOnlineMachine(w);
 
@@ -509,7 +471,7 @@ describe('#1257 归属机离线的无人认领挂起（sweepAbandonedBuildSteps 
     expect(todoRowOf(w).phase).toBe('building');
   });
 
-  test('未设归属机：不动（等待补设，恒 pending）', () => {
+  test('no home machine set: untouched (waiting for it to be set, stays pending)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 90_000,
@@ -524,12 +486,7 @@ describe('#1257 归属机离线的无人认领挂起（sweepAbandonedBuildSteps 
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  // 「归属机行缺失」形态已被结构消灭：agent.machineId 带 FK（references
-  // machine.id），悬空 id 插不进去、有绑定 agent 的机器删不掉（删机保护
-  // 见 routes-resources 机器面测试）。sweep 的 homeRow === undefined 分支
-  // 降为防御位（残留库/导入面）。
-
-  test('归属机在线：不动（步等它认领，合法排队）', () => {
+  test('home machine online: untouched (step waits for it to claim, legal queueing)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 90_000,
@@ -543,7 +500,7 @@ describe('#1257 归属机离线的无人认领挂起（sweepAbandonedBuildSteps 
     expect(todoRowOf(w).phase).toBe('building');
   });
 
-  test('归属机是另一台在线机器：不动（本机不能抢——归属机闸恒拒，步等归属机）', () => {
+  test('home machine is another online machine: untouched (this machine cannot grab it -- the home-machine gate always refuses, step waits for its home)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 1_800_000,
@@ -562,8 +519,7 @@ describe('#1257 归属机离线的无人认领挂起（sweepAbandonedBuildSteps 
     expect(stepRowOf(w).status).toBe('pending');
   });
 
-  test('释放后重等：锚在步的最后活动（心跳），释放后持续挂起（#1257：不判死，等归属机回归）', () => {
-    // 入队 20 分钟前，但机器 130 秒前才失联（心跳停更刚过 T1 的 120 秒释放线）。
+  test('re-wait after release: anchored on the step last activity (heartbeat), stays suspended after release (#1257: no death verdict, waits for the home machine to return)', () => {
     const w = makeWorld({
       status: 'claimed',
       createdAgo: 1_200_000,
@@ -573,17 +529,17 @@ describe('#1257 归属机离线的无人认领挂起（sweepAbandonedBuildSteps 
     addOnlineMachine(w);
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
-    expect(stepRowOf(w).status).toBe('pending'); // T1 释放
+    expect(stepRowOf(w).status).toBe('pending');
 
     sweepAbandonedBuildSteps(w.s.svc, w.base + 1_000);
     expect(stepRowOf(w).status).toBe('pending');
 
     sweepAbandonedBuildSteps(w.s.svc, w.base + 600_000);
-    expect(stepRowOf(w).status).toBe('pending'); // 挂起：机器回来即续跑
+    expect(stepRowOf(w).status).toBe('pending');
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('归属机离线但步心跳新鲜（claimed 在跑）：不动（claimed 面判据不变）', () => {
+  test('home machine offline but step heartbeat fresh (claimed running): untouched (claimed-surface criteria unchanged)', () => {
     const w = makeWorld({
       status: 'claimed',
       createdAgo: 1_200_000,
@@ -598,13 +554,8 @@ describe('#1257 归属机离线的无人认领挂起（sweepAbandonedBuildSteps 
   });
 });
 
-describe('#881 归属机在线但 runtime 闸挡（#1257 挂起语义）', () => {
-  // 归属机在线但 enabledRuntimes 不含本步 runtime → claim 侧
-  // runtimeGatePasses 恒 false + 归属机闸令唯有该机可见 → 步挂起等 runtime
-  // （机器在、闸开前轮不到它领）。#1257：挂起不判死，开 runtime 后自动续跑
-  // （PATCH 热写秒级生效，chip 即改即愈）。
-
-  test('归属机在线 + 闸挡（claude-code 步 × 只开 pi 的机器）+ 超龄：挂起等机器（#1257：开 runtime 后自动续跑，不按失败收尾）', () => {
+describe('#881 home machine online but blocked by the runtime gate (#1257 suspension semantics)', () => {
+  test('home machine online + gate blocked (claude-code step x pi-only machine) + past age: suspended waiting for a machine (#1257: auto-resumes after runtime enabled, no failure wrap-up)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 601_000,
@@ -614,8 +565,6 @@ describe('#881 归属机在线但 runtime 闸挡（#1257 挂起语义）', () =>
       machineRuntimes: ['pi'],
       pin: 'self',
     });
-    // 团队里另有能跑 claude-code 的在线机器——归属机闸恒拒（归属不换机），
-    // 挂起等的是归属机自己开 runtime。
     const otherId = addOnlineMachine(w);
     w.s.db
       .update(machineTable)
@@ -628,14 +577,12 @@ describe('#881 归属机在线但 runtime 闸挡（#1257 挂起语义）', () =>
     expect(stepRowOf(w).status).toBe('pending');
     expect(buildRowOf(w).errorMessage).toBeNull();
     expect(todoRowOf(w).phase).toBe('building');
-    // 归属机在位（归属语义 = 确定性，静默换机违背它）。
     expect(agentRowOf(w).machineId).toBe(w.machineId);
-    // 持续挂起。
     sweepAbandonedBuildSteps(w.s.svc, w.base + 60_000);
     expect(stepRowOf(w).status).toBe('pending');
   });
 
-  test('归属机在线 + 闸挡：不动（runtime 开关 PATCH 热写，开闸即自动续领）', () => {
+  test('home machine online + gate blocked: untouched (runtime flag PATCH writes hot, enabling the gate auto-resumes claiming)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 90_000,
@@ -654,8 +601,7 @@ describe('#881 归属机在线但 runtime 闸挡（#1257 挂起语义）', () =>
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('归属机在线 + runtime 开 + 满载：不动（步在它队列里排队，合法——闸判负例）', () => {
-    // 满载 = 真排队不动（#1257 挂起语义下在线不领一律等，无楔住判死面）。
+  test('home machine online + runtime on + at capacity: untouched (step queues in its queue, legal -- gate counterexample)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 1_800_000,
@@ -665,7 +611,6 @@ describe('#881 归属机在线但 runtime 闸挡（#1257 挂起语义）', () =>
       machineRuntimes: ['pi', 'claude-code'],
       pin: 'self',
     });
-    // 满载：归属机的并发位被在跑步占满（makeWorld 机器缺省 maxConcurrent=3）。
     for (let i = 0; i < 3; i++) {
       const loadStepId = `step-load-${i}-${Math.random().toString(36).slice(2)}`;
       w.s.db
@@ -689,7 +634,7 @@ describe('#881 归属机在线但 runtime 闸挡（#1257 挂起语义）', () =>
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('review 步同判（agentId 走 prompt meta 头行，provider 重算同源）：闸挡同样挂起', () => {
+  test('review step judged the same (agentId from the prompt meta header line, provider recomputed from the same source): gate blocked also suspends', () => {
     const w = makeWorld({
       status: 'pending',
       kind: 'review',
@@ -700,13 +645,11 @@ describe('#881 归属机在线但 runtime 闸挡（#1257 挂起语义）', () =>
       machineRuntimes: ['pi'],
       pin: 'self',
     });
-    // review 步的 Agent 不走 assignment 槽，agentId 在 prompt meta 头行（M7 #330）。
     w.s.db
       .update(stepTable)
       .set({ prompt: `{"kind":"review","agentId":"${w.agentId}","gate":"review"}\n审核任务` })
       .where(eq(stepTable.id, w.stepId))
       .run();
-    // assignment 槽清空：证明判据吃的是 review meta 而非 assignment。
     w.s.db
       .update(todoTable)
       .set({ assignment: { plan: null, build: null } })
@@ -719,7 +662,7 @@ describe('#881 归属机在线但 runtime 闸挡（#1257 挂起语义）', () =>
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('未指派 Agent 的步不进本判（未指派 = 无人可领的另一族缝，不是闸挡）', () => {
+  test('steps with no Agent assigned do not enter this check (unassigned = another seam family nobody can claim, not a gate block)', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 1_200_000,
@@ -730,14 +673,12 @@ describe('#881 归属机在线但 runtime 闸挡（#1257 挂起语义）', () =>
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
-    // 机器在线 → 「零在线」判不中；无 Agent → 归属机判族无从计算 → 不动。
-    // （未指派步无人可领的缝另行登记，不在本票收口。）
     expect(stepRowOf(w).status).toBe('pending');
   });
 });
 
-describe('#1284 verify 步 sweep（sweepAbandonedBuildSteps 补 verify kind）', () => {
-  test('claimed verify 步心跳过期 + 机器离线：释放回 pending（机位清空、相位不动、无失败痕迹）+ 会话流 step 事件', async () => {
+describe('#1284 verify step sweep (sweepAbandonedBuildSteps adds the verify kind)', () => {
+  test('claimed verify step heartbeat expired + machine offline: released back to pending (machine slot cleared, phase unchanged, no failure trace) + conversation-stream step event', async () => {
     const w = makeWorld({
       status: 'claimed',
       kind: 'verify',
@@ -758,7 +699,7 @@ describe('#1284 verify 步 sweep（sweepAbandonedBuildSteps 补 verify kind）',
     await expect(woken).resolves.toBe(true);
   });
 
-  test('B-C7 同形：claimed verify 步零心跳进展超阈值 + 机器在线：同样释放', () => {
+  test('B-C7 same shape: claimed verify step zero heartbeat progress past threshold + machine online: also released', () => {
     const w = makeWorld({
       status: 'claimed',
       kind: 'verify',
@@ -774,7 +715,7 @@ describe('#1284 verify 步 sweep（sweepAbandonedBuildSteps 补 verify kind）',
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('负例：心跳新鲜的 claimed verify 步不动', () => {
+  test('counterexample: fresh-heartbeat claimed verify step untouched', () => {
     const w = makeWorld({
       status: 'claimed',
       kind: 'verify',
@@ -789,7 +730,7 @@ describe('#1284 verify 步 sweep（sweepAbandonedBuildSteps 补 verify kind）',
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('负例：done verify 步不动（终态——sweep 只扫 pending/claimed）', () => {
+  test('counterexample: done verify step untouched (terminal -- sweep only scans pending/claimed)', () => {
     const w = makeWorld({
       status: 'claimed',
       kind: 'verify',
@@ -803,7 +744,7 @@ describe('#1284 verify 步 sweep（sweepAbandonedBuildSteps 补 verify kind）',
     expect(stepRowOf(w).status).toBe('done');
   });
 
-  test('负例：failed verify 步不动（终态——sweep 只扫 pending/claimed）', () => {
+  test('counterexample: failed verify step untouched (terminal -- sweep only scans pending/claimed)', () => {
     const w = makeWorld({
       status: 'claimed',
       kind: 'verify',
@@ -817,7 +758,7 @@ describe('#1284 verify 步 sweep（sweepAbandonedBuildSteps 补 verify kind）',
     expect(stepRowOf(w).status).toBe('failed');
   });
 
-  test('负例：pending verify 步超龄 + 团队零在线：挂起等机器不动（#1257）', () => {
+  test('counterexample: pending verify step past age + team zero online: suspended waiting for a machine, untouched (#1257)', () => {
     const w = makeWorld({
       status: 'pending',
       kind: 'verify',

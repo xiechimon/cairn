@@ -1,6 +1,3 @@
-// spec 15 #394 server 面：占位标题派生（createTodo 落库）+ 固定词表播种 +
-// set_task_meta worker 窄工具 relay。失败方式清单 = spec 15 Testing Decisions。
-
 import { type ClaimedStep, FIXED_TAGS, todoRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
@@ -26,8 +23,8 @@ async function call(
   );
 }
 
-describe('占位标题派生（ADR 0002 D2：title 空白 → 正文首个非空行 ≤50 字符）', () => {
-  test('title 空串 → 取首个非空行；多行只取首行', async () => {
+describe('placeholder title derivation (ADR 0002 D2: blank title -> the first non-empty body line, <=50 characters)', () => {
+  test('title empty string -> the first non-empty line; of several lines only the first', async () => {
     const s = bootServer();
     const projectId = await postProject(s.app);
     const res = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -39,7 +36,7 @@ describe('占位标题派生（ADR 0002 D2：title 空白 → 正文首个非空
     s.dispose();
   });
 
-  test('首行 >50 字符 → 截断 50 + 省略号', async () => {
+  test('the first line >50 characters -> truncated at 50 + an ellipsis', async () => {
     const s = bootServer();
     const projectId = await postProject(s.app);
     const res = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -50,7 +47,7 @@ describe('占位标题派生（ADR 0002 D2：title 空白 → 正文首个非空
     s.dispose();
   });
 
-  test('显式标题原样保留（chief/mcp 面不变）', async () => {
+  test('an explicit title is kept verbatim (the chief/mcp surfaces unchanged)', async () => {
     const s = bootServer();
     const projectId = await postProject(s.app);
     const res = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -62,8 +59,8 @@ describe('占位标题派生（ADR 0002 D2：title 空白 → 正文首个非空
   });
 });
 
-describe('固定词表播种（ADR 0002 D4）', () => {
-  test('项目创建自带 6 行固定标签（name/color 全对拍）', async () => {
+describe('fixed-vocabulary seeding (ADR 0002 D4)', () => {
+  test('project creation ships the 6 fixed tags (name/color fully compared)', async () => {
     const s = bootServer();
     const projectId = await postProject(s.app);
     const res = await call(s.app, 'GET', `/api/projects/${projectId}/tags`);
@@ -73,7 +70,7 @@ describe('固定词表播种（ADR 0002 D4）', () => {
     s.dispose();
   });
 
-  test('播种/启动补齐幂等：重复调用零插入', async () => {
+  test('seed/startup backfill is idempotent: repeated calls insert nothing', async () => {
     const s = bootServer();
     const projectId = await postProject(s.app);
     expect(seedFixedTags(s.db, projectId)).toBe(0);
@@ -84,7 +81,7 @@ describe('固定词表播种（ADR 0002 D4）', () => {
   });
 });
 
-describe('set_task_meta worker 窄工具（ADR 0002 D3：stepId 钉 todoId）', () => {
+describe('the set_task_meta narrow worker tool (ADR 0002 D3: stepId pins the todoId)', () => {
   const AGENT_ID = 'agent-task-meta';
 
   async function world() {
@@ -99,7 +96,7 @@ describe('set_task_meta worker 窄工具（ADR 0002 D3：stepId 钉 todoId）', 
       .insert(agentTable)
       .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'meta', provider: 'p', modelId: 'm' })
       .run();
-    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+    bindAllAgents(s);
 
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -128,13 +125,13 @@ describe('set_task_meta worker 窄工具（ADR 0002 D3：stepId 钉 todoId）', 
       body: { name: 'set_task_meta', params },
     });
 
-  test('claim 载荷含 set_task_meta', async () => {
+  test('the claim payload contains set_task_meta', async () => {
     const { s, step } = await world();
     expect(step.remoteTools?.map((t) => t.name)).toContain('set_task_meta');
     s.dispose();
   });
 
-  test('回填标题 + 标签：todo 更新且 v 递增', async () => {
+  test('backfilling title + tags: the todo updates and v increments', async () => {
     const { s, token, step, todoId } = await world();
     const res = await relay(s.app, token, step.step.id, {
       title: '登录页加图形验证码',
@@ -146,12 +143,11 @@ describe('set_task_meta worker 窄工具（ADR 0002 D3：stepId 钉 todoId）', 
     );
     expect(one.title).toBe('登录页加图形验证码');
     expect(one.tagIds).toHaveLength(1);
-    // v 递增（派发链路本身会 v++，钉相对单调不钉绝对值）
     expect(one.v).toBeGreaterThan(1);
     s.dispose();
   });
 
-  test('tag 省略 = 只回填标题；词表外 tag = 400；title 空白 = 400', async () => {
+  test('tag omitted = only the title backfilled; a tag outside the vocabulary = 400; a blank title = 400', async () => {
     const { s, token, step, todoId } = await world();
     const ok = await relay(s.app, token, step.step.id, { title: '只回填标题' });
     expect(ok.status).toBe(200);

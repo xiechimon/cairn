@@ -1,13 +1,3 @@
-// 附件回收 GC（issue #759，策略正本 docs/spec/20-附件回收策略.md）。
-// 失败方式清单（先固化，代码是让场景通过的手段）：
-// ① 未引用 ready 件超 grace → 文件 + 行皆被收（stats.orphan+1）
-// ② spec / message / chief_message / steer / plan 任一引用 → 不动
-// ③ 行内 token（非整行形态）→ 仍算引用（多留不多删）
-// ④ 删任务本身不动附件（R1）；零引用孤儿超 grace 才被收
-// ⑤ pending 超 24h → 行被收；新鲜 pending → 留
-// ⑥ 配额满时 grant → 400；旧件不受影响
-// ⑦ scheduler tick gen：首 tick 扫、1h 内不重扫、1h 后再扫
-
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
@@ -55,8 +45,6 @@ function makeLogger(): GcLogger & { infos: string[]; debugs: string[] } {
   };
 }
 
-/** 直插附件行 + 落盘（创建面走真实 grant/upload 的见 attachments.test.ts；
- * 本文件只测回收面）。 */
 function putAttachment(
   s: TestServer,
   opts: {
@@ -99,7 +87,6 @@ function tokenFor(fileName: string, key: string): string {
   return `![${fileName}](attachment:${key})`;
 }
 
-/** 直插 project + todo（spec 可带 token）。 */
 function putTodo(s: TestServer, spec: string): string {
   const todoId = newRecordId();
   const projectId = newRecordId();
@@ -123,8 +110,8 @@ function rowOf(s: TestServer, id: string) {
   return s.db.select().from(attachmentTable).where(eq(attachmentTable.id, id)).get();
 }
 
-describe('attachment gc — 未引用 ready 件', () => {
-  test('超 grace → 文件 + 行被收，stats 记 orphan + bytes', () => {
+describe('attachment gc -- unreferenced ready items', () => {
+  test('past grace -> file + row collected, stats record orphan + bytes', () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const log = makeLogger();
@@ -141,7 +128,7 @@ describe('attachment gc — 未引用 ready 件', () => {
     expect(log.infos.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('grace 内 → 留（文件 + 行皆在，stats 全零）', () => {
+  test('within grace -> kept (file + row both present, stats all zero)', () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const log = makeLogger();
@@ -157,8 +144,8 @@ describe('attachment gc — 未引用 ready 件', () => {
   });
 });
 
-describe('attachment gc — 有引用一律保留', () => {
-  test('todo.spec 整行 token 引用 → 不动', () => {
+describe('attachment gc -- anything referenced is kept', () => {
+  test('todo.spec whole-line token reference -> untouched', () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const { id, key } = putAttachment(s, {
@@ -174,7 +161,7 @@ describe('attachment gc — 有引用一律保留', () => {
     expect(existsSync(join(s.attachmentsDir, key))).toBe(true);
   });
 
-  test('message.content JSON 内引用 → 不动', () => {
+  test('reference inside message.content JSON -> untouched', () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const { id, key } = putAttachment(s, {
@@ -198,11 +185,10 @@ describe('attachment gc — 有引用一律保留', () => {
     expect(rowOf(s, id)).toBeTruthy();
   });
 
-  test('行内 token（非整行形态）→ 仍算引用，不动', () => {
+  test('inline token (not whole-line shape) -> still counts as a reference, untouched', () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const { id } = putAttachment(s, { createdAgo: ATTACHMENT_ORPHAN_GRACE_MS + DAY });
-    // 行内形态渲染面退化成字面文本，但用户意图仍在——多留不多删。
     putTodo(s, `正文里顺手一提 ${tokenFor('note.md', `${s.team.id}/${id}.md`)} 别删`);
     const stats = sweepAttachments(
       { db: s.db, attachmentsDir: s.attachmentsDir, logger: makeLogger() },
@@ -212,7 +198,7 @@ describe('attachment gc — 有引用一律保留', () => {
     expect(rowOf(s, id)).toBeTruthy();
   });
 
-  test('chief_message 引用 → 不动', () => {
+  test('chief_message reference -> untouched', () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const { id, key } = putAttachment(s, {
@@ -251,7 +237,7 @@ describe('attachment gc — 有引用一律保留', () => {
     expect(rowOf(s, id)).toBeTruthy();
   });
 
-  test('steer_pending / plan 引用 → 不动', () => {
+  test('steer_pending / plan reference -> untouched', () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const a = putAttachment(s, { createdAgo: ATTACHMENT_ORPHAN_GRACE_MS + DAY });
@@ -297,21 +283,19 @@ describe('attachment gc — 有引用一律保留', () => {
   });
 });
 
-describe('attachment gc — 删任务语义（R1）', () => {
-  test('删任务本身不动附件；孤儿超 grace 后被收', async () => {
+describe('attachment gc -- delete-task semantics (R1)', () => {
+  test('deleting the task itself does not touch attachments; orphans collected after grace', async () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const { id, key } = putAttachment(s, {
       createdAgo: ATTACHMENT_ORPHAN_GRACE_MS + DAY,
     });
     const todoId = putTodo(s, `带图任务\n${tokenFor('note.md', key)}\n`);
-    // 删任务：附件行与文件当场不动（R1：不连带删）。
     const { deleteTodo } = await import('../src/services/todos.js');
     const deleted = deleteTodo({ db: s.db, hub: s.hub, user: s.user }, todoId);
     expect(deleted).toBe(true);
     expect(rowOf(s, id)).toBeTruthy();
     expect(existsSync(join(s.attachmentsDir, key))).toBe(true);
-    // 引用源消失 → 下一次 sweep 收走孤儿。
     const stats = sweepAttachments(
       { db: s.db, attachmentsDir: s.attachmentsDir, logger: makeLogger() },
       Date.now(),
@@ -320,7 +304,7 @@ describe('attachment gc — 删任务语义（R1）', () => {
     expect(rowOf(s, id)).toBeUndefined();
   });
 
-  test('删任务但附件仍被他处引用 → 不动', async () => {
+  test('task deleted but attachment still referenced elsewhere -> untouched', async () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const { id } = putAttachment(s, { createdAgo: ATTACHMENT_ORPHAN_GRACE_MS + DAY });
@@ -337,8 +321,8 @@ describe('attachment gc — 删任务语义（R1）', () => {
   });
 });
 
-describe('attachment gc — pending 件', () => {
-  test('pending 超 24h → 行被收（无文件、无引用、grant 已死）', () => {
+describe('attachment gc -- pending items', () => {
+  test('pending past 24h -> row collected (no file, no reference, grant dead)', () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const { id } = putAttachment(s, {
@@ -354,7 +338,7 @@ describe('attachment gc — pending 件', () => {
     expect(rowOf(s, id)).toBeUndefined();
   });
 
-  test('新鲜 pending → 留（上传在途）', () => {
+  test('fresh pending -> kept (upload in flight)', () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const { id } = putAttachment(s, { status: 'pending', createdAgo: 60_000 });
@@ -367,11 +351,10 @@ describe('attachment gc — pending 件', () => {
   });
 });
 
-describe('attachment gc — 配额（R4：准入卡，不删有引用）', () => {
-  test('team 用量满 1GiB 时 grant → 400；旧件不受影响', async () => {
+describe('attachment gc -- quota (R4: admission gate, referenced items not deleted)', () => {
+  test('grant -> 400 when team usage is at 1GiB; old items unaffected', async () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
-    // 直插一行占满配额的行（grant 面只读 DB 求和，不碰盘）。
     s.db
       .insert(attachmentTable)
       .values({
@@ -399,8 +382,8 @@ describe('attachment gc — 配额（R4：准入卡，不删有引用）', () =>
   });
 });
 
-describe('attachment gc — scheduler 节奏', () => {
-  test('首 tick 扫；1h 内不重扫；1h 后再扫', async () => {
+describe('attachment gc -- scheduler cadence', () => {
+  test('first tick scans; no rescan within 1h; scans again after 1h', async () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const { createScheduler } = await import('../src/services/scheduler.js');
@@ -426,7 +409,6 @@ describe('attachment gc — scheduler 节奏', () => {
         .all()
         .filter((r) => r.status === 'ready'),
     ).toHaveLength(0);
-    // 第二件孤儿在 1min 后到来 → 卡住不扫。
     putAttachment(s, { createdAgo: ATTACHMENT_ORPHAN_GRACE_MS + DAY });
     scheduler.tick(base + 60_000);
     expect(
@@ -436,7 +418,6 @@ describe('attachment gc — scheduler 节奏', () => {
         .all()
         .filter((r) => r.status === 'ready'),
     ).toHaveLength(1);
-    // 1h 后 → 扫走。
     scheduler.tick(base + 61 * 60_000);
     expect(
       s.db

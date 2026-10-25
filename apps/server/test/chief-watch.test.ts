@@ -1,7 +1,3 @@
-// watch/wake 主动回路三触发（#1128 自 chief.test.ts 拆分；判定口径与 M4a 组头注见
-// ./chief-harness.ts）。共享 harness 收编位 = ./chief-harness.ts，
-// 状态经 H 单出口每用例重绑。
-
 import { CHIEF_WATCH_REASON_DISPATCH } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
@@ -13,9 +9,7 @@ import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
 
 registerChiefHarness();
 
-// —— AC r5 §3.5: watch/wake 三触发 ————————————————————————————————————————
-
-describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
+describe('watch/wake active loop three triggers (r5 section 3.5)', () => {
   function seedWatchedTodo(): string {
     const id = newRecordId();
     const now = nowMs();
@@ -46,7 +40,7 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
     return id;
   }
 
-  test('run_builds 派工即自动 watch（reason canon）', async () => {
+  test('run_builds dispatching a job auto-watches it (reason canon)', async () => {
     const todoRec = (await relay('create_todo', {
       projectId: H.projectId,
       title: 't',
@@ -67,14 +61,13 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
     expect(env.watches[0]!.todoId).toBe(todoRec.id);
   });
 
-  test('gate 触发（停 review）→ chief wake 步入队，watch 保留', async () => {
+  test('gate trigger (at review) -> chief wake step enqueued, watch kept', async () => {
     const todoId = seedWatchedTodo();
     const rec = getTodo({ db: H.s.db, hub: H.s.hub, user: H.s.user }, todoId)!;
     addChiefWatch(
       { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
       { teamId: H.teamId, todo: rec, projectName: 'demo', threadId: H.threadId },
     );
-    // 停驻 review（gate）
     setTodoPhase(
       { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
       todoId,
@@ -94,7 +87,6 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
     expect(after.length).toBe(before + 1);
     expect(after.at(-1)!.kind).toBe('chief');
     expect(after.at(-1)!.prompt).toContain('[wake:gate]');
-    // watch 保留（gate 不解除）
     const env = getChiefEnvelope(
       { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
       H.teamId,
@@ -102,7 +94,7 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
     expect(env.watches).toHaveLength(1);
   });
 
-  test('settle 触发（done）→ wake + watch 自动解除（r5 §3.5）', async () => {
+  test('settle trigger (done) -> wake + watch auto-cleared (r5 section 3.5)', async () => {
     const todoId = seedWatchedTodo();
     const rec = getTodo({ db: H.s.db, hub: H.s.hub, user: H.s.user }, todoId)!;
     addChiefWatch(
@@ -120,10 +112,10 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
       { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
       H.teamId,
     );
-    expect(env.watches).toHaveLength(0); // settle 后自动解除
+    expect(env.watches).toHaveLength(0);
   });
 
-  test('failed 触发 → wake（法证式汇报指引）+ watch 自动解除', async () => {
+  test('failed trigger -> wake (forensic reporting guidance) + watch auto-cleared', async () => {
     const todoId = seedWatchedTodo();
     const rec = getTodo({ db: H.s.db, hub: H.s.hub, user: H.s.user }, todoId)!;
     addChiefWatch(
@@ -137,7 +129,7 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
     );
     const steps = H.s.db.select().from(stepTable).where(eq(stepTable.buildId, H.threadId)).all();
     expect(steps.at(-1)!.prompt).toContain('[wake:failed]');
-    expect(steps.at(-1)!.prompt).toContain('machines'); // 先调 machines 工具核实环境
+    expect(steps.at(-1)!.prompt).toContain('machines');
     const env = getChiefEnvelope(
       { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
       H.teamId,
@@ -145,8 +137,7 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
     expect(env.watches).toHaveLength(0);
   });
 
-  test('#1254 拆卡父 gate → wake 文本含 split_todo 父卡停驻指引', async () => {
-    // 建父卡 + 子卡（sourceTodo = 父 id，模拟 split_todo 结果）
+  test('#1254 split-parent gate -> wake text carries the split_todo parent-card stay instruction', async () => {
     const parentId = seedWatchedTodo();
     const childId = newRecordId();
     const now = nowMs();
@@ -179,7 +170,6 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
       { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
       { teamId: H.teamId, todo: parentRec, projectName: 'demo', threadId: H.threadId },
     );
-    // 父进 confirm
     setTodoPhase(
       { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
       parentId,
@@ -197,7 +187,7 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
     expect(steps.at(-1)!.prompt).toContain('拆解方案必须人审');
   });
 
-  test('#1254 普通卡（非拆卡父）gate → wake 文本含自动确认规则', async () => {
+  test('#1254 ordinary card (not split parent) gate -> wake text carries auto-confirm rules', async () => {
     const todoId = seedWatchedTodo();
     const rec = getTodo({ db: H.s.db, hub: H.s.hub, user: H.s.user }, todoId)!;
     addChiefWatch(
@@ -222,7 +212,7 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
     expect(steps.at(-1)!.prompt).not.toContain('split_todo 父卡');
   });
 
-  test('#1403 G9（G3）：关注的卡经相位漏斗进 review → wake 文本是 review 关口的，不是自动确认规则', async () => {
+  test('#1403 G9 (G3): a watched card reaches review through the phase funnel -> wake text is the review-gate one, not the auto-confirm rules', async () => {
     const todoId = seedWatchedTodo();
     const deps = { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user };
     addChiefWatch(deps, {

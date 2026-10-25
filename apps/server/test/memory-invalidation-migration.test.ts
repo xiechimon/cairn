@@ -14,7 +14,7 @@ afterAll(() => {
   for (const dir of temps) rmSync(dir, { recursive: true, force: true });
 });
 
-test('旧库升级后存量记忆全部保持有效：三列只加不填', () => {
+test('legacy db upgrade keeps all stored memories valid: three columns added but not filled', () => {
   const journal = JSON.parse(
     readFileSync(join(MIGRATIONS_FOLDER, 'meta', '_journal.json'), 'utf8'),
   ) as { entries: { tag: string }[] };
@@ -23,7 +23,7 @@ test('旧库升级后存量记忆全部保持有效：三列只加不填', () =>
       readFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), 'utf8'),
     ),
   );
-  expect(cut, 'journal 里找不到加 invalidAt 的 migration').toBeGreaterThan(0);
+  expect(cut, 'migration adding invalidAt missing from journal').toBeGreaterThan(0);
   const oldMigrations = mkdtempSync(join(tmpdir(), 'cairn-migrations-pre-invalidation-'));
   mkdirSync(join(oldMigrations, 'meta'));
   for (const entry of journal.entries.slice(0, cut)) {

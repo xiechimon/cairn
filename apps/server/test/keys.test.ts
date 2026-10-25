@@ -1,11 +1,3 @@
-// 密钥三面对拍（02 §8 三层边界之 API 面 + r3 §2/§6 实测行为）：
-// - provider：apiKey 只写不读——GET/PATCH 响应永不返回；密文经 SecretBox
-//   （v1 信封落 apiKeyCipher [内部] 列）；presets[] 38 项原样（r3 §2）
-// - secret：值只写不读（保存后只能覆盖或删除，r2 §6.3）；密文经 SecretBox
-// - apiKey：创建响应含明文一次 `cairn_<48hex>`（r3 §6 原形前缀 tds_ 随槽切换）；
-//   列表行掩码 `cairn_afe07565…`；服务端存哈希不存可逆值（[设计] 02 §8）
-// 泄漏扫描纪律：三面全部 GET/POST/PATCH 响应串扫明文子串，命中即红。
-
 import {
   API_KEY_PATTERN,
   maskApiKey,
@@ -34,7 +26,7 @@ async function expectNoLeak(res: Response, ...plaintexts: string[]): Promise<unk
   for (const plain of plaintexts) {
     expect(text, `leaked plaintext: ${plain}`).not.toContain(plain);
   }
-  expect(text).not.toContain('"apiKey"'); // key 类字段名本身也不出现（只写不读）
+  expect(text).not.toContain('"apiKey"');
   expect(text).not.toContain('keyHash');
   expect(text).not.toContain('Cipher');
   return JSON.parse(text) as unknown;
@@ -46,12 +38,12 @@ async function expectErrorShape(res: Response, status: number): Promise<void> {
   expect(Object.keys(body)).toEqual(['error']);
 }
 
-describe('provider 面（r3 §2 + 02 §8）', () => {
+describe('provider surface (r3 section 2 + 02 section 8)', () => {
   function teamPath(s: TestServer, rest = ''): string {
     return `/api/teams/${s.team.id}/providers${rest}`;
   }
 
-  test('GET 封套：presets[] 38 项原样 + providers[]（封套 [推断]）', async () => {
+  test('GET envelope: presets[] 38 items verbatim + providers[] (envelope [inferred])', async () => {
     const s = bootServer();
     const res = await req(s.app, 'GET', teamPath(s));
     expect(res.status).toBe(200);
@@ -62,14 +54,14 @@ describe('provider 面（r3 §2 + 02 §8）', () => {
     expect(body.presets.map((p) => p.id)).toEqual([...PROVIDER_PRESET_IDS]);
     expect(body.presets).toHaveLength(38);
     const oauth = body.presets.filter((p) => p.auth === 'oauth').map((p) => p.id);
-    expect(oauth).toEqual([...PROVIDER_OAUTH_PRESET_IDS]); // 仅二项（r3 §2）
+    expect(oauth).toEqual([...PROVIDER_OAUTH_PRESET_IDS]);
     const xai = body.presets.find((p) => p.id === PROVIDER_XAI_PRESET.id);
-    expect(xai?.auth).toBe('api_key'); // xai 双通道
+    expect(xai?.auth).toBe('api_key');
     expect(xai?.oauthLabel).toBe(PROVIDER_XAI_PRESET.oauthLabel);
     expect(body.providers).toEqual([]);
   });
 
-  test('POST 自定义端点：201 record 无 apiKey 字段；密文 v1 信封经 SecretBox 可解', async () => {
+  test('POST custom endpoint: 201 record with no apiKey field; v1 envelope ciphertext decrypts via SecretBox', async () => {
     const s = bootServer();
     const res = await req(s.app, 'POST', teamPath(s), {
       providerId: 'my-relay',
@@ -87,26 +79,24 @@ describe('provider 面（r3 §2 + 02 §8）', () => {
       label: 'r3-gw',
       baseUrl: 'https://api.example.com/v1',
       api: 'anthropic-messages',
-      authHeader: true, // 「以 Authorization: Bearer 请求头发送」默认勾（r3 §2 样本）
+      authHeader: true,
       compat: { supportsDeveloperRole: false },
       createdBy: s.user.id,
     });
     expect(record.models).toEqual([{ id: 'claude-sonnet-5', name: 'claude-sonnet-5' }]);
 
-    // at-rest：apiKeyCipher = v1 信封；经同一 SecretBox 可解回明文（01 §4.2）。
     const row = s.db.select().from(providerTable).all()[0];
     expect(row?.apiKeyCipher?.startsWith('v1:')).toBe(true);
     expect(row?.apiKeyCipher).not.toContain(RELAY_KEY);
     expect(s.secretBox.open(row?.apiKeyCipher ?? '')).toBe(RELAY_KEY);
 
-    // GET 列表同样只读掩码面（写只读，02 §8 API 面纪律）。
     const list = await req(s.app, 'GET', teamPath(s));
     const envelope = (await expectNoLeak(list, RELAY_KEY)) as { providers: unknown[] };
     expect(envelope.providers).toHaveLength(1);
     expect(providerRecordSchema.safeParse(envelope.providers[0]).success).toBe(true);
   });
 
-  test('POST 无密钥网关可留空（r3 §2 表单注）；重复 providerId → 409 [设计]', async () => {
+  test('POST keyless gateway may leave it blank (r3 section 2 form note); duplicate providerId -> 409 [design]', async () => {
     const s = bootServer();
     const body = {
       providerId: 'gw',
@@ -125,7 +115,7 @@ describe('provider 面（r3 §2 + 02 §8）', () => {
     );
   });
 
-  test('PATCH 替换密钥 → 重加密；apiKey:null 清除；响应永不回显', async () => {
+  test('PATCH replacing the key -> re-encrypts; apiKey:null clears; response never echoes back', async () => {
     const s = bootServer();
     const created = providerRecordSchema.parse(
       await (
@@ -149,7 +139,6 @@ describe('provider 面（r3 §2 + 02 §8）', () => {
     expect(s.secretBox.open(row?.apiKeyCipher ?? '')).toBe('sk-rotated');
     expect(row?.updatedAt).toBeGreaterThanOrEqual(created.updatedAt);
 
-    // 凭证「可以替换或删除」（r2 §6.5）：null = 清除密钥位。
     const cleared = await req(s.app, 'PATCH', teamPath(s, `/${created.id}`), { apiKey: null });
     expect(cleared.status).toBe(200);
     expect(s.db.select().from(providerTable).all()[0]?.apiKeyCipher).toBeNull();
@@ -157,7 +146,7 @@ describe('provider 面（r3 §2 + 02 §8）', () => {
     await expectErrorShape(await req(s.app, 'PATCH', teamPath(s, '/nope'), { label: 'x' }), 404);
   });
 
-  test('DELETE → 204；再删 404；未知 team 一律 404', async () => {
+  test('DELETE -> 204; deleting again 404; unknown team always 404', async () => {
     const s = bootServer();
     const created = providerRecordSchema.parse(
       await (
@@ -175,7 +164,7 @@ describe('provider 面（r3 §2 + 02 §8）', () => {
   });
 });
 
-describe('secret 面（团队密钥，r2 §6.3 + 02 §8 只写不读）', () => {
+describe('secret surface (team secrets, r2 section 6.3 + 02 section 8 write-only)', () => {
   function teamPath(s: TestServer, rest = ''): string {
     return `/api/teams/${s.team.id}/secrets${rest}`;
   }
@@ -185,9 +174,9 @@ describe('secret 面（团队密钥，r2 §6.3 + 02 §8 只写不读）', () => 
     value: SECRET_VALUE,
   };
 
-  test('POST：body = shared setSecretBodySchema；201 record 无 value 字段', async () => {
+  test('POST: body = shared setSecretBodySchema; 201 record without the value field', async () => {
     const s = bootServer();
-    expect(setSecretBodySchema.safeParse(body).success).toBe(true); // body 即契约
+    expect(setSecretBodySchema.safeParse(body).success).toBe(true);
     const res = await req(s.app, 'POST', teamPath(s), body);
     expect(res.status).toBe(201);
     const record = secretRecordSchema.parse(await expectNoLeak(res, SECRET_VALUE));
@@ -197,13 +186,12 @@ describe('secret 面（团队密钥，r2 §6.3 + 02 §8 只写不读）', () => 
       description: body.description,
     });
 
-    // at-rest：valueCipher = v1 信封，SecretBox 可解（per-step 下发读点）。
     const row = s.db.select().from(secretTable).all()[0];
     expect(row?.valueCipher?.startsWith('v1:')).toBe(true);
     expect(s.secretBox.open(row?.valueCipher ?? '')).toBe(SECRET_VALUE);
   });
 
-  test('GET 列表 = SecretRecord[]（值永不出现）；重名 → 409 [设计]', async () => {
+  test('GET list = SecretRecord[] (value never appears); duplicate name -> 409 [design]', async () => {
     const s = bootServer();
     await req(s.app, 'POST', teamPath(s), body);
     const res = await req(s.app, 'GET', teamPath(s));
@@ -214,7 +202,7 @@ describe('secret 面（团队密钥，r2 §6.3 + 02 §8 只写不读）', () => 
     await expectErrorShape(await req(s.app, 'POST', teamPath(s), body), 409);
   });
 
-  test('PATCH 覆盖值 → 重加密（「保存后只能覆盖或删除」r2 §6.3）；改名撞他行 409、撞自身放行', async () => {
+  test('PATCH overwriting the value -> re-encrypts ("after save only overwrite or delete" r2 section 6.3); renaming into another row 409, into itself allowed', async () => {
     const s = bootServer();
     const created = secretRecordSchema.parse(
       await (await req(s.app, 'POST', teamPath(s), body)).json(),
@@ -227,7 +215,6 @@ describe('secret 面（团队密钥，r2 §6.3 + 02 §8 只写不读）', () => 
     const row = s.db.select().from(secretTable).all()[0];
     expect(s.secretBox.open(row?.valueCipher ?? '')).toBe('sk_live_rotated');
 
-    // 改名撞自身名 = no-op 放行；撞他行 = 409（env 名唯一 [设计]）。
     const selfRename = await req(s.app, 'PATCH', teamPath(s, `/${created.id}`), {
       name: 'STRIPE_API_KEY',
     });
@@ -242,7 +229,7 @@ describe('secret 面（团队密钥，r2 §6.3 + 02 §8 只写不读）', () => 
     await expectErrorShape(await req(s.app, 'PATCH', teamPath(s, '/nope'), { value: 'x' }), 404);
   });
 
-  test('PATCH 改名放行自身；DELETE → 204；再删 404', async () => {
+  test('PATCH rename allowed into itself; DELETE -> 204; deleting again 404', async () => {
     const s = bootServer();
     const created = secretRecordSchema.parse(
       await (await req(s.app, 'POST', teamPath(s), body)).json(),
@@ -260,7 +247,7 @@ describe('secret 面（团队密钥，r2 §6.3 + 02 §8 只写不读）', () => 
   });
 });
 
-describe('apiKey 面（r3 §6 实测展示规则 + 02 §8 存哈希）', () => {
+describe('apiKey surface (r3 section 6 observed display rules + 02 section 8 hash storage)', () => {
   function teamPath(s: TestServer): string {
     return `/api/teams/${s.team.id}/api-keys`;
   }
@@ -271,7 +258,7 @@ describe('apiKey 面（r3 §6 实测展示规则 + 02 §8 存哈希）', () => {
     toolGrants: { read: ['Todos', 'Projects'], write: ['Create Todo'] },
   };
 
-  test('POST 创建：明文一次 cairn_<48hex> + 行掩码 cairn_afe07565…；库存哈希', async () => {
+  test('POST create: plaintext once cairn_<48hex> + row masked cairn_afe07565...; stored hashed', async () => {
     const s = bootServer();
     const res = await req(s.app, 'POST', teamPath(s), body);
     expect(res.status).toBe(201);
@@ -285,9 +272,7 @@ describe('apiKey 面（r3 §6 实测展示规则 + 02 §8 存哈希）', () => {
       createdAt: number;
       plaintext: string;
     };
-    // 明文一次（r3 §6：创建后一次性明文；文案 canon 由 web 面渲染 shared 常量）。
     expect(API_KEY_PATTERN.test(created.plaintext)).toBe(true);
-    // 行掩码 = 品牌前缀 + 前 8 hex + 省略号（r3 §6 展示规则，shared 单源）。
     expect(created.masked).toBe(maskApiKey(created.plaintext));
     expect(created.masked).toMatch(/^cairn_[0-9a-f]{8}…$/);
     expect(created.name).toBe('笔记本');
@@ -296,18 +281,16 @@ describe('apiKey 面（r3 §6 实测展示规则 + 02 §8 存哈希）', () => {
     expect(created.toolGrants).toEqual({ read: ['Todos', 'Projects'], write: ['Create Todo'] });
     expect(Number.isInteger(created.createdAt)).toBe(true);
 
-    // 存哈希不存可逆值（[设计] 02 §8）：明文与哈希之外无第三形态。
     const row = s.db.select().from(apiKeyTable).all()[0];
     expect(row?.keyHash).toBe(hashCredential(created.plaintext));
     expect(row?.masked).toBe(created.masked);
     expect(JSON.stringify(row)).not.toContain(created.plaintext);
 
-    // 校验只需匹配（verifyApiKey = 机器注册/MCP Bearer 挂接点，面归 M3）。
     expect(verifyApiKey({ db: s.db }, created.plaintext)?.id).toBe(created.id);
     expect(verifyApiKey({ db: s.db }, 'cairn_wrong')).toBeNull();
   });
 
-  test('GET 列表：掩码行、无明文无哈希（此后任何视图不再出现明文）', async () => {
+  test('GET list: masked rows, no plaintext no hash (no later view shows plaintext again)', async () => {
     const s = bootServer();
     const created = (await (await req(s.app, 'POST', teamPath(s), body)).json()) as {
       plaintext: string;
@@ -323,7 +306,7 @@ describe('apiKey 面（r3 §6 实测展示规则 + 02 §8 存哈希）', () => {
     await expectErrorShape(await req(s.app, 'GET', '/api/teams/nope/api-keys'), 404);
   });
 
-  test('POST 可选名称缺省 null；坏 body 400', async () => {
+  test('POST optional name defaults to null; bad body 400', async () => {
     const s = bootServer();
     const res = await req(s.app, 'POST', teamPath(s), {
       gitAccess: false,

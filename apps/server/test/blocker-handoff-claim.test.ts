@@ -203,8 +203,8 @@ async function claim(w: World): Promise<ClaimedStep> {
 const text = (value: string) => [{ type: 'text', text: value }];
 const toolOnly = [{ type: 'toolCall', id: 'c1', name: 'bash', arguments: { command: 'ls' } }];
 
-describe('#1624 子卡 claim 带前置卡交付', () => {
-  test('S1 两张前置卡：载荷按 blockedBy 顺序带两条，字段取自真值', async () => {
+describe('#1624 child-card claim carries blocker-card deliveries', () => {
+  test('S1 two blocking cards: payload carries two entries in blockedBy order, fields from the source of truth', async () => {
     const w = await setupWorld({
       github: true,
       pulls: { 41: { state: 'closed', merged: true, title: 'feat: login api' } },
@@ -247,7 +247,7 @@ describe('#1624 子卡 claim 带前置卡交付', () => {
     });
   });
 
-  test('S2 无前置的子卡：载荷无该字段，step 行为 null', async () => {
+  test('S2 child card with no blockers: payload has no such field, step rows are null', async () => {
     const w = await setupWorld();
     await startChild(w, '独立卡', []);
     const got = await claim(w);
@@ -257,7 +257,7 @@ describe('#1624 子卡 claim 带前置卡交付', () => {
     expect(w.mock.requests).toEqual([]);
   });
 
-  test('S3 step 行与载荷同形，steps REST 透出', async () => {
+  test('S3 step rows match the payload shape, exposed through steps REST', async () => {
     const w = await setupWorld({
       github: true,
       pulls: { 7: { state: 'closed', merged: true, title: 'PR seven' } },
@@ -278,7 +278,7 @@ describe('#1624 子卡 claim 带前置卡交付', () => {
     );
   });
 
-  test('S4 PR 标题读不到：标题为空，claim 照常成功', async () => {
+  test('S4 PR title unreadable: title empty, claim still succeeds', async () => {
     const w = await setupWorld({ github: true, pulls: { 9: 'missing' } });
     const a = await seedDoneBlocker(w, {
       title: '前置',
@@ -294,7 +294,7 @@ describe('#1624 子卡 claim 带前置卡交付', () => {
     });
   });
 
-  test('S5 总结取最后一条带文字的 assistant 行，跳过工具行与用户行', async () => {
+  test('S5 summary takes the last assistant line with text, skipping tool lines and user lines', async () => {
     const w = await setupWorld({ github: false });
     const a = await seedDoneBlocker(w, {
       title: '前置',
@@ -311,7 +311,7 @@ describe('#1624 子卡 claim 带前置卡交付', () => {
     expect(got.todo?.blockerHandoff?.blockers[0]?.summary).toBe('最终总结');
   });
 
-  test('S6 超长总结在 server 侧截断；文件清单超上限计数', async () => {
+  test('S6 over-long summary truncated on the server side; file list counted against the cap', async () => {
     const w = await setupWorld({ github: false });
     const a = await seedDoneBlocker(w, {
       title: '前置',
@@ -334,7 +334,7 @@ describe('#1624 子卡 claim 带前置卡交付', () => {
     expect(entry?.omittedFiles).toBe(15);
   });
 
-  test('S7 非 github 形态：分支与 head，零 GitHub 出站', async () => {
+  test('S7 non-github shape: branch and head, zero GitHub outbound', async () => {
     const w = await setupWorld({ github: false });
     const a = await seedDoneBlocker(w, {
       title: '前置',
@@ -351,7 +351,7 @@ describe('#1624 子卡 claim 带前置卡交付', () => {
     expect(w.mock.requests).toEqual([]);
   });
 
-  test('S8 先规划的子卡：plan 步同样带交付节', async () => {
+  test('S8 child card planned first: plan step also carries the delivery section', async () => {
     const w = await setupWorld({ github: false });
     const a = await seedDoneBlocker(w, { title: '前置', head: HEAD_B });
     await startChild(w, '后置', [a], true);
@@ -360,7 +360,7 @@ describe('#1624 子卡 claim 带前置卡交付', () => {
     expect(got.todo?.blockerHandoff?.blockers).toHaveLength(1);
   });
 
-  test('S9 续接会话的步照样带：会话丢失降级为新会话时 daemon 要靠它重组首轮 prompt', async () => {
+  test('S9 steps on a resumed session still carry it: when the session is lost and downgraded to a fresh session the daemon needs it to reassemble the first-round prompt', async () => {
     const w = await setupWorld({ github: false });
     const a = await seedDoneBlocker(w, { title: '前置', head: HEAD_B });
     const childId = await startChild(w, '后置', [a]);
@@ -385,7 +385,7 @@ describe('#1624 子卡 claim 带前置卡交付', () => {
     expect(got.todo?.blockerHandoff?.blockers).toHaveLength(1);
   });
 
-  test('S10 同一 build 的后续步复用首次 claim 的快照：不再出站，记录不漂移', async () => {
+  test('S10 later steps of the same build reuse the first claim snapshot: no more outbound, records do not drift', async () => {
     const w = await setupWorld({
       github: true,
       pulls: { 5: { state: 'closed', merged: true, title: 'live title' } },
@@ -429,7 +429,7 @@ describe('#1624 子卡 claim 带前置卡交付', () => {
     expect(w.mock.requests).toEqual([]);
   });
 
-  test('S11 review / verify / merge 步不带', async () => {
+  test('S11 review / verify / merge steps do not carry it', async () => {
     const w = await setupWorld({ github: false });
     const a = await seedDoneBlocker(w, { title: '前置', head: HEAD_B });
     const childId = await startChild(w, '后置', [a]);

@@ -1,21 +1,3 @@
-// #1106 派发技能注入闭环（服务端半）：worker claim = 任务 brief 的组装投递
-// 位——选择在 claim 时对「任务文本 × 授予集」计算（规则匹配起步，不引向量
-// 检索），随同一次 claim 原子落 step 行（选择正本），ids 经 claim 载荷
-// agent.injectedSkills 透传 daemon 收窄目录注入。失败方式（先于实现固化，
-// 仓测试纪律）：
-// 1. ≥20 授予技能 × 明确域任务 → 载荷只携带选中 ids（无关技能零注入）；
-// 2. 零命中任务 → 正常派发不报错：claim 成功 + injectedSkills=[] + step 行
-//    hits=[]（零注入是配置事实，不是故障）；
-// 3. 注入 ⊆ 授予：任务文本点名未授予技能 → 不进选择（授予是候选边界）；
-// 4. step 行 = 选择正本（每条含规则与命中原因），steps REST 透出——任务
-//    详情面回查面（票面验收 4）；
-// 5. chief 步不经选择面：injectedSkills 缺省（信任面全量 catalog，#372），
-//    step 行 skillInjection null；
-// 6. wire 纯增可选字段：不带 injectedSkills 的旧形载荷仍过 claimedStepSchema
-//    （版本墙零新增）。
-// 8.（#1169）skillsAllowlist=null（不限制）被读成全拒零候选 → 不限制 agent
-//    的注入选择面塌缩；null = 候选基全量现扫（数组才是候选边界）。
-
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -55,7 +37,6 @@ function addSkill(root: string, id: string, description: string): void {
   );
 }
 
-/** 21 个授予技能（票面验收 1 的 ≥20 量级）：跨域若干 + 明确无关若干。 */
 const SKILLS: readonly (readonly [string, string])[] = [
   ['tdd', 'Test-driven development: red-green-refactor, integration tests'],
   ['better-typography', '产品 UI 排版工程：字号阶梯、字距、换行与截断'],
@@ -81,7 +62,6 @@ const SKILLS: readonly (readonly [string, string])[] = [
 ];
 
 const GRANTED = SKILLS.map(([id]) => id);
-/** 任务文本零域命中、零点名的「无关」族（求职/知识库/导学）。 */
 const IRRELEVANT = [
   'great-resume',
   'offer',
@@ -134,7 +114,7 @@ async function setupWorld(): Promise<World> {
         mcpServers: [],
       })
       .run();
-    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+    bindAllAgents(s);
   }
   const projectId = await postProject(s.app, 'si-proj');
   return { s, token, projectId };
@@ -181,51 +161,45 @@ async function stepsRest(s: TestServer, buildId: string): Promise<StepsRestRow[]
   return (await res.json()) as StepsRestRow[];
 }
 
-describe('#1106 派发技能注入（worker claim 选择）', () => {
-  test('失败方式 1+4：明确域任务 → 载荷只携带选中 ids；step 行 = 带原因的选择正本，steps REST 透出', async () => {
+describe('#1106 dispatch skill injection (worker claim selection)', () => {
+  test('failure modes 1+4: an explicit-domain task -> the payload carries only the selected ids; the step row = the selection record with reasons, exposed via the steps REST', async () => {
     const w = await setupWorld();
     const todoId = await createTodo(w.s, w.projectId, '修复看板卡片的字号过小与换行溢出');
     const buildId = await startBuild(w.s, w.projectId, todoId);
     const got = await claim(w.s.app, w.token);
     expect(got).not.toBeNull();
     expect(got?.step.kind).toBe('build');
-    // 授权上限不变：skillsAllowlist 全量透传（#917 硬挡判定吃它）。
     expect(got?.agent?.skillsAllowlist).toEqual(GRANTED);
-    // 注入选择 ⊆ 授权，且只含前端域技能（求职/知识库族零注入）。
     const injected = got?.agent?.injectedSkills ?? [];
     expect(injected.length).toBeGreaterThan(0);
     expect(injected.every((id) => GRANTED.includes(id))).toBe(true);
     for (const id of IRRELEVANT) expect(injected).not.toContain(id);
-    // step 行 = 选择正本：每条命中含规则与原因（票面验收 4 的回查面）。
     const row = stepRow(w.s, got!.step.id);
     expect(row.skillInjection?.hits.map((h) => h.id)).toEqual(injected);
     for (const hit of row.skillInjection?.hits ?? []) {
       expect(['explicit-mention', 'domain']).toContain(hit.rule);
       expect(hit.reason.length).toBeGreaterThan(0);
     }
-    // steps REST（详情面数据源）透出同一份记录。
     const rest = await stepsRest(w.s, buildId);
     const restStep = rest.find((st) => st.id === got!.step.id);
     expect(restStep?.skillInjection?.hits.map((h) => h.id)).toEqual(injected);
     expect(restStep?.skillInjection?.hits.length).toBe(injected.length);
   });
 
-  test('失败方式 2：零命中任务 → 正常派发：claim 成功 + injectedSkills=[] + hits=[]（零注入不是故障）', async () => {
+  test('failure mode 2: a zero-hit task -> normal dispatch: claim succeeds + injectedSkills=[] + hits=[] (zero injection is not a failure)', async () => {
     const w = await setupWorld();
     const todoId = await createTodo(w.s, w.projectId, '把首页轮播图换成静态图');
     const buildId = await startBuild(w.s, w.projectId, todoId);
     expect(buildId).toBeTruthy();
     const got = await claim(w.s.app, w.token);
     expect(got?.step.kind).toBe('build');
-    // 零命中：ids 空数组（已计算）；授权集仍全量（零注入 ≠ 收权）。
     expect(got?.agent?.injectedSkills).toEqual([]);
     expect(got?.agent?.skillsAllowlist).toEqual(GRANTED);
     expect(stepRow(w.s, got!.step.id).skillInjection).toEqual({ hits: [] });
   });
 
-  test('失败方式 3：任务文本点名未授予技能 → 不进选择（授予是候选边界，不编造）', async () => {
+  test('failure mode 3: the task text names an ungranted skill -> not selected (grants bound the candidates, nothing invented)', async () => {
     const w = await setupWorld();
-    // tdd 在技能根里但收权（授予集不再含它）；文本点名 tdd。
     w.s.db
       .update(agentTable)
       .set({ skillsAllowlist: GRANTED.filter((id) => id !== 'tdd') })
@@ -234,15 +208,12 @@ describe('#1106 派发技能注入（worker claim 选择）', () => {
     const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
     await startBuild(w.s, w.projectId, todoId);
     const got = await claim(w.s.app, w.token);
-    // 显式点名不越授予边界；测试域无其它已授予技能 → 零注入。
     expect(got?.agent?.injectedSkills).toEqual([]);
     expect(got?.agent?.skillsAllowlist).not.toContain('tdd');
   });
 
-  test('失败方式 8（#1169）：skillsAllowlist=null（不限制）→ 候选基 = 全量现扫（不再是零候选）', async () => {
+  test('failure mode 8 (#1169): skillsAllowlist=null (unrestricted) -> the candidate base = the full scan (no longer zero candidates)', async () => {
     const w = await setupWorld();
-    // null = 不限制：tdd 不在授予集也进候选基，点名照选——deny 闸管读，
-    // 选择面管 brief，两缝互不越界（拆字段后 null 不再被读成全拒零候选）。
     w.s.db
       .update(agentTable)
       .set({ skillsAllowlist: null })
@@ -257,10 +228,8 @@ describe('#1106 派发技能注入（worker claim 选择）', () => {
     expect(hits.map((h) => h.id)).toContain('tdd');
   });
 
-  test('失败方式 7：授予但 server 未扫到（daemon 本机库技能）→ 点名照选（候选基 = 授予集）', async () => {
+  test('failure mode 7: granted but not scanned by the server (a daemon-local skill) -> still selected by name (candidate base = the granted set)', async () => {
     const w = await setupWorld();
-    // local-one 授予但技能根里没有（= daemon 本机库的技能）：server 只见授予
-    // 名——现扫只提供描述侧联接，不是候选边界（候选边界 = 授予集）。
     w.s.db
       .update(agentTable)
       .set({ skillsAllowlist: [...GRANTED, 'local-one'] })
@@ -270,8 +239,6 @@ describe('#1106 派发技能注入（worker claim 选择）', () => {
     const buildId = await startBuild(w.s, w.projectId, todoId);
     expect(buildId).toBeTruthy();
     const got = await claim(w.s.app, w.token);
-    // 点名命中：未扫到的授予 id 照选（描述侧无料时规则只剩点名/域文本信号），
-    // 落库正本同形；文本无域命中 → 不夹带其它技能。
     expect(got?.agent?.injectedSkills).toEqual(['local-one']);
     const hits = stepRow(w.s, got!.step.id).skillInjection?.hits ?? [];
     expect(hits.map((h) => h.id)).toEqual(['local-one']);
@@ -279,8 +246,8 @@ describe('#1106 派发技能注入（worker claim 选择）', () => {
   });
 });
 
-describe('#1106 chief 步不经选择面（claim 实走）', () => {
-  test('失败方式 5：chief claim 载荷无 injectedSkills；chief step 行 skillInjection null', async () => {
+describe('#1106 chief steps bypass the selection surface (a live claim)', () => {
+  test('failure mode 5: the chief claim payload has no injectedSkills; the chief step row has skillInjection null', async () => {
     const w = await setupWorld();
     const chiefId = `chief-${w.s.user.id}-${w.s.team.id}`;
     w.s.db
@@ -300,7 +267,6 @@ describe('#1106 chief 步不经选择面（claim 实走）', () => {
     const body = (await orch.json()) as { thread: { id: string } };
     const got = await claim(w.s.app, w.token);
     expect(got?.step.kind).toBe('chief');
-    // chief = 信任面：选择字段缺省（不是 []——缺省 = 未选择，[] = 已算零命中）。
     expect(got?.agent?.injectedSkills).toBeUndefined();
     expect(got?.agent?.skillsAllowlist).toBeUndefined();
     expect(got?.agent?.defaultSkill).toBeUndefined();
@@ -310,8 +276,8 @@ describe('#1106 chief 步不经选择面（claim 实走）', () => {
   });
 });
 
-describe('#1106 wire 纯增可选字段（版本墙零新增）', () => {
-  test('失败方式 6：不带 injectedSkills 的旧形 agent 块仍过 claimedStepSchema', () => {
+describe('#1106 the wire gains only an optional field (zero additions to the version wall)', () => {
+  test('failure mode 6: the old-shape agent block without injectedSkills still passes claimedStepSchema', () => {
     const legacyAgent = {
       id: 'a',
       displayName: 'a',
@@ -328,7 +294,6 @@ describe('#1106 wire 纯增可选字段（版本墙零新增）', () => {
         agent: legacyAgent,
       }),
     ).not.toThrow();
-    // 新形（含 injectedSkills）同样过。
     expect(() =>
       claimedStepSchema.parse({
         step: { id: 's', buildId: 'b', kind: 'build', machineId: null, createdAt: 1 },

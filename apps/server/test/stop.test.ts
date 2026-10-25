@@ -1,25 +1,3 @@
-// stop 写面（M7 #308，08 册附录 A composer 停止钮行 / r9 §3.3）：
-// POST /api/builds/{id}/stop = 中断在跑步——claimed 步走机器信号（SSE stop
-// 事件 + stop_pending 单槽 + GET /api/machine/stop 拉取-确认，#278 steer 同律）；
-// pending 步 server 侧即时取消（无机器可通知）。落账 = done(stopped) 收尾：
-// step.status 'stopped' + build.errorMessage '已取消'（运行历史面数据源）+
-// gate 回落（最近 done 步的关口；无 done 步 → build.prevPhase）——回落绕过
-// 通知/chief-wake 漏斗 [设计]（取消是用户在场动作，不重复发「方案就绪」）。
-// 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
-//   1. 无活动步 stop → 409 不静默；未知 build → 404；body 缺 discard → 400
-//   2. pending 步 stop → 即时取消：step stopped + phase 落 prevPhase +
-//      build.errorMessage '已取消' + {delegated:false} 200
-//   3. claimed 步 stop → stopPending 单槽 + SSE {type:'stop',stepId} +
-//      {delegated:true} 202；步保持 claimed（中断在途，done(stopped) 才落账）
-//   4. 拉取-确认：首拉 {discard}、二拉 {discard:null}；无凭证 401；
-//      他机拉取 → null 且 pending 不清
-//   5. 旧步 pending（步收尾换新步）→ 新步拉取 null + 丢弃
-//   6. gate 回落三分支：停首轮 plan 步 → prevPhase；停 build 步 → confirm
-//      （plan v1 保留）；停 merge 步 → review 不动
-//   7. 回落不发通知：confirm 回落不新增 notification 行、不入队 chief 步
-//   8. 双 stop → 单槽覆盖（discard 位以后发为准）；stopped 后再 stop → 409
-//   9. stop 后 steer 拉取 → null（步非 claimed，pending 不复活）
-
 import {
   type ClaimedStep,
   claimedStepSchema,
@@ -67,8 +45,6 @@ async function call(
   );
 }
 
-/** steer.test/plan-handoff 同款引导裁剪面：provider/agent + 双机 enroll +
- *  项目/todo 就位。 */
 async function setupWorld() {
   const s = bootServer({ claimHoldMs: 200, pingIntervalMs: 3_600_000 });
   const key = await issueApiKey(s);
@@ -98,19 +74,16 @@ async function setupWorld() {
       displayName: 'stub-builder',
       provider: 'stub-gw',
       modelId: 'stub-model',
-      // XMON-77：本世界含 merge 步（停 merge 步用例），合并闸要求两开关。
       tools: ['合并分支', '推送分支'],
     })
     .run();
-  // 双机 = 双 key（enroll 按 key/team 认机器且轮换 token——同 key 二次
-  // enroll 会作废首台 token，r3 §1.2）。
   async function enroll(name: string, cred: string): Promise<string> {
     const res = await call(s.app, 'POST', '/api/machine/enroll', {
       cred,
       body: { teamId: s.team.id, name, cliVersion: '0.1.0' },
     });
 
-    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+    bindAllAgents(s);
     expect(res.status).toBe(200);
     return ((await res.json()) as { token: string }).token;
   }
@@ -200,13 +173,13 @@ async function setupWorld() {
 
 type World = Awaited<ReturnType<typeof setupWorld>>;
 
-describe('stop 服务端写面（M7 #308）', () => {
+describe('the stop server write surface (M7 #308)', () => {
   let w: World;
   beforeEach(async () => {
     w = await setupWorld();
   });
 
-  test('失败方式 1：无活动步 409；未知 build 404；缺 discard 400', async () => {
+  test('failure mode 1: no active step 409; an unknown build 404; missing discard 400', async () => {
     const buildId = await w.startBuild(true);
     const unknown = await call(w.s.app, 'POST', '/api/builds/does-not-exist/stop', {
       body: { discard: true },
@@ -214,9 +187,6 @@ describe('stop 服务端写面（M7 #308）', () => {
     expect(unknown.status).toBe(404);
     const badBody = await call(w.s.app, 'POST', `/api/builds/${buildId}/stop`, { body: {} });
     expect(badBody.status).toBe(400);
-    // 步收尾后（plan done + 关口 confirm，无活动步）再 stop → 409 不静默。
-    // 注：plan 步 done(success) 必须先上传 plan.md，否则 #113 自动补写步入队
-    // （仍有活动步）。
     const claimed = await w.claim();
     await w.uploadPlan(claimed.step.id, withVerification('# plan v1'));
     await w.done(claimed.step.id, { status: 'success' });
@@ -225,7 +195,7 @@ describe('stop 服务端写面（M7 #308）', () => {
     expect(Object.keys((await late.json()) as object)).toEqual(['error']);
   });
 
-  test('失败方式 2：pending 步 → server 即时取消（step stopped + prevPhase 回落 + 已取消）', async () => {
+  test('failure mode 2: a pending step -> canceled by the server at once (step stopped + prevPhase falls back + canceled)', async () => {
     const buildId = await w.startBuild(true);
     const res = await w.stop(buildId, true);
     expect(res.status).toBe(200);
@@ -233,13 +203,12 @@ describe('stop 服务端写面（M7 #308）', () => {
     const steps = w.stepsOf(buildId);
     expect(steps).toHaveLength(1);
     expect(steps[0]!.status).toBe('stopped');
-    expect(w.todoRow().phase).toBe('todo'); // prevPhase 回落（fresh 任务）
+    expect(w.todoRow().phase).toBe('todo');
     expect(w.buildRow(buildId).errorMessage).toBe('已取消');
-    // 取消后 stopPending 无残留（无机器可通知，不落 pending）。
     expect(w.s.db.select().from(stopPendingTable).all()).toHaveLength(0);
   });
 
-  test('失败方式 3：claimed 步 → 单槽 pending + SSE stop 信号 + 202 delegated', async () => {
+  test('failure mode 3: a claimed step -> single-slot pending + an SSE stop signal + 202 delegated', async () => {
     const buildId = await w.startBuild(true);
     const claimed = await w.claim();
     const events: unknown[] = [];
@@ -249,7 +218,6 @@ describe('stop 服务端写面（M7 #308）', () => {
     expect(res.status).toBe(202);
     expect(await res.json()).toEqual({ delegated: true });
     expect(events).toEqual([{ type: 'stop', stepId: claimed.step.id }]);
-    // 中断在途：步保持 claimed，phase 不动（planning），done(stopped) 才落账。
     expect(w.stepsOf(buildId)[0]!.status).toBe('claimed');
     expect(w.todoRow().phase).toBe('planning');
     const pending = w.s.db.select().from(stopPendingTable).all();
@@ -261,14 +229,13 @@ describe('stop 服务端写面（M7 #308）', () => {
     });
   });
 
-  test('失败方式 4：拉取-确认（首拉/二拉/401/他机不消费）', async () => {
+  test('failure mode 4: fetch-acknowledge (first fetch / second fetch / 401 / another machine does not consume)', async () => {
     const buildId = await w.startBuild(true);
     const claimed = await w.claim();
     await w.stop(buildId, false);
     const stepId = claimed.step.id;
     const noCred = await call(w.s.app, 'GET', `/api/machine/stop?stepId=${stepId}`);
     expect(noCred.status).toBe(401);
-    // 他机拉取 → null 且 pending 不清（steer 同律）。
     const other = await call(w.s.app, 'GET', `/api/machine/stop?stepId=${stepId}`, {
       cred: w.otherToken,
     });
@@ -277,19 +244,18 @@ describe('stop 服务端写面（M7 #308）', () => {
     const first = await call(w.s.app, 'GET', `/api/machine/stop?stepId=${stepId}`, {
       cred: w.token,
     });
-    expect(await first.json()).toEqual({ discard: false }); // false ≠ null（勾选位如实）
+    expect(await first.json()).toEqual({ discard: false });
     const second = await call(w.s.app, 'GET', `/api/machine/stop?stepId=${stepId}`, {
       cred: w.token,
     });
     expect(await second.json()).toEqual({ discard: null });
   });
 
-  test('失败方式 5：旧步 pending → 新步拉取 null + 丢弃', async () => {
+  test('failure mode 5: the old step pending -> the new step fetch gets null + discard', async () => {
     const buildId = await w.startBuild(true);
     const first = await w.claim();
     await w.uploadPlan(first.step.id, withVerification('# plan v1'));
     await w.stop(buildId, true);
-    // 竞态：机器在拉取前自然完成 → pending 定向旧步。
     await w.done(first.step.id, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
     await w.confirm(buildId);
@@ -302,7 +268,7 @@ describe('stop 服务端写面（M7 #308）', () => {
     expect(w.s.db.select().from(stopPendingTable).all()).toHaveLength(0);
   });
 
-  test('失败方式 6a：停首轮 plan 步（claimed → done(stopped)）→ prevPhase 回落', async () => {
+  test('failure mode 6a: stopping the first-round plan step (claimed -> done(stopped)) -> prevPhase falls back', async () => {
     const buildId = await w.startBuild(true);
     const claimed = await w.claim();
     await w.stop(buildId, true);
@@ -310,14 +276,13 @@ describe('stop 服务端写面（M7 #308）', () => {
     expect(w.stepsOf(buildId)[0]!.status).toBe('stopped');
     expect(w.todoRow().phase).toBe('todo');
     expect(w.buildRow(buildId).errorMessage).toBe('已取消');
-    // steps 读面透出 stopped（stepJournalRow 词表）。
     const face = await call(w.s.app, 'GET', `/api/builds/${buildId}/steps`);
     expect(face.status).toBe(200);
     const rows = (await face.json()) as { status: string }[];
     expect(rows[0]!.status).toBe('stopped');
   });
 
-  test('失败方式 6b/7：停 build 步 → confirm 回落（plan v1 保留）且不发通知', async () => {
+  test('failure modes 6b/7: stopping the build step -> confirm falls back (plan v1 kept) and no notification', async () => {
     const buildId = await w.startBuild(true);
     const planStep = await w.claim();
     await w.uploadPlan(planStep.step.id, withVerification('# plan v1'));
@@ -330,18 +295,15 @@ describe('stop 服务端写面（M7 #308）', () => {
     const chiefBefore = w.chiefStepCount();
     await w.stop(buildId, true);
     await w.done(buildStep.step.id, { status: 'stopped' });
-    // gate 回落 = 上一完成 turn（plan）的关口 confirm；plan v1 保留。
     expect(w.todoRow().phase).toBe('confirm');
     const plans = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get();
     expect(plans?.planDocId).not.toBeNull();
-    // 回落绕过通知漏斗：无新增通知、无 chief wake 入队。
     expect(w.notificationCount()).toBe(before);
     expect(w.chiefStepCount()).toBe(chiefBefore);
-    // stopPending 已清（done(stopped) 收尾卫生）。
     expect(w.s.db.select().from(stopPendingTable).all()).toHaveLength(0);
   });
 
-  test('失败方式 6c：停 merge 步 → review 不动', async () => {
+  test('failure mode 6c: stopping the merge step -> review unchanged', async () => {
     const buildId = await w.startBuild(true);
     const planStep = await w.claim();
     await w.uploadPlan(planStep.step.id, withVerification('# plan v1'));
@@ -356,11 +318,11 @@ describe('stop 服务端写面（M7 #308）', () => {
     expect(mergeStep.step.kind).toBe('merge');
     await w.stop(buildId, false);
     await w.done(mergeStep.step.id, { status: 'stopped' });
-    expect(w.todoRow().phase).toBe('review'); // 上一完成 turn（build）的关口
+    expect(w.todoRow().phase).toBe('review');
     expect(w.buildRow(buildId).errorMessage).toBe('已取消');
   });
 
-  test('失败方式 8：双 stop 单槽覆盖（discard 后发为准）；stopped 后 409', async () => {
+  test('failure mode 8: a double stop overwrites the single slot (the later discard wins); after stopped 409', async () => {
     const buildId = await w.startBuild(true);
     const claimed = await w.claim();
     await w.stop(buildId, true);
@@ -373,7 +335,7 @@ describe('stop 服务端写面（M7 #308）', () => {
     expect(again.status).toBe(409);
   });
 
-  test('失败方式 9：stop 落账后 steer 拉取 → null（步非 claimed）', async () => {
+  test('failure mode 9: after stop is booked, the steer fetch -> null (the step is not claimed)', async () => {
     const buildId = await w.startBuild(true);
     const claimed = await w.claim();
     await call(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, {
@@ -387,9 +349,7 @@ describe('stop 服务端写面（M7 #308）', () => {
     expect(await steerFetch.json()).toEqual({ content: null });
   });
 
-  test('chief 会话不受 stop 面波及：chief- 前缀 id → 404（stop 以 build 表为门）', async () => {
-    // stop 端点以 build 行存在为门（chief 会话无 build 行）——chief 停止面
-    // 不在 #308 范围（composer 停止钮 = build 会话专属）。
+  test('chief conversations are outside the stop surface: a chief- prefixed id -> 404 (stop gates on the build table)', async () => {
     const res = await call(w.s.app, 'POST', '/api/builds/chief-stop-probe/stop', {
       body: { discard: true },
     });

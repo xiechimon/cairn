@@ -1,28 +1,3 @@
-// #1466 规则 1：GitHub `owner/repo` 的 `.` / `..` 段（server 面）。
-// `repos/${owner}/${repo}/...` 拼出的请求 URL 经 WHATWG 归一（fetch 内
-// new URL）：`../user` → `https://api.github.com/user/...`，团队 token 被带去
-// api.github.com 的其它路径。失败方式（先于实现固化）：
-//  写入面（能把这种值落进 project.githubRepo 的入口）：
-//   W1 POST /api/projects kind=github：字符串面与 {owner,repo} 对象面接受。
-//   W2 PATCH local→github 转换：接受且先出站探可达（`repos/../user` =
-//      GET /user，带 token 的请求先发出去）。
-//   W3 chief connect_repo（chief 读的 issue 正文可能含注入文本）接受。
-//   W4 误伤：带点的合法名（my.org/repo.js、.../x）被拒。
-//  读路径（存量行已存了这种值）——一律按「项目不是合法 GitHub 仓」处理，
-//  零出站：
-//   R1 issue 列表 / R2 issue 导入；
-//   R3 建任务时 #452 自建 issue（planSelfIssue）/ R4 未建成重试；
-//   R5 来源 issue 回显 / R6 #452 标题回写（todo.sourceRef 带 `..` 段）；
-//   R7 PR 交付：执行步成后停在 building 等 CI，而轮询器对这种行不出站——
-//      任务永远卡在 building；应与无 GitHub 仓的项目同样直进 review。
-//   R7b CI 轮询器自身的防御位：todo 已在 building、build 带 prNumber
-//      （R7 修前落下的行，或绕过交付闸的行），轮询器不出站、按跳过计数。
-//   R8 PR 状态探测（requestMerge 第二张 PR 守卫）。
-//   R9 builds.ts 交付闸本身（completeStep）：非法存量值走「无 GitHub 仓」
-//      分支（进 review、verify 槽在位即入队验证步）；合法值照旧停 building。
-// 出站断言 = 注入 githubFetch 的调用记录为空（mock 对任何路径都回 404——
-// 只断 HTTP 状态分不出「没发请求」与「发了、上游 404」）。
-
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -45,8 +20,6 @@ import { bootServer, req, type TestServer } from './helpers.js';
 const TOKEN = 'ghp_dot_segment_token';
 const VALID_REPO = 'octo/alpha';
 const DOT_SEGMENT_REFS = ['../user', './x', 'owner/..', 'owner/.'];
-/** 存量行读路径的代表值：owner 段 `..`（改写成 /user/...）与 repo 段 `..`
- * （改写成 /repos/<owner>/...——吃掉 repo 段）。 */
 const STORED_BAD_REFS = ['../user', 'owner/..'];
 
 interface Recorder {
@@ -54,7 +27,6 @@ interface Recorder {
   calls: { method: string; url: string }[];
 }
 
-/** 记录全部出站、一律回 404（零出站断言面；404 让旧代码照常走完错误分支）。 */
 function recorder(): Recorder {
   const calls: { method: string; url: string }[] = [];
   const impl: FetchLike = async (input, init) => {
@@ -85,7 +57,6 @@ function boot(rec: Recorder): TestServer {
   return s;
 }
 
-/** github 形态项目直插（存量行面：值绕过今天的写入闸落库）。 */
 function insertGithubProject(s: TestServer, githubRepo: string): string {
   const id = `proj-${Math.random().toString(36).slice(2, 10)}`;
   s.db
@@ -120,8 +91,6 @@ function insertTodo(
   return id;
 }
 
-/** todo 已在 building + 已产 PR 的 build（无在飞步）：CI 磨绿轮询的候选形态
- * （build 是 todo 的当前 build——#1403 起磨绿只看 todo.latestBuildId）。 */
 function insertPrBuild(
   s: TestServer,
   projectId: string,
@@ -144,7 +113,6 @@ function insertPrBuild(
   return { todoId, buildId };
 }
 
-/** 已产 PR 的 build + 一条在跑的执行步（claimed）：completeStep 即「PR 交付」。 */
 function insertDeliveringBuild(
   s: TestServer,
   projectId: string,
@@ -207,8 +175,8 @@ async function postGithub(app: Hono, githubRepo: unknown): Promise<Response> {
   return req(app, 'POST', '/api/projects', { name: 'dot', kind: 'github', githubRepo });
 }
 
-describe('#1466 写入面：. / .. 段拒绝（W1-W4）', () => {
-  test('W1 POST /api/projects kind=github：字符串面与对象面都 400', async () => {
+describe('#1466 write surface: . / .. segment refusal (W1-W4)', () => {
+  test('W1 POST /api/projects kind=github: string surface and object surface both 400', async () => {
     const rec = recorder();
     const s = boot(rec);
     for (const ref of DOT_SEGMENT_REFS) {
@@ -221,7 +189,7 @@ describe('#1466 写入面：. / .. 段拒绝（W1-W4）', () => {
     expect(rec.calls).toHaveLength(0);
   });
 
-  test('W2 PATCH local→github 转换：400，且不出站探可达', async () => {
+  test('W2 PATCH local->github conversion: 400, and no outbound reachability probe', async () => {
     const rec = recorder();
     const s = boot(rec);
     const created = await req(s.app, 'POST', '/api/projects', {
@@ -244,7 +212,7 @@ describe('#1466 写入面：. / .. 段拒绝（W1-W4）', () => {
     expect(row?.githubRepo).toBeNull();
   });
 
-  test('W3 chief connect_repo：400，项目行不改', async () => {
+  test('W3 chief connect_repo: 400, project row unchanged', async () => {
     const rec = recorder();
     const s = boot(rec);
     const projectId = insertGithubProject(s, VALID_REPO);
@@ -263,7 +231,7 @@ describe('#1466 写入面：. / .. 段拒绝（W1-W4）', () => {
     expect(row?.githubRepo).toBe(VALID_REPO);
   });
 
-  test('W4 带点的合法名照过（POST 201 / connect_repo 落值）', async () => {
+  test('W4 legal name with dots passes (POST 201 / connect_repo lands the value)', async () => {
     const rec = recorder();
     const s = boot(rec);
     for (const ref of ['my.org/repo.js', '.../x', 'owner/...', 'owner/.github']) {
@@ -285,20 +253,23 @@ describe('#1466 写入面：. / .. 段拒绝（W1-W4）', () => {
   });
 });
 
-describe('#1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8）', () => {
-  test.each(STORED_BAD_REFS)('R1/R2 issue 列表与导入 → 404，零出站（%s）', async (bad) => {
-    const rec = recorder();
-    const s = boot(rec);
-    const projectId = insertGithubProject(s, bad);
-    const list = await req(s.app, 'GET', `/api/projects/${projectId}/github/issues`);
-    expect(list.status).toBe(404);
-    const imported = await req(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
-      number: 7,
-    });
-    expect(imported.status).toBe(404);
-    expect(rec.calls).toEqual([]);
-    expect(s.db.select().from(todoTable).all()).toHaveLength(0);
-  });
+describe('#1466 read path: legacy rows treated as "not a valid GitHub repo", zero outbound (R1-R8)', () => {
+  test.each(STORED_BAD_REFS)(
+    'R1/R2 issue list and import -> 404, zero outbound (%s)',
+    async (bad) => {
+      const rec = recorder();
+      const s = boot(rec);
+      const projectId = insertGithubProject(s, bad);
+      const list = await req(s.app, 'GET', `/api/projects/${projectId}/github/issues`);
+      expect(list.status).toBe(404);
+      const imported = await req(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
+        number: 7,
+      });
+      expect(imported.status).toBe(404);
+      expect(rec.calls).toEqual([]);
+      expect(s.db.select().from(todoTable).all()).toHaveLength(0);
+    },
+  );
 
   test.each(STORED_BAD_REFS)(
     'R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（%s）',
@@ -319,7 +290,7 @@ describe('#1466 读路径：存量行按「不是合法 GitHub 仓」处理，�
     },
   );
 
-  test.each(STORED_BAD_REFS)('R4 未建成重试 → 404，零出站（%s）', async (bad) => {
+  test.each(STORED_BAD_REFS)('R4 not-yet-created retry -> 404, zero outbound (%s)', async (bad) => {
     const rec = recorder();
     const s = boot(rec);
     const projectId = insertGithubProject(s, bad);
@@ -384,7 +355,6 @@ describe('#1466 读路径：存量行按「不是合法 GitHub 仓」处理，�
       await poller.sweep();
       expect(rec.calls).toEqual([]);
       expect(info).toHaveBeenCalledTimes(1);
-      // 磨绿计数逐项钉；#1403 对账的计数（review 候选集）此处为 0。
       expect(info.mock.calls[0]?.[0]).toMatchObject({
         candidates: 1,
         pending: 0,
@@ -439,26 +409,29 @@ describe('#1466 读路径：存量行按「不是合法 GitHub 仓」处理，�
   );
 });
 
-describe('#1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9）', () => {
+describe('#1466 builds.ts delivery gate: legacy invalid githubRepo treated as "no GitHub repo" (R9)', () => {
   const assignment = {
     plan: null,
     build: { agentId: 'agent-build-1466' },
     verify: { agentId: 'agent-verify-1466' },
   };
 
-  test.each(STORED_BAD_REFS)('R9 completeStep 执行步交付 PR → review + 验证步入队（%s）', (bad) => {
-    const s = boot(recorder());
-    const projectId = insertGithubProject(s, bad);
-    const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId, { assignment });
-    completeStep(s.svc, stepId, { hasChanges: true });
-    expect(phaseOf(s, todoId)).toBe('review');
-    expect(stepsOf(s, buildId)).toEqual([
-      { kind: 'build', status: 'done' },
-      { kind: 'verify', status: 'pending' },
-    ]);
-  });
+  test.each(STORED_BAD_REFS)(
+    'R9 completeStep execution step delivering a PR -> review + the verify step queued (%s)',
+    (bad) => {
+      const s = boot(recorder());
+      const projectId = insertGithubProject(s, bad);
+      const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId, { assignment });
+      completeStep(s.svc, stepId, { hasChanges: true });
+      expect(phaseOf(s, todoId)).toBe('review');
+      expect(stepsOf(s, buildId)).toEqual([
+        { kind: 'build', status: 'done' },
+        { kind: 'verify', status: 'pending' },
+      ]);
+    },
+  );
 
-  test('R9 对照：合法 githubRepo 的 PR 交付照旧停 building 等 CI，不入队验证步', () => {
+  test('R9 control: a legal githubRepo PR delivery still stays building waiting for CI, no verify step enqueued', () => {
     const s = boot(recorder());
     const projectId = insertGithubProject(s, VALID_REPO);
     const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId, { assignment });

@@ -1,10 +1,3 @@
-// #684 失联超时兜底 + #1257 无人认领挂起（chief 步的 infra 事件面）：
-// #631 只闭环了「认领后失败」路径；#1257 起无人认领的 pending 回合挂起等
-// 机器（机器回来走既有 claim 循环自动续跑），claimed 心跳停更且机器离线
-// 释放回 pending（联系不上不杀）。本文件钉 sweep 判定的全部边界：超龄 ×
-// 机器在线态 × 步状态 × 步 kind，以及落库行/会话流事件的对接形状。
-// 机器在线位直写 DB（生产置位路径 wake SSE 断连面归 machine-wire 测试）。
-
 import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -53,8 +46,6 @@ interface World {
   sentAt: number;
 }
 
-/** 绑定 Agent + 发一条 chief 消息 → 线程 + pending 步（机器面全部缺席）。
- *  #881：provider 可覆写（'claude-code' = runtime 闸判的反例位）。 */
 async function sendChiefTurn(content = '你好', provider = 'stub-gw'): Promise<World> {
   const s = bootServer();
   disposables.push(() => s.dispose());
@@ -84,7 +75,6 @@ async function sendChiefTurn(content = '你好', provider = 'stub-gw'): Promise<
   return { s, teamId, threadId: thread.id, stepId: stepRow.id, sentAt };
 }
 
-/** 注册一台机器并返回其 token（不认领、不置在线）。 */
 async function enrollMachine(s: TestServer, teamId: string): Promise<string> {
   const key = await issueApiKey(s);
   const res = await call(s.app, 'POST', '/api/machine/enroll', {
@@ -95,7 +85,6 @@ async function enrollMachine(s: TestServer, teamId: string): Promise<string> {
   return token;
 }
 
-/** 认领当前 pending chief 步（真 claim 端点：置 claimed/machineId/心跳位）。 */
 async function claimStep(s: TestServer, token: string): Promise<ClaimedStep> {
   const res = await call(s.app, 'POST', '/api/machine/tasks/claim', { cred: token, body: {} });
   const body = (await res.json()) as { step: ClaimedStep | null };
@@ -103,13 +92,10 @@ async function claimStep(s: TestServer, token: string): Promise<ClaimedStep> {
   return body.step;
 }
 
-/** 机器在线位直写（sweep 的唯一消费位）。 */
 function setMachineOnline(s: TestServer, machineId: string, online: boolean): void {
   s.db.update(machineTable).set({ online }).where(eq(machineTable.id, machineId)).run();
 }
 
-/** #1260：chief 步的机器去处 = 绑定 Agent 的归属机——本文件所有「钉选线程」
- *  形态（原 chiefThread.pinnedMachineId）一律改绑 Agent（钉选列已退役）。 */
 function bindChiefAgent(s: TestServer, machineId: string): void {
   s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, AGENT_ID)).run();
 }
@@ -118,7 +104,6 @@ function chiefAgentRowOf(s: TestServer) {
   return s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get()!;
 }
 
-/** 会话流事件捕获桩（钉 web SSE 契约：message 事件携带失败行原形）。 */
 function tapConvStream(s: TestServer, conversationId: string): { events: object[] } {
   const events: object[] = [];
   s.convHub.subscribe(conversationId, {
@@ -139,7 +124,6 @@ function stepRowOf(w: World) {
   return w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
 }
 
-/** #631 失败行读取（id = chief-err-<stepId>，幂等 upsert 键）。 */
 function turnErrorRow(w: World) {
   return w.s.db
     .select()
@@ -148,23 +132,22 @@ function turnErrorRow(w: World) {
     .get();
 }
 
-describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
-  test('pending 超龄 + 零在线机器：挂起等机器（#1257：不判死，activeRun 保持、零失败痕迹）', async () => {
+describe('#684 chief lost-contact timeout fallback (sweepAbandonedChiefSteps)', () => {
+  test('pending past age + zero online machines: suspended waiting for a machine (#1257: no death verdict, activeRun kept, zero failure trace)', async () => {
     const w = await sendChiefTurn();
     const { events } = tapConvStream(w.s, w.threadId);
-    expect(threadRowOf(w).activeRun).not.toBeNull(); // 发送后回合挂起
+    expect(threadRowOf(w).activeRun).not.toBeNull();
 
-    // 锚步自身 createdAt（sentAt 取样早于落库数毫秒，直接用会被阈值余量吃掉）。
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + CHIEF_ABANDONED_STEP_MS * 10);
 
     expect(stepRowOf(w).status).toBe('pending');
     const thread = threadRowOf(w);
-    expect(thread.activeRun).not.toBeNull(); // 挂起可见性由 pending 队列面承担
-    expect(turnErrorRow(w)).toBeUndefined(); // 不产失败行（#1257：infra 事件）
-    expect(events).toHaveLength(0); // 不推终态事件
+    expect(thread.activeRun).not.toBeNull();
+    expect(turnErrorRow(w)).toBeUndefined();
+    expect(events).toHaveLength(0);
   });
 
-  test('pending 未超龄 → 不动（无行、activeRun 保持）', async () => {
+  test('pending not past age -> untouched (no row, activeRun kept)', async () => {
     const w = await sendChiefTurn();
     sweepAbandonedChiefSteps(w.s.svc, w.sentAt + 30_000);
     expect(stepRowOf(w).status).toBe('pending');
@@ -172,7 +155,7 @@ describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
     expect(threadRowOf(w).activeRun).not.toBeNull();
   });
 
-  test('pending 超龄但机器在线 → 不误杀（合法排队）', async () => {
+  test('pending past age but machine online -> not falsely killed (legal queueing)', async () => {
     const w = await sendChiefTurn();
     await enrollMachine(w.s, w.teamId);
     const machineId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
@@ -182,25 +165,22 @@ describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
     expect(turnErrorRow(w)).toBeUndefined();
   });
 
-  test('claimed + 机器离线 + 心跳停更超时 → 释放回 pending（#1257：联系不上不杀，机器回来续跑回合）', async () => {
+  test('claimed + machine offline + stale heartbeat timed out -> released back to pending (#1257: not killed when unreachable, machine returning resumes the turn)', async () => {
     const w = await sendChiefTurn();
     const token = await enrollMachine(w.s, w.teamId);
     bindChiefAgent(w.s, w.s.db.select().from(machineTable).limit(1).all()[0]!.id);
     const claimed = await claimStep(w.s, token);
     expect(claimed.step.id).toBe(w.stepId);
-    // daemon 死亡形态：机器离线（wake SSE 断连面）+ 心跳停更（认领时刻即最后心跳）。
     setMachineOnline(w.s, claimed.step.machineId!, false);
     const { events } = tapConvStream(w.s, w.threadId);
     const woken = w.s.svc.machineHub.waitWake(w.teamId, 50);
-    // 锚 claim 时刻（lastHeartbeatAt = claimedAt，均晚于 sentAt）。
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).lastHeartbeatAt! + CHIEF_ABANDONED_STEP_MS + 1);
 
     const row = stepRowOf(w);
     expect(row.status).toBe('pending');
-    expect(row.machineId).toBeNull(); // 认领原子位复位，他机/本机可重领
-    expect(threadRowOf(w).activeRun).not.toBeNull(); // 回合仍挂起等续跑
-    expect(turnErrorRow(w)).toBeUndefined(); // 不产失败行
-    // 会话流 step 事件携带 pending 态（与 worker 释放同形）+ wake 唤醒认领循环。
+    expect(row.machineId).toBeNull();
+    expect(threadRowOf(w).activeRun).not.toBeNull();
+    expect(turnErrorRow(w)).toBeUndefined();
     const ev = events.find(
       (e): e is { type: string; step: unknown } => (e as { type?: string }).type === 'step',
     );
@@ -209,13 +189,12 @@ describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
     await expect(woken).resolves.toBe(true);
   });
 
-  test('claimed + 机器离线但心跳新鲜 → 不动（重连窗口）', async () => {
+  test('claimed + machine offline but fresh heartbeat -> untouched (reconnect window)', async () => {
     const w = await sendChiefTurn();
     const token = await enrollMachine(w.s, w.teamId);
     bindChiefAgent(w.s, w.s.db.select().from(machineTable).limit(1).all()[0]!.id);
     const claimed = await claimStep(w.s, token);
     setMachineOnline(w.s, claimed.step.machineId!, false);
-    // 心跳刚打过（步运行中 daemon 仍活着——仅推送通道瞬断）。
     const heartbeatedAt = w.sentAt + 5_000;
     w.s.db
       .update(stepTable)
@@ -227,12 +206,11 @@ describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
     expect(turnErrorRow(w)).toBeUndefined();
   });
 
-  test('#1257 归属机离线 + 别的机器在线 + 超龄：回合挂起等机器（不判死、不静默改派）', async () => {
+  test('#1257 home machine offline + another machine online + past age: turn suspended waiting for a machine (no death verdict, no silent reassignment)', async () => {
     const w = await sendChiefTurn();
-    await enrollMachine(w.s, w.teamId); // 归属机：注册但离线
+    await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     bindChiefAgent(w.s, pinnedId);
-    // 团队里另有在线机器——判据必须是「归属机不在」，不是「团队没机器」。
     await enrollMachine(w.s, w.teamId);
     const otherId = w.s.db
       .select()
@@ -244,12 +222,12 @@ describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
 
     expect(stepRowOf(w).status).toBe('pending');
-    expect(threadRowOf(w).activeRun).not.toBeNull(); // 回合挂起可见
-    expect(chiefAgentRowOf(w.s).machineId).toBe(pinnedId); // 不静默改绑
-    expect(turnErrorRow(w)).toBeUndefined(); // 不产失败行
+    expect(threadRowOf(w).activeRun).not.toBeNull();
+    expect(chiefAgentRowOf(w.s).machineId).toBe(pinnedId);
+    expect(turnErrorRow(w)).toBeUndefined();
   });
 
-  test('归属机离线：不动（挂起等机器，机器回来即续跑）', async () => {
+  test('home machine offline: untouched (suspended waiting for a machine, machine returning resumes it)', async () => {
     const w = await sendChiefTurn();
     await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
@@ -261,7 +239,7 @@ describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
     expect(turnErrorRow(w)).toBeUndefined();
   });
 
-  test('归属机在线 → 不动（回合等它认领）', async () => {
+  test('home machine online -> untouched (turn waits for it to claim)', async () => {
     const w = await sendChiefTurn();
     await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
@@ -274,7 +252,7 @@ describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
     expect(turnErrorRow(w)).toBeUndefined();
   });
 
-  test('worker 步超龄零在线 → 不在本 sweep 面（scope = chief）', async () => {
+  test('worker step past age with zero online -> not in this sweep surface (scope = chief)', async () => {
     const w = await sendChiefTurn();
     const now = Date.now();
     w.s.db
@@ -294,7 +272,7 @@ describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
     expect(row.status).toBe('pending');
   });
 
-  test('scheduler tick 接线：tick(now) 驱动 sweep（真实宿主路径；#1257 挂起不判死）', async () => {
+  test('scheduler tick wiring: tick(now) drives the sweep (real host path; #1257 suspension does not decide death)', async () => {
     const w = await sendChiefTurn();
     const scheduler = createScheduler(w.s.svc, { tickMs: 60_000 });
     scheduler.tick(stepRowOf(w).createdAt + CHIEF_ABANDONED_STEP_MS * 10);
@@ -304,19 +282,13 @@ describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
   });
 });
 
-describe('#881 归属机在线但 runtime 闸挡（sweepAbandonedChiefSteps，#1257 挂起语义）', () => {
-  // 归属机在线但 enabledRuntimes 不含绑定 Agent 的 runtime → buildChiefClaim
-  // 的 runtime 闸恒 false + 归属机闸令唯有该机可见 → 回合挂起等 runtime
-  // （#1257：不判死，开 runtime 后自动续跑）。
-
-  test('归属机在线 + 闸挡（claude-code 档 × 只开 pi 的机器）+ 超龄：回合挂起等机器（#1257：不判死，开 runtime 后续跑）', async () => {
+describe('#881 home machine online but blocked by the runtime gate (sweepAbandonedChiefSteps, #1257 suspension semantics)', () => {
+  test('home machine online + gate blocked (claude-code tier x pi-only machine) + past age: turn suspended waiting for a machine (#1257: no death verdict, resumes after runtime enabled)', async () => {
     const w = await sendChiefTurn('你好', 'claude-code');
-    await enrollMachine(w.s, w.teamId); // 归属机：enroll 缺省只开 pi
+    await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     setMachineOnline(w.s, pinnedId, true);
     bindChiefAgent(w.s, pinnedId);
-    // 团队里另有能跑 claude-code 的在线机器——归属机闸恒拒（不换机），等
-    // 的是归属机自己开 runtime。
     await enrollMachine(w.s, w.teamId);
     const otherRow = w.s.db
       .select()
@@ -333,12 +305,12 @@ describe('#881 归属机在线但 runtime 闸挡（sweepAbandonedChiefSteps，#1
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
 
     expect(stepRowOf(w).status).toBe('pending');
-    expect(threadRowOf(w).activeRun).not.toBeNull(); // 回合挂起可见
-    expect(chiefAgentRowOf(w.s).machineId).toBe(pinnedId); // 不静默改绑
-    expect(turnErrorRow(w)).toBeUndefined(); // 不产失败行
+    expect(threadRowOf(w).activeRun).not.toBeNull();
+    expect(chiefAgentRowOf(w.s).machineId).toBe(pinnedId);
+    expect(turnErrorRow(w)).toBeUndefined();
   });
 
-  test('归属机在线 + 闸挡：不动（runtime 开关 PATCH 热写，开闸即续跑）', async () => {
+  test('home machine online + gate blocked: untouched (runtime flag PATCH writes hot, enabling resumes it)', async () => {
     const w = await sendChiefTurn('你好', 'claude-code');
     await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
@@ -351,7 +323,7 @@ describe('#881 归属机在线但 runtime 闸挡（sweepAbandonedChiefSteps，#1
     expect(turnErrorRow(w)).toBeUndefined();
   });
 
-  test('归属机在线 + runtime 开：不动（回合等它认领，闸判负例）', async () => {
+  test('home machine online + runtime on: untouched (turn waits for it to claim, gate counterexample)', async () => {
     const w = await sendChiefTurn('你好', 'claude-code');
     await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;

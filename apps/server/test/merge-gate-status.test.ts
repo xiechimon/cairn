@@ -1,12 +1,3 @@
-// #1404 S4b: the pure planner for the cairn/merge-gate commit status (merge-gate/gate-status.ts).
-// Failure modes B-32 to B-38 in docs/verify/1404/s4b-failure-modes.txt (S1 to S4 below):
-// - a status is planned under the human policy, with no head, against another commit, or when the
-//   gate's own current status on that SHA cannot be read;
-// - the same value is written again, or a different value (written by someone else) is left;
-// - the state says ready when it is not, uses error, or calls a human blocker pending;
-// - the description is over 140 characters or carries blocker detail (author-controlled names);
-// - the context is not the exact constant; the writer retries or throws.
-
 import {
   MERGE_BLOCKERS,
   MERGE_GATE_STATUS_CONTEXT,
@@ -84,7 +75,6 @@ describe('gateStatusFor (S3: state, description, context)', () => {
       expect(s.state, b.code).not.toBe('success');
       expect(s.state, b.code).toBe(b.class === 'transient' ? 'pending' : 'failure');
     }
-    // ready: true with a blocker listed is not success (blockers decide, not the flag).
     expect(gateStatusFor({ ...WAITING, ready: true }).state).toBe('pending');
   });
 
@@ -135,7 +125,6 @@ describe('planGateStatusWrite (S1, S2)', () => {
       write: false,
       reason: 'policy-human',
     });
-    // shadow writes (P4: shadow computes the gate and writes the status, never merges).
     expect(
       planGateStatusWrite({
         ...base,

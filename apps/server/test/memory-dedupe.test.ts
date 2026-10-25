@@ -51,7 +51,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(await invoke('memories', {})).toHaveLength(1);
     });
 
-    test('候选只含同 Agent 同项目与全局，显式项目优先', async () => {
+    test('candidates only include same-Agent same-project and global, explicit project wins', async () => {
       const otherProject = await postProject(H.s.app, 'other');
       const global = (await relay('save_memory', {
         title: '包管理器',
@@ -88,7 +88,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(globalOnly.candidates.map((c) => c.id)).toEqual([global.id]);
     });
 
-    test('不同主题直接新增，候选只有 force:true 才新增', async () => {
+    test('different topics added directly, candidate only adds with force:true', async () => {
       await save({ title: '包管理器', content: '使用 npm 安装依赖' });
       await save({ title: '界面配色', content: '按钮采用蓝色' });
       await expect(
@@ -109,7 +109,7 @@ for (const mode of ['chief', 'worker'] as const) {
       ).rejects.toMatchObject({ status: 409 });
     });
 
-    test('候选请求相同内容重试返回 409，已保存内容重试也返回 409', async () => {
+    test('candidate request same content retry returns 409, saved content retry also 409', async () => {
       await save({ title: '包管理器', content: '使用 npm 安装依赖' });
       const input = { title: '包管理器', content: '使用 pnpm 安装依赖' };
       expect(await save(input)).toMatchObject({ status: 'candidates' });
@@ -121,7 +121,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(await invoke('memories', {})).toHaveLength(1);
     });
 
-    test('同内容改掉标题、不再命中候选也不能绕过重试 409', async () => {
+    test('same content with a changed title, no longer hitting a candidate, still cannot bypass the retry 409', async () => {
       await save({ title: '工作规则', content: '蓝色按钮' });
       expect(await save({ title: '工作规则', content: '部署使用容器' })).toMatchObject({
         status: 'candidates',
@@ -131,7 +131,7 @@ for (const mode of ['chief', 'worker'] as const) {
       });
     });
 
-    test('候选都被删除后同正文可正常保存并清掉指纹，仍有候选存活时保持 409', async () => {
+    test('same body saves normally and clears the fingerprint after all candidates deleted, stays 409 while a candidate survives', async () => {
       const first = (await save({ title: '包管理器', content: '使用 npm 安装依赖' })) as {
         id: string;
       };
@@ -153,7 +153,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(await invoke('memories', {})).toHaveLength(1);
     });
 
-    test('候选被删除又换了新的相近条目时，同正文重新给出候选', async () => {
+    test('when the candidate is deleted and a new similar entry replaces it, the same body gets a candidate again', async () => {
       const first = (await save({ title: '包管理器', content: '使用 npm 安装依赖' })) as {
         id: string;
       };
@@ -169,7 +169,7 @@ for (const mode of ['chief', 'worker'] as const) {
       });
     });
 
-    test('全局记忆改成同 Agent 同团队某项目记忆的正文返回 409，他人的不算', async () => {
+    test('a global memory changed to the body of a same-Agent same-team project memory returns 409, another person does not count', async () => {
       const global = (await relay('save_memory', {
         title: '全局约定',
         content: '全局使用 npm',
@@ -196,7 +196,7 @@ for (const mode of ['chief', 'worker'] as const) {
       ).toMatchObject({ content: '他人使用 bun', projectId: null });
     });
 
-    test('update_memory 新条目继承溯源、沿用链上旧值，无变化不新增条目', async () => {
+    test('update_memory new entry inherits provenance, reuses old chain values, no change adds no entry', async () => {
       const original = (await save({ title: '包管理器', content: '使用 npm' })) as {
         id: string;
         updatedAt: number;
@@ -232,7 +232,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(await invoke('memories', { includeInvalid: true })).toHaveLength(3);
     });
 
-    test('update_memory 改成同口径另一条的正文返回 409 并指出那条 id，跨项目或他人不算', async () => {
+    test('update_memory changed to the body of another same-criteria entry returns 409 and names that id, cross-project or another person does not count', async () => {
       const otherProject = await postProject(H.s.app, 'other');
       const local = (await save({ title: '包管理器', content: '使用 npm' })) as { id: string };
       const global = (await relay('save_memory', {
@@ -275,7 +275,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(new Set(contents).size).toBe(contents.length);
     });
 
-    test('更新不存在或其他 Agent 的记忆返回 404', async () => {
+    test('updating a nonexistent or another Agent memory returns 404', async () => {
       const other = (await relay(
         'save_memory',
         { title: '他人', content: '不可改' },
@@ -291,7 +291,7 @@ for (const mode of ['chief', 'worker'] as const) {
       ).rejects.toMatchObject({ status: 404 });
     });
 
-    test('issue 围栏不能经 save force 或 update 进入记忆', async () => {
+    test('issue fence cannot enter memory via save force or update', async () => {
       const original = (await save({ title: '安全约定', content: '可信内容' })) as { id: string };
       for (const field of ['title', 'content']) {
         await expect(

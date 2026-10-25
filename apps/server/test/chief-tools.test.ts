@@ -1,7 +1,3 @@
-// 51 词表 relay 执行面（#1128 自 chief.test.ts 拆分；判定口径与 M4a 组头注见
-// ./chief-harness.ts）。共享 harness 收编位 = ./chief-harness.ts，
-// 状态经 H 单出口每用例重绑。
-
 import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
@@ -12,10 +8,8 @@ import { req } from './helpers.js';
 
 registerChiefHarness();
 
-// —— 结构契约: 51 词表 relay 白名单（raw 49 − 除名 1 + 新增 3，XMON-109/115/#627）—————
-
-describe('51 词表 relay 执行面（02 §4.3）', () => {
-  test('词表外工具名 → 400（白名单纪律，不执行）', async () => {
+describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
+  test('out-of-vocabulary tool name -> 400 (whitelist discipline, not executed)', async () => {
     let status = 0;
     try {
       await relay('not_a_tool', {});
@@ -25,15 +19,7 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
     expect(status).toBe(400);
   });
 
-  // XMON-115 回摆：set_remote_shell 写入点恢复（XMON-108 双闸预检 + XMON-110
-  // daemon 工具落地后的收尾）。失败方式先于实现钉死：
-  // ① 绕过 filterAgentTools 的裸 Set 写 → 存量残值不清退；② 写 wire 词
-  // remote_shell 而非开关词「远程 shell」→ claim localTools 判定不认
-  // （machine-shell.test.ts 对拍）；③ revoke 读改写撞掉邻档；④ enabled 缺省
-  // 静默当 true（#573 前形如此——fail-open，恢复时收紧为 400）；⑤ 未知
-  // agentId 不 404。
-  test('set_remote_shell 授予：REST 先写邻档 → chief 增「远程 shell」→ REST GET 回读一致（验收 #2）', async () => {
-    // 双入口同字段正向半：REST PATCH 先写（UI 通道语义），chief 再授予。
+  test('set_remote_shell grant: REST writes a neighbor entry first -> chief adds the remote-shell switch word -> REST GET readback matches (acceptance #2)', async () => {
     const patch = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/agents/${AGENT_ID}`, {
       tools: ['推送分支'],
     });
@@ -43,19 +29,17 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
       remoteShell: boolean;
       tools: string[];
     };
-    // 返回体带 tools（写点回读，XMON-74 证据探针按此字段复核，见 chief-tools.ts）。
     expect(granted).toEqual({
       agentId: AGENT_ID,
       remoteShell: true,
       tools: ['推送分支', '远程 shell'],
     });
-    // REST 回读（验收 #2：chief 改后 UI/API 回读一致——UI 消费同一 GET）。
     const readback = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/agents/${AGENT_ID}`);
     const record = (await readback.json()) as { tools: string[] };
     expect(record.tools).toEqual(['推送分支', '远程 shell']);
   });
 
-  test('撤销只摘「远程 shell」：邻档与顺序不动；重复授予幂等', async () => {
+  test('revoke removes only the remote-shell switch word: neighbors and order untouched; repeat grant is idempotent', async () => {
     H.s.db
       .update(agentTable)
       .set({ tools: ['远程 shell', '推送分支'] })
@@ -77,7 +61,7 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
     ).toEqual(['推送分支', '远程 shell']);
   });
 
-  test('写路径同过 filterAgentTools：存量残值随写清退（与 REST PATCH 同律）', async () => {
+  test('the write path goes through filterAgentTools: stale entries are swept on write (same rule as REST PATCH)', async () => {
     H.s.db
       .update(agentTable)
       .set({ tools: ['自造档', '推送分支'] })
@@ -89,7 +73,7 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
     ).toEqual(['推送分支', '远程 shell']);
   });
 
-  test('enabled 缺省/非布尔 → 400 且行未写（fail-closed；不沿用 #573 前缺省 true）', async () => {
+  test('missing or non-boolean enabled -> 400 and the row is not written (fail-closed; no pre-#573 default-true)', async () => {
     for (const bad of [{ agentId: AGENT_ID }, { agentId: AGENT_ID, enabled: 'yes' }]) {
       let status = 0;
       try {
@@ -104,7 +88,7 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
     ).toEqual([]);
   });
 
-  test('未知 agentId → 404（requireTeamAgent 同律，不误写）', async () => {
+  test('unknown agentId -> 404 (same requireTeamAgent rule, no stray write)', async () => {
     let status = 0;
     let message = '';
     try {
@@ -117,17 +101,11 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
     expect(message).toContain('agent-nope');
   });
 
-  // #627 models 读工具：候选清单行语义 = web toModelOptions 投影（#770 起
-  // providers 段已除，只剩 model-sources 非 pi 段，first-wins 去重）。
-  // 失败方式先于实现钉死：① 无 provider 且 claude-code 未装时报错而非空集；
-  // ② 空 id 行漏跳 → 脏行；③ pi 段重复产行；④ claude-code 段 providerLabel
-  // 落 runtime 原词而非显示名 → 与 web 候选不同义；⑤ custom provider 的
-  // models[] 不再被任何候选面引用（providers 写面照常可用）。
-  test('models：无 custom provider + claude-code 未装 → 空清单不报错', async () => {
+  test('models: no custom provider and claude-code not installed -> empty list without error', async () => {
     expect(await relay('models', {})).toEqual([]);
   });
 
-  test('models：providers 写面照常，候选只出 claude-code 段（去重 + 行卫生）', async () => {
+  test('models: providers write surface works as usual; candidates come from report rows (dedupe + row hygiene)', async () => {
     const provRes = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/providers`, {
       providerId: 'gw-a',
       label: '网关甲',
@@ -140,8 +118,6 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
       ],
     });
     expect(provRes.status).toBe(201);
-    // claude-code 段：上报行（default 槽 + opus 槽同 id → 段内去重留一行）；
-    // providers 段（gw-a 三行）一律不产候选行（#770）。
     seedMachineReport('exec-1', {
       installed: true,
       hostname: 'exec-host-1',
@@ -168,7 +144,7 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
     ]);
   });
 
-  test('models：custom provider 取名 claude-code 不再遮蔽上报行（#770/#707）', async () => {
+  test('models: a custom provider named claude-code no longer shadows report rows (#770/#707)', async () => {
     const provRes = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/providers`, {
       providerId: 'claude-code',
       label: '同名网关',
@@ -188,15 +164,13 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
       modelId: string;
       modelName: string;
     }[];
-    // providers 段已除：同名 provider 记录存在，但候选行取执行机上报
-    // （品牌 label 'Claude Code'，name 原样）。
     expect(rows).toEqual([
       { provider: 'pi', providerLabel: 'pi', modelId: 'm-cc', modelName: '同名行' },
       { provider: 'claude-code', providerLabel: 'Claude Code', modelId: 'm-cc', modelName: 'm-cc' },
     ]);
   });
 
-  test('读工具 replaySafe 标记与执行一致（抽样 projects/todos/machines/models）', async () => {
+  test('read-tool replaySafe flags match execution (sampled projects/todos/machines/models)', async () => {
     for (const name of ['projects', 'todos', 'machines', 'models']) {
       const def = CHIEF_REMOTE_TOOLS.find((t) => t.name === name)!;
       expect(def.replaySafe).toBe(true);

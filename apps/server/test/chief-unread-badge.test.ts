@@ -1,11 +1,3 @@
-// #1303 chief 未读徽标。
-// 失败方式：
-// - wake/watch 步（prompt 以 [wake: 开头）收尾仍把 chief_message 通知 readAt 重置为空，
-//   未读集因此计入机器回头。
-// - 已经置读的线程，再来一轮 wake，readAt 被重置为空。
-// - scheduler.tick(now) 不把最后活动早于 7 天的 chief 线程置读。
-// 用户回合仍是未读。正好 7 天、更新的 lastTurnAt、非 chief 通知不被 tick 改掉。
-
 import type { ClaimedStep } from '@cairn/shared';
 import { chiefIdFormat, claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';

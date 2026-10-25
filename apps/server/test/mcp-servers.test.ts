@@ -1,19 +1,3 @@
-// MCP 本地 config 面（spec 13 / #368）：来源 = ~/.claude.json mcpServers 段。
-// server 读本机供 UI 展示（投影永不含密钥值），daemon 读本机供执行（slug 解析
-// 权下放）。失败方式清单（先固化场景，实现是让场景通过的手段）：
-//   读取缝六态——文件不存在 / 坏 JSON / 无 mcpServers 键 / mcpServers 非对象 /
-//     单条坏条目跳过 / http+stdio 混合正常；
-//   投影面——env/headers 值永不出 server（只 hasCredential/credentialKeys 键名）、
-//     slug = key 小写化（撞名 first-wins）、stdio url 槽 = command 预览、
-//     时间戳 = 文件 mtime、record 过 mcpServerRecordSchema；
-//   REST 面——GET 换源；POST/PATCH/DELETE 管理写面已删（404）；未知 team 404；
-//   agent 授权面——mcpServers[] 未知键静默容忍（不再 400）；
-//   claim 载荷——mcpServers slug 化（string[] 原样透传不过滤）；三态受管
-//     （#1307）：勾选空 = 携带 []（受管严格空，下游 strict 锁），缺省只在
-//     版本墙未达时出现（machine-wire 断约，不混发形状）；
-//   chief 工具——mcp_servers 读面换 config 源。
-// 记忆删除 REST 面（02 §4.4）随本文件既有权衡保留在尾部。
-
 import { mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -56,7 +40,6 @@ async function call(
   );
 }
 
-/** 写一份 config fixture，返回路径；不传 content = 不存在文件的路径。 */
 function configPath(content?: unknown): string {
   const dir = mkdtempSync(join(tmpdir(), 'cairn-mcp-cfg-'));
   const p = join(dir, 'claude.json');
@@ -66,7 +49,6 @@ function configPath(content?: unknown): string {
   return p;
 }
 
-/** 混合正常 + 两条坏条目（形状坏 / 类型坏）——条目级失败不殃及池鱼的钉扎源。 */
 const MIXED = {
   mcpServers: {
     demo: { url: 'https://example.invalid/mcp', headers: { Authorization: 'Bearer s3cret' } },
@@ -76,25 +58,25 @@ const MIXED = {
   },
 };
 
-describe('readClaudeMcpServers — config 读取缝（spec 13：坏 = 空集不炸）', () => {
-  test('文件不存在 = 空集（不抛）', () => {
+describe('readClaudeMcpServers -- config read seam (spec 13: bad = empty set, does not blow up)', () => {
+  test('file missing = empty set (no throw)', () => {
     expect(readClaudeMcpServers(configPath()).records).toEqual([]);
   });
 
-  test('坏 JSON = 空集（文件级解析失败不炸 server，premortem 护栏一）', () => {
+  test('bad JSON = empty set (file-level parse failure does not blow up the server, premortem guardrail one)', () => {
     expect(readClaudeMcpServers(configPath('{ "mcpServers": oops')).records).toEqual([]);
   });
 
-  test('无 mcpServers 键 = 空集', () => {
+  test('no mcpServers key = empty set', () => {
     expect(readClaudeMcpServers(configPath({ projects: {} })).records).toEqual([]);
   });
 
-  test('mcpServers 非对象 = 空集', () => {
+  test('mcpServers not an object = empty set', () => {
     expect(readClaudeMcpServers(configPath({ mcpServers: 'nope' })).records).toEqual([]);
     expect(readClaudeMcpServers(configPath({ mcpServers: [{ url: 'x' }] })).records).toEqual([]);
   });
 
-  test('http+stdio 混合正常；单条坏条目跳过不殃及其余', () => {
+  test('http+stdio mix normal; a single bad entry skipped without hurting the rest', () => {
     const { records } = readClaudeMcpServers(configPath(MIXED));
     expect(records.map((r) => r.slug)).toEqual(['demo', 'local']);
     expect(records[0]).toMatchObject({
@@ -103,7 +85,6 @@ describe('readClaudeMcpServers — config 读取缝（spec 13：坏 = 空集不�
       hasCredential: true,
       credentialKeys: ['Authorization'],
     });
-    // stdio：url 槽 = command 预览（spec 13「stdio 条目的 url 槽位填 command」）。
     expect(records[1]).toMatchObject({
       transport: 'stdio',
       url: 'npx',
@@ -112,13 +93,13 @@ describe('readClaudeMcpServers — config 读取缝（spec 13：坏 = 空集不�
     });
   });
 
-  test('安全不变量：env/headers 密钥值永不出读取缝（spec 13 凭证面收窄）', () => {
+  test('security invariant: env/headers secret values never leave the read seam (spec 13 credential surface narrowed)', () => {
     const raw = JSON.stringify(readClaudeMcpServers(configPath(MIXED)));
     expect(raw).not.toContain('s3cret');
     expect(raw).not.toContain('k3y');
   });
 
-  test('slug = key 小写化；label = 原 key；小写撞名 first-wins', () => {
+  test('slug = key lowercased; label = original key; lowercase name collision first-wins', () => {
     const { records } = readClaudeMcpServers(
       configPath({ mcpServers: { Playwright: { command: 'pw' }, playwright: { command: 'pw2' } } }),
     );
@@ -126,7 +107,7 @@ describe('readClaudeMcpServers — config 读取缝（spec 13：坏 = 空集不�
     expect(records[0]).toMatchObject({ label: 'Playwright', slug: 'playwright', url: 'pw' });
   });
 
-  test('空 env / 空 headers = hasCredential false、credentialKeys 空', () => {
+  test('empty env / empty headers = hasCredential false, credentialKeys empty', () => {
     const { records } = readClaudeMcpServers(
       configPath({
         mcpServers: { a: { command: 'x', env: {} }, b: { url: 'https://u', headers: {} } },
@@ -137,8 +118,8 @@ describe('readClaudeMcpServers — config 读取缝（spec 13：坏 = 空集不�
   });
 });
 
-describe('listMcpServers — wire record 投影（形状保形 = web 零学习成本）', () => {
-  test('record 过 mcpServerRecordSchema；teamId = 入参占位；时间戳 = 文件 mtime；id = slug', () => {
+describe('listMcpServers -- wire record projection (shape-preserving = web zero learning cost)', () => {
+  test('record passes mcpServerRecordSchema; teamId = input placeholder; timestamp = file mtime; id = slug', () => {
     const p = configPath(MIXED);
     const stamp = new Date('2026-09-01T00:00:00Z');
     utimesSync(p, stamp, stamp);
@@ -154,22 +135,21 @@ describe('listMcpServers — wire record 投影（形状保形 = web 零学习�
       createdAt: stamp.getTime(),
       updatedAt: stamp.getTime(),
     });
-    // teamId 对 scoping 是 no-op（config 按机器不按团队）——保形槽位随入参。
     expect(listMcpServers({ mcpConfigPath: p }, 'team-other').map((r) => r.teamId)).toEqual([
       'team-other',
       'team-other',
     ]);
   });
 
-  test('投影面永不出现密钥值（即便未来 bug 也不给 wire 携带的机会）', () => {
+  test('projection surface never shows secret values (even a future bug gets no chance to carry them on the wire)', () => {
     const raw = JSON.stringify(listMcpServers({ mcpConfigPath: configPath(MIXED) }, 'team-1'));
     expect(raw).not.toContain('s3cret');
     expect(raw).not.toContain('k3y');
   });
 });
 
-describe('REST 面：GET 换源，管理写面删除（spec 13 删除面）', () => {
-  test('GET /api/teams/{id}/mcp-servers = config 投影；响应永不含 env/headers 值', async () => {
+describe('REST surface: GET re-sourced, management write surface deleted (spec 13 delete surface)', () => {
+  test('GET /api/teams/{id}/mcp-servers = config projection; response never contains env/headers values', async () => {
     const s = bootServer({ mcpConfigPath: configPath(MIXED) });
     const res = await call(s.app, 'GET', `/api/teams/${s.team.id}/mcp-servers`);
     expect(res.status).toBe(200);
@@ -181,7 +161,7 @@ describe('REST 面：GET 换源，管理写面删除（spec 13 删除面）', ()
     s.dispose();
   });
 
-  test('GET 未知 team = 404 {error}', async () => {
+  test('GET unknown team = 404 {error}', async () => {
     const s = bootServer({ mcpConfigPath: configPath(MIXED) });
     const res = await call(s.app, 'GET', '/api/teams/nope/mcp-servers');
     expect(res.status).toBe(404);
@@ -189,7 +169,7 @@ describe('REST 面：GET 换源，管理写面删除（spec 13 删除面）', ()
     s.dispose();
   });
 
-  test('POST / PATCH / DELETE 管理写面已删 = 404', async () => {
+  test('POST / PATCH / DELETE management write surface already deleted = 404', async () => {
     const s = bootServer({ mcpConfigPath: configPath(MIXED) });
     const base = `/api/teams/${s.team.id}/mcp-servers`;
     const post = await call(s.app, 'POST', base, {
@@ -202,8 +182,8 @@ describe('REST 面：GET 换源，管理写面删除（spec 13 删除面）', ()
   });
 });
 
-describe('agent 授权面：mcpServers[] = config 键名，未知键静默容忍', () => {
-  test('PATCH 未知键 = 200 原样存（DB 存在性校验已随管理面删除）', async () => {
+describe('agent grant surface: mcpServers[] = config key names, unknown keys silently tolerated', () => {
+  test('PATCH unknown key = 200 stored as-is (DB existence check already deleted with the management surface)', async () => {
     const s = bootServer();
     const agentRes = await call(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
       body: { displayName: 'worker-a', machineId: insertMachine(s) },
@@ -226,7 +206,7 @@ describe('agent 授权面：mcpServers[] = config 键名，未知键静默容忍
     s.dispose();
   });
 
-  test('POST agents 携带 mcpServers = 同律容忍', async () => {
+  test('POST agents carrying mcpServers = tolerated same law', async () => {
     const s = bootServer();
     const res = await call(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
       body: { displayName: 'w', machineId: insertMachine(s), mcpServers: ['ghost'] },
@@ -236,7 +216,7 @@ describe('agent 授权面：mcpServers[] = config 键名，未知键静默容忍
   });
 });
 
-describe('claim 载荷：mcpServers slug 化（string[]）+ 版本墙提升（machine-wire 断约）', () => {
+describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (machine-wire contract break)', () => {
   async function world(cliVersion: string, opts: { slugs?: string[] } = {}) {
     const s = bootServer({ claimHoldMs: 250 });
     const plain = await issueApiKey(s);
@@ -257,7 +237,7 @@ describe('claim 载荷：mcpServers slug 化（string[]）+ 版本墙提升（ma
         mcpServers: opts.slugs ?? ['demo'],
       })
       .run();
-    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+    bindAllAgents(s);
 
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -275,18 +255,15 @@ describe('claim 载荷：mcpServers slug 化（string[]）+ 版本墙提升（ma
     return { s, step: body.step ? claimedStepSchema.parse(body.step) : null };
   }
 
-  test('版本门达标 = 携带勾选 slug 原样（不解析端点、不过滤——解析权在 daemon）', async () => {
+  test('version gate met = carries the checked slugs verbatim (no endpoint parse, no filter -- parsing is the daemon responsibility)', async () => {
     const { s, step } = await world(MCP_MIN_CLI_VERSION, { slugs: ['demo', 'ghost'] });
     expect(step).not.toBeNull();
     expect(step!.mcpServers).toEqual(['demo', 'ghost']);
-    // 记忆 + 附件工具不受版本墙门控（02 §4.4 无版本语义，原律保留）。
     expect(step!.remoteTools?.map((t) => t.name)).toEqual(WORKER_REMOTE_TOOLS.map((t) => t.name));
     s.dispose();
   });
 
-  test('版本墙：旧 daemon 版本线（0.1.x）收不到 mcpServers（断约提升已落）', async () => {
-    // 断约语义：MCP_MIN_CLI_VERSION 必须已越过全部旧 daemon 版本线（≤0.1.x），
-    // 旧 daemon 视为无 MCP 运行，不存在混发两种形状的失败模式。
+  test('version wall: legacy daemon version line (0.1.x) receives no mcpServers (contract-break bump landed)', async () => {
     expect(MCP_MIN_CLI_VERSION).not.toBe('0.1.0');
     const { s, step } = await world('0.1.1');
     expect(step).not.toBeNull();
@@ -294,17 +271,14 @@ describe('claim 载荷：mcpServers slug 化（string[]）+ 版本墙提升（ma
     s.dispose();
   });
 
-  // #1307 三态受管（对齐 Multica mcp_config.go）：勾选空不再是「不携带」——
-  // [] 必须上 wire，下游 daemon 据此给 SDK 上 strictMcpConfig 锁（受管严格空，
-  // 用户全局 MCP 不进会话）。缺省态只留给旧 daemon 形（版本门未达）。
-  test('受管空（勾选空）= 携带 []（strict 语义下游消费，不塌回缺省）', async () => {
+  test('managed empty (checked empty) = carries [] (strict semantics consumed downstream, no collapse back to default)', async () => {
     const { s, step } = await world(MCP_MIN_CLI_VERSION, { slugs: [] });
     expect(step).not.toBeNull();
     expect(step!.mcpServers).toEqual([]);
     s.dispose();
   });
 
-  test('版本门未达 = 缺省不携带（[] 也不发——旧 daemon 无三态消费面）', async () => {
+  test('version gate unmet = default not carried ([] also not sent -- legacy daemon has no three-state consumption surface)', async () => {
     const { s, step } = await world('0.1.1', { slugs: [] });
     expect(step).not.toBeNull();
     expect(step!.mcpServers).toBeUndefined();
@@ -312,8 +286,8 @@ describe('claim 载荷：mcpServers slug 化（string[]）+ 版本墙提升（ma
   });
 });
 
-describe('chief mcp_servers 读工具：数据源 = 本机 config（spec 13 换源）', () => {
-  test('返回 config 投影行 {id,label,slug,transport,url}；密钥值不出工具面', async () => {
+describe('chief mcp_servers read tool: data source = local config (spec 13 re-source)', () => {
+  test('returns config projection rows {id,label,slug,transport,url}; secret values stay out of the tool surface', async () => {
     const p = configPath(MIXED);
     const s = bootServer({ mcpConfigPath: p });
     const ctx: ChiefToolCtx = {
@@ -356,8 +330,8 @@ describe('chief mcp_servers 读工具：数据源 = 本机 config（spec 13 换�
   });
 });
 
-describe('记忆删除 REST 面（02 §4.4「列表/删除 API 保形」；DELETE 同名 [推断]）', () => {
-  test('DELETE memories/{mid} → 204；未知/越权 agent = 404', async () => {
+describe('memory delete REST surface (02 section 4.4 "list/delete API shape-preserving"; DELETE same name [inferred])', () => {
+  test('DELETE memories/{mid} -> 204; unknown/out-of-scope agent = 404', async () => {
     const s: TestServer = bootServer();
     s.db.insert(agentTable).values({ id: 'a1', teamId: s.team.id, displayName: 'w' }).run();
 

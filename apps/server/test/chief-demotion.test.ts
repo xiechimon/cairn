@@ -1,27 +1,3 @@
-// #1260 总管降级为普通 agent（对齐 Multica leader 模型）：chief 步的去处 =
-// 绑定 Agent 的归属机（chief.machineId 主力机槽退役）；chief 步占机器并发槽
-// 且受绑定 Agent 并发闸；模型/思考强度 = 绑定 Agent 自身配置（chief 行的
-// model/compactionModel/thinkingLevel 覆盖槽退役）。
-// 失败方式（先于实现固化）：
-// 1. 路由换源：绑定 Agent 的归属机 M 在线 → 唯 M 可领 chief 步；他机 claim
-//    空手、步留 pending（chief.machineId 已不存在，无「主力机」第二答案）。
-// 2. 同闸：归属机 runtime 闸关（agent 是 claude-code 档、机器只开 pi）→
-//    归属机自己也空手（与 worker 步同一 runtimeGatePasses）。
-// 3. 占机器槽：maxConcurrent=1 且一条 worker 步在跑 → chief 步空手（满载
-//    不再放行 chief）；反向——chief 步在跑占满 → worker 步空手。
-// 4. 占 Agent 槽：绑定 Agent maxConcurrentTasks=1 且其 chief 步在跑 → 该
-//    Agent 的 worker 步与另一线程的 chief 步均空手（agent 计数含 chief 步
-//    ——经 chiefThread→chief.agentId 归账）。
-// 5. 无继承：claim 载荷的 provider/modelId/thinkingLevel 恒 = 绑定 Agent
-//    行值（chief 行无覆盖槽可改它）。
-// 6. 退役槽 wire 面：PATCH /chief 只带 machineId/model/compactionModel →
-//    400；GET /chief 的 chief 记录无这三个键；orchestration.homeMachineId =
-//    绑定 Agent 的归属机。
-// 7. 未绑定 Agent 的 chief 步：任何机器不可领——挂起等绑定（#1257 挂起
-//    语义：不判死；板面 waitingOn chip 透出等机器态）。
-// 8. 绑定 Agent 未设归属机：同上，挂起等补设。
-// 9. 归属机离线：挂起等机器回来（#1257：机器回来走 claim 循环自动续跑）。
-
 import { chiefTurnErrorContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -66,9 +42,6 @@ function machineDepsOf(s: TestServer): MachineDeps {
   };
 }
 
-/** 建世界：两台在线机器 + Agent（默认绑归属机 A）+ chief 行 + 线程 +
- *  pending chief 步。opts.agentMachineId null = Agent 不设归属机；
- *  opts.bindAgent false = chief 不绑定 Agent。 */
 async function setupWorld(
   opts: { agentMachineId?: string | null; bindAgent?: boolean; provider?: string } = {},
 ): Promise<World> {
@@ -138,7 +111,6 @@ function stepRowOf(w: World, id = w.stepId) {
   return w.s.db.select().from(stepTable).where(eq(stepTable.id, id)).get()!;
 }
 
-/** 该线程回合的失败行文案（#631 链：chief-err-<stepId>）。 */
 function turnErrorMessage(w: World): string | null {
   const row = w.s.db
     .select()
@@ -150,8 +122,6 @@ function turnErrorMessage(w: World): string | null {
   return parsed.success ? parsed.data.message : null;
 }
 
-/** 直插一条 claimed 步占机器 A 的槽（kind = chief 时挂在 world 线程上，
- *  归账绑定 Agent；kind = build 时挂完整 todo/build 链）。 */
 function insertClaimedOn(w: World, kind: 'build' | 'chief'): void {
   if (kind === 'chief') {
     w.s.db
@@ -209,7 +179,6 @@ function insertClaimedOn(w: World, kind: 'build' | 'chief'): void {
     .run();
 }
 
-/** 直插一条该 Agent 的 pending worker 步（候选探针）。 */
 function insertPendingWorkerStep(w: World): string {
   w.s.db
     .insert(todoTable)
@@ -249,8 +218,8 @@ function insertPendingWorkerStep(w: World): string {
   return 'step-build-waiting';
 }
 
-describe('#1260 路由换源：chief 步去处 = 绑定 Agent 的归属机', () => {
-  test('失败方式 1：他机 claim 空手、步留 pending；归属机领到', async () => {
+describe('#1260 route re-source: chief step destination = the bound Agent home machine', () => {
+  test('failure mode 1: another machine claims empty, step stays pending; the home machine claims it', async () => {
     const w = await setupWorld();
     expect(await claimOn(w, w.machineBId)).toBeNull();
     expect(stepRowOf(w).status).toBe('pending');
@@ -259,7 +228,7 @@ describe('#1260 路由换源：chief 步去处 = 绑定 Agent 的归属机', () 
     expect(home?.step.machineId).toBe(w.machineAId);
   });
 
-  test('失败方式 2：归属机 runtime 闸关 → 归属机也空手（同 worker 闸）', async () => {
+  test('failure mode 2: home machine runtime gate off -> home machine also comes up empty (same worker gate)', async () => {
     const w = await setupWorld({ provider: 'claude-code' });
     w.s.db
       .update(machineTable)
@@ -270,7 +239,7 @@ describe('#1260 路由换源：chief 步去处 = 绑定 Agent 的归属机', () 
     expect(stepRowOf(w).status).toBe('pending');
   });
 
-  test('失败方式 5：载荷模型/思考强度 = 绑定 Agent 自身配置（无覆盖槽）', async () => {
+  test('failure mode 5: payload model/thinking level = the bound Agent own config (no override slot)', async () => {
     const w = await setupWorld();
     const claimed = await claimOn(w, w.machineAId);
     expect(claimed?.agent?.provider).toBe('stub-gw');
@@ -279,8 +248,8 @@ describe('#1260 路由换源：chief 步去处 = 绑定 Agent 的归属机', () 
   });
 });
 
-describe('#1260 占槽：chief 步 = 机器槽与 Agent 槽的普通消费者', () => {
-  test('失败方式 3a：worker 满载（cap 1）→ chief 步空手，步留 pending', async () => {
+describe('#1260 slot occupancy: chief steps are ordinary consumers of the machine and Agent slots', () => {
+  test('failure mode 3a: worker at capacity (cap 1) -> chief step comes up empty, step stays pending', async () => {
     const w = await setupWorld();
     w.s.db
       .update(machineTable)
@@ -292,7 +261,7 @@ describe('#1260 占槽：chief 步 = 机器槽与 Agent 槽的普通消费者', 
     expect(stepRowOf(w).status).toBe('pending');
   });
 
-  test('失败方式 3b：chief 步在跑占满（cap 1）→ worker 步空手', async () => {
+  test('failure mode 3b: running chief steps fill it (cap 1) -> worker step comes up empty', async () => {
     const w = await setupWorld();
     w.s.db
       .update(machineTable)
@@ -303,17 +272,17 @@ describe('#1260 占槽：chief 步 = 机器槽与 Agent 槽的普通消费者', 
     const waiting = insertPendingWorkerStep(w);
     expect(await claimOn(w, w.machineAId)).toBeNull();
     expect(stepRowOf(w, waiting).status).toBe('pending');
-    expect(stepRowOf(w).status).toBe('pending'); // 本线程 pending 回合同被挡
+    expect(stepRowOf(w).status).toBe('pending');
   });
 
-  test('失败方式 4：Agent 槽（maxConcurrentTasks=1）——chief 步在跑 → 同 Agent worker/他线程 chief 均空手', async () => {
+  test('failure mode 4: Agent slot (maxConcurrentTasks=1) -- chief step running -> same-Agent workers and other-thread chiefs all come up empty', async () => {
     const w = await setupWorld();
     w.s.db
       .update(agentTable)
       .set({ maxConcurrentTasks: 1 })
       .where(eq(agentTable.id, AGENT_ID))
       .run();
-    insertClaimedOn(w, 'chief'); // 该 Agent 的 chief 步在跑（占其唯一槽）
+    insertClaimedOn(w, 'chief');
     const waiting = insertPendingWorkerStep(w);
     w.s.db
       .insert(chiefThreadTable)
@@ -351,8 +320,8 @@ describe('#1260 占槽：chief 步 = 机器槽与 Agent 槽的普通消费者', 
   });
 });
 
-describe('#1260 退役槽 wire 面', () => {
-  test('失败方式 6：PATCH 只带 machineId/model/compactionModel → 400；GET chief 记录无三键；orchestration.homeMachineId = 绑定 Agent 归属机', async () => {
+describe('#1260 retired-slot wire surface', () => {
+  test('failure mode 6: PATCH carrying only machineId/model/compactionModel -> 400; GET chief record has none of the three keys; orchestration.homeMachineId = bound Agent home machine', async () => {
     const w = await setupWorld();
     for (const body of [
       { machineId: w.machineBId },
@@ -373,33 +342,31 @@ describe('#1260 退役槽 wire 面', () => {
     expect(orch.homeMachineId).toBe(w.machineAId);
   });
 
-  test('PATCH agent 槽不再受理 thinkingLevel 覆盖（绑定/换绑照常 200）', async () => {
+  test('PATCH agent slot no longer accepts a thinkingLevel override (binding/rebinding still 200)', async () => {
     const w = await setupWorld();
     const res = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
       agent: { agentId: AGENT_ID, thinkingLevel: 'low' },
     });
-    // thinkingLevel 键被 schema 剥离，绑定本身成立；chief 行不再有思考强度
-    // 位——载荷恒取 Agent 行值（失败方式 5 钉死）。
     expect(res.status).toBe(200);
   });
 });
 
-describe('#1260 sweep 挂起面（sweepAbandonedChiefSteps，#1257 挂起语义）', () => {
-  test('失败方式 7：未绑定 Agent → 挂起等绑定（步留 pending，不产失败行）', async () => {
+describe('#1260 sweep suspension surface (sweepAbandonedChiefSteps, #1257 suspension semantics)', () => {
+  test('failure mode 7: no Agent bound -> suspended waiting for binding (step stays pending, no failure row)', async () => {
     const w = await setupWorld({ bindAgent: false });
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorMessage(w)).toBeNull();
   });
 
-  test('失败方式 8：绑定 Agent 未设归属机 → 挂起等补设（步留 pending）', async () => {
+  test('failure mode 8: bound Agent has no home machine -> suspended waiting for it to be set (step stays pending)', async () => {
     const w = await setupWorld({ agentMachineId: null });
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorMessage(w)).toBeNull();
   });
 
-  test('失败方式 9：归属机离线 → 挂起等机器回来（步留 pending，不产失败行）', async () => {
+  test('failure mode 9: home machine offline -> suspended waiting for the machine to return (step stays pending, no failure row)', async () => {
     const w = await setupWorld();
     w.s.db
       .update(machineTable)
@@ -411,7 +378,7 @@ describe('#1260 sweep 挂起面（sweepAbandonedChiefSteps，#1257 挂起语义�
     expect(turnErrorMessage(w)).toBeNull();
   });
 
-  test('归属机在线且闸开 → 不动（合法排队）', async () => {
+  test('home machine online and gate open -> untouched (legal queueing)', async () => {
     const w = await setupWorld();
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
     expect(stepRowOf(w).status).toBe('pending');

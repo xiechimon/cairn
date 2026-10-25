@@ -67,7 +67,7 @@ for (const mode of ['chief', 'worker'] as const) {
   };
 
   describe(`${mode} memory invalidation`, () => {
-    test('update_memory 把旧条目置失效并指向新条目，memories 默认只返回有效条目', async () => {
+    test('update_memory invalidates the old entry and points at the new one, memories defaults to only valid entries', async () => {
       const old = (await invoke('save_memory', {
         title: '包管理器',
         content: '使用 npm',
@@ -96,7 +96,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(everything.map((row) => row.id).sort()).toEqual([old.id, next.id].sort());
     });
 
-    test('已被取代的条目不能再更新，取代链不会回到自身', async () => {
+    test('an already-replaced entry cannot be updated again, the replacement chain does not return to itself', async () => {
       const first = (await invoke('save_memory', { title: '约定', content: '版本一' })) as Entry;
       const second = (await invoke('update_memory', {
         memoryId: first.id,
@@ -118,7 +118,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(rows.filter((row) => row.invalidAt === null).map((row) => row.id)).toEqual([third.id]);
     });
 
-    test('失效条目不占配额，也不挡住与它相同正文的新写入', async () => {
+    test('invalidated entries do not occupy quota, and do not block a new write with the same body', async () => {
       const retired = Array.from({ length: 3 }, () => insertMemory({ invalidAt: nowMs() }));
       for (let i = 0; i < MEMORY_QUOTA_PER_AGENT - 1; i++) insertMemory();
       expect(
@@ -142,7 +142,7 @@ for (const mode of ['chief', 'worker'] as const) {
       });
     });
 
-    test('配额写满时 update_memory 仍可用：旧条目失效、新条目补位', async () => {
+    test('update_memory still usable when quota is full: old entry invalidated, new entry takes its place', async () => {
       const first = (await invoke('save_memory', { title: '约定', content: '版本一' })) as Entry;
       for (let i = 0; i < MEMORY_QUOTA_PER_AGENT - 1; i++) insertMemory();
       const next = (await invoke('update_memory', {
@@ -153,7 +153,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(await invoke('memories')).toHaveLength(MEMORY_QUOTA_PER_AGENT);
     });
 
-    test('把正文改回已失效条目的旧正文是合法的', async () => {
+    test('changing the body back to an already-invalidated old body is legal', async () => {
       const first = (await invoke('save_memory', { title: '约定', content: '版本一' })) as Entry;
       const second = (await invoke('update_memory', {
         memoryId: first.id,
@@ -166,10 +166,10 @@ for (const mode of ['chief', 'worker'] as const) {
   });
 }
 
-describe('记忆读面口径一致', () => {
+describe('memory read-surface semantics consistent', () => {
   const listUrl = () => `/api/teams/${H.teamId}/agents/${AGENT_ID}/memories`;
 
-  test('REST 列表默认只含有效条目（UI 记忆 · n / 100 的分子），includeInvalid 才含历史', async () => {
+  test('REST list defaults to only valid entries (the UI memory n/100 numerator), includeInvalid includes history', async () => {
     const old = (await relay('save_memory', { title: '约定', content: '版本一' })) as Entry;
     const next = (await relay('update_memory', { memoryId: old.id, content: '版本二' })) as Entry;
 
@@ -186,7 +186,7 @@ describe('记忆读面口径一致', () => {
     });
   });
 
-  test('chief 系统提示只注入有效条目，并记下注入时刻', () => {
+  test('chief system prompt only injects valid entries and records the injection time', () => {
     const live = insertMemory({ title: '有效', content: '这条在用' });
     const retired = insertMemory({ title: '作废', content: '这条已被推翻', invalidAt: nowMs() });
 

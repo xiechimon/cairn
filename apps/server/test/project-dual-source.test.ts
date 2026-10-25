@@ -1,23 +1,3 @@
-// #1213 / ADR 0017 双执行源 server 半：github 形态项目加挂 localPath 同机
-// 加速位。失败方式先列（本文件即失败场景清单；票面失败方式逐条对应）：
-//   T1 github + localPath（绝对路径，不存在）→ 201 且落库——server 只做形态
-//      校验（绝对路径），不做存在性/git 仓校验：路径可能活在执行机上，
-//      server 进程看不见它（t-0302 调研钉死；硬验会把合法形态 400 掉）。
-//   T2 github + localPath 相对路径 → 400 + reason not_absolute。
-//   T3 local + githubRepo → 400（local 形态语义不变：无 githubRepo 槽）。
-//   T4 github + localPath null / 空串 → 201 不落（空 ≡ 未设）。
-//   P1 PATCH {localPath:'/abs'} on github 项目 → 200 + record/DB 落值。
-//   P2 PATCH {localPath:null} → 200 + 显式清空（DB 列 null；record 键缺席）。
-//   P3 PATCH localPath 键打到 local 形态项目 → 400（加速位只属 github 形态；
-//      local 形态 localPath 是创建闸的绑定，不经本面改写）。
-//   P4 PATCH 未知项目 → 404。
-//   P5 PATCH 缺 localPath 键 → 200 no-op（与 null 的显式清空两态分离）。
-//   P6 PATCH localPath 相对路径 → 400 + reason not_absolute。
-//   P7 PATCH localPath 键打到 hosted 形态项目 → 400。
-//   C1 github 项目带 localPath → claim 载荷 repo {kind, cloneUrl, localPath}。
-//   C2 github 项目无 localPath → claim 载荷 repo 无 localPath 键（g2t2 既有
-//      toEqual 钉的形状零漂移）。
-
 import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -51,15 +31,14 @@ async function patchProject(
   return { status: res.status, body: (await res.json()) as ProjectReply };
 }
 
-/** github 形态项目（无 localPath）；返回 id。 */
 async function createGithubProject(name: string): Promise<string> {
   const r = await postCreate({ name, kind: 'github', githubRepo: 'octo/dual' });
   expect(r.status).toBe(201);
   return String(r.body.id);
 }
 
-describe('POST /api/projects kind=github + localPath——形态校验（#1213）', () => {
-  test('T1 绝对路径（不存在）→ 201 落库：server 不验存在性（路径活在执行机）', async () => {
+describe('POST /api/projects kind=github + localPath -- shape validation (#1213)', () => {
+  test('T1 an absolute path (nonexistent) -> 201 stored: the server does not verify existence (the path lives on the execution machine)', async () => {
     const missing = '/definitely/not/here/cairn';
     const r = await postCreate({
       name: 'p-dual-t1',
@@ -79,7 +58,7 @@ describe('POST /api/projects kind=github + localPath——形态校验（#1213�
     expect(row?.localPath).toBe(missing);
   });
 
-  test('T2 相对路径 → 400 + reason not_absolute', async () => {
+  test('T2 a relative path -> 400 + reason not_absolute', async () => {
     const r = await postCreate({
       name: 'p-dual-t2',
       kind: 'github',
@@ -91,7 +70,7 @@ describe('POST /api/projects kind=github + localPath——形态校验（#1213�
     expect(r.body.reason).toBe('not_absolute');
   });
 
-  test('T3 local + githubRepo → 400（local 形态无 githubRepo 槽，语义不变）', async () => {
+  test('T3 local + githubRepo -> 400 (the local shape has no githubRepo slot, semantics unchanged)', async () => {
     const r = await postCreate({
       name: 'p-dual-t3',
       kind: 'local',
@@ -102,7 +81,7 @@ describe('POST /api/projects kind=github + localPath——形态校验（#1213�
     expect(String(r.body.error)).toContain('githubRepo');
   });
 
-  test('T4 localPath null / 空串 → 201 不落（空 ≡ 未设）', async () => {
+  test('T4 localPath null / empty string -> 201 without storing (empty means unset)', async () => {
     for (const localPath of [null, '', '   ']) {
       const r = await postCreate({
         name: `p-dual-t4-${JSON.stringify(localPath).replace(/\W/g, '')}`,
@@ -116,8 +95,8 @@ describe('POST /api/projects kind=github + localPath——形态校验（#1213�
   });
 });
 
-describe('PATCH /api/projects/{id}——localPath 加速位写面（#1213）', () => {
-  test('P1 github 项目挂 localPath → 200 + record/DB 落值', async () => {
+describe('PATCH /api/projects/{id} -- the localPath accelerator write surface (#1213)', () => {
+  test('P1 a github project gains localPath -> 200 + the value in record/DB', async () => {
     const id = await createGithubProject('p-dual-p1');
     const path = '/Users/who/code/cairn';
     const r = await patchProject(id, { localPath: path });
@@ -128,7 +107,7 @@ describe('PATCH /api/projects/{id}——localPath 加速位写面（#1213）', (
     expect(row?.localPath).toBe(path);
   });
 
-  test('P2 清空写回显式 null → 200 + DB 列 null + record 键缺席', async () => {
+  test('P2 clearing with an explicit null -> 200 + DB column null + the record key absent', async () => {
     const id = await createGithubProject('p-dual-p2');
     await patchProject(id, { localPath: '/Users/who/code/cairn' });
     const r = await patchProject(id, { localPath: null });
@@ -138,8 +117,7 @@ describe('PATCH /api/projects/{id}——localPath 加速位写面（#1213）', (
     expect(row?.localPath).toBeNull();
   });
 
-  test('P3 localPath 键打到 local 形态项目 → 400（加速位只属 github 形态）', async () => {
-    // 直插 local 形态行（创建闸要求真 git 仓，本测只关心 PATCH 形态分叉）。
+  test('P3 the localPath key on a local-shape project -> 400 (the accelerator belongs to the github shape only)', async () => {
     const id = 'proj-dual-local-row';
     s.db
       .insert(projectTable)
@@ -160,12 +138,12 @@ describe('PATCH /api/projects/{id}——localPath 加速位写面（#1213）', (
     expect(r2.status).toBe(400);
   });
 
-  test('P4 未知项目 → 404', async () => {
+  test('P4 unknown project -> 404', async () => {
     const r = await patchProject('proj-no-such', { localPath: '/abs' });
     expect(r.status).toBe(404);
   });
 
-  test('P5 五键全缺（空 body）→ 400（#1242 推翻 #1213 的 200 no-op 钉：缺键早退 = 静默族判死；null 显式清空两态仍分离）', async () => {
+  test('P5 all five keys missing (empty body) -> 400 (#1242 overturns the #1213 200 no-op pin: an early exit on missing keys kills the silent family; the explicit null clear and the unset state stay distinct)', async () => {
     const id = await createGithubProject('p-dual-p5');
     await patchProject(id, { localPath: '/Users/who/code/cairn' });
     const r = await patchProject(id, {});
@@ -175,7 +153,7 @@ describe('PATCH /api/projects/{id}——localPath 加速位写面（#1213）', (
     expect(row?.localPath).toBe('/Users/who/code/cairn');
   });
 
-  test('P6 相对路径 → 400 + reason not_absolute', async () => {
+  test('P6 a relative path -> 400 + reason not_absolute', async () => {
     const id = await createGithubProject('p-dual-p6');
     const r = await patchProject(id, { localPath: 'rel/x' });
     expect(r.status).toBe(400);
@@ -183,7 +161,7 @@ describe('PATCH /api/projects/{id}——localPath 加速位写面（#1213）', (
     expect(r.body.reason).toBe('not_absolute');
   });
 
-  test('P7 localPath 键打到 hosted 形态项目 → 400', async () => {
+  test('P7 the localPath key on a hosted-shape project -> 400', async () => {
     const r = await postCreate({ name: 'p-dual-hosted', kind: 'hosted' });
     expect(r.status).toBe(201);
     const pr = await patchProject(String(r.body.id), { localPath: '/abs' });
@@ -191,7 +169,7 @@ describe('PATCH /api/projects/{id}——localPath 加速位写面（#1213）', (
     expect(String(pr.body.error)).toContain('github');
   });
 
-  test('P8 空串 → 清空（空 ≡ null）', async () => {
+  test('P8 an empty string -> cleared (empty means null)', async () => {
     const id = await createGithubProject('p-dual-p8');
     await patchProject(id, { localPath: '/Users/who/code/cairn' });
     const r = await patchProject(id, { localPath: '   ' });
@@ -200,8 +178,6 @@ describe('PATCH /api/projects/{id}——localPath 加速位写面（#1213）', (
     expect(row?.localPath).toBeNull();
   });
 });
-
-// —— claim 载荷半（g2t2-executor-wire.test.ts 同款 harness 简化版）———————
 
 const AGENT_ID = 'agent-dual-1';
 
@@ -228,7 +204,6 @@ async function call(
   );
 }
 
-/** github 项目 + 一步可领 → claim 一次（带 localPath 预置）。 */
 async function claimGithubProject(s2: TestServer, localPath: string | null): Promise<ClaimedStep> {
   const key = await issueApiKey(s2);
   const enrollRes = await call(s2.app, 'POST', '/api/machine/enroll', {
@@ -240,7 +215,7 @@ async function claimGithubProject(s2: TestServer, localPath: string | null): Pro
     .insert(agentTable)
     .values({ id: AGENT_ID, teamId: s2.team.id, displayName: 'dual-builder', modelId: 'm' })
     .run();
-  bindAllAgents(s2); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+  bindAllAgents(s2);
   const projBody: Record<string, unknown> = {
     name: 'dual-claim',
     kind: 'github',
@@ -271,8 +246,8 @@ async function claimGithubProject(s2: TestServer, localPath: string | null): Pro
   return claimedStepSchema.parse(body.step);
 }
 
-describe('claim 载荷 project.repo.localPath（#1213）', () => {
-  test('C1 github 项目带 localPath → repo 携带 localPath', async () => {
+describe('claim payload project.repo.localPath (#1213)', () => {
+  test('C1 a github project with localPath -> repo carries localPath', async () => {
     const s2 = bootServer({ claimHoldMs: 200 });
     claimDisposables.push(() => s2.dispose());
     const claimed = await claimGithubProject(s2, '/Users/who/code/cairn');
@@ -283,7 +258,7 @@ describe('claim 载荷 project.repo.localPath（#1213）', () => {
     });
   });
 
-  test('C2 github 项目无 localPath → repo 无 localPath 键（既有形状零漂移）', async () => {
+  test('C2 a github project without localPath -> repo has no localPath key (zero drift of the existing shape)', async () => {
     const s2 = bootServer({ claimHoldMs: 200 });
     claimDisposables.push(() => s2.dispose());
     const claimed = await claimGithubProject(s2, null);

@@ -1,28 +1,3 @@
-// #1251 可见 pending reason（排队投影 blocked 位 + 板面挂起态）：
-// pending 成因区分「等机器上线」（等待有用）与「缺能力」（装 X 即解锁，给修法）
-// ——Multica dispatch/reason.go 族语义对位（runtime_offline vs runtime_unusable
-// 的分野：等待有没有用），落 cairn 两个读面：
-// - 步级 = stepQueueProjector 的 queue.blocked（step-queue.ts，#1108 排队投影
-//   扩展位——transcript「排队中」行与 chief turnQueue 两面同源）；
-// - 板面 = todo waitingOn 派生（#1257 律：pending 不再失败收尾，挂起等机器；
-//   todos.ts waitingOnOf 钉选机在线但能力闸挡 → 同 {on:'machine'} 挂起态，
-//   chip 粗粒度，缺项点名 + 修法文案归 queue.blocked 面）。
-// 失败方式（先于实现固化；#1259 起机器去处 = agent 归属机，钉选退役——
-// 原「钉选机」语义一律落到 agent 绑定，两 agent 可各绑各机）：
-// 1. 归属机在线但缺能力 → blocked capability-missing，missing 点名可读形。
-// 2. 归属机离线 → blocked machine-offline（missing 空集）——
-//    无 requiredCapabilities 的 agent 同样给（离线等待与能力无关，是事实）。
-// 3. 归属机能力齐 → blocked 缺席（正常排队，零回归）。
-// 4. fail-open 显示面同律：归属机未上报快照 → blocked 缺席（未知不编造缺项）。
-// 5. 归属机离线 → machine-offline；归属机在线缺能力 → capability-missing。
-// 6. runtime 闸挡（机器在线但没开 runtime）不冒充能力成因——既有已知缝
-//    保持既有呈现（blocked 缺席），能力闸不越权。
-// 7. chief 回合同律（turnQueue 投影同形）。
-// 8. #1257 挂起律：钉选在线能力挡 → sweep 不做失败收尾（pending 面无失败），
-//    步挂起等机器，板面可见态 = todo waitingOn {on:'machine'} 派生。
-// 9. 能力补齐后 waitingOn 挂起态即消失（可领即活）；chief pending 回合
-//    同样不被 sweep 触碰。
-
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -60,7 +35,6 @@ function makeWorld(): ReasonWorld {
   const s = bootServer();
   disposables.push(() => s.dispose());
   const base = Date.now();
-  // projectId 由 postProject 提供需要 async——直插 project 行（sweep 测试同律）。
   const projectId = 'proj-capreason';
   s.db.insert(projectTable).values({ id: projectId, name: 'capreason', teamId: s.team.id }).run();
   return { s, teamId: s.team.id, projectId, base };
@@ -125,9 +99,6 @@ function insertAgent(
     .run();
 }
 
-/** pending worker 步三行组（todo/build/step），返回投影目标。
- *  #1259：机器去处 = agent 归属机——homeMachineId 即把该 agent 绑到该机
- *  （钉选退役）。 */
 function insertPendingWorkerStep(
   w: ReasonWorld,
   opts: { agentId: string; homeMachineId?: string | null; createdAgo?: number },
@@ -191,8 +162,6 @@ function insertPendingWorkerStep(
   return { id, createdAt, homeMachineId, buildId, todoId };
 }
 
-/** pending chief 步三行组（chief/chiefThread/step），返回投影目标。
- *  #1259：chief 步去处 = 绑定 Agent 的归属机——homeMachineId 即绑该 agent。 */
 function insertPendingChiefStep(
   w: ReasonWorld,
   opts: { agentId: string; homeMachineId?: string | null; createdAgo?: number },
@@ -261,8 +230,8 @@ function stepRowOf(w: ReasonWorld, stepId: string) {
   return w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
 }
 
-describe('#1251 排队投影 blocked 位（worker 步）', () => {
-  test('失败方式 1：在线机全缺能力 → capability-missing + 可读缺项', () => {
+describe('#1251 queue projection blocked bit (worker steps)', () => {
+  test('failure mode 1: all online machines missing the capability -> capability-missing + readable missing items', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-r1', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-r1a', capabilities: { mcpServers: ['ctx'], skills: [] } });
@@ -273,10 +242,10 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
       kind: 'capability-missing',
       missing: ['MCP server "figma"'],
     });
-    expect(info?.position).toBe(1); // 位次照算（blocked 不吞排队事实）
+    expect(info?.position).toBe(1);
   });
 
-  test('失败方式 2：团队零在线机器 → machine-offline（无能力要求的 agent 同样给）', () => {
+  test('failure mode 2: team has zero online machines -> machine-offline (agents without capability requirements also get it)', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-r2' });
     insertMachine(w, { id: 'm-r2', online: false, capabilities: { mcpServers: [], skills: [] } });
@@ -285,7 +254,7 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
     expect(info?.blocked).toEqual({ kind: 'machine-offline', missing: [] });
   });
 
-  test('失败方式 3：有能力齐的在线机 → blocked 缺席（正常排队）', () => {
+  test('failure mode 3: a capable online machine exists -> blocked absent (normal queueing)', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-r3', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-r3a', capabilities: { mcpServers: ['ctx'], skills: [] } });
@@ -294,7 +263,7 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
     expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
   });
 
-  test('失败方式 4：在线机未上报快照 → blocked 缺席（fail-open 显示面同律）', () => {
+  test('failure mode 4: online machine never reported a snapshot -> blocked absent (fail-open display surface same law)', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-r4', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-r4', capabilities: null });
@@ -302,9 +271,8 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
     expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
   });
 
-  test('失败方式 5：归属机离线 → machine-offline；归属机在线缺能力 → capability-missing', () => {
+  test('failure mode 5: home machine offline -> machine-offline; home machine online but missing capability -> capability-missing', () => {
     const w = makeWorld();
-    // 一个 agent 只有一个归属机——两形态各用各的 agent（#1259 绑定律）。
     insertAgent(w, { id: 'agent-r5a', requiredCapabilities: { mcpServers: ['figma'] } });
     insertAgent(w, { id: 'agent-r5b', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, {
@@ -332,16 +300,15 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
     });
   });
 
-  test('失败方式 6：runtime 闸挡不冒充能力成因 → blocked 缺席（既有缝既有呈现）', () => {
+  test('failure mode 6: runtime gate block does not impersonate a capability cause -> blocked absent (existing seam keeps its presentation)', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-r6', requiredCapabilities: { mcpServers: ['figma'] } });
-    // 在线但 pi 关（runtime 闸挡）——即使能力也缺，成因不归能力维。
     insertMachine(w, { id: 'm-r6', runtimes: [], capabilities: { mcpServers: [], skills: [] } });
     const target = insertPendingWorkerStep(w, { agentId: 'agent-r6', homeMachineId: 'm-r6' });
     expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
   });
 
-  test('失败方式 1 补：models 维缺项同形点名', () => {
+  test('failure mode 1 addendum: models dimension missing items named the same shape', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-r7', requiredCapabilities: { models: ['glm-5.3'] } });
     insertMachine(w, {
@@ -357,8 +324,8 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
   });
 });
 
-describe('#1251 排队投影 blocked 位（chief 回合）', () => {
-  test('失败方式 7：绑定 Agent 缺能力 → turnQueue 投影同形 blocked', () => {
+describe('#1251 queue projection blocked bit (chief turns)', () => {
+  test('failure mode 7: bound Agent missing capability -> turnQueue projection blocked same shape', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-c1', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-c1', capabilities: { mcpServers: [], skills: [] } });
@@ -374,27 +341,23 @@ describe('#1251 排队投影 blocked 位（chief 回合）', () => {
   });
 });
 
-describe('#1251×#1257 能力挡挂起：sweep 不失败收尾，可见态归 waitingOn + queue.blocked', () => {
-  test('失败方式 8：钉选在线能力挡 → sweep 超任何宽限不做失败收尾（挂起等机器）', () => {
+describe('#1251x#1257 capability-block suspension: sweep does no failure wrap-up, visible state lands on waitingOn + queue.blocked', () => {
+  test('failure mode 8: pinned online capability block -> sweep does no failure wrap-up past any grace period (suspended waiting for a machine)', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-s1', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-s1', capabilities: { mcpServers: ['ctx'], skills: [] } });
     const target = insertPendingWorkerStep(w, { agentId: 'agent-s1', homeMachineId: 'm-s1' });
 
-    // #1257 律：pending 步一律不动（挂起等机器，claim 循环自动续跑）。远超
-    // 既有失联阈也照样不失败——能力挡不是 infra 事件，失败收尾会烧掉用户的步。
     sweepAbandonedBuildSteps(w.s.svc, w.base + BUILD_ABANDONED_STEP_MS * 10);
     expect(stepRowOf(w, target.id).status).toBe('pending');
     expect(buildRowOf(w, target.buildId).errorMessage).toBeNull();
   });
 
-  test('失败方式 9：todo waitingOn 派生 = 等机器挂起；能力补齐即消失', () => {
+  test('failure mode 9: todo waitingOn derived = waiting for machine suspension; disappears once capability is filled', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-s2', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-s2', capabilities: { mcpServers: ['ctx'], skills: [] } });
     const target = insertPendingWorkerStep(w, { agentId: 'agent-s2', homeMachineId: 'm-s2' });
-    // waitingOn 派生要求在飞位：latestBuildId 指向本 build（phase queued ∈
-    // IN_PROGRESS_PHASES；healthy 排队与挂起的分界 = 闸判，不是相位）。
     w.s.db
       .update(todoTable)
       .set({ latestBuildId: target.buildId })
@@ -403,12 +366,8 @@ describe('#1251×#1257 能力挡挂起：sweep 不失败收尾，可见态归 wa
     const todoRow = () =>
       w.s.db.select().from(todoTable).where(eq(todoTable.id, target.todoId)).get()!;
 
-    // 钉选机在线、runtime 闸开、能力缺 → 板面挂起「等机器」（等待不解锁，
-    // 装齐才解锁——修法文案在步级 queue.blocked 面，失败方式 5 已钉）。
     expect(toTodoRecord(w.s.svc, todoRow()).waitingOn).toEqual({ on: 'machine', retryAt: null });
 
-    // 机器装上 figma（下一拍 presence 覆写的 DB 终态直写）→ 挂起态即消失
-    //（正常排队：机器在、能领，只是没轮到）。
     w.s.db
       .update(machineTable)
       .set({ capabilities: { mcpServers: ['ctx', 'figma'], skills: [] } })
@@ -417,7 +376,7 @@ describe('#1251×#1257 能力挡挂起：sweep 不失败收尾，可见态归 wa
     expect(toTodoRecord(w.s.svc, todoRow()).waitingOn).toBeUndefined();
   });
 
-  test('失败方式 7（chief）：能力挡的 pending 回合不被 sweep 触碰（挂起律同律）', () => {
+  test('failure mode 7 (chief): a capability-blocked pending turn is not touched by sweep (same suspension law)', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-s3', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-s3', capabilities: { mcpServers: [], skills: [] } });

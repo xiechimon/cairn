@@ -1,9 +1,3 @@
-// SecretBox 实现对拍（01 §4.2 锁定细案 + 02 §8 at-rest 层）：
-// - keyfile：首次启动生成 = crypto.randomBytes(32) base64、权限 0600；重启复用
-// - 信封：`v1` 版本头 + iv + ciphertext + authTag（AES-256-GCM）
-// - 护栏：篡改 / 换 key / 坏信封 / 坏 keyfile → 抛 SecretBoxError（GCM 认证）；
-//   keyfile 丢失再生成 = 存量密文报废口径（README 护栏的机制面实证）。
-
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -19,43 +13,41 @@ const tmpDirs: string[] = [];
 function tmpKeyfile(): string {
   const dir = mkdtempSync(join(tmpdir(), 'cairn-secretbox-'));
   tmpDirs.push(dir);
-  return join(dir, 'server', 'secretbox.key'); // 嵌套目录顺带验证 mkdir -p
+  return join(dir, 'server', 'secretbox.key');
 }
 afterEach(() => {
   for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-describe('keyfile 生命周期（01 §4.2：首启生成、重启复用）', () => {
-  test('首次启动生成 keyfile：32 字节 base64、权限 0600', () => {
+describe('the keyfile lifecycle (01 §4.2: generated on first boot, reused across restarts)', () => {
+  test('first boot generates the keyfile: 32 bytes base64, mode 0600', () => {
     const path = tmpKeyfile();
     createKeyfileSecretBox(path);
     const raw = readFileSync(path, 'utf8').trim();
     expect(Buffer.from(raw, 'base64')).toHaveLength(32);
-    // 权限位低 9 位 = 0600（root 位/SUID 位不计）。
     expect(statSync(path).mode & 0o777).toBe(0o600);
   });
 
-  test('重启复用同一 key：跨实例 seal/open 互通', () => {
+  test('a restart reuses the same key: seal on one instance opens on another', () => {
     const path = tmpKeyfile();
     const first = createKeyfileSecretBox(path);
     const envelope = first.seal('sk-provider-key');
     const second = createKeyfileSecretBox(path);
     expect(second.open(envelope)).toBe('sk-provider-key');
-    // 复用 = 不重写文件（内容逐字节稳定）。
     const raw = readFileSync(path, 'utf8');
     createKeyfileSecretBox(path);
     expect(readFileSync(path, 'utf8')).toBe(raw);
   });
 
-  test('keyfile 丢失再生成 = 存量密文报废（02 §8 恢复口径的机制面）', () => {
+  test('a lost keyfile regenerated = existing ciphertexts are dead (the mechanism behind the 02 §8 recovery story)', () => {
     const path = tmpKeyfile();
     const envelope = createKeyfileSecretBox(path).seal('存量 provider key');
-    rmSync(path); // 丢失
-    const reborn = createKeyfileSecretBox(path); // 首启语义再生成
+    rmSync(path);
+    const reborn = createKeyfileSecretBox(path);
     expect(() => reborn.open(envelope)).toThrow(SecretBoxError);
   });
 
-  test('坏 keyfile（长度不符）→ 启动即抛，不静默降级', () => {
+  test('a bad keyfile (wrong length) -> throws at boot, no silent downgrade', () => {
     const path = tmpKeyfile();
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, Buffer.from('too-short').toString('base64'));
@@ -63,15 +55,15 @@ describe('keyfile 生命周期（01 §4.2：首启生成、重启复用）', () 
   });
 });
 
-describe('信封与加解密（AES-256-GCM，01 §4.2）', () => {
-  test('roundtrip：unicode / 空串 / 长文本', () => {
+describe('envelope and encryption (AES-256-GCM, 01 §4.2)', () => {
+  test('roundtrip: unicode / empty string / long text', () => {
     const box = createEphemeralSecretBox();
     for (const plaintext of ['', '密钥值 🔐 ünïcøde', 'x'.repeat(10_000)]) {
       expect(box.open(box.seal(plaintext))).toBe(plaintext);
     }
   });
 
-  test('信封 = v1 版本头起首；同明文两次 seal 密文不同（iv 随机）', () => {
+  test('the envelope starts with the v1 version header; the same plaintext seals differently twice (random iv)', () => {
     const box = createEphemeralSecretBox();
     const a = box.seal('same');
     const b = box.seal('same');
@@ -81,30 +73,30 @@ describe('信封与加解密（AES-256-GCM，01 §4.2）', () => {
     expect(box.open(b)).toBe('same');
   });
 
-  test('密文不含明文子串（at-rest 语义本体）', () => {
+  test('the ciphertext contains no plaintext substring (the at-rest semantics itself)', () => {
     const box = createEphemeralSecretBox();
     expect(box.seal('sk-ant-secret-value')).not.toContain('sk-ant-secret-value');
   });
 
-  test('篡改密文 / 篡改 authTag → SecretBoxError（GCM 认证）', () => {
+  test('tampering with the ciphertext / authTag -> SecretBoxError (GCM authentication)', () => {
     const box = createEphemeralSecretBox();
     const [, payload = ''] = box.seal('payload').split(':');
     const bytes = Buffer.from(payload, 'base64');
-    bytes[bytes.length - 20] = ((bytes[bytes.length - 20] ?? 0) ^ 0xff) as number; // ct 区翻转
+    bytes[bytes.length - 20] = ((bytes[bytes.length - 20] ?? 0) ^ 0xff) as number;
     expect(() => box.open(`v1:${bytes.toString('base64')}`)).toThrow(SecretBoxError);
-    bytes[bytes.length - 1] = ((bytes[bytes.length - 1] ?? 0) ^ 0xff) as number; // tag 末位翻转
+    bytes[bytes.length - 1] = ((bytes[bytes.length - 1] ?? 0) ^ 0xff) as number;
     expect(() => box.open(`v1:${bytes.toString('base64')}`)).toThrow(SecretBoxError);
   });
 
-  test('换 key → SecretBoxError（错 key 不可解）', () => {
+  test('a different key -> SecretBoxError (a wrong key does not decrypt)', () => {
     const envelope = createEphemeralSecretBox().seal('secret');
     expect(() => createEphemeralSecretBox().open(envelope)).toThrow(SecretBoxError);
   });
 
-  test('坏信封：非 base64 / 版本不符 / 截断 → SecretBoxError', () => {
+  test('a bad envelope: not base64 / wrong version / truncated -> SecretBoxError', () => {
     const box = createEphemeralSecretBox();
     expect(() => box.open('garbage')).toThrow(SecretBoxError);
     expect(() => box.open(`v2:${box.seal('x').slice(3)}`)).toThrow(SecretBoxError);
-    expect(() => box.open('v1:AAAA')).toThrow(SecretBoxError); // 短于 iv+tag
+    expect(() => box.open('v1:AAAA')).toThrow(SecretBoxError);
   });
 });

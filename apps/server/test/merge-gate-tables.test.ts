@@ -1,23 +1,3 @@
-// #1404 S3：合并就绪闸的四张 server 表（gate_digest / gate_round / gate_verdict /
-// gate_state）的迁移。约束在库里成立才算数，故断言走迁移后的真库（原生 SQL 读写），
-// 不只看 drizzle 对象。
-//
-// 失败方式（先于实现固化，全文 docs/verify/1404/s3-failure-modes.txt，下文按号引用）：
-// F1 旧库升级不应用本迁移（journal 的 when 不大于库里最新一条即被静默跳过）。
-// F2 同一构建同一摘要两轮。F3 同一构建两轮同号。F4 同一步两条判定。
-// F5 判定指向不存在的构建（stepId 不设外键，见 F17/F18）。F6 删构建留下孤儿行。
-// F7 闸行挡住现有删除路径。
-// F8 摘要为空（head 对不上）的判定存不进。F9 chief 小合并步的判定挂不到被审构建。
-// F10 同一构建两份快照。F11 blockers JSON 往返失真。F12 同一 head 两份摘要。
-// F14 共享表清单漏登记。F15 机器回传路径写判定。F16 迁移按序号定位（合并期重编号即坏）。
-// F13（schema 与迁移漂移）由 drizzle-kit generate 空转与 db:check 两道闸钉住，不在本文件。
-// 第二轮（pr-gate 1469 run 1，失败方式全文 docs/verify/1404/s3-r2-red-green.txt）：
-// F17 后续迁移按 drizzle 形状重建 step：drizzle 在事务里跑迁移，PRAGMA foreign_keys=OFF
-// 不生效，DROP TABLE step 的隐式删行经 stepId 外键级联清空判定，步行却被拷回。
-// F18 删步而构建还在：记下的 block / tampered 判定随步消失。
-// F19 本迁移之后的迁移重建 build（或经 build.todoId 级联的 todo）：四表的行被清空。
-// F20 判定缺 expectedHeadSha 也能存。F21 轮缺 patchDigest 也能存（UNIQUE 视 NULL 互异）。
-
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -51,7 +31,6 @@ afterAll(() => {
 
 type Row = Record<string, string | number | null>;
 
-/** 原生插行：列名取对象键，值原样绑定（JSON 列由调用方先序列化）。 */
 function insert(sqlite: Database.Database, table: string, row: Row): void {
   const cols = Object.keys(row);
   sqlite
@@ -71,15 +50,12 @@ function count(sqlite: Database.Database, table: string, buildId: string): numbe
   ).n;
 }
 
-/** 种 seed() 那一对 user / team（原生 SQL，同 seedBuild：只写建库那一刻的必填列，
- * 不经 head 的 drizzle schema，旧库缺后来加的列也不碍事）。 */
 function seedTeam(sqlite: Database.Database): string {
   insert(sqlite, 'user', { id: 'u-1', displayName: 'Owner' });
   insert(sqlite, 'team', { id: 'team-1', name: "Owner's team", createdAt: 1 });
   return 'team-1';
 }
 
-/** 种一个 project → todo → build → worker step（列取各表的必填最小集）。 */
 function seedBuild(sqlite: Database.Database, teamId: string, suffix: string) {
   const ids = {
     project: `p-${suffix}`,
@@ -153,7 +129,6 @@ const stateRow = (buildId: string, over: Row = {}): Row => ({
   ...over,
 });
 
-/** 四张表各种一行（verdict 挂在给定步上）。 */
 function seedGateRows(sqlite: Database.Database, buildId: string, stepId: string): void {
   insert(sqlite, 'gate_digest', digestRow(buildId, H1, D1));
   insert(sqlite, 'gate_round', roundRow(`r-${buildId}`, buildId, D1, 1));
@@ -161,8 +136,6 @@ function seedGateRows(sqlite: Database.Database, buildId: string, stepId: string
   insert(sqlite, 'gate_state', stateRow(buildId));
 }
 
-/** 内存库，开法同 db/client.ts openDbWithHandle（外键开、同一 migrations 目录），
- * 另留原生句柄给 SQL 断言。 */
 function memory(): { db: Db; sqlite: Database.Database; teamId: string } {
   const sqlite = new Database(':memory:');
   sqlite.pragma('foreign_keys = ON');
@@ -172,7 +145,6 @@ function memory(): { db: Db; sqlite: Database.Database; teamId: string } {
   return { db, sqlite, teamId: team.id };
 }
 
-/** 经 drizzle 句柄读本构建在四表的行数（bootServer 只给 drizzle 句柄）。 */
 function gateCounts(db: Db, buildId: string): Record<string, number> {
   return Object.fromEntries(
     GATE_TABLES.map((t) => [
@@ -183,8 +155,6 @@ function gateCounts(db: Db, buildId: string): Record<string, number> {
     ]),
   );
 }
-
-// —— 迁移定位与旧库升级（F1 / F16）——————————————————————————————————————
 
 const GATE_MARKER = /CREATE TABLE `gate_verdict`/;
 
@@ -201,8 +171,6 @@ function findGateEntry() {
   return { journal, index, entry: journal.entries[index]! };
 }
 
-/** 测试用 migrations 目录（mkdtemp）：真 journal 的前 end 条；extra 另接一条合成
- * 迁移，when 排在全部真迁移之后（模拟本迁移之后才写的一条）。 */
 function migrationsUpTo(
   journal: Journal,
   end: number,
@@ -223,14 +191,14 @@ function migrationsUpTo(
   return dir;
 }
 
-describe('F1 / F16 旧库升级：main 的库补跑本迁移', () => {
-  test('本迁移的 when 大于此前每一条（否则 migrator 对旧库静默跳过）', () => {
+describe('F1 / F16 legacy db upgrade: a db from main catches up on this migration', () => {
+  test('this migration when is greater than every earlier one (otherwise the migrator silently skips it for legacy dbs)', () => {
     const { journal, index, entry } = findGateEntry();
     const before = Math.max(...journal.entries.slice(0, index).map((e) => e.when));
     expect(entry.when).toBeGreaterThan(before);
   });
 
-  test('截到本迁移之前的库（带构建行）→ 全量 migrate：四表建成、旧行不动、可为旧构建写闸行', () => {
+  test('a db cut before this migration (with build rows) -> full migrate: the four tables created, old rows untouched, gate rows writable for old builds', () => {
     const { journal, index } = findGateEntry();
     const dbPath = join(temp('cairn-gate-upgrade-'), 'server.db');
     const old = new Database(dbPath);
@@ -257,10 +225,8 @@ describe('F1 / F16 旧库升级：main 的库补跑本迁移', () => {
   });
 });
 
-// —— gate_round（F2 / F3）——————————————————————————————————————————————
-
-describe('gate_round：每 (buildId, patchDigest) 一轮', () => {
-  test('F2 同一构建同一摘要的第二轮被 UNIQUE 拒绝；别的构建同摘要、同构建别的摘要照常', () => {
+describe('gate_round: one round per (buildId, patchDigest)', () => {
+  test('F2 a second round for the same build and digest is rejected by UNIQUE; another build with the same digest, or the same build with another digest, still works', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     const b = seedBuild(sqlite, teamId, 'b');
@@ -274,7 +240,7 @@ describe('gate_round：每 (buildId, patchDigest) 一轮', () => {
     expect(count(sqlite, 'gate_round', b.build)).toBe(1);
   });
 
-  test('F3 同一构建两轮同号被 UNIQUE 拒绝（roundsMax 按轮号数）', () => {
+  test('F3 two rounds of one build with the same number rejected by UNIQUE (roundsMax counts rounds by number)', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     insert(sqlite, 'gate_round', roundRow('r1', a.build, D1, 1));
@@ -283,7 +249,7 @@ describe('gate_round：每 (buildId, patchDigest) 一轮', () => {
     );
   });
 
-  test('F21 缺 patchDigest 的轮被 NOT NULL 拒绝（UNIQUE 视 NULL 互异，空摘要能开无数轮）', () => {
+  test('F21 a round without patchDigest rejected by NOT NULL (UNIQUE treats NULLs as distinct, an empty digest could open endless rounds)', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     expect(() =>
@@ -292,7 +258,7 @@ describe('gate_round：每 (buildId, patchDigest) 一轮', () => {
     expect(count(sqlite, 'gate_round', a.build)).toBe(0);
   });
 
-  test('缺省值：fixRound 0、state open、timedOut []、dispatches {}（drizzle 读回）', () => {
+  test('defaults: fixRound 0, state open, timedOut [], dispatches {} (read back through drizzle)', () => {
     const { db, sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     insert(sqlite, 'gate_round', roundRow('r1', a.build, D1, 1));
@@ -313,10 +279,8 @@ describe('gate_round：每 (buildId, patchDigest) 一轮', () => {
   });
 });
 
-// —— gate_verdict（F4 / F5 / F8 / F9）——————————————————————————————————
-
-describe('gate_verdict：每步一条，只挂真实的构建', () => {
-  test('F4 同一步的第二条判定被主键拒绝', () => {
+describe('gate_verdict: one row per step, attached only to real builds', () => {
+  test('F4 a second verdict for the same step is rejected by the primary key', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     insert(sqlite, 'gate_verdict', verdictRow(a.step, a.build));
@@ -326,7 +290,7 @@ describe('gate_verdict：每步一条，只挂真实的构建', () => {
     expect(sqlite.prepare('SELECT outcome FROM gate_verdict').all()).toEqual([{ outcome: 'pass' }]);
   });
 
-  test('F5 不存在的构建：外键拒绝；stepId 不设外键（F17/F18），由派步的 server 写入方给出', () => {
+  test('F5 a nonexistent build: rejected by the foreign key; stepId has no foreign key (F17/F18), supplied by the server writer that queues the step', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     expect(() => insert(sqlite, 'gate_verdict', verdictRow(a.step, 'no-such-build'))).toThrow(
@@ -336,7 +300,7 @@ describe('gate_verdict：每步一条，只挂真实的构建', () => {
     expect(count(sqlite, 'gate_verdict', a.build)).toBe(1);
   });
 
-  test('F20 缺 expectedHeadSha 的判定被 NOT NULL 拒绝（判定只按 server 派步时钉下的 head 绑定）', () => {
+  test('F20 a verdict without expectedHeadSha rejected by NOT NULL (verdicts bind only to the head the server pinned when queueing the step)', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     expect(() =>
@@ -345,7 +309,7 @@ describe('gate_verdict：每步一条，只挂真实的构建', () => {
     expect(count(sqlite, 'gate_verdict', a.build)).toBe(0);
   });
 
-  test('F8 head 对不上的判定（patchDigest null）、没报 head、没有视角：照存，读回 null', () => {
+  test('F8 a verdict whose head does not match (patchDigest null), no head reported, no perspective: stored as is, read back null', () => {
     const { db, sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     insert(
@@ -374,7 +338,7 @@ describe('gate_verdict：每步一条，只挂真实的构建', () => {
     ]);
   });
 
-  test('S2 的三种 kind 与七种 outcome 都存得下', () => {
+  test('all three kinds and seven outcomes of S2 are storable', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     const outcomes = [
@@ -399,7 +363,7 @@ describe('gate_verdict：每步一条，只挂真实的构建', () => {
     ).toEqual(outcomes);
   });
 
-  test('F9 chief 小合并步（step.buildId = chief 线程，无 build 行）的判定挂被审构建；删构建带走判定、不动 chief 步', () => {
+  test('F9 a verdict of a chief mini-merge step (step.buildId = the chief thread, no build row) attaches to the reviewed build; deleting the build takes the verdict, the chief step stays', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     insert(sqlite, 'step', { id: 's-chief', buildId: 'chief-x', kind: 'chief', createdAt: 1 });
@@ -416,7 +380,7 @@ describe('gate_verdict：每步一条，只挂真实的构建', () => {
     ]);
   });
 
-  test('判定表按 buildId 有索引（readiness 每轮读本构建全部判定）', () => {
+  test('the verdict table has an index on buildId (readiness reads all verdicts of the build each round)', () => {
     const { sqlite } = memory();
     const plan = sqlite
       .prepare("EXPLAIN QUERY PLAN SELECT * FROM gate_verdict WHERE buildId = 'x'")
@@ -425,10 +389,8 @@ describe('gate_verdict：每步一条，只挂真实的构建', () => {
   });
 });
 
-// —— gate_state / gate_digest（F10 / F11 / F12）————————————————————————
-
-describe('gate_state：每构建一份最新快照', () => {
-  test('F10 同一构建第二份快照被主键拒绝；按 buildId upsert 覆盖成一行', () => {
+describe('gate_state: one latest snapshot per build', () => {
+  test('F10 a second snapshot of the same build is rejected by the primary key; an upsert by buildId overwrites into one row', () => {
     const { db, sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     insert(sqlite, 'gate_state', stateRow(a.build));
@@ -462,11 +424,9 @@ describe('gate_state：每构建一份最新快照', () => {
     ).toEqual([{ ready: true, headSha: H2, evaluatedAt: 20 }]);
   });
 
-  test('F11 blockers 往返不失真（转义名、双向控制符、中文标签、S2 名单上限），存的是合法 JSON', () => {
+  test('F11 blockers round-trip without loss (escaped names, bidi controls, CJK labels, the S2 list cap), stored as valid JSON', () => {
     const { db, sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
-    // S2 的 detail：名字写成 JSON 串、不可见字符写成 \uXXXX、每名至多 120 字符加 …、
-    // 每份名单至多 10 个加 +N more。这里按上限造满，再混入原样的控制字符。
     const longName = `"${'名'.repeat(118)}"…`;
     const blockers = Array.from({ length: 60 }, (_, i) => ({
       code: `code-${i}`,
@@ -502,8 +462,8 @@ describe('gate_state：每构建一份最新快照', () => {
   });
 });
 
-describe('gate_digest：每 (buildId, headSha) 一份摘要', () => {
-  test('F12 同一 head 第二份被主键拒绝；update-branch 后新 head 同摘要照常落', () => {
+describe('gate_digest: one digest per (buildId, headSha)', () => {
+  test('F12 a second entry for the same head rejected by the primary key; after update-branch the same digest on the new head lands as usual', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     insert(sqlite, 'gate_digest', digestRow(a.build, H1, D1));
@@ -515,10 +475,8 @@ describe('gate_digest：每 (buildId, headSha) 一份摘要', () => {
   });
 });
 
-// —— 删除（F6 / F7）——————————————————————————————————————————————————
-
-describe('F6 删构建：本构建四表的行随之删除，别的构建不动', () => {
-  test('DELETE build 级联', () => {
+describe('F6 deleting a build: rows of this build in the four tables go with it, other builds untouched', () => {
+  test('DELETE build cascades', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     const b = seedBuild(sqlite, teamId, 'b');
@@ -532,7 +490,7 @@ describe('F6 删构建：本构建四表的行随之删除，别的构建不动'
   });
 });
 
-describe('F7 现有删除路径带着闸行照常成功', () => {
+describe('F7 the existing delete paths succeed with gate rows present', () => {
   async function started(): Promise<{
     s: TestServer;
     projectId: string;
@@ -558,7 +516,6 @@ describe('F7 现有删除路径带着闸行照常成功', () => {
       .from(schema.step)
       .where(eq(schema.step.buildId, buildId))
       .get();
-    // drizzle 写法（S5a/S6a 落库同形），四表各一行，判定挂在这条构建的真步上。
     s.db
       .insert(schema.gateDigest)
       .values({
@@ -627,7 +584,7 @@ describe('F7 现有删除路径带着闸行照常成功', () => {
     });
   }
 
-  test('重置任务（先删步、再删构建）', async () => {
+  test('resetting a todo (steps deleted first, then builds)', async () => {
     const { s, todoId, buildId } = await started();
     const res = await req(s.app, 'POST', `/api/todos/${todoId}/reset`, {});
     expect(res.status).toBe(200);
@@ -635,7 +592,7 @@ describe('F7 现有删除路径带着闸行照常成功', () => {
     s.dispose();
   });
 
-  test('删除任务（todo → build 级联）', async () => {
+  test('deleting a todo (todo -> build cascade)', async () => {
     const { s, todoId, buildId } = await started();
     const res = await req(s.app, 'DELETE', `/api/todos/${todoId}`);
     expect(res.status).toBe(204);
@@ -643,7 +600,7 @@ describe('F7 现有删除路径带着闸行照常成功', () => {
     s.dispose();
   });
 
-  test('删除项目（事务内删步、删任务）', async () => {
+  test('deleting a project (steps and todos deleted in the transaction)', async () => {
     const { s, projectId, buildId } = await started();
     const res = await req(s.app, 'DELETE', `/api/projects/${projectId}`);
     expect(res.status).toBe(204);
@@ -652,10 +609,8 @@ describe('F7 现有删除路径带着闸行照常成功', () => {
   });
 });
 
-// —— 判定不随步走，后续迁移不清闸行（F17 / F18 / F19）——————————————————————
-
-describe('F17 / F18 / F19 闸行只随构建删除', () => {
-  test('F17 后续迁移按 drizzle 形状重建 step（__new_step、拷行、DROP TABLE step、改名）：判定与步一条不少', () => {
+describe('F17 / F18 / F19 gate rows are deleted only with the build', () => {
+  test('F17 the follow-up migration rebuilds step in the drizzle shape (__new_step, copy rows, DROP TABLE step, rename): not one verdict or step missing', () => {
     const { db, sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     const b = seedBuild(sqlite, teamId, 'b');
@@ -677,8 +632,6 @@ describe('F17 / F18 / F19 闸行只随构建删除', () => {
     const verdictsBefore = verdicts();
     expect(verdictsBefore).toHaveLength(3);
 
-    // drizzle-kit 改 step 列约束时生成的形状（同 0004_opposite_chimera.sql），列与建表
-    // 语句取自当前库，step 以后加列也照样成立。
     const { sql: createStep } = sqlite
       .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'step'")
       .get() as { sql: string };
@@ -709,7 +662,7 @@ describe('F17 / F18 / F19 闸行只随构建删除', () => {
     expect(verdicts()).toEqual(verdictsBefore);
   });
 
-  test('F18 删步（构建还在）：判定留着；删构建才带走', () => {
+  test('F18 deleting a step (the build remains): the verdicts stay; only deleting the build takes them', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
     insert(sqlite, 'gate_verdict', verdictRow(a.step, a.build, { outcome: 'block' }));
@@ -721,9 +674,7 @@ describe('F17 / F18 / F19 闸行只随构建删除', () => {
     expect(count(sqlite, 'gate_verdict', a.build)).toBe(0);
   });
 
-  test('F19 截到本迁移的库（四表各有行）→ 跑完之后的全部迁移：四表的行一条不少', () => {
-    // 之后的迁移若按 drizzle 形状重建 build（或经 build.todoId 级联的 todo），DROP TABLE
-    // 的隐式删行会清掉四表；那条迁移得先把闸行挪开再写回。
+  test('F19 a db cut at this migration (rows in all four tables) -> every later migration runs: not one row of the four tables missing', () => {
     const { journal, index } = findGateEntry();
     const sqlite = new Database(':memory:');
     sqlite.pragma('foreign_keys = ON');
@@ -740,10 +691,8 @@ describe('F17 / F18 / F19 闸行只随构建删除', () => {
   });
 });
 
-// —— 登记与写入面（F14 / F15）————————————————————————————————————————————
-
-describe('F14 共享表清单', () => {
-  test('四表进 DB_TABLES 与 INTERNAL_ONLY_TABLES（无 wire record，readiness 经构建记录展示）', () => {
+describe('F14 shared table list', () => {
+  test('the four tables are in DB_TABLES and INTERNAL_ONLY_TABLES (no wire record, readiness surfaces them via build records)', () => {
     for (const t of GATE_TABLES) {
       expect(DB_TABLES).toContain(t);
       expect(INTERNAL_ONLY_TABLES).toContain(t);
@@ -751,8 +700,8 @@ describe('F14 共享表清单', () => {
   });
 });
 
-describe('F15 机器回传面不碰闸表', () => {
-  test('routes-machine.ts 与 services/machine*.ts 不引用四张表', () => {
+describe('F15 the machine report surface never touches the gate tables', () => {
+  test('routes-machine.ts and services/machine*.ts reference none of the four tables', () => {
     const src = resolve(import.meta.dirname, '../src');
     const files = [
       join(src, 'routes-machine.ts'),

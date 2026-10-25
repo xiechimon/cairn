@@ -1,30 +1,3 @@
-// #1403 段 3：CI 磨绿按 PR 的 head SHA 读 check runs、只认必需检查名单，BEHIND / DIRTY，
-// 步收尾时刻（step.finishedAt）。失败方式先于实现，编号同 docs/verify/1403/seg3-plan.md §8：
-//   F1 读 PR 拿 head SHA，check runs 按这个 SHA 读，不按分支名
-//   F2 新 head 上还没有必需检查 → pending（不拿旧 head 的绿）
-//   F3 必需检查 neutral / skipped / cancelled → 不推进、不派修复步，每轮提示一次
-//   F4 必需检查缺席 → pending；超过空 checks 宽限也不按「仓无 CI」推进
-//   F5 非必需检查失败、必需全绿 → 绿
-//   F6 必需检查 failure / timed_out / action_required → [ci-fix]
-//   F7 没有必需名单 → 旧规则，cancelled 挡住，neutral / skipped 不挡
-//   F8 必需名单读不到 → 不动、不读 check runs
-//   F9 classic 保护的 contexts、checks[].context 与 ruleset 的 required_status_checks 取并集
-//   F10 名单按仓库与默认分支缓存 10 分钟
-//   F11 PR 读不到 → 不读 check runs、不动
-//   F12 building 上 dirty → 同一 build 一条 [merge-conflict] 执行步（合并默认分支、禁 force-push）
-//   F13 review 上 dirty → review → queued + 同一条步
-//   F14 本轮已有 2 轮 [merge-conflict] 仍 dirty → 不派第三条，每轮提示一次
-//   F15 有步在飞 → dirty 也不动
-//   F16 读 PR 的网络窗里卡离开相位 → 不写
-//   F17 review 上 behind → 每轮一行提示（update-branch 带 expected_head_sha），不发请求；
-//       building 上 behind → 照 checks 走
-//   F18 mergeable_state 其它值 / 缺失 → 不按 BEHIND / DIRTY 动
-//   F19 提示里的 GitHub 文本经 githubText 清洗
-//   F20 步收尾写 finishedAt；最后推送的提交按它排
-//   F21 迁移之前的行（finishedAt 为空）照旧排
-//   F23 [merge-conflict] 轮不算进 [ci-fix] 的轮数
-//   F24 匿名磨绿：PR 读与名单读同样记进按 IP 的额度
-
 import { conversationBranch, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -54,7 +27,6 @@ afterAll(() => {
 const HEAD = 'a1b2c3d4'.repeat(5);
 const OLD = '0f1e2d3c'.repeat(5);
 const REPO_ID = 4242;
-/** cairn 刚推送、PR 读还没跟上的提交。 */
 const PUSHED = '5e6f7a8b'.repeat(5);
 
 interface Run {
@@ -77,34 +49,23 @@ function reply(status: number, body: unknown, etag = '"e"', extra: Record<string
   };
 }
 
-/** 假 GitHub：pulls/{n}、branches/{b}、rules/branches/{b}、commits/{sha}/check-runs。 */
 class Fake {
   requests: string[] = [];
   headSha = HEAD;
   mergeableState: string | null = 'clean';
-  /** pulls/{n} 的状态码（非 200 = 读不到）；'throw' = 网络错。 */
   pullStatus: number | 'throw' = 200;
-  /** classic 保护：contexts 与 checks[].context；数字 = 状态码。 */
   protection: { contexts: string[]; checks: string[] } | null | number = null;
-  /** ruleset 的 required_status_checks；数字 = 状态码。 */
   rules: string[] | number = [];
-  /** rules 读的限流信号（状态码取 rules）：头 = x-ratelimit-remaining 0；text = 只在 message 里。 */
   rulesRateLimit: 'header' | 'text' | 'sso' | null = null;
-  /** classic 保护 required_status_checks.enforcement_level（null = 不带）。 */
   enforcement: string | null = null;
   runs: Record<string, Run[]> = {};
   onPull: (() => void) | null = null;
-  /** PR 的 state / head 仓 id（null = fork 已删）/ head 分支（缺省本 build 的工作分支）。 */
   pullState: 'open' | 'closed' = 'open';
   headRepoId: number | null = REPO_ID;
   headRef: string | null = null;
-  /** true = 应答里没有 head.ref（字段不齐的 PR 响应）。 */
   headRefMissing = false;
-  /** PR 的目标分支（默认 main = 默认分支）。 */
   baseRef = 'main';
-  /** base 仓的默认分支。 */
   defaultBranch = 'main';
-  /** rules 读非 2xx 时的 message。 */
   rulesMessage = 'x';
 
   reads = (part: string) => this.requests.filter((u) => u.includes(part));
@@ -516,7 +477,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     pushedJustNow(w, t0);
     w.fake.runs[HEAD] = [{ name: 'check', conclusion: 'failure' }];
     await w.poller.sweep(t0);
-    expect(fixSteps(w)).toHaveLength(1); // only the round that pushed
+    expect(fixSteps(w)).toHaveLength(1);
     w.fake.mergeableState = 'dirty';
     await w.poller.sweep(t0 + 60_000);
     expect(conflictSteps(w)).toEqual([]);
@@ -709,7 +670,6 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     await w.poller.sweep(t0);
     await w.poller.sweep(t0 + 60_000);
     expect(conflictSteps(w)).toHaveLength(2);
-    // at building the card goes to failed (as the [ci-fix] dead-loop gate does): a person can act on it
     expect(w.phase()).toBe('failed');
     const build = w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get();
     expect(build?.errorMessage).toContain('冲突');
@@ -784,7 +744,6 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     const t0 = Date.now();
     await w.poller.sweep(t0);
     expect(w.phase()).toBe('queued');
-    // the round ran: its step is done, the PR merges cleanly and the checks are green
     w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
     w.setPhase('building');
     w.fake.mergeableState = 'clean';
@@ -824,7 +783,6 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
     w.setPhase('building');
     w.fake.mergeableState = 'clean';
-    // the merge broke a check: one [ci-fix] round, then green
     w.fake.runs[HEAD] = [{ name: 'check', conclusion: 'failure' }];
     await w.poller.sweep(t0 + 60_000);
     expect(fixSteps(w)).toHaveLength(1);
@@ -1169,7 +1127,6 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
           createdAt: now - 20_000,
         })
         .run();
-    // A heartbeated last but finished first; B finished last
     add('a', 'aaaaaaaa'.repeat(5), now - 1_000, now - 5_000);
     add('b', 'bbbbbbbb'.repeat(5), now - 9_000, now - 2_000);
     expect(lastPushedCheckpoint(w.deps, w.buildId, { mergeSteps: false })).toBe(
@@ -1229,16 +1186,12 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
   });
 
   test('[s3-F24] anonymous: the grind’s PR and required-list reads count toward the per-IP total', async () => {
-    // five per IP: the grind's four reads leave one, and the review PR read needs two free
-    // slots (counting the two required-list reads as one would leave two)
     const w = makeWorld({ connected: false, anonIpReadsPerHour: 5 });
     w.fake.runs[HEAD] = [{ name: 'check', status: 'in_progress', conclusion: null }];
     const r = makeWorld({ phase: 'review', s: w.s, fake: w.fake });
     await w.poller.sweep();
-    // the grind read the PR, the branch, the rules and the check runs: four
     expect(w.fake.reads('/check-runs')).toHaveLength(1);
     expect(w.fake.reads('/branches/')).toHaveLength(2);
-    // only the grind's PR read: the review card's read was skipped for the budget
     expect(w.fake.reads('/pulls/')).toHaveLength(1);
     expect(r.phase()).toBe('review');
   });

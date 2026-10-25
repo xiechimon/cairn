@@ -1,18 +1,3 @@
-// #1108 机器并发上限 + 排队可见（server 面）：claim 容量闸、空位释放 wake、
-// 排队投影（位次 + 等待对象）、写面校验。失败方式（先于实现固化）：
-// 1. 满载不领：本机 claimed 步数 ≥ maxConcurrent → claim 空手、步留
-//    pending（容量排队是合法态——不进失败漏斗，与钉选机离线扫尾正交）。
-// 2. 空位即领：一步收尾（done）→ 下一步可领；finishStep 发 team wake
-//    （满载机器挂起的 claim 长轮询被即时唤醒，不等满 hold）。
-// 3. 上调即时生效 / 下调不抢占：PATCH maxConcurrent 后新领随新值；在飞步
-//    照常收尾（闸只挡新认领）。
-// 4. 投影口径：钉选步位次只数「该机可见集」（钉同机或未钉）；未钉步数全队
-//    pending；waitingFor = 钉选机器 + running/capacity 快照；步被领走 →
-//    投影退场（queue/turnQueue 消失）。
-// 5. PATCH 校验：0 / 17 → 400；合法值落库并在机器记录带 runningSteps。
-// 6. 旧形态零漂移：缺 maxConcurrent 字段的机器记录（老 server 响应形）→
-//    wire 解析通过（optional 契约）。
-
 import { machineRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
@@ -89,13 +74,8 @@ async function fetchEnroll(s: TestServer, key: string): Promise<{ token: string 
   return (await res.json()) as { token: string };
 }
 
-/** seq 单调计数（todo.seqNum 团队内唯一——随机数有撞号面）+ createdAt 单调
- *  偏移（排队位次按 createdAt 序——同刻插入是随机序）。 */
 let seqCounter = 9_000;
 
-/** 建 todo + build + pending 首步（build kind 步；直插最小行集——claim 路径
- *  只消费 step/build/todo/agent 四行；assignment 指 AGENT_ID，无主步会被
- *  claim 静默跳过 = #1104 面）。 */
 function insertPendingBuildStep(
   s: TestServer,
   world: World,
@@ -103,7 +83,7 @@ function insertPendingBuildStep(
 ): { todoId: string; buildId: string; stepId: string } {
   const suffix = Math.random().toString(36).slice(2, 8);
   seqCounter += 1;
-  const now = seqCounter; // 单调时标：调用序 = 队列序
+  const now = seqCounter;
   s.db
     .insert(todoTable)
     .values({
@@ -189,34 +169,32 @@ function insertClaimedStep(s: TestServer, machineId: string, opts: { createdAt: 
   return id;
 }
 
-describe('#1108 claim 容量闸（满载不领 / 空位即领 / 调整即时生效）', () => {
-  test('失败方式 1：满载 → claim 空手、步留 pending（不进失败漏斗）', async () => {
+describe('#1108 claim capacity gate (at capacity no claim / free slot claims / adjustments immediate)', () => {
+  test('failure mode 1: at capacity -> claim comes up empty, step stays pending (no failure funnel)', async () => {
     const w = await setupWorld();
     setCap(w, 2);
-    // 占满两个位（直插 claimed 步——claim 闸只数本机 claimed 计数）。
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 4000 });
     const { stepId } = insertPendingBuildStep(w.s, w);
     const claimed = await claimAs(w);
-    expect(claimed).toBeNull(); // 满载不发步
+    expect(claimed).toBeNull();
     expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!.status).toBe(
       'pending',
     );
   });
 
-  test('失败方式 2：空位即领（在跑步收尾 → 容量闸开）', async () => {
+  test('failure mode 2: free slot claims (running step wraps up -> capacity gate opens)', async () => {
     const w = await setupWorld();
     setCap(w, 1);
     const running = insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const { stepId } = insertPendingBuildStep(w.s, w);
-    expect(await claimAs(w)).toBeNull(); // cap=1 满载
-    // 释放空位：在跑步收尾 → 容量闸开。
+    expect(await claimAs(w)).toBeNull();
     w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, running)).run();
     const claimed = await claimAs(w);
     expect(claimed?.step.id).toBe(stepId);
   });
 
-  test('失败方式 3：下调不抢占——在飞步照常、新步不领；上调即时生效', async () => {
+  test('failure mode 3: lowering does not preempt -- in-flight steps as usual, new steps not claimed; raising immediate', async () => {
     const w = await setupWorld();
     setCap(w, 3);
     const running = [
@@ -224,27 +202,22 @@ describe('#1108 claim 容量闸（满载不领 / 空位即领 / 调整即时生�
       insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 4000 }),
     ];
     insertPendingBuildStep(w.s, w);
-    // 下调到 2 = 在飞数 → 新步不领（不抢占在飞）。
     setCap(w, 2);
     expect(await claimAs(w)).toBeNull();
-    // 在飞收尾一个 → 空位开。
     w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, running[0]!)).run();
     expect((await claimAs(w))?.step.id).toBeTruthy();
-    // 上调：cap 3 → 剩余 1 在飞 + 新 pending → 可领。
     setCap(w, 3);
     const { stepId: step3 } = insertPendingBuildStep(w.s, w);
     expect((await claimAs(w))?.step.id).toBe(step3);
   });
 });
 
-describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
-  test('失败方式 4（#1259 归属机版）：归属机步位次只数同归属机集；waitingFor 快照', async () => {
+describe('#1108 queue projection (position + waiting target + read-surface mount)', () => {
+  test('failure mode 4 (#1259 home-machine version): home-machine step position only counts the same home-machine set; waitingFor snapshot', async () => {
     const w = await setupWorld();
     setCap(w, 2);
-    // 机器 A 满载（2 claimed）。
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 9000 });
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 8000 });
-    // 第二台机器 B + 绑 B 的 agent。
     const machineBId = `machine-b-${Math.random().toString(36).slice(2)}`;
     w.s.db
       .insert(machineTable)
@@ -267,12 +240,10 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
         machineId: machineBId,
       })
       .run();
-    // 队列：中 pending（归 A）、晚 pending（归 B）、目标（归 A，最晚）。
     insertPendingBuildStep(w.s, w);
     const lateB = insertPendingBuildStep(w.s, w, { agentId: 'agent-cap-b' });
     const target = insertPendingBuildStep(w.s, w);
     const projector = stepQueueProjector(w.s.db, w.s.team.id);
-    // 归 A 目标：可见集 = [midA, target]——归 B 的步不可见不计；位次 = 2。
     const targetInfo = projector.project({
       id: target.stepId,
       createdAt: Date.now(),
@@ -284,7 +255,6 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
       running: 2,
       capacity: 2,
     });
-    // 归 B 步：B 机可见集只它自己 → 位次 1；waitingFor = B 快照。
     const bInfo = projector.project({
       id: lateB.stepId,
       createdAt: Date.now(),
@@ -294,16 +264,15 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
     expect(bInfo?.waitingFor).toMatchObject({ machineId: machineBId, running: 0, capacity: 3 });
   });
 
-  test('失败方式 4b：steps 查询挂 queue；步被领走 → 投影退场', async () => {
+  test('failure mode 4b: steps query mounts queue; step claimed -> projection exits', async () => {
     const w = await setupWorld();
     setCap(w, 1);
-    const running = insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 }); // 满载
+    const running = insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const { buildId, stepId } = insertPendingBuildStep(w.s, w);
     const rows = listSteps(machineDepsOf(w), buildId);
     const row = rows.find((r) => r.id === stepId);
     expect(row?.status).toBe('pending');
     expect(row?.queue).toMatchObject({ position: 1 });
-    // 收尾占位步 → 领走目标 → queue 退场（claimed 行无投影）。
     w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, running)).run();
     await claimAs(w);
     const after = listSteps(machineDepsOf(w), buildId).find((r) => r.id === stepId);
@@ -311,12 +280,11 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
     expect(after?.queue).toBeUndefined();
   });
 
-  test('失败方式 4c：chief threads 挂 turnQueue；被领走后退场', async () => {
+  test('failure mode 4c: chief threads mount turnQueue; after claimed they exit', async () => {
     const w = await setupWorld();
     setCap(w, 1);
-    const running = insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 }); // 满载
+    const running = insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const now = Date.now();
-    // chief 线程 + pending 回合步（直插——sendChiefMessage 面归 chief.test）。
     const threadId = `chief-cap-${Math.random().toString(36).slice(2, 8)}`;
     w.s.db
       .insert(chiefTable)
@@ -326,8 +294,6 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
         teamId: w.s.team.id,
         agentId: AGENT_ID,
         charter: '',
-        // #1260：chief 步的归属 = 绑定 Agent 的归属机（AGENT_ID 出生绑 A；
-        // 投影的 waitingFor 快照源）。
         createdAt: now,
       })
       .run();
@@ -377,7 +343,6 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
       position: 1,
       waitingFor: { machineId: w.machineAId, running: 1, capacity: 1 },
     });
-    // 领走（腾出占位步后 claim）→ turnQueue 退场。
     w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, running)).run();
     const claimed = await claimAs(w);
     expect(claimed?.step.id).toBe(chiefStepId);
@@ -389,8 +354,8 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
   });
 });
 
-describe('#1108 写面与 wire 契约（PATCH 校验 / 记录投影 / wake）', () => {
-  test('失败方式 5：PATCH maxConcurrent 0 / 17 → 400；合法值落库 + runningSteps', async () => {
+describe('#1108 write surface and wire contract (PATCH validation / record projection / wake)', () => {
+  test('failure mode 5: PATCH maxConcurrent 0 / 17 -> 400; legal value persisted + runningSteps', async () => {
     const w = await setupWorld();
     for (const bad of [0, 17]) {
       const res = await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
@@ -406,7 +371,6 @@ describe('#1108 写面与 wire 契约（PATCH 校验 / 记录投影 / wake）', 
     const body = (await res.json()) as { maxConcurrent: number; runningSteps: number };
     expect(body.maxConcurrent).toBe(5);
     expect(body.runningSteps).toBe(1);
-    // 团队机器列表同投影。
     const list = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/machines`);
     const rows = (await list.json()) as {
       id: string;
@@ -416,8 +380,7 @@ describe('#1108 写面与 wire 契约（PATCH 校验 / 记录投影 / wake）', 
     expect(rows.find((r) => r.id === w.machineAId)?.maxConcurrent).toBe(5);
   });
 
-  test('失败方式 6：老 server 形（无 maxConcurrent/runningSteps 字段）→ wire 解析通过', () => {
-    // optional 加法契约：老响应缺字段可解析（消费面回退，混版本零崩）。
+  test('failure mode 6: legacy server shape (no maxConcurrent/runningSteps fields) -> wire parse passes', () => {
     const parsed = machineRecordSchema.parse({
       id: 'm-old',
       name: 'old',
@@ -432,13 +395,12 @@ describe('#1108 写面与 wire 契约（PATCH 校验 / 记录投影 / wake）', 
     expect(parsed.runningSteps).toBeUndefined();
   });
 
-  test('失败方式 2b：finishStep 终态发 team wake（空位即时交接）', async () => {
+  test('failure mode 2b: finishStep terminal sends a team wake (free slot handover immediately)', async () => {
     const w = await setupWorld();
     setCap(w, 1);
     const { stepId } = insertPendingBuildStep(w.s, w);
     const claimed = await claimAs(w);
     expect(claimed?.step.id).toBe(stepId);
-    // 领走后机器满载——挂起的 claim 等 wake/hold；收尾步应发 wake。
     const wake = vi.spyOn(w.s.machineHub, 'wake');
     const res = await w.s.app.request(`/api/machine/done/${stepId}`, {
       method: 'POST',

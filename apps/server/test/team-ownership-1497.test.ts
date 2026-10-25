@@ -1,18 +1,3 @@
-// #1497：#1470 之后剩下的团队归属缺口——startBuilds、claim 与 chief
-// delete_memory。单团队部署下不可触发；本文件直插第二个团队造出触发面。
-// 失败方式（先于实现固化）：
-//  V1 startBuilds：本队任务指向他队项目（#1466 前 create_todo 可造）照样建
-//     build、推相位——REST / 定时 / 其它调用方不经 chief / MCP 的入口校验。
-//  V2 定时触发同一种行：tick 不得抛出（tick 在启动时同步跑，抛出会拖垮
-//     启动），也不建 build。
-//  V3 已存在的 build 在这种行上被领取：claim 载荷带他队仓库，凭证端点发
-//     本队的 git 凭证。
-//  V4 chief delete_memory：按 id 删掉别的 Agent / 他队的记忆。
-//  V5 同团队路径不变。
-//  V6 startBuilds 同一 id 出现两次：第二次照旧 409，不建第二个 build。
-//  V7 build 变更读面（readBuildChangeFile）：任务指向他队 hosted 项目时读到
-//     他队 bare 仓。
-
 import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -61,7 +46,6 @@ async function call(
   });
 }
 
-/** 本队、他队各一个 hosted 项目（claim 时会派生出 clone URL）+ 本队任务。 */
 async function world() {
   const s = bootServer({ claimHoldMs: 250 });
   servers.push(s);
@@ -99,7 +83,6 @@ async function world() {
   return { s, projectId, todoId, token };
 }
 
-/** 把任务改指他队项目（存量异常行的形状）。 */
 function pointAtTeamB(s: TestServer, todoId: string): void {
   s.db.update(todoTable).set({ projectId: PROJ_B }).where(eq(todoTable.id, todoId)).run();
 }
@@ -112,8 +95,8 @@ function stateOf(s: TestServer, todoId: string) {
 
 const assignment = { plan: null, build: { agentId: AGENT_ID } };
 
-describe('#1497 startBuilds：项目须与任务同队', () => {
-  test('V1 本队任务指向他队项目 → NotFound project，不建 build、相位不动', async () => {
+describe('#1497 startBuilds: the project must share the todo team', () => {
+  test('V1 an own-team todo pointing at another team project -> NotFound project, no build created, the phase unchanged', async () => {
     const { s, todoId } = await world();
     pointAtTeamB(s, todoId);
     const before = stateOf(s, todoId);
@@ -123,7 +106,7 @@ describe('#1497 startBuilds：项目须与任务同队', () => {
     expect(stateOf(s, todoId)).toEqual(before);
   });
 
-  test('V1 REST 入口同样 404', async () => {
+  test('V1 the REST entry 404s the same way', async () => {
     const { s, todoId } = await world();
     pointAtTeamB(s, todoId);
     const res = await call(s.app, 'POST', `/api/projects/${PROJ_B}/builds`, {
@@ -133,7 +116,7 @@ describe('#1497 startBuilds：项目须与任务同队', () => {
     expect(stateOf(s, todoId).builds).toBe(0);
   });
 
-  test('V2 定时触发：tick 不抛出，不建 build', async () => {
+  test('V2 a scheduled trigger: tick does not throw, no build created', async () => {
     const { s, todoId } = await world();
     pointAtTeamB(s, todoId);
     const at = Math.ceil((nowMs() + 3_600_000) / 900_000) * 900_000;
@@ -152,13 +135,12 @@ describe('#1497 startBuilds：项目须与任务同队', () => {
     const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
     expect(() => scheduler.tick(at + 1_000)).not.toThrow();
     expect(stateOf(s, todoId).builds).toBe(0);
-    // 这条定时再也触发不了：出队，不在每个 tick 上重试。
     expect(s.db.select().from(scheduleTable).where(eq(scheduleTable.todoId, todoId)).all()).toEqual(
       [],
     );
   });
 
-  test('V6 同一 id 出现两次：第二次 409，只有一个 build', async () => {
+  test('V6 the same id twice: the second 409s, only one build', async () => {
     const { s, projectId, todoId } = await world();
     expect(() =>
       startBuilds(s.svc, { projectId, todoIds: [todoId, todoId], assignment, withPlan: false }),
@@ -166,7 +148,7 @@ describe('#1497 startBuilds：项目须与任务同队', () => {
     expect(stateOf(s, todoId).builds).toBe(1);
   });
 
-  test('V7 变更读面：任务指向他队 hosted 项目 → 404，不读他队仓库', async () => {
+  test('V7 the changes read surface: a todo pointing at another team hosted project -> 404, the other team repo unread', async () => {
     const { s, projectId, todoId } = await world();
     const [created] = startBuilds(s.svc, {
       projectId,
@@ -187,7 +169,7 @@ describe('#1497 startBuilds：项目须与任务同队', () => {
     expect((err as HttpError).status).toBe(404);
   });
 
-  test('V5 本队项目照常建 build', async () => {
+  test('V5 own-team projects create builds as usual', async () => {
     const { s, projectId, todoId } = await world();
     const created = startBuilds(s.svc, {
       projectId,
@@ -200,11 +182,10 @@ describe('#1497 startBuilds：项目须与任务同队', () => {
   });
 });
 
-describe('#1497 claim：他队项目不进载荷，不发凭证', () => {
+describe('#1497 claim: another team project stays out of the payload, no credentials issued', () => {
   async function claimed(cross: boolean) {
     const { s, projectId, todoId, token } = await world();
     startBuilds(s.svc, { projectId, todoIds: [todoId], assignment, withPlan: false });
-    // build 已在跑之后，任务才指到他队项目（存量行在 claim 时的形状）。
     if (cross) pointAtTeamB(s, todoId);
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,
@@ -219,21 +200,21 @@ describe('#1497 claim：他队项目不进载荷，不发凭证', () => {
     return { step, creds };
   }
 
-  test('V3 任务指向他队 hosted 项目：载荷无 repo，凭证 git = null', async () => {
+  test('V3 a todo pointing at another team hosted project: no repo in the payload, the git credential null', async () => {
     const { step, creds } = await claimed(true);
     expect(step.project?.repo ?? null).toBeNull();
     expect(JSON.stringify(step)).not.toContain(`/${TEAM_B}/`);
     expect(creds.git).toBeNull();
   });
 
-  test('V5 本队 hosted 项目：载荷带 repo，凭证照发', async () => {
+  test('V5 an own-team hosted project: the payload carries the repo, credentials issued as usual', async () => {
     const { step, creds } = await claimed(false);
     expect(step.project?.repo?.kind).toBe('hosted');
     expect(creds.git).not.toBeNull();
   });
 });
 
-describe('#1497 chief delete_memory：只删本 Agent 本团队条目', () => {
+describe('#1497 chief delete_memory: deletes only this agent own-team entries', () => {
   function insertMemory(s: TestServer, agentId: string, teamId: string): string {
     const id = newRecordId();
     s.db
@@ -274,7 +255,7 @@ describe('#1497 chief delete_memory：只删本 Agent 本团队条目', () => {
     return s.db.select().from(agentMemory).where(eq(agentMemory.id, id)).get() !== undefined;
   }
 
-  test('V4 别的 Agent / 他队的记忆不被删', async () => {
+  test('V4 another agent / another team memories are not deleted', async () => {
     const { s } = await world();
     const otherAgent = insertMemory(s, 'agent-other-1497', s.team.id);
     const otherTeam = insertMemory(s, AGENT_ID, TEAM_B);
@@ -290,7 +271,7 @@ describe('#1497 chief delete_memory：只删本 Agent 本团队条目', () => {
     expect(exists(s, otherTeam)).toBe(true);
   });
 
-  test('V4 worker delete_memory：别的 Agent 的记忆 → 404，不删', async () => {
+  test('V4 worker delete_memory: another agent memories -> 404, not deleted', async () => {
     const { s, todoId } = await world();
     const otherAgent = insertMemory(s, 'agent-other-1497', s.team.id);
     const err = await executeWorkerMemoryTool(
@@ -313,7 +294,7 @@ describe('#1497 chief delete_memory：只删本 Agent 本团队条目', () => {
     expect(exists(s, otherAgent)).toBe(true);
   });
 
-  test('V5 本 Agent 本团队的记忆照删', async () => {
+  test('V5 this agent own-team memories are deleted as usual', async () => {
     const { s } = await world();
     const own = insertMemory(s, AGENT_ID, s.team.id);
     await chiefDelete(s, own);

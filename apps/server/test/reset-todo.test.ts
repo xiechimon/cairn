@@ -1,8 +1,3 @@
-// 任务重置（#755，todos.dev 看板指南「已开始的卡片拖回待开始会重置任务：
-// 中断构建并清空对话、方案和改动记录」）：POST /api/todos/:id/reset 面——
-// 中断在飞构建（含远端执行机的 stop 信号）+ 硬清空产物 + 相位回 todo。
-// 脏读面：dialog 打开后构建推进了 = 409 + 现记录（按旧文案重置被拒）。
-
 import { type Phase, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
@@ -25,7 +20,6 @@ async function setupStarted(phase: Phase): Promise<{ s: TestServer; id: string }
       await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: 'p', spec: 'x' })
     ).json(),
   );
-  // startBuilds = pending 步在队 + latestBuildId 在位（真实开始路径的产物位）。
   startBuilds(s.svc, {
     projectId,
     todoIds: [created.id],
@@ -45,8 +39,8 @@ async function reset(
   return { status: res.status, json: (await res.json()) as Record<string, unknown> };
 }
 
-describe('任务重置（#755）', () => {
-  test('building 卡：200 + 相位回 todo + 产物旗清零 + build/steps/messages 全删', async () => {
+describe('todo reset (#755)', () => {
+  test('a building card: 200 + phase back to todo + the deliverable flags zeroed + build/steps/messages all deleted', async () => {
     const { s, id } = await setupStarted('building');
     const buildsBefore = s.db.select().from(buildTable).where(eq(buildTable.todoId, id)).all();
     expect(buildsBefore.length).toBe(1);
@@ -67,7 +61,7 @@ describe('任务重置（#755）', () => {
     s.dispose();
   });
 
-  test('pending 步：无 stop 信号（无机器可通知，随 build 删除而消失）', async () => {
+  test('a pending step: no stop signal (no machine to notify, it disappears with the deleted build)', async () => {
     const { s, id } = await setupStarted('building');
     const signals: Array<{ teamId: string; stepId: string }> = [];
     const origStop = s.machineHub.stopSignal.bind(s.machineHub);
@@ -83,7 +77,7 @@ describe('任务重置（#755）', () => {
     s.dispose();
   });
 
-  test('claimed 步：machineHub.stopSignal 被调用（远端执行机可达面）', async () => {
+  test('a claimed step: machineHub.stopSignal is called (the reachable remote execution machine surface)', async () => {
     const { s, id } = await setupStarted('building');
     const buildRow = s.db.select().from(buildTable).where(eq(buildTable.todoId, id)).get()!;
     const stepRow = s.db.select().from(stepTable).where(eq(stepTable.buildId, buildRow.id)).get()!;
@@ -105,7 +99,7 @@ describe('任务重置（#755）', () => {
     s.dispose();
   });
 
-  test('done（有构建历史）卡：同样重置（改动记录清空，任务定义保留）', async () => {
+  test('a done card (with build history): reset the same way (change records cleared, the todo definition kept)', async () => {
     const { s, id } = await setupStarted('done');
     const { status, json } = await reset(s, id);
     expect(status).toBe(200);
@@ -117,19 +111,18 @@ describe('任务重置（#755）', () => {
     s.dispose();
   });
 
-  test('快照对不上：409 + 现记录（dialog 打开后构建推进，旧文案作废）', async () => {
+  test('snapshot mismatch: 409 + the current record (the build advanced after the dialog opened, the old copy void)', async () => {
     const { s, id } = await setupStarted('building');
     const { status, json } = await reset(s, id, { expectedBuildId: 'build-from-another-timeline' });
     expect(status).toBe(409);
     expect(json).toHaveProperty('error');
     expect(json).toHaveProperty('record');
-    // 零写入：构建行还在，相位未动。
     expect(s.db.select().from(buildTable).where(eq(buildTable.todoId, id)).all().length).toBe(1);
     expect(s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()!.phase).toBe('building');
     s.dispose();
   });
 
-  test('不存在的 todo：404', async () => {
+  test('a nonexistent todo: 404', async () => {
     const { s } = await setupStarted('building');
     const { status } = await reset(s, 'todo-that-does-not-exist');
     expect(status).toBe(404);
