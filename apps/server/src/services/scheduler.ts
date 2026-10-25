@@ -5,6 +5,11 @@ import { build, schedule, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import {
+  OUTCOME_BACKFILL_INTERVAL_MS,
+  type OutcomeBackfillLogger,
+  sweepOutcomeBackfill,
+} from '../trajectory-outcome-backfill.js';
+import {
   ATTACHMENT_GC_INTERVAL_MS,
   type GcLogger,
   sweepAttachmentBatches,
@@ -64,6 +69,23 @@ export interface AttachmentGcRun {
   logger: GcLogger;
 }
 
+export interface TrajectoryOutcomeRun {
+  logger: OutcomeBackfillLogger;
+}
+
+export function trajectoryOutcomeRunOf(
+  config: { trajectoryOutcomeBackfill: boolean },
+  run: TrajectoryOutcomeRun,
+): TrajectoryOutcomeRun | null {
+  run.logger.info(
+    { trajectoryOutcomeBackfill: config.trajectoryOutcomeBackfill },
+    config.trajectoryOutcomeBackfill
+      ? `trajectory outcome backfill on (${ENV_VARS.trajectoryOutcomeBackfill})`
+      : `trajectory outcome backfill off (set ${ENV_VARS.trajectoryOutcomeBackfill}=1 to enable)`,
+  );
+  return config.trajectoryOutcomeBackfill ? run : null;
+}
+
 const CANCEL_GATE_PHASES = new Set(['confirm', 'review']);
 
 export function createScheduler(
@@ -72,6 +94,7 @@ export function createScheduler(
   gc?: AttachmentGcRun | null,
   ci?: CiPollRun | null,
   intake?: IssueIntakeRun | null,
+  outcome?: TrajectoryOutcomeRun | null,
 ): Scheduler {
   let timer: NodeJS.Timeout | null = null;
   const ciPoller =
@@ -87,6 +110,8 @@ export function createScheduler(
   let lastGcAt = 0;
   let gcImmediate: NodeJS.Immediate | null = null;
   let gcBatches: ReturnType<typeof sweepAttachmentBatches> | null = null;
+  let outcomeTimer: NodeJS.Timeout | null = null;
+  let outcomeSweeping = false;
 
   function advanceGc(): void {
     if (!gc || !gcBatches) return;
@@ -206,8 +231,27 @@ export function createScheduler(
         }, ISSUE_INTAKE_INTERVAL_MS);
         intakeTimer.unref?.();
       }
+      if (outcome !== undefined && outcome !== null && deps.reposDir !== undefined) {
+        const reposDir = deps.reposDir;
+        const sweep = () => {
+          if (outcomeSweeping) return;
+          outcomeSweeping = true;
+          void sweepOutcomeBackfill({ db: deps.db, reposDir, logger: outcome.logger })
+            .catch(() => {})
+            .finally(() => {
+              outcomeSweeping = false;
+            });
+        };
+        sweep();
+        outcomeTimer = setInterval(sweep, OUTCOME_BACKFILL_INTERVAL_MS);
+        outcomeTimer.unref?.();
+      }
     },
     stop() {
+      if (outcomeTimer !== null) {
+        clearInterval(outcomeTimer);
+        outcomeTimer = null;
+      }
       if (gcImmediate !== null) clearImmediate(gcImmediate);
       gcImmediate = null;
       gcBatches = null;

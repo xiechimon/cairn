@@ -59,6 +59,7 @@ export const ENV_VARS = {
   piCacheRetention: 'CAIRN_PI_CACHE_RETENTION',
   hookTimeoutMs: 'CAIRN_HOOK_TIMEOUT_MS',
   issueIntake: 'CAIRN_ISSUE_INTAKE',
+  trajectoryOutcomeBackfill: 'CAIRN_TRAJ_OUTCOME_BACKFILL',
 } as const;
 
 export const API_KEY_PATTERN = /^cairn_[0-9a-f]{48}$/;

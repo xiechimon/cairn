@@ -704,3 +704,13 @@ export const buildFeedback = sqliteTable(
   },
   (t) => [index('build_feedback_buildId_idx').on(t.buildId)],
 );
+
+export const buildOutcomeBackfill = sqliteTable('build_outcome_backfill', {
+  buildId: text('buildId')
+    .primaryKey()
+    .references(() => build.id, { onDelete: 'cascade' }),
+  revertedWithin7d: bool('revertedWithin7d').notNull(),
+  fixedByLaterPr: bool('fixedByLaterPr').notNull(),
+  mergeCommit: text('mergeCommit').notNull(),
+  checkedAt: epochMs('checkedAt').notNull(),
+});

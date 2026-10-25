@@ -6061,6 +6061,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "skillsDir": "CAIRN_SKILLS_DIR",
     "team": "CAIRN_TEAM",
     "token": "CAIRN_TOKEN",
+    "trajectoryOutcomeBackfill": "CAIRN_TRAJ_OUTCOME_BACKFILL",
     "webDir": "CAIRN_WEB_DIR",
     "workspacesDir": "CAIRN_WORKSPACES_DIR",
   },
@@ -6520,6 +6521,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "autonomy_state",
   "member_activity",
   "build_feedback",
+  "build_outcome_backfill",
   "memory_save_conflict",
   "memory_candidate",
 ]

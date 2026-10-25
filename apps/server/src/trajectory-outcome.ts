@@ -1,6 +1,6 @@
 import { and, asc, eq, gt, inArray, like, ne } from 'drizzle-orm';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { build, message, step } from './db/schema.js';
+import type { Db } from './db/client.js';
+import { build, buildOutcomeBackfill, message, step } from './db/schema.js';
 import { DONE_ROW, prClosedUnmergedRow } from './services/delivery-rows.js';
 
 export const REVERT_PROMPT_HEAD = '[revert]';
@@ -14,20 +14,28 @@ export interface PackOutcomeSignals {
   revertWindowOpen: boolean;
 }
 
-export function derivePackOutcome(
-  db: BetterSQLite3Database,
-  b: { id: string; todoId: string; prNumber: number | null },
-  now: number,
-): PackOutcomeSignals {
+export function latestDeliveryVerdict(
+  db: Db,
+  b: { id: string; prNumber: number | null },
+): { content: string; at: number } | undefined {
   const closedRow = b.prNumber === null ? [] : [prClosedUnmergedRow(b.prNumber)];
-  const verdicts = db
+  return db
     .select({ content: message.content, at: message.createdAt })
     .from(message)
     .where(and(eq(message.conversationId, b.id), eq(message.role, 'system')))
     .orderBy(asc(message.createdAt), asc(message.id))
     .all()
-    .filter((row) => row.content === DONE_ROW || closedRow.includes(String(row.content)));
-  const latest = verdicts.at(-1);
+    .filter((row) => row.content === DONE_ROW || closedRow.includes(String(row.content)))
+    .map((row) => ({ content: String(row.content), at: row.at }))
+    .at(-1);
+}
+
+export function derivePackOutcome(
+  db: Db,
+  b: { id: string; todoId: string; prNumber: number | null },
+  now: number,
+): PackOutcomeSignals {
+  const latest = latestDeliveryVerdict(db, b);
   if (latest === undefined)
     return { merged: null, revertedWithin7d: null, fixedByLaterPr: null, revertWindowOpen: false };
   if (latest.content !== DONE_ROW)
@@ -63,10 +71,20 @@ export function derivePackOutcome(
     (later) => later.prNumber !== null && !revertBuildIds.has(later.id),
   );
   const revertWindowOpen = now < windowEnd;
-  return {
+  const signals: PackOutcomeSignals = {
     merged: true,
     revertedWithin7d: revertWindowOpen ? null : reverted,
     fixedByLaterPr: fixed ? true : revertWindowOpen ? null : false,
     revertWindowOpen,
   };
+  const backfill = db
+    .select()
+    .from(buildOutcomeBackfill)
+    .where(eq(buildOutcomeBackfill.buildId, b.id))
+    .get();
+  if (backfill !== undefined) {
+    signals.revertedWithin7d = backfill.revertedWithin7d;
+    signals.fixedByLaterPr = backfill.fixedByLaterPr;
+  }
+  return signals;
 }
