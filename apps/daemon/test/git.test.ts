@@ -524,7 +524,11 @@ describe('machineGitEnv — 执行机本机凭据 env（#1225 兜底路）', () 
       input: 'protocol=http\nhost=127.0.0.1:1\n\n',
       encoding: 'utf8',
       env: {
-        ...process.env,
+        ...Object.fromEntries(
+          Object.entries(process.env).filter(
+            ([key]) => !/^GIT_CONFIG_(COUNT|KEY_\d+|VALUE_\d+|PARAMETERS)$/.test(key),
+          ),
+        ),
         HOME: home,
         GIT_CONFIG_NOSYSTEM: '1',
         ...machineGitEnv(),
