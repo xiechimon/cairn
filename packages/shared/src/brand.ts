@@ -76,5 +76,6 @@ export function conversationBranch(conversationId: string): string {
 }
 
 export const PUBLISHED_PACKAGES = {
+  server: { name: '@xiechimon/cairn', command: 'cairn' },
   cli: { name: '@xiechimon/cairn-cli', command: 'cairn' },
 } as const;
