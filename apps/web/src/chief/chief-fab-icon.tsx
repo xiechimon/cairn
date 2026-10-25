@@ -4,7 +4,7 @@ import { BUSY_SPIN_CLS } from './chief-spiral-face.js';
 
 export function SpiralMark({
   busy,
-  className = 'size-5.5 text-(--fab-mark)',
+  className = 'size-5.5',
 }: {
   busy: boolean;
   className?: string;
