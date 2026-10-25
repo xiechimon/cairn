@@ -34,6 +34,7 @@
 - **No inline imports** (`await import()`, `import("pkg").Type`, dynamic type imports); top-level only.
 - `apps/daemon/src/backend/` is the GitOps / MCP / LLM provider seam; other modules import it as an interface boundary and must not reach around it.
 - **Ask first** before removing a feature or code that looks intentional.
+- Before offering or estimating a move or rename of a path, grep every consumer of that path (product code, agent prompts, CI, skills, generators) and price the option from that list.
 
 ## Commands
 
