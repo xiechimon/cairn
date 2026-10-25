@@ -1,37 +1,41 @@
-# Agent 派活提示模板
+# Agent dispatch prompt templates
 
-将任务、范围和验收命令补在对应模板后；三家均遵循 AGENTS.md。
+Append the task, scope and acceptance commands after the matching template; all three executors follow AGENTS.md.
 
-## 起任务与汇报（#1556）
+## Starting tasks and reporting (#1556)
 
-后台长任务不经 `( ... & )` 或 `nohup ... &` 直起——工具调用返回时的进程组清理会杀掉它们（台账 #1556）。一律走 `scripts/dispatch-agent.mjs`：
+Do not start long background tasks directly with `( ... & )` or `nohup ... &`: the process-group cleanup when a tool call returns kills them (ledger #1556). Always use `scripts/dispatch-agent.mjs`:
 
 ```sh
-node scripts/dispatch-agent.mjs start <id> [--cwd <目录>] [--ticket <票号> [--force]] -- <完整命令>
+node scripts/dispatch-agent.mjs start <id> [--cwd <dir>] [--ticket <ticket> [--force]] -- <full command>
 node scripts/dispatch-agent.mjs check <id>
 ```
 
-start 让命令在自己的会话里启动（躲开进程组清理）、立即核对进程并把状态写进状态文件（默认 `$TMPDIR/cairn-dispatch/<id>.json`，`CAIRN_DISPATCH_STATUS_DIR` 可覆写；命令输出写进 `<id>.log`）。汇报任务状态前必须先跑 `check` 读状态文件，不许凭印象说「在跑」；直起的任务没有状态记录，`check` 报进程不存在。
+start runs the command in its own session (avoiding the process-group cleanup), checks the process immediately and writes the state to a status file (default `$TMPDIR/cairn-dispatch/<id>.json`, overridable with `CAIRN_DISPATCH_STATUS_DIR`; command output goes to `<id>.log`). Before reporting a task's state, run `check` to read the status file; never say "running" from memory. A task started directly has no status record, and `check` reports that the process does not exist.
 
-派某张票的活一律带 `--ticket <票号>`（台账「派活前没查重」，#1569/#1578）：start 先查同票是否已有人在做——系统 tmp 目录（`os.tmpdir()` 与 `/tmp`）下名字含票号的 git 工作目录（不含 `--cwd` 自身）、`origin` 上含票号的分支、`xiechimon/cairn` 里搜得到该票号的 open PR、命令行含票号的 codex / pi / grok 进程。任一命中即列出并以退出码 1 拒绝启动；查不了的来源（如 gh 不可用）报「unchecked」，不当作无命中。确认命中项与本次无关后才加 `--force`。
+Dispatch work for a ticket always with `--ticket <ticket>` (ledger: no duplicate check before dispatch, #1569/#1578): start first checks whether someone is already on the same ticket: git working directories whose name contains the ticket number under the system tmp directories (`os.tmpdir()` and `/tmp`, excluding `--cwd` itself), branches on `origin` containing the ticket number, open PRs in `xiechimon/cairn` that mention the ticket number, and codex / pi / grok processes whose command line contains the ticket number. Any hit is listed and start refuses with exit code 1; a source that cannot be checked (for example gh unavailable) is reported as "unchecked", not as no hit. Add `--force` only after confirming the hits are unrelated.
 
 ```sh
-node scripts/dispatch-agent.mjs start 1556-impl --cwd <worktree> --ticket 1556 -- ai-route run implement -C <worktree> "<任务>"
+node scripts/dispatch-agent.mjs start 1556-impl --cwd <worktree> --ticket 1556 -- ai-route run implement -C <worktree> "<task>"
 node scripts/dispatch-agent.mjs check 1556-impl
 ```
 
-## 访问 GitHub
+## Accessing GitHub
 
-查 GitHub 上的名字、PR、CI 状态只用已登录的 `gh api`（`gh api /users/<名字>`，404 即空闲），一个名字一次请求；不对 `github.com/...` 网页做未登录的批量或循环请求（curl、浏览器自动化都算）。轮询 PR / CI 状态间隔不短于 5 分钟。未登录的网页请求按出口 IP 计入 GitHub 二级限流，同一 IP 上的人会一起被挡（台账「GitHub 二级限流」）。
+Look up GitHub names, PRs and CI status only with the authenticated `gh api` (`gh api /users/<name>`; 404 means free), one request per name. Do not make unauthenticated batch or looped requests to `github.com/...` pages (curl and browser automation both count). Poll PR / CI status no more often than every 5 minutes. Unauthenticated page requests count against GitHub's secondary rate limit per egress IP, and everyone on the same IP gets blocked together (ledger: GitHub secondary rate limit).
+
+## Image assets
+
+Images for the site, README, demo site, phone UI, icons and avatars, and doc illustrations are generated with codex first, not hand-drawn as SVG or canvas code. Image generation is exempt from the "codex for hard jobs only" quota rule. Show each generated image to ian first; it goes into the repo and gets pushed only after he approves.
 
 ## Codex
 
-实现下述任务并按仓库规则验证。不写新注释；用命名和代码结构表达意图，例外遵循仓库注释纪律。任务中犯错并修好后，当轮执行 AGENTS.md「错误台账」规则，按类别更新 `docs/lessons.md`，取最高可行防护级；新闸用真实失误做负对照。
+Implement the task below and verify it according to the repository rules. Do not write comments; express intent through naming and code structure; exceptions follow the repository comment discipline. Write all repository content in English: comments, docs, test titles, commit messages and PR bodies. When you make a mistake during the task and fix it, apply the AGENTS.md "Lessons ledger" rule in the same round: update `docs/lessons.md` by category at the highest feasible protection level, and use the real mistake as the negative control for any new gate.
 
 ## Grok
 
-实现下述任务并按仓库规则验证。不写新注释；用命名和代码结构表达意图，例外遵循仓库注释纪律。任务中犯错并修好后，当轮执行 AGENTS.md「错误台账」规则，按类别更新 `docs/lessons.md`，取最高可行防护级；新闸用真实失误做负对照。
+Implement the task below and verify it according to the repository rules. Do not write comments; express intent through naming and code structure; exceptions follow the repository comment discipline. Write all repository content in English: comments, docs, test titles, commit messages and PR bodies. When you make a mistake during the task and fix it, apply the AGENTS.md "Lessons ledger" rule in the same round: update `docs/lessons.md` by category at the highest feasible protection level, and use the real mistake as the negative control for any new gate.
 
 ## pi
 
-实现下述任务并按仓库规则验证。不写新注释；用命名和代码结构表达意图，例外遵循仓库注释纪律。任务中犯错并修好后，当轮执行 AGENTS.md「错误台账」规则，按类别更新 `docs/lessons.md`，取最高可行防护级；新闸用真实失误做负对照。
+Implement the task below and verify it according to the repository rules. Do not write comments; express intent through naming and code structure; exceptions follow the repository comment discipline. Write all repository content in English: comments, docs, test titles, commit messages and PR bodies. When you make a mistake during the task and fix it, apply the AGENTS.md "Lessons ledger" rule in the same round: update `docs/lessons.md` by category at the highest feasible protection level, and use the real mistake as the negative control for any new gate.

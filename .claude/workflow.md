@@ -1,58 +1,58 @@
-# Cairn 工作流（给任何接手的 Claude / agent）
+# Cairn workflow (for any Claude or agent taking over)
 
-> 目的：换账号、换机器后，新的 Claude（Desktop / Code）克隆本仓，读完这一页和 `AGENTS.md` 就能按同样方式继续。本文件只写工作方式、分工和当前进展摘要；规则细节以 `AGENTS.md` 为准，冲突时 `AGENTS.md` 赢。
-> 本仓是公开的：不写密钥、内部地址、个人信息、额度细节。
+> Purpose: after switching accounts or machines, a new Claude (Desktop / Code) clones this repo, reads this page and `AGENTS.md`, and continues the same way. This file covers working style, division of labor and a progress summary only; `AGENTS.md` holds the rule details and wins on conflict.
+> This repo is public: no secrets, internal addresses, personal information or quota details.
 
-## 1. 项目目标
+## 1. Project goal
 
-让 cairn 能自己迭代自己：跑通 spec 28 自举闭环（ADR 0021），cairn 自己领票、实现、审核、合并 PR；再用评测与轨迹数据闭环持续优化 harness（提示词、技能、路由）。不微调模型：这里说的「训练」指优化 harness，不是改权重。杂活交给便宜的执行器，尽量省 Claude 的 token。
+Let cairn iterate on itself: close the spec 28 bootstrap loop (ADR 0021), where cairn picks up tickets, implements, reviews and merges its own PRs; then keep improving the harness (prompts, skills, routing) with an eval and trajectory data loop. No model fine-tuning: "training" here means improving the harness, not changing weights. Routine work goes to cheap executors to save Claude tokens.
 
-## 2. 工作方式
+## 2. Working style
 
-- 一律用中文大白话回复，少用术语。
-- 修复中发现的同类 bug 或遗留问题，直接修，CI 绿了就合并，不用问。
-- 不给人留手动步骤（例如去 GitHub 摘标签）。不给 PR 打 `needs-decision`：需要拍板的事在聊天里问，问完自己合并。
-- 设计取舍（改变原定行为、动 ADR 或保护路径）先问人，再动手。
-- 开完 PR 就打开 GitHub auto-merge 然后收工，不要挂着盯 CI。
-- 每个线程收尾前自动做一次 retro（见 `.claude/skills/retro-cairn/SKILL.md`），不用人提醒。错误台账在 `docs/lessons.md`。
-- 一件事一个本机线程：新主题开新线程，不往已有的「调度本机 agent」线程里堆活；已有事项在原线程做完。
-- 线程默认模型用 Sonnet 级以省 token；拆票、审改动、写 PR、做取舍才是 Claude 的活。
-- 派活时不要停下来等人排优先级，自己选顺序直接做。附图片直接附在回复里，别只放进文件库。
+- Reply to the user in plain Chinese with little jargon. Everything committed to the repo is English (`AGENTS.md`, "Language").
+- Fix same-kind bugs or leftovers found during a fix directly, and merge once CI is green without asking.
+- Leave no manual steps for the human (such as removing a label on GitHub). Do not put `needs-decision` on a PR: ask in chat when a decision is needed, then merge yourself.
+- Ask the human before design trade-offs (changing intended behavior, touching an ADR or a protected path).
+- After opening a PR, enable GitHub auto-merge and stop; do not sit watching CI.
+- Run a retro before closing every thread (see `.claude/skills/retro-cairn/SKILL.md`) without being reminded. The lessons ledger is `docs/lessons.md`.
+- One local thread per topic: a new topic gets a new thread instead of piling onto the existing "dispatch local agents" thread; finish existing items in their own thread.
+- Threads default to a Sonnet-class model to save tokens; splitting tickets, reviewing changes, writing PRs and making trade-offs is Claude's work.
+- Do not stop to wait for the human to set priorities when dispatching; pick the order and go. Attach images directly in the reply, not only in the file library.
 
-## 3. 分工（省 token）
+## 3. Division of labor (saving tokens)
 
-| 执行器 | 用在哪 |
+| Executor | Use for |
 |---|---|
-| pi | 默认执行器，不限量：实现、跑测试、lint、e2e、批量改动、审查 |
-| codex | 额度少，只接难活 |
-| grok | 按本周剩余额度的节奏用，优先上网和 X 搜索 |
-| Claude | 只拆票、审改动、写 PR、做取舍，尽量不自己读大段代码或写代码 |
+| pi | Default executor, unmetered: implementation, tests, lint, e2e, bulk edits, review |
+| codex | Small quota, hard jobs only |
+| grok | Pace by this week's remaining quota; prefer web and X search |
+| Claude | Only split tickets, review changes, write PRs and make trade-offs; avoid reading large code or writing code itself |
 
-这些执行器都在本机，云端线程够不着，必须通过跑在本机上的线程派活。在 `git clone --local` 出来的独立目录里干活，别直接动主工作区。
+These executors all run on the local machine, which cloud threads cannot reach, so work must be dispatched through a thread running locally. Work in a separate directory made with `git clone --local`, not in the main working tree.
 
-派活一律用 `ai-route run <implement|test|bulk|review|scout|summary> [-C <目录>] [--hard] "<任务>"`：它每次实测可用模型、读剩余额度再挑执行器和模型。不手写 pi / codex / grok 命令，也不套固定模型名单。
+Dispatch always with `ai-route run <implement|test|bulk|review|scout|summary> [-C <dir>] [--hard] "<task>"`: each run measures which models work and reads remaining quota before choosing the executor and model. Do not hand-write pi / codex / grok commands or use a fixed model list.
 
-后台起 `ai-route` 一律走 `scripts/dispatch-agent.mjs start <id> -- <命令>`：脱离进程组启动、立即核对进程并写状态文件（`( ... & )` / `nohup` 直起的任务会被工具调用边界的进程组清理杀掉）。汇报前先 `check <id>` 读状态文件，直起的任务没有状态记录，check 报进程不存在（#1556）。
+Start background `ai-route` runs with `scripts/dispatch-agent.mjs start <id> -- <command>`: it starts the command outside the process group, checks the process right away and writes a status file (tasks started with `( ... & )` / `nohup` are killed by the process-group cleanup at the tool-call boundary). Before reporting, run `check <id>` to read the status file; a task started directly has no status record and check reports that the process does not exist (#1556).
 
-## 4. 模型规则
+## 4. Model rules
 
-- 只用 1M 上下文的模型。
-- 不用：额外模型、gpt-6-astra（codex 也一样，保持它原来的模型）、GPT 5.6 系列、旧代模型、MiniMax M3、DeepSeek V4 Flash。
-- 可用的：glm-5.3、glm-5.3-flash、deepseek-v4.1-flash。
-- 公司 Claude 线路约每 6 小时撞一次配额，撞了就换别的执行器。
+- Use only models with a 1M context.
+- Do not use: extra models, gpt-6-astra (codex too; keep its original model), the GPT 5.6 series, older-generation models, MiniMax M3, DeepSeek V4 Flash.
+- Allowed: glm-5.3, glm-5.3-flash, deepseek-v4.1-flash.
+- The company Claude route hits its quota about every 6 hours; switch executors when it does.
 
-## 5. 当前进展摘要（会过时，以 issue 为准）
+## 5. Progress summary (goes stale; issues are the source of truth)
 
-- 主线：spec 28 自举闭环（ADR 0021），票 #1401 到 #1409；P4 到 P8 未开始。spec 28 第 8 节的台账略有滞后。
-- 评测闭环：#1510 到 #1519。
-- harness A/B 评测 #1532：弱模型 glm-5.3-flash 对强模型 glm-5.3；先做评分标准和基线，#1511 到 #1514 合并后再做完整对比。
-- 过程错误复盘：台账 `docs/lessons.md`；后续 L1 `pnpm prepush`（#1533）、L2 fail→fix 检测器（#1535，依赖 E0）、L3 拦截计数与复发升级（#1534）。动 AGENTS.md 的票由人合并。
-- 注释纪律 #1520；另有待办：单开票清理存量注释。
-- 已知：150 多个陈旧远端分支待清理；云端构建 better-sqlite3 需先 `npm i -g node-gyp`。
-- cairn 自己不能合并自己的 PR：chief 的 merge_builds 被硬拒（`chief.ts`），人在 web 界面点「完成」。
+- Main line: the spec 28 bootstrap loop (ADR 0021), tickets #1401 to #1409; P4 to P8 not started. The ledger in spec 28 section 8 lags slightly.
+- Eval loop: #1510 to #1519.
+- Harness A/B eval #1532: weak model glm-5.3-flash against strong model glm-5.3; first the rubric and baseline, then the full comparison after #1511 to #1514 merge.
+- Process-error retros: ledger `docs/lessons.md`; follow-ups L1 `pnpm prepush` (#1533), L2 fail→fix detector (#1535, depends on E0), L3 interception counts and recurrence escalation (#1534). Tickets that touch AGENTS.md are merged by the human.
+- Comment discipline #1520. Legacy comments are being deleted (not translated) and legacy Chinese docs translated to English in batches.
+- Known: 150+ stale remote branches to clean up; cloud builds of better-sqlite3 need `npm i -g node-gyp` first.
+- cairn cannot merge its own PRs: chief's merge_builds is hard-refused (`chief.ts`); the human clicks "Done" (`完成`) in the web UI.
 
-## 6. 接手清单
+## 6. Takeover checklist
 
-1. 读 `AGENTS.md`、本文件、`docs/lessons.md`。
-2. 看 `.claude/skills/`：`pr-cairn`（写 PR body）、`retro-cairn`（收尾复盘）、`verify-cairn`、`verify-step-claim`。
-3. `gh issue list` 看在途票，从 spec 28 主线和评测闭环里挑下一张，不等人排序。
+1. Read `AGENTS.md`, this file and `docs/lessons.md`.
+2. Look at `.claude/skills/`: `pr-cairn` (PR bodies), `retro-cairn` (wrap-up retro), `verify-cairn`, `verify-step-claim`.
+3. Run `gh issue list` for tickets in flight and pick the next one from the spec 28 main line or the eval loop without waiting for someone to prioritize.

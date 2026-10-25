@@ -104,6 +104,12 @@ jobs:
           set -o pipefail
           python3 scripts/pr-tasks-gate.py "$RUNNER_TEMP/pr-body.md" | tee pr-tasks.log
 
+      # Repository content is English (AGENTS.md "Language"). Chinese quoted
+      # inside backticks or fenced blocks, such as a UI label, is allowed.
+      - name: Check PR body language (English only)
+        if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
+        run: node scripts/english-only-gate.mjs --text "$RUNNER_TEMP/pr-body.md"
+
       # A pending decision must not be racing an armed auto-merge. An
       # unchecked Acceptance item is a pending decision (verify it or waive
       # it), so it adds the label; then, whenever the label is on, auto-merge

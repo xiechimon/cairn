@@ -7,7 +7,12 @@ import test from 'node:test';
 import { prepushPlan } from './prepush.mjs';
 
 test('documentation skips code checks, unknown paths fail closed', () => {
-  assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), []);
+  assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
+    ['node', 'scripts/english-only-gate.mjs'],
+  ]);
+  assert.deepEqual(prepushPlan(['docs/lessons.md'], 'advisory'), [
+    ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],
+  ]);
   assert.ok(prepushPlan(['new-config']).length > 0);
 });
 
@@ -15,6 +20,7 @@ test('local code checks include both UI gates and affected e2e', () => {
   const commands = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   for (const command of [
     'node scripts/ci-job-structure-gate.mjs',
+    'node scripts/english-only-gate.mjs',
     'node scripts/ui-debt-gate.mjs',
     'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs --compile',
@@ -72,7 +78,12 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
     prepushPlan(paths, 'ci'),
     prepushPlan(paths)
       .slice(0, -3)
-      .filter((args) => !args[1].endsWith('-gate.mjs') || args[1].startsWith('scripts/ui-')),
+      .filter(
+        (args) =>
+          !args[1].endsWith('-gate.mjs') ||
+          args[1].startsWith('scripts/ui-') ||
+          args[1] === 'scripts/english-only-gate.mjs',
+      ),
   );
   assert.deepEqual(prepushPlan(paths, 'advisory'), [
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],
@@ -120,9 +131,16 @@ test('CLI skips real document changes and rejects a missing base', () => {
     mkdirSync(join(directory, 'scripts'));
     copyFileSync('scripts/prepush.mjs', join(directory, 'scripts/prepush.mjs'));
     copyFileSync('scripts/heavy-slots.mjs', join(directory, 'scripts/heavy-slots.mjs'));
+    copyFileSync('scripts/english-only-gate.mjs', join(directory, 'scripts/english-only-gate.mjs'));
     runGit(['init']);
     writeFileSync(join(directory, 'README.md'), 'first\n');
-    runGit(['add', 'README.md', 'scripts/prepush.mjs', 'scripts/heavy-slots.mjs']);
+    runGit([
+      'add',
+      'README.md',
+      'scripts/prepush.mjs',
+      'scripts/heavy-slots.mjs',
+      'scripts/english-only-gate.mjs',
+    ]);
     runGit(['commit', '-m', 'initial']);
     runGit(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
     writeFileSync(join(directory, 'README.md'), 'second\n');
@@ -135,7 +153,7 @@ test('CLI skips real document changes and rejects a missing base', () => {
       env: { ...process.env, PREPUSH_BASE_SHA: 'origin/main' },
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /PASS \(0 checks\)/);
+    assert.match(result.stdout, /PASS \(1 checks\)/);
     writeFileSync(join(directory, 'new.ts'), 'export const probe = 1;\n');
     for (const staged of [false, true]) {
       if (staged) runGit(['add', 'new.ts']);
@@ -192,8 +210,15 @@ test('a stale local origin/main is refreshed by fetch before computing changes',
     mkdirSync(join(upstream, 'scripts'));
     copyFileSync('scripts/prepush.mjs', join(upstream, 'scripts/prepush.mjs'));
     copyFileSync('scripts/heavy-slots.mjs', join(upstream, 'scripts/heavy-slots.mjs'));
+    copyFileSync('scripts/english-only-gate.mjs', join(upstream, 'scripts/english-only-gate.mjs'));
     writeFileSync(join(upstream, 'README.md'), 'first\n');
-    gitIn(upstream, ['add', 'README.md', 'scripts/prepush.mjs', 'scripts/heavy-slots.mjs']);
+    gitIn(upstream, [
+      'add',
+      'README.md',
+      'scripts/prepush.mjs',
+      'scripts/heavy-slots.mjs',
+      'scripts/english-only-gate.mjs',
+    ]);
     gitIn(upstream, ['commit', '-m', 'initial']);
     gitIn(upstream, ['push', 'origin', 'HEAD:main']);
     mkdirSync(join(upstream, 'apps'));
@@ -209,7 +234,7 @@ test('a stale local origin/main is refreshed by fetch before computing changes',
     gitIn(work, ['commit', '-m', 'docs']);
     const result = runPrepushCi(work);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(result.stdout, /PASS \(0 checks\)/);
+    assert.match(result.stdout, /PASS \(1 checks\)/);
     assert.doesNotMatch(result.stderr, /may be stale/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -224,8 +249,15 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
     mkdirSync(join(work, 'scripts'));
     copyFileSync('scripts/prepush.mjs', join(work, 'scripts/prepush.mjs'));
     copyFileSync('scripts/heavy-slots.mjs', join(work, 'scripts/heavy-slots.mjs'));
+    copyFileSync('scripts/english-only-gate.mjs', join(work, 'scripts/english-only-gate.mjs'));
     writeFileSync(join(work, 'README.md'), 'first\n');
-    gitIn(work, ['add', 'README.md', 'scripts/prepush.mjs', 'scripts/heavy-slots.mjs']);
+    gitIn(work, [
+      'add',
+      'README.md',
+      'scripts/prepush.mjs',
+      'scripts/heavy-slots.mjs',
+      'scripts/english-only-gate.mjs',
+    ]);
     gitIn(work, ['commit', '-m', 'initial']);
     gitIn(work, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
     writeFileSync(join(work, 'README.md'), 'second\n');
@@ -233,7 +265,7 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
     gitIn(work, ['commit', '-m', 'docs']);
     const result = runPrepushCi(work);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(result.stdout, /PASS \(0 checks\)/);
+    assert.match(result.stdout, /PASS \(1 checks\)/);
     assert.match(result.stderr, /git fetch origin main failed.*may be stale/);
   } finally {
     rmSync(directory, { recursive: true, force: true });

@@ -5,10 +5,12 @@ import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 const root = resolve(import.meta.dirname, '..');
 
 export function prepushPlan(paths, mode = 'local') {
-  if (paths.every((path) => /^(docs\/|.*\.md$|LICENSE$)/.test(path))) return [];
   const advisory = [['node', 'scripts/ui-dead-class-gate.mjs', '--compile']];
   if (mode === 'advisory') return advisory;
+  const language = ['node', 'scripts/english-only-gate.mjs'];
+  if (paths.every((path) => /^(docs\/|.*\.md$|LICENSE$)/.test(path))) return [language];
   const required = [
+    language,
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
     ['pnpm', 'lint'],
