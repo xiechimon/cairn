@@ -78,6 +78,33 @@ cairn start        # also: stop / restart / logs -f / status
 
 Both packages install a `cairn` bin: installing both globally on the same machine means whichever came last wins the name. The clean split is running the server where you browse and `cairn-cli` where agents build.
 
+### Run the server in Docker
+
+Only the server (with the web UI) is containerized; agents run through a daemon on your own machines. The image binds `0.0.0.0` and keeps all state under `/data`:
+
+```sh
+docker build -t cairn .
+docker run -d --name cairn -v cairn-data:/data -e CAIRN_TOKEN="$(openssl rand -hex 32)" -p 8787:8787 cairn
+```
+
+The image sets `CAIRN_REQUIRE_TOKEN=1`: without a non-empty `CAIRN_TOKEN` the container logs the reason and exits with code 1 instead of serving an open API on a public address. Back up by copying the whole `/data` volume (database and `secretbox.key` together). Terminate TLS in front of the container (a reverse proxy, or the platform's HTTPS domain), since the bearer token travels in a header.
+
+### Deploy on Railway
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new)
+
+`railway.json` makes Railway build the `Dockerfile` and health-check `/app`. The button opens Railway's new-project page; choose Deploy from GitHub repo and this repository, then:
+
+1. Attach a volume mounted at `/data`.
+2. Set `CAIRN_TOKEN` to `${{secret(64, "abcdef0123456789")}}` (Railway generates a random value once) and `RAILWAY_RUN_UID=0` (Railway volumes are root-owned; the image otherwise runs as the `node` user).
+3. Generate a public domain. `PORT` is supplied by Railway.
+
+Point a daemon at the public server. Create an API key in the web UI (`/app/api-keys`), then on the machine that runs builds:
+
+```sh
+cairn start --server https://<your-app>.up.railway.app --api-key <cairn_...> --team <teamId>
+```
+
 ### Develop from source
 
 Requires Node.js >= 22.19 and pnpm (e.g. via `corepack enable`).
@@ -96,6 +123,7 @@ Server environment variables (all optional):
 | Variable | Default | Description |
 |---|---|---|
 | `CAIRN_TOKEN` | unset | Bearer token guarding `/api/*`. Set to enable authentication — the web UI asks for the token on first visit; unset means auth off (default). The two SSE stream endpoints additionally accept `?token=` (EventSource cannot set headers). Always set this when binding the server to a non-localhost interface. |
+| `CAIRN_REQUIRE_TOKEN` | unset (the Docker image sets `1`) | `1`, `true` or `yes`: refuse to start (log the reason, exit 1) when `CAIRN_TOKEN` is unset or empty. |
 | `PORT` | `8787` | HTTP listen port. |
 | `HOST` | unset (all interfaces) | HTTP bind address. For split deployment (server on an always-on host, daemon on another machine pointing `CAIRN_SERVER` at it), set this to that host's LAN address and set `CAIRN_TOKEN` alongside. Explicit `0.0.0.0`/`::` with `CAIRN_TOKEN` unset logs a startup warning. |
 | `CAIRN_HOME` | `~/.cairn` | Data root. Server state lives under `<CAIRN_HOME>/server/` (`server.db`, `secretbox.key`, hosted bare repos); the daemon keeps `machine.json`, `daemon.log`, and `workspaces/` at the root. **Backup = copy the whole directory** — the db alone is useless without the keyfile, since secrets are stored encrypted. |
