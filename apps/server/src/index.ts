@@ -8,6 +8,7 @@ import { BUNDLED_FORM } from './bundle-form.js';
 import {
   attachmentsDirOf,
   loadConfig,
+  logTokenAuthStartup,
   missingRequiredTokenError,
   reposDirOf,
   warnInsecureBind,
@@ -86,6 +87,7 @@ const app = createApp(
 );
 
 warnInsecureBind(logger, config);
+logTokenAuthStartup(logger, config);
 
 const scheduler = createScheduler(
   { db, hub, machineHub, user: seeded.user, convHub, box: secretBox },

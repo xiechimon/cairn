@@ -1,9 +1,20 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MCP_TOOL_REGISTRY } from '@cairn/shared';
+import {
+  ACCESS_TOKEN_FILE_NAME,
+  ENV_VARS,
+  formatAccessTokenFile,
+  MCP_TOOL_REGISTRY,
+} from '@cairn/shared';
 import { afterAll, describe, expect, test, vi } from 'vitest';
-import { insecureBindWarning, loadConfig, warnInsecureBind } from '../src/config.js';
+import {
+  insecureBindWarning,
+  loadConfig,
+  logTokenAuthStartup,
+  tokenAuthStartupLines,
+  warnInsecureBind,
+} from '../src/config.js';
 import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
 
 const TOKEN = 'cairn-test-token-0123456789abcdef';
@@ -282,6 +293,146 @@ describe('protected-surface guard: path variants do not bypass (review hardening
     const s = bootServer({ authToken: TOKEN });
     const res = await reqWith(s, 'GET', '/%61pi/teams', authHeaders);
     expect(res.status).toBe(200);
+  });
+});
+
+const FILE_TOKEN = 'cairn-file-token-0123456789abcdef';
+
+function writeTokenFile(home: string, token: string): void {
+  writeFileSync(join(home, ACCESS_TOKEN_FILE_NAME), formatAccessTokenFile(token));
+}
+
+describe('#1708 token file fallback ($CAIRN_HOME/token, env wins)', () => {
+  test('env unset + file present -> authToken = file value (same store `cairn token` prints)', () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    tmpDirs.push(home);
+    writeTokenFile(home, FILE_TOKEN);
+    vi.stubEnv(ENV_VARS.home, home);
+    vi.stubEnv(ENV_VARS.token, '');
+    expect(loadConfig().authToken).toBe(FILE_TOKEN);
+    vi.unstubAllEnvs();
+  });
+
+  test('env set + file present -> env wins (precedence unchanged)', () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    tmpDirs.push(home);
+    writeTokenFile(home, FILE_TOKEN);
+    vi.stubEnv(ENV_VARS.home, home);
+    vi.stubEnv(ENV_VARS.token, TOKEN);
+    expect(loadConfig().authToken).toBe(TOKEN);
+    vi.unstubAllEnvs();
+  });
+
+  test('file missing -> authToken null (auth off, same as today)', () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    tmpDirs.push(home);
+    vi.stubEnv(ENV_VARS.home, home);
+    vi.stubEnv(ENV_VARS.token, '');
+    expect(loadConfig().authToken).toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  test('file present but malformed -> startup fails fail-closed (never silently opens the API)', () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    tmpDirs.push(home);
+    writeFileSync(join(home, ACCESS_TOKEN_FILE_NAME), 'OTHER_KEY=x\n');
+    vi.stubEnv(ENV_VARS.home, home);
+    vi.stubEnv(ENV_VARS.token, '');
+    expect(() => loadConfig()).toThrow(/token file/i);
+    vi.unstubAllEnvs();
+  });
+});
+
+describe('#1708 startup lines (token location + one-time login link)', () => {
+  test('auth off -> zero lines (no behavior change)', () => {
+    expect(tokenAuthStartupLines(loadConfig({ authToken: null }))).toEqual([]);
+  });
+
+  test('env source -> names the env var, the `cairn token` command, and the login link', () => {
+    vi.stubEnv(ENV_VARS.token, TOKEN);
+    const lines = tokenAuthStartupLines(loadConfig({ host: '127.0.0.1' }));
+    vi.unstubAllEnvs();
+    const text = lines.join('\n');
+    expect(lines.length).toBeGreaterThan(0);
+    expect(text).toContain(ENV_VARS.token);
+    expect(text).toContain('cairn token');
+    expect(text).toContain(`http://127.0.0.1:8787/app#token=${TOKEN}`);
+  });
+
+  test('local mode (requireToken off) -> the login link carries the token value', () => {
+    vi.stubEnv(ENV_VARS.token, TOKEN);
+    const text = tokenAuthStartupLines(loadConfig({ requireToken: false })).join('\n');
+    vi.unstubAllEnvs();
+    expect(text).toContain(`http://localhost:8787/app#token=${TOKEN}`);
+  });
+
+  test('container mode (requireToken on) -> names the token source but never the value or the login link', () => {
+    vi.stubEnv(ENV_VARS.token, TOKEN);
+    const lines = tokenAuthStartupLines(loadConfig({ requireToken: true }));
+    vi.unstubAllEnvs();
+    const text = lines.join('\n');
+    expect(text).toContain(ENV_VARS.token);
+    expect(text).toContain('cairn token');
+    expect(text).not.toContain(TOKEN);
+    expect(text).not.toContain('/app#token=');
+  });
+
+  test('container mode + file source -> still no token value, no login link', () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    tmpDirs.push(home);
+    writeTokenFile(home, FILE_TOKEN);
+    vi.stubEnv(ENV_VARS.home, home);
+    vi.stubEnv(ENV_VARS.token, '');
+    const text = tokenAuthStartupLines(loadConfig({ requireToken: true })).join('\n');
+    vi.unstubAllEnvs();
+    expect(text).toContain(ACCESS_TOKEN_FILE_NAME);
+    expect(text).not.toContain(FILE_TOKEN);
+    expect(text).not.toContain('/app#token=');
+  });
+
+  test('file source -> names the absolute token file path', () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    tmpDirs.push(home);
+    writeTokenFile(home, FILE_TOKEN);
+    vi.stubEnv(ENV_VARS.home, home);
+    vi.stubEnv(ENV_VARS.token, '');
+    const lines = tokenAuthStartupLines(loadConfig());
+    vi.unstubAllEnvs();
+    expect(lines.join('\n')).toContain(join(home, ACCESS_TOKEN_FILE_NAME));
+  });
+
+  test('link host: default bind and any-interface -> localhost; ::1 bracketed; explicit host verbatim', () => {
+    vi.stubEnv(ENV_VARS.token, TOKEN);
+    expect(tokenAuthStartupLines(loadConfig({ host: null })).join('\n')).toContain(
+      'http://localhost:8787/app#token=',
+    );
+    expect(tokenAuthStartupLines(loadConfig({ host: '0.0.0.0' })).join('\n')).toContain(
+      'http://localhost:8787/app#token=',
+    );
+    expect(tokenAuthStartupLines(loadConfig({ host: '::1' })).join('\n')).toContain(
+      'http://[::1]:8787/app#token=',
+    );
+    expect(tokenAuthStartupLines(loadConfig({ host: 'example.com' })).join('\n')).toContain(
+      'http://example.com:8787/app#token=',
+    );
+    vi.unstubAllEnvs();
+  });
+
+  test('logTokenAuthStartup emits exactly the lines; auth off emits nothing', () => {
+    const calls: string[] = [];
+    const stubLogger = {
+      info: (msg: string) => {
+        calls.push(msg);
+      },
+    };
+    vi.stubEnv(ENV_VARS.token, TOKEN);
+    logTokenAuthStartup(stubLogger, loadConfig());
+    const expected = tokenAuthStartupLines(loadConfig());
+    vi.unstubAllEnvs();
+    expect(calls).toEqual(expected);
+    calls.length = 0;
+    logTokenAuthStartup(stubLogger, loadConfig({ authToken: null }));
+    expect(calls).toEqual([]);
   });
 });
 
