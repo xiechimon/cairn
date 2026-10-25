@@ -80,6 +80,7 @@
        font-variation-settings。 */
     font-weight: 400;
     line-height: 1.5;
+    text-autospace: normal;
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
   }
@@ -373,6 +374,21 @@
 
 @utility above-chief-launcher {
   bottom: calc(var(--chief-launcher-clearance) + var(--chief-launcher-inset));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .chat-row-icons .chat-copy {
+    transition: opacity var(--dur-fast) var(--ease-standard);
+  }
+  [data-slot="message-scroller-item"]:not(:hover, :focus-within) .chat-row-icons .chat-copy {
+    opacity: 0;
+  }
+  [data-slot="message-scroller-item"]:not(:hover, :focus-within)
+    .chat-row-icons
+    .chat-copy
+    ~ .border-l {
+    border-color: transparent;
+  }
 }
 
 @media (max-width: 640px) {

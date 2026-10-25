@@ -764,6 +764,7 @@ export function BoardPage() {
             onlyColumn={onlyColumn}
             tagsById={tagIndex.tagById}
             onNewTask={openNewTask}
+            loading={live && !todosQ.isSuccess}
           />
         )}
       </div>

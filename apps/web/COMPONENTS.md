@@ -49,6 +49,7 @@ popover.tsx              # 仓内语义映射：z 走 --z-dialog 单梯（#733�
 seeded-avatar.tsx        # dicebear 种子头像适配层（src 覆盖 > name 种子 > 兜底换图，img 常驻 DOM；Root 定尺盒，几何走消费点 className size-N，#983/#1003）；头像一律用它
 select.tsx               # 单选下拉（registry 同源 compound 族：Select/SelectTrigger/SelectValue/SelectContent/SelectItem，#1010 回源，XMON-75 手写形退役；清空档 = value=null 的 SelectItem，几何/锚位归 Base UI Positioner 默认）；**别再用原生 `<select>`**——它弹的是系统菜单，跟自制弹层并排就是两套弹窗
 separator.tsx            # 语义分隔线（field.tsx 的 registryDependency）：替代 <hr> 与 border-t div
+skeleton.tsx             # first-load placeholder drawn in the card shape while data has not arrived; use it instead of a spinner or empty copy (no existing primitive covers this)
 status-chip.tsx          # 任务状态五态 chip（idle/plan/confirm/done/failed，皮肤 = --chip-* token 对）；落在 badge.tsx 上，状态载体 data-tone；替旧轨 ui/chip.tsx（正典表 spec/22 §5.2，#942）
 switch.tsx
 tabs.tsx                 # default/line 两档走上游原生 data-[variant] 机制 + TabsIndicator 零 chrome 透传（#644，去留归 #1009）；segmented/bare 手写档已退役（#991），分段控制器皮肤 = pages/parts.ts 的 SEG_* 配方

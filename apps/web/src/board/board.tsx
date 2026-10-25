@@ -59,6 +59,8 @@ import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { Link, useLocation } from 'react-router';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
+import { Kbd } from '../components/ui/kbd.js';
+import { Skeleton } from '../components/ui/skeleton.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 // #72: the 总管 FAB moved to the route (board-page.tsx) so the chief
@@ -147,6 +149,7 @@ interface BoardProps {
   tagsById?: ReadonlyMap<string, TagChipData>;
   /** 待开始 column header plus button: the same opener as the sidebar 新任务 row. */
   onNewTask?: () => void;
+  loading?: boolean;
 }
 
 const COLUMN_ICON = {
@@ -203,6 +206,7 @@ export function BoardSurface({
   onlyColumn = null,
   tagsById,
   onNewTask,
+  loading = false,
 }: BoardProps) {
   const { t } = useI18n();
   const { search } = useLocation();
@@ -440,7 +444,27 @@ export function BoardSurface({
                       </Button>
                     )}
                   </header>
-                  <ColumnList columnId={column.id} empty={t('暂无')} count={todos.length}>
+                  <ColumnList
+                    columnId={column.id}
+                    empty={
+                      column.id === 'todo' && onNewTask != null ? (
+                        <Button
+                          variant="ghost"
+                          data-column-empty-new=""
+                          onClick={onNewTask}
+                          className="h-auto w-full justify-start gap-2 rounded-(--radius-card) border border-dashed border-border bg-transparent px-3.5 py-3 text-left text-ui font-normal text-content-tertiary transition-colors duration-150 ease-out hover:border-content-dim hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent"
+                        >
+                          <Plus aria-hidden strokeWidth={1.75} className="size-3.5 flex-none" />
+                          <span className="min-w-0 flex-1">{t('写下想做的事')}</span>
+                          <Kbd>C</Kbd>
+                        </Button>
+                      ) : (
+                        t(EMPTY_COPY[column.id] ?? '暂无')
+                      )
+                    }
+                    count={todos.length}
+                    loading={loading}
+                  >
                     {/* #753 可拖面（todos.dev 2026-10-03/04 live 重测）：
                         每列的卡都武装传感器——旧「待处理/已完成不可拖」是
                         2026-10-02 旧测误判，已推翻；点击导航由 PointerSensor
@@ -521,6 +545,13 @@ function writeColumnScroll(columnId: string, top: number): void {
   }
 }
 
+const EMPTY_COPY: Record<string, string> = {
+  todo: '还没有待开始的任务',
+  building: '没有在跑的任务',
+  pending: '没有等你处理的事',
+  done: '最近 7 天还没有完成的任务',
+};
+
 /** The list area doubles as the column's drop target so empty columns
  *  accept drops (useDroppable id = column id). #504: the list is the
  *  column's scroll surface — the header stays fixed while cards
@@ -536,11 +567,13 @@ function ColumnList({
   columnId,
   empty,
   count,
+  loading,
   children,
 }: {
   columnId: string;
-  empty: string;
+  empty: ReactNode;
   count: number;
+  loading: boolean;
   children: ReactNode;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -587,7 +620,20 @@ function ColumnList({
       data-column-list={columnId}
     >
       {children}
-      {count === 0 && (
+      {count === 0 &&
+        loading &&
+        [0, 1].map((n) => (
+          <div
+            key={n}
+            data-card-skeleton=""
+            className="flex h-21 flex-none flex-col gap-2.5 rounded-(--radius-card) bg-card px-3.5 py-3 shadow-(--panel-shadow)"
+          >
+            <Skeleton className="bg-accent h-3.5 w-4/5" />
+            <Skeleton className="bg-accent h-3.5 w-1/2" />
+            <Skeleton className="bg-accent mt-auto h-3 w-2/5" />
+          </div>
+        ))}
+      {count === 0 && !loading && (
         <div className="board-column-empty px-0.5 py-2 text-meta text-content-tertiary">
           {empty}
         </div>

@@ -150,12 +150,8 @@ const HEAD_ICON_BTN_CLS =
 const TOOL_BTN_CLS =
   "size-5 cursor-pointer text-(--text-tertiary) hover:text-(--text-secondary) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
-/** 发送钮双态（旧 .chief-send / .is-on 等值：歇态 seg-active 底、hover 升
- *  secondary 墨不换底；有草稿 = card-button 实底 + on-accent 墨，hover 不动。
- *  is-on 状态类退役，双态随 draft 条件类切换）。歇态墨 dim→tertiary：dim 压
- *  seg-active 双主题皆低于 3:1（light 2.53 / dark 2.4），#950 实测换槽。 */
 const SEND_BTN_CLS =
-  'ml-auto cursor-pointer rounded-md border-0 bg-(--seg-active) text-(--text-tertiary) hover:bg-(--seg-active) hover:text-(--text-secondary) dark:hover:bg-(--seg-active) aria-expanded:bg-(--seg-active) active:not-aria-[haspopup]:translate-y-0';
+  'ml-auto cursor-pointer rounded-md border-0 bg-transparent text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 const SEND_ON_CLS =
   'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent)';
 
@@ -663,11 +659,11 @@ function ChiefDrawerInner({
                   #1260 总管降级：chief 无模型覆盖槽——行 = 绑定 Agent 自身
                   模型的只读展示（行首运行时标记同前：pi 块状 π / claude-code
                   品牌星标）；改模型去 Agent 设置面。 */}
-        <div
-          className="mt-1 flex items-center gap-1 text-meta text-(--text-tertiary)"
-          data-testid="chief-model-row"
-        >
-          {chief.bound ? (
+        {chief.bound && (
+          <div
+            className="mt-1 flex items-center gap-1 text-meta text-(--text-tertiary)"
+            data-testid="chief-model-row"
+          >
             <span className="flex min-w-0 items-center gap-1 px-1">
               <span className="inline-flex flex-none items-center">
                 {(chief.modelProvider ?? 'pi') === 'claude-code' ? (
@@ -678,10 +674,8 @@ function ChiefDrawerInner({
               </span>
               <span className="min-w-0 truncate">{chief.modelSlot}</span>
             </span>
-          ) : (
-            <span>n/a</span>
-          )}
-        </div>
+          </div>
+        )}
         {threadsOpen && (
           // 主题切换器（r5 116）：头部锚定绝对位、264 宽、drawer-local
           // z 5——#688 阶梯外，收编于抽屉 stacking context 只压内部内容。

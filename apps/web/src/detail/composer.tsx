@@ -43,12 +43,8 @@ import { ComposerChips } from './composer-chips.js';
 // #945（detail.css 清零）：composer 卡皮肤迁 token utilities——中心列唯一
 // 卡（One Card Per Screen，#366）：min-h84 + 方角 + 1px 缝线 +
 // --surface-secondary 底 + --card-shadow 卡级抬升（#775 阴影管层次），
-// 16px 侧/底 margin = 列 inset 律（#472 in-flow）。
 const COMPOSER_CARD =
-  'composer relative mx-4 mb-4 flex-none rounded-(--radius-composer) border-0 bg-(--secondary) shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
-// 占位行/输入行共用几何：12px/16px 内衬 + text-ui 墨（#470：一档压正文
-// text-card-title）。84px 最小高走卡片本体。占位字用 ink-2：卡底是
-// --secondary，ink-3 在上面不够 4.5:1（DESIGN.md 对比度条，#1442）。
+  'composer relative mx-auto mb-4 w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none rounded-(--radius-composer) border-0 bg-(--card) shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
 const COMPOSER_PLACEHOLDER = 'px-4 pt-3 text-ui';
 // 真输入面（M5 live）：48px 基高（3×16 行盒，#860）向 --composer-max-h 384px wire cap 自增
 // （grow 由 useComposerWire 的 inline height 承载），内部滚动。老
@@ -62,10 +58,6 @@ const COMPOSER_INPUT =
 // 七通道中和 + #860 hover 增亮律（tertiary → secondary，只动墨色）。
 const COMPOSER_TOOL =
   'flex size-7.5 cursor-pointer items-center justify-center border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0';
-// 发送/停止（XMON-55 P5 同胞对：32×32、同底、同轴、8px 间隔）共享的定位/
-// 盒形串——漆面（bg/text/hover）不进本串：tailwind-merge 后写者胜，共享串
-// 排消费端漆面之后会压掉 --ready 态的品牌实底。idle 底 --seg-active
-// （#860），停止的红只住 10px glyph。
 const COMPOSER_SQUARE =
   'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-[8px] border-none p-0 active:not-aria-[haspopup]:translate-y-0';
 
@@ -399,7 +391,7 @@ export function Composer({
         variant="ghost"
         className={`composer-send ${COMPOSER_SQUARE} right-3 transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
           draft.trim() === ''
-            ? 'bg-(--seg-active) text-(--text-tertiary) hover:bg-(--seg-active) hover:text-(--text-tertiary) dark:hover:bg-(--seg-active) dark:hover:text-(--text-tertiary)'
+            ? 'bg-transparent text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary)'
             : 'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent) dark:hover:bg-(--card-button) dark:hover:text-(--text-on-accent)'
         } [&_svg:not([class*='size-'])]:size-auto`}
         aria-label={t('发送')}

@@ -507,14 +507,15 @@ export function SchedulesPage() {
       selected="schedules"
       title={t('定时')}
       actions={
-        // page-new-action = overlay-focus / dead-buttons handle.
-        <Button
-          className={`page-new-action ${TOPBAR_PRIMARY_BUTTON}`}
-          onClick={() => (live ? setFormOpen(true) : setFixtureFormOpen(true))}
-        >
-          <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
-          {t('新建')}
-        </Button>
+        schedules.length > 0 && (
+          <Button
+            className={`page-new-action ${TOPBAR_PRIMARY_BUTTON}`}
+            onClick={() => (live ? setFormOpen(true) : setFixtureFormOpen(true))}
+          >
+            <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
+            {t('新建')}
+          </Button>
+        )
       }
     >
       {schedules.length === 0 ? (
@@ -522,7 +523,7 @@ export function SchedulesPage() {
         <EmptyState
           className="sched-empty mt-6"
           icon={Clock}
-          title={t('尚无定时。')}
+          title={t('还没有定时任务')}
           description={t(
             '按周期或在指定时间自动重新运行任务。每一轮都会依据任务描述从头开始一次全新运行，到达确认或审核关口时暂停，交由负责人接手。',
           )}

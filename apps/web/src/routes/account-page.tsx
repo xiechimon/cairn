@@ -104,7 +104,7 @@ export function AccountPage() {
   // 开着但权限被拒 = 显示开而实际不弹，必须给出解释（不能裸奔成新的假可供性）。
   const notifyBlocked = notifyOn && permission === 'denied';
   return (
-    <PageShell route="account" fixture={fixture} selected="team" title={t('帐号')}>
+    <PageShell route="account" fixture={fixture} selected="none" title={t('帐号')}>
       <div className="flex flex-col gap-6">
         <ProfileHeader
           className="account-header"

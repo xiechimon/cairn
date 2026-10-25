@@ -102,7 +102,8 @@ export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?:
 
 /** 对话框主操作：Button default 档（墨底、32px）+ 8px 圆角；危险确认换
  *  destructive 档保危险 token。一个对话框只有一个。 */
-export const DIALOG_PRIMARY_BUTTON = 'rounded-md text-ui';
+export const DIALOG_PRIMARY_BUTTON =
+  'rounded-md text-ui disabled:bg-secondary disabled:text-content-secondary disabled:opacity-100';
 
 /** 对话框次操作：文字按钮（Button ghost 档），hover 出浅底。 */
 export const DIALOG_TEXT_BUTTON = 'gap-1.5 px-3 text-ui font-normal text-content-secondary';

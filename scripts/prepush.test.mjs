@@ -1,10 +1,25 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { prepushModules, prepushPlan, runPlan, selfTests } from './prepush.mjs';
+import {
+  ciOnlyScripts,
+  localOnly,
+  prepushModules,
+  prepushPlan,
+  runPlan,
+  selfTests,
+} from './prepush.mjs';
 
 test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
@@ -49,6 +64,45 @@ test('local code checks include both UI gates and affected e2e', () => {
     'pnpm --filter @cairn/web e2e:affected -- apps/web/src/main.tsx',
   ])
     assert.ok(commands.includes(command), command);
+});
+
+test('every single-script CI step also runs in local prepush or is listed as CI-only', () => {
+  const local = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
+  const ciScripts = [
+    ...readFileSync('.github/workflows/ci.yml', 'utf8').matchAll(
+      /run: node (scripts\/[\w-]+\.mjs)\n/g,
+    ),
+  ].map((match) => match[1]);
+  assert.ok(ciScripts.includes('scripts/ui-registry-gate.mjs'));
+  for (const script of ciScripts)
+    assert.ok(
+      local.includes(`node ${script}`) || script in ciOnlyScripts,
+      `${script} runs in CI but not in local prepush; add it to prepushPlan or ciOnlyScripts`,
+    );
+  for (const script of Object.keys(ciOnlyScripts)) assert.ok(ciScripts.includes(script), script);
+});
+
+test('a web change runs the whole web unit suite, which catches tests that read sources instead of importing them', () => {
+  const webSuite = 'pnpm --filter @cairn/web test';
+  assert.ok(
+    prepushPlan(['apps/web/src/components/ui/skeleton.tsx'])
+      .map((args) => args.join(' '))
+      .includes(webSuite),
+  );
+  assert.ok(
+    !prepushPlan(['apps/server/src/index.ts'])
+      .map((args) => args.join(' '))
+      .includes(webSuite),
+  );
+});
+
+test('local gates default their base to the merge-base, not the moving origin/main tip', () => {
+  for (const file of readdirSync('scripts').filter((name) => /-gate\.mjs$/.test(name)))
+    assert.doesNotMatch(
+      readFileSync(join('scripts', file), 'utf8'),
+      /\|\|\s*'origin\/main'/,
+      `scripts/${file} falls back to the origin/main tip; use git merge-base origin/main HEAD`,
+    );
 });
 
 test('affected e2e gets only code paths, so a bulk evidence prune fits on the command line', () => {
@@ -103,14 +157,15 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
   const paths = ['apps/web/src/main.tsx'];
   assert.deepEqual(
     prepushPlan(paths, 'ci'),
-    prepushPlan(paths)
-      .slice(0, -3)
-      .filter(
-        (args) =>
-          !args[1].endsWith('-gate.mjs') ||
-          args[1].startsWith('scripts/ui-') ||
-          args[1] === 'scripts/english-only-gate.mjs',
-      ),
+    prepushPlan(paths).filter(
+      (args) =>
+        !localOnly.some((local) => local.join(' ') === args.join(' ')) &&
+        !['node scripts/prepush-vitest.mjs', 'pnpm --filter @cairn/web test'].includes(
+          args.join(' '),
+        ) &&
+        !args.includes('e2e:affected') &&
+        !args.includes('--compile'),
+    ),
   );
   assert.deepEqual(prepushPlan(paths, 'advisory'), [
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],

@@ -140,20 +140,23 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
 4. **项目**：分组标签「项目」+ 右侧加号；每个项目一行 = 彩色首字母方块（`project-tiles` 按序取色）+ 名称 + 未完成数。
 5. **底部**：「资源」一行（技能 / MCP / 密钥 / 机器 / 模型服务折叠在里面，点击展开为缩进子列表）；用户行 = 头像 + 名字 + 第二行「● 2 台机器在线 · 执行中 N」。
 
-### 看板列
-- 列标题：状态图标 + 衬线列名 + `ink-3` 计数；hover「待开始」列时右侧出现加号（新任务只落在这一列，其它列不放加号）。下方一条 `rule` 线。
-- 空列显示「暂无」，不画占位框。
+### Board columns
+- Column header: status icon + serif column name + `ink-3` count; hovering the `待开始` column shows a plus on the right (new tasks land only in that column; other columns get no plus). A `rule` line sits below.
+- An empty column says what is missing in one plain sentence (`还没有待开始的任务`, `没有在跑的任务`, `没有等你处理的事`, `最近 7 天还没有完成的任务`), never a bare `暂无`. The empty `待开始` column instead shows one dashed ghost card, `写下想做的事` with the `C` key cap, which opens the new-task dialog.
+- While the first board read is in flight, each column shows two skeleton cards (registry `Skeleton`) in the card shape, so the layout does not jump when data lands.
 
-### 任务卡
-- 白底、10px 圆角（`--radius-card`）、`line` 1px 发丝环 + 一层极轻的暖色投影（`0 1px 2px`，4%；两者合起来就是 `--e1`），边缘清楚、不发虚；hover 时环加深、投影升到 `0 4px 14px` 7%（150ms ease-out）。不叠第二层大模糊阴影。
-- 在飞编排（点了开始、总管还没派发）：待开始卡把「开始」换成一行底栏「⏳ 编排中 · 等待原因」（等 X 上线 / 缺能力 / 排队中）+ 右侧「查看会话」；失败卡把「重试」换成不可点的「编排中」。不在元信息行上叠层。
-- 结构：标题（最多两行）→ 单行元信息（📁 项目 · #编号 · 🏷 标签 · 🕒 时间，永不换行；空间不够时先截断标签，项目名至少保留 5 个字宽）→ 按状态的底栏。标签图标着用户自定义的标签色，标签名用元信息墨色。
-- 底栏：
-  - 待处理三态：虚线分隔 + 「图标 状态名」（赭红）+ 原因（截断）+ 右侧赭红操作链接（↻ 重试 / ✓ 确认计划 / → 审阅）。
-  - 执行中：机器人图标（缓慢呼吸）+ 「agent · 当前步骤」+ 右侧 `3/7`，下面一条 3px 进度条。排队中的卡（已开始、等机器）也住这一列：静态沙漏 + 次级墨「agent · 排队中」，挂起时换成「等机器 / 等额度」；不呼吸，呼吸只给真在跑的卡。
-  - 待开始：只收未开始的卡。没有底栏；「▶ 开始」悬停时浮在元信息行右侧，不占高度。
-  - 已完成：没有底栏，标题降级。
-- 卡片上不放实心按钮。
+### Task card
+- White surface, 10px corner (`--radius-card`), a `line` 1px hairline ring plus one very light warm shadow (`0 1px 2px`, 4%; together they are `--e1`), so the edge is crisp, never soft. On hover the ring deepens and the shadow rises to `0 4px 14px` 7% (150ms ease-out). No second large blur shadow.
+- In-flight orchestration (start was pressed, the chief has not dispatched yet): a todo card swaps `开始` for a footer `编排中 · reason` (waiting for X to come online / missing capability / queued) plus `查看会话` on the right; a failed card swaps `重试` for an inert `编排中`. Nothing is layered over the meta line.
+- A failed orchestration shows a short plain summary (`orchestrationErrorSummary`: connection dropped, timed out, out of quota, context too long, bad key, provider unavailable); the raw provider error stays in the `title` tooltip and never wraps character by character on the card.
+- Structure: title (at most two lines), then one meta line (project, #number, tag, time; never wraps; when space runs out the tag truncates first and the project keeps at least five characters), then a footer by status. The tag icon uses the user's tag color; the tag name uses the meta ink.
+- The right-side meta icons (plan, changes, chief-created, branch) stay hidden until the card is hovered or focused, and are always visible on touch screens (`pointer-coarse`).
+- Footer:
+  - Three pending states: dashed divider + status icon and name (ochre) + reason (truncated) + an ochre action link on the right (retry / confirm plan / review).
+  - Running: robot icon (slow breathing) + `agent · current step` + `3/7` on the right, with a 3px progress bar below. Queued cards (started, waiting for a machine) live in this column too: a still hourglass + secondary ink `agent · 排队中`, switching to `等机器 / 等额度` when suspended; no breathing, which is reserved for cards that are really running.
+  - Todo: only cards that have not started. No footer; `开始` floats at the right of the meta line on hover and takes no height.
+  - Done: no footer, title demoted.
+- No solid buttons on cards.
 
 ### 按钮
 - 主按钮：shadcn Button default 档，墨底，8px 圆角（`rounded-md`，即 `control`），高 32。
@@ -165,6 +168,12 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
 
 ### 设置列表（帐号页、Agent 概览）
 见下节「页面模式 · 设置列表」。
+
+### Conversation
+- User turns sit on the right with no avatar: a `--secondary` bubble, at most `min(80%, 56ch)` wide, 32px tall for one line, with a tighter bottom-right corner. Their action row aligns right. Agent and chief turns keep the avatar on the left.
+- Copy icons under a message stay hidden until its row is hovered or focused (`.chat-copy` in `app.css`); touch screens always show them.
+- The plan preview fades out at the bottom with a mask instead of a hard cut.
+- The composer is a white card (`--card`) with the warm `--shadow-composer` ladder and a `--border-soft` ring; it is the one white surface in the conversation because it is where you act. The idle send button has no fill; only the stop button gets the `seg-active` square.
 
 ## 页面模式
 
@@ -202,7 +211,7 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
 - **栈**（`FormStack`）：字段竖排，字段间 16px，最宽 520px，靠左。
 - **字段**（`FormField`）：标签在上（`text-ui` 500 `ink`，`htmlFor` 指向控件），控件，可选帮助文字（`text-meta` `ink-3`）在下。
 - **控件**：Input / SelectTrigger 加 `FORM_CONTROL_CLS`：高 32、白底、`line` 1px 环、8px 圆角、`text-ui`。
-- **操作行**（`FormActions`）：表单最后一行，靠右；可选文字按钮（如「取消」）在左，shadcn Button default 主按钮在右。不能提交时用按钮自身的 `disabled`（半透明），不另画灰条。
+- **Action row** (`FormActions`): the last row of the form, right-aligned; an optional text button (such as `取消`) on the left, the shadcn Button default primary on the right. When the form cannot submit, the button's own `disabled` state paints it `secondary` with secondary ink at full opacity (`DIALOG_PRIMARY_BUTTON`); no separate gray bar.
 - 要：窄栏、标签在上、主按钮靠右。不要：撑满整列的输入框、整宽的灰色提交条、标签和输入框左右并排的双栏表单。
 
 ### 分段控件

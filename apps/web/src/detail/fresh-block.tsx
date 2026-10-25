@@ -110,9 +110,11 @@ export function FreshBlock({
               {t(action)}
             </Button>
           )}
-          <span className="text-meta text-(--text-tertiary)">
-            {t('点开始后由总管编排派发，Agent 在你的机器上跑')}
-          </span>
+          {action === '开始' && (
+            <span className="text-meta text-(--text-tertiary)">
+              {t('点开始后由总管编排派发，Agent 在你的机器上跑')}
+            </span>
+          )}
         </div>
       )}
     </div>
