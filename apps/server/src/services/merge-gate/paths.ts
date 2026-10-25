@@ -18,7 +18,7 @@ import {
   EVIDENCE_PREFIX,
   MERGE_GATE_SOURCE_GLOBS,
   PROTECTED_PATH_GLOBS,
-} from '@cairn/shared';
+} from '@cairn/shared/merge-gate';
 import { isEvidencePath } from './digest.js';
 
 // 大小写折叠按方向分（与 pr-gate.js 同一条规则）：放行的匹配只折 ASCII，收紧的

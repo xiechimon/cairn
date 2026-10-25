@@ -12,7 +12,7 @@ export const MEMORY_QUOTA_PER_AGENT = 100;
 
 /** 写工具名（r5 §6 改判：agent 工具 save_memory，经 remoteTools 服务端执行；
  * Chief 词表同族 save_memory/delete_memory/memories）。 */
-export const MEMORY_TOOLS = ['save_memory', 'delete_memory', 'memories'] as const;
+export const MEMORY_TOOLS = ['save_memory', 'update_memory', 'delete_memory', 'memories'] as const;
 
 /** 空态文案 canon（02 §4.4/r3 §4 原文；Chief 设置记忆 tab 同文）。 */
 export const MEMORY_EMPTY_COPY = '尚无记忆。Agent 会在工作中将值得沉淀的经验存入此处。';
@@ -31,6 +31,12 @@ export const memoryRecordSchema = z.object({
   sourceBuildId: z.string().nullable(),
   createdAt: epochMs,
   updatedAt: epochMs,
+  invalidAt: epochMs.nullable().optional(),
+  supersededBy: recordId.nullable().optional(),
+  lastInjectedAt: epochMs.nullable().optional(),
+  history: z
+    .array(z.object({ title: z.string(), content: z.string(), updatedAt: epochMs }))
+    .optional(),
 });
 export type MemoryRecord = z.infer<typeof memoryRecordSchema>;
 

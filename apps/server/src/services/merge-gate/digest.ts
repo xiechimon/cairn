@@ -17,7 +17,7 @@ import {
   EVIDENCE_PREFIX,
   GATE_LIMITS,
   PATCH_DIGEST_VERSION,
-} from '@cairn/shared';
+} from '@cairn/shared/merge-gate';
 
 /** 摘要不可得的原因：截断（≥ 上限，或与 PR 的 changed_files 对不上）、
  * 非删除条目缺 blob sha（子模块之类，无法绑定内容）、证据之外没有文件

@@ -16,7 +16,15 @@
 // 保持 #56–#75 行为字节不变。
 import { canOrchestrate } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { activityStore } from '../api/activity.js';
 import { agentTodoStore } from '../api/agent-todo.js';
@@ -56,6 +64,7 @@ import {
   mapRunHistory,
   mapTokenUsage,
   mapTranscript,
+  mapUsageCost,
   toDisplayTodo,
 } from '../api/mappers.js';
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
@@ -390,7 +399,7 @@ export function TodoDetailPage() {
   // either; it survives the navigation as a cross-route resident). Its inner
   // popovers (thread switcher etc.) portal as separate nodes without the
   // .chief-drawer class and still consume the key first per the layering law.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       const openSurface = document.querySelector(
@@ -709,7 +718,7 @@ export function TodoDetailPage() {
   const content = live
     ? wireTodo && buildId
       ? {
-          token: mapTokenUsage(usageQ.data ?? []),
+          token: { ...mapTokenUsage(usageQ.data ?? []), cost: mapUsageCost(wireTodo.usageCost) },
           branch: mapBranchInfo(buildId, steps, machinesQ.data ?? []),
           runs: mapRunHistory(wireTodo, projectBuildsQ.data ?? [], Date.now(), historyTokens),
         }
@@ -1146,6 +1155,7 @@ export function TodoDetailPage() {
         rejectReason={mergeReject}
         substantiveChanges={live ? substantiveChangesOf(changesQ.data, changesQ.isSuccess) : null}
         mergeLocked={phase === 'failed'}
+        infoOutput={wireTodo?.output === 'info'}
         confirming={mutations.mergeBuild.isPending || donePatchPending}
         onConfirm={
           live

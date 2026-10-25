@@ -53,9 +53,11 @@ import {
   REVIEW_VERDICT_KIND,
   reconcileVerifyVerdict,
   STOP_MESSAGE,
+  type TodoOutputKind,
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
+  withRetryLessons,
 } from '@cairn/shared';
 import { and, asc, desc, eq, gte, inArray, isNotNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -85,16 +87,19 @@ import {
 } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { recordBuildFeedback } from './build-provenance.js';
+import { DONE_ROW } from './delivery-rows.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
+import { storeInfoReport } from './info-handoff.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 // #1261 配额挂起投影单源（listSteps 的 waiting_quota 行）。
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
+import { retryLessonsOf } from './retry-lessons.js';
 import { stepQueueProjector } from './step-queue.js';
 import {
   childrenOfTodo,
@@ -126,6 +131,7 @@ export interface BuildDeps {
   /** #931：GitHub 出站注入位（AppContext.githubFetch 同族；缺省
    * globalThis.fetch，测试注入 mock——零真实出站）。 */
   githubFetch?: FetchLike;
+  attachmentsDir?: string;
 }
 
 type BuildRow = typeof build.$inferSelect;
@@ -143,6 +149,7 @@ export function toBuildRecord(row: BuildRow): BuildRecord {
     prUrl: row.prUrl,
     prNumber: row.prNumber,
     diffHash: row.diffHash,
+    reportAttachmentId: row.reportAttachmentId,
     createdAt: row.createdAt,
   };
 }
@@ -663,6 +670,7 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
     // #1106 注入选择记录（详情面回查正本）：null = 未计算（chief 步/旧
     // 数据），hits=[] = 已计算零命中。
     skillInjection: r.skillInjection ?? null,
+    ...(r.blockerHandoff !== null ? { blockerHandoff: r.blockerHandoff } : {}),
     // #1261 配额挂起投影（waiting_quota 行携带——详情页「等额度」进度行
     // 数据源；投影单源 = services/quota-wait.ts toQuotaWait）。
     ...(r.status === 'waiting_quota' && r.quotaBlock !== null
@@ -726,7 +734,18 @@ export function startBuilds(
       })
       .run();
     // 首步：先做规划 = 规划步；立即执行 = 执行步（02 §4.2 开始 dialog 两分支）。
-    enqueueStep(deps, id, input.withPlan ? 'plan' : 'build', todoRecord.teamId);
+    const firstKind = input.withPlan ? 'plan' : 'build';
+    const lessons =
+      todoRecord.phase === 'failed' && todoRecord.latestBuildId !== null
+        ? retryLessonsOf(deps.db, todoRecord.latestBuildId)
+        : null;
+    enqueueStep(
+      deps,
+      id,
+      firstKind,
+      todoRecord.teamId,
+      withRetryLessons(undefined, firstKind, lessons),
+    );
     setTodoPhase(deps, todoId, 'queued', {
       assignment: input.assignment,
       latestBuildId: id,
@@ -1041,6 +1060,7 @@ export async function applyBuildStepAction(
     if (reworkTarget !== null && prClosed === null) {
       // —— 复用路：不建新 build——同 conversationId = 同分支 = 原 PR。——
       const now = nowMs();
+      const reuseLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
       recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
       // 消息先于首步入队（transcript 排序 + machine wake 后置）：反馈行（用户
       // 话语）+ 轮界 note（system → web note 面：去向 + 被清空 errorMessage 的
@@ -1067,12 +1087,13 @@ export async function applyBuildStepAction(
       // 返工轮边界（用户裁定「只复用分支、上下文真空」：claim 强制 new
       // session，daemon 以「任务全文 + 指令」组合串开全新会话）。
       const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
+      const reuseKind = reworkTarget.withPlan ? 'plan' : 'build';
       enqueueStep(
         deps,
         reworkTarget.id,
-        reworkTarget.withPlan ? 'plan' : 'build',
+        reuseKind,
         todoRecord.teamId,
-        restartPrompt,
+        withRetryLessons(restartPrompt, reuseKind, reuseLessons),
         true,
       );
       // build 行收尾：errorMessage 清空（原因已进 note）、prevPhase=failed
@@ -1097,6 +1118,7 @@ export async function applyBuildStepAction(
     }
     // —— 新建路：无 PR build（现行行为，逐字节保持）或原 PR 已合并/已关闭
     // （prClosed 在位）——新 conversationId = 新分支。——
+    const priorLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
     recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
     const newId = newUuidv7();
     const createdAt = nowMs();
@@ -1147,7 +1169,14 @@ export async function applyBuildStepAction(
     // #720：该指令经 claim instruction 位 → daemon 组合串（任务文本 + 指令）
     // 进会话，超长反馈在单源截断）。
     const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
-    enqueueStep(deps, newId, row.withPlan ? 'plan' : 'build', todoRecord.teamId, restartPrompt);
+    const firstKind = row.withPlan ? 'plan' : 'build';
+    enqueueStep(
+      deps,
+      newId,
+      firstKind,
+      todoRecord.teamId,
+      withRetryLessons(restartPrompt, firstKind, priorLessons),
+    );
     setTodoPhase(deps, todoRecord.id, 'queued', {
       assignment,
       latestBuildId: newId,
@@ -1398,6 +1427,7 @@ export async function requestMerge(
   if (!row) throw new NotFoundError(`build ${buildId}`);
   let todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
+  if (todoRow.output === 'info') throw new HttpError(409, INFO_CARD_MERGE_REFUSAL);
   // #1487：同一 build 已有在途合并步（排队、等额度或已领走）= 409，不多排一个——
   // 两个合并步先后跑完会各落一次地、各推一次。放在最前：拒收不该先改相位或
   // 去探 GitHub。
@@ -1435,6 +1465,9 @@ export async function requestMerge(
   enqueueStep(deps, buildId, 'merge', todoRow.teamId);
   return { delegated: true };
 }
+
+export const INFO_CARD_MERGE_REFUSAL =
+  '信息卡的产出是报告附件，不进合并：要把内容落进仓库，请建下游代码卡走正常流程';
 
 /** GitHub 形态、build 记着 PR：目标仓与 PR 号；否则 null。经 API 合并（requestMerge 的
  *  分流）、合并步收尾（不收这类卡）与 #1150 磨绿入口（执行步成停在 building）同一判据。
@@ -2035,7 +2068,12 @@ function releaseClaimedStep(
 function stepArtifactGate(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
-  outcome: { hasChanges?: boolean; workBranchDrift?: { expected: string; actual: string } },
+  outcome: {
+    hasChanges?: boolean;
+    workBranchDrift?: { expected: string; actual: string };
+    report?: string;
+    output?: TodoOutputKind;
+  },
   planContract: PlanContractCheck | null,
 ): string | null {
   if (stepRow.kind === 'plan') {
@@ -2068,6 +2106,9 @@ function stepArtifactGate(
     return '规划未产出方案';
   }
   if (stepRow.kind === 'build') {
+    if (outcome.output === 'info') {
+      return outcome.report === undefined ? '信息卡未产出报告' : null;
+    }
     // #1277：HEAD 停在契约分支之外即硬失败，不论 hasChanges。#1195 只在
     // hasChanges=false 时点名，有提交的偏离被并集面放进 review。Multica
     // verifyDeliveryPoint 拒绝记录 off-branch 交付，留给人工。
@@ -2131,6 +2172,7 @@ export function completeStep(
      *  皆缺（旧 daemon）= 消息落「验证未返回结论」兜底。 */
     verifyVerdict?: VerifyVerdict;
     verifyVerdictError?: string;
+    report?: string;
   } = {},
 ): void {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
@@ -2174,7 +2216,12 @@ export function completeStep(
   // 结束——B-C10 空方案 / B-C11 零改动 / B-C14 假完成同病族）。
   // #1492 结构闸结论只算一次：产物闸与 plan 腿的补写判定共用。
   const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
-  const gateFailure = stepArtifactGate(deps, stepRow, outcome, planContract);
+  const gateFailure = stepArtifactGate(
+    deps,
+    stepRow,
+    { ...outcome, output: todoRow.output },
+    planContract,
+  );
   if (gateFailure !== null) {
     // #1277：有提交的偏离拒绝记录。finishStep 在闸前已把 daemon 上报的 PR
     // 写入 build 行；硬失败不保留这次回填。无提交偏离（hasChanges=false）
@@ -2234,6 +2281,23 @@ export function completeStep(
     // 单次写+发布（XMON-59：直写漏斗外曾无 v 无发布——漏斗同相位幂等化后，
     // 重放轮 done 直写还会被 no-op 吞掉伴随位，extra 是唯一「写+发」原子位）。
     setTodoPhase(deps, todoRow.id, 'confirm', { hasPlan: true });
+    return;
+  }
+  if (stepRow.kind === 'build' && todoRow.output === 'info') {
+    if (outcome.report !== undefined && deps.attachmentsDir !== undefined) {
+      storeInfoReport(
+        { db: deps.db, attachmentsDir: deps.attachmentsDir },
+        {
+          buildId: stepRow.buildId,
+          teamId: todoRow.teamId,
+          createdBy: deps.user.id,
+          report: outcome.report,
+        },
+      );
+      const stored = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+      if (stored) publishBuild(deps, stored);
+    }
+    setTodoPhase(deps, todoRow.id, 'review', { hasChanges: false });
     return;
   }
   if (stepRow.kind === 'build') {
@@ -2401,9 +2465,6 @@ export function completeStep(
   // r3 §3.6；celebration 行 [设计] = role system 纯文本）。
   finishTodoDone(deps, todoRow.id, buildRow.id);
 }
-
-/** done 收尾漏斗写的完成行（#1403 PR 对账据它判断本轮是否已收过尾）。 */
-export const DONE_ROW = '🎉 任务已完成';
 
 /** 本 build 这一轮的起点：最近一个 build / plan 步的创建时刻（#931 返工复用
  * 同一个 build 时，新一轮从新的执行步算起）；没有这类步为 0。 */

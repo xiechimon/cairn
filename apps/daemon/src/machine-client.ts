@@ -157,7 +157,11 @@ export interface MachineApi {
    * REMOTE_TOOL_RETRY_DELAYS_MS 重试预算（幂等 GET）；4xx = 协议事实
    * （pending 409 / 未知 404 / 跨 team 404）单次即抛——调用方按「不可用
    * 注记」处理，步不崩。 */
-  attachment(stepId: string, attachmentId: string): Promise<MachineAttachmentResponse>;
+  attachment(
+    stepId: string,
+    attachmentId: string,
+    teamId: string,
+  ): Promise<MachineAttachmentResponse>;
   uploadUrls(
     stepId: string,
     files: { name: string; size?: number }[],
@@ -514,7 +518,11 @@ export class MachineClient implements MachineApi {
     throw lastErr instanceof Error ? lastErr : new Error('skill file download failed');
   }
 
-  async attachment(stepId: string, attachmentId: string): Promise<MachineAttachmentResponse> {
+  async attachment(
+    stepId: string,
+    attachmentId: string,
+    teamId: string,
+  ): Promise<MachineAttachmentResponse> {
     // 幂等 GET（relayTool replaySafe 同族）：网络/5xx 按预算重试；4xx 单次抛。
     const delays = [...REMOTE_TOOL_RETRY_DELAYS_MS];
     let lastErr: unknown;
@@ -522,7 +530,7 @@ export class MachineClient implements MachineApi {
       try {
         return await this.request<MachineAttachmentResponse>(
           'GET',
-          `/api/machine/attachment/${stepId}/${attachmentId}`,
+          `/api/machine/attachment/${encodeURIComponent(stepId)}/${encodeURIComponent(attachmentId)}?teamId=${encodeURIComponent(teamId)}`,
           {
             signal: AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS),
             parse: (raw) => machineAttachmentResponseSchema.parse(raw),

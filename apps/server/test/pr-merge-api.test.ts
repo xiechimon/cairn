@@ -90,8 +90,9 @@ import {
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { type FetchLike, githubListPulls } from '../src/lib/github.js';
-import { type BuildDeps, completeStep, DONE_ROW, requestMerge } from '../src/services/builds.js';
+import { type BuildDeps, completeStep, requestMerge } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
+import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 

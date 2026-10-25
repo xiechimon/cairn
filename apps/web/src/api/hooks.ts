@@ -74,7 +74,10 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { api } from './client.js';
+
+const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 
 // 行形单源 = shared（01 §4.4 双端消费）：plan 行 = planRowSchema（record +
 // content 透出 [推断] 封套）；steps 行 = stepJournalRowSchema（journal 位
@@ -543,6 +546,8 @@ export const useChiefThreads = (teamId: string | undefined, enabled: boolean) =>
     queryKey: ['chiefThreads', teamId],
     queryFn: () => api.get<ChiefThread[]>(`/api/teams/${teamId}/chief/threads`),
     enabled: enabled && teamId !== undefined,
+    refetchInterval: (query) =>
+      query.state.data?.some(threadTurnInFlight) ? CHIEF_THREADS_INFLIGHT_POLL_MS : false,
   });
 
 export const useNotifications = (teamId: string | undefined, enabled: boolean) =>

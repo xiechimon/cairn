@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { pressUntil } from './helpers.js';
+import { pressAndExpect } from './helpers.js';
 
 // Issue #844: 第二下 Ctrl+K 关闭时闪一下。根因是退出 keyframe
 // （animate-out）在 Base UI 的卸载窗（--dur-fast = 150ms 的 visibility
@@ -18,10 +18,9 @@ const BOARD = '/app?scenario=01';
 const PANEL_SEL = '[role="dialog"][aria-label="搜索"]';
 const panel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
-/** Ctrl+K 直到面板应答（重试律见 helpers.ts 的 pressUntil）。 */
 async function openPanel(page: Page) {
   await expect(page.getByRole('complementary')).toBeVisible();
-  await pressUntil(page, 'Control+k', panel(page));
+  await pressAndExpect(page, 'Control+k', panel(page));
 }
 
 /** 进场动效落定后再采样——否则 trace 里混进场余量。 */

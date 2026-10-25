@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -13,11 +14,14 @@ export function prepushPlan(paths, mode = 'local') {
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
+    ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
+    ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
   ];
   const localOnly = [
     ['node', 'scripts/ci-job-structure-gate.mjs'],
     ['node', 'scripts/comment-discipline-gate.mjs'],
     ['node', 'scripts/single-use-helper-gate.mjs'],
+    ['node', 'scripts/baseline-ratchet-gate.mjs'],
   ];
   return mode === 'ci'
     ? required
@@ -32,6 +36,13 @@ export function prepushPlan(paths, mode = 'local') {
 
 export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main') {
   const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  if (base === 'origin/main') {
+    const fetch = spawnSync('git', ['fetch', 'origin', 'main'], { cwd: root });
+    if (fetch.status !== 0)
+      console.error(
+        `[prepush] git fetch origin main failed (exit ${fetch.status ?? 1}); using local origin/main, which may be stale`,
+      );
+  }
   const ancestor = /^0{40}$/.test(base) ? null : git(['merge-base', 'HEAD', base]).trim();
   return [
     ...new Set(
@@ -62,9 +73,14 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     args[0] === '--e2e-shard'
       ? [['pnpm', '--filter', '@cairn/web', 'e2e', `--shard=${args[1]}`]]
       : prepushPlan(changedPaths(), args[0]?.slice(2) ?? 'local');
+  const lease = plan.length > 0 ? await acquireSlot() : null;
   for (const [command, ...commandArgs] of plan) {
     console.log(`[prepush] ${command} ${commandArgs.join(' ')}`);
-    const result = spawnSync(command, commandArgs, { cwd: root, stdio: 'inherit' });
+    const result = spawnSync(command, commandArgs, {
+      cwd: root,
+      stdio: 'inherit',
+      env: leaseEnv(lease),
+    });
     if (result.status !== 0) process.exit(result.status ?? 1);
   }
   console.log(`[prepush] PASS (${plan.length} checks)`);

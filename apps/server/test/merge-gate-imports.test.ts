@@ -121,7 +121,7 @@ function sharedNames(js: string): string[] {
   const names: string[] = [];
   let parsed = 0;
   for (const m of js.matchAll(
-    /^(?:import|export)\s+(\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+[\w$]+))?)\s*from\s*(['"])@cairn\/shared\2/gm,
+    /^(?:import|export)\s+(\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+[\w$]+))?)\s*from\s*(['"])@cairn\/shared(?:\/merge-gate)?\2/gm,
   )) {
     parsed += 1;
     const clause = (m[1] as string).trim();
@@ -137,13 +137,13 @@ function sharedNames(js: string): string[] {
   }
   // 没被上面的形状认出的 '@cairn/shared' 语句（例如 esbuild 把非 ASCII 的名字印成
   // \uXXXX）一律记下，不让它悄悄漏过；只为副作用的 import 不带名字，不算。
-  const statements = [...js.matchAll(/\bfrom\s*(['"])@cairn\/shared\1/g)].length;
+  const statements = [...js.matchAll(/\bfrom\s*(['"])@cairn\/shared(?:\/merge-gate)?\1/g)].length;
   if (statements !== parsed) names.push(`non-named:${statements - parsed} unparsed`);
   return names;
 }
 
 function allowed(spec: string, file: string): boolean {
-  if (spec === '@cairn/shared' || NODE_BUILTINS.has(spec)) return true;
+  if (spec === '@cairn/shared/merge-gate' || NODE_BUILTINS.has(spec)) return true;
   if (!spec.startsWith('./') && !spec.startsWith('../')) return false;
   const target = resolve(dirname(file), spec);
   return target === GATE_DIR || target.startsWith(GATE_DIR + sep);
@@ -247,7 +247,8 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
     expect(foreignName('phaseSchema')).toBe(true);
     expect(foreignName('MERGE_BLOCKERS')).toBe(false);
     const file = join(GATE_DIR, 'readiness.ts');
-    expect(allowed('@cairn/shared', file)).toBe(true);
+    expect(allowed('@cairn/shared', file)).toBe(false);
+    expect(allowed('@cairn/shared/merge-gate', file)).toBe(true);
     expect(allowed('node:crypto', file)).toBe(true);
     expect(allowed('node:module', file)).toBe(false);
     expect(allowed('./digest.js', file)).toBe(true);
@@ -266,6 +267,15 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
     expect(specifiers(toJs("const f = new Function('return 1');"))).toEqual(
       expect.arrayContaining(['dynamic:Function']),
     );
+  });
+
+  test('运行时导入不经过 shared 总出口', () => {
+    const outside = gateJs.flatMap(({ file, js }) =>
+      specifiers(js)
+        .filter((spec) => spec === '@cairn/shared')
+        .map((spec) => `${relative(GATE_DIR, file)}: ${spec}`),
+    );
+    expect(outside).toEqual([]);
   });
 
   test('读到了闸的源码（不是对零个文件恒真）', () => {

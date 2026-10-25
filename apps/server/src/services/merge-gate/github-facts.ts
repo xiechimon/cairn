@@ -19,7 +19,7 @@ import {
   EVIDENCE_PREFIX,
   HARNESS_REGRESSION_RESULT_NAME,
   MERGE_GATE_STATUS_CONTEXT,
-} from '@cairn/shared';
+} from '@cairn/shared/merge-gate';
 import { compareFilesFromResponse } from './digest.js';
 import { qualifyingEvidenceLinks } from './evidence-link.js';
 import type { GateGithubPort, GateRaw, GateRawFailure } from './github-port.js';
@@ -199,6 +199,7 @@ function projectPull(
       headRepoFullName: isObj(head.repo) ? (head.repo.full_name as string) : null,
       body: body.body ?? '',
       changedFiles: body.changed_files,
+      baseBehindBy: null,
     },
     defaultBranch: typeof base.repo.default_branch === 'string' ? base.repo.default_branch : null,
   };
@@ -588,6 +589,7 @@ export async function readGateGithubFacts(
     const c = await readCompare(r, projectedBranch.tip, head);
     facts.compare = c.compare;
     facts.baseBehindBy = c.behindBy;
+    pr.baseBehindBy = c.behindBy;
   }
 
   // 条件读的缓存键带 head 的 SHA：推送之后旧 head 的 ETag 不会拿去问新 head 的 URL（#1525 pr-gate

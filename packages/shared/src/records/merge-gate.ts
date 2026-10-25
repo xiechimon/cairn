@@ -223,6 +223,7 @@ export const MERGE_BLOCKERS = [
   // 策略
   { code: 'policy-human', class: 'policy', label: '项目策略为人工合并' },
   { code: 'autonomy-paused', class: 'policy', label: '自治合并已暂停' },
+  { code: 'daily-cap', class: 'policy', label: '当日自治合并数已达上限' },
   { code: 'not-applicable', class: 'policy', label: '不是 GitHub PR 形态的构建' },
   // 车道状态
   { code: 'not-current-build', class: 'transient', label: '不是任务的当前构建' },
@@ -236,6 +237,7 @@ export const MERGE_BLOCKERS = [
   },
   { code: 'pr-not-open', class: 'human', label: 'PR 已合并或已关闭' },
   { code: 'pr-draft', class: 'transient', label: 'PR 是草稿' },
+  { code: 'pr-behind-base', class: 'transient', label: 'PR 落后于目标分支或落后数未知' },
   { code: 'pr-from-fork', class: 'human', label: 'PR 来自 fork' },
   { code: 'base-not-default', class: 'human', label: 'PR 的目标分支不是默认分支' },
   { code: 'mergeable-state', class: 'transient', label: 'GitHub 判定暂不可合并' },

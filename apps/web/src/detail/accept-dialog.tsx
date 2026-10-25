@@ -46,6 +46,7 @@ interface AcceptDialogProps {
    *  授权也不禁用。failed 锁定（mergeLocked）优先：空 diff 也不给出跳过
    *  合并的出口。 */
   substantiveChanges?: boolean | null;
+  infoOutput?: boolean;
 }
 
 export function AcceptDialog({
@@ -57,6 +58,7 @@ export function AcceptDialog({
   missingTools,
   rejectReason,
   substantiveChanges,
+  infoOutput,
 }: AcceptDialogProps) {
   const { t } = useI18n();
   const [merge, setMerge] = useState(true);
@@ -67,7 +69,7 @@ export function AcceptDialog({
   }, [open]);
   const locked = mergeLocked === true;
   // 空提交收口不提供合并。failed 卡的锁定优先于空 diff：done 仍只能经合并。
-  const skipMerge = substantiveChanges === false && !locked;
+  const skipMerge = infoOutput === true || (substantiveChanges === false && !locked);
   const blocked = !skipMerge && (missingTools?.length ?? 0) > 0;
   const mergeChecked = locked || merge;
   return (
@@ -98,7 +100,9 @@ export function AcceptDialog({
           行盒由消费点 label 承载——整行可点走 label 激活转发）。 */}
       {skipMerge ? (
         <p className="text-meta text-(--text-tertiary)">
-          {t('本轮没有文件改动，完成不会合并分支。')}
+          {infoOutput === true
+            ? t('信息卡的产出是报告附件，不进合并。')
+            : t('本轮没有文件改动，完成不会合并分支。')}
         </p>
       ) : (
         <div className="flex items-center gap-2">
@@ -116,7 +120,7 @@ export function AcceptDialog({
           </label>
         </div>
       )}
-      {locked && (
+      {locked && !skipMerge && (
         // failed 卡锁定行：与缺项行同档 tertiary 说明位（「禁掉它并把原因写
         // 在旁边是同一件事的两半」，XMON-89 律）。
         <p className="mt-2 text-meta text-(--text-tertiary)">

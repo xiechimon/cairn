@@ -102,6 +102,18 @@ beforeEach(async () => {
 });
 
 describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
+  test('info 卡只读导出拒绝提交与推送', async () => {
+    const prepared = await ws.prepare({ ...prepareInput(CONV_A), readonly: true });
+    expect(prepared.readonly).toBe(true);
+    expect(existsSync(join(prepared.cwd, '.git'))).toBe(false);
+    await expect(ws.commitAll(prepared.cwd, 'report', IDENTITY)).rejects.toThrow(
+      'readonly workspace rejects git writes',
+    );
+    await expect(ws.push(prepared.cwd, prepared.branch, null)).rejects.toThrow(
+      'readonly workspace rejects git writes',
+    );
+  }, 30_000);
+
   test('prepare：基座 clone 落 <root>/<projectId>/repo + worktree add -b 落 <root>/<convId>，分支 cairn/conv-*', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     expect(prepared.cwd).toBe(join(root, CONV_A));

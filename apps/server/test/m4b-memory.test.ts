@@ -115,6 +115,73 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     s.dispose();
   });
 
+  test('候选重试返回 HTTP 409，更新历史可从 REST 读取', async () => {
+    const { s, token, step } = await world();
+    try {
+      const first = await relay(s.app, token, step.step.id, 'save_memory', {
+        title: '包管理器',
+        content: '本仓使用 npm',
+      });
+      expect(first.status).toBe(200);
+      const { id } = JSON.parse(((await first.json()) as { text: string }).text) as { id: string };
+      const params = { title: '包管理器', content: '本仓使用 pnpm' };
+      const conflict = await relay(s.app, token, step.step.id, 'save_memory', params);
+      expect(conflict.status).toBe(200);
+      expect(JSON.parse(((await conflict.json()) as { text: string }).text)).toMatchObject({
+        status: 'candidates',
+        candidates: [{ id }],
+      });
+      const retry = await relay(s.app, token, step.step.id, 'save_memory', params);
+      expect(retry.status).toBe(409);
+      const update = await relay(s.app, token, step.step.id, 'update_memory', {
+        memoryId: id,
+        content: params.content,
+      });
+      expect(update.status).toBe(200);
+      const list = await call(s.app, 'GET', `/api/teams/${s.team.id}/agents/${AGENT_ID}/memories`);
+      expect(await list.json()).toMatchObject([
+        { content: '本仓使用 pnpm', history: [{ content: '本仓使用 npm' }] },
+      ]);
+      const all = await call(
+        s.app,
+        'GET',
+        `/api/teams/${s.team.id}/agents/${AGENT_ID}/memories?includeInvalid=true`,
+      );
+      expect(await all.json()).toMatchObject([
+        { id, content: '本仓使用 npm', supersededBy: expect.any(String) },
+        { content: '本仓使用 pnpm' },
+      ]);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('REST 删除候选后，同正文重试按新增处理', async () => {
+    const { s, token, step } = await world();
+    try {
+      const first = await relay(s.app, token, step.step.id, 'save_memory', {
+        title: '包管理器',
+        content: '本仓使用 npm',
+      });
+      const { id } = JSON.parse(((await first.json()) as { text: string }).text) as { id: string };
+      const params = { title: '包管理器', content: '本仓使用 pnpm' };
+      await relay(s.app, token, step.step.id, 'save_memory', params);
+      const removed = await call(
+        s.app,
+        'DELETE',
+        `/api/teams/${s.team.id}/agents/${AGENT_ID}/memories/${id}`,
+      );
+      expect(removed.status).toBe(204);
+      const retry = await relay(s.app, token, step.step.id, 'save_memory', params);
+      expect(retry.status).toBe(200);
+      expect(JSON.parse(((await retry.json()) as { text: string }).text)).toMatchObject({
+        content: params.content,
+      });
+    } finally {
+      s.dispose();
+    }
+  });
+
   test('显式 sourceTodoId/projectId 参数优先（跨任务记录经验 [设计]）', async () => {
     const { s, token, step } = await world();
     // 显式值须是本队真实行（#1470 团队归属）：另建一个本队项目与任务。
@@ -251,6 +318,48 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     expect(projectId2).not.toBe(projectId);
     const step2 = await claimNextTask(s, token, projectId2);
     expect(step2.agent?.memories).toEqual([{ title: '全局', content: 'g' }]);
+    s.dispose();
+  });
+
+  test('失效条目不进 claim 载荷；只有真正注入的条目记下 lastInjectedAt', async () => {
+    const { s, token, step, projectId } = await world();
+    await relay(s.app, token, step.step.id, 'save_memory', { title: '项目一', content: 'p1' });
+    await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {
+      cred: token,
+      body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
+    });
+    const now = Date.now();
+    const base = { agentId: AGENT_ID, teamId: s.team.id, createdAt: now, updatedAt: now };
+    s.db
+      .insert(agentMemory)
+      .values([
+        { ...base, id: 'mem-retired', title: '旧', content: 'old', projectId, invalidAt: now },
+        { ...base, id: 'mem-global', title: '全局', content: 'g', projectId: null },
+      ])
+      .run();
+    const otherProject = await postProject(s.app, 'p3');
+    s.db
+      .insert(agentMemory)
+      .values({ ...base, id: 'mem-other', title: '别项目', content: 'o', projectId: otherProject })
+      .run();
+
+    const step2 = await claimNextTask(s, token, projectId);
+
+    expect(step2.agent?.memories).toEqual([
+      { title: '项目一', content: 'p1' },
+      { title: '全局', content: 'g' },
+    ]);
+    const stamped = Object.fromEntries(
+      s.db
+        .select()
+        .from(agentMemory)
+        .all()
+        .map((row) => [row.id, row.lastInjectedAt !== null]),
+    );
+    expect(stamped['mem-retired']).toBe(false);
+    expect(stamped['mem-other']).toBe(false);
+    expect(stamped['mem-global']).toBe(true);
+    expect(Object.values(stamped).filter(Boolean)).toHaveLength(2);
     s.dispose();
   });
 });

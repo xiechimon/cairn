@@ -68,7 +68,6 @@ import { and, asc, eq, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
-  agentMemory,
   apiKey,
   build,
   chief,
@@ -90,6 +89,7 @@ import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { newMachineToken } from '../lib/keys.js';
 import { readAttachmentMeta } from './attachments.js';
+import { blockerHandoffForClaim } from './blocker-handoff.js';
 import {
   applyStepFailure,
   applyStoppedStep,
@@ -134,6 +134,7 @@ import {
 } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { injectMemories } from './memory.js';
 import {
   effectiveModel,
   isZeroUsageSilentSuccess,
@@ -886,11 +887,7 @@ function buildChiefClaim(
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
   // 记忆注入（02 §4.4 读路径最小形；注入形 [推断] 保留）：绑定 Agent 记忆条目。
-  const memories = deps.db
-    .select({ title: agentMemory.title, content: agentMemory.content })
-    .from(agentMemory)
-    .where(eq(agentMemory.agentId, agentRow.id))
-    .all();
+  const memories = injectMemories(deps.db, { agentId: agentRow.id });
   // Chief = 特例 Agent（02 §4.3）：绑定 Agent 的 MCP 授权同样进回合载荷。
   const chiefMcp = claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
   return {
@@ -1099,6 +1096,7 @@ async function tryClaim(
       cand.stepRow.kind === 'plan' || cand.stepRow.kind === 'build'
         ? await mergedPrElsewhere(deps, cand.todoRow.id, cand.stepRow.buildId)
         : null;
+    const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
     // 原子领取：仅当仍 pending 时置 claimed（单进程 better-sqlite3 同步写）。
     const claimedAt = nowMs();
     const res = db
@@ -1109,6 +1107,7 @@ async function tryClaim(
         claimedAt,
         lastHeartbeatAt: claimedAt,
         skillInjection,
+        blockerHandoff,
         // #1257 挂起位清零：领取即不再是挂起态（holdCount 保留——退避档位
         // 在同一挂起系列内递进，重领后再挂起按次数升级）。
         holdReason: null,
@@ -1209,6 +1208,8 @@ async function tryClaim(
         // 原文围栏、不在 systemPrompt 里写标题（ADR 0021 D5）。
         sourceKind: cand.todoRow.sourceKind,
         sourceRef: cand.todoRow.sourceRef,
+        ...(blockerHandoff !== null ? { blockerHandoff } : {}),
+        output: cand.todoRow.output,
       },
       project: { id: cand.todoRow.projectId, name: projectRow?.name ?? '', repo },
       agent: {
@@ -1222,16 +1223,10 @@ async function tryClaim(
         // 记忆注入（02 §4.4 读路径最小形，注入形 [推断] 保留）：执行 Agent 记忆，
         // 只取本任务项目的条目与全局条目（projectId 空）——别的项目的经验不进本
         // 项目的 systemPrompt（#1494）。
-        memories: db
-          .select({ title: agentMemory.title, content: agentMemory.content })
-          .from(agentMemory)
-          .where(
-            and(
-              eq(agentMemory.agentId, agentRow.id),
-              or(eq(agentMemory.projectId, cand.todoRow.projectId), isNull(agentMemory.projectId)),
-            ),
-          )
-          .all(),
+        memories: injectMemories(db, {
+          agentId: agentRow.id,
+          projectId: cand.todoRow.projectId,
+        }),
         // #1169 拆字段透传（原 skills 单字段两义分家）：defaultSkill（携带，
         // 单值——daemon 据此排 #1116 注入绑定序首位）+ skillsAllowlist（授权；
         // null = 不限制，[] = 显式全拒，worker 步恒携带 null 或数组，chief 步
@@ -1451,8 +1446,10 @@ export function machineAttachmentDownload(
   machineTeamId: string,
   stepId: string,
   attachmentId: string,
+  tokenTeamId: string | undefined,
 ): MachineAttachmentResponse {
   ownedStep(deps, machineId, stepId); // 非本机步/未知步 = 404
+  if (tokenTeamId !== machineTeamId) throw new NotFoundError(`attachment ${attachmentId}`);
   const meta = readAttachmentMeta(
     { db: deps.db, attachmentsDir: deps.attachmentsDir },
     machineTeamId,
@@ -2131,6 +2128,7 @@ export async function finishStep(
       ...(outcome.verifyVerdictError !== undefined
         ? { verifyVerdictError: outcome.verifyVerdictError }
         : {}),
+      ...(outcome.report !== undefined ? { report: outcome.report } : {}),
     });
     publishStepStatus(deps, stepId);
     return;

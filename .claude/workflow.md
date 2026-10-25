@@ -23,18 +23,16 @@
 
 | 执行器 | 用在哪 |
 |---|---|
-| codex | 额度每一两天重置，放开用，写代码、改代码的第一选择；额度用完换 pi |
-| pi | 不限量的主力之一：实现、跑测试、lint、e2e、批量改动；codex 没额度时顶上 |
-| grok | 难实现、大范围重构、长上下文阅读、联网和 X 搜索 |
+| pi | 默认执行器，不限量：实现、跑测试、lint、e2e、批量改动、审查 |
+| codex | 额度少，只接难活 |
+| grok | 按本周剩余额度的节奏用，优先上网和 X 搜索 |
 | Claude | 只拆票、审改动、写 PR、做取舍，尽量不自己读大段代码或写代码 |
 
-这些执行器都在本机，云端线程够不着，必须通过跑在本机上的线程派活。在 `git clone --local` 出来的独立目录里干活，别直接动主工作区。调用方式（本机命令行，具体路径因机器而异）：
+这些执行器都在本机，云端线程够不着，必须通过跑在本机上的线程派活。在 `git clone --local` 出来的独立目录里干活，别直接动主工作区。
 
-- pi：`pi -p --no-session --thinking low "<任务>"`，能跑 e2e，可能改文件，回来要看 diff。
-- grok：`grok -p "<任务>" -m <模型> --always-approve --cwd <目录>`，要联网或搜 X 就别加 `--disable-web-search`。
-- codex：`codex exec -s workspace-write -C <目录> "<票>"`，不能绑端口、不能跑 e2e，可以生成图片。
+派活一律用 `ai-route run <implement|test|bulk|review|scout|summary> [-C <目录>] [--hard] "<任务>"`：它每次实测可用模型、读剩余额度再挑执行器和模型。不手写 pi / codex / grok 命令，也不套固定模型名单。
 
-后台起以上命令一律走 `scripts/dispatch-agent.mjs start <id> -- <命令>`：脱离进程组启动、立即核对进程并写状态文件（`( ... & )` / `nohup` 直起的任务会被工具调用边界的进程组清理杀掉）。汇报前先 `check <id>` 读状态文件，直起的任务没有状态记录，check 报进程不存在（#1556）。
+后台起 `ai-route` 一律走 `scripts/dispatch-agent.mjs start <id> -- <命令>`：脱离进程组启动、立即核对进程并写状态文件（`( ... & )` / `nohup` 直起的任务会被工具调用边界的进程组清理杀掉）。汇报前先 `check <id>` 读状态文件，直起的任务没有状态记录，check 报进程不存在（#1556）。
 
 ## 4. 模型规则
 

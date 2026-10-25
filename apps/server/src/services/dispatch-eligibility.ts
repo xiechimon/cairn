@@ -15,6 +15,7 @@ import {
   type ClaudeCodeReport,
   capabilityMissingLabels,
   isBackendRuntimeId,
+  isPlanFirstRoundWithLessons,
   type MachineCapabilities,
   type MachineHardware,
   parseReviewPromptMeta,
@@ -30,7 +31,10 @@ import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
  *  其余（含 BYOK 自定义 provider）→ pi）。判定单源在此；claim 侧与 sweep
  *  侧（#881 起「归属机在线被挡」判据）共同消费，机器侧开关 =
  *  machine.enabledRuntimes（PATCH 热写，秒级生效）。 */
-export function stepRuntimeFor(agentProvider: string | null | undefined): 'pi' | 'claude-code' {
+export function stepRuntimeFor(
+  agentProvider: string | null | undefined,
+): 'pi' | 'claude-code' | 'gemini' {
+  if (agentProvider === 'gemini') return 'gemini';
   return isBackendRuntimeId(agentProvider) ? 'claude-code' : 'pi';
 }
 
@@ -177,7 +181,11 @@ function planSlotFor(
 ): Assignment['plan'] | Assignment['build'] {
   if (kind !== 'plan') return todoRow.assignment?.build ?? null;
   if (todoRow.assignment?.plan != null) return todoRow.assignment.plan;
-  return prompt !== null ? (todoRow.assignment?.build ?? null) : null;
+  return isReworkPlanPrompt(prompt) ? (todoRow.assignment?.build ?? null) : null;
+}
+
+function isReworkPlanPrompt(prompt: string | null): boolean {
+  return prompt !== null && !isPlanFirstRoundWithLessons(prompt);
 }
 
 /** #1104 B 无主步失败文案（agentForStep 返 null 的三族分类）：assignment 槽
@@ -211,7 +219,7 @@ export function unassignedStepReason(
   if (todoRow.assignment?.plan?.agentId != null) {
     return `plan 步指派的 Agent 不存在（agentId ${todoRow.assignment.plan.agentId} 已删除或不在本团队），无人可领。改派 Agent 后重新运行任务。`;
   }
-  if (prompt !== null) {
+  if (isReworkPlanPrompt(prompt)) {
     return `plan 步无指派 Agent：assignment 的 plan 槽与 build 槽均为空（返工步已尝试回落 build 槽），无人可领。指派 Agent 后重新运行任务。`;
   }
   return `plan 步无指派 Agent：assignment 的 plan 槽为空，无人可领。指派 Agent 后重新运行任务。`;

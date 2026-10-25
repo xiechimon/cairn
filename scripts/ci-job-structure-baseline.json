@@ -35,5 +35,6 @@
   "single-use-helper-gate": ["Single-use helper gate (advisory, #1543)"],
   "npm-command-gate": ["Package names in install commands exist on npm"],
   "dispatch-agent-test": ["Dispatch agent start/check round trip (#1556)"],
-  "closing-keyword-gate": ["Closing keyword gate (advisory, #1541)"]
+  "closing-keyword-gate": ["Closing keyword gate (advisory, #1541)"],
+  "baseline-ratchet-gate": ["Baseline ratchet gate and gardener sweep self-test (#1617)"]
 }

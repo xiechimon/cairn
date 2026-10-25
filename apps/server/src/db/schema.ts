@@ -9,10 +9,13 @@ import type {
   AutonomyGateReason,
   AutonomyKind,
   AutonomySettings,
+  BlockerHandoffRecord,
+  BuildEvidence,
   ChiefWatch,
   ClaudeCodeReport,
   DocumentDiffFile,
   MachineCapabilities,
+  MemoryCandidateStatus,
   ModelRef,
   PersonaRole,
   Phase,
@@ -23,6 +26,7 @@ import type {
   RequiredCapabilities,
   SkillInjectionRecord,
   StepKind,
+  TodoOutputKind,
   TodoSourceKind,
   TriggerSource,
 } from '@cairn/shared';
@@ -118,6 +122,7 @@ export const todo = sqliteTable('todo', {
   /** 外部引用（#446）：形如 `github:owner/repo#123`（shared
    * githubIssueSourceRef 单源）；无来源 = null。 */
   sourceRef: text('sourceRef'),
+  output: text('output').$type<TodoOutputKind>().notNull().default('code'),
 });
 
 // tag record 三位补全（#309，r9 §3.4 实测 wire {id, projectId, name, color,
@@ -172,6 +177,7 @@ export const build = sqliteTable('build', {
   diffHash: text('diffHash'),
   baseSha: text('baseSha'),
   harnessHash: text('harnessHash'),
+  reportAttachmentId: text('reportAttachmentId'),
   createdAt: epochMs('createdAt').notNull(),
 });
 
@@ -255,6 +261,7 @@ export const step = sqliteTable('step', {
    * agent.injectedSkills 透传 daemon 收窄目录注入；本列 = 任务详情面的
    * 回查正本（「本任务注入了哪些技能、为何选中」）。 */
   skillInjection: json<SkillInjectionRecord>('skillInjection'),
+  blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
   /** [内部] #1257 额度挂起面：done(failed) 分类为 quota 时步不判死，挂起
    *  等额度（重领退避）。holdReason = 挂起原因（现值 'quota'）；null = 未
    *  挂起。重领成功即清位（挂起是退避态不是持久属性）。 */
@@ -469,9 +476,41 @@ export const agentMemory = sqliteTable('agent_memory', {
   projectId: text('projectId'),
   sourceTodoId: text('sourceTodoId'),
   sourceBuildId: text('sourceBuildId'),
+  history: json<{ title: string; content: string; updatedAt: number }[]>('history')
+    .notNull()
+    .default(sql`'[]'`),
+  invalidAt: epochMs('invalidAt'),
+  supersededBy: text('supersededBy'),
+  lastInjectedAt: epochMs('lastInjectedAt'),
   createdAt: epochMs('createdAt').notNull(),
   updatedAt: epochMs('updatedAt').notNull(),
 });
+
+export const memorySaveConflict = sqliteTable('memory_save_conflict', {
+  id: text('id').primaryKey(),
+  candidateIds: json<string[]>('candidateIds').notNull(),
+  createdAt: epochMs('createdAt').notNull(),
+});
+
+export const memoryCandidate = sqliteTable(
+  'memory_candidate',
+  {
+    id: text('id').primaryKey(),
+    agentId: text('agentId').notNull(),
+    teamId: text('teamId').notNull(),
+    projectId: text('projectId').notNull(),
+    title: text('title').notNull(),
+    content: text('content').notNull(),
+    status: text('status').$type<MemoryCandidateStatus>().notNull().default('pending'),
+    buildIds: json<string[]>('buildIds').notNull(),
+    evidence: json<BuildEvidence[]>('evidence').notNull(),
+    conflictIds: json<string[]>('conflictIds').notNull().default(sql`'[]'`),
+    memoryId: text('memoryId'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [index('memory_candidate_scope_idx').on(t.agentId, t.teamId, t.projectId)],
+);
 
 // skill 表已退役（spec 13 #367）：技能 = 本地目录现扫只读投影，不入库——
 // drop migration 前旧行导出到 <home>/legacy-export-<ts>.json（db/legacy-export.ts）。

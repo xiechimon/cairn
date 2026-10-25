@@ -105,7 +105,6 @@ import {
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
   type BuildDeps,
-  DONE_ROW,
   enqueueStep,
   finishTodoDone,
   hasActiveStep,
@@ -117,9 +116,11 @@ import {
   toBuildRecord,
 } from './builds.js';
 import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
+import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import { githubText } from './github-text.js';
+import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD, CI_FIX_PUSH_RULE } from './retry-lessons.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -162,7 +163,7 @@ export const CI_CLOSED_CONFIRM_MS = 50_000;
 /** 修复步 prompt 头行标记：修复轮计数判据（marker prompt 的 build 步 = 一轮
  * 修复；原执行步/confirm 步无 marker 不计——与 buildRestartPrompt 等模板步
  * 的识别同律）。 */
-export const CI_FIX_PROMPT_HEAD = '[ci-fix]';
+export { CI_FIX_PROMPT_HEAD };
 
 /** 解冲突步指令头行 marker（#1403 段 3：PR 与默认分支冲突 → 同分支把默认分支合进来）。
  * 轮数计数按它（与 [ci-fix] 各数各的）。 */
@@ -302,10 +303,10 @@ export function buildCiFixPrompt(args: {
   return [
     `${CI_FIX_PROMPT_HEAD} CI 修复轮（第 ${args.round} 轮）：PR #${args.prNumber}${args.prUrl ? `（${args.prUrl}）` : ''} 的 CI 检查未通过。`,
     '',
-    '失败的检查：',
+    CI_FIX_FAILURES_HEAD,
     failures,
     '',
-    '请修复以上检查，并在同一分支上推送（不要新开分支、不要合并 PR）；推送后 CI 会重跑，系统会继续轮询直到检查通过。',
+    CI_FIX_PUSH_RULE,
   ].join('\n');
 }
 
@@ -805,7 +806,7 @@ export function createCiPoller(
       tally.reviewSkipped += 1;
       return;
     }
-    const closedText = `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`;
+    const closedText = prClosedUnmergedRow(prNumber);
     const since = roundStart(deps, cand.buildId);
     // PR 是本 build 的、目标是默认分支才写（见文件头）：缺这几个字段的响应不当终态
     // 缓存，下次读不带它的 etag（304 会交回同一份）。
