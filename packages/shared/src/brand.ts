@@ -91,6 +91,7 @@ export const ENV_VARS = {
    * 两条 SSE stream 端点另收 ?token=——EventSource 无法设 header）；
    * 未设/空串 = 关（默认，行为与现状一致）。 */
   token: 'CAIRN_TOKEN',
+  requireToken: 'CAIRN_REQUIRE_TOKEN',
   /** 技能根目录覆写（spec 13 #367：skills = 本地目录现扫只读投影；
    * 缺省 = SKILLS_DIR_DEFAULT `~/.agents/skills`，records/skill.ts 单源）。
    * spec 14/#371：daemon 侧同键读扫描根（缺省同上；指向不存在目录 =

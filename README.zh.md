@@ -78,6 +78,33 @@ cairn start        # stop / restart / logs -f / status 同面
 
 两个包都装 `cairn` 这个 bin：同机全局双装时后装的占名。干净的分工是——浏览机跑 server，执行机装 cairn-cli。
 
+### 用 Docker 跑 server
+
+只容器化 server（含 web UI）；agent 仍由你自己机器上的 daemon 执行。镜像监听 `0.0.0.0`，状态全放在 `/data`：
+
+```sh
+docker build -t cairn .
+docker run -d --name cairn -v cairn-data:/data -e CAIRN_TOKEN="$(openssl rand -hex 32)" -p 8787:8787 cairn
+```
+
+镜像内置 `CAIRN_REQUIRE_TOKEN=1`：`CAIRN_TOKEN` 未设或为空时，容器打印原因后以退出码 1 退出，不会在公网地址上裸奔。备份 = 整个拷走 `/data` 卷（数据库和 `secretbox.key` 要一起）。token 走请求头，请在容器前面加 TLS（反向代理或平台的 HTTPS 域名）。
+
+### 部署到 Railway
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new)
+
+`railway.json` 让 Railway 用 `Dockerfile` 构建并以 `/app` 做健康检查。按钮打开 Railway 的新建项目页；选 Deploy from GitHub repo 和本仓库，然后：
+
+1. 挂一个卷到 `/data`。
+2. 设 `CAIRN_TOKEN` 为 `${{secret(64, "abcdef0123456789")}}`（Railway 生成一次随机值），并设 `RAILWAY_RUN_UID=0`（Railway 的卷归 root，镜像默认以 `node` 用户运行）。
+3. 生成公网域名。`PORT` 由 Railway 提供。
+
+让 daemon 指向公网 server：先在 web UI（`/app/api-keys`）建 API key，然后在跑 build 的机器上：
+
+```sh
+cairn start --server https://<你的应用>.up.railway.app --api-key <cairn_...> --team <teamId>
+```
+
 ### 从源码开发
 
 要求 Node.js >= 22.19、pnpm（可 `corepack enable`）。
@@ -96,6 +123,7 @@ server 环境变量（全部可选）：
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `CAIRN_TOKEN` | 未设 | 守护 `/api/*` 的 Bearer token。设 = 开鉴权（web 首访出 token 门页）；未设 = 关（默认）。两条 SSE stream 端点额外接受 `?token=`（EventSource 设不了 header）。绑非 localhost 接口时务必设。 |
+| `CAIRN_REQUIRE_TOKEN` | 未设（Docker 镜像内为 `1`） | `1` / `true` / `yes`：`CAIRN_TOKEN` 未设或为空时拒绝启动（打印原因，退出码 1）。 |
 | `PORT` | `8787` | HTTP 监听端口。 |
 | `HOST` | 未设（全部接口） | HTTP 绑定地址。分体部署（server 在常开主机、daemon 在另一台机器用 `CAIRN_SERVER` 指过来）时设为该主机的局域网/内网地址，并同设 `CAIRN_TOKEN`。显式 `0.0.0.0`/`::` 且 `CAIRN_TOKEN` 未设 → 启动日志 WARN。 |
 | `CAIRN_HOME` | `~/.cairn` | 数据根。server 状态在 `<CAIRN_HOME>/server/`（`server.db`、`secretbox.key`、托管裸仓）；daemon 的 `machine.json`、`daemon.log`、`workspaces/` 在根下。**备份 = 整目录拷走**——密文离了 keyfile 永久不可解，只拷 db 没用。 |
