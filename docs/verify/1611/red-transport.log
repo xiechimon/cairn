@@ -1,0 +1,779 @@
+
+ RUN  v5.0.1 /home/ian/lanes/cairn-1611
+
+ ❯ |@xiechimon/cairn-cli| test/acp-stdio.test.ts (9 tests | 9 failed) 10118ms
+   ❯ Gemini stdio execution (9)
+     × records complete text and merged tool results with empty usage 69ms
+     × continues through advertised load without replaying history 5002ms
+     × continues through advertised resume without replaying history 5005ms
+     × fails on max_tokens 6ms
+     × fails on max_turn_requests 4ms
+     × fails on refusal 3ms
+     × accepts images only when advertised 3ms
+     × reports both negotiated protocol versions 17ms
+     × cancellation converts an ordinary prompt error into a valid stop event 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > records complete text and merged tool results with empty usage
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/acp-stdio.test.ts:49:82
+     47|     const events = await Array.fromAsync(handle.events);
+     48|     expect(handle.sessionId).toBe('session-1');
+     49|     for (const event of events) expect(stepEventSchema.safeParse(event…
+       |                                                                                  ^
+     50|     expect(events).toContainEqual(expect.objectContaining({ type: 'mes…
+     51|     expect(events).toContainEqual({ type: 'done', usage: [] });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > continues through advertised load without replaying history
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > continues through advertised resume without replaying history
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/acp-stdio.test.ts:55:32
+     53|   });
+     54|
+     55|   test.each(['load', 'resume'])('continues through advertised %s witho…
+       |                                ^
+     56|     const handle = await backend({ ACP_RESUME: resume }).continueSessi…
+     57|     const events = await Array.fromAsync(handle.events);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > fails on max_tokens
+AssertionError: expected [ { type: 'text_delta', …(1) }, …(3) ] to deep equally contain { type: 'error', error: { …(2) } }
+
+- Expected:
+{
+  "error": {
+    "message": "Gemini ACP stopped: max_tokens",
+    "retryable": false,
+  },
+  "type": "error",
+}
+
++ Received:
+[
+  {
+    "text": "new turn",
+    "type": "text_delta",
+  },
+  {
+    "type": "message_stop",
+  },
+  {
+    "call": {
+      "arguments": {},
+      "id": "tool-1",
+      "name": "unknown",
+    },
+    "type": "toolcall_end",
+  },
+  {
+    "type": "done",
+    "usage": [],
+  },
+]
+
+ ❯ test/acp-stdio.test.ts:64:50
+     62|   test.each(['max_tokens', 'max_turn_requests', 'refusal'])('fails on …
+     63|     const handle = await backend({ ACP_STOP: reason }).createSession(o…
+     64|     expect(await Array.fromAsync(handle.events)).toContainEqual({ type…
+       |                                                  ^
+     65|   });
+     66|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > fails on max_turn_requests
+AssertionError: expected [ { type: 'text_delta', …(1) }, …(3) ] to deep equally contain { type: 'error', error: { …(2) } }
+
+- Expected:
+{
+  "error": {
+    "message": "Gemini ACP stopped: max_turn_requests",
+    "retryable": false,
+  },
+  "type": "error",
+}
+
++ Received:
+[
+  {
+    "text": "new turn",
+    "type": "text_delta",
+  },
+  {
+    "type": "message_stop",
+  },
+  {
+    "call": {
+      "arguments": {},
+      "id": "tool-1",
+      "name": "unknown",
+    },
+    "type": "toolcall_end",
+  },
+  {
+    "type": "done",
+    "usage": [],
+  },
+]
+
+ ❯ test/acp-stdio.test.ts:64:50
+     62|   test.each(['max_tokens', 'max_turn_requests', 'refusal'])('fails on …
+     63|     const handle = await backend({ ACP_STOP: reason }).createSession(o…
+     64|     expect(await Array.fromAsync(handle.events)).toContainEqual({ type…
+       |                                                  ^
+     65|   });
+     66|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > fails on refusal
+AssertionError: expected [ { type: 'text_delta', …(1) }, …(3) ] to deep equally contain { type: 'error', error: { …(2) } }
+
+- Expected:
+{
+  "error": {
+    "message": "Gemini ACP stopped: refusal",
+    "retryable": false,
+  },
+  "type": "error",
+}
+
++ Received:
+[
+  {
+    "text": "new turn",
+    "type": "text_delta",
+  },
+  {
+    "type": "message_stop",
+  },
+  {
+    "call": {
+      "arguments": {},
+      "id": "tool-1",
+      "name": "unknown",
+    },
+    "type": "toolcall_end",
+  },
+  {
+    "type": "done",
+    "usage": [],
+  },
+]
+
+ ❯ test/acp-stdio.test.ts:64:50
+     62|   test.each(['max_tokens', 'max_turn_requests', 'refusal'])('fails on …
+     63|     const handle = await backend({ ACP_STOP: reason }).createSession(o…
+     64|     expect(await Array.fromAsync(handle.events)).toContainEqual({ type…
+       |                                                  ^
+     65|   });
+     66|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > accepts images only when advertised
+Error: gemini ACP backend: image capability is not advertised
+ ❯ validateGeminiSession src/backend/acp.ts:47:11
+     45|   }
+     46|   if ((opts.promptImages?.length ?? 0) > 0) {
+     47|     throw new Error('gemini ACP backend: image capability is not adver…
+       |           ^
+     48|   }
+     49|   return { prompt: opts.resumeId === undefined ? opts.prompt : undefin…
+ ❯ GeminiBackend.open src/backend/acp.ts:189:23
+ ❯ GeminiBackend.createSession src/backend/acp.ts:181:17
+ ❯ test/acp-stdio.test.ts:70:56
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > reports both negotiated protocol versions
+AssertionError: promise resolved "GeminiSession{ …(10) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ GeminiSession {
++   "connection": ClientConnectionHandle {
++     "agent": ClientContext {
++       "currentRequestId": undefined,
++       "cx": ConnectionContext {
++         "connection": Connection {
++           "abortController": AbortController {},
++           "allowBatches": false,
++           "closedPromise": Promise {},
++           "context": [Circular],
++           "dynamicHandlers": Set {},
++           "fallbackHandlers": [],
++           "incomingRequests": Map {},
++           "nextRequestId": 2,
++           "pendingResponses": Map {},
++           "receiveReader": ReadableStreamDefaultReader {
++             Symbol(kType): "ReadableStreamDefaultReader",
++             Symbol(kState): {
++               "close": undefined,
++               "readRequests": Queue {
++                 "capacityMask": 7,
++                 "dequeuedSize": 0,
++                 "head": 0,
++                 "length": 1,
++                 "list": [
++                   DefaultReadRequest {
++                     Symbol(kState): {
++                       "promise": Promise {},
++                       "reject": [Function anonymous],
++                       "resolve": [Function anonymous],
++                     },
++                   },
++                   ,
++                   ,
++                   ,
++                   ,
++                   ,
++                   ,
++                   ,
++                 ],
++                 "tail": 1,
++               },
++               "stream": ReadableStream {
++                 Symbol(kType): "ReadableStream",
++                 Symbol(kState): {
++                   "closedPromise": undefined,
++                   "controller": ReadableStreamDefaultController {
++                     Symbol(kType): "ReadableStreamDefaultController",
++                     Symbol(kState): {
++                       "cancelAlgorithm": [Function anonymous],
++                       "closeRequested": false,
++                       "highWaterMark": 1,
++                       "pullAgain": false,
++                       "pullAlgorithm": [Function nonOpCallback],
++                       "pullFulfilled": undefined,
++                       "pullRejected": undefined,
++                       "pulling": false,
++                       "queue": Queue {
++                         "capacityMask": -1,
++                         "dequeuedSize": 0,
++                         "head": 0,
++                         "length": 0,
++                         "list": [],
++                         "tail": 0,
++                       },
++                       "queueTotalSize": 0,
++                       "sizeAlgorithm": [Function defaultSizeAlgorithm],
++                       "started": false,
++                       "stream": [Circular],
++                     },
++                   },
++                   "disturbed": true,
++                   "reader": [Circular],
++                   "state": "readable",
++                   "storedError": undefined,
++                   "transfer": {
++                     "port1": undefined,
++                     "port2": undefined,
++                     "promise": undefined,
++                     "writable": undefined,
++                   },
++                 },
++               },
++             },
++           },
++           "retryQueue": [],
++           "staticHandlers": [
++             {
++               "describe": [Function describe],
++               "handleMessage": [Function handleMessage],
++             },
++             {
++               "describe": [Function describe],
++               "handleMessage": [Function handleMessage],
++             },
++           ],
++           "stream": {
++             "readable": ReadableStream {
++               Symbol(kType): "ReadableStream",
++               Symbol(kState): {
++                 "closedPromise": undefined,
++                 "controller": ReadableStreamDefaultController {
++                   Symbol(kType): "ReadableStreamDefaultController",
++                   Symbol(kState): {
++                     "cancelAlgorithm": [Function anonymous],
++                     "closeRequested": false,
++                     "highWaterMark": 1,
++                     "pullAgain": false,
++                     "pullAlgorithm": [Function nonOpCallback],
++                     "pullFulfilled": undefined,
++                     "pullRejected": undefined,
++                     "pulling": false,
++                     "queue": Queue {
++                       "capacityMask": -1,
++                       "dequeuedSize": 0,
++                       "head": 0,
++                       "length": 0,
++                       "list": [],
++                       "tail": 0,
++                     },
++                     "queueTotalSize": 0,
++                     "sizeAlgorithm": [Function defaultSizeAlgorithm],
++                     "started": false,
++                     "stream": [Circular],
++                   },
++                 },
++                 "disturbed": true,
++                 "reader": ReadableStreamDefaultReader {
++                   Symbol(kType): "ReadableStreamDefaultReader",
++                   Symbol(kState): {
++                     "close": undefined,
++                     "readRequests": Queue {
++                       "capacityMask": 7,
++                       "dequeuedSize": 0,
++                       "head": 0,
++                       "length": 1,
++                       "list": [
++                         DefaultReadRequest {
++                           Symbol(kState): {
++                             "promise": Promise {},
++                             "reject": [Function anonymous],
++                             "resolve": [Function anonymous],
++                           },
++                         },
++                         ,
++                         ,
++                         ,
++                         ,
++                         ,
++                         ,
++                         ,
++                       ],
++                       "tail": 1,
++                     },
++                     "stream": [Circular],
++                   },
++                 },
++                 "state": "readable",
++                 "storedError": undefined,
++                 "transfer": {
++                   "port1": undefined,
++                   "port2": undefined,
++                   "promise": undefined,
++                   "writable": undefined,
++                 },
++               },
++             },
++             "writable": WritableStream {
++               Symbol(kType): "WritableStream",
++               Symbol(kState): {
++                 "backpressure": false,
++                 "closeQueuedOrInFlight": false,
++                 "closeRequest": {
++                   "promise": undefined,
++                   "reject": undefined,
++                   "resolve": undefined,
++                 },
++                 "closedPromise": undefined,
++                 "controller": WritableStreamDefaultController {
++                   Symbol(kType): "WritableStreamDefaultController",
++                   Symbol(kState): {
++                     "abortAlgorithm": [Function nonOpCancel],
++                     "abortController": AbortController {},
++                     "closeAlgorithm": [Function nonOpCancel],
++                     "highWaterMark": 1,
++                     "queue": Queue {
++                       "capacityMask": 7,
++                       "dequeuedSize": 1,
++                       "head": 0,
++                       "length": 0,
++                       "list": [
++                         undefined,
++                         undefined,
++                         ,
++                         ,
++                         ,
++                         ,
++                         ,
++                         ,
++                       ],
++                       "tail": 0,
++                     },
++                     "queueTotalSize": 0,
++                     "sizeAlgorithm": [Function defaultSizeAlgorithm],
++                     "started": true,
++                     "stream": [Circular],
++                     "writeAlgorithm": [Function anonymous],
++                     "writeFulfilled": [Function anonymous],
++                     "writeRejected": [Function anonymous],
++                   },
++                 },
++                 "inFlightCloseRequest": {
++                   "promise": undefined,
++                   "reject": undefined,
++                   "resolve": undefined,
++                 },
++                 "inFlightWriteRequest": {
++                   "promise": undefined,
++                   "reject": undefined,
++                   "resolve": undefined,
++                 },
++                 "pendingAbortRequest": {
++                   "abort": {
++                     "promise": undefined,
++                     "reject": undefined,
++                     "resolve": undefined,
++                   },
++                   "reason": undefined,
++                   "wasAlreadyErroring": false,
++                 },
++                 "state": "writable",
++                 "storedError": undefined,
++                 "transfer": {
++                   "port1": undefined,
++                   "port2": undefined,
++                   "promise": undefined,
++                   "readable": undefined,
++                 },
++                 "writeRequests": Queue {
++                   "capacityMask": 7,
++                   "dequeuedSize": 0,
++                   "head": 0,
++                   "length": 0,
++                   "list": [
++                     undefined,
++                     ,
++                     ,
++                     ,
++                     ,
++                     ,
++                     ,
++                     ,
++                   ],
++                   "tail": 0,
++                 },
++                 "writer": undefined,
++               },
++             },
++           },
++           "writeQueue": Promise {},
++         },
++       },
++     },
++     "connectHandlers": [],
++     "connection": Connection {
++       "abortController": AbortController {},
++       "allowBatches": false,
++       "closedPromise": Promise {},
++       "context": ConnectionContext {
++         "connection": [Circular],
++       },
++       "dynamicHandlers": Set {},
++       "fallbackHandlers": [],
++       "incomingRequests": Map {},
++       "nextRequestId": 2,
++       "pendingResponses": Map {},
++       "receiveReader": ReadableStreamDefaultReader {
++         Symbol(kType): "ReadableStreamDefaultReader",
++         Symbol(kState): {
++           "close": undefined,
++           "readRequests": Queue {
++             "capacityMask": 7,
++             "dequeuedSize": 0,
++             "head": 0,
++             "length": 1,
++             "list": [
++               DefaultReadRequest {
++                 Symbol(kState): {
++                   "promise": Promise {},
++                   "reject": [Function anonymous],
++                   "resolve": [Function anonymous],
++                 },
++               },
++               ,
++               ,
++               ,
++               ,
++               ,
++               ,
++               ,
++             ],
++             "tail": 1,
++           },
++           "stream": ReadableStream {
++             Symbol(kType): "ReadableStream",
++             Symbol(kState): {
++               "closedPromise": undefined,
++               "controller": ReadableStreamDefaultController {
++                 Symbol(kType): "ReadableStreamDefaultController",
++                 Symbol(kState): {
++                   "cancelAlgorithm": [Function anonymous],
++                   "closeRequested": false,
++                   "highWaterMark": 1,
++                   "pullAgain": false,
++                   "pullAlgorithm": [Function nonOpCallback],
++                   "pullFulfilled": undefined,
++                   "pullRejected": undefined,
++                   "pulling": false,
++                   "queue": Queue {
++                     "capacityMask": -1,
++                     "dequeuedSize": 0,
++                     "head": 0,
++                     "length": 0,
++                     "list": [],
++                     "tail": 0,
++                   },
++                   "queueTotalSize": 0,
++                   "sizeAlgorithm": [Function defaultSizeAlgorithm],
++                   "started": false,
++                   "stream": [Circular],
++                 },
++               },
++               "disturbed": true,
++               "reader": [Circular],
++               "state": "readable",
++               "storedError": undefined,
++               "transfer": {
++                 "port1": undefined,
++                 "port2": undefined,
++                 "promise": undefined,
++                 "writable": undefined,
++               },
++             },
++           },
++         },
++       },
++       "retryQueue": [],
++       "staticHandlers": [
++         {
++           "describe": [Function describe],
++           "handleMessage": [Function handleMessage],
++         },
++         {
++           "describe": [Function describe],
++           "handleMessage": [Function handleMessage],
++         },
++       ],
++       "stream": {
++         "readable": ReadableStream {
++           Symbol(kType): "ReadableStream",
++           Symbol(kState): {
++             "closedPromise": undefined,
++             "controller": ReadableStreamDefaultController {
++               Symbol(kType): "ReadableStreamDefaultController",
++               Symbol(kState): {
++                 "cancelAlgorithm": [Function anonymous],
++                 "closeRequested": false,
++                 "highWaterMark": 1,
++                 "pullAgain": false,
++                 "pullAlgorithm": [Function nonOpCallback],
++                 "pullFulfilled": undefined,
++                 "pullRejected": undefined,
++                 "pulling": false,
++                 "queue": Queue {
++                   "capacityMask": -1,
++                   "dequeuedSize": 0,
++                   "head": 0,
++                   "length": 0,
++                   "list": [],
++                   "tail": 0,
++                 },
++                 "queueTotalSize": 0,
++                 "sizeAlgorithm": [Function defaultSizeAlgorithm],
++                 "started": false,
++                 "stream": [Circular],
++               },
++             },
++             "disturbed": true,
++             "reader": ReadableStreamDefaultReader {
++               Symbol(kType): "ReadableStreamDefaultReader",
++               Symbol(kState): {
++                 "close": undefined,
++                 "readRequests": Queue {
++                   "capacityMask": 7,
++                   "dequeuedSize": 0,
++                   "head": 0,
++                   "length": 1,
++                   "list": [
++                     DefaultReadRequest {
++                       Symbol(kState): {
++                         "promise": Promise {},
++                         "reject": [Function anonymous],
++                         "resolve": [Function anonymous],
++                       },
++                     },
++                     ,
++                     ,
++                     ,
++                     ,
++                     ,
++                     ,
++                     ,
++                   ],
++                   "tail": 1,
++                 },
++                 "stream": [Circular],
++               },
++             },
++             "state": "readable",
++             "storedError": undefined,
++             "transfer": {
++               "port1": undefined,
++               "port2": undefined,
++               "promise": undefined,
++               "writable": undefined,
++             },
++           },
++         },
++         "writable": WritableStream {
++           Symbol(kType): "WritableStream",
++           Symbol(kState): {
++             "backpressure": false,
++             "closeQueuedOrInFlight": false,
++             "closeRequest": {
++               "promise": undefined,
++               "reject": undefined,
++               "resolve": undefined,
++             },
++             "closedPromise": undefined,
++             "controller": WritableStreamDefaultController {
++               Symbol(kType): "WritableStreamDefaultController",
++               Symbol(kState): {
++                 "abortAlgorithm": [Function nonOpCancel],
++                 "abortController": AbortController {},
++                 "closeAlgorithm": [Function nonOpCancel],
++                 "highWaterMark": 1,
++                 "queue": Queue {
++                   "capacityMask": 7,
++                   "dequeuedSize": 1,
++                   "head": 0,
++                   "length": 0,
++                   "list": [
++                     undefined,
++                     undefined,
++                     ,
++                     ,
++                     ,
++                     ,
++                     ,
++                     ,
++                   ],
++                   "tail": 0,
++                 },
++                 "queueTotalSize": 0,
++                 "sizeAlgorithm": [Function defaultSizeAlgorithm],
++                 "started": true,
++                 "stream": [Circular],
++                 "writeAlgorithm": [Function anonymous],
++                 "writeFulfilled": [Function anonymous],
++                 "writeRejected": [Function anonymous],
++               },
++             },
++             "inFlightCloseRequest": {
++               "promise": undefined,
++               "reject": undefined,
++               "resolve": undefined,
++             },
++             "inFlightWriteRequest": {
++               "promise": undefined,
++               "reject": undefined,
++               "resolve": undefined,
++             },
++             "pendingAbortRequest": {
++               "abort": {
++                 "promise": undefined,
++                 "reject": undefined,
++                 "resolve": undefined,
++               },
++               "reason": undefined,
++               "wasAlreadyErroring": false,
++             },
++             "state": "writable",
++             "storedError": undefined,
++             "transfer": {
++               "port1": undefined,
++               "port2": undefined,
++               "promise": undefined,
++               "readable": undefined,
++             },
++             "writeRequests": Queue {
++               "capacityMask": 7,
++               "dequeuedSize": 0,
++               "head": 0,
++               "length": 0,
++               "list": [
++                 undefined,
++                 ,
++                 ,
++                 ,
++                 ,
++                 ,
++                 ,
++                 ,
++               ],
++               "tail": 0,
++             },
++             "writer": undefined,
++           },
++         },
++       },
++       "writeQueue": Promise {},
++     },
++     "didStartConnectHandlers": false,
++   },
++   "events": {
++     Symbol(Symbol.asyncIterator): [Function [Symbol.asyncIterator]],
++   },
++   "onUpdate": [Function anonymous],
++   "prompt": "new turn",
++   "promptStarted": false,
++   "queue": [],
++   "sessionId": "session-1",
++   "stopped": false,
++   "usageRows": [],
++   "waiters": [],
+  }
+
+ ❯ test/acp-stdio.test.ts:75:70
+     73|
+     74|   test('reports both negotiated protocol versions', async () => {
+     75|     await expect(backend({ ACP_VERSION: 'bad' }).createSession(opts)).…
+       |                                                                      ^
+     76|   });
+     77|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > cancellation converts an ordinary prompt error into a valid stop event
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/acp-stdio.test.ts:85:82
+     83|     expect(result.some((event) => event.type === 'message_stop')).toBe…
+     84|     expect(result.some((event) => event.type === 'error')).toBe(false);
+     85|     for (const event of result) expect(stepEventSchema.safeParse(event…
+       |                                                                                  ^
+     86|   });
+     87| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  9 failed (9)
+   Start at  09:31:43
+   Duration  11.57s (tests 89%, transform 8%, import 3%)
