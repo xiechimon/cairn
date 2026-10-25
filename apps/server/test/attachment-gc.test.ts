@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
   attachment as attachmentTable,
@@ -21,6 +22,7 @@ import {
   sweepAttachments,
   TEAM_ATTACHMENTS_QUOTA_BYTES,
 } from '../src/services/attachment-gc.js';
+import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -383,10 +385,166 @@ describe('attachment gc -- quota (R4: admission gate, referenced items not delet
 });
 
 describe('attachment gc -- scheduler cadence', () => {
+  test('scheduler lookup plans use indexes for bounded tick scans', () => {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    const schedulePlan = s.db.all(
+      sql`EXPLAIN QUERY PLAN SELECT * FROM schedule WHERE nextRunAt IS NOT NULL AND nextRunAt <= 1`,
+    ) as Array<{ detail: string }>;
+    const notificationPlan = s.db.all(
+      sql`EXPLAIN QUERY PLAN SELECT notification.id FROM notification INNER JOIN chief_thread ON notification.entityId = chief_thread.id WHERE notification.type = 'chief_message' AND notification.readAt IS NULL`,
+    ) as Array<{ detail: string }>;
+    expect(schedulePlan.some((row) => row.detail.includes('schedule_nextRunAt_idx'))).toBe(true);
+    expect(
+      notificationPlan.some((row) => row.detail.includes('notification_type_readAt_idx')),
+    ).toBe(true);
+  });
+
+  test('a large transcript corpus does not block the event loop during a tick', async () => {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    const threadId = 'chief-gc-large';
+    s.db
+      .insert(chiefThreadTable)
+      .values({
+        id: threadId,
+        chiefId: `chief-${s.user.id}-${s.team.id}`,
+        userId: s.user.id,
+        teamId: s.team.id,
+        title: 'Large corpus',
+        createdAt: 0,
+        updatedAt: 0,
+        sessionId: '',
+        sessionOpenedAt: 0,
+      })
+      .run();
+    const rows = Array.from({ length: 100_000 }, (_, index) => ({
+      id: `message-gc-${index}`,
+      conversationId: 'build-gc',
+      role: 'assistant' as const,
+      content: { text: 'x'.repeat(256) },
+      createdAt: index,
+      actor: null,
+    }));
+    for (let offset = 0; offset < rows.length; offset += 1_000) {
+      const batch = rows.slice(offset, offset + 1_000);
+      s.db.insert(messageTable).values(batch).run();
+      s.db
+        .insert(chiefMessageTable)
+        .values(
+          batch.map((row) => ({
+            id: `chief-message-${row.id}`,
+            threadId,
+            role: row.role,
+            content: row.content,
+            createdAt: row.createdAt,
+          })),
+        )
+        .run();
+    }
+    const indexedQueries = [
+      'SELECT * FROM schedule WHERE nextRunAt IS NOT NULL AND nextRunAt <= 1',
+      "SELECT notification.id FROM notification INNER JOIN chief_thread ON notification.entityId = chief_thread.id WHERE notification.type = 'chief_message' AND notification.readAt IS NULL",
+      'SELECT id FROM machine WHERE online = 1 AND lastSeenAt IS NOT NULL AND lastSeenAt < 1',
+      "SELECT * FROM step WHERE kind = 'chief'",
+      "SELECT step.id FROM step INNER JOIN build ON step.buildId = build.id INNER JOIN todo ON build.todoId = todo.id WHERE todo.phase IN ('closed', 'done') AND step.status IN ('pending', 'waiting_quota')",
+      "SELECT * FROM step WHERE kind IN ('plan', 'build', 'merge', 'review', 'verify') AND status IN ('pending', 'claimed')",
+      "SELECT * FROM todo WHERE phase = 'queued'",
+      "SELECT id FROM step WHERE buildId = 'missing' AND status IN ('pending', 'claimed', 'waiting_quota')",
+      "SELECT * FROM step WHERE status = 'waiting_quota'",
+      "SELECT id FROM step WHERE id = 'missing'",
+    ];
+    for (const query of indexedQueries) {
+      const plan = s.db.all<{ detail: string }>(sql.raw(`EXPLAIN QUERY PLAN ${query}`));
+      expect(
+        plan.some((row) => row.detail.includes('SCAN')),
+        query,
+      ).toBe(false);
+    }
+    for (const source of [
+      { table: 'todo', cursor: 'id', content: 'spec' },
+      { table: 'message', cursor: 'id', content: 'content' },
+      { table: 'chief_message', cursor: 'id', content: 'content' },
+      { table: 'steer_pending', cursor: 'conversationId', content: 'content' },
+      { table: 'plan', cursor: 'id', content: 'content' },
+    ]) {
+      const plan = s.db.all<{ detail: string }>(
+        sql.raw(
+          `EXPLAIN QUERY PLAN SELECT ${source.cursor}, ${source.content} FROM ${source.table} WHERE ${source.cursor} > 'cursor' ORDER BY ${source.cursor} LIMIT 128`,
+        ),
+      );
+      expect(
+        plan.some((row) => row.detail.includes('SEARCH')),
+        source.table,
+      ).toBe(true);
+      expect(
+        plan.some((row) => row.detail.includes('TEMP B-TREE')),
+        source.table,
+      ).toBe(false);
+    }
+    const logger = makeLogger();
+    const orphan = putAttachment(s, { createdAgo: ATTACHMENT_ORPHAN_GRACE_MS + DAY });
+    const scheduler = createScheduler(
+      { db: s.db, hub: s.hub, user: s.user },
+      { tickMs: 15_000 },
+      { attachmentsDir: s.attachmentsDir, logger },
+    );
+    const server = createServer((_request, response) => {
+      void Promise.resolve(s.app.request('/api/projects')).then(async (result) => {
+        response.writeHead(result.status);
+        response.end(await result.text());
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing HTTP address');
+      const startedAt = performance.now();
+      const response = fetch(`http://127.0.0.1:${address.port}/api/projects`);
+      const tickAt = performance.now();
+      scheduler.tick(Date.now());
+      const tickMs = performance.now() - tickAt;
+      expect((await response).status).toBe(200);
+      expect(tickMs).toBeLessThan(100);
+      expect(performance.now() - startedAt).toBeLessThan(250);
+      expect(logger.infos.some((line) => line.startsWith('attachment gc:'))).toBe(false);
+      const referenced = putAttachment(s, { createdAgo: ATTACHMENT_ORPHAN_GRACE_MS + DAY });
+      s.db
+        .insert(messageTable)
+        .values({
+          id: 'message-gc-new-reference',
+          conversationId: 'build-gc',
+          role: 'user',
+          content: { text: tokenFor('note.md', referenced.key) },
+          createdAt: Date.now(),
+        })
+        .run();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(logger.infos).toContain('attachment gc deferred after database writes');
+      expect(rowOf(s, referenced.id)).toBeTruthy();
+      scheduler.tick(Date.now() + 61 * 60_000);
+      for (let attempt = 0; attempt < 5_000; attempt += 1) {
+        if (logger.infos.some((line) => line.startsWith('attachment gc:'))) break;
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      expect(logger.infos.some((line) => line.startsWith('attachment gc:'))).toBe(true);
+      expect(rowOf(s, referenced.id)).toBeTruthy();
+      expect(rowOf(s, orphan.id)).toBeUndefined();
+      expect(
+        logger.infos.some((line) => line.startsWith('attachment gc: 0 pending, 1 orphan,')),
+      ).toBe(true);
+      scheduler.stop();
+    } finally {
+      scheduler.stop();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  }, 30_000);
+
   test('first tick scans; no rescan within 1h; scans again after 1h', async () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
-    const { createScheduler } = await import('../src/services/scheduler.js');
     const infos: string[] = [];
     const logger = {
       info: (_m: unknown, msg: string) => {
