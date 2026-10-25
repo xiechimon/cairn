@@ -64,11 +64,11 @@ test('C on the board opens the new-task dialog; ⌘C and the retired N do not', 
   await expect(dialog(page)).toHaveCount(0);
 });
 
-test('sidebar `新任务` row carries the C badge and click-opens the dialog', async ({ page }) => {
+test('sidebar `新任务` row drops the C badge and click-opens the dialog', async ({ page }) => {
   await page.goto(BOARD);
   const row = page.getByRole('complementary').getByRole('button', { name: '新任务' });
   await expect(row).toBeVisible();
-  await expect(row.getByText('C', { exact: true })).toHaveText('C');
+  await expect(row.locator('kbd')).toHaveCount(0);
   await row.click();
   await expect(dialog(page)).toBeVisible();
   await pressAndExpect(page, 'Escape', dialog(page), 'hidden');

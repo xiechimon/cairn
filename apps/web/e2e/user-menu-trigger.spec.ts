@@ -51,7 +51,7 @@ async function expectAnchoredAboveChip(page: Page, chip: Locator) {
   expect(box).not.toBeNull();
   expect(row).not.toBeNull();
   expect(img).not.toBeNull();
-  expect(box!.x).toBe(row!.x);
+  expect(box!.x).toBe(Math.round(row!.x));
   expect(box!.width).toBe(224);
   const gapToRowTop = row!.y - (box!.y + box!.height);
   expect(gapToRowTop).toBeGreaterThanOrEqual(3); // family 4px, subpixel-safe

@@ -12,9 +12,7 @@ async function settled(page: Page) {
 
 const WIN_BOX = { x: 1440 - 8 - 380, y: 732 - 8 - 600, width: 380, height: 600 };
 
-// Paper sheet (PR 6 pages, PR 7 board): every route's main panel sits 10px
-// off the right viewport edge, so the column is 1440 - 248 - 10.
-const SHEET_W = 1440 - 248 - 10;
+const SHEET_W = 1440 - 248;
 
 test.describe('chief panel floating form (ADR 0013)', () => {
   test('Esc never closes the panel on the board route (D3)', async ({ page }) => {

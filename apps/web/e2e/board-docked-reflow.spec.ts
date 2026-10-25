@@ -82,7 +82,7 @@ test.describe('board never reflows under the floating chief window (ADR 0013 D1)
 
     const box = await scroller(page).boundingBox();
     expect(box).not.toBeNull();
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + 40);
+    await page.mouse.move(box!.x + 120, box!.y + 40);
     await page.mouse.wheel(300, 0);
     await expect
       .poll(async () => (await measure(page)).scrollLeft, { timeout: 2000 })

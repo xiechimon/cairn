@@ -22,7 +22,7 @@ test('user menu drops its dead rows — `反馈` (#149), `新功能/快捷键` (
   await expect(menu.locator('a.user-menu-row')).toHaveCount(3);
 });
 
-test('board topbar drops the `看板指南` button — right actions = `筛选` / `定时` / `新任务` (#363, Paper top bar)', async ({
+test('board topbar drops the `看板指南` button — right actions = `筛选` / `定时`, `新任务` lives in the new-task bar (#363, claude shell)', async ({
   page,
 }) => {
   await page.goto('/app');
@@ -34,11 +34,17 @@ test('board topbar drops the `看板指南` button — right actions = `筛选` 
 
   const actions = page.locator('.board-topbar-actions');
   await expect(actions).toBeVisible();
-  await expect(actions.getByRole('button')).toHaveCount(2);
+  await expect(actions.getByRole('button')).toHaveCount(1);
   await expect(actions.getByRole('link')).toHaveCount(1);
   await expect(actions.getByRole('button', { name: '筛选', exact: true })).toBeVisible();
   await expect(actions.getByRole('link', { name: '定时' })).toBeVisible();
-  await expect(actions.getByRole('button', { name: '新任务' })).toBeVisible();
+  await expect(actions.getByRole('button', { name: '新任务' })).toHaveCount(0);
+
+  const bar = page.getByTestId('board-new-task-bar');
+  await expect(bar).toBeVisible();
+  await expect(bar).toContainText('新任务：接下来让 agent 做什么？');
+  await bar.click();
+  await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
 });
 
 test('board renders exactly the four #351 columns, retired names and collapse family gone', async ({
