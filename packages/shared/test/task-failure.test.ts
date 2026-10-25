@@ -66,7 +66,7 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
     expect(classifyStepFailure('error sending request for url (http://127.0.0.1:9/v1)')).toBe(
       'network',
     );
-    expect(classifyStepFailure('dial tcp 112.80.47.186:8783: connection refused')).toBe('network');
+    expect(classifyStepFailure('dial tcp 203.0.113.7:8783: connection refused')).toBe('network');
     expect(classifyStepFailure('dns lookup failed for api.example.com')).toBe('network');
     expect(classifyStepFailure('read: i/o timeout')).toBe('network');
     expect(classifyStepFailure('context deadline exceeded')).toBe('network');

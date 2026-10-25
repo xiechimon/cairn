@@ -140,7 +140,6 @@ export function conversationBranch(conversationId: string): string {
   return `${BRAND.branchPrefix}${conversationId}`;
 }
 
-/** 界面里给用户抄的 npm 包名和它装出来的命令名：npm 上实际存在的那一对。cairn 包发布后改成 BRAND 里的新名与 cliCommandName。 */
 export const PUBLISHED_PACKAGES = {
-  cli: { name: '@xiechimon/pacman-cli', command: 'pacman' },
+  cli: { name: '@xiechimon/cairn-cli', command: 'cairn' },
 } as const;

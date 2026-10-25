@@ -28,7 +28,7 @@
 WAL 态直读）。一律**只读 URI 模式**打开：
 
 ```sh
-sqlite3 'file:/Users/xmon/.pacman/server/server.db?mode=ro' "<SQL>"
+sqlite3 'file:<home>/.pacman/server/server.db?mode=ro' "<SQL>"
 ```
 
 第二数据集（mea 上用户自己的部署）：`ssh mea` 后同款只读查询，见附录 C。
@@ -59,11 +59,11 @@ chief 会话在 `chief_message` 表。
 
 ```sh
 # withPlan × triggerSource 分布
-sqlite3 'file:/Users/xmon/.pacman/server/server.db?mode=ro' \
+sqlite3 'file:<home>/.pacman/server/server.db?mode=ro' \
   "SELECT withPlan, triggerSource, COUNT(*) FROM build GROUP BY 1,2"
 
 # 逐 build：todo 序号、直/带方案、步构成、plan 落库行数
-sqlite3 -header 'file:/Users/xmon/.pacman/server/server.db?mode=ro' "
+sqlite3 -header 'file:<home>/.pacman/server/server.db?mode=ro' "
 SELECT b.id, t.seqNum, b.withPlan, b.triggerSource, b.prevPhase,
   (SELECT COUNT(*) FROM step s WHERE s.buildId=b.id AND s.kind='plan')  AS planSteps,
   (SELECT COUNT(*) FROM step s WHERE s.buildId=b.id AND s.kind='build') AS buildSteps,
@@ -72,12 +72,12 @@ SELECT b.id, t.seqNum, b.withPlan, b.triggerSource, b.prevPhase,
 FROM build b JOIN todo t ON t.id=b.todoId ORDER BY b.createdAt"
 
 # 进闸时刻（最后一条）
-sqlite3 'file:/Users/xmon/.pacman/server/server.db?mode=ro' \
+sqlite3 'file:<home>/.pacman/server/server.db?mode=ro' \
   "SELECT entityId, type, datetime(createdAt/1000,'unixepoch','localtime')
    FROM notification WHERE type IN ('plan_ready','build_review') ORDER BY createdAt"
 
 # done 落地时刻 + 卡的终态
-sqlite3 -header 'file:/Users/xmon/.pacman/server/server.db?mode=ro' \
+sqlite3 -header 'file:<home>/.pacman/server/server.db?mode=ro' \
   "SELECT seqNum, phase, hasPlan, hasChanges, datetime(phaseAt/1000,'unixepoch','localtime')
    FROM todo ORDER BY seqNum"
 ```
@@ -90,7 +90,7 @@ sqlite3 -header 'file:/Users/xmon/.pacman/server/server.db?mode=ro' \
 ```python
 # ledger.py — python3 ledger.py   (db path 按需替换)
 import sqlite3, datetime
-db = sqlite3.connect("file:/Users/xmon/.pacman/server/server.db?mode=ro", uri=True)
+db = sqlite3.connect("file:<home>/.pacman/server/server.db?mode=ro", uri=True)
 db.row_factory = sqlite3.Row
 c = db.cursor()
 cin  = {r["entityId"]: r["createdAt"] for r in c.execute(

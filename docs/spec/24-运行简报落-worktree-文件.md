@@ -2,7 +2,7 @@
 
 > 范围：把每一步的 agent 简报从 systemPrompt 通道搬到任务 worktree 的上下文文件，靠 CLI 的原生记忆机制加载。回答三问：A9 当初为什么否掉它、那两条理由今天是否还成立；照 Multica 做到什么程度；换过去之后新增哪些失败面、各自护栏在哪。
 >
-> 参照：spec 17（A9 出处，本次标 superseded）、spec 14（skills 执行面，目录扫描口径不变）、Multica 源码 `/Users/xmon/Code/AgentProjects/multica`（`execenv/runtime_config.go`、`runtime_config_sections.go`、`repocache/cache.go`、`local_worktree.go`）、issue #958、#917。
+> References: spec 17 (origin of A9, marked superseded here), spec 14 (skills execution surface; directory scan rules unchanged), Multica source (`execenv/runtime_config.go`, `runtime_config_sections.go`, `repocache/cache.go`, `local_worktree.go`), issues #958 and #917.
 
 ## Problem Statement
 
