@@ -3,7 +3,9 @@ import { readFileSync } from 'node:fs';
 import { countMetric, METRICS } from './baseline-ledger.mjs';
 
 try {
-  const base = process.env.BASELINE_RATCHET_BASE_SHA || 'origin/main';
+  const base =
+    process.env.BASELINE_RATCHET_BASE_SHA ||
+    execFileSync('git', ['merge-base', 'origin/main', 'HEAD'], { encoding: 'utf8' }).trim();
   const git = (...args) =>
     execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   git('rev-parse', '--verify', '--quiet', `${base}^{commit}`);

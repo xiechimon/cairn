@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -72,6 +80,15 @@ test('every single-script CI step also runs in local prepush or is listed as CI-
       `${script} runs in CI but not in local prepush; add it to prepushPlan or ciOnlyScripts`,
     );
   for (const script of Object.keys(ciOnlyScripts)) assert.ok(ciScripts.includes(script), script);
+});
+
+test('local gates default their base to the merge-base, not the moving origin/main tip', () => {
+  for (const file of readdirSync('scripts').filter((name) => /-gate\.mjs$/.test(name)))
+    assert.doesNotMatch(
+      readFileSync(join('scripts', file), 'utf8'),
+      /\|\|\s*'origin\/main'/,
+      `scripts/${file} falls back to the origin/main tip; use git merge-base origin/main HEAD`,
+    );
 });
 
 test('e2e coverage check passes on the real suite and names an unmapped spec', () => {

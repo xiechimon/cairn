@@ -13,7 +13,9 @@ import { API, SymbolFlags } from 'typescript/unstable/sync';
 
 let api;
 try {
-  const base = process.env.SINGLE_USE_HELPER_BASE_SHA || 'origin/main';
+  const base =
+    process.env.SINGLE_USE_HELPER_BASE_SHA ||
+    execFileSync('git', ['merge-base', 'origin/main', 'HEAD'], { encoding: 'utf8' }).trim();
   const git = (...args) =>
     execFileSync('git', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
   const allowlist = JSON.parse(readFileSync('scripts/single-use-helper-allowlist.json', 'utf8'));
