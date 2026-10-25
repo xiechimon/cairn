@@ -15,7 +15,7 @@ function validateMemoryText(title: string, content: string): void {
   }
 }
 
-function overlaps(left: string, right: string): boolean {
+export function overlaps(left: string, right: string): boolean {
   const normalize = (value: string) =>
     value
       .normalize('NFKC')
@@ -89,7 +89,7 @@ export function injectMemories(db: Db, scope: { agentId: string; projectId?: str
   });
 }
 
-function memoriesInScope(
+export function memoriesInScope(
   tx: MemoryTx,
   scope: { agentId: string; teamId: string; projectId: string | null },
   everyProject = false,
