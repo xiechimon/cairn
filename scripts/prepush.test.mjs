@@ -4,7 +4,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { prepushPlan, selfTests } from './prepush.mjs';
+import { prepushModules, prepushPlan, runPlan, selfTests } from './prepush.mjs';
 
 test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
@@ -142,18 +142,10 @@ test('CLI skips real document changes and rejects a missing base', () => {
     );
   try {
     mkdirSync(join(directory, 'scripts'));
-    copyFileSync('scripts/prepush.mjs', join(directory, 'scripts/prepush.mjs'));
-    copyFileSync('scripts/heavy-slots.mjs', join(directory, 'scripts/heavy-slots.mjs'));
-    copyFileSync('scripts/english-only-gate.mjs', join(directory, 'scripts/english-only-gate.mjs'));
+    for (const file of prepushModules) copyFileSync(file, join(directory, file));
     runGit(['init']);
     writeFileSync(join(directory, 'README.md'), 'first\n');
-    runGit([
-      'add',
-      'README.md',
-      'scripts/prepush.mjs',
-      'scripts/heavy-slots.mjs',
-      'scripts/english-only-gate.mjs',
-    ]);
+    runGit(['add', 'README.md', ...prepushModules]);
     runGit(['commit', '-m', 'initial']);
     runGit(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
     writeFileSync(join(directory, 'README.md'), 'second\n');
@@ -221,17 +213,9 @@ test('a stale local origin/main is refreshed by fetch before computing changes',
     gitIn(directory, ['init', '--bare', remote]);
     gitIn(directory, ['clone', remote, upstream]);
     mkdirSync(join(upstream, 'scripts'));
-    copyFileSync('scripts/prepush.mjs', join(upstream, 'scripts/prepush.mjs'));
-    copyFileSync('scripts/heavy-slots.mjs', join(upstream, 'scripts/heavy-slots.mjs'));
-    copyFileSync('scripts/english-only-gate.mjs', join(upstream, 'scripts/english-only-gate.mjs'));
+    for (const file of prepushModules) copyFileSync(file, join(upstream, file));
     writeFileSync(join(upstream, 'README.md'), 'first\n');
-    gitIn(upstream, [
-      'add',
-      'README.md',
-      'scripts/prepush.mjs',
-      'scripts/heavy-slots.mjs',
-      'scripts/english-only-gate.mjs',
-    ]);
+    gitIn(upstream, ['add', 'README.md', ...prepushModules]);
     gitIn(upstream, ['commit', '-m', 'initial']);
     gitIn(upstream, ['push', 'origin', 'HEAD:main']);
     mkdirSync(join(upstream, 'apps'));
@@ -260,17 +244,9 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
   try {
     gitIn(directory, ['init', work]);
     mkdirSync(join(work, 'scripts'));
-    copyFileSync('scripts/prepush.mjs', join(work, 'scripts/prepush.mjs'));
-    copyFileSync('scripts/heavy-slots.mjs', join(work, 'scripts/heavy-slots.mjs'));
-    copyFileSync('scripts/english-only-gate.mjs', join(work, 'scripts/english-only-gate.mjs'));
+    for (const file of prepushModules) copyFileSync(file, join(work, file));
     writeFileSync(join(work, 'README.md'), 'first\n');
-    gitIn(work, [
-      'add',
-      'README.md',
-      'scripts/prepush.mjs',
-      'scripts/heavy-slots.mjs',
-      'scripts/english-only-gate.mjs',
-    ]);
+    gitIn(work, ['add', 'README.md', ...prepushModules]);
     gitIn(work, ['commit', '-m', 'initial']);
     gitIn(work, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
     writeFileSync(join(work, 'README.md'), 'second\n');
@@ -299,4 +275,22 @@ test('prepush vitest only forgives files listed as known local red', async () =>
     unexpected: ['b/new.test.ts'],
     knownFailed: ['a/known.test.ts'],
   });
+});
+
+test('plan children do not inherit the git hook repository binding', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-hook-env-'));
+  const victim = join(directory, 'victim');
+  const scratch = join(directory, 'scratch');
+  try {
+    gitIn(directory, ['init', '-q', victim]);
+    mkdirSync(scratch);
+    runPlan([['git', 'init', '-q']], {
+      cwd: scratch,
+      env: { ...process.env, GIT_DIR: join(victim, '.git') },
+    });
+    assert.equal(gitIn(victim, ['config', 'core.bare']).trim(), 'false');
+    assert.equal(gitIn(scratch, ['rev-parse', '--is-inside-work-tree']).trim(), 'true');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
