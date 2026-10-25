@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   buildVerifyStepPrompt,
+  parseVerifyPromptMeta,
   reconcileVerifyVerdict,
   verifyVerdictSchema,
 } from '../src/records/verify.js';
@@ -34,19 +35,41 @@ describe('buildVerifyStepPrompt material (#1250)', () => {
     expect(prompt).toContain('passed 如实报');
   });
 
-  test('failure mode 3: workspace discipline (evidence writable, deliverables unchanged) in the material', () => {
+  test('failure mode 3: workspace discipline (code read-only, only the evidence directory writable) is in the materials', () => {
     const prompt = buildVerifyStepPrompt({
       ticketRef: '1250',
       taskText: TASK,
       planText: '',
       pr: null,
     });
+    expect(prompt).toContain('the code is read-only');
     expect(prompt).toContain('git add / commit / push');
-    expect(prompt).toContain('不改动交付物本身');
+    expect(prompt).toContain('docs/verify/1250/');
+    expect(prompt).not.toContain('writable work area');
     expect(prompt).not.toContain('## 方案');
   });
 
-  test('failure mode 4: whether a PR exists -- with a PR, named and replied; without, truthfully states the skip', () => {
+  test('#1404 S5a: the expectedHeadSha written at dispatch lands in the meta; without it no meta head is written', () => {
+    const sha = 'ab'.repeat(20);
+    const withSha = buildVerifyStepPrompt({
+      ticketRef: '1250',
+      taskText: TASK,
+      planText: '',
+      pr: null,
+      expectedHeadSha: sha,
+    });
+    expect(parseVerifyPromptMeta(withSha)?.expectedHeadSha).toBe(sha);
+    expect(parseVerifyPromptMeta(withSha)?.kind).toBe('verify');
+    const without = buildVerifyStepPrompt({
+      ticketRef: '1250',
+      taskText: TASK,
+      planText: '',
+      pr: null,
+    });
+    expect(parseVerifyPromptMeta(without)).toBeNull();
+  });
+
+  test('failure mode 5: whether a PR exists -- with a PR, named and replied; without, truthfully states the skip', () => {
     const withPr = buildVerifyStepPrompt({
       ticketRef: '1250',
       taskText: TASK,
