@@ -50,6 +50,10 @@ const LINE_BREAKS = /\r\n?|[\v\f\x1c-\x1e\x85\u2028\u2029]/g;
  *  进围栏前剥掉（cleanGithubText 对工具结果里的 GitHub 文字同律）。 */
 const FORMAT_CHARS = /\p{Cf}/gu;
 const SAFE_REPO_SEGMENT = /^[A-Za-z0-9_.-]+$/;
+const ATTACHMENT_SCHEME_THROUGH_FORMAT_CHARS = new RegExp(
+  [...'attachment:'].join(`${FORMAT_CHARS.source}*`),
+  `${FORMAT_CHARS.flags}i`,
+);
 
 /** 首尾行里的出处。owner / repo 段只认 GitHub 名字字符：带换行或方括号的引用
  *  会把首行拆开或提前收口，按「出处未知」写，照样进围栏。 */
@@ -69,6 +73,10 @@ export function quoteIssueLines(text: string): string {
     .split('\n')
     .map((line) => `${ISSUE_FENCE_QUOTE}${line}`.trimEnd())
     .join('\n');
+}
+
+export function neutralizeIssueAttachmentTokens(text: string): string {
+  return text.replace(ATTACHMENT_SCHEME_THROUGH_FORMAT_CHARS, 'attachment-disabled:');
 }
 
 /** 把 issue 作者写的文字包进围栏：首行点名出处并说明这是数据，正文逐行引用

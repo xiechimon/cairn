@@ -135,7 +135,11 @@ export function sweepStepAttachments(
 /** 下载面最小结构（MachineApi.attachment 的投影——测试注入最小 fake 即可，
  * 不必实现整个 machine 接口）。 */
 export interface AttachmentDownloader {
-  attachment(stepId: string, attachmentId: string): Promise<MachineAttachmentResponse>;
+  attachment(
+    stepId: string,
+    attachmentId: string,
+    teamId: string,
+  ): Promise<MachineAttachmentResponse>;
 }
 
 export interface ResolveStepImagesOpts {
@@ -253,7 +257,7 @@ async function resolveOne(
   if (!isImageAttachmentExt(ref.ext)) return { kind: 'untouched' };
   let res: MachineAttachmentResponse;
   try {
-    res = await opts.client.attachment(opts.stepId, ref.attachmentId);
+    res = await opts.client.attachment(opts.stepId, ref.attachmentId, ref.key.split('/')[0] ?? '');
   } catch (err) {
     return unavailable(ref.key, 'download', err, opts.log);
   }

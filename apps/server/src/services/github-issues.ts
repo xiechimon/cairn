@@ -15,6 +15,7 @@ import {
   type GithubIssuesResponse,
   type GithubRepoRef,
   githubIssueSourceRef,
+  neutralizeIssueAttachmentTokens,
   parseGithubIssueSourceRef,
   type SecretBox,
   type TodoRecord,
@@ -187,8 +188,8 @@ export async function importGithubIssue(
     return createTodo(deps, {
       teamId: row.teamId,
       projectId: row.id,
-      title: detail.title,
-      spec: detail.body ?? '',
+      title: neutralizeIssueAttachmentTokens(detail.title),
+      spec: neutralizeIssueAttachmentTokens(detail.body ?? ''),
       tagIds,
       createdBy: opts.createdBy ?? deps.user.id, // 缺省 = seed 用户（REST 建任务面同律）
       ownerId: deps.user.id,
