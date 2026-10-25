@@ -16,6 +16,7 @@ import type {
   SessionOpts,
   StepEvent,
 } from '@cairn/shared';
+import { DAEMON_VERSION } from '../version.js';
 
 export const GEMINI_CAPABILITIES: AgentBackendCapabilities = {
   name: 'gemini',
@@ -215,7 +216,7 @@ export class GeminiBackend implements AgentBackend {
       await connection.agent.request(methods.agent.initialize, {
         protocolVersion: PROTOCOL_VERSION,
         clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, session: {} },
-        clientInfo: { name: 'cairn', version: '0.2.0' },
+        clientInfo: { name: 'cairn', version: DAEMON_VERSION },
       });
       const response = resumeId
         ? await connection.agent.request(methods.agent.session.load, {

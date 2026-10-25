@@ -581,8 +581,10 @@ describe('machine wire (02 §5 canonical, wire layer enters CI)', () => {
 describe('PUBLISHED_PACKAGES', () => {
   it('install command and start command come from the same published package (package name and command name paired)', () => {
     const pairs: Record<string, string> = {
+      '@xiechimon/cairn': 'cairn',
       '@xiechimon/cairn-cli': 'cairn',
     };
-    expect(pairs[PUBLISHED_PACKAGES.cli.name]).toBe(PUBLISHED_PACKAGES.cli.command);
+    for (const published of Object.values(PUBLISHED_PACKAGES))
+      expect(pairs[published.name]).toBe(published.command);
   });
 });
