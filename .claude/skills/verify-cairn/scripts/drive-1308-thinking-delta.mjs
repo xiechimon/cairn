@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// drive-1308-thinking-delta.mjs — #1308 live 思考正文是否进会话流。
-//
-// 假机器、零 daemon、零 LLM。认领一步，推 activity phase=thinking，再推
-// {kind:'thinking_delta', text}。old：服务端拒该形，会话流里没有这段正文，
-// 详情页只剩「模型思考中...」。new：同一 POST 200，流上出现
-// {type:'thinking_delta', text}，详情页思考行预览出这段字；随后落一条
-// thinking 段行，页面上这段字只剩一份。
-//
-// 用法：launch.mjs 之后
-//   node drive-1308-thinking-delta.mjs --expect=old|new
 
 import { createRequire } from 'node:module';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';

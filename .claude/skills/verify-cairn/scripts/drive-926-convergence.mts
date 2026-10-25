@@ -1,25 +1,3 @@
-// #926 机制生效实物探针：重试面显式化 + 收敛判定改 agent_settled。
-//
-// 取「运行时真值」而非读源码（.claude/skills/verify-cairn「机制生效验收:实物判据」）：
-//   Phase A — pi 真 SettingsManager 读回 daemon 显式 retry 配置（getRetrySettings），
-//             证明 retry.* 不再是上游默认、而是被 pi 实际消费的显式值。
-//   Phase B — 起一个真 pi AgentSession（daemon materializeProvider + buildPiSessionSettings
-//             + ModelRuntime + createAgentSession）打 stub LLM，订阅**原始 pi 事件**：
-//             实证真 pi 发 agent_end 之后还发 agent_settled，且 daemon 的 mapPiSessionEvent
-//             只在 agent_settled 处产出 done（agent_end 处不产出）——收敛信号 = settled。
-//   Phase C — mapPiSessionEvent 的确定性对照（agent_end(!willRetry) → 空；agent_settled → done）。
-//
-// 运行（tsx 在 daemon 包内）：
-//   cd apps/daemon && corepack pnpm exec tsx \
-//     <repo>/.claude/skills/verify-cairn/scripts/drive-926-convergence.mts
-// 产物：docs/verify/926/convergence-evidence.json（+ stdout 人读摘要）。退出码 0 = 全部断言通过。
-//
-// import 形态（CLAUDE.md 禁 inline import，top-level only）：探针在 .claude/ 下，bare
-// `@earendil-works/*` 只在 apps/daemon 内解析（pnpm 未 hoist 到仓根），故一律走 repo-relative
-// 静态 import——daemon 源码（.ts，tsx 直接加载）+ pi 的 dist 入口（package.json exports "."
-// 的 import 位）。探针位置与 pnpm 布局固定，相对路径稳定；pi dist 内部 bare import 从其
-// realpath（.pnpm store）解析，不受探针位置影响。
-
 import { createServer, type Server } from 'node:http';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -49,7 +27,6 @@ function check(name: string, ok: boolean, detail?: unknown): void {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail !== undefined ? `  ${JSON.stringify(detail)}` : ''}`);
 }
 
-// —— stub LLM：OpenAI Chat Completions 兼容 SSE（integration/test/stub-llm.ts 同形，单轮）——
 interface StubLlm {
   url: string;
   close: () => Promise<void>;
@@ -97,19 +74,12 @@ async function startStubLlm(): Promise<StubLlm> {
 
 const evidence: Record<string, unknown> = { ticket: 926, generatedAt: new Date().toISOString() };
 
-// —— Phase A：pi 真 SettingsManager 读回显式 retry 配置 + 设置驱动读回对照 ——————
 {
   const settings = buildPiSessionSettings();
   const sm = SettingsManager.inMemory(settings);
   const readback = sm.getRetrySettings();
   const providerReadback = sm.getProviderRetrySettings();
-  // 关键对照：上面的显式值恰与 pi 1.0.4 内建默认逐字节相同，单看读回**分不清**「读了我们
-  // 的设置」还是「回落默认」。故再喂同一 inMemory 一份 maxRetries ≠ 默认（5）的 retry 设置，
-  // 读回随即变 5 —— 证明 getRetrySettings 读的是传入设置（设置驱动读回）。配合单测的引用
-  // 同一性（buildPiSessionSettings().retry === PI_RETRY_SETTINGS）与 pi.ts 把该设置喂进
-  // SettingsManager.inMemory，即得：真会话里 pi 读到的 maxRetries=3 来自我们的显式设置，不是
-  // 默认巧合；且改动设置值会改变 pi 重试逻辑读到的值（不是摆设）。
-  const probeMaxRetries = 5; // 故意 ≠ pi 默认 3
+  const probeMaxRetries = 5;
   const drivenReadback = SettingsManager.inMemory({
     compaction: { enabled: true },
     retry: { ...PI_RETRY_SETTINGS, maxRetries: probeMaxRetries },
@@ -138,7 +108,6 @@ const evidence: Record<string, unknown> = { ticket: 926, generatedAt: new Date()
   });
 }
 
-// —— Phase B：真 pi AgentSession 打 stub LLM，捕获原始事件序 ——————————————
 {
   const stub = await startStubLlm();
   const stubUrl = stub.url;
@@ -227,7 +196,6 @@ const evidence: Record<string, unknown> = { ticket: 926, generatedAt: new Date()
   );
 }
 
-// —— Phase C：mapPiSessionEvent 确定性对照 ————————————————
 {
   const s1 = newMapState();
   const endOut = mapPiSessionEvent({ type: 'agent_end', willRetry: false }, s1);
@@ -238,7 +206,6 @@ const evidence: Record<string, unknown> = { ticket: 926, generatedAt: new Date()
   check('agent_settled → 发 done', settledOut.length === 1 && settledOut[0].type === 'done', settledOut);
 }
 
-// —— 落盘 + 收尾 ————————————————
 const outDir = resolve(root, 'docs/verify/926');
 mkdirSync(outDir, { recursive: true });
 const outPath = join(outDir, 'convergence-evidence.json');

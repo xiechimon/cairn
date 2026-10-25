@@ -1,28 +1,3 @@
-// verify-cairn 定制 probe（#1106 派发技能注入——目录粗分发 + description
-// 细触发注入任务 brief）：live 栈 + 裸 HTTP 扮机器（claim = brief 组装投递位）
-// + 浏览器详情面取证。纯 wire 相位（无 daemon / 无 LLM）——注入选择的正本
-// 在 server 侧 claim 落库与载荷，daemon 半的目录收窄由 apps/daemon 单测
-// （skills-catalog.test.ts #1106 块）钉住，两层相加即票面验收链。
-//
-// 票面验收 seam 对照（--phase=claim）：
-//   验收 1  ≥20 授予技能 × 明确域任务 → claim 载荷 agent.injectedSkills
-//           只含相关域技能（求职/知识库族零注入）；agent.skills 授权集
-//           仍全量（授权不收窄）。
-//   验收 2  （agent 可答「为何没用未注入技能」的前提 = brief 里没有它的
-//           description）注入 ids 与技能根盘上清单对拍——只有选中技能的
-//           description 进 brief，其余不出现在选择面。
-//   验收 3  零命中任务正常派发：startBuild 201 + claim 成功 +
-//           injectedSkills=[] + step 行 hits=[]（零注入不是故障）。
-//   验收 4  选择过程可查：steps REST + SQLite step 行带每条命中的规则与
-//           原因；详情面 injected-skills 行渲染（截图 + DOM 断言）。
-//   显式点名：任务文本点名 tdd → injectedSkills 含 tdd、rule=explicit-mention。
-//
-// 用法（栈必须在跑：先 launch.mjs）：
-//   node drive-1106-skill-inject.mjs
-// env：SERVER（缺省读 VERIFY_RUN_DIR/ports.json）、VERIFY_RUN_DIR、
-//      SKILLS_DIR（缺省 <RUN_DIR>/home/skills）、DB（缺省
-//      <RUN_DIR>/home/server/server.db）、VERIFY_EVIDENCE_DIR、WEB_URL。
-
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -91,8 +66,6 @@ async function jfetch(method, path, opts = {}) {
   return { status: res.status, body };
 }
 
-// —— fixture 技能库（21 个 = 票面 ≥20 量级；跨域 + 明确无关族）—————————
-
 const SKILLS = [
   ['tdd', 'Test-driven development: red-green-refactor, integration tests'],
   ['better-typography', '产品 UI 排版工程：字号阶梯、字距、换行与截断'],
@@ -117,7 +90,7 @@ const SKILLS = [
   ['scaffold-exercises', '生成课程练习目录结构并通过 lint'],
 ];
 const GRANTED = SKILLS.map(([id]) => id);
-/** 任务文本零域命中、零点名时的「无关」族（求职/知识库/导学）。 */
+
 const IRRELEVANT = [
   'great-resume',
   'offer',
@@ -145,8 +118,6 @@ function buildFixtureLibrary() {
   }
 }
 
-// —— seed（REST，drive-920 同形）———————————————————————————————————
-
 const STUB_BASE = 'http://127.0.0.1:8919/v1';
 let uniq = 0;
 
@@ -164,7 +135,7 @@ async function seed() {
       compat: { supportsDeveloperRole: false },
       models: [{ id: 'stub-model', name: 'stub-model' }],
     },
-  }); // 幂等性不保证：已存在则忽略状态
+  });
   const agentRes = await jfetch('POST', `/api/teams/${teamId}/agents`, {
     body: {
       displayName: `probe-1106-builder-${++uniq}`,
@@ -211,8 +182,6 @@ function openDb() {
   return new Database(DB, { readonly: true });
 }
 
-// —— phase: claim（wire 相位主链）———————————————————————————————————
-
 buildFixtureLibrary();
 const seeded = await seed();
 const enrollRes = await jfetch('POST', '/api/machine/enroll', {
@@ -227,8 +196,6 @@ async function claimOnce() {
   const res = await jfetch('POST', '/api/machine/tasks/claim', { bearer: token, body: {} });
   return { status: res.status, claimed: res.body?.step ?? null };
 }
-
-// —— 验收 1：明确域任务（≥20 授予技能）—————————————————————————————
 
 const domainTask = await dispatchTask(
   seeded.projectId,
@@ -257,8 +224,6 @@ check(
   injected.every((id) => granted.includes(id)),
   `injected=${injected.length}/granted=${granted.length}`,
 );
-
-// —— 验收 4：step 行 + steps REST 带规则与原因（详情面回查面）———————
 
 const domainSteps = await jfetch('GET', `/api/builds/${domainTask.buildId}/steps`);
 save('steps-domain.json', domainSteps.body);
@@ -293,15 +258,12 @@ try {
     JSON.stringify(hitDomains.map((h) => h.reason)),
   );
 } catch (err) {
-  // before 腿（origin/main 无本列）：SqliteError no such column = 机制缺席的
-  // 实物——记 FAIL 不崩，跑完整张对照表。
+
   check('SQLite step 行 skillInjection 与 REST 一致（正本落库）', false, String(err));
   check('命中原因含域与关键词（可解释性：至少规则命中原因一条）', false, 'no column on main');
 } finally {
   db.close();
 }
-
-// —— 验收 3：零命中任务正常派发（零注入不是故障）——————————————————————
 
 const zeroTask = await dispatchTask(seeded.projectId, seeded.agentId, '把首页轮播图换成静态图');
 save('task-zero.json', zeroTask);
@@ -331,8 +293,6 @@ check(
   JSON.stringify(zeroRestStep?.skillInjection),
 );
 
-// —— 显式点名：任务文本点名 tdd ————————————————————————————————————
-
 const mentionTask = await dispatchTask(
   seeded.projectId,
   seeded.agentId,
@@ -357,8 +317,6 @@ check(
   JSON.stringify(tddHit),
 );
 
-// —— 验收 4（浏览器面）：详情面 injected-skills 行渲染 ——————————————————
-
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -369,8 +327,7 @@ try {
     await row.waitFor({ state: 'visible', timeout: 15_000 });
     text = await row.textContent();
   } catch (err) {
-    // before 腿（origin/main 无本行）：行缺席 = 机制缺席的 UI 实物——截图照出
-    // （无行详情面）并记 FAIL，不崩探针。
+
     check('验收 4（详情面）：injected-skills 行渲染且含注入技能与原因', false, String(err));
   }
   if (text !== null) {
@@ -382,7 +339,6 @@ try {
   }
   await page.screenshot({ path: join(EVIDENCE, 'detail-domain.png'), fullPage: false });
 
-  // 零命中任务详情面：行渲染「未注入」占位（零命中是可查事实）。
   await page.goto(`${WEB_URL}/app/todo/${zeroTask.todoId}`);
   let zeroText = null;
   try {

@@ -1,24 +1,5 @@
 #!/usr/bin/env node
-// verify-cairn 定制 probe（#919 技能路由行为验收）：主判据（行为）取证面。
-//
-//   behavior  真模型腿（claude-code runtime，本机 claude 登录态，缺省
-//             glm-5.3）：票面零技能词 → lane 干完活 → 产物 haiku.txt 带
-//             技能正文 marker（SKILL-ROUTE-919）= 自己命中了技能；
-//             transcript 的 Read 命中行 + daemon.log catalog/team 行 =
-//             日志面；详情页截图（线程列技能行 + 右栏「技能」汇总节）=
-//             真实用户路径前端面。relay 有间歇故障史：整步最多 3 次尝试
-//             （每次新 todo+build），全部留档。
-//   deny-ui   stub 腿（pi runtime + 本探针内嵌脚本 stub）：被 deny 挡下的
-//             read 落 UI blocked 行 + 汇总拦截计数（deny 事件可见面），
-//             同跑取授权 read 命中行与 LLM 输入面目录（含点名技能、无
-//             白名单外条目）。
-//
-// 前置（配方 = docs/verify/919/README.md）：launch.mjs 起栈；真 daemon 外
-// 部起（CAIRN_SKILLS_DIR 指 LOCAL_SKILLS）；行为腿要求本机能经 claude 登
-// 录态到模型（#917 probe 同前提）。
-// env：SERVER / WEB（缺省读 VERIFY_RUN_DIR/ports.json）、VERIFY_RUN_DIR、
-//      DB、DAEMON_HOME、LOCAL_SKILLS、VERIFY_EVIDENCE_DIR、MODEL
-//      （缺省 glm-5.3）、STUB_PORT（缺省 8921）。
+
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -61,11 +42,10 @@ const EVIDENCE =
   process.env.VERIFY_EVIDENCE_DIR ?? `/tmp/cairn-919-evidence-${PHASE}-${ts}`;
 mkdirSync(EVIDENCE, { recursive: true });
 
-// —— 判据常量（产物 marker 与票面词表是先于运行固化的期望值）———————————
 const SKILL_MARKER = 'SKILL-ROUTE-919';
 const SECRET_MARKER = 'SECRET-LOCAL-BODY-919';
 const HAIKU_LOCAL_MARKER = 'HAIKU-LOCAL-BODY-919';
-/** 票面（title+spec）禁止出现的技能指涉词——主判据的输入面自证。 */
+
 const SKILL_WORDS = /技能|skill|haiku-helper/i;
 const TASK_TITLE = '写一首三行俳句并保存';
 const TASK_SPEC =
@@ -140,7 +120,7 @@ function openDb() {
 }
 
 async function waitStepTerminal(buildId, timeoutMs) {
-  // step 行无 errorMessage 列——根因在 build.errorMessage（completeStep 落位）。
+
   const db = openDb();
   const started = Date.now();
   try {
@@ -148,12 +128,10 @@ async function waitStepTerminal(buildId, timeoutMs) {
       const rows = db
         .prepare('SELECT id, kind, status FROM step WHERE buildId = ? ORDER BY createdAt')
         .all(buildId);
-      // 终态词表 = shared stepStatusSchema：done/failed/stopped（drive-920 模板
-      // 只见过 failed 形——它的 stub 会话恒撞产物闸——本探针真模型腿落 done）。
+
       const terminal = rows.filter((r) => ['done', 'failed', 'stopped'].includes(r.status));
       if (terminal.length > 0) {
-        // build 表没有 status 列（docs/verify/920/README 结果判读第 3 条）——
-        // 步终态在 step.status，失败根因在 build.errorMessage。
+
         const build = db.prepare('SELECT id, errorMessage FROM build WHERE id = ?').get(buildId);
         return {
           step: terminal[terminal.length - 1],
@@ -195,8 +173,7 @@ function daemonLogLines() {
 }
 
 function ensureLocalSkills() {
-  // 本机库（daemon CAIRN_SKILLS_DIR）：haiku-local 供 stub 腿放侧，
-  // secret-local 供拒侧（两腿的白名单都不含它）。
+
   const w = (name, description, body, marker) => {
     const dir = join(LOCAL_SKILLS, name);
     mkdirSync(dir, { recursive: true });
@@ -210,11 +187,6 @@ function ensureLocalSkills() {
   w('secret-local', '白名单外本机技能（#919 探针拒侧）。', '白名单外技能正文。', SECRET_MARKER);
 }
 
-/** 团队库三技能：haiku-helper（两腿白名单内）+ haiku-local / secret-local。
- *  后两者同时进团队库是因为 agent.skillsAllowlist 的授权引用在 server 侧按团队库
- *  现扫过滤（死引用静默脱落）——deny 腿要白名单含 haiku-local，它就必须是
- *  团队库已知 id；secret-local 进库但无人白名单 → 永不分发，拒侧仍靠本机
- *  目录那份（同名冲突团队条目胜，本机 loser 不进拒绝集，读取照放行）。 */
 async function ensureTeamSkill(teamId) {
   const bodies = [
     {
@@ -246,7 +218,7 @@ async function ensureTeamSkill(teamId) {
   ];
   for (const body of bodies) {
     const res = await jfetch('POST', `/api/skills?teamId=${encodeURIComponent(teamId)}`, { body });
-    // 201 = 新建；4xx 且已存在 = 幂等通过（复跑形态）。
+
     if (res.status === 201) continue;
     const list = await jfetch('GET', `/api/skills?teamId=${encodeURIComponent(teamId)}`);
     const names = (Array.isArray(list.body) ? list.body : (list.body?.skills ?? [])).map(
@@ -267,9 +239,6 @@ async function teamIdOf() {
   return teamId;
 }
 
-/** #682 enabledRuntimes 真闸：enroll 缺省只开 pi——claude-code runtime 的
- *  agent 步会永远 pending（机器面开关 = PATCH /api/machines/:id，spec 11
- *  A8/A9 的用户面）。两腿都先给在线机器把两 runtime 打开（幂等）。 */
 async function enableRuntimes(teamId) {
   const list = await jfetch('GET', `/api/teams/${teamId}/machines`);
   const rows = Array.isArray(list.body) ? list.body : [];
@@ -308,9 +277,6 @@ async function createTaskAndBuild(projectId, agentId, title, spec) {
   return { todoId, buildId };
 }
 
-/** 详情页截图（真实用户路径）：#918 落地的持久汇总行（testid
- *  skills-summary，读/挡两列）——活行披露面是瞬态（步终态即清），截图取
- *  持久面；返回汇总行文本供列断言。 */
 async function captureDetailUi(todoId, prefix, expectName) {
   const browser = await chromium.launch();
   try {
@@ -325,8 +291,6 @@ async function captureDetailUi(todoId, prefix, expectName) {
   }
 }
 
-// —— phase: behavior（真模型腿，主判据）————————————————————————————
-
 async function phaseBehavior() {
   check('票面自证：title/spec 零技能指涉词', !SKILL_WORDS.test(`${TASK_TITLE}\n${TASK_SPEC}`), TASK_SPEC);
   const teamId = await teamIdOf();
@@ -339,8 +303,7 @@ async function phaseBehavior() {
     modelId: MODEL,
     skillsAllowlist: ['haiku-helper'],
   });
-  // hosted = 项目创建即 init bare repo + 种子 main（提交面断言与变更面截图
-  // 都要 git 真值；缺省 manual 形态无仓库，产物进不了任何提交）。
+
   const projRes = await jfetch('POST', '/api/projects', {
     body: { name: `probe-919-behavior-${Date.now()}`, repoKind: 'hosted' },
   });
@@ -366,15 +329,13 @@ async function phaseBehavior() {
   if (landed === null) return finish();
   const { todoId, buildId } = landed;
 
-  // 主判据（产物）：haiku.txt 带技能正文 marker——模型自己读了 SKILL.md 并
-  // 按其指令行事；票面从未提到技能。
   const worktree = join(DAEMON_HOME, 'workspaces', buildId);
   const haikuPath = join(worktree, 'haiku.txt');
   const haikuText = existsSync(haikuPath) ? readFileSync(haikuPath, 'utf8') : null;
   save('behavior-artifact-haiku.txt', haikuText ?? '(missing)');
   check('产物 haiku.txt 存在', haikuText !== null, haikuPath);
   check(`产物含技能 marker ${SKILL_MARKER}（主判据）`, (haikuText ?? '').includes(SKILL_MARKER));
-  // 提交面：产物已进步收尾提交（分支历史真值，不只看工作树）。
+
   let committed = '';
   try {
     committed = execFileSync('git', ['-C', worktree, 'show', 'HEAD:haiku.txt'], {
@@ -385,7 +346,6 @@ async function phaseBehavior() {
   }
   check('提交面 HEAD:haiku.txt 含 marker', committed.includes(SKILL_MARKER));
 
-  // 日志面：transcript 里 SKILL.md 的 Read 命中 + daemon.log 目录/分发行。
   const msgs = messagesOf(buildId);
   save('behavior-messages.json', msgs);
   const msgsFlat = JSON.stringify(msgs);
@@ -400,7 +360,6 @@ async function phaseBehavior() {
   check('daemon.log 目录行 entries=1（白名单 ∩ 全库）', logs.some((l) => l.includes('[skills] catalog: entries=1 ')));
   check('daemon.log 硬挡行（本机白名单外 2 技能）', logs.some((l) => l.includes('[skills] deny: 2 skill dir(s) hard-blocked')));
 
-  // 前端面（真实用户路径，#918 落地的持久汇总行）：点名命中技能在读列。
   try {
     const summaryText = await captureDetailUi(todoId, 'behavior', 'haiku-helper');
     check(
@@ -414,13 +373,6 @@ async function phaseBehavior() {
   return finish();
 }
 
-// —— phase: deny-ui（stub 腿：deny 事件 UI 可见面 + LLM 输入面）—————————————
-
-/** 内嵌脚本 stub（integration/test/stub-llm.ts 的 .mjs 最小移植）：轮次按
- *  数组序消费，末轮重复；捕获全部请求体供输入面断言。
- *  ⚠️ call id 必须**跨进程唯一**（RUN_SALT）：message 行以 toolcall id 为
- *  行 id 全局去重——两次 probe 进程都发 `call-stub-N` 时，后跑那次的行会被
- *  server 静默判重丢弃（2026-10-07 实测：outbox 有行、DB 无行、UI 空等）。 */
 const RUN_SALT = Math.random().toString(36).slice(2, 10);
 function startScriptedStub(responses) {
   const requests = [];
@@ -489,9 +441,7 @@ function startScriptedStub(responses) {
       resolveP({
         url: `http://127.0.0.1:${STUB_PORT}/v1`,
         requests,
-        // close 必须回调接 promise 且先掐 keep-alive 连接——daemon 的 provider
-        // 连接不放手时裸 server.close() 永不 settle，进程挂 unsettled
-        // top-level await 退码 13（实测）。
+
         close: () =>
           new Promise((r) => {
             server.closeAllConnections?.();
@@ -504,7 +454,7 @@ function startScriptedStub(responses) {
 
 async function phaseDenyUi() {
   const teamId = await teamIdOf();
-  await enableRuntimes(teamId); // pi 腿本就走缺省闸，幂等打开防复跑漂移
+  await enableRuntimes(teamId);
   await ensureTeamSkill(teamId);
   ensureLocalSkills();
   const secretFile = join(LOCAL_SKILLS, 'secret-local', 'SKILL.md');
@@ -526,7 +476,7 @@ async function phaseDenyUi() {
         compat: { supportsDeveloperRole: false },
         models: [{ id: 'stub-model', name: 'stub-model' }],
       },
-    }); // 已存在（复跑）则忽略状态
+    });
     const agentId = await createAgent(teamId, {
       displayName: `route-stub-919-${Date.now()}`,
       provider: 'stub-gw-919',
@@ -549,8 +499,7 @@ async function phaseDenyUi() {
     const msgs = messagesOf(buildId);
     save('deny-messages.json', msgs);
     const flat = JSON.stringify(msgs);
-    // deny 双向（live 栈上复核 integration 断言的同词表）：拒绝文案落库、
-    // 白名单外正文 marker 永不落库、授权本机技能正文落库。
+
     check('拒绝文案落库（not in the agent allowlist）', flat.includes('not in the agent allowlist'));
     check('白名单外技能正文 marker 不落库', !flat.includes(SECRET_MARKER));
     check('授权本机技能正文 marker 落库', flat.includes(HAIKU_LOCAL_MARKER));
@@ -562,15 +511,12 @@ async function phaseDenyUi() {
     check('daemon.log denied-read 行（带路径）', logs.some((l) => l.includes('denied-read:') && l.includes(secretFile)));
     check('daemon.log 目录行 entries=2（haiku-helper + haiku-local）', logs.some((l) => l.includes('[skills] catalog: entries=2 ')));
 
-    // LLM 输入面（stub 捕获 = live 栈上的注入面真值）：目录含点名技能、
-    // 白名单外条目不出现。
     const inputFlat = JSON.stringify(stub.requests[0]?.messages ?? []);
     save('deny-llm-input-request0.json', stub.requests[0] ?? null);
     check('LLM 输入面含 <available_skills> 目录', inputFlat.includes('<available_skills>'));
     check('目录含点名技能 haiku-helper 与 haiku-local', inputFlat.includes('<name>haiku-helper</name>') && inputFlat.includes('<name>haiku-local</name>'));
     check('目录不含白名单外 secret-local', !inputFlat.includes('secret-local'));
 
-    // 前端面（#918 持久汇总行）：挡下列点名被拒技能。
     try {
       const summaryText = await captureDetailUi(todoId, 'deny', 'secret-local');
       check(

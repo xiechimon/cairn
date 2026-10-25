@@ -1,27 +1,3 @@
-// verify-cairn 定制 probe（#918 活行与详情显示「读了哪些技能」，含被 deny
-// 挡下的事件）：真 daemon + stub LLM + Playwright 浏览器面全链取证。
-//
-// 票面验收 seam 对照：
-//   真实用户路径   起一个任务，stub LLM 按 catalog 指引 read 授权 SKILL.md——
-//                  活行披露面出现 `▶ skill: demo-skill` 条目（运行中截图），
-//                  步终态后详情页出现汇总行（技能：demo-skill）。
-//   deny 事件      同一步先 read 白名单外技能的 SKILL.md（#917 门控 read 以
-//                  tool error 拒绝）——同一条线出现 `✕ skill: extra-skill
-//                  （已挡下）`，与「看不见」可区分；SQLite 落库拒绝文案对拍。
-//   对照组         第二个任务（另一 agent + 另一 stub，脚本零技能读取）：
-//                  全程 activity 事件不带 skills 字段、详情页无汇总行、无
-//                  技能条目——「无技能命中的步骤不出现空条目」。
-//   stepId 过滤    wire 面证据：activity 事件 skills 载荷只出现在本步事件上
-//                  （server 盖 stepId；mapper 消费侧按在跑步过滤已有单测
-//                  W8 钉住，probe 取 wire 真值）。
-//
-// 用法（栈须先 launch；配方见 docs/verify/918/README.md）：
-//   node drive-918-skill-facts.mjs
-// env：VERIFY_REPO_ROOT / VERIFY_RUN_DIR / VERIFY_EVIDENCE_DIR、
-//      SKILLS_DIR（缺省 /tmp/cairn-918-skills，探针自动落 fixture）、
-//      DAEMON_HOME（缺省 /tmp/cairn-918-daemon-home）。
-// 探针自 spawn：stub LLM ×2（ephemeral 端口）+ 真 daemon（--server 指向本
-// 栈、CAIRN_SKILLS_DIR 指向 fixture）；收尾全部回收（finally kill）。
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -89,15 +65,10 @@ async function jfetch(method, path, opts = {}) {
   return { status: res.status, body };
 }
 
-// —— stub LLM（integration/test/stub-llm.ts 的 .mjs 最小移植：脚本轮次 +
-//    delayMs 门控——延迟撑开运行窗口，给浏览器面留拍摄时间）————————————
-
 function startStubLlm(responses) {
   const requests = [];
   let next = 0;
-  // call id 每次运行唯一：message 表主键 = call id，而 upsert 的冲突更新不动
-  // conversationId——跨运行复用同 id 会把本轮工具行「钉」进上一轮的会话
-  // （第四跑实测：汇总行因本轮会话缺工具行而永不出现）。
+
   const runId = Date.now().toString(36);
   const server = createServer((req, res) => {
     if (req.method !== 'POST' || !req.url?.endsWith('/chat/completions')) {
@@ -168,8 +139,6 @@ function startStubLlm(responses) {
   });
 }
 
-// —— conversation stream activity 收集器（integration 同款判据的 probe 形）——
-
 function collectActivities(buildId) {
   const ctrl = new AbortController();
   const events = [];
@@ -193,7 +162,7 @@ function collectActivities(buildId) {
             const ev = JSON.parse(line.slice(5).trim());
             if (ev.type === 'activity') events.push(ev.activity);
           } catch {
-            // 半帧防御
+
           }
         }
         idx = buf.indexOf('\n\n');
@@ -213,8 +182,6 @@ function collectActivities(buildId) {
   };
 }
 
-// —— fixture / seed / daemon / SQLite ————————————————————————————————
-
 const DENIED_SKILL = 'extra-skill';
 const ALLOWED_SKILL = 'demo-skill';
 const SKILL_MARKER = 'SKILL-FACTS-MARKER-918';
@@ -231,10 +198,7 @@ function buildSkillFixtures() {
       `---\nname: ${DENIED_SKILL}\ndescription: 白名单外对照技能（#918 探针）。\n---\n\nextra body.\n`,
     ],
   ];
-  // 双落点：① daemon 本地 CAIRN_SKILLS_DIR（stub 脚本按固定绝对路径 read，
-  // 门控/deny 判定的目标面）；② server 端技能目录——agent 白名单写入走
-  // filterKnownSkillIds(ctx.skillsDir) 现扫校验，server 目录里没有的名字会被
-  // 静默丢弃（首跑实测：skills=[] → 双技能全 deny，授权读也变成拒绝）。
+
   const roots = [SKILLS_DIR, join(stack.homeDir, 'skills')];
   for (const root of roots) {
     for (const [rel, content] of files) {
@@ -264,8 +228,7 @@ async function seed(stubSkillUrl, stubCtlUrl) {
     });
     if (r.status >= 400) throw new Error(`provider create failed: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
   };
-  // provider id 每次运行唯一：stub 是 ephemeral 端口，同 id 复跑会撞上一轮
-  // 的死 baseUrl（create-if-absent 不更新）。
+
   const runTag = Date.now().toString(36);
   const skillProvider = `stub-918-${runTag}`;
   const ctlProvider = `stub-918-ctl-${runTag}`;
@@ -350,8 +313,7 @@ async function waitStepTerminal(buildId, timeoutMs = 180_000) {
       const db = openDb();
       try {
         const rows = db.prepare('SELECT id, kind, status FROM step WHERE buildId = ? ORDER BY createdAt').all(buildId);
-        // 状态词表 = shared stepStatusSchema：成功终态是 'done'（920 探针里
-        // 写 'success' 是它的失败步形态碰不到成功分支的潜伏笔误，勿抄）。
+
         const terminal = rows.filter((r) => ['done', 'failed', 'stopped'].includes(r.status));
         if (terminal.length === 0) return null;
         const build = db.prepare('SELECT id, errorMessage FROM build WHERE id = ?').get(buildId);
@@ -365,15 +327,11 @@ async function waitStepTerminal(buildId, timeoutMs = 180_000) {
   );
 }
 
-// —— main ———————————————————————————————————————————————————————————
-
 buildSkillFixtures();
 check('fixture 技能库落盘（1 授权 + 1 白名单外）', existsSync(join(SKILLS_DIR, ALLOWED_SKILL, 'SKILL.md')) && existsSync(join(SKILLS_DIR, DENIED_SKILL, 'SKILL.md')), SKILLS_DIR);
 
 rmSync(DAEMON_HOME, { recursive: true, force: true });
 
-// stub A（技能任务）：拒读 → 授读 → 写改动（过产物闸）→ 收尾。delayMs 撑开
-// 运行窗口给浏览器拍摄；stub B（对照任务）：零技能读取。
 const stubSkill = await startStubLlm([
   { toolCall: { name: 'read', arguments: { path: join(SKILLS_DIR, DENIED_SKILL, 'SKILL.md') } }, delayMs: 4_000 },
   { toolCall: { name: 'read', arguments: { path: join(SKILLS_DIR, ALLOWED_SKILL, 'SKILL.md') } }, delayMs: 4_000 },
@@ -392,16 +350,14 @@ let collectorA = null;
 let collectorB = null;
 
 try {
-  // vite dev 首访冷编译可达数十秒——先暖机再建任务，否则详情页落地时步已
-  // 终态（activity 单槽即清），活行面板永远拍不到（第三跑实测踩中）。
+
   const warm = await browser.newPage();
   await warm.goto(`${WEB}/app`, { waitUntil: 'networkidle', timeout: 90_000 });
   await warm.close();
-  // daemon.log 行带 wall-clock 前缀（#735）——子串判定，不整行相等。
+
   await waitFor(() => daemonLogLines().some((l) => l.includes('[wake] push channel connected')), 60_000, 'daemon online');
   check('真 daemon 上线（--server 指本栈，CAIRN_SKILLS_DIR 指 fixture）', true, DAEMON_HOME);
 
-  // ——— 任务 A：技能读取 + deny 事件 ———
   const taskA = await makeTask(seeded.projectId, seeded.agentId, '918 技能事实探针');
   collectorA = collectActivities(taskA.buildId);
 
@@ -409,9 +365,7 @@ try {
   await page.goto(`${WEB}/app/todo/${taskA.todoId}`);
   const liveRow = page.getByTestId('live-row');
   await liveRow.first().waitFor({ timeout: 90_000 });
-  // 运行中：技能条目逐条冒出来（拒读在前、授读在后；累计集）。披露面展开态
-  // 是 LiveRow 组件内 state——transcript 条目增减会重挂载把面板合上（#905
-  // 面板同款既有行为，非本票范围）——故轮询里反复重展开，直到两条条目同框。
+
   const expand = page.getByRole('button', { name: '展开实时步骤' });
   await expand.waitFor({ timeout: 30_000 });
   const skillLines = page.getByTestId('skill-line');
@@ -429,13 +383,11 @@ try {
   }
   check('活行披露面出现「▶ skill: demo-skill」（运行中，实时）', lineTexts.some((t) => t.includes('▶ skill: demo-skill')), JSON.stringify(lineTexts));
   check('deny 事件同线可见「✕ skill: extra-skill（已挡下）」', lineTexts.some((t) => t.includes('✕ skill: extra-skill') && t.includes('已挡下')), JSON.stringify(lineTexts));
-  // 头标签增强（best-effort 拍摄，不作 check：tool 相位窗口秒级）——把头行
-  // 文本原样存档供判读。
+
   const headLabel = await liveRow.first().innerText().catch(() => null);
   save('live-head-label.txt', headLabel ?? '(capture failed)');
   await page.screenshot({ path: join(EVIDENCE, 'live-panel.png') });
 
-  // wire 真值：activity 事件累计集含双事实 + 工具相位显示名 skill: 前缀。
   await waitFor(
     () => {
       const skills = collectorA.latestSkills();
@@ -454,7 +406,6 @@ try {
   check('wire：技能入口调用的 tool 相位显示名带 skill: 前缀', Boolean(skillToolPhase), JSON.stringify(skillToolPhase ?? null));
   save('activity-wire.json', collectorA.events);
 
-  // 步终态 → 详情页汇总行（持久面）。
   const terminalA = await waitStepTerminal(taskA.buildId);
   check('任务 A 步以 done 收尾（产物闸被 bash 写改动满足）', terminalA.terminal?.status === 'done', JSON.stringify(terminalA.terminal));
   const summary = page.getByTestId('skills-summary');
@@ -463,7 +414,6 @@ try {
   check('步终态后详情页汇总行在位：技能：demo-skill · 挡下：extra-skill', summaryText.includes('技能：demo-skill') && summaryText.includes('挡下：extra-skill'), summaryText);
   await page.screenshot({ path: join(EVIDENCE, 'summary.png') });
 
-  // SQLite 真值：拒绝文案落库（deny 事件不是活行专属的瞬态）。
   const db = openDb();
   let dbRows;
   try {
@@ -475,7 +425,6 @@ try {
   check('SQLite：拒绝文案落库（not in the agent allowlist）且授权正文 marker 落库', flat.includes('not in the agent allowlist') && flat.includes(SKILL_MARKER), `messages=${dbRows.length}`);
   save('messages-918a.json', dbRows);
 
-  // ——— 任务 B：对照组（零技能命中 → 零条目） ———
   const taskB = await makeTask(seeded.projectId, seeded.ctlAgentId, '918 对照探针（零技能）');
   collectorB = collectActivities(taskB.buildId);
   const terminalB = await waitStepTerminal(taskB.buildId);
@@ -495,14 +444,14 @@ try {
   finish({ taskA, taskB });
 } catch (err) {
   check(`探针异常：${err instanceof Error ? err.message : String(err)}`, false);
-  // 失败路径诊断（第五跑实测：冷栈下面板等待超时但无现场——补拍）。
+
   try {
     for (const p of browser.contexts().flatMap((c) => c.pages())) {
       await p.screenshot({ path: join(EVIDENCE, `fail-${Date.now()}.png`) }).catch(() => {});
     }
     save('fail-activity-wire.json', collectorA?.events ?? []);
   } catch {
-    // 诊断失败不掩盖原始异常
+
   }
   finish({ error: err instanceof Error ? err.stack : String(err) });
 } finally {

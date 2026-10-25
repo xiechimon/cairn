@@ -1,28 +1,3 @@
-// verify-cairn 定制 probe（#929/#930：命令闸 tool_call 阻断缝 + MCP 原生
-// 桥）：真 daemon + stub LLM + stdio MCP fixture server + Playwright 全链取证。
-//
-// 票面验收 seam 对照（两票双向证据）：
-//   #929 拒绝   bash `rm -rf /` 命中 DEFAULT_BASH_PATTERNS：[gate] canon 行 +
-//              拒绝文案（含 reason 与改道建议）进 transcript 工具行——模型
-//              可见，非空 tool error。
-//   #929 放行   合法 bash 照跑（printf 落 README.md，步过产物闸到 done）。
-//   #930 放行   mcp__demo__echo 真调用外部 server（transcript 工具行 + 回
-//              文 marker）；工具名与旧桥逐字节同形。
-//   #930 拒绝   dead 端点（http://127.0.0.1:1）单点失败降级 canon 行、会话
-//              不阻断；ghost slug 走 not-in-config 扩展行。
-//   #930 新能力 resources 工具可用：read_mcp_resource 读回 demo://note 内容
-//              落 transcript（pi 原生 resources 面，旧手写桥没有）。
-//   收尾纪律   步终态后 pi MCP stdio 子进程被 session_shutdown 关闭（单会话
-//              dispose 不发该事件——#930 实测坑，pgrep 计数立证）。
-//
-// 用法（栈须先 launch；配方见 docs/verify/929-930/README.md）：
-//   node drive-929-930.mjs
-// env：VERIFY_REPO_ROOT / VERIFY_RUN_DIR / VERIFY_EVIDENCE_DIR、
-//      DAEMON_HOME（缺省 /tmp/cairn-929-930-daemon-home）、
-//      MCP_HOME（缺省 /tmp/cairn-929-930-mcp）。
-// 探针自 spawn：stub LLM + stdio MCP fixture（脚本落在 apps/daemon 内解
-// 析依赖）+ 真 daemon（--server 指向本栈、CAIRN_MCP_CONFIG 指向 fixture）；
-// 收尾全部回收（finally kill + rm 探针脚本）。
 import { spawn, execSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -92,8 +67,6 @@ async function jfetch(method, path, opts = {}) {
   return { status: res.status, body };
 }
 
-// —— stub LLM（drive-918 同款 .mjs 移植：call id 每运行唯一）————————————
-
 function startStubLlm(responses) {
   const requests = [];
   let next = 0;
@@ -142,10 +115,6 @@ function startStubLlm(responses) {
   });
 }
 
-// —— MCP fixture：stdio server 脚本（echo 工具 + note 资源 + pid 落盘）——
-// 脚本必须落在 apps/daemon 内（ESM 裸说明符按脚本文件位置解析 node_modules）；
-// 文件名带 run 标记，收尾删除。
-
 const MCP_SERVER_MARKER = `verify-echo-${Date.now().toString(36)}`;
 const MCP_SERVER_FILE = join(REPO, 'apps', 'daemon', `verify-929-930-mcp-server-${Date.now().toString(36)}.mjs`);
 const MCP_SERVER_SRC = `
@@ -161,8 +130,6 @@ server.resource('note', 'demo://note', { description: 'A demo note resource (#93
 }));
 await server.connect(new StdioServerTransport());
 `;
-
-// —— seed / daemon / SQLite（drive-918 同族）———————————————————————————
 
 let uniq = 0;
 async function seed(stubUrl) {
@@ -277,8 +244,6 @@ async function waitStepTerminal(buildId, timeoutMs = 180_000) {
   );
 }
 
-// —— main ———————————————————————————————————————————————————————————
-
 rmSync(DAEMON_HOME, { recursive: true, force: true });
 rmSync(MCP_HOME, { recursive: true, force: true });
 mkdirSync(MCP_HOME, { recursive: true });
@@ -297,15 +262,15 @@ writeFileSync(
 check('MCP 本机 config fixture 落盘（demo=stdio 活端点 + dead=死端点）', existsSync(MCP_CONFIG), MCP_CONFIG);
 
 const stub = await startStubLlm([
-  // 轮 1（#929 拒绝路径）：不可逆形态 → tool_call 闸拒（模型拿到 reason）。
+
   { toolCall: { name: 'bash', arguments: { command: 'rm -rf /' } }, delayMs: 4_000 },
-  // 轮 2（#930 resources 新能力）：读外部资源。
+
   { toolCall: { name: 'read_mcp_resource', arguments: { server: 'demo', uri: 'demo://note' } }, delayMs: 4_000 },
-  // 轮 3（#930 放行路径）：真调 MCP echo 工具（命名 = mcp__demo__echo）。
+
   { toolCall: { name: 'mcp__demo__echo', arguments: { text: 'live-gate' } }, delayMs: 6_000 },
-  // 轮 4（#929 放行路径 + 产物闸）：合法 bash 落一处改动。
+
   { toolCall: { name: 'bash', arguments: { command: 'printf "verify 929 30\\n" >> README.md' } }, delayMs: 6_000 },
-  // 轮 5：收尾。
+
   { content: '闸与桥双向验证完成。', delayMs: 2_000 },
 ]);
 
@@ -325,7 +290,7 @@ const mcpChildCount = () => {
 };
 
 try {
-  // vite dev 首访冷编译可达数十秒（drive-918 同坑）——先暖机再建任务。
+
   const warm = await browser.newPage();
   await warm.goto(`${WEB}/app`, { waitUntil: 'networkidle', timeout: 90_000 });
   await warm.close();
@@ -338,14 +303,12 @@ try {
   await page.goto(`${WEB}/app/todo/${task.todoId}`);
   await page.getByTestId('live-row').first().waitFor({ timeout: 90_000 });
 
-  // 运行中拍摄（echo 轮 delayMs 撑开的窗口；best-effort，硬判据在 DB/log）。
   await page.waitForTimeout(15_000);
   await page.screenshot({ path: join(EVIDENCE, 'live-mcp.png') }).catch(() => {});
 
   const terminal = await waitStepTerminal(task.buildId);
   check('步以 done 收尾（闸拒 + 死端点 + ghost 全不阻断会话；产物闸被放行 bash 满足）', terminal.terminal?.status === 'done', JSON.stringify(terminal.terminal));
 
-  // ——— #929：双向证据 ———
   const lines = daemonLogLines();
   save('daemon.log', lines.join('\n'));
   check('#929 拒绝：[gate] canon 行（rule + command）', lines.some((l) => l.includes('[gate] ask: rule=ask-rm-rf-root command=rm -rf /')), 'daemon.log');
@@ -361,7 +324,6 @@ try {
   check('#929 拒绝：改道文案进 transcript 工具行（模型可见 reason，非空 tool error）', flat.includes('command gate (ask-rm-rf-root)') && flat.includes('requires approval, and this daemon runs unattended'), `messages=${dbRows.length}`);
   check('#929 放行：合法 bash 照跑（printf 改动落 README.md，进 transcript）', flat.includes('verify 929 30'), null);
 
-  // ——— #930：双向证据 + 新能力 ———
   const firstRequest = stub.requests[0] ?? {};
   const declared = (firstRequest.tools ?? []).map((t) => t?.function?.name ?? '').filter((n) => n !== '');
   save('first-request-tools.json', declared);
@@ -372,12 +334,9 @@ try {
   check('#930 拒绝：未命中 slug 扩展行（ghost not in local config）', lines.some((l) => l.includes('[mcp] ghost: not in local config — its tools are unavailable this turn')), 'daemon.log');
   check('#930 装载行：实际加载集与来源文件（demo, dead）', lines.some((l) => l.includes(`[mcp] loaded from ${MCP_CONFIG}: demo, dead`)), 'daemon.log');
 
-  // ——— 收尾纪律：session_shutdown 关 stdio 子进程 ———
   await waitFor(() => mcpChildCount() === 0, 30_000, 'mcp stdio child exit');
   check('收尾：步终态后 MCP stdio 子进程已关（session_shutdown 缝，无孤儿泄漏）', mcpChildCount() === 0, `children=${mcpChildCount()}`);
 
-  // 详情页终态截图（transcript 工具行 pill + 输出块 = 图证据）。「工具过程」
-  // 组默认收起（r7 27 形）——先点开每个收起组再拍。
   await page.waitForTimeout(3_000);
   await page.reload({ waitUntil: 'networkidle' });
   const toolToggles = page.getByRole('button', { name: /工具过程/ });
@@ -401,7 +360,7 @@ try {
     }
     save('fail-daemon.log', daemonLogLines().join('\n'));
   } catch {
-    // 诊断失败不掩盖原始异常
+
   }
   finish({ error: err instanceof Error ? err.stack : String(err) });
 } finally {

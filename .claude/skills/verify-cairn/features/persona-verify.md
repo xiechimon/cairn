@@ -1,90 +1,36 @@
-# 角色名册 + verify 步 + 三视角 fan-out + split_todo（#1250 / ADR 0018）
+# Persona roster + verify step + three-perspective fan-out + split_todo (#1250 / ADR 0018)
 
-三层多 agent 团队的层 1 + 层 2 落地（票面 #1250；能力闸/并发语义归 #1251，
-`ui-classname` 收编钉扎见下）。正本 = `docs/adr/0018-多agent团队三层与机器能力
-闸.md`。
+The layer-1 + layer-2 landing of a three-layer multi-agent team (ticket #1250; the capability gate / concurrency semantics belong to #1251, the `ui-classname` consolidation pin below). Canonical source = `docs/adr/0018-多agent团队三层与机器能力闸.md`.
 
-- **六员名册**：全新库首启 server 自动 seed 六个 persona agent（Planner /
-  Implementer / CodeReviewer / SecurityAuditor / TestEngineer / Verifier；
-  契约描述 + thinkingLevel 档位 planner=xhigh / implementer=high /
-  review 族+verifier=medium）；`agent.persona` 列 + (teamId, persona) 部分唯一
-  索引保证同队同角色一员。#1259 未落地 → 暂不带归属机（其迁移会把存量
-  agent 回填归属）。模型位不猜：seed 时按机器 claudeCodeReport / provider
-  清单取「当时可领值」，null 留空由用户/后续 PATCH 补。
-- **assignment 四槽**：`plan/build/review/verify`（shared assignmentSchema；
-  REST builds 面 + chief `run_builds` relay 两路都落全四槽——后者是本票
-  实测补的缝，live V1 钉）。缺省指派（web startBuild）：plan/build 优先
-  persona、无 persona 回落首 Agent（存量零变化）；review/verify 只在
-  persona 在位时落。
-- **verify 步**：review 关口抵达（build 成非 PR 分支 / CI 绿）且 verify 槽
-  在位 → 入队 `kind:verify` 步（幂等/build 一条；槽空零动作）。额外 agent
-  步不推进主时序（phase 留 review）；claim 恒 new session + 可写工作区
-  （材料 = buildVerifyStepPrompt：证据目录 + 输出契约 + 工作区纪律）。
-  done 带 `verifyVerdict`（passed/conclusion/evidence[]）→
-  `VERIFY_VERDICT_KIND` 消息行；daemon 侧提取器 = `verify-verdict.ts`
-  （review 提取器同族）。web：chip「验证中」优先于「审核中」，transcript
-  verdict 行三态（验证通过/验证未通过/判定提取失败）+ 证据条目块。
-- **三视角 fan-out**：AI 审核弹层勾「三视角并行审」→ steps `{action:review}`
-  不带 agentId → CodeReviewer/SecurityAuditor/TestEngineer 三员各入队一条
-  review 步（agentId 走 prompt meta header；关注点 = 用户 focus + 各自
-  reviewFocus「本视角重点」）。无 persona 回落 assignment.review 单步，两者
-  皆缺 400。三份 blocking verdict 只入队一条修订步（去重闸）。fixture 面
-  fan-out 行零渲染（persona 只由 live members 点亮）。
-- **split_todo**（层 2）：chief 工具拆大票——子卡（sourceTodo/blockedBy
-  依赖边/assignment.build）+ 父方案文档（拆解方案：子卡清单+依赖+agent 名）
-  + 父停 confirm 人审。confirm 派发无阻塞子卡（直执行）；子卡 done 推进
-  波次；全子卡 done → 父自动收（DONE_ANNOUNCEMENT actor=Chief）。校验族：
-  相位非 todo 409 / 双拆 409 / 少于两张 400 / 索引越界 400 / 环 400 /
-  agent 越队 404。
+- **Six-person roster**: a fresh DB's first boot server auto-seeds six persona agents (Planner / Implementer / CodeReviewer / SecurityAuditor / TestEngineer / Verifier; the contract description + thinkingLevel tiers planner=xhigh / implementer=high / the review family + verifier=medium); the `agent.persona` column + the (teamId, persona) partial unique index guarantee one member per role per team. #1259 not yet landed -> temporarily no home machine (its migration would backfill home machines for existing agents). The model slot is not guessed: at seed time it takes the "claimable value at the time" per the machine's claudeCodeReport / provider list, null left empty for the user / a later PATCH to fill.
+- **assignment four slots**: `plan/build/review/verify` (shared assignmentSchema; both the REST builds face and the chief `run_builds` relay land all four slots - the latter is the seam patched by this ticket's measurement, live V1 pinned). Default assignment (web startBuild): plan/build prefer the persona, no persona falls back to the first Agent (existing behavior zero change); review/verify only land when a persona is present.
+- **verify step**: the review gate reached (build on a non-PR branch / CI green) and the verify slot present -> enqueue a `kind:verify` step (idempotent / one per build; an empty slot zero action). The extra agent step does not advance the main timeline (phase stays review); the claim always new session + writable workspace (material = buildVerifyStepPrompt: evidence directory + output contract + workspace discipline). done carries `verifyVerdict` (passed/conclusion/evidence[]) -> a `VERIFY_VERDICT_KIND` message row; the daemon-side extractor = `verify-verdict.ts` (same family as the review extractor). web: the chip `验证中` takes priority over `审核中`, the transcript verdict row three states (passed / not passed / extraction failed) + the evidence entry block.
+- **three-perspective fan-out**: the AI-review popover checks `三视角并行审` -> steps `{action:review}` without agentId -> CodeReviewer/SecurityAuditor/TestEngineer three members each enqueue a review step (agentId via the prompt meta header; the focus = the user's focus + each one's reviewFocus "this perspective's focus"). No persona falls back to assignment.review single step, both missing 400. Three blocking verdicts only enqueue one revision step (the dedup gate). The fixture face renders no fan-out rows (personas only light up from live members).
+- **split_todo** (layer 2): the chief tool splits a big ticket - child cards (sourceTodo/blockedBy dependency edges/assignment.build) + the parent plan document (the split plan: child list + dependencies + agent names) + the parent stop-confirm human review. confirm dispatches the unblocked child cards (direct execute); a child card done advances the wave; all child cards done -> the parent auto-closes (DONE_ANNOUNCEMENT actor=Chief). The validation family: phase not todo 409 / double split 409 / fewer than two cards 400 / index out of range 400 / cycle 400 / agent outside the team 404.
 
-服务端失败方式钉在 `apps/server/test/persona-split-verify.test.ts`（12 测：
-播种/幂等/verify 入队-verdict-claim/fan-out 三步-回落-400/blocking 去重/
-split 校验族/happy/confirm 派发/波次+父收）；shared 钉在
-`packages/shared/test/persona.test.ts` + `verify-prompt.test.ts` +
-`chief-tools.test.ts`（52 词表）；daemon 提取钉在
-`apps/daemon/test/verify-verdict.test.ts`。fixture 面钉在
-`apps/web/e2e/persona-verify.spec.ts`（verdict 三态 + 证据条目 + 弹层
-fan-out 行零渲染负向钉）。live 真值面 = `docs/verify/1250/`（drive-1250
-27/27：播种/verify 链/浏览器真点击 fan-out/拆解波次，含 chip 与 verdict
-截图）。
+The server-side failure modes pinned in `apps/server/test/persona-split-verify.test.ts` (12 tests: seeding / idempotence / verify enqueue-verdict-claim / fan-out three steps-fallback-400 / blocking dedup / split validation family / happy / confirm dispatch / wave + parent close); shared pinned in `packages/shared/test/persona.test.ts` + `verify-prompt.test.ts` + `chief-tools.test.ts` (52 vocabulary); the daemon extraction pinned in `apps/daemon/test/verify-verdict.test.ts`. The fixture face pinned in `apps/web/e2e/persona-verify.spec.ts` (the verdict three states + evidence entry + the popover fan-out row zero-render negative pin). The live truth face = `docs/verify/1250/` (drive-1250 27/27: seeding / verify chain / browser real-click fan-out / split wave, with chip and verdict screenshots).
 
 ## Sub-features
 
-- `persona-seeding` — 全新库首启六员落库（persona 位/契约名/档位），模型位
-  取当时清单可领值、null 留空；幂等补缺不覆盖用户编辑；删行复活（PATCH
-  persona:null = 显式除名不复活）。
-- `assignment-four-slots` — assignment 四槽持久（REST + chief relay 双路），
-  verify 槽空 = 存量行为零变化（零 verify 步、无 fan-out 槽回落）。
-- `verify-step-chain` — review 关口抵达入队 verify 步（幂等）→ claim（new
-  session + 材料 + agent 块 = verify 槽）→ done verifyVerdict → 消息行 +
-  phase 不动。提取失败兜底「判定提取失败」上浮原因；两字段皆缺 =
-  「验证未返回结论」。卡收尾时链断在这里：合并步成与 #1403 PR 对账收尾
-  （done / failed）都停掉本 build 没人领（排队中或等额度）的 verify /
-  review 步（`stopUnclaimedGateSteps`，步 → stopped），不在已收尾的卡上跑。
-- `review-fanout` — 无 agentId 的 review 动作按 persona 三员 fan-out；meta
-  header agentId + 本视角重点；回落/400 两兜底；blocking 去重闸。
-- `split-todo` — 拆解三件（子卡+边/父方案文档/父停 confirm）+ 派发波次 +
-  父自动收 + 校验族。
+- `persona-seeding` — a fresh DB first boot lands six members (persona slot / contract name / tier), the model slot takes the currently-list claimable value, null left empty; idempotent refill does not overwrite user edits; delete-row resurrection (PATCH persona:null = explicit removal, no resurrection).
+- `assignment-four-slots` — the assignment four slots persist (REST + chief relay dual path), an empty verify slot = existing behavior zero change (zero verify steps, no fan-out slot fallback).
+- `verify-step-chain` — the review gate reached enqueues a verify step (idempotent) -> claim (new session + material + the agent block = the verify slot) -> done verifyVerdict -> message row + phase unchanged. The extraction-failure fallback `判定提取失败` floats the reason; both fields missing = `验证未返回结论`. At card close the chain stops here: the merge-step success and the #1403 PR reconciliation close (done / failed) both stop this build's unclaimed (queued or quota-waiting) verify / review steps (`stopUnclaimedGateSteps`, step -> stopped), not run on an already-closed card.
+- `review-fanout` — a review action without agentId fans out per the three personas; the meta header agentId + each perspective's focus; fallback/400 two bottoms; the blocking dedup gate.
+- `split-todo` — the split three pieces (child cards + edges / parent plan document / parent stop-confirm) + the dispatch wave + parent auto-close + the validation family.
 
 ## How to get to it (user POV)
 
-- 全新库首开 → 设置页成员区多出六员角色 agent（模型位需配置后才可领步）。
-- 任务开始 → 缺省四槽指派（plan/build 走 persona，review/verify 在位才带）。
-- build 完成进 review → 头带 chip「验证中」，verdict 行进时间线（含证据
-  路径清单），人读 verdict 决定合并。
-- AI 审核弹层 → 勾「三视角并行审」→ 开始 → 三份结论并行落会话。
-- 总管对话「把这张大票拆了」→ chief 调 split_todo → 父卡停 confirm 展示
-  拆解方案 → 确认后子卡按依赖波次推进，全 done 父卡自动收。
-- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list persona-verify` 列出 usage:
-  - `vp.mjs drive persona-verify persona-verify`:建 agent 不带 machineId,ADR 0019 起 400。
+- Fresh DB first open -> the settings page members area gains six persona agents (the model slot needs configuring before they can claim steps).
+- Task starts -> the default four-slot assignment (plan/build take the persona, review/verify only carried when present).
+- Build done entering review -> the head chip `验证中`, the verdict row in the timeline (with the evidence-path list), the human reads the verdict to decide merge.
+- AI-review popover -> check `三视角并行审` -> start -> three conclusions land in parallel in the session.
+- Chief conversation "split this big ticket" -> chief calls split_todo -> the parent card stops at confirm showing the split plan -> after confirm the child cards advance per dependency waves, all done the parent card auto-closes.
+- Driving: this feature has no current case; all registered judged stale, refused without `--force` (prints the reason on refusal), `vp.mjs list persona-verify` lists usage:
+  - `vp.mjs drive persona-verify persona-verify`: creating an agent without machineId 400s since ADR 0019.
 
 ## Gotchas
 
-- **run_builds 自动 watch → chief gate 回合插队**：派工即 watch，相位一变
-  gate 回合步入队——假机器探针要 claimUntil(目标 kind)，线性 claim 会把
-  gate 回合当目标步领走（agent 块 = chief 绑定 Agent 是症状指纹）。
-- **worker 步材料在 claim 载荷 instruction**：step 本体不带 prompt；DB 断言
-  打 step.prompt 列，wire 断言打 instruction。
-- **review 步 agentId 只在 prompt meta header**：step 表无 agentId 列。
-- **message.content 双包 JSON**：drizzle json 列存字符串值带引号再包一层，
-  verdict 行要 JSON.parse 两次（'{' 开头判别），纯文本宣告行一次即终值。
+- **run_builds auto-watch -> chief gate rounds cut in line**: dispatch then watch, any phase change enqueues a gate round - the fake-machine probe must claimUntil(target kind), a linear claim takes the gate round as the target step (the agent block = the chief-bound Agent is the symptom fingerprint).
+- **The worker step's material is in the claim payload's instruction**: the step body carries no prompt; DB assertions hit the step.prompt column, wire assertions hit instruction.
+- **A review step's agentId is only in the prompt meta header**: the step table has no agentId column.
+- **message.content double-wrapped JSON**: the drizzle json column stores string values quoted then wrapped another layer, the verdict row must JSON.parse twice (the '{'-prefix discriminator), a plain-text announcement line terminates after one parse.

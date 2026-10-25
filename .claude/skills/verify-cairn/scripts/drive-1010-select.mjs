@@ -1,25 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn probe — #1010（波 2 select.tsx 手写件退役 → registry compound
-// select）live 面证据。单件最小面：schedules 新建定时弹层的 时/分 Select（24 /
-// 4 档候选，无需 seed）承载「registry select 真用户路径 + 结构实物 + 双模对比度」。
-//
-// 取证四面：
-//   A. 真用户路径：顶栏「新建」开面 → 频率「单次」→ 点 时 触发钮 → 选值 → 回显
-//      触发钮；分 同律（保存落库的 live 实证归 drive-1007-pages.mjs，本探针不重复，
-//      只钉 select 本体的开面/选值/回显）。
-//   B. registry 结构实物（机制生效判据，SKILL「实物判据」）：弹层 data-slot=
-//      select-content 的外层 Popup = role="presentation"，role="listbox" 落在
-//      内层 Select.List（aria-label 恒 null——pristine 件下 SelectContent 的
-//      aria-label 只到 Popup），行 = role="option"；触发钮 = button + aria-label
-//      + aria-haspopup="listbox" + aria-expanded + aria-controls→listbox。这是
-//      m5 集成钩子从 `[role=listbox][aria-label]` 迁到 `[role=listbox]` 的实物因。
-//   C. 增量面对比度（better-colors，实测非估算）：渲染 fg 叠 alpha 合成 bg，
-//      light + dark 双模，行文本/弹层底、聚焦行文本/accent 底、触发钮文本/合成底。
-//   D. 双模截图（开面态）。
-//
-// 栈必须已在跑（launch.mjs；坐标取 VERIFY_RUN_DIR/ports.json，worktree 车道传
-// VERIFY_REPO_ROOT）。证据落 VERIFY_EVIDENCE_DIR；任一断言失败退出码 1。
-// 运行前置：proxy env 全 unset（回环请求过代理会 502 假阳性）。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -57,7 +36,6 @@ const check = (ok, label, detail) => {
   if (!ok) failures += 1;
 };
 
-// —— WCAG 相对亮度 / 对比度（better-colors 口径：实测 computed 值，不估算）——
 const parseColor = (str) => {
   const m = String(str).match(/rgba?\(([^)]+)\)/);
   if (!m) return null;
@@ -96,7 +74,6 @@ const shot = async (name) => {
   console.log(`shot  ${name}`);
 };
 
-// 从元素向上找第一个 alpha≈1 的 background-color 当有效衬底。
 const effectiveBg = (el) => {
   let node = el;
   while (node && node !== document.documentElement) {
@@ -123,9 +100,8 @@ const waitListboxesGone = async () => {
 const runContrast = async (mode) => {
   await page.locator('button[aria-label="时"]').click();
   await page.getByRole('listbox').first().waitFor({ state: 'visible', timeout: 5000 });
-  await page.waitForTimeout(200); // 进场动效落定再量静息色
+  await page.waitForTimeout(200);
 
-  // 1) 弹层行文本 / 弹层底（bg-popover 是行向上第一个不透明衬底）
   const itemPair = await page.evaluate(() => {
     const el = document.querySelector('[role="option"]');
     if (!el) return { error: 'no option' };
@@ -147,7 +123,6 @@ const runContrast = async (mode) => {
     return { fgRaw: cs.color, bgRaw };
   });
 
-  // 2) 聚焦行文本 / accent 底——键盘下移一格制造 highlighted 态
   await page.keyboard.press('ArrowDown');
   await page.waitForTimeout(80);
   const focusPair = await page.evaluate(() => {
@@ -157,7 +132,7 @@ const runContrast = async (mode) => {
       document.querySelector('[role="option"]');
     if (!opt) return { error: 'no option' };
     const cs = getComputedStyle(opt);
-    // 行自身 focus bg（accent）若不透明即用它，否则向上找衬底
+
     let bgRaw = cs.backgroundColor;
     const m = bgRaw.match(/rgba?\(([^)]+)\)/);
     const parts = m ? m[1].split(/[,/\s]+/).filter(Boolean).map(Number) : [];
@@ -186,7 +161,6 @@ const runContrast = async (mode) => {
     };
   });
 
-  // 3) 触发钮文本 / 合成底
   const trigPair = await page.evaluate(() => {
     const el =
       document.querySelector('button[aria-label="时"] [data-slot="select-value"]') ??
@@ -242,7 +216,7 @@ const runContrast = async (mode) => {
 };
 
 try {
-  // —— A. 真用户路径 ——
+
   await page.goto(`${WEB}/app/schedules`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: '新建', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '新建定时' });
@@ -250,7 +224,6 @@ try {
   await page.getByRole('tab', { name: '单次' }).click();
   await shot('01-sched-dialog-once.png');
 
-  // —— B. registry 结构实物（light）——
   await page.locator('button[aria-label="时"]').click();
   const listbox = page.getByRole('listbox').first();
   await listbox.waitFor({ state: 'visible', timeout: 5000 });
@@ -293,17 +266,11 @@ try {
   );
   await shot('02-time-listbox-open-light.png');
 
-  // 选值 → 回显
   await page.getByRole('option', { name: '08', exact: true }).click();
   await page.waitForTimeout(120);
   const timeEcho = (await page.locator('button[aria-label="时"]').textContent()) ?? '';
   check(timeEcho.includes('08'), 'A1 时 选 08 回显触发钮', timeEcho.trim());
 
-  // 分 select 同律。注意：Base UI 关闭的弹层可能滞留 DOM（隐藏），schedules 面
-  // 无 prefix 句柄类可定域，裸 `[role=listbox]` 会命中滞留的 时 弹层（24 档）。
-  // 精确定域 = 触发钮的 aria-controls → 本 select 自己的 listbox id（m5 集成钩子
-  // 用 `[role=listbox]` 单数无歧义，是因它选的 分 值 30/45 不在 时 的 00–23 里，
-  // 天然只命中 分 弹层；本探针要数行数，故走 aria-controls）。
   await waitListboxesGone();
   const minTrigger = page.locator('button[aria-label="分"]');
   await minTrigger.click();
@@ -321,17 +288,15 @@ try {
   payloads.minuteListbox = minInfo;
   check(minInfo.count === 4, 'A2 分 listbox = 4 档（00/15/30/45，aria-controls 定域）', JSON.stringify(minInfo));
   await shot('03-minute-listbox-open-light.png');
-  // 选 30：时（00–23）无 '30'，故 getByRole 唯一命中 分 弹层的行，无歧义。
+
   await page.getByRole('option', { name: '30', exact: true }).click();
   await page.waitForTimeout(120);
   const minEcho = (await page.locator('button[aria-label="分"]').textContent()) ?? '';
   check(minEcho.includes('30'), 'A3 分 选 30 回显触发钮', minEcho.trim());
   await waitListboxesGone();
 
-  // —— C. 增量面对比度（light）——
   await runContrast('light');
 
-  // —— D. 暗模：结构 + 对比度 + 截图 ——
   await page.evaluate(() => localStorage.setItem('cairn-theme', 'dark'));
   await page.goto(`${WEB}/app/schedules`, { waitUntil: 'networkidle' });
   const isDark = await page.evaluate(
@@ -352,7 +317,6 @@ try {
   await waitListboxesGone();
   await runContrast('dark');
 
-  // 对比度判据：文本对 ≥4.5，全部 pass
   for (const mode of ['light', 'dark']) {
     for (const row of contrast[mode] ?? []) {
       if (row.error) {

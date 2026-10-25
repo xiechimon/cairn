@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-attachments — 附件全链真用户路径（#310/#331，r9 §3.1/§4）。
-//
-// 路径 A（默认跑）：新建任务对话框——`.sidebar-new-task` → 原生文件触发器
-//   `input[type=file]` 选文件 → 三步 wire（grant → upload → token）→ token 落
-//   `.new-task-spec` → 保存 → todo.spec 携 token。
-// 路径 B（argv 给 todoId 时追加）：详情页 composer——`.composer input[type=file]`
-//   选文件 → token 落 draft（`.composer-input`）。
-//
-// 真值三面：UI token 文本 / `GET /api/todos` 的 spec 字段 / SQLite attachment 行
-// + 磁盘文件字节 + `GET /api/attachments/:id` 读回。上传样本写在证据目录里，
-// 归档后 reviewer 可对照原始字节。
-//
-// 用法：node drive-attachments.mjs [todoId]
-//   todoId 省略 = 只跑对话框路径（自足，无需 daemon/seed）
-//   todoId 给出 = 追加 composer 路径（todo 需处于 composer 可编辑相位，
-//                 seed 走 setup-review-seed.mjs）
 
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -43,9 +27,7 @@ const require2 = createRequire(join(REPO, 'apps/server/package.json'));
 
 const checks = [];
 function check(name, ok, detail) {
-  // 断言位必须真是 boolean：本文件与 drive.mjs 的 check 参数序相反
-  // （那边是 (ok, label)），写反时 ok 会吃到 label 字符串而恒真，把整轮验证
-  // 变成假绿。守卫把这种错变成响亮崩溃，不给沉默的假 PASS。
+
   if (typeof ok !== 'boolean') {
     throw new TypeError(`check(${JSON.stringify(name)}) 的 ok 位须为 boolean，收到 ${typeof ok}`);
   }
@@ -65,7 +47,6 @@ const getJson = async (url) => {
   return res.json();
 };
 
-/** SQLite 真值（只读）。better-sqlite3 在 apps/server 依赖里，按包定位解析。 */
 const dbQuery = (fn) => {
   try {
     const Database = require2('better-sqlite3');
@@ -88,7 +69,7 @@ const page = await browser.newPage({
 const extra = {};
 
 try {
-  // 上传样本：内容含时间戳，读回时逐字节比对。样本留在证据目录随归档进 PR。
+
   const stamp = Date.now() % 100000;
   const fileName = `verify-attachment-${stamp}.txt`;
   const fileBody = `verify-cairn 附件样本 ${stamp} @ ${new Date().toISOString()}\n`;
@@ -96,7 +77,6 @@ try {
   writeFileSync(samplePath, fileBody);
   extra.sample = { fileName, bytes: Buffer.byteLength(fileBody) };
 
-  // ---------- 路径 A：新建任务对话框 ----------
   await page.goto(`${WEB}/app`);
   await page.waitForSelector('[data-route="board"]', { timeout: 15_000 });
   check('board-ready', true, '看板 shell 就绪');
@@ -106,7 +86,7 @@ try {
   await shot(page, '01-dialog-open.png');
 
   await page.setInputFiles('.new-task-dialog input[type=file]', samplePath);
-  // 三步 wire 是异步的（grant → upload），token 落 spec 需要等。
+
   await page
     .waitForFunction(
       (sel) => (document.querySelector(sel)?.value ?? '').includes('attachment:'),
@@ -126,8 +106,6 @@ try {
   );
   await shot(page, '02-spec-token.png');
 
-  // spec 15 #394 单字段面：无标题输入——标题 = server 派生正文首行
-  // （derivePlaceholderTitle），故把标题写成正文首行、token 行随其后。
   const title = `附件验证任务 ${stamp}`;
   const specWithToken = await page.locator('.new-task-spec').inputValue();
   await page.fill('.new-task-spec', `${title}\n${specWithToken}`);
@@ -135,7 +113,6 @@ try {
   await page.waitForSelector('.new-task-dialog', { state: 'hidden', timeout: 5000 });
   check('dialog-closed', true, '保存后 dialog 关闭');
 
-  // 真值 1：API 面 todo.spec 携 token
   const todos = await getJson(`${SERVER}/api/todos`);
   const apiTodo = Array.isArray(todos) ? todos.find((t) => t.title === title) : undefined;
   check(
@@ -145,9 +122,6 @@ try {
   );
   extra.todoId = apiTodo?.id ?? null;
 
-  // 真值 2：SQLite attachment 行落账（status=ready 由 upload 段置位）
-  // 按 UI token 里的 storageKey 精确取行(不用 .get() 取首行——重跑会命中上
-// 一轮的旧行)；同时证明界面 token 与落库行是对应同一份文件
   const dbTruth = dbQuery((db) => ({
     row: db
       .prepare(
@@ -168,7 +142,6 @@ try {
   );
   extra.attachmentRow = attRow ?? null;
 
-  // 真值 3：磁盘文件逐字节等于样本
   const absPath = join(ATTACH_DIR, attRow?.storageKey ?? '');
   const diskOk = existsSync(absPath);
   check('disk-file', diskOk, `附件落盘 <attachmentsDir>/<storageKey>(${attRow?.storageKey ?? '缺失'})`);
@@ -181,7 +154,6 @@ try {
     );
   }
 
-  // 真值 4：读回端点 GET /api/attachments/:id 内容一致
   if (attRow?.id) {
     const res = await fetch(`${SERVER}/api/attachments/${attRow.id}`, {
       signal: AbortSignal.timeout(8000),
@@ -195,7 +167,6 @@ try {
   }
   await shot(page, '03-card-saved.png');
 
-  // ---------- 路径 B：详情页 composer（可选） ----------
   if (todoId) {
     await page.goto(`${WEB}/app/todo/${todoId}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('.composer', { timeout: 15_000 });

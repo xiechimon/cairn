@@ -1,21 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn probe — #1097 项目 Files 面目录下钻(hosted + local 双形态):
-// 两相位真用户路径取证(live 栈 + 真浏览器,URL 不带 ?scenario=):
-//   H hosted:托管 bare repo push 嵌套真内容(根 README.md + docs/README.md 同名
-//     对照 + docs/setup.md + docs/guide/deep.md 三层)→ REST tree?path= 逐层
-//     真值 → 浏览器:文件夹/文件行区分(载体 + 图标不同形)、点文件夹下钻(且
-//     **不发文件读请求** = 原始 bug 的反面钉)、面包屑回上层/回中间层、同名
-//     文件跨目录选中与预览不串、≥3 层深嵌套。
-//   L local:真 git 工作树仓(默认分支 trunk)同套嵌套 → 下钻 + 查看器
-//     (local 读面 #1030 之上叠本票下钻,chip=HEAD 零回归)。
-// 空目录/加载态不在 live 面演:git 不跟踪空目录,live 造不出真空目录;该两面
-// 定义态由 e2e W5/W6(project-files-tree.spec)+ server vitest P5 钉住。
-// REST 侧真值:tree(顶层/path=docs/path=docs/guide)+ file(同名双路径)落
-// responses.json;SQLite project 行(repoKind)。栈必须已在跑(launch.mjs;
-// 坐标取 VERIFY_RUN_DIR/ports.json,worktree 车道传 VERIFY_REPO_ROOT)。
-// 证据(result.json + responses.json + 截图)落 VERIFY_EVIDENCE_DIR;交付见
-// SKILL.md「证据归档纪律」。任一断言失败退出码 1。
-// 运行前置:proxy env 全 unset(回环请求过代理会 502 假阳性)。
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -71,7 +54,6 @@ async function api(method, path, body) {
   return { status: res.status, json };
 }
 
-// git 隔离环境(drive-1030 同款:防用户 git 配置/凭证干扰)
 const GIT_ENV = {
   ...process.env,
   GIT_TERMINAL_PROMPT: '0',
@@ -84,7 +66,6 @@ const GIT_ENV = {
 };
 const git = (args, cwd) => execFileSync('git', args, { cwd, env: GIT_ENV, stdio: 'pipe' });
 
-// —— 道具:嵌套内容单源(hosted 与 local 两相位写同一套)———————————
 const MARK_ROOT = 'VERIFY-1097-ROOT-MARKER';
 const MARK_DOCS = 'VERIFY-1097-DOCS-MARKER';
 const MARK_SETUP = 'VERIFY-1097-SETUP-MARKER';
@@ -104,7 +85,6 @@ function tempDir(prefix) {
   return dir;
 }
 
-// local 真仓(默认分支 trunk + 同套嵌套)
 const localRepo = tempDir('verify-1097-local-');
 git(['init', '-b', 'trunk', localRepo]);
 writeNested(localRepo);
@@ -117,7 +97,6 @@ const page = await browser.newPage({
   colorScheme: 'dark',
 });
 
-// 文件读请求账本:「点文件夹不得发 file?path=<目录>」的反面钉
 const fileRequests = [];
 page.on('request', (req) => {
   const u = req.url();
@@ -134,7 +113,7 @@ const folderRow = (name) => page.locator('[data-tree-entry="folder"]').filter({ 
 const fileRow = (name) => page.locator('[data-tree-entry="file"]').filter({ hasText: name });
 
 try {
-  // —— REST 铺底:hosted + local 项目 + git push 凭证 ————————————————
+
   const rHosted = await api('POST', '/api/projects', {
     name: 'verify-1097-hosted',
     repoKind: 'hosted',
@@ -172,7 +151,6 @@ try {
     `REST:git push 用 API key 创建 201(实际 ${rKey.status})`,
   );
 
-  // hosted bare repo push 嵌套真内容(cloneUrl origin = 请求源,与本栈同源)
   const cloneUrl = new URL(rHosted.json?.cloneUrl ?? '');
   cloneUrl.username = 'git';
   cloneUrl.password = apiKey;
@@ -183,7 +161,6 @@ try {
   git(['commit', '-m', 'docs: nested verify-1097 content'], hostedClone);
   git(['push', '-u', 'origin', 'main'], hostedClone);
 
-  // —— REST 真值:tree?path= 逐层 + 同名双路径 file(hosted)——————————
   const topTree = await api('GET', `/api/projects/${hostedId}/tree?ref=main`);
   payloads.hostedTreeTop = topTree;
   check(
@@ -225,7 +202,6 @@ try {
     `REST:hosted file?path=docs/README.md 读回 docs 标记(实际 ${docsReadme.status})`,
   );
 
-  // —— H. 浏览器:hosted 下钻全链 ——————————————————————————————
   await page.goto(`${WEB}/app/project/${hostedId}`);
   await fileRow('README.md').first().waitFor({ timeout: 20_000 });
   const docsFolder = folderRow('docs');
@@ -273,7 +249,6 @@ try {
     '浏览器:根 README.md → 查看器出根标记 + aria-current 选中态(既有行为零回归)',
   );
 
-  // 同名不串:回 docs 选 docs/README.md,再回根——根行不得顶替选中,预览不串回
   await folderRow('docs').click();
   await fileRow('setup.md').waitFor({ timeout: 15_000 });
   await fileRow('README.md').first().click();
@@ -289,7 +264,6 @@ try {
   );
   await shot('H4-hosted-samename-no-cross.png');
 
-  // 深嵌套 ≥3 层 + 面包屑中段回跳
   await folderRow('docs').click();
   await fileRow('setup.md').waitFor({ timeout: 15_000 });
   await folderRow('guide').click();
@@ -305,7 +279,6 @@ try {
   await fileRow('setup.md').waitFor({ timeout: 15_000 });
   check(true, '浏览器:面包屑中段 docs → 回中间层(setup.md 复位)');
 
-  // —— L. 浏览器:local 形态下钻(chip=HEAD 之上叠本票)——————————————
   await page.goto(`${WEB}/app/project/${localId}`);
   await fileRow('README.md').first().waitFor({ timeout: 20_000 });
   const localChip = await page.locator('.prj-branch-chip').textContent();
@@ -321,7 +294,6 @@ try {
   check(true, '浏览器:local 下钻 docs → setup.md → 查看器出 setup 标记');
   await shot('L2-local-drill-viewer.png');
 
-  // —— SQLite 只读真值 ————————————————————————————————————
   try {
     const requireServer = createRequire(join(ROOT, 'apps', 'server', 'package.json'));
     const Database = requireServer('better-sqlite3');

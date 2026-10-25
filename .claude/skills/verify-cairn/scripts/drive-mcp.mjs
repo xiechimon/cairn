@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-mcp — MCP 页只读本地 config 面 probe(spec 13/#368)。
-// 前置:launch.mjs 起栈时带 CAIRN_MCP_CONFIG=<fixture claude.json 路径>
-// (env 经 launch 的 {...process.env} 透传给 server 进程);fixture 内容约定
-// 见 features/mcp-servers.md(一个 http 条目带 headers + 一个 stdio 条目带
-// env——密钥值只应出现在 config 文件,绝不上接口)。
-// 真值三面:API JSON(config 投影 + 404 写面 + 无密钥值)、UI(行渲染 +
-// 无新建/更多入口)、SQLite(mcp_server 表不存在)。
-// #944 载体迁移:类名钩 → 语义/data-* 载体(.res-rowcard--mcp →
-// [data-testid="resource-row"][data-mcp]、.res-empty → resource-empty
-// testid、.res-row-title → 文案一级、.res-new → resource-new testid、
-// .res-row-more 负向 → 行内 button 计数 0;断言语义不变)。
-// 用法:node drive-mcp.mjs   (栈必须已在跑;证据目录同 drive.mjs 纪律)
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -37,7 +25,6 @@ const API = `http://127.0.0.1:${stack.serverPort}`;
 const WEB = `http://127.0.0.1:${stack.webPort}`;
 const DB_PATH = join(stack.homeDir, 'server', 'server.db');
 
-// fixture 期望面(与 features/mcp-servers.md 的配方一致;launch 前落盘)。
 const EXPECT_SLUGS = ['demo', 'local'];
 const SECRET_VALUES = ['v3r1fy-header-secret', 'v3r1fy-env-secret'];
 
@@ -90,7 +77,7 @@ const page = await browser.newPage({
 });
 
 try {
-  // —— API 真值面 ————————————————————————————————————————————————
+
   const teams = await getJson(`${API}/api/teams`);
   const teamId = teams[0]?.id;
   check(typeof teamId === 'string' && teamId.length > 0, `GET /api/teams 拿到 teamId(${teamId})`);
@@ -120,7 +107,6 @@ try {
     '安全不变量:env/headers 密钥值不出接口',
   );
 
-  // 管理写面已删:POST/PATCH/DELETE = 404。
   for (const [method, path] of [
     ['POST', `/api/teams/${teamId}/mcp-servers`],
     ['PATCH', `/api/teams/${teamId}/mcp-servers/demo`],
@@ -135,7 +121,6 @@ try {
     check(res.status === 404, `${method} ${path} = 404(管理写面已删,实测 ${res.status})`);
   }
 
-  // —— SQLite 真值面:mcp_server 表不存在(migration drop)————————————
   const db = dbQuery((handle) => {
     const names = handle
       .prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`)
@@ -145,16 +130,14 @@ try {
   });
   check(db.ok === true && db.hasMcpTable === false, `SQLite 无 mcp_server 表(${JSON.stringify(db)})`);
 
-  // —— UI 面:live 渲染 + 只读钉扎 ————————————————————————————————
   await page.goto(`${WEB}/app/resources/mcp-servers`);
   await page.waitForSelector('[data-route="/app/resources/mcp-servers"]', { timeout: 15_000 });
-  // live 数据 = react-query 异步到达——先行壳后行卡,等其一出现再断言。
+
   await page.waitForSelector('[data-testid="resource-row"][data-mcp], [data-testid="resource-empty"]', { timeout: 15_000 });
   const cards = page.locator('[data-testid="resource-row"][data-mcp]');
   const cardCount = await cards.count();
   check(cardCount === EXPECT_SLUGS.length, `页面渲染 ${cardCount} 行(期望 ${EXPECT_SLUGS.length})`);
-  // #944 载体迁移:.res-row-title 类名钩 → 文案一级——行标题断言改按期望
-  // slug 命中行内**精确文本节点**(getByText exact;节点级等值,强度不减)。
+
   const titles = [];
   for (const slug of EXPECT_SLUGS) {
     if ((await cards.getByText(slug, { exact: true }).count()) > 0) titles.push(slug);
@@ -169,7 +152,7 @@ try {
   try {
     await shot(page, '99-error.png');
   } catch {
-    /* 截不上就算了 */
+
   }
 } finally {
   await browser.close();

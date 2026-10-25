@@ -1,33 +1,33 @@
-# 主题(外观)
+# Theme (appearance)
 
-用户切浅色/深色:根元素即时换肤(`html.light` + `data-theme`),选择持久化在 `cairn-theme` localStorage 键,重载保形;无存储时跟随系统色(e2e colorScheme dark 即此默认)。
+Users switch light/dark: the root element re-skins instantly (`html.light` + `data-theme`), the choice persists in the `cairn-theme` localStorage key and survives reload; with no stored value it follows the system color (the e2e colorScheme dark is exactly this default).
 
 ## Sub-features
 
-- `theme-apply` 切换即时重绘:根 `.light` 类 + `dataset.theme`。
-- `theme-persist` `cairn-theme` 键落 localStorage,重载后仍生效(apps/web/src/theme.ts `THEME_STORAGE_KEY`)。
-- `theme-segments` 用户菜单 popover 的「外观」分段行(浅色/深色,`data-active` 跟随)——**live 面暂无 popover 触发器**(见 Gotchas)。
+- `theme-apply` switching repaints instantly: root `.light` class + `dataset.theme`.
+- `theme-persist` the `cairn-theme` key lands in localStorage and still applies after reload (apps/web/src/theme.ts `THEME_STORAGE_KEY`).
+- `theme-segments` the user-menu popover `外观` segmented row (light/dark, `data-active` follows) — **the live surface currently has no popover trigger** (see Gotchas).
 
 ## How to get to it (user POV)
 
-- 用户菜单 popover「外观」行(浅色/深色分段)。
-- 直改 `cairn-theme` 存储(开发者路径;live 面当前唯一可驱动路径)。
-- 驱动(`vp.mjs list theme` 列出全部 case 与 usage):
-  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive theme persist`:浅色 / 深色写入 `cairn-theme`,重载保形。
-  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive theme sealed-tokens-audit`:双主题下退役规则缺席、选中行颜色与 token 对比度。
+- The user-menu popover `外观` row (light/dark segments).
+- Editing the `cairn-theme` storage directly (developer path; currently the only drivable path on the live surface).
+- Driving (`vp.mjs list theme` lists all cases and usage):
+  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive theme persist`: light / dark written into `cairn-theme`, survives reload.
+  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive theme sealed-tokens-audit`: retired rules absent under both themes, selected-row color and token contrast.
 
 ## Driving it with verify-cairn
 
 Preconditions:
 
-- `launch.mjs` 起栈 + `doctor.mjs` 全 PASS。
+- `launch.mjs` stack up + `doctor.mjs` fully PASS.
 
-- **双向持久化。** Run `node <skill>/scripts/drive.mjs theme`。链路:默认 dark 截图 → `localStorage.setItem('cairn-theme','light')` + reload → `dataset.theme='light'` 且根含 `.light` → 截图;再置 'dark' + reload → 回 dark。证据 `01-theme-default-dark.png` / `02-theme-light.png` / `03-theme-dark.png` + `result.json`。
-- **注入即初值。** storage 注入路径同键:reload 前先注入 light,首帧即 light(fixture e2e theme-toggle.spec.ts 第 3 测已锁;live 复验同 probe 即覆盖——probe 的写入就是同一条注入路径)。
+- **Two-way persistence.** Run `node <skill>/scripts/drive.mjs theme`. Chain: default dark screenshot -> `localStorage.setItem('cairn-theme','light')` + reload -> `dataset.theme='light'` and the root has `.light` -> screenshot; then set 'dark' + reload -> back to dark. Evidence `01-theme-default-dark.png` / `02-theme-light.png` / `03-theme-dark.png` + `result.json`.
+- **Injection as initial value.** The storage-injection path uses the same key: inject light before reload and the first frame is light (the fixture e2e theme-toggle.spec.ts test 3 already pins it; the live re-check via the same probe is covered — the probe's write is the same injection path).
 
 ## Gotchas
 
-- **popover 触发器是 fixture-only**:`UserMenu` 只在 `!live && detail.userMenuOpen` 时挂载(todo-detail-page.tsx);live 界面上没有打开用户菜单的钮(触发器归后票)。别在 live 驱动里找 `.user-menu-seg`——找不到不是 bug。
-- 主题键是 `cairn-theme`(**中划线**);i18n 的 locale 键才是 `cairn.locale`(**点**),别混。
-- 断言三件套:`dataset.theme` + 根 `.light` 类 + localStorage 值;只看背景色会被截图压缩骗。
-- probe 用 reload 驱动,不动系统 colorScheme;e2e 的 follow-system 断言(`emulateMedia`)属 fixture 面,不在此重复。
+- **The popover trigger is fixture-only**: `UserMenu` mounts only when `!live && detail.userMenuOpen` (todo-detail-page.tsx); the live UI has no button to open the user menu (the trigger belongs to a later ticket). Do not look for `.user-menu-seg` in a live drive — not finding it is not a bug.
+- The theme key is `cairn-theme` (**hyphen**); only the i18n locale key is `cairn.locale` (**dot**), do not mix them up.
+- The assertion trio: `dataset.theme` + root `.light` class + localStorage value; looking only at the background color gets fooled by screenshot compression.
+- The probe drives via reload and does not touch the system colorScheme; the e2e follow-system assertion (`emulateMedia`) belongs to the fixture surface and is not repeated here.

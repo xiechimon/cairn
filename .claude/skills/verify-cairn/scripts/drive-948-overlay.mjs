@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn 定制 probe（#948 overlay/ 域施工）— live 栈真用户路径 +
-// per-face CSS 清零的运行时机制断言。栈必须已在跑（launch.mjs；坐标取
-// VERIFY_RUN_DIR/ports.json，worktree 车道传 VERIFY_REPO_ROOT）。
-//
-// 前置：全新库（launch 即清）。probe 自己走 保存 建第一张卡（无项目时
-// server 自动建「默认项目」，drive.mjs new-task 同律）。
-//
-// 检查面：
-//   A. 新建任务 dialog 真路径（开面 / autofocus / 未保存闸三态 / 保存落卡
-//      + API + SQLite 三真值）
-//   B. utility 迁移的 computed 实物（#746 机制生效纪律：类名写了 ≠ 生效——
-//      more-menu frozen-anchor 坐标与行带 40/37/41/45、picker 400 宽负
-//      margin 居中 + transform none、close 28×28 贴右缘 4px、chip 13px 字）
-//   C. 弹层真路径（项目 popover 选行回填 / 机器 popover 自动行 / 提及
-//      picker 首层五类目 + 钻取搜索行 / Esc 分层）
-//   D. more-menu + delete-confirm 真路径（相位禁用行 / 删除行 / 确认层
-//      取消）+ .overlay-backdrop 的 z 档实物（app.css 机制残段 = 40）
-//   E. 清零运行时机制（vite dev 样式表枚举：四张退役 CSS 从未加载；退役
-//      选择器的规则只许住在 carrier 层 motion.css/app.css；DOM 钩子类存活）
-//   F. 亮模走一遍主面（主题持久化 localStorage，dialog + picker 截图）
-// 证据（截图 + result.json）落 VERIFY_EVIDENCE_DIR；任一断言失败退出码 1。
-// 口径与 apps/web/playwright.config.ts 一致：1440×732。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -107,7 +85,6 @@ const specBox = () => dialog().getByRole('textbox');
 try {
   await gotoBoard();
 
-  // ---- A. 新建任务 dialog：开面 / autofocus / 几何实物 ----
   await page.locator('.sidebar-new-task').click();
   await dialog().waitFor({ state: 'visible', timeout: 10_000 });
   check(true, 'A1 新建任务 dialog 开面（role+name 载体）');
@@ -116,7 +93,6 @@ try {
   );
   check(focused, 'A2 开门 autofocus 落正文 textarea（testid 实物）');
 
-  // B 组几何实物与 A 同窗（dialog 开着量）：进场动画落定后读。
   await dialog().evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   const headBox = await page.getByTestId('new-task-head').boundingBox();
   const closeBox = await dialog().getByRole('button', { name: '关闭' }).boundingBox();
@@ -135,7 +111,6 @@ try {
   );
   await shot(page, '01-dialog-dark.png');
 
-  // 未保存闸三态：净表单直关 / 脏表单确认层 / 继续编辑保留 / 放弃并关闭重置
   await dialog().getByRole('button', { name: '关闭' }).click();
   await dialog().waitFor({ state: 'hidden', timeout: 10_000 });
   check(true, 'A3 净表单 X 直关（无确认层）');
@@ -159,7 +134,6 @@ try {
   const afterReset = await specBox().inputValue();
   check(afterReset === '', 'A6 放弃并关闭 = 关面 + 重开净面');
 
-  // 保存落卡 + API + SQLite 三真值
   await specBox().fill('948 探针任务');
   await dialog().getByRole('button', { name: '保存', exact: true }).click();
   await dialog().waitFor({ state: 'hidden', timeout: 10_000 });
@@ -178,7 +152,6 @@ try {
   extra.sqliteTodo = dbRow;
   check(dbRow.ok === true && dbRow.row != null, 'A9 SQLite todo 行真值');
 
-  // ---- C. 弹层真路径（保存后：项目/任务行集非空） ----
   await page.locator('.sidebar-new-task').click();
   await dialog().waitFor({ state: 'visible', timeout: 10_000 });
   const chip = dialog().getByTestId('new-task-project-chip');
@@ -187,7 +160,7 @@ try {
   await projectMenu.waitFor({ state: 'visible', timeout: 10_000 });
   const optionCount = await projectMenu.getByRole('option').count();
   check(optionCount >= 1, `C1 项目 popover 开行集（${optionCount} 行）`);
-  // 面板实物：V2 弹层壳 + frozen 几何（12px 垫 / 220 宽 / z 30）
+
   const menuGeom = await projectMenu.evaluate((el) => {
     const cs = getComputedStyle(el);
     return { width: cs.width, padding: cs.padding, zIndex: cs.zIndex, radius: cs.borderRadius };
@@ -201,22 +174,19 @@ try {
   await projectMenu.waitFor({ state: 'hidden', timeout: 10_000 });
   const chipText = await chip.textContent();
   check((chipText ?? '').length > 0, `C3 选行回填 chip（「${chipText}」）`);
-  // 13px 字在 name span 上（旧 .new-task-project-name 规则位；按钮本体旧面
-  // 是 font:inherit，量按钮会量到件 text-sm 的 14px）。
+
   const chipFont = await chip
     .locator('.new-task-project-name')
     .evaluate((el) => getComputedStyle(el).fontSize);
   check(chipFont === '13px', `C4 chip 项目名 13px 字实物（${chipFont}）`);
 
-  // 机器 popover：live 无机器 → 只有「自动」行（降级面）
   const machineChip = dialog().getByTestId('new-task-machine-chip');
   await machineChip.click();
   const machineMenu = dialog().getByRole('listbox', { name: '机器' });
   await machineMenu.waitFor({ state: 'visible', timeout: 10_000 });
   const autoRow = machineMenu.getByRole('option', { name: '自动' });
   check(await autoRow.isVisible(), 'C5 机器 popover 自动行（live 无机器降级面）');
-  // 向上开几何实物：abspos 的 computed top/bottom 是 used value（陷阱），
-  // 改量盒子关系——菜单底沿在 chip 顶沿之上（bottom: calc(100%+8px) 语义）。
+
   const menuBox = await machineMenu.boundingBox();
   const chipBox = await machineChip.boundingBox();
   check(
@@ -229,11 +199,10 @@ try {
   await autoRow.click();
   await machineMenu.waitFor({ state: 'hidden', timeout: 10_000 });
 
-  // 提及 picker：首层五类目 + 400 宽居中 + transform none + 钻取
   await dialog().getByRole('button', { name: '提及' }).click();
   const picker = page.getByRole('dialog', { name: '提及' });
   await picker.waitFor({ state: 'visible', timeout: 10_000 });
-  await page.waitForTimeout(300); // 过 150ms 进场动画（缩放中读数会假）
+  await page.waitForTimeout(300);
   const pickerGeom = await picker.evaluate((el) => {
     const cs = getComputedStyle(el);
     const r = el.getBoundingClientRect();
@@ -245,8 +214,7 @@ try {
       pickerGeom.transform === 'none',
     `C7 picker 400 宽居中 + transform none（${JSON.stringify(pickerGeom)}）`,
   );
-  // 类目行 = 五个「<类目> (N)」aria-label（插入钮「插入 (N)」也是计数形，
-  // 用类目名穷举排掉）。
+
   const topRows = picker.getByRole('button', {
     name: /^(任务|技能|Agents|项目|机器) \(\d+\)$/,
   });
@@ -259,19 +227,18 @@ try {
   const drilled = await picker.locator('.mention-row--entry').count();
   check(drilled >= 1, `C10 钻取层实体行 ≥1（${drilled}，钩子类存活面）`);
   await shot(page, '06-mention-drill-dark.png');
-  await page.keyboard.press('Escape'); // 只收 picker（Base UI layer 栈）
+  await page.keyboard.press('Escape');
   await picker.waitFor({ state: 'hidden', timeout: 10_000 });
   check(await dialog().isVisible(), 'C11 Esc 分层：只收 picker，dialog 留');
   await dialog().getByRole('button', { name: '关闭' }).click();
   await dialog().waitFor({ state: 'hidden', timeout: 10_000 });
 
-  // ---- D. more-menu + delete-confirm 真路径（todo 详情） ----
   await page.locator('[data-column="todo"] .todo-card', { hasText: '948 探针任务' }).first().click();
   await page.waitForURL(/\/app\/todo\//, { timeout: 10_000 });
   await page.locator('.detail-head-icon--more').click();
   const menu = page.getByRole('menu', { name: '更多' });
   await menu.waitFor({ state: 'visible', timeout: 10_000 });
-  // zoom-in-98 进场中读 rect 会整组 ×0.98（40→39.2）——先等动画落定。
+
   await menu.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   const moreGeom = await menu.evaluate((el) => {
     const cs = getComputedStyle(el);
@@ -313,7 +280,6 @@ try {
   await confirm.waitFor({ state: 'hidden', timeout: 10_000 });
   check(true, 'D7 取消收层（卡片保留）');
 
-  // ---- E. 清零运行时机制（vite dev 样式表枚举） ----
   const cssFacts = await page.evaluate(() => {
     const tags = [...document.querySelectorAll('style[data-vite-dev-id]')].map((s) =>
       s.getAttribute('data-vite-dev-id'),
@@ -321,7 +287,7 @@ try {
     const retiredLoaded = tags.filter((id) =>
       /overlay\/(overlay|mention-picker|slash-menu|attachment-strip)\.css/.test(id ?? ''),
     );
-    // 退役选择器只许住 carrier 层（motion.css 家族 hover / app.css backdrop z）
+
     const retiredSel =
       /\.(more-menu|new-task-|mention-|slash-menu|slash-help|attachment-|delete-confirm-)/;
     const offenders = [];
@@ -337,7 +303,7 @@ try {
       for (const rule of rules) {
         const sel = rule.selectorText ?? '';
         if (retiredSel.test(sel) && !isCarrier) offenders.push({ ownerId, sel });
-        // @media 包着的家族 hover 律也在 carrier 判定内
+
         if (rule.cssRules) {
           for (const inner of rule.cssRules) {
             const isel = inner.selectorText ?? '';
@@ -357,7 +323,7 @@ try {
     cssFacts.offenders.length === 0,
     `E2 退役选择器规则零驻留非 carrier 层（offenders ${cssFacts.offenders.length}）`,
   );
-  // ---- F. 亮模主面 ----
+
   await page.evaluate(() => localStorage.setItem('cairn-theme', 'light'));
   await gotoBoard();
   const lightRoot = await page.evaluate(() => document.documentElement.classList.contains('light'));
@@ -380,7 +346,7 @@ try {
   try {
     await shot(page, 'error-context.png');
   } catch {
-    // 截图失败不掩盖原异常
+
   }
 } finally {
   const result = {

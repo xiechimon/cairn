@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn launch — 起一套隔离验证栈:apps/server(tsx 直跑,无 watch)
-// + apps/web(vite dev)。隔离三轴:VERIFY_PORT(server,默认 8791)、
-// VERIFY_WEB_PORT(vite,默认 5273)、CAIRN_HOME(<RUN_DIR>/home,scratch,
-// 绝不碰用户真数据根 ~/.cairn)。技能目录第四轴(spec 13 #367):
-// CAIRN_SKILLS_DIR=<HOME_DIR>/skills——不隔离就会现扫用户真
-// ~/.agents/skills(上百真技能进验证面,证据不可复现)。每次 launch 先清
-// 运行目录 = 每次全新库。
-// 运行态(server.pid/web.pid/server.log/web.log/ports.json)落 VERIFY_RUN_DIR
-// (默认 <repo>/.claude/verify-run),cleanup.mjs 按它回收;launch 失败自杀
-// 已起进程,不留孤儿。worktree 车道:VERIFY_REPO_ROOT=<worktree> 传入。
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -27,7 +17,6 @@ const SKILLS_DIR = join(HOME_DIR, 'skills');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** 端口可占 = 无人在听(ECONNREFUSED)。有应答或挂住都算被占。 */
 async function portFree(port) {
   try {
     await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(600) });
@@ -37,7 +26,6 @@ async function portFree(port) {
   }
 }
 
-/** detached spawn 的 child.pid == 进程组长;组探测用它。 */
 function groupAlive(pid) {
   try {
     process.kill(-pid, 0);
@@ -51,7 +39,7 @@ function killGroup(pid) {
   try {
     process.kill(-pid, 'SIGTERM');
   } catch {
-    /* already gone */
+
   }
 }
 
@@ -67,7 +55,6 @@ async function main() {
     process.exit(1);
   }
 
-  // 已有活栈 → 拒绝重复 launch(doctor 体检 / cleanup 回收后再来)
   const portsFile = join(RUN_DIR, 'ports.json');
   if (existsSync(portsFile)) {
     try {
@@ -78,7 +65,7 @@ async function main() {
         process.exit(1);
       }
     } catch {
-      /* 坏文件当无栈,直接重建 */
+
     }
   }
 
@@ -99,7 +86,7 @@ async function main() {
     stdio: ['ignore', serverLog, serverLog],
   });
   writeFileSync(join(RUN_DIR, 'server.pid'), `${server.pid}\n`);
-  // detached + unref:子进程独立会话存活,父脚本(本 launcher)可正常退出
+
   server.unref();
 
   const webLog = openSync(join(RUN_DIR, 'web.log'), 'a');
@@ -123,8 +110,6 @@ async function main() {
   writeFileSync(join(RUN_DIR, 'web.pid'), `${web.pid}\n`);
   web.unref();
 
-  // 失败即自杀 + 打日志尾(注意:Bash 直接 tail *.log 会被 scout-block hook 的
-  // *.log 基线拦,所以由本脚本用 fs 打印;agent 平时看日志用 Read 工具)。
   const tailOf = (name, lines = 30) => {
     const p = join(RUN_DIR, name);
     if (!existsSync(p)) return '(无输出)';
@@ -147,7 +132,7 @@ async function main() {
         const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
         if (res.ok) return;
       } catch {
-        /* 未就绪,继续 poll */
+
       }
       if (Date.now() > deadline) bail(`${label} 未就绪:${url}`);
       await sleep(300);

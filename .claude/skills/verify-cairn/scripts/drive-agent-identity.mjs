@@ -1,22 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-agent-identity — agent 身份可点进设置（#741）live 闭环。
-//
-// 真用户路径：/app（board）FAB 开 drawer → 绑定总管的 robot 行身份 chip
-// （头像+名字，整块 anchor）→ 点击 SPA 导航进 /app/resources/agents/<id>
-// 设置页；robot markdown 里的 agent 提及 chip 同律可点。键盘面：composer
-// 持焦 → Shift+Tab 走上身份 chip → Enter 激活（真 anchor 键盘律）。
-//
-// 铺底全走公开 REST（drive-chief-drawer / setup-review-seed 铺底律，非被测
-// 路径）：provider + agent + PATCH chief 绑定 + POST chief/threads 建线程
-// 入队回合步 + api-key/machine enroll 后**假机器**认领该步、经 upload-urls
-// PUT transcript.json（assistant 终稿行，内嵌 [名](agent:<id>) 提及 wire）、
-// POST done 收尾——零 daemon、零 LLM，回合数据面与真机器逐字节同形。
-//
-// 双态：缺省 = 新行为全链应 PASS；`--expect=old` 反转期望取「同等场景」
-// before 基线（drive-newtask-key.mjs 先例）：身份 chip 不存在（robot 行
-// 头像不可点、无名字），提及 chip 是死 span（点击零导航）。
-// 依赖全新库：重验 = 重 launch。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-agent-identity.mjs [--expect=old]
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -82,7 +64,6 @@ async function sendJson(url, body, method, token) {
 
 const AGENT_NAME = '验证员 Kimi';
 
-// —— 铺底（全 REST，非被测路径）—————————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -139,13 +120,11 @@ const enroll = await sendJson(
 const machineToken = enroll.body?.token ?? enroll.body?.machine?.token;
 if (enroll.status !== 200 || !machineToken) throw new Error('enroll → ' + enroll.status);
 
-// 假机器认领 chief 回合步（响应双层包装 {step:{step:{…}}}，machine-wire 律）。
 const claim = await sendJson(SERVER + '/api/machine/tasks/claim', {}, 'POST', machineToken);
 const claimed = claim.body?.step?.step ?? claim.body?.step;
 if (!claimed?.id) throw new Error('claim 失败：' + JSON.stringify(claim.body));
 const stepId = claimed.id;
 
-// 终稿 assistant 行：内嵌 agent 提及 wire（segments 单源解析面）。
 const replyText = '凭证链路复核完成：由 [' + AGENT_NAME + '](agent:' + AGENT_ID + ') 承接，三项检查全部通过。';
 const transcript = {
   stepId,
@@ -170,8 +149,6 @@ if (!put.ok) throw new Error('PUT transcript → ' + put.status + ' ' + (await p
 const done = await sendJson(SERVER + '/api/machine/done/' + stepId, { status: 'success' }, 'POST', machineToken);
 if (done.status !== 200) throw new Error('done → ' + done.status + ' ' + JSON.stringify(done.body));
 
-// 铺底真值：会话读面带 assistant 终稿行（不是只看 UI）。threadId 自带
-// chief- 前缀，会话 id 即 threadId（r5 §3.6 键形）。
 const msgs = await getJson(SERVER + '/api/conversations/' + threadId + '/messages');
 const rows = msgs?.messages ?? [];
 check(
@@ -180,10 +157,9 @@ check(
   'messages=' + rows.length + ' threadId=' + threadId,
 );
 
-// —— 浏览器面（live 模式，无 scenario）————————————————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
-// dicebear 外网桩（e2e 同配方）：头像立即落，不悬 8s。
+
 await page.route('**/api.dicebear.com/**', (route) =>
   route.fulfill({
     contentType: 'image/svg+xml',
@@ -191,9 +167,6 @@ await page.route('**/api.dicebear.com/**', (route) =>
   }),
 );
 
-// 抽屉就位（防御式）：已开则直用（SPA back 后 open 态可能仍在——FAB 点击
-// 会被 composer 件拦截）；未开走 FAB（真用户路径）；落新主题 hero 面则
-// ?chief= 深链兜底。滑入动画落定后返回（chief-panel settled 同律）。
 async function ensureDrawer() {
   const drawer = page.locator('.chief-drawer');
   if (!(await drawer.isVisible().catch(() => false))) {
@@ -211,30 +184,25 @@ async function ensureDrawer() {
 await page.goto(WEB + '/app');
 await ensureDrawer();
 
-// #950 载体迁移：身份 chip = robot 行的行级直子 anchor（.chief-identity 类
-// 退役；mention chip 是气泡 markdown 深层的 a.mention-chip--agent，直子位
-// 不撞）；名字载体 = link 文本（.chief-identity-name 退役）。
 const chip = page.locator('[data-testid="chief-msg"] > a');
 const mention = page.locator('[data-testid="chief-stream"] .mention-chip--agent');
 
 if (!EXPECT_OLD) {
-  // N1 身份 chip：头像+名字并排，整块 anchor。
+
   await chip.waitFor({ state: 'visible', timeout: 8000 });
   check('N1 身份 chip 渲染（头像 img + 名字）', (await chip.locator('img').count()) === 1 &&
     ((await chip.textContent()) ?? '').trim() === AGENT_NAME);
   check('N2 身份 chip href 指 Agent 设置页',
     (await chip.getAttribute('href')) === '/app/resources/agents/' + AGENT_ID,
     'href=' + (await chip.getAttribute('href')));
-  // N3 hover 正典：仅 cursor，无背景变化（参考站实测）。
+
   const bgBefore = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
   await chip.hover();
   const bgAfter = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
   check('N3 hover 无背景态、cursor=pointer',
     bgBefore === bgAfter && (await chip.evaluate((el) => getComputedStyle(el).cursor)) === 'pointer');
   await shot(page, '01-drawer-identity-chip-hover.png');
-  // N4 点击 = 同 tab SPA 路由进设置页，落点解析真记录。live 面 agent 记录
-  // 走 GET 异步——加载窗口内 source undefined 会先闪「找不到该 Agent」回退
-  // 态，等 tabs 真可见再断言（不是竞态放行，是等真值落定）。
+
   await chip.click();
   await page.waitForURL((u) => u.pathname === '/app/resources/agents/' + AGENT_ID, { timeout: 8000 });
   await page.locator('.agent-tabs').waitFor({ state: 'visible', timeout: 10000 });
@@ -243,7 +211,7 @@ if (!EXPECT_OLD) {
     (await page.locator('.agent-tabs').isVisible()) &&
     (await page.locator('body').textContent()).includes(AGENT_NAME));
   await shot(page, '02-agent-settings-landing.png');
-  // N5 键盘可达：回板面重开抽屉，composer 持焦 → Shift+Tab 走上 chip → Enter。
+
   await page.goBack();
   await ensureDrawer();
   await page.locator('.chief-composer textarea').focus();
@@ -257,7 +225,7 @@ if (!EXPECT_OLD) {
   await page.keyboard.press('Enter');
   await page.waitForURL((u) => u.pathname === '/app/resources/agents/' + AGENT_ID, { timeout: 8000 });
   check('N6 Enter 激活导航', true);
-  // N7/N8 提及 chip（robot markdown 内 [名](agent:<id>) wire）。
+
   await page.goBack();
   await ensureDrawer();
   await mention.waitFor({ state: 'visible', timeout: 8000 });
@@ -274,14 +242,12 @@ if (!EXPECT_OLD) {
     (await page.locator('body').textContent()).includes(AGENT_NAME));
   await shot(page, '05-mention-landing.png');
 } else {
-  // O1 robot 行头像不可点、无名字：身份 chip 零出现，头像仍是惰性槽。
-  // #950 载体：身份 link = 行级直子 anchor、名字 = link 内 span、头像 =
-  // 行级 img（.chief-identity*/.chief-avatar--img 类退役）。
+
   check('O1 身份 chip 不存在（旧态：头像惰性、无名字）',
     (await page.locator('[data-testid="chief-msg"] > a').count()) === 0 &&
     (await page.locator('[data-testid="chief-msg"] > a span').count()) === 0 &&
     (await page.locator('[data-testid="chief-msg"] img').count()) >= 1);
-  // O2 提及 chip 是死 span：无 href，点击零导航。
+
   await mention.waitFor({ state: 'visible', timeout: 8000 });
   const tag = await mention.evaluate((el) => el.tagName);
   const href = await mention.getAttribute('href');

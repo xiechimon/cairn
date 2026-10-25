@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive — 用仓库自带 @playwright/test 的 chromium 走真用户路径
-// (live 面,URL 不带 ?scenario=)。栈必须已在跑(launch.mjs;坐标取
-// VERIFY_RUN_DIR 下 ports.json,worktree 车道传 VERIFY_REPO_ROOT)。
-// 用法:node drive.mjs <probe>   probe ∈ board | new-task | api-key | search | theme
-// 证据(截图 + result.json)落 VERIFY_EVIDENCE_DIR(默认落**主仓**的
-// .claude/verify-evidence/<时间戳>-<probe>/,与 VERIFY_REPO_ROOT 无关——
-// lane 的栈在 worktree,证据落 worktree 会随它删除而丢失)。cleanup.mjs 不
-// 删证据;证据交付见 SKILL.md「证据归档纪律」(在 PR 分支上 vp.mjs archive
-// <票号> --from <证据目录> 拷进 docs/verify/<票号>/ 随 PR 提交,不手工 cp)。
-// 任一断言失败退出码 1,
-// result.json 里逐条记 checks。
-// 口径与 apps/web/playwright.config.ts 一致:1440×732、colorScheme dark。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -83,7 +71,6 @@ const postJson = async (url, body) => {
   return res.json();
 };
 
-/** SQLite 真值(只读)。better-sqlite3 在 apps/server 依赖里,按包定位解析。 */
 const dbQuery = (fn) => {
   try {
     const requireServer = createRequire(join(ROOT, 'apps', 'server', 'package.json'));
@@ -113,8 +100,7 @@ const gotoBoard = async () => {
 try {
   if (probe === 'board') {
     await gotoBoard();
-    // #351:看板更名「工作台」+ 6 列收敛为 4 列(单键折叠),列收起族删除,
-    // 滚动器改 4 列均匀 grid(桌面无横向滚动,overflow-x 只作窄窗兜底)。
+
     const title = (await page.locator('.board-topbar-title').textContent())?.trim();
     check(title === '工作台', `顶栏标题 = 工作台(实测 ${title})`);
 
@@ -136,7 +122,7 @@ try {
       JSON.stringify(seats) === JSON.stringify(canon),
       `列序 id↔名对拍(实测 ${seats.map(([id, name]) => `${id}:${name}`).join(' ')})`,
     );
-    // 退役列名不再占列头(规划中 仍存活于详情 phase chip,本 probe 只看工作台面)
+
     const retired = await page
       .locator('.board-column-name')
       .evaluateAll((els) =>
@@ -144,13 +130,11 @@ try {
       );
     check(retired.length === 0, `退役列名不渲染(实测 ${retired.join('/') || '无'})`);
 
-    // #147 列收起全家删除:钮/窄条/折叠态均无渲染位
     const collapse = await page
       .locator('.board-column-collapse, .board-column-strip, .board-column--collapsed')
       .count();
     check(collapse === 0, `列收起族已删除(实测 ${collapse} 个残留节点)`);
 
-    // 均匀分布:4 列同轨宽 + 桌面无横向滚动,overflow-x 仍是窄窗兜底
     const widths = await page
       .locator('.board-column')
       .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
@@ -163,7 +147,6 @@ try {
     check(!scroller.scrollable, '桌面无横向滚动');
     check(scroller.overflowX === 'auto', `窄窗兜底 overflow-x = auto(实测 ${scroller.overflowX})`);
 
-    // 待处理列空态 = Paper 列空态「暂无」(DESIGN.md 看板列;全新库全列空)
     const pendingEmpty = (
       await page.locator('[data-column="pending"] .board-column-empty').textContent()
     )?.trim();
@@ -175,7 +158,7 @@ try {
   }
 
   if (probe === 'new-task') {
-    // 真用户路径:新建任务(全新库无项目 → 自动建「默认项目」再落任务)
+
     const title = `验证任务 ${Date.now() % 100000}`;
     await gotoBoard();
     await shot(page, '01-board-before.png');
@@ -183,7 +166,7 @@ try {
     await page.click('.sidebar-new-task');
     await page.waitForSelector('.new-task-dialog', { timeout: 5000 });
     check(true, '新建任务 dialog 打开');
-    // spec 15 #394：单字段正文——标题输入位移除,占位标题 = 正文首行。
+
     await page.fill('.new-task-spec', title);
     await page.click('.new-task-save');
     await page.waitForSelector('.new-task-dialog', { state: 'hidden', timeout: 5000 });
@@ -217,24 +200,16 @@ try {
   }
 
   if (probe === 'api-key') {
-    // 真用户路径:/app/api-keys 空态点「新建密钥」→ 一次性明文 + 掩码行。
-    // 前提:全新库(重验先重跑 launch,按钮只在空态)。
+
     await page.goto(`${WEB}/app/api-keys`);
-    // #1166 迁语义载体(spec 22 §5,#950/#910 后类名退役):空态 = keys-empty
-    // testid、新建钮 = 空态 scope 的 role=button 文案一级;弹窗 = DialogShell
-    // role=dialog(可及名 = title),提交钮 = 弹窗 scope 文案一级;一次性明文
-    // = <code> 语义元素;掩码行 = Card 件 data-slot,一次块凭「仅显示一次」
-    // 文案排除。
+
     const keysEmpty = page.getByTestId('keys-empty');
     await keysEmpty.waitFor({ timeout: 15_000 });
     check(true, 'API 密钥页空态就绪');
     await shot(page, '01-keys-empty.png');
 
     await keysEmpty.getByRole('button', { name: '新建密钥' }).click();
-    // #287 起「新建密钥」走权限位表单弹窗(api-key-create-dialog.tsx):点
-    // 「新建密钥」只开弹窗,须再点弹窗内「创建」提交,POST 成功响应回明文才
-    // 渲染一次性明文块。表单默认值可直接提交(空名称 + 全不选,server
-    // createApiKeyBodySchema 接受)。
+
     const createDialog = page.getByRole('dialog', { name: '新建密钥' });
     await createDialog.waitFor({ timeout: 15_000 });
     check(true, '新建密钥弹窗打开(#287 两步流)');
@@ -247,9 +222,7 @@ try {
       plaintext?.startsWith('cairn_') === true,
       `一次性明文形态 cairn_…(${plaintext?.slice(0, 14)}…,仅显示一次)`,
     );
-    // 掩码行的判别面:列表给明文条目也渲染一张无掩码的行卡,卡总数在
-    // once 态 = 3(一次块 + 真掩码行 + once 空行)。真掩码行 = 文本含
-    // cairn_ 且无 <code> 子孙(一次块是唯一带 code 的卡)。
+
     const maskedRow = page
       .locator('[data-slot="card"]')
       .filter({ hasText: 'cairn_' })
@@ -277,10 +250,7 @@ try {
   }
 
   if (probe === 'search') {
-    // 铺底(公开 REST,非被测路径)→ 真用户路径:⌘K 开面板 → 输入 → 命中。
-    // ⌘K 配方照抄 e2e search-focus.spec.ts:热键监听注册在被动 effect,首按
-    // 可能早于 hydration,丢键就重按(面板可见即停,不会双 toggle);折叠/
-    // 展开两种侧栏态都覆盖(展开态无 .rail-row,别用侧栏行当唯一入口)。
+
     const title = `搜索目标 ${Date.now() % 100000}`;
     const proj = await postJson(`${API}/api/projects`, {
       name: '搜索验证',
@@ -289,9 +259,6 @@ try {
     await postJson(`${API}/api/projects/${proj.id}/todos`, { title, spec: title });
     await gotoBoard();
 
-    // #1166 迁语义载体(spec 22 §5,#949/#910 裁定后类名退役,与
-    // e2e search-focus.spec.ts 同律):面板 = role dialog + 可及名「搜索」,
-    // 输入 = 面板 scope 的 textbox,结果行 = data-row-kind="todo"。
     const panel = page.getByRole('dialog', { name: '搜索' });
     for (let attempt = 0; attempt < 6; attempt += 1) {
       await page.keyboard.press('Meta+k');
@@ -314,9 +281,7 @@ try {
   }
 
   if (probe === 'theme') {
-    // live 面用户菜单 popover 暂无触发器(fixture-only,见 features/theme.md
-    // gotcha);live 可验的持久化路径 = cairn-theme localStorage 键(与
-    // e2e addInitScript 同键,apps/web/src/theme.ts)。
+
     await gotoBoard();
     await shot(page, '01-theme-default-dark.png');
 
@@ -351,7 +316,7 @@ try {
   try {
     await shot(page, '99-error.png');
   } catch {
-    /* 截不上就算了 */
+
   }
 } finally {
   await browser.close();

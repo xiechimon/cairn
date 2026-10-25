@@ -1,36 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn 定制 probe（#951 detail-b 域施工）— live 栈真用户路径 +
-// detail/overlays.css 清零后 live-only 面的运行时机制断言 + 渲染对比度实测。
-// 栈必须已在跑（launch.mjs + doctor 全 PASS；坐标取 VERIFY_RUN_DIR/ports.json，
-// worktree 车道传 VERIFY_REPO_ROOT）。
-//
-// 为什么需要 live：fixture 面盖不住的本域迁移面——
-//   A. 创建 Agent 告警面（dlg-agent-warn/-configure/avatar 迁移 + agent-avatar
-//      testid 二级载体）
-//   B. 分支 section live 判别式：机器 pill **可点态**（fixture 只有 disabled
-//      占位）+ 菜单 role=listbox + 漆底 hover 中性化实测 + Switch 换代真交互
-//      （role=switch aria-checked 翻转，旧隐藏 checkbox 绝迹）+ getByLabel
-//      (同步目录) 载体 + 停止确认弹层（ACCEPT_* 常量族 live 面：默认勾选/
-//      标签文案/取消/停止）
-//   C. AI 审核模态 live 面（review-* 迁移：搜索行/agent 行/选中 spot-soft/
-//      独立性提示/关注点 textarea/开始审核钮）+ live-only 对比度对
-//   D. 运行时机制：本票退役选择器在 live 栈 document.styleSheets 零规则
-//      （drive-949 D 段同法）+ overlays.css 不再出现在任何样式表源文本
-//
-// 前置：
-//   - launch.mjs + doctor 全 PASS
-//   - stub LLM 门控轮（STUB_PORT=8919）+ 真 daemon 在线（B 段 stop 链）
-//   - seed：SEED951_JSON（seed-951-live.mjs 产物：teamId/agentId/projectId/
-//     todoId，todo 留 todo 相位）+ SEED_REVIEW_JSON（setup-review-seed.mjs
-//     产物：confirm 相位 todo，C 段用）
-//   - ⚠️ B 段不经 UI「开始」钮起 build——spec 21 单机编排默认策略后 fresh 面
-//     「开始」= POST /orchestrate（chief 未绑定 409；绑定后 chief 轮走 stub
-//     门控永不 dispatch）。drive-stop.mjs 的 UI 开链因此 stale（先于 #951，
-//     已记 features/stop-button.md）。本脚本改走 REST POST builds（m5 集成
-//     同法），daemon 认领 plan 步 → stub 门控轮 streaming → 停止窗仍在。
-//
-// 证据（截图 + result.json + contrast-live-951.{json,md}）落 VERIFY_EVIDENCE_DIR。
-// 任一断言失败退出码 1。口径与 apps/web/playwright.config.ts 一致：1440×732。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -88,7 +56,6 @@ const jget = async (path) => {
 
 const shot = (page, name) => page.screenshot({ path: join(EVIDENCE, name) });
 
-// —— 对比度引擎（contrast-951.mjs 同源；渲染对 = fg × 有效合成 bg）——
 const contrastRows = [];
 async function measurePair(page, locate, label, kind, fgFrom = 'color') {
   const loc = typeof locate === 'string' ? page.locator(locate).first() : locate(page).first();
@@ -199,14 +166,11 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 
-  // —— A. 创建 Agent 告警面（team 页，无 build 依赖）———————————————
   await page.goto(`${WEB}/app/team`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: '创建 Agent' }).first().click();
   const agentDialog = page.getByRole('dialog', { name: '创建 agent' });
   await agentDialog.waitFor({ state: 'visible', timeout: 10_000 });
-  // live 团队已配 provider（seed 链）→ #485 两态走「模型槽」面（告警行面是
-  // 无 provider 态，fixture e2e agent-create-model/team-create-agent 已钉死；
-  // live 这里钉 slot-row 迁移面：运行时/模型 两个纵排标签列在场）。
+
   check(
     'A1-slot-rows-visible',
     (await agentDialog.getByText('运行时', { exact: true }).count()) === 1 &&
@@ -231,7 +195,6 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(400);
 
-  // —— B. 分支 section live + 停止确认弹层（REST 起 build，daemon 认领）——
   const started = await jpost(`/api/projects/${seed951.projectId}/builds`, {
     todoIds: [seed951.todoId],
     assignment: { plan: { agentId: seed951.agentId }, build: { agentId: seed951.agentId } },
@@ -240,7 +203,7 @@ try {
   check('B0-build-started', started.status === 201, `POST builds → ${started.status}`);
   const buildId = started.body?.builds?.[0]?.id ?? started.body?.build?.id ?? started.body?.id ?? null;
   if (buildId == null) {
-    // 兜底：从 todo 面读 latestBuildId
+
     const t = await jget(`/api/todos/${seed951.todoId}`);
     var resolvedBuildId = t.body?.latestBuildId ?? null;
   } else {
@@ -249,10 +212,9 @@ try {
   check('B0b-build-id', resolvedBuildId != null, `buildId=${resolvedBuildId}`);
 
   await page.goto(`${WEB}/app/todo/${seed951.todoId}`, { waitUntil: 'networkidle' });
-  // streaming 窗（stub 门控 30s）内：composer-stop 出现
+
   await page.waitForSelector('.composer-stop', { timeout: 90_000 });
 
-  // 分支 section：右 pane 型选 →「分支与 PR」
   await page.click('.detail-right .doc-select-wrap .doc-pane-select');
   await page.waitForSelector('[role="menu"]', { timeout: 5000 });
   await page.locator('[role="menuitemradio"]', { hasText: '分支与 PR' }).click();
@@ -260,7 +222,7 @@ try {
   await right.getByLabel('同步目录').waitFor({ state: 'visible', timeout: 10_000 });
   const picker = right.locator('button[aria-haspopup="listbox"]');
   check('B1-picker-live', (await picker.count()) === 1, '机器 picker 可点态在场（live 判别式）');
-  // 漆底 hover 中性化实测（fixture 面盖不住：占位钮恒 disabled 不可 hover）
+
   const restBg = await picker.evaluate((el) => getComputedStyle(el).backgroundColor);
   await picker.hover();
   await page.waitForTimeout(350);
@@ -275,12 +237,10 @@ try {
   await shot(page, '02-branch-section-live-menu.png');
   await right.locator('[role="listbox"] button').first().click();
   await page.waitForTimeout(300);
-  // Switch 换代真交互：role=switch 翻转 + 旧隐藏 checkbox 绝迹
+
   const sw = right.getByRole('switch', { name: '强制同步' });
   check('B4-switch-carrier', (await sw.count()) === 1, 'role=switch + aria-label 载体在场');
-  // Base UI Switch 的官方隐藏 input 渲染在 role=switch 钮的**兄弟位**（不在
-  // 其子树内）——归属判据 = 每枚隐藏 input 的父容器内恰有 role=switch（1:1
-  // 配对）+ 手搓 label.dlg-toggle 结构绝迹，不是 input 绝对计数为零。
+
   const cbAll = await right.locator('input[type="checkbox"]').count();
   const cbOwnedBySwitch = await right
     .locator('input[type="checkbox"]')
@@ -303,7 +263,6 @@ try {
   await measurePair(page, () => right.getByLabel('同步目录'), 'dir box tertiary on surface (live)', 'canon tertiary 7.86/4.5');
   await measurePair(page, () => sw, 'switch track unchecked vs pane bg (§4-1 report-only)', 'report', 'background');
 
-  // 停止确认弹层（ACCEPT_* 常量族 live 面）
   await page.click('.composer-stop');
   const stopDialog = page.getByRole('dialog', { name: '停止当前这一轮？' });
   await stopDialog.waitFor({ state: 'visible', timeout: 10_000 });
@@ -321,7 +280,7 @@ try {
   await shot(page, '04-stop-confirm-dialog.png');
   await measurePair(page, () => stopDialog.locator('.ui-checkbox > span:last-of-type'), 'stop label primary on popover-bg', 'canon 13.09/4.5');
   await measurePair(page, () => stopDialog.getByRole('button', { name: '取消' }), 'stop cancel tertiary on popover-bg', 'canon tertiary 7.86/4.5');
-  // 点停止 → 弹层关 + 中断落账
+
   await stopDialog.getByRole('button', { name: '停止' }).click();
   await stopDialog.waitFor({ state: 'hidden', timeout: 10_000 });
   check('B8-stop-closes', true, '停止 → 弹层关闭');
@@ -333,7 +292,6 @@ try {
     `stop 后 phase=${after.body?.phase}（gate 回落）`,
   );
 
-  // —— C. AI 审核模态 live 面（seed2 confirm 相位 todo）—————————————
   await page.goto(`${WEB}/app/todo/${seedReview.todoId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.composer-tool[aria-label="AI 审核"]', { timeout: 15_000 });
   await page.click('.composer-tool[aria-label="AI 审核"]');
@@ -357,12 +315,10 @@ try {
   await measurePair(page, () => options.first().locator('span').nth(1).locator('span').first(), 'review row name primary on surface', 'canon 14.17/4.5');
   await measurePair(page, () => reviewDialog.getByRole('textbox'), 'focus textarea primary on surface (live)', 'canon 14.17/4.5');
   await measurePair(page, () => reviewDialog.getByRole('button', { name: '开始审核' }), 'review start on-accent on card-button', 'canon 8.24/4.5');
-  // 选中行 spot-soft 底：图形对（自身 bg × 父合成底无意义）——文字对 = name span
-  // fg × 行 bg（spot-soft）：直接量 name span（其 effectiveBg 合成到 spot-soft）。
+
   await page.keyboard.press('Escape');
   await page.waitForTimeout(400);
 
-  // —— D. 运行时机制：退役选择器零规则 + overlays.css 绝迹 —————————————
   const mech = await page.evaluate(() => {
     const retired = [
       '.dlg-accept', '.dlg-accept-footer', '.dlg-accept-cancel', '.dlg-accept-done',

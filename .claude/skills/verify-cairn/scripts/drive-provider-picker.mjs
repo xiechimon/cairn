@@ -1,36 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-provider-picker — 添加服务商 picker dialog 全链
-// （spec 11 A5/A6，#353；先行地图 #354）。
-//
-// 真用户路径：/app/resources/providers（页面无 preset 投喂负向）→「新建」
-// 开 picker dialog（搜索框 + 38 项 preset 行 + 底部「自定义端点」入口）→
-// 搜索过滤 → 点 api_key 族 preset 行进密钥表单（DeepSeek）→ xai 密钥表单
-// 展示 oauthLabel → 重开走 disclosure 展开现有自定义网关表单 → 填表 +
-// 模型行 → 保存 → dialog 关。
-//
-// 真值：POST /api/teams/:id/providers 建行 → GET 封套 providers 段字段全对
-// + SQLite provider 表行（models JSON 含所填模型）。创建链是既有行为，重构
-// （A6）不得击穿——本段在 disclosure 未落地时（表单现状外露）同样可达，
-// 红态运行也产出创建链回归证据。
-// 负向（A6 + #385）：xai 行不带「OAuth」标签（其 oauthLabel 在密钥表单内
-// 展示）；openai-codex 族表未接线——行不带标签、行禁用、带「暂未开通」注记，
-// 标签仅 github-copilot 一项。Paper 分组选择器：行 = 首字母方块 + 名称 span +
-// 右侧标签 span，名称节点等值仍是显示名 canon 的判据。
-//
-// OAuth 点击链（authorize → 外网重定向 → 302 着陆）不在本 probe 验证：需真
-// 外网 + 真订阅，属 #231/#243 e2e 面；probe 内不发外部请求。
-//
-// 先行地图语义（A12）：spec 11 实现票（picker 重构）落地前本 probe 为红——
-// 每条 FAIL detail 指向 spec 条款，红态输出即实现票的验收清单。
-//
-// 次序纪律：后于 drive-providers-tabs.mjs 跑——tabs 的 pi 空态断言要求库内
-// 无 custom provider，本 probe 的 e2e 会建一个。重验 = 重 launch。
-// #944 载体迁移：类名钩 → 语义/data-* 载体，断言语义不变——.res-new →
-// [data-testid="resource-new"]、.dlg-picker-search → input[aria-label=
-// "搜索服务商..."]、.dlg-picker-row → [data-preset-id]、.dlg-picker-custom /
-// .dlg-provider-create / -model-add → button:text-is(文案)；#dlg-provider-*
-// id 载体不变；壳句柄 = role=dialog，关窗钮 = aria-label「关闭」（#952 面）。
-// 用法：node drive-provider-picker.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -58,10 +26,8 @@ mkdirSync(EVIDENCE, { recursive: true });
 
 const require2 = createRequire(join(REPO, 'apps/server/package.json'));
 
-// 38 项 preset 显示名 canon = spec 11「上游 38 项 preset 显示名（2026-09-28
-// 实测，picker 文案源）」名单逐字转录。文案变更先改 spec 11 再改这里。
 const PRESET_NAMES = {
-  // 名称节点只含显示名；OAuth / 暂未开通 是行右的独立标签节点（下方 5) 钉）。
+
   'github-copilot': 'GitHub Copilot',
   'openai-codex': 'OpenAI Codex',
   xai: 'xAI',
@@ -103,14 +69,14 @@ const PRESET_NAMES = {
 };
 const PRESET_IDS = Object.keys(PRESET_NAMES);
 if (PRESET_IDS.length !== 38) {
-  // 自守卫：canon 与 shared PROVIDER_PRESET_IDS 同数（38，spec 11 A5）。
+
   process.stderr.write(`PRESET_NAMES 应恰 38 项，实际 ${PRESET_IDS.length}\n`);
   process.exit(2);
 }
 
 const checks = [];
 function check(name, ok, detail) {
-  // 断言位必须真是 boolean（drive-tags 同律）——写反会恒真。
+
   if (typeof ok !== 'boolean') {
     throw new TypeError(`check(${JSON.stringify(name)}) 的 ok 位须为 boolean，收到 ${typeof ok}`);
   }
@@ -137,7 +103,6 @@ const tryGetJson = async (url) => {
   }
 };
 
-/** SQLite 真值（只读）。 */
 const dbQuery = (fn) => {
   try {
     const Database = require2('better-sqlite3');
@@ -152,7 +117,6 @@ const dbQuery = (fn) => {
   }
 };
 
-// 软断言原语：先行 probe 的红态要逐条产出 FAIL detail，所有探测一律不抛。
 const softVisible = async (page, selector, timeout = 5000) =>
   page
     .waitForSelector(selector, { state: 'visible', timeout })
@@ -201,7 +165,7 @@ const page = await browser.newPage({
 });
 
 try {
-  // 0) 页面就绪 + teamId
+
   await page.goto(`${WEB}${PAGE_PATH}`);
   const shellReady = await softVisible(page, SHELL, 15_000);
   check('page-ready', shellReady, shellReady ? `${PAGE_PATH} shell 就绪` : '页面 shell 未渲染');
@@ -214,8 +178,6 @@ try {
     teamId != null ? `GET /api/teams 取到 teamId=${teamId}` : `取 teamId 失败：${teamsRes.error}`,
   );
 
-  // 1) A5 负向：页面列表不投喂 preset 目录（preset 仅在 dialog 内出现）。
-  //    样本取三个辨识名；非空守卫：读不到正文时负向不可判真。
   const pageText = await softText(page, `${SHELL} .page-main`);
   const leaked = ['DeepSeek', 'OpenRouter', 'Cloudflare AI Gateway'].filter((n) =>
     pageText.includes(n),
@@ -230,7 +192,6 @@ try {
         : `spec 11 A5：preset 仅在 dialog 内出现——页面泄漏 ${leaked.join(', ')}`,
   );
 
-  // 2) 「新建」开 dialog（既有入口，重构前后皆应在位）
   await page.click(`${SHELL} [data-testid="resource-new"]`).catch(() => {});
   const dlgOk = await softVisible(page, DLG);
   check(
@@ -240,7 +201,6 @@ try {
   );
   await shot(page, '01-dialog-open.png');
 
-  // 2) A6：搜索框
   const searchOk = dlgOk && (await softVisible(page, `${DLG} input[aria-label="搜索服务商..."]`));
   check(
     'picker-search-present',
@@ -250,7 +210,6 @@ try {
       : 'spec 11 A6：dialog 应为 picker 形态，顶部搜索框（input[aria-label="搜索服务商..."]）——未实现（现状为自定义网关表单直陈）',
   );
 
-  // 3) A5/A6：38 项 preset 行（与 shared PROVIDER_PRESET_IDS 1:1 同数）
   const rowCount = dlgOk ? await softCount(page, ROW) : 0;
   check(
     'preset-rows-38',
@@ -260,9 +219,6 @@ try {
       : `spec 11 A5/A6：dialog 内应渲染 38 项 preset 行——实测 ${rowCount} 项`,
   );
 
-  // 4) 显示名 canon（spec 11 名单逐字，名称节点**等值**——徽标标记除外。
-  //    整行子串会放行更长变体假命中：MiniMax ⊂ MiniMax CN、Google ⊂
-  //    Google Vertex AI、Qwen Token Plan ⊂ …CN/Individual 等。）
   const rowData = await page
     .locator(ROW)
     .evaluateAll((els) =>
@@ -296,9 +252,6 @@ try {
           .join(', ')}${missingNames.length > 4 ? ` 等 ${missingNames.length} 项` : ''}`,
   );
 
-  // 5) A6 + #385：「OAuth」标签节点仅族表已接线的 github-copilot；openai-codex
-  //    未接线——无标签、带「暂未开通」注记、行禁用；xai 行不带（其
-  //    oauthLabel 在密钥表单内）
   const hasOauthTag = (id) => (rowData[id]?.nodes ?? []).includes('OAuth');
   const ghOk = hasOauthTag('github-copilot');
   const codexText = rowTexts['openai-codex'] ?? '';
@@ -316,17 +269,15 @@ try {
   );
   await shot(page, '02-preset-rows.png');
 
-  // 6) A6：搜索客户端过滤（qwen→3 / 无命中→0 / 清空→38）
   let filterDetail = '搜索框缺失，过滤无从验证';
   let filtersOk = false;
   if (searchOk) {
-    // #944 载体迁移：.dlg-picker-search 类名钩 → aria-label 一级（dialog 内唯一
-    // 搜索框，无双腿歧义；.first() 仅防意外多命中把 strict-mode 违例吞成 spec 红）
+
     const searchInput = page
       .locator(`${DLG} input[aria-label="搜索服务商..."]`)
       .first();
     await searchInput.fill('qwen').catch(() => {});
-    await page.waitForTimeout(300); // 客户端过滤随击即应，给一帧渲染余量
+    await page.waitForTimeout(300);
     const qwenIds = await visibleRowIds(page);
     const qwenOk =
       qwenIds.length === 3 &&
@@ -349,8 +300,6 @@ try {
   }
   check('search-filters', filtersOk, filterDetail);
 
-  // 7) A6：api_key 族 preset 行点击 → 该 preset 的密钥表单（#380 落地契约 =
-  //    现有自定义网关表单原样复用 + providerId/label 预填，与 e2e spec 钉扎同形）
   const deepseekSel = `${ROW}[data-preset-id="deepseek"]`;
   let keyFormOk = false;
   let keyFormDetail = 'spec 11 A6：点 api_key 族 preset 行应进该 preset 的密钥表单——preset 行缺失（前置未达）';
@@ -373,7 +322,6 @@ try {
   }
   check('preset-key-form', keyFormOk, keyFormDetail);
 
-  // 8) DialogShell 律：X 关窗
   const closedOk = dlgOk
     ? await page
         .click(`${DLG} button[aria-label="关闭"]`)
@@ -382,8 +330,6 @@ try {
     : false;
   check('keyform-closes', closedOk === true, closedOk ? '关闭钮关窗（#68 family law，aria-label 载体）' : '关窗失败/dialog 未开');
 
-  // 8b) A6 正向：xai 的 oauthLabel 在其密钥表单内展示（spec 11 名单注；行不带
-  //     「OAuth」标签的负向已在 oauth-badge-wired-only 钉）。无外网请求。
   await page.click(`${SHELL} [data-testid="resource-new"]`).catch(() => {});
   const xaiReopen = await softVisible(page, DLG);
   const xaiRowSel = `${ROW}[data-preset-id="xai"]`;
@@ -406,7 +352,6 @@ try {
     await softHidden(page, DLG);
   }
 
-  // 9) A6：底部「自定义端点」disclosure 入口
   await page.click(`${SHELL} [data-testid="resource-new"]`).catch(() => {});
   const reopened = await softVisible(page, DLG);
   const entrySel = `${DLG} button:text-is("自定义端点")`;
@@ -420,7 +365,6 @@ try {
       : 'spec 11 A6：dialog 底部应有「自定义端点」disclosure 入口（button:text-is("自定义端点")）——未实现',
   );
 
-  // 10) A6：disclosure 展开现有自定义网关表单（既有句柄保全）
   const formFieldsOk = async () =>
     (await softVisible(page, '#dlg-provider-id', 2000)) &&
     (await softVisible(page, '#dlg-provider-baseurl', 2000)) &&
@@ -430,7 +374,7 @@ try {
     await page.click(entrySel).catch(() => {});
     formReachable = await formFieldsOk();
   } else {
-    // 现状（重构前）表单外露：e2e 段仍可达，产出创建链回归证据。
+
     formReachable = reopened && (await formFieldsOk());
   }
   check(
@@ -444,7 +388,6 @@ try {
   );
   await shot(page, '05-disclosure-form.png');
 
-  // 11) 创建链 e2e（既有行为回归护栏，A6 重构不得击穿）
   let created = false;
   if (formReachable) {
     await page.fill('#dlg-provider-id', newProvider.providerId).catch(() => {});
@@ -471,7 +414,6 @@ try {
       : `保存后 dialog 未关闭/表单不可达——创建链（POST providers）未走通${formReachable ? '' : '（前置 disclosure/表单缺失）'}`,
   );
 
-  // 12) 真值 1：GET 封套 providers 段字段全对
   const envRes =
     teamId != null
       ? await tryGetJson(`${SERVER}/api/teams/${teamId}/providers`)
@@ -492,7 +434,6 @@ try {
           .join(', ') || '空'}]${envRes.ok ? '' : `（${envRes.error}）`}`,
   );
 
-  // 13) 真值 2：SQLite provider 行 + models JSON
   const dbTruth = dbQuery((db) => ({
     row: db
       .prepare('SELECT id, providerId, label, baseUrl, models FROM provider WHERE providerId = ?')
@@ -517,7 +458,7 @@ try {
   try {
     await shot(page, '99-error.png');
   } catch {
-    /* 截不上就算了 */
+
   }
 } finally {
   await browser.close();

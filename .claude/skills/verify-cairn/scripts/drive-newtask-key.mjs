@@ -1,19 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-newtask-key — 「新任务」快捷键键位验证（XMON-41）。
-//
-// 验收标准原文（XMON-41）：把 Cairn 中「新任务」的快捷键改成 `c`。
-// 判定：在看板页面、原本新任务快捷键生效的同等场景下，按 `c` 弹出新任务创建
-// 入口；旧快捷键不再触发新任务。
-//
-// 本 probe 只按该标准判读，不引用实现：正向（c 开）与负向（旧键 n 不开）在
-// 同一批场景上各跑一遍，场景集 = 快捷键原本生效的三条渲染路径（看板本页 /
-// 项目页本页 / 非看板页的 AppSidebar 全局面），外加输入态守卫与侧栏行动作入
-// 口（同一 opener 的另一入口）。真值三件套：截图 + `GET /api/todos` 行 +
-// SQLite `todo` 表行。
-//
-// 用法：node drive-newtask-key.mjs [旧键]         # 旧键默认 n
-//   基线对照：在旧提交的栈上跑 `node drive-newtask-key.mjs n --expect=old`
-//   ——旧栈上 c 不开、n 开，用于证明「同等场景」这一集合在两版之间没有漂移。
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -33,7 +18,7 @@ const DB_PATH = join(RUN_DIR, 'home/server/server.db');
 
 const NEW_KEY = 'c';
 const OLD_KEY = process.argv[2] ?? 'n';
-// 基线模式：期望反转（c 不开、旧键开），用于在旧提交上取「同等场景」对照。
+
 const BASELINE = process.argv.includes('--expect=old');
 
 const ts = new Date().toISOString().replace(/[:.]/g, '-');
@@ -100,7 +85,6 @@ const dialogVisible = async (page) => {
     .catch(() => false);
 };
 
-/** 热键监听在被动 effect 注册（hydration 后）；丢键重按，目标可见即停。 */
 async function pressUntilOpen(page, key, attempts = 8) {
   for (let i = 0; i < attempts; i += 1) {
     await page.keyboard.press(key);
@@ -110,7 +94,6 @@ async function pressUntilOpen(page, key, attempts = 8) {
   return false;
 }
 
-/** 负向：反复按同一键，弹层**一次都不许出现**（丢键重按不能掩盖真开）。 */
 async function pressExpectClosed(page, key, attempts = 5) {
   for (let i = 0; i < attempts; i += 1) {
     await page.keyboard.press(key);
@@ -128,7 +111,6 @@ async function closeDialog(page) {
   await page.waitForTimeout(200);
 }
 
-/** 一个场景 = 一次「新键开 / 旧键不开」的正负对，跑在同一页面状态下。 */
 async function scenario(page, label, { positive = !BASELINE } = {}) {
   const openKey = positive ? NEW_KEY : OLD_KEY;
   const closedKey = positive ? OLD_KEY : NEW_KEY;
@@ -146,7 +128,6 @@ async function scenario(page, label, { positive = !BASELINE } = {}) {
   }
   await closeDialog(page);
 
-  // 负向必须紧跟正向、在同一页面状态下做（否则页面状态不同，结论不可比）。
   const negTag = positive ? 'old-key' : 'new-key';
   const neg = await pressExpectClosed(page, closedKey);
   check(
@@ -167,7 +148,7 @@ const page = await browser.newPage({
 });
 
 try {
-  // —— 场景 1：看板页（AC 点名的「在看板页面」）
+
   await page.goto(`${WEB}/app`);
   await page.waitForSelector('[data-route="board"]', { timeout: 15_000 });
   check('board-ready', true, '看板 shell 就绪');
@@ -177,10 +158,10 @@ try {
   await row.first().waitFor({ state: 'visible', timeout: 8000 });
 
   if (!BASELINE) {
-    // 侧栏角标与热键同源（改键应同步）；只作为观测量，AC 未点名，不参与判读基调。
+
     const badge = (await row.first().locator('.sidebar-kbd').textContent())?.trim();
     check('sidebar-badge-key', badge === 'C', `侧栏「新任务」行角标=${JSON.stringify(badge)}`);
-    // 侧栏行点击是同一 opener 的另一入口——改键不该动它。
+
     await row.first().click();
     const rowOpened = await dialogVisible(page);
     check('sidebar-row-click-opens', rowOpened, `行点击开 ${DIALOG}=${rowOpened}`);
@@ -189,9 +170,6 @@ try {
 
   await scenario(page, 'board');
 
-  // —— 场景 2：看板页输入态守卫（原热键在输入态本就不触发，改键须保持）
-  // #1166/#1181 载体（#949/#910 裁定后类名退役，与 e2e search-focus.spec.ts
-  // 同律）：面板 = role dialog + 可及名「搜索」，输入 = 面板 scope 的 textbox。
   await page.keyboard.press('Meta+k');
   const searchPanel = page.getByRole('dialog', { name: '搜索' });
   await searchPanel.waitFor({ state: 'visible', timeout: 5000 });
@@ -208,12 +186,10 @@ try {
   await page.keyboard.press('Escape');
   await searchPanel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
-  // —— 场景 3：非看板页（AppSidebar 全局面）
   await page.goto(`${WEB}/app/schedules`);
   await page.waitForSelector('.page-shell', { timeout: 15_000 });
   await scenario(page, 'schedules');
 
-  // —— 场景 4：项目页（本页 dialog）
   const teamId = (await getJson(`${SERVER}/api/teams`))[0]?.id;
   const project = await postJson(`${SERVER}/api/projects`, {
     name: `快捷键验证项目 ${stamp}`,
@@ -225,7 +201,7 @@ try {
   await scenario(page, 'project');
 
   if (!BASELINE) {
-    // —— 全链真值：新键开面 → 落标题 → 保存 → API + SQLite 双行
+
     await page.goto(`${WEB}/app`);
     await page.waitForSelector('[data-route="board"]', { timeout: 15_000 });
     const opened = await pressUntilOpen(page, NEW_KEY);

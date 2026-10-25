@@ -1,151 +1,151 @@
 ---
 name: verify-step-claim
-description: cairn 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡停止的 TLA+ 模型检查（TLC，一条命令约 1 分钟）。改到 tryClaim、heartbeatStep、ownedStep、finishStep、sweepAbandonedBuildSteps、sweepStaleMachines、sweepQuotaWaitSteps、stopActiveStepsAfterExit、fetchStop、scheduler tick 顺序，或 daemon 的领取循环、recover、deliverStop、runStep 的心跳 / 会话登记 / 收尾时用；判断改动有没有让「同一步被两处同时跑」「旧执行者的结果被采纳」「关卡后又被领走」「已接收的停止信号丢失」变得更好或更坏。
+description: TLA+ model checking (TLC, one command ~1 minute) of cairn's step claim / heartbeat / abandoned release / finish report / stop-on-close. Use when changing tryClaim, heartbeatStep, ownedStep, finishStep, sweepAbandonedBuildSteps, sweepStaleMachines, sweepQuotaWaitSteps, stopActiveStepsAfterExit, fetchStop, the scheduler tick order, or the daemon's claim loop, recover, deliverStop, runStep heartbeat / session registration / finish; judge whether a change makes "the same step run in two places at once", "an old executor's result being accepted", "being claimed again after close", or "an accepted stop signal being lost" better or worse.
 ---
 
 # verify-step-claim
 
-一个步（`step` 行）从 pending 被某台机器领走、跑完、回报结果，中间会被四方同时碰：daemon（领取、心跳、回报、重启恢复、停止投递）、server 调度一拍（翻离线机器、扫失联步、放回配额到期步）、用户（关卡 / 标完成）、环境（断网、进程崩溃、时间流逝、改绑归属机）。测试只覆盖写测试的人想到的顺序；本技能用 TLC 把有界范围内的**所有**顺序走一遍。
+A step (a `step` row) goes from pending to being claimed by a machine, running, and reporting its result; in between, four parties touch it at once: the daemon (claim, heartbeat, report, restart recovery, stop delivery), one server scheduler tick (flipping offline machines, sweeping abandoned steps, releasing quota-expired steps), the user (close / mark done), and the environment (network loss, process crash, time passing, re-binding the home machine). Tests only cover the orderings the test author thought of; this skill uses TLC to walk **all** orderings within a bounded range.
 
-模型：`model/StepClaim.tla`（除首行外不写注释，动作与代码的对应只记在本文件）。每条性质一个配置：`model/P*.cfg`。预期结果：`expected.txt`。
+Model: `model/StepClaim.tla` (no comments except the first line; the action-to-code correspondence lives only in this file). One configuration per property: `model/P*.cfg`. Expected results: `expected.txt`.
 
-## 什么时候跑
+## When to run
 
-改动碰到下面「覆盖记录」里的任一文件里的列出函数，或者改了 `scheduler.ts` 里 `tick` 的扫尾顺序，就跑。只改文案、日志行、与步状态无关的字段（PR 回填内容、token 记账、transcript）不用跑。拿不准就跑。
+Run when a change touches any of the listed functions in the "coverage record" below, or changes the sweep order of `tick` in `scheduler.ts`. Copy-only, log-line, or step-status-unrelated field changes (PR backfill content, token accounting, transcript) do not need a run. When unsure, run.
 
-## 怎么跑
+## How to run
 
 ```sh
-.claude/skills/verify-step-claim/scripts/run.sh            # 四条全跑，8 核约 1 分钟（四条都是 PASS，每条十几秒，视机器负载）
-.claude/skills/verify-step-claim/scripts/run.sh P1_SingleExecutorPerMachine   # 只跑一条，几秒
+.claude/skills/verify-step-claim/scripts/run.sh            # all four, ~1 minute on 8 cores (all four PASS, ~ten-odd seconds each depending on machine load)
+.claude/skills/verify-step-claim/scripts/run.sh P1_SingleExecutorPerMachine   # just one, a few seconds
 ```
 
-前置：Java 11+（本机 `~/.sdkman/candidates/java/current/bin/java`，17.0.7）和 `~/.cache/cairn/tla2tools-1.7.4.jar`。jar 缺失时脚本打印下载命令并退出 2；脚本校验 SHA-256 `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`（v1.7.4 官方 release，2,274,532 字节）。路径可用 `CAIRN_TLA_JAR`、`JAVA` 覆盖。TLC 的中间产物全写在 `$TMPDIR/verify-step-claim.*`，不进仓。
+Prerequisites: Java 11+ (locally `~/.sdkman/candidates/java/current/bin/java`, 17.0.7) and `~/.cache/cairn/tla2tools-1.7.4.jar`. When the jar is missing the script prints the download command and exits 2; the script checks SHA-256 `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88` (the official v1.7.4 release, 2,274,532 bytes). Paths can be overridden with `CAIRN_TLA_JAR`, `JAVA`. All TLC intermediates are written under `$TMPDIR/verify-step-claim.*`, never into the repo.
 
-`expected.txt` 每行：配置名、预期结果，预期 FAIL 的还记着反例的动作序列（逗号分隔，不含初始状态）。预期 FAIL 的性质用单线程跑（几百到几千个状态，一两秒），反例是确定的；预期 PASS 的用全部核。
+Each line of `expected.txt`: config name, expected result; expected-FAIL ones also record the counterexample action sequence (comma-separated, excluding the initial state). Expected-FAIL properties run single-threaded (a few hundred to a few thousand states, one or two seconds), and the counterexample is deterministic; expected-PASS ones use all cores.
 
-退出码：
-- 0 = 每条结果与 `expected.txt` 一致，预期 FAIL 的反例动作序列也一致。
-- 1 = 有一条变了：新违反、已知发现不再违反，或已知发现的反例换了一条路径。最后一种也要当回事：同一条性质出现了更短的新路径，或者原路径被堵上、剩下一条更长的。
-- 2 = 工具或模型错误，包括 TLC 报的违反不是这条配置的性质（比如 `TypeOK`）。
+Exit codes:
+- 0 = every result matches `expected.txt`, and expected-FAIL counterexample action sequences match too.
+- 1 = one changed: a new violation, a known finding no longer violating, or a known finding's counterexample took a different path. The last one also counts: the same property now has a shorter new path, or the old path got blocked leaving a longer one.
+- 2 = tool or model error, including TLC reporting a violation that is not this config's property (e.g. `TypeOK`).
 
-脚本最后列出 `sync-commit` 之后改过覆盖文件的提交和未提交改动；`sync-commit` 不在本地历史里（浅克隆）时只打印一行说明。
+At the end the script lists commits and uncommitted changes that touched covered files after `sync-commit`; when `sync-commit` is not in local history (shallow clone) it prints a single note instead.
 
-## 四条性质（一句承诺 + 一句伤害）
+## Four properties (one promise + one harm each)
 
-- **P1 `SingleExecutorPerMachine`**：同一台机器上，同一个步任一时刻最多一个 runStep 在准备或运行。坏了 = 两个 agent 在同一个 worktree（`workspace.ts:122` 按会话号建目录）、同一条分支上同时改代码和推送。
-- **P2 `OnlyHolderResultApplied`**：server 只采纳当前这次领取的执行者的回报。坏了 = 旧执行者的结果把步和卡片改掉，而新执行者还在跑；卡片会在「审核」和「失败」之间被来回改写。
-  - #1473 起幽灵变量的口径（措辞不变）：旧口径「被采纳的回报不是 `holder` 发的就算违反」；新口径多一条例外：`orphan`（发回报的 daemon 已崩溃）在 await 之后的复查里对上了**当前这次领取**，就不算。证据：`orphan` 只能从 `applying` 来，那时 journal 已是 `awaiting`；重启后 recover 起的执行者走 `resumePendingUpload`，重放的是同一份 `doneBody`，两者是同一次执行的同一份结果。没有这条例外，TLC 报的唯一反例就是这条（领取 → 会话 → 收尾 → 所有权校验 → daemon 崩溃 → recover → orphan 落账）。
-- **P3 `NoClaimAfterClose`**：卡片关闭 / 标完成后，这个步不会再变成 claimed。坏了 = 用户关掉的任务又被 agent 领走开工。
-- **P4 `AcceptedStopReachesWorkers`**：daemon 处理过一条停止信号后，本机上为这个步干活的执行者都已被打断。坏了 = 用户关卡后 agent 继续跑完整轮会话（烧额度、推提交、可能开 PR）。
+- **P1 `SingleExecutorPerMachine`**: on one machine, at most one runStep per step is preparing or running at any moment. Broken = two agents editing code and pushing on the same branch in the same worktree (`workspace.ts:122` builds the directory by session number).
+- **P2 `OnlyHolderResultApplied`**: the server only accepts the report from the executor of the current claim. Broken = an old executor's result rewrites the step and card while the new executor is still running; the card flip-flops between "review" and "failed".
+  - The ghost-variable wording since #1473 (unchanged wording): the old wording "a report not sent by the `holder` is a violation"; the new wording adds one exception: an `orphan` (the daemon that sent the report has crashed) does not count if, in the re-check after the await, it matches **the current claim**. Evidence: an `orphan` can only come from `applying`, by which point the journal is already `awaiting`; the executor that `recover` starts after a restart goes through `resumePendingUpload` and replays the same `doneBody`, so the two are the same result of the same execution. Without this exception, the only counterexample TLC reports is exactly this one (claim → session → finish → ownership check → daemon crash → recover → orphan landing).
+- **P3 `NoClaimAfterClose`**: after the card closes / is marked done, this step never becomes claimed again. Broken = a task the user closed gets picked up again by an agent.
+- **P4 `AcceptedStopReachesWorkers`**: after the daemon handles a stop signal, every executor working on that step on this machine has been interrupted. Broken = after the user closes the card the agent keeps running the full session round (burning quota, pushing commits, possibly opening a PR).
 
-## 当前结果与已知发现（sync-commit 时）
+## Current results and known findings (at sync-commit)
 
-`P1 PASS`、`P2 PASS`、`P3 PASS`、`P4 PASS`（各 685,236 个不同状态，8 核各十几秒）。F1 / F2 由 #1473 修掉，F3 由停止投递修复修掉（见下）。F3 修复后停止不再经会话句柄投递，模型去掉了 `handle` / `stopReq` 两个变量，状态数从 794,525 降到 685,236。以后哪条变成 FAIL，先按「怎么分辨真 bug 和模型写错」判断；**不要为了让它通过去削弱性质或模型。**
+`P1 PASS`, `P2 PASS`, `P3 PASS`, `P4 PASS` (685,236 distinct states each, ~ten-odd seconds each on 8 cores). F1 / F2 fixed by #1473, F3 fixed by the stop-delivery fix (below). After the F3 fix stop no longer delivers through the session handle, so the model dropped the two variables `handle` / `stopReq`, and the state count dropped from 794,525 to 685,236. If any becomes FAIL later, first judge with "how to tell a real bug from a model mistake"; **do not weaken the property or model to make it pass.**
 
-`sync-commit` 指向 #1495（F3 修复）的 squash 提交 93b9ce21。本仓 squash 合并，分支上的提交号合并后不在 main 上：以后同步模型的改动合并后，把 `sync-commit` 推到那个 squash 提交。
+`sync-commit` points at the squash commit 93b9ce21 of #1495 (the F3 fix). This repo squash-merges, so branch commit ids are not on main after the merge: after syncing a model change post-merge, push `sync-commit` to that squash commit.
 
-F1、F2 已由 #1473 修掉（下面保留原发现，供对照）：
-- daemon `runStep` 入口即起心跳，会话结束与失败回报前各自停，`finally` 兜住其余出口（`runner.ts:423-454`、`failStep` 2338）。模型：`HeartbeatStep` / `KeepsFresh` 在 `preparing` 也成立，`StartSession` 不再清 `beat`。
-- daemon 领取循环：领到的步号已在 `inFlight` 里就什么也不起（`machine-loop.ts:672`），在飞那份就是新这次领取的执行者。模型：`TryClaim` / `TryClaimResponseLost` 在本机有 `Live` 执行者时只把 `holder` 交给它（`Carrier(m)`），不建新执行者、不动 journal。
-- server `finishStep`：步已不是 claimed（记名本机，或已放回、无记名且同团队）就答 ok、只回收 git 凭证（`machines.ts:1788-1799`）；await 之后复查「同机、同一次领取（`claimedAt`）、仍 claimed」，不符就 409，之前不写步 / build / 卡片（`machines.ts:1827-1836`）。模型：`FinishStepOwnedCheck` 在 `sm = m` 或（`sm = NoMachine` 且不是 claimed）时先判 `st`，success 记下 `seen = claims`；`FinishStepApply` 复查不过就丢弃（daemon 侧 = done 失败，journal 留着）。
+F1 and F2 were fixed by #1473 (the original findings are kept below for comparison):
+- The daemon starts the heartbeat at `runStep` entry, stops it before session end and before the failure report, and `finally` catches the remaining exits (`runner.ts:423-454`, `failStep` 2338). Model: `HeartbeatStep` / `KeepsFresh` hold in `preparing` too, `StartSession` no longer clears `beat`.
+- The daemon claim loop: if the claimed step id is already in `inFlight`, start nothing (`machine-loop.ts:672`); the in-flight one is executor of this new claim. Model: `TryClaim` / `TryClaimResponseLost`, when this machine has a `Live` executor, only hand `holder` to it (`Carrier(m)`), create no new executor, touch no journal.
+- Server `finishStep`: if the step is no longer claimed (registered to this machine, or already released, or unregistered and same-team), answer ok and only reclaim the git credential (`machines.ts:1788-1799`); the post-await re-check "same machine, same claim (`claimedAt`), still claimed", mismatch = 409, before that no step / build / card writes (`machines.ts:1827-1836`). Model: `FinishStepOwnedCheck` judges `st` first when `sm = m` or (`sm = NoMachine` and not claimed), success records `seen = claims`; `FinishStepApply` discards when the re-check fails (daemon side = done failed, journal retained).
 
-**F1（P1，已修）同机重领，同一步两个执行者。**
-1. 机器 m1 的 daemon 领到步（`tryClaim`），runStep 开始准备工作区（clone / 等同项目锁 / `.agents/setup`，后者上限 20 分钟）。
-2. 心跳计时器在准备完成后才启动（`runner.ts:1133`），所以 120 秒内没有任何心跳落地。
-3. 调度一拍：步 claimed、心跳超 120 秒、`lastHeartbeatAt` 从未推进 → `sweepAbandonedBuildSteps` 在机器**在线**时也把它放回 pending、清掉 `machineId`，并唤醒等待中的领取请求。
-4. 同一台 daemon 的领取循环立刻又领到它（归属机只有 m1；领取循环不查这个步是否已在本机跑，`machine-loop.ts:666-689`）→ 第二个 runStep。
-笔记本合盖或断网超过 150 秒也能走到这里（机器先被 `sweepStaleMachines` 翻离线，再被释放）。
+**F1 (P1, fixed) same-machine re-claim, two executors on one step.**
+1. Machine m1's daemon claims the step (`tryClaim`), runStep starts preparing the workspace (clone / wait for the project lock / `.agents/setup`, the latter up to 20 minutes).
+2. The heartbeat timer starts only after preparation finishes (`runner.ts:1133`), so no heartbeat lands for 120 seconds.
+3. One scheduler tick: step claimed, heartbeat over 120s, `lastHeartbeatAt` never advanced → `sweepAbandonedBuildSteps` releases it back to pending and clears `machineId` even while the machine is **online**, and wakes the waiting claim requests.
+4. The same daemon's claim loop claims it again immediately (only m1 is the home machine; the claim loop does not check whether this step is already running on this machine, `machine-loop.ts:666-689`) → a second runStep.
+A laptop lid close or over 150s of network loss also reaches here (the machine is first flipped offline by `sweepStaleMachines`, then released).
 
-**F2（P2，已修）旧执行者的回报被采纳。** 接 F1 第 4 步：第一个 runStep 准备失败（比如 setup 失败）报 `done(failed)` → `ownedStep` 只比机器号（`machines.ts:1265-1270`）→ 采纳，步变 failed、卡片变 failed，而第二个 runStep 还在跑。`finishStep` / `completeStep` 都不检查步当前状态，第二个执行者之后的回报同样被采纳。单次领取也能违反（交接时用诊断不变式确认过，时间窗窄）：success 回报通过 `ownedStep` 后在 await（`mergedPrElsewhere` 查 GitHub / `applyMergeLanding`）期间，扫尾把步放回 pending，await 结束后照样写成 done。
+**F2 (P2, fixed) an old executor's report is accepted.** Continuing F1 step 4: the first runStep's preparation fails (e.g. setup failure) and reports `done(failed)` → `ownedStep` only compares the machine id (`machines.ts:1265-1270`) → accepted, step failed, card failed, while the second runStep is still running. Neither `finishStep` nor `completeStep` checks the step's current status, so the second executor's later report is accepted too. A single claim can also violate (confirmed with a diagnostic invariant during handoff, the window is narrow): a success report passes `ownedStep`, and during the await (`mergedPrElsewhere` querying GitHub / `applyMergeLanding`) the sweep releases the step back to pending, and after the await it still lands as done.
 
-**F4（无性质覆盖，推断）回报丢一次，步就一直卡在执行中。** 模型里用诊断不变式走到过这条 8 步路径，真代码没跑过：
-1. 会话开始，心跳已落地（`lastHeartbeatAt` 推进过）。
-2. 断网，会话结束，`client.done` 抛错（`machine-client.ts` 的 `request` 不重试），runner 留着 journal 直接返回（`runner.ts:2228-2234`）。
-3. 网络恢复，presence 照常，机器在线。
-4. 扫尾：心跳超时，但机器在线且心跳推进过 → 当成歧义态不动（`builds.ts:1515-1524`）。没有执行者，也没有人补报，直到 daemon 重启走 recover。
-四条性质都是安全性质，抓不到「一直不前进」；要抓需要加带公平性假设的活性性质（见「不在范围」）。
+**F4 (no property covers it, inferred) a report lost once, the step stuck in executing forever.** The model reached this 8-step path with a diagnostic invariant; the real code was never run:
+1. Session started, heartbeat landed (`lastHeartbeatAt` advanced).
+2. Network loss, session ends, `client.done` throws (`machine-client.ts`'s `request` does not retry), the runner keeps the journal and returns directly (`runner.ts:2228-2234`).
+3. Network recovers, presence normal, machine online.
+4. Sweep: heartbeat timed out, but the machine is online and the heartbeat had advanced → treated as an ambiguous state, untouched (`builds.ts:1515-1524`). No executor, no one re-reports, until the daemon restarts and recover runs.
+All four properties are safety properties and cannot catch "never progresses"; catching that needs a liveness property with a fairness assumption (see "not in scope").
 
-**F3（P4，已修）准备期收到的停止信号被丢掉。**
-修复前（23a39da9）：步已被 m1 领走、runStep 还在准备（会话句柄要到开会话后才登记）时用户关卡 → `stopActiveStepsAfterExit` 写 `stop_pending` 并推 stop 事件 → daemon `deliverStop` 经 `fetchStop` 拉到 discard，server 随即删掉 `stop_pending` 行 → `sessionHandles.get(stepId)` 为空，记一行 `stop dropped (no live session)` 就返回 → 会话照常开始并跑完，回报 success。同一结局还有两条路径：F1 的双执行者状态下停止只投到最新登记的那个会话（`sessionHandles` 按步号覆盖；#1473 后同机不再有双执行者）；关卡后 daemon 崩溃重启，recover 按 journal 把这一步重跑，而 server 的停止记录已删。
-修复（server 的拉取即确认不变，`fetchStop` 照旧删行）：
-1. 停止投给 run，不投给会话句柄（`apps/daemon/src/step-stops.ts`）。runStep 进门登记本次 run 的停止位（`runner.ts:437`），`deliverStop` 找到这一步在本机的停止位就投递（`machine-loop.ts:529-534`），找不到照旧记 `stop dropped (no live session)`。会话未开时只记下请求；会话循环每一轮开头查到请求就不再开会话（`runner.ts:1451`），直接走正常收尾：discard 回退、回传 transcript、报 `done(stopped)`。开会话途中到的，会话一开即中断（`runner.ts:1494`）。收尾读停止位时 settle 并注销（`runner.ts:1832`），之后到的停止找不到它。
-2. 停止位接收请求时同步写 journal 的 `stopRequest`，中断调用抛错时抹掉（`runner.ts:437-445`；写失败只记日志，不挡投递）。recover 见到 journal 里的停止，把它预置进 runStep（`machine-loop.ts:463`，`opts.stopRequest`），这一轮不开会话、按 stopped 收尾，discard 照常回退；awaiting-upload 残留仍按快照补报（会话已跑完，完成优先）。
-验证：P4 PASS；把修复在模型里退回会再报违反（见「证明检查能失败」）。测试先红后绿：`apps/daemon/test/machine-stop.test.ts`「已接收的停止送达本机这一步的 run（F3）」、`runner-network-retry.test.ts` 失败方式 5b、`machine-recover.test.ts` 两条「重启前已接收停止」。
+**F3 (P4, fixed) a stop signal received during preparation is dropped.**
+Before the fix (23a39da9): the step is claimed by m1, runStep is still preparing (the session handle registers only after the session opens) and the user closes the card → `stopActiveStepsAfterExit` writes `stop_pending` and pushes a stop event → the daemon's `deliverStop` pulls it via `fetchStop` and discards it, the server deletes the `stop_pending` row right away → `sessionHandles.get(stepId)` is empty, it records a `stop dropped (no live session)` line and returns → the session starts and finishes normally, reporting success. Two more paths reach the same outcome: under F1's two-executor state a stop only delivers to the latest registered session (`sessionHandles` overwrites per step id; after #1473 a machine no longer has two executors); the daemon crashes and restarts after the close, recover re-runs this step per the journal, and the server's stop record is already deleted.
+Fix (the server's pull-is-ack unchanged, `fetchStop` still deletes the row):
+1. Stop delivers to the run, not the session handle (`apps/daemon/src/step-stops.ts`). runStep registers this run's stop bit on entry (`runner.ts:437`); `deliverStop` delivers when it finds this step's stop bit on this machine (`machine-loop.ts:529-534`), otherwise it still records `stop dropped (no live session)`. Before the session opens it only records the request; the session loop checks for the request at the top of each round and, when found, does not open a session (`runner.ts:1451`) and goes straight to the normal finish: discard rollback, transcript upload, report `done(stopped)`. One arriving mid-session-start interrupts the session as soon as it opens (`runner.ts:1494`). The finish reads the stop bit and settles and unregisters it (`runner.ts:1832`); a stop arriving after that finds nothing.
+2. Stop delivery records the request synchronously into the journal's `stopRequest`, and the interrupt-call throw erases it (`runner.ts:437-445`; a write failure only logs, does not block delivery). recover sees the journal's stop and pre-seeds it into runStep (`machine-loop.ts:463`, `opts.stopRequest`), that round does not open a session, finishes as stopped, discard rolls back normally; awaiting-upload residue still reports by snapshot (the session already ran, completion first).
+Verification: P4 PASS; reverting the fix in the model reports a violation again (see "prove the check can fail"). Tests first red then green: `apps/daemon/test/machine-stop.test.ts` "the accepted stop reaches this step's run on this machine (F3)", `runner-network-retry.test.ts` failure mode 5b, `machine-recover.test.ts` two "stop accepted before restart" tests.
 
-### 复现证据（23a39da9 时实测，F1 / F2 修复前）
+### Reproduction evidence (measured at 23a39da9, before the F1 / F2 fix)
 
-测试源码、输出和 `run.sh` 的输出存在 `docs/verify/step-claim-tla/`：`repro-server.test.ts.txt`、`repro-daemon.test.ts.txt`（复现时去掉 `.txt` 放回 `apps/server/test/`、`apps/daemon/test/` 跑，跑完删掉，不进产品测试集）、`repro-output.txt`、`run-full.txt`、`run-p3-break.txt`。
+Test source, output, and `run.sh` output stored under `docs/verify/step-claim-tla/`: `repro-server.test.ts.txt`, `repro-daemon.test.ts.txt` (drop the `.txt` back into `apps/server/test/`, `apps/daemon/test/` to run, delete after running, they do not enter the product test set), `repro-output.txt`, `run-full.txt`, `run-p3-break.txt`.
 
-- server 半（F1 / F2）：在 `apps/server/test/` 下用 `bootServer()` 建一台在线机器 + 归属该机的 agent + pending build 步；`claimStep` → 推进 121 秒跑 `sweepAbandonedBuildSteps` → 步变 pending、`machineId` 清空 → 同机 `claimStep` 返回同一步 → 旧执行者 `heartbeatStep` 被接受 → 旧执行者 `finishStep(success)` 被接受（步 done、卡片 review）→ 新执行者 `finishStep(failed)` 也被接受（步 failed、卡片 failed）。
-- daemon 半（F1）：`apps/daemon/test/machine-loop-harness.ts` 的 `FakeMachineApi`，`mePatch = { maxConcurrent: 1 }`，两次推同一个 `CLAIMED`（步 s1）→ `createSession` 被调用 2 次、两次 `done(success)`。
-- daemon 半（F3）：同一 harness，`createSession` 挂住期间推 `{type:'stop', stepId:'s1'}`、`stopResponse = true` → 日志 `stop dropped (no live session)` → 放开后回报 `done(success)`，会话 `stop()` 调用 0 次。修复时改写成提交的测试，断言修复后的行为（见 F3「验证」）。
+- Server half (F1 / F2): under `apps/server/test/` use `bootServer()` to build an online machine + an agent bound to it + a pending build step; `claimStep` → advance 121s and run `sweepAbandonedBuildSteps` → step back to pending, `machineId` cleared → a same-machine `claimStep` returns the same step → the old executor's `heartbeatStep` accepted → the old executor's `finishStep(success)` accepted (step done, card review) → the new executor's `finishStep(failed)` also accepted (step failed, card failed).
+- Daemon half (F1): `FakeMachineApi` from `apps/daemon/test/machine-loop-harness.ts`, `mePatch = { maxConcurrent: 1 }`, push the same `CLAIMED` twice (step s1) → `createSession` called 2 times, two `done(success)`.
+- Daemon half (F3): the same harness, while `createSession` is hung push `{type:'stop', stepId:'s1'}`, `stopResponse = true` → log `stop dropped (no live session)` → after releasing, report `done(success)`, session `stop()` called 0 times. At fix time, rewrite into the committed test asserting the fixed behavior (see F3 "verification").
 
-## 怎么分辨真 bug 和模型写错
+## How to tell a real bug from a model mistake
 
-TLC 报违反时，脚本打印反例：每一步是模型里的动作名，下面是这一步改变的变量。拿下面的动作对照表，逐步问「代码里这一步真能在这个状态下发生吗」：
+When TLC reports a violation, the script prints the counterexample: each step is an action name from the model, below it the variables this step changed. Take the action correspondence table below and ask step by step "can this step really happen from this state in the code":
 
-- 每一步都能在代码里找到对应、且前置条件在代码里也成立 → 真 bug。用代码里的名词写成步骤（像上面的 F1-F3），报告给用户，**不改业务代码**，除非用户要求。
-- 某一步在代码里不可能（前置条件比代码宽、把代码里一个同步块拆成了两步、漏了代码里的某个检查）→ 模型写错。改模型，写清楚错在哪，再跑。
-- 拿不准时写一个不提交的复现测试（见上面三条的搭法），用真代码走一遍。
+- Every step maps to something in the code and its preconditions hold in the code too → real bug. Write the steps in the code's own terms (like F1-F3 above), report to the user, **do not change business code** unless the user asks.
+- A step is impossible in the code (precondition looser than the code, one code-side synchronous block split into two steps, a code-side check missing from the model) → model mistake. Fix the model, document what was wrong, run again.
+- When unsure, write an uncommitted reproduction test (using the three setups above) and walk the real code.
 
-## 动作 ↔ 代码对照（`runner.ts` / `machine-loop.ts` 行号为 F3 修复时，其余为 sync-commit 时）
+## Action ↔ code correspondence (line numbers for `runner.ts` / `machine-loop.ts` are at the F3 fix, the rest are at sync-commit)
 
-server 是单进程、better-sqlite3 同步写：两个 `await` 之间的代码不会被别的请求插进来。模型按 `await` 切原子步，这是忠实度的核心。
+The server is single-process, better-sqlite3 synchronous write: code between two `await`s cannot be interleaved by other requests. The model splits atomic steps by `await`, which is the core of fidelity.
 
-- `TryClaim(m)` / `TryClaimResponseLost(m)`：`apps/server/src/services/machines.ts` `tryClaim`（924）的 worker 分支，`status = pending` 条件写 1077-1091；`claimStep` 长轮询 1240。daemon 侧：`apps/daemon/src/machine-loop.ts` 633 起的循环，步号已在 `inFlight` 就跳过（672，`Carrier(m)`），否则发 runStep → 进门登记停止位（`runner.ts:437`）、`runner.ts:548` `journal.claim`，与领取响应同一同步段。ResponseLost = server 已写 claimed、daemon 没收到响应（B-C7 移交竞态）；本机有在飞执行者时，它照样是这次领取的执行者（server 所有权按机器号判）。
-- `StartSession(e)`：`runner.ts:706` `workspace.prepare` 结束 → 1451 停止位已有请求就不开会话（模型里这个 run 不走 StartSession，由 `FinishSession` 给 stopped）→ 1493 `sessionHandles.set` → 1494 `stop.attach`（开会话途中到的停止在这里兑现）。准备期 = 模型里的 `preparing`。心跳在 runStep 入口（432）就已起，不随会话开始重置。
-- `HeartbeatStep(e)`：`runner.ts:432-434`（失败被吞；`preparing` / `running` 都发）→ `machines.ts:1263` `heartbeatStep`，所有权只看 `ownedStep`（1270，只比机器号）。
-- `FinishSession(e)`：会话结束停心跳（`runner.ts:1803`）、读本次 run 的停止位并 settle（1832）定结果，`journal.update(awaiting-upload)`（2217）。准备期失败走 `failStep`（2338，先停心跳），模型只给 `failed`；准备期停止位有请求 → 1451 不开会话、走同一收尾报 stopped，模型给 `stopped`。`ex[e].halt` = 本次 run 的停止位有请求（会话已开则已中断）。
-- `FinishStepOwnedCheck(e)` / `FinishStepApply(e)`：`machines.ts:1776` `finishStep`。先 `ownedStep`，步已不是 claimed → 只回收凭证、答 ok（1788-1799）。只有 success 回报可能带 `prUrl`（`runner.ts:2206`）或是合并落地，才会在 1813 / 1820 处 await，所以只有 success 被拆成两步；await 后复查同机、同 `claimedAt`、仍 claimed，不符 409（1827-1836）；其余结果校验和写入在同一同步块。写入：配额 → `quota-wait.ts:87` `applyQuotaWaitStep`；success → `builds.ts:1611` `completeStep`；stopped → `builds.ts:292` `applyStoppedStep`；failed → `builds.ts:1407` `applyStepFailure`；全部先清 `stop_pending`（`machines.ts:1938`）。
-- `SchedulerTick`：`apps/server/src/services/scheduler.ts:130` `tick` 一整拍原子，按 179 `sweepStaleMachines`（`machines.ts:646`）→ 186 `sweepAbandonedBuildSteps`（`builds.ts:1482`：先停已关 / 已完成卡片的 pending / waiting_quota 残留，再判 claimed：心跳超时且（机器离线或心跳从未推进）→ 已关卡片 `stopStepKeepPhase`（1522 → 414），否则 `releaseClaimedStep`（1532））→ 192 `sweepQuotaWaitSteps`（`quota-wait.ts:142`）的顺序。
-- `CloseCard`：`builds.ts:465` `stopActiveStepsAfterExit` → 469 `prepareStopFor`：pending / waiting_quota 即停，claimed 写 `stop_pending` + `stopSignal`。
-- `DeliverStopFetch(m)` / `DeliverStopToRun(m)`：`machine-loop.ts:525` `deliverStop` 先 `await client.stop` → `machines.ts:254` `fetchStop`（claimed + 机器号匹配才返回并删行），再在同一同步段里找到这一步在本机还没 settle 的停止位（529）、记下请求并写 journal `stopRequest`（534 `RunStop.deliver` → `runner.ts:437-445`；模型 `jstop`，本机 Working 执行者 `halt`，按 P1 至多一个），然后中断已开的会话。
-- `MarkPresence(m)` / `PresenceAges(m)`：`machines.ts:577` `markPresence`；daemon 启动时一次（`machine-loop.ts:304`），之后 30 秒定时器（577，recover 结束后才启动）。
-- `DaemonCrash(m)` / `DaemonStartRecover(m)` / `DaemonRecoverDone(m)`：`machine-loop.ts:429` recover，`machines.ts:669` `recoverSteps`（claimed + 本机）；有 journal 时：awaiting-upload 只补报，否则 `await runStep`，journal 带 `stopRequest` 时预置进去（463；模型里新执行者 `halt = jstop`）；没有 journal 就报 failed；recover 期间不推送流、不发 presence、不领取。journal 在磁盘上，`jstop` 跨崩溃保留。
-- `MachineStreamAbort(m)`：`apps/server/src/routes-machine.ts:317` 推送流 `onAbort` 立即 `markOffline`，并丢掉还没送到的 stop 事件。模型允许它在机器在线的任何时刻发生（daemon 退出、断网、代理掐断长连接、server 重启都会触发）。
-- `DaemonCrash(m)` 时正在被 server 处理的回报（`applying`）变成 `orphan`：server 照常走完（复查过了就写，没过就 409 丢掉），但发请求的进程已经没了，所以不再动这台机器的 journal（含 `jstop`）。
-- `HeartbeatAges`、`QuotaProbeDue`、`Partition(m)`、`Reconnect(m)`、`RebindHomeMachine(m)`：时间流逝 / 网络 / 用户改 agent 归属机。
+- `TryClaim(m)` / `TryClaimResponseLost(m)`: the worker branch of `apps/server/src/services/machines.ts` `tryClaim` (924), the `status = pending` condition at 1077-1091; `claimStep` long polls 1240. Daemon side: the loop starting `apps/daemon/src/machine-loop.ts` 633, if the step id is already in `inFlight` skip (672, `Carrier(m)`), otherwise start runStep → register the stop bit on entry (`runner.ts:437`), `runner.ts:548` `journal.claim`, in the same synchronous segment as the claim response. ResponseLost = the server already wrote claimed, the daemon did not receive the response (the B-C7 handoff race); when this machine has an in-flight executor, it is still the executor of this claim (server ownership judges by machine id).
+- `StartSession(e)`: `runner.ts:706` `workspace.prepare` ends → 1451 with a pending stop-bit request it does not open a session (in the model this run does not take StartSession, `FinishSession` gives stopped) → 1493 `sessionHandles.set` → 1494 `stop.attach` (a stop arriving mid-session-start lands here). Preparation period = `preparing` in the model. The heartbeat starts at runStep entry (432), not reset by session start.
+- `HeartbeatStep(e)`: `runner.ts:432-434` (failure swallowed; sent in both `preparing` / `running`) → `machines.ts:1263` `heartbeatStep`, ownership only via `ownedStep` (1270, machine id only).
+- `FinishSession(e)`: session end stops the heartbeat (`runner.ts:1803`), reads this run's stop bit and settles (1832) to decide the result, `journal.update(awaiting-upload)` (2217). Preparation failure goes through `failStep` (2338, stops the heartbeat first), the model only gives `failed`; a pending stop-bit request during preparation → 1451 does not open a session, takes the same finish reporting stopped, the model gives `stopped`. `ex[e].halt` = this run's stop bit has a request (already interrupted if the session opened).
+- `FinishStepOwnedCheck(e)` / `FinishStepApply(e)`: `machines.ts:1776` `finishStep`. First `ownedStep`, step no longer claimed → only reclaim the credential, answer ok (1788-1799). Only a success report can carry `prUrl` (`runner.ts:2206`) or be a merge landing, so only it awaits at 1813 / 1820, hence only success splits into two steps; after the await re-check same machine, same `claimedAt`, still claimed, mismatch 409 (1827-1836); the rest validated and written in one synchronous block. Writes: quota → `quota-wait.ts:87` `applyQuotaWaitStep`; success → `builds.ts:1611` `completeStep`; stopped → `builds.ts:292` `applyStoppedStep`; failed → `builds.ts:1407` `applyStepFailure`; all clear `stop_pending` first (`machines.ts:1938`).
+- `SchedulerTick`: `apps/server/src/services/scheduler.ts:130` `tick` one whole atomic tick, in order 179 `sweepStaleMachines` (`machines.ts:646`) → 186 `sweepAbandonedBuildSteps` (`builds.ts:1482`: first stop the pending / waiting_quota residue of closed / completed cards, then judge claimed: heartbeat timed out and (machine offline or heartbeat never advanced) → closed card `stopStepKeepPhase` (1522 → 414), otherwise `releaseClaimedStep` (1532)) → 192 `sweepQuotaWaitSteps` (`quota-wait.ts:142`).
+- `CloseCard`: `builds.ts:465` `stopActiveStepsAfterExit` → 469 `prepareStopFor`: pending / waiting_quota stop immediately, claimed writes `stop_pending` + `stopSignal`.
+- `DeliverStopFetch(m)` / `DeliverStopToRun(m)`: `machine-loop.ts:525` `deliverStop` first `await client.stop` → `machines.ts:254` `fetchStop` (returns and deletes the row only when claimed + machine id matches), then in the same synchronous segment find this step's not-yet-settled stop bit on this machine (529), record the request and write journal `stopRequest` (534 `RunStop.deliver` → `runner.ts:437-445`; model `jstop`, this machine's Working executor `halt`, at most one by P1), then interrupt an open session.
+- `MarkPresence(m)` / `PresenceAges(m)`: `machines.ts:577` `markPresence`; once at daemon start (`machine-loop.ts:304`), then a 30s timer (577, starting only after recover ends).
+- `DaemonCrash(m)` / `DaemonStartRecover(m)` / `DaemonRecoverDone(m)`: `machine-loop.ts:429` recover, `machines.ts:669` `recoverSteps` (claimed + this machine); with a journal: awaiting-upload only re-reports, otherwise `await runStep`, pre-seeding the stop request when the journal carries `stopRequest` (463; in the model the new executor `halt = jstop`); no journal → report failed; during recover no stream push, no presence, no claim. The journal is on disk, `jstop` survives the crash.
+- `MachineStreamAbort(m)`: `apps/server/src/routes-machine.ts:317` the push stream's `onAbort` immediately `markOffline` and drops stop events not yet delivered. The model allows it at any moment while the machine is online (daemon exit, network loss, proxy killing the long connection, server restart all trigger it).
+- A report being handled by the server (`applying`) when `DaemonCrash(m)` happens becomes an `orphan`: the server still walks through (writes if the re-check passed, drops with 409 otherwise), but the sending process is gone, so this machine's journal (including `jstop`) is no longer touched.
+- `HeartbeatAges`, `QuotaProbeDue`, `Partition(m)`, `Reconnect(m)`, `RebindHomeMachine(m)`: time passing / network / the user re-binding an agent's home machine.
 
-## 边界与假设
+## Bounds and assumptions
 
-- 规模：2 台机器（m1 是初始归属机），1 个任务 1 个 build 1 个步，最多 2 次执行（`ExecIds = {1, 2}`、`MaxClaims = 2`：两次领取，或一次领取 + 一次 recover），断网最多 1 次，daemon 崩溃最多 1 次，改绑归属机最多 1 次。超出这些界的顺序没查。通过 = 在这个界内所有顺序都满足，不是整个系统正确。
-- 时间不建钟表：「有一个在跑的执行者在本机、网络通、心跳已经落过地」时心跳视为新鲜（30 秒一拍 ≪ 120 秒阈值），否则可以超时；presence 同理（30 秒 ≪ 150 秒）。这依赖事件循环不被卡住 90 秒以上。
-- 一台机器同时只有一个 daemon（`apps/daemon/src/supervisor.ts:32` 单实例锁）；daemon 崩溃时它的执行者一起结束（claude-code 子进程会不会成为孤儿进程未核实）。
-- 停止事件只在关卡那一刻推给当时在线、处于 up 状态的 daemon；断线后不重放（代码如此，模型如此）。
-- 拉取响应在 daemon 收到之前丢掉（崩溃、断线）时停止也丢：server 已删行，journal 还没写。模型里这时 `stopDelivered` 不置位，P4 不算它。
-- 状态视图 `StateView` 去掉了不影响后续行为的字段（非 claimed 时的心跳位、非 waiting_quota 时的探测位、非 awaiting 时的 journal 结果），只用于去重。
-- 只区分卡片「仍在执行」和「已离开执行」（`builds.ts:194` `hasLeftExecution`）；P3 / P4 只看后者。
+- Scale: 2 machines (m1 is the initial home machine), 1 task 1 build 1 step, at most 2 executions (`ExecIds = {1, 2}`, `MaxClaims = 2`: two claims, or one claim + one recover), network loss at most once, daemon crash at most once, home-machine re-bind at most once. Orderings beyond these bounds are not checked. Pass = all orderings within these bounds satisfy the properties, not that the whole system is correct.
+- Time has no clock model: "a running executor on this machine, network up, heartbeat has landed before" counts the heartbeat as fresh (30s beat ≪ 120s threshold), otherwise it can time out; presence likewise (30s ≪ 150s). This relies on the event loop not being blocked for over 90 seconds.
+- One machine has one daemon at a time (`apps/daemon/src/supervisor.ts:32` single-instance lock); when the daemon crashes its executors end with it (whether the claude-code subprocess becomes an orphan process is unverified).
+- The stop event only pushes at close-moment to daemons that are online and in the up state; no replay after disconnect (code does this, model does this).
+- A stop is also lost when the pull response is dropped before the daemon receives it (crash, disconnect): the server already deleted the row, the journal not yet written. In the model `stopDelivered` is then unset and P4 does not count it.
+- The state view `StateView` drops fields that do not affect later behavior (the heartbeat bit when not claimed, the probe bit when not waiting_quota, the journal result when not awaiting), used only for dedup.
+- Only the card's "still executing" vs "left execution" is distinguished (`builds.ts:194` `hasLeftExecution`); P3 / P4 only look at the latter.
 
-**不在范围**：活性（「最终会前进 / 最终会被停下」），所以 F4 这类卡死只能靠诊断不变式看到；chief 步（`chief.ts` 另一套扫尾）；并发上限闸、能力 / runtime 闸、模型位缺失；同一 build 内多个步的先后（plan → build → review）；重开 / 新建 build、定时重跑；CI 磨绿环；steer；旧 daemon 的文本分类配额挂起（`holdStepForQuota`，靠 60 秒退避 > 15 秒 tick 的时序保护，无钟模型表达不了）；停止事件因断线丢失后无人重发（会让关卡后的步跑完整轮，模型里没设性质抓它）；回报被 409 拒掉后（await 期间换了领取），新这次领取没人跑，要等心跳超时被扫尾放回再领（活性，不查）；跨机器的双执行（断网期间改绑归属机后两台机器各跑一份是租约机制绕不开的，P1 只管同机）；server 多实例同库；daemon 孤儿子进程。
+**Not in scope**: liveness ("eventually progresses / eventually gets stopped"), so F4-style stalls are only visible via a diagnostic invariant; chief steps (`chief.ts` has a separate sweep); the concurrency-cap gate, capability / runtime gates, missing model slot; ordering of multiple steps in one build (plan → build → review); reopen / new build, scheduled re-runs; the CI green-wash loop; steer; the old daemon's text-classifier quota hold (`holdStepForQuota`, protected by the 60s backoff > 15s tick timing, which a clock-less model cannot express); a stop event lost to disconnect with no one re-sending it (lets a post-close step run a full round, the model sets no property to catch it); after a report is 409-rejected (claim changed during the await), no one runs the new claim and it waits for the heartbeat timeout sweep to release and re-claim (liveness, not checked); cross-machine dual execution (after re-binding the home machine during network loss, two machines each running one copy is unavoidable for the lease mechanism, P1 only covers same-machine); multiple server instances on one DB; daemon orphan subprocesses.
 
-## 更新验证（代码改了之后）
+## Update verification (after a code change)
 
-1. 跑 `run.sh`，记下结果。末尾会列出 `sync-commit` 之后改过覆盖文件的提交，逐个读 diff。
-2. 对每个改动判断：不影响模型（文案、无关字段）/ 模型需要跟着改（原子步拆分或合并、条件变了、新路径写同一批字段）/ 承诺本身有意改变（要有提交说明、测试或文档为证）/ 可能破坏承诺（没有证据说有意）。
-3. 按代码改模型，不按结果改：先写好再跑。一个代码同步块仍是一个模型动作；新增 `await` 就拆动作。动作名保持与代码函数名对应，并更新上面的对照表行号。
-4. 只有承诺有意改变才改性质：在本文件写下旧措辞、新措辞和证据。不缩小界，除非改动让界失效；缩小了要在报告里说。
-5. 重跑。结果变了：FAIL → PASS 要先确认代码确实修了，再把破坏动作在代码里重做一遍、确认模型仍能报出（见下节），然后改 `expected.txt`；PASS → FAIL 按「怎么分辨真 bug 和模型写错」处理。
-6. 确认模型描述的是新提交的代码之后，才把下面的 `sync-commit` 推到那个提交，并更新「当前结果与已知发现」。
+1. Run `run.sh`, record the result. The end lists commits after `sync-commit` that touched covered files; read each diff.
+2. Judge each change: does not affect the model (copy, unrelated fields) / the model must follow (atomic step split or merge, a condition changed, a new path writing the same fields) / the promise intentionally changed (must have a commit note, test, or doc as evidence) / may break the promise (no evidence of intent).
+3. Change the model per the code, not per the result: write first then run. One code synchronous block stays one model action; a new `await` splits the action. Keep action names matching code function names, and update the correspondence table line numbers above.
+4. Only change a property when the promise intentionally changed: write the old wording, new wording, and evidence in this file. Do not shrink bounds unless the change makes them invalid; if shrunk, say so in the report.
+5. Re-run. Result changed: FAIL → PASS must first confirm the code really fixed it, then redo the breaking action in the code and confirm the model still reports it (next section), then update `expected.txt`; PASS → FAIL handled by "how to tell a real bug from a model mistake".
+6. After confirming the model describes the newly committed code, push `sync-commit` below to that commit and update "current results and known findings".
 
-## 证明检查能失败（交接时做过一次）
+## Prove the check can fail (done once at handoff)
 
-在真代码里把 `apps/server/src/services/builds.ts:1522` 的「已关 / 已完成卡片的失联 claimed 步 → `stopStepKeepPhase`」改成一律 `releaseClaimedStep`，按第 3 步把模型 `SchedulerTick` 里 `stopIt` / `release` 的判定跟着改（`release == stale`、`stopIt == FALSE`），跑 `run.sh P3_NoClaimAfterClose`：模型没改时 P3 仍通过，但末尾提示 `builds.ts` 有未提交改动；模型跟改后 P3 报违反（领取 → 推送流断开 → 关卡 → 心跳超时 → 扫尾放回 pending → 又被领走），退出 1。输出见 `docs/verify/step-claim-tla/run-p3-break.txt`。撤掉代码和模型两处改动，再跑一遍确认回到 `expected.txt`。P4 见下面 F3 那一段。
+In the real code, change `apps/server/src/services/builds.ts:1522`'s "abandoned claimed step of a closed / completed card → `stopStepKeepPhase`" to always `releaseClaimedStep`, follow step 3 to change the `stopIt` / `release` judgment in the model's `SchedulerTick` (`release == stale`, `stopIt == FALSE`), run `run.sh P3_NoClaimAfterClose`: with the model unchanged P3 still passes, but the end notes `builds.ts` has uncommitted changes; with the model changed P3 reports a violation (claim → stream abort → close → heartbeat timeout → sweep release back to pending → claimed again), exit 1. Output at `docs/verify/step-claim-tla/run-p3-break.txt`. Revert both the code and model changes and run again to confirm it returns to `expected.txt`. P4 is the F3 paragraph below.
 
-#1473 修完 F1 / F2 后各做了一次：
-- P1：把 daemon 领取循环的在飞判断撤掉（模型 `TryClaim` 恒建新执行者），P1 报违反：领取 → 心跳超时 → 扫尾放回 → 同机再领，即原 F1 路径。只有入口心跳不够，`HeartbeatAges` 在第一拍心跳落地前仍可发生（断网同理）。
-- P2：把 `finishStep` await 后的复查撤掉（模型 `FinishStepApply` 恒落账），P2 报违反：领取 → 会话 → 收尾 → 所有权校验 → 心跳超时 → 扫尾放回 → 落账，即原 F2 的单次领取路径。
-- 两处撤回后跑全量，回到 `expected.txt`。真代码一侧的对应断言在 `apps/daemon/test/step-reclaim.test.ts` 与 `apps/server/test/step-claim-report.test.ts`，修复前全红。
+After #1473 fixed F1 / F2, each got one:
+- P1: revert the daemon claim loop's in-flight judgment (model `TryClaim` always creates a new executor), P1 reports a violation: claim → heartbeat timeout → sweep release → same-machine re-claim, i.e. the original F1 path. Entry heartbeat alone is not enough, `HeartbeatAges` can still happen before the first beat lands in the first tick (network loss likewise).
+- P2: revert the post-await re-check in `finishStep` (model `FinishStepApply` always lands), P2 reports a violation: claim → session → finish → ownership check → heartbeat timeout → sweep release → land, i.e. F2's single-claim path.
+- After reverting both, run the full set, returns to `expected.txt`. The corresponding real-code assertions are in `apps/daemon/test/step-reclaim.test.ts` and `apps/server/test/step-claim-report.test.ts`, all red before the fix.
 
-F3 修完后做过一次（P4，模型副本里单线程跑）：
-- `DeliverStopToRun` 只给 `running` 的执行者置 `halt`（停止只到会话已开的 run），P4 报违反：`TryClaim,CloseCard,DeliverStopFetch,DeliverStopToRun`，即准备期丢停止。
-- `DaemonStartRecover` 给新执行者的 `halt` 改成 `FALSE`（recover 不看 journal 里的停止），P4 报违反：`TryClaim,CloseCard,DeliverStopFetch,DeliverStopToRun,DaemonCrash,DaemonStartRecover`，即关卡后崩溃重启。
-- 在 #1473 之前的模型上还有第三条：停止只投给最新登记的执行者，报违反（释放后同机重领再关卡）。#1473 之后同机不会有两个执行者，这条路径不存在，所以代码里一步只有一个停止位。
-- 真代码一侧由 F3「验证」里的测试抓住：去掉会话循环开头的停止检查、去掉 `stop.attach`、或让 `settle` 不注销停止位，对应测试都会红。
+After the F3 fix, once (P4, single-threaded in a model copy):
+- `DeliverStopToRun` only sets `halt` on a `running` executor (stop only reaches a session-already-open run), P4 reports: `TryClaim,CloseCard,DeliverStopFetch,DeliverStopToRun`, i.e. a stop dropped during preparation.
+- `DaemonStartRecover` changes the new executor's `halt` to `FALSE` (recover ignores the journal's stop), P4 reports: `TryClaim,CloseCard,DeliverStopFetch,DeliverStopToRun,DaemonCrash,DaemonStartRecover`, i.e. crash and restart after close.
+- On the pre-#1473 model there is also the third path: stop only delivered to the latest registered executor, reports a violation (release then same-machine re-claim then close). After #1473 a machine has no two executors, that path does not exist, so the code has one stop bit per step.
+- The real-code side is caught by the tests in F3 "verification": removing the stop check at the session-loop top, removing `stop.attach`, or making `settle` not unregister the stop bit, each makes the corresponding test red.
 
-## 覆盖记录
+## Coverage record
 
-`run.sh` 读下面两处：`sync-commit` 行和 `coverage` 代码块（每行两个空格开头的路径）。
+`run.sh` reads two things below: the `sync-commit` line and the `coverage` code block (each line a two-space-indented path).
 
 sync-commit: 93b9ce21
 
@@ -161,4 +161,4 @@ sync-commit: 93b9ce21
   apps/daemon/src/workspace.ts
 ```
 
-覆盖到的函数：`machines.ts` 的 `tryClaim`、`claimStep`、`heartbeatStep`、`ownedStep`、`finishStep`、`fetchStop`、`markPresence`、`sweepStaleMachines`、`recoverSteps`；`builds.ts` 的 `sweepAbandonedBuildSteps`、`releaseClaimedStep`、`stopActiveStepsAfterExit`、`prepareStopFor`、`stopStepKeepPhase`、`applyStoppedStep`、`applyStepFailure`、`completeStep`（只到写步状态与 `hasLeftExecution` 判定）；`quota-wait.ts` 的 `applyQuotaWaitStep`、`sweepQuotaWaitSteps`；`scheduler.ts` 的 `tick` 扫尾顺序；`machine-loop.ts` 的启动 presence、recover（含 `stopRequest` 分支）、`deliverStop`、领取循环；`runner.ts` 的停止位登记与落盘、`journal.claim`、心跳起止、`workspace.prepare` 与会话登记 / 开会话前停止检查的先后、停止位读取、收尾回报；`journal.ts` 的状态与 `stopRequest`；`step-stops.ts` 的 `RunStop`、`StepStops`；`workspace.ts` 的会话目录与项目锁。
+Covered functions: `machines.ts`'s `tryClaim`, `claimStep`, `heartbeatStep`, `ownedStep`, `finishStep`, `fetchStop`, `markPresence`, `sweepStaleMachines`, `recoverSteps`; `builds.ts`'s `sweepAbandonedBuildSteps`, `releaseClaimedStep`, `stopActiveStepsAfterExit`, `prepareStopFor`, `stopStepKeepPhase`, `applyStoppedStep`, `applyStepFailure`, `completeStep` (only up to the step-status write and the `hasLeftExecution` judgment); `quota-wait.ts`'s `applyQuotaWaitStep`, `sweepQuotaWaitSteps`; `scheduler.ts`'s `tick` sweep order; `machine-loop.ts`'s startup presence, recover (including the `stopRequest` branch), `deliverStop`, claim loop; `runner.ts`'s stop-bit registration and disk write, `journal.claim`, heartbeat start/stop, `workspace.prepare` and session registration / the pre-session-open stop check ordering, stop-bit read, finish report; `journal.ts`'s status and `stopRequest`; `step-stops.ts`'s `RunStop`, `StepStops`; `workspace.ts`'s session directory and project lock.

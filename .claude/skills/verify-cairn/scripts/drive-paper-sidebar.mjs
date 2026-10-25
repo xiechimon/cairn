@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn probe — Paper Grouped sidebar (plan PR 5) live evidence.
-// Seeds three projects + todos over REST, moves four todos into gate /
-// running / done phases with a direct UPDATE on the scratch SQLite (the
-// live server answers 409 to manual gate-phase PATCHes), then walks the
-// sidebar with real clicks in the light theme: expanded, 资源 opened,
-// 需要我处理 filter (and the chip back out), collapsed rail. Asserts counts
-// against the board's own column counts and the URL/aria state.
-// Stack must already run (launch.mjs; VERIFY_REPO_ROOT for worktree lanes).
-// Evidence (screenshots + result.json) lands in VERIFY_EVIDENCE_DIR.
-// Run with the proxy env unset.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -53,7 +43,6 @@ const api = async (method, path, body) => {
 const requireServer = createRequire(join(ROOT, 'apps', 'server', 'package.json'));
 const Database = requireServer('better-sqlite3');
 
-// —— seed ——
 const PROJECTS = [
   { name: 'cairn', todos: ['侧栏改版验收 A', '侧栏改版验收 B', '侧栏改版验收 C'] },
   { name: 'cairn-gh-probe', todos: ['探针任务 D', '探针任务 E'] },
@@ -80,7 +69,6 @@ for (const row of created) {
 const dbRows = db.prepare('SELECT id, title, phase, projectId FROM todo ORDER BY title').all();
 db.close();
 
-// —— browser ——
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
   viewport: { width: 1440, height: 732 },

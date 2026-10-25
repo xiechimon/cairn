@@ -1,34 +1,3 @@
-// verify-cairn 定制 probe（#1025 首轮规划提示词注入 plan.md 契约）：契约
-// 此前只存在于纠错提示词（补写轮 #113 / 驳回重规划 / 审核打回 / 失败重启），
-// 首个 plan 步 prompt=null、agent 只拿到 title+spec——写不写 plan.md 全凭模型
-// 自觉（#892 实测 28 build / 0 行 plan.md 的结构性根因）。本 probe 在活栈上把
-// 「契约真的进了首轮会话」证成实物（机制生效验收取实物，读码不算）：真
-// daemon + stub LLM + Playwright 浏览器面。两条腿各钉一族失败方式：
-//   A 腿（正向）  stub 首轮即写 plan.md：claim → 真 daemon 认领 → 会话首条
-//                 user 消息 = 任务文本 + 契约指令组合串（从 stub 收到的真实
-//                 请求体断言，非读码「看着像」）→ plan 行 v1 首轮落库 → 恰一
-//                 个 plan 步（无补写轮）→ confirm + hasPlan → wire 行同串 →
-//                 浏览器面 confirm 卡有物 + 组合行不成用户气泡（#612 套娃面）。
-//   B 腿（负对照）stub 收到契约仍不写 plan.md：链路行为有明确定义——
-//                 #113 补写轮入队（第二个 plan 步，prompt = 补写指令）→ 仍无
-//                 物 → #703 闸 1 失败收尾（phase=failed、plan 行 0、
-//                 errorMessage=规划未产出方案）。「缺物必红」，A 腿绿不是表演
-//                 型绿。
-// 失败方式清单（先固化判别面；哪条红即指认断点 hop）：
-//   1. 契约没进首轮会话（主 bug）：stub 首请求 user 消息 = 纯任务文本
-//      （缺契约段）→ A1/A2 红；
-//   2. 组合串形漂移：prompt ≠ composeTaskPromptWithInstruction 单源形状
-//      （taskText 前缀 + \n\n + 契约殿后）→ A1 红；
-//   3. wire 行与投递不同串：transcript user-<stepId> 行 ≠ 会话首条 → A5 红；
-//   4. 首轮仍未落 plan：plan 行缺席 / 多一个补写步 → A3/A4 红；
-//   5. 组合行冒名用户气泡（#612 套娃复辟）→ A6 红；
-//   6. 负链路失守：首轮不写 plan.md 时补写轮缺位或闸放行（假绿）→ B2/B3 红。
-// 用法（栈须先 launch；配方与判读见 docs/verify/1025/README.md）：
-//   node drive-1025-plan-first-round.mjs
-// env：VERIFY_REPO_ROOT / VERIFY_RUN_DIR / VERIFY_EVIDENCE_DIR、
-//      DAEMON_HOME（缺省 /tmp/cairn-1025-daemon-home）。
-// 探针自 spawn：stub LLM ×2（ephemeral 端口，每腿一只免轮次串扰）+ 真
-// daemon（--server 指向本栈）；收尾全部回收（finally kill）。
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -52,9 +21,7 @@ mkdirSync(EVIDENCE, { recursive: true });
 
 const runTag = Date.now().toString(36);
 const PLAN_FILE_NAME = 'plan.md';
-// 契约期望文本与 shared 单源同串（probe 独立于 daemon 源码重述一遍，断言面
-// 才是「wire 上是什么」而不是「import 什么就是什么」——两边各自出现且逐字
-// 相等才证明注入的是正典契约，而不是别的什么指令）。
+
 const CONTRACT_TEXT = `本步的交接物是 ${PLAN_FILE_NAME}：结束本步前，将方案写入工作区根目录的 ${PLAN_FILE_NAME}（覆盖 Context/Changes/Edge cases/Verification 四段）。`;
 const FOUR_SECTIONS = '（覆盖 Context/Changes/Edge cases/Verification 四段）';
 
@@ -101,9 +68,6 @@ async function jfetch(method, path, opts = {}) {
   }
   return { status: res.status, body };
 }
-
-// —— stub LLM（integration/test/stub-llm.ts 的 .mjs 最小移植，drive-904 同款：
-//    本轮次 + delayMs 门控；call id 每次运行唯一防 message 主键跨运行复用）——
 
 function startStubLlm(responses) {
   const requests = [];
@@ -178,8 +142,6 @@ function startStubLlm(responses) {
   });
 }
 
-// —— plan.md 内容（字节等值断言的期望值；heredoc 写入 = 内容以 \n 结尾）——
-
 function markerOf(leg) {
   return `PLAN-1025-MARKER-${leg}-${runTag}`;
 }
@@ -197,8 +159,6 @@ function writePlanCommand(content) {
   return `cat > ${PLAN_FILE_NAME} <<'PLANEOF'\n${content}PLANEOF`;
 }
 
-// —— user wire 消息文本（openai 双形：纯 string 或 text parts 数组——pi 会话
-//    首条 user 恒走 parts 形，m7-failed-send 同款实测钉）——
 function userWireText(m) {
   if (typeof m.content === 'string') return m.content;
   if (Array.isArray(m.content)) {
@@ -209,8 +169,6 @@ function userWireText(m) {
   }
   return null;
 }
-
-// —— seed / daemon / SQLite（drive-904 同款骨架）—————————————————————
 
 let uniq = 0;
 async function seed(stubUrls) {
@@ -363,8 +321,6 @@ async function waitPhase(todoId, phases, timeoutMs, label) {
   );
 }
 
-// —— main ———————————————————————————————————————————————————————————
-
 rmSync(DAEMON_HOME, { recursive: true, force: true });
 
 const PLAN_A = planDoc();
@@ -377,7 +333,7 @@ const stubA = await startStubLlm([
   { toolCall: { name: 'bash', arguments: { command: writePlanCommand(PLAN_A) } }, delayMs: 1_500 },
   { content: '方案已就绪：请确认。', delayMs: 500 },
 ]);
-// B 腿：收到契约仍不写 plan.md——两轮都只有话、零写类工具行。
+
 const stubB = await startStubLlm([
   { content: '这一轮我不写方案文件。', delayMs: 500 },
   { content: '仍然不写方案文件。', delayMs: 500 },
@@ -388,19 +344,18 @@ const daemon = spawnDaemon(seeded.apiKey, seeded.teamId);
 const browser = await chromium.launch();
 
 try {
-  // vite dev 首访冷编译可达数十秒——先暖机再建任务（drive-918 同款）。
+
   const warm = await browser.newPage();
   await warm.goto(`${WEB}/app`, { waitUntil: 'networkidle', timeout: 90_000 });
   await warm.close();
   await waitFor(() => daemonLogLines().some((l) => l.includes('[wake] push channel connected')), 60_000, 'daemon online');
-  // waitFor 超时即抛 → catch 兜底成红 check；此处再读同一事实让 check 本身承载断言。
+
   check(
     '真 daemon 上线（--server 指本栈，wake 通道连通）',
     daemonLogLines().some((l) => l.includes('[wake] push channel connected')),
     DAEMON_HOME,
   );
 
-  // ——— A 腿：首轮契约注入 + 首轮即落 plan 行 v1 ———
   const taskA = await makeTask(seeded.projects.a, seeded.agents.a, TASK_TITLE_A, TASK_SPEC_A);
   const firstStepA = await waitFor(() => {
     const rows = dbSteps(taskA.buildId);
@@ -408,7 +363,6 @@ try {
   }, 30_000, 'leg A first step row');
   check('A0：withPlan build 首步 kind=plan 且 claim 前零 prompt（server 不动，注入归 daemon）', firstStepA.kind === 'plan' && firstStepA.prompt === null, `kind=${firstStepA.kind} prompt=${JSON.stringify(firstStepA.prompt)}`);
 
-  // 主验收（可断言）：从 stub 收到的真实请求体里抓首轮会话 prompt。
   const reqA = await waitFor(() => stubA.requests[0] ?? null, 120_000, 'leg A first stub request');
   const userTextsA = reqA.messages.filter((m) => m.role === 'user').map(userWireText);
   const firstUserA = userTextsA[0] ?? null;
@@ -440,8 +394,7 @@ try {
     `planSteps=${planStepsA.length} status=${planStepsA[0]?.status}`,
   );
   const promptRowA = dbMessageRows(taskA.buildId).find((m) => m.id === `user-${planStepsA[0].id}`);
-  // message.content 是 drizzle json 列——字符串值带引号存储（#902 实测坑），
-  // canon 比对前先 JSON.parse 剥引号，裸等值恒假阴性。
+
   let rowTextA = null;
   if (typeof promptRowA?.content === 'string') {
     try {
@@ -468,7 +421,7 @@ try {
   await pageA.locator('.detail-chip', { hasText: '确认' }).first().waitFor({ timeout: 30_000 });
   const cardTitle = await pageA.locator('.chat-plan-title').last().innerText();
   check('A6a：web confirm 卡「方案 · v1」上屏（首轮方案有物可看）', cardTitle.includes('方案 · v1'), cardTitle);
-  // 套娃负例（#612 面）：首轮组合行（任务文本 + 契约指令）不成用户气泡。
+
   const bubbleWithTask = await pageA.getByTestId('user-bubble').filter({ hasText: TASK_TITLE_A }).count();
   const bubbleWithContract = await pageA.getByTestId('user-bubble').filter({ hasText: '本步的交接物是' }).count();
   check('A6b：首轮契约组合行退场——任务原文/契约段都不成用户气泡（套娃负例）', bubbleWithTask === 0 && bubbleWithContract === 0, `taskBubble=${bubbleWithTask} contractBubble=${bubbleWithContract}`);
@@ -479,7 +432,6 @@ try {
   await pageA.screenshot({ path: join(EVIDENCE, 'leg-a-confirm.png') });
   await pageA.close();
 
-  // ——— B 腿：负对照（契约已送达仍不写 → 补写轮兜住、闸红）———
   const TASK_TITLE_B = '1025 首轮契约探针 · 负对照腿';
   const TASK_SPEC_B = '收到契约也不写 plan.md（#1025 探针负对照）。';
   const TASK_TEXT_B = `${TASK_TITLE_B}\n\n${TASK_SPEC_B}`;
@@ -518,7 +470,6 @@ try {
   await pageB.screenshot({ path: join(EVIDENCE, 'leg-b-failed.png') });
   await pageB.close();
 
-  // daemon 日志关键行存档（[step] 家族 = 收集/上传/done 的运行时旁证）。
   save('daemon-log-step-lines.txt', daemonLogLines().filter((l) => l.includes('[step]') || l.includes('plan')).join('\n'));
 
   finish({ legA: taskA, legB: taskB, runTag });
@@ -530,7 +481,7 @@ try {
     }
     save('fail-daemon-log.txt', daemonLogLines().slice(-40).join('\n'));
   } catch {
-    // 诊断失败不掩盖原始异常
+
   }
   finish({ error: err instanceof Error ? err.stack : String(err) });
 } finally {

@@ -1,30 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-providers-tabs — providers 页 runtime tabs 全链
-// （spec 11 A1-A4/A7，#353；先行地图 #354）。
-//
-// 真用户路径：/app/resources/providers → runtime tablist（pi / Claude Code）
-// → pi 空态引导钮开 picker → API 铺底 custom provider 后 pi tab 出模型行
-// → 切 Claude Code tab（?runtime= 同步）→ header 卡安装态 → 深链直落。
-//
-// 真值：GET /api/teams/:id/model-sources 封套（sources[] = runtime/installed/
-// hostname/models）与 UI header 卡、模型行双真值一致；铺底走公开 REST
-// POST /api/teams/:id/providers（非被测路径，同 drive.mjs search probe 铺底律）。
-// 负向（A1/A7）：页面无「Cairn（内置）」facade 行；行无 chevron/三点装饰。
-//
-// 先行地图语义（A12）：spec 11 实现票（model-sources 端点 + providers 页
-// 重写）落地前本 probe 为红——每条 FAIL detail 指向 spec 条款，红态输出即
-// 实现票的验收清单，不是 harness 故障。
-//
-// 依赖全新库（pi 空态断言，同 api-key probe 律）：先于 drive-provider-picker
-// .mjs 跑；重验 = 重 launch。claude-code 段数据源 = 执行机上报（#707，A4 修订）：
-// probe 经公开 machine wire 自铺底一台上报过的机器（建 API key → enroll 携
-// claudeCode 上报，无需真 daemon），断言 UI=API=上报值三方一致。
-// #944 载体迁移：类名钩 → 语义/data-* 载体，断言语义不变——.res-runtime-empty →
-// [data-testid="runtime-empty"]、.res-model-row → [data-model-id][data-runtime]、
-// .res-runtime-head → [data-testid="runtime-head"]、.dlg-picker-search →
-// input[aria-label="搜索服务商..."]、.res-row-chev/-more 负向 → 行内 svg/button
-// 计数 0；.page-main = 页面壳 sheet（PR 6 三壳合一）。
-// 用法：node drive-providers-tabs.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
@@ -51,7 +25,7 @@ mkdirSync(EVIDENCE, { recursive: true });
 
 const checks = [];
 function check(name, ok, detail) {
-  // 断言位必须真是 boolean（drive-tags 同律）——写反会恒真。
+
   if (typeof ok !== 'boolean') {
     throw new TypeError(`check(${JSON.stringify(name)}) 的 ok 位须为 boolean，收到 ${typeof ok}`);
   }
@@ -70,7 +44,7 @@ const getJson = async (url) => {
   if (!res.ok) throw new Error(`GET ${url} → ${res.status}`);
   return res.json();
 };
-/** 软 GET：端点未实现（404 等）不抛，返回 { ok:false, error } 供 FAIL detail。 */
+
 const tryGetJson = async (url) => {
   try {
     return { ok: true, data: await getJson(url) };
@@ -99,8 +73,6 @@ const postAuthedJson = async (url, bearer, body) => {
   return res.json();
 };
 
-// 软断言原语：先行 probe 的红态要逐条产出 FAIL detail（不是首个超时即中止），
-// 所有 selector 探测一律不抛。
 const softVisible = async (page, selector, timeout = 5000) =>
   page
     .waitForSelector(selector, { state: 'visible', timeout })
@@ -142,7 +114,7 @@ const page = await browser.newPage({
 });
 
 try {
-  // 0) 页面就绪 + teamId（API 真值坐标）
+
   await page.goto(`${WEB}${PAGE_PATH}`);
   const shellReady = await softVisible(page, SHELL, 15_000);
   check('page-ready', shellReady, shellReady ? `${PAGE_PATH} shell 就绪` : '页面 shell 未渲染');
@@ -156,8 +128,6 @@ try {
     teamId != null ? `GET /api/teams 取到 teamId=${teamId}` : `取 teamId 失败：${teamsRes.error}`,
   );
 
-  // 0b) #707 执行机铺底：建 API key → enroll 携 claudeCode 上报（公开 machine
-  // wire，无需真 daemon）。上报值钉死，与本机真实 settings.json 无关。
   const ccModelId = `verify-cc-model-${stamp}`;
   let enrolled = false;
   let enrollError = '无 teamId';
@@ -194,11 +164,10 @@ try {
       : `#707 铺底失败：${enrollError}`,
   );
   extra.ccModelId = ccModelId;
-  // 上报后重载页面，使 model-sources 查询拿到含执行机段的封套。
+
   await page.reload();
   await page.waitForSelector(SHELL, { timeout: 15_000 }).catch(() => {});
 
-  // 1) A1：runtime tablist = 恰 pi / Claude Code 两 tab，默认 pi，无「内置」字样
   const tablistOk = await softVisible(page, `${SHELL} [role="tablist"]`);
   check(
     'tablist-present',
@@ -238,7 +207,6 @@ try {
     `默认选中 pi tab——aria-selected=${piTab?.selected ?? 'tab 缺失'}`,
   );
 
-  // 2) A1 负向：「Cairn（内置）」facade 行已除（非空守卫：读不到正文时负向不可判真）
   const bodyText = await softText(page, `${SHELL} .page-main`);
   const facadeGone = bodyText !== '' && !bodyText.includes('Cairn（内置）');
   check(
@@ -251,7 +219,6 @@ try {
         : 'spec 11 A1：「Cairn（内置）」facade 行仍在（前端静态装饰行未除）',
   );
 
-  // 3) A3：全新库 → pi 空态 + 引导钮开 picker
   const emptyOk = await softVisible(page, `${SHELL} [data-testid="runtime-empty"]`);
   check(
     'pi-empty-state',
@@ -284,7 +251,6 @@ try {
       : `spec 11 A3：空态引导应开添加服务商 picker${emptyOk ? '——dialog/搜索框未出现' : '（前置空态缺失）'}`,
   );
 
-  // 4) 铺底：API POST custom provider（非被测路径）→ pi tab 应投影其 models[]
   let seeded = false;
   let seedError = '无 teamId';
   if (teamId != null) {
@@ -305,8 +271,6 @@ try {
   await page.reload();
   await page.waitForSelector(SHELL, { timeout: 15_000 }).catch(() => {});
 
-  // #944 载体迁移：.res-model-row 类名钩 → [data-model-id][data-runtime]
-  // 契约句柄（providers-tabs.spec 同锚）。
   const rowSelA = `${SHELL} [data-model-id="${seedProvider.models[0].id}"][data-runtime="pi"]`;
   const rowSelB = `${SHELL} [data-model-id="${seedProvider.models[1].id}"][data-runtime="pi"]`;
   const rowsOk = (await softVisible(page, rowSelA)) && (await softVisible(page, rowSelB));
@@ -320,8 +284,6 @@ try {
   );
   await shot(page, '03-pi-model-rows.png');
 
-  // 5) A2/A7 负向：纯展示行无可点感装饰（#944 载体迁移：.res-row-chev/-more
-  //    装饰类退役——断言改钉「行内零 svg 零 button」，providers-tabs.spec 同 canon）。
   const chevCount = await softCount(page, `${SHELL} [data-model-id] svg`);
   const moreCount = await softCount(page, `${SHELL} [data-model-id] button`);
   check(
@@ -330,13 +292,6 @@ try {
     `spec 11 A7：无 handler 行不渲染 chevron/三点（行内 svg/button 计数 0）——实测 svg ${chevCount} 个 / button ${moreCount} 个`,
   );
 
-  // 6) A1：切 Claude Code tab → aria-selected 翻转 + ?runtime= 同步
-  // #423 修正探针竞态（断言语义不变，两条件并收进同一次有界轮询）：data
-  // router（react-router v7 createBrowserRouter）把路由态更新包在
-  // startTransition 里，history.push 恒先于 React commit 一拍——「先等 URL、
-  // 再单读 aria-selected」读到的是 commit 前旧值（旧 DOM 树 commit 快，曾靠
-  // 时序侥幸过关；shadcn Tabs 迁移后 commit 变长即翻车，实测 0–50ms 窗口）。
-  // e2e providers-tabs.spec 用自动重试断言，无此面。
   let switched = false;
   if (ccTab != null) {
     await page
@@ -361,8 +316,6 @@ try {
       : 'spec 11 A1：tab 切换应同步 ?runtime= search param（刷新/分享可回定位）——未达成',
   );
 
-  // 7) 数据契约（#707）：GET model-sources = pi 首段 + 每台上报过的机器一段
-  // claude-code（序固定：pi 首 + 按机器名）
   const msRes =
     teamId != null
       ? await tryGetJson(`${SERVER}/api/teams/${teamId}/model-sources`)
@@ -386,7 +339,7 @@ try {
       .map((s) => `${s.runtime}@${s.hostname}`)
       .join(', ') || '空'}]`,
   );
-  // #707 F1：段值 = 执行机上报值（非 server 本机配置）——hostname 与模型双钉。
+
   const followsExecutor =
     execSeg != null &&
     execSeg.installed === true &&
@@ -399,7 +352,7 @@ try {
       ? `claude-code 段跟随执行机：hostname=${EXEC_HOST}，模型含上报值 ${ccModelId}`
       : `#707 F1：claude-code 段应为执行机上报值——实测段 ${JSON.stringify(execSeg)?.slice(0, 160) ?? '缺席'}`,
   );
-  // 封套元素形状（机器无关，可钉死）：{runtime, installed, hostname, models[{id,name,slot?}]}
+
   const shapeOk =
     sources.length >= 1 &&
     sources.every(
@@ -426,7 +379,6 @@ try {
   );
   extra.modelSources = sources;
 
-  // 8) A2/A4（#707）：执行机 header 卡——上报过的机器各一张，文案为上报 hostname
   const headSel = `${SHELL} [data-testid="runtime-head"][data-runtime="claude-code"]`;
   const headCount = await softCount(page, headSel);
   const headTexts = headCount > 0 ? await softText(page, headSel) : '';
@@ -441,8 +393,6 @@ try {
   );
   await shot(page, '04-cc-header.png');
 
-  // 9) UI=API 一致性：claude-code 可见模型行数 = 各段 models 长度之和，且上报
-  // 模型行在位（data-model-id 钉死上报值）
   const ccApiModels = ccSegs.reduce(
     (n, seg) => n + (Array.isArray(seg.models) ? seg.models.length : 0),
     0,
@@ -462,7 +412,6 @@ try {
   );
   await shot(page, '05-cc-tab.png');
 
-  // 10) A1：深链 ?runtime=claude-code 直落对应 tab
   await page.goto(`${WEB}${PAGE_PATH}?runtime=claude-code`);
   await page.waitForSelector(SHELL, { timeout: 15_000 }).catch(() => {});
   const deepSelected = await page
@@ -484,7 +433,7 @@ try {
   try {
     await shot(page, '99-error.png');
   } catch {
-    /* 截不上就算了 */
+
   }
 } finally {
   await browser.close();

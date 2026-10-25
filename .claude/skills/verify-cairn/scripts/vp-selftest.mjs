@@ -1,12 +1,5 @@
 #!/usr/bin/env node
-// vp.mjs self-test (#1402): the dispatch and archive rules, checked without a
-// stack. drive cases run a copy of vp.mjs in a throwaway skill directory with
-// its own registry and a stub probe, and set each case's status, needs and
-// arguments themselves, so no case depends on a real registry entry; most use
-// --dry-run, which prints the resolved command and the evidence/run paths
-// instead of running anything. The whole-registry scans read the real
-// registry. archive cases use a throwaway VERIFY_REPO_ROOT.
-// Usage: node .claude/skills/verify-cairn/scripts/vp-selftest.mjs
+
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   cpSync,
@@ -30,10 +23,6 @@ const GATE = resolve(import.meta.dirname, 'vp-registry-gate.mjs');
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const REGISTRY = JSON.parse(readFileSync(resolve(import.meta.dirname, '../vp-registry.json'), 'utf8'));
 
-// A new directory under the system temp dir, as its physical path. vp.mjs
-// derives its paths from import.meta.url and process.cwd(), which Node gives
-// with symlinks resolved; where the temp dir sits behind a symlink (macOS:
-// /var -> /private/var) the link path never equals them as a string.
 function tempDir(prefix) {
   return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
 }
@@ -71,11 +60,6 @@ function callEnd(src, open) {
   return src.length;
 }
 
-// Each call in a probe that sends a body to .../agents, judged by its own
-// argument text plus the 200 characters after it (a probe that checks the 400
-// of a body without machineId names machineId there). A body passed through a
-// helper (createAgent(teamId, body)) has no machineId in the call and counts as
-// broken: the check fails closed and names the helper's line.
 function agentBodiesWithoutMachineId(src) {
   const lines = [];
   for (const m of src.matchAll(/\/agents['"`]\s*,/g)) {
@@ -85,12 +69,6 @@ function agentBodiesWithoutMachineId(src) {
   return lines;
 }
 
-// Current cases that depend on a seed script whose call to .../agents sends no
-// machineId: the probe names the seed, or its usage does. A seed the usage
-// names inside a parenthesized clause that says optional ("[todoId] (optional;
-// seed via setup-review-seed.mjs)") feeds an optional path and does not count;
-// every other seed does. Seeds live in scriptsDir; case script paths are
-// relative to root.
 function seedDependents(registry, scriptsDir, root) {
   const broken = Object.entries(registry.support)
     .filter(([, v]) => v.kind === 'seed')
@@ -112,12 +90,6 @@ function seedDependents(registry, scriptsDir, root) {
   return dependent;
 }
 
-// The registry gate run on a skill directory of its own: a copy of the gate,
-// the given registry, an empty file per script name, and the given feature
-// maps, all tracked in a git repository at the fake root; untracked names
-// repo-relative files written but left out of the index. Run from the system
-// temp dir, not the fake root, so a gate that reads the caller's cwd scans the
-// wrong place and fails here.
 function runGate(registry, scripts, maps, untracked = []) {
   const root = tempDir('vp-selftest-gate-');
   try {
@@ -148,8 +120,6 @@ function runGate(registry, scripts, maps, untracked = []) {
   }
 }
 
-// A skill the registry gate passes: support scripts, a ticket-named probe that
-// exists today, a probe named after its feature, and a map naming a drive line.
 const GATE_DIR = '.claude/skills/verify-cairn/scripts/';
 const GATE_SCRIPTS = [
   'cleanup.mjs',
@@ -164,7 +134,6 @@ const GATE_SCRIPTS = [
 ];
 const GATE_MAPS = { 't.md': '# t\n\n- `node .claude/skills/verify-cairn/scripts/vp.mjs drive t legacy`\n' };
 
-// Every script of GATE_SCRIPTS that is no drive case, plus the gate itself.
 const GATE_SUPPORT = [...GATE_SCRIPTS.filter((name) => !name.startsWith('drive-')), 'vp-registry-gate.mjs'];
 
 function gateRegistry(cases = {}, support = {}) {
@@ -185,10 +154,6 @@ function gateRegistry(cases = {}, support = {}) {
   };
 }
 
-// A copy of vp.mjs in <root>/.claude/skills/verify-cairn: its own registry
-// (feature t with the given cases), the given scripts beside vp.mjs, a stub
-// probe <root>/stub.mjs that writes result.json where it is pointed, and the
-// repo's node_modules (vp.mjs imports @playwright/test). Returns the copy's path.
 function installSkill(root, cases, scripts = {}) {
   const skill = join(root, '.claude', 'skills', 'verify-cairn');
   mkdirSync(join(skill, 'scripts'), { recursive: true });
@@ -210,9 +175,6 @@ function installSkill(root, cases, scripts = {}) {
   return join(skill, 'scripts', 'vp.mjs');
 }
 
-// installSkill in a throwaway directory that is a git repository of its own, so
-// its evidence root is the throwaway directory itself, also when the temp dir
-// sits inside another checkout. run() runs from the root unless given a cwd.
 function fakeSkill(cases, scripts = {}) {
   const root = tempDir('vp-fake-');
   gitAt(root)('init', '-q');
@@ -227,7 +189,6 @@ function fakeSkill(cases, scripts = {}) {
   };
 }
 
-// fakeSkill for the length of check(fake), removed afterwards whatever happens.
 function withFake(cases, check, scripts = {}) {
   const fake = fakeSkill(cases, scripts);
   try {
@@ -238,14 +199,11 @@ function withFake(cases, check, scripts = {}) {
 }
 
 const STUB = { script: 'stub.mjs', args: [], needs: [], status: 'current', purpose: 'stub' };
-// A case whose probe takes its evidence directory through an output option,
-// with a journey name as its default argument (glass.mjs <journey> --out <dir>).
+
 const JOURNEY = { ...STUB, args: ['create-task'], evidence: { flag: '--out' } };
-// A case that refuses to run without a positional argument.
+
 const NEEDS_ARGS = { ...STUB, needsArgs: true, usage: '<todoId> <branch>' };
 
-// git in a throwaway repository. The caller's git config may sign commits or
-// run hooks; this repository does neither.
 function gitAt(repo) {
   return (...args) =>
     execFileSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
@@ -253,8 +211,6 @@ function gitAt(repo) {
     });
 }
 
-// A repository at main with one commit, and a detached worktree at each of
-// worktreePaths.
 function repoWithWorktrees(main, ...worktreePaths) {
   mkdirSync(main, { recursive: true });
   const g = gitAt(main);
@@ -265,9 +221,6 @@ function repoWithWorktrees(main, ...worktreePaths) {
   for (const wt of worktreePaths) g('worktree', 'add', '-q', '--detach', wt);
 }
 
-// A probe that runs its pre-fix mode, or refuses to run, when called with no
-// arguments needs the post-fix flag as its registry default; without it,
-// vp.mjs drive goes red on a healthy stack.
 const PRE_FIX_DEFAULTS = [
   [/=== '--expect=new' \? 'new' : 'old'/, '--expect=new'],
   [/includes\('--expect=new'\) \? 'new' : 'old'/, '--expect=new'],
@@ -292,8 +245,6 @@ function vp(args, env = {}, cwd = process.cwd(), script = VP) {
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
-// Every entry under dir, files with their contents: equal snapshots mean
-// nothing was added, removed or rewritten.
 function snapshot(dir) {
   return readdirSync(dir, { recursive: true })
     .sort()
@@ -312,7 +263,6 @@ function tempRoot() {
   return { root, src };
 }
 
-// <root>/docs/verify/T/run-a holding one committed file, as archive leaves it.
 function committedEvidence(root) {
   const archived = join(root, 'docs', 'verify', 'T', 'run-a');
   mkdirSync(archived, { recursive: true });
@@ -415,9 +365,7 @@ const cases = [
       for (const [feature, entry] of Object.entries(REGISTRY.features)) {
         for (const [name, c] of Object.entries(entry.cases)) {
           if (c.status !== 'current') continue;
-          // Each call that sends a body to .../agents (the helpers default to
-          // POST), judged by its own body: a probe that names machineId anywhere
-          // else in the file still 400s.
+
           const lines = agentBodiesWithoutMachineId(readFileSync(resolve(ROOT, c.script), 'utf8'));
           if (lines.length > 0) broken.push(`${feature}/${name} (${c.script.split('/').at(-1)}:${lines.join(',')})`);
         }
@@ -429,7 +377,7 @@ const cases = [
   [
     'every case writes where drive points it, or the registry says where it writes',
     () => {
-      // Any status: --force runs a stale or host-bound case too.
+
       const blind = [];
       for (const [feature, entry] of Object.entries(REGISTRY.features)) {
         for (const [name, c] of Object.entries(entry.cases)) {
@@ -463,7 +411,7 @@ const cases = [
     "arguments after -- keep the case's own positional args (the probe or journey name)",
     () =>
       withFake({ x: JOURNEY }, (fake) => {
-        // Giving the name again after -- does not run it twice (covered by the output-flag case).
+
         const r = fake.run(['drive', 't', 'x', '--dry-run', '--', '--out', '/tmp/x']);
         return r.code === 0 && /args create-task --out \/tmp\/x\n/.test(r.out);
       }),
@@ -476,7 +424,7 @@ const cases = [
         const mine = join(fake.root, 'mine');
         const r = fake.run(['drive', 't', 'out', '--', '--out', mine]);
         const made = fake.evidence();
-        // Without the option after --, the probe gets drive's own directory through it.
+
         const auto = fake.run(['drive', 't', 'out']);
         const autoDir = auto.out.match(/vp: evidence (\S+)/)?.[1] ?? '';
         const argv = existsSync(join(autoDir, 'result.json'))
@@ -511,7 +459,7 @@ const cases = [
       withFake({ x: { ...NEEDS_ARGS, status: 'stale' } }, (fake) => {
         const bare = fake.run(['drive', 't', 'x', '--force', '--dry-run']);
         const given = fake.run(['drive', 't', 'x', '--force', '--dry-run', '--', 't1', 'b1']);
-        // The --force list is printed for a run that goes ahead, not before this refusal.
+
         return (
           bare.code === 2 &&
           bare.out.includes('needs arguments: <todoId> <branch>') &&
@@ -599,7 +547,7 @@ const cases = [
       writeFileSync(join(run, 'ports.json'), JSON.stringify({ serverPort: 9, webPort: 9 }));
       vp(['capture', '/app', '--wait', '0'], { VERIFY_RUN_DIR: run, VERIFY_EVIDENCE_DIR: ev });
       const first = readdirSync(join(ev, 'capture-page')).length;
-      // The page cannot load (port 9); capture records that in the new directory.
+
       const second = existsSync(join(ev, 'capture-page-2', 'result.json'));
       rmSync(run, { recursive: true, force: true });
       return first === 0 && second;
@@ -621,7 +569,7 @@ const cases = [
           fake.run(['drive', 't', 'out', '--', '--out', 'docs/verify/T/run-a']),
           fake.run(['drive', 't', 'out', '--dry-run', '--', '--out', archived]),
         ];
-        // A directory beside docs/verify whose name starts the same is not committed evidence.
+
         const beside = fake.run(['drive', 't', 'x', '--dry-run'], { VERIFY_EVIDENCE_DIR: 'docs/verify-notes/run' });
         return (
           refused.every(
@@ -708,9 +656,7 @@ const cases = [
         const broken = 'const t = 1;\nawait post(`/api/teams/${t}/agents`, { name: "a" });\n';
         writeFileSync(join(dir, 'setup-bad-seed.mjs'), broken);
         writeFileSync(join(dir, 'setup-other-seed.mjs'), broken);
-        // [probe source, usage]: a calls the seed and only an option is optional;
-        // b names the seed in its optional clause; c calls one seed and marks
-        // another optional; d names the seed outside the optional clause.
+
         const probes = {
           a: ['// run setup-bad-seed.mjs first\n', '--expect=old optional'],
           b: ['', '[todoId] (optional; seed via setup-bad-seed.mjs)'],
@@ -746,8 +692,7 @@ const cases = [
   [
     'with the temp dir inside a git repository, a fake skill writes nothing outside its own root',
     () => {
-      // The outer repository stands for a checkout that holds TMPDIR. Its
-      // .claude/verify-evidence is a shared root that archive --latest reads.
+
       const outer = tempDir('vp-selftest-outer-');
       const saved = process.env.TMPDIR;
       let fake;
@@ -890,8 +835,7 @@ const cases = [
   [
     'links prints sha-pinned raw links and refuses a ticket with no evidence',
     () => {
-      // A throwaway repository with its own committed evidence, so the case does
-      // not depend on this repository's docs/verify.
+
       const repo = tempDir('vp-selftest-git-');
       const g = gitAt(repo);
       let r = { code: null, out: '' };
@@ -938,7 +882,7 @@ const cases = [
   [
     'a drive from a worktree puts its evidence under the main checkout, not the worktree',
     () => {
-      // vp.mjs runs from a real worktree of a throwaway repository.
+
       const root = tempDir('vp-selftest-wt-');
       const main = join(root, 'main');
       const wt = join(main, '.claude', 'worktrees', 'wt');
@@ -1035,9 +979,7 @@ const cases = [
   [
     'archive refuses to overwrite an archived directory and leaves the archive as it was',
     () => {
-      // The archive is unchanged after the refusal, and a run naming one new and
-      // one archived source copies neither: a refusal that comes after the copy
-      // fails here.
+
       const { root, src } = tempRoot();
       const archive = join(root, 'docs', 'verify', 'T');
       writeFileSync(join(archive, 'run-a', 'result.json'), '{"archived":true}\n');
@@ -1113,7 +1055,7 @@ const cases = [
     'archive --latest 1 copies the newest run only',
     () =>
       withFake({}, (fake) => {
-        // Name order and mtime order disagree, so only the newest by mtime is run-b.
+
         const now = Date.now() / 1000;
         for (const [name, age] of [
           ['run-a', 200],
@@ -1153,9 +1095,7 @@ const cases = [
   [
     'drive and capture refuse an evidence directory inside docs/verify of any worktree of the repository',
     () => {
-      // vp.mjs sits in the main checkout; the caller works in worktree p2, and p3
-      // is a third worktree. other is a repository of its own (a second clone).
-      // p2, p3 and other each hold archived evidence.
+
       const root = tempDir('vp-selftest-wts-');
       const main = join(root, 'main');
       const [p2, p3, other] = [join(root, 'p2'), join(root, 'p3'), join(root, 'other')];
@@ -1176,14 +1116,14 @@ const cases = [
         const at = (cwd, args, env = {}) => vp(args, env, cwd, script);
         const inP2 = 'docs/verify/T/run-a';
         runs = [
-          // The reproduction from pr-gate run 9: relative to the caller's worktree.
+
           at(p2, ['drive', 't', 'x'], { VERIFY_EVIDENCE_DIR: inP2 }),
           at(p2, ['drive', 't', 'x', '--dry-run'], { VERIFY_EVIDENCE_DIR: inP2 }),
           at(main, ['drive', 't', 'x'], { VERIFY_EVIDENCE_DIR: join(p3, 'docs', 'verify', 'T', 'run-new') }),
           at(p2, ['drive', 't', 'out', '--', '--out', join(p3, 'docs', 'verify', 'T', 'run-a')]),
           at(p2, ['drive', 't', 'out', '--', '--out', 'docs/verify/T/run-b']),
           at(p2, ['capture', '/app', '--wait', '0'], { VERIFY_RUN_DIR: run, VERIFY_EVIDENCE_DIR: inP2 }),
-          // The caller's own repository, which is not vp.mjs's.
+
           at(other, ['drive', 't', 'x'], { VERIFY_EVIDENCE_DIR: inP2 }),
         ];
         beside = at(p2, ['drive', 't', 'x', '--dry-run'], { VERIFY_EVIDENCE_DIR: 'docs/verify-notes/run' });
@@ -1214,13 +1154,12 @@ const cases = [
             return { VERIFY_RUN_DIR: run };
           };
           const a = stackAt('run-a');
-          // A dry run drives nothing, so the first real drive still finds the stack fresh.
+
           const dry = fake.run(['drive', 't', 'plain', '--dry-run'], a);
           const first = fake.run(['drive', 't', 'fresh'], a);
           const again = fake.run(['drive', 't', 'fresh'], a);
           const forced = fake.run(['drive', 't', 'fresh', '--force'], a);
-          // Another stack (a new launch empties its run directory): the plain drive
-          // before it is what the refusal names.
+
           const b = stackAt('run-b');
           const plain = fake.run(['drive', 't', 'plain'], b);
           const after = fake.run(['drive', 't', 'fresh'], b);
@@ -1360,7 +1299,7 @@ const cases = [
       const nope = runGate(gateRegistry(), GATE_SCRIPTS, line('vp.mjs drive t nope'));
       const other = runGate(gateRegistry(), GATE_SCRIPTS, line('vp.mjs drive other x'));
       const none = runGate(gateRegistry(), GATE_SCRIPTS, { 't.md': '# t\n\nno drive line here\n' });
-      // A single-case feature named alone, placeholders and a flag after the feature are not case names.
+
       const single = {
         ...gateRegistry(),
         features: { ...gateRegistry().features, u: { recipe: null, cases: { only: { ...STUB, script: `${GATE_DIR}drive-hotkeys.mjs` } } } },

@@ -1,30 +1,5 @@
 #!/usr/bin/env node
-// verify-cairn 定制 probe（#1171 团队技能原生插件通道）：两相位。
-//
-//   wire      零 LLM（假 claude CLI 捕获 argv）：四腿——
-//             A 版本 2.1.294 + allowlist [marker-alpha]：native-plugin 行 /
-//               插件目录形状（manifest + 只含 allowed）/ hardlink 同 inode /
-//               `--plugin-dir` 进 CLI argv / deny 规则同 argv（Skill(marker-beta)）/
-//               白名单外零文件 / worktree `.claude` 零残留；
-//             B 版本 2.0.5 → `native-plugin: skipped` 行 + argv 无 --plugin-dir
-//               （版本闸 fail-closed，catalog 通道照常）；
-//             C allowlist [] → team-manifest-empty 行 + 无 native-plugin 行 +
-//               argv 无 --plugin-dir（server 空清单 = 无 view = 无插件）；
-//             D allowlist null（不限制）→ 团队 2 技能全量进插件 + 本机
-//               CAIRN_SKILLS_DIR 技能不混入 + 零 deny 行。
-//             daemon 由探针自 spawn 自回收（CAIRN_CLAUDE_BIN 注入假 CLI；
-//             腿间换 daemon 时等 80s 僵尸 claim 窗口，#1025 gotcha）。
-//   behavior  真模型腿（本机 claude 登录态，MODEL 缺省 glm-5.3；relay 间歇
-//             故障按 ≤3 次整步重试，#919 同律）：allowlist [haiku-native-1171]、
-//             任务文本不点名技能 → 原生 Skill 发现自命中。硬判据 = transcript
-//             的 Skill 工具调用行（input 含技能名）+ marker 复述 + 步 done；
-//             收尾面 = worktree git status 零残留、仓库预植
-//             .claude/skills/repo-native 逐字节保留（验收 3 的不覆盖面）。
-//
-// env：SERVER / WEB（缺省读 VERIFY_RUN_DIR/ports.json）、VERIFY_RUN_DIR、DB、
-//      VERIFY_EVIDENCE_DIR、MODEL（缺省 glm-5.3）。
-// 前置：live 栈已 launch（VERIFY_PORT=8797 VERIFY_WEB_PORT=5279）。daemon 由
-//      本探针自起自收，不需要外部 daemon。
+
 import { execFileSync, spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import {
@@ -67,7 +42,6 @@ const ts = new Date().toISOString().replace(/[:.]/g, '-');
 const EVIDENCE = process.env.VERIFY_EVIDENCE_DIR ?? `/tmp/cairn-1171-evidence-${PHASE}-${ts}`;
 mkdirSync(EVIDENCE, { recursive: true });
 
-// —— 判据常量（先于运行固化）———————————————————————————————
 const MARKER_ALPHA = 'PINEAPPLE-1171-ALPHA';
 const MARKER_BETA = 'DURIAN-1171-BETA';
 const HAIKU_MARKER = 'HAIKU-NATIVE-1171';
@@ -136,8 +110,6 @@ async function teamIdOf() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// —— daemon 自 spawn 自回收（925/929 同律；--server 显式命令行 = cleanup 端口钉选可回收）——
-
 function daemonEnv(home, skillsDir, extra) {
   const env = { ...process.env };
   for (const k of [
@@ -160,9 +132,7 @@ function daemonEnv(home, skillsDir, extra) {
 }
 
 async function spawnDaemon({ home, name, apiKey, teamId, extraEnv }) {
-  // 每次 spawn 全新 home：device.json 持久 machineId——复用旧 home 会以旧
-  // 身份重 enroll（--name 不覆盖存储名），machines 轮询按新名字永远等不到
-  // （run 2 实测 90s 超时的根因）。
+
   rmSync(home, { recursive: true, force: true });
   mkdirSync(home, { recursive: true });
   const logPath = join(EVIDENCE, `daemon-${name}.log`);
@@ -210,7 +180,7 @@ async function spawnDaemon({ home, name, apiKey, teamId, extraEnv }) {
     } catch {}
     closeSync(logFd);
   };
-  // 等 enroll 上线（machines 列表点名）+ 打开 runtime 闸（#682 claim 真闸）。
+
   const started = Date.now();
   for (;;) {
     const res = await jfetch('GET', `/api/teams/${teamId}/machines`);
@@ -255,8 +225,6 @@ function capturesAfter(file, offset) {
   return { entries, offset: text.length };
 }
 
-// —— 假 claude CLI（wire 相位）：--version / auth status 应答，其余 spawn 捕获 argv 后 exit 1 ——
-
 const LOCAL_SKILLS = process.env.LOCAL_SKILLS ?? '/tmp/cairn-1171-local-skills';
 
 function writeFakeClaude(versionCapture) {
@@ -297,8 +265,6 @@ function ensureLocalSkill() {
     'utf8',
   );
 }
-
-// —— 铺底（REST，1169 同形）———————————————————————————————
 
 async function ensureTeamSkill(teamId, name, description, bodyLines) {
   const content = `---\nname: ${name}\ndescription: ${description}\n---\n\n${bodyLines}\n`;
@@ -384,7 +350,6 @@ function tryParse(text) {
   }
 }
 
-/** hosted bare repo 定位（RUN_DIR/home/server/repos/<teamId>/ 下最新 .git）。 */
 function findBareRepo(teamId, afterMs) {
   const root = join(RUN_DIR, 'home', 'server', 'repos', teamId);
   if (!existsSync(root)) return null;
@@ -403,7 +368,6 @@ function logOffsetOf(logPath) {
   return existsSync(logPath) ? statSync(logPath).size : 0;
 }
 
-/** 向 hosted bare repo 预植一个提交（.claude/skills/repo-native）。 */
 function seedRepoSkill(bareRepo, branch) {
   const clone = join(EVIDENCE, 'repo-seed-clone');
   if (existsSync(clone)) execFileSync('rm', ['-r', clone]);
@@ -430,8 +394,6 @@ async function apiKeyFor(teamId, name) {
   return key;
 }
 
-// —— phase: wire（假 CLI，零 LLM）————————————————————————————
-
 async function phaseWire() {
   const teamId = await teamIdOf();
   const fake = writeFakeClaude();
@@ -449,7 +411,6 @@ async function phaseWire() {
     `When invoked, reply with exactly: ${MARKER_BETA}`,
   );
 
-  // —— daemon 1（版本 2.1.294 假 CLI）：腿 A / C / D ——
   const home1 = '/tmp/cairn-1171-wire-home1';
   const capture1 = join(EVIDENCE, 'fake-cli-capture-1.jsonl');
   const d1 = await spawnDaemon({
@@ -465,7 +426,7 @@ async function phaseWire() {
   });
   save('wire-daemon1-version-line.txt', logLinesAfter(d1.logPath, 0).lines.filter((l) => l.includes('claude binary')).join('\n'));
   try {
-    // —— 腿 A：allowlist [marker-alpha]（部分授权）——
+
     let offset = logOffsetOf(d1.logPath);
     const cap = capturesAfter(capture1, 0);
     let capOffset = cap.offset;
@@ -495,7 +456,7 @@ async function phaseWire() {
       check('A2 SKILL.md 内容逐字节 = server 分发源', pluginSkill === alphaContent, `${pluginSkill.length}B vs ${alphaContent.length}B`);
       check('A2 marker-beta 在插件目录零文件（deny 面零回退）', !existsSync(join(pluginDir, 'skills', 'marker-beta')));
       check('A2 本机技能 local-only-1171 不混入插件', !existsSync(join(pluginDir, 'skills', 'local-only-1171')));
-      // A7 hardlink 同 inode（与 view 共享 blob，非复制）
+
       const viewsRoot = join(home1, 'team-skills', 'views');
       const viewDirs = existsSync(viewsRoot) ? readdirSync(viewsRoot) : [];
       let inodeOk = false;
@@ -518,13 +479,12 @@ async function phaseWire() {
     const argvFlat = JSON.stringify(capA.entries);
     check('A4 deny 规则同 argv：白名单外本机技能 Skill(local-only-1171) 在 settings 面', argvFlat.includes('Skill(local-only-1171)'), '');
     check('A4 deny 规则同 argv：白名单内 marker-alpha 不在 deny 面', !argvFlat.includes('Skill(marker-alpha)'), '');
-    // marker-beta 的 deny 面在 server 侧就更早收口：白名单 ∩ 现扫 = 分发面，
-    // 它根本没进 manifest → 本机无 view 目录 → 插件/扫描/deny 三面都无它。
+
     const viewsRootA = join(home1, 'team-skills', 'views');
     const viewDirsA = existsSync(viewsRootA) ? readdirSync(viewsRootA) : [];
     const betaOnMachine = viewDirsA.some((v) => existsSync(join(viewsRootA, v, 'marker-beta')));
     check('A4 marker-beta 未被 server 分发（本机 view 零落盘 = 授权面最早收口）', !betaOnMachine, `views=${viewDirsA.length}`);
-    // A5 worktree 零残留（失败步收尾后）：无 .claude 条目；插件路径不在 workspaces 下
+
     const wtA = join(home1, 'workspaces', stepA.buildId);
     let porcelain = '(worktree absent)';
     if (existsSync(wtA)) porcelain = git(['-C', wtA, 'status', '--porcelain']);
@@ -534,7 +494,6 @@ async function phaseWire() {
     const denyLineA = logA.lines.find((l) => l.includes('[skills] deny:'));
     check('A6 deny 汇总行在位（1 dir = local-only-1171；团队 view 已被 server 白名单过滤）', Boolean(denyLineA?.includes('1 skill dir(s)')), denyLineA ?? '(missing)');
 
-    // —— 腿 C：allowlist []（显式全拒 → server 空清单 → 无插件）——
     const agentC = await createAgent(teamId, {
       displayName: `wire-c-${Date.now()}`,
       provider: 'claude-code',
@@ -555,7 +514,6 @@ async function phaseWire() {
     save('wire-c-cli-argv.json', capC.entries);
     check('C2 CLI argv 无 --plugin-dir', capC.entries.length > 0 && !capC.entries.some((e) => e.argv.includes('--plugin-dir')), `${capC.entries.length} capture(s)`);
 
-    // —— 腿 D：allowlist null（不限制 → 团队全量进插件；本机技能不混入）——
     const agentD = await createAgent(teamId, {
       displayName: `wire-d-${Date.now()}`,
       provider: 'claude-code',
@@ -588,7 +546,6 @@ async function phaseWire() {
     await d1.stop();
   }
 
-  // —— daemon 2（版本 2.0.5）：腿 B 版本闸。先等 80s 僵尸 claim 窗口（#1025）。
   process.stdout.write('[wire] waiting 80s for zombie claim window before daemon 2…\n');
   await sleep(80_000);
   const home2 = '/tmp/cairn-1171-wire-home2';
@@ -634,8 +591,6 @@ async function phaseWire() {
   return finish();
 }
 
-// —— phase: behavior（真模型腿）—————————————————————————————
-
 async function phaseBehavior() {
   const teamId = await teamIdOf();
   ensureLocalSkill();
@@ -657,7 +612,7 @@ async function phaseBehavior() {
     name: `probe-1171-behavior-${Date.now()}`,
     apiKey: await apiKeyFor(teamId, `probe-1171-behavior-${Date.now()}`),
     teamId,
-    extraEnv: {}, // 真 claude（PATH 解析），无 CAIRN_CLAUDE_BIN
+    extraEnv: {},
   });
   try {
     const projectId = await createProject(`probe-1171-behavior-${Date.now()}`);
@@ -686,14 +641,12 @@ async function phaseBehavior() {
     if (landed === null) return finish();
     const { todoId, buildId } = landed;
 
-    // E2/E3 主判据：原生 Skill 工具调用 + marker 复述（不依赖 brief XML 文字）
     const msgs = messagesOf(buildId);
     save('behavior-messages.json', msgs);
     const msgsFlat = JSON.stringify(msgs);
     let skillCall = null;
     for (const m of msgs) {
-      // 工具调用有两种落库形：内容块 tool_use 与段行 kind:'toolcall'
-      // （ADR 0011 第五形——claude 后端的 toolcall_end 走段行帧）。
+
       const blocks = Array.isArray(m.content) ? m.content : [];
       for (const b of blocks) {
         if (
@@ -721,7 +674,6 @@ async function phaseBehavior() {
     check('E2 transcript 有 Skill 工具调用（原生发现面，点名 haiku-native-1171）', skillCall !== null, skillCall ? JSON.stringify(skillCall.arguments ?? skillCall.input) : '(no Skill toolcall found)');
     check('E3 transcript 复述了技能 marker 行', msgsFlat.includes(HAIKU_MARKER), '');
 
-    // E4 日志面：native-plugin 交付行指向 plugins/ 分区
     const logAll = logLinesAfter(daemon.logPath, landed.logOffset);
     const skillLogs = logAll.lines.filter((l) => l.includes('[skills]'));
     save('behavior-daemon-skills-log.txt', skillLogs.join('\n'));
@@ -736,14 +688,12 @@ async function phaseBehavior() {
       check('E4 插件目录在盘', false, pluginDir ?? '(missing line)');
     }
 
-    // E5 收尾面：worktree git status 零残留（done 收尾 = brief 擦除 + 提交完成）
     const wt = join(home, 'workspaces', buildId);
     let porcelain = '(worktree absent)';
     if (existsSync(wt)) porcelain = git(['-C', wt, 'status', '--porcelain']);
     save('behavior-worktree-status.txt', porcelain);
     check('E5 done 收尾后 worktree git status 干净（验收 2）', porcelain === '', porcelain.slice(0, 200) || '(clean)');
 
-    // E6 预植仓技能不被覆盖/改名（验收 3）
     if (seed && existsSync(wt)) {
       const headContent = git(['-C', wt, 'show', 'HEAD:.claude/skills/repo-native/SKILL.md']).toString();
       save('behavior-repo-skill-head.txt', headContent);

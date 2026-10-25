@@ -1,21 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn probe — #1400 待处理 has one meaning. Live stack, no daemon,
-// no LLM. Seeds one project and three todos over REST (fresh `todo`, plus one
-// moved to `queued` and one to `confirm` with a direct UPDATE on the scratch
-// SQLite: manual gate-phase PATCHes answer 409 on the live server), and a
-// once schedule (2030) on the fresh todo. Browser leg with real clicks reads the
-// word on every surface:
-//   board columns (待开始 holds todo + queued, 待处理 holds confirm),
-//   detail header chip (fresh / queued / confirm), ⌘K search row chips,
-//   schedule card chip, project task row status.
-// --expect=new (default): the todo chip reads 待开始, the queued chip 排队中,
-// and no chip reads 待处理. --expect=old: the same reads on the pre-#1400
-// build, where both chips read 待处理 (the before half: launch the base
-// worktree's stack and point VERIFY_REPO_ROOT + VERIFY_RUN_DIR at it).
-// Stack must already run (launch.mjs; coordinates from VERIFY_RUN_DIR/
-// ports.json). Evidence (screenshots + result.json + SQLite rows) lands in
-// VERIFY_EVIDENCE_DIR; delivery per SKILL.md 证据归档纪律. Exit 1 on any FAIL.
-// Proxy env must be unset (loopback through the proxy answers 502).
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -76,7 +59,7 @@ const api = async (method, path, body) => {
   try {
     json = JSON.parse(text);
   } catch {
-    /* non-JSON body */
+
   }
   return { status: res.status, json, text };
 };
@@ -97,7 +80,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 732 }, col
 const shot = (name) => page.screenshot({ path: join(EVIDENCE, name) });
 
 try {
-  // —— seed ——————————————————————————————————————————————————————————
+
   const proj = await api('POST', '/api/projects', { name: 'verify-1400' });
   const projectId = proj.json?.id;
   check(proj.status === 201 || proj.status === 200, `seed: project (id=${projectId})`);
@@ -117,9 +100,8 @@ try {
     set.run('queued', queued);
     set.run('confirm', confirm);
   });
-  // A once rule years out: the server scheduler never fires it mid-probe, so
-  // the fresh todo stays in `todo`.
-  const at = Date.UTC(2030, 0, 1, 1, 0); // 2030-01-01 09:00 +08
+
+  const at = Date.UTC(2030, 0, 1, 1, 0);
   const sched = await api('POST', '/api/schedules', { todoId: fresh, kind: 'once', at });
   check(sched.status === 201, `seed: once schedule on the fresh todo (status ${sched.status})`);
   const rows = withDb(true, (db) =>
@@ -136,7 +118,6 @@ try {
   const todos = await api('GET', `/api/todos?projectId=${projectId}`);
   payloads.apiTodos = (todos.json ?? []).map((t) => ({ id: t.id, title: t.title, phase: t.phase }));
 
-  // —— board ——————————————————————————————————————————————————————————
   await page.goto(`${WEB}/app`, { waitUntil: 'load' });
   const col = (id) => page.locator(`.board-column[data-column="${id}"]`);
   const card = (id) => page.locator(`[data-todo-id="${id}"]`);
@@ -157,7 +138,6 @@ try {
   );
   await shot('01-board.png');
 
-  // —— detail header ————————————————————————————————————————————————————
   const detailChips = {};
   for (const [id, label, want] of [
     [fresh, 'fresh', FRESH_WORD],
@@ -174,15 +154,13 @@ try {
     await card(fresh).first().waitFor({ state: 'visible', timeout: 10_000 });
   }
 
-  // —— ⌘K search —————————————————————————————————————————————————————————
   const panel = page.getByRole('dialog', { name: '搜索' });
   await page.locator('aside, [role="complementary"]').first().waitFor({ state: 'visible' });
   for (let i = 0; i < 6 && !(await panel.isVisible()); i += 1) {
     await page.keyboard.press('Meta+k');
     await panel.waitFor({ state: 'visible', timeout: 1000 }).catch(() => undefined);
   }
-  // Read the rows after the server answers the full query: until then the
-  // panel shows client-filtered rows.
+
   const searched = page.waitForResponse(
     (r) =>
       r.url().includes('/api/search') && new URL(r.url()).searchParams.get('q') === 'verify 1400',
@@ -212,7 +190,6 @@ try {
   await shot('03-search.png');
   await page.keyboard.press('Escape');
 
-  // —— schedules ——————————————————————————————————————————————————————————
   await page.goto(`${WEB}/app/schedules`, { waitUntil: 'load' });
   const schedCard = page.locator('.sched-card', { hasText: 'verify 1400 fresh' });
   await schedCard.waitFor({ state: 'visible', timeout: 10_000 });
@@ -220,7 +197,6 @@ try {
   check(schedChip === FRESH_WORD, `schedules: fresh card reads ${FRESH_WORD} (got ${schedChip})`);
   await shot('04-schedules.png');
 
-  // —— project page ——————————————————————————————————————————————————————
   await page.goto(`${WEB}/app/project/${projectId}`, { waitUntil: 'load' });
   await page.locator('.page-tab', { hasText: '任务' }).click();
   await page.getByTestId('task-row').first().waitFor({ state: 'visible', timeout: 10_000 });
@@ -245,7 +221,6 @@ try {
   check(projectStatus.confirm === '确认', 'project rows: confirm reads 确认');
   await shot('05-project.png');
 
-  // —— one meaning ————————————————————————————————————————————————————————
   if (EXPECT === 'new') {
     check(
       [

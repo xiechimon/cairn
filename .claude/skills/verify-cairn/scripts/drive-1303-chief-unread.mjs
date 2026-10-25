@@ -1,22 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1303-chief-unread — chief 未读徽标（#1303）。
-//
-// 纯 live 栈 + 假机器 wire，零 daemon 零 LLM。铺底走公开 REST，回合收尾走
-// claim / upload-urls / done，与真机器同形。
-//
-// 判的四件事：
-// 1. 徽标单位 = 未读 chief 线程数（一个线程两条 assistant 文本仍计 1），裸数字。
-// 2. wake 轮（set_wake → scheduler tick → [wake:wake] 步 done）是否把该线程算进未读。
-// 3. 打开抽屉再最小化是否把 readAt 写上；把线程最后活动改到 8 天前、等一次
-//    tick（wake 步出现 = tick 已跑）后，未读是否还在。
-// 4. 未读线程数到 100 时徽标文本是裸数字还是 99+。
-//
-// --expect=old 钉修复前：wake 计入、8 天仍未读、徽标文本 = 原始计数、无会话数 tooltip。
-// --expect=new 钉修复后：wake 不计、tick 后 8 天线程已读、100 渲染 99+、tooltip 报真实线程数。
-// 打开抽屉不置读两态相同（本票不改那条路径）。
-//
-// 用法：node drive-1303-chief-unread.mjs [--expect=old|new]
-// 依赖全新库。重验 = 先 cleanup 再 launch。
 
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -205,7 +187,6 @@ try {
     if (done.status !== 200) throw new Error(`done → ${done.status} ${JSON.stringify(done.body)}`);
   }
 
-  // —— A. 用户回合：两条 assistant 文本，徽标按线程计 1 ——
   const threadA = await openThread('请看一下这个任务');
   const stepA = await claimStep();
   const now = Date.now();
@@ -279,7 +260,6 @@ try {
   check('A6 打开线程再最小化，徽标仍是 1，readAt 仍空', afterOpen === '1' && rowAfterOpen?.readAt == null, `badge=${afterOpen} readAt=${rowAfterOpen?.readAt}`);
   await shot(page, '07-badge-after-open.png');
 
-  // —— B. 把 A 的最后活动拨到 8 天前，再造一个到期 wake，等 tick ——
   const staleAt = Date.now() - EIGHT_DAYS;
   db.prepare('UPDATE chief_thread SET updatedAt = ?, lastTurnAt = ? WHERE id = ?').run(staleAt, staleAt, threadA);
   const threadB = await openThread('设一个回头提醒');
@@ -321,7 +301,6 @@ try {
     check('B3 wake 收尾落库即已读，B 不进未读', rowB?.snippet === TEXT_WAKE && rowB?.readAt != null && !unreadAfterWake.ids.includes(threadB), `readAt=${rowB?.readAt} snippet=${rowB?.snippet} ids=${unreadAfterWake.ids.join(',')}`);
   }
 
-  // —— C. 堆到 100 个未读用户线程，看徽标文本 ——
   let guard = 0;
   while (guard < 130) {
     const cur = await unreadChiefIds(teamId);

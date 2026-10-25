@@ -1,40 +1,3 @@
-// verify-cairn 定制 probe（#904 plan.md 落库通道全链验证）：withPlan build →
-// plan 表落行 → confirm 卡有物可看。真 daemon + stub LLM ×3 + Playwright
-// 浏览器面全链取证。背景：#892 量闸实证 28 build / 0 行 plan.md / 0 样本——
-// 「版本化方案文档」支柱零使用，本 probe 把「这条链真能跑通」证成实物
-//（机制生效验收取实物，读码不算）。三条腿各钉一族失败方式：
-//   A 腿（hosted repo）  正典形正向全链：plan 步入队 → 真 daemon 认领 →
-//                        stub agent bash 写 plan.md → daemon 收集上传 →
-//                        plan 行 v1 字节等值 + build.planDocId 置位 →
-//                        step done → phase confirm + hasPlan 置位 →
-//                        REST /api/builds/:id/plans 读面 → 浏览器 confirm
-//                        卡（方案 · v1 + preview）+ 右栏方案面全文 marker
-//                        上屏 + 打开方案钮。
-//   B 腿（无 repo 裸目录）#703 修复面（此前无 repo withPlan 恒无方案）的
-//                        活栈全链正向：同款落行 + confirm + 卡面。
-//   C 腿（负对照）        agent 两轮都不写 plan.md → #113 自动补写轮
-//                        （rewrite 步 prompt 含 plan.md）→ #703 闸 1 失败
-//                        收尾：phase=failed、plan 行 0、build.errorMessage
-//                        =「规划未产出方案」——「缺物必红」，证明 A/B 腿
-//                        绿不是表演型绿（闸在，绿才有判别力）。
-// 失败方式清单（先固化判别面；哪条红即指认断点 hop）：
-//   1. plan 步没入队（withPlan:true 但首步 kind≠plan）→ A1 红；
-//   2. plan 步没被真 daemon 认领（machineId 恒空）→ A2 红；
-//   3. plan.md 没被收集/上传（worktree 或裸目录路径漂移、upload 4xx）→
-//      A3/B1 红（plan 表 0 行——#892 的实证形态）；
-//   4. 上传到达但 plan 行/planDocId 未落库（receivePlanUpload 断）→ A3 红；
-//   5. plan 行在但 confirm 不翻 / hasPlan 不置（completeStep 相位机断）→
-//      A4/B2 红；
-//   6. REST 有行但 web 方案卡缺席（mapper/失效面，#666 断口回归）→ A6 红；
-//   7. 方案卡在但右栏方案面无全文（plans content 槽 / DocPane 断）→ A7 红；
-//   8. 无 repo 形 withPlan 恒无方案（#703 回归）→ B 腿红；
-//   9. 无 plan.md 仍放行 confirm（#113/#703 闸失效——假绿）→ C 腿红。
-// 用法（栈须先 launch；配方与判读见 docs/verify/904/README.md）：
-//   node drive-904-plan-chain.mjs
-// env：VERIFY_REPO_ROOT / VERIFY_RUN_DIR / VERIFY_EVIDENCE_DIR、
-//      DAEMON_HOME（缺省 /tmp/cairn-904-daemon-home）。
-// 探针自 spawn：stub LLM ×3（ephemeral 端口，每腿一只免轮次串扰）+ 真
-// daemon（--server 指向本栈）；收尾全部回收（finally kill）。
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -102,9 +65,6 @@ async function jfetch(method, path, opts = {}) {
   }
   return { status: res.status, body };
 }
-
-// —— stub LLM（integration/test/stub-llm.ts 的 .mjs 最小移植，drive-918 同款：
-//    脚本轮次 + delayMs 门控；call id 每次运行唯一防 message 主键跨运行复用）——
 
 function startStubLlm(responses) {
   const requests = [];
@@ -179,8 +139,6 @@ function startStubLlm(responses) {
   });
 }
 
-// —— plan.md 内容（字节等值断言的期望值；heredoc 写入 = 内容以 \n 结尾）——
-
 function markerOf(leg) {
   return `PLAN-904-MARKER-${leg}-${runTag}`;
 }
@@ -197,8 +155,6 @@ function planDoc(leg) {
 function writePlanCommand(content) {
   return `cat > ${PLAN_FILE_NAME} <<'PLANEOF'\n${content}PLANEOF`;
 }
-
-// —— seed / daemon / SQLite（drive-918 同款骨架）—————————————————————
 
 let uniq = 0;
 async function seed(stubUrls) {
@@ -345,8 +301,6 @@ async function waitPhase(todoId, phases, timeoutMs, label) {
   );
 }
 
-// —— 浏览器面公共断言（confirm 卡 + 右栏方案面）———————————————————————
-
 async function assertConfirmSurface(page, todoId, leg, shotName) {
   await page.goto(`${WEB}/app/todo/${todoId}`);
   const chip = page.locator('.detail-chip');
@@ -358,15 +312,13 @@ async function assertConfirmSurface(page, todoId, leg, shotName) {
   check(`${leg}：web confirm 卡「方案 · v1」上屏（#666 断口面正向）`, titleText.includes('方案 · v1'), titleText);
   const previewText = await page.locator('.chat-preview').last().innerText();
   check(`${leg}：confirm 卡 preview = plan.md 首个有效行`, previewText.includes(`#904 全链探针（${leg} 腿）`), previewText);
-  // 右栏方案面（confirm 相位 docMode 缺省 'plan'，paneView 缺省 'doc'）：
-  // 全文 = plans 读面 content 槽 → mapPlanDoc 渲染，marker 行必须在屏。
+
   const docBody = page.locator('[data-testid="doc-body"]');
   await docBody.waitFor({ timeout: 30_000 });
   const docText = await docBody.innerText();
   check(`${leg}：右栏方案面全文含 marker（confirm 有物可看）`, docText.includes(markerOf(leg)), `${markerOf(leg)} in ${docText.length} chars`);
   await page.screenshot({ path: join(EVIDENCE, `${shotName}-confirm.png`) });
-  // 打开方案钮（transcript plan 卡激活右栏 plan 面，#366 AC）——点击后仍钉
-  // marker（planView 强制 plan 面不空转）。
+
   const openBtn = page.locator('button[aria-label="打开方案"]').last();
   await openBtn.click();
   await page.waitForTimeout(500);
@@ -374,8 +326,6 @@ async function assertConfirmSurface(page, todoId, leg, shotName) {
   check(`${leg}：「打开方案」点击后方案面仍持全文`, docText2.includes(markerOf(leg)));
   await page.screenshot({ path: join(EVIDENCE, `${shotName}-docpane.png`) });
 }
-
-// —— main ———————————————————————————————————————————————————————————
 
 rmSync(DAEMON_HOME, { recursive: true, force: true });
 
@@ -389,7 +339,7 @@ const stubB = await startStubLlm([
   { toolCall: { name: 'bash', arguments: { command: writePlanCommand(PLAN_B) } }, delayMs: 1_500 },
   { content: '方案已就绪：请确认。', delayMs: 500 },
 ]);
-// C 腿：两轮都只有话、零写类工具行——plan.md 永不落盘（闸的输入面）。
+
 const stubC = await startStubLlm([
   { content: '这一轮我不写方案文件。', delayMs: 500 },
   { content: '仍然不写方案文件。', delayMs: 500 },
@@ -400,14 +350,13 @@ const daemon = spawnDaemon(seeded.apiKey, seeded.teamId);
 const browser = await chromium.launch();
 
 try {
-  // vite dev 首访冷编译可达数十秒——先暖机再建任务（drive-918 同款）。
+
   const warm = await browser.newPage();
   await warm.goto(`${WEB}/app`, { waitUntil: 'networkidle', timeout: 90_000 });
   await warm.close();
   await waitFor(() => daemonLogLines().some((l) => l.includes('[wake] push channel connected')), 60_000, 'daemon online');
   check('真 daemon 上线（--server 指本栈）', true, DAEMON_HOME);
 
-  // ——— A 腿：hosted repo 正典形 ———
   const taskA = await makeTask(seeded.projects.a, seeded.agents.a, '904 全链探针 · hosted 腿', '在 plan.md 落一版方案（#904 探针任务）。');
   const stepRowsA = await waitFor(() => {
     const rows = dbSteps(taskA.buildId);
@@ -439,7 +388,6 @@ try {
   await assertConfirmSurface(pageA, taskA.todoId, 'A', 'leg-a');
   await pageA.close();
 
-  // ——— B 腿：无 repo 裸任务目录（#703 修复面）———
   const taskB = await makeTask(seeded.projects.b, seeded.agents.b, '904 全链探针 · 裸目录腿', '在 plan.md 落一版方案（#904 探针任务）。');
   const todoB = await waitPhase(taskB.todoId, ['confirm', 'failed'], 240_000, 'leg B confirm');
   const plansB = dbPlans(taskB.buildId);
@@ -461,7 +409,6 @@ try {
   await assertConfirmSurface(pageB, taskB.todoId, 'B', 'leg-b');
   await pageB.close();
 
-  // ——— C 腿：负对照（agent 永不写 plan.md → 闸必须红）———
   const taskC = await makeTask(seeded.projects.c, seeded.agents.c, '904 全链探针 · 负对照腿', '不要写 plan.md（#904 探针负对照）。');
   const todoC = await waitPhase(taskC.todoId, ['failed', 'confirm'], 240_000, 'leg C terminal');
   const stepsC = dbSteps(taskC.buildId);
@@ -492,7 +439,6 @@ try {
   await pageC.screenshot({ path: join(EVIDENCE, 'leg-c-failed.png') });
   await pageC.close();
 
-  // daemon 日志关键行存档（[step] 家族 = 收集/上传/done 的运行时旁证）。
   save('daemon-log-step-lines.txt', daemonLogLines().filter((l) => l.includes('[step]') || l.includes('plan')).join('\n'));
 
   finish({ legA: taskA, legB: taskB, legC: taskC, runTag });
@@ -504,7 +450,7 @@ try {
     }
     save('fail-daemon-log.txt', daemonLogLines().slice(-40).join('\n'));
   } catch {
-    // 诊断失败不掩盖原始异常
+
   }
   finish({ error: err instanceof Error ? err.stack : String(err) });
 } finally {

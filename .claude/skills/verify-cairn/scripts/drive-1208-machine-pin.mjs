@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1208-machine-pin — 机器钉选派发（#1208）live 闭环。
-//
-// 两条腿：
-//   A 前提腿（wire 真值）：todo.machineId 钉 mea → orchestrate 线程落 pin +
-//     编排请求行明示机器名 + 别机 claim 空手 + 钉机领到 chief 步——派发面
-//     已经把 todo 钉选当硬约束（#687 落地，票面前提「读面没接」的反证）。
-//   B 交付腿（浏览器）：唯一分歧源 = run_builds 显式 machineId 改派（卡 #26
-//     实录形态：mea 在线、clone 失败、chief 改派本机）→ 详情页机器行
-//     「（任务钉选 {machine}）」尾注可见，换机不再静默；两个对照：
-//     钉选被遵守 = 零噪声；未钉（自动）行为不变。
-//
-// 铺底全走公开 REST（drive-agent-identity 铺底律，非被测路径）：provider +
-// agent + PATCH chief 绑定 + project + 3 todo（A/B 钉 mea、C 不钉）+
-// 双 api-key + 双机 enroll（各持各 key——enrollment 按 key/team 认机器，
-// 同 key 重注册会顶掉前一行的 schema 注释律）。
-// 零 daemon、零 LLM：chief 回合数据面与真机器同形（claim → tool relay 全走
-// 真 machine wire）。claim 空手是长轮询（~75s hold 后返 null）——走生产
-// 节奏等满，别用 8s 短超时把合法等待误判成网络错（drive-895 N7 律）。
-// 依赖全新库：重验 = 重 launch。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-1208-machine-pin.mjs
-//   --expect=old 打 origin/main 基线栈（8793/5275）：A/C/D 腿照旧（派发
-//   读面在 main 已在），B1 反转为「无尾注」（缺陷基线：静默换机）。
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -105,7 +83,6 @@ function dbRead(fn) {
 const MEA_NAME = 'verify-mea-1208';
 const MAC_NAME = 'verify-mac-1208';
 
-// —— 铺底（全 REST，非被测路径）—————————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -150,7 +127,7 @@ async function issueKey(name) {
   if (!keyPlain) throw new Error('api-key 无 plaintext：' + JSON.stringify(key.body));
   return keyPlain;
 }
-// 双机各持各的 key（drive-895 律）：同 key 重注册 = 复用同一 machine 行。
+
 async function enroll(name, keyPlain) {
   const res = await sendJson(SERVER + '/api/machine/enroll', { teamId, name, cliVersion: '0.1.0' }, 'POST', keyPlain);
   const token = res.body?.token ?? res.body?.machine?.token;
@@ -164,9 +141,6 @@ const meaId = machineRows.find((m) => m.name === MEA_NAME)?.id;
 const macId = machineRows.find((m) => m.name === MAC_NAME)?.id;
 if (!meaId || !macId) throw new Error('机器行缺失：' + JSON.stringify(machineRows.map((m) => m.name)));
 
-// 三卡：A/B 钉 mea（A 走改派腿、B 走遵守对照），C 不钉（自动对照）。
-// machineId 建 todo 前先 enroll（界外 id 建任务 400——machine-pin 失败
-// 方式 1 律），故铺底序 = project → 双机 → 三卡。
 const todoA = await sendJson(SERVER + '/api/projects/' + projectId + '/todos', {
   title: '改派腿探针',
   spec: '钉 mea 后被 chief 显式改派到本机——#1208 可见性腿。',
@@ -193,8 +167,6 @@ check(
   'mea=' + meaId + ' mac=' + macId,
 );
 
-// —— chief 回合辅助（真 machine wire，零 LLM）——————————————————
-// claim 响应双层包装 {step:{step:{…}, chief, remoteTools}}（machine-wire 律）。
 async function claimStep(tag, token, wantKind) {
   const claim = await sendJson(SERVER + '/api/machine/tasks/claim', {}, 'POST', token, 100_000);
   const payload = claim.body?.step;
@@ -222,7 +194,6 @@ function buildPinRow(todoId) {
   );
 }
 
-// —— A 前提腿：派发把 todo 钉选当硬约束（wire 真值）————————————
 const orchA = await sendJson(SERVER + '/api/todos/' + TASK_A + '/orchestrate', {});
 if (orchA.status !== 201) throw new Error('orchestrate A → ' + orchA.status);
 const THREAD_A = orchA.body?.thread?.id;
@@ -239,7 +210,7 @@ check(
   typeof orchA.body?.message?.content === 'string' && orchA.body.message.content.includes(MEA_NAME),
   'content 含 ' + MEA_NAME + '：' + String(orchA.body?.message?.content).slice(0, 80),
 );
-// 别机 claim 空手（长轮询 ~75s hold 后返 null——drive-895 N7 律，100s 超时）。
+
 const macClaim = await sendJson(SERVER + '/api/machine/tasks/claim', {}, 'POST', mac.token, 100_000);
 check(
   'A3 别机 claim 空手：钉 mea 的 chief 步只投给 mea（pin = 硬约束）',
@@ -253,10 +224,9 @@ check(
   'step=' + chiefA.stepId,
 );
 
-// —— A5 chief 显式改派（run_builds machineId 覆盖——卡 #26 实录形态）——
 const relayA = await relayTool(chiefA.stepId, 'run_builds', {
   todoIds: [TASK_A],
-  // plan 槽必带：plan 步 agent 无 modelId 会被 tryClaim 跳过（drive-903 律）。
+
   assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
   machineId: macId,
 }, mea.token);
@@ -273,7 +243,6 @@ await saveJson('leg-a-dispatch-premise.json', {
   sqliteBuilds: rowsA,
 });
 
-// —— C 遵守对照腿：无显式 machineId → build 落 todo 值（缺省链）————
 const orchB = await sendJson(SERVER + '/api/todos/' + TASK_B + '/orchestrate', {});
 if (orchB.status !== 201) throw new Error('orchestrate B → ' + orchB.status);
 const chiefB = await claimStep('C', mea.token, 'chief');
@@ -289,7 +258,6 @@ check(
 );
 await saveJson('leg-c-honored-control.json', { relayRunBuilds: relayB, sqliteBuilds: rowsB });
 
-// —— D 自动对照腿：REST 人工启动（不钉）→ build pin null ————————————
 const startC = await sendJson(SERVER + '/api/projects/' + projectId + '/builds', {
   todoIds: [TASK_C],
   assignment: { plan: null, build: { agentId: AGENT_ID } },
@@ -302,7 +270,6 @@ check(
   'status=' + startC.status + ' pin=' + rowsC[0]?.pinnedMachineId,
 );
 
-// —— B 浏览器腿：详情页机器行的改派尾注 ————————————————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 await page.route('**/api.dicebear.com/**', (route) =>

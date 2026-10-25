@@ -1,18 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn probe — #1030 local 项目 Files tab 开闸(推翻 spec 12 out-of-scope):
-// 三相位真用户路径取证(live 栈 + 真浏览器,URL 不带 ?scenario=):
-//   A local 可读:真 git 工作树仓(默认分支 trunk,非 main——钉「local 默认分支
-//     任意,web 不硬编码 ref」的根因面)→ 项目页 Files tab 开闸、文件行/查看器/
-//     历史 seg 全链;分支 chip = HEAD 回显。
-//   B hosted 对照零回归:托管 bare repo push 真 README 后同页面链路(chip='main')。
-//   C local 不可达降级:删仓目录 → 页面出人话降级文案(主行 + reason 分译行),
-//     不空树不 500;API 侧 404 + reason=not_found。
-// REST 侧真值:tree/file/branches/commits/files 五读面 JSON(可达 + 不可达双态)
-// 落 responses.json;SQLite project 行(repoKind/localPath)。栈必须已在跑
-// (launch.mjs;坐标取 VERIFY_RUN_DIR/ports.json,worktree 车道传 VERIFY_REPO_ROOT)。
-// 证据(result.json + responses.json + 截图)落 VERIFY_EVIDENCE_DIR;交付见
-// SKILL.md「证据归档纪律」。任一断言失败退出码 1。
-// 运行前置:proxy env 全 unset(回环请求过代理会 502 假阳性)。
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -68,7 +54,6 @@ async function api(method, path, body) {
   return { status: res.status, json };
 }
 
-// git 隔离环境(git-hosting.test.ts 同款:防用户 git 配置/凭证干扰)
 const GIT_ENV = {
   ...process.env,
   GIT_TERMINAL_PROMPT: '0',
@@ -81,7 +66,6 @@ const GIT_ENV = {
 };
 const git = (args, cwd) => execFileSync('git', args, { cwd, env: GIT_ENV, stdio: 'pipe' });
 
-// —— 道具:local 真仓(默认分支 trunk + README 标记行)————————————
 const props = [];
 function tempDir(prefix) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -108,7 +92,7 @@ const shot = async (name) => {
 };
 
 try {
-  // —— REST 铺底:local + hosted 项目 + git push 凭证 —————————————————
+
   const rLocal = await api('POST', '/api/projects', {
     name: 'verify-1030-local',
     kind: 'local',
@@ -146,7 +130,6 @@ try {
     `REST:git push 用 API key 创建 201(实际 ${rKey.status})`,
   );
 
-  // hosted bare repo push 真 README(cloneUrl origin = 请求源,与本栈同源)
   const cloneUrl = new URL(rHosted.json?.cloneUrl ?? '');
   cloneUrl.username = 'git';
   cloneUrl.password = apiKey;
@@ -157,7 +140,6 @@ try {
   git(['commit', '-m', 'docs: hosted readme'], hostedClone);
   git(['push', '-u', 'origin', 'main'], hostedClone);
 
-  // —— REST 真值:local 五读面(可达态)———————————————————————
   const localTree = await api('GET', `/api/projects/${localId}/tree`);
   payloads.localTree = localTree;
   check(
@@ -198,7 +180,6 @@ try {
     `REST:local files(@ 候选面)全递归含 README.md(实际 ${localFiles.status})`,
   );
 
-  // —— A. 浏览器:local 项目 Files tab ——————————————————————————
   await page.goto(`${WEB}/app/project/${localId}`);
   const filesTab = page.getByRole('banner').getByRole('tab', { name: '文件' });
   await filesTab.waitFor({ timeout: 20_000 });
@@ -210,7 +191,7 @@ try {
   const row = page.getByRole('button', { name: 'README.md', exact: true });
   await row.waitFor({ timeout: 20_000 });
   check(true, '浏览器:FilesPane 渲染 + README.md 文件行在');
-  // 分支 chip = tree ref 回显(HEAD),非硬编码 main
+
   const chip = await page.locator('.prj-branch-chip').textContent();
   check(
     (chip ?? '').trim() === 'HEAD',
@@ -228,7 +209,6 @@ try {
   await shot('A3-local-history.png');
   check(true, '浏览器:历史 seg → 提交行在屏');
 
-  // —— B. 浏览器:hosted 对照零回归 ———————————————————————————
   await page.goto(`${WEB}/app/project/${hostedId}`);
   const hostedRow = page.getByRole('button', { name: 'README.md', exact: true });
   await hostedRow.waitFor({ timeout: 20_000 });
@@ -242,7 +222,6 @@ try {
   await shot('B1-hosted-files-zero-regression.png');
   check(true, '浏览器: hosted 文件行 + 查看器内容(push 后真 README)');
 
-  // —— C. local 不可达降级(删目录)————————————————————————————
   rmSync(localRepo, { recursive: true, force: true });
   await page.goto(`${WEB}/app/project/${localId}`);
   await page.getByText('本地仓库当前无法读取。').waitFor({ timeout: 30_000 });
@@ -260,7 +239,6 @@ try {
     `REST:删仓后 tree → 404 + reason=not_found(实际 ${degradedTree.status}/${JSON.stringify(degradedTree.json?.reason)})`,
   );
 
-  // —— SQLite 只读真值 ————————————————————————————————————
   try {
     const requireServer = createRequire(join(ROOT, 'apps', 'server', 'package.json'));
     const Database = requireServer('better-sqlite3');

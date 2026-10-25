@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Usage: run.sh [property ...]   (default: every line of expected.txt)
-# Exit: 0 = every property matches expected.txt, 1 = a result or counterexample changed,
-#       2 = tool or setup error.
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"

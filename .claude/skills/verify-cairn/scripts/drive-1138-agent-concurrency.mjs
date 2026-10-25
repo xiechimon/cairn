@@ -1,28 +1,3 @@
-// verify-cairn 定制 probe（#1138 agent 级并发闸）：机器闸只数机器槽位，
-// 单个 Agent 可占满一台机的全部 maxConcurrent——本 probe 在活栈上把「按
-// agent 分池计数、闸在候选级、与机器闸各自 gate」证成实物。纯 live 栈零
-// daemon 零 LLM 零浏览器（#1065 同族）：步只领不执行（provider 指向不可达
-// 端口），机器面 = 探针自身走真 machine wire（enroll + claim + done）。
-// 四族断言：
-//   D 写面：PATCH maxConcurrentTasks 0/51 → 400；1 → 200 落库回读（REST
-//     记录 + SQLite 行双真值）；未设置的 Agent 读 null。
-//   G 闸判：A cap=1 + A 首步在跑 → A 二步不进 claim（长轮询挂起 = 无步可
-//     发）且步留 pending；同批 B（不设上限）候选照领（候选级 skip，无队头
-//     阻塞）；他机 claim 同被挡（agent 池跨机器；机器闸开着 = 纯 agent 闸
-//     的自然合成，无集中 min）。
-//   C 空位即领：A 首步 done → finishStep 团队 wake → 挂起中的 claim 即刻
-//     领走 A 二步（空位交接实物）。
-//   R 零值回归：PATCH null 清回不限 → A 二步在跑时新步照领（不设上限行
-//     为完全不变）。
-// 失败方式清单（先固化判别面）：
-//   1. 闸不在 → A 二步被领（挂起 claim 直接返回步 / DB 步 claimed）→ G 红；
-//   2. 闸做成了整批收口 → B 候选也不发（claim 挂起）→ G 分池腿红；
-//   3. 计数只数本机 → 他机 claim 领走 A 二步 → G 跨机腿红；
-//   4. 空位交接死等 → done 后挂起 claim 不领（等满 75s hold）→ C 红；
-//   5. 写面漂移 → 越界值放行 / null 不清 / 记录不带字段 → D/R 红。
-// 用法（栈须先 launch）：
-//   node drive-1138-agent-concurrency.mjs
-// env：VERIFY_REPO_ROOT / VERIFY_RUN_DIR / VERIFY_EVIDENCE_DIR。
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -86,10 +61,6 @@ async function jfetch(method, path, opts = {}) {
   return { status: res.status, body };
 }
 
-// —— 子进程 claim（挂起判别面）：budget 内服务端发步 → 打印响应；budget 尽
-//    无步（闸挡）→ fetch 挂起被客户端超时打断 → 打印 hung 标记。挂起 = 长
-//    轮询真形态（daemon 侧观感就是「claim 不返回」）。
-
 function spawnClaim(token, budgetMs) {
   const code = `
     try {
@@ -132,8 +103,6 @@ async function childDone(spawned, timeoutMs, label) {
     await new Promise((r) => setTimeout(r, 300));
   }
 }
-
-// —— seed：team + 不可达 provider（步可领不执行）+ A/B 双 Agent + 项目 + 双机 —
 
 async function seed() {
   const teams = await jfetch('GET', '/api/teams');
@@ -209,17 +178,15 @@ function dbQuery(sql, ...params) {
 }
 
 async function claimStepNow(token) {
-  // 即时领（有可领步时 <1s 返回；无步才会长轮询——本函数只用于「必可领」位）。
+
   return jfetch('POST', '/api/machine/tasks/claim', { body: {}, cred: token, timeoutMs: 20_000 });
 }
-
-// —— main ———————————————————————————————————————————————————————————
 
 const seeded = await seed();
 const { teamId, agentA, agentB, projectId, machineMain, machineOther } = seeded;
 
 try {
-  // —— D 写面 ——
+
   const bad1 = await jfetch('PATCH', `/api/teams/${teamId}/agents/${agentA}`, { body: { maxConcurrentTasks: 0 } });
   const bad2 = await jfetch('PATCH', `/api/teams/${teamId}/agents/${agentA}`, { body: { maxConcurrentTasks: 51 } });
   check('D1: PATCH maxConcurrentTasks 0 / 51 → 400（值域 1..50）', bad1.status === 400 && bad2.status === 400, `${bad1.status}/${bad2.status}`);
@@ -233,35 +200,30 @@ try {
   const getB = await jfetch('GET', `/api/teams/${teamId}/agents/${agentB}`);
   check('D3: 未设置的 Agent 记录 maxConcurrentTasks = null（缺省不限）', getB.body?.maxConcurrentTasks === null, `got ${JSON.stringify(getB.body?.maxConcurrentTasks)}`);
 
-  // —— 铺底：A 两条 + B 一条（A1 早于 A2 早于 B1，FIFO 序即此） ——
   const taskA1 = await makeTask(projectId, agentA, 'A1');
   const taskA2 = await makeTask(projectId, agentA, 'A2');
   const taskB1 = await makeTask(projectId, agentB, 'B1');
   const stepOf = (task) => dbQuery('SELECT id FROM step WHERE buildId = ? AND kind = ?', task.buildId, 'build')[0]?.id;
 
-  // —— G 闸判 ——
   const claim1 = await claimStepNow(machineMain.token);
   const stepA1 = stepOf(taskA1);
   check('G1: A 首步可领（闸只挡第二步起）', claim1.status === 200 && claim1.body?.step?.step?.id === stepA1, `got ${claim1.body?.step?.step?.id}（期望 ${stepA1}）`);
   const stepA2 = stepOf(taskA2);
   const stepB1 = stepOf(taskB1);
-  // A1 在跑（machine 1/3，机器闸开）→ A2 被 agent 闸挡、B1 照领（候选级 skip）。
+
   const claim2 = await claimStepNow(machineMain.token);
   check('G2: A 满载时同批 B 候选照领（候选级闸、无队头阻塞）', claim2.status === 200 && claim2.body?.step?.step?.id === stepB1, `got ${claim2.body?.step?.step?.id}（期望 ${stepB1}）`);
   const pendingA2 = dbQuery('SELECT status, machineId FROM step WHERE id = ?', stepA2)[0];
   check('G3: A 二步留 pending 未被领（agent 闸挡、步不进失败漏斗）', pendingA2?.status === 'pending' && pendingA2?.machineId === null, JSON.stringify(pendingA2));
 
-  // 他机 claim：机器闸同样开着（other 0/3）——agent 池跨机器，A2 仍不可领。
   const otherClaim = spawnClaim(machineOther.token, 8_000);
   const otherResult = await childDone(otherClaim, 12_000, 'other machine claim');
   check('G4: 他机 claim 同被 agent 闸挡（跨机归账；机器闸开着仍不发 = 两闸各自 gate）', otherResult.hung === true, JSON.stringify(otherResult).slice(0, 160));
 
-  // 挂起 claim（真 daemon 观感）：唯一 pending 候选是 A2 → 长轮询不返回。
   const holdClaim = spawnClaim(machineMain.token, 45_000);
   await new Promise((r) => setTimeout(r, 2_000));
   check('G5: 挂起中的 claim 无步可发（A 唯一候选被闸挡，长轮询真形态）', holdClaim.result() === null, 'claim 仍挂起（未返回）');
 
-  // —— C 空位即领：done A1 → 终态 + 团队 wake → 挂起 claim 即刻领走 A2 ——
   const doneRes = await jfetch('POST', `/api/machine/done/${stepA1}`, {
     body: { status: 'success', sessionId: 'sess-1138-probe' },
     cred: machineMain.token,
@@ -276,7 +238,6 @@ try {
   const a1Terminal = dbQuery('SELECT status FROM step WHERE id = ?', stepA1)[0];
   check('C2: A1 步收尾落终态（释放 agent 计数位）', a1Terminal?.status === 'done' || a1Terminal?.status === 'failed', JSON.stringify(a1Terminal));
 
-  // —— R 零值回归：PATCH null 清回不限 → A2 在跑 + 新 A 步照领 ——
   const cleared = await jfetch('PATCH', `/api/teams/${teamId}/agents/${agentA}`, { body: { maxConcurrentTasks: null } });
   check('R1: PATCH {maxConcurrentTasks:null} → 200 + 记录回 null（清回不限）', cleared.status === 200 && cleared.body?.maxConcurrentTasks === null, `body=${JSON.stringify(cleared.body?.maxConcurrentTasks)}`);
   const taskA3 = await makeTask(projectId, agentA, 'A3');
@@ -284,7 +245,6 @@ try {
   const claim3 = await claimStepNow(machineMain.token);
   check('R2: 清回不限后 A 新步照领（A2 在跑不挡——不设上限行为完全不变）', claim3.status === 200 && claim3.body?.step?.step?.id === stepA3, `got ${claim3.body?.step?.step?.id}（期望 ${stepA3}）`);
 
-  // —— SQLite 全量快照（终局真值） ——
   save('agent-rows.json', dbQuery('SELECT id, displayName, maxConcurrentTasks FROM agent'));
   save('step-rows.json', dbQuery('SELECT id, kind, status, machineId FROM step ORDER BY createdAt'));
   finish({ teamId, agentA, agentB, machineMain: machineMain.machineId, machineOther: machineOther.machineId });

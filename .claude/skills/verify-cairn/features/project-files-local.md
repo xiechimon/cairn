@@ -1,33 +1,33 @@
-# local 项目 Files tab(开闸读面 + 不可达降级)
+# local project Files tab (read-face opening + unreachable degradation)
 
-#1030(2026-10-08 用户裁决)推翻 spec 12「Files tab 对 local 项目隐藏/禁用」的 out-of-scope:local 项目的 文件 tab 可用,读面 = server 直读行上 `localPath` 工作树(目录解析分支 `requireRepoReadDir`,git 读原语对裸库/工作树同形,无检出要求)。github 形态仍无本地读面(404,web 不发请求)。spec 12 相关行已标注被本票推翻。
+#1030 (the 2026-10-08 user ruling) overturns spec 12's "Files tab hidden/disabled for local projects" out-of-scope: a local project's `文件` tab works, the read face = the server directly reads the `localPath` worktree on the line (the directory-resolution branch `requireRepoReadDir`, git read primitives same shape for bare repos / worktrees, no checkout requirement). The github form still has no local read face (404, the web does not send the request). The relevant spec 12 rows are annotated as overturned by this ticket.
 
 ## Sub-features
 
-- `local-read-face` — 五读面(tree/file/files/branches/commits)对 `repoKind='local'` 放行:ref 缺省落 HEAD(工作树当前检出),commits 面落默认分支(`listBranches` 先行);hosted 形态维持 `ref=main`(种子提交恒 main)既有口径。web 侧 tree/commits/file 对 local 形态发请求,ref 不传。
-- `branch-chip-echo` — 分支 chip 显示 tree 载荷的 ref 回显:hosted='main'、local='HEAD'(live);fixture 面 = `project.branch`(prj-local-files 钉 `trunk`,证 local 默认分支任意)。
-- `unreachable-degradation` — localPath 失格(多机部署 server 看不见 / 目录已删 / 已非 git 仓)→ 404 + reason code(`not_found`/`not_git`,词表复用 #386 `PROJECT_LOCAL_ERROR_REASONS`);web 渲染「本地仓库当前无法读取。」主行 + reason 分译行,FilesPane 不渲染(不空树、无历史假面)。`repoKind='local'` 而 localPath 列空(行完整性破)→ 404 显式红无 reason。
+- `local-read-face` — the five read faces (tree/file/files/branches/commits) allow `repoKind='local'`: the ref defaults to HEAD (the worktree's current checkout), the commits face lands on the default branch (`listBranches` first); the hosted form keeps the `ref=main` existing convention (seed commits are always main). The web side's tree/commits/file send requests for the local form without passing the ref.
+- `branch-chip-echo` — the branch chip shows the tree payload's ref echo: hosted='main', local='HEAD' (live); the fixture face = `project.branch` (prj-local-files pins `trunk`, proving the local default branch is arbitrary).
+- `unreachable-degradation` — localPath ineligible (a multi-machine deployment the server cannot see / the directory deleted / no longer a git repo) -> 404 + reason code (`not_found`/`not_git`, the vocabulary reuses #386 `PROJECT_LOCAL_ERROR_REASONS`); the web renders the `本地仓库当前无法读取。` main row + the reason split-translation row, FilesPane does not render (no empty tree, no fake history face). `repoKind='local'` with an empty localPath column (row-integrity break) -> 404 explicit red without reason.
 
 ## How to get to it (user POV)
 
-- 建 local 项目(见 [local-repo-api.md](./local-repo-api.md))→ 项目页 文件 tab(默认落)→ 分支 chip + 文件行 + 查看器 + 历史 seg。
-- 驱动(`vp.mjs list project-files-local` 列出全部 case 与 usage):
-  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive project-files-local local-files`:local 项目文件 tab、hosted 对照、删仓降级。
+- Create a local project (see [local-repo-api.md](./local-repo-api.md)) -> the project page's `文件` tab (the default landing) -> branch chip + file rows + viewer + history seg.
+- Driving (`vp.mjs list project-files-local` lists all cases and usage):
+  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive project-files-local local-files`: the local project's files tab, hosted control, deleted-repo degradation.
 
 ## Driving it with drive-1030-local-files.mjs
 
-Preconditions: `launch.mjs` 已起隔离栈;proxy env 全 unset(回环过代理 = 502 假阳性);本机有 `git`。
+Preconditions: `launch.mjs` already started the isolated stack; proxy env all unset (loopback through a proxy = 502 false positive); the local machine has `git`.
 
-- 一键三相位:`env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' VERIFY_REPO_ROOT=<worktree> node .claude/skills/verify-cairn/scripts/drive-1030-local-files.mjs` → 控制台 20 条 PASS/FAIL + `evidence:<目录>`(result.json + responses.json + 5 截图)。
-- 相位 A:真 git 工作树仓(默认分支 `trunk` + README 标记行)→ REST 五读面真值 + 浏览器 Files tab 开闸/chip=HEAD/行→查看器/历史。
-- 相位 B:hosted 对照零回归(bare repo push 真 README 后同页面链路,chip='main')。
-- 相位 C:删仓目录 → reload 出降级文案 + FilesPane 不渲染 + API 404+reason。
-- 脚本自建道具并自回收(mkdtemp 真仓/hosted clone);hosted push 走 REST 建的 git API key(Basic auth)。
+- One-command three phases: `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' VERIFY_REPO_ROOT=<worktree> node .claude/skills/verify-cairn/scripts/drive-1030-local-files.mjs` -> console 20 PASS/FAIL + `evidence:<dir>` (result.json + responses.json + 5 screenshots).
+- Phase A: a true git worktree repo (default branch `trunk` + README marker line) -> REST five read-face truth + browser Files tab opening/chip=HEAD/row->viewer/history.
+- Phase B: hosted control zero regression (bare repo push a real README then the same page chain, chip='main').
+- Phase C: delete the repo directory -> reload shows the degradation copy + FilesPane does not render + API 404+reason.
+- The script builds and self-reaps its props (mkdtemp real repo / hosted clone); the hosted push goes through the REST-created git API key (Basic auth).
 
 ## Gotchas
 
-- **local 的 ref 不得硬编码 'main'**:local 仓默认分支任意(探针钉 `trunk`);web 对 local 传 undefined → server 落 HEAD,文件查看器 ref 同口径(漏改会 404 假红)。
-- 不可达降级钉在 `treeQ.isError`(local 形态)上——fixture 面 live=false、tree query 恒 disabled,**e2e 钉不到降级面**,归本 probe 相位 C + server vitest(project-local.test.ts F2/F3/F4)。
-- `requireRepoReadDir` 对 local 每次 `existsSync + isGitRepo` 预检:不做预检时 runGit spawn ENOENT 会直接 500(「不要 500」的机制根因)。
-- fixture 面数据源 = `prj-local-files` scenario(`projectLocalFiles`,branch='trunk' + 自有 README/提交,不再复用 hosted 演示内容)。
-- e2e 面 = `e2e/project-files-local.spec.ts`(4 条;旧 `project-files-local-disabled.spec.ts` 随票退役)。
+- **local's ref must not hardcode 'main'**: the local repo's default branch is arbitrary (the probe pins `trunk`); the web passes undefined for local -> the server lands HEAD, the file viewer's ref same convention (a miss = 404 false red).
+- The unreachable degradation pins on `treeQ.isError` (the local form) - the fixture face live=false, the tree query always disabled, **e2e cannot pin the degradation face**, it belongs to this probe's phase C + server vitest (project-local.test.ts F2/F3/F4).
+- `requireRepoReadDir` does `existsSync + isGitRepo` pre-check per local read: without the pre-check runGit spawn ENOENT 500s directly (the "no 500" mechanism root cause).
+- The fixture-face data source = the `prj-local-files` scenario (`projectLocalFiles`, branch='trunk' + its own README/commits, no longer reusing the hosted demo content).
+- The e2e face = `e2e/project-files-local.spec.ts` (4 cases; the old `project-files-local-disabled.spec.ts` retired with the ticket).

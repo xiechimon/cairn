@@ -1,20 +1,5 @@
 #!/usr/bin/env node
-// verify-cairn 定制 probe（#1169 agent.skills 拆字段）：两相位。
-//
-//   api        纯 live 栈（launch 后直跑，零 daemon 零 LLM）：拆字段三面——
-//              ① REST 读写面（缺省 null、PATCH 显式 null/[]、两槽互不影响、
-//              单值不进数组位）；② claim 载荷（worker 步恒携带
-//              skillsAllowlist/defaultSkill，null 与 [] 两态原样、不塌缩）；
-//              ③ machine 技能清单 selection（null = 'all' 全量、[] = 空清单）。
-//   behavior   真模型腿（claude-code runtime + 本机 claude 登录态，前置与
-//              配方 = docs/verify/919/README.md 的 daemon 启动段）：**不设技能
-//              的新建 agent**（skillsAllowlist=null）跑任务 → 任务文本点名
-//              技能 → SKILL.md 读取不被 deny（#1169 主修位的反面复现位：
-//              旧代码里缺省 [] = 出生即全拒）+ 产物带技能正文 marker。
-//
-// env：SERVER / WEB（缺省读 VERIFY_RUN_DIR/ports.json）、VERIFY_RUN_DIR、
-//      DB、DAEMON_HOME、LOCAL_SKILLS、VERIFY_EVIDENCE_DIR、MODEL（缺省
-//      glm-5.3）。
+
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -48,7 +33,6 @@ const EVIDENCE =
   process.env.VERIFY_EVIDENCE_DIR ?? `/tmp/cairn-1169-evidence-${PHASE}-${ts}`;
 mkdirSync(EVIDENCE, { recursive: true });
 
-// —— 判据常量（产物 marker 与技能正文先于运行固化）—————————————————————
 const SKILL_MARKER = 'SKILL-SPLIT-1169';
 const TASK_TITLE = '读技能并写俳句';
 const TASK_SPEC = `读取技能 haiku-helper 的 SKILL.md 全文，按照其中的步骤以「深夜写代码」为主题写一首三行俳句，保存到仓库根目录的 haiku.txt，然后在汇报里逐字复述 SKILL.md 中含 ${SKILL_MARKER} 的那一行。`;
@@ -114,8 +98,6 @@ async function teamIdOf() {
   return id;
 }
 
-/** #682 enabledRuntimes 真闸（behavior 相位）：enroll 缺省只开 pi——claude-code
- *  runtime 的步永远 pending。给在线机器幂等打开两 runtime。 */
 async function enableRuntimes(teamId) {
   const list = await jfetch('GET', `/api/teams/${teamId}/machines`);
   const rows = Array.isArray(list.body) ? list.body : [];
@@ -130,7 +112,6 @@ async function enableRuntimes(teamId) {
   return patched;
 }
 
-/** 团队技能（server skillsDir 现扫）：haiku-helper = 本探针两相位的放侧。 */
 async function ensureTeamSkill(teamId) {
   const body = {
     name: 'haiku-helper',
@@ -219,8 +200,6 @@ function daemonLogLines() {
   return readFileSync(p, 'utf8').split('\n').filter(Boolean);
 }
 
-/** 本机技能根（daemon CAIRN_SKILLS_DIR）：白名单外对照（null 腿本不用，
- *  留作复跑时 deny 腿对照）。 */
 function ensureLocalSkills() {
   const dir = join(LOCAL_SKILLS, 'unrestrict-local');
   mkdirSync(dir, { recursive: true });
@@ -231,13 +210,10 @@ function ensureLocalSkills() {
   );
 }
 
-// —— phase: api（纯 live 栈）—————————————————————————————————————————————
-
 async function phaseApi() {
   const teamId = await teamIdOf();
   await ensureTeamSkill(teamId);
 
-  // A1 创建缺省：两槽 null（不限制 + 不携带）——旧 [] 缺省（出生即全拒）退役。
   const nullAgentId = await createAgent(teamId, {
     displayName: `split-null-${Date.now()}`,
     provider: 'stub-gw',
@@ -248,7 +224,6 @@ async function phaseApi() {
   check('A1 创建缺省 = defaultSkill null + skillsAllowlist null（不再 []）', g1.body?.defaultSkill === null && g1.body?.skillsAllowlist === null, JSON.stringify({ d: g1.body?.defaultSkill, a: g1.body?.skillsAllowlist }));
   check('A1 旧 skills 字段不出 wire', !('skills' in (g1.body ?? {})));
 
-  // A2 PATCH 显式 null 与 []（两态互转——undefined 省键 = 不动）。
   const p1 = await jfetch('PATCH', `/api/teams/${teamId}/agents/${nullAgentId}`, {
     body: { skillsAllowlist: [] },
   });
@@ -258,7 +233,6 @@ async function phaseApi() {
   });
   check('A2 显式 null 写回（不限制，与省键两态）', p2.body?.skillsAllowlist === null, JSON.stringify(p2.body?.skillsAllowlist));
 
-  // A3 两槽互不影响：defaultSkill 单值不进数组位、不动授权面；反向亦然。
   const p3 = await jfetch('PATCH', `/api/teams/${teamId}/agents/${nullAgentId}`, {
     body: { defaultSkill: 'haiku-helper' },
   });
@@ -270,15 +244,11 @@ async function phaseApi() {
   check('A4 数组白名单过现扫滤除（ghost 死引用静默脱落）', JSON.stringify(p4.body?.skillsAllowlist) === JSON.stringify(['haiku-helper']), JSON.stringify(p4.body?.skillsAllowlist));
   check('A4 授权面不动携带面（defaultSkill 保持）', p4.body?.defaultSkill === 'haiku-helper');
 
-  // A5 单值槽拒数组形（携带语义不得再经数组位表达）。
   const p5 = await jfetch('PATCH', `/api/teams/${teamId}/agents/${nullAgentId}`, {
     body: { defaultSkill: ['haiku-helper'] },
   });
   check('A5 defaultSkill 收数组 = 400', p5.status === 400, `status=${p5.status}`);
 
-  // A6 claim 载荷（假机器 enroll + claim，零 daemon）：null 与数组两态原样。
-  // 用新行（A3/A4 已把上面的 nullAgentId PATCH 成白名单形——claim 腿要的是
-  // 未触碰过的缺省 null 行，别拿 PATCH 游乐场当判据行）。
   const claimNullAgentId = await createAgent(teamId, {
     displayName: `split-claim-null-${Date.now()}`,
     provider: 'stub-gw',
@@ -307,7 +277,6 @@ async function phaseApi() {
     body: { name: `probe-1169-${Date.now()}`, repoKind: 'hosted' },
   })).body?.id;
 
-  // null 腿：claim 载荷 null/null（不是缺省不携带、不是 []）。
   const nullBuild = await createTaskAndBuild(projectId, claimNullAgentId, 'null 腿', '读一个文件并汇报。');
   const c1 = await jfetch('POST', '/api/machine/tasks/claim', { bearer: token, body: {} });
   const claimed1 = c1.body?.step;
@@ -321,7 +290,6 @@ async function phaseApi() {
   check('A6 null agent 直取团队技能文件 200（不限制）', n1.status === 200, `status=${n1.status}`);
   await jfetch('POST', `/api/machine/done/${claimed1.step.id}`, { bearer: token, body: { status: 'failed', errorMessage: 'probe-1169 api leg released' } });
 
-  // subset 腿：数组 + 单值原样。
   const subsetBuild = await createTaskAndBuild(projectId, subsetAgentId, 'subset 腿', '读一个文件并汇报。');
   const c2 = await jfetch('POST', '/api/machine/tasks/claim', { bearer: token, body: {} });
   const claimed2 = c2.body?.step;
@@ -337,17 +305,14 @@ async function phaseApi() {
   return finish();
 }
 
-// —— phase: behavior（真模型腿——前置 = 919 README 的 daemon 启动段）—————————
-
 async function phaseBehavior() {
   const teamId = await teamIdOf();
-  // 机器 runtime 闸（#682 claim 真闸）：daemon 须已 enroll（在线）。
+
   const patched = await enableRuntimes(teamId);
   check('在线机器 runtime 闸打开（pi + claude-code）', patched > 0, `patched=${patched}`);
   await ensureTeamSkill(teamId);
   ensureLocalSkills();
 
-  // 主修位：不设技能的新建 agent（skillsAllowlist=null = 不限制）。
   const agentId = await createAgent(teamId, {
     displayName: `split-behavior-${Date.now()}`,
     provider: 'claude-code',
@@ -373,15 +338,12 @@ async function phaseBehavior() {
   if (landed === null) return finish();
   const { todoId, buildId } = landed;
 
-  // 主判据（行为面）：模型读了 haiku-helper 的 SKILL.md 并复述 marker 行——
-  // 旧代码里这个 agent 的 allowlist 缺省是 []（出生即全拒），Read 会被硬挡。
   const msgs = messagesOf(buildId);
   save('behavior-messages.json', msgs);
   const msgsFlat = JSON.stringify(msgs);
   check('transcript 含 haiku-helper SKILL.md 的读取', msgsFlat.includes('haiku-helper') && msgsFlat.includes('SKILL.md'));
   check('transcript 复述了技能 marker 行（主判据）', msgsFlat.includes(SKILL_MARKER));
 
-  // 日志面：catalog 非空 + 无硬挡行（null 不限制——deny 只在白名单态出现）。
   const logs = daemonLogLines();
   const skillLogs = logs.filter((l) => l.includes('[skills]'));
   save('behavior-daemon-skills-log.txt', skillLogs.join('\n'));
@@ -390,7 +352,6 @@ async function phaseBehavior() {
   save('behavior-deny-lines.txt', denyLines.join('\n'));
   check('daemon.log 无硬挡行（不限制 agent 零 deny）', denyLines.length === 0, `${denyLines.length} line(s)`);
 
-  // 产物面：haiku.txt 进步收尾提交（hosted 真仓库）。
   const { execFileSync } = await import('node:child_process');
   const worktree = join(DAEMON_HOME, 'workspaces', buildId);
   let committed = '';
@@ -402,7 +363,6 @@ async function phaseBehavior() {
   save('behavior-artifact-head-haiku.txt', committed);
   check('提交面 HEAD:haiku.txt 含俳句产物', !committed.startsWith('(git show failed)') && committed.length > 0, committed.slice(0, 120));
 
-  // 详情面（真实用户路径）：技能汇总行点名 haiku-helper。
   const { chromium } = await import('@playwright/test');
   const browser = await chromium.launch();
   try {

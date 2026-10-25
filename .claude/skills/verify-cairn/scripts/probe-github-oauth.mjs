@@ -1,27 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn probe — spec 12 / #361 G2-T4 GitHub 连接认证 + repo picker
-// (API 段 + 浏览器 UI 段;live 面,URL 不带 ?scenario=):
-// 1. 认证状态读面:GET /api/teams/{id}/github/connection 未连接 → {connected:false}
-//    (封套无 token 位);requireTeam 闸(未知 team → 404)
-// 2. authorize 签发:POST /api/teams/{id}/github/oauth/authorize —— env 未配
-//    → 400 not-configured(error 含 env 槽名,oauth.ts 错误族沿用);env 已配
-//    → 200 + authorizationUrl(github authorize 端点 + scope=read:user repo +
-//    state 在位;不跟跳真授权页)。两形皆 PASS,label 点名实际形态。
-// 3. 断开幂等:DELETE connection 缺行 → 204,状态读面回 {connected:false}
-// 4. repos 代理未连接 → 404(T1 面随认证面回归)
-// 5. UI 真用户路径(chromium,drive.mjs 同口径 1440×732 dark):新建项目 →
-//    「GitHub 仓库」→ 未认证 = 认证钮 + 手动兜底链接;env 未配时点认证 →
-//    authorize 400 原文落内联错误行;手动兜底 → owner/repo input → 填名 +
-//    合法 ref → 创建钮放开 → 提交 → 跳项目页(公开仓免认证降级路全链)
-// 6. 第二只眼:GET /api/projects 投影 repoKind=github + githubRepo 原值
-// 真 OAuth 回环(授权页 → callback → token 密封落行 → picker 列表)需真
-// GitHub App 凭证 + 人环登录,不可自动化——进程内全链证明在
-// apps/server/test/github-oauth.test.ts(mock 上游 14 条),此 probe 不冒充。
-// 栈必须已在跑(launch.mjs;坐标取 VERIFY_RUN_DIR/ports.json)。
-// 证据(result.json + responses.json + 截图)落 VERIFY_EVIDENCE_DIR;交付见
-// SKILL.md「证据归档纪律」(在 PR 分支上 vp.mjs archive <票号> --from <证据目录>
-// 拷进 docs/verify/<票号>/ 随 PR 提交,不手工 cp)。任一断言失败退出码 1。
-// 运行前置:proxy env 全 unset(回环请求过代理会 502 假阳性)。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -75,7 +52,6 @@ async function api(method, path, body, headers) {
   return { status: res.status, json };
 }
 
-// —— API 段 ——————————————————————————————————————————————————————————————
 const session = await api('GET', '/api/auth/session');
 payloads.session = session;
 check(session.status === 200, `GET /api/auth/session → 200(实际 ${session.status})`);
@@ -139,7 +115,6 @@ check(
   `repos 代理未连接 → 404 {error}(T1 面回归;实际 ${repos.status})`,
 );
 
-// —— UI 段(chromium;drive.mjs 同口径)—————————————————————————————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({
   viewport: { width: 1440, height: 732 },
@@ -148,14 +123,12 @@ const page = await browser.newPage({
 try {
   await page.goto(`${WEB}/app/project/new`, { waitUntil: 'load' });
   await page.locator('#prj-new-repo').click();
-  // #1007 载体迁:.prj-new-* 别名 #946 已退役,探针改语义载体(role 一级)。
+
   await page
     .getByRole('menu', { name: '仓库' })
     .getByRole('menuitemradio', { name: 'GitHub 仓库' })
     .click();
-  // 认证钮 = #prj-new-repo 续作位(label「仓库」关联命名覆盖了按钮文案的
-  // 可及名,e2e project-new-github 同律钉 id + 文案判面)——探针同载体。
-  // 连接态首取在途 = 禁用占位(不闪认证钮)——等读面收敛再断言。
+
   const auth = page.locator('#prj-new-repo');
   await expect
     .poll(() => auth.textContent(), { timeout: 8000 })
@@ -184,7 +157,6 @@ try {
     console.log('SKIP  UI 点认证(env 已配 = 会跳真 GitHub 授权页,自动化不跟人环;真回环证明归 server test)');
   }
 
-  // 手动兜底 → input → 公开仓免认证降级路全链(填名 + 合法 ref → 提交跳项目页)
   await page.getByRole('button', { name: '手动输入 owner/repo' }).click();
   const input = page.locator('#prj-new-repo');
   const inputOk = (await input.getAttribute('placeholder')) === 'owner/repo';
@@ -203,7 +175,6 @@ try {
   );
   await page.screenshot({ path: join(EVIDENCE, 'created-project.png') });
 
-  // 第二只眼:REST 投影真值
   const projectId = landedUrl.match(/\/app\/project\/([\w-]+)/)?.[1];
   const list = await api('GET', '/api/projects');
   payloads.projectsAfterCreate = list;

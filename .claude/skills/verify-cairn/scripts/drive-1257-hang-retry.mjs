@@ -1,21 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn 定制 probe（#1257 无人认领挂起 + 额度挂起 + 流断续跑）：活栈
-// 全链取证，三腿——
-//   A（等机器）  建 todo/build 后**不启 daemon**，等 130s（旧 120s 判死窗）：
-//     步仍 pending、todo 不落 failed、errorMessage 空、todo.waitingOn={on:
-//     machine}；板面「等机器」chip 截图。然后启 daemon → 无人工操作自动
-//     续跑：plan 步被领、stub 写 plan.md、步 done、todo 到 confirm。
-//   B（等额度）  stub LLM 首请求回 402 quota → daemon 报失败 → server 挂起
-//     （pending + holdReason=quota + holdUntil、todo 不落 failed、conv 等额度
-//     system 行、板面「等额度」chip）→ 退避 60s 到期自动重领 → stub 第二次
-//     起回正常应答 → 步 done、todo 到 confirm（零人工操作跑完）。
-//   C（流断续跑）stub 前两次请求流中段断连（写部分 SSE 后 destroy）→ 第三
-//     次正常应答 → 步 done（会话续跑不断会话：stub 收到的第 2/3 次请求体
-//     含第 1 次已产出的内容 = 同一会话在续）。
-// 断言面：SQLite step/build/todo 行 + REST todo record + Playwright 板面
-// 截图 + daemon.log（provider network retry 行）。双向：before 证据 =
-// 单测红态（docs/verify/1257/before-*.txt，本 probe 不复放旧判死——旧码在
-// 本 worktree 已改，before 由单测面承担）。
 
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
@@ -70,16 +53,11 @@ async function jfetch(method, path, body) {
   try {
     parsed = JSON.parse(text);
   } catch {
-    /* keep text */
+
   }
   return { status: res.status, body: parsed, text };
 }
 
-// —— stub LLM：三个独立 server（每腿一个，baseUrl 直连——pi 会往 baseUrl
-//    追加 /chat/completions，query 串切腿会被拼进路径打到 404，实测坑）：
-//    ok = 正常应答（bash heredoc 写 plan.md）；quotaFirst = 首请求回 402 配额、
-//    之后正常；cutTwice = 前两次请求 SSE 中段 destroy、之后正常。
-//    toolCall 形 = drive-1025 同款。—————————————————————————————
 function startStubServer(behavior, log) {
   const server = createServer((req, res) => {
     if (req.method !== 'POST' || !req.url?.endsWith('/chat/completions')) {
@@ -100,8 +78,7 @@ function startStubServer(behavior, log) {
       };
       const chunk = (payload) => `data: ${JSON.stringify(payload)}\n\n`;
       const toolCall = MODE_TOOLCALL[behavior];
-      // 轮次交替（drive-1025 同律）：首个真应答 = 写 plan.md 的 toolcall，
-      // 其后一律纯文本收轮——stub 恒回 toolcall 会把会话顶成无限工具环。
+
       const prelude = behavior === 'quota-first' ? 1 : behavior === 'cut-twice' ? 2 : 0;
       const send = () => {
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
@@ -231,7 +208,6 @@ try {
   const stubCut = await startStubServer('cut-twice', logC);
   stub = { requests: [], close: async () => { await stubOk.close(); await stubQuota.close(); await stubCut.close(); } };
 
-  // —— seed：provider（三腿各一，baseUrl query 切模式）+ agent + api-key ——
   const teams = await jfetch('GET', '/api/teams');
   const teamId = teams.body[0]?.id ?? teams.body.teams?.[0]?.id;
   const modeUrls = { a: stubOk.url, b: stubQuota.url, c: stubCut.url };
@@ -281,10 +257,9 @@ try {
     return { todoId, buildId };
   }
 
-  // ============ Leg A：等机器（无 daemon → 挂起 → daemon 回来续跑）============
   const taskA = await makeTask('a', '1257A 等机器探针');
   save('a-seed.json', { taskA });
-  // 无 daemon：等过旧的 120s 判死窗（+10s 余量）。
+
   process.stdout.write('legA: waiting 130s with no daemon (old fail window was 120s)…\n');
   await new Promise((r) => setTimeout(r, 130_000));
   {
@@ -307,7 +282,6 @@ try {
   check('A5 板面「等机器」chip 可见', chipA.includes('等机器'), `chips=${JSON.stringify(chipA)}`);
   save('a-todo-record.json', todoApi.body);
 
-  // daemon 回来：无人工操作自动续跑 → plan 步 done + plan.md 行 + todo confirm。
   daemon = spawnDaemon(apiKey, teamId);
   const dbA = openDb();
   await waitFor(
@@ -326,9 +300,8 @@ try {
   save('a-final.json', { steps: stepsA, plans: plansA });
   dbA.close();
 
-  // ============ Leg B：等额度（402 → 挂起 → 退避到期自动续跑跑完）============
   const taskB = await makeTask('b', '1257B 等额度探针');
-  // 等 quota 失败上报 + 挂起落位（daemon 在跑）。
+
   const dbB = openDb();
   const held = await waitFor(
     () => {
@@ -355,7 +328,6 @@ try {
   save('b-hold.json', { step: held, todo: tB, build: bB });
   save('b-todo-record.json', todoApiB.body);
 
-  // 退避 60s 到期 → 自动重领 → stub 第二次正常 → 跑完。
   process.stdout.write('legB: waiting for 60s backoff to expire and step to auto-complete…\n');
   await waitFor(
     () => {
@@ -374,7 +346,6 @@ try {
   save('b-final.json', { steps: stepsB, plans: plansB });
   dbB.close();
 
-  // ============ Leg C：流断续跑（两次中段断连 → 第三次成功）============
   const taskC = await makeTask('c', '1257C 流断续跑探针');
   const dbC = openDb();
   await waitFor(
@@ -397,8 +368,7 @@ try {
   check('C4 todo 到 confirm', todoRow(dbC, taskC.todoId).phase === 'confirm');
   save('c-final.json', { steps: stepsC, plans: plansC, networkRetryLogLines: retryLines, cutRequests: cuts });
   dbC.close();
-  // 断流重试层的可见证据：runner 重试行或 pi auto_retry 行（任一层吸收都算
-  // 续跑成功；runner 层的行样 = `provider network retry N`）。
+
   const autoRetryLines = readFileSync(join(DAEMON_HOME, 'daemon.log'), 'utf8')
     .split('\n')
     .filter((l) => l.includes('auto_retry_start') || l.includes('provider network retry'));

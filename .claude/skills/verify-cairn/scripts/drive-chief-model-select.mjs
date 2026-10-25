@@ -1,28 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-chief-model-select — 总管设置压缩模型选择器数据源
-// （spec 11 §A10，#358）。
-//
-// 真用户路径：/app（board）→ 总管 FAB 开 drawer → gear（总管设置）换内容区
-// → Agent tab → 压缩模型选择器 button[aria-label="压缩模型"] → 展开
-// [role="dialog"][aria-label="压缩模型"]（#950 载体：旧 button.chief-select /
-// .chief-model-menu 类钩退役）。
-//
-// 验 #358 的 live 面（fixture e2e 覆盖不到的「hook → mapper → DOM」段），
-// 数据契约按 #770 用户裁决后的现行形（正本 api/mappers.ts toModelOptions）：
-//   #770 排除裁决 —— custom providers 不再进 picker 候选；选项清单 =
-//       GET model-sources 非 pi 段投影。铺底 provider 的模型仍会出现在
-//       model-sources 输出里（pi 段，数据通路活着），但**不得**进选择器行。
-//   #707 机器跟随 —— claude-code 段 = 执行机 daemon 上报；未注册 daemon 的
-//       verify 栈上非 pi 段恒空，选择器只有默认行，这是预期真值不是故障。
-//   并集一致性 —— 选择器非默认行 (providerLabel, modelName) 集合 ==
-//       toModelOptions(GET model-sources) 的期望投影（driver 内复刻现行
-//       mapper 逻辑做 UI=API 双真值对拍）。
-//   原「铺 provider → 行随之变」的 AC1 行变化腿随 #770 裁决退役（该数据
-//       通道已不供 picker）；行变化面由 fixture e2e 的 options 面承接。
-//
-// 铺底走公开 REST POST /api/teams/:id/providers（非被测路径，drive.mjs search
-// probe 铺底律）。依赖全新库：重验 = 重 launch。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-chief-model-select.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -77,9 +53,6 @@ async function postJson(url, body) {
   return res.json();
 }
 
-// driver 内复刻 api/mappers.ts toModelOptions（#358；#770 起 providers 段已除）
-// 做 UI=API 对拍：只剩非 pi runtime 段（provider 位 = runtime 词表值；段卫生：
-// 空 id 跳过），同 (provider, modelId) 去重 first-wins。
 function expectedOptions(sources) {
   const out = [];
   const seen = new Set();
@@ -113,9 +86,6 @@ const SETTINGS = 'h1:text-is("总管设置")';
 const SELECT_BTN = 'button[aria-label="压缩模型"]';
 const MENU = '[role="dialog"][aria-label="压缩模型"]';
 
-// 从 board 走到压缩模型选择器并展开菜单（真用户路径：FAB → gear → select）。
-// 行读取不与取数竞态：进面后等 model-sources 响应落地再开菜单（未发请求 =
-// 缓存命中，等待超时吞掉不阻塞）。
 async function openModelMenu(page) {
   const sourcesFetched = page
     .waitForResponse((res) => res.url().includes('/model-sources'), { timeout: 8000 })
@@ -132,9 +102,6 @@ async function openModelMenu(page) {
   await page.waitForSelector(MENU, { state: 'visible', timeout: 8000 });
 }
 
-// 读菜单里的行：默认行（无 provider 副题）+ 模型行（有 provider 副题 span）。
-// #950 载体：行 = role=option；名 = data-testid="model-pick-name"；副题 =
-// 行内唯一无 data-testid 的 span（check 勾形也带 testid，不误中）。
 async function readMenuRows(page) {
   return page.evaluate((menuSel) => {
     const menu = document.querySelector(menuSel);
@@ -195,13 +162,11 @@ async function apiTruth(teamId) {
   return { expected: expectedOptions(msEnv.sources ?? []), sources: msEnv.sources ?? [] };
 }
 
-// 铺底模型是否抵达 model-sources 输出（任意段——数据通路活着的实证；
-// #770 后它们落在 pi 段，picker 投影天然排除）。
 function sourcesContainModels(sources, models) {
   const flat = (sources ?? []).flatMap((s) => (s.models ?? []).map((m) => m.id));
   return models.every((m) => flat.includes(m.id));
 }
-// #770 排除裁决腿：铺底模型不得出现在选择器行里。
+
 function pickerExcludes(rows, models) {
   const names = new Set(models.map((m) => m.name));
   return rows.every((r) => !names.has(r.modelName));
@@ -216,9 +181,6 @@ try {
     teamId != null ? 'GET /api/teams teamId=' + teamId : '取 teamId 失败',
   );
 
-  // 基线：全新库 + 未注册 daemon → 非 pi 段恒空，选择器只有默认行；
-  // UI=API 对拍从基线就开始（不是「空对空」的摆设——若本机有 daemon 上报过
-  // claude-code 段，基线期望投影会带上它，UI 必须同现）。
   await openModelMenu(page);
   const baseline = await readMenuRows(page);
   await shot(page, '01-baseline.png');
@@ -238,8 +200,6 @@ try {
         JSON.stringify(sortedKeys(truth0.expected)),
   );
 
-  // 铺底 provider A（2 模型）→ 重载走真路径 → #770 裁决：模型抵达
-  // model-sources（pi 段）但不进选择器行。
   const seedA = teamId != null ? await seedProvider(teamId, provA) : { ok: false, error: '无 teamId' };
   check(
     'seed-provider-a',
@@ -278,8 +238,7 @@ try {
         ' vs 期望 ' +
         JSON.stringify(sortedKeys(truthA.expected)),
   );
-  // 铺底 provider B（1 模型）→ 重载 → 同律：抵达 sources、被 picker 排除、
-  // 并集仍一致（delta 驱动 = 配置变化，断言面 = 排除 + 一致）。
+
   const seedB = teamId != null ? await seedProvider(teamId, provB) : { ok: false, error: '无 teamId' };
   check(
     'seed-provider-b',
@@ -325,7 +284,7 @@ try {
   try {
     await shot(page, '99-error.png');
   } catch {
-    /* 截不上就算了 */
+
   }
 } finally {
   await browser.close();

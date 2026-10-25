@@ -1,24 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1104-unassigned-build — run_builds 无指派 build 静默
-// 卡死双修（#1104）live 闭环：chief 入口 400 打回 + claim 面无主步失败收尾。
-//
-// 四腿（铺底全走公开 REST，drive-903 铺底律，非被测路径；零 daemon 零 LLM
-// ——chief 回合数据面与真机器同形，claim → tool relay → done 全走真
-// machine wire）：
-//   A chief relay：假机器认领 chief 回合步后 relay run_builds——整参缺失 /
-//     空对象 / 两槽显式全空三形均 400 且文案可指导补正（含 assignment 示例）；
-//     补传 assignment 后同 todo 成功派发（400 不留半启动态，SQLite 对拍）。
-//     收道 = 同回合 relay cancel_builds（903 律：不用 claim+done failed）。
-//   B REST + claim 面：POST builds 空 assignment → 201 入队（步允许入队）；
-//     更晚入队的合法 build 在前（FIFO）——machine claim 一次即证「无主步
-//     当场失败收尾 + 合法步照常领走」（无队头阻塞）；SQLite 对拍 step
-//     failed + build.errorMessage 落根因 + todo → failed 终态。
-//   C scheduler：无指派 todo 挂 once 过期档 → 等 15s tick 建 build
-//     （triggerSource='schedule'）→ claim 面同漏斗失败收尾。
-//   D 看板可见：浏览器开看板（失败卡在「待处理」列）+ 详情页失败行
-//     （r8 canon：标题 = build.errorMessage 根因）双截图。
-// 依赖全新库：重验 = 重 launch。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-1104-unassigned-build.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -99,7 +79,6 @@ function dbRead(fn) {
   }
 }
 
-// —— 铺底（全 REST，非被测路径）—————————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -174,7 +153,6 @@ check(
   'project=' + projectId,
 );
 
-// —— 机器 wire 辅助（claim 双层包装 {step:{step:{…}}}，machine-wire 律）————
 async function claimStep() {
   const claim = await sendJson(SERVER + '/api/machine/tasks/claim', {}, 'POST', machineToken);
   const payload = claim.body?.step;
@@ -185,8 +163,7 @@ async function relayRaw(stepId, name, params) {
   return sendJson(SERVER + '/api/machine/tool/' + stepId, { name, params }, 'POST', machineToken);
 }
 async function doneStep(stepId) {
-  // wire 词表 = success/failed/stopped（机器上报面；DB 步终态词 done 是
-  // 落账后的列值，别混进请求体——920 gotcha 的反向面）。
+
   const res = await sendJson(SERVER + '/api/machine/done/' + stepId, { status: 'success' }, 'POST', machineToken);
   if (res.status !== 200) throw new Error('done → ' + res.status + ' ' + JSON.stringify(res.body).slice(0, 300));
 }
@@ -206,7 +183,6 @@ function rowsFor(todoId) {
   });
 }
 
-// —— A chief relay：无指派 assignment → 400 打回（三空形 + 补传成功）————
 const thread = await sendJson(SERVER + '/api/teams/' + teamId + '/chief/threads', {
   content: '#1104 无指派派发探针：请对下面的 todo 执行 run_builds。',
 });
@@ -264,14 +240,13 @@ check(
   e5.status === 200 && Boolean(chiefBuildId) && rowsFor(T_CHIEF).phase === 'queued',
   'buildId=' + chiefBuildId,
 );
-// 收道（903 律）：同回合 cancel_builds，别留 pending worker 步顶歪后续腿。
+
 if (chiefBuildId) {
   await relayRaw(chiefStepId, 'cancel_builds', { buildIds: [chiefBuildId] });
 }
 await doneStep(chiefStepId);
 await saveJson('a-chief-relay-400.json', { e1, e2, e3, e5: { status: e5.status, buildId: chiefBuildId } });
 
-// —— B REST + claim 面：空 assignment 入队 → 无主步失败收尾 + 合法步领走 ————
 const b1 = await sendJson(SERVER + '/api/projects/' + projectId + '/builds', {
   todoIds: [T_REST],
   assignment: { plan: null, build: null },
@@ -321,9 +296,6 @@ await saveJson('b-rest-claim-face.json', {
   todoApi: restTodoApi,
 });
 
-// —— C scheduler：无指派 todo 定时触发 → 同漏斗 ————————————————————————
-// once 档 at 必须钉 00/15/30/45 四档分钟（assertMinuteStep，r5 §8）：取上一
-// 个整刻钟（过去时刻 → next tick 即到期）。
 const quarter = 15 * 60_000;
 const pastQuarter = Math.floor((Date.now() - quarter) / quarter) * quarter;
 const c1 = await sendJson(SERVER + '/api/schedules', {
@@ -349,8 +321,7 @@ check(
   Boolean(schedBuildId),
   'buildId=' + schedBuildId,
 );
-// claim 长轮询 ~75s hold：tryClaim 第一轮同步失败无主步后挂起，探针短超时
-// 打断即可（打断不打断，失败收尾都已落账）。
+
 try {
   await fetch(SERVER + '/api/machine/tasks/claim', {
     method: 'POST',
@@ -359,7 +330,7 @@ try {
     signal: AbortSignal.timeout(2500),
   });
 } catch {
-  // 预期的超时打断：claim 已先跑 tryClaim。
+
 }
 await new Promise((r) => setTimeout(r, 500));
 const schedRows = rowsFor(T_SCHED);
@@ -373,7 +344,6 @@ check(
 );
 await saveJson('c-scheduler-funnel.json', { db: schedRows });
 
-// —— D 看板可见：失败卡在「待处理」列 + 详情页失败行 ————————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 await page.route('**/api.dicebear.com/**', (route) =>
@@ -399,7 +369,6 @@ check(
 await shot(page, '02-detail-fail-row.png');
 await browser.close();
 
-// —— 汇总 ————————————————————————————————————————————————
 const failed = checks.filter((c) => !c.ok);
 await saveJson('result.json', {
   probe: 'drive-1104-unassigned-build',

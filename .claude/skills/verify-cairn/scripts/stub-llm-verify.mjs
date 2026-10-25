@@ -1,7 +1,3 @@
-// stub LLM（stop-button probe 前置）：OpenAI Chat Completions 兼容 SSE，
-// 单轮门控延迟（缺省 30s）——给浏览器停止路径留窗口（integration
-// stub-llm.ts 同族最小形）。客户端中断（停止钮 abort）即清延迟计时。
-// 用法：STUB_PORT=8919 STUB_DELAY_MS=30000 node stub-llm-verify.mjs（后台跑）。
 import { createServer } from 'node:http';
 
 const PORT = Number(process.env.STUB_PORT ?? 8919);
@@ -45,10 +41,7 @@ const server = createServer((req, res) => {
       res.write('data: [DONE]\n\n');
       res.end();
     }, DELAY_MS);
-    // Node ≥ v20: IncomingMessage 'close' fires on normal completion (after
-    // 'end'), not just on abort — clearing the timer there kills every
-    // response. Watch the *response* close instead, and only clear while the
-    // delayed reply is still pending (client abort mid-gate).
+
     res.on('close', () => {
       if (!responded) clearTimeout(timer);
     });

@@ -1,22 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive — spec 12 / #360 G2-T3 web 新建项目表单面(live 浏览器):
-// 1. 仓库菜单两行「GitHub 仓库」「本地文件夹」,hosted 行创建入口消失
-// 2. 名称回填:local = basename(路径),github = repo 段;手改后不覆盖,清空
-//    后恢复;两形态选态换输入面 + swap 重开菜单
-// 3. focus-visible 收编(#1007 重钉):项目名输入框 focus = outline none +
-//    registry Input 件默认环(focus-visible:border-ring + ring-3 ring-ring/50,
-//    #982 判决回官方形;旧 spot 系边框 + 1px ring 配方随 L4 原型退役) —— 截图证据
-// 4. 本地路径校验错误行:不存在 → 「路径不存在」/ 非 git → 「不是 git 仓库」
-//    (--danger 红),阻止导航;编辑路径即撤陈旧错误
-// 5. 提交闸:local 空路径 = 创建钮 disabled
-// 6. 三条创建链落库真值:local(repoKind/localPath)、github(repoKind/
-//    githubRepo)、未选形态(repoKind NULL 无 repo 项目)—— API + SQLite 双证
-// 栈必须已在跑(launch.mjs;坐标取 VERIFY_RUN_DIR/ports.json,worktree 车道
-// 传 VERIFY_REPO_ROOT)。道具(真 git 仓/非 git 目录)自建自清。
-// 证据(截图 + result.json)落 VERIFY_EVIDENCE_DIR;交付见 SKILL.md「证据归档
-// 纪律」(在 PR 分支上 vp.mjs archive <票号> --from <证据目录> 拷进
-// docs/verify/<票号>/ 随 PR 提交,不手工 cp)。任一断言失败退出码 1。
-// 运行前置:proxy env 全 unset(回环请求过代理会 502 假阳性)。
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -44,10 +26,8 @@ const WEB = `http://127.0.0.1:${stack.webPort}`;
 const DB_PATH = join(stack.homeDir, 'server', 'server.db');
 const NEW_PAGE = `${WEB}/app/project/new`;
 
-/** shadcn.css 值正本:探针跑暗色, --ring 暗 #938e8a(registry 环槽) /
- *  --danger 并流 --destructive 暗 #e05a5a(#839 起吃 destructive,旧 #ca3a32 作废)。 */
 const FOCUS_RING = 'rgb(147, 142, 138)';
-const DANGER = 'rgb(255, 171, 183)'; // --destructive dark(#1002 色板翻值后)
+const DANGER = 'rgb(255, 171, 183)';
 
 const now = new Date();
 const pad = (n) => String(n).padStart(2, '0');
@@ -67,7 +47,6 @@ const check = (ok, label) => {
   if (!ok) failures += 1;
 };
 
-// —— 现场道具:真 git 工作树仓 + 非 git 目录 + 不存在路径 ——————————
 const props = [];
 function tempDir(prefix) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -91,7 +70,6 @@ const getJson = async (url) => {
   return res.json();
 };
 
-/** SQLite 真值(只读)。better-sqlite3 在 apps/server 依赖里,按包定位解析。 */
 const dbQuery = (fn) => {
   try {
     const requireServer = createRequire(join(ROOT, 'apps', 'server', 'package.json'));
@@ -124,8 +102,7 @@ const gotoNew = async () => {
 };
 const menu = () => page.getByRole('menu', { name: '仓库' });
 const openMenu = async () => {
-  // #1007 载体迁:.prj-new-repo-menu* 别名 #946 已退役,探针改语义载体
-  // (role=menu / menuitemradio);开合归 Base UI 原语,无 ClickCatcher 罩面。
+
   if (await menu().isVisible()) return;
   const swap = page.locator('button[aria-label="选择仓库"]');
   if (await swap.isVisible()) await swap.click();
@@ -146,7 +123,7 @@ const nameValue = () => page.locator('#prj-new-name').inputValue();
 const errorRow = page.getByRole('alert');
 
 try {
-  // 1. 菜单两行,hosted 创建入口消失
+
   await gotoNew();
   await openMenu();
   const rows = menu().getByRole('menuitemradio');
@@ -162,7 +139,6 @@ try {
   );
   await shot('01-menu-two-rows.png');
 
-  // 2. local 选态 → 路径输入面;名称回填 basename
   await selectRow('本地文件夹');
   const localInput = page.locator('input[aria-label="本地文件夹"]');
   check(await localInput.isVisible(), '本地文件夹选态:触发行换成路径输入面');
@@ -173,7 +149,6 @@ try {
   );
   await shot('02-backfill-local.png');
 
-  // 3. 手改不覆盖;清空恢复回填
   await page.locator('#prj-new-name').fill('Custom Name');
   await localInput.fill(plainDir);
   check((await nameValue()) === 'Custom Name', '手改项目名后,路径变化不再覆盖');
@@ -184,8 +159,6 @@ try {
     `清空名称后回填恢复(实际「${await nameValue()}」)`,
   );
 
-  // 4. github 选态 → 认证门控面(#361):未认证 = 认证钮 + 手动兜底链接,
-  //    owner/repo input 在链接后——点链接露出输入面再回填
   await selectRow('GitHub 仓库');
   check(
     (await page.locator('input[aria-label="本地文件夹"]').count()) === 0,
@@ -199,8 +172,6 @@ try {
     `github 回填:项目名 = repo 段(实际「${await nameValue()}」)`,
   );
 
-  // 5. focus-visible 收编:registry 环(border-ring + ring-3),非 UA 蓝(AC 截图)。
-  //    border-color 走 transition-colors(150ms)——读值前等过渡落定,shadow 不过渡。
   await page.locator('#prj-new-name').click();
   await page.waitForTimeout(300);
   const focus = await page.locator('#prj-new-name').evaluate((el) => {
@@ -217,7 +188,6 @@ try {
   );
   await shot('03-focus-ring-registry.png');
 
-  // 6. 提交闸:local 空路径 = disabled
   await gotoNew();
   await page.locator('#prj-new-name').fill('Gated');
   await selectRow('本地文件夹');
@@ -226,7 +196,6 @@ try {
     '提交闸:local 形态空路径 = 创建钮 disabled',
   );
 
-  // 7. 错误行:不存在 → 路径不存在(红),阻止导航;编辑即撤
   await page.locator('input[aria-label="本地文件夹"]').fill(missingPath);
   await page.getByRole('button', { name: '创建项目' }).click();
   await errorRow.waitFor({ state: 'visible', timeout: 8000 });
@@ -242,7 +211,6 @@ try {
   await page.locator('input[aria-label="本地文件夹"]').fill(plainDir);
   check((await errorRow.count()) === 0, '编辑路径后陈旧错误行即撤');
 
-  // 8. 错误行:非 git → 不是 git 仓库
   await page.getByRole('button', { name: '创建项目' }).click();
   await errorRow.waitFor({ state: 'visible', timeout: 8000 });
   const errText2 = await errorRow.textContent();
@@ -250,7 +218,6 @@ try {
   check(errText2 === '不是 git 仓库', `400 非 git 目录 → 错误行「不是 git 仓库」(实际「${errText2}」)`);
   await shot('05-error-not-git.png');
 
-  // 9. local 成功链:提交 → 导航 → API/SQLite 双真值
   await gotoNew();
   await selectRow('本地文件夹');
   await page.locator('input[aria-label="本地文件夹"]').fill(gitRepo);
@@ -280,7 +247,6 @@ try {
     `SQLite:local 项目行 repoKind/localPath 落库(${JSON.stringify(dbLocal.row ?? dbLocal)})`,
   );
 
-  // 10. github 成功链(同 4:未认证面 input 在手动兜底链接后,#361 门控)
   await gotoNew();
   await selectRow('GitHub 仓库');
   await page.getByRole('button', { name: '手动输入 owner/repo' }).click();
@@ -295,7 +261,6 @@ try {
     `github 创建链:record repoKind=github + githubRepo 落库(实际 ${JSON.stringify(ghRow ?? null)})`,
   );
 
-  // 11. 未选形态 = 无 repo 普通项目(repoKind NULL)
   await gotoNew();
   const untouchedName = `verify-untouched-${Date.now() % 100000}`;
   await page.locator('#prj-new-name').fill(untouchedName);
@@ -318,7 +283,7 @@ try {
   );
 } catch (err) {
   check(false, `probe 异常:${String(err?.message ?? err)}`);
-  // 崩溃现场 DOM 快照：repo-field 面 + 全 input aria-label，失败自释（别靠猜）。
+
   try {
     payloads.crashDom = await page.evaluate(() => ({
       url: location.href,
