@@ -141,7 +141,7 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
               data-testid="chief-chip-agent"
               className={`${CHIP_INLINE_CLS} bg-(--seg-active) text-(--text-secondary)`}
             >
-              <img src={spiralAvatarUrl(s.agent)} alt="" className="size-[11px] rounded-full" />
+              <img src={spiralAvatarUrl(s.agent)} alt="" className="size-3 rounded-full" />
               {s.agent}
             </span>
           );
