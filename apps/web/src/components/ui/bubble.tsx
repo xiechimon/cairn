@@ -25,17 +25,6 @@ const bubbleVariants = cva(
           '*:data-[slot=bubble-content]:bg-secondary *:data-[slot=bubble-content]:text-secondary-foreground [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]',
         muted:
           '*:data-[slot=bubble-content]:bg-muted [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--muted),var(--foreground)_5%)]',
-        // #1009 A1 registered deviation (#851 G5 / map #980 oklch-fold
-        // contract): upstream tinted paints relative-color
-        // oklch(from var(--primary) L C h) — runtime-dependent on --primary,
-        // not foldable to a static token value, and raw `[oklch` is red under
-        // G5. Rewritten as two-token color-mix washes over the file's own
-        // bracket idiom (the secondary/muted hovers upstream); ratios derived
-        // per theme from the upstream L targets (base 0.93 light / 0.30 dark,
-        // hover 0.88 / 0.35) against the measured oklch L of the #988 tokens
-        // (card 0.9426/0.2553, primary 0.1706/0.9346): 2%/8% light, 7%/14%
-        // dark — |ΔL| ≤ 0.005 on all four faces. No new token slot minted;
-        // zero consumers at registration (A1 consumes secondary/ghost only).
         tinted:
           '*:data-[slot=bubble-content]:bg-[color-mix(in_oklch,var(--primary)_2%,var(--card))] *:data-[slot=bubble-content]:text-foreground dark:*:data-[slot=bubble-content]:bg-[color-mix(in_oklch,var(--primary)_7%,var(--card))] [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--primary)_8%,var(--card))] dark:[&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--primary)_14%,var(--card))]',
         outline:

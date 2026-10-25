@@ -1,11 +1,3 @@
-// 仓内语义映射（其余与上游 base-nova 逐字同源）：
-// ① z-50 → z-(--z-dialog)——#733 全仓单一 z 梯（overlay 架构槽位，非皮肤）；
-// ② Content 透出 anchor——#454 调用点定位（project-new-page 1 处消费）；
-// ③ Paper menu（apps/web/DESIGN.md 弹窗与菜单）：32px 行、13.5px 字、15px
-//    ink-3 图标、menu-hover 底、danger-soft 危险行、内缩 6px 分隔线、
-//    caption 分组标签与快捷键提示。
-// 图标走 lucide 契约（components.json iconLibrary=lucide，#982 判决：生成件缝
-// 属皮肤）；动效 = 上游默认（#991 Q9：动效是 base-nova 形态一部分）。
 import { Menu as MenuPrimitive } from '@base-ui/react/menu';
 import { cn } from 'cn';
 import { CheckIcon, ChevronRightIcon } from 'lucide-react';

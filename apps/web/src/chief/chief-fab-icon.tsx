@@ -1,5 +1,3 @@
-// 唯一消费点 = 根 host 的全站 FAB（chief-root.tsx，ADR 0013 D6 单实例）。
-
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { ChiefContent } from '../fixtures/records.js';
 import { BUSY_SPIN_CLS } from './chief-spiral-face.js';
@@ -32,9 +30,6 @@ export function ChiefFabIcon({
   expanded: boolean;
 }) {
   return chief.agent ? (
-    // #444/#950：头像铺满 FAB 圆（字形的内边距不适用于头像面），尺寸由本
-    // 槽钉死——Avatar 加载失败退静态资产时盒子不变，无布局跳动。utility
-    // 单源在此，五族 FAB（board inline + 四个 wake 壳）同配方。
     <span
       className={`block flex-none overflow-hidden rounded-full [&_img]:block [&_img]:size-full [&_img]:object-cover ${expanded ? 'size-8' : 'size-full'}`}
     >

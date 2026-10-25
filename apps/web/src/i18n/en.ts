@@ -547,10 +547,8 @@ export const EN: Record<string, string> = {
   技能已更新: 'Skill updated',
   关注与提醒: 'Watches & reminders',
   未设置: 'Not set',
-  压缩模型: 'Compaction model',
   // #854 收编 popover 后用户菜单面板的 aria-label（原 FloatingShell 壳无标签）
   用户菜单: 'User menu',
-  '默认（与 Chief 相同）': 'Default (same as Chief)',
   '尚无章程。点击编辑，为总管添加常设指示。':
     'No charter yet. Click edit to give the Chief standing instructions.',
   编辑: 'Edit',
@@ -695,7 +693,6 @@ export const EN: Record<string, string> = {
   '未注入技能（任务文本未命中任何技能）': 'No skills injected (task text matched none)',
   // #1288：模型活性标注——dead 模型置灰 +「已下架」（不隐藏）。
   已下架: 'Delisted',
-  '{name}（已下架）': '{name} (Delisted)',
   [PROBE_TOOL_CALL_LABEL]: `Calling tool: ${PROBE_TOOL_PILLS[1]}`,
   '方案 · v1': 'Plan · v1',
   'Xmon Dai 发起了合并': 'Xmon Dai started a merge',
@@ -703,7 +700,6 @@ export const EN: Record<string, string> = {
   '运行在 ': 'Running on ',
   '远程（HTTP）': 'Remote (HTTP)',
   '2 天前': '2d ago',
-  未启用: 'Disabled',
   // —— overlay dialogs (issues #66 / #68) ——
   新建任务: 'New task',
   '我想要的结果：': 'The outcome I want:',

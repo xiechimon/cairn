@@ -1,8 +1,3 @@
-// #1259 团队 agent 卡网格（team-page 与机器详情页共用）：卡 = 进 Agent 详情
-// 面的链接（#485）。Paper 卡（DESIGN.md「页面模式 · 卡片圆角」）：白底、
-// --radius-card、1px 环 + 看板任务卡同一层轻投影；内容 = 头像 + 名字 + 一行
-// 元信息（模型 · 归属机）+ 归属机状态（图标 + 颜色 + 文字）。
-
 import { cn } from 'cn';
 import { Bot, CircleAlert, CircleDashed, CircleDot, type LucideIcon, Plus } from 'lucide-react';
 import { Link } from 'react-router';
@@ -30,17 +25,12 @@ const STATUS_FACE: Record<MachineStatus, { icon: LucideIcon; label: string; cls:
 
 interface TeamAgentGridProps {
   agents: TeamAgentCard[];
-  /** 归属机名与在线态的解析源（machineId → row）；可省 = 不出归属机与状态。 */
   machines?: MachineRow[];
-  /** 网格自带的创建入口（机器详情页）；团队页的创建在顶栏，不传。 */
   onCreate?: () => void;
-  /** Link 律（#121）：scenario 串随行。 */
   search: string;
-  /** fixture 删除覆面（#66）：删掉的卡隐去。 */
   isDeleted?: (id: string) => boolean;
 }
 
-/** 零 Agent 空态：团队页 grid 与 chart 两种布局共用。 */
 export function TeamAgentsEmpty({ onCreate }: { onCreate?: () => void }) {
   const { t } = useI18n();
   return (

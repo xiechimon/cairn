@@ -1,15 +1,3 @@
-// Account route (issue #70): avatar and name above one settings card with
-// 语言 / 密度 / 推送通知. 删除 / 退出登录 (#148), 邮箱 (XMON-107) and the avatar
-// swap button (#306) are gone: a single-user self-host has no account face for
-// them. The name is inline-editable and lands PATCH /api/user/me (#1031).
-//
-// 推送通知 (#1031) is a stored preference (cairn.notifyEnabled, read by the
-// sse.ts desktop-notification gate) layered over Notification.permission:
-// until the user picks, it follows the permission; a non-granted "on" also
-// drives the #114 requestPermission() path, and on + denied explains the block
-// in place of the sub-line. Fixture mode freezes the permission per scenario
-// and defaults to granted (headless chromium reports the real API 'denied').
-
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useSession } from '../api/hooks.js';
@@ -51,13 +39,9 @@ export function AccountPage() {
   const { locale, setLocale, t } = useI18n();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  // M5 live：名称 = GET /api/user/me（seed 单用户 displayName，02 §2.1）。
-  // 邮箱行已删（XMON-107 用户裁决）：无邮箱账位面，占位无信息量。
   const { live, teamId } = useLiveData();
   const sessionQ = useSession(live);
   const mutations = useApiMutations(teamId);
-  // #1031 改名：live 落 PATCH /api/user/me（既有资料更新通道，成功后 session
-  // 读面失效重取回显）；fixture 面本地态覆写（scenario 无后端，改名只回显）。
   const [fixtureName, setFixtureName] = useState<string | null>(null);
   const userName = live ? (sessionQ.data?.displayName ?? USER_NAME) : (fixtureName ?? USER_NAME);
   const commitName = (next: string) => {
@@ -70,15 +54,6 @@ export function AccountPage() {
       { onError: (error) => toastError(t('保存失败，请重试。'), error) },
     );
   };
-  // #1031 推送通知开关 = 用户偏好档（本地持久化）× 浏览器权限，两层分离：
-  //  · 偏好档（cairn.notifyEnabled）：显示态主源。null（未表态）时跟随权限
-  //    ——granted 显示开、其余显示关；一旦点过就以偏好为准，不再被权限推导。
-  //  · 权限（Notification.permission）：只决定「真弹与否」（sse.ts 闸门）与
-  //    非 granted 态点开时驱动一次 requestPermission（#114 banner 同一路径）。
-  // 这样 granted 态点「关」落地为偏好 off（sse 停弹），denied 态点「开」落地
-  // 为偏好 on + 拦截解释——两侧点击都有可解释结果，不再是单向空操作。
-  // fixture 面权限由 scenario 冻结（可表达 granted/denied/default 三态，不再
-  // 硬编 granted）；无 scenario 位时缺省 granted 保 r7 13 基线行的开态。
   const [notifyPref, setNotifyPref] = useState<NotifyPref | null>(() =>
     readNotifyPref(safeLocalStorage()),
   );
@@ -87,7 +62,6 @@ export function AccountPage() {
     applyDensity(next);
     setDensity(next);
   };
-  // Keep segment face in sync with user-menu (Bugbot #1366 desync).
   useEffect(() => {
     const onDensity = (e: Event) => {
       const detail = (e as CustomEvent<Density>).detail;
@@ -101,7 +75,6 @@ export function AccountPage() {
     live ? null : (fixture.ui?.notificationPermission ?? 'granted'),
   );
   const notifyOn = notifyPref === null ? permission === 'granted' : notifyPref === 'on';
-  // 开着但权限被拒 = 显示开而实际不弹，必须给出解释（不能裸奔成新的假可供性）。
   const notifyBlocked = notifyOn && permission === 'denied';
   return (
     <PageShell route="account" fixture={fixture} selected="none" title={t('帐号')}>

@@ -1,9 +1,3 @@
-// CDS PR-6: wire useScrollFade onto the MessageScroller viewport without
-// editing the pristine registry message-scroller.tsx (S5). Call sites pass
-// className including `scroll-fade` (replacing the dead `scroll-fade-b` that
-// still ships on the registry Viewport default — our className appends the
-// live utility; both can coexist harmlessly).
-
 import { useCallback, useRef } from 'react';
 import { useScrollFade } from '../../hooks/use-scroll-fade.js';
 import { MessageScrollerViewport } from '../ui/message-scroller.js';

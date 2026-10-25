@@ -1,7 +1,3 @@
-// Paper empty state (DESIGN.md「页面模式 · 空态」) on the registry Empty
-// compound: a bare neutral icon, a title, a short description, at most one
-// primary action and an optional hint line. Callers pass translated strings.
-
 import { cn } from 'cn';
 import type { ComponentType, SVGProps } from 'react';
 import { Button } from './ui/button.js';
@@ -14,9 +10,7 @@ export interface EmptyStateProps {
   icon: EmptyStateIcon;
   title: string;
   description?: string;
-  /** The page's one primary action: shadcn Button default, 32px. */
   action?: { label: string; onClick?: () => void; disabled?: boolean };
-  /** Meta line under the action, e.g. a permission or read-only note. */
   hint?: { icon?: EmptyStateIcon; text: string };
   className?: string;
   testId?: string;

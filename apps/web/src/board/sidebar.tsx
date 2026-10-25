@@ -1,9 +1,3 @@
-// Board sidebar, Paper Grouped layout (apps/web/DESIGN.md 侧栏): workspace
-// row, 新任务 button, 工作台 / 需要我处理 / 定时, 项目 group, then the folded
-// 资源 row and the user row pinned to the bottom. The collapsed rail is the
-// icon-only twin of the same rows. Class aliases (board-sidebar, sidebar-*,
-// rail-*) stay as e2e carriers.
-
 import { BRAND } from '@cairn/shared';
 import {
   Box,
@@ -42,9 +36,6 @@ import { readStoredTheme } from '../theme.js';
 import { withColumnParam } from './columns.js';
 import { ProjectAvatar } from './project-avatar.js';
 
-/** Which row carries the active face: a nav row, the workspace row on
- *  team/account, a 资源 subrow by href, or none. Project rows match by
- *  pathname instead of a named slot. */
 export type SidebarSelected =
   | 'board'
   | 'attention'
@@ -62,26 +53,19 @@ export interface SidebarProject {
   name: string;
 }
 
-/** Fallback row while the scenario carries no project list. */
 const CANON_PROJECT: SidebarProject = { id: PROJECT_ID, name: PROJECT_NAME };
 
 interface BoardSidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
-  /** 待处理 column count: the 需要我处理 badge. */
   attention?: number;
-  /** 执行中 column count: the user row's second line. */
   running?: number;
-  /** Online machines: the user row's second line and the 机器 row dot. */
   machinesOnline?: number;
   onSearch?: () => void;
-  /** Shared with the C hotkey (AppSidebar resolves the dialog). */
   onNewTask: () => void;
   usageNav?: boolean;
   selected?: SidebarSelected;
-  /** Live = projectsQ projection ([] while in flight); absent = canon row. */
   projects?: SidebarProject[];
-  /** Unfinished todos per project id. */
   projectCounts?: ReadonlyMap<string, number>;
 }
 
@@ -101,8 +85,6 @@ const RESOURCE_ROWS: ResourceRow[] = [
 
 const USAGE_ROW: ResourceRow = { label: '用量', href: '/app/usage', Icon: ChartColumn };
 
-/** Fold keys. 项目: "1" folded, absent open. 资源: "0" open, absent folded
- *  (the Grouped layout folds resources by default). */
 export const GROUP_STORAGE_KEYS = {
   project: 'cairn.sidebarProjectsCollapsed',
   resource: 'cairn.sidebarResourcesCollapsed',
@@ -127,9 +109,6 @@ const STROKE = 1.75;
 const FOCUS =
   'outline-none focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2';
 
-/** The ⌘K panel is the only lit surface while open (#137): the page-layer
- *  active row drops its face under the scrim. Marker writer =
- *  overlays/search-panel useSingleLitSurface. */
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
 
@@ -137,8 +116,6 @@ const ROW = `flex h-8 w-full flex-none items-center gap-2.5 rounded-(--cds-radiu
 const ROW_IDLE = 'hover:bg-sidebar-hover hover:text-foreground [&>svg:first-child]:text-icon';
 const ROW_ACTIVE = `bg-background font-medium text-foreground shadow-xs ring-1 ring-border [&>svg:first-child]:text-(--card-button) ${SEARCH_OPEN_DIM}`;
 
-/** Ghost Button neutralizer for rows: the row recipe owns fill, radius and
- *  type; the primitive's hover fill, gap and press shift are zeroed. */
 const ROW_BTN =
   'justify-start border-none font-normal dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0';
 
@@ -149,9 +126,6 @@ const RAIL_ACTIVE = `bg-background text-(--card-button) shadow-xs ring-1 ring-bo
 const RAIL_BTN =
   'cursor-pointer border-none bg-transparent p-0 dark:hover:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-content-tertiary aria-expanded:hover:bg-sidebar-hover aria-expanded:hover:text-foreground active:not-aria-[haspopup]:translate-y-0';
 
-/** Module-level on purpose: nested in BoardSidebar it would get a new
- *  identity per render and React would remount the Popover subtree, whose
- *  close callback then snaps the controlled `open` back to false. */
 function UserMenuPopover({
   open,
   onOpenChange,

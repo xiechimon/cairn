@@ -1,6 +1,3 @@
-// 仓内语义映射（零皮肤；其余与上游 base-nova 逐字同源）：z-50 →
-// z-(--z-dialog)——#733 全仓单一 z 梯。动效 = 上游默认（#991 Q9 判决：
-// scale-fade 仓内正典退役，动效是 base-nova 形态一部分）。
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover';
 import { cn } from 'cn';
 import type * as React from 'react';

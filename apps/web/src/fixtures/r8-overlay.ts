@@ -10,14 +10,6 @@ import {
 } from './core.js';
 import type { DocBlock, FixtureSet, TodoRecord, TranscriptItem } from './records.js';
 
-/* ---- r8 overlay batch (#66): dark captures 78–81, shot 2026-09-22
-   23:41–23:45 on the live space. The board behind them carries the
-   session's own probe #16 plus the concurrent r8-dynamic ticket's #15
-   and its #11–#14 leftovers; all transcribed off the captures, never
-   touched on the live space. ---- */
-
-/** r8-dynamic ticket probe #15 (concurrent session, left untouched):
- *  planning while 54 shot, confirm by 57. */
 function dyn15(phase: TodoRecord['phase']): TodoRecord {
   return {
     id: 'r8-dynamic-15',
@@ -42,7 +34,6 @@ function dyn15(phase: TodoRecord['phase']): TodoRecord {
   };
 }
 
-/** r8-dynamic ticket's failed #12 (执行中 column, 重试 button, 5 小时前). */
 const dyn12Failed: TodoRecord = {
   id: 'r8-dynamic-12',
   teamId: TEAM_ID,
@@ -65,8 +56,6 @@ const dyn12Failed: TodoRecord = {
   v: 3,
 };
 
-/** r8-dynamic ticket's review/done leftovers (#13 待验收, #14/#11 已完成;
- *  #1/#2 are the r3 legacy pair, still on the board). */
 function dynLeftover(
   seq: number,
   title: string,
@@ -102,7 +91,6 @@ const R8_LEFTOVERS = [
   dynLeftover(11, '编写 CONTRIBUTING.md 贡献指南', 'done', 6),
 ];
 
-/** This ticket's probe #16 (created 23:42, deleted 23:45 — zero residue). */
 function probe16(phase: TodoRecord['phase'], phaseAt: number): TodoRecord {
   return {
     id: 'u_B5ngeVOlKdKbG_4H9Cl',
@@ -127,12 +115,8 @@ function probe16(phase: TodoRecord['phase'], phaseAt: number): TodoRecord {
   };
 }
 
-/** r8 build id of probe #16 (synthetic: the record never survived the
- *  session, same precedent as r7 probe #10). */
 const R8_BUILD_ID = 'r8-conv-overlay-16';
 
-/** Probe #16 plan document, verbatim from the 56 doc pane: markdown
- *  headings + file/commit reference spans (blue mono chips). */
 const R8_PLAN_DOC: DocBlock[] = [
   { kind: 'head', segments: [{ text: 'Context' }] },
   {
@@ -233,8 +217,6 @@ const R8_PLAN_DOC: DocBlock[] = [
   },
 ];
 
-/** Probe #16 transcript at confirm (r8 80): stamp, start bubble with the
- *  taskline, the agent's spec-empty note, plan card `完成 2m 41s`. */
 const R8_CONFIRM_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'run', at: '23:43', machine: MACHINE_NAME },
   { kind: 'user', text: '开始执行任务', seq: 16, title: 'r8-overlay-dark 探针' },
@@ -261,16 +243,12 @@ const R8_CONFIRM_TRANSCRIPT: TranscriptItem[] = [
   },
 ];
 
-/** r8 78: board at 23:41 — #15 planning (streaming card behind the
- *  dialog), #12 failed with 重试, the legacy pair in 待验收/已完成 plus
- *  the dynamic ticket's done leftovers. */
 export const boardR8Overlay: FixtureSet = {
   todos: [dyn15('planning'), dyn12Failed, legacyReview, ...R8_LEFTOVERS, legacyDone],
   now: r8(23, 44),
   usageNav: true,
 };
 
-/** r8 81: probe #16 fresh detail at 23:43 (#15 already confirm → badge 3). */
 export const detailR8Fresh: FixtureSet = {
   todos: [
     probe16('todo', r8(23, 42)),
@@ -284,10 +262,6 @@ export const detailR8Fresh: FixtureSet = {
   usageNav: true,
 };
 
-/** r8 82: probe #17 (created 2026-09-23 00:34, deleted 00:36 — zero
- *  residue), fresh detail under the delete confirm. Badge 2 in the
- *  capture → #15 already out of confirm by then; the fresh surface keeps
- *  this pair clear of the doc-pane/taskline drift the 79/80 pairs hit. */
 const probe17Fresh: TodoRecord = {
   id: 'r8-delete-17',
   teamId: TEAM_ID,
@@ -316,8 +290,6 @@ export const detailR8DeleteFresh: FixtureSet = {
   usageNav: true,
 };
 
-/** r8 80/79: probe #16 confirm detail at 23:44 (badge 4), the surface the
- *  更多 menu and the delete confirm sit over. */
 export function detailR8Confirm(): FixtureSet {
   return {
     todos: [

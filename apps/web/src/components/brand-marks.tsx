@@ -1,19 +1,9 @@
-// 官方品牌 mark：pi / Claude（#503 机器行 runtime 面）。
 //
-// 原件来源（2026-09-30 抓站点静态资源，路径数据逐字未改）：
-//   pi     https://pi.dev/logo-auto.svg   334 B  三色块 珊瑚 #F09082 / 蓝 #4D9ABF / 琥珀 #F1BE58
-//   Claude https://claude.ai/favicon.svg 2558 B  星芒单路径 黏土 #D97757
 //
-// viewBox 按各自 ink 边界收紧：两个原件的留白差得远（pi 画面只占 800 框的
-// 58.7%，Claude 占 248 框的 95%），原件直接同尺寸并排会差出一倍视觉重量。
-// 收紧后两者共用同一方形框，尺寸沿 icons 族约定走 width/height 默认值。
 //
-// 不走 currentColor：这是本仓唯一按品牌原色着色的图标族。启用/未启用态由
-// CSS opacity 承载（resources.css 的 .mach-runtime 族），不另出资产。
 
 import type { SVGProps } from 'react';
 
-/** pi 官方彩色 mark（pi.dev 站点 logo 原路径）。 */
 export function PiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -42,7 +32,6 @@ export function GeminiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSV
   );
 }
 
-/** Claude 官方 mark（claude.ai favicon 原路径，星芒）。 */
 export function ClaudeMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg aria-hidden="true" width={width} height={height} viewBox="6.2 6.2 235.6 235.6" {...props}>

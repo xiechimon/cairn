@@ -3,8 +3,6 @@ import { MACHINE_ID, MACHINE_REMOTE_ID, R3_BUILDER } from './core.js';
 import type { FixtureSet, TeamContent } from './records.js';
 import { RESOURCES } from './resources.js';
 
-/** Team route roster (r7 12): `1 个成员` stats bar + the single agent card
- *  (`claude-sonnet-5 · 默认`, role unset) beside the dashed 创建 Agent slot. */
 export const TEAM_R7: TeamContent = {
   members: 1,
   agents: [
@@ -18,19 +16,12 @@ export const TEAM_R7: TeamContent = {
   ],
 };
 
-/** Team route fixture (r7 12): the board todos never render here, the
- *  roster is the whole surface. */
 export const teamGrid: FixtureSet = {
   todos: boardDefault.todos,
   now: boardDefault.now,
   team: TEAM_R7,
 };
 
-/** chart 组织图 named scenario（命名场景无 capture 先例 #444）：r7 12 捕获
- *  只有一个成员，组织图的根/子结构在那份语料里长不出来——这里合成 3 个
- *  Agent + 1 个绑定总管，字段形状照 todos.dev 实测 members 行
- *  （displayName/provider/modelId/description）。供
- *  ./e2e/team-org-chart.spec.ts 钉组织图的结构与连接件几何。 */
 const TEAM_ORG_CHART: TeamContent = {
   members: 3,
   agents: [
@@ -61,7 +52,6 @@ const TEAM_ORG_CHART: TeamContent = {
   ],
 };
 
-/** 总管绑定在 org-chief 上 —— 组织图的根节点由它决定。 */
 export const teamOrgChart: FixtureSet = {
   todos: boardDefault.todos,
   now: boardDefault.now,
@@ -74,7 +64,6 @@ export const teamOrgChart: FixtureSet = {
   },
 };
 
-/** 零成员团队（r2 §8.1 17c：无成员时整块内容 = 暂无成员，不渲组织图）。 */
 export const teamOrgChartEmpty: FixtureSet = {
   todos: boardDefault.todos,
   now: boardDefault.now,
@@ -141,9 +130,6 @@ export const teamOrgChartPair: FixtureSet = {
   },
 };
 
-/** Paper team page: four agents across an online machine, an offline machine
- *  and no home machine, so every card status renders. The remote machine is
- *  forced offline; the chief is bound to the first agent (drawer closed). */
 export const teamRoster: FixtureSet = {
   todos: boardDefault.todos,
   now: boardDefault.now,

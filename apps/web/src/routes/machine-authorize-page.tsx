@@ -1,16 +1,3 @@
-// 浏览器授权页（W4 #285，02 §5.2 路径一）：enroll/start 返回的 capability
-// URL 落地页——?enroll=<id> 到达 → poll 轮询（pending = 待授权卡 + 确认钮；
-// authorized = 完成态；expired = 失效文案）→ confirm 建机（无 apiKey，capability
-// 单次）。无参到达 = 本页自起 start（拿 enrollId 即转入轮询，授权链接可复制
-// 给执行机侧流程）。CLI 主路径（--api-key 两步弹窗，#181/#179）不动。
-// B2 收编（#426）：面板 = 仓内 shadcn Card，字样 = 语义标签 + TW 工具
-// 类直引 token 正本；per-face 样式（routes/machine-authorize.css）随片退役。
-// 类名别名（authorize-*）原样保留在元素上（别名保留律 #411 政策 1）；新增
-// e2e 钉扎面按同政策走语义 locator，不再新铸类名钉。
-// #1005 registry 对齐：Card 的 12px 圆角/shadow-lg 覆写退役（rounded-xl /
-// ring-1 官方默认几何赢，#980 裁决④），提交钮走 Button default 档原样
-// （轨 A3 per-face 钉回值退役）；360px 卡宽与 p-6 内垫是 layout，留消费点。
-
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { api } from '../api/client.js';
@@ -29,7 +16,6 @@ type Phase = 'idle' | 'pending' | 'authorizing' | 'authorized' | 'expired' | 'er
 
 const POLL_INTERVAL_MS = 2_000;
 
-/** 相位文案共用的一档字样（13px / 1.5 行高 / 次级墨）。 */
 const DESC_CLASS = 'text-[13px] leading-normal text-content-secondary';
 
 export function MachineAuthorizePage() {
@@ -39,7 +25,6 @@ export function MachineAuthorizePage() {
   const [phase, setPhase] = useState<Phase>(enrollId !== null ? 'pending' : 'idle');
   const [machine, setMachine] = useState<MachineJson | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // 终态后停轮询（unmount 亦停）。
   const stopped = useRef(false);
   useEffect(() => {
     stopped.current = false;
@@ -48,7 +33,6 @@ export function MachineAuthorizePage() {
     };
   }, [enrollId]);
 
-  // 轮询：pending 期每 2s poll；authorized/expired 终态停。
   useEffect(() => {
     if (enrollId === null || phase !== 'pending') return;
     const tick = async () => {
@@ -64,9 +48,7 @@ export function MachineAuthorizePage() {
         } else if (res.status === 'expired') {
           setPhase('expired');
         }
-      } catch {
-        // 网络抖动不终态——下一轮 poll 兜底（TTL 面归 server）。
-      }
+      } catch {}
     };
     void tick();
     const timer = setInterval(() => void tick(), POLL_INTERVAL_MS);
@@ -95,16 +77,12 @@ export function MachineAuthorizePage() {
       setMachine(res.machine);
       setPhase('authorized');
     } catch (err) {
-      // 409（已确认）/404（失效）→ 失效文案；网络错 → 通用文案，停留。
       setPhase('pending');
       setError(err instanceof Error ? err.message : String(err));
     }
   };
 
   return (
-    // 独立路由页（pathless 布局，不在 app 壳内）：画布底色铺满视口。底色取
-    // --background（B 页面第一档，board-main 同款），不取 --surface-secondary：
-    // 暗色下 --surface-secondary 与 Card 的 bg-card 同值 #1f1f23，面板会与底同色。
     <div className="authorize-backdrop fixed inset-0 flex items-center justify-center bg-background">
       <Card
         role="region"

@@ -1,11 +1,3 @@
-// Delete project confirm (#207 删除区复活, r2 24d): DeleteConfirm 家族同形
-// — Paper S 档确认面、项目名摘要、右对齐 取消/删除(danger) —
-// 加键入项目名确认行:输入与项目名精确匹配才解禁删除钮(误删闸门,票面
-// 「确认输入不匹配禁用」)。级联语义不在本层——server services/projects.ts
-// 单源(#189);本层只管确认形状与闸门。
-// #425 B1：壳与底栏换 components/ui/alert-dialog-shell（同 delete-confirm；
-// 两面共享 .delete-confirm-* css 面，收编同构）。
-
 import { useEffect, useState } from 'react';
 import { FORM_CONTROL_CLS, FormField, FormStack } from '../components/form-layout.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
@@ -13,9 +5,7 @@ import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 
 interface DeleteProjectConfirmProps {
-  /** 确认输入需精确匹配的项目名。 */
   projectName: string;
-  /** #73: retained-mount open flag — the exit fade outlives the close. */
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -29,8 +19,6 @@ export function DeleteProjectConfirm({
 }: DeleteProjectConfirmProps) {
   const { t } = useI18n();
   const [typed, setTyped] = useState('');
-  // 每次重开回到空输入:关闭期 typed 随 retained mount 存活,不重置会让
-  // 重开的弹层带着上一次的输入(闸门形同虚设)。
   useEffect(() => {
     if (open) setTyped('');
   }, [open]);

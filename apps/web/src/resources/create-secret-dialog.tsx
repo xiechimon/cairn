@@ -1,14 +1,3 @@
-// 添加密钥 dialog (wayfinder #173, r2 §242 field authority): rides
-// DialogShell (#68 family law — X / Esc / backdrop). Field set verbatim:
-// 名称（环境变量名）/ 描述（可选）/ 值 textarea + the encrypted-storage
-// note + 添加密钥 submit. Live submit = mutations.createSecret (POST
-// /api/teams/:id/secrets, 02 §8 值只写不读 — the value never echoes back);
-// fixture follows the accept-dialog 律 (#148: close on submit).
-//
-// Paper 表单（DESIGN.md 页面模式 · 表单）：FormStack / FormField，32px 带框
-// 控件，footer = FormActions（取消 + 添加密钥，不是整宽提交条）。label 的
-// htmlFor/id 配对是 getByLabel 一级载体依赖的语义资产。
-
 import { useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -18,10 +7,8 @@ import { useI18n } from '../i18n/provider.js';
 import { FORM_TEXTAREA_CLS } from './parts.js';
 
 interface CreateSecretDialogProps {
-  /** #73 retained-mount open flag. */
   open?: boolean;
   onClose: () => void;
-  /** M5 live 面：添加 = POST secrets；缺省 = fixture 律（提交即关）。 */
   onCreate?: (input: { name: string; description?: string; value: string }) => void;
 }
 

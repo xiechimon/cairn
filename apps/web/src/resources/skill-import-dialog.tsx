@@ -1,13 +1,3 @@
-// 技能导入弹窗（#1170）：localPath 与 url 两字段二选一的导入表单——
-// POST /api/teams/{id}/skills/import（server 收集与守卫：SSRF 固定 host 面 /
-// realpath 归一 / 字节闸 / utf8 严格；落盘复用 createLocalSkill 校验）。
-// 客户端预检只有一条：两字段恰好一个非空（xor 同 shared importSkillBodySchema
-// ——双填/双空不发请求）；其余校验全在 server（与 SkillDialog「server 仍是
-// 终闸」同律：400/409/502/504 落内联错误行，headline 按 status 分译，server
-// 原文作 detail 行，消息子串不作契约）。
-// fixture 面 = accept 律（#148：提交即关），不发请求。
-// Paper 表单：FormStack / FormField + footer FormActions（同 SkillDialog 形）。
-
 import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
@@ -23,7 +13,6 @@ interface Fields {
   url: string;
 }
 
-/** 服务端错误 → 可读 headline（status 分译）+ 原文 detail。 */
 function serverErrorCopy(
   err: unknown,
   t: (s: string) => string,
@@ -50,8 +39,6 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
   const [fields, setFields] = useState<Fields | null>(null);
   const [error, setError] = useState<{ headline: string; detail: string } | null>(null);
 
-  // 开/关初始化：关 = 清场；开 = 空表（无编辑面——导入是单向动作）。
-  // SkillDialog 同律（open 沿初始化，exhaustive-deps 豁免注释同形）。
   useEffect(() => {
     if (!open) {
       setFields(null);
@@ -59,19 +46,18 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
       return;
     }
     setFields({ localPath: '', url: '' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在开/关沿初始化
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialize fields only on the open/close edge
   }, [open]);
 
   const localFilled = fields !== null && fields.localPath.trim() !== '';
   const urlFilled = fields !== null && fields.url.trim() !== '';
-  // xor 预检（server schema 同律）：双填/双空不发请求。
   const submittable =
     fields !== null && localFilled !== urlFilled && !mutations.importSkill.isPending;
 
   const submit = () => {
     if (fields === null || !submittable) return;
     if (!live) {
-      onClose(); // fixture accept 律
+      onClose();
       return;
     }
     setError(null);

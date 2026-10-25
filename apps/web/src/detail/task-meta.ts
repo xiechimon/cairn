@@ -1,8 +1,3 @@
-// taskMeta 投影（#1127 自 todo-detail-page 提取）：live 方案空态的任务元信息
-// ——纯函数，页面侧的 useMemo 只是它的缓存壳。字段序与缺省律见
-// task-meta-block.tsx；fixture 面恒 null（无来源/机器/模型数据源），空态
-// 占位「暂无方案」字节不变。
-
 import { conversationBranch, parseGithubIssueSourceRef } from '@cairn/shared';
 import type { useBuild, useBuildUsage } from '../api/hooks.js';
 import type { toDisplayTodo } from '../api/mappers.js';
@@ -17,8 +12,6 @@ export function buildTaskMeta(input: {
   machineWaiting: boolean;
   agentModel: string | null;
   usage: ReturnType<typeof useBuildUsage>['data'];
-  /** ADR 0006 D5：来源 issue 标题的真值在 issue 侧（echo 查询）；拉不到
-   *  退本地标题，行不因此丢失。 */
   sourceEchoTitle: string | undefined;
 }): TaskMetaFields | null {
   const { live, wireTodo, buildId, build, machineField, machineWaiting, agentModel, usage } = input;

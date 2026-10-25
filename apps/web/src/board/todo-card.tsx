@@ -1,8 +1,3 @@
-// Board todo card, Paper anatomy (DESIGN.md 任务卡): title (2 lines) → one
-// meta row that never wraps → a footer chosen by cardFace(). Card root keeps
-// data-todo-id, the stretched title link (#629 drag locks) and the
-// todo-card / todo-card-title / todo-card-action / todo-card-branch aliases.
-
 import { canOrchestrate } from '@cairn/shared';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -45,21 +40,11 @@ import { relativeTime } from './rel-time.js';
 interface TodoCardProps {
   todo: TodoRecord;
   now: number;
-  /** Card action link (开始/重试/确认计划/审阅/回复); the page decides what
-   *  it does (issue #68: review-phase 审阅 opens the accept dialog). */
   onAction?: (todo: TodoRecord) => void;
-  /** Card branch icon (issue #68): opens the 分支与 PR dialog. */
   onBranch?: (todo: TodoRecord) => void;
-  /** #828: false = no branch icon (cards without a build have nothing to open). */
   hasBranch?: boolean;
-  /** Project name. Absent: fixture = capture canon constant, live = no
-   *  project item (projects read pending/failed, or no row for the todo). */
   projectName?: string;
-  /** #445: the card's tag (cardTag result, at most one); null = no tag item. */
   tag?: TagChipData | null;
-  /** #1216: an orchestration round is in flight for this card. A 待开始 card
-   *  swaps its 开始 for a 编排中 footer naming what the round waits on; a
-   *  失败 card swaps 重试 for an inert 编排中, so neither can fire twice. */
   orchestration?: CardOrchestration | null;
 }
 
@@ -92,7 +77,6 @@ function Glyph({
   return <Icon aria-hidden strokeWidth={1.75} className={className} style={style} />;
 }
 
-/** #1257 / #1261 suspension (等机器 / 等额度); quotaWait wins when both exist. */
 function suspension(todo: TodoRecord): { label: string; quota: string | undefined } | null {
   if (todo.quotaWait != null) return { label: '等额度', quota: todo.quotaWait.kind };
   if (todo.waitingOn == null) return null;
@@ -156,8 +140,6 @@ export function TodoCard({
     );
 
   return (
-    /* #629: the card face is not selectable (select-none) and the title
-       link cannot be dragged natively (draggable=false + -webkit-user-drag). */
     <Card
       data-todo-id={todo.id}
       className="todo-card relative w-full gap-0 rounded-(--radius-card) bg-card px-3.5 py-3 shadow-(--panel-shadow) ring-0 transition-[box-shadow] duration-150 ease-out hover:shadow-(--panel-shadow-hover) select-none"
@@ -184,12 +166,6 @@ export function TodoCard({
             {project !== undefined && (
               <span className="flex items-center gap-1">
                 <Glyph icon={Folder} className="size-3 flex-none text-content-dim" />
-                {/* The ::before ghost holds the first five characters plus the
-                    ellipsis on one line, so the name truncates but never below
-                    five visible characters. The tag's huge shrink factor keeps
-                    the project from losing even a sub-pixel (which would already
-                    draw its ellipsis) until the tag is gone; the tag carries
-                    its leading gap inside, so a fully shrunk tag leaves one gap. */}
                 <span
                   data-floor={
                     [...project].length > 5 ? `${[...project].slice(0, 5).join('')}…` : project
@@ -292,8 +268,6 @@ export function TodoCard({
       )}
 
       {face.kind === 'running' && (
-        // #1447：queued 住执行中但还没跑——静态沙漏 + 次级墨（排队中 / 等机器 /
-        // 等额度），呼吸机器人留给真在跑的 planning/building。
         <div
           data-card-footer={queued ? 'waiting' : 'running'}
           className={`mt-2 flex items-center gap-1.5 text-meta whitespace-nowrap ${queued ? 'text-content-secondary' : 'text-running-text'}`}

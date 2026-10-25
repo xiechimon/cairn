@@ -1,9 +1,3 @@
-// The one segmented control (DESIGN.md 页面模式 · 分段控件). Two semantics,
-// one face: SegmentedTabs switches a view (tablist/tab on the registry Tabs),
-// SegmentedRadio picks a value (radiogroup/radio). The face lives only here;
-// scripts/ui-drift-gate.mjs G7 fails any TabsList/TabsTrigger or hand-written
-// radiogroup outside this file. The inset keyboard ring is the
-// [data-segmented='option'] rule in styles/app.css.
 import { cn } from 'cn';
 import { type KeyboardEvent, type ReactNode, useRef } from 'react';
 import { Button } from './ui/button.js';
@@ -13,12 +7,9 @@ interface SegmentedOptionBase<T extends string> {
   value: T;
   disabled?: boolean;
   testId?: string;
-  /** Extra data-* handles on the option (e.g. data-runtime). */
   data?: Record<`data-${string}`, string>;
 }
 
-/** Text option (icon optional, before the text) or icon-only option, which
- *  must name itself through ariaLabel. Labels arrive translated. */
 export type SegmentedOption<T extends string> = SegmentedOptionBase<T> &
   (
     | { label: string; icon?: ReactNode; ariaLabel?: undefined }
@@ -29,9 +20,7 @@ interface SegmentedProps<T extends string> {
   value: T;
   options: readonly SegmentedOption<T>[];
   onChange: (next: T) => void;
-  /** Handle / placement classes on the track (margins, e2e aliases). */
   className?: string;
-  /** Handle class on every option (e2e alias); not for restyling. */
   optionHandle?: string;
 }
 
@@ -43,19 +32,15 @@ const OPTION_CLS =
 
 const OPTION_ICON_CLS = 'w-7 px-0';
 
-/** Radio options ride the registry ghost Button: hold its hover fill and press
- *  shift off so they match the tab options. */
 const RADIO_BUTTON_NEUTRAL_CLS =
   'hover:bg-transparent dark:hover:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 
 const OPTION_SELECTED_CLS =
   'data-active:font-medium data-active:text-foreground dark:data-active:text-foreground';
 
-/** White card + 1px line ring + the faint shadow (PICKER_ROW_SELECTED family). */
 const OPTION_SELECTED_FACE_CLS =
   'data-active:bg-card data-active:shadow-xs data-active:ring-1 data-active:ring-border dark:data-active:bg-card group-data-[variant=default]/tabs-list:data-active:shadow-xs';
 
-/** With `slide`, the white face rides a pill under the options instead. */
 const OPTION_UNDER_PILL_CLS =
   'z-[1] data-active:bg-transparent data-active:shadow-none dark:data-active:bg-transparent group-data-[variant=default]/tabs-list:data-active:shadow-none';
 
@@ -75,7 +60,6 @@ function OptionContent({ option }: { option: SegmentedOption<string> }) {
   );
 }
 
-/** View switch: each option controls a panel or route. Keeps tablist/tab. */
 export function SegmentedTabs<T extends string>({
   value,
   options,
@@ -85,9 +69,7 @@ export function SegmentedTabs<T extends string>({
   optionHandle,
   slide = false,
 }: SegmentedProps<T> & {
-  /** Accessible name of the tablist. */
   label?: string;
-  /** The white face slides between options (chief settings, #644). */
   slide?: boolean;
 }) {
   return (
@@ -120,8 +102,6 @@ export function SegmentedTabs<T extends string>({
   );
 }
 
-/** Value picker in a form or setting: radiogroup with roving tabindex; arrow
- *  keys move focus and select, skipping disabled options. */
 export function SegmentedRadio<T extends string>({
   value,
   options,
@@ -130,7 +110,6 @@ export function SegmentedRadio<T extends string>({
   className,
   optionHandle,
 }: SegmentedProps<T> & {
-  /** Accessible name of the radiogroup. */
   label: string;
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);

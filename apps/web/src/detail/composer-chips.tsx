@@ -1,21 +1,5 @@
-// Composer mention-chip strip (issue #812): the select-time confirmation
-// face for inline `@` inserts. After Tab/Enter/click lands a token, the
-// draft shows raw text (a bare path, a `[label](agent:id)` link) — the
-// strip renders the settled mentions back as chips in the transcript's own
-// `.mention-chip` face, so the select reads as confirmed instead of dead.
-//
-// Data = parseDraftChips over the live draft (scheme links + roster file
-// tokens, draft order); the wire is never touched. Only first-appearance
-// chips pop (the tw-animate-css enter pair, same as the listbox face —
-// site-wide reduced-motion reset in styles/motion.css covers it); edits
-// elsewhere keep stable keys so the pop never replays (C8). The strip
-// yields while any completion popup is open (C6) and unmounts on an empty
-// row (C7 — the static/fixture composer never mounts it).
-
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../i18n/provider.js';
-// #948：chip 家族皮肤单源迁 overlay/mention-chip.ts（原 mention-picker.css），
-// 类名钩子（mention-chip--*）与 fresh 动效类原样保留。
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import {
   type DraftChip,
@@ -27,12 +11,9 @@ import { COMPOSER_CHIP_LABEL } from './chat-markdown.js';
 interface ComposerChipsProps {
   draft: string;
   files?: FileMentionEntry[];
-  /** A completion popup is open — the strip stays out of its way (C6). */
   suspended: boolean;
 }
 
-/** Identity-stable key: one ordinal per repeated reference so two copies of
- *  the same mention keep distinct, stable keys across unrelated edits. */
 function keyChips(chips: DraftChip[]): { chip: DraftChip; key: string }[] {
   const ordinals = new Map<string, number>();
   return chips.map((chip) => {
@@ -47,9 +28,6 @@ export function ComposerChips({ draft, files, suspended }: ComposerChipsProps) {
   const { t } = useI18n();
   const chips = useMemo(() => parseDraftChips(draft, files), [draft, files]);
   const keyed = useMemo(() => keyChips(chips), [chips]);
-  // Committed keys (effect-committed, never render-phase: StrictMode
-  // double-invokes renders and a render-phase write would swallow the fresh
-  // set before paint). Fresh = in this row but not in the last commit.
   const committedRef = useRef<Set<string>>(new Set());
   const [freshKeys, setFreshKeys] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -62,11 +40,6 @@ export function ComposerChips({ draft, files, suspended }: ComposerChipsProps) {
   }, [keyed]);
   if (suspended || keyed.length === 0) return null;
   return (
-    // #945（detail.css 清零）：strip 挂载皮肤迁 utilities——盒外锚
-    // （bottom: calc(100% + 6px)，与 listbox 同锚）、pointer-events none
-    // 永不拦截 transcript/listbox、z-30 local 阶梯（#688：只需压住 composer
-    // 内部，listbox 40 在其上）。mention-chip 皮肤正本在
-    // overlay/mention-picker.css（overlay 域），不动。
     <div
       className="composer-chips pointer-events-none absolute right-0 bottom-[calc(100%+6px)] left-0 z-30 flex flex-wrap gap-1.5"
       role="status"
@@ -78,8 +51,6 @@ export function ComposerChips({ draft, files, suspended }: ComposerChipsProps) {
           className={`${mentionChipClass(chip.kind)}${
             freshKeys.has(key) ? ' animate-in fade-in-0 zoom-in-98 duration-100' : ''
           }`}
-          // #910 裁定 3：fresh 是瞬态动画状态——data-fresh 数据载体是唯一
-          // 断言面（composer-chip--fresh 别名零引用，已随 #1036 终摘）。
           {...(freshKeys.has(key) ? { 'data-fresh': 'true' } : {})}
         >
           <span className={COMPOSER_CHIP_LABEL}>{chip.label}</span>

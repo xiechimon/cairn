@@ -1,29 +1,3 @@
-// 机器 route (spec 11 A8, #357): one card of machine rows — the local
-// machine row (server-host baseline, seeded at startup, pinned first,
-// undeletable) with one per-runtime pi / Claude Code brand mark pair, then
-// one row per attached LAN/VPS machine. 添加机器 sits in the top bar (or in
-// the empty state when there is no machine); CreateMachineDialog flow
-// unchanged: run the same CLI on the target box.
-// A7: no row carries a navigation/menu handler, so no row renders chevron or
-// ellipsis affordances. The former `Cairn 托管机器` facade row is gone —
-// hosted execution does not exist in the local-first architecture.
-// #503: per-runtime 开关摘除，改官方品牌 mark（启用 = 品牌原色，未启用 =
-// 35% 透明，read-only）。enabledRuntimes 字段与 PATCH /api/machines/{id}
-// 原样保留——那是死控件（PR #507：「该字段全仓只写不读」），摘除是对的。
-// XMON-113：行内接回机器层 shell 闸（machine.shellEnabled，消费方 = claim
-// 组装 localTools 双闸 + 每命令预检，XMON-108 R1）。#1108 起行内活控件 =
-// 两个：shell 闸 + 并发上限选择器（machine.maxConcurrent，消费方 = server
-// claim 闸 + daemon 本地闸）——两者都有真实消费链，死钮纪律（删除 /
-// chevron / per-runtime 开关）原样由 e2e 负向把守。
-// 三态读标注（#895 起，全读态零控件；#1260 降级后语义 = 绑定 Agent 的归属
-// 机事实）：「总管主机」徽标（chief 回合的归属机）、「总管回合进行中」
-// （该机正在执行 chief 步）、「总管等待机器」（挂起的 pending 回合等该机
-// 上线/开闸）。live 数据 = GET /chief 封套
-// orchestration 块（homeMachineId + per 机 activity 计数）join 本页行集；
-// fixture = MachineRow chief* 字段静态投影。chief 的归属机 = 绑定 Agent 的
-// 归属机（无独立设定面），本页只有观测——「关电脑前确认编排已落在常开机器
-// 上」的观测面。
-
 import { AGENT_TOOL_SHELL, MACHINE_RUNTIMES, type MachineRuntime } from '@cairn/shared';
 import { cn } from 'cn';
 import { Monitor, Plus as PlusIcon } from 'lucide-react';
@@ -51,32 +25,20 @@ import { OnlineStatus, ResourceList, ResourceRow, RowMeta, RowText, RowTitle } f
 
 export const MACHINES_HREF = '/app/resources/machines';
 
-/** runtime 可读名（专有名词，双语言同形；词表单源 = shared MACHINE_RUNTIMES）。
- *  #887 起不再上屏为文字——挂在 mark 容器上做 aria-label 与 title 悬停提示。 */
 const RUNTIME_LABELS: Record<MachineRuntime, string> = {
   pi: 'pi',
   'claude-code': 'Claude Code',
   gemini: 'Gemini',
 };
 
-/** runtime → 官方品牌 mark。键集钉 MachineRuntime：词表扩项时此处编译期报错，
- * 不会静默退化成默认 mark。 */
 const RUNTIME_MARKS: Record<MachineRuntime, typeof PiMark> = {
   pi: PiMark,
   'claude-code': ClaudeMark,
   gemini: GeminiMark,
 };
 
-/** 机器层 shell 开关的说明句（#1175：不再作为行副行常驻——挂在开关簇的
- * tooltip 上，hover/focus 弹出。机器侧的那半边语义：Agent 权限 tab 的同名
- * 开关说的是「在哪台机器上能用」，这里说的是「这台机器让不让用」，两者齐开
- * 预检才放行（XMON-108 R1 双闸）。工具名经 {tool} 插值走 shared
- * AGENT_TOOL_SHELL 单源——两层开关共用同一个词，词变了不会只改一处。 */
 const MACHINE_SHELL_HINT = '已授权「{tool}」的 Agent 可在该机器上执行命令。';
 
-/** #1108 并发档位候选（UI 面 1..8——单机同刻 8 个 agent 会话已是重负载；
- * PATCH 值域 1..16 更宽，API 设的 9..16 动态并入选项，控件不谎报现值）。 */
-/** 老 server（无 concurrencyRange）的退场档位。 */
 const FALLBACK_RANGE = { min: 1, max: 8 };
 
 export const CONCURRENCY_SOURCE_LABEL = {
@@ -94,13 +56,6 @@ function BasisRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** #1108 并发上限选择器（机器行第二个活控件，listbox 族形态
- * 的 popover listbox 正典：Button ghost 触发 + Check 选中行）。值 =
- * machine.maxConcurrent；live 选定 = PATCH /api/machines/{id}；fixture 面
- * 本地草稿（shell 开关同律——scenario 无 API，开关也是活的）。
- * #1241 设计 A：行内触发面只剩 数值 + chevron（与邻座行文本同视觉档），
- * 语义词（「并发上限」+ 来源）整体搬进 aria-label / title 与弹层——行内
- * 不再出现 并发 标签词与 推荐/手动/估算 来源词。 */
 function MachineConcurrencySelect({
   machine,
   value,
@@ -114,15 +69,8 @@ function MachineConcurrencySelect({
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  // #1241 弹性区间：server 按总内存给 1..max（单源公式在 dispatch-eligibility）。
-  // 现值超出区间（API 设的 / 换机后内存变小）→ 照实显示并标「超出」，不谎报；
-  // 新输入一律夹进区间（失焦 / Enter / 步进时提交，Esc 还原不提交）。
   const range = machine.concurrencyRange ?? FALLBACK_RANGE;
   const outOfRange = value < range.min || value > range.max;
-  // #1342 Bugbot：只有用户真改过草稿（dirty）才在 Enter / 失焦时提交——未编辑的
-  // 超区间现值不许被夹值存成手动；未改时草稿跟随现值（弹层开着时心跳改值也同步）。
-  // #1346 Bugbot：写在途时（PATCH 串行排队、缓存尚未更新）下一次 ± / Enter 的
-  // 基数取「最后一次请求的值」而非旧 value，草稿也不回弹到旧值；队列清空后回到 value。
   const [pendingTarget, setPendingTarget] = useState<number | null>(null);
   const inFlight = useRef(0);
   const current = pendingTarget ?? value;
@@ -158,7 +106,6 @@ function MachineConcurrencySelect({
     settle(next);
     if (next !== current) send(next);
   };
-  // ± = 单次写：基数取草稿（改过）或现值，步进后夹值，直接一发 PATCH。
   const step = (delta: number) => {
     const parsed = Number.parseInt(draft, 10);
     const base = dirty && !Number.isNaN(parsed) ? parsed : current;
@@ -166,15 +113,12 @@ function MachineConcurrencySelect({
     settle(next);
     if (next !== current) send(next);
   };
-  // ± / 恢复推荐 按下时不让输入框失焦（失焦提交会先发一笔手动值，与本次动作竞态）。
   const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
   const recommended = machine.recommendedConcurrent;
   const hardware = machine.capabilities?.hardware;
   const source = machine.concurrencySource;
   const estimate = source === 'estimate';
   const overridden = machine.maxConcurrentOverridden === true;
-  // aria-label / title 单源：来源缺席（老 server / 存量 fixture）退无来源段
-  // 的短形——退场判据与行内呈现同律，不谎报不存在的来源。
   const label =
     source !== undefined
       ? t('并发上限 {n}，{source}', { n: value, source: t(CONCURRENCY_SOURCE_LABEL[source]) })
@@ -194,9 +138,6 @@ function MachineConcurrencySelect({
         render={
           <Button
             variant="ghost"
-            // aria-label = e2e 一级载体（shell 开关同律，strict-mode 独立命名）；
-            // data-concurrency-source = 来源状态载体——原行内来源词 span 的
-            // 载体随可见词迁入触发钮（#1241 设计 A）。
             aria-label={label}
             title={label}
             data-machine-id={machine.id}
@@ -220,8 +161,6 @@ function MachineConcurrencySelect({
           <span className="text-meta text-content-tertiary">{t('并发上限')}</span>
           <span className="text-ui font-medium tabular-nums text-foreground">{value}</span>
         </div>
-        {/* #1241 设计 A：来源词（推荐/手动/估算）只在弹层上屏——行内触发面
-            不再携带，读法随 aria-label / title 可达。 */}
         {source !== undefined && (
           <div className="px-1 text-meta text-content-tertiary">
             {t(CONCURRENCY_SOURCE_LABEL[source])}
@@ -268,7 +207,6 @@ function MachineConcurrencySelect({
               }
             }}
             onBlur={(e) => {
-              // 焦点去往 ± / 恢复推荐（键盘 Tab 也算）：由该动作单发 PATCH，失焦不提交。
               const to = e.relatedTarget as HTMLElement | null;
               if (skipCommit.current || to?.dataset.concurrencyAction !== undefined) {
                 skipCommit.current = false;
@@ -353,7 +291,6 @@ function MachineConcurrencySelect({
   );
 }
 
-/** #1241 能力读标注全文（title / aria-label）：行内只露紧凑短标。 */
 function capabilityFull(
   t: ReturnType<typeof useI18n>['t'],
   caps: { mcpServers: unknown[]; skills: unknown[] } | null,
@@ -367,13 +304,9 @@ export function MachinesPage() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  // M5 live：GET teams/{id}/machines（machine_presence SSE 联动失效）。
   const { live, teamId } = useLiveData();
   const machinesQ = useMachines(teamId, live);
   const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
-  // #895 orchestration 读面：live = chief 封套块（无效数据 = 无标注，页面
-  // 不等 chief 查询——标注是增量信息，查询未决时行照常渲染）；fixture = 行
-  // 字段（chiefHost / chiefRunning / chiefWaiting）静态投影。
   const chiefQ = useChief(teamId, live);
   const orchestration = live ? chiefQ.data?.orchestration : undefined;
   const activityOf = (machineId?: string) =>
@@ -392,9 +325,6 @@ export function MachinesPage() {
           running: machine.chiefRunning === true,
           waiting: machine.chiefWaiting === true,
         };
-  // wayfinder #181: res-add 钮开 添加机器 dialog（r2 11b CLI 两步表单，
-  // #179 裁决）；团队名插值同 team-page 律（live = GET /api/teams，
-  // fixture = TEAM_NAME 常量），teamId 内嵌 API key 命令
   const teamsQ = useTeams(live);
   const teamName = live ? (teamsQ.data?.[0]?.name ?? TEAM_NAME) : TEAM_NAME;
   const [addOpen, setAddOpen] = useState(false);
@@ -402,9 +332,6 @@ export function MachinesPage() {
 
   const rowKey = (machine: MachineRow): string => machine.id ?? machine.name;
 
-  // shell 开关态：live 面由记录驱动（mutation 的乐观写落在 ['machines'] 缓存
-  // 上），fixture 面（scenario 数据源，无 API）落本地草稿——两态同形，fixture
-  // 面的开关因此也是活的，不是演示死钮。
   const [shellDraft, setShellDraft] = useState<Record<string, boolean>>({});
   const shellOn = (machine: MachineRow): boolean =>
     shellDraft[rowKey(machine)] ?? machine.shellEnabled ?? false;
@@ -415,14 +342,9 @@ export function MachinesPage() {
     }
     mutations.patchMachine.mutate({ id: machine.id, body: { shellEnabled: on } });
   };
-  // #1108 并发上限：与 shell 开关同一 mutation/草稿两态律。字段缺席（老
-  // server / 存量 fixture）= 控件与读标注整组退场（maxConcurrent undefined
-  // 判据），行回到 shell 单控件面。
   const [capDraft, setCapDraft] = useState<Record<string, number>>({});
   const capOn = (machine: MachineRow): number =>
     capDraft[rowKey(machine)] ?? machine.maxConcurrent ?? 1;
-  // #1342 Bugbot：同一台机器的并发写按序发——后一笔等前一笔回执再发，服务端
-  // 落库顺序 = 用户意图顺序（最后一次意图胜出），不会乱序留下覆盖位。
   const capChain = useRef<Record<string, Promise<unknown>>>({});
   const patchCap = (id: string, maxConcurrent: number | null): Promise<unknown> => {
     const prev = capChain.current[id] ?? Promise.resolve();
@@ -449,9 +371,6 @@ export function MachinesPage() {
     }
     return patchCap(machine.id, null);
   };
-  // 保存失败的显式反馈（XMON-80/P2 同律）：本面无 toast，失败只可能来自
-  // shell 开关 / 并发选择这两条写（页面仅有的 mutation），文案是固定句、
-  // 不透传 server 原文。
   const shellSaveFailed =
     mutations.patchMachine.isError &&
     mutations.patchMachine.variables?.body.shellEnabled !== undefined;
@@ -500,13 +419,10 @@ export function MachinesPage() {
               >
                 <RowText>
                   <RowTitle>
-                    {/* #1259：机器名 = 详情页入口（行内开关控件不动，整行不
-                        改链接——控件与导航分家）。 */}
                     <Link to={`${MACHINES_HREF}/${machine.id}?${searchParams.toString()}`}>
                       {t(machine.name)}
                     </Link>
                   </RowTitle>
-                  {/* undefined（无该字段的旧 fixture）不渲染状态行。 */}
                   {machine.online !== undefined && <OnlineStatus on={machine.online !== false} />}
                 </RowText>
                 <span className="flex flex-none items-center gap-5">
@@ -516,9 +432,6 @@ export function MachinesPage() {
                         const on = (machine.enabledRuntimes ?? []).includes(runtime);
                         const Mark = RUNTIME_MARKS[runtime];
                         return (
-                          // #887 图标独形：容器 role="img" + aria-label 给读屏报名字，
-                          // title 给悬停提示；on/off 由实色 / 35% 透明承载，
-                          // data-enabled 是状态断言载体。
                           <span
                             className="flex items-center"
                             key={runtime}
@@ -538,9 +451,6 @@ export function MachinesPage() {
                   ) : (
                     machine.pill != null && <RowMeta>{t(machine.pill)}</RowMeta>
                   )}
-                  {/* #895 三态读标注（A8）：纯文本读态——无 handler、无 button、
-                      无 menu。等待灰点与离线灰点同色：「在等谁」与「机器在不在
-                      线」是两个正交事实。 */}
                   {(chief.host || chief.running || chief.waiting) && (
                     <span className="flex flex-none items-center gap-3">
                       {chief.host && (
@@ -569,8 +479,6 @@ export function MachinesPage() {
                       )}
                     </span>
                   )}
-                  {/* 机器层 shell 闸（XMON-113）：label 与 Agent 权限 tab 同词
-                      （AGENT_TOOL_SHELL）；#1175 说明句挂开关簇 tooltip。 */}
                   <Tooltip>
                     <TooltipTrigger
                       render={
@@ -594,7 +502,6 @@ export function MachinesPage() {
                       {t(MACHINE_SHELL_HINT, { tool: t(AGENT_TOOL_SHELL) })}
                     </TooltipContent>
                   </Tooltip>
-                  {/* #1108 并发面（读标注 + 上限选择器）：字段缺席 = 整组退场。 */}
                   {machine.maxConcurrent !== undefined && (
                     <span
                       className="flex flex-none items-center gap-2.5"
@@ -619,7 +526,6 @@ export function MachinesPage() {
                       />
                     </span>
                   )}
-                  {/* #1251 能力清单读标注（null = 从未上报，字段缺席 = 整组退场）。 */}
                   {machine.capabilities !== undefined && (
                     <span
                       className="w-24 flex-none truncate text-right text-meta whitespace-nowrap text-content-tertiary"

@@ -1,7 +1,3 @@
-// #1491 项目设置页「后台自动任务」卡（live github 项目）：issue 进料、园丁、
-// 自治合并开一轮前要过的闸——总开关、人在用时让路、同类冷却、每日预算四项
-// 可改（分钟数 / 预算填 0 = 关掉那一道），下面列每种任务最近一次判定：放行
-// 还是被拦、被拦的原因。数据 = GET /api/projects/{id}/autonomy。
 import type {
   AutonomyGateReason,
   AutonomyKind,
@@ -49,7 +45,6 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
   const { t } = useI18n();
   const q = useProjectAutonomy(projectId, true);
   const mutations = useApiMutations(teamId);
-  // 草稿态：null = 未编辑，显示值回落 server 真值；保存成功后清草稿。
   const [draft, setDraft] = useState<Partial<Record<NumberKey, string>>>({});
   const data: AutonomyRecord | undefined = q.data;
   if (data === undefined) return null;
@@ -120,7 +115,6 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
             {t('保存')}
           </Button>
         </SettingsRow>
-        {/* 进料恒显示；园丁、自治合并接上闸、判过一次后才出行。 */}
         {data.kinds
           .filter((k) => k.kind === 'issue-intake' || k.lastEvaluatedAt !== null)
           .map((k) => (

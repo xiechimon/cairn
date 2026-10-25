@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "5791b3ed549a350c2dcf0f908cbe76b8eddf2e03",
+    "sha": "112706bba9ebe85be242453258714ec9284594f8",
     "date": "2026-10-25"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -64,7 +64,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers.",
-      "hash": "696aecb87e9650fa2e641bf066c32463c6751ec21b91d60cdb33f7341b4c0821"
+      "hash": "8cd1d956bca73a2a8053db457adda79775652d830a0e5cc500c3b8e98caf21cb"
     },
     "dialog.tsx": {
       "kind": "registry",

@@ -1,22 +1,3 @@
-// Slash menu + command help skins (issue #731).
-//
-// SlashMenu: the `/` listbox. Same combobox contract as MentionInline
-// (#728): the textarea keeps focus for the whole open window — rows are
-// non-focusable (tabIndex -1 + mousedown preventDefault) and the highlight
-// is exposed through aria-activedescendant. Rows render in caller-given
-// sections (builtins first, then skills); a zero total renders the empty
-// state (rule 51 isomorph).
-//
-// SlashHelp: the `/help` panel. A read-only registry Dialog listing the
-// currently available builtins with their descriptions — the only builtin
-// that needs its own surface (proposal §2).
-//
-// /help 面板 = DialogShell S 档（Paper 弹窗），技能数行走脚左提示位。
-// listbox 面（SlashMenu 本体）仍是 composer 相对锚的内联面板（无壳）。
-// 行钮收编 components/ui Button（ghost 档七通道中和，#908
-// comment-6001887439 裁决 3；行不在 motion.css hover 家族名单，hover 底
-// 中和为透明、高亮只走 --active 类）。
-
 import { Fragment, type Ref, useEffect } from 'react';
 import { Button } from '../components/ui/button.js';
 import { DialogShell, PICKER_ROW_SELECTED } from '../components/ui/dialog-shell.js';
@@ -31,11 +12,8 @@ export interface SlashMenuSection {
 export interface SlashMenuProps {
   open: boolean;
   sections: SlashMenuSection[];
-  /** Start offset of the detected `/` token (data-caret debug anchor). */
   caret: number | null;
-  /** Query text after `/` — only the empty-state copy consumes it. */
   query: string;
-  /** Global highlight index across sections; null = none highlighted. */
   highlight: number | null;
   onHover: (index: number) => void;
   onPick: (row: SlashRow) => void;
@@ -43,17 +21,12 @@ export interface SlashMenuProps {
   listboxId: string;
 }
 
-/** 面板壳（原 .slash-menu）：与 .mention-inline 同锚同皮（r9 §2.2/§3.2）。 */
 const MENU_CLS =
   'slash-menu absolute inset-x-0 bottom-[calc(100%+8px)] z-40 max-h-55 overflow-auto rounded-lg bg-popover p-1 shadow-(--shadow-popover)';
 
-/** 行钮基底（原 .slash-menu-row，Button ghost 七通道中和 + h-auto——旧行
- *  高随内容，不吃件 size 档的 32px）。 */
 const ROW_CLS =
   'slash-menu-row flex h-auto w-full cursor-pointer items-baseline justify-start gap-2 rounded-md border-0 px-2 py-2 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground active:not-aria-[haspopup]:translate-y-0';
 
-/** 命令行名（mono 12px，DESIGN 代码档）与描述（12px tertiary 截断）——menu
- *  行与 /help 行共用（原 .slash-menu-name / .slash-menu-desc）。 */
 const NAME_CLS = 'flex-none font-mono text-meta';
 const DESC_CLS = 'truncate text-meta text-content-tertiary';
 
@@ -131,7 +104,6 @@ export function SlashMenu({
 export interface SlashHelpProps {
   open: boolean;
   onClose: () => void;
-  /** Currently available builtins (same rows as the menu). */
   commands: SlashRow[];
   skillCount: number;
 }

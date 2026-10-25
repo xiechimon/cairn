@@ -1,18 +1,3 @@
-// team chart 组织图 —— 照 todos.dev/app/team 的 chart 布局现场实测重建
-// （2026-09-30 DOM 实测）。r7 12 那份捕获的团队是 0 个成员，只留下「暂无成员」
-// 空态，树结构从未出现在旧语料里 —— 旧实现把那份空态当成了 chart 的唯一状态。
-//
-// 树形是渲染约定，不是数据：members 载荷没有层级字段（只有 memberType /
-// role / provider / modelId / description），所以根 = 总管绑定的 agent
-// （GET teams/{id}/chief 的 chief.agent.agentId），未绑定时退首个成员；其余
-// 成员按序落子列。创建 Agent 在页面顶栏，组织图里没有创建节点。
-//
-// 几何：节点 220×56（Paper 卡，--radius-card）/ 连接线 44×1 / 括号列 28 宽，
-// 只有两个以上子节点时才画括号。chart 内部全是无 role 的结构 div，e2e 载体走
-// data-testid 二级
-// （节点/名字/模型行/皇冠/服务商徽标/连接线/括号/子列），根节点身份由
-// 皇冠徽标承载（crown 只渲染在总管绑定 agent 上，即原 --root 修饰类的
-// 语义载体）。
 import { cn } from 'cn';
 import type { SVGProps } from 'react';
 import { CARD_RADIUS_CLS } from '../components/settings-list.js';
@@ -41,9 +26,6 @@ function CrownGlyph(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** 服务商徽标字形：逐字抄自参考产品节点第二行（实心 currentColor）。参考账号
- *  里两个 Agent 同属一个服务商，字形一致 —— 采样不足以反推「服务商 → 字形」
- *  的映射表，故照抄实测字形而不臆造映射。 */
 function ProviderGlyph(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -59,15 +41,11 @@ function ProviderGlyph(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** 节点卡盒：220×56，Paper 卡（白底、--radius-card、1px 环 + 轻投影，与团队
- *  卡、看板任务卡同一套）。 */
 const NODE_CLS = cn(
   'flex h-14 w-55 items-center gap-2 bg-card px-2.5 shadow-(--panel-shadow)',
   CARD_RADIUS_CLS,
 );
 
-/** 组织图节点卡：32 圆头像 + 两行文本（名字 text-ui 500，第二行 = 服务商徽标
- *  + text-meta 模型行）。 */
 function ChartNode({ agent, crown }: { agent: TeamAgentCard; crown?: boolean }) {
   const { t } = useI18n();
   return (
@@ -116,8 +94,6 @@ function ChartNode({ agent, crown }: { agent: TeamAgentCard; crown?: boolean }) 
   );
 }
 
-/** chart 布局的整块内容：零成员 = 空态（与 grid 同一件），否则出树。两条分支
- *  收在同一处，调用方不必自己按成员数分流。 */
 export function TeamChart({
   agents,
   chiefAgentId,
@@ -135,9 +111,6 @@ export function TeamChart({
         <>
           <div className="h-px w-11 flex-none bg-input" data-testid="team-chart-link" />
           <div className="flex" data-testid="team-chart-children">
-            {/* 括号列本身不画东西，只给绝对定位的括号当坐标架：高度随子列撑满，
-                于是括号 top/bottom 各留半个卡片高（28），正好落在首/末子节点的
-                垂直中心上。只有一个子节点时连接线直连，不画括号。 */}
             {subordinates.length > 1 && (
               <div className="relative w-7 flex-none">
                 <div

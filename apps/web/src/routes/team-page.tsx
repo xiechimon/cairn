@@ -1,19 +1,3 @@
-// Team route (issue #70, r7 12): stats line (`N 个成员` — the r7 capture's
-// plan badge / upgrade link are SaaS surface this local-first self-hosted
-// app does not carry, #129) and the agent card grid. Head title is the
-// team-switch dropdown trigger (r2 §8.1); the top bar right side carries the
-// grid|chart switch, the 设置 link (routes to the account surface — the
-// app's only settings face, #148) and the page's one primary action,
-// 创建 Agent.
-// #148: the tablist is a real toggle persisted to the registered
-// client-state key (r2 §1.5 `cairn.teamMembersLayout`); chart drops the
-// stats bar (r2 §8.1 17c) and renders the org chart (#490). The tablist
-// itself stays in both layouts — 17c shows it absent, but a toggle with no
-// way back is a trap (divergence noted, 01 册 §8).
-//
-// #490: chart 此前是把 17c 捕获到的空态当成了唯一状态 —— 那份捕获的团队是
-// 0 个成员，于是 chart 分支写死 暂无成员 字面量，同一份数据下与 grid 自相
-// 矛盾。现在按成员数分流：0 个成员才走空态，否则由 ./team-chart.tsx 出树。
 import { Grid2x2, Network, Plus } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { Link, useLocation } from 'react-router';
@@ -43,14 +27,11 @@ import { CreateAgentDialog } from './create-agent-dialog.js';
 import { TeamAgentGrid } from './team-agent-grid.js';
 import { TeamChart } from './team-chart.js';
 
-/** r2 §1.5 registered client-state key (packages/shared protocol/
- *  client-state.ts): the team view switch, grid | chart; absent = grid. */
 export const TEAM_LAYOUT_STORAGE_KEY = 'cairn.teamMembersLayout';
 
 type TeamLayout = 'grid' | 'chart';
 
 function readStoredLayout(storage: Storage | null): TeamLayout {
-  // #1091：null / getItem 抛 = 无记忆，回落 grid（本页首渲染路径）。
   try {
     return storage?.getItem(TEAM_LAYOUT_STORAGE_KEY) === 'chart' ? 'chart' : 'grid';
   } catch {
@@ -60,21 +41,14 @@ function readStoredLayout(storage: Storage | null): TeamLayout {
 
 export function TeamPage() {
   const { t } = useI18n();
-  // the 设置 link carries the scenario string along like the shell's back
-  // chevron, so dev/fixture selection survives the hop
   const { search } = useLocation();
   const fixture = resolveScenario(new URLSearchParams(search));
-  // M5 live：成员/Agent 网格 = GET members 真值（r5 §1：Agent 列表实际走
-  // members，memberType:"agent" 行内嵌 actor）；团队名 = GET /api/teams。
   const { live, teamId } = useLiveData();
   const membersQ = useMembers(teamId, live);
   const teamsQ = useTeams(live);
   const todosQ = useTodos(teamId, live);
   const team = live && membersQ.data ? mapTeam(membersQ.data) : (fixture.team ?? TEAM_R7);
   const teamName = live ? (teamsQ.data?.[0]?.name ?? TEAM_NAME) : TEAM_NAME;
-  // #490: 组织图的根 = 总管绑定的 agent。live 直读 GET chief 的
-  // chief.agent.agentId；fixture 走场景里的 chief.agent.id；未绑定 → null，
-  // 此时 TeamChart 退到首个成员当根。
   const chiefQ = useChief(teamId, live);
   const chiefAgentId = live
     ? (chiefQ.data?.chief.agent?.agentId ?? null)
@@ -84,24 +58,14 @@ export function TeamPage() {
     setLayout(next);
     safeSetItem(TEAM_LAYOUT_STORAGE_KEY, next);
   }, []);
-  // #170: the top-bar 创建 Agent opens the dialog-family form; live submit =
-  // POST agents then close (invalidateAll refetches members → the new
-  // agent card lands in the grid), fixture = accept-dialog 律 (close only)
   const mutations = useApiMutations(teamId);
   const [createOpen, setCreateOpen] = useState(false);
-  // #485: 创建弹窗的模型候选——数据源与投影同 Agent 详情页概览（同一份
-  // toModelOptions；#770 起 providers 段已除，只剩 model-sources 非 pi 段）。
-  // 清单非空 = 弹窗出模型选择器；空 = 落「配置服务商」告警行（原版 capture 20 态）。
   const modelSourcesQ = useModelSources(teamId, live);
   const modelOptions = live
     ? toModelOptions(modelSourcesQ.data?.sources ?? [])
     : toModelOptions(fixture.resources?.providerSources ?? []);
-  // #1259 归属机：创建弹窗的机器候选（live = GET machines；fixture 同
-  //  machines 页面）。
   const machinesQ = useMachines(teamId, live);
   const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
-  // Cards show home-machine status only once the machine list has loaded;
-  // an empty list mid-fetch would flag every agent 未设归属机.
   const cardMachines = live && machinesQ.data === undefined ? undefined : machines;
   return (
     <PageShell
@@ -174,7 +138,6 @@ export function TeamPage() {
             ? (input) =>
                 mutations.createAgent.mutate(input, {
                   onSuccess: () => setCreateOpen(false),
-                  // #638：失败 = 弹窗留着（关挂在 onSuccess）但零反馈。
                   onError: (error) => toastError(t('创建 Agent 失败，请重试。'), error),
                 })
             : undefined

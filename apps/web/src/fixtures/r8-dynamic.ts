@@ -22,17 +22,8 @@ import type {
   TranscriptItem,
 } from './records.js';
 
-// ---- issue #75: r8 dynamic-state sets (reject loop / failed / reuse) ----
-// Content verbatim from the r8 captures 54–77 (docs/research/r8-dynamic-
-// states.md §1–§3) plus the raw geometry dumps. Two session days: the
-// evening of 2026-09-22 (23:1x–23:5x) and the minutes past midnight
-// (00:0x, 2026-09-23) — the `昨天 17:38` stamp flip in 57 pins the split.
-
-/** r8 past-midnight (2026-09-23). */
 const r8n = (h: number, m: number) => at('2026-09-23', h, m);
 
-/** #12: r5-leftover failed todo, chief-launched, no plan document
- *  (r8 §3.4: hence no 复用方案 button on its rerun dialog). */
 const failed12: TodoRecord = {
   id: 'r8-12',
   teamId: TEAM_ID,
@@ -55,8 +46,6 @@ const failed12: TodoRecord = {
   v: 3,
 };
 
-/** #13: review todo of the r8 session — only ever off-screen (board
- *  column 5 sliver) but counted by the 看板 badge (r8 55/57). */
 const review13: TodoRecord = {
   id: 'r8-13',
   teamId: TEAM_ID,
@@ -81,7 +70,6 @@ const review13: TodoRecord = {
 
 const R8_TITLE = '在 README.md 末尾追加一行「r8 dynamic probe」';
 
-/** #15 in the given phase (probe of the r8 session). */
 function probe15(phase: TodoRecord['phase'], phaseAt: number): TodoRecord {
   return {
     id: 'r8-15',
@@ -111,7 +99,6 @@ function probe15(phase: TodoRecord['phase'], phaseAt: number): TodoRecord {
   };
 }
 
-/** #12 changeset (r8 54): three files, +15. */
 const CHANGES_12: ChangesContent = {
   expanded: false,
   files: [
@@ -121,14 +108,11 @@ const CHANGES_12: ChangesContent = {
   ],
 };
 
-/** #15 changeset (r8 73/77): README.md +1. */
 const CHANGES_15: ChangesContent = {
   expanded: false,
   files: [{ path: 'README.md', added: 1, hunks: [] }],
 };
 
-/** #12 transcript (r8 54): chief-launched run, result message, failed
- *  merge round. `stamp` flips to `昨天 17:38` past midnight (57). */
 function transcript12(stamp: string): TranscriptItem[] {
   return [
     { kind: 'run', at: stamp, machine: MACHINE_NAME },
@@ -187,8 +171,6 @@ function transcript12(stamp: string): TranscriptItem[] {
   ];
 }
 
-/** plan.md section paragraph per version wording (`w` = the appended
- *  line; r8 63/76 doc panes). The first README.md chip is link-styled. */
 function planDoc(w: string, withCommit: boolean, msg: string): DocBlock[] {
   const blocks: DocBlock[] = [
     { kind: 'head', segments: [{ text: 'Context' }] },
@@ -270,13 +252,9 @@ const DOC_V1 = planDoc(DYNAMIC, false, MSG_DYNAMIC);
 const DOC_V2 = planDoc(DYNAMIC, true, MSG_DYNAMIC);
 const DOC_V3 = planDoc(MANUAL, true, MSG_MANUAL);
 
-/** Plan-card preview line of the #15 plan cards (r8 63/68/73/76): the
- *  two-line clamp cut lands before the version wording, so every version
- *  shares this truncation, ellipsis included. */
 const R8_PLAN_PREVIEW =
   'Context 仓库根目录的 README.md 目前内容为逐行累积的"探针记录"（r3 lifecycle probe、r6 rebaseline probe、r7 rebaseline probe 等），每次任务在文件末尾新增一行文字，文件以换行符结尾。本次任务按同样的惯例，在文件末尾…';
 
-/** plan.md line list per version (diff source of truth). */
 function planLines(w: string, msg: string | null): string[] {
   return [
     '## Context',
@@ -298,18 +276,13 @@ function planLines(w: string, msg: string | null): string[] {
 
 const NO_NEWLINE = '\\ No newline at end of file';
 
-/** Unified hunk between two plan.md line lists (single hunk, full file).
- *  The trailing no-newline marker rides per side when both sides change
- *  at EOF (r8 72: del marker between the last del and the first add). */
 function planHunk(from: string[], to: string[]): DiffHunk {
-  // 01-stack-v2 §4.1 pins the diff data layer to npm `diff` 9.0.0 (render
-  // stays hand-rolled); the fixture hunks go through the same pin.
   const lines: DiffLine[] = [];
   let oldNo = 0;
   let newNo = 0;
   for (const part of diffLines(from.join('\n'), to.join('\n'))) {
     const rows = part.value.split('\n');
-    if (rows[rows.length - 1] === '') rows.pop(); // trailing join separator
+    if (rows[rows.length - 1] === '') rows.pop();
     for (const text of rows) {
       if (part.added === true) {
         newNo++;
@@ -324,8 +297,6 @@ function planHunk(from: string[], to: string[]): DiffHunk {
       }
     }
   }
-  // r8 72 renders the no-newline marker per side when both sides change
-  // at EOF; add-only diffs (r8 66) carry the single trailing marker
   const lastDel = lines.findLastIndex((l) => l.kind === 'del');
   const firstAdd = lines.findIndex((l) => l.kind === 'add');
   if (lastDel !== -1 && lastDel > firstAdd) {
@@ -337,8 +308,6 @@ function planHunk(from: string[], to: string[]): DiffHunk {
   };
 }
 
-/** plan-version diff surface (r8 65–72): one plan.md file, stats derived
- *  from the hunk. */
 function planDiff(
   fromV: string,
   toV: string,
@@ -353,8 +322,6 @@ function planDiff(
     from: fromV,
     to: toV,
     expanded,
-    // #244 全文槽:to 版本 plan.md 全文(与 hunk 同源,LINES 数组即版本内容);
-    // 初渲不展示,视觉零影响。
     files: [{ path: 'plan.md', added, removed, hunks: [hunk], fullContent: to.join('\n') }],
   };
 }
@@ -363,8 +330,6 @@ const LINES_V1 = planLines(DYNAMIC, null);
 const LINES_V2 = planLines(DYNAMIC, MSG_DYNAMIC);
 const LINES_V3 = planLines(MANUAL, MSG_MANUAL);
 
-/** AI-review message of run 1 (r8 60/65): conclusion-first prose, one
- *  numbered blocking finding, the quoted plan line, closing paragraph. */
 const REVIEW_MESSAGE: TranscriptItem = {
   kind: 'robot',
   paragraphs: [
@@ -404,7 +369,6 @@ const REVIEW_MESSAGE: TranscriptItem = {
   footer: { seconds: 53 },
 };
 
-/** Auto-revision summary after the blocking finding (r8 61/65). */
 const ADJUST_V2_MESSAGE: TranscriptItem = {
   kind: 'robot',
   paragraphs: [
@@ -422,7 +386,6 @@ const ADJUST_V2_MESSAGE: TranscriptItem = {
   ],
 };
 
-/** Manual-reject revision summary (r8 68). */
 const ADJUST_V3_MESSAGE: TranscriptItem = {
   kind: 'robot',
   paragraphs: [
@@ -438,7 +401,6 @@ const ADJUST_V3_MESSAGE: TranscriptItem = {
 
 const REJECT_FEEDBACK = '请把追加行的文案改为「r8 probe manual-revision」，其余不变';
 
-/** Run-1 transcript of #15 up to the v2 plan card (r8 62/63). */
 const RUN1_TO_V2: TranscriptItem[] = [
   { kind: 'run', at: '23:40', machine: MACHINE_NAME },
   { kind: 'user', text: '开始执行任务', seq: 15, title: R8_TITLE },
@@ -457,7 +419,6 @@ const RUN1_TO_V2: TranscriptItem[] = [
   { kind: 'plan', title: '方案 · v2', preview: R8_PLAN_PREVIEW, seconds: 29 },
 ];
 
-/** v2 landed (r8 63–66): run-1 transcript, version dropdown rows. */
 function detailV2(now: number): FixtureSet {
   return {
     todos: [failed12, review13, probe15('confirm', r8(23, 53))],
@@ -473,8 +434,6 @@ function detailV2(now: number): FixtureSet {
   };
 }
 
-/** v3 landed (r8 68–72): reject bubble + v3 summary + v3 card; the open
- *  diff auto-rebased to v1 → v3 (r8 §2.7). */
 const RUN1_TO_V3: TranscriptItem[] = [
   ...RUN1_TO_V2,
   { kind: 'user', text: REJECT_FEEDBACK },
@@ -499,7 +458,6 @@ function detailV3(now: number): FixtureSet {
   };
 }
 
-/** #15 failed (r8 73–75): v3 round confirmed, execution merged-failed. */
 const RUN1_FAILED: TranscriptItem[] = [
   ...RUN1_TO_V3,
   { kind: 'user', text: '确认' },
@@ -538,8 +496,6 @@ function detailFailed15(now: number): FixtureSet {
   };
 }
 
-/** Reused build (r8 76): skipped planning, quoted plan card, second run
- *  stamp split around it, 确认 round streaming. */
 const REUSED_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'run', at: '00:02' },
   { kind: 'user', text: '开始执行任务', seq: 15, title: R8_TITLE },
@@ -550,7 +506,6 @@ const REUSED_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'streaming', seconds: 1, label: '连接机器...' },
 ];
 
-/** Reused build once it reached review (r8 77 background). */
 const REUSED_REVIEW_TRANSCRIPT: TranscriptItem[] = [
   ...REUSED_TRANSCRIPT.slice(0, 5),
   {
@@ -572,10 +527,6 @@ const REUSED_REVIEW_TRANSCRIPT: TranscriptItem[] = [
   },
 ];
 
-// ---- scenario sets ----
-
-/** Detail-content patch helper: keeps the r8 scenario sets free of
- *  non-null assertions on the optional `detail` field. */
 function withDetail(
   base: FixtureSet,
   patch: Partial<NonNullable<FixtureSet['detail']>>,
@@ -585,14 +536,12 @@ function withDetail(
   return { ...base, detail: { ...detail, ...patch } };
 }
 
-/** r8 54/56: #12 failed detail, evening now. */
 export const detailFailed12: FixtureSet = {
   todos: [failed12, review13],
   now: r8(23, 14),
   detail: { transcript: transcript12('17:38'), changes: CHANGES_12 },
 };
 
-/** r8 55: board with the failed #12 card in 执行中. */
 export const boardFailed: FixtureSet = {
   todos: [failed12, review13],
   now: r8(23, 14),
@@ -600,24 +549,16 @@ export const boardFailed: FixtureSet = {
   project: projectContent,
 };
 
-/** r8 56: rerun dialog over #12 (no plan doc → no 复用方案 button)。
- *  #640：dialog 瘦身形（说明行 + 重跑；agent 行/分用开关/双分支已撤销）。 */
 export const rerunDialog12: FixtureSet = {
   ...detailFailed12,
   overlay: { kind: 'rerun' },
 };
 
-/** r8 57: run history of #12 past midnight (昨天 stamp, 6 小时前 row).
- *  Rows ride the upstream overlayContent mechanism (#68); #366 freezes the
- *  right pane on the history section instead of opening a dialog. */
 export const history12: FixtureSet = {
   ...detailFailed12,
   ui: { paneView: 'history' },
 };
 
-/** #366 AC 钉面（无 capture，smoke scenario）：review 变更面 + 线程内折叠
- *  plan 卡行——plan 卡激活入口（右 pane 切文档面 plan 显示面）需要「变更面
- *  + 线程含 plan 卡」的组合面，r7/r8 捕获均无此组合。 */
 export const planOpenReview: FixtureSet = {
   todos: [probeTodo('review', r7(13, 37))],
   now: r7(13, 40),
@@ -632,14 +573,6 @@ export const planOpenReview: FixtureSet = {
   },
 };
 
-/** #469 named scenario (no capture, planOpenReview precedent): the chat
- *  surface that exercises the two block-rendering paths — an agent reply
- *  carrying raw block markdown (heading / ordered+unordered nested lists /
- *  code fence / inline code) and a tool group whose bash stdout renders as
- *  left-aligned mono blocks instead of flattening into `.chat-note`. The
- *  robot message holds `markdown` (parsed at render time by
- *  chat-markdown.tsx), so this fixture drives the same parse+render path
- *  as the live mapper. */
 const MD_SAMPLE = [
   '## 检查结果',
   '',
@@ -721,10 +654,6 @@ export const agentTodoLive: FixtureSet = {
   },
 };
 
-/** #919 named scenario（无 capture，mdToolout 先例）：技能路由行为验收的
- *  UI 面钉扎 #918 落地的那张脸（并行票先合，本票 seam 4 的验收对象即它）：
- *  活行披露面的技能事实行（▶ 命中 / ✕ 挡下）+ 持久汇总行（技能/挡下两列）。
- *  场景词表与行为证据腿同款（haiku 命中 + secret 挡下）。 */
 const SKILLS_ROUTING_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
   {
@@ -751,11 +680,6 @@ export const skillsRouting: FixtureSet = {
   },
 };
 
-/** #1106 named scenario（无 capture，skills-routing 先例）：派发技能注入
- *  回查行（详情面持久一份）的渲染钉扎——live 面由 mapTranscript 从
- *  step.skillInjection 派生（unit：injected-skills-row.test.ts + live 探针
- *  docs/verify/1106/）；fixture 捕获面无 step 数据源，行以冻结 view item
- *  直供本场景钉渲染缝（行形/原因随行/零命中占位）。 */
 const SKILL_INJECT_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
   {
@@ -781,8 +705,6 @@ const SKILL_INJECT_TRANSCRIPT: TranscriptItem[] = [
   },
 ];
 
-/** 零命中对照面：已计算零命中的行 = 「未注入技能」占位（配置事实可见，
- *  不是行缺席——与 skills-routing 的零噪声对照（27 场景）语义相反）。 */
 const SKILL_INJECT_ZERO_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
   { kind: 'injected-skills', skills: [] },
@@ -814,26 +736,22 @@ export const skillInjectZero: FixtureSet = {
   },
 };
 
-/** r8 63: version dropdown open on the v2 surface. */
 export const versionMenuV2: FixtureSet = withDetail(detailV2(r8(23, 54)), {
   versionMenu: 'versions',
   compareTarget: planDiff('v1', 'v2', LINES_V1, LINES_V2, false),
 });
 
-/** r8 64: compare submenu open (single 上一版本 row). */
 export const compareMenuV2: FixtureSet = withDetail(detailV2(r8(23, 54)), {
   versionMenu: 'compare',
   compareTarget: planDiff('v1', 'v2', LINES_V1, LINES_V2, false),
 });
 
-/** r8 65/66: plan-version diff v1 → v2, collapsed / expanded. */
 export function diffV1V2(expanded: boolean): FixtureSet {
   return withDetail(detailV2(r8(23, 55)), {
     planDiff: planDiff('v1', 'v2', LINES_V1, LINES_V2, expanded),
   });
 }
 
-/** r8 67: reject sent — replan streaming with the v1 → v2 diff still open. */
 export const revisionStreaming: FixtureSet = {
   todos: [failed12, review13, probe15('planning', r8(23, 55))],
   now: r8(23, 55),
@@ -852,47 +770,37 @@ export const revisionStreaming: FixtureSet = {
   },
 };
 
-/** r8 68/69: v3 landed, auto-rebased v1 → v3 diff collapsed. */
 export const detailV3Collapsed: FixtureSet = detailV3(r8(23, 58));
 
-/** r8 70: version dropdown open over the v3 diff surface (5 rows: the
- *  open diff adds the compare row's `v1` label + 回到与 base 对比). */
 export const versionMenuV3: FixtureSet = withDetail(detailV3(r8(23, 58)), {
   versionMenu: 'versions',
   compareTarget: planDiff('v2', 'v3', LINES_V2, LINES_V3, false),
 });
 
-/** r8 71/72: manual-reject diff v2 → v3, collapsed / expanded. */
 export function diffV2V3(expanded: boolean): FixtureSet {
   return withDetail(detailV3(r8(23, 58)), {
     planDiff: planDiff('v2', 'v3', LINES_V2, LINES_V3, expanded),
   });
 }
 
-/** r8 73: #15 failed detail. */
 export const detailFailed15Set: FixtureSet = detailFailed15(r8n(0, 1));
 
-/** r8 74: rerun dialog with the 复用方案 button (#15 has a plan doc)。
- *  #640：dialog 瘦身形（重跑降 ghost 次钮 + indigo 复用方案）。 */
 export const rerunDialog15: FixtureSet = {
   ...detailFailed15(r8n(0, 1)),
   overlay: { kind: 'rerun' },
 };
 
-/** r8 75: 复用方案 sub-panel. */
 export const reusePanel15: FixtureSet = {
   ...detailFailed15(r8n(0, 1)),
   overlay: { kind: 'reuse' },
 };
 
-/** r8 76: reused build streaming (执行中, plan pane on the reused v1). */
 export const reusedBuilding: FixtureSet = {
   todos: [failed12, review13, probe15('building', r8n(0, 2))],
   now: r8n(0, 2),
   detail: { transcript: REUSED_TRANSCRIPT, doc: DOC_V3 },
 };
 
-/** r8 77: run history of the reused build, two rows, review phase. */
 export const history15: FixtureSet = {
   todos: [failed12, review13, probe15('review', r8n(0, 2))],
   now: r8n(0, 3),
@@ -900,8 +808,6 @@ export const history15: FixtureSet = {
   ui: { paneView: 'history' },
 };
 
-/** Interactive reject chain (issue #75 AC3): confirm v1 with a revision
- *  script — send walks 请求修改 → streaming → v2 → diff → 确认. */
 export const revisionChain: FixtureSet = {
   todos: [failed12, review13, probe15('confirm', r8(23, 44))],
   now: r8(23, 45),
