@@ -1,21 +1,4 @@
 #!/usr/bin/env node
-// drive-1313-empty-review — #1313 零实质改动的 review 收口。
-//
-// 纯 live 栈 + 假机器 wire + Playwright 真点击，零 daemon 零 LLM。
-//
-// 两张 review 卡，执行 Agent 只有「推送分支」、缺「合并分支」：
-//   empty  — done { hasChanges:true, changesDiff:'' }。空提交仍让
-//            countAhead 形的 hasChanges 为真，diff 文件集为空。
-//   files  — done { hasChanges:true, changesDiff:<一文件 unified diff> }。
-//
-// --expect=before（修复前栈）：empty 弹层仍展示「将改动合并到默认分支」，
-//   完成钮因缺授权禁用；取消勾选后完成钮仍禁用。files 卡同形（合并路径）。
-// --expect=after（修复后栈）：empty 弹层不展示合并行，完成钮可点，点击走
-//   PATCH phase=done、零 merge 步、时间线落「标记为已完成」。files 卡仍展示
-//   合并行且缺授权时完成钮禁用。
-//
-// 用法（栈已 launch）：
-//   node .claude/skills/verify-cairn/scripts/drive-1313-empty-review.mjs --expect=before|after
 
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -57,7 +40,7 @@ const SAMPLE_DIFF = [
   '+new',
   '',
 ].join('\n');
-// 100% rename：git 有 diff --git 头，parseUnifiedDiff 因没有 @@ hunk 丢掉。
+
 const RENAME_DIFF = [
   'diff --git a/old-name.txt b/new-name.txt',
   'similarity index 100%',
@@ -304,8 +287,6 @@ async function openAccept(todoId) {
   return dialog;
 }
 
-// 弹层先开、changes 查询后到。查询未完成时判据是未知，合并行会先闪一下。
-// 截图和断言都等合并行计数落到期望值（最多 8s），避免拍到查询在飞的中间态。
 async function settleMerge(dialog, expectedCount) {
   const deadline = Date.now() + 8000;
   let count = await dialog.getByText(MERGE_LABEL).count();
@@ -374,7 +355,7 @@ if (EXPECT === 'after') {
       try {
         content = JSON.parse(content);
       } catch {
-        /* keep */
+
       }
     }
     return { ...r, content };

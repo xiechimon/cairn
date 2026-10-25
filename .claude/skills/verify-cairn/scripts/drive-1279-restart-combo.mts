@@ -1,17 +1,3 @@
-// verify-cairn drive-1279 — restart combo line bubble (#1279).
-//
-// Live stack, no daemon, no LLM. A failed-restart round stores two user rows:
-// the feedback text, and the daemon combo (task text at claim time + restart
-// instruction). classifyUserText runs in the web mapper. This probe plants
-// four wire rows against one todo whose title was patched after the combo
-// was composed, then reads the rendered user bubbles.
-//
-//   --expect=old  current main: drifted combo renders as a user bubble
-//   --expect=new  fix: drifted combo leaves the bubble list; feedback stays
-//
-// Run:
-//   cd apps/server && pnpm exec tsx ../../.claude/skills/verify-cairn/scripts/drive-1279-restart-combo.mts --expect=old
-
 import { createRequire } from 'node:module';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';

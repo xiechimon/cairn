@@ -1,26 +1,3 @@
-// drive-1065-zombie-claim.mjs — #1065 僵尸认领最小场景探针。
-//
-// 票面：daemon 在 claim 长轮询 hold 期间被杀 → 服务端遗留的 waitWake 在 ≤75s
-// 窗口内替死机跑第二次 tryClaim，新步落到死机（响应无处投递 → 步卡到 sweep
-// 失败收尾）。机理与实栈复现配方 = docs/verify/1025/README.md。
-//
-// 场景（可断言，非「看着像」）：
-//   A（死机）先发 claim 长轮询（waiter Set 插入序在前）→ B（活机）再发 claim
-//   → SIGKILL A 的认领进程（连接断 = 请求 signal abort）→ 入队新步（enqueue
-//   + wake 同一同步轮）→ wake 按插入序先醒 A 的僵尸 waiter：
-//   - 修前：A 的续跑替死机 tryClaim → 步落 A、B 空手 → 红。
-//   - 修后：A 的 waiter 已随 abort 摘除（或出口复查拦截）→ B 领到 → 绿。
-//   双向断言：死机零认领（step.machineId ≠ A）+ 活机照领（= B，wake 路径）。
-//
-// 本探针不 spawn 真 daemon、不依赖 LLM——认领归属就是断言面，步不需要被执行。
-// 活机的真 daemon 全链（领步→执行→confirm）由 drive-1025 复跑覆盖（见
-// docs/verify/1065/README.md 的「复跑配方」）。
-//
-// env：VERIFY_REPO_ROOT（stack 所在 worktree；缺省 = 本脚本所在仓）、
-//      VERIFY_RUN_DIR（缺省 <REPO>/.claude/verify-run，读 ports.json）、
-//      VERIFY_EVIDENCE_DIR（缺省 <REPO>/.claude/verify-evidence/<ts>-1065）。
-// 前置：launch.mjs 已起栈（同 worktree 或 VERIFY_REPO_ROOT 指向的 worktree）。
-
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -60,7 +37,6 @@ function finish(extra = {}) {
   if (checks.some((c) => !c.ok)) process.exitCode = 1;
 }
 
-// 代理剥离：回环 API 走 --noproxy 语义（NO_PROXY，仓内既有探针同款）。
 async function jfetch(method, path, opts = {}) {
   const headers = {};
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
@@ -80,8 +56,6 @@ async function jfetch(method, path, opts = {}) {
   }
   return { status: res.status, body };
 }
-
-// —— seed：team + 不可达 stub provider + agent（步可领即可，不执行）+ 双机 ——
 
 async function seed() {
   const teams = await jfetch('GET', '/api/teams');
@@ -108,7 +82,7 @@ async function seed() {
   const projectRes = await jfetch('POST', '/api/projects', { body: { name: `probe-1065-${runTag}`, teamId } });
   const projectId = projectRes.body?.id;
   if (!projectId) throw new Error(`project create failed: ${projectRes.status}`);
-  // 双机各一把 key（同 key 重注册 = 同 machineId，r3 §1.2）。
+
   const enroll = async (name) => {
     const keyRes = await jfetch('POST', `/api/teams/${teamId}/api-keys`, {
       body: { name: `probe-1065-${name}-${runTag}`, gitAccess: false, mcpAccess: false, toolGrants: { read: [], write: [] } },
@@ -124,9 +98,6 @@ async function seed() {
   };
   return { teamId, agentId, projectId, machineA: await enroll('dead'), machineB: await enroll('live') };
 }
-
-// —— A（死机）：子进程长轮询认领。SIGKILL = 「daemon 在 hold 期间被杀」的最小
-//    同构形（进程死 → 内核关 socket → server 侧连接断 → 请求 signal abort）。 ——
 
 function spawnDeadClaim(token) {
   const code = `
@@ -148,8 +119,6 @@ function spawnDeadClaim(token) {
   });
   return { child, stdout: () => out, exit: () => exit };
 }
-
-// —— B（活机）：本进程内的长轮询认领（wake 路径；无 abort）———————
 
 async function liveClaim(token) {
   return jfetch('POST', '/api/machine/tasks/claim', { body: {}, cred: token, timeoutMs: 30_000 });
@@ -181,22 +150,19 @@ function dbSteps(buildId) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// —— main ———————————————————————————————————————————————————————————
-
 const seeded = await seed();
 const { machineA, machineB, agentId, projectId } = seeded;
 
-// A 先认领（waiter 插入序在前——修前僵尸先醒先领的竞序条件）。
 const dead = spawnDeadClaim(machineA.token);
-await sleep(1_500); // 首次 tryClaim（无步）+ waitWake 注册完成
-// B 再认领（活机，wake 路径的等待者）。
+await sleep(1_500);
+
 const bClaim = liveClaim(machineB.token);
 await sleep(1_000);
-// 杀 A：hold 期间进程死亡。
+
 dead.child.kill('SIGKILL');
 const killedAt = Date.now();
-await sleep(1_000); // 连接断传播 + （修后）waiter 摘除
-// 新步入队（enqueue → wake 同一同步轮）。
+await sleep(1_000);
+
 const task = await makeTask(projectId, agentId);
 const bRes = await bClaim;
 const bBody = bRes.body;

@@ -1,30 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1033-avatar — 总管抽屉思考行/工具行头像几何（#1033）live 闭环。
-//
-// 症状路径：#950 退役 chief.css 后，chief-drawer 的思考行与流式期工具行留着
-// 死类名（chief-msg / chief-avatar--img / chief-msg-col，匹配 0 条规则）——
-// 头像 img 丢掉 [&_img]:size-6 约束，dicebear Lorelei 的真响应是无
-// width/height、只有 viewBox="0 0 980 980" 的 SVG，自然盒 = 容器宽，用户
-// 现场看到 380×380 巨图独占一行、正文被推到图下方。
-//
-// 铺底与 drive-chief-segments.mjs 同律：公开 REST + 假机器（provider /
-// agent / PATCH chief / POST chief/threads / api-key / machine enroll /
-// claim），按真 wire 序推思考段行 + 正文段行 + 工具行开始半，零 daemon、
-// 零 LLM。浏览器面拦截 dicebear 域并按**真 Lorelei 形态**fulfill（无
-// width/height、viewBox 980——形态即验收判据，网络来源不是）。
-//
-// 判据（同帧单 evaluate 量取，杜绝跨动画帧采样假倒挂）：
-//   new：img 24×24、行 display:flex、列 flex-grow:1 / min-width:0、
-//        列在头像右侧且垂直重叠（头像在文字左边、同一行）。
-//   old：img 宽 >100（撑满列宽）、行 display:block —— before 基线复现症状。
-//
-// 用法：
-//   after  ：VERIFY_REPO_ROOT=<本 lane worktree> node drive-1033-avatar.mjs
-//   before ：origin/main 一次性 worktree 起独立栈（8793/5275），同脚本加
-//            --expect=old（drive-agent-identity 先例）。
-//
-// 探针坑位（drive-chief-segments 同源）：行 id 每次运行唯一（chief_message
-// 幂等 upsert 以 id 为冲突键）；断言走 server 读面，SQLite 只作落盘实物。
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -107,7 +81,7 @@ async function apiRows(threadId) {
 }
 
 const DB_PATH = join(stack.homeDir ?? join(RUN_DIR, 'home'), 'server', 'server.db');
-/** SQLite 实物快照（真值三件套的库面；只作证据落盘，断言走 server 读面）。 */
+
 function dbDump(threadId) {
   try {
     const requireServer = createRequire(join(REPO, 'apps', 'server', 'package.json'));
@@ -123,7 +97,6 @@ function dbDump(threadId) {
   }
 }
 
-// —— 铺底（全 REST + 假机器，非被测路径）————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -183,7 +156,6 @@ const claimed = claim.body?.step?.step ?? claim.body?.step;
 if (!claimed?.id) throw new Error('claim 失败：' + JSON.stringify(claim.body));
 const stepId = claimed.id;
 
-// —— 帧发射（真 wire 序；回合保持在飞 = 工具行可见）—————————————
 async function segmentRow(row) {
   const res = await sendJson(
     SERVER + '/api/machine/tool/' + stepId,
@@ -226,14 +198,11 @@ const toolLanded = await waitFor(
 );
 check('W0 工具行开始半落库（在飞态可见的前提）', toolLanded === true, null);
 
-// —— 浏览器面：同帧几何量取 ————————————————————————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 let geometry = null;
 try {
-  // 真 Lorelei 形态桩：无 width/height、viewBox="0 0 980 980"（票面验收判据
-  // 原样）。不 mock 该域会真发外网请求（沙箱实测悬 ~8s），且网络来源不是
-  // 判据、形态才是。
+
   await page.route('**/api.dicebear.com/**', (route) =>
     route.fulfill({
       contentType: 'image/svg+xml',
@@ -244,8 +213,7 @@ try {
   await page.waitForSelector('.chief-drawer', { timeout: 20000 });
   const thinking = page.locator('.chief-msg', { hasText: '先把头像的约束链捋一遍' });
   await waitFor(async () => (await thinking.count()) === 1, 8000);
-  // 头像 img 必须真加载完成（naturalWidth>0）才量得到自然盒——SVG 未载时
-  // rect 是 0×0，会把 old 模式的「巨图」判成假绿/假红。
+
   const imgLoaded = await waitFor(
     () =>
       thinking.evaluate((row) => {
@@ -299,7 +267,7 @@ try {
     );
     check('G5 工具行同律：flex 行 + 列 flex-grow:1', toolGeom.rowDisplay === 'flex' && toolGeom.colFlexGrow === '1', JSON.stringify(toolGeom));
   } else {
-    // before 基线 = 症状复现：无约束 img 撑满列宽、行是 block、列不 grow。
+
     check('G1old 头像无约束撑满列宽（>100px，症状本体）', (geometry.img?.width ?? 0) > 100, JSON.stringify(geometry.img));
     check('G2old 思考行 display:block（flex 骨架缺失）', geometry.rowDisplay === 'block', 'display=' + geometry.rowDisplay);
     check('G3old 消息列 flex-grow:0（min-w-0 flex-1 缺失）', geometry.colFlexGrow === '0', JSON.stringify({ grow: geometry.colFlexGrow, minW: geometry.colMinWidth }));
@@ -311,7 +279,6 @@ try {
   await browser.close();
 }
 
-// —— 真值三件套的读面/库面实物 ——————————————————————————————
 const rows = await apiRows(threadId);
 writeFileSync(
   join(EVIDENCE, 'db-rows.json'),

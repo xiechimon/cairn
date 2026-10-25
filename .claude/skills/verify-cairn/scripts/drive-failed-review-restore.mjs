@@ -1,19 +1,3 @@
-// verify-cairn probe（#702 / #519 B-C17 failed→review 恢复全链真栈证据）：
-// live 栈复现 #519 死锁形态——build 步 done（真实 conv 分支 + commit）→ AI 审核
-// 步 failed（540s 墙形态）→ todo failed——然后验证两条出路：
-//   A) 产品内合并：UI 更多菜单「完成」重新可见（build 腿已交付）→ accept 弹层 →
-//      merge 202 委派合并步 → 机器合并落地（bare repo main fast-forward）→ done。
-//   B) 只重跑审核：第二个 todo 同形态到 failed → steps action review 直接 202 →
-//      恢复回 review 关口 + 新审核步入队（不孤儿化、不重跑 build 腿）。
-// 真值三面：HTTP API JSON + SQLite 行 + 截图；git 面 = bare repo refs（分支在、
-// main 落地点）。证据 = result.json + PNG。
-//
-// 机器侧步（claim/done/upload-urls）走真实 machine wire（与 daemon 同端点）——
-// 与 drive-review-blocking 同律：机器面由本探针扮演，用户面全部真点击。
-//
-// 前置：launch.mjs 起栈（hosted 项目形态，merge 落地面真实生效）。
-// 用法：VERIFY_REPO_ROOT=<worktree> [VERIFY_EVIDENCE_DIR=…] node drive-failed-review-restore.mjs
-
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -74,11 +58,9 @@ async function jpost(path, body, token, method = 'POST') {
   return { status: res.status, body: parsed };
 }
 
-/** 走机器真 wire 把一个 todo 推到「build done + review failed」死锁形态。
- * 返回 { buildId, convSha, reviewStepId }。 */
 async function driveToDeadlock(seed) {
   const { todoId, machineToken, agentId } = seed;
-  // build 起跑（plan 步）→ claim → upload plan.md → done → confirm。
+
   const build = await jpost(`/api/projects/${seed.projectId}/builds`, {
     todoIds: [todoId],
     assignment: { plan: { agentId }, build: { agentId } },
@@ -104,10 +86,10 @@ async function driveToDeadlock(seed) {
     sessionId: `pi-${buildId}`,
   }, machineToken);
   if (planDone.status !== 200) throw new Error(`plan done ${planDone.status}`);
-  // 确认 → 执行步入队。
+
   const confirm = await jpost(`/api/builds/${buildId}/steps`, { action: 'confirm' });
   if (confirm.status !== 202) throw new Error(`confirm ${confirm.status}`);
-  // 种真实 conv 分支（产物 = 分支 + commit）：clone bare → 分支上落一提交 → push。
+
   const bareDir = join(REPOS_DIR, seed.teamId, `${seed.repoName}.git`);
   const work = mkdtempSync(join(tmpdir(), 'cairn-702-'));
   try {
@@ -120,7 +102,7 @@ async function driveToDeadlock(seed) {
     git(['commit', '-m', 'conv round (702 probe)'], repoDir);
     git(['push', 'origin', branch], repoDir);
     const convSha = git(['rev-parse', 'HEAD'], repoDir);
-    // 执行步 claim → done(success, commit=conv HEAD) → review。
+
     const buildClaim = await jpost('/api/machine/tasks/claim', {}, machineToken);
     const buildStep = buildClaim.body?.step?.step ?? buildClaim.body?.step;
     if (buildStep?.kind !== 'build') throw new Error(`expected build claim: ${JSON.stringify(buildClaim.body)}`);
@@ -133,8 +115,7 @@ async function driveToDeadlock(seed) {
     if (buildDone.status !== 200) throw new Error(`build done ${buildDone.status}`);
     const phase1 = await jget(`/api/todos/${todoId}`);
     if (phase1.body.phase !== 'review') throw new Error(`expected review, got ${phase1.body.phase}`);
-    // 发起 AI 审核（真用户面在第一个 todo 上走 UI；这里走同一 REST 动作面）→
-    // 审核步 claim → done(failed) = 540s 墙形态 → todo failed（死锁形态就位）。
+
     const reviewStart = await jpost(`/api/builds/${buildId}/steps`, {
       action: 'review',
       agentId,
@@ -160,7 +141,6 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 
-  // —— seed：team / provider / agent（授合并+推送两开关，XMON-77 闸放行）——
   const teams = await jget('/api/teams');
   const teamId = teams.body?.[0]?.id;
   const prov = await jpost(`/api/teams/${teamId}/providers`, {
@@ -211,7 +191,6 @@ try {
   if (!machineToken) throw new Error(`enroll: ${JSON.stringify(enroll.body)}`);
   const seed = { teamId, projectId, repoName, machineToken, agentId };
 
-  // —— 两个 todo：A 走「产品内合并」出口，B 走「只重跑审核」出口 ——
   const todoA = await jpost(`/api/projects/${projectId}/todos`, {
     title: '702 恢复探针 A（合并出口）',
     spec: '走完 build 腿，审核步撞墙后从产品内合并',
@@ -223,7 +202,6 @@ try {
   const deadA = await driveToDeadlock({ ...seed, todoId: todoA.body.id });
   const deadB = await driveToDeadlock({ ...seed, todoId: todoB.body.id });
 
-  // —— 死锁形态真值（API + git 分支在）——
   const stepsA = await jget(`/api/builds/${deadA.buildId}/steps`);
   const buildStepA = (stepsA.body ?? []).filter((s) => s.kind === 'build').at(-1);
   const reviewStepA = (stepsA.body ?? []).filter((s) => s.kind === 'review').at(-1);
@@ -240,7 +218,6 @@ try {
   writeFileSync(join(EVIDENCE, 'api-todoA-failed.json'), JSON.stringify(todoAFace.body, null, 2));
   writeFileSync(join(EVIDENCE, 'api-buildA-steps-deadlock.json'), JSON.stringify(stepsA.body, null, 2));
 
-  // —— 出口 A：产品内合并（UI 更多菜单「完成」→ accept 弹层 → merge 202）——
   await page.goto(`${WEB}/app/todo/${todoA.body.id}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   await page.screenshot({ path: join(EVIDENCE, '01-todoA-failed-detail.png'), fullPage: true });
@@ -250,7 +227,7 @@ try {
   await page.screenshot({ path: join(EVIDENCE, '02-todoA-more-menu-complete-enabled.png') });
   const completeRow = page.locator('.more-menu-item', { hasText: '完成' });
   check('ui-complete-row-enabled', await completeRow.isEnabled(), 'build 腿已交付 → 完成钮回亮（修前 = 消失/禁用）');
-  // 点完成 → accept 弹层（同一验收确认弹层）。
+
   const mergeResponseP = page.waitForResponse(
     (r) => r.request().method() === 'POST' && r.url().includes(`/api/builds/${deadA.buildId}/merge`),
     { timeout: 10_000 },
@@ -259,14 +236,13 @@ try {
   await page.waitForSelector('[role="dialog"]', { timeout: 5_000 });
   await page.screenshot({ path: join(EVIDENCE, '03-todoA-accept-dialog.png') });
   check('ui-accept-dialog-opened', (await page.locator('[role="dialog"]').getAttribute('aria-label')) === '完成任务', '验收确认弹层打开（可及名载体，#952）');
-  // #951/#910 载体：.dlg-accept-done 类钩退役 → dialog scope role+文案一级。
+
   await page.locator('[role="dialog"]').getByRole('button', { name: '完成' }).click();
   const mergeResponse = await mergeResponseP;
   check('api-merge-from-failed-202', mergeResponse.status() === 202,
     `POST /builds/{id}/merge from failed = ${mergeResponse.status()}（修前 409 illegal phase transition）`);
   await page.waitForSelector('[role="dialog"]', { state: 'detached', timeout: 5_000 });
 
-  // 恢复盘面真值：相位 review（恢复 ≠ done）+ 合并步入队。
   const restored = await jget(`/api/todos/${todoA.body.id}`);
   check('api-restored-phase-review', restored.body.phase === 'review', `phase=${restored.body.phase}`);
   const stepsA2 = await jget(`/api/builds/${deadA.buildId}/steps`);
@@ -275,7 +251,6 @@ try {
   await page.waitForTimeout(800);
   await page.screenshot({ path: join(EVIDENCE, '04-todoA-restored-review-gate.png'), fullPage: true });
 
-  // —— 机器领合并步 → done（commit = conv HEAD）→ 落地 + done 终态 ——
   const mergeClaim = await jpost('/api/machine/tasks/claim', {}, machineToken);
   const mergeStepClaimed = mergeClaim.body?.step?.step ?? mergeClaim.body?.step;
   check('machine-claim-merge-step', mergeStepClaimed?.kind === 'merge', `kind=${mergeStepClaimed?.kind}`);
@@ -285,7 +260,7 @@ try {
     commit: deadA.convSha,
   }, machineToken);
   check('machine-done-merge-step', mergeDone.status === 200, `status=${mergeDone.status}`);
-  // 终态轮询（SSE 推 UI；API 面直接读）。
+
   let doneFace = null;
   for (let i = 0; i < 20; i++) {
     doneFace = await jget(`/api/todos/${todoA.body.id}`);
@@ -301,7 +276,6 @@ try {
   writeFileSync(join(EVIDENCE, 'api-todoA-done.json'), JSON.stringify(doneFace?.body, null, 2));
   writeFileSync(join(EVIDENCE, 'api-buildA-steps-final.json'), JSON.stringify((await jget(`/api/builds/${deadA.buildId}/steps`)).body, null, 2));
 
-  // —— 出口 B：只重跑审核（REST 动作面，恢复闸共用）——
   const reviewAgain = await jpost(`/api/builds/${deadB.buildId}/steps`, {
     action: 'review',
     agentId,
@@ -314,7 +288,7 @@ try {
   const reviewStepsB = (stepsB.body ?? []).filter((s) => s.kind === 'review');
   check('api-review-rerun-new-step-pending', reviewStepsB.length === 2 && reviewStepsB[1].status === 'pending',
     `review steps=${JSON.stringify(reviewStepsB.map((s) => s.status))}（旧 failed + 新 pending）`);
-  // build 腿未被重跑（不孤儿化现有交付）：build 步仍只有一条 done。
+
   const buildStepsB = (stepsB.body ?? []).filter((s) => s.kind === 'build');
   check('api-review-rerun-build-leg-untouched', buildStepsB.length === 1 && buildStepsB[0].status === 'done',
     `build steps=${JSON.stringify(buildStepsB.map((s) => s.status))}`);
@@ -324,7 +298,6 @@ try {
   writeFileSync(join(EVIDENCE, 'api-todoB-restored.json'), JSON.stringify(restoredB.body, null, 2));
   writeFileSync(join(EVIDENCE, 'api-buildB-steps-restored.json'), JSON.stringify(stepsB.body, null, 2));
 
-  // —— SQLite 真值 ——
   const db = new Database(DB_PATH, { readonly: true });
   const rowsA = db
     .prepare('select kind, status, checkpointCommit from step where buildId = ? order by createdAt')

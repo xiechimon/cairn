@@ -1,84 +1,43 @@
-# 技能导入通道（技能页 + server 收集器 + refresh，#1170）
+# Skill import channel (skills page + server collector + refresh, #1170)
 
-技能进入 server 库的既有唯一通道是 web 表单/API 手建（`createLocalSkill`）；
-#1170 加第二条：**导入**——`POST /api/teams/{id}/skills/import`（body
-`{localPath}` 或 `{url}` 二选一）+ **refresh** `POST
-/api/teams/{id}/skills/{sid}/refresh` 按记录的来源重拉（id 不变，复用
-`updateLocalSkill` 覆写语义）。落盘一律复用 createLocalSkill/updateLocalSkill
-既有校验（目录名正则 / frontmatter 唯一真值 / 字节闸 / 审计行），**不另开写
-路径**——`services/skill-import.ts` 只做「把来源变成 CreateSkillBody」。
+The existing only channel for skills entering the server library is web-form/API manual creation (`createLocalSkill`); #1170 adds a second: **import** - `POST /api/teams/{id}/skills/import` (body `{localPath}` or `{url}`, one of two) + **refresh** `POST /api/teams/{id}/skills/{sid}/refresh` re-pulls by the record's source (id unchanged, reusing `updateLocalSkill`'s overwrite semantics). The disk write always reuses createLocalSkill/updateLocalSkill's existing validation (directory-name regex / frontmatter sole truth / byte gate / audit row), **no separate write path** - `services/skill-import.ts` only does "turn the source into a CreateSkillBody".
 
-来源记录（refresh 的数据源）落**数据根侧车** `<CAIRN_HOME>/server/
-skill-sources.json`：技能本体是现扫目录（spec 13 #367「不入库」域律），来源
-登记同样不入 DB——零 migration、不污染用户技能池目录。键 = skillId；值 =
-`{kind: localPath|github, ref, importedAt, refreshedAt}`（ref：localPath =
-realpath 归一；github = canonical URL 含 ref——refresh 确定性重拉）。
+The source record (refresh's data source) lands in the **data-root sidecar** `<CAIRN_HOME>/server/skill-sources.json`: the skill body is the live-scan directory (spec 13 #367 "not stored in DB" domain law), the source registration likewise does not enter the DB - zero migration, no pollution of the user's skill-pool directory. Key = skillId; value = `{kind: localPath|github, ref, importedAt, refreshedAt}` (ref: localPath = realpath normalized; github = canonical URL including ref - refresh re-pulls deterministically).
 
-安全面（票面硬要求）：URL 分支的用户输入只作「规格」不作「抓取目标」——
-实际出站只打**固定 host**（api.github.com / raw.githubusercontent.com），
-owner/repo/ref/子路径先过字符白名单；输入校验仍显式拒非 https 与
-私网/回环/link-local host（贴错内网地址的用户拿到点名报错）。localPath：
-resolve+realpath 归一后落在技能根内 = 400（已被 cairn 现扫管理）；根外任意
-可读目录 = local 形态的信任面（server 进程权限 = 操作者本人）。只读复制
-（源目录零写入）；walk 不追符号链接（listSkillFiles 同律）；`.git` 不入包。
-二进制文件显式 400（写面 body 是 utf8 文本；Multica 因 PG TEXT 列选择跳过
-——cairn 写面纪律是显式拒绝，见 `skill-import.ts` 头注）。
+Security face (ticket-face hard requirement): the URL branch's user input is only a "spec" not a "fetch target" - the actual outbound only hits **fixed hosts** (api.github.com / raw.githubusercontent.com), owner/repo/ref/subpath first pass a character allowlist; input validation still explicitly rejects non-https and private-network/loopback/link-local hosts (a user pasting a wrong intranet address gets a named error). localPath: after resolve+realpath normalization falling inside the skill root = 400 (already managed by cairn's live scan); any readable directory outside the root = the local-form trust face (the server process permission = the operator themselves). Read-only copy (zero writes to the source directory); the walk does not follow symlinks (listSkillFiles same law); `.git` not packed. Binary files explicit 400 (the write face's body is utf8 text; Multica skips because of the PG TEXT column - cairn's write-face discipline is explicit rejection, see the `skill-import.ts` header note).
 
 ## Sub-features
 
-- `skill-import-local` localPath 导入：收集器只读 walk + 逐文件字节闸 +
-  utf8 严格解码 → createLocalSkill。源在技能根内（含 symlink 解析后）→ 400
-  「it is already visible to cairn」。
-- `skill-import-url` GitHub URL 导入：repo meta（默认分支）→ recursive tree
-  （truncated = 400）→ 子目录前缀过滤 + 路径守卫 + **树声明尺寸预检**（超限
-  在拉取前拒绝、零 raw 请求）→ 逐文件 raw 拉取（每请求 15s 超时 + 整体 120s
-  截止 + content-length/实读双上限）→ utf8 严格。文件数上限 256 [设计]
-  （Multica maxImportFileCount 同量级——每文件一次出站请求）。
-- `skill-refresh` refresh 重拉：无来源记录 → 409；frontmatter name ≠ sid
-  （来源身份漂移）→ 409 拒绝、盘上不动；通过后 updateLocalSkill 覆写
-  （**列出者覆写、未列者保留**——源删的文件本地保留，与手动 PUT 同律）。
-  refresh 后物化清单 sha256 变 → 新 digest 视图（#920 接力，零额外改动）。
-- `skill-import-wire` web 面：技能页 topbar「导入」钮（`data-testid=
-  resource-import`，ResourceShell headerExtra 槽首用）开 `SkillImportDialog`
-  （localPath / GitHub URL 两字段，客户端 xor 预检，400/409/502/504 落内联
-  错误行）。
+- `skill-import-local` localPath import: collector read-only walk + per-file byte gate + utf8 strict decode -> createLocalSkill. A source inside the skill root (including after symlink resolution) -> 400 "it is already visible to cairn".
+- `skill-import-url` GitHub URL import: repo meta (default branch) -> recursive tree (truncated = 400) -> subdirectory prefix filter + path guard + **tree-declared size pre-check** (over-limit rejected before fetching, zero raw requests) -> per-file raw fetch (15s timeout per request + 120s overall deadline + content-length/actual-read dual cap) -> utf8 strict. File-count cap 256 [design] (Multica's maxImportFileCount same magnitude - one outbound request per file).
+- `skill-refresh` refresh re-pull: no source record -> 409; frontmatter name != sid (source identity drift) -> 409 rejected, disk untouched; after passing, updateLocalSkill overwrites (**listed overwrites, unlisted keeps** - a file the source deleted stays locally, same law as manual PUT). After refresh the materialized manifest's sha256 changes -> the new digest view (#920 handoff, zero extra changes).
+- `skill-import-wire` web face: the skills page topbar `导入` button (`data-testid=resource-import`, the ResourceShell headerExtra slot's first use) opens `SkillImportDialog` (localPath / GitHub URL two fields, client-side xor pre-check, 400/409/502/504 land in an inline error row).
 
 ## How to get to it (user POV)
 
-- 侧栏「资源 → 技能」→ `/app/resources/skills` → topbar「导入」钮(data-testid=resource-import)→ 导入对话框,本地路径与 GitHub URL 二选一。
-- API:`POST /api/teams/{id}/skills/import`、`POST /api/teams/{id}/skills/{sid}/refresh`。
-- 驱动(`vp.mjs list skill-import` 列出全部 case 与 usage):
-  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive skill-import import-rollback`:导入失败回滚、重试成功写来源记录(默认带修复后开关 `--expect=new`)。
-  - `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' node .claude/skills/verify-cairn/scripts/vp.mjs drive skill-import local-and-github-import`:本地目录与 GitHub URL 导入、refresh,即下面的驱动步;调 GitHub,drive 不带 `--force` 会拒跑并列出原因,确认要打 GitHub 再自己补上;launch 时带 `NODE_USE_ENV_PROXY=1`(Gotchas 1)。
+- Sidebar `资源` -> `技能` -> `/app/resources/skills` -> topbar `导入` button (data-testid=resource-import) -> the import dialog, local path and GitHub URL one of two.
+- API: `POST /api/teams/{id}/skills/import`, `POST /api/teams/{id}/skills/{sid}/refresh`.
+- Driving (`vp.mjs list skill-import` lists all cases and usage):
+  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive skill-import import-rollback`: import-failure rollback, retry success writes the source record (default carries the post-fix switch `--expect=new`).
+  - `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' node .claude/skills/verify-cairn/scripts/vp.mjs drive skill-import local-and-github-import`: local-directory and GitHub-URL import, refresh, i.e. the driving steps below; it calls GitHub, drive without `--force` refuses and lists why, add `--force` yourself after confirming you want to hit GitHub; launch with `NODE_USE_ENV_PROXY=1` (Gotchas 1).
 
-## 驱动步（drive-1170-skill-import.mjs）
+## Driving steps (drive-1170-skill-import.mjs)
 
-1. `launch.mjs` 起栈（**命令行带 `NODE_USE_ENV_PROXY=1`**——见 gotcha 1）。
+1. `launch.mjs` starts the stack (**the command line carries `NODE_USE_ENV_PROXY=1`** - see gotcha 1).
 2. `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' node
-   .claude/skills/verify-cairn/scripts/drive-1170-skill-import.mjs`。
-3. 判读 = `docs/verify/1170/README.md`（A/B/C/D 六面 31 checks，每条 `ok` 是布尔）。
+   .claude/skills/verify-cairn/scripts/drive-1170-skill-import.mjs`.
+3. Reading = `docs/verify/1170/README.md` (A/B/C/D six faces 31 checks, each `ok` is a boolean).
 
 ## Gotchas
 
-1. **栈的 GitHub 出站必须走代理**：直连 raw.githubusercontent.com 间歇被重置
-   （api.github.com 稳定）；launch 命令行带 `NODE_USE_ENV_PROXY=1`（Node
-   fetch 默认不吃 proxy env——lib/github.ts 头注的部署形态）。
-2. **anthropics/skills 挑单行 description 的子目录**：`skills/academy-guide`
-   一类 `description: >` 折叠形被 parseSkillFrontmatter 按缺省回落 → 导入
-   400（既有解析语义，非缺陷）；`skills/pdf` 是安全目标。
-3. B 相位跑真网络（14 次出站请求）——网络抖动重跑即可，A/C/D 相位零外网
-   依赖可单独定位。
-4. 假机器物化腿（C5-C7）走 REST 全链（api-key → enroll → agent 白名单 →
-   build → claim → manifest），claim 响应是 `{step:{step,…}}` 双层包装——
-   `.step.step.id`（#519 同坑）。
-5. 来源记录断言要 `realpathSync` 对拍——macOS `/var → /private/var` 族
-   变换会让裸等值假红（本次栈在 /Users 下无此问题，通用护栏）。
+1. **The stack's GitHub outbound must go through the proxy**: a direct connection to raw.githubusercontent.com intermittently resets (api.github.com is stable); launch's command line carries `NODE_USE_ENV_PROXY=1` (Node fetch by default ignores the proxy env - lib/github.ts header note's deployment form).
+2. **anthropics/skills has subdirectories with folded single-line descriptions**: `skills/academy-guide`-style `description: >` folded shapes fall back to the default in parseSkillFrontmatter -> import 400 (existing parse semantics, not a defect); `skills/pdf` is the safe target.
+3. Phase B runs the real network (14 outbound requests) - on network jitter just re-run, phases A/C/D have zero external-network dependency and can be located alone.
+4. The fake-machine materialization leg (C5-C7) walks the full REST chain (api-key -> enroll -> agent allowlist -> build -> claim -> manifest), the claim response is `{step:{step,...}}` double-wrapped - `.step.step.id` (the #519 same pit).
+5. The source-record assertion must `realpathSync` cross-check - the macOS `/var -> /private/var`-family transform makes bare equality a false red (this stack is under /Users so no issue here, a general guardrail).
 
-## 验证账
+## Verification account
 
-- live：`drive-1170-skill-import.mjs` 31/31 PASS，证据 `docs/verify/1170/`
-  （2026-10-10）。来源登记失败时导入删掉刚建的目录（#1185），同名可以再导入。
-- server 单元：`apps/server/test/skill-import.test.ts` 35 用例（失败方式
-  先行枚举——LP0-LP11 / U1-U11 / R1-R8 / M1 / W1，外加来源空登记不被失败写污染）。
-- web e2e：`apps/web/e2e/skill-import.spec.ts` 4 用例（fixture 字段集 +
-  xor 闸 + accept 律；live 201/400/409 打桩）。
+- live: `drive-1170-skill-import.mjs` 31/31 PASS, evidence `docs/verify/1170/` (2026-10-10). When source registration fails the import deletes the just-created directory (#1185), the same name can be imported again.
+- server unit: `apps/server/test/skill-import.test.ts` 35 cases (failure modes enumerated first - LP0-LP11 / U1-U11 / R1-R8 / M1 / W1, plus the empty source registration not polluted by a failed write).
+- web e2e: `apps/web/e2e/skill-import.spec.ts` 4 cases (the fixture field set + xor gate + accept law; live 201/400/409 stubbed).

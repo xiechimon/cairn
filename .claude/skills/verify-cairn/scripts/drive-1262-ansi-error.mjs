@@ -1,18 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1262-ansi-error — #1262 失败行/运行历史 ANSI 兜底真栈
-// 取证。链路：REST 建 project+todo（真用户路径）→ SQLite 直接置 phase=failed
-// + 落 build.errorMessage = **用户库实测污染行原文**（359,698 字符、75,458 个
-// ESC——git commit 钩子带出的 biome SGR+OSC8 输出）→ Playwright 开板面任务
-// → 失败行截图 + textContent 断言（无 \x1b、无 `]8;;`、首行含 文件:行:列+规则名）。
-//
-// 双向证据口径：before 面 = 同一行原文（本脚本 seed 的输入即用户库污染样本，
-// docs/verify/1262/row-from-user-db.txt）；after 面 = 渲染 textContent + 截图。
-// 写入侧（daemon done.errorMessage 落库前剥）由 integration
-// test/ansi-errormessage-e2e.test.ts 全链钉住，本 probe 只证显示侧兜底。
-//
-// 用法（栈先 launch）：node <repo>/.claude/skills/verify-cairn/scripts/drive-1262-ansi-error.mjs
-// env：SERVER / WEB（缺省读 VERIFY_RUN_DIR/ports.json）、POLLUTED_ROW_FILE
-// （缺省 <repo>/docs/verify/1262/row-from-user-db.txt）、VERIFY_EVIDENCE_DIR。
 
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -70,7 +56,6 @@ async function api(method, path, body) {
   return res.json();
 }
 
-// —— seed：REST 建世界 + SQLite 置失败态（污染原文进 build.errorMessage）————
 const seed = await api('POST', '/api/projects', { name: 'ansi-1262', teamId: (await (await fetch(`${SERVER}/api/teams`)).json())[0].id });
 const projectId = seed.id;
 const todoRes = await api('POST', `/api/projects/${projectId}/todos`, {
@@ -98,22 +83,18 @@ const buildId = `1262-${crypto.randomUUID()}`;
 }
 check('seed：污染行落库（build.errorMessage 含 ESC/OSC8）', POLLUTED.includes('\x1b') && POLLUTED.includes(']8;;'), `${POLLUTED.length} 字符`);
 
-// —— 驱动：板面开任务 → 失败行 ————————————————————————————————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 await page.goto(`${WEB}/app`, { waitUntil: 'networkidle' });
 
-// 待处理列收纳 failed（#351）：失败卡在待处理列。点卡开详情。
 const card = page.locator('.todo-card', { hasText: TITLE }).first();
 await card.waitFor({ state: 'visible', timeout: 15_000 });
 await card.click();
 
-// 失败行（橙色标题）：等「git commit failed」文本出现（渲染兜底已剥）。
 const failText = page.getByText('git commit failed (1):', { exact: false }).first();
 await failText.waitFor({ state: 'visible', timeout: 15_000 });
 await shot(page, 'fail-row-1262.png');
 
-// 断言面：textContent 无转义残片 + 首行可读（文件:行:列 + 规则名）。
 const text = await page.evaluate(() => document.body.textContent ?? '');
 check('渲染 textContent 无 ESC 残留', !text.includes('\x1b'), '显示侧兜底生效');
 check('渲染 textContent 无 ]8;; 残留', !text.includes(']8;;'));

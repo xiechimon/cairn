@@ -1,31 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn probe — #1170（技能导入通道：localPath + GitHub URL + refresh
-// 重拉）live 面证据。
-//
-// 取证六面：
-//   A. localPath 导入（真用户路径——web 技能页 topbar「导入」开弹窗、填路径、
-//      提交）：列表即现 + REST 读面（record/文件内容对拍）+ 盘上文件集 +
-//      来源记录 skill-sources.json（kind/ref/importedAt）。
-//   B. GitHub URL 导入（真 anthropics/skills 子目录 skills/pdf——12 文件纯文本
-//      目录）：列表即现 + 文件清单对拍（12 个文件）+ 来源记录 canonical URL。
-//   C. refresh：C1 手建技能（直接落目录，无来源记录）→ 409 说明；C2 本地源
-//      改内容 → refresh → 200、id 不变、盘上内容更新；C3 machine-wire 物化
-//      清单（假机器 REST：apiKey → enroll → agent 白名单 → build → claim →
-//      manifest）含导入技能 + C4 源再改 → refresh → 同 id 新 sha256（#920 接力
-//      ——新 digest 视图的根因）；C5 skill_audit 审计行（create/import +
-//      update/refresh，SQLite 只读）。
-//   D. 红态面（真拒绝，非模拟）：SSRF 逐形（http://127.0.0.1、私网段、
-//      非 GitHub host）、localPath 落技能根内、二进制文件、超单文件上限——
-//      全部 400 且消息点名根因；另取一张 UI 错误态截图（弹窗内联错误行 +
-//      server 原文 detail）。
-//
-// 栈必须已在跑（launch.mjs；坐标取 VERIFY_RUN_DIR/ports.json）。证据落
-// VERIFY_EVIDENCE_DIR；任一断言失败退出码 1。
-// 运行前置：proxy env 全 unset（回环请求过代理会 502 假阳性）；URL 导入
-// 依赖 server 直连 api.github.com / raw.githubusercontent.com（Node fetch
-// 不吃 proxy env——launch 形态即直连）。
-// 注：B 相位打真实 GitHub（票面验收口径「从一个 GitHub 公共技能仓用 url
-// 导入」）——树/文件拉取共 14 次出站请求，网络抖动时重跑本脚本即可。
 
 import { createRequire } from 'node:module';
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -85,8 +58,6 @@ const saveJson = (name, data) => {
   writeFileSync(join(EVIDENCE, name), `${JSON.stringify(data, null, 2)}\n`);
 };
 
-// —— 源目录组装（技能根外的 scratch 位置）———————————————————————————
-
 const SRC = join(RUN_DIR, 'import-src');
 rmSync(SRC, { recursive: true, force: true });
 mkdirSync(join(SRC, 'my-live-skill', 'scripts'), { recursive: true });
@@ -96,15 +67,12 @@ writeFileSync(join(SRC, 'my-live-skill', 'SKILL.md'), MY_SKILL_MD);
 writeFileSync(join(SRC, 'my-live-skill', 'helper.md'), 'helper v1\n');
 writeFileSync(join(SRC, 'my-live-skill', 'scripts', 'run.sh'), 'echo v1\n');
 
-// 红态源：二进制 + 超限。
 mkdirSync(join(SRC, 'bin-src'), { recursive: true });
 writeFileSync(join(SRC, 'bin-src', 'SKILL.md'), '---\nname: bin-src\ndescription: d\n---\n');
 writeFileSync(join(SRC, 'bin-src', 'logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe]));
 mkdirSync(join(SRC, 'big-src'), { recursive: true });
 writeFileSync(join(SRC, 'big-src', 'SKILL.md'), '---\nname: big-src\ndescription: d\n---\n');
 writeFileSync(join(SRC, 'big-src', 'big.txt'), 'x'.repeat(512_001));
-
-// —— 相位驱动 ————————————————————————————————————————————————
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
@@ -117,7 +85,6 @@ try {
   const detailApi = (sid) =>
     j(`/api/teams/${TEAM}/skills/${encodeURIComponent(sid)}`, undefined, 'GET').then((r) => r.json());
 
-  // —— A. localPath 导入（web 真用户路径）——
   await page.goto(`${WEB}/app/resources/skills`);
   await page.getByTestId('resource-empty').waitFor({ state: 'visible' });
   await page.getByTestId('resource-import').click();
@@ -159,7 +126,6 @@ try {
   await page.screenshot({ path: join(EVIDENCE, 'a-localpath-list.png') });
   check(true, 'A10 截图：导入后列表行');
 
-  // —— B. GitHub URL 导入（真 anthropics/skills 子目录）——
   await page.getByTestId('resource-import').click();
   const dlgB = page.getByRole('dialog', { name: '导入技能' });
   await dlgB.locator('#dlg-skill-import-url').waitFor({ state: 'visible' });
@@ -191,7 +157,6 @@ try {
   await page.screenshot({ path: join(EVIDENCE, 'b-github-list.png') });
   check(true, 'B7 截图：两行导入技能');
 
-  // —— C1. 手建技能 refresh → 409 ——
   mkdirSync(join(SKILLS_DIR, 'hand-made-skill'));
   writeFileSync(
     join(SKILLS_DIR, 'hand-made-skill', 'SKILL.md'),
@@ -205,7 +170,6 @@ try {
     `${c1.status}: ${c1Body.error}`,
   );
 
-  // —— C2. 源改内容 → refresh → 200 id 不变 盘上更新 ——
   writeFileSync(
     join(SRC, 'my-live-skill', 'SKILL.md'),
     MY_SKILL_MD.replace('v1 正文', 'v2 正文（refresh 后）').replace('本地技能 v1', '本地技能 v2'),
@@ -224,7 +188,6 @@ try {
   ).json();
   check(helper2.content === 'helper v2 (refreshed)\n', 'C4 覆写语义（列出者覆写——helper.md v2）');
 
-  // —— C5. machine-wire 物化清单（#920 接力：假机器 REST 全链）——
   const keyRes = await j(`/api/teams/${TEAM}/api-keys`, {
     name: 'probe-machine',
     gitAccess: false,
@@ -281,7 +244,6 @@ try {
   const shaBefore = entry1?.files?.find((f) => f.path === 'SKILL.md')?.sha256;
   saveJson('c-manifest-before.json', manifest1);
 
-  // C6: 源再改 → refresh → 清单同 id 新 sha。
   writeFileSync(
     join(SRC, 'my-live-skill', 'SKILL.md'),
     MY_SKILL_MD.replace('v1 正文', 'v3 正文（物化对拍）').replace('本地技能 v1', '本地技能 v3'),
@@ -298,7 +260,6 @@ try {
     `id=${entry2?.id} sha ${shaBefore?.slice(0, 8)}→${shaAfter?.slice(0, 8)}`,
   );
 
-  // —— C8. 审计行（SQLite 只读）——
   const requireServer = createRequire(join(ROOT, 'apps', 'server', 'package.json'));
   const Database = requireServer('better-sqlite3');
   const db = new Database(DB_PATH, { readonly: true });
@@ -318,7 +279,6 @@ try {
     auditRows.map((r) => `${r.action}:${r.skillId}`).join(' '),
   );
 
-  // —— D. 红态面（真拒绝）——
   const ssrf = [
     ['http://127.0.0.1/skills/x', /127\.0\.0\.1|https/],
     ['https://192.168.1.5/acme/repo', /192\.168\.1\.5|private|loopback/],
@@ -357,7 +317,6 @@ try {
   );
   saveJson('d-red-states.json', red);
 
-  // —— D5. UI 错误态截图（SSRF 形经弹窗）——
   await page.getByTestId('resource-import').click();
   const dlgD = page.getByRole('dialog', { name: '导入技能' });
   await dlgD.locator('#dlg-skill-import-url').waitFor({ state: 'visible' });
@@ -372,7 +331,6 @@ try {
   );
   await page.screenshot({ path: join(EVIDENCE, 'd-red-ui.png') });
 
-  // 收尾真值存档。
   saveJson('a-import-rest-rows.json', rowsB);
   const sourcesFinal = JSON.parse(readFileSync(SOURCES_PATH, 'utf8'));
   saveJson('sources-records.json', sourcesFinal);

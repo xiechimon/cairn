@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// mea 真链验收（#1259/#1260 真机半）：mea 上的分支栈（server 8792 + web
-// 5274 + 真 daemon + 真 claude-code CLI）——浏览器真用户路径创建 agent
-//（三级级联：claude-code → mea-wsl-verify → mea 真实模型清单），然后真任务
-// 让 mea 的 claude 真跑一轮（README 加日期行）。
-// 从本机跑：node drive-1259-mea-live.mjs（栈由 ssh 脚本起在 mea 上）。
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
@@ -13,8 +8,7 @@ import { chromium } from '@playwright/test';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const EVIDENCE = join(REPO, 'docs/verify/1259');
 mkdirSync(EVIDENCE, { recursive: true });
-// 浏览器在 mea 本机跑（localhost）——tailnet 上 vite dev 模块图分钟级
-//（type=module 的 DCL 等全图，HTTP/1.1 六连上界）；栈在 mea、探针也在 mea。
+
 const WEB = process.env.MEA_WEB ?? 'http://127.0.0.1:5274';
 const SERVER = process.env.MEA_SERVER ?? 'http://127.0.0.1:8792';
 
@@ -28,13 +22,9 @@ async function shot(page, name) {
   process.stdout.write('shot  ' + name + '\n');
 }
 
-// tailnet 地址必须直连——本机系统代理（127.0.0.1:7890）路由不了 tailnet。
 const browser = await chromium.launch({ args: ['--no-proxy-server'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 
-// —— 腿 1：机器页 → 详情页 → 创建弹窗级联 ————————————————————
-// vite dev 冷转换的模块图在 tailnet 上分钟级（type=module 延迟 DCL）——
-// 首击 commit 即放，等具体元素出场（转换结果入 .vite 缓存，后续腿快）。
 await page.goto(WEB + '/app/resources/machines', { waitUntil: 'commit', timeout: 60_000 });
 await page.getByRole('link', { name: 'mea-wsl-verify' }).waitFor({ timeout: 180_000 });
 await page.getByRole('link', { name: 'mea-wsl-verify' }).click();
@@ -47,12 +37,10 @@ const dlg = page.getByRole('dialog', { name: '创建 agent' });
 await dlg.waitFor();
 await dlg.getByLabel('名称').fill('mea-live-agent');
 
-// 级联第一级：运行时。pi → claude-code。
 await dlg.locator('.dlg-agent-machine-select').waitFor();
 const machineBefore = await dlg.locator('.dlg-agent-machine-select').textContent();
 check('M2 详情页创建槽预选归属机 = mea', (machineBefore ?? '').includes('mea-wsl-verify'), machineBefore);
 
-// 运行时选择器（runtime 一级）。
 const runtimeSelect = dlg.locator('.dlg-agent-runtime-select');
 await runtimeSelect.click();
 await shot(page, 'mea-2-runtime-menu.png');
@@ -61,7 +49,6 @@ check('M3 运行时清单含 claude-code', await ccItem.count() === 1);
 await ccItem.click();
 await page.waitForTimeout(300);
 
-// 模型选择器：应列出 mea 自报的真实模型（fable / deepseek / qwen / gpt-5.6 / MiniMax）。
 const modelSelect = dlg.locator('.dlg-agent-model-select');
 await modelSelect.click();
 await page.waitForTimeout(300);
@@ -81,10 +68,9 @@ await page.waitForTimeout(800);
 check('M6 创建成功（弹窗关闭）', (await dlg.count()) === 0);
 await shot(page, 'mea-5-after-create.png');
 
-// —— 腿 2：真任务 —— README 加日期行，mea 的 claude 真跑 ————————————
 const teams = await (await fetch(SERVER + '/api/teams')).json();
 const teamId = teams[0].id;
-// 成员读面（词表端点 /members）：agent 行 = memberType 'agent'，记录挂在 actor 上。
+
 const members = await (await fetch(SERVER + `/api/teams/${teamId}/members`)).json();
 const member = (Array.isArray(members) ? members : []).find(
   (m) => m.memberType === 'agent' && m.actor?.displayName === 'mea-live-agent',
@@ -117,7 +103,6 @@ const build = await (
 ).json();
 check('M8 真任务 build 入队', build.builds?.[0]?.id != null, JSON.stringify(build).slice(0, 120));
 
-// 等 daemon 领步 + 真跑（claude 真跑分钟级；5 分钟窗口轮询步态）。
 const stepId = build.builds[0].id;
 let lastPhase = '';
 let done = null;
@@ -133,7 +118,7 @@ for (let i = 0; i < 60; i++) {
     lastPhase = phase;
   }
   if (['confirm', 'review', 'done', 'building'].includes(phase) === false && row?.status === 'claimed') {
-    // 仍在跑
+
   }
   if (phase === 'confirm' || phase === 'done' || phase === 'review') {
     done = { phase, stepStatus: row?.status };

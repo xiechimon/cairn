@@ -1,27 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-chief-catchup — 回合进行中订阅会话流的进场补发（#740）live 闭环。
-//
-// 症状路径：#640「开始任务」发完回合只给 toast → 用户点「查看会话」开抽屉时
-// 回合已在飞 → 订阅前流掉的增量此前任何地方都不存在（hub 零缓冲）。本票 =
-// hub 为在飞段维护文本缓冲、subscribe 时作为一条 text_delta 快照补发。
-//
-// 铺底全走公开 REST + **假机器**（drive-agent-identity.mjs 同律）：provider +
-// agent + PATCH chief 绑定 + POST chief/threads 建线程入队回合步 + api-key/
-// machine enroll 后认领该步、经 machine tool 缝推 transcript_delta、终局 PUT
-// transcript.json + POST done——零 daemon、零 LLM，回合数据面与真机器同形。
-//
-// 两条证据面：
-//  A. API 面（确定性）：回合在飞时第二个 SSE 客户端进场 = 收到一条补发
-//     text_delta（全前缀精确拼接）；接续增量不重不断；断线重连同快照；
-//     终局后新流零补发。
-//  B. 浏览器面：中途打开 chief 抽屉 → 打字尾行即刻显示已流出前缀 → 继续
-//     打字 → 终稿收敛（不双份）。动效面证据 = GIF（本仓 #656/#644 先例）。
-//
-// 双态：缺省 = 新行为全链应 PASS；`--expect=old` 反转期望取「同等场景」
-// before 基线（drive-agent-identity.mjs / drive-newtask-key.mjs 先例）：
-// 中途进场打字行零文本（前缀丢失）、API 面零补发帧。依赖全新库：重验 =
-// 重 launch。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-chief-catchup.mjs [--expect=old]
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -96,7 +73,6 @@ async function waitFor(fn, timeoutMs, label) {
   }
 }
 
-/** 原生 SSE 读流（Node fetch 流式 body）：frames 累积 text_delta 事件载荷。 */
 async function openSse(url) {
   const ctrl = new AbortController();
   const res = await fetch(url, { signal: ctrl.signal, headers: { accept: 'text/event-stream' } });
@@ -120,7 +96,7 @@ async function openSse(url) {
             try {
               frames.push(JSON.parse(line.slice(5).trim()));
             } catch {
-              /* 半帧防御 */
+
             }
           }
         }
@@ -140,7 +116,6 @@ async function openSse(url) {
   };
 }
 
-// —— 铺底（全 REST + 假机器，非被测路径）————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -197,7 +172,6 @@ const enroll = await sendJson(
 const machineToken = enroll.body?.token ?? enroll.body?.machine?.token;
 if (enroll.status !== 200 || !machineToken) throw new Error('enroll → ' + enroll.status);
 
-// 假机器认领 chief 回合步（响应双层包装 {step:{step:{…}}}，machine-wire 律）。
 const claim = await sendJson(SERVER + '/api/machine/tasks/claim', {}, 'POST', machineToken);
 const claimed = claim.body?.step?.step ?? claim.body?.step;
 if (!claimed?.id) throw new Error('claim 失败：' + JSON.stringify(claim.body));
@@ -237,7 +211,6 @@ async function finishTurn(finalText) {
   if (done.status !== 200) throw new Error('done → ' + done.status);
 }
 
-// 无订阅期增量（回合在飞、观众未进场——症状原态）。
 const SEG_A = '第一步：读取仓库结构。';
 const SEG_B = '第二步：核对补发语义。';
 await delta(SEG_A);
@@ -247,9 +220,8 @@ const PREFIX = SEG_A + SEG_B;
 
 const STREAM_URL = SERVER + '/api/conversations/' + threadId + '/stream';
 
-// —— A. API 面（第二个 SSE 客户端中途进场）———————————————————————
 const s1 = await openSse(STREAM_URL);
-await sleep(600); // 补发落地窗口
+await sleep(600);
 const d1 = s1.deltas();
 if (!EXPECT_OLD) {
   check(
@@ -260,7 +232,7 @@ if (!EXPECT_OLD) {
 } else {
   check('O-A1 旧态零补发：订阅后无任何 text_delta', d1.length === 0, 'deltas=' + JSON.stringify(d1));
 }
-// 接缝：进场后新增量实时到达，且与补发精确拼接（不重不断）。
+
 await delta('第三步：结论如下。');
 await sleep(600);
 const d2 = s1.deltas();
@@ -280,7 +252,6 @@ if (!EXPECT_OLD) {
 s1.close();
 await sleep(200);
 
-// 断线重连 = 新订阅：服务端补发当前段全量快照。
 const s2 = await openSse(STREAM_URL);
 await sleep(600);
 const d3 = s2.deltas();
@@ -296,7 +267,6 @@ if (!EXPECT_OLD) {
 s2.close();
 await sleep(200);
 
-// —— B. 浏览器面：中途打开抽屉（打字行即刻显示前缀）———————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 await page.route('**/api.dicebear.com/**', (route) =>
@@ -306,8 +276,6 @@ await page.route('**/api.dicebear.com/**', (route) =>
   }),
 );
 
-// #950 载体迁移：.chief-stream/.chief-msg 类钩退役 → data-testid 同名载体
-// （.chief-drawer 是零规则机制钩子，存活不动）。
 await page.goto(WEB + '/app?chief=' + threadId);
 const drawer = page.locator('.chief-drawer');
 await drawer.waitFor({ state: 'visible', timeout: 8000 });
@@ -329,7 +297,6 @@ if (!EXPECT_OLD) {
   await shot(page, '01-before-midturn-no-text.png', { clip: '.chief-drawer' });
 }
 
-// GIF 帧：进场快照 → 逐段增量 → 收敛（同一视角，逐帧可复现）。
 const frames = [];
 async function grabFrame(tag) {
   const f = 'gif-' + String(frames.length).padStart(2, '0') + '-' + tag + '.png';
@@ -350,7 +317,6 @@ await sleep(250);
 await grabFrame('delta-live');
 await shot(page, '02-midturn-live-delta.png', { clip: '.chief-drawer' });
 
-// GIF 逐段帧：连续增量各抓一帧（同一视角，逐帧可复现）。
 const SEG_E = '第五步：核对写盘顺序。';
 const SEG_F = '第六步：核对越权面。';
 const SEG_G = '第七步：收尾。';
@@ -361,7 +327,6 @@ for (const seg of [SEG_E, SEG_F, SEG_G]) {
   await grabFrame('stream');
 }
 
-// —— C. 回合终局：终稿接管，前缀不双份 ————————————————————————
 const FINAL = PREFIX + '第三步：结论如下。' + SEG_D + SEG_E + SEG_F + SEG_G + ' 终稿：补发链路核对完成。';
 await finishTurn(FINAL);
 const converged = await waitFor(async () => (await streamText()).includes('终稿：补发链路核对完成。'), 6000, 'final');
@@ -374,14 +339,12 @@ const occurrences = drawerText.split(SEG_A).length - 1;
 check('C2 不双份：已落库文本在抽屉里只出现一次', occurrences === 1, 'occurrences=' + occurrences);
 await browser.close();
 
-// —— D. 终局后新订阅：缓冲已清，零补发 ————————————————————————
 const s3 = await openSse(STREAM_URL);
 await sleep(900);
 const d4 = s3.deltas();
 check('D1 终局后缓冲清空：新流零 text_delta（下一回合从空开始）', d4.length === 0, 'deltas=' + JSON.stringify(d4));
 s3.close();
 
-// —— 证据落盘 ————————————————————————————————————————————
 const failed = checks.filter((c) => !c.ok);
 writeFileSync(
   join(EVIDENCE, 'result.json'),

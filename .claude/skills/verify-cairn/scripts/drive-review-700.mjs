@@ -1,20 +1,3 @@
-// verify-cairn probe（#700 B-C13 verdict 提取真链证据）：live 栈 + 真 daemon
-// + stub-review-700（#519 形状：verdict JSON 与 set_task_meta 工具调用同轮）
-// 走真用户路径，两场景：
-//   B（先跑，终态稳定）：提取失败——stub 纯散文 → daemon findingsError →
-//     server verdict 消息 conclusion「判定提取失败」+ extractionError 上浮 →
-//     web 审核面 danger 色 tag 行（区别于「审核未返回结论」兜底）→ 不触发修订。
-//   A（后跑，收尾窗口）：#519 形状——verdict JSON 后跟 set_task_meta 工具行
-//     → verdict 照常提取（findings 落库）→ blocking → review→planning 回流
-//     （revise note + 重规划步入队）→ set_task_meta 真执行（标题改写）。
-//     stub 对重规划轮延迟 30s 响应 = planning 窗口恒开，断言无竞态。
-//
-// 真值三面：HTTP API JSON + SQLite 行 + 截图；证据 = result.json + 快照。
-// 前置：launch.mjs 起栈 + stub-review-700.mjs（STUB_PORT=8921）+
-// setup-review-700-seed.mjs + 真 daemon（见 features/review-700.md 配方）。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-review-700.mjs <todoA> <todoB>
-//   env：VERIFY_EVIDENCE_DIR（缺省 <repo>/.claude/verify-evidence/<ts>-review-700）
-
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -65,8 +48,6 @@ function parseVerdictRow(row) {
 const isVerdictRow = (m) =>
   m.role === 'system' && typeof m.content === 'string' && m.content.includes(REVIEW_VERDICT_KIND);
 
-/** 等待 verdict 消息落地（daemon 真跑审核步：claim → pi 会话 → stub 两轮 →
- * done）。返回 { verdictRow, messages }。 */
 async function awaitVerdict(buildId, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -78,7 +59,6 @@ async function awaitVerdict(buildId, timeoutMs) {
   }
 }
 
-/** UI 走真用户路径发起审核（AI 审核钮 → 选 Agent → 开始）。 */
 async function startReviewFromUi(page, todoId, shotName) {
   await page.goto(`${WEB}/app/todo/${todoId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.composer-tool[aria-label="AI 审核"]', { timeout: 10_000 });
@@ -87,7 +67,7 @@ async function startReviewFromUi(page, todoId, shotName) {
   const agentRows = await page.$$('[role="dialog"][aria-label="AI 审核"] [role="option"]');
   await agentRows[0].click();
   await page.waitForTimeout(150);
-  // #951/#910 载体：.review-start 类钩退役 → dialog scope role+文案一级。
+
   await page.locator('[role="dialog"][aria-label="AI 审核"]').getByRole('button', { name: '开始审核' }).click();
   await page.waitForSelector('[role="dialog"]', { state: 'detached', timeout: 5_000 });
   await page.waitForTimeout(400);
@@ -98,7 +78,6 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 
-  // ———————— 场景 B：提取失败（先跑，终态稳定无后随步） ————————————————
   await startReviewFromUi(page, todoB, '01-review-b-started.png');
   const todoFaceB0 = await jget(`/api/todos/${todoB}`);
   const buildB = todoFaceB0.body.latestBuildId;
@@ -119,7 +98,7 @@ try {
     typeof parsedB?.extractionError === 'string' && parsedB.extractionError.includes('未找到'),
     `extractionError=${parsedB?.extractionError}`,
   );
-  // 提取失败 ≠ 审核未返回：旧兜底字符串不得出现
+
   check(
     'b-legacy-fallback-absent',
     parsedB?.verdict?.conclusion !== '审核未返回结论',
@@ -133,7 +112,7 @@ try {
     (stepsB.body ?? []).filter((s) => s.kind === 'plan').length === 1,
     `plan steps=${(stepsB.body ?? []).filter((s) => s.kind === 'plan').length}`,
   );
-  // UI：danger 色 tag 行 + 原因正文
+
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   const errorTag = await page.$('.chat-review-tag--error');
@@ -152,14 +131,12 @@ try {
   await page.screenshot({ path: join(EVIDENCE, '02-extraction-failure-row.png'), fullPage: true });
   writeFileSync(join(EVIDENCE, 'messages-b.json'), JSON.stringify(parsedB, null, 2));
 
-  // ———————— 场景 A：#519 形状（verdict JSON + 尾部 set_task_meta） ————————
   await startReviewFromUi(page, todoA, '03-review-a-started.png');
   const todoFaceA0 = await jget(`/api/todos/${todoA}`);
   const buildA = todoFaceA0.body.latestBuildId;
   const { verdictRow: verdictRowA, messages: messagesA } = await awaitVerdict(buildA, 90_000);
   const parsedA = parseVerdictRow(verdictRowA);
 
-  // 核心：#519 形状下 verdict 提取成功（旧实现被尾部工具行击穿回 null）
   check(
     'a-verdict-extracted-despite-trailing-toolcall',
     parsedA?.verdict?.conclusion === '方案在边界情况上存在硬风险，需修复两处',
@@ -172,10 +149,6 @@ try {
     `findings=${aFindings.length} blocking=${aFindings.filter((f) => f.severity === 'blocking').length}`,
   );
 
-  // #519 形状真值：transcript 行集里 verdict JSON 文本行在前、纯工具调用行
-  // 在其后（daemon 落行序 = createdAt 序；messages API 的数组序按 id 排——
-  // 先按 createdAt 重排再断言。content 是解析后的值（block 数组 / toolcall
-  // 对象 / 字符串）——统一 stringify 匹配）。
   const contentOf = (m) =>
     typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '');
   const orderedA = [...messagesA].sort((x, y) => (x.createdAt ?? 0) - (y.createdAt ?? 0));
@@ -194,7 +167,6 @@ try {
     `verdict 文本行 #${jsonRowIdx} → set_task_meta 工具行 #${toolRowIdx}（尾部工具行在 JSON 之后）`,
   );
 
-  // set_task_meta 真执行（工具行不是摆设）：标题被 stub 改写
   const todoFaceA = await jget(`/api/todos/${todoA}`);
   check(
     'a-set-task-meta-executed',
@@ -202,8 +174,6 @@ try {
     `title=${todoFaceA.body.title}`,
   );
 
-  // review→planning 回流：phase 翻转 + revise note + 重规划步入队（stub 对
-  // 重规划轮延迟 30s = 窗口恒开）
   check(
     'a-phase-planning-backflow',
     todoFaceA.body.phase === 'planning',
@@ -228,7 +198,7 @@ try {
     ['pending', 'claimed', 'running'].includes(planStepsA[1]?.status),
     `status=${planStepsA[1]?.status}（stub 延迟轮撑住 planning 窗口）`,
   );
-  // UI：verdict 段 + 调整摘要行
+
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   const reviewTag = await page.$('.chat-review-tag:not(.chat-review-tag--error)');
@@ -248,7 +218,6 @@ try {
   await page.screenshot({ path: join(EVIDENCE, '04-blocking-revise-transcript.png'), fullPage: true });
   writeFileSync(join(EVIDENCE, 'messages-a.json'), JSON.stringify(parsedA, null, 2));
 
-  // ———————— SQLite 真值 ————————————————
   const db = new Database(DB_PATH, { readonly: true });
   const sqliteVerdictB = db
     .prepare(

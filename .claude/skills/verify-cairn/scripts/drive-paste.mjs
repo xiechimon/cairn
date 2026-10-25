@@ -1,24 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-paste — 剪贴板图片粘贴 → 既有附件链真用户路径
-// (#729,正典 #727 Part 2 + r9 §3.1)。
-//
-// 路径 A(详情页 composer,confirm 相位):真 PNG 字节以合成 ClipboardEvent
-//   (DataTransfer + File 'image.png')粘进 `.composer-input`——grant → upload
-//   → token 三步 wire 全捕获,token 以独占一行落 caret 位(行中原样断行),
-//   caret 落块后行首;Enter 发送 = revision(反馈行落 transcript)→ 会话里
-//   AttachmentChip 缩略图像素真加载(naturalWidth > 0)。
-// 路径 B(新建任务对话框):同款粘贴落 `.new-task-spec` caret 位 → 保存 →
-//   todo.spec 携 token → 详情页 spec 卡片渲染缩略 chip。
-// 路径 C(FM10 探针):真键盘路——clipboard-read/write 权限 +
-//   ClipboardItem.write + Meta+V/Ctrl+V,结果( fired / swallowed )记进
-//   result.json,不作硬断言(平台差异属证据,不属回归)。
-//
-// 真值四面:UI token 文本 + caret 位 / wire 捕获(wire-captures.json)/
-//   SQLite attachment 行(按 storageKey 精确取)/ 磁盘字节 === 样本字节 +
-//   GET /api/attachments/:id 读回一致。样本 PNG(canvas 生成)留在证据目录。
-//
-// 用法:VERIFY_REPO_ROOT=<worktree> node drive-paste.mjs <todoId>
-//   todoId 需处于 confirm 相位(setup-review-seed.mjs 产物)。
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -83,7 +63,6 @@ const dbQuery = (fn) => {
   }
 };
 
-// wire 捕获:grant/upload/revision 三缝的请求与响应逐条落盘(r9 §4 同形态)。
 const wire = [];
 function captureWire(page) {
   page.on('response', async (res) => {
@@ -116,7 +95,6 @@ function captureWire(page) {
   });
 }
 
-/** 合成 ClipboardEvent 粘贴(确定性路,FM10 路 A):真 File 字节进 DataTransfer。 */
 async function pasteFile(page, selector, { name, type, bytesB64, caret }) {
   await page.evaluate(
     ({ selector, name, type, bytesB64, caret }) => {
@@ -156,7 +134,6 @@ try {
   const page = await context.newPage();
   captureWire(page);
 
-  // 样本 PNG:canvas 生成 24×24(红底白心,缩略图肉眼可辨),字节写进证据目录。
   await page.goto(`${WEB}/app`, { waitUntil: 'domcontentloaded' });
   const pngB64 = await page.evaluate(() => {
     const c = document.createElement('canvas');
@@ -174,7 +151,6 @@ try {
   writeFileSync(samplePath, pngBytes);
   extra.sample = { fileName: 'paste-sample.png', bytes: pngBytes.length };
 
-  // ---------- 路径 A:详情页 composer(confirm 相位,revision 发送) ----------
   await page.goto(`${WEB}/app/todo/${todoId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.composer-input', { timeout: 15_000 });
   check('composer-ready', true, 'confirm 相位 composer 可编辑面就绪');
@@ -183,7 +159,6 @@ try {
   const beforeShot = '01-detail-before-paste.png';
   await shot(page, beforeShot);
 
-  // caret 落「看看|这个截图」中间(偏移 2)——行中粘贴必须两侧断行。
   await pasteFile(page, '.composer-input', {
     name: 'image.png',
     type: 'image/png',
@@ -213,7 +188,6 @@ try {
   );
   await shot(page, '02-detail-draft-token.png');
 
-  // wire:grant 请求体携合成名 + scope=message;upload 200。
   await page.waitForTimeout(300);
   const grantCall = wire.find((w) => w.url.includes('/api/uploads/grant'));
   let grantBody = null;
@@ -233,7 +207,6 @@ try {
     `grant(fileName=${grantBody?.fileName},scope=${grantBody?.scope},status=${grantCall?.status}) → upload(status=${uploadCall?.status},201=created)`,
   );
 
-  // Enter 发送 = confirm 关口 revision;反馈行(携 token)落 transcript。
   let revisionStatus = null;
   {
     const resp = page.waitForResponse(
@@ -250,7 +223,6 @@ try {
     `POST /api/builds/:id/steps revision(status=${revisionStatus},202=重规划步入队)`,
   );
 
-  // transcript chip:缩略图像素真加载(naturalWidth>0,dicebear 坑同款等待)。
   const chipImg = page.locator('.chat-md-attachment a.spec-chip--image img').first();
   await chipImg.waitFor({ state: 'visible', timeout: 15_000 });
   await page.waitForFunction(
@@ -270,7 +242,6 @@ try {
   );
   await shot(page, '03-detail-transcript-chip.png');
 
-  // API 真值:会话消息行携 token(content 可能是 JSON 字符串字面量,子串判)。
   const todoNow = await getJson(`${SERVER}/api/todos/${todoId}`);
   const convBuildId = todoNow.latestBuildId;
   if (!convBuildId) throw new Error(`todo ${todoId} 无 latestBuildId,会话面无从取真值`);
@@ -278,10 +249,6 @@ try {
   const msgHit = (conv.messages ?? []).some((m) => String(m.content ?? '').includes(detailKey));
   check('api-message-token', msgHit, `会话消息行携 attachment token(build=${convBuildId})`);
 
-  // ---------- 路径 B:新建任务对话框(首个用稿者,scope=spec) ----------
-  // 顺序纪律:B 必须在真键盘探针(C)之前——C 会消耗对话框 counter 的 1 号,
-  // C 先行会把 B 的合成名顶成 pasted-image-2(每 draft 递增是设计行为,
-  // 但证据要的是每面各自从 1 起的干净形态)。
   await page.goto(`${WEB}/app`, { waitUntil: 'networkidle' });
   await page.click('.sidebar-new-task');
   await page.waitForSelector('.new-task-dialog', { timeout: 5000 });
@@ -290,7 +257,7 @@ try {
     name: 'image.png',
     type: 'image/png',
     bytesB64: pngB64,
-    caret: 6, // 「粘贴验证任务」行尾
+    caret: 6,
   });
   const specLanded = await waitToken(page, '.new-task-spec');
   const specValue = await page.locator('.new-task-spec').inputValue();
@@ -317,7 +284,6 @@ try {
   );
   extra.newTodoId = newTodo?.id ?? null;
 
-  // 详情 spec 卡片:缩略 chip 渲染 + 像素加载(既有面回归钉)。
   if (newTodo?.id) {
     await page.goto(`${WEB}/app/todo/${newTodo.id}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('.spec-block a.spec-chip--image', { timeout: 15_000 });
@@ -341,7 +307,6 @@ try {
     check('spec-card-chip-pixels', false, '新建任务未落库,详情面无从验证');
   }
 
-  // ---------- 路径 C:真键盘探针(FM10 路 B,不作硬断言,verdict 进证据) ----------
   let realKeyboard = { fired: false, note: 'not attempted' };
   try {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: WEB });
@@ -385,7 +350,6 @@ try {
   extra.realKeyboard = realKeyboard;
   if (realKeyboard.fired) await shot(page, '06-real-keyboard-token.png');
 
-  // ---------- 真值:SQLite 行 + 磁盘字节 + 读回(两 scope 各一) ----------
   const dbTruth = dbQuery((db) => ({
     rows: db
       .prepare(

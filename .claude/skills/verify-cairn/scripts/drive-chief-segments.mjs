@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-chief-segments — 段行封口（#955 / ADR 0011）live 闭环。
-//
-// 症状路径：总管跑一个回合时整轮叙述被拼成一个不断变长的文本块，中间看不到
-// 它调了什么工具，直到回合收尾才一次性分开。根因 = assistant 文本行只在步收尾
-// 落库、工具行在流式期被缓冲进折叠面、在飞段缓冲由任何落库行清。
-//
-// 铺底全走公开 REST + **假机器**（drive-chief-catchup.mjs 同律）：provider +
-// agent + PATCH chief 绑定 + POST chief/threads 建线程入队回合步 + api-key/
-// machine enroll 后认领该步，然后按**封口后的真 wire 序**推帧——零 daemon、
-// 零 LLM，回合数据面与真机器同形。daemon 侧的封口本身由 daemon 套件钉
-// （apps/daemon/test/machine-loop.test.ts 的段序断言 + segment.test.ts）。
-//
-// 机制判据（「机制生效验收:实物判据」的 wire 行 = 各层实跑）：
-//   A1 段序：DB 里文本段行先于它之后的工具行（封口点在工具到达那一刻）。
-//   A2 落库形：段行 content = 单类型块数组（text / thinking 各成一行）。
-//   A3 先落库再广播：SSE 的 message 帧序 == DB 行序，段行在流上可见。
-//   A4 D7 不变量：工具行落库**不**清在飞缓冲——迟到工具行之后进场的人仍拿到
-//      当前未封段的文本（旧律「任何落库行都清」在这里会抹掉它）。
-//   A5 幂等：终稿上传按同 id 覆盖，段行不双份（行数对账）。
-//   B  浏览器面：抽屉里思考段单列、在飞工具行平铺并挂进行态（截图）。
-//
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-chief-segments.mjs
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -95,8 +73,7 @@ async function waitFor(fn, timeoutMs) {
 }
 
 const DB_PATH = join(stack.homeDir ?? join(RUN_DIR, 'home'), 'server', 'server.db');
-/** 读该线程的 chief_message 行（按落库序）。每次新开连接——服务端连接仍持有
- *  WAL，且行是异步落地的，所以读侧一律配 waitFor 轮询，不假设「写完即刻可读」。 */
+
 async function apiRows(threadId) {
   const res = await sendJson(
     SERVER + '/api/conversations/' + threadId + '/messages',
@@ -112,8 +89,6 @@ async function apiRows(threadId) {
   }));
 }
 
-/** SQLite 实物快照（真值三件套的库面；只作证据落盘，断言走 server 自己的读面
- *  ——服务端连接持有 WAL，外部只读连接会在行刚落地时读不到尾行）。 */
 function dbDump(threadId) {
   const requireServer = createRequire(join(REPO, 'apps', 'server', 'package.json'));
   const Database = requireServer('better-sqlite3');
@@ -127,7 +102,6 @@ function dbDump(threadId) {
   return rows;
 }
 
-/** 原生 SSE 读流：frames 累积事件载荷。 */
 async function openSse(url) {
   const ctrl = new AbortController();
   const res = await fetch(url, { signal: ctrl.signal, headers: { accept: 'text/event-stream' } });
@@ -150,7 +124,7 @@ async function openSse(url) {
             try {
               frames.push(JSON.parse(line.slice(5).trim()));
             } catch {
-              /* 半帧防御 */
+
             }
           }
         }
@@ -161,7 +135,6 @@ async function openSse(url) {
   return { frames, close: () => ctrl.abort(), pump };
 }
 
-// —— 铺底（全 REST + 假机器，非被测路径）————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -221,7 +194,6 @@ const claimed = claim.body?.step?.step ?? claim.body?.step;
 if (!claimed?.id) throw new Error('claim 失败：' + JSON.stringify(claim.body));
 const stepId = claimed.id;
 
-// —— 帧发射器：封口后的真 wire 序 ————————————————————————————————
 async function delta(text) {
   const res = await sendJson(
     SERVER + '/api/machine/tool/' + stepId,
@@ -231,7 +203,7 @@ async function delta(text) {
   );
   if (res.status !== 200) throw new Error('delta → ' + res.status);
 }
-/** 第五形：段行落库（daemon 封口后即时上报）。 */
+
 async function segmentRow(row) {
   const res = await sendJson(
     SERVER + '/api/machine/tool/' + stepId,
@@ -242,7 +214,7 @@ async function segmentRow(row) {
   if (res.status !== 200)
     throw new Error('segment row → ' + res.status + ' ' + JSON.stringify(res.body));
 }
-/** 工具行 live 回传（①形 = toolCallRecord）。 */
+
 async function toolRow(call) {
   const res = await sendJson(SERVER + '/api/machine/tool/' + stepId, call, 'POST', machineToken);
   if (res.status !== 200) throw new Error('tool row → ' + res.status);
@@ -250,14 +222,10 @@ async function toolRow(call) {
 
 let seq = 0;
 const nextId = () => 'msg-' + stepId + '-' + ++seq;
-// 时间锚：段行的 createdAt 由本探针给（真 daemon 里由消费端的单调计数器给），
-// 工具行由 **server** 盖（`call.endedAt ?? nowMs()`）。两者必须落进同一个时间
-// 轴才谈得上段序——所以本探针的段行时刻全部锚在 T0 的相对偏移上，而工具行的
-// startedAt/endedAt 也取 T0 的偏移，保证「段 → 工具 → 下一段」这条序稳定。
+
 const T0 = Date.now();
 const at = (n) => T0 + n;
-// 行 id 必须**每次运行唯一**：chief_message 的幂等 upsert 以 id 为冲突键，且
-// set 不改 threadId——复用同一个 'call-1' 会让第二次运行的行写回第一次的线程。
+
 const RUN = String(Date.now() % 1000000);
 const CALL_ID = 'call-1-' + RUN;
 const FINAL_ID = 'probe-assistant-final-' + RUN;
@@ -299,11 +267,9 @@ async function finishTurn(finalText) {
 
 const STREAM_URL = SERVER + '/api/conversations/' + threadId + '/stream';
 
-// 观众先进场（这条流贯穿全程，用于 A3/A4 的帧序断言）。
 const sse = await openSse(STREAM_URL);
 await sleep(300);
 
-// 第 0 步：思考段（模型先想）——单类型块数组，单列一行。
 await segmentRow({
   id: nextId(),
   role: 'assistant',
@@ -312,7 +278,6 @@ await segmentRow({
 });
 await sleep(120);
 
-// 第 1 步：正文流出 → 段行落库 → 工具行（开始半，**无 result = 进行中**）。
 await delta('第一步：读取仓库结构。');
 await sleep(120);
 await segmentRow({
@@ -329,7 +294,6 @@ const toolLanded = await waitFor(
 );
 check('B0 工具行开始半落库（第五形之外的既有 live 工具行路径）', toolLanded === true, null);
 
-// —— B. 浏览器面（真·在飞态：工具尚无结果、回合未收口）———————————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 try {
@@ -359,12 +323,9 @@ try {
   await browser.close();
 }
 
-// 第 2 步：工具执行中，下一段正文开始流（**此刻工具行已落库**——旧律「任何
-// 落库行都清」会把这段刚流的文本抹掉，D7 之后不会）。
 await delta('第二步：核对补发语义。');
 await sleep(400);
 
-// —— A4：工具行落库之后进场的新观众，仍拿到当前未封段的文本 ——
 const late = await openSse(STREAM_URL);
 await sleep(700);
 const lateDeltas = late.frames.filter((f) => f.type === 'text_delta').map((f) => f.text);
@@ -375,8 +336,6 @@ check(
 );
 late.close();
 
-// 第 2 步封口 + 工具完成（同 id 覆盖带 result；endedAt 取本段之前，段序不因
-// 工具行的二次落库而翻转——与真 daemon 的单调时刻同效）。
 await segmentRow({
   id: nextId(),
   role: 'assistant',
@@ -394,7 +353,6 @@ await toolRow({
 });
 await sleep(300);
 
-// 第 3 步：收尾段（无工具）。
 await delta('第三步：结论如下，三段全部核对通过。');
 await segmentRow({
   id: nextId(),
@@ -403,14 +361,12 @@ await segmentRow({
   createdAt: at(1010),
 });
 
-// —— 终局：routes 上传 + done（幂等对账用）————————————————————
 await finishTurn('三段已核对完毕，结论：全部通过。');
 await sleep(800);
 sse.close();
 
-// —— A 面：DB 行序与形状（实物）———————————————————————————
 const rows = await apiRows(threadId);
-// 库面实物（best-effort 落盘，不作断言：外部连接可能落后于服务端持有的 WAL）。
+
 let dump = [];
 try {
   dump = dbDump(threadId);
@@ -423,8 +379,6 @@ writeFileSync(
 );
 artifacts.push('db-rows.json');
 
-// server API 读面回的是**已解析**的 content（数组 / 对象），与探针内部发出的
-// 字符串形不同——断言一律走归一函数，不假设形状。
 function contentText(content) {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
@@ -483,14 +437,12 @@ check(
   '段行数=' + segRows.length + ' shapes=' + JSON.stringify(segRows.map((r) => blockTypes(r.content))),
 );
 
-// —— A3/A4/A5：SSE 帧序 + 幂等 ————————————————————————————————
 const messageFrames = sse.frames.filter((f) => f.type === 'message');
 const frameIds = messageFrames.map((f) => f.message.id);
-// 首次出现序去重：工具行两半同 id（结束半是同 id 覆盖，不是新行）。
+
 const firstSeen = frameIds.filter((id, i) => frameIds.indexOf(id) === i);
 const dbIds = rows.map((r) => r.id);
-// 订阅前就已落库的行（用户行）不进帧列表，故比对「帧里出现过的 id 在 DB 里的
-// 相对序」——两者必须逐位相同，且每个帧 id 都已在库里（先落库再广播）。
+
 const dbOnlyFramed = dbIds.filter((id) => firstSeen.includes(id));
 check(
   'A3 先落库再广播：每个 message 帧的行都已在 DB 里，且帧序 = DB 中的相对序',

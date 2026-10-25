@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-avatars — dicebear Lorelei 头像系统（#387）live 全链验证。
-//
-// 真用户路径：看板侧栏头像 chip → user-menu 头部 → 团队页连建两个不同名
-// Agent（创建 dialog 头像行随名称输入即时预览 dicebear 种子）→ 卡片网格两像
-// 不同。live 面数据全真（members POST/GET、SQLite agent 表），dicebear 出站
-// 请求由 page.route 拦截回固定 SVG——探针钉的是 src 契约 + 真服务端数据，
-// 外网可达性不进断言（离线兜底 = onError 回退静态资产，由 e2e
-// avatar-dicebear.spec.ts 钉）。
-//
-// 真值：GET /api/user/me（displayName=Owner, avatarUrl=null）/ GET members
-// （agent actor.avatarUrl=null =  dicebear 生成语义保留）/ SQLite agent 行
-// avatarUrl IS NULL / 拦截器实测到 dicebear 请求（证明 URL 真被构造发出）。
-// 用法：node drive-avatars.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -37,7 +24,7 @@ const require2 = createRequire(join(REPO, 'apps/server/package.json'));
 
 const checks = [];
 function check(name, ok, detail) {
-  // 断言位必须真是 boolean（drive-tags 同款护栏）——写反会恒真。
+
   if (typeof ok !== 'boolean') {
     throw new TypeError(`check(${JSON.stringify(name)}) 的 ok 位须为 boolean，收到 ${typeof ok}`);
   }
@@ -73,11 +60,10 @@ const dbQuery = (fn) => {
 
 const DICEBEAR_PREFIX = 'https://api.dicebear.com/9.x/lorelei/svg?seed=';
 const dicebearUrl = (seed) => `${DICEBEAR_PREFIX}${encodeURIComponent(seed)}`;
-// 侧栏/user-menu 是 fixture canon chrome（USER_NAME 常量，live 不变）——种子
-// 即展示名，两态一致。
+
 const USER_SEED = 'Xmon Dai';
 const stamp = Date.now() % 100000;
-const AGENT_A = `验证头像-${stamp}`; // 非 ASCII 种子,顺带钉 encodeURIComponent 路径
+const AGENT_A = `验证头像-${stamp}`;
 const AGENT_B = `avatar-probe-b-${stamp}`;
 
 const browser = await chromium.launch();
@@ -86,8 +72,6 @@ const page = await browser.newPage({
   colorScheme: 'dark',
 });
 
-// dicebear 拦截:回固定 SVG(两色区分 user/agent 请求无意义,统一即可),
-// 记录命中 URL——命中即证明浏览器真的按 src 发出了请求。
 const dicebearHits = [];
 await page.route('**/api.dicebear.com/**', (route) => {
   dicebearHits.push(route.request().url());
@@ -100,7 +84,7 @@ await page.route('**/api.dicebear.com/**', (route) => {
 const imgSrc = (locator) => locator.getAttribute('src', { timeout: 5000 });
 
 try {
-  // —— 看板:侧栏 chip + user-menu 头部 ————————————————————————————————
+
   await page.goto(`${WEB}/app`);
   await page.waitForSelector('[data-route="board"]', { timeout: 15_000 });
   const chipSrc = await imgSrc(page.locator('.sidebar-user img'));
@@ -116,12 +100,10 @@ try {
   await shot(page, '01-sidebar-user-menu.png');
   await page.keyboard.press('Escape');
 
-  // —— 团队页:创建 dialog 预览 + 双 Agent 网格 ————————————————————————
   await page.goto(`${WEB}/app/team`);
   await page.waitForSelector('.team-create-agent', { timeout: 15_000 });
   await page.click('.team-create-agent');
-  // #951/#910 载体：.dlg-agent-avatar 类钩退役 → agent-avatar testid（img 在
-  // loaded 前 aria-hidden，role 钉不到——二级载体）。
+
   await page.waitForSelector('[data-testid="agent-avatar"] img', { timeout: 5000 });
   const emptySrc = await imgSrc(page.locator('[data-testid="agent-avatar"] img'));
   check(
@@ -145,7 +127,6 @@ try {
   await page.getByRole('button', { name: '创建', exact: true }).click();
   await page.waitForSelector('[role="dialog"]', { state: 'hidden', timeout: 5000 });
 
-  // 第二个不同名 Agent
   await page.click('.team-create-agent');
   await page.waitForSelector('#dlg-agent-name', { timeout: 5000 });
   await page.fill('#dlg-agent-name', AGENT_B);
@@ -168,7 +149,6 @@ try {
   check('distinct-names-distinct-srcs', srcA != null && srcB != null && srcA !== srcB, '不同名不同像');
   await shot(page, '03-team-two-agents.png');
 
-  // —— 真值:API + SQLite + dicebear 请求命中 ————————————————————————————
   const me = await getJson(`${SERVER}/api/user/me`);
   check(
     'api-user-me',

@@ -1,25 +1,3 @@
-// verify-cairn 定制 probe（#1108 机器并发上限 + 排队可见）：用户实测现场 =
-// 看板连发两条任务钉本机，第二条 18 分钟静默 pending——本 probe 在活栈上把
-// 「一个数 + 超过才排队 + 排队有呈现」证成实物。真 daemon + 门控 stub LLM
-// （请求挂起 = 步在飞的受控时钟）+ Playwright 浏览器面。四族断言：
-//   A 并行真跑：cap=2 + 3 条钉本机 chief 回合 → 前两步并发（daemon.log
-//     canon 行 `(1 running)`/`(2 running)` + stub 请求区间重叠）。
-//   B 排队可见：第三回合 pending + threads 查询带 turnQueue（位次/等待机器
-//     的 running/capacity 快照）+ 抽屉在飞存在行渲染「排队中：等 …」+
-//     机器页「执行中 2/2」读标注与「并发 2」控件。
-//   C 空位交接：释放第一步 → done 落账 + finish wake → 第三步被认领
-//     （canon 行再现 `(2 running)`——第二步未收尾位被顶上）。
-//   D 写面：PATCH {maxConcurrent} 单字段落库回读 + 0/17 越界 400。
-// 失败方式清单（先固化判别面）：
-//   1. 闸不在 → 第三步也被认领（三行 canon、零 pending）→ A/B 红；
-//   2. daemon 串行 → canon 行只有 (1 running)、stub 请求区间零重叠 → A 红；
-//   3. 投影缺席 → threads 查询无 turnQueue / 抽屉仍「处理中...」谎报 → B 红；
-//   4. 空位交接死等 → 第三步 pending 到超时（无 wake）→ C 红；
-//   5. 写面漂移 → PATCH 连带字段 / 越界值放行 → D 红。
-// 用法（栈须先 launch）：
-//   node drive-1108-concurrency.mjs
-// env：VERIFY_REPO_ROOT / VERIFY_RUN_DIR / VERIFY_EVIDENCE_DIR、
-//      DAEMON_HOME（缺省 /tmp/cairn-1108-daemon-home）。
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -88,12 +66,9 @@ async function jfetch(method, path, opts = {}) {
   return { status: res.status, body };
 }
 
-// —— 门控 stub LLM：每请求挂起到对应 gate resolve（在飞时钟的受控面）；
-//    记录每请求 start/end 时间戳——重叠区间 = daemon 真并发 ————————
-
 function startGatedStub() {
-  const requests = []; // {index, startedAt, endedAt}
-  const gates = []; // {promise, resolve}
+  const requests = [];
+  const gates = [];
   let next = 0;
   const server = createServer((req, res) => {
     if (req.method !== 'POST' || !req.url?.endsWith('/chat/completions')) {
@@ -142,7 +117,7 @@ function startGatedStub() {
     });
   });
   return {
-    url: undefined, // listen 后回填
+    url: undefined,
     requests,
     release: (index) => {
       const g = gates[index];
@@ -157,8 +132,6 @@ function startGatedStub() {
       }),
   };
 }
-
-// —— seed / daemon（drive-1025 同款骨架）—————————————————————————
 
 let uniq = 0;
 async function seed(stubUrl) {
@@ -241,8 +214,6 @@ function dbChiefSteps() {
   }
 }
 
-// —— main ———————————————————————————————————————————————————————————
-
 rmSync(DAEMON_HOME, { recursive: true, force: true });
 
 const stub = startGatedStub();
@@ -253,7 +224,7 @@ const seeded = await seed(stubUrl);
 const daemon = spawnDaemon(seeded.apiKey, seeded.teamId);
 let browser = null;
 try {
-  // daemon 上线 + enroll（machine 行就位）。
+
   await waitFor(
     () => daemonLogLines().some((l) => l.includes('Online (machineId=')),
     30_000,
@@ -264,24 +235,20 @@ try {
   if (!machine) throw new Error('verify-1108 machine row missing after enroll');
   save('machine-after-enroll.json', machinesRes.body);
 
-  // D1：enroll 缺省 cap = 3（migration DEFAULT 同值）。
   check('D1: enroll 缺省 maxConcurrent = 3（历史默认值）', machine.maxConcurrent === 3, `got ${machine.maxConcurrent}`);
 
-  // D2：PATCH 单字段 maxConcurrent=2 落库回读 + 机器记录 runningSteps。
   const patchRes = await jfetch('PATCH', `/api/machines/${machine.id}`, { body: { maxConcurrent: CAP } });
   check('D2: PATCH {maxConcurrent:2} → 200 + 回读 maxConcurrent=2 + runningSteps=0', patchRes.status === 200 && patchRes.body?.maxConcurrent === CAP && patchRes.body?.runningSteps === 0, JSON.stringify(patchRes.body ?? null).slice(0, 160));
-  // D3：越界值 400（shared schema 值域 1..16）。
+
   const bad1 = await jfetch('PATCH', `/api/machines/${machine.id}`, { body: { maxConcurrent: 0 } });
   const bad2 = await jfetch('PATCH', `/api/machines/${machine.id}`, { body: { maxConcurrent: 17 } });
   check('D3: PATCH maxConcurrent 0 / 17 → 400（值域闸）', bad1.status === 400 && bad2.status === 400, `${bad1.status}/${bad2.status}`);
 
-  // chief 绑 Agent + 主力机（新线程缺省钉选链）。
   const chiefPatch = await jfetch('PATCH', `/api/teams/${seeded.teamId}/chief`, {
     body: { agent: { agentId: seeded.agentId, thinkingLevel: null }, machineId: machine.id },
   });
   check('D0: chief 绑 Agent + 主力机 PATCH → 200', chiefPatch.status === 200, `status ${chiefPatch.status}`);
 
-  // 发 3 条新线程（回合全钉本机——主力机缺省链）。
   const threads = [];
   for (let i = 1; i <= 3; i++) {
     const r = await jfetch('POST', `/api/teams/${seeded.teamId}/chief/threads`, {
@@ -291,7 +258,6 @@ try {
   }
   save('threads-created.json', threads);
 
-  // —— A 并行真跑：等前两步 claimed + 第三步 pending ——
   await waitFor(
     () => {
       const steps = dbChiefSteps();
@@ -304,20 +270,16 @@ try {
   save('steps-phase-a.json', stepsA);
   check('A1: cap=2 → 恰两步 claimed、第三步 pending（超 N 才排队）', stepsA.filter((s) => s.status === 'claimed').length === 2 && stepsA.filter((s) => s.status === 'pending').length === 1);
 
-  // A2：daemon canon 行——第一步 (1 running)、第二步 (2 running)。
   const linesA = daemonLogLines();
   const run1 = linesA.find((l) => /step \S+ for conv chief-\S+ \(1 running\)/.test(l));
   const run2 = linesA.find((l) => /step \S+ for conv chief-\S+ \(2 running\)/.test(l));
   check('A2: daemon.log canon 行 (1 running) + (2 running)（并行执行实物）', Boolean(run1 && run2), `${run1 ?? '—'} | ${run2 ?? '—'}`);
 
-  // A3：stub 请求区间重叠（两个 LLM 会话同时在飞）。
   await waitFor(() => stub.requests.length >= 2, 20_000, 'two stub requests in flight');
   const [r0, r1] = stub.requests;
   const overlap = r0 && r1 && r1.startedAt < (r0.endedAt ?? Number.POSITIVE_INFINITY);
   check('A3: stub 两请求区间重叠（并发会话实物）', Boolean(overlap), `r0 ${r0?.startedAt}~${r0?.endedAt ?? 'held'} r1 ${r1?.startedAt}~${r1?.endedAt ?? 'held'}`);
 
-  // —— B 排队可见 ——
-  // B1：threads 查询的 turnQueue（位次 + 等待机器快照）。
   const threadsRes = await jfetch('GET', `/api/teams/${seeded.teamId}/chief/threads`);
   const pendingThread = (threadsRes.body ?? []).find((t) => t.turnQueue != null);
   save('threads-phase-b.json', threadsRes.body);
@@ -328,24 +290,19 @@ try {
     JSON.stringify(tq ?? null),
   );
 
-  // B2：机器记录 runningSteps = 2（`执行中 2/2` 数据源）。
   const machinesB = await jfetch('GET', `/api/teams/${seeded.teamId}/machines`);
   const mB = (machinesB.body ?? []).find((m) => m.id === machine.id);
   check('B2: 机器记录 runningSteps=2 / maxConcurrent=2（满载读数）', mB?.runningSteps === 2 && mB?.maxConcurrent === CAP, JSON.stringify({ runningSteps: mB?.runningSteps, maxConcurrent: mB?.maxConcurrent }));
 
-  // —— 浏览器面 ——
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 
-  // B3：chief 抽屉——pending 回合渲染「排队中：等 …」+ 位次 + 机器读数。
   await page.goto(`${WEB}/app?chief=${pendingThread.id}`);
   const queueRow = page.getByText(/排队中：等 verify-1108（2\/2 在跑，前面 0 个）/);
   await queueRow.waitFor({ state: 'visible', timeout: 15_000 });
   check('B3: 抽屉在飞存在行渲染「排队中：等 verify-1108（2/2 在跑，前面 0 个）」', true);
   await page.screenshot({ path: join(EVIDENCE, 'chief-drawer-queued.png') });
 
-  // B4：机器页——「执行中 2/2」读标注 + 「并发 2」控件在探针机行内（按
-  // data-machine-id 钉位：本机 seed 行排首，`.first()` 会抓错行）。
   await page.goto(`${WEB}/app/resources/machines`);
   const readout = page.getByText('执行中 2/2');
   await readout.waitFor({ state: 'visible', timeout: 15_000 });
@@ -354,7 +311,6 @@ try {
   check('B4: 机器页「执行中 2/2」读标注 + 并发控件显示 2', capText.includes('2'), capText.replace(/\n/g, ' '));
   await page.screenshot({ path: join(EVIDENCE, 'machines-running-2of2.png') });
 
-  // —— C 空位交接：释放第一步 → 第三步被认领 ——
   stub.release(0);
   await waitFor(
     () => {
@@ -369,18 +325,15 @@ try {
   const claimedC = stepsC.filter((s) => s.status === 'claimed');
   check('C1: 释放空位 → 第三步被认领（claimed 回 2、pending 归零）', claimedC.length === 2 && stepsC.filter((s) => s.status === 'pending').length === 0);
 
-  // C2：canon 行再现 (2 running)（新步顶上空位；第二步仍未收尾）。
   const linesC = daemonLogLines();
   const run2again = linesC.filter((l) => /step \S+ for conv chief-\S+ \(2 running\)/.test(l));
   check('C2: 空位交接后 daemon.log 再现 (2 running)（新步顶位）', run2again.length >= 2, `count ${run2again.length}`);
 
-  // C3：抽屉排队行退场（被领取 → 回落处理中语义）。
   await page.goto(`${WEB}/app?chief=${pendingThread.id}`);
   const queueRowAfter = page.getByText(/排队中：等 verify-1108（2\/2 在跑，前面 0 个）/);
   await queueRowAfter.waitFor({ state: 'hidden', timeout: 15_000 });
   check('C3: 被领取后抽屉排队行退场（不再谎称排队）', true);
 
-  // 收尾：释放其余门（回合全部收完，daemon 优雅退出走 allSettled 契约）。
   stub.release(1);
   stub.release(2);
   await waitFor(

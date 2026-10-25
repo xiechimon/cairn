@@ -1,12 +1,3 @@
-// #1186 live probe: stub LLM + real daemon on the verify stack.
-// After the fix, a completed dispatch persists the actually injected name
-// set and a skill_injection_check system row.
-//   open allowlist [demo-skill], task names it, stub never reads SKILL.md
-//     → yellow injected-unread, step still done
-//   closed allowlist [] → red allowlist-closed, injected [], step still done
-// The stub writes README.md so the artifact gate can pass. Call ids are
-// unique per process. message.content is JSON (parse twice when the column
-// stores a string).
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

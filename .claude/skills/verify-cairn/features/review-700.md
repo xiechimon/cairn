@@ -1,45 +1,45 @@
-# review-700 — verdict 提取真链（#700 B-C13）
+# review-700 — the verdict-extraction real chain (#700 B-C13)
 
-票：#700（B-C13，#519 实测：审核步 verdict JSON 之后又调 set_task_meta，「审核结论」静默丢弃）。probe 走**真 daemon 全链**（区别于 drive-review-blocking 的 server 直投 done：那条不进 daemon 提取面），stub 回放 #519 形状——verdict JSON 文本与 set_task_meta 工具调用同轮发出，daemon transcript 落行序 = 文本行在前、工具行在后（正是击穿旧提取器的形状）。
+Ticket: #700 (B-C13, measured at #519: after the review step's verdict JSON, `set_task_meta` is called again, and the `审核结论` is silently dropped). The probe walks the **real daemon full chain** (unlike drive-review-blocking's server-direct done injection, which does not enter the daemon's extraction surface), the stub replaying the #519 shape — the verdict JSON text and the set_task_meta tool call are emitted in the same round, and the daemon transcript's row order = the text row first, the tool row second (exactly the shape that defeated the old extractor).
 
-## 覆盖
+## Coverage
 
-- 场景 B（提取失败面）：stub 纯散文 → daemon `findingsError` → server verdict 消息 conclusion「判定提取失败」+ `extractionError` 原因上浮 → web 审核面 danger 色 tag 行（区别于旧兜底「审核未返回结论」）→ 不触发修订（phase 留 confirm、无新 plan 步）。
-- 场景 A（#519 形状面）：verdict JSON + 尾部 set_task_meta 工具行 → verdict 照常提取（findings 落库）→ blocking → review→planning 回流（revise note + 重规划步入队 + prompt 注入审核事实）→ set_task_meta 真执行（todo 标题改写）。
-- stub 对重规划轮（daemon 下发的 CONTINUE_PROMPTS.plan 文本）**延迟 30s** 响应 = planning 相位窗口恒开，断言无竞态；probe 收尾 cleanup 整栈丢弃，该步不收尾。
+- Scenario B (the extraction-failure surface): the stub's pure prose -> the daemon's `findingsError` -> the server verdict message's conclusion `判定提取失败` + the `extractionError` reason floats up -> the web review surface's danger-colored tag row (distinct from the old fallback `审核未返回结论`) -> no revision is triggered (the phase stays confirm, no new plan step).
+- Scenario A (the #519 shape surface): the verdict JSON + the trailing set_task_meta tool row -> the verdict is extracted as usual (the findings land in the DB) -> blocking -> the review -> planning reflow (the revise note + the re-planning step enqueued + the prompt carries the review facts) -> set_task_meta really executes (the todo title is rewritten).
+- The stub answers the re-planning round (the daemon-delivered CONTINUE_PROMPTS.plan text) **with a 30s delay** = the planning-phase window is held open, the assertions are race-free; the probe's close cleanup discards the whole stack, that step is not closed.
 
 ## How to get to it (user POV)
 
-- 任务详情页(`/app/todo/:id`)在 confirm 相位 → composer「AI 审核」钮发起审核(入口同 [review-modal.md](./review-modal.md));审核步跑完,结论落进会话:场景 A 是 verdict 行与 findings 并回流 planning,场景 B 是「判定提取失败」danger 色 tag 行。
-- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list review-700` 列出 usage:
-  - `vp.mjs drive review-700 verdict-extraction`:依赖的 setup-review-700-seed.mjs 建 agent 不带 machineId,ADR 0019 起 400。
+- The task detail page (`/app/todo/:id`) in the confirm phase -> the composer's `AI 审核` button launches the review (the same entry as [review-modal.md](./review-modal.md)); once the review step finishes, the conclusion lands in the conversation: scenario A = the verdict row and the findings with a reflow to planning, scenario B = the `判定提取失败` danger-colored tag row.
+- Driving: this feature has no current case; all registered ones are judged stale and refuse to run without `--force` (the refusal prints the reason), `vp.mjs list review-700` lists the usage:
+  - `vp.mjs drive review-700 verdict-extraction`: its dependency setup-review-700-seed.mjs creates the agent without machineId, 400 since ADR 0019.
 
-## 前置与跑法
+## Preconditions and how to run
 
 ```sh
-# 1. 栈（worktree 代码）
+# 1. Stack (worktree code)
 VERIFY_REPO_ROOT=<worktree> node .claude/skills/verify-cairn/scripts/launch.mjs
-# 2. stub（分档见脚本头注释；marker: EXTRACT-FAIL-MARKER=场景 B / Blocking findings=重规划延迟轮）
+# 2. Stub (tiers see the script's header comment; markers: EXTRACT-FAIL-MARKER = scenario B / Blocking findings = the delayed re-planning round)
 STUB_PORT=8921 node .claude/skills/verify-cairn/scripts/stub-review-700.mjs &
-# 3. seed（两个 todo = 两场景；provider baseUrl 指向 stub）
+# 3. Seed (two todos = the two scenarios; the provider baseUrl points at the stub)
 VERIFY_REPO_ROOT=<worktree> STUB_LLM_URL=http://127.0.0.1:8921/v1 \
   node .claude/skills/verify-cairn/scripts/setup-review-700-seed.mjs   # stdout JSON
-# 4. 真 daemon（第 4 进程，cleanup.mjs 不管它——自己起自己收）
+# 4. Real daemon (the 4th process, cleanup.mjs does not reap it — start and collect it yourself)
 cd <worktree>/apps/daemon && env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
   -u all_proxy -u ALL_PROXY CAIRN_HOME=/tmp/cairn-review700-daemon-home \
   corepack pnpm exec tsx src/cli.ts start --foreground \
-  --server http://127.0.0.1:8791 --api-key <seed 的 apiKeyPlain> \
-  --team <seed 的 teamId> --name review-700-mbp
-# 等 GET /api/teams/<teamId>/machines 出现 online:true
-# 5. probe
+  --server http://127.0.0.1:8791 --api-key <the seed's apiKeyPlain> \
+  --team <the seed's teamId> --name review-700-mbp
+# Wait until GET /api/teams/<teamId>/machines shows online:true
+# 5. Probe
 VERIFY_REPO_ROOT=<worktree> node .claude/skills/verify-cairn/scripts/drive-review-700.mjs <todoA> <todoB>
 ```
 
 ## Gotchas
 
-- daemon 启动**6 个 proxy env 全 unset** + `CAIRN_HOME` 显式 scratch（透传坑见 stop-button.md）——否则 enroll 401 / 污染 `~/.cairn`。
-- 场景先 B 后 A：B 终态稳定（不触发修订）；A 的重规划轮被 stub 延迟撑窗，probe 结束即 cleanup。
-- seed 的 plan 步由 seed 自己 claim/done（daemon 未起时）；daemon 起在 seed 之后，只碰 review/重规划步。
-- stub 轮次判别**不能** `body.includes('tool')`（tools 定义数组含该词）——按 `messages` 含 `role:'tool'` 行判第二轮。
-- **重规划轮判据 = `请重新规划该任务`（CONTINUE_PROMPTS.plan 文本）**：daemon 对 continue-session plan 步下发的是通用续轮指令——步表里存的 REVIEW_REVISE_PROMPT 不走 claim instruction 面（审核事实经被续会话的历史送达 agent）。拿 'Blocking findings' 当判据永远不命中，延迟轮失效 = planning 窗口竞态（首轮实测踩过）。
-- messages API 返回的 `content` 是**解析后的值**（block 数组 / toolcall 对象 / 字符串）——匹配前统一 stringify。
+- Unset **all 6 proxy env vars** at the daemon start + an explicit scratch `CAIRN_HOME` (the pass-through pitfall is in stop-button.md) — otherwise enroll 401s / pollutes `~/.cairn`.
+- Run scenario B before A: B's terminal state is stable (no revision triggered); A's re-planning round is held open by the stub's delay, the probe cleans up the moment it ends.
+- The seed's plan step is claimed/done by the seed itself (before the daemon starts); the daemon starts after the seed and only touches the review / re-planning steps.
+- The stub's round discrimination **must not** use `body.includes('tool')` (the tools definition array contains that word) — judge the second round by the `messages` containing a `role:'tool'` row.
+- **The re-planning-round criterion = `请重新规划该任务` (the CONTINUE_PROMPTS.plan text)**: what the daemon delivers for a continue-session plan step is the generic continuation-round instruction — the REVIEW_REVISE_PROMPT stored in the step table does not go through the claim-instruction surface (the review facts reach the agent via the continued session's history). Taking 'Blocking findings' as the criterion never hits, and the delayed round degenerates into a planning-window race (stepped on in the first run).
+- The `content` returned by the messages API is the **parsed value** (a block array / a toolcall object / a string) — stringify before matching.

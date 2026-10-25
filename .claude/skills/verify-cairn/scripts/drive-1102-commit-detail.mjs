@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn probe — #1102 项目「历史」列表提交详情面(点一行看该提交 diff):
-// 三相位真用户路径取证(live 栈 + 真浏览器,URL 不带 ?scenario=):
-//   H hosted 形态:bare repo push 真提交链(README → side 分支 → main 侧
-//     another → --no-ff merge)→ REST 详情面五判据(普通提交 diff、merge =
-//     第一父 diff(side.txt 单文件,combined 恒空的反面)、种子空提交 files=[]
-//     定义态、未知 sha 404、注入形 404)+ 浏览器点行出 diff/元信息与行一致/
-//     切换不串/关闭还原。
-//   L local 形态:真工作树仓(默认分支 trunk,非 main)根提交 + 二次提交 →
-//     根提交 = 相对空树全文件新增(S4)+ 浏览器面。
-//   D 不可达降级:删 local 仓目录 → API 404 + reason=not_found(不 500 不空树),
-//     浏览器整 pane 人话降级(主行 + reason 分译行)。
-// REST 侧真值落 responses.json;SQLite project 行(repoKind)双形态。栈必须已在
-// 跑(launch.mjs;坐标取 VERIFY_RUN_DIR/ports.json,worktree 车道传
-// VERIFY_REPO_ROOT)。证据(result.json + responses.json + 截图)落
-// VERIFY_EVIDENCE_DIR;交付见 SKILL.md「证据归档纪律」。任一断言失败退出码 1。
-// 运行前置:proxy env 全 unset(回环请求过代理会 502 假阳性)。
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -70,7 +54,6 @@ async function api(method, path, body) {
   return { status: res.status, json };
 }
 
-// git 隔离环境(git-hosting.test.ts 同款:防用户 git 配置/凭证干扰)
 const GIT_ENV = {
   ...process.env,
   GIT_TERMINAL_PROMPT: '0',
@@ -84,7 +67,6 @@ const GIT_ENV = {
 const git = (args, cwd) => execFileSync('git', args, { cwd, env: GIT_ENV, stdio: 'pipe' });
 const gitOut = (args, cwd) => git(args, cwd).toString('utf8').trim();
 
-// —— 道具:local 真仓(默认分支 trunk;根提交 + 二次提交各带唯一标记行)————
 const props = [];
 function tempDir(prefix) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -123,7 +105,7 @@ const historyRow = (message) => page.locator('.prj-history-row').filter({ hasTex
 const pane = page.locator('[data-commit-detail="pane"]');
 
 try {
-  // —— REST 铺底:hosted + local 项目 + git push 凭证 ——————————————————
+
   const rHosted = await api('POST', '/api/projects', {
     name: 'verify-1102-hosted',
     repoKind: 'hosted',
@@ -160,8 +142,6 @@ try {
     `REST:git push 用 API key 创建 201(实际 ${rKey.status})`,
   );
 
-  // hosted bare repo push 真提交链:种子(空树)→ README → side 分支 →
-  // main 侧 another → --no-ff merge(merge 的第一父 diff = side.txt 单文件)
   const HOSTED_MARKER = 'verify-1102 HOSTED-README-MARKER';
   const cloneUrl = new URL(rHosted.json?.cloneUrl ?? '');
   cloneUrl.username = 'git';
@@ -182,7 +162,6 @@ try {
   git(['merge', '--no-ff', 'side', '-m', 'merge side into main'], hostedClone);
   git(['push', '-u', 'origin', 'main'], hostedClone);
 
-  // —— H. REST 真值:hosted 详情面五判据 ——————————————————————————
   const hList = await api('GET', `/api/projects/${hostedId}/commits`);
   payloads.hostedCommits = hList;
   const rows = hList.json?.commits ?? [];
@@ -241,7 +220,6 @@ try {
   payloads.hostedDetailInjection = hInject;
   check(hInject.status === 404, `REST:注入形 sha → 404 不 500(实际 ${hInject.status})`);
 
-  // —— H 浏览器:hosted 历史行点击 → 详情面 ————————————————————————
   await page.goto(`${WEB}/app/project/${hostedId}`);
   await historyTab().waitFor({ timeout: 30_000 });
   await historyTab().click();
@@ -274,20 +252,17 @@ try {
   );
   await shot('H2-hosted-readme-diff.png');
 
-  // 切换不串:merge 行 → side.txt;README 内容退场
   await historyRow('merge side into main').click();
   await pane.locator('.doc-file-row', { hasText: 'side.txt' }).waitFor({ timeout: 15_000 });
   const readmeGone = (await pane.locator('.doc-file-row', { hasText: 'README.md' }).count()) === 0;
   check(readmeGone, '浏览器:切 merge 提交 → side.txt(第一父 diff),README 内容退场不串');
   await shot('H3-hosted-merge-first-parent.png');
 
-  // 种子提交 → 空改动定义态
   await historyRow('init verify-1102-hosted').click();
   await page.getByText('该提交没有可显示的改动。').waitFor({ timeout: 15_000 });
   check(true, '浏览器:种子空提交 → 「该提交没有可显示的改动。」定义态(不白屏不报错)');
   await shot('H4-hosted-seed-empty.png');
 
-  // 关闭钮 → 清选中回占位
   await page.getByRole('button', { name: '关闭提交详情' }).click();
   await page.getByText('请选择一个提交查看').waitFor({ timeout: 15_000 });
   check(
@@ -296,7 +271,6 @@ try {
     '浏览器:关闭钮清选中 → 占位还原,行 aria-current 撤回',
   );
 
-  // —— L 浏览器 + REST:local 形态(根提交 = 全文件新增)————————————————
   const lRoot = await api('GET', `/api/projects/${localId}/commits/${LOCAL_ROOT_SHA}`);
   payloads.localDetailRoot = lRoot;
   check(
@@ -331,7 +305,6 @@ try {
   );
   await shot('L1-local-root-commit.png');
 
-  // —— D. 不可达降级:删 local 仓目录 ——————————————————————————————
   rmSync(localRepo, { recursive: true, force: true });
   const dDetail = await api('GET', `/api/projects/${localId}/commits/${LOCAL_ROOT_SHA}`);
   payloads.degradedDetail404 = dDetail;
@@ -349,7 +322,6 @@ try {
   );
   await shot('D1-local-unreachable-degradation.png');
 
-  // —— SQLite 只读真值 ————————————————————————————————————
   try {
     const requireServer = createRequire(join(ROOT, 'apps', 'server', 'package.json'));
     const Database = requireServer('better-sqlite3');

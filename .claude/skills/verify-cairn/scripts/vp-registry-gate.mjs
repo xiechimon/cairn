@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn registry gate (#1402): every file in scripts/ is a registered
-// drive case or a support script; no new script is named after a ticket
-// (drive-<number>), new cases go into ../vp-registry.json with a script named
-// after the feature; the registry has cases, its paths exist, its statuses and
-// needs are known; a case that writes into docs/verify needs
-// rewrites-evidence; each `vp.mjs drive` line in features/*.md names a
-// registered case, and each feature with a recipe is named in it. The
-// self-test runs it (vp-selftest.mjs). Pure node stdlib; paths come from this
-// file's location, not the caller's cwd.
-// Usage: node .claude/skills/verify-cairn/scripts/vp-registry-gate.mjs
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -21,8 +11,6 @@ const FEATURES_DIR = join(SKILL_DIR, 'features');
 const ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
 const COMMITTED = resolve(ROOT, 'docs', 'verify');
 
-// The ticket-named scripts there were when the gate came in. The list does not
-// grow: a new case gets a script named after its feature, or reuses one.
 const TICKET_NAMED = new Set([
   'drive-1007-pages.mjs',
   'drive-1008-overlay-registry.mjs',
@@ -98,7 +86,7 @@ const NEEDS = new Set([
   'rewrites-evidence',
   'remote-host',
 ]);
-// `vp.mjs drive <feature> [<case>]`; a placeholder (<feature>) or a flag is not a name.
+
 const DRIVE_LINE = /vp\.mjs drive ([a-z0-9][\w-]*)(?: ([a-z0-9][\w-]*|<[^>\s]+>))?/g;
 const COMMAND_SPAN = /vp\.mjs drive [^`\n]*/g;
 const TICKET_NAME = /^drive-\d/;

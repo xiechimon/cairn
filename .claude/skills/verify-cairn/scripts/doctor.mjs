@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn doctor — 只读体检,零写操作。回答「这套栈值得驱动吗」:
-// 进程组活着、端口应答、seed 会话/teams/projects 200。任一 FAIL 退出码 1。
-// 栈坐标 = VERIFY_RUN_DIR(默认 <repo>/.claude/verify-run)下 ports.json;
-// 没有则提示先跑 launch.mjs。
 
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

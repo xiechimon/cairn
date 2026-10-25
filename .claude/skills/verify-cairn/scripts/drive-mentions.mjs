@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-mentions — @提及真用户路径（#311/#327，r9 §3.2）。
-//
-// 路径 A（默认跑）：新建任务对话框——工具条「提及」钮 → 五分组 MentionPicker
-//   → 进 Agents 分组选一行 → 底条「插入 (N)」→ spec 出现 `[名](agent:{id})`
-//   token → 保存 → todo.spec 携 token。
-// 路径 B（argv 给 todoId 时追加）：详情页 composer——picker 路径 + 内联 `@`
-//   补全路径，token 落 draft。
-//
-// 真值：token 是**文本约定**（`[名](agent:{id})` / 任务 `#seq`），无 server 侧
-// mention 表——所以断言落在 spec/draft 文本 + `GET /api/todos/{id}` 的 spec。
-// 负向：空分组仍让 picker 开（显 0 计数，别把「0 计数」当死钮）——断言五组行
-// 恒在，且 0 计数的组行是 disabled 而非消失。
-//
-// 前置：live 面需有可引用实体（至少一个 agent 才会让 Agents 组非空）。
-// setup-review-seed.mjs 会建 agent/project/todo，可直接复用。
-// 用法：node drive-mentions.mjs [todoId]
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -37,7 +21,7 @@ mkdirSync(EVIDENCE, { recursive: true });
 
 const checks = [];
 function check(name, ok, detail) {
-  // 断言位必须真是 boolean（本文件与 drive.mjs 的参数序相反）——写反会恒真。
+
   if (typeof ok !== 'boolean') {
     throw new TypeError(`check(${JSON.stringify(name)}) 的 ok 位须为 boolean，收到 ${typeof ok}`);
   }
@@ -68,7 +52,6 @@ const page = await browser.newPage({
   colorScheme: 'dark',
 });
 
-/** 点开 picker 并在 Agents 分组选第一行，返回 picker 五组行的计数信息。 */
 async function drivePicker(scopeSelector) {
   await page.click(`${scopeSelector} button[aria-label="提及"]`);
   await page.waitForSelector('.mention-picker', { timeout: 8000 });
@@ -92,12 +75,12 @@ async function drivePicker(scopeSelector) {
 }
 
 try {
-  // ---------- 路径 A：新建任务对话框 ----------
+
   await page.goto(`${WEB}/app`);
   await page.waitForSelector('[data-route="board"]', { timeout: 15_000 });
   await page.click('.sidebar-new-task');
   await page.waitForSelector('.new-task-dialog', { timeout: 5000 });
-  // spec 15 #394：单字段正文——标题输入位移除。
+
   await page.fill('.new-task-spec', title);
   check('dialog-open', true, '新建任务 dialog 打开');
 
@@ -125,8 +108,7 @@ try {
   await page.click('.new-task-save');
   await page.waitForSelector('.new-task-dialog', { state: 'hidden', timeout: 5000 });
   const todos = await getJson(`${SERVER}/api/todos`);
-  // spec 15 #394：标题 = 正文首行派生——mention token 与首行同行时进标题,
-  // 用前缀匹配探针首行（时间戳段唯一）。
+
   const apiTodo = Array.isArray(todos)
     ? todos.find((t) => typeof t.title === 'string' && t.title.startsWith(title))
     : undefined;
@@ -137,7 +119,6 @@ try {
   );
   extra.todoId = apiTodo?.id ?? null;
 
-  // ---------- 路径 B：详情页 composer（可选） ----------
   if (todoId) {
     await page.goto(`${WEB}/app/todo/${todoId}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('.composer-input', { timeout: 15_000 });
@@ -151,7 +132,6 @@ try {
     extra.composerToken = draft.match(AGENT_TOKEN)?.[0] ?? null;
     await shot(page, '02-composer-picker-token.png');
 
-    // 内联 @ 补全路径：清稿 → 键入 @ → 内联 listbox → 选行
     await page.fill('.composer-input', '');
     await page.click('.composer-input');
     await page.keyboard.type('@');

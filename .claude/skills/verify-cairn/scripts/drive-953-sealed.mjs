@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn 定制 probe（#953 sealed 封版）— live 栈双模截图抽样 +
-// 封版态运行时审计 + ROW_SELECTED 终账裁决实物 + 跨域 token 对比度实测。
-// 栈必须已在跑（launch.mjs；坐标取 VERIFY_RUN_DIR/ports.json，worktree 车道传
-// VERIFY_REPO_ROOT）。
-//
-// 检查面：
-//   A. 退役审计（运行时样式表枚举，双模）：#952 的壳级/原语族零规则 +
-//      侧栏别名状态类（.sidebar-row--selected / .sidebar-subrow--selected /
-//      .sidebar-team-row--active）按 spec/22 §5.0 别名残留律「DOM 存活、
-//      CSS 零规则」+ --toggle-track/--toggle-knob 两槽保持已删
-//   B. ROW_SELECTED 终账裁决实物（#908 comment-6001887439 观察 2，双模）：
-//      选中行（aria-current="page" 一级载体）computed 前景色 == 解析的
-//      --muted-foreground（#414 以来渲染真值；text-foreground 死槽摘除前后
-//      本组数值必须逐字节一致），pill 底色 == 解析的 --sidebar-active，
-//      行墨对 pill-合成-实测衬底 的 WCAG 文本对比 ≥ 4.5（#943 同法）
-//   C. 双模截图抽样：board / 新建任务 dialog / detail / resources 四面 ×
-//      dark+light（任务经真用户路径在暗模建、亮模复用）
-//   D. 跨域 token 对比度实测（better-colors：实测不许估，双模同配对集）：
-//      detail 值行 / dialog 正文 / chip 状态 / 品牌钮 / 危险文 / Switch 轨 /
-//      stop 面，WCAG 2.1 亮度比逐对打分（board 选中行归 B5：alpha 梯要衬底真值）
-// 证据（截图 + result.json）落 VERIFY_EVIDENCE_DIR。任一断言失败退出码 1。
-// 口径与 apps/web/playwright.config.ts 一致：1440×732。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -67,7 +45,6 @@ const shot = async (page, name) => {
   console.log(`shot  ${name}`);
 };
 
-// ---- WCAG 2.1 对比度（better-colors：实测不许估，drive-952 G 面同款） ----
 const parseRgb = (c) => {
   if (c.startsWith('color(')) {
     const m = c.match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)/);
@@ -107,8 +84,7 @@ const scorePairs = (pairs) =>
     let bg = parseRgb(p.bg);
     if (fg == null || bg == null) return { ...p, ratio: null, pass: false, note: 'unparsable' };
     if (bg.a < 0.999 || fg.a < 0.999) {
-      // 半透明 tint 先合成到真实底再量（measure-912 同律）：底 = 该面自己的
-      // base token（选中行的底是 --sidebar 不是白页底），缺省 --background
+
       const base = parseRgb(p.base ?? '') ?? { r: 255, g: 255, b: 255, a: 1 };
       if (bg.a < 0.999) bg = over(bg, base);
       if (fg.a < 0.999) fg = over(fg, bg);
@@ -123,8 +99,6 @@ const scorePairs = (pairs) =>
     };
   });
 
-/** A 面：退役审计——运行时样式表零规则（drive-952 F 面同款枚举 + §5.0 别名
- *  残留三面：类名 DOM 存活合法，CSS 规则必须为零）。 */
 const RETIRED_SELECTORS = [
   '.dlg-title',
   '.dlg-close',
@@ -199,8 +173,6 @@ const toggleSlots = (page) =>
     };
   });
 
-/** B 面：选中行终账实物——aria-current 一级载体行上的 computed 真值 +
- *  token 解析值（probe-div 走 var() 解析，drive-943/947/952 同款）。 */
 const selectedRowTruth = (page) =>
   page.evaluate(() => {
     const resolveVar = (decl, value) => {
@@ -215,8 +187,7 @@ const selectedRowTruth = (page) =>
     if (row == null) return { found: false };
     const cs = getComputedStyle(row);
     const before = getComputedStyle(row, '::before');
-    // pill 的真实衬底 = 从行向上第一个非透明 computed 背景（渲染真值，
-    // 不猜 token——仓内没有裸 --sidebar 槽，只有 hover/active 两级 alpha 梯）
+
     let surface = '';
     for (let el = row.parentElement; el != null; el = el.parentElement) {
       const bg = getComputedStyle(el).backgroundColor;
@@ -243,8 +214,6 @@ const selectedRowTruth = (page) =>
     };
   });
 
-/** D 面：跨域 token 解析对（board 选中行 / detail / dialog / chip / 品牌钮 /
- *  危险文 / Switch 轨 / stop），双模同配对集。 */
 const tokenPairs = (page) =>
   page.evaluate(() => {
     const resolveVar = (decl, value) => {
@@ -262,7 +231,7 @@ const tokenPairs = (page) =>
       base: baseVar == null ? undefined : resolveVar('color', baseVar),
       kind,
     });
-    // board 选中行对不在这里：pill 是 alpha 梯、衬底要走 B 面实测的渲染真值
+
     return [
       tokenPair('detail-value', 'var(--text-primary)', 'var(--surface-secondary)', 'text'),
       tokenPair('dialog-body', 'var(--foreground)', 'var(--dialog-bg)', 'text'),
@@ -287,7 +256,6 @@ for (const theme of ['dark', 'light']) {
   await context.addInitScript(([t]) => localStorage.setItem('cairn-theme', t), [theme]);
   const page = await context.newPage();
 
-  // ---- A. 退役审计（board 面上取全量样式表） ----
   await page.goto(`${WEB}/app`);
   await page
     .locator('[data-testid="board-scroller"]')
@@ -305,7 +273,6 @@ for (const theme of ['dark', 'light']) {
     `A2-${theme} --toggle-track/--toggle-knob 两槽保持已删（track='${slots.track}' knob='${slots.knob}'）`,
   );
 
-  // ---- B. 选中行终账实物 ----
   const row = await selectedRowTruth(page);
   selectedRow[theme] = row;
   check(row.found === true, `B1-${theme} 选中行在场（aria-current="page" 一级载体）`);
@@ -322,7 +289,7 @@ for (const theme of ['dark', 'light']) {
       row.pillBg === row.tokens.sidebarActive,
       `B4-${theme} 选中行 pill == --sidebar-active（pill='${row.pillBg}' token='${row.tokens.sidebarActive}'）`,
     );
-    // B5：行墨对 pill-合成-衬底 的 WCAG 文本对比（#943 同法：alpha 梯先合成再量）
+
     const fgC = parseRgb(row.fg);
     const pillC = parseRgb(row.pillBg);
     const surfC = parseRgb(row.surfaceBg);
@@ -339,7 +306,6 @@ for (const theme of ['dark', 'light']) {
     }
   }
 
-  // ---- D. 跨域 token 对比度 ----
   const pairs = await tokenPairs(page);
   const rows = scorePairs(pairs);
   const bad = rows.filter((r) => !r.pass);
@@ -351,9 +317,8 @@ for (const theme of ['dark', 'light']) {
   );
   contrast[theme] = rows;
 
-  // ---- C. 双模截图抽样 ----
   if (theme === 'dark') {
-    // 真用户路径建任务（暗模建、两模共用；dialog 本身就是抽样面之一）
+
     await page.locator('.sidebar-new-task').click();
     const dialog = page.getByRole('dialog', { name: '新建任务' });
     await dialog.waitFor({ timeout: 10_000 });
@@ -394,7 +359,6 @@ for (const theme of ['dark', 'light']) {
   await context.close();
 }
 
-// ---- 汇总落盘 ----
 const result = {
   ticket: 953,
   probe: 'drive-953-sealed',

@@ -1,32 +1,3 @@
-// verify-cairn 定制 probe（#920 技能分发「清单 + 按需拉」）：机器 wire 面 +
-// 真 daemon 物化面全链取证。纯 HTTP + fs + SQLite 只读，无浏览器面。
-//
-// 票面验收 seam 对照：
-//   wire  --expect=new   清单端点 200：超限文件（727,976B > 旧单文件闸
-//                        512,000）与超总量库（>2,000,000B）照常出清单，
-//                        逐文件 sizeBytes/sha256 与盘上真值对拍；file 端点
-//                        逐文件字节校验（含二进制诚实）；负面 404 四面
-//                        （他机凭证 / 未知步 / 白名单外技能 / 逃逸形）。
-//   wire  --expect=old   origin/main 一次性栈同库同请求 → 400 点名旧闸
-//                        （before 基线：根因形态复现）。
-//   daemon-success       真 daemon 跑一步：技能落盘可读、文件数与清单一致、
-//                        sha256 逐文件对拍、blobs 内容库计数。
-//   daemon-incremental   改一个文件再跑一步：只传变化文件（fetched 1 /
-//                        reused 11），字节数差异可断言。
-//   daemon-fail          新 daemon 对旧 server（skills 端点 400）：步按
-//                        failed 收尾、errorMessage 点名根因、daemon.log
-//                        team-skills-failed 行——「4xx 显式报错可观测，
-//                        不是静默空清单」的运行时实物。
-//
-// 用法（配方见 docs/verify/920/README.md）：
-//   node drive-920-skills-manifest.mjs --phase=wire [--expect=new|old]
-//   node drive-920-skills-manifest.mjs --phase=daemon-success
-//   node drive-920-skills-manifest.mjs --phase=daemon-incremental
-//   node drive-920-skills-manifest.mjs --phase=daemon-fail
-// env：SERVER（缺省读 VERIFY_RUN_DIR/ports.json）、VERIFY_RUN_DIR、
-//      SKILLS_DIR（缺省 <RUN_DIR>/home/skills）、DB（缺省
-//      <RUN_DIR>/home/server/server.db）、DAEMON_HOME（缺省
-//      /tmp/cairn-920-daemon-home）、VERIFY_EVIDENCE_DIR。
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import {
@@ -124,10 +95,8 @@ function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-// —— fixture 技能库（#920 根因形态：超单文件闸 + 超总量闸 + 二进制 + 白名单外）——
-
-const FAT_FILE_BYTES = 727_976; // 票面实测 archify/assets/template.html 同尺寸
-const HEAVY_PART_BYTES = 450_000; // ×5 → 2.25MB，超旧总量闸 2,000,000
+const FAT_FILE_BYTES = 727_976;
+const HEAVY_PART_BYTES = 450_000;
 const WHITELIST = ['alpha', 'bin', 'fat', 'heavy'];
 
 function skillMd(name, description) {
@@ -162,7 +131,7 @@ function buildFixtureLibrary() {
 }
 
 function fixtureFiles() {
-  // 盘上真值（server 现扫同源）：{relPosix: bytes}
+
   const out = new Map();
   const walk = (dir) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -174,8 +143,6 @@ function fixtureFiles() {
   walk(SKILLS_DIR);
   return out;
 }
-
-// —— seed（REST，stop-button.md 配方同形）—————————————————————————————
 
 let uniq = 0;
 async function seed() {
@@ -192,7 +159,7 @@ async function seed() {
       compat: { supportsDeveloperRole: false },
       models: [{ id: 'stub-model', name: 'stub-model' }],
     },
-  }); // 幂等性不保证：已存在则忽略状态
+  });
   const agentRes = await jfetch('POST', `/api/teams/${teamId}/agents`, {
     body: {
       displayName: `probe-920-builder-${++uniq}`,
@@ -233,7 +200,7 @@ function openDb() {
 }
 
 async function waitStepTerminal(buildId, timeoutMs = 120_000) {
-  // step 行无 errorMessage 列——根因在 build.errorMessage（completeStep 落位）。
+
   const db = openDb();
   const started = Date.now();
   try {
@@ -254,9 +221,6 @@ async function waitStepTerminal(buildId, timeoutMs = 120_000) {
   }
 }
 
-/** 会话完整跑完的判据：success，或 failed 但根因 = 产物闸「构建零改动」
- * （stub 会话零写类工具行 → sawChangeTool=false → stepArtifactGate；该闸在
- * skills 缝之后、与 #920 正交——到达它即证明分发/物化/会话全链未阻断）。 */
 function sessionRanToCompletion(terminal) {
   return (
     terminal?.status === 'success' ||
@@ -286,8 +250,6 @@ function walkTree(dir) {
 const MATERIALIZED_RE =
   /\[skills\] team: (\d+) skill\(s\), (\d+) file\(s\) materialized → (\S+) \(fetched (\d+) file\(s\) \/ (\d+) byte\(s\), reused (\d+)\)/;
 
-// —— phase: wire ————————————————————————————————————————————————————————
-
 async function phaseWire(pngBytes) {
   const seeded = await seed();
   const enrollRes = await jfetch('POST', '/api/machine/enroll', {
@@ -305,7 +267,7 @@ async function phaseWire(pngBytes) {
 
   const manifestRes = await jfetch('GET', `/api/machine/skills/${stepId}`, { bearer: token });
   if (EXPECT === 'old') {
-    // before 基线：旧整包端点对本库必 400（根因复现实物）。
+
     const text = typeof manifestRes.body === 'string' ? manifestRes.body : JSON.stringify(manifestRes.body);
     check('旧 server 整包端点 400（根因复现）', manifestRes.status === 400, `status=${manifestRes.status}`);
     check('400 点名旧单文件闸 512000', text.includes('512000') && text.includes('template.html'), text.slice(0, 160));
@@ -320,16 +282,14 @@ async function phaseWire(pngBytes) {
   const ids = (manifest?.skills ?? []).map((s) => s.id);
   check('白名单交集出清单（4 技能，beta 不列）', JSON.stringify(ids) === JSON.stringify([...WHITELIST].sort()), JSON.stringify(ids));
 
-  // 根因形态一：超单文件闸的资产在清单里带真实 size。
   const fatFile = manifest?.skills?.find((s) => s.id === 'fat')?.files?.find((f) => f.path === 'assets/template.html');
   check('超限文件（727,976B > 512,000）真实 size 入清单', fatFile?.sizeBytes === FAT_FILE_BYTES, JSON.stringify(fatFile));
-  // 根因形态二：总量超旧包闸照常出清单。
+
   const totalBytes = (manifest?.skills ?? []).flatMap((s) => s.files).reduce((n, f) => n + f.sizeBytes, 0);
   check('库总量 > 旧整包闸 2,000,000 且清单完整', totalBytes > 2_000_000, `total=${totalBytes}`);
   const fileCount = (manifest?.skills ?? []).flatMap((s) => s.files).length;
   check('清单文件数 = 12（alpha2+bin2+fat2+heavy6）', fileCount === 12, `count=${fileCount}`);
 
-  // 清单三元组与盘上真值逐文件对拍。
   const disk = fixtureFiles();
   let shaOk = 0;
   for (const s of manifest?.skills ?? []) {
@@ -340,7 +300,6 @@ async function phaseWire(pngBytes) {
   }
   check('逐文件 sizeBytes/sha256 = 盘上真值', shaOk === fileCount, `${shaOk}/${fileCount}`);
 
-  // file 端点：逐文件拉取 + sha256/size 校验 + 二进制诚实。
   const fileResults = [];
   let filesOk = 0;
   for (const s of manifest?.skills ?? []) {
@@ -359,7 +318,6 @@ async function phaseWire(pngBytes) {
   check('二进制资产逐字节诚实（非 utf8 不损坏）', pngRes.status === 200 && pngRes.bytes.equals(pngBytes), `status=${pngRes.status}`);
   check('file 响应 content-type = application/octet-stream', (pngRes.headers.get('content-type') ?? '').includes('application/octet-stream'), pngRes.headers.get('content-type'));
 
-  // 负面四面：他机凭证 / 未知步 / 白名单外技能 / 逃逸形——一律 404 不泄存在性。
   const key2 = await jfetch('POST', `/api/teams/${seeded.teamId}/api-keys`, {
     body: { name: `probe-920-neg-${Date.now()}`, gitAccess: false, mcpAccess: false, toolGrants: { read: [], write: [] } },
   });
@@ -385,12 +343,9 @@ async function phaseWire(pngBytes) {
   save('negatives-new.json', negatives);
   check('负面 8 面全部 404', [n1, n2, n3, n4, n5, n6, n7, n8].every((s) => s === 404), JSON.stringify([n1, n2, n3, n4, n5, n6, n7, n8]));
 
-  // 释放步（探针不走会话面；failed 收尾防 claimed 悬挂）。
   await jfetch('POST', `/api/machine/done/${stepId}`, { bearer: token, body: { status: 'failed', errorMessage: 'probe-920 wire leg released' } });
   return finish();
 }
-
-// —— phase: daemon-success / daemon-incremental ——————————————————————————
 
 async function phaseDaemonSuccess() {
   const seeded = await seed();
@@ -403,14 +358,12 @@ async function phaseDaemonSuccess() {
   const m = mat[mat.length - 1];
   save('daemon-success-log.txt', lines.filter((l) => l.includes('[skills]')).join('\n'));
   if (!m) return finish();
-  // 运行时消费实证：catalog 合并行指向物化视图目录，且 allowlist 过滤后
-  // loaded 计数 = 团队技能数（agent 真「读得到」的判据，非仅落盘）。
+
   const loaded = lines.find((l) => l.includes('[skills] loaded:') && l.includes(join(DAEMON_HOME, 'team-skills', 'views')));
   check('catalog loaded 行指向物化视图（运行时读得到）', Boolean(loaded) && loaded.includes('loaded: 4 skills'), (loaded ?? '').slice(0, 200));
   const [, skills, files, dir, fetched, fetchedBytes, reused] = m;
   check('materialized 行计数 = 4 技能 / 12 文件', skills === '4' && files === '12', `${skills}/${files}`);
-  // 期望值按 fixture 动态算：内容寻址去重（heavy/p0..p4 同内容 = 同 blob，
-  // 首拉即 reused）——fetched = 唯一 sha 数、reused = 文件数 − 唯一 sha 数。
+
   const diskNow = fixtureFiles();
   const whitelisted = [...diskNow.entries()].filter(([rel]) => WHITELIST.includes(rel.split('/')[0]));
   const uniqShas = new Set(whitelisted.map(([, bytes]) => sha256(bytes)));
@@ -446,7 +399,7 @@ async function phaseDaemonSuccess() {
 
 async function phaseDaemonIncremental() {
   const before = daemonLogLines().filter((l) => MATERIALIZED_RE.test(l)).length;
-  // 改一个文件（server 现扫下一步即见）：只 alpha/notes.md 变化。
+
   const notesPath = join(SKILLS_DIR, 'alpha', 'notes.md');
   const notesBefore = readFileSync(notesPath);
   appendFileSync(notesPath, '\nINCREMENTAL-920 第二版增补行\n');
@@ -469,8 +422,6 @@ async function phaseDaemonIncremental() {
   check('新视图内容 = 第二版', readFileSync(join(dir, 'alpha', 'notes.md'), 'utf8').includes('INCREMENTAL-920 第二版增补行'));
   return finish();
 }
-
-// —— phase: daemon-fail（新 daemon × 旧 server：4xx 显式报错可观测）————————
 
 async function phaseDaemonFail() {
   const seeded = await seed();
@@ -496,8 +447,6 @@ async function phaseDaemonFail() {
   }
   return finish();
 }
-
-// —— main —————————————————————————————————————————————————————————————
 
 const pngBytes = buildFixtureLibrary();
 check('fixture 技能库落盘（5 技能 / 13 文件）', statSync(join(SKILLS_DIR, 'fat', 'assets', 'template.html')).size === FAT_FILE_BYTES, SKILLS_DIR);

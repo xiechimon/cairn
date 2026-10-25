@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn 定制 probe（#949 overlays/ 域施工）— live 栈真用户路径 +
-// better-colors 对比度实测（渲染对/token 解析对，双主题）+ overlays.css
-// 清零的运行时机制断言。栈必须已在跑（launch.mjs；坐标取
-// VERIFY_RUN_DIR/ports.json，worktree 车道传 VERIFY_REPO_ROOT）。
-//
-// 前置：drive.mjs new-task 已跑过（库里有 1 卡 + 默认项目）。
-//
-// 检查面：
-//   A. ⌘K 面板真路径（开面几何/皮肤、行钮收编 data-slot、hover pill、
-//      键盘光标 data-selected、结果行 StatusChip data-tone、常亮互斥
-//      html[data-search-open] 调暗律、scrim 点击关、退出透明度单调）
-//   B. chip popover 真路径（锚定几何、V2 壳皮肤 + Arrow、ClickCatcher
-//      收编 data-slot=button、data-selected section、行 hover tint、
-//      编辑分配钮中和、Esc 分层关）
-//   C. plan dropdown：live 面需要 build 载荷数据（fresh todo 无右 pane
-//      型选面）——本 probe 声明跳过，覆盖面 = fixture e2e（detail-3pane /
-//      dead-buttons §6）+ parity 探针（docs/verify/949/parity/）
-//   D. overlays.css 清零运行时机制（样式表枚举：退役选择子零规则；
-//      html[data-search-open] utility 律在场；新 data-* 载体在 DOM）
-//   E. 对比度实测（WCAG 2.x 相对亮度公式，文本 ≥4.5、非文本 ≥3.0，双主题）
-// 证据（截图 + result.json + contrast.json）落 VERIFY_EVIDENCE_DIR。
-// 任一断言失败退出码 1。口径与 apps/web/playwright.config.ts 一致：1440×732。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -67,10 +45,8 @@ const shot = async (page, name) => {
   console.log(`shot  ${name}`);
 };
 
-// ---- WCAG 2.x contrast（better-colors：实测不许估） ----
 const parseRgb = (c) => {
-  // computed 序列化两形：rgb(r g b / a)（0-255）与 color(srgb r g b / a)
-  // （0-1，color-mix 槽的渲染真值）——后者按 srgb 通道换算 0-255。
+
   const srgb = c.startsWith('color(srgb');
   const m = c.match(/[\d.]+/g)?.map(Number);
   if (m == null || m.length < 3) return null;
@@ -108,8 +84,7 @@ const scorePairs = (pairs) =>
     if (bg.a < 1 && canvas != null) bg = over(bg, canvas);
     if (fg.a < 1 && canvas != null) fg = over(fg, canvas);
     const r = ratio(fg, bg);
-    // report 档 = spec/22 §1.3 report-only 族（软发丝线：结构暗示非可辨边界，
-    // 非 AA 门控）——报数不判红。
+
     const floor = p.kind === 'text' ? 4.5 : p.kind === 'ui' ? 3.0 : null;
     return {
       ...p,
@@ -129,7 +104,6 @@ async function api(method, path) {
 const browser = await chromium.launch();
 const contrast = {};
 
-// 库里的种子任务（drive.mjs new-task）——A6 结果行 chip 要用真标题命中
 const todosRes = await api('GET', '/api/todos');
 const seeded = (todosRes.body?.todos ?? todosRes.body ?? [])[0];
 if (seeded == null) {
@@ -166,7 +140,6 @@ for (const theme of ['dark', 'light']) {
     throw new Error('⌘K never opened the panel');
   };
 
-  // ---- A. ⌘K 面板真路径 ----
   await openPanel();
   await page.waitForTimeout(300);
   const pbox = await panel.boundingBox();
@@ -211,7 +184,6 @@ for (const theme of ['dark', 'light']) {
   await page.keyboard.press('Escape');
   await panel.waitFor({ state: 'hidden', timeout: 3000 });
 
-  // A6 结果行 StatusChip（服务端搜索真路径）
   await openPanel();
   await page.keyboard.type(QUERY);
   const todoRow = panel.locator('[data-row-kind="todo"]').first();
@@ -225,8 +197,6 @@ for (const theme of ['dark', 'light']) {
     `A6[${theme}] 结果行 chip = StatusChip sm（data-tone + data-slot=badge + 16px，§5.2 正典）`,
   );
 
-  // A7 常亮互斥（html[data-search-open] utility 律）——A6 留着面板开态，
-  // 先关面采静息基线，再重开采调暗态。
   await page.keyboard.press('Escape');
   await panel.waitFor({ state: 'hidden', timeout: 3000 });
   await page.waitForTimeout(300);
@@ -235,7 +205,7 @@ for (const theme of ['dark', 'light']) {
   const litAtRest = (await pillBg()) !== 'rgba(0, 0, 0, 0)';
   await openPanel();
   const marker = await page.evaluate(() => 'searchOpen' in document.documentElement.dataset);
-  await page.waitForTimeout(300); // pill 底色骑 150ms 过渡
+  await page.waitForTimeout(300);
   const dimmed = await pillBg();
   await page.keyboard.press('Escape');
   await panel.waitFor({ state: 'hidden', timeout: 3000 });
@@ -246,7 +216,6 @@ for (const theme of ['dark', 'light']) {
     `A7[${theme}] 常亮互斥：静息亮(${litAtRest}) → 开面标记(${marker})+pill 透明(${dimmed}) → 关面复原(${restored})`,
   );
 
-  // A8 scrim（Backdrop 位）点击关
   await openPanel();
   const scrim = await page.evaluate(() => {
     const el = document.elementFromPoint(20, 20);
@@ -261,7 +230,6 @@ for (const theme of ['dark', 'light']) {
     `A8[${theme}] scrim = 壳 Backdrop 位（data-slot=dialog-overlay、fixed、z=--z-modal-scrim(40)），暗角点击即关`,
   );
 
-  // A9 退出透明度单调（#844 律的 live 面 lite 采样）
   await openPanel();
   await page.waitForTimeout(400);
   const traceP = page.evaluate(() => {
@@ -292,7 +260,6 @@ for (const theme of ['dark', 'light']) {
   await panel.waitFor({ state: 'hidden', timeout: 3000 });
   if (theme === 'dark') await shot(page, `01-board-${theme}.png`);
 
-  // ---- B. chip popover 真路径（detail 面） ----
   await page.goto(`${WEB}/app/todo/${SEEDED_ID}`);
   await page.getByTestId('chip-chevron').waitFor({ state: 'visible', timeout: 15_000 });
   const chevron = page.getByTestId('chip-chevron');
@@ -368,7 +335,6 @@ for (const theme of ['dark', 'light']) {
   await popover.waitFor({ state: 'hidden', timeout: 3000 });
   check(page.url().includes(`/app/todo/${SEEDED_ID}`), `B7[${theme}] Esc 分层：先收 popover、不离开详情`);
 
-  // ---- D. overlays.css 清零运行时机制 ----
   const mech = await page.evaluate(() => {
     const retired = [
       '.search-panel', '.search-row', '.search-scrim', '.search-input-row', '.search-group-label',
@@ -383,8 +349,7 @@ for (const theme of ['dark', 'light']) {
       try { rules = sheet.cssRules; } catch { continue; }
       const walk = (list) => {
         for (const r of list) {
-          // CSSStyleRule 也带（空的）cssRules——先读本规则的选择子，再只对有
-          // 子规则的组（@media/@supports/CSS 嵌套）下钻。
+
           if (r.cssRules != null && r.cssRules.length > 0) walk(r.cssRules);
           const sel = r.selectorText;
           if (sel == null) continue;
@@ -404,8 +369,6 @@ for (const theme of ['dark', 'light']) {
   check(hitList.length === 0, `D1[${theme}] 退役选择子零 CSS 规则（命中 ${JSON.stringify(mech.hits)}）`);
   check(mech.searchOpenRule, `D2[${theme}] 常亮互斥 utility 律在场（html[data-search-open] 变体已编译）`);
 
-  // ---- E. 对比度实测（渲染对 + token 解析对） ----
-  // E 的面要在场：重开面板 + popover 采渲染对
   await page.goto(`${WEB}/app`);
   await page.getByRole('complementary').waitFor({ state: 'visible', timeout: 20_000 });
   await openPanel();
@@ -442,17 +405,17 @@ for (const theme of ['dark', 'light']) {
     if (label != null) push('group-label', cs(label).color, panelBg, 'text');
     const input = panel.querySelector('input');
     push('input-text', cs(input).color, panelBg, 'text');
-    // 亮面行（--row-selected pill 合成面板底）
+
     push(
       'row-text-lit',
       cs(row).color,
       `${resolveVar('background-color', 'var(--row-selected)')}||${panelBg}`,
       'text',
     );
-    // icon tile（非文本）
+
     const tile = row.querySelector(':scope > span:nth-of-type(1)');
     push('icon-tile-glyph', cs(tile).color, cs(tile).backgroundColor, 'ui');
-    // 五态 chip token 对（canon §1.7/1.8 消费面复核）
+
     for (const tone of ['idle', 'plan', 'confirm', 'done', 'failed']) {
       push(
         `chip-${tone}-token`,
@@ -461,7 +424,7 @@ for (const theme of ['dark', 'light']) {
         'text',
       );
     }
-    // popover 面 token 对（渲染面在 detail；此处 token 解析对）
+
     push('popover-title', resolveVar('color', 'var(--text-primary)'), resolveVar('background-color', 'var(--popover-bg)'), 'text');
     push('popover-row', resolveVar('color', 'var(--text-tertiary)'), resolveVar('background-color', 'var(--popover-bg)'), 'text');
     push(
@@ -477,7 +440,7 @@ for (const theme of ['dark', 'light']) {
       'text',
     );
     push('popover-seq', resolveVar('color', 'var(--text-tertiary)'), resolveVar('background-color', 'var(--popover-bg)'), 'text');
-    // 输入行放大镜图标墨（容器色，--text-dim→--text-tertiary 换槽后的现役值）
+
     const inputRowEl = panel.querySelector(':scope > div:nth-of-type(1)');
     push('input-icon', cs(inputRowEl).color, panelBg, 'ui');
     push(
@@ -490,7 +453,7 @@ for (const theme of ['dark', 'light']) {
     push('panel-border', resolveVar('color', 'var(--card-border)'), resolveVar('background-color', 'var(--popover-bg)'), 'report');
     push('popover-border', resolveVar('color', 'var(--border-default)'), canvas, 'report');
     push('project-avatar', resolveVar('color', 'var(--project-avatar-fg)'), resolveVar('background-color', 'var(--project-avatar-bg)'), 'text');
-    // 型选盘（live 无右 pane 面 → token 解析对）
+
     push('menu-row', resolveVar('color', 'var(--text-primary)'), resolveVar('background-color', 'var(--popover-bg)'), 'text');
     push(
       'menu-row-checked',
@@ -505,7 +468,7 @@ for (const theme of ['dark', 'light']) {
       'ui',
     );
     push('focus-ring', resolveVar('color', 'var(--focus-ring)'), resolveVar('background-color', 'var(--popover-bg)'), 'ui');
-    // 常亮互斥调暗态行墨
+
     const aside = q('aside');
     push('sidebar-dim-row', resolveVar('color', 'var(--text-secondary)'), cs(aside).backgroundColor, 'text');
     return pairs;

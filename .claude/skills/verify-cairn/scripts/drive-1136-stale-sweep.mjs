@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-// #1136 机器行陈旧判定 live 验证：presence 落 lastSeenAt + 阈值扫掠翻 offline。
-// 形态：真 daemon（enroll + presence 30s + SSE/claim 通道）× 静默死机 =
-// SIGSTOP 整棵进程树（进程冻结、socket 不关、无 FIN——断电/网络分区的本地
-// 等价形；kill -9 会发 FIN 走 SSE abort 老路，验不到本票的 sweep）。
-// 三相位：
-//   A healthy：presence 正常 → online 恒 true、lastSeenAt 持续刷新（≤ 节拍+抖动）。
-//   B silent-death：SIGSTOP → online 在 150s 阈值内保持 true（SSE ping 写入
-//     被对端 TCP 缓冲吸收、不触发 onAbort——票面未核实项的实测答案），
-//     过阈后 sweep 翻 false；翻转延迟 ∈ [150s, 150s+tick+余量]。
-//   C recovery：SIGCONT → 下一拍 presence 翻回 online、lastSeenAt 刷新。
-// 零浏览器面（seam 在 DB 行 + 进程信号）；证据 = result.json（时间线 +
-// checks）+ daemon-console.log + server.log 副本。运行态依赖 launch.mjs
-// 起好的 8791 栈（VERIFY_PORT 环境变量可覆写）。
 
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -20,14 +7,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 
-const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url)); // scripts → repo root
+const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
 const SERVER = `http://127.0.0.1:${process.env.VERIFY_PORT ?? '8791'}`;
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(SCRIPT_ROOT, '.claude', 'verify-run');
 const DB_PATH = join(RUN_DIR, 'home', 'server', 'server.db');
 const DAEMON_HOME = join(RUN_DIR, 'daemon-1136');
 const MACHINE_NAME = 'verify-1136';
-const STALE_MS = 150_000; // 钉 MACHINE_STALE_OFFLINE_MS（apps/server machines.ts）
-const TICK_MS = 15_000; // 钉 config schedulerTickMs
+const STALE_MS = 150_000;
+const TICK_MS = 15_000;
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const EVIDENCE =
   process.env.VERIFY_EVIDENCE_DIR ?? join(SCRIPT_ROOT, '.claude', 'verify-evidence', `${stamp}-1136-stale-sweep`);
@@ -43,10 +30,6 @@ const check = (ok, label) => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const now = () => Date.now();
 
-// —— DB 读面（better-sqlite3 从 apps/server 解析，只读打开）———————————————
-// --expect=old：打 origin/main 的旧栈（VERIFY_PORT/VERIFY_RUN_DIR 指过去），
-// 断言反向——静默死机后 machine.online 永不翻 false（本票要杀的 bug 复现）。
-// 旧 schema 无 lastSeenAt 列：PRAGMA 探列存在性，缺列时 lastSeenAt 恒 null。
 const EXPECT_OLD = process.argv.includes('--expect=old');
 const openDb = () => {
   const requireServer = createRequire(join(SCRIPT_ROOT, 'apps', 'server', 'package.json'));
@@ -69,14 +52,13 @@ function machineRow() {
     const row = withCol
       ? db.prepare('SELECT id, online, "lastSeenAt" FROM machine WHERE name = ?').get(MACHINE_NAME)
       : db.prepare('SELECT id, online FROM machine WHERE name = ?').get(MACHINE_NAME);
-    // SQLite 布尔 = 0/1 整数；取样统一转 JS 布尔（严格等值比较用）。
+
     return row === undefined ? undefined : { ...row, online: !!row.online };
   } finally {
     db.close();
   }
 }
 
-// —— REST 小件 ————————————————————————————————————————————————
 async function jfetch(method, path, opts = {}) {
   const res = await fetch(`${SERVER}${path}`, {
     method,
@@ -87,7 +69,6 @@ async function jfetch(method, path, opts = {}) {
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 
-// —— 进程树信号（SIGSTOP 单进程不传播，冻结必须整棵树）———————————————
 function treePids(root) {
   const out = execFileSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' });
   const edges = new Map();
@@ -116,13 +97,11 @@ const signalTree = (root, sig) => {
     try {
       process.kill(pid, sig);
     } catch {
-      /* 竞态退出则跳过 */
+
     }
   }
 };
 
-// —— 采样循环 ————————————————————————————————————————————————————
-/** 每拍读 machine 行，直至谓词真或超时；返回时间线（含每拍的年龄）。 */
 async function pollUntil(label, pred, { timeoutMs, intervalMs = 5000 }) {
   const timeline = [];
   const t0 = now();
@@ -142,11 +121,9 @@ async function pollUntil(label, pred, { timeoutMs, intervalMs = 5000 }) {
   }
 }
 
-// —— 主流程 ————————————————————————————————————————————————————————
 console.log(`evidence → ${EVIDENCE}`);
 console.log(`server   → ${SERVER} (db ${DB_PATH})`);
 
-// 1) API key + daemon enroll。
 const teams = await jfetch('GET', '/api/teams');
 const teamId = teams.body?.[0]?.id ?? teams.body?.teams?.[0]?.id;
 if (!teamId) throw new Error('no team found (stack not fresh?)');
@@ -171,13 +148,11 @@ daemon.stdout.on('data', (d) => appendFileSync(daemonConsole, d));
 daemon.stderr.on('data', (d) => appendFileSync(daemonConsole, d));
 daemon.on('exit', (code) => appendFileSync(daemonConsole, `\n[probe] daemon exited code=${code}\n`));
 
-// 2) 等机器上线 + lastSeenAt 落列（markPresence 写时间戳的 live 实证）。
 const enrolled = await pollUntil('enroll', (s) => s.online === true, { timeoutMs: 60_000, intervalMs: 2000 });
 check(enrolled.hit, 'daemon enroll → machine online（presence 置位）');
 const enrolledRow = machineRow();
 const machineId = enrolledRow?.id;
 
-// —— --expect=old 腿：origin/main 旧栈上的反向断言（bug 复现），跑完即收————
 if (EXPECT_OLD) {
   check(!hasLastSeenColumn(), 'old-1: machine 表无 lastSeenAt 列（改动前 schema 形态）');
   console.log('old leg: SIGSTOP silent death (210s)');
@@ -194,11 +169,11 @@ if (EXPECT_OLD) {
   check(back.hit, 'old-3: SIGCONT 后 presence 通道恢复（机器全程 online，无需翻回）');
   try {
     daemon.kill('SIGTERM');
-  } catch { /* 已退出 */ }
+  } catch {  }
   await sleep(2000);
   try {
     if (!daemon.killed) daemon.kill('SIGKILL');
-  } catch { /* 已退出 */ }
+  } catch {  }
   const oldResult = {
     probe: 'drive-1136-stale-sweep',
     expect: 'old',
@@ -221,24 +196,18 @@ check(
   'markPresence 落 lastSeenAt（迁移列 + 写路径 live 实证）',
 );
 
-// 3) Phase A：healthy 观察 60s（≥ 4 个 scheduler tick）。
 console.log('phase A: healthy observation 60s');
 const phaseA = await pollUntil('healthy-window', () => false, { timeoutMs: 60_000, intervalMs: 5000 });
 const aMaxAge = Math.max(...phaseA.timeline.map((s) => s.ageMs ?? 0));
 check(phaseA.timeline.every((s) => s.online === true), 'A: 正常 presence 的机器不被误翻（60s 全程 online）');
 check(aMaxAge < 40_000, `A: lastSeenAt 持续刷新（最大年龄 ${(aMaxAge / 1000).toFixed(1)}s < 40s = 节拍 30s + 抖动）`);
 
-// 4) Phase B：SIGSTOP（静默死机：无 FIN，SSE 通道保持「连接」）。
-// 窗口按 lastSeenAt 年龄推（不是墙钟）：死时刻的列年龄 ageAtDeath 已非零
-//（presence 节拍 30s），合法最早翻转 = ageAtDeath 后再过 STALE_MS。窗口
-// [death, death + preWindow] 内任何 tick 都不许翻——online 保持 true 即证明
-// SSE ping 写入被对端 TCP 缓冲吸收、不触发 onAbort（票面未核实项实测）。
 console.log('phase B: SIGSTOP silent death');
 const deathAt = now();
 const deathRow = machineRow();
 const lastSeenAtDeath = deathRow?.lastSeenAt ?? null;
 const ageAtDeath = lastSeenAtDeath === null ? 0 : deathAt - lastSeenAtDeath;
-const preWindowMs = STALE_MS - ageAtDeath + 10_000; // 列龄到阈 + 10s：末拍可越阈（判据按样本自身列龄过滤）
+const preWindowMs = STALE_MS - ageAtDeath + 10_000;
 signalTree(daemon.pid, 'SIGSTOP');
 const preThreshold = await pollUntil('pre-threshold', () => false, { timeoutMs: preWindowMs, intervalMs: 5000 });
 check(
@@ -249,7 +218,7 @@ check(
   preThreshold.timeline.every((s) => s.lastSeenAt === lastSeenAtDeath),
   'B2: lastSeenAt 冻结在死机时刻（presence 是唯一写源；断连检测不写此列）',
 );
-// 过阈后翻 offline（合法窗口 = preWindow + ≤1 tick + 采样拍）。
+
 const flipped = await pollUntil('flip', (s) => s.online === false, { timeoutMs: TICK_MS + 45_000, intervalMs: 5000 });
 const flippedAt = flipped.hit ? now() : null;
 const flipLatency = flipped.hit ? flippedAt - deathAt : null;
@@ -266,7 +235,6 @@ if (flipped.hit) {
   );
 }
 
-// 5) Phase C：SIGCONT（闪断恢复——机器回来翻回在线）。
 console.log('phase C: SIGCONT recovery');
 signalTree(daemon.pid, 'SIGCONT');
 const recoverAt = now();
@@ -282,16 +250,14 @@ if (recovered.hit) {
   check(recoverLatency < 90_000, `C3: 恢复延迟 ${recoverLatency}ms < 90s（下一拍 presence + 抖动量级）`);
 }
 
-// 6) 收尾：停 daemon（树内 SIGTERM→SIGKILL 兜底）。
 try {
   daemon.kill('SIGTERM');
-} catch { /* 已退出 */ }
+} catch {  }
 await sleep(2000);
 try {
   if (!daemon.killed) daemon.kill('SIGKILL');
-} catch { /* 已退出 */ }
+} catch {  }
 
-// 7) 证据落盘。
 const result = {
   probe: 'drive-1136-stale-sweep',
   ticket: 1136,

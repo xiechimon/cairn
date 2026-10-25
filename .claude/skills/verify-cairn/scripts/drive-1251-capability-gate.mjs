@@ -1,28 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1251-capability-gate — 机器能力上报 + 派发能力闸 +
-// 可见 pending 成因 + agent 机器匹配面（#1251，ADR 0018 决策 4）live 闭环。
-//
-// 三相位（失败方式先于断言固化）：
-//   R 上报链（假机器 wire + SQLite 真值）：enroll/presence 携带能力清单落
-//     machine.capabilities 列并随 record 读面透出；presence 的 capabilities
-//     坏形状（类型错三形）→ 200 {ok:true} 且旧值保留（心跳红线 02 §5.4 的
-//     活栈实证）；老 daemon 形（不带位）→ 列 NULL ≠ 空集（三态判据）。
-//   G 闸面（浏览器真点击 + chief relay run_builds + 假机器 claim）：权限 tab
-//     机器匹配段真用户路径拨「要求安装 figma」→ PATCH 落库；machine-fit 读面
-//     三态（缺项不可跑 / 未上报 fail-open 可跑 / 声明对账缺口）；缺能力机器
-//     claim 空手、步留 pending；steps 读面 queue.blocked = capability-missing
-//     + 可读缺项；详情页排队行文案可见（截图）；presence 补装 figma 后同一
-//     机器即领（装齐下一拍解锁 = 修法即时闭环）；机器页能力读标注两面。
-//   D 真 daemon 上报腿：真 daemon（fixture ~/.claude.json + fixture 技能目录，
-//     CAIRN_MCP_CONFIG / CAIRN_SKILLS_DIR / CAIRN_HOME 三隔离）注册上行 →
-//     SQLite 机器行 capabilities 含 fixture slug 与技能名（探测→wire→落库全
-//     链实物），SIGTERM 自回收。
-//
-// 前置：launch 时 server 须带 CAIRN_MCP_CONFIG=<fixture>（MCP 投影面词表
-// 确定性：figma/ctx 两 slug）——本脚本自带 fixture 生成与重 launch 提示。
-// 铺底全走公开 REST（drive-903 铺底律）；假机器 wire 零 LLM。依赖全新库：
-// 重验 = cleanup + 重 launch。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-1251-capability-gate.mjs
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -123,15 +99,10 @@ function stepsOf(buildId) {
   );
 }
 
-// —— 铺底（全 REST，非被测路径）—————————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
 
-// MCP 投影面词表确定性检查：server 的 mcp-servers 读面 = server 主机
-// ~/.claude.json 投影（CAIRN_MCP_CONFIG 可覆写）。本 probe 的 UI 腿要拨
-// 「figma」要求开关——launch 时没给 fixture 就在此止步（提示重 launch），
-// 不在真词表上即兴改判据。
 const mcpList = await getJson(SERVER + '/api/teams/' + teamId + '/mcp-servers');
 const mcpSlugs = (mcpList.mcpServers ?? mcpList ?? []).map((r) => r.id ?? r.slug ?? r.name);
 if (!mcpSlugs.includes('figma') || !mcpSlugs.includes('ctx')) {
@@ -180,7 +151,6 @@ async function enrollMachine(name, extra) {
   return { token, machineId };
 }
 
-// ============ R 上报链相位 ===================================================
 const A = await enrollMachine('cap-mbp', {
   capabilities: { mcpServers: ['figma'], skills: ['probe-skill'] },
 });
@@ -241,9 +211,6 @@ check(
   'raw=' + (rowB === undefined ? 'row-missing' : JSON.stringify(rowB.capabilities)),
 );
 
-// ============ G 闸面相位 =====================================================
-// 被测 Agent：声明 mcpServers [figma, ctx]（对账面）；要求位留空——由浏览器
-// 真用户路径拨开关写入（写面实证）。
 const capAgentRes = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
   displayName: '能力闸探针 Agent',
   description: '#1251 probe：要求 figma 的执行角色',
@@ -255,7 +222,6 @@ if (![200, 201].includes(capAgentRes.status))
   throw new Error('agent → ' + capAgentRes.status + ' ' + JSON.stringify(capAgentRes.body));
 const CAP_AGENT = capAgentRes.body?.id ?? capAgentRes.body?.agentId;
 
-// 总管绑定（chief relay 派工要走 chief 回合；未绑定 threads 409）。
 const chiefAgent = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
   displayName: '能力闸总管 1251',
   provider: 'stub-gw',
@@ -279,7 +245,6 @@ const todoRes = await sendJson(SERVER + '/api/projects/' + projectId + '/todos',
 const TASK_G = todoRes.body?.id;
 if (!TASK_G) throw new Error('todo 无 id：' + JSON.stringify(todoRes.body));
 
-// —— 浏览器腿 1：权限 tab 机器匹配段真点击拨「要求安装 figma」——————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 await page.route('**/api.dicebear.com/**', (route) =>
@@ -294,7 +259,7 @@ await page.locator('.agent-machine-fit').waitFor({ state: 'visible', timeout: 10
 const figmaSwitch = page.locator('.agent-required-mcp-row', { hasText: 'figma' }).locator('.agent-required-mcp-switch');
 await figmaSwitch.waitFor({ state: 'visible', timeout: 10_000 });
 await figmaSwitch.click();
-// PATCH 落库轮询（REST 真值面，不靠 UI 状态自证）。
+
 let patched = null;
 for (let i = 0; i < 20; i++) {
   const rec = await getJson(SERVER + '/api/teams/' + teamId + '/agents/' + CAP_AGENT);
@@ -310,7 +275,6 @@ check(
   'required=' + JSON.stringify(patched),
 );
 
-// A 在线位（presence 已发 = online）；缺 figma 态的 machine-fit 读面三态。
 const fit1 = await getJson(
   SERVER + '/api/teams/' + teamId + '/agents/' + CAP_AGENT + '/machine-fit',
 );
@@ -327,9 +291,7 @@ check(
   'A=' + JSON.stringify(fitA1) + ' B=' + JSON.stringify(fitB),
 );
 await saveJson('g2-machine-fit-blocked.json', fit1);
-// PATCH 成功后 invalidateAll 触发整页重取——截图必须等 UI 收敛到服务端真值，
-// 否则拍到的是点击前的旧查询态（实测坑：首跑 g2 截图开关仍 OFF、fit 行仍
-// 「可跑」，API 判据却已 PASS——截图与判据不同源即假证据）。
+
 await page
   .locator('.agent-required-mcp-switch[aria-checked="true"]')
   .first()
@@ -337,7 +299,6 @@ await page
 await page.getByText('不可跑').first().waitFor({ timeout: 10_000 });
 await shot(page, 'g2-agent-machine-fit-blocked.png');
 
-// —— chief relay run_builds：build 步挂被测 Agent ————————————————
 const thread = await sendJson(SERVER + '/api/teams/' + teamId + '/chief/threads', {
   content: '开始任务「能力闸探针任务」，直接派发执行。',
 });
@@ -377,10 +338,6 @@ const buildStep = stepsOf(BUILD_G).find((s) => s.kind === 'build');
 check('G3 chief relay run_builds → build 步入队 pending（assignment.build = 被测 Agent）',
   buildStep !== undefined && buildStep.status === 'pending', 'step=' + buildStep?.id);
 
-// —— 闸面：缺能力机器 claim 空手，步留 pending ————————————————
-// run_builds 自动 watch → 相位翻动会插 chief gate 回合步（drive-1250 实测
-// 坑）：空手判定要能区分「领到 chief gate 回合（合法，收掉再试）」与「领到
-// 被闸的 build 步（= 闸失效，硬失败）」。
 let emptyHanded = false;
 for (let i = 0; i < 6 && !emptyHanded; i++) {
   const claim = await sendJson(
@@ -409,10 +366,10 @@ for (let i = 0; i < 6 && !emptyHanded; i++) {
       'POST',
       A.token,
     );
-    continue; // gate 回合收掉，回到空手判定
+    continue;
   }
   if (claimed == null) {
-    emptyHanded = true; // {step:null} = 长轮询空手形
+    emptyHanded = true;
     break;
   }
   throw new Error('G4 意外认领形：' + JSON.stringify(claimed).slice(0, 200));
@@ -424,7 +381,6 @@ check(
   'step=' + JSON.stringify({ status: stepAfterClaim.status, machineId: stepAfterClaim.machineId }),
 );
 
-// —— 可见成因：steps 读面 queue.blocked + 详情页排队行 ——————————
 const stepsRes = await getJson(SERVER + '/api/builds/' + BUILD_G + '/steps');
 const stepsRows = stepsRes.steps ?? stepsRes;
 const pendingRow = (Array.isArray(stepsRows) ? stepsRows : []).find((r) => r.id === buildStep.id);
@@ -438,8 +394,7 @@ await saveJson('g5-queue-blocked.json', { pendingRow });
 
 await page.goto(WEB + '/app/todo/' + TASK_G);
 await page.locator('[data-testid="detail-title"]').waitFor({ state: 'visible', timeout: 10_000 });
-// 排队行载体 = LiveRow（data-testid="live-row" 变体 + 文案一级兜底——#910
-// 语义载体律：testid 优先，文案兜底）。
+
 let queueRowText = '';
 for (let i = 0; i < 40; i++) {
   const row = page.getByText('排队中', { exact: false }).first();
@@ -456,14 +411,13 @@ check(
 );
 await shot(page, 'g6-queue-blocked-row.png');
 
-// —— 修法即时闭环：presence 补装 figma → 同机即领 —————————————
 await sendJson(
   SERVER + '/api/machine/presence',
   { cliVersion: '0.1.0', capabilities: { mcpServers: ['figma', 'ctx'], skills: [] } },
   'POST',
   A.token,
 );
-// claimUntil 同律（drive-1250）：中途领到 gate 回合就收掉再领，直到 build 步。
+
 let claimed2 = null;
 for (let i = 0; i < 8 && claimed2 === null; i++) {
   const claim = await sendJson(
@@ -502,7 +456,6 @@ await sendJson(
   A.token,
 );
 
-// —— 终态读面：machine-fit 齐能力态 + 机器页读标注 —————————————
 const fit2 = await getJson(
   SERVER + '/api/teams/' + teamId + '/agents/' + CAP_AGENT + '/machine-fit',
 );
@@ -539,10 +492,6 @@ check(
 );
 await shot(page, 'g9-machines-capability-annotation.png');
 
-// ============ D 真 daemon 上报腿 =============================================
-// 真 daemon（非假 wire）：fixture ~/.claude.json + fixture 技能目录 + scratch
-// CAIRN_HOME，注册上行后 SQLite 机器行 capabilities = 探测实物（slug 小写
-// 归一 + 技能目录名）。--server 显式进命令行（cleanup 钉选回收契约）。
 const dHome = join(tmpdir(), 'cairn-1251-daemon-' + Date.now());
 const dMcp = join(dHome, 'claude.json');
 const dSkills = join(dHome, 'skills');
@@ -604,7 +553,6 @@ writeFileSync(join(EVIDENCE, 'd1-daemon-log-tail.txt'), daemonLog.join('').slice
 artifacts.push('d1-daemon-log-tail.txt');
 rmSync(dHome, { recursive: true, force: true });
 
-// —— 收口 ——————————————————————————————————————————————————————
 await browser.close();
 const failed = checks.filter((c) => !c.ok);
 writeFileSync(

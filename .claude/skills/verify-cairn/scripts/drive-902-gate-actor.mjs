@@ -1,35 +1,4 @@
 #!/usr/bin/env node
-// drive-902-gate-actor — #902/#900/#901 三票联合 live 探针（纯 REST + 假机器
-// wire + Playwright 拖拽，零 daemon 零 LLM）。
-//
-// 覆盖（--expect=new，lane 栈）：
-//   A #902 人过闸记 actor：真机器 wire 把 todo1 推到 confirm（plan.md 上传 +
-//     done success），REST steps {action:'confirm'} 过闸 → SQLite message 行
-//     content='通过了确认' ∧ actor=seed 用户 displayName；GET messages wire
-//     透出 actor；详情页时间线 note「Owner 通过了确认」截图。
-//   B #901 拖拽 done 闸：build 步 done {hasChanges:true} → review；浏览器真
-//     拖拽 卡片→已完成 列 → 确认弹层出现（截图 + 录像）→ 确认完成 → 落位 +
-//     PATCH phase=done + DONE 审计行（actor=用户）+ 详情页时间线截图；
-//     录像转 GIF（拖拽是动效，票面要求 GIF 证据）。
-//   C #900 chief 不得自过闸 + #902 chief actor：todo2 同 wire 推到 confirm；
-//     绑 chief（agent B）→ 建 chief 线程 → 假机器认领 chief 步 →
-//     relay confirm_builds（回执 + CONFIRM 行 actor=chief Agent 名，不是
-//     用户名）→ build 步 done → review → relay complete_todos → 回执
-//     {skipped+reasons}（toolcall 侧回执，票面证据）∧ 相位仍 review。
-//   D 落证：wire messages JSON（含 actor 位）+ SQLite message 行全量 dump。
-//
-// --expect=old（origin/main 基线栈）：同脚本重放 A/B 两相位的「before」面——
-//   confirm 过闸零行、拖拽 review→done 静默落位（无弹层）、库里无 done 审计
-//   行；录像转 before GIF。C/D 相位跳过（main 无对应面）。
-//
-// 用法：
-//   VERIFY_REPO_ROOT=<lane worktree> node .claude/skills/verify-cairn/scripts/launch.mjs
-//   node .claude/skills/verify-cairn/scripts/drive-902-gate-actor.mjs --expect=new
-//   # before 基线（main 栈在 8793/5275，own RUN_DIR）：
-//   VERIFY_RUN_DIR=<main 栈 run dir> node .../drive-902-gate-actor.mjs --expect=old
-//
-// 前置：栈已 launch（ports.json 在位）。证据落 VERIFY_EVIDENCE_DIR（缺省
-// 主仓 .claude/verify-evidence/<ts>-902-gate-actor/）。GIF 转换要 ffmpeg。
 
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -59,8 +28,6 @@ const EVIDENCE =
   join(SCRIPT_REPO, '.claude/verify-evidence/' + ts + '-902-gate-actor-' + EXPECT);
 mkdirSync(EVIDENCE, { recursive: true });
 
-// 宣告行 content canon（shared records/message.ts 同字面；old 栈上这些串
-// 恒不出现 = before 证据的负断言基线）。
 const CONFIRM_TEXT = '通过了确认';
 const DONE_TEXT = '标记为已完成';
 const MERGE_TEXT = '发起了合并';
@@ -133,7 +100,7 @@ function messageRows(conversationId) {
     const sel = hasActor
       ? 'SELECT id, role, content, actor, createdAt FROM message WHERE conversationId = ? ORDER BY createdAt'
       : 'SELECT id, role, content, createdAt FROM message WHERE conversationId = ? ORDER BY createdAt';
-    // drizzle json<> 列 = JSON 串存储（字符串值带引号）——比对 canon 前先解。
+
     const rows = db.prepare(sel).all(conversationId).map((r) => {
       if (typeof r.content !== 'string') return r;
       try {
@@ -146,7 +113,6 @@ function messageRows(conversationId) {
   });
 }
 
-// —— 机器 wire 助手（setup-review-seed / drive-agent-identity 同律）—————————
 let MACHINE_TOKEN = null;
 async function presence() {
   await sendJson(SERVER + '/api/machine/presence', {}, 'POST', MACHINE_TOKEN);
@@ -198,8 +164,6 @@ async function relayTool(stepId, name, params) {
   return JSON.parse(res.body.text);
 }
 
-/** 铺底一段：team/provider/agent/project/todo/build(withPlan) → confirm 相位
- *  （真机器 wire：claim plan 步 + plan.md 上传 + done success）。 */
 async function seedToConfirm(label, agentId) {
   const teams = await getJson(SERVER + '/api/teams');
   const teamId = teams.body[0].id;
@@ -227,8 +191,6 @@ async function seedToConfirm(label, agentId) {
   return { teamId, projectId, todoId, buildId };
 }
 
-/** 铺底二段：confirm → building（REST 或 chief relay 过确认闸）→ build 步
- *  done {hasChanges:true} → review 相位。 */
 async function advanceToReview(todoId) {
   const buildStep = await claimStep('build');
   await doneStep(buildStep.id, { status: 'success', hasChanges: true });
@@ -236,7 +198,6 @@ async function advanceToReview(todoId) {
   if (face.body.phase !== 'review') throw new Error('推进后相位=' + face.body.phase + '，期望 review');
 }
 
-// —— 浏览器拖拽（B 相位）：卡片 → 已完成 列，e2e dragTo 同款指针序 ——————————
 async function dragCardToDone(page, todoId) {
   const fromBox = await page.locator('[data-todo-id="' + todoId + '"]').first().boundingBox();
   if (fromBox == null) throw new Error('卡片不在板上：' + todoId);
@@ -270,7 +231,6 @@ async function webmToGif(webmPath, gifName) {
   process.stdout.write('gif   ' + gifName + '\n');
 }
 
-// —— 主流程 ————————————————————————————————————————————————————————————————
 const session = await getJson(SERVER + '/api/auth/session');
 if (session.status !== 200) throw new Error('session → ' + session.status);
 const USER_NAME = session.body.displayName;
@@ -279,7 +239,6 @@ check('seed 用户 displayName 可读', typeof USER_NAME === 'string' && USER_NA
 const teams0 = await getJson(SERVER + '/api/teams');
 const TEAM_ID = teams0.body[0].id;
 
-// provider + agents（setup-review-seed 同律；409 = 已建，跳过）。
 await sendJson(SERVER + '/api/teams/' + TEAM_ID + '/providers', {
   providerId: 'stub-gw',
   label: 'Stub Gateway',
@@ -302,7 +261,6 @@ async function makeAgent(name) {
 }
 const AGENT_A = await makeAgent('verify-builder');
 
-// api-key + enroll 假机器。
 const key = await sendJson(SERVER + '/api/teams/' + TEAM_ID + '/api-keys', {
   name: 'gate-actor-probe',
   gitAccess: false,
@@ -320,7 +278,6 @@ const enroll = await sendJson(
 MACHINE_TOKEN = enroll.body?.token ?? enroll.body?.machine?.token;
 if (enroll.status !== 200 || !MACHINE_TOKEN) throw new Error('enroll → ' + enroll.status);
 
-// —— A 相位：todo1 → confirm → REST 过闸 → actor 行 ————————————————
 const t1 = await seedToConfirm('甲', AGENT_A);
 const confirmRes = await sendJson(SERVER + '/api/builds/' + t1.buildId + '/steps', {
   action: 'confirm',
@@ -344,10 +301,8 @@ if (EXPECT === 'new') {
   check('A3(before) main 栈 message 表无 actor 列', t1rows.hasActor === false);
 }
 
-// build 步 → review（wire done 带 hasChanges:true）。
 await advanceToReview(t1.todoId);
 
-// wire 面：GET messages 透出 actor（new）。
 const wire = await getJson(SERVER + '/api/conversations/' + t1.buildId + '/messages');
 await saveJson(EXPECT + '-wire-messages-todo1.json', wire.body);
 if (EXPECT === 'new') {
@@ -355,7 +310,6 @@ if (EXPECT === 'new') {
   check('A4 #902 GET messages wire 行含 actor', wireRow?.actor === USER_NAME, JSON.stringify(wireRow ?? null));
 }
 
-// —— B 相位：浏览器拖拽 review→done（录像 + 弹层/静默分叉）————————————
 const browser = await chromium.launch();
 const videoDir = join(EVIDENCE, 'video-' + EXPECT);
 const context = await browser.newContext({
@@ -374,14 +328,14 @@ if (EXPECT === 'new') {
   await dialog.waitFor({ state: 'visible', timeout: 15000 });
   await shot(page, EXPECT + '-drag-done-dialog.png');
   check('B1 #901 弹层在 review(有变更)→done 落位出现', true);
-  // 确认前零提交：卡片仍在源列。
+
   const stillSource = await page
     .locator('[data-column="pending"] [data-todo-id="' + t1.todoId + '"]')
     .isVisible();
   check('B2 #901 确认前零提交（卡停源列）', stillSource);
   await dialog.getByRole('button', { name: '确认完成' }).click();
 } else {
-  // before 面：无弹层，静默落位（等卡直接出现在 done 列）。
+
   await page.waitForTimeout(800);
   const dialogCount = await dialog.count();
   check('B1(before) main 栈拖拽零弹层（静默改相病灶复现）', dialogCount === 0);
@@ -394,13 +348,12 @@ await shot(page, EXPECT + '-drag-done-landed.png');
 const todoFace = await getJson(SERVER + '/api/todos/' + t1.todoId);
 check('B3 落位后相位 = done', todoFace.body.phase === 'done', 'phase=' + todoFace.body.phase);
 
-// 落位后审计行（new：DONE 行 + actor；old：零行）。
 const t1rowsAfter = messageRows(t1.buildId);
 const doneRow = t1rowsAfter.rows.find((r) => r.content === DONE_TEXT);
 if (EXPECT === 'new') {
   check('B4 #901/#902 done 落地审计行在库', doneRow !== undefined, JSON.stringify(doneRow ?? null));
   check('B5 #902 审计行 actor = seed 用户', doneRow?.actor === USER_NAME, 'actor=' + JSON.stringify(doneRow?.actor ?? null));
-  // 详情页时间线：两条 note（通过了确认 / 标记为已完成）可见。
+
   await page.goto(WEB + '/app/todo/' + t1.todoId, { waitUntil: 'domcontentloaded' });
   await page.getByText(CONFIRM_TEXT).first().waitFor({ state: 'visible', timeout: 30000 });
   await page.getByText(DONE_TEXT).first().waitFor({ state: 'visible', timeout: 15000 });
@@ -410,7 +363,6 @@ if (EXPECT === 'new') {
   check('B4(before) main 栈 done 落地零审计行', doneRow === undefined);
 }
 
-// 收录像 → GIF（context 关闭才落 webm）。
 const video = page.video();
 await context.close();
 await browser.close();
@@ -418,7 +370,6 @@ const webmPath = await video.path();
 await webmToGif(webmPath, EXPECT + '-drag-review-to-done.gif');
 rmSync(videoDir, { recursive: true, force: true });
 
-// —— C 相位（仅 new）：chief 工具面 — actor 区分 + complete_todos 拒 ————
 if (EXPECT === 'new') {
   const AGENT_B = await makeAgent('verify-chief');
   const bind = await sendJson(
@@ -436,7 +387,6 @@ if (EXPECT === 'new') {
   const threadId = thread.body?.thread?.id;
   const chiefStep = await claimStep('chief');
 
-  // chief relay confirm_builds：过确认闸的 actor 必须记 chief Agent，不是用户。
   const confirmReceipt = await relayTool(chiefStep.id, 'confirm_builds', { buildIds: [t2.buildId] });
   await saveJson('new-chief-confirm-receipt.json', confirmReceipt);
   const t2rows = messageRows(t2.buildId);
@@ -449,7 +399,6 @@ if (EXPECT === 'new') {
 
   await advanceToReview(t2.todoId);
 
-  // chief relay complete_todos：review 闸自过必须被拒，回执带拒因。
   const rejectReceipt = await relayTool(chiefStep.id, 'complete_todos', { todoIds: [t2.todoId] });
   await saveJson('new-chief-complete-todos-receipt.json', rejectReceipt);
   check(
@@ -468,10 +417,8 @@ if (EXPECT === 'new') {
     t2rowsAfter.rows.find((r) => r.content === DONE_TEXT) === undefined,
   );
 
-  // chief 步收尾（清 claim；失败不判）。
   await doneStep(chiefStep.id, { status: 'success' }).catch(() => {});
 
-  // —— D 相位：SQLite 全量 dump（回读校验的库侧凭证）——————————————
   await saveJson('new-sqlite-message-rows.json', {
     todo1Build: t1.buildId,
     todo1Rows: messageRows(t1.buildId).rows,
@@ -482,8 +429,7 @@ if (EXPECT === 'new') {
   const announcementRows = allRows.filter((r) =>
     [CONFIRM_TEXT, DONE_TEXT, MERGE_TEXT, REVIEW_TEXT].includes(r.content),
   );
-  // 防空集假过（every 对空集恒 true）：本探针必产 3 条宣告行——todo1 人
-  // confirm + todo1 done 落地 + todo2 chief confirm。
+
   const actorFilled =
     announcementRows.length >= 3 &&
     announcementRows.every((r) => typeof r.actor === 'string' && r.actor.length > 0);
@@ -496,7 +442,6 @@ if (EXPECT === 'new') {
   process.stdout.write('skip  C/D 相位（--expect=old：main 无 chief 闸面/actor 列）\n');
 }
 
-// —— 汇总 ————————————————————————————————————————————————————————————————
 const failed = checks.filter((c) => !c.ok);
 await saveJson('result.json', {
   probe: 'drive-902-gate-actor',

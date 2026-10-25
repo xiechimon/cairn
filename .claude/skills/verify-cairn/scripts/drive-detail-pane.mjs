@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-detail-pane — 详情页 3-pane 结构 + 右 pane 视图切换
-// (#366)。live 面(URL 不带 ?scenario=),栈必须已在跑(launch.mjs)。
-//
-// 自含现场:API 建 provider/agent/project/todo(不起 daemon——结构验证不需要
-// 步执行)→ fresh 面验左中贴合/右栏不渲染(XMON-55 P0 #563:无线程态整栏
-// 让给中心列)/头部单图标 → POST build → thread 面验三栏几何 + 右 pane
-// 四视图(文档/分支与 PR/Token 用量/运行历史)全程无模态。
-//
-// 判别式(与 integration/test/m7-branch-dialog-e2e.test.ts 同款):分支 section
-// live 面 = `.dlg-machine-picker` + `.dlg-dir--input`;buildId 漏传则落回
-// fixture 占位(`.dlg-machine[disabled]` + `.dlg-dir` div),必红。
-//
-// 用法:node drive-detail-pane.mjs
-// 证据(截图 + result.json)落 VERIFY_EVIDENCE_DIR(默认脚本所在仓的
-// .claude/verify-evidence/<时间戳>-detail-pane/)。任一断言失败退出码 1。
-// 口径与 apps/web/playwright.config.ts 一致:1440×732、colorScheme dark。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -95,7 +79,6 @@ const dbQuery = (fn) => {
   }
 };
 
-// —— 现场 seed(API 直建,不起 daemon)———————————————————————————————
 const teams = await getJson(`${API}/api/teams`);
 const teamId = teams[0].id;
 await postJson(`${API}/api/teams/${teamId}/providers`, {
@@ -106,7 +89,7 @@ await postJson(`${API}/api/teams/${teamId}/providers`, {
   authHeader: true,
   compat: { supportsDeveloperRole: false },
   models: [{ id: 'stub-model', name: 'stub-model' }],
-}).catch(() => {}); // 409 = 已存在
+}).catch(() => {});
 const agent = await postJson(`${API}/api/teams/${teamId}/agents`, {
   displayName: 'detail-pane-probe',
   provider: 'stub-gw',
@@ -129,7 +112,7 @@ const page = await browser.newPage({
 });
 
 try {
-  // —— 1. fresh 面:左中贴合 + 右栏不渲染 + 头部单图标 ——————————————
+
   await page.goto(`${WEB}/app/todo/${todoId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.detail-fresh', { timeout: 15_000 });
   const geo = await page.evaluate(() => {
@@ -173,12 +156,11 @@ try {
   );
   await shot(page, '01-fresh-3pane.png');
 
-  // —— 2. 起 build → thread 面:右 pane 文档视图 + 型选 listbox ——————————
   await postJson(`${API}/api/projects/${projectId}/builds`, {
     todoIds: [todoId],
     assignment: { plan: { agentId }, build: { agentId } },
     withPlan: true,
-  }).catch(() => {}); // 响应体形状不依赖——buildId 以 todo 读面为真值
+  }).catch(() => {});
   const afterBuild = await getJson(`${API}/api/todos/${todoId}`);
   const buildId = afterBuild.latestBuildId ?? null;
   extra.buildId = buildId;
@@ -187,7 +169,7 @@ try {
   await page.goto(`${WEB}/app/todo/${todoId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.detail-right .doc-pane', { timeout: 15_000 });
   check(true, 'thread 面右 pane 默认文档视图(DocPane 在位)');
-  // 三栏几何在 thread 面钉(fresh 面无右栏,见 XMON-55 P0)。
+
   const threadGeo = await page.evaluate(() => {
     const rect = (sel) => {
       const el = document.querySelector(sel);
@@ -207,18 +189,14 @@ try {
   await shot(page, '02-thread-doc.png');
 
   await page.click('.detail-right .doc-select-wrap .doc-pane-select');
-  // #949/#910 载体：.plan-dropdown/.plan-dropdown-row 类钉已随 overlays.css 清零
-  // 退役 → role=menu / menuitemradio（本脚本 #951 维护轮补迁）。
+
   await page.waitForSelector('[role="menu"]', { timeout: 5000 });
   const rows = await page.locator('[role="menuitemradio"]').count();
   check(rows === 4, `型选 listbox 4 行(文档 + 三 section;实测 ${rows})`);
   await shot(page, '03-pane-dropdown.png');
 
-  // —— 3. 分支与 PR section:live 判别式(机器 picker + 可编辑目录)—————
   await page.locator('[role="menuitemradio"]', { hasText: '分支与 PR' }).click();
-  // #951/#910 载体：.dlg-machine-picker/.dlg-dir--input/.dlg-machine[disabled]/
-  // .dlg-branch-value 类钩退役 → aria-haspopup 钮 + getByLabel(同步目录) +
-  // 互斥分支判别（picker 在场即占位缺席，同一 ternary）+ 结构位取分支值。
+
   await page.waitForSelector('.detail-right button[aria-haspopup="listbox"]', { timeout: 15_000 });
   check(
     (await page.locator('.detail-right').getByLabel('同步目录').count()) === 1 &&
@@ -236,7 +214,6 @@ try {
   );
   await shot(page, '04-branch-section.png');
 
-  // —— 4. Token 用量 / 运行历史 section + 切回文档 ————————————————
   await page.click('.detail-right .doc-select-wrap .doc-pane-select');
   await page.locator('[role="menuitemradio"]', { hasText: 'Token 用量' }).click();
   await page.locator('.detail-right').getByText('tokens', { exact: true }).waitFor({ timeout: 5000 });
@@ -255,7 +232,6 @@ try {
   await page.waitForSelector('.detail-right .doc-pane', { timeout: 5000 });
   check(true, '文档行切回 DocPane 视图');
 
-  // —— 5. 双真值:API + SQLite ————————————————————————————————————
   const buildFace = await getJson(`${API}/api/builds/${buildId}`);
   check(
     buildFace.id === buildId && buildFace.todoId === todoId,

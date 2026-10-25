@@ -1,35 +1,35 @@
-# GitHub 连接认证 + repo picker(新建项目)
+# GitHub connection auth + repo picker (new project)
 
-用户在新建项目表单选「GitHub 仓库」:未认证 → 「认证 GitHub」钮走 OAuth(同页签跳 GitHub 授权页,callback 302 回本页自动开 picker);已认证 → picker 触发钮开锚定弹层(搜索 / 仓库行单选回填 owner/repo 与项目名 / 断开钮);三种降级(公开仓免认证 / 组织仓不在列表 / OAuth 未配置)都经「手动输入 owner/repo」链接切回现状 input(isGithubRepoRef 提交闸不变)。#361(spec 12 G2-T4);连接数据面(schema/DAO/repos 代理)见 [local-repo-api.md](./local-repo-api.md)。
+Users pick `GitHub 仓库` in the new-project form: unauthenticated -> the `认证 GitHub` button goes through OAuth (a same-tab jump to the GitHub authorization page, the callback 302s back to this page and auto-opens the picker); authenticated -> the picker trigger button opens an anchored popup (search / repo-row single-select backfilling owner/repo and the project name / a disconnect button); all three degradations (public repo needs no auth / org repo not in the list / OAuth not configured) go back to the status-quo input via the `手动输入 owner/repo` link (the isGithubRepoRef submit gate is unchanged). #361 (spec 12 G2-T4); the connection data surface (schema/DAO/repos proxy) is in [local-repo-api.md](./local-repo-api.md).
 
 ## Sub-features
 
-- `auth-face` — 未认证选「GitHub 仓库」= 认证钮 + 手动兜底链接;live 点认证 = POST github/oauth/authorize → 同页签跳授权页;OAuth env 未配 = authorize 400 原文落内联错误行。
-- `connection-status` — `GET /api/teams/{id}/github/connection`:未连接 `{connected:false}` 恰形;已连接 `{connected:true,login,scope}`(无 token 位,02 §8)。
-- `disconnect` — `DELETE` 同路径:删行幂等(缺行 204);UI = picker 头部「断开连接」钮 → 回未认证面。
-- `picker` — 已认证面:触发钮开弹层,搜索框本地过滤 full_name(数据 = `GET /api/github/repos` 单页 100 条),行单选 → 回填 owner/repo + 项目名(回填律:名称空或等于上次回填值才覆盖)。
-- `manual-fallback` — 手动链接 → owner/repo input(现状面);合法 ref + 名称 → 创建钮放开 → 提交建 repoKind=github 项目(公开仓免认证全链)。
-- `callback-landing` — callback 302 回 `/app/project/new?oauth=connected|error&reason=…&github=connection`:connected 自动开 picker;error reason 三译落内联行;读后清参不重放。(真 OAuth 回环需真 App 凭证 + 人环,见 Gotchas。)
+- `auth-face` — unauthenticated, picking `GitHub 仓库` = the auth button + the manual-fallback link; clicking auth live = POST github/oauth/authorize -> a same-tab jump to the authorization page; OAuth env unset = the authorize 400's raw text lands in an inline error row.
+- `connection-status` — `GET /api/teams/{id}/github/connection`: unconnected `{connected:false}` exact shape; connected `{connected:true,login,scope}` (no token field, 02 §8).
+- `disconnect` — `DELETE` on the same path: row deletion idempotent (204 when missing); the UI = the picker's header `断开连接` button -> back to the unauthenticated face.
+- `picker` — the authenticated face: the trigger button opens the popup, the search box filters full_name locally (data = `GET /api/github/repos`, a single page of 100), row single-select -> backfills owner/repo + the project name (the backfill rule: the name is overwritten only when empty or equal to the last backfilled value).
+- `manual-fallback` — the manual link -> the owner/repo input (the status-quo face); a legal ref + a name -> the create button unlocks -> submitting creates a repoKind=github project (the public-repo-no-auth full chain).
+- `callback-landing` — the callback 302s back to `/app/project/new?oauth=connected|error&reason=…&github=connection`: connected auto-opens the picker; the error reasons fall into three translations landing in an inline row; the parameters are read then cleared, not replayed. (A real OAuth loop needs real App credentials + a human in the loop, see Gotchas.)
 
 ## How to get to it (user POV)
 
-- web:侧栏/项目页「新建项目」→ `/app/project/new` → 仓库行 → 「GitHub 仓库」。
-- API:`GET|DELETE /api/teams/{id}/github/connection`、`POST /api/teams/{id}/github/oauth/authorize`、`GET /api/github/repos?q=`(T1 面)。
-- 驱动(`vp.mjs list github-oauth-picker` 列出全部 case 与 usage):
-  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive github-oauth-picker oauth-and-manual-repo`:未认证态认证钮 + 手动兜底建 github 项目全链。
+- Web: sidebar / project page `新建项目` -> `/app/project/new` -> the repo row -> `GitHub 仓库`.
+- API: `GET|DELETE /api/teams/{id}/github/connection`, `POST /api/teams/{id}/github/oauth/authorize`, `GET /api/github/repos?q=` (the T1 surface).
+- Driving (`vp.mjs list github-oauth-picker` lists all cases and usage):
+  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive github-oauth-picker oauth-and-manual-repo`: the unauthenticated face's auth button + the manual-fallback full chain of creating a github project.
 
 ## Driving it with probe-github-oauth.mjs
 
-Preconditions: `launch.mjs` 已起隔离栈(全新库);proxy env 全 unset;chromium 可用(仓库自带 @playwright/test)。
+Preconditions: `launch.mjs` has the isolated stack up (fresh DB); all proxy env unset; chromium available (the repo ships @playwright/test).
 
-- 一键全链:`env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY NO_PROXY='*' VERIFY_REPO_ROOT=<worktree> node .claude/skills/verify-cairn/scripts/probe-github-oauth.mjs` → 控制台逐条 PASS/FAIL + `evidence:<目录>`(result.json + responses.json + auth-face/error-face/created-project 截图)。
-- authorize 双形自适应:OAuth env(`CAIRN_GITHUB_OAUTH_CLIENT_ID/SECRET`)未配 → 断 400 not-configured + UI 点认证落内联错误行;已配 → 断 200 授权 URL 形状(scope=read:user repo)且 UI 段跳过点认证(不跟跳真授权页)。
-- 第二只眼:手动兜底建出的项目经 `GET /api/projects` 投影断 repoKind=github + githubRepo 原值。
+- One-shot full chain: `env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY NO_PROXY='*' VERIFY_REPO_ROOT=<worktree> node .claude/skills/verify-cairn/scripts/probe-github-oauth.mjs` -> per-line PASS/FAIL on the console + `evidence:<directory>` (result.json + responses.json + auth-face/error-face/created-project screenshots).
+- The authorize dual-form adaptive: OAuth env (`CAIRN_GITHUB_OAUTH_CLIENT_ID/SECRET`) unset -> break at 400 not-configured + clicking auth in the UI lands the inline error row; set -> break at 200 with the authorization-URL shape (scope=read:user repo) and the UI segment skips clicking auth (it does not follow the jump to the real authorization page).
+- Second pair of eyes: the project created via the manual fallback is judged through the `GET /api/projects` projection as repoKind=github + githubRepo at its original value.
 
 ## Gotchas
 
-- **真 OAuth 回环不可自动化**:授权页 → callback → token 密封落行 → picker 列表这段需真 GitHub App 凭证 + 人环登录/2FA。进程内全链证明在 `apps/server/test/github-oauth.test.ts`(mock 上游 14 条:happy 落行 / GET /user 失败归 exchange / denied / state 过期 / 两族不串线 / token 永不进 wire);live probe 只验不需凭证的面,勿冒充全覆盖。
-- callback 落点按 state kind 分支:connection 族 → `/app/project/new`,provider 族(#231)→ `/app/resources/providers`;state 不在册(kind 不可判)默认 providers 页。验落点用 server test,不要在 live 手造 state。
-- picker 列表 live 有数据的前提 = github_connection 行有真 token(断开面验完即回未连接);无凭证栈上 `GET /api/github/repos` 只能验 404 面。
-- fixture 面(scenario=github-picker)的行为钉在 `apps/web/e2e/project-new-github.spec.ts`(15 条),live probe 不重复。
-- 8791/5273 常被别的 lane 占用——换 `VERIFY_PORT`/`VERIFY_WEB_PORT`,不杀。
+- **A real OAuth loop cannot be automated**: the authorization page -> callback -> token sealed into a row -> the picker list stretch needs a real GitHub App credential + a human in the loop for login/2FA. The in-process full-chain proof is in `apps/server/test/github-oauth.test.ts` (14 mock-upstream cases: happy path lands a row / GET /user failure attributed to exchange / denied / state expired / the two families do not cross / the token never enters the wire); the live probe only verifies the surfaces that need no credentials, do not pretend it is full coverage.
+- The callback landing branches by state kind: the connection family -> `/app/project/new`, the provider family (#231) -> `/app/resources/providers`; a state not in the registry (kind undecidable) defaults to the providers page. Verify the landing with a server test, do not hand-craft a state on live.
+- The picker list has live data only when the github_connection row holds a real token (after the disconnect-face verification, return to unconnected); on a no-credential stack `GET /api/github/repos` can only verify the 404 face.
+- The fixture surface (scenario=github-picker) behavior is pinned in `apps/web/e2e/project-new-github.spec.ts` (15 cases), the live probe does not repeat it.
+- 8791/5273 is often held by another lane — switch `VERIFY_PORT`/`VERIFY_WEB_PORT`, do not kill.

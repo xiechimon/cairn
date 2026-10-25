@@ -1,37 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-machines-local — machines 页本机行 + per-runtime 品牌
-// mark + 机器层 shell 开关全链（spec 11 A8/A9/A7，#353；先行地图 #354；
-// #503 开关 → 品牌 mark；XMON-113 行内接回 shell 开关）。
-//
-// 真用户路径：/app/resources/machines → 本机行钉列表首（hostname）→ 行内
-// pi / Claude Code 两个品牌 mark（启用 = 品牌原色，未启用 = 35% 透明，
-// read-only）→ 机器层 shell 开关真点击（拨反 → 落库 → reload 回显 → 拨回）
-// →「添加机器」dialog 流程不变。
-//
-// 真值：GET /api/teams/:id/machines 记录（kind='local' + enabledRuntimes +
-// shellEnabled）与 UI（mark 亮度分态 / 开关 aria-checked）一致；SQLite
-// machine 行 kind / enabledRuntimes / shellEnabled 列（A9 + XMON-108
-// migration）。负向：「Cairn 托管机器」facade 行已除；行内恰一个控件
-// （shell 开关），零 button；副行只承载该开关说明（无 id 尾巴 / 并发上限）；
-// 行无 chevron；本机行无删除控件（不可删）。
-//
-// 幂等设计：不假设 enabledRuntimes / shellEnabled 初值——期望值从 API 态
-// 推导，shell 开关收尾拨回初值。同栈重跑不假红（重验仍推荐重 launch）。
-//
-// 先行地图语义（A12）：spec 11 实现票（machine 两列 migration + server 本机
-// seed + PATCH + machines 页重写）落地前本 probe 为红——每条 FAIL detail 指向
-// spec 条款，红态输出即实现票的验收清单，不是 harness 故障。
-//
-// 前置 = server 启动 seed 路径（verify 栈无 daemon）；daemon loopback enroll
-// 落 kind='local' 是另一条路径，不在本 probe 覆盖（需真 daemon，属 stop-button
-// 家族配方）。
-// #944 载体迁移：类名钩 → 语义/data-* 载体，断言语义不变——.res-grow →
-// div[data-machine-id]、.mach-runtime/.mach-mark/.mach-runtime-label →
-// [data-runtime] 容器 + svg + aria-label 可读名、.mach-runtime--on →
-// data-enabled、.mach-shell-switch → role=switch、.res-row-desc → 文案一级、
-// .res-add → button:text-is(文案)、.res-row-chev/-more 负向 → 可点语义/menu
-// 触发计数 0；.page-main = 页面壳 sheet（PR 6 三壳合一）。
-// 用法：node drive-machines-local.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -62,7 +29,7 @@ const require2 = createRequire(join(REPO, 'apps/server/package.json'));
 
 const checks = [];
 function check(name, ok, detail) {
-  // 断言位必须真是 boolean（drive-tags 同律）——写反会恒真。
+
   if (typeof ok !== 'boolean') {
     throw new TypeError(`check(${JSON.stringify(name)}) 的 ok 位须为 boolean，收到 ${typeof ok}`);
   }
@@ -71,7 +38,7 @@ function check(name, ok, detail) {
 }
 const artifacts = [];
 const shot = async (page, name, selector) => {
-  // selector 给了就拍那一块（元素级证据：行内控件细节，全页图看不清）。
+
   const target = selector ? page.locator(selector).first() : page;
   await target.screenshot({ path: join(EVIDENCE, name) });
   artifacts.push(name);
@@ -91,7 +58,6 @@ const tryGetJson = async (url) => {
   }
 };
 
-/** SQLite 真值（只读）。列缺失（A9 migration 未落）→ skipped，不炸脚本。 */
 const dbQuery = (fn) => {
   try {
     const Database = require2('better-sqlite3');
@@ -106,7 +72,6 @@ const dbQuery = (fn) => {
   }
 };
 
-// 软断言原语：先行 probe 的红态要逐条产出 FAIL detail，所有探测一律不抛。
 const softVisible = async (page, selector, timeout = 5000) =>
   page
     .waitForSelector(selector, { state: 'visible', timeout })
@@ -120,13 +85,13 @@ const softText = async (page, selector) =>
     .innerText()
     .catch(() => '');
 const oneLine = (s) => (s ?? '').replace(/\s*\n\s*/g, ' / ').slice(0, 200);
-/** 开关态读数（base-ui Switch root 的 aria-checked）；元素缺失 = null。 */
+
 const switchChecked = async (page, selector) =>
   page
     .getAttribute(selector, 'aria-checked')
     .then((v) => (v == null ? null : v === 'true'))
     .catch(() => null);
-/** 轮询条件直到成立（写路径是异步的：点击 → PATCH → 落库，读数要等）。 */
+
 const pollUntil = async (fn, timeoutMs = 6000) => {
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
@@ -138,15 +103,14 @@ const pollUntil = async (fn, timeoutMs = 6000) => {
 
 const PAGE_PATH = '/app/resources/machines';
 const SHELL = `[data-route="${PAGE_PATH}"]`;
-// #944 载体迁移：.res-grow → div[data-machine-id]（div 元素名限定防串——
-// shell 开关元素也带 data-machine-id；machines-local.spec 同锚）。
+
 const ROW = `${SHELL} div[data-machine-id]`;
 const LOCAL_ROW = `${ROW}[data-kind="local"]`;
 const HOST = hostname();
 const extra = { hostname: HOST };
 
 const runtimeSel = (runtime) => `${LOCAL_ROW} [data-runtime="${runtime}"]`;
-/** mark 亮度分态读数（data-enabled = 启用载体，#944 起替 .mach-runtime--on 修饰类）。 */
+
 const runtimeOn = async (page, runtime) =>
   page
     .evaluate(
@@ -157,7 +121,7 @@ const runtimeOn = async (page, runtime) =>
       runtimeSel(runtime),
     )
     .catch(() => null);
-/** GET machines → 本机记录（kind='local'）。 */
+
 const fetchLocalMachine = async (teamId) => {
   const res = await tryGetJson(`${SERVER}/api/teams/${teamId}/machines`);
   if (!res.ok) return { error: res.error, record: null };
@@ -172,7 +136,7 @@ const page = await browser.newPage({
 });
 
 try {
-  // 0) 页面就绪 + teamId
+
   await page.goto(`${WEB}${PAGE_PATH}`);
   const shellReady = await softVisible(page, SHELL, 15_000);
   check('page-ready', shellReady, shellReady ? `${PAGE_PATH} shell 就绪` : '页面 shell 未渲染');
@@ -186,7 +150,6 @@ try {
     teamId != null ? `GET /api/teams 取到 teamId=${teamId}` : `取 teamId 失败：${teamsRes.error}`,
   );
 
-  // 1) A8 负向：「Cairn 托管机器」facade 行已除（非空守卫：读不到正文时负向不可判真）
   const bodyText = await softText(page, `${SHELL} .page-main`);
   const facadeGone = bodyText !== '' && !bodyText.includes('Cairn 托管机器');
   check(
@@ -199,7 +162,6 @@ try {
         : 'spec 11 A8：「Cairn 托管机器」facade 行仍在（前端静态装饰行未除）',
   );
 
-  // 2) A8：server 启动 seed → API 有本机记录（kind='local'，name=hostname）
   const before =
     teamId != null ? await fetchLocalMachine(teamId) : { error: '无 teamId', record: null };
   check(
@@ -218,7 +180,6 @@ try {
     : [];
   extra.enabledRuntimes = apiRuntimes;
 
-  // 3) A8：本机行钉列表首 + 行文本含 hostname
   const firstRowKind = await page
     .evaluate(
       (rowSel) => document.querySelector(rowSel)?.getAttribute('data-kind') ?? null,
@@ -236,7 +197,6 @@ try {
   );
   await shot(page, '02-local-row.png');
 
-  // 4) A8 负向：本机行不可删（行内无删除控件/三点菜单）
   const deleteCtl = localRowOk
     ? await softCount(
         page,
@@ -251,9 +211,6 @@ try {
       : `spec 11 A8：本机行不可删——行内命中 ${deleteCtl} 个删除类控件${deleteCtl < 0 ? '（前置本机行缺失）' : ''}`,
   );
 
-  // 5) #503/#887：per-runtime 品牌 mark = 行内两个 [data-runtime] 容器（pi /
-  //    claude-code）各带 svg；#887 图标独形后名称不上屏——可读名载体 =
-  //    容器 aria-label（+ title 悬停），此处钉 aria-label 真值。
   const piMarkOk = await softVisible(page, `${runtimeSel('pi')} svg`);
   const ccMarkOk = await softVisible(page, `${runtimeSel('claude-code')} svg`);
   const piLabel = await page.getAttribute(runtimeSel('pi'), 'aria-label').catch(() => null);
@@ -268,7 +225,6 @@ try {
       : `#503：本机行应带 per-runtime 品牌 mark（[data-runtime] 内 svg + aria-label 可读名）——实测 mark pi=${piMarkOk} cc=${ccMarkOk}，label pi="${piLabel}" cc="${ccLabel}"`,
   );
 
-  // 6) UI=API 一致：mark 亮度分态 === enabledRuntimes.includes（幂等基线）
   const piOn0 = await runtimeOn(page, 'pi');
   const ccOn0 = await runtimeOn(page, 'claude-code');
   const consistent0 =
@@ -281,16 +237,10 @@ try {
       : `#503：mark 亮度分态应等于 API enabledRuntimes 成员——UI pi=${piOn0} cc=${ccOn0} vs API [${apiRuntimes.join(', ')}]`,
   );
 
-  // 7) XMON-113：行内控件面 = 机器层 shell 开关**恰一个**。判据是「不许死
-  //    控件」而非「不许有控件」——#503 摘除的 per-runtime 开关全仓只写不读
-  //    （PR #507），shell 开关有消费方（XMON-108 R1 双闸 + 每命令预检）。
   const SHELL_SW = `${LOCAL_ROW} [role="switch"]`;
   const swCount = localRowOk ? await softCount(page, `${LOCAL_ROW} [role="switch"]`) : -1;
   const btnCount = localRowOk ? await softCount(page, `${LOCAL_ROW} button`) : -1;
-  // #1108 起行内活控件 = 两个：shell 开关 + 并发上限选择器触发钮（live 行带
-  // maxConcurrent 时 button=1；e2e machines-local 同 canon 钉 ===1）。闸口
-  // 放宽到 btnCount<=1：写链必须真跑（#1175 维护轮实测：旧闸 btnCount===0
-  // 在 #1108 后永不开，写链四 check 级联假红、一次真点击都没发生）。
+
   const swOnly = swCount === 1 && btnCount <= 1;
   check(
     'shell-switch-single',
@@ -300,8 +250,6 @@ try {
       : `XMON-113/#1108：本机行应恰有一个 role=switch（shell 开关）、至多一个 button（并发触发钮）——实测 switch=${swCount} button=${btnCount}${swCount < 0 ? '（前置本机行缺失）' : ''}`,
   );
 
-  // 7b) 开关读真值：UI aria-checked === API machine.shellEnabled（幂等基线，
-  //     不假设初值）。
   const apiShell0 = before.record?.shellEnabled === true;
   const uiShell0 = await switchChecked(page, SHELL_SW);
   check(
@@ -312,10 +260,6 @@ try {
       : `XMON-113：开关态应等于 GET machines 的 shellEnabled——API=${apiShell0} UI=${uiShell0}`,
   );
 
-  // 8) #1175：hint 句不再常驻副行——改挂 shell 开关簇 tooltip（hover/focus
-  //    弹出，base-ui portal 落 body）。两面钉：静息 = 行内无常驻载体且
-  //    portal 未挂载；真 hover 开关簇 = portal 出现成品句（{tool} 插值后）。
-  //    #503 的 id 尾巴 / 并发上限负向原样保留。machines-local.spec 同 canon。
   const HINT_CANON = '已授权「远程 shell」的 Agent 可在该机器上执行命令。';
   const tipLocator = page.locator('[data-slot="tooltip-content"]');
   const restNoHint = localRowOk && !localRowText.includes('已授权');
@@ -336,14 +280,10 @@ try {
       : `#1175：hint 句应静息缺席 + hover 开关簇弹 tooltip——静息无句=${restNoHint} 静息 portal=${tipAtRest} hover 弹出=${tipShown} tooltip 文案「${oneLine(tipText)}」行文本「${oneLine(localRowText)}」`,
   );
   await shot(page, '03-tooltip-hover.png');
-  // 移开指针收 tooltip，避免 portal 干扰后续写链点击的命中判定。
+
   await page.mouse.move(5, 5);
   await shot(page, '03-marks.png');
 
-  // 8b) 开关写全链：真点击 → PATCH → API 回读 → SQLite 列 → reload 回显。
-  //     目标值由 API 初值取反（幂等：同栈重跑不假红），收尾拨回初值。
-  // （乐观更新这一条本 probe 不断言：localhost 往返比 React 重渲染还快，
-  // 读数分不出先后。它的确定性钉法在 e2e——按住 PATCH 响应再读开关态。）
   const target = !apiShell0;
   let writeOk = false;
   let dbShell = null;
@@ -380,7 +320,6 @@ try {
   await shot(page, '03b-shell-flipped.png');
   await shot(page, '03b-row-zoom.png', LOCAL_ROW);
 
-  // 8c) reload 持久回显
   await page.reload();
   await page.waitForSelector(SHELL, { timeout: 15_000 }).catch(() => {});
   uiAfterReload = await switchChecked(page, SHELL_SW);
@@ -393,7 +332,6 @@ try {
   );
   await shot(page, '03c-shell-after-reload.png');
 
-  // 8d) 收尾：拨回初值，栈留原样（幂等重跑的前提）
   const restored = await (async () => {
     if (!swOnly) return false;
     await page.click(SHELL_SW).catch(() => {});
@@ -410,7 +348,6 @@ try {
       : `XMON-113：收尾应把开关拨回初值 ${apiShell0}——未复原`,
   );
 
-  // 9) A9：SQLite machine 行真值（kind + enabledRuntimes JSON，与 API 同集）
   const dbTruth =
     localId != null
       ? dbQuery((db) => ({
@@ -447,7 +384,6 @@ try {
         }`,
   );
 
-  // 10) reload 持久：mark 亮度分态与 API 仍一致
   await page.reload();
   await page.waitForSelector(SHELL, { timeout: 15_000 }).catch(() => {});
   const afterReload = teamId != null ? await fetchLocalMachine(teamId) : { record: null };
@@ -467,11 +403,6 @@ try {
   );
   await shot(page, '04-after-reload.png');
 
-  // 11) A8：「添加机器」流程不变（button:text-is("添加机器") → CLI 命令 dialog）。
-  //     dialog 定位必须带 :has-text 定域：ADR 0013 起 chief 悬浮窗是根级
-  //     [role="dialog"]（关闭态 display:none 常驻 DOM），裸选择器的
-  //     waitForSelector 只等 DOM 首匹配 → 永等隐藏窗、假红（#1175 维护轮实测：
-  //     钮点击后 dialog 实开（count=2），旧选择器仍判 false）。
   const ADD_DLG = '[role="dialog"]:has-text("添加机器")';
   const addOk = await softVisible(page, `${SHELL} button:text-is("添加机器")`);
   let addDialogOk = false;
@@ -494,9 +425,6 @@ try {
       : `spec 11 A8：添加机器流程应不变（button:text-is("添加机器") → CLI 命令 dialog）——钮=${addOk} dialog=${addDialogOk}`,
   );
 
-  // 12) A7 负向：行无 chevron 装饰（#944 载体迁移：.res-row-chev 装饰类退役
-  //     ——断言改钉「行级可点语义不在」：行本体无 role=button、行内无链接，
-  //     machines-local.spec 同 canon）。
   const chevCount = await softCount(
     page,
     `${SHELL} [data-kind][role="button"], ${SHELL} [data-kind] a`,
@@ -512,7 +440,7 @@ try {
   try {
     await shot(page, '99-error.png');
   } catch {
-    /* 截不上就算了 */
+
   }
 } finally {
   await browser.close();

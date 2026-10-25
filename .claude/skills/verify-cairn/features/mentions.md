@@ -1,40 +1,40 @@
-# @提及(composer + 新建任务,#311/#327)
+# @mentions (composer + new task, #311/#327)
 
-用户在 composer 或新建任务对话框引用其他实体(agent/todo/skill/project/machine):点工具条「提及」钮开五分组 MentionPicker(任务/技能/Agents/项目/机器,多选累积 + 插入 (N) 底条),或在 textarea 键入 `@` 触发内联 agents 补全。选中的提及序列化为 token 落进文本——agent → `[名](agent:{id})`、任务 → `#seq`——随消息/任务 spec 提交,执行面(Segments 渲染)解析回 chip。规格源:r9 §3.2(todos.dev 实测)。
+Users reference other entities (agent/todo/skill/project/machine) in the composer or the new-task dialog: click the toolbar `提及` button to open the five-group MentionPicker (tasks / skills / Agents / projects / machines, multi-select accumulation + an `插入 (N)` bottom bar), or type `@` in the textarea to trigger inline agents completion. Selected mentions serialize into tokens that land in the text — agent -> `[名](agent:{id})`, task -> `#seq` — and go with the message / task spec; the execution surface (Segments rendering) parses them back into chips. Spec source: r9 §3.2 (todos.dev measured).
 
 ## Sub-features
 
-- `mention-button-opens-picker` composer / 新建任务工具条「提及」钮(`button[aria-label="提及"]`)点击开 MentionPicker 弹层(`.mention-picker` 或 `.mention-inline`)。
-- `mention-five-groups` picker 五分组:任务/技能/Agents/项目/机器,每组行带 `(N)` 计数;数据源 live = useTodos/useSkills/useMembers/useProjects/useMachines 投影,fixture = fixture.todos/resources。
-- `mention-multi-select` 多选累积,底条「插入 (N)」确认插入 N 个 token。
-- `mention-inline-at` composer textarea 键入 `@` 触发内联 agents-only 补全(`.mention-inline`),按 `@partial` 过滤,Enter/点击插入,Esc 关。
-- `mention-serialization` 选中提及序列化:agent → `[名](agent:{id})`、任务 → `#seq`;落进 draft/spec 文本。
-- `mention-render-back` 提交后执行面/详情 spec 渲染把 token 解析回 chip(Segments 组件)。
+- `mention-button-opens-picker` the composer / new-task toolbar `提及` button (`button[aria-label="提及"]`) opens the MentionPicker popup (`.mention-picker` or `.mention-inline`).
+- `mention-five-groups` the picker's five groups: tasks / skills / Agents / projects / machines, each group's rows carry an `(N)` count; the live data source = useTodos/useSkills/useMembers/useProjects/useMachines projections, the fixture = fixture.todos/resources.
+- `mention-multi-select` multi-select accumulation, the bottom bar `插入 (N)` confirms inserting N tokens.
+- `mention-inline-at` typing `@` in the composer textarea triggers inline agents-only completion (`.mention-inline`), filtered by `@partial`, Enter/click inserts, Esc closes.
+- `mention-serialization` selected mentions serialize: agent -> `[名](agent:{id})`, task -> `#seq`; landing in the draft/spec text.
+- `mention-render-back` after submitting, the execution surface / detail spec rendering parses the token back into a chip (Segments component).
 
 ## How to get to it (user POV)
 
-- composer(详情页运行/确认面)工具条「提及」钮 → picker;或 textarea 键入 `@`。
-- 新建任务对话框(看板「新建任务」)工具条「提及」钮 → picker(落 spec textarea)。
-- 驱动(`vp.mjs list mentions` 列出全部 case 与 usage):
-  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive mentions mention-picker`:提及钮 picker 与 `@` 内联补全;`--` 后给 todoId 时加 composer 路径。
+- The composer (detail page run / confirm surfaces) toolbar `提及` button -> the picker; or type `@` in the textarea.
+- The new-task dialog (board `新建任务`) toolbar `提及` button -> the picker (lands in the spec textarea).
+- Driving (`vp.mjs list mentions` lists all cases and usage):
+  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive mentions mention-picker`: the mention-button picker and the `@` inline completion; pass a todoId after `--` to add the composer path.
 
 ## Driving it with verify-cairn
 
 Preconditions:
 
-1. `launch.mjs` 起隔离栈,`doctor.mjs` 全 PASS。提及是纯 UI + 文本序列化,无需 daemon。
-2. live 面需有可引用实体:seed 至少一个 agent(`POST /api/teams/{t}/agents`)+ 一个 todo(看板新建或 seed),否则 picker 分组计数为 0(仍可开,只显空)。
+1. `launch.mjs` brings the isolated stack up, `doctor.mjs` fully PASS. Mentions are pure UI + text serialization, no daemon needed.
+2. The live surface needs referenceable entities: seed at least one agent (`POST /api/teams/{t}/agents`) + one todo (board-create or seed), otherwise the picker group counts are 0 (it still opens, just shows empty).
 
-- **跑法。** `node <skill>/scripts/drive-mentions.mjs`(只跑新建任务对话框路径,自足)或 `node <skill>/scripts/drive-mentions.mjs <todoId>`(追加 composer 的 picker + 内联 `@` 两条路径;todo 需可编辑相位,seed 走 `setup-review-seed.mjs`)。**前置:至少一个 agent**,否则 Agents 组 0 计数(seed 会建)。
-- **picker 路径。** 详情页 composer 或新建任务对话框 → 点 `button[aria-label="提及"]` → `.mention-picker`/`.mention-inline` 可见 → 选 Agents 分组一行(分组行 `.mention-row--top[aria-label^="Agents"]` → 条目 `.mention-row--entry`)→ 底条「插入 (1)」→ textarea/spec 出现 `[名](agent:{id})` token。
-- **内联 @ 路径。** composer textarea(live editable 面)键入 `@` → `.mention-inline` 内联 listbox 出现 → 继续键入过滤 → 选行 → token 落 caret 位。
-- **真值。** 提交后 `GET /api/todos/{id}` 的 spec 或 conversation message content 含序列化 token(`[名](agent:` / `#seq`);详情 spec 渲染面出现 chip。
+- **How to run.** `node <skill>/scripts/drive-mentions.mjs` (only the new-task-dialog path, self-sufficient) or `node <skill>/scripts/drive-mentions.mjs <todoId>` (additionally the composer's picker + inline `@` paths; the todo must be in an editable phase, the seed comes from `setup-review-seed.mjs`). **Precondition: at least one agent**, otherwise the Agents group counts 0 (the seed creates one).
+- **Picker path.** Detail-page composer or new-task dialog -> click `button[aria-label="提及"]` -> `.mention-picker`/`.mention-inline` visible -> select a row in the Agents group (group row `.mention-row--top[aria-label^="Agents"]` -> entry `.mention-row--entry`) -> the bottom bar `插入 (1)` -> the textarea/spec shows the `[名](agent:{id})` token.
+- **Inline @ path.** Type `@` in the composer textarea (live editable surface) -> the `.mention-inline` inline listbox appears -> keep typing to filter -> select a row -> the token lands at the caret.
+- **Truth.** After submitting, `GET /api/todos/{id}`'s spec or the conversation message content contains the serialized token (`[名](agent:` / `#seq`); the detail spec rendering surface shows a chip.
 
-- **验证状态(2026-09-28)**:主仓脚本化 probe 已补——`drive-mentions.mjs` 10 checks 全绿(对话框 picker + composer picker + 内联 @ 三条路径),证据归档 `docs/verify/311/2026-09-28T13-29-24-524Z-mentions/`。
+- **Verification state (2026-09-28)**: the main-repo scripted probe is in — `drive-mentions.mjs` 10 checks all green (dialog picker + composer picker + inline `@`, three paths), evidence archived at `docs/verify/311/2026-09-28T13-29-24-524Z-mentions/`.
 
 ## Gotchas
 
-- 序列化格式是文本约定(`[名](agent:{id})`),不是结构化字段——执行面「解析」= 文本渲染回 chip,agent 读文本即知引用,无 server 侧 mention 表。
-- 内联 `@` 补全只在 live editable composer 面(fixture 静态 div 无 textarea);picker 钮两面都有。
-- picker 数据源 agnostic:live 走 REST hooks 投影,fixture 走 fixture.todos/resources——drive 时确认在 live 面(URL 不带 `?scenario=`)。
-- 空分组仍让 picker 开(显 0 计数,r9 §2.2 首层)——别把「0 计数」当死钮。
+- The serialization format is a text convention (`[名](agent:{id})`), not a structured field — the execution surface "parsing" = text rendering back into chips; the agent reads the text and knows the reference, there is no server-side mention table.
+- The inline `@` completion exists only on the live editable composer surface (the fixture static div has no textarea); the picker button exists on both surfaces.
+- The picker data source is agnostic: live goes through REST-hook projections, fixture goes through fixture.todos/resources — when driving, confirm you are on the live surface (the URL carries no `?scenario=`).
+- An empty group still lets the picker open (shows a 0 count, r9 §2.2 first layer) — do not treat "0 count" as a dead button.

@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1259-1260-binding — agent 归属机绑定 + 总管降级（#1259/#1260）
-// live 全链验证。
-//
-// 腿：
-//   A 路由（wire 真值）：worker 步与 chief 回合都只投归属机——别机 claim
-//     空手（75s 长轮询等满）、归属机领到。
-//   B 占槽（#1260）：归属机 maxConcurrent=1 且 chief 步在跑 → 再 claim 空手
-//     （chief 占槽，worker 同闸）。
-//   C 换绑校验：PATCH agent 改归属机 → 下一步即时改派；绑到缺模型的机器
-//     （claude-code agent → 目标机自报清单无该模型）→ 400 指名。
-//   D 机器生命周期：删机保护 409 点名 → 整机迁移（模型不合的留机列原因，
-//     合格的迁走）→ 腾空后删除 204。
-//   E sweep 挂起：DB 直插无归属机的存量 agent + 老化其 pending 步 →
-//     调度拍后仍 pending（#1257 挂起语义：不判死）+ 板面 waitingOn「等机器」。
-//   F UI 闭环（浏览器）：machines 列表行名可点 → 详情页（fact 条/归属
-//     agent 网格/迁移与删除出口）→ 详情页建 agent 弹窗预选归属机；chief
-//     抽屉模型行只读（无触发钮）；总管设置 Agent tab 只读信息卡在位、
-//     压缩模型/机器选择器不在。
-// 零 daemon、零 LLM：chief 回合数据面与真机器同形（claim 全走真 machine
-// wire）。claim 空手是长轮询（~75s 等满），别用短超时误判（drive-895 N7 律）。
-// 依赖全新库：重验 = 重 launch。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-1259-1260-binding.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -100,7 +78,6 @@ function db(fn, readonly = true) {
 const HOME_NAME = 'verify-home-1259';
 const OTHER_NAME = 'verify-other-1259';
 
-// —— 铺底（全 REST，非被测路径）——————————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -160,13 +137,11 @@ other.id = machineRows.find((m) => m.name === OTHER_NAME)?.id;
 check('铺底：双机 enroll（各持各 key）', home.id != null && other.id != null, `home=${home.id} other=${other.id}`);
 if (!home.id || !other.id) throw new Error('机器行缺失');
 
-// 双 runtime 显式开齐（创建/换绑校验读 enabledRuntimes）。
 for (const id of [home.id, other.id]) {
   const r = await sendJson(SERVER + '/api/machines/' + id, { enabledRuntimes: ['pi', 'claude-code'] }, 'PATCH');
   if (r.status !== 200) throw new Error('开 runtime 失败 ' + id);
 }
 
-// —— A 腿：路由 = 归属机（worker + chief）———————————————————————
 const agentRes = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
   displayName: 'verify-bound-agent',
   description: '绑定探针',
@@ -177,7 +152,6 @@ const agentRes = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
 check('A0 创建 agent（归属机 = home）→ 201', agentRes.status === 201, JSON.stringify(agentRes.body).slice(0, 120));
 const agentId = agentRes.body.id;
 
-// 缺 machineId 创建 → 400（必填槽）。
 const noHome = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
   displayName: 'verify-nohome-agent',
   provider: 'stub-gw',
@@ -185,11 +159,9 @@ const noHome = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
 });
 check('A0b 创建缺 machineId → 400', noHome.status === 400);
 
-// chief 绑定该 agent。
 const bind = await sendJson(SERVER + '/api/teams/' + teamId + '/chief', { agent: { agentId } }, 'PATCH');
 check('A1 chief 绑定 agent → 200', bind.status === 200);
 
-// todo + build 指给该 agent。
 const proj = await sendJson(SERVER + '/api/projects', { name: 'verify-1259' });
 if (proj.status !== 201) throw new Error('建项目失败');
 const todoRes = await sendJson(SERVER + '/api/projects/' + proj.body.id + '/todos', {
@@ -203,7 +175,6 @@ const buildRes = await sendJson(SERVER + '/api/projects/' + proj.body.id + '/bui
 });
 if (buildRes.status !== 201) throw new Error('起 build 失败 ' + JSON.stringify(buildRes.body));
 
-// chief 回合。
 const turn = await sendJson(SERVER + '/api/teams/' + teamId + '/chief/threads', { content: '归属机路由探针。' });
 if (turn.status !== 201) throw new Error('chief 回合失败 ' + JSON.stringify(turn.body));
 const threadId = turn.body.thread.id;
@@ -214,8 +185,6 @@ async function claim(token, timeoutMs = 100_000) {
   return res.body.step;
 }
 
-// 别机 claim 空手（chief 步 + worker 步都不可见——FIFO 下 chief 更早在队，
-// 两个都不可见即一次空手证明整批不可见）。
 const otherClaim = await claim(other.token);
 check('A2 别机 claim 空手（worker 步 + chief 步都不投它）', otherClaim === null);
 
@@ -227,15 +196,12 @@ check('A4 归属机领到 chief 步（降级后 = 绑定 Agent 归属机路由�
 check('A4b chief 载荷模型 = 绑定 Agent 自身（无覆盖槽）', homeClaim2?.agent?.modelId === 'stub-model');
 saveJson('a-claims.json', { homeClaim1, homeClaim2 });
 
-// —— B 腿：chief 占槽（maxConcurrent=1 + chief 在跑 → 再 claim 空手）———————
 const cap = await sendJson(SERVER + '/api/machines/' + home.id, { maxConcurrent: 1 }, 'PATCH');
 if (cap.status !== 200) throw new Error('设 cap 失败');
 const capClaim = await claim(home.token);
 check('B1 cap 1 + chief 在跑 → 归属机 claim 空手（chief 步占槽）', capClaim === null);
 await sendJson(SERVER + '/api/machines/' + home.id, { maxConcurrent: 3 }, 'PATCH');
 
-// —— C 腿：换绑校验——————————————————————————————————————————
-// C1 模型不合 → 400 指名（claude-code agent 绑到自报清单无该模型的机器）。
 const ccAgent = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
   displayName: 'verify-cc-agent',
   provider: 'claude-code',
@@ -253,7 +219,7 @@ check(
   ccReject.status === 400 && JSON.stringify(ccReject.body).includes('stub-cc-model'),
   JSON.stringify(ccReject.body).slice(0, 200),
 );
-// C2 合法换绑即时生效：build agent 换到 other → 新步 other 领、home 空手。
+
 const rebind = await sendJson(
   SERVER + '/api/teams/' + teamId + '/agents/' + agentId,
   { machineId: other.id },
@@ -274,11 +240,6 @@ check('C3 换绑后原归属机 claim 空手（改派即时生效）', homeEmpty
 const otherGot = await claim(other.token);
 check('C4 新归属机领到', otherGot?.step?.kind === 'build', otherGot?.step?.kind);
 
-// —— D 腿：删机保护 + 整机迁移 ———————————————————————————————
-// 两台 agent 都在 other 上（agentId 换绑到此、ccAgent 也绑过去——先给 ccAgent
-// 绑到 other 是不行的（C1 已证），ccAgent 留在 home；做部分迁移腿：home 上
-// 的 ccAgent 模型在 other 没有 → 迁 other 时被拒留机）。
-// 把 build agent 再绑回 home，让 home 名下有两个 agent（一合格一不合）。
 await sendJson(SERVER + '/api/teams/' + teamId + '/agents/' + agentId, { machineId: home.id }, 'PATCH');
 const del = await sendJson(SERVER + '/api/machines/' + home.id, undefined, 'DELETE');
 check(
@@ -304,8 +265,7 @@ check(
   JSON.stringify(evac.body).slice(0, 200),
 );
 saveJson('d-evacuate.json', { evacuate: evac.body, agents: evacAgents });
-// ccAgent 换绑去 other 不行（C1 的模型洞）——改绑前先给 other 补模型报告
-// （presence 心跳面），再迁走、腾空删除 home。
+
 await sendJson(
   SERVER + '/api/machine/presence',
   { claudeCode: { installed: true, hostname: OTHER_NAME, models: [
@@ -324,17 +284,12 @@ check('D4 目标机补模型报告后换绑 → 200', fixRebind.status === 200);
 const del2 = await sendJson(SERVER + '/api/machines/' + home.id, undefined, 'DELETE');
 check('D5 腾空后删除 → 204 + 行消失', del2.status === 204 && db((d) => d.prepare('SELECT COUNT(*) n FROM machine WHERE id = ?').get(home.id).n) === 0);
 
-// —— E 腿：sweep 挂起（存量无归属机 agent）———————————————————
-// DB 直插存量形态（创建面已禁设 null——这条腿钉的是迁移前的存量行）。
-// #1257 裁决后的挂起语义：无归属机的 pending 步不判死（机器回来/补设即自动
-// 续领），可见性 = 板面 waitingOn「等机器」chip（todos.ts 读侧派生）。
 db((d) => {
   d.prepare(
     `INSERT INTO agent (id, teamId, displayName, provider, modelId, machineId) VALUES (?, ?, ?, ?, ?, NULL)`,
   ).run('agent-legacy-nohome', teamId, 'verify-legacy-nohome', 'stub-gw', 'stub-model');
   const now = Date.now();
-  // phase = building（在飞形：confirm 已过、步在等机——waitingOn 派生只答
-  // 在飞卡的挂起态；queued 形板面自显「排队中」，不进本腿判读）。
+
   d.prepare(
     `INSERT INTO todo (id, teamId, projectId, seqNum, title, spec, phase, phaseAt, assignment, latestBuildId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run('todo-legacy-1', teamId, proj.body.id, 9901, '存量任务', '', 'building', now, JSON.stringify({ plan: null, build: { agentId: 'agent-legacy-nohome' } }), 'build-legacy-1');
@@ -345,7 +300,7 @@ db((d) => {
     `INSERT INTO step (id, buildId, kind, status, createdAt) VALUES (?, ?, 'build', 'pending', ?)`,
   ).run('step-legacy-1', 'build-legacy-1', now - 11 * 60_000);
 }, false);
-// 等三个调度拍（15s 间隔）——「不动」是有界等待：到点后仍是 pending 即挂起。
+
 await new Promise((r) => setTimeout(r, 35_000));
 const legacyStep = db((d) => d.prepare(`SELECT status FROM step WHERE id = 'step-legacy-1'`).get());
 const legacyBuild = db((d) =>
@@ -363,22 +318,18 @@ check(
 );
 saveJson('e-legacy-sweep.json', { step: legacyStep, build: legacyBuild, todo: legacyTodo });
 
-// —— F 腿：UI 闭环（浏览器）——————————————————————————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 
-// F1 列表行名可点 → 详情页。
 await page.goto(WEB + '/app/resources/machines', { waitUntil: 'networkidle' });
 await page.getByRole('link', { name: OTHER_NAME }).click();
 await page.waitForURL('**/app/resources/machines/*');
 await shot(page, 'f1-machine-detail.png');
 check('F1 机器名链接 → 详情页（fact 条在位）', await page.getByTestId('machine-detail-online').isVisible());
 
-// F2 详情页网格 = 归属本机的 agent（两台都在）。
 const gridCards = await page.getByTestId('team-agent-card').count();
 check('F2 详情页网格列出归属本机的 2 个 agent', gridCards === 2, `cards=${gridCards}`);
 
-// F3 详情页建 agent：预选归属机 = 本机。
 await page.getByRole('button', { name: '创建 Agent' }).click();
 const dlg = page.getByRole('dialog', { name: '创建 agent' });
 await dlg.locator('.dlg-agent-machine-select').waitFor();
@@ -387,7 +338,6 @@ check('F3 创建弹窗预选归属机 = 本机', (prefill ?? '').includes(OTHER_
 await shot(page, 'f3-create-dialog.png');
 await page.keyboard.press('Escape');
 
-// F4 chief 抽屉：模型行只读（无触发钮）。
 await page.goto(WEB + '/app', { waitUntil: 'networkidle' });
 await page.keyboard.press('Meta+j');
 await page.waitForTimeout(800);
@@ -395,10 +345,9 @@ const modelTrigger = await page.getByRole('button', { name: '总管主模型' })
 check('F4 chief 抽屉无模型覆盖触发钮（只读行）', modelTrigger === 0);
 await shot(page, 'f4-chief-drawer.png');
 
-// F5 总管设置：只读信息卡在位 + 退役选择器不在。
 await page.getByRole('button', { name: /设置|总管设置/ }).first().click().catch(() => {});
 await page.waitForTimeout(500);
-// 设置面在 Agent tab（默认）。
+
 const infoCard = await page.getByTestId('chief-follows-agent').count();
 const compressBtn = await page.getByRole('button', { name: '压缩模型' }).count();
 const machineBtn = await page.getByRole('button', { name: '机器', exact: true }).count();
@@ -407,7 +356,6 @@ await shot(page, 'f5-chief-settings.png');
 
 await browser.close();
 
-// —— 汇总 ————————————————————————————————————————————————
 const failed = checks.filter((c) => !c.ok);
 writeFileSync(
   join(EVIDENCE, 'result.json'),

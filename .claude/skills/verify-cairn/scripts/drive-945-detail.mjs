@@ -1,25 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn 定制 probe（#945 detail-a 域施工）— live 栈真用户路径 +
-// detail.css 清零后 live-only 面的运行时机制断言 + 渲染对比度实测。
-// 栈必须已在跑（launch.mjs；坐标取 VERIFY_RUN_DIR/ports.json，worktree
-// 车道传 VERIFY_REPO_ROOT）。
-//
-// 为什么需要 live：fixture 面盖不住的 detail.css 迁移面——
-//   1. composer 真 textarea（Textarea 件收编 + COMPOSER_INPUT 中和串：
-//      48px 基高 / 13·15·0 内衬 / Inter 栈 / tabular-nums / 无框无环）
-//   2. live 行披露钮形态（button.chat-streaming：24px 命中盒 + 20px 内容
-//      盒 + 2px 负 margin 律，#885；fixture 只有 span 形态）
-//   3. 任务元信息块（task-meta live 空态面，#476）
-//   4. StatusChip live 相位链（data-tone 载体）+ 发送钮 --ready 翻面
-//   5. 停止钮 live 面（streaming 时 composer-stop 在场）
-//
-// 前置（build 在飞段）：stop-button.md 的 seed 配方——stub LLM 门控轮
-// （STUB_PORT=8919）+ provider/agent/api-key/project/todo + 真 daemon。
-// 无 build 段（A/B）只需 launch.mjs + drive.mjs new-task（或本脚本自建
-// todo）。--skip-build 跳过 C 段（无 daemon/stub 时的降级跑法）。
-//
-// 证据（截图 + result.json + contrast.json）落 VERIFY_EVIDENCE_DIR。
-// 任一断言失败退出码 1。口径与 apps/web/playwright.config.ts 一致：1440×732。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -43,7 +22,7 @@ try {
 const API = `http://127.0.0.1:${stack.serverPort}`;
 const WEB = `http://127.0.0.1:${stack.webPort}`;
 const SKIP_BUILD = process.argv.includes('--skip-build');
-// 运行中 todo（C 段）：env 传 id，缺省取最近一个非 closed todo。
+
 const RUNNING_ID = process.env.RUNNING_ID ?? null;
 
 const now = new Date();
@@ -77,7 +56,6 @@ const api = async (path, options = {}) => {
   return res.status === 204 ? null : res.json();
 };
 
-// ---- WCAG 2.x contrast（better-colors：实测不许估） ----
 const parseRgb = (c) => {
   const srgb = c.startsWith('color(srgb');
   const m = c.match(/[\d.]+/g)?.map(Number);
@@ -160,8 +138,6 @@ const probeContrast = async (page, sel, label, floor) => {
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 
-// ================= A. live 详情基础面 =================
-// 取（或建）一个探针 todo：优先 running，其次任一 todo。
 let todoId = RUNNING_ID;
 if (todoId == null) {
   const teams = await api('/api/teams');
@@ -177,7 +153,6 @@ if (todoId == null) {
 await page.goto(`${WEB}/app/todo/${todoId}`);
 await page.waitForSelector('[data-testid="detail-head"]', { timeout: 15_000 });
 
-// A1 壳 testid 载体在场（#910 二级载体落 DOM 的运行时真值）
 for (const testid of [
   'detail-main',
   'detail-body',
@@ -190,7 +165,6 @@ for (const testid of [
   check(n >= 1, `A1 carrier [data-testid=${testid}] present (${n})`);
 }
 
-// A2 StatusChip live：data-tone 载体 + chip 文案
 const tone = await page
   .locator('.detail-chip [data-tone]')
   .first()
@@ -201,7 +175,6 @@ check(
 );
 await shot(page, '01-detail-live.png');
 
-// A3 composer 真 textarea（Textarea 件 + COMPOSER_INPUT 中和串）
 const ta = page.locator('[data-testid="composer-card"] textarea');
 const taCount = await ta.count();
 if (taCount === 1) {
@@ -224,7 +197,7 @@ if (taCount === 1) {
       bg: cs.backgroundColor,
     };
   });
-  // 空稿基高 48（3×16 行盒）；grow 由 wire 的 inline height 承载
+
   check(geo.h === 48, `A3 textarea base height 48 (${geo.h})`);
   check(geo.pt === '13px' && geo.pl === '15px' && geo.pb === '0px', `A3 padding 13/15/0 (${geo.pt} ${geo.pl} ${geo.pb})`);
   check(geo.fs === '14px' && geo.lh === '16px', `A3 font 14/16 (${geo.fs}/${geo.lh})`);
@@ -234,7 +207,6 @@ if (taCount === 1) {
   check(geo.resize === 'none', `A3 resize none (${geo.resize})`);
   check(geo.fsizing === 'fixed', `A3 field-sizing fixed (${geo.fsizing})`);
 
-  // A4 draft → send 钮翻品牌实底（XMON-55 P5 live 翻面）
   await ta.fill('945 探针草稿');
   await page.waitForTimeout(200);
   const readyBg = await page
@@ -254,7 +226,6 @@ if (taCount === 1) {
   check(false, `A3 live textarea present (count=${taCount})`);
 }
 
-// A5 chip popover live 开合（FloatingShell wrap 锚定）
 await page.locator('[data-testid="detail-head"] button[aria-expanded]').click();
 await page.waitForTimeout(300);
 const popoverOpen = await page.getByRole('dialog', { name: '任务分配' }).isVisible().catch(() => false);
@@ -263,7 +234,6 @@ await shot(page, '03-chip-popover.png');
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
 
-// A6 user-menu floating 形态（Popover Positioner + PANEL_FLOATING 皮肤）
 const userTrigger = page.locator('.sidebar-user').first();
 if ((await userTrigger.count()) > 0) {
   await userTrigger.click();
@@ -280,7 +250,6 @@ if ((await userTrigger.count()) > 0) {
   await page.waitForTimeout(150);
 }
 
-// ================= B. 运行中面（stub build 在飞） =================
 if (!SKIP_BUILD) {
   if (RUNNING_ID == null) {
     console.log('B 段跳过：未给 RUNNING_ID（运行中 todo id）');
@@ -308,7 +277,7 @@ if (!SKIP_BUILD) {
           h: cs.height,
         };
       });
-      // #885：border box 24（命中区），padding 2 + 负 margin 2 → 相邻行零位移
+
       check(geo.borderH === 24, `B2 button row border-box 24 (${geo.borderH})`);
       check(geo.pt === '2px', `B2 padding-top 2 (${geo.pt})`);
       check(geo.mt === '-2px', `B2 margin-top -2 (${geo.mt})`);
@@ -325,7 +294,6 @@ if (!SKIP_BUILD) {
   }
 }
 
-// ================= C. 对比度（live 面渲染对） =================
 await page.goto(`${WEB}/app/todo/${todoId}`);
 await page.waitForSelector('[data-testid="detail-head"]', { timeout: 15_000 });
 await probeContrast(page, '[data-testid="detail-title"]', 'head title primary/surface', 4.5);

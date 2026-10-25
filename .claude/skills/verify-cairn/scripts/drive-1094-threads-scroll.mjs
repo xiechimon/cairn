@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1094-threads-scroll — 总管切换器长列表滚动（#1094）双向证据。
-//
-// 缺陷路径：头部主题切换器容器零 max-height / 零 overflow，父链窗体
-// WINDOW_CLS 是 overflow-hidden——线程攒到 22 条时列表 668px 冲出 600px
-// 窗底，尾部行被裁掉：看不见、滚不到、点不着（真实命中测试落在窗后
-// 的板面上）。不是换代回归：退役前 .chief-switcher 同缺口。
-//
-// 修法（本票）：容器加 max-h-[220px] overflow-y-auto（slash-menu 的绝对
-// 定位列表先例值；registry 的 max-h-(--available-height) 不适用——该变量
-// 由 Base UI Positioner 注入，本容器不在 Positioner 里，探针 N13/O12 实测
-// 恒空）。
-//
-// 铺底全走公开 REST（drive-1034 同律）：零 daemon、零 LLM、零 SQL——
-// POST /chief/threads 建 22 条线程（标题 = 首句截断，API 回读为准）。
-// 交互面断言用 page.mouse 坐标级真实点击（不用 locator.click——它对
-// fixed 祖先裁剪不做命中测试，改前也会放行，测不出「点不到」）。
-//
-// 用法：
-//   VERIFY_REPO_ROOT=<检出> node drive-1094-threads-scroll.mjs --expect=new
-//   # before 基线（origin/main 一次性 worktree 栈，期望反转 = 复现缺陷）：
-//   VERIFY_REPO_ROOT=/tmp/<main 检出> VERIFY_PORT=8793 VERIFY_WEB_PORT=5275 \
-//     node <lane>/.../drive-1094-threads-scroll.mjs --expect=old
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -86,7 +64,6 @@ async function sendJson(url, body, method, token) {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// —— 铺底（全 REST，非被测路径）————————————————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -118,8 +95,6 @@ const bind = await sendJson(
 );
 if (bind.status !== 200) throw new Error('chief bind → ' + bind.status);
 
-// 线程 22 条：先建 2 条（短列面对照面），再补 20 条（长列面）。
-// listChiefThreads 按 updatedAt 降序 → 最新在前，尾行 = 最先建的那条。
 const TITLES = [];
 async function makeThread(label) {
   const r = await sendJson(SERVER + '/api/teams/' + teamId + '/chief/threads', {
@@ -141,7 +116,7 @@ async function openSwitcher() {
   if (!(await drawer.isVisible())) {
     await page.locator('.chief-fab').click();
     await drawer.waitFor({ state: 'visible' });
-    // 窗体进场 fade+scale（ADR 0013 D7）——几何量测前等动画落定
+
     await drawer.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   }
   const menu = page.getByRole('menu');
@@ -152,7 +127,6 @@ async function openSwitcher() {
   return { drawer, menu };
 }
 
-// —— A 面：短列表（2 条）——两面同判据 = 视觉零变化对照 —————————————
 {
   const { drawer, menu } = await openSwitcher();
   const geom = await menu.evaluate((el) => {
@@ -166,8 +140,7 @@ async function openSwitcher() {
       overflowY: cs.overflowY,
     };
   });
-  // 2 行 × 30px + p-1（4px × 2）= 68——封顶在下面长列面才咬合，短列面
-  // 盒尺寸两面必须逐值相同（零变化的量化判据）
+
   check('A1 短列面 2 行在位', geom.rows === 2, JSON.stringify(geom));
   check('A2 短列面自然高 68px', geom.clientHeight === 68, 'clientHeight=' + geom.clientHeight);
   check(
@@ -182,16 +155,15 @@ async function openSwitcher() {
     'maxHeight=' + geom.maxHeight + ' overflowY=' + geom.overflowY,
   );
   await shot(drawer, '01-short-list.png');
-  // 收面：Esc 关切换器 + 最小化，回 FAB 态
+
   await page.keyboard.press('Escape');
 }
 
-// —— B 面：长列表（22 条）———————————————————————————————————————
 for (let i = 3; i <= 22; i++) await makeThread(String(i).padStart(2, '0'));
 const apiThreads = await getJson(SERVER + '/api/teams/' + teamId + '/chief/threads');
 writeFileSync(join(EVIDENCE, 'api-chief-threads.json'), JSON.stringify(apiThreads, null, 2));
 check('B1 API 线程 22 条', Array.isArray(apiThreads) && apiThreads.length === 22, 'len=' + apiThreads?.length);
-const tailThread = apiThreads[apiThreads.length - 1]; // updatedAt 升序尾 = 最先建的 01
+const tailThread = apiThreads[apiThreads.length - 1];
 const headThread = apiThreads[0];
 
 {
@@ -227,7 +199,7 @@ const headThread = apiThreads[0];
   writeFileSync(join(EVIDENCE, 'measurements.json'), JSON.stringify(m, null, 2));
 
   if (OLD) {
-    // 缺陷复现面：无封顶、列表冲出窗底、尾行被裁、真实命中测试打不到尾行
+
     check('O3 无封顶', m.maxHeight === 'none', 'maxHeight=' + m.maxHeight);
     check('O4 无滚动轴', m.overflowY === 'visible', 'overflowY=' + m.overflowY);
     check(
@@ -245,7 +217,7 @@ const headThread = apiThreads[0];
       m.lastRowBottom > m.winBottom,
       'lastRowBottom=' + m.lastRowBottom + ' winBottom=' + m.winBottom,
     );
-    // 「点不到」的物理判据：尾行中心点上真正接事件的元素不是尾行
+
     const hit = await page.evaluate(
       ({ x, y }) => {
         const el = document.elementFromPoint(x, y);
@@ -278,7 +250,6 @@ const headThread = apiThreads[0];
       'v=' + JSON.stringify(m.availableHeight),
     );
 
-    // 滚到底：尾行进滚动口且仍在窗内
     await menu.evaluate((el) => {
       el.scrollTop = el.scrollHeight;
     });
@@ -301,7 +272,6 @@ const headThread = apiThreads[0];
     await shot(drawer, '02-long-list-bottom.png');
     await shot(menu, '03-menu-scrolled.png');
 
-    // 坐标级真实点击尾行 → active 切换 + 头部 chip 换成尾行标题
     const beforeCurrent = await menu
       .evaluate((el) => el.querySelector('[aria-current="true"]')?.textContent ?? null);
     await page.mouse.click(bottom.centerX, bottom.centerY);
@@ -320,7 +290,6 @@ const headThread = apiThreads[0];
     check('N8c 点击前 active 是首行（对照位）', (beforeCurrent ?? '').includes(headThread.title), 'before=' + JSON.stringify(beforeCurrent));
     await shot(drawer, '04-after-tail-click.png');
 
-    // 键盘面：重开切换器，Tab 走到尾行（滚动口带焦滚动），Enter 切换
     await page.locator('.chief-drawer button[aria-label="主题"]').click();
     const menu2 = page.getByRole('menu');
     await menu2.waitFor({ state: 'visible' });

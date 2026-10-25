@@ -1,41 +1,41 @@
-# 附件(composer + 新建任务,#310/#331)
+# Attachments (composer + new task, #310/#331)
 
-用户在 composer 或新建任务对话框附加文件:点工具条「添加附件」钮(`button[aria-label="添加附件"]`,原生文件多选触发器)→ 选文件 → 上传 → 附件 token 注入文本(`![名](attachment:attachments/{teamId}/{id}.{ext})`)随消息/任务 spec 提交;执行面 agent 可读取附件内容。规格源:r9 §3.1/§4(todos.dev 实测 wire 三步)。
+Users attach files in the composer or the new-task dialog: click the toolbar `添加附件` button (`button[aria-label="添加附件"]`, a native multi-file trigger) -> pick files -> upload -> an attachment token is injected into the text (`![名](attachment:attachments/{teamId}/{id}.{ext})`) and goes with the message / task spec; the executing agent can read the attachment content. Spec source: r9 §3.1/§4 (todos.dev measured wire, three steps).
 
 ## Sub-features
 
-- `attachment-button` composer / 新建任务工具条「添加附件」钮(`button[aria-label="添加附件"]` + Paperclip 图标)= 原生 `<input type=file multiple>` 触发器。
-- `attachment-upload-wire` 选文件 → 三步上传(r9 §4):`POST /api/uploads/grant`(拿上传凭证)→ 独立 upload host(FormData PUT)→ 返回 attachment id。
-- `attachment-token-inject` 上传成功后 token `![名](attachment:attachments/{teamId}/{id}.{ext})` 注入 composer draft / 新建任务 spec(受控 state,父组件 setDraft/setSpec)。
-- `attachment-submit` token 随消息/任务 spec 提交,落 conversation message content / todo.spec。
-- `attachment-executable` 执行面 agent 可读取附件(daemon 侧 attachment 工具进 worker 词表,remoteTools)。
-- `attachment-dirty-gate` 附件 token 注入 spec 后由 spec 非空承载未保存闸 dirty 位(#318 闸,#310 接线)。
+- `attachment-button` the composer / new-task toolbar `添加附件` button (`button[aria-label="添加附件"]` + Paperclip icon) = a native `<input type=file multiple>` trigger.
+- `attachment-upload-wire` file picked -> three-step upload (r9 §4): `POST /api/uploads/grant` (get the upload credential) -> a separate upload host (FormData PUT) -> returns the attachment id.
+- `attachment-token-inject` after a successful upload the token `![名](attachment:attachments/{teamId}/{id}.{ext})` is injected into the composer draft / new-task spec (controlled state, the parent component's setDraft/setSpec).
+- `attachment-submit` the token goes with the message / task spec and lands in the conversation message content / todo.spec.
+- `attachment-executable` the executing agent can read attachments (the daemon-side attachment tool enters the worker vocabulary, remoteTools).
+- `attachment-dirty-gate` after an attachment token is injected into the spec, the spec being non-empty carries the unsaved-gate dirty bit (#318 gate, wired by #310).
 
 ## How to get to it (user POV)
 
-- 详情页 composer 工具条「添加附件」钮(运行/确认面)。
-- 新建任务对话框工具条「添加附件」钮(落 spec textarea)。
-- 驱动(`vp.mjs list attachments` 列出全部 case 与 usage):
-  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive attachments new-task-and-composer-upload`:新建任务对话框上传附件;`--` 后给 todoId 时加 composer 路径。
-  - 判 stale、不带 `--force` 拒跑的 case(拒跑时打印原因):`vp.mjs drive attachments clipboard-paste`(依赖的 setup-review-seed.mjs 建 agent 不带 machineId,ADR 0019 起 400)。
+- The detail-page composer toolbar `添加附件` button (run / confirm surfaces).
+- The new-task dialog toolbar `添加附件` button (lands in the spec textarea).
+- Driving (`vp.mjs list attachments` lists all cases and usage):
+  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive attachments new-task-and-composer-upload`: upload an attachment in the new-task dialog; pass a todoId after `--` to add the composer path.
+  - Cases judged stale and refusing to run without `--force` (the refusal prints the reason): `vp.mjs drive attachments clipboard-paste` (its dependency setup-review-seed.mjs creates the agent without machineId, 400 since ADR 0019).
 
 ## Driving it with verify-cairn
 
 Preconditions:
 
-1. `launch.mjs` 起隔离栈,`doctor.mjs` 全 PASS。
-2. 附件上传需 server 的 upload host 可达(grant → upload → token);live 面。
-3. 执行面读取需 daemon + worker 步(attachment 工具在 remoteTools 词表)。
+1. `launch.mjs` brings the isolated stack up, `doctor.mjs` fully PASS.
+2. Attachment upload needs the server's upload host reachable (grant -> upload -> token); live surface.
+3. Execution-surface reading needs a daemon + worker step (the attachment tool is in the remoteTools vocabulary).
 
-- **跑法。** `node <skill>/scripts/drive-attachments.mjs` 只跑新建任务对话框路径(自足,无需 daemon/seed);`node <skill>/scripts/drive-attachments.mjs <todoId>` 追加 composer 路径(todo 需处于 composer 可编辑相位,seed 走 `setup-review-seed.mjs`)。样本文件写在证据目录里随归档进 PR,便于对照原始字节。
-- **剪贴板粘贴路(#729)。** `node <skill>/scripts/drive-paste.mjs <todoId>`(todoId = `setup-review-seed.mjs` 产出的 confirm 相位任务):canvas 生成 24×24 真 PNG → 合成 ClipboardEvent 粘进 detail composer(caret 行中,断行插入 + caret 落块后行首)→ Enter = revision 发送 → transcript 缩略 chip 像素加载;再走新建任务对话框粘贴 → 保存 → spec 卡片 chip;末了真键盘探针(clipboard-write 权限 + ClipboardItem + Meta+V/Ctrl+V,verdict 记 result.json 不硬断言)。14 checks:wire 捕获(grant 200 / upload 201 / revision 202)+ SQLite 两行(message/spec 两 scope,status=ready)+ 磁盘字节 === 样本 + 读回一致。证据先例 `docs/verify/729/`。注意:粘贴合成名 `pasted-image-<n>` 每 draft 递增——探针的路径 B 必须先于真键盘路跑,否则 counter 被顶号(设计行为,非回归)。
-- **上传路径。** composer/新建任务 → 点 `button[aria-label="添加附件"]` → 文件选择(playwright `setInputFiles`)→ 等上传 → draft/spec 出现 `![名](attachment:...)` token。
-- **真值。** `POST /api/uploads/grant` 返回上传 URL;upload host PUT 200;提交后 message content / todo.spec 含 attachment token;SQLite attachment 表有行(#310 migration 0008);磁盘 `<attachmentsDir>/<storageKey>` 字节等于上传样本;`GET /api/attachments/:id` 读回一致。**未覆盖**:daemon 执行面读附件(worker 步 attachment 工具)——需真 daemon + worker 步,脚本不驱动这一面。
+- **How to run.** `node <skill>/scripts/drive-attachments.mjs` runs only the new-task-dialog path (self-sufficient, no daemon/seed needed); `node <skill>/scripts/drive-attachments.mjs <todoId>` additionally runs the composer path (the todo must be in a composer-editable phase, the seed comes from `setup-review-seed.mjs`). Sample files are written into the evidence directory and archived with the PR, so the original bytes are available for comparison.
+- **Clipboard-paste path (#729).** `node <skill>/scripts/drive-paste.mjs <todoId>` (todoId = a confirm-phase task produced by `setup-review-seed.mjs`): the canvas generates a real 24x24 PNG -> synthesizes a ClipboardEvent and pastes it into the detail composer (mid-caret line, line-break insertion + caret lands at the head of the line after the block) -> Enter = revision send -> the transcript thumbnail chip loads its pixels; then paste into the new-task dialog -> save -> the spec card chip; finally a real-keyboard probe (clipboard-write permission + ClipboardItem + Meta+V/Ctrl+V, the verdict is recorded in result.json, not hard-asserted). 14 checks: wire capture (grant 200 / upload 201 / revision 202) + two SQLite rows (message/spec two scopes, status=ready) + on-disk bytes === sample + readback consistent. Evidence precedent `docs/verify/729/`. Note: the synthesized paste name `pasted-image-<n>` increments per draft — the probe's path B must run before the real-keyboard path, otherwise the counter gets bumped (designed behavior, not a regression).
+- **Upload path.** composer / new-task -> click `button[aria-label="添加附件"]` -> file selection (playwright `setInputFiles`) -> wait for the upload -> the draft/spec shows the `![名](attachment:...)` token.
+- **Truth.** `POST /api/uploads/grant` returns the upload URL; upload host PUT 200; after submitting, the message content / todo.spec contains the attachment token; the SQLite attachment table has a row (#310 migration 0008); the on-disk `<attachmentsDir>/<storageKey>` bytes equal the uploaded sample; `GET /api/attachments/:id` reads back consistently. **Not covered**: the daemon execution surface reading attachments (the worker-step attachment tool) — needs a real daemon + worker step, the script does not drive that surface.
 
 ## Gotchas
 
-- 附件钮是**原生文件触发器**(`input[type=file]`),playwright 用 `setInputFiles` 而非 click;选中后 onAttachment(files) 委托父组件做 grant+upload+token 注入。
-- 上传是三步异步(grant → 独立 host PUT → token),不是一步 POST;drive 要等 token 落 draft 再断言。
-- composer 附件需 live editable 面(受控 draft,父持 state);fixture 静态 div 无附件 wire。
-- token 格式 `![名](attachment:attachments/{teamId}/{id}.{ext})` 是 markdown 图片语法变体——执行面/渲染面按 attachment: 协议解析,非真 URL。
-- **验证状态(2026-09-28)**:本功能由 #331 lane 在 worktree 内验证(integration attachments.test.ts 588 行 + lane verify run),证据随 worktree 删除未留主仓;主仓 live re-probe 待补(需 upload host + daemon worker 步完整编排)。user path 从合并代码核实。
+- The attachment button is a **native file trigger** (`input[type=file]`), playwright uses `setInputFiles`, not click; after selection, onAttachment(files) delegates to the parent component for grant + upload + token injection.
+- The upload is a three-step async (grant -> separate host PUT -> token), not a one-shot POST; the drive must wait for the token to land in the draft before asserting.
+- Composer attachments need a live editable surface (controlled draft, the parent holds state); the fixture static div has no attachment wire.
+- The token format `![名](attachment:attachments/{teamId}/{id}.{ext})` is a markdown-image-syntax variant — the execution/rendering surfaces parse it by the attachment: protocol, it is not a real URL.
+- **Verification state (2026-09-28)**: this feature was verified by the #331 lane inside a worktree (integration attachments.test.ts, 588 lines + a lane verify run); the evidence was not preserved in the main repo when the worktree was deleted; a main-repo live re-probe is pending (needs the full orchestration of upload host + daemon worker step). The user path was verified from the merged code.

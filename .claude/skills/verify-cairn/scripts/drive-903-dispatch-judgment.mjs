@@ -1,24 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-903-dispatch-judgment — chief 派发判定（#903，ADR
-// 0014）live 闭环：设置槽死态 + chief 逐次判定 + 回执理由三条腿。
-//
-// 真用户路径：抽屉齿轮进总管设置 → Agent tab 无「派发方式」行（僵尸控件
-// 负向钉）→ REST 钉设置槽死态（GET 封套无 dispatchWithPlan 键、PATCH 单独
-// 该键 400、混发被剥离）→ 假机器认领 chief 回合步 → claim 载荷取两样运行
-// 时实物（systemPrompt 派发判定节 + run_builds 工具定义含 withPlan/
-// dispatchReason 参数）→ relay run_builds 三形态实证：
-//   E1 缺省 → withPlan=true 先规划（fail-safe，D2）+ dispatchReason null；
-//   E2 显式 false + 理由 → 直修（判定权归 chief，D1）+ 理由回显（D4）；
-//   E3 显式 true + 理由 → 先规划 + 理由回显。
-// 每腿 SQLite 落库对拍：build.withPlan + 首步 step.kind；收道 = relay
-// cancel_builds（别用 claim+done failed——机器上报 failed 触发重试/replan
-// 步，顶歪下一腿的 chief claim）。
-//
-// 铺底全走公开 REST（drive-agent-identity 铺底律，非被测路径）：provider +
-// agent + PATCH chief 绑定 + project + 3 todo + api-key + machine enroll。
-// 零 daemon、零 LLM：chief 回合数据面与真机器同形（claim → tool relay →
-// done 全走真 machine wire）。依赖全新库：重验 = 重 launch。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-903-dispatch-judgment.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -99,7 +79,6 @@ function dbRead(fn) {
   }
 }
 
-// —— 铺底（全 REST，非被测路径）—————————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -178,8 +157,6 @@ check(
   'project=' + projectId,
 );
 
-// —— chief 回合辅助（真 machine wire，零 LLM）——————————————————
-// claim 响应双层包装 {step:{step:{…}, chief, remoteTools}}（machine-wire 律）。
 async function claimChiefStep(tag) {
   const claim = await sendJson(SERVER + '/api/machine/tasks/claim', {}, 'POST', machineToken);
   const payload = claim.body?.step;
@@ -225,29 +202,24 @@ function dispatchRows(todoId) {
     return { builds, steps };
   });
 }
-// 收道 = 在本腿 chief 步内 relay cancel_builds：pending worker 步直接标
-// failed（DB 直写，不走机器 done 通道）。别用「claim + done failed」收道——
-// 机器上报 failed 会走 finishStep 的重试/replan 语义，生成新的 pending 步，
-// 把下一腿的 chief claim 顶歪（首轮实测：E2 claim 领到 plan 重试步）。
+
 async function cancelBuild(stepId, buildId, tag) {
   const out = await relayTool(stepId, 'cancel_builds', { buildIds: [buildId] });
   if (!Array.isArray(out?.cancelled)) throw new Error(tag + ' cancel_builds 异常：' + JSON.stringify(out));
 }
 
-// 派发判定节 canon（composeChiefSystemPrompt 静态产物，ADR 0014 D5）。
 const JUDGMENT_MUSTS = [
-  '当信息会实质改变结果、执行方式、权限或安全时才问', // Mika 判断纪律原句
+  '当信息会实质改变结果、执行方式、权限或安全时才问',
   '否则自己决定，并说出你决定了什么',
-  '有可复现步骤或失败测试的缺陷 → 直接修', // 信号一
-  '引入新能力、或改动跨包 → 先问', // 信号二（#1049 前问 = 先规划承载）
-  '判不准 → 先规划', // 信号三（fail-safe）
-  '审阅关口恒在', // D3
-  'dispatchReason', // D4 审计参数
-  '就地一句话推翻', // D4 推翻
-  '只影响这一次', // D4 单次性
+  '有可复现步骤或失败测试的缺陷 → 直接修',
+  '引入新能力、或改动跨包 → 先问',
+  '判不准 → 先规划',
+  '审阅关口恒在',
+  'dispatchReason',
+  '就地一句话推翻',
+  '只影响这一次',
 ];
 
-// —— U 浏览器面（live 模式，无 scenario）：设置槽死态 ——————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 await page.route('**/api.dicebear.com/**', (route) =>
@@ -261,7 +233,7 @@ await page.locator('button[aria-label="总管"]').click();
 await page.locator('.chief-drawer').waitFor({ state: 'visible', timeout: 8000 });
 await page.locator('button[aria-label="总管设置"]').click();
 await page.locator('h1:text-is("总管设置")').waitFor({ state: 'visible', timeout: 8000 });
-// Agent tab 缺省即在位；等机器行加载完成再数（邻座行在位 = 拆的只是派发槽）。
+
 await page.locator('button[aria-label="机器"]').waitFor({ state: 'visible', timeout: 8000 });
 const dispatchRowCount = await page.locator('button[aria-label="派发方式"]').count();
 const dispatchHeadingCount = await page.getByRole('heading', { name: '派发方式' }).count();
@@ -276,7 +248,6 @@ check(
 await shot(page, '01-settings-agent-no-dispatch-row.png');
 await browser.close();
 
-// —— A REST 面：设置槽死态（回读确认律）—————————————————————
 const patchLone = await sendJson(SERVER + '/api/teams/' + teamId + '/chief', {
   dispatchWithPlan: false,
 }, 'PATCH');
@@ -299,7 +270,6 @@ await saveJson('patch-reject-and-envelope.json', {
   chiefEnvelope: envAfter.chief,
 });
 
-// —— E1 缺省腿：不带 withPlan → 先规划（fail-safe，D2）————————————
 const t1 = await openChiefThread('开始任务「缺省腿探针」，直接派发执行。');
 if (t1.status !== 201) throw new Error('chief threads → ' + t1.status);
 const claimE1 = await claimChiefStep('E1');
@@ -330,8 +300,7 @@ await saveJson('claim-e1.json', {
 });
 const relayE1 = await relayTool(claimE1.stepId, 'run_builds', {
   todoIds: [TASK_A],
-  // plan 槽必带：plan 步的 agent 无 modelId 会被 tryClaim 跳过（machines.ts
-  // 「未指派 Agent = 不可执行」），收道腿的 claim 会长轮询到超时。
+
   assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
 });
 check(
@@ -352,7 +321,6 @@ await saveJson('relay-e1-default-plan.json', { relayResult: relayE1, sqlite: row
 await cancelBuild(claimE1.stepId, relayE1.builds[0].id, 'E1');
 await doneStep(claimE1.stepId, 'success');
 
-// —— E2 直修腿：withPlan=false + 理由 → 判定生效 + 理由回显（D1/D4）————
 const t2 = await openChiefThread('开始任务「直修腿探针」，直接派发执行。');
 if (t2.status !== 201) throw new Error('chief threads → ' + t2.status);
 const claimE2 = await claimChiefStep('E2');
@@ -381,7 +349,6 @@ await saveJson('relay-e2-direct-reason.json', { relayResult: relayE2, sqlite: ro
 await cancelBuild(claimE2.stepId, relayE2.builds[0].id, 'E2');
 await doneStep(claimE2.stepId, 'success');
 
-// —— E3 显式规划腿：withPlan=true + 理由 → 回显 + 首步 plan ——————————
 const t3 = await openChiefThread('开始任务「显式规划腿探针」，直接派发执行。');
 if (t3.status !== 201) throw new Error('chief threads → ' + t3.status);
 const claimE3 = await claimChiefStep('E3');

@@ -1,44 +1,44 @@
-# 添加服务商 picker dialog（providers 页「新建」，spec 11 A5/A6，#353/#354）
+# Add-provider picker dialog (the providers page's `新建`, spec 11 A5/A6, #353/#354)
 
-用户在模型服务页点「新建」， dialog 是上游形态的 picker：顶部搜索框（客户端过滤）+ 38 项 preset 行（显示名照 spec 11 名单；OAuth 徽标只骑族表已接线族——现仅 github-copilot；openai-codex 族未接线，#385：行禁用 + 右端「暂未开通」注记）+ 底部「自定义端点」入口（disclosure 展开现有自定义网关表单）。点 api_key 族 preset 行进该 preset 的密钥表单；已接线 OAuth 族走既有 authorize 重定向（#231/#243 着陆面原样保留）。38 项 preset 数据层全留（shared `PROVIDER_PRESET_IDS`），但只在 dialog 内出现——页面列表不再投喂。规格源：`docs/spec/11-模型服务与机器本地化.md`（A5/A6 + 38 项名单 + #385 修订注）。
+Users click `新建` on the model-services page, and the dialog is the upstream-form picker: a top search box (client-side filtering) + 38 preset rows (display names per the spec 11 list; OAuth badges ride only on the family-table wired families — currently only github-copilot; the openai-codex family is not wired, #385: the row disabled + a `暂未开通` note at the right end) + a bottom `自定义端点` entry (a disclosure expanding the existing custom-gateway form). Clicking an api_key-family preset row enters that preset's key form; an already-wired OAuth family goes through the existing authorize redirect (the #231/#243 landing surfaces stay as-is). The 38 preset rows stay entirely in the data layer (shared `PROVIDER_PRESET_IDS`), but appear only inside the dialog — the page list no longer feeds them. Spec source: `docs/spec/11-模型服务与机器本地化.md` (A5/A6 + the 38-item list + the #385 revision note).
 
 ## Sub-features
 
-- `pick-open` providers 页「新建」（role=button 文案「新建」exact；CSS 载体 `[data-testid="resource-new"]`）开 picker dialog（dialog 族律不变：X / Esc / backdrop，#68）。
-- `pick-page-no-presets` 页面列表不投喂 preset 目录（A5 负向：preset 仅在 dialog 内出现；抽样三个辨识名 DeepSeek / OpenRouter / Cloudflare AI Gateway，页面正文非空守卫）。
-- `pick-search` 搜索框（契约句柄 `input[aria-label="搜索服务商..."]`，getByLabel 一级）客户端过滤 38 项，大小写不敏感：`qwen` → 3 行（Token Plan 族）/ 无命中 → 0 行 / 清空 → 38 行。
-- `pick-preset-rows` preset 行（契约句柄 `[data-preset-id]`）38 项与数据层目录（A5 全留）1:1 同数；显示名 canon = spec 11「上游 38 项 preset 显示名」名单逐字（脚本常量 `PRESET_NAMES` 单源转录）——断言为**名称节点等值**（徽标标记除外；整行子串会放行 MiniMax ⊂ MiniMax CN 类更长变体假命中）。
-- `pick-oauth-badge` OAuth 标签 = 族表已接线族行右的「OAuth」标签节点（现仅 github-copilot 一项）；openai-codex 族表未接线（#385）——行**不带**标签、行禁用（`disabled`）、右端「暂未开通」注记（行内文案载体，getByText「暂未开通」）；xai 行**不带**标签（负向钉）。Paper 分组选择器（#1393）：行在小标题分组下，行 = 首字母方块 + 名称 + 右侧标签。
-- `pick-xai-label` xai 密钥表单内展示 oauthLabel「Sign in with SuperGrok or X Premium」（spec 11 名单注正向；纯 UI 文案，无外网请求）。
-- `pick-preset-keyform` 点 api_key 族 preset 行 → 该 preset 的密钥表单（#380 落地契约 = 现有自定义网关表单原样复用 + 预填）：`#dlg-provider-id` 值 = preset id、`#dlg-provider-label` 值 = 显示名、密钥输入（password）在场。
-- `pick-custom-disclosure` 底部「自定义端点」入口（契约句柄 role=button 文案「自定义端点」）→ 展开**现有**自定义网关表单——既有句柄保全：`#dlg-provider-id` / `#dlg-provider-label` / `#dlg-provider-baseurl` / API 协议段（`[role="tab"]` + `aria-selected`）/ `#dlg-provider-apikey` / 「添加模型」钮（role=button，exact——「添加模型服务」含它作子串）/ 「添加模型服务」submit 钮（role=button，dialog 内 scoped）。
-- `pick-create-e2e` 创建链回归护栏（既有行为，A6 重构不得击穿）：填表 + 模型行 → 保存 → `POST /api/teams/:id/providers` → dialog 关 → 封套 providers 段字段全对 + SQLite `provider` 表行（models JSON 含所填模型）。
+- `pick-open` the providers page `新建` (role=button, exact copy `新建`; CSS carrier `[data-testid="resource-new"]`) opens the picker dialog (the dialog family rules unchanged: X / Esc / backdrop, #68).
+- `pick-page-no-presets` the page list does not feed the preset catalog (the A5 negative: presets appear only inside the dialog; sample three recognizable names DeepSeek / OpenRouter / Cloudflare AI Gateway, with a non-empty page-body guard).
+- `pick-search` the search box (contract handle `input[aria-label="搜索服务商..."]`, getByLabel first-class) client-side filters the 38 items, case-insensitive: `qwen` -> 3 rows (the Token Plan family) / no hit -> 0 rows / cleared -> 38 rows.
+- `pick-preset-rows` the preset rows (contract handle `[data-preset-id]`) are 38, 1:1 with the data-layer catalog (A5 keeps all); the display-name canon = the spec 11 "upstream 38 preset display names" list verbatim (the script constant `PRESET_NAMES` is the single-source transcription) — the assertion is **name-node equality** (except the badge markup; a whole-row substring would let longer variants like MiniMax ⊂ MiniMax CN slip through as false hits).
+- `pick-oauth-badge` the OAuth label = the `OAuth` label node at the right of each wired-family row in the family table (currently only github-copilot); the openai-codex family table is not wired (#385) — the row carries **no** label, is disabled (`disabled`), and has a `暂未开通` note at the right end (in-row copy carrier, getByText `暂未开通`); the xai row carries **no** label (the negative pin). The Paper group selector (#1393): rows sit under subtitle groups, a row = an initial-letter block + name + a right-side label.
+- `pick-xai-label` the xai key form shows the oauthLabel `Sign in with SuperGrok or X Premium` (the spec 11 list's positive note; pure UI copy, no external request).
+- `pick-preset-keyform` clicking an api_key-family preset row -> that preset's key form (the #380 landing contract = the existing custom-gateway form reused as-is + prefilled): `#dlg-provider-id` value = the preset id, `#dlg-provider-label` value = the display name, the key input (password) in place.
+- `pick-custom-disclosure` the bottom `自定义端点` entry (contract handle role=button, copy `自定义端点`) -> expands the **existing** custom-gateway form — the existing handles all preserved: `#dlg-provider-id` / `#dlg-provider-label` / `#dlg-provider-baseurl` / the API-protocol segment (`[role="tab"]` + `aria-selected`) / `#dlg-provider-apikey` / the `添加模型` button (role=button, exact — `添加模型服务` contains it as a substring) / the `添加模型服务` submit button (role=button, scoped inside the dialog).
+- `pick-create-e2e` the create-chain regression guard (existing behavior, the A6 refactor must not break it): filling the form + a model row -> save -> `POST /api/teams/:id/providers` -> the dialog closes -> the envelope's providers-section fields all match + a SQLite `provider` table row (the models JSON contains the entered model).
 
 ## How to get to it (user POV)
 
-- 模型服务页（`/app/resources/providers`）topbar「+ 新建」。
-- pi tab 空态引导钮（providers-tabs.md `prov-pi-empty`）同样开到本 dialog。
-- 驱动(`vp.mjs list provider-picker` 列出全部 case 与 usage):
-  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive provider-picker picker-dialog`:「+ 新建」开 picker:搜索、OAuth 徽标、密钥表单;在 `providers-tabs runtime-tabs` 之后跑。
+- The model-services page (`/app/resources/providers`) topbar `+ 新建`.
+- The pi tab's empty-state guide button (providers-tabs.md `prov-pi-empty`) opens this same dialog.
+- Driving (`vp.mjs list provider-picker` lists all cases and usage):
+  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive provider-picker picker-dialog`: `+ 新建` opens the picker: search, OAuth badges, the key form; run after `providers-tabs runtime-tabs`.
 
 ## Driving it with verify-cairn
 
 Preconditions:
 
-1. `launch.mjs` 起隔离栈，`doctor.mjs` 全 PASS。无需 daemon。
-2. **后于 `drive-providers-tabs.mjs` 跑**——本 probe 的 e2e 会建 custom provider，破坏 tabs 的 pi 空态断言（全新库前置）。重验 = 重 launch。
+1. `launch.mjs` brings the isolated stack up, `doctor.mjs` fully PASS. No daemon needed.
+2. **Run after `drive-providers-tabs.mjs`** — this probe's e2e creates a custom provider, breaking the tabs probe's pi empty-state assertion (the fresh-DB precondition). Re-verification = relaunch.
 
-- **picker 全链。** **跑法：** `node <skill>/scripts/drive-provider-picker.mjs`（自足）——17 checks：页面就绪 → 页面无 preset 投喂负向 → 「新建」开 dialog → 搜索框在位 → preset 行 38 项 → 显示名 canon 等值命中（缺项列名）→ OAuth 徽标仅 github-copilot + codex 未接线注记/禁用 + xai 负向 → 搜索过滤三腿（qwen→3 / 无命中→0 / 清空→38）→ 点 DeepSeek 行进密钥表单 → X 关窗 → 重看点 xai 行验 oauthLabel → 关窗重开 → 「自定义端点」入口 → disclosure 展开现有表单三句柄 → 填表（含模型行）保存关窗 → GET 封套 providers 段字段全对 → SQLite provider 行 + models JSON。
-- **真值。** `GET /api/teams/:id/providers` 封套（providers 段：providerId/label/baseUrl/models）+ SQLite `provider` 表行（`SELECT ... FROM provider WHERE providerId=?`，models JSON parse 后含所填模型 id）。
-- **红态也产出回归证据**：创建链段（e2e 三 checks）在 disclosure 未落地时同样可达（现状表单外露直陈）——重构前跑 = 创建链绿的基线证据，重构后跑 = 重构没击穿创建链。
-- **验证状态（2026-09-29，#385）**：picker 已落地（#355/PR #380）。本 probe 随 #385 改钉——openai-codex 族表未接线：行无 OAuth 标签、禁用、「暂未开通」注记（canon `PRESET_NAMES['openai-codex']` 同步改）；其余 checks 不变。
+- **The picker full chain.** **How to run:** `node <skill>/scripts/drive-provider-picker.mjs` (self-sufficient) — 17 checks: page ready -> the page-has-no-preset-feeding negative -> `新建` opens the dialog -> the search box in place -> 38 preset rows -> the display-name canon equality hits (listing the missing on failure) -> the OAuth badge only on github-copilot + the codex unwired note/disabled + the xai negative -> the search-filter three legs (qwen -> 3 / no hit -> 0 / cleared -> 38) -> click DeepSeek entering the key form -> X closes the window -> reopen and click the xai row to verify the oauthLabel -> close and reopen -> the `自定义端点` entry -> the disclosure expands the existing form with three handles -> fill the form (including a model row), save, the dialog closes -> the GET envelope's providers-section fields all match -> the SQLite provider row + the models JSON.
+- **Truth.** The `GET /api/teams/:id/providers` envelope (the providers section: providerId/label/baseUrl/models) + the SQLite `provider` table row (`SELECT ... FROM provider WHERE providerId=?`, the models JSON parsed contains the entered model id).
+- **The red state also produces regression evidence**: the create-chain segment (the three e2e checks) is reachable even before the disclosure lands (the current form is exposed directly) — running it before the refactor = the create-chain-green baseline evidence, running it after = the refactor did not break the create chain.
+- **Verification state (2026-09-29, #385)**: the picker has landed (#355/PR #380). This probe re-pins with #385 — the openai-codex family table not wired: the row has no OAuth label, is disabled, with a `暂未开通` note (the canon `PRESET_NAMES['openai-codex']` updated in sync); the other checks are unchanged.
 
 ## Gotchas
 
-- **OAuth 点击链不在本 probe**：authorize → 外网重定向 → 302 着陆（?oauth=connected|error&reason=…）需真外网 + 真订阅，属 #231/#243 e2e 面；probe 内不发外部请求，只钉徽标/未接线注记文本与 xai oauthLabel 的密钥表单展示（皆纯 UI 文案）。
-- 38 项显示名含大小写/空格细节（`MiniMax CN`、`Z.AI`、`OpenCode Zen` vs `OpenCode Go`、`Kimi For Coding`）——`PRESET_NAMES` 是 spec 11 名单逐字转录，文案变更先改 spec 再改脚本（脚本自带 38 项数守卫）。
-- 搜索过滤是客户端行为（A6）：断言可见行数用 `:visible` 口径，实现无论 DOM 移除还是隐藏皆过。
-- 密钥表单断言用可观测真值（预填的 input 值 + password 输入在位），不钉未定的类名——`data-preset-id` 是唯一契约句柄。（先行期曾按「preset 名文本 + 自定义表单隐藏」的假想形态断言，#380 落地为表单复用 + 预填后该形态不成立，#385 校正。）
-- dialog 重构后族律不变（#68：X/Esc/backdrop 关；状态在重开边沿重置）——`keyform-closes` 是这条律的哨兵 check。
-- **#944 载体迁移**：类名钩 → 语义/data-* 载体（断言语义不变）——原 `.res-new` → role=button「新建」exact / `[data-testid="resource-new"]`、`.dlg-picker-search` → `input[aria-label="搜索服务商..."]`、`.dlg-picker-row` → `[data-preset-id]`、`.dlg-picker-custom` / `.dlg-provider-create` / `.dlg-provider-model-add` → role=button+文案（「自定义端点」/「添加模型服务」/「添加模型」exact）、`.dlg-provider-note` → 行内「暂未开通」文案；`#dlg-provider-*` id 载体不变；#952 起壳级 dlg 系类名（dlg / dlg-title / dlg-close）不再输出，spec/22 §5.5——壳句柄 = `[role="dialog"]`（可及名 = title）、关窗钮 = `button[aria-label="关闭"]`、结构盒 = `dialog-head/-body/-foot` testid。
-- preset 数据层（shared 38 项常量 + OAuth 授权链）A5 全留——probe 红的是**页面形态**，不是数据缺失；`GET providers` 封套 presets 段现在就有 38 项。
+- **The OAuth click chain is not in this probe**: authorize -> external redirect -> the 302 landing (?oauth=connected|error&reason=…) needs the real external network + a real subscription, belonging to the #231/#243 e2e surface; the probe makes no external requests, it only pins the badge / unwired note text and the xai oauthLabel's key-form display (all pure UI copy).
+- The 38 display names carry case/space details (`MiniMax CN`, `Z.AI`, `OpenCode Zen` vs `OpenCode Go`, `Kimi For Coding`) — `PRESET_NAMES` is the spec 11 list's verbatim transcription, a copy change goes through the spec first and then the script (the script carries its own 38-item count guard).
+- The search filtering is a client-side behavior (A6): assert the visible row counts with the `:visible` criterion, so the implementation passes whether it removes or hides DOM nodes.
+- The key-form assertions use observable truth (the prefilled input values + the password input in place), not undecided class names — `data-preset-id` is the only contract handle. (During the advance phase the assertions were written against an imagined "preset-name text + hidden custom form" shape; #380 landed as form reuse + prefill, after which that shape does not hold, corrected by #385.)
+- The dialog family rules are unchanged after the refactor (#68: X/Esc/backdrop close; the state resets on the reopen edge) — `keyform-closes` is the sentinel check of this rule.
+- **#944 carrier migration**: class-name hooks -> semantic/data-* carriers (assertion semantics unchanged) — the original `.res-new` -> role=button `新建` exact / `[data-testid="resource-new"]`, `.dlg-picker-search` -> `input[aria-label="搜索服务商..."]`, `.dlg-picker-row` -> `[data-preset-id]`, `.dlg-picker-custom` / `.dlg-provider-create` / `.dlg-provider-model-add` -> role=button + copy (`自定义端点` / `添加模型服务` / `添加模型` exact), `.dlg-provider-note` -> the in-row `暂未开通` copy; the `#dlg-provider-*` id carriers are unchanged; since #952 the shell-level dlg-family class names (dlg / dlg-title / dlg-close) are no longer emitted, spec/22 §5.5 — the shell handles = `[role="dialog"]` (accessible name = title), the close button = `button[aria-label="关闭"]`, the structural boxes = `dialog-head/-body/-foot` testids.
+- The preset data layer (the shared 38-item constant + the OAuth authorization chain) stays in full per A5 — what the probe reds is the **page form**, not missing data; the `GET providers` envelope's presets section already has the 38 items.

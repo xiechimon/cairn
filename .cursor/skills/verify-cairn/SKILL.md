@@ -27,8 +27,8 @@ Journey ids, optional: `board`, `create-task`, `dispatch`, `view-diff`, `request
 The script records facts. These calls are yours:
 
 - Console errors and failed requests are listed, not classified. A Vite transform miss, a favicon 404, or an aborted navigation is not a product failure. A failed `/api/` call during a journey is, unless that journey's expected outcome is the rejection.
-- Dispatch: the toast and the chief thread are the handoff. The card remaining in 待开始 with no daemon is the stack boundary, not a failed dispatch. A 409 on `POST /api/todos/:id/orchestrate` that says the chief agent is not bound is a seed miss: the button fired, the bind in the map did not.
-- Merge: the toast 已发起合并 means the server accepted the request. The phase staying `review` until a machine runs the merge step is that same boundary, not a failed merge.
+- Dispatch: the toast and the chief thread are the handoff. The card remaining in `待开始` with no daemon is the stack boundary, not a failed dispatch. A 409 on `POST /api/todos/:id/orchestrate` that says the chief agent is not bound is a seed miss: the button fired, the bind in the map did not.
+- Merge: the toast `已发起合并` means the server accepted the request. The phase staying `review` until a machine runs the merge step is that same boundary, not a failed merge.
 - A DOM check can pass while the screenshot shows the wrong pane, an empty diff, or a disabled button. Trust the screenshot, name the stale check, and do not edit the map to make a red run look green.
 - Seeded review tasks are a precondition. Create task and dispatch are clicks. A curl is not evidence that the journey worked.
 - Use a `drive-*.mjs` probe when the ticket names that probe. Do not re-derive it by hand.

@@ -1,33 +1,3 @@
-// verify-cairn 定制 probe（#1210 C 兜底）：local 形态项目的仓路径在执行机
-// 不可达时，步在 clone/fetch 之前显式失败——errorMessage 点名机器/路径/原因/
-// 补法（不再是裸 git clone 错误 + 重试退避），仓库所在机上行为零漂移。
-// 纯 HTTP + fs + SQLite + daemon.log + 浏览器详情页真用户路径；自 spawn
-// stub LLM + 单 daemon 并自回收。
-//
-// 「他机不可达」的模拟口径：单机上把仓目录 mv 走——existsSync 视角与
-// 「repo 在另一台机器上」不可分（daemon 只看本机文件系统），与 #1213 probe
-// 的 PATCH → 不存在路径同族手法。
-//
-// 票面验收 seam 对照：
-//   fail-loud  腿 A：mv 走仓目录 → build 步失败；SQLite build.errorMessage =
-//            合成文案（机器名/路径/「路径不存在」/两条补法）；daemon.log 无
-//            `Cloning` 行（clone 未尝试 = fail-fast，不烧 withGitNetRetries
-//            的 1s+5s 退避）；详情页失败卡显示文案（截图）。
-//   回归      腿 B：mv 回仓目录 → 新 build 步照常材料化（`Cloning <路径>` +
-//            `Worktree added` 日志行、基座/conv worktree git 实物在位、
-//            README 内容对）；步终态若 failed 也只属 stub 零改动产物闸，
-//            errorMessage 不含不可达文案。
-//   凭据面    local 形态凭证恒 null；errorMessage 与 daemon.log 断言不含
-//            token/password 字样。
-//
-// 用法（配方 = docs/verify/1210/README.md）：
-//   先 launch.mjs 起栈，再 node drive-1210-local-unreachable.mjs [--expect=new|old]
-//   --expect=old（缺省 new）：断言反转成基线形——腿 A 期望裸 git clone 错误
-//   （`does not exist`）且 daemon.log 有 `Cloning` 行（clone 尝试 + 重试退避
-//   = 旧行为指纹）；打在 origin/main 一次性 worktree 栈上取 before 证据
-//   （VERIFY_REPO_ROOT 指向 before 树 = daemon 用旧代码，#1035 配方）。
-// env：SERVER（缺省读 VERIFY_RUN_DIR/ports.json）、VERIFY_RUN_DIR、
-//      VERIFY_EVIDENCE_DIR、VERIFY_REPO_ROOT。
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
@@ -80,10 +50,6 @@ async function jfetch(method, path, opts = {}) {
   return { status: res.status, body };
 }
 
-// —— stub LLM（drive-1213 同款最小形）：纯文本应答。腿 A 的步死在 prepare
-//    （会话之前），stub 只服务腿 B 的会话轮；零改动 → 产物闸 failed 收尾
-//    属预期（材料化 seam 在会话之前，验收面 = 材料化实物 + 文案区分）。
-
 function startStubLlm() {
   const server = createServer((req, res) => {
     if (req.method !== 'POST' || !req.url?.endsWith('/chat/completions')) {
@@ -117,7 +83,6 @@ function git(args, cwd) {
   return { code: r.status, out: (r.stdout ?? '').trim(), err: (r.stderr ?? '').trim() };
 }
 
-/** local 形态种子仓：非 bare 工作树仓、main、单提交 README。 */
 function seedLocalRepo() {
   const dir = join(mkdtempSync(join(tmpdir(), 'cairn-1210-repo-')), 'repo');
   const init = git(['init', '-b', 'main', dir]);
@@ -132,8 +97,6 @@ function seedLocalRepo() {
   if (commit.status !== 0) throw new Error(`git commit failed: ${commit.stderr}`);
   return dir;
 }
-
-// —— daemon spawn（drive-1213 同形：--server 显式进命令行 = cleanup 钉选面）——
 
 function spawnDaemon(apiKey, teamId) {
   const env = { ...process.env };
@@ -164,9 +127,6 @@ function openDb() {
   return new Database(DB, { readonly: true });
 }
 
-/** 步终态轮询（#920 gotcha：step 表无 errorMessage 列，根因落 build.errorMessage；
- * build 表也无 status 列——终态判据 = 该 build 的任一 step 行入 done/failed/stopped）。
- * 返回 {stepStatus, errorMessage, elapsedMs(探针墙钟)}。 */
 async function waitBuildTerminal(buildId, timeoutMs = 180_000) {
   const started = Date.now();
   for (;;) {
@@ -201,8 +161,6 @@ async function waitFor(pred, timeoutMs, label) {
   }
 }
 
-// —— main —————————————————————————————————————————————————————————————
-
 let stubHandle = null;
 let daemon = null;
 let browser = null;
@@ -212,7 +170,6 @@ try {
   stubHandle = await startStubLlm();
   const stubUrl = `http://127.0.0.1:${stubHandle.port}/v1`;
 
-  // seed：team / provider / agent / api-key。
   const teams = await jfetch('GET', '/api/teams');
   const teamId = teams.body[0]?.id ?? teams.body.teams?.[0]?.id;
   if (!teamId) throw new Error(`no team: ${JSON.stringify(teams.body).slice(0, 200)}`);
@@ -251,8 +208,6 @@ try {
   const apiKey = keyRes.body?.plaintext ?? keyRes.body?.key;
   if (!apiKey) throw new Error(`api-key create failed: ${keyRes.status}`);
 
-  // —— local 项目创建（路径此刻在位，server 创建闸过）。
-
   const projRes = await jfetch('POST', '/api/projects', {
     body: { name: `probe-1210-${Date.now()}`, teamId, kind: 'local', localPath: repoDir },
   });
@@ -267,8 +222,6 @@ try {
 
   daemon = spawnDaemon(apiKey, teamId);
   await waitFor(() => daemonLogLines().some((l) => l.includes('[wake] push channel connected')), 90_000, 'daemon online');
-
-  // —— 腿 A：mv 走仓目录（模拟「repo 在另一台机器上」）→ 步显式失败。
 
   renameSync(repoDir, repoGone);
   const buildA = await jfetch('POST', `/api/projects/${projectId}/builds`, {
@@ -298,8 +251,7 @@ try {
       `elapsed=${elapsedA}ms`,
     );
   } else {
-    // 基线形（origin/main 栈）：裸 git clone 错误直透 + clone 尝试痕迹 +
-    // withGitNetRetries 退避（elapsed 信息位，新行为下无此三项）。
+
     check('腿 A(old)：errorMessage = 裸 git 错误（fatal/does not exist）', /fatal|does not exist/i.test(msgA), msgA.slice(0, 160));
     check('腿 A(old)：errorMessage 无合成文案', !msgA.includes('无法在机器'));
     check('腿 A(old)：daemon.log 有 Cloning 行（clone 被尝试）', linesA.some((l) => l.includes('Cloning')), `elapsed=${elapsedA}ms`);
@@ -313,7 +265,6 @@ try {
   save('leg-a-todo-record.json', todoRecA.body);
   check('腿 A：REST todo record phase=failed（API 真值）', todoRecA.body?.phase === 'failed', `phase=${todoRecA.body?.phase}`);
 
-  // 详情页真用户路径：失败文案可见（截图证据）。
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
   await page.goto(`http://127.0.0.1:${stack.webPort}/app/todo/${todoId}`, { waitUntil: 'networkidle' });
@@ -325,8 +276,6 @@ try {
     check('腿 A(old)：详情页可见裸 git 错误', /fatal|does not exist/i.test(bodyText) || bodyText.includes(repoDir));
   }
   await page.screenshot({ path: join(EVIDENCE, 'leg-a-detail-failed.png'), fullPage: true });
-
-  // —— 腿 B：mv 回仓目录（仓库所在机形态）→ 材料化照常，行为零漂移。
 
   renameSync(repoGone, repoDir);
   const buildB = await jfetch('POST', `/api/projects/${projectId}/builds`, {

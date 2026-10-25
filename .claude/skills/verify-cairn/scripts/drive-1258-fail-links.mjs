@@ -1,18 +1,3 @@
-// verify-cairn probe（#1258 失败行「查看原始错误」可点化——live 栈真用户
-// 路径）：机器 wire 把一个 todo 推到 failed（done(failed) → applyStepFailure
-// → build.errorMessage + todo failed，落账单源 machines.ts 失败漏斗），然后
-// 浏览器腿在详情页真点「查看原始错误」，钉三件事——
-//   1) 弹窗（dialog 族 DialogShell，可及名「原始错误」）打开且正文 =
-//      build.errorMessage 全文（逐字节，多行 + 超长文本不截断）；
-//   2) 排查指南不再渲染（无文档落点死链出账，#136「查看文档」wontfix 同律）；
-//   3) X 关闭收层（#68 家族三路关闭律的 X 路）。
-// 真值三面：HTTP API JSON（todo phase + build errorMessage）+ SQLite 行
-// （build.errorMessage）+ 截图（行形态 / 弹窗开态）。零 daemon 零 LLM——机器
-// 面由本探针扮演（与 daemon 同端点），用户面全部真点击。
-//
-// 前置：launch.mjs 起栈。用法：
-//   VERIFY_REPO_ROOT=<worktree> [VERIFY_EVIDENCE_DIR=…] node drive-1258-fail-links.mjs
-
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -63,10 +48,6 @@ async function jpost(path, body, token, method = 'POST') {
   return { status: res.status, body: parsed };
 }
 
-// #1258 全文判据用的错误文本：多行 + ~1.1k 字（daemon 侧 errorMessage 封顶
-// 2000 字，取一档真实量级）+ 首尾 marker 钉「逐字不截断」。词面避开
-// classifyStepFailure 的 quota/capacity/network 桶（402/429/529、quota、
-// rate limit、连接失败等）——落 other 桶走失败漏斗（quota 桶会挂起不判死）。
 const ERR_HEAD = '构建失败：远程 shell 预检拒绝（verify-1258 探针假错误）';
 const ERR_TAIL = '[1258-probe] 尾部 marker——完整文本必须逐字出现在「原始错误」弹窗里，一个字都不能少。';
 const LONG_ERROR = [
@@ -91,8 +72,6 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 
-  // —— seed：team（launch 自带）/ provider / 机器 / agent（#1259 起创建必带
-  // machineId——先 enroll 再建 agent）/ hosted project ——
   const teams = await jget('/api/teams');
   const teamId = teams.body?.[0]?.id;
   const prov = await jpost(`/api/teams/${teamId}/providers`, {
@@ -136,7 +115,6 @@ try {
   const projectId = project.body?.id;
   if (!projectId) throw new Error(`project: ${JSON.stringify(project.body)}`);
 
-  // —— 一个 todo：build（withPlan）→ 机器 claim plan 步 → done(failed) ——
   const todo = await jpost(`/api/projects/${projectId}/todos`, {
     title: '1258 失败行探针（查看原始错误）',
     spec: '探针任务：plan 步直接报失败， errorMessage 上 build',
@@ -160,7 +138,6 @@ try {
   );
   if (done.status !== 200) throw new Error(`done ${done.status}`);
 
-  // —— 真值 1：HTTP API（todo failed + build.errorMessage 逐字节）——
   const todoRow = await jget(`/api/todos/${todoId}`);
   check('wire: todo phase = failed', todoRow.body?.phase === 'failed', `phase=${todoRow.body?.phase}`);
   const buildRow = await jget(`/api/builds/${buildId}`);
@@ -170,7 +147,6 @@ try {
     `len=${buildRow.body?.errorMessage?.length ?? 'n/a'} (期望 ${LONG_ERROR.length})`,
   );
 
-  // —— 真值 2：SQLite 行（build 表 errorMessage）——
   const db = new Database(DB_PATH, { readonly: true });
   const row = db
     .prepare('SELECT "errorMessage" FROM build WHERE id = ?')
@@ -182,7 +158,6 @@ try {
     `len=${row?.errorMessage?.length ?? 'n/a'}`,
   );
 
-  // —— 浏览器腿：详情页真点「查看原始错误」——
   await page.goto(`${WEB}/app/todo/${todoId}`);
   const failTitle = page.locator('.chat-para--fail');
   await failTitle.waitFor({ state: 'visible', timeout: 15000 });

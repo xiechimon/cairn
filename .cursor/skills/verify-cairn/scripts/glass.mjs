@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Control Glass CLI. One command: scratch CAIRN_HOME, Hono + Vite on the
-// verify ports, Playwright along the journeys in features/glass-journeys.md,
-// result.json plus screenshots. Launch and cleanup stay in the encyclopedia
-// scripts. This file only hardcodes the steps.
 
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -357,7 +353,7 @@ try {
       try {
         ctx.row.screenshots.push(await shot(`fail-${id}.png`));
       } catch {
-        /* page may already be closed */
+
       }
       ctx.check(false, message);
     }

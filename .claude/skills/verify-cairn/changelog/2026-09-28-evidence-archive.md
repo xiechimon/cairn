@@ -1,5 +1,5 @@
-# 2026-09-28 · 证据归档纪律 + M7 闭环维护
+# 2026-09-28 · Evidence archive discipline + M7 closure maintenance
 
 ## skill
 
-证据归档纪律(证据默认落主仓 + archive.mjs 归档进 docs/verify/<ticket>/ + 硬规则「无归档路径的 verify 声明视为未验证」)+ M7 功能闭环维护(feature map 补 6 条 + drive-stop.mjs 修 #318 + stub-llm-verify.mjs 修 Node ≥v20 close bug)。
+Evidence archive discipline (evidence lands in the main checkout by default + archive.mjs archives into docs/verify/<ticket>/ + hard rule "a verify claim without an archive path counts as unverified") + M7 feature-closure maintenance (feature map gains 6 entries + drive-stop.mjs fixes #318 + stub-llm-verify.mjs fixes the Node >= v20 close bug).

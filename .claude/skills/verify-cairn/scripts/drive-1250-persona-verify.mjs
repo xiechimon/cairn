@@ -1,27 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1250-persona-verify — 角色名册 + verify 步 + 三视角
-// fan-out + split_todo（#1250，ADR 0018 层 1/层 2）live 闭环。
-//
-// 四相位（失败方式先于断言固化）：
-//   S 播种：全新库首启 → 六员 persona agent 自动落库（persona 位 + 档位 +
-//     契约名）；REST PATCH 模型位（机器 claim 闸：Agent 在但无模型位 = 不可
-//     领）。#1259 未落地 → 无归属机字段，前向兼容。
-//   V 验证步：chief relay run_builds 四槽指派 → build 步成（非 PR 分支）→
-//     review 关口抵达 + verify 步入队（agent 走 verify 槽）→ claim（new
-//     session + 材料：证据目录/输出契约）→ done 带 verifyVerdict →
-//     VERIFY_VERDICT 消息行 + phase 留 review。浏览器面：验证中 chip 截图 +
-//     verdict 行三态截图。
-//   F fan-out：浏览器真点击（AI 审核 → 三视角勾选 → 开始）→ 无 agentId 的
-//     steps review 动作 → 三条 review 步各挂 persona agent（meta header +
-//     本视角重点）→ 逐条 claim/done（非 blocking findings）→ 三份 verdict
-//     消息、零重规划步。
-//   P 拆解：chief relay split_todo → 子卡 + 依赖边 + 父方案文档 + 父停
-//     confirm → confirm 派发无阻塞子卡 → 子卡 build→review→merge→done →
-//     波次推进（B 自动派发）→ 全 done 父自动收 + DONE_ANNOUNCEMENT。
-//
-// 铺底全走公开 REST（drive-903 铺底律）；假机器 wire（claim/relay/done）零
-// daemon 零 LLM。依赖全新库：重验 = 重 launch。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-1250-persona-verify.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -101,7 +78,6 @@ function dbRead(fn) {
   }
 }
 
-// —— 铺底（全 REST，非被测路径）—————————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -134,7 +110,6 @@ const enroll = await sendJson(
 const machineToken = enroll.body?.token ?? enroll.body?.machine?.token;
 if (enroll.status !== 200 || !machineToken) throw new Error('enroll → ' + enroll.status);
 
-// —— 假机器 wire（drive-903 同律，零 daemon 零 LLM）—————————————
 async function claimOnce(tag) {
   const claim = await sendJson(SERVER + '/api/machine/tasks/claim', {}, 'POST', machineToken);
   const payload = claim.body?.step;
@@ -142,9 +117,7 @@ async function claimOnce(tag) {
   if (!claimed?.id) throw new Error(tag + ' claim 空手：' + JSON.stringify(claim.body).slice(0, 200));
   return { stepId: claimed.id, claimed, payload };
 }
-// run_builds 派工即自动 watch（r5 §3.5）→ 相位一变 chief gate 回合步就插进
-// 队列。认领要的是特定 kind 的 worker 步：中途领到 gate 回合就收掉它（空回
-// 合 done success，同 drive-903 chief 收尾形）再领，直到目标 kind 出现。
+
 async function claimUntil(tag, kind) {
   for (let i = 0; i < 8; i++) {
     const claim = await claimOnce(tag);
@@ -181,7 +154,7 @@ function todoRow(todoId) {
   return dbRead((db) => db.prepare('SELECT * FROM todo WHERE id = ?').get(todoId));
 }
 function assignmentOf(todoId) {
-  // assignment 列是 drizzle json 列——better-sqlite3 裸读给字符串，先 parse。
+
   return JSON.parse(todoRow(todoId).assignment ?? '{}');
 }
 function stepsOf(buildId) {
@@ -190,23 +163,20 @@ function stepsOf(buildId) {
   );
 }
 function messagesOf(buildId) {
-  // message 表无 buildId 列——conversationId ≡ buildId（CONTEXT.md 实体等式）。
+
   return dbRead((db) =>
     db
       .prepare('SELECT * FROM message WHERE "conversationId" = ? ORDER BY "createdAt"')
       .all(buildId)
       .map((m) => {
         let c = JSON.parse(m.content);
-        // drizzle json 列存「字符串值」时带引号再包一层（#902 坑）：system
-        // verdict 行是 JSON 串的 JSON 串——首解得 '{' 开头的字符串再解一次；
-        // 纯文本宣告行首解即终值。
+
         if (typeof c === 'string' && c.startsWith('{')) c = JSON.parse(c);
         return { ...m, content: c };
       }),
   );
 }
 
-// ============ S 播种相位 =====================================================
 const members = await getJson(SERVER + '/api/teams/' + teamId + '/members');
 const personaRows = members.filter((m) => m.memberType === 'agent' && m.actor?.persona);
 const byRole = Object.fromEntries(personaRows.map((m) => [m.actor.persona, m]));
@@ -229,8 +199,6 @@ check(
   'roles=' + JSON.stringify(Object.keys(byRole)),
 );
 
-// 模型位补齐（Agent 设置面同字段；claim 闸：无模型位 = 不可领）。Implementer
-// 额外补「合并分支」权限（默认仅 推送分支；子卡 merge 闸需要两开关）。
 for (const [role] of EXPECT_ROLES) {
   const agentId = byRole[role].actorId;
   const tools =
@@ -269,8 +237,6 @@ await saveJson('seeding-personas.json', {
   })),
 });
 
-// 总管绑定（Chief 是既有 chief 机制，不在六员名册——ADR 0018 决策 0）：
-// 独立第七员 + PATCH chief 绑定（drive-903 同律；未绑定 chief threads 409）。
 const chiefAgent = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
   displayName: '验证总管 1250',
   provider: 'stub-gw',
@@ -287,7 +253,6 @@ const bind = await sendJson(
 if (bind.status !== 200)
   throw new Error('chief bind → ' + bind.status + ' ' + JSON.stringify(bind.body));
 
-// ============ V 验证步相位（todo V）==========================================
 const proj = await sendJson(SERVER + '/api/projects', { name: 'probe-1250' });
 const projectId = proj.body?.id ?? proj.body?.project?.id;
 if (!projectId) throw new Error('project 无 id：' + JSON.stringify(proj.body));
@@ -327,7 +292,7 @@ const ASSIGNMENT4 = {
   verify: { agentId: AGENTS.verifier },
 };
 const chiefV = await chiefDispatch(TASK_V, '验证步探针');
-// 词表实物：split_todo 工具定义随 chief claim 载荷下发（organize 族）。
+
 const splitDef = (chiefV.payload.remoteTools ?? []).find((t) => t.name === 'split_todo');
 check(
   'V0 claim 载荷 remoteTools 含 split_todo 定义（todoId + subtodos[].blockedBy 参数面）',
@@ -382,7 +347,6 @@ await saveJson('verify-step.json', {
   todoPhase: todoRow(TASK_V).phase,
 });
 
-// 浏览器面：验证步 pending → chip「验证中」。
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 await page.route('**/api.dicebear.com/**', (route) =>
@@ -393,8 +357,7 @@ await page.route('**/api.dicebear.com/**', (route) =>
 );
 await page.goto(WEB + '/app/todo/' + TASK_V);
 await page.locator('[data-testid="detail-title"]').waitFor({ state: 'visible', timeout: 10_000 });
-// chip 文案与相位解耦（dhead）：verifyActive 优先于审核中——StatusChip 的
-// 精确文本「验证中」即判据（无专用 testid，文案一级钉）。
+
 let verifyChipOk = false;
 try {
   await page.getByText('验证中', { exact: true }).first().waitFor({ timeout: 8000 });
@@ -406,8 +369,7 @@ check('V4 浏览器：verify 步 pending → 头带 chip「验证中」（优先
 await shot(page, '01-detail-verify-active.png');
 
 const verifyClaim = await claimUntil('V-verify', 'verify');
-// 材料载体 = claim 载荷 instruction（machines.ts：worker 步 prompt 拼 instruction
-// 下发，step 记录本体不带 prompt）。
+
 const verifyPrompt = verifyClaim.payload.instruction ?? '';
 const headLine = verifyPrompt.split('\n')[0] ?? '';
 check(
@@ -446,11 +408,10 @@ const evidenceCount = await page.getByTestId('verify-evidence').count();
 check('V7 浏览器：verdict 行「验证未通过」+ 证据条目 2 条渲染', evidenceCount === 2, 'evidence=' + evidenceCount);
 await shot(page, '02-detail-verify-verdict.png');
 
-// ============ F fan-out 相位（todo F，浏览器真点击）==========================
 const chiefF = await chiefDispatch(TASK_F, 'fan-out 探针');
 const relayF = await relayTool(chiefF.stepId, 'run_builds', {
   todoIds: [TASK_F],
-  // fan-out 腿故意只给 plan/build（review/verify 槽空 → 无 verify 步、无槽回落）。
+
   assignment: { plan: { agentId: AGENTS.planner }, build: { agentId: AGENTS.implementer } },
   withPlan: false,
   dispatchReason: '#1250 fan-out 探针',
@@ -466,7 +427,6 @@ check(
   'steps=' + JSON.stringify(stepsOf(buildF).map((s) => s.kind)),
 );
 
-// 浏览器真点击：AI 审核 → 勾选三视角 → 开始（无 agentId 提交）。
 await page.goto(WEB + '/app/todo/' + TASK_F);
 await page.locator('.composer-tool[aria-label="AI 审核"]').waitFor({ state: 'visible', timeout: 10_000 });
 await page.locator('.composer-tool[aria-label="AI 审核"]').click();
@@ -474,8 +434,7 @@ await page.locator('[role="dialog"][aria-label="AI 审核"]').waitFor({ state: '
 const fanoutRow = page.getByTestId('review-fanout-toggle');
 check('F2 浏览器：review 弹层出现「三视角并行审」行（persona 命中点亮）', (await fanoutRow.count()) === 1);
 await shot(page, '03-review-dialog-fanout.png');
-// registry Checkbox 原语藏了 native input（Base UI Root），勾选改点行——
-// label 包裹整行，点行即翻勾。
+
 await fanoutRow.click();
 await page
   .locator('[role="dialog"][aria-label="AI 审核"]')
@@ -546,7 +505,6 @@ await page.goto(WEB + '/app/todo/' + TASK_F);
 await page.getByText('非阻塞建议一条。', { exact: false }).first().waitFor({ timeout: 10_000 });
 await shot(page, '04-detail-fanout-verdicts.png');
 
-// ============ P 拆解相位（todo P）============================================
 const chiefP = await chiefDispatch(TASK_P, '拆解探针');
 const split = await relayTool(chiefP.stepId, 'split_todo', {
   todoId: TASK_P,

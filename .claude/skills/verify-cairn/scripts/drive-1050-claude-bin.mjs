@@ -1,22 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn 定制 probe（#1050 claude 二进制事实源）：机制实物取证。
-//
-// 声称面：daemon 探测本机 claude 二进制（PATH 解析 + `claude --version`）与
-// 凭据态，随 enroll/presence 上报；server 透传；providers 页把它呈现成
-// 「细字行 + 未登录角标」。三条腿各钉一个方向：
-//
-//   A 装了（PATH 前置 stub claude：--version 报 9.9.9-probe、auth status 报
-//     logged-in）→ ① daemon.log `claude binary: <path> (9.9.9-probe)`；
-//     ② machine 行 claudeCodeReport.bin/.auth 实测值；③ model-sources 段带
-//     bin/auth；④ 页面细字行报版本与路径、data-auth=logged-in、无「未登录」。
-//   B 没装（同一台机器，CAIRN_CLAUDE_BIN 指不存在路径）→ bin **缺席**
-//     （不是空对象、不是「未知」），页面回「未安装」且无细字行——这是
-//     「配置文件在但二进制缺失」那一类假绿被消掉的负向。
-//
-// 前置：`node .claude/skills/verify-cairn/scripts/launch.mjs` 起隔离栈；
-// 本脚本自起 daemon（CAIRN_HOME 独立 scratch）并自回收。
-// env：VERIFY_REPO_ROOT / VERIFY_RUN_DIR / SERVER / WEB / DB /
-//      VERIFY_EVIDENCE_DIR / STUB_VERSION（缺省 9.9.9-probe）。
 
 import { spawn } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -82,7 +64,6 @@ function openDb() {
   return new Database(DB, { readonly: true });
 }
 
-/** machine 行读回（drizzle json 列原文带引号 → JSON.parse 后再比）。 */
 function machineRow(name) {
   const db = openDb();
   try {
@@ -100,7 +81,6 @@ function machineRow(name) {
   }
 }
 
-/** stub claude：--version 报定值、auth status 报已登录 JSON（其余子命令空答）。 */
 function writeStubBin(dir) {
   const p = join(dir, 'claude');
   writeFileSync(
@@ -156,25 +136,24 @@ function killDaemon(handle) {
     try {
       process.kill(-handle.child.pid, 'SIGTERM');
     } catch {
-      // 组已散：退化成单进程杀。
+
       try {
         handle.child.kill('SIGTERM');
       } catch {
-        // 已退出。
+
       }
     }
     setTimeout(() => {
       try {
         process.kill(-handle.child.pid, 'SIGKILL');
       } catch {
-        // 已退出。
+
       }
       resolveKill();
     }, 6_000);
   });
 }
 
-/** 轮询直到该机器的上报满足谓词（首拍 presence 即带，通常 1 轮内命中）。 */
 async function waitForReport(name, predicate, timeoutMs = 30_000) {
   const started = Date.now();
   let last = null;
@@ -198,8 +177,6 @@ if (!teamId) {
 }
 check('stack-ready', true, `teamId=${teamId}`);
 
-// 建 key 的 body = shared apiKeyRecordSchema（name 放宽可选）；明文只在
-// 创建响应里回一次（字段名 `plaintext`）。
 const keyRes = await jfetch('POST', `/api/teams/${teamId}/api-keys`, {
   body: {
     name: '1050-probe',
@@ -216,7 +193,6 @@ const stubDir = join(runsRoot, 'bin');
 mkdirSync(stubDir, { recursive: true });
 const stubPath = writeStubBin(stubDir);
 
-// 环回探针与 daemon 都必须绕开本机代理（代理拦 localhost 会造 502 假红）。
 const baseEnv = { ...process.env, NO_PROXY: 'localhost,127.0.0.1,::1', no_proxy: 'localhost,127.0.0.1,::1' };
 for (const k of ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']) {
   delete baseEnv[k];
@@ -228,7 +204,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, col
 let handleA = null;
 let handleB = null;
 try {
-  // —— 腿 A：装了（stub 在 PATH 前置）——
+
   handleA = spawnDaemon({
     home: join(runsRoot, 'home-a'),
     env: { apiKey, teamId, env: { ...baseEnv, PATH: `${stubDir}:${baseEnv.PATH}` } },
@@ -281,7 +257,6 @@ try {
   await killDaemon(handleA);
   handleA = null;
 
-  // —— 腿 B：没装（显式指一个不存在的二进制路径，settings.json 不动）——
   handleB = spawnDaemon({
     home: join(runsRoot, 'home-b'),
     env: {
@@ -322,8 +297,7 @@ try {
   const textB = await headB.innerText();
   save('page-b.txt', textB);
   await headB.screenshot({ path: join(EVIDENCE, '02-binary-missing.png') });
-  // 页面此刻**同时**有 settings.json（installed:true，本机真配置）与
-  // bin:null——旧行为在这里说「已安装在」，正是本票要消的假绿。
+
   check(
     'B4 页面回「未安装」（不再假报已安装）',
     textB.includes('未安装') && !textB.includes('已安装在'),

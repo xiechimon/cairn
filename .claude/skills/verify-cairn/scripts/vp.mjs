@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn 单一入口(#1402)。功能 → case → 脚本的对应关系登记在
-// ../vp-registry.json,drive 按表分发;launch / doctor / cleanup 转给同名脚本。
-// 证据交付分两步:archive 只拷贝(docs/verify 只增不改,ADR 0015),links 在提交
-// 推送之后打印钉 SHA 的 raw 链。drive 与 capture 不往 docs/verify 里写。
-// 栈坐标、端口、证据目录取自环境变量:VERIFY_REPO_ROOT / VERIFY_RUN_DIR /
-// VERIFY_PORT / VERIFY_WEB_PORT / VERIFY_EVIDENCE_DIR。
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
@@ -25,9 +19,7 @@ import { chromium } from '@playwright/test';
 const SKILL_DIR = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPTS_DIR = join(SKILL_DIR, 'scripts');
 const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
-// Paths from the environment are made absolute against the caller's cwd before
-// anything runs: tsx cases run from a package directory, where a relative path
-// would point somewhere else than it does for doctor and archive. Empty = unset.
+
 for (const key of ['VERIFY_REPO_ROOT', 'VERIFY_RUN_DIR', 'VERIFY_EVIDENCE_DIR']) {
   if (process.env[key]) process.env[key] = resolve(process.env[key]);
   else delete process.env[key];
@@ -36,13 +28,11 @@ for (const key of ['VERIFY_PORT', 'VERIFY_WEB_PORT']) if (!process.env[key]) del
 const ROOT = process.env.VERIFY_REPO_ROOT ?? SCRIPT_ROOT;
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(ROOT, '.claude', 'verify-run');
 const MAIN_ROOT = mainCheckout(SCRIPT_ROOT);
-// Evidence goes to the main checkout, also when this vp.mjs sits in a worktree:
-// a worktree's evidence is deleted with it (#345, SKILL.md Evidence).
+
 const EVIDENCE_ROOT = join(MAIN_ROOT, '.claude', 'verify-evidence');
-// Drives on the stack in RUN_DIR since launch, one feature/case per line;
-// launch empties RUN_DIR, so a new stack starts without it.
+
 const DRIVES_FILE = join(RUN_DIR, 'vp-drives.txt');
-// Needs that make a case run only when asked with --force, and why.
+
 const FORCE_NEEDS = {
   'real-llm': 'spends model tokens',
   github: 'calls GitHub',
@@ -103,7 +93,6 @@ function firstLine(err) {
   return String(err.message ?? err).split('\n')[0];
 }
 
-// The stack doctor checks: ports.json in VERIFY_RUN_DIR; undefined before launch.
 function readStack() {
   const file = join(RUN_DIR, 'ports.json');
   if (!existsSync(file)) return undefined;
@@ -126,8 +115,6 @@ function mainCheckout(dir) {
   }
 }
 
-// The path with symlinks resolved as far as it exists, so a link into
-// docs/verify, or a temp dir behind a symlink, compares as the directory itself.
 function physical(path) {
   const rest = [];
   let head = resolve(path);
@@ -141,8 +128,6 @@ function physical(path) {
   return join(head, ...rest);
 }
 
-// Every worktree git lists for the repository dir is in (its main checkout and
-// dir's own toplevel among them); none when dir is in no repository.
 function worktrees(dir) {
   try {
     return execFileSync('git', ['-C', dir, 'worktree', 'list', '--porcelain'], {
@@ -157,11 +142,6 @@ function worktrees(dir) {
   }
 }
 
-// Committed evidence, add-only (ADR 0015): docs/verify of the repository vp.mjs
-// works on, of vp.mjs's own checkout, of the main checkout, and of every
-// worktree of the repositories the caller's cwd, VERIFY_REPO_ROOT and vp.mjs
-// sit in. archive adds to it; drive and capture never write into it. Computed
-// on first use, since it runs git.
 let committedEvidence;
 function committedRoots() {
   committedEvidence ??= [
@@ -174,8 +154,6 @@ function committedRoots() {
   return committedEvidence;
 }
 
-// An evidence directory inside committed evidence is refused before anything
-// runs: a probe writing there would rewrite archived files in place.
 function refuseCommitted(dir, what) {
   const path = physical(dir);
   const root = committedRoots().find((r) => path === r || path.startsWith(`${r}${sep}`));
@@ -191,14 +169,11 @@ function pad(n) {
   return String(n).padStart(2, '0');
 }
 
-// Local time, the stamp drive.mjs and the other probes use for their directories.
 function localStamp() {
   const d = new Date();
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
-// A directory nobody wrote to yet: base, else base-2, base-3, ... Two runs in
-// one second (or two lanes in the shared root) never share one.
 function freshDir(base) {
   mkdirSync(dirname(base), { recursive: true });
   for (let n = 1; ; n += 1) {
@@ -276,12 +251,11 @@ function driveCommand(argv) {
   }
   if (!Object.hasOwn(entry.cases, name)) fail(`unknown case ${feature}/${name}; cases: ${names.join(', ')}`);
   const c = entry.cases[name];
-  // Registry mistakes fail before doctor and before any directory exists.
+
   const script = resolve(SCRIPT_ROOT, c.script);
   if (!existsSync(script)) fail(`registered script is missing: ${c.script}`, 1);
   if (c.runner === 'tsx' && c.cwd === undefined) fail(`${feature}/${name} has runner tsx but no cwd in the registry`, 1);
-  // A probe that starts its own stack in RUN_DIR fails at its launch while a
-  // stack is up there; --force does not change that.
+
   const up = c.needs.includes('own-stack') ? readStack() : undefined;
   if (up !== undefined) {
     fail(
@@ -289,8 +263,7 @@ function driveCommand(argv) {
         `(server ${up.serverPort}, web ${up.webPort}); stop it with vp.mjs cleanup first.`,
     );
   }
-  // Every reason the case needs --force goes into one refusal, and --force
-  // prints the same list, so a --force is given knowing all it authorizes.
+
   const reasons = [];
   if (c.status !== 'current') reasons.push(`is ${c.status}${c.note ? `: ${c.note.replace(/\.+$/, '')}` : ''}`);
   for (const need of c.needs) if (need in FORCE_NEEDS) reasons.push(`needs ${need} (${FORCE_NEEDS[need]})`);
@@ -305,13 +278,12 @@ function driveCommand(argv) {
   if (reasons.length > 0 && !force) {
     fail(`${feature}/${name} runs only with --force:${forceList}\nRe-run with --force to drive it anyway; --force covers every line above.`);
   }
-  // Options alone do not satisfy a case whose usage names a required argument.
+
   if (c.needsArgs && !extra.some((a) => !a.startsWith('-'))) {
     fail(`${feature}/${name} needs arguments: ${c.usage}. Pass them after --.`);
   }
   if (c.usage && extra.length === 0) console.log(`vp: ${feature}/${name} usage: ${c.usage}`);
-  // The probe's output option takes its directory as the next argument (glass.mjs
-  // reads no '--out=<dir>'); refused here, before doctor or any directory.
+
   const evidence = c.evidence ?? {};
   const outAt = evidence.flag === undefined ? -1 : extra.indexOf(evidence.flag);
   if (
@@ -320,21 +292,15 @@ function driveCommand(argv) {
   ) {
     fail(`${evidence.flag} takes its directory as the next argument: -- ${evidence.flag} <dir>`);
   }
-  // Arguments after -- replace the default arguments they name (the same option
-  // before '=', or the same probe or journey name); the other defaults stay, so a
-  // post-fix --expect flag survives an unrelated option.
-  // The output directory is a value, so a directory named like the journey does
-  // not replace the journey.
+
   const keyOf = (a) => a.split('=')[0];
   const replaced = new Set(extra.filter((_, i) => outAt === -1 || i !== outAt + 1).map(keyOf));
   const args = [...c.args.filter((a) => !replaced.has(keyOf(a))), ...extra];
   const cwd = resolve(SCRIPT_ROOT, c.cwd ?? '.');
   const doctorFirst = c.needs.includes('stack');
-  // The probe reads the run directory doctor checks, also when its own default
-  // (its script's checkout) differs from VERIFY_REPO_ROOT's.
+
   process.env.VERIFY_RUN_DIR = RUN_DIR;
-  // The probe drives the stack doctor checks, not the 8791 / 5273 defaults
-  // the probes fall back to.
+
   const stack = doctorFirst ? readStack() : undefined;
   if (stack !== undefined) {
     for (const [key, port] of [
@@ -348,15 +314,9 @@ function driveCommand(argv) {
       process.env[key] = String(port);
     }
   }
-  // Every drive writes somewhere new unless told otherwise: several probes
-  // default their evidence into docs/verify/<their ticket>/ or into scripts/,
-  // which would rewrite committed evidence. A probe that writes fixed evidence
-  // by design gets no directory; one that takes an output option gets the
-  // directory through it, or uses the one given after --; one that reads
-  // another variable gets it there.
+
   const flagAt = args.indexOf(evidence.flag);
-  // A path given after -- is the caller's: made absolute against their cwd, not
-  // the probe's (node cases run from the repo root, tsx cases from a package).
+
   if (flagAt !== -1 && args[flagAt + 1] !== undefined) args[flagAt + 1] = resolve(args[flagAt + 1]);
   const given = flagAt === -1 ? undefined : args[flagAt + 1];
   if (given !== undefined) refuseCommitted(given, `${evidence.flag} ${given}`);
@@ -366,9 +326,9 @@ function driveCommand(argv) {
     given !== undefined || evidence.writes !== undefined
       ? undefined
       : (named ?? join(EVIDENCE_ROOT, `${localStamp()}-${feature}-${name}`));
-  // The probe's own output option carries the directory, in a dry run and a real one alike.
+
   const withEvidence = (dir) => (evidence.flag === undefined || dir === undefined ? args : [...args, evidence.flag, dir]);
-  // After the argument and port refusals above, so a refused run does not print it.
+
   if (reasons.length > 0) console.log(`vp: --force drives ${feature}/${name}:${forceList}`);
   if (dryRun) {
     console.log(`vp: dry-run ${feature}/${name}${doctorFirst ? ' (doctor first)' : ''}`);
@@ -388,10 +348,10 @@ function driveCommand(argv) {
     if (runNode(join(SCRIPTS_DIR, 'doctor.mjs'), []) !== 0) {
       fail('vp: doctor failed. Start the stack with `vp.mjs launch` (or fix what doctor reported) and retry.', 1);
     }
-    // Recorded before the probe runs: a probe that fails half way has changed the stack too.
+
     appendFileSync(DRIVES_FILE, `${feature}/${name}\n`);
   }
-  // After doctor: a failed doctor leaves no empty directory for --latest to pick.
+
   let run = args;
   if (evidence.writes !== undefined) {
     console.log(`vp: ${feature}/${name} writes its evidence itself: ${evidence.writes}`);
@@ -404,8 +364,7 @@ function driveCommand(argv) {
     run = withEvidence(dir);
     console.log(`vp: evidence ${dir}`);
   }
-  // tsx is a dependency of apps/server, apps/daemon and integration, not of the
-  // repo root, so a tsx case runs from the package its registry entry names.
+
   const runner = c.runner === 'tsx' ? `(cd ${c.cwd} && pnpm exec tsx)` : 'node';
   console.log(`vp: ${feature}/${name} -> ${runner} ${c.script} ${run.join(' ')}`.trimEnd());
   if (c.runner !== 'tsx') return runNode(script, run, cwd);
@@ -431,8 +390,7 @@ async function captureCommand(argv) {
   if (stack === undefined) fail('vp: no stack coordinates, run `vp.mjs launch` first', 1);
   const { webPort } = stack;
   const url = `http://127.0.0.1:${webPort}${path}`;
-  // Inside a drive's VERIFY_EVIDENCE_DIR, a subdirectory: the drive's result.json
-  // stays, and a second capture with the same label gets capture-<label>-2.
+
   const envDir = process.env.VERIFY_EVIDENCE_DIR;
   const dir = freshDir(envDir ? join(envDir, `capture-${label}`) : join(EVIDENCE_ROOT, `${localStamp()}-capture-${label}`));
 
@@ -441,8 +399,7 @@ async function captureCommand(argv) {
   let navigation = 'ok';
   let screenshot = `${label}.png`;
   let title = '';
-  // Whatever fails (no browser, no page, no screenshot of an error page) is
-  // recorded in result.json, not thrown past it.
+
   let browser;
   try {
     browser = await chromium.launch();
@@ -463,7 +420,7 @@ async function captureCommand(argv) {
     await page.screenshot({ path: join(dir, screenshot) });
     title = await page.title().catch(() => '');
   } catch (err) {
-    // The first failure is the one to read: a navigation error stays as it was.
+
     if (navigation === 'ok') navigation = firstLine(err);
     screenshot = null;
   } finally {
@@ -480,7 +437,7 @@ async function captureCommand(argv) {
 
 function newestEvidenceDirs(count) {
   if (!existsSync(EVIDENCE_ROOT)) fail(`no evidence yet: ${EVIDENCE_ROOT} does not exist`, 1);
-  // One stat per entry; an entry another lane removes meanwhile is skipped.
+
   const runs = [];
   for (const name of readdirSync(EVIDENCE_ROOT)) {
     const path = join(EVIDENCE_ROOT, name);
@@ -507,8 +464,7 @@ function archiveCommand(argv) {
   if (latestOption !== undefined && (from.length > 0 || envDir)) {
     fail(`--latest cannot be combined with --from or VERIFY_EVIDENCE_DIR; name one source\n${usage}`);
   }
-  // No implicit "newest run": the evidence root is shared by every lane on this
-  // machine, so the newest directory can be someone else's.
+
   if (from.length === 0 && !envDir && latestOption === undefined) {
     fail(`${usage}\nname the source: --from <dir>, VERIFY_EVIDENCE_DIR, or --latest <n> (other lanes' runs included)`);
   }
@@ -526,8 +482,7 @@ function archiveCommand(argv) {
   const twice = names.find((n, i) => names.indexOf(n) !== i);
   if (twice !== undefined) fail(`two sources share the directory name ${twice}; archive them in separate runs`, 1);
   for (const { src, dest } of plans) {
-    // Only the parent: Node 24's cpSync with errorOnExist throws EEXIST when the
-    // target directory itself already exists, even empty.
+
     mkdirSync(dirname(dest), { recursive: true });
     cpSync(src, dest, { recursive: true, errorOnExist: true, force: false });
     console.log(`vp: ${src} -> ${dest}`);
@@ -553,7 +508,7 @@ function linksCommand(argv) {
   const sha = git(['rev-parse', shaOption ?? 'HEAD']);
   const onRemote = git(['branch', '-r', '--contains', sha]);
   if (onRemote === '') console.warn(`vp: ${sha} is not on any remote branch yet; push before using these links`);
-  // -z: names come back verbatim (without it git quotes and escapes non-ASCII names).
+
   const files = git(['ls-tree', '-r', '-z', '--name-only', sha, '--', `docs/verify/${ticket}`]).split('\0').filter(Boolean);
   if (files.length === 0) fail(`no files under docs/verify/${ticket} at ${sha}; archive, commit and push first`, 1);
   const slug = repoSlug();
@@ -576,7 +531,7 @@ switch (command) {
     code = runNode(join(SCRIPTS_DIR, 'doctor.mjs'), argv);
     break;
   case 'cleanup':
-    // cleanup lists the newest runs under the evidence root drive writes to.
+
     process.env.VERIFY_EVIDENCE_DIR ??= EVIDENCE_ROOT;
     code = runNode(join(SCRIPTS_DIR, 'cleanup.mjs'), argv);
     break;

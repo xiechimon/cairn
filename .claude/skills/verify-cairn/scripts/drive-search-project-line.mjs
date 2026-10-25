@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-// ⌘K 搜索任务行的项目副行(live 面):GET /api/search 回包前,行来自客户端
-// 过滤,副行必须是该任务自己的项目名(项目读面在途/失败 = 无副行),
-// 永不出现 fixture capture 项目名 r3-lifecycle。纯 live 栈,零 daemon 零 LLM。
-//
-// 相位:
-//   S 铺底:公开 REST 建两个项目(verify-1400 / atlas)各一条任务(非被测路径)
-//   N 自然时序:不拦截,输入后 +0 / +500 / +3000ms 采样行副行(报告里的原测法)
-//   H 拦 /api/search:回包前帧截图断言 → 放行 → 服务端帧截图断言
-//   P 拦 /api/projects:项目读面在途帧,行无副行
-// 真值:/api/search + /api/projects JSON、SQLite project/todo 行。
-//
-// 用法:VERIFY_REPO_ROOT=<worktree> node <worktree>/.claude/skills/verify-cairn/scripts/drive-search-project-line.mjs
-// 证据落 VERIFY_EVIDENCE_DIR(默认主仓 .claude/verify-evidence/<时间戳>-search-project-line/)。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -77,7 +64,6 @@ const dbRows = () => {
   }
 };
 
-// —— S 铺底 ——
 const seed = [
   { project: 'verify-1400', title: '副行探针 alpha' },
   { project: 'atlas', title: '副行探针 beta' },
@@ -105,7 +91,7 @@ const openPanel = async (page) => {
   }
   throw new Error('⌘K 未打开搜索面板(6 次重按后)');
 };
-/** 每条任务行:标题行 + 项目副行(无副行 = null),按 DOM 序。 */
+
 const readRows = (page) =>
   panelOf(page)
     .locator('[data-row-kind="todo"]')
@@ -132,7 +118,7 @@ const gotoBoardReady = async (page, { projects = true } = {}) => {
 };
 
 try {
-  // —— N 自然时序(不拦截)——
+
   {
     const page = await newPage();
     await gotoBoardReady(page);
@@ -173,7 +159,6 @@ try {
     await page.close();
   }
 
-  // —— H 拦 /api/search:回包前帧 vs 服务端帧 ——
   {
     const page = await newPage();
     const held = [];
@@ -213,7 +198,6 @@ try {
     await page.close();
   }
 
-  // —— P 拦 /api/projects:项目读面在途 ——
   {
     const page = await newPage();
     const heldProjects = [];
@@ -247,7 +231,6 @@ try {
     await page.close();
   }
 
-  // —— 真值 ——
   const teams = await getJson(`${API}/api/teams`);
   const projects = await getJson(`${API}/api/projects?teamId=${teams[0].id}`);
   writeJson('projects-api.json', projects);

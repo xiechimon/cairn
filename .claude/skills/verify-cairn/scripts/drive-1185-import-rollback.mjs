@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn probe — #1185 技能导入来源登记失败。
-//
-// 栈必须已在跑（launch.mjs）。把 skill-sources.json 换成目录，使原子
-// rename 失败，然后看刚导入的技能还在不在。
-//   --expect=old  登记失败后目录仍在，同名再导入 409；撤掉阻挡后同进程
-//                 refresh 仍能读到来源（空登记对象被写路径改过）。
-//   --expect=new  登记失败后目录与 create 审计行都没了；撤掉阻挡后 refresh
-//                 404，同名再导入 201，来源文件里有这条记录。
-//
-// 证据落 VERIFY_EVIDENCE_DIR。断言不符退出码 1。
 
 import { createRequire } from 'node:module';
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

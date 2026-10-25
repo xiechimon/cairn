@@ -1,15 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn probe — #1007（wave 1 L4 pages 域）live 面证据：
-// A. schedules 新建定时弹层 = registry Dialog 直组（#983 居中模态族判决）的
-//    真用户路径：顶栏「新建」开面 → 频率 Tabs 切档 → 时/分 Select 选值 →
-//    保存落库（POST /api/schedules → 卡面行渲染 + SQLite schedules 行）；
-//    关闭四路里的 Esc / 背板 / X 三路 live 复证（取消路归 fixture e2e）。
-// B. 项目设置页 Panel→Card 判决面：REST 建项目 → 设置路由 → registry Card
-//    结构在位（data-slot=card ≥2 + CardHeader/CardContent 行）+ 截图。
-// 栈必须已在跑（launch.mjs；坐标取 VERIFY_RUN_DIR/ports.json，worktree 车道
-// 传 VERIFY_REPO_ROOT）。证据（截图 + result.json + SQLite 行）落
-// VERIFY_EVIDENCE_DIR；交付见 SKILL.md「证据归档纪律」。任一断言失败退出码 1。
-// 运行前置：proxy env 全 unset（回环请求过代理会 502 假阳性）。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -61,7 +50,7 @@ const api = async (method, path, body) => {
   try {
     json = JSON.parse(text);
   } catch {
-    /* 非 JSON 响应体 */
+
   }
   return { status: res.status, json, text };
 };
@@ -86,7 +75,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 732 }, col
 const shot = (name) => page.screenshot({ path: join(EVIDENCE, name) });
 
 try {
-  // —— seed:项目 → 任务(POST /api/projects/:id/todos,web mutation 同路) ——
+
   const proj = await api('POST', '/api/projects', { name: 'verify-1007-settings' });
   const projectId = proj.json?.id;
   payloads.projectCreate = proj.json;
@@ -103,7 +92,7 @@ try {
   await page.locator('.page-new-action').click();
   const dialog = page.getByRole('dialog', { name: '新建定时' });
   await dialog.waitFor({ state: 'visible', timeout: 8000 });
-  // registry Dialog 载体在位：overlay + content 槽（#983 判决的件默认形态）
+
   check(
     (await page.locator('[data-slot="dialog-overlay"]').count()) === 1 &&
       (await page.locator('[data-slot="dialog-content"]').count()) === 1,
@@ -116,9 +105,7 @@ try {
     (await dialog.getByRole('tab', { name: '每周' }).getAttribute('aria-selected')) === 'true',
     '频率分段 = registry Tabs：切「每周」后 aria-selected 真',
   );
-  // 时 Select（#1010 回源 = registry compound select）：trigger aria-label=时 →
-  // getByRole(option)（role=listbox 迁内层 Select.List，无 aria-label；关闭弹层
-  // display:none 滞留被 getByRole 排除，值 08 唯一命中）→ 08
+
   await page.locator('button[aria-label="时"]').click();
   await page.getByRole('option', { name: '08', exact: true }).click();
   check(
@@ -137,7 +124,7 @@ try {
     cardText.includes('每周运行') && cardText.includes('08:00'),
     `保存落面：卡行含「每周运行 / 08:00」(实际「${cardText.slice(0, 60)}」)`,
   );
-  // StatusChip 适配层载体（data-tone + data-slot=badge）
+
   const chipTone = await cardRow.first().locator('[data-slot="badge"]').getAttribute('data-tone');
   check(chipTone != null, `卡面 chip = StatusChip 适配层(data-tone=${chipTone})`);
   await shot('02-sched-card.png');
@@ -150,14 +137,12 @@ try {
   payloads.scheduleRow = schedRows.rows;
   const row = schedRows.rows?.[0];
   const atHour = row ? new Date(row.at + 8 * 3_600_000).getUTCHours() : -1;
-  // 页面契约:保存绑 teams 首 todo(liveTodo = todosQ.data?.[0]),非探针种子——
-  // 断言 kind/at 真值 + todoId 非空即可,种子 id 不对齐是设计而非断链。
+
   check(
     schedRows.ok === true && row?.kind === 'weekly' && row?.todoId != null && atHour === 8,
     `SQLite:schedule 行 kind=weekly + todoId 在位 + at 折 +08 时区 = 8 点(实际 ${JSON.stringify(row)})`,
   );
 
-  // 关闭三路 live 复证（Esc / 背板 / X；取消路归 fixture e2e overlay-focus）
   await page.locator('.page-new-action').click();
   await dialog.waitFor({ state: 'visible' });
   await page.keyboard.press('Escape');
@@ -174,7 +159,6 @@ try {
   await dialog.waitFor({ state: 'hidden', timeout: 8000 });
   check(true, 'X 关面（自携 DialogClose，aria-label=t(关闭)）');
 
-  // —— B. 项目设置页 Panel→Card 判决面(项目已在 seed 建好) ——————————
   await page.goto(`${WEB}/app/project/${projectId}/settings`, { waitUntil: 'load' });
   const cards = page.locator('[data-slot="card"]');
   await cards.first().waitFor({ state: 'visible', timeout: 8000 });

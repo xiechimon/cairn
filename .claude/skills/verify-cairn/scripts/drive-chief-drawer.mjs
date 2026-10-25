@@ -1,21 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-chief-drawer — 总管抽屉四连报（#615）live 闭环验证。
-//
-// 真用户路径：/app（board）FAB 开 drawer；/app/team（secondary wake 面）FAB
-// 开 drawer。铺底走公开 REST（providers/agents/PATCH chief agent——非被测
-// 路径，drive-chief-model-select 铺底律）。
-//
-// 验 #615 的 live 面（fixture e2e 覆盖不到的「hook → PATCH → 落库 → 回显」段）：
-//   A 主模型闭环：模型行是控制件 → dialog 开（候选 = 铺底 provider 模型并集）
-//     → 选定 → PATCH chief model 槽落库（GET 封套 + SQLite 行双真值）→ 行回显
-//     → 重载仍回显 → 默认行清空回继承（`· 默认` 徽标回）。
-//   B 运行时标记（返工裁决）：模型行首 = 运行时标记 svg（pi = RuntimePi 块状 π；
-//     claude-code = RuntimeClaudeCode 品牌星标；正本 = 参考站 providers 运行时
-//     tab SVG），不是 Agent 头像、不是坏 trace glyph。
-//   C 死钮：非 board 面 gear / 门控条设置可达（落 board 设置视图深链）；消息行
-//     复制 = 真 clipboard 钮（读回剪贴板对拍）；恢复/foot chevron 不渲染。
-// 依赖全新库：重验 = 重 launch。
-// 用法：VERIFY_REPO_ROOT=<worktree> node drive-chief-drawer.mjs
 
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -70,7 +53,6 @@ async function postJson(url, body, method) {
   return res.json();
 }
 
-// 抽屉是滑入动画（anim-drawer）——截图前等动画落定，transform 离盒（chief-panel.spec settled 同律）。
 async function settled(page) {
   await page
     .locator(DRAWER_SEL)
@@ -78,11 +60,6 @@ async function settled(page) {
     .catch(() => {});
 }
 
-// #950 载体迁移：chief per-face 类钩退役——FAB = aria-label 总管 钮、模型行
-// 触发钮 = aria-label 总管主模型、头部弹层 = dialog role + aria-label 模型
-// （行 = role=option）、设置视图 = h1「总管设置」、确认层 = dialog role +
-// aria-label。`.chief-drawer`（零规则机制钩）与 `.secondary-fab`（外域 CSS
-// 仍活）不动。
 const FAB = 'button[aria-label="总管"]';
 const WAKE_FAB = '.secondary-fab';
 const DRAWER = '.chief-drawer';
@@ -115,10 +92,6 @@ const context = await browser.newContext({
 await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: WEB });
 const page = await context.newPage();
 
-// SQLite 真值（只读）：better-sqlite3 走仓内依赖。
-// 无 daemon 的 probe 栈里回合永不收尾（activeRun 恒在位）——rewind 的 409
-// 守门会挡掉一切探针 rewind。scratch 库归 probe 所有：直接清 activeRun 模拟
-// 回合收尾（finishChiefTurn 的同效果面），再走真用户路径点恢复钮。
 function sqliteClearActiveRun(threadId) {
   if (threadId == null) return false;
   const require = createRequire(join(REPO, 'apps/server/package.json'));
@@ -153,13 +126,12 @@ try {
   const teamId = teams?.[0]?.id ?? null;
   check('api-team-ready', teamId != null, teamId != null ? 'teamId=' + teamId : '取 teamId 失败');
 
-  // —— 未绑定面：非 board 的门控条「设置」可达（#615 C 死钮半）——
   await page.goto(WEB + '/app/team');
   await page.waitForSelector(WAKE_FAB, { timeout: 15000 });
   await page.click(WAKE_FAB);
   await page.waitForSelector(DRAWER, { state: 'visible', timeout: 8000 });
   await settled(page);
-  // #950 载体：门控条 = 「请先为总管选择一个 Agent。」文案行 + 文本「设置」钮。
+
   const gateBtn = page.locator(DRAWER + ' button:text-is("设置")');
   const gateVisible = await gateBtn.isVisible().catch(() => false);
   check('offboard-gate-rendered', gateVisible, gateVisible ? '非 board 门控条设置钮在' : '门控条设置钮缺失');
@@ -168,7 +140,7 @@ try {
     await page
       .waitForSelector(SETTINGS, { state: 'visible', timeout: 8000 })
       .catch(() => {});
-    // 深链参消费后即剥（XMON-106 律）——稳定契约是设置视图落地，不是 URL 中途态
+
     const landed = await page.locator(SETTINGS).isVisible().catch(() => false);
     check(
       'offboard-gate-reaches-settings',
@@ -178,7 +150,6 @@ try {
     await shot(page, '01-offboard-settings.png');
   }
 
-  // —— 铺底：provider → agent → 绑定 chief ——
   if (teamId != null) {
     await postJson(SERVER + '/api/teams/' + teamId + '/providers', prov);
     const agentEnv = await postJson(SERVER + '/api/teams/' + teamId + '/agents', {
@@ -196,14 +167,12 @@ try {
   }
   check('seed-bound', extra.agentId != null, extra.agentId != null ? 'agent=' + extra.agentId : '铺底绑定失败');
 
-  // —— 绑定面：模型行是控制件 + 头像闭环（#615 A/B）——
   await page.goto(WEB + '/app');
   await page.waitForSelector(FAB, { timeout: 15000 });
   await page.click(FAB);
   await page.waitForSelector(DRAWER, { state: 'visible', timeout: 8000 });
   await settled(page);
-  // #615 返工后模型行无外链头像（行首 = 运行时标记 svg）——截图前只等标记
-  // svg 落定；等不到就照截（不 hang，防御律沿旧）。
+
   await page
     .waitForFunction(
       () => {
@@ -221,8 +190,7 @@ try {
     btnVisible,
     btnVisible ? '模型行 = button[aria-haspopup=dialog]' : '模型行仍非控制件（纯显示）',
   );
-  // #615 返工裁决：行首 = 运行时标记（π 字形 svg），不是 Agent 头像 img。
-  // #950 载体：行首槽 = 触发钮的首个 span（.chief-model-mark 类退役）。
+
   const markSvg = btnVisible ? await modelBtn.locator('> span:first-child svg').count() : 0;
   const markImg = btnVisible ? await modelBtn.locator('> span:first-child img').count() : 0;
   check(
@@ -233,11 +201,10 @@ try {
       : '行首标记 svg=' + markSvg + ' img=' + markImg,
   );
   await shot(page, '02-bound-model-row.png');
-    // #950 载体：头部区 = 抽屉内唯一 header 元素（.chief-head 类退役）。
+
     await page.locator(DRAWER + ' header').screenshot({ path: join(EVIDENCE, '06-drawer-head.png') });
     artifacts.push('06-drawer-head.png');
 
-  // —— dialog 开：候选含铺底模型 + 默认行（#615 A）——
   if (btnVisible) {
     await modelBtn.click();
     await page.waitForSelector(DIALOG, { state: 'visible', timeout: 8000 }).catch(() => {});
@@ -254,7 +221,6 @@ try {
     );
     await shot(page, '03-model-dialog.png');
 
-    // —— 选定 → 落库 → 回显（GET 封套 + SQLite 双真值）——
     const target = prov.models[1];
     await page.locator(DIALOG + ' [role="option"]', { hasText: target.name }).click();
     await page.waitForSelector(DIALOG, { state: 'detached', timeout: 8000 }).catch(() => {});
@@ -272,7 +238,7 @@ try {
     const apiModel = env?.chief?.model ?? null;
     const apiOk = apiModel != null && apiModel.provider === prov.providerId && apiModel.modelId === target.id;
     const rowLabel = (await page.locator(MODEL_BTN).textContent().catch(() => '')) ?? '';
-    // 行 canon = modelId（r5 111 `claude-sonnet-5 · 默认`）；dialog 行才出 modelName
+
     check(
       'pick-persists-and-echoes',
       apiOk && rowLabel.includes(target.id),
@@ -295,7 +261,6 @@ try {
     check('sqlite-row-holds-override', sqlOk, 'chief.model 行=' + String(sqlRaw));
     await shot(page, '04-after-pick.png');
 
-    // —— 重载回显（持久化半）——
     await page.reload();
     await page.waitForSelector(FAB, { timeout: 15000 });
     await page.click(FAB);
@@ -304,7 +269,6 @@ try {
     const reloaded = (await page.locator(MODEL_BTN).textContent().catch(() => '')) ?? '';
     check('reload-echo', reloaded.includes(target.id), '重载后行=' + reloaded.trim());
 
-    // —— 默认行清空回继承（`· 默认` 徽标回）——
     await page.locator(MODEL_BTN).click();
     await page.waitForSelector(DIALOG, { state: 'visible', timeout: 8000 }).catch(() => {});
     await page
@@ -333,8 +297,6 @@ try {
     );
   }
 
-  // —— 消息行复制钮 + 死 glyph 出账（#615 C；#950 载体：msg 工具容器 =
-  // data-testid chief-msg-tools/chief-msg-foot）——
   await page.locator('[data-testid="chief-composer-input"]').fill('验证复制钮的一句话。');
   await page.keyboard.press('Enter');
   await page.waitForSelector(DRAWER + ' [data-testid="chief-msg-tools"] button[aria-label="复制"]', {
@@ -351,7 +313,7 @@ try {
     check('copy-button-writes-clipboard', false, '消息行复制钮缺失（仍裸 glyph）');
   }
   await settled(page);
-  // —— 恢复到此处闭环（#615 返工）：发第二句 → 恢复到第一句 → 截断 + 重入队 ——
+
   await page.locator('[data-testid="chief-composer-input"]').fill('第二句供 rewind。');
   await page.keyboard.press('Enter');
   await page
@@ -371,9 +333,7 @@ try {
   sqliteClearActiveRun(threadsPre?.[0]?.id ?? null);
   if (nRestore >= 2) {
     await restoreBtns.first().click();
-    // #950 载体：确认层 = dialog role + aria-label「恢复到此处」（.chief-pick-
-    // confirm 文案钩退役）；确认钮 = 层内文本「恢复到此处」的 button（.chief-
-    // dlg-primary 退役；.dlg 壳级别名存活至 #952，但本断言改骑 role 载体）。
+
     await page.waitForSelector(REWIND_DIALOG, { state: 'visible', timeout: 8000 }).catch(() => {});
     await page.locator(REWIND_DIALOG + ' button:has-text("恢复到此处")').click();
     await page
@@ -415,7 +375,7 @@ try {
   try {
     await shot(page, '99-error.png');
   } catch {
-    /* 截不上就算了 */
+
   }
 } finally {
   await browser.close();

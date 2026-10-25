@@ -1,29 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1242-project-identity — 项目身份可变面（#1242）live
-// 闭环：五字段 PATCH + local→github 形态转换 + 在飞 build 409 + board 注记。
-//
-// 真用户路径 + REST + SQLite 三源对拍，六腿：
-//   A REST 静默族判死：空 body / 未知键 → 400（#1213 缺键早退族就此判死）；
-//     REST 改名 → 200 + 行/record 更新。
-//   B 浏览器改名：设置页名称输入 → 保存 → invalidate 收敛后侧栏行 + 看板卡
-//     chip 均显新名（名称纯显示面，数据源 = projects 面同源）。
-//   C 浏览器描述：输入 → 保存 → record + SQLite 行落值；清空 → 显式 null。
-//   D 在飞闸（票面失败方式 1）：起一 pending build → 浏览器点「转换」→
-//     409 + 失败 toast 可见（票面验收「失败可见」的 live 实例）；假机器
-//     claim+done 收口步 → 静止点恢复。
-//   E 浏览器转换（票面验收 1 UI 半）：githubRepo=octocat/Hello-World（公开
-//     仓，匿名可达梯）+ localPath 预填现值（local 绑定就地转加速位）→
-//     转换成功 → 转换卡卸载/加速位行上线 + record cloneUrl 切 https + SQLite
-//     行 + 项目各 todo 最新会话落 system 注记（#902 坑：content 是 drizzle
-//     json 列，比对前 JSON.parse）+ todo 详情 transcript 可见注记行。
-//   F 转换后新步按新形态解析（票面「既有 builds/conv 分支按新形态解析」）：
-//     todo3 起 build → 假机器 claim → 载荷 repo {kind:github, cloneUrl,
-//     localPath}（与转换前 C1 对照：local 形态时 cloneUrl = 本机路径）。
-//
-// 铺底全走公开 REST（drive-903 铺底律）：provider + agent + api-key + machine
-// enroll + local 项目（scratch 真 git 仓）+ 3 todo。零 daemon、零 LLM：步数据
-// 面与真机器同形（claim → done 走真 machine wire）。依赖全新库：重验 = 重
-// launch。用法：node drive-1242-project-identity.mjs
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -83,7 +58,7 @@ async function sendJson(url, body, method, token) {
     method: method ?? 'POST',
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
-    // 转换腿出站 GitHub（可达性校验），给足真实 RTT 预算。
+
     signal: AbortSignal.timeout(30000),
   });
   const text = await res.text();
@@ -105,9 +80,6 @@ function dbRead(fn) {
   }
 }
 
-// —— 铺底（全 REST，非被测路径）—————————————————————————————
-
-// scratch 真 git 仓（local 形态创建闸：绝对路径 + 存在 + 工作树仓）。
 const LOCAL_REPO = join(RUN_DIR, 'local-repo');
 mkdirSync(LOCAL_REPO, { recursive: true });
 execFileSync('git', ['-C', LOCAL_REPO, 'init', '-b', 'main'], { stdio: 'pipe' });
@@ -132,7 +104,6 @@ const prov = await sendJson(SERVER + '/api/teams/' + teamId + '/providers', {
 });
 if (![200, 201, 409].includes(prov.status)) throw new Error('provider → ' + prov.status);
 
-// 机器先于 agent（#1259 起 agent 创建必填归属机 machineId）。
 const key = await sendJson(SERVER + '/api/teams/' + teamId + '/api-keys', {
   name: 'identity-probe',
   gitAccess: false,
@@ -186,10 +157,6 @@ for (const title of todoTitles) {
 
 check('S0 铺底：local 项目（scratch 真 git 仓）+ 3 todo + 假机器 enroll', true, 'project=' + PROJECT_ID);
 
-// —— 假机器 wire（worker 步与真机器同形）—————————————————————
-// claim 响应 = {step: ClaimedStep}，ClaimedStep 自带内层 step 位（步 id 面）
-// + project/todo 面（repo 派生判据在这里，machine-wire 律；drive-903 的
-// chief 双包解包不适用于 worker——payload.step 是 ClaimedStep 的字段）。
 async function claimStep() {
   const claim = await sendJson(SERVER + '/api/machine/tasks/claim', {}, 'POST', machineToken);
   const claimed = claim.body?.step;
@@ -218,8 +185,6 @@ async function startBuild(todoId) {
   return buildId;
 }
 
-// todo1 首轮 build：转换前 claim 载荷 = local 形态（cloneUrl = 本机路径），
-// 收口成终态（后续转换的 409 闸以步状态判静止点）。
 await startBuild(todoIds[0]);
 const claim1 = await claimStep();
 check(
@@ -230,13 +195,11 @@ check(
 );
 await doneStep(claim1.stepId);
 
-// —— A REST 面：静默族判死 + 改名 ————————————————————————————
 const emptyPatch = await sendJson(SERVER + '/api/projects/' + PROJECT_ID, {}, 'PATCH');
 check('A1 空 body → 400（五键全缺 = 静默 no-op 族判死）', emptyPatch.status === 400, 'status=' + emptyPatch.status);
 const unknownPatch = await sendJson(SERVER + '/api/projects/' + PROJECT_ID, { repoName: 'x' }, 'PATCH');
 check('A2 未知字段 → 400（strict 明示拒绝）', unknownPatch.status === 400, 'status=' + unknownPatch.status + ' ' + String(unknownPatch.body?.error).slice(0, 80));
 
-// —— 浏览器腿（改名/描述/转换卡真用户路径）——————————————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 await page.route('**/api.dicebear.com/**', (route) =>
@@ -247,9 +210,6 @@ await page.route('**/api.dicebear.com/**', (route) =>
 );
 const SETTINGS = WEB + '/app/project/' + PROJECT_ID + '/settings';
 
-// B 改名：设置页输入 → 保存 → invalidate 收敛 → 侧栏 + 卡面新名。
-// #1251 坑①：判据必须等 invalidateAll 的重取收敛（waitForResponse 拿 GET
-// /api/projects 回包），不能点击后立刻读 DOM/DB——那是点击前的旧态。
 await page.goto(SETTINGS);
 const nameInput = page.getByRole('textbox', { name: '名称' });
 await nameInput.waitFor({ state: 'visible', timeout: 8000 });
@@ -271,7 +231,7 @@ check(
 );
 await page.goto(WEB + '/app');
 await page.locator('.todo-card').first().waitFor({ state: 'visible', timeout: 8000 });
-// 侧栏项目行 + 卡面项目 chip 都是 projects 面投影（改名即时生效两面）。
+
 const sidebarRow = page.locator('.sidebar-subrow', { hasText: 'probe-1242-renamed' });
 const cardChip = page.locator('.todo-card').first().locator('.ml-1.truncate');
 await sidebarRow.waitFor({ state: 'visible', timeout: 8000 });
@@ -283,7 +243,6 @@ check(
 );
 await shot(page, '01-board-renamed.png');
 
-// C 描述：输入 → 保存；清空 → 显式 null（#1169 序列化坑族同律）。
 await page.goto(SETTINGS);
 const descInput = page.getByRole('textbox', { name: '描述' });
 await descInput.waitFor({ state: 'visible', timeout: 8000 });
@@ -310,12 +269,11 @@ const descRow2 = dbRead((db) =>
 );
 check('C2 清空描述 → 列 null（空 ≡ null）', descRow2?.description === null, 'row=' + descRow2?.description);
 
-// D 在飞闸：todo2 起 pending build → 浏览器转换 → 409 + toast 可见。
 await startBuild(todoIds[1]);
 await page.goto(SETTINGS);
 const repoInput = page.getByRole('textbox', { name: 'GitHub 仓库（owner/repo）' });
 await repoInput.waitFor({ state: 'visible', timeout: 8000 });
-// localPath 预填 = local 绑定路径（就地转加速位）
+
 await expectValue(page.getByRole('textbox', { name: '本机加速路径' }), LOCAL_REPO);
 await repoInput.fill('octocat/Hello-World');
 await page.getByRole('button', { name: '转换' }).click();
@@ -332,13 +290,12 @@ const blockedRow = dbRead((db) =>
   db.prepare('SELECT repoKind FROM project WHERE id = ?').get(PROJECT_ID),
 );
 check('D2 409 后行未动（仍 local）', blockedRow?.repoKind === 'local', 'repoKind=' + blockedRow?.repoKind);
-// 收口 todo2 的步（claim+done）→ 静止点恢复。
+
 const claim2 = await claimStep();
 await doneStep(claim2.stepId);
 
-// E 转换（happy）：同一表单再点转换 → 200 → 形态切面 + 注记。
 await page.getByRole('button', { name: '转换' }).click();
-// 收敛信号 = invalidate 重取后转换卡卸载（github 形态不再渲染）。
+
 await page
   .getByText('转换为 GitHub 形态', { exact: true })
   .waitFor({ state: 'hidden', timeout: 15000 });
@@ -367,8 +324,6 @@ check(
 );
 await saveJson('04-project-record.json', converted);
 
-// 注记面：项目各 todo（有会话者）最新会话各落一条 system 行（#902 坑：
-// content 是 drizzle json 列，字符串带引号存储，比对前 JSON.parse）。
 const noteRows = dbRead((db) =>
   db
     .prepare(
@@ -391,14 +346,13 @@ check(
   'rename=' + renameNotes.length + ' convert=' + convertNotes.length,
 );
 await saveJson('05-system-notes.json', parsedNotes);
-// 注记可见面：todo1 详情 transcript 渲染注记行（note 行居中 tertiary 小字）。
+
 await page.goto(WEB + '/app/todo/' + todoIds[0]);
 const noteLine = page.getByText('项目形态已从 local 转换为 GitHub', { exact: false });
 await noteLine.first().waitFor({ state: 'visible', timeout: 8000 });
 check('E5 todo 详情 transcript 可见转换注记行（板面可见性）', true);
 await shot(page, '06-transcript-note.png');
 
-// F 转换后新步按新形态解析：todo3 起 build → claim 载荷 repo 切 github。
 await startBuild(todoIds[2]);
 const claim3 = await claimStep();
 check(
@@ -414,7 +368,6 @@ check(
 await doneStep(claim3.stepId);
 await browser.close();
 
-// —— 收尾：result.json ————————————————————————————————————————
 const passCount = checks.filter((c) => c.ok).length;
 writeFileSync(
   join(EVIDENCE, 'result.json'),
@@ -434,9 +387,6 @@ writeFileSync(
 process.stdout.write('\nresult  ' + passCount + '/' + checks.length + ' PASS，证据 ' + EVIDENCE + '\n');
 if (passCount !== checks.length) process.exit(1);
 
-// —— helper ———————————————————————————————————————————————————
-/** 轮询收敛的输入值断言（e2e toHaveValue 同语义）：invalidate 重取后 React
- *  重渲染比网络回包晚一拍，单次读会假红。 */
 async function expectValue(locator, value, timeoutMs = 8000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {

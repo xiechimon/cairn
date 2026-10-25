@@ -1,42 +1,42 @@
-# 失败面发送(详情页 composer failed 相位,#320/#322)
+# Failure-surface send (detail-page composer failed phase, #320/#322)
 
-用户在失败任务的详情页 composer 输入反馈并发送 → 触发带反馈重启新一轮(非 steer 409 语义):`POST /api/builds/{id}/steps {action:"restart", feedback, clientMessageId}` → server 起新 build(withPlan 承接失败轮)+ 反馈行落新 conversation + 首步入队(instruction 携反馈)+ failed→queued 漏斗。原站实测:failed 态发消息 = 触发新一轮,消息随新轮入会话(r9 §3.3)。
+Users type feedback into the failed task's detail-page composer and send it -> triggers a feedback-carrying restart of a new round (not the steer 409 semantics): `POST /api/builds/{id}/steps {action:"restart", feedback, clientMessageId}` -> the server starts a new build (withPlan carries the failed round) + the feedback row lands in the new conversation + the first step enqueued (the instruction carries the feedback) + the failed -> queued funnel. Original-site measurement: sending a message in the failed state = triggering a new round, the message enters the conversation with the new round (r9 §3.3).
 
 ## Sub-features
 
-- `failed-composer-send` failed 相位详情页 composer 可输入 + 发送(非只读);发送钮走 restart 语义。
-- `restart-action-wire` 发送 → `POST /api/builds/{id}/steps {action:"restart", feedback, clientMessageId}`(shared buildStepActionBodySchema 的 restart 变体)。
-- `restart-new-build` server 起新 build(withPlan 承接失败轮)+ failed→queued 漏斗;反馈行落新 conversation。
-- `restart-first-step` 首步入队,instruction 携用户反馈(revision 同缝)。
-- `restart-phase-gate` restart 门只收 failed 相位(confirm 走 revision、building/review 走 steer——两写面相位隔离,不共享入口)。
-- `restart-empty-rejected` 空消息不成发送(`feedback: z.string().min(1)`);异步 onSend 失败(409)时 draft 保留不丢字。
+- `failed-composer-send` the failed-phase detail-page composer is editable + sendable (not read-only); the send button goes through the restart semantics.
+- `restart-action-wire` send -> `POST /api/builds/{id}/steps {action:"restart", feedback, clientMessageId}` (the restart variant of shared buildStepActionBodySchema).
+- `restart-new-build` the server starts a new build (withPlan carries the failed round) + the failed -> queued funnel; the feedback row lands in the new conversation.
+- `restart-first-step` the first step enqueued, its instruction carries the user feedback (same seam as revision).
+- `restart-phase-gate` the restart gate accepts only the failed phase (confirm goes through revision, building/review go through steer — the two write surfaces are phase-isolated, they do not share an entry).
+- `restart-empty-rejected` an empty message cannot be sent (`feedback: z.string().min(1)`); when the async onSend fails (409), the draft is kept (no lost text).
 
 ## How to get to it (user POV)
 
-- 失败任务详情页(`/app/todo/:id`,phase=failed)→ composer 输入反馈 → 发送钮。
-- 驱动(`vp.mjs list failed-send` 列出全部 case 与 usage):
-  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive failed-send restart-combo`:失败任务重启后,漂移的重启组合不显示成用户气泡。
-  - 判 stale、不带 `--force` 拒跑的 case(拒跑时打印原因):`vp.mjs drive failed-send restart-with-feedback`(依赖的 setup-branch-sync-seed.mjs 建 agent 不带 machineId,ADR 0019 起 400)。
+- The failed task's detail page (`/app/todo/:id`, phase=failed) -> composer input with feedback -> the send button.
+- Driving (`vp.mjs list failed-send` lists all cases and usage):
+  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive failed-send restart-combo`: after a failed-task restart, the drifted restart combo does not display as a user bubble.
+  - Cases judged stale and refusing to run without `--force` (the refusal prints the reason): `vp.mjs drive failed-send restart-with-feedback` (its dependency setup-branch-sync-seed.mjs creates the agent without machineId, 400 since ADR 0019).
 
 ## Driving it with verify-cairn
 
 Preconditions:
 
-1. `launch.mjs` 起隔离栈,`doctor.mjs` 全 PASS。
-2. seed 一个 failed 相位的 todo(起 build → 让 plan/build 步失败,或直接构造 failed 态);live 面。
-3. restart 起新 build 后,新轮执行需 daemon(可选——验证 restart 入队只需 server 面)。
+1. `launch.mjs` brings the isolated stack up, `doctor.mjs` fully PASS.
+2. Seed a failed-phase todo (start a build -> fail the plan/build step, or construct the failed state directly); live surface.
+3. After the restart starts the new build, the new round's execution needs a daemon (optional — verifying the restart enqueue needs only the server surface).
 
-- **跑法。** 造 failed 相位:launch → `setup-branch-sync-seed.mjs` 出一个待跑的 build(它留 pending 的 plan 步,git 现场对本功能无害) → 起真 daemon(`pnpm exec tsx src/cli.ts start --foreground --api-key <k> --team <teamId> --server http://127.0.0.1:<port>`)让它认领并跑挂该步(stub provider 不可达 → 步 failed → todo 落 failed) → **把 daemon 停干净**(见下方坑) → `node <skill>/scripts/drive-failed-send.mjs <todoId> <buildId>`。
-- **失败面发送路径。** failed todo 详情页 → composer 填反馈文本 → 点发送 → 新 build 起(离开 failed)+ 反馈行入会话。
-- **真值。** `POST /api/builds/{id}/steps {action:"restart",...}` 200;`GET /api/todos/{id}` 相位离开 failed——**具体值取决于有无机器认领**:`queued`(尚无认领)/`planning`(规划步已被 claim,`machines.ts` claim 处才推相位,`phase.ts` 注「机器 claim:规划步→planning」);新 build 行(prevPhase=failed + withPlan 承接)+ 新 conversation 含反馈 message(`message.content` 是 **JSON 列**,用户行 = JSON 字符串字面量,断言前要解码)+ 首步入队 prompt 携反馈;负向:非 failed 相位再发 restart → 409。
-- **相位门负向。** 非 failed 相位调 restart → 409(`restart 仅适用于 failed 相位`)。
+- **How to run.** To build the failed phase: launch -> `setup-branch-sync-seed.mjs` produces a pending build (it leaves the plan step pending; the git scene is harmless to this feature) -> start a real daemon (`pnpm exec tsx src/cli.ts start --foreground --api-key <k> --team <teamId> --server http://127.0.0.1:<port>`) and let it claim and fail that step (the stub provider is unreachable -> the step fails -> the todo lands failed) -> **stop the daemon cleanly** (see the pitfalls below) -> `node <skill>/scripts/drive-failed-send.mjs <todoId> <buildId>`.
+- **Failure-surface send path.** The failed todo's detail page -> composer filled with feedback -> click send -> a new build starts (leaves failed) + the feedback row enters the conversation.
+- **Truth.** `POST /api/builds/{id}/steps {action:"restart",...}` 200; `GET /api/todos/{id}` phase leaves failed — **the concrete value depends on whether a machine claims it**: `queued` (no claim yet) / `planning` (the plan step already claimed; `machines.ts` pushes the phase at claim time, `phase.ts` notes "machine claim: plan step -> planning"); the new build row (prevPhase=failed + withPlan carries it) + the new conversation contains the feedback message (`message.content` is a **JSON column**, the user row = a JSON string literal, decode before asserting) + the first step's enqueued prompt carries the feedback; negative: sending restart again in a non-failed phase -> 409.
+- **Phase-gate negative.** Calling restart in a non-failed phase -> 409 (`restart 仅适用于 failed 相位`).
 
 ## Gotchas
 
-- restart ≠ steer:steer 是运行中中断(building/review 相位,停止钮),restart 是失败后带反馈重启(failed 相位,composer 发送)——两写面相位隔离,server 漏斗边不同。
-- 空 feedback 被 schema 拒(`z.string().min(1)`);异步 onSend 失败时 draft 保留(不丢用户输入)。
-- restart 起的是**新 build**(withPlan 承接失败轮的 plan),不是原 build 续跑;todo.latestBuildId 指向新 build。
-- 失败面 composer 在 fixture 静态面是只读占位;live 面才接 restart wire。
-- **daemon 停不干净、还会「死前再认领一次」(实测)**:`TaskStop`/杀外层 shell 只给进程组发 SIGTERM,daemon(tsx)走**优雅收尾**——收尾窗口内它仍会受理已派发的 long-poll claim。实测时序:停止 → 点检通过 → probe 启动后 ~1.2s 步被认领(相位 failed→planning),之后再扫已无进程。所以 `machine.online=0` 与「服务端口无 ESTABLISHED」都是**时点快照**,抓不住这个窗口(claim 走长轮询、不走 machine stream,online 位不反映它)。两条应对:①**别指望停干净**——probe 已把相位断言放宽到「离开 failed」(queued/planning/building 都算过),这个 race 自然不致命;②真要确定它退出了,按 PID 判进程存活,别用 `pgrep -fl "tsx src/cli.ts start"`——真实命令行是 `.../tsx/dist/cli.mjs src/cli.ts start -f`,该 pattern 匹配不到,会给「已停」的假阴性。
-- **composer 发送钮鼠标不可达(实测,非本功能缺陷)**:`.composer-send`(32×32)被 `.detail-fab`(48×48,总管悬浮钮,右下 16px 锚定)**完全覆盖**,`document.elementFromPoint` 在钮中心命中 fab → 真实 `click()` 超时(fixture 与 live 面皆如此)。仓内 `reject-chain.spec.ts` 与 `integration/test/m5-web-e2e.test.ts` 都因此用 `dispatchEvent('click')`。键盘 Enter 发送不受影响。本 probe 同样走 dispatchEvent 驱动 wire,并把遮挡事实量进 `result.json` 的 `sendReachableByMouse`/`sendCenterHit`。
-- **验证状态(2026-09-28)**:主仓 live re-probe 已补——`drive-failed-send.mjs` 11 checks 全绿,证据归档 `docs/verify/320/`。
+- restart != steer: steer interrupts a running round (building/review phases, the stop button), restart is a feedback-carrying restart after failure (failed phase, composer send) — the two write surfaces are phase-isolated, the server funnel edges differ.
+- Empty feedback is rejected by the schema (`z.string().min(1)`); when the async onSend fails, the draft is kept (the user's input is not lost).
+- The restart starts a **new build** (withPlan carries the failed round's plan), not a continuation of the old build; todo.latestBuildId points at the new build.
+- The failure-surface composer is a read-only placeholder on the fixture static surface; only the live surface wires the restart.
+- **A daemon that is not stopped cleanly will "claim once more before dying" (measured)**: `TaskStop`/killing the outer shell only SIGTERMs the process group, and the daemon (tsx) does a **graceful shutdown** — during the shutdown window it still serves already-dispatched long-poll claims. Measured timeline: stop -> the click-check passes -> ~ 1.2s after the probe starts, the step is claimed (phase failed -> planning), and a later scan finds no process. So both `machine.online=0` and "no ESTABLISHED on the service port" are **point-in-time snapshots** and cannot catch this window (claims go through the long poll, not the machine stream, the online bit does not reflect it). Two countermeasures: (1) **do not count on a clean stop** — the probe has relaxed its phase assertion to "leaves failed" (queued/planning/building all count as pass), this race is naturally non-fatal; (2) to really confirm it has exited, judge process liveness by PID, do not use `pgrep -fl "tsx src/cli.ts start"` — the real command line is `.../tsx/dist/cli.mjs src/cli.ts start -f`, that pattern does not match and gives a false negative for "stopped".
+- **The composer send button is mouse-unreachable (measured, not this feature's defect)**: `.composer-send` (32x32) is **completely covered** by `.detail-fab` (48x48, the chief floating button, anchored 16px from the bottom-right), `document.elementFromPoint` at the button center hits the fab -> a real `click()` times out (true on both the fixture and live surfaces). Both the in-repo `reject-chain.spec.ts` and `integration/test/m5-web-e2e.test.ts` therefore use `dispatchEvent('click')`. Keyboard Enter send is unaffected. This probe likewise drives the wire via dispatchEvent, and measures the occlusion fact into `result.json`'s `sendReachableByMouse`/`sendCenterHit`.
+- **Verification state (2026-09-28)**: the main-repo live re-probe is in — `drive-failed-send.mjs` 11 checks all green, evidence archived at `docs/verify/320/`.

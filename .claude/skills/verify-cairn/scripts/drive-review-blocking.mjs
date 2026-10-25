@@ -1,19 +1,3 @@
-// verify-cairn probe（M7 #330 AI 审核 blocking 自动修订回路全链真栈证据）：
-// live 栈走真用户路径——confirm phase → composer AI 审核钮 → 选 Agent → 发起
-// → review 步 claim → done(success, 含 blocking verdict) →
-// 1) REVIEW_VERDICT_KIND 消息行落地（conclusion + 编号 findings）
-// 2) phase 转 planning（review → planning 自动修订回路扩展）
-// 3) 调整摘要行 note 落地「AI 审核检测到 N 处 blocking 风险…」
-// 4) 新 plan 步入队，prompt 注入审核事实
-// 5) UI reload 后 transcript 显示 verdict 段 + 调整摘要行 + 新 plan 卡（v2）
-//
-// 真值三面：HTTP API JSON + SQLite 行 + 截图；证据 = result.json。
-//
-// 前置：launch.mjs 起栈 + setup-review-seed.mjs 推到 confirm phase。
-// 用法：VERIFY_REPO_ROOT=<worktree> REVIEW_MACHINE_TOKEN=<token> \
-//      node drive-review-blocking.mjs <todoId> <agentId>
-//   env：VERIFY_EVIDENCE_DIR（缺省主仓 .claude/verify-evidence/<ts>-review-blocking）
-
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -48,8 +32,7 @@ mkdirSync(EVIDENCE, { recursive: true });
 
 const require2 = createRequire(join(REPO, 'apps/server/package.json'));
 const Database = require2('better-sqlite3');
-// REVIEW_VERDICT_KIND = shared 单源常量值；不在此复刻 zod 契约，直接
-// 字面量 + hasBlockingFinding 本地实现，避免依赖 packages/shared/dist 构建。
+
 const REVIEW_VERDICT_KIND = 'review_verdict';
 function hasBlockingFinding(verdict) {
   return Array.isArray(verdict?.findings) &&
@@ -87,7 +70,6 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 
-  // —— 1. 详情页 load + AI 审核钮可见 ——
   await page.goto(`${WEB}/app/todo/${todoId}`, { waitUntil: 'networkidle' });
   await page.waitForSelector('.composer-tool[aria-label="AI 审核"]', { timeout: 10_000 });
   await page.waitForTimeout(300);
@@ -98,16 +80,15 @@ try {
     'AI 审核 toolbar 钮渲染',
   );
 
-  // —— 2. 发起审核 ——
   await page.click('.composer-tool[aria-label="AI 审核"]');
   await page.waitForSelector('[role="dialog"]', { timeout: 5_000 });
   const agentRows = await page.$$('[role="dialog"][aria-label="AI 审核"] [role="option"]');
   await agentRows[0].click();
   await page.waitForTimeout(150);
-  // #951/#910 载体：.review-start 类钩退役 → dialog scope role+文案一级。
+
   await page.locator('[role="dialog"][aria-label="AI 审核"]').getByRole('button', { name: '开始审核' }).click();
   await page.waitForSelector('[role="dialog"]', { state: 'detached', timeout: 5_000 });
-  // composer placeholder 切换证明审核入队
+
   await page.waitForFunction(
     () => {
       const el = document.querySelector('.composer-placeholder.composer-input');
@@ -136,7 +117,6 @@ try {
     `review step=${JSON.stringify(reviewStepBefore)}`,
   );
 
-  // —— 3. 模拟机器 claim review 步 → done(success, blocking verdict) ——
   const claimRes = await jpost('/api/machine/tasks/claim', {}, MACHINE_TOKEN);
   const claimStep = claimRes.body?.step?.step ?? claimRes.body?.step;
   check('api-claim-review-step', claimStep?.kind === 'review', `kind=${claimStep?.kind}`);
@@ -144,7 +124,6 @@ try {
     throw new Error(`expected review claim, got ${JSON.stringify(claimStep)}`);
   }
 
-  // 两条 blocking findings + 一条 suggestion，注入完整 verdict 形态
   const verdict = {
     conclusion: '方案在边界情况上存在硬风险，需修复两处',
     findings: [
@@ -180,9 +159,8 @@ try {
   );
   check('api-done-review-step', doneRes.status === 200, `status=${doneRes.status}`);
 
-  // —— 4. HTTP API 真值：verdict 消息落地 + phase 转 planning + 新 plan 步入队 ——
   const messages = await jget(`/api/conversations/${buildId}/messages`);
-  // REVIEW_VERDICT_KIND 系统消息（r8 §3.1 60/61）
+
   const verdictRow = (messages.body?.messages ?? []).find(
     (m) =>
       m.role === 'system' &&
@@ -212,7 +190,6 @@ try {
     );
   }
 
-  // 「调整摘要行」note（系统纯文本消息，不是 JSON 行）
   const reviseNote = (messages.body?.messages ?? []).find(
     (m) =>
       m.role === 'system' &&
@@ -238,7 +215,6 @@ try {
     );
   }
 
-  // phase 转 planning
   const todoFaceAfter = await jget(`/api/todos/${todoId}`);
   check(
     'api-phase-planning',
@@ -246,7 +222,6 @@ try {
     `phase=${todoFaceAfter.body.phase}`,
   );
 
-  // 新 plan 步入队（原 plan v1 + 新 auto-revise plan v2）
   const stepsAfter = await jget(`/api/builds/${buildId}/steps`);
   const planSteps = (stepsAfter.body ?? []).filter((s) => s.kind === 'plan');
   check('api-two-plan-steps', planSteps.length === 2, `plan steps=${planSteps.length}`);
@@ -257,9 +232,6 @@ try {
     `status=${reviseStep?.status}`,
   );
 
-  // —— 5. SQLite 真值（content 列 = JSON-encoded text 字符串——leading
-  //    `"` + `\"…\"` 转义包内部）。LIKE 在 better-sqlite3 默认只支持 ASCII
-  //    大小写匹配，CJK 字面量 LIKE 不可靠，改用 instr() 字节级匹配 ——
   const db = new Database(DB_PATH, { readonly: true });
   const sqliteVerdict = db
     .prepare(
@@ -271,7 +243,7 @@ try {
       `select role, content from message where conversationId = ? and role = 'system' and instr(content, ?) > 0`,
     )
     .get(buildId, 'AI 审核检测到');
-  // 步骤的 prompt 列 = raw TEXT，不走 JSON 包裹
+
   const sqliteReviseStep = db
     .prepare(
       `select kind, status, prompt from step where buildId = ? and kind = 'plan' and status = 'pending'`,
@@ -294,7 +266,7 @@ try {
     Boolean(sqliteReviseStep) && sqliteReviseStep.status === 'pending',
     `step=${JSON.stringify(sqliteReviseStep)}`,
   );
-  // prompt 注入审核事实（审核结论 + blocking facts + 文件:行）
+
   const revisePrompt = sqliteReviseStep?.prompt ?? '';
   check(
     'revise-prompt-has-conclusion',
@@ -308,9 +280,6 @@ try {
     'revisePrompt 含 blocking fact 文件:行',
   );
 
-  // —— 6. UI reload：transcript 显示 verdict 段 + 调整摘要行 ——
-  // v2 plan 卡要等新 plan 步真跑出 plan.md 才渲染（r7 17 = 完成 plan 才有 plan 卡）；
-  // 当前新 plan 在 pending 状态，所以这里只断言 verdict + 调整摘要行可见。
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   await page.screenshot({

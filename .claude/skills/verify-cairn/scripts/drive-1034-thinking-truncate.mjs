@@ -1,27 +1,4 @@
 #!/usr/bin/env node
-// verify-cairn drive-1034-thinking-truncate — 思考行宽截断（#1034）双向证据。
-//
-// 症状路径：主管抽屉的思考预览行（ThinkingRow）在窄列里不截断——Button 基类
-// 写死 whitespace-nowrap + shrink-0，行钮又挂 w-fit：nowrap 下 min-content ==
-// max-content，fit-content 解成整段文本宽（判因档实测 626px 钮 / 384px 列）。
-// 截图里那个「…」是 JS 按 PREVIEW_CHARS=150 切的字面字符，不是 CSS 省略号。
-// 详情对话面同源缺陷：thinking 行只挂死类名（chat-row / chat-text 零规则），
-// 既无 flex 也无宽度上限，头像压在文字上。
-//
-// 修法（本票）：行钮 min-w-0 max-w-full + 预览 span 挂 #772 截断律
-// min-w-0 flex-auto truncate；详情行对齐 robot 行工具类（transcript.tsx :419）。
-//
-// 铺底全走公开 REST + 假机器（drive-chief-segments.mjs 同律）：零 daemon、
-// 零 LLM。C 面 = chief 抽屉（长思考段两条：CJK 65 字符 + 拉丁 130 字符，
-// 均 < PREVIEW_CHARS=150——字符切片不触发，能收住宽度的只剩 CSS）；
-// D 面 = 详情对话（187 字符长思考，> 150——切片先触发、CSS 截断接力，
-// 两级分工的口径面）。
-//
-// 用法：
-//   VERIFY_REPO_ROOT=<检出> node drive-1034-thinking-truncate.mjs --expect=new
-//   # before 基线（origin/main 一次性 worktree 栈，期望反转 = 复现缺陷）：
-//   VERIFY_REPO_ROOT=/tmp/<main 检出> VERIFY_PORT=8793 VERIFY_WEB_PORT=5275 \
-//     node <lane>/.../drive-1034-thinking-truncate.mjs --expect=old
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -97,21 +74,18 @@ async function waitFor(fn, timeoutMs) {
   }
 }
 
-// —— 被测文本（与 e2e 钉同族：F-R21 / thinking-row-truncate.spec）——————————
-/** CJK 65 字符（< 150：切片不触发；无空格无断行点，纯 CSS 截断面）。 */
 const LONG_CJK =
   '用户只是打了个招呼「你好」，没有具体任务，先不路由到任何看板任务，等下一句话再判断意图，同时留意要不要唤起定时器或者翻既有会话记录';
-/** 拉丁 130 字符（< 150：票面截图同款形态）。 */
+
 const LONG_LATIN =
   '> The user just said "你好" — pure greeting. No task. I should not route it to the board yet; wait for the next line to tell intent.';
-/** 详情面 187 字符（> 150：切片先触发——预览以字面 … 收尾，CSS 截断接力）。 */
+
 const LONG_DETAIL =
   '用户这句「你好」是纯招呼，没有任务实体：先不路由看板，也不建卡。接下来要做的事分三步——第一步核对会话历史里有没有未收口的执行步，第二步看定时器有没有到点要唤起的复盘，第三步再判断这句招呼背后是不是藏着一个新需求的开头；如果三步都空，就只回一句招呼，等用户把真实意图说出来再动手。另外留意中英混排时省略号的落点，别让截断把行尾标点吃掉半个，视觉上会显得字被切坏而不是被收纳。';
 if (LONG_CJK.length >= 150 || LONG_LATIN.length >= 150 || LONG_DETAIL.length <= 150) {
   throw new Error('被测文本长度契约破坏：CJK/LATIN 须 < 150，DETAIL 须 > 150');
 }
 
-// —— 铺底（全 REST + 假机器，非被测路径）————————————————————————
 const teams = await getJson(SERVER + '/api/teams');
 const teamId = teams[0]?.id;
 if (!teamId) throw new Error('无 team——先重 launch（全新库 seed）');
@@ -174,7 +148,6 @@ async function claimStep() {
   return claimed.id;
 }
 
-// —— C 面铺底：chief 回合步推两条长思考段 + 收尾 ————————————————
 const chiefStepId = await claimStep();
 const T0 = Date.now();
 const at = (n) => T0 + n;
@@ -239,7 +212,6 @@ const chiefDone = await sendJson(
 );
 if (chiefDone.status !== 200) throw new Error('chief done → ' + chiefDone.status);
 
-// —— D 面铺底：项目 + 卡 + build 步，transcript 带长思考行 ——————————
 const projRes = await sendJson(SERVER + '/api/projects', { name: 'probe-1034-' + RUN });
 const projectId = projRes.body?.id;
 if (!projectId) throw new Error('project → ' + JSON.stringify(projRes.body));
@@ -279,8 +251,7 @@ await uploadTranscript(buildStepId, [
     createdAt: at(2200),
   },
 ]);
-// done 的产物闸可能因零改动判 failed——不拦本票：消息在 PUT 时已落库
-// （receiveUpload），详情面对话列照常渲染。
+
 await sendJson(SERVER + '/api/machine/done/' + buildStepId, { status: 'success' }, 'POST', machineToken);
 const detailLanded = await waitFor(async () => {
   const res = await sendJson(SERVER + '/api/conversations/' + buildId + '/messages', undefined, 'GET');
@@ -290,12 +261,10 @@ const detailLanded = await waitFor(async () => {
 }, 8000);
 if (!detailLanded) throw new Error('详情面 thinking 行未落库');
 
-// —— 浏览器面 ——————————————————————————————————————————————
 const measurements = {};
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
-// dicebear 桩：agent 头像走名字种子（avatarUrl null），不 mock 外网在沙箱里
-// 要悬 ~8s（avatars 面先例）。
+
 await page.route('**/api.dicebear.com/**', (route) =>
   route.fulfill({
     contentType: 'image/svg+xml',
@@ -303,7 +272,6 @@ await page.route('**/api.dicebear.com/**', (route) =>
   }),
 );
 
-/** 行钮 + 预览 span 的几何/计算态测量（两面共用形状）。 */
 async function measureRow(row, colSelector) {
   return row
     .getByRole('button', { name: /展开思考|收起思考/ })
@@ -328,7 +296,7 @@ async function measureRow(row, colSelector) {
 }
 
 try {
-  // —— C 面：chief 抽屉 ——
+
   await page.goto(WEB + '/app?chief=' + threadId, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.chief-drawer', { timeout: 20000 });
   await waitFor(
@@ -359,21 +327,20 @@ try {
     check('C5 拉丁行：可见宽 < 内容宽', l.labelScroll > l.labelClient, 'scroll/client=' + l.labelScroll + '/' + l.labelClient);
     check('C6 拉丁行：钮宽 ≤ 列宽', l.btnW <= l.colW, 'btn/col=' + l.btnW + '/' + l.colW);
     check('C7 页面级零横向溢出', measurements.chiefPageOverflow <= 0, 'overflow=' + measurements.chiefPageOverflow);
-    // 口径钉：两条都 < 150 字符——JS 切片没参与，收住宽度的只能是 CSS。
+
     check('C8 切片未触发（预览 = 全文，无字面 …）而截断仍生效', c.labelText === LONG_CJK && l.labelText === LONG_LATIN, 'cjkLen=' + c.labelText.length + ' latinLen=' + l.labelText.length);
   } else {
-    // before 基线 = 复现缺陷：无省略号、span 无可溢出的盒、钮宽冲出列宽。
+
     check('C1o CJK 行：无 CSS 省略号（text-overflow clip）', c.textOverflow !== 'ellipsis', 'textOverflow=' + c.textOverflow);
     check('C2o CJK 行：span 无可溢出的盒（scroll == client）', c.labelScroll === c.labelClient, 'scroll/client=' + c.labelScroll + '/' + c.labelClient);
     check('C3o CJK 行：钮宽 > 列宽（fit-content 解成整段文本宽）', c.btnW > c.colW, 'btn/col=' + c.btnW + '/' + c.colW);
     check('C4o 拉丁行：无 CSS 省略号', l.textOverflow !== 'ellipsis', 'textOverflow=' + l.textOverflow);
     check('C5o 拉丁行：钮宽 > 列宽', l.btnW > l.colW, 'btn/col=' + l.btnW + '/' + l.colW);
-    // 页面级溢出在改前取决于上游容器的横裁，不是缺陷判据——只记录不断言。
+
     process.stdout.write('note  改前页面级横向溢出 = ' + measurements.chiefPageOverflow + '（记录，不断言）\n');
     check('C6o 切片未参与时宽度无人收（预览全文直出成钮宽）', c.labelText === LONG_CJK, 'cjkLen=' + c.labelText.length);
   }
 
-  // —— D 面：详情对话 ——
   await page.goto(WEB + '/app/todo/' + todoId, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('[data-testid="transcript-col"]', { timeout: 20000 });
   const detailRow = page.locator('div.chat-row--agent', { hasText: LONG_DETAIL.slice(0, 12) });
@@ -417,8 +384,7 @@ try {
     check('D5o 钮宽 > 文字列宽（无界）', d.btnW > d.colW, 'btn/col=' + d.btnW + '/' + d.colW);
     process.stdout.write('note  改前详情面页面级横向溢出 = ' + measurements.detailPageOverflow + '（记录，不断言）\n');
   }
-  // 两级分工（两种期望下都成立）：> 150 字符 → 切片先行（字面 … 收尾），
-  // 宽度截断由 CSS 承担；展开仍见全文。
+
   check(
     'D8 切片管预览长度：> 150 字符的预览以字面 … 收尾且短于全文',
     d.labelText.endsWith('…') && d.labelText.length < LONG_DETAIL.length,
@@ -434,7 +400,6 @@ try {
   await browser.close();
 }
 
-// —— 真值落盘 ——————————————————————————————————————————————
 const chiefRows = await sendJson(SERVER + '/api/conversations/' + threadId + '/messages', undefined, 'GET');
 writeFileSync(join(EVIDENCE, 'api-chief-messages.json'), JSON.stringify(chiefRows.body, null, 2) + '\n');
 artifacts.push('api-chief-messages.json');
@@ -442,7 +407,6 @@ const detailRows = await sendJson(SERVER + '/api/conversations/' + buildId + '/m
 writeFileSync(join(EVIDENCE, 'api-detail-messages.json'), JSON.stringify(detailRows.body, null, 2) + '\n');
 artifacts.push('api-detail-messages.json');
 
-// SQLite 行级 pin（详情面 message 表；只读，best-effort——服务端连接持 WAL）。
 try {
   const requireServer = createRequire(join(REPO, 'apps', 'server', 'package.json'));
   const Database = requireServer('better-sqlite3');

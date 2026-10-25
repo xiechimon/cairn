@@ -1,24 +1,3 @@
-// verify-cairn 定制 probe（#1213 / ADR 0017 双执行源）：github 形态项目加挂
-// localPath 同机加速位的活栈全链取证。纯 HTTP + fs + SQLite + daemon.log +
-// 浏览器设置页真用户路径；自 spawn stub LLM + 双 daemon（A=本机加速位可见机、
-// B=localPath 失格机）并自回收。
-//
-// 票面验收 seam 对照：
-//   server 松绑   POST github 项目 + PATCH localPath（形态校验、显式 null 清空）
-//                 + SQLite 行双真值。
-//   daemon 选源A  localPath 存在且同仓（真 GitHub 仓 octocat/Hello-World 的
-//                 本地克隆，主引用故意落到旧提交）→ 基座走本地源，origin 重指
-//                 https 真值 URL，fetch 后 worktree HEAD = 远端 tip（新鲜度
-//                 不松）。
-//   daemon 选源B  localPath 改成不存在路径 → 第二台 daemon 基座缺位 → 静默
-//                 回落 GitHub clone + 一行选源日志（含回落原因）。
-//   web 最小面    设置页 github 形态显示「本机加速路径」字段，真用户路径改值
-//                 落 PATCH + 截图双态。
-//
-// 用法（配方 = docs/verify/1213/README.md）：
-//   先 launch.mjs 起栈，再 node drive-1213-dual-source.mjs
-// env：SERVER（缺省读 VERIFY_RUN_DIR/ports.json）、VERIFY_RUN_DIR、
-//      VERIFY_EVIDENCE_DIR。
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
@@ -35,12 +14,9 @@ const stack = JSON.parse(readFileSync(join(RUN_DIR, 'ports.json'), 'utf8'));
 const SERVER = process.env.SERVER ?? `http://127.0.0.1:${stack.serverPort}`;
 const DB = join(stack.homeDir, 'server', 'server.db');
 
-// 唯一可写机器名（双 daemon 各持各的 api-key，#895 gotcha）。
 const DAEMON_HOME_A = `/tmp/cairn-1213-daemon-a-${Date.now()}`;
 const DAEMON_HOME_B = `/tmp/cairn-1213-daemon-b-${Date.now()}`;
 
-// 真值远端：公共小仓 octocat/Hello-World（匿名 clone/fetch 可达；本地源 = 该
-// 仓的真克隆，origin 归一化后与项目 cloneUrl 同仓——双条件判定的正向腿）。
 const GH_REPO = 'octocat/Hello-World';
 const GH_CLONE_URL = `https://github.com/${GH_REPO}.git`;
 
@@ -78,9 +54,6 @@ async function jfetch(method, path, opts = {}) {
   return { status: res.status, body };
 }
 
-// —— stub LLM（drive-925 最小移植）：纯文本应答——build 步按「零改动」产物闸
-//    failed 收尾属预期（材料化 seam 在会话之前，验收面 = 选源日志 + git 实物）。
-
 function startStubLlm() {
   const requests = [];
   const server = createServer((req, res) => {
@@ -116,14 +89,11 @@ function git(args, cwd) {
   return { code: r.status, out: (r.stdout ?? '').trim(), err: (r.stderr ?? '').trim() };
 }
 
-// —— 本地加速位种子：真 GitHub 仓的本地克隆 + 主引用故意回退到旧提交
-//    （新鲜度判定的活证据：本地源落后时，fetch 后 worktree 仍须在远端 tip）。
-
 function seedLocalSource() {
   const dir = join(mkdtempSync(join(tmpdir(), 'cairn-1213-local-')), 'Hello-World');
   const clone = git(['clone', GH_CLONE_URL, dir], undefined);
   if (clone.code !== 0) throw new Error(`clone seed failed: ${clone.err}`);
-  const branch = git(['symbolic-ref', '--short', 'HEAD'], dir).out; // master
+  const branch = git(['symbolic-ref', '--short', 'HEAD'], dir).out;
   const history = git(['rev-list', '--max-count=5', branch], dir).out.split('\n').filter(Boolean);
   const stale = history[history.length - 1];
   const tip = history[0];
@@ -131,8 +101,6 @@ function seedLocalSource() {
   if (back.code !== 0) throw new Error(`stale ref failed: ${back.err}`);
   return { dir, branch, tip, stale };
 }
-
-// —— daemon spawn（drive-925 同形：--server 显式进命令行 = cleanup 钉选面）——
 
 function spawnDaemon(apiKey, teamId, name, daemonHome) {
   const env = { ...process.env };
@@ -189,7 +157,6 @@ async function waitFor(pred, timeoutMs, label) {
   }
 }
 
-/** 基座/conv worktree 的 git 实物（选源与新鲜度的判据面）。 */
 function repoState(daemonHome, projectId, conversationId) {
   const base = join(daemonHome, 'workspaces', projectId, 'repo');
   const conv = join(daemonHome, 'workspaces', conversationId);
@@ -199,8 +166,6 @@ function repoState(daemonHome, projectId, conversationId) {
   const convHead = existsSync(join(conv, '.git')) ? git(['rev-parse', '--verify', 'HEAD'], conv).out : null;
   return { base, conv, origin, originDefault, remoteTip, convHead };
 }
-
-// —— main —————————————————————————————————————————————————————————————
 
 let stubHandle = null;
 let daemonA = null;
@@ -212,7 +177,6 @@ try {
 
   const local = seedLocalSource();
 
-  // seed：team / provider / agent / api-key ×2。
   const teams = await jfetch('GET', '/api/teams');
   const teamId = teams.body[0]?.id ?? teams.body.teams?.[0]?.id;
   if (!teamId) throw new Error(`no team: ${JSON.stringify(teams.body).slice(0, 200)}`);
@@ -255,8 +219,6 @@ try {
     keys.push(apiKey);
   }
 
-  // —— server 松绑面：POST github 项目（不带 localPath）→ PATCH 挂加速位。
-
   const projRes = await jfetch('POST', '/api/projects', {
     body: { name: `probe-1213-${Date.now()}`, teamId, kind: 'github', githubRepo: GH_REPO },
   });
@@ -279,8 +241,6 @@ try {
   check('SQLite project 行 localPath 落库（githubRepo 与加速位并存）', dbRow?.localPath === local.dir && dbRow?.githubRepo === GH_REPO, JSON.stringify(dbRow));
   save('sqlite-project-row-localpath.json', dbRow);
 
-  // —— web 最小面：设置页 github 形态显示「本机加速路径」，真用户路径改值。
-
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
   await page.goto(`http://127.0.0.1:${stack.webPort}/app/project/${projectId}/settings`);
@@ -298,11 +258,8 @@ try {
   check('设置页改值落 PATCH：record.localPath = 新路径', afterRow?.localPath === BAD_PATH, `localPath=${afterRow?.localPath}`);
   save('project-record-after-ui.json', afterRow);
 
-  // 回到有效加速位再走腿 A（改值面已验，选源面用同仓路径）。
   const patchBack = await jfetch('PATCH', `/api/projects/${projectId}`, { body: { localPath: local.dir } });
   check('PATCH 恢复有效加速位（腿 A 前置）', patchBack.status === 200 && patchBack.body?.localPath === local.dir, `${patchBack.status}`);
-
-  // —— daemon A（本机加速位可见）：build 1 → 本地源 + fetch 后 HEAD = 远端 tip。
 
   const todoRes = await jfetch('POST', `/api/projects/${projectId}/todos`, {
     body: { title: '双执行源探针', spec: '探针任务：无需改动。' },
@@ -342,8 +299,6 @@ try {
     `convHead=${stateA.convHead} remoteTip=${stateA.remoteTip} tip=${local.tip} stale=${local.stale}`,
   );
 
-  // —— localPath 改成不存在路径（票面动作）→ daemon B（基座缺位）回落 GitHub。
-
   const patchBad = await jfetch('PATCH', `/api/projects/${projectId}`, { body: { localPath: BAD_PATH } });
   check('PATCH localPath → 不存在路径（回落腿前置）', patchBad.status === 200 && patchBad.body?.localPath === BAD_PATH, `${patchBad.status}`);
   db = openDb();
@@ -354,7 +309,6 @@ try {
   }
   save('sqlite-project-row-badpath.json', dbRow);
 
-  // 杀 A 后等过僵尸 claim 窗（≤75s，#1025 gotcha）再派 build 2——B 独占认领。
   daemonA.kill('SIGTERM');
   daemonA = null;
   await new Promise((r) => setTimeout(r, 80_000));

@@ -1,33 +1,3 @@
-// verify-cairn 定制 probe（#1261 relay 额度空/限流显性反馈 + 自动续跑）：
-// 票面三验收在活栈上证成实物——真 daemon + 真 server + 真 web + stub relay
-// （429 限流 + Retry-After，pi 视其可重试 = 旧路径会烧 auto_retry 风暴的那
-// 一族）。两条腿：
-//   断粮腿（两个任务同一路 relay）  daemon 认领 → stub 429 → runner 配额熔断
-//     （首错即停会话，不打满 pi 预算）→ done(failed + quotaBlock) → server
-//     挂起 waiting_quota（不判死）→ 板面「等额度」横幅 + 卡芯片（SSE 驱动
-//     live-push，验收「3 分钟内板面出现」计时取证）+ 详情头 chip / 进度行
-//     → in-app 通知行（quota_wait）→ daemon.log 可查熔断行且零 storm。
-//   恢复腿  stub 翻 200（SSE 正常轮）→ probeAt（Retry-After 5s）到期 sweep
-//     释放回 pending → wake → daemon 再认领 → continue session 跑完 → 步
-//     done + todo 进 review——「额度恢复后无人工操作自动续跑」。
-// 失败方式清单（先固化判别面；哪条红即指认断点 hop）：
-//   1. 熔断缺席（主 bug）：daemon.log 无 quota circuit breaker 行 / 出现
-//      retry storm / auto_retry 打满 → 断粮腿红；
-//   2. 判死而非挂起：todo failed / build.errorMessage 非空 / 步 failed →
-//      挂起断言红（旧路径的「判失败立刻重起」正是票面病灶）；
-//   3. 板面零感知：横幅 / 卡芯片 / 详情 chip 任一缺席，或 live-push 超
-//      3 分钟（验收红线）→ 断粮腿红；
-//   4. 通知缺席：notification 行无 quota_wait / snippet 不指名 relay → 红；
-//   5. 永不恢复：翻 200 后步不 done（probeAt 到期不释放 / 释放不被认领 /
-//      ok 轮跑不完）→ 恢复腿红；
-//   6. Retry-After 链断：quotaBlock.retryAfterMs ≠ 5000（头没进诊断行或
-//      没被解析）→ 红。
-// 用法（栈须先 launch：VERIFY_PORT=8802 VERIFY_WEB_PORT=5282）：
-//   node drive-1261-quota-wait.mjs
-// env：VERIFY_REPO_ROOT / VERIFY_RUN_DIR / VERIFY_EVIDENCE_DIR、
-//      DAEMON_HOME（缺省 /tmp/cairn-1261-daemon-home）。
-// 探针自 spawn：stub relay（ephemeral 端口，模式可翻）+ 真 daemon
-// （--server 指本栈）；收尾全部回收（finally kill）。
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -103,11 +73,6 @@ async function jfetch(method, path, opts = {}) {
   return { status: res.status, body };
 }
 
-// —— stub relay：模式门控（quota = 429 + Retry-After；ok = SSE 正常轮）——————
-// ok 轮首答带写类工具（echo 落 marker 文件）——零改动步过不了产物闸，产物面
-// 同 1025 的 bash 工具行形态；次答纯文本收尾。ok 请求计数从翻转起算（每会话
-// 两请求：continue 首轮 + 工具结果轮）。
-
 function startRelay() {
   const requests = [];
   let mode = 'quota';
@@ -124,8 +89,7 @@ function startRelay() {
     req.on('end', () => {
       requests.push({ mode, url: req.url, at: Date.now() });
       if (mode === 'quota') {
-        // pi 视 429/rate limit 为可重试——这正是旧路径烧 auto_retry 风暴的
-        // 那一族；Retry-After 头经 #882 诊断行透传进 runner 的 quotaBlock。
+
         res.writeHead(429, {
           'content-type': 'application/json',
           'retry-after': String(RETRY_AFTER_SECONDS),
@@ -133,17 +97,14 @@ function startRelay() {
         res.end(JSON.stringify({ error: { message: 'rate limit exceeded for this key', type: 'rate_limit_error' } }));
         return;
       }
-      // ok 轮按会话状态应答而非请求序号——两任务并发续跑时序交错，奇偶轮
-      // 会串到对方会话（首轮实跑把 toolCall 给了 A、纯文本给了 B → B 零改动
-      // 被产物闸判死）。判据 = 请求体末条消息角色：tool（工具结果回传轮）→
-      // 纯文本收尾；否则（任务/续跑轮）→ 写类工具调用。
+
       let lastRole = 'user';
       try {
         const parsed = JSON.parse(body);
         const msgs = parsed?.messages;
         if (Array.isArray(msgs) && msgs.length > 0) lastRole = msgs[msgs.length - 1]?.role ?? 'user';
       } catch {
-        /* body 非法按缺省 user 轮处理 */
+
       }
       okRounds += 1;
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
@@ -212,8 +173,6 @@ function startRelay() {
     });
   });
 }
-
-// —— seed / daemon / SQLite（drive-1025 同款骨架）———————————————————
 
 async function seed(relayUrl) {
   const teams = await jfetch('GET', '/api/teams');
@@ -344,8 +303,6 @@ const dbBuild = (buildId) => dbOne('SELECT id, errorMessage FROM build WHERE id 
 const dbSteps = (buildId) =>
   dbAll('SELECT id, kind, status, quotaBlock FROM step WHERE buildId = ? ORDER BY createdAt', buildId);
 
-// —— main ———————————————————————————————————————————————————————————
-
 rmSync(DAEMON_HOME, { recursive: true, force: true });
 
 const relay = await startRelay();
@@ -369,7 +326,7 @@ const buildStartAt = Date.now();
 
 let bannerVisibleAt = null;
 try {
-  // vite 冷编译暖机（drive-918 同款）。
+
   const warm = await browser.newPage();
   await warm.goto(`${WEB}/app`, { waitUntil: 'networkidle', timeout: 90_000 });
   await warm.close();
@@ -379,11 +336,9 @@ try {
     'daemon online',
   );
 
-  // 板面先就位（断粮前），横幅出现 = SSE live-push 驱动（验收「3 分钟内」）。
   const board = await browser.newPage();
   await board.goto(`${WEB}/app`, { waitUntil: 'networkidle', timeout: 90_000 });
 
-  // 断粮腿：daemon 认领 → stub 429 → 熔断 → done(quotaBlock) → 挂起。
   await waitFor(
     () => relay.quotaHits() >= 2,
     60_000,
@@ -440,7 +395,6 @@ try {
     notif.map((n) => n.snippet).join(' | ').slice(0, 300),
   );
 
-  // 3 板面三件（live-push 计时 = build 起 → 横幅可见）。
   const banner = board.locator('[data-quota-banner]');
   await banner.waitFor({ state: 'visible', timeout: 120_000 });
   bannerVisibleAt = Date.now();
@@ -465,7 +419,6 @@ try {
   );
   await board.screenshot({ path: join(EVIDENCE, 'board-quota-waiting.png'), fullPage: false });
 
-  // 详情面：头 chip + 等额度进度行。
   const detail = await browser.newPage();
   await detail.goto(`${WEB}/app/todo/${taskA.todoId}`, { waitUntil: 'networkidle', timeout: 90_000 });
   const headChip = await detail.getByTestId('phase-chip').innerText();
@@ -482,7 +435,6 @@ try {
   );
   await detail.screenshot({ path: join(EVIDENCE, 'detail-quota-waiting.png'), fullPage: false });
 
-  // 恢复腿：relay 翻 200 → probeAt（Retry-After 5s + tick）到期释放 → 续跑完成。
   relay.setOk();
   const resumeAt = Date.now();
   await waitFor(
@@ -528,7 +480,6 @@ try {
   check('5c 恢复后横幅退场（板面回常态）', postBanner === 0, `banner count=${postBanner}`);
   await board.screenshot({ path: join(EVIDENCE, 'board-after-resume.png'), fullPage: false });
 
-  // 产物真值：ok 轮的写类工具在会话里落过 marker（transcript 行面）。
   const markerRows = dbAll(
     'SELECT id, role, content FROM message WHERE conversationId = ? ORDER BY createdAt',
     taskA.buildId,

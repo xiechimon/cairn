@@ -1,30 +1,30 @@
 ---
 name: retro-cairn
-description: 任务收尾或出错修复后使用：列出过程中出过又修好的错（含被用户纠正的），归因，落成防止复发的防护并记进 docs/lessons.md。
+description: Use when wrapping up a task or after fixing an error: list the mistakes that appeared and got fixed along the way (including ones a user corrected), attribute them, turn them into recurrence-preventing safeguards, and record them in docs/lessons.md.
 ---
 
-# retro-cairn：过程错误 → 防护
+# retro-cairn: process error -> safeguard
 
-本仓正本叫 `retro-cairn`，不叫 `retro`：个人级同名技能优先级压过项目级，仓里接管不了 `retro` 这个名字（和 `pr-cairn` 同一个原因）。换账号或换机器后，克隆本仓即可用，不依赖个人技能。
+This repo's canonical name is `retro-cairn`, not `retro`: a personal-level skill of the same name takes precedence over a project-level one, so the repo cannot take over the name `retro` (the same reason as `pr-cairn`). After switching accounts or machines, cloning this repo makes it available without depending on personal skills.
 
-原则：过程中出现过的错，即使最后修好了，也要揪出来，保证同类错下次被自动拦下。适用于 agent 自己犯的错，也适用于被管理的系统犯的错。
+Principle: a mistake that appeared during the process, even if fixed by the end, must be surfaced so the same kind gets stopped automatically next time. This applies to mistakes an agent makes itself and to mistakes made by the systems under management.
 
-## 何时触发
+## When to trigger
 
-- 线程或任务收尾、准备汇报之前（不用用户提醒）。
-- 测试红后转绿、CI 修了几轮、审核打回、方案被驳回、重试、回滚、被用户纠正之后。
+- Before wrapping up a thread or task and preparing the report (no user reminder needed).
+- After a test goes red then green, several rounds of CI fixes, a review rejection, a plan being turned down, a retry, a rollback, or being corrected by a user.
 
-## 步骤
+## Steps
 
-1. 列错：列出每个「出错又修好」的点，一句话写清现象。用户纠正过的一定算。
-2. 归因：问「为什么当时没被拦住」，找根因（缺检查、规则不清、上下文缺失、工具误用）。
-3. 选防护，从级别 1 往下问「能不能做」，台账的五级阶梯是正本（`docs/lessons.md`）：架构或类型 > lint、脚本闸、测试、CI > 规则 > 技能 > 记忆。级别 4、5 必须在备注写明为什么做不成更高级；做不小的当场开票并把票号写进备注，不能只写「待升」（`node scripts/lessons-ledger-gate.mjs` 会检查）。新增机器检查必须拿这次真实错误做负对照：旧错在新闸下变红才算落地。
-4. 记账：在 `docs/lessons.md` 台账加一行。一类错一行，同类合并，不开重复行。
-5. 复发升级：同类错再出现，「复发」加一，防护往更硬一层升，不是再补一条文字。
-6. 汇报：收尾时一两句话说明抓到几个过程错误、各落成了什么防护。
+1. List the errors: list every "appeared and got fixed" point, one sentence describing the symptom. Ones a user corrected always count.
+2. Attribute: ask "why was it not stopped at the time", find the root cause (missing check, unclear rule, missing context, tool misuse).
+3. Choose a safeguard, working from level 1 downward asking "can this be done"; the ledger's five-rung ladder is the canonical source (`docs/lessons.md`): architecture or types > lint, script gates, tests, CI > rules > skills > memory. Levels 4 and 5 must note in the remark why a higher level cannot be done; if it cannot be done now, open a ticket and put the ticket number in the remark, do not write just "to be upgraded" (`node scripts/lessons-ledger-gate.mjs` checks this). A new machine check must use this real mistake as the negative control: the old error turning red under the new gate is what counts as landing it.
+4. Record: add a row to the `docs/lessons.md` ledger. One error kind per row, merge the same kind, do not open duplicate rows.
+5. Recurrence escalation: when the same kind appears again, increment "recurrences" and push the safeguard to a harder level, not add another line of text.
+6. Report: when wrapping up, summarize in one or two sentences how many process errors were caught and what safeguard each became.
 
-## 边界
+## Boundaries
 
-- 动 ADR、保护路径或改变原定行为的防护，先问用户。
-- 防护走正常 PR 流程（开 PR、开 auto-merge、收工），不绕过审核。
-- 不追求「永不再犯」，追求「每个错都有去处、可计数、会升级」。
+- Ask the user first before a safeguard that touches ADRs, protected paths, or changes intended behavior.
+- Safeguards go through the normal PR flow (open PR, open auto-merge, wrap up), not around review.
+- Do not aim for "never again"; aim for "every mistake has a home, is countable, and escalates".
