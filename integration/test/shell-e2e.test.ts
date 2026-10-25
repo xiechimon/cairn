@@ -1,11 +1,3 @@
-// remote_shell 全链 E2E（XMON-110 验收 6）：真 server（HTTP + 审计表）+ 真
-// daemon（runMachine + pi 会话）+ 真 bash spawn，stub LLM 只顶替模型决策。
-// 链路 = claim localTools（双闸开）→ agent 调 remote_shell → 预检落审计行
-// （running）→ 本机执行 → 回写终态（done + exitCode + output）→ 工具结果
-// 文本回到 agent 会话面。
-// 断言面三处：server shell_command 审计行（正本）、daemon.log 审计行族
-// （执行机副本）、message 表（agent 真拿到输出）。任一环节静默失败即红。
-
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -34,7 +26,6 @@ import {
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
-/** 命令与输出 marker：审计行 / message 面共用的对账键。 */
 const MARKER = 'SHELL-E2E-MARKER-110';
 const COMMAND = `echo ${MARKER}`;
 const MACHINE_NAME = 'shell-e2e-mbp';
@@ -53,11 +44,8 @@ function logLines(): string[] {
 
 beforeAll(async () => {
   stub = await startStubLlm([
-    // 轮 1：agent 调 remote_shell（pi 会话内真执行：预检 → bash → 回写）。
     { toolCall: { name: 'remote_shell', arguments: { command: COMMAND } } },
-    // 轮 2：真做一处改动（#703 闸 2——执行步无改动过不了 review 闸）。
     { toolCall: { name: 'bash', arguments: { command: 'printf "shell probe\\n" >> README.md' } } },
-    // 轮 3：收尾。
     { content: '命令已执行。' },
   ]);
   server = await bootRealServer({
@@ -65,8 +53,6 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试 Agent：按指令使用工具，然后简短汇报。',
   });
-  // 双闸 agent 侧：授「远程 shell」工具开关（machine.shellEnabled 在 daemon
-  // 注册出 machine 行后开，见下——claim 期两闸齐开才有 localTools 词）。
   server.db
     .update(agentTable)
     .set({ tools: ['合并分支', '推送分支', AGENT_TOOL_SHELL] })
@@ -95,8 +81,6 @@ beforeAll(async () => {
     heartbeatIntervalMs: 500,
   });
   await waitFor(() => logLines().includes('[wake] push channel connected'), 30_000);
-  // 双闸 machine 侧：注册行落库后开机器 shell 闸（先于 build 创建 = 先于
-  // claim，localTools 组装期两闸齐开）。
   await waitFor(
     () =>
       server.db.select().from(machineTable).where(eq(machineTable.name, MACHINE_NAME)).get() !==
@@ -122,8 +106,8 @@ afterAll(async () => {
   );
 });
 
-describe('XMON-110 remote_shell 全链 E2E（预检 → 执行 → 审计行终态）', () => {
-  test('一条真命令走通全链：审计行 done + exitCode/output 正确 + agent 拿到输出', async () => {
+describe('XMON-110 remote_shell full-chain E2E (precheck → execute → audit row final state)', () => {
+  test('one real command walks the whole chain: audit row done + exitCode/output correct + agent receives the output', async () => {
     world = await seedWorld(
       server.url,
       server.teamId,
@@ -140,8 +124,6 @@ describe('XMON-110 remote_shell 全链 E2E（预检 → 执行 → 审计行终�
 
     await waitFor(() => server.todoPhase(world.todoId) === 'review', 150_000);
 
-    // ① 审计正本（server shell_command 表）：一行、命令原文、终态 done、
-    //    exitCode 0、输出含 marker、挂在本 build 的步上、finishedAt 落位。
     const rows = server.db.select().from(shellCommandTable).all();
     expect(rows).toHaveLength(1);
     const row = rows[0]!;
@@ -159,14 +141,11 @@ describe('XMON-110 remote_shell 全链 E2E（预检 → 执行 → 审计行终�
       .map((s) => s.id);
     expect(stepIds).toContain(row.stepId);
 
-    // ② 执行机副本（daemon.log 审计行族）：allowed（预检放行）+ done（exit=0）。
     expect(logLines().some((l) => l.includes('shell allowed') && l.includes(`run=${row.id}`))).toBe(
       true,
     );
     expect(logLines().some((l) => l.includes('shell done') && l.includes('exit=0'))).toBe(true);
 
-    // ③ agent 会话面：工具结果文本（真实输出）经 relay 落 message 表——
-    //    证明 agent 拿到的不是错误占位文本。
     const msgs = server.db
       .select()
       .from(messageTable)

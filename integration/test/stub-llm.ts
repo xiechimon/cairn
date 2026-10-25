@@ -1,19 +1,11 @@
-// stub LLM = OpenAI Chat Completions 兼容 SSE 端点（pi-ai `openai-completions`
-// api 消费面）。集成 demo/T2 用它替代真 provider——「无密钥网关可留空」
-// （r3 §2 表单语义）使凭证面不参与骨架验证。
-
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 export interface StubResponse {
   content?: string;
-  /** 响应前延迟（崩溃窗口用）。 */
   delayMs?: number;
   usage?: { prompt: number; completion: number; cached?: number };
-  /** M3b：工具调用轮（OpenAI tool_calls delta 形）——pi 内建工具真执行
-   * （bash 改文件 → worktree 真改动面），随后 pi 会带工具结果再请求一轮。 */
   toolCall?: { id?: string; name: string; arguments: Record<string, unknown> };
-  /** M3b：HTTP 错误轮（provider 流级失败 → 步 failed 语义，02 §4.2）。 */
   status?: number;
 }
 
@@ -26,7 +18,6 @@ export interface StubRequest {
 export interface StubLlm {
   url: string;
   requests: StubRequest[];
-  /** 每次请求的到达时刻（与 requests 同步 push；#698 诊断面：请求时间线）。 */
   requestTimes: number[];
   close(): Promise<void>;
 }
@@ -60,11 +51,10 @@ export async function startStubLlm(
       next += 1;
       const usage = rsp.usage ?? DEFAULT_USAGE;
       const send = () => {
-        // HTTP 错误轮（M3b 失败语义面）：非 SSE，直接状态码。错误 type 随状态
-        // 分档——pi 会话级 auto_retry 按 errorMessage 文本判可重试（pi-ai
-        // retry.js RETRYABLE_PROVIDER_ERROR_PATTERN 含 `server.?error`）：5xx =
-        // server_error（可重试，被 pi 流级吸收并重发，02 §4.2）；4xx =
-        // invalid_request_error（不可重试，步级失败无自动重跑，02/A6）。
+        // pi-ai session-level auto_retry matches errorMessage against
+        // RETRYABLE_PROVIDER_ERROR_PATTERN (retry.js, includes `server.?error`):
+        // 5xx must be typed server_error (retriable, absorbed at stream level);
+        // 4xx must be invalid_request_error (not retriable, step-level failure).
         if (rsp.status !== undefined && rsp.status >= 400) {
           const errType = rsp.status >= 500 ? 'server_error' : 'invalid_request_error';
           res.writeHead(rsp.status, { 'content-type': 'application/json' });
@@ -89,8 +79,6 @@ export async function startStubLlm(
           }),
         );
         if (rsp.toolCall) {
-          // OpenAI 流式 tool_calls：首帧带 id/name/空 arguments，次帧补全
-          // arguments JSON，finish_reason=tool_calls。
           const callId = rsp.toolCall.id ?? `call-stub-${requests.length}`;
           res.write(
             chunk({
@@ -136,7 +124,6 @@ export async function startStubLlm(
             chunk({ ...base, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] }),
           );
         } else {
-          // 内容按词切块（text_delta 多帧，transcript 流形更接近真 provider）。
           for (const word of (rsp.content ?? 'ok').split(/(?<=。|\.|\s)/u)) {
             if (word === '') continue;
             res.write(chunk({ ...base, choices: [{ index: 0, delta: { content: word } }] }));

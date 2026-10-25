@@ -42,7 +42,9 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const knownRed = JSON.parse(readFileSync(join(root, 'scripts/prepush-known-red.json'), 'utf8'));
   const { unexpected, knownFailed } = unexpectedFailures(report, knownRed);
   for (const file of knownFailed)
-    console.log(`[prepush] 本机已知环境红（scripts/prepush-known-red.json）: ${file}`);
+    console.log(
+      `[prepush] known environment red locally (scripts/prepush-known-red.json): ${file}`,
+    );
   if (unexpected.length > 0) {
     for (const file of unexpected) console.error(`[prepush] FAIL: ${file}`);
     process.exit(1);

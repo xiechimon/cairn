@@ -1,14 +1,3 @@
-// W3 steer E2E（真 server + 真 daemon + pi + 门控 stub LLM，06 册 D9 / spec
-// #277）：building 态发消息的全链焊点——POST /conversations/{id}/messages →
-// steer_pending 单槽 + machine stream steer 信号 → daemon 拉取-确认 →
-// pi `session.steer`（#278 server 写面 × #279 daemon 接线的端到端证明；
-// composer 调用面在 web（#280 本票），REST 形状与其一致）。
-// 失败方式（spec #277 Testing Decisions 5 的全链化）：
-//   1. 送达：daemon.log `steer delivered`（真实 pi steer 调用成功落日志）
-//   2. 呈现：GET messages 面用户行在位
-//   3. 门：确认后（无在跑步）POST → 409 不静默
-//   4. 步收尾不受扰：延迟窗过后 done → phase confirm
-
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,8 +28,6 @@ function logLines(): string[] {
 }
 
 beforeAll(async () => {
-  // 门控轮：延迟 8s 的工具轮——期间步 claimed、pi 会话在跑，POST steer 窗口。
-  // #703 产物闸：bash 写 plan.md 让规划步有真产物（纯文本轮过不了闸 1）。
   stub = await startStubLlm([
     {
       toolCall: {
@@ -88,8 +75,8 @@ afterAll(async () => {
   if (home) rmSync(home, { recursive: true, force: true });
 });
 
-describe('W3 steer E2E：building 态发消息 → pending → 信号 → 拉取-确认 → session.steer', () => {
-  test('全链送达 + 呈现 + 收尾不受扰 + 门拒绝', async () => {
+describe('W3 steer E2E: message while building → pending → signal → pull-confirm → session.steer', () => {
+  test('full-chain delivery + rendering + undisturbed step finish + gate reject', async () => {
     const world = await seedWorld(server.url, server.teamId, {
       title: 'steer 探针',
       spec: '写一行 steer 探针。',
@@ -102,29 +89,23 @@ describe('W3 steer E2E：building 态发消息 → pending → 信号 → 拉取
     expect(started.status).toBe(201);
     const buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    // daemon 领步 → pi 会话开（stub 延迟窗内步在跑）。
     await waitFor(() => logLines().some((l) => l.includes(`new session ${buildId}`)), 30_000);
 
-    // 发送（主链）：POST → 201（claimed 步门收）。
     const sent = await api(server.url, 'POST', `/api/conversations/${buildId}/messages`, {
       content: '顺便把测试补上',
     });
     expect(sent.status).toBe(201);
 
-    // 送达（失败方式 1）：真实链 = SSE steer 事件 → 拉取-确认 → pi steer。
     await waitFor(() => logLines().some((l) => l.includes('steer delivered')), 30_000);
 
-    // 呈现（失败方式 2）：GET messages 面用户行。
     const face = await api(server.url, 'GET', `/api/conversations/${buildId}/messages`);
     const faceBody = face.body as { messages: { role: string; content: unknown }[] };
     expect(faceBody.messages.some((m) => m.role === 'user' && m.content === '顺便把测试补上')).toBe(
       true,
     );
 
-    // 收尾不受扰（失败方式 4）：延迟窗过后步 done → phase confirm。
     await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 120_000);
 
-    // 门（失败方式 3）：确认后（无在跑步）再发 → 409 不静默。
     const late = await api(server.url, 'POST', `/api/conversations/${buildId}/messages`, {
       content: '晚到的一条',
     });

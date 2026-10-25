@@ -1,80 +1,5 @@
 #!/usr/bin/env node
 
-// Permanent debt ratchet (#851; born as the construction-period brake for
-// #908, sealed as a standing regression gate by #1012 when map #980 closed —
-// the ledgers sit at their floor, so the ratchet now purely blocks regrowth).
-// Three debt ledgers may only shrink, never grow:
-//
-//   per-face CSS   every *.css under apps/web/src except the five
-//                  carrier-layer files (WHITELIST below). Counted per file in
-//                  physical lines (newline characters, wc -l parity).
-//   bare controls  occurrences of <button / <input / <select / <textarea in
-//                  *.tsx under apps/web/src, excluding components/ui/ (the
-//                  primitives are the sanctioned implementations). Counted as
-//                  a grand total. Tag matching keeps the semantics of
-//                  scripts/count-raw-controls.mjs (the docs/spec/16 §6.5
-//                  ledger tool): multi-line opening tags are found, longer tag
-//                  names (<buttonish) are not, and comments are NOT stripped —
-//                  a tag-shaped mention inside a comment counts, which keeps
-//                  the baseline directly comparable to the published ledger
-//                  (76 sites / 30 files @ a831032e).
-//   arbitrary      Tailwind arbitrary-value classes in *.ts/*.tsx under
-//   values         apps/web/src (Paper redesign PR 2, apps/web/DESIGN.md
-//                  「六档字号」「4px 网格」): text sizes `text-[13px]` and
-//                  spacing/size utilities `ml-[10.5px]` (SPACING_UTILITIES),
-//                  each a single px/rem/em length, plus any interpolated
-//                  `text-[${x}]`-shaped class (Tailwind cannot see it, so it
-//                  is broken as well as off-scale). Same exclusions as bare
-//                  controls (components/ui/ primitives belong to the #989
-//                  registry gate) plus test files. Matching follows what the
-//                  Tailwind scanner extracts: variants, `!`, negative
-//                  prefixes and `/modifier` suffixes are seen through, and
-//                  comments/strings are NOT stripped — Tailwind emits CSS for
-//                  a class-shaped comment too, so it is counted.
-//                  Two totals (text, spacing), per-file counts for diagnosis.
-//
-// The baseline is scripts/ui-debt-baseline.json, frozen from a clean main by
-// `--write`. Domain tickets shrink debt, then re-freeze in their own PR (the
-// ratchet only moves down; see D3 for why up never passes CI).
-//
-// Gates (default check mode):
-//   D1  A per-face CSS file holds more lines than its baseline entry. A file
-//       absent from the baseline has an entry of 0, so any brand-new per-face
-//       CSS file is red — "新增面为零" (#913 acceptance template v2, item 7).
-//   D2  The bare-control total exceeds the baseline total. Per-file deltas are
-//       printed for diagnosis, but the rule is the total: moving controls
-//       between files without adding any is not new debt.
-//   D3  With a base ref (--base <sha> or UI_DEBT_BASE_SHA; CI passes the PR's
-//       base sha), the baseline carried by the branch must not be higher than
-//       the base's baseline — on any CSS entry, on the control total, or on
-//       either arbitrary-value total. This
-//       is what makes re-freezing inside a PR unable to legalize new debt:
-//       the comparison for D1/D2 runs against the BASE baseline when one is
-//       available, so raising the in-tree numbers changes nothing. Bootstrap:
-//       a base without the file (the PR that introduces the gate) skips D3;
-//       a base whose baseline predates the arbitraryValues ledger skips D3
-//       for that ledger only and D5 falls back to the in-tree numbers.
-//   D4  Fail-closed housekeeping: malformed or structurally inconsistent
-//       baseline (rawControls.files must sum to rawControls.total, the
-//       arbitraryValues files must sum to both totals, values must be
-//       non-negative integers), an empty source scan, a missing whitelist
-//       carrier file, or a matcher that fails its built-in canary
-//       (ARBITRARY_CANARY) all end red — a broken gate must never pass
-//       silently (same stance as the drizzle chain guard in ci.yml).
-//   D5  Either arbitrary-value total exceeds the baseline total. Per-file
-//       deltas are printed; the rule is the total, as in D2.
-//
-// Debt below baseline is not red: the run prints a note asking for a
-// `--write` re-freeze so the ledger follows the tree down (#851: 基线随动递减).
-//
-// Usage:
-//   node scripts/ui-debt-gate.mjs                 # check against the baseline
-//   node scripts/ui-debt-gate.mjs --write         # freeze baseline from tree
-//   node scripts/ui-debt-gate.mjs --base <sha>    # check + D3 against <sha>
-//
-// Exit codes: 0 = at or below baseline, 1 = violations, 2 = operational error
-// (baseline missing/unreadable, base sha not fetched, scan sanity failed).
-
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
@@ -84,11 +9,6 @@ const WEB_SRC = join(REPO_ROOT, 'apps/web/src');
 const BASELINE_PATH = join(REPO_ROOT, 'scripts/ui-debt-baseline.json');
 const BASELINE_REL = 'scripts/ui-debt-baseline.json';
 
-// Carrier layer (#851 whitelist): theme values, tokens, motion, app shell and
-// fonts are infrastructure for the new UI, not per-face debt. Paths are
-// relative to apps/web/src. Adding a file here is a deliberate, reviewable
-// act — the list is intentionally part of the gate's source, mirroring how
-// ui-drift-gate.mjs carries HEX_ALLOWLIST.
 const WHITELIST = [
   'styles/app.css',
   'styles/fonts.css',
@@ -98,13 +18,8 @@ const WHITELIST = [
 ];
 
 const CONTROL_TAGS = ['button', 'input', 'select', 'textarea'];
-// The primitives: bare native tags inside components/ui/ ARE the sanctioned
-// implementation (same boundary as count-raw-controls' ledger, which the #908
-// baseline of 76 sites / 30 files was cut from).
 const CONTROLS_EXCLUDED_PREFIX = 'components/ui/';
 
-// Tailwind utilities whose value is a spacing/size length. Negative forms
-// (-mt-[3px]) are matched through the optional leading `-`.
 const SPACING_UTILITIES = [
   'p',
   'px',
@@ -164,9 +79,6 @@ const utilityAlternation = (names) =>
     .sort((a, b) => b.length - a.length)
     .map((n) => n.replace(/-/g, '\\-'))
     .join('|');
-// (?<![\w-]) keeps `max-w-[` from also matching as `w-[`, and `context-[`
-// from matching as `text-[`; variants (`md:`), `!`, `[&>svg]:` and quotes
-// all sit outside that class, so prefixed candidates are still seen.
 const arbitraryPattern = (names) =>
   new RegExp(
     String.raw`(?<![\w-])-?(?:${utilityAlternation(names)})-\[(?:${LENGTH}|${INTERPOLATED})\]`,
@@ -182,8 +94,6 @@ function countArbitrary(source) {
   };
 }
 
-// Run on every invocation before the scan: if the matcher drifts (a refactor
-// of the patterns above), the gate exits 2 instead of silently counting 0.
 const ARBITRARY_CANARY = [
   ['className="text-[13px]"', 1, 0],
   ['md:text-[13.5px] hover:!text-[12px] text-[11px]!', 3, 0],
@@ -221,16 +131,12 @@ function walk(dir, extensions, out = []) {
   return out;
 }
 
-/** wc -l parity: the number of newline characters. */
 function countLines(text) {
   let n = 0;
   for (let i = 0; i < text.length; i++) if (text[i] === '\n') n++;
   return n;
 }
 
-/** Opening-tag finder, semantics copied from scripts/count-raw-controls.mjs:
- *  scans to the matching `>` of the opening tag, skipping quoted strings and
- *  JSX expression braces, and rejecting longer tag names. */
 function tagsOf(source, tag) {
   const open = `<${tag}`;
   const found = [];
@@ -256,15 +162,11 @@ function tagsOf(source, tag) {
   return found;
 }
 
-/** Scan the tree and produce the ledger shape used by the baseline file. */
 function scanTree() {
   const cssFiles = walk(WEB_SRC, '.css');
   const tsxFiles = walk(WEB_SRC, '.tsx');
   const arbitraryFiles = walk(WEB_SRC, ARBITRARY_EXTENSIONS);
 
-  // D4 sanity: an empty scan means the walk broke (moved src? wrong cwd?),
-  // and a missing carrier file means the whitelist went stale. Both are
-  // operational errors, not debt.
   const problems = [];
   if (cssFiles.length === 0) problems.push('scan found no *.css under apps/web/src');
   if (tsxFiles.length === 0) problems.push('scan found no *.tsx under apps/web/src');
@@ -332,8 +234,6 @@ function isNonNegativeInt(v) {
   return Number.isInteger(v) && v >= 0;
 }
 
-/** D4: the arbitraryValues ledger. Absent is allowed only where the caller
- *  says so (a base baseline frozen before this ledger existed). */
 function validateArbitrary(av, label, { optional }) {
   if (av === undefined && optional) return [];
   if (av === null || typeof av !== 'object')
@@ -370,7 +270,6 @@ function validateArbitrary(av, label, { optional }) {
   return problems;
 }
 
-/** D4: structural validation of a parsed baseline. Returns problem strings. */
 function validateBaseline(b, label, { arbitraryOptional = false } = {}) {
   const problems = [];
   if (b === null || typeof b !== 'object') return [`${label}: baseline is not an object`];
@@ -438,17 +337,11 @@ function git(args) {
   });
 }
 
-/** Resolve the base baseline for D3. Returns { baseline|null, mode } where
- *  mode is 'base' (loaded), 'bootstrap' (base commit predates the baseline
- *  file) — anything else is an operational error and exits 2. */
 function loadBaseBaseline(sha) {
   let text;
   try {
     text = git(['show', `${sha}:${BASELINE_REL}`]);
   } catch {
-    // Distinguish "commit known, file absent" (bootstrap) from "commit not
-    // even fetched" (broken CI plumbing — fail loudly rather than gate
-    // against a branch-supplied baseline).
     try {
       git(['rev-parse', '--verify', '--quiet', `${sha}^{commit}`]);
     } catch {
@@ -556,8 +449,6 @@ function check(baseSha) {
   const scan = scanTree();
   const inTree = loadInTreeBaseline();
 
-  // The comparison baseline for D1/D2: the base ref's copy when CI provides
-  // one (so a branch cannot lift its own ceiling), else the in-tree file.
   let effective = inTree;
   let baseMode = 'in-tree only';
   let arbitraryCeiling = inTree.arbitraryValues;
@@ -578,7 +469,6 @@ function check(baseSha) {
   const failures = [];
   const shrunk = [];
 
-  // D1: per-file per-face CSS lines.
   for (const [file, n] of Object.entries(scan.perFaceCss)) {
     const allowed = effective.perFaceCss?.[file] ?? 0;
     if (n > allowed) {
@@ -591,7 +481,6 @@ function check(baseSha) {
     }
   }
 
-  // D2: bare-control total, with per-file deltas as diagnosis.
   const allowedTotal = effective.rawControls?.total ?? 0;
   if (scan.controlTotal > allowedTotal) {
     const grew = [];
@@ -606,7 +495,6 @@ function check(baseSha) {
     shrunk.push(`bare controls total: ${allowedTotal} -> ${scan.controlTotal}`);
   }
 
-  // D5: arbitrary-value totals, with per-file deltas as diagnosis.
   for (const [key, label] of [
     ['text', 'arbitrary text sizes (text-[<len>])'],
     ['spacing', 'arbitrary spacing/size (SPACING_UTILITIES-[<len>])'],
@@ -627,7 +515,6 @@ function check(baseSha) {
     }
   }
 
-  // D3: the branch's own baseline must not sit higher than the base's.
   if (baseSha && effective !== inTree) {
     for (const [file, n] of Object.entries(inTree.perFaceCss)) {
       const before = effective.perFaceCss?.[file] ?? 0;
@@ -675,7 +562,6 @@ function check(baseSha) {
   process.exit(0);
 }
 
-// --- CLI ---------------------------------------------------------------------
 const argv = process.argv.slice(2);
 let writeMode = false;
 let baseSha = process.env.UI_DEBT_BASE_SHA || '';

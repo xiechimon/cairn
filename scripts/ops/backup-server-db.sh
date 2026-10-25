@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# backup-server-db.sh — cairn server SQLite DB 的小时级备份（#1151 / ADR 0016 裁决 7）。
+# backup-server-db.sh — hourly backup of the cairn server SQLite DB (#1151 / ADR 0016 ruling 7).
 #
-#   scripts/ops/backup-server-db.sh --db <server.db 路径> --out <备份目录> [--remote <ssh目标:目录>] [--keep N]
+#   scripts/ops/backup-server-db.sh --db <path to server.db> --out <backup dir> [--remote <ssh target:dir>] [--keep N]
 #
-# 行为：sqlite3 .backup（活库安全、原子）→ integrity_check 不过即失败 →
-# gzip 落 <out>/server-db-<UTC 时间戳>.db.gz → 可选 scp 推远端 → 两端各按
-# --keep（默认 48）滚动删除最老份。任何一步失败都以非零退出并打印失败点——
-# 备份是「坏了没人会知道」的那类东西，静默失败比没有备份更糟。
+# Behavior: sqlite3 .backup (safe on a live DB, atomic) → integrity_check failure
+# aborts → gzip lands at <out>/server-db-<UTC timestamp>.db.gz → optional scp push
+# to a remote → both ends rotate away the oldest copies beyond --keep (default 48).
+# Any failed step exits non-zero and prints where it failed — backups are the kind
+# of thing nobody notices when broken; silent failure is worse than no backup.
 set -euo pipefail
 
 DB=""
@@ -49,12 +50,13 @@ if [ -n "$REMOTE" ]; then
   ssh -o BatchMode=yes -o ConnectTimeout=10 "$host" "mkdir -p '$rdir'"
   scp -q -o BatchMode=yes -o ConnectTimeout=10 "$OUT/$name" "$REMOTE/"
   echo "[$ts] pushed to $REMOTE/"
-  # 远端滚动保留：文件名即 UTC 时间戳，按名倒序跳过最新 KEEP 份、删其余。
-  # while-read 而非 xargs -r：BSD xargs 无 -r，空输入会跑出「rm -f 缺操作数」。
+  # Remote rotation: the file name carries the UTC timestamp; sort by name desc,
+  # skip the newest KEEP entries, delete the rest. while-read instead of xargs -r:
+  # BSD xargs has no -r, and empty input would run `rm -f` with no operand.
   ssh -o BatchMode=yes "$host" "cd '$rdir' && { ls -1 server-db-*.db.gz 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) | while IFS= read -r f; do rm -f -- \"\$f\"; done"
 fi
 
-# 本地滚动保留（同款口径）。
+# Local rotation (same rule).
 cd "$OUT" && { ls -1 server-db-*.db.gz 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) | while IFS= read -r f; do rm -f -- "$f"; done
 
 echo "[$ts] backup done"

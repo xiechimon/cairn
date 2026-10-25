@@ -1,15 +1,3 @@
-// #720 负例 E2E：空白反馈的重启轮不注入空指令（真 server + 真 daemon + pi +
-// 门控 stub LLM）。API 层 `feedback: z.string().min(1)` 已拒真空串，但空白串
-// （'  '）能过 schema 且 UI composer 的 `text !== ''` 判定也拦不住——server 守卫
-// （feedback.trim() === ''）必须把它收口成纯重启轮：不写 step instruction、不落
-// 空白用户行；runner 投递纯任务文本，「用户反馈：「」」空壳指令不出现。
-// 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
-//   1. 空壳指令进会话：空白反馈 → 会话 prompt 携「上一轮失败…用户反馈：「」」
-//      模板（agent 收到一条没有内容的「反馈」）
-//   2. 空白用户行落库：restart 写一条 content='  ' 的 user 消息行（空气泡）
-//   3. 误伤常规重启：非空白反馈路径（m7-failed-send-e2e 覆盖）不因守卫退化
-// 本文件只钉 1/2 的负例面。
-
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,8 +21,6 @@ const TASK_TITLE = '空白反馈探针';
 const TASK_SPEC = '重启轮不注入空指令。';
 const TASK_TEXT = buildTaskPromptText(TASK_TITLE, TASK_SPEC);
 
-/** user wire 消息文本（openai 双形：纯 string 或 text parts 数组——pi 会话
- * 首条 user 恒走 parts 形，m7-failed-send 同款实测钉）。 */
 function userWireText(m: { role: string; content?: unknown }): string | null {
   if (typeof m.content === 'string') return m.content;
   if (Array.isArray(m.content)) {
@@ -53,8 +39,6 @@ let handle: MachineHandle;
 let home: string;
 
 beforeAll(async () => {
-  // 失败轮：build 步 provider 400（不可重试）→ todo failed；空白反馈重启轮：
-  // 一轮文本应答（内容无关紧要——断言的是请求体里 user 消息长什么样）。
   stub = await startStubLlm([{ status: 400 }, { content: '重启轮照常执行。' }]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
   home = mkdtempSync(join(tmpdir(), 'cairn-restart-blank-home-'));
@@ -89,8 +73,8 @@ afterAll(async () => {
   if (home) rmSync(home, { recursive: true, force: true });
 });
 
-describe('空白反馈重启轮（#720 负例）：不注入空指令', () => {
-  test('空白 feedback → 纯重启轮：无 instruction、无空白用户行、会话 prompt = 任务文本', async () => {
+describe('blank-feedback restart round (#720 negative case): no empty instruction injected', () => {
+  test('blank feedback → plain restart round: no instruction, no blank user row, session prompt = task text', async () => {
     const world = await seedWorld(server.url, server.teamId, {
       title: TASK_TITLE,
       spec: TASK_SPEC,
@@ -116,7 +100,6 @@ describe('空白反馈重启轮（#720 负例）：不注入空指令', () => {
     const newBuildId = todoRow.latestBuildId!;
     expect(newBuildId).not.toBe(failedBuildId);
 
-    // 失败方式 1 的 DB 面：首步不带 instruction（prompt 列 null）。
     const firstStep = server.db
       .select()
       .from(stepTable)
@@ -126,7 +109,6 @@ describe('空白反馈重启轮（#720 负例）：不注入空指令', () => {
     expect(firstStep.kind).toBe('build');
     expect(firstStep.prompt).toBeNull();
 
-    // 失败方式 2：不落空白用户行（反馈行缺席，不是 content='   ' 的空气泡）。
     const userRows = server.db
       .select()
       .from(messageTable)
@@ -135,8 +117,6 @@ describe('空白反馈重启轮（#720 负例）：不注入空指令', () => {
       .filter((m) => m.role === 'user');
     expect(userRows).toHaveLength(0);
 
-    // 失败方式 1 的会话面：重启轮请求已到 stub；全部 user 消息 = 纯任务文本，
-    // 任何请求都不含重启指令模板（空壳不出现）。
     await waitFor(() => stub.requests.length >= 2, 120_000);
     for (const req of stub.requests) {
       const userMessages = req.messages.filter((m) => m.role === 'user');

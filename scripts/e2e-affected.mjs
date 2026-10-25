@@ -1,31 +1,5 @@
 #!/usr/bin/env node
 
-// #693 affected-surface e2e selector. Development-period answer to "which
-// e2e specs does my change touch": map changed paths to spec families,
-// then run only those specs on the standard fixture-build config. The
-// fixture build itself is sub-second (vite 8), so the quickness comes
-// entirely from the selection — 617 tests in the full run vs a few dozen
-// for a domain change — with full production-build fidelity, no separate
-// quick-lane config, and no special cases: token-gate.spec.ts works the
-// same way (its spawned server serves the dist the webServer just built).
-//
-// Families are the e2e/ filename prefixes; the source map below is
-// deliberately over-inclusive, because a missed spec reads as a false
-// green while an extra one only costs seconds. Cross-cutting paths fall
-// back to the full suite, and CI stays the only exhaustive check — this
-// tool is a signal, not the bar.
-//
-// Usage (from apps/web, or anywhere via the workspace filter):
-//   pnpm --filter @cairn/web e2e:affected            # diff vs origin/main + working tree
-//   pnpm --filter @cairn/web e2e:affected -- apps/web/src/chief/chief-drawer.tsx
-//   node scripts/e2e-affected.mjs --dry-run -- <paths>  # print the plan only
-//
-// Port: the default playwright webServer binds E2E_PORT (8399) with
-// reuseExistingServer — on a multi-lane machine that would silently test
-// whichever lane's build answered first (#137). Affected runs default to
-// their own lane port 8398: E2E_AFFECTED_PORT overrides it, an explicitly
-// set E2E_PORT wins (a lane that picked a port did so deliberately).
-
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
@@ -37,8 +11,6 @@ const E2E_DIR = join(WEB_DIR, 'e2e');
 const E2E_PREFIX = 'apps/web/e2e/';
 const PORT = process.env.E2E_PORT ?? process.env.E2E_AFFECTED_PORT ?? '8398';
 
-// --- spec families -----------------------------------------------------------
-
 const BOARD = [
   'board-',
   'card-',
@@ -49,9 +21,7 @@ const BOARD = [
   'dead-',
   'shell-',
   'visual-',
-  // #1423: the queued card has no 开始 (queued-action.spec also pins the detail head).
   'queued-action',
-  // #1428: one ring per edge — the card and the notify banner are probed there.
   'elevation-',
   'cds-board',
   'paper-board-',
@@ -66,9 +36,6 @@ const BOARD = [
   'live-project-name',
   'shadcn-primitives',
   'storage-unavailable',
-  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
-  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
-  // chief FAB/drawer, search panel, dialogs.
   'mobile-narrow',
 ];
 const SIDEBAR = [
@@ -88,9 +55,6 @@ const SIDEBAR = [
   'registry-focus-ring',
   'shadcn-primitives',
   'storage-unavailable',
-  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
-  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
-  // chief FAB/drawer, search panel, dialogs.
   'mobile-narrow',
 ];
 const DETAIL = [
@@ -109,12 +73,8 @@ const DETAIL = [
   'chief-stream-markdown',
   'composer-wire-reject',
   'user-menu-',
-  // #1400: phase chip words (detail head, search rows, schedule cards,
-  // project task rows). Each of those surfaces pulls it in.
   'phase-chip-words',
-  // #1423: a queued task's detail head has no primary button.
   'queued-action',
-  // #1428: one ring per edge — the user menu and the composer are probed there.
   'elevation-',
   'ticket-cost',
   'accent-typo',
@@ -139,12 +99,8 @@ const DETAIL = [
   'spec-flow',
   'thinking-row-truncate',
   'hotkeys-ready',
-  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
-  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
-  // chief FAB/drawer, search panel, dialogs.
   'mobile-narrow',
 ];
-// #1428: one ring per edge — the chief window and the FAB are probed there.
 const CHIEF = [
   'chief-',
   'composer-wire-reject',
@@ -155,9 +111,6 @@ const CHIEF = [
   'storage-unavailable',
   'z-ladder',
   'hotkeys-ready',
-  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
-  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
-  // chief FAB/drawer, search panel, dialogs.
   'mobile-narrow',
 ];
 const AGENT = ['agent-', 'team-create-agent', 'registry-focus-ring', 'resource-back-spa'];
@@ -173,7 +126,6 @@ const OVERLAY = [
   'dialog-',
   'project-settings-delete',
   'hotkeys',
-  // #1446: the queued 停止 row lives in overlay/more-menu.tsx.
   'detail-queued-exit',
   'accent-typo',
   'attachment-strip',
@@ -197,9 +149,6 @@ const OVERLAYS = [
   'live-agent-model-line',
   'live-project-name',
   'shadcn-primitives',
-  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
-  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
-  // chief FAB/drawer, search panel, dialogs.
   'mobile-narrow',
 ];
 const PAGES = [
@@ -208,17 +157,12 @@ const PAGES = [
   'github-issue-writeback',
   'segmented-',
   'dialog-',
-  // #1037: the schedules page family (schedules-live.spec pins the form's
-  // live face; src/pages/schedules-page.tsx edits must pull it in).
   'schedules-',
   'phase-chip-words',
   'accent-typo',
   'page-scroll',
   'registry-focus-ring',
   'resource-back-spa',
-  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
-  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
-  // chief FAB/drawer, search panel, dialogs.
   'mobile-narrow',
 ];
 const RESOURCES = [
@@ -239,15 +183,9 @@ const RESOURCES = [
 const SHARED_SURFACE_ONLY = ['cds-motion', 'color-freeze', 'fixture-mode-chip'];
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
-// Exact-file rules win over directory prefixes (longest prefix wins among
-// directories). Add a file rule when one file inside a directory feeds a
-// different family than its siblings (the board/ sidebar pair, the
-// routes/ page files).
 const FILE_RULES = new Map([
-  // src/board — the sidebar pair carries the shell-side family, not the board column family.
   ['apps/web/src/board/sidebar.tsx', SIDEBAR],
   ['apps/web/src/board/app-sidebar.tsx', SIDEBAR],
-  // src/routes — one file per page family.
   ['apps/web/src/routes/board-page.tsx', BOARD],
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
   ['apps/web/src/routes/account-page.tsx', ['account-team-cleanse', 'user-menu-', 'cds-density']],
@@ -260,7 +198,6 @@ const FILE_RULES = new Map([
   ['apps/web/src/routes/machine-authorize-page.tsx', ['machine-']],
   ['apps/web/src/routes/team-chart.tsx', ['team-', 'account-team-cleanse']],
   ['apps/web/src/routes/team-page.tsx', ['team-', 'account-team-cleanse']],
-  // src/components — shared faces with their own consumers.
   [
     'apps/web/src/components/model-select-core.tsx',
     [...AGENT, 'chief-drawer-model', 'chief-settings'],
@@ -269,7 +206,6 @@ const FILE_RULES = new Map([
     'apps/web/src/components/profile-card.tsx',
     ['avatar-', 'user-menu-', 'paper-', 'account-', ...AGENT],
   ],
-  // Paper page patterns: every page that composes them, plus their own pins.
   [
     'apps/web/src/components/settings-list.tsx',
     ['paper-', 'account-', 'cds-settings', 'user-menu-', ...AGENT, ...PAGES],
@@ -280,7 +216,6 @@ const FILE_RULES = new Map([
   ],
   ['apps/web/src/components/form-layout.tsx', ['paper-', 'account-', ...AGENT, ...PAGES]],
   ['apps/web/src/components/brand-marks.tsx', ['machines-', 'title-', 'brand-']],
-  // #1455: vitest-only config (includes test/**/*.test.ts); not in the e2e build.
   ['apps/web/vitest.config.ts', []],
   ['apps/web/e2e/live-server.ts', LIVE_SERVER],
   ['apps/web/e2e/live-server-tether.mjs', LIVE_SERVER],
@@ -297,15 +232,9 @@ const DIR_RULES = [
   { prefix: 'apps/web/src/resources/', specs: RESOURCES },
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },
   { prefix: 'apps/web/src/pwa/', specs: ['notify-'] },
-  // #1455: the web unit-test layer. vitest-only, never in the fixture build
-  // playwright serves, and nothing under e2e/ imports from it: no spec is
-  // affected. `pnpm exec vitest run --changed origin/main` covers it.
   { prefix: 'apps/web/test/', specs: [] },
 ];
 
-// Cross-cutting paths: consumed (or rendered) everywhere, so the honest
-// affected surface is the full suite. Unmapped apps/web paths join this
-// set (never silently skipped).
 const FULL_PATH_PREFIXES = [
   'apps/web/src/ui/',
   'apps/web/src/styles/',
@@ -328,8 +257,6 @@ const FULL_PATH_PREFIXES = [
   'pnpm-workspace.yaml',
 ];
 
-// --- changed-path collection -------------------------------------------------
-
 function git(args) {
   const res = spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' });
   return res.status === 0 ? res.stdout : '';
@@ -338,15 +265,11 @@ function git(args) {
 function changedPaths(explicit) {
   if (explicit.length > 0) return { paths: explicit, source: 'explicit' };
   const paths = new Set();
-  // Uncommitted (staged + unstaged + untracked), root-relative: run git
-  // from the repo root so porcelain output needs no renormalizing.
   for (const line of git(['status', '--porcelain=v1']).split('\n')) {
     if (line === '') continue;
     const entry = line.slice(3).trim();
-    // Renames arrive as "old -> new": both sides can carry effects.
     for (const side of entry.split(' -> ')) paths.add(side.trim());
   }
-  // Committed on this branch since it left origin/main.
   const base = git(['merge-base', 'HEAD', 'origin/main']).trim();
   if (base !== '') {
     for (const p of git(['diff', '--name-only', `${base}..HEAD`]).split('\n')) {
@@ -355,8 +278,6 @@ function changedPaths(explicit) {
   }
   return { paths: [...paths], source: 'git (working tree + branch vs origin/main)' };
 }
-
-// --- selection ----------------------------------------------------------------
 
 function classify(path) {
   if (path.startsWith(E2E_PREFIX) && path.endsWith('.spec.ts')) {
@@ -386,14 +307,6 @@ function classify(path) {
   return { specs: [], why: 'outside the web e2e surface' };
 }
 
-// #1463: a non-spec module under e2e/ (helpers.ts and the like) affects the
-// specs that import it, directly or through other e2e modules (spec →
-// helpers.ts → the file). The scan only narrows, and only where every mention
-// of the file is a static relative import between top-level e2e modules.
-// Anything else runs the full suite (specs: []): a file that is not a
-// top-level module, a mention that is not an import (a spawn path, a read, a
-// template literal), a chain that reaches a full-fallback file or a
-// subdirectory, a name playwright.config.ts mentions, or no spec found.
 let e2eSources = null;
 function importingSpecs(path) {
   e2eSources ??= {
@@ -405,7 +318,6 @@ function importingSpecs(path) {
           return [relative(E2E_DIR, file), readFileSync(file, 'utf8')];
         }),
     ),
-    // What runs or configures the suite from outside e2e/.
     config: ['playwright.config.ts', 'package.json']
       .map((file) => readFileSync(join(WEB_DIR, file), 'utf8'))
       .join('\n'),
@@ -466,14 +378,7 @@ function expand(prefixes, allSpecs) {
   return [...matched].sort();
 }
 
-// --- run ------------------------------------------------------------------------
-
 function runPlaywright(specs, full) {
-  // Quick lane pins 2 workers (E2E_AFFECTED_WORKERS overrides): at domain
-  // scale throughput is irrelevant, and on a memory-pressured machine two
-  // concurrent chromiums (vs the default 4 on an 8-core) halve the peak.
-  // The full-suite fallback keeps playwright's default — its throughput
-  // is the point.
   const args = ['exec', 'playwright', 'test'];
   const env = { ...leaseEnv(lease), E2E_PORT: PORT };
   if (lease !== null) {
@@ -498,8 +403,6 @@ function runPlaywright(specs, full) {
   });
   process.exit(res.status ?? 1);
 }
-
-// --- main -----------------------------------------------------------------------
 
 const argv = process.argv.slice(2);
 const dryRun = argv.includes('--dry-run');
@@ -533,8 +436,6 @@ const picked = new Set();
 const reasons = [];
 for (const path of paths) {
   const { specs, why } = classify(path);
-  // #1442: the axe sweep scans every main page in both themes, so any web
-  // source change runs it — one rule here, not a copy in every family.
   const axe = specs !== null && path.startsWith('apps/web/src/');
   reasons.push(
     `  ${path} → ${specs === null ? `FULL (${why})` : specs.length === 0 && !axe ? 'none' : why}${axe ? ' + a11y-axe' : ''}`,

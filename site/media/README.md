@@ -1,1 +1,1 @@
-把宣传片放在这里，文件名固定为 `promo.mp4`（H.264，16:9）。放进来后首页首屏会自动换成视频，封面用当前主题和语言的看板截图；没有这个文件时首页只显示截图。
+Put the promo video here, with the fixed filename `promo.mp4` (H.264, 16:9). Once it is in place, the homepage hero switches to video automatically, with a cover taken from a board screenshot in the current theme and language; without this file the homepage only shows the screenshot.

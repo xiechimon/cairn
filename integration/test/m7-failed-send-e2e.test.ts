@@ -1,22 +1,3 @@
-// M7 失败面发送 E2E（真 server + 真 daemon + pi + 门控 stub LLM，#320 /
-// r9 §3.3）：failed 相位 composer 发送的全链焊点——POST /api/builds/{id}/steps
-// {action:"restart"} → 反馈消息行落新轮会话 + 首步入队（instruction 携反馈，
-// revision 同缝）+ failed→queued 漏斗 → 机器领取实跑新一轮。
-// 与 #308 停止钮的落态分界：停止 = 运行轮落上一完成 turn 的 gate（落态非
-// failed）；restart 门只收 failed——两写面相位隔离，不共享入口。
-// 失败方式（先列后写，AGENTS.md 测试规则 3）：
-//   1. 静默丢稿复发：发送不落库（本 bug 现状）→ POST 后消息行必须在新轮会话
-//   2. 消息不入新轮：只建 build 不插消息行 → GET messages 面 user 行在位
-//   3. transcript 次序倒挂：消息 createdAt 晚于首步 → 反馈行排运行行之后
-//   4. 新一轮不触发：todo 停留 failed → 漏斗推进 + daemon 实跑到 confirm
-//   5. 反馈到不了 agent：首步 prompt 空 → claim instruction 位缺（db 钉）
-//   6. 相位误触发：confirm/review 也走 restart → 与 revision/steer 撞写面（409 钉）
-//   7. 双发竞态：连打两次发送 → 两个新 build（第二次 409 钉）
-//   8. assignment/withPlan 丢失：新轮步无 agent 不可 claim → 卡死 queued
-//   9. build 位错乱：latestBuildId 不指向新 build / prevPhase 不记 failed
-//   10.（#720）反馈进不了 agent 会话：new session 步 prompt 只有 title+spec，
-//       返工理由只落 DB —— stub LLM 请求体 + transcript wire 行双面对账
-
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -60,8 +41,6 @@ const PLAN_MD = [
   'Verification: 读回 README.md 确认探针行在位。',
 ].join('\n');
 
-/** user wire 消息文本（openai 双形：纯 string 或 text parts 数组——pi 会话
- * 首条 user 恒走 parts 形，实测 dump 钉）。 */
 function userWireText(m: { role: string; content?: unknown }): string | null {
   if (typeof m.content === 'string') return m.content;
   if (Array.isArray(m.content)) {
@@ -86,9 +65,7 @@ function logLines(): string[] {
 
 beforeAll(async () => {
   stub = await startStubLlm([
-    // 失败轮：plan 步 provider 400（不可重试类，m3b 同形）→ 步 failed → todo failed。
     { status: 400 },
-    // 重启轮：bash 写 plan.md（pi 内建工具真执行）→ 收尾文本轮 → confirm。
     {
       toolCall: {
         name: 'bash',
@@ -131,8 +108,8 @@ afterAll(async () => {
   if (home) rmSync(home, { recursive: true, force: true });
 });
 
-describe('M7 失败面发送 E2E：failed 发消息 → restart → 反馈随新轮入会话 → 实跑到 confirm', () => {
-  test('全链落库 + 新轮实跑 + 相位门拒绝', async () => {
+describe('M7 failed-phase send E2E: failed send → restart → feedback joins the new round session → runs to confirm', () => {
+  test('full-chain persistence + new round actually runs + phase gate rejects', async () => {
     const world = await seedWorld(server.url, server.teamId, {
       title: 'restart 探针',
       spec: '这个任务的第一轮会失败。',
@@ -145,10 +122,8 @@ describe('M7 失败面发送 E2E：failed 发消息 → restart → 反馈随新
     expect(started.status).toBe(201);
     const failedBuildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    // 失败轮落态（失败方式 4 的前置）：provider 400 → 步 failed → todo failed。
     await waitFor(() => server.todoPhase(world.todoId) === 'failed', 150_000);
 
-    // —— 主链：失败面发送 = restart（r9 §3.3 原站实走 steps 端点）——
     const sent = await api(server.url, 'POST', `/api/builds/${failedBuildId}/steps`, {
       action: 'restart',
       feedback: '把测试也补上',
@@ -157,8 +132,6 @@ describe('M7 失败面发送 E2E：failed 发消息 → restart → 反馈随新
     expect(sent.status).toBe(202);
     expect(sent.body).toEqual({ delegated: true });
 
-    // build 位（失败方式 9）：新 build ≠ 旧，prevPhase=failed，withPlan 承接，
-    // latestBuildId 指向新轮；assignment 保留（失败方式 8 的 db 面）。
     const todoRow = server.db.select().from(todoTable).where(eq(todoTable.id, world.todoId)).get()!;
     const newBuildId = todoRow.latestBuildId!;
     expect(newBuildId).not.toBe(failedBuildId);
@@ -175,15 +148,12 @@ describe('M7 失败面发送 E2E：failed 发消息 → restart → 反馈随新
       build: { agentId: AGENT_ID },
     });
 
-    // 消息随新轮入会话（失败方式 1/2）：反馈行落新 conv 的 transcript 读面。
     const face = await api(server.url, 'GET', `/api/conversations/${newBuildId}/messages`);
     const faceBody = face.body as { messages: { role: string; content: unknown }[] };
     expect(faceBody.messages.some((m) => m.role === 'user' && m.content === '把测试也补上')).toBe(
       true,
     );
 
-    // 次序与 instruction 位（失败方式 3/5）：消息行 createdAt 不晚于首步；
-    // 首步 prompt 携反馈（claim wire instruction 槽，revision 同缝）。
     const msgRow = server.db
       .select()
       .from(messageTable)
@@ -200,16 +170,8 @@ describe('M7 失败面发送 E2E：failed 发消息 → restart → 反馈随新
     expect(firstStep.kind).toBe('plan');
     expect(firstStep.prompt).toContain('把测试也补上');
 
-    // 新一轮实跑（失败方式 4/8 端到端）：机器领取 → 规划轮完成 → confirm。
     await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 120_000);
 
-    // —— #720 对账面：反馈真的进了 agent 会话（票面验收 = transcript 可见，
-    // 不是只落 DB）—— stub LLM 全量录请求体（不从截断 dump 推结论），重启轮
-    // 会话首条 user 消息 = 任务文本 + 重启指令组合串（compose 单源），与
-    // transcript 读面的 user-<stepId> wire 行同串。 ——
-    // #1203：restart 复用轮首步是 plan 步（withPlan），daemon 投递串尾部
-    // 附 plan.md 交接位置注记行（路径 = daemon home 的 plans 面，conv id =
-    // build id）——stub 对账与 transcript 读面同串。
     const expectedPrompt = appendPlanLocationNote(
       composeTaskPromptWithInstruction(
         buildTaskPromptText('restart 探针', '这个任务的第一轮会失败。'),
@@ -226,8 +188,6 @@ describe('M7 失败面发送 E2E：failed 发消息 → restart → 反馈随新
       .messages;
     expect(rowsAfter.some((m) => m.role === 'user' && m.content === expectedPrompt)).toBe(true);
 
-    // 相位门（失败方式 6/7）：phase 已离开 failed——对新 build 再发 restart、
-    // 对旧 failed build 重放 restart 均 409，不产生第三个 build。
     const againNew = await api(server.url, 'POST', `/api/builds/${newBuildId}/steps`, {
       action: 'restart',
       feedback: '再来一轮',

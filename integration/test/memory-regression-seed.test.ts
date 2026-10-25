@@ -52,8 +52,8 @@ afterAll(async () => {
   await stack?.close();
 });
 
-describe('记忆种库', () => {
-  test('冲突类（旧条被标失效）：提示词只带新条，旧条仍留在库里', async () => {
+describe('memory seed library', () => {
+  test('conflict class (old entry invalidated): prompt carries only the new entry, the old one stays in the library', async () => {
     const c = caseOf('c01');
     await seedMemories(stack.server, world, c);
     const prompt = chiefPrompt();
@@ -65,7 +65,7 @@ describe('记忆种库', () => {
     );
   });
 
-  test('冲突类（旧条只是较早）：两条都进提示词，新条创建得更晚', async () => {
+  test('conflict class (old entry merely earlier): both entries in the prompt, the new one created later', async () => {
     const c = caseOf('c05');
     await seedMemories(stack.server, world, c);
     const prompt = chiefPrompt();
@@ -82,7 +82,7 @@ describe('记忆种库', () => {
     );
   });
 
-  test('跨项目类：别的项目的记忆挂在另一个真实项目名下，本项目的挂在 eval-project 名下', async () => {
+  test('cross-project class: the other project memory sits under another real project, this one under eval-project', async () => {
     const c = caseOf('l03');
     await seedMemories(stack.server, world, c);
     const rows = listMemoryEntries(stack.server.db, {
@@ -96,7 +96,7 @@ describe('记忆种库', () => {
     expect(own?.projectId).toBe(world.projectId);
   });
 
-  test('过期类：种进库的过期条与无关条都是有效条目', async () => {
+  test('stale class: the seeded stale entry and the unrelated entry are both active rows', async () => {
     const c = caseOf('s01');
     await seedMemories(stack.server, world, c);
     const rows = readMemoryRows(stack.server, world.chiefAgentId);

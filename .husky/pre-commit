@@ -1,42 +1,25 @@
 #!/usr/bin/env sh
-# Cairn pre-commit — single hook, runs the canonical check chain.
-# Mirrors earendil-works/pi's pattern: lockfile guard + format+lint+typecheck + restage.
 set -e
 
 STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
 [ -z "$STAGED" ] && exit 0
 
-# 1. Lockfile guard — diff-aware (#1077), delegated to
-#    scripts/check-lockfile-commit.mjs (pi's check-lockfile-commit.mjs shape
-#    adapted from npm's package-lock.json to pnpm-lock.yaml): workspace-side
-#    lockfile changes (importers/catalogs/settings) auto-pass; external
-#    dependency changes (packages/snapshots) block with a per-package summary.
-#    Escape hatch keeps the same env var the binary gate used —
-#    CAIRN_ALLOW_LOCKFILE_CHANGE (1/true/yes) — so lane discipline and
-#    AGENTS.md keep working unchanged. AGENTS.md bans `git commit --no-verify`,
-#    so an authorized lockfile change needs a sanctioned exit through the
-#    hook itself.
 node scripts/check-lockfile-commit.mjs
 
-# 1.5 黑名单注释（实现 ~/Code/AgentProjects/cairn/CLAUDE.md「注释纪律」）
-# 黑名单外置到 .husky/banned.txt，本文件不含关键字词自身（避免自匹配）
-# 同时排除 .husky/ 目录（工具脚本，加新词维护就改 banned.txt）
-# 放行出口 = 显式环境变量 CAIRN_ALLOW_BANNED_VOCAB（1/true/yes），同锁文件闸形态（#661）：
-# AGENTS.md 禁止绕过本钩子，提示文案不得再推荐绕过路径
+# Strip base64 payload runs from data: URIs before scanning (#1112). drawio
+# svg exports embed a PNG fallback layer as a single multi-hundred-KB base64
+# run; random payload bytes make banned words appear as substrings by
+# chance, which blocked legitimate diagram commits (t-0267 / #1105). Only
+# the payload run is dropped — the surrounding markup is still scanned, so
+# a real TODO written in svg markup is still caught. perl handles the
+# multi-hundred-KB diff lines (BSD awk truncates at LINE_MAX); when perl is
+# missing the fallback scans unfiltered, i.e. fails closed to blocking.
 HUSKY_DIR="$(git rev-parse --show-toplevel)/.husky"
 BANNED_FILE="$HUSKY_DIR/banned.txt"
 [ -f "$BANNED_FILE" ] || { echo "missing banned-vocabulary file: $BANNED_FILE" >&2; exit 1; }
 [ -r "$BANNED_FILE" ] || { echo "unreadable banned-vocabulary file (check permissions): $BANNED_FILE" >&2; exit 1; }
 STAGED_FOR_GREP=$(printf '%s\n' "$STAGED" | grep -vE '^\.husky/' || true)
 if [ -n "$STAGED_FOR_GREP" ]; then
-  # Strip base64 payload runs from data: URIs before scanning (#1112). drawio
-  # svg exports embed a PNG fallback layer as a single multi-hundred-KB base64
-  # run; random payload bytes make banned words appear as substrings by
-  # chance, which blocked legitimate diagram commits (t-0267 / #1105). Only
-  # the payload run is dropped — the surrounding markup is still scanned, so
-  # a real TODO written in svg markup is still caught. perl handles the
-  # multi-hundred-KB diff lines (BSD awk truncates at LINE_MAX); when perl is
-  # missing the fallback scans unfiltered, i.e. fails closed to blocking.
   if command -v perl >/dev/null 2>&1; then
     strip_data_uri_base64() {
       perl -pe 's{data:[a-z0-9.+-]+/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+}{}g'
@@ -45,7 +28,6 @@ if [ -n "$STAGED_FOR_GREP" ]; then
     strip_data_uri_base64() { cat; }
   fi
   DIFF_OUT=$(git diff --cached -U0 -- $STAGED_FOR_GREP 2>/dev/null | strip_data_uri_base64 | grep -E '^\+' | grep -v '^+++' || true)
-  # grep -f 失败默认吞掉会破坏 hook 立论（注释纪律）；按 rc 区分：1=无匹配正常；其他=I/O 故障 → exit 1
   BANNED_MATCH=$(printf '%s' "$DIFF_OUT" | grep -E -f "$BANNED_FILE") || {
     rc=$?
     if [ "$rc" -ne 1 ]; then
@@ -68,30 +50,21 @@ if [ -n "$STAGED_FOR_GREP" ]; then
   fi
 fi
 
-# 2. biome format (writes) + biome ci (read-only check)
 pnpm exec biome format --write . >/dev/null 2>&1 || true
 pnpm exec biome ci .
 
-# 3. typecheck — only when TS source in apps/*/src, packages/*/src, or integration actually changed
 HAS_DEEP_TS=$(printf '%s\n' "$STAGED" | grep -E '^(apps|packages|integration)/.*\.(ts|tsx|js|mjs|cjs)$' || true)
 if [ -n "$HAS_DEEP_TS" ]; then
   pnpm -r typecheck
 fi
 
-# 3.5 spec parse gate (#1052) — e2e specs live outside every tsconfig
-#     (apps/web's includes src+test only), so the typecheck above can never
-#     see their syntax; a dropped `});` used to go red only in the CI e2e
-#     shard's collection phase. When the commit touches spec territory,
-#     parse-collect both territories (playwright --list + integration tsc).
 HAS_SPEC=$(printf '%s\n' "$STAGED" | grep -E '^(apps/web/e2e/|integration/(test|eval)/)' || true)
 if [ -n "$HAS_SPEC" ]; then
   pnpm spec:parse
 fi
 
-# 3.6 test spawn gate — test code spawning through a package-manager shim orphans the real process
 node scripts/test-spawn-gate.mjs
 
-# 4. Restage anything biome format --write modified
 for f in $STAGED; do
   [ -f "$f" ] && git add "$f"
 done
