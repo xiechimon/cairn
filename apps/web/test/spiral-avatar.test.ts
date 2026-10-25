@@ -15,7 +15,7 @@ describe('spiralAvatarSvg', () => {
     const svg = spiralAvatarSvg('Xmon Dai');
     expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 100 100">/);
     expect(svg).not.toMatch(/\swidth=/);
-    expect(svg).toMatch(/fill="#(c06a43|7d8b5a|6b7a8f|a0784a|8a6a9a|4f8a8b)"/);
+    expect(svg).toMatch(/fill="#(c06a43|788656|6b7a8f|a0784a|8a6a9a|4f8a8b)"/);
     expect(svg).toContain('stroke="#f2ead7"');
   });
 
