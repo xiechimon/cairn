@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
 
 // Issue #443 acceptance, re-pinned for ADR 0013 (#1009 A0): 详情页总管 FAB
 // 仅未读才显示. The detail family is the intentional divergence from the
@@ -69,23 +70,12 @@ test.describe('detail FAB renders only with unread (#443)', () => {
 //   4. the avatar does not fill the 40×40 circle, or the badge/geometry
 //      drift on the avatar face
 
-const R3_SRC = 'https://api.dicebear.com/9.x/lorelei/svg?seed=r3-builder';
-const SVG_BODY =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12"/></svg>';
-
-/** Hermetic dicebear: the generated avatar "loads" without network
- *  (avatar-dicebear.spec.ts idiom). */
-async function stubDicebear(page: Page) {
-  await page.route('**/api.dicebear.com/**', (route) =>
-    route.fulfill({ contentType: 'image/svg+xml', body: SVG_BODY }),
-  );
-}
+const R3_SRC = spiralAvatarUrl('r3-builder');
 
 test.describe('FAB icon follows the bound agent (#444)', () => {
   test('bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay', async ({
     page,
   }) => {
-    await stubDicebear(page);
     await page.goto('/app?scenario=fab-avatar');
     // #950: .fab-avatar 类退役——FAB 载体 = role + aria-label（A0 起单实例
     // 根 host，.chief-fab 类钩同载体）；头像 img 直取（wrapper 无独立语义）。
@@ -103,7 +93,6 @@ test.describe('FAB icon follows the bound agent (#444)', () => {
   });
 
   test('bound: a non-board route swaps at the same single consumption point', async ({ page }) => {
-    await stubDicebear(page);
     await page.goto('/app/team?scenario=fab-avatar');
     // A0：五挂载点退役后全站一个 FAB（根 host），team 面与 board 面同载体；
     // button 限定防与窗 aside 的 aria-label 双匹配（#947 重钉先例）。

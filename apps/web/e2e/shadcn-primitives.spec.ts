@@ -14,21 +14,9 @@ import { expect, type Page, test } from '@playwright/test';
 // 4. kbd 落点没接上 registry（data-slot=kbd 缺失）或静息没隐藏
 // 5. tag-chip 落点没接上 registry Badge（data-slot=badge 缺失）或几何漂移
 
-const DICEBEAR = '**/api.dicebear.com/**';
-const SVG_BODY =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12"/></svg>';
-
-/** Hermetic dicebear（avatar-dicebear.spec.ts idiom）：断 src 契约，不打真外网。 */
-async function stubDicebear(page: Page) {
-  await page.route(DICEBEAR, (route) =>
-    route.fulfill({ contentType: 'image/svg+xml', body: SVG_BODY }),
-  );
-}
-
 // Paper card (DESIGN.md 任务卡) dropped the executor avatar; the running
 // footer names the agent instead, so the board face left this list.
 test('avatar 落点：侧栏人像走 components/ui 落点', async ({ page }) => {
-  await stubDicebear(page);
   await page.goto('/app?scenario=22d');
   const faces = [page.locator('.sidebar-user')];
   for (const face of faces) {
@@ -46,7 +34,6 @@ test('avatar 落点：侧栏人像走 components/ui 落点', async ({ page }) =>
 test('avatar 落点定尺盒（#983/#1003）：Root 生成真盒承上游发丝环，img 几何不变', async ({
   page,
 }) => {
-  await stubDicebear(page);
   await page.goto('/app?scenario=22d');
   const probe = await page.evaluate(() => {
     const root = document.querySelector('.sidebar-user [data-slot="avatar"]')!;

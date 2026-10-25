@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
 
 // #650/#651 总管抽屉 markdown 单源 + 流式打字面。
 // 失败方式枚举（渲染缝；mapper 缝的钉在 test/chief-markdown.test.ts）：
@@ -75,21 +76,6 @@ function stubEventSource(page: Page) {
     }
     Object.defineProperty(window, 'EventSource', { configurable: true, value: FakeEventSource });
   });
-}
-
-/** dicebear 桩：fixture 面用户头像走名字种子（avatarUrl null），mock 掉
- *  外网（avatar-dicebear.spec 先例），img 立即加载完成不悬 8s。
- *  桩形态必须与真 Lorelei 响应一致（#1033）：无 width/height 属性、只有
- *  viewBox="0 0 980 980"。无固有尺寸的 SVG 在消费面漏挂 [&_img]:size-N
- *  约束时会撑满容器宽——旧 24×24 桩自带尺寸，恰好把约束缺失掩蔽成
- *  「看着还是小的」，CI 恒绿测不到 #1033 这类断裂。 */
-function stubDicebear(page: Page) {
-  return page.route('**/api.dicebear.com/**', (route) =>
-    route.fulfill({
-      contentType: 'image/svg+xml',
-      body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 980"><rect width="980" height="980" fill="#888"/></svg>',
-    }),
-  );
 }
 
 /** avatarUrl 覆盖桩（live 面）：1×1 PNG 直接 fulfill——不 mock 该主机会真发
@@ -242,7 +228,6 @@ async function settledDrawer(drawer: Locator) {
 
 test.describe('chief drawer markdown 面（fixture，#650）', () => {
   test.beforeEach(async ({ page }) => {
-    await stubDicebear(page);
     await page.goto('/app?scenario=chief-md');
     await expect(page.locator('.chief-drawer')).toBeVisible();
   });
@@ -324,8 +309,7 @@ test.describe('chief drawer markdown 面（fixture，#650）', () => {
     // #950 载体：头像 = 行内 img（.chief-avatar 槽类退役；XMON-105 img 律）。
     const img = userRow.locator('img');
     await expect(img).toBeVisible();
-    // fixture 面 avatarUrl null → dicebear 名字种子（USER_NAME canon）。
-    await expect(img).toHaveAttribute('src', /api\.dicebear\.com.*Xmon%20Dai/);
+    await expect(img).toHaveAttribute('src', spiralAvatarUrl('Xmon Dai'));
     // 写死的通用人形字形退场（行直接子级无 svg 字形槽）。
     await expect(userRow.locator('> svg')).toHaveCount(0);
 
@@ -373,7 +357,6 @@ test.describe('chief drawer markdown 面（fixture，#650）', () => {
 test.describe('chief drawer 流式面（live mock，#651）', () => {
   test('F-R7/R10/R11: text_delta 增量上屏，message 终稿收敛不重复不残留', async ({ page }) => {
     await stubEventSource(page);
-    await stubDicebear(page);
     await stubCdnAvatar(page);
     const state = { final: false };
     await mockChiefLiveApi(page, state);
@@ -425,7 +408,6 @@ test.describe('chief drawer 流式面（live mock，#651）', () => {
     page,
   }) => {
     await stubEventSource(page);
-    await stubDicebear(page);
     await stubCdnAvatar(page);
     // 生产对齐：每回合双落库（POST 行 + daemon transcript 回声行 user-<stepId>），
     // 两句话 → mock 4 条 user 行 + 1 条 robot。
@@ -459,7 +441,6 @@ test.describe('chief drawer 流式面（live mock，#651）', () => {
     page,
   }) => {
     await stubEventSource(page);
-    await stubDicebear(page);
     await stubCdnAvatar(page);
     // running 在位（THREAD.activeRun）、缓冲空、终稿未落 = 发送到首 token 的
     // 静默窗口（绑定慢模型时分钟级）。
@@ -508,7 +489,6 @@ test.describe('chief drawer 流式面（live mock，#651）', () => {
     page,
   }) => {
     await stubEventSource(page);
-    await stubDicebear(page);
     await stubCdnAvatar(page);
     const state: Parameters<typeof mockChiefLiveApi>[1] = { final: false };
     await mockChiefLiveApi(page, state);
@@ -560,7 +540,6 @@ test.describe('chief drawer 流式面（live mock，#651）', () => {
     page,
   }) => {
     await stubEventSource(page);
-    await stubDicebear(page);
     await stubCdnAvatar(page);
     // activeRun 带 tool 位 + 本轮已落库工具行 = 展开面两件现货（无新 wire）。
     const state = {
@@ -640,7 +619,6 @@ test.describe('chief drawer 流式面（live mock，#651）', () => {
     page,
   }) => {
     await stubEventSource(page);
-    await stubDicebear(page);
     await stubCdnAvatar(page);
     await mockChiefLiveApi(page, { final: true });
     await page.goto('/app?chief=chief-bbb');
@@ -673,7 +651,6 @@ test.describe('chief drawer 用户气泡 markdown 面（live mock，#742）', ()
 
   async function boot(page: Page) {
     await stubEventSource(page);
-    await stubDicebear(page);
     await stubCdnAvatar(page);
     await mockChiefLiveApi(page, {
       final: true,
@@ -778,7 +755,6 @@ test.describe('chief drawer 用户气泡 markdown 面（live mock，#742）', ()
   test('F-R17: fixture 捕获面用户气泡零漂移——无槽走字面路径（无 --md 类、无 chat-md 块）', async ({
     page,
   }) => {
-    await stubDicebear(page);
     await page.goto('/app?scenario=chief-md');
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const bubble = page.getByTestId('chief-stream').getByTestId('chief-bubble');
@@ -791,7 +767,6 @@ test.describe('chief drawer 用户气泡 markdown 面（live mock，#742）', ()
 
   test('F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数', async ({ page }) => {
     await stubEventSource(page);
-    await stubDicebear(page);
     await stubCdnAvatar(page);
     // 起点取真实过去时刻：秒数必须由「真实锚 + 走表」得出（#471 律），
     // 摆冻结数或没有锚的假数都会让这条断言红。
@@ -934,7 +909,6 @@ test.describe('chief drawer 用户气泡 markdown 面（live mock，#742）', ()
     // 「段文本恰一次」的 live 缓冲↔落库行交接面由 F-R16（#857）钉住，
     // 本条钉 DOM 序与折叠归属，不重复覆盖。
     await stubEventSource(page);
-    await stubDicebear(page);
     await stubCdnAvatar(page);
     const startedAt = Date.now() - 3000;
     const segRows = [
@@ -1056,7 +1030,6 @@ test.describe('chief drawer 用户气泡 markdown 面（live mock，#742）', ()
       ],
     };
     await stubEventSource(page);
-    await stubDicebear(page);
     await stubCdnAvatar(page);
     await mockChiefLiveApi(page, state);
     await page.goto('/app?chief=chief-bbb');
