@@ -1,27 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-// Project page (任务 / 文件) on the Paper page patterns (DESIGN.md「页面模式」,
-// issue #1397).
-//
-// Failure modes, each pinned below:
-//  T1 the 任务 body bleeds across the whole sheet instead of the 768px reading
-//     column every other list page uses (文件 keeps the bleed for the tree)
-//  T2 task rows go back to grey rounded tiles instead of one --radius-card
-//     card of 52px rows with dividers only between rendered rows
-//  T3 a row's status is missing or colour-only: the decorative checkbox comes
-//     back, or the status drops its icon or its word
-//  T4 title / meta leave the type scale (13.5px ink title, 12px ink-3 meta
-//     carrying #seq and the relative time)
-//  T5 a done task keeps the full-ink title instead of dropping to ink-3
-//  G1 grid cards keep the registry 14px corner instead of --radius-card
-//  E1 the empty state brings back the tinted icon tile, or its one primary
-//     action stops being the 32px 新建任务 button
-//  F1 the selected file row is a muted fill instead of the picker face
-//     (white card + 1px ring)
-//  F2 history rows and the commit head leave the type scale (13.5px message,
-//     12px meta)
-//  F3 the viewer placeholder drifts off text-ui / ink-3
-
 const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX';
 const TASKS = `${PROJ}?scenario=prj-tasks`;
 const EMPTY = `${PROJ}?scenario=r2-24b&tab=tasks`;

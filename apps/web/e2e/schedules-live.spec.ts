@@ -1,18 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// #1037: the 新建定时 form's live face — the pin the acceptance called out as
-// missing: click 保存 → a real POST /api/schedules carrying the form state.
-// Boot stubs follow the stubLiveBoot discipline (agent-detail / page-scroll):
-// teams + user me must succeed (they feed teamId); every other GET 500s into
-// the app's existing isError tolerance (data ?? []). No ?scenario= in the URL
-// = live data source (api/mode.ts gate: fixture build without the param hits
-// the real API surface, which page.route intercepts).
-//
-// Hostile-data discipline (#1037 brief): the stub todo carries a long
-// unbreakable title — the dialog must stay capped, the task row must stay
-// truncated, and 保存 must still fire. Stubs this tame would let a dead
-// button ship: the row geometry only breaks on content a real user can type.
-
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const PROJECT = {
@@ -80,7 +67,7 @@ async function stubLiveBoot(page: Page) {
   await page.route('**/api/user/me', (route) => route.fulfill({ json: USER }));
 }
 
-test('live face: 保存 fires POST /api/schedules with the form state (#1037)', async ({ page }) => {
+test('live face: save fires POST /api/schedules with the form state (#1037)', async ({ page }) => {
   await stubLiveBoot(page);
   await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
   await page.route('**/api/todos?*', (route) => route.fulfill({ json: [wireTodo(0)] }));
@@ -99,11 +86,6 @@ test('live face: 保存 fires POST /api/schedules with the form state (#1037)', 
   const dialog = page.getByRole('dialog', { name: '新建定时' });
   await expect(dialog).toBeVisible();
 
-  // b face: the 项目/任务/机器 rows must not read as pickers — no chevron
-  // affordance anywhere in the form (ChevronRight's polyline is its own
-  // outline, icons/ChevronRight.tsx). The r2 §6.6 inventory registers the
-  // reference's rows as preselected values with no observed picker
-  // interaction, so the honest local-first face is a static display row.
   await expect(dialog.locator('polyline[points="9 18 15 12 9 6"]')).toHaveCount(0);
 
   // Hostile data: the unbreakable 124-char title must stay inside the row box
@@ -118,17 +100,6 @@ test('live face: 保存 fires POST /api/schedules with the form state (#1037)', 
   expect(panel).not.toBeNull();
   expect(panel!.width).toBeLessThanOrEqual(488.5);
 
-  // Drive the form: 单次 tab + hour 10 — the wire body must carry both.
-  // #1010/#1084 hook migration (same law as m5-web-e2e): the registry compound
-  // select portals its popup to body — dialog-scoped listbox locators can never
-  // see it — and Base UI puts role=listbox on the inner Select.List while the
-  // SelectContent aria-label lands on the role=presentation outer Popup (the
-  // listbox's own aria-label is always null), so the old
-  // `[role=listbox][aria-label=时]` compound hook is unreachable on the
-  // pristine component. The trigger keeps aria-label=时 and still renders
-  // inside the dialog; the open popup is the only listbox in the a11y tree
-  // (closed popups stay display:none), so page-level getByRole('listbox')
-  // is unambiguous.
   await dialog.getByRole('radio', { name: '单次' }).click();
   await dialog.locator('button[aria-label="时"]').click();
   await page.getByRole('listbox').getByRole('option', { name: '10', exact: true }).click();

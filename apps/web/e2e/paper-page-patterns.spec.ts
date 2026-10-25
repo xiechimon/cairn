@@ -1,25 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Paper page patterns (DESIGN.md「页面模式」): one card radius, the shared
-// EmptyState (adopted on API keys) and the settings list card.
-//
-// Failure modes, each pinned below:
-//  R1 --radius-card drifts off the DESIGN.md card value (20px)
-//  R2 the board task card stops reading the token
-//  R3 the settings card goes back to its own corner (12px in #1386) or the
-//     registry Card's rounded-xl (14px)
-//  E1 the empty-state icon sits on a tinted tile again (orange or beige fill)
-//  E2 the icon is painted in ink or accent instead of ink-3
-//  E3 the action is not the shadcn default button at 32px / 8px corners
-//     (size sm, an outline variant, a pill or a full-width bar)
-//  E4 title / description leave the type keys (14px 500 / 12px ink-3) or the
-//     description runs the full column width
-//  S1 settings rows drift to per-row heights
-//  S2 a divider lands on the card top or under the last row, doubling the
-//     card outline there
-//  S3 clickable rows (a Button per row) lose the divider: the button's own
-//     transparent border outranks the card's zero-specificity divide rule
-
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
 
 function setTheme(page: Page, theme: 'light' | 'dark') {

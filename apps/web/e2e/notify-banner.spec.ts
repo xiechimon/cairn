@@ -1,22 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { stubNotification } from './helpers.js';
 
-// Issue #114 acceptance: the 看板顶部通知引导条 (r2 §1.3 / 02 §9.1) shows
-// while Notification.permission === 'default', the 开启 button drives
-// Notification.requestPermission(), and the strip hides on either
-// resolution (granted/denied). Copy assertions are the shared
-// NOTIFICATION_BANNER_COPY canon verbatim.
-//
-// The fixture scenario (ui.notificationBanner) freezes the pre-permission
-// state — the headless chromium reports the real API as
-// 'denied', so the live permission can never pin a fixture row. The stub
-// below replaces window.Notification to make the requestPermission()
-// resolution deterministic and observable (call count).
-//
-// #943/#910 重钉：banner 的载体 = region role（<section aria-label=标题>），
-// 三段文案走一级 text，开启钮走 role+name——.board-notify-banner* 类名钉
-// 退役（board.css 清零，类名按 §5.0 别名残留律留在 DOM）。
-
 const banner = (page: Page) => page.getByRole('region', { name: '浏览器通知未开启' });
 
 test('permission=default → banner renders the canon copy', async ({ page }) => {
@@ -31,7 +15,7 @@ test('permission=default → banner renders the canon copy', async ({ page }) =>
   await expect(banner(page).getByRole('button', { name: '开启' })).toHaveText('开启');
 });
 
-test('开启 → requestPermission() fires; granted hides the bar', async ({ page }) => {
+test('enable → requestPermission() fires; granted hides the bar', async ({ page }) => {
   await stubNotification(page, 'default', 'granted');
   await page.goto('/app?scenario=notify-banner');
 
@@ -40,12 +24,11 @@ test('开启 → requestPermission() fires; granted hides the bar', async ({ pag
 
   await expect(banner(page)).toHaveCount(0);
   expect(await page.evaluate(() => window.__permCalls)).toBe(1);
-  // the sse.ts fireDesktopNotification gate reads this exact slot —
-  // granted here is what unlocks the 后台桌面通知 chain
+
   expect(await page.evaluate(() => Notification.permission)).toBe('granted');
 });
 
-test('开启 → denied resolution also hides the bar', async ({ page }) => {
+test('enable → denied resolution also hides the bar', async ({ page }) => {
   await stubNotification(page, 'default', 'denied');
   await page.goto('/app?scenario=notify-banner');
 

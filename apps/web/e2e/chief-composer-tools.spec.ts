@@ -136,7 +136,7 @@ async function openChief(page: Page) {
   );
   await page.goto('/app');
   await membersLoaded;
-  // #950: .chief-fab → aria-label 载体(resources 家族 #944 同款)。
+
   await page.getByRole('button', { name: '总管' }).click();
   const drawer = page.locator('.chief-drawer');
   await expect(drawer).toBeVisible();
@@ -213,8 +213,6 @@ async function deferUploads(page: Page) {
   };
 }
 
-// #950: .chief-composer-input → data-testid(evaluate 内 querySelector 用属性
-// 选择器;locator 面一律 getByTestId)。
 const COMPOSER = '[data-testid="chief-composer-input"]';
 const TOKEN_1 = '![pasted-image-1.png](attachment:team-1/att-1.png)';
 
@@ -354,7 +352,6 @@ test('the mention button opens the popover with live group counts and inserts a 
 }) => {
   const { drawer, input } = await openChief(page);
 
-  // #950: .chief-composer-bar 容器类退役 → drawer 内 role+aria-label。
   await drawer.getByRole('button', { name: '提及' }).click();
   const picker = page.locator('.mention-picker');
   await expect(picker).toBeVisible();
@@ -537,7 +534,7 @@ test('transcript: mention and attachment tokens in a user row render as chips, n
   page,
 }) => {
   const drawer = await openChiefThread(page);
-  // #950: .chief-bubble → data-testid;.chief-bubble--md(渲染路径态)→ data-md。
+
   const bubble = drawer.getByTestId('chief-bubble').first();
   await expect(bubble).toHaveAttribute('data-md', '');
 
@@ -569,9 +566,6 @@ test.describe('fixture face stays inert (#732 FM3)', () => {
     await page.keyboard.type('@bu');
     await expect(drawer.locator('.mention-inline')).toHaveCount(0);
 
-    // The attach button renders (canon composer bar) but is inert without
-    // an upload delegate.
-    // #950: .chief-composer-bar 容器类退役 → drawer 内 role+aria-label。
     await expect(drawer.getByRole('button', { name: '添加附件' })).toBeDisabled();
 
     // The popover opens on the capture face with zero counts (no live hooks).

@@ -1,18 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-// #1301：Agent 概览 tab 二级模型弹层宽度不足——弹层宽钉死在触发钮宽
-// （--anchor-width），行文本 nowrap，长 id（`deepseek-v4-pro[1M]` 一类）右侧
-// 被 overflow-x-hidden 吃掉。修后弹层随内容放宽：下限仍是触发钮宽，上限是
-// 视口可用宽，全名可读。
-//
-// 每条断言钉一个失败方式：
-// 1. 弹层横向溢出（scrollWidth > clientWidth = 右侧被裁）
-// 2. 某一行的文本右缘越过行盒右缘（行内被裁）
-// 3. 放宽后弹层越出视口
-// 4. 放宽成比触发钮还窄（下限丢了）
-//
-// fixture 场景 = 'agent-detail-long-models'：r3-builder 绑 claude-code，该段
-// 模型换成长 id（src/fixtures/agents.ts AGENT_LONG_MODEL_IDS）。
 const DETAIL_LONG_MODELS = '/app/resources/agents/r3-builder?scenario=agent-detail-long-models';
 const LONG_IDS = [
   'deepseek-v4-pro[1M]',
@@ -20,7 +7,7 @@ const LONG_IDS = [
   'vendor/very-long-model-id-for-clipping-check-2026-10[1M]',
 ];
 
-test('长模型 id：概览 tab 模型弹层不横向裁切，最长 id 全名可见（#1301）', async ({ page }) => {
+test('long model id: overview tab model popover does not clip horizontally, longest id fully visible (#1301)', async ({ page }) => {
   await page.goto(DETAIL_LONG_MODELS);
   const detail = page.locator('.agent-detail');
   const trigger = detail.locator('.agent-model-select');

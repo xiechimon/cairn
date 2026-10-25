@@ -1,21 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Issue #128 acceptance (dogfood 侧栏视觉三件, claude.ai 参照面): the ⌘K chip
-// is the official bordered pill (r7 01/02 probe: 26×20 box, 1px
-// --border-default ring, right-anchored) sitting clear of the 搜索 label —
-// the row-content lift rule must not demote it into the label's flow; the
-// hover and selected faces share ONE geometry (the official 32px inset face,
-// V2 骨架方角 #792 P6) with the selected state one cds alpha step deeper than
-// the hover instead of a different shape; the machine-online dot keeps its
-// absolute anchor (same lift-rule hazard as the kbd chip).
-//
-// #943/#910 重钉：类名载体全退役——行 = nav 内的 link/button（一级
-// role/tag + 文本），选中态 = aria-current="page"，侧栏 = aside
-// （complementary），在线点 = data-testid="online-dot"（二级：aria 不可见
-// 的纯装饰结构钩子）。探针期望值不动（本域 token 槽与行几何零改动，
-// #915 翻值后的现值即新正典）。
-
-/** Parse a computed rgb()/rgba() color. */
 const parse = (c: string) => {
   const m = c.match(/[\d.]+/g)?.map(Number);
   if (m == null || m.length < 3) throw new Error(`unparsable color ${c}`);
@@ -35,12 +19,6 @@ const over = (fg: string, bg: string) => {
 
 const dist = (x: { r: number; g: number; b: number }, y: { r: number; g: number; b: number }) =>
   Math.abs(x.r - y.r) + Math.abs(x.g - y.g) + Math.abs(x.b - y.b);
-//
-// Paper Grouped sidebar (DESIGN.md 侧栏) re-cut: the ⌘K hint moves from a
-// search row's chip into the workspace row's search button tooltip; rows
-// carry their own fill (the ::before pill retired); active = sheet fill +
-// hairline ring, hover = the --sidebar-hover step; the online dot is a flex
-// child of the 机器 row inside the 资源 fold.
 
 const resolve = (page: Page, token: string) =>
   page.evaluate((v) => {
@@ -110,7 +88,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('machine-online dot sits centered on the 机器 row', async ({ page }) => {
+test('machine-online dot sits centered on the `机器` row', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('cairn-theme', 'dark');
     localStorage.setItem('cairn.sidebarResourcesCollapsed', '0');

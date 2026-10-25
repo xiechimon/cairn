@@ -1,19 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { settleTransitions } from './helpers.js';
 
-// Issue #138 family law, re-pinned onto the one segmented control
-// (components/segmented.tsx; colours and heights across controls live in
-// paper-segmented.spec.ts). Every member rides one face: canvas track, the
-// selected option a white card tab with a 1px ring, idle options paint no
-// box and answer hover with an ink step (ink-2 -> ink), the selected option
-// keeps its fill under hover, and both states share one geometry. View
-// switches keep role=tab (PageShell .page-tab, project files seg, tasks view
-// toggle, branch dialog, team layout, chief tabs); value pickers are
-// role=radio (sched-form freq, user-menu 外观 / 密度).
-// #366: the detail doc/chat tab group is gone from the family; the
-// branch-dialog seg opens from the board card icon.
-// #367: the skills-import tabs are gone from the family too.
-
 const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX';
 
 const CARD_DARK = 'rgb(47, 42, 38)'; // --card dark
@@ -164,7 +151,7 @@ test('files seg + tasks view toggle: hover steps the unselected ink (dark)', asy
   );
 });
 
-test('user-menu 外观 seg: hover steps the ink, click switches the theme', async ({ page }) => {
+test('user-menu appearance segment: hover steps the ink, click switches the theme', async ({ page }) => {
   await themed(page, 'light', '/app?scenario=01');
   await page.click('.sidebar-user');
   const group = page.getByRole('radiogroup', { name: '外观' });
@@ -174,7 +161,7 @@ test('user-menu 外观 seg: hover steps the ink, click switches the theme', asyn
 
   await dark.click();
   await expect(dark).toHaveAttribute('aria-checked', 'true');
-  // 深色 selected = the .light root class drops (dark is the :root default)
+
   await expect(page.locator('html')).not.toHaveClass(/light/);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(group.getByRole('radio', { name: '浅色' })).toHaveAttribute('aria-checked', 'false');
@@ -197,7 +184,7 @@ test('branch-dialog seg: hover steps the Git ink, click swaps the tab body', asy
 
 test('team layout toggle: segmented face (paper track, white ringed chip)', async ({ page }) => {
   await themed(page, 'light', '/app/team?scenario=12');
-  // 团队 grid|chart 切换住在顶栏，载体仍 = role=tablist/tab（#947/#910）。
+
   const bar = page.getByTestId('page-topbar');
   const group = await bar.getByRole('tablist').evaluate((g) => ({
     border: getComputedStyle(g).borderTopWidth,
@@ -216,8 +203,6 @@ test('team layout toggle: segmented face (paper track, white ringed chip)', asyn
   await expect.poll(() => bg(chart)).toBe(CLEAR);
 });
 
-// skills-import tab 半已随 spec 13（#367）退役——导入页删除，res-tab 族
-// 出账；chief tabs 半保留。
 test('chief tabs: hover steps the ink, click swaps the view', async ({ page }) => {
   await themed(page, 'light', '/app?scenario=101');
   const charter = page.getByRole('tab', { name: '章程' });
@@ -278,8 +263,6 @@ test('chief tabs: indicator pill slides between chips — 150ms ease on left/top
   expect(trans.dur).toBe('0.15s, 0.15s, 0.15s, 0.15s');
   expect(trans.ease).toBe('ease, ease, ease, ease');
 
-  // 切换必须真的滑：transitionrun 事件在过渡起跑时对每个属性各响一次
-  //（rAF 采样在无合成帧的环境里会停摆，事件路径不依赖渲染帧）。
   await page.evaluate(() => {
     (window as unknown as Record<string, string[]>).__pillRuns = [];
     document.addEventListener(
@@ -304,7 +287,7 @@ test('chief tabs: indicator pill slides between chips — 150ms ease on left/top
     )
     .toEqual(['left', 'width']);
   await expect(charter).toHaveAttribute('aria-selected', 'true');
-  // 落位核对要等 150ms 滑行动画跑完——poll 到 pill 与新激活 chip 重合。
+
   await expect
     .poll(async () => {
       const [p, c] = await Promise.all([box(pill), box(charter)]);

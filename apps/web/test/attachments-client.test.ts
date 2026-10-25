@@ -1,13 +1,3 @@
-// attachFile 客户端预检与失败分类（#729 失败方式 FM5 / FM12）。
-//
-// 逐条钉住的失败方式：
-//  FM5  白名单与 cap：边界值 10*1024*1024 整 = 过、+1 = 拒；拒必须在本地
-//       发生（fetch 一次都不许发）；mime 白名单外拒；文件名非法拒。
-//  FM12 上传失败草稿保全的前提 = 失败可被调用面分类呈现：grant/upload
-//       网络失败各归其类，toast 文案映射（attachmentFailureTitle）钉死。
-//  附加：token 形态 ![name](attachment:key) 是渲染面 ATTACHMENT_LINE 的
-//  唯一输入，序列化形状在这里钉住。
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AttachmentError, attachFile } from '../src/api/attachments.js';
 import { attachmentFailureTitle } from '../src/overlay/attachment-paste.js';
@@ -44,8 +34,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('attachFile 本地预检（FM5：拒了就不许发请求）', () => {
-  it('size 恰为 10MiB 整 = 过（走完 grant+upload，返回 token）', async () => {
+describe('attachFile local preflight (FM5: rejected means no request sent)', () => {
+  it('size exactly 10MiB = passes (goes through grant+upload, returns a token)', async () => {
     const fetchMock = stubFetch();
     const r = await attachFile({ file: pngFile(MAX), scope: 'message' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -54,7 +44,7 @@ describe('attachFile 本地预检（FM5：拒了就不许发请求）', () => {
     expect(r.key).toBe('team-1/att-9.png');
   });
 
-  it('size = 10MiB + 1 = 拒（reason=size，fetch 零调用）', async () => {
+  it('size = 10MiB + 1 = rejected (reason=size, zero fetch calls)', async () => {
     const fetchMock = stubFetch();
     const err = await attachFile({ file: pngFile(MAX + 1), scope: 'message' }).catch((e) => e);
     expect(err).toBeInstanceOf(AttachmentError);
@@ -62,14 +52,14 @@ describe('attachFile 本地预检（FM5：拒了就不许发请求）', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('size = 0 = 拒（reason=size）', async () => {
+  it('size = 0 = rejected (reason=size)', async () => {
     const fetchMock = stubFetch();
     const err = await attachFile({ file: pngFile(0), scope: 'spec' }).catch((e) => e);
     expect((err as AttachmentError).reason).toBe('size');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('mime 白名单外（application/zip）= 拒（reason=mime，fetch 零调用）', async () => {
+  it('mime outside the whitelist (application/zip) = rejected (reason=mime, zero fetch calls)', async () => {
     const fetchMock = stubFetch();
     const zip = new File([new Uint8Array(10)], 'a.zip', { type: 'application/zip' });
     const err = await attachFile({ file: zip, scope: 'message' }).catch((e) => e);
@@ -77,7 +67,7 @@ describe('attachFile 本地预检（FM5：拒了就不许发请求）', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('文件名含路径穿越 = 拒（reason=invalid-name）', async () => {
+  it('filename with path traversal = rejected (reason=invalid-name)', async () => {
     const fetchMock = stubFetch();
     const bad = new File([new Uint8Array(10)], '../a.png', { type: 'image/png' });
     const err = await attachFile({ file: bad, scope: 'message' }).catch((e) => e);
@@ -86,8 +76,8 @@ describe('attachFile 本地预检（FM5：拒了就不许发请求）', () => {
   });
 });
 
-describe('attachFile 网络失败分类（FM12）', () => {
-  it('grant 400 → reason=grant，不再发 upload', async () => {
+describe('attachFile network failure classification (FM12)', () => {
+  it('grant 400 → reason=grant, upload not attempted', async () => {
     const fetchMock = stubFetch(false, true);
     const err = await attachFile({ file: pngFile(64), scope: 'message' }).catch((e) => e);
     expect((err as AttachmentError).reason).toBe('grant');
@@ -102,22 +92,22 @@ describe('attachFile 网络失败分类（FM12）', () => {
   });
 });
 
-describe('attachmentFailureTitle —— toast 文案映射（zh 键 = en 词典键）', () => {
-  it('size → 大小上限文案', () => {
+describe('attachmentFailureTitle — toast copy mapping (zh keys = en dictionary keys)', () => {
+  it('size → size-limit copy', () => {
     expect(attachmentFailureTitle(new AttachmentError('size', 'x'))).toBe('附件超过 10MB 上限');
   });
 
-  it('mime → 类型不支持文案', () => {
+  it('mime → unsupported-type copy', () => {
     expect(attachmentFailureTitle(new AttachmentError('mime', 'x'))).toBe('不支持该文件类型');
   });
 
-  it('grant / upload / invalid-name → 上传失败文案', () => {
+  it('grant / upload / invalid-name → upload-failure copy', () => {
     expect(attachmentFailureTitle(new AttachmentError('grant', 'x'))).toBe('附件上传失败');
     expect(attachmentFailureTitle(new AttachmentError('upload', 'x'))).toBe('附件上传失败');
     expect(attachmentFailureTitle(new AttachmentError('invalid-name', 'x'))).toBe('附件上传失败');
   });
 
-  it('非 AttachmentError（未知异常）→ 上传失败文案，不吞不炸', () => {
+  it('non-AttachmentError (unknown exception) → upload-failure copy, not swallowed, does not crash', () => {
     expect(attachmentFailureTitle(new Error('network down'))).toBe('附件上传失败');
     expect(attachmentFailureTitle(undefined)).toBe('附件上传失败');
   });

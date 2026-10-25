@@ -1,15 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-// Paper team pages (DESIGN.md「页面模式」). Failure modes pinned here:
-// 1. agent card keeps its own face: corner not --radius-card, not white, no
-//    1px ring, or no lift under the ring
-// 2. card status is colour only, or one of online / offline / no home machine
-//    is missing its icon or label
-// 3. card grows a second meta line (role text back on the card)
-// 4. 创建 Agent comes back as a card in the grid, or the top bar loses it
-// 5. a team with no agents renders a bare grid instead of the empty state
-// 6. create dialog labels do not point at their controls, or 取消 is missing
-
 const ROSTER = '/app/team?scenario=team-roster';
 
 test.beforeEach(async ({ page }) => {
@@ -68,7 +58,7 @@ test('card holds a name and one meta line: model · home machine', async ({ page
   await expect(page).toHaveURL(/\/app\/resources\/agents\/roster-scribe\?scenario=team-roster$/);
 });
 
-test('创建 Agent is the top-bar primary, not a card in the grid', async ({ page }) => {
+test('`创建 Agent` is the top-bar primary, not a card in the grid', async ({ page }) => {
   await page.goto(ROSTER);
   const create = page.getByRole('button', { name: '创建 Agent' });
   await expect(create).toHaveCount(1);
@@ -87,7 +77,7 @@ test('a team with no agents shows the empty state in the grid layout', async ({ 
   await expect(page.getByText('0 个成员')).toHaveCount(0);
 });
 
-test('create dialog: labels point at controls, 取消 closes, 创建 sits right of 取消', async ({
+test('create dialog: labels point at controls, `取消` closes, `创建` sits right of `取消`', async ({
   page,
 }) => {
   await page.goto(ROSTER);

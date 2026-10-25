@@ -1,11 +1,3 @@
-// API keys and schedules on the Paper page patterns (apps/web/DESIGN.md
-// 页面模式). Failure modes pinned here:
-// 1. An empty state grows a tinted icon tile again.
-// 2. The list falls back to one card per item, or its rows lose the 52px
-//    settings-row height or the 20px card corner.
-// 3. The 新建定时 dialog footer goes back to an outline 取消 + bare primary
-//    instead of FormActions (text 取消, 32px primary on the right).
-
 import { expect, type Page, test } from '@playwright/test';
 
 const light = async (page: Page, url: string) => {
@@ -50,7 +42,7 @@ for (const [name, url] of [
   });
 }
 
-test('新建定时 footer: text 取消 left of a 32px primary 保存, no outline button', async ({
+test('`新建定时` footer: text `取消` left of a 32px primary `保存`, no outline button', async ({
   page,
 }) => {
   await light(page, '/app/schedules?scenario=r3-92');

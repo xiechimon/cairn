@@ -1,47 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-// Issue #672: the transcript's live cues — the loading-dev pilot. The #471
-// braille reel (todos.dev replica, 10 frames × 90ms) is retired by user
-// decision (2026-10-03, recorded in ADR 0009 D4's revision); after viewing
-// the live preview the user picked the Atom indicator. It renders a 16×16
-// square at size 16: one shell circle (0.88px stroke) plus three orbits
-// tilted 0/60/120°, each spinning an inner ring (0.72px stroke) through
-// `ld-atom-rotate`. The duration prop pins the cycle to 1800ms — slowed from
-// the old reel's 900ms period (2026-10-10, user found 900ms too fast) —
-// staggered −1.8s/−1.2s/−0.6s across the three spins. The library injects its own
-// React-19 precedence stylesheet (rendered as data-href/data-precedence),
-// sets aria-hidden on its root, and freezes under prefers-reduced-motion
-// (animation: none on every part + a static rotate(60deg) settle on the
-// spins) — the replica's freeze law (motion.css r1 §4.3) survives through
-// the library contract. The static label stays the accessible live cue;
-// the elapsed seconds still ride tabular figures so the 3s→10s width jump
-// never shifts the row tail. The quiescent building gap (scenario
-// `spinner-quiescent`, #471) keeps one live row through the same component,
-// no seconds counter. Render-side failure modes pinned here:
-//   L1 root / library stylesheet not mounted (parts missing or not spinning)
-//   L2 geometry drift: root not a 16px square, shell not a 16px circle,
-//      part counts wrong (1 shell / 3 orbits / 3 spins / 3 rings)
-//   L3 row geometry regression: the 20px row height drifts
-//   L4 animation contract broken: not infinite / period ≠ 1.8s (duration
-//      prop) / not running / stagger or tilt spread lost / breathe pulse
-//      missing or off-period (root must carry exactly one spinner-breathe,
-//      3600ms = twice the spin period so the pulse never beats the orbits)
-//   L5 reduced motion doesn't freeze the spins (or drops the static settle)
-//   L6 spinner root not aria-hidden — the static label is the accessible cue
-//   L7 seconds span missing tabular-nums (width jitter regression)
-//   L8 seconds-less row rendering "undefineds" / a bare "s"
-//   L9 currentColor chain broken: shell/ring stroke ≠ root color (root rides
-//      the spot solid, #821 — the chain, not the value, is pinned here)
-// Mapper-side modes (phantom/duplicate tails) live in
-// test/transcript-quiescent.test.ts.
-//
-// #945/#910 重钉：detail.css 退役——live 行 = live-row testid（无 role
-// 结构位，二级）；spinner 根 = 行内 aria-hidden 库根（loading-dev Atom 的
-// props 是封闭集，无 data-* 透传——aria-hidden 是库契约属性，L6 本身就钉
-// 它）；ld-atom-* 内部件类 = 库契约面（探针工具面全盘继承 #411/#910 裁定
-// 4，非本仓 per-face，保留）；label/秒数 = 文本一级；头 chip = head 内
-// aria-expanded 按钮。
-
 const DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc';
 
 const row = (page: Page) => page.getByTestId('live-row');
@@ -183,7 +141,7 @@ test.describe('quiescent building gap (scenario spinner-quiescent)', () => {
     await page.goto(`${DETAIL}?scenario=spinner-quiescent`);
   });
 
-  test('one live row: spinning indicator + static 执行中... label, no seconds', async ({
+  test('one live row: spinning indicator + static `执行中...` label, no seconds', async ({
     page,
   }) => {
     await expect(row(page)).toHaveCount(1);

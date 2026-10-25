@@ -1,14 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-// Paper task card + column header (apps/web/DESIGN.md 任务卡 / 看板列, PR 3).
-// Failure modes pinned here:
-//   1. a needs-you card loses its state flag or its action link;
-//   2. the queued start link takes height or never shows for keyboard users;
-//   3. a done card keeps the 500 title weight / ink color;
-//   4. the meta row wraps (tag, long project) and grows the card;
-//   5. the running breath keeps looping under reduced motion;
-//   6. the column header loses its serif name, its fixed icon, or the plus.
-
 const MATRIX = '/app?scenario=board-drag-matrix';
 const card = (page: Page, id: string) => page.locator(`[data-todo-id="${id}"]`);
 
@@ -107,7 +98,7 @@ test('running footer breathes, and stops under reduced motion', async ({ page })
   await expect(bot).toHaveCSS('animation-name', 'none');
 });
 
-test('column header: serif name, fixed status icon, plus only on 待开始 and it opens new task', async ({
+test('column header: serif name, fixed status icon, plus only on `待开始` and it opens new task', async ({
   page,
 }) => {
   await page.goto(MATRIX);

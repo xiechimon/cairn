@@ -1,21 +1,3 @@
-// #905 活动相位的消费面（mapper 半）：活行标签接管、陈旧过滤、优先级与
-// 零回归。失败方式清单（先固化；store/SSE 半在 sse-conversation-stream.test，
-// 渲染半（走表/缺席不摆数）在 e2e 与 live-row 的 #471 既有律）：
-//   W1 陈旧相位跨步：activity.stepId ≠ 在跑步 id → 基础标签原样，signalAt 缺席
-//   W4 stopping 过渡态优先于活动标签（停止在途更要解释）
-//   W5 无活动信号（fixture / 旧 server）→ 既有标签逐字不变（零回归）
-//   W6 相位词表 8 件全有标签（穷尽 switch，编译期 + 运行期双保险）
-//   W7 chief 面：tool 相位 → runningTool 投影；标签接管；无信号回落「处理中...」
-// #918 技能事实面（活行条目 + 详情页汇总）续编：
-//   W8 技能条目跨步串场：streaming 项的 skills 只来自**在跑步**的 activity
-//      （W1 同一道 stepId 过滤）——陈旧步的技能条目不得挂到下一步头上。
-//   W9 汇总派生自落库 toolcall 行：首见序、同名去重、denied 粘滞（挡下的
-//      名字从读列移除，两列互斥）。
-//   W10 对照组：无技能命中的任务不产 skills 汇总条目、streaming 项不带
-//      skills 字段（空条目 = 噪声，验收明令禁止）。
-//   W11 半程行（无 result 的开始半 upsert）不计入汇总——读取完成才是事实；
-//      终态行同 id 覆盖后自然计入。
-
 import type { BuildRecord, StepActivity, StepJournalRow, ToolCallRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { activityLabel } from '../src/api/activity.js';
@@ -81,8 +63,8 @@ function tail(items: TranscriptItem[]) {
   return rows[rows.length - 1];
 }
 
-describe('mapTranscript 活动相位（#905）', () => {
-  test('在跑步的活动接管标签，signalAt/labelVars 随行', () => {
+describe('mapTranscript activity phase (#905)', () => {
+  test('running activity takes over the label, signalAt/labelVars come along', () => {
     const running = step('claimed');
     const items = render({
       steps: [running],
@@ -96,7 +78,7 @@ describe('mapTranscript 活动相位（#905）', () => {
     });
   });
 
-  test('W1: stepId 不匹配（陈旧步相位）→ 基础标签原样、无 signalAt', () => {
+  test('W1: stepId mismatch (stale step phase) → base label unchanged, no signalAt', () => {
     const running = step('claimed');
     const items = render({
       steps: [running],
@@ -106,7 +88,7 @@ describe('mapTranscript 活动相位（#905）', () => {
     expect(tail(items)?.signalAt).toBeUndefined();
   });
 
-  test('W4: stopping 优先——「正在停止…」不被活动标签劫持', () => {
+  test('W4: stopping wins — `正在停止…` is not hijacked by the activity label', () => {
     const running = step('claimed');
     const items = render({
       steps: [running],
@@ -117,7 +99,7 @@ describe('mapTranscript 活动相位（#905）', () => {
     expect(tail(items)?.signalAt).toBeUndefined();
   });
 
-  test('W5: 无活动信号 → 既有标签逐字不变（含 pending plan 的准备工作区）', () => {
+  test('W5: no activity signal → existing labels verbatim unchanged (including the pending-plan preparation workspace)', () => {
     const pendingPlan = step('pending', 'plan');
     const items = render({ steps: [pendingPlan], activity: null });
     expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区...' });
@@ -125,7 +107,7 @@ describe('mapTranscript 活动相位（#905）', () => {
     expect(tail(items)?.signalAt).toBeUndefined();
   });
 
-  test('W6: 相位词表 8 件全有标签（穷尽）', () => {
+  test('W6: all 8 vocab phase words have labels (exhaustive)', () => {
     const running = step('claimed');
     const phases = [
       'preparing',
@@ -146,7 +128,7 @@ describe('mapTranscript 活动相位（#905）', () => {
   });
 });
 
-describe('mapTranscript 技能事实（#918）', () => {
+describe('mapTranscript skill facts (#918)', () => {
   function toolMsg(
     id: string,
     call: Partial<ToolCallRecord> & { name: string },
@@ -178,7 +160,7 @@ describe('mapTranscript 技能事实（#918）', () => {
     return items.find((i) => i.kind === 'skills');
   }
 
-  test('W8: 在跑步 activity 的 skills 随行；陈旧步（stepId 不匹配）不串场', () => {
+  test('W8: skills of the running activity come along; stale steps (stepId mismatch) do not cross over', () => {
     const running = step('claimed');
     const facts = [
       { name: 'to-spec', denied: false },
@@ -189,7 +171,7 @@ describe('mapTranscript 技能事实（#918）', () => {
       activity: act(running.id, 'tool', { tool: 'skill: to-spec', skills: facts }),
     });
     expect(tail(items)).toMatchObject({ kind: 'streaming', skills: facts });
-    // 陈旧步的 activity（上一跑步）：skills 不得挂到当前 streaming 项。
+
     const stale = render({
       steps: [running],
       activity: act('step-previous-run', 'tool', { skills: facts }),
@@ -197,14 +179,14 @@ describe('mapTranscript 技能事实（#918）', () => {
     expect(tail(stale)?.skills).toBeUndefined();
   });
 
-  test('W9: 汇总从落库行派生——首见序、去重、denied 粘滞两列互斥', () => {
+  test('W9: summary derives from stored rows — first-seen order, dedup, denied sticky across the two mutually exclusive columns', () => {
     const items = render({
       messages: [
         readSkill('c1', 'to-spec', NOW - 5_000),
         deniedSkill('c2', 'extra-skill', NOW - 4_000),
-        readSkill('c3', 'to-spec', NOW - 3_000), // 重复读：去重
+        readSkill('c3', 'to-spec', NOW - 3_000),
         readSkill('c4', 'implement', NOW - 2_000),
-        deniedSkill('c5', 'implement', NOW - 1_000), // 先读后拒：denied 粘滞
+        deniedSkill('c5', 'implement', NOW - 1_000),
       ],
     });
     expect(summary(items)).toEqual({
@@ -214,7 +196,7 @@ describe('mapTranscript 技能事实（#918）', () => {
     });
   });
 
-  test('W10: 对照组——无技能命中不产汇总条目；非技能工具行不算', () => {
+  test('W10: control group — no skill hits produce no summary entries; non-skill tool rows do not count', () => {
     const plain = render({
       messages: [
         toolMsg('c1', { name: 'bash', arguments: { command: 'ls' }, result: 'x', isError: false }),
@@ -227,7 +209,7 @@ describe('mapTranscript 技能事实（#918）', () => {
     expect(tail(noSkills)?.skills).toBeUndefined();
   });
 
-  test('W11: 半程行（无 result）不计入汇总；终态覆盖后计入', () => {
+  test('W11: half-run rows (no result) do not count into the summary; after the final state covers them they do', () => {
     const pending = render({
       messages: [toolMsg('c1', { name: 'read', arguments: { path: '/skills/x/SKILL.md' } })],
     });
@@ -237,9 +219,8 @@ describe('mapTranscript 技能事实（#918）', () => {
   });
 });
 
-describe('mapChief 活动相位（#905 W7）', () => {
-  // harness 同 chief-flight-expand.test.ts（#822）：封套最小形 + threads 走
-  // opts；activeRun 在位（回合在飞）+ user 行 → 尾挂存在行。
+describe('mapChief activity phase (#905 W7)', () => {
+
   const ENV = {
     chief: {
       id: 'chief-u1-t1',
@@ -290,12 +271,12 @@ describe('mapChief 活动相位（#905 W7）', () => {
     });
   }
 
-  test('无活动 → 存在行标签「处理中...」原样（零回归）', () => {
+  test('no activity → presence row label `处理中...` unchanged (zero regression)', () => {
     const row = chiefOf().stream?.at(-1);
     expect(row).toMatchObject({ kind: 'streaming', label: '处理中...' });
   });
 
-  test('thinking 相位接管标签 + signalAt 随行', () => {
+  test('thinking phase takes over the label + signalAt comes along', () => {
     expect(chiefOf(act('step-chief-1', 'thinking')).stream?.at(-1)).toMatchObject({
       kind: 'streaming',
       label: '模型思考中...',
@@ -303,7 +284,7 @@ describe('mapChief 活动相位（#905 W7）', () => {
     });
   });
 
-  test('tool 相位 → runningTool 投影（activeRun.tool 死位让位活信号）', () => {
+  test('tool phase → runningTool projection (the dead activeRun.tool slot yields to the live signal)', () => {
     const vm = chiefOf(act('step-chief-1', 'tool', { tool: 'docs' }));
     expect(vm.runningTool).toBe('docs');
     expect(vm.stream?.at(-1)).toMatchObject({
@@ -314,21 +295,12 @@ describe('mapChief 活动相位（#905 W7）', () => {
   });
 });
 
-// —— #1108 排队行标签（pending 步「排队中」+ 位次 + 等待对象）———————————
-// 失败方式（先于实现固化）：
-//   Q1 pending + queue（带机器）→ 排队标签 + machine/running/cap/ahead 插值
-//   Q2 pending + queue（未钉）→ 等空闲机器 + ahead
-//   Q3 投影缺席（老 server / fixture）→ 既有标签逐字不变（零回归）
-//   Q4 排队优先于陈旧活动相位（步没在跑，相位是上一步的残留）
-//   Q5 claimed 步 → 处理中（queue 本就不挂 claimed 行）
-//   Q6 chief turnQueue → 存在行同款排队标签；被领走（turnQueue 消失）→ 处理中
-
-describe('mapTranscript 排队投影（#1108 Q1–Q5）', () => {
+describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
   function queuedStep(queue: NonNullable<StepJournalRow['queue']>): StepJournalRow {
     return { ...step('pending'), queue };
   }
 
-  test('Q1: pending + queue 带机器 → 排队标签全插值', () => {
+  test('Q1: pending + queue with machine → queue label fully interpolated', () => {
     const items = render({
       steps: [
         queuedStep({
@@ -344,7 +316,7 @@ describe('mapTranscript 排队投影（#1108 Q1–Q5）', () => {
     });
   });
 
-  test('Q2: pending + queue 未钉 → 等空闲机器 + ahead', () => {
+  test('Q2: pending + queue without pinned machine → waiting-for-free-machine + ahead', () => {
     const items = render({
       steps: [queuedStep({ position: 1, waitingFor: null })],
     });
@@ -355,7 +327,7 @@ describe('mapTranscript 排队投影（#1108 Q1–Q5）', () => {
     });
   });
 
-  test('Q3: 投影缺席（老 server）→ 既有标签逐字不变', () => {
+  test('Q3: projection absent (old server) → existing labels verbatim unchanged', () => {
     const firstPlan = step('pending', 'plan');
     const items = render({ steps: [firstPlan] });
     expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区...' });
@@ -364,11 +336,11 @@ describe('mapTranscript 排队投影（#1108 Q1–Q5）', () => {
     expect(tail(items2)).toMatchObject({ kind: 'streaming', label: '处理中...' });
   });
 
-  test('Q4: 排队优先于陈旧活动相位（步没在跑）', () => {
+  test('Q4: queue wins over a stale activity phase (the step is not running)', () => {
     const pending = queuedStep({ position: 1, waitingFor: null });
     const items = render({
       steps: [pending],
-      activity: act(pending.id, 'thinking'), // 陈旧相位不得盖排队态
+      activity: act(pending.id, 'thinking'),
     });
     expect(tail(items)).toMatchObject({
       kind: 'streaming',
@@ -377,14 +349,14 @@ describe('mapTranscript 排队投影（#1108 Q1–Q5）', () => {
     expect(tail(items)?.signalAt).toBeUndefined();
   });
 
-  test('Q5: claimed 步 → 处理中（现状锁）', () => {
+  test('Q5: claimed step → `处理中` (current behavior locked)', () => {
     const items = render({ steps: [step('claimed')] });
     expect(tail(items)).toMatchObject({ kind: 'streaming', label: '处理中...' });
   });
 });
 
-describe('mapChief 排队投影（#1108 Q6）', () => {
-  // harness 同 W7 块（作用域不跨 describe，本块自持一份）。
+describe('mapChief queue projection (#1108 Q6)', () => {
+
   const ENV_Q = {
     chief: {
       id: 'chief-u1-t1',
@@ -434,7 +406,7 @@ describe('mapChief 排队投影（#1108 Q6）', () => {
     });
   }
 
-  test('Q6: turnQueue 带机器 → 存在行排队标签；消失 → 处理中', () => {
+  test('Q6: turnQueue with machine → presence-row queue label; when it disappears → `处理中`', () => {
     expect(
       chiefOfThread({
         ...THREAD_Q,
@@ -455,7 +427,7 @@ describe('mapChief 排队投影（#1108 Q6）', () => {
       label: '排队中：等空闲机器（前面 {ahead} 个）',
       labelVars: { ahead: 0 },
     });
-    // 被领取（turnQueue 退场）→ 既有存在行收敛。
+
     expect(chiefOfThread({ ...THREAD_Q }).stream?.at(-1)).toMatchObject({
       kind: 'streaming',
       label: '处理中...',

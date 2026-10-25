@@ -1,5 +1,3 @@
-// #1011 证据合成：两面聚焦帧上下拼一张对照图，标行内缩实测值。
-// 用法（apps/web 目录下）：node e2e/make-indent-compare-1011.mjs <evidenceDir>
 import { chromium } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

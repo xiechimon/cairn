@@ -1,30 +1,3 @@
-// Issue #471 quiescent live tail: the mapper seam that keeps a spinner +
-// static-label row in the transcript while the task is executing but the
-// agent is not streaming (no claimed/pending step — the measured gap: the
-// header chip read 执行中 while the conversation area had zero live cues).
-// Failure modes pinned here; the render-side ones (reel geometry, reduced
-// motion, tabular seconds) live in e2e/spinner-live.spec.ts:
-//   F8  building + build + no active step → no live tail (the measured bug)
-//   F9  active step present → duplicate tail (two streaming rows)
-//   F10 task left building (done/failed/review/confirm/todo) → phantom
-//       执行中... tail (a lie after the run ended)
-//   F11 no build → phantom tail
-//   F12 quiescent tail carrying a seconds counter — nothing re-renders
-//       during the gap, so a frozen counter would lie
-//   F18 (#873) the live tail carrying a PRE-COMPUTED seconds value — the
-//       projection ran once and the number froze at whatever it was then
-//       (the reported `1s` stuck for the whole step). The row must instead
-//       carry the step's real start stamp, so the renderer's clock is the
-//       only thing that produces the number
-//   F14 stopping + active step must still read 正在停止… (not hijacked by
-//       the quiescent label)
-//   F14b stopping with NO active step (single-render transient — the live
-//       face clears the flag) falls back to the quiescent label, not a
-//       正在停止… row describing an interruption that has nothing running
-//   F17 a stopped run (停止钮 landed, phase not flipped yet) hangs no
-//       执行中... tail — the 已取消 run stamp is the cue; claiming
-//       execution for a dead run would lie
-
 import type { BuildRecord, StepJournalRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapTranscript } from '../src/api/mappers.js';
@@ -97,7 +70,7 @@ describe('mapTranscript quiescent live tail (#471)', () => {
     expect(streamingRows(items)).toEqual([{ kind: 'streaming', label: '执行中...' }]);
   });
 
-  test('F9: an active step keeps exactly one streaming tail (处理中..., with seconds)', () => {
+  test('F9: an active step keeps exactly one streaming tail (`处理中...`, with seconds)', () => {
     const items = render({ todo: todo(9, 'building'), steps: [step('done'), step('claimed')] });
     const rows = streamingRows(items);
     expect(rows).toHaveLength(1);
@@ -120,7 +93,7 @@ describe('mapTranscript quiescent live tail (#471)', () => {
     expect(streamingRows(items)).toHaveLength(0);
   });
 
-  test('F14: stopping with an active step still reads 正在停止…', () => {
+  test('F14: stopping with an active step still reads `正在停止…`', () => {
     const items = render({ todo: todo(9, 'building'), steps: [step('claimed')], stopping: true });
     expect(streamingRows(items).map((r) => r.label)).toEqual(['正在停止…']);
   });
@@ -130,7 +103,7 @@ describe('mapTranscript quiescent live tail (#471)', () => {
     expect(streamingRows(items).map((r) => r.label)).toEqual(['执行中...']);
   });
 
-  test('F17: a stopped run hangs no 执行中... tail', () => {
+  test('F17: a stopped run hangs no `执行中...` tail', () => {
     const items = render({ todo: todo(9, 'building'), steps: [step('stopped')] });
     expect(streamingRows(items)).toHaveLength(0);
   });

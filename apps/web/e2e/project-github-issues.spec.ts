@@ -1,15 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// #446（ADR 0005 读向）「从 GitHub issue 建任务」真用户路径——live build +
-// route stub（skills-readonly / project-new-repo 先例；GitHub 真链路归
-// server test/github-issues.test.ts 的注入 mock 面，e2e 不打真 GitHub）。
-// Each test pins one failure mode:
-// 1. 已连接 github 项目页 → 入口出现 → 弹层列 issue（label chips）→ 点选
-//    导入（POST body {number}）→ 导航详情 → issue 标题 + 全部标签 + 正文
-// 2. local 项目 → 入口不渲染（形态门）
-// 3. 未连接 github 项目 → 入口不渲染，任务面正常（不报错不空白）
-// 4. 状态过滤与分页参数直达请求面；hasMore=false → 下一页禁用
-
 const PROJECTS = [
   {
     id: 'proj-gh',
@@ -99,9 +89,6 @@ const ISSUES_CLOSED = {
   hasMore: false,
 };
 
-/** live 面全量 stub：单 handler 按 method+pathname 分发（glob `?` 语义陷阱
- * 的规避面）；未配置路径 = 500（skills-readonly.stubBoot 容忍律）。返回
- * issue 查询串与导入 body 的记录器供参数断言。 */
 async function stubWorld(page: Page, opts: { connected?: boolean } = {}) {
   const issueQueries: string[] = [];
   const importBodies: unknown[] = [];
@@ -157,11 +144,6 @@ async function stubWorld(page: Page, opts: { connected?: boolean } = {}) {
   return { issueQueries, importBodies };
 }
 
-// #946/#910 载体：入口/弹层/过滤/翻页 = role+文案一级载体（弹层 =
-// role=dialog，可及名 = 标题）；issue 行 = 含 #编号 文案的 button（行面
-// 唯一形态）；标签 chip 无 role（TagChip = Badge 皮肤件），走 exact text。
-// 详情落地面（.fresh-title / .fresh-tag-chip / .spec-block）是 detail 域
-// 的跨域别名，重钉权归 #945（本 spec 只消费、不重钉）。
 const issueRows = (scope: ReturnType<Page['getByRole']>) =>
   scope.getByRole('button', { name: /#\d+/ });
 
@@ -175,12 +157,12 @@ async function openDialog(page: Page) {
   return dialog;
 }
 
-test('1. 已连接 github 项目：入口 → 弹层 → 点选导入 → 详情见 issue 标题与全部标签', async ({
+test('1. connected github project: entry → sheet → pick to import → detail shows issue title and all labels', async ({
   page,
 }) => {
   const { importBodies } = await stubWorld(page);
   const dialog = await openDialog(page);
-  // 列表面：两行 issue，label chips 全渲染（#7 两枚 + #9 一枚）
+
   const rows = issueRows(dialog);
   await expect(rows).toHaveCount(2);
   await expect(dialog.getByText('bug', { exact: true })).toHaveCount(2);
@@ -191,7 +173,7 @@ test('1. 已连接 github 项目：入口 → 弹层 → 点选导入 → 详情
   await expect(
     rows.filter({ hasText: ISSUE_TITLE }).getByText('area:auth', { exact: true }),
   ).toHaveCount(1);
-  // 点选导入 → POST body {number} → 导航任务详情
+
   await rows.filter({ hasText: ISSUE_TITLE }).click();
   await expect(page).toHaveURL(/\/app\/todo\/todo-gh-1/);
   await expect(page.locator('.fresh-title')).toHaveText(ISSUE_TITLE);
@@ -200,14 +182,14 @@ test('1. 已连接 github 项目：入口 → 弹层 → 点选导入 → 详情
   expect(importBodies).toEqual([{ number: 7 }]);
 });
 
-test('2. local 项目：入口不渲染', async ({ page }) => {
+test('2. local project: entry not rendered', async ({ page }) => {
   await stubWorld(page);
   await page.goto('/app/project/proj-local?tab=tasks');
   await expect(page.getByRole('textbox', { name: '搜索任务' })).toBeVisible();
   await expect(page.getByRole('button', { name: '从 GitHub issue 建任务' })).toHaveCount(0);
 });
 
-test('3. 未连接 github 项目：入口不渲染，任务面正常不空白', async ({ page }) => {
+test('3. unconnected github project: entry not rendered, task face normal, not blank', async ({ page }) => {
   await stubWorld(page, { connected: false });
   await page.goto('/app/project/proj-gh?tab=tasks');
   await expect(page.getByRole('textbox', { name: '搜索任务' })).toBeVisible();
@@ -215,21 +197,20 @@ test('3. 未连接 github 项目：入口不渲染，任务面正常不空白', 
   await expect(page.getByRole('dialog', { name: '从 GitHub issue 建任务' })).toHaveCount(0);
 });
 
-test('4. 状态过滤与分页参数直达请求面；hasMore=false 下一页禁用', async ({ page }) => {
+test('4. status filter and pagination params reach the request face; hasMore=false disables the next page', async ({ page }) => {
   const { issueQueries } = await stubWorld(page);
   const dialog = await openDialog(page);
   const rows = issueRows(dialog);
   const next = dialog.getByRole('button', { name: '下一页' });
   expect(issueQueries).toEqual(['state=open&page=1']);
   await expect(next).toBeEnabled();
-  // 已关闭过滤：state=closed 直达；hasMore=false → 下一页禁用
+
   await dialog.getByRole('button', { name: '已关闭' }).click();
   await expect(rows).toHaveCount(1);
   await expect(rows).toContainText('closed issue');
   expect(issueQueries).toEqual(['state=open&page=1', 'state=closed&page=1']);
   await expect(next).toBeDisabled();
-  // 回「打开」翻到第 2 页：page=2 直达，行集换页。回切「打开」不重发
-  // open&page=1（TanStack staleTime 缓存命中，键含 state/page）。
+
   await dialog.getByRole('button', { name: '打开' }).click();
   await next.click();
   await expect(rows).toHaveCount(1);

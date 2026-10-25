@@ -1,22 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-// XMON-87: the new-task dialog's project chip was pure component state, so a
-// reload dropped the pick back to rows[0] of the team set. The chip now
-// remembers the pick in localStorage (key = NEW_TASK_PROJECT_STORAGE_KEY in
-// overlay/new-task-dialog.tsx, mirrored below). Scope: the unanchored face
-// (board / sidebar global dialog) only — the project page's own dialog keeps
-// #305/#404, where the untouched default is the route project.
-// Each test pins one failure mode:
-// 1. pick a non-first row, reload → chip and check still on it
-// 2. remembered id no longer in the project set → rows[0], board alive
-// 3. nothing stored → rows[0] (the pre-fix default, unchanged)
-// 4. the anchored project page ignores the memory while the board honors it
-//
-// #948 载体重钉（#910 裁定 1/2）：dialog = role+name；chip =
-// data-testid "new-task-project-chip"（二级载体，与 machine-chip 对称）；
-// 行 = getByRole('option')；chip 上的项目名 = chip scope getByText（一级
-// text 载体，头像字母 span 不含全名故唯一命中）。断言语义逐字不动。
-
 const STORAGE_KEY = 'cairn.newTaskProjectId'; // mirrored: new-task-dialog.tsx
 const BOARD = '/app?scenario=newtask-projects';
 const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=newtask-projects';
@@ -29,9 +12,6 @@ function seedStoredProject(page: Page, projectId: string) {
   );
 }
 
-// #389 opener on every route: the sidebar 新任务 row. On the project page it
-// routes through the page's own dialog (anchored), elsewhere through the
-// global one.
 async function openDialog(page: Page) {
   await page.locator('.sidebar-new-task').click();
   const dialog = page.getByRole('dialog', { name: '新建任务' });
@@ -72,7 +52,7 @@ test('a remembered project that is gone falls back to the first row', async ({ p
   await expect(
     page.getByRole('listbox', { name: '项目' }).getByRole('option').first(),
   ).toHaveAttribute('aria-selected', 'true');
-  // 不是白屏：看板本体照常渲染
+
   await expect(page.locator('.board-column').first()).toBeVisible();
 });
 

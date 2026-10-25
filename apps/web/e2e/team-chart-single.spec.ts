@@ -7,7 +7,7 @@ async function openChart(page: Page, scenario: string) {
   await page.getByRole('tab', { name: 'chart' }).click();
 }
 
-test('chart 组织图：只有根节点时不画连接线与括号', async ({ page }) => {
+test('org chart: single root node draws no connector lines or bracket', async ({ page }) => {
   await openChart(page, 'team-org-chart-single');
   await expect(page.getByTestId('team-chart-node')).toHaveCount(1);
   await expect(page.getByTestId('team-chart-name')).toHaveText('solo-root');
@@ -15,7 +15,7 @@ test('chart 组织图：只有根节点时不画连接线与括号', async ({ pa
   await expect(page.getByTestId('team-chart-bracket')).toHaveCount(0);
 });
 
-test('chart 组织图：单个子节点直连，无括号，连接线对齐子卡中心', async ({ page }) => {
+test('org chart: a single child connects directly, no bracket, connector aligned to the child card center', async ({ page }) => {
   await openChart(page, 'team-org-chart-pair');
   const child = page.getByTestId('team-chart-children').getByTestId('team-chart-node');
   await expect(child).toHaveCount(1);
@@ -30,7 +30,7 @@ test('chart 组织图：单个子节点直连，无括号，连接线对齐子�
   expect(Math.abs(link!.y + link!.height / 2 - (box!.y + box!.height / 2))).toBeLessThanOrEqual(1);
 });
 
-test('chart 组织图：零成员不渲染连接线与括号', async ({ page }) => {
+test('org chart: zero members renders no connector lines or bracket', async ({ page }) => {
   await openChart(page, 'team-org-chart-empty');
   await expect(page.getByTestId('team-agents-empty')).toContainText('暂无成员');
   await expect(page.getByTestId('team-chart-node')).toHaveCount(0);

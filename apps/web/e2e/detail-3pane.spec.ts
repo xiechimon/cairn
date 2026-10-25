@@ -33,7 +33,7 @@ test('three abutting panes: 248 sidebar | fluid center | 488 right', async ({ pa
   expect(seam.shadow).toBe('none');
 });
 
-test('no 文档|聊天 tab group survives on any phase surface', async ({ page }) => {
+test('no `文档|聊天` tab group survives on any phase surface', async ({ page }) => {
   for (const scenario of ['16', '17b', '23', '26', '27', '36']) {
     await page.goto(`${DETAIL_ROUTE}?scenario=${scenario}`);
     await expect(page.locator('.detail-tabs-group')).toHaveCount(0);
@@ -42,7 +42,7 @@ test('no 文档|聊天 tab group survives on any phase surface', async ({ page }
   }
 });
 
-test('detail head keeps the 更多 icon only — branch/token/history icons are gone', async ({
+test('detail head keeps the `更多` icon only — branch/token/history icons are gone', async ({
   page,
 }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=27`);
@@ -171,8 +171,7 @@ test('composer width tracks the center column; the floating window overlays with
   const pane = await measure();
   expect(pane.center).toBe(1440 - 248 - 10 - 488);
   expect(pane.comp).toBeCloseTo(pane.center - 32, 0);
-  // A0（ADR 0013 D7 反转）：窗是覆盖层——开窗后右栏在位、中心列与
-  // composer 宽度与关态逐值相同（418 互斥态退役，无 pane-var 重同步）
+
   await page.locator('.chief-fab').click();
   await expect(page.getByTestId('detail-right')).toBeVisible();
   const drawer = page.locator('.chief-drawer');
@@ -186,25 +185,19 @@ test('right pane type select switches between the doc surface and the three sect
   page,
 }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=27`);
-  // review phase opens on the doc view (变更 surface)
+
   const right = page.getByTestId('detail-right');
   await expect(right.getByTestId('doc-pane')).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  // .doc-select-wrap/.doc-pane-select = overlays 域（#949 批次），保留类载体
   const select = page.locator('.doc-select-wrap .doc-pane-select');
   await select.click();
-  // #949 载体：盘 = role menu，行 = menuitemradio + 文案（.plan-dropdown/
-  // .plan-dropdown-row 类钉随 overlays.css 清零退役）。不钉可及名：Base UI
-  // 把 popup 的名字经 aria-labelledby 绑到触发钮（压过 aria-label
-  // 「面板视图」），名 = 当前视图词，随选择漂移；测试上下文里开着的 menu
-  // 恒唯一，裸 role 即够。
+
   const dropdown = page.getByRole('menu');
   await expect(dropdown).toBeVisible();
   await expect(dropdown.getByRole('menuitemradio')).toHaveCount(4);
   await expect(dropdown.getByRole('menuitemradio').first()).toContainText('变更');
 
-  // pick Token 用量 → static section in the pane, no dialog anywhere
   await dropdown.getByRole('menuitemradio', { name: 'Token 用量' }).click();
   await expect(dropdown).toBeHidden();
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -237,8 +230,7 @@ test('plan card activation in the thread opens the plan doc in the right pane', 
   page,
 }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=plan-open`);
-  // review phase opens on the changes surface
-  // （.doc-select-wrap/.doc-pane-select = overlays 域类载体，#949 批次）
+
   await expect(page.locator('.doc-select-wrap .doc-pane-select')).toContainText('变更');
   // the build-open round carries its own plan card; the frozen row is first
   await page.getByRole('button', { name: '打开方案' }).first().click();
@@ -251,9 +243,7 @@ test('fresh phase: the brief owns the whole center column, right pane collapses'
   page,
 }) => {
   await page.goto(FRESH);
-  // XMON-55 P0 (reverses #366 修订裁决 3): a fresh todo has no run content, so
-  // the 488px pane that existed only to say 「尚无运行内容」 is gone and the
-  // fresh block takes the full fluid remainder instead.
+
   await expect(page.getByTestId('detail-center').getByTestId('fresh-block')).toBeVisible();
   await expect(page.getByTestId('detail-right')).toHaveCount(0);
   await expect(page.locator('.right-empty')).toHaveCount(0);
@@ -277,7 +267,6 @@ test('fresh phase: the brief owns the whole center column, right pane collapses'
   await expect(start).toBeVisible();
   await expect(start).toHaveText('开始');
   await start.click();
-  // #640：todo 相位 开始 = 单出口直发编排回合，不再弹选择 dialog（fixture
-  // inert）。缺席断言走 rerun 面唯一文案（.overlay-title 类载体退役）。
+
   await expect(page.getByText('这张任务将交给总管重新编排。')).toHaveCount(0);
 });

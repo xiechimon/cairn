@@ -43,7 +43,7 @@ for (const [route, scenario] of [
   });
 }
 
-test('team right-slot action owns its hit area (设置 in the top bar)', async ({ page }) => {
+test('team right-slot action owns its hit area (`设置` in the top bar)', async ({ page }) => {
   await page.goto('/app/team?scenario=12');
   const right = page.locator('[aria-label="设置"]');
   expect(await right.count()).toBeGreaterThan(0);
@@ -57,7 +57,7 @@ for (const [route, scenario] of [
   ['/app/resources/secrets', '08'],
   ['/app/resources/providers', '10'],
 ] as const) {
-  test(`resources 新建 owns its hit area — ${route}`, async ({ page }) => {
+  test(`resources \`新建\` owns its hit area — ${route}`, async ({ page }) => {
     await page.goto(`${route}?scenario=${scenario}`);
     await expectOwnsCenter(page, '[data-testid="resource-new"]');
   });

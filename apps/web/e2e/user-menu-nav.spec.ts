@@ -1,12 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Issue #163 acceptance: the user-menu rows are real navigation — 帐号 /
-// API 密钥 / MCP render as SPA Links to their real routes with the current
-// location.search riding along (#121 Link-family discipline: no bare
-// anchor, no document reload), and the menu closes on the hop (the target
-// route remounts the sidebar). Rows without a local-first surface
-// (新功能 / 快捷键) are hidden — dead-buttons.spec.ts pins their absence.
-
 const BOARD = '/app?scenario=01';
 
 async function openMenu(page: Page) {
@@ -15,8 +8,7 @@ async function openMenu(page: Page) {
   await page.evaluate(() => {
     (window as unknown as Record<string, unknown>).__spaMarker = 'alive';
   });
-  // #910 一级载体：用户 chip 的可及名 = fixture USER_NAME（aria-label）。
-  // 旧 .sidebar-user 类名钉退役（#943）。
+
   await page.getByRole('complementary').getByRole('button', { name: 'Xmon Dai' }).click();
   await expect(page.locator('.user-menu')).toBeVisible();
 }
@@ -32,7 +24,7 @@ const NAV_ROWS = [
 ] as const;
 
 for (const row of NAV_ROWS) {
-  test(`「${row.label}」row SPA-navigates to ${row.url}`, async ({ page }) => {
+  test(`\`${row.label}\` row SPA-navigates to ${row.url}`, async ({ page }) => {
     await openMenu(page);
 
     const link = page.locator('.user-menu-row', { hasText: row.label });

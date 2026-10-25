@@ -1,12 +1,3 @@
-// i18n core seam (issue #74): workspace zh-CN authoritative + en fallback
-// (01-stack-v2 §4.1 i18n row, S6). Locale persistence follows the r2 §1.5
-// observed dual-key contract (原键 `tds.locale` + `tds-locale`，value `zh`；
-// `en` is [推断] — the official dropdown set was never observed, r2 §11
-// Q19). D3 替换相位（#109）：键前缀 `cairn.locale` + `cairn-locale`
-// 同形替换（素材替换计划 §2 localStorage 键族）。
-// zh renders must be identity — the capture-verbatim strings are the
-// regression anchor, so t() must never rewrite the canonical source string.
-
 import { describe, expect, it } from 'vitest';
 import {
   LOCALE_STORAGE_KEYS,
@@ -45,7 +36,7 @@ describe('readStoredLocale', () => {
     expect(readStoredLocale(fakeStorage({ 'cairn-locale': 'en' }), 'zh-CN')).toBe('en');
   });
 
-  it('reads the observed dual keys (r2 §1.5, cairn 同形替换)', () => {
+  it('reads the observed dual keys (r2 §1.5, cairn same-shape replacement)', () => {
     expect(LOCALE_STORAGE_KEYS).toEqual(['cairn.locale', 'cairn-locale']);
     expect(
       readStoredLocale(fakeStorage({ 'cairn.locale': 'en', 'cairn-locale': 'en' }), 'zh-CN'),

@@ -1,27 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Issue #629 acceptance: the board card's press face matches the reference
-// product (todos.dev, 2026-10-02 live 实测; 可拖面由 #753 扩到每列——2026-10-03/04
-// 重测推翻「待处理/已完成卡不带传感器」，done 卡的按压微移现在武装 dnd 手势，
-// 但 #629 的原生链接拖抑制与点击导航不受影响):
-//   · 卡面文本不可选中（参考站卡根 user-select: none）；
-//   · stretched link 不可原生拖——draggable="false" + -webkit-user-drag:
-//     none；按住微移零 dragstart（Chrome 拖影 chip = 用户报的「偶尔出现
-//     一个小链接」，绝迹）；dnd overlay（#753 起 done 卡也会升起）不是原生
-//     拖影，两者判据分开钉；
-//   · 悬停 = 中性升档微染（--card-hover；2026-10-12 用户派对齐
-//     deepseek-harness 对话框的交互面 hover 反馈，取代「卡面无 hover」的
-//     todos.dev 静止正典）；
-//   · 按压 = 整卡 bg tint 一档（--surface-press：dark surface-tertiary /
-//     light surface-secondary，参考站 active:bg-* 同源），标题链接不吃全局
-//     a:active 压暗（参考站单一反馈）；
-//   · 点击（未移动）导航详情路由——参考站同款效果，钉住不被封锁误伤。
-// #943/#910 重钉：卡 = [data-todo-id] 属性载体（列 scope 走既有
-// data-column）；标题链接 = 卡内唯一 role=link；dnd 浮层 =
-// data-testid="drag-overlay"（二级：portal 容器无 role）。断言值不动。
-
-/** Two responsive frame boundaries — flushes React tasks queued before it
- *  (the same-column drop teardown, #753). */
 async function settleFrames(page: Page): Promise<void> {
   await page.evaluate(
     () => new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res()))),
@@ -59,8 +37,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(restBg).not.toBe(expectedPress);
 
     await page.mouse.move(cx, cy);
-    // 悬停微染（2026-10-12 用户派 dsh 对话框观感对齐）：hover = --card-hover
-    // 中性升档（dsh interactive-bg-hover 同族），与按压档互不混淆。
+
     const expectedHover = await resolveVar(page, 'background-color', 'var(--card-hover)');
     expect(restBg).not.toBe(expectedHover);
     expect(expectedHover).not.toBe(expectedPress);
@@ -73,10 +50,6 @@ for (const theme of ['light', 'dark'] as const) {
       .evaluate((el) => getComputedStyle(el).opacity);
     expect(linkOpacity).toBe('1');
 
-    // release away from the card BUT inside the source column: no click, tint
-    // clears with :active. (#753: a cross-column release would be a committed
-    // drop — done(有变更)→待处理 is a valid pair now — so the abort point stays
-    // in the done column, keeping this spec on the press face alone.)
     await page.mouse.move(cx, cy + box.height + 40, { steps: 6 });
     await page.mouse.up();
     await settleFrames(page);
@@ -84,7 +57,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('card face is selection- and native-drag-locked (「小链接」绝迹)', async ({ page }) => {
+test('card face is selection- and native-drag-locked (no `小链接` anywhere)', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const card = page.locator('[data-column="done"] [data-todo-id]').first();
   await expect(card).toHaveCSS('user-select', 'none');

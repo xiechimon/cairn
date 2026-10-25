@@ -1,24 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Issue #933: the collapsed tool-call group used to be a zero-context bare
-// pill — [复制 | 完成 Ns ›] with no glyph, no label — reading as a stray
-// button when it lands above the first agent message, and its copy button
-// copied content the screen did not show yet (the pills + outputs only
-// exist once expanded). The collapsed row now carries the group's identity
-// (terminal glyph + 工具过程 label, the #615 过程 word family) and the copy
-// affordance only exists in the expanded state, where what it copies is on
-// screen. Each test pins one failure way:
-//   I1 collapsed row names itself — glyph + label, not a bare pill
-//   I2 collapsed row offers no copy; expanding brings it back
-//   I3 the copy still puts pills + outputs on the clipboard (expanded only)
-//   I4 expand/collapse interaction and the #470 geometry fence are untouched
-//   I5 the identity row draws no rule and keeps the transcript's air
-//
-// #945/#910 重钉：detail.css 退役——组 toggle = role=button+「工具过程」
-// 文案一级；action 行 = msg-actions testid（无 role 结构容器，二级）；
-// 复制 = role=button+文案；pill = tool-pill testid；收起 = role=button+
-// 文案；行内 label/elapsed 用文本载体（不再钉类名）。
-
 const COLLAPSED = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout';
 const EXPANDED = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28';
 
@@ -31,7 +12,7 @@ async function readClipboard(page: Page): Promise<string> {
   return page.evaluate(() => navigator.clipboard.readText());
 }
 
-test('I1: the collapsed group names itself — terminal glyph + 工具过程 label', async ({
+test('I1: the collapsed group names itself — terminal glyph + `工具过程` label', async ({
   page,
 }) => {
   await page.goto(COLLAPSED);

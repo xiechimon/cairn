@@ -1,11 +1,3 @@
-// #1106 注入选择回查行（mapper 缝）：step.skillInjection 落库记录 → 头部
-// injected-skills 行（票面验收 4「选择过程在任务详情面可查」）。失败方式：
-//   F1 有记录的步存在 → 头部出 injected-skills 行，run 行之后
-//   F2 多步同技能去重（首见序），reason 取首见条目
-//   F3 hits=[]（已计算零命中）→ 行仍在、skills 空（零注入是可查事实）
-//   F4 全部步 null（chief 面 / 旧 server）→ 不产行零噪声
-//   F5 无 build → 不产行（行随 run 行走）
-
 import type { BuildRecord, SkillInjectionRecord, StepJournalRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapTranscript } from '../src/api/mappers.js';
@@ -63,8 +55,8 @@ function injectedItems(items: TranscriptItem[]) {
   );
 }
 
-describe('#1106 注入选择回查行（mapper 缝）', () => {
-  test('F1：有记录 → 头部出 injected-skills 行（run 行之后）', () => {
+describe('#1106 injected-selection readback row (mapper seam)', () => {
+  test('F1: with records → injected-skills row in the header (after the run row)', () => {
     const items = render([
       step('s1', {
         hits: [
@@ -77,12 +69,12 @@ describe('#1106 注入选择回查行（mapper 缝）', () => {
     expect(rows[0]?.skills).toEqual([
       { id: 'better-typography', reason: '任务文本与技能同域「前端界面」' },
     ]);
-    // 位置：run 行之后（head 序）。
+
     expect(items[0]?.kind).toBe('run');
     expect(items[1]?.kind).toBe('injected-skills');
   });
 
-  test('F2：多步同技能去重（首见序），reason 取首见条目', () => {
+  test('F2: multi-step same-skill dedup (first-seen order), reason takes the first-seen entry', () => {
     const items = render([
       step('s1', { hits: [{ id: 'a', rule: 'domain', reason: '首见原因' }] }, 'plan'),
       step('s2', { hits: [{ id: 'a', rule: 'domain', reason: '第二原因' }] }),
@@ -94,19 +86,19 @@ describe('#1106 注入选择回查行（mapper 缝）', () => {
     ]);
   });
 
-  test('F3：hits=[]（已计算零命中）→ 行在、skills 空（零注入是可查事实）', () => {
+  test('F3: hits=[] (computed zero hits) → row present, skills empty (zero injection is a checkable fact)', () => {
     const items = render([step('s1', { hits: [] })]);
     const rows = injectedItems(items);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.skills).toEqual([]);
   });
 
-  test('F4：全部步 null（chief 面 / 旧 server）→ 不产行', () => {
+  test('F4: all steps null (chief face / old server) → no row produced', () => {
     expect(injectedItems(render([step('s1', null)])).length === 0 ? 0 : 1).toBe(0);
     expect(injectedItems(render([])).length === 0 ? 0 : 1).toBe(0);
   });
 
-  test('F5：无 build → 不产行（行随 run 行走）', () => {
+  test('F5: no build → no row (the row rides the run row)', () => {
     const items = render(
       [
         step('s1', {
@@ -116,7 +108,7 @@ describe('#1106 注入选择回查行（mapper 缝）', () => {
       null,
     );
     expect(injectedItems(items)).toHaveLength(0);
-    // 无 build = 无 run 行也无注入行。
+
     expect(items.length).toBe(0);
   });
 });

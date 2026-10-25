@@ -1,28 +1,6 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
-// Live face, the detail chip popover's 执行对话 row: `<agent> · <model line>`.
-// The model line used to be the fixture capture constant (AGENT_MODEL_LINE,
-// `claude-sonnet-5 · 默认`) on every live todo, unassigned ones included.
-// Live it is the assigned agent's own members projection: modelId plus the
-// thinking level (null = 默认); no model segment at all when the todo is
-// unassigned, the members read is pending or failed, or the agent has no
-// model configured.
-//
-// Failure modes pinned:
-// 1. unassigned todo still carries a model segment
-// 2. assigned agent shows the fixture model instead of its own
-// 3. thinking level ignored (hardcoded 默认)
-// 4. join on the wrong agent (another member's model)
-// 5. members read pending / failed leaks a model, or never fills in
-// 6. agent without a model configured still carries a segment
-// 7. the null thinking level is not localized
-//
-// Boot stubs follow live-project-name.spec.ts: teams + user me succeed,
-// every other GET 500s into the app's isError tolerance; no ?scenario= =
-// live. Evidence shots (CAIRN_E2E_EVIDENCE) sit before the assertions so
-// the same run also frames the old code.
-
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const FIXTURE_MODEL = 'claude-sonnet-5';
@@ -125,7 +103,7 @@ async function shot(page: Page, name: string) {
   await evidencePanelShot(page, name, page.locator('.chip-popover'));
 }
 
-test('unassigned todo: 未指派 alone, no model segment', async ({ page }) => {
+test('unassigned todo: `未指派` alone, no model segment', async ({ page }) => {
   await stubLiveBoot(page);
   await serveMembers(page);
   const { popover, row } = await openRow(page, 'todo-0');

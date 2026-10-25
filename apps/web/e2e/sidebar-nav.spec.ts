@@ -1,21 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-// Issue #121 acceptance: the sidebar nav family (rail + expanded rows,
-// team name, 新建项目) are react-router Links — clicks navigate
-// client-side with no document reload, the URL/pill/aria-current follow,
-// and the fixture ?scenario= survives the hop. The 安装 App entries are
-// gone from both sidebar states and /zh/install takes the registered
-// unmatched-path redirect to /app. Non-selected rows tint the
-// --sidebar-hover pill on hover in both themes (#128 cds alpha ladder over
-// the sidebar layer); the selected row keeps its deeper --sidebar-active
-// pill under hover.
-// #943/#910 重钉：行 locator 走一级 role/name（link 行 = 可及名即行文案，
-// rail 态 aria-label 同名）；选中态断言从 .sidebar-row--selected /
-// .sidebar-team-row--active 状态类换 aria-current="page"（裁定 3 灰区：
-// 状态类归行为、载体改 aria-*）；侧栏容器 = complementary role；用户 chip
-// = button/Xmon Dai（fixture USER_NAME）。pill 的 ::before 探针值不动
-// （--sidebar-hover/--sidebar-active 槽值 #915 已翻，本 spec 现值即新正典）。
-
 declare global {
   interface Window {
     __spaCanary?: string;
@@ -63,7 +47,7 @@ test('nav rows hop client-side: no reload, pill + aria-current follow', async ({
 });
 
 test('subrow and team name hop client-side too', async ({ page }) => {
-  // 资源 folds by default in the Grouped sidebar; open it to reach 技能
+
   await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
   await page.goto('/app?scenario=01');
   await plantCanary(page);
@@ -75,8 +59,7 @@ test('subrow and team name hop client-side too', async ({ page }) => {
   await page.getByRole('link', { name: 'Cairn' }).click();
   await expect(page).toHaveURL('/app/team?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
-  // team 头行的选中态载体 = 品牌链接上的 aria-current（#943 新增；旧
-  // .sidebar-team-row--active 状态类断言按裁定 3 换 aria-*）
+
   await expect(page.getByRole('link', { name: 'Cairn' })).toHaveAttribute(
     'aria-current',
     'page',
@@ -93,9 +76,9 @@ test('rail rows hop client-side', async ({ page }) => {
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 });
 
-test('安装 App entries are gone from both sidebar states', async ({ page }) => {
+test('install-app entries are gone from both sidebar states', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  // 负钉换一级载体（role+name），语义 = 任何「安装」入口不得复活
+
   await expect(page.getByRole('link', { name: /安装/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /安装/ })).toHaveCount(0);
   await expect(page.locator('a[href^="/zh/install"]')).toHaveCount(0);
@@ -150,9 +133,7 @@ test('selected row keeps its sheet fill under hover', async ({ page }) => {
 
   const sheet = await tokenBg(page, '--background');
   await board.hover();
-  // past the 150ms step: the active row keeps the sheet fill (DESIGN.md
-  // 侧栏: active = sheet + hairline) — hover must not wash it to the hover
-  // step
+
   await page.waitForTimeout(250);
   expect(await pillBg(board)).toBe(sheet);
   await expect(board).toHaveAttribute('aria-current', 'page');

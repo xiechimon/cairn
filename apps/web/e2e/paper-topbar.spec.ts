@@ -1,9 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Paper board top bar (apps/web/DESIGN.md 布局与间距, paper-redesign-plan PR 4):
-// 56px bar; serif 工作台 + needs-you summary on the left; 筛选 / 定时 text
-// controls and the ink 新任务 button on the right; nothing wraps.
-
 const topbar = (page: Page) => page.locator('[data-route="board"] header').first();
 const summary = (page: Page) => topbar(page).getByTestId('needs-you');
 const pendingCount = (page: Page) =>
@@ -12,7 +8,7 @@ const filterBtn = (page: Page) => topbar(page).getByRole('button', { name: '筛�
 const schedulesLink = (page: Page) => topbar(page).getByRole('link', { name: '定时' });
 const newTaskButton = (page: Page) => topbar(page).getByRole('button', { name: '新任务' });
 
-test('bar geometry: 56px, serif page title, summary N = the 待处理 column count', async ({
+test('bar geometry: 56px, serif page title, summary N = the `待处理` column count', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01');
@@ -44,7 +40,7 @@ test('N = 0 reads the quiet line, no accent icon', async ({ page }) => {
   await expect(summary(page).locator('svg')).toHaveCount(0);
 });
 
-test('active filter: summary follows the narrowed column, badge + chip stay, popover anchors under 筛选', async ({
+test('active filter: summary follows the narrowed column, badge + chip stay, popover anchors under `筛选`', async ({
   page,
 }) => {
   await page.goto('/app?scenario=board-repos');
@@ -67,7 +63,7 @@ test('active filter: summary follows the narrowed column, badge + chip stay, pop
   expect(panel.y).toBeGreaterThan(trigger.y + trigger.height);
 });
 
-test('定时 is a client-side link to the schedules page, scenario kept', async ({ page }) => {
+test('`定时` is a client-side link to the schedules page, scenario kept', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await page.evaluate(() => {
     (window as unknown as { __spaCanary: string }).__spaCanary = 'alive';
@@ -79,7 +75,7 @@ test('定时 is a client-side link to the schedules page, scenario kept', async 
   ).toBe('alive');
 });
 
-test('新任务 is the shadcn default Button (ink, 32px, 8px corners) and opens the same new-task dialog as C', async ({
+test('`新任务` is the shadcn default Button (ink, 32px, 8px corners) and opens the same new-task dialog as C', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01');
@@ -91,7 +87,7 @@ test('新任务 is the shadcn default Button (ink, 32px, 8px corners) and opens 
   await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
 });
 
-test('keyboard: Tab reaches all three controls with a visible focus ring; Enter on 新任务 opens the dialog', async ({
+test('keyboard: Tab reaches all three controls with a visible focus ring; Enter on `新任务` opens the dialog', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01');

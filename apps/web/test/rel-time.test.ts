@@ -1,9 +1,3 @@
-// Relative-time seam (issue #74): the zh strings are canon anchors from the
-// captures (9 min → `9 分钟前` r7 02; 46 h across two calendar days →
-// `2 天前` r7 01; 33 h within adjacent days → `昨天` r5b 10) and must stay
-// byte-identical — fixture rows 01/02/22 gate them. The en side is the dict
-// fallback ([设计] compact forms).
-
 import { describe, expect, it } from 'vitest';
 import { relativeTime } from '../src/board/rel-time.js';
 import { EN } from '../src/i18n/en.js';
@@ -17,23 +11,23 @@ const HOUR = 3_600_000;
 const en = (source: string, vars?: TVars) => translate('en', EN, source, vars);
 
 describe('relativeTime zh (canon anchors)', () => {
-  it('under a minute → 刚刚', () => {
+  it('under a minute → `刚刚`', () => {
     expect(relativeTime(NOW - 30 * 1000, NOW)).toBe('刚刚');
   });
 
-  it('minute bucket → N 分钟前 (r7 02 anchor)', () => {
+  it('minute bucket → N `分钟前` (r7 02 anchor)', () => {
     expect(relativeTime(NOW - 9 * MINUTE, NOW)).toBe('9 分钟前');
   });
 
-  it('same calendar day hours → N 小时前', () => {
+  it('same calendar day hours → N `小时前`', () => {
     expect(relativeTime(NOW - 3 * HOUR, NOW)).toBe('3 小时前');
   });
 
-  it('adjacent calendar days → 昨天 (r5b 10 anchor: 33 h)', () => {
+  it('adjacent calendar days → `昨天` (r5b 10 anchor: 33 h)', () => {
     expect(relativeTime(NOW - 33 * HOUR, NOW)).toBe('昨天');
   });
 
-  it('two calendar days → N 天前 (r7 01 anchor: 46 h)', () => {
+  it('two calendar days → N `天前` (r7 01 anchor: 46 h)', () => {
     expect(relativeTime(NOW - 46 * HOUR, NOW)).toBe('2 天前');
   });
 });

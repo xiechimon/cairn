@@ -1,15 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-// One segmented control (components/segmented.tsx, DESIGN.md 页面模式 ·
-// 分段控件). Failure modes pinned here:
-// 1. A control drifts to its own track / selected colour or height (the
-//    three looks this file replaced: registry beige Tabs, SettingsSegmented,
-//    the team page's hand copy).
-// 2. The selected option loses the white face or its 1px ring.
-// 3. The keyboard ring is drawn outside the option and overlaps neighbours.
-// 4. A pointer click leaves a focus ring behind.
-// 5. Arrow keys on a radio group move focus without selecting.
-
 const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX';
 
 interface Control {

@@ -1,11 +1,3 @@
-// e2e 起的真 apps/server 必须随调用方一起消失。失败方式：
-//   1. dispose 只打到包装层：corepack 的 pnpm shim 收到 SIGTERM 自己退出、
-//      不转发，pnpm-native → tsx → server → esbuild 整串被 PID 1 收养
-//   2. 调用方被 SIGKILL / 崩溃（Bash 超时、Ctrl-C、worker 崩），afterAll
-//      没机会跑，server 树原样留存
-// 判据与实现无关：按 CAIRN_HOME=<本次 home> 反查整机进程环境——包装层、
-// tsx、server、esbuild 任一层还活着都算残留。
-
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { rmSync } from 'node:fs';
@@ -44,7 +36,7 @@ test.afterEach(() => {
   }
 });
 
-test('dispose 之后 server 整棵进程树不留一个', async () => {
+test('after dispose not a single process of the server tree remains', async () => {
   const server = await bootLiveServer(null);
   homes.push(server.home);
   expect(pidsCarrying(server.home).length).toBeGreaterThan(0);
@@ -54,7 +46,7 @@ test('dispose 之后 server 整棵进程树不留一个', async () => {
   expect(pidsCarrying(server.home)).toEqual([]);
 });
 
-test('调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出', async () => {
+test('caller SIGKILLed, teardown never runs → the server tree exits on its own', async () => {
   const spawner = spawn(process.execPath, ['--import', 'tsx', SPAWNER], {
     cwd: SERVER_DIR,
     stdio: ['ignore', 'pipe', 'inherit'],

@@ -1,17 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// 任务简报卡（#612）：用户原话的唯一展示面 = 线程列首的描述区。此前
-// .spec-block/.spec-chip 三个类在全部样式表里没有任何规则（#310 引入起裸排），
-// 且只按 \n\n 切段——`#` 标题、`-` 列表、代码围栏全按字面渲染；附件 token
-// 的图片以原尺寸裸图撑破页面。本 spec 走 live 面打桩（github-issue-writeback
-// 同律），钉住的失败方式：
-//  1. spec 的块级 markdown 退回字面文本（'# ' 前缀可见 / 无 head·list·fence 元素）
-//  2. 附件 token 行退回字面文本（'attachment:' 泄漏）或 chip 缺失/链接错位
-//  3. 图片附件不受缩略约束（原尺寸裸图）
-//  4. 简报卡丢配方（边线/圆角/底色 ≠ composer 卡家族）或行宽失 cap
-//  5. 有 spec 的 live 任务仍显示「尚无描述」（与下方简报自相矛盾）；
-//     空 spec 时占位必须保留（fresh-probe 家族回归）
-
 const BRIEF_ID = 'todo-brief-1';
 const BRIEF_EMPTY_ID = 'todo-brief-empty';
 const TEAM_ID = 'team-1';
@@ -66,8 +54,6 @@ function wireTodo(id: string, title: string, spec: string, seqNum: number) {
 const WIRE_BRIEF = wireTodo(BRIEF_ID, '登录按钮圆角与悬停过渡', SPEC_MD, 1);
 const WIRE_BRIEF_EMPTY = wireTodo(BRIEF_EMPTY_ID, '空描述任务', '', 2);
 
-/** live fresh 面打桩（github-issue-writeback.stubWorld 同律）：未配置路径 =
- *  500（应用既有 isError 耐受 = data ?? [] 族）。 */
 async function stubWorld(page: Page) {
   const json = (body: unknown, status = 200) => ({
     status,
@@ -94,7 +80,7 @@ async function stubWorld(page: Page) {
   });
 }
 
-test('1. spec 块级 markdown 渲染：标题/列表/围栏成元素，字面标记不泄漏', async ({ page }) => {
+test('1. spec block-level markdown rendering: headings/lists/fences become elements, literal markers do not leak', async ({ page }) => {
   await stubWorld(page);
   await page.goto(`/app/todo/${BRIEF_ID}`);
   const block = page.locator('.spec-block');
@@ -106,7 +92,7 @@ test('1. spec 块级 markdown 渲染：标题/列表/围栏成元素，字面标
   await expect(block).not.toContainText('```');
 });
 
-test('2. 附件 token 行渲染成 chip：图片带缩略约束，文件带名字与端点链接', async ({ page }) => {
+test('2. attachment token rows render as chips: images with thumbnail constraints, files with name and endpoint link', async ({ page }) => {
   await stubWorld(page);
   await page.goto(`/app/todo/${BRIEF_ID}`);
   const block = page.locator('.spec-block');
@@ -118,7 +104,7 @@ test('2. 附件 token 行渲染成 chip：图片带缩略约束，文件带名�
   await expect(fileChip).toHaveAttribute('href', '/api/attachments/att-doc-7');
 });
 
-test('3. 图片附件受缩略约束——不再以原尺寸裸图撑破页面', async ({ page }) => {
+test('3. image attachments constrained by thumbnails — no longer naked original-size images breaking the page', async ({ page }) => {
   await stubWorld(page);
   await page.goto(`/app/todo/${BRIEF_ID}`);
   const img = page.locator('.spec-block img.spec-chip-img');
@@ -128,7 +114,7 @@ test('3. 图片附件受缩略约束——不再以原尺寸裸图撑破页面',
   expect(maxWidth).toBe('100%');
 });
 
-test('4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-secondary 底）', async ({
+test('4. brief-card recipe = framed content box (1px border / rounded-lg / surface-secondary background)', async ({
   page,
 }) => {
   await stubWorld(page);
@@ -145,17 +131,15 @@ test('4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-s
     };
   });
   expect(cs.borderTop).toBe('1px');
-  // #1054：直角随 ADR 0012 D1 退役——带框内容盒接 registry 圆角词汇
-  // rounded-lg（=10px，#1072 同域先例）；composer 卡家族绑定随 #991 Q7
-  // 登记偏离解除（composer 保持手写方角是登记在案的偏离，不再拖带本盒）。
+
   expect(cs.radius).toBe('10px');
-  // --secondary 暗色侧 #3c3732；--border #3e3a34（shadcn.css 正本 Paper 暗色；surface-secondary/border-default 已并，#1002）
+
   expect(cs.bg).toBe('rgb(60, 55, 50)');
   expect(cs.borderColor).toBe('rgb(62, 58, 52)');
   expect(cs.fontSize).toBe('14px');
 });
 
-test('4b. 宽屏下行宽吃 68ch cap（#470 的 60–75 字符带同律）', async ({ page }) => {
+test('4b. wide screens line length takes the 68ch cap (same law as the 60–75 character band in #470)', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await stubWorld(page);
   await page.goto(`/app/todo/${BRIEF_ID}`);
@@ -173,7 +157,7 @@ test('4b. 宽屏下行宽吃 68ch cap（#470 的 60–75 字符带同律）', as
   expect(Math.abs(capped.maxWidth - capped.zero68)).toBeLessThanOrEqual(2);
 });
 
-test('5. 有 spec 的 live 任务不再显示「尚无描述」；空 spec 保留占位', async ({ page }) => {
+test('5. live tasks with a spec no longer show `尚无描述`; empty spec keeps the placeholder', async ({ page }) => {
   await stubWorld(page);
   await page.goto(`/app/todo/${BRIEF_ID}`);
   await expect(page.locator('.spec-block')).toBeVisible();
@@ -183,7 +167,7 @@ test('5. 有 spec 的 live 任务不再显示「尚无描述」；空 spec 保�
   await expect(page.locator('.spec-block')).toHaveCount(0);
 });
 
-test('6. 有序列表序号与正文区分、与首行基线对齐、双位数不 jog 内容列 (#814 rework)', async ({
+test('6. ordered-list numerals distinguished from body text, aligned with the first-line baseline, two-digit numbers do not jog the content column (#814 rework)', async ({
   page,
 }) => {
   await stubWorld(page);
@@ -206,13 +190,13 @@ test('6. 有序列表序号与正文区分、与首行基线对齐、双位数�
       };
     }),
   );
-  // 序号与正文不同色（tertiary vs primary），同行基线对齐
+
   for (const pin of pins) {
     expect(pin.rowAlign).toBe('baseline');
     expect(pin.ordColor).not.toBe(pin.contentColor);
     expect(Math.abs(pin.ordTop - pin.contentTop)).toBeLessThanOrEqual(1);
   }
-  // 1. / 2. / 10. 内容列同一起点（双位数不把整列往右 jog）
+
   const lefts = pins.map((pin) => pin.contentLeft);
   expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(1);
 });

@@ -1,33 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-// #1032 acceptance: 容器层滚动收口——ChiefSettings（记忆/章程/关注与提醒）与
-// PageShell 四页（项目设置 / 项目任务 / 排期 / 新建项目）此前没有任何一环
-// 提供纵向滚动（外壳 overflow-hidden，内容列 visible），长内容被裁掉、滚轮
-// 不动。修复 = 容器层各补一次滚动层（secondary/shell.tsx:92 与
-// resources/shell.tsx:121 是仓内既有模板），子页自动受益。
-//
-// 钉住的失败方式（每条断言对一个死法）：
-//  F1 无可滚祖先：内容超一屏却整链 overflow visible/hidden → 「找不到滚动
-//     容器」即红（scroller count=0）；
-//  F2 滚轮不到达：用户实测的原始症状——鼠标悬在内容上滚轮零响应 →
-//     wheel 后 scrollTop 仍 0 即红；
-//  F3 滚不到底：滚动层高度未被 flex 约束（缺 min-h/flex-1 语义）→ 置底后
-//     末条不在视口即红；
-//  F4 问题搬家：把「滚不动」换成「整页滚」——documentElement 出现页面级
-//     溢出（横或纵）即红（验收第 3 条：壳仍是唯一裁切者）。
-//
-// 数据面纪律（2026-10-08 批教训：stub 太乖会让 CI 假绿）：列表一律打桩成
-// **远超一屏**的长内容（40 条记忆 / 30 条关注 / 60 行章程 / 40 条任务 /
-// 30 条定时），静态表单页（设置/新建项目）用真实 fixture 内容 + 360px 矮
-// 视口逼出溢出；finder 同时要求 scrollHeight > clientHeight，内容不够长
-// 时测试红而不是空转通过。
-
-/** 滚动层标记属性：finder 在 evaluate 里就地打标，后续断言用它定位。 */
 const MARK = 'data-scroll-probe-1032';
 
-/** 从 probe 元素向上找第一个「可滚且内容确实超高」的祖先并打标；随后按
- *  F2→F3→F4 逐条钉。probe 必须是滚动前就在视口内的元素（滚轮要打在它
- *  上），last 是置底后必须完整可见的末尾元素。 */
 async function expectScrollerReachesBottom(page: Page, probe: Locator, last: Locator) {
   await probe.evaluate((el, mark) => {
     let node = el.parentElement;
@@ -43,11 +17,10 @@ async function expectScrollerReachesBottom(page: Page, probe: Locator, last: Loc
       node = node.parentElement;
     }
   }, MARK);
-  // F1：没有可滚祖先 → 0 个（修复前的 ChiefSettings/PageShell 全族）。
+
   const scroller = page.locator(`[${MARK}]`);
   await expect(scroller).toHaveCount(1);
 
-  // F2：滚轮真的驱动这个容器（用户报障的原始交互）。
   const box = await probe.boundingBox();
   if (box == null) throw new Error('probe element has no box (not rendered?)');
   // Aim near the probe's top: a tall probe (the 60-line charter) centers
@@ -58,7 +31,6 @@ async function expectScrollerReachesBottom(page: Page, probe: Locator, last: Loc
     .poll(() => scroller.evaluate((el) => el.scrollTop), { timeout: 3_000 })
     .toBeGreaterThan(0);
 
-  // F3：能滚到底——置底后末条元素在视口内。
   await scroller.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
@@ -69,7 +41,6 @@ async function expectScrollerReachesBottom(page: Page, probe: Locator, last: Loc
     .toBe(true);
   await expect(last).toBeInViewport();
 
-  // F4：页面级零溢出——壳仍是唯一裁切者，问题没从「滚不动」搬成「整页滚」。
   const overflow = await page.evaluate(() => ({
     h: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     v: document.documentElement.scrollHeight - document.documentElement.clientHeight,
@@ -90,9 +61,6 @@ const PROJECT = {
   localPath: null,
 };
 
-/** 启动面打桩（agent-detail.spec 的 stubLiveBoot 同律）：teams / user me 是
- *  teamId 来源、必须成功；其余 GET 一律 500——应用既有 isError 耐受。
- *  page.route 匹配序 = 注册逆序：catch-all 先注册，具体路由后注册才生效。 */
 async function stubLiveBoot(page: Page) {
   await page.route('**/api/**', (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
@@ -101,8 +69,6 @@ async function stubLiveBoot(page: Page) {
   await page.route('**/api/teams', (route) => route.fulfill({ json: [TEAM] }));
   await page.route('**/api/user/me', (route) => route.fulfill({ json: USER }));
 }
-
-// —— ChiefSettings（board 壳内容交换面；live 打桩出长内容）——
 
 const AGENT_ACTOR = {
   id: 'agent-1',
@@ -165,8 +131,6 @@ const MEMORIES = Array.from({ length: 40 }, (_, i) => ({
   updatedAt: 0,
 }));
 
-/** live 面开总管设置：FAB → 抽屉 → 齿轮（内容交换；`?chief=settings` 深链
- *  打不开设置面——t-0053 实测，齿轮是唯一通路）。 */
 async function openChiefSettings(page: Page) {
   await page.goto('/app');
   await page.locator('button[aria-label="总管"]').click();
@@ -174,15 +138,11 @@ async function openChiefSettings(page: Page) {
   await expect(drawer).toBeVisible();
   await drawer.locator('button[aria-label="总管设置"]').click();
   await expect(page.getByRole('heading', { name: '总管设置' })).toBeVisible();
-  // #1009 A0（ADR 0013）：设置面 = board 路由内容交换，窗体自身停在泊位
-  // （chiefView 三态互斥，settings 态 windowOpen=false，keepMounted 以
-  // hidden 属性驻 DOM）——溢出量测要的是窗体节点不卸载（无退场腿顶宽
-  // documentElement.scrollWidth，F4 页面级溢出量的噪声源），载体判据 =
-  // 节点在场（attached），不是可见。
+
   await expect(page.locator('.chief-drawer')).toBeAttached();
 }
 
-test('总管设置三个长内容 tab 都能滚到底 (#1032)', async ({ page }) => {
+test('all three long-content tabs of chief settings scroll to the bottom (#1032)', async ({ page }) => {
   await stubLiveBoot(page);
   const longCharter = Array.from({ length: 60 }, (_, i) => `章程第 ${i} 行：${MEMORY_LINE}`).join(
     '\n',
@@ -195,19 +155,16 @@ test('总管设置三个长内容 tab 都能滚到底 (#1032)', async ({ page })
   );
   await openChiefSettings(page);
 
-  // 记忆 tab（用户报障的原始面）：40 条撑出滚动，末条滚轮可达。
   await page.getByRole('tab', { name: '记忆' }).click();
   const quota = page.getByText('记忆 · 40 / 100');
   await expect(quota).toBeVisible();
   await expectScrollerReachesBottom(page, quota, page.getByText('记忆条目 39'));
 
-  // 关注与提醒 tab：30 条 watch 行。
   await page.getByRole('tab', { name: '关注与提醒' }).click();
   const firstWatch = page.getByText('关注条目 0', { exact: true });
   await expect(firstWatch).toBeVisible();
   await expectScrollerReachesBottom(page, firstWatch, page.getByText('关注条目 29', { exact: true }));
 
-  // 章程 tab：60 行长文 + 底部编辑钮。
   await page.getByRole('tab', { name: '章程' }).click();
   const charterHead = page.getByText('章程第 0 行', { exact: false }).first();
   await expect(charterHead).toBeVisible();
@@ -217,8 +174,6 @@ test('总管设置三个长内容 tab 都能滚到底 (#1032)', async ({ page })
     page.getByRole('button', { name: '编辑' }),
   );
 });
-
-// —— PageShell 四页（pages/shell.tsx:160 一处包装，四页同时受益）——
 
 function wireTodo(i: number) {
   return {
@@ -244,7 +199,7 @@ function wireTodo(i: number) {
   };
 }
 
-test('项目任务列表页能滚到底 (#1032)', async ({ page }) => {
+test('project task list page scrolls to the bottom (#1032)', async ({ page }) => {
   await stubLiveBoot(page);
   await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
   await page.route('**/api/todos?*', (route) =>
@@ -280,7 +235,7 @@ function wireSchedule(i: number) {
   };
 }
 
-test('排期页能滚到底 (#1032)', async ({ page }) => {
+test('schedules page scrolls to the bottom (#1032)', async ({ page }) => {
   await stubLiveBoot(page);
   await page.route('**/api/schedules*', (route) =>
     route.fulfill({ json: Array.from({ length: 30 }, (_, i) => wireSchedule(i)) }),
@@ -291,10 +246,7 @@ test('排期页能滚到底 (#1032)', async ({ page }) => {
   await expectScrollerReachesBottom(page, cards.first(), cards.last());
 });
 
-// 静态内容页（无列表可打桩）：真实 fixture 内容 + 360px 矮视口逼出溢出。
-// finder 的 scrollHeight > clientHeight 前提保证「没溢出就红」，不会空转。
-
-test('项目设置页能滚到底 (#1032)', async ({ page }) => {
+test('project settings page scrolls to the bottom (#1032)', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 360 });
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c');
   const danger = page.getByText('危险操作');
@@ -308,13 +260,13 @@ test('项目设置页能滚到底 (#1032)', async ({ page }) => {
   );
 });
 
-test('新建项目页能滚到底 (#1032)', async ({ page }) => {
-  // Paper 表单（窄栏、操作行靠右）比旧整宽版矮，360 不再溢出；300 仍逼出溢出。
+test('new project page scrolls to the bottom (#1032)', async ({ page }) => {
+
   await page.setViewportSize({ width: 1440, height: 300 });
   await page.goto('/app/project/new?scenario=01');
   const heading = page.getByRole('button', { name: '创建项目' });
   await expect(heading).toBeAttached();
-  // probe 必须在滚动层内且滚动前可见——顶栏返回箭头在壳上不在层内，不能用。
+
   const hint = page.getByText('可选。未设置时以首字母代替。');
   await expect(hint).toBeVisible();
   await expectScrollerReachesBottom(page, hint, heading);

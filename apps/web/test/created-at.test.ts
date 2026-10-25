@@ -1,8 +1,3 @@
-// Creation-stamp seam (issue #74): the zh line is capture-verbatim
-// (「2026年9月21日 13:21 创建」, r7 23) and pinned to the +08:00 capture
-// timezone so fixture output never drifts with the runner locale; the en shape is
-// [设计] (no observed en workspace).
-
 import { describe, expect, it } from 'vitest';
 import { formatCreatedAt } from '../src/detail/fresh-block.js';
 import { EN } from '../src/i18n/en.js';

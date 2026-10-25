@@ -1,12 +1,3 @@
-// Paper dialogs and menus (apps/web/DESIGN.md 弹窗与菜单). Drift fails here:
-// 1. Every dialog backdrop (DialogShell, AlertDialogShell) is the light dim
-//    --dialog-backdrop with no blur, in both themes.
-// 2. Dialog widths are the three sizes: S 400 / M 480 / L 640.
-// 3. The footer splits: hint left, actions right, no band fill.
-// 4. Menu rows are 32px with 13.5px text and 15px icons; the panel is 18px
-//    corners with 4px padding.
-// 5. The provider picker groups rows and search hides empty groups.
-// Screenshots: CAIRN_E2E_EVIDENCE=docs/verify/paper-overlays.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence.js';
 

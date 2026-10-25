@@ -1,26 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-// Issue #932: the detail route's fixed 3-pane shell (240 sidebar | fluid
-// thread | 488 right pane) had no narrow-viewport strategy at all — at 320px
-// the sidebar kept its full width, the right pane kept 488px off-screen behind the
-// shell's overflow:hidden, and the thread column swallowed 133px of content
-// in a 35px box (#885 recorded it). Below 816px — max-[816px] media (width < 816): 815 folds, 816 restores;
-// 248+488 leaves ~80px center
-// 2026-10-05) — the shell now degrades: both side panes drop, the thread
-// owns the full width, and the head's back chevron stays the way out. Each
-// test pins one failure way:
-//   N1 320px: nothing clips, nothing swallows a horizontal scroll
-//   N2 360/390: same law at the common phone widths
-//   N3 the degradation is bounded — 816px keeps the full 3-pane shell
-//   N4 the chief dock cannot re-introduce the clip at 320px
-//   N5 head and composer stay inside the viewport at 320px
-//
-// #945/#910 重钉：detail.css 退役——载体换壳属性 + 二级 testid：
-// [data-route=todo-detail] > aside（侧栏）、detail-center / detail-right /
-// transcript-col / detail-head-actions / composer-card；返回箭头 =
-// role=link+文案，FAB = role=button 总管。.chief-drawer 属 chief 域
-// （#950 批次），类载体保留。
-
 const DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=26';
 
 async function overflowProbe(page: import('@playwright/test').Page) {
@@ -134,8 +113,7 @@ test('N5: head actions and the composer stay inside the 320px viewport', async (
     const left = (sel: string) =>
       Math.round(document.querySelector(sel)!.getBoundingClientRect().left);
     return {
-      // the actions cluster (更多 + the phase's primary when it has one) is
-      // the head's trailing edge — scenario 26's phase carries no primary
+
       actionsRight: right('[data-testid="detail-head-actions"]'),
       compLeft: left('[data-testid="composer-card"]'),
       compRight: right('[data-testid="composer-card"]'),

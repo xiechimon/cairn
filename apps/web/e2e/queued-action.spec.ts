@@ -1,20 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { evidencePanelShot, evidenceShot } from './evidence';
 
-// #1423: a queued task (started, waiting for a free machine) has no primary
-// action. It sits in IN_PROGRESS_PHASES beside planning / building, which
-// carry no button either: the server pushes the next phase. The detail
-// transcript's 排队中 row says what it waits for; a held card (here 等机器)
-// also says so in its meta. Live face, no
-// ?scenario=: the queued phase only exists on the live data path, and
-// page.route answers it (stubLiveBoot discipline from schedules-live.spec.ts).
-// Failure modes pinned here:
-//   1. the queued detail header shows a 开始 button whose click does nothing;
-//   2. the fix drops the 排队中 chip (#1400) or the transcript wait row;
-//   3. the fix also drops the todo header's 开始;
-//   4. the queued board card floats a 开始 on hover or keyboard focus;
-//   5. the todo card in the same 待开始 column loses its 开始.
-
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const PROJECT = {
@@ -118,7 +104,7 @@ test.beforeEach(async ({ page }) => {
   await stubLiveBoot(page);
 });
 
-test('detail: a queued task has no 开始, keeps 排队中 and the wait row', async ({ page }) => {
+test('detail: a queued task has no `开始`, keeps `排队中` and the wait row', async ({ page }) => {
   await page.goto(`/app/todo/${QUEUED_ID}`);
   const head = page.getByTestId('detail-head');
   await expect(head.getByTestId('phase-chip')).toHaveText('排队中');
@@ -129,18 +115,18 @@ test('detail: a queued task has no 开始, keeps 排队中 and the wait row', as
   await expect(page.getByRole('button', { name: '开始', exact: true })).toHaveCount(0);
 });
 
-test('detail: a todo task keeps its 开始', async ({ page }) => {
+test('detail: a todo task keeps its `开始`', async ({ page }) => {
   await page.goto(`/app/todo/${FRESH_ID}`);
   const head = page.getByTestId('detail-head');
   await expect(head.getByTestId('phase-chip')).toHaveText('待开始');
   await expect(head.getByRole('button', { name: '开始', exact: true })).toBeVisible();
 });
 
-test('board: the queued card renders no 开始, the todo card shows it on hover', async ({
+test('board: the queued card renders no `开始`, the todo card shows it on hover', async ({
   page,
 }) => {
   await page.goto('/app');
-  // The queued card sits in 执行中 (#1447), the todo card in 待开始.
+
   const running = page.locator('.board-column[data-column="building"]');
   const queued = running.locator(`[data-todo-id="${QUEUED_ID}"]`);
   const fresh = page.locator(`.board-column[data-column="todo"] [data-todo-id="${FRESH_ID}"]`);

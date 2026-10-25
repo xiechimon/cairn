@@ -1,26 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// spec 15 #394: the new-task dialog is single-field (spec body only) — no
-// title input (server derives the placeholder title from the first non-empty
-// line; the executing agent backfills the real title via set_task_meta),
-// no manual tag UI (fixed vocabulary, agent-assigned, ADR 0002).
-// Each test pins one failure mode:
-// 1. the title input / tag row come back (structure regression)
-// 2. the save gate regresses to title-based (empty body stays disabled)
-// 3. the fixture card lands without the derived first-line title
-// 4. a >50-char first line isn't truncated with the ellipsis
-// 5. autofocus leaves the spec textarea
-//
-// #948 载体重钉（#910 裁定 1/2）：dialog = role+name，正文框 = dialog scope
-// getByRole('textbox')（唯一 textbox）；.new-task-input/-tags/-tag-add 三条
-// 负钉（toHaveCount(0)）保留类名形态——它们钉的就是「退役结构不许回」，
-// 类名即断言对象。.sidebar-new-task / .todo-card-title 是 board 域载体，不动。
-
 const BOARD = '/app?scenario=01';
 
 async function openDialog(page: Page) {
   await page.goto(BOARD);
-  // #445：顶栏「+ 任务」撤除——opener = 侧栏「新任务」行（C 热键同解析）
+
   await page.locator('.sidebar-new-task').click();
   const dialog = page.getByRole('dialog', { name: '新建任务' });
   await expect(dialog).toBeVisible();
@@ -46,14 +30,14 @@ test('save buttons gate on the spec body, not a title', async ({ page }) => {
   await expect(start).toBeEnabled();
 });
 
-test('fixture 保存 lands a card titled by the first line', async ({ page }) => {
+test('fixture save lands a card titled by the first line', async ({ page }) => {
   const dialog = await openDialog(page);
   await dialog.getByRole('textbox').fill('给登录页加验证码\n\n现在的情况：无');
   await dialog.getByRole('button', { name: '保存', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   const card = page.locator('[data-column="todo"] .todo-card', { hasText: '给登录页加验证码' });
   await expect(card).toBeVisible();
-  // 标题只取首行——第二行不进卡片标题
+
   await expect(card.locator('.todo-card-title')).toHaveText('给登录页加验证码');
 });
 
@@ -70,7 +54,7 @@ test('autofocus lands on the spec textarea', async ({ page }) => {
   await expect(dialog.getByRole('textbox')).toBeFocused();
 });
 
-test('Esc close returns focus to the invoking button (#388 族律；#445 触发位 = 侧栏行)', async ({
+test('Esc close returns focus to the invoking button (#388 family law; #445 trigger position = sidebar row)', async ({
   page,
 }) => {
   const dialog = await openDialog(page);

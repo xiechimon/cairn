@@ -1,16 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { pressAndExpect } from './helpers.js';
 
-// #1400: 待处理 has one meaning. It names the board column of tasks that need
-// the user (confirm / review / failed; the sidebar 需要我处理 opens it).
-// Not-started tasks (todo / queued) sit in 待开始. The todo chip reads 待开始
-// and the queued chip (started, waiting for a machine) reads 排队中, so
-// neither shows 待处理.
-// Pinned surfaces: board columns, search rows and project task rows
-// (scenario 22: fresh probe #9 beside the review / done legacy pair), detail
-// header (scenario 23), schedule cards (live stub: todo / queued / confirm
-// rows). The agent detail queued row is pinned in agent-detail.spec.ts.
-
 const FRESH_TITLE = 'r7 rebaseline probe';
 
 const panel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
@@ -20,7 +10,7 @@ async function openPanel(page: Page) {
   await pressAndExpect(page, 'Meta+k', panel(page));
 }
 
-test('board: the fresh task sits in 待开始, 待处理 holds the review card', async ({ page }) => {
+test('board: the fresh task sits in `待开始`, `待处理` holds the review card', async ({ page }) => {
   await page.goto('/app?scenario=22');
   const todoColumn = page.locator('.board-column[data-column="todo"]');
   const pendingColumn = page.locator('.board-column[data-column="pending"]');
@@ -30,12 +20,12 @@ test('board: the fresh task sits in 待开始, 待处理 holds the review card',
   await expect(pendingColumn.locator('[data-todo-id="r3-legacy-1"]')).toHaveCount(1);
 });
 
-test('detail header: the fresh task chip reads the column word 待开始', async ({ page }) => {
+test('detail header: the fresh task chip reads the column word `待开始`', async ({ page }) => {
   await page.goto('/app/todo/fresh-probe?scenario=23');
   await expect(page.getByTestId('phase-chip')).toHaveText('待开始');
 });
 
-test('search rows: fresh reads 待开始, review 审核, done 已完成', async ({ page }) => {
+test('search rows: fresh reads `待开始`, review `审核`, done `已完成`', async ({ page }) => {
   await page.goto('/app?scenario=22');
   await openPanel(page);
   await page.keyboard.type('probe');
@@ -48,7 +38,7 @@ test('search rows: fresh reads 待开始, review 审核, done 已完成', async 
   await expect(panel(page).getByText('待处理', { exact: true })).toHaveCount(0);
 });
 
-test('project task rows: fresh reads 待开始, review 审核', async ({ page }) => {
+test('project task rows: fresh reads `待开始`, review `审核`', async ({ page }) => {
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=22&tab=tasks');
   const status = (title: string) =>
     page.getByTestId('task-row').filter({ hasText: title }).getByTestId('task-status');
@@ -84,7 +74,7 @@ function wireSchedule(seqNum: number, phase: string) {
   };
 }
 
-test('schedule cards: todo reads 待开始, queued 排队中, confirm 确认', async ({ page }) => {
+test('schedule cards: todo reads `待开始`, queued `排队中`, confirm `确认`', async ({ page }) => {
   await page.route('**/api/**', (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });

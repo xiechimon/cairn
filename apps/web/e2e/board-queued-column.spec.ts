@@ -2,22 +2,6 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
-// #1447: a queued task (started, waiting for a machine) sits in 执行中, the
-// step its build will run (the reference product's 2026-09-12 board entry),
-// and says why it waits in the 执行中 footer: 排队中 for a healthy queue,
-// 等机器 / 等额度 when held. The hourglass is static; the breathing robot is
-// for planning / building, which actually run. Dropping a queued card on
-// 待开始 is a reset (#755). Live face, no ?scenario= (stubWorld discipline from
-// board-dnd-live.spec.ts).
-// Failure modes pinned here:
-//   1. a queued card still sits in 待开始 beside cards that have not started;
-//   2. a healthy queued card shows no waiting state, or a held one hides its
-//      reason;
-//   3. a queued card borrows the breathing robot of a running agent;
-//   4. a queued card dropped on 待开始 does nothing instead of opening reset;
-//   5. todo and building cards change: todo leaves 待开始, building loses its
-//      breathing footer, or the column counts drift.
-
 const TEAM_ID = 'team-1';
 const PROJECT_ID = 'proj-1447';
 const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
@@ -90,7 +74,7 @@ const column = (page: Page, id: string) => page.locator(`.board-column[data-colu
 const card = (page: Page, columnId: string, todoId: string) =>
   column(page, columnId).locator(`[data-todo-id="${todoId}"]`);
 
-test('queued cards sit in 执行中 with a waiting footer; todo and building stay put', async ({
+test('queued cards sit in `执行中` with a waiting footer; todo and building stay put', async ({
   page,
 }) => {
   await stubWorld(page);
@@ -117,10 +101,8 @@ test('queued cards sit in 执行中 with a waiting footer; todo and building sta
   await expect(runningFooter.locator('.animate-breath')).toHaveCount(1);
 });
 
-// The fixture board has no queued card, so a11y-axe.spec never sees the
-// waiting footer; scan the 执行中 column here in both themes (WCAG 2.1 AA).
 for (const theme of ['light', 'dark'] as const) {
-  test(`axe: the 执行中 column with waiting footers (${theme})`, async ({ page }) => {
+  test(`axe: the \`执行中\` column with waiting footers (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await stubWorld(page);
@@ -139,7 +121,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('a queued card dropped on 待开始 opens the reset dialog', async ({ page }) => {
+test('a queued card dropped on `待开始` opens the reset dialog', async ({ page }) => {
   await stubWorld(page);
   await page.goto('/app');
   const from = await page.locator(`[data-todo-id="${QUEUED.id}"]`).first().boundingBox();
