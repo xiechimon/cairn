@@ -21,6 +21,7 @@ import {
   build as buildTable,
   chiefMessage,
   chiefThread,
+  machine as machineTable,
   project as projectTable,
   step as stepTable,
   todo as todoTable,
@@ -30,6 +31,7 @@ import { repoDirFor } from '../../../apps/server/src/services/git.js';
 import {
   api,
   bootRealServer,
+  daemonLogLines,
   AGENT_ID as HELPER_BOOTSTRAP_AGENT_ID,
   type RealServer,
   waitFor,
@@ -200,13 +202,7 @@ export async function bootStack(): Promise<Stack> {
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
   });
-  const logLines = (): string[] => {
-    try {
-      return readFileSync(paths.daemonLog, 'utf8').split('\n');
-    } catch {
-      return [];
-    }
-  };
+  const logLines = (): string[] => daemonLogLines(paths.daemonLog);
   await waitFor(() => logLines().includes('[wake] push channel connected'), 30_000);
   return {
     server,
@@ -333,6 +329,9 @@ export async function seedWorld(
   // 分派候选，也让「按顺序数条目」多一个错位机会。清掉。
   server.db.delete(agentTable).where(eq(agentTable.id, HELPER_BOOTSTRAP_AGENT_ID)).run();
 
+  const machineRow = server.db.select().from(machineTable).all()[0];
+  if (machineRow === undefined) throw new Error('daemon 未注册机器，无法给 Agent 绑归属机');
+
   const agentIds: Record<string, string> = {};
   for (const a of opts.roster) {
     const res = await api(server.url, 'POST', `/api/teams/${server.teamId}/agents`, {
@@ -340,8 +339,10 @@ export async function seedWorld(
       description: a.description,
       provider: 'relay-186',
       modelId: a.modelId,
+      machineId: machineRow.id,
     });
-    if (res.status !== 201) throw new Error(`建 agent ${a.key} 失败: ${res.status}`);
+    if (res.status !== 201)
+      throw new Error(`建 agent ${a.key} 失败: ${res.status} ${JSON.stringify(res.body)}`);
     agentIds[a.key] = (res.body as { id: string }).id;
   }
 
