@@ -33,6 +33,16 @@
 - **Eval and trajectory driven.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Strong-vs-weak model A/B evals then decide which prompt, skill and routing changes stay. "Training" here means improving the harness, never fine-tuning weights.
 - **Your machines.** Register any host by running the daemon on it. Builds run there in their own git worktree, and the board streams plans, diffs and tool calls back live.
 
+## Showcase
+
+Real work that agents shipped inside Cairn, each with a recording, the pull request and numbers you can check. Cairn is still taking shape, so these slots are placeholders for now.
+
+| | Work | What it will show |
+|---|---|---|
+| 1 | Bootstrap loop | An agent inside Cairn takes one of Cairn's own tickets from claim through build and review to merge. *Coming soon.* |
+| 2 | An app from scratch | One sentence in, and the agent team builds a complete app on your machine. *Coming soon.* |
+| 3 | Harness before and after | The same task set, scored before and after a prompt, skill and routing change. *Coming soon.* |
+
 ## Features
 
 - **Tasks & phases** — kanban board with numbered tasks, tags, and schedules that re-run a task on a cycle.
