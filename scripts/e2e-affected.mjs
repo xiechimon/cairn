@@ -168,6 +168,7 @@ const PAGES = [
 const RESOURCES = [
   'machine-',
   'machines-',
+  'agent-settings-row-label',
   'provider-',
   'providers-',
   'secret-',

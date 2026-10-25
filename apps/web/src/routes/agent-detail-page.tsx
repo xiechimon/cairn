@@ -38,6 +38,7 @@ import {
   SETTINGS_VALUE_EDITOR_CLS,
   SettingsCard,
   SettingsRow,
+  SettingsSelectTrigger,
 } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
@@ -50,13 +51,7 @@ import {
 } from '../components/ui/dropdown-menu.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select.js';
+import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { StatusChip } from '../components/ui/status-chip.js';
 import { Switch } from '../components/ui/switch.js';
 import { Textarea } from '../components/ui/textarea.js';
@@ -316,8 +311,7 @@ export function AgentDetailPage() {
                     value={defaultSkill}
                     onValueChange={(next) => patch({ defaultSkill: next })}
                   >
-                    <SelectTrigger
-                      aria-label={t('默认 skill')}
+                    <SettingsSelectTrigger
                       className={cn('agent-skill-select', SETTINGS_SELECT_TRIGGER_CLS)}
                     >
                       <SelectValue>
@@ -326,7 +320,7 @@ export function AgentDetailPage() {
                           : (skillOptions.find((skill) => skill.id === defaultSkill)?.name ??
                             defaultSkill)}
                       </SelectValue>
-                    </SelectTrigger>
+                    </SettingsSelectTrigger>
                     <SelectContent aria-label={t('默认 skill')}>
                       <SelectItem value={null}>{t('未设置')}</SelectItem>
                       {skillOptions.map((skill) => (
@@ -339,7 +333,6 @@ export function AgentDetailPage() {
                 </SettingsRow>
                 <SettingsRow label={t('运行时')} labelClassName="agent-field-label">
                   <AgentRuntimeSelect
-                    ariaLabel={t('运行时')}
                     value={runtimeValue}
                     options={modelOptions}
                     onPick={(next) => {
@@ -359,7 +352,6 @@ export function AgentDetailPage() {
                 </SettingsRow>
                 <SettingsRow label={t('模型')} labelClassName="agent-field-label">
                   <AgentModelSelect
-                    ariaLabel={t('模型')}
                     provider={runtimeValue}
                     modelId={agent.modelId}
                     options={modelOptions}
@@ -373,14 +365,13 @@ export function AgentDetailPage() {
                     value={thinkingLevel}
                     onValueChange={(next) => patch({ thinkingLevel: next })}
                   >
-                    <SelectTrigger
-                      aria-label={t('思考强度')}
+                    <SettingsSelectTrigger
                       className={cn('agent-thinking-select', SETTINGS_SELECT_TRIGGER_CLS)}
                     >
                       <SelectValue>
                         {thinkingLevel === null ? t('未设置') : thinkingLevel}
                       </SelectValue>
-                    </SelectTrigger>
+                    </SettingsSelectTrigger>
                     <SelectContent aria-label={t('思考强度')}>
                       <SelectItem value={null}>{t('未设置')}</SelectItem>
                       {thinkingOptions.map((level) => (
