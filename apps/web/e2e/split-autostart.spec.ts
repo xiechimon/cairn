@@ -105,10 +105,10 @@ async function splitThroughChief(
   });
   if (splitPolicy !== 'human') await ok('PATCH', `/api/projects/${project.id}`, { splitPolicy });
   const parent = await ok<{ id: string }>('POST', `/api/projects/${project.id}/todos`, {
-    title: `拆解探针 ${splitPolicy}`,
-    spec: '拆成两张：先建表，再接接口',
+    title: `split probe ${splitPolicy}`,
+    spec: 'split into two cards: create the table first, then wire the endpoint',
   });
-  await ok('POST', `/api/teams/${teamId}/chief/threads`, { content: `拆解 ${parent.id}` });
+  await ok('POST', `/api/teams/${teamId}/chief/threads`, { content: `split ${parent.id}` });
   const chiefStep = await claimStep(machineToken);
   expect(chiefStep.kind).toBe('chief');
   const relayed = await ok<{ text: string }>(
@@ -119,10 +119,10 @@ async function splitThroughChief(
       params: {
         todoId: parent.id,
         subtodos: [
-          { title: '建表', spec: '在 apps/server/src/db 加一张表', agentId: implementerId },
+          { title: 'create table', spec: 'add a table under apps/server/src/db', agentId: implementerId },
           {
-            title: '接接口',
-            spec: '在 apps/server/src/routes-todos.ts 接读接口',
+            title: 'wire endpoint',
+            spec: 'expose a read endpoint in apps/server/src/routes-todos.ts',
             agentId: implementerId,
             blockedBy: [1],
           },
@@ -146,7 +146,7 @@ async function splitThroughChief(
 
 const todoOf = (id: string) => ok<TodoWire>('GET', `/api/todos/${id}`);
 
-test('auto 项目：拆解不经人确认即开跑，阻塞子卡等前置 done 后起跑', async ({ page }) => {
+test('auto project: split starts without human confirmation; blocked children start once their blockers are done', async ({ page }) => {
   const { machineToken } = await teamStage();
   const split = await splitThroughChief('auto');
 
@@ -173,10 +173,10 @@ test('auto 项目：拆解不经人确认即开跑，阻塞子卡等前置 done 
   expect((await todoOf(split.childB)).latestBuildId).toBe(buildB.buildId);
 
   await page.goto(`${server.base}/app/todo/${split.parentId}`);
-  await expect(page.getByText('检查器结果：已自动开跑')).toBeVisible();
+  await expect(page.getByText('checker verdict: started automatically')).toBeVisible();
 });
 
-test('默认 human 项目：拆解照旧停在父卡确认关口，子卡不动', async ({ page }) => {
+test('default human project: split still stops at the parent confirm gate; children stay put', async ({ page }) => {
   const split = await splitThroughChief('human');
 
   expect((await todoOf(split.parentId)).phase).toBe('confirm');
@@ -184,5 +184,5 @@ test('默认 human 项目：拆解照旧停在父卡确认关口，子卡不动'
   expect((await todoOf(split.childB)).phase).toBe('todo');
 
   await page.goto(`${server.base}/app/todo/${split.parentId}`);
-  await expect(page.getByText('检查器结果：回落人审 + 项目策略为 human')).toBeVisible();
+  await expect(page.getByText('checker verdict: falls back to human review + project policy is human')).toBeVisible();
 });

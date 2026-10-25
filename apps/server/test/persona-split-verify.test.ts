@@ -550,7 +550,7 @@ describe('#1250 split_todo (layer 2)', () => {
     );
   });
 
-  test('auto 策略检查器通过后直接派发无阻塞子卡并记录结果', async () => {
+  test('auto policy dispatches unblocked children directly once the checker passes and records the verdict', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     w.s.db
@@ -582,11 +582,13 @@ describe('#1250 split_todo (layer 2)', () => {
       w.s.db.select().from(todoTable).where(eq(todoTable.id, result.children[0]!.id)).get()!.phase,
     ).toBe('queued');
     expect(
-      w.messagesOf(result.parentBuildId).some((m) => m.content === '检查器结果：已自动开跑'),
+      w
+        .messagesOf(result.parentBuildId)
+        .some((m) => m.content === 'checker verdict: started automatically'),
     ).toBe(true);
   });
 
-  test('shadow 策略只记录检查器结果并保留 confirm', async () => {
+  test('shadow policy only records the checker verdict and keeps the confirm gate', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     w.s.db
@@ -613,7 +615,7 @@ describe('#1250 split_todo (layer 2)', () => {
     expect(
       w
         .messagesOf(result.parentBuildId)
-        .some((m) => m.content === '检查器结果：若自动会开跑（shadow）'),
+        .some((m) => m.content === 'checker verdict: would start automatically (shadow)'),
     ).toBe(true);
   });
 

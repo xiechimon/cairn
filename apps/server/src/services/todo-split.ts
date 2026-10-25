@@ -242,12 +242,12 @@ export function createSplitTodo(
   insertGateAnnouncement(deps, parentBuildId, SPLIT_ANNOUNCEMENT, input.actorName);
   const checkerText =
     splitPolicy === 'human'
-      ? '检查器结果：回落人审 + 项目策略为 human'
+      ? 'checker verdict: falls back to human review + project policy is human'
       : checkerPassed
         ? splitPolicy === 'auto'
-          ? '检查器结果：已自动开跑'
-          : '检查器结果：若自动会开跑（shadow）'
-        : `检查器结果：回落人审 + ${checkerReasons.join('；')}`;
+          ? 'checker verdict: started automatically'
+          : 'checker verdict: would start automatically (shadow)'
+        : `checker verdict: falls back to human review + ${checkerReasons.join('; ')}`;
   insertMessageRow(deps, parentBuildId, {
     id: newRecordId(),
     role: 'user',

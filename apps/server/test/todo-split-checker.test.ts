@@ -37,14 +37,14 @@ describe('split_todo checker', () => {
           ],
         }),
       ).reasons,
-    ).toEqual(expect.arrayContaining([expect.stringContaining('成环')]));
+    ).toEqual(expect.arrayContaining([expect.stringContaining('cycle')]));
     expect(
       checkSplitPlan(
         base({
           subtodos: [{ title: 'A', spec: 'a', agentId: 'agent-a', blockedBy: [2] }],
         }),
       ).reasons,
-    ).toEqual(expect.arrayContaining([expect.stringContaining('范围')]));
+    ).toEqual(expect.arrayContaining([expect.stringContaining('range')]));
   });
 
   test('rejects a missing or offline agent', () => {
@@ -64,7 +64,7 @@ describe('split_todo checker', () => {
           ],
         }),
       ).reasons,
-    ).toEqual(expect.arrayContaining([expect.stringContaining('离线')]));
+    ).toEqual(expect.arrayContaining([expect.stringContaining('offline')]));
   });
 
   test('rejects more than the configured child limit', () => {
@@ -74,7 +74,7 @@ describe('split_todo checker', () => {
           maxChildren: 1,
         }),
       ).reasons,
-    ).toEqual(expect.arrayContaining([expect.stringContaining('上限')]));
+    ).toEqual(expect.arrayContaining([expect.stringContaining('limit')]));
   });
 
   test('rejects a spec that names a protected path', () => {
@@ -84,7 +84,7 @@ describe('split_todo checker', () => {
           subtodos: [
             {
               title: 'A',
-              spec: '改动 .github/workflows/check.yml',
+              spec: 'edit .github/workflows/check.yml',
               agentId: 'agent-a',
               blockedBy: [],
             },
@@ -98,7 +98,7 @@ describe('split_todo checker', () => {
   test('falls back to human review while autonomy is paused', () => {
     expect(checkSplitPlan(base({ autonomyPaused: true }))).toEqual({
       ok: false,
-      reasons: ['团队自治已暂停'],
+      reasons: ['team autonomy is paused'],
     });
   });
 
