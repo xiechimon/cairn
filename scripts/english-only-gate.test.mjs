@@ -21,6 +21,7 @@ test('prose flags Chinese outside code spans, fences and HTML comments', () => {
   ].join('\n');
   assert.deepEqual(fileViolations('docs/a.md', doc), [1, 8]);
   assert.deepEqual(textViolations('## What 什么\n\nAll English.'), [1]);
+  assert.deepEqual(textViolations('~~~\n```\n中文\n~~~\n中文'), [5]);
 });
 
 test('code checks comments only; UI strings and exempt paths pass', () => {
@@ -31,6 +32,7 @@ test('code checks comments only; UI strings and exempt paths pass', () => {
     ' * 续行',
     ' */',
     "const url = 'https://example.com'; // fine",
+    "const label = 'a // \u4e2d label';",
     '// Safari private mode throws on setItem',
   ].join('\n');
   assert.deepEqual(fileViolations('apps/server/src/x.ts', code), [2, 4]);

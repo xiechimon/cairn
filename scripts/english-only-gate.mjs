@@ -21,13 +21,14 @@ export function stripQuoted(text) {
 
 function proseViolations(lines) {
   const found = [];
-  let fenced = false;
+  let fence = '';
   for (const [index, text] of lines.entries()) {
-    if (/^\s*(```|~~~)/.test(text)) {
-      fenced = !fenced;
+    const marker = /^\s*(```|~~~)/.exec(text)?.[1];
+    if (marker && (!fence || marker === fence)) {
+      fence = fence ? '' : marker;
       continue;
     }
-    if (!fenced && HAN.test(stripQuoted(text))) found.push(index + 1);
+    if (!fence && HAN.test(stripQuoted(text))) found.push(index + 1);
   }
   return found;
 }
@@ -49,7 +50,11 @@ export function fileViolations(path, content) {
     if (block) comment = text;
     else if (hash) comment = /(^|\s)#(?!!)(.*)$/.exec(text)?.[2] ?? '';
     else if (/^(\/\*|\{\s*\/\*)/.test(trimmed)) comment = text;
-    else comment = /(^|\s)\/\/(.*)$/.exec(text)?.[2] ?? '';
+    else
+      comment =
+        /(^|\s)\/\/(.*)$/.exec(
+          text.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g, "''"),
+        )?.[2] ?? '';
     if (HAN.test(stripQuoted(comment))) found.push(index + 1);
     if (!hash && !block && /^(\/\*|\{\s*\/\*)/.test(trimmed)) block = true;
     if (block && trimmed.includes('*/')) block = false;
