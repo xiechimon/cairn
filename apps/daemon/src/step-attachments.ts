@@ -133,6 +133,13 @@ function tokenLinesOf(lines: readonly string[]): (TokenLine | null)[] {
   });
 }
 
+export function hasImageAttachmentTokens(text: string): boolean {
+  const lines = text.split('\n');
+  const bodies = tokenLinesOf(lines).flatMap((t) => (t === null ? [] : [t.body]));
+  if (bodies.length === 0) return false;
+  return parseAttachmentTokenLines(bodies.join('\n')).some((ref) => isImageAttachmentExt(ref.ext));
+}
+
 export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<ResolvedStepImages> {
   const lines = opts.text.split('\n');
   const tokens = tokenLinesOf(lines);

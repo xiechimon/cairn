@@ -217,6 +217,68 @@ describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.st
     await handle.done;
   });
 
+  test('degraded step (#1671): steer with an image token → annotation text, zero downloads, steer receives no images', async () => {
+    const api = new FakeMachineApi();
+    const png = Buffer.from('89504e470d0a1a0a', 'hex');
+    api.attachments.id1 = {
+      fileName: 'shot.png',
+      mimeType: 'image/png',
+      sizeBytes: png.byteLength,
+      contentBase64: png.toString('base64'),
+    };
+    const token = formatAttachmentToken('shot.png', 't1/id1.png');
+    const claimed: typeof CLAIMED = {
+      ...CLAIMED,
+      todo: { ...CLAIMED.todo!, spec: `写一行探针\n\n${token}` },
+    };
+    api.steerResponse = `再看一眼这张图\n\n${token}`;
+    const steered: { text: string; images?: readonly DeliveredImage[] }[] = [];
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'pi-sess-steer-novision',
+          events: (async function* () {
+            yield { type: 'text_delta', text: '跑着' } as StepEvent;
+            await gate;
+            yield { type: 'done', usage: [] } as StepEvent;
+          })(),
+          async steer(text: string, images?: readonly DeliveredImage[]) {
+            steered.push({ text, images });
+          },
+          async stop() {},
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new Error('unused');
+      },
+      async modelSupportsImages() {
+        return false;
+      },
+    };
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(claimed);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    await waitFor(() => lines.some((l) => l.includes('image attachment skipped')));
+    expect(api.attachmentCalls).toHaveLength(0);
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => steered.length === 1);
+    expect(steered[0]!.text).toContain(token);
+    expect(steered[0]!.text).toContain('[图片附件 t1/id1.png 未被模型读取 — 该图片未下载]');
+    expect(steered[0]!.text).not.toContain('[image attached:');
+    expect(steered[0]!.images ?? []).toHaveLength(0);
+    expect(api.attachmentCalls).toHaveLength(0);
+    release();
+    await handle.stop();
+    await handle.done;
+  });
+
   test('failure mode: no running handle after the step closed → dropped even on successful fetch, no crash (log line + loop survives)', async () => {
     const api = new FakeMachineApi();
     api.steerResponse = '晚到的补充';

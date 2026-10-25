@@ -48,6 +48,7 @@ import {
   LOCAL_TOOL_CREATE_TAG,
   LOCAL_TOOL_REMOTE_SHELL,
   LocalRepoUnreachableError,
+  noVisionSignalOf,
   PLAN_FILE_NAME,
   parseRetryAfterMs,
   parseReviewPromptMeta,
@@ -92,7 +93,7 @@ import { readSessionJsonlForUpload } from './session-jsonl.js';
 import { buildRemoteShellTool } from './shell-channel.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
-import { resolveStepImages } from './step-attachments.js';
+import { hasImageAttachmentTokens, resolveStepImages } from './step-attachments.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
@@ -115,6 +116,7 @@ export interface RunStepDeps {
   mcpConfigPath: string;
   workspace?: WorktreeOps;
   sessionHandles?: Map<string, AgentSessionHandle>;
+  stepImageSupport?: Map<string, boolean | null>;
   stops?: StepStops;
   heartbeatIntervalMs?: number;
   skillsDir?: string;
@@ -453,28 +455,6 @@ async function runClaimedStep(
     stopRequest: stop.request,
   });
 
-  let deliveryPrompt = prompt;
-  let promptImages: DeliveredImage[] | undefined;
-  if (!isChief && prompt !== null) {
-    try {
-      const resolved = await resolveStepImages({
-        text: prompt,
-        stepId,
-        client,
-        materializeDir: deps.paths.stepAttachmentsDir,
-        log: (line) => logger.step(line),
-      });
-      deliveryPrompt = resolved.text;
-      if (resolved.images.length > 0) promptImages = [...resolved.images];
-    } catch (err) {
-      logger.step(
-        `attachment resolve failed (delivering raw text): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
-  }
-
   const tokenRes = await client.token(stepId);
   const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
   const agent = claimed.agent;
@@ -538,6 +518,50 @@ async function runClaimedStep(
   const backend = deps.backendFor(agent?.provider);
   const modelKey = `${provider?.providerId ?? agent.provider}/${agent.modelId}`;
   logger.raw(`using model ${modelKey}`);
+
+  let imageSupport: boolean | null = null;
+  if (!isChief && prompt !== null && hasImageAttachmentTokens(prompt)) {
+    try {
+      imageSupport = (await backend.modelSupportsImages?.(provider, agent.modelId)) ?? null;
+    } catch (err) {
+      imageSupport = null;
+      logger.step(
+        `image support probe failed (assuming unknown): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+  deps.stepImageSupport?.set(stepId, imageSupport);
+  let deliveryPrompt = prompt;
+  let promptImages: DeliveredImage[] | undefined;
+  let skippedNoVisionCount = 0;
+  if (!isChief && prompt !== null) {
+    try {
+      const resolved = await resolveStepImages({
+        text: prompt,
+        stepId,
+        client,
+        materializeDir: deps.paths.stepAttachmentsDir,
+        log: (line) => logger.step(line),
+        imageSupport,
+      });
+      deliveryPrompt = resolved.text;
+      if (resolved.images.length > 0) promptImages = [...resolved.images];
+      skippedNoVisionCount = resolved.skippedNoVision;
+    } catch (err) {
+      logger.step(
+        `attachment resolve failed (delivering raw text): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+  if (skippedNoVisionCount > 0) {
+    logger.step(
+      `image attachment skipped: model ${modelKey} does not support images (${skippedNoVisionCount} image(s) not delivered)`,
+    );
+  }
 
   logger.workspace('准备工作区...');
   let ws: PreparedWorkspace | null = null;
@@ -773,6 +797,14 @@ async function runClaimedStep(
       : null;
 
   const transcript = new TranscriptBuffer(deps.paths.outboxDir, stepId);
+  if (skippedNoVisionCount > 0) {
+    transcript.upsert({
+      id: `image-skip-${stepId}`,
+      role: 'system',
+      content: `图片未被模型读取：模型 ${modelKey} 不支持图片输入，${skippedNoVisionCount} 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）`,
+      createdAt: now(),
+    });
+  }
   if (prompt !== null) {
     transcript.upsert({
       id: transcriptPromptRowId(stepId),
@@ -925,6 +957,7 @@ async function runClaimedStep(
     retryAfterMs: number | null;
   } | null = null;
   let networkRetries = 0;
+  let noVisionDegraded = false;
   const providerNetworkFinalWaitMs =
     opts.providerNetworkFinalWaitMs ?? PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS;
   const streamTimeouts = {
@@ -1105,6 +1138,7 @@ async function runClaimedStep(
               client,
               materializeDir: deps.paths.stepAttachmentsDir,
               log: (line) => logger.step(line),
+              imageSupport,
             });
             delivery = resolved.text;
             if (resolved.images.length > 0) images = [...resolved.images];
@@ -1324,6 +1358,12 @@ async function runClaimedStep(
                 }
                 void handle.stop();
               }
+              if (promptImages !== undefined && noVisionSignalOf(ev.error.message)) {
+                logger.step(
+                  `image capability rejected by ${modelKey} — stopping session (no auto-retry spin)`,
+                );
+                void handle.stop();
+              }
             }
             break;
           case 'auto_retry_start':
@@ -1414,6 +1454,53 @@ async function runClaimedStep(
           deps.sessionHandles?.delete(stepId);
           continue;
         }
+      }
+    }
+    if (
+      pass === 0 &&
+      !sawProgress &&
+      quotaTrip === null &&
+      !noVisionDegraded &&
+      promptImages !== undefined &&
+      prompt !== null
+    ) {
+      const failureText = lastModelError ?? lastError;
+      if (failureText !== null && noVisionSignalOf(failureText)) {
+        noVisionDegraded = true;
+        backend.rememberNoVision?.(provider, agent.modelId);
+        deps.stepImageSupport?.set(stepId, false);
+        let degradedText = prompt;
+        try {
+          const resolved = await resolveStepImages({
+            text: prompt,
+            stepId,
+            client,
+            materializeDir: deps.paths.stepAttachmentsDir,
+            log: (line) => logger.step(line),
+            imageSupport: false,
+          });
+          degradedText = resolved.text;
+        } catch (err) {
+          logger.step(
+            `attachment resolve failed (delivering raw text): ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+        sessionOpts.prompt = degradedText;
+        delete sessionOpts.promptImages;
+        promptImages = undefined;
+        logger.step(
+          `image degrade retry: ${modelKey} rejected image input — retrying without images`,
+        );
+        transcript.upsert({
+          id: `image-skip-${stepId}`,
+          role: 'system',
+          content: `图片未被模型读取：模型 ${modelKey} 拒绝了图片输入（${failureText.slice(0, 200)}），已去掉图片重试本步骤`,
+          createdAt: now(),
+        });
+        deps.sessionHandles?.delete(stepId);
+        continue;
       }
     }
     break;
@@ -1725,6 +1812,7 @@ async function runClaimedStep(
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
     deps.sessionHandles?.delete(stepId);
+    deps.stepImageSupport?.delete(stepId);
     return;
   }
 
@@ -1734,11 +1822,13 @@ async function runClaimedStep(
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
     deps.sessionHandles?.delete(stepId);
+    deps.stepImageSupport?.delete(stepId);
     return;
   }
   clearCredentials(creds);
   journal.remove(stepId);
   deps.sessionHandles?.delete(stepId);
+  deps.stepImageSupport?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
 }
 
@@ -1854,6 +1944,7 @@ async function failStep(
 ): Promise<void> {
   clearInterval(heartbeat);
   deps.sessionHandles?.delete(stepId);
+  deps.stepImageSupport?.delete(stepId);
   deps.logger.step(`failed: ${message}`);
   try {
     await deps.client.done(stepId, { status: 'failed', errorMessage: message });

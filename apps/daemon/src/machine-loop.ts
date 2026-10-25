@@ -261,6 +261,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(opts.hookTimeoutMs !== undefined ? { hookTimeoutMs: opts.hookTimeoutMs } : {}),
   });
   const sessionHandles = new Map<string, AgentSessionHandle>();
+  const stepImageSupport = new Map<string, boolean | null>();
   const stops = new StepStops();
   const inFlightChief = new Set<string>();
   const workerSlots = new Map<string, number>();
@@ -374,6 +375,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           client,
           materializeDir: paths.stepAttachmentsDir,
           log: (line) => logger.step(line),
+          imageSupport: stepImageSupport.get(stepId) ?? null,
         });
         deliveryText = resolved.text;
         if (resolved.images.length > 0) images = [...resolved.images];
@@ -466,6 +468,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
       sessionHandles,
+      stepImageSupport,
       stops,
       machineName: config.name,
       claudeCodeAuthProbe: probeAuthAndRemember,
