@@ -1,11 +1,3 @@
-// sync 执行层 checkout 步回归（#1329）。git 2.43 不认 `checkout --end-of-options`
-// （当 pathspec 吞掉，退出 1）；旧实现 runGit 不看退出码，checkout 失败后 reset --hard
-// 仍照常执行，performSync 回写 synced，且会移动当前检出的分支。
-// 用例走 performSync 公开入口 + 真 git 仓库。2.43 上 reset --hard 本身的失败由
-// #1316 / PR #1330 覆盖，本文件只断言 checkout 步的结果（HEAD、本地 main、工作区文件）。
-// argv 断言读 spawn 包装记下的实际参数：git 2.47 也接受 --end-of-options，只看行为
-// 抓不住回退，必须比对传给 git 的 argv。
-
 import * as childProcess from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,7 +30,6 @@ function git(cwd: string, args: string[]): string {
   return res.stdout.trim();
 }
 
-/** daemon 经 spawn 发出的 git argv（发出顺序；夹具的 spawnSync 不计入）。 */
 function daemonGitArgv(): string[][] {
   return vi.mocked(childProcess.spawn).mock.calls.map(([, args]) => [...args]);
 }
@@ -49,7 +40,6 @@ interface Fixture {
   b: string;
 }
 
-/** origin：main@A、feat@B。work 是克隆后停在 main@A 的工作副本（复用路径）。 */
 function makeFixture(): Fixture {
   const root = mkdtempSync(join(tmpdir(), 'cairn-sync-'));
   const origin = join(root, 'origin.git');
@@ -112,12 +102,12 @@ function silentLogger(): DaemonLogger {
   };
 }
 
-describe('performSync — checkout 步不吞失败（#1329）', () => {
+describe('performSync — the checkout step does not swallow failures (#1329)', () => {
   beforeEach(() => {
     vi.mocked(childProcess.spawn).mockClear();
   });
 
-  test('ref 不存在：回写 failed 并点名 ref，当前分支保持原位', async () => {
+  test('ref missing: failed written back naming the ref, current branch stays put', async () => {
     const f = makeFixture();
     const { client, results } = recordingClient();
 
@@ -129,7 +119,7 @@ describe('performSync — checkout 步不吞失败（#1329）', () => {
     expect(git(f.work, ['rev-parse', 'refs/heads/main'])).toBe(f.a);
   });
 
-  test('远端分支存在：HEAD 以 detached 落到目标 commit，本地 main 不被移动（契约：不推进同名本地分支）', async () => {
+  test('remote branch exists: HEAD lands detached on the target commit, local main not moved (contract: do not advance a same-named local branch)', async () => {
     const f = makeFixture();
     const { client } = recordingClient();
 
@@ -142,7 +132,7 @@ describe('performSync — checkout 步不吞失败（#1329）', () => {
     expect(git(f.work, ['rev-parse', 'refs/heads/main'])).toBe(f.a);
   });
 
-  test('非 force：工作区有与目标冲突的未提交改动时 checkout 拒绝覆盖，文件内容保留', async () => {
+  test('non-force: checkout refuses to overwrite conflicting uncommitted worktree changes, file contents preserved', async () => {
     const f = makeFixture();
     writeFileSync(join(f.work, 'README.md'), 'dirty\n');
     const { client, results } = recordingClient();
@@ -155,7 +145,7 @@ describe('performSync — checkout 步不吞失败（#1329）', () => {
     expect(git(f.work, ['rev-parse', 'HEAD'])).toBe(f.a);
   });
 
-  test('force：工作区冲突改动被 checkout 丢弃，HEAD 落到 origin/<ref>', async () => {
+  test('force: conflicting worktree changes discarded by checkout, HEAD lands on origin/<ref>', async () => {
     const f = makeFixture();
     writeFileSync(join(f.work, 'README.md'), 'dirty\n');
     const { client } = recordingClient();
@@ -166,7 +156,7 @@ describe('performSync — checkout 步不吞失败（#1329）', () => {
     expect(git(f.work, ['rev-parse', 'HEAD'])).toBe(f.b);
   });
 
-  test('远端分支 checkout argv 精确为全限定 ref + `--`：非 force 不带 --force，且不含 --end-of-options', async () => {
+  test('remote-branch checkout argv is exactly the fully-qualified ref + `--`: no --force when non-force, and no --end-of-options', async () => {
     const f = makeFixture();
     const { client } = recordingClient();
 
@@ -175,7 +165,7 @@ describe('performSync — checkout 步不吞失败（#1329）', () => {
     expect(daemonGitArgv()).toContainEqual(['checkout', 'refs/remotes/origin/feat', '--']);
   });
 
-  test('远端分支 checkout argv 精确为 --force + 全限定 ref + `--`（force 时）', async () => {
+  test('remote-branch checkout argv is exactly --force + fully-qualified ref + `--` (when forced)', async () => {
     const f = makeFixture();
     const { client } = recordingClient();
 
@@ -189,7 +179,7 @@ describe('performSync — checkout 步不吞失败（#1329）', () => {
     ]);
   });
 
-  test('tag：无同名分支时解析为 commit，以 oid detached 检出', async () => {
+  test('tag: resolved to a commit when no same-named branch exists, checked out detached by oid', async () => {
     const f = makeFixture();
     git(f.work, ['tag', 'v1', f.b]);
     const { client } = recordingClient();
@@ -201,7 +191,7 @@ describe('performSync — checkout 步不吞失败（#1329）', () => {
     expect(git(f.work, ['rev-parse', 'refs/heads/main'])).toBe(f.a);
   });
 
-  test('SHA：无同名分支时解析为 commit，以 oid detached 检出', async () => {
+  test('SHA: resolved to a commit when no same-named branch exists, checked out detached by oid', async () => {
     const f = makeFixture();
     const { client } = recordingClient();
 

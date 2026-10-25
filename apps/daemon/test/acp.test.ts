@@ -2,39 +2,39 @@ import { describe, expect, test } from 'vitest';
 import { acpErrorMessage, mapAcpUpdate, validateGeminiSession } from '../src/backend/acp.js';
 
 describe('Gemini ACP bridge', () => {
-  test('失败方式 1：spawn 不存在时给出安装提示', () => {
+  test('failure mode 1: missing spawn binary yields an install hint', () => {
     expect(acpErrorMessage(new Error('spawn gemini ENOENT'))).toContain('未找到 gemini');
   });
 
-  test('失败方式 2：认证失败指向 Gemini 登录', () => {
+  test('failure mode 2: auth failure points to Gemini login', () => {
     expect(acpErrorMessage(new Error('authenticate required'))).toContain('Gemini 登录');
   });
 
-  test('失败方式 3：gemini 是独立 runtime，未知 provider 仍是 pi', async () => {
+  test('failure mode 3: gemini is a standalone runtime; unknown provider stays pi', async () => {
     const shared = await import('@cairn/shared');
     expect(shared.isBackendRuntimeId('gemini')).toBe(true);
     expect(shared.isBackendRuntimeId('unknown-provider')).toBe(false);
   });
 
-  test('失败方式 4：runtime 开关缺席时不通过', async () => {
+  test('failure mode 4: absent runtime switch does not pass', async () => {
     const { MACHINE_RUNTIMES } = await import('@cairn/shared');
     expect(MACHINE_RUNTIMES).toContain('gemini');
     expect(['pi'].includes('gemini')).toBe(false);
   });
 
-  test('失败方式 5：简报后端使用 GEMINI.md', async () => {
+  test('failure mode 5: brief backend uses GEMINI.md', async () => {
     const { briefBackendForProvider, BRIEF_CREATE_NAME } = await import('@cairn/shared');
     expect(BRIEF_CREATE_NAME[briefBackendForProvider('gemini')]).toBe('GEMINI.md');
   });
 
-  test('失败方式 6：resume 不产生新的用户消息', () => {
+  test('failure mode 6: resume produces no new user message', () => {
     expect(validateGeminiSession({ cwd: '/tmp', modelId: 'gemini', resumeId: 's1' })).toEqual({
       prompt: undefined,
       resumeId: 's1',
     });
   });
 
-  test('失败方式 7：不支持图片能力时拒绝图片', () => {
+  test('failure mode 7: images rejected when image capability is absent', () => {
     expect(() =>
       validateGeminiSession({ cwd: '/tmp', modelId: 'gemini', promptImages: [] }),
     ).not.toThrow();
@@ -47,7 +47,7 @@ describe('Gemini ACP bridge', () => {
     ).toThrow('image capability');
   });
 
-  test('失败方式 8：非空工具集合 fail-closed', () => {
+  test('failure mode 8: non-empty tool set fails closed', () => {
     expect(() =>
       validateGeminiSession({ cwd: '/tmp', modelId: 'gemini', remoteTools: [{ name: 'x' }] }),
     ).toThrow('fail-closed');
@@ -56,11 +56,11 @@ describe('Gemini ACP bridge', () => {
     ).toThrow('fail-closed');
   });
 
-  test('失败方式 9：取消错误映射为 message_stop', () => {
+  test('failure mode 9: cancellation error maps to message_stop', () => {
     expect(mapAcpUpdate({ kind: 'cancelled' })).toEqual({ type: 'message_stop' });
   });
 
-  test('失败方式 10：协议版本不一致保留双方版本', () => {
+  test('failure mode 10: protocol version mismatch keeps both versions', () => {
     expect(acpErrorMessage(new Error('protocolVersion 0.16.1 != 2.0.2'))).toContain(
       'protocolVersion',
     );

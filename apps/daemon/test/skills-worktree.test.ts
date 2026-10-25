@@ -1,9 +1,3 @@
-// #1299 skills 执行面联合扫描五态：worktree 侧技能目录（.claude/skills +
-// .pi/skills）并入 scanSessionSkills → collectVisibleSkillNames /
-// collectVisibleSkillFileMap。失败方式清单（票 #1299 验收映射）：
-// 双目录都有 / 仅团队 / 仅 worktree / 同名冲突 / 都无；worktree 目录
-// 不存在静默收窄（loadSkills warning 诊断不报错）。
-
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -46,8 +40,8 @@ function baseCollectOpts(skillsDir: string, cwd: string) {
   };
 }
 
-describe('skills 联合扫描（#1299 worktree 侧）', () => {
-  test('双目录都有 + worktree 各有技能 → 全部可见', () => {
+describe('skills joint scan (#1299 worktree side)', () => {
+  test('both directories present + skills in each worktree → all visible', () => {
     const root = fixtureRoot('both');
     const skillsDir = join(root, 'skills');
     mkdirSync(skillsDir, { recursive: true });
@@ -68,22 +62,22 @@ describe('skills 联合扫描（#1299 worktree 侧）', () => {
     expect(names.has('wt-only')).toBe(true);
   });
 
-  test('仅团队目录有技能 → worktree 目录不存在静默收窄', () => {
+  test('only the team directory has skills → nonexistent worktree directories silently narrow', () => {
     const root = fixtureRoot('team-only');
     const skillsDir = join(root, 'skills');
     mkdirSync(skillsDir, { recursive: true });
     writeSkill(skillsDir, 'team-skill', { description: 'team desc' });
 
-    const worktreeDir = join(root, 'no-such-worktree'); // does not exist
+    const worktreeDir = join(root, 'no-such-worktree');
     const names = collectVisibleSkillNames({
       ...baseCollectOpts(skillsDir, root),
       worktreeSkillsDirs: piWorktreeSkillDirs(worktreeDir),
     });
     expect(names.has('team-skill')).toBe(true);
-    expect(names.size).toBe(1); // only team skill, worktree dir missing silently
+    expect(names.size).toBe(1);
   });
 
-  test('仅 worktree 有技能 → CAIRN_SKILLS_DIR 空也可见 worktree 技能', () => {
+  test('only the worktree has skills → worktree skills visible even with CAIRN_SKILLS_DIR empty', () => {
     const root = fixtureRoot('wt-only');
     const emptySkillsDir = join(root, 'empty-skills');
     mkdirSync(emptySkillsDir, { recursive: true });
@@ -101,7 +95,7 @@ describe('skills 联合扫描（#1299 worktree 侧）', () => {
     expect(names.size).toBe(1);
   });
 
-  test('同名冲突 → 团队/本机条目胜（first-wins），worktree 条目是 loser', () => {
+  test('same-name conflict → team/local entry wins (first-wins), worktree entry is the loser', () => {
     const root = fixtureRoot('collision');
     const skillsDir = join(root, 'skills');
     mkdirSync(skillsDir, { recursive: true });
@@ -116,14 +110,13 @@ describe('skills 联合扫描（#1299 worktree 侧）', () => {
       ...baseCollectOpts(skillsDir, root),
       worktreeSkillsDirs: piWorktreeSkillDirs(worktreeDir),
     });
-    // first-wins: CAIRN_SKILLS_DIR is in skillPaths before worktreeSkillsDirs
     expect(fileMap.has('shared-skill')).toBe(true);
     const path = fileMap.get('shared-skill')!;
     expect(path).toContain('skills/shared-skill/SKILL.md');
     expect(path).not.toContain('.claude');
   });
 
-  test('同名冲突 → buildSkillsCatalog 点 collision 日志 + winner 路径', () => {
+  test('same-name conflict → buildSkillsCatalog logs a collision + winner path', () => {
     const root = fixtureRoot('collision-log');
     const skillsDir = join(root, 'skills');
     mkdirSync(skillsDir, { recursive: true });
@@ -144,11 +137,10 @@ describe('skills 联合扫描（#1299 worktree 侧）', () => {
     const collisionLog = logs.find((l) => l.startsWith('collision:'));
     expect(collisionLog).toBeDefined();
     expect(collisionLog).toContain('shared-skill');
-    // catalog 里条目 name 恒唯一（winner 只出现一次）
     expect(catalog).toContain('shared-skill');
   });
 
-  test('都无 → 空集，不炸', () => {
+  test('neither → empty set, no crash', () => {
     const root = fixtureRoot('none');
     const emptySkillsDir = join(root, 'empty');
     mkdirSync(emptySkillsDir, { recursive: true });
@@ -161,7 +153,7 @@ describe('skills 联合扫描（#1299 worktree 侧）', () => {
     expect(names.size).toBe(0);
   });
 
-  test('worktreeSkillsDirs 缺省（旧调用面）→ 仅本机目录扫描，零回归', () => {
+  test('worktreeSkillsDirs absent (old call surface) → only local directories scanned, zero regression', () => {
     const root = fixtureRoot('legacy');
     const skillsDir = join(root, 'skills');
     mkdirSync(skillsDir, { recursive: true });
@@ -172,15 +164,14 @@ describe('skills 联合扫描（#1299 worktree 侧）', () => {
     mkdirSync(wtSkillsDir, { recursive: true });
     writeSkill(wtSkillsDir, 'new-skill', { description: 'new path' });
 
-    // No worktreeSkillsDirs → only skillsDir scanned
     const names = collectVisibleSkillNames({
       ...baseCollectOpts(skillsDir, root),
     });
     expect(names.has('legacy-skill')).toBe(true);
-    expect(names.has('new-skill')).toBe(false); // not in scan surface
+    expect(names.has('new-skill')).toBe(false);
   });
 
-  test('piWorktreeSkillDirs 返回 .claude/skills + .pi/skills', () => {
+  test('piWorktreeSkillDirs returns .claude/skills + .pi/skills', () => {
     const dirs = piWorktreeSkillDirs('/tmp/worktree');
     expect(dirs).toHaveLength(2);
     expect(dirs[0]).toBe('/tmp/worktree/.claude/skills');

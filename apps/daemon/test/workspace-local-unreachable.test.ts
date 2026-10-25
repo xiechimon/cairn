@@ -1,19 +1,3 @@
-// #1210 C 兜底（无 origin 的 local 形态仓在他机执行）：repo 路径在执行机
-// 不可达 → prepare 在 clone/fetch 之前抛类型化 LocalRepoUnreachableError，
-// runner 合成点名机器/路径/原因/补法的步失败文案——不再把裸 git clone 错误
-// 当步 errorMessage（用户与 chief 都读不出「哪台机、哪个路径、去修什么」）。
-// 失败方式先列（本文件即失败场景清单；AGENTS.md 测试规则 3）：
-//   L1 repoKind='local' + 路径不存在 → 抛 LocalRepoUnreachableError
-//      (reason=not_found)，且不留半成品基座目录。
-//   L2 repoKind='local' + 路径存在但不是 git 仓 → reason=not_git。
-//   L3 repoKind='local' + 健康工作树仓 → prepare 照常成功：自路径 clone +
-//      worktree 落位（仓库所在机行为零漂移——票面回归验收）。
-//   L4 repoKind 缺省（兼容形：老调用方/测试桩）+ cloneUrl 指向不存在路径
-//      → 保持现行为：裸 git 错误上浮，不是类型化错误（fail-open 版本墙，
-//      与 machineCredentialFallback 缺省同形）。
-//   L5 文案面：localRepoUnreachableMessage 点名机器 + 仓路径 + 原因人话
-//      （复用 LOCAL_ERROR_REASON_COPY 词表单源）+ 两条补法；不含凭据面。
-
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -49,7 +33,7 @@ function fakeLogger(): DaemonLogger & { lines: string[] } {
 const PROJECT_ID = 'proj-local-unreach';
 const CONV = '01a0b86f-04f9-72a8-bba4-75c5cfd65990';
 
-let root: string; // workspacesRoot
+let root: string;
 let logger: ReturnType<typeof fakeLogger>;
 let ws: WorkspaceManager;
 
@@ -59,7 +43,6 @@ beforeEach(() => {
   ws = new WorkspaceManager({ logger });
 });
 
-/** 真用户仓库种子（非 bare 工作树仓、main、单提交——#1211 判据最小形态）。 */
 async function seedUserRepo(): Promise<string> {
   const dir = join(mkdtempSync(join(tmpdir(), 'cairn-lu-repo-')), 'repo');
   await runGit(['init', '-b', 'main', dir]);
@@ -80,8 +63,8 @@ function localPrepareInput(cloneUrl: string, withKind: boolean) {
   };
 }
 
-describe('local 形态执行面 fail-loud（#1210 C 兜底）', () => {
-  test('L1 路径不存在 → LocalRepoUnreachableError(not_found)，无半成品基座', async () => {
+describe('local-shape execution surface fail-loud (#1210 C fallback)', () => {
+  test('L1 path missing → LocalRepoUnreachableError(not_found), no half-built base', async () => {
     const gone = join(root, 'definitely-not-here', 'repo');
     const err = await ws.prepare(localPrepareInput(gone, true)).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(LocalRepoUnreachableError);
@@ -93,7 +76,7 @@ describe('local 形态执行面 fail-loud（#1210 C 兜底）', () => {
     expect(existsSync(join(root, PROJECT_ID, 'repo'))).toBe(false);
   });
 
-  test('L2 路径存在但不是 git 仓 → LocalRepoUnreachableError(not_git)', async () => {
+  test('L2 path exists but is not a git repo → LocalRepoUnreachableError(not_git)', async () => {
     const plain = mkdtempSync(join(tmpdir(), 'cairn-lu-plain-'));
     writeFileSync(join(plain, 'notes.txt'), 'not a repo\n');
     const err = await ws.prepare(localPrepareInput(plain, true)).catch((e: unknown) => e);
@@ -106,7 +89,7 @@ describe('local 形态执行面 fail-loud（#1210 C 兜底）', () => {
     rmSync(plain, { recursive: true, force: true });
   }, 30_000);
 
-  test('L3 健康工作树仓 → prepare 照常成功（仓库所在机行为零漂移）', async () => {
+  test('L3 healthy worktree repo → prepare succeeds as usual (zero drift on the machine hosting the repo)', async () => {
     const repo = await seedUserRepo();
     const prepared = await ws.prepare(localPrepareInput(repo, true));
     expect(prepared.reused).toBe(false);
@@ -114,23 +97,21 @@ describe('local 形态执行面 fail-loud（#1210 C 兜底）', () => {
     expect(prepared.defaultBranch).toBe('main');
   }, 30_000);
 
-  test('L4 repoKind 缺省 + 路径不存在 → 现行为保持：裸 git 错误，不是类型化错误', async () => {
-    // 裸 clone 走 withGitNetRetries 两档退避（1s+5s）——预算内等它烧完。
+  test('L4 repoKind absent + path missing → current behavior preserved: bare git error, not a typed error', async () => {
     const gone = join(root, 'definitely-not-here', 'repo');
     const err = await ws.prepare(localPrepareInput(gone, false)).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(Error);
     expect(err).not.toBeInstanceOf(LocalRepoUnreachableError);
   }, 30_000);
 
-  test('L5 文案：点名机器 + 路径 + 原因人话 + 两条补法', () => {
+  test('L5 wording: names machine + path + human-readable cause + two remedies', () => {
     const err = new LocalRepoUnreachableError('/Users/dev/code/cairn', 'not_found');
     const msg = localRepoUnreachableMessage('mea', err);
-    expect(msg).toContain('mea'); // 哪台机器
-    expect(msg).toContain('/Users/dev/code/cairn'); // 哪个路径
-    expect(msg).toContain('路径不存在'); // 原因人话（LOCAL_ERROR_REASON_COPY 词表）
-    expect(msg).toContain('钉选'); // 补法①：机器钉选面
-    expect(msg).toContain('GitHub 形态'); // 补法②：跨机开发的项目形态
-    // 凭据面零出现（local 形态凭证恒 null；文案只含机器/路径/补法）。
+    expect(msg).toContain('mea');
+    expect(msg).toContain('/Users/dev/code/cairn');
+    expect(msg).toContain('路径不存在');
+    expect(msg).toContain('钉选');
+    expect(msg).toContain('GitHub 形态');
     expect(msg).not.toMatch(/token|password|x-access/i);
     const notGit = localRepoUnreachableMessage(
       'mea',

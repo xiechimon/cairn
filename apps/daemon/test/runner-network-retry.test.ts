@@ -1,20 +1,3 @@
-// #1257 provider_network 会话续跑重试（runner 步内闸）：relay 流断
-// （upstream stream disconnected / connection reset 族，分类 = network 桶）
-// 是瞬态基础设施毛刺——按 Multica 语义自动重试（会话续跑，不断会话），
-// 总尝试 3 次（首跑 + 立即重试 + 末次延迟约 5 秒），退避后仍断才按失败
-// 收尾。失败方式（先于实现固化）：
-//  1. 首轮流断 → 立即续跑重试（continueSession 同一 sessionId），第二轮
-//     成功 → 步 success（2 次会话开启）。
-//  2. 两轮流断 → 第三轮（延迟后）成功 → 步 success（3 次会话开启）。
-//  3. 三轮流断 → 按失败收尾：done(failed) 携原错误，不再开第四轮。
-//  4. quota 类错误（402/usage limit）→ 不重试（挂起语义在 server done 面），
-//     单轮收尾 failed。
-//  5. 停止钮在位 → 不重试（用户要的是退出，不是续跑）。
-//  5b. 停止在两轮之间（续跑会话开启途中）到达 → 续跑会话一开即中断，报 stopped。
-//  5c. 停止在末次重试的退避等待中到达（真 pi 失败流以 done 收尾）→ 不开末轮，
-//      报 stopped，不报上轮的网络错误。
-//  6. 中途有进展的流断 → 重试走 continue（断点续跑，不重放整轮）。
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -167,9 +150,6 @@ class FakeClient implements MachineApi {
 
 type Script = StepEvent[];
 
-/** 每次会话开启（create 或 continue）按序取下一条脚本；记录 continue 的
- * sessionId 以钉「续跑不断会话」语义。末次重试的 ~5s 延迟注入 1ms。
- * onCreate = 新会话开启途中的钩子（停止钮在位的注入点）。 */
 function scriptedNetworkBackend(
   scripts: Script[],
   onCreate?: () => void,
@@ -267,8 +247,8 @@ async function runNetworkCase(
   return { client, lines, opened };
 }
 
-describe('#1257 runner provider_network 流断重试（会话续跑）', () => {
-  test('失败方式 1：首轮流断 → 立即 continueSession 同一会话续跑，第二轮成功 → 步 success（两次开启）', async () => {
+describe('#1257 runner provider_network stream-drop retry (session continuation)', () => {
+  test('failure mode 1: first-round stream drop → immediate continueSession on the same session, second round succeeds → step success (two opens)', async () => {
     const { client, opened, lines } = await runNetworkCase([
       [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
       [
@@ -280,12 +260,12 @@ describe('#1257 runner provider_network 流断重试（会话续跑）', () => {
     expect(opened).toHaveLength(2);
     expect(opened[0]?.kind).toBe('new');
     expect(opened[1]?.kind).toBe('continue');
-    expect(opened[1]?.sessionId).toBe(opened[0]?.sessionId); // 会话续跑，不断会话
+    expect(opened[1]?.sessionId).toBe(opened[0]?.sessionId);
     expect(client.doneBodies[0]?.body.status).toBe('success');
     expect(lines.some((l) => l.includes('provider network'))).toBe(true);
   });
 
-  test('失败方式 2：两轮流断 → 第三轮（延迟后）成功 → 步 success（三次开启）', async () => {
+  test('failure mode 2: two stream drops → third round (after delay) succeeds → step success (three opens)', async () => {
     const { client, opened } = await runNetworkCase(
       [
         [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
@@ -305,7 +285,7 @@ describe('#1257 runner provider_network 流断重试（会话续跑）', () => {
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('失败方式 3：三轮流断 → 失败收尾（done(failed) 携原错误，无第四轮）', async () => {
+  test('failure mode 3: three stream drops → failed close (done(failed) carries the original error, no fourth round)', async () => {
     const { client, opened } = await runNetworkCase(
       [
         [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
@@ -315,12 +295,12 @@ describe('#1257 runner provider_network 流断重试（会话续跑）', () => {
       { finalWaitMs: 1 },
     );
 
-    expect(opened).toHaveLength(3); // 首跑 + 两次重试 = 上限
+    expect(opened).toHaveLength(3);
     expect(client.doneBodies[0]?.body.status).toBe('failed');
     expect(client.doneBodies[0]?.body.errorMessage).toContain(NETWORK_ERROR);
   });
 
-  test('失败方式 4：quota 类错误 → 不重试（单轮收尾，挂起语义归 server done 面）', async () => {
+  test('failure mode 4: quota-class error → no retry (single-round close, suspension semantics belong to the server done surface)', async () => {
     const { client, opened } = await runNetworkCase([
       [{ type: 'error', error: { message: QUOTA_ERROR, retryable: false } }],
     ]);
@@ -330,7 +310,7 @@ describe('#1257 runner provider_network 流断重试（会话续跑）', () => {
     expect(client.doneBodies[0]?.body.errorMessage).toContain('402');
   });
 
-  test('失败方式 5：停止钮在位 → 不重试（用户意图优先于续跑）', async () => {
+  test('failure mode 5: stop button present → no retry (user intent outranks continuation)', async () => {
     const { client, opened } = await runNetworkCase(
       [
         [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
@@ -343,7 +323,7 @@ describe('#1257 runner provider_network 流断重试（会话续跑）', () => {
     expect(client.doneBodies[0]?.body.status).toBe('stopped');
   });
 
-  test('失败方式 5b：停止在两轮之间到达 → 续跑会话一开即中断，报 stopped', async () => {
+  test('failure mode 5b: stop arrives between rounds → the continued session is interrupted as soon as it opens, reports stopped', async () => {
     const { client, opened } = await runNetworkCase(
       [
         [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
@@ -359,7 +339,7 @@ describe('#1257 runner provider_network 流断重试（会话续跑）', () => {
     expect(client.doneBodies[0]?.body.status).toBe('stopped');
   });
 
-  test('失败方式 5c：停止在末次重试的退避等待中到达 → 不开末轮，报 stopped', async () => {
+  test("failure mode 5c: stop arrives during the last retry's backoff wait → final round not opened, reports stopped", async () => {
     const failedRound: Script = [
       { type: 'error', error: { message: NETWORK_ERROR, retryable: false } },
       { type: 'done', usage: [] },
@@ -374,7 +354,7 @@ describe('#1257 runner provider_network 流断重试（会话续跑）', () => {
     expect(client.doneBodies[0]?.body.errorMessage).toBeUndefined();
   });
 
-  test('失败方式 6：中途有进展的流断 → 重试仍走 continue（断点续跑，不重放整轮）', async () => {
+  test('failure mode 6: stream drop with mid-way progress → retry still uses continue (resume from the break point, no whole-round replay)', async () => {
     const { client, opened } = await runNetworkCase([
       [
         { type: 'text_delta', text: '写了一半' },

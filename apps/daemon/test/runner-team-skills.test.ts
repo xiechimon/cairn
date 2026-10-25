@@ -1,20 +1,3 @@
-// 团队技能物化的 runner 接线（#920 清单 + 按需拉；原 XMON-112 S2，spec 14
-// 增补）：步启动拉 GET /api/machine/skills/{stepId} 清单 → 按清单拉缺失
-// 文件 → 物化缓存目录 → SessionOpts.teamSkillsDir 透传 backend。失败方式
-// 清单先于实现固化（票面纪律；#920 口径 = 显式报错，不许静默降级跑空）：
-//   R1 拉取成功 → sessionOpts.teamSkillsDir = 缓存目录（SKILL.md 内容可读）
-//      + `[skills] team: … materialized` 行 + done success
-//   R2 清单拉取抛错（server 不可达 / 4xx / 5xx 同形）→ done failed、
-//      errorMessage 点名 team skills 与根因、零会话创建、
-//      `[skills] team-skills-failed` 行——旧 fail-open 降级已退役
-//   R3 空清单（whitelist = 白名单空；all = server 信任面空）→ 配置事实非
-//      通道故障：无 teamSkillsDir、缓存根零创建、`team-manifest-empty`
-//      显式行（点名 selection）、会话照常、done success
-//   R4 非法清单（dirName 逃逸）→ done failed 显式报错、零会话创建
-//   R5 文件按需拉取失败（materialize 中途）→ done failed 显式报错
-//   R6 老 server 404（无端点）→ 与 R2 同形 failed（版本墙 fail-open 退役，
-//      #920：静默降级正是本票要消灭的形态）
-
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -102,7 +85,6 @@ function claimedBuildStep(): ClaimedStep {
       modelId: 'stub-model',
       thinkingLevel: null,
       tools: [],
-      // #1169：白名单槽正名（worker 步授权面）。
       defaultSkill: null,
       skillsAllowlist: ['deploy-demo'],
     },
@@ -202,7 +184,6 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** 录制型 backend：记录每次 createSession 的 SessionOpts；自然完成。 */
 function recordingBackend(): { backend: AgentBackend; sessions: SessionOpts[] } {
   const sessions: SessionOpts[] = [];
   const backend: AgentBackend = {
@@ -250,8 +231,8 @@ async function setup(outcome: SkillsOutcome) {
   return { client, lines, sessions, paths };
 }
 
-describe('runner 团队技能接线（#920 清单 + 按需拉）', () => {
-  test('R1 拉取成功 → teamSkillsDir 透传会话 + 内容落盘可读 + materialized 行 + done success', async () => {
+describe('runner team-skills wiring (#920 manifest + on-demand fetch)', () => {
+  test('R1 fetch succeeds → teamSkillsDir passed to the session + content on disk and readable + materialized line + done success', async () => {
     const { client, lines, sessions, paths } = await setup({
       kind: 'manifest',
       manifest: DEMO_MANIFEST,
@@ -270,7 +251,7 @@ describe('runner 团队技能接线（#920 清单 + 按需拉）', () => {
     expect(client.doneBodies[0]!.body.status).toBe('success');
   });
 
-  test('R2 清单拉取抛错 → done failed 点名根因 + 零会话创建 + team-skills-failed 行', async () => {
+  test('R2 manifest fetch throws → done failed naming the root cause + zero sessions created + team-skills-failed line', async () => {
     const { lines, sessions, client } = await setup({
       kind: 'manifestError',
       error: new MachineApiError(500, 'boom'),
@@ -299,7 +280,7 @@ describe('runner 团队技能接线（#920 清单 + 按需拉）', () => {
     },
   );
 
-  test('R4 非法清单（dirName 逃逸）→ done failed 显式报错 + 零会话创建', async () => {
+  test('R4 invalid manifest (dirName escape) → done failed with an explicit error + zero sessions created', async () => {
     const evil: MachineSkillsManifestResponse = {
       selection: 'whitelist',
       skills: [{ ...DEMO_MANIFEST.skills[0]!, dirName: '../evil' }],
@@ -311,7 +292,7 @@ describe('runner 团队技能接线（#920 清单 + 按需拉）', () => {
     expect(lines.some((l) => l.startsWith('[skills] team-skills-failed:'))).toBe(true);
   });
 
-  test('R5 文件按需拉取失败 → done failed 点名文件与根因 + 零会话创建', async () => {
+  test('R5 on-demand file fetch fails → done failed naming the file and root cause + zero sessions created', async () => {
     const { sessions, client } = await setup({
       kind: 'fileError',
       error: new MachineApiError(503, 'file upstream gone'),
@@ -322,7 +303,7 @@ describe('runner 团队技能接线（#920 清单 + 按需拉）', () => {
     expect(client.doneBodies[0]!.body.errorMessage).toContain('503');
   });
 
-  test('R6 老 server 404（无端点）→ 与 R2 同形 failed（fail-open 退役）', async () => {
+  test('R6 old server 404 (no endpoint) → same-shaped failed as R2 (fail-open retired)', async () => {
     const { lines, sessions, client } = await setup({
       kind: 'manifestError',
       error: new MachineApiError(404, 'not found'),
@@ -332,7 +313,7 @@ describe('runner 团队技能接线（#920 清单 + 按需拉）', () => {
     expect(client.doneBodies[0]!.body.status).toBe('failed');
   });
 
-  test('R1 补充：物化成功的缓存目录无 .tmp 残留（views/ blobs/ 双面）', async () => {
+  test('R1 supplement: a successfully materialized cache directory has no .tmp residue (both views/ and blobs/)', async () => {
     const { sessions, paths } = await setup({ kind: 'manifest', manifest: DEMO_MANIFEST });
     expect(
       readdirSync(join(paths.teamSkillsCacheDir, 'views')).filter((e) => e.includes('.tmp-')),

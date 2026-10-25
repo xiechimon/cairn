@@ -1,17 +1,3 @@
-// #1406 P5-3（ADR 0021 D5）daemon 投递面：从 GitHub issue 导入的任务，会话首轮
-// prompt 把标题与正文包进「GitHub issue 原文」围栏；systemPrompt（职责文本 +
-// 记忆 + 任务元信息，spec 24 的运行简报正文）里不出现 issue 的任何文字。
-// 失败方式全表见 docs/verify/1406/p5-3-failure-modes.txt；本文件钉：
-//   F2 新会话 build 步、首轮 plan 步（契约组合行）、重启轮组合行都进围栏，
-//      系统指令与注记行留在围栏之外
-//   F6 claim 缺 meta.titleFinal 时（旧 server 或非 github 形态），github-issue
-//      任务的标题也不进 systemPrompt 的任务元信息段
-//   F1 非 GitHub 导入任务的首轮 prompt 逐字节不变
-// 补段（docs/verify/1406/p5-3-fix-failure-modes.txt）：
-//   S3 merge 新会话、ci-fix 组合行、#1312 降级新会话同样进围栏
-//   A1 任务 spec 里的图片 token 行经 runStep 照常交付（build、降级新会话、
-//      server 组好围栏的 verify 指令），锚行留在围栏里
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -61,15 +47,12 @@ const silent: DaemonLogger = {
   trust: () => {},
 };
 
-/** 来源两列另起变量再并入 todo：先于实现的测试提交里 claim 类型还没有这两列，
- *  变量引用不触发对象字面量的多余属性检查。 */
 function claimed(opts: {
   kind: 'plan' | 'build' | 'merge' | 'verify';
   source: { sourceKind: string | null; sourceRef: string | null };
   instruction?: string;
   title?: string;
   spec?: string;
-  /** 续接会话 id（缺省 = 新会话）。 */
   continueId?: string;
 }): ClaimedStep {
   const todo = {
@@ -103,8 +86,6 @@ function claimed(opts: {
 
 const GH = { sourceKind: 'github-issue', sourceRef: 'github:octo/alpha#7' };
 
-/** 跑一步，返回 createSession 收到的 prompt、systemPrompt 与内联图片。
- *  missingSession = 续接会话时本机找不到会话（#1312 降级新会话）。 */
 async function deliver(
   step: ClaimedStep,
   opts: {
@@ -159,7 +140,6 @@ async function deliver(
   };
 }
 
-/** 真收尾行之后的部分。正文里那行伪造的收尾行带 `> ` 前缀，按行首匹配跳过它。 */
 function afterFence(text: string): string {
   return text.slice(text.indexOf(`\n${FOOT}`) + 1 + FOOT.length);
 }
@@ -170,14 +150,13 @@ function expectFenced(text: string): void {
   const end = lines.indexOf(FOOT);
   expect(end).toBeGreaterThan(0);
   for (const line of lines.slice(1, end)) expect(line, line).toMatch(/^>( |$)/);
-  // 正文里那行伪造的收尾行仍带前缀；真收尾行只有一条。
   expect(lines.filter((l) => l === FOOT)).toHaveLength(1);
   expect(lines).toContain(`> ${FOOT}`);
   expect(lines).toContain(`> ${ISSUE_TITLE}`);
 }
 
-describe('F2 GitHub issue 任务的首轮 prompt 进围栏', () => {
-  test('新会话 build 步：prompt 就是围栏本身', async () => {
+describe('F2 first-round prompt of a GitHub-issue task goes into the fence', () => {
+  test('new-session build step: the prompt is the fence itself', async () => {
     const step = claimed({ kind: 'build', source: GH });
     const { prompt } = await deliver(step);
     expectFenced(prompt);
@@ -185,7 +164,7 @@ describe('F2 GitHub issue 任务的首轮 prompt 进围栏', () => {
     expect(buildTaskPrompt(step)).toBe(prompt);
   });
 
-  test('首轮 plan 步：围栏在前，plan.md 契约与交接位置注记在围栏之外', async () => {
+  test('first-round plan step: fence first, plan.md contract and handoff-location annotation outside the fence', async () => {
     const { prompt, home } = await deliver(claimed({ kind: 'plan', source: GH }));
     expectFenced(prompt);
     const after = afterFence(prompt);
@@ -197,7 +176,7 @@ describe('F2 GitHub issue 任务的首轮 prompt 进围栏', () => {
     );
   });
 
-  test('重启轮组合行：围栏在前，重启指令在围栏之外', async () => {
+  test('restart-round composed line: fence first, restart instruction outside the fence', async () => {
     const instruction = buildRestartPrompt('补上单测');
     const { prompt } = await deliver(claimed({ kind: 'build', source: GH, instruction }));
     expectFenced(prompt);
@@ -205,22 +184,22 @@ describe('F2 GitHub issue 任务的首轮 prompt 进围栏', () => {
   });
 });
 
-describe('S3 其余 prompt 变体同样进围栏', () => {
-  test('merge 新会话：prompt 就是围栏本身', async () => {
+describe('S3 other prompt variants likewise go into the fence', () => {
+  test('merge new session: the prompt is the fence itself', async () => {
     const step = claimed({ kind: 'merge', source: GH });
     const { prompt } = await deliver(step);
     expectFenced(prompt);
     expect(prompt.endsWith(FOOT)).toBe(true);
   });
 
-  test('ci-fix 组合行：围栏在前，修复指令在围栏之外', async () => {
+  test('ci-fix composed line: fence first, fix instruction outside the fence', async () => {
     const instruction = '[ci-fix] PR #12 的 CI 第 1 轮失败：\n- lint（failure）：biome ci 报错';
     const { prompt } = await deliver(claimed({ kind: 'build', source: GH, instruction }));
     expectFenced(prompt);
     expect(afterFence(prompt)).toBe(`\n\n${instruction}`);
   });
 
-  test('#1312 降级新会话：本机找不到会话时改投的原任务进围栏', async () => {
+  test('#1312 degraded new session: the original task re-delivered when no session is found locally goes into the fence', async () => {
     const step = claimed({ kind: 'build', source: GH, continueId: 'pi-sess-gone' });
     const { prompt } = await deliver(step, { missingSession: true });
     expectFenced(prompt);
@@ -228,7 +207,7 @@ describe('S3 其余 prompt 变体同样进围栏', () => {
   });
 });
 
-describe('A1 围栏里的图片 token 行经 runStep 照常交付', () => {
+describe('A1 image token lines inside the fence are delivered as usual through runStep', () => {
   const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
   const attachments = {
     att1: {
@@ -250,20 +229,20 @@ describe('A1 围栏里的图片 token 行经 runStep 照常交付', () => {
     expect(prompt).not.toContain('attachment:team1/att1.png');
   }
 
-  test('新会话 build 步', async () => {
+  test('new-session build step', async () => {
     const { prompt, images } = await deliver(claimed({ kind: 'build', source: GH, spec }), {
       attachments,
     });
     expectImageInFence(prompt, images);
   });
 
-  test('#1312 降级新会话', async () => {
+  test('#1312 degraded new session', async () => {
     const step = claimed({ kind: 'build', source: GH, spec, continueId: 'pi-sess-gone' });
     const { prompt, images } = await deliver(step, { attachments, missingSession: true });
     expectImageInFence(prompt, images);
   });
 
-  test('verify 步：server 组好围栏的指令', async () => {
+  test('verify step: instruction with the fence assembled by the server', async () => {
     const instruction = buildVerifyStepPrompt({
       ticketRef: '7',
       taskText: buildTaskPromptText(ISSUE_TITLE, spec, GH),
@@ -284,8 +263,8 @@ describe('A1 围栏里的图片 token 行经 runStep 照常交付', () => {
   });
 });
 
-describe('F6 issue 文字不进 systemPrompt', () => {
-  test('claim 缺 meta.titleFinal：职责与记忆在位，issue 标题与正文都不在', async () => {
+describe('F6 issue text does not enter systemPrompt', () => {
+  test('claim missing meta.titleFinal: duty and memory present, issue title and body both absent', async () => {
     const { systemPrompt } = await deliver(claimed({ kind: 'build', source: GH }));
     expect(systemPrompt).toContain('角色：Implementer（执行者）。');
     expect(systemPrompt).toContain('提交前先跑 lint');
@@ -294,7 +273,7 @@ describe('F6 issue 文字不进 systemPrompt', () => {
   });
 });
 
-describe('F1 非 GitHub 导入任务的首轮 prompt 逐字节不变', () => {
+describe('F1 first-round prompt of a non-GitHub-imported task unchanged byte for byte', () => {
   test.each([
     ['无来源', { sourceKind: null, sourceRef: null }],
     ['编排来源', { sourceKind: 'orchestration', sourceRef: 'chief:x' }],
@@ -314,7 +293,7 @@ describe('F1 非 GitHub 导入任务的首轮 prompt 逐字节不变', () => {
     },
   );
 
-  test('首轮 plan 步组合串形状不变', async () => {
+  test('first-round plan step composed string shape unchanged', async () => {
     const step = claimed({
       kind: 'plan',
       source: { sourceKind: null, sourceRef: null },

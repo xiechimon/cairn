@@ -1,13 +1,3 @@
-// #1026/#1028 daemon 侧（#904 调研副产物 2/4）：终稿回传通道的失败恢复面。
-// 现状失败方式清单（先固化，代码是让场景通过的手段）：
-//  1. 预签名 URL 只存 server 进程内存：server 重启后旧 URL 404 → PUT 失败 →
-//     整步 journal 残留，且恢复只能整会话重跑（#1028：恢复不得依赖进程内存）；
-//  2. PUT 成功 / done 失败 → journal 残留但终稿快照（doneBody + plan 内容）
-//     未持久 → recover 只能整会话重跑：白烧一轮 agent + 同内容重复版本
-//     （#1026：恢复不重跑整会话）；
-//  3. 语义性 4xx（#1027 拒绝腿）误当 transient 重试 → 白烧重试轮（409 重试
-//     永不成功，只有 404/5xx/网络断才值得重取 URL 重传）。
-
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -51,7 +41,6 @@ function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   return { logger, lines };
 }
 
-/** 无 repo 绑定的 plan 步（裸任务目录退化形，同 runner-artifact 形）。 */
 function claimedPlanStep(): ClaimedStep {
   return {
     step: { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1 },
@@ -70,8 +59,6 @@ function claimedPlanStep(): ClaimedStep {
   };
 }
 
-/** 可注入失败序列的假客户端：PUT 失败按 failPutStatuses 顺序消耗（404/5xx =
- * transient，409 = 语义拒）；done 失败按 failDone 计数。 */
 class FlakyClient implements MachineApi {
   calls: string[] = [];
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
@@ -151,9 +138,7 @@ class FlakyClient implements MachineApi {
   async stop() {
     return null;
   }
-  async syncResult(_syncId: string, _body: { status: string; errorMessage?: string }) {
-    /* no-op stub for branch sync (M7 #319) */
-  }
+  async syncResult(_syncId: string, _body: { status: string; errorMessage?: string }) {}
   async attachment(): Promise<never> {
     throw new Error('unused');
   }
@@ -164,7 +149,6 @@ class FlakyClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** 会话期把 plan.md 写进 cwd 的后端（agent 产物形态）。 */
 function planWritingBackend(events: StepEvent[]): {
   backend: AgentBackend;
   prompts: (string | undefined)[];
@@ -220,13 +204,12 @@ async function setup(claimed: ClaimedStep, backend: AgentBackend, client: Machin
   return { deps, client, journal, lines, workspacesDir };
 }
 
-describe('#1028 预签名 URL 失效重传（恢复不依赖 server 进程内存）', () => {
-  test('PUT 404（server 重启后旧 URL 失效）→ 重取 URL 重传：done 落、journal 清', async () => {
+describe('#1028 expired presigned-URL resend (recovery does not depend on server process memory)', () => {
+  test('PUT 404 (old URL expired after a server restart) → re-fetch the URL and resend: done lands, journal cleared', async () => {
     const { backend } = planWritingBackend([DONE_EVENT]);
     const client = new FlakyClient();
-    client.failPutStatuses = [404]; // 首 PUT 撞旧 URL 404（server 刚重启）
+    client.failPutStatuses = [404];
     const { journal } = await setup(claimedPlanStep(), backend, client);
-    // URL 重取了一轮（transcript.json + plan.md 两份重传）。
     expect(client.uploadNames).toHaveLength(2);
     expect(client.uploadNames[1]).toEqual(['transcript.json', PLAN_FILE_NAME]);
     expect(
@@ -237,25 +220,24 @@ describe('#1028 预签名 URL 失效重传（恢复不依赖 server 进程内存
     expect(journal.pending()).toHaveLength(0);
   });
 
-  test('PUT 409（语义拒绝）→ 不重试：URL 只取一轮，journal 残留待 recover 补报', async () => {
+  test('PUT 409 (semantic rejection) → no retry: URL fetched only once, journal residue awaits recover reporting', async () => {
     const { backend } = planWritingBackend([DONE_EVENT]);
     const client = new FlakyClient();
-    client.failPutStatuses = [409]; // #1027 拒绝腿（如已收尾步迟到上传）
+    client.failPutStatuses = [409];
     const { journal } = await setup(claimedPlanStep(), backend, client);
-    expect(client.uploadNames).toHaveLength(1); // 没有第二轮 URL 请求
-    expect(client.doneBodies).toHaveLength(0); // done 未发
-    expect(journal.pending()).toHaveLength(1); // 残留（awaiting-upload）
+    expect(client.uploadNames).toHaveLength(1);
+    expect(client.doneBodies).toHaveLength(0);
+    expect(journal.pending()).toHaveLength(1);
   });
 });
 
-describe('#1026 done 失败 → 终稿快照残留 + recover 快路径补报', () => {
-  test('done 失败 → journal 残留含 doneBody+planContent；快路径补报不再跑 agent 轮', async () => {
+describe('#1026 done failure → final-draft snapshot residue + recover fast-path report', () => {
+  test('done failure → journal residue contains doneBody+planContent; fast-path reporting runs no further agent rounds', async () => {
     const { backend, prompts } = planWritingBackend([DONE_EVENT]);
     const client = new FlakyClient();
-    client.failDone = 1; // PUT 成功、done 失败（server 重启窗）
+    client.failDone = 1;
     const { deps, journal } = await setup(claimedPlanStep(), backend, client);
 
-    // 残留快照：状态 + 终稿 body + plan 内容。
     const pending = journal.pending();
     expect(pending).toHaveLength(1);
     const entry = pending[0]!;
@@ -263,34 +245,32 @@ describe('#1026 done 失败 → 终稿快照残留 + recover 快路径补报', (
     expect(entry.planContent).toBe('# 方案\nContext: 恢复探针');
     expect(entry.doneBody).toMatchObject({ status: 'success', sessionId: 'pi-sess-1' });
 
-    // 首轮上传已落（PUT 成功在前）。
     expect(
       client.uploads.filter((u) => typeof u.body === 'string' && u.body.includes('恢复探针')),
     ).toHaveLength(1);
 
-    // 快路径补报：重传（transcript + plan）+ done；不再开 session。
     client.failDone = 0;
     await resumePendingUpload(deps, entry);
-    expect(prompts).toHaveLength(1); // 无第二轮 agent 会话
+    expect(prompts).toHaveLength(1);
     expect(
       client.uploads.filter((u) => typeof u.body === 'string' && u.body.includes('恢复探针')),
-    ).toHaveLength(2); // plan 重传一轮
+    ).toHaveLength(2);
     expect(client.doneBodies).toHaveLength(1);
     expect(client.doneBodies[0]?.body).toEqual(entry.doneBody);
-    expect(journal.pending()).toHaveLength(0); // 补报完成清残留
+    expect(journal.pending()).toHaveLength(0);
   });
 
-  test('快路径 done 再失败 → journal 残留保留（下次重启再试，仍不重跑 agent 轮）', async () => {
+  test('fast-path done fails again → journal residue kept (retried on next restart, still no agent rounds rerun)', async () => {
     const { backend } = planWritingBackend([DONE_EVENT]);
     const client = new FlakyClient();
-    client.failDone = 2; // 首次 done 失败 + 快路径 done 再失败
+    client.failDone = 2;
     const { deps, journal } = await setup(claimedPlanStep(), backend, client);
     const entry = journal.pending()[0]!;
     expect(entry).toBeTruthy();
     client.failDone = 1;
     await resumePendingUpload(deps, entry);
     expect(client.doneBodies).toHaveLength(0);
-    expect(journal.pending()).toHaveLength(1); // 残留保留
-    expect(journal.pending()[0]?.doneBody).toEqual(entry.doneBody); // 快照仍在
+    expect(journal.pending()).toHaveLength(1);
+    expect(journal.pending()[0]?.doneBody).toEqual(entry.doneBody);
   });
 });

@@ -1,18 +1,3 @@
-// runner 凭据降级收尾单测（#1225 票面「clone/push 凭据序」的 push 半 + 凭据
-// 来源行上浮）。harness 同 runner-local.test.ts（FakeClient + fake WorktreeOps
-// 录制调用序；github-probe 走 mock——真实网络面不进单测）。
-// 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
-//   1. github + per-step token auth 失败 → push 以 machine（null cred）二发
-//      成功；transcript 落 git-credential 行（来源 machine，不含 token 值）；
-//      done success
-//   2. github + token 有效 → 单发 push（cred = token）；来源行 = integration
-//      （集成有效时行为不变）
-//   3. github + 两路都 auth 失败 → done failed，errorMessage 点名两路
-//      （per-step token + machine credentials，票失败方式 1）
-//   4. hosted + auth 失败 → 单发 push（绝不 null 二发）+ 无 git-credential 行
-//      （票失败方式 3：hosted 仍走 server per-step key，行为不动）
-//   5. local + push 失败 → 单发，无降级无来源行（local 无凭据面）
-
 import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -34,7 +19,6 @@ import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 
-// 同 runner-local.test.ts 的 #966 防 Flake 钉法：github 步收尾探测走 mock。
 const probeMock = vi.fn();
 vi.mock('../src/github-probe.js', async (importOriginal) => {
   const real = (await importOriginal<typeof import('../src/github-probe.js')>()) as {
@@ -44,9 +28,7 @@ vi.mock('../src/github-probe.js', async (importOriginal) => {
 });
 
 const GITHUB_TOKEN: GitCredentials = { username: 'x-access-token', password: 'ghp_steptoken' };
-/** runner 交给 push 的凭证 = token 响应绑定 claim 的 cloneUrl（#1484）。 */
 const GITHUB_STEP_CRED = { ...GITHUB_TOKEN, url: 'https://github.com/o/r.git' };
-/** 票 #1225 现象段原文（mea 2026-10-11 实测 push 失败 stderr）。 */
 const MEA_AUTH_FAILURE =
   'remote: Invalid username or token. Password authentication is not supported.\n' +
   "fatal: Authentication failed for 'https://github.com/xiechimon/cairn.git/'";
@@ -172,7 +154,6 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** fake worktree：push 行为可编程（按 cred 分派），prepare 可声明来源。 */
 function fakeWorkspace(opts: {
   pushWithToken?: () => Promise<void>;
   pushWithMachine?: () => Promise<void>;
@@ -220,7 +201,6 @@ function fakeWorkspace(opts: {
   return { ws, calls, pushes };
 }
 
-/** 自然完成 backend（无工具行——git 真值面接管 hasChanges）。 */
 function completingBackend(): AgentBackend {
   return {
     capabilities: PI_CAPABILITIES,
@@ -275,7 +255,6 @@ async function setup(
   return { client, lines, paths };
 }
 
-/** outbox transcript 行（TranscriptBuffer 落盘面，journal.ts）。 */
 function transcriptRows(paths: {
   outboxDir: string;
 }): { id: string; role: string; content: unknown }[] {
@@ -286,8 +265,8 @@ function transcriptRows(paths: {
   }[];
 }
 
-describe('runner push 凭据降级 + 来源行（#1225）', () => {
-  test('失败方式 1：github token auth 失败 → machine 二发成功，来源行 machine（不含 token 值），done success', async () => {
+describe('runner push credential fallback + provenance line (#1225)', () => {
+  test('failure mode 1: github token auth failure → machine second attempt succeeds, provenance line machine (no token value), done success', async () => {
     const workspace = fakeWorkspace({
       pushWithToken: () => {
         throw new Error(MEA_AUTH_FAILURE);
@@ -297,23 +276,20 @@ describe('runner push 凭据降级 + 来源行（#1225）', () => {
       claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
       { git: GITHUB_TOKEN, workspace },
     );
-    // integration 一发（auth 失败）+ machine 二发（成功）。
     expect(workspace.pushes).toEqual([
       { branch: 'cairn/conv-conv-1', cred: GITHUB_STEP_CRED },
       { branch: 'cairn/conv-conv-1', cred: null },
     ]);
     expect(client.doneBodies[0]!.body.status).toBe('success');
-    // 来源行：machine；transcript 与日志都不携带 token 值（票失败方式 2）。
     const row = transcriptRows(paths).find((r) => r.id === 'git-credential-s1');
     expect(row?.role).toBe('system');
     expect(String(row?.content)).toContain('machine');
     const allText = `${JSON.stringify(transcriptRows(paths))}\n${lines.join('\n')}`;
     expect(allText).not.toContain(GITHUB_TOKEN.password);
-    // 降级日志行在（原文回传）。
     expect(lines.some((l) => l.includes('machine credentials'))).toBe(true);
   }, 20_000);
 
-  test('失败方式 2：github token 有效 → 单发 push（cred = token），来源行 integration', async () => {
+  test('failure mode 2: github token valid → single push (cred = token), provenance line integration', async () => {
     const workspace = fakeWorkspace({});
     const { client, paths } = await setup(
       claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
@@ -325,7 +301,7 @@ describe('runner push 凭据降级 + 来源行（#1225）', () => {
     expect(client.doneBodies[0]!.body.status).toBe('success');
   }, 20_000);
 
-  test('失败方式 3：github 两路都 auth 失败 → done failed，errorMessage 点名两路', async () => {
+  test('failure mode 3: github auth fails on both paths → done failed, errorMessage names both paths', async () => {
     const workspace = fakeWorkspace({
       pushWithToken: () => {
         throw new Error(MEA_AUTH_FAILURE);
@@ -345,15 +321,12 @@ describe('runner push 凭据降级 + 来源行（#1225）', () => {
     expect(msg).toContain('Invalid username or token');
     expect(msg).toContain('machine credentials');
     expect(msg).toContain('could not read Username');
-    // 步失败面上浮（done.errorMessage 点名两路）；来源行保留 prepare 报告的
-    // 来源（fake prepare 走了 integration——行事实与 push 失败分属两个面）。
     const row = transcriptRows(paths).find((r) => r.id === 'git-credential-s1');
     expect(String(row?.content)).toContain('integration');
-    // token 值不进任何面（票失败方式 2）。
     expect(`${msg}\n${JSON.stringify(transcriptRows(paths))}`).not.toContain(GITHUB_TOKEN.password);
   }, 20_000);
 
-  test('失败方式 4：hosted auth 失败 → 单发 push、无降级、无来源行（server per-step key 不动）', async () => {
+  test('failure mode 4: hosted auth failure → single push, no fallback, no provenance line (server per-step key untouched)', async () => {
     const workspace = fakeWorkspace({
       pushWithToken: () => {
         throw new Error(MEA_AUTH_FAILURE);
@@ -369,7 +342,7 @@ describe('runner push 凭据降级 + 来源行（#1225）', () => {
     expect(transcriptRows(paths).some((r) => r.id === 'git-credential-s1')).toBe(false);
   }, 20_000);
 
-  test('失败方式 5：local push 失败 → 单发无降级、无来源行', async () => {
+  test('failure mode 5: local push failure → single attempt, no fallback, no provenance line', async () => {
     const workspace = fakeWorkspace({
       pushWithMachine: () => {
         throw new Error('push failed (128): bad object');
@@ -379,23 +352,21 @@ describe('runner push 凭据降级 + 来源行（#1225）', () => {
       claimedStep('build', { kind: 'local', cloneUrl: '/tmp/user-repo' }),
       { git: null, workspace },
     );
-    // local：cred null（现行为），失败原错误直抛——不套凭据序。
     expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: null }]);
     expect(client.doneBodies[0]!.body.status).toBe('failed');
     expect(String(client.doneBodies[0]!.body.errorMessage)).toContain('bad object');
     expect(transcriptRows(paths).some((r) => r.id === 'git-credential-s1')).toBe(false);
   }, 20_000);
 
-  test('失败方式 6：prepare 已降级（来源 machine）→ 来源行随 prepare 上浮（push 未再触发的轮次也可见）', async () => {
+  test('failure mode 6: prepare already fell back (provenance machine) → provenance line surfaces with prepare (visible even on rounds where push never fired)', async () => {
     const workspace = fakeWorkspace({
       credentialSource: 'machine',
-      // push 成功但持推送闸缺——不推，只留 prepare 的来源行。
     });
     const claimed = claimedStep(
       'build',
       { kind: 'github', cloneUrl: 'https://github.com/o/r.git' },
       {
-        tools: ['合并分支'], // 缺「推送分支」→ push 软拒
+        tools: ['合并分支'],
       },
     );
     const { client, paths } = await setup(claimed, { git: GITHUB_TOKEN, workspace });

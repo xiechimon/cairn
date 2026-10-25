@@ -1,6 +1,3 @@
-// recover 对账（02 §5.4 步 journal 恢复）（#1128 自 machine-loop.test.ts 拆分；共享 harness 收编位
-// = ./machine-loop-harness.ts，每个测试自 boot 自停）。
-
 import type { AgentBackend, ClaimedStep, MachineDoneBody, StepEvent } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { SessionNotResumableError } from '../src/backend/errors.js';
@@ -10,8 +7,8 @@ import { StepJournal } from '../src/journal.js';
 import type { StatePaths } from '../src/state.js';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 
-describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
-  test('server 有 claimed 步而本地无 journal → done failed（journal lost）', async () => {
+describe('recover reconciliation (02 §5.4 step journal recovery)', () => {
+  test('server has a claimed step but no local journal → done failed (journal lost)', async () => {
     const api = new FakeMachineApi();
     api.recoverSteps = [{ id: 'ghost', buildId: 'b', kind: 'plan', machineId: 'm1', createdAt: 1 }];
     const { handle, lines } = await boot({ api });
@@ -25,9 +22,6 @@ describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
     await handle.done;
   });
 
-  // #1026：PUT 成功 / done 失败的残留（state=awaiting-upload + 终稿快照）→
-  // recover 走快路径补报，不开新 agent 轮（对照：快照缺失仍走整步重跑）。
-  /** s1 步 journal 预置（快路径两腿共用形状；patch 追加终稿快照与否分流）。 */
   function seedS1Journal(
     paths: StatePaths,
     patch: Partial<{
@@ -51,7 +45,7 @@ describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
     journal.update('s1', patch);
   }
 
-  test('awaiting-upload 残留含终稿快照 → recover 快路径补报（不开 agent 会话）', async () => {
+  test('awaiting-upload residue with a final-draft snapshot → recover fast-path reports it (no agent session opened)', async () => {
     const api = new FakeMachineApi();
     api.recoverSteps = [
       { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1 },
@@ -70,7 +64,6 @@ describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
       stepId: 's1',
       body: { status: 'success', sessionId: 'pi-sess-1' },
     });
-    // 快路径行在位；agent 会话不开（无 new/continue session 行）。
     expect(lines.some((l) => l.includes('awaiting upload — replaying final report'))).toBe(true);
     expect(lines.some((l) => l.includes('new session conv-1'))).toBe(false);
     expect(lines.some((l) => l.includes('continue session conv-1'))).toBe(false);
@@ -78,9 +71,7 @@ describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
     await handle.done;
   });
 
-  // F3 失败方式 5/6：重启前已接收停止。会话没跑完 → 不重跑、直接报 stopped
-  // （带上次会话号，续接链不断）；会话已跑完待补报 → 补报原结果，完成优先。
-  test('重启前已接收停止、会话没跑完 → recover 报 stopped，不开会话', async () => {
+  test('stop received before restart, session never finished → recover reports stopped, no session opened', async () => {
     const api = new FakeMachineApi();
     api.recoverSteps = [
       { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1 },
@@ -103,7 +94,7 @@ describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
     await handle.done;
   });
 
-  test('重启前已接收停止、会话已跑完待补报 → 补报原结果（完成优先）', async () => {
+  test('stop received before restart, session finished awaiting report → original result reported (completion first)', async () => {
     const api = new FakeMachineApi();
     api.recoverSteps = [
       { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1 },
@@ -124,24 +115,21 @@ describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
     await handle.done;
   });
 
-  test('awaiting-upload 残留但终稿快照缺失（快照前崩溃）→ 整步重跑原路径', async () => {
+  test('awaiting-upload residue but final-draft snapshot missing (crashed before snapshot) → whole step reruns the original path', async () => {
     const api = new FakeMachineApi();
     api.recoverSteps = [
       { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1 },
     ];
     const { handle, lines } = await boot({
       api,
-      seedJournal: (paths) => seedS1Journal(paths, { state: 'awaiting-upload' }), // 无 doneBody/planContent
+      seedJournal: (paths) => seedS1Journal(paths, { state: 'awaiting-upload' }),
     });
     await waitFor(() => lines.some((l) => l.includes('continue session conv-1')));
     await handle.stop();
     await handle.done;
   });
 
-  // 失败方式：换机 continue 的 journal 快照带 priorMachineId。崩溃 recover
-  // 重拼 session 时若只留 action/sessionId，resumeMissNote 会写成
-  // 「本机找不到会话」。注记应仍点名另一台机器。
-  test('换机 continue 崩溃后续跑仍点名另一台机器', async () => {
+  test('continue on another machine crashed and resumed still names the other machine', async () => {
     const api = new FakeMachineApi();
     api.recoverSteps = [
       { id: 's1', buildId: 'conv-1', kind: 'build', machineId: 'm1', createdAt: 1 },
@@ -198,10 +186,7 @@ describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
     await handle.done;
   });
 
-  // 失败方式：换机 continue 降级后 journal.sessionId 已是本机新会话，
-  // claim 上的 priorMachineId 仍指旧机器。再续这份本机会话失败时，
-  // 注记应写「本机找不到会话」，不能再点名另一台机器。
-  test('本机新会话再失败不再沿用旧机器号', async () => {
+  test('a fresh local session that fails again does not reuse the old machine number', async () => {
     const api = new FakeMachineApi();
     api.recoverSteps = [
       { id: 's1', buildId: 'conv-1', kind: 'build', machineId: 'm1', createdAt: 1 },

@@ -1,17 +1,3 @@
-// provider 配置即时生效（#708 失败方式 3，物化面）：PATCH provider 后新会话
-// 按新配置发请求，不依赖 daemon 重启。链路事实（2026-10-03 侦察）：
-//   - token/{stepId} 每步现读 server 库；materializeProvider 每次会话创建重写
-//     models.json；ModelRuntime.create 每会话重建（磁盘重读）——pi 侧无跨会话
-//     缓存。真正的残留staleness = pi.ts 的 learnedCompat 模块级补位：server 侧
-//     **删除** compat 旋钮后，学习位会把旧形填回去（重启 daemon 才清）。
-// 失败方式枚举先于实现固化：
-//   1. 删除位回流：学习翻过 {mct, store} 后 server compat 改为不含它们 → 物化
-//      仍带旧学习位（现行为）→ 修后：学习作废，物化 = 纯显式位。
-//   2. 学习补位保留：server compat 未变（重复物化同配置）→ 学习照旧补位
-//      （#654「学费一次」语义零回归）。
-//   3. 变更后再撞错 → 可重新学习（作废不是永久拉黑）。
-//   4. 修改位：server compat 显式改写某旋钮 → 物化取新显式值，不被学习位盖。
-
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -38,51 +24,43 @@ function loadCompat(path: string, providerId: string): ProviderCompat | undefine
   return raw.providers[providerId]?.compat;
 }
 
-describe('materializeProvider 配置变更即时生效（#708 失败方式 3）', () => {
-  // 学习面是模块级 Map：每个用例独立 providerId 隔离（pi-protocol-fallback 同律）。
-
-  test('失败方式 1：server compat 删除学习位所填的旋钮 → 学习作废，旧形不回流', () => {
+describe('materializeProvider config changes take effect immediately (#708 failure mode 3)', () => {
+  test('failure mode 1: server compat deletes the knob the learning slot filled → learning voided, old shape does not flow back', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
     const path = join(dir, 'models.json');
-    // 学费：撞错 → learnedCompat 填 {mct:max_tokens, store:false}。
     adaptProviderCompat(gateway('cfg-remove'), RELAY_400);
     materializeProvider(path, gateway('cfg-remove'));
     expect(loadCompat(path, 'cfg-remove')).toEqual({
       maxTokensField: 'max_tokens',
       supportsStore: false,
     });
-    // server 侧改为显式只钉 supportsDeveloperRole（mct/store 位被删除）→
-    // 物化不得再带学习旧形。
     materializeProvider(path, gateway('cfg-remove', { supportsDeveloperRole: false }));
     expect(loadCompat(path, 'cfg-remove')).toEqual({ supportsDeveloperRole: false });
   });
 
-  test('失败方式 2：server compat 未变 → 学习照旧补位（学费一次，零回归）', () => {
+  test('failure mode 2: server compat unchanged → learning fills the slot as before (tuition paid once, zero regression)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
     const path = join(dir, 'models.json');
     adaptProviderCompat(gateway('cfg-stable'), RELAY_400);
     materializeProvider(path, gateway('cfg-stable'));
-    materializeProvider(path, gateway('cfg-stable')); // 同配置二次物化（后续步）
+    materializeProvider(path, gateway('cfg-stable'));
     expect(loadCompat(path, 'cfg-stable')).toEqual({
       maxTokensField: 'max_tokens',
       supportsStore: false,
     });
   });
 
-  test('失败方式 3：作废后再撞错 → 可重新学习（作废不是永久拉黑）', () => {
+  test('failure mode 3: after voiding, hitting the error again → can relearn (voiding is not a permanent ban)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
     const path = join(dir, 'models.json');
-    // 学费期：server compat 为空，学习 {mct, store}；本次物化兼作基线快照。
     adaptProviderCompat(gateway('cfg-relearn'), RELAY_400);
     materializeProvider(path, gateway('cfg-relearn'));
     expect(loadCompat(path, 'cfg-relearn')).toEqual({
       maxTokensField: 'max_tokens',
       supportsStore: false,
     });
-    // 变更 → 作废。
     materializeProvider(path, gateway('cfg-relearn', { supportsDeveloperRole: false }));
     expect(loadCompat(path, 'cfg-relearn')).toEqual({ supportsDeveloperRole: false });
-    // 新配置下再撞错 → 重新学习并入（新学习位基于新配置，不与显式位冲突）。
     const amended = adaptProviderCompat(
       gateway('cfg-relearn', { supportsDeveloperRole: false }),
       RELAY_400,
@@ -100,23 +78,17 @@ describe('materializeProvider 配置变更即时生效（#708 失败方式 3）'
     });
   });
 
-  test('失败方式 4：server compat 显式改写旋钮值 → 物化取新显式值', () => {
+  test('failure mode 4: server compat explicitly rewrites the knob value → materialization takes the new explicit value', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
     const path = join(dir, 'models.json');
-    adaptProviderCompat(gateway('cfg-rewrite'), RELAY_400); // 学习 {mct: max_tokens}
+    adaptProviderCompat(gateway('cfg-rewrite'), RELAY_400);
     materializeProvider(path, gateway('cfg-rewrite'));
-    // server 显式改钉 mct 回现代字段 → 物化取显式值（显式压学习的既有语义
-    // 不变；但同 provider 后续无 server 变更时不得把学习位偷偷并回来）。
     materializeProvider(path, gateway('cfg-rewrite', { maxTokensField: 'max_completion_tokens' }));
     expect(loadCompat(path, 'cfg-rewrite')?.maxTokensField).toBe('max_completion_tokens');
   });
 });
 
-// —— #927 成本声明位：custom 端点的模型价格（USD / 1M tokens，pi 目录价
-// 语义）由 server 配置下发、物化进 models.json 条目——pi calculateCost 据此
-// 算 per-message cost（宿主不自造价格表、不重算）。无价格声明维持零价
-// （cost 恒 0 = 如实反映「该端点无价格来源」）。
-describe('materializeProvider cost 声明位（#927）', () => {
+describe('materializeProvider cost declaration slot (#927)', () => {
   function providerWith(providerId: string, models: ProviderConfig['models']): ProviderConfig {
     return { ...gateway(providerId), models };
   }
@@ -127,7 +99,7 @@ describe('materializeProvider cost 声明位（#927）', () => {
     return raw.providers[providerId]?.models ?? [];
   }
 
-  test('模型声明 cost → models.json 条目 = 声明价（覆盖零默认）', () => {
+  test('model declares cost → models.json entry = declared price (overrides the zero default)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-cost-'));
     const path = join(dir, 'models.json');
     materializeProvider(
@@ -142,7 +114,7 @@ describe('materializeProvider cost 声明位（#927）', () => {
     });
   });
 
-  test('未声明价格 → 零价默认同形（既有物化产物零回归）', () => {
+  test('price undeclared → zero-price default unchanged (zero regression for existing materialized output)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-cost-'));
     const path = join(dir, 'models.json');
     materializeProvider(path, providerWith('cost-none', [{ id: 'm2', name: 'M2' }]));
@@ -153,7 +125,7 @@ describe('materializeProvider cost 声明位（#927）', () => {
   });
 });
 
-describe('materializeProvider 上下文/输出上限声明位（#1526）', () => {
+describe('materializeProvider context/output cap declaration slots (#1526)', () => {
   function providerWith(providerId: string, models: ProviderConfig['models']): ProviderConfig {
     return { ...gateway(providerId), models };
   }
@@ -164,7 +136,7 @@ describe('materializeProvider 上下文/输出上限声明位（#1526）', () =>
     return raw.providers[providerId]?.models ?? [];
   }
 
-  test('模型声明 contextWindow=1000000 → models.json 条目 = 声明值（1M 上下文不再被 128k 默认截短）', () => {
+  test('model declares contextWindow=1000000 → models.json entry = declared value (1M context no longer truncated by the 128k default)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-ctxwin-'));
     const path = join(dir, 'models.json');
     materializeProvider(
@@ -180,7 +152,7 @@ describe('materializeProvider 上下文/输出上限声明位（#1526）', () =>
     });
   });
 
-  test('未声明 → 128k/16k 默认同形（不配时行为不变）', () => {
+  test('undeclared → 128k/16k defaults unchanged (behavior unchanged when unconfigured)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-ctxwin-'));
     const path = join(dir, 'models.json');
     materializeProvider(path, providerWith('ctx-none', [{ id: 'm2', name: 'M2' }]));
@@ -191,7 +163,7 @@ describe('materializeProvider 上下文/输出上限声明位（#1526）', () =>
     });
   });
 
-  test('同 provider 两模型仅其一声明 → 覆盖按模型独立，不串扰', () => {
+  test('two models on one provider with only one declaring → overrides are per-model, no cross-talk', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-ctxwin-'));
     const path = join(dir, 'models.json');
     materializeProvider(

@@ -1,22 +1,11 @@
 #!/bin/sh
 # Guarded cairn daemon launcher for launchd (user domain).
 #
-# Why this wrapper exists: `cli.ts start -f` (foreground) carries no
-# singleton lock — the daemon.json pid guard only covers `start`
-# (supervisor mode). Without this check, a launchd job plus a manual
-# `pnpm dev:daemon` on the same checkout would both claim steps from the
-# server. Either guard hit means "already running" and exits 0:
-# with KeepAlive {SuccessfulExit: false} a clean exit is NOT relaunched,
-# while a crash still is.
-#
-# Guards (read-only, never kills — port/cwd钉选 discipline):
-#   G1  $CAIRN_HOME/daemon.json holds a live pid (supervisor-mode twin).
-#   G2  a bare `src/cli.ts start -f` foreground process whose cwd is this
-#       checkout (manual `pnpm dev:daemon` twin). The pgrep pattern is
-#       end-anchored so verify-stack daemons (extra --server/--api-key
-#       args) never match; each hit is confirmed via lsof cwd, never by
-#       shape alone. The `[.]` keeps the pattern from matching this
-#       script's own command line.
+# Exit 0 means "already running": with KeepAlive {SuccessfulExit: false}
+# launchd does not relaunch a clean exit, while a crash still is relaunched.
+# pgrep -f takes an ERE: the pattern is end-anchored (verify-stack daemons
+# carry extra args and must not match), `[.]` keeps the pattern from matching
+# this script's own command line, and the server URL is dot-escaped.
 set -u
 
 REPO="@CAIRN_REPO@"
@@ -28,7 +17,6 @@ DAEMON_JSON="$CAIRN_HOME_DIR/daemon.json"
 
 note() { printf '%s [cairn-daemon-run] %s\n' "$(date '+%F %T')" "$*"; }
 
-# G1: supervisor-mode twin via daemon.json.
 if [ -f "$DAEMON_JSON" ]; then
   twin_pid="$(sed -n 's/.*"pid"[ :]*\([0-9][0-9]*\).*/\1/p' "$DAEMON_JSON" | head -n 1)"
   if [ -n "${twin_pid:-}" ] && kill -0 "$twin_pid" 2>/dev/null; then
@@ -37,9 +25,7 @@ if [ -f "$DAEMON_JSON" ]; then
   fi
 fi
 
-# G2: foreground twin from this same checkout.
 if command -v pgrep >/dev/null 2>&1 && command -v lsof >/dev/null 2>&1; then
-  # Escape the server URL for ERE (dots and slashes only; scheme/host/port shape).
   server_re="$(printf '%s' "$SERVER_URL" | sed 's/\./[.]/g')"
   for pid in $(pgrep -f "src/cli[.]ts start -f(\$| .*--server $server_re)" 2>/dev/null); do
     [ "$pid" = "$$" ] && continue

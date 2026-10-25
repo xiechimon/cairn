@@ -1,12 +1,3 @@
-// GitHub PR 只读探测（#704 / B-C16）：gh → REST（token/匿名）双梯 + 候选
-// 选取。失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
-//   1. gh 命中（stdout JSON）→ open 优先、多 open 取 number 最大
-//   2. gh 不可用（未安装/非零退出）→ REST 梯接手；token 只进头
-//   3. REST 非数组/非 200/网络错 → null（未知，不抛不重试）
-//   4. 全梯失败 → null（面板分支名在、PR 槽留空）
-//   5. githubRepoRefOf：github cloneUrl → owner/repo；hosted/local/垃圾 → null；
-//      owner 或 repo 为 `.` / `..`（#1466：拼进 repos/{o}/{r} 会被 URL 归一改写）→ null
-
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,7 +9,6 @@ afterAll(() => {
   for (const d of disposables) rmSync(d, { recursive: true, force: true });
 });
 
-/** gh 替身脚本：退出 0 + stdout 固定 JSON（gh pr list --json 响应形）。 */
 function fakeGh(stdout: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'cairn-gh-probe-'));
   disposables.push(dir);
@@ -29,8 +19,6 @@ function fakeGh(stdout: string): string {
   return path;
 }
 
-/** 退出 1 的 gh 替身（模拟 gh 未登录/查询失败——真实 gh 对无 PR 分支退出 0
- * 空数组，对错误形态退出 1）。 */
 function failingGh(): string {
   const dir = mkdtempSync(join(tmpdir(), 'cairn-gh-probe-'));
   disposables.push(dir);
@@ -49,8 +37,8 @@ const GITHUB_API_ROWS = [
   { number: 13, html_url: 'https://github.com/o/r/pull/13', state: 'open' },
 ];
 
-describe('gh 梯（失败方式 1/2）', () => {
-  test('gh 命中 → open 优先、多 open 取 number 最大', async () => {
+describe('gh ladder (failure modes 1/2)', () => {
+  test('gh hit → open preferred, multiple open take the largest number', async () => {
     const gh = fakeGh(
       JSON.stringify([
         { number: 12, url: 'https://github.com/o/r/pull/12', state: 'closed' },
@@ -68,7 +56,7 @@ describe('gh 梯（失败方式 1/2）', () => {
     expect(probe).toEqual({ number: 14, url: 'https://github.com/o/r/pull/14' });
   });
 
-  test('gh 非零退出 → REST 梯接手（无 token = 匿名形态）', async () => {
+  test('gh non-zero exit → REST ladder takes over (no token = anonymous shape)', async () => {
     const probe = await probeGithubPr({
       owner: 'o',
       repo: 'r',
@@ -80,8 +68,8 @@ describe('gh 梯（失败方式 1/2）', () => {
   });
 });
 
-describe('REST 梯（失败方式 2/3/4）', () => {
-  test('gh 缺席 + token 在位 → Authorization 头携带 token，只取头不进 URL', async () => {
+describe('REST ladder (failure modes 2/3/4)', () => {
+  test('gh absent + token present → Authorization header carries the token, header only, never in the URL', async () => {
     const seen: { url?: string; headers?: Record<string, string> } = {};
     const fetchImpl = async (url: string, init?: { headers?: Record<string, string> }) => {
       seen.url = url;
@@ -104,7 +92,7 @@ describe('REST 梯（失败方式 2/3/4）', () => {
     expect(seen.headers?.authorization).toBe('Bearer ghp_secret');
   });
 
-  test('REST 404（私仓匿名）→ null 不抛', async () => {
+  test('REST 404 (private repo, anonymous) → null, no throw', async () => {
     const probe = await probeGithubPr({
       owner: 'o',
       repo: 'private-r',
@@ -115,7 +103,7 @@ describe('REST 梯（失败方式 2/3/4）', () => {
     expect(probe).toBeNull();
   });
 
-  test('REST 网络错 → null（全梯失败 = 未知）', async () => {
+  test('REST network error → null (whole ladder failed = unknown)', async () => {
     const probe = await probeGithubPr({
       owner: 'o',
       repo: 'r',
@@ -128,7 +116,7 @@ describe('REST 梯（失败方式 2/3/4）', () => {
     expect(probe).toBeNull();
   });
 
-  test('REST 非数组载荷 → null（不假阳）', async () => {
+  test('REST non-array payload → null (no false positive)', async () => {
     const probe = await probeGithubPr({
       owner: 'o',
       repo: 'r',
@@ -140,23 +128,22 @@ describe('REST 梯（失败方式 2/3/4）', () => {
   });
 });
 
-describe('githubRepoRefOf（失败方式 5：形态前置闸）', () => {
-  test('github cloneUrl → owner/repo（.git 剥离）', () => {
+describe('githubRepoRefOf (failure mode 5: shape pre-gate)', () => {
+  test('github cloneUrl → owner/repo (.git stripped)', () => {
     expect(githubRepoRefOf('https://github.com/octocat/Hello-World.git')).toEqual({
       owner: 'octocat',
       repo: 'Hello-World',
     });
   });
-  test('hosted / local / 垃圾形状 → null（探测跳过）', () => {
+  test('hosted / local / garbage shapes → null (probe skipped)', () => {
     expect(githubRepoRefOf('http://server/git/t1/demo')).toBeNull();
     expect(githubRepoRefOf('/Users/me/repo')).toBeNull();
     expect(githubRepoRefOf('not a url')).toBeNull();
     expect(githubRepoRefOf('https://github.com/only-owner/')).toBeNull();
   });
-  test('#1466 repo 段为 . / ..（存量 owner/.. 或 owner/. 行派生的 cloneUrl）→ null，不进探测', () => {
+  test('#1466 repo segment is . / .. (cloneUrl derived from a legacy owner/.. or owner/. line) → null, no probe', () => {
     expect(githubRepoRefOf('https://github.com/owner/...git')).toBeNull();
     expect(githubRepoRefOf('https://github.com/owner/..git')).toBeNull();
-    // 三点仓名不是 dot segment，照常探测。
     expect(githubRepoRefOf('https://github.com/owner/....git')).toEqual({
       owner: 'owner',
       repo: '...',

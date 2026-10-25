@@ -1,20 +1,3 @@
-// daemon 侧图片附件解析下载（#730）失败方式先于实现固化：
-//   1. spec 整行 png token → 下载 → 内联交付（images 携带 base64 + 锚行替换文本）
-//   2. svg/bmp/ico/avif → 素材化到 worktree 外目录 + token 行替换为绝对路径
-//      （materialize 目录绝不在 worktree 内——git status clean 的构造性保证）
-//   3. 下载失败（pending 409 / 未知 404）→ 步不崩：token 原样保留 + 文本注明
-//      不可用 + 日志行
-//   4. 路径穿越 key → 独立复验拒绝（不发起下载、token 保留 + 注记）
-//   5. text/pdf token → 零触碰（既有 attachment 工具路径，token 原样）
-//   6. 行内 token → 零触碰（已知限制）
-//   7. 素材化文件名安全化（fileName 含路径段/控制字符 → 落 basename 形）
-// #1406 issue 原文围栏里的 token 行（docs/verify/1406/p5-3-fix-failure-modes.txt
-// A1-A9）：围栏逐行带「> 」前缀，整行 token 去掉这一层前缀后照常交付；改写与
-// 注记行带回同一前缀，留在围栏里。围栏外的引用 token 行不变（#730 整行律）。
-// A3d（#1480 第二轮，失败方式见 docs/verify/1406/p5-3-fix-red-green-2.txt）：
-// 剥掉格式字符与换行变体后只剩空串、. 或 .. 的文件名落 attachment；素材化
-// 路径恒是 <materializeDir>/<stepId>/<一段名>。
-
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
@@ -69,8 +52,8 @@ function setup() {
   };
 }
 
-describe('daemon 图片附件解析下载（#730）', () => {
-  test('#1481 令牌 team 经真实客户端传到下载请求', async () => {
+describe('daemon image attachment parse and download (#730)', () => {
+  test('#1481 token team reaches the download request through the real client', async () => {
     const s = setup();
     const urls: string[] = [];
     const client = new MachineClient({
@@ -90,7 +73,7 @@ describe('daemon 图片附件解析下载（#730）', () => {
     expect(urls).toEqual(['http://server.test/api/machine/attachment/s1/id1?teamId=team-token']);
   });
 
-  test('失败方式 1：整行 png token → 下载 + 内联交付 + token 行换锚行', async () => {
+  test('failure mode 1: full-line png token → downloaded + delivered inline + token line becomes the anchor line', async () => {
     const s = setup();
     const { client } = fakeClient({ id1: pngResponse() });
     const text = `标题\n\n${formatAttachmentToken('shot.png', 't1/id1.png')}\n\n后文`;
@@ -112,7 +95,7 @@ describe('daemon 图片附件解析下载（#730）', () => {
     expect(out.text).toContain('后文');
   });
 
-  test('失败方式 2：svg → 素材化到 worktree 外 + 路径行（git clean 的构造保证）', async () => {
+  test('failure mode 2: svg → materialized outside the worktree + a path line (a constructive guarantee of git clean)', async () => {
     const s = setup();
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>');
     const { client } = fakeClient({
@@ -131,21 +114,20 @@ describe('daemon 图片附件解析下载（#730）', () => {
       materializeDir: s.materializeDir,
       log: s.log,
     });
-    expect(out.images).toHaveLength(0); // 不内联
+    expect(out.images).toHaveLength(0);
     expect(out.text).not.toContain('attachment:t1/id1.svg');
     const m = /查看图片：(\/[^\s`\]]+)/.exec(out.text);
     expect(m).not.toBeNull();
     const path = m![1]!;
     expect(isAbsolute(path)).toBe(true);
     expect(path.startsWith(s.materializeDir)).toBe(true);
-    // 素材化目录在 worktree 外（git status clean 的构造性断言）
     const rel = relative(s.worktree, path);
     expect(rel.startsWith('..')).toBe(true);
     expect(existsSync(path)).toBe(true);
     expect(readFileSync(path).toString()).toContain('<svg');
   });
 
-  test('失败方式 3：下载 409（pending）→ 步不崩：token 原样保留 + 不可用注记 + 日志', async () => {
+  test('failure mode 3: download 409 (pending) → step does not crash: token kept verbatim + unavailable annotation + log', async () => {
     const s = setup();
     const { client } = fakeClient({
       id1: new Error('machine api 409: attachment id1 not ready (pending)'),
@@ -160,13 +142,13 @@ describe('daemon 图片附件解析下载（#730）', () => {
       log: s.log,
     });
     expect(out.images).toHaveLength(0);
-    expect(out.text).toContain(token); // token 原样保留
+    expect(out.text).toContain(token);
     expect(out.text).toContain('不可用');
     expect(out.text).toContain('pending');
     expect(s.log.length).toBeGreaterThan(0);
   });
 
-  test('失败方式 3：下载 404（未知 id）→ 同形：token 保留 + 注记', async () => {
+  test('failure mode 3: download 404 (unknown id) → same shape: token kept + annotation', async () => {
     const s = setup();
     const { client } = fakeClient({});
     const token = formatAttachmentToken('gone.png', 't1/id404.png');
@@ -182,7 +164,7 @@ describe('daemon 图片附件解析下载（#730）', () => {
     );
   });
 
-  test('失败方式 4：路径穿越 key → 不发起下载，token 保留 + 注记', async () => {
+  test('failure mode 4: path-traversal key → no download attempted, token kept + annotation', async () => {
     const s = setup();
     const { client, requested } = fakeClient({});
     const token = '![x](attachment:t1/../id1.png)';
@@ -198,7 +180,7 @@ describe('daemon 图片附件解析下载（#730）', () => {
     expect(out.text).toContain('未交付');
   });
 
-  test('失败方式 5：text/pdf token → 零触碰（文本逐字节不变）', async () => {
+  test('failure mode 5: text/pdf token → zero touching (text unchanged byte for byte)', async () => {
     const s = setup();
     const { client, requested } = fakeClient({});
     const text = [
@@ -220,7 +202,7 @@ describe('daemon 图片附件解析下载（#730）', () => {
     expect(requested).toHaveLength(0);
   });
 
-  test('失败方式 6：行内 token → 零触碰', async () => {
+  test('failure mode 6: inline token → zero touching', async () => {
     const s = setup();
     const { client, requested } = fakeClient({ id1: pngResponse() });
     const text = `看 ![inline](attachment:t1/id1.png) 这张`;
@@ -236,7 +218,7 @@ describe('daemon 图片附件解析下载（#730）', () => {
     expect(requested).toHaveLength(0);
   });
 
-  test('失败方式 7：素材化文件名安全化——fileName 带路径段时落 basename', async () => {
+  test('failure mode 7: materialized file name sanitized — a fileName with path segments lands as basename', async () => {
     const s = setup();
     const bmp = Buffer.from('424d');
     const { client } = fakeClient({
@@ -257,12 +239,11 @@ describe('daemon 图片附件解析下载（#730）', () => {
     const m = /查看图片：(\/[^\s`\]]+)/.exec(out.text);
     expect(m).not.toBeNull();
     const path = m![1]!;
-    // 落点是 materialize 根下（不因 fileName 的 ../ 逃逸）
     expect(path.startsWith(s.materializeDir)).toBe(true);
     expect(existsSync(path)).toBe(true);
   });
 
-  test('mime 与 ext 漂移：key 说 png、响应说 svg+xml → 按响应 mime 走素材化', async () => {
+  test('mime/ext drift: key says png, response says svg+xml → materialized per the response mime', async () => {
     const s = setup();
     const svg = Buffer.from('<svg/>');
     const { client } = fakeClient({
@@ -284,7 +265,7 @@ describe('daemon 图片附件解析下载（#730）', () => {
     expect(out.text).toMatch(/\.svg\b/);
   });
 
-  test('同文本多图片：下载顺序 = token 行序（锚行与 images 序一致）', async () => {
+  test('multiple images in one text: download order = token line order (anchor lines and images order consistent)', async () => {
     const s = setup();
     const { client } = fakeClient({
       id1: { ...pngResponse(), fileName: 'a.png' },
@@ -304,7 +285,7 @@ describe('daemon 图片附件解析下载（#730）', () => {
     expect(out.text.indexOf('a.png')).toBeLessThan(out.text.indexOf('b.png'));
   });
 
-  test('无 token 文本 → 原文与零图片（零回归基线）', async () => {
+  test('text without tokens → original text and zero images (zero-regression baseline)', async () => {
     const s = setup();
     const { client } = fakeClient({});
     const text = '普通任务文本，无附件。';
@@ -320,9 +301,8 @@ describe('daemon 图片附件解析下载（#730）', () => {
   });
 });
 
-// 直接物化辅助（materialize 步的独立单测）：文件已存在时幂等覆写。
 describe('materializeAttachmentFile', () => {
-  test('同名重复物化 → 覆写不报错', () => {
+  test('duplicate materialization of the same name → overwritten without error', () => {
     const s = setup();
     const p1 = materializeFile(s.materializeDir, 's1', 'pic.png', Buffer.from('abc'));
     const p2 = materializeFile(s.materializeDir, 's1', 'pic.png', Buffer.from('def'));
@@ -330,7 +310,7 @@ describe('materializeAttachmentFile', () => {
     expect(readFileSync(p1).toString()).toBe('def');
   });
 
-  test('A3d：剥字符后为空、. 或 .. 的文件名 → attachment；其余名照落，都在 <materializeDir>/<stepId>/ 下', () => {
+  test('A3d: file names empty, . or .. after stripping → attachment; other names land as-is, all under <materializeDir>/<stepId>/', () => {
     const s = setup();
     const stepDir = join(s.materializeDir, 's1');
     const fallback = [
@@ -362,7 +342,7 @@ describe('materializeAttachmentFile', () => {
     }
   });
 
-  test('A3d：stepId 带不出素材化根——落点不是 <materializeDir>/<一段>/<名> 就抛错，不写盘', () => {
+  test('A3d: a stepId that escapes the materialization root — anything not landing at <materializeDir>/<one-segment>/<name> throws, nothing written to disk', () => {
     const s = setup();
     for (const stepId of ['..', '', '.', '../escape', 'a/../..', 'a/b', '../\nforged']) {
       expect(
@@ -377,18 +357,16 @@ describe('materializeAttachmentFile', () => {
   });
 });
 
-describe('#1406 issue 原文围栏里的 token 行', () => {
+describe('#1406 token lines inside the issue-body fence', () => {
   const GH = { sourceKind: 'github-issue', sourceRef: 'github:octo/alpha#7' };
   const HEAD = '【GitHub issue 原文 · octo/alpha#7】';
   const FOOT = '【GitHub issue 原文结束 · octo/alpha#7】';
   const TOKEN = formatAttachmentToken('shot.png', 't1/id1.png');
 
-  /** 从 GitHub issue 导入的任务文本（标题 + 正文进围栏）。 */
   function fenced(spec: string): string {
     return buildTaskPromptText('登录页圆角', spec, GH);
   }
 
-  /** 围栏结构：首行之后、唯一的裸收尾行之前，每行都带引用前缀；返回围栏内的行。 */
   function fenceInner(text: string): string[] {
     const lines = text.split('\n');
     const start = lines.findIndex((l) => l.startsWith(HEAD));
@@ -418,7 +396,7 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     return { out, requested };
   }
 
-  test('A1/A2：围栏里的 png token 行照常内联交付，锚行带引用前缀留在围栏里', async () => {
+  test('A1/A2: full-line png tokens inside the fence are delivered inline as usual, anchor lines with the quote prefix stay inside the fence', async () => {
     const { out, requested } = await resolve(fenced(`把圆角改成 8px。\n\n${TOKEN}\n\n见上图。`), {
       id1: pngResponse(),
     });
@@ -431,7 +409,7 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     expect(out.text).not.toContain('attachment:t1/id1.png');
   });
 
-  test('A2：文件名与报错原文里的 \\r、U+2028 等换行变体也造不出无前缀的行', async () => {
+  test('A2: line-break variants like \r and U+2028 in file names and error text also cannot produce a prefix-free line', async () => {
     const { out } = await resolve(
       fenced(`${TOKEN}\n${formatAttachmentToken('b.png', 't1/id2.png')}`),
       {
@@ -440,7 +418,6 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
       },
     );
     expect(out.images).toHaveLength(1);
-    // 按 Python str.splitlines 的行界切（模型侧可能认的全集）。
     // biome-ignore lint/suspicious/noControlCharactersInRegex: \x1c-\x1e are line boundaries for str.splitlines; the test splits on exactly that set
     const pieces = out.text.split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/);
     const start = pieces.findIndex((p) => p.startsWith(HEAD));
@@ -452,7 +429,7 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     }
   });
 
-  test('A3：素材化路径行带引用前缀', async () => {
+  test('A3: materialized path lines carry the quote prefix', async () => {
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>');
     const { out } = await resolve(fenced(formatAttachmentToken('diagram.svg', 't1/id1.svg')), {
       id1: {
@@ -469,10 +446,9 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     expect(existsSync(path)).toBe(true);
   });
 
-  test('A3c：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）', async () => {
+  test('A3c: materialized file name with zero-width characters and U+2028 → on-disk name matches the path in the note (same rule inside and outside the fence)', async () => {
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>');
     const response = {
-      // 四类都在：Cf（U+200B）与三种换行变体（U+0085 / U+2028 / U+2029）。
       fileName: 'dia\u200bg\x85ram\u2028x\u2029.svg',
       mimeType: 'image/svg+xml',
       sizeBytes: svg.byteLength,
@@ -487,7 +463,7 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     }
   });
 
-  test('A3d：剥字符后只剩 .. 的文件名 → 落盘名回落 attachment，路径不出步目录（围栏内外同律）', async () => {
+  test('A3d: file name reduced to .. after stripping → on-disk name falls back to attachment, path stays inside the step directory (same rule inside and outside the fence)', async () => {
     const tiff = Buffer.from('49492a00', 'hex');
     const response = {
       fileName: '\u200b..\u200b',
@@ -511,7 +487,7 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     }
   });
 
-  test('A3d：素材化落盘失败（stepId 带出根、写盘报错）→ 只这个 token 不可用，同一文本的 png 照常内联', async () => {
+  test('A3d: materialized write failure (stepId escapes root, disk write error) → only this token unavailable, other pngs in the same text delivered inline as usual', async () => {
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>');
     const attachments = {
       id1: pngResponse(),
@@ -524,7 +500,6 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     };
     const svgToken = formatAttachmentToken('diagram.svg', 't1/id2.svg');
     const body = `${TOKEN}\n${svgToken}`;
-    // 两种失败：stepId 是 ..（落点出根）；步目录的位置上已有同名文件（mkdir 报错）。
     const cases: Array<[string, (s: ReturnType<typeof setup>) => void]> = [
       ['..', () => {}],
       [
@@ -559,7 +534,7 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     }
   });
 
-  test('A3：下载失败（报错原文带换行）→ token 行与注记的每一行都带前缀', async () => {
+  test('A3: download failure (error text contains line breaks) → every line of the token line and annotation carries the prefix', async () => {
     const { out, requested } = await resolve(fenced(`看图：\n${TOKEN}`), {
       id1: new Error('machine api 502: <html>\n<body>bad gateway</body>\n</html>'),
     });
@@ -572,7 +547,7 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     expect(inner).toContain('> </html> — 该图片未交付]');
   });
 
-  test('A3：key 语法外 → 不下载，token 行与注记行带前缀', async () => {
+  test('A3: key outside the grammar → no download, token line and annotation line carry the prefix', async () => {
     const bad = '![x](attachment:t1/../id1.png)';
     const { out, requested } = await resolve(fenced(bad), {});
     expect(requested).toHaveLength(0);
@@ -581,14 +556,14 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     expect(inner).toContain('> [图片附件形态不合法（key 语法外）——该图片未交付]');
   });
 
-  test('A4：围栏里的 pdf token → 零触碰（逐字节不变）', async () => {
+  test('A4: pdf token inside the fence → zero touching (unchanged byte for byte)', async () => {
     const text = fenced('![doc](attachment:t1/id2.pdf)');
     const { out, requested } = await resolve(text, {});
     expect(out.text).toBe(text);
     expect(requested).toHaveLength(0);
   });
 
-  test('A5/A9：alt 文字写着收尾行或首行，正文写着收尾行——都逃不出围栏', async () => {
+  test('A5/A9: alt text naming the closing or opening line, body naming the closing line — none escape the fence', async () => {
     const spec = [
       FOOT,
       formatAttachmentToken(FOOT, 't1/id404.png'),
@@ -603,21 +578,21 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     expect(inner).toContain('> [image attached: shot.png]');
   });
 
-  test('A6：issue 正文里的引用块 token（两层前缀）不交付，同 #1475 之前', async () => {
+  test('A6: quote-block tokens in the issue body (two prefix layers) are not delivered, same as before #1475', async () => {
     const text = fenced(`> ${TOKEN}`);
     const { out, requested } = await resolve(text, { id1: pngResponse() });
     expect(requested).toHaveLength(0);
     expect(out.text).toBe(text);
   });
 
-  test('A7：围栏外的引用 token 行不交付（用户自己的引用块，#730 整行律）', async () => {
+  test("A7: quoted token lines outside the fence are not delivered (the user's own quote block, #730 full-line rule)", async () => {
     const text = `用户引用：\n> ${TOKEN}`;
     const { out, requested } = await resolve(text, { id1: pngResponse() });
     expect(requested).toHaveLength(0);
     expect(out.text).toBe(text);
   });
 
-  test('A8：收尾行之后的引用 token 行在围栏外，不交付', async () => {
+  test('A8: quoted token lines after the closing line are outside the fence, not delivered', async () => {
     const after = `\n\n> ${formatAttachmentToken('later.png', 't1/id2.png')}`;
     const { out, requested } = await resolve(`${fenced(TOKEN)}${after}`, {
       id1: pngResponse(),

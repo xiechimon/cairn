@@ -1,7 +1,3 @@
-// readClaudeCodeReport 对拍（#707 daemon 侧读数）：读本机
-// ~/.claude/settings.json → presence/enroll 上报载荷。文件缺失/不可读 →
-// installed:false（不抛，上线序列不被上报阻断）。
-
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,7 +20,7 @@ function tmpHome(settingsJson?: string): string {
 }
 
 describe('readClaudeCodeReport', () => {
-  test('settings.json 缺失 → installed:false + models 空（不抛）', () => {
+  test('missing settings.json → installed:false + empty models (no throw)', () => {
     expect(readClaudeCodeReport(tmpHome())).toEqual({
       installed: false,
       hostname: hostname(),
@@ -32,7 +28,7 @@ describe('readClaudeCodeReport', () => {
     });
   });
 
-  test('model + env 槽解析（shared 槽位语义同源）', () => {
+  test('model + env slot parsing (same source as shared slot semantics)', () => {
     const report = readClaudeCodeReport(
       tmpHome(
         JSON.stringify({
@@ -51,7 +47,7 @@ describe('readClaudeCodeReport', () => {
     });
   });
 
-  test('非法 JSON → installed:false（不抛）', () => {
+  test('invalid JSON → installed:false (no throw)', () => {
     const report = readClaudeCodeReport(tmpHome('{ not json'));
     expect(report.installed).toBe(false);
     expect(report.models).toEqual([]);

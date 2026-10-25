@@ -1,19 +1,3 @@
-// runner 终态错误生命周期（#708）：根因透传 + auto_retry 有界收尾。失败方式
-// 先于实现固化（票面四条 + 两条实测事件形态坑）：
-//   1. 根因被收尸文案覆盖：终态错误优先级 = 真实终态错误 > 超时文案；两者并存
-//      组合成文（票面例「stream timeout；根因: 400 …」），不静默丢根因。
-//   2. 无限同形重试：连续零进展 auto_retry 超过预算（默认 3 = pi 自身单错
-//      预算）→ 有界收尾——停会话、failed、根因直报；重试发数钉死（1+max/轮）。
-//   3. 配置不生效：物化面归 pi-config-effect.test.ts（本文件只测 runner）。
-//   4. 误判根因：根因只取结构化错误面（error 事件携带的 pi 错误对象消息），
-//      不做字符串猜测——断言的 errorMessage 全部来自事件载荷原文。
-// 事件形态坑（真 pi 流 vs #654 脚本流的差异，实测代码路径 pi 0.86.0）：
-//   - 真 400 的事件序 = message_end(assistant, stopReason=error) + error +
-//     agent_end(willRetry=false) + agent_settled → done（#926：done 由 agent_settled
-//     触发，不再由 agent_end 猜测；settled 在 finally 恒发，错误流也带）；#654 脚本
-//     只喂 error 时，sawProgress / sawDone 两处闭锁会让回落闸在真流上永不开启——
-//     本文件用真形态脚本钉住回落闸对真 400 开闸。
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -119,7 +103,6 @@ class FakeClient implements MachineApi {
     };
   }
   async skillsManifest() {
-    // #920：默认空清单 = 零团队技能（selection=whitelist，既有断言零扰动）。
     return { selection: 'whitelist' as const, skills: [] };
   }
   async skillFile(): Promise<Buffer> {
@@ -161,10 +144,6 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** 会话脚本（StepEvent 序列；真形态 = message_end 带 stopReason）。stop() 经
- * gate 立即终止生成器（真 handle.stop() 中断事件流语义同形）；counts.autoRetries
- * = 实际送达 runner 的 auto_retry_start 事件数（发数上界的对账面；引用计数
- * 对象——生成器闭包内递增，用例收尾时读）。 */
 function scriptedStormBackend(scripts: StepEvent[][]): {
   backend: AgentBackend;
   providers: (ProviderConfig | null | undefined)[];
@@ -204,8 +183,6 @@ function scriptedStormBackend(scripts: StepEvent[][]): {
   return { backend, providers, counts };
 }
 
-/** 真形态会话开面前缀（verify 栈实测事件序，#708）：pi 每会话必发
- * system prompt 回声（message_end role=system）+ 任务文本 user 回声。 */
 function sessionOpenEcho(): StepEvent[] {
   return [
     { type: 'message_end', message: { role: 'system', content: 'you are a builder' } },
@@ -213,8 +190,6 @@ function sessionOpenEcho(): StepEvent[] {
   ];
 }
 
-/** 真形态错误循环脚本：开面回声 + n × [message_end(assistant error) + error +
- * auto_retry]。 */
 function errorCycles(
   n: number,
   message: string,
@@ -265,10 +240,8 @@ async function runLifecycleCase(
   return { client, lines, providers, autoRetries: counts.autoRetries };
 }
 
-// —— 失败方式 1：超时文案与根因组合（纯函数；组合点 = 超时收尾行）——————
-
-describe('combineTimeoutWithRootCause（超时收尸 + 根因组合）', () => {
-  test('并存 → 组合成文（票面例「stream timeout；根因: 400 …」），不丢根因', () => {
+describe('combineTimeoutWithRootCause (timeout cleanup + root-cause composition)', () => {
+  test('both present → composed into one message (ticket example "stream timeout; root cause: 400 …"), root cause not lost', () => {
     const out = combineTimeoutWithRootCause(
       'stream timeout (first=300000ms idle=480000ms)',
       RELAY_400,
@@ -276,36 +249,32 @@ describe('combineTimeoutWithRootCause（超时收尸 + 根因组合）', () => {
     expect(out).toBe(`stream timeout (first=300000ms idle=480000ms)；根因: ${RELAY_400}`);
   });
 
-  test('无根因 → 纯超时文案（零回归：超时但无底层错误的旧形态）', () => {
+  test('no root cause → pure timeout wording (zero regression: old shape of timeout without an underlying error)', () => {
     expect(combineTimeoutWithRootCause('stream timeout (first=1ms idle=2ms)', null)).toBe(
       'stream timeout (first=1ms idle=2ms)',
     );
   });
 });
 
-// —— 失败方式 2：auto_retry 有界生命周期（runner 集成）——————————————
-
-describe('runner auto_retry 生命周期（#708）', () => {
-  // 学习面是模块级 Map：每个用例独立 providerId 隔离（pi-protocol-fallback 同律）。
-
-  test('storm：非签名可重试错 → 连续零进展超预算即收，发数 = 1+max，根因直报', async () => {
+describe('runner auto_retry lifecycle (#708)', () => {
+  test('storm: non-signature retryable errors → stopped once consecutive zero-progress exceeds budget, send count = 1+max, root cause reported directly', async () => {
     const { client, lines, providers, autoRetries } = await runLifecycleCase(
       [errorCycles(10, TRANSIENT_503)],
       { providerId: 'gw-lc-storm' },
     );
-    expect(providers).toHaveLength(1); // 非签名错：无回落轮
-    expect(autoRetries).toBe(RETRY_STORM_MAX + 1); // 发数钉死：预算内 3 发 + 触发即停
+    expect(providers).toHaveLength(1);
+    expect(autoRetries).toBe(RETRY_STORM_MAX + 1);
     expect(client.doneBodies[0]?.body.status).toBe('failed');
     expect(client.doneBodies[0]?.body.errorMessage).toBe(TRANSIENT_503);
     expect(lines.some((l) => l.includes('retry storm'))).toBe(true);
   });
 
-  test('storm：签名错 → 回落轮翻旋钮，二度 storm → failed 根因（两会话，每轮发数 1+max）', async () => {
+  test('storm: signature error → fallback round flips knobs, second storm → failed with root cause (two sessions, each round 1+max sends)', async () => {
     const { client, providers, autoRetries } = await runLifecycleCase(
       [errorCycles(10, RELAY_400), errorCycles(10, RELAY_400)],
       { providerId: 'gw-lc-sig' },
     );
-    expect(providers).toHaveLength(2); // #654 回落闸在 storm 收尾后仍开
+    expect(providers).toHaveLength(2);
     expect(providers[1]?.compat).toEqual({
       maxTokensField: 'max_tokens',
       supportsStore: false,
@@ -315,7 +284,7 @@ describe('runner auto_retry 生命周期（#708）', () => {
     expect(client.doneBodies[0]?.body.errorMessage).toBe(RELAY_400);
   });
 
-  test('storm 边界：pi 自身预算 3 次退场（run8 连接错形）→ 不触发 storm，failed 根因', async () => {
+  test("storm boundary: pi's own budget exits after 3 tries (run8 connection-error shape) → storm not triggered, failed with root cause", async () => {
     const script: StepEvent[] = [
       ...errorCycles(3, 'connection error', { attempts: [1, 2, 3] }),
       { type: 'message_end', message: { role: 'assistant', content: '', stopReason: 'error' } },
@@ -331,7 +300,7 @@ describe('runner auto_retry 生命周期（#708）', () => {
     expect(client.doneBodies[0]?.body.errorMessage).toBe('connection error');
   });
 
-  test('progress 重置计数：错误与进展交替 → 不触发 storm，步 success', async () => {
+  test('progress resets the count: errors alternating with progress → storm not triggered, step success', async () => {
     const script: StepEvent[] = [
       ...errorCycles(6, TRANSIENT_503, { progress: '写了一行' }),
       { type: 'done', usage: [] },
@@ -343,7 +312,7 @@ describe('runner auto_retry 生命周期（#708）', () => {
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('预算可注入：retryStormMax=1 → 第 2 发即收（发数 = 1+1）', async () => {
+  test('budget injectable: retryStormMax=1 → stopped at the 2nd send (send count = 1+1)', async () => {
     const { client, autoRetries } = await runLifecycleCase([errorCycles(10, TRANSIENT_503)], {
       providerId: 'gw-lc-tight',
       retryStormMax: 1,
@@ -354,10 +323,8 @@ describe('runner auto_retry 生命周期（#708）', () => {
   });
 });
 
-// —— 真形态 400 事件序（#654 回落闸对真流开闸）———————————————————
-
-describe('真 pi 事件形态：message_end(stopReason=error) + error + done', () => {
-  test('run9 形（非重试 400 带 body）：回落闸开——message_end(error) 不算进展，done 不闭锁', async () => {
+describe('real pi event shape: message_end(stopReason=error) + error + done', () => {
+  test('run9 shape (non-retry 400 with body): fallback gate open — message_end(error) does not count as progress, done does not latch', async () => {
     const script: StepEvent[] = [
       ...sessionOpenEcho(),
       { type: 'message_end', message: { role: 'assistant', content: '', stopReason: 'error' } },
@@ -381,12 +348,8 @@ describe('真 pi 事件形态：message_end(stopReason=error) + error + done', (
   });
 });
 
-// —— #927 per-message usage 追溯面：pi 报的 usage（含 cost）随 assistant
-// 消息逐条落 [step] 行——「落库成本 ← 哪次请求算出来的」的对账链在
-// daemon.log 运行时可读（票面「能追溯到具体的 per-message usage」）。
-
-describe('runner per-message usage 追溯行（#927）', () => {
-  test('message_end 携 usage → [step] message usage 行（含 cost）；done 体保 cost 位', async () => {
+describe('runner per-message usage trace line (#927)', () => {
+  test('message_end carrying usage → [step] message usage line (including cost); done body keeps the cost field', async () => {
     const usage = {
       input: 0,
       output: 980,
@@ -407,7 +370,6 @@ describe('runner per-message usage 追溯行（#927）', () => {
     ];
     const { client, lines } = await runLifecycleCase([events], { providerId: 'gw-lc-usage' });
     const usageLines = lines.filter((l) => l.includes('message usage:'));
-    // system/user 回声行不产 usage 行——仅携 usage 的 assistant 行落。
     expect(usageLines).toHaveLength(1);
     expect(usageLines[0]).toContain('gw-lc-usage/stub-model');
     expect(usageLines[0]).toContain('input=0');
@@ -418,7 +380,7 @@ describe('runner per-message usage 追溯行（#927）', () => {
     expect(client.doneBodies[0]?.body.usage?.[0]?.cost?.total).toBe(2010);
   });
 
-  test('无 usage 的消息（claude-code 面 / 旧投影）→ 零 usage 行（静默零回归）', async () => {
+  test('messages without usage (claude-code surface / old projection) → zero usage lines (silent zero regression)', async () => {
     const events: StepEvent[] = [
       ...sessionOpenEcho(),
       { type: 'message_end', message: { role: 'assistant', content: 'ok', stopReason: 'stop' } },
@@ -429,19 +391,13 @@ describe('runner per-message usage 追溯行（#927）', () => {
   });
 });
 
-// —— #1262 写入侧剥离：daemon 落 done.errorMessage 前剥 ANSI/OSC8 ——————————
-
-describe('runner done.errorMessage ANSI 剥离（#1262）', () => {
+describe('runner done.errorMessage ANSI stripping (#1262)', () => {
   const ESC = '\x1b';
-  /** 实测污染形态（用户库 build.errorMessage 首行）：git commit 钩子 stderr
-   * 带 SGR + OSC8；error 事件载荷原文携带，done 上报前剥。 */
   const ANSI_FAILURE = `git commit failed (1): ${ESC}[0mapps/web/src/fixtures/fixtures.ts${ESC}[0m${ESC}[0m:${ESC}[0m${ESC}[0m1667${ESC}[0m${ESC}[0m:${ESC}[0m${ESC}[0m53${ESC}[0m${ESC}[0m ${ESC}[0m${ESC}[0m${ESC}]8;;https://biomejs.dev/linter/rules/use-template${ESC}\\lint/style/useTemplate${ESC}]8;;${ESC}\\`;
   const CLEAN_FAILURE =
     'git commit failed (1): apps/web/src/fixtures/fixtures.ts:1667:53 lint/style/useTemplate';
 
-  test('error 事件载荷带 SGR + OSC8 → doneBody.errorMessage 纯文本', async () => {
-    // 真形态事件序（同「真 pi 事件形态」describe）：stopReason=error + error +
-    // done——lastError 取 error 载荷原文，done 上报前剥。
+  test('error event payload with SGR + OSC8 → doneBody.errorMessage plain text', async () => {
     const script: StepEvent[] = [
       ...sessionOpenEcho(),
       { type: 'message_end', message: { role: 'assistant', content: '', stopReason: 'error' } },
@@ -453,7 +409,7 @@ describe('runner done.errorMessage ANSI 剥离（#1262）', () => {
     expect(client.doneBodies[0]?.body.errorMessage).toBe(CLEAN_FAILURE);
   });
 
-  test('干净错误文案逐字透传（零回归，与既有根因透传律一致）', async () => {
+  test('clean error wording passes through verbatim (zero regression, consistent with the existing root-cause passthrough rule)', async () => {
     const script: StepEvent[] = [
       ...sessionOpenEcho(),
       { type: 'message_end', message: { role: 'assistant', content: '', stopReason: 'error' } },
@@ -465,12 +421,8 @@ describe('runner done.errorMessage ANSI 剥离（#1262）', () => {
   });
 });
 
-// —— #1493 noOutput：成功收尾但 transcript 里没有任何 assistant 输出 ——————
-// server 侧「0 token 静默失败」只在 daemon 明说「无输出」时才判：pi 对不回
-// usage 的 relay 也报 0 token 行，单看 usage 会把正常完成的步误判成静默失败。
-
-describe('runner noOutput 信号（#1493）', () => {
-  test('成功但零 assistant 输出 → done 携带 noOutput', async () => {
+describe('runner noOutput signal (#1493)', () => {
+  test('success but zero assistant output → done carries noOutput', async () => {
     const { client } = await runLifecycleCase(
       [[...sessionOpenEcho(), { type: 'done', usage: [] }]],
       { providerId: 'gw-lc-no-output' },
@@ -479,7 +431,7 @@ describe('runner noOutput 信号（#1493）', () => {
     expect(client.doneBodies[0]?.body.noOutput).toBe(true);
   });
 
-  test('有 assistant 输出 → 不携带（负对照）', async () => {
+  test('assistant output present → not carried (negative control)', async () => {
     const { client } = await runLifecycleCase(
       [
         [

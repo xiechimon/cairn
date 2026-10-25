@@ -1,400 +1,5 @@
 [
   {
-    "path": "apps/daemon/scripts/smoke-pack.mjs",
-    "line": "// 运行：pnpm --filter @xiechimon/cairn-cli smoke（依赖面走公网 registry）",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": "// 工具（remoteTools relay + localTools 本地执行）包成一个 `cairn` in-process",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": "/** SDK ModelUsage/usage → cairn 行集（A6）。modelUsage 优先（per-model 总计，",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": " *  `~/.cairn` 工作区的预检路径与 CLI 落盘目录不一致，continue 在文件",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": "// host 注入工具（remoteTools relay / localTools 本地执行）包成一个 `cairn`",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": "// 已知语义差异（票面明示不抹平）：工具名经 MCP 面恒带 `mcp__cairn__` 前缀",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": "/** host 注入工具的 in-process server 名（工具名形 `mcp__cairn__<name>`）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": " *  handler 闭包钉 def.name 发 relay——CLI 工具名带 `mcp__cairn__` 前缀，",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": "// `cairn-team-skills:<name>` 限定形进 Skill 工具清单（alias = 非限定名），",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": "   *  CAIRN_SKILLS_DIR 扫描根；cwd = daemon home。缺省 = 不注入。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": "    // #1049 起 AskUserQuestion 仍恒拒，理由换血：SDK 原生问答工具与 cairn 的",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": "    // 结构化 ask_user（mcp__cairn__ask_user，阻塞语义 = in-process MCP 工具",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/claude-code.ts",
-    "line": "    // 调用默认无超时）是同一能力的两个面——留一个通道（cairn 词表件），问答",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/mcp-config.ts",
-    "line": "// 从不跨 wire、从不落 cairn 状态目录。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/pi.ts",
-    "line": "//      `.pi/APPEND_SYSTEM.md` 同族。cairn 的授权面全部自有（简报 = runner",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/pi.ts",
-    "line": "/** 缓存保留档（#927 D6）：`CAIRN_PI_CACHE_RETENTION=long` 才 long，其余",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/pi.ts",
-    "line": "/** 开关：`CAIRN_CUSTOM_MODEL_REASONING=1` 时，自定义端点的模型条目改标",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/pi.ts",
-    "line": "  /** skills 执行面注入（spec 14/#371）：skillsDir = CAIRN_SKILLS_DIR 扫描根；",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/pi.ts",
-    "line": "      // cairn catalog 构成重复清单，且不受 agent.skills 白名单约束。关断后",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/backend/skills.ts",
-    "line": "  /** 扫描根（CAIRN_SKILLS_DIR；目录缺失 = 空集非致命，pi 出诊断行）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/brief-file.ts",
-    "line": "// @cairn/shared 的 brief-file.ts），跑完再**逐字节回滚**。 Multipic 的三态",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/claude-code-auth.ts",
-    "line": "  /** `claude` 可执行文件（缺省 PATH 解析；`CAIRN_CLAUDE_BIN` 可覆盖）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/claude-code-bin.ts",
-    "line": "// （`@anthropic-ai/claude-agent-sdk` Options）。此前 `CAIRN_CLAUDE_BIN` 只喂",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/claude-code-bin.ts",
-    "line": "  /** `claude` 可执行文件（缺省 `CAIRN_CLAUDE_BIN` ?? 'claude'；裸名走 PATH）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/config.ts",
-    "line": "  /** CAIRN_HOME 默认 ~/.cairn（02 §5.3 布局根；r3 §1.1 实测原名 TDS_HOME）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/config.ts",
-    "line": "  /** skills 扫描根（spec 14/#371）：CAIRN_SKILLS_DIR 缺省 ~/.agents/skills；",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/config.ts",
-    "line": "   * 默认 ~/.claude.json；CAIRN_MCP_CONFIG 覆盖。执行机各读各机——stdio",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/config.ts",
-    "line": "   * CAIRN_HOOK_TIMEOUT_MS 覆写，非正整数 = 忽略用缺省）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/config.ts",
-    "line": "  /** #1149 环境钩子超时 ms 覆写（env CAIRN_HOOK_TIMEOUT_MS 同位）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/config.ts",
-    "line": "  // [设计]（非 BRAND 槽——cairn 与用户其它 agent 工具共享同一 skills 正本）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/git.ts",
-    "line": "// ≥2.31；凭证值在 CAIRN_GIT_CRED_*）——不进 argv（ps 面，含 helper 的 sh -c）、",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/git.ts",
-    "line": " * 值分开：本体是 CREDENTIAL_HELPER 定值，签发远端与凭证值走 CAIRN_GIT_CRED_*",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/machine-loop.ts",
-    "line": "  /** #1148 cap 解析 env 源（CAIRN_DAEMON_MAX_CONCURRENT；默认 process.env，",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/machine-loop.ts",
-    "line": "   * 缩短时标；CAIRN_HOOK_TIMEOUT_MS 覆写在 cli.ts 组装入参时生效）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/machine-loop.ts",
-    "line": " * 的命令环境（项目 dev server 自愿消费——cairn 仓自身的 CAIRN_DEV_WEB_PORT",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/machine-loop.ts",
-    "line": "      // skills 执行面注入（spec 14/#371）：skillsDir = CAIRN_SKILLS_DIR 扫描根；",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/machine-loop.ts",
-    "line": "        // 「执行的二进制」不是一个（CAIRN_CLAUDE_BIN 此前只喂 auth 探针）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/machine-loop.ts",
-    "line": "  // 退避死循环，本行是排障第一线索（轮询地址仍以配置为准，A1「CAIRN_SERVER",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/machine-loop.ts",
-    "line": "  // CAIRN_DAEMON_MAX_CONCURRENT 覆盖 DB 值）；② serverGates 标记（me",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/machine-loop.ts",
-    "line": "  //   CAIRN_PORT_BASE = 段公式（portBaseForSlot）随 RunStepOptions.env 注",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/proxy.ts",
-    "line": "// 代理探测（02 §5.6/r3 §1.5：启动读系统/环境代理并打印 `[cairn] Proxy: <url>`；",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/runner.ts",
-    "line": "  /** CAIRN_SKILLS_DIR 扫描根（#1299 /name 派发判定与 Skill 工具目录面；",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/runner.ts",
-    "line": "  /** #1148 步级 env 注入（worker 步端口基座 CAIRN_PORT_BASE；machine-loop",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/runner.ts",
-    "line": "  /** 步级流时长上界覆盖（测试注入；缺省 = env CAIRN_STREAM_DURATION_CAP_MS",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/runner.ts",
-    "line": "  // CAIRN_HOME 面目录）——local-repo 项目的 conv 工作区即 checkout，plan.md",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/runner.ts",
-    "line": "        // 用户主检出的分支/工作树永不被 cairn 推进——合并到默认分支由用户",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/runner.ts",
-    "line": "      // cairn/conv-<他>）按品牌前缀排除——别的 build 的产物不能记到本步。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/runner.ts",
-    "line": "    // 方案 = 无方案）。#1203 起正位 = repo 检出外的 CAIRN_HOME 面",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/state.ts",
-    "line": "  /** 步图片附件素材化根（#730）：worktree **外**的 CAIRN_HOME 面目录",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/state.ts",
-    "line": "   *  同 step-attachments 的「worktree 外 CAIRN_HOME 面目录」律：local-repo",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/step-attachments.ts",
-    "line": "//   - svg/bmp/ico/avif → 下载 → **素材化**到 worktree 外（CAIRN_HOME 面",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/supervisor.ts",
-    "line": " * node 原生 TS 不解 workspace 包内 .js 后缀 specifier（@cairn/shared/src",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/tag-tool.ts",
-    "line": "// 发布流不挂接（leader 裁定）：cairn 无发布管线；tag 推 origin 后用户仓",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/team-skills.ts",
-    "line": "// `skills/<dirName>/SKILL.md`；技能名成为 `cairn-team-skills:<name>` 限定形",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/team-skills.ts",
-    "line": "/** 插件名（CLI 撞名面 = 技能限定前缀 `cairn-team-skills:<skill>`）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/version.ts",
-    "line": "// daemon 版本单源（cairn version / presence cliVersion / 版本墙形状 02 §7.1）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/workspace-hooks.ts",
-    "line": "// §3.2）—— 同路径同名 = 一份配置 Amp 与 cairn 两用。本模块 = 进程执行面：",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/workspace.ts",
-    "line": "//   `<workspacesRoot>/<conversationId>`；分支 `cairn/conv-<conversationId>`",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/src/workspace.ts",
-    "line": "   * cairn 触碰——本类所有 git 操作的作用域都限于基座 clone 与其 worktree，",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/claude-code-bin.test.ts",
-    "line": "//   9. `CAIRN_CLAUDE_BIN` 指向绝对路径 → 不扫 PATH，但仍校验存在与执行位",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/claude-transcript-path.test.ts",
-    "line": "//       （`/[^a-zA-Z0-9]/g` → `-`）。只替换 `/` 时 `~/.cairn` 工作区",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/local-executor.test.ts",
-    "line": "//      CAIRN_GIT_CRED_* 携带 token（凭证确实经 env 注入，credential.helper 读它）",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/local-executor.test.ts",
-    "line": "        // 凭证值在 CAIRN_GIT_CRED_*（helper 本体是定值，#1484）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/local-executor.test.ts",
-    "line": "    // 远端协议无关——断言对象是 cairn 侧 spawn 形态，不是 git auth 结果）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/local-executor.test.ts",
-    "line": "    // ——CAIRN_GIT_CRED_* = 内联 credential.helper 读取的凭证（git.ts gitCredentialEnv）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/machine-loop-harness.ts",
-    "line": "  /** #1148：cap 解析 env 源注入面（CAIRN_DAEMON_MAX_CONCURRENT；缺省 =",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/machine-parallel-chief.test.ts",
-    "line": "//   C3 env 兜底（ungated server）：CAIRN_DAEMON_MAX_CONCURRENT=2 → me 缺",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/machine-parallel-chief.test.ts",
-    "line": "//   C6 端口基座：并发 worker 步 CAIRN_PORT_BASE 不同段（槽位 ×100）；chief",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/pi-session-policy.test.ts",
-    "line": "// 缓存保留（#927 D6）同走 env 钉面：CAIRN_PI_CACHE_RETENTION → PI_CACHE_RETENTION。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/runner-artifact.test.ts",
-    "line": "// ① plan.md 产物收集（#1203 起从 CAIRN_HOME 面 `<home>/plans/<convId>/`",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/runner-artifact.test.ts",
-    "line": "    // 注记行真带路径且在 CAIRN_HOME 面（worktree/裸任务目录树之外）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/runner-branch-drift.test.ts",
-    "line": "//   5. 邻座会话分支（cairn/conv-<他 build>）有新提交 → 不算本步产物",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/runner-local.test.ts",
-    "line": "// 永不被移动——用户仓库只多 cairn/ 分支）。harness 同 runner-stop.test.ts",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/runner-local.test.ts",
-    "line": "//      工作树永不被 cairn 推进）；done success",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/runner-local.test.ts",
-    "line": "    // 交接位置真在 repo 检出外（CAIRN_HOME 面）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/runner-plan-contract.test.ts",
-    "line": "/** #1203 期望投递形：基础 prompt + 交接位置注记行（路径在 CAIRN_HOME 面）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/skills-hard-block.test.ts",
-    "line": "    // 继承位，per-step 值（CAIRN_PORT_BASE）最后覆盖。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/skills-native-plugin.test.ts",
-    "line": "//   P11 plugin.json 形状钉死：name = cairn-team-skills、无 mcpServers 键、",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/daemon/test/skills-worktree.test.ts",
-    "line": "    // first-wins: CAIRN_SKILLS_DIR is in skillPaths before worktreeSkillsDirs",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/server/build.mjs",
     "line": "// esbuild 单文件 bundle（06 册 §11 W2-D2：主包 `@xiechimon/cairn` 的 server",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
@@ -1145,16 +750,6 @@
     "reason": "既有注释仅更正工具件数文字，与 CHIEF_TOOL_COUNT 对齐"
   },
   {
-    "path": "apps/daemon/src/git.ts",
-    "line": " * 路的独有语义，见 gitCredentialEnv 注），代理变量原样透传，只由 runGit 给",
-    "reason": "既有注释更正：#1635 后 runGit 给回环地址补 NO_PROXY，旧句「不碰代理变量」已不成立"
-  },
-  {
-    "path": "apps/daemon/src/git.ts",
-    "line": " * 回环地址补进 NO_PROXY（#1635：全局 http.proxy 不能拦本机 server）。只补 TTY 守卫：无凭据时 git 快速失败而不是挂等不存在的终端。",
-    "reason": "既有注释更正：#1635 后 runGit 给回环地址补 NO_PROXY，旧句「不碰代理变量」已不成立"
-  },
-  {
     "path": "packages/shared/src/ansi.ts",
     "line": "  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL are the literal bytes of CSI/OSC sequences; there is no alternative spelling.",
     "reason": "biome noControlCharactersInRegex: stripping ANSI escapes requires matching the literal ESC/BEL control bytes; no alternative spelling exists"
@@ -1193,5 +788,40 @@
     "path": "apps/server/src/services/skill-import.ts",
     "line": "// GitHub rejects API requests without a User-Agent (403).",
     "reason": "external quirk: GitHub API rejects requests without a User-Agent"
+  },
+  {
+    "path": "apps/daemon/build.mjs",
+    "line": "// esbuild CJS wrapper leaves pino's top-level require without a real require in the bundle.",
+    "reason": "external quirk: esbuild CJS wrapper turns pino require into a __require stub"
+  },
+  {
+    "path": "apps/daemon/src/backend/claude-code.ts",
+    "line": "// Claude Code slug: realpath'd cwd, non-alphanumerics to \"-\", 200-char cap plus path hash, darwin NFC root.",
+    "reason": "external quirk: Claude Code store slug layout the preflight must mirror"
+  },
+  {
+    "path": "apps/daemon/src/claude-code-bin.ts",
+    "line": "// launchd omits login-shell PATH; Homebrew claude needs well-known bin dirs.",
+    "reason": "external quirk: launchd narrow PATH hides a homebrew claude"
+  },
+  {
+    "path": "apps/daemon/src/git.ts",
+    "line": "// Empty credential.helper clears stacked helpers (e.g. osxkeychain) so step cred does not persist.",
+    "reason": "external quirk: empty credential.helper resets helpers; osxkeychain caches stale credentials and writes successes back"
+  },
+  {
+    "path": "apps/daemon/src/version.ts",
+    "line": "// esbuild single-file output: banner createRequire must not be redeclared here.",
+    "reason": "external quirk: esbuild single-file output throws SyntaxError on a duplicate createRequire binding"
+  },
+  {
+    "path": "apps/daemon/test/claude-transcript-path.test.ts",
+    "line": "// macOS spawn cwd is symlink-resolved; transcript slug must match or resume misses.",
+    "reason": "external quirk: macOS resolves the CLI spawn cwd through symlinks"
+  },
+  {
+    "path": "apps/daemon/test/shell-channel.test.ts",
+    "line": "    // macOS tmpdir symlinks /var to /private/var; pwd is resolved.",
+    "reason": "external quirk: macOS tmpdir is a symlink (/var -> /private/var)"
   }
 ]

@@ -1,10 +1,3 @@
-// worktree 契约单测（02 §5.5 全表 × r3 §1.4 实测行为；真 git 落地——
-// file:// 远端 bare repo 即 origin，凭证面归 integration（http + per-step key））。
-// 覆盖：基座 clone/worktree add -b/reused/远端分支 base 二择/commitAll+push/
-// countAhead/checkpoint 恢复（reset --hard + clean -fd → `Worktree restored`）/
-// merge --no-edit 两态/孤儿回收 TTL 7×24h/防分叉护栏 REMOTE_BRANCH_DIVERGED/
-// projectLock 串行化。
-
 import {
   chmodSync,
   existsSync,
@@ -52,18 +45,17 @@ function fakeLogger(): DaemonLogger & { lines: string[] } {
   };
 }
 
-let root: string; // workspacesRoot
-let originDir: string; // bare origin（server 托管 repo 等价物）
-let seedDir: string; // 种子提交工作区
+let root: string;
+let originDir: string;
+let seedDir: string;
 let logger: ReturnType<typeof fakeLogger>;
 let ws: WorkspaceManager;
 
 const PROJECT_ID = 'proj-1';
-const CONV_A = '01a0b86f-04f9-72a8-bba4-75c5cfd6598f'; // r3 §1.4 UUIDv7 样本形
+const CONV_A = '01a0b86f-04f9-72a8-bba4-75c5cfd6598f';
 const CONV_B = '01a0b870-1111-7222-8888-75c5cfd6598f';
 
 async function seedOrigin(): Promise<void> {
-  // bare origin：init + HEAD→main + 种子提交（README.md 一行）。
   await runGit(['init', '--bare', originDir]);
   await runGit(['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd: originDir });
   await runGit(['clone', originDir, seedDir]);
@@ -84,7 +76,6 @@ function prepareInput(conversationId: string) {
   };
 }
 
-/** #1149：种子仓写 .agents/<name> 钩子（可执行位）。 */
 function seedHook(name: 'setup' | 'resume', body: string): void {
   mkdirSync(join(seedDir, '.agents'), { recursive: true });
   const p = join(seedDir, '.agents', name);
@@ -101,8 +92,8 @@ beforeEach(async () => {
   await seedOrigin();
 });
 
-describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
-  test('info 卡只读导出拒绝提交与推送', async () => {
+describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
+  test('the info-card read-only export refuses commit and push', async () => {
     const prepared = await ws.prepare({ ...prepareInput(CONV_A), readonly: true });
     expect(prepared.readonly).toBe(true);
     expect(existsSync(join(prepared.cwd, '.git'))).toBe(false);
@@ -114,7 +105,7 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     );
   }, 30_000);
 
-  test('prepare：基座 clone 落 <root>/<projectId>/repo + worktree add -b 落 <root>/<convId>，分支 cairn/conv-*', async () => {
+  test('prepare: base clone lands at <root>/<projectId>/repo + worktree add -b lands at <root>/<convId>, branch cairn/conv-*', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     expect(prepared.cwd).toBe(join(root, CONV_A));
     expect(prepared.baseRepoDir).toBe(join(root, PROJECT_ID, 'repo'));
@@ -127,7 +118,7 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     expect(logger.lines.some((l) => l.includes('Cloning'))).toBe(true);
   }, 30_000);
 
-  test('同项目第二 conv：基座 fetch 复用（不重 clone）；同 conv 再来 = Worktree reused', async () => {
+  test('a second conv on the same project: base fetch reused (no re-clone); the same conv again = Worktree reused', async () => {
     await ws.prepare(prepareInput(CONV_A));
     logger.lines.length = 0;
     const b = await ws.prepare(prepareInput(CONV_B));
@@ -138,9 +129,7 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     expect(logger.lines).toContain('[workspace] Worktree reused');
   }, 30_000);
 
-  test('#1484：复用基座时 origin 已偏离 cloneUrl → 先指回 cloneUrl 再 fetch', async () => {
-    // per-step 凭证只对 cloneUrl 的主机应答，基座 origin 必须跟 claim 一致。偏离
-    // 来源：server 地址变了，或 worktree 里 set-url（worktree 与基座共用配置）。
+  test('#1484: on base reuse, origin has drifted from cloneUrl → repointed to cloneUrl first, then fetch', async () => {
     const first = await ws.prepare(prepareInput(CONV_A));
     await runGit(['remote', 'set-url', 'origin', join(root, 'gone.git')], { cwd: first.cwd });
     const second = await ws.prepare(prepareInput(CONV_B));
@@ -148,9 +137,7 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     expect(logger.lines).toContain('[workspace] Repo origin re-pointed to the project clone URL');
   }, 30_000);
 
-  test('#1484：比较的是 origin 的原始配置值，insteadOf 改写不触发重指', async () => {
-    // 机器配置里常见 url.<ssh>.insteadOf <https>：git remote get-url 返回改写后的
-    // URL，与 cloneUrl 永远不等；拿它比会每步重写共享配置、打误导日志。
+  test("#1484: comparison uses origin's raw configured value, insteadOf rewrites do not trigger repointing", async () => {
     const alias = 'cairn-alias:repo';
     stubOutInheritedGitConfig();
     vi.stubEnv('GIT_CONFIG_COUNT', '1');
@@ -168,8 +155,7 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     }
   }, 30_000);
 
-  test('base 二择：origin/<convBranch> 已 fetch 时优先（异机续跑面）', async () => {
-    // 从种子工作区把 conv 分支推上远端（带独有提交）。
+  test('base choice: origin/<convBranch> preferred when already fetched (cross-machine continuation surface)', async () => {
     const branch = conversationBranch(CONV_A);
     await runGit(['checkout', '-b', branch], { cwd: seedDir });
     writeFileSync(join(seedDir, 'probe.txt'), 'remote-work\n');
@@ -178,18 +164,17 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     await runGit(['push', 'origin', branch], { cwd: seedDir });
 
     const prepared = await ws.prepare(prepareInput(CONV_A));
-    expect(existsSync(join(prepared.cwd, 'probe.txt'))).toBe(true); // base=origin/<convBranch>
+    expect(existsSync(join(prepared.cwd, 'probe.txt'))).toBe(true);
     expect(await gitPrim.currentBranch(prepared.cwd)).toBe(branch);
   }, 30_000);
 
-  test('commitAll + push：每步结束自动 push 本 conversation 工作分支；干净树 = committed false', async () => {
+  test("commitAll + push: the conversation's working branch is pushed automatically at the end of every step; a clean tree = committed false", async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     writeFileSync(join(prepared.cwd, 'README.md'), '# seed\n\nprobe line\n');
     const first = await ws.commitAll(prepared.cwd, 'build: probe', IDENTITY);
     expect(first.committed).toBe(true);
     expect(first.head).toMatch(/^[0-9a-f]{40}$/);
     await ws.push(prepared.cwd, prepared.branch, null);
-    // 远端分支在位且指向该提交（bare origin 直查 refs/heads）。
     const remoteRef = await runGit(['rev-parse', '--verify', `refs/heads/${prepared.branch}`], {
       cwd: originDir,
     });
@@ -197,18 +182,15 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     expect(remoteRef.stdout.trim()).toBe(first.head);
     const clean = await ws.commitAll(prepared.cwd, 'build: noop', IDENTITY);
     expect(clean.committed).toBe(false);
-    // countAhead：conv 分支领先 origin/main 1 提交（hasChanges 真值面）。
     expect(await ws.countAhead(prepared.cwd, prepared.defaultBranch)).toBe(1);
   }, 30_000);
 
-  test('#958 闸 5：带简报标记的文件被剔出提交，无标记的同名文件照常提交', async () => {
+  test('#958 gate 5: files carrying the brief marker are excluded from the commit, same-named files without the marker are committed as usual', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
-    // ① 漏网的简报文件（agent 自己 git add 过 / 擦除失败留下的形态）。
     writeFileSync(
       join(prepared.cwd, 'AGENTS.md'),
       `<!-- BEGIN CAIRN-RUNTIME (auto-managed; do not edit) -->\n简报\n<!-- END CAIRN-RUNTIME -->\n`,
     );
-    // ② agent 合法产出的普通文件——必须照常进提交（认内容不认名的理由）。
     writeFileSync(join(prepared.cwd, 'NOTES.md'), 'agent 的产物\n');
     const first = await ws.commitAll(prepared.cwd, 'build: marker scan', IDENTITY);
     expect(first.committed).toBe(true);
@@ -217,19 +199,14 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     });
     expect(listed.stdout).toContain('NOTES.md');
     expect(listed.stdout).not.toContain('AGENTS.md');
-    // 剔除行进了 workspace 日志（可观测面）。
     expect(logger.lines.some((l) => l.includes('brief marker dropped from commit'))).toBe(true);
-    // 文件仍在盘上（剔除的是提交，不是删除工作区内容——擦除归 runner）。
     expect(existsSync(join(prepared.cwd, 'AGENTS.md'))).toBe(true);
   }, 30_000);
 
-  test('#958 闸 4：分支历史里带标记时 briefMarkerInRef 点名，干净分支为空', async () => {
+  test('#958 gate 4: briefMarkerInRef names it when the branch history carries the marker, empty for a clean branch', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
-    // 先证负例：干净分支查不到。
     expect(await ws.briefMarkerInRef(prepared.cwd, prepared.branch)).toEqual([]);
 
-    // agent 在 bash 里自己提交（绕过 commitAll 的认标记剔除）——daemon 拦不住
-    // 的那条路径，本函数是它唯一的可见性面。
     writeFileSync(
       join(prepared.cwd, 'AGENTS.md'),
       `<!-- BEGIN CAIRN-RUNTIME (auto-managed; do not edit) -->\n简报\n<!-- END CAIRN-RUNTIME -->\n`,
@@ -252,10 +229,9 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     expect(await ws.briefMarkerInRef(prepared.cwd, prepared.branch)).toEqual(['AGENTS.md']);
   }, 30_000);
 
-  test('checkpoint 恢复：reset --hard + clean -fd → Worktree restored（r3 §1.4/§3.5）', async () => {
+  test('checkpoint restore: reset --hard + clean -fd → Worktree restored (r3 §1.4/§3.5)', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     const checkpoint = (await ws.commitAll(prepared.cwd, 'plan: v1', IDENTITY)).head;
-    // 步后污染：改跟踪文件 + 落未跟踪文件。
     writeFileSync(join(prepared.cwd, 'README.md'), 'corrupted\n');
     writeFileSync(join(prepared.cwd, 'scratch.txt'), 'dirty\n');
     await ws.restoreCheckpoint(prepared.cwd, checkpoint!);
@@ -264,12 +240,11 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     expect(logger.lines).toContain('[workspace] Worktree restored');
   }, 30_000);
 
-  test('merge --no-edit 两态：Already up to date / 真合并（main 前进时）', async () => {
+  test('merge --no-edit two states: Already up to date / a real merge (when main advances)', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     const idle = await ws.mergeDefaultBranch(prepared.cwd, prepared.defaultBranch);
-    expect(idle.output).toMatch(/Already up to date/i); // r3 §3.6 实测样本词
+    expect(idle.output).toMatch(/Already up to date/i);
 
-    // main 前进（种子工作区直推）→ conv 分支合并出 merge commit。
     await runGit(['checkout', 'main'], { cwd: seedDir });
     writeFileSync(join(seedDir, 'main-note.txt'), 'main moved\n');
     await runGit(['add', '-A'], { cwd: seedDir });
@@ -281,11 +256,9 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     expect(existsSync(join(prepared.cwd, 'main-note.txt'))).toBe(true);
   }, 30_000);
 
-  test('防分叉护栏：origin/<branch> 领先且 worktree 不在该分支 → remote branch diverged', async () => {
+  test('anti-divergence guardrail: origin/<branch> is ahead and the worktree is not on that branch → remote branch diverged', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
-    // worktree 切离 conv 分支。
     await runGit(['checkout', '-B', 'detached-probe', 'origin/main'], { cwd: prepared.cwd });
-    // 远端 conv 分支被推进（异机面）。
     const branch = conversationBranch(CONV_A);
     await runGit(['checkout', '-B', branch], { cwd: seedDir });
     writeFileSync(join(seedDir, 'other.txt'), 'elsewhere\n');
@@ -298,11 +271,9 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     await expect(ws.prepare(prepareInput(CONV_A))).rejects.toThrow(/remote branch diverged/);
   }, 30_000);
 
-  test('孤儿回收：龄超 TTL(7×24h) 的 conv worktree 清理三步；活步/新目录不动', async () => {
+  test('orphan reclamation: three-step cleanup of conv worktrees older than the TTL (7×24h); live steps / new directories untouched', async () => {
     const stale = await ws.prepare(prepareInput(CONV_A));
     const fresh = await ws.prepare(prepareInput(CONV_B));
-    // 陈旧化：目录 mtime 拨回 8 天前（提交时刻同参与取新——种子提交是刚刚，
-    // 故同时把 worktree HEAD 指回旧提交不可行；直接以 now 注入 +8d 判龄）。
     const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
     utimesSync(stale.cwd, old, old);
 
@@ -312,42 +283,33 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
       now: Date.now(),
       activeConversationIds: [],
     });
-    // 龄 = max(目录 mtime, 最后提交时刻)（lastActivity [设计]）：种子提交是
-    // 「刚刚」→ 真实 now 下两目录都不满足 TTL。
     expect(removed).toEqual([]);
-    // now 前移 8d（> TTL 7×24h）：CONV_A 回收、活步 CONV_B 护栏不动。
     const removedByNow = await ws.cleanupOrphans({
       workspacesRoot: root,
       ttlMs: ORPHAN_WORKTREE_TTL_MS,
       now: Date.now() + 8 * 24 * 60 * 60 * 1000,
       activeConversationIds: [CONV_B],
     });
-    expect(removedByNow).toContain(CONV_A); // 陈旧回收
-    expect(removedByNow).not.toContain(CONV_B); // 活步护栏
+    expect(removedByNow).toContain(CONV_A);
+    expect(removedByNow).not.toContain(CONV_B);
     expect(existsSync(stale.cwd)).toBe(false);
     expect(existsSync(fresh.cwd)).toBe(true);
-    // 分支清理（branch -D）：基座内 conv A 分支已删。
     expect(await gitPrim.hasLocalBranch(stale.baseRepoDir, stale.branch)).toBe(false);
     expect(await gitPrim.hasLocalBranch(fresh.baseRepoDir, fresh.branch)).toBe(true);
   }, 30_000);
 
-  test('projectLock：同项目并发 prepare 串行化（clone 竞态护栏）', async () => {
+  test('projectLock: concurrent prepares on the same project serialized (clone race guardrail)', async () => {
     const [a, b] = await Promise.all([
       ws.prepare(prepareInput(CONV_A)),
       ws.prepare(prepareInput(CONV_B)),
     ]);
     expect(a.cwd).toBe(join(root, CONV_A));
     expect(b.cwd).toBe(join(root, CONV_B));
-    // 基座只 clone 一次（第二进 = fetch 路径）。
     expect(logger.lines.filter((l) => l.includes('Cloning'))).toHaveLength(1);
   }, 30_000);
 });
 
-// #1195 产物并集面的 git 原语（真 git）：agent 在步内自建分支提交后把 HEAD
-// 切回会话分支——收尾按 HEAD 计数恒 0，「构建零改动」把真交付判成没干活
-// （mea 事故形）。扫描原语 = 「base 之外、tip 落在步窗口内」的本地分支集；
-// 邻座 conv 分支的排除是 runner 侧策略，原语只报事实（分工钉扎）。
-describe('#1195 branchesWithNewCommits（步窗口分支扫描原语）', () => {
+describe('#1195 branchesWithNewCommits (step-window branch scan primitive)', () => {
   async function commitOn(
     dir: string,
     branch: string,
@@ -364,7 +326,7 @@ describe('#1195 branchesWithNewCommits（步窗口分支扫描原语）', () => 
     });
   }
 
-  test('事故形：自建分支留有窗口内新提交、HEAD 已切回 → 扫出该分支', async () => {
+  test('accident shape: a self-created branch keeps new commits within the window, HEAD already switched back → the branch is scanned out', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     const base = (await gitPrim.head(prepared.cwd)) as string;
     const sinceMs = Date.now();
@@ -372,10 +334,10 @@ describe('#1195 branchesWithNewCommits（步窗口分支扫描原语）', () => 
     await runGit(['checkout', prepared.branch], { cwd: prepared.cwd });
     const found = await gitPrim.branchesWithNewCommits(prepared.cwd, base, sinceMs);
     expect(found).toContain('dogfood/tracer-1153');
-    expect(found).not.toContain(prepared.branch); // HEAD 切回后 conv 分支无 base 外提交
+    expect(found).not.toContain(prepared.branch);
   }, 30_000);
 
-  test('窗口外分支不中：tip 提交早于 sinceMs（用户既有分支不误认）', async () => {
+  test("branches outside the window miss: tip commit earlier than sinceMs (user's existing branches not misattributed)", async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     await commitOn(prepared.cwd, 'user/old-feature', 'old.md', 'old work\n', {
       GIT_COMMITTER_DATE: '2020-01-01T00:00:00+00:00',
@@ -387,7 +349,7 @@ describe('#1195 branchesWithNewCommits（步窗口分支扫描原语）', () => 
     expect(found).not.toContain('user/old-feature');
   }, 30_000);
 
-  test('base 之外无提交的分支不中（同 tip 空分支）', async () => {
+  test('branches with no commits beyond base miss (same-tip empty branches)', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     const base = (await gitPrim.head(prepared.cwd)) as string;
     await runGit(['branch', 'agent/empty', base], { cwd: prepared.cwd });
@@ -395,7 +357,7 @@ describe('#1195 branchesWithNewCommits（步窗口分支扫描原语）', () => 
     expect(found).not.toContain('agent/empty');
   }, 30_000);
 
-  test('邻座 conv 分支照实上报（排除是 runner 侧策略，原语不做归属裁决）', async () => {
+  test('neighboring conv branches reported as-is (exclusion is a runner-side policy, the primitive makes no attribution ruling)', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     const base = (await gitPrim.head(prepared.cwd)) as string;
     const sibling = conversationBranch(CONV_B);
@@ -405,7 +367,7 @@ describe('#1195 branchesWithNewCommits（步窗口分支扫描原语）', () => 
     expect(found).toContain(sibling);
   }, 30_000);
 
-  test('base 不可解析 → 空集（fail-open，不抛错不阻断收尾）', async () => {
+  test('base unparseable → empty set (fail-open, no throw, no blocked close-out)', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     const found = await gitPrim.branchesWithNewCommits(
       prepared.cwd,
@@ -415,7 +377,7 @@ describe('#1195 branchesWithNewCommits（步窗口分支扫描原语）', () => 
     expect(found).toEqual([]);
   }, 30_000);
 
-  test('WorkspaceManager 透传同语义（WorktreeOps 缝消费面）', async () => {
+  test('WorkspaceManager passes through the same semantics (WorktreeOps seam consumer surface)', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     const base = (await gitPrim.head(prepared.cwd)) as string;
     await commitOn(prepared.cwd, 'dogfood/passthrough', 'p.md', 'x\n');
@@ -426,9 +388,8 @@ describe('#1195 branchesWithNewCommits（步窗口分支扫描原语）', () => 
   }, 30_000);
 });
 
-describe('#1149 环境生命周期钩子（prepare 两挂点）', () => {
-  test('fresh 检出 → .agents/setup 跑，hooks 槽带 ok note（含 stdout）', async () => {
-    // 钩子经种子提交进仓（真实路径：hook 在 worktree 树上）。
+describe('#1149 environment lifecycle hooks (two prepare mount points)', () => {
+  test('fresh checkout → .agents/setup runs, hooks slot carries an ok note (including stdout)', async () => {
     seedHook('setup', '#!/bin/sh\necho setup-ran-marker\n');
     await runGit(['add', '-A'], { cwd: seedDir });
     await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
@@ -444,13 +405,13 @@ describe('#1149 环境生命周期钩子（prepare 两挂点）', () => {
     expect(logger.lines.some((l) => l.includes('setup hook: running'))).toBe(true);
   }, 30_000);
 
-  test('无钩子仓：hooks 缺省 []，零钩子日志行（行为与现状一致）', async () => {
+  test('repo without hooks: hooks default to [], zero hook log lines (behavior consistent with current)', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     expect(prepared.hooks).toEqual([]);
     expect(logger.lines.some((l) => l.includes('hook'))).toBe(false);
   }, 30_000);
 
-  test('reused → .agents/resume 跑（setup 不重跑）；失败/超时非致命，步继续', async () => {
+  test('reused → .agents/resume runs (setup not rerun); failure/timeout non-fatal, step continues', async () => {
     seedHook('setup', '#!/bin/sh\necho setup-ran\n');
     seedHook('resume', '#!/bin/sh\necho resume-ran-marker\necho boom >&2\nexit 1\n');
     await runGit(['add', '-A'], { cwd: seedDir });
@@ -459,31 +420,28 @@ describe('#1149 环境生命周期钩子（prepare 两挂点）', () => {
     const first = await ws.prepare(prepareInput(CONV_A));
     expect(first.reused).toBe(false);
     expect(first.hooks![0]!.name).toBe('setup');
-    // 第二进 = reused → resume（exit 1，非致命——步继续，note 照落）。
     const second = await ws.prepare(prepareInput(CONV_A));
     expect(second.reused).toBe(true);
     expect(second.hooks).toHaveLength(1);
     expect(second.hooks![0]!.name).toBe('resume');
     expect(second.hooks![0]!.status).toBe('failed');
     expect(second.hooks![0]!.output).toContain('resume-ran-marker');
-    // 非致命日志行点名（policy 层 warn 形）。
     expect(logger.lines.some((l) => l.includes('resume hook failed (non-fatal'))).toBe(true);
   }, 30_000);
 
-  test('setup 失败 → prepare 抛错（步失败面）；worktree 回滚 → 重试重新走 fresh→setup', async () => {
+  test('setup failure → prepare throws (step failure surface); worktree rolled back → retry goes through fresh→setup again', async () => {
     seedHook('setup', '#!/bin/sh\necho boom >&2\nexit 3\n');
     await runGit(['add', '-A'], { cwd: seedDir });
     await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
     await runGit(['push', 'origin', 'main'], { cwd: seedDir });
     await expect(ws.prepare(prepareInput(CONV_A))).rejects.toThrow(/exited 3/);
-    // 回滚真值：convDir 已清（重试认领重新走 fresh → setup 重跑）。
     expect(existsSync(join(root, CONV_A))).toBe(false);
     expect(
       await gitPrim.hasLocalBranch(join(root, PROJECT_ID, 'repo'), conversationBranch(CONV_A)),
     ).toBe(false);
   }, 30_000);
 
-  test('陈旧重建（worktree 目录被手工删）→ 仍走 fresh → setup 重跑', async () => {
+  test('stale rebuild (worktree directory manually deleted) → still goes through fresh → setup rerun', async () => {
     seedHook('setup', '#!/bin/sh\necho setup-again-marker\n');
     await runGit(['add', '-A'], { cwd: seedDir });
     await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
@@ -496,14 +454,12 @@ describe('#1149 环境生命周期钩子（prepare 两挂点）', () => {
     expect(second.hooks![0]!.output).toContain('setup-again-marker');
   }, 30_000);
 
-  test('钩子消费步级凭据：credentials 非空 → GIT_CONFIG_COUNT=2 进钩子 env', async () => {
+  test('hooks consume step-level credentials: credentials non-null → GIT_CONFIG_COUNT=2 enters the hook env', async () => {
     // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
     seedHook('setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
     await runGit(['add', '-A'], { cwd: seedDir });
     await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
     await runGit(['push', 'origin', 'main'], { cwd: seedDir });
-    // 父进程自带的 GIT_CONFIG_*（云端容器的代理配置）会把凭证条目往后推
-    // （#1460），先摘掉，断言无继承条目时的 COUNT=2。
     stubOutInheritedGitConfig();
     let prepared: Awaited<ReturnType<typeof ws.prepare>>;
     try {
@@ -521,13 +477,13 @@ describe('#1149 环境生命周期钩子（prepare 两挂点）', () => {
     expect(prepared.hooks![0]!.output).toContain('cred=2');
   }, 30_000);
 
-  test('钩子超时 → setup 面致命（步失败），resume 面非致命', async () => {
+  test('hook timeout → fatal on the setup surface (step failure), non-fatal on the resume surface', async () => {
     seedHook('setup', '#!/bin/sh\nsleep 10\n');
     await runGit(['add', '-A'], { cwd: seedDir });
     await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
     await runGit(['push', 'origin', 'main'], { cwd: seedDir });
     const short = new WorkspaceManager({ logger, hookTimeoutMs: 300 });
     await expect(short.prepare(prepareInput(CONV_A))).rejects.toThrow(/timed out/);
-    expect(existsSync(join(root, CONV_A))).toBe(false); // 回滚面
+    expect(existsSync(join(root, CONV_A))).toBe(false);
   }, 30_000);
 });

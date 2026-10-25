@@ -67,7 +67,7 @@ function dumbGitServer(root: string): Server {
   });
 }
 
-describe('git 子进程访问回环 server 绕过全局 http.proxy（#1635）', () => {
+describe('git subprocess reaches the loopback server bypassing the global http.proxy (#1635)', () => {
   let tmp: string;
   let proxyHits: string[];
   let proxy: Listening;
@@ -120,20 +120,20 @@ describe('git 子进程访问回环 server 绕过全局 http.proxy（#1635）', 
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  test('前置：全局代理确实劫持了不带豁免的 git（排除假绿）', async () => {
+  test('precondition: the global proxy really hijacks git without the exemption (rule out false green)', async () => {
     const r = await runGit(['ls-remote', 'http://example.invalid/repo.git']);
     expect(r.code).not.toBe(0);
     expect(proxyHits.length).toBeGreaterThan(0);
   });
 
-  test('machine 路 clone 127.0.0.1 server 成功且不经代理', async () => {
+  test('machine-path clone of the 127.0.0.1 server succeeds without the proxy', async () => {
     const dir = join(tmp, 'clone-machine');
     await gitPrim.clone(`http://127.0.0.1:${gitServer4.port}/repo.git`, dir, null);
     expect(readFileSync(join(dir, 'a.txt'), 'utf8')).toBe('a');
     expect(proxyHits).toEqual([]);
   });
 
-  test('integration 路（per-step 凭证）clone 127.0.0.1 server 成功且不经代理', async () => {
+  test('integration path (per-step credentials) clone of the 127.0.0.1 server succeeds without the proxy', async () => {
     const url = `http://127.0.0.1:${gitServer4.port}/repo.git`;
     const dir = join(tmp, 'clone-cred');
     await gitPrim.clone(url, dir, { username: 'git', password: 'tok', url });
@@ -141,14 +141,14 @@ describe('git 子进程访问回环 server 绕过全局 http.proxy（#1635）', 
     expect(proxyHits).toEqual([]);
   });
 
-  test('localhost 写法同样直连', async () => {
+  test('localhost spelling also connects directly', async () => {
     const dir = join(tmp, 'clone-localhost');
     await gitPrim.clone(`http://localhost:${gitServer4.port}/repo.git`, dir, null);
     expect(readFileSync(join(dir, 'a.txt'), 'utf8')).toBe('a');
     expect(proxyHits).toEqual([]);
   });
 
-  test('[::1] 写法同样直连', async (ctx) => {
+  test('[::1] spelling also connects directly', async (ctx) => {
     if (!gitServer6) ctx.skip();
     const dir = join(tmp, 'clone-v6');
     await gitPrim.clone(`http://[::1]:${gitServer6?.port}/repo.git`, dir, null);
@@ -156,7 +156,7 @@ describe('git 子进程访问回环 server 绕过全局 http.proxy（#1635）', 
     expect(proxyHits).toEqual([]);
   });
 
-  test('fetch 回环 server 同样直连', async () => {
+  test('fetch from the loopback server also connects directly', async () => {
     const url = `http://127.0.0.1:${gitServer4.port}/repo.git`;
     const dir = join(tmp, 'clone-fetch');
     await gitPrim.clone(url, dir, null);
@@ -164,7 +164,7 @@ describe('git 子进程访问回环 server 绕过全局 http.proxy（#1635）', 
     expect(proxyHits).toEqual([]);
   });
 
-  test('非回环远端保留用户的 http.proxy', async () => {
+  test("non-loopback remotes keep the user's http.proxy", async () => {
     const dir = join(tmp, 'clone-external');
     await expect(
       gitPrim.clone('http://cairn-external.invalid/repo.git', dir, null),
@@ -173,7 +173,7 @@ describe('git 子进程访问回环 server 绕过全局 http.proxy（#1635）', 
     expect(proxyHits[0]).toContain('cairn-external.invalid');
   });
 
-  test('用户已有的 NO_PROXY 条目保留，非回环 host 仍走代理', async () => {
+  test("the user's existing NO_PROXY entries are kept, non-loopback hosts still go through the proxy", async () => {
     vi.stubEnv('NO_PROXY', 'internal.example');
     const dirLoop = join(tmp, 'clone-keep-loop');
     await gitPrim.clone(`http://127.0.0.1:${gitServer4.port}/repo.git`, dirLoop, null);

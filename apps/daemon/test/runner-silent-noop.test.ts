@@ -1,18 +1,3 @@
-// #698 静默 no-op 双闸测试面。失败方式枚举先于实现固化（AGENTS.md 测试规则
-// 3；票面 #698「一个被 claim 的步能一路走到 finished 而从不调模型且无任何
-// 错误面」）：
-//   1. 事件流零事件 + 零错误 + 无 done 自然耗尽（claude-code pump 生成器耗
-//      尽形——终局事件缺席时直接 queue.end()）→ 步必须 failed 且文案点名
-//      零事件轮（现状：success = 洞 1）
-//   2. 事件流只有 user-role message_end 回声（输入侧投递，非模型产出）→
-//      同律 failed（回声不算进展，防「事件面非空」绕过闸）
-//   3. 正常轮（有 done）→ success 不受闸影响（防误伤）
-//   4. 有进展事件（text_delta）+ done → success 不受闸影响
-//   5. 停止钮中断（停止位）→ 仍 stopped 收尾（闸不覆盖停止）
-//   6. pi prompt() 预检拒绝（真 PiBackend + preset provider 无凭据：auth 校验
-//      在 agent run 之前 throw）→ 事件面快速收到 error 事件且流终结（现状：
-//      吞掉后挂到流超时看门狗——测试形态 = 超时失败；修复后 = 真因文案）
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -112,7 +97,6 @@ class FakeClient implements MachineApi {
     };
   }
   async skillsManifest() {
-    // #920：默认空清单 = 零团队技能（selection=whitelist，既有断言零扰动）。
     return { selection: 'whitelist' as const, skills: [] };
   }
   async skillFile(): Promise<Buffer> {
@@ -154,9 +138,6 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** 事件脚本 backend（pi-protocol-fallback.test.ts 同律）：脚本耗尽 = 事件流
- * 自然耗尽（零事件脚本 = 生成器不 yield 任何事件即 return——claude-code
- * pump 生成器耗尽的同形）。 */
 function scriptedBackend(script: StepEvent[]): { backend: AgentBackend; handle: null } {
   const backend: AgentBackend = {
     capabilities: PI_CAPABILITIES,
@@ -199,15 +180,15 @@ async function runNoopCase(script: StepEvent[]) {
   return { client, lines };
 }
 
-describe('runner 静默 no-op 闸（#698 洞 1：零事件轮不得按 success 收）', () => {
-  test('失败方式 1：零事件 + 零错误 + 无 done → failed 且文案点名零事件轮', async () => {
+describe('runner silent no-op gate (#698 hole 1: a zero-event round must not close as success)', () => {
+  test('failure mode 1: zero events + zero errors + no done → failed, wording names the zero-event round', async () => {
     const { client } = await runNoopCase([]);
     expect(client.doneBodies).toHaveLength(1);
     expect(client.doneBodies[0]!.body.status).toBe('failed');
     expect(client.doneBodies[0]!.body.errorMessage).toMatch(/no-op|zero-event|零事件/i);
   });
 
-  test('失败方式 2：user-role 回声事件不算进展 → 同律 failed', async () => {
+  test('failure mode 2: user-role echo events do not count as progress → failed by the same rule', async () => {
     const { client } = await runNoopCase([
       { type: 'message_end', message: { role: 'user', content: '任务文本回声' } },
     ]);
@@ -215,7 +196,7 @@ describe('runner 静默 no-op 闸（#698 洞 1：零事件轮不得按 success �
     expect(client.doneBodies[0]!.body.errorMessage).toMatch(/no-op|zero-event|零事件/i);
   });
 
-  test('失败方式 3：有 done 的正常轮 → success 不受闸影响', async () => {
+  test('failure mode 3: a normal round with done → success unaffected by the gate', async () => {
     const { client } = await runNoopCase([
       { type: 'text_delta', text: '完成' },
       { type: 'done', usage: [] },
@@ -223,21 +204,15 @@ describe('runner 静默 no-op 闸（#698 洞 1：零事件轮不得按 success �
     expect(client.doneBodies[0]!.body.status).toBe('success');
   });
 
-  test('失败方式 4：零进展但有 done（会话自报完成）→ 不进闸（done = 自然收尾语义）', async () => {
+  test('failure mode 4: zero progress but done present (session self-reports completion) → gate not entered (done = natural close semantics)', async () => {
     const { client } = await runNoopCase([{ type: 'done', usage: [] }]);
     expect(client.doneBodies[0]!.body.status).toBe('success');
   });
 });
 
-describe('pi prompt() 预检拒绝上浮（#698 洞 2：吞错 → 看门狗假凶手）', () => {
-  // 真 PiBackend + preset provider 无凭据：prompt() 的 auth 校验在 agent run
-  // 之前 throw（无 API key）——原先被 .catch(void err) 吞掉，事件流永远不
-  // 终结（挂到 300s 看门狗）。修复后：error 事件快速到达 + 流终结。
-  test('失败方式 6：无凭据 preset provider → error 事件到达且流终结（真因文案）', async () => {
+describe('pi prompt() preflight rejection surfaces (#698 hole 2: swallowed error → watchdog false culprit)', () => {
+  test('failure mode 6: credential-less preset provider → error event arrives and the stream ends (true-cause wording)', async () => {
     const home = mkdtempSync(join(tmpdir(), 'cairn-pi-noop-'));
-    // 预检要走到「无凭据」分支：环境里的 ANTHROPIC_API_KEY / AUTH_TOKEN（本
-    // 会话跑在 relay 上）会让 provider 视作已配置——走运行期 403 而非预检拒
-    // 绝。清掉并在结束后恢复。
     const saved = {
       apiKey: process.env.ANTHROPIC_API_KEY,
       authToken: process.env.ANTHROPIC_AUTH_TOKEN,
@@ -259,8 +234,6 @@ describe('pi prompt() 预检拒绝上浮（#698 洞 2：吞错 → 看门狗假�
       const collect = (async () => {
         for await (const ev of handle.events) events.push(ev);
       })();
-      // 现状（吞错）：流永不终结 → 这里 8s 超时炸（失败方式即本测试的失败
-      // 形态）；修复后：毫秒级收到 error 事件并终结。
       await Promise.race([
         collect,
         new Promise<never>((_, reject) =>

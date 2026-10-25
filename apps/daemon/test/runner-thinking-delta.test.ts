@@ -1,12 +1,3 @@
-// #1308 runner 半：thinking_delta 按 text_delta 同一节流窗批量上报，不进
-// transcript_delta。失败方式：
-//   1. 每个 token 各打一发（不节流）。
-//   2. 思考正文进 transcriptDelta（正文通道被污染）。
-//   3. 窗内两段被拆成两次，或跨窗两段被粘成一次。
-//   4. 收尾不补刷缓冲 → 最后一截思考到不了 wire，只留落库行。
-//   5. 活动相位不再报 thinking。
-//   6. 落库段行丢失思考正文。
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -204,8 +195,8 @@ async function run(script: StepEvent[] | AsyncIterable<StepEvent>) {
   return client;
 }
 
-describe('runner thinking_delta 节流转发（#1308）', () => {
-  test('同一窗口内的两段合成一次上报，不进正文通道', async () => {
+describe('runner thinking_delta throttled forwarding (#1308)', () => {
+  test('two segments within the same window are merged into one report, not the body channel', async () => {
     const client = await run([
       { type: 'thinking_delta', text: 'alpha' },
       { type: 'thinking_delta', text: 'beta' },
@@ -223,7 +214,7 @@ describe('runner thinking_delta 节流转发（#1308）', () => {
     expect(client.doneBodies[0]?.status).toBe('success');
   });
 
-  test('跨过节流窗的两段各报一次', async () => {
+  test('two segments across the throttle window are reported separately', async () => {
     async function* paced(): AsyncIterable<StepEvent> {
       yield { type: 'thinking_delta', text: 'alpha' };
       await new Promise((resolve) => setTimeout(resolve, 400));
@@ -235,7 +226,7 @@ describe('runner thinking_delta 节流转发（#1308）', () => {
     expect(client.deltas).toEqual([]);
   });
 
-  test('正文增量仍只走 transcriptDelta', async () => {
+  test('body deltas still go only through transcriptDelta', async () => {
     const client = await run([
       { type: 'text_delta', text: 'answer' },
       { type: 'done', usage: [] },

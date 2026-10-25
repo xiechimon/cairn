@@ -1,38 +1,3 @@
-// 团队技能原生插件通道（#1171）：claude 后端的团队技能经 SDK `plugins`
-// 选项（→ CLI `--plugin-dir`）进入 Claude Code 原生 Skill 发现面，落点在
-// daemon 缓存 plugins/ 分区——任务 worktree 零写入。失败方式清单先于实现
-// 固化（票面纪律；调研实测 = issue #1171 评论 2026-10-11，探针 1-7）：
-//   P1  版本闸：executableVersion < 下限 / null / 缺省 → 插件通道跳过 +
-//       `native-plugin: skipped` 行（catalog 通道照常）；≥ 下限 → 交付；
-//       边界值恰等于下限 = 交付；后缀形（2.1.289-beta.3）按数值段解析
-//   P2  deny 面零回退（验收 4）：allowlist 数组 → 插件只含 allowed 条目，
-//       名单外技能在插件目录零文件；null → 全量；[]（防御形：view 在位
-//       但全被过滤）→ 无插件 + 显式行
-//   P3  injectedSkills 不收窄 native 面（#917「选择不越授权」同律）：
-//       injectedSkills=[] 而 allowlist 全量 → 插件仍按 allowed 集交付
-//   P4  本机 skillsDir 条目不混入插件（插件只承载团队 view 条目）
-//   P5  worktree 零写入（验收 2）：resolve 前后 worktree 目录清单不变
-//       （验收 3「仓内既有 .claude/skills 不被覆盖」由本条结构性覆盖——
-//       插件通道根本不进 worktree；CLI 侧撞名优先序 = 探针 7 实测）
-//   P6  pruneCache 不误删 plugins/ 分区（旧形态回收逻辑的新 keep 位）；
-//       旧形态残骸回收行为不回归
-//   P7  plugins LRU：条目超上限 → 只留最新（mtime）
-//   P8  装配失败不阻断步：viewDir 缺失 / dirName 在 view 里不存在 →
-//       null + `plugin-failed:` 行，不抛
-//   P9  内容寻址幂等：同 (view, allowed 集) 两次调用 → 同一目录、第二次
-//       不重建（篡改探针文件保留）；allowed 集不同 → 不同 key
-//   P10 hardlink 装配：插件文件与 view 文件同 inode（共享 blob，非复制）
-//   P11 plugin.json 形状钉死：name = cairn-team-skills、无 mcpServers 键、
-//       插件根无 .mcp.json（skipMcpDiscovery 不发的配套保证——该选项会
-//       翻译成 --plugin-dir-no-mcp，版本下限无实证）
-//   P12 buildClaudeSdkOptions：plugins 在位 → 原样进 opts；缺省/空数组 →
-//       键不发（chief 面与无团队技能面零漂移）
-//   P13 realpath 漂移：teamSkillsDir 以 symlink 形传入（macOS /tmp 同形）
-//       → 条目仍被识别为 view 内（双侧 realpath 归一，读门同律）
-//   P14 dirName 防御位：entries 含 '/' 或 '..' 段 → 跳过该条不装配
-//   P15 撞名避让（Multica 原则）：ensure 只写 cacheRoot/plugins 下自建
-//       分区，view/blobs 分区零扰动
-
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -67,7 +32,6 @@ function fixtureRoot(tag: string): string {
   return mkdtempSync(join(tmpdir(), `cairn-native-plugin-${tag}-`));
 }
 
-/** 写一个 skill 目录（<root>/<dirName>/SKILL.md）；返回 baseDir。 */
 function writeSkill(root: string, dirName: string, name?: string): string {
   const dir = join(root, dirName);
   mkdirSync(dir, { recursive: true });
@@ -79,7 +43,6 @@ function writeSkill(root: string, dirName: string, name?: string): string {
   return dir;
 }
 
-/** 伪造一个团队 view 目录（<root>/views/<digest>/<dirName>/SKILL.md）。 */
 function makeView(root: string, dirNames: readonly string[], digest = 'deadbeef'): string {
   const view = join(root, 'views', digest);
   for (const d of dirNames) writeSkill(view, d);
@@ -90,14 +53,12 @@ function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
-// —— P1 版本闸（claudeVersionAtLeast 纯函数面）————————————————————
-
-describe('claudeVersionAtLeast（#1050 探测版本 → 插件通道闸）', () => {
-  test('下限常量 = 2.1.74（--plugin-dir 最早可证 CHANGELOG 版本）', () => {
+describe('claudeVersionAtLeast (#1050 probed version → plugin channel gate)', () => {
+  test('floor constant = 2.1.74 (earliest CHANGELOG-provable version with --plugin-dir)', () => {
     expect(MIN_CLAUDE_PLUGIN_VERSION).toBe('2.1.74');
   });
 
-  test('数值段比较：高于/恰等于/低于下限', () => {
+  test('numeric segment comparison: above / exactly at / below the floor', () => {
     expect(claudeVersionAtLeast('2.1.294', '2.1.74')).toBe(true);
     expect(claudeVersionAtLeast('2.1.74', '2.1.74')).toBe(true);
     expect(claudeVersionAtLeast('2.1.73', '2.1.74')).toBe(false);
@@ -106,11 +67,11 @@ describe('claudeVersionAtLeast（#1050 探测版本 → 插件通道闸）', () 
     expect(claudeVersionAtLeast('1.9.99', '2.1.74')).toBe(false);
   });
 
-  test('后缀形按数值段解析（2.1.289-beta.3 ≥ 2.1.74）', () => {
+  test('suffixed forms parsed by numeric segments (2.1.289-beta.3 ≥ 2.1.74)', () => {
     expect(claudeVersionAtLeast('2.1.289-beta.3', '2.1.74')).toBe(true);
   });
 
-  test('null / 缺省 / 不可解析 = false（fail-closed：跳过插件通道，catalog 兜底）', () => {
+  test('null / absent / unparseable = false (fail-closed: skip the plugin channel, catalog fallback)', () => {
     expect(claudeVersionAtLeast(null, '2.1.74')).toBe(false);
     expect(claudeVersionAtLeast(undefined, '2.1.74')).toBe(false);
     expect(claudeVersionAtLeast('not-a-version', '2.1.74')).toBe(false);
@@ -118,20 +79,18 @@ describe('claudeVersionAtLeast（#1050 探测版本 → 插件通道闸）', () 
   });
 });
 
-// —— P2/P3/P4/P13 collectTeamSkillEntries（native 面 allowed 集单源）——
-
-describe('collectTeamSkillEntries（与 catalog/deny 同扫描源的团队条目面）', () => {
-  test('teamSkillsDir 缺省 = 空集（纯本机步零变化）', () => {
+describe('collectTeamSkillEntries (team entry surface sharing the catalog/deny scan source)', () => {
+  test('teamSkillsDir absent = empty set (zero change for pure-local steps)', () => {
     const local = fixtureRoot('local');
     writeSkill(local, 'local-a');
     expect(collectTeamSkillEntries({ skillsDir: local, cwd: tmpdir() }, {})).toEqual([]);
   });
 
-  test('skills 配置缺省 = 空集（不注入面）', () => {
+  test('skills config absent = empty set (no injection surface)', () => {
     expect(collectTeamSkillEntries(undefined, { teamSkillsDir: '/no/such' })).toEqual([]);
   });
 
-  test('allowlist null（不限制）= 团队条目全量；本机条目不混入（P4）', () => {
+  test('allowlist null (unrestricted) = full team entries; local entries not mixed in (P4)', () => {
     const root = fixtureRoot('full');
     const view = makeView(root, ['team-a', 'team-b']);
     const local = join(root, 'local-skills');
@@ -144,7 +103,7 @@ describe('collectTeamSkillEntries（与 catalog/deny 同扫描源的团队条目
     expect(entries.every((e) => e.baseDir.startsWith(view))).toBe(true);
   });
 
-  test('allowlist 数组 = 只留名单内条目（P2 构造面；名单外零条目）', () => {
+  test('allowlist array = only entries inside the list kept (P2 construction surface; zero entries outside)', () => {
     const root = fixtureRoot('allow');
     const view = makeView(root, ['team-a', 'team-b', 'team-c']);
     const entries = collectTeamSkillEntries(
@@ -154,7 +113,7 @@ describe('collectTeamSkillEntries（与 catalog/deny 同扫描源的团队条目
     expect(entries.map((e) => e.dirName).sort()).toEqual(['team-a', 'team-c']);
   });
 
-  test('allowlist [] = 空集（显式全拒；runner 面通常 teamSkillsDir 已缺省，此为防御形）', () => {
+  test('allowlist [] = empty set (explicit deny-all; on the runner surface teamSkillsDir is usually already absent, this is the defensive shape)', () => {
     const root = fixtureRoot('empty-al');
     const view = makeView(root, ['team-a']);
     expect(
@@ -165,7 +124,7 @@ describe('collectTeamSkillEntries（与 catalog/deny 同扫描源的团队条目
     ).toEqual([]);
   });
 
-  test('同名冲突团队条目胜（first-wins）→ native 面拿团队版 dirName', () => {
+  test("same-name conflict: team entry wins (first-wins) → native surface takes the team version's dirName", () => {
     const root = fixtureRoot('collision');
     const view = makeView(root, ['dup']);
     const local = join(root, 'local-skills');
@@ -178,7 +137,7 @@ describe('collectTeamSkillEntries（与 catalog/deny 同扫描源的团队条目
     expect(entries[0]?.baseDir).toBe(join(view, 'dup'));
   });
 
-  test('realpath 漂移：teamSkillsDir 以 symlink 形传入仍识别（P13，macOS /tmp 同形）', () => {
+  test('realpath drift: teamSkillsDir passed in symlink form is still recognized (P13, same macOS /tmp shape)', () => {
     const root = fixtureRoot('realpath');
     const view = makeView(root, ['team-a']);
     const viaSymlink = join(tmpdir(), `cairn-sym-view-${sha256(root).slice(0, 8)}`);
@@ -190,12 +149,11 @@ describe('collectTeamSkillEntries（与 catalog/deny 同扫描源的团队条目
       );
       expect(entries.map((e) => e.dirName)).toEqual(['team-a']);
     } finally {
-      // symlink 本身回收（fixture 目录留给 OS tmp 惯例）
       rmSync(viaSymlink, { force: true });
     }
   });
 
-  test('扫描失败（目录缺失）= 空集 fail-open（catalog 同律，不阻断会话）', () => {
+  test('scan failure (directory missing) = fail-open empty set (same rule as catalog, does not block the session)', () => {
     expect(
       collectTeamSkillEntries(
         { skillsDir: '/no/such/local', cwd: tmpdir() },
@@ -205,10 +163,8 @@ describe('collectTeamSkillEntries（与 catalog/deny 同扫描源的团队条目
   });
 });
 
-// —— P8/P9/P10/P11/P14/P15/P7 ensureTeamSkillsPlugin（装配面）———————
-
-describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
-  test('正常装配：plugin.json + skills/<dirName> 树落位，返回插件目录', () => {
+describe('ensureTeamSkillsPlugin (cacheRoot/plugins partition assembly)', () => {
+  test('normal assembly: plugin.json + skills/<dirName> tree in place, returns the plugin directory', () => {
     const root = fixtureRoot('basic');
     const view = makeView(root, ['team-a', 'team-b']);
     const dir = ensureTeamSkillsPlugin({
@@ -227,14 +183,14 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     );
   });
 
-  test('dirNames 空 = null，零创建（P2 [] 防御形的装配面）', () => {
+  test('empty dirNames = null, zero creation (assembly surface of the P2 [] defensive shape)', () => {
     const root = fixtureRoot('empty');
     const view = makeView(root, ['team-a']);
     expect(ensureTeamSkillsPlugin({ cacheRoot: root, viewDir: view, dirNames: [] })).toBeNull();
     expect(existsSync(join(root, 'plugins'))).toBe(false);
   });
 
-  test('P10 hardlink 装配：插件文件与 view 文件同 inode（非复制）', () => {
+  test('P10 hardlink assembly: plugin files share the inode with view files (not copies)', () => {
     const root = fixtureRoot('hardlink');
     const view = makeView(root, ['team-a']);
     const dir = ensureTeamSkillsPlugin({ cacheRoot: root, viewDir: view, dirNames: ['team-a'] });
@@ -243,7 +199,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     expect(a.ino).toBe(b.ino);
   });
 
-  test('P11 plugin.json 形状：name 钉死、无 mcpServers 键、根无 .mcp.json', () => {
+  test('P11 plugin.json shape: name pinned, no mcpServers key, no .mcp.json at the root', () => {
     const root = fixtureRoot('manifest');
     const view = makeView(root, ['team-a']);
     const dir = ensureTeamSkillsPlugin({ cacheRoot: root, viewDir: view, dirNames: ['team-a'] });
@@ -254,7 +210,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     expect(readdirSync(join(dir!)).sort()).toEqual(['.claude-plugin', 'skills']);
   });
 
-  test('P9 内容寻址幂等：同 (view, dirNames) 二次调用同目录、不重建（篡改探针保留）', () => {
+  test('P9 content-addressed idempotence: same (view, dirNames) called twice yields the same directory, no rebuild (tamper probe preserved)', () => {
     const root = fixtureRoot('idempotent');
     const view = makeView(root, ['team-a']);
     const first = ensureTeamSkillsPlugin({ cacheRoot: root, viewDir: view, dirNames: ['team-a'] });
@@ -265,7 +221,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     expect(readFileSync(probe, 'utf8')).toBe('tampered');
   });
 
-  test('P9 allowed 集不同 → 不同 key（同 view 两白名单互不覆写）', () => {
+  test('P9 different allowed sets → different keys (two allowlists on the same view never overwrite each other)', () => {
     const root = fixtureRoot('keys');
     const view = makeView(root, ['team-a', 'team-b']);
     const d1 = ensureTeamSkillsPlugin({ cacheRoot: root, viewDir: view, dirNames: ['team-a'] });
@@ -277,7 +233,6 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     expect(d1).not.toBe(d2);
     expect(existsSync(join(d1!, 'skills', 'team-b'))).toBe(false);
     expect(existsSync(join(d2!, 'skills', 'team-b'))).toBe(true);
-    // dirNames 顺序无关（key 排序归一）
     const d3 = ensureTeamSkillsPlugin({
       cacheRoot: root,
       viewDir: view,
@@ -286,7 +241,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     expect(d3).toBe(d2);
   });
 
-  test('P8 viewDir 缺失 = null + plugin-failed 行，不抛（catalog 通道兜底）', () => {
+  test('P8 viewDir missing = null + plugin-failed line, no throw (catalog channel fallback)', () => {
     const root = fixtureRoot('missing-view');
     const logs: string[] = [];
     const dir = ensureTeamSkillsPlugin({
@@ -297,14 +252,13 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     });
     expect(dir).toBeNull();
     expect(logs.some((l) => l.startsWith('plugin-failed:'))).toBe(true);
-    // 失败路径零残留：无 .tmp-* 半写目录
     const pluginsDir = join(root, 'plugins');
     if (existsSync(pluginsDir)) {
       expect(readdirSync(pluginsDir).filter((n) => n.startsWith('.tmp-'))).toEqual([]);
     }
   });
 
-  test('P8 dirName 在 view 里不存在 = null + plugin-failed 行（整插件拒绝，不半装配）', () => {
+  test('P8 dirName not present in the view = null + plugin-failed line (whole plugin refused, no half assembly)', () => {
     const root = fixtureRoot('missing-skill');
     const view = makeView(root, ['team-a']);
     const logs: string[] = [];
@@ -318,7 +272,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     expect(logs.some((l) => l.startsWith('plugin-failed:'))).toBe(true);
   });
 
-  test('P14 不安全 dirName（含 / 或 .. 段）= 跳过该条，其余照常装配', () => {
+  test('P14 unsafe dirName (contains / or .. segments) = that entry skipped, the rest assembled as usual', () => {
     const root = fixtureRoot('unsafe-dirname');
     const view = makeView(root, ['team-a']);
     const logs: string[] = [];
@@ -334,7 +288,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     expect(existsSync(join(root, 'evil'))).toBe(false);
   });
 
-  test('P15 只写自建 plugins/ 分区：views 分区零扰动', () => {
+  test('P15 writes only the self-owned plugins/ partition: views partition untouched', () => {
     const root = fixtureRoot('no-touch');
     const view = makeView(root, ['team-a']);
     const before = readdirSync(view).sort();
@@ -345,7 +299,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     expect(readdirSync(root).sort()).toEqual(['plugins', 'views']);
   });
 
-  test('P7 plugins LRU：超 maxEntries → 只留最新（mtime）', () => {
+  test('P7 plugins LRU: over maxEntries → keep only the newest (mtime)', () => {
     const root = fixtureRoot('lru');
     const view = makeView(root, ['team-a', 'team-b', 'team-c']);
     const d1 = ensureTeamSkillsPlugin({
@@ -355,7 +309,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
       maxEntries: 2,
     });
     const past = new Date(Date.now() - 60_000);
-    utimesSync(d1!, past, past); // 人为做旧
+    utimesSync(d1!, past, past);
     ensureTeamSkillsPlugin({
       cacheRoot: root,
       viewDir: view,
@@ -373,7 +327,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     expect(readdirSync(join(root, 'plugins'))).toHaveLength(2);
   });
 
-  test('原子落位：成功后 plugins/ 无 .tmp-* 残留', () => {
+  test('atomic placement: no .tmp-* residue in plugins/ after success', () => {
     const root = fixtureRoot('atomic');
     const view = makeView(root, ['team-a']);
     ensureTeamSkillsPlugin({ cacheRoot: root, viewDir: view, dirNames: ['team-a'] });
@@ -381,9 +335,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
   });
 });
 
-// —— P6 pruneCache keep 集（materializeTeamSkills 集成面）————————————
-
-describe('pruneCache × plugins 分区（P6）', () => {
+describe('pruneCache × plugins partition (P6)', () => {
   function manifestFor(dirNames: readonly string[]): MachineSkillsManifestResponse {
     const content = (d: string): Buffer =>
       Buffer.from(`---\nname: ${d}\ndescription: x\n---\n`, 'utf8');
@@ -405,7 +357,7 @@ describe('pruneCache × plugins 分区（P6）', () => {
     };
   }
 
-  test('materialize 的 prune 不删 plugins/ 分区；旧形态残骸仍被回收', async () => {
+  test("materialize's prune does not delete the plugins/ partition; legacy-shape residue is still reclaimed", async () => {
     const root = fixtureRoot('prune-keep');
     const fetchFile = async (dirName: string): Promise<Buffer> =>
       Buffer.from(`---\nname: ${dirName}\ndescription: x\n---\n`, 'utf8');
@@ -420,9 +372,7 @@ describe('pruneCache × plugins 分区（P6）', () => {
       viewDir: view!,
       dirNames: ['team-a'],
     });
-    // 旧形态残骸（#920 前顶层目录）仍须被回收（M15 回归位）
     mkdirSync(join(root, 'legacy-junk'), { recursive: true });
-    // 第二个 manifest 触发新一轮 prune
     await materializeTeamSkills({
       cacheRoot: root,
       manifest: manifestFor(['team-a', 'team-b']),
@@ -436,9 +386,7 @@ describe('pruneCache × plugins 分区（P6）', () => {
   });
 });
 
-// —— P1/P2/P3/P5 resolveTeamSkillsPluginDir（backend 组合面）————————
-
-describe('resolveTeamSkillsPluginDir（claude 后端组合面）', () => {
+describe('resolveTeamSkillsPluginDir (claude backend composition surface)', () => {
   interface Harness {
     root: string;
     view: string;
@@ -480,7 +428,7 @@ describe('resolveTeamSkillsPluginDir（claude 后端组合面）', () => {
     return out;
   }
 
-  test('P1 版本低于下限 = 跳过 + skipped 行；≥ 下限 = 交付', () => {
+  test('P1 version below floor = skipped + skipped line; ≥ floor = delivered', () => {
     const h = harness('gate', ['team-a']);
     const base = {
       skills: { skillsDir: h.local, cwd: h.root },
@@ -504,7 +452,7 @@ describe('resolveTeamSkillsPluginDir（claude 后端组合面）', () => {
     );
   });
 
-  test('P2 allowlist 数组 = 插件只含 allowed；名单外技能零文件（deny 面零回退）', () => {
+  test('P2 allowlist array = plugin contains only allowed entries; zero files for skills outside the list (zero fallback on the deny surface)', () => {
     const h = harness('allow', ['team-a', 'team-secret']);
     const dir = resolveTeamSkillsPluginDir({
       skills: { skillsDir: h.local, cwd: h.root },
@@ -516,11 +464,10 @@ describe('resolveTeamSkillsPluginDir（claude 后端组合面）', () => {
     expect(dir).not.toBeNull();
     expect(readdirSync(join(dir!, 'skills'))).toEqual(['team-a']);
     expect(existsSync(join(dir!, 'skills', 'team-secret'))).toBe(false);
-    // 全插件目录树里不存在名单外技能的任何文件
     expect(listing(dir!).some((p) => p.includes('team-secret'))).toBe(false);
   });
 
-  test('P2 allowlist [] = 无插件 + 显式行（不静默）', () => {
+  test('P2 allowlist [] = no plugin + explicit line (not silent)', () => {
     const h = harness('empty-al', ['team-a']);
     const dir = resolveTeamSkillsPluginDir({
       skills: { skillsDir: h.local, cwd: h.root },
@@ -535,7 +482,7 @@ describe('resolveTeamSkillsPluginDir（claude 后端组合面）', () => {
     );
   });
 
-  test('P3 injectedSkills 不收窄 native 面（选择不越授权）', () => {
+  test('P3 injectedSkills does not narrow the native surface (selection does not over-authorize)', () => {
     const h = harness('injected', ['team-a', 'team-b']);
     const dir = resolveTeamSkillsPluginDir({
       skills: { skillsDir: h.local, cwd: h.root },
@@ -548,7 +495,7 @@ describe('resolveTeamSkillsPluginDir（claude 后端组合面）', () => {
     expect(readdirSync(join(dir!, 'skills')).sort()).toEqual(['team-a', 'team-b']);
   });
 
-  test('P5 worktree 零写入：resolve 前后 worktree 清单逐位相同（验收 2/3）', () => {
+  test('P5 zero worktree writes: the worktree listing is bit-identical before and after resolve (acceptances 2/3)', () => {
     const h = harness('clean-worktree', ['team-a'], ['local-x']);
     const before = listing(h.worktree);
     resolveTeamSkillsPluginDir({
@@ -561,7 +508,7 @@ describe('resolveTeamSkillsPluginDir（claude 后端组合面）', () => {
     expect(listing(h.worktree)).toEqual(before);
   });
 
-  test('teamSkillsDir 缺省 = null 且零日志（纯本机步无信号噪声）', () => {
+  test('teamSkillsDir absent = null and zero logs (no signal noise for pure-local steps)', () => {
     const h = harness('no-team', []);
     const dir = resolveTeamSkillsPluginDir({
       skills: { skillsDir: h.local, cwd: h.root },
@@ -574,7 +521,7 @@ describe('resolveTeamSkillsPluginDir（claude 后端组合面）', () => {
     expect(h.logs).toEqual([]);
   });
 
-  test('cacheRoot 未接线 = null + skipped 行（接线缺失可见，不静默死）', () => {
+  test('cacheRoot not wired = null + skipped line (unwired is visible, not a silent dead end)', () => {
     const h = harness('no-cache-root', ['team-a']);
     const dir = resolveTeamSkillsPluginDir({
       skills: { skillsDir: h.local, cwd: h.root },
@@ -587,8 +534,6 @@ describe('resolveTeamSkillsPluginDir（claude 后端组合面）', () => {
     expect(h.logs.some((l) => l.startsWith('native-plugin: skipped'))).toBe(true);
   });
 });
-
-// —— P12 buildClaudeSdkOptions plugins 键 ————————————————
 
 function baseParts() {
   return {
@@ -603,18 +548,17 @@ function baseParts() {
 }
 
 describe('buildClaudeSdkOptions × plugins（P12）', () => {
-  test('缺省 / 空数组 = plugins 键不发（chief 面与无团队技能面零漂移）', () => {
+  test('absent / empty array = plugins key not sent (zero drift on the chief surface and the no-team-skills surface)', () => {
     expect('plugins' in buildClaudeSdkOptions(baseParts())).toBe(false);
     expect('plugins' in buildClaudeSdkOptions({ ...baseParts(), plugins: [] })).toBe(false);
   });
 
-  test('在位 = 原样进 opts（SDK 默认 pluginDelivery=argv → --plugin-dir）', () => {
+  test('present = enters opts verbatim (SDK default pluginDelivery=argv → --plugin-dir)', () => {
     const opts = buildClaudeSdkOptions({
       ...baseParts(),
       plugins: [{ type: 'local', path: '/cache/plugins/key1' }],
     });
     expect(opts.plugins).toEqual([{ type: 'local', path: '/cache/plugins/key1' }]);
-    // pluginDelivery 不发：argv 缺省兼容全版本段（initialize 形要求 ≥2.1.261）
     expect('pluginDelivery' in opts).toBe(false);
   });
 });

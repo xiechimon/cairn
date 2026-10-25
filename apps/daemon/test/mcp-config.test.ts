@@ -1,13 +1,3 @@
-// spec 13 daemon 本机解析面（#368）：claim 载荷 mcpServers = slug 列表 →
-// 读本机 config（mcpConfigPath，默认 ~/.claude.json）解析 McpEndpoint[] →
-// 喂 pi 原生 MCP（backend/pi.ts registerMcpServer，#930）。密钥值只活在执行机
-// （config 文件 → 子进程/请求头），从不跨 wire。失败方式清单：
-//   正常——http headers / stdio command+args+env 全保真；
-//   未知 slug——跳过 + onMissing 降级回调（canon 行「config 里找不到」）；
-//   坏条目——config 里有键但形状坏 = 跳过不炸；
-//   文件缺失 / 坏 JSON——全集视为未命中，不炸；
-//   大小写——slug 匹配 config 键不区分大小写（与 server 投影小写化同律）。
-
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,8 +20,8 @@ const CONFIG = {
   },
 };
 
-describe('resolveMcpEndpoints — slug → 本机 config 解析（spec 13）', () => {
-  test('正常：http 带 headers、stdio 带 command/args/env，值全保真（执行面本机读）', () => {
+describe('resolveMcpEndpoints — slug → local config resolution (spec 13)', () => {
+  test('normal: http with headers, stdio with command/args/env, values kept verbatim (execution surface reads locally)', () => {
     const eps = resolveMcpEndpoints(cfg(CONFIG), ['demo', 'local']);
     expect(eps).toEqual([
       {
@@ -50,7 +40,7 @@ describe('resolveMcpEndpoints — slug → 本机 config 解析（spec 13）', (
     ]);
   });
 
-  test('未知 slug：跳过 + onMissing 回调；canon 降级行「config 里找不到」', () => {
+  test('unknown slug: skipped + onMissing callback; canon degradation line "not found in config"', () => {
     const missing: string[] = [];
     const eps = resolveMcpEndpoints(cfg(CONFIG), ['ghost', 'demo'], {
       onMissing: (slug) => missing.push(slug),
@@ -61,12 +51,12 @@ describe('resolveMcpEndpoints — slug → 本机 config 解析（spec 13）', (
     expect(notInConfigLine('ghost')).toContain('its tools are unavailable this turn');
   });
 
-  test('坏条目：config 里有键但形状坏 = 跳过不炸（与 server 读取缝同律）', () => {
+  test('bad entry: key present in config but malformed shape = skipped without crashing (same rule as the server read seam)', () => {
     const eps = resolveMcpEndpoints(cfg(CONFIG), ['broken']);
     expect(eps).toEqual([]);
   });
 
-  test('文件缺失 / 坏 JSON = 空集，全部走 onMissing，不抛', () => {
+  test('missing file / bad JSON = empty set, everything goes through onMissing, no throw', () => {
     const missing: string[] = [];
     const absent = join(tmpdir(), 'cairn-no-such-claude.json');
     expect(resolveMcpEndpoints(absent, ['a'], { onMissing: (s) => missing.push(s) })).toEqual([]);
@@ -74,14 +64,14 @@ describe('resolveMcpEndpoints — slug → 本机 config 解析（spec 13）', (
     expect(resolveMcpEndpoints(cfg('{{{ not json'), ['a'])).toEqual([]);
   });
 
-  test('大小写归一匹配：config 键 Playwright ↔ claim slug playwright', () => {
+  test('case-normalized matching: config key Playwright ↔ claim slug playwright', () => {
     const eps = resolveMcpEndpoints(cfg({ mcpServers: { Playwright: { command: 'pw' } } }), [
       'playwright',
     ]);
     expect(eps).toEqual([{ slug: 'playwright', transport: 'stdio', command: 'pw' }]);
   });
 
-  test('空 slug 列表 = 空端点集（零开销，不读文件）', () => {
+  test('empty slug list = empty endpoint set (zero cost, no file read)', () => {
     expect(resolveMcpEndpoints(cfg(CONFIG), [])).toEqual([]);
   });
 });

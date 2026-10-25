@@ -1,15 +1,3 @@
-// #654 协议 400 自适配测试面：pi 侧三件（签名匹配 / 回落学习 / models.json
-// 物化）+ runner 步内回落闸。失败方式枚举先于实现固化（AGENTS.md 测试规则
-// 3，票面 #654「先列失败方式」节）：
-//   1. relay 协议 400 签名 → 双旋钮翻到旧式形（max_tokens + 无 store）
-//   2. OpenAI 形 unsupported parameter 只翻被点名字段
-//   3. 无关错误 / preset 端点 → 不翻（防误伤与死循环）
-//   4. 学习态：翻过一次后同错不再翻（单次预算，防循环）；后续物化直接带旋钮
-//   5. 显式 record compat 压过学习位
-//   6. 物化零漂移：无 compat 的 provider 条目与旧行为同形（无 compat 键）
-//   7. runner：零进展 + 签名命中 → 第二轮会话以翻过旋钮的 provider 重开，
-//      步 success；非签名错 / 有进展 / 二起失败 / 后端无适配面 → 按现状收尾
-
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -49,58 +37,53 @@ function gateway(providerId: string, compat?: ProviderConfig['compat']): Provide
   };
 }
 
-describe('protocolCompatFlip（签名匹配，纯函数）', () => {
-  test('失败方式 1：relay 协议 400 原文 → 双旋钮（max_tokens + 无 store）', () => {
+describe('protocolCompatFlip (signature match, pure function)', () => {
+  test('failure mode 1: relay protocol 400 body → both knobs (max_tokens + no store)', () => {
     expect(protocolCompatFlip(RELAY_400)).toEqual({
       maxTokensField: 'max_tokens',
       supportsStore: false,
     });
   });
 
-  test('失败方式 2a：OpenAI unsupported parameter 点名 max_completion_tokens → 只翻字段名', () => {
+  test('failure mode 2a: OpenAI unsupported parameter names max_completion_tokens → only the field name is flipped', () => {
     expect(
       protocolCompatFlip('400 Unsupported parameter: max_completion_tokens is not supported'),
     ).toEqual({ maxTokensField: 'max_tokens' });
   });
 
-  test('失败方式 2b：OpenAI unsupported parameter 点名 store → 只摘 store', () => {
+  test('failure mode 2b: OpenAI unsupported parameter names store → only store is dropped', () => {
     expect(protocolCompatFlip('400 Unsupported parameter: store')).toEqual({
       supportsStore: false,
     });
   });
 
-  test('失败方式 3：无关错误 → null 不翻', () => {
+  test('failure mode 3: unrelated error → null, no flip', () => {
     expect(protocolCompatFlip('400: invalid model id')).toBeNull();
     expect(protocolCompatFlip('rate limit exceeded')).toBeNull();
   });
 });
 
-describe('adaptProviderCompat（回落学习面）', () => {
-  // 学习面是模块级 Map：每个用例用独立 providerId 隔离（无跨用例污染）。
-
-  test('失败方式 4：签名命中 → 返回翻过的配置；同错再翻 → null（单次预算）', () => {
+describe('adaptProviderCompat (fallback learning surface)', () => {
+  test('failure mode 4: signature hit → returns the flipped config; flipping the same error again → null (single-shot budget)', () => {
     const gw = gateway('adapt-once');
     const amended = adaptProviderCompat(gw, RELAY_400);
     expect(amended?.compat).toEqual({ maxTokensField: 'max_tokens', supportsStore: false });
-    // 第二次同错：已在目标态 → null（不再翻、runner 不再重试）。
     expect(adaptProviderCompat(amended ?? gw, RELAY_400)).toBeNull();
   });
 
-  test('失败方式 3：preset（无 baseUrl）→ null；非签名错 → null', () => {
+  test('failure mode 3: preset (no baseUrl) → null; non-signature error → null', () => {
     expect(adaptProviderCompat({ kind: 'api_key', providerId: 'anthropic' }, RELAY_400)).toBeNull();
     expect(adaptProviderCompat(gateway('adapt-nosig'), '500 internal')).toBeNull();
   });
 
-  test('失败方式 5：显式 compat 不挡错误驱动回落（回落轮改写它；持久化面仍是显式压学习——见物化用例）', () => {
+  test('failure mode 5: explicit compat does not block error-driven fallback (the fallback round rewrites it; on the persistence surface explicit still beats learning — see the materialization cases)', () => {
     const explicit = gateway('adapt-explicit', { maxTokensField: 'max_completion_tokens' });
     const amended = adaptProviderCompat(explicit, RELAY_400);
-    // 用户钉了 mct 但 upstream 明拒：回落轮按 Multica 协商同律改写到旧式形
-    //（配错的显式位 = 每步付一次回落学费；持久化不覆盖显式位，钉在物化用例）。
     expect(amended?.compat).toEqual({ maxTokensField: 'max_tokens', supportsStore: false });
   });
 });
 
-describe('materializeProvider（compat 物化进 models.json）', () => {
+describe('materializeProvider (compat materialized into models.json)', () => {
   function load(path: string): Record<string, Record<string, unknown>> {
     return (
       JSON.parse(readFileSync(path, 'utf8')) as {
@@ -109,7 +92,7 @@ describe('materializeProvider（compat 物化进 models.json）', () => {
     ).providers;
   }
 
-  test('失败方式 6：无 compat（显式与学习皆无）→ 条目无 compat 键（旧行为同形）', () => {
+  test('failure mode 6: no compat (neither explicit nor learned) → entry has no compat key (same shape as before)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
     const path = join(dir, 'models.json');
     materializeProvider(path, gateway('mat-bare'));
@@ -119,7 +102,7 @@ describe('materializeProvider（compat 物化进 models.json）', () => {
     expect(entry).toMatchObject({ baseUrl: 'http://127.0.0.1:9/v1', apiKey: 'per-step' });
   });
 
-  test('wire compat 原样物化（maxTokensField / supportsStore / supportsDeveloperRole）', () => {
+  test('wire compat materialized verbatim (maxTokensField / supportsStore / supportsDeveloperRole)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
     const path = join(dir, 'models.json');
     materializeProvider(
@@ -139,8 +122,7 @@ describe('materializeProvider（compat 物化进 models.json）', () => {
     });
   });
 
-  test('失败方式 4/5：学习位并入物化（后续步直接干净形态）；显式位压过学习', () => {
-    // 学习：翻 mat-learn 的旋钮。
+  test('failure modes 4/5: learning slot merged into materialization (later steps get the clean shape directly); explicit beats learning', () => {
     adaptProviderCompat(gateway('mat-learn'), RELAY_400);
     const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
     const path = join(dir, 'models.json');
@@ -148,7 +130,6 @@ describe('materializeProvider（compat 物化进 models.json）', () => {
     expect(load(path)['mat-learn']).toMatchObject({
       compat: { maxTokensField: 'max_tokens', supportsStore: false },
     });
-    // 显式位压过学习：wire 钉 supportsStore:true → 学习不得覆盖。
     adaptProviderCompat(gateway('mat-mixed'), RELAY_400);
     materializeProvider(path, gateway('mat-mixed', { supportsStore: true }));
     expect(load(path)['mat-mixed']).toMatchObject({
@@ -156,8 +137,6 @@ describe('materializeProvider（compat 物化进 models.json）', () => {
     });
   });
 });
-
-// —— runner 步内回落闸（fake backend 走真 adaptProviderCompat）——————————
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -237,7 +216,6 @@ class FakeClient implements MachineApi {
     };
   }
   async skillsManifest() {
-    // #920：默认空清单 = 零团队技能（selection=whitelist，既有断言零扰动）。
     return { selection: 'whitelist' as const, skills: [] };
   }
   async skillFile(): Promise<Buffer> {
@@ -285,8 +263,6 @@ type ScriptedEvents = (
   | { type: 'done'; usage: [] }
 )[];
 
-/** 事件脚本 backend：createSession 依序消费脚本；记录每轮收到的 provider。
- * adaptProviderCompat 走真实现（pi 模块函数）——runner 面与物化面同源。 */
 function scriptedBackend(
   scripts: ScriptedEvents[],
   opts?: { withAdapt?: boolean },
@@ -351,10 +327,8 @@ async function runFallbackCase(
   return { client, lines, providers };
 }
 
-describe('runner 协议 400 步内回落（#654）', () => {
-  // 学习面是模块级 Map：每个用例独立 providerId 隔离（同 adapt describe 律）。
-
-  test('失败方式 1+7：零进展签名错 → 翻旋钮重开一轮，步 success；第二轮 provider 带翻过的 compat', async () => {
+describe('runner protocol 400 in-step fallback (#654)', () => {
+  test('failure modes 1+7: zero-progress signature error → knobs flipped and a new round starts, step success; second round provider carries the flipped compat', async () => {
     const { client, lines, providers } = await runFallbackCase(
       [
         [{ type: 'error', error: { message: RELAY_400, retryable: false } }],
@@ -374,7 +348,7 @@ describe('runner 协议 400 步内回落（#654）', () => {
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('失败方式 3：非签名错误 → 不回落单轮收尾，步 failed', async () => {
+  test('failure mode 3: non-signature error → no fallback, single round, step failed', async () => {
     const { client, providers } = await runFallbackCase(
       [[{ type: 'error', error: { message: '401 unauthorized', retryable: false } }]],
       { providerId: 'gw-fb-nosig' },
@@ -383,7 +357,7 @@ describe('runner 协议 400 步内回落（#654）', () => {
     expect(client.doneBodies[0]?.body.status).toBe('failed');
   });
 
-  test('失败方式 3（有进展）：text_delta 后同错 → 不回落（重放会重复执行），步 failed', async () => {
+  test('failure mode 3 (with progress): same error after a text_delta → no fallback (a replay would re-execute), step failed', async () => {
     const { client, providers } = await runFallbackCase(
       [
         [
@@ -397,7 +371,7 @@ describe('runner 协议 400 步内回落（#654）', () => {
     expect(client.doneBodies[0]?.body.status).toBe('failed');
   });
 
-  test('失败方式 4：二起同错 → 回落轮收尾 failed（pass>0 不再进闸，无第三轮）', async () => {
+  test('failure mode 4: same error on the second occurrence → fallback round ends failed (pass>0 no longer enters the gate, no third round)', async () => {
     const { client, providers } = await runFallbackCase(
       [
         [{ type: 'error', error: { message: RELAY_400, retryable: false } }],
@@ -405,12 +379,11 @@ describe('runner 协议 400 步内回落（#654）', () => {
       ],
       { providerId: 'gw-fb-twice' },
     );
-    // 第二轮有开（第一轮翻过旋钮给了重试），第二轮失败后不再第三轮。
     expect(providers).toHaveLength(2);
     expect(client.doneBodies[0]?.body.status).toBe('failed');
   });
 
-  test('后端无适配面（claude-code 形）→ 单轮收尾，步 failed（零回归）', async () => {
+  test('backend without an adaptation surface (claude-code shape) → single round, step failed (zero regression)', async () => {
     const { client, providers } = await runFallbackCase(
       [[{ type: 'error', error: { message: RELAY_400, retryable: false } }]],
       { withAdapt: false, providerId: 'gw-fb-noadapt' },

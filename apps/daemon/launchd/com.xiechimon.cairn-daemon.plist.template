@@ -1,13 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- cairn executor daemon, user-domain launchd job (@LABEL@).
-     Rendered by install.sh (placeholders @..@ are baked to absolute paths;
-     launchd does not expand ~, so nothing relative is used here).
-     Semantics: KeepAlive restarts crashes/kills but NOT clean exits, so the
-     run.sh singleton guard exiting 0 ("already running") stays quiet instead
-     of spinning. ThrottleInterval caps any restart storm at one per 30s.
-     Premise: the dev server on :8787 is NOT managed here — the daemon's
-     claim loop backs off (cap 30s) and attaches once the server is up. -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
@@ -21,9 +13,7 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <!-- homebrew 两槽进模板 PATH（#1290）：launchd 不给 login shell 的 PATH，
-         claude 等 homebrew 装的二进制要靠这里可见；探测侧另有 well-known
-         回落（claude-code-bin.ts），这里是第一道。 -->
+    <!-- launchd provides no login-shell PATH; homebrew-installed binaries (claude) become visible through this template PATH. -->
     <string>@NODE_DIR@:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
 @EXTRA_ENV@
   </dict>

@@ -107,8 +107,8 @@ async function deliver(
   return { prompt: sent.prompt ?? '', systemPrompt: sent.systemPrompt ?? '', home };
 }
 
-describe('#1624 daemon 投递：前置卡交付进首轮 prompt，不进 system 层', () => {
-  test('D1 build 步新会话：prompt = 任务文本 + 交付节；systemPrompt 不含交付内容', async () => {
+describe('#1624 daemon delivery: prior-card handoff goes into the first-round prompt, not the system layer', () => {
+  test('D1 build step new session: prompt = task text + handoff section; systemPrompt contains no handoff content', async () => {
     const step = claimed({ kind: 'build', blockerHandoff: HANDOFF });
     const { prompt, systemPrompt } = await deliver(step);
     expect(prompt).toBe(
@@ -120,12 +120,12 @@ describe('#1624 daemon 投递：前置卡交付进首轮 prompt，不进 system 
     expect(buildTaskPrompt(step)).toBe(prompt);
   });
 
-  test('D2 无 blockerHandoff：prompt 逐字节不变', async () => {
+  test('D2 no blockerHandoff: prompt unchanged byte for byte', async () => {
     const { prompt } = await deliver(claimed({ kind: 'build' }));
     expect(prompt).toBe(buildTaskPromptText('接线', '把登录接到页面'));
   });
 
-  test('D3 plan 步首轮：交付节在契约指令之前，契约与交接位置注记在其后', async () => {
+  test('D3 plan step first round: handoff section before the contract instruction, contract and handoff-location annotation after it', async () => {
     const { prompt, home } = await deliver(claimed({ kind: 'plan', blockerHandoff: HANDOFF }));
     const withHandoff = appendBlockerHandoff(
       buildTaskPromptText('接线', '把登录接到页面'),
@@ -139,7 +139,7 @@ describe('#1624 daemon 投递：前置卡交付进首轮 prompt，不进 system 
     );
   });
 
-  test('D4 GitHub issue 导入的子卡：issue 围栏在前，交付节在围栏之外', async () => {
+  test('D4 GitHub-issue-imported child card: issue fence first, handoff section outside the fence', async () => {
     const step = claimed({
       kind: 'build',
       blockerHandoff: HANDOFF,

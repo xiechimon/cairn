@@ -8,15 +8,6 @@
 #   install.sh --node PATH             node binary override (default: node on PATH)
 #   install.sh --home DIR              CAIRN_HOME override (default: ~/.cairn)
 #   install.sh --server URL            CAIRN_SERVER override (test jobs)
-#
-# Installed artifacts live OUTSIDE the repo (plist in ~/Library/LaunchAgents,
-# rendered wrapper in $HOME_DIR) so deleting this checkout never orphans the
-# job. Re-run after pulling daemon updates. Test jobs pass --label plus
-# --home/--server so the real daemon is never disturbed — the run.sh
-# singleton guard is scoped to its own home/server/cwd, not global.
-#
-# User domain only: refuses root/sudo (a system-domain job needs a reboot to
-# take effect and must never host this).
 set -eu
 
 LABEL="com.xiechimon.cairn-daemon"
@@ -80,7 +71,6 @@ REPO_ESC="$(esc "$REPO")"
 RUN_ESC="$(esc "$RUN_DEST")"
 HOME_ESC="$(esc "$HOME_DIR")"
 
-# Rendered wrapper copy: the installed job never depends on this checkout.
 sed -e "s|@CAIRN_REPO@|$REPO_ESC|g" -e "s|@NODE_BIN@|$(esc "$NODE_BIN")|g" \
   "$RUN_SRC" > "$RUN_DEST"
 chmod +x "$RUN_DEST"

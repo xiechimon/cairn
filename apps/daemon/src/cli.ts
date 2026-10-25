@@ -1,10 +1,3 @@
-// CLI 命令面（02 §5.1 照抄 r3 §1.1）：start / stop / restart / logs [-f] /
-// logout / status / version / provider；provider 仅提示
-// 「Providers are managed on the website」。start 选项：--foreground/-f、
-// --api-key <k> --team <id>（非交互注册，覆盖既有注册以换团队）、--name
-// （默认 hostname）、--server、--workspaces-dir（父目录必须已存在护栏）。
-// 品牌槽：命令名/env 前缀/主目录 = brand.ts（02 §5.8）。
-
 import {
   closeSync,
   existsSync,
@@ -50,7 +43,6 @@ function configInput(opts: StartOptions): DaemonConfigInput {
   };
 }
 
-/** 后台 start 时透传给前台 runner 的 argv（注册覆盖语义随参数走，02 §5.1）。 */
 function passthroughArgv(opts: StartOptions): string[] {
   const argv = ['start', '--foreground'];
   if (opts.apiKey) argv.push('--api-key', opts.apiKey);
@@ -80,11 +72,8 @@ export async function runForeground(opts: StartOptions): Promise<void> {
     paths,
     logger,
     idleSleepPrevention: true,
-    // #1149：环境钩子超时（config 已解析 env/默认；machine-loop 注给
-    // WorkspaceManager）。
     hookTimeoutMs: config.hookTimeoutMs,
   });
-  // #691：信号名透传进退出行（SIGTERM/SIGINT 面事后可考）。
   const onSignal = (signal: string) => {
     void handle.stop(signal);
   };
@@ -132,12 +121,10 @@ export function buildProgram(): Command {
       process.stdout.write(`Started in background (pid ${pid})\n`);
     });
 
-  // 隐藏命令：supervisor 进程入口（spawnSupervisor 内部使用）。
   program
     .command('supervise', { hidden: true })
     .allowUnknownOption(true)
-    .allowExcessArguments(true) // runner argv 整体透传（start --foreground …）；
-    // commander v14+ 默认对多余位置参数报错，本命令 action 自行切片 process.argv。
+    .allowExcessArguments(true)
     .helpOption(false)
     .action(async () => {
       const argv = process.argv.slice(2);
@@ -232,7 +219,6 @@ export function buildProgram(): Command {
       );
     });
 
-  // version 子命令（02 §5.1 命令面含独立 version；commander 顶层 -v 并存）。
   program
     .command('version')
     .description('Print the daemon version')
@@ -244,7 +230,6 @@ export function buildProgram(): Command {
     .command('provider')
     .description('Provider management notice')
     .action(() => {
-      // r3 实测语义：凭据管理在 web，CLI 不代做。
       process.stdout.write(`${PROVIDER_COMMAND_NOTICE}\n`);
     });
 
@@ -255,11 +240,6 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   await buildProgram().parseAsync(argv);
 }
 
-// 直接执行入口（tsx dev 与 esbuild bundle 同形）。argv[1] 从符号链接进来
-// （npm .bin 链接、npx、symlink 安装前缀）时保留链接原样，import.meta.url
-// 恒为 realpath——须先 realpath 再比对，否则 bin 执行静默无操作退出 0
-// （2026-09-25 裸跑实测）。realpath 失败（argv[1] 消失/奇异 runner）按非主
-// 模块处理，不炸加载方。
 function isMainModule(): boolean {
   if (!process.argv[1]) return false;
   try {

@@ -1,6 +1,3 @@
-// Settings 缝最小层（优先级 = 显式入参 > env > 默认值）+ 本地状态布局
-// （02 §5.3/r3 §1.3 形状；zod 单源 = shared machine/device/daemonJsonSchema）。
-
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,8 +27,8 @@ function tmp(): string {
   return mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
 }
 
-describe('loadDaemonConfig（Settings 缝优先级）', () => {
-  test('defaults: CAIRN_SERVER 缺省=DEFAULT_SERVER_URL, hostname name, ~/.cairn home', () => {
+describe('loadDaemonConfig (Settings seam precedence)', () => {
+  test('defaults: CAIRN_SERVER defaults to DEFAULT_SERVER_URL, hostname name, ~/.cairn home', () => {
     const cfg = loadDaemonConfig({}, {});
     expect(cfg.serverUrl).toBe(DEFAULT_SERVER_URL);
     expect(cfg.home.endsWith(BRAND.homeDirName)).toBe(true);
@@ -39,7 +36,7 @@ describe('loadDaemonConfig（Settings 缝优先级）', () => {
     expect(cfg.foreground).toBe(false);
   });
 
-  test('env 层：CAIRN_* 五件词表（r3 §1.1 观测原名 TDS_*，替换相位同形）', () => {
+  test('env layer: the CAIRN_* five-item vocabulary (r3 §1.1 observed under the original TDS_* names, same shape at the replacement phase)', () => {
     const home = tmp();
     const cfg = loadDaemonConfig(
       {},
@@ -50,13 +47,13 @@ describe('loadDaemonConfig（Settings 缝优先级）', () => {
         [ENV_VARS.home]: home,
       },
     );
-    expect(cfg.serverUrl).toBe('http://10.0.0.2:9999'); // 尾斜杠归一
+    expect(cfg.serverUrl).toBe('http://10.0.0.2:9999');
     expect(cfg.apiKey).toBe('cairn_key');
     expect(cfg.teamId).toBe('team-1');
     expect(cfg.home).toBe(home);
   });
 
-  test('显式入参 > env', () => {
+  test('explicit args > env', () => {
     const cfg = loadDaemonConfig(
       { serverUrl: 'http://explicit:1', name: 'explicit-name' },
       { [ENV_VARS.server]: 'http://env:2' },
@@ -65,7 +62,7 @@ describe('loadDaemonConfig（Settings 缝优先级）', () => {
     expect(cfg.name).toBe('explicit-name');
   });
 
-  test('skillsDir（spec 14/#371）：缺省 = ~/.agents/skills；env 覆盖；显式入参 > env', () => {
+  test('skillsDir (spec 14/#371): default = ~/.agents/skills; env overrides; explicit args > env', () => {
     const cfg = loadDaemonConfig({}, {});
     expect(cfg.skillsDir).toBe(join(homedir(), '.agents', 'skills'));
 
@@ -78,35 +75,31 @@ describe('loadDaemonConfig（Settings 缝优先级）', () => {
     expect(viaInput.skillsDir).toBe(explicitDir);
   });
 
-  test('skillsDir 指向不存在目录 = 非致命（空 skills 集由扫描层降级，config 不抛）', () => {
+  test('skillsDir pointing at a missing directory = non-fatal (empty skills set degraded by the scan layer, config does not throw)', () => {
     const missing = join(tmp(), 'no-such-skills-dir');
     expect(() => loadDaemonConfig({ skillsDir: missing }, {})).not.toThrow();
     expect(loadDaemonConfig({ skillsDir: missing }, {}).skillsDir).toBe(missing);
   });
 
-  test('workspaces-dir 护栏：父目录必须已存在（r3 §1.1 canon）', () => {
+  test('workspaces-dir guardrail: the parent directory must already exist (r3 §1.1 canon)', () => {
     const home = tmp();
-    // 父目录存在 → OK。
     expect(() => loadDaemonConfig({ workspacesDir: join(home, 'ws') }, {})).not.toThrow();
-    // 父目录不存在 → 拒绝启动而非落到启动盘。
     expect(() => loadDaemonConfig({ workspacesDir: join(home, 'missing', 'ws') }, {})).toThrow(
       WorkspacesDirError,
     );
   });
 
-  // spec 13（#368）：daemon 读本机 MCP config 的路径槽——优先级同律
-  // （显式入参 > env > 默认值），默认 = ~/.claude.json。
-  test('mcpConfigPath 默认 = ~/.claude.json', () => {
+  test('mcpConfigPath default = ~/.claude.json', () => {
     const cfg = loadDaemonConfig({}, {});
     expect(cfg.mcpConfigPath).toBe(join(homedir(), '.claude.json'));
   });
 
-  test('mcpConfigPath env 覆盖（CAIRN_MCP_CONFIG）', () => {
+  test('mcpConfigPath env override (CAIRN_MCP_CONFIG)', () => {
     const cfg = loadDaemonConfig({}, { [ENV_VARS.mcpConfig]: '/tmp/custom-claude.json' });
     expect(cfg.mcpConfigPath).toBe('/tmp/custom-claude.json');
   });
 
-  test('mcpConfigPath 显式入参 > env', () => {
+  test('mcpConfigPath explicit args > env', () => {
     const cfg = loadDaemonConfig(
       { mcpConfigPath: '/explicit-claude.json' },
       { [ENV_VARS.mcpConfig]: '/env-claude.json' },
@@ -115,20 +108,20 @@ describe('loadDaemonConfig（Settings 缝优先级）', () => {
   });
 });
 
-describe('#1149 环境钩子超时（hookTimeoutMs，Settings 缝优先级同律）', () => {
-  test('缺省 = WORKSPACE_HOOK_TIMEOUT_MS（20min，票面钉死）', () => {
+describe('#1149 environment hook timeout (hookTimeoutMs, same Settings seam precedence)', () => {
+  test('default = WORKSPACE_HOOK_TIMEOUT_MS (20min, pinned on the ticket)', () => {
     const cfg = loadDaemonConfig({}, {});
     expect(cfg.hookTimeoutMs).toBe(WORKSPACE_HOOK_TIMEOUT_MS);
   });
-  test('env 覆盖（CAIRN_HOOK_TIMEOUT_MS）', () => {
+  test('env override (CAIRN_HOOK_TIMEOUT_MS)', () => {
     const cfg = loadDaemonConfig({}, { [ENV_VARS.hookTimeoutMs]: '45000' });
     expect(cfg.hookTimeoutMs).toBe(45_000);
   });
-  test('显式入参 > env', () => {
+  test('explicit args > env', () => {
     const cfg = loadDaemonConfig({ hookTimeoutMs: 60_000 }, { [ENV_VARS.hookTimeoutMs]: '45000' });
     expect(cfg.hookTimeoutMs).toBe(60_000);
   });
-  test('env 非正整数（0/负/NaN/浮点）= 忽略，用缺省（静默回缺省面）', () => {
+  test('env non-positive-integer (0/negative/NaN/float) = ignored, default used (silent default fallback)', () => {
     for (const bad of ['0', '-5', 'abc', '1.5']) {
       const cfg = loadDaemonConfig({}, { [ENV_VARS.hookTimeoutMs]: bad });
       expect(cfg.hookTimeoutMs).toBe(WORKSPACE_HOOK_TIMEOUT_MS);
@@ -136,8 +129,8 @@ describe('#1149 环境钩子超时（hookTimeoutMs，Settings 缝优先级同律
   });
 });
 
-describe('本地状态布局（02 §5.3）', () => {
-  test('ensureStateDirs 建齐 home + outbox/chat-sessions/agent-runtime/workspaces', () => {
+describe('local state layout (02 §5.3)', () => {
+  test('ensureStateDirs creates home + outbox/chat-sessions/agent-runtime/workspaces', () => {
     const home = join(tmp(), 'cairn-home');
     const paths = statePaths(home);
     ensureStateDirs(paths);
@@ -152,7 +145,7 @@ describe('本地状态布局（02 §5.3）', () => {
     }
   });
 
-  test('machine.json 形状校验：坏 token 拒读（64hex，r3 §1.3）', () => {
+  test('machine.json shape validation: bad token refused (64hex, r3 §1.3)', () => {
     const paths = statePaths(tmp());
     ensureStateDirs(paths);
     writeFileSync(
@@ -169,12 +162,12 @@ describe('本地状态布局（02 §5.3）', () => {
     expect(MACHINE_TOKEN_PATTERN.test(good.token)).toBe(true);
     saveMachineJson(paths, good);
     expect(loadMachineJson(paths)).toEqual(good);
-    expect(forgetMachine(paths)).toBe(true); // logout 只 Forget 本机（02 §5.2）
+    expect(forgetMachine(paths)).toBe(true);
     expect(loadMachineJson(paths)).toBeNull();
     expect(forgetMachine(paths)).toBe(false);
   });
 
-  test('device.json 32hex 生成且稳定（r3 §1.3 设备指纹）', () => {
+  test('device.json 32hex generated and stable (r3 §1.3 device fingerprint)', () => {
     const paths = statePaths(tmp());
     ensureStateDirs(paths);
     const d1 = loadOrCreateDeviceJson(paths);
@@ -190,7 +183,7 @@ describe('本地状态布局（02 §5.3）', () => {
     expect(loadDaemonJson(paths)).toEqual({ pid: 4242, startedAt: 1, runner: 'cli' });
   });
 
-  test('chat-sessions 索引：sessionId → sessionFile（continueSession 解析键）', () => {
+  test('chat-sessions index: sessionId → sessionFile (continueSession resolution key)', () => {
     const paths = statePaths(tmp());
     ensureStateDirs(paths);
     recordSession(paths, 'sess-1', '/x/sessions/sess-1.jsonl');

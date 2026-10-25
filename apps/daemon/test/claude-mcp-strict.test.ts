@@ -1,19 +1,3 @@
-// 三态受管 MCP（#1307）加上 #1314 的真实 spawn argv 判据。
-//
-// 产品语义：claim / SessionOpts 字段缺省 = 继承机器自己的 MCP 配置，不上
-// strict；字段是数组（含 []）= 只加载列出的 server，并打开 strict。#1314 把
-// strictMcpConfig 无条件钉成 true，会把缺省态塌成受管空锁，这里不采。
-//
-// 组装面（Options 字段，先于实现固化的四态）：
-//   1. 受管空：mcpServers 键恒发（{} 也发）+ strictMcpConfig: true
-//   2. 受管非空：集原样透传 + strict
-//   3. 缺省 + 空 record：两键都不发
-//   4. 缺省 + 非空：键发、strict 不发
-//
-// spawn 面（query → spawnClaudeCodeProcess 的真实 argv，#1314）：SDK 在组
-// argv 前丢掉空表和仅 in-process sdk server，所以 --mcp-config 只出现在有
-// 外部端点时。锁是 --strict-mcp-config，且只在受管态出现。
-
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { createSdkMcpServer, query, type SpawnedProcess } from '@anthropic-ai/claude-agent-sdk';
@@ -39,7 +23,6 @@ function parts(over: Partial<ClaudeSdkOptionParts> = {}): ClaudeSdkOptionParts {
   };
 }
 
-/** 受管集在位形（组装面只认 record 透传，条目取合法 http 形即可）。 */
 function withSeam(): McpRecord {
   return { cairn: { type: 'http', url: 'https://example.invalid/mcp' } };
 }
@@ -114,15 +97,15 @@ function mcpConfig(args: string[]): string | null {
   return args[index + 1] ?? null;
 }
 
-describe('buildClaudeSdkOptions 三态（#1307 失败方式 1/2）', () => {
-  test('受管空：strictMcpConfig 态下 mcpServers 键恒发（空 record {} 不例外）+ strict 锁', () => {
+describe('buildClaudeSdkOptions three states (#1307 failure modes 1/2)', () => {
+  test('managed empty: mcpServers key always sent under strictMcpConfig (empty record {} no exception) + strict lock', () => {
     const opts = buildClaudeSdkOptions(parts({ mcpServers: {}, strictMcpConfig: true }));
     expect('mcpServers' in opts).toBe(true);
     expect(opts.mcpServers).toEqual({});
     expect(opts.strictMcpConfig).toBe(true);
   });
 
-  test('受管非空：managed 集原样透传 + strict 锁（host 缝在集内）', () => {
+  test('managed non-empty: managed set passed through verbatim + strict lock (host seam inside the set)', () => {
     const record = withSeam();
     const opts = buildClaudeSdkOptions(parts({ mcpServers: record, strictMcpConfig: true }));
     expect(opts.mcpServers).toBe(record);
@@ -130,14 +113,14 @@ describe('buildClaudeSdkOptions 三态（#1307 失败方式 1/2）', () => {
   });
 });
 
-describe('buildClaudeSdkOptions 继承态（#1307 失败方式 3/4：逃生门 + 零回归）', () => {
-  test('缺省（继承）+ 空 record：mcpServers 与 strictMcpConfig 两键都不发', () => {
+describe('buildClaudeSdkOptions inherit state (#1307 failure modes 3/4: escape hatch + zero regression)', () => {
+  test('default (inherit) + empty record: neither mcpServers nor strictMcpConfig key sent', () => {
     const opts = buildClaudeSdkOptions(parts({ mcpServers: {} }));
     expect('mcpServers' in opts).toBe(false);
     expect('strictMcpConfig' in opts).toBe(false);
   });
 
-  test('缺省（继承）+ 非空 record：mcpServers 键发（host 缝存活）、strict 键不发', () => {
+  test('default (inherit) + non-empty record: mcpServers key sent (host seam alive), strict key not sent', () => {
     const record = withSeam();
     const opts = buildClaudeSdkOptions(parts({ mcpServers: record }));
     expect(opts.mcpServers).toBe(record);
@@ -146,7 +129,7 @@ describe('buildClaudeSdkOptions 继承态（#1307 失败方式 3/4：逃生门 +
 });
 
 describe('claude-code spawn MCP isolation (#1307, tri-state)', () => {
-  test('受管空：--strict-mcp-config，不带 --mcp-config，setting sources 仍在', async () => {
+  test('managed empty: --strict-mcp-config, no --mcp-config, setting sources intact', async () => {
     const { options, args } = await spawnArgs(parts({ mcpServers: {}, strictMcpConfig: true }));
     expect(options.strictMcpConfig).toBe(true);
     expect(args).toContain('--strict-mcp-config');
@@ -154,7 +137,7 @@ describe('claude-code spawn MCP isolation (#1307, tri-state)', () => {
     expect(args).toContain('--setting-sources=user,project,local');
   });
 
-  test('缺省空：argv 不上 --strict-mcp-config，也不带 --mcp-config', async () => {
+  test('default empty: argv carries neither --strict-mcp-config nor --mcp-config', async () => {
     const { options, args } = await spawnArgs(parts({ mcpServers: {} }));
     expect('strictMcpConfig' in options).toBe(false);
     expect(args).not.toContain('--strict-mcp-config');
@@ -162,7 +145,7 @@ describe('claude-code spawn MCP isolation (#1307, tri-state)', () => {
     expect(args).toContain('--setting-sources=user,project,local');
   });
 
-  test('受管、仅 in-process cairn：严格模式，argv 不序列化 sdk server', async () => {
+  test('managed, in-process cairn only: strict mode, argv does not serialize the sdk server', async () => {
     const cairn = createSdkMcpServer({ name: 'cairn', alwaysLoad: true, tools: [] });
     const { options, args } = await spawnArgs(
       parts({ mcpServers: { cairn }, strictMcpConfig: true }),
@@ -172,7 +155,7 @@ describe('claude-code spawn MCP isolation (#1307, tri-state)', () => {
     expect(mcpConfig(args)).toBe(null);
   });
 
-  test('受管、显式 stdio 端点：--mcp-config 只有该端点，并带严格模式', async () => {
+  test('managed, explicit stdio endpoint: --mcp-config carries only that endpoint, plus strict mode', async () => {
     const cairn = createSdkMcpServer({ name: 'cairn', alwaysLoad: true, tools: [] });
     const figma = mapMcpEndpoint({
       slug: 'figma',
@@ -191,7 +174,7 @@ describe('claude-code spawn MCP isolation (#1307, tri-state)', () => {
     );
   });
 
-  test('缺省 + 显式 stdio：--mcp-config 在，--strict-mcp-config 不在', async () => {
+  test('default + explicit stdio: --mcp-config present, --strict-mcp-config absent', async () => {
     const figma = mapMcpEndpoint({
       slug: 'figma',
       transport: 'stdio',

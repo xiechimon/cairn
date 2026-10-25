@@ -183,8 +183,8 @@ async function setup(backend: AgentBackend, client: FakeClient = new FakeClient(
   return { client, lines };
 }
 
-describe('步收尾会话 JSONL 上传（#1512）', () => {
-  test('失败方式 1：可读会话文件 → 随 transcript 上传原文', async () => {
+describe('session JSONL upload at step close (#1512)', () => {
+  test('failure mode 1: readable session file → original uploaded with the transcript', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-'));
     const sessionFile = join(dir, 'sess.jsonl');
     const body = '{"type":"assistant","stopReason":"length"}\n';
@@ -197,7 +197,7 @@ describe('步收尾会话 JSONL 上传（#1512）', () => {
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('失败方式 2：文件不存在 → 步成功，日志可见，不请求 session.jsonl', async () => {
+  test('failure mode 2: file missing → step succeeds, visible in logs, no session.jsonl request', async () => {
     const missing = join(tmpdir(), `cairn-session-gone-${Date.now()}.jsonl`);
     const { client, lines } = await setup(backendWithSession(missing));
     expect(client.uploadNames[0]).toEqual(['transcript.json']);
@@ -205,7 +205,7 @@ describe('步收尾会话 JSONL 上传（#1512）', () => {
     expect(lines.some((l) => l.includes('session') && l.includes('missing'))).toBe(true);
   });
 
-  test('失败方式 3：超过上限 → 步成功，日志可见，不请求 session.jsonl', async () => {
+  test('failure mode 3: over the cap → step succeeds, visible in logs, no session.jsonl request', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-big-'));
     const sessionFile = join(dir, 'sess.jsonl');
     writeFileSync(sessionFile, 'x'.repeat(SESSION_JSONL_MAX_BYTES + 1));
@@ -215,7 +215,7 @@ describe('步收尾会话 JSONL 上传（#1512）', () => {
     expect(lines.some((l) => l.includes('session') && l.includes('over'))).toBe(true);
   });
 
-  test('失败方式 4：session PUT 失败 → transcript 仍上传、done 仍报', async () => {
+  test('failure mode 4: session PUT fails → transcript still uploaded, done still reported', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-put-'));
     const sessionFile = join(dir, 'sess.jsonl');
     writeFileSync(sessionFile, '{"ok":1}\n');

@@ -188,8 +188,8 @@ async function run(script: StepEvent[]) {
 const LIST_V1 = ['- [ ] 通读 poteto 的推文观点', '- [x] 查 pi 模型上下文'].join('\n');
 const LIST_V2 = ['- [x] 通读 poteto 的推文观点', '- [x] 查 pi 模型上下文'].join('\n');
 
-describe('runner agent todo 转发（#1524）', () => {
-  test('文本段任务行 → 整表上报一次', async () => {
+describe('runner agent todo forwarding (#1524)', () => {
+  test('text-segment task lines → whole table reported once', async () => {
     const client = await run([
       { type: 'text_delta', text: LIST_V1 },
       { type: 'done', usage: [] },
@@ -204,7 +204,7 @@ describe('runner agent todo 转发（#1524）', () => {
     ]);
   });
 
-  test('重复整表去重；状态变化再报', async () => {
+  test('duplicate whole-table deduped; reported again on status change', async () => {
     const client = await run([
       { type: 'text_delta', text: LIST_V1 },
       { type: 'message_end', message: { role: 'assistant', content: '换段' } },
@@ -217,7 +217,7 @@ describe('runner agent todo 转发（#1524）', () => {
     expect(client.todos[1]?.items[0]).toEqual({ text: '通读 poteto 的推文观点', state: 'done' });
   });
 
-  test('围栏内的任务行不触发上报', async () => {
+  test('task lines inside fences do not trigger reporting', async () => {
     const client = await run([
       { type: 'text_delta', text: ['```md', '- [ ] 假清单', '```'].join('\n') },
       { type: 'done', usage: [] },
@@ -225,7 +225,7 @@ describe('runner agent todo 转发（#1524）', () => {
     expect(client.todos).toEqual([]);
   });
 
-  test('纯散文不触发上报（无清单零噪声）', async () => {
+  test('plain prose does not trigger reporting (no list, zero noise)', async () => {
     const client = await run([
       { type: 'text_delta', text: '没有清单的正文，说完就收。' },
       { type: 'done', usage: [] },
@@ -233,7 +233,7 @@ describe('runner agent todo 转发（#1524）', () => {
     expect(client.todos).toEqual([]);
   });
 
-  test('toolcall_end 携带 todo 投影 → 同一上报面', async () => {
+  test('toolcall_end carrying the todo projection → same reporting surface', async () => {
     const client = await run([
       {
         type: 'toolcall_end',
@@ -250,7 +250,7 @@ describe('runner agent todo 转发（#1524）', () => {
     expect(client.todos).toEqual([{ items: [{ text: '读 README', state: 'doing' }] }]);
   });
 
-  test('同一清单先文本段后调用行 → 去重为一报', async () => {
+  test('same list first as text segment then as call row → deduped into one report', async () => {
     const client = await run([
       { type: 'text_delta', text: LIST_V1 },
       {
@@ -271,7 +271,7 @@ describe('runner agent todo 转发（#1524）', () => {
     expect(client.todos).toHaveLength(1);
   });
 
-  test('步收尾正常（todo 面不扰步生命周期）', async () => {
+  test('step closes normally (todo surface does not disturb the step lifecycle)', async () => {
     const client = await run([
       { type: 'text_delta', text: LIST_V1 },
       { type: 'done', usage: [] },

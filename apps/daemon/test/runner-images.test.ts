@@ -1,14 +1,3 @@
-// runner 图片附件接线（#730）失败方式先于实现固化：
-//   1. spec 携带整行图片 token → backend 收到的 prompt 是展开文本（锚行），
-//      promptImages 携带 base64 图片；transcript 的 user 行保留**原始**
-//      prompt（token 原样——web 渲染面 ATTACHMENT_LINE chip 不因展开而丢）。
-//   2. journal.claim 记录的也是原始 prompt（recover 重放时重新解析——
-//      token 不因首次解析而漂移）。
-//   3. 下载失败（pending）→ 步照常跑（不 failed）：prompt 文本带不可用注记，
-//      promptImages 空。
-//   4. chief 步不经本机制（instruction 原样透传，零解析）。
-//   5. 无 token 步 → sessionOpts.prompt 与原始文本逐字节一致（零回归）。
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -90,7 +79,6 @@ class FakeClient implements MachineApi {
     };
   }
   async skillsManifest() {
-    // #920：默认空清单 = 零团队技能（selection=whitelist，既有断言零扰动）。
     return { selection: 'whitelist' as const, skills: [] };
   }
   async skillFile(): Promise<Buffer> {
@@ -198,8 +186,8 @@ async function setup(claim: ClaimedStep, client: FakeClient) {
   return { seen, lines, paths };
 }
 
-describe('runner 图片附件接线（#730）', () => {
-  test('失败方式 1：spec 整行 png token → backend 收展开文本 + 图片；transcript 保留原始 token', async () => {
+describe('runner image attachment wiring (#730)', () => {
+  test('failure mode 1: full-line png token in the spec → backend receives expanded text + images; transcript keeps the original token', async () => {
     const client = new FakeClient();
     client.attachments.id1 = {
       fileName: 'shot.png',
@@ -217,24 +205,22 @@ describe('runner 图片附件接线（#730）', () => {
       { data: PNG.toString('base64'), mimeType: 'image/png' },
     ]);
     expect(client.attachmentCalls).toEqual(['s1:id1']);
-    // transcript 终稿 = 原始 prompt（title + spec，token 原样——web 渲染面
-    // chip 不因展开丢）
     const userRow = client.transcripts[0]!.messages.find((m) => m.id === 'user-s1');
     expect(userRow?.content).toBe(`图片任务\n\n${spec}`);
   });
 
-  test('失败方式 3：下载 409 → 步照常 success，prompt 带不可用注记，零图片', async () => {
+  test('failure mode 3: download 409 → step still succeeds, prompt carries an unavailable annotation, zero images', async () => {
     const client = new FakeClient();
     client.attachments.id1 = new Error('machine api 409: attachment id1 not ready (pending)');
     const token = formatAttachmentToken('shot.png', 't1/id1.png');
     const { seen } = await setup(claimed(`任务\n\n${token}`), client);
     expect(seen).toHaveLength(1);
-    expect(seen[0]!.prompt).toContain(token); // token 原样保留
+    expect(seen[0]!.prompt).toContain(token);
     expect(seen[0]!.prompt).toContain('不可用');
     expect(seen[0]!.promptImages ?? []).toHaveLength(0);
   });
 
-  test('失败方式 4：chief 步 instruction 原样透传（零解析、零下载）', async () => {
+  test('failure mode 4: chief step instruction passed through verbatim (zero parsing, zero downloads)', async () => {
     const client = new FakeClient();
     const token = formatAttachmentToken('shot.png', 't1/id1.png');
     const { seen } = await setup(claimed(`看图 ${token}`, { kind: 'chief' }), client);
@@ -244,7 +230,7 @@ describe('runner 图片附件接线（#730）', () => {
     expect(seen[0]!.promptImages).toBeUndefined();
   });
 
-  test('失败方式 5：无 token 步 → prompt 逐字节一致（零回归）', async () => {
+  test('failure mode 5: step without tokens → prompt identical byte for byte (zero regression)', async () => {
     const client = new FakeClient();
     const spec = '纯文本任务，没有附件。';
     const { seen } = await setup(claimed(spec), client);

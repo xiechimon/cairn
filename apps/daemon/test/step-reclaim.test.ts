@@ -1,12 +1,3 @@
-// #1473 同一步在一台机器上只有一个 runStep（verify-step-claim F1 / P1 的
-// daemon 半）。失败方式（先于实现固化）：
-//   1. 重复领取：server 把本机在飞的步放回 pending 又发回本机，领取循环再起
-//      一个 runStep——同一 worktree、同一分支两个会话，两次 done。
-//   2. 准备期无心跳：心跳计时器在 workspace.prepare 之后才起，clone / 项目锁
-//      / setup 期间 120s 无心跳，server 扫尾把在线机器上的步放回 pending。
-//   3. 心跳泄漏：早退失败路径不清计时器，步结束后仍在给 server 发心跳。
-//   4. 收尾期仍发心跳：上传 / 回报期间心跳应已停（会话结束即停的现行为）。
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -34,7 +25,6 @@ function defer<T = void>(): { promise: Promise<T>; resolve: (v: T) => void } {
   return { promise, resolve };
 }
 
-/** 门闩会话：事件流挂起直到 release，然后 done 收尾。 */
 function gatedBackend(release: Promise<void>) {
   const probe = { createCalls: 0 };
   const backend: AgentBackend = {
@@ -95,7 +85,6 @@ function repoStep(): ClaimedStep {
   };
 }
 
-/** prepare 挂起到 gate 再按 outcome 结束的工作区（其余原语不该被调用到）。 */
 function gatedWorkspace(gate: Promise<void>): WorktreeOps {
   const unused = async (): Promise<never> => {
     throw new Error('unused');
@@ -132,8 +121,8 @@ function stepDeps(api: FakeMachineApi, extra: { workspace?: WorktreeOps; backend
   };
 }
 
-describe('#1473 同机同步只跑一份', () => {
-  test('在飞步被再次发回本机：不起第二个会话，只有一次 done', async () => {
+describe('#1473 only one copy of a step runs on the same machine', () => {
+  test('an in-flight step dispatched back to the same machine: no second session, exactly one done', async () => {
     const api = new FakeMachineApi();
     api.mePatch = { maxConcurrent: 1 };
     const release = defer();
@@ -142,11 +131,9 @@ describe('#1473 同机同步只跑一份', () => {
     await waitFor(() => api.parked !== null);
     api.parked?.(CLAIMED);
     await waitFor(() => probe.createCalls === 1);
-    // server 扫尾放回 pending 后同机重领：同一步号再次发回。
     await waitFor(() => api.parked !== null);
     api.parked?.(CLAIMED);
     await waitFor(() => lines.some((l) => l.includes('already running here')));
-    // 领取循环照常继续（下一条 claim 挂起），不被重领卡住。
     await waitFor(() => api.parked !== null);
     release.resolve();
     await waitFor(() => api.doneBodies.length === 1);
@@ -157,7 +144,7 @@ describe('#1473 同机同步只跑一份', () => {
     await handle.done;
   });
 
-  test('准备工作区期间就有心跳；准备失败后心跳停止', async () => {
+  test('heartbeat runs during workspace preparation; stops after preparation failure', async () => {
     const api = new FakeMachineApi();
     const gate = defer();
     const run = runStep(stepDeps(api, { workspace: gatedWorkspace(gate.promise) }), repoStep());
@@ -171,7 +158,7 @@ describe('#1473 同机同步只跑一份', () => {
     expect(heartbeats(api)).toBe(after);
   });
 
-  test('会话结束后上传与回报期间不再发心跳', async () => {
+  test('no heartbeat during upload and reporting after the session ends', async () => {
     const reporting = defer();
     const report = defer();
     let heartbeatsAtReport = -1;
