@@ -76,6 +76,7 @@ import type { FetchLike } from '../lib/github.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { newMachineToken } from '../lib/keys.js';
+import { emitRuntimeStepSpan } from '../runtime-otel.js';
 import { readAttachmentMeta } from './attachments.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import {
@@ -1570,6 +1571,7 @@ export async function finishStep(
         createdAt: nowMs(),
       });
     }
+    emitRuntimeStepSpan(deps.db, stepId);
     return;
   }
   const verdictReport = reportedVerdictHeads(stepRow, {
@@ -1592,6 +1594,7 @@ export async function finishStep(
     }
     applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictReport);
     publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
     return;
   }
   if (outcome.status === 'success') {
@@ -1610,15 +1613,18 @@ export async function finishStep(
       verdictReport,
     });
     publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
     return;
   }
   if (outcome.status === 'stopped') {
     applyStoppedStep(deps, stepId);
     publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
     return;
   }
   applyStepFailure(deps, stepRow, outcome.errorMessage ?? `step ${outcome.status}`, verdictReport);
   publishStepStatus(deps, stepId);
+  emitRuntimeStepSpan(deps.db, stepId);
 }
 
 function workerStepContext(

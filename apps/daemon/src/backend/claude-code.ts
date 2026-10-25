@@ -37,6 +37,7 @@ import { z } from 'zod';
 import { claudeCodeAuthFailureMessage } from '../claude-code-auth.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { SessionNotResumableError } from './errors.js';
+import { claudeTelemetryEnv } from './otel.js';
 import {
   appendSkillsCatalog,
   collectDeniedSkillDirs,
@@ -791,6 +792,12 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   };
 }
 
+export function claudeSessionEnv(opts: SessionOpts): Record<string, string> | undefined {
+  const telemetryEnv = opts.telemetry !== undefined ? claudeTelemetryEnv(opts.telemetry) : null;
+  if (opts.env === undefined && telemetryEnv === null) return undefined;
+  return { ...opts.env, ...telemetryEnv };
+}
+
 export interface ClaudeCodeBackendOpts {
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
@@ -865,6 +872,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       session: opts,
       ...(this.opts.onSkillsLog !== undefined ? { log: this.opts.onSkillsLog } : {}),
     });
+    const sessionEnv = claudeSessionEnv(opts);
     const sdkOptions: Options = buildClaudeSdkOptions({
       cwd: opts.cwd,
       modelId: opts.modelId,
@@ -879,7 +887,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       ...(this.opts.executablePath !== undefined
         ? { executablePath: this.opts.executablePath }
         : {}),
-      ...(opts.env !== undefined ? { env: opts.env } : {}),
+      ...(sessionEnv !== undefined ? { env: sessionEnv } : {}),
       ...(nativePluginDir !== null
         ? { plugins: [{ type: 'local' as const, path: nativePluginDir }] }
         : {}),

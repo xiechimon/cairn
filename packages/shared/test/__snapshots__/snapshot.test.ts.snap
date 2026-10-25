@@ -6081,6 +6081,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > local state layou
     "skills",
     "gate",
     "trust",
+    "otel",
   ],
   "LOCAL_STATE_DIRS": [
     "outbox",

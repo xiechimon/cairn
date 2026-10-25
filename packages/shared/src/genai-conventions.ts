@@ -51,7 +51,7 @@ export interface TokenCounts {
   cacheWrite?: number;
 }
 
-export interface ModelRef {
+export interface ProviderModelRef {
   provider?: string;
   model?: string;
 }
@@ -62,7 +62,7 @@ function compact(entries: Record<string, AttributeValue | null | undefined>): At
   );
 }
 
-export function splitModelId(qualified: string): ModelRef {
+export function splitModelId(qualified: string): ProviderModelRef {
   const slash = qualified.indexOf('/');
   return slash < 0
     ? { model: qualified }
@@ -109,6 +109,21 @@ export function invokeAgentAttributes(build: {
   });
 }
 
+export function runtimeBuildAttributes(build: {
+  buildId: string;
+  baseSha: string | null;
+  harnessHash: string | null;
+  agentName?: string;
+}): Attributes {
+  return compact({
+    [GENAI_ATTR.operationName]: GENAI_OPERATION.invokeAgent,
+    [GENAI_ATTR.agentName]: build.agentName,
+    [CAIRN_ATTR.buildId]: build.buildId,
+    [CAIRN_ATTR.baseSha]: build.baseSha,
+    [CAIRN_ATTR.harnessHash]: build.harnessHash,
+  });
+}
+
 export function stepAttributes(step: {
   stepId: string;
   kind: string;
@@ -131,7 +146,7 @@ export function chatAttributes(
     usage?: TokenCounts;
     costUsd?: number;
   },
-  fallback: ModelRef,
+  fallback: ProviderModelRef,
 ): Attributes {
   const { usage } = turn;
   const hasInput =
