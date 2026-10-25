@@ -1,8 +1,0 @@
-== vitest light project set (VITEST_PROJECT_SET=light) ==
- Test Files  2 failed | 172 passed (174)
-      Tests  2 failed | 2092 passed (2094)
-(first run: 2 failed = ui-reuse-inventory fixed via COMPONENTS.md registration; skill-write M5 = load flake under concurrent full-e2e, passed on isolated rerun)
-
-== isolated rerun of the two ==
- Test Files  2 passed (2)
-      Tests  33 passed (33)

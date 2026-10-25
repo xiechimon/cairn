@@ -1,7 +1,0 @@
-scenario: a base that predates the manifest (main at e9253388fc083cca6d69695f5c242af082f83b15) skips the S5 ratchet and passes — the introducing PR is green
-scratch worktree: /tmp/registry-gate-989-scenarios @ 91c3f789
-
-$ node scripts/ui-registry-gate.mjs --base e9253388fc083cca6d69695f5c242af082f83b15
-[ui-registry-gate] PASS: 25 file(s) in apps/web/src/components/ui = 16 registry (6 pristine vs pinned snapshot / 10 registered deviations) + 9 adapters; snapshot shadcn@4.21.3 fetched 2026-10-07; ledger frozen from e9253388fc08; comparison: bootstrap (base e9253388fc08 has no scripts/ui-registry.json).
-exit=0
-

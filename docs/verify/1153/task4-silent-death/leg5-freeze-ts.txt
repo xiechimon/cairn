@@ -1,7 +1,0 @@
-freeze-target=claim+60s
-now=2026-10-11T07:55:26.560734000Z
-id|kind|status|machineId|checkpointCommit|claimed|beat
-t6EnfPh3N8cviHYbfkNSu|plan|done|DHS9BRFaSnKYVHx38VyOm|4a2052d18b13105322be17778516d2e1a52bba40|2026-10-11 07:35:32|2026-10-11 07:47:03
-i2FOCZdcvffp4UArNgB0z|build|claimed|DHS9BRFaSnKYVHx38VyOm||2026-10-11 07:54:24|2026-10-11 07:55:26
-
-=== FREEZE leg5 at 2026-10-11T07:55:30.868454000Z ===

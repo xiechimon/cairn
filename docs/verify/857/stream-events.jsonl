@@ -1,8 +1,0 @@
-{"t":449,"type":"ping"}
-{"t":1088,"type":"text_delta","text":"第一轮：先看任务现状和上一轮失败情况。"}
-{"t":1418,"type":"message","id":"c-p857-r1","role":"assistant"}
-{"t":2416,"type":"text_delta","text":"第二轮：失败原因是凭证过期，正在重新派工。"}
-{"t":2449,"type":"message","id":"c-p857-r2","role":"assistant"}
-{"t":3436,"type":"message","id":"p857-tool-1","role":"assistant"}
-{"t":3436,"type":"message","id":"p857-final","role":"assistant"}
-{"t":3442,"type":"step","status":"done"}

@@ -1,9 +1,0 @@
-
- RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0103-717-m5-ci-dump/integration
-
-
- Test Files  1 passed (1)
-      Tests  3 passed (3)
-   Start at  01:47:31
-   Duration  12.52s (tests 86%, import 10%, transform 4%)
-

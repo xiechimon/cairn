@@ -1,4 +1,0 @@
-2026-10-10 22:08:34 [skills] team: 1 skill(s), 1 file(s) materialized → /tmp/pacman-1169-daemon-home/team-skills/views/d57d8a253ecd30f4041e4fb6fecf4bbb466fbe898a6949899dcf8690b470d68e (fetched 1 file(s) / 293 byte(s), reused 0)
-2026-10-10 22:08:34 [skills] filtered: unrestrict-local not in injected selection
-2026-10-10 22:08:34 [skills] loaded: 1 skills from /tmp/pacman-1169-daemon-home/team-skills/views/d57d8a253ecd30f4041e4fb6fecf4bbb466fbe898a6949899dcf8690b470d68e + /tmp/pacman-1169-local-skills
-2026-10-10 22:08:34 [skills] catalog: entries=1 chars=675 bytes=675

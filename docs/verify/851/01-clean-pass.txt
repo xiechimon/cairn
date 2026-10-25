@@ -1,6 +1,0 @@
-scenario: clean tree at the mechanism commit passes (in-tree baseline)
-scratch worktree: /tmp/debt-gate-851-scenarios @ dcf0115
-
-$ node scripts/ui-debt-gate.mjs   # (run in the lane worktree, clean at dcf0115)
-[ui-debt-gate] PASS: 20 per-face css files / 11412 lines; 76 bare control(s) in 30 file(s); 25 css + 185 tsx scanned. Baseline: in-tree only, frozen from b38e70d75435.
-exit=0

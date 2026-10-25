@@ -1,9 +1,0 @@
-{
-  "context": "#863 T2 physical run world v2 (server WITHOUT machine-stream keep-alive ping), flip-poller at 1s resolution on machine.online",
-  "events": [
-    "2026-10-05T06:07:55Z machine-online-flip daemon-mea 1->0 (SSE stream silently dropped; daemon healthy, running steps; no crash/restart lines in its log)",
-    "2026-10-05T06:08:14Z machine-online-flip daemon-mea 0->1 (presence heartbeat restored online 19s later)"
-  ],
-  "effect": "during the false-offline window the #863 affinity gate in tryClaim releases session-continuing steps to other machines (observed: mea claimed buildB plan2 gSd1PgTHufxebTJOfsVAd at 05:56:19 during daemon-mac's identical blip, continue payload -> SessionNotResumable fallback -> new session, losing conversation context although the session machine never died)",
-  "rootCause": "GET /api/machine/stream sends zero bytes to machines with no events; undici bodyTimeout (default 300s, measured between body chunks) aborts the response; server onAbort -> markOffline; daemon reconnects silently (machine-loop 'announced' flag logs push-channel-connected only once)"
-}

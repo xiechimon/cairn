@@ -1,6 +1,0 @@
-$ python3 scripts/pr-evidence-gate.py /tmp/pr-1110-body.md
-(the body this PR was opened with, written by following .claude/skills/pr-pacman/SKILL.md)
-pr-evidence: sections: 2/2 answered
-pr-evidence: scanned 1 image link(s)
-pr-evidence: GREEN
-exit=0

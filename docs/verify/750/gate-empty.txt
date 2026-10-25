@@ -1,3 +1,0 @@
-pr-evidence: scanned 0 image link(s)
-pr-evidence: GREEN
-exit=0

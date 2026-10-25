@@ -1,1 +1,0 @@
-SHIM CALLED: pr list --repo o/r --head pacman/conv-conv-1 --state all --json number,url,state --limit 5

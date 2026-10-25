@@ -1,4 +1,0 @@
-$ # negative control: the escape restored, same gate
-[ui-drift-gate] G2 overlay/attachment-strip.css:76: hex literal outside token source (color: #fff;)
-[ui-drift-gate] FAIL: 1 drift site(s). See header for gate intent.
-exit=1

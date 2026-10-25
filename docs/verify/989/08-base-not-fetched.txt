@@ -1,7 +1,0 @@
-scenario: an unavailable base sha exits 2 instead of silently falling back to the branch manifest
-scratch worktree: /tmp/registry-gate-989-scenarios @ 91c3f789
-
-$ node scripts/ui-registry-gate.mjs --base deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
-[ui-registry-gate] S6 base sha deadbeefdeadbeefdeadbeefdeadbeefdeadbeef is not available locally; fetch it first (CI: git fetch --depth=1 origin <sha>). Refusing to fall back to the branch manifest.
-exit=2
-

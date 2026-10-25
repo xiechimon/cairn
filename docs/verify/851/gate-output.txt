@@ -1,1 +1,0 @@
-[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, 6 chip variants single-sourced (25 css files scanned).

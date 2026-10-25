@@ -1,9 +1,0 @@
-# Runtime geometry measured in the fixture build via page.evaluate(offsetWidth/offsetHeight)
-
-## BEFORE fix (className removed):
-  img  [32, 64]   Root [32, 32]   .profile-avatar box [64, 64]
-## AFTER fix (className="size-16"):
-  img  [64, 64]   Root [64, 64]   .profile-avatar box [64, 64]
-
-# Ticket item 3: after the fix the wrapper rule [&_img]:size-16 and the Root
-# size-full agree at 64px — no conflict.

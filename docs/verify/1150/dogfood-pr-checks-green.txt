@@ -1,4 +1,0 @@
-# dogfood PR checks — GREEN state (after fix push, poller advanced)
-Sat Oct 10 21:56:26 CST 2026
-gate	pass	4s	https://github.com/xiechimon/pacman-1150-dogfood/actions/runs/38057568479/job/114229060500	
-gate	pass	5s	https://github.com/xiechimon/pacman-1150-dogfood/actions/runs/38057571697/job/114229068894	

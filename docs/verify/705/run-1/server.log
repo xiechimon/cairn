@@ -1,4 +1,0 @@
-[08:22:39] INFO (41620): pacman-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 pacman start --api-key <key> --team <teamId>
-    port: 56793
-    dataDir: "/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-probe-705-home-L911tT/server"
-    teamId: "l6yZO6fPt1O-6pJ_1tjQW"
