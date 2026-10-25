@@ -1,8 +1,8 @@
 # #931 验证证据：返工回原分支 / 原 PR
 
-两条返工路（失败重启带反馈 + 审核关口打回）在同一 todo 上不再产出第二个
-conversationId / 第二条分支；原分支收到新提交（PR 就地更新的机制面 = conv
-分支 push）。正本 = `docs/spec/23-返工回原分支与PR收敛.md`。
+The two rework paths (failure restart with feedback + review-gate rejection) no longer produce a second
+conversationId / second branch on the same todo; the original branch receives new commits (the mechanism surface of the PR updating in place = conv
+branch push). Canonical copy = `docs/spec/23-rework-to-original-branch-and-pr-convergence.md`.
 
 ## 复现（本目录证据的生成方式）
 

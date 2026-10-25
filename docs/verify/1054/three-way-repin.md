@@ -33,7 +33,7 @@ measure-*.md 里带 `(registered deviation, stays)` 标注）。
 
 其余无钉改动面（gate 横幅 / TURN_TOOLS / 切换器盘 / 示例卡 / icon tile /
 SEARCH_BOX / token-gate input / EMPTY_CARD / 章程块 / 虚线空态框）为类级
-单点改动，依据与逐处理由见 `docs/spec/27-消费点形状与品牌墨台账.md` §2；
+A single-point change; basis and per-site reasoning in `docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md` §2;
 segmented-controls.spec 的 pill 追踪断言（位置/尺寸 ≤1px，无半径）与
 chief-settings.spec 的 inset 断言在改动后全绿（本分支 e2e:affected 663 passed）。
 

@@ -1,7 +1,8 @@
 # 644 · 全站动效迁移 shadcn：原型与取舍
 
 > 状态：**已裁决**（2026-10-02，用户拍板**方向 B**：全站采用 shadcn 默认，显式推翻 #73
-> 复刻纪律）。裁决正本 = `docs/adr/0009-全站动效收敛-shadcn-默认.md`；逐域施工在执行票
+> Status: **ruled** (2026-10-02, the user decided **direction B**: adopt shadcn defaults site-wide, explicitly overturning #73's
+> replication discipline). The ruling canonical copy = `docs/adr/0009-site-wide-motion-converges-on-shadcn-defaults.md`; per-domain construction is in the execution ticket
 > （票面引本原型 §4）。本文保留为裁决前的现状盘点与两向对比记录。
 > 取数时点：`hp/pacman/t-0041-tabs` @ 2026-10-02；tw-animate-css 1.4.0（dist 逐字读取）；
 > 参考站实测记录见 `docs/verify/644/reference-measurements.md`。
@@ -11,9 +12,9 @@
 1. `apps/web/src/styles/motion.css` 是**故意复刻参考站**的 transition registry（#73；文件头
    注释写明数值逐条抄自参考站生产样式表 `docs/research/assets/r1/f965382e067739e9.css`）。
    「迁到 shadcn」不是收拾残局，而是**对这条已生效决定的改判或重构**——所以本文给方向而不是直接动手。
-2. `docs/spec/16-shadcn全站铺开批次表与验收口径.md` **没有动效批次**（已核，批次表 §1 五批全是
-   结构/控件迁移，且明文「逐域迁移是纯结构改动、零视觉重钉」）。动效迁移属**新增范围**，
-   需要用户拍板后追加批次条目，不是已排期项。
+2. `docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md` **has no motion batch** (verified: §1's five batches are all
+   structure/control migrations, and it states outright "per-domain migration is pure structure change, zero visual re-pinning"). Motion migration is **new scope**,
+   needing the user's decision before appending a batch entry — it is not an already-scheduled item.
 
 ## 1. 现状盘点：站点已经是双动效系统并存
 

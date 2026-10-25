@@ -1,7 +1,7 @@
 # #903 派发判定 — live 验证证据（返工轮 / 第 2 轮）
 
-裁决正本 = `docs/adr/0014-chief派发判定-判定权归chief-判说可推翻.md`（返工轮，
-推翻第一轮 ADR 0013 的设置槽方案）。探针 =
+The ruling canonical copy = `docs/adr/0014-chief-dispatch-verdict-authority-rests-with-chief-overridable.md` (rework round,
+overturning round 1's ADR 0013 settings-slot scheme). Probe =
 `.claude/skills/verify-pacman/scripts/drive-903-dispatch-judgment.mjs`，
 2026-10-08 live **12/12 PASS**（隔离栈 8795/5277，全新库，零 daemon 零 LLM，
 假机器走真 machine wire）。

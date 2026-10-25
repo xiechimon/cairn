@@ -23,7 +23,7 @@
       "dimension": "correctness",
       "title": "Spec 28 §7.5 says every blocking finding gets two skeptics, but the gate caps skeptics at four",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 246,
       "failurePath": "The §7.5 table says '每条 blocking 发现派 2 个反驳者' with '5 + 每条 blocking 2 个，上限 10'. pr-gate.js sets MAX_SKEPTICS = 4 (line 23) and, at lines 238-241, keeps every blocking finding after the second without skeptics ('skipped: cap reached'). So a run with three or more blocking findings can never reach go, even when they are all false positives. Someone reading only the spec expects each finding to get its own refutation. The maximum is also 9 agents, not 10. The code fails closed, so this is a documentation gap and not a wrong verdict.",
       "evidence": "pr-gate.js:23 `const MAX_SKEPTICS = 4`; :238-241 push to unrefuted and blocking with skeptics 'skipped: cap reached'; the selfcheck case 'findings past the skeptic cap are kept' pins this behaviour."
@@ -77,7 +77,7 @@
       "dimension": "rules",
       "title": "ADR 0021 status credits the 2026-10-20 user confirmation for D2-D4 text rewritten later in this PR",
       "severity": "suggestion",
-      "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+      "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
       "line": 3,
       "failurePath": "The status line says the decisions are what the user confirmed in the session (D1-D7 of spec 28 §3, 2026-10-20). In e5414a2, D4 was a 12-entry name list (`.github/**`, `biome.json`, `scripts/*gate*`, …). At the head it is default deny, with case-insensitive protected classes at any depth. D2 (merging clicked in pacman goes through the REST merge; the 'only github.com egress' claim is dropped) and D3 (update-branch keeps the digest only when main's new commits leave this PR's files alone) were also rewritten by the session in 7f0b544, 4c27770, 2953b40, 37674a9 and 8ca12ea. Spec 28 §3 (line 64) says the goal session builds only on decisions written there and stops on anything not yet decided. Every change is more conservative, the Risk section names the default-deny trade, and the user merges this PR, so the merge is the real confirmation. The status line could say that D2-D4 were revised in #1410 and take effect when the user merges.",
       "evidence": "Compare `git show e5414a2:docs/adr/0021-…md` lines 35-37 with the head's lines 35-37."
@@ -86,7 +86,7 @@
       "dimension": "rules",
       "title": "Spec 28 D7 adds a precondition to ADR 0007 D3 while ADR 0021 says ADR 0007 is unchanged",
       "severity": "suggestion",
-      "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+      "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
       "line": 60,
       "failurePath": "ADR 0007 D3: open the PR, then immediately run `gh pr merge <n> --squash --auto`. Spec 28 D7 (line 74) and §7.5 (line 256) change this for the bootstrap session's PRs:\n- auto-merge waits for a pr-gate go;\n- it is pinned with `--match-head-commit`;\n- D4-protected PRs and P0/P4 go to the user.\nThe ADR 0007 bullet in ADR 0021's relationship section (line 60) only says repo-level auto-merge and branch protection stay the same. This is a scoped amendment of an ADR process decision, made in a spec, not an ADR being overturned. One clause in that bullet naming the D7 precondition would keep the relationship explicit for the next reader of ADR 0007.",
       "evidence": "Base ADR 0007 D3 text compared with spec 28 head lines 74 and 256."
@@ -186,15 +186,15 @@
     ".claude/workflows/pr-gate.js",
     ".github/workflows/ci.yml",
     ".gitignore",
-    "docs/adr/0018-多agent团队三层与机器能力闸.md",
-    "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+    "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+    "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
     "docs/pr-review.md",
     "scripts/pr-gate-selfcheck.mjs",
-    "docs/spec/28-自举闭环-自写自合.md"
+    "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md"
   ],
   "mergedBy": "user",
   "humanReasons": [
-    "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-多agent团队三层与机器能力闸.md, docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-自举闭环-自写自合.md",
+    "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md, docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
     "2804 lines changed (over 800)"
   ],
   "missing": [],

@@ -62,7 +62,7 @@
       "dimension": "correctness",
       "title": "Spec 28 §8 ledger still says 'lane auto-merge' for phases whose deliverables are now D4-protected under scripts/**",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 272,
       "failurePath": "1. 2953b40 widened D4 to all of scripts/**.\n2. The P7 deliverable is scripts/ops/deploy-mea.sh (spec 28 line 153), which pr-gate now routes to the user (probe: scripts/ops/x.sh gives mergedBy 'user'). The §8 row at line 272 still lists 车道 auto-merge (lane auto-merge) as the merger.\n3. P1 (line 266) adds a new static CI gate (line 93), which will live under scripts/ or .github/, both D4-protected, and its row also says lane auto-merge.\n4. pr-gate's mergedBy decides the merger mechanically, so nothing merges wrongly, but the ledger that spec 28 calls the only progress truth across compactions disagrees with D4 and D7.\n5. Fix: mark P1 and P7 as user merges, or partly user like the P3/P6 rows."
     },
@@ -78,7 +78,7 @@
       "dimension": "rules",
       "title": "Three branch commits lack the ticket in the subject, and the AGENTS.md squash recipe would pick one of them",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 1,
       "failurePath": "The subjects of commits ca088ce, 3944905 and 662cbd9 are `docs: ...` with no (1401), so they do not follow `<scope>(<ticket>): <subject>`. The repo allows merge-commit and rebase merges (allow_merge_commit and allow_rebase_merge are true). AGENTS.md's squash recipe takes `gh api .../pulls/1410/commits -q '.[0].commit.message'`, and `.[0]` here is ca088ce. Merging with that recipe would land the subject `docs: spec 28 自举闭环计划...` with no `closes #1401`, and #1401 would stay open. GitHub's default squash (PR title plus COMMIT_MESSAGES) is correct, and the PR body's Issues section warns about this. The risk is only that a merger follows AGENTS.md literally. The commits cannot be reworded without a force push, so keeping the PR body warning is the fix. A smaller point: the PR title's `docs(1401)` scope becomes the squash subject even though the PR ships executable .claude/workflows/pr-gate.js and scripts/pr-gate-harness.mjs, which the branch commits labelled chore(1401).",
       "evidence": "git log --format='%h %s': ca088ce, 3944905 and 662cbd9 use `docs:`. gh api repos/xiechimon/pacman returns merge:true, rebase:true, squash_title COMMIT_OR_PR_TITLE, squash_msg COMMIT_MESSAGES. Ticket #1401 was created at 20:23Z, after ca088ce (19:48Z)."
@@ -200,7 +200,7 @@
       "file": "docs/verify/1401/pr-gate-named-probe.txt",
       "line": 8,
       "failurePath": "Ticket #1401's acceptance item says pr-gate can be called by name, and that item rests on this file. Lines 8-9 show `diff <(git show 7f0b544:...) <persisted script>  -> identical` with a placeholder in place of a real path or hash, so a reviewer cannot rerun or check the comparison. The PR body says 'Before the resume the same call returned `Workflow \"pr-gate\" not found`', and spec 28 line 254 says '#1410 两次实测' (two measured runs). The file records only the resumed-session call, so the second measurement has no artifact. The probe also ran in a resumed session, while the Acceptance box says 'a session that starts after the file is in the tree'.",
-      "evidence": "pr-gate-named-probe.txt lines 7-9 use `<persisted script>`, and nowhere in the file does `not found` appear. docs/spec/28-自举闭环-自写自合.md:254 cites this file for two measured runs."
+      "evidence": "pr-gate-named-probe.txt lines 7-9 use `<persisted script>`, and nowhere in the file does `not found` appear. docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md:254 cites this file for two measured runs."
     },
     {
       "dimension": "evidence",
@@ -214,14 +214,14 @@
   ],
   "protectedPaths": [
     ".claude/workflows/pr-gate.js",
-    "docs/adr/0018-多agent团队三层与机器能力闸.md",
-    "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+    "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+    "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
     "scripts/pr-gate-harness.mjs",
     ".gitignore"
   ],
   "mergedBy": "user",
   "humanReasons": [
-    "protected paths: .claude/workflows/pr-gate.js, docs/adr/0018-多agent团队三层与机器能力闸.md, docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md, scripts/pr-gate-harness.mjs, .gitignore",
+    "protected paths: .claude/workflows/pr-gate.js, docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md, docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md, scripts/pr-gate-harness.mjs, .gitignore",
     "1918 lines changed (over 800)"
   ],
   "missing": [],

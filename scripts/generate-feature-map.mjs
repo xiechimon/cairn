@@ -61,10 +61,10 @@ const TEST_SKIP_DIRS = new Set([
 ]);
 const TEST_SUFFIXES = ['.test.ts', '.test.tsx', '.spec.ts'];
 
-// Tier vocabulary and semantics: docs/spec/18-定位与差异化.md (差异化面 = the
+// Tier vocabulary and semantics: docs/spec/18-positioning-and-differentiation.md (the `差异化面` tier = the
 // three semantic-axis cores — two hard gates, AI review with teeth, versioned
-// plan documents; 运行轴 = the runtime model — machine × CLI, daemon,
-// self-hosted orchestration; 通用面 = everything else). Classification is a
+// plan documents; the `运行轴` tier = the runtime model — machine × CLI, daemon,
+// self-hosted orchestration; the `通用面` tier = everything else). Classification is a
 // title keyword match, first rule wins, not a semantic judgment — §0.6 of the
 // doc states this limitation.
 const TIER_ORDER = ['差异化面', '运行轴', '通用面'];
@@ -357,7 +357,9 @@ out.push('四列：功能 = `#票号` + issue 标题逐字；哪一档 = §0.2�
 out.push('');
 out.push('### 0.2 档位规则（18 册口径）');
 out.push('');
-out.push('档位词表来自 `docs/spec/18-定位与差异化.md`（差异化面 / 运行轴 / 通用面）。');
+out.push(
+  '档位词表来自 `docs/spec/18-positioning-and-differentiation.md`（差异化面 / 运行轴 / 通用面）。',
+);
 out.push('判定 = 标题关键词匹配，按下表顺序首中即停，全不中 = 通用面：');
 out.push('');
 out.push('| 档 | 标题正则（脚本内正本） |');

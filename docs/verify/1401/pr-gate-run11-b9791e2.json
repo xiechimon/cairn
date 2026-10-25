@@ -9,7 +9,7 @@
    "dimension": "correctness",
    "title": "ADR 0021 D3 and D4 disagree on files compare returns without a patch (pure renames, oversized diffs)",
    "severity": "suggestion",
-   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
    "line": 36,
    "failurePath": "D3 (line 36) says a file with no patch gets patchSha null and, outside the evidence directory, goes to a person under D4. D4 (line 37) names only binary files outside docs/verify among the forced-human cases. For pure renames it says compare counts them as 0 lines and that pr-gate's --no-renames is 'stricter on pure renames'. The P3 implementation in #1420 follows D3: apps/server/src/services/merge-gate/paths.ts lines 8-9, 66 and 103 route every no-patch file outside docs/verify (binary, oversized diff, pure rename) to the user. So for a pure rename apps/web/src/a.ts -> apps/web/src/b.ts the product gate answers user, while pr-gate (D + A rows, counted as whole files, not binary) answers auto-merge. D4's claim that pr-gate is the stricter of the two holds only for the line count, not for the routing.",
    "evidence": "ADR 0021 D3: '没有 patch 时为 null（这种文件在证据目录外按 D4 留人）'. D4: '证据目录外的二进制文件 ... 纯改名为 0，pr-gate 用 --no-renames ... 在纯改名上更严'. The #1420 head paths.ts:8: '对二进制不给 patch，纯改名也不给，两者分不出来，没有 patch 的一律算'. Add 'compare 不给 patch 的文件（二进制、diff 过大、纯改名）' to D4's list, or drop the parenthetical from D3."
@@ -18,7 +18,7 @@
    "dimension": "correctness",
    "title": "ADR 0021 status line says its wording changed over six pr-gate rounds and only ever in the conservative direction; both parts are stale",
    "severity": "suggestion",
-   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
    "line": 3,
    "failurePath": "Commit 1517363 changed the merge-readiness blocker. It used to say '`mergeable_state` 不是 `clean`'. Now has_hooks counts as clean, and unstable passes when the only failing check is pacman/merge-gate. That relaxation is needed, because otherwise the gate locks on its own failing status, but it is not a move toward the conservative side. D3's patchSha also came from pr-gate run 3 on #1420, not from the six rounds on #1410. A reader who trusts the status line would assume no D2-D4 rule was loosened during construction.",
    "evidence": "Line 3: 'D2–D4 的措辞在 #1410 施工中按 pr-gate 六轮评审的发现改过，每次都只往更保守的方向'. The 1517363 diff of the merge-readiness bullet at line 46 adds the has_hooks and unstable exceptions."
@@ -45,7 +45,7 @@
    "dimension": "rules",
    "title": "The squash method AGENTS.md prescribes, which ADR 0021 D2 points to for human merges, gives this PR a message with no ticket and no closing line",
    "severity": "suggestion",
-   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
    "line": 35,
    "failurePath": "ADR 0021 D2 says a human merging in the GitHub UI or CLI follows AGENTS.md's squash method (AGENTS.md:70). That method uses `gh api repos/xiechimon/pacman/pulls/<n>/commits -q '.[0].commit.message'`. For #1410, `.[0]` is ca088ce, \"docs: spec 28 自举闭环计划（pacman 自写 PR、自合 PR，goal 模式执行）\", whose message has no ticket in the subject and no `closes #1401`. The only closing line is in the 4th of 34 commits, e5414a2. A merger who follows AGENTS.md literally would put a ticket-less subject on main and leave #1401 open. The UI default (PR_TITLE + COMMIT_MESSAGES) and the squash message in the PR body's Issues section both carry `closes #1401`, so the risk sits only with a CLI merge that follows AGENTS.md rather than the body.",
    "evidence": "REST pulls/1410/commits: .[0].sha = ca088cedbded3d23924f275af54f5444b7692d67, length 34. `git log --format=%B` shows `closes #1401` only in e5414a2. The PR body says: \"The first commit's message (what `.[0].commit.message` returns) has no ticket in its subject and no closing line, so squash with this message instead.\""
@@ -61,7 +61,7 @@
    "dimension": "rules",
    "title": "Two AGENTS.md rule adjustments rely on the user's merge as the explicit confirmation required by User Override",
    "severity": "suggestion",
-   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
    "line": 227,
    "failurePath": "1. AGENTS.md:96 adds an exception to the hard rule \"不切分支看 diff\": the pr-gate evidence dimension and its skeptics may run `checkout --detach` in their own worktrees.\n2. Spec 28 §7.4 (line 227) and D7 (line 74) declare that listing PRs that await the user's merge is \"a report, not a question\" under AGENTS.md:94, while §7.5 (line 247) has the main session \"请用户合并\". AGENTS.md:94 covers any question about a PR, including whether to merge. That carve-out lives in a spec, not in AGENTS.md.\nAGENTS.md:113-115 requires explicit user confirmation before its rules are overridden. D4 already routes this PR to a user merge, and the Risk section names the checkout exception, but not the needs-decision reading as a rule change. If the carve-out is meant to stand, the user should confirm both points when merging. Otherwise the needs-decision reading should move into AGENTS.md itself. The carve-out is low risk in practice: §7.5 line 257 enables auto-merge only for go verdicts outside D4, so a PR that awaits the user has no auto-merge armed, and that is the failure AGENTS.md:94 guards against (#1435).",
    "evidence": "AGENTS.md:94, :96, :113-115 at the head; spec 28 lines 74, 227, 247, 257."
@@ -160,15 +160,15 @@
   ".github/workflows/ci.yml",
   ".gitignore",
   "AGENTS.md",
-  "docs/adr/0018-多agent团队三层与机器能力闸.md",
-  "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+  "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+  "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
   "docs/pr-review.md",
   "scripts/pr-gate-selfcheck.mjs",
-  "docs/spec/28-自举闭环-自写自合.md"
+  "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md"
  ],
  "mergedBy": "user",
  "humanReasons": [
-  "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, AGENTS.md, docs/adr/0018-多agent团队三层与机器能力闸.md, docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-自举闭环-自写自合.md",
+  "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, AGENTS.md, docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md, docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
   "5272 lines changed (over 800)"
  ],
  "missing": [],

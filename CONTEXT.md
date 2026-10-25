@@ -1,6 +1,6 @@
 # Cairn domain model and vocabulary
 
-This file fixes, for each domain concept, a three-column mapping between the Chinese UI word, the English word and the internal code name, and settles the boundaries between concepts (positioning is in `docs/spec/18-定位与差异化.md`). Implementation contracts (the full phase enum, REST and SSE endpoints, record shapes) are not here; they live in the `docs/spec/` architecture specs (map ticket #41).
+This file fixes, for each domain concept, a three-column mapping between the Chinese UI word, the English word and the internal code name, and settles the boundaries between concepts (positioning is in `docs/spec/18-positioning-and-differentiation.md`). Implementation contracts (the full phase enum, REST and SSE endpoints, record shapes) are not here; they live in the `docs/spec/` architecture specs (map ticket #41).
 
 Internal names are renamed only where a word is overloaded, and each rename is marked (see `密钥`).
 
@@ -44,7 +44,7 @@ _Avoid_：**Workspace** —— 它不是领域实体，仅指执行机本地的�
 | Agent | Agent | `agent` | 配了模型、职责、技能、工具、密钥、MCP 与记忆的执行角色；运行在某台机器上。 |
 | 总管 | Chief | `chief` | 每「用户×团队」一个的调度与对话代理，负责分派任务；领域上区别于干活的 worker Agent。 |
 | 主力机 | Primary machine | `chief.machineId` | chief 的默认执行机器（#895）：chief 新线程钉选缺省链的第二级（`todo.machineId` → 本槽 → null），钉选语义同 `todo.machineId`——确定性、无自动回退，解除归用户；null = 自动（任何在线机器认领 + 会话亲和）。只辖 chief 线程的钉选，不辖 worker 派发。设定面在 chief 设置 Agent tab「机器」槽（PATCH /chief），machines 页只读三态标注（总管主机 / 回合进行中 / 等待机器）。 |
-| 记忆 | Memory | `memory` | Agent 在工作中沉淀的经验条目。todos.dev 写入路径未实测 [黑盒]；复刻采最小机制（02-架构平价 §4.4，全标 [推断]，待 #46 校准）。 |
+| `记忆` | Memory | `memory` | Experience entries an agent accumulates while working. The todos.dev write path is unmeasured [black box]; the replica uses a minimal mechanism (02-architecture-parity §4.4, all marked [inferred], pending #46 calibration). |
 
 边界裁决：Agent ≠ Machine（一个是配置好的角色，一个是承载它的物理主机）。Chief 是单独概念，不作为普通 Agent 的子类型混称。**总管面板是布局的一列，不是浮层**（ADR 0004）——界面词「总管面板」指贴右竖板；形态事实归 ADR，此处只钉术语。
 

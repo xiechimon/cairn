@@ -132,7 +132,7 @@ for (const entry of boxEntries) {
 if (failures.length > 0) {
   for (const failure of failures) console.log(failure);
   console.log(
-    `[ui-consumer-shape-gate] FAIL: ${hits.length} flagged line(s), ${failures.length} violation(s). Caliber + inventory: docs/spec/27-消费点形状与品牌墨台账.md.`,
+    `[ui-consumer-shape-gate] FAIL: ${hits.length} flagged line(s), ${failures.length} violation(s). Caliber + inventory: docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md.`,
   );
   process.exit(1);
 }

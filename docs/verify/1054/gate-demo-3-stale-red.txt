@@ -1,4 +1,4 @@
 === demo 3: site FIXED (registry radius + text tier) but ledger entry kept (expect STALE RED, exit 1) ===
 [ui-consumer-shape-gate] STALE apps/web/src/__gate-demo.tsx (demo-square-box): ledger entry matches no flagged line — the site was fixed, deleted, or reworded; drop or re-anchor the entry in the same PR.
-[ui-consumer-shape-gate] FAIL: 7 flagged line(s), 1 violation(s). Caliber + inventory: docs/spec/27-消费点形状与品牌墨台账.md.
+[ui-consumer-shape-gate] FAIL: 7 flagged line(s), 1 violation(s). Caliber + inventory: docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md.
 gate exit code: 1

@@ -13,7 +13,7 @@ $ cd /home/user/pacman && git rev-parse --short HEAD && git diff --shortstat 9ef
  3 files changed, 250 insertions(+), 31 deletions(-)
 $ cd /home/user/pacman/.claude/worktrees/p2a && git diff --shortstat 9ef2a0c..81d5ef1
  3 files changed, 250 insertions(+), 31 deletions(-)
-Files: apps/server/src/services/ci-loop.ts, apps/server/test/pr-reconcile.test.ts, docs/spec/02-架构平价.md.
+Files: apps/server/src/services/ci-loop.ts, apps/server/test/pr-reconcile.test.ts, docs/spec/02-architecture-parity.md.
 The review skips test hunks, so it read the ci-loop.ts change (and the spec line).
 
 Result: (none). The review's notes:

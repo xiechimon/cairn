@@ -2,7 +2,7 @@
 
 Base = `23a39da9` (origin/main). Branch = `claude/optimistic-albattani-r5pmfn`.
 
-`scripts/e2e-affected.mjs` maps `apps/web/test/` (a `DIR_RULES` entry) and `apps/web/vitest.config.ts` (an exact `FILE_RULES` entry) to no specs. Both lookups run ahead of the unmapped-web fallback. Both paths are vitest-only (`apps/web/vitest.config.ts` includes `test/**/*.test.ts`). Neither is in the fixture build that playwright serves, and no file under `apps/web/e2e/` imports from `../test/` or reads `vitest.config.ts`. Every other unmapped `apps/web/**` path keeps the full-suite fallback, including `apps/web/DESIGN.md`, which several e2e specs read. `docs/spec/19-测试分层与受影响面.md` lists the exception next to the fallback rule, citing `pnpm exec vitest run --changed origin/main` as the coverage (a bare `--changed` only diffs uncommitted files, per the same spec). The "nothing to run" message prints that command.
+`scripts/e2e-affected.mjs` maps `apps/web/test/` (a `DIR_RULES` entry) and `apps/web/vitest.config.ts` (an exact `FILE_RULES` entry) to no specs. Both lookups run ahead of the unmapped-web fallback. Both paths are vitest-only (`apps/web/vitest.config.ts` includes `test/**/*.test.ts`). Neither is in the fixture build that playwright serves, and no file under `apps/web/e2e/` imports from `../test/` or reads `vitest.config.ts`. Every other unmapped `apps/web/**` path keeps the full-suite fallback, including `apps/web/DESIGN.md`, which several e2e specs read. `docs/spec/19-test-layering-and-blast-radius.md` lists the exception next to the fallback rule, citing `pnpm exec vitest run --changed origin/main` as the coverage (a bare `--changed` only diffs uncommitted files, per the same spec). The "nothing to run" message prints that command.
 
 ## Dry runs
 

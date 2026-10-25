@@ -1,5 +1,5 @@
 === demo 1: unregistered square box (expect RED, exit 1) ===
 [ui-consumer-shape-gate] R1 apps/web/src/__gate-demo.tsx:1: square box with no registry basis and no ledger entry — point it at a registry component, ride the registry default radius, or register a deviation with a reason in scripts/ui-consumer-registry.json (#1054, ADR 0012 D1).
     export const DEMO_BOX = 'demo-square-box rounded-none border border-(--border) bg-(--card) p-2';
-[ui-consumer-shape-gate] FAIL: 8 flagged line(s), 1 violation(s). Caliber + inventory: docs/spec/27-消费点形状与品牌墨台账.md.
+[ui-consumer-shape-gate] FAIL: 8 flagged line(s), 1 violation(s). Caliber + inventory: docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md.
 gate exit code: 1

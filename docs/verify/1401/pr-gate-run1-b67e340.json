@@ -92,7 +92,7 @@
    "dimension": "correctness",
    "title": "ADR 0021 D3: 'update-branch keeps the digest unchanged' holds only in a narrower case",
    "severity": "suggestion",
-   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
    "line": 36,
    "failurePath": "The digest is sha256 over `status filename blobSha` from compare/{base}...{headSha}, and compare `files[].sha` is the blob at head.\n\nCase 1: main changed a file the PR also changes. After update-branch, that file's blob at the new head includes main's hunks, so its blobSha and the digest change, and the verdict is forced to re-run. The claim also appears at spec 28 line 70.\nCase 2: P3 pins `base` to the PR's recorded base.sha instead of the moving branch name. After update-branch, the three-dot merge base is still the old SHA, so all of main's merged-in files enter the list and every update-branch invalidates the verdict.\n\nBoth cases fail safe (an extra re-verify), but the stated invariant is false as written. State the condition (base = branch name, no file overlap with the commits merged in) so the P3 tests are not written against a false invariant."
   },
@@ -100,7 +100,7 @@
    "dimension": "correctness",
    "title": "ADR 0021 D2 and spec 28 D2 call lib/github.ts the only github.com egress; skill-import.ts also calls api.github.com",
    "severity": "suggestion",
-   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
    "line": 35,
    "failurePath": "At the head, apps/server/src/services/skill-import.ts:89 defines `GH_API_BASE = 'https://api.github.com'` and fetches repos/{o}/{r} and git/trees directly (lines 405, 441, 476, 487), bypassing lib/github.ts. These are reads, but a P2/P4 audit that relies on 'single egress' (for example, grep lib/github.ts to prove that merge is the only new write) would rest on a false premise. Say 'the only github.com write egress', or note the skill-import read path."
   },
@@ -108,7 +108,7 @@
    "dimension": "correctness",
    "title": "spec 28 §1 says 40 feature maps; the head has 36 plus a README",
    "severity": "suggestion",
-   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
    "line": 27,
    "failurePath": "`git ls-tree -r` over .claude/skills/verify-pacman/features/ at both af161e3 and b67e340 gives 37 files: README.md plus 36 maps. The 101-script count on the same line matches."
   },
@@ -116,7 +116,7 @@
    "dimension": "correctness",
    "title": "spec 28 §7.5 describes a pr-gate that differs from the committed script",
    "severity": "suggestion",
-   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
    "line": 246,
    "failurePath": "Output: the row says pr-gate returns `{headSha, go, blocking[], notes}`. The script returns {pr, ticket, headSha, go, blocking, suggestions, protectedPaths, mergedBy, missing, shaMismatch, checked}; there is no `notes`.\nEvidence dimension: the row says it re-runs the matching verify-pacman drive in a detached worktree. The script (pr-gate.js:64) re-runs at most three narrow commands quoted in Verified and skips everything for docs-only diffs.\n\nA caller written against §7.5 reads a field that does not exist and expects a verify-pacman drive that never runs. Align one with the other."
   },
@@ -156,7 +156,7 @@
    "dimension": "rules",
    "title": "Spec 28 §7.5 and §8 disagree with the pr-gate.js this PR ships",
    "severity": "suggestion",
-   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
    "line": 246,
    "failurePath": "Commit b67e340 says it wrote the real path and args into §7.5, but other parts of §7.5 and §8 no longer match the script.\n- Output shape: the §7.5 table row (line 246) gives pr-gate's output as `{headSha, go, blocking[], notes}`. pr-gate.js:170-182 returns {pr, ticket, headSha, go, blocking, suggestions, protectedPaths, mergedBy, missing, shaMismatch, checked}, with no `notes`.\n- Evidence dimension: the row says it re-runs the matching verify-pacman driver at headSha. pr-gate.js:64 instead re-runs at most three of the narrowest commands quoted in the PR's Verified section.\n- Rules dimension: the row says it covers docs/pr-review.md and the attribution trailers (尾标). pr-gate.js:51 mentions neither.\n- Skeptic cap: when the cap is reached, pr-gate.js:118-121 keeps blocking findings without any skeptics. The spec does not document this.\n- §8 P0 row (line 264): the PR column says `见 #1401 的关联 PR` instead of #1410, but the ledger rule at line 226 says to fill in the PR number after opening. Its evidence column says `不适用（仅文档）`, but P0 now ships an executable workflow script.\n\nA later session that resumes from the spec after context compaction (which §8 names as the only source of truth for progress) will expect `notes` and verify-pacman reruns that the gate does not produce.",
    "evidence": "docs/spec/28 line 246 table row and line 264 ledger row; .claude/workflows/pr-gate.js lines 51, 64, 118-121, 170-182."
@@ -174,7 +174,7 @@
    "dimension": "rules",
    "title": "Spec 28 P5 and ADR 0021 D2 assume only the server-composed message reaches main, which conflicts with the AGENTS.md squash rule on the human path",
    "severity": "suggestion",
-   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
    "line": 140,
    "failurePath": "Spec 28 line 140 keeps daemon in-branch commits in `<kind>: <title>` form. Its reasoning is that after a squash only the message the server builds under D2 reaches main. ADR 0021 D2 (adr line 35) has the server take the title from the PR title.\n\nBut the default policy is `mergePolicy = human`, and under it a human can still merge on GitHub using the AGENTS.md:70 recipe, which takes `.[0].commit.message`. That is the daemon's first `<kind>: <title>` commit, so a subject without a ticket and without `closes #N` lands on main (the same path as finding 1).\n\nD2's PR-title-as-subject rule also differs from AGENTS.md:70, which takes the subject from the commit message. Fix, when P2 or P4 lands: update AGENTS.md:70 to match D2, or have daemon commitAll write the `<scope>(<ticket>)` form. AGENTS.md is a D4 protected path, so that change goes through the user.",
    "evidence": "docs/spec/28 line 140; docs/adr/0021 line 35; AGENTS.md lines 61 and 70"
@@ -192,7 +192,7 @@
    "dimension": "tests",
    "title": "§8 ledger P0 row has no PR link, although the spec names #1410 elsewhere and the completion condition requires one",
    "severity": "suggestion",
-   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
    "line": 264,
    "failurePath": "The ledger rule (l.226) says to fill in the PR number after opening the PR and push again. The cloud completion condition (l.235) requires P0-P6 rows to carry a ticket number, a PR link and an evidence link. The P0 row says '见 #1401 的关联 PR' and is marked [x], while l.254 of the same file already names '#1410'. A session resuming after context compression reads origin/main §8 as the progress record and finds P0 without a PR link. It either judges the completion condition unmet or has to search for the PR. This is next to ticket #1401's failure mode 台账与实际票号不一致 (ledger out of sync with real ticket numbers).",
    "evidence": "spec 28 l.264: `| P0 裁决落盘 / ADR 0021 | #1401 | 见 #1401 的关联 PR | 不适用（仅文档） | 用户 | [x] |`. l.254: '随 P0 的 PR（#1410）提交'."
@@ -219,7 +219,7 @@
    "dimension": "safety",
    "title": "Gate can approve edits to itself: .claude/workflows/** is not in ADR 0021 D4 and the gate runs from the PR branch's working tree",
    "severity": "suggestion",
-   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
    "line": 37,
    "failurePath": "Protection of pr-gate.js exists only in spec 28 §7.5 prose (line 254, 'D4 精神') and in the gate's own safety prompt (pr-gate.js:59 'Add .claude/workflows/** too'). Spec 28 §7.5 says the gate is called by name after it lands. This run shows the named script is loaded from the working tree: /home/user/pacman/.claude/workflows/pr-gate.js, on the PR branch claude/nice-faraday-o329b3. Consider a later bootstrap PR that edits pr-gate.js and drops the line-59 sentence or loosens the skeptic rule. It is judged by its own modified gate, which no longer lists .claude/workflows/**. mergedBy then becomes 'auto-merge', and ADR 0021 D4, the authoritative list, gives no other hook to catch it.",
    "evidence": "Suggest adding `.claude/workflows/**` explicitly to the ADR 0021 D4 list (and spec 28 D4 line 71). Also run the gate from origin/main's copy, for example by writing `git show origin/main:.claude/workflows/pr-gate.js` to a scratch path and invoking it via scriptPath, never from the branch under review."
@@ -246,7 +246,7 @@
    "dimension": "safety",
    "title": "ADR 0021 D4 leaves gate-equivalent files unprotected",
    "severity": "suggestion",
-   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
    "line": 37,
    "failurePath": "D4 lists `package.json`, which reads as the root manifest only, and `scripts/*gate*` / `scripts/*baseline*.json`. CI's required checks run per-package scripts: `pnpm typecheck` = `pnpm -r typecheck`, which runs apps/*/package.json `typecheck`, and e2e-gate runs `pnpm --filter @pacman/web e2e` (ci.yml:237), which is apps/web/package.json `e2e: playwright test`. A PR that rewrites apps/web/package.json `e2e` to a no-op makes e2e-gate pass while touching no D4 path and no lockfile, and it deletes no test file. That is the premortem's first cause of failure, 'agent 改闸让自己过闸'. Also missing: pnpm-workspace.yaml (allowBuilds decides which dependencies run install scripts; catalog pins versions), vitest/playwright configs (they can exclude tests without deleting files), and .claude/hillclimb/*/baseline/** (the chief-dispatch regression gate data that spec 28 §2.1 calls a 回归闸).",
    "evidence": "ADR 0021 line 37; spec 28 line 71. Suggest `**/package.json`, `pnpm-workspace.yaml`, `**/vitest.config.*`, `**/playwright.config.*`, `.claude/hillclimb/**/baseline/**`, `.claude/workflows/**`. This is cheap to fix now, while D4 is still text, before P3 encodes the list."
@@ -289,7 +289,7 @@
    "dimension": "evidence",
    "title": "spec 28 ledger marks P0 evidence as not applicable (docs only) and already done, though P0 now ships a workflow script",
    "severity": "suggestion",
-   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
    "line": 264,
    "failurePath": "The §8 ledger, which the spec calls the only source of progress truth across context compaction, records the P0 row with evidence \"不适用（仅文档）\" (not applicable, docs only) and completion [x]. §4 still titles P0 \"（仅文档）\" (docs only) at line 82. At the head, the P0 PR also delivers .claude/workflows/pr-gate.js. A session that resumes from the ledger would read P0 as needing no evidence and as finished before the user merge that D7 requires.",
    "evidence": "Line 264: `| P0 裁决落盘 / ADR 0021 | #1401 | 见 #1401 的关联 PR | 不适用（仅文档） | 用户 | [x] |`"
@@ -297,8 +297,8 @@
  ],
  "protectedPaths": [
   ".claude/workflows/pr-gate.js",
-  "docs/adr/0018-多agent团队三层与机器能力闸.md",
-  "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md"
+  "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+  "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md"
  ],
  "mergedBy": "user",
  "missing": [],

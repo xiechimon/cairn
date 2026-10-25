@@ -605,7 +605,7 @@ writeFileSync(
     {
       probe: '1250-persona-verify',
       ticket: '#1250',
-      adr: 'docs/adr/0018-多agent团队三层与机器能力闸.md',
+      adr: 'docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md',
       stack: { server: SERVER, web: WEB, repo: REPO, db: DB_PATH },
       ids: { teamId, projectId, TASK_V, TASK_F, TASK_P, buildV, buildF, parentBuild },
       checks,

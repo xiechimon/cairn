@@ -203,4 +203,4 @@
 - `r2-app-ui-inventory.md` / `r1-site-inventory.md` — 参考站看板与站点清单
 - wiki [[todos.dev 与 Multica 对照]] — 对象面宽窄对照底座（L-B 的 Multica 一手来源）
 - `CONTEXT.md` — 「无 Goal 概念」「来源=外部出处」现裁决（§5.7 列出随实现票更新的词条）
-- `docs/spec/18-定位与差异化.md` — 语义轴钉 todos.dev 的定位正本（§5.8 论证 1 依据）
+- `docs/spec/18-positioning-and-differentiation.md` — the positioning canonical copy that pins the semantic axes to todos.dev (basis of §5.8 argument 1)

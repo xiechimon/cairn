@@ -219,7 +219,7 @@ https://agentclientprotocol.com/protocol/v1/initialization
 
 ## 4. `acp.ts` 接口草图
 
-一座桥，多条身份。符合 spec 17 写过的触发条件：runtime 多于两个，且「同一族、多个身份」（spec 17 不采 12 字段注册表的那一行，`docs/spec/17-双运行时执行面.md:80`）。不照搬 Multica 的 12 字段描述符。身份表只留启动 argv、简报文件名、以及「凭据留在本机」。
+One bridge, many identities. It meets the trigger condition spec 17 wrote down: more than two runtimes, plus "same family, multiple identities" (the row where spec 17 declines the 12-field registry, `docs/spec/17-dual-runtime-execution-surface.md:80`). Do not copy Multica's 12-field descriptor. The identity table keeps only the launch argv, the brief filename, and "credentials stay on this machine".
 
 缝纪律：`biome.json` 的 `noRestrictedImports` 增加 `@agentclientprotocol/sdk`，唯一落点 `apps/daemon/src/backend/acp.ts`。与 `@earendil-works/*` → `pi.ts`、`@anthropic-ai/claude-agent-sdk` → `claude-code.ts` 同律。依赖进 `apps/daemon/package.json`，锁文件按仓库闸授权，不在本调研票里加。
 
@@ -265,7 +265,7 @@ function createAcpBackend(identity: AcpIdentity, opts: {
 
 ### spec 17
 
-spec 17 的分叉形状可以接着用：身份是词汇，家族是 `AgentBackend` 实现，claim 仍共享，分叉只在 `backendFor`。当时不立注册表，是因为只有两个 runtime，而且 pi 不是 CLI（`docs/spec/17-双运行时执行面.md:50`、`:80`）。ACP 正好是「第三族 + 同族多身份」。落点是第 4 节那张小表，不是第二份模型源词表，也不是 12 字段描述符。
+spec 17's fork shape keeps applying: identity is vocabulary, family is an `AgentBackend` implementation, claim stays shared, and the fork lives only in `backendFor`. No registry was set up back then because there were only two runtimes and pi was not a CLI (`docs/spec/17-dual-runtime-execution-surface.md:50`, `:80`). ACP is exactly "a third family + multiple identities in one family". The landing spot is the small table in section 4, not a second model-source vocabulary and not a 12-field descriptor.
 
 要一起改的现有词，漏一个就会把步领错：
 
@@ -280,7 +280,7 @@ spec 17 A12 写过 enabledRuntimes 首票不消费。那条已被后来的 #682 
 
 ### ADR 0018
 
-协调模型不用改写。agent 仍不绑死机器；派发看机器上报的能力快照（`docs/adr/0018-多agent团队三层与机器能力闸.md` 决策 4）。
+The orchestration model needs no rewrite. Agents still do not bind to machines; dispatch reads the machine-reported capability snapshot (`docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md` decision 4).
 
 现有快照盖不住「这台机器有没有 gemini 二进制」：
 
@@ -292,7 +292,7 @@ spec 17 A12 写过 enabledRuntimes 首票不消费。那条已被后来的 #682 
 
 ### ADR 0020
 
-推荐并发公式不改。输入仍是 `cpuCores` 与 `memoryTotalMb`，每槽 2 GiB，夹在 1..16（`docs/adr/0020-机器推荐并发-能力指纹公式与覆盖优先级.md:15-18`）。指纹是机器配置，不是 agent 协议。外部 CLI 多一个进程，不改变「用总量、不用可用量」这条已经写明的理由。
+The recommended-concurrency formula is unchanged. Inputs stay `cpuCores` and `memoryTotalMb`, 2 GiB per slot, clamped to 1..16 (`docs/adr/0020-machine-recommended-concurrency-capability-fingerprint-formula-coverage-priority.md:15-18`). The fingerprint is machine configuration, not an agent-protocol item. One extra process for external CLIs does not change the already-written-down "use totals, not availability" rationale.
 
 不在本票把槽大小改成「外部 CLI 更吃内存」。那需要实测，而且会推翻「推荐值只由机器配置决定、相邻两拍不抖动」。若以后要改，另开 ADR 0020 的修订，不夹在 ACP 桥里。
 

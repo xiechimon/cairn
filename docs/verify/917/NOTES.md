@@ -1,9 +1,9 @@
 # #917 技能可见面收归 —— 验证证据索引
 
-票：#917（server+daemon: 技能可见面收归 pacman）。裁决后范围的正本 =
-`docs/spec/14-skills执行面注入.md` §技能可见面收归（口径 1/2 被 #958/spec 24
-搁置；落地 = 口径 3 settingSources 显式声明、口径 4 白名单硬挡、口径 5 观测行，
-外加 #958 折回的 pi 原生 `<available_skills>` 段关断）。
+Ticket: #917 (server+daemon: fold the skill visibility surface back to pacman). The canonical copy of the post-ruling scope =
+`docs/spec/14-skills-execution-surface-injection.md` §skill-visibility-surface folding (points 1/2 deferred by #958/spec 24;
+landed = point 3 explicit settingSources declaration, point 4 hard-block whitelist, point 5 observation lines,
+plus the shutoff of pi's native `<available_skills>` section folded back by #958).
 
 机制类声称一律取运行时真值（仓规「机制生效验收:实物判据」）。本目录两组实物：
 

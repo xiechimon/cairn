@@ -61,8 +61,8 @@
 7. **并发不是「比 Multica 低」，而是根本没有并发。** daemon 的 claim 循环 `await runStep(...)` 串行
    （`apps/daemon/src/machine-loop.ts:361`），server 侧 #503 已把上限概念整体摘除
    （`apps/server/src/services/machines.ts:744`）。Multica 是 daemon 20 / agent 6 的双层闸（r10 §5.4）。
-   pacman 侧是 02/A3 **有意**摘除上限（`docs/spec/02-架构平价.md:15`），但现状与「有意」之间差一步：
-   摘除的是**上限**，实际效果是**串行**。
+   On the pacman side 02/A3 **deliberately** removed the cap (`docs/spec/02-architecture-parity.md:15`), but between the status quo and "deliberate" there is a missing step:
+   what was removed is the **cap**, while the actual effect is **serial execution**.
 8. **模型来源的读取机器，与执行机器不是同一台。** claude-code 段的模型清单由 **server 进程** fs 直读
    `~/.claude/settings.json`（`apps/server/src/services/providers.ts:141`；同文件 `:132` 与 `:179` 两处
    `hostname()` 取的都是 server 所在机器）。#519 一旦把控制面搬上常开主机、执行面留在另一台，这一页显示的就是**控制面主机的 Claude Code 配置**。
@@ -71,7 +71,7 @@
    （`apps/daemon/src/workspace.ts:66`）、per-step git 凭证、plan.md/transcript 产物上传、steer/stop/sync 三条
    拉取-确认指令（`packages/shared/src/protocol/machine-wire.ts:264`）、review 只读检出（`apps/daemon/src/runner.ts:593`）、
    supervisor 崩溃保活（`apps/daemon/src/supervisor.ts:58`）——这些 Multica 的 runtime 模型里没有对应物，
-   其中多数是 02/08 册按 todos 语义**有意**锁的（`docs/spec/02-架构平价.md:18`、`:21`）。
+   most of these were **deliberately** locked per todos semantics by volumes 02/08 (`docs/spec/02-architecture-parity.md:18`, `:21`).
 10. **`enabledRuntimes` 是形状先到、执行面没到。** machines 页的 per-runtime 开关存得下、读得出
     （`apps/server/src/db/schema.ts:416`、`apps/server/src/services/machines.ts:368`），但 claim 与执行两侧都不读它
     （穷举 grep：仓内消费点只有 schema 投影与测试）。Multica 对应的是 `agent_runtime.visibility`，
@@ -114,7 +114,7 @@
 
 | # | 现状（文件:行号） | Multica 的做法 | 差距性质 | 是否属本图要修的范围 |
 |---|---|---|---|---|
-| **G11** | 串行：claim 循环 `await client.claim(...)` → `await runStep(...)` 顺序执行，一轮一步（`apps/daemon/src/machine-loop.ts:342-362`，`running` 恒传 1，`:361`）；server 侧无任何并发门（`apps/server/src/services/machines.ts:744-745`，#503 注释原文「机器领活不受上限约束」） | daemon 20 / agent 6 双层闸，认领时按 `running >= agent.MaxConcurrentTasks` 拒（r10 §5.4） | pacman 有意不同 | 不属·有意不同（`docs/spec/02-架构平价.md:15` A3 已裁「并发上限概念随 #503 整体摘除」）；但现状是**串行**而非「无上限」，这一层差异值得在地图上单列，见 §9 |
+| **G11** | Serial: the claim loop `await client.claim(...)` → `await runStep(...)` executes in order, one step per round (`apps/daemon/src/machine-loop.ts:342-362`, `running` always passed as 1, `:361`); no concurrency gate server-side (`apps/server/src/services/machines.ts:744-745`, #503 comment verbatim "machine claiming is not bound by the cap") | daemon 20 / agent 6 double gate; claims rejected when `running >= agent.MaxConcurrentTasks` (r10 §5.4) | pacman deliberately different | Not in scope · deliberate (`docs/spec/02-architecture-parity.md:15` A3 already ruled "the concurrency-cap concept is removed wholesale with #503"); but the status quo is **serial**, not "uncapped" — this layer of difference deserves its own row on the map, see §9 |
 | **G12** | claim 候选只筛 `status='pending'` + team + `pinnedMachineId`（`apps/server/src/services/machines.ts:581-597`），**不看机器能不能跑这一步的模型** | runtime 与 agent 绑定，任务路由到匹配的 runtime（r10 §2.1/§8） | 缺 | 属·本图要定（= G5 的另一面；单机不阻塞，第二台机器一上就出问题） |
 | **G13** | 步与机器硬绑定：claim 时写 `machineId`（`apps/server/src/services/machines.ts:767-772`），此后仅该机器经 `recover` 可见（`apps/server/src/services/machines.ts:553-561`），他机 claim 不到，**无重派、无超时释放**。失败后的唯一出路是人工重跑 = 新 build 新会话（`apps/server/src/services/builds.ts:7`） | `RecoverOrphanedTasksForRuntime` 绕开宽限 reclaim；`FailTasksForOfflineRuntimes` 按宽限判失败（r10 §5.3） | 缺 | **属·阻塞#519**（#519 要的是「真闭环」，机器半路掉线会把闭环永久卡死在这一步） |
 
@@ -144,11 +144,11 @@
 
 | # | 现状（文件:行号） | Multica 的做法 | 差距性质 | 是否属本图要修的范围 |
 |---|---|---|---|---|
-| **G20** | 机器无 owner、无 visibility：schema 八列无 `ownerId`/`visibility`；单用户 seed + 自动登录（`docs/spec/02-架构平价.md:14` A2） | `agent_runtime.owner_id` + `visibility`；owner 独占分享、admin 无旁路；无主 runtime 一律不可绑（r10 §8.2） | pacman 有意不同 | 不属·有意不同（local-first 单用户，02/A2 已锁） |
+| **G20** | Machines have no owner, no visibility: the schema's eight columns have no `ownerId`/`visibility`; single-user seed + auto login (`docs/spec/02-architecture-parity.md:14` A2) | `agent_runtime.owner_id` + `visibility`; owner-exclusive sharing, no admin bypass; ownerless runtimes can never be bound (r10 §8.2) | pacman deliberately different | Not in scope · deliberate (local-first single user, locked in 02/A2) |
 | **G21** | 无自定义 runtime profile：无命令字段、无 `fixed_args`、无参数排序问题（全仓零命中） | `runtime_profile` + `fixed_args` 排在 Multica 参数**之前**，位置不可回退（r10 §7.3） | 缺 | 不属·本图 Out of scope（自用场景不接 wrapper CLI；若 G6 落地多 backend，此条须重判） |
 | **G22** | 模型源读的是 **server 进程所在机器**：claude-code 段 fs 直读 `~/.claude/settings.json`（`apps/server/src/services/providers.ts:131-161`，`:132` 的 `hostname()` 取 server 主机名，`:141` 读文件）；pi 段 = 团队 custom provider 的 `models[]`（`:167-183`，`:179` 再用一次 `hostname()`） | 模型清单来自**对应 runtime**（部分工具暴露固定集，部分按本机配置/登录态算；r10 §4.2） | 形状不同 | **属·阻塞#519**（控制面与执行面分机后，这一页显示的是常开主机的 Claude Code 配置，不是执行机的） |
 | **G23** | 版本门只有一个，且比的是 **daemon 自己的版本**：`meetsMcpVersionGate(latestCliVersion)` vs `MCP_MIN_CLI_VERSION`，未达则 claim 不携带 `mcpServers`（`apps/server/src/services/machines.ts:643-666`、`packages/shared/src/protocol/mcp.ts:164`） | 每族最低版本表 10 条（r10 §3.2/D7），低于则**不注册**该 runtime；另有 `capabilities`/`launched_by` 注册元数据（r10 §2.2） | 形状不同 | 属·本图要定（G6 的配套；单 backend 形态下现门够用） |
-| **G24** | 传输 = HTTP 长轮询 claim（server hold 75s，`packages/shared/src/protocol/machine-api.ts:30`、`apps/server/src/services/machines.ts:882-893`）+ SSE wake（`apps/server/src/routes-machine.ts:227`）。**daemon 端不消费 wake 事件**（`apps/daemon/src/machine-loop.ts:286-290` 只分流 shutdown/steer/stop/sync；`:227-234` 注释记 #482 裁定：hold 到期重发是残余上界兜底） | WebSocket `GET /api/daemon/ws` + 3 分钟 claim 轮询兜底（r10 §5.2） | pacman 有意不同（实现层） | 不属·有意不同（`docs/spec/02-架构平价.md:13` A1「实时面全 SSE 无 WS」已锁；协作语义（长轮询 + 兜底）两边一致） |
+| **G24** | Transport = HTTP long-poll claim (server holds 75s, `packages/shared/src/protocol/machine-api.ts:30`, `apps/server/src/services/machines.ts:882-893`) + SSE wake (`apps/server/src/routes-machine.ts:227`). **The daemon side does not consume wake events** (`apps/daemon/src/machine-loop.ts:286-290` only dispatches shutdown/steer/stop/sync; `:227-234` comment records the #482 ruling: hold-expiry resend is the residual upper-bound backstop) | WebSocket `GET /api/daemon/ws` + 3-minute claim-poll backstop (r10 §5.2) | pacman deliberately different (implementation layer) | Not in scope · deliberate (`docs/spec/02-architecture-parity.md:13` A1 "real-time surface all SSE, no WS" is locked; the collaboration semantics (long poll + backstop) are identical on both sides) |
 | **G25** | 发行 = 纯 JS npm 包（`docs/spec/01-stack-v2.md:123`）；supervisor 自建崩溃保活（`apps/daemon/src/supervisor.ts:28-92`，指数退避封顶 30s）；引擎 pin pi 0.86.0（`docs/spec/01-stack-v2.md:126`） | 6 平台二进制（275MB）；引擎 pi 0.84.3 构建（r10 §0 / `docs/spec/01-stack-v2.md:231-232`） | pacman 有意不同 | 不属·有意不同（`docs/spec/01-stack-v2.md:231-232` 差异表已登记；supervisor 是 pacman 独有增量，见 §9） |
 
 ---
@@ -160,14 +160,14 @@
 
 | 项 | pacman 出处 | 性质 |
 |---|---|---|
-| 每步 worktree 契约：基座 clone + `worktree add -b` + 复用/恢复/陈旧三步 + `projectLock` 串行化 + 防分叉护栏 | `apps/daemon/src/workspace.ts:66-114`、`docs/spec/02-架构平价.md:183-195` | 有意（todos 语义）；Multica 的 daemon 不下发 git 凭证、不做 worktree |
+| Per-step worktree contract: base clone + `worktree add -b` + reuse/recover/stale three steps + `projectLock` serialization + anti-fork guardrails | `apps/daemon/src/workspace.ts:66-114`, `docs/spec/02-architecture-parity.md:183-195` | Deliberate (todos semantics); Multica's daemon hands no git credentials down and does no worktree |
 | 每步 commit + push + merge 落地（hosted / github / local 三形态） | `apps/daemon/src/runner.ts:606-660`、`apps/daemon/src/workspace.ts:137-140` | 有意；见上 |
 | per-step git 凭证（hosted 一次性 key 现签现 revoke / github connection token），不进 argv、不落盘 | `apps/server/src/services/machines.ts:1208-1213`、`apps/daemon/src/credentials.ts:16-18` | 有意；wiki A3 已判定 secrets 面应对齐这条纪律 |
 | 产物上传：`upload-urls/{stepId}` 预签名 + `PUT /api/machine/upload/{uploadId}` 自出（self-host 无对象存储）；plan.md 即文件版本 | `packages/shared/src/protocol/machine-wire.ts:356-391`、`apps/daemon/src/runner.ts:666-696` | 有意 |
 | steer / stop（含 discard rewind）/ sync 三条 server→daemon 拉取-确认指令 | `packages/shared/src/protocol/machine-wire.ts:264-297`、`apps/daemon/src/machine-loop.ts:236-271` | 有意 |
 | review 步只读检出：工具面不下发 edit/write + 收尾 rewind 回步起点两层 | `apps/daemon/src/backend/pi.ts:63-71`、`apps/daemon/src/runner.ts:593-604` | 有意（#511，本仓独有的硬闸语义） |
 | chief 步：服务端 relay 工具 49 词表 + 绑定 Agent 的 pi 会话 | `packages/shared/src/protocol/machine-wire.ts:189-200`、`apps/server/src/services/machines.ts:668-730` | 有意（02/A7）；#515 明列「Chief 存废」为 Not yet specified |
-| 硬闸 phase 模型（九个 phase、两道人工闸） | `packages/shared/src/phase.ts:5-15`（九值词表）、`apps/server/src/services/phase.ts:17`（迁移边集）、`docs/spec/02-架构平价.md:17-18` | 有意；#515 明列为 pacman 唯一差异化 |
+| Hard-gate phase model (nine phases, two manual gates) | `packages/shared/src/phase.ts:5-15` (nine-value vocabulary), `apps/server/src/services/phase.ts:17` (migration edge set), `docs/spec/02-architecture-parity.md:17-18` | Deliberate; #515 names it pacman's sole differentiation |
 | MCP slug 化：服务端只下发 slug 列表，端点由执行机读本机 `~/.claude.json` 解析，凭证从不跨 wire | `packages/shared/src/protocol/machine-wire.ts:207-213`、`apps/daemon/src/backend/mcp-config.ts:60` | 有意（spec 13 断约） |
 | 机器 per-runtime 开关 `enabledRuntimes` | `apps/server/src/db/schema.ts:416` | **形状先到、执行面没到**（见 G7） |
 | supervisor 崩溃保活（detach spawn + daemon.json + 指数退避重启） | `apps/daemon/src/supervisor.ts:28-92` | 有意（02/A1「detached + supervisor 跨崩溃保活」） |
@@ -200,8 +200,8 @@
 
 **不属·有意不同（02/01 册已锁）——五条**
 
-- G11（并发上限摘除，`docs/spec/02-架构平价.md:15` A3）、G20（单用户无 owner/visibility，A2）、
-  G24（全 SSE 无 WS，A1）、G25（纯 JS npm 发行 + pi 0.86.0，01 册 §8）、G4（重启不重注册，优于 Multica）。
+- G11 (concurrency cap removal, `docs/spec/02-architecture-parity.md:15` A3), G20 (single user, no owner/visibility, A2),
+  G24 (all SSE, no WS, A1), G25 (pure-JS npm distribution + pi 0.86.0, volume 01 §8), G4 (no re-registration on restart, better than Multica).
 
 **不属·本图 Out of scope——四条**
 

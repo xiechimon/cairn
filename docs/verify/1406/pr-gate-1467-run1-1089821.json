@@ -18,7 +18,7 @@
    "dimension": "rules",
    "title": "spec 02 §7.2 still says MCP issues/pull_requests/workflow_runs are stubs",
    "severity": "suggestion",
-   "file": "docs/spec/02-架构平价.md",
+   "file": "docs/spec/02-architecture-parity.md",
    "line": 281,
    "evidence": "Line 281 (M4b landing note of the /api/mcp face) reads: \"`attachment`/`issues`/`pull_requests`/`workflow_runs`/`run_review` 存根与 chief 词表同口径\". At this head, mcp-face.ts routes the three tools to executeGithubReadTool and switches their inputSchema to githubReadToolParamsSchemas, which makes projectId required. mcp-face.test.ts:309 now expects isError for `{}` instead of an empty items list. The PR does not touch docs/spec. Sibling bootstrap PR #1414 does update spec 02 for its own behavior change.",
    "failurePath": "After merge, a reader of the MCP face spec (02 §7.2) is told these three tools are empty stubs that take an optional projectId. They actually read GitHub with the team token and reject a call without projectId. docs/pr-review.md step 5 (sync docs/spec when existing behavior changes) is not met. Fix: update the line 281 sentence (and the 02 §3/A4 reference) to describe the real reads and the required projectId."

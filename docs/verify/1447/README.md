@@ -2,7 +2,7 @@
 
 Base = this branch before the #1447 commit (board code unchanged since `bbd1e858`). Branch = `claude/optimistic-albattani-r5pmfn`.
 
-`packages/shared/src/phase.ts` `boardColumnFor('queued')` is 执行中: a started task sits on the step its build will run, as the reference product's 2026-09-12 changelog says ("a queued todo sits on the step its build will run"). This replaces the old `queued → 待开始` fold, which `docs/spec/02-架构平价.md` §4.1 marked [推断]. The web 执行中 column accepts queued (`apps/web/src/board/columns.ts`); `IN_FLIGHT_PHASES` stays planning / building. A queued card takes the 执行中 footer in a waiting form (`apps/web/src/board/todo-card.tsx`): a static hourglass, secondary ink, "agent · 排队中", or 等机器 / 等额度 when held. The breathing robot stays for planning / building. A queued card dropped on 待开始 opens the #755 reset dialog.
+`packages/shared/src/phase.ts` `boardColumnFor('queued')` is `执行中` (in progress): a started task sits on the step its build will run, as the reference product's 2026-09-12 changelog says ("a queued todo sits on the step its build will run"). This replaces the old `queued → 待开始` fold, which `docs/spec/02-architecture-parity.md` §4.1 marked [inferred]. The web in-progress column accepts queued (`apps/web/src/board/columns.ts`); `IN_FLIGHT_PHASES` stays planning / building. A queued card takes the in-progress footer in a waiting form (`apps/web/src/board/todo-card.tsx`): a static hourglass, secondary ink, "agent · `排队中`", or `等机器` / `等额度` when held. The breathing robot stays for planning / building. A queued card dropped on `待开始` opens the #755 reset dialog.
 
 ## Unit
 
