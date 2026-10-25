@@ -21,8 +21,8 @@
 </div>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/board-dark.png">
-  <img alt="Cairn board: tickets move from to-do through planning, running and review to done, each one claimed by an agent" src="docs/assets/readme/board-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="site/img/board-en-dark.webp">
+  <img alt="Cairn board: tickets move from to-do through planning, running and review to done, each one claimed by an agent" src="site/img/board-en-light.webp">
 </picture>
 
 ## Highlights
@@ -59,19 +59,19 @@ Cairn (formerly pacman) began as a clean-room study of todos.dev's public interf
 Requirements: Node.js 22 or 24 (LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to source compilation and need a build toolchain).
 
 ```sh
-npx @xiechimon/pacman
+npx @xiechimon/cairn
 ```
 
 One command: download, start, and serve on **http://127.0.0.1:8787/app**. The first boot creates the database under `~/.cairn`, runs migrations, and seeds a default team.
 
-Use a different port with `PORT=9000 npx @xiechimon/pacman`.
+Use a different port with `PORT=9000 npx @xiechimon/cairn`.
 
 ### Run builds on your own machines
 
 The UI is fully usable without a daemon; register a machine when you want agents to actually run builds on it. On each machine that executes builds:
 
 ```sh
-npm i -g @xiechimon/pacman-cli
+npm i -g @xiechimon/cairn-cli
 # One-time enrollment: create an API key in the web UI (/app/api-keys, plaintext shown once), then
 cairn start --api-key <cairn_...> --team <teamId>
 # Daily use (credentials persisted in ~/.cairn/machine.json):
@@ -133,7 +133,7 @@ pnpm test         # vitest
 | Path | Contents |
 |---|---|
 | `CONTEXT.md` | Domain model & glossary — canonical terminology (Chinese interface terms ↔ English ↔ internal names) |
-| `apps/web` | Web UI (React + vite) |
+| `apps/web` | Web UI, React + vite (`@cairn/web`) |
 | `apps/server` | Server: Hono REST + SSE + SQLite (package `@xiechimon/cairn` — directory name differs from package name) |
 | `apps/daemon` | Executor daemon (package `@xiechimon/cairn-cli` — directory name differs from package name) |
 | `packages/shared` | Protocol vocabulary, record shapes, brand-slot single source (`@cairn/shared`) |
@@ -148,8 +148,6 @@ pnpm test         # vitest
 - Icons [lucide](https://lucide.dev) — ISC License
 - Emoji curation data [gitmoji](https://gitmoji.dev) — MIT License
 - Execution engine [pi SDK](https://github.com/badlogic/pi-mono) — MIT License
-
-Full obligations table: `docs/spec/素材替换计划.md` §4.
 
 ## License
 

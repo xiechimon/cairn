@@ -21,8 +21,8 @@
 </div>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/board-dark.png">
-  <img alt="Cairn 看板：任务从待开始、规划、执行到待审核、已完成，每张票都由一个 agent 领走" src="docs/assets/readme/board-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="site/img/board-zh-dark.webp">
+  <img alt="Cairn 看板：任务从待开始、规划、执行到待审核、已完成，每张票都由一个 agent 领走" src="site/img/board-zh-light.webp">
 </picture>
 
 ## 亮点
@@ -59,19 +59,19 @@ Cairn（原名 pacman）起步于对 todos.dev 公开界面的 clean-room 研究
 环境要求：Node.js 22 或 24（LTS 线自带 better-sqlite3 预编译产物；其它版本可能回退源码编译，需要构建工具链）。
 
 ```sh
-npx @xiechimon/pacman
+npx @xiechimon/cairn
 ```
 
 一条命令：下载、启动、托管在 **http://127.0.0.1:8787/app**。首启在 `~/.cairn` 下自动建库 + 迁移 + seed 默认团队。
 
-换端口：`PORT=9000 npx @xiechimon/pacman`。
+换端口：`PORT=9000 npx @xiechimon/cairn`。
 
 ### 让自己的机器跑 build
 
 不起 daemon 也能用全部界面功能；要让 agent 真在某台机器上跑 build 时再登记。在执行机上：
 
 ```sh
-npm i -g @xiechimon/pacman-cli
+npm i -g @xiechimon/cairn-cli
 # 首次注册：网页 /app/api-keys 建 key（明文只显示一次），然后
 cairn start --api-key <cairn_...> --team <teamId>
 # 日常（凭据已存 ~/.cairn/machine.json）：
@@ -132,7 +132,7 @@ pnpm test         # vitest
 | 路径 | 内容 |
 |---|---|
 | `CONTEXT.md` | 领域模型与术语表（中文界面词 ↔ 英文原词 ↔ 内部名，canonical） |
-| `apps/web` | Web UI（React + vite） |
+| `apps/web` | Web UI，React + vite（`@cairn/web`） |
 | `apps/server` | server：Hono REST + SSE + SQLite（包名 `@xiechimon/cairn`，目录名 ≠ 包名） |
 | `apps/daemon` | 执行机 daemon（包名 `@xiechimon/cairn-cli`，目录名 ≠ 包名） |
 | `packages/shared` | 协议词表 / 记录形状 / 品牌槽单源（`@cairn/shared`） |
@@ -147,8 +147,6 @@ pnpm test         # vitest
 - 图标 [lucide](https://lucide.dev) — ISC License
 - emoji 策展数据 [gitmoji](https://gitmoji.dev) — MIT License
 - 执行引擎 [pi SDK](https://github.com/badlogic/pi-mono) — MIT License
-
-完整义务表见 `docs/spec/素材替换计划.md` §4。
 
 ## 许可
 
