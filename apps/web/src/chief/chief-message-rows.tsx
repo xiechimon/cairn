@@ -22,17 +22,11 @@ import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import type { ChiefContent, ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  ChiefFaceDashed,
-  Copy,
-  FileText,
-  Restore,
-} from '../icons/index.js';
+import { Check, ChevronDown, ChevronRight, Copy, FileText, Restore } from '../icons/index.js';
+import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
+import { ChiefSpiralFace } from './chief-spiral-face.js';
 import { AVATAR_IMG_CLS, AVATAR_SLOT_CLS } from './recipes.js';
 
 /** 消息行 20×20 工具钮（旧 .chief-msg-tool 几何等值；hover 升
@@ -147,7 +141,7 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
               data-testid="chief-chip-agent"
               className={`${CHIP_INLINE_CLS} bg-(--seg-active) text-(--text-secondary)`}
             >
-              <ChiefFaceDashed width={11} height={11} />
+              <img src={spiralAvatarUrl(s.agent)} alt="" className="size-[11px] rounded-full" />
               {s.agent}
             </span>
           );
@@ -342,10 +336,11 @@ export function ChiefStreamRow({
                 name={agent.displayName}
                 src={agent.avatarUrl}
                 fallback="/avatar-robot-1.svg"
+                busy
               />
             </span>
           ) : (
-            <ChiefFaceDashed width={24} height={24} className={AVATAR_SLOT_CLS} />
+            <ChiefSpiralFace size={24} busy className={AVATAR_SLOT_CLS} />
           )}
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
             <ThinkingRow text={item.text} />
@@ -390,7 +385,7 @@ export function ChiefStreamRow({
               />
             </span>
           ) : (
-            <ChiefFaceDashed width={24} height={24} className={AVATAR_SLOT_CLS} />
+            <ChiefSpiralFace size={24} className={AVATAR_SLOT_CLS} />
           )}
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
             <ChiefQuestionCard
@@ -418,10 +413,11 @@ export function ChiefStreamRow({
                 name={agent.displayName}
                 src={agent.avatarUrl}
                 fallback="/avatar-robot-1.svg"
+                busy
               />
             </span>
           ) : (
-            <ChiefFaceDashed width={24} height={24} className={AVATAR_SLOT_CLS} />
+            <ChiefSpiralFace size={24} busy className={AVATAR_SLOT_CLS} />
           )}
           {/* #873：行骨架/展开律/走秒律全部收进共享 LiveRow
               （components/chat/live-row）——与详情页 streaming 行
@@ -487,7 +483,8 @@ export function ChiefStreamRow({
   // row, content full-width below it (reference assistant-
   // message form) — the row flips to a column. The dashed form
   // keeps the old side-avatar slot, byte-identical DOM.
-  const identity = bound && agent ? <ChiefIdentity agent={agent} /> : null;
+  const identity =
+    bound && agent ? <ChiefIdentity agent={agent} busy={item.typing === true} /> : null;
   return (
     // #741：绑定形行翻列（identity chip 头 + 全宽正文，参考站
     // assistant-message 形）；虚线未绑定形保持侧头像槽，
@@ -502,7 +499,9 @@ export function ChiefStreamRow({
         className={identity != null ? MSG_ROW_IDENTITY_CLS : MSG_ROW_CLS}
         data-testid="chief-msg"
       >
-        {identity ?? <ChiefFaceDashed width={24} height={24} className={AVATAR_SLOT_CLS} />}
+        {identity ?? (
+          <ChiefSpiralFace size={24} busy={item.typing === true} className={AVATAR_SLOT_CLS} />
+        )}
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
           <Bubble variant="ghost" className={BUBBLE_WRAP_CLS}>
             <BubbleContent className={BUBBLE_ROBOT_CLS}>

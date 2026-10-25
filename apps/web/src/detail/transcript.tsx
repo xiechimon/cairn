@@ -269,8 +269,10 @@ function Para({ para, gap = false }: { para: RobotPara; gap?: boolean }) {
  *  as one face across the app. */
 function AgentRowAvatar({
   agent,
+  busy = false,
 }: {
   agent: { displayName: string; avatarUrl: string | null } | null;
+  busy?: boolean;
 }) {
   // agent 头像骑在文本行盒上方 4px（r7 26/27/36：avatar top = text top − 4，
   // 老 `.chat-row--agent .chat-avatar` 上下文规则的同值迁移）。
@@ -284,6 +286,7 @@ function AgentRowAvatar({
         name={agent?.displayName}
         src={agent?.avatarUrl}
         fallback="/avatar-robot-1.svg"
+        busy={busy}
       />
     </span>
   );
@@ -508,7 +511,7 @@ function Row({
     case 'streaming':
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
-          <AgentRowAvatar agent={agent} />
+          <AgentRowAvatar agent={agent} busy />
           {/* #873: the row itself is the shared live row (components/chat/
               live-row) — same skeleton, same disclosure rule and same honest
               clock as the chief drawer's in-flight row. What differs per

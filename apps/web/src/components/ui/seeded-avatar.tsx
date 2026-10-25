@@ -26,11 +26,12 @@ export interface SeededAvatarProps {
   fallback: string;
   /** per-face 别名类/几何类透传。 */
   className?: string;
+  busy?: boolean;
 }
 
-export function SeededAvatar({ name, src, fallback, className }: SeededAvatarProps) {
+export function SeededAvatar({ name, src, fallback, className, busy = false }: SeededAvatarProps) {
   // falsy-safe：'' avatarUrl（空串覆盖）视同未设置，落回生成/兜底路径
-  const generated = name ? spiralAvatarUrl(name) : fallback;
+  const generated = name ? spiralAvatarUrl(name, busy) : fallback;
   const resolved = src || generated;
   const [failedFor, setFailedFor] = useState<string | null>(null);
   const failed = failedFor === resolved;

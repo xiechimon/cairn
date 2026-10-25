@@ -193,3 +193,37 @@ test('account head shares the seeded user src (same identity as the sidebar chip
   await page.goto('/app/account?scenario=13');
   await expect(page.locator('.account-avatar img')).toHaveAttribute('src', USER_SRC);
 });
+
+test('a working agent spins its spiral; idle rows stay still', async ({ page }) => {
+  await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=26');
+  const rows = page.locator('.chat-row--agent');
+  await expect(rows.last().getByTestId('msg-avatar').locator('img')).toHaveAttribute(
+    'src',
+    /%3Cg%20class%3D%22spin%22%3E/,
+  );
+  await expect(rows.first().getByTestId('msg-avatar').locator('img')).not.toHaveAttribute(
+    'src',
+    /spin/,
+  );
+});
+
+test('the unbound chief wears the spiral face instead of the dashed one', async ({ page }) => {
+  await page.goto('/app?scenario=114');
+  const face = page.getByTestId('chief-stream').getByTestId('chief-msg').locator('> svg');
+  await expect(face).toHaveCount(1);
+  await expect(face.locator('circle')).toHaveAttribute('fill', 'var(--fab-surface)');
+  await expect(face.locator('path')).toHaveAttribute('stroke', 'var(--fab-mark)');
+});
+
+test('the chief spiral spins on the reply it is still typing, rests on finished ones', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=chief-md');
+  const spirals = page
+    .getByTestId('chief-stream')
+    .getByTestId('chief-msg')
+    .locator('> svg > g');
+  await expect(spirals).toHaveCount(2);
+  await expect(spirals.first()).toHaveCSS('animation-name', 'none');
+  await expect(spirals.last()).toHaveCSS('animation-name', 'spin');
+});

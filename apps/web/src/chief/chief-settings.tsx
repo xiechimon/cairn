@@ -24,8 +24,9 @@ import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { ChiefContent, ChiefSettingsTab, MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronLeft, ChevronRight, ChiefFaceDashed } from '../icons/index.js';
+import { ChevronLeft, ChevronRight } from '../icons/index.js';
 import { ChiefAgentDialog, type ChiefAgentOption } from './chief-agent-dialog.js';
+import { ChiefSpiralFace } from './chief-spiral-face.js';
 import { EditCharterDialog } from './edit-charter-dialog.js';
 
 const TABS: { id: ChiefSettingsTab; label: string }[] = [
@@ -188,7 +189,7 @@ export function ChiefSettings({
                     <span className={ROW_AVATAR_CLS}>{boundAgent.name.charAt(0)}</span>
                   )
                 ) : (
-                  <ChiefFaceDashed width={24} height={24} />
+                  <ChiefSpiralFace size={24} />
                 )}
                 <span>{boundAgent != null ? boundAgent.name : t('未设置')}</span>
                 <ChevronRight width={14} height={14} className="ml-auto text-content-tertiary" />
