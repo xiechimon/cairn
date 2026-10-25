@@ -21,7 +21,7 @@ import { killInFlightPick } from './services/fs-pick.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { backfillPersonas } from './services/personas.js';
-import { createScheduler, issueIntakeRunOf } from './services/scheduler.js';
+import { createScheduler, issueIntakeRunOf, trajectoryOutcomeRunOf } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
 
 const config = loadConfig();
@@ -90,11 +90,12 @@ warnInsecureBind(logger, config);
 logTokenAuthStartup(logger, config);
 
 const scheduler = createScheduler(
-  { db, hub, machineHub, user: seeded.user, convHub, box: secretBox },
+  { db, hub, machineHub, user: seeded.user, convHub, box: secretBox, reposDir },
   { tickMs: config.schedulerTickMs },
   { attachmentsDir, logger },
   { githubFetch: globalThis.fetch, logger },
   issueIntakeRunOf(config, { githubFetch: globalThis.fetch, logger }),
+  trajectoryOutcomeRunOf(config, { logger }),
 );
 scheduler.start();
 

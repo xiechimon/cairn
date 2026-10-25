@@ -37,6 +37,7 @@ export const DB_TABLES = [
   'autonomy_state',
   'member_activity',
   'build_feedback',
+  'build_outcome_backfill',
   'memory_save_conflict',
   'memory_candidate',
 ] as const;
@@ -61,6 +62,7 @@ export const INTERNAL_ONLY_TABLES = [
   'autonomy_state',
   'member_activity',
   'build_feedback',
+  'build_outcome_backfill',
   'memory_save_conflict',
   'memory_candidate',
 ] as const;

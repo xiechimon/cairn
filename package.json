@@ -21,6 +21,7 @@
     "traj:label": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-label-cli.ts",
     "traj:attribution": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-attribution-summary-cli.ts",
     "traj:reflect": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-reflect-cli.ts",
+    "traj:backfill": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-backfill-cli.ts",
     "traj:curate": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-curate-cli.ts",
     "lint": "biome ci .",
     "prepush": "node scripts/prepush.mjs",
