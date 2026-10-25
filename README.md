@@ -11,7 +11,7 @@
   <p>
     <a href="https://cairn.xmon.me">Website</a> ·
     <a href="#quickstart">Quickstart</a> ·
-    <a href="./README.zh.md">简体中文</a>
+    <a href="./README.zh.md">Simplified Chinese</a>
   </p>
 
   <p>

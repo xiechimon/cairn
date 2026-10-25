@@ -1,68 +1,68 @@
-# Paper 改版落地计划
+# Paper redesign landing plan
 
-定稿方向见 [`../DESIGN.md`](../DESIGN.md)：Paper Dense 看板 · Grouped 侧栏 · Hybrid 字体（衬线标题 + 无衬线正文）。参考 mockup：[`board-paper-r5.html`](board-paper-r5.html)（浏览器打开后按 `3`）。
+The final direction lives in [`../DESIGN.md`](../DESIGN.md): Paper Dense board · Grouped sidebar · Hybrid type (serif headings + sans body). Reference mockup: [`board-paper-r5.html`](board-paper-r5.html) (open it in a browser and press `3`).
 
-## 原则
+## Principles
 
-- **一次一面，一个 PR**。每个 PR 可以单独合并、单独回滚，按下面的顺序走：先 token，再看板，再侧栏，最后铺到其它页面。
-- **先亮色**。暗色主题保持现值，最后单独做一轮 mockup 再改。
-- **有意改的视觉钉扎就改钉扎**。近期 CDS 系列（#1355–#1366）钉了一批值（侧栏 288px、面板卡 10px、`color-freeze` 锁值等）。本计划会有意推翻其中一部分；每个 PR 在同一 diff 里更新对应 spec，并在 PR body 写明「哪个钉扎、旧值 → 新值、为什么」。
-- **每个 PR 的验收**（仓规）：`pnpm lint` / `pnpm typecheck` / `pnpm spec:parse` / `pnpm exec vitest run --changed` / `pnpm --filter @cairn/web e2e:affected`（默认 8398，先 `lsof -iTCP:8398`）；截图 = fixture 两态 + live 真点击，存 `docs/verify/<票号>/`，PR body 用 raw 永久链引用。
+- **One surface at a time, one PR each**. Every PR can be merged and rolled back independently, in the order below: tokens first, then the board, then the sidebar, and finally rolled out to the other pages.
+- **Light mode first**. The dark theme keeps its current values; a separate mockup round comes last.
+- **Intentionally changed visual pins get their pins changed**. The recent CDS series (#1355–#1366) pinned a batch of values (sidebar 288px, panel card 10px, `color-freeze` locked values, and the like). This plan deliberately overturns some of them; each PR updates the corresponding spec in the same diff and states in the PR body "which pin, old value → new value, why".
+- **Acceptance for every PR** (repo rules): `pnpm lint` / `pnpm typecheck` / `pnpm spec:parse` / `pnpm exec vitest run --changed` / `pnpm --filter @cairn/web e2e:affected` (default 8398, run `lsof -iTCP:8398` first); screenshots = fixture in both states + real clicks on live, stored in `docs/verify/<ticket>/`, and referenced in the PR body with permanent raw links.
 
-## PR 1 · 亮色 token 换成 Paper 值
+## PR 1 · Switch the light tokens to the Paper values
 
-只改 token，不改组件。合并后整个亮色主题的底色、文字、强调色一起变。
+Change only tokens, not components. After the merge, the light theme's background, text, and accent colors all change at once.
 
-- `src/styles/shadcn.css` 的 `.light` 块：
-  - 先盘点：哪个槽在画「应用底 / 主面板 / 任务卡」（目前主面板走 `bg-(--card)`，卡片走哪个槽要在 PR 里查实），再按角色映射到 `canvas #f3eee5` / `sheet #fbf9f5` / `card #fff`。
-  - 文字阶梯：`--foreground` → `ink #2b2620`，`--text-secondary` → `ink-2 #5e564d`，`--text-tertiary` → `ink-3 #746a5f`，`--text-dim` 只留给装饰。
-  - 强调色：`--card-button` / `--focus-ring` 目前是洋红 `#97227e`，改成赭红 `#b4532a`；`--spot-*` 派生色随之自动跟。
-  - 新增语义 token：`--running` / `--running-text` / `--running-bar` / `--running-track`、`--accent-hover`、`--project-tile-1..6`。同时在 `:root`（暗色）给出取自现有暗色阶梯的值。
-- 要更新的 spec：`e2e/color-freeze.spec.ts`（锁值本来就是为了拦「无意」改动，这里是有意改）。
-- 风险：`--spot-*` 消费面广（DESIGN.md 旧版的「品牌墨」G6 规则），先跑 `node scripts/ui-drift-gate.mjs` 确认没有新增未登记消费点。
+- The `.light` block in `src/styles/shadcn.css`:
+  - Audit first: which slot paints the "app background / main panel / task card" (currently the main panel goes through `bg-(--card)`; which slot the card uses must be verified in the PR), then map by role to `canvas #f3eee5` / `sheet #fbf9f5` / `card #fff`.
+  - Text ladder: `--foreground` → `ink #2b2620`, `--text-secondary` → `ink-2 #5e564d`, `--text-tertiary` → `ink-3 #746a5f`, `--text-dim` only for decoration.
+  - Accent: `--card-button` / `--focus-ring` are currently magenta `#97227e`; change to terracotta `#b4532a`; the derived `--spot-*` colors follow automatically.
+  - New semantic tokens: `--running` / `--running-text` / `--running-bar` / `--running-track`, `--accent-hover`, `--project-tile-1..6`. At the same time, give `:root` (dark) values taken from the existing dark ladder.
+- Spec to update: `e2e/color-freeze.spec.ts` (the locked values exist to intercept "unintentional" changes; this one is intentional).
+- Risk: `--spot-*` has a wide consumer surface (the old-version "brand ink" G6 rule in DESIGN.md); run `node scripts/ui-drift-gate.mjs` first to confirm no new unregistered consumers.
 
-## PR 2 · 字号 token + 任意值棘轮
+## PR 2 · Font-size tokens + arbitrary-value ratchet
 
-- `src/styles/app.css` 的 `@theme inline` 加六档字号键：`text-page`(18) / `text-heading`(16) / `text-card-title`(14) / `text-ui`(13.5) / `text-meta`(12) / `text-caption`(11.5)，乘现有 `--rem-scale`（密度切换照常生效）；加 `font-heading` = `var(--font-source-serif)`。14px 档不叫 `text-card`：shadcn 的 `--color-card` 已占用这个类名（Tailwind 只输出颜色）。
-- `scripts/ui-debt-gate.mjs` 加第三本账：`text-[Npx]` 与间距类 `-[Npx]` 任意值的出现次数（今天约 179 处字号 + 273 处间距），冻结进 `scripts/ui-debt-baseline.json`，只降不升（复用现有 D3 机制）。
-- 不改任何页面，只是让漂移从此不能再涨。后面每个 PR 顺手把自己那块的任意值换成 token 并重冻基线。
+- Add the six font-size keys to the `@theme inline` block of `src/styles/app.css`: `text-page`(18) / `text-heading`(16) / `text-card-title`(14) / `text-ui`(13.5) / `text-meta`(12) / `text-caption`(11.5), multiplied by the existing `--rem-scale` (density switching keeps working); add `font-heading` = `var(--font-source-serif)`. The 14px tier is not called `text-card`: shadcn's `--color-card` already occupies that class name (Tailwind would emit a color).
+- Add a third ledger to `scripts/ui-debt-gate.mjs`: occurrence counts of `text-[Npx]` and spacing-class `-[Npx]` arbitrary values (today about 179 font sizes + 273 spacings), frozen into `scripts/ui-debt-baseline.json`, only allowed to go down (reusing the existing D3 mechanism).
+- No page changes; this just stops drift from growing. Each later PR converts the arbitrary values in its own area to tokens and re-freezes the baseline as it goes.
 
-## PR 3 · 任务卡与看板列
+## PR 3 · Task cards and board columns
 
-- `src/board/todo-card.tsx`：按 DESIGN.md「任务卡」重写结构——标题 → 单行元信息（图标 + 截断优先级：标签先截、项目名至少 5 字宽）→ 按状态的底栏；去掉卡片上的实心按钮（`Button variant="default"`），待开始的「开始」改为悬停浮现、不占高度。顺带删掉三处重复的 badge className（约 195 / 218 / 227 行）。
-- `src/board/board.tsx` + `src/board/columns.ts`：列标题 = 状态图标 + 衬线列名 + 计数，hover 出加号（只在「待开始」列：新任务总是落在这一列，其它列的加号没有对应动作）。
-- 标签：卡片不再渲染 `components/ui/tag-chip.tsx` 的实心色块，改为标签图标 + 文字，图标着 `tag.color`（已定问题 2）；`TagChip` 本身保留给筛选弹层。`e2e/board-filter.spec.ts` 的卡面契约改为「tag.color → 标签图标 color」。
-- 要更新的 spec：`cds-board.spec.ts`、`card-press.spec.ts`、`board-filter.spec.ts`、`visual-polish.spec.ts`。改类名前先 grep `apps/web/e2e` 与 `integration/` 的类名钉扎。
+- `src/board/todo-card.tsx`: restructure per the DESIGN.md "Task card" section — title → single-line meta (icon + truncation priority: the tag truncates first, the project name keeps at least 5 characters) → a footer by status; remove the solid buttons from cards (`Button variant="default"`); the `待开始` "start" action becomes hover-floating and takes no height. Also delete the three duplicated badge classNames (around lines 195 / 218 / 227).
+- `src/board/board.tsx` + `src/board/columns.ts`: column heading = status icon + serif column name + count, plus on hover (only in the `待开始` column: new tasks always land in this column, and the other columns' plus has no corresponding action).
+- Tags: the card no longer renders the solid color block of `components/ui/tag-chip.tsx`; it becomes a tag icon + text, the icon colored by `tag.color` (decided question 2); `TagChip` itself stays for the filter popup. The `e2e/board-filter.spec.ts` card-face contract changes to "tag.color → tag icon color".
+- Specs to update: `cds-board.spec.ts`, `card-press.spec.ts`, `board-filter.spec.ts`, `visual-polish.spec.ts`. Grep the class-name pins in `apps/web/e2e` and `integration/` before renaming classes.
 
-## PR 4 · 看板顶栏
+## PR 4 · Board top bar
 
-- `src/routes/board-page.tsx`（及顶栏实际所在组件）：56px；左侧衬线「工作台」+「⚠ N 项等你处理」；右侧「筛选」「定时」文字按钮 + 墨色胶囊「新任务」；全部 `nowrap`。
+- `src/routes/board-page.tsx` (and wherever the top bar actually lives): 56px; serif "Workbench" + "⚠ N items need your attention" on the left; text buttons "filter" / "schedules" + an ink capsule "New task" on the right; all `nowrap`.
 
-## PR 5 · Grouped 侧栏
+## PR 5 · Grouped sidebar
 
-- `src/board/sidebar.tsx`（主体，695 行）+ `src/board/app-sidebar.tsx`：按 DESIGN.md「侧栏」五段重排——工作区行（搜索、收起两个图标按钮）→ 新任务按钮 → 工作台 / 需要我处理 / 定时 → 项目 → 底部「资源」折叠行 + 用户行（第二行机器状态）。「需要我处理」= 打开看板并只显示「待处理」列（已定问题 1），不新建页面。
-- `src/styles/tokens.css`：`--sidebar-w` 288 → 248。
-- `src/board/project-avatar.tsx`：首字母方块按 `--project-tile-1..6` 顺序取色。
-- 资源折叠的展开状态存 `safe-storage`，刷新不丢。
-- 要更新的 spec：`cds-sidebar.spec.ts`（288px 钉扎）、`sidebar-visual.spec.ts`、`sidebar-nav.spec.ts`、`sidebar-seam.spec.ts`、`sidebar-search-offboard.spec.ts`、`visual-polish.spec.ts`（收起态）。
+- `src/board/sidebar.tsx` (the main file, 695 lines) + `src/board/app-sidebar.tsx`: rearrange per the DESIGN.md "Sidebar" section into five segments — workspace row (two icon buttons: search, collapse) → new-task button → workbench / needs my attention / schedules → projects → footer "Resources" collapsible row + user row (machine status on the second line). "Needs my attention" = open the board showing only the `待处理` column (decided question 1); it does not create a new page.
+- `src/styles/tokens.css`: `--sidebar-w` 288 → 248.
+- `src/board/project-avatar.tsx`: the first-letter tiles take colors in order from `--project-tile-1..6`.
+- The expanded state of the resources collapse is stored in `safe-storage` and survives refresh.
+- Specs to update: `cds-sidebar.spec.ts` (the 288px pin), `sidebar-visual.spec.ts`, `sidebar-nav.spec.ts`, `sidebar-seam.spec.ts`, `sidebar-search-offboard.spec.ts`, `visual-polish.spec.ts` (collapsed state).
 
-## PR 6 · 三个页面壳合一
+## PR 6 · Merging the three page shells into one
 
-- `src/pages/shell.tsx`（PageShell）、`src/resources/shell.tsx`（ResourceShell）、`src/secondary/shell.tsx`（SecondaryShell）各自重画了一遍侧栏 + 顶栏，标题字号（14 / 16 / 14）、内容宽（768 / 768 / 766）、底色都不一样。合成一个壳，统一用 PR 4 的顶栏；侧栏目的地页面去掉无意义的返回箭头。
-- 这是结构重构，放在视觉定型之后做，避免一边改结构一边改样式。
+- `src/pages/shell.tsx` (PageShell), `src/resources/shell.tsx` (ResourceShell), and `src/secondary/shell.tsx` (SecondaryShell) each redraw the sidebar + top bar on their own; the title sizes (14 / 16 / 14), content widths (768 / 768 / 766), and background colors all differ. Merge them into one shell using the PR 4 top bar; destination pages in the sidebar lose their meaningless back arrows.
+- This is a structural refactor, scheduled after the visual shape settles, to avoid changing structure and style at the same time.
 
-## PR 7 起 · 铺到其它页面
+## PR 7 onwards · Rolling out to the other pages
 
-按使用频率：任务详情页 → 资源页（机器 / 技能 / MCP / 密钥 / 模型服务）→ 定时 → 项目页 → 对话框。每页一个 PR：套 token 与字号键、清掉该页任意值、重冻棘轮基线。
+By usage frequency: task detail page → resource pages (machines / skills / MCP / keys / providers) → schedules → project page → dialogs. One PR per page: apply the token and font-size keys, clear that page's arbitrary values, and re-freeze the ratchet baseline.
 
-其余页面（项目设置 / 新建项目、资源与 API 密钥与定时、团队与 Agent 卡）先合入一个共享件 PR：`--radius-card`、`EmptyState`、设置列表、表单件，规则见 DESIGN.md「页面模式」；之后各页 PR 只拼这几件，不另做卡片、空态或表单。
+The remaining pages (project settings / new project, resources and API keys and schedules, team and agent cards) first merge a shared-pieces PR: `--radius-card`, `EmptyState`, the settings list, and the form pieces — rules in the DESIGN.md "Page patterns" section; afterwards each page PR only composes these pieces and builds no cards, empty states, or forms of its own.
 
-## 最后 · 暗色
+## Last · Dark
 
-单独一轮 mockup（同样的 Paper 结构，暖深色纸面），定稿后改 `:root` 块与 `color-freeze` 暗色锁值。
+A separate mockup round (the same Paper structure in warm deep paper); after it is finalized, change the `:root` block and the `color-freeze` dark locked values.
 
-## 已定问题
+## Decided questions
 
-1. **「需要我处理」点进去是什么**：打开看板并筛到「待处理」一列，不做独立收件箱页。落在 PR 5（侧栏导航项）+ 看板的状态筛选。
-2. **标签颜色**：保留用户自定义的标签色，着在卡片的标签图标上，标签名用正文墨色；卡片上不再是实心色块。`TagChip` 留给筛选弹层等其它面。已在 PR 3 落地。
-3. **暗色时机**：亮色 PR 1–5 合并后单独做一轮暗色 mockup 再改。
+1. **What "needs my attention" opens**: the board filtered to the `待处理` column; no standalone inbox page. Lands in PR 5 (the sidebar nav item) + the board's status filter.
+2. **Tag colors**: keep the user's custom tag colors, paint them on the card's tag icon, and use the body ink for the tag name; the card no longer shows a solid color block. `TagChip` stays for other surfaces like the filter popup. Landed in PR 3.
+3. **Dark timing**: after the light PRs 1–5 merge, do a separate dark mockup round before changing it.

@@ -1,23 +1,23 @@
 # docs/
 
-这个目录装两类东西：**长期文档**（规范、裁决、流程——改了要过评审）和**随票产物**（一次性的验证证据与调研笔记——写完归档，不再维护）。读之前先分清自己在哪一类里。
+This directory holds two kinds of things: **long-lived documents** (specs, decisions, processes — changes go through review) and **per-ticket artifacts** (one-off verification evidence and research notes — written, then archived, no longer maintained). Before reading, decide which kind you are in.
 
-## 长期文档
+## Long-lived documents
 
-| 目录 / 文件 | 内容 |
+| Directory / file | Content |
 |---|---|
-| `spec/` | 编号规范（测试分层、PR 流程等），工程规则的正本 |
-| `adr/` | 架构决策记录（ADR），按编号排序；已裁决的事不在评审里重辩，推翻要走新 ADR |
-| `pr-review.md` | PR 评审流程（五步流程 + 六节评分卡） |
-| `ops-db-backup.md` | server DB 备份与恢复（脚本 `scripts/ops/backup-server-db.sh`，调度模板与演练纪律） |
-| `feature-map.md` | 功能地图（当前状态活册），由 `scripts/generate-feature-map.mjs` 机械抽取生成，勿手改；重生成跑脚本，校验加 `--check` |
-| `lessons.md` | 错误台账（过程中出过错又修好的事每类一行），防护按阶梯取最高可行级，能做成机器检查的不许只停在文字 |
-| `agent-dispatch-prompts.md` | Agent 派活提示模板（任务、范围和验收命令补在对应模板后），Codex / Grok / pi 三家共用，均遵循 AGENTS.md |
-| `ops/langfuse.md` | 本机自托管 Langfuse v4（compose 在 `ops/langfuse/`，不进产品安装路径） |
+| `spec/` | Numbered specs (test layering, PR process, etc.); the canonical text of the engineering rules |
+| `adr/` | Architecture decision records (ADRs), ordered by number; decided matters are not re-debated in review, and overturning one takes a new ADR |
+| `pr-review.md` | The PR review process (five-step process + six-section scorecard) |
+| `ops-db-backup.md` | Server DB backup and recovery (script `scripts/ops/backup-server-db.sh`, schedule template, and drill discipline) |
+| `feature-map.md` | Feature map (living register of current state), mechanically extracted by `scripts/generate-feature-map.mjs` — do not hand-edit; re-run the script to regenerate, add `--check` to verify |
+| `lessons.md` | Error ledger (one row per error category of things that went wrong and were later fixed); protections take the highest feasible level on the ladder, and anything that can be made a machine check must not stop at prose |
+| `agent-dispatch-prompts.md` | Agent dispatch prompt templates (task, scope, and acceptance commands are appended after the matching template), shared by Codex / Grok / pi, all following AGENTS.md |
+| `ops/langfuse.md` | Self-hosted Langfuse v4 on this machine (compose lives in `ops/langfuse/`, not in the product install path) |
 
-## 随票产物
+## Per-ticket artifacts
 
-| 目录 | 内容 | 纪律 |
+| Directory | Content | Discipline |
 |---|---|---|
 | `verify/<ticket>/` | Verification evidence committed with each PR (screenshots, probe output, mechanism diagrams) | Lands with its PR; a weekly run removes folders older than 14 days from `main` and records their last commit in `verify/pruned.json` (`git show <sha>:docs/verify/<ticket>/`). Merged PR bodies keep working because their raw links pin a commit. Decision: [`adr/0022-prune-merged-evidence-weekly.md`](adr/0022-prune-merged-evidence-weekly.md) |
-| `research/` | 按票归档的调研笔记（`r*.md`、实测记录） | 写完归档。可当史料引用，不当现行规范读 |
+| `research/` | Research notes archived per ticket (`r*.md`, measurement records) | Archived once written. Cite them as historical material; do not read them as current specs |

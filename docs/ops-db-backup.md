@@ -1,25 +1,25 @@
-# server DB 备份与恢复（#1151 / ADR 0016 裁决 7）
+# Server DB backup and recovery (#1151 / ADR 0016 ruling 7)
 
-状态离机之后，server 的 SQLite 库（任务 / 线程 / 审核记录的真值）是唯一单点。本页是它的备份与恢复正本：脚本在仓内（`scripts/ops/backup-server-db.sh`），调度与目标机属部署侧，随本页模板落地。
+Once state leaves the machine, the server's SQLite database (the source of truth for todos / threads / review records) is the single point of failure. This page is the canonical text for its backup and recovery: the script lives in the repo (`scripts/ops/backup-server-db.sh`); the schedule and the target machine belong to the deployment side and are set up following the template on this page.
 
-## 环境前置
+## Environment prerequisites
 
-- **跑脚本的机器（持有 `server.db` 的那台）必须装好 `sqlite3`**：脚本开工第一步就检查它，缺失时直接报错退出——这是有意设计，缺依赖宁可失败可见，也不静默绕过。Debian/Ubuntu 安装：`sudo apt-get install -y sqlite3`。
-- **远端备份目标机要 ssh 互通**：推送走 `scp`，且脚本对远端的每条命令都带 `-o BatchMode=yes`（禁交互输密码），必须提前打通公钥登录。建议在 `~/.ssh/config` 里给目标机配 Host 别名——本页示例的 `dmit:~/pacman-db-backups` 就是这种用法。
-- **自检**：手动跑一次「备份」一节的命令，本地 `--out` 目录与远端目录各多出一份新备份（`server-db-<UTC 时间戳>.db.gz`），即环境就绪；任何一步失败，脚本以非零退出并打印失败点。
+- **The machine running the script (the one holding `server.db`) must have `sqlite3` installed**: the script checks for it as its very first step and exits with an error if it is missing — this is deliberate design; a missing dependency must fail visibly rather than being silently worked around. On Debian/Ubuntu: `sudo apt-get install -y sqlite3`.
+- **The remote backup target machine must be reachable over ssh**: the push uses `scp`, and the script passes `-o BatchMode=yes` on every remote command (no interactive password entry), so public-key login must be set up in advance. It is recommended to give the target a Host alias in `~/.ssh/config` — the `dmit:~/pacman-db-backups` in the examples on this page is exactly that usage.
+- **Self-check**: run the "Backup" command below once by hand; if a new backup appears in both the local `--out` directory and the remote directory (`server-db-<UTC timestamp>.db.gz`), the environment is ready; on any failure the script exits non-zero and prints where it failed.
 
-## 备份
+## Backup
 
 ```sh
 scripts/ops/backup-server-db.sh --db ~/.pacman/server.db --out ~/backups/pacman \
   --remote dmit:~/pacman-db-backups --keep 48
 ```
 
-行为：`sqlite3 .backup`（活库安全、原子）→ `integrity_check` 不过即失败 → gzip 落本地 `--out` → scp 推远端 → 两端各滚动保留最新 48 份。RPO = 调度间隔（一小时）。**任何一步失败都以非零退出并打印失败点**——备份是「坏了没人会知道」的那类东西，调度侧必须能看到失败（timer 失败状态 / cron 邮件），不许静默。
+Behavior: `sqlite3 .backup` (safe and atomic on a live database) → failure if `integrity_check` does not pass → gzip into the local `--out` → scp to the remote → rolling retention of the latest 48 copies on both ends. RPO = the schedule interval (one hour). **Every failure exits non-zero and prints where it failed** — backups are the kind of thing that "nobody knows when they break", so the schedule side must be able to see failures (timer failed state / cron mail); silent failure is forbidden.
 
-## 调度（mea：systemd user timer）
+## Scheduling (mea: systemd user timer)
 
-`~/.config/systemd/user/pacman-db-backup.service`：
+`~/.config/systemd/user/pacman-db-backup.service`:
 
 ```ini
 [Unit]
@@ -30,7 +30,7 @@ Type=oneshot
 ExecStart=/home/measure/pacman/scripts/ops/backup-server-db.sh --db %h/.pacman/server.db --out %h/backups/pacman --remote dmit:~/pacman-db-backups --keep 48
 ```
 
-`~/.config/systemd/user/pacman-db-backup.timer`：
+`~/.config/systemd/user/pacman-db-backup.timer`:
 
 ```ini
 [Unit]
@@ -44,25 +44,25 @@ Persistent=true
 WantedBy=timers.target
 ```
 
-启用：`systemctl --user daemon-reload && systemctl --user enable --now pacman-db-backup.timer`。`Persistent=true` = 停机窗口在开机后补跑。验证：`systemctl --user list-timers pacman-db-backup.timer` 有下一拍；手动触发一次 `systemctl --user start pacman-db-backup.service` 后两端目录各多一份。
+Enable: `systemctl --user daemon-reload && systemctl --user enable --now pacman-db-backup.timer`. `Persistent=true` = a downtime window is made up right after boot. Verify: `systemctl --user list-timers pacman-db-backup.timer` shows the next run; after triggering `systemctl --user start pacman-db-backup.service` once manually, both directories gain one new backup.
 
-## 恢复
+## Recovery
 
-1. `systemctl --user stop pacman-dev-server`（停写）。
-2. 从 dmit 拉回最新一份：`scp dmit:~/pacman-db-backups/<最新>.db.gz /tmp/` → `gunzip`。
-3. `sqlite3 /tmp/server.db 'PRAGMA integrity_check;'` 必须 `ok`。
-4. 换入：`mv /tmp/server.db ~/.pacman/server.db`（旧库改名留底，别删）。
-5. `systemctl --user start pacman-dev-server`，开 web 抽查最近任务在；daemon 会自重连（`systemctl --user status pacman-daemon` 看无报错）。
+1. `systemctl --user stop pacman-dev-server` (stop writes).
+2. Pull the latest backup from dmit: `scp dmit:~/pacman-db-backups/<latest>.db.gz /tmp/` → `gunzip`.
+3. `sqlite3 /tmp/server.db 'PRAGMA integrity_check;'` must print `ok`.
+4. Swap it in: `mv /tmp/server.db ~/.pacman/server.db` (rename the old database as a record, do not delete it).
+5. `systemctl --user start pacman-dev-server`, open the web UI and spot-check that recent todos are there; the daemon reconnects by itself (`systemctl --user status pacman-daemon` shows no errors).
 
-## 演练纪律
+## Drill discipline
 
-恢复演练永远在**副本**上做：拉回备份 → gunzip → integrity_check + 关键表行数与活库对账（todo / build / chief_thread）。不碰运行中的 server。演练输出随首次落地的 PR 归档进 `docs/verify/1151/`。
+Recovery drills are always done on a **copy**: pull the backup → gunzip → integrity_check + reconcile row counts of key tables against the live database (todo / build / chief_thread). Never touch the running server. Drill output is archived into `docs/verify/1151/` with the PR that first lands this.
 
-## 排障
+## Troubleshooting
 
-备份没按时跑或失败时，按这个顺序看：
+When a backup fails or does not run on time, look in this order:
 
-1. 先 `systemctl --user status pacman-db-backup.service`：最近一次执行的退出码与输出——成功以 `backup done` 收尾，失败会打印失败点（sqlite3 缺失 / integrity_check 不过 / scp 推送失败）。
-2. 再 `journalctl --user -u pacman-db-backup.service`：逐次备份的完整历史输出，定位「从哪一拍开始坏」。
+1. First `systemctl --user status pacman-db-backup.service`: the exit code and output of the most recent run — success ends with `backup done`, failure prints where it failed (missing sqlite3 / integrity_check failed / scp push failed).
+2. Then `journalctl --user -u pacman-db-backup.service`: the complete historical output of each backup run, to locate "which run it broke from".
 
-若压根没触发（status 里连最近一次执行都没有），先查 timer 排程：`systemctl --user list-timers pacman-db-backup.timer`（启用与验证见「调度」一节）。失败输出指到的环境缺口，对照「环境前置」逐项补齐。
+If it never fired at all (the status shows no recent run), check the timer schedule first: `systemctl --user list-timers pacman-db-backup.timer` (enablement and verification are in the "Scheduling" section). For environment gaps pointed to by the failure output, work through "Environment prerequisites" item by item.
