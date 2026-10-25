@@ -10,9 +10,6 @@
 //
 // 不走 currentColor：这是本仓唯一按品牌原色着色的图标族。启用/未启用态由
 // CSS opacity 承载（resources.css 的 .mach-runtime 族），不另出资产。
-//
-// 落点不在 apps/web/src/icons/：scripts/generate-icons.mjs:333 对该目录
-// rmSync 后重建，手加文件会被下次生成抹掉。
 
 import type { SVGProps } from 'react';
 

@@ -1,33 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-// Issue #366: the detail route drops the 文档|聊天 tab group and re-lays
-// out as three abutting panes — 248 sidebar | fluid thread | 488 right
-// pane (docs/design/todos.dev.md grid). The right pane owns the doc
-// surface (plan/changes/diff) plus the three former head-icon overlays
-// (分支与 PR / Token 用量 / 运行历史) as static pane sections picked from
-// the document-type select; fresh phases render no right pane at all
-// (XMON-55 P0 — the brief takes the whole center column). The composer is
-// the only card in the center column. Each test pins one failure way of the
-// rework:
-//   1. pane widths/abutment wrong  2. tab group survives somewhere
-//   3. head icon trio survives     4. composer escapes the center column,
-//      loses its card form, or overlays the transcript again (#472)
-//   5. section switching dead      6. frozen pane-view scenarios
-//      (30/31/32) still pop dialogs  7. fresh phase keeps the empty right
-//      pane or loses the brief's primary action
-//
-// #945/#910 重钉：detail.css 退役——本域载体换语义/二级制：壳 =
-// [data-route=todo-detail]、侧栏 = 壳的直接 aside、列/主栏/右栏 =
-// detail-center / detail-main / detail-right testid、线程列 =
-// transcript-col、composer 卡 = composer-card、头带 = detail-main 内的
-// header、标题 = detail-title、按钮走 role+文案（更多/停止/发送/总管/
-// 打开方案/开始）、dialog 缺席断言走 role=dialog、overlay 缺席断言走
-// rerun 文案。跨域类 locator 保留至各自批次：.doc-select-wrap/
-// .doc-pane-select/.plan-dropdown*（overlays #949）、.dlg-token-total/
-// .dlg-branch-box/.dlg-history-row（detail/overlays.css，detail-b）、
-// .chief-drawer（chief #950）。.detail-tab* / .right-empty 是缺席钉
-// （零规则死类，钉的就是「这些类名永不回来」），原样保留。
-
 const DETAIL_ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc';
 const FRESH = '/app/todo/fresh-probe?scenario=23';
 

@@ -8,8 +8,6 @@
 |---|---|
 | `spec/` | 编号规范（测试分层、PR 流程等），工程规则的正本 |
 | `adr/` | 架构决策记录（ADR），按编号排序；已裁决的事不在评审里重辩，推翻要走新 ADR |
-| `design/` | 设计参考与对照稿 |
-| `a3/` | todos.dev 对照审计报告（逐页 / 逐面） |
 | `pr-review.md` | PR 评审流程（五步流程 + 六节评分卡） |
 | `ops-db-backup.md` | server DB 备份与恢复（脚本 `scripts/ops/backup-server-db.sh`，调度模板与演练纪律） |
 | `feature-map.md` | 功能地图（当前状态活册），由 `scripts/generate-feature-map.mjs` 机械抽取生成，勿手改；重生成跑脚本，校验加 `--check` |

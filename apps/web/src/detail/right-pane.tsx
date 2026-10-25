@@ -1,16 +1,3 @@
-// Detail right pane (issue #366): the 488px static column of the 3-pane
-// detail layout (docs/design/todos.dev.md grid `240 | ~730 | 488`). Hosts
-// the doc surface (DocPane plan/changes/diff — the page passes it in) plus
-// the three former head-icon overlay dialogs as static sections:
-// 分支与 PR / Token 用量 / 运行历史 — one section per view, switched by the
-// 方案▾ family type select (overlays/plan-dropdown) every head carries.
-// Taste DNA law honored: still pane content on a hairline-divided plane,
-// never modals; the pane itself abuts the thread column on a 1px seam. Content classes ride the #68 dialog family (dlg-token-* /
-// dlg-history-* / dlg-branch-*) so the captured geometry carries over.
-// XMON-55 P0 supersedes #366 修订裁决 3 (空占位，不折叠不隐藏): a fresh phase
-// has no build payload, so the page does not mount this pane at all — the
-// 488px goes to the fresh block's task brief instead of a placeholder.
-
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
 import { useBuild } from '../api/hooks.js';

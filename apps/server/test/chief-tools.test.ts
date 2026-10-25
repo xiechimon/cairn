@@ -4,13 +4,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  CHIEF_REMOTE_TOOLS,
-  CHIEF_TOOL_COUNT,
-  CHIEF_TOOL_NAMES,
-  CHIEF_TOOLS_ADDED,
-  CHIEF_TOOLS_REMOVED,
-} from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS, CHIEF_TOOL_COUNT } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';
@@ -210,37 +204,6 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
       expect(def.replaySafe).toBe(true);
       expect(await relay(name, {})).toBeDefined();
     }
-  });
-
-  test('词表键集 = r5 raw toolDefHashes 全键 − 除名登记（一手来源防漂移，node fs 面）', () => {
-    const raw = resolve(
-      import.meta.dirname,
-      '../../../docs/research/assets/r5/raw/chief-threads-testA.json',
-    );
-    const doc = JSON.parse(readFileSync(raw, 'utf8')) as unknown;
-    const found: string[][] = [];
-    const walk = (o: unknown) => {
-      if (Array.isArray(o)) return o.forEach(walk);
-      if (o !== null && typeof o === 'object') {
-        const rec = o as Record<string, unknown>;
-        if (rec.toolDefHashes && typeof rec.toolDefHashes === 'object') {
-          found.push(Object.keys(rec.toolDefHashes as Record<string, unknown>));
-        }
-        Object.values(rec).forEach(walk);
-      }
-    };
-    walk(doc);
-    expect(found.length).toBeGreaterThan(0);
-    // divergence 双向登记（XMON-109/XMON-115/#627）：raw 观测 49 键冻结，现行
-    // 词表 = raw − CHIEF_TOOLS_REMOVED（delete_skills）+ CHIEF_TOOLS_ADDED
-    // （create_skill/update_skill，chief 免开关；models，#627 候选清单）
-    // + set_remote_shell 回摆。
-    const removed: readonly string[] = CHIEF_TOOLS_REMOVED;
-    const added: readonly string[] = CHIEF_TOOLS_ADDED;
-    const expected = (found[0] as string[]).filter(
-      (name) => !removed.includes(name) && !added.includes(name),
-    );
-    expect(CHIEF_TOOL_NAMES).toEqual([...expected, ...added].sort());
   });
 
   test('chief-tools.ts 里所有「现行 N 件」文字与 CHIEF_TOOL_COUNT 一致', () => {

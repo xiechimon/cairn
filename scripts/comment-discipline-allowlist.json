@@ -1195,16 +1195,6 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/src/resources/create-machine-dialog.tsx",
-    "line": "// CLI → `npm install -g @xiechimon/cairn-cli@latest`;在机器上执行 → `cairn start`",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/resources/create-machine-dialog.tsx",
-    "line": "// key 注册」disclosure 展开 `cairn start --api-key <key> --team <teamId>`",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/src/resources/machines-page.tsx",
     "line": "// ellipsis affordances. The former `Cairn 托管机器` facade row is gone —",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
@@ -1267,21 +1257,6 @@
   {
     "path": "apps/web/test/i18n.test.ts",
     "line": "// Q19). D3 替换相位（#109）：键前缀 `cairn.locale` + `cairn-locale`",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/test/pwa.test.ts",
-    "line": "// name/short_name = Cairn + description 自写 + sw.js 通知兜底标题 =",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/test/pwa.test.ts",
-    "line": "// Cairn；其余字段/字节仍须与 docs/research/assets/r1/ 原件逐字节一致。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/test/pwa.test.ts",
-    "line": "/** manifest 品牌槽替换值（素材替换计划 §3.4：`Cairn` + 自写 description）。 */",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
