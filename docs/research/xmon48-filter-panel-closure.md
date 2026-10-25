@@ -2,7 +2,7 @@
 
 日期：2026-10-02 · 票：XMON-48（子票 XMON-57 · PR #564 · commit `6f079a81`）
 pacman 侧核对基准：`origin/main@4647eaf`（board 筛选面文件自 `6f079a81` 起零改动）
-参考实现取证：Multica = 本地源码逐行复核（`/Users/xmon/Code/AgentProjects/multica`，2026-10-02）；todos.dev = 官方 llms-full.txt 归档 + changelog live 重抓（2026-10-02）
+Reference evidence: Multica = line-by-line review of a local source checkout (2026-10-02); todos.dev = archived official llms-full.txt plus a live re-capture of the changelog (2026-10-02).
 
 ## 1. 结论先行
 

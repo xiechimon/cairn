@@ -2,7 +2,7 @@
 
 > 目标 issue：#1288（OPEN）。本文件原为只读调研产物，现已随 #1288 施工 PR 入仓（docs/research/r16-model-catalog-liveness.md）——数据流全链证据 / 方案 A/B/C 对比 / 10 条失败方式 / spec 骨架为开工时的决策正本，实现时已按票面三道闸落地。
 > 仓内相关票：#1287（别名解析去重，施工中，改 `packages/shared/src/records/model-source.ts`）。
-> 背景事实（已实测采信）：claude-code 机器可选模型 = `~/.claude/settings.json` 槽位映射至多 5 条；上游 relay（provider 表 relay-186，baseUrl `http://112.80.47.186:8783`，apiKeyCipher 在 SecretBox）`GET /v1/models` 实供 9 个，其中 `deepseek-v4.1-flash` 与 `gpt-5.6-luna` 已被上游下架（`/v1/messages` 404），但 UI 照常显示、`homeMachineRejectReason` 反而 400 拒绝清单外的活模型。
+> Background (measured): a claude-code machine offers at most 5 models, one per slot mapped in `~/.claude/settings.json`. The upstream relay (provider row relay-186, baseUrl `http://<relay-host>:<port>`, apiKeyCipher in SecretBox) serves 9 models from `GET /v1/models`; two of them, `deepseek-v4.1-flash` and `gpt-5.6-luna`, were withdrawn upstream (`/v1/messages` 404), yet the UI still lists them, while `homeMachineRejectReason` rejects live models outside the list with a 400.
 
 ---
 

@@ -37,8 +37,8 @@ test('添加机器 button opens the dialog with the two-step command blocks', as
   );
   const commands = dialog.locator('code');
   await expect(commands).toHaveCount(2);
-  await expect(commands.nth(0)).toHaveText('npm install -g @xiechimon/pacman-cli@latest');
-  await expect(commands.nth(1)).toHaveText('pacman start');
+  await expect(commands.nth(0)).toHaveText('npm install -g @xiechimon/cairn-cli@latest');
+  await expect(commands.nth(1)).toHaveText('cairn start');
   // API key disclosure collapsed by default
   await expect(
     dialog.getByRole('button', { name: '在云服务器上运行？改用 API key 注册' }),
@@ -68,7 +68,7 @@ test('API key disclosure expands the key command and the api-keys link', async (
   await toggle.click();
   // fixture 模式无真 teamId → <teamId> 占位;命令形状 = 02 §5.2 路径二
   await expect(dialog.locator('code').filter({ hasText: '--api-key' })).toHaveText(
-    'pacman start --api-key <key> --team <teamId>',
+    'cairn start --api-key <key> --team <teamId>',
   );
   const link = dialog.getByRole('link', { name: '获取 API key →' });
   await expect(link).toHaveText('获取 API key →');
@@ -89,9 +89,9 @@ test('copy buttons write their command to the clipboard', async ({ page, context
   await copy.first().click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe('npm install -g @xiechimon/pacman-cli@latest');
+    .toBe('npm install -g @xiechimon/cairn-cli@latest');
   await copy.nth(1).click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe('pacman start');
+    .toBe('cairn start');
 });

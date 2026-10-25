@@ -142,6 +142,15 @@ export function relayKey(): string {
   return token;
 }
 
+export function relayBaseUrl(): string {
+  const url = process.env.CAIRN_EVAL_RELAY_URL;
+  if (!url)
+    throw new Error(
+      'relay URL missing: set CAIRN_EVAL_RELAY_URL (for example http://<relay-host>:<port>/v1)',
+    );
+  return url;
+}
+
 export async function bootStack(): Promise<Stack> {
   // providerBaseUrl 只喂给 helpers 自带的 stub-gw 行；本评测不使用它，真 provider
   // 由 seedWorld 经 REST 建（key 走服务端 SecretBox 密封）。
