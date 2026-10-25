@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { attachment } from '../src/db/schema.js';
 import { signAttachmentGrant } from '../src/lib/attachments-token.js';
 import { newRecordId } from '../src/lib/ids.js';
-import { bootServer, req } from './helpers.js';
+import { bootServer, postProject, req } from './helpers.js';
 
 type TestServer = ReturnType<typeof bootServer>;
 
@@ -459,6 +459,16 @@ describe('attachments — chief-tools / mcp-face tool', () => {
   });
 });
 
+async function todoCiting(s: TestServer, attachmentId: string, ext: string): Promise<string> {
+  const projectId = await postProject(s.app);
+  const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+    title: 'Attachment text',
+    spec: `![file](attachment:${s.team.id}/${attachmentId}.${ext})`,
+  });
+  expect(res.status).toBe(201);
+  return ((await res.json()) as { id: string }).id;
+}
+
 describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachment:` token parse path)', () => {
   test('worker attachment text/* → utf8', async () => {
     const s = bootServer();
@@ -469,13 +479,14 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
         'text/markdown',
         new TextEncoder().encode('hello'),
       );
+      const todoId = await todoCiting(s, id, 'md');
       const { executeWorkerMemoryTool } = await import('../src/services/chief-tools.js');
       const text = await executeWorkerMemoryTool(
         s.db,
         {
           teamId: s.team.id,
           agentId: 'a',
-          todoId: 't',
+          todoId,
           projectId: 'p',
           buildId: 'b',
           attachmentsDir: s.attachmentsDir,
@@ -499,13 +510,14 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
     try {
       const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
       const { id } = await uploadOne(s, 'tiny.png', 'image/png', bytes);
+      const todoId = await todoCiting(s, id, 'png');
       const { executeWorkerMemoryTool } = await import('../src/services/chief-tools.js');
       const text = await executeWorkerMemoryTool(
         s.db,
         {
           teamId: s.team.id,
           agentId: 'a',
-          todoId: 't',
+          todoId,
           projectId: 'p',
           buildId: 'b',
           attachmentsDir: s.attachmentsDir,

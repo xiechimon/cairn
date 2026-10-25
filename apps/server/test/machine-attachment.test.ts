@@ -1,10 +1,16 @@
 import { machineAttachmentResponseSchema, machineEnrollResponseSchema } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   attachment as attachmentTable,
+  message as messageTable,
+  step as stepTable,
   team as teamTable,
+  todo as todoTable,
 } from '../src/db/schema.js';
+import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
+import { createTodo, updateTodo } from '../src/services/todos.js';
 import {
   bindAllAgents,
   bootServer,
@@ -20,6 +26,8 @@ interface World {
   s: TestServer;
   token: string;
   stepId: string;
+  todoId: string;
+  buildId: string;
 }
 
 async function setupWorld(): Promise<World> {
@@ -55,8 +63,8 @@ async function setupWorld(): Promise<World> {
   bindAllAgents(s);
   const projectId = await postProject(s.app);
   const todoRes = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
-    title: '附件探针',
-    spec: '探针',
+    title: 'Attachment probe',
+    spec: 'Probe',
   });
   const todo = (await todoRes.json()) as { id: string };
   const buildRes = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
@@ -73,7 +81,9 @@ async function setupWorld(): Promise<World> {
   expect(claimRes.status).toBe(200);
   const claim = (await claimRes.json()) as { step: null | { step: { id: string } } };
   expect(claim.step).not.toBeNull();
-  return { s, token: machineJson.token, stepId: claim.step!.step.id };
+  const stepId = claim.step!.step.id;
+  const buildId = s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!.buildId;
+  return { s, token: machineJson.token, stepId, todoId: todo.id, buildId };
 }
 
 async function uploadOne(
@@ -99,6 +109,13 @@ async function uploadOne(
   return { id: g.attachmentId };
 }
 
+async function citeInSpec(w: World, attachmentId: string, ext: string): Promise<void> {
+  const patch = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, {
+    spec: `![file](attachment:${w.s.team.id}/${attachmentId}.${ext})`,
+  });
+  expect(patch.status).toBe(200);
+}
+
 async function pendingOne(s: TestServer): Promise<{ id: string }> {
   const grantRes = await req(s.app, 'POST', '/api/uploads/grant', {
     kind: 'attachment',
@@ -112,6 +129,96 @@ async function pendingOne(s: TestServer): Promise<{ id: string }> {
 }
 
 describe('GET /api/machine/attachment/{stepId}/{attachmentId} (#730)', () => {
+  test('#1481 only human task text authorizes both attachment interfaces', async () => {
+    const w = await setupWorld();
+    try {
+      const { id } = await uploadOne(w.s, 'private.png', 'image/png', PNG);
+      const content = `![private](attachment:${w.s.team.id}/${id}.png)`;
+      const projectId = w.s.db
+        .select()
+        .from(todoTable)
+        .where(eq(todoTable.id, w.todoId))
+        .get()!.projectId;
+      const download = () =>
+        w.s.app.request(`/api/machine/attachment/${w.stepId}/${id}?teamId=${w.s.team.id}`, {
+          headers: { authorization: `Bearer ${w.token}` },
+        });
+      const workerOn = (todoId: string) =>
+        executeWorkerMemoryTool(
+          w.s.db,
+          {
+            teamId: w.s.team.id,
+            agentId: 'agent-stub-att',
+            todoId,
+            projectId: null,
+            buildId: w.buildId,
+            attachmentsDir: w.s.attachmentsDir,
+          },
+          'attachment',
+          { attachmentId: id },
+        );
+      const worker = () => workerOn(w.todoId);
+      expect((await download()).status).toBe(404);
+      await expect(worker()).rejects.toMatchObject({ status: 404 });
+      const wrongTeam = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, {
+        spec: `![private](attachment:team-other/${id}.png)`,
+      });
+      expect(wrongTeam.status).toBe(200);
+      expect((await download()).status).toBe(404);
+      await expect(worker()).rejects.toMatchObject({ status: 404 });
+      const agentMade = createTodo(
+        { db: w.s.db, hub: w.s.hub, user: w.s.user },
+        {
+          teamId: w.s.team.id,
+          projectId,
+          title: 'Agent spec',
+          spec: content,
+          createdBy: 'chief-agent',
+          ownerId: w.s.user.id,
+        },
+      );
+      await expect(workerOn(agentMade.id)).rejects.toMatchObject({ status: 404 });
+      const created = await req(w.s.app, 'POST', `/api/projects/${projectId}/todos`, {
+        title: 'Human created',
+        spec: content,
+      });
+      expect(created.status).toBe(201);
+      const createdId = ((await created.json()) as { id: string }).id;
+      expect(JSON.parse(await workerOn(createdId)).id).toBe(id);
+      const patch = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { spec: content });
+      expect(patch.status).toBe(200);
+      expect((await download()).status).toBe(200);
+      expect(JSON.parse(await worker()).id).toBe(id);
+      updateTodo({ db: w.s.db, hub: w.s.hub, user: w.s.user }, w.todoId, { spec: content });
+      expect((await download()).status).toBe(404);
+      await expect(worker()).rejects.toMatchObject({ status: 404 });
+      w.s.db
+        .insert(messageTable)
+        .values({
+          id: 'agent-wrote-the-token',
+          conversationId: w.buildId,
+          role: 'user',
+          content,
+          createdAt: 1,
+        })
+        .run();
+      expect((await download()).status).toBe(404);
+      await expect(worker()).rejects.toMatchObject({ status: 404 });
+      const steer = await req(w.s.app, 'POST', `/api/conversations/${w.buildId}/messages`, {
+        content,
+      });
+      expect(steer.status).toBe(201);
+      expect((await download()).status).toBe(200);
+      expect(JSON.parse(await worker()).id).toBe(id);
+      const reset = await req(w.s.app, 'POST', `/api/todos/${w.todoId}/reset`, {});
+      expect(reset.status).toBe(200);
+      expect((await download()).status).toBe(404);
+      await expect(worker()).rejects.toMatchObject({ status: 404 });
+    } finally {
+      w.s.dispose();
+    }
+  });
+
   test('#1481 token team must exactly match the machine team, missing also refused', async () => {
     const w = await setupWorld();
     try {
@@ -149,6 +256,7 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId} (#730)', () => {
     const w = await setupWorld();
     try {
       const { id } = await uploadOne(w.s, 'shot.png', 'image/png', PNG);
+      await citeInSpec(w, id, 'png');
       const res = await w.s.app.request(
         `/api/machine/attachment/${w.stepId}/${id}?teamId=${w.s.team.id}`,
         {
@@ -171,6 +279,7 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId} (#730)', () => {
     const w = await setupWorld();
     try {
       const { id } = await pendingOne(w.s);
+      await citeInSpec(w, id, 'png');
       const res = await w.s.app.request(
         `/api/machine/attachment/${w.stepId}/${id}?teamId=${w.s.team.id}`,
         {
@@ -249,6 +358,7 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId} (#730)', () => {
     const w = await setupWorld();
     try {
       const { id } = await uploadOne(w.s, 'shot.png', 'image/png', PNG);
+      await citeInSpec(w, id, 'png');
       const mres = await w.s.app.request(
         `/api/machine/attachment/${w.stepId}/${id}?teamId=${w.s.team.id}`,
         {

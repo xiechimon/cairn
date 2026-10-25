@@ -99,6 +99,10 @@ export const todo = sqliteTable(
     sourceKind: text('sourceKind').$type<TodoSourceKind | null>(),
     sourceRef: text('sourceRef'),
     output: text('output').$type<TodoOutputKind>().notNull().default('code'),
+    userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
+    userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
+      .notNull()
+      .default(sql`'[]'`),
   },
   (t) => [index('todo_phase_idx').on(t.phase)],
 );

@@ -247,6 +247,7 @@ export function createTodo(
     sourceRef?: string;
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
+    userSpecAttachmentIds?: string[];
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -315,6 +316,9 @@ export function createTodo(
           ? orchestrationSourceRef(input.orchestration.threadId)
           : null),
       output: input.output ?? 'code',
+      ...(input.userSpecAttachmentIds !== undefined
+        ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
+        : {}),
     })
     .run();
   for (const tagId of tagIds) {
@@ -343,7 +347,7 @@ export function updateTodo(
       verify?: NonNullable<Assignment['verify']>;
     };
   },
-  opts: { manualPhase?: boolean } = {},
+  opts: { manualPhase?: boolean; userSpecAttachmentIds?: string[] } = {},
 ): TodoRecord | null {
   const { db, hub } = deps;
   const row = getRow(deps, id);
@@ -351,7 +355,10 @@ export function updateTodo(
 
   const sets: Partial<TodoRow> = {};
   if (patch.title !== undefined) sets.title = patch.title;
-  if (patch.spec !== undefined) sets.spec = patch.spec;
+  if (patch.spec !== undefined) {
+    sets.spec = patch.spec;
+    sets.userSpecAttachmentIds = opts.userSpecAttachmentIds ?? [];
+  }
   if (patch.orderIndex !== undefined) sets.orderIndex = patch.orderIndex;
   if (patch.assignment !== undefined) {
     const merged: NonNullable<TodoRow['assignment']> = {
@@ -572,6 +579,7 @@ export function resetTodo(
       hasChanges: false,
       latestBuildId: null,
       lastRunAt: null,
+      userMessageAttachmentIds: [],
       v: row.v + 1,
     })
     .where(eq(todo.id, id))

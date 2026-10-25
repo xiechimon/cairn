@@ -93,6 +93,7 @@ import {
 } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
+import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { DONE_ROW } from './delivery-rows.js';
 import { agentForStep } from './dispatch-eligibility.js';
@@ -191,7 +192,10 @@ export function sendBuildSteer(
     })
     .run();
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  if (todoRow) deps.machineHub?.steerSignal(todoRow.teamId, running.id);
+  if (todoRow) {
+    addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
+    deps.machineHub?.steerSignal(todoRow.teamId, running.id);
+  }
   return { message: messageRow };
 }
 
