@@ -1,8 +1,3 @@
-// Paper settings list (DESIGN.md「页面模式 · 设置列表」): a header above one
-// white card of 52px rows. Rows are only ever rendered or not rendered; the
-// card draws dividers between rendered rows with divide-y, so a row hidden
-// with CSS would still draw a divider against the card edge.
-
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
 import { FORM_CONTROL_CLS } from './form-layout.js';
@@ -10,7 +5,6 @@ import { Button } from './ui/button.js';
 import { Card } from './ui/card.js';
 import { DIALOG_PRIMARY_BUTTON } from './ui/dialog-shell.js';
 
-/** The one card corner (DESIGN.md rounded.card, `--radius-card`). */
 export const CARD_RADIUS_CLS = 'rounded-(--radius-card)';
 
 const SETTINGS_CARD_CLS = cn(
@@ -18,26 +12,20 @@ const SETTINGS_CARD_CLS = cn(
   CARD_RADIUS_CLS,
 );
 
-/** Row box. Raw-div rows (agent memories, empty rows) use it directly. */
 export const SETTINGS_ROW_CLS =
   'settings-row flex min-h-13 items-center justify-between gap-4 px-4 py-1.5';
 
 export const SETTINGS_HINT_CLS = 'text-meta text-content-tertiary';
 
-/** Value slot turned into a column: editor on top, actions under it. */
 export const SETTINGS_VALUE_EDITOR_CLS = 'min-w-0 flex-auto flex-col items-stretch gap-2';
 
-/** Boxed select trigger shared by every select in a settings card. */
 export const SETTINGS_SELECT_TRIGGER_CLS = FORM_CONTROL_CLS;
 
 interface SettingsHeaderProps {
-  /** Avatar or tile node; the header owns the 56px circle around it. */
   avatar?: ReactNode;
   title: string;
   sub?: string;
-  /** Right-side control, usually a text button. */
   action?: ReactNode;
-  /** Replaces title, sub and action while present (inline rename). */
   editor?: ReactNode;
   className?: string;
   avatarClassName?: string;
@@ -140,8 +128,6 @@ interface SettingsDangerZoneProps {
   className?: string;
 }
 
-/** Danger-zone row in a card of its own, last on the page: label and
- *  description left, a destructive button in the standard 32px shape right. */
 export function SettingsDangerZone({
   label,
   description,
@@ -166,5 +152,4 @@ export function SettingsDangerZone({
   );
 }
 
-/** Single-choice control inside a settings row: the shared segmented radio. */
 export { SegmentedRadio as SettingsSegmented } from './segmented.js';

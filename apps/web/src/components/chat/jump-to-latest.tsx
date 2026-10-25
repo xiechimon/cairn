@@ -1,16 +1,9 @@
-// CDS PR-6: jump-to-latest with an independent distance threshold.
-// Lives outside the pristine message-scroller registry file (S5).
-// Follow pin stays on MessageScrollerProvider.scrollEdgeThreshold={40};
-// this button shows past JUMP_THRESHOLD (120px).
-
 import { cn } from 'cn';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../ui/button.js';
 import { useMessageScroller } from '../ui/message-scroller.js';
 
-/** CDS stick-to-bottom: pin when distanceFromBottom ≤ 40px (plan SP). */
 export const FOLLOW_THRESHOLD = 40;
-/** CDS stick-to-bottom: show jump-to-latest past 120px (plan SP). */
 export const JUMP_THRESHOLD = 120;
 
 const JUMP_BTN_CLS =

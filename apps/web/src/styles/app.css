@@ -1,51 +1,18 @@
 @import "tailwindcss";
-/* shadcn 语义变量层（#414）：必须从本文件 import——TW4 的 PostCSS 接线只在
-   含 @import "tailwindcss" 的样式表里吃 @theme，独立 CSS 模块里的 @theme
-   会被静默忽略（bg-background 一族工具类不生成）。 */
 @import "./shadcn.css";
-/* tw-animate-css：进出场动效工具类（animate-in / animate-out + fade-* / zoom-*
-   / slide-*），仓内 shadcn / Base UI 弹层件按 popup 的 data-open / data-closed
-   消费它。与 shadcn.css 同理必须从本表 import——TW4 的 PostCSS 只在含
-   @import "tailwindcss" 的样式表里注册它的 @theme（--animate-in: enter …）与
-   @utility，独立 CSS 模块里会被静默忽略（animate-in 一族不生成）。 */
 @import "tw-animate-css";
 
-/* r1 §4.3 官方反相 dark 变体的 v4 等价实现（#106）：深色 = :root 默认态，
-   浅色 = 根元素挂 .light。`dark:*` 编译为 `.dark\:x:where(:not(.light):not(.light *))`，
-   与官方 v3 编译产物（assets/r1/f965382e067739e9.css）的选择器逐字符一致；
-   勿按常规「默认浅色 + dark: 前缀」做。 */
 @custom-variant dark (&:where(:not(.light):not(.light *)));
 
-/* 仓扩展 utility 的 @theme 映射（v3 theme.extend.colors 的 v4 语义迁移，#106；
-   inline 模式让 utility 声明直引 shadcn.css 变量，v4 官方「引用其他变量必须用
-   inline」）。官方 18 槽 + spot 族 + sidebar 梯的映射住在 shadcn.css 的 @theme
-   inline；本文件只留官方词表无对口的仓扩展类名面：
-   - content-secondary/tertiary/dim = 文本三阶（--text-secondary/tertiary/dim，
-     #987 §3.4-C 留类；r1 §4.2 语义族「变量名 --text-*，类名 content-*」）；
-   - surface-tertiary = 嵌入控件底独有档（§3.4-D 留类）。
-   #1002 收敛（#987 §3.3）退役了曾在此的并流别名 utility（content / line /
-   line-strong / surface / surface-secondary / surface-inset / surface-elevated /
-   surface-hover / card-bg / card-border / col-bg / col-head-text）与 5 条零消费
-   Tailwind 原色映射（accent-blue/amber/green/gray/rose）——消费点已改直引官方
-   utility（text-foreground / border-border / border-input / bg-card / bg-secondary
-   / bg-background / text-destructive），accent-rose 的 2 处 error 文案并入
-   text-destructive（裸 rose-500 绕过色板体系，§3.5-1）。
-   .light 双主题覆写走 shadcn.css/tokens.css 级联，不经 --color-* 间接层。 */
 @theme inline {
   --color-content-secondary: var(--text-secondary);
   --color-content-tertiary: var(--text-tertiary);
   --color-content-dim: var(--text-dim);
   --color-icon: var(--icon);
   --color-surface-tertiary: var(--surface-tertiary);
-  /* 自指是有意的：theme key 名即 utility 名（font-sans/font-mono），值直引
-     tokens.css 的同名消费栈变量（--font-sans/--font-mono），inline 不下发
-     theme 变量定义，无循环 */
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-source-serif);
-  /* Paper 六档字号（DESIGN.md「字体」）。14px 档叫 card-title 不叫 card：
-     shadcn.css 已注册 --color-card，TW 4.3.3 实测 text-card 只出
-     color: var(--card)，同名字号键被吞。 */
   --text-page: var(--type-page);
   --text-page--line-height: calc(24 / 18);
   --text-heading: var(--type-heading);
@@ -58,7 +25,6 @@
   --text-meta--line-height: calc(16 / 12);
   --text-caption: var(--type-caption);
   --text-caption--line-height: calc(16 / 11.5);
-  /* DESIGN.md 动效: the running icon's 2.4s opacity breath is the one loop. */
   --animate-breath: card-breath 2.4s ease-in-out infinite;
 }
 
@@ -74,10 +40,6 @@
     color: var(--foreground);
     font-family: var(--font-sans);
     font-size: 14px;
-    /* 字重基线（#390，DESIGN.md §Typography 三档锚点）：正文显式 400。
-       inter-var 的 fvar wght 轴 100–900 / default 400 且 @font-face 已声明
-       全档范围（fonts.css），浏览器按请求档实例化，无需
-       font-variation-settings。 */
     font-weight: 400;
     line-height: 1.5;
     text-autospace: normal;
@@ -88,8 +50,6 @@
     display: block;
   }
 
-  /* Safari 等 UA 对纯鼠标点击（:focus 但非 :focus-visible）也画默认环——
-     清零。键盘路径在文件后部的 @layer utilities（#1244），可达性不减。 */
   :where(
     button,
     a,
@@ -106,15 +66,6 @@
   }
 }
 
-/* #1244：键盘焦点环放在 utilities 层，并且写在 @import "tailwindcss"
-   之后，所以同层里它排在生成的 utility 后面。特异性与 .outline-none
-   同为 (0,1,0)（:where 把元素列表归零），后写者胜，outline-none 不再
-   把 2px solid var(--focus-ring) 盖掉。显式的 focus-visible:outline-*
-   （(0,2,0)：内描 offset -2、focus-visible:outline-none、菜单行
-   outline-hidden 不在此列）仍压过本规则。
-   ring-3 / border-ring 是另一条属性，(0,2,0)，靠后面更高特异性的声明
-   把 --tw-ring-shadow 归零，并把 border-color 拨回静止色。aria-invalid
-   不在归零范围内，destructive 环留着。 */
 @layer utilities {
   :where(
     button,
@@ -189,9 +140,6 @@
     border-color: var(--input);
   }
 
-  /* 分段控件（components/segmented.tsx）：选项之间只隔 2px，外描 offset 2
-     会压到相邻选项——键盘环收进选项盒内。同特异性 (0,3,0)，写在 tab 规则
-     之后取胜。 */
   [data-segmented="option"]:focus-visible:not([aria-invalid="true"]) {
     outline: 2px solid var(--focus-ring);
     outline-offset: -2px;
@@ -262,27 +210,15 @@
   }
 }
 
-/* CDS PR-8: settings/resources forms — 8px input radius (registry input
- * stays pristine / S5). Height already h-8 = --h-control 32px.
- * Scoped so search-panel de-boxed rounded-none still wins (PR-5). */
-/* Global (dialog-portaled forms included); search panel's de-boxed
- * rounded-none field is excluded so PR-5 stays intact. */
 [data-slot="input"]:not(.rounded-none) {
   border-radius: var(--cds-radius-lg);
 }
 
-/* CDS PR-5: select popup shell (select.tsx stays pristine under S5).
- * Radius/shadow match popover; ring-0 clears registry ring-1 so dark does
- * not keep an outer ring beside --shadow-popover. */
 [data-slot="select-content"] {
   border-radius: var(--radius-popover);
-  /* Replace registry ring-1 + shadow-md entirely (unlayered beats @layer). */
   box-shadow: var(--shadow-popover);
 }
 
-/* Paper menu rows (DESIGN.md 弹窗与菜单): 32px, 6px corners, 13.5px text and
- * the menu hover. Dropdown-menu.tsx is deviated and carries the classes;
- * select.tsx stays pristine (S5), so its rows take them here. */
 [data-slot="select-item"] {
   height: 2rem;
   border-radius: var(--cds-radius-md);
@@ -294,56 +230,25 @@
   background-color: var(--menu-hover);
 }
 
-/* Paper backdrop (DESIGN.md 弹窗与菜单): one light dim, no blur, behind every
- * dialog. Lives outside components/ui so dialog.tsx / alert-dialog.tsx stay
- * pristine under the S5 ratchet (map #980); unlayered, so it beats the
- * registry bg-black/10 + backdrop-blur-xs utilities. */
 [data-slot="dialog-overlay"],
 [data-slot="alert-dialog-overlay"] {
   background-color: var(--dialog-backdrop);
   backdrop-filter: none;
 }
 
-/* #948（overlay/ per-face 清零）：确认面（AlertDialogShell 族）背板的 z 档。
-   .overlay-backdrop 类由 components/ui/alert-dialog-shell.tsx（冻结共享件）
-   输出，其皮肤 utility（fixed inset-0 bg-black/60 ≡ --overlay-scrim 值）已在
-   件上，唯 z-index 无 utility 承载——原规则住 overlay.css，文件退役后本条是
-   #688 阶梯的机制残段（--z-modal-scrim 40，压常驻抽屉族），随阶梯文档落
-   carrier 层（motion.css 的 body 级状态钩同族先例，#943）。件侧摘类归
-   #952（components/ui 授权票）。 */
 .overlay-backdrop {
   z-index: var(--z-modal-scrim);
 }
 
-/* #1067：chief 悬浮窗的停靠载体。Base UI keepMounted 把关态窗以 `hidden`
-   属性停驻（DialogPopup 恒渲染 hidden: !mounted，退场动画播完才落），而
-   tailwind preflight 的 [hidden] { display: none !important } 把关态窗塌缩
-   成 display:none——浏览器在这种盒子上丢弃 scrollTop，「最小化后滚动位置
-   保留」物理不可达。本条中和 hidden 的 display 副作用。落位必须在
-   @layer base：preflight 的 display:none 带 !important，而 CSS 级联对
-   important 声明反转层序——unlayered 的 !important 反而输给 layered 的
-   （实测钉死）；同层内则以特异性决胜，.chief-drawer[hidden]（0,2,0）压
-   [hidden]:where(…)（0,1-0，:where 计零）——两条缺一不可。窗保持 flex
-   布局盒、visibility:hidden 停靠：布局/scrollHeight 保留，scrollTop 存活，
-   指针 hit-test 不命中。可及树/焦点剔除由 `hidden` 属性自身承载（浏览器
-   原生：aria 查询、Tab 焦点、Playwright toBeHidden 全走它），属性选择器
-   又只在退场动画播完那一刻命中——进场/退场动效零剪裁。 */
 @layer base {
   .chief-drawer[hidden] {
-    /* biome-ignore lint/complexity/noImportantStyles: tailwind preflight `[hidden] { display: none !important }` 反转层序，必须用 !important 反压；详见规则上方注释 */
+    /* biome-ignore lint/complexity/noImportantStyles: tailwind preflight `[hidden] { display: none !important }` wins over the base layer, so the park state must counter it with !important */
     display: flex !important;
     visibility: hidden;
     opacity: 0;
   }
 }
 
-/* 看板卡族的平滑圆角（2026-10-12 用户派：对齐 deepseek-harness 对话框观感——
-   dsh packages/client/ui-theme/src/styles/corner-shape.css 的全局面形机制
-   在看板卡族上的 Scoped 移植）：支持的引擎里角曲率走 superellipse(1.5)
-   （介于圆弧与 squircle 之间，dsh 签名质感）；不支持的引擎该规则整组不
-   生效，圆角保持普通圆弧，属纯渐进增强。只钉四个承载面形圆角的根元素
-   （卡 / 列容器 / 通知条 / 拖拽克隆）；全圆徽标（999px）按 dsh 同律不参与
-   ——superellipse 会把胶囊端头压方。 */
 @supports (corner-shape: superellipse(1.5)) {
   .todo-card,
   .board-column,
@@ -353,17 +258,6 @@
   }
 }
 
-/* 右下角预约制度（ADR 0013 D10，Multica base.css:10-33 同律同形）：
-   总管 launcher（FAB / 悬浮窗）常驻内容区右下角，吸底元素给该角让位。
-   命名而非逐点写死：意图可读、每个让位点可被这三个类检索到、距离由
-   launcher 自身几何派生（--chief-launcher-*，tokens.css）。选哪个取决于
-   让位点如何接近角落：
-   - 全宽条从左侧到达该角   -> pe-chief-launcher
-   - 滚动内容在那里结束     -> pb-chief-launcher
-   - 居中悬浮物长进该角     -> above-chief-launcher
-   居中工具条（left-1/2 -translate-x-1/2）不能用 padding 系（对称加宽，
-   右缘照旧到达），改走 above- 垂直让位；宽视口下居中物通常够不到角落，
-   消费点自按断点挂（Multica max-md: 先例）。 */
 @utility pe-chief-launcher {
   padding-inline-end: var(--chief-launcher-clearance);
 }

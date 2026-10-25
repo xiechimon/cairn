@@ -24,22 +24,6 @@ import { MachineAuthorizePage } from './routes/machine-authorize-page.js';
 import { TeamPage } from './routes/team-page.js';
 import { TodoDetailPage } from './routes/todo-detail-page.js';
 
-// Hand-written route table (issue #52): board + todo detail full page.
-// #71 adds the schedules + project surfaces (r2 §2 route table; /new
-// precedes :id so the literal wins); #70 the secondary batch B
-// (team / account / api-keys); #69 the resources batch A. The feedback
-// route is removed outright (#149 local-first 裁决，#129 先例）— the old
-// path falls through to the catch-all redirect.
-// Unmatched paths redirect to /app (01-stack §4.1 i18n row, [设计]).
-// #74: every route rides the pathless PwaBridge layout (sw registration +
-// notification-click deep links) and the app-level I18nProvider.
-// #83 (M5): the LiveDataBridge pathless layout sits above PwaBridge — it
-// resolves fixture-vs-live mode, the seed team/user and the global team
-// stream; fully inert in fixture (fixture/dev-scenario) mode.
-// ADR 0013 D6 (#1009 A0): the ChiefRoot pathless layout below PwaBridge is
-// the chief surface's single persistent home — the floating window + FAB
-// mount once for every route, route switches no longer remount the surface,
-// and the five docked-era mount points are retired.
 export const router = createBrowserRouter([
   {
     element: <LiveDataBridge />,
@@ -57,9 +41,6 @@ export const router = createBrowserRouter([
               { path: '/app/project/:id', element: <ProjectPage /> },
               { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
               { path: '/app/team', element: <TeamPage /> },
-              // #485：Agent 详情编辑面（r3 §4 实测路由 `/app/resources/agents/<id>`）。
-              // 非侧栏行——只从团队页的 Agent 卡进入（r2 §8.4 命令面板「前往」清单
-              // 里没有 Agents 行）。
               { path: `${AGENTS_HREF}/:id`, element: <AgentDetailPage /> },
               { path: '/app/account', element: <AccountPage /> },
               { path: '/app/api-keys', element: <ApiKeysPage /> },
@@ -83,16 +64,10 @@ export function App() {
   return (
     <ApiProvider>
       <I18nProvider>
-        {/* #1008（#983 判决：kbd-hint 退役换 Tooltip+Kbd 组合）：全站唯一
-            Tooltip Provider——delay=0 复刻旧纯 CSS hover chip 的「悬停立现」，
-            快捷键提示与后续 hover 信息气泡共用同一延迟档。 */}
         <TooltipProvider>
           <RouterProvider router={router} />
-          {/* #253 token 门页：401 触发的全屏唯一面，鉴权关时恒不可见 */}
           <TokenGate />
         </TooltipProvider>
-        {/* #631 toast 原语挂载：全站唯一 toaster（sonner，shadcn 官方配方），
-            imperative toast.* 调用面由各 feature 自取。 */}
         <Toaster />
       </I18nProvider>
     </ApiProvider>

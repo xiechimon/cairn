@@ -1,8 +1,3 @@
-// #1259 机器详情页（/app/resources/machines/:id）：设置列表一张卡（在线态 /
-// runtime / 并发 / 整机迁移）+ 归属该机的 agent 网格（复用 team 页卡网格，
-// 「在这台机器新建 agent」预选归属机）+ 末尾危险区删除（先确认；有绑定
-// agent 时 server 409 拒，按钮先禁并写明原因）。
-
 import { Monitor } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
@@ -79,8 +74,6 @@ export function MachineDetailPage() {
         error?: string;
       };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-      // 部分迁移合法：被拒的留原机——原因必须可见（成功 toast 指名数量，
-      // 逐项处置回详情页/agent 编辑面）。
       if ((body.rejected?.length ?? 0) > 0) {
         toastError(
           t('{n} 个 agent 未过校验留在原机', { n: body.rejected?.length ?? 0 }),

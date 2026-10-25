@@ -8,14 +8,6 @@ import type {
   FixtureSet,
 } from './records.js';
 
-// ── Chief surfaces (issue #72, r5 100–116) ───────────────────────────────
-// Copy verbatim from the r5 captures: 100 gate bar + hero + draft, 101–104
-// settings tabs, 111 bound hero, 114 dispatch-report stream, 116 switcher.
-// The r5 batch is 1438×730 (off the r7 baseline batch), so these sets back
-// smoke rows only — see docs/research/r8-chief-panel-adhoc.md for the
-// baseline gap registration.
-
-/** r5 100/111 hero grid, card order = capture order. */
 export const CHIEF_EXAMPLES: ChiefExample[] = [
   { icon: 'user-plus', text: '帮我组建 Agent 团队' },
   { icon: 'folder', text: '帮我创建一个新项目' },
@@ -23,18 +15,14 @@ export const CHIEF_EXAMPLES: ChiefExample[] = [
   { icon: 'bars', text: '查一下这个月的 token 用量' },
 ];
 
-/** r5 100/111 composer draft (localStorage cairn.cache.chief-draft-v1, the
- *  capture shows it restored into the textarea). */
 const CHIEF_DRAFT =
   '我想做一个能在浏览器里直接玩的网页小游戏 （比如贪吃蛇或打砖块）： 单文件 HTML + Canvas， 不用任何构建工具，做完能在项目的文件页直接试玩。请在现有的入门项目里做， 组建 Agent 团队把游戏逻辑、 画面手感、 难度调优拆成并行任务， 然后向我汇报方案， 等我确认后再开始动工。';
 
-/** r5 116 switcher rows: the two threads of the r5 session, active first. */
 const CHIEF_THREADS: ChiefThreadRef[] = [
   { title: '给 r3-lifecycle 做三件小事…', active: true },
   { title: '帮 r3-lifecycle 写一份…' },
 ];
 
-/** r5 100: drawer on a fresh thread, no agent bound — gate bar + hero. */
 export const chiefGated: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
@@ -47,8 +35,6 @@ export const chiefGated: FixtureSet = {
   },
 };
 
-/** r5 111: same fresh-thread drawer once an agent is bound — model slot
- *  filled, gate bar gone. */
 export const chiefReady: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
@@ -62,13 +48,6 @@ export const chiefReady: FixtureSet = {
   },
 };
 
-/** r5 113: 回合进行中流式面（#624 命名场景，手法循 #499/#444 无 capture
- *  先例）——testA 线程发出后 Chief 在仓库基座跑 git 只读探索（doc §2 实测
- *  工具行 `git show`），回合未收尾：robot 行无 `完成 Ns` 徽标（seconds 空串
- *  = live 流式同形），composer 占位切 steer canon（running 位）。线程标题 =
- *  首句 12 字截断 + …（shared chiefThreadTitle 律）。流内容 [推断]：capture
- *  仅工具行与占位词可辨（截图 113），拼装循 114 族；捕获面的 `停止` 钮属
- *  live 停止链，另票裁决不入本景。 */
 export const chiefStreaming: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
@@ -98,8 +77,6 @@ export const chiefStreaming: FixtureSet = {
   },
 };
 
-/** r5 114: thread view with the dispatch report of todo #11 — user bubble,
- *  chief report paragraphs with the #11 / r5-scribe chips, 完成 44s footer. */
 export const chiefThread: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
@@ -132,8 +109,6 @@ export const chiefThread: FixtureSet = {
           ],
         ],
         seconds: '44s',
-        // #615 返工：foot 折叠箭头展开面（r5 114 捕获为折叠态，展开内容未
-        // 采——工具行 [推断] 自回执文本「已创建并派工 #11 … 承接」）。
         tools: [
           { label: 'create_todo', seconds: 2 },
           { label: 'run_builds', seconds: 5 },
@@ -143,8 +118,6 @@ export const chiefThread: FixtureSet = {
   },
 };
 
-/** r5 116: the 三件小事 thread with the header switcher popover open —
- *  the visible stream tail is the merge-check report (bullets + #12 ask). */
 export const chiefThreadsOpen: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
@@ -208,11 +181,6 @@ export const chiefThreadsOpen: FixtureSet = {
   },
 };
 
-/** #1094 长列表滚动面（synthetic scenario，chief-md 先例）：r5 116 的
- *  切换器形态 + 22 行线程（canon 两行在前，active 仍钉首行）。修复前
- *  容器零 max-height，尾部行被 WINDOW_CLS 的 overflow-hidden 裁掉——
- *  不可见也不可点；e2e/chief-thread-switcher-scroll.spec 钉封顶 +
- *  纵向滚动可达 + 尾部行可点，短列表面（116）零变化对照。 */
 const CHIEF_THREADS_LONG: ChiefThreadRef[] = [
   ...CHIEF_THREADS,
   ...Array.from({ length: 20 }, (_, i) => ({ title: `长列表主题 ${i + 1}` })),
@@ -238,11 +206,6 @@ export const chiefThreadsLong: FixtureSet = {
   },
 };
 
-/** #1067 滚动保留面命名场景（无 capture，chief-threads-long / chief-md
- *  先例）：r5 114 的线程形态 + 程序拼装 40 条交替 user/robot 行——流高远超
- *  600px 窗高，钉「滚到中部→最小化→重开落在原位置」的载体能力（关态窗
- *  不得塌缩 display:none——浏览器在 display:none 上丢 scrollTop）。行文
- *  取 chief-md 同款回执语料变体，内容对断言无意义，只有高度有意义。 */
 const CHIEF_SCROLL_ROWS: ChiefStreamItem[] = Array.from({ length: 40 }, (_, i) =>
   i % 2 === 0
     ? { kind: 'user', text: `滚动保留探针第 ${i + 1} 条：检查最小化后滚动位置是否存活。` }
@@ -271,12 +234,6 @@ export const chiefScrollLong: FixtureSet = {
   },
 };
 
-/** #650/#651 named scenario (no capture, mdToolout / chiefStreaming 先例):
- *  总管抽屉的 markdown 面——定稿 robot 行携带 raw block markdown（`markdown`
- *  槽优先于段数组，渲染期走共用 chat-markdown 解析，live mapper 同路），
- *  尾行 = typing 打字面（`typing` 位，无 foot；静态表达 live 流式态，
- *  scenario 113 的 running 位同手法）。e2e/chief-stream-markdown.spec 钉
- *  bold/code/mention/列表/栅栏的渲染形与「星号不漏字面」。 */
 const CHIEF_MD_REPLY = [
   '## 凭证链路验证报告',
   '',
@@ -322,9 +279,6 @@ export const chiefMarkdown: FixtureSet = {
   },
 };
 
-/** #1398 问答卡命名场景（无 capture，chief-md 先例）：一张已回答的卡 + 一张
- *  待回答的两题卡（选项题 + 自由文本题），钉问答卡三态的 Paper 面。fixture
- *  面没有 onAnswer，待回答卡按惰性律渲染（控件 disabled，状态行照常）。 */
 export const chiefQuestion: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),
@@ -378,7 +332,6 @@ export const chiefQuestion: FixtureSet = {
   },
 };
 
-/** r5 101–104: the 总管设置 view, one set per tab (unbound agent). */
 export function chiefSettings(tab: ChiefSettingsTab): FixtureSet {
   return {
     todos: [legacyReview, legacyDone],
@@ -387,8 +340,6 @@ export function chiefSettings(tab: ChiefSettingsTab): FixtureSet {
   };
 }
 
-/** Default drawer content for a FAB-opened drawer on a scenario without a
- *  chief surface (dev interactivity; fixture rows always carry a set). */
 export const chiefDefault: ChiefContent = {
   view: 'drawer',
   bound: false,

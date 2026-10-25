@@ -1,12 +1,3 @@
-// 停止确认 dialog（M7 #308，r9 §2.3/§3.3）：accept dialog 同族——
-// 「停止当前这一轮？」头 + 默认勾选的丢弃复选行（「丢弃本轮修改——方案和
-// 代码回到上一个版本」，勾选 = daemon 侧 rewind worktree 到步起点
-// checkpoint）+ footer 取消/停止。仅 live 面接线（fixture 捕获面无后端，
-// 停止钮不挂 handler，DOM 字节不变）。
-// #1446 queued 档：等机器的步还没跑过，没有「本轮修改」可丢——换「停止排队？」
-// 头 + 一句去向说明，不出复选行。去向 = 服务端 stopFallbackPhase（首轮回待开始，
-// 重跑回本轮起点如失败/已完成），故文案只说「排队前」。
-
 import { useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -18,18 +9,14 @@ import {
 import { useI18n } from '../i18n/provider.js';
 
 interface StopConfirmDialogProps {
-  /** #73 retained-mount open flag. */
   open?: boolean;
   onClose: () => void;
-  /** 停止确认：discard = 复选位终值（POST /api/builds/{id}/stop body）。 */
   onConfirm: (discard: boolean) => void;
-  /** #1446：停的是 queued 卡（步还在等机器）。 */
   queued?: boolean;
 }
 
 export function StopConfirmDialog({ open, onClose, onConfirm, queued }: StopConfirmDialogProps) {
   const { t } = useI18n();
-  // 默认勾选（r9 §2.3 实测：checkbox 选中态 = indigo 底 + 白勾）。
   const [discard, setDiscard] = useState(true);
   return (
     <DialogShell
@@ -38,7 +25,6 @@ export function StopConfirmDialog({ open, onClose, onConfirm, queued }: StopConf
       onClose={onClose}
       size="s"
       footer={
-        // 「停止」是销毁本轮修改的破坏性动作 → destructive 档。
         <>
           <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
             {t('取消')}
@@ -57,8 +43,6 @@ export function StopConfirmDialog({ open, onClose, onConfirm, queued }: StopConf
         <p className="m-0 text-ui text-foreground">{t('任务回到排队前的状态。')}</p>
       ) : (
         <div className="flex items-center gap-2">
-          {/* XMON-72：与 accept-dialog 同族，收口 components/ui/checkbox 原语
-            （registry 同源件，行盒由消费点 label 承载）。 */}
           {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
           <label className="inline-flex cursor-pointer items-center gap-2">
             <Checkbox

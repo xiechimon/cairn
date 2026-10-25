@@ -285,96 +285,6 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/src/api/auth.ts",
-    "line": "/** localStorage 键（品牌前缀纪律同 cairn.locale / cairn.sidebar-collapsed）。 */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/api/hooks.ts",
-    "line": "// 查询键词表 = 本文件 QK 单源；wire 类型单源 = @cairn/shared（02/A9）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/api/sse.ts",
-    "line": "  // #1031 偏好档闸门：帐号页开关关档（cairn.notifyEnabled=0）即使用户已授权",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/board/notify-pref.ts",
-    "line": "// 键走品牌槽（brand localStoragePrefix，locale.ts 同族）：cairn.notifyEnabled。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/chief/chief-drawer.tsx",
-    "line": "// 菜单内容从未点开无正典（r8-chief-panel-adhoc §3），cairn server chief",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/chief/chief-drawer.tsx",
-    "line": " *  cairn.chief-open 先例（use-chief-surface.ts）。fixture 面永不读写",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/chief/use-chief-surface.ts",
-    "line": " *  纪律照 `cairn.sidebar-collapsed` 先例（app-sidebar.ts）；默认 = 关",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/components/ui/toaster.tsx",
-    "line": "// - 主题：仓内无 next-themes，cairn 反相规约（theme.ts）= dark 是 :root",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/density.ts",
-    "line": "// Persisted under brand-slot key `cairn-density`, mirrored to",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/detail/segments.tsx",
-    "line": " *  those three were never captured (project has a cairn route but no",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/detail/source-issue.tsx",
-    "line": "//   r14 §5.4：cairn 的 sourceRef 有会话粒度，链回编排回合）；",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/detail/source-issue.tsx",
-    "line": "//   本地值**（D5：issue 侧为真值，cairn 侧只显示差异）；",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/detail/user-menu.tsx",
-    "line": "// via the root .light class and persists under `cairn-theme`. The",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/detail/user-menu.tsx",
-    "line": "// XMON-107 (用户裁决): the capture's head mail line is removed — cairn",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/fixtures/chief.ts",
-    "line": "/** r5 100/111 composer draft (localStorage cairn.cache.chief-draft-v1, the",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/fixtures/records.ts",
-    "line": "// phase 九值枚举单源 = @cairn/shared（02 §4.1；#65 M1 收口），本地不再定义。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/fixtures/records.ts",
-    "line": "  /** True = the `Cairn 托管` chip rides beside the repo name (r2 24c). */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/fixtures/records.ts",
-    "line": "  /** List-row mask `cairn_afe07565…` (r3 §6 display rule; prefix 随品牌槽). */",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/src/i18n/en.ts",
     "line": "  // 创建入口移除；下方「Cairn 托管」= 存量 hosted 项目的设置面显示键，",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
@@ -823,5 +733,45 @@
     "path": "apps/daemon/test/shell-channel.test.ts",
     "line": "    // macOS tmpdir symlinks /var to /private/var; pwd is resolved.",
     "reason": "external quirk: macOS tmpdir is a symlink (/var -> /private/var)"
+  },
+  {
+    "path": "apps/web/src/resources/skill-dialog.tsx",
+    "line": "    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialize fields only on the open/close edge",
+    "reason": "tool directive: eslint-disable for react-hooks/exhaustive-deps kept, explanation in English"
+  },
+  {
+    "path": "apps/web/src/resources/skill-dialog.tsx",
+    "line": "    // eslint-disable-next-line react-hooks/exhaustive-deps -- fields===null is the load gate",
+    "reason": "tool directive: eslint-disable for react-hooks/exhaustive-deps kept, explanation in English"
+  },
+  {
+    "path": "apps/web/src/resources/skill-dialog.tsx",
+    "line": "    // eslint-disable-next-line react-hooks/exhaustive-deps -- recompute only when the error object identity changes",
+    "reason": "tool directive: eslint-disable for react-hooks/exhaustive-deps kept, explanation in English"
+  },
+  {
+    "path": "apps/web/src/resources/skill-import-dialog.tsx",
+    "line": "    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialize fields only on the open/close edge",
+    "reason": "tool directive: eslint-disable for react-hooks/exhaustive-deps kept, explanation in English"
+  },
+  {
+    "path": "apps/web/src/styles/app.css",
+    "line": "    /* biome-ignore lint/complexity/noImportantStyles: tailwind preflight `[hidden] { display: none !important }` wins over the base layer, so the park state must counter it with !important */",
+    "reason": "external quirk: Tailwind preflight gives [hidden] a display none !important that outranks the base layer"
+  },
+  {
+    "path": "apps/web/src/chief/chief-drawer.tsx",
+    "line": "        {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}",
+    "reason": "ui-drift-gate G4 marker: hidden file input is deliberately native"
+  },
+  {
+    "path": "apps/web/src/detail/composer.tsx",
+    "line": "      {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}",
+    "reason": "ui-drift-gate G4 marker: hidden file input is deliberately native"
+  },
+  {
+    "path": "apps/web/src/overlay/new-task-dialog.tsx",
+    "line": "          {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}",
+    "reason": "ui-drift-gate G4 marker: hidden file input is deliberately native"
   }
 ]

@@ -1,9 +1,3 @@
-// shadcn/ui base-nova registry 件 `kbd`（XMON-14 落点）。取自
-// https://ui.shadcn.com/r/styles/base-nova/kbd.json ，无外部依赖（只用 cn）。
-//
-// 本文件保持 registry 原样，无仓内偏离；#468 快捷键悬浮提示 = TooltipContent
-// 内放 Kbd 的官网组合（#983 判决，#1008 落地，旧 kbd-hint.tsx 适配件退役）。
-
 import { cn } from 'cn';
 import type * as React from 'react';
 

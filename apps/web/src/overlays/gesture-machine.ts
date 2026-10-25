@@ -1,25 +1,9 @@
-// Global gesture state (#1267). New global gestures land in this file:
-// add a GestureEvent, a reduceGesture arm, and, when the gesture is a key,
-// a row in bindGestureKeys. Callers dispatch. They do not keep a second
-// chief-open boolean or a second window listener for ⌘J or Escape.
-//
-// Surface chords stay in their own modules: ⌘K search (useSearchState),
-// C for a new task, N inside the drawer, Tab inside the new-task dialog.
-// Those fire an action on one surface. They are not a second copy of this
-// state.
-//
-// Chief transitions match the previous call-site rules: ⌘J toggles
-// (settings counts as closed, so the chord opens the drawer), the FAB is
-// open-only, Minimize closes, Escape never closes the drawer (ADR 0013 D3)
-// and dismisses only the top registered layer.
-
 import { isEditableOutsideChiefDrawer } from './hotkeys.js';
 
 export type ChiefView = 'none' | 'drawer' | 'settings';
 
 export interface GestureState {
   chief: ChiefView;
-  /** Oldest first. The last id is the layer Escape dismisses. */
   escStack: readonly string[];
 }
 
@@ -135,8 +119,6 @@ export function createGestureStore(initial: GestureState): GestureStore {
 
 let singleton: GestureStore | null = null;
 
-/** First call wins the initial chief view (fixture capture, else the
- *  persisted drawer bit). Later calls return that store. */
 export function getGestureStore(initialChief?: ChiefView): GestureStore {
   if (singleton === null) {
     singleton = createGestureStore({ chief: initialChief ?? 'none', escStack: [] });
@@ -164,7 +146,6 @@ export function bindGestureKeys(store: GestureStore): () => void {
 
 let unbindKeys: (() => void) | null = null;
 
-/** One window listener for ⌘J and Escape. A second call does nothing. */
 export function ensureGestureKeys(): void {
   if (unbindKeys !== null) return;
   if (typeof window === 'undefined') return;

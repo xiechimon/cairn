@@ -1,10 +1,3 @@
-// Detail top bar (issue #56; Paper top bar, paper-redesign-plan PR 7): back
-// link, serif task title, #seq, the status (icon + color + label) that
-// toggles the assignment popover, then 更多 and the phase's one ink primary button.
-// #58: the back link carries the current search string home so the
-// dev/fixture ?scenario= selection survives the round trip. #1255: each
-// column list's scrollTop is restored by BoardSurface from sessionStorage.
-
 import { Activity, Hourglass } from 'lucide-react';
 import { type Ref, useState } from 'react';
 import { Link, useLocation } from 'react-router';
@@ -19,36 +12,16 @@ import { PHASE_STATUS, PHASE_UI, RUNNING_INK } from '../phase.js';
 
 interface DetailHeadProps {
   todo: TodoRecord;
-  /** Live project name for the chip popover head; see ChipPopover. */
   projectName?: string;
-  /** Chip popover 执行对话 row: the model of `todo.agent` (live only). */
   agentModel?: ChipAgentModel;
-  /** Rendered phase; the reject chain overrides the record's phase
-   *  (replan streaming / building rounds, issue #75). */
   phase?: TodoRecord['phase'];
-  /** #66: opens the 更多 menu popover. */
   onMore?: () => void;
-  /** Primary button (开始/确认/完成/重开/重跑); the page decides what it
-   *  does — the reject chain's 确认 step, the failed 重跑 dialog (#75). */
   onAction: () => void;
-  /** Scenario-frozen initial open state of the chip popover (#67). */
   chipPopoverOpen?: boolean;
-  /** #209: chip popover「编辑分配」入口——关 popover 后由页层开 agent 选择
-   *  弹层(弹层挂页层:popover 关即卸载,挂内层会被带走)。 */
   onEditAssign?: () => void;
-  /** M7 #312 / r8 §3.1：审核中态旗标——chip 改「审核中」、composer placeholder
-   * 改「AI 审核进行中…」、期间显示停止钮（复用 #308）。 */
   reviewActive?: boolean;
-  /** #1250 / ADR 0018 层 1：验证中态旗标——chip 改「验证中」（reviewActive
-   *  同律：额外 agent 步，phase 不动）。verify 优先于 review 显示（同刻
-   *  并行时验证是更晚的相位事实）。 */
   verifyActive?: boolean;
-  /** #1216：在飞编排回合（todo 开始 / failed 重跑 已发出，chief 尚未落位）
-   *  ——主钮翻禁用「编排中」，相位不动的静默窗口显性化。缺省 false =
-   *  fixture 面与既有行为零变化。 */
   actionInFlight?: boolean;
-  /** #1008: 更多 钮的定位锚 ref（MoreMenu 迁 DropdownMenu 后触发钮与菜单体
-   *  分住两层，页面层持 ref 双投：这里挂到钮上，Content 走 anchor）。 */
   moreButtonRef?: Ref<HTMLButtonElement>;
 }
 
@@ -68,9 +41,6 @@ export function DetailHead({
 }: DetailHeadProps) {
   const { t } = useI18n();
   const shown = phase ?? todo.phase;
-  // The review/verify steps are extra agent steps (phase stays confirm/review),
-  // so their words and the green ink come from the active step, not the phase.
-  // #1261: a quota hold says 等额度 instead of a misleading 执行中.
   const status = verifyActive
     ? { chip: '验证中', icon: Activity, ink: RUNNING_INK }
     : reviewActive
@@ -102,9 +72,6 @@ export function DetailHead({
         {todo.title}
       </h1>
       <span className="flex-none text-meta tabular-nums text-content-tertiary">#{todo.seqNum}</span>
-      {/* #1008: Base UI Popover; initialFocus=false keeps focus on the trigger
-          so the same key closes it again (#666). #634: the chevron sits inside
-          the trigger, one hit area. */}
       <Popover open={popover} onOpenChange={setPopover}>
         <PopoverTrigger
           render={
@@ -140,8 +107,6 @@ export function DetailHead({
               onEditAssign == null
                 ? undefined
                 : () => {
-                    // Close first: the dialog lives on the page and the two
-                    // overlays never stack.
                     setPopover(false);
                     onEditAssign();
                   }
@@ -166,8 +131,6 @@ export function DetailHead({
         </Button>
         {action != null &&
           (actionInFlight === true ? (
-            // #1216: a start/rerun already went out; a second click would
-            // spawn another orchestration thread.
             <Button
               className={`detail-head-action ${TOPBAR_PRIMARY_BUTTON}`}
               data-orchestrating="true"

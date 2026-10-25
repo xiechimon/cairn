@@ -1,7 +1,3 @@
-// Identity header for the Paper settings list (account page, agent overview):
-// SettingsHeader with an inline 编辑名称 editor. The card and rows below it
-// come from settings-list.tsx.
-
 import { cn } from 'cn';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n/provider.js';
@@ -10,7 +6,6 @@ import { Button } from './ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from './ui/dialog-shell.js';
 import { Input } from './ui/input.js';
 
-/** Focus on entering edit mode; ref + effect because biome's a11y/noAutofocus is an error here. */
 export function useEditorFocus<T extends HTMLElement>(editing: boolean) {
   const ref = useRef<T | null>(null);
   useEffect(() => {
@@ -20,11 +15,9 @@ export function useEditorFocus<T extends HTMLElement>(editing: boolean) {
 }
 
 interface ProfileHeaderProps {
-  /** Avatar image node; the header owns the 56px circle around it. */
   avatar: ReactNode;
   name: string;
   sub: string;
-  /** Receives a trimmed, non-empty name that differs from `name`. */
   onRename: (next: string) => void;
   className?: string;
   avatarClassName?: string;
@@ -33,8 +26,6 @@ interface ProfileHeaderProps {
   inputId?: string;
 }
 
-/** Avatar and name above the settings card. 编辑名称 swaps the name for an
- *  input with 保存 / 取消; Enter saves, Esc cancels. */
 export function ProfileHeader({
   avatar,
   name,

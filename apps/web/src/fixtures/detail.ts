@@ -1,7 +1,3 @@
-// Detail-route surfaces: probe #9 plan/transcript/changeset canon, the
-// per-phase detail sets, r3 legacy details, and the build-scoped overlay
-// payload lookup (issue #68).
-
 import { BRAND, conversationBranch } from '@cairn/shared';
 import {
   at,
@@ -28,8 +24,6 @@ import type {
   TranscriptItem,
 } from './records.js';
 
-/** r7 probe #10 — the dark fresh capture (23d) is a separate throwaway
- *  todo: title/seq/creation time all read off that bitmap. */
 const probe10: TodoRecord = {
   ...probeTodo('todo', r7(13, 40)),
   id: 'r7-probe-10',
@@ -38,11 +32,6 @@ const probe10: TodoRecord = {
   seqNum: 10,
 };
 
-/** Plan document of probe #9, verbatim from the r7 17 doc pane except for the
- *  section labels: XMON-55 P2 promotes the four canon sections (PLAN_SECTIONS)
- *  from body-weight lines to `.doc-block--head`, so the four `label:` paras the
- *  r7 capture froze as plain text are now head blocks with their remainder
- *  trailing — what mapPlanDoc's planSectionHead does to the live wire text. */
 const PROBE_PLAN_DOC: DocBlock[] = [
   { kind: 'head', segments: [{ text: 'Context' }] },
   {
@@ -85,8 +74,6 @@ const PROBE_PLAN_DOC: DocBlock[] = [
   },
 ];
 
-/** Probe #9 transcript while planning (r7 16): stamp, start bubble, live
- *  step row. */
 const PROBE_RUN_OPEN: TranscriptItem[] = [
   { kind: 'run', at: '13:26', machine: MACHINE_NAME },
   {
@@ -97,14 +84,11 @@ const PROBE_RUN_OPEN: TranscriptItem[] = [
   },
 ];
 
-/** Probe #9 transcript while planning (r7 16): run open + live step row. */
 const PROBE_PLANNING_TRANSCRIPT: TranscriptItem[] = [
   ...PROBE_RUN_OPEN,
   { kind: 'streaming', seconds: 3, label: '准备工作区...' },
 ];
 
-/** Probe #9 transcript once the plan landed (r7 17/17b/17d, and 16d which
- *  the r7 manifest filed under the streaming name). */
 const PROBE_CONFIRM_TRANSCRIPT: TranscriptItem[] = [
   ...PROBE_RUN_OPEN,
   {
@@ -122,16 +106,12 @@ const PROBE_CONFIRM_TRANSCRIPT: TranscriptItem[] = [
   },
 ];
 
-/** Execution round open, shared by the 26/26d/27/27b/28/36 surfaces: plan
- *  round + 13:35 stamp + the user's 确认 bubble (r7 §5 时序). */
 export const PROBE_BUILD_OPEN: TranscriptItem[] = [
   ...PROBE_CONFIRM_TRANSCRIPT,
   { kind: 'note', text: '13:35' },
   { kind: 'user', text: '确认' },
 ];
 
-/** Agent result message closing the execution round (r7 26d/27/36;
- *  straight quotes + fullwidth commas per the captures). */
 export const PROBE_BUILD_RESULT: TranscriptItem = {
   kind: 'robot',
   paragraphs: [
@@ -144,28 +124,17 @@ export const PROBE_BUILD_RESULT: TranscriptItem = {
   footer: {},
 };
 
-/** The two tool calls of the execution round (r7 28 expanded form:
- *  `edit README.md` + the verification `bash …` pill). The bash label is
- *  also the 26d streaming row's 调用工具 text — the capture runs it to
- *  the chat edge with an ellipsis. */
 export const PROBE_TOOL_PILLS = [
   'edit README.md',
   'bash cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" && tail -n 3 README.md && echo …',
 ];
 
-/** Streaming-row tool label of the 26d capture — chrome carried inside the
- *  fixture (frozen capture text); the en dict keys on this exact value. */
 export const PROBE_TOOL_CALL_LABEL = `调用工具：${PROBE_TOOL_PILLS[1]}`;
 
-/** Tool-call group row of the execution round (r7 27 collapsed `完成
- *  19s ▸`; r7 28 expanded with pills + 收起). */
 function probeTools(expanded: boolean): TranscriptItem {
   return { kind: 'tools', seconds: 19, expanded, pills: PROBE_TOOL_PILLS };
 }
 
-/** Merge round appended on completion (r7 36/36d): announcement stamp,
- *  merge-result message with the mono command chip, elapsed row, 🎉
- *  banner. */
 const PROBE_MERGE_ROUND: TranscriptItem[] = [
   { kind: 'note', text: 'Xmon Dai 发起了合并' },
   {
@@ -181,10 +150,6 @@ const PROBE_MERGE_ROUND: TranscriptItem[] = [
   { kind: 'note', text: '🎉 任务已完成' },
 ];
 
-/** r3 legacy #1 transcript (r7 38): schedule-triggered run waiting on the
- *  user's reply — stamp + 由定时发起 + start bubble + the agent's
- *  no-op analysis (code chips around the probe line and the commit
- *  subject) + 完成 32s. */
 const LEGACY_REVIEW_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'run', at: '星期六 14:30', machine: 'r3-mbp' },
   { kind: 'scheduled' },
@@ -212,9 +177,6 @@ const LEGACY_REVIEW_TRANSCRIPT: TranscriptItem[] = [
   },
 ];
 
-/** The probe's one-file changeset (r7 27/27b/36): README.md +1 line.
- *  `expanded` is the pane's initial state — review surfaces pass true
- *  (XMON-55 P2), the captured-collapsed form is opt-in. */
 export function probeChanges(expanded: boolean): ChangesContent {
   return {
     expanded,
@@ -233,8 +195,6 @@ export function probeChanges(expanded: boolean): ChangesContent {
             ],
           },
         ],
-        // #225 全文槽:与 hunk 窗(@@ -3,3 +3,4 @@)自洽的六行——3–5 行 =
-        // 窗内 context 原文,第 6 行 = +行;初渲不展示,视觉零影响。
         fullContent:
           '# r3 probe\nprobe readme\nr3 lifecycle probe2\nr5b lifecycle probe\nr6 rebaseline probe\nr7 rebaseline probe\n',
       },
@@ -242,25 +202,19 @@ export function probeChanges(expanded: boolean): ChangesContent {
   };
 }
 
-/** Detail fresh state (r7 23): no transcript, no doc pane. */
 export const detailFresh: FixtureSet = {
   todos: [probeTodo('todo', r7(13, 21))],
   now: r7(13, 22),
 };
 
-/** Detail fresh state, dark capture (r7 23d = probe #10). */
 export const detailFreshDark: FixtureSet = { todos: [probe10], now: r7(13, 41) };
 
-/** Detail planning state (r7 16): live transcript, empty doc pane. */
 export const detailPlanning: FixtureSet = {
   todos: [probeTodo('planning', r7(13, 26))],
   now: r7(13, 26),
   detail: { transcript: PROBE_PLANNING_TRANSCRIPT },
 };
 
-/** Detail confirm state (r7 17/17b/17d, plus 16d = same surface dark with
- *  the popover). `userMenuOpen` reproduces the popover the 17 and 16d
- *  captures include. */
 export function detailConfirm(userMenuOpen: boolean): FixtureSet {
   return {
     todos: [probeTodo('confirm', r7(13, 26))],
@@ -269,11 +223,6 @@ export function detailConfirm(userMenuOpen: boolean): FixtureSet {
   };
 }
 
-/** Detail building state (r7 26/26d): execution streaming. The light
- *  capture froze at `3s › 处理中...`; the dark one (with the user menu
- *  open) caught the later `19s › 调用工具：bash …` after the result
- *  message landed. `lateCapture` selects the dark capture's later
- *  moment — the theme itself comes from the matrix row. */
 export function detailBuilding(lateCapture: boolean): FixtureSet {
   const tail: TranscriptItem[] = lateCapture
     ? [
@@ -281,8 +230,6 @@ export function detailBuilding(lateCapture: boolean): FixtureSet {
         {
           kind: 'streaming',
           seconds: 19,
-          // full command rides the label; CSS ellipsis cuts it at the
-          // chat edge exactly like the capture
           label: PROBE_TOOL_CALL_LABEL,
         },
       ]
@@ -298,11 +245,6 @@ export function detailBuilding(lateCapture: boolean): FixtureSet {
   };
 }
 
-/** #471 quiescent building gap (named scenario, no capture — the
- *  detail-unread precedent): the task is executing but the agent is not
- *  streaming (no active step) — the transcript keeps one live row through
- *  the same streaming component: loading indicator (#672: loading-dev
- *  Atom) + the static 执行中... label, no seconds counter. [设计] */
 export function detailSpinnerQuiescent(): FixtureSet {
   return {
     todos: [probeTodo('building', r7(13, 35))],
@@ -314,10 +256,6 @@ export function detailSpinnerQuiescent(): FixtureSet {
   };
 }
 
-/** Detail review state (r7 27/27b/28). XMON-55 P2 flipped the changes-pane
- *  default to expanded: the r7 27/27d captures froze it collapsed, which
- *  left the 488px pane holding one file row over blank space. The dark
- *  capture carries the user-menu popover. */
 export function detailReview(opts: {
   userMenuOpen: boolean;
   changesExpanded?: boolean;
@@ -338,11 +276,6 @@ export function detailReview(opts: {
   };
 }
 
-/** #1250（ADR 0018 层 1）verify verdict 行三态（named scenario，无 capture —
- *  skills-routing 先例）：review 面之上叠一条 passed、一条 failed（带两条
- *  证据）与一条判定提取失败行——pass 徽标（绿）与 fail 徽标（红）都是有效
- *  结论，extractionError 在位才走「判定提取失败」档。证据条目 = path 等宽
- *  块 + 可选注记，是验证面「读 verdict 即知证据落哪」的核心交付。 */
 export function detailVerifyVerdict(): FixtureSet {
   const base = detailReview({ userMenuOpen: false });
   const verifyRows: TranscriptItem[] = [
@@ -378,14 +311,6 @@ export function detailVerifyVerdict(): FixtureSet {
   };
 }
 
-/** #1101 diff-pane stress changeset (named scenario, no capture —
- *  chief-threads-long precedent). One file, three hunks, pinning the five
- *  shapes the word-level highlight + horizontal-scroll fixes must handle:
- *  a one-word del/add pair (word highlight), an uneven del run against a
- *  shorter add run (minimum pairing, the surplus del stays whole-line),
- *  a marker row separating a del/add pair (r8 72 adjacency shape — pairing
- *  must see through markers), long rows (the horizontal-scroll bg face) and
- *  an oversized pair beyond the word-diff cap (the loud fallback face). */
 const STRESS_MEGA_ARGS = Array.from({ length: 120 }, (_, i) => `field${i}: "value${i}"`).join(', ');
 
 function stressChanges(): ChangesContent {
@@ -438,8 +363,6 @@ function stressChanges(): ChangesContent {
             ],
           },
         ],
-        // #225 full-file slot: the long rows ride here too so the 显示完整文件
-        // face exercises the same horizontal-scroll width contract.
         fullContent: [
           '// src/pipeline/config.ts',
           longAdd,
@@ -452,7 +375,6 @@ function stressChanges(): ChangesContent {
   };
 }
 
-/** #1101 review surface carrying the stress changeset above. */
 export function detailDiffWordStress(): FixtureSet {
   return {
     todos: [probeTodo('review', r7(13, 37))],
@@ -464,7 +386,6 @@ export function detailDiffWordStress(): FixtureSet {
   };
 }
 
-/** Detail done state (r7 36/36d): review surface + merge round. */
 export function detailDone(): FixtureSet {
   return {
     todos: [probeTodo('done', r7(13, 52))],
@@ -481,19 +402,12 @@ export function detailDone(): FixtureSet {
   };
 }
 
-/** r3 legacy #1 detail (r7 38): read-only review surface, schedule
- *  marker, no changes to show (`暂无可显示的变更`). */
 export const detailLegacy: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 58),
   detail: { transcript: LEGACY_REVIEW_TRANSCRIPT },
 };
 
-/** Overlay payloads of the r3 legacy #1 build as the r8 78–80 dark captures
- *  froze them (issue #68): probe #9 no longer exists on the live account, so
- *  the dark overlay pairs bind to this todo's own build data. #1 re-ran on
- *  2026-09-22 18:30 (schedule trigger), which replaced the r7 38 surface:
- *  new run stamp, four-run history, a real changeset, no awaiting-reply. */
 const LEGACY_TOKEN_USAGE: TokenUsageContent = {
   total: '66.1k',
   model: 'r3-gw/claude-sonnet-5',
@@ -506,18 +420,12 @@ const LEGACY_TOKEN_USAGE: TokenUsageContent = {
 };
 
 const LEGACY_BRANCH_INFO: BranchInfoContent = {
-  // capture 79 truncates the branch after `2488`; the tail is unobservable
-  // and only needs to keep the mono row overflowing at the same glyph
   branch: conversationBranch('01a0c8aa-9e64-742b-acbd-2488a1b2c3d4'),
   commit: 'f3ce121ba492',
   machine: MACHINE_NAME,
   directory: '~/preview/project',
 };
 
-/** r8 57 surface: #12's failed build whose single history row IS the
- *  failed current run — 当前 chip + footer 重跑 (r8 57); title/seq verbatim
- *  from the r8 54/57 captures. The failed-detail background behind the
- *  dialog is a later ticket, so the fixture pair rides smoke for now. */
 const FAILED_CURRENT_ID = 'r8-failed-12';
 const failedCurrentTodo: TodoRecord = {
   ...probeTodo('failed', at('2026-09-22', 12, 30)),
@@ -539,8 +447,6 @@ export function detailFailedCurrent(): FixtureSet {
   return {
     todos: [failedCurrentTodo],
     now: at('2026-09-22', 18, 30),
-    // the failed-state transcript surface is a later ticket; the smoke
-    // pair only gates the dialog over whatever the detail route renders
     detail: { transcript: [] },
   };
 }
@@ -552,9 +458,6 @@ const LEGACY_RUN_HISTORY: RunHistoryRow[] = [
   { label: '第 1 次运行', meta: '4 天前 · Machine offline', status: 'failed' },
 ];
 
-/** r3 legacy #2 overlay payload — [推断]: no capture ever opened an overlay
- *  on this build; the values exist so the done card's branch icon opens a
- *  dialog instead of dead-clicking. No e2e row rides them. */
 const LEGACY2_OVERLAY: BuildOverlayContent = {
   token: {
     total: '41.7k',
@@ -575,8 +478,6 @@ const LEGACY2_OVERLAY: BuildOverlayContent = {
   runs: [{ label: '第 1 次运行', meta: '2 天前 · 41.7k tokens', status: 'done' }],
 };
 
-/** r3 legacy #1 as of the r8 dark captures (2026-09-23): review phase,
- *  schedule-triggered run of 2026-09-22 18:30, single-paragraph result. */
 const legacyNow: TodoRecord = {
   ...legacyReview,
   phaseAt: at('2026-09-22', 18, 30),
@@ -590,9 +491,6 @@ const legacyNow: TodoRecord = {
   ],
 };
 
-/** Two synthetic confirm-phase todos: the dark captures show the sidebar
- *  看板 badge at 2 (live board had two confirm cards); the detail route
- *  renders nothing of them but the badge. */
 const darkBadgeFillers: TodoRecord[] = [1, 2].map((n) => ({
   ...legacyNow,
   id: `dark-badge-filler-${n}`,
@@ -615,10 +513,6 @@ const LEGACY_NOW_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'elapsed', seconds: 25 },
 ];
 
-/** Dark capture set (r8 78–81): legacy #1's current surface with a frozen
- *  open state — `chiefUnread` reproduces the FAB badge the captures carry.
- *  #366: the token/branch/history freezes moved from the (deleted) overlay
- *  dialogs to the right-pane view (ui.paneView); accept stays an overlay. */
 export function detailLegacyNow(freeze: Pick<FixtureSet, 'overlay' | 'ui'>): FixtureSet {
   return {
     todos: [legacyNow, ...darkBadgeFillers],
@@ -629,11 +523,6 @@ export function detailLegacyNow(freeze: Pick<FixtureSet, 'overlay' | 'ui'>): Fix
   };
 }
 
-/** Build-scoped overlay display data per todo (issue #68): the dialog
- *  payloads are not record fields (02 §6.2), so the fixture layer maps the
- *  captured builds — probe #9 (r7 30/31/32) and r3 legacy #1 (r8 78–80) —
- *  plus one [推断] set for legacy #2 so its card's branch icon is not a
- *  dead control; no e2e row rides the [推断] values. */
 export function overlayContent(todoId: string): BuildOverlayContent | null {
   if (todoId === PROBE_ID) {
     return { token: PROBE_TOKEN_USAGE, branch: PROBE_BRANCH_INFO, runs: PROBE_RUN_HISTORY };
@@ -650,8 +539,6 @@ export function overlayContent(todoId: string): BuildOverlayContent | null {
   return r8OverlayContent(todoId);
 }
 
-/** r8 57/77 run-history rows (upstream #68 shape): the failed current row
- *  carries the 当前 chip and the state-gated 重跑 button (r8 §3.3). */
 const RUNS_12: RunHistoryRow[] = [
   {
     label: '第 1 次运行',
@@ -669,8 +556,6 @@ const RUNS_15: RunHistoryRow[] = [
   },
 ];
 
-/** [推断] token/branch payloads for the r8 todos — the r8 captures only
- *  exercised the history face; no e2e row rides these values. */
 const R8_OVERLAY_TOKEN: TokenUsageContent = {
   total: '72.1k',
   model: 'r3-gw/claude-sonnet-5',

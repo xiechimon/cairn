@@ -1,9 +1,3 @@
-// 任务重置确认 dialog（#755，todos.dev 看板指南「已开始的卡片拖回待开始会
-// 重置任务：中断构建并清空对话、方案和改动记录」）：accept/stop-confirm
-// 同族——头 + 清空清单 + 保留清单 + footer 取消/确认重置。取消 = 零提交
-// （board.tsx 落位路由在 opened 前不写任何乐观值）；stale = 构建在 dialog
-// 打开后推进了，弹层不关、清单按现记录刷新、顶部显变化提示重新确认。
-
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
@@ -13,13 +7,10 @@ import {
 import { useI18n } from '../i18n/provider.js';
 
 interface ResetConfirmDialogProps {
-  /** #73 retained-mount open flag. */
   open?: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  /** 确认在飞（重置请求已发出）：确认钮禁用，弹层不关。 */
   confirming?: boolean;
-  /** 构建在 dialog 打开后推进了：清单已按现记录刷新，顶部显变化提示。 */
   stale?: boolean;
 }
 
@@ -37,10 +28,6 @@ export function ResetConfirmDialog({
       open={open}
       onClose={onClose}
       size="s"
-      // 挂账已清（#1004 → #1006 段 2）：registry dialog-shell 已进本分支，
-      // 消费点自携垫剥除、裸内容进 DialogFooter，ACCEPT_* import 撤除。
-      // 确认重置 = 销毁性动作（中断构建 + 清空对话/方案/改动，不可恢复）
-      // → destructive 档（R3 停止钮同判：registry 语义皮肤 = 语义映射）。
       footer={
         <>
           <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
@@ -57,12 +44,6 @@ export function ResetConfirmDialog({
         </>
       }
     >
-      {/* #951（overlays.css 清零）：#755 重置面律等值迁 utility——accept 同族
-          行容器是横向 flex（checkbox 行形态），重置面内容纵 stacked：block +
-          17/16 垫（原 .dlg-reset .dlg-accept 覆写）；文字四档 12/16 tertiary
-          （stale/kept）、13/18 primary（lead）、13/20 disc 清单。dlg-reset /
-          dlg-reset-confirm 类名钩退役（board-dnd 载体换 role=dialog 可及名，
-          同 PR 重钉；confirm 钩全仓零规则零 pin）。 */}
       <div className="block">
         {stale === true && (
           <p className="m-0 mb-2 text-meta text-content-tertiary">

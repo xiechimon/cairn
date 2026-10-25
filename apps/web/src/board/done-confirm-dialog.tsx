@@ -1,10 +1,3 @@
-// 已完成确认 dialog（#901，#1247）：
-// - 待处理卡（confirm / review / failed）→ Done / Canceled / 关闭
-// - 在飞卡（queued / planning / building）→ 先停构建再标完成 / 关闭
-// 关闭 = 零提交。确认完成不走 AcceptDialog 合并步。
-// dismiss 用「关闭」不用「取消」：outcome 结局钮「已取消」含子串「取消」，
-// Playwright 按名取钮会双命中（strict mode）。
-
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
@@ -16,18 +9,12 @@ import { useI18n } from '../i18n/provider.js';
 export type DoneConfirmMode = 'outcome' | 'inflight';
 
 interface DoneConfirmDialogProps {
-  /** #73 retained-mount open flag. */
   open?: boolean;
-  /** outcome = Done/Canceled；inflight = stop-then-done only. */
   mode?: DoneConfirmMode;
-  /** 确认进行中（stop-and-done 委托态）。 */
   confirming?: boolean;
   onClose: () => void;
-  /** 标记为已完成（成功结局）。 */
   onConfirmDone: () => void;
-  /** 已取消 / 不做了（closed）。inflight 模式不展示。 */
   onConfirmCanceled?: () => void;
-  /** 先停构建再标完成。仅 inflight 模式。 */
   onConfirmStopThenDone?: () => void;
 }
 

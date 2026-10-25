@@ -1,15 +1,3 @@
-// API-keys route (issue #70): the empty state per r2 19 (icon +
-// canon copy + 新建密钥; the captured 查看文档 link is gone — #307
-// wontfix, local-first 无文档站, #149 schedules 同律), and with a created key in the
-// fixture the r3 §6 display rules — list row masked `cairn_afe07565…`
-// (r3 样例原形前缀 tds_ 随品牌槽切换，#109)
-// plus the one-time plaintext block carrying the 02 §8 canon
-// 「请立即复制密钥，它仅显示一次。」. Row and one-time block shapes are
-// [推断] (no capture: r2 §9-12, r3 §6 图失); mask and copy are observed.
-// #947 per-face 清零：secondary.css 退役。
-// Paper 页面模式：空态走 components/empty-state.tsx；一次性明文块是
-// --radius-card 卡，密钥列表是一张设置卡（settings-list.tsx）的 52px 行，
-// 行不可点（无详情面），所以不带 chevron。data-testid="keys-empty" 二级载体保留。
 import { cn } from 'cn';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -32,15 +20,11 @@ export function ApiKeysPage() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  // M5 live：列表 = GET api-keys（只读掩码，02 §8）；新建 = POST 直发默认
-  // 权限位（已建屏无 r3 §6 表单弹窗面——名称/白名单归后票 [设计]），一次性
-  // 明文块 = 创建响应 plaintext（仅显示一次 canon）。
   const { live, teamId } = useLiveData();
   const keysQ = useApiKeys(teamId, live);
   const todosQ = useTodos(teamId, live);
   const mutations = useApiMutations(teamId);
   const [plaintext, setPlaintext] = useState<string | null>(null);
-  // W4 #287：新建走权限位表单弹窗（不再默认直发）；fixture 面按钮保持无操作。
   const [createOpen, setCreateOpen] = useState(false);
   const keys = live
     ? [
@@ -132,8 +116,6 @@ export function ApiKeysPage() {
             onSuccess: (res) => {
               if (typeof res.plaintext === 'string') setPlaintext(res.plaintext);
             },
-            // #638：弹窗提交即自关（dialog submit 律），失败 = 密钥没建上、
-            // 明文块也不出现，此前零解释。
             onError: (error) => toastError(t('新建 API 密钥失败，请重试。'), error),
           })
         }

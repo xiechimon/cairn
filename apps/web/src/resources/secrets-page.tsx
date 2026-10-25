@@ -1,6 +1,3 @@
-// 密钥 route (issue #69): the empty state (heading, write-only description,
-// 添加密钥 primary, 总管 hint) or one card of secret rows (name +
-// description). Values are write-only, so rows open nothing.
 import { KeyRound, Lightbulb } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -27,14 +24,9 @@ export function SecretsPage() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  // M5 live：GET secrets（只读掩码面，02 §8 值只写不读）。fixture 行集只在
-  // secrets-list 场景出现，其余场景保持空态。
   const { live, teamId } = useLiveData();
   const secretsQ = useSecrets(teamId, live);
   const secrets = live ? (secretsQ.data ?? []) : (fixture.resources?.secrets ?? []);
-  // wayfinder #173: 新建 (topbar + empty-state primary) opens the
-  // 添加密钥 dialog; live submit = POST secrets then close
-  // (invalidateAll refetches the masked rows), fixture = accept 律
   const mutations = useApiMutations(teamId);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -81,7 +73,6 @@ export function SecretsPage() {
             ? (input) =>
                 mutations.createSecret.mutate(input, {
                   onSuccess: () => setCreateOpen(false),
-                  // #638：失败 = 弹窗留着（关挂在 onSuccess）但零反馈。
                   onError: (error) => toastError(t('添加密钥失败，请重试。'), error),
                 })
             : undefined

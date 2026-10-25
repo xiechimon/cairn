@@ -1,6 +1,3 @@
-// 上游 base-nova 逐字同源 + 一件零 chrome 透传（TabsIndicator，#644）。
-// segmented / bare 手写皮肤档已按 #991 判决退役；default / line 走上游原生
-// data-[variant] 机制。
 import { Tabs as TabsPrimitive } from '@base-ui/react/tabs';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from 'cn';
@@ -72,9 +69,6 @@ function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
   );
 }
 
-/** 滑动指示条（#644 零 chrome 透传）：Base UI 把激活 tab 几何写进内联自定义
- *  属性（--active-tab-left/top/width/height），滑动形态由消费点 CSS 承载。
- *  去留归 #1009 chief 面施工裁决（#982 判决：零皮肤语义透传）。 */
 function TabsIndicator({ className, ...props }: TabsPrimitive.Indicator.Props) {
   return <TabsPrimitive.Indicator data-slot="tabs-indicator" className={className} {...props} />;
 }

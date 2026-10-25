@@ -1,8 +1,3 @@
-// Drag overlay face (#616): the lifted clone is a compact card, not the
-// board card — title (2 lines) and the project + #id half of the meta row,
-// no footer or actions. Lift recipe: 2° tilt, 0.92 opacity, --drag-shadow;
-// dnd-kit's fixed wrapper owns the translate.
-
 import { Folder } from 'lucide-react';
 import { useLiveData } from '../api/provider.js';
 import { PROJECT_NAME } from '../fixtures/fixtures.js';
@@ -10,7 +5,6 @@ import type { TodoRecord } from '../fixtures/records.js';
 
 interface DragCardProps {
   todo: TodoRecord;
-  /** Project name, same pass-through and absent semantics as the board card. */
   projectName?: string;
 }
 

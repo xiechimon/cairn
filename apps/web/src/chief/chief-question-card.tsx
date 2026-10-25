@@ -1,19 +1,3 @@
-// #1049 问答卡：chief ask_user 提问的可点交互面（选项/多选/自由文本，
-// 一次多问）。数据源 = chief_stream 的 question 行（api/mappers
-// askQuestionOfContent 投影；wire = shared askUserQuestionContentSchema）。
-// 2026-10-09 形态裁决（用户亲选原型 scratch/qcard-proto v3「Steps」）：
-// pending = 一题一屏向导——进度条 / 整行选项块 + 序号方块 / 末行「其他…」
-// + 自由文本 / 数字键 1–N 直达 / 上一步-下一步-提交 / 选项 >6 卡内滚动 /
-// 多选计数提示（结构取自原型 v3，取值见下方 #1398 段）。answered = 只读高亮（整行块 +
-// 序号填充，自定义答案以选项串回显）；cancelled = 整卡暗淡。拼装只用
-// registry 零件 Button/Input（shadcn 无「提问卡」原语，26 件快照已核）；
-// 序号方块/进度条是卡内局部 span，不进 components/ui。组件对缺省回调
-// 惰性（与恢复钮 accept 律同族纪律）。
-// #1398 Paper 面：向导结构不动，取值换 DESIGN.md——卡 = --radius-card 白卡
-// + line 1px 边；状态 = 图标 + 颜色 + 文字（等你回答 = 赭红，已回答 /
-// 已取消 = ink-3），不再是药丸徽章；字号走六档键；自由文本 =
-// FORM_CONTROL_CLS；底部 = 文字按钮 + 一个墨色主按钮。
-
 import type { AskUserAnswer } from '@cairn/shared';
 import { Ban, CircleCheck, CircleHelp, type LucideIcon } from 'lucide-react';
 import { type ReactNode, useLayoutEffect, useMemo, useState } from 'react';
@@ -24,26 +8,18 @@ import { Input } from '../components/ui/input.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 
-/** question 行投影形（mappers 产出；ChiefStreamItem 的 question 变体）。 */
 export type ChiefQuestionItem = Extract<ChiefStreamItem, { kind: 'question' }>;
 
 export interface ChiefQuestionCardProps {
   item: ChiefQuestionItem;
-  /** live 面：提交回答（POST questions/{requestId}/answer）；缺省 = 惰性。 */
   onAnswer?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
-  /** live 面：取消提问（POST questions/{requestId}/cancel）。 */
   onCancel?: (requestId: string) => void;
 }
 
-/** 单题本地作答形（渲染层状态；提交时折叠成 AskUserAnswer）。choices 题
- * 的 other = 「其他…」行选中；提交时非空 otherText 追加进 choices（wire
- * 上选项题只收 choices，自定义文本以选项串上送，答题端点按题形执法）。 */
 type Draft =
   | { kind: 'choices'; picked: string[]; other: boolean; otherText: string }
   | { kind: 'text'; value: string };
 
-/** 卡框 / 进度条 / 序号方块 / 整行选项块（向导结构取自原型 v3，取值走
- *  DESIGN.md：卡 12×14 内衬、--radius-card、控件 8px 角、字号六档键）。 */
 const CARD_CLS =
   'flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3';
 const PIP_CLS = 'h-0.75 flex-1 rounded-full bg-border transition-colors duration-200 ease-out';
@@ -58,12 +34,9 @@ const OPT_CLS =
   'h-auto w-full justify-start gap-2 whitespace-normal rounded-md border-border bg-transparent px-3 py-2.5 text-left text-ui leading-normal font-normal';
 const OPT_SEL_CLS = 'border-ring bg-(--menu-hover)';
 const OPT_TXT_CLS = 'min-w-0 flex-1';
-/** answered/cancelled 态的只读整行块（非交互：无焦点无手型）。 */
 const ROW_STATIC_CLS =
   'flex w-full items-center gap-2 rounded-md border border-border px-3 py-2.5 text-ui leading-normal text-foreground';
 
-/** 卡头状态：图标 + 颜色 + 文字（DESIGN.md 状态三件套）。等你回答是「需要
- *  你」态，走赭红；已回答 / 已取消降到 ink-3。 */
 const STATUS_WAITING_INK = 'text-(--card-button)';
 const QUESTION_STATUS: Record<
   ChiefQuestionItem['status'],
@@ -99,8 +72,6 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
   const question = item.questions[step] ?? item.questions[0];
   const draft = drafts[step];
 
-  /** 数字键 1–N 直达（原型 v3 底部提示的机制面）：pending 期挂窗口监听，
-   * 焦点在输入类控件/富文本时不劫持；N = 选项数 + 1（末位 = 其他行）。 */
   useLayoutEffect(() => {
     if (!pending || question === undefined || question.options.length === 0) return;
     const max = question.options.length + 1;
@@ -140,13 +111,9 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
     });
   };
 
-  // hooks 已全部挂完才走早退（schema questions min(1)；空数组建卡本身
-  // 就是 mapper 已过滤的坏形，防御性不渲染）。
   if (question === undefined) return null;
 
   if (item.status !== 'pending') {
-    // answered / cancelled：只读记录面（answered 高亮已选整行块；cancelled
-    // 整卡暗淡）。badge/块全部静态，无任何可点控件。
     return (
       <div
         data-testid="chief-question-card"
@@ -179,7 +146,6 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
     );
   }
 
-  // pending：Steps 向导（一题一屏）。onAnswer 缺省 = 惰性（控件全禁用）。
   const scroll = question.options.length > 6;
   const pickedCount = draft?.kind === 'choices' ? draft.picked.length : 0;
   const otherSelected = draft?.kind === 'choices' && draft.other;
@@ -314,9 +280,6 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
   );
 }
 
-/** answered 态选项题：全部选项行只读回显（已选 = 整行块 + 序号填充）；
- * choices 里不匹配任何选项 label 的串 = 「其他…」自定义答案，追加一条
- * 选中态行回显（testid 落在答案文本上）。 */
 function answeredRows(
   question: ChiefQuestionItem['questions'][number],
   qi: number,
@@ -360,8 +323,6 @@ function initialDrafts(item: ChiefQuestionItem): Draft[] {
   );
 }
 
-/** 整行选项块点选/数字键直达的纯函数面：单选 = 换选并清「其他」；多选 =
- * toggle；末位 index = 其他行（单选换位，多选 toggle）。 */
 function applyPick(
   prev: Draft[],
   qi: number,
@@ -386,8 +347,6 @@ function applyPick(
   return replaceDraft(prev, qi, { ...current, picked: [label], other: false });
 }
 
-/** 单题完成判据：文本题非空；选项题 = 至少一个常规选项，或带非空自定义
- * 文本的「其他」。空文本的「其他」不算完成（提交时也被丢弃）。 */
 function draftComplete(
   draft: Draft | undefined,
   question: ChiefQuestionItem['questions'][number] | undefined,

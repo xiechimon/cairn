@@ -1,6 +1,3 @@
-// 仓内语义映射（#411/#425，零皮肤；类串与上游 base-nova 逐字同源）：
-// 1) type 默认 button——防表单内隐式 submit（仓律，全仓 ui/button 同规）；
-// 2) data-variant / data-size 透出——e2e 材质钉按 data-variant 断言的观测点（#411）。
 import { Button as ButtonPrimitive } from '@base-ui/react/button';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from 'cn';

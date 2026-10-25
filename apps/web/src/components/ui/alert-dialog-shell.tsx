@@ -1,16 +1,3 @@
-// AlertDialogShell 适配层（#425 B1）：仓内确认面的共用底座，走 Base UI
-// AlertDialog；面、头、体、脚与 DialogShell 同一套 Paper 件（dialog-shell.tsx
-// 的 DIALOG_* 类与 DialogFootRow），缺省 S 档 400 宽。
-//
-// **与 #420 决议的一处显式接线**：Base UI 的 AlertDialog 默认「Esc 与外点
-// 不关」（阻断语义），而仓内确认面的既有契约是**三路径可关**（X / Esc /
-// 背板，picker 与 delete-confirm 系列 spec 逐条钉死）。故本层显式接管：
-// Popup 上挂 Escape、Backdrop 上挂外点——语义仍是 alertdialog（role + 焦点
-// 圈定 + 不可误触的默认），只是把"可关"这一条接回来。
-//
-// .delete-confirm 族 / .overlay-backdrop 类名原样输出（零规则的 e2e 句柄）；
-// 背板皮肤 = styles/app.css 的 [data-slot=alert-dialog-overlay] 浅墨 dim。
-
 import { AlertDialog as AlertDialogPrimitive } from '@base-ui/react/alert-dialog';
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
@@ -33,20 +20,13 @@ import {
 } from './dialog-shell.js';
 
 interface AlertDialogShellProps {
-  /** Head title — the caller's canon copy (任务: 确定删除该任务…). */
   title: string;
-  /** Optional 12px sub-line under the title. */
   subtitle?: ReactNode;
-  /** Dialog aria-label (任务: 删除任务). */
   ariaLabel: string;
-  /** #73: retained-mount open flag — the exit fade outlives the close. */
   open: boolean;
   onClose: () => void;
-  /** Body content. */
   children: ReactNode;
-  /** Footer actions (usually AlertDialogActions), right-aligned. */
   footer: ReactNode;
-  /** Muted 12px hint left of the actions. */
   hint?: ReactNode;
   className?: string;
   size?: DialogSize;
@@ -65,9 +45,6 @@ export function AlertDialogShell({
   size = 's',
 }: AlertDialogShellProps) {
   const { t } = useI18n();
-  // 接管 Esc（AlertDialog 默认不关）：仓内确认面契约的键盘路径。
-  // #466：走 useEscClose 的 open 周期注册（onClose 走 ref）——消费点全传
-  // 内联箭头，按渲染重挂会在重渲染窗口内丢 Esc（#462 症状 2 同根因）。
   useEscClose(onClose, open);
 
   return (
@@ -81,7 +58,6 @@ export function AlertDialogShell({
         <AlertDialogPrimitive.Backdrop
           data-slot="alert-dialog-overlay"
           className="overlay-backdrop fixed inset-0 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
-          // 接管外点（AlertDialog 默认不关）：背板点击 = 关
           onClick={onClose}
         />
         <AlertDialogPrimitive.Popup
@@ -98,8 +74,6 @@ export function AlertDialogShell({
         >
           <div data-testid="dialog-head" className={DIALOG_HEAD_CLS}>
             <div className="min-w-0 flex-1">
-              {/* 纯 div：Base UI 的 Title 会挂 aria-labelledby，压过调用方给的
-                  ariaLabel（确认面的可及名是「删除任务」而不是标题全句）。 */}
               <div className={cn('delete-confirm-title', DIALOG_TITLE_CLS)}>{title}</div>
               {subtitle != null && (
                 <AlertDialogPrimitive.Description className={DIALOG_SUBTITLE_CLS}>
@@ -131,7 +105,6 @@ export function AlertDialogShell({
   );
 }
 
-/** 确认面操作组（取消 + 危险动作），放进 AlertDialogShell 的 footer。 */
 export function AlertDialogActions({
   cancelLabel,
   confirmLabel,

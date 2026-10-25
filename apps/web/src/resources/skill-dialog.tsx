@@ -1,19 +1,3 @@
-// 技能新建/编辑弹窗（XMON-114 S3，spec 13 回摆：技能页摘只读封印）。
-// 表单化口径：frontmatter 的 name/description = 表单字段，SKILL.md 由
-// shared buildSkillEntry 组装——用户只写正文，不手写 YAML 头。预填反向走
-// splitSkillEntry（编辑面打开时 GET 入口文件拆开回填）。
-// 客户端预检（同 shared 单源）：目录名安全域 SKILL_DIR_NAME_RE、单文件
-// 字节闸 MAX_SKILL_FILE_BYTES、round-trip 对拍（引号包裹等解析器会改写
-// 的形态不发请求）；server 仍是终闸——400/404/409 落内联错误行（headline
-// 按 status 分译，server 原文作 detail 行，消息子串不作契约）。
-// fixture 面 = accept 律（#148：提交即关），不发请求不读文件。
-// #944 正典表执行（spec/22 §5.3/§5.4）：裸 button/textarea → Button
-// default / Textarea 件、Input 摘 .dlg-form-input 老类（I3——件已是
-// components/ui，几何即正典 h-8）。
-// Paper 表单（DESIGN.md 页面模式 · 表单）：FormStack / FormField，错误行
-// 走 FieldError（role=alert 内建），footer = FormActions。SKILL.md 正文框
-// 等宽 + min-h-40：markdown/YAML 源码编辑要等宽，正文要多行空间。
-
 import {
   buildSkillEntry,
   MAX_SKILL_FILE_BYTES,
@@ -35,7 +19,6 @@ import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
 import { FORM_TEXTAREA_CLS } from './parts.js';
 
-/** 编辑目标（行数据投影）；undefined = 新建。 */
 export interface SkillEditTarget {
   id: string;
   name: string;
@@ -48,7 +31,6 @@ interface Fields {
   body: string;
 }
 
-/** 服务端错误 → 可读 headline（status 分译）+ 原文 detail。 */
 function serverErrorCopy(
   err: unknown,
   t: (s: string) => string,
@@ -88,11 +70,8 @@ export function SkillDialog({
   const [fields, setFields] = useState<Fields | null>(null);
   const [error, setError] = useState<{ headline: string; detail: string } | null>(null);
 
-  // 编辑面（live）预填读：弹窗开着才发；404 = 目标刚被移除（一等错误态）。
   const fileQ = useSkillFile(teamId, skill?.id, open && live && editing);
 
-  // 开/关初始化：关 = 清场；开 = 新建空表 / fixture 编辑取行投影 / live 编辑
-  // 等文件读回（下方 effect 回填）。
   useEffect(() => {
     if (!open) {
       setFields(null);
@@ -104,7 +83,7 @@ export function SkillDialog({
     } else if (!live) {
       setFields({ name: skill.name, description: skill.description, body: '' });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在开/关沿初始化
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialize fields only on the open/close edge
   }, [open]);
 
   useEffect(() => {
@@ -116,17 +95,16 @@ export function SkillDialog({
       description: split.description ?? skill.description,
       body: split.body,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fields===null 是装载闸
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fields===null is the load gate
   }, [open, editing, live, fields, fileQ.data]);
 
-  // 预填读 404：列错误行 + 列表失效（行应随之消失）。
   useEffect(() => {
     if (!open || !(fileQ.error instanceof ApiError)) return;
     if (fileQ.error.status === 404) {
       void qc.invalidateQueries({ queryKey: ['skills'] });
     }
     setError(serverErrorCopy(fileQ.error, t));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 错误对象换实例才重算
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recompute only when the error object identity changes
   }, [open, fileQ.error]);
 
   const entry =
@@ -162,7 +140,7 @@ export function SkillDialog({
       files: [{ path: SKILL_ENTRY_FILE, content: entry }],
     };
     if (!live) {
-      onClose(); // fixture accept 律
+      onClose();
       return;
     }
     setError(null);
@@ -197,8 +175,6 @@ export function SkillDialog({
         />
       }
     >
-      {/* 编辑面（live）预填读失败 = 表单整体让位错误块——拿不到原 SKILL.md
-          时绝不让用户盲写覆写（PUT 覆写语义，空表单提交会抹掉正文）。 */}
       {error !== null && fields === null ? (
         <FormStack className="max-w-none">
           <FieldError>

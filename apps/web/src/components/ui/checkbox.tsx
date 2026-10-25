@@ -1,7 +1,3 @@
-// 仓内语义映射（#952 三态，零皮肤；其余与上游 base-nova 逐字同源）：
-// indeterminate 时 Indicator 渲染横杠语义图标——上游 mixed 态复用勾形，会丢
-// 「部分选中 / 全选」的区分（board 筛选全选行等三态消费面依赖）。#982 判决：
-// 真功能语义缺口以零皮肤方式保留，几何 / 配色 / 动效全走上游。
 import { Checkbox as CheckboxPrimitive } from '@base-ui/react/checkbox';
 import { cn } from 'cn';
 

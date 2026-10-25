@@ -1,13 +1,3 @@
-// Fixture data — content copied verbatim from the r7 capture session
-// (docs/research/r7-rebaseline.md §5): probe #9, r3 legacy #1/#2, project
-// and team identifiers, branch strings, 13:21/13:35 timestamps. The #1/#2
-// titles were extracted from captures 01/01b by glyph template matching
-// (glyph template matching) in #54; all other strings come from the research
-// records.
-//
-// Re-export barrel over the per-domain fixture modules; import sites keep
-// consuming ./fixtures.js.
-
 export {
   AGENT_LONG_ROLE,
   agentDelete,
@@ -32,7 +22,6 @@ export {
   boardMachinePicker,
   boardOverflow,
   boardProjectPicker,
-  // #1261 等额度看板场景（quota-wait 命名场景底）。
   boardQuotaWait,
   boardRepoFilter,
   boardResetGate,

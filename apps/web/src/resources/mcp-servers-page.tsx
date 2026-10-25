@@ -1,9 +1,3 @@
-// MCP 服务器 route (issue #69, r7 09; spec 13/#368 本地 config 只读制):
-// one card of server rows — name + type label on the title line, endpoint
-// url below, relative modification label at the right edge. 数据源 =
-// server 本机 ~/.claude.json mcpServers 段投影 (GET mcp-servers；密钥值永不上接口，record 只带 hasCredential/
-// credentialKeys)。无新建/编辑入口——配置变更 = 直接编辑该文件；空态文案
-// 即配置指引（更多菜单 ink 随管理面一并撤除，行改纯只读）。
 import { Network } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import { useMcpServers } from '../api/hooks.js';
@@ -29,7 +23,6 @@ export function McpServersPage() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  // M5 live：GET mcp-servers（spec 13 起 = 本地 config 投影，record 保形）。
   const { live, teamId } = useLiveData();
   const mcpQ = useMcpServers(teamId, live);
   const servers = live

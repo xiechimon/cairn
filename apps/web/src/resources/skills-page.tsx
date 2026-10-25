@@ -1,13 +1,3 @@
-// 技能 route (issue #69): search input + 排序 button row, then one card of
-// skill rows (name + description, row chevron).
-// #306 接真：排序钮开单选 listbox（默认/名称，当前项 ✓，行点击 = 选中即关
-// — lang-dropdown 家族律）。原站排序下拉内容未观测，选项集 [设计]：SkillRow
-// 数据面只有 name/description（无时间戳），可诚实承载的排序键 = 名称。
-// spec 13（#367）只读面 → XMON-114（S3，spec 13 回摆）写面：技能 = server
-// 本地目录现扫投影不变，但页面恢复新建/编辑——topbar「+ 新建」与空态主钮
-// 开 SkillDialog（frontmatter 表单化），行点击开编辑。空态文案指路目录 +
-// 界面新建双入口（canon = shared SKILL_PAGE_COPY 单源消费，{dir} =
-// SKILLS_DIR_DEFAULT；env 覆写在 server 侧，i18n 键经 COMPUTED_KEYS 登记）。
 import { SKILL_PAGE_COPY, SKILLS_DIR_DEFAULT } from '@cairn/shared';
 import { Puzzle } from 'lucide-react';
 import { useState } from 'react';
@@ -45,7 +35,6 @@ import { SkillImportDialog } from './skill-import-dialog.js';
 
 export const SKILLS_HREF = '/app/resources/skills';
 
-/** #306 [设计]: the two honest sorts — server (arrival) order and name. */
 const SORT_OPTIONS = ['默认', '名称'] as const;
 type SortKind = (typeof SORT_OPTIONS)[number];
 
@@ -53,17 +42,13 @@ export function SkillsPage() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  // M5 live：GET /api/skills?teamId=（02 §6.1 词表；spec 13 起 server 现扫
-  // 本地目录，wire 形状不变）。
   const { live, teamId } = useLiveData();
   const skillsQ = useSkills(teamId, live);
   const rows = live ? mapSkills(skillsQ.data ?? []) : (fixture.resources?.skills ?? []);
   const [sort, setSort] = useState<SortKind>('默认');
   const skills = sort === '名称' ? [...rows].sort((a, b) => a.name.localeCompare(b.name)) : rows;
-  // 弹窗态：null = 关；{skill?} 无 skill = 新建，有 = 编辑（XMON-114）。
   const [dialog, setDialog] = useState<{ skill?: SkillEditTarget } | null>(null);
   const openCreate = () => setDialog({});
-  // 导入弹窗（#1170）：localPath / GitHub URL 二选一 → POST skills/import。
   const [importOpen, setImportOpen] = useState(false);
 
   return (

@@ -1,8 +1,3 @@
-// The one shell for every non-board route (paper-redesign-plan PR 6):
-// Grouped sidebar on canvas, a sheet panel inset 10px, the Paper top bar
-// (56px, serif page title, text buttons + one ink primary button) and one 768px
-// reading column. Class aliases page-shell / page-main / page-main-col /
-// page-tabs-group / page-tab are e2e handles.
 import type { ReactNode } from 'react';
 import { Link, type To } from 'react-router';
 import { AppSidebar } from '../board/app-sidebar.js';
@@ -12,24 +7,15 @@ import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft } from '../icons/index.js';
 
-/** The sheet panel inset 10px off the canvas; the board route wears the
- *  same one so moving between routes keeps the main panel still. A div, not
- *  <main>: a <header> inside <main> loses role=banner. The ring is an
- *  ::after layer above the content: an inset box-shadow on the sheet itself
- *  paints under its children, so any child with a background hides it. */
 export const SHEET_PANEL =
   "relative isolate my-2.5 mr-2.5 flex min-w-0 flex-1 overflow-hidden rounded-(--cds-radius-2xl) bg-background after:pointer-events-none after:absolute after:inset-0 after:z-10 after:rounded-[inherit] after:[box-shadow:var(--sheet-ring)] after:content-['']";
 
 export interface PageTab {
   id: string;
   label: string;
-  /** Disabled tab (local project 文件 tab); the page renders the placeholder. */
   disabled?: boolean;
 }
 
-/** Text tabs on the shared segmented face: 任务|文件 in the top bar,
- *  基本信息|仓库|标签 in the project settings column. The tab value drives
- *  page state; no panels. */
 export function TabGroup({
   tabs,
   tab,
@@ -56,25 +42,16 @@ export function TabGroup({
 }
 
 interface PageShellProps {
-  /** data-route value: route-scoped selectors hang off it. */
   route: string;
   fixture: FixtureSet;
-  /** Sidebar row to light; absent = the AppSidebar default (工作台). */
   selected?: SidebarSelected;
-  /** Serif page title, already translated. */
   title: ReactNode;
-  /** Parent route for detail pages. Sidebar destinations have no parent and
-   *  render no back arrow. */
   back?: To;
-  /** Tab group right after the title (project 任务|文件). */
   tabs?: PageTab[];
   tab?: string;
   onTab?: (id: string) => void;
-  /** Right side of the top bar: text buttons, then at most one ink primary button. */
   actions?: ReactNode;
-  /** Page-owned 新任务 dialog (project page); absent = the sidebar's own. */
   onNewTask?: () => void;
-  /** Body fills the sheet instead of the 768px column (project files). */
   bleed?: boolean;
   children: ReactNode;
 }

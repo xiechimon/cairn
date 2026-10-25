@@ -1,45 +1,4 @@
-/* Motion layer — retained faces under ADR 0009 (#656 全站动效收敛).
-
-   复刻时代的 overlay registry（overlay-fade / overlay-pop / drawer-in
-   keyframes、.overlay-mount retained wrapper、.anim-fade/.anim-pop/.anim-drawer
-   家族）已整体退役：全站进出场统一走 tw-animate-css 缺省档（shadcn 现值，
-   D3 核准的漂移照旧），壳机制归 FloatingShell / DialogShell 适配层——Base UI
-   的 data-open/data-closed 经具名 group 变体驱动 enter/exit keyframe，卸载窗
-   由壳上零视觉的 visibility 延迟过渡撑住。时长/缓动正本在 token 层
-   （--dur-* / --ease-*）与 tw 的 duration-* 工具类。
-
-   本文件只留 D4 的非进出场面：
-     - hover / press tint（#73，official sheet 的 hover:hover + pointer:fine
-       门与 pointer:coarse 零过渡律）；
-     - 全局 :active 压暗、#629 板面卡按压面、XMON-69 侧栏 toggle 例外；
-     - #73 板面拖拽手势锁（body[data-board-dragging]：grabbing 指针 +
-       全页选区封锁；#943 随 board.css 清零迁入，body 级状态钩与
-       .theme-suppress 同族）；
-     - prefers-reduced-motion 全站法（含 tw-animate-css keyframe 的降级
-       reset——tab pill 的 150ms transition 滑动与 spinner 面走各自文件的
-       reduced-motion 处理，不在此列）。
-     - spinner-breathe 共享 keyframes（#821：在飞 loading 的呼吸脉冲——
-       opacity + scale 双通道，3.6s = Atom 1800ms 自旋周期的两倍，避开拍频；
-       颜色与 reduced-motion 静止态走各自文件的 spinner 类，不在此列）。 */
-
-/* r1 §4.3 convention: the whole site degrades motion under
-   prefers-reduced-motion — the replica mirrors it. The loading indicator
-   is not listed here: #672 moved it to loading-dev, whose injected sheet
-   carries its own equivalent freeze (animation: none + a static settle
-   transform on the spinning parts). */
 @media (prefers-reduced-motion: reduce) {
-  /* tw-animate-css enter/exit (the animate-in / animate-out keyframe pair the
-     shadcn / Base UI overlay parts run under data-open / data-closed) degrade
-     under the same site-wide law (ADR 0009 D4). Keyframe animations only —
-     transitions are left alone: hover/press tints and the tab-indicator slide
-     ride transitions and keep their own reduced-motion handling. Setting
-     duration/iteration-count rather than animation-name lets the loading
-     indicator's freeze (the loading-dev sheet's animation: none on the atom
-     parts, #672) stay authoritative (name none wins on specificity), so the
-     indicator still freezes instead of flashing. A reduced-motion reset has
-     to outrank the utility that sets the duration (.data-open\:animate-in and
-     friends carry class+attribute specificity), so !important is the standard
-     accessibility escape hatch, not a cascade shortcut. */
   *,
   ::before,
   ::after {
@@ -51,29 +10,8 @@
   }
 }
 
-/* ---- hover / press states (#73, base-ui-theme P4 #791) ----
-   Row and menu surfaces tint with the theme accent-soft token
-   (color-mix spot 14%, shadcn.css 值正本） over the standard 150ms color
-   step. Menu rows (DropdownMenuItem) carry the Paper menu hover and the
-   danger-soft delete row in the primitive itself. Hover is gated to fine pointers like the official sheet's
-   @media (hover:hover) and (pointer:fine) block, and coarse pointers zero
-   the transition on press (same sheet, pointer:coarse block).
-   不跟本 tint 的行 hover（有意为例外，见各自注释）：侧栏行（§2.2 [保留]
-   cds alpha 梯）、提及/下拉选中行（hover 即选中语义）、分段 chip
-   （--seg-hover 自立 token，有专属 spec 钉扎）。搜索行/型选盘行/chip
-   popover 行原挂本族（搜索行以 --row-selected 覆写），#949 per-face 清零
-   随各自行的 utility 自持同值 tint，不再走本选择子族。 */
-
-/* 卡面 hover（2026-10-12 用户派：看板卡对齐 deepseek-harness 对话框观感——
-   dsh 交互面 hover 一律有微染反馈，interactive-bg-hover 族）。卡不吃本族
-   的 accent-soft 玫 tint（卡片是大面不是行，品牌 tint 会读成选中态），吃
-   中性升档 --card-hover（shadcn.css 补位族）。本块必须在 .todo-card:active
-   之前：hover 与 active 同特异性，按压面靠规则序赢。 */
 @media (hover: hover) and (pointer: fine) {
   .todo-card {
-    /* CDS PR-4: include box-shadow + translate so utility hover lift
-       (--panel-shadow-hover / -1.5px) eases; unlayered rule would otherwise
-       win over transition-[box-shadow,translate] utilities. */
     transition:
       background-color var(--dur-fast) var(--ease-standard),
       box-shadow 200ms var(--ease-out-expo),
@@ -85,18 +23,12 @@
   }
 }
 
-/* 拖拽在飞时源卡不读 hover：指针按住在拖，hover 染色 / 抬升会跟在飞的
-   克隆打架。特异性（0,2,1）压上面的裸 hover 规则。 */
 body[data-board-dragging] .todo-card:hover {
   background-color: var(--card);
   box-shadow: var(--panel-shadow);
   translate: none;
 }
 
-/* 卡面入场（dsh 对话框的消息入场同族：快、小幅、只动 opacity/transform）：
-   新卡上板 / 落位换列 / 筛选命中重现时 150ms 浮入。reduced-motion 由本文件
-   的全站 keyframe 冻结兜底；拖拽克隆是 board-drag-card（另一组件）不吃本
-   动画；dnd-kit 的位移 transform 写在 wrapper 上，与卡本体互不覆盖。 */
 @keyframes card-enter {
   from {
     opacity: 0;
@@ -133,12 +65,6 @@ a:active {
   opacity: 0.85;
 }
 
-/* #629 板面卡按压面（参考站 2026-10-02 实测）：press = 整卡 bg tint 一档
-   （--surface-press：dark 走 surface-tertiary、light 走 surface-secondary，
-   与参考站 active:bg-* 类逐值同源），瞬切无过渡（参考站 computed
-   transition 0s）。:active 从 stretched link 的 ::after 命中点沿 DOM 祖先
-   链传到卡根。标题链接同时退出上面的全局 a:active 压暗——参考站按压只有
-   bg tint 一个反馈，标题文字不 dim（双重反馈是噪音）。 */
 .todo-card:active {
   background-color: var(--surface-press);
 }
@@ -155,24 +81,12 @@ a:active {
   }
 }
 
-/* #73 drag-gesture law (relocated from board.css by #943, board per-face
-   CSS 清零): while a board drag is in flight the whole document stops
-   selecting text (changelog 2026-09-14 hygiene) and the pointer reads as
-   grabbing. The data attribute is toggled on <body> by board.tsx for the
-   gesture's duration — a body-level state hook, same family as
-   .theme-suppress below, so the rule lives in the carrier motion layer, not
-   a per-face file. Carrier per #910 裁定 3 (状态类归行为，载体改 data-*). */
 body[data-board-dragging] {
   cursor: grabbing;
   user-select: none;
   -webkit-user-select: none;
 }
 
-/* Theme-switch suppression (base-ui-theme §1.2/F8, #787, better-ui recipe):
-   applyTheme (theme.ts) rides .theme-suppress on <html> across the .light
-   flip — every transition off for that paint, so the color / background /
-   border / shadow steps don't smear the page. The class lives for two
-   frames only; a .theme-suppress outside theme.ts + this rule is a bug. */
 .theme-suppress,
 .theme-suppress *,
 .theme-suppress *::before,
@@ -182,29 +96,11 @@ body[data-board-dragging] {
   transition: none !important;
 }
 
-/* XMON-69: the sidebar's two toggles are the same control on either side of
-   the flip — a bare 14px glyph in a 28px (expanded) / 40px (rail) box with no
-   surface of its own, so the global dim above lands on the glyph alone and is
-   read as the icon shrinking under the cursor. They hold full ink while
-   pressed. The rail toggle keeps its hover face (it rides its own seam row,
-   sidebar.tsx) — only the press dim is excepted. Unlayered on purpose: this
-   file is loaded outside @layer, so a tailwind `active:opacity-100` utility
-   cannot outrank the rule above (measured, 2026-10-01); the exception has to
-   live beside it. */
 .sidebar-team-collapse:active,
 .rail-toggle:active {
   opacity: 1;
 }
 
-/* #821 in-flight spinner breathe: the shared pulse for the loading-dev Atom
-   roots (.chief-spinner in chief.css, .chat-spinner in detail.css). Opacity +
-   scale only (compositor lanes, no layout); 3600ms is twice the Atom 1800ms
-   spin period so the pulse never beats against the orbits; ease rides the
-   --ease-standard token. The animation lives on the library root while the
-   spins run one level down (.ld-atom-spin), so the two never override each
-   other. Under reduced motion the roots go static via their own
-   animation: none (same end state as the library freeze + the site-wide
-   reset above — no fight, deterministic from any sheet order). */
 @keyframes spinner-breathe {
   0%,
   100% {

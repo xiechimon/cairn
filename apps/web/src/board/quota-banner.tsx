@@ -1,15 +1,6 @@
-// 看板「等额度」横幅（#1261）：任一任务 waiting_quota 挂起时顶条显性——
-// 哪一路 relay、什么事件（额度空/限流）、几个任务挂起、下次探测时刻。
-// 票面三件套的「横幅」半（卡态 = todo-card 芯片、通知 = quota_wait 行）。
-// 几何与 notify-banner 同族（banner 槽 + card-tier 视觉），数据面 = 既有
-// todos 集合（todo doc SSE 失效重取已覆盖——挂起/释放都发 todo doc 事件，
-// 横幅随之出现/消失，无独立订阅面）。live 与 fixture 面同判（fixture 的
-// quotaWait 行走 scenario 数据）。
-
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 
-/** 挂起聚合行：按 relay lane + 事件类型分组的显示形状。 */
 export interface QuotaBannerInfo {
   lane: string;
   kindText: string;
@@ -17,8 +8,6 @@ export interface QuotaBannerInfo {
   probe: string;
 }
 
-/** todos → 横幅聚合（纯函数；多 lane 多条，同 lane 同 kind 合并，probe 取
- * 最近的探测时刻——「什么时候恢复」答最早的那个）。null = 无挂起不渲染。 */
 export function quotaBannerInfo(todos: readonly TodoRecord[]): QuotaBannerInfo[] | null {
   const groups = new Map<string, QuotaBannerInfo>();
   for (const todo of todos) {
@@ -43,11 +32,8 @@ export function quotaBannerInfo(todos: readonly TodoRecord[]): QuotaBannerInfo[]
   return groups.size === 0 ? null : [...groups.values()];
 }
 
-/** 顶条横幅本体（e2e 锚 = data-quota-banner）。 */
 export function QuotaBanner({ infos }: { infos: QuotaBannerInfo[] }) {
   const { t } = useI18n();
-  // 单 lane 形 = 聚合行直陈（lane/kind/count/probe 全位）；多 lane 形退计数
-  // 摘要（详情归各卡芯片，横幅不排队列清单）。
   const single = infos.length === 1 ? infos[0] : null;
   return (
     <section
