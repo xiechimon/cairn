@@ -7,27 +7,19 @@ const SPIRAL_ARCS = [
   ' A252 252 0 0 1 -224 0',
 ];
 
-function fnv1a(text: string): number {
-  let hash = 2166136261;
-  for (const char of text) {
-    hash ^= char.codePointAt(0) ?? 0;
-    hash = Math.imul(hash, 16777619);
+export function spiralAvatarSvg(seed: string): string {
+  let state = 2166136261;
+  for (const char of seed) {
+    state ^= char.codePointAt(0) ?? 0;
+    state = Math.imul(state, 16777619);
   }
-  return hash >>> 0;
-}
-
-function xorshift(seed: number): () => number {
-  let state = seed || 1;
-  return () => {
+  state = state >>> 0 || 1;
+  const next = () => {
     state ^= state << 13;
     state ^= state >>> 17;
     state ^= state << 5;
     return (state >>> 0) / 4294967296;
   };
-}
-
-export function spiralAvatarSvg(seed: string): string {
-  const next = xorshift(fnv1a(seed));
   const color = TILE_COLORS[Math.floor(next() * TILE_COLORS.length)];
   const turns = 2 + Math.floor(next() * 2);
   const rotation = Math.floor(next() * 4) * 90;

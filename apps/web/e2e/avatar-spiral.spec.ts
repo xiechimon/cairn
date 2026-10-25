@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
 import { pressAndExpect } from './helpers.js';
 
@@ -8,14 +8,6 @@ const AGENT_SRC = spiralAvatarUrl('r3-builder');
 
 const SVG_BODY =
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12"/></svg>';
-
-function watchDicebear(page: Page): string[] {
-  const hits: string[] = [];
-  page.on('request', (request) => {
-    if (request.url().includes('api.dicebear.com')) hits.push(request.url());
-  });
-  return hits;
-}
 
 test('sidebar avatar chips (expanded + rail) and user-menu head share one seeded src', async ({
   page,
@@ -148,7 +140,10 @@ test('unreachable avatarUrl override → img onError falls back to the static as
 });
 
 test('no avatar surface reaches a third-party avatar host', async ({ page }) => {
-  const hits = watchDicebear(page);
+  const hits: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('api.dicebear.com')) hits.push(request.url());
+  });
   await page.goto('/app?scenario=01');
   await expect(page.locator('.sidebar-user img')).toHaveAttribute('src', USER_SRC);
   await page.goto('/app/team?scenario=12');
