@@ -976,13 +976,13 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
   });
 });
 
-describe('mergeReadiness: docs-only patches (#1621) go under shadow, protected docs mixed in stay human', () => {
+describe('mergeReadiness: a docs-only patch (#1621) is a go under shadow; a protected doc mixed in stays with the user', () => {
   const docsOnly = [
     file('docs/ops/langfuse.md'),
     file('docs/research/r9.md', { status: 'added', additions: 40, deletions: 0 }),
   ];
 
-  test('shadow with only docs/ Markdown changed: ready, no blockers', () => {
+  test('only Markdown under docs/ changed under shadow: ready, no blockers', () => {
     const i = green();
     i.policy.mergePolicy = 'shadow';
     setFiles(i, docsOnly);
@@ -992,7 +992,7 @@ describe('mergeReadiness: docs-only patches (#1621) go under shadow, protected d
     expect(r.policy).toBe('shadow');
   });
 
-  test('shadow with docs/spec or a case-variant docs/ADR mixed in: protected-path stays human', () => {
+  test('docs/spec or a case variant of docs/ADR mixed into the docs patch under shadow: protected-path stays with the user', () => {
     for (const name of ['docs/spec/28-x.md', 'docs/ADR/0021-x.md', 'docs/\u{17F}pec/28-x.md']) {
       const i = green();
       i.policy.mergePolicy = 'shadow';
@@ -1001,7 +1001,7 @@ describe('mergeReadiness: docs-only patches (#1621) go under shadow, protected d
     }
   });
 
-  test('shadow with a non-Markdown file under docs mixed in: outside-auto-merge stays human', () => {
+  test('a non-Markdown file under docs mixed into the patch under shadow: outside-auto-merge stays with the user', () => {
     const i = green();
     i.policy.mergePolicy = 'shadow';
     setFiles(i, [...docsOnly, file('docs/research/assets/r1/sw.js')]);
@@ -1010,7 +1010,7 @@ describe('mergeReadiness: docs-only patches (#1621) go under shadow, protected d
     ]);
   });
 
-  test('deleted tests still stay human: a docs patch with a removed test file inside', () => {
+  test('a deleted test still stays with the user: a docs patch carrying a deleted test file', () => {
     const i = green();
     i.policy.mergePolicy = 'shadow';
     setFiles(i, [...docsOnly, file('apps/server/test/old.test.ts', { status: 'removed' })]);

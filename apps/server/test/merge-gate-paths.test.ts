@@ -60,11 +60,11 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     ['CLAUDE 变体', 'CLAUDE.local.md', 'apps/web/src/claude-md.ts'],
     ['AGENTS 变体', 'AGENTS.override.md', 'apps/web/src/agents.ts'],
     ['评审口径', 'docs/pr-review.md', 'docs/pr-review-notes/x.md'],
-    ['错误台账', 'docs/lessons.md', 'docs/lessons-archive.md'],
-    ['错误台账条目', 'docs/lessons/1651-probe-reach.md', 'docs/lessonsx/1651.md'],
-    ['派活模板', 'docs/agent-dispatch-prompts.md', 'docs/agent-dispatch.md'],
+    ['error ledger', 'docs/lessons.md', 'docs/lessons-archive.md'],
+    ['error ledger entry', 'docs/lessons/1651-probe-reach.md', 'docs/lessonsx/1651.md'],
+    ['dispatch template', 'docs/agent-dispatch-prompts.md', 'docs/agent-dispatch.md'],
     ['ADR', 'docs/adr/0021-x.md', 'docs/adrs.md'],
-    ['设计决定', 'docs/spec/28-x.md', 'docs/specs.md'],
+    ['design decisions', 'docs/spec/28-x.md', 'docs/specs.md'],
     ['闸脚本', 'apps/server/scripts/db-check.mjs', 'apps/server/src/scriptsx.ts'],
     ['配置', 'apps/web/vite.config.mts', 'apps/web/src/config.ts'],
     ['biome', 'apps/web/biome.jsonc', 'apps/web/src/biome.ts'],
@@ -368,15 +368,15 @@ describe('default deny: anything outside the auto-merge set is left to a human',
   });
 });
 
-describe('docs-only (#1621): Markdown under docs/ is in the set; design decisions, ADRs and review policies stay human', () => {
-  test('Markdown at any depth under docs/ is in the set', () => {
+describe('docs-only (#1621): Markdown under docs joins the auto-merge set; design decisions, ADRs and the review guide still stay with the user', () => {
+  test('Markdown at any depth under docs is in the set', () => {
     const files = ['docs/ops/langfuse.md', 'docs/README.md', 'docs/a3/x.md', 'docs/research/r1.MD'];
     const r = classify(files.map((p) => f(p)));
     expect(r.protected).toEqual([]);
     expect(r.outsideAutoMerge).toEqual([]);
   });
 
-  test('protected doc paths still match under case or Unicode folding and never land in the set', () => {
+  test('protected doc paths still match under case or Unicode folds and never land in the set', () => {
     for (const p of [
       'docs/ADR/0021-x.md',
       'Docs/Adr/0021-x.md',
@@ -395,14 +395,14 @@ describe('docs-only (#1621): Markdown under docs/ is in the set; design decision
     }
   });
 
-  test('a name that only looks like docs after Unicode folding falls outside', () => {
+  test('a name that only looks like docs via Unicode folding lands outside the set', () => {
     const p = 'doc\u{17F}/x.md';
     const r = classify([f(p, { status: 'added' })]);
     expect(r.protected).toEqual([]);
     expect(r.outsideAutoMerge).toEqual([p]);
   });
 
-  test('a rename moving an ADR to a plain doc is protected by the original name', () => {
+  test('renaming an ADR into a plain doc counts as protected by its original name', () => {
     const r = classify([
       f('docs/notes/0021.md', { status: 'renamed', previousFilename: 'docs/adr/0021-x.md' }),
     ]);

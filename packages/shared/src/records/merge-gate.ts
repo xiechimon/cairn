@@ -65,6 +65,7 @@ export const PROTECTED_PATH_GLOBS = [
   '**/AGENTS*.md',
   'docs/pr-review.md',
   'docs/lessons.md',
+  'docs/lessons/**',
   'docs/agent-dispatch-prompts.md',
   'docs/adr/**',
   'docs/spec/**',
