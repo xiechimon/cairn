@@ -1,127 +1,138 @@
 # Cairn Development Rules
 
-> 仓库级 agent / 人类共同规则。规则**可覆写**但需用户显式确认（见末尾"User Override"）。
-> 项目背景与历史决策在 `~/.claude/projects/-Users-xmon-Code-AgentProjects-cairn/memory/MEMORY.md`——本文件只列规则不重复事实。
-> 工作方式、分工、模型规则与当前进展摘要见 `.claude/workflow.md`；收尾复盘用 `.claude/skills/retro-cairn`。
+> Repository rules shared by agents and humans. A rule **can be overridden**, but only with explicit user confirmation (see "User Override" at the end).
+> Project background and past decisions live in `~/.claude/projects/-Users-xmon-Code-AgentProjects-cairn/memory/MEMORY.md`; this file lists rules only and does not repeat facts.
+> Working style, division of labor, model rules and the current progress summary are in `.claude/workflow.md`; the wrap-up retro uses `.claude/skills/retro-cairn`.
+
+## Language
+
+- **Everything committed to this repository is English**: code comments, docs, specs, ADRs, skills, scripts' messages, test titles, commit messages, PR titles and bodies, issue text. Do not mix Chinese into English text, and do not add English lines to a Chinese document as a stopgap; translate the section you touch.
+- Exceptions: product UI text and its translations (Chinese source strings passed to `t()` and the i18n locale files), agent-facing prompt strings in product code, Chinese test fixtures and selectors that match that UI text, `README.zh.md`, and the generated `docs/feature-map.md` until its generator is translated. When prose has to name a Chinese UI label or a Chinese file path, quote it in backticks.
+- Conversation with the user follows the user's language; only repository content is English.
+- Machine check: `node scripts/english-only-gate.mjs` reds Chinese on added lines (prose in `.md` / `.yml`, comments in code files) and in commit messages of the branch, against `origin/main`. It runs in `pnpm prepush` for every change, including docs-only ones, and the `pr-evidence` check runs it on the PR body (`--text <file>`). Text inside backticks, fenced code blocks and HTML comments is not checked.
+- Legacy Chinese content is being translated in batches; until a file is translated, edits to it follow the rule above.
 
 ## Conversational Style
 
-- 技术散文。commit / issue / PR / 代码里**禁 emoji**。
-- 禁套话（"Thanks @user!"、"Great question"、"Sure thing"），直接回答。
-- 解释非平凡设计时按"问题 → 具体例子 / 短 trace → 方案；为何必要 vs 可选复杂度"四段走。
-- 用户提问时**先答问题，再动编辑**。
-- 同意/不同意用户反馈时先表态（"同意/不同意，因为 X"），再列改动。
+- Technical prose. **No emoji** in commits, issues, PRs or code.
+- No filler ("Thanks @user!", "Great question", "Sure thing"); answer directly.
+- When explaining a non-trivial design, use four parts: problem, then a concrete example or short trace, then the solution, then why it is necessary versus optional complexity.
+- When the user asks a question, **answer it first, then edit**.
+- When agreeing or disagreeing with user feedback, state the position first ("Agree / disagree, because X"), then list the changes.
 
 ## Code Quality
 
-- **缝纪律先于一切**：biome 的 `noRestrictedImports` 已经把 `@earendil-works/*`、`@modelcontextprotocol/sdk`、`simple-git`、`isomorphic-git`、`cron-parser` 锁死只能经薄桥模块消费。**改这些 import 路径前先看 `biome.json` 注释**（缝纪律 01 §5/§7.3 等条款）——改文件位置之前先校验 seam 是否仍然成立。
-- 改自己没完整读过的文件前先 Read；不要靠搜索片段做广义修改。
-- **注释纪律**：默认不写新注释，用命名和代码结构表达意图；仅允许解释浏览器 / 平台 bug、第三方怪癖等外部行为或公开 API 文档的注释。写给将来的补救或待办类注释违规，先修代码；机器检查见下方「注释检查」。存量注释不在清理范围。
-- 默认无 `any`；需要时写明 `any intentionally - <理由>`。
-- 单行 helper 且唯一调用点 → inline。
-- 外部包 API: bundled types → 读 `node_modules/<pkg>/dist/*.d.ts`; 仅 `@types/` → 读 `node_modules/@types/<pkg>/index.d.ts` + 同包 JS 源; 无类型 → 跑 `node -e` 或查 docs, 不靠记忆推。pnpm 仓顶层 node_modules 只挂直接依赖——路径不存在就去 `node_modules/.pnpm/<pkg>@<ver>/node_modules/<pkg>/`（本仓实测）。钉 `npm ls <pkg>` 版本。详 `~/.agents/wiki/wiki/外部包 API 事实源调研.md`。
-- **禁 inline import**（`await import()`、`import("pkg").Type`、动态类型导入）；top-level only。
-- `apps/daemon/src/backend/` 是 GitOps / MCP / LLM provider 缝；其它模块要把他们当成接口边界 import，不要从外部模块绕过去。
-- 移除"看起来是有意写的"功能或代码前**先问**。
+- **Seam discipline comes first**: biome's `noRestrictedImports` locks `@earendil-works/*`, `@modelcontextprotocol/sdk`, `simple-git`, `isomorphic-git` and `cron-parser` so they are consumed only through thin bridge modules. **Before changing those import paths, read the comments in `biome.json`** (seam discipline 01 §5/§7.3 and related clauses); before moving a file, check that the seam still holds.
+- Read a file in full before changing it; do not make broad edits based on search snippets.
+- **Comment discipline (no comments)**: do not write comments. Express intent through naming and code structure. Agents treat comments as license to patch around problems, and other agents copy them. Only two kinds may exist, written in English:
+  - external behavior the code cannot show: a browser or platform bug, a third-party quirk (for example `// Safari private mode throws on setItem`);
+  - documentation of a public API.
+  A comment that restates what the code does (for example `// --name defaults to hostname`), a to-do note, or a note about a future fix is a violation; fix the code instead. Legacy comments are being cleaned up in batches: comments that are not one of the two kinds above are **deleted, not translated**; surviving ones are translated to English. Machine check: see "Comment check" below.
+- No `any` by default; when needed, write `any intentionally - <reason>`.
+- A one-line helper with a single call site gets inlined.
+- External package APIs: bundled types → read `node_modules/<pkg>/dist/*.d.ts`; only `@types/` → read `node_modules/@types/<pkg>/index.d.ts` plus the package's JS source; no types → run `node -e` or check the docs; never rely on memory. In this pnpm repo the top-level node_modules only links direct dependencies; if the path does not exist, look in `node_modules/.pnpm/<pkg>@<ver>/node_modules/<pkg>/` (measured in this repo). Pin the version with `npm ls <pkg>`. Details: `~/.agents/wiki/wiki/外部包 API 事实源调研.md`.
+- **No inline imports** (`await import()`, `import("pkg").Type`, dynamic type imports); top-level only.
+- `apps/daemon/src/backend/` is the GitOps / MCP / LLM provider seam; other modules import it as an interface boundary and must not reach around it.
+- **Ask first** before removing a feature or code that looks intentional.
 
 ## Commands
 
-代码改动后（仅文档改动不跑）：
+After code changes (not for docs-only changes):
 ```sh
-pnpm lint       # biome ci . —— CI 视角
-pnpm format     # biome format --write . —— 不写文件就别跑
+pnpm lint       # biome ci . (the CI view)
+pnpm format     # biome format --write . (do not run unless you mean to write files)
 pnpm typecheck  # pnpm -r typecheck
-pnpm spec:parse # spec 解析闸（#1052）：只收集不执行、秒级，覆盖 apps/web/e2e + integration/test
+pnpm spec:parse # spec parse gate (#1052): collects without executing, seconds; covers apps/web/e2e + integration/test
 ```
-三类必须先通过才能提交。**别跑 `pnpm build`**（vite 全量；不值得 commit 前做）。
+All of these must pass before committing. **Do not run `pnpm build`** (full vite build; not worth it before a commit).
 
-测试规则（强制，分层职责正本 = `docs/spec/19-测试分层与受影响面.md`）：
-- **禁止写完实现再补 unit test**——要测就先于实现。
-- **E2E 为主**：复杂功能用真 e2e 验证能跑通；开发期跑受影响面——`pnpm --filter @cairn/web e2e:affected`（改 `src/ui` / styles / i18n / api / fixtures 等共享面时自动回落全量）。**全量 e2e 的执行点在 CI**（4 分片，覆盖面不降）；本地全量仅在收尾复核确需时跑——实测 617 用例 154s（不是旧口径的 1h+），但它是多 lane 内存压力的主力，别当日常。
-- unit 受影响面缩窄：`pnpm exec vitest run --changed`（vitest 5 原生，按 git 变更取 related 测试，跨 project 生效）。**别用 `vitest related --changed`**：`related` 把空的位置参数当作「已给定的源文件列表」，跳过 git 变更查找，恒选 0 个测试（2026-10-20 实测，源码见 `docs/spec/19` 同节）。
-- **先列失败方式，再写实现**：动某块系统前，先枚举它可能失败的所有场景，写代码是让场景通过的手段。
-- **e2e spec 文件合并/解冲突后必跑 `pnpm spec:parse` 验解析**（#1052 起有秒级闸：playwright `--list` 收集全部 web spec + integration tsc；M7 实战：typecheck 不覆盖 spec 语法，手工解冲突吞 `});` 到 EOF 才炸——typecheck 绿≠playwright 能解析）。
-- **机制类改动，验收取实物**：「X 生效了」的机制声称（CSS/动效、落盘/wire 格式、schema、shim 流量、判据字段）必须从**编译产物 / 运行时日志 / 快照套件 / 该形态运行时真值**上取实物；读源码、看配置、装好依赖都不算验收——声称→实物→实案路径表见 `.claude/skills/verify-cairn/SKILL.md`「机制生效验收:实物判据」（#656/#677、#735、#700 等六实例）。
+Testing rules (mandatory; the canonical layering is `docs/spec/19-测试分层与受影响面.md`):
+- **Do not write unit tests after the implementation**; if something gets a test, the test comes first.
+- **E2E first**: verify complex features with real e2e. During development run the affected set with `pnpm --filter @cairn/web e2e:affected` (it falls back to the full suite when shared surfaces change: `src/ui`, styles, i18n, api, fixtures). **The full e2e suite runs in CI** (4 shards, no coverage reduction); run it locally only when a final review really needs it. Measured: 617 cases in 154s (not the old 1h+ figure), but it is the main source of memory pressure across lanes, so do not run it routinely.
+- Narrow unit tests to the affected set with `pnpm exec vitest run --changed` (native in vitest 5; picks related tests from git changes, across projects). **Do not use `vitest related --changed`**: `related` treats the empty positional argument as "a given list of source files", skips the git change lookup and always selects 0 tests (measured 2026-10-20; source in the same section of `docs/spec/19`).
+- **List failure modes before implementing**: before touching a system, enumerate every way it can fail; the code exists to make those scenarios pass.
+- **After merging or resolving conflicts in e2e spec files, run `pnpm spec:parse`** (since #1052 there is a seconds-long gate: playwright `--list` collects every web spec plus integration tsc. M7 lesson: typecheck does not cover spec syntax, and a hand-resolved conflict that swallowed `});` to EOF only blew up later; green typecheck does not mean playwright can parse).
+- **For mechanism changes, accept on real artifacts**: a claim that "X takes effect" (CSS/animation, on-disk or wire format, schema, shim traffic, verdict fields) must be checked on the **compiled output / runtime log / snapshot suite / runtime truth of that form**; reading source, reading config, or having installed dependencies is not acceptance. The claim → artifact → case table is in `.claude/skills/verify-cairn/SKILL.md`, section `机制生效验收:实物判据` (six cases including #656/#677, #735, #700).
 
-跑验证服务（port 与 dist/ 互斥）：
-- `dev:web` / `dev:server` / `dev:daemon` ——dev server，端口 `5173` / `8787`。vite 带 `strictPort`——撞端口即启动失败，不静默顺延到下一个空闲口（顺延才是危险的：proxy 目标不变，界面会去驱动持有该端口的别的栈）。覆写：`CAIRN_DEV_WEB_PORT` / `CAIRN_DEV_SERVER_PORT`。
-- **E2E_PORT** 默认 8399——跑前先 `lsof -iTCP:8399` 查占用，占用的是别的车道**不能杀**，换端口。**`e2e:affected` 默认走 8398**（`E2E_AFFECTED_PORT` 覆写，显式 `E2E_PORT` 优先）——与全量分道，同款撞端口纪律。
-- **同 worktree 内不要并跑两个 playwright**——`vite build --mode fixture` 写同一个 `dist/`，会互踩。跨 worktree 各用各的 dist 无碍。
+Running verification servers (ports and `dist/` are exclusive):
+- `dev:web` / `dev:server` / `dev:daemon`: dev servers on ports `5173` / `8787`. vite uses `strictPort`, so a taken port fails startup instead of silently moving to the next free port (moving is the dangerous case: the proxy target stays the same and the UI ends up driving another stack that owns the port). Overrides: `CAIRN_DEV_WEB_PORT` / `CAIRN_DEV_SERVER_PORT`.
+- **E2E_PORT** defaults to 8399. Check it first with `lsof -iTCP:8399`; if another lane holds it, **do not kill it**, use another port. **`e2e:affected` defaults to 8398** (override with `E2E_AFFECTED_PORT`; an explicit `E2E_PORT` wins), separate from the full suite, same port discipline.
+- **Do not run two playwright instances in the same worktree**: `vite build --mode fixture` writes the same `dist/` and they clobber each other. Separate worktrees each have their own dist and are fine.
 
-注释检查：`node scripts/comment-discipline-gate.mjs` 对比 `origin/main`，只检查 `apps/`、`packages/` 下 ts / tsx / mjs / css 的新增独立注释行及块注释续行。例外在 `scripts/comment-discipline-allowlist.json` 按 `path`、完整 `line`、`reason` 登记，仅用于外部怪异行为或公开 API 文档。CI 独立 advisory job 报红，暂不列为必需检查。
+Comment check: `node scripts/comment-discipline-gate.mjs` compares against `origin/main` and checks only added standalone comment lines and block-comment continuation lines in ts / tsx / mjs / css files under `apps/` and `packages/`. Exceptions are registered in `scripts/comment-discipline-allowlist.json` by `path`, full `line` and `reason`, and only for external quirks or public API docs. It runs as a separate advisory CI job and is not yet a required check.
 
-派活给 Codex / Grok / pi 时，使用 `docs/agent-dispatch-prompts.md`，提示必须包含：「不写新注释；用命名和代码结构表达意图，例外遵循仓库注释纪律。」
+When dispatching work to Codex / Grok / pi, use `docs/agent-dispatch-prompts.md`. The prompt must include: "Do not write comments; express intent through naming and code structure; exceptions follow the repository comment discipline. Write all repository content in English."
 
-## 错误台账
+## Lessons ledger
 
-任务中犯错并修好后，当轮按 `docs/lessons.md` 的格式新增或更新一行；同类错误合并，lane 冲突按类别合并。按台账阶梯取最高可行级，能落机器检查就落机器检查；新闸必须用真实失误做负对照，确认旧错变红、修正后变绿。
+When you make a mistake during a task and fix it, add or update a row in `docs/lessons.md` in its format in the same round; merge errors of the same kind, and merge lane conflicts by category. Take the highest feasible level on the ledger ladder; if a machine check is possible, add one. A new gate must use the real mistake as a negative control: confirm the old error goes red and the fix goes green.
 
-推送前运行 `pnpm prepush`，按改动路径执行检查；纯文档跳过代码检查。CI 使用同一入口，dead-class 保持独立咨询性检查，全量 E2E 保持四分片。
+Run `pnpm prepush` before pushing; it selects checks by changed paths, and docs-only changes skip code checks (the language gate still runs). CI uses the same entry point; dead-class stays a separate advisory check, and full e2e stays in four shards.
 
 ## Dependencies & Install Security
 
-- 锁文件 `pnpm-lock.yaml`：**入 commit 前先确认**——除非是依赖变更伴随的合法 lockfile diff，否则视为误操作（`git reset pnpm-lock.yaml` 退出 staging）。已获授权的合法改动，过闸唯一出口是 `CAIRN_ALLOW_LOCKFILE_CHANGE=1 git commit ...`（对齐 pi 的 `PI_ALLOW_LOCKFILE_CHANGE`，接受 `1`/`true`/`yes`）；pre-commit 锁文件闸不提供其它出口。
-- 本地 `pnpm install`；CI 用 `pnpm install --frozen-lockfile`。
-- 引入第三方包前先看 `biome.json` 的禁列：simple-git / isomorphic-git 等已被缝纪律取代，**不要再装**。
-- 不跑 postinstall 脚本除非用户明确允许。
+- Lockfile `pnpm-lock.yaml`: **confirm before committing it**. Unless it is the legitimate lockfile diff that comes with a dependency change, treat it as a mistake (`git reset pnpm-lock.yaml` to unstage). For an authorized legitimate change, the only way past the gate is `CAIRN_ALLOW_LOCKFILE_CHANGE=1 git commit ...` (matching pi's `PI_ALLOW_LOCKFILE_CHANGE`; accepts `1`/`true`/`yes`); the pre-commit lockfile gate offers no other exit.
+- `pnpm install` locally; CI uses `pnpm install --frozen-lockfile`.
+- Before adding a third-party package, check the deny list in `biome.json`: simple-git / isomorphic-git and similar are replaced by seam discipline; **do not install them again**.
+- Do not run postinstall scripts unless the user explicitly allows it.
 
 ## Git
 
-仓库单 remote：`origin = xiechimon/cairn`（正主，开 PR 去这里）。曾挂的 upstream（craft-ai-agents/craft-agents-oss，项目起步时的借鉴来源）已于 2026-09-29 移除，勿再加回。
+The repository has one remote: `origin = xiechimon/cairn` (the canonical repo; open PRs here). The former upstream (craft-ai-agents/craft-agents-oss, a reference source when the project started) was removed on 2026-09-29; do not add it back.
 
-Commit 约定：
-- 格式：`<scope>(<ticket>): <subject>` 或 `web(<PR>): <subject>`——scope 跟现有节奏（`web` / `daemon` / `server` / `shared` / `integration` / `docs` / `chore` 等）；subject 短、要点。
-- PR 编号或 issue 编号挂末尾：`(#123)` PR 号。
-- **关票关键字写进 commit message，不是 PR body**：结尾一行 `closes #N`（多 issue 用 `closes #N1, closes #N2`，不能合并写）。squash 合并只把 **commit message** 带进 main，PR body 根本不进 commit——关键字只写在 PR body 里等于没写，票会留着 OPEN（477/478/479/480 四票全中，2026-09-30 又中 #487/#488）。对照实测（2026-09-30 #495）：PR body 一个关键字都不写、只写进 commit message，合并即自动 CLOSED/COMPLETED。开 PR 前先在 commit message 收尾这一行。
-- **否定句里的关票关键字照样生效**：GitHub 的关键字解析器**不认否定词**。写成「不 closes #417」这种否定句，仍然会在合并落地时把 #417 关掉——2026-09-30 实测：Map #417 就是被 PR #522 的 squash 提交这样关掉的（timeline 把 closed 事件挂在该 commit 上），写那句话的本意恰恰是「声明不要关它」。要表达「本 PR 不关某票」，**去掉那个动词**：写「不关闭 #417」或「本 PR 与 #417 无关」，并确认整个 commit message 里没有任何「关票关键字 + 票号」的形态。同上一条，这条也只在 commit message 通道上生效，PR body 不进 commit。
-- **只 commit 自己改过的文件**。`git add <path1> <path2>` 显式路径，**禁 `git add -A` / `git add .`**——同 cwd 可能多个 lane 并行（agent / 人类）。例外：merge 落盘（解决冲突后的 merge commit）语义上是全量 stage，允许 `git commit --no-edit` 完成 merge 而不再 add（merge 状态自带 index）；手工模拟 merge 落普通 commit 不在此例。
-- 永远别 `git commit --no-verify`。
-- 被 pre-commit 闸拦下、且改动确属有意时，唯一放行出口是该闸的显式环境变量：锁文件闸 `CAIRN_ALLOW_LOCKFILE_CHANGE=1`、禁词闸 `CAIRN_ALLOW_BANNED_VOCAB=1`（均接受 `1`/`true`/`yes`）；不提供其它出口。
+Commit conventions:
+- Format: `<scope>(<ticket>): <subject>` or `web(<PR>): <subject>`. Scope follows existing usage (`web` / `daemon` / `server` / `shared` / `integration` / `docs` / `chore`, etc.); the subject is short and to the point, in English.
+- Append the PR or issue number at the end: `(#123)` for a PR.
+- **Closing keywords go in the commit message, not the PR body**: end with a line `closes #N` (for several issues write `closes #N1, closes #N2`; they cannot be combined). A squash merge carries only the **commit message** into main; the PR body never enters the commit, so a keyword only in the PR body does nothing and the issue stays OPEN (477/478/479/480 all hit this; again #487/#488 on 2026-09-30). Control measurement (2026-09-30, #495): with no keyword in the PR body and the keyword only in the commit message, the merge closed the issue as COMPLETED. Add the line to the commit message before opening the PR.
+- **Closing keywords in a negated sentence still fire**: GitHub's keyword parser **ignores negation**. A sentence like "does not closes #417" still closes #417 when the merge lands. Measured 2026-09-30: Map #417 was closed this way by the squash commit of PR #522 (the timeline attaches the closed event to that commit), when the sentence was meant to say "do not close it". To say "this PR does not close an issue", **drop the verb**: write "unrelated to #417", and make sure no "closing keyword + issue number" shape appears anywhere in the commit message. As above, this only applies on the commit message channel; the PR body does not enter the commit.
+- **Commit only files you changed**. Use explicit paths, `git add <path1> <path2>`; **never `git add -A` / `git add .`**, because several lanes (agents or humans) may share the same cwd. Exception: a merge commit after resolving conflicts stages everything by nature, so `git commit --no-edit` may finish the merge without another add (the merge state carries its own index); a hand-simulated merge committed as a normal commit is not covered.
+- Never `git commit --no-verify`.
+- When a pre-commit gate blocks an intentional change, the only exit is that gate's explicit environment variable: lockfile gate `CAIRN_ALLOW_LOCKFILE_CHANGE=1`, banned-vocabulary gate `CAIRN_ALLOW_BANNED_VOCAB=1` (both accept `1`/`true`/`yes`); there is no other exit.
 
-- **验收必核 PR body 的证据 raw 永久链**：合并前 grep body 含 `raw.githubusercontent` 指向本分支 `docs/verify/<票号>/`；缺失 = 打回补齐（2026-10-13 #1297/#1294 双漏实测：lane 没交证据、编排者验收只看了闸）。
-- **squash 合并的 subject/body 取全量 commit message**：`gh pr view --json commits` 的 `messageHeadline` 是**截断首行**（带省略号），拿它当 `--subject` 会把截断行落进 main。取法 = REST：`gh api repos/xiechimon/cairn/pulls/<n>/commits -q '.[0].commit.message'` 再拆首行/余行（2026-10-13 #1289 实测：subject 落成「…claude-code m…」）。
+- **Acceptance must check the PR body's permanent raw evidence links**: before merging, grep the body for `raw.githubusercontent` links pointing at this branch's `docs/verify/<ticket>/`; if missing, send it back (measured 2026-10-13 on #1297/#1294: the lane did not submit evidence and the orchestrator only looked at the gates).
+- **The squash subject/body comes from the full commit message**: `messageHeadline` in `gh pr view --json commits` is a **truncated first line** (with an ellipsis); using it as `--subject` lands the truncated line in main. Use REST instead: `gh api repos/xiechimon/cairn/pulls/<n>/commits -q '.[0].commit.message'`, then split the first line from the rest (measured 2026-10-13 on #1289: the subject landed as "…claude-code m…").
 
-Worktree（cairn 是多 lane 设计，所以特别强调）：
-- **建 worktree 必须绝对路径**。`git worktree add /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/<name>`。相对路径 + cwd 漂移（heredoc / cd 改变 cwd 后）会把 worktree 嵌进 `apps/web/src/.claude/worktrees/`，vite watcher 撞上去触发 reload 风暴拖死 dev server。
-- 切 lane 时从 `origin/main` 切（本地 main 常落后）；PR 合并顺序撞上，GitHub 报 CLEAN 才合，冲突 rebase 重验。
-- **半场交接必 commit**（M7 实战踩坑）：同一 worktree 换施工者（主线↔lane 或 lane↔lane）前，把手头改动 commit 落盘——未 commit 的解法会被下一手的 merge --abort / merge 尝试现场覆盖，对象不可恢复（05 册 M7 合并期 #309 位实测丢失一轮 drizzle 解法）。
-- **drizzle migration 撞号纪律**：并发票都加表时序号必撞。序号永远以**合并时点** main 的尾部为准，lane 施工期不占固定号（票面不写死序号），合并期冲突时重编到 main 尾部+1。
+Worktrees (cairn is designed for many lanes, hence the emphasis):
+- **Create worktrees with absolute paths**: `git worktree add /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/<name>`. A relative path plus cwd drift (after a heredoc or `cd`) nests the worktree inside `apps/web/src/.claude/worktrees/`, where the vite watcher triggers a reload storm that kills the dev server.
+- Branch lanes from `origin/main` (local main is often behind). When PRs collide on merge order, merge only when GitHub reports CLEAN; on conflict, rebase and re-verify.
+- **Commit before handing off mid-task** (an M7 lesson): before a worktree changes hands (main line ↔ lane or lane ↔ lane), commit what you have. Uncommitted work gets overwritten by the next person's `merge --abort` or merge attempt and cannot be recovered (during the M7 merge phase, one round of drizzle conflict resolution for #309 was lost this way).
+- **Drizzle migration numbering**: concurrent tickets that add tables will collide on sequence numbers. The number is always taken from the tail of main **at merge time**; lanes do not reserve a fixed number during development (tickets do not hard-code it), and on conflict at merge time renumber to main's tail + 1.
 
-Git 拦截（autoresearch / pre-commit 共识）：
-- `git reset --hard` / `git checkout .` / `git clean -fd` / `git stash` ——**别跑**，会砸 lane 同事的活。
-- `git branch -D` / `git restore` 在 autoresearch loop 内会被 hook 拦——绕法：`git branch -d` / `git worktree remove --force`。
-- 永远别 `--force push`。
+Git blocks (shared by autoresearch and pre-commit):
+- `git reset --hard` / `git checkout .` / `git clean -fd` / `git stash`: **do not run**; they destroy other lanes' work.
+- `git branch -D` / `git restore` are blocked by a hook inside the autoresearch loop; use `git branch -d` / `git worktree remove --force` instead.
+- Never `--force` push.
 
 ## Issues and PRs
 
-**写 PR body 一律走 `.claude/skills/pr-cairn/SKILL.md` 照做**（本仓六节契约 What/Verified/Upstream/Risk/Acceptance/Issues；`pr-evidence` 闸按字面小节名查）。**全局 `/pr` 技能（show-me 三节 Summary/Evidence/Merge Danger）在本仓过不了闸**——同名时个人级 skill 优先级压过项目级，仓里没法接管 `pr` 这个名字，所以本仓正本叫 `pr-cairn`（#1110，四条 lane 撞同一坑后定）。
+**Write PR bodies by following `.claude/skills/pr-cairn/SKILL.md`** (this repo's six-section contract What/Verified/Upstream/Risk/Acceptance/Issues; the `pr-evidence` gate checks the literal section names). **The global `/pr` skill (show-me's three sections Summary/Evidence/Merge Danger) does not pass the gate here.** A personal skill with the same name takes precedence over a project skill and the repo cannot take over the name `pr`, so the canonical skill here is `pr-cairn` (#1110, decided after four lanes hit the same trap).
 
-**开 PR 前先跑 `/code-review` 自审**（Skill `code-review`，审本分支相对 `origin/main` 的 diff）：确认的发现先修再开 PR；判定不修的，在 PR body 的 Risk 节写一句理由。PR 期间推送代码修复后、合并前再跑一次。新增或重写较多代码（新文件、重构、大段新逻辑）时，接着跑 `/simplify`。仅文档改动不跑。仓库闸和 e2e 全绿不等于没问题：#1412（2026-10-20）闸与全量 e2e 都过了，`code-review` 仍查出三处要修的：新 spec 没进 `e2e-affected` 的家族表、`drive-stop` 的「开始」选择器被新芯片词「待开始」误命中、queued 芯片语义错。
+**Run `/code-review` on your own branch before opening a PR** (Skill `code-review`, reviewing this branch's diff against `origin/main`): fix confirmed findings before opening the PR; for findings you decide not to fix, write a one-line reason in the PR body's Risk section. Run it again after pushing code fixes during the PR and before merging. When adding or rewriting a lot of code (new files, refactors, large new logic), follow up with `/simplify`. Skip both for docs-only changes. Green gates and green e2e do not mean the change is fine: on #1412 (2026-10-20) the gates and the full e2e suite passed, and `code-review` still found three things to fix: a new spec missing from the `e2e-affected` family table, the `drive-stop` "start" selector (`开始`) falsely matching the new chip word `待开始`, and wrong queued-chip semantics.
 
-**碰安全敏感面时加跑 `/security-review`**（Skill `security-review`）：diff 改到下列任一处，开 PR 前在 `/code-review` 之外再跑一次。确认的发现先修；判定不修的，在 PR body 的 Risk 节写理由，并在 PR 里点名请用户确认，不能自行放过。
-- 密钥与加密：`apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`、`apps/server/src/services/{secrets,credentials,api-keys,webhook-tokens,oauth}.ts`
-- 机器注册与下发协议：`apps/server/src/routes-machine.ts`、`apps/server/src/services/machine*.ts`、`apps/daemon/src/{credentials,secret-channel,shell-channel,machine-client}.ts`、`apps/daemon/src/backend/command-gate.ts`
-- MCP 鉴权与外部入口：`apps/server/src/services/{mcp-face,mcp-servers}.ts`、`apps/server/src/routes-webhook.ts`
+**Also run `/security-review` when touching security-sensitive surfaces** (Skill `security-review`): if the diff touches any of the following, run it before opening the PR in addition to `/code-review`. Fix confirmed findings; for findings you decide not to fix, write the reason in the PR body's Risk section and ask the user by name in the PR to confirm; do not let it through on your own.
+- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,webhook-tokens,oauth}.ts`
+- Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,shell-channel,machine-client}.ts`, `apps/daemon/src/backend/command-gate.ts`
+- MCP auth and external entry points: `apps/server/src/services/{mcp-face,mcp-servers}.ts`, `apps/server/src/routes-webhook.ts`
 
-**合并前的人类裁决用标签表达，不用聊天**：凡要问用户任何关于某 PR 的问题（验收措辞、冲突取舍、要不要合），按这个顺序做完再问：`gh pr merge <n> --disable-auto`（同步生效，先关扳机）→ `gh pr edit <n> --add-label needs-decision`。`pr-evidence` 是 main 的必需检查（钉 GitHub Actions app）：见到这个标签即红，标签在身时每次 run 都会解除该 PR 的 auto-merge（含有人重新挂上的那次）；Acceptance 有未勾项时它也会自己加上这个标签。摘标签是人的动作：在 GitHub 上摘，或用户在聊天里给了裁决后由 agent 带前缀 `CAIRN_DECIDED=1` 摘（本机 PreToolUse hook 否则拦，`gh pr merge --admin` 没有出口）；摘掉后 auto-merge 要重新 `gh pr merge <n> --squash --auto`。改 body 让闸变绿不等于裁决落了：标签还在就还是红。来由：2026-10-21 #1435 在用户裁决未落时被 auto-merge 合入——编排者自己把 Acceptance 勾绿去问用户，而 pr-evidence 那时只是咨询性检查。
+**Human decisions before a merge are expressed with a label, not in chat**: before asking the user anything about a PR (acceptance wording, conflict trade-offs, whether to merge), do these in order: `gh pr merge <n> --disable-auto` (takes effect synchronously; disarm first) → `gh pr edit <n> --add-label needs-decision`. `pr-evidence` is a required check on main (pinned to the GitHub Actions app): it goes red when it sees this label, and while the label is on, every run disarms the PR's auto-merge (including when someone re-arms it); it also adds the label itself when Acceptance has unchecked items. Removing the label is a human action: on GitHub, or by an agent with the prefix `CAIRN_DECIDED=1` after the user gave the decision in chat (otherwise the local PreToolUse hook blocks it; `gh pr merge --admin` is no way out). After removal, re-arm auto-merge with `gh pr merge <n> --squash --auto`. Editing the body to turn the gate green is not the decision landing: while the label is on, the check stays red. Origin: on 2026-10-21 #1435 was auto-merged before the user's decision landed; the orchestrator had checked the Acceptance boxes itself while asking the user, and pr-evidence was only advisory then.
 
-**审 PR 走 `docs/pr-review.md`**（#1080）：五步流程 + 固定六节评分卡（What it does / Good / Bad / Ugly / Tests / Open questions）。其中「**不切分支看 diff**」是硬要求——`gh pr view` / `gh pr diff` / `gh api` / `git show <ref>:<path>`，绝不 `gh pr checkout`：本仓多车道并行、各占独立 worktree，评审者一 checkout 就撞别的 lane 的现场。唯一例外是 `pr-gate` workflow 的证据维度及其反驳者：只在各自的独立 worktree 里（绝不在共享 clone），关掉钩子 `git -c core.hooksPath=/dev/null checkout --detach <headSha>`，fork 来的 head 不 checkout，见 `docs/pr-review.md`「例外：`pr-gate` workflow」。
+**Review PRs with `docs/pr-review.md`** (#1080): a five-step process plus a fixed six-section scorecard (What it does / Good / Bad / Ugly / Tests / Open questions). "**Read the diff without switching branches**" is a hard requirement: use `gh pr view` / `gh pr diff` / `gh api` / `git show <ref>:<path>`, never `gh pr checkout`. Many lanes run in parallel here, each in its own worktree, and a reviewer's checkout collides with another lane's state. The only exception is the evidence dimension of the `pr-gate` workflow and its refuter: only in their own separate worktrees (never in the shared clone), with hooks off via `git -c core.hooksPath=/dev/null checkout --detach <headSha>`, and never checking out a head from a fork; see the `pr-gate` exception section in `docs/pr-review.md`.
 
-仓库只有 origin（xiechimon/cairn），裸 `gh` 命令解析正确；显式 `-R xiechimon/cairn` 写法仍可用：
+The repository has only origin (xiechimon/cairn), so bare `gh` commands resolve correctly; the explicit `-R xiechimon/cairn` form still works:
 - `gh issue list -R xiechimon/cairn`
 - `gh pr view 149 -R xiechimon/cairn`
-- `gh repo view` 不支持 `-R`——用位置参数：`gh repo view xiechimon/cairn`
+- `gh repo view` does not support `-R`; use the positional argument: `gh repo view xiechimon/cairn`
 
-Worktree 车道开 PR：
+Opening a PR from a worktree lane:
 ```sh
 gh pr create --repo xiechimon/cairn --head xiechimon:<branch>
 ```
-裸 `--head <branch>` 曾在双 remote 时期报 `Head sha can't be blank`（worktree + 多 remote 下 head ref 解析走偏）；现单 remote 未复验，继续用全限定写法最稳。已误开裸 body 的 PR 用 `gh pr edit <n> --title --body-file /tmp/pr.md` 补全。
+A bare `--head <branch>` once failed with `Head sha can't be blank` in the two-remote era (head ref resolution went wrong with worktrees and multiple remotes); it has not been re-tested with a single remote, so keep the fully qualified form. Fix a PR opened with an empty body with `gh pr edit <n> --title --body-file /tmp/pr.md`.
 
-PR body / 长 issue 评论：**写临时文件再 `--body-file`**，不内联 `--body` 多行 markdown。
-- **改完回读**：`gh pr edit <n> --body-file ...` 会被 gh 的 Projects-classic GraphQL 报错打断且**不生效**（#550 实测：命令报错、body 仍是旧的）。改走 `gh api -X PATCH repos/xiechimon/cairn/pulls/<n> --input -`（JSON 由脚本生成，避开 shell 转义），写完用 `gh pr view <n> --json body` 拉回逐字节比对。
-- **要进 PR 的截图/证据必须提交到分支**：Multica 的附件 URL 对匿名读者不可读（`static.multica.ai/...` → `403 MissingKey`、`/api/attachments/<id>/download` → `401`），直接嵌进 PR body 只会渲染成碎图；而 PR body 只能嵌 URL，本地文件没有 URL。故按既有约定提交到任务分支的 `docs/verify/<票号>/`，body 引 `https://raw.githubusercontent.com/xiechimon/cairn/<sha>/<path>`（repo public，raw 匿名可读）。本地留副本只是保底，不是通路。
+PR bodies and long issue comments: **write a temporary file and use `--body-file`**; do not inline multi-line markdown in `--body`.
+- **Read back after editing**: `gh pr edit <n> --body-file ...` can be interrupted by gh's Projects-classic GraphQL error and **not apply** (measured on #550: the command errored and the body stayed old). Use `gh api -X PATCH repos/xiechimon/cairn/pulls/<n> --input -` instead (JSON generated by a script to avoid shell escaping), then pull it back with `gh pr view <n> --json body` and compare byte for byte.
+- **Screenshots and evidence for a PR must be committed to the branch**: Multica attachment URLs are not readable anonymously (`static.multica.ai/...` → `403 MissingKey`, `/api/attachments/<id>/download` → `401`), so embedding them in a PR body renders broken images; and a PR body can only embed URLs, which local files do not have. By convention, commit them to the task branch under `docs/verify/<ticket>/` and reference `https://raw.githubusercontent.com/xiechimon/cairn/<sha>/<path>` in the body (the repo is public; raw is anonymously readable). A local copy is only a backup, not a channel.
 
 ## User Override
 
-本文件规则在用户指令冲突时可覆写——但**必须先得到用户显式确认**（"我同意打破 No X 规则，因为 Y"），再执行。仅执行确认过的部分。
+The rules in this file can be overridden when they conflict with a user instruction, but **only after explicit user confirmation** ("I agree to break the No X rule because Y"). Carry out only the confirmed part.

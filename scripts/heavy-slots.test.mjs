@@ -425,7 +425,7 @@ test('prepush queues for a slot in local mode and starts once the holder is kill
       { cwd: repo, stdio: 'pipe' },
     );
   try {
-    for (const file of ['prepush.mjs', 'heavy-slots.mjs'])
+    for (const file of ['prepush.mjs', 'heavy-slots.mjs', 'english-only-gate.mjs'])
       copyFileSync(join('scripts', file), join(repo, 'scripts', file));
     git('init');
     writeFileSync(join(repo, 'README.md'), 'first\n');

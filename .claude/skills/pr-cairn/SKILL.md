@@ -114,7 +114,10 @@ not carry the closing keyword for the parent ticket.
   compare.
 - Image links must be the embedded `![label](url)` form and must not sit
   inside fenced code blocks — a link in a fence renders nowhere.
-- Bodies are in English.
+- Bodies are in English, with no Chinese mixed in. Quote a Chinese UI label
+  or file path in backticks. The pr-evidence check runs
+  `node scripts/english-only-gate.mjs --text <body>` and reds otherwise;
+  run it locally on `/tmp/pr.md` before opening.
 - Asking the user anything about an open PR: first `gh pr merge <n> --disable-auto`, then `gh pr edit <n> --add-label needs-decision`, then ask. The gate is red while the label is on and disarms auto-merge on every run until a person removes the label (an agent may remove it only after the user decided in chat, with the `CAIRN_DECIDED=1` prefix). Editing the body green does not clear the label.
 - Arm auto-merge (`gh pr merge <n> --squash --auto`) only on a PR whose Acceptance is fully checked and that carries no `needs-decision` label; an unchecked item adds the label and disarms auto-merge on its own.
 
@@ -126,3 +129,4 @@ not carry the closing keyword for the parent ticket.
 | image links embedded + HTTP 200 | pr-evidence (required check) |
 | Acceptance carries >=1 task-list item, all checked | pr-evidence (required check, pr-tasks step) |
 | no `needs-decision` label on the PR (a person's decision is pending) | pr-evidence (required check); while the label is on, each run also disarms auto-merge, and an unchecked Acceptance item adds the label |
+| body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |

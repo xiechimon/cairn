@@ -120,7 +120,7 @@ jobs:
         run: pnpm prepush --ci
 
       - name: Prepush self-test
-        run: node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs
+        run: node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs
 
       # verify-cairn 入口自测（#1402）：vp.mjs 的分派、证据、capture、links 与归档
       # 规则。drive 多走 --dry-run；要真跑的几条在自建的 skill 副本里配桩探针跑，
