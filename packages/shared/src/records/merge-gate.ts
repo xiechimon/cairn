@@ -129,6 +129,57 @@ export const MERGE_GATE_SOURCE_GLOBS = [
   'apps/daemon/src/merge-decision.ts',
 ] as const;
 
+const CHIEF_DISPATCH_DIR = 'integration/eval/chief-dispatch';
+
+export const CHIEF_DISPATCH_HARNESS_PATHS = [
+  `${CHIEF_DISPATCH_DIR}/stack.mts`,
+  'apps/daemon/src/backend/pi.ts',
+  'apps/server/src/services/chief-tools.ts',
+  'packages/shared/src/protocol/chief-tools.ts',
+  `${CHIEF_DISPATCH_DIR}/grade.mts`,
+  '.claude/hillclimb/chief-dispatch/cases.json',
+  'apps/server/src/services/chief.ts',
+  `${CHIEF_DISPATCH_DIR}/repo-seed/.github/workflows/ci.yml`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/CHANGELOG.md`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/Dockerfile`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/README.md`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/daemon/package.json`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/server/README.md`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/server/package.json`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/server/src/auth.ts`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/server/src/export.ts`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/server/src/routes.ts`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/server/src/search.ts`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/server/src/tasks.ts`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/server/src/todos.ts`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/web/README.md`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/web/package.json`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/web/src/board.tsx`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/web/src/export-button.tsx`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/web/src/login.tsx`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/apps/web/src/theme.ts`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/docs/api.md`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/docs/deploy.md`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/docs/index.md`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/docs/usage.md`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/package.json`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/packages/shared/README.md`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/packages/shared/package.json`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/packages/shared/src/protocol.ts`,
+];
+
+export const CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER = 0.924;
+
+export const HARNESS_REGRESSION_RESULT_NAME = 'harness-regression.json';
+
+export const harnessRegressionResultSchema = z.object({
+  patchDigest: z.string().min(1),
+  harness_sha: z.string().regex(/^[0-9a-f]{64}$/),
+  decision_ok: z.number().finite().min(0).max(1),
+  trace_digest: z.string().regex(/^[0-9a-f]{64}$/),
+});
+export type HarnessRegressionResult = z.infer<typeof harnessRegressionResultSchema>;
+
 /** compare 接口 files[].status 的取值（GitHub REST「Compare two commits」）。 */
 export const COMPARE_FILE_STATUSES = [
   'added',
@@ -234,6 +285,21 @@ export const MERGE_BLOCKERS = [
   },
   { code: 'evidence-outside-ticket', class: 'human', label: '改动了别的票的证据目录' },
   { code: 'evidence-executable', class: 'human', label: '证据目录里新增或改动了可执行文件' },
+  {
+    code: 'harness-regression-missing',
+    class: 'human',
+    label: '改了 harness 但缺少绑定当前补丁的回归评测结果',
+  },
+  {
+    code: 'harness-regression-stale',
+    class: 'human',
+    label: '回归评测结果绑定的补丁摘要不是当前补丁',
+  },
+  {
+    code: 'harness-regression-below-threshold',
+    class: 'human',
+    label: '回归评测 decision_ok 低于基线置信区间下限',
+  },
   // 来源与证据
   { code: 'issue-ref-missing', class: 'human', label: '任务来源解不出 issue 号' },
   {
@@ -297,6 +363,7 @@ for (const value of [
   AUTO_MERGE_PATH_GLOBS,
   PROTECTED_PATH_GLOBS,
   MERGE_GATE_SOURCE_GLOBS,
+  CHIEF_DISPATCH_HARNESS_PATHS,
   COMPARE_FILE_STATUSES,
   BLOCKER_CLASSES,
   ...MERGE_BLOCKERS,
