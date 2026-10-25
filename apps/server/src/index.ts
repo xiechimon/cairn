@@ -8,7 +8,13 @@ import { serve } from '@hono/node-server';
 import pino from 'pino';
 import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
-import { attachmentsDirOf, loadConfig, reposDirOf, warnInsecureBind } from './config.js';
+import {
+  attachmentsDirOf,
+  loadConfig,
+  missingRequiredTokenError,
+  reposDirOf,
+  warnInsecureBind,
+} from './config.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
@@ -30,6 +36,12 @@ const logger = pino({
     ? {}
     : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } } }),
 });
+
+const refusal = missingRequiredTokenError(config);
+if (refusal !== null) {
+  logger.fatal(refusal);
+  process.exit(1);
+}
 
 const { db, close } = openDbWithHandle(config.dbPath, { legacyExportDir: config.homeDir });
 // keyfile 首启生成（0600）；丢失再生成 = 存量密文报废需重录（02 §8 护栏，

@@ -52,6 +52,7 @@ export const serverConfigSchema = z.object({
   /** 可选 token 鉴权（#251，06 册 D8）：env ENV_VARS.token 设 = 开、未设/
    *  空串 = null 关（默认，行为与现状一致）。 */
   authToken: z.string().nullable(),
+  requireToken: z.boolean(),
   /** HTTP 绑定主机（env HOST，PORT 同款通用基建位不进品牌槽）；null = 默认
    *  绑定（node 缺省 = 全接口）。显式 `0.0.0.0`/`::` 且鉴权关 → 启动 WARN
    *  （insecureBindWarning，#251 验收面 6）。 */
@@ -147,6 +148,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
         ? { clientId: oauthId, clientSecret: oauthSecret }
         : null,
     authToken: envStr(ENV_VARS.token),
+    requireToken: envFlag(ENV_VARS.requireToken),
     host: envStr('HOST'),
     mcpConfigPath: resolve(
       process.env[ENV_VARS.mcpConfig] || join(homedir(), CLAUDE_CONFIG_FILE_NAME),
@@ -164,6 +166,11 @@ export function insecureBindWarning(config: ServerConfig): string | null {
   if (config.authToken !== null) return null;
   if (config.host === null || !ANY_INTERFACE_HOSTS.has(config.host)) return null;
   return `绑定 ${config.host}（全网卡可达）且 ${ENV_VARS.token} 未设——API 面裸奔于所有网络接口；设 ${ENV_VARS.token}=<token> 开启 Bearer 鉴权，或 HOST=127.0.0.1 收回本机`;
+}
+
+export function missingRequiredTokenError(config: ServerConfig): string | null {
+  if (!config.requireToken || config.authToken !== null) return null;
+  return `${ENV_VARS.requireToken} 已开但 ${ENV_VARS.token} 未设或为空——拒绝启动；设 ${ENV_VARS.token}=<随机长串>（例如 openssl rand -hex 32）后重启`;
 }
 
 /** 入口接线（index.ts 启动段唯一调用点）：警示行经 logger.warn 落日志。

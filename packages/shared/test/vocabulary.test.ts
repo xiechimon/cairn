@@ -470,6 +470,7 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
       githubOauthClientId,
       githubOauthClientSecret,
       token,
+      requireToken,
       mcpConfig,
       skillsDir,
       customModelReasoning,
@@ -489,6 +490,7 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
     expect(githubOauthClientId).toBe('CAIRN_GITHUB_OAUTH_CLIENT_ID');
     expect(githubOauthClientSecret).toBe('CAIRN_GITHUB_OAUTH_CLIENT_SECRET');
     expect(token).toBe('CAIRN_TOKEN');
+    expect(requireToken).toBe('CAIRN_REQUIRE_TOKEN');
     expect(mcpConfig).toBe('CAIRN_MCP_CONFIG');
     // spec 13 #367 / spec 14 #371 自有面 [设计]：技能根目录覆写（缺省
     // SKILLS_DIR_DEFAULT）
