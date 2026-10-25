@@ -141,10 +141,16 @@ function NeedsYouStrip({
           if (face.kind !== 'attention') return null;
           const attention = ATTENTION[face.need];
           return (
-            <div key={todo.id} className="flex min-h-14 items-center gap-3 px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-ui text-foreground">{todo.title}</div>
-                <div className="truncate text-meta text-content-tertiary">
+            <div
+              key={todo.id}
+              data-testid="needs-you-row"
+              className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
+            >
+              <div className="min-w-0 grow basis-64">
+                <div className="line-clamp-2 text-ui wrap-break-word text-foreground">
+                  {todo.title}
+                </div>
+                <div className="text-meta text-content-tertiary">
                   {[
                     projectNames?.[todo.projectId] ?? (live ? undefined : PROJECT_NAME),
                     `#${todo.seqNum}`,
@@ -154,22 +160,24 @@ function NeedsYouStrip({
                     .join(' · ')}
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="xs"
-                className="flex-none text-(--card-button)"
-                onClick={() => onAction?.(todo)}
-              >
-                {t(attention.action)}
-              </Button>
-              <Button
-                variant="ghost"
-                size="xs"
-                className="flex-none text-content-secondary"
-                render={<Link to={`/app/todo/${todo.id}`} />}
-              >
-                {t('打开')}
-              </Button>
+              <div className="ml-auto flex flex-none items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="flex-none text-(--card-button)"
+                  onClick={() => onAction?.(todo)}
+                >
+                  {t(attention.action)}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="flex-none text-content-secondary"
+                  render={<Link to={`/app/todo/${todo.id}`} />}
+                >
+                  {t('打开')}
+                </Button>
+              </div>
             </div>
           );
         })}

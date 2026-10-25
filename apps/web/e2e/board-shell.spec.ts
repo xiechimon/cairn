@@ -71,3 +71,25 @@ test('a 390px board stacks non-empty columns tightly with no horizontal scroll',
   for (const gap of metrics.gaps) expect(gap).toBeLessThan(48);
   await expect(page.locator('[data-column-empty-new]')).toBeHidden();
 });
+
+test('a 390px needs-you row shows the whole title and keeps its actions on screen', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app?scenario=01');
+  const row = page.getByTestId('needs-you-row').first();
+  await expect(row).toBeVisible();
+  const fit = await row.evaluate((element) => {
+    const title = element.querySelector<HTMLElement>('.line-clamp-2')!;
+    const rowBox = element.getBoundingClientRect();
+    return {
+      clipped: title.scrollHeight > title.clientHeight + 1 || title.scrollWidth > title.clientWidth + 1,
+      buttonsInside: [...element.querySelectorAll('button, a')].every((control) => {
+        const box = control.getBoundingClientRect();
+        return box.left >= rowBox.left && box.right <= rowBox.right;
+      }),
+    };
+  });
+  expect(fit.clipped).toBe(false);
+  expect(fit.buttonsInside).toBe(true);
+});
