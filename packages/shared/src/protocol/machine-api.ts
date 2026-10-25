@@ -1,7 +1,3 @@
-// 机器面协议——02 §5.4/§6.1（「机器面 13 端点见 §5」）+ r3 §1.6（bundle 静态
-// 提取，/api/machine/* 全词表）。HTTP 动词未逐一观测 [推断]（claim 为长轮询、
-// stream 为 SSE 有实证）；路径词表即契约，不改形状（02 §5.8 尾注）。
-
 export interface MachineEndpoint {
   readonly path: string;
   readonly note?: string;
@@ -26,28 +22,15 @@ export const MACHINE_ENDPOINTS: readonly MachineEndpoint[] = [
   { path: '/api/machine/done/{stepId}', note: '步骤收尾' },
 ];
 
-/** claim 长轮询节奏（r3 §1.5 实测 ~75–76s）。 */
 export const CLAIM_POLL_INTERVAL_MS = 75_000;
 
-/** 断网 claim 指数退避封顶（r3 §1.5）。 */
 export const CLAIM_BACKOFF_CAP_MS = 30_000;
 
-/** remoteTools relay 读工具重试预算与超时（r5 §3.1 bundle 提取：
- * RETRY_DELAYS_MS=[500,2000]、remoteTool:10s；读工具 replaySafe）。 */
 export const REMOTE_TOOL_RETRY_DELAYS_MS = [500, 2000] as const;
 export const REMOTE_TOOL_TIMEOUT_MS = 10_000;
 
-/** 注册两条路径（02 §5.2，r3 §1.2 实测）：
- * 1. 浏览器授权：start 无参 → 开登录页授权团队（enroll/start + enroll/poll）。
- * 2. key 非交互（云服务器文案路径）：--api-key --team；「添加机器」弹窗底部
- *    展开命令 + 「获取 API key →」跳 api-keys 页（r2 11b 文案）。
- * logout 只 Forget 本机；服务端机器记录保留，重注册复用同一 machineId
- * （r3 实测 + [推断] 按 key/team 认机器）。 */
 export const ENROLL_PATHS = ['browser', 'api-key'] as const;
 
-/** 上线序列 canon 行（02 §5.4/r3 §1.5 daemon.log 实测）。#503 起去掉
- * `maxConcurrent changed null -> 3` 行——并发上限概念已从仓里摘除，本机
- * 上线序列随之少一行。 */
 export const ONLINE_SEQUENCE_CANON = [
   'Loading pi runtime…',
   'Online (machineId=…); polling <url>',

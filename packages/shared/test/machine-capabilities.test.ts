@@ -1,21 +1,3 @@
-// #1251 机器能力上报 + agent 能力要求（ADR 0018 决策 4）：wire/record 形状。
-// 失败方式（先于实现固化）：
-// 1. 心跳红线（02 §5.4）：presence/enroll body 的 capabilities 位必须是
-//    wire 级宽松（z.unknown）——坏形状（类型错、非对象）在 body 解析层
-//    恒通过，不得 400 整个心跳；收严发生在 server 侧 safeParse
-//    （machineCapabilitiesSchema），失败丢弃该字段保留旧值。
-// 2. 加法契约：不带 capabilities 的 body（老 daemon）照常解析；不带
-//    requiredCapabilities 的 agent record / 不带 capabilities 的 machine
-//    record（老 server 响应）照常解析。
-// 3. machineCapabilitiesSchema 本体是严的：mcpServers/skills 必须 string[]，
-//    类型错 = 拒（server safeParse 的判据面）。
-// 4. requiredCapabilitiesSchema：两维各自可选（mcpServers/models），空对象
-//    合法（显式「无要求」与缺省 null 同值）；类型错 = 拒（写侧 400 判据）。
-// 5. queue 投影的 blocked 位：kind 词表钉死 machine-offline /
-//    capability-missing；缺席 = 老 server（排队呈现退化，零回归）。
-// 6. machine-fit 读面（agent 面「哪些机器可跑它」）：形状钉死——canRun /
-//    runtimeOk / missing（null = 该机未上报快照）/ mcpGaps（对账面，null 同律）。
-
 import { describe, expect, it } from 'vitest';
 import {
   agentMachineFitResponseSchema,
@@ -31,8 +13,8 @@ import {
   stepJournalRowSchema,
 } from '../src/index.js';
 
-describe('machineCapabilitiesSchema（daemon 上报的机器能力清单）', () => {
-  it('合法清单：mcpServers slug 集 + 本机技能名集', () => {
+describe('machineCapabilitiesSchema (daemon-reported machine capability list)', () => {
+  it('valid list: mcpServers slug set + local skill name set', () => {
     const parsed = machineCapabilitiesSchema.parse({
       mcpServers: ['figma', 'context7'],
       skills: ['verify-cairn', 'pr-cairn'],
@@ -41,14 +23,14 @@ describe('machineCapabilitiesSchema（daemon 上报的机器能力清单）', ()
     expect(parsed.skills).toEqual(['verify-cairn', 'pr-cairn']);
   });
 
-  it('空集合法（机器没装 MCP / 没有本机技能）', () => {
+  it('empty set legal (machine without MCP / without local skills)', () => {
     expect(machineCapabilitiesSchema.parse({ mcpServers: [], skills: [] })).toEqual({
       mcpServers: [],
       skills: [],
     });
   });
 
-  it('类型错 = 拒（server safeParse 判据：坏字段丢弃、心跳不阻）', () => {
+  it('type error = reject (server safeParse criterion: bad fields dropped, heartbeat unblocked)', () => {
     expect(machineCapabilitiesSchema.safeParse({ mcpServers: 'figma', skills: [] }).success).toBe(
       false,
     );
@@ -60,8 +42,8 @@ describe('machineCapabilitiesSchema（daemon 上报的机器能力清单）', ()
   });
 });
 
-describe('requiredCapabilitiesSchema（agent 能力要求声明）', () => {
-  it('两维各自可选；空对象 = 显式无要求', () => {
+describe('requiredCapabilitiesSchema (agent capability-requirement declaration)', () => {
+  it('each dimension optional; empty object = explicit no requirement', () => {
     expect(requiredCapabilitiesSchema.parse({})).toEqual({});
     expect(requiredCapabilitiesSchema.parse({ mcpServers: ['figma'] })).toEqual({
       mcpServers: ['figma'],
@@ -71,14 +53,14 @@ describe('requiredCapabilitiesSchema（agent 能力要求声明）', () => {
     });
   });
 
-  it('类型错 = 拒（写侧 400 判据）', () => {
+  it('type error = reject (write-side 400 criterion)', () => {
     expect(requiredCapabilitiesSchema.safeParse({ mcpServers: 'figma' }).success).toBe(false);
     expect(requiredCapabilitiesSchema.safeParse({ models: [3] }).success).toBe(false);
   });
 });
 
-describe('心跳红线：capabilities 位在 body 解析层恒宽（02 §5.4）', () => {
-  it('presence body：带合法 capabilities / 不带（老 daemon）/ 带坏形状，三形皆过 body 解析', () => {
+describe('heartbeat red line: the capabilities field is always lenient at the body-parsing layer (02 §5.4)', () => {
+  it('presence body: with valid capabilities / without (old daemon) / with malformed shape, all three pass body parsing', () => {
     expect(
       machinePresenceBodySchema.parse({
         cliVersion: '0.1.0',
@@ -86,15 +68,13 @@ describe('心跳红线：capabilities 位在 body 解析层恒宽（02 §5.4）'
       }).capabilities,
     ).toEqual({ mcpServers: ['figma'], skills: [] });
     expect(machinePresenceBodySchema.parse({ cliVersion: '0.1.0' }).capabilities).toBeUndefined();
-    // 坏形状不得在 wire 层拒——拒它 = 400 整个心跳 = 红线违规；
-    // 收严在 server 侧 safeParse（丢弃坏字段保留旧值）。
     expect(
       machinePresenceBodySchema.parse({ capabilities: { mcpServers: 'oops' } }).capabilities,
     ).toEqual({ mcpServers: 'oops' });
     expect(machinePresenceBodySchema.parse({ capabilities: 42 }).capabilities).toBe(42);
   });
 
-  it('enroll body：同律（注册上报能力清单，坏形状不阻注册）', () => {
+  it('enroll body: same rule (capabilities reported at registration; malformed shapes do not block enrollment)', () => {
     expect(
       machineEnrollBodySchema.parse({
         teamId: 'team-1',
@@ -108,7 +88,7 @@ describe('心跳红线：capabilities 位在 body 解析层恒宽（02 §5.4）'
   });
 });
 
-describe('record 加法契约（老 server / 老 daemon 双向可解析）', () => {
+describe('record additive contract (old server / old daemon parse both ways)', () => {
   const agentBase = {
     id: 'agent-1',
     displayName: 'Implementer',
@@ -125,12 +105,12 @@ describe('record 加法契约（老 server / 老 daemon 双向可解析）', () 
     mcpServers: [],
   };
 
-  it('agentRecordSchema：不带 requiredCapabilities（存量行/老 server）照常解析', () => {
+  it('agentRecordSchema: without requiredCapabilities (existing rows / old server) still parses', () => {
     const parsed = agentRecordSchema.parse(agentBase);
     expect(parsed.requiredCapabilities ?? null).toBeNull();
   });
 
-  it('agentRecordSchema：带 requiredCapabilities 原样透出', () => {
+  it('agentRecordSchema: with requiredCapabilities passed through verbatim', () => {
     const parsed = agentRecordSchema.parse({
       ...agentBase,
       requiredCapabilities: { mcpServers: ['figma'] },
@@ -138,7 +118,7 @@ describe('record 加法契约（老 server / 老 daemon 双向可解析）', () 
     expect(parsed.requiredCapabilities).toEqual({ mcpServers: ['figma'] });
   });
 
-  it('createAgentBodySchema：requiredCapabilities 可写、可缺省、null = 清空', () => {
+  it('createAgentBodySchema: requiredCapabilities writable, optional, null = clear', () => {
     expect(
       createAgentBodySchema.parse({
         displayName: 'a',
@@ -177,7 +157,7 @@ describe('record 加法契约（老 server / 老 daemon 双向可解析）', () 
     shellEnabled: false,
   };
 
-  it('machineRecordSchema：capabilities 三态——缺席（老 server）/ null（从未上报）/ 清单', () => {
+  it('machineRecordSchema: capabilities three states -- absent (old server) / null (never reported) / list', () => {
     expect(machineRecordSchema.parse(machineBase).capabilities).toBeUndefined();
     expect(
       machineRecordSchema.parse({ ...machineBase, capabilities: null }).capabilities,
@@ -191,7 +171,7 @@ describe('record 加法契约（老 server / 老 daemon 双向可解析）', () 
   });
 });
 
-describe('queue 投影 blocked 位（#1251 可见 pending reason）', () => {
+describe('queue projection blocked bit (#1251 visible pending reason)', () => {
   const rowBase = {
     id: 'step-1',
     buildId: 'build-1',
@@ -203,7 +183,7 @@ describe('queue 投影 blocked 位（#1251 可见 pending reason）', () => {
     skillInjection: null,
   };
 
-  it('blocked 缺席 = 老 server（排队呈现退化，零回归）', () => {
+  it('blocked absent = old server (queue rendering degrades, zero regression)', () => {
     const parsed = stepJournalRowSchema.parse({
       ...rowBase,
       queue: { position: 1, waitingFor: null },
@@ -211,7 +191,7 @@ describe('queue 投影 blocked 位（#1251 可见 pending reason）', () => {
     expect(parsed.queue?.blocked).toBeUndefined();
   });
 
-  it('capability-missing：缺项名可读形随行', () => {
+  it('capability-missing: missing item names in readable form travel with the row', () => {
     const parsed = stepJournalRowSchema.parse({
       ...rowBase,
       queue: {
@@ -226,7 +206,7 @@ describe('queue 投影 blocked 位（#1251 可见 pending reason）', () => {
     });
   });
 
-  it('machine-offline：等机器上线（missing 空集）', () => {
+  it('machine-offline: waiting for the machine to come online (missing empty)', () => {
     const parsed = stepJournalRowSchema.parse({
       ...rowBase,
       queue: { position: 1, waitingFor: null, blocked: { kind: 'machine-offline', missing: [] } },
@@ -234,7 +214,7 @@ describe('queue 投影 blocked 位（#1251 可见 pending reason）', () => {
     expect(parsed.queue?.blocked?.kind).toBe('machine-offline');
   });
 
-  it('kind 词表外值 = 拒', () => {
+  it('kinds outside the vocabulary = rejected', () => {
     expect(
       stepJournalRowSchema.safeParse({
         ...rowBase,
@@ -244,8 +224,8 @@ describe('queue 投影 blocked 位（#1251 可见 pending reason）', () => {
   });
 });
 
-describe('agentMachineFitResponseSchema（agent 面「哪些机器可跑它」）', () => {
-  it('行形：canRun 判定 + missing/mcpGaps 三态（null = 未上报快照）', () => {
+describe('agentMachineFitResponseSchema (agent-facing "which machines can run it")', () => {
+  it('row shape: canRun verdict + missing/mcpGaps three states (null = no snapshot reported)', () => {
     const parsed = agentMachineFitResponseSchema.parse({
       machines: [
         {
@@ -273,7 +253,7 @@ describe('agentMachineFitResponseSchema（agent 面「哪些机器可跑它」�
     expect(parsed.machines[1]?.missing).toBeNull();
   });
 
-  it('缺 machines / 行缺位 = 拒（读面恒发全块）', () => {
+  it('missing machines / row missing fields = reject (read surface always sends the full block)', () => {
     expect(agentMachineFitResponseSchema.safeParse({}).success).toBe(false);
     expect(
       agentMachineFitResponseSchema.safeParse({ machines: [{ machineId: 'm1' }] }).success,
@@ -281,7 +261,7 @@ describe('agentMachineFitResponseSchema（agent 面「哪些机器可跑它」�
   });
 });
 
-describe('#1241 parseReportedCapabilities（字段级收严）', () => {
+describe('#1241 parseReportedCapabilities (field-level tightening)', () => {
   const hardware = {
     cpuCores: 8,
     memoryTotalMb: 16384,
@@ -290,13 +270,13 @@ describe('#1241 parseReportedCapabilities（字段级收严）', () => {
     diskFreeMb: 20480,
   };
 
-  it('7 合法指纹随包原样保留', () => {
+  it('7 valid fingerprints preserved verbatim in the bundle', () => {
     expect(
       parseReportedCapabilities({ mcpServers: ['figma'], skills: ['deploy'], hardware }),
     ).toEqual({ mcpServers: ['figma'], skills: ['deploy'], hardware });
   });
 
-  it('7 指纹形状坏（核数 0）：只丢 hardware，mcp/skills 照收', () => {
+  it('7 malformed fingerprint shape (zero cores): only hardware dropped, mcp/skills still accepted', () => {
     expect(
       parseReportedCapabilities({
         mcpServers: ['figma'],
@@ -306,7 +286,7 @@ describe('#1241 parseReportedCapabilities（字段级收严）', () => {
     ).toEqual({ mcpServers: ['figma'], skills: [] });
   });
 
-  it('7 升级前落库的指纹无 memoryTotalMb：整块照收（读侧不因新字段整行解析失败）', () => {
+  it('7 pre-upgrade fingerprints without memoryTotalMb accepted as-is (read side does not fail whole rows on new fields)', () => {
     const { memoryTotalMb: _dropped, ...legacy } = hardware;
     expect(parseReportedCapabilities({ mcpServers: [], skills: [], hardware: legacy })).toEqual({
       mcpServers: [],
@@ -315,25 +295,25 @@ describe('#1241 parseReportedCapabilities（字段级收严）', () => {
     });
   });
 
-  it('7 老 daemon 无 hardware：照收清单，hardware 缺席', () => {
+  it('7 old daemon without hardware: list accepted, hardware absent', () => {
     expect(parseReportedCapabilities({ mcpServers: [], skills: ['a'] })).toEqual({
       mcpServers: [],
       skills: ['a'],
     });
   });
 
-  it('7 清单本身坏（mcpServers 非数组）→ 整包 undefined，不论 hardware 是否合法', () => {
+  it('7 malformed list itself (mcpServers not an array) -> whole bundle undefined, regardless of hardware validity', () => {
     expect(
       parseReportedCapabilities({ mcpServers: 'figma', skills: [], hardware }),
     ).toBeUndefined();
   });
 
-  it('7 非对象 / 数组 → undefined', () => {
+  it('7 non-object / array -> undefined', () => {
     expect(parseReportedCapabilities(null)).toBeUndefined();
     expect(parseReportedCapabilities(['figma'])).toBeUndefined();
   });
 
-  it('7 machineHardwareSchema 拒负数内存与非整数核数', () => {
+  it('7 machineHardwareSchema rejects negative memory and non-integer cores', () => {
     expect(machineHardwareSchema.safeParse({ ...hardware, memoryAvailableMb: -1 }).success).toBe(
       false,
     );

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { CHIEF_REMOTE_TOOLS, MEMORY_TOOLS, WORKER_MEMORY_REMOTE_TOOLS } from '../src/index.js';
 
-test('记忆工具发布更新入口与候选、强制写入和历史语义', () => {
+test('memory tools: publish-update entry, plus candidates, forced-write, and history semantics', () => {
   expect(MEMORY_TOOLS).toContain('update_memory');
   for (const tools of [CHIEF_REMOTE_TOOLS, WORKER_MEMORY_REMOTE_TOOLS]) {
     const save = tools.find((t) => t.name === 'save_memory');

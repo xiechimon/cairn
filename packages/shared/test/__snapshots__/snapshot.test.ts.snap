@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > claimedStep > claimedStep.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > claimedStep > claimedStep.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -526,7 +526,25 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineClaimBody > machineClaimBody.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machine surface 13 endpoint verbs + paths (MACHINE_WIRE, verb [inferred] registry surface) 1`] = `
+[
+  "POST /api/machine/enroll",
+  "POST /api/machine/enroll/start",
+  "POST /api/machine/enroll/poll",
+  "GET /api/machine/me",
+  "POST /api/machine/presence",
+  "POST /api/machine/recover",
+  "POST /api/machine/tasks/claim",
+  "GET /api/machine/stream",
+  "POST /api/machine/heartbeat/{stepId}",
+  "POST /api/machine/tool/{stepId}",
+  "GET /api/machine/token/{stepId}",
+  "POST /api/machine/upload-urls/{stepId}",
+  "POST /api/machine/done/{stepId}",
+]
+`;
+
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineClaimBody > machineClaimBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -541,7 +559,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineClaimResponse > machineClaimResponse.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineClaimResponse > machineClaimResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -1083,7 +1101,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineDoneBody > machineDoneBody.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineDoneBody > machineDoneBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -1388,7 +1406,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineEnrollBody > machineEnrollBody.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineEnrollBody > machineEnrollBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -1513,7 +1531,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineEnrollResponse > machineEnrollResponse.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineEnrollResponse > machineEnrollResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -1542,7 +1560,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machinePresenceBody > machinePresenceBody.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machinePresenceBody > machinePresenceBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -1658,7 +1676,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineRecoverResponse > machineRecoverResponse.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineRecoverResponse > machineRecoverResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -1715,7 +1733,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineStreamEvent > machineStreamEvent.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineStreamEvent > machineStreamEvent.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "oneOf": [
@@ -1837,7 +1855,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineThinkingDeltaBody > machineThinkingDeltaBody.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineThinkingDeltaBody > machineThinkingDeltaBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -1858,7 +1876,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineTokenResponse > machineTokenResponse.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineTokenResponse > machineTokenResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -2029,7 +2047,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineToolBody > machineToolBody.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineToolBody > machineToolBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "anyOf": [
@@ -2313,7 +2331,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineTranscriptDeltaBody > machineTranscriptDeltaBody.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineTranscriptDeltaBody > machineTranscriptDeltaBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -2334,7 +2352,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineUploadUrlsBody > machineUploadUrlsBody.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineUploadUrlsBody > machineUploadUrlsBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -2367,7 +2385,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineUploadUrlsResponse > machineUploadUrlsResponse.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineUploadUrlsResponse > machineUploadUrlsResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -2414,7 +2432,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > stepEvent = 02 §5.6 pi 词表会话内 15 件 1:1（01 §5 锁定） > stepEvent.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > stepEvent = 02 §5.6 pi vocabulary, 15 session events 1:1 (locked by 01 §5) > stepEvent.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "oneOf": [
@@ -2848,7 +2866,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > transcriptUpload > transcriptUpload.json 1`] = `
+exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > transcriptUpload > transcriptUpload.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -2897,25 +2915,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
 }
 `;
 
-exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > 机器面 13 端点动词 + 路径（MACHINE_WIRE，动词 [推断] 登记面） 1`] = `
-[
-  "POST /api/machine/enroll",
-  "POST /api/machine/enroll/start",
-  "POST /api/machine/enroll/poll",
-  "GET /api/machine/me",
-  "POST /api/machine/presence",
-  "POST /api/machine/recover",
-  "POST /api/machine/tasks/claim",
-  "GET /api/machine/stream",
-  "POST /api/machine/heartbeat/{stepId}",
-  "POST /api/machine/tool/{stepId}",
-  "GET /api/machine/token/{stepId}",
-  "POST /api/machine/upload-urls/{stepId}",
-  "POST /api/machine/done/{stepId}",
-]
-`;
-
-exports[`body/封套 schema 快照 > apiKeyRow > apiKeyRow.json 1`] = `
+exports[`body/envelope schema snapshots > apiKeyRow > apiKeyRow.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -2979,7 +2979,7 @@ exports[`body/封套 schema 快照 > apiKeyRow > apiKeyRow.json 1`] = `
 }
 `;
 
-exports[`body/封套 schema 快照 > buildStepActionBody > buildStepActionBody.json 1`] = `
+exports[`body/envelope schema snapshots > buildStepActionBody > buildStepActionBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "oneOf": [
@@ -3067,7 +3067,7 @@ exports[`body/封套 schema 快照 > buildStepActionBody > buildStepActionBody.j
 }
 `;
 
-exports[`body/封套 schema 快照 > conversationMessagesResponse > conversationMessagesResponse.json 1`] = `
+exports[`body/envelope schema snapshots > conversationMessagesResponse > conversationMessagesResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -3165,7 +3165,7 @@ exports[`body/封套 schema 快照 > conversationMessagesResponse > conversation
 }
 `;
 
-exports[`body/封套 schema 快照 > conversationStreamEvent > conversationStreamEvent.json 1`] = `
+exports[`body/envelope schema snapshots > conversationStreamEvent > conversationStreamEvent.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "oneOf": [
@@ -3817,7 +3817,7 @@ exports[`body/封套 schema 快照 > conversationStreamEvent > conversationStrea
 }
 `;
 
-exports[`body/封套 schema 快照 > createProjectBody > createProjectBody.json 1`] = `
+exports[`body/envelope schema snapshots > createProjectBody > createProjectBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -3881,7 +3881,7 @@ exports[`body/封套 schema 快照 > createProjectBody > createProjectBody.json 
 }
 `;
 
-exports[`body/封套 schema 快照 > createScheduleBody > createScheduleBody.json 1`] = `
+exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -3919,7 +3919,7 @@ exports[`body/封套 schema 快照 > createScheduleBody > createScheduleBody.jso
 }
 `;
 
-exports[`body/封套 schema 快照 > createTodoBody > createTodoBody.json 1`] = `
+exports[`body/envelope schema snapshots > createTodoBody > createTodoBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -3952,7 +3952,7 @@ exports[`body/封套 schema 快照 > createTodoBody > createTodoBody.json 1`] = 
 }
 `;
 
-exports[`body/封套 schema 快照 > daemonJson > daemonJson.json 1`] = `
+exports[`body/envelope schema snapshots > daemonJson > daemonJson.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -3981,7 +3981,7 @@ exports[`body/封套 schema 快照 > daemonJson > daemonJson.json 1`] = `
 }
 `;
 
-exports[`body/封套 schema 快照 > deviceJson > deviceJson.json 1`] = `
+exports[`body/envelope schema snapshots > deviceJson > deviceJson.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -3998,7 +3998,7 @@ exports[`body/封套 schema 快照 > deviceJson > deviceJson.json 1`] = `
 }
 `;
 
-exports[`body/封套 schema 快照 > githubConnectionStatus > githubConnectionStatus.json 1`] = `
+exports[`body/envelope schema snapshots > githubConnectionStatus > githubConnectionStatus.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4020,7 +4020,7 @@ exports[`body/封套 schema 快照 > githubConnectionStatus > githubConnectionSt
 }
 `;
 
-exports[`body/封套 schema 快照 > githubReposResponse > githubReposResponse.json 1`] = `
+exports[`body/envelope schema snapshots > githubReposResponse > githubReposResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4064,7 +4064,7 @@ exports[`body/封套 schema 快照 > githubReposResponse > githubReposResponse.j
 }
 `;
 
-exports[`body/封套 schema 快照 > machineJson > machineJson.json 1`] = `
+exports[`body/envelope schema snapshots > machineJson > machineJson.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4093,7 +4093,7 @@ exports[`body/封套 schema 快照 > machineJson > machineJson.json 1`] = `
 }
 `;
 
-exports[`body/封套 schema 快照 > mergeAcceptedResponse > mergeAcceptedResponse.json 1`] = `
+exports[`body/envelope schema snapshots > mergeAcceptedResponse > mergeAcceptedResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4110,7 +4110,7 @@ exports[`body/封套 schema 快照 > mergeAcceptedResponse > mergeAcceptedRespon
 }
 `;
 
-exports[`body/封套 schema 快照 > notificationsResponse > notificationsResponse.json 1`] = `
+exports[`body/envelope schema snapshots > notificationsResponse > notificationsResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4129,7 +4129,7 @@ exports[`body/封套 schema 快照 > notificationsResponse > notificationsRespon
 }
 `;
 
-exports[`body/封套 schema 快照 > patchChiefBody > patchChiefBody.json 1`] = `
+exports[`body/envelope schema snapshots > patchChiefBody > patchChiefBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4164,7 +4164,7 @@ exports[`body/封套 schema 快照 > patchChiefBody > patchChiefBody.json 1`] = 
 }
 `;
 
-exports[`body/封套 schema 快照 > planRow > planRow.json 1`] = `
+exports[`body/envelope schema snapshots > planRow > planRow.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4200,7 +4200,7 @@ exports[`body/封套 schema 快照 > planRow > planRow.json 1`] = `
 }
 `;
 
-exports[`body/封套 schema 快照 > projectBranchesResponse > projectBranchesResponse.json 1`] = `
+exports[`body/envelope schema snapshots > projectBranchesResponse > projectBranchesResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4239,7 +4239,7 @@ exports[`body/封套 schema 快照 > projectBranchesResponse > projectBranchesRe
 }
 `;
 
-exports[`body/封套 schema 快照 > projectFileResponse > projectFileResponse.json 1`] = `
+exports[`body/envelope schema snapshots > projectFileResponse > projectFileResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4281,7 +4281,7 @@ exports[`body/封套 schema 快照 > projectFileResponse > projectFileResponse.j
 }
 `;
 
-exports[`body/封套 schema 快照 > projectTreeResponse > projectTreeResponse.json 1`] = `
+exports[`body/envelope schema snapshots > projectTreeResponse > projectTreeResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4346,7 +4346,7 @@ exports[`body/封套 schema 快照 > projectTreeResponse > projectTreeResponse.j
 }
 `;
 
-exports[`body/封套 schema 快照 > searchResponse > searchResponse.json 1`] = `
+exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4449,7 +4449,7 @@ exports[`body/封套 schema 快照 > searchResponse > searchResponse.json 1`] = 
 }
 `;
 
-exports[`body/封套 schema 快照 > setSecretBody > setSecretBody.json 1`] = `
+exports[`body/envelope schema snapshots > setSecretBody > setSecretBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4475,7 +4475,7 @@ exports[`body/封套 schema 快照 > setSecretBody > setSecretBody.json 1`] = `
 }
 `;
 
-exports[`body/封套 schema 快照 > startBuildsBody > startBuildsBody.json 1`] = `
+exports[`body/envelope schema snapshots > startBuildsBody > startBuildsBody.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4585,7 +4585,7 @@ exports[`body/封套 schema 快照 > startBuildsBody > startBuildsBody.json 1`] 
 }
 `;
 
-exports[`body/封套 schema 快照 > stepJournalRow > stepJournalRow.json 1`] = `
+exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -4981,7 +4981,7 @@ exports[`body/封套 schema 快照 > stepJournalRow > stepJournalRow.json 1`] = 
 }
 `;
 
-exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] = `
+exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "oneOf": [
@@ -5849,7 +5849,1008 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent > agent.json 1`] = `
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > DELETE surface rules ([inferred], 02 §6.1) and divergence registry 1`] = `
+{
+  "DELETE_FACE": {
+    "resources": [
+      "teams/{id}/machines",
+      "teams/{id}/agents/{aid}",
+      "teams/{id}/skills",
+      "teams/{id}/mcp-servers",
+      "teams/{id}/agents/{aid}/memories",
+      "teams/{id}/providers",
+      "teams/{id}/secrets",
+      "todos",
+      "schedules",
+    ],
+    "rule": "REST 同名 DELETE（02 §6.1）",
+    "status": "[推断]",
+  },
+  "NON_REPLICATED_ENDPOINTS": [
+    {
+      "method": "POST",
+      "path": "/api/push",
+      "reason": "Web Push 订阅上传——R1 已裁决有意 divergence（02 §9.1 终裁、04 §5）",
+    },
+  ],
+}
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > MCP server surface: 24-tool whitelist + six capability groups (02 §7.2) 1`] = `
+{
+  "MCP_CAPABILITY_GROUPS": [
+    "Read the workspace",
+    "Read the repo",
+    "Read progress",
+    "Organize work",
+    "Run work",
+    "Manage lifecycle",
+  ],
+  "MCP_TOOLS_READ": [
+    "Todos",
+    "Projects",
+    "Conversation",
+    "Agents",
+    "Schedules",
+    "Attachment",
+    "Skills",
+    "Machines",
+    "Issues",
+    "Pull Requests",
+    "Workflow Runs",
+  ],
+  "MCP_TOOLS_WRITE": [
+    "Create Todo",
+    "Update Todo",
+    "Message Todo",
+    "Run Builds",
+    "Run Review",
+    "Confirm Builds",
+    "Merge Builds",
+    "Cancel Builds",
+    "Complete Todos",
+    "Close Todos",
+    "Reopen Todos",
+    "Schedule Todo",
+    "Unschedule Todo",
+  ],
+}
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > SSE's three channels (02 §1.2) 1`] = `
+[
+  {
+    "audience": "browser",
+    "endpoint": "/api/teams/{id}/stream",
+    "id": "team",
+    "note": "团队流：ping/machine_presence/todo/build/notification/branch_sync（02 §1.2，r5 §7.2 扩充 + M7 #319）",
+  },
+  {
+    "audience": "browser",
+    "endpoint": "/api/conversations/{id}/stream",
+    "id": "conversation",
+    "note": "会话流：transcript 实时流（r3 §3.5 抓包）；逐事件载荷未枚举，承载 pi 流词表 [推断]（protocol/executor.ts）",
+  },
+  {
+    "audience": "daemon",
+    "endpoint": "/api/machine/stream",
+    "id": "machine",
+    "note": "机器 wake：低延迟派发唤醒 + sync 命令（M7 #319；r3 §1.5）",
+  },
+]
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > brand-string naming table (02 §5.8 + replacement plan §2) 1`] = `
+{
+  "BRAND": {
+    "apiKeyPrefix": "cairn_",
+    "branchPrefix": "cairn/conv-",
+    "cliCommandName": "cairn",
+    "cliPackageName": "@xiechimon/cairn-cli",
+    "envPrefix": "CAIRN_",
+    "homeDirName": ".cairn",
+    "manifestName": "Cairn",
+    "remoteMcpPath": "/api/mcp",
+    "sessionCookieName": "cairn_session",
+    "workspacesDirName": "workspaces",
+  },
+  "BRAND_SLOTS": {
+    "apiKeyPrefix": {
+      "replacement": "cairn_<48hex>",
+      "todosDev": "tds_<48hex>",
+    },
+    "branchPrefix": {
+      "replacement": "cairn/conv-",
+      "todosDev": "tds/conv-",
+    },
+    "cliCommandName": {
+      "replacement": "cairn",
+      "todosDev": "tds",
+    },
+    "cliPackageName": {
+      "replacement": "@xiechimon/cairn-cli（npm 公发，06 册 W2-D1）",
+      "todosDev": "@todos-dev/cli",
+    },
+    "daemonLog": {
+      "replacement": "~/.cairn/daemon.log",
+      "todosDev": "~/.tds/daemon.log",
+    },
+    "deepLinkScheme": {
+      "replacement": "cairn://",
+      "todosDev": "tds://",
+    },
+    "envPrefix": {
+      "replacement": "CAIRN_",
+      "todosDev": "TDS_",
+    },
+    "firstTouchCookie": {
+      "replacement": "cairn_ft",
+      "todosDev": "tds_ft",
+    },
+    "gitHostDomain": {
+      "replacement": "本地主机名代位",
+      "todosDev": "git.todos.dev",
+    },
+    "homeDir": {
+      "replacement": "~/.cairn",
+      "todosDev": "~/.tds",
+    },
+    "localStoragePrefix": {
+      "replacement": "cairn- / cairn. 同形替换",
+      "todosDev": "tds- / tds.（约 15 键，见 protocol/client-state.ts）",
+    },
+    "machineToken": {
+      "replacement": "保持（非品牌槽）",
+      "todosDev": "64hex（无前缀）",
+    },
+    "manifestName": {
+      "replacement": "Cairn",
+      "todosDev": "Todos（manifest name/short_name/apple-mobile-web-app-title）",
+    },
+    "remoteMcpPath": {
+      "replacement": "保持（形状无品牌）",
+      "todosDev": "/api/mcp",
+    },
+    "sessionCookie": {
+      "replacement": "cairn_session",
+      "todosDev": "tds_session",
+    },
+    "workspacesDir": {
+      "replacement": "~/.cairn/workspaces/<conversationId>",
+      "todosDev": "~/.tds/workspaces/<conversationId>",
+    },
+  },
+}
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-version gate shape (02 §7.1: value self-determined per replica version line [design]) 1`] = `
+{
+  "CLI_COMMANDS": [
+    "start",
+    "stop",
+    "restart",
+    "logs",
+    "logout",
+    "status",
+    "version",
+    "provider",
+  ],
+  "CLI_START_OPTIONS": [
+    "--foreground|-f",
+    "--api-key <k>",
+    "--team <id>",
+    "--name",
+    "--server",
+    "--workspaces-dir",
+  ],
+  "ENV_VARS": {
+    "apiKey": "CAIRN_API_KEY",
+    "customModelReasoning": "CAIRN_CUSTOM_MODEL_REASONING",
+    "githubOauthClientId": "CAIRN_GITHUB_OAUTH_CLIENT_ID",
+    "githubOauthClientSecret": "CAIRN_GITHUB_OAUTH_CLIENT_SECRET",
+    "home": "CAIRN_HOME",
+    "hookTimeoutMs": "CAIRN_HOOK_TIMEOUT_MS",
+    "issueIntake": "CAIRN_ISSUE_INTAKE",
+    "mcpConfig": "CAIRN_MCP_CONFIG",
+    "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
+    "requireToken": "CAIRN_REQUIRE_TOKEN",
+    "server": "CAIRN_SERVER",
+    "skillsDir": "CAIRN_SKILLS_DIR",
+    "team": "CAIRN_TEAM",
+    "token": "CAIRN_TOKEN",
+    "webDir": "CAIRN_WEB_DIR",
+    "workspacesDir": "CAIRN_WORKSPACES_DIR",
+  },
+  "PROVIDER_COMMAND_NOTICE": "Providers are managed on the website",
+}
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > local state layout and log prefixes (02 §5.3) 1`] = `
+{
+  "DAEMON_LOG_PREFIXES": [
+    "supervisor",
+    "machine",
+    "step",
+    "workspace",
+    "recover",
+    "wake",
+    "mcp",
+    "skills",
+    "gate",
+    "trust",
+  ],
+  "LOCAL_STATE_DIRS": [
+    "outbox",
+    "chat-sessions",
+    "agent-runtime",
+    "workspaces",
+  ],
+  "LOCAL_STATE_FILES": [
+    "machine.json",
+    "device.json",
+    "daemon.json",
+    "daemon.log",
+  ],
+}
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > localStorage key contract (02 §6.4/r2 §1.5) 1`] = `
+{
+  "LOCAL_STORAGE_KEYS": [
+    {
+      "key": "cairn-theme",
+      "source": "r2 §1.5",
+      "valueShape": "light | dark",
+    },
+    {
+      "key": "cairn.locale",
+      "source": "r2 §1.5（与 cairn-locale 双形，原键同构）",
+      "valueShape": "zh",
+    },
+    {
+      "key": "cairn-locale",
+      "source": "r2 §1.5",
+      "valueShape": "zh",
+    },
+    {
+      "key": "cairn.sidebarProjectsCollapsed",
+      "source": "r2 §1.5",
+      "valueShape": ""1"",
+    },
+    {
+      "key": "cairn.sidebarResourcesCollapsed",
+      "source": "[推断] #147（资源组折叠，与 sidebarProjectsCollapsed 同形；原键未观测）",
+      "valueShape": ""1"",
+    },
+    {
+      "key": "cairn.panel-maximized",
+      "source": "r2 §1.5",
+      "valueShape": ""0"",
+    },
+    {
+      "key": "cairn.teamMembersLayout",
+      "source": "r2 §1.5（团队页视图切换）",
+      "valueShape": "grid | chart",
+    },
+    {
+      "key": "cairn.projectTasksLayout",
+      "source": "[推断] #178（project 任务页视图切换，与 teamMembersLayout 同形；原键未观测）",
+      "valueShape": "list | grid",
+    },
+    {
+      "key": "cairn.cache.session-v1",
+      "source": "r2 §1.5",
+      "valueShape": "{token:"",cookieName:"",expiresAt,user{…}}——会话走 cookie，token 字段留空",
+    },
+    {
+      "key": "cairn.cache.me-v1:<userId>",
+      "source": "r2 §1.5",
+      "valueShape": "{type:"user",id,displayName,avatarUrl,…}",
+    },
+    {
+      "key": "cairn.cache.teams-v1:<userId>",
+      "source": "r2 §1.5",
+      "valueShape": "[{id,name,createdAt,plan:"free",avatarStyle:"notionist…"}]",
+    },
+    {
+      "key": "cairn.cache.members-v1:<userId>:<teamId>",
+      "source": "r2 §1.5",
+      "valueShape": "[{id,teamId,actorId,memberType:"user",…}]",
+    },
+    {
+      "key": "cairn.cache.projects-v1:<userId>:<teamId>",
+      "source": "r2 §1.5",
+      "valueShape": "[]",
+    },
+    {
+      "key": "cairn.cache.team-models-v1:<teamId>",
+      "source": "r2 §1.5",
+      "valueShape": "{"models":[]}",
+    },
+    {
+      "key": "cairn.cache.team-machines-v1:<teamId>",
+      "source": "r2 §1.5",
+      "valueShape": "[]",
+    },
+    {
+      "key": "cairn.cache.progress-v2:<userId>:<teamId>",
+      "source": "r2 §1.5",
+      "valueShape": "{"todos":[],"builds":[]}",
+    },
+    {
+      "key": "cairn.cache.notifications-v2:<userId>:<teamId>",
+      "source": "r2 §1.5",
+      "valueShape": "{"unreadThreadIds":[]}",
+    },
+    {
+      "key": "cairn.cache.chief-data-v3:<userId>:<teamId>",
+      "source": "r2 §1.5",
+      "valueShape": "{"chief":{id:"chief-<user>-<team>",userId,teamId,…}}",
+    },
+    {
+      "key": "cairn.cache.chief-threads-v1:<userId>:<teamId>",
+      "source": "r2 §1.5",
+      "valueShape": "[]",
+    },
+    {
+      "key": "cairn.cache.chief-draft-v1:<teamId>:new",
+      "source": "r5 §3.6 补录",
+      "valueShape": "草稿文本（跨会话恢复实测）",
+    },
+  ],
+  "THIRD_PARTY_CLIENT_KEYS": [
+    {
+      "key": "nextauth.message",
+      "note": "复刻无 auth 库（01 §4.2）；形状处置归 M2 [推断]",
+      "valueShape": "{"event":"session","data":{"trigger":"getSession"}}",
+    },
+    {
+      "key": "mp_* / __mpq_*",
+      "note": "埋点可空实现（02 §6.1）",
+      "valueShape": "mixpanel 埋点（distinct_id = userId）",
+    },
+  ],
+}
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > machine surface 13 endpoints (02 §5/r3 §1.6) 1`] = `
+[
+  {
+    "note": "注册（02 §5.2）",
+    "path": "/api/machine/enroll",
+  },
+  {
+    "note": "浏览器授权流（02 §5.2 路径一）",
+    "path": "/api/machine/enroll/start",
+  },
+  {
+    "path": "/api/machine/enroll/poll",
+  },
+  {
+    "note": "机器自述",
+    "path": "/api/machine/me",
+  },
+  {
+    "note": "心跳（断网时并行失败，进程不退出，r3 §1.5）",
+    "path": "/api/machine/presence",
+  },
+  {
+    "note": "步 journal 恢复（细节 [推断]，02 §5.4/§11）",
+    "path": "/api/machine/recover",
+  },
+  {
+    "note": "长轮询领取（~75–76s 节奏，r3 §1.5）",
+    "path": "/api/machine/tasks/claim",
+  },
+  {
+    "note": "wake SSE 低延迟派发（02 §1.2/§5.4）",
+    "path": "/api/machine/stream",
+  },
+  {
+    "note": "步骤 journal 续活（02 §5.4）",
+    "path": "/api/machine/heartbeat/{stepId}",
+  },
+  {
+    "note": "工具调用回传；remoteTools relay 同径（r5 §3.1）",
+    "path": "/api/machine/tool/{stepId}",
+  },
+  {
+    "note": "per-step 凭证下发（模型 key + 托管 repo git 凭证），不落盘常驻 [推断]（02 §5.4/§8）",
+    "path": "/api/machine/token/{stepId}",
+  },
+  {
+    "note": "预签名产物上传：transcript/产物（r3 §1.6）",
+    "path": "/api/machine/upload-urls/{stepId}",
+  },
+  {
+    "note": "步骤收尾",
+    "path": "/api/machine/done/{stepId}",
+  },
+]
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocker vocabulary: codes, categories, and copy, in fixed order (#1404; S5-S9 routed by category, first blocker is the status description) 1`] = `
+[
+  "policy-human: policy, 项目策略为人工合并",
+  "autonomy-paused: policy, 自治合并已暂停",
+  "daily-cap: policy, 当日自治合并数已达上限",
+  "not-applicable: policy, 不是 GitHub PR 形态的构建",
+  "not-current-build: transient, 不是任务的当前构建",
+  "phase-not-review: transient, 任务不在审核关口",
+  "work-in-flight: transient, 还有步骤在跑",
+  "pr-unreadable: transient, 读不到 PR 或仓库默认分支，或 PR 的 head 不是可用的 SHA",
+  "pr-not-open: human, PR 已合并或已关闭",
+  "pr-draft: transient, PR 是草稿",
+  "pr-behind-base: transient, PR 落后于目标分支或落后数未知",
+  "pr-from-fork: human, PR 来自 fork",
+  "base-not-default: human, PR 的目标分支不是默认分支",
+  "mergeable-state: transient, GitHub 判定暂不可合并",
+  "self-required: human, cairn/merge-gate 被设成了必需检查",
+  "required-checks-unreadable: transient, 读不到当前 head 的检查或必需检查清单",
+  "required-checks-none: human, 默认分支没有必需检查",
+  "required-check-missing: transient, 必需检查在当前 head 上缺席",
+  "required-check-pending: transient, 必需检查还在跑",
+  "required-check-failed: transient, 必需检查未通过",
+  "pr-evidence-not-green: transient, pr-evidence 未通过",
+  "patch-unavailable: transient, 读不到当前 head 的 compare，补丁摘要暂不可得",
+  "compare-malformed: human, compare 的响应形状不对，或它的 SHA（请求的 head、提交、父提交）写错",
+  "compare-truncated: human, compare 文件列表被截断",
+  "patch-unbindable: human, 补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）",
+  "size-cap: human, 补丁超过 800 行或 40 个文件",
+  "protected-path: human, 改动命中 D4 保护路径",
+  "outside-auto-merge: human, 改动在可自动合并集之外",
+  "test-deleted: human, 删除了测试",
+  "opaque-file: human, 证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）",
+  "evidence-outside-ticket: human, 改动了别的票的证据目录",
+  "evidence-executable: human, 证据目录里新增或改动了可执行文件",
+  "harness-regression-missing: human, 改了 harness 但缺少绑定当前补丁的回归评测结果",
+  "harness-regression-stale: human, 回归评测结果绑定的补丁摘要不是当前补丁",
+  "harness-regression-below-threshold: human, 回归评测 decision_ok 低于基线置信区间下限",
+  "issue-ref-missing: human, 任务来源解不出 issue 号",
+  "evidence-link-missing: transient, PR body 缺钉在本 PR 提交上、指向本 PR 证据的 raw 永久链",
+  "verify-missing: transient, 当前补丁没有验证判定",
+  "verify-failed: transient, 验证未通过",
+  "verify-extraction-failed: transient, 验证判定提取失败",
+  "verify-evidence-invalid: transient, 验证证据不在本票目录",
+  "verify-tampered: human, 验证者改了代码",
+  "review-missing: transient, 有视角还没有审核判定",
+  "review-blocking: transient, 审核有 blocking 发现",
+  "review-extraction-failed: transient, 审核判定提取失败",
+  "perspective-timed-out: human, 审核视角超时",
+  "decision-missing: transient, chief 还没有出 go/no-go",
+  "decision-no-go: transient, chief 判 no-go",
+  "decision-extraction-failed: transient, chief 判定提取失败",
+  "fix-rounds-exhausted: human, 修复轮用完",
+  "fix-no-change: human, 修复轮没有改动补丁",
+  "gate-rounds-exhausted: human, 闸轮次用完",
+  "no-reviewers: human, 团队没有可派的审核视角",
+  "no-verifier: human, 团队没有可派的验证者",
+  "no-decider: human, chief 没有可用的 agent",
+]
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > phase nine values + board columns + semantics (02 §4.1) 1`] = `
+{
+  "BOARD_COLUMNS": [
+    "待开始",
+    "执行中",
+    "待处理",
+    "已完成",
+  ],
+  "PHASE_SEMANTICS": {
+    "building": "在改",
+    "closed": "未完成即搁置",
+    "confirm": "计划就绪等你",
+    "done": "已接受，若选了则已合并",
+    "failed": "run 停在错误上",
+    "planning": "读仓库写计划",
+    "queued": "已启动，等空闲机器",
+    "review": "改动就绪等你（\`待验收\`≡\`审核\` 同 phase，CONTEXT.md 裁决）",
+    "todo": "已建档未开始",
+  },
+  "PHASE_VALUES": [
+    "todo",
+    "queued",
+    "planning",
+    "confirm",
+    "building",
+    "review",
+    "done",
+    "failed",
+    "closed",
+  ],
+}
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > pi stream events / config kinds / stream timeouts / machine tools / proxy probing (02 §5.6) 1`] = `
+{
+  "CONFIG_KINDS": [
+    "api_key",
+    "oauth",
+    "http",
+    "stdio",
+  ],
+  "MACHINE_CUSTOM_TOOLS": [
+    "web_fetch",
+    "remote_shell",
+    "push_branch",
+  ],
+  "PI_STREAM_EVENTS": [
+    "text_delta",
+    "thinking",
+    "thinking_delta",
+    "toolcall_end",
+    "message_update",
+    "message_end",
+    "message_stop",
+    "compaction",
+    "compaction_start",
+    "compaction_end",
+    "auto_retry_start",
+    "auto_retry_end",
+    "steer",
+    "done",
+    "error",
+    "wake",
+    "shutdown",
+  ],
+  "PROXY_ENV_VARS": [
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+  ],
+  "PROXY_PROBE_LOG_CANON": "[cairn] Proxy: <url>",
+  "RELAY_TOOLS": [
+    "push_credential",
+    "open_repo",
+  ],
+  "STREAM_TIMEOUTS_MS": {
+    "streamBodyTimeout": 540000,
+    "streamFirstEvent": 300000,
+    "streamIdle": 480000,
+  },
+  "WEB_FETCH_CHAR_LIMIT": 8000,
+}
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > provider presets 38-item catalog (r3 §2/02 §6.2) 1`] = `
+[
+  "github-copilot",
+  "openai-codex",
+  "xai",
+  "amazon-bedrock",
+  "ant-ling",
+  "anthropic",
+  "baseten",
+  "cerebras",
+  "cloudflare-ai-gateway",
+  "cloudflare-workers-ai",
+  "deepseek",
+  "fireworks",
+  "google",
+  "google-vertex",
+  "groq",
+  "huggingface",
+  "kimi-coding",
+  "minimax",
+  "minimax-cn",
+  "mistral",
+  "moonshotai",
+  "moonshotai-cn",
+  "nvidia",
+  "openai",
+  "opencode",
+  "opencode-go",
+  "openrouter",
+  "qwen-token-plan",
+  "qwen-token-plan-cn",
+  "qwen-token-plan-individual",
+  "together",
+  "vercel-ai-gateway",
+  "xiaomi",
+  "xiaomi-token-plan-ams",
+  "xiaomi-token-plan-cn",
+  "xiaomi-token-plan-sgp",
+  "z-ai",
+  "z-ai-coding-cn",
+]
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > step lifecycle line order (02 §5.7) and bring-up sequence canon (02 §5.4) 1`] = `
+{
+  "ONLINE_SEQUENCE_CANON": [
+    "Loading pi runtime…",
+    "Online (machineId=…); polling <url>",
+    "Idle-sleep prevention active (caffeinate)",
+    "[recover] no pending steps found",
+    "[wake] push channel connected",
+  ],
+  "STEP_LIFECYCLE_LOG_LINES": [
+    "claim step=<id>",
+    "step <id> for conv <uuid> (n running)",
+    "using model <provider>/<modelId>",
+    "new session <convId> | continue session <convId>",
+    "workspace 准备（准备工作区...）",
+    "pushed <convBranch>",
+    "finished (m running)",
+  ],
+}
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table list (01 §6) 1`] = `
+[
+  "user",
+  "team",
+  "project",
+  "todo",
+  "tag",
+  "todo_tag",
+  "build",
+  "step",
+  "steer_pending",
+  "stop_pending",
+  "message",
+  "plan",
+  "schedule",
+  "notification",
+  "agent",
+  "agent_memory",
+  "provider",
+  "secret",
+  "api_key",
+  "machine",
+  "token_usage",
+  "chief",
+  "chief_thread",
+  "chief_message",
+  "whats_new",
+  "attachment",
+  "branch_sync",
+  "github_connection",
+  "skill_audit",
+  "shell_command",
+  "webhook_token",
+  "gate_digest",
+  "gate_round",
+  "gate_verdict",
+  "gate_state",
+  "autonomy_state",
+  "member_activity",
+  "build_feedback",
+  "memory_save_conflict",
+  "memory_candidate",
+]
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint vocabulary (02 §6.1) 1`] = `
+[
+  {
+    "method": "GET",
+    "note": "保形返回 seed 用户（02 §2.1）",
+    "path": "/api/auth/session",
+  },
+  {
+    "method": "GET",
+    "path": "/api/user/me",
+  },
+  {
+    "method": "GET",
+    "note": "恒 seed 一行（02 §2.2）",
+    "path": "/api/teams",
+  },
+  {
+    "method": "GET",
+    "note": "Agent 列表实际走此端点（r5 §1）",
+    "path": "/api/teams/{id}/members",
+  },
+  {
+    "method": "GET",
+    "path": "/api/teams/{id}/machines",
+  },
+  {
+    "method": "GET",
+    "note": "presets[] 38 项原样（r3 §2）",
+    "path": "/api/teams/{id}/providers",
+  },
+  {
+    "method": "GET",
+    "path": "/api/teams/{id}/mcp-servers",
+  },
+  {
+    "method": "GET",
+    "path": "/api/teams/{id}/models",
+  },
+  {
+    "method": "GET",
+    "note": "→ {unreadThreadIds}（02 §9.1）",
+    "path": "/api/teams/{id}/notifications",
+  },
+  {
+    "method": "GET",
+    "path": "/api/teams/{id}/progress",
+  },
+  {
+    "method": "GET",
+    "note": "SSE，见 protocol/sse.ts",
+    "path": "/api/teams/{id}/stream",
+  },
+  {
+    "method": "GET",
+    "note": "spec 13 #367：本地目录现扫投影（sid = frontmatter name 回落目录名）",
+    "path": "/api/teams/{id}/skills/{sid}",
+  },
+  {
+    "method": "GET",
+    "note": "spec 13 #367：技能目录文件读面（磁盘现读，文本投影）",
+    "path": "/api/teams/{id}/skills/{sid}/file",
+    "query": [
+      "fileName",
+    ],
+  },
+  {
+    "method": "GET",
+    "path": "/api/teams/{id}/agents/{aid}",
+  },
+  {
+    "method": "GET",
+    "path": "/api/teams/{id}/agents/{aid}/tasks",
+  },
+  {
+    "method": "GET",
+    "note": "02 §4.4/r5 §6 实测",
+    "path": "/api/teams/{id}/agents/{aid}/memories",
+  },
+  {
+    "method": "GET",
+    "path": "/api/teams/{id}/chief",
+  },
+  {
+    "method": "GET",
+    "path": "/api/teams/{id}/chief/threads",
+  },
+  {
+    "method": "GET",
+    "path": "/api/projects",
+    "query": [
+      "teamId",
+    ],
+  },
+  {
+    "method": "GET",
+    "path": "/api/projects/{id}/todos",
+  },
+  {
+    "method": "GET",
+    "path": "/api/projects/{id}/branches",
+  },
+  {
+    "method": "GET",
+    "path": "/api/projects/{id}/tags",
+  },
+  {
+    "method": "GET",
+    "path": "/api/projects/{id}/builds",
+  },
+  {
+    "method": "GET",
+    "note": "读裸库 ref 树（02 §3）",
+    "path": "/api/projects/{id}/tree",
+    "query": [
+      "ref",
+    ],
+  },
+  {
+    "method": "GET",
+    "path": "/api/projects/{id}/file",
+    "query": [
+      "path",
+      "ref",
+    ],
+  },
+  {
+    "method": "GET",
+    "note": "02 §9.3 在册不设计；触发条件 = 04 册附录 B",
+    "path": "/api/projects/{id}/preview-token",
+    "query": [
+      "ref",
+    ],
+  },
+  {
+    "method": "GET",
+    "path": "/api/todos",
+    "query": [
+      "teamId",
+    ],
+  },
+  {
+    "method": "GET",
+    "path": "/api/todos/{id}",
+  },
+  {
+    "method": "GET",
+    "path": "/api/builds/{id}",
+  },
+  {
+    "method": "GET",
+    "path": "/api/builds/{id}/steps",
+  },
+  {
+    "method": "GET",
+    "note": "chief 会话同族（r5 §3.6）",
+    "path": "/api/conversations/{id}/messages",
+  },
+  {
+    "method": "GET",
+    "note": "SSE，见 protocol/sse.ts",
+    "path": "/api/conversations/{id}/stream",
+  },
+  {
+    "method": "GET",
+    "note": "plan.md unified diff（02 §4.2/r5 §4）",
+    "path": "/api/documents/{id}/diff",
+  },
+  {
+    "method": "GET",
+    "path": "/api/schedules",
+    "query": [
+      "team",
+    ],
+  },
+  {
+    "method": "GET",
+    "note": "spec 13 #367：每次请求现扫本地技能目录，无缓存不入库",
+    "path": "/api/skills",
+    "query": [
+      "teamId",
+    ],
+  },
+  {
+    "method": "GET",
+    "note": "[设计] 能力读面（XMON-16 / #499 B3 裁决 A）：引擎能力词表送 web——载荷 = 思考强度档位，单源 shared THINKING_LEVELS",
+    "path": "/api/capabilities",
+  },
+  {
+    "method": "GET",
+    "note": "形状保留、内容自选（02 §6.1）",
+    "path": "/api/whats-new",
+  },
+  {
+    "method": "GET",
+    "note": "⌘K [设计] 自设（02 §6.3）",
+    "path": "/api/search",
+    "query": [
+      "q",
+    ],
+  },
+  {
+    "method": "POST",
+    "note": "body {title,spec}（r3 §3.1）+ 可选 tagIds[]（r9 §3.4 实测携带位）",
+    "path": "/api/projects/{id}/todos",
+  },
+  {
+    "method": "POST",
+    "note": "body {name,color} → 201 tag record 全形（r9 §3.4 实测；#309）",
+    "path": "/api/projects/{id}/tags",
+  },
+  {
+    "method": "POST",
+    "note": "开始/重跑；body {todoIds[],assignment,withPlan}（r5 §3.4）",
+    "path": "/api/projects/{id}/builds",
+  },
+  {
+    "method": "POST",
+    "note": "→ 202 {delegated:true}（r3 §3.6）",
+    "path": "/api/builds/{id}/merge",
+  },
+  {
+    "method": "POST",
+    "note": "确认/驳回回路（02 §4.2/r5 §4）",
+    "path": "/api/builds/{id}/steps",
+  },
+  {
+    "method": "POST",
+    "path": "/api/teams/{id}/providers",
+  },
+  {
+    "method": "POST",
+    "path": "/api/teams/{id}/mcp-servers",
+  },
+  {
+    "method": "POST",
+    "note": "→ 201 {id}（r5 §1/§8 补录）",
+    "path": "/api/teams/{id}/agents",
+  },
+  {
+    "method": "POST",
+    "note": "XMON-109（spec 13 回摆）：写路径——建技能目录（body {name,description,files[]}，frontmatter 是唯一真值）；→ 201 record",
+    "path": "/api/skills",
+    "query": [
+      "teamId",
+    ],
+  },
+  {
+    "method": "PUT",
+    "note": "XMON-109（spec 13 回摆）：写路径——覆写式更新（列出者覆写、未列者保留；改名须携带新 SKILL.md）",
+    "path": "/api/teams/{id}/skills/{sid}",
+  },
+  {
+    "method": "POST",
+    "note": "#1170：导入通道——body {localPath} 或 {url} 二选一（本地目录 / GitHub 公共仓子目录）；落盘复用 createLocalSkill 校验；SSRF/路径守卫见 services/skill-import.ts",
+    "path": "/api/teams/{id}/skills/import",
+  },
+  {
+    "method": "POST",
+    "note": "#1170：按记录的来源重拉（技能 id 不变，复用 updateLocalSkill 覆写语义）；无来源记录 = 409",
+    "path": "/api/teams/{id}/skills/{sid}/refresh",
+  },
+  {
+    "method": "POST",
+    "path": "/api/schedules",
+  },
+  {
+    "method": "POST",
+    "note": "形状保留、内容自选；可空实现",
+    "path": "/api/analytics/first-touch",
+  },
+  {
+    "method": "POST",
+    "note": "埋点端点（r3 §8.2 PostHog 风格 base64 batch）；复刻可空实现（02 §6.1）",
+    "path": "/_mp/api/track",
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/teams/{id}/providers/{pid}",
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/teams/{id}/agents/{aid}",
+  },
+  {
+    "method": "PATCH",
+    "note": "绑定 Agent（r5 §2 抓包）",
+    "path": "/api/teams/{id}/chief",
+  },
+  {
+    "method": "POST",
+    "note": "#231 [设计]：签发授权 URL（state 入册，TTL 10min 单次核销）",
+    "path": "/api/teams/{id}/providers/oauth/{preset}/authorize",
+  },
+  {
+    "method": "GET",
+    "note": "#231 [设计]：收码 → token 密封落 provider 行（02 §8）→ 302 回 providers 页",
+    "path": "/api/oauth/callback",
+    "query": [
+      "code",
+      "state",
+      "error",
+    ],
+  },
+]
+`;
+
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > worktree contract (02 §5.5) 1`] = `
+{
+  "baseRepoSubpath": "<projectId>/repo",
+  "branchPrefix": "cairn/conv-",
+  "checkpointResetArgs": [
+    "reset --hard",
+    "clean -fd",
+  ],
+  "concurrencyGuard": "projectLock(projectId)",
+  "forceSyncCopy": "丢弃代码修改并删除非忽略的未跟踪文件；保留忽略内容。仅本次生效。",
+  "mergeArgs": "merge --no-edit",
+  "remoteBranchDiverged": "remote branch diverged",
+  "retryBudgetCanon": "~2 min typical, ~8 min worst on /done's path",
+  "staleCleanupArgs": [
+    "worktree remove --force",
+    "worktree prune",
+    "branch -D",
+  ],
+  "taskDirLayout": "<workspacesRoot>/<conversationId>",
+}
+`;
+
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > agent > agent.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -6043,7 +7044,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent > ag
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent_memory > agent_memory.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > agent_memory > agent_memory.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -6163,7 +7164,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent_memo
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > api_key > api_key.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > api_key > api_key.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -6213,7 +7214,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > api_key > 
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > build > build.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > build > build.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -6321,7 +7322,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > build > bu
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief > chief.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chief > chief.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -6397,7 +7398,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief > ch
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief_message > chief_message.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chief_message > chief_message.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": {},
@@ -6420,7 +7421,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief_mess
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief_thread > chief_thread.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chief_thread > chief_thread.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -6652,7 +7653,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief_thre
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > machine > machine.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > machine > machine.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -6817,7 +7818,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > machine > 
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > message > message.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > message > message.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": {},
@@ -6840,7 +7841,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > message > 
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > notification > notification.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > notification > notification.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -6968,7 +7969,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > notificati
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > plan > plan.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > plan > plan.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7000,7 +8001,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > plan > pla
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > project > project.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > project > project.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7047,7 +8048,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > project > 
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > provider > provider.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > provider > provider.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7187,7 +8188,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > provider >
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > schedule > schedule.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > schedule > schedule.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7301,7 +8302,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > schedule >
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > secret > secret.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > secret > secret.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7332,7 +8333,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > secret > s
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > step > step.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > step > step.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7377,7 +8378,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > step > ste
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > tag > tag.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tag > tag.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7417,7 +8418,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > tag > tag.
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > team > team.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > team > team.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7454,7 +8455,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > team > tea
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > todo.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > todo > todo.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7881,7 +8882,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > tod
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > token_usage > token_usage.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > token_usage > token_usage.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7945,7 +8946,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > token_usag
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > user > user.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > user > user.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -7976,7 +8977,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > user > use
 }
 `;
 
-exports[`record 形状 24 表投影——zod → JSON Schema 快照 > whats_new > whats_new.json 1`] = `
+exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > whats_new > whats_new.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": {},
@@ -7984,1006 +8985,5 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > whats_new 
     "type": "string",
   },
   "type": "object",
-}
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > DELETE 面规则（[推断]，02 §6.1）与 divergence 登记 1`] = `
-{
-  "DELETE_FACE": {
-    "resources": [
-      "teams/{id}/machines",
-      "teams/{id}/agents/{aid}",
-      "teams/{id}/skills",
-      "teams/{id}/mcp-servers",
-      "teams/{id}/agents/{aid}/memories",
-      "teams/{id}/providers",
-      "teams/{id}/secrets",
-      "todos",
-      "schedules",
-    ],
-    "rule": "REST 同名 DELETE（02 §6.1）",
-    "status": "[推断]",
-  },
-  "NON_REPLICATED_ENDPOINTS": [
-    {
-      "method": "POST",
-      "path": "/api/push",
-      "reason": "Web Push 订阅上传——R1 已裁决有意 divergence（02 §9.1 终裁、04 §5）",
-    },
-  ],
-}
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > MCP server 面 24 工具白名单 + 能力六组（02 §7.2） 1`] = `
-{
-  "MCP_CAPABILITY_GROUPS": [
-    "Read the workspace",
-    "Read the repo",
-    "Read progress",
-    "Organize work",
-    "Run work",
-    "Manage lifecycle",
-  ],
-  "MCP_TOOLS_READ": [
-    "Todos",
-    "Projects",
-    "Conversation",
-    "Agents",
-    "Schedules",
-    "Attachment",
-    "Skills",
-    "Machines",
-    "Issues",
-    "Pull Requests",
-    "Workflow Runs",
-  ],
-  "MCP_TOOLS_WRITE": [
-    "Create Todo",
-    "Update Todo",
-    "Message Todo",
-    "Run Builds",
-    "Run Review",
-    "Confirm Builds",
-    "Merge Builds",
-    "Cancel Builds",
-    "Complete Todos",
-    "Close Todos",
-    "Reopen Todos",
-    "Schedule Todo",
-    "Unschedule Todo",
-  ],
-}
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > SSE 三通道（02 §1.2） 1`] = `
-[
-  {
-    "audience": "browser",
-    "endpoint": "/api/teams/{id}/stream",
-    "id": "team",
-    "note": "团队流：ping/machine_presence/todo/build/notification/branch_sync（02 §1.2，r5 §7.2 扩充 + M7 #319）",
-  },
-  {
-    "audience": "browser",
-    "endpoint": "/api/conversations/{id}/stream",
-    "id": "conversation",
-    "note": "会话流：transcript 实时流（r3 §3.5 抓包）；逐事件载荷未枚举，承载 pi 流词表 [推断]（protocol/executor.ts）",
-  },
-  {
-    "audience": "daemon",
-    "endpoint": "/api/machine/stream",
-    "id": "machine",
-    "note": "机器 wake：低延迟派发唤醒 + sync 命令（M7 #319；r3 §1.5）",
-  },
-]
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > executor CLI 面（02 §5.1） 1`] = `
-{
-  "CLI_COMMANDS": [
-    "start",
-    "stop",
-    "restart",
-    "logs",
-    "logout",
-    "status",
-    "version",
-    "provider",
-  ],
-  "CLI_START_OPTIONS": [
-    "--foreground|-f",
-    "--api-key <k>",
-    "--team <id>",
-    "--name",
-    "--server",
-    "--workspaces-dir",
-  ],
-  "ENV_VARS": {
-    "apiKey": "CAIRN_API_KEY",
-    "customModelReasoning": "CAIRN_CUSTOM_MODEL_REASONING",
-    "githubOauthClientId": "CAIRN_GITHUB_OAUTH_CLIENT_ID",
-    "githubOauthClientSecret": "CAIRN_GITHUB_OAUTH_CLIENT_SECRET",
-    "home": "CAIRN_HOME",
-    "hookTimeoutMs": "CAIRN_HOOK_TIMEOUT_MS",
-    "issueIntake": "CAIRN_ISSUE_INTAKE",
-    "mcpConfig": "CAIRN_MCP_CONFIG",
-    "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
-    "requireToken": "CAIRN_REQUIRE_TOKEN",
-    "server": "CAIRN_SERVER",
-    "skillsDir": "CAIRN_SKILLS_DIR",
-    "team": "CAIRN_TEAM",
-    "token": "CAIRN_TOKEN",
-    "webDir": "CAIRN_WEB_DIR",
-    "workspacesDir": "CAIRN_WORKSPACES_DIR",
-  },
-  "PROVIDER_COMMAND_NOTICE": "Providers are managed on the website",
-}
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > localStorage 键名契约（02 §6.4/r2 §1.5） 1`] = `
-{
-  "LOCAL_STORAGE_KEYS": [
-    {
-      "key": "cairn-theme",
-      "source": "r2 §1.5",
-      "valueShape": "light | dark",
-    },
-    {
-      "key": "cairn.locale",
-      "source": "r2 §1.5（与 cairn-locale 双形，原键同构）",
-      "valueShape": "zh",
-    },
-    {
-      "key": "cairn-locale",
-      "source": "r2 §1.5",
-      "valueShape": "zh",
-    },
-    {
-      "key": "cairn.sidebarProjectsCollapsed",
-      "source": "r2 §1.5",
-      "valueShape": ""1"",
-    },
-    {
-      "key": "cairn.sidebarResourcesCollapsed",
-      "source": "[推断] #147（资源组折叠，与 sidebarProjectsCollapsed 同形；原键未观测）",
-      "valueShape": ""1"",
-    },
-    {
-      "key": "cairn.panel-maximized",
-      "source": "r2 §1.5",
-      "valueShape": ""0"",
-    },
-    {
-      "key": "cairn.teamMembersLayout",
-      "source": "r2 §1.5（团队页视图切换）",
-      "valueShape": "grid | chart",
-    },
-    {
-      "key": "cairn.projectTasksLayout",
-      "source": "[推断] #178（project 任务页视图切换，与 teamMembersLayout 同形；原键未观测）",
-      "valueShape": "list | grid",
-    },
-    {
-      "key": "cairn.cache.session-v1",
-      "source": "r2 §1.5",
-      "valueShape": "{token:"",cookieName:"",expiresAt,user{…}}——会话走 cookie，token 字段留空",
-    },
-    {
-      "key": "cairn.cache.me-v1:<userId>",
-      "source": "r2 §1.5",
-      "valueShape": "{type:"user",id,displayName,avatarUrl,…}",
-    },
-    {
-      "key": "cairn.cache.teams-v1:<userId>",
-      "source": "r2 §1.5",
-      "valueShape": "[{id,name,createdAt,plan:"free",avatarStyle:"notionist…"}]",
-    },
-    {
-      "key": "cairn.cache.members-v1:<userId>:<teamId>",
-      "source": "r2 §1.5",
-      "valueShape": "[{id,teamId,actorId,memberType:"user",…}]",
-    },
-    {
-      "key": "cairn.cache.projects-v1:<userId>:<teamId>",
-      "source": "r2 §1.5",
-      "valueShape": "[]",
-    },
-    {
-      "key": "cairn.cache.team-models-v1:<teamId>",
-      "source": "r2 §1.5",
-      "valueShape": "{"models":[]}",
-    },
-    {
-      "key": "cairn.cache.team-machines-v1:<teamId>",
-      "source": "r2 §1.5",
-      "valueShape": "[]",
-    },
-    {
-      "key": "cairn.cache.progress-v2:<userId>:<teamId>",
-      "source": "r2 §1.5",
-      "valueShape": "{"todos":[],"builds":[]}",
-    },
-    {
-      "key": "cairn.cache.notifications-v2:<userId>:<teamId>",
-      "source": "r2 §1.5",
-      "valueShape": "{"unreadThreadIds":[]}",
-    },
-    {
-      "key": "cairn.cache.chief-data-v3:<userId>:<teamId>",
-      "source": "r2 §1.5",
-      "valueShape": "{"chief":{id:"chief-<user>-<team>",userId,teamId,…}}",
-    },
-    {
-      "key": "cairn.cache.chief-threads-v1:<userId>:<teamId>",
-      "source": "r2 §1.5",
-      "valueShape": "[]",
-    },
-    {
-      "key": "cairn.cache.chief-draft-v1:<teamId>:new",
-      "source": "r5 §3.6 补录",
-      "valueShape": "草稿文本（跨会话恢复实测）",
-    },
-  ],
-  "THIRD_PARTY_CLIENT_KEYS": [
-    {
-      "key": "nextauth.message",
-      "note": "复刻无 auth 库（01 §4.2）；形状处置归 M2 [推断]",
-      "valueShape": "{"event":"session","data":{"trigger":"getSession"}}",
-    },
-    {
-      "key": "mp_* / __mpq_*",
-      "note": "埋点可空实现（02 §6.1）",
-      "valueShape": "mixpanel 埋点（distinct_id = userId）",
-    },
-  ],
-}
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > phase 九值 + 看板列 + 语义（02 §4.1） 1`] = `
-{
-  "BOARD_COLUMNS": [
-    "待开始",
-    "执行中",
-    "待处理",
-    "已完成",
-  ],
-  "PHASE_SEMANTICS": {
-    "building": "在改",
-    "closed": "未完成即搁置",
-    "confirm": "计划就绪等你",
-    "done": "已接受，若选了则已合并",
-    "failed": "run 停在错误上",
-    "planning": "读仓库写计划",
-    "queued": "已启动，等空闲机器",
-    "review": "改动就绪等你（\`待验收\`≡\`审核\` 同 phase，CONTEXT.md 裁决）",
-    "todo": "已建档未开始",
-  },
-  "PHASE_VALUES": [
-    "todo",
-    "queued",
-    "planning",
-    "confirm",
-    "building",
-    "review",
-    "done",
-    "failed",
-    "closed",
-  ],
-}
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > pi 流事件/配置 kind/流超时/机器工具/代理探测（02 §5.6） 1`] = `
-{
-  "CONFIG_KINDS": [
-    "api_key",
-    "oauth",
-    "http",
-    "stdio",
-  ],
-  "MACHINE_CUSTOM_TOOLS": [
-    "web_fetch",
-    "remote_shell",
-    "push_branch",
-  ],
-  "PI_STREAM_EVENTS": [
-    "text_delta",
-    "thinking",
-    "thinking_delta",
-    "toolcall_end",
-    "message_update",
-    "message_end",
-    "message_stop",
-    "compaction",
-    "compaction_start",
-    "compaction_end",
-    "auto_retry_start",
-    "auto_retry_end",
-    "steer",
-    "done",
-    "error",
-    "wake",
-    "shutdown",
-  ],
-  "PROXY_ENV_VARS": [
-    "HTTP_PROXY",
-    "HTTPS_PROXY",
-    "NO_PROXY",
-  ],
-  "PROXY_PROBE_LOG_CANON": "[cairn] Proxy: <url>",
-  "RELAY_TOOLS": [
-    "push_credential",
-    "open_repo",
-  ],
-  "STREAM_TIMEOUTS_MS": {
-    "streamBodyTimeout": 540000,
-    "streamFirstEvent": 300000,
-    "streamIdle": 480000,
-  },
-  "WEB_FETCH_CHAR_LIMIT": 8000,
-}
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > provider presets 38 项目录（r3 §2/02 §6.2） 1`] = `
-[
-  "github-copilot",
-  "openai-codex",
-  "xai",
-  "amazon-bedrock",
-  "ant-ling",
-  "anthropic",
-  "baseten",
-  "cerebras",
-  "cloudflare-ai-gateway",
-  "cloudflare-workers-ai",
-  "deepseek",
-  "fireworks",
-  "google",
-  "google-vertex",
-  "groq",
-  "huggingface",
-  "kimi-coding",
-  "minimax",
-  "minimax-cn",
-  "mistral",
-  "moonshotai",
-  "moonshotai-cn",
-  "nvidia",
-  "openai",
-  "opencode",
-  "opencode-go",
-  "openrouter",
-  "qwen-token-plan",
-  "qwen-token-plan-cn",
-  "qwen-token-plan-individual",
-  "together",
-  "vercel-ai-gateway",
-  "xiaomi",
-  "xiaomi-token-plan-ams",
-  "xiaomi-token-plan-cn",
-  "xiaomi-token-plan-sgp",
-  "z-ai",
-  "z-ai-coding-cn",
-]
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > web REST 端点词表（02 §6.1） 1`] = `
-[
-  {
-    "method": "GET",
-    "note": "保形返回 seed 用户（02 §2.1）",
-    "path": "/api/auth/session",
-  },
-  {
-    "method": "GET",
-    "path": "/api/user/me",
-  },
-  {
-    "method": "GET",
-    "note": "恒 seed 一行（02 §2.2）",
-    "path": "/api/teams",
-  },
-  {
-    "method": "GET",
-    "note": "Agent 列表实际走此端点（r5 §1）",
-    "path": "/api/teams/{id}/members",
-  },
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/machines",
-  },
-  {
-    "method": "GET",
-    "note": "presets[] 38 项原样（r3 §2）",
-    "path": "/api/teams/{id}/providers",
-  },
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/mcp-servers",
-  },
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/models",
-  },
-  {
-    "method": "GET",
-    "note": "→ {unreadThreadIds}（02 §9.1）",
-    "path": "/api/teams/{id}/notifications",
-  },
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/progress",
-  },
-  {
-    "method": "GET",
-    "note": "SSE，见 protocol/sse.ts",
-    "path": "/api/teams/{id}/stream",
-  },
-  {
-    "method": "GET",
-    "note": "spec 13 #367：本地目录现扫投影（sid = frontmatter name 回落目录名）",
-    "path": "/api/teams/{id}/skills/{sid}",
-  },
-  {
-    "method": "GET",
-    "note": "spec 13 #367：技能目录文件读面（磁盘现读，文本投影）",
-    "path": "/api/teams/{id}/skills/{sid}/file",
-    "query": [
-      "fileName",
-    ],
-  },
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/agents/{aid}",
-  },
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/agents/{aid}/tasks",
-  },
-  {
-    "method": "GET",
-    "note": "02 §4.4/r5 §6 实测",
-    "path": "/api/teams/{id}/agents/{aid}/memories",
-  },
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/chief",
-  },
-  {
-    "method": "GET",
-    "path": "/api/teams/{id}/chief/threads",
-  },
-  {
-    "method": "GET",
-    "path": "/api/projects",
-    "query": [
-      "teamId",
-    ],
-  },
-  {
-    "method": "GET",
-    "path": "/api/projects/{id}/todos",
-  },
-  {
-    "method": "GET",
-    "path": "/api/projects/{id}/branches",
-  },
-  {
-    "method": "GET",
-    "path": "/api/projects/{id}/tags",
-  },
-  {
-    "method": "GET",
-    "path": "/api/projects/{id}/builds",
-  },
-  {
-    "method": "GET",
-    "note": "读裸库 ref 树（02 §3）",
-    "path": "/api/projects/{id}/tree",
-    "query": [
-      "ref",
-    ],
-  },
-  {
-    "method": "GET",
-    "path": "/api/projects/{id}/file",
-    "query": [
-      "path",
-      "ref",
-    ],
-  },
-  {
-    "method": "GET",
-    "note": "02 §9.3 在册不设计；触发条件 = 04 册附录 B",
-    "path": "/api/projects/{id}/preview-token",
-    "query": [
-      "ref",
-    ],
-  },
-  {
-    "method": "GET",
-    "path": "/api/todos",
-    "query": [
-      "teamId",
-    ],
-  },
-  {
-    "method": "GET",
-    "path": "/api/todos/{id}",
-  },
-  {
-    "method": "GET",
-    "path": "/api/builds/{id}",
-  },
-  {
-    "method": "GET",
-    "path": "/api/builds/{id}/steps",
-  },
-  {
-    "method": "GET",
-    "note": "chief 会话同族（r5 §3.6）",
-    "path": "/api/conversations/{id}/messages",
-  },
-  {
-    "method": "GET",
-    "note": "SSE，见 protocol/sse.ts",
-    "path": "/api/conversations/{id}/stream",
-  },
-  {
-    "method": "GET",
-    "note": "plan.md unified diff（02 §4.2/r5 §4）",
-    "path": "/api/documents/{id}/diff",
-  },
-  {
-    "method": "GET",
-    "path": "/api/schedules",
-    "query": [
-      "team",
-    ],
-  },
-  {
-    "method": "GET",
-    "note": "spec 13 #367：每次请求现扫本地技能目录，无缓存不入库",
-    "path": "/api/skills",
-    "query": [
-      "teamId",
-    ],
-  },
-  {
-    "method": "GET",
-    "note": "[设计] 能力读面（XMON-16 / #499 B3 裁决 A）：引擎能力词表送 web——载荷 = 思考强度档位，单源 shared THINKING_LEVELS",
-    "path": "/api/capabilities",
-  },
-  {
-    "method": "GET",
-    "note": "形状保留、内容自选（02 §6.1）",
-    "path": "/api/whats-new",
-  },
-  {
-    "method": "GET",
-    "note": "⌘K [设计] 自设（02 §6.3）",
-    "path": "/api/search",
-    "query": [
-      "q",
-    ],
-  },
-  {
-    "method": "POST",
-    "note": "body {title,spec}（r3 §3.1）+ 可选 tagIds[]（r9 §3.4 实测携带位）",
-    "path": "/api/projects/{id}/todos",
-  },
-  {
-    "method": "POST",
-    "note": "body {name,color} → 201 tag record 全形（r9 §3.4 实测；#309）",
-    "path": "/api/projects/{id}/tags",
-  },
-  {
-    "method": "POST",
-    "note": "开始/重跑；body {todoIds[],assignment,withPlan}（r5 §3.4）",
-    "path": "/api/projects/{id}/builds",
-  },
-  {
-    "method": "POST",
-    "note": "→ 202 {delegated:true}（r3 §3.6）",
-    "path": "/api/builds/{id}/merge",
-  },
-  {
-    "method": "POST",
-    "note": "确认/驳回回路（02 §4.2/r5 §4）",
-    "path": "/api/builds/{id}/steps",
-  },
-  {
-    "method": "POST",
-    "path": "/api/teams/{id}/providers",
-  },
-  {
-    "method": "POST",
-    "path": "/api/teams/{id}/mcp-servers",
-  },
-  {
-    "method": "POST",
-    "note": "→ 201 {id}（r5 §1/§8 补录）",
-    "path": "/api/teams/{id}/agents",
-  },
-  {
-    "method": "POST",
-    "note": "XMON-109（spec 13 回摆）：写路径——建技能目录（body {name,description,files[]}，frontmatter 是唯一真值）；→ 201 record",
-    "path": "/api/skills",
-    "query": [
-      "teamId",
-    ],
-  },
-  {
-    "method": "PUT",
-    "note": "XMON-109（spec 13 回摆）：写路径——覆写式更新（列出者覆写、未列者保留；改名须携带新 SKILL.md）",
-    "path": "/api/teams/{id}/skills/{sid}",
-  },
-  {
-    "method": "POST",
-    "note": "#1170：导入通道——body {localPath} 或 {url} 二选一（本地目录 / GitHub 公共仓子目录）；落盘复用 createLocalSkill 校验；SSRF/路径守卫见 services/skill-import.ts",
-    "path": "/api/teams/{id}/skills/import",
-  },
-  {
-    "method": "POST",
-    "note": "#1170：按记录的来源重拉（技能 id 不变，复用 updateLocalSkill 覆写语义）；无来源记录 = 409",
-    "path": "/api/teams/{id}/skills/{sid}/refresh",
-  },
-  {
-    "method": "POST",
-    "path": "/api/schedules",
-  },
-  {
-    "method": "POST",
-    "note": "形状保留、内容自选；可空实现",
-    "path": "/api/analytics/first-touch",
-  },
-  {
-    "method": "POST",
-    "note": "埋点端点（r3 §8.2 PostHog 风格 base64 batch）；复刻可空实现（02 §6.1）",
-    "path": "/_mp/api/track",
-  },
-  {
-    "method": "PATCH",
-    "path": "/api/teams/{id}/providers/{pid}",
-  },
-  {
-    "method": "PATCH",
-    "path": "/api/teams/{id}/agents/{aid}",
-  },
-  {
-    "method": "PATCH",
-    "note": "绑定 Agent（r5 §2 抓包）",
-    "path": "/api/teams/{id}/chief",
-  },
-  {
-    "method": "POST",
-    "note": "#231 [设计]：签发授权 URL（state 入册，TTL 10min 单次核销）",
-    "path": "/api/teams/{id}/providers/oauth/{preset}/authorize",
-  },
-  {
-    "method": "GET",
-    "note": "#231 [设计]：收码 → token 密封落 provider 行（02 §8）→ 302 回 providers 页",
-    "path": "/api/oauth/callback",
-    "query": [
-      "code",
-      "state",
-      "error",
-    ],
-  },
-]
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > worktree 契约（02 §5.5） 1`] = `
-{
-  "baseRepoSubpath": "<projectId>/repo",
-  "branchPrefix": "cairn/conv-",
-  "checkpointResetArgs": [
-    "reset --hard",
-    "clean -fd",
-  ],
-  "concurrencyGuard": "projectLock(projectId)",
-  "forceSyncCopy": "丢弃代码修改并删除非忽略的未跟踪文件；保留忽略内容。仅本次生效。",
-  "mergeArgs": "merge --no-edit",
-  "remoteBranchDiverged": "remote branch diverged",
-  "retryBudgetCanon": "~2 min typical, ~8 min worst on /done's path",
-  "staleCleanupArgs": [
-    "worktree remove --force",
-    "worktree prune",
-    "branch -D",
-  ],
-  "taskDirLayout": "<workspacesRoot>/<conversationId>",
-}
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > 合并闸 blocker 词表：码、类别与文案，按固定顺序（#1404；S5–S9 按类别分流，首个 blocker 即 status 描述） 1`] = `
-[
-  "policy-human: policy, 项目策略为人工合并",
-  "autonomy-paused: policy, 自治合并已暂停",
-  "daily-cap: policy, 当日自治合并数已达上限",
-  "not-applicable: policy, 不是 GitHub PR 形态的构建",
-  "not-current-build: transient, 不是任务的当前构建",
-  "phase-not-review: transient, 任务不在审核关口",
-  "work-in-flight: transient, 还有步骤在跑",
-  "pr-unreadable: transient, 读不到 PR 或仓库默认分支，或 PR 的 head 不是可用的 SHA",
-  "pr-not-open: human, PR 已合并或已关闭",
-  "pr-draft: transient, PR 是草稿",
-  "pr-behind-base: transient, PR 落后于目标分支或落后数未知",
-  "pr-from-fork: human, PR 来自 fork",
-  "base-not-default: human, PR 的目标分支不是默认分支",
-  "mergeable-state: transient, GitHub 判定暂不可合并",
-  "self-required: human, cairn/merge-gate 被设成了必需检查",
-  "required-checks-unreadable: transient, 读不到当前 head 的检查或必需检查清单",
-  "required-checks-none: human, 默认分支没有必需检查",
-  "required-check-missing: transient, 必需检查在当前 head 上缺席",
-  "required-check-pending: transient, 必需检查还在跑",
-  "required-check-failed: transient, 必需检查未通过",
-  "pr-evidence-not-green: transient, pr-evidence 未通过",
-  "patch-unavailable: transient, 读不到当前 head 的 compare，补丁摘要暂不可得",
-  "compare-malformed: human, compare 的响应形状不对，或它的 SHA（请求的 head、提交、父提交）写错",
-  "compare-truncated: human, compare 文件列表被截断",
-  "patch-unbindable: human, 补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）",
-  "size-cap: human, 补丁超过 800 行或 40 个文件",
-  "protected-path: human, 改动命中 D4 保护路径",
-  "outside-auto-merge: human, 改动在可自动合并集之外",
-  "test-deleted: human, 删除了测试",
-  "opaque-file: human, 证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）",
-  "evidence-outside-ticket: human, 改动了别的票的证据目录",
-  "evidence-executable: human, 证据目录里新增或改动了可执行文件",
-  "harness-regression-missing: human, 改了 harness 但缺少绑定当前补丁的回归评测结果",
-  "harness-regression-stale: human, 回归评测结果绑定的补丁摘要不是当前补丁",
-  "harness-regression-below-threshold: human, 回归评测 decision_ok 低于基线置信区间下限",
-  "issue-ref-missing: human, 任务来源解不出 issue 号",
-  "evidence-link-missing: transient, PR body 缺钉在本 PR 提交上、指向本 PR 证据的 raw 永久链",
-  "verify-missing: transient, 当前补丁没有验证判定",
-  "verify-failed: transient, 验证未通过",
-  "verify-extraction-failed: transient, 验证判定提取失败",
-  "verify-evidence-invalid: transient, 验证证据不在本票目录",
-  "verify-tampered: human, 验证者改了代码",
-  "review-missing: transient, 有视角还没有审核判定",
-  "review-blocking: transient, 审核有 blocking 发现",
-  "review-extraction-failed: transient, 审核判定提取失败",
-  "perspective-timed-out: human, 审核视角超时",
-  "decision-missing: transient, chief 还没有出 go/no-go",
-  "decision-no-go: transient, chief 判 no-go",
-  "decision-extraction-failed: transient, chief 判定提取失败",
-  "fix-rounds-exhausted: human, 修复轮用完",
-  "fix-no-change: human, 修复轮没有改动补丁",
-  "gate-rounds-exhausted: human, 闸轮次用完",
-  "no-reviewers: human, 团队没有可派的审核视角",
-  "no-verifier: human, 团队没有可派的验证者",
-  "no-decider: human, chief 没有可用的 agent",
-]
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > 品牌串命名常量表（02 §5.8 + 素材替换计划 §2） 1`] = `
-{
-  "BRAND": {
-    "apiKeyPrefix": "cairn_",
-    "branchPrefix": "cairn/conv-",
-    "cliCommandName": "cairn",
-    "cliPackageName": "@xiechimon/cairn-cli",
-    "envPrefix": "CAIRN_",
-    "homeDirName": ".cairn",
-    "manifestName": "Cairn",
-    "remoteMcpPath": "/api/mcp",
-    "sessionCookieName": "cairn_session",
-    "workspacesDirName": "workspaces",
-  },
-  "BRAND_SLOTS": {
-    "apiKeyPrefix": {
-      "replacement": "cairn_<48hex>",
-      "todosDev": "tds_<48hex>",
-    },
-    "branchPrefix": {
-      "replacement": "cairn/conv-",
-      "todosDev": "tds/conv-",
-    },
-    "cliCommandName": {
-      "replacement": "cairn",
-      "todosDev": "tds",
-    },
-    "cliPackageName": {
-      "replacement": "@xiechimon/cairn-cli（npm 公发，06 册 W2-D1）",
-      "todosDev": "@todos-dev/cli",
-    },
-    "daemonLog": {
-      "replacement": "~/.cairn/daemon.log",
-      "todosDev": "~/.tds/daemon.log",
-    },
-    "deepLinkScheme": {
-      "replacement": "cairn://",
-      "todosDev": "tds://",
-    },
-    "envPrefix": {
-      "replacement": "CAIRN_",
-      "todosDev": "TDS_",
-    },
-    "firstTouchCookie": {
-      "replacement": "cairn_ft",
-      "todosDev": "tds_ft",
-    },
-    "gitHostDomain": {
-      "replacement": "本地主机名代位",
-      "todosDev": "git.todos.dev",
-    },
-    "homeDir": {
-      "replacement": "~/.cairn",
-      "todosDev": "~/.tds",
-    },
-    "localStoragePrefix": {
-      "replacement": "cairn- / cairn. 同形替换",
-      "todosDev": "tds- / tds.（约 15 键，见 protocol/client-state.ts）",
-    },
-    "machineToken": {
-      "replacement": "保持（非品牌槽）",
-      "todosDev": "64hex（无前缀）",
-    },
-    "manifestName": {
-      "replacement": "Cairn",
-      "todosDev": "Todos（manifest name/short_name/apple-mobile-web-app-title）",
-    },
-    "remoteMcpPath": {
-      "replacement": "保持（形状无品牌）",
-      "todosDev": "/api/mcp",
-    },
-    "sessionCookie": {
-      "replacement": "cairn_session",
-      "todosDev": "tds_session",
-    },
-    "workspacesDir": {
-      "replacement": "~/.cairn/workspaces/<conversationId>",
-      "todosDev": "~/.tds/workspaces/<conversationId>",
-    },
-  },
-}
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > 存储表清单（01 §6） 1`] = `
-[
-  "user",
-  "team",
-  "project",
-  "todo",
-  "tag",
-  "todo_tag",
-  "build",
-  "step",
-  "steer_pending",
-  "stop_pending",
-  "message",
-  "plan",
-  "schedule",
-  "notification",
-  "agent",
-  "agent_memory",
-  "provider",
-  "secret",
-  "api_key",
-  "machine",
-  "token_usage",
-  "chief",
-  "chief_thread",
-  "chief_message",
-  "whats_new",
-  "attachment",
-  "branch_sync",
-  "github_connection",
-  "skill_audit",
-  "shell_command",
-  "webhook_token",
-  "gate_digest",
-  "gate_round",
-  "gate_verdict",
-  "gate_state",
-  "autonomy_state",
-  "member_activity",
-  "build_feedback",
-  "memory_save_conflict",
-  "memory_candidate",
-]
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > 本地状态布局与日志前缀（02 §5.3） 1`] = `
-{
-  "DAEMON_LOG_PREFIXES": [
-    "supervisor",
-    "machine",
-    "step",
-    "workspace",
-    "recover",
-    "wake",
-    "mcp",
-    "skills",
-    "gate",
-    "trust",
-  ],
-  "LOCAL_STATE_DIRS": [
-    "outbox",
-    "chat-sessions",
-    "agent-runtime",
-    "workspaces",
-  ],
-  "LOCAL_STATE_FILES": [
-    "machine.json",
-    "device.json",
-    "daemon.json",
-    "daemon.log",
-  ],
-}
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > 机器面 13 端点（02 §5/r3 §1.6） 1`] = `
-[
-  {
-    "note": "注册（02 §5.2）",
-    "path": "/api/machine/enroll",
-  },
-  {
-    "note": "浏览器授权流（02 §5.2 路径一）",
-    "path": "/api/machine/enroll/start",
-  },
-  {
-    "path": "/api/machine/enroll/poll",
-  },
-  {
-    "note": "机器自述",
-    "path": "/api/machine/me",
-  },
-  {
-    "note": "心跳（断网时并行失败，进程不退出，r3 §1.5）",
-    "path": "/api/machine/presence",
-  },
-  {
-    "note": "步 journal 恢复（细节 [推断]，02 §5.4/§11）",
-    "path": "/api/machine/recover",
-  },
-  {
-    "note": "长轮询领取（~75–76s 节奏，r3 §1.5）",
-    "path": "/api/machine/tasks/claim",
-  },
-  {
-    "note": "wake SSE 低延迟派发（02 §1.2/§5.4）",
-    "path": "/api/machine/stream",
-  },
-  {
-    "note": "步骤 journal 续活（02 §5.4）",
-    "path": "/api/machine/heartbeat/{stepId}",
-  },
-  {
-    "note": "工具调用回传；remoteTools relay 同径（r5 §3.1）",
-    "path": "/api/machine/tool/{stepId}",
-  },
-  {
-    "note": "per-step 凭证下发（模型 key + 托管 repo git 凭证），不落盘常驻 [推断]（02 §5.4/§8）",
-    "path": "/api/machine/token/{stepId}",
-  },
-  {
-    "note": "预签名产物上传：transcript/产物（r3 §1.6）",
-    "path": "/api/machine/upload-urls/{stepId}",
-  },
-  {
-    "note": "步骤收尾",
-    "path": "/api/machine/done/{stepId}",
-  },
-]
-`;
-
-exports[`协议词表快照（02 §5/§6 canonical） > 步骤生命周期行序（02 §5.7）与上线序列 canon（02 §5.4） 1`] = `
-{
-  "ONLINE_SEQUENCE_CANON": [
-    "Loading pi runtime…",
-    "Online (machineId=…); polling <url>",
-    "Idle-sleep prevention active (caffeinate)",
-    "[recover] no pending steps found",
-    "[wake] push channel connected",
-  ],
-  "STEP_LIFECYCLE_LOG_LINES": [
-    "claim step=<id>",
-    "step <id> for conv <uuid> (n running)",
-    "using model <provider>/<modelId>",
-    "new session <convId> | continue session <convId>",
-    "workspace 准备（准备工作区...）",
-    "pushed <convBranch>",
-    "finished (m running)",
-  ],
 }
 `;

@@ -1,15 +1,3 @@
-// 审核步材料组装（#511）：外部行为 = 「某个关口组装出的审核材料里有什么」，
-// 不是「某个函数怎么拼字符串」——断言逐条对应票面 User Stories。
-// 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
-//   1. 确认关口（gate=confirm）：材料不含变更——无变更段、无文件路径、无检出
-//      段（事实还不存在，只审方案）。
-//   2. 审核关口（gate=review）有变更：材料同时含方案全文与变更（文件路径 +
-//      逐行 diff）——审核者能做人能做的事。
-//   3. 审核关口变更面为空：材料如实写「无改动」，不臆造文件（US 10）。
-//   4. 审核关口的只读/验证纪律在材料里：不得写、不提交、不推送，跑过的命令与
-//      输出要落进结论（US 6/7/8）。
-//   5. meta 头携带 gate（相位值单源）——daemon 据此决定是否开只读检出。
-
 import { describe, expect, test } from 'vitest';
 import type { DocumentDiffFile } from '../src/records/document-diff.js';
 import {
@@ -45,8 +33,8 @@ function parseMeta(prompt: string): ReviewPromptMeta {
   return meta;
 }
 
-describe('buildReviewStepPrompt 关口分叉（#511）', () => {
-  test('失败方式 1：确认关口材料不含变更（无变更段、无文件路径、无检出段）', () => {
+describe('buildReviewStepPrompt gate branching (#511)', () => {
+  test('failure mode 1: confirm-gate material contains no changes (no change section, no file paths, no checkout section)', () => {
     const prompt = buildReviewStepPrompt({ agentId: 'a1', gate: 'confirm', planText: PLAN });
     expect(prompt).toContain(PLAN);
     expect(prompt).not.toContain('## 本轮变更');
@@ -55,7 +43,7 @@ describe('buildReviewStepPrompt 关口分叉（#511）', () => {
     expect(parseMeta(prompt).gate).toBe('confirm');
   });
 
-  test('失败方式 2：审核关口材料含方案 + 变更（文件路径与逐行 diff 都在）', () => {
+  test('failure mode 2: review-gate material contains plan + changes (file paths and line-by-line diff both present)', () => {
     const prompt = buildReviewStepPrompt({
       agentId: 'a1',
       gate: 'review',
@@ -70,7 +58,7 @@ describe('buildReviewStepPrompt 关口分叉（#511）', () => {
     expect(parseMeta(prompt).gate).toBe('review');
   });
 
-  test('失败方式 3：审核关口变更面为空 → 材料如实交代空态，不臆造文件', () => {
+  test('failure mode 3: review-gate empty change surface -> material states the empty state truthfully, fabricates no files', () => {
     const prompt = buildReviewStepPrompt({
       agentId: 'a1',
       gate: 'review',
@@ -81,11 +69,10 @@ describe('buildReviewStepPrompt 关口分叉（#511）', () => {
     expect(prompt).toContain('变更面为空');
     expect(prompt).toContain('无改动');
     expect(prompt).not.toContain('src/parse.ts');
-    // 空变更面仍是审核关口材料（有检出可读），不是退化成方案审阅
     expect(parseMeta(prompt).gate).toBe('review');
   });
 
-  test('失败方式 3b：空变更面 + 有检出 → 材料指向检出自行核对（不把空面说成「没改东西」）', () => {
+  test('failure mode 3b: empty change surface + checkout present -> material points at the checkout for self-verification (does not call the empty surface "nothing changed")', () => {
     const prompt = buildReviewStepPrompt({
       agentId: 'a1',
       gate: 'review',
@@ -98,7 +85,7 @@ describe('buildReviewStepPrompt 关口分叉（#511）', () => {
     expect(prompt).not.toContain('本轮无改动');
   });
 
-  test('失败方式 4：审核关口 + 有检出 → 材料含只读与验证纪律（不得提交/推送 + 命令与输出入结论）', () => {
+  test('failure mode 4: review gate + checkout present -> material contains read-only and verification discipline (no commit/push + commands and output into the conclusion)', () => {
     const prompt = buildReviewStepPrompt({
       agentId: 'a1',
       gate: 'review',
@@ -112,7 +99,7 @@ describe('buildReviewStepPrompt 关口分叉（#511）', () => {
     expect(prompt).toContain('命令');
   });
 
-  test('失败方式 6：未绑 repo（checkout 缺省）→ 不写检出段（不谎称有检出），变更段照旧', () => {
+  test('failure mode 6: no bound repo (checkout default) -> no checkout section written (no false claim of a checkout), change section as usual', () => {
     const prompt = buildReviewStepPrompt({
       agentId: 'a1',
       gate: 'review',
@@ -123,7 +110,7 @@ describe('buildReviewStepPrompt 关口分叉（#511）', () => {
     expect(prompt).toContain('src/parse.ts');
   });
 
-  test('失败方式 5：用户关注点仍在尾段（回归：focus 注入口径不变）', () => {
+  test('failure mode 5: user focus still in the final section (regression: focus injection unchanged)', () => {
     const prompt = buildReviewStepPrompt({
       agentId: 'a1',
       gate: 'review',

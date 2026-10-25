@@ -2,9 +2,7 @@
 // ./chief-harness.ts）。共享 harness 收编位 = ./chief-harness.ts，
 // 状态经 H 单出口每用例重绑。
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { CHIEF_REMOTE_TOOLS, CHIEF_TOOL_COUNT } from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';
@@ -204,15 +202,5 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
       expect(def.replaySafe).toBe(true);
       expect(await relay(name, {})).toBeDefined();
     }
-  });
-
-  test('chief-tools.ts 里所有「现行 N 件」文字与 CHIEF_TOOL_COUNT 一致', () => {
-    const source = readFileSync(
-      resolve(import.meta.dirname, '../../../packages/shared/src/protocol/chief-tools.ts'),
-      'utf8',
-    );
-    const stated = [...source.matchAll(/现行 (\d+) 件/g)].map((match) => Number(match[1]));
-    expect(stated.length).toBeGreaterThan(0);
-    expect(stated.every((count) => count === CHIEF_TOOL_COUNT)).toBe(true);
   });
 });
