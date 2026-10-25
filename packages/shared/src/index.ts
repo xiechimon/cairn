@@ -16,6 +16,7 @@ export * from './blocker-handoff-record.js';
 export * from './brand.js';
 // #958：运行简报落 worktree 上下文文件的词表与落点判定（spec 24）。
 export * from './brief-file.js';
+export * from './experience-candidate.js';
 export * from './failure-attribution.js';
 export * from './git-ops.js';
 export * from './phase.js';

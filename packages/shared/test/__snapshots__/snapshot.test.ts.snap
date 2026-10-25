@@ -8844,6 +8844,7 @@ exports[`协议词表快照（02 §5/§6 canonical） > 存储表清单（01 §6
   "member_activity",
   "build_feedback",
   "memory_save_conflict",
+  "memory_candidate",
 ]
 `;
 

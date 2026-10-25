@@ -15,7 +15,7 @@ function validateMemoryText(title: string, content: string): void {
   }
 }
 
-function overlaps(left: string, right: string): boolean {
+export function overlaps(left: string, right: string): boolean {
   const normalize = (value: string) =>
     value
       .normalize('NFKC')
@@ -37,7 +37,7 @@ function overlaps(left: string, right: string): boolean {
 
 type MemoryTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
-function memoriesInScope(
+export function memoriesInScope(
   tx: MemoryTx,
   scope: { agentId: string; teamId: string; projectId: string | null },
   everyProject = false,

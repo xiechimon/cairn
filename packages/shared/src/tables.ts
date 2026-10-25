@@ -53,6 +53,7 @@ export const DB_TABLES = [
   'member_activity', // 人最近一次写操作的时刻（人在用就让路）
   'build_feedback',
   'memory_save_conflict',
+  'memory_candidate',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -99,4 +100,5 @@ export const INTERNAL_ONLY_TABLES = [
   'member_activity',
   'build_feedback',
   'memory_save_conflict',
+  'memory_candidate',
 ] as const;

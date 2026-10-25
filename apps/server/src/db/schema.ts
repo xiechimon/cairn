@@ -10,10 +10,12 @@ import type {
   AutonomyKind,
   AutonomySettings,
   BlockerHandoffRecord,
+  BuildEvidence,
   ChiefWatch,
   ClaudeCodeReport,
   DocumentDiffFile,
   MachineCapabilities,
+  MemoryCandidateStatus,
   ModelRef,
   PersonaRole,
   Phase,
@@ -486,6 +488,26 @@ export const memorySaveConflict = sqliteTable('memory_save_conflict', {
   candidateIds: json<string[]>('candidateIds').notNull(),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export const memoryCandidate = sqliteTable(
+  'memory_candidate',
+  {
+    id: text('id').primaryKey(),
+    agentId: text('agentId').notNull(),
+    teamId: text('teamId').notNull(),
+    projectId: text('projectId').notNull(),
+    title: text('title').notNull(),
+    content: text('content').notNull(),
+    status: text('status').$type<MemoryCandidateStatus>().notNull().default('pending'),
+    buildIds: json<string[]>('buildIds').notNull(),
+    evidence: json<BuildEvidence[]>('evidence').notNull(),
+    conflictIds: json<string[]>('conflictIds').notNull().default(sql`'[]'`),
+    memoryId: text('memoryId'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [index('memory_candidate_scope_idx').on(t.agentId, t.teamId, t.projectId)],
+);
 
 // skill 表已退役（spec 13 #367）：技能 = 本地目录现扫只读投影，不入库——
 // drop migration 前旧行导出到 <home>/legacy-export-<ts>.json（db/legacy-export.ts）。
