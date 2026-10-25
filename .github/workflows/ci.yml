@@ -66,7 +66,7 @@ jobs:
           LANE_FILE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$LANE_FILE_BASE_SHA" ]; then
-            git fetch --depth=1 origin "$LANE_FILE_BASE_SHA"
+            git fetch origin "$LANE_FILE_BASE_SHA"
           fi
           node scripts/lane-file-gate.mjs
 
@@ -180,7 +180,7 @@ jobs:
           LINT_WARNING_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$LINT_WARNING_BASE_SHA" ]; then
-            git fetch --depth=1 origin "$LINT_WARNING_BASE_SHA"
+            git fetch origin "$LINT_WARNING_BASE_SHA"
           fi
           node scripts/lint-warning-cap.mjs
 
