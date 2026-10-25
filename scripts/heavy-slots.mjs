@@ -53,7 +53,7 @@ export default {
   testDir: ${JSON.stringify(join(webDir, 'e2e'))},
   outputDir: ${JSON.stringify(join(slotDir, 'test-results'))},
   use: { ...base.use, baseURL: 'http://127.0.0.1:${port}' },
-  webServer: { ...webServer, command, cwd: ${JSON.stringify(webDir)}, url: 'http://127.0.0.1:${port}/app' },
+  webServer: { ...webServer, command, cwd: ${JSON.stringify(webDir)}, url: 'http://127.0.0.1:${port}/app', reuseExistingServer: false },
 };
 `,
   );

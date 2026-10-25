@@ -129,7 +129,7 @@ function backendWithSession(sessionFile?: string): AgentBackend {
 }
 
 async function setup(backend: AgentBackend, client: FakeClient = new FakeClient()) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-session-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-session-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = (() => {
@@ -185,7 +185,7 @@ async function setup(backend: AgentBackend, client: FakeClient = new FakeClient(
 
 describe('步收尾会话 JSONL 上传（#1512）', () => {
   test('失败方式 1：可读会话文件 → 随 transcript 上传原文', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-pi-session-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-'));
     const sessionFile = join(dir, 'sess.jsonl');
     const body = '{"type":"assistant","stopReason":"length"}\n';
     writeFileSync(sessionFile, body);
@@ -198,7 +198,7 @@ describe('步收尾会话 JSONL 上传（#1512）', () => {
   });
 
   test('失败方式 2：文件不存在 → 步成功，日志可见，不请求 session.jsonl', async () => {
-    const missing = join(tmpdir(), `pacman-session-gone-${Date.now()}.jsonl`);
+    const missing = join(tmpdir(), `cairn-session-gone-${Date.now()}.jsonl`);
     const { client, lines } = await setup(backendWithSession(missing));
     expect(client.uploadNames[0]).toEqual(['transcript.json']);
     expect(client.doneBodies[0]?.body.status).toBe('success');
@@ -206,7 +206,7 @@ describe('步收尾会话 JSONL 上传（#1512）', () => {
   });
 
   test('失败方式 3：超过上限 → 步成功，日志可见，不请求 session.jsonl', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-pi-session-big-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-big-'));
     const sessionFile = join(dir, 'sess.jsonl');
     writeFileSync(sessionFile, 'x'.repeat(SESSION_JSONL_MAX_BYTES + 1));
     const { client, lines } = await setup(backendWithSession(sessionFile));
@@ -216,7 +216,7 @@ describe('步收尾会话 JSONL 上传（#1512）', () => {
   });
 
   test('失败方式 4：session PUT 失败 → transcript 仍上传、done 仍报', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-pi-session-put-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-put-'));
     const sessionFile = join(dir, 'sess.jsonl');
     writeFileSync(sessionFile, '{"ok":1}\n');
     const client = new FakeClient();

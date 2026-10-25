@@ -21,6 +21,7 @@ export default defineConfig({
     // default; the follow-system behavior itself is asserted per-test via
     // page.emulateMedia in shell-consistency.spec.ts.
     colorScheme: 'dark',
+    locale: 'zh-CN',
   },
   webServer: {
     command: `pnpm exec vite build --mode fixture && pnpm exec vite preview --host 127.0.0.1 --port ${PORT} --strictPort`,

@@ -2,9 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 try {
-  const base = process.env.COMMENT_DISCIPLINE_BASE_SHA || 'origin/main';
   const git = (...args) =>
     execFileSync('git', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  const base = git(
+    'merge-base',
+    process.env.COMMENT_DISCIPLINE_BASE_SHA || 'origin/main',
+    'HEAD',
+  ).trim();
   const allowlist = JSON.parse(readFileSync('scripts/comment-discipline-allowlist.json', 'utf8'));
   if (
     !Array.isArray(allowlist) ||

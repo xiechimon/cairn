@@ -275,7 +275,7 @@ beforeAll(async () => {
   const [e1, e2, e3] = [await enroll('trio-m1'), await enroll('trio-m2'), await enroll('trio-m3')];
   tokens = { m1: e1.token, m2: e2.token, m3: e3.token };
   browser = await chromium.launch();
-  page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
+  page = await browser.newPage({ viewport: { width: 1440, height: 732 }, locale: 'zh-CN' });
 }, 300_000);
 
 afterAll(async () => {
