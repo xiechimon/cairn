@@ -23,20 +23,20 @@ describe('readSessionJsonlForUpload（#1512）', () => {
 
   test('失败方式 2：文件不存在 → null + 日志', () => {
     const { lines, log } = capture();
-    const missing = join(tmpdir(), `pacman-session-missing-${Date.now()}.jsonl`);
+    const missing = join(tmpdir(), `cairn-session-missing-${Date.now()}.jsonl`);
     expect(readSessionJsonlForUpload(missing, log)).toBeNull();
     expect(lines.some((l) => l.includes('missing') && l.includes(missing))).toBe(true);
   });
 
   test('失败方式 3：读取失败 → null + 日志', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-session-unreadable-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-session-unreadable-'));
     const { lines, log } = capture();
     expect(readSessionJsonlForUpload(dir, log)).toBeNull();
     expect(lines.some((l) => l.includes('read failed'))).toBe(true);
   });
 
   test('失败方式 4：超过上限 → 跳过 + 日志，不截断', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-session-oversize-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-session-oversize-'));
     const file = join(dir, 'session.jsonl');
     writeFileSync(file, 'x'.repeat(40));
     const { lines, log } = capture();
@@ -45,7 +45,7 @@ describe('readSessionJsonlForUpload（#1512）', () => {
   });
 
   test('失败方式 5：未超上限 → 原样返回', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-session-ok-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-session-ok-'));
     const file = join(dir, 'session.jsonl');
     const body = '{"type":"assistant","stopReason":"length"}\n';
     writeFileSync(file, body);
