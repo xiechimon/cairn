@@ -4,7 +4,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { prepushPlan } from './prepush.mjs';
+import { prepushPlan, selfTests } from './prepush.mjs';
 
 test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
@@ -14,6 +14,19 @@ test('documentation skips code checks, unknown paths fail closed', () => {
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],
   ]);
   assert.ok(prepushPlan(['new-config']).length > 0);
+});
+
+test('changes to prepush scripts run the CI self-test files locally', () => {
+  const selfTest = ['node', '--test', ...selfTests];
+  assert.ok(
+    prepushPlan(['scripts/heavy-slots.mjs']).some((args) => args.join(' ') === selfTest.join(' ')),
+  );
+  assert.ok(
+    !prepushPlan(['apps/web/src/main.tsx']).some((args) => args.join(' ') === selfTest.join(' ')),
+  );
+  assert.ok(
+    readFileSync('.github/workflows/ci.yml', 'utf8').includes(`run: ${selfTest.join(' ')}\n`),
+  );
 });
 
 test('local code checks include both UI gates and affected e2e', () => {
