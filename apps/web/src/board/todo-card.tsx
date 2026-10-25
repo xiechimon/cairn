@@ -39,6 +39,7 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { PHASE_UI } from '../phase.js';
 import { type CardFace, cardFace } from './columns.js';
+import { orchestrationErrorSummary } from './orchestration-error.js';
 import { relativeTime } from './rel-time.js';
 
 interface TodoCardProps {
@@ -239,7 +240,7 @@ export function TodoCard({
               'absolute inset-y-0 right-0 my-auto bg-inherit opacity-0 transition-opacity duration-150 ease-out group-hover/card:opacity-100 group-focus-within/card:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100',
             )}
         </div>
-        <div className="flex flex-none items-center gap-1 text-content-dim empty:hidden">
+        <div className="flex flex-none items-center gap-1 text-content-dim opacity-0 transition-opacity duration-150 ease-out empty:hidden group-hover/card:opacity-100 group-focus-within/card:opacity-100 pointer-coarse:opacity-100">
           {todo.chiefCreated === true && (
             <span role="img" aria-label={t('由总管创建')} title={t('由总管创建')} className="flex">
               <Glyph icon={Sparkles} className="size-3" />
@@ -335,10 +336,10 @@ export function TodoCard({
             </Link>
           </div>
           <p
-            className="mt-1 line-clamp-2 break-all text-content-secondary"
+            className="mt-1 line-clamp-2 wrap-break-word text-content-secondary"
             title={orchestrationError}
           >
-            {orchestrationError}
+            {t(orchestrationErrorSummary(orchestrationError))}
           </p>
         </div>
       )}

@@ -8,8 +8,8 @@ import { evidencePanelShot } from './evidence';
 //      runtime mark render, and no picker control / model popover exists
 //      (the #615/#950 control carrier 总管主模型 retired with the slot).
 //   2. the row stays readable in both themes (rendered-pair contrast).
-//   3. the row carries the runtime mark (RuntimePi 块状 π / RuntimeClaudeCode
-//      品牌星标), not an agent avatar; unbound keeps the plain n/a line.
+//   3. the row carries the runtime mark (RuntimePi block pi / RuntimeClaudeCode
+//      brand star), not an agent avatar; unbound renders no model row.
 //   4. the message-row copy glyphs are real clipboard buttons; 恢复 / foot
 //      chevron had no backend and no local-first object face, so per the
 //      #306/#146 二分律 they are gone, not inert.
@@ -92,10 +92,10 @@ test.describe('chief drawer model row (#615)', () => {
     await expect(row.locator('span').first().locator('svg')).toHaveCount(1);
     await expect(row.locator('img')).toHaveCount(0);
 
-    // unbound: plain n/a line, no control (nothing to pick until an agent binds)
     await page.goto('/app?scenario=100');
     await expect(drawer(page)).toBeVisible();
-    await expect(page.getByText('n/a', { exact: true })).toBeVisible();
+    await expect(modelRow(page)).toHaveCount(0);
+    await expect(page.getByText('n/a', { exact: true })).toHaveCount(0);
   });
 
   test('message copy glyphs are clipboard buttons; no bare inert glyphs remain', async ({

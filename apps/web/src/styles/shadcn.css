@@ -221,18 +221,15 @@
   --seg-active: #46413c;
   --seg-hover: rgb(255 252 248 / 0.05);
   /* diff pane：stat 绿与删除行红随定版色板走 */
-  --diff-add-bg: #1a3821;
-  --diff-add-fg: #6ac380;
+  --diff-add-bg: #26321f;
+  --diff-add-fg: #99ce9a;
   /* r8 dynamic states (#75): failed chip + fail message + del diff row */
   --chip-failed-bg: #48242a;
   --chip-failed-fg: #ffabb7;
   --fail-fg: #ffb091;
-  --diff-del-bg: #48242a;
-  /* #1101 词级高亮层：配对 del/add 行内变化的词骑更深/更饱和的底，与整行
-     底色可区分（word-vs-row 实测 1.62/1.53），fg(--text-secondary) 对比度
-     实测 5.10/5.64 过 AA——读数见 docs/verify/1101/contrast.txt */
-  --diff-add-word-bg: #1f5c33;
-  --diff-del-word-bg: #77363f;
+  --diff-del-bg: #3d2a24;
+  --diff-add-word-bg: #3a5230;
+  --diff-del-word-bg: #6a3d30;
   /* resource surfaces (r7 06–10, #69)：tile-orange 橙系是状态语义，与 spot
      各表一意（tile-indigo 判死退役——0 消费，§3.2） */
   --tile-orange-bg: #422b0d;
@@ -368,17 +365,15 @@
   --seg-active: #e2dcd7;
   --seg-hover: rgb(28 25 21 / 0.05);
   /* diff pane（add/del 行、stat 字保留语义，值随定版） */
-  --diff-add-bg: #c3f5cc;
-  --diff-add-fg: #005f28;
+  --diff-add-bg: #e2eed8;
+  --diff-add-fg: #3d6a35;
   /* r8 dynamic states (#75)：failed chip / fail title / del row tint */
   --chip-failed-bg: #ffdce0;
   --chip-failed-fg: #6b1f31;
   --fail-fg: #823a1c;
-  --diff-del-bg: #ffdce0;
-  /* #1101 词级高亮层（暗侧同律）：word-vs-row 实测 1.37/1.42 可区分，
-     fg 对比度实测 7.59/7.07 过 AA——读数见 docs/verify/1101/contrast.txt */
-  --diff-add-word-bg: #7ddc96;
-  --diff-del-word-bg: #ffaab6;
+  --diff-del-bg: #f7e2da;
+  --diff-add-word-bg: #bcd9a9;
+  --diff-del-word-bg: #f0c6b5;
   --tile-orange-bg: #ffe5c8;
   --tile-orange-fg: #825100;
   --tile-hero-bg: #ffd099;

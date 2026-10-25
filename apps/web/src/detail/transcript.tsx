@@ -11,7 +11,6 @@
 
 import { useState } from 'react';
 import { inlineSegments } from '../api/mappers.js';
-import { type CurrentUser, useLiveData } from '../api/provider.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { Button } from '../components/ui/button.js';
@@ -144,6 +143,7 @@ function ActionRow({
   t,
   toggle,
   label,
+  align = 'start',
 }: {
   seconds?: number;
   /** `完成` with no seconds (reused-plan card, r8 76). */
@@ -160,6 +160,7 @@ function ActionRow({
    *  tail, so a collapsed group reads as a folded tool process instead of
    *  a stray pill. Only the tools group passes one. */
   label?: string;
+  align?: 'start' | 'end';
 }) {
   const tail = (
     <>
@@ -192,7 +193,7 @@ function ActionRow({
   );
   return (
     <div
-      className="chat-row-icons mt-5 flex items-center gap-3.5 pl-8 text-(--text-tertiary)"
+      className={`chat-row-icons mt-5 flex items-center gap-3.5 text-(--text-tertiary) ${align === 'end' ? 'justify-end' : 'pl-8'}`}
       data-testid="msg-actions"
     >
       {copy != null && (
@@ -298,7 +299,6 @@ function Row({
   t,
   onOpenPlan,
   agent,
-  user,
   liveStep,
 }: {
   item: TranscriptItem;
@@ -307,7 +307,6 @@ function Row({
   t: TFunc;
   onOpenPlan?: () => void;
   agent: { displayName: string; avatarUrl: string | null } | null;
-  user: CurrentUser;
   liveStep: LiveStep | null;
 }) {
   const margin = rowMargin(item, prev);
@@ -399,25 +398,9 @@ function Row({
     case 'user':
       return (
         <>
-          <div className={`${ROW_BASE} ${margin}`}>
+          <div className={`${ROW_BASE} chat-row--user justify-end ${margin}`}>
             <span
-              className="chat-avatar flex-none size-5 [&_img]:block [&_img]:size-5"
-              data-testid="msg-avatar"
-            >
-              <SeededAvatar
-                className="size-5"
-                name={user.displayName}
-                src={user.avatarUrl}
-                fallback="/avatar-user.png"
-              />
-            </span>
-            {/* #612：真实用户话语带 markdown 槽（live mapper 设置；robot 行
-                #469 同款渲染期解析）——围栏/列表/标题不再按字面裸排。纯文本
-                槽 = fixture 捕获形，DOM 与几何保持不变。XMON-55 P3：
-                min-height 保单行药丸 24px、多行随文长；12px 位圆角与
-                composer 同层（页面上两个用户说话的面同材质）。 */}
-            <span
-              className={`chat-bubble anim-message-fade-up ml-3 mt-1 min-h-6 min-w-0 max-w-[68ch] rounded-(--radius-bubble) bg-(--secondary) px-3 text-card-title leading-6 break-words text-(--foreground) ${
+              className={`chat-bubble anim-message-fade-up mt-1 min-h-6 min-w-0 max-w-[min(80%,56ch)] rounded-(--radius-bubble) rounded-br-[6px] bg-(--secondary) px-3.5 py-1 text-card-title leading-6 break-words text-(--foreground) ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'
@@ -429,7 +412,7 @@ function Row({
             </span>
           </div>
           {item.seq != null && item.title != null && (
-            <div className="mt-1.5 flex items-center pl-12" data-testid="taskline">
+            <div className="mt-1.5 flex items-center justify-end" data-testid="taskline">
               <span className="flex h-5 flex-none items-center rounded-[4px] bg-(--muted) px-2 text-caption text-(--text-secondary)">
                 #{item.seq}
               </span>
@@ -441,7 +424,7 @@ function Row({
           {/* #634 follow-up: the user row's copy is real too — the bubble's
               own text (the reference copies its todo markdown link here;
               our share surface for that is the 更多 menu's 复制链接). */}
-          <ActionRow copy={item.markdown ?? item.text} t={t} />
+          <ActionRow copy={item.markdown ?? item.text} t={t} align="end" />
         </>
       );
     case 'robot':
@@ -592,7 +575,7 @@ function Row({
           {/* r7 26/27：preview 行距 20（12px/20），首行距 plan 标题行 8px；
               两行截断走 max-height（line-clamp 在 headless 上算成 flow-root
               零高，不可用）；flex-none 防溢出行压扁本项。 */}
-          <div className="chat-preview mt-2 max-h-10 flex-none overflow-hidden pl-8 pr-6 text-meta leading-5 text-(--text-tertiary)">
+          <div className="chat-preview mt-2 max-h-10 flex-none overflow-hidden pl-8 pr-6 text-meta leading-5 text-(--text-tertiary) [mask-image:linear-gradient(to_bottom,black_50%,transparent)]">
             {item.preview}
           </div>
           <ActionRow
@@ -951,9 +934,6 @@ export function Transcript({
   liveStep = null,
 }: TranscriptProps) {
   const { t } = useI18n();
-  // XMON-105: the user row's avatar is the logged-in user's own identity
-  // (sidebar chip / account head share it), not a per-surface static asset.
-  const { user } = useLiveData();
   return (
     <>
       {transcript.map((item, i) => {
@@ -969,7 +949,6 @@ export function Transcript({
               t={t}
               onOpenPlan={onOpenPlan}
               agent={agent}
-              user={user}
               liveStep={liveStep}
             />
           </MessageScrollerItem>

@@ -67,6 +67,10 @@ export const EN: Record<string, string> = {
   执行中: 'Running',
   已完成: 'Done',
   暂无: 'None',
+  写下想做的事: 'Write down what you want done',
+  还没有待开始的任务: 'Nothing waiting to start',
+  没有在跑的任务: 'Nothing running',
+  '最近 7 天还没有完成的任务': 'Nothing finished in the last 7 days',
   // Paper card footer (DESIGN.md 任务卡): needs-you state flag + action link
   待确认: 'Plan to confirm',
   确认计划: 'Confirm plan',
@@ -242,7 +246,7 @@ export const EN: Record<string, string> = {
   '按你的本地时区运行（Asia/Shanghai）': 'Runs in your local time zone (Asia/Shanghai)',
   // #1037 fixture 模式自我声明 chip（api/provider.tsx）
   '示例数据（scenario {id}）': 'Sample data (scenario {id})',
-  '尚无定时。': 'No schedules yet.',
+  还没有定时任务: 'No schedules yet',
   '按周期或在指定时间自动重新运行任务。每一轮都会依据任务描述从头开始一次全新运行，到达确认或审核关口时暂停，交由负责人接手。':
     'Automatically rerun a task on a cycle or at a chosen time. Every round starts a fresh run from the task description, pausing at the confirm or review gate for the owner to pick up.',
   '也可以直接告诉总管某个任务要多久重跑一次，它会替你写好规则。':
@@ -1116,6 +1120,13 @@ export const EN: Record<string, string> = {
   未能开始编排: 'Could not start orchestration',
   // —— #1216 在飞编排态（开始/重跑的可见反馈）与详情缺失三态 ——
   编排中: 'Orchestrating',
+  '上下文超出模型上限，精简任务后重试': 'Context exceeds the model limit; trim the task and retry',
+  '额度不足或请求太频繁，稍后重试': 'Out of quota or rate limited; retry later',
+  '模型服务鉴权失败，检查密钥': 'Model provider rejected the credentials; check the key',
+  '连接中断，可以重试': 'Connection dropped; retry',
+  '请求超时，可以重试': 'Request timed out; retry',
+  '模型服务暂时不可用，可以重试': 'Model provider is unavailable; retry',
+  '出了点问题，可以重试或查看会话': 'Something went wrong; retry or open the thread',
   编排失败: 'Orchestration failed',
   '等 {machine} 上线': 'waiting for {machine} to come online',
   等机器上线: 'waiting for a machine to come online',

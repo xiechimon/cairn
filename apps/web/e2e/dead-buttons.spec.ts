@@ -164,7 +164,8 @@ test('schedules fixture face: topbar 新建 opens the dialog, freq tabs respond,
   page,
 }) => {
   await page.goto('/app/schedules?scenario=11');
-  await page.locator('.page-new-action').click();
+  await expect(page.locator('.page-new-action')).toHaveCount(0);
+  await page.locator('.sched-empty').getByRole('button', { name: '新建定时' }).click();
   const dialog = page.getByRole('dialog', { name: '新建定时' });
   await expect(dialog).toBeVisible();
   // 频率 tabs 在冻结面同样是真 tabs：点 每周 选中即跟（旧态 = 受控 value

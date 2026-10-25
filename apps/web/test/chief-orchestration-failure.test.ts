@@ -35,7 +35,8 @@ test('a failed context-length round leaves orchestration and displays its reason
   expect(inflightOrchestrationFor([failed], 1586)).toBeNull();
   const html = render([failed]);
   expect(html).toContain('编排失败');
-  expect(html).toContain(reason);
+  expect(html).toContain('上下文超出模型上限，精简任务后重试');
+  expect(html).toContain(`title="${reason}"`);
   expect(html).toContain('重试');
   expect(html).not.toContain('data-orchestrating="true"');
 });

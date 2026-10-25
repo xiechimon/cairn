@@ -69,7 +69,7 @@ test.describe('#15 focus ring收编', () => {
     // frozen dialog, Esc closes it and focus returns to the opener per the
     // DialogShell #389 contract; the UA-ring ban rides the returned focus).
     await page.goto('/app/schedules?scenario=11');
-    const pageNew = page.locator('.page-new-action');
+    const pageNew = page.locator('.sched-empty').getByRole('button', { name: '新建定时' });
     await pageNew.click();
     const schedDialog = page.getByRole('dialog', { name: '新建定时' });
     await expect(schedDialog).toBeVisible();

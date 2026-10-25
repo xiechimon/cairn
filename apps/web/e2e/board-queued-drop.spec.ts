@@ -171,7 +171,8 @@ test('a context length failure replaces orchestration with a reason and retry', 
   failed = true;
   await expect(card.locator('[data-orchestrating="true"]')).toHaveCount(0);
   await expect(card.getByText('编排失败', { exact: true })).toBeVisible();
-  await expect(card.getByText(reason, { exact: true })).toBeVisible();
+  await expect(card.getByText('上下文超出模型上限，精简任务后重试', { exact: true })).toBeVisible();
+  await expect(card.locator(`[title="${reason}"]`)).toHaveCount(1);
   await evidencePanelShot(page, 'context-length-failed.png', card);
   await card.getByRole('button', { name: '重试', exact: true }).click();
   await expect.poll(() => stub.orchestrated).toEqual([FRESH_ID]);

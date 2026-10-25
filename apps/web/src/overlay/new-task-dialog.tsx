@@ -775,7 +775,7 @@ export function NewTaskDialog({
               列，strip 挂正文与 footer 之间、空时零节点。 */}
           <AttachmentStrip draft={spec} pending={pendingAttachments} />
         </div>
-        <div className="flex-none border-t border-border p-3">
+        <div className="flex-none p-3">
           <div className="flex h-8 items-center">
             {/* A4-deep 收编：icon 变体皮肤；30×30 = size-7.5（原 .new-task-tools
                 button 元素选择器）。 */}

@@ -172,7 +172,7 @@ test('search agent rows + project task rows are seeded (Agent 列表 / 任务行
   await expect(page.locator('.prj-task-avatar img').first()).toHaveAttribute('src', USER_SRC);
 });
 
-test('conversation transcript: agent rows carry the assigned agent avatar, user rows the user avatar', async ({
+test('conversation transcript: agent rows carry the assigned agent avatar, user rows carry none', async ({
   page,
 }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
@@ -180,11 +180,8 @@ test('conversation transcript: agent rows carry the assigned agent avatar, user 
     'src',
     AGENT_SRC,
   );
-  await expect(
-    page
-      .locator('.chat-row:not(.chat-row--agent):not(.chat-row--chief) .chat-avatar img')
-      .first(),
-  ).toHaveAttribute('src', USER_SRC);
+  await expect(page.locator('.chat-row--user').first()).toBeVisible();
+  await expect(page.locator('.chat-row--user .chat-avatar')).toHaveCount(0);
 });
 
 test('account head shares the seeded user src (same identity as the sidebar chip)', async ({

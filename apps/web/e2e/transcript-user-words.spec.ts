@@ -229,7 +229,7 @@ test('4. 真实 steer 话语走 markdown：围栏成代码块，字面 ``` 不�
   await expect(md).not.toContainText('```');
 });
 
-test('5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）', async ({ page }) => {
+test('5. a one-line message keeps the 32px bubble height (no geometry drift)', async ({ page }) => {
   await stubWorld(page);
   const short = page.getByTestId('user-bubble').filter({ hasText: '收到，谢谢' });
   await expect(short).toBeVisible();
@@ -237,7 +237,7 @@ test('5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）', as
     const r = el.getBoundingClientRect();
     return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
   });
-  expect(box.h).toBe(24);
+  expect(box.h).toBe(32);
   expect(box.font).toBe('14px');
 });
 

@@ -144,7 +144,11 @@ test('bubble / avatar / footer keep their own geometry (#470 scope fence)', asyn
   const geo = await page.evaluate(() => {
     const bubble = document.querySelector('[data-testid="user-bubble"]')!;
     const avatar = document.querySelector('[data-testid="msg-avatar"] img')!;
-    const footer = document.querySelector('[data-testid="msg-actions"]')!;
+    const userItem = bubble.closest('[data-slot="message-scroller-item"]')!;
+    const userFooter = userItem.querySelector('[data-testid="msg-actions"]')!;
+    const footer = [...document.querySelectorAll('[data-testid="msg-actions"]')].find(
+      (el) => !userItem.contains(el),
+    )!;
     const b = bubble.getBoundingClientRect();
     const a = avatar.getBoundingClientRect();
     return {
@@ -152,12 +156,14 @@ test('bubble / avatar / footer keep their own geometry (#470 scope fence)', asyn
       bubbleFont: getComputedStyle(bubble).fontSize,
       avatarBox: { w: Math.round(a.width), h: Math.round(a.height) },
       footerPad: getComputedStyle(footer).paddingLeft,
+      userFooterAlign: getComputedStyle(userFooter).justifyContent,
     };
   });
-  expect(geo.bubbleH).toBe(24);
+  expect(geo.bubbleH).toBe(32);
   expect(geo.bubbleFont).toBe('14px');
   expect(geo.avatarBox).toEqual({ w: 20, h: 20 });
   expect(geo.footerPad).toBe('32px');
+  expect(geo.userFooterAlign).toBe('flex-end');
 });
 
 test('turn boundary is air, not a rule: no divider between a user turn and the agent row', async ({
