@@ -13,7 +13,11 @@ import { appendFileSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest, type IncomingMessage } from 'node:http';
 
 const PORT = Number(process.argv[2] ?? 8901);
-const UPSTREAM = process.argv[3] ?? 'http://112.80.47.186:8783/v1';
+const UPSTREAM = process.argv[3] ?? process.env.CAIRN_EVAL_RELAY_UPSTREAM;
+if (!UPSTREAM)
+  throw new Error(
+    'upstream missing: pass it as the second argument or set CAIRN_EVAL_RELAY_UPSTREAM',
+  );
 const OUT = process.argv[4] ?? '/tmp/wire-tap.jsonl';
 
 writeFileSync(OUT, '');

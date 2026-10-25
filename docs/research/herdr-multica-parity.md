@@ -2,7 +2,7 @@
 
 - 性质：方法论 / 工具调研，不是研究票产物（仓内 `r<N>-*.md` 是按研究票编号的，这份不是）。无实施计划。
 - 对象：① herdr 本体的能力面（能不能自己长出 Multica 的效果）；② herdr 的扩展面（插件 / socket API / 多机）；③ 生态里已经做出来的成品（逐个核实）。
-- 抓取日期：2026-10-01。本机 herdr 实测版本：client 0.9.3、server 0.9.1、socket protocol 22、socket `/Users/xmon/.config/herdr/herdr.sock`。
+- Captured 2026-10-01. Local herdr versions measured: client 0.9.3, server 0.9.1, socket protocol 22, socket `~/.config/herdr/herdr.sock`.
 - 联网通道：`agent-reach` 的 github 后端（= `gh` CLI）。插件 README 为项目自述原文（一手），star 数为 `gh search repos --topic herdr-plugin` 实测快照。
 - 标记约定：`measured` = 亲手跑到命令输出 / 抓到原文；`inferred` = 由原文或代码推导；`guess` = 无一手证据。来源性质用 `[一手]` / `[项目自述]` / `[二手]` 标注。
 - 引用约定：herdr 结论来自本机 CLI 实测（`herdr --help`、`herdr api schema --json`、`herdr --skill`、`herdr status`）；Multica 结论转引 wiki [[todos.dev 与 Multica 对照]]（该页为 2026-09-30 全量精读 multica.ai 41 页官方文档的产物），本页**未重新抓 Multica 文档复核**。

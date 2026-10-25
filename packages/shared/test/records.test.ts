@@ -232,7 +232,7 @@ describe('provider record (r3 §2 实测原样, key 打码)', () => {
     kind: 'custom',
     providerId: 'r3-gw',
     label: 'r3-gw',
-    baseUrl: 'http://100.65.44.76:3000',
+    baseUrl: 'http://203.0.113.7:3000',
     api: 'anthropic-messages',
     authHeader: true,
     compat: { supportsDeveloperRole: false },
