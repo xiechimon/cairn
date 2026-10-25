@@ -1,6 +1,13 @@
-import { ENV_VARS } from '@cairn/shared';
+import { ACCESS_TOKEN_FILE_NAME, BRAND, ENV_VARS } from '@cairn/shared';
 import { type FormEvent, useEffect, useState } from 'react';
-import { passGate, probeToken, useAuth } from '../api/auth.js';
+import {
+  beginGateProbe,
+  consumeLoginFragment,
+  passGate,
+  probeToken,
+  rejectGate,
+  useAuth,
+} from '../api/auth.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { Input } from '../components/ui/input.js';
@@ -10,13 +17,15 @@ export function TokenGate() {
   const { t } = useI18n();
   const auth = useAuth();
   const [value, setValue] = useState('');
-  const [rejected, setRejected] = useState(false);
   const [probing, setProbing] = useState(false);
+
+  useEffect(() => {
+    void consumeLoginFragment();
+  }, []);
 
   useEffect(() => {
     if (!auth.gateOpen) return;
     setValue('');
-    setRejected(false);
     (document.getElementById('cairn-token-input') as HTMLInputElement | null)?.focus();
   }, [auth.gateOpen]);
 
@@ -27,12 +36,12 @@ export function TokenGate() {
     const candidate = value.trim();
     if (candidate === '' || probing) return;
     setProbing(true);
-    setRejected(false);
+    beginGateProbe();
     void probeToken(candidate).then((accepted) => {
       if (accepted) {
         passGate(candidate);
       } else {
-        setRejected(true);
+        rejectGate();
         setValue('');
       }
       setProbing(false);
@@ -56,8 +65,12 @@ export function TokenGate() {
           </p>
           <p className="token-gate-help text-xs leading-relaxed text-content-tertiary">
             {t(
-              '令牌由部署方在服务端用环境变量 {tokenVar} 设定，页面无法读出它的值：自己部署的服务，去启动它的环境里找这个变量（systemd 部署看单元 EnvironmentFile 指向的文件）；别人部署的，向部署者索取。删除该变量并重启服务端即可关闭令牌鉴权。',
-              { tokenVar: ENV_VARS.token },
+              '令牌从哪来：在运行服务端的机器上执行 `cairn token` 查看当前令牌（`cairn token --rotate` 换发新令牌；令牌存于服务端 {tokenFile} 文件，设了 {tokenVar} 环境变量则以环境变量为准）。本地自行部署时，服务端启动日志还会打印一次性登录链接；容器/托管部署（{requireTokenVar}）的日志是共享的，不会打印令牌值和登录链接，请向部署者索取。删除环境变量或令牌文件并重启服务端即可关闭令牌鉴权。',
+              {
+                tokenVar: ENV_VARS.token,
+                requireTokenVar: `${ENV_VARS.requireToken}=1`,
+                tokenFile: `~/${BRAND.homeDirName}/${ACCESS_TOKEN_FILE_NAME}`,
+              },
             )}
           </p>
           <label className="text-xs text-content-tertiary" htmlFor="cairn-token-input">
@@ -71,7 +84,7 @@ export function TokenGate() {
             autoComplete="off"
             onChange={(event) => setValue(event.target.value)}
           />
-          {rejected && (
+          {auth.rejected && (
             <p className="token-gate-error text-xs text-destructive" role="alert">
               {t('令牌无效，请重试。')}
             </p>

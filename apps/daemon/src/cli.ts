@@ -21,6 +21,7 @@ import { createDaemonLogger } from './log.js';
 import { runMachine } from './machine-loop.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import { isAlive, runSupervisor, spawnSupervisor, stopSupervisor } from './supervisor.js';
+import { runTokenCommand } from './token-command.js';
 import { DAEMON_VERSION } from './version.js';
 
 interface StartOptions {
@@ -217,6 +218,18 @@ export function buildProgram(): Command {
           ? `Running: pid ${daemon.pid} (since ${new Date(daemon.startedAt).toISOString()})\n`
           : 'Not running\n',
       );
+    });
+
+  program
+    .command('token')
+    .description('Print the server access token and its location; --rotate writes a new one')
+    .option('--rotate', 'write a new token to the token file ($CAIRN_HOME/token)')
+    .action((opts: { rotate?: boolean }) => {
+      const code = runTokenCommand(
+        { rotate: opts.rotate === true },
+        { env: process.env, writeOut: (text) => process.stdout.write(text) },
+      );
+      if (code !== 0) process.exitCode = code;
     });
 
   program

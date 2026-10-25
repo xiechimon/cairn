@@ -19,14 +19,15 @@ function writeToken(token: string | null): void {
 
 export interface AuthSnapshot {
   gateOpen: boolean;
+  rejected: boolean;
 }
 
-let snapshot: AuthSnapshot = { gateOpen: false };
+let snapshot: AuthSnapshot = { gateOpen: false, rejected: false };
 const listeners = new Set<() => void>();
 let gateWaiters: Array<() => void> = [];
 
-function publish(gateOpen: boolean): void {
-  snapshot = { gateOpen };
+function publish(gateOpen: boolean, rejected: boolean): void {
+  snapshot = { gateOpen, rejected };
   for (const listener of listeners) listener();
 }
 
@@ -54,15 +55,44 @@ export async function probeToken(token: string): Promise<boolean> {
 
 export function demandGate(): void {
   writeToken(null);
-  if (!snapshot.gateOpen) publish(true);
+  if (snapshot.gateOpen) return;
+  publish(true, false);
 }
 
 export function passGate(token: string): void {
   writeToken(token);
   const waiters = gateWaiters;
   gateWaiters = [];
-  publish(false);
+  publish(false, false);
   for (const wake of waiters) wake();
+}
+
+export function beginGateProbe(): void {
+  if (!snapshot.rejected) return;
+  publish(snapshot.gateOpen, false);
+}
+
+export function rejectGate(): void {
+  writeToken(null);
+  publish(true, true);
+}
+
+const LOGIN_FRAGMENT_PREFIX = '#token=';
+
+export async function consumeLoginFragment(): Promise<void> {
+  const hash = window.location.hash;
+  if (!hash.startsWith(LOGIN_FRAGMENT_PREFIX)) return;
+  const token = decodeURIComponent(hash.slice(LOGIN_FRAGMENT_PREFIX.length));
+  window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  if (token === '') return;
+  try {
+    const open = await fetch(PROBE_PATH);
+    if (open.ok) return;
+  } catch {
+    return;
+  }
+  if (await probeToken(token)) passGate(token);
+  else rejectGate();
 }
 
 export function awaitGate(): Promise<void> {
