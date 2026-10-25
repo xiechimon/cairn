@@ -3,7 +3,7 @@
 > 目的：回填 `docs/spec/02-架构平价.md` §4.3/§4.4/§9.1 钉为黑盒逼近的 [推断] 项——Chief 策略层（plan 拆分/分派/措辞→spec）、驳回回路、双 Agent 分派、memory 写路径、通知实际弹出矩阵、总管设置齿轮——全部以 todos.dev 一手行为证据改判。
 > 素材：Ego 浏览器 TaskSpace **1**（Profile 2「mon (2)」，free 档已登录 Xmon Dai's team `BoZYfvqKSGanlxsXVbXSa`）+ 本机 `@todos-dev/cli` 0.1.52 真机（`xmonsMac-3574.local` / `TlZ2sSD4EJCxjNJqVhdo_`）+ CDP Network 抓包 + 页内钩子（`window.__r5`：Notification/SW showNotification/XHR-SSE tee/visibility，源码见 `assets/r5/raw/r5-hooks.js`）+ CLI bundle 静态提取 + macOS screencapture。
 > 观察时间：2026-09-22 17:00–18:40（本地 Asia/Shanghai；daemon.log 为 UTC，正文时间均标本地）。
-> 前置：r3 会话环境复用（BYOK 网关 `r3-gw` 12 模型存活，`http://100.65.44.76:3000`，无密钥请求回 `Invalid token` = 在线）；会话开始时 daemon 未运行，`tds start` 上线（daemon.log `09:00:07Z Online`）。
+> Setup: reuses the r3 session environment (BYOK gateway `r3-gw` with 12 live models at `http://<tailnet-host>:3000`; a keyless request returning `Invalid token` means it is up). The daemon was not running at session start; `tds start` brought it online (daemon.log `09:00:07Z Online`).
 > 测试 Agent：`r3-builder`（claude-sonnet-5，职责「负责代码实现与工程修改…」）为 r3 遗留；本会话新建 `r5-scribe`（qwen3.8-max，职责「负责撰写与润色各类文档…」，`POST /api/teams/{id}/agents` → 201）——模型差异用于在 daemon.log `using model` 行区分两 Agent 的 step 痕迹。职责文本经 `PATCH /api/teams/{id}/agents/{aid}` 设置。
 > 密钥卫生：沿用 r3 口径，凭证只记形态不记值；push subscription 的 endpoint/keys 仅记宿主域与字段形状。
 
