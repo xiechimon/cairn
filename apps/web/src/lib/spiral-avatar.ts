@@ -27,13 +27,13 @@ export function spiralAvatarSvg(seed: string, busy = false): string {
   const rotation = Math.floor(next() * 4) * 90;
   const mirror = next() < 0.5 ? -1 : 1;
   const path = `M0 0${SPIRAL_ARCS.slice(0, turns + 1).join('')}`;
-  const centerShift = turns === 2 ? -14 : 28;
+  const center = turns === 2 ? '-84 28' : '-28 -28';
   return (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
     (busy ? SPIN_STYLE : '') +
     `<circle cx="50" cy="50" r="50" fill="${color}"/>` +
     (busy ? '<g class="spin">' : '') +
-    `<g transform="translate(50 50) rotate(${rotation}) scale(${0.105 * mirror} 0.105) translate(-84 ${centerShift})">` +
+    `<g transform="translate(50 50) rotate(${rotation}) scale(${0.105 * mirror} 0.105) translate(${center})">` +
     `<path d="${path}" fill="none" stroke="${SPIRAL_CREAM}" stroke-width="64" stroke-linecap="round"/>` +
     (busy ? '</g></g></svg>' : '</g></svg>')
   );

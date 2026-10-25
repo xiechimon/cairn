@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
+import { spiralAvatarSvg, spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
 import { pressAndExpect } from './helpers.js';
 
 
@@ -226,4 +226,25 @@ test('the chief spiral spins on the reply it is still typing, rests on finished 
   await expect(spirals).toHaveCount(2);
   await expect(spirals.first()).toHaveCSS('animation-name', 'none');
   await expect(spirals.last()).toHaveCSS('animation-name', 'spin');
+});
+
+test('every spiral sits on the disc centre, so it turns in place', async ({ page }) => {
+  const seeds = ['chief', 'coder-1', 'coder-2', 'reviewer', 'r3-builder', 'Xmon Dai', 'nova'];
+  await page.setContent(
+    seeds.map((seed) => `<div style="width:100px;height:100px">${spiralAvatarSvg(seed)}</div>`).join(''),
+  );
+  const centres = await page.locator('svg path').evaluateAll((paths) =>
+    paths.map((path) => {
+      const spiral = path.getBoundingClientRect();
+      const disc = (path.ownerSVGElement as SVGSVGElement).getBoundingClientRect();
+      return [
+        ((spiral.x + spiral.width / 2 - disc.x) / disc.width) * 100,
+        ((spiral.y + spiral.height / 2 - disc.y) / disc.height) * 100,
+      ];
+    }),
+  );
+  for (const centre of centres) {
+    expect(centre?.[0]).toBeCloseTo(50, 0);
+    expect(centre?.[1]).toBeCloseTo(50, 0);
+  }
 });
