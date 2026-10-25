@@ -1027,22 +1027,21 @@ describe('readGateGithubFacts: harness regression at head', () => {
   const HARNESS_FILE = 'apps/server/src/services/chief.ts';
   const HARNESS_RESULT = `${EVIDENCE_PREFIX}${REQ.ticketRef}/${HARNESS_REGRESSION_RESULT_NAME}`;
   const HARNESS_TEXT = '{"decision_ok":0.95}';
-  const ghContentsFile = (text: string) =>
-    ok({
-      type: 'file',
-      encoding: 'base64',
-      content: Buffer.from(text, 'utf8')
-        .toString('base64')
-        .replace(/(.{8})/g, '$1\n'),
-      name: HARNESS_REGRESSION_RESULT_NAME,
-      path: HARNESS_RESULT,
-    });
 
   test('touches harness: file text at the PR head is harnessEvalText', async () => {
     const f = await read({
       compare: comparePages(chain(EARLIER, HEAD), [...FILES, ghFile(HARNESS_FILE)]),
       contents: (path, ref) => {
-        if (path === HARNESS_RESULT && ref === HEAD) return ghContentsFile(HARNESS_TEXT);
+        if (path === HARNESS_RESULT && ref === HEAD)
+          return ok({
+            type: 'file',
+            encoding: 'base64',
+            content: Buffer.from(HARNESS_TEXT, 'utf8')
+              .toString('base64')
+              .replace(/(.{8})/g, '$1\n'),
+            name: HARNESS_REGRESSION_RESULT_NAME,
+            path: HARNESS_RESULT,
+          });
         if (path === 'docs/verify/1404' && ref === HEAD) return listing('shot.png');
         return NOT_FOUND;
       },

@@ -523,18 +523,6 @@ async function probeEvidence(
   return out;
 }
 
-async function readHeadFileText(r: Reader, path: string, sha: string): Promise<string | null> {
-  const res = await send(r, () => r.port.contents(path, sha));
-  if (res === null || res.kind !== 'ok' || !isObj(res.body)) return null;
-  if (res.body.type !== 'file' || typeof res.body.content !== 'string') return null;
-  if (res.body.encoding !== 'base64') return null;
-  try {
-    return Buffer.from(res.body.content.replace(/\s/g, ''), 'base64').toString('utf8');
-  } catch {
-    return null;
-  }
-}
-
 // —— 求值 ——
 
 export async function readGateGithubFacts(
@@ -647,11 +635,26 @@ export async function readGateGithubFacts(
   if (typeof facts.compare !== 'string') {
     facts.evidence = await probeEvidence(r, req, pr, facts.compare);
     if (touchesHarness(facts.compare.files)) {
-      facts.harnessEvalText = await readHeadFileText(
-        r,
-        `${EVIDENCE_PREFIX}${req.ticketRef}/${HARNESS_REGRESSION_RESULT_NAME}`,
-        head,
-      );
+      const harnessPath = `${EVIDENCE_PREFIX}${req.ticketRef}/${HARNESS_REGRESSION_RESULT_NAME}`;
+      const res = await send(r, () => r.port.contents(harnessPath, head));
+      facts.harnessEvalText = null;
+      if (
+        res !== null &&
+        res.kind === 'ok' &&
+        isObj(res.body) &&
+        res.body.type === 'file' &&
+        typeof res.body.content === 'string' &&
+        res.body.encoding === 'base64'
+      ) {
+        try {
+          facts.harnessEvalText = Buffer.from(
+            res.body.content.replace(/\s/g, ''),
+            'base64',
+          ).toString('utf8');
+        } catch {
+          facts.harnessEvalText = null;
+        }
+      }
     }
   }
   return done();

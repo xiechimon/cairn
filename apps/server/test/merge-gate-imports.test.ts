@@ -6,7 +6,7 @@
 // 失败方式先行：
 // - merge-gate/ 下的模块从这几处之外 import：相对路径跳出 merge-gate/、别的包、
 //   node:crypto 以外的内置模块（node:module、node:vm 之类能按路径加载别的文件）；
-// - 绕开静态 import 加载代码：import()、require()、createRequire、import.meta、eval（含间接）、
+// - 绕开静态 import 加载代码：import()、require()、createRequire、import.meta、eval、
 //   Function（构造、借名，或经 .constructor 取到）、process、globalThis；只写不用的
 //   import 照样会加载外面的模块（运行时按 verbatimModuleSyntax 保留它）；漏查
 //   .tsx / .jsx 模块；
@@ -20,10 +20,6 @@
 //   （清空保护清单、往可自动合并集里加 '**'、改上限），值还是同一个，内容却变了；
 // - 解析器被注释或写法骗过（注释里的 import 字样、花括号里的 ;、import type、多行
 //   import）；目录读空了，检查对零个文件恒真。
-// 解析不用正则直接读源码：先用 esbuild 把每个模块转成 JS（去掉注释与只作类型用的
-// import，按 verbatimModuleSyntax 保留没用到的 import，import 语句按统一的格式重印），
-// 再从转出的代码里取模块名与名字。加载器扫描前抹掉字符串与模板字面量的文本，间接
-// eval 仍中，字面量里的 eval 和 evaluate 不中。
 // 这条测试防的是闸的源码直接依赖闸外的文件；闸的源码里有意写出的混淆加载本身就是
 // 闸路径上的改动，要人合。'@cairn/shared' 的总出口在 import 时会运行 shared 的全部
 // 模块，别的 shared 模块改全局（例如改原型）这里管不到，那是整个进程的完整性问题。
@@ -62,8 +58,11 @@ const toJs = (source: string, file = 'x.ts') =>
     tsconfigRaw: { compilerOptions: { verbatimModuleSyntax: true } },
   }).code;
 
-function blankLiteralText(code: string): string {
-  const out = code.split('');
+/** 转出的 JS 里每条 import / export … from / 只为副作用的 import 的模块名，以及加载
+ * 代码的其他写法（记成 'dynamic:' 前缀）。 */
+function specifiers(js: string): string[] {
+  const found: string[] = [];
+  const out = js.split('');
   let i = 0;
   const blank = (end: string, interp = false) => {
     i += 1;
@@ -80,29 +79,26 @@ function blankLiteralText(code: string): string {
       }
       if (interp && out[i] === '$' && out[i + 1] === '{') {
         i += 2;
-        scanExpr();
+        let depth = 0;
+        while (i < out.length) {
+          const c = out[i];
+          if (c === '}' && depth === 0) break;
+          if (c === "'" || c === '"') {
+            blank(c);
+            continue;
+          }
+          if (c === '`') {
+            blank('`', true);
+            continue;
+          }
+          if (c === '{') depth += 1;
+          else if (c === '}') depth -= 1;
+          i += 1;
+        }
         if (out[i] === '}') i += 1;
         continue;
       }
       out[i] = ' ';
-      i += 1;
-    }
-  };
-  const scanExpr = () => {
-    let depth = 0;
-    while (i < out.length) {
-      const c = out[i];
-      if (c === '}' && depth === 0) return;
-      if (c === "'" || c === '"') {
-        blank(c);
-        continue;
-      }
-      if (c === '`') {
-        blank('`', true);
-        continue;
-      }
-      if (c === '{') depth += 1;
-      else if (c === '}') depth -= 1;
       i += 1;
     }
   };
@@ -112,16 +108,10 @@ function blankLiteralText(code: string): string {
     else if (c === '`') blank('`', true);
     else i += 1;
   }
-  return out.join('');
-}
-
-/** 转出的 JS 里每条 import / export … from / 只为副作用的 import 的模块名，以及加载
- * 代码的其他写法（记成 'dynamic:' 前缀）。 */
-function specifiers(js: string): string[] {
-  const found: string[] = [];
+  const blanked = out.join('');
   for (const m of js.matchAll(/\bfrom\s*(['"])([^'"]+)\1/g)) found.push(m[2] as string);
   for (const m of js.matchAll(/\bimport\s*(['"])([^'"]+)\1/g)) found.push(m[2] as string);
-  for (const m of blankLiteralText(js).matchAll(LOADERS)) found.push(`dynamic:${m[0]}`);
+  for (const m of blanked.matchAll(LOADERS)) found.push(`dynamic:${m[0]}`);
   return found;
 }
 
