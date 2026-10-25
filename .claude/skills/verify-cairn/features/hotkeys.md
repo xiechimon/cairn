@@ -12,7 +12,7 @@ Pressing `C` on any shell page (outside input state) opens the new-task dialog �
 
 ## How to get to it (user POV)
 
-- The expanded sidebar `新任务` row (`button.sidebar-row` carrying the `新任务` copy + a `.sidebar-kbd` C badge).
+- The expanded sidebar `新任务` row (`button.sidebar-row` carrying the `新任务` copy; the row has no C badge since #1733).
 - Keyboard: `C` on any page (outside input state); `⌘J` summons the chief drawer.
 - Driving (`vp.mjs list hotkeys` lists all cases and usage):
   - `node .claude/skills/verify-cairn/scripts/vp.mjs drive hotkeys hotkeys-chain`: C opens the new task, Space summons the chief, input-state guards.
