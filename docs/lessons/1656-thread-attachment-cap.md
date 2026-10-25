@@ -1,9 +1,9 @@
 ---
-类别: 一次发图超过线程附件上限，5 张被静默跳过
-首次来源: Claude 线程 (2026-10-22)
-级别: 5
-防护: 记忆 thread-attachment-cap
-拦截: 0
-复发: 0
-备注: 上限在 hearthbot 工具里，本仓管不到
+Category: More images were sent in one go than the thread attachment cap; 5 were silently skipped
+Source: Claude thread (2026-10-22)
+Level: 5
+Safeguard: memory thread-attachment-cap
+Intercepts: 0
+Recurrences: 0
+Notes: the cap lives in the hearthbot tool, outside this repo's reach
 ---

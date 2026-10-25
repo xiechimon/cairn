@@ -1,9 +1,9 @@
 ---
-类别: web PR 推送前漏跑 ui-debt 与 dead-class 两道闸，CI 红两轮
-首次来源: PR #1523 (2026-10-22)
-级别: 2
-防护: `pnpm prepush` 与 CI 共用 `scripts/prepush.mjs`，`scripts/prepush.test.mjs` 检查入口一致
-拦截: 1
-复发: 0
-备注: #1533：`mt-[3px]` 负对照触发 D5，移除后静态检查转绿；dead-class 在 CI 保持咨询性
+Category: A web PR was pushed before the ui-debt and dead-class gates ran; CI went red twice
+Source: PR #1523 (2026-10-22)
+Level: 2
+Safeguard: `pnpm prepush` and CI share `scripts/prepush.mjs`; `scripts/prepush.test.mjs` checks the same entry
+Intercepts: 1
+Recurrences: 0
+Notes: #1533: the `mt-[3px]` negative control tripped D5, and the static check turned green after removal; dead-class stays advisory in CI
 ---

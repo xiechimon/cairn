@@ -1,9 +1,9 @@
 ---
-类别: 开票前只搜了 issue，没查 spec：#1617 园丁巡检与 spec 28 P6「园丁」重复，#1618 没对上 P5a 进料入口
-首次来源: #1617/#1618 (2026-10-24)
-级别: 5
-防护: 记忆：给自举闭环相关的事开票前先 grep `docs/spec/28-*.md` 与 ADR 0021；两票已补评论改为 P6 园丁段、挂到 P5a 入口
-拦截: 0
-复发: 0
-备注: `scripts/dispatch-dedupe.mjs` 只查分支、PR、进程，不读 spec 正文；按关键词查 spec 误报太多，暂不做成闸
+Category: Before opening a ticket only issues were searched, the spec was never checked: #1617 duplicated spec 28 P6 "gardener" with the existing gardener patrol, and #1618 did not match the P5a intake entry
+Source: #1617/#1618 (2026-10-24)
+Level: 5
+Safeguard: memory: before opening a ticket for bootstrap-loop work, grep `docs/spec/28-*.md` and ADR 0021 first; both tickets were commented and re-pointed at the P6 gardener section and the P5a intake entry
+Intercepts: 0
+Recurrences: 0
+Notes: `scripts/dispatch-dedupe.mjs` checks branches, PRs and processes but does not read spec text; keyword spec search has too many false positives to make into a gate
 ---

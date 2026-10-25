@@ -1,9 +1,9 @@
 ---
-类别: React 渲染测试把必填 children 仅放在 createElement 的第三参数
-首次来源: #1586 (2026-10-24)
-级别: 1
-防护: provider 的 children 显式写入受类型检查的 props；线程与任务夹具使用完整类型声明
-拦截: 1
-复发: 0
-备注: 原调用在 pnpm typecheck 报 TS2769；显式 children 后通过，保留组件原本的必填类型
+Category: A React render test put required children only in the third argument of createElement
+Source: #1586 (2026-10-24)
+Level: 1
+Safeguard: the provider's children are written explicitly into the type-checked props; thread and task fixtures use full type declarations
+Intercepts: 1
+Recurrences: 0
+Notes: the original call failed typecheck with TS2769; passing with explicit children kept the component's original required types
 ---

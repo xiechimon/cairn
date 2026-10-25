@@ -1,9 +1,9 @@
 ---
-类别: 写文件前没查目标是否已存在，覆盖了已有的 `retro` 技能（从 git 恢复）
-首次来源: Claude 线程 (2026-10-22)
-级别: 5
-防护: 记忆：新建技能先 `ls` 目标目录
-拦截: 0
-复发: 0
-备注: 本次靠 git 里的历史救回；机器检查做不到
+Category: Wrote a file without checking whether the target already existed and overwrote the existing `retro` skill (recovered from git)
+Source: Claude thread (2026-10-22)
+Level: 5
+Safeguard: memory: `ls` the target directory before creating a new skill
+Intercepts: 0
+Recurrences: 0
+Notes: this time git history saved it; no machine check is possible
 ---

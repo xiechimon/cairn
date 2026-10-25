@@ -1,9 +1,9 @@
 ---
-类别: 新 UI 文案漏加英文词条
-首次来源: #1586 (2026-10-24)
-级别: 2
-防护: 既有 `i18n-coverage.test.ts` 扫描所有 t 字面量并核对 EN
-拦截: 1
-复发: 0
-备注: 真实负对照：编排失败缺词条时 coverage 报红；补词条后转绿，不另建重复闸
+Category: New UI copy shipped without the English entry
+Source: #1586 (2026-10-24)
+Level: 2
+Safeguard: the existing `i18n-coverage.test.ts` scans all `t` literals and checks them against EN
+Intercepts: 1
+Recurrences: 0
+Notes: real negative control: the coverage check went red when the orchestration-failure entry was missing; green after adding the entry, no duplicate gate created
 ---

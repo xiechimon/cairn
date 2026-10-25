@@ -1,9 +1,9 @@
 ---
-类别: 拿随手画的示意稿当界面设计，没先看真实界面，被 ian 指出太简陋
-首次来源: Claude 线程 (2026-10-22)
-级别: 5
-防护: 记忆：界面类先截真实界面再出方案
-拦截: 0
-复发: 0
-备注: 机器检查做不到，属判断错误
+Category: A hand-drawn sketch was presented as UI design without looking at the real interface first; ian called it too crude
+Source: Claude thread (2026-10-22)
+Level: 5
+Safeguard: memory: for UI work, screenshot the real interface before proposing anything
+Intercepts: 0
+Recurrences: 0
+Notes: no machine check is possible; a judgment error
 ---

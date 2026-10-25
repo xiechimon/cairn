@@ -1,9 +1,9 @@
 ---
-类别: 改 `scripts/e2e-affected.mjs` 的 `--check-coverage` 让它拒收非 spec 路径，没人发现 verify-cairn 的 `vp-registry-gate.mjs --check-reach` 把探针脚本一并喂给它；探针可达闸只在咨询性 CI job 里跑，main 连红多个提交无人拦
-首次来源: probe-reach-gate 在 main 上红 (#1651, 2026-10-24)
-级别: 2
-防护: `vp-registry-gate.mjs --check-reach` 只把 `*.spec.ts` 交给 e2e-affected，探针脚本由它自己的 drive 注册判定；`docs/verify/1542/reach.test.mjs` 进 `scripts/prepush.mjs` 必需检查，`scripts/prepush.test.mjs` 钉住；该测试里替换家族表前缀的改写对象随 #1599 的表结构更新
-拦截: 0
-复发: 1
-备注: 负对照：修前 `node --test docs/verify/1542/reach.test.mjs` 两条红（drive-hotkeys.mjs 可达探针、从基线发现新增文件），修后 9 条全绿；`prepush.test.mjs` 在计划里加该命令前先红
+Category: Changing `scripts/e2e-affected.mjs` `--check-coverage` to reject non-spec paths broke verify-cairn's `vp-registry-gate.mjs --check-reach`, which fed probe scripts to it, and nobody noticed; the probe-reach gate only runs in an advisory CI job, so main stayed red across several commits with no one blocking it
+Source: probe-reach gate red on main (#1651, 2026-10-24)
+Level: 2
+Safeguard: `vp-registry-gate.mjs --check-reach` hands only `*.spec.ts` files to e2e-affected, and probe scripts are judged by its own drive registration; `docs/verify/1542/reach.test.mjs` is in the required checks of `scripts/prepush.mjs`, pinned by `scripts/prepush.test.mjs`; that test's family-table prefix rewrite object follows the table-structure update from #1599
+Intercepts: 0
+Recurrences: 1
+Notes: negative control: before the fix `node --test docs/verify/1542/reach.test.mjs` had 2 red cases (drive-hotkeys.mjs reachable probe, new file found from the baseline) and all 9 green after; `prepush.test.mjs` went red first when the command was added to the plan
 ---

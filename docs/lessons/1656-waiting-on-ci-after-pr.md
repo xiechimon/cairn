@@ -1,9 +1,9 @@
 ---
-类别: 开 PR 后挂着等 CI，不收工
-首次来源: Claude 线程 (2026-10-22)
-级别: 3
-防护: 项目指令：开 PR 打开 auto-merge 后收工
-拦截: 0
-复发: 0
-备注: 行为类，CI 不看线程动作
+Category: Sat watching CI after opening a PR instead of wrapping up
+Source: Claude thread (2026-10-22)
+Level: 3
+Safeguard: project instruction: enable auto-merge after opening a PR, then wrap up
+Intercepts: 0
+Recurrences: 0
+Notes: behavioral; CI cannot see thread actions
 ---

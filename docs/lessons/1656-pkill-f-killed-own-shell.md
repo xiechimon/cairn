@@ -1,9 +1,9 @@
 ---
-类别: 用 `pkill -f <模式>` 收后台 vite，模式命中自己所在的 shell 命令行，把整条命令连同后续步骤一起杀掉
-首次来源: Claude 线程 (2026-10-23)
-级别: 5
-防护: 记忆：起后台进程时记 PID（`echo $! > pidfile`），按 PID 收，不用 `pkill -f`；直接起 `node_modules/.bin/vite`，不经 pnpm 包一层
-拦截: 0
-复发: 0
-备注: 属 agent 自身 shell 操作，仓库闸看不到
+Category: `pkill -f <pattern>` used to reap background vite matched the shell's own command line and killed the whole command together with the following steps
+Source: Claude thread (2026-10-23)
+Level: 5
+Safeguard: memory: record the PID when starting a background process (`echo $! > pidfile`) and reap by PID, never `pkill -f`; start `node_modules/.bin/vite` directly instead of through pnpm
+Intercepts: 0
+Recurrences: 0
+Notes: an agent-level shell operation the repo gates cannot see
 ---

@@ -1,9 +1,9 @@
 ---
-类别: 派活前没查重：派 #1569、#1578 给 codex/pi 时，同机另一个 Claude 会话已在 /tmp/pm-1569-*、/tmp/pm-1578-* 做同票，#1569 白做一版
-首次来源: #1569/#1578 (2026-10-24)
-级别: 2
-防护: `scripts/dispatch-agent.mjs start --ticket <N>` 查系统 tmp 目录下的 git 工作目录、origin 分支、open PR、codex/pi/grok 进程，命中即拒绝启动，`--force` 才放行；纯函数 `scripts/dispatch-dedupe.mjs` 由 `scripts/dispatch-dedupe.test.mjs`（CI dispatch-agent-test job）钉住数字边界、排除自身、gh 不可用
-拦截: 0
-复发: 0
-备注: 负对照：对 1569 跑 `start --ticket 1569` 命中 /tmp/pm-1569-*（分支 obs/1569-langfuse-selfhost）并以退出码 1 拒绝；不带 `--ticket` 仍不查，靠派活提示 `docs/agent-dispatch-prompts.md` 要求带上
+Category: No duplicate check before dispatching: #1569 and #1578 were sent to codex/pi while another Claude session on the same machine was already working the same tickets in /tmp/pm-1569-* and /tmp/pm-1578-*; #1569's work was thrown away
+Source: #1569/#1578 (2026-10-24)
+Level: 2
+Safeguard: `scripts/dispatch-agent.mjs start --ticket <N>` checks git work directories under the system tmp dir, origin branches, open PRs and codex/pi/grok processes, and refuses to start on a hit unless `--force`; the pure function `scripts/dispatch-dedupe.mjs` is pinned by `scripts/dispatch-dedupe.test.mjs` (CI dispatch-agent-test job) for numeric boundaries, self-exclusion and gh unavailability
+Intercepts: 0
+Recurrences: 0
+Notes: negative control: `start --ticket 1569` for 1569 matched /tmp/pm-1569-* (branch obs/1569-langfuse-selfhost) and refused with exit code 1; without `--ticket` it still does not check, which the dispatch prompt in `docs/agent-dispatch-prompts.md` covers by requiring the flag
 ---

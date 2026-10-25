@@ -1,9 +1,9 @@
 ---
-类别: 后台长任务用 `( ... & )` 或 nohup 起，工具调用一返回就被杀，随后还告诉 ian 任务在跑
-首次来源: Claude 线程 (2026-10-22)
-级别: 2
-防护: `scripts/dispatch-agent.mjs` start 脱离进程组启动并立即核对进程写状态文件，汇报前 `check` 读状态文件；负对照在 `scripts/dispatch-agent.test.mjs`（CI 独立 job）：旧写法直起的任务 check 报进程不存在
-拦截: 0
-复发: 1
-备注: 复发 1（先 pi，后 codex）后由 #1556 升级到级别 2
+Category: A long background task started with `( ... & )` or nohup was killed as soon as the tool call returned, and the report still told ian the task was running
+Source: Claude thread (2026-10-22)
+Level: 2
+Safeguard: `scripts/dispatch-agent.mjs` start launches outside the process group, verifies the process immediately and writes a status file; `check` reads the status file before reporting; the negative control lives in `scripts/dispatch-agent.test.mjs` (standalone CI job): a task started the old way reports "process does not exist"
+Intercepts: 0
+Recurrences: 1
+Notes: after 1 recurrence (first pi, then codex) #1556 raised it to level 2
 ---

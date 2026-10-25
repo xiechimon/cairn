@@ -1,9 +1,9 @@
 ---
-类别: 解 `ci.yml` 冲突后，新步骤落在了另一个 job 里，推送前没看 hunk 所在 job
-首次来源: PR #1540 (2026-10-23)
-级别: 2
-防护: `scripts/ci-job-structure-gate.mjs` 对照 `scripts/ci-job-structure-baseline.json` 钉住每个 job 的命名步骤，CI check job 装机前一步与 `pnpm prepush` 共用；负对照 = #1540 错误 hunk（freshness 步落进 comment-discipline-gate）在 `scripts/ci-job-structure-gate.test.mjs` 变红
-拦截: 1
-复发: 0
-备注: #1557 落地，级别 5 升 2；首拦：rebase 后 baseline 漏跟上游步骤迁移，闸拦下后才补
+Category: After resolving a `ci.yml` conflict the new step landed in a different job and nobody checked which job the hunk was in before pushing
+Source: PR #1540 (2026-10-23)
+Level: 2
+Safeguard: `scripts/ci-job-structure-gate.mjs` pins every job's named steps against `scripts/ci-job-structure-baseline.json`, and the CI check job's pre-install step shares `pnpm prepush`; negative control: the #1540 bad hunk (freshness step landing in comment-discipline-gate) goes red in `scripts/ci-job-structure-gate.test.mjs`
+Intercepts: 1
+Recurrences: 0
+Notes: landed with #1557, level raised 5 to 2; first interception: the baseline missed an upstream step migration after a rebase and the gate caught it before it was fixed
 ---

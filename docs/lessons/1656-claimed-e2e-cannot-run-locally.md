@@ -1,9 +1,9 @@
 ---
-类别: 误称 e2e 本地跑不了，其实记忆里已有绕法
-首次来源: Claude 线程 (2026-10-22)
-级别: 5
-防护: 记忆：先查记忆再说做不了
-拦截: 0
-复发: 0
-备注: 机器检查做不到，属判断错误
+Category: Claimed e2e could not run locally when memory already held the known way to run it locally
+Source: Claude thread (2026-10-22)
+Level: 5
+Safeguard: memory: check memory before saying something cannot be done
+Intercepts: 0
+Recurrences: 0
+Notes: no machine check is possible; a judgment error
 ---

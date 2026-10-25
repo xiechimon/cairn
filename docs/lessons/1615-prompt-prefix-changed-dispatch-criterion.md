@@ -1,9 +1,9 @@
 ---
-类别: 往提示词前面追加段落，改变了「提示词是否为空」这个派发判据，规划步从 failed 重跑且 plan 槽为空时被回落到 build 槽
-首次来源: #1615 复审 (2026-10-24)
-级别: 2
-防护: `retry-lessons.test.ts` 的「规划步改派」三条用例钉住派发对象；`dispatch-eligibility.ts` 把带教训的首轮规划提示归为首轮
-拦截: 1
-复发: 0
-备注: 负对照：未改派发判据时「不回落 build 槽」两条用例红（claim 领到了步），改后全绿，带反馈的 restart 仍回落
+Category: Appending a paragraph to the front of the prompt changed the "is the prompt empty" dispatch criterion, so a planning step restarted from failed with an empty plan slot fell back to the build slot
+Source: #1615 re-review (2026-10-24)
+Level: 2
+Safeguard: the three "planning-step redispatch" cases in `retry-lessons.test.ts` pin the dispatch target; `dispatch-eligibility.ts` treats a first-round planning prompt with lessons as first round
+Intercepts: 1
+Recurrences: 0
+Notes: negative control: without the criterion change the two "does not fall back to the build slot" cases went red (the claim took the step), green after the change; restarts with feedback still fall back
 ---

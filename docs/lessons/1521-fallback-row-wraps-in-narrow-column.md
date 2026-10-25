@@ -1,9 +1,9 @@
 ---
-类别: 备用模型行在窄列里 runtime 标签折成两行、长说明压到右侧控件，截图自带的问题上一轮没发现
-首次来源: #1521 (2026-10-24)
-级别: 2
-防护: `apps/web/e2e/agent-fallback-models.spec.ts` 排版用例（1280 与 560 宽）量标签高度不超过一行、说明框与控件框不相交且都在行内
-拦截: 1
-复发: 0
-备注: 负对照：修前两个宽度都红（标签高 32，单行行高 17），加 whitespace-nowrap 与控件区 flex-none 后转绿
+Category: In a narrow column the fallback model row wrapped the runtime label onto two lines and squeezed the long description against the control on the right; the screenshots from the previous round carried the problem without anyone noticing
+Source: #1521 (2026-10-24)
+Level: 2
+Safeguard: the layout case in `apps/web/e2e/agent-fallback-models.spec.ts` (1280 and 560 wide) measures that the label stays one line high and that the description box and the control box do not intersect and stay inside the row
+Intercepts: 1
+Recurrences: 0
+Notes: negative control: both widths went red before the fix (label height 32 vs single-line 17) and turned green after adding `whitespace-nowrap` and `flex-none` on the control area
 ---

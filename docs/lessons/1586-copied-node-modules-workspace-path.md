@@ -1,9 +1,9 @@
 ---
-类别: 复制依赖目录时沿用其他 clone 的 pnpm 工作区绝对路径，执行检查触发重新安装
-首次来源: #1586 (2026-10-24)
-级别: 3
-防护: 离线复用依赖先比对锁文件，再校正复制目录中的工作区状态路径并核实直接工具可运行
-拦截: 1
-复发: 0
-备注: 本轮已校正复制来的 node_modules 状态后成功执行 pnpm 检查；仓库代码不拥有复制依赖的恢复操作，新增仓内闸无法阻止复制前的外部命令
+Category: When copying a dependency directory, the absolute pnpm workspace path from another clone was reused, and running checks triggered a reinstall
+Source: #1586 (2026-10-24)
+Level: 3
+Safeguard: before reusing dependencies offline, compare the lockfile, then fix the workspace state paths in the copied directory and verify the direct tools run
+Intercepts: 1
+Recurrences: 0
+Notes: this round fixed the copied node_modules state and the pnpm checks then ran; repo code does not own the restore operation of copied dependencies, so no in-repo gate can prevent the external command before copying
 ---

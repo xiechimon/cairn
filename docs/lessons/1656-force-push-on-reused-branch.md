@@ -1,9 +1,9 @@
 ---
-类别: 分支上一张 PR 已合并，从 main 重切同名分支后用 `git push -f` 推送，违反 AGENTS.md「永远别 --force push」
-首次来源: Claude 线程「学习 poteto 高产 PR 的方法」(2026-10-24)
-级别: 5
-防护: 记忆：已合并分支重用时换新分支名推送，不强推
-拦截: 0
-复发: 0
-备注: 这次被覆盖的只有已 squash 进 main 的提交，没丢东西；pre-push 钩子能判非快进推送，留作升级候选
+Category: A previous PR from the branch had been merged; after re-cutting the same branch name from main, `git push -f` was used, breaking AGENTS.md "never force push"
+Source: Claude thread "learning from poteto's high-output PR method" (2026-10-24)
+Level: 5
+Safeguard: memory: when reusing an already-merged branch, push under a new branch name instead of force-pushing
+Intercepts: 0
+Recurrences: 0
+Notes: this time only the commits already squashed into main were overwritten, nothing was lost; a pre-push hook can judge non-fast-forward pushes and stays a candidate for an upgrade
 ---

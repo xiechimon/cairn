@@ -1,9 +1,9 @@
 ---
-类别: 评审里反复出现的同类问题
-首次来源: #1528
-级别: 2
-防护: #1528 盘点后逐类开子票
-拦截: 0
-复发: 0
-备注: 盘点清单出来后并入本表
+Category: The same kinds of problems kept appearing in reviews
+Source: #1528
+Level: 2
+Safeguard: #1528 opened a child ticket per problem class after the audit
+Intercepts: 0
+Recurrences: 0
+Notes: merge into this ledger once the audit list exists
 ---

@@ -1,9 +1,9 @@
 ---
-类别: 新增 web 源文件没进 `e2e-affected` 的文件映射，`e2e:affected` 回落成全量 172 条跑了 15 分钟
-首次来源: #1521 (2026-10-24)
-级别: 3
-防护: `scripts/e2e-affected.mjs` 文件映射补 `agent-fallback-models.tsx`，机器检查尚无
-拦截: 0
-复发: 0
-备注: 负对照：`--dry-run -- apps/web/src/routes/agent-fallback-models.tsx` 旧表为 FULL，新表为 file map；待升：#1599 让 `--check-coverage` 也报未映射的 routes 源文件
+Category: A new web source file was not added to the `e2e-affected` file map, so `e2e:affected` fell back to the full 172-case suite and ran for 15 minutes
+Source: #1521 (2026-10-24)
+Level: 3
+Safeguard: the `scripts/e2e-affected.mjs` file map gained `agent-fallback-models.tsx`; no machine check yet for this class
+Intercepts: 0
+Recurrences: 0
+Notes: negative control: `--dry-run -- apps/web/src/routes/agent-fallback-models.tsx` said FULL with the old table and file map with the new one; pending upgrade: #1599 makes `--check-coverage` also report unmapped route source files
 ---

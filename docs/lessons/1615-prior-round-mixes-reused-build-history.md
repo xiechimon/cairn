@@ -1,9 +1,9 @@
 ---
-类别: 按 buildId 读全部历史记录拼「上一轮」内容，同一 build 被返工复用多次后第 3 轮混进第 1、2 轮的教训
-首次来源: #1615 复审 (2026-10-24)
-级别: 2
-防护: `apps/server/test/retry-lessons.test.ts`「多次复用混入旧轮」用两次复用造数，断言第 3 次只含上一轮内容；实现以上一次 restart 反馈的时间为界
-拦截: 1
-复发: 0
-备注: 负对照：未加时间界时该用例红（出现 blocking-round1），加界后为绿
+Category: Reading all history records by buildId to compose the "prior round" content mixed lessons from rounds 1 and 2 into round 3 after the same build was reworked and reused
+Source: #1615 re-review (2026-10-24)
+Level: 2
+Safeguard: the "multiple reuses mix in old rounds" case in `apps/server/test/retry-lessons.test.ts` builds two reuses and asserts round 3 only contains round 2's content; the implementation bounds by the previous restart feedback's timestamp
+Intercepts: 1
+Recurrences: 0
+Notes: negative control: without the time bound the case goes red (blocking-round1 appears), green with the bound
 ---

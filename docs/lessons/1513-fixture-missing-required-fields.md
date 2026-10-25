@@ -1,9 +1,9 @@
 ---
-类别: 新测试夹具遗漏必填字段或外键父行，未进入待验证路径
-首次来源: #1513 (2026-10-23)
-级别: 2
-防护: `build-provenance.test.ts` 先断言建 build 返回 201，旧库迁移用真实外键链建数据
-拦截: 2
-复发: 0
-备注: 负对照：缺 spec 时建 build 失败，缺 todo 父行时 SQLite 拒绝插入；补齐后迁移与反馈测试通过
+Category: A new test fixture missed required fields or the foreign-key parent row and never entered the path under test
+Source: #1513 (2026-10-23)
+Level: 2
+Safeguard: `build-provenance.test.ts` first asserts that creating a build returns 201; the old-database migration builds data through real foreign-key chains
+Intercepts: 2
+Recurrences: 0
+Notes: negative control: creating a build fails without the spec, and SQLite rejects the insert without the todo parent row; migration and feedback tests pass once filled in
 ---

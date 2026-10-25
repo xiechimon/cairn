@@ -1,9 +1,9 @@
 ---
-类别: 从同步回调赋值的局部变量读取结果，被 TypeScript 缩窄为 never
-首次来源: #1513 (2026-10-23)
-级别: 1
-防护: runner 将技能解析结果保存在显式类型的对象属性中；`pnpm typecheck` 检查消费面
-拦截: 1
-复发: 0
-备注: 负对照：原局部变量的 injected 读取报 TS2339；对象属性承接回调后通过
+Category: Reading a result from a local variable assigned inside a synchronous callback; TypeScript narrowed it to never
+Source: #1513 (2026-10-23)
+Level: 1
+Safeguard: the runner stores the skill-resolution result in a property of an explicitly typed object; `pnpm typecheck` covers the consumers
+Intercepts: 1
+Recurrences: 0
+Notes: negative control: reading `injected` from the original local variable reports TS2339; passing the callback result through the object property works
 ---

@@ -1,40 +1,40 @@
-# 错误台账
+# Lessons ledger
 
-过程中出过错、后来又修好的事，每一类一个文件：`docs/lessons/<票号>-<短名>.md`。每个条目必须有防护，防护按下面的阶梯取最高可行级；能做成机器检查的不许只停在文字。设计依据见 ian 在 2026-10-22 确认的方案「过程错误复盘机制」。
+Things that went wrong during the process and were later fixed, one file per error kind: `docs/lessons/<ticket>-<short-name>.md`. Every entry must carry a safeguard, chosen at the highest feasible rung of the ladder below; anything a machine check can cover must not stay at the wording level. Design basis: the "process error retro" scheme ian confirmed on 2026-10-22.
 
-一条一个文件是为了让并行车道各加各的文件，合并不冲突（旧的单表 `docs/lessons.md` 每合一个 PR 就让其余 PR 在表尾冲突）。
+One file per entry exists so parallel lanes each add their own file and merges do not conflict (the old single table `docs/lessons.md` conflicted at the table tail on every merged PR).
 
-## 阶梯
+## Ladder
 
-1. 架构或类型让它写不出来
-2. lint、脚本闸、测试、CI 检查
-3. AGENTS.md 或提示词里的规则
-4. 技能
-5. 记忆（只对 Claude 线程有效，最软）
+1. Architecture or types make it unwritable
+2. Lint, script gates, tests, CI checks
+3. Rules in AGENTS.md or prompts
+4. Skills
+5. Memory (softest; only works inside a Claude thread)
 
-## 文件格式
+## File format
 
-文件名：票号 + 连字符 + 小写英文短名，如 `1566-prepush-stale-origin-main.md`。没有票号的线程内失误，用当轮任务的票号。
+File name: ticket number, a hyphen, and a lowercase English short name, e.g. `1566-prepush-stale-origin-main.md`. For a thread-internal mistake without a ticket, use the current task's ticket number.
 
-正文是固定顺序的七个字段，放在开头的 frontmatter 里，每个字段一行：
+The body is seven fields in a fixed order, kept in the leading frontmatter, one field per line:
 
 ```
 ---
-类别: 一句话写清现象
-首次来源: PR 或票号 (日期)
-级别: 1 到 5
-防护: 防护实际是什么
-拦截: 防护实际挡下的次数
-复发: 同类错又出现的次数
-备注: 负对照、做不成更高级的原因等
+Category: one sentence naming the symptom
+Source: PR or ticket number (date)
+Level: 1 to 5
+Safeguard: what the safeguard actually is
+Intercepts: how many times the safeguard actually blocked it
+Recurrences: how many times the same kind reappeared
+Notes: negative controls, why a higher level is not feasible, etc.
 ---
 ```
 
-## 写法
+## Writing rules
 
-- 一类错一个文件，同类合并，不开重复文件。同类错复发：改原文件的「复发」计数和防护，不新建。
-- 新闸必须拿那次真实失误做负对照：旧错在新闸下变红，才算落地。
-- 「拦截」记防护实际挡下的次数，「复发」记同类错又出现的次数。复发大于 0 说明这一层不够硬，升一级。
-- 级别 4、5 必须在「备注」写明做不成更高级的原因；备注里写「待升」必须带票号。
-- 校验：`node scripts/lessons-ledger-gate.mjs`（`pnpm prepush` 与 CI 共用）。检查文件名、七个字段的顺序与取值、级别范围、级别 4、5 的原因、「待升」的票号。
-- 汇总表不入库，需要时 `pnpm lessons:table` 输出到标准输出。
+- One file per error kind, merge the same kind, do not open duplicate files. On recurrence update the original file's "Recurrences" count and safeguard; do not create a new file.
+- A new gate must use the real mistake as its negative control: the old error going red under the new gate is what counts as landing it.
+- "Intercepts" records actual blocks by the safeguard, "Recurrences" records reappearances of the same kind. A Recurrences count above 0 means this layer is not hard enough; escalate one rung.
+- Levels 4 and 5 must state in Notes why a higher level is not feasible; a "pending upgrade" note must carry a ticket number.
+- Validation: `node scripts/lessons-ledger-gate.mjs` (shared by `pnpm prepush` and CI). It checks file names, the order and values of the seven fields, the level range, the level 4/5 reasons, and the ticket number on "pending upgrade".
+- The summary table is not committed; print it on demand with `pnpm lessons:table`.

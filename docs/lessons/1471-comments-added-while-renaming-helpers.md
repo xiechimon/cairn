@@ -1,9 +1,9 @@
 ---
-类别: 改名或重写 e2e 辅助函数时顺手写了新的说明注释，14 行被注释纪律检查报出
-首次来源: #1471 (2026-10-24)
-级别: 2
-防护: `scripts/comment-discipline-gate.mjs` 收尾必跑；真实失误做负对照：helpers.ts、hotkeys.spec.ts 与五个 search 类 spec 的 14 行新注释报红，删除后 0 行
-拦截: 1
-复发: 0
-备注: 检查已覆盖，无需追加防护；该检查在 CI 仍是咨询性
+Category: New explanatory comments were written while renaming or rewriting e2e helper functions; the comment-discipline check reported 14 lines
+Source: #1471 (2026-10-24)
+Level: 2
+Safeguard: `scripts/comment-discipline-gate.mjs` runs at every wrap-up; real mistake as negative control: 14 new comment lines across helpers.ts, hotkeys.spec.ts and five search specs reported red, 0 lines after removal
+Intercepts: 1
+Recurrences: 0
+Notes: the check covers it, no further safeguard needed; the check is still advisory in CI
 ---

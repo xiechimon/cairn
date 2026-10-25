@@ -1,9 +1,9 @@
 ---
-类别: 总结里还列着等 ian 拍板的两件事，线程就先收起来了，ian 醒来找不到
-首次来源: Claude 线程「学习 poteto 高产 PR 的方法」(2026-10-24)
-级别: 5
-防护: 记忆：收线程前看自己最后一条回复里有没有等人回答的问题，有就不收
-拦截: 0
-复发: 0
-备注: 线程动作，CI 看不到；同类已在项目记忆「线程卫生」里写过，属复发，升级只能到项目指令
+Category: The wrap-up still listed two items waiting for ian's decision, but the thread was closed and ian could not find them on waking up
+Source: Claude thread "learning from poteto's high-output PR method" (2026-10-24)
+Level: 5
+Safeguard: memory: before closing a thread, check your last reply for questions waiting on an answer; if there are any, do not close it
+Intercepts: 0
+Recurrences: 0
+Notes: a thread-level action CI cannot see; the same kind was already recorded in project memory under "thread hygiene", which counts as a recurrence, and the only upgrade left is a project instruction
 ---

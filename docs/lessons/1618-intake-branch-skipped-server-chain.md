@@ -1,9 +1,9 @@
 ---
-类别: 新增进料分支先只验证共享文本，遗漏服务端真实标签到编排消息的链路
-首次来源: #1618 (2026-10-24)
-级别: 2
-防护: `apps/server/test/orchestration-source.test.ts` 固定 bug 标签、来源字段与编排请求，相关测试在实现后必须通过
-拦截: 1
-复发: 0
-备注: 负对照：首次集成测试没有来源字段时未进入目标分支；补齐来源夹具后测试转绿
+Category: A new intake branch was verified only against the shared text, missing the server-side chain from real labels to orchestration messages
+Source: #1618 (2026-10-24)
+Level: 2
+Safeguard: `apps/server/test/orchestration-source.test.ts` pins the bug label, the source fields and the orchestration request, and must pass after the implementation
+Intercepts: 1
+Recurrences: 0
+Notes: negative control: the first integration test never entered the target branch without the source field in the fixture; green after filling the fixture
 ---

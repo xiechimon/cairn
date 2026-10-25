@@ -1,9 +1,9 @@
 ---
-类别: 驱动脚本断言前没等元素出现就 `count()`，掩码行还没渲染就判 0 行，随后先猜「截图 mask 参数导致」改了一轮才隔离出真因
-首次来源: #1478 (2026-10-24)
-级别: 2
-防护: `drive.mjs` api-key 探针先 `waitFor` 掩码行再计数；不等就数的写法在全新栈上 10 次跑红 4 次（偶发），加等待后 5 次全 PASS；偶发失误做不成确定的负对照
-拦截: 0
-复发: 0
-备注: 猜因先改属判断错误，机器拦不住；可拦的半边是探针不等就数
+Category: The drive script counted before waiting for the element to appear, judged 0 masked rows before they rendered, then guessed "screenshot mask parameter" and changed a round before isolating the real cause
+Source: #1478 (2026-10-24)
+Level: 2
+Safeguard: the `drive.mjs` api-key probe waits for the masked rows before counting; counting without waiting ran red 4 of 10 times on a fresh stack (flaky), 5 out of 5 PASS after adding the wait; a flaky mistake makes no deterministic negative control
+Intercepts: 0
+Recurrences: 0
+Notes: guessing a cause before isolating is a judgment error no machine can block; the blockable half is the probe counting without waiting
 ---

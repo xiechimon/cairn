@@ -3,46 +3,59 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const FIELDS = ['类别', '首次来源', '级别', '防护', '拦截', '复发', '备注'];
+export const FIELDS = [
+  'Category',
+  'Source',
+  'Level',
+  'Safeguard',
+  'Intercepts',
+  'Recurrences',
+  'Notes',
+];
 const ENTRY_NAME = /^\d+-[a-z0-9]+(-[a-z0-9]+)*\.md$/;
 const FRONTMATTER = /^---\n([\s\S]*?)\n---(\n|$)/;
 
 export function parseEntry(text) {
   const match = FRONTMATTER.exec(text);
-  if (!match) return { fields: null, problems: ['缺少开头的 --- frontmatter'] };
+  if (!match) return { fields: null, problems: ['missing leading --- frontmatter'] };
   const lines = match[1].split('\n');
   const problems = [];
   const fields = {};
   for (const line of lines) {
     const separator = line.indexOf(':');
     const key = separator === -1 ? line : line.slice(0, separator);
-    if (!FIELDS.includes(key)) problems.push(`未知或格式错误的行: ${line.slice(0, 30)}`);
-    else if (Object.hasOwn(fields, key)) problems.push(`字段重复: ${key}`);
+    if (!FIELDS.includes(key)) problems.push(`unknown or malformed line: ${line.slice(0, 30)}`);
+    else if (Object.hasOwn(fields, key)) problems.push(`duplicate field: ${key}`);
     else fields[key] = line.slice(separator + 1).trim();
   }
   const present = lines.map((line) => line.slice(0, line.indexOf(':'))).filter((k) => k in fields);
-  for (const key of FIELDS) if (!(key in fields)) problems.push(`缺字段: ${key}`);
+  for (const key of FIELDS) if (!(key in fields)) problems.push(`missing field: ${key}`);
   if (problems.length === 0 && present.join() !== FIELDS.join())
-    problems.push(`字段顺序必须是 ${FIELDS.join('、')}`);
+    problems.push(`fields must be in the order: ${FIELDS.join(', ')}`);
   return { fields: problems.length === 0 ? fields : null, problems };
 }
 
 export function checkEntry(fileName, text) {
   const violations = [];
   if (!ENTRY_NAME.test(fileName))
-    violations.push(`${fileName}: 文件名必须是 <票号>-<短名>.md，短名为小写字母数字连字符`);
+    violations.push(
+      `${fileName}: file name must be <ticket>-<short-name>.md with a lowercase alphanumeric hyphenated short name`,
+    );
   const { fields, problems } = parseEntry(text);
   violations.push(...problems.map((problem) => `${fileName}: ${problem}`));
   if (fields === null) return violations;
-  for (const key of ['类别', '首次来源', '防护'])
-    if (fields[key] === '') violations.push(`${fileName}: ${key}不能为空`);
-  if (!/^[1-5]$/.test(fields.级别)) violations.push(`${fileName}: 级别必须是 1 到 5`);
-  for (const key of ['拦截', '复发'])
-    if (!/^\d+$/.test(fields[key])) violations.push(`${fileName}: ${key}必须是非负整数`);
-  if (Number(fields.级别) >= 4 && fields.备注 === '')
-    violations.push(`${fileName}: 级别 ${fields.级别} 必须在备注写明为什么做不成更高级`);
-  if (fields.备注.includes('待升') && !/#\d+/.test(fields.备注))
-    violations.push(`${fileName}: 「待升」必须带票号`);
+  for (const key of ['Category', 'Source', 'Safeguard'])
+    if (fields[key] === '') violations.push(`${fileName}: ${key} must not be empty`);
+  if (!/^[1-5]$/.test(fields.Level)) violations.push(`${fileName}: Level must be between 1 and 5`);
+  for (const key of ['Intercepts', 'Recurrences'])
+    if (!/^\d+$/.test(fields[key]))
+      violations.push(`${fileName}: ${key} must be a non-negative integer`);
+  if (Number(fields.Level) >= 4 && fields.Notes === '')
+    violations.push(
+      `${fileName}: Level ${fields.Level} must state in Notes why a higher level is not feasible`,
+    );
+  if (/pending upgrade/i.test(fields.Notes) && !/#\d+/.test(fields.Notes))
+    violations.push(`${fileName}: "pending upgrade" in Notes must carry a ticket number`);
   return violations;
 }
 
@@ -57,10 +70,12 @@ export function ledgerEntries(root) {
 export function checkLedgerRoot(root) {
   const violations = [];
   if (existsSync(join(root, 'docs/lessons.md')))
-    violations.push('docs/lessons.md 已拆成 docs/lessons/ 单文件，不许再建汇总表文件');
-  if (!existsSync(join(root, 'docs/lessons'))) return [...violations, 'docs/lessons/ 目录缺失'];
+    violations.push(
+      'docs/lessons.md was split into per-entry files under docs/lessons/; do not bring the summary table back',
+    );
+  if (!existsSync(join(root, 'docs/lessons'))) return [...violations, 'docs/lessons/ is missing'];
   const entries = ledgerEntries(root);
-  if (entries.length === 0) violations.push('docs/lessons/ 里没有任何条目');
+  if (entries.length === 0) violations.push('docs/lessons/ has no entries');
   for (const { name, text } of entries) violations.push(...checkEntry(name, text));
   return violations;
 }
@@ -70,7 +85,7 @@ export function renderTable(entries) {
     const { fields } = parseEntry(text);
     return `| ${[name.replace(/\.md$/, ''), ...FIELDS.map((key) => fields[key])].map((value) => value.replaceAll('|', '\\|')).join(' | ')} |`;
   });
-  return [`| 文件 | ${FIELDS.join(' | ')} |`, `|${'---|'.repeat(FIELDS.length + 1)}`, ...rows].join(
+  return [`| File | ${FIELDS.join(' | ')} |`, `|${'---|'.repeat(FIELDS.length + 1)}`, ...rows].join(
     '\n',
   );
 }

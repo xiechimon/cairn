@@ -1,9 +1,9 @@
 ---
-类别: 工具执行无流事件被 idle 看门狗误杀
-首次来源: #1591 (2026-10-24)
-级别: 2
-防护: runner 按调用 ID 维护执行中工具集合；`runner-stream-timeout.test.ts` 覆盖静默长工具、并行工具、结束后 idle 恢复与 duration 上限
-拦截: 1
-复发: 0
-备注: 负对照：旧实现新增 4 例全部失败（idle=80ms 提前终止），修复后 12 例通过；存活依赖运行时事件，需行为测试验证
+Category: A tool execution with no stream events was killed by the idle watchdog by mistake
+Source: #1591 (2026-10-24)
+Level: 2
+Safeguard: the runner tracks in-flight tools by call ID; `runner-stream-timeout.test.ts` covers silent long tools, parallel tools, idle recovery after completion and the duration ceiling
+Intercepts: 1
+Recurrences: 0
+Notes: negative control: all 4 new cases failed on the old implementation (idle=80ms terminated early), 12 of 12 pass after the fix; liveness depends on runtime events, so it needs a behavioral test
 ---

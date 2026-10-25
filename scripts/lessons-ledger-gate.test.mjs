@@ -31,27 +31,35 @@ test('every migrated entry passes and the old table is gone', () => {
 });
 
 test('level 5 entry without a reason is rejected', () => {
-  const bad = withField(entryText(memoryEntry), '备注', '');
+  const bad = withField(entryText(memoryEntry), 'Notes', '');
   assert.equal(checkEntry(memoryEntry, bad).length, 1);
 });
 
 test('level outside 1 to 5 is rejected', () => {
-  for (const level of ['0', '6', '二']) {
-    assert.equal(checkEntry(gateEntry, withField(entryText(gateEntry), '级别', level)).length, 1);
+  for (const level of ['0', '6', 'two']) {
+    assert.equal(checkEntry(gateEntry, withField(entryText(gateEntry), 'Level', level)).length, 1);
   }
 });
 
 test('pending upgrade without a ticket is rejected, with a ticket passes', () => {
   const base = entryText(memoryEntry);
-  assert.equal(checkEntry(memoryEntry, withField(base, '备注', '待升到级别 2')).length, 1);
-  assert.deepEqual(checkEntry(memoryEntry, withField(base, '备注', '待升到级别 2，见 #12')), []);
+  assert.equal(
+    checkEntry(memoryEntry, withField(base, 'Notes', 'pending upgrade to level 2')).length,
+    1,
+  );
+  assert.deepEqual(
+    checkEntry(memoryEntry, withField(base, 'Notes', 'pending upgrade to level 2, see #12')),
+    [],
+  );
 });
 
 test('the real bad note that sat on main without a ticket is rejected', () => {
   const unticketed =
-    '负对照：旧表为 FULL，新表为 file map；待升：让 `--check-coverage` 也报未映射的 routes 源文件';
-  const text = withField(entryText(gateEntry), '备注', unticketed);
-  assert.deepEqual(checkEntry(gateEntry, text), [`${gateEntry}: 「待升」必须带票号`]);
+    'Negative control: the old table said FULL, the new table says file map; pending upgrade: make --check-coverage also report unmapped route source files';
+  const text = withField(entryText(gateEntry), 'Notes', unticketed);
+  assert.deepEqual(checkEntry(gateEntry, text), [
+    `${gateEntry}: "pending upgrade" in Notes must carry a ticket number`,
+  ]);
 });
 
 test('file name without a ticket number is rejected', () => {
@@ -68,9 +76,9 @@ test('file name without a ticket number is rejected', () => {
 
 test('missing, reordered or malformed fields are rejected', () => {
   const text = entryText(gateEntry);
-  assert.ok(checkEntry(gateEntry, text.replace(/^拦截:.*\n/m, '')).length >= 1);
-  assert.ok(checkEntry(gateEntry, withField(text, '复发', 'many')).length >= 1);
-  assert.ok(checkEntry(gateEntry, withField(text, '拦截', '-1')).length >= 1);
+  assert.ok(checkEntry(gateEntry, text.replace(/^Intercepts:.*\n/m, '')).length >= 1);
+  assert.ok(checkEntry(gateEntry, withField(text, 'Recurrences', 'many')).length >= 1);
+  assert.ok(checkEntry(gateEntry, withField(text, 'Intercepts', '-1')).length >= 1);
   assert.ok(checkEntry(gateEntry, text.replace(/^---\n/, '')).length >= 1);
 });
 
@@ -80,7 +88,7 @@ test('a resurrected docs/lessons.md table is rejected', () => {
     mkdirSync(join(root, 'docs/lessons'), { recursive: true });
     cpSync(join(lessonsDir, gateEntry), join(root, 'docs/lessons', gateEntry));
     assert.deepEqual(checkLedgerRoot(root), []);
-    writeFileSync(join(root, 'docs/lessons.md'), '| 类别 |\n');
+    writeFileSync(join(root, 'docs/lessons.md'), '| Category |\n');
     assert.equal(checkLedgerRoot(root).length, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -149,12 +157,12 @@ test('the old single table does conflict when two branches append a row', () => 
     );
   const appendRow = (branch) => {
     git('checkout', '-q', '-b', branch, 'main');
-    writeFileSync(join(root, 'lessons.md'), `| 类别 |\n|---|\n| base |\n| ${branch} |\n`);
+    writeFileSync(join(root, 'lessons.md'), `| Category |\n|---|\n| base |\n| ${branch} |\n`);
     git('commit', '-q', '-am', branch);
   };
   try {
     git('init', '-q', '-b', 'main');
-    writeFileSync(join(root, 'lessons.md'), '| 类别 |\n|---|\n| base |\n');
+    writeFileSync(join(root, 'lessons.md'), '| Category |\n|---|\n| base |\n');
     git('add', '.');
     git('commit', '-q', '-m', 'base');
     appendRow('lane-a');

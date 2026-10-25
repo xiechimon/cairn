@@ -1,9 +1,9 @@
 ---
-类别: 共机多车道下用 `pkill -f vitest` 按名字收尾，可能误杀别的车道的测试进程
-首次来源: #1635 (2026-10-25)
-级别: 5
-防护: 记忆式约定：只按自己启动的 pid 或进程组收尾
-拦截: 0
-复发: 0
-备注: 进程在仓外且归属无标记，仓内脚本检查不到；下次长测改用 `tee` 日志盯完成标记
+Category: Under multi-lane sharing, `pkill -f vitest` killed test processes by name and could hit another lane's run
+Source: #1635 (2026-10-25)
+Level: 5
+Safeguard: memory convention: only reap by the PID or process group you started
+Intercepts: 0
+Recurrences: 0
+Notes: the processes live outside the repo with no ownership marker, so in-repo scripts cannot check them; for the next long run, watch a `tee` log for the completion marker instead
 ---

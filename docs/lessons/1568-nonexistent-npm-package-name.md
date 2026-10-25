@@ -1,9 +1,9 @@
 ---
-类别: 官网和文档写了 npm 上不存在的包名（`npx @xiechimon/cairn` 返回 404），访客照抄直接报错
-首次来源: PR #1568 (2026-10-23)
-级别: 2
-防护: `scripts/npm-command-gate.mjs` 在 CI 里查 README、site/、web 界面里 npx / npm i 用到的包名，npm 404 即红
-拦截: 0
-复发: 0
-备注: 负对照：对含 `npx @xiechimon/cairn` 的 site/index.html 跑闸为红，改回 `@xiechimon/pacman` 后为绿；闸自身首版的 pathspec 漏扫 site/ 根目录文件，也由这次负对照发现
+Category: The website and docs named an npm package that does not exist (`npx @xiechimon/cairn` returns 404); visitors copied it and hit the error directly
+Source: PR #1568 (2026-10-23)
+Level: 2
+Safeguard: `scripts/npm-command-gate.mjs` checks the package names used with npx / npm i across README, site/ and the web UI in CI; an npm 404 goes red
+Intercepts: 0
+Recurrences: 0
+Notes: negative control: running the gate against site/index.html containing `npx @xiechimon/cairn` went red and turned green after reverting to `@xiechimon/pacman`; the gate's own first version missed site/ root files in its pathspec, also found by this negative control
 ---

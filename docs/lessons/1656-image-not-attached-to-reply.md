@@ -1,9 +1,9 @@
 ---
-类别: 只把图放进文件库、没有直接附在回复里
-首次来源: Claude 线程 (2026-10-22)
-级别: 5
-防护: 记忆
-拦截: 0
-复发: 0
-备注: 机器检查做不到
+Category: An image went only into the file library, not attached to the reply directly
+Source: Claude thread (2026-10-22)
+Level: 5
+Safeguard: memory
+Intercepts: 0
+Recurrences: 0
+Notes: no machine check is possible
 ---

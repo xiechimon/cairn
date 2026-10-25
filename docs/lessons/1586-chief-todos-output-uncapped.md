@@ -1,9 +1,9 @@
 ---
-类别: 总管任务列表把所有 spec 原文放进单次工具结果，撑爆上下文
-首次来源: #1586 (2026-10-24)
-级别: 2
-防护: `chief-todos-cap.test.ts` 通过真实数据库与工具执行面验证 32 KiB UTF-8 序列化预算、分页取全和按 id 取全文
-拦截: 1
-复发: 0
-备注: 负对照：旧实现输出 32369783 字节，超过 32768；摘要分页后同一用例转绿。动态序列化大小不能只靠静态类型约束
+Category: The chief todos tool put the full original text of every spec into a single tool result, blowing up the context
+Source: #1586 (2026-10-24)
+Level: 2
+Safeguard: `chief-todos-cap.test.ts` verifies the 32 KiB UTF-8 serialization budget, full pagination and fetch-by-id against the real database and tool execution surface
+Intercepts: 1
+Recurrences: 0
+Notes: negative control: the old implementation output 32369783 bytes, over 32768; the same case turned green after summary pagination. Dynamic serialized size cannot be constrained by static types alone
 ---

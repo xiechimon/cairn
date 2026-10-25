@@ -1,9 +1,9 @@
 ---
-类别: shell 命令用 zsh 只读变量 `status` 接退出码，中断了后续清理
-首次来源: #1533 (2026-10-23)
-级别: 3
-防护: 工具命令变量使用任务专属前缀，遵循现有执行规则
-拦截: 0
-复发: 0
-备注: 已移除负对照文件；交互工具命令不属于仓内受检脚本，无法由仓内 lint 覆盖
+Category: A shell command used zsh's readonly variable `status` for the exit code and aborted the rest of the cleanup
+Source: #1533 (2026-10-23)
+Level: 3
+Safeguard: tool commands use task-specific prefixes for variables, following the existing execution rules
+Intercepts: 0
+Recurrences: 0
+Notes: the negative-control file was removed; interactive tool commands are not in-repo checked scripts, so in-repo lint cannot cover them
 ---

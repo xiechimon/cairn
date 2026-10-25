@@ -1,9 +1,9 @@
 ---
-类别: 新增的提示词段落打破两条既有集成测试：带反馈的失败重启只剩失败原因时也追加教训段，m7 反馈对账串对不上；空白反馈纯重启轮被塞入教训段，破坏 #720 的 prompt 为空
-首次来源: #1615 推送前 prepush (2026-10-24)
-级别: 2
-防护: `integration/test/m7-failed-send-e2e.test.ts` 与 `restart-blank-feedback-e2e.test.ts` 在 prepush 全量集成里变红；`retry-lessons.test.ts` 补「空白反馈纯重启」「只有失败原因」两条用例钉住；教训段只在带用户反馈的重启里出现，且至少有一条教训之外的上一轮记录
-拦截: 2
-复发: 0
-备注: 负对照：改动前两条集成测试实跑均红（m7 的 llmSawFeedback 为 false，空白反馈用例 prompt 非 null），改后均绿；根因是本地只跑了 server 单测，没跑受影响的集成测试
+Category: The new prompt paragraph broke two existing integration tests: a failed restart with only a failure reason still got the lessons paragraph appended and the m7 feedback reconciliation mismatched; a blank-feedback pure restart round was stuffed with the lessons paragraph, breaking #720's prompt-is-null invariant
+Source: #1615 pre-push prepush (2026-10-24)
+Level: 2
+Safeguard: `integration/test/m7-failed-send-e2e.test.ts` and `restart-blank-feedback-e2e.test.ts` went red in the full integration run under prepush; `retry-lessons.test.ts` added the "blank-feedback pure restart" and "only failure reason" cases; the lessons paragraph only appears in restarts with user feedback and only when at least one prior-round record exists besides lessons
+Intercepts: 2
+Recurrences: 0
+Notes: negative control: both integration tests actually ran red before the change (m7's llmSawFeedback false, the blank-feedback case's prompt non-null) and green after; the root cause was running only the server unit tests locally, not the affected integration tests
 ---
