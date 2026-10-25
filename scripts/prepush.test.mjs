@@ -4,7 +4,14 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { prepushModules, prepushPlan, runPlan, selfTests } from './prepush.mjs';
+import {
+  ciOnlyScripts,
+  localOnly,
+  prepushModules,
+  prepushPlan,
+  runPlan,
+  selfTests,
+} from './prepush.mjs';
 
 test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
@@ -51,6 +58,22 @@ test('local code checks include both UI gates and affected e2e', () => {
     assert.ok(commands.includes(command), command);
 });
 
+test('every single-script CI step also runs in local prepush or is listed as CI-only', () => {
+  const local = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
+  const ciScripts = [
+    ...readFileSync('.github/workflows/ci.yml', 'utf8').matchAll(
+      /run: node (scripts\/[\w-]+\.mjs)\n/g,
+    ),
+  ].map((match) => match[1]);
+  assert.ok(ciScripts.includes('scripts/ui-registry-gate.mjs'));
+  for (const script of ciScripts)
+    assert.ok(
+      local.includes(`node ${script}`) || script in ciOnlyScripts,
+      `${script} runs in CI but not in local prepush; add it to prepushPlan or ciOnlyScripts`,
+    );
+  for (const script of Object.keys(ciOnlyScripts)) assert.ok(ciScripts.includes(script), script);
+});
+
 test('e2e coverage check passes on the real suite and names an unmapped spec', () => {
   const ciCommands = prepushPlan(['apps/web/src/main.tsx'], 'ci').map((args) => args.join(' '));
   assert.ok(ciCommands.includes('node scripts/e2e-affected.mjs --check-coverage'));
@@ -91,12 +114,7 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
     prepushPlan(paths, 'ci'),
     prepushPlan(paths)
       .slice(0, -3)
-      .filter(
-        (args) =>
-          !args[1].endsWith('-gate.mjs') ||
-          args[1].startsWith('scripts/ui-') ||
-          args[1] === 'scripts/english-only-gate.mjs',
-      ),
+      .filter((args) => !localOnly.some((local) => local.join(' ') === args.join(' '))),
   );
   assert.deepEqual(prepushPlan(paths, 'advisory'), [
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],

@@ -628,9 +628,9 @@ function ColumnList({
             data-card-skeleton=""
             className="flex h-21 flex-none flex-col gap-2.5 rounded-(--radius-card) bg-card px-3.5 py-3 shadow-(--panel-shadow)"
           >
-            <Skeleton className="h-3.5 w-4/5" />
-            <Skeleton className="h-3.5 w-1/2" />
-            <Skeleton className="mt-auto h-3 w-2/5" />
+            <Skeleton className="bg-accent h-3.5 w-4/5" />
+            <Skeleton className="bg-accent h-3.5 w-1/2" />
+            <Skeleton className="bg-accent mt-auto h-3 w-2/5" />
           </div>
         ))}
       {count === 0 && !loading && (

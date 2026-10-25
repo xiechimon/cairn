@@ -12,10 +12,28 @@ export const prepushModules = [
   'scripts/scrub-git-env.mjs',
 ];
 
+export const ciOnlyScripts = {
+  'scripts/css-mechanism-gate.mjs': 'greps the apps/web/dist build the CI e2e step writes',
+  'scripts/issue-label-gate.mjs': 'reads issue labels through the GitHub token',
+  'scripts/feature-map-staleness-gate.mjs': 'advisory job that never blocks a merge',
+};
+
 export const selfTests = [
   'scripts/prepush.test.mjs',
   'scripts/heavy-slots.test.mjs',
   'scripts/english-only-gate.test.mjs',
+];
+
+export const localOnly = [
+  ['node', 'scripts/ci-job-structure-gate.mjs'],
+  ['node', 'scripts/comment-discipline-gate.mjs'],
+  ['node', 'scripts/single-use-helper-gate.mjs'],
+  ['node', 'scripts/baseline-ratchet-gate.mjs'],
+  ['node', 'scripts/test-spawn-gate.mjs'],
+  ['node', 'scripts/pr-evidence-workflow-gate.mjs'],
+  ['node', 'scripts/ui-registry-gate.mjs'],
+  ['node', 'scripts/ui-consumer-shape-gate.mjs'],
+  ['node', 'scripts/pr-gate-selfcheck.mjs'],
 ];
 
 export function prepushPlan(paths, mode = 'local') {
@@ -32,12 +50,6 @@ export function prepushPlan(paths, mode = 'local') {
     ['pnpm', 'spec:parse'],
     ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
     ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
-  ];
-  const localOnly = [
-    ['node', 'scripts/ci-job-structure-gate.mjs'],
-    ['node', 'scripts/comment-discipline-gate.mjs'],
-    ['node', 'scripts/single-use-helper-gate.mjs'],
-    ['node', 'scripts/baseline-ratchet-gate.mjs'],
   ];
   return mode === 'ci'
     ? required
