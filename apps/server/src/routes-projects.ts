@@ -7,6 +7,7 @@ import {
   importGithubIssueBodySchema,
   patchAutonomyBodySchema,
   patchProjectBodySchema,
+  patchProjectMergeConfigSchema,
 } from '@cairn/shared';
 import { eq, inArray } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -44,7 +45,12 @@ import {
   validateLocalRepoPath,
 } from './services/git.js';
 import { importGithubIssue, listProjectGithubIssues } from './services/github-issues.js';
-import { deleteProject, updateProject } from './services/projects.js';
+import {
+  deleteProject,
+  projectMergeConfigOf,
+  updateProject,
+  updateProjectMergeConfig,
+} from './services/projects.js';
 import { seedFixedTags } from './services/tags.js';
 import { listTodos } from './services/todos.js';
 
@@ -56,6 +62,17 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const origin = requestOrigin(c);
     const rows = ctx.db.select().from(project).where(eq(project.teamId, teamId)).all();
     return c.json(rows.map((r) => toProjectRecord(r, origin)));
+  });
+
+  app.get('/api/projects/:id/merge-policy', (c) => {
+    const row = requireProject(ctx, c.req.param('id'));
+    return c.json(projectMergeConfigOf(row));
+  });
+
+  app.patch('/api/projects/:id/merge-policy', async (c) => {
+    const row = requireProject(ctx, c.req.param('id'));
+    const body = parseWith(patchProjectMergeConfigSchema, await jsonBody(c), 'body');
+    return c.json(updateProjectMergeConfig(ctx.db, row, body));
   });
 
   app.get('/api/projects/:id/todos', (c) => {

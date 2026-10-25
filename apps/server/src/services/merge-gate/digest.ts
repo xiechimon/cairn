@@ -9,6 +9,16 @@ import {
 
 export type DigestUnavailable = 'truncated' | 'count-mismatch' | 'null-sha' | 'empty';
 
+export interface LocalDiffFile {
+  status: CompareFile['status'];
+  filename: string;
+  previousFilename: string | null;
+  sha: string | null;
+  additions: number;
+  deletions: number;
+  patch: string | null;
+}
+
 export interface PatchDigestResult {
   patchDigest: string | null;
   unavailable: DigestUnavailable | null;
@@ -61,6 +71,25 @@ export function computePatchDigest(
     .sort();
   const hex = createHash('sha256').update(tuples.join('\n')).digest('hex');
   return result(`${PATCH_DIGEST_VERSION}:${hex}`, null);
+}
+
+export function computeLocalPatchDigest(
+  files: readonly LocalDiffFile[],
+  opts: { expectedFileCount?: number | null } = {},
+): PatchDigestResult {
+  const compareFiles: CompareFile[] = files.map((file) => ({
+    status: file.status,
+    filename: file.filename,
+    previousFilename: file.previousFilename,
+    sha: file.sha,
+    additions: file.additions,
+    deletions: file.deletions,
+    patchSha:
+      file.patch === null || file.patch === ''
+        ? null
+        : createHash('sha256').update(file.patch, 'utf8').digest('hex'),
+  }));
+  return computePatchDigest(compareFiles, opts);
 }
 
 const STATUSES: readonly string[] = COMPARE_FILE_STATUSES;

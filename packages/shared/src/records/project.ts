@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { recordId } from './common.js';
 import { diffFileSchema } from './document-diff.js';
+import { mergePolicySchema } from './merge-gate.js';
 
 export const PROJECT_REPO_KINDS = ['hosted', 'github', 'local'] as const;
 export const projectRepoKindSchema = z.enum(PROJECT_REPO_KINDS);
@@ -15,10 +16,19 @@ export const projectRecordSchema = z.object({
   repoName: z.string().optional(),
   githubRepo: z.string().optional(),
   localPath: z.string().optional(),
+  mergePolicy: mergePolicySchema.optional(),
+  localChecks: z.array(z.string().min(1)).optional(),
   cloneUrl: z.string().optional(),
 });
 export type ProjectRecord = z.infer<typeof projectRecordSchema>;
 
+export const projectMergeConfigSchema = z.object({
+  mergePolicy: mergePolicySchema.default('human'),
+  localChecks: z.array(z.string().min(1)).default([]),
+});
+export type ProjectMergeConfig = z.infer<typeof projectMergeConfigSchema>;
+export const patchProjectMergeConfigSchema = projectMergeConfigSchema.partial().strict();
+export type PatchProjectMergeConfig = z.infer<typeof patchProjectMergeConfigSchema>;
 export const githubRepoRefSchema = z.object({
   owner: z.string(),
   repo: z.string(),

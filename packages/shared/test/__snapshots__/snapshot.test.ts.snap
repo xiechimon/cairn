@@ -8018,7 +8018,22 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "id": {
       "type": "string",
     },
+    "localChecks": {
+      "items": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "type": "array",
+    },
     "localPath": {
+      "type": "string",
+    },
+    "mergePolicy": {
+      "enum": [
+        "human",
+        "shadow",
+        "autonomous",
+      ],
       "type": "string",
     },
     "name": {
