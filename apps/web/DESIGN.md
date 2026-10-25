@@ -257,7 +257,7 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
 | 内容到达 | 对话消息入场 | 380ms（`--spring-snappy-dur`） | `--spring-snappy` | `opacity` + `translateY` |
 | 内容到达 | 流式字符显现 | 350ms | `--ease-out-expo` | `opacity` |
 | 内容到达 | 保存勾衰减 | 2.5s | `--ease-out-expo` | `opacity` + `scale` |
-| 循环 | 执行中图标呼吸 | 2.4s | `ease-in-out` | `opacity` |
+| Loop | Running task card footer: the spiral mark spins (same as the busy chief button) | 2.4s per turn | `linear` | `transform: rotate`; static under reduced motion |
 | 循环 | 在飞 spinner 呼吸 | 3.6s | `ease-in-out` | `opacity` + `scale` |
 
 - 只动 `opacity` / `transform` / 阴影 / 颜色，不动布局属性（width / height / top）。

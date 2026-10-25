@@ -88,14 +88,14 @@ test('meta row never wraps at the 200px column floor', async ({ page }) => {
   }
 });
 
-test('running footer breathes, and stops under reduced motion', async ({ page }) => {
+test('running footer spiral spins, and stops under reduced motion', async ({ page }) => {
   await page.goto(MATRIX);
   const running = card(page, 'dm-building');
   await expect(running).toContainText('执行中');
-  const bot = running.locator('svg.animate-breath');
-  await expect(bot).toHaveCSS('animation-name', 'card-breath');
+  const spinner = running.locator('[data-card-footer="running"] svg');
+  await expect(spinner).toHaveCSS('animation-name', 'spin');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(bot).toHaveCSS('animation-name', 'none');
+  await expect(spinner).toHaveCSS('animation-name', 'none');
 });
 
 test('column header: serif name, fixed status icon, plus only on `待开始` and it opens new task', async ({

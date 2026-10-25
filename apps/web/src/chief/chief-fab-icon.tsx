@@ -2,12 +2,18 @@ import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { ChiefContent } from '../fixtures/records.js';
 import { BUSY_SPIN_CLS } from './chief-spiral-face.js';
 
-function ChiefFabMark({ busy }: { busy: boolean }) {
+export function SpiralMark({
+  busy,
+  className = 'size-5.5 text-(--fab-mark)',
+}: {
+  busy: boolean;
+  className?: string;
+}) {
   return (
     <svg
       aria-hidden="true"
       viewBox="-142 -254 452 452"
-      className={`size-5.5 text-(--fab-mark) ${busy ? BUSY_SPIN_CLS : ''}`}
+      className={`${className} ${busy ? BUSY_SPIN_CLS : ''}`}
     >
       <path
         d="M0 0 A84 84 0 0 1 168 0 A140 140 0 0 1 -112 0 A196 196 0 0 1 280 0"
@@ -43,9 +49,9 @@ export function ChiefFabIcon({
     </span>
   ) : expanded ? (
     <span className="flex size-8 flex-none items-center justify-center">
-      <ChiefFabMark busy={busy} />
+      <SpiralMark busy={busy} />
     </span>
   ) : (
-    <ChiefFabMark busy={busy} />
+    <SpiralMark busy={busy} />
   );
 }

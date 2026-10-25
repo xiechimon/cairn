@@ -94,11 +94,12 @@ test('queued cards sit in `执行中` with a waiting footer; todo and building s
   const heldFooter = card(page, 'building', HELD.id).locator('[data-card-footer="waiting"]');
   await expect(heldFooter).toHaveText('r3-builder · 等机器');
   for (const footer of [queuedFooter, heldFooter]) {
-    await expect(footer.locator('.animate-breath')).toHaveCount(0);
+    for (const icon of await footer.locator('svg').all())
+      await expect(icon).not.toHaveCSS('animation-name', 'spin');
   }
   const runningFooter = card(page, 'building', RUNNING.id).locator('[data-card-footer="running"]');
   await expect(runningFooter).toHaveText('r3-builder · 执行中');
-  await expect(runningFooter.locator('.animate-breath')).toHaveCount(1);
+  await expect(runningFooter.locator('svg')).toHaveCSS('animation-name', 'spin');
 });
 
 for (const theme of ['light', 'dark'] as const) {
