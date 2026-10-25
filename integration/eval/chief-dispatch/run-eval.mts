@@ -13,6 +13,13 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  gradeMemoryCase,
+  isMemoryCase,
+  type MemoryCase,
+  type MemoryRowLite,
+} from '../memory-regression/grade.mts';
+import { readMemoryRows, seedMemories } from '../memory-regression/seed.mts';
 import { type Case, gradeCase, type RosterAgent } from './grade.mts';
 import {
   bootStack,
@@ -43,10 +50,12 @@ const PRICES: Record<string, { in: number; out: number; cacheRead: number }> = {
   'deepseek-v4-pro': { in: 0.955, out: 1.911, cacheRead: 0.08 },
 };
 
-async function loadCases(): Promise<Case[]> {
+type EvalCase = Case | MemoryCase;
+
+async function loadCases(): Promise<EvalCase[]> {
   const d = JSON.parse(readFileSync(join(ARGS.flow, 'cases.json'), 'utf8')) as {
     roster: RosterAgent[];
-    cases: Case[];
+    cases: EvalCase[];
   };
   ROSTER = d.roster;
   CHIEF_MODEL = ARGS.model ?? CHIEF_MODEL;
@@ -59,7 +68,7 @@ async function loadCases(): Promise<Case[]> {
  * 复用栈就必须在例间删行，而在 daemon 手里删步会 404 打死进程（实测）；
  * 全新栈 + 判完即关则让那次下游执行根本没机会跑起来，同时白得「每 trial
  * 干净隔离」——每例的库、home、skills 根、机器注册都是新的。 */
-async function freshStack(): Promise<{ stack: Stack; world: SeededWorld }> {
+async function freshStack(input: EvalCase): Promise<{ stack: Stack; world: SeededWorld }> {
   const stack = await bootStack();
   try {
     const world = await seedWorld(stack, {
@@ -68,6 +77,7 @@ async function freshStack(): Promise<{ stack: Stack; world: SeededWorld }> {
       roster: ROSTER,
       chiefModelId: CHIEF_MODEL,
     });
+    if (isMemoryCase(input)) await seedMemories(stack.server, world, input);
     return { stack, world };
   } catch (e) {
     await stack.close();
@@ -76,7 +86,7 @@ async function freshStack(): Promise<{ stack: Stack; world: SeededWorld }> {
 }
 
 async function runCase(
-  input: Case,
+  input: EvalCase,
   ctx: { timeoutS: number },
 ): Promise<{
   output: string;
@@ -89,8 +99,9 @@ async function runCase(
   /** 本 case 实际跑的那条栈上 key→agentId 的映射（每条栈 id 随机，判分必须
    * 用同一条栈的映射反查，不能用全局表）。 */
   agentIds: Record<string, string>;
+  memoryAfter: MemoryRowLite[];
 }> {
-  const { stack, world } = await freshStack();
+  const { stack, world } = await freshStack(input);
   try {
     const timeoutMs = ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000;
     const ev = await driveTurn(stack, input.prompt, { timeoutMs });
@@ -122,6 +133,7 @@ async function runCase(
       evidence: ev,
       truncated,
       agentIds: world.agentIds,
+      memoryAfter: readMemoryRows(stack.server, world.chiefAgentId),
     };
   } finally {
     await stack.close();
@@ -383,7 +395,7 @@ async function main() {
     seen.set(k, c.id);
   }
 
-  const tasks: { c: Case; rep: number }[] = [];
+  const tasks: { c: EvalCase; rep: number }[] = [];
   for (const c of cases)
     for (let rep = 0; rep < ARGS.reps; rep++) {
       if (done.has(`${pathSafeId(c.id)}\0${rep}`)) continue;
@@ -450,7 +462,10 @@ async function main() {
               }
             }
             const g = await withBackoff(
-              async () => gradeCase(c, run, ROSTER),
+              async () =>
+                isMemoryCase(c)
+                  ? gradeMemoryCase(c, { evidence: run.evidence, memoryAfter: run.memoryAfter })
+                  : gradeCase(c, run, ROSTER),
               judgeRetry,
               deadline,
             );

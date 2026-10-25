@@ -330,7 +330,7 @@ describe('#1470 save_memory：projectId / sourceTodoId 核团队', () => {
     const worker = JSON.parse(
       await executeWorkerMemoryTool(H.s.db, workerCtx(), 'save_memory', {
         title: 'w',
-        content: 'c',
+        content: 'worker-owned',
       }),
     ) as { projectId: string; sourceTodoId: string };
     expect(worker).toMatchObject({ projectId: H.projectId, sourceTodoId: OWN_TASK });

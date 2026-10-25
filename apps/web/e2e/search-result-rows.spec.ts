@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { pressUntil } from './helpers.js';
+import { pressAndExpect } from './helpers.js';
 
 // Issue #159: 搜索结果行——点击即跳 + 常亮改 hover 跟随。Every panel row is
 // a live SPA hop carrying the current ?search= along (#121 convention) and
@@ -39,10 +39,9 @@ const isLit = (locator: Locator) =>
     return cs.backgroundColor === lit && cs.boxShadow !== 'none';
   });
 
-/** ⌘K until the panel answers (retry rules: pressUntil in helpers.ts). */
 async function openPanel(page: Page) {
   await expect(page.getByRole('complementary')).toBeVisible();
-  await pressUntil(page, 'Meta+k', panel(page));
+  await pressAndExpect(page, 'Meta+k', panel(page));
 }
 
 /** Panel open + the probe query typed into the auto-focused input. */

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { blockerHandoffSchema } from './blocker-handoff-record.js';
+import { failureAttributionSchema } from './failure-attribution.js';
 import { personaRoleSchema } from './records/agent.js';
 import { epochMs, recordId } from './records/common.js';
 import { transcriptRowSchema } from './records/message.js';
@@ -17,6 +19,7 @@ export const trajectoryPackSchema = z.object({
     agentId: recordId,
     model: z.string().min(1),
     skillInjection: skillInjectionSchema.nullable(),
+    blockerHandoff: blockerHandoffSchema.nullable(),
     harnessHash: z.string().min(1),
   }),
   process: z.object({
@@ -40,7 +43,7 @@ export const trajectoryPackSchema = z.object({
     ),
     diff: z.array(
       z.object({
-        action: z.enum(['approve', 'restart']),
+        action: z.enum(['approve', 'revision', 'restart']),
         reason: z.string().nullable(),
       }),
     ),
@@ -75,6 +78,7 @@ export const trajectoryPackSchema = z.object({
       costTotal: z.number().nonnegative().nullable(),
     })
     .nullable(),
+  attribution: failureAttributionSchema.nullable().default(null),
 });
 
 export type TrajectoryPack = z.infer<typeof trajectoryPackSchema>;

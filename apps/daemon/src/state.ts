@@ -37,6 +37,7 @@ export interface StatePaths {
    *  项目的 conv 工作区即 repo checkout，plan.md 落工作区根会被 agent 提交
    *  进仓库根。runner 组装交接位置注记行时首用即建。 */
   plansDir: string;
+  reportsDir: string;
 }
 
 export function statePaths(home: string, workspacesDir?: string): StatePaths {
@@ -53,6 +54,7 @@ export function statePaths(home: string, workspacesDir?: string): StatePaths {
     teamSkillsCacheDir: join(home, 'team-skills'),
     stepAttachmentsDir: join(home, 'step-attachments'),
     plansDir: join(home, 'plans'),
+    reportsDir: join(home, 'reports'),
   };
 }
 

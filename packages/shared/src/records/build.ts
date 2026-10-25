@@ -27,6 +27,7 @@ export const buildRecordSchema = z.object({
   prUrl: z.string().nullable(),
   prNumber: z.number().int().nullable(),
   diffHash: z.string().nullable(),
+  reportAttachmentId: recordId.nullable().optional(),
   createdAt: epochMs,
 });
 export type BuildRecord = z.infer<typeof buildRecordSchema>;

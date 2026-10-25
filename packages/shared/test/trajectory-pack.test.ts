@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { type TrajectoryPack, trajectoryPackSchema } from '../src/index.js';
+import {
+  FAILURE_WHERE,
+  FAILURE_WHY,
+  type TrajectoryPack,
+  trajectoryPackSchema,
+} from '../src/index.js';
 
 const pack = {
   buildId: 'build-1',
@@ -11,6 +16,7 @@ const pack = {
     agentId: 'agent-1',
     model: 'provider/model',
     skillInjection: null,
+    blockerHandoff: null,
     harnessHash: 'harness-v1',
   },
   process: {
@@ -41,6 +47,7 @@ const pack = {
       { action: 'confirm', reason: null },
     ],
     diff: [
+      { action: 'revision', reason: 'Tighten the diff' },
       { action: 'restart', reason: 'Fix failure' },
       { action: 'approve', reason: null },
     ],
@@ -48,6 +55,7 @@ const pack = {
     ciFixRounds: 0,
   },
   outcome: null,
+  attribution: null,
 } satisfies TrajectoryPack;
 
 describe('trajectoryPackSchema', () => {
@@ -71,6 +79,7 @@ describe('trajectoryPackSchema', () => {
       sourceRef: 'github:owner/repo#1',
       persona: 'code_reviewer',
       skillInjection: { hits: [] },
+      blockerHandoff: null,
     } satisfies TrajectoryPack['input'];
     const process = { steps: [], plans: [], token_usage: [] };
     expect(trajectoryPackSchema.parse({ ...pack, input, process })).toEqual({
@@ -101,7 +110,7 @@ describe('trajectoryPackSchema', () => {
 
   test('requires every declared field even when nullable', () => {
     const parsed = trajectoryPackSchema.parse(pack);
-    for (const key of Object.keys(parsed)) {
+    for (const key of Object.keys(parsed).filter((key) => key !== 'attribution')) {
       const missing = { ...parsed } as Record<string, unknown>;
       delete missing[key];
       expect(trajectoryPackSchema.safeParse(missing).success, key).toBe(false);
@@ -137,5 +146,70 @@ describe('trajectoryPackSchema', () => {
         outcome: { merged: true, revertedWithin7d: null, fixedByLaterPr: null, costTotal: -1 },
       }).success,
     ).toBe(false);
+  });
+
+  describe('attribution', () => {
+    const attribution = {
+      where: 'runtime',
+      why: 'premature_finish',
+      evidence: [{ stepId: 'step-1', messageIndex: 0 }],
+      labeler: 'provider/stronger-model',
+      labeledAt: 1_700_000_000_000,
+    };
+
+    test('packs written before the field existed parse with attribution null', () => {
+      const { attribution: _omitted, ...legacy } = pack;
+      expect(trajectoryPackSchema.parse(legacy).attribution).toBeNull();
+      expect(trajectoryPackSchema.parse({ ...pack, attribution: null }).attribution).toBeNull();
+    });
+
+    test('keeps a full label and accepts human as labeler', () => {
+      expect(trajectoryPackSchema.parse({ ...pack, attribution }).attribution).toEqual(attribution);
+      const human = { ...attribution, labeler: 'human', evidence: [] };
+      expect(trajectoryPackSchema.parse({ ...pack, attribution: human }).attribution).toEqual(
+        human,
+      );
+    });
+
+    test('exposes the fixed vocabularies', () => {
+      expect(FAILURE_WHERE).toEqual([
+        'prompt',
+        'knowledge',
+        'runtime',
+        'config',
+        'infra',
+        'unknown',
+      ]);
+      expect(FAILURE_WHY).toEqual([
+        'premature_finish',
+        'thinking_runaway',
+        'wrong_tool',
+        'ignored_instruction',
+        'context_missing',
+        'ci_misread',
+        'other',
+      ]);
+    });
+
+    test('rejects values outside the vocabularies and incomplete labels', () => {
+      const bad: unknown[] = [
+        { ...attribution, where: 'harness' },
+        { ...attribution, why: 'laziness' },
+        { ...attribution, where: null },
+        { ...attribution, labeler: '' },
+        { ...attribution, labeledAt: 1.5 },
+        { ...attribution, evidence: [{ stepId: 'step-1', messageIndex: -1 }] },
+        { ...attribution, evidence: [{ messageIndex: 0 }] },
+      ];
+      for (const value of bad)
+        expect(trajectoryPackSchema.safeParse({ ...pack, attribution: value }).success).toBe(false);
+      for (const key of Object.keys(attribution)) {
+        const missing = { ...attribution } as Record<string, unknown>;
+        delete missing[key];
+        expect(trajectoryPackSchema.safeParse({ ...pack, attribution: missing }).success, key).toBe(
+          false,
+        );
+      }
+    });
   });
 });

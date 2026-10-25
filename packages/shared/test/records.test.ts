@@ -67,6 +67,7 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
     sourceBuildId: 'chief-6ItyfRe7Q7hru5xFmMu-u-',
     sourceKind: null,
     sourceRef: null,
+    output: 'code',
   };
 
   it('parses the full observed field set', () => {

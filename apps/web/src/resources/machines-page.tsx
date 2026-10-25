@@ -33,7 +33,7 @@ import { useApiMutations, useChief, useMachines, useTeams } from '../api/hooks.j
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
-import { ClaudeMark, PiMark } from '../components/brand-marks.js';
+import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
@@ -56,6 +56,7 @@ export const MACHINES_HREF = '/app/resources/machines';
 const RUNTIME_LABELS: Record<MachineRuntime, string> = {
   pi: 'pi',
   'claude-code': 'Claude Code',
+  gemini: 'Gemini',
 };
 
 /** runtime → 官方品牌 mark。键集钉 MachineRuntime：词表扩项时此处编译期报错，
@@ -63,6 +64,7 @@ const RUNTIME_LABELS: Record<MachineRuntime, string> = {
 const RUNTIME_MARKS: Record<MachineRuntime, typeof PiMark> = {
   pi: PiMark,
   'claude-code': ClaudeMark,
+  gemini: GeminiMark,
 };
 
 /** 机器层 shell 开关的说明句（#1175：不再作为行副行常驻——挂在开关簇的

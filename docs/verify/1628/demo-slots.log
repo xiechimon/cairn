@@ -1,0 +1,12 @@
+== A: slots=2, 4 stand-in jobs launched at once
+exit codes all zero: yes
+queued messages:
+   2 [heavy-slots] 拿到名额 1/2
+   2 [heavy-slots] 拿到名额 2/2
+   1 [heavy-slots] 排队中，第 1 位（2 个名额都被占用）
+   1 [heavy-slots] 排队中，第 2 位（2 个名额都被占用）
+jobs started: 4 peak concurrent: 2
+== B: kill -9 the holder, queued job takes the slot
+[heavy-slots] 排队中，第 1 位（1 个名额都被占用）
+[heavy-slots] 拿到名额 1/1
+waiter ran 111 ms after kill -9

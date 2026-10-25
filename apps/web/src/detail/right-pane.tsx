@@ -14,6 +14,7 @@
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
 import { useBuild } from '../api/hooks.js';
+import { NO_PRICE_REASON } from '../api/mappers.js';
 import { Badge } from '../components/ui/badge.js';
 import { Label } from '../components/ui/label.js';
 import type { BuildOverlayContent, PaneView, RunHistoryRow } from '../fixtures/records.js';
@@ -75,6 +76,13 @@ function TokenSection({
     ['缓存写入', stats.cacheWrite],
     ['缓存命中率', stats.cacheHitRate],
   ];
+  const costRows: Array<[string, string, string]> = stats.cost
+    ? [
+        ['缓存读取', stats.cost.cacheRead, 'cost-cache-read'],
+        ['输入（含缓存写入）', stats.cost.input, 'cost-input'],
+        ['输出', stats.cost.output, 'cost-output'],
+      ]
+    : [];
   return (
     <section className="flex min-h-0 flex-1 flex-col">
       <SectionHead icon={<BarChart3 width={14} height={14} />} select={select} />
@@ -101,6 +109,34 @@ function TokenSection({
             </div>
           ))}
         </div>
+        {stats.cost !== undefined && (
+          <fieldset
+            aria-label={t('花费')}
+            className="m-0 mt-2 min-w-0 border-0 border-t border-t-(--border) p-0 pt-2"
+          >
+            <div className="flex h-7 items-center justify-between px-4 text-meta">
+              <span className="text-(--text-tertiary)">{t('花费')}</span>
+              <span
+                data-testid="cost-total"
+                title={stats.cost === null ? t(NO_PRICE_REASON) : undefined}
+                className="font-semibold tabular-nums text-(--foreground)"
+              >
+                {stats.cost === null ? '—' : stats.cost.total}
+              </span>
+            </div>
+            {stats.cost === null && (
+              <p className="px-4 pb-2 text-meta text-(--text-tertiary)">{t(NO_PRICE_REASON)}</p>
+            )}
+            {costRows.map(([label, value, testId]) => (
+              <div key={testId} className="flex h-7 items-center justify-between px-4 text-meta">
+                <span className="text-(--text-tertiary)">{t(label)}</span>
+                <span data-testid={testId} className="tabular-nums text-(--foreground)">
+                  {value}
+                </span>
+              </div>
+            ))}
+          </fieldset>
+        )}
       </div>
     </section>
   );

@@ -86,7 +86,7 @@ const RAW_TOOL_DEF_HASH_KEYS = [
   'workflow_runs',
 ];
 
-describe('52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1）', () => {
+describe('53 词表', () => {
   const rawKeys: string[] = RAW_TOOL_DEF_HASH_KEYS;
   const removed: readonly string[] = CHIEF_TOOLS_REMOVED;
   const added: readonly string[] = CHIEF_TOOLS_ADDED;
@@ -95,9 +95,9 @@ describe('52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1）', () => {
     ...added,
   ].sort();
 
-  it('raw 键集恰 49 件；现行词表 = raw − 除名 + 新增 = 52 件', () => {
+  it('raw 键集恰 49 件；现行词表 = raw − 除名 + 新增 = 53 件', () => {
     expect(rawKeys).toHaveLength(49);
-    expect(CHIEF_TOOL_COUNT).toBe(52);
+    expect(CHIEF_TOOL_COUNT).toBe(53);
     expect(CHIEF_TOOL_COUNT).toBe(rawKeys.length - removed.length + added.length);
   });
 
@@ -106,9 +106,15 @@ describe('52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1）', () => {
     expect(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort()).toEqual(expected);
   });
 
-  it('除名登记 = delete_skills；新增登记 = create_skill + update_skill + models + split_todo（divergence 全量双向）；set_remote_shell 已回摆（XMON-115）', () => {
+  it('除名登记 = delete_skills；新增登记 = create_skill + update_skill + models + split_todo + update_memory（divergence 全量双向）；set_remote_shell 已回摆（XMON-115）', () => {
     expect(removed).toEqual(['delete_skills']);
-    expect(added).toEqual(['create_skill', 'update_skill', 'models', 'split_todo']);
+    expect(added).toEqual([
+      'create_skill',
+      'update_skill',
+      'models',
+      'split_todo',
+      'update_memory',
+    ]);
     // XMON-115 回摆钉：写入点词条/分组/定义三处在位（claim 判定与 REST 双闸
     // 都指着它——缺席即恢复不完整）。
     expect(CHIEF_TOOL_NAMES).toContain('set_remote_shell');
@@ -128,11 +134,11 @@ describe('52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1）', () => {
     }
   });
 
-  it('分组 = 读 16 + 组织 21 + 执行 5 + 私有 10（raw 实数 − delete_skills + 四件新增 + 回摆一件）', () => {
+  it('分组 = 读 16 + 组织 21 + 执行 5 + 私有 11（raw 实数 − delete_skills + 五件新增）', () => {
     expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(16);
     expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(21);
     expect(CHIEF_TOOL_CATEGORIES.execute).toHaveLength(5);
-    expect(CHIEF_TOOL_CATEGORIES.private).toHaveLength(10);
+    expect(CHIEF_TOOL_CATEGORIES.private).toHaveLength(11);
   });
 
   it('读侧全 replaySafe（bundle 提取：读工具带重试预算，r5 §3.1）；写侧不标', () => {

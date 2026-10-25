@@ -24,7 +24,7 @@
 // 载体 = data-row-kind（todo 行计数/定位的语义盲区继任者）。
 
 import type { SearchResponse } from '@cairn/shared';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
@@ -535,7 +535,7 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
 export function useSearchState(initialOpen: boolean, initialQuery: string) {
   const [open, setOpen] = useState(initialOpen);
   const [query, setQuery] = useState(initialQuery);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'k') {
         event.preventDefault();

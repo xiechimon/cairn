@@ -25,18 +25,16 @@ import {
   DONE_ANNOUNCEMENT,
   filterAgentTools,
   IN_PROGRESS_PHASES,
-  ISSUE_FENCE_OPEN,
   isChiefConversationId,
-  MEMORY_QUOTA_PER_AGENT,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
+  todoOutputSchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
-  agentMemory,
   build,
   chief,
   chiefMessage,
@@ -65,6 +63,12 @@ import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
+import {
+  deleteMemoryEntry,
+  listMemoryEntries,
+  saveMemoryEntry,
+  updateMemoryEntry,
+} from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { getModelSources } from './providers.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
@@ -137,6 +141,15 @@ function optStr(params: Params, key: string): string | undefined {
   if (typeof v !== 'string') throw new HttpError(400, `invalid params.${key}: expected string`);
   return v;
 }
+function optTodoOutput(params: Params, key: string): 'code' | 'info' | undefined {
+  const v = params[key];
+  if (v === undefined || v === null) return undefined;
+  const parsed = todoOutputSchema.safeParse(v);
+  if (!parsed.success) {
+    throw new HttpError(400, `invalid params.${key}: expected "code" or "info"`);
+  }
+  return parsed.data;
+}
 function strArr(params: Params, key: string): string[] {
   const v = params[key];
   if (!Array.isArray(v) || v.some((x) => typeof x !== 'string')) {
@@ -193,6 +206,10 @@ function requireTeamTodo(db: Db, todoId: string, teamId: string) {
  * 个仓」——结果过大反而把上下文撑爆，后几趟更贵。超出的条数在应答里显式报出
  * （omitted），模型可再发一趟接着读。 */
 const DOCS_MAX_PATHS = 24;
+
+export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
+export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
+export const CHIEF_TASK_LIST_SUMMARY_MAX_CHARS = 240;
 
 function requireTeamAgent(db: Db, agentId: string, teamId: string) {
   const row = db
@@ -265,12 +282,39 @@ export async function executeChiefTool(
       );
     }
     case 'todos': {
+      const todoId = optStr(params, 'todoId');
+      if (todoId !== undefined) {
+        requireTeamTodo(db, todoId, ctx.teamId);
+        return json(getTodo(svc, todoId));
+      }
+      const offset = num(params, 'offset') ?? 0;
+      if (!Number.isSafeInteger(offset) || offset < 0) {
+        throw new HttpError(400, 'invalid params.offset: expected non-negative safe integer');
+      }
       const projectId = optStr(params, 'projectId');
       const phase = optStr(params, 'phase');
       // 团队过滤恒在（#1466）：他队 projectId 与不存在的 id 同回 []。
       let records = listTodos(svc, { teamId: ctx.teamId, ...(projectId ? { projectId } : {}) });
       if (phase) records = records.filter((t) => t.phase === phase);
-      return json(records);
+      const todos: { id: string; seqNum: number; title: string; phase: string; summary: string }[] =
+        [];
+      const response = { todos, total: records.length, nextOffset: null as number | null };
+      for (const record of records.slice(offset)) {
+        todos.push({
+          id: record.id,
+          seqNum: record.seqNum,
+          title: record.title.slice(0, CHIEF_TASK_LIST_TITLE_MAX_CHARS),
+          phase: record.phase,
+          summary: record.spec.slice(0, CHIEF_TASK_LIST_SUMMARY_MAX_CHARS),
+        });
+        response.nextOffset = offset + todos.length < records.length ? offset + todos.length : null;
+        if (Buffer.byteLength(json(response), 'utf8') > CHIEF_TASK_LIST_MAX_OUTPUT_BYTES) {
+          todos.pop();
+          response.nextOffset = offset + todos.length;
+          break;
+        }
+      }
+      return json(response);
     }
     case 'agents': {
       const rows = db.select().from(agent).where(eq(agent.teamId, ctx.teamId)).all();
@@ -465,6 +509,7 @@ export async function executeChiefTool(
       // 措辞→spec 三段式（r5 §3.2）由 LLM 侧组织 spec 文本；本层落库 + 溯源。
       const projectId = str(params, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId); // 存在性 + 团队归属校验（404 面）
+      const output = optTodoOutput(params, 'output');
       const record = createTodo(svc, {
         teamId: ctx.teamId,
         projectId,
@@ -476,6 +521,7 @@ export async function executeChiefTool(
         // 答「哪次请求拆的」）；GitHub 接入项目镜像槽位优先，裁决单源在
         // createTodo。
         orchestration: { threadId: ctx.threadId },
+        ...(output !== undefined ? { output } : {}),
       });
       // sourceBuildId = chief id（r5 §3.2 实测：「sourceBuildId = chief id」，
       // 样本 `chief-<userId>-…` = chief 实例 id，非 thread/conv id）。
@@ -517,11 +563,13 @@ export async function executeChiefTool(
                     `invalid params.subtodos[${i}].blockedBy: expected array`,
                   );
                 })();
+        const output = optTodoOutput(item, 'output');
         return {
           title: str(item, 'title'),
           spec: str(item, 'spec'),
           agentId: str(item, 'agentId'),
           ...(blockedBy !== undefined ? { blockedBy } : {}),
+          ...(output !== undefined ? { output } : {}),
         };
       });
       const result = createSplitTodo(
@@ -957,11 +1005,24 @@ export async function executeChiefTool(
         teamId: ctx.teamId,
         title: str(params, 'title'),
         content: str(params, 'content'),
+        force: bool(params, 'force', false),
         projectId,
         sourceTodoId,
         sourceBuildId: ctx.conversationId, // chief 来源 = chief 回合 id（r5 §6）
       });
       return json(row);
+    }
+    case 'update_memory': {
+      const memoryId = str(params, 'memoryId');
+      if (ctx.chiefAgentId === null) throw new HttpError(404, `memory ${memoryId}`);
+      return json(
+        updateMemoryEntry(db, {
+          memoryId,
+          agentId: ctx.chiefAgentId,
+          teamId: ctx.teamId,
+          content: str(params, 'content'),
+        }),
+      );
     }
     case 'delete_memory': {
       // 越权防御（#1497）：只删绑定 Agent 本团队条目；别人的与不存在的同 404，
@@ -970,28 +1031,23 @@ export async function executeChiefTool(
       const removed =
         ctx.chiefAgentId === null
           ? 0
-          : db
-              .delete(agentMemory)
-              .where(
-                and(
-                  eq(agentMemory.id, memoryId),
-                  eq(agentMemory.agentId, ctx.chiefAgentId),
-                  eq(agentMemory.teamId, ctx.teamId),
-                ),
-              )
-              .run().changes;
+          : deleteMemoryEntry(db, {
+              memoryId,
+              agentId: ctx.chiefAgentId,
+              teamId: ctx.teamId,
+            });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
     }
     case 'memories': {
       if (ctx.chiefAgentId === null) return json([]);
-      const rows = db
-        .select()
-        .from(agentMemory)
-        .where(and(eq(agentMemory.agentId, ctx.chiefAgentId), eq(agentMemory.teamId, ctx.teamId)))
-        .orderBy(asc(agentMemory.createdAt))
-        .all();
-      return json(rows);
+      return json(
+        listMemoryEntries(
+          db,
+          { agentId: ctx.chiefAgentId, teamId: ctx.teamId },
+          bool(params, 'includeInvalid', false),
+        ),
+      );
     }
     case 'watch_todos': {
       const todoIds = strArr(params, 'todoIds');
@@ -1168,46 +1224,6 @@ export async function confirmBuild(
 // 同一存储」r5 §2/§6 的写侧半；worker 侧 = 指令触发 + Agent 裁量，宿主不做
 // 任务结束蒸馏——零自动写入语义由「无钩子调用点」结构性守住）。
 
-/** 配额门 + 落库（r5 §6 形状原样）。超限 = 409（UI `记忆 · n/100` 同源常量）。 */
-export function saveMemoryEntry(
-  db: Db,
-  input: {
-    agentId: string;
-    teamId: string;
-    title: string;
-    content: string;
-    projectId: string | null;
-    sourceTodoId: string | null;
-    sourceBuildId: string | null;
-  },
-): typeof agentMemory.$inferSelect {
-  // #1406（ADR 0021 D5）：记忆每轮进系统提示层，GitHub issue 原文围栏里是仓外
-  // 作者写的数据，逐字搬进记忆就等于把它升进系统层。只认得出逐字搬运的围栏
-  // 标记；改写过的转述认不出，那一半靠 chief 章程与围栏首行的禁令。
-  if (input.title.includes(ISSUE_FENCE_OPEN) || input.content.includes(ISSUE_FENCE_OPEN)) {
-    throw new HttpError(
-      400,
-      'invalid params.content: text quoted from a GitHub issue fence is third-party data and is not saved as memory',
-    );
-  }
-  const count = db
-    .select({ n: sql<number>`count(*)` })
-    .from(agentMemory)
-    .where(eq(agentMemory.agentId, input.agentId))
-    .get();
-  if ((count?.n ?? 0) >= MEMORY_QUOTA_PER_AGENT) {
-    throw new HttpError(409, `memory quota exceeded (${MEMORY_QUOTA_PER_AGENT}/agent)`);
-  }
-  const id = newRecordId();
-  const now = nowMs();
-  db.insert(agentMemory)
-    .values({ id, ...input, createdAt: now, updatedAt: now })
-    .run();
-  const row = db.select().from(agentMemory).where(eq(agentMemory.id, id)).get();
-  if (!row) throw new HttpError(500, 'memory insert lost');
-  return row;
-}
-
 /** worker 步记忆工具上下文（machines.ts 从 step → build → todo → assignment
  * 解析；执行 Agent = 该步类的 assignment 槽，02 §4.2）。 */
 export interface WorkerMemoryCtx {
@@ -1250,37 +1266,43 @@ export async function executeWorkerMemoryTool(
         teamId: ctx.teamId,
         title: str(params, 'title'),
         content: str(params, 'content'),
+        force: bool(params, 'force', false),
         projectId: projectId ?? ctx.projectId,
         sourceTodoId: sourceTodoId ?? ctx.todoId,
         sourceBuildId: ctx.buildId,
       });
       return json(row);
     }
+    case 'update_memory': {
+      return json(
+        updateMemoryEntry(db, {
+          memoryId: str(params, 'memoryId'),
+          agentId: ctx.agentId,
+          teamId: ctx.teamId,
+          content: str(params, 'content'),
+        }),
+      );
+    }
     case 'delete_memory': {
       const memoryId = str(params, 'memoryId');
       // 越权防御：只删本 Agent 本团队条目；别人的与不存在的同 404（#1497，
       // chief delete_memory 同律）。
-      const removed = db
-        .delete(agentMemory)
-        .where(
-          and(
-            eq(agentMemory.id, memoryId),
-            eq(agentMemory.agentId, ctx.agentId),
-            eq(agentMemory.teamId, ctx.teamId),
-          ),
-        )
-        .run().changes;
+      const removed = deleteMemoryEntry(db, {
+        memoryId,
+        agentId: ctx.agentId,
+        teamId: ctx.teamId,
+      });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
     }
     case 'memories': {
-      const rows = db
-        .select()
-        .from(agentMemory)
-        .where(and(eq(agentMemory.agentId, ctx.agentId), eq(agentMemory.teamId, ctx.teamId)))
-        .orderBy(asc(agentMemory.createdAt))
-        .all();
-      return json(rows);
+      return json(
+        listMemoryEntries(
+          db,
+          { agentId: ctx.agentId, teamId: ctx.teamId },
+          bool(params, 'includeInvalid', false),
+        ),
+      );
     }
     case 'attachment': {
       // #310 / r9 §3.1：worker 步读附件，与 chief-tools / mcp-face 同源。

@@ -298,6 +298,154 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
     "todo": {
       "additionalProperties": false,
       "properties": {
+        "blockerHandoff": {
+          "additionalProperties": false,
+          "properties": {
+            "blockers": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "changedFiles": {
+                    "items": {
+                      "type": "string",
+                    },
+                    "type": "array",
+                  },
+                  "delivery": {
+                    "anyOf": [
+                      {
+                        "oneOf": [
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "const": "pr",
+                                "type": "string",
+                              },
+                              "number": {
+                                "maximum": 9007199254740991,
+                                "minimum": -9007199254740991,
+                                "type": "integer",
+                              },
+                              "title": {
+                                "type": [
+                                  "string",
+                                  "null",
+                                ],
+                              },
+                              "url": {
+                                "type": [
+                                  "string",
+                                  "null",
+                                ],
+                              },
+                            },
+                            "required": [
+                              "kind",
+                              "number",
+                              "url",
+                              "title",
+                            ],
+                            "type": "object",
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "branch": {
+                                "type": "string",
+                              },
+                              "head": {
+                                "type": [
+                                  "string",
+                                  "null",
+                                ],
+                              },
+                              "kind": {
+                                "const": "branch",
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "kind",
+                              "branch",
+                              "head",
+                            ],
+                            "type": "object",
+                          },
+                        ],
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "omittedFiles": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "phase": {
+                    "enum": [
+                      "todo",
+                      "queued",
+                      "planning",
+                      "confirm",
+                      "building",
+                      "review",
+                      "done",
+                      "failed",
+                      "closed",
+                    ],
+                    "type": "string",
+                  },
+                  "report": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "attachmentId": {
+                        "type": "string",
+                      },
+                      "content": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "attachmentId",
+                      "content",
+                    ],
+                    "type": "object",
+                  },
+                  "summary": {
+                    "type": [
+                      "string",
+                      "null",
+                    ],
+                  },
+                  "title": {
+                    "type": "string",
+                  },
+                  "todoId": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "todoId",
+                  "title",
+                  "phase",
+                  "delivery",
+                  "changedFiles",
+                  "omittedFiles",
+                  "summary",
+                ],
+                "type": "object",
+              },
+              "type": "array",
+            },
+          },
+          "required": [
+            "blockers",
+          ],
+          "type": "object",
+        },
         "id": {
           "type": "string",
         },
@@ -328,6 +476,12 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
             "vocab",
           ],
           "type": "object",
+        },
+        "output": {
+          "type": [
+            "string",
+            "null",
+          ],
         },
         "seqNum": {
           "maximum": 9007199254740991,
@@ -690,6 +844,154 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
             "todo": {
               "additionalProperties": false,
               "properties": {
+                "blockerHandoff": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "blockers": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "changedFiles": {
+                            "items": {
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "delivery": {
+                            "anyOf": [
+                              {
+                                "oneOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "kind": {
+                                        "const": "pr",
+                                        "type": "string",
+                                      },
+                                      "number": {
+                                        "maximum": 9007199254740991,
+                                        "minimum": -9007199254740991,
+                                        "type": "integer",
+                                      },
+                                      "title": {
+                                        "type": [
+                                          "string",
+                                          "null",
+                                        ],
+                                      },
+                                      "url": {
+                                        "type": [
+                                          "string",
+                                          "null",
+                                        ],
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "number",
+                                      "url",
+                                      "title",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "branch": {
+                                        "type": "string",
+                                      },
+                                      "head": {
+                                        "type": [
+                                          "string",
+                                          "null",
+                                        ],
+                                      },
+                                      "kind": {
+                                        "const": "branch",
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "branch",
+                                      "head",
+                                    ],
+                                    "type": "object",
+                                  },
+                                ],
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "omittedFiles": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer",
+                          },
+                          "phase": {
+                            "enum": [
+                              "todo",
+                              "queued",
+                              "planning",
+                              "confirm",
+                              "building",
+                              "review",
+                              "done",
+                              "failed",
+                              "closed",
+                            ],
+                            "type": "string",
+                          },
+                          "report": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "attachmentId": {
+                                "type": "string",
+                              },
+                              "content": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "attachmentId",
+                              "content",
+                            ],
+                            "type": "object",
+                          },
+                          "summary": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                          "title": {
+                            "type": "string",
+                          },
+                          "todoId": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "todoId",
+                          "title",
+                          "phase",
+                          "delivery",
+                          "changedFiles",
+                          "omittedFiles",
+                          "summary",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "blockers",
+                  ],
+                  "type": "object",
+                },
                 "id": {
                   "type": "string",
                 },
@@ -720,6 +1022,12 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
                     "vocab",
                   ],
                   "type": "object",
+                },
+                "output": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
                 },
                 "seqNum": {
                   "maximum": 9007199254740991,
@@ -896,6 +1204,10 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
         "reason",
       ],
       "type": "object",
+    },
+    "report": {
+      "maxLength": 524288,
+      "type": "string",
     },
     "sessionId": {
       "type": "string",
@@ -2965,6 +3277,154 @@ exports[`body/封套 schema 快照 > conversationStreamEvent > conversationStrea
         "step": {
           "additionalProperties": false,
           "properties": {
+            "blockerHandoff": {
+              "additionalProperties": false,
+              "properties": {
+                "blockers": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "changedFiles": {
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "delivery": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "pr",
+                                    "type": "string",
+                                  },
+                                  "number": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  "title": {
+                                    "type": [
+                                      "string",
+                                      "null",
+                                    ],
+                                  },
+                                  "url": {
+                                    "type": [
+                                      "string",
+                                      "null",
+                                    ],
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "number",
+                                  "url",
+                                  "title",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "branch": {
+                                    "type": "string",
+                                  },
+                                  "head": {
+                                    "type": [
+                                      "string",
+                                      "null",
+                                    ],
+                                  },
+                                  "kind": {
+                                    "const": "branch",
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "branch",
+                                  "head",
+                                ],
+                                "type": "object",
+                              },
+                            ],
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "omittedFiles": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "phase": {
+                        "enum": [
+                          "todo",
+                          "queued",
+                          "planning",
+                          "confirm",
+                          "building",
+                          "review",
+                          "done",
+                          "failed",
+                          "closed",
+                        ],
+                        "type": "string",
+                      },
+                      "report": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "attachmentId": {
+                            "type": "string",
+                          },
+                          "content": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "attachmentId",
+                          "content",
+                        ],
+                        "type": "object",
+                      },
+                      "summary": {
+                        "type": [
+                          "string",
+                          "null",
+                        ],
+                      },
+                      "title": {
+                        "type": "string",
+                      },
+                      "todoId": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "todoId",
+                      "title",
+                      "phase",
+                      "delivery",
+                      "changedFiles",
+                      "omittedFiles",
+                      "summary",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "blockers",
+              ],
+              "type": "object",
+            },
             "buildId": {
               "type": "string",
             },
@@ -3464,6 +3924,13 @@ exports[`body/封套 schema 快照 > createTodoBody > createTodoBody.json 1`] = 
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "output": {
+      "enum": [
+        "code",
+        "info",
+      ],
+      "type": "string",
+    },
     "spec": {
       "type": "string",
     },
@@ -4123,6 +4590,154 @@ exports[`body/封套 schema 快照 > stepJournalRow > stepJournalRow.json 1`] = 
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "blockerHandoff": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "changedFiles": {
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "delivery": {
+                "anyOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "pr",
+                            "type": "string",
+                          },
+                          "number": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer",
+                          },
+                          "title": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                          "url": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "number",
+                          "url",
+                          "title",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "branch": {
+                            "type": "string",
+                          },
+                          "head": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                          "kind": {
+                            "const": "branch",
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "branch",
+                          "head",
+                        ],
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+              "omittedFiles": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "phase": {
+                "enum": [
+                  "todo",
+                  "queued",
+                  "planning",
+                  "confirm",
+                  "building",
+                  "review",
+                  "done",
+                  "failed",
+                  "closed",
+                ],
+                "type": "string",
+              },
+              "report": {
+                "additionalProperties": false,
+                "properties": {
+                  "attachmentId": {
+                    "type": "string",
+                  },
+                  "content": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "attachmentId",
+                  "content",
+                ],
+                "type": "object",
+              },
+              "summary": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+              "title": {
+                "type": "string",
+              },
+              "todoId": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "todoId",
+              "title",
+              "phase",
+              "delivery",
+              "changedFiles",
+              "omittedFiles",
+              "summary",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "blockers",
+      ],
+      "type": "object",
+    },
     "buildId": {
       "type": "string",
     },
@@ -4602,6 +5217,14 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
             "orderIndex": {
               "type": "number",
             },
+            "output": {
+              "default": "code",
+              "enum": [
+                "code",
+                "info",
+              ],
+              "type": "string",
+            },
             "ownerId": {
               "type": [
                 "string",
@@ -4736,6 +5359,34 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
             "title": {
               "type": "string",
             },
+            "usageCost": {
+              "additionalProperties": false,
+              "properties": {
+                "cacheRead": {
+                  "type": "number",
+                },
+                "cacheWrite": {
+                  "type": "number",
+                },
+                "input": {
+                  "type": "number",
+                },
+                "output": {
+                  "type": "number",
+                },
+                "total": {
+                  "type": "number",
+                },
+              },
+              "required": [
+                "input",
+                "output",
+                "cacheRead",
+                "cacheWrite",
+                "total",
+              ],
+              "type": "object",
+            },
             "v": {
               "maximum": 9007199254740991,
               "minimum": -9007199254740991,
@@ -4796,6 +5447,7 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
             "sourceBuildId",
             "sourceKind",
             "sourceRef",
+            "output",
           ],
           "type": "object",
         },
@@ -4891,6 +5543,12 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
                 {
                   "type": "null",
                 },
+              ],
+            },
+            "reportAttachmentId": {
+              "type": [
+                "string",
+                "null",
               ],
             },
             "todoId": {
@@ -5401,8 +6059,57 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent_memo
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "history": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "type": "string",
+          },
+          "title": {
+            "type": "string",
+          },
+          "updatedAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+        },
+        "required": [
+          "title",
+          "content",
+          "updatedAt",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "id": {
       "type": "string",
+    },
+    "invalidAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "lastInjectedAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
     },
     "projectId": {
       "type": [
@@ -5417,6 +6124,12 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent_memo
       ],
     },
     "sourceTodoId": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "supersededBy": {
       "type": [
         "string",
         "null",
@@ -5568,6 +6281,12 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > build > bu
         {
           "type": "null",
         },
+      ],
+    },
+    "reportAttachmentId": {
+      "type": [
+        "string",
+        "null",
       ],
     },
     "todoId": {
@@ -5758,6 +6477,12 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief_thre
         {
           "type": "null",
         },
+      ],
+    },
+    "lastTurnError": {
+      "type": [
+        "string",
+        "null",
       ],
     },
     "pendingSessionResumeAt": {
@@ -6920,6 +7645,14 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > tod
     "orderIndex": {
       "type": "number",
     },
+    "output": {
+      "default": "code",
+      "enum": [
+        "code",
+        "info",
+      ],
+      "type": "string",
+    },
     "ownerId": {
       "type": [
         "string",
@@ -7054,6 +7787,34 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > tod
     "title": {
       "type": "string",
     },
+    "usageCost": {
+      "additionalProperties": false,
+      "properties": {
+        "cacheRead": {
+          "type": "number",
+        },
+        "cacheWrite": {
+          "type": "number",
+        },
+        "input": {
+          "type": "number",
+        },
+        "output": {
+          "type": "number",
+        },
+        "total": {
+          "type": "number",
+        },
+      },
+      "required": [
+        "input",
+        "output",
+        "cacheRead",
+        "cacheWrite",
+        "total",
+      ],
+      "type": "object",
+    },
     "v": {
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
@@ -7114,6 +7875,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > tod
     "sourceBuildId",
     "sourceKind",
     "sourceRef",
+    "output",
   ],
   "type": "object",
 }
@@ -7935,6 +8697,7 @@ exports[`协议词表快照（02 §5/§6 canonical） > 合并闸 blocker 词表
 [
   "policy-human: policy, 项目策略为人工合并",
   "autonomy-paused: policy, 自治合并已暂停",
+  "daily-cap: policy, 当日自治合并数已达上限",
   "not-applicable: policy, 不是 GitHub PR 形态的构建",
   "not-current-build: transient, 不是任务的当前构建",
   "phase-not-review: transient, 任务不在审核关口",
@@ -7942,6 +8705,7 @@ exports[`协议词表快照（02 §5/§6 canonical） > 合并闸 blocker 词表
   "pr-unreadable: transient, 读不到 PR 或仓库默认分支，或 PR 的 head 不是可用的 SHA",
   "pr-not-open: human, PR 已合并或已关闭",
   "pr-draft: transient, PR 是草稿",
+  "pr-behind-base: transient, PR 落后于目标分支或落后数未知",
   "pr-from-fork: human, PR 来自 fork",
   "base-not-default: human, PR 的目标分支不是默认分支",
   "mergeable-state: transient, GitHub 判定暂不可合并",
@@ -8109,6 +8873,8 @@ exports[`协议词表快照（02 §5/§6 canonical） > 存储表清单（01 §6
   "autonomy_state",
   "member_activity",
   "build_feedback",
+  "memory_save_conflict",
+  "memory_candidate",
 ]
 `;
 

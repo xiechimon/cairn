@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
+import { formatUsd, NO_PRICE_REASON } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
@@ -124,7 +125,9 @@ export function TodoCard({
           }),
         })
       : undefined;
-  const lockedByOrchestration = orchestration != null && canOrchestrate(todo.phase);
+  const orchestrationError = canOrchestrate(todo.phase) ? orchestration?.error : undefined;
+  const lockedByOrchestration =
+    orchestration != null && orchestrationError === undefined && canOrchestrate(todo.phase);
   const chiefSearch = (threadId: string) => {
     const params = new URLSearchParams(search);
     params.set('chief', threadId);
@@ -210,6 +213,15 @@ export function TodoCard({
               <Glyph icon={Clock} className="size-3 text-content-dim" />
               {relativeTime(todo.phaseAt, now, t)}
             </span>
+            {todo.usageCost !== undefined && (
+              <span
+                data-testid="card-cost"
+                title={todo.usageCost.total > 0 ? undefined : t(NO_PRICE_REASON)}
+                className={`${META_ITEM} tabular-nums`}
+              >
+                {todo.usageCost.total > 0 ? formatUsd(todo.usageCost.total) : '—'}
+              </span>
+            )}
             {face.kind === 'done' && face.canceled && (
               <span data-todo-canceled="" className={META_ITEM}>
                 <Glyph icon={Ban} className="size-3 text-content-dim" />
@@ -220,6 +232,7 @@ export function TodoCard({
           {face.kind === 'todo' &&
             face.action != null &&
             !lockedByOrchestration &&
+            !orchestrationError &&
             actionLink(
               face.action,
               Play,
@@ -305,7 +318,32 @@ export function TodoCard({
         </div>
       )}
 
-      {face.kind === 'attention' && (
+      {orchestrationError && (
+        <div
+          data-orchestration-failed="true"
+          className="mt-2.5 border-t border-dashed border-border pt-2 text-meta"
+        >
+          <div className="flex items-center gap-1.5">
+            <Glyph icon={CircleX} className="size-3.25 flex-none" />
+            <span>{t('编排失败')}</span>
+            {actionLink('重试', RotateCcw, 'ml-auto')}
+            <Link
+              className="relative z-10 text-content-secondary"
+              to={{ search: chiefSearch(orchestration?.threadId ?? '') }}
+            >
+              {t('查看会话')}
+            </Link>
+          </div>
+          <p
+            className="mt-1 line-clamp-2 break-all text-content-secondary"
+            title={orchestrationError}
+          >
+            {orchestrationError}
+          </p>
+        </div>
+      )}
+
+      {face.kind === 'attention' && !orchestrationError && (
         <div className="mt-2.5 flex items-center gap-1.5 border-t border-dashed border-border pt-2 text-meta whitespace-nowrap">
           <span className={`flex min-w-0 items-center gap-1 font-medium ${ACCENT_INK}`}>
             <Glyph icon={ATTENTION[face.need].icon} className="size-3.25 flex-none" />

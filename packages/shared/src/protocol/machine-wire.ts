@@ -9,11 +9,13 @@
 import { z } from 'zod';
 import { modelUsageSchema, providerConfigSchema, toolCallRecordSchema } from '../agent-backend.js';
 import { agentTodoReportSchema } from '../agent-todo.js';
+import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { epochMs, recordId } from '../records/common.js';
 import { machineRecordSchema } from '../records/machine.js';
 import { messageRoleSchema, transcriptRowSchema } from '../records/message.js';
 import { claudeCodeReportSchema } from '../records/model-source.js';
 import { PROJECT_REPO_KINDS } from '../records/project.js';
+import { INFO_REPORT_MAX_BYTES } from '../records/report.js';
 import { reviewVerdictSchema } from '../records/review.js';
 import { stepActivityReportSchema, stepRecordSchema } from '../records/step.js';
 import { verifyVerdictSchema } from '../records/verify.js';
@@ -179,6 +181,8 @@ export const claimedStepSchema = z.object({
        * 现行为）；旧 daemon 按 zod strip 忽略。 */
       sourceKind: z.string().nullable().optional(),
       sourceRef: z.string().nullable().optional(),
+      blockerHandoff: blockerHandoffSchema.optional(),
+      output: z.string().nullable().optional(),
     })
     .optional(),
   /** worker 步项目面；chief 步 = 探索基座（可缺省 = 裸目录回合）。 */
@@ -652,6 +656,7 @@ export const machineDoneBodySchema = z.object({
    * （zod strip，混版本零破坏）。不是 step.skillInjection：那一列是 claim
    * 期的选择 hits，预算截断之后的名字只在这里。 */
   skillInjectionFacts: skillInjectionFactsSchema.optional(),
+  report: z.string().max(INFO_REPORT_MAX_BYTES).optional(),
 });
 export type MachineDoneBody = z.infer<typeof machineDoneBodySchema>;
 export const machineDoneResponseSchema = machineOkResponseSchema;

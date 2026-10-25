@@ -1,0 +1,80 @@
+import { redactSecrets, type TrajectoryPack, trajectoryPackSchema } from '@cairn/shared';
+import { type OtlpTracesRequest, packToOtlp } from './trajectory-otlp.js';
+
+export class TrajectoryPushError extends Error {}
+
+export interface OtlpTarget {
+  url: URL;
+  headers: Record<string, string>;
+}
+
+export function parsePacks(jsonl: string): TrajectoryPack[] {
+  return jsonl
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => trajectoryPackSchema.parse(JSON.parse(line)));
+}
+
+export function resolveTarget(env: NodeJS.ProcessEnv): OtlpTarget {
+  const endpoint = env.CAIRN_OTEL_ENDPOINT;
+  if (!endpoint) throw new TrajectoryPushError('Set CAIRN_OTEL_ENDPOINT');
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new TrajectoryPushError('CAIRN_OTEL_ENDPOINT is not a valid URL');
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:')
+    throw new TrajectoryPushError('CAIRN_OTEL_ENDPOINT must be http or https');
+  const base = url.pathname.replace(/\/+$/, '').replace(/\/v1\/traces$/, '');
+  url.pathname = `${base}/v1/traces`;
+  const headers: Record<string, string> = {};
+  if (url.username !== '') {
+    const credentials = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`;
+    headers.authorization = `Basic ${Buffer.from(credentials).toString('base64')}`;
+    url.username = '';
+    url.password = '';
+  }
+  for (const pair of (env.CAIRN_OTEL_HEADERS ?? '').split(',').filter((p) => p.trim() !== '')) {
+    const separator = pair.indexOf('=');
+    if (separator <= 0)
+      throw new TrajectoryPushError('CAIRN_OTEL_HEADERS must look like name=value,name=value');
+    headers[pair.slice(0, separator).trim().toLowerCase()] = pair.slice(separator + 1).trim();
+  }
+  return { url, headers };
+}
+
+export interface PushResult {
+  pushed: number;
+  spans: number;
+  redacted: number;
+}
+
+export async function pushPacks(packs: TrajectoryPack[], target: OtlpTarget): Promise<PushResult> {
+  const result: PushResult = { pushed: 0, spans: 0, redacted: 0 };
+  for (const pack of packs) {
+    const cleaned = redactSecrets(packToOtlp(pack));
+    const request = cleaned.value as OtlpTracesRequest;
+    let response: Response;
+    try {
+      response = await fetch(target.url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...target.headers },
+        body: JSON.stringify(request),
+      });
+    } catch {
+      throw new TrajectoryPushError(`Endpoint unreachable after ${result.pushed} pushed`);
+    }
+    if (!response.ok)
+      throw new TrajectoryPushError(
+        `Endpoint replied HTTP ${response.status} after ${result.pushed} pushed`,
+      );
+    result.pushed++;
+    result.redacted += cleaned.count;
+    result.spans += request.resourceSpans.reduce(
+      (sum, resource) => sum + resource.scopeSpans.reduce((n, scope) => n + scope.spans.length, 0),
+      0,
+    );
+  }
+  return result;
+}

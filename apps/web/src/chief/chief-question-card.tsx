@@ -16,7 +16,7 @@
 
 import type { AskUserAnswer } from '@cairn/shared';
 import { Ban, CircleCheck, CircleHelp, type LucideIcon } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useMemo, useState } from 'react';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
@@ -101,7 +101,7 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
 
   /** 数字键 1–N 直达（原型 v3 底部提示的机制面）：pending 期挂窗口监听，
    * 焦点在输入类控件/富文本时不劫持；N = 选项数 + 1（末位 = 其他行）。 */
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!pending || question === undefined || question.options.length === 0) return;
     const max = question.options.length + 1;
     const handler = (e: KeyboardEvent) => {

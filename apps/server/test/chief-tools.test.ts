@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   CHIEF_REMOTE_TOOLS,
+  CHIEF_TOOL_COUNT,
   CHIEF_TOOL_NAMES,
   CHIEF_TOOLS_ADDED,
   CHIEF_TOOLS_REMOVED,
@@ -240,5 +241,15 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
       (name) => !removed.includes(name) && !added.includes(name),
     );
     expect(CHIEF_TOOL_NAMES).toEqual([...expected, ...added].sort());
+  });
+
+  test('chief-tools.ts 里所有「现行 N 件」文字与 CHIEF_TOOL_COUNT 一致', () => {
+    const source = readFileSync(
+      resolve(import.meta.dirname, '../../../packages/shared/src/protocol/chief-tools.ts'),
+      'utf8',
+    );
+    const stated = [...source.matchAll(/现行 (\d+) 件/g)].map((match) => Number(match[1]));
+    expect(stated.length).toBeGreaterThan(0);
+    expect(stated.every((count) => count === CHIEF_TOOL_COUNT)).toBe(true);
   });
 });

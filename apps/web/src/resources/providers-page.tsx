@@ -23,7 +23,7 @@ import { useSearchParams } from 'react-router';
 import { useApiMutations, useModelSources } from '../api/hooks.js';
 import { RUNTIME_LABELS } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
-import { ClaudeMark, PiMark } from '../components/brand-marks.js';
+import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -51,6 +51,7 @@ export const PROVIDERS_HREF = '/app/resources/providers';
 const RUNTIME_DESCRIPTIONS: Record<ModelSourceRuntime, string> = {
   pi: 'cairn 自有运行时。模型来自你添加的服务商。',
   'claude-code': '执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。',
+  gemini: '执行机 Gemini CLI 的本地会话。',
 };
 
 /** runtime → 官方品牌 mark（components/brand-marks.tsx 单源，机器行
@@ -59,6 +60,7 @@ const RUNTIME_DESCRIPTIONS: Record<ModelSourceRuntime, string> = {
 const RUNTIME_MARKS: Record<ModelSourceRuntime, typeof PiMark> = {
   pi: PiMark,
   'claude-code': ClaudeMark,
+  gemini: GeminiMark,
 };
 
 /** Needs-you ink (未安装 / 未登录): the accent, DESIGN.md 颜色. */

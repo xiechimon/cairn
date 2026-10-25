@@ -20,13 +20,50 @@ test('local code checks include both UI gates and affected e2e', () => {
     'node scripts/ui-dead-class-gate.mjs --compile',
     'node scripts/comment-discipline-gate.mjs',
     'node scripts/single-use-helper-gate.mjs',
+    'node scripts/baseline-ratchet-gate.mjs',
     'pnpm lint',
     'pnpm typecheck',
     'pnpm spec:parse',
+    'node scripts/e2e-affected.mjs --check-coverage',
+    'node --test docs/verify/1542/reach.test.mjs',
     'node scripts/prepush-vitest.mjs',
     'pnpm --filter @cairn/web e2e:affected -- apps/web/src/main.tsx',
   ])
     assert.ok(commands.includes(command), command);
+});
+
+test('e2e coverage check passes on the real suite and names an unmapped spec', () => {
+  const ciCommands = prepushPlan(['apps/web/src/main.tsx'], 'ci').map((args) => args.join(' '));
+  assert.ok(ciCommands.includes('node scripts/e2e-affected.mjs --check-coverage'));
+  const suite = spawnSync(process.execPath, ['scripts/e2e-affected.mjs', '--check-coverage'], {
+    encoding: 'utf8',
+  });
+  assert.equal(suite.status, 0, suite.stdout);
+  const probe = 'apps/web/e2e/zz-unmapped-probe.spec.ts';
+  const unmapped = spawnSync(
+    process.execPath,
+    ['scripts/e2e-affected.mjs', '--check-coverage', probe],
+    { encoding: 'utf8' },
+  );
+  assert.equal(unmapped.status, 1);
+  assert.match(unmapped.stdout, new RegExp(`${probe}: no family table entry reaches this spec`));
+  const bare = spawnSync(
+    process.execPath,
+    ['scripts/e2e-affected.mjs', '--check-coverage', 'zz-unmapped-probe.spec.ts'],
+    { encoding: 'utf8' },
+  );
+  assert.equal(bare.status, 1, bare.stdout);
+  assert.match(bare.stdout, new RegExp(`${probe}: no family table entry reaches this spec`));
+});
+
+test('a board card source change selects the spec that reads its title', () => {
+  const plan = spawnSync(
+    process.execPath,
+    ['scripts/e2e-affected.mjs', '--dry-run', '--', 'apps/web/src/board/todo-card.tsx'],
+    { encoding: 'utf8' },
+  );
+  assert.equal(plan.status, 0, plan.stderr);
+  assert.match(plan.stdout, /\baccent-typo\.spec\.ts\b/);
 });
 
 test('CI shares the plan but keeps advisory and full e2e in separate jobs', () => {
@@ -72,6 +109,7 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
 
 test('CLI skips real document changes and rejects a missing base', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-'));
+  process.env.CAIRN_HEAVY_SLOTS_DIR = join(directory, 'heavy-slots');
   const runGit = (args) =>
     execFileSync(
       'git',
@@ -81,9 +119,10 @@ test('CLI skips real document changes and rejects a missing base', () => {
   try {
     mkdirSync(join(directory, 'scripts'));
     copyFileSync('scripts/prepush.mjs', join(directory, 'scripts/prepush.mjs'));
+    copyFileSync('scripts/heavy-slots.mjs', join(directory, 'scripts/heavy-slots.mjs'));
     runGit(['init']);
     writeFileSync(join(directory, 'README.md'), 'first\n');
-    runGit(['add', 'README.md', 'scripts/prepush.mjs']);
+    runGit(['add', 'README.md', 'scripts/prepush.mjs', 'scripts/heavy-slots.mjs']);
     runGit(['commit', '-m', 'initial']);
     runGit(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
     writeFileSync(join(directory, 'README.md'), 'second\n');
@@ -120,6 +159,82 @@ test('CLI skips real document changes and rejects a missing base', () => {
       env: { ...process.env, PREPUSH_BASE_SHA: 'missing-ref' },
     });
     assert.notEqual(missing.status, 0);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+const gitIn = (cwd, args) =>
+  execFileSync(
+    'git',
+    ['-c', 'user.name=prepush-test', '-c', 'user.email=prepush@example.invalid', ...args],
+    { cwd, encoding: 'utf8', stdio: 'pipe' },
+  );
+
+const runPrepushCi = (cwd) => {
+  const env = { ...process.env };
+  delete env.PREPUSH_BASE_SHA;
+  return spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
+    cwd,
+    encoding: 'utf8',
+    env,
+  });
+};
+
+test('a stale local origin/main is refreshed by fetch before computing changes', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-stale-'));
+  const remote = join(directory, 'remote.git');
+  const upstream = join(directory, 'upstream');
+  const work = join(directory, 'work');
+  try {
+    gitIn(directory, ['init', '--bare', remote]);
+    gitIn(directory, ['clone', remote, upstream]);
+    mkdirSync(join(upstream, 'scripts'));
+    copyFileSync('scripts/prepush.mjs', join(upstream, 'scripts/prepush.mjs'));
+    copyFileSync('scripts/heavy-slots.mjs', join(upstream, 'scripts/heavy-slots.mjs'));
+    writeFileSync(join(upstream, 'README.md'), 'first\n');
+    gitIn(upstream, ['add', 'README.md', 'scripts/prepush.mjs', 'scripts/heavy-slots.mjs']);
+    gitIn(upstream, ['commit', '-m', 'initial']);
+    gitIn(upstream, ['push', 'origin', 'HEAD:main']);
+    mkdirSync(join(upstream, 'apps'));
+    writeFileSync(join(upstream, 'apps/other.ts'), 'export const other = 1;\n');
+    gitIn(upstream, ['add', 'apps/other.ts']);
+    gitIn(upstream, ['commit', '-m', 'merged elsewhere']);
+    gitIn(upstream, ['push', 'origin', 'HEAD:main']);
+    const stale = gitIn(upstream, ['rev-parse', 'HEAD~1']).trim();
+    gitIn(directory, ['clone', '--branch', 'main', remote, work]);
+    gitIn(work, ['update-ref', 'refs/remotes/origin/main', stale]);
+    writeFileSync(join(work, 'README.md'), 'second\n');
+    gitIn(work, ['add', 'README.md']);
+    gitIn(work, ['commit', '-m', 'docs']);
+    const result = runPrepushCi(work);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /PASS \(0 checks\)/);
+    assert.doesNotMatch(result.stderr, /may be stale/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('fetch failure falls back to the local origin/main and prints a stale notice', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-offline-'));
+  const work = join(directory, 'work');
+  try {
+    gitIn(directory, ['init', work]);
+    mkdirSync(join(work, 'scripts'));
+    copyFileSync('scripts/prepush.mjs', join(work, 'scripts/prepush.mjs'));
+    copyFileSync('scripts/heavy-slots.mjs', join(work, 'scripts/heavy-slots.mjs'));
+    writeFileSync(join(work, 'README.md'), 'first\n');
+    gitIn(work, ['add', 'README.md', 'scripts/prepush.mjs', 'scripts/heavy-slots.mjs']);
+    gitIn(work, ['commit', '-m', 'initial']);
+    gitIn(work, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    writeFileSync(join(work, 'README.md'), 'second\n');
+    gitIn(work, ['add', 'README.md']);
+    gitIn(work, ['commit', '-m', 'docs']);
+    const result = runPrepushCi(work);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /PASS \(0 checks\)/);
+    assert.match(result.stderr, /git fetch origin main failed.*may be stale/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

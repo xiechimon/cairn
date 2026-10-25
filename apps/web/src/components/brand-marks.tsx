@@ -33,6 +33,18 @@ export function PiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGEle
   );
 }
 
+export function GeminiMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
+  return (
+    <svg aria-hidden="true" width={width} height={height} viewBox="0 0 16 16" {...props}>
+      <circle cx="8" cy="8" r="7" fill="#4285F4" />
+      <path
+        fill="#FFFFFF"
+        d="M4.2 8a3.8 3.8 0 0 1 6.5-2.7l-1 1A2.4 2.4 0 1 0 10.4 9H8V7.6h4v4h-1.4V10A3.8 3.8 0 0 1 4.2 8Z"
+      />
+    </svg>
+  );
+}
+
 /** Claude 官方 mark（claude.ai favicon 原路径，星芒）。 */
 export function ClaudeMark({ width = 16, height = 16, ...props }: SVGProps<SVGSVGElement>) {
   return (

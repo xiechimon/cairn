@@ -126,6 +126,21 @@ OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:3000/api/public/otel"
 OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic $(printf '%s' "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" | base64 | tr -d '\n'),x-langfuse-ingestion-version=4"
 ```
 
+## 推送轨迹包（#1570）
+
+`pnpm traj:export` 产出的 JSONL 轨迹包，用 `pnpm traj:push` 转成 OTLP/HTTP JSON 推到上面的入口。只用公开协议，不带 Langfuse SDK，未配置 `CAIRN_OTEL_ENDPOINT` 时直接报错退出，Cairn 其它行为不受影响。
+
+```sh
+export CAIRN_OTEL_ENDPOINT="http://127.0.0.1:3000/api/public/otel"
+export CAIRN_OTEL_HEADERS="Authorization=Basic $(printf '%s' "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" | base64 | tr -d '\n'),x-langfuse-ingestion-version=4"
+pnpm traj:export --build <buildId> --out /tmp/pack.jsonl
+pnpm traj:push /tmp/pack.jsonl
+```
+
+`CAIRN_OTEL_ENDPOINT` 末尾的 `/v1/traces` 可写可不写。`CAIRN_OTEL_HEADERS` 是逗号分隔的 `name=value`。endpoint 里内嵌的 `user:password@` 会转成 Basic 头，不会出现在输出里。
+
+树结构：一个 build 一个 trace，根 span `invoke_agent`；每个 step 一个子 span；step 下每次模型回合是 `chat`，每次工具调用是 `execute_tool`。trace id 取 buildId 的哈希，span id 取 buildId、stepId、回合序号的哈希，同一个包重推得到完全相同的 id，Langfuse 按 id 合并，条数不变。字段名集中在 `apps/server/src/genai-conventions.ts`，约定改名只改这一处。推送前整个请求过 `redactSecrets`，打码条数在输出的 `redacted=` 里。
+
 ## 绑定本机或内网
 
 默认 `BIND_ADDRESS=127.0.0.1`，只有 omarchy 本机进程能打到 UI 和 OTLP。
