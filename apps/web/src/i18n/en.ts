@@ -496,6 +496,8 @@ export const EN: Record<string, string> = {
   保存名称: 'Save name',
   保存描述: 'Save description',
   '描述保存失败，请重试。': 'Failed to save description. Try again.',
+  保存仓库: 'Save repository',
+  '仓库保存失败，请重试。': 'Failed to save repository. Try again.',
   // #1491 project settings: background autonomy gates card
   后台自动任务: 'Background tasks',
   允许后台自动开跑: 'Allow background runs',

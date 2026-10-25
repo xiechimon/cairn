@@ -235,6 +235,7 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
         box: ctx.secretBox,
         ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
         ...(ctx.convHub !== undefined ? { convHub: ctx.convHub } : {}),
+        ...(ctx.logger !== undefined ? { logger: ctx.logger } : {}),
       },
       row.id,
       body,

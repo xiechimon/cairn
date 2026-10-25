@@ -48,6 +48,8 @@ export function ProjectSettingsPage() {
   const [convRepo, setConvRepo] = useState('');
   const [convPathDraft, setConvPathDraft] = useState<string | null>(null);
   const [convError, setConvError] = useState<string | null>(null);
+  const [repoDraft, setRepoDraft] = useState<string | null>(null);
+  const [repoError, setRepoError] = useState<string | null>(null);
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const mutations = useApiMutations(teamId);
@@ -141,7 +143,57 @@ export function ProjectSettingsPage() {
               </>
             )}
           </SettingsRow>
-          <SettingsRow label={t('仓库')}>{project?.repoName ?? ''}</SettingsRow>
+          {live && wireProject?.repoKind === 'github' ? (
+            <SettingsRow label={t('仓库')}>
+              <Input
+                aria-label={t('GitHub 仓库（owner/repo）')}
+                className={`${ROW_INPUT_CLS} font-mono`}
+                placeholder="owner/repo"
+                value={repoDraft ?? wireProject.githubRepo ?? ''}
+                onChange={(event) => {
+                  setRepoDraft(event.target.value);
+                  setRepoError(null);
+                }}
+              />
+              <Button
+                className={DIALOG_PRIMARY_BUTTON}
+                aria-label={t('保存仓库')}
+                disabled={
+                  mutations.patchProject.isPending ||
+                  (repoDraft ?? wireProject.githubRepo ?? '').trim() ===
+                    (wireProject.githubRepo ?? '').trim() ||
+                  (repoDraft ?? '').trim() === ''
+                }
+                onClick={() => {
+                  if (id === undefined) return;
+                  const repo = (repoDraft ?? '').trim();
+                  if (!isGithubRepoRef(repo)) {
+                    setRepoError(t('GitHub 仓库格式应为 owner/repo。'));
+                    return;
+                  }
+                  mutations.patchProject.mutate(
+                    { id, body: { githubRepo: repo } },
+                    {
+                      onSuccess: () => {
+                        setRepoDraft(null);
+                        setRepoError(null);
+                      },
+                      onError: (error) => toastError(t('仓库保存失败，请重试。'), error),
+                    },
+                  );
+                }}
+              >
+                {t('保存')}
+              </Button>
+              {repoError !== null && (
+                <span role="alert" className="text-meta text-destructive">
+                  {repoError}
+                </span>
+              )}
+            </SettingsRow>
+          ) : (
+            <SettingsRow label={t('仓库')}>{project?.repoName ?? ''}</SettingsRow>
+          )}
           <SettingsRow label={t('目标分支')}>
             <span
               className={`prj-set-branch inline-flex w-32 items-center justify-between border px-2.5 font-mono ${SETTINGS_SELECT_TRIGGER_CLS}`}

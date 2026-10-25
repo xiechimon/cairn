@@ -317,21 +317,29 @@ export async function githubBranchPulls(
   return page.ok ? page.items : null;
 }
 
+export interface GithubRepoProbe {
+  reachable: boolean;
+  fullName: string | null;
+}
+
 export async function githubRepoReachable(
   fetchImpl: FetchLike,
   token: string | null,
   owner: string,
   repo: string,
-): Promise<boolean> {
+): Promise<GithubRepoProbe> {
   const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
   try {
-    await readJson(fetchImpl, url, {
+    const data = (await readJson(fetchImpl, url, {
       ...API_HEADERS,
       ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
-    });
-    return true;
+    })) as { full_name?: unknown };
+    return {
+      reachable: true,
+      fullName: typeof data.full_name === 'string' ? data.full_name : null,
+    };
   } catch (err) {
-    if (err instanceof HttpError && err.status === 404) return false;
+    if (err instanceof HttpError && err.status === 404) return { reachable: false, fullName: null };
     throw err;
   }
 }
