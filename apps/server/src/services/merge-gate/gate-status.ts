@@ -1,10 +1,3 @@
-// cairn/merge-gate commit status 的纯规划（#1404 S4b，计划 docs/verify/1404/s4-plan.md §4.6）：
-// 由 readiness 的结果定 state 与描述，再决定这一次写不写。写的时机、按团队限速与调度归 S7；
-// 这里只保证：human 策略下永远不写；只写在 readiness 的 head 上，且检查（含 combined status）
-// 就是在那个 head 上读的；head 上自家 status 读不到时不盲写；值没变不写（对照的是 GitHub 上
-// 那个 SHA 的当前值，别人写的不同的值下次求值时改回来）。描述不带 blocker 的 detail（文件名、
-// 检查名由 PR 作者或第三方起），至多 140 个字符（GitHub 文档没写上限，第三方实测 140）。
-
 import {
   MERGE_GATE_STATUS_CONTEXT,
   type MergePolicy,
@@ -26,7 +19,6 @@ export type GateStatusPlan =
     }
   | { write: true; sha: string; payload: GateStatusValue & { context: string } };
 
-/** 按码位截到上限，截了的末尾记 …。 */
 function capped(text: string): string {
   const chars = Array.from(text);
   return chars.length <= GATE_STATUS_DESCRIPTION_MAX
@@ -34,8 +26,6 @@ function capped(text: string): string {
     : `${chars.slice(0, GATE_STATUS_DESCRIPTION_MAX - 1).join('')}…`;
 }
 
-/** ready（没有 blocker）= success；有 human 或 policy 类 blocker = failure；只有 transient 的 =
- * pending。从不写 error。描述 = 首个 blocker 的文案与码，再加其余几个；ready 时带摘要开头。 */
 export function gateStatusFor(r: MergeReadiness): GateStatusValue {
   const [first, ...rest] = r.blockers;
   if (first === undefined) {
@@ -53,9 +43,7 @@ export function gateStatusFor(r: MergeReadiness): GateStatusValue {
 export function planGateStatusWrite(input: {
   policy: MergePolicy;
   readiness: MergeReadiness;
-  /** 这次检查（check runs 与 combined status）是在哪个 SHA 上读的；没读到 = null。 */
   checksHeadSha: string | null;
-  /** 那个 SHA 上自家 status 的当前值（GateGithubFacts.ownStatus）。 */
   current: { state: string; description: string | null } | null | 'unreadable';
 }): GateStatusPlan {
   const { readiness } = input;
@@ -81,7 +69,6 @@ export function planGateStatusWrite(input: {
   };
 }
 
-/** 按计划写一次；失败原样交回，不重试；端口抛错按网络错。 */
 export async function writeGateStatus(
   port: GateGithubPort,
   plan: Extract<GateStatusPlan, { write: true }>,

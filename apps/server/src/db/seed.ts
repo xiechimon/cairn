@@ -1,7 +1,3 @@
-// 单用户 seed + team 保形（02 §2/A2）：seed 单本地用户、启动即自动登录；
-// team 表与全部 teamId 路径段形状保留，数据恒 seed 一行。幂等：已有行即返回。
-// seed 内容（displayName/team name/avatarStyle）= [设计]（无观测 canon，内容自选）。
-
 import type { TeamRecord, UserRecord } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -23,8 +19,6 @@ export function seed(db: Db): SeedResult {
   const userId = newRecordId();
   const teamId = newRecordId();
   const createdAt = nowMs();
-  // 02 §2.1：seed 单本地用户。响应面补 type:"user"（r2 §1.5 me-v1 缓存样本；
-  // 记录本体还是缓存封套未分离观测 [推断]，按封套处理不落列）。
   const displayName = 'Owner';
   db.insert(user).values({ id: userId, displayName, avatarUrl: null }).run();
   db.insert(team)
@@ -32,8 +26,8 @@ export function seed(db: Db): SeedResult {
       id: teamId,
       name: `${displayName}'s team`,
       createdAt,
-      plan: 'free', // 形状保留、不参与门控（02 §2.4/A3）
-      avatarStyle: 'notionist', // [推断] 值域（records/team.ts）
+      plan: 'free',
+      avatarStyle: 'notionist',
     })
     .run();
 

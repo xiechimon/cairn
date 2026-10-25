@@ -1,9 +1,3 @@
-// GitOps 缝实现（shared git-ops.ts 接口；01 §4.2 锁定：spawn 系统 git，
-// `git http-backend` CGI + bare repo 读树/单文件，isomorphic-git/simple-git
-// 不引入）。缝纪律：本模块是 server 内唯一 git spawn 点。
-// 注入安全：全程 argv 数组（无 shell）；ref 先经 `rev-parse --end-of-options`
-// 解析为 sha 再消费（防 flag 样 ref）；path 拒绝 NUL/绝对路径/`..` 段。
-
 import { spawn } from 'node:child_process';
 import type {
   GitCgiRequest,
@@ -20,7 +14,6 @@ export interface GitRunResult {
   stderr: string;
 }
 
-/** spawn 系统 git 并收齐 stdout/stderr；不抛非零（调用方按 code 判定）。 */
 export function runGit(
   args: string[],
   opts: { cwd?: string; stdin?: Uint8Array; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
@@ -42,10 +35,7 @@ export function runGit(
     child.on('close', (code) =>
       resolve({ code: code ?? 0, stdout: Buffer.concat(stdout), stderr }),
     );
-    // stdin 写端兜底（#216）：子进程先关读端（早退/不消费输入，如 http-backend
-    // 或其 service 提前结束）时，在途写吃 EPIPE。该错误不携带结果信息——退出码
-    // 与 stdout 才是结果面；无监听则以 unhandled error 击穿进程（vitest 判整跑
-    // 挂；生产 = uncaughtException）。CI run 36038226922 实测。
+    // an in-flight stdin write becomes EPIPE when the child closes its read end early
     child.stdin.on('error', () => {});
     if (opts.stdin !== undefined) {
       child.stdin.end(Buffer.from(opts.stdin));
@@ -56,17 +46,14 @@ export function runGit(
 }
 
 const META_TIMEOUT_MS = 15_000;
-const DEFAULT_HEAD_BRANCH = 'main'; // r3 §3.6 merge `origin/main` / 83 main README 实测
+const DEFAULT_HEAD_BRANCH = 'main';
 
-/** path 段护栏：仓库根相对、无 `..`、无 NUL、非绝对。 */
 export function isSafeRepoPath(path: string): boolean {
   if (path === '' || path.startsWith('/') || path.includes('\0')) return false;
   return !path.split('/').includes('..');
 }
 
-/** CGI 响应解码：头区（CRLF/LF 双容忍）+ Status 头 + chunked 体解码。 */
 export function decodeCgiResponse(raw: Buffer): GitCgiResponse {
-  // 头/体分界 = 首个空行（git http-backend 用 \r\n\r\n；容忍 \n\n）。
   let split = -1;
   let splitLen = 0;
   for (const [needle, len] of [
@@ -94,11 +81,11 @@ export function decodeCgiResponse(raw: Buffer): GitCgiResponse {
     if (name.toLowerCase() === 'status') {
       const parsed = Number.parseInt(value, 10);
       if (Number.isInteger(parsed)) status = parsed;
-      continue; // Status 是 CGI 伪头，不透传
+      continue;
     }
     if (name.toLowerCase() === 'transfer-encoding') {
       chunked = value.toLowerCase().includes('chunked');
-      continue; // 分帧由 HTTP server 重新负责
+      continue;
     }
     headers.push([name, value]);
   }
@@ -106,7 +93,6 @@ export function decodeCgiResponse(raw: Buffer): GitCgiResponse {
   return { status, headers, body };
 }
 
-/** HTTP/1.1 chunked 解码（CGI 缓冲态 → 原样字节）。 */
 export function decodeChunked(buf: Buffer): Buffer {
   const out: Buffer[] = [];
   let pos = 0;
@@ -120,21 +106,16 @@ export function decodeChunked(buf: Buffer): Buffer {
     if (size === 0) break;
     out.push(buf.subarray(pos, pos + size));
     pos += size;
-    // 跳过 chunk 尾 CRLF
     if (buf[pos] === 0x0d) pos += 1;
     if (buf[pos] === 0x0a) pos += 1;
   }
   return Buffer.concat(out);
 }
 
-/** `ls-tree -l` 行解析（单层 `lsTree` 与全递归 `lsFilesRecursive` 共用；
- * 子模块 = `commit` 型条目，`cat-file blob` 读不出，候选/浏览两面都滤掉）。 */
 function parseLsTreeLines(stdout: Buffer): GitTreeEntry[] {
   const entries: GitTreeEntry[] = [];
   for (const line of stdout.toString('utf8').split('\n')) {
     if (line === '') continue;
-    // `<mode> <type> <sha> <size|->\t<path>`（-l 出 size；tree 为 `-`；
-    // size 右对齐空格填充 → 按空白段切分）
     const tab = line.indexOf('\t');
     if (tab < 0) continue;
     const meta = line.slice(0, tab).split(/\s+/);
@@ -154,10 +135,6 @@ function parseLsTreeLines(stdout: Buffer): GitTreeEntry[] {
   return entries;
 }
 
-/** 全递归文件列举（#760 composer `@` 候选源）：`ls-tree -r -t -l` 一次打全仓
- * 路径表。缝词表外的只读查询，直调 runGit（readCommitHistory 同先例），不进
- * GitOps 接口——daemon 侧 worktree 词表不受影响。commit 须是已解析 sha
- * （调用方先 resolveCommitOr404，与 tree/file 同律）。 */
 export async function lsFilesRecursive(dir: string, commit: string): Promise<GitTreeEntry[]> {
   const r = await runGit(['ls-tree', '-r', '-t', '-l', commit, '--'], {
     cwd: dir,
@@ -173,7 +150,6 @@ export const systemGitOps: GitOps = {
     if (init.code !== 0) throw new Error(`git init --bare failed: ${init.stderr}`);
     const steps: string[][] = [
       ['symbolic-ref', 'HEAD', `refs/heads/${DEFAULT_HEAD_BRANCH}`],
-      // http-backend 双服务放开（匿名侧由 server Basic auth 层把关，02 §3 凭证纪律）。
       ['config', 'http.receivepack', 'true'],
       ['config', 'http.uploadpack', 'true'],
     ];
@@ -184,8 +160,6 @@ export const systemGitOps: GitOps = {
   },
 
   async seedInitialCommit(dir, message) {
-    // 空树 sha = 常量（`git hash-object -t tree /dev/null`）；plumbing 直落
-    // refs/heads/main（bare 无检出面，commit-tree + update-ref 即够）。
     const emptyTree = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
     const env: NodeJS.ProcessEnv = {
       GIT_AUTHOR_NAME: 'cairn-git',
@@ -228,7 +202,6 @@ export const systemGitOps: GitOps = {
   },
 
   async resolveCommit(dir, ref) {
-    // --end-of-options：ref 位的 flag 样串不被当选项消费（git ≥ 2.24）。
     const r = await runGit(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`], {
       cwd: dir,
       timeoutMs: META_TIMEOUT_MS,
@@ -239,9 +212,6 @@ export const systemGitOps: GitOps = {
   },
 
   async isGitRepo(dir) {
-    // 工作树仓判定（spec 12 local 形态 400 闸）：bare 仓 = false（无工作树，
-    // ff-only 落地面不成立）。cwd 缺位/非目录时 spawn 即拒（ENOENT/ENOTDIR）
-    // ——判定语义为 false，不向上抛。
     try {
       const r = await runGit(['rev-parse', '--is-inside-work-tree'], {
         cwd: dir,
@@ -257,7 +227,6 @@ export const systemGitOps: GitOps = {
     const args = ['ls-tree', '-l', commit];
     if (subPath !== undefined && subPath !== '') {
       if (!isSafeRepoPath(subPath)) throw new Error(`unsafe path: ${subPath}`);
-      // 目录内容列举 = 尾斜杠语义；blob 直查亦容忍。
       args.push('--', subPath.endsWith('/') ? subPath : `${subPath}/`);
     }
     const r = await runGit(args, { cwd: dir, timeoutMs: META_TIMEOUT_MS });
@@ -271,7 +240,7 @@ export const systemGitOps: GitOps = {
       cwd: dir,
       timeoutMs: META_TIMEOUT_MS,
     });
-    if (r.code !== 0) return null; // missing file / not a blob
+    if (r.code !== 0) return null;
     return { size: r.stdout.byteLength, content: new Uint8Array(r.stdout) };
   },
 
@@ -296,12 +265,10 @@ export const systemGitOps: GitOps = {
   async httpBackend(req: GitCgiRequest): Promise<GitCgiResponse> {
     const env: NodeJS.ProcessEnv = {
       GIT_PROJECT_ROOT: req.projectRoot,
-      GIT_HTTP_EXPORT_ALL: '1', // 免 git-daemon-export-ok 逐库置位
+      GIT_HTTP_EXPORT_ALL: '1',
       PATH_INFO: req.pathInfo,
       QUERY_STRING: req.queryString,
       REQUEST_METHOD: req.method,
-      // receive-pack ref 更新落 committer 身份 [设计]（server 侧固定值，品牌槽
-      // 归 #44；daemon push 侧身份归 M3 per-step 面）。
       GIT_COMMITTER_NAME: 'cairn-git',
       GIT_COMMITTER_EMAIL: 'git@localhost',
       ...(req.contentType !== undefined ? { CONTENT_TYPE: req.contentType } : {}),

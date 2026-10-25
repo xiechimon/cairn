@@ -1528,5 +1528,40 @@
     "path": "packages/shared/src/ansi.ts",
     "line": "  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL are the literal bytes of CSI/OSC sequences; there is no alternative spelling.",
     "reason": "biome noControlCharactersInRegex: stripping ANSI escapes requires matching the literal ESC/BEL control bytes; no alternative spelling exists"
+  },
+  {
+    "path": "apps/server/src/bundle-form.ts",
+    "line": "// pino transports cannot load from a single-file bundle: thread-stream starts the worker from disk.",
+    "reason": "external quirk: pino thread-stream cannot start its worker from a single-file bundle"
+  },
+  {
+    "path": "apps/server/src/index.ts",
+    "line": "  // pino-pretty cannot load its transport worker from a single-file bundle.",
+    "reason": "external quirk: pino transport worker cannot load from a single-file bundle"
+  },
+  {
+    "path": "apps/server/src/lib/git.ts",
+    "line": "    // an in-flight stdin write becomes EPIPE when the child closes its read end early",
+    "reason": "external quirk: Node.js turns an in-flight stdin write into EPIPE when the child closed its read end"
+  },
+  {
+    "path": "apps/server/src/lib/github.ts",
+    "line": "// Node fetch ignores http_proxy/https_proxy unless the server starts with NODE_USE_ENV_PROXY=1 (Node >= 24.5).",
+    "reason": "external quirk: Node fetch ignores proxy environment variables unless NODE_USE_ENV_PROXY=1"
+  },
+  {
+    "path": "apps/server/src/lib/github.ts",
+    "line": "// GitHub rejects API requests without a user-agent.",
+    "reason": "external quirk: GitHub API rejects requests without a user-agent"
+  },
+  {
+    "path": "apps/server/src/routes-machine.ts",
+    "line": "      // undici's default 300s body timeout (measured per received chunk) silently drops an idle SSE stream.",
+    "reason": "external quirk: undici drops idle SSE streams via its default 300s per-chunk body timeout"
+  },
+  {
+    "path": "apps/server/src/services/skill-import.ts",
+    "line": "// GitHub rejects API requests without a User-Agent (403).",
+    "reason": "external quirk: GitHub API rejects requests without a User-Agent"
   }
 ]

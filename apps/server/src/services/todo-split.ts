@@ -1,18 +1,3 @@
-// 拆卡执行面（#1250 / ADR 0018 层 2）：chief split_todo 工具的落库半边。
-// 依赖方向纪律：本文件只 import todos.ts（createTodo/setTodoPhase）与 db
-// schema——builds.ts（波次派发）与 chief-tools.ts（工具入口）import 本文件，
-// 不反向（machines → builds 是既有正向边的同族约束）。
-//
-// 落库内容：
-// - N 张子卡（createTodo 同通道 + sourceTodo=父 id + blockedBy 依赖边 +
-//   assignment.build=各钉角色 agent）；子卡落 todo 相位等派发。
-// - 父卡的「拆解方案」= 一份 plan 文档（子卡清单 + 依赖边 + 各钉 agent），
-//   挂在新建的父 build 上，父卡停 confirm 关口（todo→confirm 边，phase.ts
-//   #1250）——人审整棵拆解树（premortem 3：可整树驳回；驳回走既有 revision
-//   面，父卡 assignment.plan=Planner persona，重规划轮有主）。
-// - 确认派发与波次推进不在此文件（builds.ts confirmSplitParent /
-//   advanceSplitWaves——它们要 startBuilds，本文件不 import builds）。
-
 import type { TodoOutputKind } from '@cairn/shared';
 import { SPLIT_ANNOUNCEMENT, type UserRecord } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
@@ -25,12 +10,10 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { createTodo, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
-/** split_todo 子卡入参（工具 params 的 server 形）。 */
 export interface SplitSubtodoInput {
   title: string;
   spec: string;
   agentId: string;
-  /** 1-based 兄弟序号（工具层约定）；server 解析为子卡 id。 */
   blockedBy?: number[];
   output?: TodoOutputKind;
 }
@@ -43,30 +26,23 @@ export interface SplitDeps {
   convHub?: ConversationStreamHub;
 }
 
-/** 执行拆解：建子卡 + 依赖边 + 父方案文档 + 父停 confirm。返回子卡行（chief
- *  工具回执用）。全量校验先行（失败零落库）——半截拆解树是最糟残态。 */
 export function createSplitTodo(
   deps: SplitDeps,
   input: {
     parentId: string;
     subtodos: SplitSubtodoInput[];
-    /** 溯源三件（chief 派工同律，create_todo 工具位语义）。 */
     chiefAgentId: string | null;
     chiefId: string;
     threadId: string;
-    /** 宣告行 actor（Chief 绑定 Agent displayName；未绑定回落 'Chief'）。 */
     actorName: string;
   },
 ): { parentId: string; parentBuildId: string; children: { id: string; title: string }[] } {
   const { db } = deps;
   const parent = db.select().from(todo).where(eq(todo.id, input.parentId)).get();
   if (parent === undefined) throw new HttpError(404, `todo ${input.parentId}`);
-  // 拆解门：只拆未开工的卡（todo 相位）。运行中/已交付的卡再拆 = 半途换轨，
-  // 现有产物与子卡边界对不上；重拆诉求先 close 旧卡再建新卡。
   if (parent.phase !== 'todo') {
     throw new HttpError(409, `split 仅适用于未开工任务（当前相位 ${parent.phase}）`);
   }
-  // 双拆防御：已有子项的父卡再拆 = 边界漂移（旧子卡还挂着依赖边）。
   const existing = db
     .select({ id: todo.id })
     .from(todo)
@@ -79,8 +55,6 @@ export function createSplitTodo(
   if (items.length < 2) {
     throw new HttpError(400, 'subtodos 至少两张：单卡诉求不是拆解，直接派发或改写 spec');
   }
-  // agentId 团队归属先行校验（requireTeamAgent 同律：错 id 当场 400 折回工具
-  // 结果，chief 可重挑——不留「指派不存在 agent」的静默残态）。
   for (const item of items) {
     if (item.title.trim() === '' || item.spec.trim() === '') {
       throw new HttpError(400, 'subtodos 每项 title/spec 必填非空');
@@ -94,7 +68,6 @@ export function createSplitTodo(
       throw new HttpError(404, `agent ${item.agentId}（不在本团队，或 id 抄错了）`);
     }
   }
-  // 依赖边校验：索引界内、无自指、无环（对解析后的边做 DFS）。
   const edges: { from: number; to: number }[] = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -110,7 +83,7 @@ export function createSplitTodo(
   {
     const adj = new Map<number, number[]>();
     for (const e of edges) adj.set(e.from, [...(adj.get(e.from) ?? []), e.to]);
-    const state = new Uint8Array(items.length); // 0=未访 1=在栈 2=完
+    const state = new Uint8Array(items.length);
     const visit = (n: number): void => {
       if (state[n] === 1) throw new HttpError(400, 'blockedBy 依赖成环（DFS 检测命中）');
       if (state[n] === 2) return;
@@ -121,7 +94,6 @@ export function createSplitTodo(
     for (let i = 0; i < items.length; i++) visit(i);
   }
 
-  // —— 全部校验过 → 落库（先子卡，后父 build/plan/confirm）——
   const children: {
     id: string;
     title: string;
@@ -144,9 +116,6 @@ export function createSplitTodo(
         ...(item.output !== undefined ? { output: item.output } : {}),
       },
     );
-    // 拆卡专属位：sourceTodo（父指针）+ blockedBy（依赖边，索引→id）+
-    // assignment.build（各钉角色 agent）。依赖索引在上方已校验界内且小于
-    // 当前序号（无前向依赖/自指），children 数组按序累积故前向元素必在位。
     const blockerIds = (item.blockedBy ?? []).map((idx) => {
       const blocker = children[idx - 1];
       if (blocker === undefined) throw new Error(`split blockedBy index ${idx} not resolvable`);
@@ -171,7 +140,6 @@ export function createSplitTodo(
     });
   }
 
-  // 父 build + 拆解方案 plan 文档（stepId null = server 落稿非步上传）。
   const parentBuildId = newUuidv7();
   db.insert(build)
     .values({
@@ -201,9 +169,6 @@ export function createSplitTodo(
     })
     .run();
   db.update(build).set({ planDocId: planId }).where(eq(build.id, parentBuildId)).run();
-  // 父卡：停 confirm（拆解方案等人审）+ hasPlan + 指回父 build；assignment.plan
-  // = Planner persona（缺省无 persona 时 null——revision 重规划步回落 plan 槽
-  // 的失败收尾面）。拆解宣告行随父会话落库（actor = 谁拆的）。
   const planner = db
     .select({ id: agent.id })
     .from(agent)
@@ -230,8 +195,6 @@ export function createSplitTodo(
   };
 }
 
-/** 拆解方案文档（父卡 plan 面 = confirm 人审材料）：子卡清单 + 依赖 + 各钉
- *  agent + 收口规则，读卡即懂整棵树。 */
 function renderSplitPlan(
   db: Db,
   parentTitle: string,

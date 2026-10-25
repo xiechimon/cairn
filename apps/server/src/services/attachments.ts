@@ -1,12 +1,3 @@
-// 附件服务（#310，r9 §3.1/§4）。三步 wire 服务层：
-//   grant   → 校验输入、落 attachment.pending 行、签 HMAC token
-//   upload  → 校验 grant、写盘、转 ready
-//   read    → 团队归属校验后吐原始字节
-//   getMeta → chief-tools / mcp-face 工具面读（文本 utf8 / 二进制 base64）
-//
-// 存储 layout = `<attachmentsDir>/<teamId>/<id>.<ext>`（与 reposDir 同律
-// 01 §4.2）；文件名 → 扩展名白名单守门（防双扩展名 / 可执行）。
-
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { and, eq } from 'drizzle-orm';
@@ -25,8 +16,6 @@ import { TEAM_ATTACHMENTS_QUOTA_BYTES, teamAttachmentBytes } from './attachment-
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
-/** MIME 白名单（白名单制，避免可执行 / 压缩炸弹）。扩缩走 [设计] 登记；文本
- * 族全收；图片族全收；其余拒。`text/*` 走 utf8，其他走 base64。 */
 const ALLOWED_MIME_PREFIXES = ['text/', 'image/'];
 const ALLOWED_MIME_EXACT = new Set(['application/json', 'application/pdf', 'application/xml']);
 
@@ -95,7 +84,6 @@ const ALLOWED_EXTS = new Set([
   'patch',
 ]);
 
-/** 提取扩展名（取 fileName 末段 . 后的字符，限小写字母/数字）。 */
 export function extOf(fileName: string): string {
   const lastDot = fileName.lastIndexOf('.');
   if (lastDot < 0 || lastDot === fileName.length - 1) return '';
@@ -103,12 +91,10 @@ export function extOf(fileName: string): string {
   return /^[a-z0-9]{1,8}$/.test(ext) ? ext : '';
 }
 
-/** fileName 合法性校验（拒空 / 路径穿越 / 控制字符）。 */
 export function isValidFileName(fileName: string): boolean {
   if (fileName.length === 0 || fileName.length > 200) return false;
   if (fileName.includes('/') || fileName.includes('\\') || fileName.includes('\0')) return false;
   if (fileName === '.' || fileName === '..') return false;
-  // biome 禁裸控制字符在 regex 字面里——逐字符 codePoint 比较，行为等价 /[\x00-\x1f]/
   for (let i = 0; i < fileName.length; i += 1) {
     if (fileName.charCodeAt(i) < 0x20) return false;
   }
@@ -151,7 +137,6 @@ export function grantUpload(deps: AttachmentDeps, input: GrantInput): GrantOutpu
   if (ext === '' || !ALLOWED_EXTS.has(ext)) {
     throw new HttpError(400, `file extension not allowed: ${ext || '(none)'}`);
   }
-  // 总量配额走准入（#759 R4：超限拒 grant，不删有引用件——误删为 0）。
   const usedBytes = teamAttachmentBytes(deps.db, deps.teamId);
   if (usedBytes + input.size > TEAM_ATTACHMENTS_QUOTA_BYTES) {
     throw new HttpError(
@@ -232,7 +217,6 @@ export function uploadFile(deps: AttachmentDeps, input: UploadInput): UploadOutp
   if (input.fileMimeType !== payload.mimeType) {
     throw new HttpError(409, `uploaded mime ${input.fileMimeType} ≠ grant ${payload.mimeType}`);
   }
-  // grant key 内含 id.<ext>，再次核对 ext（grant 已被验签，此处为冗余防御）
   const grantExt = payload.key.split('.').pop() ?? '';
   const fileExt = extOf(input.fileName);
   if (fileExt !== '' && grantExt !== fileExt) {
@@ -242,7 +226,6 @@ export function uploadFile(deps: AttachmentDeps, input: UploadInput): UploadOutp
   const dir = dirname(fullPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(fullPath, input.fileBytes);
-  // 幂等：grant 重放视为同 id 覆盖写（DB 行 upsert 语义）
   deps.db
     .update(attachment)
     .set({ status: 'ready' })
@@ -288,9 +271,6 @@ export function readAttachment(
   return { row, absPath: join(deps.attachmentsDir, row.storageKey) };
 }
 
-/** 工具面读：utf8 当 text/*（含 json/xml/yaml 等文本型应用类型），base64 当其他
- * （image/*、pdf 等）。chief-tools / mcp-face case 'attachment' 单源 [设计]——
- * 服务层做归属 + 状态校验，避免工具面分散重复。 */
 export function readAttachmentMeta(
   deps: { db: Db; attachmentsDir: string },
   teamId: string,
@@ -304,8 +284,6 @@ export function readAttachmentMeta(
   content: string;
 } {
   const row = requireAttachmentRow(deps.db, teamId, attachmentId);
-  // 同步读盘——小文件（≤10MiB）握手内同步返回；chief/agent 视角 token 用量可
-  // 控（一次工具调用 = 一次 round-trip）。
   const bytes = readFileSync(join(deps.attachmentsDir, row.storageKey));
   const isText = row.mimeType.startsWith('text/') || ALLOWED_MIME_EXACT.has(row.mimeType);
   return {

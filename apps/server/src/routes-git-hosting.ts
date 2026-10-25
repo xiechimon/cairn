@@ -1,9 +1,3 @@
-// 托管 repo git 面（02 §3/A4：`git http-backend` CGI，不引第三方 git host；
-// 远端 URL 形状 = `<origin>/git/<teamId>/<repoName>`）。
-// #1125 拆域：本模块是 routes.ts 的一个资源域切片（词表单源与
-// 对拍契约不变——shared WEB_REST_ENDPOINTS + test/wire.test.ts 拍的是组合
-// 后的 app，不是文件布局）。编排位 = routes.ts 的 registerRoutes。
-
 import { join } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -14,11 +8,6 @@ import { systemGitOps } from './lib/git.js';
 import { GIT_AUTH_REALM, verifyGitBasicAuth } from './routes-helpers.js';
 
 export function registerGitHostingRoutes(app: Hono, ctx: AppContext): void {
-  // —— 托管 repo git 面（02 §3/A4：`git http-backend` CGI，不引第三方 git host；
-  // 远端 URL 形状 = `<origin>/git/<teamId>/<repoName>`，对应 r3 §1.4
-  // `https://git.todos.dev/<teamId>/<repoName>`，域名段 = 本地主机代位 +
-  // 同源 `/git` 前缀 [设计]）。凭证纪律（r3 §1.4 实测手动 fetch 无凭证失败）：
-  // Basic auth → api_key(gitAccess) 哈希比对，未认证一律 401。 ————————————————
   app.all('/git/*', async (c) => {
     const url = new URL(c.req.url);
     const segments = url.pathname.slice('/git/'.length).split('/');
@@ -56,17 +45,13 @@ export function registerGitHostingRoutes(app: Hono, ctx: AppContext): void {
     const contentType = c.req.header('content-type');
     const cgi = await systemGitOps.httpBackend({
       projectRoot: join(ctx.reposDir, teamId),
-      pathInfo: `/${row.repoName}.git/${rest}`, // repoName 取库行（slug 安全字符集）
+      pathInfo: `/${row.repoName}.git/${rest}`,
       queryString: url.search.replace(/^\?/, ''),
       method,
       ...(contentType !== undefined ? { contentType } : {}),
       remoteUser,
       body,
     });
-    return c.body(
-      new Uint8Array(cgi.body),
-      cgi.status as 200, // CGI Status 头透传（git 协议面 200/403/404 族）
-      Object.fromEntries(cgi.headers),
-    );
+    return c.body(new Uint8Array(cgi.body), cgi.status as 200, Object.fromEntries(cgi.headers));
   });
 }

@@ -1,9 +1,3 @@
-// 附件面（#310，r9 §3.1/§4 三步 wire：grant → upload → content 内嵌）。
-// #1125 顺带按仓规把两处 inline import 提为顶层（拆域前唯一例外位）。
-// #1125 拆域：本模块是 routes.ts 的一个资源域切片（词表单源与
-// 对拍契约不变——shared WEB_REST_ENDPOINTS + test/wire.test.ts 拍的是组合
-// 后的 app，不是文件布局）。编排位 = routes.ts 的 registerRoutes。
-
 import { readFileSync } from 'node:fs';
 import type { Hono } from 'hono';
 import { z } from 'zod';
@@ -17,10 +11,6 @@ import {
 } from './services/attachments.js';
 
 export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
-  // —— 附件面（#310，r9 §3.1/§4 三步 wire：grant → upload → content 内嵌
-  // `attachment:<key>`）。grant 端返回 uploadUrl + HMAC 签名 token；upload 端
-  // 验签 + 写盘 + DB 状态 ready；read 端供详情页/工具面拉原始字节。—————————————
-
   const grantBodySchema = z.object({
     kind: z.literal('attachment'),
     fileName: z.string(),

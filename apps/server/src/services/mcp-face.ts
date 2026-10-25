@@ -1,18 +1,3 @@
-// MCP server 面（02 §7.2，00/D4 薄桥的 server 半；M4b）——外部 MCP 客户端
-// （Claude Code/Codex/VS Code…）← cairn。端点 /api/mcp（路径保形），
-// Authorization: Bearer <apiKey>；调用以 key 属主身份执行（r3 §5.2）。
-// 权限模型（r3 §6 矩阵 1:1）：key 级工具白名单 24 件 = 读 11 组 + 写 13 项
-// （MCP_TOOL_REGISTRY 单源）；「The key's tool selection limits every call」=
-// 只注册授出工具（list 与 call 同受限）；「Removing every MCP tool disables
-// MCP for that key」= 零授权 → 空工具面（机器自持 machine token 不受影响）。
-// 工具语义 = docs 六能力组（MCP_CAPABILITY_GROUPS）投影，与 chief 词表同族
-// （r5 §3.1「与 docs MCP server 面六能力组同构」）——description 单源复用
-// CHIEF_REMOTE_TOOLS；身份语义差：key 属主 = 用户（triggerSource 'user'、
-// 无 chief 溯源/watch）。
-// 传输 = sdk WebStandardStreamableHTTPServerTransport stateless（每请求独立
-// server+transport，enableJsonResponse——self-host 单机无会话粘滞需求 [设计]）。
-// 缝纪律（00/D4、01 §7.3）：本文件 = server 侧唯一 sdk 消费位（biome override）。
-
 import {
   BRAND,
   CHIEF_REMOTE_TOOLS,
@@ -49,17 +34,11 @@ import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
 import { createTodo, listTodos, updateTodo } from './todos.js';
 
-/** key 属主调用上下文（r3 §5.2「MCP 调用以 key 属主身份执行」；单用户 seed
- * 02 §2.1 → user 恒 seed 行，teamId 随 key 行）。 */
 export interface McpCallerCtx {
   teamId: string;
   user: UserRecord;
-  /** 授出的 grant 标签集（MCP_TOOLS_READ/WRITE 原词）。 */
   grants: ReadonlySet<string>;
 }
-
-// —— 24 工具面（MCP_TOOL_REGISTRY 单源；input schema [推断] = chief 词表同族
-// 参数投影，wire 原件未采，04 §3 不判负口径）———————————————————————————————
 
 const s = z.string();
 const sArr = z.array(z.string());
@@ -73,8 +52,6 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   attachment: { attachmentId: s },
   skills: {},
   machines: {},
-  // #1406 P5a-2：与 chief 词表同一套参数（shared 单源）；projectId 必填——
-  // 缺省是错误结果，不替调用方挑项目、不跨项目扇出。
   issues: githubReadToolParamsSchemas.issues.shape,
   pull_requests: githubReadToolParamsSchemas.pull_requests.shape,
   workflow_runs: githubReadToolParamsSchemas.workflow_runs.shape,
@@ -106,15 +83,12 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   unschedule_todo: { todoId: s },
 };
 
-/** description 单源 = chief 词表同名工具（r5 §3.1 同构注记）。 */
 const CHIEF_DESCRIPTIONS = new Map(CHIEF_REMOTE_TOOLS.map((t) => [t.name, t.description]));
 
 function json(result: unknown): string {
   return JSON.stringify(result ?? null);
 }
 
-/** project 存在性 + 团队归属校验（#1466，requireTeamTodo 同口径：key 属主
- * 团队之外的 id 与不存在同 404，不泄露存在性）。 */
 function requireProjectRow(db: Db, projectId: string, teamId: string) {
   const row = db
     .select()
@@ -144,8 +118,6 @@ function requireTeamTodo(db: Db, todoId: string, teamId: string) {
   return row;
 }
 
-/** build 归属校验（纵深防御，transitionTodos 同律）：build 表无 teamId 列，
- * 经 build → todo → teamId 联查；跨团队/不存在一律 404（不泄露存在性）。 */
 function requireTeamBuild(db: Db, buildId: string, teamId: string) {
   const row = db.select({ todoId: build.todoId }).from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new HttpError(404, `build ${buildId}`);
@@ -175,7 +147,6 @@ function strArrOf(args: Args, key: string): string[] {
   return v as string[];
 }
 
-/** 24 工具执行体（key 属主身份）。返回 JSON 串（content text 位）。 */
 export async function executeMcpTool(
   deps: ChiefToolDeps,
   ctx: McpCallerCtx,
@@ -183,7 +154,6 @@ export async function executeMcpTool(
   args: Args,
 ): Promise<string> {
   const { db } = deps;
-  // #452 写向：box/githubFetch 透传——MCP create_todo 与三条创建路径同律。
   const svc = {
     db,
     hub: deps.hub,
@@ -192,16 +162,11 @@ export async function executeMcpTool(
     box: deps.box,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
-  // #902 过闸宣告行的 actor 位：MCP 面身份语义（本文件头注）= key 属主即
-  // 用户，triggerSource 'user' 同律——宣告行记用户名，#900 的 agent 闸相位
-  // 拒否不咬本面。
   const mcpActor: TransitionActor = { kind: 'user', name: deps.user.displayName };
   switch (name) {
-    // —— 读 11 组（Read the workspace / Read the repo / Read progress）——
     case 'todos': {
       const projectId = optStr(args, 'projectId');
       const phase = optStr(args, 'phase');
-      // 团队过滤恒在（#1466）：他队 projectId 与不存在的 id 同回 []。
       let records = listTodos(svc, { teamId: ctx.teamId, ...(projectId ? { projectId } : {}) });
       if (phase) records = records.filter((t) => t.phase === phase);
       return json(records);
@@ -220,10 +185,6 @@ export async function executeMcpTool(
       );
     }
     case 'conversation': {
-      // Read progress：最新构建完整对话含流式（02 §7.2 六能力组）；chief 会话
-      // 同族可读（r5 §3.6 端点族）。
-      // 团队归属（#1470）：chief thread 行带 teamId；build 对话 id ≡ buildId，
-      // 走 requireTeamBuild。跨团队与不存在同 404。
       const conversationId = str(args, 'conversationId');
       if (isChiefConversation(conversationId)) {
         const thread = db
@@ -268,8 +229,6 @@ export async function executeMcpTool(
     case 'schedules':
       return json(listSchedules({ db, hub: deps.hub }, ctx.teamId));
     case 'attachment': {
-      // #310 / r9 §3.1：同 chief-tools 路径（MCP 工具面 = 词表 + 执行同源，
-      // 服务层复用避免双修）。
       const attachmentId = str(args, 'attachmentId');
       const { readAttachmentMeta } = await import('./attachments.js');
       return json(
@@ -281,8 +240,6 @@ export async function executeMcpTool(
       );
     }
     case 'skills': {
-      // spec 13 #367：本地目录现扫（chief-tools 同源，id = frontmatter name
-      // 回落目录名）。
       const scanned = scanLocalSkills(deps.skillsDir);
       return json(scanned.map((k) => ({ id: k.id, name: k.name, description: k.description })));
     }
@@ -300,16 +257,11 @@ export async function executeMcpTool(
     case 'issues':
     case 'pull_requests':
     case 'workflow_runs':
-      // #1406 P5a-2：与 chief 面同一份实现（services/github-reads.ts）；团队 =
-      // key 行的 teamId，只读本团队项目、用本团队的 GitHub 连接。
       return json(await executeGithubReadTool(deps, ctx.teamId, name, args));
 
-    // —— 写 13 项（Organize work / Run work / Manage lifecycle）——
     case 'create_todo': {
       const projectId = str(args, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId);
-      // key 属主身份：ownerId = 用户、createdBy 无 Agent 位（非 chief 派工，
-      // 无 sourceBuildId 溯源——r3 §5.2 身份语义）。
       return json(
         createTodo(svc, {
           teamId: ctx.teamId,
@@ -359,9 +311,6 @@ export async function executeMcpTool(
         plan: assignmentIn?.plan?.agentId ? { agentId: assignmentIn.plan.agentId } : null,
         build: assignmentIn?.build?.agentId ? { agentId: assignmentIn.build.agentId } : null,
       };
-      // 逐项校验先于任何派工（#1470，chief run_builds 同律）：指派 Agent 须是
-      // 本队的；本队任务指向他队项目在建 build 之前就 404，整批不动——否则
-      // build 建在他队项目上，claim 载荷带他队仓库与本队 GitHub 凭证。
       for (const slot of [assignment.plan, assignment.build]) {
         if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
       }
@@ -378,7 +327,7 @@ export async function executeMcpTool(
             todoIds: [row.id],
             assignment,
             withPlan,
-            triggerSource: 'user', // key 属主 = 用户身份（非 chief、非定时）
+            triggerSource: 'user',
           }),
         );
       }
@@ -397,10 +346,6 @@ export async function executeMcpTool(
       return json({ confirmed: buildIds });
     }
     case 'merge_builds': {
-      // #1256（ADR 0018「合并动作留人，不在名册内」）：合并只由人触发——
-      // MCP key 属主（外部 MCP 客户端 = 机器）不得代合。先过跨团队存在性
-      // 守卫（纵深防御，同 cancel/confirm），再抛 403 硬拒——isError 面回
-      // MCP 客户端，文案指认人工出口（web 界面 review 关口「完成」按钮）。
       const buildIds = strArrOf(args, 'buildIds');
       for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
       throw new HttpError(403, MERGE_HUMAN_ONLY_COPY);
@@ -409,14 +354,10 @@ export async function executeMcpTool(
       const buildIds = strArrOf(args, 'buildIds');
       for (const buildId of buildIds) {
         requireTeamBuild(db, buildId, ctx.teamId);
-        // #1219：与 chief cancel_builds 同漏斗（cancelBuild——pending stopped /
-        // claimed stop 委托 / 僵尸释放；旧裸 UPDATE 的 todo-留-queued 僵尸不复存在）。
         cancelBuild(svc, buildId);
       }
       return json({ cancelled: buildIds });
     }
-    // MCP 面身份语义（本文件头注）：key 属主 = 用户——transitionTodos 的
-    // actor 记 user（#900 的 agent 闸相位拒否不咬本面；done 落地照落审计行）。
     case 'complete_todos':
       return json(transitionTodos(deps, ctx.teamId, strArrOf(args, 'todoIds'), 'done', mcpActor));
     case 'close_todos':
@@ -426,7 +367,7 @@ export async function executeMcpTool(
     case 'schedule_todo': {
       const todoId = str(args, 'todoId');
       const row = requireTeamTodo(db, todoId, ctx.teamId);
-      requireProjectRow(db, row.projectId, ctx.teamId); // #1470：同 run_builds
+      requireProjectRow(db, row.projectId, ctx.teamId);
       const at = args.at;
       if (typeof at !== 'number' || !Number.isFinite(at)) throw new HttpError(400, 'invalid at');
       return json(
@@ -456,7 +397,6 @@ export async function executeMcpTool(
   }
 }
 
-/** per-request McpServer 组装：只注册 key 授出的工具（limits every call）。 */
 export function buildMcpFaceServer(deps: ChiefToolDeps, ctx: McpCallerCtx): McpServer {
   const server = new McpServer(
     { name: BRAND.cliCommandName, version: '0.1.0' },
@@ -485,9 +425,6 @@ export function buildMcpFaceServer(deps: ChiefToolDeps, ctx: McpCallerCtx): McpS
   return server;
 }
 
-/** /api/mcp 请求处理（Hono raw Request 直通；stateless = 每请求独立
- * server+transport，enableJsonResponse——JSON-RPC 单响应，无 SSE 会话粘滞）。
- * 认证失败 = HTTP {error} 面（协议前拒绝，git 面 401 同族）。 */
 export async function handleMcpRequest(
   deps: ChiefToolDeps & { db: Db },
   request: Request,
@@ -510,20 +447,18 @@ export async function handleMcpRequest(
   };
   const server = buildMcpFaceServer(deps, ctx);
   const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: undefined, // stateless（02 §7.2 无会话语义要求）
+    sessionIdGenerator: undefined,
     enableJsonResponse: true,
   });
   await server.connect(transport);
   try {
     return await transport.handleRequest(request);
   } finally {
-    // stateless + JSON 单响应：本请求结束即回收（无挂起流 [设计]）。
     await transport.close().catch(() => {});
     await server.close().catch(() => {});
   }
 }
 
-/** 薄桥自检面（vocabulary 对拍用，非运行时路径）：授出集 → 工具名单投影。 */
 export function grantedToolNames(grants: ReadonlySet<string>): string[] {
   return MCP_TOOL_REGISTRY.filter((t) => grants.has(t.grant)).map((t) => t.name);
 }
