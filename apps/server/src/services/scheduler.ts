@@ -1,17 +1,3 @@
-// Scheduler 缝实现（shared scheduler.ts 接口；02 §9.2 server 端 cron 宿主自持，
-// 00/D3 不外包 pi）。触发闭环（r3 §9 + r5 §8 实测语义）：
-// - 到期 → 新 build 全新重跑：triggerSource="schedule"、直执行（观测轮 32s 直达
-//   审核关口、未在方案关口停驻 [推断]）
-//   （schedule 显式钉 > todo.machineId #682 任务级默认 > null 自动；r3 §9 的
-//   「schedule null = 自动」现在精确为「schedule 未钉 → 回落 todo 值」）；
-//   到确认/审核关口暂停 = 常规 build 流程（02 §9.2）。
-// - 触发时停驻关口（confirm/review）的旧 build 标 errorMessage:"Cancelled"
-//   + build 文档事件（r5 §8 实测；done 轮旧 build 已合并落地，不标 [推断]）。
-// - `once` 触发后自动出队（r3 §9）；周期档滚动 nextRunAt（cron tz 感知）。
-// - 进行中 phase（queued/planning/building）不抢占：本轮跳过、周期档仍滚动
-//   [设计]（wire/UI 无抢占观测）。孤儿（todo 已删）自愈出队 [设计]。
-// 时间线「由定时发起」= build.triggerSource 数据面（呈现归 web）。
-
 import { ENV_VARS, type Scheduler } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -43,36 +29,23 @@ import {
 import { sweepStaleMachines } from './machines.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
-// #1261 配额挂起探测 sweep（tick 驱动）。
 import { sweepQuotaWaitSteps } from './quota-wait.js';
 import { computeNextRunAt, dueSchedules, isRecurring, updateNextRunAt } from './schedules.js';
 
 export interface SchedulerOptions {
-  /** 真实时间循环 tick 间隔（config schedulerTickMs）。 */
   tickMs: number;
 }
 
-/** #1150 CI 磨绿环运行位：轮询器挂本调度器家族——自有 60s 循环
- * （CI_POLL_INTERVAL_MS，与 tick 的 15s 分道——tick 是同步契约（shared
- * Scheduler.tick: void），网络读不进 tick；GC 的 sweep 是纯 fs 才能 piggyback）。
- * 缺省/null = 不开轮询（既有调用零改动）。githubFetch 是轮询的出站读位
- * （AppContext.githubFetch 同族），logger = 对账行（每 sweep 一行）。 */
 export interface CiPollRun {
   githubFetch: FetchLike;
   logger: CiPollLogger;
 }
 
-/** #1406 issue 进料运行位：轮询器挂本调度器家族——自有 5 分钟循环
- * （ISSUE_INTAKE_INTERVAL_MS，与 CI 磨绿环的 60s 分道，同样不进同步 tick）。
- * 缺省/null = 不开进料（既有调用零改动）。 */
 export interface IssueIntakeRun {
   githubFetch: FetchLike;
   logger: IssueIntakeLogger;
 }
 
-/** index.ts 接线单点（#1406 opt-in，默认关）：开关关 → null（调度器不起进料
- * 循环），开 → 原样给出运行位；两种情况都在启动日志落一行写明开关状态。
- * 抽函数 = 接线可钉（test/issue-intake.test.ts 钉它与 index.ts 的调用）。 */
 export function issueIntakeRunOf(
   config: { issueIntake: boolean },
   run: IssueIntakeRun,
@@ -86,13 +59,11 @@ export function issueIntakeRunOf(
   return config.issueIntake ? run : null;
 }
 
-/** 附件回收运行位（#759：tick piggyback，缺省 = 不开回收——既有调用零改动）。 */
 export interface AttachmentGcRun {
   attachmentsDir: string;
   logger: GcLogger;
 }
 
-/** 触发时旧 build 标 Cancelled 的关口集（r5 §8：停驻轮被新轮顶替）。 */
 const CANCEL_GATE_PHASES = new Set(['confirm', 'review']);
 
 export function createScheduler(
@@ -103,8 +74,6 @@ export function createScheduler(
   intake?: IssueIntakeRun | null,
 ): Scheduler {
   let timer: NodeJS.Timeout | null = null;
-  // #1150 CI 磨绿环轮询器（可选运行位）：start/stop 生命周期与 tick 同家族；
-  // sweep 自带 per 候选容错 + 对账日志，循环兜底 catch 防 interval 上抛。
   const ciPoller =
     ci !== undefined && ci !== null
       ? createCiPoller(deps, { githubFetch: ci.githubFetch, logger: ci.logger })
@@ -115,8 +84,6 @@ export function createScheduler(
       ? createIssueIntake(deps, { githubFetch: intake.githubFetch, logger: intake.logger })
       : null;
   let intakeTimer: NodeJS.Timeout | null = null;
-  // 回收限流位（内存记上次 sweep 时刻；多实例同库时各自限流，重复 sweep
-  // 无害——Victim 判定幂等，删过即无行）。
   let lastGcAt = 0;
 
   function cancelGateBuild(db: Db, hub: TeamStreamHub, todoId: string): void {
@@ -125,10 +92,7 @@ export function createScheduler(
       return;
     }
     const buildId = todoRow.latestBuildId;
-    db.update(build)
-      .set({ errorMessage: 'Cancelled' }) // r5 §7.2 实测字面值
-      .where(eq(build.id, buildId))
-      .run();
+    db.update(build).set({ errorMessage: 'Cancelled' }).where(eq(build.id, buildId)).run();
     const row = db.select().from(build).where(eq(build.id, buildId)).get();
     if (row) hub.publishBuildDoc(todoRow.teamId, toBuildRecord(row));
   }
@@ -137,10 +101,6 @@ export function createScheduler(
     const due = dueSchedules(deps, now);
     for (const row of due) {
       const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-      // 孤儿自愈：todo 已删，或任务已不属该项目 / 项目与任务不同队（#1497，
-      // startBuilds 会拒绝，这条定时再也触发不了）→ 出队 [设计]。先于
-      // cancelGateBuild 判，不取消一个接不上新 build 的关口；也不让 startBuilds
-      // 的 NotFoundError 从 tick 抛出（tick 在启动时同步跑）。
       const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
       if (!todoRow || todoRow.projectId !== row.projectId || !projectRow) {
         deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
@@ -157,8 +117,6 @@ export function createScheduler(
         });
       } catch (err) {
         if (err instanceof PhaseTransitionError) {
-          // 进行中/搁置 phase：本轮不触发。周期档仍滚动（同一落点不重复尝试）；
-          // once 保留 nextRunAt，todo 可重跑后的下一 tick 补触发 [设计]。
           if (isRecurring(row.kind) && row.at !== null) {
             updateNextRunAt(deps, row.id, computeNextRunAt(row.kind, row.at, row.tz, now));
           }
@@ -167,41 +125,18 @@ export function createScheduler(
         throw err;
       }
       if (!isRecurring(row.kind)) {
-        // once 触发后自动出队（r3 §9：GET /api/schedules?team= → []）。
         deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
       } else if (row.at !== null) {
         updateNextRunAt(deps, row.id, computeNextRunAt(row.kind, row.at, row.tz, now));
       }
     }
-    // #1303：闲置超过 7 天的 chief 未读在本 tick 置读。先于 fireDueChiefWakes——
-    // 到期 wake 入队会把 thread.updatedAt 刷成现在，后扫会把本该过期的旧未读留住。
     sweepIdleChiefUnread(deps, now);
-    // chief set_wake 到期触发（r5 §2 关注与提醒「约定到点回头核实」；BuildDeps
-    // 与 ChiefDeps 同形，直接复用）。
     fireDueChiefWakes(deps, now);
-    // #1136 机器行陈旧扫掠：先于步扫尾跑——同 tick 内把静默死机（无 FIN，SSE
-    // abort 抓不住）的机器翻 offline，下方两族步扫尾的「机器在线」判据立即
-    // 生效（挂起面/释放同拍起算，不再多等一个 tick）。只翻 online 不动步。
-    // 钟面取真实时钟而非本 tick 的 now：机器活性是 presence 数据的墙钟属性，
-    // 而定时触发的既有驱动约定（schedules/m5 集成）会用「未来时刻」手动 tick
-    // ——拿合成 now 判陈旧会把健康机器的 30s 新鲜列龄看成超龄误翻 offline
-    //（#1146 CI 首轮 m5-web-e2e 定时轮腿即死于此）。
     sweepStaleMachines(deps);
-    // #684 失联超时兜底：daemon 死亡后 pending/claimed chief 步永挂零反馈，
-    // tick 扫尾把失联回合按失败收进 #631 可见面（chief_turn_error 行 + toast）。
     sweepAbandonedChiefSteps(deps, now);
-    // #706/#862 失联扫尾：失联 claimed 步释放回 pending 供他机认领、无人认领
-    // 的 pending 步按失败收尾（step 事件 + build.errorMessage + todo → failed，
-    // 与机器报失败同漏斗）。
     sweepAbandonedBuildSteps(deps, now);
-    // #1219 僵尸 reconcile：queued 却无活步的 todo（旧 cancel 裸 UPDATE /
-    // 崩溃窗口遗留）回落释放——不修则 run_builds 409 queued→queued 停摆。
     sweepZombieQueuedTodos(deps, now);
-    // #1261 配额挂起探测：waiting_quota 步 probeAt 到期 → 释放回 pending
-    // （额度恢复自动续跑的 server 半；仍配额则 daemon 再报、退避重挂）。
     sweepQuotaWaitSteps(deps, now);
-    // #759 附件回收：tick piggyback，每小时最多扫一次（启动首 tick 即补扫）。
-    // sweep 自带 try/catch——回收失败不许打断定时闭环。
     if (gc !== undefined && gc !== null && now - lastGcAt >= ATTACHMENT_GC_INTERVAL_MS) {
       lastGcAt = now;
       try {
@@ -226,20 +161,16 @@ export function createScheduler(
     tick,
     start() {
       if (timer !== null) return;
-      tick(); // 启动即补扫（停机期间到期行下一 tick 语义，[设计]）
+      tick();
       timer = setInterval(() => tick(), opts.tickMs);
-      timer.unref?.(); // 测试/短命令不吊住事件循环
-      // #1150 CI 磨绿环：独立 60s 循环（启动即补扫 + 周期轮询；tick 不承载——
-      // tick 是同步契约，网络读只进本循环）。
+      timer.unref?.();
       if (ciPoller !== null) {
-        void ciPoller.sweep().catch(() => {}); // sweep 内部已容错，此处兜底不打进 start
+        void ciPoller.sweep().catch(() => {});
         ciTimer = setInterval(() => {
           void ciPoller.sweep().catch(() => {});
         }, CI_POLL_INTERVAL_MS);
         ciTimer.unref?.();
       }
-      // #1406 issue 进料：独立 5 分钟循环（启动即补扫；sweep 自带不重叠闸与
-      // 单项目容错，此处兜底 catch 防 interval 上抛）。
       if (issueIntake !== null) {
         void issueIntake.sweep().catch(() => {});
         intakeTimer = setInterval(() => {

@@ -1,10 +1,3 @@
-// 附件 grant 令牌（#310，r9 §4 三步 wire 的 grant 段）。HMAC-SHA256 签名：
-// 密钥派生 = sha256(secretBox.open(secretBox.seal('attachment-grant-key-v1')))
-// ——round-trip 出确定明文，SecretBox 密钥丢失/重生成 → 派生密钥同变（既存
-// grant 全部失效，符合 5min TTL 的预期）。WeakMap 缓存避免每请求重复派生。
-// token 格式 = base64url(JSON payload) + '.' + base64url(hmac)——非标准 JWT，
-// self-host 单机足够，避开第三方 jwt 包（缝纪律 01 §5）。
-
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { SecretBox } from '@cairn/shared';
 

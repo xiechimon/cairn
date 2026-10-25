@@ -1,20 +1,3 @@
-// 合并就绪闸的 GitHub 外壳（#1404 S4b，计划 docs/verify/1404/s4-plan.md §4.3–§4.5）：经注入的
-// 端口读 GitHub，把应答变成 GateInputs 里 GitHub 那一半（pr、repo.defaultBranch、checks、
-// compare、evidence），照 readiness.ts 里 GateInputs 的外壳契约（#1479）：
-// - 先读 PR；它不说自己是这张 PR（号或目标仓不对）、字段缺或类型不对，pr = null，其余不读。
-//   head 不是 40 位小写 SHA，PR 照报，按 head 读的都不读（没有 SHA 可按，不拿分支名代替）。
-// - 目标分支：头提交（compare 的 base）与分支保护的必需检查；再读规则集的必需检查，两份
-//   合起来。哪一份读不到，必需清单就是 null（不是 []）。
-// - compare 按 SHA 读 {目标分支头}...{PR head}，每页同一对 SHA、不发条件读；files 只取第 1
-//   页；commits 照读到的原样传（不去重、不排序）；各页的 total_commits 要一致。
-// - check runs 与 combined status 都按 PR head 的 SHA 读；check run 按 (app, 名字) 只留 id 最大
-//   的一条，必需检查绑了 app 的，那个 app 的那条排在前面（readiness 按名字取第一条）；status
-//   按 context（不分大小写）只留最新的一条，自家 cairn/merge-gate 那条另给状态写入用。
-// - 证据链：合格的链接（qualifyingEvidenceLinks）逐条按 contents 列它所在的目录，看文件在那个
-//   提交上在不在；一个在就停，至多探 5 个 (提交, 目录)。
-// 读全部串行；任何一次读被限流，本次求值停读，余下的按读不到处理。端口抛错按网络错。
-// 不读库、不取时钟（now 由调用方给）、不 import 闸外的东西（测试 merge-gate-imports）。
-
 import {
   EVIDENCE_PREFIX,
   HARNESS_REGRESSION_RESULT_NAME,
@@ -32,15 +15,11 @@ import {
 } from './readiness.js';
 
 const PER_PAGE = 100;
-/** 每样分页读的页数上限：compare 1,000 个提交、check runs 1,000 条、status 500 个 context、
- * 规则集 500 条。到了上限还没读全 = 没读全。 */
 const COMPARE_PAGES = 10;
 const RUN_PAGES = 10;
 const STATUS_PAGES = 5;
 const RULE_PAGES = 5;
-/** 每次求值至多探几个 (提交, 目录)。 */
 const EVIDENCE_PROBES = 5;
-/** contents 列目录的上限（GitHub 文档：目录至多给 1,000 个文件）。 */
 const DIRECTORY_CAP = 1000;
 
 export interface GateReadRequest {
@@ -48,13 +27,9 @@ export interface GateReadRequest {
   repo: string;
   prNumber: number;
   ticketRef: string;
-  /** 毫秒时间戳，只用来换算 retry-after。 */
   now: number;
 }
 
-/** 调用方持有、跨求值复用的缓存：bodies = 条件读的上次应答（etag 与原样的应答体；304 时拿
- * 原样的体重新投影，投影本身不缓存）；present = 已查到存在的 (仓库, 提交, 路径)（提交里的
- * 文件不会变，只记存在，不记不存在）。 */
 export interface GateReadCache {
   bodies: Map<string, { etag: string; body: unknown }>;
   present: Set<string>;
@@ -70,27 +45,20 @@ export interface GateEvidencePresence {
 
 export interface GateGithubFacts {
   pr: GateInputs['pr'];
-  /** → GateInputs.repo.defaultBranch。 */
   defaultBranch: string | null;
   checks: GateInputs['checks'];
   compare: GateInputs['compare'];
   evidence: GateEvidencePresence[];
   harnessEvalText: string | null;
-  /** compare 的 behind_by（目标分支领先 PR 几个提交）；P4-0 的 GateInputs.pr.baseBehindBy。 */
   baseBehindBy: number | null;
-  /** head 上自家 cairn/merge-gate 的当前值（状态写入只在值变化时写）；没有 = null，
-   * combined status 读不到 = 'unreadable'。 */
   ownStatus: { state: string; description: string | null } | null | 'unreadable';
-  /** 本次求值被限流：retryAt = 可再读的时刻（retry-after 优先，否则 x-ratelimit-reset）。 */
   rateLimited: { retryAt: number | null } | null;
-  /** 哪样读不到、为什么（日志用，不进 GateInputs）。 */
   notes: string[];
 }
 
 export interface GateCompareRead {
   compare: GateInputs['compare'];
   behindBy: number | null;
-  /** 读不到时最后的那个失败；读到了（哪怕形状不对）= null。 */
   failure: GateRawFailure | null;
 }
 
@@ -110,7 +78,6 @@ interface Reader {
 
 type Read = { ok: true; body: unknown } | { ok: false; status: number | null };
 
-/** 发一个请求：已被限流就不发（null）；端口抛错按网络错；限流记下可再读的时刻。 */
 async function send(r: Reader, request: () => Promise<GateRaw>): Promise<GateRaw | null> {
   if (r.limited !== null) return null;
   let res: GateRaw;
@@ -129,8 +96,6 @@ async function send(r: Reader, request: () => Promise<GateRaw>): Promise<GateRaw
   return res;
 }
 
-/** 读一个应答体。key 非 null = 条件读：缓存里有、且 reuse(上次的体) 为真时发 etag，304 拿缓存的
- * 原样体；应答带 etag 才进缓存。 */
 async function readBody(
   r: Reader,
   key: string | null,
@@ -157,8 +122,6 @@ async function readBody(
 }
 
 const always = () => true;
-
-// —— PR ——
 
 function projectPull(
   body: unknown,
@@ -205,8 +168,6 @@ function projectPull(
   };
 }
 
-// —— 目标分支与必需检查 ——
-
 interface Binding {
   context: string;
   appId: number | null;
@@ -217,8 +178,6 @@ const binding = (context: unknown, appId: unknown): Binding | null =>
     ? { context, appId: appId ?? null }
     : null;
 
-/** 分支应答 → 头提交与分支保护的必需检查。protected 为 false = 没有；为 true 却没有
- * protection 对象 = 读不到（null）。 */
 function projectBranch(body: unknown): { tip: string | null; classic: Binding[] | null } {
   if (!isObj(body)) return { tip: null, classic: null };
   const tip = isObj(body.commit) && isSha(body.commit.sha) ? body.commit.sha : null;
@@ -227,7 +186,6 @@ function projectBranch(body: unknown): { tip: string | null; classic: Binding[] 
   const rsc = body.protection.required_status_checks;
   if (rsc == null) return { tip, classic: [] };
   if (!isObj(rsc)) return { tip, classic: null };
-  // enforcement_level off：GitHub 不要求这些检查，闸也不要求（code review 第 7 条）。
   if (rsc.enforcement_level === 'off') return { tip, classic: [] };
   const list: unknown[] | null = Array.isArray(rsc.checks)
     ? rsc.checks.map((c) => (isObj(c) ? binding(c.context, c.app_id) : null))
@@ -238,8 +196,6 @@ function projectBranch(body: unknown): { tip: string | null; classic: Binding[] 
   return { tip, classic: list as Binding[] };
 }
 
-/** 规则集里 required_status_checks 规则的必需检查（逐页读到不满一页为止）；读不到、形状不对
- * 或到了页数上限 = null。 */
 async function readRules(
   r: Reader,
   req: GateReadRequest,
@@ -270,8 +226,6 @@ async function readRules(
   return null;
 }
 
-// —— compare ——
-
 function commitsOf(v: unknown): GateCompareCommit[] | null {
   if (!Array.isArray(v)) return null;
   const out: GateCompareCommit[] = [];
@@ -288,7 +242,6 @@ function commitsOf(v: unknown): GateCompareCommit[] | null {
 }
 
 async function readCompare(r: Reader, baseSha: string, headSha: string): Promise<GateCompareRead> {
-  // failure 只报 compare 自己的请求（共用的 Reader 上可能还留着别的读的失败）。
   r.failure = null;
   const unreadable = (): GateCompareRead => ({
     compare: 'unreadable',
@@ -326,7 +279,6 @@ async function readCompare(r: Reader, baseSha: string, headSha: string): Promise
   };
 }
 
-/** compare {baseSha}...{headSha}（S5a 按判定自报的 head 现算摘要用）。 */
 export function readCompareAt(
   port: GateGithubPort,
   baseSha: string,
@@ -338,8 +290,6 @@ export function readCompareAt(
     headSha,
   );
 }
-
-// —— head 上的检查 ——
 
 interface RunRow {
   id: number;
@@ -378,10 +328,6 @@ function statusOf(v: unknown): StatusRow | null {
   return { context, state, description, at };
 }
 
-/** 分页读一个列表（check runs 或 statuses）：读到 total_count 条、或一页为空、或到页数上限。
- * 第 1 页只在上次的第 1 页就是全部时才发 etag。complete = 读够了第 1 页说的条数（某页的
- * total_count 与第 1 页不同时就停，条数到不了）。
- * 任何一条形状不对、或 accept(第 1 页的体, 这一页的体) 为假 = null。 */
 async function readPaged<T>(
   r: Reader,
   key: string,
@@ -406,7 +352,6 @@ async function readPaged<T>(
     if (!Array.isArray(list)) return null;
     first ??= got.body;
     if (!accept(first, got.body)) return null;
-    // 各页的 total_count 不一致 = 不是同一次读：停下，条数对不上就不算读全。
     if (got.body.total_count !== first.total_count) break;
     for (const v of list as unknown[]) {
       const row = parse(v);
@@ -419,7 +364,6 @@ async function readPaged<T>(
   return { rows, complete: rows.length === first.total_count, first };
 }
 
-/** (app, 名字) 去重留 id 最大的一条，保持首次出现的位置；必需检查绑了 app 的排前面。 */
 function pickRuns(rows: RunRow[], bound: Binding[]): GateCheckRun[] {
   const key = (appId: number | null, name: string) => JSON.stringify([appId, name]);
   const latest = new Map<string, RunRow>();
@@ -438,8 +382,6 @@ function pickRuns(rows: RunRow[], bound: Binding[]): GateCheckRun[] {
   ].map(([, row]) => row.run);
 }
 
-/** context 不分大小写去重（GitHub：context 不分大小写），留 updated_at 最新的一条；时刻相同时
- * 留不是 success 的那条。保持首次出现的位置。 */
 function pickStatuses(rows: StatusRow[]): StatusRow[] {
   const latest = new Map<string, StatusRow>();
   for (const row of rows) {
@@ -455,8 +397,6 @@ function pickStatuses(rows: StatusRow[]): StatusRow[] {
   }
   return [...latest.values()];
 }
-
-// —— 证据链 ——
 
 type Listing = { kind: 'list'; entries: unknown[] } | { kind: 'absent' } | { kind: 'unknown' };
 
@@ -506,7 +446,6 @@ async function probeEvidence(
     const dirKey = `${sha}:${dir}`;
     let listing = listings.get(dirKey);
     if (listing === undefined) {
-      // 探测数到了上限：余下的链接记为读不到（null），不当成不存在（code review 第 4 条）。
       if (listings.size >= EVIDENCE_PROBES) {
         out.push({ sha, path, present: null });
         continue;
@@ -523,8 +462,6 @@ async function probeEvidence(
   }
   return out;
 }
-
-// —— 求值 ——
 
 export async function readGateGithubFacts(
   port: GateGithubPort,
@@ -592,8 +529,6 @@ export async function readGateGithubFacts(
     pr.baseBehindBy = c.behindBy;
   }
 
-  // 条件读的缓存键带 head 的 SHA：推送之后旧 head 的 ETag 不会拿去问新 head 的 URL（#1525 pr-gate
-  // 第 1 轮建议 2）。
   const runs = await readPaged(
     r,
     `runs:${repoKey}@${head}`,
@@ -615,7 +550,6 @@ export async function readGateGithubFacts(
   if (statuses !== null) {
     const picked = pickStatuses(statuses.rows);
     const own = picked.find((s) => s.context.toLowerCase() === MERGE_GATE_STATUS_CONTEXT);
-    // 没读全时自家 status 可能在没读的那页：按读不到算，状态写入不盲写（code review 第 2 条）。
     facts.ownStatus = !statuses.complete
       ? 'unreadable'
       : own === undefined

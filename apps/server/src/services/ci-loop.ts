@@ -1,87 +1,3 @@
-// #1150 CI 磨绿环（server 轮询器）：「任务发完 PR 并把 CI 磨到绿」的服务器半。
-// webhook 不可行（server 在 tailnet 内，GitHub 打不进来）——轮询是唯一通道；
-// 挂 scheduler 家族（services/scheduler.ts start/stop 生命周期），60s 自循环
-// ——不进 tick()：tick 是同步契约（shared Scheduler.tick: void），网络读
-// 不许把异步塞进同步面（GC 的 sweep 是纯 fs 所以能 piggyback，本模块不能）。
-//
-// 状态机（票面钉死三态）：
-//   pending（有 check 在跑/排队）→ 不动——「checks pending 被误判红」是票面
-//     列名的失败方式，判据钉「全部 completed 才判红绿」；
-//   red（有 failure/timed_out）→ 同 build 追加修复步（enqueueStep 续轮，同
-//     conv 同分支 = 原 PR 就地更新；prompt 带失败 check 名与日志摘要 + 轮号）；
-//   green（全 success；仓无 CI 超 grace 也算）→ phase 推进 review 闸（人工接管）。
-// #1403 段 3：check runs 按 PR 的 head SHA 读（先条件读 pulls/{n}），只认默认分支的
-//   必需检查名单（verdictOfCheckRuns）；必需检查 cancelled / neutral / skipped 等不算
-//   通过 = blocked（不推进、不派修复步，每轮提示一次）；mergeable_state dirty → 同分支
-//   [merge-conflict] 解冲突轮（review 上的卡先回 queued），behind 在 review 上只提示。
-// 死循环闸：同一 build 连续修复 N 轮（默认 3）仍红 → 停手，build.errorMessage
-//   落因 + todo → failed（转人工；既有 failed→review 恢复闸 #702 照常可用）。
-//
-// 纪律（票面）：
-// - 只读 GitHub（checks 读取），不写——本模块零 api.github.com 写面；
-// - 扫描面批量（一条 DB 查询取全候选）+ 条件请求（磨绿候选每轮一个 PR 条件读、一个
-//   check-runs 条件读，必需名单每仓 10 分钟两读；304 复用缓存判据），禁止逐 PR 全量拉——GitHub
-//   无跨 PR 批量端点，条件 GET 是最小合规形；429/404/网络 = fail-open 不动，
-//   下轮重试（读不到 ≠ 红）；
-// - build 已被人手动推进/关闭时不得回写：候选是扫描快照，动作前重读当前
-//   phase（两次：网络读之前、写面之前——网络窗是人工动作最可能落进的缝）；
-// - 有步在飞（hasActiveStep：已领取的任意步，排队中或等额度的非审核类步，以及
-//   人点的合并正在经 GitHub API 进行，#1403 段 2b）不叠派：读到的 checks 是推送前旧 head 的，等它跑完重评（幂等：同轮重复
-//   sweep 不追加第二条）。没人领（排队中或等额度）的 verify / review 步不挡
-//   磨绿与对账。
-//
-// 磨绿入口（completeStep 的 build 分支，builds.ts）：PR 交付（prNumber 在）
-// 的执行步成 → 停在 building（本模块推进 review）；无 PR → 既有直进 review
-// 不变。空 checks 宽限：PR head 上一条 check 都没有 = 「仓没配 CI」与「CI
-// 还没注册 check（竞态）」不可分——宽限内按 pending 等，超宽限按绿交人
-// （不把无 CI 仓永远锁在 building）。
-//
-// #1403 第二候选集（review 关口的 PR 对账）：相位 review、build 是 todo 的
-// 当前 build（todo.latestBuildId；更旧的被取代 PR 关了或合了都不算数，当前
-// build 没 PR 时也不拿旧 PR 替它收尾）、没有在飞的步（merge 步正在合并时不
-// 插手）。未连接 GitHub（匿名 60 次/小时按 IP 算）时每候选 5 分钟最多读一次；
-// 最近一小时里对账自己的匿名请求到 20 次、或对账与磨绿合计到 50 次时，对账
-// 停读（磨绿只记数，不受这两个上限拦）；pulls 读要给它可能跟着的 compare 留
-// 一次额度。每候选一次条件 GET pulls/{n}，合并后分支 head 与最后的 checkpoint
-// 不同时再加一次 compare（结果按 checkpoint 与 head 缓存，同一对只读一次）：
-// - 已合并（不论谁合的）进了默认分支、且合并时的 head 包含最后收尾的那一步的
-//   checkpoint（daemon 除审核步外每一步收尾都提交并推送，verify 步推的提交同样
-//   算）→ system 行写合并 SHA + done 收尾漏斗（与 merge 步成同一条）；
-// - 关闭未合并、紧接着的下一次读（隔一轮）仍关闭（为重跑 CI 关掉又重开 PR 不
-//   算；中间有步在飞没读、或有一次读不到，就从下一次读重新数）→ system 行 +
-//   build.errorMessage + failed。只认目标是默认分支的 PR（与已合并同一条规则）：
-//   从工作分支往别的分支开的另一张 PR（协作者的 backport 等；daemon 探测取编号
-//   最大的 open PR 记在 build 上，本 build 真正的 PR 可能还开着）关掉 → 每轮提示
-//   一次，不写关闭行、不打回、不停步；
-// - open → 不动；读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
-// - 写之前核对 PR 是本 build 的：PR 号是 daemon 按分支名查到的（gh pr list
-//   --head 只比分支名），公开仓里别人 fork 的同名分支开的 PR 也会被查到。head
-//   仓与 base 仓是同一个仓（同一份响应里按仓库 id 比：仓库改名或转移后照样
-//   对得上，fork 对不上）、head 分支是本 build 的工作分支才写；对不上（含 fork
-//   已删、head 仓为 null）→ 不收尾不打回，每轮提示一次，结果照常按 etag 缓存；
-//   响应缺 head 分支、base 分支、默认分支或 base 仓 id → 按读不到。
-// - build 上记的 PR 号只在非审核步收尾时由 daemon 探测刷新：人在 review 期间关掉
-//   它、从同一工作分支另开一张时，记的号就过时了（#1403 段 2）。确认关闭之后、打回
-//   之前，以及每轮第一次读到别人的 PR、提示之前，列一次本 build 工作分支往默认分支
-//   的 PR（`pulls?state=all&head=<owner>:<分支>&base=<默认分支>`，owner 取响应里目标仓
-//   现在的）：有本 build 自己的另一张（同一个仓、本 build 的工作分支、作者有写权限即
-//   author_association 为 OWNER / MEMBER / COLLABORATOR，段 2b；开着的，或比记的
-//   那张新的已合并的；已合并的都要比本 build 自己最近一张关闭未合并的新：更早合并的是
-//   旧事）→ 改记它（号与链接，只在 build 上记的还是原来那张时）、每轮落一行，不打回、不
-//   提示，下一轮读它；记的那张在列表里又开着或已合并 → 不写，下一轮重读它。关闭路径列不到 → 不写，
-//   下一次读再列，连续第二次列不到 → 按段 1 打回；别人的 PR 那条路每 10 分钟（未连接
-//   GitHub 时每小时）最多列一次，没有或列不到 → 照常提示。记的 PR 开着但不是本 build 的，
-//   同样走别人的 PR 那条路。
-// - system 行里引用的 GitHub 文本（分支名、合并者、合并提交）去掉控制字符与格式
-//   字符（双向覆盖、零宽字符）、截到 100 个字符（会话行经 chief / MCP 的会话读
-//   工具交给 agent，也在 web 时间线上显示）。
-// 每个结局每一轮只报告一次（轮界 = 本 build 最近一个 build / plan 步，#931
-// 返工复用同一个 build 时从新的一轮算起）：本轮已有完成行（合并步或对账写的）
-// 就不再按「已合并」收，已有对账的关闭行就不再按「已关闭」收。人在报告之后把
-// 卡拖回 review 是人的决定；报告之前人手拖到已完成或已关闭再拖回，报告照样
-// 来一次。不看时钟：CI 一绿就合并（含 GitHub auto-merge）时卡在合并之后才进
-// review，照样收尾。收尾时停掉没人领的 verify / review 步。
-
 import { conversationBranch } from '@cairn/shared';
 import { and, desc, eq, isNotNull, like, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -124,72 +40,44 @@ import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD, CI_FIX_PUSH_RULE } from './re
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
-/** 轮询节奏（票面：60s 扫）。 */
 export const CI_POLL_INTERVAL_MS = 60_000;
 
-/** 死循环闸阈值：同一 build 连续修复 N 轮仍红 → 停手转人工。 */
 export const CI_FIX_ROUNDS_MAX = 3;
 
-/** 空 checks 宽限（[设计]：够 GitHub Actions 在新 head 上注册 check；仓真没
- * CI 时延迟到此推闸交人）。 */
 export const CI_EMPTY_CHECKS_GRACE_MS = 300_000;
 
-/** 未连接 GitHub 时 PR 对账的最短重读间隔（匿名主限流 60 次/小时，#931 /
- * #1217 守卫同用这份额度）。 */
 export const CI_ANON_READ_INTERVAL_MS = 300_000;
 
-/** compare 答 404（提交不在 GitHub 上）或读不到之后，同一对提交的最短重读间隔。 */
 export const CI_MISSING_COMPARE_RECHECK_MS = 600_000;
 
-/** 未连接 GitHub 时对账自己每小时最多发的匿名请求（pulls 与 compare 合计）。 */
 export const CI_ANON_READS_PER_HOUR = 20;
 
-/** 对账与磨绿合计每小时最多发的匿名请求：GitHub 的匿名主限流 60 次/小时按 IP
- * 算，留 10 次给 #931 / #1217 守卫。磨绿只记数、不受它拦，对账在总数满了时
- * 不读。 */
 export const CI_ANON_IP_READS_PER_HOUR = 50;
 
-/** 记的 PR 不是本 build 的时候，隔这么久再列一次工作分支上的 PR（本 build 自己的 PR 可能
- * 之后才开出来或合并；列表读不到时同样隔这么久再试）。 */
 export const CI_FOREIGN_RELIST_MS = 600_000;
 
-/** 同上，未连接 GitHub 时（匿名额度按 IP 算，对账自己每小时只有 20 次）。 */
 export const CI_FOREIGN_RELIST_ANON_MS = 3_600_000;
 
-/** PR 读到关闭未合并之后，隔这么久再读到仍关闭才打成 failed：为重跑 CI 关掉又
- * 重开 PR 很常见，一次 sweep 落在中间不算（略短于一轮 sweep，下一轮即确认）。 */
 export const CI_CLOSED_CONFIRM_MS = 50_000;
 
-/** 修复步 prompt 头行标记：修复轮计数判据（marker prompt 的 build 步 = 一轮
- * 修复；原执行步/confirm 步无 marker 不计——与 buildRestartPrompt 等模板步
- * 的识别同律）。 */
 export { CI_FIX_PROMPT_HEAD };
 
-/** 解冲突步指令头行 marker（#1403 段 3：PR 与默认分支冲突 → 同分支把默认分支合进来）。
- * 轮数计数按它（与 [ci-fix] 各数各的）。 */
 export const CI_MERGE_CONFLICT_PROMPT_HEAD = '[merge-conflict]';
 
-/** 解冲突轮上限：同一 build 上已跑过这么多轮仍冲突 → 不再派，提示交人。 */
 export const CI_MERGE_CONFLICT_ROUNDS_MAX = 2;
 
-/** 必需检查名单的缓存时长（每个仓库与默认分支一份；分支保护很少变）。 */
 export const CI_REQUIRED_CHECKS_TTL_MS = 600_000;
 
-/** fix prompt 里单条失败摘要的截断（prompt 是会话注入位，不给无界长文本）。 */
 const CI_FIX_SUMMARY_MAX = 800;
 
-/** 对账日志口（scheduler 接线传 pino；每 sweep 一行：候选数 × 三态落位）。 */
 export interface CiPollLogger {
   info(obj: object, msg: string): void;
 }
 
 export interface CiPoller {
-  /** 单轮扫描：批量取候选 → 每候选一次条件 GET → 按三态落位。 */
   sweep(now?: number): Promise<void>;
 }
 
-/** 失败 check 的最小材料（fix prompt 位）：name + conclusion + 日志摘要
- * （GitHub 在 check-runs 端点给的 output.summary/title，真实日志不在轮询面）。 */
 export interface CiCheckFailure {
   name: string;
   conclusion: string;
@@ -198,33 +86,14 @@ export interface CiCheckFailure {
 
 export type CheckVerdict =
   | { state: 'green' }
-  /** missing：必需检查里还没有任何 run 的名字（其余必需检查都已完成且没有可修的失败）。
-   * 超过 CI_EMPTY_CHECKS_GRACE_MS 仍缺 → 调用方按 blocked 提示（conclusion 记 missing）。 */
   | { state: 'pending'; missing?: string[] }
-  /** PR head 零 check run（仓无 CI / CI 未注册竞态——宽限归调用方；只在没有必需名单时出现）。 */
   | { state: 'empty' }
   | { state: 'red'; failures: CiCheckFailure[] }
-  /** 有检查结论既不是通过也不是可修的失败（cancelled，或必需检查 neutral / skipped /
-   * stale）：不推进、不派修复步，提示交人（#1403 段 3）。 */
   | { state: 'blocked'; checks: { name: string; conclusion: string }[] };
 
-/** 可修的失败结论（派 [ci-fix]）。action_required 不在内：等人批准（fork 的 workflow、
- * 部署），agent 修不了——按不算通过提示交人。 */
 const FIXABLE = new Set(['failure', 'timed_out']);
-/** 没有必需名单时挡住的结论（其余 neutral、skipped 等不挡）。 */
 const BLOCKING_UNREQUIRED = new Set(['cancelled', 'action_required']);
 
-/** 判定（#1403 段 3：按 PR head SHA 读到的 check runs，只认必需检查名单）。同名的 run
- * （不同 app 或 workflow 报的同一个名字）合成一个名字看：有没完成的 → pending；有可修的
- * 失败且没有 success → red；有一个 success → 这个名字过。
- * - 必需名单非空：只看名单里的名字。有没完成的 → pending；failure / timed_out → red
- *   （action_required 等人批准，agent 修不了，按不算通过）；某个名字没有 run → pending（missing）；有名字没有 success
- *   （cancelled、neutral、skipped、stale）→ blocked；否则 green。
- * - 必需名单为空（默认分支没有保护也没有规则）：看全部 run。零个 → empty；有没完成的 →
- *   pending；failure / timed_out → red；某个名字没有 success 而有 cancelled 或
- *   action_required → blocked；其余
- *   green：没有必需检查时 neutral 与 skipped 本就不挡。
- * pending 先于红绿判（「pending 被误判红」的闸）。 */
 export function verdictOfCheckRuns(runs: GithubCheckRun[], required: string[] = []): CheckVerdict {
   const counted = required.length > 0 ? runs.filter((r) => required.includes(r.name)) : runs;
   if (required.length === 0 && counted.length === 0) return { state: 'empty' };
@@ -240,7 +109,6 @@ export function verdictOfCheckRuns(runs: GithubCheckRun[], required: string[] = 
   if (failures.length > 0) return { state: 'red', failures };
   const missing = required.filter((name) => !counted.some((r) => r.name === name));
   if (missing.length > 0) return { state: 'pending', missing };
-  // 每个名字一项（同名多个 run 的结论合在一起），提示里不重复。
   const blocked = new Map<string, Set<string>>();
   for (const r of counted) {
     if (passed.has(r.name)) continue;
@@ -256,26 +124,18 @@ export function verdictOfCheckRuns(runs: GithubCheckRun[], required: string[] = 
   return { state: 'green' };
 }
 
-/** 解冲突轮在 review 上、本 build 已有 verify 步时落的行：磨绿回到 review 时据它（在最近
- * 一条 verify 步之后有这一行）为合并后的 head 重排一条 verify（#1403 段 3）。 */
 export const CI_MERGE_CONFLICT_VERIFY_NOTE =
   '解冲突轮会把默认分支合进来、改动交付：之前的验证是冲突前的提交（还没人领的已停掉），检查通过、回到审核关口时重排一条验证步。';
 
-/** 解冲突轮在 review 上停掉了还没人领的 AI 审核步时落的行（审核步不自动重排：要几位、谁来
- * 审是人发起时定的）。 */
 export const CI_MERGE_CONFLICT_REVIEW_NOTE =
   '解冲突轮停掉了还没人领的 AI 审核步（它审的是冲突前的提交）；回到审核关口后如需审核，请重新发起。';
 
-/** 解冲突步指令（#1403 段 3，spec 23 同分支续轮）：同一分支上把默认分支合进来、解冲突、
- * 提交并推送；不 rebase、不 force-push、不新开分支或 PR。 */
 export function buildMergeConflictPrompt(args: {
   prNumber: number;
   prUrl: string | null;
   defaultBranch: string;
   round: number;
 }): string {
-  // 默认分支名来自 GitHub（ref 名可以含 ; $ | & 与反引号）：命令里按 shell 单引号引起来，
-  // 说明文字里过 githubText。
   const quote = (v: string) => `'${v.replaceAll("'", `'\\''`)}'`;
   return [
     `${CI_MERGE_CONFLICT_PROMPT_HEAD} 解冲突轮（第 ${args.round} 轮）：PR #${args.prNumber}${args.prUrl ? `（${args.prUrl}）` : ''} 与默认分支「${githubText(args.defaultBranch)}」冲突，GitHub 合并不了。`,
@@ -285,9 +145,6 @@ export function buildMergeConflictPrompt(args: {
   ].join('\n');
 }
 
-/** 修复步指令（step.prompt → claim instruction 位，daemon 以「任务文本 +
- * 指令」组合串进会话，#720 同律）。头行带 marker（计数判据），正文带失败
- * check 名与日志摘要 + 轮号 + 推送纪律（同一分支，不合并）。 */
 export function buildCiFixPrompt(args: {
   prNumber: number;
   prUrl: string | null;
@@ -310,9 +167,6 @@ export function buildCiFixPrompt(args: {
   ].join('\n');
 }
 
-/** 已完成的轮数（轮上限计数）：头行是 head marker 的 build 步 = 一轮（[ci-fix] 与
- * [merge-conflict] 各数各的）。无状态过滤——扫描集已挡在飞步（pending/claimed 跳过），
- * 此处全部是终态步。 */
 function countMarkedRounds(db: Db, buildId: string, head: string): number {
   return db
     .select({ id: step.id })
@@ -325,59 +179,34 @@ function deadLoopMessage(rounds: number): string {
   return `CI 检查连续 ${rounds} 轮自动修复仍未通过（死循环闸：连续 ${CI_FIX_ROUNDS_MAX} 轮）——停止追加修复步，转人工处理。`;
 }
 
-/** ETag 缓存行（进程内存——单进程 server；重启失缓存 = 下轮多一次全量读，
- * 无害）。runs 仅在 304 时复用（200 恒刷新），判据每轮按当时的必需名单重算。 */
 interface PrChecksCacheEntry {
-  /** 这份 etag 对应的提交（PR 的 head SHA；不是本 build 开着的 PR 时为分支名）。变了不带它。 */
   sha: string;
   etag: string | null;
-  /** 上次读到的 check runs：304 时按当时的必需名单重判（名单可能已刷新）。 */
   runs: GithubCheckRun[];
-  /** 首见「空 checks」或「必需检查缺 run」的时刻（宽限锚点；别的判据恒 null）。 */
   waitSince: number | null;
 }
 
 interface CiPollTally {
   candidates: number;
-  /** pending / 空 checks 宽限内：不动。 */
   pending: number;
-  /** 红 → 追加修复步。 */
   appended: number;
-  /** 绿（含空超宽限）→ 推 review 闸。 */
   advanced: number;
-  /** 死循环闸 → failed 转人工。 */
   failed: number;
-  /** 已推进/关闭/在飞步/形态不齐：不动。 */
   skipped: number;
-  /** 读不到（限流/404/网络）：fail-open 下轮重试。 */
   unreadable: number;
-  /** 单候选意外异常（不杀整轮）。 */
   errors: number;
-  /** #1403 review 关口候选数（todo 当前 build 带 PR）。 */
   reviewCandidates: number;
-  /** 对账：PR 仍 open，或关闭了还待下一轮确认。 */
   reviewPending: number;
-  /** 对账：形态不齐、有步在飞、网络窗里相位变了、匿名额度不够：不动。 */
   reviewSkipped: number;
-  /** 对账：读不到（限流/404/网络/响应缺字段）：fail-open 下轮重试。 */
   reviewUnreadable: number;
-  /** 对账：PR 的 head 仓或分支不是本 build 的（fork 的同名分支、已删的 fork）：不写。 */
   reviewForeign: number;
-  /** PR 已在 GitHub 合并 → done。 */
   merged: number;
-  /** PR 关闭未合并 → failed。 */
   closedUnmerged: number;
-  /** 已合并但分支上有合并没带走的提交，或合进了非默认分支；关闭未合并而目标不是默认
-   * 分支：提示（每轮一次）后留在 review；之后每次 sweep 照样计在这里。review 各项
-   * 之和 = reviewCandidates（单候选异常记进 errors）。 */
   hinted: number;
-  /** 本轮已报告过这个结局（人后来把卡拖回了 review）：交给人。 */
   settledBefore: number;
-  /** 记的 PR 关闭了或不是本 build 的，工作分支上另有本 build 的 PR：改记它。 */
   adopted: number;
 }
 
-/** PR 对账的条件读缓存行（etag + 上轮 PR 状态；304 时复用）。 */
 interface PullCacheEntry {
   etag: string | null;
   pull: GithubPull | null;
@@ -394,47 +223,26 @@ export function createCiPoller(
 ): CiPoller {
   const cache = new Map<string, PrChecksCacheEntry>();
   const pullCache = new Map<string, PullCacheEntry>();
-  /** 磨绿的 PR 条件读缓存（#1403 段 3：head SHA 与 mergeable_state 从这里来）。 */
   const grindPullCache = new Map<string, PullCacheEntry>();
-  /** 必需检查名单（键 = 仓库全名与默认分支；CI_REQUIRED_CHECKS_TTL_MS 内复用）。names null =
-   * 读不到：只在同一轮 sweep 里复用（同仓的下一张卡不再读），下一轮重读。 */
   const requiredCache = new Map<string, { at: number; names: string[] | null }>();
-  /** 匿名读的上次时刻（按 PR）。 */
   const anonReadAt = new Map<string, number>();
-  /** compare 结果（键 = PR + checkpoint + head；两个固定提交之间的结果不变，
-   * 读到即可复用；404 例外：那个提交之后可能被推上去，过 CI_MISSING_COMPARE_
-   * RECHECK_MS 再读）。 */
   const compareCache = new Map<
     string,
     Map<string, { status: string; at: number; failures: number }>
   >();
-  /** 记的 PR 不是本 build 的候选上次列工作分支 PR 的时刻（键 = build + 记的 PR）。 */
   const foreignListedAt = new Map<string, number>();
-  /** 关闭路径上连续列不到工作分支 PR 的次数（按 PR）：到第二次就按段 1 打回。 */
   const listFailures = new Map<string, number>();
-  /** 每个 review 候选上次读 pulls 的时刻（匿名额度轮着用：最久没读的先读）。 */
   const lastReadByBuild = new Map<string, number>();
-  /** 首次读到关闭未合并的时刻（按 PR）。确认读要紧跟在它之后：读到 open、有步在飞
-   * 而没读（或读的网络窗里步开始）、读不到，都清掉。未连接 GitHub 时的 5 分钟节流与
-   * 额度不够的跳过不清：两次读之间本来就隔着它们，清了就永远确认不了。 */
   const closedSeenAt = new Map<string, number>();
-  /** 关闭的看到时刻与关闭路径上列不到的次数一起清（一次关闭的确认从头数）。 */
   function forgetClose(key: string): void {
     closedSeenAt.delete(key);
     listFailures.delete(key);
   }
-  /** 已确认的「本轮已报告」与「提示已落」（只缓存肯定结果，免得每轮查表）。 */
   const knownRows = new Set<string>();
-  /** 本轮 sweep 见到的候选的缓存键（review / 磨绿各一份）；sweep 末尾据此清掉
-   * 别的缓存行。 */
   const liveKeys = new Set<string>();
   const grindKeys = new Set<string>();
-  /** 上一轮 sweep 还在跑（网络读慢）时下一轮不进来：缓存与匿名额度按单轮设计。 */
   let sweeping = false;
-  /** 本轮 sweep 开始的真实时刻：一次读真正发生的时刻 = now + 已过去的时间
-   * （慢的一轮里，排在后面的读可能比 sweep 开始晚几十秒）。 */
   let sweepStartedAt = 0;
-  /** 最近一小时的匿名请求时刻：对账自己的，与对账加磨绿的（按 IP 的总数）。 */
   const anonOwn: number[] = [];
   const anonAll: number[] = [];
 
@@ -448,14 +256,11 @@ export function createCiPoller(
     );
   }
 
-  /** 磨绿的匿名读（count 次）：只记进按 IP 的总数，不受额度拦。 */
   function recordGrindAnonRead(now: number, count = 1): void {
     anonFree(now);
     for (let i = 0; i < count; i += 1) anonAll.push(now);
   }
 
-  /** 取一次对账的匿名额度；need = 这次读之后还要留出的次数（pulls 读要给它
-   * 可能跟着的 compare 留一次）。 */
   function takeAnonRead(now: number, need = 1): boolean {
     if (anonFree(now) < need) return false;
     anonOwn.push(now);
@@ -463,7 +268,6 @@ export function createCiPoller(
     return true;
   }
 
-  /** 本轮（since 起）是否已有这一行；肯定结果记进 knownRows，之后不再查表。 */
   function rowKnown(buildId: string, content: string, since: number): boolean {
     const memo = `${buildId}\u0000${since}\u0000${content}`;
     if (knownRows.has(memo)) return true;
@@ -472,8 +276,6 @@ export function createCiPoller(
     return true;
   }
 
-  /** compare 读回来之后（await 之后）还轮得到对账写：卡仍在 review 且是当前
-   * build、没有步开始在飞、本轮还没有完成行（合并步刚收过尾）。 */
   function stillOurs(cand: { buildId: string; todoId: string }, since: number): boolean {
     return (
       freshReviewRow(cand.todoId, cand.buildId) !== null &&
@@ -482,7 +284,6 @@ export function createCiPoller(
     );
   }
 
-  /** 失败收尾：build.errorMessage 落因 + 发 build 文档 + todo → failed。 */
   function failWithMessage(
     cand: { buildId: string; todoId: string },
     teamId: string,
@@ -494,7 +295,6 @@ export function createCiPoller(
     setTodoPhase(deps, cand.todoId, 'failed');
   }
 
-  /** 对账写进本 build 会话的 system 行（提示、合并行、关闭行）。 */
   function writeSystemRow(buildId: string, content: string): void {
     insertMessageRow(deps, buildId, {
       id: newRecordId(),
@@ -504,12 +304,6 @@ export function createCiPoller(
     });
   }
 
-  /** 解冲突轮（#1403 段 3，spec 23 同分支续轮）：PR 与默认分支冲突 → 同一 build 派一条
-   * [merge-conflict] 执行步；先停掉没领走的 verify / review 步（交付要变，它们验的是旧 head；
-   * 已有 verify 的 build 回 review 时磨绿重排一条，见 CI_MERGE_CONFLICT_VERIFY_NOTE），review
-   * 上的卡再回 queued（领取时进 building，磨绿接手）。已跑满 CI_MERGE_CONFLICT_ROUNDS_MAX 轮仍冲突 → 不再派：building 上按死循环闸
-   * 转 failed（同 [ci-fix]），review 上每轮提示一次、卡留在关口。调用方已核对卡仍在原相位、
-   * 是本 build 开着的 PR、没有步在飞。 */
   function mergeConflictRound(
     cand: { buildId: string; todoId: string },
     teamId: string,
@@ -527,15 +321,12 @@ export function createCiPoller(
       hintOnce(cand.buildId, text, roundStart(deps, cand.buildId));
       return 'hinted';
     }
-    // 本 build 已有 verify 步（没人领的、已跑完的）：解冲突轮把默认分支合进交付，回到 review
-    // 时为合并后的 head 重排一条（building 上复用 build 的返工轮同样）。
     const reverify =
       deps.db
         .select({ id: step.id })
         .from(step)
         .where(and(eq(step.buildId, cand.buildId), eq(step.kind, 'verify')))
         .get() !== undefined;
-    // 没人领的 verify / review 步验的是冲突前的提交：building 上（复用 build 的返工轮）同样停掉。
     const stopsReview = stopUnclaimedGateSteps(deps, cand.buildId).includes('review');
     if (fromReview) setTodoPhase(deps, cand.todoId, 'queued');
     enqueueStep(
@@ -550,9 +341,6 @@ export function createCiPoller(
     return 'appended';
   }
 
-  /** cairn 刚推送（CI_EMPTY_CHECKS_GRACE_MS 内收尾的执行 / 合并步回报了提交）而 PR 读到的
-   * head 还不是它：GitHub 还没跟上（head 与 mergeable_state 落后于推送），本轮不按这个 head
-   * 判红、解冲突。过了宽限仍不是它 → 按 PR 的 head 判（人可能在上面又推了提交）。 */
   function pushNotSeen(buildId: string, headSha: string | null, now: number): boolean {
     const last = deps.db
       .select({ sha: step.checkpointCommit, at: step.finishedAt })
@@ -561,8 +349,7 @@ export function createCiPoller(
         and(
           eq(step.buildId, buildId),
           eq(step.status, 'done'),
-          ne(step.kind, 'review'), // 审核步不提交（同 lastPushedCheckpoint）
-          // 没推送的步（没有提交）不算：它不能盖住之前那次推送（同 lastPushedCheckpoint）。
+          ne(step.kind, 'review'),
           isNotNull(step.checkpointCommit),
           isNotNull(step.finishedAt),
         ),
@@ -577,23 +364,11 @@ export function createCiPoller(
     );
   }
 
-  /** 同一条提示每轮（since 起）只落一次（按内容去重）。不计数：每次 sweep 由调用方
-   * 按卡留在 review 的原因计一次。 */
   function hintOnce(buildId: string, content: string, since: number): void {
     if (rowKnown(buildId, content, since)) return;
     writeSystemRow(buildId, content);
   }
 
-  /** 本 build 工作分支往默认分支的 PR（见文件头）。只认本 build 自己的：head 仓与 base
-   * 仓都是记的那张 PR 的目标仓（按仓库 id）、head 分支是本 build 的工作分支、目标是默认
-   * 分支。记的那张在两次读之间被重开或合并（列表里它开着或已合并）→ 返回它自己，调用方
-   * 不写、下一轮重读。
-   * 否则开着的那张优先；没有开着的，取已合并的里编号最大的一张，但只认比「人最近关掉
-   * 不要的那张」新的：同一个分支可以先后开过好几张 PR，本 build 自己的、关闭未合并的里
-   * 编号最大的那张之前合并的是旧事，不是替身（人关掉新的这张，就是不要这次改动）。关闭
-   * 路径把记的那张的号作下限传进来（它就是被关掉的那张），别人的 PR 那条路传 0（记的号
-   * 是别人的）。head 过滤用响应里目标仓现在的 owner（仓库改名或转移后存的名字会过时）。
-   * 'unreadable' = 列表读不到；'skipped' = 匿名额度不够。 */
   async function ownBranchPull(
     branch: string,
     target: { owner: string; repo: string },
@@ -619,14 +394,8 @@ export function createCiPoller(
       (p) => p.number === recorded.number && (p.state === 'open' || p.merged),
     );
     if (changed !== undefined) return changed;
-    // 改记只收有写权限的作者开的 PR（#1403 段 2b，#1489 pr-gate 建议 7）：人关掉本 build 的
-    // PR 表示不要这次改动，之后没有写权限的人从同一分支另开一张，不能把这个决定翻过来。
     const adoptable = own.filter((p) => WRITE_AUTHOR_ASSOCIATIONS.has(p.authorAssociation ?? ''));
     const open = adoptable.filter((p) => p.state === 'open');
-    // 拒绝的下限看本 build 的全部 PR、不按作者筛（#1509 pr-gate 第 2 轮 correctness 建议）：
-    // 作者没有写权限的 PR 可能是维护者关掉的（不要这次改动），也可能是作者自己关的；列表应答
-    // 里没有关闭人，分不出来。两头取不改记：误判的代价是卡打回 failed、等人处理，反过来是把
-    // 维护者已否掉的旧 PR 改记回来。
     const rejected = own.reduce(
       (n, p) => (p.state === 'closed' && !p.merged && p.number > n ? p.number : n),
       mergedAfter,
@@ -638,9 +407,6 @@ export function createCiPoller(
     );
   }
 
-  /** 改记本 build 的 PR（号与链接，链接按仓名与号拼，不取响应里的）、发 build 文档、落
-   * 一行说明（只引 PR 号与本 build 自己的工作分支名；同一句每轮一次）。只在 build 上记的
-   * 仍是 from 时改：列表读的网络窗里 daemon 探测可能已改记了更新的值。没改成 → false。 */
   function adoptPull(
     buildId: string,
     teamId: string,
@@ -666,13 +432,11 @@ export function createCiPoller(
     return true;
   }
 
-  /** 读当前 phase，不在磨绿集 = 不动（④：已被人工推进/关闭/终态）。 */
   function freshGrindRow(todoId: string) {
     const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
     return row !== undefined && row.phase === 'building' ? row : null;
   }
 
-  /** 读当前 phase 与当前 build：仍在 review 且 build 仍是 todo 的当前 build。 */
   function freshReviewRow(todoId: string, buildId: string) {
     const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
     return row !== undefined && row.phase === 'review' && row.latestBuildId === buildId
@@ -680,8 +444,6 @@ export function createCiPoller(
       : null;
   }
 
-  /** github 形态目标（owner/repo）；非 github、缺仓名或仓名不合法（含 `.` / `..`
-   * 段，#1466 githubRepoOfProject 同一道闸）→ null。 */
   function githubTarget(todoRow: { projectId: string; teamId: string }) {
     const projRow = projectOfTodo(deps.db, todoRow);
     const ref = githubRepoOfProject(projRow);
@@ -700,7 +462,6 @@ export function createCiPoller(
     tally: CiPollTally,
   ): Promise<void> {
     const todoRow = freshReviewRow(cand.todoId, cand.buildId);
-    // 只取 PR 号：build 行的 changes 列是整份 diff，每轮每候选不必读它。
     const buildRow = deps.db
       .select({ prNumber: build.prNumber, prUrl: build.prUrl })
       .from(build)
@@ -720,8 +481,8 @@ export function createCiPoller(
     const key = `${target.fullName}#${prNumber}`;
     liveKeys.add(key);
     if (hasActiveStep(deps, cand.buildId)) {
-      forgetClose(key); // 这段没读：之前读到的关闭不再算数
-      tally.reviewSkipped += 1; // merge 步在飞：合并结果由它收尾
+      forgetClose(key);
+      tally.reviewSkipped += 1;
       return;
     }
     const token = githubTokenOrNull(deps, target.teamId);
@@ -729,8 +490,6 @@ export function createCiPoller(
     let pull: GithubPull | null;
     let readAt = now;
     if (entry?.pull?.merged === true) {
-      // 合并是终态：卡留在 review（提示、人拖回）时不再重读，不耗读额度。缺合并
-      // 判据字段的响应不留在缓存里（见下），之后照常节流重读。
       pull = entry.pull;
     } else {
       if (token === null) {
@@ -758,14 +517,9 @@ export function createCiPoller(
       pullCache.set(key, { etag: page.etag, pull });
     }
     const branch = conversationBranch(cand.buildId);
-    // 字段不齐时不算（下文按读不到）。
     const foreign = pull !== null && hasPullFields(pull) && !isOwnPull(pull, branch);
-    // open → 不动；不是本 build 的 open PR 除外：走下文别人的 PR 那条路（提示，或改记本
-    // build 自己的 PR），否则本 build 真正的 PR 合并了也看不到。
     if (pull === null || (pull.state === 'open' && !foreign)) {
       forgetClose(key);
-      // 开着的本 build 的 PR（#1403 段 3）：dirty → 回 queued 派解冲突步；behind → 提示
-      // （human 策略下不替人 update-branch）。写之前重读（读 PR 的网络窗）。
       const state = pull?.mergeableState ?? null;
       if (
         pull !== null &&
@@ -800,7 +554,6 @@ export function createCiPoller(
       tally.reviewPending += 1;
       return;
     }
-    // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
     if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(deps, cand.buildId)) {
       forgetClose(key);
       tally.reviewSkipped += 1;
@@ -808,8 +561,6 @@ export function createCiPoller(
     }
     const closedText = prClosedUnmergedRow(prNumber);
     const since = roundStart(deps, cand.buildId);
-    // PR 是本 build 的、目标是默认分支才写（见文件头）：缺这几个字段的响应不当终态
-    // 缓存，下次读不带它的 etag（304 会交回同一份）。
     if (!hasPullFields(pull)) {
       pullCache.delete(key);
       forgetClose(key);
@@ -822,12 +573,8 @@ export function createCiPoller(
       defaultBranch: pull.defaultBranch,
       owner: pull.baseOwner ?? target.owner,
     };
-    // 不是本 build 的 PR：结果留在缓存里（PR 的 head 不会变）。
     if (foreign) {
       const foreignText = `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`;
-      // 先看工作分支上有没有本 build 自己的 PR（每 CI_FOREIGN_RELIST_MS 最多列一次，未连接
-      // GitHub 时每 CI_FOREIGN_RELIST_ANON_MS：它可能之后才开出来或合并）；没有、列不到或
-      // 额度不够 → 照常提示（每轮一次）。记的 PR 换了就从头算。
       const listKey = `${cand.buildId}\u0000${key}`;
       const listedAt = foreignListedAt.get(listKey);
       const relistMs = token === null ? CI_FOREIGN_RELIST_ANON_MS : CI_FOREIGN_RELIST_MS;
@@ -852,7 +599,7 @@ export function createCiPoller(
             since,
           );
           if (adopted) tally.adopted += 1;
-          else tally.reviewSkipped += 1; // build 上记的 PR 在网络窗里换了：下一轮按新的读
+          else tally.reviewSkipped += 1;
           return;
         }
       }
@@ -860,7 +607,6 @@ export function createCiPoller(
       tally.reviewForeign += 1;
       return;
     }
-    // 本轮（since 起）已报告过这个结局（完成行 / 对账的关闭行）→ 交给人。
     if (rowKnown(cand.buildId, pull.merged ? DONE_ROW : closedText, since)) {
       tally.settledBefore += 1;
       return;
@@ -875,14 +621,10 @@ export function createCiPoller(
         tally.hinted += 1;
         return;
       }
-      // 合并之后同分支又推了提交（修复轮，或 verify 步推的提交：daemon 除审核步外
-      // 每一步收尾都提交并推送）：那个提交不在这次合并里，不收尾。head 包含最后
-      // 推送的 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算（最后
-      // 推送 = 最后收尾，取法见 lastPushedCheckpoint）。
       const checkpoint = lastPushedCheckpoint(deps, cand.buildId, { mergeSteps: false });
       if (checkpoint !== null && pull.headSha === null) {
-        pullCache.delete(key); // 同上：缺字段的响应不当终态缓存
-        tally.reviewUnreadable += 1; // 合并时的 head 不明，无法核对 checkpoint 在不在里面
+        pullCache.delete(key);
+        tally.reviewUnreadable += 1;
         return;
       }
       if (checkpoint !== null && pull.headSha !== null && checkpoint !== pull.headSha) {
@@ -897,7 +639,6 @@ export function createCiPoller(
             ? null
             : cached.status;
         if (status === null) {
-          // 不是 40 位 SHA 时 compare 不发请求（答 invalid），不占匿名额度。
           const sendsRequest = isFullSha(checkpoint) && isFullSha(pull.headSha);
           if (token === null && sendsRequest && !takeAnonRead(now)) {
             tally.reviewSkipped += 1;
@@ -916,9 +657,6 @@ export function createCiPoller(
           pairs.set(cmpKey, { status, at: now, failures });
         }
         if (status === 'unreadable') {
-          // 读不到（GitHub 出错、超时、限流）：10 分钟内不重读；连续两次读不到
-          // 才提示一次（一次超时之后下一次就读到的常见情形不留陈旧提示）。
-          // 写提示前同样复查（㉘）：网络窗里卡离开 review、有步开始在飞或本轮已报告 → 不写。
           if ((pairs.get(cmpKey)?.failures ?? 0) >= 2 && stillOurs(cand, since)) {
             hintOnce(
               cand.buildId,
@@ -963,18 +701,12 @@ export function createCiPoller(
       tally.merged += 1;
       return;
     }
-    // 关闭要紧接着的下一次读（隔一轮）还读到才算：为重跑 CI 关掉又重开 PR 很常见，
-    // sweep 落在中间时不能把卡打成 failed、停掉它的 verify 步。两次读之间有一段没读
-    // 或读不到时（见 closedSeenAt），这次读重新当作第一次。
     const seen = closedSeenAt.get(key);
     if (seen === undefined || readAt - seen < CI_CLOSED_CONFIRM_MS) {
       if (seen === undefined) closedSeenAt.set(key, readAt);
       tally.reviewPending += 1;
       return;
     }
-    // 目标不是默认分支（同上文合并判据）：多半是从工作分支往别的分支开的另一张 PR，
-    // 它关掉不说明本 build 的交付被否了。确认之后才提示（关掉又重开的不留提示）；
-    // closedSeenAt 留着，之后每次读照样落进 hinted。
     if (pull.baseRef !== pull.defaultBranch) {
       hintOnce(
         cand.buildId,
@@ -984,10 +716,7 @@ export function createCiPoller(
       tally.hinted += 1;
       return;
     }
-    // 打回之前看工作分支上有没有本 build 的另一张 PR（见文件头）。
     const sibling = await ownBranchPull(branch, target, token, recorded, prNumber, now);
-    // 列不到 → 这次不写，关闭照样算看到过，下一次读确认之后再列；连续第二次列不到 → 按段 1
-    // 打回（列表只是补充，不能让一张已确认关闭的卡一直不声不响地留在 review）。
     if (sibling === 'unreadable') {
       const failures = (listFailures.get(key) ?? 0) + 1;
       if (failures < 2) {
@@ -1002,14 +731,10 @@ export function createCiPoller(
     }
     const found = sibling === 'unreadable' ? null : sibling;
     forgetClose(key);
-    // 列表读的网络窗里卡离开 review、换了当前 build 或有步开始在飞 → 不写（关闭从下一次
-    // 读重新数）。
     if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(deps, cand.buildId)) {
       tally.reviewSkipped += 1;
       return;
     }
-    // 记的那张在两次读之间被重开或合并了（列表里它开着或已合并）：不再算关闭，不写，下一轮
-    // 重读它（合并了就按合并收尾）。
     if (found?.number === prNumber) {
       tally.reviewPending += 1;
       return;
@@ -1025,7 +750,7 @@ export function createCiPoller(
         since,
       );
       if (adopted) tally.adopted += 1;
-      else tally.reviewSkipped += 1; // build 上记的 PR 在网络窗里换了：下一轮按新的读
+      else tally.reviewSkipped += 1;
       return;
     }
     writeSystemRow(cand.buildId, closedText);
@@ -1039,7 +764,6 @@ export function createCiPoller(
     now: number,
     tally: CiPollTally,
   ): Promise<void> {
-    // 读当前 phase 再动（④）：候选是扫描快照。
     const todoRow = freshGrindRow(cand.todoId);
     if (todoRow === null) {
       tally.skipped += 1;
@@ -1052,21 +776,16 @@ export function createCiPoller(
       .get();
     const target = githubTarget(todoRow);
     if (buildRow === undefined || buildRow.prNumber === null || target === null) {
-      // 形态不齐（PR 号缺失/项目非 github/githubRepo 不合法 #1466——生产不可达，
-      // 防御位）：不出站、不写。
       tally.skipped += 1;
       return;
     }
     const key = `${target.fullName}#${buildRow.prNumber}`;
-    grindKeys.add(key); // 先登记：在飞步跳过的这一轮不清它的缓存行
-    // 有步在飞不叠派（幂等，口径见 hasActiveStep）：读到的 checks 是旧 head 的。
+    grindKeys.add(key);
     if (hasActiveStep(deps, cand.buildId)) {
       tally.skipped += 1;
       return;
     }
     const grindToken = githubTokenOrNull(deps, target.teamId);
-    // 先读 PR（#1403 段 3）：head SHA 定 check runs 读哪个提交，mergeable_state 定要不要解冲突。
-    // 匿名读都记进进程级额度（不拦磨绿，只让对账看见同一份 IP 额度已用了多少）。
     if (grindToken === null) recordGrindAnonRead(now);
     const pullEntry = grindPullCache.get(key) ?? null;
     const pullPage = await githubPull(
@@ -1085,9 +804,6 @@ export function createCiPoller(
       return;
     }
     grindPullCache.set(key, { etag: pullPage.etag, pull });
-    // 记的 PR 是本 build 开着的那张（同仓、head 是工作分支、目标是默认分支）才按它的 head SHA 读、按它的
-    // mergeable_state 解冲突；不是（fork 同名分支、别的分支、已关闭）→ 按本 build 的工作分支
-    // 名读 check runs（段 3 前的读法），不解冲突：别人的 PR 冲突不归本 build 修。
     const branch = conversationBranch(cand.buildId);
     const own = isOwnOpenDefaultPull(pull, branch);
     if (own && pull.headSha === null) {
@@ -1114,7 +830,6 @@ export function createCiPoller(
       else tally.appended += 1;
       return;
     }
-    // 必需检查名单（默认分支的保护与规则）：按仓库与默认分支缓存；读不到 → 不动。
     const reqKey = `${target.fullName}\u0000${pull.defaultBranch}`;
     let required = requiredCache.get(reqKey);
     if (
@@ -1124,7 +839,7 @@ export function createCiPoller(
         : now - required.at >= CI_REQUIRED_CHECKS_TTL_MS)
     ) {
       if (grindToken === null) {
-        recordGrindAnonRead(now, 2); // 保护与规则两个读
+        recordGrindAnonRead(now, 2);
       }
       const names = await githubRequiredChecks(
         run.githubFetch,
@@ -1141,7 +856,6 @@ export function createCiPoller(
       return;
     }
     const requiredNames = required.names;
-    // check runs 读哪个提交：本 build 开着的 PR 用它的 head SHA，否则用工作分支名。
     const ref = own && pull.headSha !== null ? pull.headSha : branch;
     const cached = cache.get(key);
     const entry = cached?.sha === ref ? cached : null;
@@ -1157,29 +871,23 @@ export function createCiPoller(
       },
     );
     if (page === null) {
-      tally.unreadable += 1; // 限流/私仓匿名/网络 = 读不到 ≠ 红：不动，下轮重试
+      tally.unreadable += 1;
       return;
     }
-    // 304 → 用上次的 runs 按当前名单重判（etag 只在有缓存行时发送，此处恒有）。
     const runs = page.notModified ? (entry?.runs ?? []) : page.checkRuns;
     let verdict = verdictOfCheckRuns(runs, requiredNames);
-    // 宽限锚点：空检查或有必需检查缺 run 时起算；同一 head 上别的必需检查重跑（普通 pending）
-    // 时不清——缺的那个一直缺。
     const waiting =
       verdict.state === 'empty' ||
       (verdict.state === 'pending' &&
         (verdict.missing !== undefined || (entry?.waitSince ?? null) !== null));
     const waitSince = waiting ? (entry?.waitSince ?? now) : null;
     cache.set(key, { sha: ref, etag: page.etag, runs, waitSince });
-    // 竞态窗内（CI 可能还没注册 check）：不动。
     const inGrace = now - (waitSince ?? now) < CI_EMPTY_CHECKS_GRACE_MS;
     if (verdict.state === 'pending') {
       if (verdict.missing === undefined || inGrace) {
         tally.pending += 1;
         return;
       }
-      // 超宽限仍缺的必需检查：不当「仓无 CI」放行，按不算通过提示交人（它可能报在 commit
-      // status 上，或在 check runs 第一页之外——这两处都不读）。
       verdict = {
         state: 'blocked',
         checks: verdict.missing.map((name) => ({ name, conclusion: 'missing' })),
@@ -1189,14 +897,11 @@ export function createCiPoller(
       tally.pending += 1;
       return;
     }
-    // empty 超宽限 = 仓无 CI（且没有必需检查）：无可磨，按绿交人（不把无 CI 仓锁死在 building）。
-    // 写面前再读当前 phase（④）：网络窗内被人工推进/关闭 → 弃写。
     if (freshGrindRow(cand.todoId) === null) {
       tally.skipped += 1;
       return;
     }
     if (verdict.state === 'blocked') {
-      // 不推进、不派修复步：每轮（since 起）提示一次，交人（等它重跑，或由人处理）。
       const names = verdict.checks
         .map((c) => `「${githubText(c.name)}」（${githubText(c.conclusion)}）`)
         .join('、');
@@ -1211,13 +916,10 @@ export function createCiPoller(
     if (verdict.state === 'red') {
       const rounds = countMarkedRounds(deps.db, cand.buildId, CI_FIX_PROMPT_HEAD);
       if (rounds >= CI_FIX_ROUNDS_MAX) {
-        // 死循环闸（③）：停手转人工——build.errorMessage 落因 + todo → failed
-        // （building→failed 合法边；failed→review 恢复闸 #702 照常可用）。
         failWithMessage(cand, todoRow.teamId, deadLoopMessage(rounds));
         tally.failed += 1;
         return;
       }
-      // 红 → 同 build 追加修复步（同 conv 同分支 = 原 PR 就地更新）。
       enqueueStep(
         deps,
         cand.buildId,
@@ -1233,7 +935,6 @@ export function createCiPoller(
       tally.appended += 1;
       return;
     }
-    // 绿 → phase 推进 review 闸（通知 + chief wake 走 setTodoPhase 漏斗）。
     if (
       verdict.state === 'green' &&
       own &&
@@ -1242,10 +943,6 @@ export function createCiPoller(
       hintOnce(cand.buildId, CI_FIX_GREEN_EVENT, 0);
     }
     setTodoPhase(deps, cand.todoId, 'review');
-    // #1250（ADR 0018 层 1）：CI 磨绿抵达 review 关口 = verify 入队的第二
-    // 落点（第一 = completeStep 直进 review 的非 PR 面；槽空零动作幂等）。
-    // 最近一条 verify 步之后有过解冲突轮的行 → 为合并后的 head 重排（不看 roundStart：
-    // 解冲突轮之后的 [ci-fix] 轮会挪走它）。
     const lastVerifyAt = deps.db
       .select({ at: step.createdAt })
       .from(step)
@@ -1278,16 +975,12 @@ export function createCiPoller(
 
   async function sweepOnce(now: number): Promise<void> {
     sweepStartedAt = nowMs();
-    // 批量扫描：一条查询取全候选——prNumber 在位 × 相位 building（磨绿中；
-    // review/failed/closed/done 都已退出磨绿集，天然满足「已推进不回写」）×
-    // todo 的当前 build（#1403：重跑开出的新 build 在跑时，旧 PR 不再被磨）。
     const candidates = deps.db
       .select({ buildId: build.id, todoId: todo.id })
       .from(build)
       .innerJoin(todo, and(eq(todo.id, build.todoId), eq(todo.latestBuildId, build.id)))
       .where(and(isNotNull(build.prNumber), eq(todo.phase, 'building')))
       .all();
-    // #1403 review 关口候选：同为 todo 的当前 build。
     const reviewCandidates = deps.db
       .select({ buildId: build.id, todoId: todo.id })
       .from(build)
@@ -1319,7 +1012,6 @@ export function createCiPoller(
       try {
         await pollOne(cand, now, tally);
       } catch (err) {
-        // 单候选异常不杀整轮（下轮重扫）；计数进对账行。
         tally.errors += 1;
         run.logger?.info(
           { err: err instanceof Error ? err.message : String(err) },
@@ -1336,7 +1028,6 @@ export function createCiPoller(
       );
     }
     liveKeys.clear();
-    // 最久没读的先读：匿名额度不够全读时，后面的卡也轮得到。
     reviewCandidates.sort(
       (a, b) => (lastReadByBuild.get(a.buildId) ?? 0) - (lastReadByBuild.get(b.buildId) ?? 0),
     );
@@ -1351,7 +1042,6 @@ export function createCiPoller(
         );
       }
     }
-    // 离开 review / 磨绿的 PR 不再留缓存行（进程常驻，否则只增不减）。
     for (const k of cache.keys()) if (!grindKeys.has(k)) cache.delete(k);
     for (const k of grindPullCache.keys()) if (!grindKeys.has(k)) grindPullCache.delete(k);
     for (const k of pullCache.keys()) if (!liveKeys.has(k)) pullCache.delete(k);
@@ -1365,7 +1055,6 @@ export function createCiPoller(
     for (const k of listFailures.keys()) if (!liveKeys.has(k)) listFailures.delete(k);
     for (const [k, v] of requiredCache)
       if (now - v.at >= CI_REQUIRED_CHECKS_TTL_MS) requiredCache.delete(k);
-    // 磨绿候选的提示也走 rowKnown（blocked 提示）：它们的记忆一并留着。
     const memoBuilds = new Set([...reviewBuilds, ...candidates.map((c) => c.buildId)]);
     for (const k of knownRows)
       if (!memoBuilds.has(k.slice(0, k.indexOf('\u0000')))) knownRows.delete(k);

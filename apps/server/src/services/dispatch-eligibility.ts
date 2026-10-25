@@ -1,15 +1,3 @@
-// 认领资格判定原语（#881 单源）：步的 Agent 解析 + runtime 闸判。
-//
-// 为什么单列叶子：tryClaim（machines.ts，claim 面）与失联扫尾（builds.ts /
-// chief.ts 的 sweep 面）要用**同一份判据**回答「这台机器开没开这条步的
-// runtime」。#864 把「钉选机在线但 runtime 闸挡」登记为已知缝（#1259 起
-// = 归属机在线但闸挡），原因正是
-// 判定藏在 machines.ts 里、sweep 侧值 import 会成环（machines → builds/
-// chief 是既有正向边）。下沉到本叶子（只依赖 db schema 与 shared，不 import
-// 任何 service），claim 面与 sweep 面共用一份事实——两处判定一旦漂移，后果
-// 是 sweep 误杀 claim 能领的步，或放过 claim 永远领不了的步（后者即无期
-// pending 的缝本身）。
-
 import {
   type Assignment,
   type ClaudeCodeReport,
@@ -26,11 +14,6 @@ import { and, eq, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
 
-/** #682 enabledRuntimes 真闸——步的 runtime 判定（与 daemon runner 的
- *  backendFor 同律：agent provider ∈ BACKEND_RUNTIME_IDS → claude-code，
- *  其余（含 BYOK 自定义 provider）→ pi）。判定单源在此；claim 侧与 sweep
- *  侧（#881 起「归属机在线被挡」判据）共同消费，机器侧开关 =
- *  machine.enabledRuntimes（PATCH 热写，秒级生效）。 */
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
 ): 'pi' | 'claude-code' | 'gemini' {
@@ -38,8 +21,6 @@ export function stepRuntimeFor(
   return isBackendRuntimeId(agentProvider) ? 'claude-code' : 'pi';
 }
 
-/** 机器未开步所需的 runtime = 不可领该步（步留 pending 给能跑的机器——
- *  spec 11 A8「我可以决定本机跑 pi 还是 Claude Code 任务」的兑现位）。 */
 export function runtimeGatePasses(
   machineRow: { enabledRuntimes: string[] },
   agentProvider: string | null | undefined,
@@ -47,28 +28,11 @@ export function runtimeGatePasses(
   return machineRow.enabledRuntimes.includes(stepRuntimeFor(agentProvider));
 }
 
-// —— #1251 能力闸（ADR 0018 决策 4.3，本叶子加钉点=F4）———————————————
-// 机器上报的能力快照不满足 agent.requiredCapabilities = 不领该 Agent 的步
-// （步留 pending 给能力齐的机器）。判据单源在本文件：claim 面（tryClaim /
-// buildChiefClaim）、sweep 面（④d 有界等待）、排队投影（queue.blocked）、
-// machine-fit 读面四处共同消费——与 runtimeGatePasses 同一份纪律（两处判定
-// 漂移 = sweep 误杀 claim 能领的步 / 显示面撒谎）。
-//
-// fail-open 律（版本墙纪律，Premortem 2 护栏「闸只看 server 侧已收到的上报
-// 快照」）：机器从未上报该维快照（capabilities 列 null / claudeCodeReport
-// null）= 未知 ≠ 缺失 → 该维放行。老 daemon 行为完全不变；错杀方向由可见
-// reason 兜底（缺项点名 + 修法），漏杀方向由 daemon 既有降级语义兜底（未知
-// MCP slug 执行侧跳过不阻断）。
-
-/** 能力闸的机器事实位（machine 行子集；两处快照列 + runtime 开关）。 */
 export interface MachineCapabilityFacts {
   capabilities: MachineCapabilities | null;
   claudeCodeReport: { models: { id: string }[] } | null;
 }
 
-/** 逐维缺项（slug 小写归一后比对——parseClaudeMcpEntries 律同源；模型 id
- *  精确比对 claudeCodeReport.models[].id）。快照缺席的维度 = 空缺（fail-open
- *  律）；required 缺省/null = 两维全空（闸恒开，零回归）。 */
 export function missingCapabilityItems(
   machineRow: MachineCapabilityFacts,
   required: RequiredCapabilities | null | undefined,
@@ -90,8 +54,6 @@ export function missingCapabilityItems(
   };
 }
 
-/** 缺项的可读名集（capabilityMissingLabels 单源——reason 文案 / 排队
- *  blocked.missing / machine-fit.missing 三处同词）。空集 = 闸通过。 */
 export function missingCapabilities(
   machineRow: MachineCapabilityFacts,
   agentRow: { requiredCapabilities: RequiredCapabilities | null | undefined },
@@ -99,7 +61,6 @@ export function missingCapabilities(
   return capabilityMissingLabels(missingCapabilityItems(machineRow, agentRow.requiredCapabilities));
 }
 
-/** 能力闸判定（runtimeGatePasses 同形消费面）：缺项非空 = 不可领该步。 */
 export function capabilityGatePasses(
   machineRow: MachineCapabilityFacts,
   agentRow: { requiredCapabilities: RequiredCapabilities | null | undefined },
@@ -107,10 +68,6 @@ export function capabilityGatePasses(
   return missingCapabilities(machineRow, agentRow).length === 0;
 }
 
-/** MCP 对账面（ADR 0018 决策 4.6「缺口可见」）：agent.mcpServers 声明 vs
- *  机器实装的差集（小写归一）。null = 机器未上报快照（未知，显示面闭嘴）；
- *  数组 = 缺口清单（可见不挡——daemon 对未知 slug 的既有语义是跳过降级，
- *  硬闸只吃 requiredCapabilities 显式声明）。 */
 export function declaredMcpGaps(
   machineRow: { capabilities: MachineCapabilities | null },
   agentRow: { mcpServers: string[] },
@@ -122,48 +79,24 @@ export function declaredMcpGaps(
     .filter((slug) => !installed.includes(slug));
 }
 
-/** 步的 Agent id 解析（槽位单源，无 DB 查询）：agentForStep 的解析半边
- *  （agent 表存在性查询留在那半边）。#1138 起计数面（agent 在跑计数）单独
- *  消费本原语——归账只要槽位指向，不需要行存在（指向已删 Agent 的在跑步
- *  恒不会被任何候选命中，存在性检查对计数无增益）。 */
 export function agentIdForStep(
   todoRow: typeof todo.$inferSelect,
   kind: StepKind,
   prompt: string | null = null,
 ): string | null {
-  // review 步：agentId 经 prompt meta header 透出（r8 §3.1：模态选 Agent
-  // 入队，不走 assignment 槽——执行/规划 Agent 不一定适合审核）。
   if (kind === 'review') {
     return parseReviewPromptMeta(prompt)?.agentId ?? null;
   }
-  // verify 步（#1250 / ADR 0018 层 1）：assignment.verify 槽（与 plan/build
-  // 同形，不回落 build 槽——Verifier 是独立角色，回落会让验证步静默跑在
-  // Implementer 名下，「验自己的活」破坏独立验证语义）。
   if (kind === 'verify') {
     return todoRow.assignment?.verify?.agentId ?? null;
   }
   return planSlotFor(todoRow, kind, prompt)?.agentId ?? null;
 }
 
-/** 步的 Agent 解析（claim 载荷组装与 #881 sweep 判据共用）：
- *  - review 步：agentId 在 prompt meta header 里（M7 #330，step 表无 agentId
- *    列；测试已钉此口径，apps/server/test/review.test.ts）；
- *  - 其它步类：assignment 双槽按步类取（02 §4.2/r5 §5）——规划步 → plan 槽；
- *    执行/合并步 → build 槽（合并轮复用执行轮会话，同 Agent）。
- *  - 规划步的返工回落（#1204）：带续轮指令的规划步（revision 打回 / #330
- *    自动回流 / 失败重启轮 / #113 补写轮——prompt 非空即此族）plan 槽空时
- *    回落 build 槽（持有全部施工上下文，本就是最合适的 replan 者）；两槽
- *    皆空才无主。首轮规划步（prompt 空）不回落——#1104 B 的失败收尾是
- *    chief 400 自纠回路的既有语义，首跑行为是回归红线。
- *  无 Agent（槽空 / 槽指向已删 Agent / review meta 无 agentId）= null：claim
- *  面按失败收尾该步（#1104 B：applyStepFailure 落 build.errorMessage + todo
- *  → failed 终态，不再静默跳过候选）；sweep 面无从计算 runtime（不进闸挡判）。 */
 export function agentForStep(
   db: Db,
   todoRow: typeof todo.$inferSelect,
   kind: StepKind,
-  /** review 步的 prompt（meta header 解析用）；规划步的返工判别（#1204：
-   *  prompt 非空 = 带续轮指令的返工步，plan 槽空回落 build 槽）。 */
   prompt: string | null = null,
 ): typeof agent.$inferSelect | null {
   const agentId = agentIdForStep(todoRow, kind, prompt);
@@ -171,9 +104,6 @@ export function agentForStep(
   return db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null;
 }
 
-/** 规划步的槽位解析（agentForStep 与 unassignedStepReason 同一映射，本文件
- *  单源）：返工步（prompt 非空）plan 槽空 → 回落 build 槽；首轮步与执行/
- *  合并步按步类直取。 */
 function planSlotFor(
   todoRow: typeof todo.$inferSelect,
   kind: StepKind,
@@ -188,11 +118,6 @@ function isReworkPlanPrompt(prompt: string | null): boolean {
   return prompt !== null && !isPlanFirstRoundWithLessons(prompt);
 }
 
-/** #1104 B 无主步失败文案（agentForStep 返 null 的三族分类）：assignment 槽
- * 空 / 槽指向已删 Agent / review meta 缺 agentId。与 agentForStep 同文件同
- * 槽位映射（planSlotFor 单源），各族点名各自的补法，落 build.errorMessage
- * （看板失败终态可见），claim 面失败收尾时消费。#1204：规划步返工族文案
- * 按回落后的事实点名——两槽皆空说两槽（回落已试），首轮步维持 plan 槽单点。 */
 export function unassignedStepReason(
   todoRow: typeof todo.$inferSelect,
   kind: StepKind,
@@ -215,7 +140,6 @@ export function unassignedStepReason(
     }
     return `build 步指派的 Agent 不存在（agentId ${slot.agentId} 已删除或不在本团队），无人可领。改派 Agent 后重新运行任务。`;
   }
-  // 规划步：返工族（prompt 非空）回落后仍无主 = 两槽皆空；首轮族 = plan 槽空。
   if (todoRow.assignment?.plan?.agentId != null) {
     return `plan 步指派的 Agent 不存在（agentId ${todoRow.assignment.plan.agentId} 已删除或不在本团队），无人可领。改派 Agent 后重新运行任务。`;
   }
@@ -225,12 +149,6 @@ export function unassignedStepReason(
   return `plan 步无指派 Agent：assignment 的 plan 槽为空，无人可领。指派 Agent 后重新运行任务。`;
 }
 
-/** #1108 机器在跑步数（worker + chief 同数——#1260 起 chief 占并发槽，
- *  容量闸、机器页 `执行中 n/N`、排队快照三处同源同数）。#1219 从
- *  machines.ts 下沉本叶子：sweepAbandonedBuildSteps（builds.ts）的 ④c
- *  宽限判据要「归属机有无空闲并发位」——machines → builds 是既有正向
- *  边，值 import 会成环，与 #881 把 runtime 判定下沉至此同理。
- *  machines.ts re-export 保持既有导入面不变。 */
 export function machineRunningCount(db: Db, machineId: string): number {
   return db
     .select({ id: step.id })
@@ -239,17 +157,6 @@ export function machineRunningCount(db: Db, machineId: string): number {
     .all().length;
 }
 
-/** #1138 agent 级在跑计数：该 Agent 名下 claimed 步数（机器无关——agent
- *  池跨机器，与 Multica agent 层闸同形，r10 §5.4）。worker 步归账 = 槽位
- *  解析（本文件 agentIdForStep 单源，与 claim 候选解析同一份事实）：join
- *  step⋈build⋈todo，孤儿步（无 build 行——测试占位与极端残行）天然不计；
- *  chief 步归账 = chiefThread→chief.agentId（#1260：chief = 普通 agent，
- *  其回合占绑定 Agent 的槽——Multica leader 无并发特权同律，agent 表
- *  max_concurrent_tasks 对 leader 一视同仁）。步领取后 assignment 改派的
- *  窄窗按当前槽位归账（闸是公平性约束，不是所有权账本——现读口径）。
- *  与 machineRunningCount 同居本叶子：消费同文件的 agentIdForStep，
- *  machines.ts 的 tryClaim 跨文件消费（machines → 本叶子是既有正向边，
- *  本文件不 import 任何 service，无环）。 */
 export function agentRunningCount(db: Db, agentId: string): number {
   const rows = db
     .select({ kind: step.kind, prompt: step.prompt, todoRow: todo })
@@ -271,13 +178,6 @@ export function agentRunningCount(db: Db, agentId: string): number {
   return workerCount + chiefCount;
 }
 
-/** #1259 归属机校验（创建/换绑/整机迁移共用单源）：归属机必须启用该 agent
- *  的 runtime；claude-code agent 的 modelId 还须在合并目录内（relay 活目录
- *  ∪ 该机上报的 claude-code 槽位清单）且非 dead（#1288 翻案——旧语义只查
- *  槽位清单，清单外活模型反被 400 拒）。modelId 空 = 跟随该机默认槽，恒过；
- *  pi 等 server 下发配置的 provider 免模型查。返回 null = 通过，否则 = 人话
- *  原因（点名缺什么、怎么修）。机器未上报过模型清单（老 daemon）且不在 relay
- *  目录 = 拒——无法证明该机配了该模型。 */
 export function homeMachineRejectReason(
   machineRow: {
     name: string;
@@ -285,8 +185,6 @@ export function homeMachineRejectReason(
     claudeCodeReport: ClaudeCodeReport | null;
   },
   agentRow: { provider: string | null | undefined; modelId: string | null | undefined },
-  /** #1288 合并目录（relay 探活结果 + claude-code 槽位，活性取严）。缺省
-   *  = 空目录（闸按旧槽位清单语义）。 */
   catalog?: ReadonlyArray<{ id: string; liveness?: 'alive' | 'dead' | 'unknown' }>,
 ): string | null {
   const runtime = stepRuntimeFor(agentRow.provider);
@@ -295,17 +193,13 @@ export function homeMachineRejectReason(
   }
   if (runtime === 'claude-code' && agentRow.modelId != null && agentRow.modelId !== '') {
     const report = machineRow.claudeCodeReport;
-    // #1288：合并目录 = relay 探活目录 ∪ claude-code 槽位清单。活目录里标
-    // dead 的模型直接拒（T6 律指认：模型名 + 哪台机 + 修法）。
     const catalogEntry = catalog?.find((m) => m.id === agentRow.modelId);
     if (catalogEntry !== undefined && catalogEntry.liveness === 'dead') {
       return `机器 ${machineRow.name} 的模型 ${agentRow.modelId} 已被上游下架（/v1/messages 404）。换一个活模型，或联系上游恢复上架。`;
     }
-    // 在 relay 目录（alive 或 unknown = fail-open）→ 放行，不再要求进槽位清单。
     if (catalogEntry !== undefined) {
       return null;
     }
-    // 不在 relay 目录 → 回落旧语义（槽位清单）。
     if (report == null) {
       return `机器 ${machineRow.name} 尚未上报模型清单（daemon 版本过旧或未上线），无法校验模型 ${agentRow.modelId}。`;
     }
@@ -316,29 +210,11 @@ export function homeMachineRejectReason(
   return null;
 }
 
-// —— #1241 机器推荐并发（写点算推荐值；公式单源在本叶子）————————————————
-// 问题：maxConcurrent 曾是固定默认 3，与机器承载无关。
-// 例子：32 核 / 64GiB 总内存 → min(32, round(64/2)) = 32，再夹到写域 16；
-//       8 核 / 15.6GiB 总内存 → min(8, round(7.8)) = 8；没有指纹 → 3，并标估算。
-// 方案：recommended = clamp(min(核数, round(总内存MiB / (1024 * 每槽GiB))), 1, 16)；
-// 可选区间 = 1..clamp(round(总内存MiB / (1024 * 区间每槽GiB)), 1, 16)。
-// 内存用总量而不用可用量：运行中的步占掉可用内存不应缩小推荐值（推荐是机器
-// 承载的静态上界，动态降载是后续票）。16 是既有 PATCH 写域（#1108，1..16）的
-// 上沿，不是覆盖用户之后再加的第二道闸。用户写过的数心跳不再改
-// （maxConcurrentOverridden）。server 不在推荐值之上再加封顶或暂停：负载/内存
-// 的动态降载是后续票，需要 owner 另行确认。
-
-/** 推荐值下沿（写域与 #1108 PATCH 相同）。 */
 export const CONCURRENCY_FLOOR = 1;
-/** 推荐值上沿（写域与 #1108 PATCH 相同：1..16）。 */
 export const CONCURRENCY_CEILING = 16;
-/** 推荐值：每个并发槽占用的内存，GiB（按总内存计，偏保守）。 */
 export const MEMORY_GB_PER_SLOT = 2;
-/** 可选区间：每槽 1 GiB（用户手动上调的上沿；16GiB 机可选到 16）。 */
 export const RANGE_MEMORY_GB_PER_SLOT = 1;
-/** 没有可用指纹时的保守默认（与 machine.maxConcurrent 列默认相同）。 */
 export const CONSERVATIVE_CONCURRENCY = 3;
-/** 无指纹机的可选区间上沿（与 #1108 原固定档位 1..8 同值）。 */
 export const FALLBACK_CONCURRENCY_MAX = 8;
 export interface ConcurrencyRange {
   min: number;
@@ -347,11 +223,9 @@ export interface ConcurrencyRange {
 export interface ConcurrencyRecommendation {
   value: number;
   source: 'measured' | 'estimate';
-  /** 选择器可选区间：1..clamp(round(总内存 / 1GiB), 1, 16)；无指纹 = 1..8。 */
   range: ConcurrencyRange;
 }
 
-/** 推荐并发。无指纹、核数非法、内存总量缺席或非法 → 保守默认，source = estimate。 */
 export function recommendMachineConcurrency(
   hardware: MachineHardware | null | undefined,
 ): ConcurrencyRecommendation {
@@ -369,7 +243,6 @@ export function recommendMachineConcurrency(
       range: { min: CONCURRENCY_FLOOR, max: FALLBACK_CONCURRENCY_MAX },
     };
   }
-  // round 而非 floor：15.6GiB 读作 16GiB（os 报的总内存总比标称少一点）。
   const memoryTotalMb = hardware.memoryTotalMb;
   const slots = (gbPerSlot: number) => Math.round(memoryTotalMb / (1024 * gbPerSlot));
   const clamp = (n: number) => Math.min(CONCURRENCY_CEILING, Math.max(CONCURRENCY_FLOOR, n));
