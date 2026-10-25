@@ -1,8 +1,8 @@
-# todos.dev 复刻 · 领域模型与术语表
+# Cairn domain model and vocabulary
 
-本仓起步于 todos.dev（"task-driven workspace for humans and agents"）的 clean-room 1:1 复刻（像素级 UI + 功能等价），现为自主产品（06 册 D1；定位叙事见 `docs/spec/18-定位与差异化.md`）。本文件的词汇表继续有效：为每个领域概念固定「中文界面词 ↔ 英文原词 ↔ 复刻代码内部名」三列映射，并裁决概念之间的边界。实现契约（完整 phase 枚举、REST/SSE 端点、record 形状）不在此表，归 `docs/spec/` 架构册（地图票 #41）。
+This file fixes, for each domain concept, a three-column mapping between the Chinese UI word, the English word and the internal code name, and settles the boundaries between concepts (positioning is in `docs/spec/18-定位与差异化.md`). Implementation contracts (the full phase enum, REST and SSE endpoints, record shapes) are not here; they live in the `docs/spec/` architecture specs (map ticket #41).
 
-内部名取自 todos.dev 实测 API 词表（R3 协议盘点）；仅在词被重载处改名并标注（见「密钥」）。
+Internal names are renamed only where a word is overloaded, and each rename is marked (see `密钥`).
 
 ## 租户层级
 
