@@ -232,12 +232,14 @@ describe('#1470 MCP conversation: cross-team and nonexistent are both 404', () =
   });
 
   test('U7 own-team build / chief conversations read as usual', async () => {
-    const own = (await mcp('conversation', { conversationId: OWN_BUILD })) as { content: string }[];
-    expect(own.map((m) => m.content)).toEqual(['本队对话']);
+    const own = (await mcp('conversation', { conversationId: OWN_BUILD })) as {
+      messages: { content: string }[];
+    };
+    expect(own.messages.map((m) => m.content)).toEqual(['本队对话']);
     const chief = (await mcp('conversation', { conversationId: H.threadId })) as {
-      content: string;
-    }[];
-    expect(chief.map((m) => m.content)).toEqual(['本队 chief 对话']);
+      messages: { content: string }[];
+    };
+    expect(chief.messages.map((m) => m.content)).toEqual(['本队 chief 对话']);
   });
 });
 

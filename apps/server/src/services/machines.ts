@@ -94,6 +94,7 @@ import {
   finishChiefTurn,
   notifyChiefTurn,
   parseChiefTrigger,
+  recoverGateWake,
   upsertChiefMessage,
 } from './chief.js';
 import { cancelPendingQuestions } from './chief-questions.js';
@@ -700,8 +701,8 @@ function buildChiefClaim(
     },
     conversationId: stepRow.buildId,
     session: {
-      action: threadRow.sessionId !== '' ? 'continue' : 'new',
-      sessionId: threadRow.sessionId !== '' ? threadRow.sessionId : null,
+      action: !stepRow.freshSession && threadRow.sessionId !== '' ? 'continue' : 'new',
+      sessionId: !stepRow.freshSession && threadRow.sessionId !== '' ? threadRow.sessionId : null,
     },
     ...(stepRow.prompt !== null
       ? {
@@ -1562,6 +1563,7 @@ export async function finishStep(
     );
     finishChiefTurn(deps, stepRow.buildId, outcome);
     if (outcome.status === 'success') notifyChiefTurn(deps, stepRow.buildId, stepRow.prompt);
+    if (outcome.status === 'failed') recoverGateWake(deps, stepRow);
     if (outcome.status === 'failed' && outcome.errorMessage) {
       upsertChiefRow(deps, {
         id: `chief-err-${stepId}`,
