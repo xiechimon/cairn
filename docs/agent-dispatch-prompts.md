@@ -20,6 +20,10 @@ node scripts/dispatch-agent.mjs start 1556-impl --cwd <worktree> --ticket 1556 -
 node scripts/dispatch-agent.mjs check 1556-impl
 ```
 
+## 访问 GitHub
+
+查 GitHub 上的名字、PR、CI 状态只用已登录的 `gh api`（`gh api /users/<名字>`，404 即空闲），一个名字一次请求；不对 `github.com/...` 网页做未登录的批量或循环请求（curl、浏览器自动化都算）。轮询 PR / CI 状态间隔不短于 5 分钟。未登录的网页请求按出口 IP 计入 GitHub 二级限流，同一 IP 上的人会一起被挡（台账「GitHub 二级限流」）。
+
 ## Codex
 
 实现下述任务并按仓库规则验证。不写新注释；用命名和代码结构表达意图，例外遵循仓库注释纪律。任务中犯错并修好后，当轮执行 AGENTS.md「错误台账」规则，按类别更新 `docs/lessons.md`，取最高可行防护级；新闸用真实失误做负对照。
