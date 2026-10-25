@@ -92,6 +92,7 @@ import {
   WRITE_AUTHOR_ASSOCIATIONS,
 } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
+import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { DONE_ROW } from './delivery-rows.js';
 import { agentForStep } from './dispatch-eligibility.js';
@@ -357,6 +358,7 @@ export function cancelBuild(
   }
   if (active.status === 'pending' || active.status === 'waiting_quota') {
     applyStoppedStep(deps, active.id);
+    emitRuntimeBuildSpan(deps.db, buildId, 'cancelled');
     return 'stopped';
   }
   const now = nowMs();
@@ -369,6 +371,7 @@ export function cancelBuild(
     .run();
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (todoRow) deps.machineHub?.stopSignal(todoRow.teamId, active.id);
+  emitRuntimeBuildSpan(deps.db, buildId, 'cancelled');
   return 'delegated';
 }
 
@@ -1682,6 +1685,7 @@ export function applyStepFailure(
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
   const failedStep = finished ?? stepRow;
+  emitRuntimeBuildSpan(db, buildRow.id, 'failed');
   persistGateVerdict(deps, failedStep, todoRow, {
     stepFailed: true,
     extracted: false,
@@ -2162,6 +2166,7 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
     createdAt: nowMs(),
   });
   advanceSplitWaves(deps, todoId);
+  emitRuntimeBuildSpan(deps.db, buildId, 'done');
 }
 
 export class NotFoundError extends Error {

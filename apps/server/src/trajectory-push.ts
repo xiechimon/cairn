@@ -1,7 +1,14 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { redactSecrets, type TrajectoryPack, trajectoryPackSchema } from '@cairn/shared';
-import { type OtlpTracesRequest, packToOtlp } from './trajectory-otlp.js';
+import {
+  OtlpTargetConfigError,
+  type OtlpTracesRequest,
+  parseOtlpTarget,
+  redactSecrets,
+  type TrajectoryPack,
+  trajectoryPackSchema,
+} from '@cairn/shared';
+import { packToOtlp } from './trajectory-otlp.js';
 
 export class TrajectoryPushError extends Error {}
 
@@ -18,32 +25,14 @@ export function parsePacks(jsonl: string): TrajectoryPack[] {
 }
 
 export function resolveTarget(env: NodeJS.ProcessEnv): OtlpTarget {
-  const endpoint = env.CAIRN_OTEL_ENDPOINT;
-  if (!endpoint) throw new TrajectoryPushError('Set CAIRN_OTEL_ENDPOINT');
-  let url: URL;
   try {
-    url = new URL(endpoint);
-  } catch {
-    throw new TrajectoryPushError('CAIRN_OTEL_ENDPOINT is not a valid URL');
+    const target = parseOtlpTarget(env);
+    if (target === null) throw new TrajectoryPushError('Set CAIRN_OTEL_ENDPOINT');
+    return target;
+  } catch (error) {
+    if (error instanceof OtlpTargetConfigError) throw new TrajectoryPushError(error.message);
+    throw error;
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:')
-    throw new TrajectoryPushError('CAIRN_OTEL_ENDPOINT must be http or https');
-  const base = url.pathname.replace(/\/+$/, '').replace(/\/v1\/traces$/, '');
-  url.pathname = `${base}/v1/traces`;
-  const headers: Record<string, string> = {};
-  if (url.username !== '') {
-    const credentials = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`;
-    headers.authorization = `Basic ${Buffer.from(credentials).toString('base64')}`;
-    url.username = '';
-    url.password = '';
-  }
-  for (const pair of (env.CAIRN_OTEL_HEADERS ?? '').split(',').filter((p) => p.trim() !== '')) {
-    const separator = pair.indexOf('=');
-    if (separator <= 0)
-      throw new TrajectoryPushError('CAIRN_OTEL_HEADERS must look like name=value,name=value');
-    headers[pair.slice(0, separator).trim().toLowerCase()] = pair.slice(separator + 1).trim();
-  }
-  return { url, headers };
 }
 
 export interface PushResult {

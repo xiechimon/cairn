@@ -19,6 +19,7 @@ import {
   WRITE_AUTHOR_ASSOCIATIONS,
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import {
   type BuildDeps,
   enqueueStep,
@@ -293,6 +294,7 @@ export function createCiPoller(
     const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
     if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
     setTodoPhase(deps, cand.todoId, 'failed');
+    emitRuntimeBuildSpan(deps.db, cand.buildId, 'failed');
   }
 
   function writeSystemRow(buildId: string, content: string): void {

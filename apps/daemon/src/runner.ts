@@ -65,6 +65,7 @@ import { createActivityTracker } from './activity.js';
 import { parseAgentTodoText } from './agent-todo.js';
 import { SessionNotResumableError } from './backend/errors.js';
 import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
+import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import {
   collectVisibleSkillFileMap,
@@ -120,6 +121,7 @@ export interface RunStepDeps {
   skillsDir?: string;
   machineName?: string;
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
+  otel?: DaemonOtel | null;
   now?: () => number;
 }
 
@@ -704,6 +706,8 @@ async function runClaimedStep(
     }
   }
   const askAbort = new AbortController();
+  const telemetry =
+    deps.otel != null ? deps.otel.contextFor(claimed.step.buildId, stepId) : undefined;
   let askKeepAlive: (() => void) | null = null;
   const runAskChannel = async (params: Record<string, unknown>): Promise<string> => {
     if (client.askUser === undefined) throw new Error('ask channel unavailable');
@@ -762,6 +766,7 @@ async function runClaimedStep(
     },
     ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
     ...(isReview ? { readOnly: true } : {}),
+    ...(telemetry !== undefined ? { telemetry } : {}),
     ...(opts.env !== undefined || readonlyWorkspace
       ? { env: { ...opts.env, ...(readonlyWorkspace ? READONLY_GIT_ENV : {}) } }
       : {}),

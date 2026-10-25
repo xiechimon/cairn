@@ -1,4 +1,4 @@
-import type { TokenCounts } from './genai-conventions.js';
+import type { TokenCounts } from '@cairn/shared';
 
 export type Json = Record<string, unknown>;
 

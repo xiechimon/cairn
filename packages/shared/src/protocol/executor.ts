@@ -37,6 +37,7 @@ export const DAEMON_LOG_PREFIXES = [
   'skills',
   'gate',
   'trust',
+  'otel',
 ] as const;
 
 export const LOCAL_STATE_FILES = [

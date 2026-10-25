@@ -35,6 +35,7 @@ import {
 import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
 import { SessionNotResumableError } from './errors.js';
 import { connectFailedLine } from './mcp-config.js';
+import { PiStepSpanSink } from './otel.js';
 import { PI_RETRY_SETTINGS } from './pi-retry.js';
 import {
   enrichProviderError,
@@ -410,6 +411,45 @@ export interface MapState {
   diagnose?: (message: string) => string;
 }
 
+export function recordPiSpanEvent(sink: PiStepSpanSink, event: AgentSessionEventLike): void {
+  if (event.type === 'message_end') {
+    const msg = event.message;
+    if (
+      msg != null &&
+      msg.role === 'assistant' &&
+      msg.provider !== undefined &&
+      msg.model !== undefined &&
+      msg.usage !== undefined
+    ) {
+      sink.chat(Date.now(), {
+        provider: msg.provider,
+        model: msg.model,
+        ...(msg.responseModel !== undefined ? { responseModel: msg.responseModel } : {}),
+        ...(msg.stopReason !== undefined ? { finishReason: msg.stopReason } : {}),
+        ...(msg.rawStopReason !== undefined ? { rawFinishReason: msg.rawStopReason } : {}),
+        usage: {
+          input: msg.usage.input,
+          output: msg.usage.output,
+          cacheRead: msg.usage.cacheRead,
+          cacheWrite: msg.usage.cacheWrite,
+        },
+        costUsd: msg.usage.cost?.total,
+      });
+    }
+    return;
+  }
+  if (event.type === 'message_update') {
+    const toolCall = event.assistantMessageEvent?.toolCall;
+    if (event.assistantMessageEvent?.type === 'toolcall_end' && toolCall != null) {
+      sink.toolStart(toolCall.id, Date.now(), toolCall.name, toolCall.arguments);
+    }
+    return;
+  }
+  if (event.type === 'tool_execution_end') {
+    sink.toolEnd(event.toolCallId ?? '', Date.now(), event.result, event.isError ?? false);
+  }
+}
+
 export function newMapState(opts?: { diagnose?: (message: string) => string }): MapState {
   return {
     usage: new Map(),
@@ -618,16 +658,16 @@ class PiSessionHandle implements AgentSessionHandle {
     private readonly session: AgentSession,
     private readonly model: { input: ('text' | 'image')[] } | null,
     diagnose?: (message: string) => string,
+    private readonly spans?: PiStepSpanSink,
   ) {
     this.sessionId = session.sessionId;
     this.sessionFile = session.sessionFile;
     this.state = newMapState(diagnose !== undefined ? { diagnose } : undefined);
     this.events = this.queue.iterable();
     session.subscribe((event) => {
-      for (const mapped of mapPiSessionEvent(
-        event as unknown as AgentSessionEventLike,
-        this.state,
-      )) {
+      const raw = event as unknown as AgentSessionEventLike;
+      if (this.spans !== undefined) recordPiSpanEvent(this.spans, raw);
+      for (const mapped of mapPiSessionEvent(raw, this.state)) {
         if (this.stopping && mapped.type === 'done') continue;
         this.queue.push(mapped);
         if (mapped.type === 'done') this.finish();
@@ -639,6 +679,7 @@ class PiSessionHandle implements AgentSessionHandle {
     if (this.closed) return;
     this.closed = true;
     this.queue.end();
+    if (this.spans !== undefined) void this.spans.flush();
     void this.shutdownExtensions().finally(() => {
       this.session.dispose();
     });
@@ -687,6 +728,7 @@ export interface PiBackendOpts {
   onSkillsLog?: (msg: string) => void;
   onGateLog?: (msg: string) => void;
   onTrustLog?: (msg: string) => void;
+  onOtelLog?: (msg: string) => void;
   gateRules?: readonly PermissionRule[];
   machineName?: string;
 }
@@ -938,7 +980,18 @@ export class PiBackend implements AgentBackend {
       mcpEndpoints.length > 0 || askRelay !== undefined ? { uiContext: mcpCaptureUi } : {},
     );
     this.opts.onSession?.(session.sessionId, session.sessionFile);
-    const handle = new PiSessionHandle(session, model, diagnose);
+    const handle = new PiSessionHandle(
+      session,
+      model,
+      diagnose,
+      opts.telemetry !== undefined
+        ? new PiStepSpanSink(
+            opts.telemetry,
+            { provider: opts.provider.providerId, model: opts.modelId },
+            this.opts.onOtelLog,
+          )
+        : undefined,
+    );
     if (opts.prompt !== undefined) {
       const promptImages =
         opts.promptImages !== undefined && opts.promptImages.length > 0

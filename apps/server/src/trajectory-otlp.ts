@@ -1,15 +1,21 @@
 import { createHash } from 'node:crypto';
 import type { TrajectoryPack } from '@cairn/shared';
 import {
-  type Attributes,
   chatAttributes,
   executeToolAttributes,
   GENAI_OPERATION,
   invokeAgentAttributes,
-  type ModelRef,
+  OTLP_SPAN_KIND,
+  OTLP_STATUS_ERROR,
+  type OtlpSpan,
+  type OtlpTracesRequest,
+  otlpAttributes,
+  otlpNanos,
+  otlpTraceIdOfBuild,
+  type ProviderModelRef,
   splitModelId,
   stepAttributes,
-} from './genai-conventions.js';
+} from '@cairn/shared';
 import {
   costUsd,
   isRecord,
@@ -20,37 +26,11 @@ import {
   toolOutcomesOf,
 } from './trajectory-transcript.js';
 
-interface OtlpValue {
-  stringValue?: string;
-  intValue?: string;
-  doubleValue?: number;
-  boolValue?: boolean;
-  arrayValue?: { values: OtlpValue[] };
-}
+const SPAN_KIND_INTERNAL = OTLP_SPAN_KIND.internal;
+const SPAN_KIND_CLIENT = OTLP_SPAN_KIND.client;
+const STATUS_ERROR = OTLP_STATUS_ERROR;
 
-export interface OtlpSpan {
-  traceId: string;
-  spanId: string;
-  parentSpanId?: string;
-  name: string;
-  kind: number;
-  startTimeUnixNano: string;
-  endTimeUnixNano: string;
-  attributes: { key: string; value: OtlpValue }[];
-  status?: { code: number; message?: string };
-}
-
-export interface OtlpTracesRequest {
-  resourceSpans: {
-    resource: { attributes: { key: string; value: OtlpValue }[] };
-    scopeSpans: { scope: { name: string }; spans: OtlpSpan[] }[];
-  }[];
-}
-
-const SPAN_KIND_INTERNAL = 1;
-const SPAN_KIND_CLIENT = 3;
-const STATUS_ERROR = 2;
-const NANOS_PER_MILLI = 1_000_000n;
+const nanos = otlpNanos;
 
 function derivedId(bytes: number, ...parts: (string | number)[]): string {
   return createHash('sha256')
@@ -66,28 +46,10 @@ function jsonText(value: unknown): string {
   return typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
 }
 
-function otlpAttributes(attributes: Attributes) {
-  return Object.entries(attributes).map(([key, value]): { key: string; value: OtlpValue } => {
-    if (typeof value === 'string') return { key, value: { stringValue: value } };
-    if (typeof value === 'boolean') return { key, value: { boolValue: value } };
-    if (typeof value === 'number')
-      return {
-        key,
-        value: Number.isInteger(value) ? { intValue: String(value) } : { doubleValue: value },
-      };
-    if ('double' in value) return { key, value: { doubleValue: value.double } };
-    return { key, value: { arrayValue: { values: value.map((item) => ({ stringValue: item })) } } };
-  });
-}
-
-function nanos(epochMs: number): string {
-  return (BigInt(Math.trunc(epochMs)) * NANOS_PER_MILLI).toString();
-}
-
 export function packToOtlp(pack: TrajectoryPack): OtlpTracesRequest {
   const { buildId } = pack;
-  const traceId = derivedId(16, 'trace', buildId);
-  const fallbackModel: ModelRef = splitModelId(pack.input.model);
+  const traceId = otlpTraceIdOfBuild(buildId);
+  const fallbackModel: ProviderModelRef = splitModelId(pack.input.model);
   const spans: OtlpSpan[] = [];
   let clock = 0;
   let earliest: number | undefined;
