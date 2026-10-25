@@ -1,9 +1,11 @@
 import { cn } from 'cn';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
+import { createContext, useContext, useId } from 'react';
 import { FORM_CONTROL_CLS } from './form-layout.js';
 import { Button } from './ui/button.js';
 import { Card } from './ui/card.js';
 import { DIALOG_PRIMARY_BUTTON } from './ui/dialog-shell.js';
+import { SelectTrigger } from './ui/select.js';
 
 export const CARD_RADIUS_CLS = 'rounded-(--radius-card)';
 
@@ -88,6 +90,22 @@ interface SettingsRowProps {
   children: ReactNode;
 }
 
+const SettingsRowLabelContext = createContext<string | null>(null);
+
+export function useSettingsRowLabelId(): string | null {
+  return useContext(SettingsRowLabelContext);
+}
+
+export function SettingsSelectTrigger({
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledby,
+  ...props
+}: ComponentProps<typeof SelectTrigger>) {
+  const labelId = useContext(SettingsRowLabelContext);
+  const labelledby = ariaLabelledby ?? (ariaLabel == null ? (labelId ?? undefined) : undefined);
+  return <SelectTrigger {...props} aria-label={ariaLabel} aria-labelledby={labelledby} />;
+}
+
 export function SettingsRow({
   label,
   hint,
@@ -98,23 +116,29 @@ export function SettingsRow({
   children,
 }: SettingsRowProps) {
   const withHint = hint != null;
+  const labelId = useId();
   return (
     <div className={cn(SETTINGS_ROW_CLS, className)}>
       <span className={cn('flex min-w-0 flex-col', withHint && 'max-w-3/5 flex-auto')}>
-        <span className={cn('settings-label-text text-ui text-foreground', labelClassName)}>
+        <span
+          id={labelId}
+          className={cn('settings-label-text text-ui text-foreground', labelClassName)}
+        >
           {label}
         </span>
         {withHint && <span className={cn(SETTINGS_HINT_CLS, hintClassName)}>{hint}</span>}
       </span>
-      <span
-        className={cn(
-          'flex items-center gap-3 text-ui text-foreground',
-          withHint && 'min-w-0 flex-auto justify-end',
-          valueClassName,
-        )}
-      >
-        {children}
-      </span>
+      <SettingsRowLabelContext.Provider value={labelId}>
+        <span
+          className={cn(
+            'flex items-center gap-3 text-ui text-foreground',
+            withHint && 'min-w-0 flex-auto justify-end',
+            valueClassName,
+          )}
+        >
+          {children}
+        </span>
+      </SettingsRowLabelContext.Provider>
     </div>
   );
 }

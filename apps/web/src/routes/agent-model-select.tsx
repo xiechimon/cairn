@@ -1,5 +1,6 @@
 import { cn } from 'cn';
 import { modelEchoLabel, providerEchoLabel } from '../components/model-select-core.js';
+import { useSettingsRowLabelId } from '../components/settings-list.js';
 import {
   Select,
   SelectContent,
@@ -47,6 +48,7 @@ export function AgentRuntimeSelect({
   unsetLabel,
 }: AgentRuntimeSelectProps) {
   const { t } = useI18n();
+  const rowLabelId = useSettingsRowLabelId();
   const groups = providerGroups(options);
   const unset = unsetLabel ?? t(BUILTIN_RUNTIME_LABEL);
   const label = providerEchoLabel(value, groups, unset);
@@ -56,6 +58,7 @@ export function AgentRuntimeSelect({
       <SelectTrigger
         id={id}
         aria-label={ariaLabel}
+        aria-labelledby={ariaLabel == null ? (rowLabelId ?? undefined) : undefined}
         className={cn(`${prefix}-select`, triggerClassName)}
       >
         <SelectValue>{label}</SelectValue>
@@ -103,6 +106,7 @@ export function AgentModelSelect({
   triggerClassName,
 }: AgentModelSelectProps) {
   const { t } = useI18n();
+  const rowLabelId = useSettingsRowLabelId();
   const rows = options.filter((row) => row.provider === provider);
   const unset = t('未设置模型');
   const label = modelEchoLabel({ provider, modelId }, options, unset);
@@ -116,6 +120,7 @@ export function AgentModelSelect({
       <SelectTrigger
         id={id}
         aria-label={ariaLabel}
+        aria-labelledby={ariaLabel == null ? (rowLabelId ?? undefined) : undefined}
         className={cn(`${prefix}-select`, triggerClassName)}
       >
         <SelectValue>{label}</SelectValue>
