@@ -383,7 +383,7 @@ writeFileSync(
     {
       probe: '903-dispatch-judgment',
       ticket: '#903',
-      adr: 'docs/adr/0014-chief派发判定-判定权归chief-判说可推翻.md',
+      adr: 'docs/adr/0014-chief-dispatch-verdict-authority-rests-with-chief-overridable.md',
       stack: { server: SERVER, web: WEB, repo: REPO, db: DB_PATH },
       ids: { teamId, projectId, agentId: AGENT_ID, todoA: TASK_A, todoB: TASK_B, todoC: TASK_C },
       checks,

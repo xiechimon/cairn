@@ -135,7 +135,7 @@ node .../scripts/drive-attachments.mjs / drive-branch-sync.mjs / drive-failed-se
 
 Prerequisites: stub LLM (`scripts/stub-llm-verify.mjs`, gated delay wheel) + seed (`scripts/setup-review-seed.mjs` or its variant) + real daemon (`apps/daemon` `pnpm exec tsx src/cli.ts start --foreground --server http://127.0.0.1:<VERIFY_PORT>`, **`--server` must be written explicitly into the command line** - cleanup's residual reclamation relies on port pinning, the env-only form has no command-line marker and cannot be safely reclaimed; the gate is in stop-button.md Gotchas: 6 proxy all unset / CAIRN_HOME export passthrough / vite CAIRN_DEV_SERVER_PORT).
 
-**spec 11 probes** (feature map ahead of implementation, A12/#354; implementation tickets #355/#356/#357/#358 all landed and merged, **this group should now all be green** - red = regression; run order: tabs (needs a fresh DB, pi empty-state assertion) to picker (e2e creates the provider) to machines (idempotent); the three scripts' fallback page `docs/spec/11-模型服务与机器本地化.md` is the clause canonical source):
+**spec 11 probes** (feature map ahead of implementation, A12/#354; implementation tickets #355/#356/#357/#358 all landed and merged, **this group should now all be green** - red = regression; run order: tabs (needs a fresh DB, pi empty-state assertion) to picker (e2e creates the provider) to machines (idempotent); the three scripts' fallback page `docs/spec/11-model-service-and-machine-localization.md` is the clause canonical source):
 
 ```sh
 node .../scripts/drive-providers-tabs.mjs    # providers runtime tabs (providers-tabs.md, spec 11 A1-A4/A7)

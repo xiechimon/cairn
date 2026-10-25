@@ -316,7 +316,7 @@ button.css ← button.tsx；card.css ← card.tsx（死）；chip.css ← chip.t
 > - **成员表变了**：删 2（token-gate / machine-authorize）、增 1（`routes/agent-detail.css`，未在原文分级里）、
 >   `board/sidebar.css` 除名。
 > - 高三件（chief / detail / pages）**仍在原地**；按 `#522`（`docs/417`）的批次表，铺开仍在推进中。
-> - 原文两列已按**同一口径**复算，可直接对照。decl 口径取自本仓 `docs/spec/16-shadcn全站铺开批次表与验收口径.md` §7
+> - Both columns of the original were recomputed under **the same convention** and can be compared directly. The decl convention is taken from this repo's `docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md` §7
 >   的取数命令（`grep -cE '^[[:space:]]*[-a-zA-Z]+[[:space:]]*:.*;'`）；视觉占比口径同原文（decl 行里属性命中
 >   color/background/shadow/border/radius/font/outline/opacity/filter 等的比例）：
 

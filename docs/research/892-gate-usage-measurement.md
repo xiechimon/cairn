@@ -1,6 +1,6 @@
 # #892 量闸 — 真闭环实测里的 withPlan 分布、闸被跳过的路径全枚举与橡皮图章信号
 
-> 销账对象：`docs/spec/18-定位与差异化.md` §5 诚实清单第 2 条「withPlan 使用率未知」。
+> Settled item: `docs/spec/18-positioning-and-differentiation.md` §5 honest-list item 2, "withPlan usage unknown".
 > 结论先行：**担忧在数据里成立，且形态比「橡皮图章化」更差——是「物理绕过」而非「走过场」**。
 > 本机真跑数据 28 个 build / 17 张 done 卡里：confirm 闸 13 次进闸只有 3 次按了确认钮，
 > review 闸 6 次进闸只有 1 次走 merge 步放行；**15/17（88%）的 done 卡经看板手动改相
@@ -246,7 +246,7 @@ user 侧首发选择（去掉重启继承）：17 带方案 vs 1 直执行——
 
 ## 7. 与诚实清单第 2 条的对账
 
-`docs/spec/18-定位与差异化.md` §5 第 2 条原文的判据「真闭环实测里数 withPlan 分布」——
+The original criterion in `docs/spec/18-positioning-and-differentiation.md` §5 item 2 — "count the withPlan distribution in a real closed-loop run" —
 本文件就是那个数。**该条从「未知」变为「已量，担忧成立」**：直执行 39%（chief 侧 100%）、
 confirm 放行率 3/13、review 正门放行 1/6、done 经拖拽 15/17、版本化方案文档 0 行。
 spec §5 第 2 条的更新随本 PR 落（把「使用率未知」改为已量结论 + 指针），第 1 条

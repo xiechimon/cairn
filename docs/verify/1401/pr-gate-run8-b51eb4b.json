@@ -45,7 +45,7 @@
       "dimension": "rules",
       "title": "Three commit subjects lack the ticket, and the AGENTS.md squash recipe (cited by ADR 0021 D2) picks one with no closing line",
       "severity": "suggestion",
-      "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+      "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
       "line": 35,
       "failurePath": "ca088ce, 3944905 and 662cbd9 are titled `docs: spec 28 …`, without `(<ticket>)`. The AGENTS.md squash recipe takes `gh api repos/xiechimon/pacman/pulls/1410/commits -q '.[0].commit.message'`, and ADR 0021 D2 tells human merges in the GitHub UI or CLI to use that recipe. Here it returns ca088ce: the subject 'docs: spec 28 自举闭环计划（…）' with no `closes #1401`. A merger who follows the recipe lands a ticketless subject on main, and #1401 stays OPEN. Two things mitigate this. The PR body's Issues section flags the problem and supplies a replacement message. The repo's GitHub UI default (COMMIT_MESSAGES) would include e5414a2's `closes #1401`. A merge commit or rebase merge (both enabled) would still put the three ticketless subjects on main.",
       "evidence": "The REST commits endpoint returns .[0].sha = ca088cedbded3d23924f275af54f5444b7692d67. A per-commit format check gives fmt=0 for 662cbd9, 3944905 and ca088ce, and fmt=1 for the other 16. The repo settings are squash_merge_commit_message=COMMIT_MESSAGES and allow_merge_commit=true."
@@ -132,7 +132,7 @@
       "dimension": "evidence",
       "title": "The Acceptance item cites a comment with the final-head pr-gate run, but the PR has no comments",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 267,
       "failurePath": "The PR body's Acceptance item four is ticked [x]. It says pr-gate ran seven times and that 'the run on the final head is reported in a comment'. When this review ran, `gh api repos/xiechimon/pacman/issues/1410/comments` returned an empty list. The only reviews are the cursor[bot] FETCH_HEAD thread and the owner's reply. So no pr-gate verdict at b51eb4b exists on the PR yet; the newest committed verdict is run 7 at 8ebb099. The claim is still pending, not false, and the current gate run is presumably the one that will produce that comment. The box should only be ticked once the comment is posted.",
       "evidence": "issues/1410/comments: [] ; pulls/1410/comments: 2 (cursor[bot], xiechimon) ; newest committed verdict docs/verify/1401/pr-gate-run7-8ebb099.json has headSha 8ebb099..."
@@ -160,15 +160,15 @@
     ".claude/workflows/pr-gate.js",
     ".github/workflows/ci.yml",
     ".gitignore",
-    "docs/adr/0018-多agent团队三层与机器能力闸.md",
-    "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+    "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+    "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
     "docs/pr-review.md",
     "scripts/pr-gate-selfcheck.mjs",
-    "docs/spec/28-自举闭环-自写自合.md"
+    "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md"
   ],
   "mergedBy": "user",
   "humanReasons": [
-    "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-多agent团队三层与机器能力闸.md, docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-自举闭环-自写自合.md",
+    "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md, docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
     "3768 lines changed (over 800)"
   ],
   "missing": [],

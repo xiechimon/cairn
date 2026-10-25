@@ -1,121 +1,121 @@
-# 03 · 构建顺序 ROADMAP（追认式，#45 终稿）
+# 03 · Build-order ROADMAP (ratifying form, #45 final draft)
 
-> 正典地位：本册 = 复刻实现的全量构建顺序与里程碑验收索引。像素/功能平价的具体验收规则在 `04-验收口径.md`；架构义务在 `02-架构平价.md`；栈与 pin 在 `01-stack-v2.md`；地基在 `00-地基决议.md`。
-> 裁决来源：#45 grilling 八问（2026-09-22），逐项记录见 issue resolution comment。
+> Canonical status: this volume = the full build order and milestone-acceptance index of the replication implementation. The concrete pixel/functional-parity acceptance rules are in `04-acceptance-criteria.md`; architecture obligations in `02-architecture-parity.md`; the stack and pins in `01-stack-v2.md`; the foundation in `00-foundation-decisions.md`.
+> Ruling source: the #45 grilling's eight questions (2026-09-22); item-by-item records are in the issue resolution comment.
 
-## 0. 结论一览
+## 0. Summary of rulings
 
-| # | 裁决 |
+| # | Ruling |
 |---|------|
-| R1 | 通知维持有意 divergence：SSE + 页内 `new Notification()`（`document.hidden` 时弹），Web Push 不进 spec（02 §9.1 已终裁回填） |
-| R2 | ROADMAP 为**追认式**：UI-first 既成事实（#52–#58）收编为已过里程碑，全构建顺序一册覆盖 |
-| R3 | spec 分册最小新增：本册 + 04 册；现有 00/01/02/素材替换计划四册不重组 |
-| R4 | [推断] 44 处不清零（1:1 口径允许黑盒逼近）；不再开内构研究票；遗留证据清单见 04 册附录 A |
-| R5 | 两线并行：web 像素线续 #52 自有票流；后端线 shared → server → daemon → 编排；汇合 = fixture 切真 API |
-| R6 | 基线补拍混合制：动态面集中一张 r8 票（趁 tds+BYOK 环境在），静态面逐 web 票随拍 |
-| R7 | 功能平价双层验收：wire 层逐字段自动化进 CI + 行为层场景清单半自动 E2E（04 册 §3/§4） |
-| R8 | 本册 + 04 册落盘 = 地图 #34 destination 到达；雾项处置见 §6；wayfinder 退役，实现 effort 自有票流续走 |
+| R1 | Notifications keep the deliberate divergence: SSE + in-page `new Notification()` (fired when `document.hidden`); Web Push does not enter the spec (02 §9.1 already ruled and backfilled) |
+| R2 | The ROADMAP is **ratifying**: the UI-first fait accompli (#52–#58) is incorporated as a passed milestone, and one volume covers the full build order |
+| R3 | Minimal spec-volume additions: this volume + volume 04; the existing 00/01/02/asset-replacement-plan four volumes are not reorganized |
+| R4 | The 44 [inferred] spots are not zeroed (the 1:1 criterion permits black-box approximation); no more internal-structure research tickets; the remaining-evidence checklist is in volume 04 Appendix A |
+| R5 | Two lines in parallel: the web-pixel line continues #52's own ticket flow; the backend line goes shared → server → daemon → orchestration; the merge point = fixture switching to the real API |
+| R6 | Baseline-capture mixed system: dynamic surfaces concentrated into one r8 ticket (while the tds+BYOK environment still exists), static surfaces captured per web ticket along the way |
+| R7 | Functional parity has a two-layer acceptance: the wire layer goes field-by-field automation into CI + the behavior layer is a scenario checklist with semi-automatic E2E (volume 04 §3/§4) |
+| R8 | This volume + volume 04 landing = map #34's destination reached; fog-item dispositions see §6; the wayfinder retires, and implementation effort continues in its own ticket flow |
 
-## 1. 定位与两线结构
+## 1. Positioning and the two-line structure
 
-票面原设「先最小可跑内核，UI 后铺」；实际执行 UI 像素面先行（#42 原型 → #52 伞票 → #53–#58），已产出 apps/web 双屏 + parity 对拍 harness + CI 门禁（31 行矩阵 0 失败）。本册追认该事实为 M0，不回退不重排。
+The ticket's original plan was "a minimal runnable kernel first, UI later"; the actual execution went UI-pixel-first (#42 prototype → #52 umbrella → #53–#58), producing the apps/web two screens + the parity side-by-side harness + CI gates (the 31-row matrix with 0 failures). This volume ratifies that fact as M0, with no rollback and no rearrangement.
 
-两线并行（R5）：
+Two lines in parallel (R5):
 
-- **web 像素线**：不依赖后端（fixture/scenario 契约，`?scenario=<r7编号>`，仅 parity/dev 模式存活）。续 #52 票流切分：弹层票、路由票（每路由一张）、动效票、i18n 票；每张票验收增量 = 对拍矩阵加行（04 册 §2）。
-- **后端线**：M1 shared → M2 server → M3 daemon → M4 编排，包边界即 01 §3 monorepo 布局。
-- **汇合点 M5**：web 从 fixture 切真 API，端到端生命周期实跑；M6 功能平价终验。
+- **The web-pixel line**: does not depend on the backend (fixture/scenario contracts, `?scenario=<r7 number>`, alive only in parity/dev modes). Continuing #52's ticket splitting: popover tickets, route tickets (one per route), motion tickets, i18n tickets; each ticket's acceptance increment = a matrix row added (volume 04 §2).
+- **The backend line**: M1 shared → M2 server → M3 daemon → M4 orchestration; the package boundaries are exactly the 01 §3 monorepo layout.
+- **Merge point M5**: the web switches from fixture to the real API, and the end-to-end lifecycle runs live; M6 = functional-parity final verification.
 
-## 2. 里程碑
+## 2. Milestones
 
-### M0 · UI 像素骨架 + 双屏【已过，追认】
+### M0 · UI pixel skeleton + two screens [passed, ratified]
 
-- 交付（已 merge）：apps/web 骨架（#53）、看板基面/卡态（#54/#55）、详情基面/深层（#56/#57）、收尾导航闭环 + 全矩阵终验（#58）。
-- 验收（已达成）：parity 31 行矩阵 0 失败进 CI（typecheck + biome + parity）；阈值体系定型见 04 册 §2。
+- Delivered (already merged): the apps/web skeleton (#53), the board baseline/card states (#54/#55), the detail baseline/deep layers (#56/#57), the closing navigation loop + full-matrix final verification (#58).
+- Acceptance (already achieved): the parity 31-row matrix with 0 failures enters CI (typecheck + biome + parity); the threshold system finalized per volume 04 §2.
 
-### M0+ · web 线剩余面（与 M1–M4 并行）
+### M0+ · remaining web-line surfaces (parallel with M1–M4)
 
-- 范围：13 缺路由（schedules / project×3 / resources×6 / team / account / api-keys / feedback）；~14 类弹层（新建任务 dialog、开始任务、⌘K 搜索、更多菜单、chip popover、plan 类型下拉、删除确认、Token 用量、分支与 PR、运行历史、验收确认、交互用户菜单、AI 审核钮）；动效/拖拽排序；live streaming；i18n 接线；Chief 面板。
-- PWA 注记：manifest/sw.js 按 01 §4 字节级搬义务执行；**sw.js push handler 保留文件形状、服务端不投 push**（R1 divergence，04 册 §5 验收口径）。
-- 前置依赖：动态面（驳回回路/失败态/复用方案/运行历史多行）**无 r7 基线素材**——r8 集中补拍票（§4）先行；静态面随票随拍（R6）。
-- 切票与验收：每票加矩阵行 + 单屏阈值按 04 册 §2 规则。
+- Scope: 13 missing routes (schedules / project×3 / resources×6 / team / account / api-keys / feedback); ~14 popover classes (new-task dialog, start-task, ⌘K search, more menus, chip popovers, plan-type dropdown, delete confirmation, token usage, branches & PRs, run history, acceptance confirmation, interactive user menu, AI-review button); motion/drag-sorting; live streaming; i18n wiring; the Chief panel.
+- PWA note: manifest/sw.js execute the byte-level carry-over obligation per 01 §4; **the sw.js push handler keeps its file shape and the server does not push** (the R1 divergence, acceptance criterion in volume 04 §5).
+- Prerequisites: dynamic surfaces (rejection loop / failure states / reuse-plan / multi-row run history) **have no r7 baseline material** — the r8 concentrated-capture ticket (§4) goes first; static surfaces are captured per ticket along the way (R6).
+- Ticket-splitting and acceptance: each ticket adds matrix rows + per-screen thresholds per volume 04 §2's rules.
 
-### M1 · shared 包
+### M1 · shared package
 
-- 范围：协议词表 schema（02 §5/§6 全量）、record 形状（02 §6.2，24 表投影源）、phase 九值枚举（02 §4.1）、品牌串命名常量表（02 §5.8）。
-- 验收：词表 schema 快照测试绿（01 §7.4）；不发明 02 之外字段形状（01 §6 migration 纪律）。
+- Scope: protocol-vocabulary schemas (02 §5/§6 in full), record shapes (02 §6.2, the projection source of 24 tables), the nine-value phase enum (02 §4.1), the brand-string naming-constant table (02 §5.8).
+- Acceptance: vocabulary-schema snapshot tests green (01 §7.4); no field shapes invented beyond 02 (01 §6 migration discipline).
 
 ### M2 · server
 
-- 范围：Hono REST + SSE 全端点（02 §6.1 词表，全 SSE 无 WS）；SQLite + Drizzle 24 表 migration 进 repo（01 §6）；git http-backend 本地 bare 托管 + GitHub 接入双形态（02 §3）；cron 定时（02 §9.2 词表照抄）；通知 SSE 事件（02 §9.1 + R1 divergence）；搜索 `GET /api/search`（自设，02 §6.3）；SecretBox keyfile 三层密钥（02 §8，细案 = 01 §4.2 移交项）；单用户 seed + team 保形（02 §2）。
-- 验收：M2 面端点 wire 对拍绿（04 册 §3）；行为层 M2 场景清单（04 册 §4）。
+- Scope: Hono REST + SSE all endpoints (02 §6.1 vocabulary, all-SSE no WS); SQLite + Drizzle 24-table migrations into the repo (01 §6); git http-backend local-bare hosting + the GitHub-connection dual shape (02 §3); cron scheduling (02 §9.2 vocabulary copied); notification SSE events (02 §9.1 + the R1 divergence); search `GET /api/search` (self-set, 02 §6.3); the SecretBox keyfile three-layer keys (02 §8, detailed plan = the 01 §4.2 handoff item); single-user seed + team shape kept (02 §2).
+- Acceptance: the M2-surface endpoint wire side-by-side green (volume 04 §3); the behavior-layer M2 scenario list (volume 04 §4).
 
-### M3 · daemon（executor）
+### M3 · daemon (executor)
 
-- 范围：纯 JS npm 包（01 §4.3）；pi 0.85.1 经 `AgentBackend` 缝消费（01 §5 签名闭环，缝外 import = lint 红）；机器协议 claim~75s + SSE wake、`/api/machine/*` 全词表（02 §5）；worktree 契约（`tds/conv-*`、checkpoint、7 天回收）；step 三类执行 + journal；upload-urls 回传；merge `202 delegated`；per-step 凭证下发不落盘（02 §8）。
-- 验收：executor 协议逐字段对拍（02 §5 canonical）；单机生命周期 todo→done 实跑（02 §4.2 主时序 = E2E 脊柱）。
-- **T2 时间盒（00 册移交，本册定）**：M3 首张票内验证 `AgentSession` 缝撑宿主 durable 编排（step 队列持久 + recover）；时间盒 = M3 第一张票；撑不住即触发 00/T2 重估 D3，**不拖入 M4**。
+- Scope: pure-JS npm package (01 §4.3); pi 0.85.1 consumed through the `AgentBackend` seam (01 §5 signature closure; importing outside the seam = lint red); the machine protocol claim ~75s + SSE wake, the full `/api/machine/*` vocabulary (02 §5); the worktree contract (`tds/conv-*`, checkpoint, 7-day reclamation); the three step kinds' execution + journal; upload-urls round trip; merge `202 delegated`; per-step credential delivery not on disk (02 §8).
+- Acceptance: executor-protocol field-by-field side-by-side (02 §5 canonical); the single-machine lifecycle todo→done live run (02 §4.2's main timeline = the E2E spine).
+- **The T2 time box (handed off from volume 00, set here)**: verified within M3's first ticket that the `AgentSession` seam supports host durable orchestration (persistent step queue + recover); the time box = M3's first ticket; if it does not hold, 00/T2 fires and D3 is re-evaluated, **not dragged into M4**.
 
-### M4 · 编排
+### M4 · orchestration
 
-- 范围：Chief = 特例 Agent（pi 会话 + `remoteTools[]` relay，49 词表按 02 §4.3 + r5 §2 黑盒逼近）；措辞→spec 三段变换（r5 §2.3）；分派职责文本权重（r5 §2.4 A/B 实证）；memory 写路径（`save_memory`、指令触发+裁量、溯源形状、配额 100，02 §4.4/r5 §6）；驳回回路 plan v2 + unified diff（02 §4.2/r5 §4）；双 Agent 分派 `assignment:{plan,build}`（r5 §5）；MCP 双面（团队 server per-Agent 授权 + 远程 MCP + key 级工具白名单，02 §7）；通知矩阵 in-app 三事件（02 §9.1 r5 改判）。
-- 验收：行为层 M4 场景清单 = r5 六项实测逐条对照（04 册 §4）；memory 读侧注入形等 [推断] 项触到即验证回写（04 册附录 A）。
+- Scope: Chief = special Agent (pi session + `remoteTools[]` relay, the 49-vocabulary per 02 §4.3 + r5 §2 black-box approximation); the wording→spec three-part transform (r5 §2.3); dispatch responsibility-text weights (r5 §2.4 A/B evidence); the memory write path (`save_memory`, instruction-triggered + discretion, the provenance shape, the 100 quota, 02 §4.4/r5 §6); the rejection loop plan v2 + unified diff (02 §4.2/r5 §4); the dual-Agent dispatch `assignment:{plan,build}` (r5 §5); the MCP dual surfaces (team-server per-Agent authorization + remote MCP + key-level tool allowlists, 02 §7); the notification matrix's three in-app events (02 §9.1 r5 re-adjudication).
+- Acceptance: the behavior-layer M4 scenario list = the r5 six-item measurement checked item by item (volume 04 §4); [inferred] items like the memory read-side injection form fire when touched and verify back (volume 04 Appendix A).
 
-### M5 · 汇合
+### M5 · merge
 
-- 范围：web fixture 切真 API（scenario 参数退役为 dev-only 或删）；live streaming 接真 SSE；r8 补拍基线进矩阵；端到端生命周期 UI 实跑（新建→规划→确认→执行→审核→合并→done，含驳回支线与定时轮）。
-- 验收：全矩阵（含 r8 新基线行）0 失败；E2E 主时序全链绿（01 §7.4）。
+- Scope: the web switches from fixture to the real API (the scenario parameter retires to dev-only or is deleted); live streaming connects to the real SSE; the r8-captured baselines enter the matrix; the end-to-end lifecycle runs live on the UI (create → plan → confirm → execute → review → merge → done, including the rejection branch and scheduled rounds).
+- Acceptance: the full matrix (including the new r8 baseline rows) 0 failures; the E2E main-timeline full chain green (01 §7.4).
 
-### M6 · 功能平价终验
+### M6 · functional-parity final verification
 
-- 范围：04 册全部口径终验——像素矩阵全跑、wire 对拍全绿、行为层清单逐条核、真人一次项（OS 通知权限弹窗、桌面通知实弹、OAuth 连订阅）。
-- 出口：验收报告落 `docs/spec/`（或 parity/output 存档）；升级票开窗（§3）。
+- Scope: final verification of all volume-04 criteria — the full pixel matrix, all wire side-by-side green, the behavior-layer checklist checked item by item, and the once-per-real-human items (the OS notification-permission popup, a real desktop-notification fire, OAuth-connecting subscriptions).
+- Exit: the acceptance report lands in `docs/spec/` (or archived under parity/output); upgrade tickets open their windows (§3).
 
-### M7 · 功能闭环【已过】
+### M7 · feature closed loop [passed]
 
-- 范围：08 册定案——死按钮清零与反向差距收编。档 1–4 施工行 23 条（接真 18 / wontfix 移除 5）全部落终态；档 5 六区经 #303 核实「已实」；语音按 C5 移除两处钮。处置二分律：有对象面接真，无 local-first 对象面移除渲染 + `dead-buttons.spec.ts` 钉死。
-- 出口：验收报告落 `docs/spec/10-M7-验收报告.md`；每功能 verify-pacman 证据归档 `docs/verify/<ticket>/`（口径见 `.claude/skills/verify-pacman/SKILL.md`「证据归档纪律」）。
+- Scope: settled by volume 08 — dead buttons zeroed and the reverse-gap incorporated. Construction rows 1–4's 23 items (18 connected / 5 removed as wontfix) all landed in their final states; row 5's six regions were verified as "already implemented" by #303; voice removed two buttons per C5. The disposition dichotomy: surfaces with a real object get connected; surfaces without a local-first object get their rendering removed + pinned by `dead-buttons.spec.ts`.
+- Exit: the acceptance report lands in `docs/spec/10-m7-acceptance-report.md`; each feature's verify-pacman evidence is archived under `docs/verify/<ticket>/` (criterion see `.claude/skills/verify-pacman/SKILL.md` `证据归档纪律`).
 
-## 3. 升级窗口与节奏（01 §9 / 00 册移交项汇编）
+## 3. Upgrade windows and cadence (01 §9 / volume-00 handoff items assembled)
 
-| 项 | 节奏 |
+| Item | Cadence |
 |---|------|
-| pi 0.86.0 | M3 期间首个 D6 升级窗口：读 Breaking 段，过 `AgentBackend` 缝回归 |
-| TS 7.0.2 / react-router 8.4.0 / Tailwind 4.x | M6 验收后各自成票（承旧升级票纪律） |
-| turbo | CI 时长成痛点时触发，不预装 |
-| transcript 虚拟滚动 | 实现期按实测定，不预锁（@tanstack/react-virtual 候选） |
-| T1/T3 触发条款 | 随时可触发，回写 00 册 + 对应票 comment |
+| pi 0.86.0 | The first D6 upgrade window during M3: read the Breaking section, pass the `AgentBackend` seam regression |
+| TS 7.0.2 / react-router 8.4.0 / Tailwind 4.x | Each gets its own ticket after the M6 acceptance (inheriting the old upgrade-ticket discipline) |
+| turbo | Fires when CI duration becomes a pain point; not pre-installed |
+| transcript virtual scrolling | Decided by measurement at implementation time, not pre-locked (@tanstack/react-virtual candidate) |
+| T1/T3 trigger clauses | Can fire at any time; write back to volume 00 + the corresponding ticket comment |
 
-## 4. r8 集中补拍票（R6）
+## 4. The r8 concentrated-capture ticket (R6)
 
-- **实现 effort 第一张研究票**（不属地图 #34；地图已关）：动态面基线补拍——驳回回路各态、失败态、`复用方案` 弹层、运行历史多行 + `重跑` 钮；顺带 r7 §6 缺口表中需真实 build 触发的项（AI 审核钮点击后行为）。
-- 前置：本机 tds + BYOK 链路可用（r3/r5 会话已打通；机器离线先 `tds start`）；环境有失效风险（站点已三次漂移），**优先排期**。
-- 纪律：截图编号续 r7（54+），落 `docs/research/assets/r8/`；产出 `docs/research/r8-*.md`；新基线进 parity matrix 引用。
-- 静态面（资源页弹窗表单、dark 弹层、搜索面板结果态）：不开集中票，各 web 实现票内置前置补拍动作。
+- **The implementation effort's first research ticket** (not part of map #34; the map is closed): dynamic-surface baseline captures — the rejection loop's states, failure states, the `复用方案` popover, multi-row run history + the `重跑` button; along the way, the r7 §6 gap-table items that need a real build to trigger (the behavior after clicking the AI-review button).
+- Prerequisites: the local tds + BYOK link is usable (the r3/r5 sessions already connected; if the machine is offline, `tds start` first); the environment is at risk of expiring (the site has drifted three times already), so **schedule it first**.
+- Discipline: screenshot numbering continues r7 (54+), landing in `docs/research/assets/r8/`; producing `docs/research/r8-*.md`; the new baselines enter the parity-matrix references.
+- Static surfaces (resource-page popup forms, dark popovers, the search-panel result state): no concentrated ticket; each web-implementation ticket builds in a capture-first action.
 
-## 5. 每阶段验收清单索引
+## 5. Per-milestone acceptance-checklist index
 
-| 里程碑 | 像素层 | wire 层 | 行为层 |
+| Milestone | Pixel layer | Wire layer | Behavior layer |
 |---|---|---|---|
-| M0+/每 web 票 | 矩阵加行（04 §2） | — | — |
-| M1 | — | schema 快照（04 §3） | — |
-| M2 | — | M2 端点对拍 | M2 场景（04 §4） |
-| M3 | — | machine 协议对拍 | 单机生命周期实跑 |
-| M4 | — | — | r5 六项对照（04 §4） |
-| M5 | 全矩阵 + r8 行 | 全端点 | E2E 主时序全链 |
-| M6 | 终验 | 终验 | 清单逐条 + 真人一次项 |
+| M0+/each web ticket | matrix row added (04 §2) | — | — |
+| M1 | — | schema snapshots (04 §3) | — |
+| M2 | — | M2 endpoint side-by-side | M2 scenarios (04 §4) |
+| M3 | — | machine-protocol side-by-side | single-machine lifecycle live run |
+| M4 | — | — | r5 six-item comparison (04 §4) |
+| M5 | full matrix + r8 rows | all endpoints | E2E main-timeline full chain |
+| M6 | final verification | final verification | checklist item by item + once-per-real-human items |
 
-## 6. 雾处置记录（R8，地图 #34 收尾）
+## 6. Fog-disposition record (R8, map #34 wrap-up)
 
-| 原雾项 | 处置 |
+| Original fog item | Disposition |
 |---|------|
-| 分屏幕 UI 规格切分 + 像素 diff 工具 | 被现实吸收：#52 票流切分（弹层/路由/动效/i18n 票）+ #53 parity harness 已建成；规则定型入 04 册 §2 |
-| preview-token / tds-tunnel | 转 04 册附录 B：实现期见到 UI/wire 触点再 graduate 设计票（02 §9.3 在册不设计不变） |
-| spec 分册结构与出版格式 | 本册 + 04 册落盘即终稿（R3） |
-| 执行 effort 启动与组织 | 已自发启动（web 线 #52–#58 实跑）；组织方式 = `ready-for-agent` 票 + 逐票实现会话；后端线按本册 §2 里程碑切票 |
+| per-screen UI-spec splitting + pixel-diff tool | Absorbed by reality: #52's ticket splitting (popover/route/motion/i18n tickets) + #53's parity harness already built; the rules were finalized into volume 04 §2 |
+| preview-token / tds-tunnel | Moved to volume 04 Appendix B: graduate a design ticket when a UI/wire touchpoint is seen at implementation time (02 §9.3's recorded-but-undesigned standing unchanged) |
+| spec-volume structure and publishing format | This volume + volume 04 landing is the final draft (R3) |
+| execution-effort startup and organization | Already self-started (the web line #52–#58 ran live); the organization form = `ready-for-agent` tickets + per-ticket implementation sessions; the backend line splits tickets per this volume's §2 milestones |
 
-## 7. 交接
+## 7. Handoff
 
-- 地图 #34：Decisions-so-far 补齐后关闭；wayfinder 退役。
-- 实现票纪律：每票自足（引用正典册章节，不复述）；票间上下文可弃；web 线续 `web/NN-*` 分支 + PR，后端线同型。
-- 遗留 [推断] 与证据缺口：04 册附录 A 清单，实现期触到就地验证，结果回写 02 §11。
+- Map #34: close it after Decisions-so-far is filled in; the wayfinder retires.
+- Implementation-ticket discipline: every ticket self-sufficient (citing the canon-volume chapters, not restating them); inter-ticket context is disposable; the web line continues on `web/NN-*` branches + PRs, the backend line likewise.
+- Remaining [inferred] and evidence gaps: the volume-04 Appendix A checklist; verify on the spot when touched at implementation time, and write the results back to 02 §11.

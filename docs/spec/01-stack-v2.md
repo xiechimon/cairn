@@ -1,161 +1,161 @@
-# 01 · 技术栈锁定 v2（todos.dev 复刻）
+# 01 · Tech-stack locking v2 (todos.dev replication)
 
-> Wayfinder 票：xiechimon/pacman #43（`wayfinder:grilling`，决议 2026-09-20，两轮全 frontier 裁决）。
-> 方法论承旧 01-stack（`git show 131620e:docs/spec/01-stack.md`，nanobot 复刻册，仓库转向后仅方法论有效）：逐项锁死、实现会话零选型权、接口替换缝、pin 纪律、对拍验收。
-> 边界继承：`00-地基决议.md` D1–D7（记作 `00/D*`）；`02-架构平价.md` A1–A12（记作 `02/§*`）；词汇与实体边界 = 根 `CONTEXT.md`。上游证据：`docs/research/r1-site-inventory.md`（记 `r1 §…`）、`r2-app-ui-inventory.md`（`r2 §…`）、`r3-protocol-executor.md`（`r3 §…`）、`r4-foundation.md`（`r4 §…`）。
-> npm 版本为 **2026-09-20 registry 实测**（latest 或指定 tag）；pi 系版本从 00/D6 canon。
-> 类型记号：**沿用**（继承旧 01-stack 或 00/02 既有决议）/ **锁定**（本票新拍板）/ **[设计]**（官方不可观测，复刻自设）/ **[推断]**（无一手观测的黑盒逼近）/ **移交**（本册只定边界，细案归他票）。
+> Wayfinder ticket: xiechimon/pacman #43 (`wayfinder:grilling`, decision 2026-09-20, two rounds of all-frontier rulings).
+> Methodology inherited from the old 01-stack (`git show 131620e:docs/spec/01-stack.md`, the nanobot replication volume; only the methodology survived the repo pivot): lock item by item, implementation sessions have zero selection authority, interface replacement seams, pin discipline, side-by-side acceptance.
+> Boundary inheritance: `00-foundation-decisions.md` D1–D7 (cited as `00/D*`); `02-architecture-parity.md` A1–A12 (cited as `02/§*`); vocabulary and entity boundaries = root `CONTEXT.md`. Upstream evidence: `docs/research/r1-site-inventory.md` (cited `r1 §…`), `r2-app-ui-inventory.md` (`r2 §…`), `r3-protocol-executor.md` (`r3 §…`), `r4-foundation.md` (`r4 §…`).
+> npm versions are **measured from the 2026-09-20 registry** (latest or specified tag); pi-family versions follow the 00/D6 canon.
+> Type notation: **inherited** (carries over the old 01-stack or existing 00/02 decisions) / **locked** (newly decided by this ticket) / **[designed]** (not observable on the official side, self-set by the replication) / **[inferred]** (black-box approximation without first-hand observation) / **handed off** (this volume fixes only the boundary; the detailed plan belongs to another ticket).
 
-## 0. 结论一览
+## 0. Summary of conclusions
 
-| # | 决策 | 一句话 |
+| # | Decision | One-liner |
 |---|---|---|
-| S1 | 同栈原则 | **像素平价不要求同栈**；验收 =「用户视角不可分辨」（#34 口径），每项带观测栈差异注记（§8） |
-| S2 | 前端形态 | **单 Vite + React SPA**：landing 与 workspace 同应用、路由分隔；不引 Next.js/SSR |
-| S3 | runtime | **Node 24 LTS**（`engines >=22.19.0`，pi 底线），CI 矩阵 22/24；Bun 不引入 |
-| S4 | 存储 | **SQLite（better-sqlite3）+ Drizzle**；schema 面 = 02 §6.2 record 形状投影（§6） |
-| S5 | 样式体系 | **Tailwind 4.3.3**（#106 升级窗口；观测同版期 3.4.19 → v4，§4.1）+ CSS 变量 token 层 + Radix（`radix-ui` 统一包）+ cmdk；深色默认 `.light` 反相 trick 原样复刻 |
-| S6 | i18n | **分层同构官方不对称**：landing 四语 / docs 仅 en+zh-CN / 法务仅英文 / workspace zh-CN 权威 + en 兜底；react-i18next |
-| S7 | 流式渲染 | **streamdown**（内置 shiki + katex + 流式半渲染安全），patch-pin |
-| S8 | 状态与数据层 | **TanStack Query v5**（SSE 事件 → `invalidateQueries`，兑现 02 §1.2）+ **Zustand**；localStorage 键名照 r2 §1.5 契约 |
-| S9 | daemon 发行 | **纯 JS npm 包**（esbuild 单文件 + node shebang）；不复刻 6 平台二进制 |
-| S10 | git 操作层 | **spawn 系统 git + 自建薄 wrapper**（词表 = 02 §5.5 契约）；server 端 `git http-backend` CGI；isomorphic-git/simple-git 不引入 |
-| S11 | 批量沿用面 | Hono、zod 4、pnpm+catalog、Biome、vitest+playwright、commander+clack、pino、cron-parser、TS 7.0.2、ESM nodenext、PWA 原样搬、keyfile AES-256-GCM、EventSource、undici 代理（§4.5） |
-| S12 | AgentBackend 缝 | 落 `packages/shared`，事件面 = 02 §5.6 pi 词表 1:1（签名草案 §5） |
+| S1 | Same-stack principle | **Pixel parity does not require the same stack**; acceptance = "indistinguishable from the user's perspective" (#34 wording), each item carries an observed-stack-difference note (§8) |
+| S2 | Frontend form | **Single Vite + React SPA**: landing and workspace in the same app, separated by routes; no Next.js/SSR |
+| S3 | runtime | **Node 24 LTS** (`engines >=22.19.0`, pi's floor), CI matrix 22/24; Bun not introduced |
+| S4 | Storage | **SQLite (better-sqlite3) + Drizzle**; the schema surface = projection of the 02 §6.2 record shapes (§6) |
+| S5 | Style system | **Tailwind 4.3.3** (#106 upgrade window; observed same-version-period 3.4.19 → v4, §4.1) + CSS-variable token layer + Radix (`radix-ui` unified package) + cmdk; the dark-default `.light` inversion trick replicated as-is |
+| S6 | i18n | **Layered, isomorphic to the official asymmetry**: landing in four languages / docs in en+zh-CN only / legal in English only / workspace zh-CN authoritative + en fallback; react-i18next |
+| S7 | Streaming rendering | **streamdown** (built-in shiki + katex + streaming half-render safety), patch-pinned |
+| S8 | State and data layer | **TanStack Query v5** (SSE events → `invalidateQueries`, honoring 02 §1.2) + **Zustand**; localStorage key names per the r2 §1.5 contract |
+| S9 | daemon distribution | **Pure-JS npm package** (esbuild single file + node shebang); no replication of the 6-platform binaries |
+| S10 | git operation layer | **spawn the system git + a self-built thin wrapper** (vocabulary = the 02 §5.5 contract); `git http-backend` CGI on the server side; isomorphic-git/simple-git not introduced |
+| S11 | Batch inherited surfaces | Hono, zod 4, pnpm+catalog, Biome, vitest+playwright, commander+clack, pino, cron-parser, TS 7.0.2, ESM nodenext, PWA carried over as-is, keyfile AES-256-GCM, EventSource, undici proxying (§4.5) |
+| S12 | AgentBackend seam | Lives in `packages/shared`; event surface = 02 §5.6 pi vocabulary 1:1 (signature draft §5) |
 
 ---
 
-## 1. 定位与裁决原则
+## 1. Positioning and adjudication principles
 
-本册把复刻实现所需**全部技术选型逐项锁死**。实现者拿到 00 + 02 + 本册后不做任何选型决策；只改决定，不改实现。00 定地基边界（引擎/craft 档位/UI 地基/pin 纪律），02 定架构 canon（进程拓扑/协议契约/安全边界），本册钉引擎与逐项 pin 表——三册分工即 00 §「对下游票的影响」与 02 §10 的移交清单，本册逐项闭环。
+This volume **locks every tech selection** the replication implementation needs, item by item. After receiving 00 + 02 + this volume, the implementer makes no selection decisions of any kind; only decisions change, not implementations. 00 fixes the foundation boundaries (engine/craft tier/UI foundation/pin discipline), 02 fixes the architecture canon (process topology/protocol contracts/security boundaries), and this volume pins the engine and the per-item pin table — the three-volume division of labor is exactly 00's "Impact on downstream tickets" section and 02 §10's handoff checklist; this volume closes item by item.
 
-**S1 同栈裁决（票面问「像素平价是否要求同栈」）**：**不要求**，且「同栈」无单一对象——官方自身两套异构（landing = Next.js App Router SSG，r1 §1.1 headers 实证；workspace = 原子类 `r-*`/`css-*` DOM → **[推断] React Native Web / Expo 系**，r2 §92）。验收口径「像素级 UI + 功能等价，用户视角不可分辨」约束的是渲染结果与行为，不是构建栈。RNW 复刻成本极高且与 00/D5（从零 React + Radix + 自建 token）冲突，同栈路线不成立。**义务转化为**：每项决策带观测栈差异注记（§8 汇总），不可观测处标 [设计]/[推断]，像素对拍靶 = r1/r2 截图与 CSS 抓包原件。
+**S1 same-stack adjudication (the ticket asks "does pixel parity require the same stack")**: **it does not**, and "same stack" has no single object — the official side itself runs two heterogeneous stacks (landing = Next.js App Router SSG, evidenced by r1 §1.1 headers; workspace = atomic-class `r-*`/`css-*` DOM → **[inferred] React Native Web / Expo family**, r2 §92). The acceptance criterion "pixel-level UI + functional equivalence, indistinguishable from the user's perspective" constrains the rendered result and behavior, not the build stack. RNW replication cost is extremely high and conflicts with 00/D5 (React from scratch + Radix + self-built tokens), so the same-stack route does not hold. **The obligation translates into**: every decision carries an observed-stack-difference note (§8 aggregate); unobservable spots are marked [designed]/[inferred]; pixel side-by-side targets = the r1/r2 screenshots and CSS-capture originals.
 
-## 2. 观测栈底账（差异注记的事实基线）
+## 2. Observed-stack baseline (the factual basis of the difference notes)
 
-| 面 | todos.dev 观测 | 出处 |
+| Surface | todos.dev observation | Source |
 |---|---|---|
-| landing 框架 | Next.js App Router、SSG 预渲染（`x-nextjs-prerender: 1`、`/_next/static/*`） | r1 §1.1 |
-| landing CSS | Tailwind CSS **3.4.19**（文件头 banner）+ Tailwind Typography（`--tw-prose-*` 全量） | r1 §1.1 |
-| 主题 | **深色 = `:root` 默认态**，浅色 = 根挂 `.light`；`dark:*` 编译为 `.dark\:x:where(:not(.light):not(.light *))`；`theme-color #18181b`、`color-scheme dark light` 全 163 页一致 | r1 §4.3 |
-| 色板 | 深色侧 zinc 原色阶、浅色侧 stone 暖米白；主强调 indigo 原色阶；状态色 rose/amber/green/gray；阴影未自定义（`shadow-sm` 主力）；断点 = Tailwind 默认五档 | r1 §5 |
-| 字体 | 仅 2 个 woff2：Inter + JetBrains Mono；**CJK 无 webfont，全靠系统字体 + emoji 字体族兜底**；CSS 变量 `--font-inter`/`--font-jetbrains-mono` + Arial 兜底度量覆写（859B 样式表已全量抓取） | r1 §4.1 |
-| workspace 框架 | **[推断]** React Native Web / Expo 系（原子类实证） | r2 §92 |
-| 实时面 | **全 SSE 无 WebSocket**（team stream / conversation stream / machine stream） | r3 §8.1、02 §1.2 |
-| executor 发行 | npm -g `@todos-dev/cli` 0.1.52，包体 275MB：6 平台二进制（`@todos-dev/cli-darwin-arm64` 等）+ 内嵌依赖；`pi-ai`/`pi-coding-agent` **0.84.3** 明文 | r3 §1.1 |
-| PWA | `manifest.webmanifest`（1,146B）+ `sw.js`（3,495B，自述「notification click routing only, 无 fetch handler」）全量已抓 | r1 §5.1/§5.3 |
-| i18n | `en` 无前缀 / `/zh` / `/zh-TW` / `/ja`，`x-default`→en；营销四语全译、docs 仅 zh-CN 全译、privacy/terms 仅英文；未匹配路径 307 → `/login?callbackUrl=` | r1 §1.1/§8 |
-| DB / server 框架 / 状态库 / markdown 渲染栈 | **不可观测**（服务端黑盒；前端在 minified bundle 内） | r1 §9、r3 §11 |
+| landing framework | Next.js App Router, SSG pre-rendering (`x-nextjs-prerender: 1`, `/_next/static/*`) | r1 §1.1 |
+| landing CSS | Tailwind CSS **3.4.19** (file-header banner) + Tailwind Typography (full `--tw-prose-*`) | r1 §1.1 |
+| theme | **dark = the `:root` default state**, light = `.light` hung on the root; `dark:*` compiles to `.dark\:x:where(:not(.light):not(.light *))`; `theme-color #18181b`, `color-scheme dark light` identical across all 163 pages | r1 §4.3 |
+| palette | zinc pure scale on the dark side, stone warm off-white on the light side; primary accent indigo pure scale; status colors rose/amber/green/gray; shadows not customized (`shadow-sm` mainstay); breakpoints = Tailwind default five tiers | r1 §5 |
+| fonts | only 2 woff2 files: Inter + JetBrains Mono; **no CJK webfont, all fallback to system fonts + emoji font families**; CSS variables `--font-inter`/`--font-jetbrains-mono` + Arial-fallback metric overrides (the 859B stylesheet fully captured) | r1 §4.1 |
+| workspace framework | **[inferred]** React Native Web / Expo family (atomic-class evidence) | r2 §92 |
+| realtime surfaces | **all SSE, no WebSocket** (team stream / conversation stream / machine stream) | r3 §8.1, 02 §1.2 |
+| executor distribution | npm -g `@todos-dev/cli` 0.1.52, 275MB package: 6-platform binaries (`@todos-dev/cli-darwin-arm64` etc.) + embedded dependencies; `pi-ai`/`pi-coding-agent` **0.84.3** in plaintext | r3 §1.1 |
+| PWA | `manifest.webmanifest` (1,146B) + `sw.js` (3,495B, self-described "notification click routing only, no fetch handler") fully captured | r1 §5.1/§5.3 |
+| i18n | `en` unprefixed / `/zh` / `/zh-TW` / `/ja`, `x-default`→en; marketing fully translated in four languages, docs only fully translated in zh-CN, privacy/terms English only; unmatched paths 307 → `/login?callbackUrl=` | r1 §1.1/§8 |
+| DB / server framework / state library / markdown rendering stack | **not observable** (server-side black box; frontend inside the minified bundle) | r1 §9, r3 §11 |
 
-## 3. monorepo 布局与 pin 纪律
+## 3. Monorepo layout and pin discipline
 
-**pnpm 12.5.1 workspaces + catalog**（沿用旧 §3；turbo 后置——CI 时长成痛点再加）。四包：
+**pnpm 12.5.1 workspaces + catalog** (inherited from old §3; turbo deferred — add it when CI duration becomes a pain point). Four packages:
 
 ```
-apps/web        # SPA：landing（41 路由 × locale）+ workspace（/app 树），Vite 构建，路由分隔
-apps/server     # Hono：REST + SSE + SPA 静态同源托管（02/A1）+ git http-backend + cron + DB + 通知
-apps/daemon     # executor CLI（tds 品牌位→#44）：claim/心跳/worktree/pi 会话/上传，esbuild 单文件
-packages/shared # 协议词表、record 形状 zod schema、命名常量表（02 §5.8）、AgentBackend 缝（§5）
+apps/web        # SPA: landing (41 routes × locale) + workspace (/app tree), Vite build, separated by routes
+apps/server     # Hono: REST + SSE + SPA static same-origin hosting (02/A1) + git http-backend + cron + DB + notifications
+apps/daemon     # executor CLI (tds brand slot → #44): claim/heartbeat/worktree/pi session/upload, esbuild single file
+packages/shared # protocol vocabulary, record-shape zod schemas, naming-constant table (02 §5.8), AgentBackend seam (§5)
 ```
 
-依赖方向：`web / server / daemon → shared`，三端互不依赖，shared 零反向。全线 ESM（`"type": "module"`），tsconfig `module: nodenext` + `strict`，target Node 24。共享依赖版本走 catalog 统一。
+Dependency direction: `web / server / daemon → shared`; the three ends have no dependencies on each other; shared has zero reverse dependencies. All ESM (`"type": "module"`), tsconfig `module: nodenext` + `strict`, target Node 24. Shared-dependency versions are unified through the catalog.
 
-**pin 纪律（00/D6 展开为逐项 pin 表 = §4 各表「pin」列）**：一切依赖精确 patch-pin；pi 系（`@earendil-works/*`）钉 **0.86.0**（00/D6 canon；首个升级窗口 #107 已读 0.86.0 Breaking 段并兑现——三条 Breaking 全落缝外，§9）。升级票后置纪律承旧：复刻验收前禁止框架 major 抬版（Tailwind 4 / TS 7 / react-router 8 各自成票，§9）。
+**Pin discipline (00/D6 expanded into the per-item pin table = the "pin" column of each table in §4)**: every dependency is exactly patch-pinned; the pi family (`@earendil-works/*`) is pinned at **0.86.0** (00/D6 canon; the first upgrade window #107 already read the 0.86.0 Breaking section and honored it — all three Breaking entries land outside the seams, §9). The post-upgrade-ticket discipline is inherited: no framework major-version bumps before replication acceptance (Tailwind 4 / TS 7 / react-router 8 each get their own ticket, §9).
 
-**接口替换缝**（沿用旧 §3 方法论，lint 规则强制——缝外直接 import 被包依赖 = 违规）：
+**Interface replacement seams** (inheriting the old §3 methodology, enforced by lint rules — importing a wrapped dependency directly outside the seam is a violation):
 
-- `AgentBackend` ← pi SDK（§5，00/D1 缝的签名落地）
-- `GitOps` ← 系统 git spawn wrapper（词表 = 02 §5.5 worktree 契约 + §3 http-backend/读树）
-- `Settings` ← 自建分层 config（zod schema，优先级 = 显式入参 > env > .env > 配置文件 > 默认值，承旧）
-- `SecretBox` ← node:crypto AES-256-GCM（keyfile 细案 §4.2）
-- `Scheduler` ← cron-parser + 自建调度循环（02 §9.2 词表）
+- `AgentBackend` ← pi SDK (§5, the signature landing of 00/D1's seam)
+- `GitOps` ← system-git spawn wrapper (vocabulary = the 02 §5.5 worktree contract + §3 http-backend/tree-reading)
+- `Settings` ← self-built layered config (zod schema, precedence = explicit args > env > .env > config file > defaults, inherited)
+- `SecretBox` ← node:crypto AES-256-GCM (keyfile detailed plan §4.2)
+- `Scheduler` ← cron-parser + self-built scheduling loop (02 §9.2 vocabulary)
 
-## 4. 逐项决策表
+## 4. Item-by-item decision tables
 
-### 4.1 前端（apps/web）
+### 4.1 Frontend (apps/web)
 
-| 项 | 决策 | pin | 类型 | 理由 / 观测栈注记 |
+| Item | Decision | pin | Type | Reasoning / observed-stack note |
 |---|---|---|---|---|
-| 框架 | React 19 SPA（从零，00/D5） | react / react-dom **19.3.0** | 锁定 | 新建无升级债，直取 latest 19；官方 workspace RNW [推断] 不复刻（S1） |
-| 构建 | Vite + @vitejs/plugin-react；dev 期 proxy → server | vite **8.3.0** / plugin-react **6.1.1** | 锁定 | 单 SPA 无 SSR 诉求；PWA/桌面壳包 SPA 最顺（02 §1.1 前提）；官方 landing Next.js SSG → 差异注记 §8 |
-| 路由 | React Router v8（library mode），手写路由表 | react-router **8.4.0** | 锁定 | 路由表固定（41 landing + locale + /app 树）；#105 兑现 v8 窗口：Breaking 全缝外（ESM-only 发布形、`react-router-dom` 移除、middleware 常开——本面无 loader/action 不触），/app 树 + 未匹配→/app 重定向实跑保真；locale 形状照抄：`en` 无前缀 `/zh` `/zh-TW` `/ja` + hreflang alternate + `x-default`→en（r1 §1.1） |
-| 样式 | Tailwind CSS **4.3.3**（#106 升级窗口兑现；观测同版期 = 3.4.19，r1 编译产物对拍基线不变） | tailwindcss **4.3.3** / @tailwindcss/postcss **4.3.3** | 锁定 | v4 CSS-first 形态：`dark:` 变体 = `@custom-variant dark (&:where(:not(.light):not(.light *)))`，编译选择器与官方产物逐字符一致（r1 §4.3，勿按常规「默认浅色+dark:前缀」做）；token 消费面（v3 `theme.extend.colors`/`fontFamily`）迁 `@theme inline`——utility 声明直引 tokens.css 变量，`.light` 双主题覆写仍走 tokens.css 级联；类名语义、默认断点五档（640/768/1024/1280/1536）、shadow 值零翻译对拍义务不变，升级后 parity 全矩阵 174 行重验 0 失败 |
-| design token | CSS 变量层：r1 §5 色名→变量映射表照抄进 `theme.extend.colors` 消费；`--font-inter`/`--font-jetbrains-mono` 照抄；zinc/stone/indigo 原色阶语义保持 | — | 锁定 | 00/D5「自建 token」的落地形；对拍靶 = r1 `[f965382e067739e9.css]` 原件 |
-| 字体 | r1 已抓 859B `@font-face` CSS 原样搬 + 2 woff2 自托管；CJK 无 webfont 系统兜底（r1 关键复刻约束）；emoji 字体族进 font stack | — | 沿用 | woff2 文件与位图图标下载归 #44 素材清单（§9） |
-| 组件层 | Radix Primitives（`radix-ui` 统一包）+ cmdk（⌘K 面板骨架，行为靶 = r2 §8.4 面板形 + 02 §6.3 wire） | radix-ui **1.6.7** / cmdk **1.1.1** | 锁定 | 00/D5 已定 Radix 类 + 自建 token；craft UI 仅交互参考 |
-| 图标 | 自建 SVG sprite；字形提取（登录态抓 workspace bundle/截图描摹）列 #44 素材清单；不引 lucide 占位 | — | 移交 | 官方图标字形不可观测（RNW bundle 内）；占位库字形错配返工 |
-| 数据层 | TanStack Query v5：server state 全走查询失效重取（02 §1.2 [推断] 策略的复刻实现）；SSE 事件仅作 `invalidateQueries` 提示信号 | @tanstack/react-query **5.103.1** | 锁定 | 02 已锁策略，本册钉库 |
-| 客户端状态 | Zustand；localStorage 键名照 r2 §1.5 实测契约（`tds.` 前缀 = 品牌位→#44） | zustand **5.0.15** | 锁定 | 官方状态库不可观测 [设计] |
-| 流式 markdown | streamdown（底层 react-markdown 管线 + 流式未闭合块安全 + 内置 shiki 高亮 + katex 数学） | streamdown **2.6.0** | 锁定 | transcript `text_delta` 流（02 §5.6 词表）+ plan 卡 + docs `.tex` 数学面（r1 changelog 09-08 实测）；官方渲染栈不可观测 [设计]；对拍靶 = r3 transcript 行形 + 截图 |
-| 拖拽 | @dnd-kit/core + sortable（看板卡跨列 + 列内 `orderIndex` 排序） | core **6.3.1** / sortable **10.0.0** | 锁定 | 85 号截图实测拖动；react-beautiful-dnd 停更不选 |
-| 表单 | 手写受控组件 + zod 校验；不引 react-hook-form | — | 锁定 | 像素全定制时 RHF 只省注册样板；评论框 = 原生 textarea + 自建 mention/附件弹层（r2 工具条三钮实测）；「语音输入」= Web Speech API **[推断]**（形状平价，行为尽力，差异注记 §8） |
-| diff 视图 | npm `diff` 算数据 + 自建渲染（行级/词级高亮 ~150 行） | diff **9.0.0** | 锁定 | plan 卡 Changes 像素靶 = 69 号截图；diff2html 自带样式对不上靶 |
-| emoji 选择器 | 自建：`Intl.Segmenter` grapheme 切分 + Unicode property escape 校验「恰好一个 emoji cluster」（旗帜/keycap/肤色/ZWJ，r1 changelog 09-08 实测语义）；常用网格子集归 #44 | — | 锁定 | 第三方 picker 像素对不上且重 |
-| 日期 | date-fns（前端展示层；locale 覆盖 en/zh-CN/zh-TW/ja 恰配 S6） | date-fns **4.4.0** | 锁定 | 定时表单四档分刻/tz 注文案靶 = r3 §9；后端时区 = 内置 `Intl`（§4.2） |
-| i18n | react-i18next；**分层口径（S6，地图雾本次裁决）**：landing 四语全量（素材 = r1 `i18n-*.txt` 逐语对照已抓）；docs 仅 en+zh-CN 全译、zh-TW/ja 仅 6 营销页+changelog（sitemap 92 条形状照抄）；privacy/terms 仅英文；**workspace zh-CN 权威**（r2/r3 全部文案 canon 即中文）+ en 兜底，zh-TW/ja 不做 | i18next **26.4.2** / react-i18next **17.0.14** | 锁定 | 验收 = 对官方不可分辨，官方本就不对称（r1 §8）；workspace 另两语无观测真值，做了也无对照物；路由形状照抄，未匹配路径官方 307→`/login?callbackUrl=`——复刻无登录页（02/A2 自动登录），改 **[设计]** 未匹配 → `/app` 重定向 |
-| PWA | `manifest.webmanifest` + `sw.js` **照 r1 全量抓包原样搬**（仅品牌槽/图标 URL 替换，归 #44）；不引 PWA 插件库；`theme-color #18181b` + `color-scheme dark light` 全页一致照抄 | — | 沿用 | sw.js 自述「notification click routing only、无 fetch handler」= 02 §9.1 通知设计的前提，字节级搬最省对拍 |
-| 通知 | 页内 `new Notification()`，仅 `document.hidden` 时弹（02 §9.1 canon）；无 VAPID/Web Push 库 | — | 沿用 | 02/A12 已锁，零选型 |
-| SSE 客户端 | 原生 `EventSource`（同源 cookie 会话，无自定义 header 需求） | — | 锁定 | 三通道端点 = 02 §1.2 表 |
-| 虚拟滚动 | 不锁定；transcript 长流实现期可选 `@tanstack/react-virtual` | — | 移交 | 性能面非平价面，实现期按实测定 |
+| framework | React 19 SPA (from scratch, 00/D5) | react / react-dom **19.3.0** | locked | New build with no upgrade debt; take latest 19 directly; the official workspace RNW [inferred] is not replicated (S1) |
+| build | Vite + @vitejs/plugin-react; dev-time proxy → server | vite **8.3.0** / plugin-react **6.1.1** | locked | Single SPA with no SSR demand; PWA/desktop shell wrapping an SPA is the smoothest (02 §1.1 premise); official landing Next.js SSG → difference note §8 |
+| routing | React Router v8 (library mode), hand-written route table | react-router **8.4.0** | locked | The route table is fixed (41 landing + locale + /app tree); #105 honored the v8 window: Breaking all outside the seams (ESM-only release form, `react-router-dom` removed, middleware always on — this surface has no loader/action so untouched), /app tree + unmatched→/app redirect run faithful; locale shape copied: `en` unprefixed `/zh` `/zh-TW` `/ja` + hreflang alternate + `x-default`→en (r1 §1.1) |
+| styling | Tailwind CSS **4.3.3** (#106 upgrade window honored; observed same-version-period = 3.4.19, the r1-compiled-artifact side-by-side baseline unchanged) | tailwindcss **4.3.3** / @tailwindcss/postcss **4.3.3** | locked | v4 CSS-first form: the `dark:` variant = `@custom-variant dark (&:where(:not(.light):not(.light *)))`, the compiled selector character-identical to the official artifact (r1 §4.3, do not do the conventional "light default + dark: prefix"); the token consumption surface (v3 `theme.extend.colors`/`fontFamily`) migrates to `@theme inline` — utility declarations reference tokens.css variables directly, and the `.light` dual-theme override still cascades at the tokens.css level; class-name semantics, the five default breakpoints (640/768/1024/1280/1536), and zero-translation shadow side-by-side obligations unchanged; after the upgrade the full parity matrix of 174 lines re-verified with 0 failures |
+| design tokens | CSS-variable layer: the r1 §5 color-name→variable mapping table copied into the `theme.extend.colors` consumption; `--font-inter`/`--font-jetbrains-mono` copied; the zinc/stone/indigo pure-scale semantics preserved | — | locked | The landing form of 00/D5's "self-built tokens"; side-by-side target = the r1 `[f965382e067739e9.css]` original |
+| fonts | the 859B `@font-face` CSS already captured by r1 carried over as-is + 2 self-hosted woff2; no CJK webfont, system fallback (a key replication constraint from r1); emoji font families enter the font stack | — | inherited | woff2 files and bitmap-icon downloads belong to the #44 asset checklist (§9) |
+| component layer | Radix Primitives (`radix-ui` unified package) + cmdk (⌘K panel skeleton, behavior target = the r2 §8.4 panel form + 02 §6.3 wire) | radix-ui **1.6.7** / cmdk **1.1.1** | locked | 00/D5 already fixed Radix-class + self-built tokens; craft UI is interaction reference only |
+| icons | self-built SVG sprite; glyph extraction (capturing the workspace bundle in logged-in state / tracing screenshots) listed in the #44 asset checklist; no lucide placeholders | — | handed off | official icon glyphs are not observable (inside the RNW bundle); placeholder-library glyph mismatch means rework |
+| data layer | TanStack Query v5: all server state goes through query-invalidation re-fetch (the replication implementation of 02 §1.2's [inferred] strategy); SSE events serve only as `invalidateQueries` hint signals | @tanstack/react-query **5.103.1** | locked | 02 already locked the strategy; this volume pins the library |
+| client state | Zustand; localStorage key names per the r2 §1.5 measured contract (`tds.` prefix = brand slot → #44) | zustand **5.0.15** | locked | the official state library is not observable [designed] |
+| streaming markdown | streamdown (react-markdown pipeline underneath + streaming-unclosed-block safety + built-in shiki highlighting + katex math) | streamdown **2.6.0** | locked | the transcript `text_delta` stream (02 §5.6 vocabulary) + plan cards + docs `.tex` math surface (r1 changelog 09-08 measured); the official rendering stack is not observable [designed]; side-by-side target = the r3 transcript line forms + screenshots |
+| drag & drop | @dnd-kit/core + sortable (board cards across columns + `orderIndex` sorting within a column) | core **6.3.1** / sortable **10.0.0** | locked | dragging measured in screenshot 85; react-beautiful-dnd unmaintained, not chosen |
+| forms | hand-written controlled components + zod validation; react-hook-form not introduced | — | locked | with fully custom pixels, RHF only saves registration boilerplate; the comment box = a native textarea + self-built mention/attachment popovers (the three-button r2 toolbar measured); "voice input" = Web Speech API **[inferred]** (shape parity, best-effort behavior, difference note §8) |
+| diff view | npm `diff` for data + self-built rendering (line/word-level highlighting, ~150 lines) | diff **9.0.0** | locked | the plan-card Changes pixel target = screenshot 69; diff2html's built-in styles do not match the target |
+| emoji picker | self-built: `Intl.Segmenter` grapheme segmentation + Unicode property-escape validation of "exactly one emoji cluster" (flags/keycaps/skin tones/ZWJ, the semantics measured in r1 changelog 09-08); the common-grid subset belongs to #44 | — | locked | third-party pickers neither match pixels nor stay light |
+| dates | date-fns (frontend display layer; locales cover en/zh-CN/zh-TW/ja, exactly matching S6) | date-fns **4.4.0** | locked | the scheduled-form four-tier minute marks / tz-note copy target = r3 §9; backend timezones = built-in `Intl` (§4.2) |
+| i18n | react-i18next; **layered criterion (S6, the map fog ruled this time)**: landing fully in four languages (source material = r1 `i18n-*.txt` per-language side-by-side captures); docs fully translated only in en+zh-CN, zh-TW/ja only the 6 marketing pages + changelog (the 92-item sitemap shape copied); privacy/terms English only; **workspace zh-CN authoritative** (all r2/r3 copy canon is Chinese) + en fallback, zh-TW/ja not done | i18next **26.4.2** / react-i18next **17.0.14** | locked | acceptance = indistinguishable from the official, which is asymmetric to begin with (r1 §8); the other two workspace languages have no observable truth to check against, so doing them would produce nothing to compare; the route shape is copied; for unmatched paths the official 307s to `/login?callbackUrl=` — the replication has no login page (02/A2 auto-login), so **[designed]** unmatched → `/app` redirect |
+| PWA | `manifest.webmanifest` + `sw.js` **carried over byte-for-byte from the r1 captures** (only brand slots / icon URLs replaced, belongs to #44); no PWA plugin library; `theme-color #18181b` + `color-scheme dark light` identical on every page | — | inherited | the sw.js self-description "notification click routing only, no fetch handler" = the premise of 02 §9.1's notification design; byte-level copying costs the least side-by-side effort |
+| notifications | in-page `new Notification()`, fired only when `document.hidden` (02 §9.1 canon); no VAPID/Web Push library | — | inherited | already locked by 02/A12, zero selection left |
+| SSE client | native `EventSource` (same-origin cookie session, no custom-header needs) | — | locked | the three channel endpoints = the 02 §1.2 table |
+| virtual scrolling | not locked; `@tanstack/react-virtual` is an option when the long-transcript implementation lands | — | handed off | a performance surface, not a parity surface; decided by measurement at implementation time |
 
-### 4.2 server（apps/server）
+### 4.2 server (apps/server)
 
-| 项 | 决策 | pin | 类型 | 理由 / 观测栈注记 |
+| Item | Decision | pin | Type | Reasoning / observed-stack note |
 |---|---|---|---|---|
-| runtime | Node 24 LTS；`engines >=22.19.0`（pi 底线，00/D6）；CI 矩阵 22/24、24 为主 | — | 沿用 | 承旧 stack 论证（LTS 覆盖周期；验收红须归因自代码）；官方 runtime 不可直接观测，npm 发行 + pi 依赖 → Node [推断] |
-| HTTP 框架 | Hono + @hono/node-server；SSE 走 streaming helper（`streamSSE`）；SPA 静态同源托管（02/A1） | hono **4.13.8** / @hono/node-server **2.1.1** | 沿用 | 旧 stack 决议平移：SSE 一等支持、zod 集成；**无 WS 库**——02/A1 已锁全 SSE |
-| DB | SQLite：better-sqlite3 + Drizzle ORM（schema-as-code + migration 进 repo） | better-sqlite3 **13.0.3** / drizzle-orm **0.45.2** / drizzle-kit **0.31.10**(dev) | 锁定 | 官方 DB 黑盒 [设计]；self-host 单机恰配；⌘K 搜索（02 §6.3 LIKE）、tokenUsage 记账、transcript 查询都要 SQL 面；`node:sqlite` 仍 experimental（旧 stack 拒入生产路径的判定延续）；Postgres 对单用户 self-host 过重 |
-| schema 面 | = 02 §6.2 record 形状 + §1.3 数据所有权的投影（表清单 §6） | — | 沿用 | 字段即契约，schema 不发明新形状 |
-| git 服务端 | `GitOps` wrapper spawn 系统 git：`git http-backend`（CGI env + stdio 管道，托管 repo 远端 URL 形状 = 02 §3）+ bare repo 读树/单文件（`ls-tree`/`cat-file`，服务 `tree?ref=`/`file?path=&ref=` 端点） | — | 锁定 | 前置条件「系统 git ≥ 2.x」写安装文档；isomorphic-git 无 http-backend/worktree 面出局；simple-git 覆盖面不足仍须裸 spawn，多一层 pin 无收益 |
-| 密钥 at-rest | `SecretBox`：node:crypto **AES-256-GCM**；keyfile = `crypto.randomBytes(32)` base64、权限 0600、首次启动生成（02 §8 已锁「不引外部 KMS/口令派生」）；信封 = `v1` 版本头 + iv + ciphertext + authTag；加密对象 = provider key、team secret 值、git 凭证；apiKey/machine token 存哈希不入 SecretBox（02 §8） | — | 锁定 | keyfile 丢失 = 存量 provider key 报废需重录——文档护栏照 02 §8 原话 |
-| 定时 | `Scheduler`：cron-parser 纯解析 + 自建调度循环（词表照抄 02 §9.2：每小时/每天/每周/单次、分 00/15/30/45 四档、tz = 内置 `Intl.DateTimeFormat().resolvedOptions().timeZone`、`once` 触发后出队） | cron-parser **5.10.1** | 沿用 | 承旧（croniter 对应物）；调度语义 02 已锁 |
-| MCP server 面 | `/api/mcp` 端点用 @modelcontextprotocol/sdk（server 侧）；24 工具白名单 + key 级授权 = 02 §7.2 | @modelcontextprotocol/sdk **1.30.0** | 沿用 | 00/D4 薄桥归属的 server 半 |
-| validation | zod 4（record 形状 schema 落 shared，双端消费） | zod **4.6.5** | 沿用 | 旧 stack 决议平移 |
-| config | 自建分层 `Settings`（§3 缝；zod schema + 加载器 <200 行）；env 前缀 = 品牌位→#44 | — | 沿用 | 承旧 |
-| 日志 | pino + pino-pretty(dev)；server 结构化 JSON；`daemon.log` 行形在 daemon 侧（§4.3） | pino **10.3.1** / pino-pretty **13.1.3**(dev) | 沿用 | 承旧 |
-| 认证 | 无 auth 库：单用户 seed + 自动登录（02/A2），httpOnly cookie 自设；apiKey Bearer（MCP 面）与 machine token 校验 = 哈希比对 | — | 沿用 | 02/A2 已锁形状 |
-| 数据目录 | server 数据根（DB 文件 + keyfile + bare repo 存储）路径 = 品牌位→#44 | — | 移交 | 形状：单一数据根，备份 = 拷目录 |
+| runtime | Node 24 LTS; `engines >=22.19.0` (pi's floor, 00/D6); CI matrix 22/24 with 24 primary | — | inherited | carries over the old stack's argument (LTS coverage window; acceptance reds must be attributable to our own code); the official runtime is not directly observable, npm distribution + pi dependency → Node [inferred] |
+| HTTP framework | Hono + @hono/node-server; SSE via the streaming helper (`streamSSE`); SPA static same-origin hosting (02/A1) | hono **4.13.8** / @hono/node-server **2.1.1** | inherited | old-stack decision carried over: first-class SSE, zod integration; **no WS library** — 02/A1 already locked all-SSE |
+| DB | SQLite: better-sqlite3 + Drizzle ORM (schema-as-code + migrations into the repo) | better-sqlite3 **13.0.3** / drizzle-orm **0.45.2** / drizzle-kit **0.31.10**(dev) | locked | the official DB is a black box [designed]; perfect fit for self-hosted single machine; ⌘K search (02 §6.3 LIKE), tokenUsage accounting, and transcript queries all need a SQL surface; `node:sqlite` is still experimental (the old stack's judgment against production paths carries over); Postgres is too heavy for single-user self-hosting |
+| schema surface | = the projection of 02 §6.2 record shapes + §1.3 data ownership (table list §6) | — | inherited | fields are the contract; the schema invents no new shapes |
+| git server side | `GitOps` wrapper spawning the system git: `git http-backend` (CGI env + stdio pipes, the hosted-repo remote URL shape = 02 §3) + bare-repo tree-reading/single-file (`ls-tree`/`cat-file`, serving the `tree?ref=`/`file?path=&ref=` endpoints) | — | locked | the precondition "system git ≥ 2.x" goes into the install docs; isomorphic-git is out (no http-backend/worktree surface); simple-git does not cover enough and still needs raw spawn, an extra pin with no payoff |
+| keys at rest | `SecretBox`: node:crypto **AES-256-GCM**; keyfile = `crypto.randomBytes(32)` base64, mode 0600, generated on first start (02 §8 already locked "no external KMS / no passphrase derivation"); envelope = `v1` version header + iv + ciphertext + authTag; encrypted objects = provider keys, team secret values, git credentials; apiKey/machine tokens are stored as hashes, not in SecretBox (02 §8) | — | locked | a lost keyfile = existing provider keys must be re-entered — the documentation guardrail follows 02 §8's original wording |
+| scheduling | `Scheduler`: cron-parser pure parsing + self-built scheduling loop (vocabulary copied from 02 §9.2: hourly/daily/weekly/once, minute marks at 00/15/30/45, tz = built-in `Intl.DateTimeFormat().resolvedOptions().timeZone`, `once` dequeues after firing) | cron-parser **5.10.1** | inherited | inherited (the croniter counterpart); scheduling semantics already locked by 02 |
+| MCP server surface | the `/api/mcp` endpoint uses @modelcontextprotocol/sdk (server side); the 24-tool allowlist + key-level authorization = 02 §7.2 | @modelcontextprotocol/sdk **1.30.0** | inherited | the server half of 00/D4's thin-bridge ownership |
+| validation | zod 4 (record-shape schemas land in shared, consumed by both ends) | zod **4.6.5** | inherited | old-stack decision carried over |
+| config | self-built layered `Settings` (the §3 seam; zod schema + loader <200 lines); env prefix = brand slot → #44 | — | inherited | inherited |
+| logging | pino + pino-pretty(dev); server structured JSON; the `daemon.log` line form lives on the daemon side (§4.3) | pino **10.3.1** / pino-pretty **13.1.3**(dev) | inherited | inherited |
+| authentication | no auth library: single-user seed + auto-login (02/A2), self-set httpOnly cookie; apiKey Bearer (MCP surface) and machine-token verification = hash comparison | — | inherited | the shape is already locked by 02/A2 |
+| data directory | the server data root (DB file + keyfile + bare-repo storage) path = brand slot → #44 | — | handed off | shape: a single data root; backup = copy the directory |
 
-### 4.3 executor daemon（apps/daemon）
+### 4.3 executor daemon (apps/daemon)
 
-| 项 | 决策 | pin | 类型 | 理由 / 观测栈注记 |
+| Item | Decision | pin | Type | Reasoning / observed-stack note |
 |---|---|---|---|---|
-| 发行 | 纯 JS npm 包：esbuild bundle 单文件 + node shebang，`npm i -g` 装；**不复刻平台二进制** | esbuild **0.28.2**(build) | 锁定 | 官方 275MB/6 平台二进制（r3 §1.1）[推断] = `tds-tunnel`(tsnet) + 防睡栈——tunnel 已挂雾（02 §9.3），防睡用平台命令表 spawn（darwin `caffeinate -i`；linux `systemd-inhibit` **[推断]** 可缺省）；差异注记 §8 |
-| CLI | commander（命令面照抄 02 §5.1：`start/stop/restart/logs [-f]/logout/status/version/provider`）+ @clack/prompts（交互注册流 02 §5.2 路径一） | commander **15.0.0** / @clack/prompts **1.8.1** | 沿用 | 承旧；`provider` 命令仅提示文案（r3 实测语义） |
-| supervisor | 自建：detach spawn + `daemon.json{pid,startedAt,runner}`（02 §5.3 形状）+ 崩溃保活重启，~100 行 | — | 锁定 | 02 §5.1「detached + supervisor 跨崩溃保活」的实现形 |
-| 执行引擎 | pi 单引擎（00/D1）：`@earendil-works/pi-ai` / `pi-coding-agent` / `pi-agent-core`，AgentSession 稳定面（00/D3）；经 `AgentBackend` 缝消费（§5） | **0.86.0**（D6 canon；首个升级窗口 #107 已兑现，§9） | 沿用 | 官方 executor = pi 0.84.3 构建（r3 §1.5 明文）——同族同型，pin 高两档 |
-| worktree/git | `GitOps` wrapper（与 server 共缝，shared 定义 daemon 实现）：词表 = 02 §5.5 全表（add -b/reused/reset --hard+clean -fd/remove --force+prune+branch -D/TTL 7×24h/projectLock/diverged 护栏/每步 push/merge --no-edit） | — | 沿用 | 系统 git 前置同 §4.2 |
-| MCP client 面 | @modelcontextprotocol/sdk（daemon 侧薄桥，00/D4）：per-turn 连接已授权 server、失败降级不阻断（02 §7.1 canon 行为）、工具名 `mcp__<slug>__<tool>` | 同 1.30.0 | 沿用 | 桥归 daemon：回合在 daemon 内跑 |
-| HTTP 客户端 | 内置 fetch + undici（`EnvHttpProxyAgent` honor `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`）；启动探测代理并打印、代理死持续重试不退出（形状保形 r3 §1.5） | undici **8.10.2** | 沿用 | 承旧 fetch+undici 路线；重试预算数值照 02 §5.5 表 |
-| 步骤 journal | outbox/ + heartbeat/tool/done/upload-urls/token 端点词表照 02 §5.4；持久化 = 文件（daemon 本地状态无 SQL 需求） | — | 沿用 | 02 §1.3 数据所有权已锁 |
-| 本地状态 | `machine.json`/`device.json`/`daemon.json`/`daemon.log` 形状照 02 §5.3（目录/前缀品牌位→#44）；`daemon.log` 行前缀词表 `supervisor/machine/step/workspace/recover/wake` 照抄，pino 自定义 transport 输出行形 | — | 沿用 | 日志形状 = 平价面（r3 实测词表） |
-| 流超时 | `streamFirstEvent 300000 / streamIdle 480000 / streamBodyTimeout 540000` ms 照抄（r3 bundle 原文） | — | 沿用 | 02 §5.6 已收录 |
-| 自定义工具 | `web_fetch`（≤8000 字符）/`remote_shell`/`push_branch` 三件 + 记忆工具（02 §4.4；r5 §6 改判名 `save_memory` 族，经 remoteTools relay 服务端执行，原 `remember` 名作废——M4b 落地）；描述 canon 照 r3 | — | 沿用 | pi 内建工具面之外的宿主增量 |
+| distribution | pure-JS npm package: esbuild bundle single file + node shebang, installed via `npm i -g`; **no replication of platform binaries** | esbuild **0.28.2**(build) | locked | the official 275MB / 6-platform binaries (r3 §1.1) [inferred] = `tds-tunnel`(tsnet) + an anti-sleep stack — the tunnel is already fogged (02 §9.3); anti-sleep spawns a platform command table (darwin `caffeinate -i`; linux `systemd-inhibit` **[inferred]**, optional); difference note §8 |
+| CLI | commander (the command surface copies 02 §5.1: `start/stop/restart/logs [-f]/logout/status/version/provider`) + @clack/prompts (the interactive registration flow, 02 §5.2 path one) | commander **15.0.0** / @clack/prompts **1.8.1** | inherited | inherited; the `provider` command is prompt copy only (r3 measured semantics) |
+| supervisor | self-built: detach spawn + `daemon.json{pid,startedAt,runner}` (02 §5.3 shape) + crash keep-alive restart, ~100 lines | — | locked | the implementation form of 02 §5.1's "detached + supervisor surviving crashes" |
+| execution engine | single pi engine (00/D1): `@earendil-works/pi-ai` / `pi-coding-agent` / `pi-agent-core`, AgentSession stable surface (00/D3); consumed through the `AgentBackend` seam (§5) | **0.86.0** (D6 canon; the first upgrade window #107 already honored, §9) | inherited | the official executor is built from pi 0.84.3 (r3 §1.5 plaintext) — same family and shape, pinned two notches higher |
+| worktree/git | `GitOps` wrapper (sharing the seam with the server; the daemon implements the shared-defined interface): vocabulary = the full 02 §5.5 table (add -b/reused/reset --hard+clean -fd/remove --force+prune+branch -D/TTL 7×24h/projectLock/divergence guards/push per step/merge --no-edit) | — | inherited | the system-git precondition is the same as §4.2 |
+| MCP client surface | @modelcontextprotocol/sdk (the daemon-side thin bridge, 00/D4): per-turn connections to authorized servers, failure degrades without blocking (02 §7.1 canon behavior), tool names `mcp__<slug>__<tool>` | same 1.30.0 | inherited | the bridge belongs to the daemon: turns run inside the daemon |
+| HTTP client | built-in fetch + undici (`EnvHttpProxyAgent` honoring `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`); probe and print the proxy at startup; on proxy death keep retrying without exiting (shape faithful to r3 §1.5) | undici **8.10.2** | inherited | inherits the fetch+undici route; the retry-budget values follow the 02 §5.5 table |
+| step journal | outbox/ + the heartbeat/tool/done/upload-urls/token endpoint vocabulary per 02 §5.4; persistence = files (the daemon's local state has no SQL needs) | — | inherited | 02 §1.3 data ownership already locked |
+| local state | the `machine.json`/`device.json`/`daemon.json`/`daemon.log` shapes per 02 §5.3 (directory/prefix brand slots → #44); the `daemon.log` line-prefix vocabulary `supervisor/machine/step/workspace/recover/wake` copied, with a custom pino transport outputting the line form | — | inherited | the log shape = a parity surface (r3 measured vocabulary) |
+| stream timeouts | `streamFirstEvent 300000 / streamIdle 480000 / streamBodyTimeout 540000` ms copied (r3 bundle verbatim) | — | inherited | already collected in 02 §5.6 |
+| custom tools | the three tools `web_fetch` (≤8000 chars) / `remote_shell` / `push_branch` + memory tools (02 §4.4; r5 §6 renamed the family to `save_memory`, executed server-side via the remoteTools relay; the original `remember` name is void — M4b landed); description canon per r3 | — | inherited | host increments beyond pi's built-in tool surface |
 
-### 4.4 shared（packages/shared）
+### 4.4 shared (packages/shared)
 
-| 项 | 内容 | 类型 |
+| Item | Content | Type |
 |---|---|---|
-| 协议词表 | 02 §5/§6 端点 + record 形状 + SSE 事件词表的 zod schema/TS 类型单一来源；双端（server/daemon/web）消费 | 沿用（02/A9 canonical） |
-| 命名常量表 | 02 §5.8 品牌槽集中为常量模块，改名 = #44 一次性替换 | 沿用 |
-| AgentBackend 缝 | §5 签名；pi 实现落 daemon，接口落 shared | 锁定（00/D1 移交闭环） |
-| GitOps / Settings / SecretBox / Scheduler 缝 | 接口定义落 shared，实现各归其端 | 锁定 |
+| protocol vocabulary | single source of zod schemas/TS types for the 02 §5/§6 endpoints + record shapes + SSE event vocabulary; consumed by both ends (server/daemon/web) | inherited (02/A9 canonical) |
+| naming-constant table | 02 §5.8's brand slots concentrated into a constant module; renaming = one-shot replacement at #44 | inherited |
+| AgentBackend seam | §5 signature; the pi implementation lands in the daemon, the interface lands in shared | locked (00/D1 handoff closure) |
+| GitOps / Settings / SecretBox / Scheduler seams | interface definitions land in shared, implementations go to their respective ends | locked |
 
-### 4.5 工具链
+### 4.5 Toolchain
 
-| 项 | 决策 | pin | 类型 | 理由 |
+| Item | Decision | pin | Type | Reasoning |
 |---|---|---|---|---|
-| TypeScript | 7.0.2 全线；ESM nodenext + strict 全配置保持 | typescript **7.0.2** | 沿用 | #104 兑现：vitest 5 / drizzle-kit 0.31 / @vitejs/plugin-react / biome 与 TS 7 原生编译器共存核实全绿；i18n 门改用 `typescript/unstable/ast` scanner（旧 JS parser API 已随原生编译器下线） |
-| lint/format | Biome 单工具（lint+format）；prettier 不引入；类型检查 = tsc | @biomejs/biome **2.5.14** | 沿用 | 承旧；复刻项目无历史规则包袱 |
-| 单测 | vitest projects 模式：每包 test/ colocated，根 projects 汇总 | vitest **5.0.1** | 沿用 | 承旧 |
-| E2E | playwright：关键流 = 02 §4.2 主时序全链（建 todo→开始→confirm→building→review→merge→done）+ 定时触发 + ⌘K | @playwright/test **1.63.0** | 锁定 | 主时序是功能平价的脊柱；**像素 diff 工具不入本册**——地图雾「像素平价验收工具」待 UI 规格切分票 graduate（§9） |
-| 包管理 | pnpm workspaces + catalog；`--frozen-lockfile` CI 门禁 | pnpm **12.5.1** | 沿用 | 承旧 |
-| CI 门禁 | Node 22/24 双矩阵 + biome ci + tsc + vitest + playwright + engines 检查 | — | 沿用 | 承旧 §5.2 |
+| TypeScript | 7.0.2 across the line; ESM nodenext + strict kept in all configs | typescript **7.0.2** | inherited | #104 honored: vitest 5 / drizzle-kit 0.31 / @vitejs/plugin-react / biome coexisting with the TS 7 native compiler verified all green; the i18n gate switches to the `typescript/unstable/ast` scanner (the old JS parser API went offline with the native compiler) |
+| lint/format | Biome single tool (lint+format); prettier not introduced; type checking = tsc | @biomejs/biome **2.5.14** | inherited | inherited; a replication project has no legacy-rules baggage |
+| unit tests | vitest projects mode: per-package test/ colocated, aggregated by root projects | vitest **5.0.1** | inherited | inherited |
+| E2E | playwright: the key flows = the full 02 §4.2 main-timeline chain (create todo → start → confirm → building → review → merge → done) + scheduled triggering + ⌘K | @playwright/test **1.63.0** | locked | the main timeline is the spine of functional parity; **pixel-diff tools are not in this volume** — the map fog "pixel-parity acceptance tooling" awaits the UI-spec split ticket to graduate (§9) |
+| package management | pnpm workspaces + catalog; `--frozen-lockfile` CI gate | pnpm **12.5.1** | inherited | inherited |
+| CI gates | Node 22/24 dual matrix + biome ci + tsc + vitest + playwright + engines check | — | inherited | inherited §5.2 |
 
-## 5. AgentBackend 缝签名（00/D1 移交项闭环，**锁定**形状、实现期可精化字段）
+## 5. AgentBackend seam signature (closing the 00/D1 handoff item; the **locked** shape, fields refinable at implementation time)
 
 ```ts
-// packages/shared/src/agent-backend.ts —— 事件词表 = 02 §5.6 pi 词表 1:1，不得增删改名
+// packages/shared/src/agent-backend.ts —— the event vocabulary = 02 §5.6 pi vocabulary 1:1, no additions, deletions, or renames
 export type StepEvent =
   | { type: 'text_delta'; text: string }
   | { type: 'thinking'; text: string }
@@ -170,27 +170,27 @@ export type StepEvent =
 
 export interface AgentBackendCapabilities {
   readonly name: string;                    // 'pi'
-  readonly thinkingLevels: readonly string[]; // 配置面「思考强度」（02 §6.2 agent 形状）
-  readonly oauthProviders: readonly string[]; // anthropic/openai-codex/github-copilot/xai（#34 锁定订阅项）
+  readonly thinkingLevels: readonly string[]; // the "thinking intensity" config surface (02 §6.2 agent shape)
+  readonly oauthProviders: readonly string[]; // anthropic/openai-codex/github-copilot/xai (#34 locked subscription items)
   readonly compaction: boolean;
-  readonly sessionResume: boolean;          // continue session（合并轮复用，02 §4.2）
+  readonly sessionResume: boolean;          // continue session (reused by merge rounds, 02 §4.2)
 }
 
 export interface SessionOpts {
-  provider: ProviderConfig;   // kind: api_key | oauth | http（02 §5.6 配置 kind）
+  provider: ProviderConfig;   // kind: api_key | oauth | http (02 §5.6 config kind)
   modelId: string;
   thinkingLevel?: string;
-  systemPrompt?: string;      // memory 注入经 pi before_agent_start 缝（00/D3、02 §4.4）
-  tools?: ToolSpec[];         // web_fetch / remote_shell / push_branch / remember（宿主增量）
-  mcpServers?: McpEndpoint[]; // per-turn 连接、失败降级不阻断（02 §7.1）
-  cwd: string;                // worktree 目录（02 §5.5）
+  systemPrompt?: string;      // memory injection goes through pi's before_agent_start seam (00/D3, 02 §4.4)
+  tools?: ToolSpec[];         // web_fetch / remote_shell / push_branch / remember (host increments)
+  mcpServers?: McpEndpoint[]; // per-turn connections, failure degrades without blocking (02 §7.1)
+  cwd: string;                // the worktree directory (02 §5.5)
 }
 
 export interface AgentSessionHandle {
   readonly events: AsyncIterable<StepEvent>;
   steer(text: string): Promise<void>;
   stop(): Promise<void>;
-  usage(): TokenUsage;        // build × model × {输入,输出,缓存读,缓存写}（02 §6.2）
+  usage(): TokenUsage;        // build × model × {input, output, cache-read, cache-write} (02 §6.2)
 }
 
 export interface AgentBackend {
@@ -200,65 +200,65 @@ export interface AgentBackend {
 }
 ```
 
-缝纪律：daemon 内 pi 实现类之外，任何模块不得 import `@earendil-works/*`（lint 规则）。第二引擎将来 = 新增一个 `AgentBackend` 实现，事件面/能力面不动（00/D1「bolt-on 非重写」兑现）。
+Seam discipline: outside the pi implementation class inside the daemon, no module may import `@earendil-works/*` (a lint rule). A second engine in the future = adding one more `AgentBackend` implementation, the event surface and capability surface unchanged (00/D1's "bolt-on, not rewrite" honored).
 
-## 6. 存储 schema 面（02 §6.2 投影，**锁定**清单；列细节 = 实现期按 record 形状展开）
+## 6. Storage schema surface (02 §6.2 projection, **locked** list; column details = expanded at implementation time per the record shapes)
 
-`user`（seed 一行）· `team`（seed 一行，含 `plan` 字段形状不参与门控 02/A3）· `project`（repo 形态字段：托管 bare / GitHub 接入，02/A4）· `todo`（§4.1 字段表全量）· `tag` + `todo_tag` · `build`（`buildId ≡ conversationId`，CONTEXT.md）· `step`（三类步队列 + journal 状态，02/A6；M4a：`buildId` 去 FK 兼作 chief conv id `chief-<threadId>`、`kind` 增 `chief`、增内部列 `prompt` = 续轮指令）· `message`（transcript 消息/工具行，经 upload-urls 回传落库）· `plan`（build facet：版本 v1/v2 + Context/Changes/Edge cases/Verification 卡）· `document_diff`（`documents/{id}/diff` 端点源）· `schedule`（02 §6.2 形状，kind 枚举含 [推断] 词）· `notification`（02 §9.1 五事件矩阵 [推断]）· `agent`（含 6 工具开关/secrets/skills/mcpServers 关联表）· `agent_memory`（02 §4.4 条目集）· `skill`（含文件内容，`skills/{sid}/file` 端点源）· `mcp_server`（02 §6.2 形状；**M4b 回写补录**：wire record 保 r3 §5.1 原样，stdio 命令/参数与 http 请求头值 wire 未采 [推断] → 增内部列 `command`/`args`/`headersCipher`（headers 密文经 SecretBox，值只写不读、`credentialKeys`=头名清单，02 §8 凭证纪律同族））· `provider`（38 presets + custom，apiKey 密文经 SecretBox）· `secret`（值密文经 SecretBox，只写不读）· `api_key`（哈希 + gitAccess/mcpAccess/toolGrants 白名单，02 §6.2）· `machine`（02 §6.2 + presence 状态）· `token_usage`（build×model 四维计数）· `chief`（**M4a 回写补录**：02 §4.3/r5 §3.6 `GET /chief` 的 chief 记录本体——绑定 Agent/charter/watches/wakes 的持久位；原清单仅列线程面两表，记录本体无表位，M4a 补 `chief` 单行表，watches/wakes 为 per-chief JSON 列 [设计]）· `chief_thread` + `chief_message`（02 §4.3 线程面）· `whats_new`（形状保留内容自选，02 §6.1）。
+`user` (one seed row) · `team` (one seed row, including the `plan` field shape not participating in gating, 02/A3) · `project` (repo-shape fields: hosted bare / GitHub connection, 02/A4) · `todo` (the §4.1 field table in full) · `tag` + `todo_tag` · `build` (`buildId ≡ conversationId`, CONTEXT.md) · `step` (the three step queues + journal states, 02/A6; M4a: `buildId` de-FK'd and doubling as the chief conv id `chief-<threadId>`, `kind` gains `chief`, an internal column `prompt` added = the continue-round instruction) · `message` (transcript messages/tool lines, persisted via the upload-urls round trip) · `plan` (build facet: versions v1/v2 + the Context/Changes/Edge cases/Verification cards) · `document_diff` (the source of the `documents/{id}/diff` endpoint) · `schedule` (02 §6.2 shape, the kind enum containing [inferred] words) · `notification` (02 §9.1 five-event matrix [inferred]) · `agent` (with the 6 tool switches/secrets/skills/mcpServers relation tables) · `agent_memory` (the 02 §4.4 entry set) · `skill` (including file contents, the source of the `skills/{sid}/file` endpoint) · `mcp_server` (02 §6.2 shape; **M4b write-back supplement**: the wire record keeps r3 §5.1 as-is; the stdio command/args and the http header values were not captured on the wire [inferred] → internal columns `command`/`args`/`headersCipher` added (header ciphertext via SecretBox, write-only values, `credentialKeys` = the header-name list, same family as the 02 §8 credential discipline)) · `provider` (38 presets + custom, apiKey ciphertext via SecretBox) · `secret` (value ciphertext via SecretBox, write-only) · `api_key` (hash + gitAccess/mcpAccess/toolGrants allowlists, 02 §6.2) · `machine` (02 §6.2 + presence state) · `token_usage` (build×model four-dimension counters) · `chief` (**M4a write-back supplement**: the chief record body of 02 §4.3/r5 §3.6's `GET /chief` — the persistent slots binding Agent/charter/watches/wakes; the original list only carried the two thread-surface tables and the record body had no table slot; M4a adds a single-row `chief` table, with watches/wakes as per-chief JSON columns [designed]) · `chief_thread` + `chief_message` (02 §4.3 thread surface) · `whats_new` (shape kept, content self-selected, 02 §6.1).
 
-migration 纪律：drizzle-kit 生成、进 repo、CI 校验 drift；**不发明 02 之外的字段形状**——协议面字段即契约（02/A9）。
+Migration discipline: drizzle-kit generation, into the repo, CI drift verification; **no field shapes invented beyond 02** — protocol-surface fields are the contract (02/A9).
 
-## 7. 验收要点（供 #45 ROADMAP 汇入）
+## 7. Acceptance points (to be merged into #45 ROADMAP)
 
-1. **engines 门禁**：CI Node 22.19+/24 双跑，24 为主（承旧）。
-2. **pi pin 纪律**：`@earendil-works/*` 全 patch-pin 0.86.0；升级 = 显式窗口读 Breaking 段（首个窗口 #107 已兑现：0.85.1 → 0.86.0，Breaking 三条全缝外）。
-3. **缝纪律**：五个接口缝（AgentBackend/GitOps/Settings/SecretBox/Scheduler）之外直接 import 被包依赖 = lint 红。
-4. **协议对拍**：shared 词表 schema 快照测试 vs 02 §5/§6 表；E2E 主时序全链（02 §4.2）为功能平价脊柱。
-5. **像素对拍**：靶索引 = r1（landing 41 路由 + CSS/字体原件）、r2（19 路由 63 截图）；diff 工具归雾票，本册只锁「对拍义务存在」。
-6. **i18n 分层验收**：landing 四语逐页对照 r1 `i18n-*.txt`；docs en/zh-CN；workspace zh-CN canon 逐条对照 r2/r3 文案表。
-7. **PWA 字节级**：manifest/sw.js 与 r1 抓包原件 diff = 仅品牌槽差异。
-8. **通知/OS 弹窗**：真人各一次（02 附验收提示沿用）。
+1. **engines gate**: CI runs Node 22.19+/24 dual with 24 primary (inherited).
+2. **pi pin discipline**: all `@earendil-works/*` exactly patch-pinned at 0.86.0; upgrades = explicit windows that read the Breaking section (the first window #107 already honored: 0.85.1 → 0.86.0, all three Breaking entries outside the seams).
+3. **seam discipline**: directly importing a wrapped dependency outside the five interface seams (AgentBackend/GitOps/Settings/SecretBox/Scheduler) = lint red.
+4. **protocol side-by-side**: shared-vocabulary schema snapshot tests vs the 02 §5/§6 tables; the E2E main-timeline full chain (02 §4.2) as the spine of functional parity.
+5. **pixel side-by-side**: target index = r1 (landing 41 routes + CSS/font originals), r2 (19 routes, 63 screenshots); the diff tool belongs to the fog ticket; this volume only locks "the side-by-side obligation exists".
+6. **i18n layered acceptance**: landing four languages page-by-page against r1 `i18n-*.txt`; docs en/zh-CN; workspace zh-CN canon entry-by-entry against the r2/r3 copy tables.
+7. **PWA byte-level**: manifest/sw.js diffed against the r1 capture originals = brand-slot differences only.
+8. **notifications/OS popups**: one real run per kind (carrying over 02's attached acceptance hints).
 
-## 8. 差异注记汇总（S1 义务履行：决策 vs 观测栈）
+## 8. Difference-note aggregate (honoring the S1 obligation: decision vs observed stack)
 
-| 面 | 观测 | 决策 | 性质 |
+| Surface | Observed | Decision | Nature |
 |---|---|---|---|
-| landing 框架 | Next.js App Router SSG | Vite SPA（与 workspace 同应用） | **差异**：官方双栈异构 → 复刻统一单 SPA；无 SEO 诉求，SSG 不保 |
-| workspace 框架 | RNW/Expo [推断] | React 19 + Radix + Tailwind | **差异**（00/D5 已锁）；RNW 不复刻 |
-| landing CSS | Tailwind 3.4.19 | 4.3.3（#106 窗口，§4.1） | 同栈跨大版本：类名语义/断点五档/shadow 对拍义务不变，全矩阵重验 |
-| 主题/色板/字体 | 深色默认 `.light` 反相、zinc/stone/indigo、Inter+JBM、CJK 无 webfont | 逐项照抄（§4.1） | 同栈 |
-| 实时面 | 全 SSE 无 WS | 同 | 同栈（02/A1） |
-| executor 发行 | npm -g 275MB、6 平台二进制 | 纯 JS npm 包 | **差异**：二进制栈 [推断] = tunnel/防睡，tunnel 挂雾不复刻 |
-| executor 引擎 | pi 0.84.3 | pi 0.86.0（D6 pin） | 同族，pin 高两档 |
-| runtime | Node [推断] | Node 24 LTS | 近似同栈 |
-| DB / server 框架 / 状态库 / markdown 栈 | 不可观测 | SQLite+Drizzle / Hono / TQ+Zustand / streamdown | **[设计]**：无对照物，验收走行为/像素靶 |
-| 未匹配路径 | 307 → `/login?callbackUrl=` | 重定向 `/app`（无登录页，02/A2） | **差异** [设计] |
-| 侧栏「安装 App」入口 | 存在（r7 01/02 底部 accent pill、r7 03 rail icon；`/zh/install` 路由） | 整体去除（#121 dogfood 裁决）；`/zh/install` 走未匹配路径重定向 `/app`（上一行口径） | **差异**：dogfood 驱动，非官方漂移；含该 pill 区域的 r7 基线行按 §04 阈值内判 |
-| 卡片边框/侧栏接缝/横向滚动条 | 实心卡片边框 + 1px `--border-default` 硬接缝（r7 01/02 像素探针 #e1dbd2/#27272a）+ 横向滚动条区 | #123 dogfood 裁决切 claude.ai 质感：卡片 1px 低 alpha 边环 + 宽柔阴影（cds alpha border / `--df-shadow-card` 族）、横向滚动条双写隐藏（滚动能力保留）；侧栏面 **#135 裁决 v2 修订「柔边不画缝」**：柔影删除（「不是悬浮的」）、1px `--border-default` 硬缝回归 r7 原站、色阶保留，且顶部分隔线延伸全屏宽——侧栏 team-row 43px + `.sidebar-nav` border-top 与各 shell topbar border-bottom 同 y43..44 像素行（rail toggle 44px 同步对齐），res-topbar 边色归一 `--border-default` | **差异**：dogfood 驱动，非官方漂移；卡片/滚动条面维持 #123 原裁决；竖缝 dark 面回归 r7 探针原值（#27272a）、active pill 宽回归 x8..231 探针，light 面缝色 #e2dbd1 与原探针 #e1dbd2 差 1 位（「复用看板线」裁决使然）；横线全屏为展开态新 divergence（r7 展开态侧栏无此线；rail 态 divider 由 y42..43 对齐至 y43..44）；parity 按 §04 处置（阈值内或重定基线带注记） |
-| 侧栏 hover/选中色阶 + ⌘K chip | r7 01/02 探针：选中 pill = `--surface-secondary` 实填（x8..231、32px 高内缩、radius 6）、⌘K = 26×20 带框 pill（1px `--border-default`、右锚 17px）；hover 面无官方捕获 | #128 dogfood 裁决：几何回官方探针（hover/选中统一同一 32px 内缩 pill、⌘K 恢复带框 pill 右锚——复刻侧原实现被行内容 lift 规则降级致重合/裁切）；色阶切 claude.ai cds alpha 梯——hover = neutral-900 5% / 选中 = 10%（dark 反相白族），叠 #123 侧栏色阶合成；`--surface-hover` 保官方值作 overlay/画布 hover 正典（motion.css） | **差异**：dogfood 驱动，非官方漂移；选中填色离 r7 实填值（几何与 ⌘K 为回官方 fidelity 修正），parity 按 §04 判（阈值内或重定基线带注记） |
-| 分段控件族 hover + 几何 | 任一分段族 hover 态无官方捕获（#128 同形）；r2 24b/24c・r3 92・r7 12/16/16d/31/37 探针：组 = 1px hairline ring + ~2px padding、chip 内缩（page-tab 族组高 30、detail tab 组 68×28 ring+plate、user-menu seg ~20px 带框 cell）；复刻侧原状：page-tab 族 chip 齐组边（毛边）、freq dark active = `--surface-elevated` 与容器同色（选中不可见）、detail 组 64 宽无 ring、team 组无 ring、user-menu seg 18h/6pad | #138 dogfood 裁决：全族 `--seg-hover` cds alpha 梯 5%（dark 白 / light 暖墨，#128 同形），hover 骑与 active chip 同 box+radius（一几何两深度，选中在 hover 下保持自身填色）；page-tab 族四组补 hairline ring（border 1 + padding 2 → chip 内缩 3）；detail-tabs 回 r7 16/16d 探针 68×28 ring+plate（`--tab-group-bg` light transparent→#faf7f3，双 tab 同 plate、active 仅 ink）；team-layout 补 ring border、chip 归一族 token；user-menu seg 回探针 20h/8pad/2px 缝；freq/res active 归一 `--tab-chip-bg`（修 dark 不可见 + light #faf7f3 正典化，r3 92 / r7 31 探针）；`--seg-container-bg`/`--seg-tab-active-bg` 并入 `--surface-secondary`/`--tab-chip-bg` | **差异**：dogfood 驱动，非官方漂移；hover 为复刻侧新增（官方无对照物，同 #121/#128 登记口径）；几何面为按探针的 fidelity 修正；parity 按 §04 判（阈值内或重定基线带注记） |
-| account/team local-first 净化（#148） | account r7 13：头像行 更换/删除 + 退出登录 box、推送通知 switch 恒 on；team r7 12：右槽 `设置` 链接无行为、grid\|chart tablist 无行为（r2 §8.1：chart 布局实测 17c = 整块内容替换为 `暂无成员`、统计条与 `创建 Agent` 不再渲染，持久化键 `tds.teamMembersLayout`） | #148 裁决（台账 #136 account/team 行，#129 SaaS 面删除先例同族）：退出登录/删除 移除（本地单用户无此语义）；更换头像 留 wontfix 占位（静态资产、无上传面）；推送通知 switch 接真 `Notification.permission`（与 #114 引导条共享 useNotificationPermission，off click 走 requestPermission() 引导开启；fixture 模式冻结 granted 保 r7 13 基线）；team `设置` 接 `/app/account`（app 唯一设置面，或通不隐、保 r7 12 ink）；grid\|chart 接真切换并持久化已登记键 `pacman.teamMembersLayout`，chart 布局按 17c 以 `暂无成员` 空态替换内容块、隐统计条与 `创建 Agent`；`创建 Agent` 仅 TODO 注记归弹层族后票 | **差异**：local-first 裁决驱动，非官方漂移；tablist 双布局保留（17c 实测无 tablist，无回路的切换是陷阱，[设计]）；switch off 态几何与 `暂无成员` 居中为 [设计]（无官方对照物）；parity 按 §04 判（阈值内或重定基线带注记） |
-| 总管 composer 行三钮 + 面板交互 | r5 100/111/114/116：composer 行发送钮左侧含 语音输入/添加附件/提及 三钮；全屏态（`tds.panel-maximized`，r2 §9-26）无任一批次抓拍；快捷提示 ×4 与 Esc 关面板无观测行为 | #146 dogfood 裁决：语音/附件/提及 local-first 无后端面——**隐藏不渲染**（wontfix，理由登记 #136 台账评论区）；「全屏」切面板形态（`.is-fullscreen` 充满定位容器、圆角归零，几何 [推断]）；Esc 关面板（useEscapeClose 弹层族同律，线程切换器内层先关）；快捷提示 ×4 点击即发预置词进 chief 线程（live 面 onSend）；「新主题」落回新线程视图 | **差异**：dogfood 驱动，非官方漂移；chief parity 行全为 smoke 行（自比对 SSIM=1.0、无基线阈值），三钮削减不判负；全屏几何无对照物 [推断]（r8-chief-panel-adhoc §3 登记） |
-| 零散死钮 + feedback 页（#149） | feedback 页存在（r2 32）；#136 台账实机排查的零散死钮：看板指南 topbar 钮、「导出」、「查看文档」空态钮、main 分支 chip、文件\|历史 分段、doc-pane 变更▾ 均无行为 | feedback 整页移除（local-first：SaaS 反馈通道无对象，#129 同族；旧路由走未匹配路径重定向 `/app`，user-menu「反馈」行随除、菜单 272→244）；「导出」/「查看文档」钮全除（wontfix：无导出后端面 / 无文档站可链）；分支 chip 静态化 **[设计]**（托管读面固定 defaultBranch，chevron 保 r2 07e 捕获形状，非交互元素）；看板指南弹层 + 变更▾ 型选接 anchored-overlay 家族律（#67/#127：OverlayMount + ClickCatcher + Esc），弹层内容 **[设计]**（官方指南面无捕获，内容自选先例 = whats-new：列语义单源 COLUMNS + 关口操作 + ⌘K）；历史面 = **[推断]** 提交读面 `GET /api/projects/{id}/commits`（wire 未采，INFERRED_ROUTES 登记；runGit 直调先例 = readBuildChanges；行形 [设计] git log 最小投影，非托管 = 404 同 tree/file 族） | **差异**：dogfood 驱动，非官方漂移；user-menu 少一行致含菜单基线行（16d/17/26d/27d + #127 触发族）像素偏移，按 §04 阈值内判（本地最薄 0.858/0.84，#121 去 pill 同款先例不重定基线）；指南弹层/历史面/型选开态为复刻侧新增 divergence（官方无对照物），parity 冒烟行（expectText）钉内容 |
+| landing framework | Next.js App Router SSG | Vite SPA (same app as the workspace) | **Difference**: the official dual-stack heterogeneity → the replication unifies on a single SPA; no SEO demand, SSG not preserved |
+| workspace framework | RNW/Expo [inferred] | React 19 + Radix + Tailwind | **Difference** (already locked by 00/D5); RNW not replicated |
+| landing CSS | Tailwind 3.4.19 | 4.3.3 (#106 window, §4.1) | same stack across a major version: class-name semantics / five breakpoints / shadow side-by-side obligations unchanged, full-matrix re-verification |
+| theme/palette/fonts | dark-default `.light` inversion, zinc/stone/indigo, Inter+JBM, no CJK webfont | copied item by item (§4.1) | same stack |
+| realtime surfaces | all SSE, no WS | same | same stack (02/A1) |
+| executor distribution | npm -g 275MB, 6-platform binaries | pure-JS npm package | **Difference**: the binary stack [inferred] = tunnel/anti-sleep; the tunnel is fogged, not replicated |
+| executor engine | pi 0.84.3 | pi 0.86.0 (D6 pin) | same family, pinned two notches higher |
+| runtime | Node [inferred] | Node 24 LTS | near-same stack |
+| DB / server framework / state library / markdown stack | not observable | SQLite+Drizzle / Hono / TQ+Zustand / streamdown | **[designed]**: nothing to compare against; acceptance walks behavior/pixel targets |
+| unmatched paths | 307 → `/login?callbackUrl=` | redirect `/app` (no login page, 02/A2) | **Difference** [designed] |
+| sidebar "Install App" entry | exists (r7 01/02 bottom accent pill, r7 03 rail icon; `/zh/install` route) | removed wholesale (#121 dogfood ruling); `/zh/install` goes through the unmatched-path redirect to `/app` (same line as above) | **Difference**: dogfood-driven, not official drift; the r7 baseline rows containing that pill region are judged within the §04 threshold |
+| card borders / sidebar seams / horizontal scrollbar | solid card borders + 1px `--border-default` hard seams (r7 01/02 pixel probes #e1dbd2/#27272a) + horizontal scrollbar area | #123 dogfood ruling switches to the claude.ai feel: cards get a 1px low-alpha border ring + wide soft shadows (the cds alpha border / `--df-shadow-card` family), the horizontal scrollbar is double-written hidden (scrolling ability preserved); the sidebar surface is **amended by #135 ruling v2 "soft edges, no seam drawn"**: the soft shadow is deleted ("it is not floating"), the 1px `--border-default` hard seam returns to the r7 original-site value, the color scale is kept, and the top divider extends full-screen width — the sidebar team-row 43px + `.sidebar-nav` border-top and each shell's topbar border-bottom share the same y43..44 pixel row (the rail toggle 44px aligns simultaneously), and the res-topbar edge color unifies to `--border-default` | **Difference**: dogfood-driven, not official drift; the card/scrollbar surfaces keep #123's original ruling; the vertical seam's dark side returns to the r7 probe's original value (#27272a), the active pill width returns to the x8..231 probes, and the light-side seam color #e2dbd1 differs from the original probe #e1dbd2 by 1 unit (a consequence of the "reuse the board line" ruling); the full-width line is a new divergence in the expanded state (the r7 expanded sidebar has no such line; the rail-state divider aligns from y42..43 to y43..44); parity is handled per §04 (within threshold or baseline re-set with a note) |
+| sidebar hover/selected color scale + ⌘K chip | r7 01/02 probes: the selected pill = `--surface-secondary` solid fill (x8..231, 32px high inset, radius 6), ⌘K = a 26×20 boxed pill (1px `--border-default`, anchored 17px from the right); no official capture exists for the hover surface | #128 dogfood ruling: the geometry returns to the official probes (hover and selected unify on the same 32px-inset pill; the ⌘K boxed pill with right anchor is restored — the replication's original implementation had been degraded by the row-content lift rule, causing overlap/clipping); the color scale switches to the claude.ai cds alpha ladder — hover = neutral-900 5% / selected = 10% (white family inverted in dark), composed over the #123 sidebar color scale; `--surface-hover` keeps the official value as the overlay/canvas-hover canon (motion.css) | **Difference**: dogfood-driven, not official drift; the selected fill color departs from the r7 solid-fill value (the geometry and ⌘K are fidelity fixes back to official); parity judged per §04 (within threshold or baseline re-set with a note) |
+| segmented-control family hover + geometry | no official capture exists for any segmented-family hover state (same shape as #128); r2 24b/24c · r3 92 · r7 12/16/16d/31/37 probes: the group = a 1px hairline ring + ~2px padding, chips inset (page-tab family group height 30, detail tab group 68×28 ring+plate, user-menu seg ~20px boxed cells); the replication's prior state: page-tab family chips flush with the group edge (frayed), freq dark active = `--surface-elevated` same as the container (selection invisible), detail group 64 wide with no ring, team group with no ring, user-menu seg 18h/6pad | #138 dogfood ruling: the whole family gets the `--seg-hover` cds alpha ladder at 5% (white in dark / warm ink in light, same shape as #128), with the hover riding the same box+radius as the active chip (one geometry, two depths; the selection keeps its own fill under hover); the page-tab family's four groups gain the hairline ring (border 1 + padding 2 → chips inset 3); detail-tabs return to the r7 16/16d probes' 68×28 ring+plate (`--tab-group-bg` light transparent→#faf7f3, both tabs on the same plate, active ink only); team-layout gains the ring border, chips unified into one family token; user-menu seg returns to the probes' 20h/8pad/2px gap; freq/res active unify on `--tab-chip-bg` (fixing the dark-invisible selection + canonicalizing light #faf7f3, r3 92 / r7 31 probes); `--seg-container-bg`/`--seg-tab-active-bg` merge into `--surface-secondary`/`--tab-chip-bg` | **Difference**: dogfood-driven, not official drift; the hover is a replication-side addition (no official counterpart, registered under the same wording as #121/#128); the geometry surfaces are probe-based fidelity fixes; parity judged per §04 (within threshold or baseline re-set with a note) |
+| account/team local-first cleanup (#148) | account r7 13: avatar row with `更换`/`删除` + a `退出登录` box, the push-notification switch permanently on; team r7 12: the right-slot `设置` link has no behavior, the grid\|chart tablist has no behavior (r2 §8.1: the chart layout measured at 17c = the whole content block replaced by `暂无成员`, the stats bar and `创建 Agent` no longer rendered, persisted under the key `tds.teamMembersLayout`) | #148 ruling (the ledger #136 account/team row, same family as the #129 SaaS-surface deletion precedent): `退出登录`/`删除` removed (no such semantics for a local single user); `更换头像` stays as a wontfix placeholder (static assets, no upload surface); the push-notification switch connects to the real `Notification.permission` (sharing useNotificationPermission with the #114 guide bar; an off click goes through requestPermission() to guide enabling; fixture mode freezes granted to keep the r7 13 baseline); the team `设置` links to `/app/account` (the app's only settings surface, always reachable, keeping the r7 12 ink); grid\|chart becomes a real switch persisted under the already-registered key `pacman.teamMembersLayout`, with the chart layout replacing the content block by the 17c `暂无成员` empty state and hiding the stats bar and `创建 Agent`; `创建 Agent` is a TODO note deferred to the popover family's follow-up ticket | **Difference**: local-first-ruling-driven, not official drift; the tablist dual layouts are kept (17c measured no tablist — a switch with no loop-back is a trap, [designed]); the switch's off-state geometry and the `暂无成员` centering are [designed] (no official counterpart); parity judged per §04 (within threshold or baseline re-set with a note) |
+| chief composer row three buttons + panel interactions | r5 100/111/114/116: the composer row's send button is flanked by `语音输入`/`添加附件`/`提及`; the fullscreen state (`tds.panel-maximized`, r2 §9-26) has no capture in any batch; the ×4 quick prompts and the Esc-close-panel behavior are unobserved | #146 dogfood ruling: voice/attachment/mention have no backend surface under local-first — **hidden, not rendered** (wontfix, the reason registered in the #136 ledger comment); "fullscreen" switches the panel form (`.is-fullscreen` fills the positioning container, radius zeroed, geometry [inferred]); Esc closes the panel (same popover-family rule as useEscapeClose, the thread-switcher inner layer closes first); the ×4 quick prompts click-send preset phrases into the chief thread (the live surface onSend); "new topic" falls back to the new-thread view | **Difference**: dogfood-driven, not official drift; all chief parity rows are smoke rows (self-comparison SSIM=1.0, no baseline threshold), and the three-button reduction is not judged negative; the fullscreen geometry has no counterpart [inferred] (registered in r8-chief-panel-adhoc §3) |
+| scattered dead buttons + feedback page (#149) | the feedback page exists (r2 32); the scattered dead buttons found in the #136 ledger's live-machine sweep: the board-guide topbar button, `导出`, the `查看文档` empty-state button, the main-branch chip, the `文件`\|`历史` segmented control, and the doc-pane `变更▾` type selector all have no behavior | the feedback page is removed wholesale (local-first: no object for a SaaS feedback channel, same family as #129; the old route redirects to `/app` via the unmatched-path rule, the user-menu `反馈` row is removed with it, and the menu shrinks 272→244); the `导出` / `查看文档` buttons are all removed (wontfix: no export backend surface / no docs site to link); the branch chip is staticized **[designed]** (the hosted read surface fixes defaultBranch, the chevron keeps the r2 07e captured shape, a non-interactive element); the board-guide popover + the `变更▾` type selector connect to the anchored-overlay family rules (#67/#127: OverlayMount + ClickCatcher + Esc), with the popover content **[designed]** (the official guide surface has no capture; the content-self-selection precedent = whats-new: the COLUMNS semantics single source + gate operations + ⌘K); the history surface = **[inferred]** commit-read surface `GET /api/projects/{id}/commits` (not captured on the wire, registered in INFERRED_ROUTES; the runGit direct-call precedent = readBuildChanges; the line form [designed] = a minimal projection of git log, non-hosted = 404 like the tree/file family) | **Difference**: dogfood-driven, not official drift; the user-menu losing one row shifts the pixels of the containing-menu baseline rows (16d/17/26d/27d + the #127 trigger family), judged within the §04 threshold (the local thinnest 0.858/0.84, same precedent as #121's pill removal without baseline re-set); the guide popover / history surface / type-selector open state are replication-side new divergences (no official counterpart), pinned by parity smoke rows (expectText) |
 
-| 语音输入按钮 | 存在（r2 工具条），实现未观测 | Web Speech API [推断] | 形状平价、行为尽力 |
+| voice-input button | exists (r2 toolbar), implementation not observed | Web Speech API [inferred] | shape parity, best-effort behavior |
 
-## 9. 移交与观察项
+## 9. Handoffs and watch items
 
-| 项 | 去向 |
+| Item | Destination |
 |---|---|
-| 图标字形提取（登录态抓 workspace bundle/SVG）、字体 woff2 与位图图标下载、emoji 常用网格子集、PWA 品牌槽替换 | **#44 素材清单增补** |
-| 像素 diff 验收工具与逐屏 UI 规格切分 | 已落地：#53 parity harness 建成，验收规则正典 = 04 册 §2（本册 §7.5 对拍义务已兑现） |
-| pi 0.86.0 升级窗口评估（读 Breaking 段） | 已落地：#107 首个 D6 窗口兑现——Breaking 三条全缝外（缝内吸收点 = 零），pin 0.86.0（§4.3） |
-| 框架升级票（TS 7 / Tailwind 4 / react-router 8） | 全落地：TS 7.0.2（#104，§4.5）、Tailwind 4.3.3（#106：+ `@theme inline` token 层 + `@custom-variant dark`，全矩阵 174 行 0 失败，§4.1）、react-router 8.4.0（#105，§4.1）；节奏 = 03 册 §3（M6 后） |
-| turbo 引入 | CI 时长成痛点时触发（承旧） |
-| transcript 虚拟滚动（@tanstack/react-virtual 候选） | 实现期按实测定，不预锁 |
-| `preview-token`/`tds-tunnel` | 02 §9.3 在册不设计；触发条件 = 04 册附录 B |
-| daemon 防睡 linux 路径（`systemd-inhibit` [推断]） | 实现期按平台实测 |
+| icon-glyph extraction (capturing the workspace bundle/SVG in logged-in state), font woff2 and bitmap-icon downloads, the emoji common-grid subset, PWA brand-slot replacement | **#44 asset checklist additions** |
+| pixel-diff acceptance tooling and per-screen UI-spec splitting | landed: #53 built the parity harness; the acceptance-rules canon = volume 04 §2 (this volume's §7.5 side-by-side obligation honored) |
+| pi 0.86.0 upgrade-window evaluation (reading the Breaking section) | landed: #107 honored the first D6 window — all three Breaking entries outside the seams (zero absorption points inside the seams), pinned 0.86.0 (§4.3) |
+| framework upgrade tickets (TS 7 / Tailwind 4 / react-router 8) | all landed: TS 7.0.2 (#104, §4.5), Tailwind 4.3.3 (#106: + the `@theme inline` token layer + `@custom-variant dark`, full matrix of 174 lines 0 failures, §4.1), react-router 8.4.0 (#105, §4.1); the cadence = volume 03 §3 (after M6) |
+| turbo introduction | triggers when CI duration becomes a pain point (inherited) |
+| transcript virtual scrolling (@tanstack/react-virtual candidate) | decided by measurement at implementation time, not pre-locked |
+| `preview-token`/`tds-tunnel` | recorded but undesigned in 02 §9.3; trigger condition = volume 04 Appendix B |
+| daemon anti-sleep linux path (`systemd-inhibit` [inferred]) | measured per platform at implementation time |
 
-## 10. 对下游票的影响
+## 10. Impact on downstream tickets
 
-- **#45 ROADMAP**：已完成（2026-09-22）——§7 验收要点汇入 04 册；§9 升级窗口/升级票节奏汇编入 03 册 §3；构建顺序按 §3 包切分落 03 册 §2（两线并行，后端段 shared → server → daemon → 编排）。
-- **#44 发布与素材**：§9 素材清单增补四项；02 §5.8 + 本册品牌位（localStorage 前缀、env 前缀、数据目录、包名）一次性替换面完整。
-- **#42 原型双屏**：前端栈即本册 §4.1（React 19 + Tailwind 3.4.19 + Radix + TQ），原型可直接按 pin 表起。
-- **#46 Chief 实验**：Chief = 挂团队工具的 pi 会话（02 §4.3），跑在 `AgentBackend` 缝上，实验产物回填不改本册。
+- **#45 ROADMAP**: completed (2026-09-22) — §7's acceptance points merged into volume 04; §9's upgrade-window/upgrade-ticket cadence assembled into volume 03 §3; the build order follows §3's package split into volume 03 §2 (two parallel lines, backend segment shared → server → daemon → orchestration).
+- **#44 release and assets**: §9's four asset-checklist additions; 02 §5.8 + this volume's brand slots (localStorage prefix, env prefix, data directory, package name) form the complete one-shot replacement surface.
+- **#42 prototype two-screens**: the frontend stack is exactly this volume's §4.1 (React 19 + Tailwind 3.4.19 + Radix + TQ); the prototype can start directly against the pin table.
+- **#46 Chief experiment**: Chief = a pi session with team tools attached (02 §4.3), running on the `AgentBackend` seam; experiment outputs are written back without changing this volume.

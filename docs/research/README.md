@@ -69,7 +69,7 @@ These folders predate the `docs/verify/` convention. Each of the twelve PR bodie
 
 ## Known broken links
 
-- `r9-pi-sdk.md`, cited by `docs/spec/00-地基决议.md` and `r4-foundation.md`, was deleted in `cae19acf` (2026-09-19) and exists only in git history.
+- `r9-pi-sdk.md`, cited by `docs/spec/00-foundation-decisions.md` and `r4-foundation.md`, was deleted in `cae19acf` (2026-09-19) and exists only in git history.
 - Specs, ADRs and code comments that cite the r1 to r9 series (for example "r3 §1.4") point at notes removed from the working tree; read them at `e95b775`.
 
 ## Citation conventions

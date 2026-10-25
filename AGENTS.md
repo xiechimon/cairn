@@ -47,7 +47,7 @@ pnpm spec:parse # spec parse gate (#1052): collects without executing, seconds; 
 ```
 All of these must pass before committing. **Do not run `pnpm build`** (full vite build; not worth it before a commit).
 
-Testing rules (mandatory; the canonical layering is `docs/spec/19-测试分层与受影响面.md`):
+Testing rules (mandatory; the canonical layering is `docs/spec/19-test-layering-and-blast-radius.md`):
 - **Do not write unit tests after the implementation**; if something gets a test, the test comes first.
 - **E2E first**: verify complex features with real e2e. During development run the affected set with `pnpm --filter @cairn/web e2e:affected` (it falls back to the full suite when shared surfaces change: `src/ui`, styles, i18n, api, fixtures). **The full e2e suite runs in CI** (4 shards, no coverage reduction); run it locally only when a final review really needs it. Measured: 617 cases in 154s (not the old 1h+ figure), but it is the main source of memory pressure across lanes, so do not run it routinely.
 - Narrow unit tests to the affected set with `pnpm exec vitest run --changed` (native in vitest 5; picks related tests from git changes, across projects). **Do not use `vitest related --changed`**: `related` treats the empty positional argument as "a given list of source files", skips the git change lookup and always selects 0 tests (measured 2026-10-20; source in the same section of `docs/spec/19`).

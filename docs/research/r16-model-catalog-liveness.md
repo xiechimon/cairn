@@ -197,7 +197,7 @@ runtime === 'claude-code' && modelId != null
 - **disabled 行**（`r13:107`）：claude 目录里 disabled 行 → `UnavailableModel` with Reason——本 spec 死模型标注借鉴此形（dead + reason）。
 - **关键差异**：Multica 的 discovery 是**对自己 spawn 的二进制**发 list_models（server 持有二进制执行权）；pacman 的 claude-code 是**用户的机器 + 用户的 relay**，server 不 spawn claude 二进制。因此 pacman 不能照搬 Multica 的 stream-json list_models 探测——pacman 探的是 relay `/v1/models`（HTTP），不是 claude 二进制控制协议。
 
-### 6.2 spec 11（`docs/spec/11-模型服务与机器本地化.md`）已有裁决——冲突核对
+### 6.2 spec 11 (`docs/spec/11-model-service-and-machine-localization.md`) already has rulings — conflict check
 
 - **A3**（pi tab 数据源 = custom providers models[]）：A 方案探活不改 pi 段数据源结构，只增活性标注层。**不冲突**。
 - **A4**（claude-code tab 数据源 = 执行机上报、server 按机器聚合）：A 方案探活对象是 relay（pi 段资产），不改 claude-code 段上报链。**不冲突**。

@@ -1,6 +1,6 @@
 # 1194 before link check
 # base: a2285aa1 (origin/main)
-# source: docs/spec/09-前端风格统一-A6.md
+# source: docs/spec/09-frontend-style-unification-a6.md
 # GitHub resolves a relative link from the file directory.
 # href a3/<file>.md therefore requests docs/spec/a3/<file>.md
 
@@ -41,7 +41,7 @@ exists docs/a3/diff-audit.md
 exists docs/a3/report-detail.md
 
 ## rendered page on origin/main
-GET https://github.com/xiechimon/pacman/blob/a2285aa1392486588fabdc24aaf6240c850ac638/docs/spec/09-前端风格统一-A6.md
+GET https://github.com/xiechimon/pacman/blob/a2285aa1392486588fabdc24aaf6240c850ac638/docs/spec/09-frontend-style-unification-a6.md
 HTTP 200
 
 anchor text: docs/a3/diff-audit.md

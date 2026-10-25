@@ -154,15 +154,15 @@
     ".claude/workflows/pr-gate.js",
     ".github/workflows/ci.yml",
     ".gitignore",
-    "docs/adr/0018-多agent团队三层与机器能力闸.md",
-    "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+    "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+    "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
     "docs/pr-review.md",
     "scripts/pr-gate-selfcheck.mjs",
-    "docs/spec/28-自举闭环-自写自合.md"
+    "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md"
   ],
   "mergedBy": "user",
   "humanReasons": [
-    "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-多agent团队三层与机器能力闸.md, docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-自举闭环-自写自合.md",
+    "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md, docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
     "4149 lines changed (over 800)"
   ],
   "missing": [],

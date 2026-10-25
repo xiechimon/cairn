@@ -446,7 +446,7 @@
   },
   {
     "path": "packages/shared/src/brand.ts",
-    "line": "  /** manifest/界面品牌词（素材替换计划 D2：产品名 Cairn；D3 已触发，",
+    "line": "  /** manifest/界面品牌词（asset-replacement-plan D2：产品名 Cairn；D3 已触发，",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
@@ -456,7 +456,7 @@
   },
   {
     "path": "packages/shared/src/brand.ts",
-    "line": "/** env 变量名（替换相位 = CAIRN_ 同形，素材替换计划 §2；观测原名 TDS_* 五件",
+    "line": "/** env 变量名（替换相位 = CAIRN_ 同形，asset-replacement-plan §2；观测原名 TDS_* 五件",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
@@ -531,7 +531,7 @@
   },
   {
     "path": "packages/shared/src/protocol/mcp.ts",
-    "line": " * （#109）= 本地主机名 + `cairn` server 名 + `cairn_<key>`，素材替换计划",
+    "line": " * （#109）= 本地主机名 + `cairn` server 名 + `cairn_<key>`，asset-replacement-plan",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {

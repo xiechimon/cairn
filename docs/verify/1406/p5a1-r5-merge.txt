@@ -8,8 +8,8 @@ $ git merge --no-ff --no-commit origin/main
 Auto-merging apps/server/src/services/chief-tools.ts
 Auto-merging apps/server/src/services/chief.ts
 Auto-merging apps/server/src/services/github-issues.ts
-Auto-merging docs/spec/28-自举闭环-自写自合.md
-CONFLICT (content): Merge conflict in docs/spec/28-自举闭环-自写自合.md
+Auto-merging docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md
+CONFLICT (content): Merge conflict in docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md
 Auto-merging packages/shared/test/__snapshots__/snapshot.test.ts.snap
 Auto-merging packages/shared/test/vocabulary.test.ts
 
@@ -88,7 +88,7 @@ asked for the round 5 result on a new branch, claude/bootstrap-p5-r5; claude/boo
 ## Merge 3: 4845cc2be2f594a597aadbb17af49d6c80a42162  Merge origin/main (e410e82) into claude/bootstrap-p5
 parents: 6a6fd572 (round 5 after the second review pass) + e410e826 (squash of #1461)
 $ git merge --no-ff --no-commit origin/main
-CONFLICT (content): README.md, README.zh.md, docs/spec/28-自举闭环-自写自合.md
+CONFLICT (content): README.md, README.zh.md, docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md
 CONFLICT (add/add): apps/server/src/services/issue-intake.ts, apps/server/test/issue-intake.test.ts
 The merge base b616110b predates the intake, so git sees the two versions of the intake files as two additions.
 Resolution: each file is the three-way merge with base c2f2baa1 (this branch right after merge 1, i.e. #1461 as of
