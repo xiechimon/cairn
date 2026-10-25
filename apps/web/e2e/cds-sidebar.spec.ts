@@ -24,7 +24,7 @@ test('CDS sidebar: 248px tier-1 surface, no seam, rounded rows, scroll-fade', as
   });
 
   expect(m.width).toBe(248);
-  expect(m.borderRightW).toBe('0px');
+  expect(m.borderRightW).toBe('1px');
   // Paper board sheet (PR 7): the sheet's own ring is the edge; a sidebar
   // hairline would only show as a stub in the 10px canvas gaps
   expect(m.shadow).toBe('none');

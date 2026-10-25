@@ -125,7 +125,7 @@ export function BoardPage() {
   );
   const writeFilterParams = useCallback(
     (tags: string[], projects: string[]) => {
-      const rest = new URLSearchParams(searchParams);
+      const rest = new URLSearchParams(window.location.search);
       rest.delete('tags');
       rest.delete('projects');
       const parts = [
@@ -135,25 +135,34 @@ export function BoardPage() {
       ].filter((s) => s !== '');
       navigate(`?${parts.join('&')}`, { replace: true });
     },
-    [searchParams, navigate],
+    [navigate],
   );
+  const latestFilters = useCallback(() => {
+    const current = new URLSearchParams(window.location.search);
+    return {
+      tags: parseTagParam(current.get('tags'), tagVocab),
+      projects: parseProjectsParam(current.get('projects')),
+    };
+  }, [tagVocab]);
   const toggleTag = useCallback(
     (name: string) => {
-      const next = selectedTags.includes(name)
-        ? selectedTags.filter((n) => n !== name)
-        : parseTagParam([...selectedTags, name].join(','), tagVocab);
-      writeFilterParams(next, selectedProjects);
+      const { tags, projects } = latestFilters();
+      const next = tags.includes(name)
+        ? tags.filter((n) => n !== name)
+        : parseTagParam([...tags, name].join(','), tagVocab);
+      writeFilterParams(next, projects);
     },
-    [selectedTags, selectedProjects, tagVocab, writeFilterParams],
+    [latestFilters, tagVocab, writeFilterParams],
   );
   const toggleProject = useCallback(
     (id: string) => {
-      const next = selectedProjects.includes(id)
-        ? selectedProjects.filter((p) => p !== id)
-        : parseProjectsParam([...selectedProjects, id].join(','));
-      writeFilterParams(selectedTags, next);
+      const { tags, projects } = latestFilters();
+      const next = projects.includes(id)
+        ? projects.filter((p) => p !== id)
+        : parseProjectsParam([...projects, id].join(','));
+      writeFilterParams(tags, next);
     },
-    [selectedProjects, selectedTags, writeFilterParams],
+    [latestFilters, writeFilterParams],
   );
   const onlyTag = useCallback(
     (name: string) => writeFilterParams([name], selectedProjects),

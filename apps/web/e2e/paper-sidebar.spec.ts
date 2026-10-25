@@ -53,10 +53,10 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   expect(asideBottom - userBottom).toBeLessThanOrEqual(16);
 });
 
-test('`新任务` button opens the new-task dialog and shows the C key', async ({ page }) => {
+test('`新任务` row opens the new-task dialog without a sidebar key badge', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const button = page.locator('.sidebar-new-task');
-  await expect(button.locator('kbd')).toHaveText('C');
+  await expect(button.locator('kbd')).toHaveCount(0);
   await button.click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
@@ -101,16 +101,22 @@ test('active row = sheet fill + hairline ring + accent icon', async ({ page }) =
     const main = document.querySelector('.board-sheet');
     if (!row || !main) throw new Error('active row missing');
     const cs = getComputedStyle(row);
+    const tokenProbe = document.createElement('span');
+    tokenProbe.style.backgroundColor = 'var(--hover-1)';
+    document.body.append(tokenProbe);
+    const hover = getComputedStyle(tokenProbe).backgroundColor;
+    tokenProbe.remove();
     return {
       bg: cs.backgroundColor,
+      hover,
       sheet: getComputedStyle(main).backgroundColor,
       ring: cs.boxShadow,
       icon: getComputedStyle(row.querySelector('svg')!).color,
       accent: getComputedStyle(document.documentElement).getPropertyValue('--card-button').trim(),
     };
   });
-  expect(m.bg).toBe(m.sheet);
-  expect(m.ring).not.toBe('none');
+  expect(m.bg).toBe(m.hover);
+  expect(m.ring).toBe('none');
   expect(m.accent).toBe('#173a2f');
   expect(m.icon).toBe('rgb(23, 58, 47)');
 });
@@ -206,7 +212,7 @@ test('long project names truncate and keep the count visible', async ({ page }) 
   expect(m.overflow).toBe(true);
   expect(m.ellipsis).toBe('ellipsis');
   expect(m.countInside).toBe(true);
-  expect(m.rowHeight).toBe(32);
+  expect(m.rowHeight).toBe(36);
 });
 
 test('user row second line reads machines online and running count', async ({ page }) => {

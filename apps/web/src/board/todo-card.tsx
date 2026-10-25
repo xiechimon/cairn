@@ -3,7 +3,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowRight,
   Ban,
-  Bot,
   Check,
   CircleX,
   Clock,
@@ -25,6 +24,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
 import { formatUsd, NO_PRICE_REASON } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { SpiralMark } from '../chief/chief-fab-icon.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
@@ -50,7 +50,7 @@ interface TodoCardProps {
 
 type AttentionNeed = Extract<CardFace, { kind: 'attention' }>['need'];
 
-const ATTENTION: Record<
+export const ATTENTION: Record<
   AttentionNeed,
   { icon: LucideIcon; label: string; action: string; actionIcon: LucideIcon }
 > = {
@@ -275,10 +275,7 @@ export function TodoCard({
           {queued ? (
             <Glyph icon={Hourglass} className="size-3.25 flex-none text-content-tertiary" />
           ) : (
-            <Glyph
-              icon={Bot}
-              className="size-3.25 flex-none animate-breath text-running motion-reduce:animate-none"
-            />
+            <SpiralMark busy className="size-3.5 flex-none text-running" />
           )}
           <span className="min-w-0 truncate">
             {todo.agent != null && `${todo.agent.displayName} · `}

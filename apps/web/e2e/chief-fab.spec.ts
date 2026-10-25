@@ -97,17 +97,29 @@ test.describe('chief unread badge cap (#1303)', () => {
 });
 
 test.describe('chief FAB brand states', () => {
-  test('idle: a 40px brand green disc, the spiral holds still, no label', async ({ page }) => {
+  test('idle: a 40px disc on the card surface with body ink, the spiral holds still, no label', async ({
+    page,
+  }) => {
     await page.goto('/app?scenario=01');
     const fab = page.getByRole('button', { name: '总管', exact: true });
     await expect(fab).not.toHaveAttribute('data-expanded');
     await expect(fab).toHaveText('');
-    const look = await fab.evaluate((el) => ({
-      bg: getComputedStyle(el).backgroundColor,
-      width: el.getBoundingClientRect().width,
-      spin: getComputedStyle(el.querySelector('svg') as Element).animationName,
-    }));
-    expect(look).toEqual({ bg: 'rgb(23, 58, 47)', width: 40, spin: 'none' });
+    const look = await fab.evaluate((el) => {
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = 'var(--card)';
+      probe.style.color = 'var(--foreground)';
+      document.body.append(probe);
+      const expected = getComputedStyle(probe);
+      const result = {
+        bgIsCard: getComputedStyle(el).backgroundColor === expected.backgroundColor,
+        inkIsForeground: getComputedStyle(el).color === expected.color,
+        width: el.getBoundingClientRect().width,
+        spin: getComputedStyle(el.querySelector('svg') as Element).animationName,
+      };
+      probe.remove();
+      return result;
+    });
+    expect(look).toEqual({ bgIsCard: true, inkIsForeground: true, width: 40, spin: 'none' });
   });
 
   test('busy: the pill says `思考中…` and the spiral spins', async ({ page }) => {

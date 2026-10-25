@@ -1,3 +1,4 @@
+import { canOrchestrate } from '@cairn/shared';
 import {
   closestCorners,
   DndContext,
@@ -14,21 +15,25 @@ import { cn } from 'cn';
 import { Activity, CircleAlert, CircleCheck, CircleDashed, Clock, Plus } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
+import { useLiveData } from '../api/provider.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
+import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { safeSessionStorage } from '../safe-storage.js';
+import { safeLocalStorage, safeSessionStorage, safeSetItem } from '../safe-storage.js';
 import {
   type BoardColumnDef,
   COLUMNS,
   canDropOnColumn,
+  cardFace,
   needsDoneGate,
   needsResetGate,
   sortColumnTodos,
+  withColumnParam,
 } from './columns.js';
 import { DRAG_THRESHOLD_PX } from './dnd.js';
 import { DragCard } from './drag-card.js';
@@ -38,10 +43,11 @@ import {
   FilterChips,
   type FilterDimension,
   FilterPanel,
-  TOPBAR_PRIMARY_BUTTON,
   TOPBAR_TEXT_BUTTON,
 } from './filter-panel.js';
+import { BrandMark } from './sidebar.js';
 import { cardTag } from './tag-filter.js';
+import { ATTENTION } from './todo-card.js';
 
 export interface BoardFilters {
   dimensions: readonly FilterDimension[];
@@ -110,6 +116,104 @@ function NeedsYouSummary({ count }: { count: number }) {
   );
 }
 
+const LAST_SEEN_KEY = 'cairn.board.lastSeenAt';
+
+function readLastSeenAt(): number {
+  const parsed = Number(safeLocalStorage()?.getItem(LAST_SEEN_KEY) ?? Number.NaN);
+  return Number.isFinite(parsed) ? parsed : Date.now();
+}
+
+function NeedsYouStrip({
+  todos,
+  projectNames,
+  onAction,
+  orchestrationOf,
+}: {
+  todos: TodoRecord[];
+  projectNames?: Record<string, string>;
+  onAction?: (todo: TodoRecord) => void;
+  orchestrationOf?: (todo: TodoRecord) => CardOrchestration | null;
+}) {
+  const { t } = useI18n();
+  const { live } = useLiveData();
+  const { search } = useLocation();
+  if (todos.length === 0) return null;
+  return (
+    <section data-testid="needs-you-strip" className="mx-auto w-full max-w-190 px-4 pt-3">
+      <div className="mb-1.5 flex items-center gap-2 text-ui font-medium text-foreground">
+        <span className="size-2 rounded-full bg-(--card-button)" />
+        <span>
+          {t('等你处理')} · {todos.length}
+        </span>
+      </div>
+      <div className="divide-y divide-border overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)">
+        {todos.slice(0, 5).map((todo) => {
+          const face = cardFace(todo);
+          const attention = face.kind === 'attention' ? ATTENTION[face.need] : null;
+          const orchestration = canOrchestrate(todo.phase)
+            ? (orchestrationOf?.(todo) ?? null)
+            : null;
+          return (
+            <div
+              key={todo.id}
+              data-testid="needs-you-row"
+              className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
+            >
+              <div className="min-w-0 grow basis-64">
+                <div className="line-clamp-2 text-ui wrap-break-word text-foreground">
+                  {todo.title}
+                </div>
+                <div className="text-meta text-content-tertiary">
+                  {[
+                    projectNames?.[todo.projectId] ?? (live ? undefined : PROJECT_NAME),
+                    `#${todo.seqNum}`,
+                    attention == null ? undefined : t(attention.label),
+                  ]
+                    .filter((part) => part != null)
+                    .join(' · ')}
+                </div>
+              </div>
+              <div className="ml-auto flex flex-none items-center gap-1">
+                {orchestration != null && orchestration.error === undefined ? (
+                  <span className="px-2 text-meta text-content-tertiary">{t('编排中')}</span>
+                ) : (
+                  attention != null &&
+                  orchestration == null && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="flex-none text-(--card-button)"
+                      onClick={() => onAction?.(todo)}
+                    >
+                      {t(attention.action)}
+                    </Button>
+                  )
+                )}
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="flex-none text-content-secondary"
+                  render={<Link to={`/app/todo/${todo.id}`} />}
+                >
+                  {t('打开')}
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {todos.length > 5 && (
+        <Link
+          className="mt-1.5 block text-right text-meta text-(--card-button)"
+          to={withColumnParam(search, 'pending')}
+        >
+          {t('查看全部')}
+        </Link>
+      )}
+    </section>
+  );
+}
+
 export function BoardSurface({
   fixture,
   onAction,
@@ -146,6 +250,31 @@ export function BoardSurface({
   );
   const visibleTodos = narrow(fixture.todos);
   const visibleColumns = onlyColumn == null ? COLUMNS : COLUMNS.filter((c) => c.id === onlyColumn);
+  const [seenWindow, setSeenWindow] = useState(() => ({
+    from: readLastSeenAt(),
+    to: Date.now(),
+  }));
+  const sinceLastSeen = visibleTodos.reduce(
+    (counts, todo) => {
+      if (todo.phaseAt <= seenWindow.from || todo.phaseAt > seenWindow.to) return counts;
+      if (todo.phase === 'done' || todo.phase === 'closed') counts.done += 1;
+      if (todo.phase === 'failed') counts.failed += 1;
+      return counts;
+    },
+    { done: 0, failed: 0 },
+  );
+  useEffect(() => {
+    const markSeen = () => safeSetItem(LAST_SEEN_KEY, String(Date.now()));
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') markSeen();
+      else setSeenWindow({ from: readLastSeenAt(), to: Date.now() });
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      markSeen();
+    };
+  }, []);
   useEffect(() => {
     if (onlyColumn != null) return;
     const cols = COLUMNS.map(
@@ -210,7 +339,7 @@ export function BoardSurface({
 
   return (
     <div className="board-main relative flex min-w-0 flex-1 flex-col">
-      <header className="board-topbar flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap">
+      <header className="board-topbar flex h-14 flex-none items-center gap-3 px-6 whitespace-nowrap">
         <h1 className="board-topbar-title flex-none font-heading text-page font-medium text-foreground">
           {t('工作台')}
         </h1>
@@ -231,16 +360,40 @@ export function BoardSurface({
             <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
             {t('定时')}
           </Button>
-          {onNewTask != null && (
-            <Button className={TOPBAR_PRIMARY_BUTTON} onClick={onNewTask}>
-              <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
-              {t('新任务')}
-            </Button>
-          )}
         </div>
       </header>
 
       {banner != null && <div className="flex-none px-[17px] pt-3">{banner}</div>}
+      {onNewTask != null && (
+        <Button
+          variant="ghost"
+          data-testid="board-new-task-bar"
+          className="board-new-task-bar mx-auto mt-3 flex h-11 w-full justify-start font-normal hover:bg-card hover:text-content-tertiary dark:hover:bg-card active:not-aria-[haspopup]:translate-y-0 max-w-190 items-center gap-3 rounded-(--radius-composer) bg-card px-3.5 text-left text-ui text-content-tertiary shadow-(--shadow-composer) transition-[box-shadow] duration-(--dur-fast) ease-(--ease-standard) hover:shadow-(--shadow-composer-hover)"
+          onClick={onNewTask}
+        >
+          <BrandMark className="size-5 text-(--card-button)" />
+          <span className="min-w-0 flex-1 truncate">{t('新任务：接下来让 agent 做什么？')}</span>
+          <Kbd>C</Kbd>
+        </Button>
+      )}
+      {onlyColumn == null && (
+        <>
+          {(sinceLastSeen.done > 0 || sinceLastSeen.failed > 0) && (
+            <span
+              data-testid="board-since-last-seen"
+              className="mx-auto block w-full max-w-190 px-4 pt-2 text-right text-meta text-content-tertiary"
+            >
+              {t('上次查看后：{done} 个完成，{failed} 个新失败', sinceLastSeen)}
+            </span>
+          )}
+          <NeedsYouStrip
+            todos={viewTodos('pending')}
+            projectNames={fixture.projectNames}
+            onAction={onAction}
+            orchestrationOf={orchestrationOf}
+          />
+        </>
+      )}
 
       <DndContext
         sensors={desktop ? sensors : []}
@@ -280,6 +433,7 @@ export function BoardSurface({
                   )}
                   aria-label={t(column.name)}
                   data-column={column.id}
+                  data-empty={todos.length === 0 && !loading ? 'true' : undefined}
                   data-drop-valid={isValidDropTarget(column.id) ? 'true' : undefined}
                   data-drop={dropColumnId === column.id ? 'true' : undefined}
                 >
@@ -320,7 +474,7 @@ export function BoardSurface({
                           className="h-auto w-full justify-start gap-2 rounded-(--radius-card) border border-dashed border-border bg-transparent px-3.5 py-3 text-left text-ui font-normal text-content-tertiary transition-colors duration-150 ease-out hover:border-content-dim hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent"
                         >
                           <Plus aria-hidden strokeWidth={1.75} className="size-3.5 flex-none" />
-                          <span className="min-w-0 flex-1">{t('写下想做的事')}</span>
+                          <span className="min-w-0 flex-1 truncate">{t('写下想做的事')}</span>
                           <Kbd>C</Kbd>
                         </Button>
                       ) : (

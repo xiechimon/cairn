@@ -76,12 +76,12 @@ export function ChiefRoot() {
                 onClick={() => surface.setChiefView('drawer')}
                 data-busy={surface.chiefBusy || undefined}
                 data-expanded={fabExpanded || undefined}
-                className="chief-fab fixed right-2 bottom-2 z-(--z-floating) size-10 cursor-pointer gap-1 rounded-full border-none bg-(--fab-surface) font-normal text-(--fab-mark) shadow-[var(--edge-ring),var(--floating-shadow)] hover:bg-(--fab-surface) hover:text-(--fab-mark) dark:hover:bg-(--fab-surface) active:not-aria-[haspopup]:translate-y-0 data-expanded:w-auto data-expanded:pr-3.5 data-expanded:pl-1"
+                className="chief-fab fixed right-2 bottom-2 z-(--z-floating) size-10 cursor-pointer gap-1 rounded-full border-none bg-card font-normal text-foreground shadow-(--fab-shadow) transition-shadow duration-(--dur-fast) ease-(--ease-standard) hover:bg-card hover:text-foreground hover:shadow-(--e3) dark:hover:bg-card active:not-aria-[haspopup]:translate-y-0 data-expanded:w-auto data-expanded:pr-3.5 data-expanded:pl-1"
               >
                 {surface.chiefUnread > 0 && (
                   <span
                     aria-hidden="true"
-                    className="ml-1.5 size-1.5 flex-none rounded-full bg-(--fab-badge)"
+                    className="ml-1.5 size-1.5 flex-none rounded-full bg-(--card-button)"
                   />
                 )}
                 <ChiefFabIcon
@@ -90,7 +90,7 @@ export function ChiefRoot() {
                   expanded={fabExpanded}
                 />
                 {surface.chiefUnread > 0 ? (
-                  <span className="text-ui font-medium whitespace-nowrap">
+                  <span className="text-ui whitespace-nowrap text-content-secondary">
                     <span className="fab-badge">
                       {surface.chiefUnread > 99 ? '99+' : surface.chiefUnread}
                     </span>{' '}
@@ -98,7 +98,9 @@ export function ChiefRoot() {
                   </span>
                 ) : (
                   surface.chiefBusy && (
-                    <span className="text-ui font-medium whitespace-nowrap">{t('思考中…')}</span>
+                    <span className="text-ui whitespace-nowrap text-content-secondary">
+                      {t('思考中…')}
+                    </span>
                   )
                 )}
               </Button>

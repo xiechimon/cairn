@@ -8,20 +8,18 @@ const sheetOf = (page: Page, selector: string) =>
     const r = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
     const root = el.parentElement!;
-    const probe = document.createElement('div');
-    probe.style.boxShadow = 'var(--sheet-ring)';
-    root.append(probe);
-    const ring = getComputedStyle(probe).boxShadow;
-    probe.remove();
+    const sidebar = root.querySelector('.board-sidebar')!;
+    const sidebarCs = getComputedStyle(sidebar);
     return {
       box: { x: r.x, y: r.y, w: r.width, h: r.height },
       radius: cs.borderRadius,
       bg: cs.backgroundColor,
       shadow: getComputedStyle(el, '::after').boxShadow,
       selfShadow: cs.boxShadow,
-      ring,
       canvas: getComputedStyle(root).backgroundColor,
-      sidebarBg: getComputedStyle(root.querySelector('.board-sidebar')!).backgroundColor,
+      sidebarBg: sidebarCs.backgroundColor,
+      sidebarBorderRightW: sidebarCs.borderRightWidth,
+      sidebarBorderRightColor: sidebarCs.borderRightColor,
     };
   });
 
@@ -44,12 +42,12 @@ for (const theme of ['light', 'dark'] as const) {
       const pages = await sheetOf(page, '.page-main');
 
       const left = rail ? 40 : 248;
-      expect(board.box).toEqual({ x: left, y: 10, w: 1440 - left - 10, h: 900 - 20 });
+      expect(board.box).toEqual({ x: left, y: 0, w: 1440 - left, h: 900 });
       expect(board).toEqual(pages);
-      expect(board.radius).toBe('16px');
-      expect(board.ring).toContain('inset');
-      expect(board.shadow).toBe(board.ring);
+      expect(board.radius).toBe('0px');
+      expect(board.shadow).toBe('none');
       expect(board.selfShadow).toBe('none');
+      expect(board.sidebarBorderRightW).toBe('1px');
       expect(board.canvas).toBe(board.sidebarBg);
       expect(board.canvas).not.toBe(board.bg);
     });
@@ -62,7 +60,7 @@ test('board header stays the banner, at the top of the sheet', async ({ page }) 
   await expect(banner).toHaveCount(1);
   await expect(page.locator('.board-sheet header').first()).toHaveClass(/board-topbar/);
   const box = await banner.boundingBox();
-  expect(box).toEqual({ x: 248, y: 10, width: 1182, height: 56 });
+  expect(box).toEqual({ x: 248, y: 0, width: 1192, height: 56 });
 });
 
 test('chief settings swaps in inside the same sheet', async ({ page }) => {
@@ -71,13 +69,13 @@ test('chief settings swaps in inside the same sheet', async ({ page }) => {
   await expect(heading).toBeVisible();
   await expect(page.locator('.board-main')).toHaveCount(0);
   const sheet = await sheetOf(page, '.board-sheet');
-  expect(sheet.box).toEqual({ x: 248, y: 10, w: 1182, h: 880 });
+  expect(sheet.box).toEqual({ x: 248, y: 0, w: 1192, h: 900 });
 });
 
 test.describe('on a 2x screen', () => {
   test.use({ deviceScaleFactor: 2 });
 
-  test('sheet and card outlines stay one CSS pixel', async ({ page }) => {
+  test('sheet stays ringless and card outlines stay one CSS pixel', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
     await page.goto(BOARD);
     const sheet = await page
@@ -87,29 +85,27 @@ test.describe('on a 2x screen', () => {
       .locator('.todo-card')
       .first()
       .evaluate((el) => getComputedStyle(el).boxShadow);
-    expect(sheet).toContain('0px 0px 0px 1px inset');
+    expect(sheet).toBe('none');
     expect(card).toContain('0px 0px 0px 1px');
     expect(card).not.toContain('0.5px');
   });
 });
 
-test('the sheet ring sits above every child of the sheet', async ({ page }) => {
+test('the sheet isolates its stacking context and carries no ring overlay above its children', async ({ page }) => {
   await page.goto(BOARD);
-  const ring = await page.locator('.board-sheet').evaluate((el) => {
+  const probe = await page.locator('.board-sheet').evaluate((el) => {
     const after = getComputedStyle(el, '::after');
     return {
       isolated: getComputedStyle(el).isolation,
+      content: after.content,
       position: after.position,
-      zIndex: after.zIndex,
-      pointerEvents: after.pointerEvents,
-      inset: [after.top, after.right, after.bottom, after.left],
+      shadow: after.boxShadow,
     };
   });
-  expect(ring).toEqual({
+  expect(probe).toEqual({
     isolated: 'isolate',
-    position: 'absolute',
-    zIndex: '10',
-    pointerEvents: 'none',
-    inset: ['0px', '0px', '0px', '0px'],
+    content: 'none',
+    position: 'static',
+    shadow: 'none',
   });
 });

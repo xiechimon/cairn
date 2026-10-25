@@ -131,9 +131,8 @@ test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the p
   expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(733);
 
   expect((await col.boundingBox())?.width).toBe(widthBefore);
-  // the sheet sits 10px below the viewport top; the Paper top bar is 56px
   const topbar = await page.getByTestId('page-topbar').boundingBox();
-  expect(topbar?.y).toBe(10);
+  expect(topbar?.y).toBe(0);
   expect(topbar?.height).toBe(56);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });

@@ -58,7 +58,7 @@ for (const theme of ['light', 'dark'] as const) {
     // one face geometry for both states — selected is a fill, not a shape
     expect(geo.plain).toEqual(geo.selected);
     // DESIGN.md: nav row 32px, control radius 8px, inside the 12px padding
-    expect(geo.selected).toEqual({ x: 12, w: 224, h: 32, radius: '8px' });
+    expect(geo.selected).toEqual({ x: 12, w: 223, h: 36, radius: '8px' });
   });
 
   test(`selected row = sheet fill + hairline, distinct from hover (${theme})`, async ({
@@ -82,8 +82,8 @@ for (const theme of ['light', 'dark'] as const) {
     expect(hoverBg).toBe(await resolve(page, '--sidebar-hover'));
     const bg = parse(sidebarBg);
     expect(dist(over(hoverBg, sidebarBg), bg)).toBeGreaterThan(3);
-    expect(selected.bg).toBe(await resolve(page, '--background'));
-    expect(selected.ring).not.toBe('none');
+    expect(selected.bg).toBe(await resolve(page, '--hover-1'));
+    expect(selected.ring).toBe('none');
     expect(selected.bg).not.toBe(hoverBg);
   });
 }

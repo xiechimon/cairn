@@ -3,5 +3,10 @@
     "path": "apps/daemon/src/machine-loop.ts",
     "name": "deliverSync",
     "reason": "改名前就存在的闭包：用循环内的状态，内联会把 SSE 回调撑长；改名 PR 触碰该文件才被闸扫到"
+  },
+  {
+    "path": "apps/web/src/board/board.tsx",
+    "name": "NeedsYouStrip",
+    "reason": "React component with its own hooks and an early return when nothing needs attention; inlining it would put conditional hook-free JSX and the attention filter inside the 300-line BoardSurface render"
   }
 ]

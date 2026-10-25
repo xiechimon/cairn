@@ -62,7 +62,7 @@ const WINDOW_CLS =
   'chief-drawer fixed right-2 bottom-2 z-(--z-floating) flex h-150 max-h-[calc(100dvh-1rem)] w-95 max-w-[calc(100dvw-1rem)] flex-col overflow-hidden rounded-(--radius-window) bg-(--card) shadow-[var(--edge-ring),var(--floating-shadow)]';
 
 const WINDOW_MOTION_CLS =
-  'origin-bottom-right duration-(--dur-overlay) transition-none data-closed:fill-mode-forwards data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95';
+  'origin-[calc(100%-1.25rem)_calc(100%-1.25rem)] transition-none ease-(--ease-drawer) data-closed:fill-mode-forwards data-open:animate-in data-open:fade-in-0 data-open:zoom-in-40 data-open:duration-(--dur-window) data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-40 data-closed:duration-(--dur-overlay)';
 
 const HEAD_ICON_BTN_CLS =
   "size-5 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";

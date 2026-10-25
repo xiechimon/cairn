@@ -7,8 +7,7 @@ import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft } from '../icons/index.js';
 
-export const SHEET_PANEL =
-  "relative isolate my-2.5 mr-2.5 flex min-w-0 flex-1 overflow-hidden rounded-(--cds-radius-2xl) bg-background after:pointer-events-none after:absolute after:inset-0 after:z-10 after:rounded-[inherit] after:[box-shadow:var(--sheet-ring)] after:content-['']";
+export const SHEET_PANEL = 'relative isolate flex min-w-0 flex-1 overflow-hidden bg-background';
 
 export interface PageTab {
   id: string;
