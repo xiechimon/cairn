@@ -181,7 +181,9 @@ test('conversation transcript: agent rows carry the assigned agent avatar, user 
     AGENT_SRC,
   );
   await expect(page.locator('.chat-row--user').first()).toBeVisible();
-  await expect(page.locator('.chat-row--user .chat-avatar')).toHaveCount(0);
+  await expect(
+    page.locator('.chat-row:not(.chat-row--agent):not(.chat-row--chief) .chat-avatar'),
+  ).toHaveCount(0);
 });
 
 test('account head shares the seeded user src (same identity as the sidebar chip)', async ({
