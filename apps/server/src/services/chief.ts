@@ -43,7 +43,6 @@ import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
-  agentMemory,
   build,
   chief,
   chiefMessage,
@@ -59,6 +58,7 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { injectMemories } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
@@ -824,9 +824,7 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
   const agents = deps.db.select().from(agent).where(eq(agent.teamId, teamId)).all();
   // spec 13 #367：skills 清单 = 本地目录现扫（id = frontmatter name 回落目录名）。
   const skills = scanLocalSkills(deps.skillsDir);
-  const memories = agentRow
-    ? deps.db.select().from(agentMemory).where(eq(agentMemory.agentId, agentRow.id)).all()
-    : [];
+  const memories = agentRow ? injectMemories(deps.db, { agentId: agentRow.id }) : [];
 
   const lines: string[] = [
     '你是「总管」（Chief）——每「用户×团队」一个的调度与对话代理：理解用户请求、创建任务、分派给合适的 Agent 执行，并在关口/落地/失败时跟进汇报。',

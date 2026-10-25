@@ -68,7 +68,6 @@ import { and, asc, eq, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
-  agentMemory,
   apiKey,
   build,
   chief,
@@ -135,6 +134,7 @@ import {
 } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { injectMemories } from './memory.js';
 import {
   effectiveModel,
   isZeroUsageSilentSuccess,
@@ -887,11 +887,7 @@ function buildChiefClaim(
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
   // 记忆注入（02 §4.4 读路径最小形；注入形 [推断] 保留）：绑定 Agent 记忆条目。
-  const memories = deps.db
-    .select({ title: agentMemory.title, content: agentMemory.content })
-    .from(agentMemory)
-    .where(eq(agentMemory.agentId, agentRow.id))
-    .all();
+  const memories = injectMemories(deps.db, { agentId: agentRow.id });
   // Chief = 特例 Agent（02 §4.3）：绑定 Agent 的 MCP 授权同样进回合载荷。
   const chiefMcp = claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
   return {
@@ -1227,16 +1223,10 @@ async function tryClaim(
         // 记忆注入（02 §4.4 读路径最小形，注入形 [推断] 保留）：执行 Agent 记忆，
         // 只取本任务项目的条目与全局条目（projectId 空）——别的项目的经验不进本
         // 项目的 systemPrompt（#1494）。
-        memories: db
-          .select({ title: agentMemory.title, content: agentMemory.content })
-          .from(agentMemory)
-          .where(
-            and(
-              eq(agentMemory.agentId, agentRow.id),
-              or(eq(agentMemory.projectId, cand.todoRow.projectId), isNull(agentMemory.projectId)),
-            ),
-          )
-          .all(),
+        memories: injectMemories(db, {
+          agentId: agentRow.id,
+          projectId: cand.todoRow.projectId,
+        }),
         // #1169 拆字段透传（原 skills 单字段两义分家）：defaultSkill（携带，
         // 单值——daemon 据此排 #1116 注入绑定序首位）+ skillsAllowlist（授权；
         // null = 不限制，[] = 显式全拒，worker 步恒携带 null 或数组，chief 步
