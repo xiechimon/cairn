@@ -1,39 +1,58 @@
-# memory-regression 判分口径
+# memory-regression scoring rubric
 
-被测对象：总管（Chief）拿到记忆后产出的任务。沿用 chief-dispatch 的 runner、隔离栈与判分方式：
-种好记忆，驱动一个 chief 回合，读环境终态判分，不读 transcript。
+Object under test: the task produced by the Chief after receiving memories. Reuses chief-dispatch's
+runner, isolated stack, and judging approach: seed the memories, drive one chief turn, judge by
+reading the final state of the environment — not the transcript.
 
-## 指标
+## Metrics
 
-| id | 类型 | 定义 |
+| id | type | definition |
 |---|---|---|
-| `decision_ok` | binary（主指标） | 回合步状态为 `done`，且新建 todo 的 title 与 spec 同时满足：每个必含词组至少命中一个别名，不含任何排除词。没有新建 todo 记 0。 |
-| `memory_write_ok` | binary（仅过期类） | 记忆表终态里，过期条已被删除，或已被取代且链上最新一条有效、内容为仓库实况；无关记忆原样保留。 |
+| `decision_ok` | binary (primary) | The turn's step status is `done`, and the newly created todo's title and spec both satisfy: every required phrase hits at least one alias and contains no excluded words. No newly created todo scores 0. |
+| `memory_write_ok` | binary (expired class only) | In the final state of the memory table, the expired entry has been deleted, or has been superseded and the newest entry in the chain is valid and its content matches repo reality; unrelated memories are preserved unchanged. |
 
-## 三类用例
+## Three case classes
 
-- 冲突（`c01`–`c07`）：库里有新旧两条矛盾记忆。`c01`–`c04` 旧条带 `invalidAt` 与 `supersededBy`，注入时已被过滤；`c05`–`c07` 旧条只是创建得更早，两条都会注入。判：产出采信新条。
-- 跨项目泄漏（`l01`–`l07`）：专有约定挂在另一个真实项目名下，任务属于 `eval-project`。判：产出不含那个约定。`composeChiefSystemPrompt` 注入记忆时不带项目范围，每条只渲染成 `- 标题：内容`，所以另一个项目的记忆在标题（`l01`）或正文（`l02`–`l07`）里自己点名 `other-project`，否则模型无从区分。每例的必含词来自仓库实况或本项目自己的记忆，空任务过不了。
-- 过期（`s01`–`s07`）：记忆里的命令、端口、版本与场景仓实况不符。判：产出以仓库实况为准，并修正记忆（`update_memory` 或 `delete_memory`）。每例另带一条无关记忆，误删误改记 0。
+- Conflict (`c01`–`c07`): the store holds two contradictory memories, old and new. In `c01`–`c04`
+  the old entry carries `invalidAt` and `supersededBy` and is filtered out at injection time; in
+  `c05`–`c07` the old entry was merely created earlier, and both are injected. Judge: the output
+  trusts the new entry.
+- Cross-project leakage (`l01`–`l07`): a project-specific convention hangs under another real
+  project's name, while the task belongs to `eval-project`. Judge: the output does not contain
+  that convention. `composeChiefSystemPrompt` injects memories without project scoping — each is
+  rendered only as `- 标题：内容` (`- title: content`) — so the other project's memory names
+  `other-project` itself in the title (`l01`) or the body (`l02`–`l07`); otherwise the model has
+  no way to tell them apart. Each case's required phrases come from repo reality or this project's
+  own memories; an empty task cannot pass.
+- Expired (`s01`–`s07`): the commands, ports, and versions in the memory do not match the scenario
+  repo's reality. Judge: the output defers to repo reality and repairs the memory
+  (`update_memory` or `delete_memory`). Each case carries one unrelated memory; a mistaken delete
+  or modification scores 0.
 
-## 难度与饱和
+## Difficulty and saturation
 
-判据词不写进提示词，题面也不提示「记忆可能过期」。过期类要靠模型自己读仓库发现，冲突类靠模型自己看出新旧。
-chief-dispatch 的教训是评测贴天花板：把规则写进提示词换来可判，难度就没了。本评测不这么做。
+The judging words are not written into the prompt, and the prompt does not hint that "the memory
+may be expired." The expired class requires the model to discover the mismatch by reading the repo
+itself; the conflict class requires the model to notice old vs. new itself. The lesson from
+chief-dispatch is that an eval hits the ceiling: writing the rules into the prompt buys
+decidability, and the difficulty is gone. This eval does not do that.
 
-## 链路失败
+## Chain failures
 
-沿用 chief-dispatch 的拦截：零 token 或 `step != done` 的回合落 `errors.jsonl`，不计分。
+Reuses chief-dispatch's interception: turns with zero tokens or `step != done` land in
+`errors.jsonl` and are not scored.
 
-## 运行
+## Running
 
 ```sh
 pnpm --filter @cairn/integration exec tsx eval/chief-dispatch/run-eval.mts \
   --flow .claude/hillclimb/memory-regression --variant baseline --model glm-5.3 --reps 3 --approve-harness
 ```
 
-需要 `CAIRN_EVAL_RELAY_KEY`（或本机 `~/.claude/settings.json` 的 `env.ANTHROPIC_AUTH_TOKEN`）与 relay 额度。
+Requires `CAIRN_EVAL_RELAY_KEY` (or `env.ANTHROPIC_AUTH_TOKEN` in the local
+`~/.claude/settings.json`) and relay quota.
 
-## 结果
+## Results
 
-真实模型评测待宿主：本机环境没有 `CAIRN_EVAL_RELAY_KEY`，未跑，不存在 baseline 分数。
+Real-model evaluation awaits a host: this machine has no `CAIRN_EVAL_RELAY_KEY`; it has not been
+run, and no baseline score exists.
