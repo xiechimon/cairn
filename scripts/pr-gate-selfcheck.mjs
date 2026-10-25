@@ -260,13 +260,7 @@ const cases = [
   [
     'paths outside the auto-merge set route to the user (run 5)',
     async () => {
-      for (const f of [
-        'docs/spec/28-x.md',
-        'README.md',
-        'CONTEXT.md',
-        'apps/web/public/x.svg',
-        'integration/eval/x.ts',
-      ]) {
+      for (const f of ['docs/spec/28-x.md', 'README.md', 'CONTEXT.md', 'apps/web/public/x.svg']) {
         const r = await gateFiles([f]);
         if (
           r.mergedBy !== 'user' ||
@@ -290,6 +284,19 @@ const cases = [
         '.cursor/skills/verify-cairn/SKILL.md',
         '.mcp.json',
         '.ckignore',
+      ]),
+  ],
+  [
+    'eval ruler paths route to the user as protected (ADR 0025)',
+    () =>
+      eachProtected([
+        'integration/eval/adoption/judge.mts',
+        'integration/eval/chief-dispatch/grade.mts',
+        '.claude/hillclimb/chief-dispatch/cases.json',
+        'apps/server/src/trajectory-export.ts',
+        'apps/server/src/trajectory-export-cli.ts',
+        'apps/server/src/trajectory-outcome.ts',
+        'packages/shared/src/trajectory-pack.ts',
       ]),
   ],
   [
