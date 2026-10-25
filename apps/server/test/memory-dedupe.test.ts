@@ -193,33 +193,43 @@ for (const mode of ['chief', 'worker'] as const) {
       await expect(rejected).rejects.toThrow(project.id);
       expect(
         await invoke('update_memory', { memoryId: global.id, content: '他人使用 bun' }),
-      ).toMatchObject({ id: global.id, content: '他人使用 bun' });
+      ).toMatchObject({ content: '他人使用 bun', projectId: null });
     });
 
-    test('update_memory 保持 id 与溯源，多次更新保留可查询旧值，无变化不添历史', async () => {
+    test('update_memory 新条目继承溯源、沿用链上旧值，无变化不新增条目', async () => {
       const original = (await save({ title: '包管理器', content: '使用 npm' })) as {
         id: string;
         updatedAt: number;
+        projectId: string | null;
+        sourceTodoId: string | null;
+        sourceBuildId: string | null;
       };
-      const updated = await invoke('update_memory', {
+      const second = (await invoke('update_memory', {
         memoryId: original.id,
         content: '使用 pnpm',
-      });
-      expect(updated).toMatchObject({
-        ...original,
+      })) as { id: string };
+      expect(second).toMatchObject({
+        title: '包管理器',
         content: '使用 pnpm',
-        updatedAt: expect.any(Number),
+        projectId: original.projectId,
+        sourceTodoId: original.sourceTodoId,
+        sourceBuildId: original.sourceBuildId,
         history: [{ title: '包管理器', content: '使用 npm', updatedAt: original.updatedAt }],
       });
-      await invoke('update_memory', { memoryId: original.id, content: '使用 bun' });
-      await invoke('update_memory', { memoryId: original.id, content: '使用 bun' });
+      const third = (await invoke('update_memory', {
+        memoryId: second.id,
+        content: '使用 bun',
+      })) as { id: string };
+      await invoke('update_memory', { memoryId: third.id, content: '使用 bun' });
       const rows = (await invoke('memories', {})) as {
+        id: string;
         content: string;
         history: { content: string }[];
       }[];
       expect(rows).toHaveLength(1);
-      expect(rows[0]?.content).toBe('使用 bun');
+      expect(rows[0]).toMatchObject({ id: third.id, content: '使用 bun' });
       expect(rows[0]?.history.map((h) => h.content)).toEqual(['使用 npm', '使用 pnpm']);
+      expect(await invoke('memories', { includeInvalid: true })).toHaveLength(3);
     });
 
     test('update_memory 改成同口径另一条的正文返回 409 并指出那条 id，跨项目或他人不算', async () => {
@@ -252,10 +262,12 @@ for (const mode of ['chief', 'worker'] as const) {
         await expect(rejected).rejects.toThrow(id);
       }
       for (const content of ['别仓使用 yarn', '他人使用 bun', '部署使用容器']) {
-        expect(await invoke('update_memory', { memoryId: target.id, content })).toMatchObject({
-          id: target.id,
+        const updated = (await invoke('update_memory', {
+          memoryId: target.id,
           content,
-        });
+        })) as { id: string };
+        expect(updated).toMatchObject({ content });
+        target.id = updated.id;
       }
       const contents = ((await invoke('memories', {})) as { content: string }[]).map(
         (row) => row.content,

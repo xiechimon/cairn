@@ -31,6 +31,9 @@ export const memoryRecordSchema = z.object({
   sourceBuildId: z.string().nullable(),
   createdAt: epochMs,
   updatedAt: epochMs,
+  invalidAt: epochMs.nullable().optional(),
+  supersededBy: recordId.nullable().optional(),
+  lastInjectedAt: epochMs.nullable().optional(),
   history: z
     .array(z.object({ title: z.string(), content: z.string(), updatedAt: epochMs }))
     .optional(),

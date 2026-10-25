@@ -148,6 +148,9 @@ export function toMemoryRecord(row: typeof agentMemory.$inferSelect): MemoryReco
     sourceBuildId: row.sourceBuildId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    invalidAt: row.invalidAt,
+    supersededBy: row.supersededBy,
+    lastInjectedAt: row.lastInjectedAt,
     history: row.history,
   };
 }

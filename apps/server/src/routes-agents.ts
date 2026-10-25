@@ -16,7 +16,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { agent, agentMemory, machine, todo } from './db/schema.js';
+import { agent, machine, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { newRecordId } from './lib/ids.js';
 import {
@@ -33,7 +33,7 @@ import {
   missingCapabilityItems,
   runtimeGatePasses,
 } from './services/dispatch-eligibility.js';
-import { deleteMemoryEntry } from './services/memory.js';
+import { deleteMemoryEntry, listMemoryEntries } from './services/memory.js';
 import { mergedCatalogModels } from './services/model-liveness.js';
 import { filterKnownSkillIds } from './services/skills.js';
 
@@ -43,11 +43,11 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     const agentId = c.req.param('aid');
-    const rows = ctx.db
-      .select()
-      .from(agentMemory)
-      .where(and(eq(agentMemory.agentId, agentId), eq(agentMemory.teamId, teamId)))
-      .all();
+    const rows = listMemoryEntries(
+      ctx.db,
+      { agentId, teamId },
+      c.req.query('includeInvalid') === 'true',
+    );
     return c.json(rows.map(toMemoryRecord));
   });
 

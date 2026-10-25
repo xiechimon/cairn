@@ -6087,6 +6087,30 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent_memo
     "id": {
       "type": "string",
     },
+    "invalidAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "lastInjectedAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "projectId": {
       "type": [
         "string",
@@ -6100,6 +6124,12 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent_memo
       ],
     },
     "sourceTodoId": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "supersededBy": {
       "type": [
         "string",
         "null",
