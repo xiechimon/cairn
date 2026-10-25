@@ -1,54 +1,61 @@
-# #1684 verify evidence — 窄屏（360/390px）走查修复
+# #1684 verify evidence — narrow-screen (360/390px) walkthrough fix
 
-走查与修复均在 fixture 构建面上完成（`vite build --mode fixture` +
-`vite preview`），before 截自 HEAD 源码的独立构建（端口 8402），after 截自
-工作树构建（端口 8401）。断点统一 ≤640px（`app-sidebar.tsx` 的
-`NARROW_QUERY` 与 `styles/app.css` 的 `@media (max-width: 640px)` 块）——
-不取 767 是因为 paper-topbar.spec 把 680px 当窄桌面宽度钉完整顶栏，第一轮
-全量 e2e 实测撞红后收窄（docs/lessons.md 同轮台账行）。
+The walkthrough and fixes were done on the fixture build (`vite build --mode fixture` +
+`vite preview`). The "before" shots come from a separate build of HEAD source (port 8402);
+the "after" shots come from the working-tree build (port 8401). The breakpoint is
+uniformly ≤640px (the `NARROW_QUERY` in `app-sidebar.tsx` and the
+`@media (max-width: 640px)` block in `styles/app.css`) — 767 was not chosen because
+paper-topbar.spec pins the full top bar at 680px as narrow desktop width, and the first
+full e2e run went red on that collision before the breakpoint was narrowed (same-round
+ledger row in docs/lessons.md).
 
-## 问题清单（走查实测，before-*.png）
+## Problem list (measured in the walkthrough, before-*.png)
 
-- **P1 侧栏吃掉大半视口**：390px 下展开态侧栏 248px，看板顶栏动作
-  （筛选/定时/新任务，x=350~583）整段被 sheet 的 overflow-hidden 裁出视口，
-  触达不到。纸页一族同病（帐号页内容列被挤到 x=894）。
-- **P2 阅读列裁切**：PageShell 的 768px 阅读列（`w-192`）无窄屏夹取，
-  在 ~300px 的可用宽里被横向裁掉大半。
-- **P3 搜索面板左缘出屏**：520px 定宽 + `-ml-65` 居中，360 视口下
-  x=-80（before-search-360.png），输入框够不到。
-- **P4 触控区低于 44px**：总管 FAB 40px、详情头按钮 28px、composer
-  工具/发送 30/32px、侧栏 rail 行 32px。
-- **P5 底部安全区缺失**：`index.html` viewport meta 无
-  `viewport-fit=cover`，FAB/悬浮窗贴 8px 底缘，`env(safe-area-inset-*)`
-  永远为 0。
+- **P1 The sidebar eats most of the viewport**: at 390px the expanded sidebar is 248px;
+  the board top-bar actions (filter / `定时` / new task, x=350~583) are entirely clipped
+  out of the viewport by the sheet's overflow-hidden and cannot be reached. The paper
+  pages share the disease (the account page content column is squeezed to x=894).
+- **P2 The reading column is clipped**: PageShell's 768px reading column (`w-192`) has
+  no narrow-screen clamp and is horizontally cut down to a fraction of the ~300px
+  available width.
+- **P3 The search panel leaves the screen on the left**: 520px fixed width + `-ml-65`
+  centring puts it at x=-80 on a 360 viewport (before-search-360.png); the input is
+  unreachable.
+- **P4 Touch targets below 44px**: chief FAB 40px, detail header buttons 28px,
+  composer tool/send 30/32px, sidebar rail rows 32px.
+- **P5 Missing bottom safe area**: the `index.html` viewport meta lacks
+  `viewport-fit=cover`, so the FAB/floating windows sit on the 8px bottom edge and
+  `env(safe-area-inset-*)` is always 0.
 
-弹层面（AI 审核对话框、合并对话框、新建任务对话框、总管悬浮窗）实测已
-有 `max-w-[calc(100dvw-1rem)]` 夹取，360 下不出屏可关——新 spec 的
-M6/M7 是防回归钉。
+Dialog surfaces (AI review dialog, merge dialog, new-task dialog, chief floating window)
+were measured to already clamp with `max-w-[calc(100dvw-1rem)]` — closable at 360, no
+overflow. The new spec's M6/M7 are regression pins.
 
-## 修复（after-*.png，浅/深 × 360/390）
+## Fixes (after-*.png, light/dark × 360/390)
 
-- 侧栏 ≤640px 强制 rail（`useSyncExternalStore` + matchMedia，不写回持久态）；
-  rail 轨宽 48px、行 44px。
-- 看板顶栏窄屏隐藏工作台标题与 定时 入口（rail 已覆盖导航），动作钮
-  min-height 44px。
-- PageShell 阅读列 `w-192 max-w-full`。
-- 搜索面板 `-ml-65` 改 `-translate-x-1/2` + `max-w-[calc(100vw-2rem)]`
-  （1440 下几何逐值不变）。
-- 详情头 / 纸页顶栏 / composer 工具·发送·停止 / 线程复制钮窄屏 ≥44px。
-- FAB 44px；FAB 与总管窗 right/bottom 走
-  `max(0.5rem, env(safe-area-inset-*))`。
+- Sidebar forces rail at ≤640px (`useSyncExternalStore` + matchMedia, no write-back to
+  persisted state); rail track width 48px, rows 44px.
+- Board top bar hides the workbench title and the `定时` entry on narrow screens (the
+  rail already covers navigation); action buttons get min-height 44px.
+- PageShell reading column gets `w-192 max-w-full`.
+- Search panel: `-ml-65` replaced by `-translate-x-1/2` +
+  `max-w-[calc(100vw-2rem)]` (geometry unchanged value-by-value at 1440).
+- Detail header / paper top bar / composer tool·send·stop / thread copy button get
+  ≥44px on narrow screens.
+- FAB 44px; FAB and chief window right/bottom use
+  `max(0.5rem, env(safe-area-inset-*))`.
 
-## 录屏（walkthrough-390.webm）
+## Recording (walkthrough-390.webm)
 
-390px 触屏走查：看板列横滚 → 任务详情（相位 chip 弹层开/关）→ 合并
-对话框开/关 → ⌘K 搜索开/关 → 总管 FAB 开窗/最小化 → 帐号页滚动。
+390px touch walkthrough: board column horizontal scroll → task detail (phase chip
+dialog open/close) → merge dialog open/close → ⌘K search open/close → chief FAB
+open/minimize → account page scroll.
 
 ## e2e
 
-`apps/web/e2e/mobile-narrow.spec.ts`：M1 看板 rail + 顶栏动作留在视口内、
-M2 纸页阅读列不裁切、M3 详情触控区 ≥44px、M4 总管 FAB/悬浮窗、M5 搜索
-面板在视口内可关、M6 AI 审核对话框、M7 合并对话框——360 与 390 两档
-参数化，修复前 M1–M5 共 10 条红、修复后 14 条全绿。已登记
-`scripts/e2e-affected.mjs` 家族表（BOARD/SIDEBAR/DETAIL/CHIEF/OVERLAYS/
-PAGES 六族）。
+`apps/web/e2e/mobile-narrow.spec.ts`: M1 board rail + top-bar actions stay in the
+viewport, M2 paper reading column is not clipped, M3 detail touch targets ≥44px,
+M4 chief FAB/floating window, M5 search panel in the viewport and closable, M6 AI
+review dialog, M7 merge dialog — parameterized at 360 and 390. Before the fix M1–M5
+had 10 red cases; after the fix all 14 pass. Registered in the family table of
+`scripts/e2e-affected.mjs` (six families: BOARD/SIDEBAR/DETAIL/CHIEF/OVERLAYS/PAGES).
