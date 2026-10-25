@@ -1,6 +1,6 @@
 # ADR 0022 · Prune merged evidence from main every week
 
-> Status: **decided** (2026-10-25, ian chose option A' in the repository structure audit thread). Supersedes [ADR 0015](0015-验证证据留存仓内-存量不可搬.md).
+> Status: **decided** (2026-10-25, ian chose option A' in the repository structure audit thread). Supersedes ADR 0015 (`docs/adr/0015-验证证据留存仓内-存量不可搬.md`).
 
 ## Problem Statement
 

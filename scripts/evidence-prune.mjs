@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -27,14 +27,6 @@ const { values } = parseArgs({
 
 const git = (...args) =>
   execFileSync('git', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-const gitGrep = (...args) => {
-  try {
-    return git('grep', ...args);
-  } catch (error) {
-    if (error.status === 1) return '';
-    throw error;
-  }
-};
 
 const top = git('rev-parse', '--show-toplevel').trim();
 process.chdir(top);
@@ -63,11 +55,16 @@ for (const line of git('log', '--format=@%H %ct', '--name-only', '--', ROOT).spl
   }
 }
 
-const referenced = new Set(
-  [...gitGrep('-ohE', FOLDER_REF.source, '--', ...CODE_PATHS, ...SELF).matchAll(FOLDER_REF)].map(
-    (match) => match[1],
-  ),
+const codeRefs = spawnSync(
+  'git',
+  ['grep', '-ohE', FOLDER_REF.source, '--', ...CODE_PATHS, ...SELF],
+  {
+    encoding: 'utf8',
+    maxBuffer: 256 * 1024 * 1024,
+  },
 );
+if (codeRefs.status !== 0 && codeRefs.status !== 1) throw new Error(`git grep failed: ${codeRefs.stderr}`);
+const referenced = new Set([...codeRefs.stdout.matchAll(FOLDER_REF)].map((match) => match[1]));
 
 const now = values.now ? Date.parse(values.now) : Date.now();
 const cutoff = now - Number(values.days) * 86400000;
