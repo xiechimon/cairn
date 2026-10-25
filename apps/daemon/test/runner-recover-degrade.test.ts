@@ -1,23 +1,3 @@
-// #1286 recover 面会话降级（pi 懒落盘窗口重启时 .jsonl 缺失的兜底）：
-// recover 面（opts.resume 在位）的 continueSession 抛 SessionNotResumableError
-// → 降级 new session 重发 journal.prompt；执行面（非 recover）直传步可见失败
-// （#1260 语义保留）。失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
-//   1. recover + .jsonl 缺失 → 降级 new session，步成功（主 bug）
-//   2. recover + .jsonl 在 → 正常 continue，不触发降级
-//   3. 非 recover 执行期 continue 失败 → 降级 new session，步成功，
-//      卡片注记「本机找不到会话」，投递文本含原任务（#1312）
-//   6. 执行期 continue 失败且 priorMachineId 不是本机 → 同样降级，
-//      注记改为「在另一台机器上」（#1312）
-//   4. journal.prompt 为 null + .jsonl 缺失 → 降级 new session，prompt 走
-//      buildTaskPrompt 单源（不静默空重发——写实现时有 prompt 即投递）
-//   5. chief 步 recover 同律（journal 面相同）
-//   7. 本机交接位有非空 plan.md → 降级 prompt 指向该绝对路径，
-//      wire 行仍判 task-prompt（#1312 评审）
-//   8. 换机且本机没有这份文件 → prompt 不指向交接路径
-//   9. 空白 plan.md 不当成交接物
-//   10. 开会话前 journal 换成原任务，session 键清空（崩溃 recover 不再重发占位句）
-//   11. 降级 prompt 里的附件 token 先展开，不沿用续轮解析出的图片
-
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -308,10 +288,10 @@ async function runExec(
   return { client, home, lines, paths, journal };
 }
 
-describe('#1286 recover 面会话降级', () => {
+describe('#1286 recover-surface session degradation', () => {
   const SESSION_ID = 'pi-sess-missing';
 
-  test('1. recover + .jsonl 缺失 → 降级 new session，步成功（主 bug 修复）', async () => {
+  test('1. recover + missing .jsonl → degrade to new session, step succeeds (main bug fixed)', async () => {
     const claimed = recoverStep('build', SESSION_ID);
     const resumePrompt = claimed.instruction ?? 'fallback prompt text';
     const { backend, calls, prompts } = recoveringBackend(true);
@@ -320,19 +300,15 @@ describe('#1286 recover 面会话降级', () => {
       prompt: resumePrompt,
     });
 
-    // continueSession 被调用后抛错 → createSession 被调用（降级）
     expect(calls).toContain('continue');
     expect(calls).toContain('create');
-    // create 排在 continue 之后（顺序：先 continue 失败，再 create）
     expect(calls.indexOf('create')).toBeGreaterThan(calls.indexOf('continue'));
-    // 降级后的 createSession prompt = resume 的原 prompt
     expect(prompts).toHaveLength(1);
-    // 步成功完成
     expect(client.doneBodies).toHaveLength(1);
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('2. recover + .jsonl 在 → 正常 continue，不触发降级', async () => {
+  test('2. recover + .jsonl present → normal continue, no degradation triggered', async () => {
     const claimed = recoverStep('build', SESSION_ID);
     const resumePrompt = claimed.instruction ?? 'fallback prompt text';
     const { backend, calls } = recoveringBackend(false);
@@ -341,13 +317,12 @@ describe('#1286 recover 面会话降级', () => {
       prompt: resumePrompt,
     });
 
-    // continueSession 成功，未触发降级，createSession 不被调用
     expect(calls).toEqual(['continue']);
     expect(client.doneBodies).toHaveLength(1);
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('3. 非 recover（无 opts.resume）→ continue 失败降级 new session，步成功（#1312）', async () => {
+  test('3. non-recover (no opts.resume) → continue failure degrades to new session, step succeeds (#1312)', async () => {
     const claimed = execStep(SESSION_ID);
     const { backend, calls, prompts } = recoveringBackend(true);
     const { client, lines } = await runExec(claimed, backend);
@@ -364,7 +339,7 @@ describe('#1286 recover 面会话降级', () => {
     expect(lines.join('\n')).toContain('falling back to new session');
   });
 
-  test('4. journal.prompt 为 null + .jsonl 缺失 → 显式失败带可读文案（不静默空重发）', async () => {
+  test('4. journal.prompt null + .jsonl missing → explicit failure with readable wording (no silent empty resend)', async () => {
     const claimed = recoverStep('build', SESSION_ID);
     const { backend, calls, prompts } = recoveringBackend(true);
     const { client } = await runRecover(claimed, backend, {
@@ -372,16 +347,14 @@ describe('#1286 recover 面会话降级', () => {
       prompt: null,
     });
 
-    // continueSession 被调用并抛错，createSession 不被调用（不空重发）
     expect(calls).toEqual(['continue']);
     expect(prompts).toHaveLength(0);
-    // 步失败，带可读文案
     expect(client.doneBodies).toHaveLength(1);
     expect(client.doneBodies[0]?.body.status).toBe('failed');
     expect(client.doneBodies[0]?.body.errorMessage).toContain('no journal prompt to resend');
   });
 
-  test('5. chief 步 recover + .jsonl 缺失 → 降级 new session，同律', async () => {
+  test('5. chief step recover + missing .jsonl → degrade to new session, same rule', async () => {
     const claimed = recoverStep('chief', SESSION_ID);
     const resumePrompt = 'chief recover test prompt';
     const { backend, calls } = recoveringBackend(true);
@@ -390,7 +363,6 @@ describe('#1286 recover 面会话降级', () => {
       prompt: resumePrompt,
     });
 
-    // chief 步同降级
     expect(calls).toContain('continue');
     expect(calls).toContain('create');
     expect(calls.indexOf('create')).toBeGreaterThan(calls.indexOf('continue'));
@@ -398,7 +370,7 @@ describe('#1286 recover 面会话降级', () => {
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('6. 执行期会话在另一台机器 → 降级，注记点名异机（#1312）', async () => {
+  test('6. execution-time session on another machine → degrade, annotation names the other machine (#1312)', async () => {
     const claimed = execStep(SESSION_ID);
     (claimed.session as { priorMachineId?: string }).priorMachineId = 'other-box';
     const { backend, calls } = recoveringBackend(true);
@@ -413,7 +385,7 @@ describe('#1286 recover 面会话降级', () => {
     expect(String(note?.content)).not.toContain('本机找不到会话');
   });
 
-  test('7. 本机交接位有非空 plan.md → 降级 prompt 指向该文件，wire 行不是用户气泡', async () => {
+  test('7. non-empty plan.md at the local handoff location → degraded prompt points at that file, wire line is not a user bubble', async () => {
     const claimed = execStep(SESSION_ID);
     const { backend, prompts } = recoveringBackend(true);
     let planFile = '';
@@ -435,7 +407,7 @@ describe('#1286 recover 面会话降级', () => {
     expect(classifyUserText(String(user?.content).trim(), TASK)).toBe('task-prompt');
   });
 
-  test('8. 换机且本机没有 plan.md → 降级 prompt 不指向交接路径', async () => {
+  test('8. machine switched and no local plan.md → degraded prompt does not point at the handoff path', async () => {
     const claimed = execStep(SESSION_ID);
     (claimed.session as { priorMachineId?: string }).priorMachineId = 'other-box';
     const { backend, prompts } = recoveringBackend(true);
@@ -446,7 +418,7 @@ describe('#1286 recover 面会话降级', () => {
     expect(prompts[0]).not.toContain(absent);
   });
 
-  test('9. 空白 plan.md 不当成交接物', async () => {
+  test('9. blank plan.md is not treated as a handoff artifact', async () => {
     const claimed = execStep(SESSION_ID);
     const { backend, prompts } = recoveringBackend(true);
     await runExec(claimed, backend, {
@@ -459,7 +431,7 @@ describe('#1286 recover 面会话降级', () => {
     expect(prompts[0]).toBe(buildTaskPromptText(TASK.title, TASK.spec));
   });
 
-  test('10. 开会话前 journal 换成原任务，不再留续轮占位句', async () => {
+  test('10. journal swapped to the original task before opening the session, no continuation-round placeholder sentence left', async () => {
     const held: { entry: StepJournalEntry | null } = { entry: null };
     let journal: StepJournal | null = null;
     const { backend } = recoveringBackend(true, [DONE_EVENT], {
@@ -479,7 +451,7 @@ describe('#1286 recover 面会话降级', () => {
     expect(held.entry?.sessionId).toBeNull();
   });
 
-  test('11. 降级 prompt 展开附件 token，不沿用续轮图片', async () => {
+  test('11. degraded prompt expands attachment tokens, does not reuse continuation-round images', async () => {
     const specPng = Buffer.from('89504e470d0a1a0a', 'hex');
     const instrPng = Buffer.from('89504e470d0a1a0b', 'hex');
     const specToken = formatAttachmentToken('spec.png', 't1/spec.png');

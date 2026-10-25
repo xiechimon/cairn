@@ -1,18 +1,3 @@
-// runner 三态受管 MCP 透传面（#1307）：claim 载荷 mcpServers 的三态
-// （缺省 = 继承 runtime 配置；数组含 [] = 受管集合）必须原样传到
-// SessionOpts.mcpServers，backend 才有判据给 SDK 上 strictMcpConfig 锁。
-// 失败方式先于实现固化：
-//   5. runner 二次塌缩：claim [] → `mcpEndpoints.length > 0` 条件把
-//      SessionOpts 键省掉 → backend 无法区分受管空与继承（本票主修位之二，
-//      runner.ts 的 SessionOpts 组装条件）→ [] 必须原样键在位透传
-//   6. 继承态反向造集：claim 缺省 → `?? []` 塌成受管空 → 旧 server 形 /
-//      版本墙机器被误锁 strict、失去应继承的 runtime 配置 → 键必须缺省
-//   7. 未知 slug 降级反转：勾选 slug 全不在本机 config → endpoints 解析
-//      为空 → 若按「endpoints 非空」判受管性会翻回继承（泄漏复活）→
-//      受管性只由 claim 键在位决定，解析失败仍受管 + 降级行照打
-//   8. 观测行缺失：受管空零 [mcp] 行 → 执行面形状不可见（spec 13
-//      premortem 护栏二同族：多机各读各 config 的跑偏要一眼可见）
-
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -152,7 +137,6 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** 录制型 fake worktree（runner-local 同款最小形）。 */
 function fakeWorkspace(): WorktreeOps {
   return {
     async prepare(input) {
@@ -184,7 +168,6 @@ function fakeWorkspace(): WorktreeOps {
   };
 }
 
-/** SessionOpts 捕获 backend：createSession 入参录制后立即自然完成。 */
 function capturingBackend(captured: SessionOpts[]): AgentBackend {
   return {
     capabilities: PI_CAPABILITIES,
@@ -236,19 +219,19 @@ async function run(claimed: ClaimedStep, localConfig?: Record<string, unknown>) 
   return { opts, lines, client };
 }
 
-describe('runner 三态透传（#1307 失败方式 5/6）', () => {
-  test('claim [] = 受管空：SessionOpts.mcpServers 键在位且为 []（不塌回缺省）', async () => {
+describe('runner three-state passthrough (#1307 failure modes 5/6)', () => {
+  test('claim [] = managed empty: SessionOpts.mcpServers key present and [] (does not collapse back to default)', async () => {
     const { opts } = await run(claimedStep([]));
     expect('mcpServers' in opts).toBe(true);
     expect(opts.mcpServers).toEqual([]);
   });
 
-  test('claim 缺省 = 继承：SessionOpts.mcpServers 键缺省（不反向造受管空）', async () => {
+  test('claim absent = inherit: SessionOpts.mcpServers key absent (does not retroactively create managed empty)', async () => {
     const { opts } = await run(claimedStep(undefined));
     expect('mcpServers' in opts).toBe(false);
   });
 
-  test('claim [slug] = 受管集：本机 config 解析端点入 SessionOpts', async () => {
+  test('claim [slug] = managed set: endpoints resolved from the local config enter SessionOpts', async () => {
     const { opts } = await run(claimedStep(['demo']), {
       mcpServers: { demo: { url: 'https://example.invalid/mcp' } },
     });
@@ -258,15 +241,15 @@ describe('runner 三态透传（#1307 失败方式 5/6）', () => {
   });
 });
 
-describe('runner 受管性不随解析结果翻转（#1307 失败方式 7/8）', () => {
-  test('勾选 slug 全不在本机 config：仍受管（键在位 [] ）+ 降级行照打', async () => {
+describe('runner managed-ness does not flip with resolution results (#1307 failure modes 7/8)', () => {
+  test('all checked slugs missing from the local config: still managed (key present as []) + degradation line still printed', async () => {
     const { opts, lines } = await run(claimedStep(['ghost']), { mcpServers: {} });
     expect('mcpServers' in opts).toBe(true);
     expect(opts.mcpServers).toEqual([]);
     expect(lines.some((l) => l.startsWith('[mcp]') && l.includes('ghost'))).toBe(true);
   });
 
-  test('受管空落观测行（[mcp] 前缀，执行面形状可见）', async () => {
+  test('managed empty lands an observation line ([mcp] prefix, shape visible on the execution surface)', async () => {
     const { lines } = await run(claimedStep([]));
     expect(lines.some((l) => l.startsWith('[mcp]') && l.includes('managed-empty'))).toBe(true);
   });

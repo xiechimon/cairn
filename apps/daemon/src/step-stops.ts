@@ -1,14 +1,9 @@
 import type { AgentSessionHandle } from '@cairn/shared';
 
-/** 停止请求：discard = 「丢弃本轮修改」勾选位，true → 收尾 rewind 到步起点。 */
 export interface StopRequest {
   discard: boolean;
 }
 
-/** 一次 runStep 的停止位。会话未开时只记下请求，runStep 开会话前查 request、
- * 开会话后 attach 兑现；收尾读取时 settle 并注销，此后再来的停止找不到它。
- * 请求随记随落盘（persist），中断调用抛错时作废并抹掉：会话没真停，收尾与
- * 重启都不该按 stopped 判。 */
 export class RunStop {
   private current: StopRequest | null = null;
   private session: AgentSessionHandle | null = null;
@@ -59,8 +54,6 @@ export class RunStop {
   }
 }
 
-/** 本机在跑 run 的停止位登记表（machine-loop 持有一份）。同一步号在本机只有
- * 一次 run（#1473 领取循环不起第二次）。 */
 export class StepStops {
   private readonly runs = new Map<string, RunStop>();
 

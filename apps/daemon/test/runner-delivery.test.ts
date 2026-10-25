@@ -1,14 +1,3 @@
-// runner 交付面上报（#704 / B-C16）：github 形态步收尾只读探测 PR + 非
-// hosted 形态步收尾上报真 diff，均随 done 通道回传。失败方式枚举先于实现
-// 固化（AGENTS.md 测试规则 3）：
-//   1. github build 步 + 探测命中 → done 带 prUrl/prNumber + changesDiff
-//      （B-C16：agent 用机器 gh 开的 PR 服务端可见）
-//   2. 探测失败/无 PR（null）→ done 不带 PR 字段（面板分支名在、PR 槽空）
-//   3. hosted 步 → 不探测、不上报（真值源 = server bare repo，双真值源不引入）
-//   4. diff 超上限 → changesDiff 缺席（投影回落空集，不带半截假象）
-//   5. review 步（github）→ 只读步不产交付面事实，不探测不上报
-//   6. repo 缺席步（无 worktree）→ 不探测不上报
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -31,7 +20,6 @@ import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 
-// 探测 mock（真实网络面不进单测；probeGithubPr 的梯行为在 github-probe.test）。
 const probeMock = vi.fn();
 vi.mock('../src/github-probe.js', async (importOriginal) => {
   const real = (await importOriginal<typeof import('../src/github-probe.js')>()) as {
@@ -61,8 +49,6 @@ function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   return { logger, lines };
 }
 
-/** repo 绑定的 build 步（github 形态 = B-C16 现场：手动 owner/repo 无
- * connection，机器 gh 是 agent 开 PR 的实际凭据）。 */
 function claimedGithubStep(kind: 'build' | 'review' = 'build'): ClaimedStep {
   return {
     step: { id: 's1', buildId: 'conv-1', kind, machineId: 'm1', createdAt: 1 },
@@ -133,7 +119,6 @@ class FakeClient implements MachineApi {
     };
   }
   async skillsManifest() {
-    // #920：默认空清单 = 零团队技能（selection=whitelist，既有断言零扰动）。
     return { selection: 'whitelist' as const, skills: [] };
   }
   async skillFile(): Promise<Buffer> {
@@ -174,7 +159,6 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** fake worktree：diffAgainstDefault 可注入返回值（#704 上报数据源）。 */
 function fakeWorkspace(cwd: string, diff: string | null) {
   const calls: string[] = [];
   const ws: WorktreeOps = {
@@ -290,8 +274,8 @@ async function runOnce(opts: RunOpts): Promise<MachineDoneBody> {
 
 const SAMPLE_DIFF = 'diff --git a/README.md b/README.md\n@@ -1 +1,2 @@\n hello\n+probe\n';
 
-describe('runner 交付面上报（#704）', () => {
-  test('失败方式 1：github build 步 + 探测命中 → done 带 PR + changesDiff', async () => {
+describe('runner delivery surface reporting (#704)', () => {
+  test('failure mode 1: github build step + probe hit → done carries PR + changesDiff', async () => {
     const body = await runOnce({
       claimed: claimedGithubStep(),
       probe: { number: 606, url: 'https://github.com/octocat/Hello-World/pull/606' },
@@ -301,7 +285,6 @@ describe('runner 交付面上报（#704）', () => {
     expect(body.prUrl).toBe('https://github.com/octocat/Hello-World/pull/606');
     expect(body.prNumber).toBe(606);
     expect(body.changesDiff).toBe(SAMPLE_DIFF);
-    // 探测入参钉凭据阶梯面：owner/repo 来自 cloneUrl、branch = conv 分支。
     expect(probeMock).toHaveBeenCalledWith(
       expect.objectContaining({
         owner: 'octocat',
@@ -312,7 +295,7 @@ describe('runner 交付面上报（#704）', () => {
     );
   });
 
-  test('失败方式 2：探测 null（无 PR/失败）→ done 不带 PR 字段', async () => {
+  test('failure mode 2: probe null (no PR/failure) → done carries no PR field', async () => {
     const body = await runOnce({
       claimed: claimedGithubStep(),
       probe: null,
@@ -323,7 +306,7 @@ describe('runner 交付面上报（#704）', () => {
     expect(body.changesDiff).toBe(SAMPLE_DIFF);
   });
 
-  test('探测抛错 → 吞掉落日志，done 不带 PR 字段（不失败不重试）', async () => {
+  test('probe throws → swallowed with a log line, done carries no PR field (no failure, no retry)', async () => {
     const body = await runOnce({
       claimed: claimedGithubStep(),
       probe: new Error('gh missing'),
@@ -333,7 +316,7 @@ describe('runner 交付面上报（#704）', () => {
     expect(body.prUrl).toBeUndefined();
   });
 
-  test('失败方式 3：hosted 步 → 不探测不上报（真值源 = server bare repo）', async () => {
+  test('failure mode 3: hosted step → no probing, no reporting (truth source = server bare repo)', async () => {
     const body = await runOnce({
       claimed: claimedHostedStep(),
       probe: { number: 1, url: 'u' },
@@ -344,7 +327,7 @@ describe('runner 交付面上报（#704）', () => {
     expect(body.changesDiff).toBeUndefined();
   });
 
-  test('失败方式 4：diff 超上限 → changesDiff 缺席', async () => {
+  test('failure mode 4: diff over the cap → changesDiff absent', async () => {
     const body = await runOnce({
       claimed: claimedGithubStep(),
       probe: null,
@@ -353,7 +336,7 @@ describe('runner 交付面上报（#704）', () => {
     expect(body.changesDiff).toBeUndefined();
   });
 
-  test('失败方式 5：github review 步 → 只读步不产交付面事实', async () => {
+  test('failure mode 5: github review step → read-only step produces no delivery-surface facts', async () => {
     const body = await runOnce({
       kind: 'review',
       claimed: claimedGithubStep('review'),

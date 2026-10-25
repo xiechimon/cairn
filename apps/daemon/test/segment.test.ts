@@ -1,11 +1,8 @@
-// 段缓冲（#955 / ADR 0011）单测。失败方式与 src/segment.ts 头注 F1..F7 一一
-// 对应——每条先红后绿，实现是让场景通过的手段。
-
 import { describe, expect, test } from 'vitest';
 import { SegmentBuffer, segmentContent } from '../src/segment.js';
 
 describe('SegmentBuffer（F1..F7）', () => {
-  test('F1 同 kind 连追加只累积，不产出行', () => {
+  test('F1: consecutive appends of the same kind only accumulate, producing no line', () => {
     const buf = new SegmentBuffer();
     expect(buf.append('text', '甲')).toBeNull();
     expect(buf.append('text', '乙')).toBeNull();
@@ -13,7 +10,7 @@ describe('SegmentBuffer（F1..F7）', () => {
     expect(buf.current()).toEqual({ kind: 'text', text: '甲乙丙' });
   });
 
-  test('F2 异 kind 切换先封上一段并把上一段交出', () => {
+  test('F2: switching to a different kind seals the previous segment and hands it over', () => {
     const buf = new SegmentBuffer();
     buf.append('text', '先说一句');
     const sealed = buf.append('thinking', '再想一下');
@@ -21,7 +18,7 @@ describe('SegmentBuffer（F1..F7）', () => {
     expect(buf.current()).toEqual({ kind: 'thinking', text: '再想一下' });
   });
 
-  test('F3 封段清空缓冲——下一段不重复上一段文本', () => {
+  test('F3: sealing clears the buffer — the next segment does not repeat the previous text', () => {
     const buf = new SegmentBuffer();
     buf.append('text', '第一段');
     expect(buf.seal()).toEqual({ kind: 'text', text: '第一段' });
@@ -30,7 +27,7 @@ describe('SegmentBuffer（F1..F7）', () => {
     expect(buf.seal()).toEqual({ kind: 'text', text: '第二段' });
   });
 
-  test('F4 空段不出行：从未开段 / 封过之后再封都返回 null', () => {
+  test('F4: empty segments produce no line: never opened / resealed after sealing both return null', () => {
     const buf = new SegmentBuffer();
     expect(buf.seal()).toBeNull();
     buf.append('text', '有内容');
@@ -38,7 +35,7 @@ describe('SegmentBuffer（F1..F7）', () => {
     expect(buf.seal()).toBeNull();
   });
 
-  test('F4 空串不改变段状态', () => {
+  test('F4: an empty string does not change segment state', () => {
     const buf = new SegmentBuffer();
     expect(buf.append('text', '')).toBeNull();
     expect(buf.current()).toBeNull();
@@ -47,14 +44,14 @@ describe('SegmentBuffer（F1..F7）', () => {
     expect(buf.current()).toEqual({ kind: 'text', text: '甲' });
   });
 
-  test('F5 全文事件是权威替换，不与已累积的增量相加', () => {
+  test('F5: a full-text event is an authoritative replacement, not added to the accumulated deltas', () => {
     const buf = new SegmentBuffer();
     buf.append('thinking', '想了一半');
     expect(buf.replace('thinking', '想了一半然后想完了')).toBeNull();
     expect(buf.seal()).toEqual({ kind: 'thinking', text: '想了一半然后想完了' });
   });
 
-  test('F5 全文事件在异 kind 时先封上一段', () => {
+  test('F5: a full-text event on a different kind seals the previous segment first', () => {
     const buf = new SegmentBuffer();
     buf.append('text', '正文');
     const sealed = buf.replace('thinking', '全文思考');
@@ -62,7 +59,7 @@ describe('SegmentBuffer（F1..F7）', () => {
     expect(buf.seal()).toEqual({ kind: 'thinking', text: '全文思考' });
   });
 
-  test('F6 封后 append 正常开新段', () => {
+  test('F6: append after sealing opens a new segment normally', () => {
     const buf = new SegmentBuffer();
     buf.append('thinking', '想过');
     buf.seal();
@@ -70,13 +67,13 @@ describe('SegmentBuffer（F1..F7）', () => {
     expect(buf.current()).toEqual({ kind: 'text', text: '说' });
   });
 
-  test('F7 内容逐字保留（不 trim）', () => {
+  test('F7: content preserved verbatim (no trim)', () => {
     const buf = new SegmentBuffer();
     buf.append('text', '  前后有空白\n\n');
     expect(buf.seal()).toEqual({ kind: 'text', text: '  前后有空白\n\n' });
   });
 
-  test('segmentContent 产出单类型块数组形', () => {
+  test('segmentContent produces a single-type block array shape', () => {
     expect(segmentContent({ kind: 'text', text: '甲' })).toEqual([{ type: 'text', text: '甲' }]);
     expect(segmentContent({ kind: 'thinking', text: '乙' })).toEqual([
       { type: 'thinking', thinking: '乙' },

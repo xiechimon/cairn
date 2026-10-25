@@ -1,19 +1,3 @@
-// local 形态执行面（spec 12 G2-T2，#362）：镜像 clone 硬链接证据 + conv 分支
-// 落地面（#1211：push 即交付，用户主检出零触碰）+ per-step 凭证不进 argv。
-// 真 git 落地（workspace.test.ts 同律；用户仓库 = 非 bare 工作树仓，origin 即
-// 用户仓库本体）。
-// 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
-//   1. 硬链接面：基座 clone 的 .git/objects 文件 nlink ≥ 2（与用户仓库共享
-//      inode）且占比 ≥ 50%；对照直接 copy 全部 nlink == 1（硬链接数 0）
-//   2. push 落地：worktree 提交 + push 回用户仓库 → 用户仓库 refs/heads 多出
-//      conv 分支（tip = worktree HEAD）；用户当前分支 HEAD/reflog/工作树零
-//      变化——即便 ff 可行也不推进用户分支（#1211：合并到默认分支由用户自取）
-//   3. 脏工作区：用户仓库有未提交改动 → push 照常成功（push 只写
-//      refs/heads/<conv>，不碰用户工作树）；用户 HEAD 与脏文件内容原样
-//   4. 凭证 argv 面：PATH shim 捕获全部 git fork+exec 命令行——带凭证
-//      clone/fetch/push 全程 token 不出现在 argv；对照 env 面
-//      CAIRN_GIT_CRED_* 携带 token（凭证确实经 env 注入，credential.helper 读它）
-
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -36,10 +20,7 @@ import { WorkspaceManager } from '../src/workspace.js';
 const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 const PROJECT_ID = 'proj-local-1';
 const CONV_A = '01a0b86f-aaaa-72a8-bba4-75c5cfd6598f';
-/** 探针 token（argv 泄漏断言的判别串；形近真实 GitHub token 但为假值）。 */
 const PROBE_TOKEN = 'ghp_PROBE0000000000000000000000000000';
-// 远端是本地 bare 仓（无需凭证）；绑定 URL 取 github 形态，helper 照样进 env，
-// 正对照「token 确实经 env 注入」才有东西可查（#1484）。
 const PROBE_CRED: BoundGitCredentials = {
   username: 'x-access-token',
   password: PROBE_TOKEN,
@@ -67,13 +48,11 @@ function fakeLogger(): DaemonLogger & { lines: string[] } {
   };
 }
 
-let userRepo: string; // 用户本机 git 工作树仓（local 形态 clone 源 + 落地面）
-let root: string; // workspacesRoot
+let userRepo: string;
+let root: string;
 let logger: ReturnType<typeof fakeLogger>;
 let ws: WorkspaceManager;
 
-/** 用户仓库种子：非 bare、main 分支、README.md + 数据文件若干提交
- * （多个松散 object → 硬链接占比断言有分母）。 */
 async function seedUserRepo(dir: string): Promise<void> {
   await runGit(['init', '-b', 'main', dir]);
   writeFileSync(join(dir, 'README.md'), '# user repo\n');
@@ -101,7 +80,6 @@ async function headOf(dir: string): Promise<string> {
   return r.stdout.trim();
 }
 
-/** 递归收集目录下全部普通文件的 nlink。 */
 function nlinksUnder(dir: string): number[] {
   const out: number[] = [];
   const walk = (d: string) => {
@@ -124,8 +102,8 @@ beforeEach(async () => {
   await seedUserRepo(userRepo);
 });
 
-describe('local 形态镜像 clone（spec 12 G2-T2：硬链接近零成本）', () => {
-  test('失败方式 1：基座 clone 对象文件走硬链接（nlink ≥ 2 占比 ≥ 50%）；直接 copy 对照 = 0 硬链接', async () => {
+describe('local-shape mirror clone (spec 12 G2-T2: hardlinks make it near-zero cost)', () => {
+  test('failure mode 1: base clone object files are hardlinked (nlink ≥ 2 for ≥ 50%); plain-copy control = 0 hardlinks', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A, userRepo));
     expect(prepared.baseRepoDir).toBe(join(root, PROJECT_ID, 'repo'));
 
@@ -134,7 +112,6 @@ describe('local 形态镜像 clone（spec 12 G2-T2：硬链接近零成本）', 
     expect(objectLinks.length).toBeGreaterThan(0);
     expect(hardlinked.length).toBeGreaterThanOrEqual(Math.ceil(objectLinks.length * 0.5));
 
-    // 对照面：直接 copy 同仓库 → 全部新 inode（无硬链接）。
     const copyDir = join(root, 'direct-copy');
     cpSync(userRepo, copyDir, { recursive: true });
     const copyLinks = nlinksUnder(join(copyDir, '.git', 'objects'));
@@ -142,8 +119,8 @@ describe('local 形态镜像 clone（spec 12 G2-T2：硬链接近零成本）', 
   }, 30_000);
 });
 
-describe('local 形态落地（#1211：conv 分支 push 即交付，用户主检出零触碰）', () => {
-  test('失败方式 2：worktree 提交 push 回用户仓库 → refs/heads 多 conv 分支；用户 HEAD/reflog/工作树零变化（即便 ff 可行也不推进）', async () => {
+describe("local-shape landing (#1211: pushing the conv branch is the delivery, user's main checkout untouched)", () => {
+  test("failure mode 2: worktree commit pushed back to the user repo → refs/heads gains the conv branch; user's HEAD/reflog/worktree unchanged (not advanced even when ff is possible)", async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A, userRepo));
     writeFileSync(join(prepared.cwd, 'probe.txt'), 'local landing probe\n');
     const committed = await ws.commitAll(prepared.cwd, 'build: probe', IDENTITY);
@@ -153,14 +130,11 @@ describe('local 形态落地（#1211：conv 分支 push 即交付，用户主检
 
     await ws.push(prepared.cwd, prepared.branch, null);
 
-    // push 回用户仓库：conv 分支在用户仓库 refs/heads 在位（非 bare 收 push）。
     const onUser = await runGit(['rev-parse', '--verify', `refs/heads/${prepared.branch}`], {
       cwd: userRepo,
     });
     expect(onUser.code).toBe(0);
     expect(onUser.stdout.trim()).toBe(committed.head);
-    // conv tip 是 main 的后代（正 ff 形）——但用户 main 不被推进（#1211：
-    // 落地只多分支，合并到默认分支由用户自取）。
     const ffShape = await runGit(
       ['merge-base', '--is-ancestor', 'main', `refs/heads/${prepared.branch}`],
       { cwd: userRepo },
@@ -168,18 +142,17 @@ describe('local 形态落地（#1211：conv 分支 push 即交付，用户主检
     expect(ffShape.code).toBe(0);
     expect(await headOf(userRepo)).toBe(headBefore);
     const reflogAfter = await runGit(['reflog', 'main'], { cwd: userRepo });
-    expect(reflogAfter.stdout).toBe(reflogBefore.stdout); // reflog 无新增
-    expect(existsSync(join(userRepo, 'probe.txt'))).toBe(false); // 工作树无新文件
+    expect(reflogAfter.stdout).toBe(reflogBefore.stdout);
+    expect(existsSync(join(userRepo, 'probe.txt'))).toBe(false);
     const status = await runGit(['status', '--porcelain'], { cwd: userRepo });
     expect(status.stdout.trim()).toBe('');
   }, 30_000);
 
-  test('失败方式 3：脏工作区 → push 照常成功（push 只写 conv 分支 ref）；用户 HEAD 与脏文件原样', async () => {
+  test("failure mode 3: dirty worktree → push still succeeds (push only writes the conv branch ref); user's HEAD and dirty files unchanged", async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A, userRepo));
     writeFileSync(join(prepared.cwd, 'README.md'), '# user repo\n\nagent line\n');
     await ws.commitAll(prepared.cwd, 'build: readme', IDENTITY);
 
-    // 用户对同一文件有未提交改动——不阻断 push，也不被 push 触碰。
     writeFileSync(join(userRepo, 'README.md'), '# user repo\nUSER UNCOMMITTED\n');
     const headBefore = await headOf(userRepo);
 
@@ -194,7 +167,7 @@ describe('local 形态落地（#1211：conv 分支 push 即交付，用户主检
   }, 30_000);
 });
 
-describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令行）', () => {
+describe('per-step credential argv discipline (spec 12 G2-T2: capturing fork+exec command lines)', () => {
   let shimDir = '';
   let argvLog = '';
   let envLog = '';
@@ -211,7 +184,6 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
       [
         '#!/bin/sh',
         `{ printf '%s ' "$@"; printf '\\n'; } >> "${argvLog}"`,
-        // 凭证值在 CAIRN_GIT_CRED_*（helper 本体是定值，#1484）。
         `printenv CAIRN_GIT_CRED_USERNAME CAIRN_GIT_CRED_PASSWORD >> "${envLog}" 2>/dev/null || true`,
         `exec "${realGit}" "$@"`,
       ].join('\n'),
@@ -225,9 +197,7 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
     process.env.PATH = savedPath;
   });
 
-  test('失败方式 5：带凭证 clone/fetch/push 全程 token 不进 argv；env credential.helper 携带（正对照）', async () => {
-    // 远端 = 本地 bare repo（http 远端不可得时的等价执行面：凭证注入通道与
-    // 远端协议无关——断言对象是 cairn 侧 spawn 形态，不是 git auth 结果）。
+  test('failure mode 5: token never enters argv throughout credential-bearing clone/fetch/push; carried by the env credential.helper (positive control)', async () => {
     const bareRemote = join(mkdtempSync(join(tmpdir(), 'cairn-cred-remote-')), 'origin.git');
     await runGit(['init', '--bare', bareRemote]);
     await runGit(['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd: bareRemote });
@@ -252,12 +222,9 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
     const argv = readFileSync(argvLog, 'utf8');
     expect(argv).toContain('clone');
     expect(argv).toContain('push');
-    // 判别断言：token 与凭证用户名都不出现在任何 git 命令行。
     expect(argv).not.toContain(PROBE_TOKEN);
     expect(argv).not.toContain('x-access-token');
     expect(argv).not.toContain('credential.helper');
-    // 正对照：token 确实经 GIT_CONFIG_* env 注入（否则「argv 无 token」空转）
-    // ——CAIRN_GIT_CRED_* = 内联 credential.helper 读取的凭证（git.ts gitCredentialEnv）。
     const envDump = readFileSync(envLog, 'utf8');
     expect(envDump).toContain(PROBE_TOKEN);
     expect(envDump).toContain('x-access-token');

@@ -1,14 +1,3 @@
-// runner 流超时护栏（#699）：三臂事件到达即重置（body 臂对齐 first/idle 的
-// 事件重置语义）+ 步级绝对上界（不随事件重置）+ 超时文案指名触发臂与数值。
-// 失败方式枚举先于实现固化（票面四条照抄）：
-//   1. 活跃流被墙杀：事件间隔 < body 预算、总时长 > body 预算的流必须自然
-//      完成（body 按事件重置的核心证明——总时长超预算而不死）。
-//   2. 真死流永远不死：首事件后停发的流由 idle 臂在既有时限内收掉。
-//   3. 完全无上界的步：事件流持续活跃但撞步级绝对上界（duration cap），
-//      上界不随事件重置；env 旋钮可配。
-//   4. 文案指错凶手：first/idle/body/duration 四臂的失败文案各自指名
-//      触发臂与数值，build.errorMessage 携带。
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -59,7 +48,6 @@ function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   return { logger, lines };
 }
 
-/** repo 绑定的 build 步（worktree 面走 fake WorktreeOps）。 */
 function claimedBuildStep(): ClaimedStep {
   return {
     step: { id: 's1', buildId: 'conv-1', kind: 'build', machineId: 'm1', createdAt: 1 },
@@ -122,7 +110,6 @@ class FakeClient implements MachineApi {
     };
   }
   async skillsManifest() {
-    // #920：默认空清单 = 零团队技能（selection=whitelist，既有断言零扰动）。
     return { selection: 'whitelist' as const, skills: [] };
   }
   async skillFile(): Promise<Buffer> {
@@ -192,9 +179,6 @@ function fakeWorkspace(cwd: string): WorktreeOps {
   };
 }
 
-/** 节流事件流后端：首事件延迟 firstEventMs，之后每 intervalMs 一条
- * text_delta；events=Infinity 即永不收尾（死流/无上界流形态）。stop() 经
- * gate 立即打断所有等待（真 handle.stop() 语义同形）。 */
 function streamingBackend(opts: {
   firstEventMs: number;
   intervalMs: number;
@@ -290,7 +274,6 @@ function toolExecutionBackend(opts: { finish: 'done' | 'silent'; parallel?: bool
   return { backend, observations };
 }
 
-/** 全部超时面放宽（不干扰被测臂）。 */
 const WIDE = 4_000;
 
 async function run(opts: {
@@ -335,10 +318,8 @@ async function run(opts: {
   return client.doneBodies[0]!.body;
 }
 
-describe('runner 流超时护栏（#699）', () => {
-  test('失败方式 1：事件间隔 < body 预算、总时长 > body 预算的活跃流自然完成', async () => {
-    // 10 条事件每 40ms 一条 = 总流时长 ~400ms，body 预算 120ms——不按事件
-    // 重置则 120ms 处必死；按事件重置则每个事件续 120ms 预算，自然完成。
+describe('runner stream-timeout guardrails (#699)', () => {
+  test('failure mode 1: an active stream with event gaps < body budget but total duration > body budget completes naturally', async () => {
     const started = Date.now();
     const body = await run({
       backend: streamingBackend({ firstEventMs: 20, intervalMs: 40, events: 10, finish: 'done' })
@@ -346,13 +327,12 @@ describe('runner 流超时护栏（#699）', () => {
       timeouts: { first: WIDE, idle: WIDE, body: 120 },
       durationCapMs: WIDE,
     });
-    expect(Date.now() - started).toBeGreaterThanOrEqual(350); // 流真跑满 400ms 量级
+    expect(Date.now() - started).toBeGreaterThanOrEqual(350);
     expect(body.status).toBe('success');
     expect(body.errorMessage).toBeUndefined();
   });
 
-  test('失败方式 2：首事件后停发的死流由 idle 臂在既有时限内收掉', async () => {
-    // 首事件 20ms 到位（first 过），之后永无事件——idle=80ms 收尸。
+  test('failure mode 2: a dead stream silent after the first event is collected by the idle arm within the existing limit', async () => {
     const body = await run({
       backend: streamingBackend({ firstEventMs: 20, intervalMs: WIDE, events: 1, finish: 'silent' })
         .backend,
@@ -363,8 +343,7 @@ describe('runner 流超时护栏（#699）', () => {
     expect(body.errorMessage).toBe('stream timeout (arm=idle, idle=80ms)');
   });
 
-  test('失败方式 3：持续活跃但无上界的流撞步级绝对上界（不随事件重置）', async () => {
-    // 事件每 30ms 持续活跃（first/idle/body 全放宽永不触发），cap=150ms 收。
+  test('failure mode 3: a continuously active but unbounded stream hits the step-level absolute cap (not reset by events)', async () => {
     const body = await run({
       backend: streamingBackend({
         firstEventMs: 20,
@@ -379,7 +358,7 @@ describe('runner 流超时护栏（#699）', () => {
     expect(body.errorMessage).toBe('stream timeout (arm=duration, cap=150ms)');
   });
 
-  test('失败方式 3（env 旋钮）：CAIRN_STREAM_DURATION_CAP_MS 配置上界生效', async () => {
+  test('failure mode 3 (env knob): CAIRN_STREAM_DURATION_CAP_MS configures the cap', async () => {
     const body = await run({
       backend: streamingBackend({
         firstEventMs: 20,
@@ -394,7 +373,7 @@ describe('runner 流超时护栏（#699）', () => {
     expect(body.errorMessage).toBe('stream timeout (arm=duration, cap=250ms)');
   });
 
-  test('失败方式 4（first）：无任何事件 → 文案指名 first 臂与数值', async () => {
+  test('failure mode 4 (first): no events at all → wording names the first arm and value', async () => {
     const body = await run({
       backend: streamingBackend({
         firstEventMs: WIDE,
@@ -409,9 +388,7 @@ describe('runner 流超时护栏（#699）', () => {
     expect(body.errorMessage).toBe('stream timeout (arm=first, first=60ms)');
   });
 
-  test('失败方式 4（body）：body 预算最紧的安静流 → 文案指名 body 臂与数值', async () => {
-    // 首事件后安静；body=80ms < idle（WIDE）→ body 臂先到——证明事件重置后
-    // body 仍是独立在案、可触发的护栏，不是被 idle 完全遮蔽的死代码。
+  test('failure mode 4 (body): the quiet stream tightest against the body budget → wording names the body arm and value', async () => {
     const body = await run({
       backend: streamingBackend({ firstEventMs: 20, intervalMs: WIDE, events: 1, finish: 'silent' })
         .backend,
@@ -422,7 +399,7 @@ describe('runner 流超时护栏（#699）', () => {
     expect(body.errorMessage).toBe('stream timeout (arm=body, body=80ms)');
   });
 
-  test('失败方式 4（文案单源）：四臂文案指名臂位与数值', () => {
+  test("failure mode 4 (wording single source): all four arms' wording names the arm and value", () => {
     const timeouts = { first: 300_000, idle: 480_000, body: 540_000, durationCap: 3_600_000 };
     const cases: [StreamTimeoutArm, string][] = [
       ['first', 'stream timeout (arm=first, first=300000ms)'],
@@ -435,13 +412,12 @@ describe('runner 流超时护栏（#699）', () => {
     }
   });
 
-  test('上界缺省 = 3600000（env 未设时回落默认墙）', () => {
+  test('cap default = 3600000 (falls back to the default wall when env is unset)', () => {
     expect(STREAM_DURATION_CAP_DEFAULT_MS).toBe(3_600_000);
-    // env 缺省/非法值回落默认值由 runStep 内部判定；此处钉默认值本身。
   });
 });
 
-describe('runner 工具执行存活（#1591）', () => {
+describe('runner tool-execution liveness (#1591)', () => {
   test.each([false, true])('静默工具超过 idle 阈值仍完成（parallel=%s）', async (parallel) => {
     const { backend, observations } = toolExecutionBackend({ finish: 'done', parallel });
     const body = await run({
@@ -453,7 +429,7 @@ describe('runner 工具执行存活（#1591）', () => {
     expect(observations).toEqual({ completedTools: 1, stoppedDuringTool: false });
   });
 
-  test('静默工具超过 body 阈值仍完成', async () => {
+  test('a silent tool still completes past the body threshold', async () => {
     const { backend, observations } = toolExecutionBackend({ finish: 'done' });
     const body = await run({
       backend,
@@ -464,7 +440,7 @@ describe('runner 工具执行存活（#1591）', () => {
     expect(observations).toEqual({ completedTools: 1, stoppedDuringTool: false });
   });
 
-  test('工具结束后静默超过 idle 阈值仍失败', async () => {
+  test('silence past the idle threshold after the tool ends still fails', async () => {
     const { backend, observations } = toolExecutionBackend({ finish: 'silent' });
     const body = await run({
       backend,
@@ -476,7 +452,7 @@ describe('runner 工具执行存活（#1591）', () => {
     expect(body.errorMessage).toBe('stream timeout (arm=idle, idle=80ms)');
   });
 
-  test('工具仍在执行时总时长上限生效', async () => {
+  test('the total-duration cap applies while a tool is still executing', async () => {
     const { backend, observations } = toolExecutionBackend({ finish: 'done' });
     const body = await run({
       backend,

@@ -1,7 +1,3 @@
-// daemon relay 客户端对拍（r5 §3.1 bundle remoteTools.ts 语义）：execute →
-// POST /api/machine/tool/<stepId> body {name, params} → 解析 {text}；机器 token
-// Bearer 附带；非 replaySafe 4xx 拒绝单次不重试即抛。
-
 import { describe, expect, test } from 'vitest';
 import { MachineApiError, MachineClient } from '../src/machine-client.js';
 
@@ -24,8 +20,8 @@ function stubFetch(responses: { status: number; body: unknown }[]): {
   return { fetchImpl, calls };
 }
 
-describe('MachineClient.relayTool（remoteTools relay 客户端半）', () => {
-  test('成功：POST {name, params} + Bearer → 返回 text', async () => {
+describe('MachineClient.relayTool (remoteTools relay client half)', () => {
+  test('success: POST {name, params} + Bearer → returns text', async () => {
     const { fetchImpl, calls } = stubFetch([{ status: 200, body: { text: '{"ok":true}' } }]);
     const client = new MachineClient({ serverUrl: 'http://s', getToken: () => 'tok', fetchImpl });
     const out = await client.relayTool('step-1', 'create_todo', {
@@ -43,7 +39,7 @@ describe('MachineClient.relayTool（remoteTools relay 客户端半）', () => {
     expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer tok');
   });
 
-  test('非 replaySafe 4xx 拒绝 → 单次不重试即抛 MachineApiError', async () => {
+  test('non-replaySafe 4xx rejection → throws MachineApiError on the first try without retry', async () => {
     const { fetchImpl, calls } = stubFetch([{ status: 400, body: { error: 'bad params' } }]);
     const client = new MachineClient({ serverUrl: 'http://s', getToken: () => 'tok', fetchImpl });
     let err: unknown;
@@ -54,10 +50,10 @@ describe('MachineClient.relayTool（remoteTools relay 客户端半）', () => {
     }
     expect(err).toBeInstanceOf(MachineApiError);
     expect((err as MachineApiError).message).toContain('bad params');
-    expect(calls).toHaveLength(1); // 不重试
+    expect(calls).toHaveLength(1);
   });
 
-  test('replaySafe 4xx 拒绝 → 亦不重试（仅 5xx/瞬态重试）', async () => {
+  test('replaySafe 4xx rejection → also not retried (only 5xx/transient retried)', async () => {
     const { fetchImpl, calls } = stubFetch([{ status: 404, body: { error: 'not found' } }]);
     const client = new MachineClient({ serverUrl: 'http://s', getToken: () => 'tok', fetchImpl });
     await expect(

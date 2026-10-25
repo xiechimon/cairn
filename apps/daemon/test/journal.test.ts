@@ -1,5 +1,3 @@
-// 步骤 journal + transcript 缓冲（02 §5.4 recover 面 = 04 附录 A 自定等价物）。
-
 import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,7 +19,7 @@ const claimed: ClaimedStep = {
 };
 
 describe('StepJournal', () => {
-  test('claim → update → pending → remove 生命周期', () => {
+  test('claim → update → pending → remove lifecycle', () => {
     const dir = tmp();
     const j = new StepJournal(dir);
     j.claim({
@@ -42,13 +40,13 @@ describe('StepJournal', () => {
     expect(j.pending()).toHaveLength(1);
 
     j.update('s1', { state: 'done' });
-    expect(j.pending()).toHaveLength(0); // done/failed 不算 pending
+    expect(j.pending()).toHaveLength(0);
     j.remove('s1');
     expect(j.get('s1')).toBeNull();
     expect(existsSync(join(dir, 'step-s1.json'))).toBe(false);
   });
 
-  test('journal 跨实例持久（崩溃 recover 的宿主 durable 面）', () => {
+  test('journal persists across instances (the durable surface hosting crash recovery)', () => {
     const dir = tmp();
     const j1 = new StepJournal(dir);
     j1.claim({
@@ -62,7 +60,6 @@ describe('StepJournal', () => {
       claimed,
     });
     j1.update('s2', { state: 'running' });
-    // 模拟进程重启：新实例读回。
     const j2 = new StepJournal(dir);
     const entry = j2.get('s2');
     expect(entry?.state).toBe('running');
@@ -72,7 +69,7 @@ describe('StepJournal', () => {
 });
 
 describe('TranscriptBuffer', () => {
-  test('id 幂等 upsert + createdAt 排序 + 跨实例读回', () => {
+  test('idempotent upsert by id + createdAt ordering + read-back across instances', () => {
     const dir = tmp();
     const t1 = new TranscriptBuffer(dir, 's1');
     t1.upsert({ id: 'msg-2', role: 'assistant', content: 'b', createdAt: 200 });

@@ -1,32 +1,3 @@
-// 步活动相位 tracker（#905）：从既有 StepEvent 流派生「在做什么」上报。
-// 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
-//   F1 假新鲜：静默期（无流事件）不得重发——重发只在 noteEvent 驱动下发生，
-//      且距上次发送不足 repeatMs 不发。卡住的模型必须让 browser 端
-//      now−at 持续增长（#471 律的反面：不伪造心跳）。
-//   F2 洪水：同相位重复 setPhase（每个 thinking_delta 都调）不得逐次发送——
-//      report 与上次已发相同即跳过；事件流的新鲜度由 F1 的节流重发承载。
-//   F3 相位变化立即发：setPhase 到不同 report 即同步发送一次（不等节流窗）。
-//   F4 并行工具：第二个 toolStarted 覆盖显示名（最近开始者）；乱序
-//      toolEnded（先结束后开始的）不清相位——pending 集合空了才回
-//      awaiting_model。
-//   F5 toolEnded 清空后当前相位不是 tool（如 retrying）时不抢相位。
-//   F6 sink 抛错（网络断 / 旧 server 400）不冒泡——tracker 继续工作，
-//      后续相位变化照常尝试发送。
-//   F7 重发携带的是当前 report（相位在两次重发之间变过则发新值，由 F3
-//      路径先行；重发本身不改变 report 内容）。
-// #918 技能事实面（累计清单随每份上报走，失败方式续编）：
-//   F8 技能事实到达立即发（不等相位变化、不等节流窗）——「实时冒一条」的
-//      daemon 半；skills 挂当前相位 report，相位本身不变。
-//   F9 去重与 denied 粘滞：同名同态重复 = 零重发（F2 同律）；先读后拒 =
-//      升级 denied 重发一次；先拒后读 = denied 不回退（挡下是既成事实，
-//      回退会把闸的价值抹掉）。
-//   F10 载荷有界：超过 SKILL_FACTS_CAP 个不同技能名后清单停长（已有名字的
-//      denied 升级仍然生效）——病态循环读技能不得把上报载荷撑爆。
-//   F11 累计集随后续每份上报走：相位变化与 noteEvent 节流重发都携带当前
-//      skills 全集（hub 单槽/订阅补发拿到的永远是全量）。
-//   F12 相位未起（current=null）时 noteSkill 不凭空发报——技能集搭下一份
-//      相位报的便车（runStep 先 setPhase('preparing')，此为防御性边界）。
-
 import { STEP_ACTIVITY_PHASES, type StepActivityReport } from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
 import { createActivityTracker, SKILL_FACTS_CAP } from '../src/activity.js';
@@ -69,20 +40,16 @@ describe('activity tracker', () => {
     const h = harness({ repeatMs: 5_000 });
     h.tracker.setPhase('thinking');
     expect(h.sent).toHaveLength(1);
-    // 静默 60s：无事件 → 零重发（卡住 = browser 端 now−at 增长，诚实）。
-    h.tracker.noteEvent(); // 首个事件到达即相位设置那次之后的 liveness
+    h.tracker.noteEvent();
     h.advance(60_000);
-    expect(h.sent).toHaveLength(1); // noteEvent 在 t=1000，距上次发送 0ms < repeatMs
-    // 事件持续流：每个事件 noteEvent，距上次发送 ≥ repeatMs 才重发。
+    expect(h.sent).toHaveLength(1);
     h.advance(5_000);
     h.tracker.noteEvent();
     expect(h.sent).toHaveLength(2);
     expect(h.sent.at(-1)?.report).toEqual({ phase: 'thinking' });
-    // 紧跟着的事件不再发（节流窗内）。
     h.tracker.noteEvent();
     h.tracker.noteEvent();
     expect(h.sent).toHaveLength(2);
-    // 下一个窗口再发一次。
     h.advance(5_000);
     h.tracker.noteEvent();
     expect(h.sent).toHaveLength(3);
@@ -101,13 +68,10 @@ describe('activity tracker', () => {
     expect(h.sent.at(-1)?.report).toEqual({ phase: 'tool', tool: 'read' });
     h.tracker.toolStarted('call-2', 'bash');
     expect(h.sent.at(-1)?.report).toEqual({ phase: 'tool', tool: 'bash' });
-    // 后开始的先结束：仍有 pending（call-1），相位留 tool，显示名回到剩余者。
     h.tracker.toolEnded('call-2');
     expect(h.sent.at(-1)?.report).toEqual({ phase: 'tool', tool: 'read' });
-    // 全部结束 → awaiting_model。
     h.tracker.toolEnded('call-1');
     expect(h.sent.at(-1)?.report).toEqual({ phase: 'awaiting_model' });
-    // 未知 id 的 toolEnded（异机回放等）不炸、不发。
     const before = h.sent.length;
     h.tracker.toolEnded('call-unknown');
     expect(h.sent).toHaveLength(before);
@@ -165,18 +129,14 @@ describe('activity tracker', () => {
     h.tracker.setPhase('thinking');
     h.tracker.noteSkill({ name: 'a', denied: false });
     const afterFirst = h.sent.length;
-    // 同名同态重复：零重发。
     h.tracker.noteSkill({ name: 'a', denied: false });
     expect(h.sent).toHaveLength(afterFirst);
-    // 先读后拒：升级 denied，重发一次。
     h.tracker.noteSkill({ name: 'a', denied: true });
     expect(h.sent).toHaveLength(afterFirst + 1);
     expect(h.sent.at(-1)?.report.skills).toEqual([{ name: 'a', denied: true }]);
-    // 先拒后读：denied 粘滞不回退，零重发。
     h.tracker.noteSkill({ name: 'a', denied: false });
     expect(h.sent).toHaveLength(afterFirst + 1);
     expect(h.sent.at(-1)?.report.skills).toEqual([{ name: 'a', denied: true }]);
-    // 首见序保持：新名字追加在尾。
     h.tracker.noteSkill({ name: 'b', denied: false });
     expect(h.sent.at(-1)?.report.skills).toEqual([
       { name: 'a', denied: true },
@@ -191,7 +151,6 @@ describe('activity tracker', () => {
       h.tracker.noteSkill({ name: `s${i}`, denied: false });
     }
     expect(h.sent.at(-1)?.report.skills).toHaveLength(SKILL_FACTS_CAP);
-    // 已收录名字的 denied 升级不受 cap 影响。
     h.tracker.noteSkill({ name: 's0', denied: true });
     expect(h.sent.at(-1)?.report.skills?.[0]).toEqual({ name: 's0', denied: true });
     expect(h.sent.at(-1)?.report.skills).toHaveLength(SKILL_FACTS_CAP);
@@ -229,9 +188,6 @@ describe('activity tracker', () => {
     for (const phase of STEP_ACTIVITY_PHASES) {
       h.tracker.setPhase(phase);
     }
-    expect(h.sent.map((s) => s.report.phase)).toEqual([
-      // preparing 起手全相位轮转：同相位不重发（F2），相邻异相位各发一次。
-      ...STEP_ACTIVITY_PHASES,
-    ]);
+    expect(h.sent.map((s) => s.report.phase)).toEqual([...STEP_ACTIVITY_PHASES]);
   });
 });

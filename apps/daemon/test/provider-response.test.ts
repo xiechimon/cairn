@@ -1,17 +1,3 @@
-// #882 非 SSE 响应诊断测试面。失败方式枚举先于实现固化（仓规测试规则 3）：
-//   1. 正确 SSE（200 text/event-stream）→ 记 eventStream、不读体；文案零追加
-//   2. 200 text/html（baseUrl 少 `/v1` 的现场）→ 文案点名 status / content-type
-//      / 前若干字节 / 请求 URL / provider baseUrl / 机器名
-//   3. 非 2xx（404 application/json）→ 文案与 1、2 都不同（含端点与机器）
-//   4. content-type 缺失 → 判非 SSE，文案给 (no content-type)
-//   5. content-type 大小写混写 + charset 参数 → 仍判 SSE
-//   6. 超长 / 带控制字符的响应体 → 摘要折叠截断、不炸
-//   7. 响应体不可读（204 无体）→ 摘要降级为缺省，主文案不受影响
-//   8. 无 provider baseUrl / 无机器名 → 对应子句消失，其余照旧
-//   9. 注入的 fetch 不改写请求与响应：状态、头、体逐字透传
-//  10. SSE 响应上出的错（流中途断 / 模型报错）→ 不追加形态（与端点无关）
-//  11. 无记录（适配器不吃注入位 / 请求没发出去）→ 原样返回（fail-open）
-
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
@@ -42,7 +28,6 @@ beforeAll(async () => {
       return;
     }
     if (url.startsWith('/chat/completions')) {
-      // baseUrl 少了 `/v1`：请求被打到站点 SPA 路由，回一张 HTML 页面。
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       res.end(HTML_PAGE);
       return;
@@ -75,18 +60,17 @@ afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
-/** 走真 HTTP 拿一份记录（诊断模块唯一的输入就是响应本身）。 */
 async function record(path: string): Promise<{ sink: ProviderResponseSink; text: string }> {
   const sink: ProviderResponseSink = { current: null };
   const response = await wrapProviderFetch(globalThis.fetch, sink)(`${baseUrl}${path}`);
-  const text = await response.text(); // 消费真响应体：证明没被诊断层吃掉
+  const text = await response.text();
   return { sink, text };
 }
 
 const CTX = { machineName: 't6-mac', providerBaseUrl: 'http://api.example.com' };
 
-describe('isEventStreamContentType（纯函数）', () => {
-  test('失败方式 5：大小写混写与 charset 参数照认', () => {
+describe('isEventStreamContentType (pure function)', () => {
+  test('failure mode 5: mixed-case and charset parameter still recognized', () => {
     expect(isEventStreamContentType('text/event-stream')).toBe(true);
     expect(isEventStreamContentType('TEXT/Event-Stream; charset=utf-8')).toBe(true);
     expect(isEventStreamContentType('text/html')).toBe(false);
@@ -95,8 +79,8 @@ describe('isEventStreamContentType（纯函数）', () => {
   });
 });
 
-describe('sanitizePreview（纯函数）', () => {
-  test('失败方式 6：控制字符折叠 + 截断带省略号', () => {
+describe('sanitizePreview (pure function)', () => {
+  test('failure mode 6: control characters collapsed + truncation with ellipsis', () => {
     expect(sanitizePreview('a\n\tb\u0000c')).toBe('a b c');
     const long = sanitizePreview('x'.repeat(1000));
     expect(long.length).toBe(RESPONSE_PREVIEW_CHARS + 1);
@@ -104,8 +88,8 @@ describe('sanitizePreview（纯函数）', () => {
   });
 });
 
-describe('wrapProviderFetch（真 HTTP 三形态）', () => {
-  test('失败方式 1：正确 SSE → eventStream 位记上、不读体、响应体原样可消费', async () => {
+describe('wrapProviderFetch (real HTTP, three shapes)', () => {
+  test('failure mode 1: proper SSE → eventStream bit recorded, body not read, response body left consumable as-is', async () => {
     const { sink, text } = await record('/v1/chat/completions');
     expect(sink.current).toMatchObject({
       status: 200,
@@ -116,18 +100,17 @@ describe('wrapProviderFetch（真 HTTP 三形态）', () => {
     expect(text).toContain('"finish_reason":"stop"');
   });
 
-  test('失败方式 2：200 text/html → 记 status / content-type / 前若干字节', async () => {
+  test('failure mode 2: 200 text/html → records status / content-type / first bytes', async () => {
     const { sink, text } = await record('/chat/completions');
     expect(sink.current?.status).toBe(200);
     expect(sink.current?.contentType).toBe('text/html; charset=utf-8');
     expect(sink.current?.eventStream).toBe(false);
     expect(sink.current?.preview).toContain('<!doctype html>');
     expect(sink.current?.url).toBe(`${baseUrl}/chat/completions`);
-    // 注入层不改写响应：SDK 拿到的还是那张真页面。
     expect(text).toBe(HTML_PAGE);
   });
 
-  test('失败方式 3：404 application/json → 状态与类型如实记录', async () => {
+  test('failure mode 3: 404 application/json → status and type recorded truthfully', async () => {
     const { sink, text } = await record('/v1/unknown');
     expect(sink.current).toMatchObject({
       status: 404,
@@ -137,19 +120,19 @@ describe('wrapProviderFetch（真 HTTP 三形态）', () => {
     expect(text).toBe('{"error":"model not found"}');
   });
 
-  test('失败方式 4：content-type 缺失 → 判非 SSE，摘要仍可读', async () => {
+  test('failure mode 4: missing content-type → judged non-SSE, summary still readable', async () => {
     const { sink } = await record('/nocontenttype');
     expect(sink.current?.contentType).toBeNull();
     expect(sink.current?.eventStream).toBe(false);
     expect(sink.current?.preview).toBe('plain body');
   });
 
-  test('失败方式 7：204 无体 → 摘要降级 null，不抛', async () => {
+  test('failure mode 7: 204 no body → summary degrades to null, no throw', async () => {
     const { sink } = await record('/empty');
     expect(sink.current).toMatchObject({ status: 204, eventStream: false, preview: null });
   });
 
-  test('失败方式 9：请求 init 原样透传（诊断层不改写请求）', async () => {
+  test('failure mode 9: request init passed through verbatim (diagnostic layer does not rewrite the request)', async () => {
     const sink: ProviderResponseSink = { current: null };
     const seen: string[] = [];
     const spy: typeof globalThis.fetch = async (input, init) => {
@@ -164,8 +147,8 @@ describe('wrapProviderFetch（真 HTTP 三形态）', () => {
   });
 });
 
-describe('enrichProviderError（三形态文案可区分）', () => {
-  test('失败方式 2：200 HTML 的文案把真凶三件都点上', async () => {
+describe('enrichProviderError (three shapes distinguishable by wording)', () => {
+  test('failure mode 2: 200 HTML wording names all three culprits', async () => {
     const { sink } = await record('/chat/completions');
     const text = enrichProviderError('Stream ended without finish_reason', sink.current, CTX);
     expect(text).toContain('Stream ended without finish_reason');
@@ -176,7 +159,7 @@ describe('enrichProviderError（三形态文案可区分）', () => {
     expect(text).toContain('first bytes: "<!doctype html>');
   });
 
-  test('失败方式 3：4xx 文案与 200 HTML 文案不同（状态与类型都点出来）', async () => {
+  test('failure mode 3: 4xx wording differs from 200 HTML wording (status and type both named)', async () => {
     const html = await record('/chat/completions');
     const missing = await record('/v1/unknown');
     const htmlText = enrichProviderError(
@@ -194,32 +177,32 @@ describe('enrichProviderError（三形态文案可区分）', () => {
     expect(missingText).not.toBe(htmlText);
   });
 
-  test('失败方式 1 / 10：SSE 响应上的错不追加形态', async () => {
+  test('failure modes 1/10: errors on SSE responses get no shape appended', async () => {
     const { sink } = await record('/v1/chat/completions');
     expect(enrichProviderError('Stream ended without finish_reason', sink.current, CTX)).toBe(
       'Stream ended without finish_reason',
     );
   });
 
-  test('失败方式 11：没有记录（适配器不吃注入位）→ 原样返回', () => {
+  test('failure mode 11: no record recorded (adapter does not consume the injected bit) → returned as-is', () => {
     expect(enrichProviderError('500: upstream unavailable', null, CTX)).toBe(
       '500: upstream unavailable',
     );
   });
 
-  test('失败方式 4：content-type 缺失的形态照报', async () => {
+  test('failure mode 4: missing content-type shape still reported', async () => {
     const { sink } = await record('/nocontenttype');
     expect(enrichProviderError('boom', sink.current, CTX)).toContain('(no content-type)');
   });
 
-  test('失败方式 8：无 baseUrl / 无机器名 → 那两个子句消失', () => {
+  test('failure mode 8: no baseUrl / no machine name → those two clauses disappear', () => {
     const shape: ProviderResponseShape = {
       url: 'http://127.0.0.1:9/chat/completions',
       status: 200,
       statusText: 'OK',
       contentType: 'text/html',
       eventStream: false,
-      retryAfterMs: null, // #1261 字段位（无头恒 null）
+      retryAfterMs: null,
       preview: '<html>',
     };
     const text = describeProviderResponse(shape, {});

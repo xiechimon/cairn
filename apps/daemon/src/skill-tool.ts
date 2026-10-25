@@ -1,26 +1,13 @@
-// Skill 加载工具（#1299）：pi session 专用自定义工具——入参 skill name
-// → 校验在可见集 → 返回 SKILL.md 全文 + [skills] invoke 日志。claude-code
-// 后端不注册本工具（其原生 Skill 机制已可观测）。
-// 参照 tag-tool.ts 的 LocalToolDef 缝：daemon 进程内执行，不经 relay。
-// 分类单源 shared/skill-facts.ts 已预埋 `Skill` 词（skillCallName 的 Skill
-// 分支即识 arguments.skill），本工具参数 shape 与之对齐。
-
 import { readFile } from 'node:fs/promises';
 import type { LocalToolDef } from '@cairn/shared';
 
-/** pi Skill 工具名（shared/skill-facts.ts skillCallName 同源）。 */
 export const SKILL_TOOL_NAME = 'Skill';
 
 export interface SkillLoadToolOpts {
-  /** name → SKILL.md 绝对路径（由调用方扫描 + allowlist/injectedSkills
-   * 过滤后传入——与 catalog 同可见面，判据永不漂移）。 */
   skillFileMap: ReadonlyMap<string, string>;
-  /** `[skills] invoke: <name>` 日志行出口（daemon logger.skills）。 */
   onInvoke?: (name: string) => void;
 }
 
-/** 构造 Skill 加载工具（pi 后端注册为 custom tool）。execute 纯内存查表 +
- * 读文件——不重扫描、不调 loadSkills。 */
 export function buildSkillLoadTool(opts: SkillLoadToolOpts): LocalToolDef {
   return {
     name: SKILL_TOOL_NAME,
@@ -60,10 +47,6 @@ export function buildSkillLoadTool(opts: SkillLoadToolOpts): LocalToolDef {
   };
 }
 
-/** 扫描技能目录 → name → SKILL.md 绝对路径映射（#1299 Skill 工具预扫描面）。
- * 目录不存在/扫描失败 = 空 Map（fail-open——已写入日志行的错误不进映射，
- * 与 catalog 注入面同律）。调用方在此映射之上自行叠加 allowlist /
- * injectedSkills 过滤后再传入 buildSkillLoadTool。 */
 export function scanSkillFileMap(
   dirs: string[],
   loadSkills: typeof import('@earendil-works/pi-coding-agent').loadSkills,

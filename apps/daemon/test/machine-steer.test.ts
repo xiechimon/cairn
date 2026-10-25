@@ -1,14 +1,10 @@
-// steer 投递（W3 #279：事件 → 拉取-确认 → handle.steer）（#1128 自 machine-loop.test.ts 拆分；共享 harness 收编位
-// = ./machine-loop-harness.ts，每个测试自 boot 自停）。
-
 import type { AgentBackend, DeliveredImage, StepEvent } from '@cairn/shared';
 import { formatAttachmentToken } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 
-describe('steer 投递（W3 #279：事件 → 拉取-确认 → AgentSessionHandle.steer）', () => {
-  /** 门控 handle：首事件后停住（步「在跑」），release 后 done 收尾。 */
+describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer)', () => {
   function gatedBackend(steered: string[]) {
     let release: () => void = () => {};
     const gate = new Promise<void>((r) => {
@@ -38,7 +34,7 @@ describe('steer 投递（W3 #279：事件 → 拉取-确认 → AgentSessionHand
     return { backend, release };
   }
 
-  test('steer 事件 → 拉取-确认 → 在跑 session 的 handle.steer(text)', async () => {
+  test('steer event → fetch-ack → handle.steer(text) on the running session', async () => {
     const api = new FakeMachineApi();
     api.steerResponse = '顺便把测试也补上';
     const steered: string[] = [];
@@ -56,7 +52,7 @@ describe('steer 投递（W3 #279：事件 → 拉取-确认 → AgentSessionHand
     await handle.done;
   });
 
-  test('失败方式：拉取空（server 门拒/旧步丢弃）→ 不 steer 不炸', async () => {
+  test('failure mode: empty fetch (server gate rejected / old step dropped) → no steer, no crash', async () => {
     const api = new FakeMachineApi();
     api.steerResponse = null;
     const steered: string[] = [];
@@ -74,7 +70,7 @@ describe('steer 投递（W3 #279：事件 → 拉取-确认 → AgentSessionHand
     await handle.done;
   });
 
-  test('steer 文本携带整行图片 token → 解析下载 → handle.steer(展开文本, images)（#730）', async () => {
+  test('steer text carries full-line image tokens → parsed and downloaded → handle.steer(expanded text, images) (#730)', async () => {
     const api = new FakeMachineApi();
     const png = Buffer.from('89504e470d0a1a0a', 'hex');
     api.attachments.id1 = {
@@ -126,7 +122,7 @@ describe('steer 投递（W3 #279：事件 → 拉取-确认 → AgentSessionHand
     await handle.done;
   });
 
-  test('失败方式（#730 先判活再下载）：无在跑 handle → 拉取后即丢，不白下字节', async () => {
+  test('failure mode (#730 liveness checked before download): no running handle → dropped after fetch, no bytes wasted', async () => {
     const api = new FakeMachineApi();
     const token = formatAttachmentToken('shot.png', 't1/id1.png');
     api.steerResponse = `补一张图\n\n${token}`;
@@ -167,16 +163,16 @@ describe('steer 投递（W3 #279：事件 → 拉取-确认 → AgentSessionHand
     api.parked?.(CLAIMED);
     await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
     release();
-    await waitFor(() => api.doneBodies.length === 1); // 步收尾，handle 已注销
+    await waitFor(() => api.doneBodies.length === 1);
     api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
     await waitFor(() => lines.some((l) => l.includes('steer dropped (no live session)')));
-    expect(api.attachmentCalls).toHaveLength(0); // 先判活：一字节都没下
+    expect(api.attachmentCalls).toHaveLength(0);
     expect(steered).toHaveLength(0);
     await handle.stop();
     await handle.done;
   });
 
-  test('失败方式（#730 步不崩）：steer 里的图片下载 409 → 注记入 steer 文本、零图片、循环存活', async () => {
+  test('failure mode (#730 step must not crash): image download 409 inside steer → annotated in the steer text, zero images, loop survives', async () => {
     const api = new FakeMachineApi();
     const token = formatAttachmentToken('shot.png', 't1/id1.png');
     api.steerResponse = `补一张图\n\n${token}`;
@@ -213,7 +209,7 @@ describe('steer 投递（W3 #279：事件 → 拉取-确认 → AgentSessionHand
     await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
     api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
     await waitFor(() => steered.length === 1);
-    expect(steered[0]!.text).toContain(token); // token 原样保留
+    expect(steered[0]!.text).toContain(token);
     expect(steered[0]!.text).toContain('不可用');
     expect(steered[0]!.images ?? []).toHaveLength(0);
     release();
@@ -221,7 +217,7 @@ describe('steer 投递（W3 #279：事件 → 拉取-确认 → AgentSessionHand
     await handle.done;
   });
 
-  test('失败方式：步收尾后无在跑 handle → 拉取成功也丢弃不炸（日志行 + 循环存活）', async () => {
+  test('failure mode: no running handle after the step closed → dropped even on successful fetch, no crash (log line + loop survives)', async () => {
     const api = new FakeMachineApi();
     api.steerResponse = '晚到的补充';
     const steered: string[] = [];
@@ -231,7 +227,7 @@ describe('steer 投递（W3 #279：事件 → 拉取-确认 → AgentSessionHand
     api.parked?.(CLAIMED);
     await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
     release();
-    await waitFor(() => api.doneBodies.length === 1); // 步收尾，handle 已注销
+    await waitFor(() => api.doneBodies.length === 1);
     api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
     await waitFor(() => lines.some((l) => l.includes('steer dropped (no live session)')));
     expect(steered).toEqual([]);

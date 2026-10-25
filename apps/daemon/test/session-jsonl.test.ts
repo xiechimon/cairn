@@ -11,31 +11,31 @@ function capture(): { lines: string[]; log: (msg: string) => void } {
 }
 
 describe('readSessionJsonlForUpload（#1512）', () => {
-  test('上限与 spec 20 单件 10MiB 对齐', () => {
+  test('cap aligned with spec 20 single-item 10MiB', () => {
     expect(SESSION_JSONL_MAX_BYTES).toBe(10 * 1024 * 1024);
   });
 
-  test('失败方式 1：路径缺席 → null、不落日志', () => {
+  test('failure mode 1: path absent → null, no log line', () => {
     const { lines, log } = capture();
     expect(readSessionJsonlForUpload(undefined, log)).toBeNull();
     expect(lines).toEqual([]);
   });
 
-  test('失败方式 2：文件不存在 → null + 日志', () => {
+  test('failure mode 2: file missing → null + log', () => {
     const { lines, log } = capture();
     const missing = join(tmpdir(), `cairn-session-missing-${Date.now()}.jsonl`);
     expect(readSessionJsonlForUpload(missing, log)).toBeNull();
     expect(lines.some((l) => l.includes('missing') && l.includes(missing))).toBe(true);
   });
 
-  test('失败方式 3：读取失败 → null + 日志', () => {
+  test('failure mode 3: read failure → null + log', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-session-unreadable-'));
     const { lines, log } = capture();
     expect(readSessionJsonlForUpload(dir, log)).toBeNull();
     expect(lines.some((l) => l.includes('read failed'))).toBe(true);
   });
 
-  test('失败方式 4：超过上限 → 跳过 + 日志，不截断', () => {
+  test('failure mode 4: over the cap → skipped + log, not truncated', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-session-oversize-'));
     const file = join(dir, 'session.jsonl');
     writeFileSync(file, 'x'.repeat(40));
@@ -44,7 +44,7 @@ describe('readSessionJsonlForUpload（#1512）', () => {
     expect(lines.some((l) => l.includes('over') && l.includes('20'))).toBe(true);
   });
 
-  test('失败方式 5：未超上限 → 原样返回', () => {
+  test('failure mode 5: under the cap → returned as-is', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-session-ok-'));
     const file = join(dir, 'session.jsonl');
     const body = '{"type":"assistant","stopReason":"length"}\n';

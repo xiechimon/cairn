@@ -1,21 +1,3 @@
-// runner 配额熔断（#1261）：quota/capacity 错误即停会话（不打满 pi 预算的
-// 同形重试风暴）+ done 携带结构化 quotaBlock（哪一路 relay / Retry-After），
-// server 侧据此挂起「等额度」而非判死。失败方式枚举先于实现固化（AGENTS.md
-// 测试规则 3；#708 有界生命周期是本面的兜底，quota 熔断是它的前哨）：
-//   Q1 风暴未熔断：quota 错误若只靠 #708 预算收尾 → 烧满 1+RETRY_STORM_MAX
-//      发才停（用户实测 attempt=4 打破 max 3）。熔断后发数 = 0（首个 error
-//      事件即停，auto_retry_start 一发不达）。
-//   Q2 信号丢失：quotaBlock 缺席 → server 按普通失败判死 todo（旧路径），
-//      板面零「等额度」态。断言 providerId/reason/retryAfterMs 逐位。
-//   Q3 非配额误报：普通 400/网络错带 quotaBlock = 板面假「等额度」（错误
-//      挂起语义）。断言 400 路径 done body 无 quotaBlock。
-//   Q4 非重试形（pi 不 retry 的 402）：error → done 自然收尾也要带 quotaBlock
-//      （zero-event round 的主形态——pi 对 402 不自动重试，会话静默耗尽）。
-//   Q5 Retry-After 透传：诊断行里的 retry-after 解析成毫秒进 quotaBlock；
-//      无头 = 缺席（不造数值）。
-//   Q6 进度后配额：会话有真实进展后遇 quota → 仍挂起（continue session
-//      语义可用），不是普通 failed。
-
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -164,9 +146,6 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** 会话脚本（StepEvent 序列；stop() 立即终止生成器 = 真 handle.stop() 中断
- * 事件流语义同形）。counts.autoRetries = 实际送达 runner 的 auto_retry_start
- * 事件数（Q1 的发数对账面）。 */
 function scriptedBackend(scripts: StepEvent[][]): {
   backend: AgentBackend;
   counts: { autoRetries: number };
@@ -175,7 +154,7 @@ function scriptedBackend(scripts: StepEvent[][]): {
   const backend: AgentBackend = {
     capabilities: PI_CAPABILITIES,
     async createSession(sessionOpts: SessionOpts): Promise<AgentSessionHandle> {
-      const idx = counts.autoRetries === 0 ? 0 : 0; // 单会话面（无回落轮）
+      const idx = counts.autoRetries === 0 ? 0 : 0;
       void sessionOpts;
       void idx;
       const script = scripts[0] ?? [{ type: 'done', usage: [] }];
@@ -203,7 +182,6 @@ function scriptedBackend(scripts: StepEvent[][]): {
   return { backend, counts };
 }
 
-/** 真形态开面前缀（#708 verify 栈实测事件序）。 */
 function sessionOpenEcho(): StepEvent[] {
   return [
     { type: 'message_end', message: { role: 'system', content: 'you are a builder' } },
@@ -211,7 +189,6 @@ function sessionOpenEcho(): StepEvent[] {
   ];
 }
 
-/** quota 风暴脚本：开面回声 + n × [message_end(error) + error + auto_retry]。 */
 function quotaCycles(n: number, message: string): StepEvent[] {
   const out: StepEvent[] = sessionOpenEcho();
   for (let i = 0; i < n; i++) {
@@ -246,17 +223,17 @@ async function runQuotaCase(script: StepEvent[], providerId = 'gw-quota') {
   return { client, lines, autoRetries: counts.autoRetries };
 }
 
-describe('runner 配额熔断（#1261）', () => {
-  test('Q1 quota 风暴：首个 error 事件即熔断——auto_retry 一发不达，根因仍报', async () => {
+describe('runner quota circuit breaker (#1261)', () => {
+  test('Q1 quota storm: circuit breaks on the first error event — auto_retry never fires once, root cause still reported', async () => {
     const { client, lines, autoRetries } = await runQuotaCase(quotaCycles(10, QUOTA_402));
-    expect(autoRetries).toBe(0); // 熔断先于 pi 预算：不发满 1+max
+    expect(autoRetries).toBe(0);
     expect(lines.some((l) => l.includes('quota circuit breaker'))).toBe(true);
     expect(client.doneBodies[0]?.body.status).toBe('failed');
     expect(client.doneBodies[0]?.body.quotaBlock?.kind).toBe('quota');
     expect(client.doneBodies[0]?.body.quotaBlock?.providerId).toBe('gw-quota');
   });
 
-  test('Q2 信号完整：label / reason 逐位（server 侧「哪一路 relay」显示面）', async () => {
+  test('Q2 signal complete: label / reason bit by bit (the server-side "which relay path" display surface)', async () => {
     const { client } = await runQuotaCase(quotaCycles(2, QUOTA_402), 'relay-186');
     const block = client.doneBodies[0]?.body.quotaBlock;
     expect(block?.providerId).toBe('relay-186');
@@ -264,7 +241,7 @@ describe('runner 配额熔断（#1261）', () => {
     expect(block?.reason).toContain('额度已用尽');
   });
 
-  test('Q4 非重试形（error → done 自然收尾）：quotaBlock 仍在（zero-event 主形态）', async () => {
+  test('Q4 non-retry shape (error → done natural close): quotaBlock still present (zero-event main shape)', async () => {
     const script: StepEvent[] = [
       ...sessionOpenEcho(),
       { type: 'message_end', message: { role: 'assistant', content: '', stopReason: 'error' } },
@@ -277,14 +254,14 @@ describe('runner 配额熔断（#1261）', () => {
     expect(client.doneBodies[0]?.body.quotaBlock?.kind).toBe('quota');
   });
 
-  test('Q5 capacity + Retry-After：kind=capacity，retryAfterMs 解析毫秒', async () => {
+  test('Q5 capacity + Retry-After: kind=capacity, retryAfterMs parsed to milliseconds', async () => {
     const { client } = await runQuotaCase(quotaCycles(2, CAPACITY_429));
     const block = client.doneBodies[0]?.body.quotaBlock;
     expect(block?.kind).toBe('capacity');
     expect(block?.retryAfterMs).toBe(30_000);
   });
 
-  test('Q3 非配额误报：普通 400 → 无 quotaBlock（旧 failed 路径零回归）', async () => {
+  test('Q3 non-quota false report: plain 400 → no quotaBlock (zero regression on the old failed path)', async () => {
     const script: StepEvent[] = [
       ...sessionOpenEcho(),
       { type: 'message_end', message: { role: 'assistant', content: '', stopReason: 'error' } },
@@ -297,7 +274,7 @@ describe('runner 配额熔断（#1261）', () => {
     expect(lines.some((l) => l.includes('quota circuit breaker'))).toBe(false);
   });
 
-  test('Q6 有进展后遇 quota：仍挂起（continue session 语义），非普通失败', async () => {
+  test('Q6 quota hit after progress: still suspends (continue session semantics), not a plain failure', async () => {
     const script: StepEvent[] = [
       ...sessionOpenEcho(),
       { type: 'text_delta', text: '写了一行' },

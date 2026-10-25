@@ -8,8 +8,8 @@ import {
   todoFromTodoWrite,
 } from '../src/backend/claude-code.js';
 
-describe('todoFromTodoWrite（claude-code TodoWrite → cairn 格式）', () => {
-  test('F3: status 三词逐字映射成 cairn 三态', () => {
+describe('todoFromTodoWrite (claude-code TodoWrite → cairn format)', () => {
+  test('F3: the three status words map verbatim to the three cairn states', () => {
     const items = todoFromTodoWrite('TodoWrite', {
       todos: [
         { content: '读 README', status: 'pending' },
@@ -24,12 +24,12 @@ describe('todoFromTodoWrite（claude-code TodoWrite → cairn 格式）', () => 
     ]);
   });
 
-  test('F1: 非 TodoWrite 名字 → null', () => {
+  test('F1: non-TodoWrite name → null', () => {
     expect(todoFromTodoWrite('bash', { todos: [{ content: 'a', status: 'pending' }] })).toBeNull();
     expect(todoFromTodoWrite('todowrite', { todos: [] })).toBeNull();
   });
 
-  test('F2: 入参形状坏 → 不猜不产', () => {
+  test('F2: malformed input shape → no guessing, no output', () => {
     expect(todoFromTodoWrite('TodoWrite', undefined)).toBeNull();
     expect(todoFromTodoWrite('TodoWrite', { todos: 'nope' })).toBeNull();
     expect(todoFromTodoWrite('TodoWrite', { todos: [{ content: 'a' }] })).toBeNull();
@@ -39,11 +39,11 @@ describe('todoFromTodoWrite（claude-code TodoWrite → cairn 格式）', () => 
     expect(todoFromTodoWrite('TodoWrite', { todos: [{ status: 'pending' }] })).toBeNull();
   });
 
-  test('F4: 空 todos 数组 → null（无内容可示）', () => {
+  test('F4: empty todos array → null (nothing to show)', () => {
     expect(todoFromTodoWrite('TodoWrite', { todos: [] })).toBeNull();
   });
 
-  test('F5: 超上限截断（载荷有界）', () => {
+  test('F5: truncated beyond the cap (bounded payload)', () => {
     const todos = Array.from({ length: AGENT_TODO_MAX_ITEMS + 10 }, (_, i) => ({
       content: `条目 ${i}`,
       status: 'pending',
@@ -53,7 +53,7 @@ describe('todoFromTodoWrite（claude-code TodoWrite → cairn 格式）', () => 
     expect(items).toHaveLength(AGENT_TODO_MAX_ITEMS);
   });
 
-  test('tool_use 块把投影挂上调用行；非 TodoWrite 调用行不带 todo 位', () => {
+  test('tool_use block attaches the projection to the call row; non-TodoWrite call rows carry no todo field', () => {
     const state = createClaudeMapState();
     const events: StepEvent[] = [];
     for (const ev of mapClaudeMessage(
@@ -85,8 +85,8 @@ describe('todoFromTodoWrite（claude-code TodoWrite → cairn 格式）', () => 
   });
 });
 
-describe('parseAgentTodoText（pi 文本通道：`- [ ]` 行 → cairn 格式）', () => {
-  test('T1: 四个 marker 全映射', () => {
+describe('parseAgentTodoText (pi text channel: `- [ ]` lines → cairn format)', () => {
+  test('T1: all four markers map', () => {
     const items = parseAgentTodoText(
       [
         '- [ ] 待开始',
@@ -105,12 +105,12 @@ describe('parseAgentTodoText（pi 文本通道：`- [ ]` 行 → cairn 格式）
     ]);
   });
 
-  test('T2: 无任务行 → null；纯散文不驱动', () => {
+  test('T2: no task lines → null; plain prose does not drive', () => {
     expect(parseAgentTodoText('先看方案，再动手。')).toBeNull();
     expect(parseAgentTodoText('')).toBeNull();
   });
 
-  test('T3: 多段任务行 → 取最后一段连续 run', () => {
+  test('T3: multiple task-line runs → take the last contiguous run', () => {
     const items = parseAgentTodoText(
       [
         '- [x] 旧计划第一条',
@@ -128,19 +128,19 @@ describe('parseAgentTodoText（pi 文本通道：`- [ ]` 行 → cairn 格式）
     ]);
   });
 
-  test('T4: 围栏内的任务行不算（web 渲染同律）', () => {
+  test('T4: task lines inside fences do not count (same rule as web rendering)', () => {
     const items = parseAgentTodoText(
       ['```md', '- [ ] 围栏里的假清单', '```', '', '- [x] 真清单'].join('\n'),
     );
     expect(items).toEqual([{ text: '真清单', state: 'done' }]);
   });
 
-  test('T5: 空文本任务行跳过', () => {
+  test('T5: empty-text task lines are skipped', () => {
     const items = parseAgentTodoText(['- [ ]', '- [x] 有内容'].join('\n'));
     expect(items).toEqual([{ text: '有内容', state: 'done' }]);
   });
 
-  test('T6: 超上限截断', () => {
+  test('T6: truncated beyond the cap', () => {
     const lines = Array.from({ length: AGENT_TODO_MAX_ITEMS + 5 }, (_, i) => `- [ ] 条目 ${i}`);
     const items = parseAgentTodoText(lines.join('\n'));
     expect(items).not.toBeNull();
@@ -149,7 +149,7 @@ describe('parseAgentTodoText（pi 文本通道：`- [ ]` 行 → cairn 格式）
     expect(items[0]).toEqual({ text: '条目 0', state: 'todo' });
   });
 
-  test('行文法与 web TaskCard 同源：`*` 记号与缩进也认', () => {
+  test('prose grammar is same-source with the web TaskCard: `*` markers and indentation also recognized', () => {
     const items = parseAgentTodoText('  * [~] 缩进的星号条目');
     expect(items).toEqual([{ text: '缩进的星号条目', state: 'doing' }]);
   });

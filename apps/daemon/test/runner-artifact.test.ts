@@ -1,23 +1,3 @@
-// #703 产物闸 daemon 侧真值面：闸的判定素材由 runner 收尾时产出——
-// ① plan.md 产物收集（#1203 起从 CAIRN_HOME 面 `<home>/plans/<convId>/`
-//    读；旧位 = 工作区根目录仅作回落腿——在飞 conv 的方案仍在旧位时读一次，
-//    不写回），空白文件不算产物（空方案 = 无方案）；
-// ② 续轮指令投递（claim 载荷 instruction）：补写/驳回重规划轮的指令必须真的
-//    进会话——此前 worker continue 步一律发 CONTINUE_PROMPTS 占位句，闸 1 的
-//    「重试一次」是空转（B-C10 两轮全空的同源）；
-// ③ hasChanges 的 transcript 推断（无 repo 退化形）：CHANGE_TOOLS 匹配归一
-//    大小写——claude-code 后端工具名是 Edit/Write/Bash（SDK 原名），pi 是
-//    edit/write/bash；不归一会把 claude-code 无 repo 步的改动判成零，闸 2
-//    误拦合法构建。
-// 失败方式枚举先于实现固化：
-//   1. plan 步按注记行写 plan.md（新位）→ 未收集未上传（#1203 主修面：
-//      agent 照旧位写才会撞 repo checkout）
-//   2. 新位缺席 + 旧位在（在飞 conv）→ 未收集（回落腿失效，方案打不开）
-//   3. plan.md 空白文件 → 被当产物上传（闸上「有物」是空文档）
-//   4. 新位空白 + 旧位残留 → 旧位内容被复活上传（空方案语义被回落吞掉）
-//   5. 补写轮 instruction 未投递（continueSession 收到 CONTINUE_PROMPTS 占位）
-//   6. claude-code 步 Edit 工具行 → hasChanges=false（闸 2 误拦）
-
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -66,7 +46,6 @@ function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   return { logger, lines };
 }
 
-/** 无 repo 绑定的步（裸任务目录退化形）。 */
 function claimedNoRepoStep(
   kind: 'plan' | 'build',
   opts: { instruction?: string; continueSession?: string } = {},
@@ -132,7 +111,6 @@ class FakeClient implements MachineApi {
     };
   }
   async skillsManifest() {
-    // #920：默认空清单 = 零团队技能（selection=whitelist，既有断言零扰动）。
     return { selection: 'whitelist' as const, skills: [] };
   }
   async skillFile(): Promise<Buffer> {
@@ -162,9 +140,7 @@ class FakeClient implements MachineApi {
   async stop() {
     return null;
   }
-  async syncResult(_syncId: string, _body: { status: string; errorMessage?: string }) {
-    /* no-op stub for branch sync (M7 #319) */
-  }
+  async syncResult(_syncId: string, _body: { status: string; errorMessage?: string }) {}
   async attachment(): Promise<never> {
     throw new Error('unused');
   }
@@ -175,8 +151,6 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** 会话期把文件写盘的后端（plan.md 产物形态探针）。onSessionStart 收到投递
- *  prompt——「听话 agent」测试按投递注记行解析 plan.md 交接位置落笔。 */
 function writingBackend(
   events: StepEvent[],
   onSessionStart: (cwd: string, prompt: string | undefined) => void,
@@ -201,7 +175,6 @@ function writingBackend(
   return { backend, prompts, continuedIds };
 }
 
-/** 从投递 prompt 解析 plan.md 交接位置（听话 agent 面：#1203 注记行真带路径）。 */
 function planPathFromPrompt(prompt: string | undefined): string | null {
   const m = /plan\.md 交接位置：(.+?)。该位置在仓库检出之外/.exec(prompt ?? '');
   return m?.[1] ?? null;
@@ -242,8 +215,8 @@ async function setup(claimed: ClaimedStep, backend: AgentBackend) {
   return { client, lines, workspacesDir, home };
 }
 
-describe('plan.md 产物收集（闸 1 真值面）', () => {
-  test('plan 步按投递注记行写 plan.md（新位）→ 收集并上传；新位在 CAIRN_HOME 面', async () => {
+describe('plan.md artifact collection (gate 1 truth surface)', () => {
+  test('plan step writes plan.md per the delivered annotation line (new location) → collected and uploaded; the new location is on the CAIRN_HOME side', async () => {
     const claimed = claimedNoRepoStep('plan');
     let notePath: string | null = null;
     const { backend } = writingBackend([DONE_EVENT], (_cwd, prompt) => {
@@ -254,11 +227,10 @@ describe('plan.md 产物收集（闸 1 真值面）', () => {
     expect(client.uploadNames).toEqual([['transcript.json', PLAN_FILE_NAME]]);
     const planPut = client.uploads.find((u) => u.url === 'http://server/up/1');
     expect(planPut?.body).toBe('# 方案\nContext: x');
-    // 注记行真带路径且在 CAIRN_HOME 面（worktree/裸任务目录树之外）。
     expect(notePath).toBe(join(home, 'plans', 'conv-1', PLAN_FILE_NAME));
   });
 
-  test('新位缺席 + 旧位在（在飞 conv，agent 写工作区根）→ 回落读一次仍收集', async () => {
+  test('new location absent + old location present (in-flight conv, agent wrote the workspace root) → falls back to a single read and still collects', async () => {
     const claimed = claimedNoRepoStep('plan');
     const { backend } = writingBackend([DONE_EVENT], (cwd) => {
       writeFileSync(join(cwd, PLAN_FILE_NAME), '# 旧位方案\nContext: y');
@@ -269,7 +241,7 @@ describe('plan.md 产物收集（闸 1 真值面）', () => {
     expect(planPut?.body).toBe('# 旧位方案\nContext: y');
   });
 
-  test('新位在场 → 新位为准（旧位残留不盖新位）', async () => {
+  test('new location present → new location wins (old-location residue does not override it)', async () => {
     const claimed = claimedNoRepoStep('plan');
     const { backend } = writingBackend([DONE_EVENT], (cwd, prompt) => {
       writeFileSync(join(cwd, PLAN_FILE_NAME), '旧位残留');
@@ -281,7 +253,7 @@ describe('plan.md 产物收集（闸 1 真值面）', () => {
     expect(planPut?.body).toBe('# 新位方案');
   });
 
-  test('新位空白文件 → 不算产物不上传；不回落旧位残骸（空方案 = 无方案）', async () => {
+  test('new location blank file → not an artifact, not uploaded; no fallback to old-location residue (empty plan = no plan)', async () => {
     const claimed = claimedNoRepoStep('plan');
     const { backend } = writingBackend([DONE_EVENT], (cwd, prompt) => {
       writeFileSync(join(cwd, PLAN_FILE_NAME), '旧位残骸');
@@ -292,7 +264,7 @@ describe('plan.md 产物收集（闸 1 真值面）', () => {
     expect(client.uploadNames).toEqual([['transcript.json']]);
   });
 
-  test('未写 plan.md → 无 plan 上传行（闸素材如实为空）', async () => {
+  test('plan.md not written → no plan upload line (gate material truthfully empty)', async () => {
     const claimed = claimedNoRepoStep('plan');
     const { backend } = writingBackend([DONE_EVENT], () => {});
     const { client } = await setup(claimed, backend);
@@ -300,8 +272,8 @@ describe('plan.md 产物收集（闸 1 真值面）', () => {
   });
 });
 
-describe('续轮指令投递（闸 1 重试面）', () => {
-  test('continue 步携带 instruction → 会话 prompt = instruction + 交接位置注记行（补写指令真的进会话）', async () => {
+describe('continuation-round instruction delivery (gate 1 retry surface)', () => {
+  test('continue step with instruction → session prompt = instruction + handoff-location annotation line (the make-up instruction really enters the session)', async () => {
     const claimed = claimedNoRepoStep('plan', {
       continueSession: 'pi-sess-9',
       instruction: buildPlanRewritePrompt(),
@@ -317,7 +289,7 @@ describe('续轮指令投递（闸 1 重试面）', () => {
     );
   });
 
-  test('instruction 缺省 → CONTINUE_PROMPTS 按 kind 兜底 + 交接位置注记行', async () => {
+  test('instruction absent → CONTINUE_PROMPTS default by kind + handoff-location annotation line', async () => {
     const claimed = claimedNoRepoStep('plan', { continueSession: 'pi-sess-9' });
     const { backend, prompts } = writingBackend([DONE_EVENT], () => {});
     const { home } = await setup(claimed, backend);
@@ -328,8 +300,8 @@ describe('续轮指令投递（闸 1 重试面）', () => {
   });
 });
 
-describe('hasChanges transcript 推断（闸 2 真值面，无 repo 退化形）', () => {
-  test('claude-code SDK 工具名 Edit → hasChanges=true（大小写归一）', async () => {
+describe('hasChanges transcript inference (gate 2 truth surface, no-repo degraded shape)', () => {
+  test('claude-code SDK tool name Edit → hasChanges=true (case-normalized)', async () => {
     const claimed = claimedNoRepoStep('build');
     const { backend } = writingBackend(
       [
@@ -345,7 +317,7 @@ describe('hasChanges transcript 推断（闸 2 真值面，无 repo 退化形）
     expect(client.doneBodies[0]?.body.hasChanges).toBe(true);
   });
 
-  test('pi 工具名 edit → hasChanges=true（原行为不回归）', async () => {
+  test('pi tool name edit → hasChanges=true (original behavior unregressed)', async () => {
     const claimed = claimedNoRepoStep('build');
     const { backend } = writingBackend(
       [
@@ -361,7 +333,7 @@ describe('hasChanges transcript 推断（闸 2 真值面，无 repo 退化形）
     expect(client.doneBodies[0]?.body.hasChanges).toBe(true);
   });
 
-  test('读类工具 Read → hasChanges=false（零改动如实上报，闸 2 的拦截素材）', async () => {
+  test('read-class tool Read → hasChanges=false (zero changes reported truthfully, gate 2 interception material)', async () => {
     const claimed = claimedNoRepoStep('build');
     const { backend } = writingBackend(
       [
