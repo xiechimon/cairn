@@ -21,6 +21,7 @@ import { isAbsolute, join, relative } from 'node:path';
 import type { MachineAttachmentResponse } from '@cairn/shared';
 import { buildTaskPromptText, formatAttachmentToken } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { MachineClient } from '../src/machine-client.js';
 import { materializeFile, resolveStepImages } from '../src/step-attachments.js';
 
 function fakeClient(attachments: Record<string, MachineAttachmentResponse | Error>): {
@@ -69,6 +70,26 @@ function setup() {
 }
 
 describe('daemon 图片附件解析下载（#730）', () => {
+  test('#1481 令牌 team 经真实客户端传到下载请求', async () => {
+    const s = setup();
+    const urls: string[] = [];
+    const client = new MachineClient({
+      serverUrl: 'http://server.test',
+      fetchImpl: async (input) => {
+        urls.push(String(input));
+        return Response.json(pngResponse());
+      },
+    });
+    await resolveStepImages({
+      text: formatAttachmentToken('shot.png', 'team-token/id1.png'),
+      stepId: 's1',
+      client,
+      materializeDir: s.materializeDir,
+      log: s.log,
+    });
+    expect(urls).toEqual(['http://server.test/api/machine/attachment/s1/id1?teamId=team-token']);
+  });
+
   test('失败方式 1：整行 png token → 下载 + 内联交付 + token 行换锚行', async () => {
     const s = setup();
     const { client } = fakeClient({ id1: pngResponse() });

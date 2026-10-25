@@ -125,6 +125,27 @@ async function pendingOne(s: TestServer): Promise<{ id: string }> {
 }
 
 describe('GET /api/machine/attachment/{stepId}/{attachmentId}（#730）', () => {
+  test('#1481 令牌 team 必须精确匹配机器 team，缺失也拒绝', async () => {
+    const w = await setupWorld();
+    try {
+      const { id } = await uploadOne(w.s, 'shot.png', 'image/png', PNG);
+      for (const query of [
+        '',
+        '?teamId=team-other',
+        `?teamId=${w.s.team.id.toUpperCase()}`,
+        `?teamId=%20${w.s.team.id}`,
+        `?teamId=${encodeURIComponent(`%${w.s.team.id}`)}`,
+      ]) {
+        const res = await w.s.app.request(`/api/machine/attachment/${w.stepId}/${id}${query}`, {
+          headers: { authorization: `Bearer ${w.token}` },
+        });
+        expect(res.status, query).toBe(404);
+      }
+    } finally {
+      w.s.dispose();
+    }
+  });
+
   test('失败方式 1：无 token → 401', async () => {
     const w = await setupWorld();
     try {
@@ -141,10 +162,13 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId}（#730）', () => 
     const w = await setupWorld();
     try {
       const { id } = await uploadOne(w.s, 'shot.png', 'image/png', PNG);
-      const res = await w.s.app.request(`/api/machine/attachment/${w.stepId}/${id}`, {
-        method: 'GET',
-        headers: { authorization: `Bearer ${w.token}` },
-      });
+      const res = await w.s.app.request(
+        `/api/machine/attachment/${w.stepId}/${id}?teamId=${w.s.team.id}`,
+        {
+          method: 'GET',
+          headers: { authorization: `Bearer ${w.token}` },
+        },
+      );
       expect(res.status).toBe(200);
       const parsed = machineAttachmentResponseSchema.parse(await res.json());
       expect(parsed.fileName).toBe('shot.png');
@@ -160,10 +184,13 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId}（#730）', () => 
     const w = await setupWorld();
     try {
       const { id } = await pendingOne(w.s);
-      const res = await w.s.app.request(`/api/machine/attachment/${w.stepId}/${id}`, {
-        method: 'GET',
-        headers: { authorization: `Bearer ${w.token}` },
-      });
+      const res = await w.s.app.request(
+        `/api/machine/attachment/${w.stepId}/${id}?teamId=${w.s.team.id}`,
+        {
+          method: 'GET',
+          headers: { authorization: `Bearer ${w.token}` },
+        },
+      );
       expect(res.status).toBe(409);
       const body = (await res.json()) as { error: string };
       expect(body.error).toContain('pending');
@@ -185,10 +212,13 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId}（#730）', () => 
       });
 
       const m2 = machineEnrollResponseSchema.parse(await enroll2.json());
-      const res = await w.s.app.request(`/api/machine/attachment/${w.stepId}/${id}`, {
-        method: 'GET',
-        headers: { authorization: `Bearer ${m2.token}` },
-      });
+      const res = await w.s.app.request(
+        `/api/machine/attachment/${w.stepId}/${id}?teamId=${w.s.team.id}`,
+        {
+          method: 'GET',
+          headers: { authorization: `Bearer ${m2.token}` },
+        },
+      );
       expect(res.status).toBe(404);
     } finally {
       w.s.dispose();
@@ -216,10 +246,13 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId}（#730）', () => 
           createdAt: 1,
         })
         .run();
-      const res = await w.s.app.request(`/api/machine/attachment/${w.stepId}/${foreignId}`, {
-        method: 'GET',
-        headers: { authorization: `Bearer ${w.token}` },
-      });
+      const res = await w.s.app.request(
+        `/api/machine/attachment/${w.stepId}/${foreignId}?teamId=${w.s.team.id}`,
+        {
+          method: 'GET',
+          headers: { authorization: `Bearer ${w.token}` },
+        },
+      );
       expect(res.status).toBe(404);
     } finally {
       w.s.dispose();
@@ -230,10 +263,13 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId}（#730）', () => 
     const w = await setupWorld();
     try {
       const { id } = await uploadOne(w.s, 'shot.png', 'image/png', PNG);
-      const mres = await w.s.app.request(`/api/machine/attachment/${w.stepId}/${id}`, {
-        method: 'GET',
-        headers: { authorization: `Bearer ${w.token}` },
-      });
+      const mres = await w.s.app.request(
+        `/api/machine/attachment/${w.stepId}/${id}?teamId=${w.s.team.id}`,
+        {
+          method: 'GET',
+          headers: { authorization: `Bearer ${w.token}` },
+        },
+      );
       expect(mres.status).toBe(200);
       // 浏览器面 = 原始字节流 + content-type（自动登录形——原行为）。
       const bres = await w.s.app.request(`/api/attachments/${id}`, { method: 'GET' });

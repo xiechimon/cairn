@@ -1446,8 +1446,10 @@ export function machineAttachmentDownload(
   machineTeamId: string,
   stepId: string,
   attachmentId: string,
+  tokenTeamId: string | undefined,
 ): MachineAttachmentResponse {
   ownedStep(deps, machineId, stepId); // 非本机步/未知步 = 404
+  if (tokenTeamId !== machineTeamId) throw new NotFoundError(`attachment ${attachmentId}`);
   const meta = readAttachmentMeta(
     { db: deps.db, attachmentsDir: deps.attachmentsDir },
     machineTeamId,
