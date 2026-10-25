@@ -1,42 +1,3 @@
-// #1170 技能导入通道（localPath + GitHub URL）+ refresh 重拉。落盘一律复用
-// createLocalSkill/updateLocalSkill 既有校验（不另开写路径）；来源记录落
-// server 数据根 skill-sources.json（无 DB schema 改动）。
-//
-// 失败方式先行枚举（仓规：先列失败方式再写实现）——
-// LP localPath 导入：LP1 happy → 201 + 落盘 + 来源记录 + 审计 create 行 +
-//   列表可见 / LP2 源目录无 SKILL.md → 400 点名 / LP3 路径不存在或非目录
-//   → 400 / LP4 源在技能根内（含 symlink 解析后）→ 400（已由 cairn 管理）
-//   / LP5 超单文件上限 → 400 点名（树状来源同闸）/ LP6 非 utf8 二进制文件
-//   → 400 点名（文本通道边界，不静默丢弃）/ LP7 符号链接文件不入包
-//   （listSkillFiles 同律：不追链接，无链接走私）/ LP8 只读复制——源目录
-//   内容与文件集写后逐字节不变 / LP9 frontmatter 缺 name → 400（唯一真值
-//   律）/ LP10 同名目录占用 → 409（复用 createLocalSkill C2 闸）/ LP11
-//   来源登记失败 → 500，刚建的目录与 create 审计行回滚，同进程手建同名
-//   技能 refresh 仍 409（失败的写不得留在进程内空登记上）/ LP0 body
-//   二选一约束（双缺/双给 → 400）。
-// U URL 导入：U1 happy（mock GitHub API + raw，子目录形）→ 201 + 落盘 +
-//   来源记录（canonical URL 含 ref）/ U1b 根目录仓（默认分支）/
-//   U2 SSRF 拒绝面逐形：非 https、127.0.0.1、localhost、私网段、
-//   link-local、v6 回环/link-local、非 github.com host → 400 明确报错、
-//   零出站 / U3 blob 形与路径残缺（无 repo）→ 400 / U4 repo 404 → 400
-//   点名；API 403/429 → 502（源暂不可用）/ U5 tree truncated → 400；文件
-//   数超上限 → 400 / U6 tree 声明尺寸超限（单文件）→ 400 且零 raw 请求
-//   （预检在拉取前）/ U7 raw 404 → 400 点名文件 / U8 拉取超时（挂起
-//   fetch + 短超时注入）→ 504 显式 / U9 树条目路径逃逸（'../x' 形）→
-//   400 无落盘 / U10 owner/ref 非法字符 → 400 / U11 URL 导入同样过
-//   frontmatter 闸（缺 name → 400）。
-// R refresh：R1 happy——源改内容后 refresh → 200、id 不变、盘上内容更新、
-//   审计 update 行 / R2 无来源记录（手建技能）→ 409 说明 / R3 未知 sid →
-//   404 / R4 来源身份漂移（frontmatter name 变）→ 409、盘上内容不动 /
-//   R5 localPath 源目录丢失 → 400 点名 / R6 覆写语义钉扎——源删一个文件，
-//   本地保留（列出者覆写、未列者保留）/ R7 来源记录跨「重启」持久（同
-//   skillSourcesPath 二次 bootServer 可 refresh）/ R8 URL 来源 refresh
-//   重拉（mock 二次内容不同）。
-// M 物化面（#920 接力）：refresh 后 machine-wire 清单同 id 新 sha256
-//   （清单每请求现扫，新内容 → 新 digest 视图的确定性根因）。
-// W wire：两新端点在册（POST /api/teams/{id}/skills/import、POST
-//   /api/teams/{id}/skills/{sid}/refresh），词表 = shared WEB_REST_ENDPOINTS。
-
 import {
   existsSync,
   mkdirSync,
@@ -63,8 +24,6 @@ import { agent as agentTable, skillAudit } from '../src/db/schema.js';
 import { readSkillSource, writeSkillSource } from '../src/services/skill-source-store.js';
 import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
 
-// —— 脚手架（隔离技能根 + 隔离来源目录 + GitHub mock）———————————————————
-
 const roots: string[] = [];
 function makeRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'cairn-skills-'));
@@ -83,7 +42,6 @@ async function errorText(res: Response): Promise<string> {
   return ((await res.json()) as { error?: string }).error ?? '';
 }
 
-/** 带凭证的请求（机器面测试用；helpers.req 无 header 面）。 */
 async function call(
   app: Hono,
   method: string,
@@ -102,7 +60,6 @@ async function call(
   );
 }
 
-/** GitHub 三面 mock（repo meta / git tree / raw 按需应答）。 */
 type GhHandlers = {
   repo?: (owner: string, repo: string) => { status: number; body: unknown };
   tree?: (owner: string, repo: string, ref: string) => { status: number; body: unknown };
@@ -122,7 +79,6 @@ function githubMock(
     const u = String(url);
     calls.push(u);
     if (handlers.hang) {
-      // 挂起并尊重 abort（超时注入测试的确定性挂起源）。
       return new Promise((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
       });
@@ -156,7 +112,6 @@ function githubMock(
   return Object.assign(fn, { calls: () => calls });
 }
 
-/** 源目录组装（localPath 测试用，位于技能根外）。 */
 function makeSourceDir(files: Record<string, string>): string {
   const dir = makeRoot();
   for (const [rel, content] of Object.entries(files)) {
@@ -167,7 +122,6 @@ function makeSourceDir(files: Record<string, string>): string {
   return dir;
 }
 
-/** git tree 响应体（blob 尺寸在声明位——预检数据源）。 */
 function treeBody(entries: { path: string; size?: number; type?: string }[]): {
   truncated: boolean;
   tree: { path: string; type: string; size: number; sha: string }[];
@@ -183,10 +137,8 @@ function treeBody(entries: { path: string; size?: number; type?: string }[]): {
   };
 }
 
-// —— LP localPath 导入 ————————————————————————————————————————————————
-
-describe('POST /api/teams/{id}/skills/import（localPath）', () => {
-  test('LP1：happy → 201 record + 落盘（frontmatter name 即目录名）+ 来源记录 + 审计行 + 列表可见', async () => {
+describe('POST /api/teams/{id}/skills/import (localPath)', () => {
+  test('LP1: happy -> 201 record + written to disk (the frontmatter name is the directory name) + a source record + an audit row + visible in the list', async () => {
     const skillsDir = makeRoot();
     const skillSourcesPath = join(makeRoot(), 'skill-sources.json');
     const source = makeSourceDir({
@@ -214,8 +166,6 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
       expect(readFileSync(join(skillsDir, 'imported-skill', 'refs/note.md'), 'utf8')).toBe(
         '嵌套文件\n',
       );
-      // 来源记录落盘（refresh 的数据源；ref = realpath 归一形——macOS
-      // /var → /private/var，源路径与落盘值对拍用 realpathSync）。
       const stored = JSON.parse(readFileSync(skillSourcesPath, 'utf8')) as {
         sources: Record<string, { kind: string; ref: string; importedAt: number }>;
       };
@@ -224,7 +174,6 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
         ref: realpathSync(source),
       });
       expect(stored.sources['imported-skill']!.importedAt).toBeGreaterThan(0);
-      // 审计：REST 导入 = create 动作、actor member。
       const rows = s.db.select().from(skillAudit).all();
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
@@ -241,7 +190,7 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP2：源目录无 SKILL.md → 400 点名', async () => {
+  test('LP2: the source directory has no SKILL.md -> 400 naming it', async () => {
     const s = bootServer({ skillsDir: makeRoot(), skillSourcesPath: join(makeRoot(), 's.json') });
     try {
       const source = makeSourceDir({ 'README.md': '不是技能' });
@@ -255,7 +204,7 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP3：路径不存在 / 指向文件 → 400', async () => {
+  test('LP3: the path does not exist / points at a file -> 400', async () => {
     const s = bootServer({ skillsDir: makeRoot(), skillSourcesPath: join(makeRoot(), 's.json') });
     try {
       const missing = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
@@ -273,11 +222,10 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP4：源在技能根内（含 symlink 解析后）→ 400（已由 cairn 管理）', async () => {
+  test('LP4: the source is inside the skills root (after symlink resolution included) -> 400 (already managed by cairn)', async () => {
     const skillsDir = makeRoot();
     mkdirSync(join(skillsDir, 'already-here'));
     writeFileSync(join(skillsDir, 'already-here', 'SKILL.md'), skillMd('already-here', 'd'));
-    // 技能根外放一个 symlink 指进技能根（realpath 归一后仍落允许面外）。
     const linkParent = makeRoot();
     symlinkSync(join(skillsDir, 'already-here'), join(linkParent, 'alias'));
     const s = bootServer({ skillsDir, skillSourcesPath: join(makeRoot(), 's.json') });
@@ -298,7 +246,7 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP5：单文件超 MAX_SKILL_FILE_BYTES → 400 点名文件与上限', async () => {
+  test('LP5: one file exceeds MAX_SKILL_FILE_BYTES -> 400 naming the file and the cap', async () => {
     const s = bootServer({ skillsDir: makeRoot(), skillSourcesPath: join(makeRoot(), 's.json') });
     try {
       const source = makeSourceDir({
@@ -317,7 +265,7 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP6：非 utf8 二进制文件 → 400 点名（文本通道边界，不静默丢弃）', async () => {
+  test('LP6: a non-utf8 binary file -> 400 naming it (the text-channel boundary, no silent drop)', async () => {
     const s = bootServer({ skillsDir: makeRoot(), skillSourcesPath: join(makeRoot(), 's.json') });
     try {
       const source = makeSourceDir({ 'SKILL.md': skillMd('bin-src', 'd') });
@@ -334,7 +282,7 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP7：符号链接文件不入包（不追链接，无走私）', async () => {
+  test('LP7: symlinked files are not packed (links are not followed, no smuggling)', async () => {
     const skillsDir = makeRoot();
     const secret = makeSourceDir({ 'secret.txt': '技能根外秘密\n' });
     const source = makeSourceDir({ 'SKILL.md': skillMd('linked', 'd') });
@@ -352,7 +300,7 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP8：只读复制——源目录内容与文件集写后逐字节不变', async () => {
+  test('LP8: a read-only copy -- the source directory content and file set are unchanged byte for byte afterwards', async () => {
     const files = {
       'SKILL.md': skillMd('ro-src', '只读源'),
       'nested/a.txt': 'A\n',
@@ -372,7 +320,7 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP9：frontmatter 缺 name → 400（frontmatter 唯一真值律）', async () => {
+  test('LP9: frontmatter missing name -> 400 (frontmatter is the single source of truth)', async () => {
     const s = bootServer({ skillsDir: makeRoot(), skillSourcesPath: join(makeRoot(), 's.json') });
     try {
       const source = makeSourceDir({ 'SKILL.md': '---\ndescription: 有描述无名\n---\n正文\n' });
@@ -386,7 +334,7 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP10：同名目录占用 → 409（复用 createLocalSkill 闸）', async () => {
+  test('LP10: the same-named directory is taken -> 409 (reusing the createLocalSkill gate)', async () => {
     const skillsDir = makeRoot();
     mkdirSync(join(skillsDir, 'busy-skill'));
     writeFileSync(join(skillsDir, 'busy-skill', 'SKILL.md'), skillMd('busy-skill', 'd'));
@@ -403,7 +351,7 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP0：body 二选一约束——两者都缺/两者都给 → 400', async () => {
+  test('LP0: the body either-or constraint -- both missing / both given -> 400', async () => {
     const s = bootServer({ skillsDir: makeRoot(), skillSourcesPath: join(makeRoot(), 's.json') });
     try {
       const neither = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {});
@@ -420,10 +368,8 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
   });
 });
 
-// —— U URL 导入（GitHub 公共仓/子目录）———————————————————————————————————
-
-describe('POST /api/teams/{id}/skills/import（url）', () => {
-  test('U1：happy（子目录）→ 201 + 落盘 + 来源记录（canonical URL 含 ref）', async () => {
+describe('POST /api/teams/{id}/skills/import (url)', () => {
+  test('U1: happy (subdirectory) -> 201 + written to disk + a source record (canonical URL with the ref)', async () => {
     const skillsDir = makeRoot();
     const skillSourcesPath = join(makeRoot(), 'skill-sources.json');
     const fetch = githubMock({
@@ -457,9 +403,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
       expect(readFileSync(join(skillsDir, 'pdf-skill', 'scripts/run.py'), 'utf8')).toBe(
         'print("ok")\n',
       );
-      // 子目录外的树条目不进包；技能根只多这一个目录。
       expect(readdirSync(skillsDir)).toEqual(['pdf-skill']);
-      // 来源记录 = canonical URL（含 ref，refresh 确定性重拉）。
       const stored = JSON.parse(readFileSync(skillSourcesPath, 'utf8')) as {
         sources: Record<string, { kind: string; ref: string }>;
       };
@@ -472,7 +416,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
     }
   });
 
-  test('U1b：根目录仓（无 tree 段，默认分支解析）→ 201', async () => {
+  test('U1b: a root-directory repo (no tree segment, default branch resolved) -> 201', async () => {
     const s = bootServer({
       skillsDir: makeRoot(),
       skillSourcesPath: join(makeRoot(), 's.json'),
@@ -495,7 +439,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
     }
   });
 
-  test('U2：SSRF 拒绝面逐形 → 400 明确报错，零出站请求', async () => {
+  test('U2: every SSRF rejection shape -> 400 with a clear error, zero outbound requests', async () => {
     const fetch = githubMock({});
     const s = bootServer({
       skillsDir: makeRoot(),
@@ -520,26 +464,23 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
         const text = await errorText(res);
         expect(text, url).toContain(marker);
       }
-      // 非 https 明确点名 scheme。
       const http = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
         url: 'http://github.com/acme/repo',
       });
       expect(http.status).toBe(400);
       expect(await errorText(http)).toContain('https');
-      // 非 github.com 公网 host：明确点名只支持 GitHub。
       const otherHost = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
         url: 'https://evil.example.com/acme/repo',
       });
       expect(otherHost.status).toBe(400);
       expect(await errorText(otherHost)).toContain('GitHub');
-      // 全部拒绝形零出站。
       expect(fetch.calls()).toHaveLength(0);
     } finally {
       s.dispose();
     }
   });
 
-  test('U3：blob 形 / 路径残缺（无 repo）→ 400', async () => {
+  test('U3: a blob URL / an incomplete path (no repo) -> 400', async () => {
     const s = bootServer({
       skillsDir: makeRoot(),
       skillSourcesPath: join(makeRoot(), 's.json'),
@@ -561,7 +502,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
     }
   });
 
-  test('U4：repo 404 → 400 点名；API 403/429 → 502（源暂不可用）', async () => {
+  test('U4: repo 404 -> 400 naming it; API 403/429 -> 502 (the source is temporarily unavailable)', async () => {
     const notFound = bootServer({
       skillsDir: makeRoot(),
       skillSourcesPath: join(makeRoot(), 's.json'),
@@ -599,7 +540,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
     }
   });
 
-  test('U5：tree truncated → 400；文件数超上限 → 400', async () => {
+  test('U5: a truncated tree -> 400; the file count over the cap -> 400', async () => {
     const truncated = bootServer({
       skillsDir: makeRoot(),
       skillSourcesPath: join(makeRoot(), 's.json'),
@@ -639,7 +580,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
     }
   });
 
-  test('U6：tree 声明尺寸超限 → 400 且零 raw 请求（预检在拉取前）', async () => {
+  test('U6: the tree declares an over-limit size -> 400 with zero raw requests (the precheck runs before fetching)', async () => {
     const fetch = githubMock({
       tree: () => ({
         status: 200,
@@ -669,7 +610,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
     }
   });
 
-  test('U7：raw 404 → 400 点名文件', async () => {
+  test('U7: raw 404 -> 400 naming the file', async () => {
     const s = bootServer({
       skillsDir: makeRoot(),
       skillSourcesPath: join(makeRoot(), 's.json'),
@@ -698,7 +639,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
     }
   });
 
-  test('U8：拉取超时（挂起 fetch + 短超时注入）→ 504 显式', async () => {
+  test('U8: a fetch timeout (a hanging fetch + a short injected timeout) -> an explicit 504', async () => {
     const s = bootServer({
       skillsDir: makeRoot(),
       skillSourcesPath: join(makeRoot(), 's.json'),
@@ -716,7 +657,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
     }
   });
 
-  test('U9：树条目路径逃逸（../ 形）→ 400 无落盘', async () => {
+  test('U9: a tree entry path escaping (../ form) -> 400, nothing written', async () => {
     const skillsDir = makeRoot();
     const s = bootServer({
       skillsDir,
@@ -744,7 +685,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
     }
   });
 
-  test('U10：owner/ref 非法字符 → 400', async () => {
+  test('U10: illegal characters in owner/ref -> 400', async () => {
     const s = bootServer({
       skillsDir: makeRoot(),
       skillSourcesPath: join(makeRoot(), 's.json'),
@@ -765,7 +706,7 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
     }
   });
 
-  test('U11：URL 导入同样过 frontmatter 闸（缺 name → 400）', async () => {
+  test('U11: URL imports pass the frontmatter gate too (missing name -> 400)', async () => {
     const s = bootServer({
       skillsDir: makeRoot(),
       skillSourcesPath: join(makeRoot(), 's.json'),
@@ -785,8 +726,6 @@ describe('POST /api/teams/{id}/skills/import（url）', () => {
   });
 });
 
-// —— R refresh ————————————————————————————————————————————————————————
-
 describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
   async function importedWorld(files: Record<string, string>) {
     const skillsDir = makeRoot();
@@ -800,7 +739,7 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
     return { s, skillsDir, skillSourcesPath, source };
   }
 
-  test('R1：源改内容后 refresh → 200、id 不变、盘上更新、审计 update 行', async () => {
+  test('R1: refresh after the source changed content -> 200, the id unchanged, updated on disk, an update audit row', async () => {
     const { s, skillsDir, source } = await importedWorld({
       'SKILL.md': skillMd('refresh-me', '旧描述'),
     });
@@ -821,7 +760,7 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
     }
   });
 
-  test('R2：无来源记录（手建技能）→ 409 说明', async () => {
+  test('R2: no source record (a hand-created skill) -> 409 with an explanation', async () => {
     const skillsDir = makeRoot();
     mkdirSync(join(skillsDir, 'hand-made'));
     writeFileSync(join(skillsDir, 'hand-made', 'SKILL.md'), skillMd('hand-made', '手建'));
@@ -837,7 +776,7 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
     }
   });
 
-  test('R3：未知 sid → 404', async () => {
+  test('R3: an unknown sid -> 404', async () => {
     const s = bootServer({ skillsDir: makeRoot(), skillSourcesPath: join(makeRoot(), 's.json') });
     try {
       const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/ghost/refresh`, {});
@@ -847,7 +786,7 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
     }
   });
 
-  test('R4：来源身份漂移（frontmatter name 变）→ 409、盘上内容不动', async () => {
+  test('R4: the source identity drifted (frontmatter name changed) -> 409, the on-disk content untouched', async () => {
     const { s, skillsDir, source } = await importedWorld({
       'SKILL.md': skillMd('stable-id', '旧'),
     });
@@ -865,7 +804,7 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
     }
   });
 
-  test('R5：localPath 源目录丢失 → 400 点名', async () => {
+  test('R5: the localPath source directory is gone -> 400 naming it', async () => {
     const { s, source } = await importedWorld({ 'SKILL.md': skillMd('gone-src', 'd') });
     try {
       rmSync(source, { recursive: true });
@@ -877,7 +816,7 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
     }
   });
 
-  test('R6：覆写语义钉扎——源删一个文件，本地保留（列出者覆写、未列者保留）', async () => {
+  test('R6: the overwrite semantics pinned -- the source dropped a file, the local copy keeps it (listed files overwrite, unlisted files stay)', async () => {
     const { s, skillsDir, source } = await importedWorld({
       'SKILL.md': skillMd('overwrite-law', 'd'),
       'keep.txt': '保留我\n',
@@ -897,7 +836,7 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
     }
   });
 
-  test('R7：来源记录跨「重启」持久（同 skillSourcesPath 二次 boot 可 refresh）', async () => {
+  test('R7: source records survive a restart (a second boot on the same skillSourcesPath can refresh)', async () => {
     const skillsDir = makeRoot();
     const skillSourcesPath = join(makeRoot(), 'skill-sources.json');
     const source = makeSourceDir({ 'SKILL.md': skillMd('persist-src', 'v1') });
@@ -906,7 +845,6 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
       localPath: source,
     });
     first.dispose();
-    // 二次「进程」：同 skillsDir + 同 skillSourcesPath。
     const second = bootServer({ skillsDir, skillSourcesPath });
     try {
       writeFileSync(join(source, 'SKILL.md'), skillMd('persist-src', 'v2'));
@@ -923,7 +861,7 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
     }
   });
 
-  test('R8：URL 来源 refresh 重拉（mock 二次内容不同）', async () => {
+  test('R8: a URL-source refresh refetches (the mock serves different content the second time)', async () => {
     const skillsDir = makeRoot();
     const skillSourcesPath = join(makeRoot(), 'skill-sources.json');
     let contentVersion = 1;
@@ -956,17 +894,14 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
   });
 });
 
-// —— M 物化面（#920 接力：refresh → 清单新 sha256）———————————————————————
-
-describe('refresh 与 machine-wire 清单（#920 接力）', () => {
-  test('M1：refresh 后同 id 新 sha256（清单每请求现扫——新视图的根因）', async () => {
+describe('refresh and the machine-wire listing (the #920 handoff)', () => {
+  test('M1: after refresh the same id has a new sha256 (the listing is rescanned per request -- the root cause of the new view)', async () => {
     const skillsDir = makeRoot();
     const skillSourcesPath = join(makeRoot(), 'skill-sources.json');
     const source = makeSourceDir({ 'SKILL.md': skillMd('dist-skill', 'v1'), 'helper.md': 'h1\n' });
     const s = bootServer({ skillsDir, skillSourcesPath, claimHoldMs: 250 });
     try {
       await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, { localPath: source });
-      // 机器面世界：enroll + agent（白名单含导入技能）+ build + claim。
       const key = await issueApiKey(s);
       const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
         cred: key,
@@ -986,7 +921,7 @@ describe('refresh 与 machine-wire 清单（#920 接力）', () => {
           skillsAllowlist: ['dist-skill'],
         })
         .run();
-      bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+      bindAllAgents(s);
 
       const projectId = await postProject(s.app);
       const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -1012,7 +947,6 @@ describe('refresh 与 machine-wire 清单（#920 接力）', () => {
       expect(before.skills.map((sk) => sk.id)).toEqual(['dist-skill']);
       const beforeEntry = before.skills[0]!.files.find((f) => f.path === 'SKILL.md')!;
 
-      // 源改内容 → refresh → 清单 sha 变、id/dirName 不变。
       writeFileSync(join(source, 'SKILL.md'), skillMd('dist-skill', 'v2', '更长的正文内容\n'));
       const refreshed = await req(
         s.app,
@@ -1032,10 +966,8 @@ describe('refresh 与 machine-wire 清单（#920 接力）', () => {
   });
 });
 
-// —— W wire：端点在册 ——————————————————————————————————————————————————
-
-describe('wire：导入/refresh 端点在册', () => {
-  test('W1：POST /api/teams/{id}/skills/import 与 refresh 路由已注册', () => {
+describe('wire: the import/refresh endpoints are registered', () => {
+  test('W1: the POST /api/teams/{id}/skills/import and refresh routes are registered', () => {
     const { app } = bootServer();
     const routes = new Set(app.routes.map((r) => `${r.method} ${r.path}`));
     expect(routes.has('POST /api/teams/:id/skills/import')).toBe(true);
@@ -1043,8 +975,8 @@ describe('wire：导入/refresh 端点在册', () => {
   });
 });
 
-describe('来源登记失败（#1185）', () => {
-  test('LP11：登记失败 → 500，目录与 create 审计行回滚，手建同名技能 refresh 仍 409', async () => {
+describe('source registration failure (#1185)', () => {
+  test('LP11: registration fails -> 500, the directory and the create audit row rolled back, a hand-created same-named skill still 409 on refresh', async () => {
     const skillsDir = makeRoot();
     const blocker = join(makeRoot(), 'not-a-directory');
     writeFileSync(blocker, 'x');
@@ -1083,7 +1015,7 @@ describe('来源登记失败（#1185）', () => {
     }
   });
 
-  test('空登记是新对象：失败的写不会让下一次读取看见那条来源', async () => {
+  test('an empty registration is a new object: a failed write never lets the next read see that source', async () => {
     const blocker = join(makeRoot(), 'not-a-directory');
     writeFileSync(blocker, 'x');
     const path = join(blocker, 'skill-sources.json');

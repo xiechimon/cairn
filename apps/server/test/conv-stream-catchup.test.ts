@@ -1,19 +1,3 @@
-// #740 conversation stream 中途进场补发：hub 在飞回合文本缓冲 + subscribe
-// 快照补发。票面失败方式清单（先固化，代码是让场景通过的手段）：
-// ① 双份文本（服务半）：补发必须是「当前段快照」而非叠加——镜像 web
-//    liveTextStore 的收敛律（message 行落库即清），否则补发 + 客户端既有
-//    缓冲双份（客户端半见 apps/web/test/sse-conversation-stream.test.ts）。
-// ② 陈旧缓冲跨回合：message 行（任意角色，含用户行开新回合）/ step 终态
-//    （done/failed/stopped）/ rewind——三个清空点逐一钉；终态缺失的死回合
-//    由下一回合的用户行兜底清。
-// ③ 无界内存：per-conv 字节上限（保尾弃头）+ 缓冲会话数上限（LRU 驱逐）。
-// ④ 多订阅者：先后进场各自补发一次，互不串扰、不重复。
-// ⑤ 跨会话隔离：补发按 conversationId 键控，A 会话缓冲不进 B 会话流
-//    （鉴权面不变——stream 端点既有门禁覆盖，补发不新增读路径）。
-// ⑥ wire 形状：补发就是一条既有 text_delta 事件（四事件词表零变更），
-//    逐帧过 shared conversationStreamEventSchema；回合终局后新订阅零补发。
-// live 栈中途进场实测（第二客户端见前缀）归 docs/verify/740/ 证据面。
-
 import type { ConversationStepEvent, TranscriptRow } from '@cairn/shared';
 import { conversationStreamEventSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
@@ -28,9 +12,6 @@ import {
 } from '../src/services/events.js';
 import { bootServer, issueApiKey, machineIdByName, openConvStream } from './helpers.js';
 
-// —— hub 单元面：替身连接直接驱动 ————————————————————————————————————
-
-/** 收帧替身：subscribe 补发与 live 发布都落 frames。 */
 class FakeConn implements TeamStreamConnection {
   readonly frames: object[] = [];
   private seq = 0;
@@ -73,22 +54,19 @@ function subscribeFresh(hub: ConversationStreamHub, conversationId: string): Fak
   return conn;
 }
 
-describe('hub 缓冲：进场补发与接缝（#740 失败方式 ①⑥）', () => {
-  test('零订阅期流掉的增量在 subscribe 时一次性补齐，随后增量照常', () => {
+describe('hub buffer: entry catch-up and seams (#740 failure modes 1 and 6)', () => {
+  test('deltas missed during the zero-subscriber period are caught up in one go on subscribe, then normal increments', () => {
     const hub = new ConversationStreamHub();
-    // 回合在飞、无人订阅（#640「开始任务」→ toast → 抽屉未开的真实形态）。
     hub.publishTextDelta('c1', '正在');
     hub.publishTextDelta('c1', '分析仓库');
     const conn = new FakeConn();
     hub.subscribe('c1', conn);
-    // 补发 = 一条 text_delta，内容 = 已流出文本的精确拼接（不重不断）。
     expect(textFrames(conn)).toEqual(['正在分析仓库']);
-    // 接缝：补发之后 live 增量继续打字。
     hub.publishTextDelta('c1', '结构');
     expect(textFrames(conn)).toEqual(['正在分析仓库', '结构']);
   });
 
-  test('补发帧过 shared 词表 schema（wire 零变更）', () => {
+  test('catch-up frames pass the shared vocabulary schema (wire unchanged)', () => {
     const hub = new ConversationStreamHub();
     hub.publishTextDelta('c1', '前缀');
     const conn = new FakeConn();
@@ -98,7 +76,7 @@ describe('hub 缓冲：进场补发与接缝（#740 失败方式 ①⑥）', () 
     expect(conversationStreamEventSchema.parse(replay)).toBeTruthy();
   });
 
-  test('空缓冲零补发', () => {
+  test('empty buffer, zero catch-up', () => {
     const hub = new ConversationStreamHub();
     const conn = new FakeConn();
     hub.subscribe('c1', conn);
@@ -112,11 +90,10 @@ describe('hub 缓冲：进场补发与接缝（#740 失败方式 ①⑥）', () 
   });
 });
 
-describe('hub 缓冲：清空点（#740 失败方式 ②）', () => {
-  test('清空点（#955 段界律）：文本行 / 用户行清，工具行与仅思考行不清', () => {
+describe('hub buffer: clear points (#740 failure mode 2)', () => {
+  test('clear points (#955 segment-boundary law): text lines / user lines cleared, tool lines and thinking-only lines not', () => {
     const hub = new ConversationStreamHub();
     hub.publishTextDelta('c1', '段一');
-    // assistant 文本行 = 段界。
     hub.publishMessage('c1', {
       id: 'm1',
       role: 'assistant',
@@ -124,8 +101,6 @@ describe('hub 缓冲：清空点（#740 失败方式 ②）', () => {
       createdAt: 1,
     } as unknown as TranscriptRow);
     expect(textFrames(subscribeFresh(hub, 'c1'))).toEqual([]);
-    // live 工具行**不清**（#955 D7）：它带 500ms/2000ms 重试链、可能迟到，
-    // 一次迟到就把正在流的下一段抹掉——这正是旧律（任何行都清）的病灶。
     hub.publishTextDelta('c1', '段二');
     hub.publishMessage('c1', {
       id: 'm2',
@@ -134,7 +109,6 @@ describe('hub 缓冲：清空点（#740 失败方式 ②）', () => {
       createdAt: 2,
     } as unknown as TranscriptRow);
     expect(textFrames(subscribeFresh(hub, 'c1'))).toEqual(['段二']);
-    // 仅思考段行**不清**：思考内容从不进文本缓冲，清它只会误伤同窗的正文。
     hub.publishMessage('c1', {
       id: 'm2b',
       role: 'assistant',
@@ -142,7 +116,6 @@ describe('hub 缓冲：清空点（#740 失败方式 ②）', () => {
       createdAt: 3,
     } as unknown as TranscriptRow);
     expect(textFrames(subscribeFresh(hub, 'c1'))).toEqual(['段二']);
-    // 用户行（新回合开始 / steer）照旧清：死回合残段不得补进新回合开头。
     hub.publishTextDelta('c1', '段三');
     hub.publishMessage('c1', {
       id: 'm3',
@@ -153,7 +126,7 @@ describe('hub 缓冲：清空点（#740 失败方式 ②）', () => {
     expect(textFrames(subscribeFresh(hub, 'c1'))).toEqual([]);
   });
 
-  test('step 终态清空（done/failed/stopped）；claimed 不清', () => {
+  test('step terminal clears (done/failed/stopped); claimed does not', () => {
     const hub = new ConversationStreamHub();
     hub.publishTextDelta('c1', '段');
     hub.publishStep('c1', stepRow('c1', 'claimed'));
@@ -161,14 +134,12 @@ describe('hub 缓冲：清空点（#740 失败方式 ②）', () => {
     for (const status of ['done', 'failed', 'stopped'] as const) {
       hub.publishTextDelta('c1', '段');
       hub.publishStep('c1', stepRow('c1', status));
-      // 断言不带定制消息（toEqual 单参律）；status 覆盖面由循环本身保证。
       expect(textFrames(subscribeFresh(hub, 'c1'))).toEqual([]);
     }
   });
 
-  test('终态缺失的死回合：下一回合用户行进场即清（跨回合陈旧兜底）', () => {
+  test('dead turn with no terminal: next turn user line entering clears it (cross-turn staleness fallback)', () => {
     const hub = new ConversationStreamHub();
-    // daemon 死亡形态：增量后无 done、无终稿上传。
     hub.publishTextDelta('c1', '死回合残段');
     hub.publishMessage('c1', {
       id: 'm9',
@@ -179,7 +150,7 @@ describe('hub 缓冲：清空点（#740 失败方式 ②）', () => {
     expect(textFrames(subscribeFresh(hub, 'c1'))).toEqual([]);
   });
 
-  test('clearConversationBuffer（rewind 通道）：显式清空后零补发', () => {
+  test('clearConversationBuffer (rewind channel): explicit clear then zero catch-up', () => {
     const hub = new ConversationStreamHub();
     hub.publishTextDelta('c1', '残段');
     hub.clearConversationBuffer('c1');
@@ -187,7 +158,7 @@ describe('hub 缓冲：清空点（#740 失败方式 ②）', () => {
   });
 });
 
-describe('hub 思考缓冲（#1308）：正文封段不得抹掉刚写入的思考快照', () => {
+describe('hub thinking buffer (#1308): closing a body segment must not wipe the just-written thinking snapshot', () => {
   function thinkingFrames(conn: FakeConn): string[] {
     return conn.frames
       .filter(
@@ -197,7 +168,7 @@ describe('hub 思考缓冲（#1308）：正文封段不得抹掉刚写入的思�
       .map((f) => f.text);
   }
 
-  test('assistant 文本行保留思考快照，同时清正文缓冲与活动相位', () => {
+  test('assistant text line keeps the thinking snapshot while clearing the body buffer and active phase', () => {
     const hub = new ConversationStreamHub();
     hub.publishThinkingDelta('c1', 'REASONING-MARKER-1308');
     hub.publishTextDelta('c1', '草稿');
@@ -218,7 +189,7 @@ describe('hub 思考缓冲（#1308）：正文封段不得抹掉刚写入的思�
     expect(conn.frames.filter((f) => (f as { type: string }).type === 'activity')).toEqual([]);
   });
 
-  test('用户行与步终态仍清思考快照', () => {
+  test('user lines and step terminals still clear the thinking snapshot', () => {
     const userHub = new ConversationStreamHub();
     userHub.publishThinkingDelta('c1', 'REASONING-MARKER-1308');
     userHub.publishMessage('c1', {
@@ -236,23 +207,22 @@ describe('hub 思考缓冲（#1308）：正文封段不得抹掉刚写入的思�
   });
 });
 
-describe('hub 缓冲：边界（#740 失败方式 ③④⑤）', () => {
-  test('字节上限保尾弃头：超限段补发 = 上限内的最长尾部后缀', () => {
+describe('hub buffer: boundaries (#740 failure modes 3/4/5)', () => {
+  test('byte cap keeps the tail and drops the head: over-limit segment catch-up = longest tail suffix within the cap', () => {
     const hub = new ConversationStreamHub();
     const head = 'a'.repeat(64 * 1024);
-    const tail = '尾部'.repeat(48 * 1024); // CJK 3B/char → 约 144KiB，总段超上限
+    const tail = '尾部'.repeat(48 * 1024);
     hub.publishTextDelta('c1', head + tail);
     const conn = new FakeConn();
     hub.subscribe('c1', conn);
     const [replay] = textFrames(conn);
     expect(replay).toBeDefined();
     expect(Buffer.byteLength(replay!)).toBeLessThanOrEqual(CONV_TEXT_BUFFER_MAX_BYTES);
-    // 保尾：补发内容 = 原文的尾后缀（无中段拼接、无代理对劈裂——用尾锚对账）。
     expect((head + tail).endsWith(replay!)).toBe(true);
     expect(replay!.length).toBeGreaterThan(0);
   });
 
-  test('缓冲会话数上限：第 N+1 个会话进场驱逐最旧缓冲', () => {
+  test('buffer session-count cap: the (N+1)-th session entering evicts the oldest buffer', () => {
     const hub = new ConversationStreamHub();
     for (let i = 0; i < CONV_TEXT_BUFFER_MAX_CONVS; i++) hub.publishTextDelta(`c${i}`, `段${i}`);
     hub.publishTextDelta('c-new', '新段');
@@ -261,7 +231,7 @@ describe('hub 缓冲：边界（#740 失败方式 ③④⑤）', () => {
     expect(textFrames(subscribeFresh(hub, 'c-new'))).toEqual(['新段']);
   });
 
-  test('多订阅者：先后进场各自补发一次，互不串扰', () => {
+  test('multiple subscribers: each entering gets one catch-up of its own, no crosstalk', () => {
     const hub = new ConversationStreamHub();
     hub.publishTextDelta('c1', '前缀');
     const first = new FakeConn();
@@ -274,14 +244,12 @@ describe('hub 缓冲：边界（#740 失败方式 ③④⑤）', () => {
     expect(textFrames(second)).toEqual(['前缀一', '二']);
   });
 
-  test('跨会话隔离：A 会话缓冲不进 B 会话流', () => {
+  test('cross-session isolation: session A buffer does not enter session B stream', () => {
     const hub = new ConversationStreamHub();
     hub.publishTextDelta('cA', 'A 的段');
     expect(textFrames(subscribeFresh(hub, 'cB'))).toEqual([]);
   });
 });
-
-// —— chief wire 面：真路由 + 机器 API 驱动 ————————————————————————————
 
 async function call(
   app: Hono,
@@ -303,7 +271,6 @@ async function call(
 
 const AGENT_ID = 'agent-740';
 
-/** chief 线程就位 + 机器已 claim（m4a 同款引导裁剪）。 */
 async function setupChief(opts: { pingIntervalMs?: number } = {}) {
   const s = bootServer({ claimHoldMs: 200, pingIntervalMs: opts.pingIntervalMs ?? 3_600_000 });
   const key = await issueApiKey(s);
@@ -359,7 +326,6 @@ async function delta(app: Hono, token: string, stepId: string, text: string): Pr
   expect(res.status).toBe(200);
 }
 
-/** 收集流上短时间内到达的全部帧（证明性读取，非阻塞等待）。 */
 async function collectFrames(
   stream: Awaited<ReturnType<typeof openConvStream>>,
   ms: number,
@@ -376,20 +342,17 @@ async function collectFrames(
   return frames;
 }
 
-describe('chief wire 面：中途进场补发（#740 票面症状路径）', () => {
-  test('零订阅期 delta → 开流即一条补发 text_delta → 实时照常 → done 后新流零补发', async () => {
+describe('chief wire surface: mid-way entry catch-up (#740 ticket symptom path)', () => {
+  test('delta during zero-subscriber period -> one catch-up text_delta on stream open -> live as usual -> new stream after done has zero catch-up', async () => {
     const { s, token, threadId, stepId } = await setupChief({ pingIntervalMs: 50 });
     try {
-      // 回合在飞、无人订阅：增量直接流掉（症状原态）。
       await delta(s.app, token, stepId, '正在');
       await delta(s.app, token, stepId, '梳理需求');
-      // 观众进场（点 toast「查看会话」开抽屉 = 订阅建立）。
       const stream = await openConvStream(s.app, threadId);
       try {
         const replay = await stream.next((ev) => ev.type === 'text_delta');
         expect(conversationStreamEventSchema.parse(replay)).toBeTruthy();
         expect((replay as { text: string }).text).toBe('正在梳理需求');
-        // 接缝：进场后 live 增量继续实时到达。
         await delta(s.app, token, stepId, '，随后动笔');
         const live = await stream.next(
           (ev) => ev.type === 'text_delta' && (ev as { text: string }).text === '，随后动笔',
@@ -398,7 +361,6 @@ describe('chief wire 面：中途进场补发（#740 票面症状路径）', () 
       } finally {
         stream.close();
       }
-      // 回合终局（step done）→ 缓冲清空：新流零补发。
       const doneRes = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
         cred: token,
         body: { status: 'success' },
@@ -406,7 +368,6 @@ describe('chief wire 面：中途进场补发（#740 票面症状路径）', () 
       expect(doneRes.status).toBe(200);
       const after = await openConvStream(s.app, threadId);
       try {
-        // 收两帧 ping（~100ms）证明流活着，随后短窗收帧证无 text_delta 补发。
         await after.next((ev) => ev.type === 'ping');
         await after.next((ev) => ev.type === 'ping');
         const leaked = (await collectFrames(after, 150)).filter((ev) => ev.type === 'text_delta');
@@ -419,18 +380,16 @@ describe('chief wire 面：中途进场补发（#740 票面症状路径）', () 
     }
   });
 
-  test('rewind 清缓冲（服务层防御清空点）：显式清空后新流零补发', async () => {
+  test('rewind clears the buffer (service-layer defensive clear point): explicit clear then new stream zero catch-up', async () => {
     const { s, threadId, anchorMessageId, stepId, token } = await setupChief({
       pingIntervalMs: 50,
     });
     try {
-      // 回合正常收尾（rewind 门 = activeRun 空）。
       const doneRes = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
         cred: token,
         body: { status: 'success' },
       });
       expect(doneRes.status).toBe(200);
-      // 状态失步形态（rewind 防御清的目标态）：缓冲带残段。
       s.convHub.publishTextDelta(threadId, '死回合残段');
       const rewind = rewindChiefThread(
         { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, convHub: s.convHub },
@@ -453,17 +412,7 @@ describe('chief wire 面：中途进场补发（#740 票面症状路径）', () 
   });
 });
 
-// —— #905 活动相位：单槽补发、终态清空、跨会话隔离 ————————————————
-// 失败方式（先固化）：
-//   A1 进场无补发：断线重连/换页后活行退回「处理中…」黑盒，直到下一次相位
-//      变化才有信号——subscribe 必须补发最后一份 activity。
-//   A2 死相位复活：步终局（done/failed/stopped）或 rewind 后，新订阅仍补发
-//      「思考中」——终态清空点必须覆盖 activity 单槽（与文本缓冲同律）。
-//   A3 陈旧叠加：单槽语义——连续多份 activity 只补发最后一份，不回放历史。
-//   A4 跨会话串扰：A 会话的相位不进 B 会话补发。
-//   A5 wire 词表：activity 帧逐帧过 shared conversationStreamEventSchema。
-
-describe('hub 活动相位（#905）', () => {
+describe('hub activity phase (#905)', () => {
   const act = (phase: 'thinking' | 'tool' | 'responding', at: number, extra?: object) =>
     ({ stepId: 'step-1', at, phase, ...extra }) as import('@cairn/shared').StepActivity;
 
@@ -471,7 +420,7 @@ describe('hub 活动相位（#905）', () => {
     return conn.frames.filter((f) => (f as { type: string }).type === 'activity');
   }
 
-  test('A1/A3/A5: 零订阅期多份 activity → 进场只补发最后一份，帧过词表', () => {
+  test('A1/A3/A5: multiple activity entries during zero-subscriber period -> catch-up carries only the last, frames pass the vocabulary', () => {
     const hub = new ConversationStreamHub();
     hub.publishActivity('c1', act('thinking', 100));
     hub.publishActivity('c1', act('tool', 200, { tool: 'bash' }));
@@ -484,12 +433,11 @@ describe('hub 活动相位（#905）', () => {
       activity: { stepId: 'step-1', at: 200, phase: 'tool', tool: 'bash' },
     });
     expect(conversationStreamEventSchema.parse(frames[0])).toBeTruthy();
-    // 补发之后 live 相位照常直达。
     hub.publishActivity('c1', act('responding', 300));
     expect(activityFrames(conn)).toHaveLength(2);
   });
 
-  test('A2: step 终态（done/failed/stopped）清 activity；claimed 不清', () => {
+  test('A2: step terminal (done/failed/stopped) clears activity; claimed does not', () => {
     for (const status of ['done', 'failed', 'stopped'] as const) {
       const hub = new ConversationStreamHub();
       hub.publishActivity('c1', act('thinking', 100));
@@ -504,14 +452,14 @@ describe('hub 活动相位（#905）', () => {
     expect(activityFrames(conn)).toHaveLength(1);
   });
 
-  test('A2: clearConversationBuffer（rewind 通道）同清 activity', () => {
+  test('A2: clearConversationBuffer (rewind channel) also clears activity', () => {
     const hub = new ConversationStreamHub();
     hub.publishActivity('c1', act('thinking', 100));
     hub.clearConversationBuffer('c1');
     expect(activityFrames(subscribeFresh(hub, 'c1'))).toHaveLength(0);
   });
 
-  test('A4: 跨会话隔离——A 的相位不进 B 的补发与 live 流', () => {
+  test('A4: cross-session isolation -- A phase does not enter B catch-up or live stream', () => {
     const hub = new ConversationStreamHub();
     hub.publishActivity('cA', act('thinking', 100));
     const b = subscribeFresh(hub, 'cB');
@@ -520,18 +468,17 @@ describe('hub 活动相位（#905）', () => {
     expect(activityFrames(b)).toHaveLength(0);
   });
 
-  test('缓冲会话数上限同律驱逐 activity 单槽（无界内存防御）', () => {
+  test('buffer session-count cap evicts the activity single slot by the same law (unbounded-memory defense)', () => {
     const hub = new ConversationStreamHub();
     for (let i = 0; i <= CONV_TEXT_BUFFER_MAX_CONVS; i++) {
       hub.publishActivity(`c${i}`, act('thinking', i));
     }
-    // 最旧会话（c0）被驱逐：进场零补发；最新会话仍在。
     expect(activityFrames(subscribeFresh(hub, 'c0'))).toHaveLength(0);
     expect(activityFrames(subscribeFresh(hub, `c${CONV_TEXT_BUFFER_MAX_CONVS}`))).toHaveLength(1);
   });
 });
 
-describe('hub agent 待办清单（#1524）', () => {
+describe('hub agent todo list (#1524)', () => {
   const list = (at: number) =>
     ({
       stepId: 'step-1',
@@ -547,7 +494,7 @@ describe('hub agent 待办清单（#1524）', () => {
     return conn.frames.filter((f) => (f as { type: string }).type === 'agent_todo');
   }
 
-  test('零订阅期多份清单 → 进场只补发最后一份，帧过词表', () => {
+  test('multiple lists during zero-subscriber period -> catch-up carries only the last, frames pass the vocabulary', () => {
     const hub = new ConversationStreamHub();
     hub.publishAgentTodo('c1', { ...list(100), items: [{ text: '旧', state: 'todo' }] });
     hub.publishAgentTodo('c1', list(200));
@@ -561,7 +508,7 @@ describe('hub agent 待办清单（#1524）', () => {
     expect(todoFrames(conn)).toHaveLength(2);
   });
 
-  test('step 终态（done/failed/stopped）清单槽；claimed 不清', () => {
+  test('step terminal (done/failed/stopped) clears the list slot; claimed does not', () => {
     for (const status of ['done', 'failed', 'stopped'] as const) {
       const hub = new ConversationStreamHub();
       hub.publishAgentTodo('c1', list(100));
@@ -574,14 +521,14 @@ describe('hub agent 待办清单（#1524）', () => {
     expect(todoFrames(subscribeFresh(hub, 'c1'))).toHaveLength(1);
   });
 
-  test('clearConversationBuffer（rewind 通道）同清单槽', () => {
+  test('clearConversationBuffer (rewind channel) also clears the list slot', () => {
     const hub = new ConversationStreamHub();
     hub.publishAgentTodo('c1', list(100));
     hub.clearConversationBuffer('c1');
     expect(todoFrames(subscribeFresh(hub, 'c1'))).toHaveLength(0);
   });
 
-  test('跨会话隔离——A 的清单不进 B 的补发与 live 流', () => {
+  test('cross-session isolation -- A list does not enter B catch-up or live stream', () => {
     const hub = new ConversationStreamHub();
     hub.publishAgentTodo('cA', list(100));
     const b = subscribeFresh(hub, 'cB');
@@ -590,7 +537,7 @@ describe('hub agent 待办清单（#1524）', () => {
     expect(todoFrames(b)).toHaveLength(0);
   });
 
-  test('缓冲会话数上限同律驱逐清单单槽（无界内存防御）', () => {
+  test('buffer session-count cap evicts the list single slot by the same law (unbounded-memory defense)', () => {
     const hub = new ConversationStreamHub();
     for (let i = 0; i <= CONV_TEXT_BUFFER_MAX_CONVS; i++) {
       hub.publishAgentTodo(`c${i}`, list(i));

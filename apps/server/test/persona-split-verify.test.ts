@@ -1,9 +1,3 @@
-// #1250 / ADR 0018 层 1+2 服务面测试：persona seeding、verify 步（入队/
-// 收尾）、review fan-out 三视角、chief split_todo（拆卡/依赖边/波次/自动收口）。
-// 失败方式枚举先于验收固化（AGENTS.md 测试规则 3）——每条 test 标题即失败
-// 方式。全程 bootServer 走真 REST + machine 端点（claim/done 语义与产线同缝，
-// 不 mock 服务内部）。
-
 import {
   claimedStepSchema,
   DONE_ANNOUNCEMENT,
@@ -52,7 +46,6 @@ async function call(
   );
 }
 
-/** 世界装置：机器 enrolled + persona 已播种 + 任务建好。 */
 interface World {
   s: TestServer;
   machineToken: string;
@@ -80,8 +73,6 @@ function loadMessagesOf(s: TestServer, buildId: string) {
 async function setupWorld(): Promise<World> {
   const s = bootServer({ claimHoldMs: 200, pingIntervalMs: 3_600_000 });
   const key = await issueApiKey(s);
-  // 模型真值先行（provider 行 = seed 面的模型清单；claim 闸要求 modelId 非空，
-  // persona seeding 的可领值从这取）。
   s.db
     .insert(providerTable)
     .values({
@@ -100,8 +91,6 @@ async function setupWorld(): Promise<World> {
       updatedAt: Date.now(),
     })
     .run();
-  // persona 六员播种（被测服务本体——不走 index.ts 启动位；此刻模型清单
-  // 已有值 → 落库即带可领 provider/modelId）。
   ensurePersonasSeeded(s.db, s.team.id);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
@@ -109,8 +98,6 @@ async function setupWorld(): Promise<World> {
   });
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string };
-  // #1259：认领机 = 全部 agent 的归属机（persona 播种在 enroll 前、彼时无
-  // 机器可绑——补值路径的机器侧真值归 personas.test；本文件钉派发行为）。
   bindAllAgents(s);
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -132,8 +119,6 @@ async function setupWorld(): Promise<World> {
     });
     const body = (await res.json()) as { step?: unknown };
     if (!body.step) throw new Error('claim returned no step');
-    // wire 形 = {step: {step: {...}, agent, session}} 双层包装（claimedStepSchema
-    // 单源解析，review.test 同款）。
     const parsed = claimedStepSchema.parse(body.step);
     return { stepId: parsed.step.id, kind: parsed.step.kind };
   }
@@ -166,7 +151,6 @@ async function setupWorld(): Promise<World> {
   };
 }
 
-/** persona agent id 查找（世界内）。 */
 function personaAgentId(s: TestServer, role: PersonaRole): string {
   return (
     s.db.select({ id: agentTable.id }).from(agentTable).where(eq(agentTable.persona, role)).get()
@@ -175,7 +159,7 @@ function personaAgentId(s: TestServer, role: PersonaRole): string {
 }
 
 describe('#1250 persona seeding', () => {
-  test('失败方式 1：六员落库、persona 位/档位/契约全文各就各位；模型取当时清单可领值', () => {
+  test('failure mode 1: six members stored, persona slots / tiers / contract texts all in place; models take the claimable values of the current list', () => {
     const s = bootServer({});
     s.db
       .insert(providerTable)
@@ -211,7 +195,6 @@ describe('#1250 persona seeding', () => {
       const row = byRole.get(role);
       expect(row, role).toBeDefined();
       expect(row!.description, role).toContain('Composition');
-      // claim 闸要求的可领二元组（无模型位 = 永远 pending 的死步）。
       expect(row!.provider, role).toBe('stub-gw');
       expect(row!.modelId, role).toBe('stub-model');
     }
@@ -221,9 +204,8 @@ describe('#1250 persona seeding', () => {
     expect(byRole.get('verifier')!.thinkingLevel).toBe('medium');
   });
 
-  test('失败方式 2：幂等 = 补缺不覆盖（二次零插入、编辑保留、null 模型启动补值、删行复活）', () => {
+  test('failure mode 2: idempotent = fill gaps without overwriting (zero inserts the second time, edits kept, null models filled at boot, deleted rows revived)', () => {
     const s = bootServer({});
-    // 先seed（无 provider → 模型 null）；后配 provider 再补齐 → null 被填。
     ensurePersonasSeeded(s.db, s.team.id);
     const before = s.db.select().from(agentTable).where(eq(agentTable.persona, 'planner')).get()!;
     expect(before.modelId).toBeNull();
@@ -248,7 +230,6 @@ describe('#1250 persona seeding', () => {
     expect(ensurePersonasSeeded(s.db, s.team.id)).toBe(0);
     const filled = s.db.select().from(agentTable).where(eq(agentTable.persona, 'planner')).get()!;
     expect(filled.modelId).toBe('late-model');
-    // 用户编辑保留（模型非 null 不覆盖；description 永不动）。
     s.db
       .update(agentTable)
       .set({ description: '自定义职责', modelId: 'glm-5.3' })
@@ -258,14 +239,13 @@ describe('#1250 persona seeding', () => {
     const edited = s.db.select().from(agentTable).where(eq(agentTable.persona, 'planner')).get()!;
     expect(edited.description).toBe('自定义职责');
     expect(edited.modelId).toBe('glm-5.3');
-    // 删行复活（seedFixedTags 同语义；永久摘角 = PATCH persona null，不删行）。
     s.db.delete(agentTable).where(eq(agentTable.persona, 'verifier')).run();
     expect(ensurePersonasSeeded(s.db, s.team.id)).toBe(1);
   });
 });
 
-describe('#1250 verify 步（层 1）', () => {
-  test('失败方式 3：review 关口抵达且 verify 槽在位 → verify 步入队 + 宣告行；槽空零动作', async () => {
+describe('#1250 the verify step (layer 1)', () => {
+  test('failure mode 3: the review gate reached and the verify slot filled -> the verify step queued + an announcement row; empty slot, no action', async () => {
     const w = await setupWorld();
     const verifierId = personaAgentId(w.s, 'verifier');
     const buildId = await w.startBuild({
@@ -273,17 +253,15 @@ describe('#1250 verify 步（层 1）', () => {
       build: { agentId: personaAgentId(w.s, 'implementer') },
       verify: { agentId: verifierId },
     });
-    const claimed = await w.claim(); // build 步
+    const claimed = await w.claim();
     expect(claimed.kind).toBe('build');
     await w.done(claimed.stepId, { status: 'success', hasChanges: true });
-    // review 相位 + verify 步已入队（build 相抵达 = review 关口）。
     expect(w.todoRow().phase).toBe('review');
     const verifySteps = w.stepsOf(buildId).filter((r) => r.kind === 'verify');
     expect(verifySteps).toHaveLength(1);
     expect(verifySteps[0]!.status).toBe('pending');
     expect(verifySteps[0]!.prompt).toContain('docs/verify/');
     expect(w.messagesOf(buildId).some((m) => m.content === VERIFY_ANNOUNCEMENT)).toBe(true);
-    // 槽空（另一任务）：零 verify 步——回归红线（存量行为不变）。
     const todoRes2 = await call(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
       body: { title: '无槽探针', spec: 'x' },
     });
@@ -297,7 +275,7 @@ describe('#1250 verify 步（层 1）', () => {
     expect(w.stepsOf(buildId).filter((r) => r.kind === 'verify')).toHaveLength(1);
   });
 
-  test('失败方式 4：verify 步收尾 → VERIFY_VERDICT 消息落地、phase 不动、agent 走 verify 槽', async () => {
+  test('failure mode 4: the verify step finishes -> the VERIFY_VERDICT message lands, the phase unchanged, the agent takes the verify slot', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     const verifierId = personaAgentId(w.s, 'verifier');
@@ -309,7 +287,6 @@ describe('#1250 verify 步（层 1）', () => {
     const claimed = await w.claim();
     await w.done(claimed.stepId, { status: 'success', hasChanges: true });
     const verifyStep = w.stepsOf(buildId).find((r) => r.kind === 'verify')!;
-    // claim 载荷 agent = verify 槽 persona（agentIdForStep 单源解析）。
     expect(agentIdForStep(w.todoRow(), 'verify', verifyStep.prompt)).toBe(verifierId);
     const verifyClaimed = await w.claim();
     expect(verifyClaimed.kind).toBe('verify');
@@ -326,11 +303,10 @@ describe('#1250 verify 步（层 1）', () => {
       JSON.parse(verdictMsg as string).verdict satisfies unknown,
     );
     expect(parsed.passed).toBe(true);
-    // 额外 agent 步不推进主时序：仍停 review 关口。
     expect(w.todoRow().phase).toBe('review');
   });
 
-  test('失败方式 5：verify 槽空 → 无主步失败文案点名 verify 槽（agentForStep null 的补法）', async () => {
+  test('failure mode 5: empty verify slot -> the ownerless-step failure text names the verify slot (the agentForStep null patch)', async () => {
     const s = bootServer({});
     ensurePersonasSeeded(s.db, s.team.id);
     const projectId = await postProject(s.app);
@@ -341,7 +317,6 @@ describe('#1250 verify 步（层 1）', () => {
     const row = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!;
     expect(agentIdForStep(row, 'verify', null)).toBeNull();
     expect(unassignedStepReason(row, 'verify', null)).toContain('verify 槽');
-    // 槽在位 → 指到 persona agent（review fan-out 的解析同源）。
     const verifierId = s.db
       .select({ id: agentTable.id })
       .from(agentTable)
@@ -357,8 +332,8 @@ describe('#1250 verify 步（层 1）', () => {
   });
 });
 
-describe('#1250 review fan-out 三视角', () => {
-  test('失败方式 6：agentId 缺省 → 三条 review 步各挂 persona agent（meta header）+ 单条宣告行', async () => {
+describe('#1250 review fan-out, three perspectives', () => {
+  test('failure mode 6: agentId absent -> three review steps each attached to a persona agent (meta header) + one announcement row', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     const buildId = await w.startBuild({
@@ -380,15 +355,13 @@ describe('#1250 review fan-out 三视角', () => {
       personaAgentId(w.s, 'test_engineer'),
     ].sort();
     expect([...metaAgentIds].sort()).toEqual(expected);
-    // 各视角 prompt 带视角重点文案。
     expect(reviewSteps.some((r) => r.prompt!.includes('五轴 review'))).toBe(true);
     expect(reviewSteps.some((r) => r.prompt!.includes('安全审计'))).toBe(true);
     expect(reviewSteps.some((r) => r.prompt!.includes('测试覆盖缺口'))).toBe(true);
-    // 宣告行单条（不是三条）。
     expect(w.messagesOf(buildId).filter((m) => m.content === REVIEW_ANNOUNCEMENT).length).toBe(1);
   });
 
-  test('失败方式 7：persona 删净 + review 槽在位 → 回落单步；两者皆缺 → 400', async () => {
+  test('failure mode 7: personas all deleted with the review slot filled -> falls back to a single step; both missing -> 400', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     const buildId = await w.startBuild({
@@ -397,7 +370,6 @@ describe('#1250 review fan-out 三视角', () => {
     });
     const claimed = await w.claim();
     await w.done(claimed.stepId, { status: 'success', hasChanges: true });
-    // 删净三视角 persona。
     w.s.db.delete(agentTable).where(eq(agentTable.persona, 'code_reviewer')).run();
     w.s.db.delete(agentTable).where(eq(agentTable.persona, 'security_auditor')).run();
     w.s.db.delete(agentTable).where(eq(agentTable.persona, 'test_engineer')).run();
@@ -406,7 +378,6 @@ describe('#1250 review fan-out 三视角', () => {
     });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toContain('assignment.review');
-    // review 槽在位 → 回落单步。
     w.s.db
       .update(todoTable)
       .set({
@@ -425,21 +396,18 @@ describe('#1250 review fan-out 三视角', () => {
     expect(w.stepsOf(buildId).filter((r) => r.kind === 'review')).toHaveLength(1);
   });
 
-  test('失败方式 8：fan-out 两份 blocking verdict → 只入队一条修订步（去重闸）', async () => {
+  test('failure mode 8: two blocking verdicts from the fan-out -> only one revision step queued (dedupe gate)', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     const buildId = await w.startBuild({
       plan: { agentId: implementerId },
       build: { agentId: implementerId },
     });
-    // withPlan=false 直接 build → review 关口。
     const claimed = await w.claim();
     await w.done(claimed.stepId, { status: 'success', hasChanges: true });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
       body: { action: 'review' },
     });
-    // 依次收尾两条 review 步（claim → done——done 面要求步已被本机认领），
-    // 各带 blocking。
     const blockingVerdict = {
       conclusion: '有 blocking',
       findings: [{ id: '1', severity: 'blocking', summary: 's1' }],
@@ -456,8 +424,8 @@ describe('#1250 review fan-out 三视角', () => {
   });
 });
 
-describe('#1250 split_todo（层 2）', () => {
-  test('失败方式 9：校验族——相位非 todo 409 / 双拆 409 / 少于两张 400 / 索引越界 400 / 环 400 / agent 越队 404', async () => {
+describe('#1250 split_todo (layer 2)', () => {
+  test('failure mode 9: the validation family -- phase not todo 409 / double split 409 / fewer than two 400 / index out of range 400 / cycle 400 / agent from another team 404', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     const deps = {
@@ -477,23 +445,19 @@ describe('#1250 split_todo（层 2）', () => {
       { title: 'a', spec: 'sa', agentId: implementerId },
       { title: 'b', spec: 'sb', agentId: implementerId, blockedBy: [1] },
     ];
-    // 少于两张。
     expect(() => createSplitTodo(deps, { ...ctx, subtodos: [two[0]!] })).toThrowError(/至少两张/);
-    // 索引越界。
     expect(() =>
       createSplitTodo(deps, {
         ...ctx,
         subtodos: [two[0]!, { ...two[1]!, blockedBy: [5] }],
       }),
     ).toThrowError(/越界/);
-    // 自指。
     expect(() =>
       createSplitTodo(deps, {
         ...ctx,
         subtodos: [two[0]!, { ...two[1]!, blockedBy: [2] }],
       }),
     ).toThrowError(/自指/);
-    // 环。
     expect(() =>
       createSplitTodo(deps, {
         ...ctx,
@@ -503,20 +467,16 @@ describe('#1250 split_todo（层 2）', () => {
         ],
       }),
     ).toThrowError(/成环/);
-    // agent 越队（不存在）。
     expect(() =>
       createSplitTodo(deps, {
         ...ctx,
         subtodos: [two[0]!, { ...two[1]!, agentId: 'ghost-agent' }],
       }),
     ).toThrowError(/ghost-agent/);
-    // happy path 落库后：再拆 = 相位闸先行（拆过的父停在 confirm，永不再
-    // 是 todo——「已拆解」守卫只对 reset 回 todo 的父兜底，见下）。
     createSplitTodo(deps, { ...ctx, subtodos: two });
     expect(() => createSplitTodo(deps, { ...ctx, subtodos: two })).toThrowError(
       /仅适用于未开工任务（当前相位 confirm）/,
     );
-    // 另一任务相位非 todo（建 build 推进相位）。
     const todoRes = await call(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
       body: { title: '跑起来的卡', spec: 'x' },
     });
@@ -533,7 +493,7 @@ describe('#1250 split_todo（层 2）', () => {
     );
   });
 
-  test('失败方式 10：happy path——子卡/依赖边/父方案文档/父停 confirm/宣告行', async () => {
+  test('failure mode 10: happy path -- child cards / dependency edges / the parent plan doc / the parent stopped at confirm / an announcement row', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     const deps = {
@@ -558,7 +518,6 @@ describe('#1250 split_todo（层 2）', () => {
     expect(parent.phase).toBe('confirm');
     expect(parent.hasPlan).toBe(true);
     expect(parent.latestBuildId).toBe(result.parentBuildId);
-    // 子卡：sourceTodo / blockedBy / assignment.build / todo 相位。
     const childA = w.s.db
       .select()
       .from(todoTable)
@@ -575,19 +534,17 @@ describe('#1250 split_todo（层 2）', () => {
     expect(childB.blockedBy).toEqual([childA.id]);
     expect(childA.assignment).toEqual({ plan: null, build: { agentId: implementerId } });
     expect(childA.phase).toBe('todo');
-    // 方案文档：子卡清单 + 依赖 + agent 名。
     const plan = w.planContent(result.parentBuildId);
     expect(plan).toContain('拆解方案');
     expect(plan).toContain('子卡 A');
     expect(plan).toContain('依赖：子卡 1');
     expect(plan).toContain('Implementer');
-    // 宣告行（父会话）。
     expect(w.messagesOf(result.parentBuildId).some((m) => m.content === SPLIT_ANNOUNCEMENT)).toBe(
       true,
     );
   });
 
-  test('失败方式 11：父 confirm → 派发无阻塞子卡（直执行）+ 父进 building；阻塞子卡不动', async () => {
+  test('failure mode 11: the parent confirms -> unblocked children dispatched (direct execution) + the parent enters building; blocked children untouched', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     const deps = {
@@ -611,7 +568,6 @@ describe('#1250 split_todo（层 2）', () => {
       body: { action: 'confirm' },
     });
     expect(confirmRes.status).toBe(202);
-    // 父伞进 building；A 派发（queued + build 步入队）；B 仍 todo 等波次。
     expect(w.todoRow().phase).toBe('building');
     const childA = w.s.db
       .select()
@@ -632,7 +588,7 @@ describe('#1250 split_todo（层 2）', () => {
     );
   });
 
-  test('失败方式 12：子卡 done → 波次推进（B 自动派发）+ 全 done 父自动收', async () => {
+  test('failure mode 12: a child done -> wave advance (B auto-dispatched) + the parent auto-closed once all are done', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     const deps = {
@@ -658,18 +614,13 @@ describe('#1250 split_todo（层 2）', () => {
     const { setTodoPhase } = await import('../src/services/todos.js');
     const childA = result.children[0]!.id;
     const childB = result.children[1]!.id;
-    // A 走系统漏斗落 done（claim 语义的相位前置 + #1250 新边 building→done——
-    // completeStep/transitionTodos 的同一挂接面）。
     setTodoPhase(deps, childA, 'building');
     setTodoPhase(deps, childA, 'done');
-    // settle（父收口半边）：B 未 done → 父不动。
     expect(w.todoRow().phase).toBe('building');
-    // advance（波次半边）：B 解锁自动派发。
     advanceSplitWaves(deps, childA);
     expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, childB)).get()!.phase).toBe(
       'queued',
     );
-    // B 也 done → 父自动收 + 父会话 DONE_ANNOUNCEMENT（actor = Chief）。
     setTodoPhase(deps, childB, 'building');
     setTodoPhase(deps, childB, 'done');
     expect(w.todoRow().phase).toBe('done');
@@ -774,8 +725,6 @@ describe('#1250 split_todo（层 2）', () => {
     );
   });
 
-  // #1451：PATCH done 离开执行中同停活动步（#1247 起此处钉的是「步留着」，
-  // 那是 stop-and-done 之外的裸改相；机器照领一张已完成的卡是 bug）。
   test('manual done stops the pending step (#1247, #1451)', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
@@ -788,25 +737,18 @@ describe('#1250 split_todo（层 2）', () => {
   });
 });
 
-describe('#1259 persona 归属机（seeding × 绑定模型桥接）', () => {
-  // 失败方式（先于实现固化）：
-  // 1. 团队无机器时播种 → persona 行 machineId null（不编造机器）。
-  // 2. mea 机在场时播种 → machineId = 该机（与迁移回填同口径）。
-  // 3. 补值半边：先 null 后有机 → 再播种填上；用户换绑过的值（非 null）不碰。
-  test('无机器播种 → null；mea 在场播种 → 绑 mea；补值不覆盖用户换绑', async () => {
+describe('#1259 the persona attribution machine (seeding x bound-model bridging)', () => {
+  test('no machine seeding -> null; seeding with mea present -> bound to mea; backfill never overwrites a user rebinding', async () => {
     const s = bootServer({});
-    // 无机器播种 → null。
     ensurePersonasSeeded(s.db, s.team.id);
     const homeless = s.db.select().from(agentTable).where(eq(agentTable.persona, 'planner')).get()!;
     expect(homeless.machineId).toBeNull();
-    // 换绑标记：把 planner 钉到一台「非 mea」机器（模拟用户换绑过）。
     const otherMachine = insertMachine(s, { name: 'user-mac' });
     s.db
       .update(agentTable)
       .set({ machineId: otherMachine })
       .where(eq(agentTable.id, homeless.id))
       .run();
-    // mea 机接入 → 再播种：planner 是用户值（不动），其余 null 行补到 mea。
     const meaMachine = insertMachine(s, { name: 'mea-wsl' });
     ensurePersonasSeeded(s.db, s.team.id);
     const planner = s.db.select().from(agentTable).where(eq(agentTable.persona, 'planner')).get()!;
@@ -820,12 +762,8 @@ describe('#1259 persona 归属机（seeding × 绑定模型桥接）', () => {
   });
 });
 
-// #1492 verify 步按方案 Verification 清单逐项出判定（规划 → 确认 → 执行 →
-// 验证全链，HTTP 面走真路由）。失败方式：
-//  1. 清单没进 verify 步材料 → Verifier 当场自己想验什么。
-//  2. Verifier 漏验清单项仍报 passed=true → 合并闸读到假通过。
-describe('#1492 verify 步按清单出判定', () => {
-  test('方案带 Verification → confirm → verify 材料列清单；漏项证据 → passed=false 点名', async () => {
+describe('#1492 the verify step issues verdicts by checklist', () => {
+  test('the plan carries Verification -> confirm -> the verify material lists the checklist; missing evidence -> passed=false naming it', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     const verifierId = personaAgentId(w.s, 'verifier');
@@ -839,7 +777,6 @@ describe('#1492 verify 步按清单出判定', () => {
     );
     const planClaimed = await w.claim();
     expect(planClaimed.kind).toBe('plan');
-    // plan.md 产物落库（真链路由 daemon 上传；completeStep 的 plan 腿只读 plan 行）。
     w.s.db
       .insert(planTable)
       .values({

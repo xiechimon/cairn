@@ -1,27 +1,3 @@
-// #1251 机器能力闸（server 面，ADR 0018 决策 4）：能力上报持久化 + claim
-// 能力闸 + agent requiredCapabilities 写读面 + machine-fit 读面。
-// 失败方式（先于实现固化）：
-// 1. 上报持久化：enroll/presence 的 capabilities 位落 machine.capabilities 列
-//    并随 record 读面透出（GET me / GET teams machines）。
-// 2. 心跳红线（02 §5.4）：presence 的 capabilities 坏形状（类型错）→ 200
-//    {ok:true}，旧值保留；缺省 → 200，旧值保留——坏字段永不打死心跳通道。
-// 3. MCP 维闸：agent.requiredCapabilities.mcpServers 含 slug X，机器上报清单
-//    缺 X → 该机 claim 空手、步留 pending；含 X 的机器照领。
-// 4. 模型维闸：requiredCapabilities.models 含 id M，机器 claudeCodeReport
-//    的 models[].id 缺 M → 挡；含 M → 放行。
-// 5. 未知快照 fail-open：机器从未上报 capabilities（老 daemon，列 null）→
-//    能力闸放行（未知 ≠ 缺失；版本墙纪律 = 老 daemon 行为不变）。
-//    claudeCodeReport null 对 models 维同律。
-// 6. 零回归：agent 无 requiredCapabilities（null/缺省）→ 闸恒开，现行为
-//    完全不变。
-// 7. 候选级 continue：被挡候选不队头阻塞同批其它候选（agent 并发闸同形）。
-// 8. chief 步同律：chief 绑定 Agent 的能力要求进 buildChiefClaim 闸。
-// 9. agent 写读面：POST/PATCH requiredCapabilities 落库即生效、record 随行；
-//    显式 null = 清空；类型错 = 400。
-// 10. machine-fit 读面：canRun = runtimeOk ∧ 能力不缺；missing null = 未上报
-//     快照（fail-open 显示面同律）；mcpGaps = agent.mcpServers 声明对账
-//     （可见不挡）。
-
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -55,11 +31,6 @@ async function setupWorld(): Promise<World> {
   return { s, projectId };
 }
 
-/** REST enroll（可带 capabilities 位——老 daemon 形 = 不带）。返回
- *  {machineId, token}；online/enabledRuntimes 直写 DB（生产置位路径归
- *  presence/SSE 面测试，sweep 测试同律直写）。
- *  每台机器发独立 API key——enroll 按 (apiKeyId, teamId) 认机器（重注册复用
- *  同一 machineId，r3 §1.2），共用一把 key 会把多台机器折叠成同一行。 */
 async function enrollMachineRest(
   w: World,
   opts: {
@@ -134,8 +105,6 @@ function insertAgent(
     .run();
 }
 
-/** 建 todo + build + pending build 步（assignment.build 指 agentId）。
- *  #1259：机器去处 = agent 归属机——homeMachineId 即把该 agent 绑到该机。 */
 function insertPendingStep(
   w: World,
   opts: { agentId: string; homeMachineId?: string | null },
@@ -220,8 +189,8 @@ function stepRow(w: World, stepId: string) {
   return w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
 }
 
-describe('#1251 能力上报持久化 + 心跳红线', () => {
-  test('失败方式 1：enroll 带 capabilities → 落列并随 record 透出', async () => {
+describe('#1251 capability report persistence + heartbeat red line', () => {
+  test('failure mode 1: enroll carrying capabilities -> column persisted and exposed through the record', async () => {
     const w = await setupWorld();
     const m = await enrollMachineRest(w, {
       name: 'cap-enroll',
@@ -229,13 +198,11 @@ describe('#1251 能力上报持久化 + 心跳红线', () => {
     });
     const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, m.machineId)).get()!;
     expect(row.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-cairn'] });
-    // GET me 读面随行。
     const me = await w.s.app.request('/api/machine/me', {
       headers: { authorization: `Bearer ${m.token}` },
     });
     const meBody = (await me.json()) as { capabilities?: unknown };
     expect(meBody.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-cairn'] });
-    // team machines 列表读面随行。
     const list = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/machines`);
     const listBody = (await list.json()) as { machines?: unknown[] } | unknown[];
     const machines = Array.isArray(listBody) ? listBody : (listBody.machines ?? []);
@@ -245,7 +212,7 @@ describe('#1251 能力上报持久化 + 心跳红线', () => {
     expect(mine?.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-cairn'] });
   });
 
-  test('失败方式 1：presence 带 capabilities → 覆写落列', async () => {
+  test('failure mode 1: presence carrying capabilities -> overwrites the column', async () => {
     const w = await setupWorld();
     const m = await enrollMachineRest(w, {
       name: 'cap-presence',
@@ -261,7 +228,7 @@ describe('#1251 能力上报持久化 + 心跳红线', () => {
     expect(row.capabilities).toEqual({ mcpServers: ['ctx'], skills: [] });
   });
 
-  test('失败方式 2：presence capabilities 坏形状 → 200 {ok:true}，旧值保留（心跳红线）', async () => {
+  test('failure mode 2: presence capabilities bad shape -> 200 {ok:true}, old value kept (heartbeat red line)', async () => {
     const w = await setupWorld();
     const m = await enrollMachineRest(w, {
       name: 'cap-tolerant',
@@ -276,7 +243,7 @@ describe('#1251 能力上报持久化 + 心跳红线', () => {
     expect(row.capabilities).toEqual({ mcpServers: ['figma'], skills: [] });
   });
 
-  test('失败方式 2：presence 缺省 capabilities → 200，旧值保留；从未上报 → 列 null', async () => {
+  test('failure mode 2: presence defaults capabilities -> 200, old value kept; never reported -> column null', async () => {
     const w = await setupWorld();
     const m = await enrollMachineRest(w, {
       name: 'cap-absent',
@@ -286,7 +253,6 @@ describe('#1251 能力上报持久化 + 心跳红线', () => {
     expect(res.status).toBe(200);
     const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, m.machineId)).get()!;
     expect(row.capabilities).toEqual({ mcpServers: ['figma'], skills: [] });
-    // 老 daemon 形（enroll/presence 均不带）：列恒 null（≠ 空集）。
     const legacy = await enrollMachineRest(w, { name: 'cap-legacy' });
     const legacyRow = w.s.db
       .select()
@@ -297,8 +263,8 @@ describe('#1251 能力上报持久化 + 心跳红线', () => {
   });
 });
 
-describe('#1251 claim 能力闸', () => {
-  test('失败方式 3：MCP 维——缺 slug 的机器 claim 空手留 pending，齐的照领', async () => {
+describe('#1251 claim capability gate', () => {
+  test('failure mode 3: MCP dimension -- machine missing slug claims empty and stays pending, complete one claims', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-mcp-a', requiredCapabilities: { mcpServers: ['figma'] } });
     insertAgent(w, { id: 'agent-cap-mcp-b', requiredCapabilities: { mcpServers: ['figma'] } });
@@ -310,8 +276,6 @@ describe('#1251 claim 能力闸', () => {
       name: 'cap-capable',
       capabilities: { mcpServers: ['figma', 'ctx'], skills: [] },
     });
-    // #1259：归属机 = 被测机（claim 面先过归属闸再过能力闸——要测能力闸，
-    // 本机必须就是归属机）。一个 agent 只有一个归属机，两形态各用各的 agent。
     const blocked = insertPendingStep(w, {
       agentId: 'agent-cap-mcp-a',
       homeMachineId: lacking.machineId,
@@ -329,7 +293,7 @@ describe('#1251 claim 能力闸', () => {
     expect(stepRow(w, runnable.stepId).status).toBe('claimed');
   });
 
-  test('失败方式 4：模型维——claudeCodeReport 缺模型 id 挡、含则放行', async () => {
+  test('failure mode 4: model dimension -- claudeCodeReport missing a model id blocks, containing it allows', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-model-a', requiredCapabilities: { models: ['glm-5.3'] } });
     insertAgent(w, { id: 'agent-cap-model-b', requiredCapabilities: { models: ['glm-5.3'] } });
@@ -356,10 +320,10 @@ describe('#1251 claim 能力闸', () => {
     expect((await claimAs(w, hasModel.machineId))?.step.id).toBe(runnable.stepId);
   });
 
-  test('失败方式 5：未上报快照 fail-open——老 daemon 机器照领', async () => {
+  test('failure mode 5: no snapshot reported fail-open -- legacy daemon machines still claim', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-open', requiredCapabilities: { mcpServers: ['figma'] } });
-    const legacy = await enrollMachineRest(w, { name: 'cap-open-legacy' }); // 无 capabilities
+    const legacy = await enrollMachineRest(w, { name: 'cap-open-legacy' });
     const { stepId } = insertPendingStep(w, {
       agentId: 'agent-cap-open',
       homeMachineId: legacy.machineId,
@@ -367,13 +331,12 @@ describe('#1251 claim 能力闸', () => {
     expect((await claimAs(w, legacy.machineId))?.step.id).toBe(stepId);
   });
 
-  test('失败方式 5：models 维对 claudeCodeReport null 同律 fail-open', async () => {
+  test('failure mode 5: models dimension fail-open same law for claudeCodeReport null', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-open2', requiredCapabilities: { models: ['glm-5.3'] } });
     const noReport = await enrollMachineRest(w, {
       name: 'cap-open-noreport',
       capabilities: { mcpServers: [], skills: [] },
-      // claudeCodeModels 缺省 = claudeCodeReport 列 null
     });
     const { stepId } = insertPendingStep(w, {
       agentId: 'agent-cap-open2',
@@ -382,7 +345,7 @@ describe('#1251 claim 能力闸', () => {
     expect((await claimAs(w, noReport.machineId))?.step.id).toBe(stepId);
   });
 
-  test('失败方式 6：零回归——无 requiredCapabilities 的 agent 行为不变', async () => {
+  test('failure mode 6: zero regression -- agent without requiredCapabilities behaves unchanged', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-none' });
     const m = await enrollMachineRest(w, {
@@ -396,7 +359,7 @@ describe('#1251 claim 能力闸', () => {
     expect((await claimAs(w, m.machineId))?.step.id).toBe(stepId);
   });
 
-  test('失败方式 7：被挡候选不队头阻塞——同批后续合法候选照领', async () => {
+  test('failure mode 7: blocked candidates do not block the head -- later legal candidates in the same batch still claim', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-blocked', requiredCapabilities: { mcpServers: ['figma'] } });
     insertAgent(w, { id: 'agent-cap-free' });
@@ -404,8 +367,6 @@ describe('#1251 claim 能力闸', () => {
       name: 'cap-hol',
       capabilities: { mcpServers: [], skills: [] },
     });
-    // 更早的候选 = 被挡 agent；更晚的候选 = 无要求 agent。两者同机（归属
-    // 机 = 被测机 m：被挡候选过不了能力闸，同机更晚的自由候选照领）。
     const blocked = insertPendingStep(w, {
       agentId: 'agent-cap-blocked',
       homeMachineId: m.machineId,
@@ -416,7 +377,7 @@ describe('#1251 claim 能力闸', () => {
     expect(stepRow(w, blocked.stepId).status).toBe('pending');
   });
 
-  test('失败方式 8：chief 步同律——绑定 Agent 缺能力不领、齐则领', async () => {
+  test('failure mode 8: chief steps same law -- bound Agent missing capability not claimed, complete claimed', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-chief', requiredCapabilities: { mcpServers: ['figma'] } });
     const lacking = await enrollMachineRest(w, {
@@ -427,8 +388,6 @@ describe('#1251 claim 能力闸', () => {
       name: 'cap-chief-yes',
       capabilities: { mcpServers: ['figma'], skills: [] },
     });
-    // #1259：chief 步去处 = 绑定 Agent 的归属机——先绑 lacking 测「不领」，
-    // 再换绑 capable 测「领到」（换绑即时改派，#1259 律）。
     w.s.db
       .update(agentTable)
       .set({ machineId: lacking.machineId })
@@ -492,8 +451,8 @@ describe('#1251 claim 能力闸', () => {
   });
 });
 
-describe('#1251 agent requiredCapabilities 写读面', () => {
-  test('失败方式 9：POST 创建带位、PATCH 改写、显式 null 清空、类型错 400', async () => {
+describe('#1251 agent requiredCapabilities write/read surface', () => {
+  test('failure mode 9: POST create carries the bits, PATCH rewrites, explicit null clears, type error 400', async () => {
     const w = await setupWorld();
     const home = await enrollMachineRest(w, { name: 'cap-write-home' });
     const created = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/agents`, {
@@ -534,7 +493,7 @@ describe('#1251 agent requiredCapabilities 写读面', () => {
     expect(bad.status).toBe(400);
   });
 
-  test('失败方式 9：members 列表读面随行（agent 列表 = members 内嵌 actor）', async () => {
+  test('failure mode 9: members list read surface follows the row (agent list = members embedded actor)', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-members', requiredCapabilities: { mcpServers: ['ctx'] } });
     const res = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/members`);
@@ -547,8 +506,8 @@ describe('#1251 agent requiredCapabilities 写读面', () => {
   });
 });
 
-describe('#1251 machine-fit 读面（agent 面「哪些机器可跑它」）', () => {
-  test('失败方式 10：canRun/missing/mcpGaps/runtimeOk 四态', async () => {
+describe('#1251 machine-fit read surface (agent surface "which machines can run it")', () => {
+  test('failure mode 10: canRun/missing/mcpGaps/runtimeOk four states', async () => {
     const w = await setupWorld();
     insertAgent(w, {
       id: 'agent-fit',
@@ -563,11 +522,11 @@ describe('#1251 machine-fit 读面（agent 面「哪些机器可跑它」）', (
       name: 'fit-lacking',
       capabilities: { mcpServers: ['ctx'], skills: [] },
     });
-    const legacy = await enrollMachineRest(w, { name: 'fit-legacy' }); // 未上报快照
+    const legacy = await enrollMachineRest(w, { name: 'fit-legacy' });
     const noRuntime = await enrollMachineRest(w, {
       name: 'fit-noruntime',
       capabilities: { mcpServers: ['figma'], skills: [] },
-      runtimes: [], // pi 关 = runtime 闸挡
+      runtimes: [],
     });
 
     const res = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/agents/agent-fit/machine-fit`);
@@ -585,28 +544,24 @@ describe('#1251 machine-fit 读面（agent 面「哪些机器可跑它」）', (
     };
     const byId = Object.fromEntries(body.machines.map((m) => [m.machineId, m]));
 
-    // 能力齐 + runtime 开 → canRun；声明对账缺 ctx。
     expect(byId[capable.machineId]).toMatchObject({
       runtimeOk: true,
       missing: [],
       canRun: true,
       mcpGaps: ['ctx'],
     });
-    // 缺 figma → 挡，missing 点名可读形。
     expect(byId[lacking.machineId]).toMatchObject({
       runtimeOk: true,
       missing: ['MCP server "figma"'],
       canRun: false,
       mcpGaps: ['figma'],
     });
-    // 未上报快照 → 未知放行（fail-open），missing/mcpGaps null（显示面闭嘴）。
     expect(byId[legacy.machineId]).toMatchObject({
       runtimeOk: true,
       missing: null,
       mcpGaps: null,
       canRun: true,
     });
-    // runtime 闸挡 → canRun false（能力面齐也挡；两闸独立）。
     expect(byId[noRuntime.machineId]).toMatchObject({ runtimeOk: false, canRun: false });
   });
 });

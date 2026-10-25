@@ -1,10 +1,3 @@
-// SSE team stream 对拍（02 §1.2 + r5 §7.2 实测形状）：
-// - {"type":"ping","seq":n} 心跳（r3 §8.1；节奏可配，默认 ~15s）
-// - {"type":"todo"|"build",seq,v,doc} 全文档推送（r5 §7.2；seq 连接内递增，
-//   v = todo 记录版本）
-// 事件 schema 单源 = shared teamStreamEventSchema（notification/
-// machine_presence 事件面归 M2c/M3）。
-
 import {
   buildDocEventSchema,
   pingEventSchema,
@@ -14,16 +7,14 @@ import {
 import { describe, expect, test } from 'vitest';
 import { bootServer, openStream, req } from './helpers.js';
 
-describe('SSE team stream（r5 §7.2 文档事件形状）', () => {
-  test('连接首帧 ping；todo/build 变更推全文档事件，seq 连接内递增', async () => {
+describe('the SSE team stream (the r5 §7.2 document event shape)', () => {
+  test('the first frame on connect is a ping; todo/build changes push full document events, seq increasing within the connection', async () => {
     const s = bootServer({ pingIntervalMs: 50 });
     const stream = await openStream(s.app, s.team.id);
     try {
-      // 首帧 ping（seq=1）
       const ping1 = pingEventSchema.parse(await stream.next((ev) => ev.type === 'ping'));
       expect(ping1.seq).toBe(1);
 
-      // 建 project + todo → todo 文档事件（{type:"todo",seq,v,doc}）
       const project = (await (
         await req(s.app, 'POST', '/api/projects', { name: 'demo' })
       ).json()) as { id: string };
@@ -37,7 +28,6 @@ describe('SSE team stream（r5 §7.2 文档事件形状）', () => {
       expect(todoEv.seq).toBeGreaterThan(ping1.seq);
       expect(teamStreamEventSchema.safeParse(todoEv).success).toBe(true);
 
-      // 启动 build → todo（queued, v+1）与 build 文档事件同流
       await req(s.app, 'POST', `/api/projects/${project.id}/builds`, {
         todoIds: [created.id],
         assignment: { plan: null, build: null },
@@ -53,7 +43,6 @@ describe('SSE team stream（r5 §7.2 文档事件形状）', () => {
       );
       expect(queuedEv.v).toBe(created.v + 1);
 
-      // PATCH → 再推 todo 文档事件（v 递增）
       await req(s.app, 'PATCH', `/api/todos/${created.id}`, { title: '写文档 v2' });
       const patchedEv = todoDocEventSchema.parse(
         await stream.next(
@@ -62,7 +51,6 @@ describe('SSE team stream（r5 §7.2 文档事件形状）', () => {
       );
       expect(patchedEv.v).toBe(created.v + 2);
 
-      // 心跳持续：再收一帧 ping，seq 严格递增
       const lastSeq = Math.max(patchedEv.seq, buildEv.seq, queuedEv.seq);
       const ping2 = pingEventSchema.parse(
         await stream.next((ev) => ev.type === 'ping' && (ev.seq as number) > lastSeq),
@@ -73,7 +61,7 @@ describe('SSE team stream（r5 §7.2 文档事件形状）', () => {
     }
   });
 
-  test('断开即退订（hub 无泄漏连接）', async () => {
+  test('disconnect unsubscribes at once (no leaked connections in the hub)', async () => {
     const s = bootServer({ pingIntervalMs: 50 });
     const stream = await openStream(s.app, s.team.id);
     await stream.next((ev) => ev.type === 'ping');
@@ -83,7 +71,7 @@ describe('SSE team stream（r5 §7.2 文档事件形状）', () => {
     expect(s.hub.subscriberCount(s.team.id)).toBe(0);
   });
 
-  test('未知 team 404 {error}（team 恒 seed 一行）', async () => {
+  test('an unknown team 404 {error} (the team stays one seeded row)', async () => {
     const s = bootServer();
     const res = await req(s.app, 'GET', '/api/teams/nope/stream');
     expect(res.status).toBe(404);

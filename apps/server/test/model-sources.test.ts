@@ -1,15 +1,3 @@
-// model-sources 端点对拍（spec 11 §A3/A4 + 数据契约，#356；#707 起
-// claude-code 段跟随执行机）：GET /api/teams/:id/model-sources → pi 一段 +
-// 每台上报过的机器一段 claude-code——pi 段 = custom providers models[]
-// 投影（installed 恒 true）；claude-code 段 = daemon 经 enroll/presence
-// 上行的本机 settings.json 解析结果（server 按机器聚合，不读本机文件）。
-// 失败方式（先于实现固化）：
-// F1 控制面配置不泄漏：上报值 ≠ server 本机值时，封套只含上报值。
-// F2 多机：两台机器各一段 + hostname 如实（按机器名排序）。
-// F3 无 claude-code 的机器：installed:false 段在、models 空。
-// F6 旧 daemon（从未上报）：段缺席，封套仍合法。
-// presence 更新即反映（30s 节拍实时语义的 server 侧）。
-
 import { hostname } from 'node:os';
 import { modelSourcesEnvelopeSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
@@ -34,7 +22,6 @@ async function postProvider(s: TestServer): Promise<void> {
   expect(res.status).toBe(201);
 }
 
-/** 注册一台机器换 token（machine wire 面）。 */
 async function enroll(s: TestServer, name: string, claudeCode?: unknown): Promise<string> {
   const key = await issueApiKey(s);
   const res = await s.app.request('/api/machine/enroll', {
@@ -64,8 +51,8 @@ function report(host: string, models: { id: string; name: string; slot?: string 
   return { installed: models.length > 0, hostname: host, models };
 }
 
-describe('getModelSources（服务层，按机器聚合）', () => {
-  test('全新库：仅 pi 一段（无上报机器时无 claude-code 段），封套过 shared schema', () => {
+describe('getModelSources (service layer, aggregated per machine)', () => {
+  test('fresh db: only the pi segment (no claude-code segment without a reporting machine), envelope passes the shared schema', () => {
     const s = bootServer();
     const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
     expect(modelSourcesEnvelopeSchema.safeParse(env).success).toBe(true);
@@ -76,7 +63,7 @@ describe('getModelSources（服务层，按机器聚合）', () => {
     s.dispose();
   });
 
-  test('pi 段 = custom providers models[] 投影（id/name 原样，跨 provider 平铺）', async () => {
+  test('pi segment = custom providers models[] projection (id/name verbatim, flattened across providers)', async () => {
     const s = bootServer();
     await postProvider(s);
     const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
@@ -88,7 +75,7 @@ describe('getModelSources（服务层，按机器聚合）', () => {
     s.dispose();
   });
 
-  test('F1：执行机上报值进段——server 本机文件不读，段 hostname/模型 = 上报值', async () => {
+  test('F1: execution machine reported values enter the segment -- server local files not read, segment hostname/models = reported values', async () => {
     const s = bootServer();
     const token = await enroll(s, 'exec-1');
     await presence(token, s, report('exec-host-1', [{ id: 'exec-model', name: 'exec-model' }]));
@@ -102,7 +89,7 @@ describe('getModelSources（服务层，按机器聚合）', () => {
     s.dispose();
   });
 
-  test('F2：两台机器各一段 + hostname 如实（按机器名排序）', async () => {
+  test('F2: two machines one segment each + hostname faithful (sorted by machine name)', async () => {
     const s = bootServer();
     const tokenB = await enroll(s, 'exec-b');
     const tokenA = await enroll(s, 'exec-a');
@@ -116,7 +103,7 @@ describe('getModelSources（服务层，按机器聚合）', () => {
     s.dispose();
   });
 
-  test('F3：无 claude-code 的机器报 installed:false（段在、models 空）', async () => {
+  test('F3: a machine without claude-code reports installed:false (segment present, models empty)', async () => {
     const s = bootServer();
     const token = await enroll(s, 'exec-plain');
     await presence(token, s, { installed: false, hostname: 'plain-host', models: [] });
@@ -128,7 +115,7 @@ describe('getModelSources（服务层，按机器聚合）', () => {
     s.dispose();
   });
 
-  test('F6：从未上报的机器（旧 daemon）缺席——enroll 不带 claudeCode 即无段', async () => {
+  test('F6: a never-reported machine (legacy daemon) absent -- enroll without claudeCode means no segment', async () => {
     const s = bootServer();
     await enroll(s, 'legacy-1');
     const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
@@ -136,7 +123,7 @@ describe('getModelSources（服务层，按机器聚合）', () => {
     s.dispose();
   });
 
-  test('F7（#1050）：bin/auth 原样透传——server 不合成、不猜', async () => {
+  test('F7 (#1050): bin/auth passed through verbatim -- server does not synthesize or guess', async () => {
     const s = bootServer();
     const token = await enroll(s, 'exec-bin');
     await presence(token, s, {
@@ -154,7 +141,7 @@ describe('getModelSources（服务层，按机器聚合）', () => {
     s.dispose();
   });
 
-  test('F8（#1050）：旧形状（无 bin/auth）→ 两键缺席，不写「未知」', async () => {
+  test('F8 (#1050): legacy shape (no bin/auth) -> two keys absent, no "unknown" written', async () => {
     const s = bootServer();
     const token = await enroll(s, 'exec-old');
     await presence(token, s, report('old-host', [{ id: 'm1', name: 'm1' }]));
@@ -166,7 +153,7 @@ describe('getModelSources（服务层，按机器聚合）', () => {
     s.dispose();
   });
 
-  test('presence 更新即反映：改上报后内容立即变（30s 节拍实时语义）', async () => {
+  test('presence update reflects immediately: content changes right after the report changes (30s beat real-time semantics)', async () => {
     const s = bootServer();
     const token = await enroll(s, 'exec-1');
     await presence(token, s, report('exec-host-1', [{ id: 'model-old', name: 'model-old' }]));
@@ -183,7 +170,7 @@ describe('getModelSources（服务层，按机器聚合）', () => {
     s.dispose();
   });
 
-  test('enroll 即带上报：首个 presence 前已有段', async () => {
+  test('enroll already carries the report: the segment exists before the first presence', async () => {
     const s = bootServer();
     await enroll(s, 'exec-1', report('exec-host-1', [{ id: 'm-early', name: 'm-early' }]));
     const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
@@ -193,8 +180,8 @@ describe('getModelSources（服务层，按机器聚合）', () => {
   });
 });
 
-describe('GET /api/teams/:id/model-sources（路由面）', () => {
-  test('未知 team → 404 error 形', async () => {
+describe('GET /api/teams/:id/model-sources (route surface)', () => {
+  test('unknown team -> 404 error shape', async () => {
     const s = bootServer();
     const res = await req(s.app, 'GET', '/api/teams/nope/model-sources');
     expect(res.status).toBe(404);
@@ -203,7 +190,7 @@ describe('GET /api/teams/:id/model-sources（路由面）', () => {
     s.dispose();
   });
 
-  test('200：pi 首段 + 上报机段 + 元素形状', async () => {
+  test('200: pi first segment + reporting-machine segment + element shape', async () => {
     const s = bootServer();
     await postProvider(s);
     const token = await enroll(s, 'exec-1');

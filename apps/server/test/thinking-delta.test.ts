@@ -1,11 +1,3 @@
-// #1308：机器上报 thinking_delta 要进会话流，且不落库。
-// 失败方式：
-// 1. POST {kind:'thinking_delta', text} 被 union 拒绝（400），流上没有该正文。
-// 2. 空 text 不得发事件。
-// 3. 晚订阅要补发当前思考段，思考段行落库后不再补发（避免和落库行叠成两份）。
-// 4. text_delta 通道照旧，不把思考正文当成正文增量。
-// 5. 思考增量把上一段正文封掉时，正文行不得清掉刚写入的思考快照。
-
 import { conversationStreamEventSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
@@ -183,8 +175,6 @@ describe('thinking_delta on the conversation stream (#1308)', () => {
     expect(textRow.status).toBe(200);
     const late = await openConvStream(s.app, buildId);
     try {
-      // 补发走串行链，排在路由首帧 ping 之前。正文行若把思考缓冲清掉，
-      // 第一帧是 ping，断言立刻失败，不必干等到流超时。
       const first = await late.next(() => true);
       expect(first).toEqual({ type: 'thinking_delta', text: MARKER });
     } finally {
@@ -228,7 +218,6 @@ describe('thinking_delta on the conversation stream (#1308)', () => {
       cred: token,
       body: { kind: 'thinking_delta', text: MARKER },
     });
-    // A plain starting resend (no resetLive) must not wipe the snapshot.
     await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
       cred: token,
       body: { kind: 'activity', activity: { phase: 'starting' } },

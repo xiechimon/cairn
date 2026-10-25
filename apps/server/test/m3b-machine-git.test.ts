@@ -1,8 +1,3 @@
-// M3b server 半对拍（02 §4.2/§5.4/§8）：claim 载荷 repo 绑定位、per-step
-// 一次性 git 凭证（发行/回收）、plan.md 产物版本落库、done 回传 commit =
-// per-step checkpoint、合并步落地 = bare repo 默认分支 fast-forward（非快进
-// 拒绝 → failed，人工重跑 02/A6）、时间线「发起了合并」/「🎉 任务已完成」。
-
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -60,7 +55,6 @@ interface GitWorld {
   startBuild(): Promise<string>;
   claim(): Promise<ClaimedStep>;
   done(stepId: string, body: Record<string, unknown>): Promise<Response>;
-  /** plan.md 产物回传（plan 关交接物，#113：无产物规划步不算成、不进 confirm）。 */
   uploadPlan(stepId: string, content: string): Promise<void>;
 }
 
@@ -78,9 +72,6 @@ async function setupGitWorld(): Promise<GitWorld> {
     body: { teamId: s.team.id, name: 'm3b-mbp', cliVersion: '0.1.0' },
   });
   const machineJson = (await enrollRes.json()) as { token: string };
-  // agent（provider 面不必要——token 响应的 provider 槽为 null 亦可断言 git 面）。
-  // XMON-77：本世界走 merge 全链（/merge 202 + 合并步 claim），合并闸要求
-  // build 槽 Agent 持两开关——先行授权。
   s.db
     .insert(agentTable)
     .values({
@@ -91,8 +82,7 @@ async function setupGitWorld(): Promise<GitWorld> {
       tools: ['合并分支', '推送分支'],
     })
     .run();
-  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
-  // 托管 repo 项目（provision = init bare + 种子提交立 main，services/git.ts）。
+  bindAllAgents(s);
   const projRes = await call(s.app, 'POST', '/api/projects', {
     body: { name: 'm3b-lifecycle', repoKind: 'hosted' },
   });
@@ -152,16 +142,12 @@ async function setupGitWorld(): Promise<GitWorld> {
   };
 }
 
-/** bare repo 内直造分支提交（模拟 daemon push 后状态）：以现 main tip 为父
- * （conv 分支 = main 后代 → fast-forward 合法）；branch='main' 时即推进 main
- * （非快进窗口用）。 */
 async function fakePushConvBranch(repoDir: string, branch: string): Promise<string> {
   const { runGit } = await import('../src/lib/git.js');
   const parent = await systemGitOps.resolveCommit(repoDir, 'refs/heads/main');
   if (parent === null) throw new Error('main missing');
   const treeRes = await runGit(['rev-parse', `${parent}^{tree}`], { cwd: repoDir });
   const tree = treeRes.stdout.toString('utf8').trim();
-  // 消息带唯一位：同树同父同秒的 commit-tree 会产出同 sha（对象内容寻址）。
   const r = await runGit(
     ['commit-tree', tree, '-p', parent, '-m', `probe ${branch} ${Math.random()}`],
     {
@@ -180,22 +166,21 @@ async function fakePushConvBranch(repoDir: string, branch: string): Promise<stri
   return sha;
 }
 
-describe('claim 载荷 repo 绑定位（M3b worktree 契约接线，02 §3/§5.5）', () => {
-  test('托管项目 → project.repo {kind:hosted, cloneUrl=/git/<teamId>/<repoName>}', async () => {
+describe('claim payload repo binding slot (M3b worktree contract wiring, 02 section 3/5.5)', () => {
+  test('hosted project -> project.repo {kind:hosted, cloneUrl=/git/<teamId>/<repoName>}', async () => {
     const w = await setupGitWorld();
     await w.startBuild();
     const claimed = await w.claim();
     expect(claimed.project!.repo?.kind).toBe('hosted');
     const url = new URL(claimed.project!.repo!.cloneUrl);
     expect(url.pathname).toBe(`/git/${w.s.team.id}/m3b-lifecycle`);
-    // 托管 provision 即种子提交：main 在位（worktree base 前提）。
     const main = await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main');
     expect(main).toMatch(/^[0-9a-f]{40}$/);
   });
 });
 
-describe('per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 push_credential r5 §3.1）', () => {
-  test('token/{stepId} → git {username,password}；done 后回收（撤销 = 行删除）', async () => {
+describe('per-step one-time git credential (02 section 5.4/8; relay tool name matches push_credential r5 section 3.1)', () => {
+  test('token/{stepId} -> git {username,password}; revoked after done (revoke = row delete)', async () => {
     const w = await setupGitWorld();
     await w.startBuild();
     const claimed = await w.claim();
@@ -206,7 +191,6 @@ describe('per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 p
     expect(token.git).not.toBeNull();
     expect(token.git?.username).toBe('git');
     expect(token.git?.password).toMatch(/^cairn_[0-9a-f]{48}$/);
-    // 发行面 = apiKey 行（gitAccess=true，服务端只存哈希）。
     const rows = w.s.db
       .select()
       .from(apiKeyTable)
@@ -215,7 +199,6 @@ describe('per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 p
     expect(rows).toHaveLength(1);
     expect(rows[0]!.gitAccess).toBe(true);
     expect(rows[0]!.keyHash).not.toContain(token.git!.password);
-    // 幂等重取（recover 二次 token）：同行换新，不叠加。
     const again = machineTokenResponseSchema.parse(
       await (
         await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, { cred: w.token })
@@ -228,7 +211,6 @@ describe('per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 p
       .where(eq(apiKeyTable.name, `git-step-${claimed.step.id}`))
       .all();
     expect(rows2).toHaveLength(1);
-    // done → 回收。
     await w.done(claimed.step.id, { status: 'success', sessionId: 'pi-1' });
     const rows3 = w.s.db
       .select()
@@ -238,7 +220,7 @@ describe('per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 p
     expect(rows3).toHaveLength(0);
   });
 
-  test('未绑 repo 项目 → git null（M3a 兼容形状）', async () => {
+  test('repo-less project -> git null (M3a compatible shape)', async () => {
     const s = bootServer({ claimHoldMs: 200 });
     disposables.push(() => s.dispose());
     const key = await issueApiKey(s);
@@ -251,7 +233,7 @@ describe('per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 p
       .insert(agentTable)
       .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'b', modelId: 'm' })
       .run();
-    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+    bindAllAgents(s);
 
     const projRes = await call(s.app, 'POST', '/api/projects', { body: { name: 'plain' } });
     const project = (await projRes.json()) as { id: string };
@@ -280,8 +262,8 @@ describe('per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 p
   });
 });
 
-describe('plan.md 产物上传（02 §4.2/r5 §4：plan 即文件，版本 = 文件版本）', () => {
-  test('upload-urls plan.md → plan v1 + build.planDocId；重规划轮 → v2', async () => {
+describe('plan.md artifact upload (02 section 4.2 / r5 section 4: plan is a file, version = file version)', () => {
+  test('upload-urls plan.md -> plan v1 + build.planDocId; replan round -> v2', async () => {
     const w = await setupGitWorld();
     const buildId = await w.startBuild();
     const claimed = await w.claim();
@@ -312,7 +294,6 @@ describe('plan.md 产物上传（02 §4.2/r5 §4：plan 即文件，版本 = 文
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
     expect(buildRow.planDocId).toBe(plans[0]!.id);
 
-    // 驳回重规划轮：同 build 第二版（v2，r5 §4）。
     await put('plan.md', '# Context\n方案 v2\n');
     const plans2 = w.s.db.select().from(planTable).where(eq(planTable.buildId, buildId)).all();
     expect(plans2).toHaveLength(2);
@@ -322,8 +303,8 @@ describe('plan.md 产物上传（02 §4.2/r5 §4：plan 即文件，版本 = 文
   });
 });
 
-describe('done 回传 commit = per-step checkpoint（r3 §3.5「恢复到此处」数据面）', () => {
-  test('step.checkpointCommit 落库', async () => {
+describe('done commit report = per-step checkpoint (r3 section 3.5 "restore here" data surface)', () => {
+  test('step.checkpointCommit persisted', async () => {
     const w = await setupGitWorld();
     await w.startBuild();
     const claimed = await w.claim();
@@ -334,12 +315,10 @@ describe('done 回传 commit = per-step checkpoint（r3 §3.5「恢复到此处�
   });
 });
 
-describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服务端 main 验证）', () => {
-  test('合并步 done(commit) → bare repo main fast-forward + 时间线 🎉', async () => {
+describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section 3.6 server-side main verify)', () => {
+  test('merge step done(commit) -> bare repo main fast-forward + timeline 🎉', async () => {
     const w = await setupGitWorld();
     const buildId = await w.startBuild();
-    // plan → confirm → build → review → merge 步（server 面驱动，daemon 面归
-    // integration m3b-demo）。plan 步带 plan.md 交接物（#113：无产物不进 confirm）。
     const planStep = await w.claim();
     await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n'));
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -358,7 +337,6 @@ describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服�
     const mergeRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
     expect(mergeRes.status).toBe(202);
     expect(await mergeRes.json()).toEqual({ delegated: true });
-    // 时间线「发起了合并」（r3 §3.6）。
     const msgsAfterRequest = w.s.db
       .select()
       .from(messageTable)
@@ -375,10 +353,8 @@ describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服�
       commit: convSha,
     });
     expect(todoNow().phase).toBe('done');
-    // bare repo main 已 fast-forward 到 conv 分支 HEAD（r3 §3.6「83 号验证」同语义）。
     const main = await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main');
     expect(main).toBe(convSha);
-    // 时间线 🎉（r3 §3.6）。
     const msgs = w.s.db
       .select()
       .from(messageTable)
@@ -387,11 +363,11 @@ describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服�
     expect(msgs.some((m) => m.content === '🎉 任务已完成')).toBe(true);
   });
 
-  test('非快进（main 在合并窗口被推进）→ 步 failed + todo failed（失败仅人工重跑，02/A6）', async () => {
+  test('not fast-forward (main advanced during the merge window) -> step failed + todo failed (failure only human rerun, 02/A6)', async () => {
     const w = await setupGitWorld();
     const buildId = await w.startBuild();
     const planStep = await w.claim();
-    await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n')); // 交接物（#113）
+    await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n'));
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
     const buildStep = await w.claim();
@@ -399,7 +375,6 @@ describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服�
     await w.done(buildStep.step.id, { status: 'success', sessionId: 'pi-1', commit: convSha });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
     const mergeStep = await w.claim();
-    // 合并窗口内 main 前进（分叉提交）→ convSha 不再是 main 的后代。
     await fakePushConvBranch(w.repoDir, 'main');
     await w.done(mergeStep.step.id, { status: 'success', sessionId: 'pi-1', commit: convSha });
 
@@ -416,10 +391,7 @@ describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服�
   });
 });
 
-describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409', () => {
-  // 2026-10-22 裁决方案 a：卡已关闭或已挪回待开始时，合并步的成功回报不再把
-  // 托管仓默认分支快进；卡保持原相位，时间线落一行说明合并没有落地。
-  /** 走到「合并步已被领走」：返回 world、buildId、conv 分支 sha、合并步 id、main 原 tip。 */
+describe('#1487 merge step in flight when the card leaves review: success report not landed; repeated merge request 409', () => {
   async function mergeInFlight() {
     const w = await setupGitWorld();
     const buildId = await w.startBuild();
@@ -448,7 +420,7 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
   const timeline = (w: Awaited<ReturnType<typeof setupGitWorld>>, buildId: string) =>
     w.s.db.select().from(messageTable).where(eq(messageTable.conversationId, buildId)).all();
 
-  test('失败方式 1：合并步在跑时关闭 → 成功回报不快进 main，卡仍 closed，时间线说明', async () => {
+  test('failure mode 1: closed while the merge step is in flight -> success report does not fast-forward main, card still closed, timeline explanation', async () => {
     const { w, buildId, convSha, mergeStepId, mainBefore } = await mergeInFlight();
     expect(
       (await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { phase: 'closed' } }))
@@ -461,9 +433,8 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
     expect(timeline(w, buildId).some((m) => m.content === '🎉 任务已完成')).toBe(false);
   });
 
-  test('失败方式 1b：回报进来时卡还在审核、落地的 git 检查期间被关闭 → 仍不快进', async () => {
+  test('failure mode 1b: report arrives while card still in review, closed during the landing git check -> still not fast-forwarded', async () => {
     const { w, buildId, convSha, mergeStepId, mainBefore } = await mergeInFlight();
-    // 在 applyMergeLanding 的第一个 git await（listBranches）期间关卡。
     const real = systemGitOps.listBranches.bind(systemGitOps);
     let closedInWindow = false;
     const spy = vi.spyOn(systemGitOps, 'listBranches').mockImplementation(async (...args) => {
@@ -482,7 +453,7 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
     expect(timeline(w, buildId).some((m) => m.content === MERGE_NOT_LANDED_NOTE)).toBe(true);
   });
 
-  test('失败方式 2：关闭后重新打开回待开始 → 同样不落地，卡仍 todo', async () => {
+  test('failure mode 2: closed then reopened to to-do -> also not landed, card still todo', async () => {
     const { w, buildId, convSha, mergeStepId, mainBefore } = await mergeInFlight();
     expect(
       (await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { phase: 'closed' } }))
@@ -497,7 +468,7 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
     expect(timeline(w, buildId).some((m) => m.content === MERGE_NOT_LANDED_NOTE)).toBe(true);
   });
 
-  test('失败方式 3：同一 build 已有在途合并步（pending 或已领走）→ 再请求合并 409，不多排一个', async () => {
+  test('failure mode 3: same build already has an in-flight merge step (pending or claimed) -> another merge request 409, no extra one queued', async () => {
     const w = await setupGitWorld();
     const buildId = await w.startBuild();
     const planStep = await w.claim();
@@ -532,8 +503,8 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
   });
 });
 
-describe('托管 repo provision 种子提交（M3b [设计]：空库不能 worktree）', () => {
-  test('init bare 即立 refs/heads/main（空树种子）', async () => {
+describe('hosted repo provision seed commit (M3b [design]: empty repo cannot worktree)', () => {
+  test('init bare immediately establishes refs/heads/main (empty-tree seed)', async () => {
     const dir = join(mkdtempSync(join(tmpdir(), 'cairn-seed-')), 'x.git');
     disposables.push(() => rmSync(dir, { recursive: true, force: true }));
     await systemGitOps.initBareRepo(dir);

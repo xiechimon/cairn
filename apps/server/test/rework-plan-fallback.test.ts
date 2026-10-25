@@ -1,16 +1,3 @@
-// #1204 返工回路两修（server 面）：
-//  A（缺陷一）：返工回 plan 步时 assignment.plan 为空 → 回落 build 槽 agent
-//    接管，不再 failed。票面实锤（卡 #25）：assignment {plan:null, build:{…}}
-//    在 review 收「请求修改」→ 重规划步无人可领 → todo failed 终态，恢复只能
-//    整卡重跑。
-// 失败方式（先于实现固化，仓测试纪律）：
-//  A1. plan 槽空（build 槽在）+ review 收请求修改 → 重规划步由 build agent
-//      认领，不再 failed（回落生效）。
-//  A2. 两槽皆空的返工步 → 仍失败收尾（回落已试，文案点名两槽）。
-//  A3. 首轮规划步（无 prompt）plan 槽空 → 仍按 #1104 B 失败收尾——回落只作用
-//      于带续轮指令的返工步，首跑语义是回归红线（chief 400 自纠回路不摘）。
-//  A4. plan 槽在位的返工步 → plan agent 认领（现状行为不变，卡 #24 形）。
-
 import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -41,7 +28,6 @@ afterAll(() => {
   for (const s of servers) s.dispose();
 });
 
-/** machine wire 面裸请求（helpers.req 不带鉴权头，unassigned-build 同律）。 */
 function call(
   app: TestServer['app'],
   method: string,
@@ -82,7 +68,7 @@ async function setupWorld(): Promise<World> {
       .values({ id, teamId: s.team.id, displayName: id, modelId: 'stub-model' })
       .run();
   }
-  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+  bindAllAgents(s);
   const projectId = await postProject(s.app, 'rework-proj');
   return { s, tokenA: token, projectId };
 }
@@ -105,9 +91,6 @@ interface ReviewWorld {
   phaseOf: () => Promise<string>;
 }
 
-/** 新 todo → 首跑全链（plan 步成 → confirm → build 步成）→ review 静息态。
- *  assignment 由入参钉（A 组的落差全在 plan 槽）；首跑步用 completeStep 直驱
- *  （claim 面归 A 组断言，wire.test 同口径）。 */
 async function worldInReview(
   w: World,
   assignment: { plan: { agentId: string } | null; build: { agentId: string } | null },
@@ -142,17 +125,16 @@ async function worldInReview(
       createdAt: 1,
     })
     .run();
-  completeStep(w.s.svc, (await stepsOf())[0]!.id); // plan 步成 → confirm
+  completeStep(w.s.svc, (await stepsOf())[0]!.id);
   await req(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { action: 'confirm' });
   const steps = await stepsOf();
   const buildStep = steps[steps.length - 1]!;
-  // 降级注入面的前置：prior session 在位（B1 的 continue 判定吃 step.sessionId）。
   w.s.db
     .update(stepTable)
     .set({ sessionId: 'sess-first-build' })
     .where(eq(stepTable.id, buildStep.id))
     .run();
-  completeStep(w.s.svc, buildStep.id); // build 步成 → review
+  completeStep(w.s.svc, buildStep.id);
   return { w, todoId, buildId, stepsOf, phaseOf };
 }
 
@@ -168,8 +150,8 @@ async function rejectInReview(rw: ReviewWorld): Promise<void> {
   expect(res.status).toBe(202);
 }
 
-describe('#1204 A：返工回 plan 步的槽位回落（agentForStep）', () => {
-  test('A1：plan 槽空（build 槽在）+ review 请求修改 → build agent 认领重规划步，不再 failed', async () => {
+describe('#1204 A: the slot fallback when rework returns to a plan step (agentForStep)', () => {
+  test('A1: an empty plan slot (build slot filled) + review requests changes -> the build agent claims the replan step, no longer failed', async () => {
     const w = await setupWorld();
     const rw = await worldInReview(w, {
       plan: null,
@@ -182,9 +164,7 @@ describe('#1204 A：返工回 plan 步的槽位回落（agentForStep）', () => 
     const claimed = await claim(w);
     expect(claimed).not.toBeNull();
     expect(claimed?.step.kind).toBe('plan');
-    // 回落判据：认领者 = build 槽 agent（plan 槽空，无人可从 plan 槽解出）。
     expect(claimed?.agent?.id).toBe(AGENT_BUILD);
-    // 步被认领而非失败收尾（票面原文：改前 todo failed 终态）。
     const stepRow = w.s.db
       .select()
       .from(stepTable)
@@ -195,7 +175,7 @@ describe('#1204 A：返工回 plan 步的槽位回落（agentForStep）', () => 
     expect(todoRow.phase).toBe('planning');
   });
 
-  test('A2：两槽皆空的返工步 → 仍失败收尾，文案点名两槽', async () => {
+  test('A2: a rework step with both slots empty -> still ends failed, the text names both slots', async () => {
     const w = await setupWorld();
     const rw = await worldInReview(w, { plan: null, build: null });
     await rejectInReview(rw);
@@ -207,12 +187,11 @@ describe('#1204 A：返工回 plan 步的槽位回落（agentForStep）', () => 
     expect(last.status).toBe('failed');
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, rw.todoId)).get()!;
     expect(todoRow.phase).toBe('failed');
-    // 回落已试、两槽皆空：根因文案点名两槽（#1104 B 漏斗的 build.errorMessage）。
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, rw.buildId)).get()!;
     expect(buildRow.errorMessage).toContain('plan 槽与 build 槽均为空');
   });
 
-  test('A3（回归红线）：首轮规划步（无 prompt）plan 槽空 → 仍按 #1104 B 失败收尾', async () => {
+  test('A3 (regression red line): a first-round plan step (no prompt) with an empty plan slot -> still ends failed per #1104 B', async () => {
     const w = await setupWorld();
     const todoRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
       title: 'first-run probe',
@@ -234,7 +213,7 @@ describe('#1204 A：返工回 plan 步的槽位回落（agentForStep）', () => 
     expect(todoRow.phase).toBe('failed');
   });
 
-  test('A4（回归）：plan 槽在位的返工步 → plan agent 认领（现状不变）', async () => {
+  test('A4 (regression): a rework step with the plan slot filled -> the plan agent claims it (status quo unchanged)', async () => {
     const w = await setupWorld();
     const rw = await worldInReview(w, {
       plan: { agentId: AGENT_PLAN },

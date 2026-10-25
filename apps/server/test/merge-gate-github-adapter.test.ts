@@ -1,10 +1,3 @@
-// #1404 S4b: services/merge-gate-github.ts binds S4a's transport (lib/github.ts) into the gate's port.
-// Failure mode B-44 (docs/verify/1404/s4b-failure-modes.txt): the adapter binds another owner, repo, token or
-// timeout than given, or drops a parameter the gate passes (page, per_page, filter, etag). A1 checks each
-// method's request; A2 runs the shell end to end over the live captures of S4a
-// (apps/server/test/fixtures/github/gate-*.json), so a drift between the port type and the transport is a
-// compile or test failure.
-
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -121,7 +114,6 @@ describe('githubGatePort end to end over the live captures (A2)', () => {
     expect(f.pr).toMatchObject({ state: 'open', draft: false, headSha: PR_HEAD, baseRef: 'main' });
     expect(f.defaultBranch).toBe('main');
     expect(f.checks?.required).toEqual(['check', 'pack-smoke', 'e2e-gate', 'pr-evidence']);
-    // 14 runs, pr-evidence twice from one app in two suites: 13 after the (app, name) dedupe.
     expect(f.checks?.runs).toHaveLength(13);
     expect(f.checks?.statusSha).toBe(PR_HEAD);
     expect(f.checks?.complete).toBe(true);

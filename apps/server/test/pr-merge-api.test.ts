@@ -1,80 +1,3 @@
-// #1403 段 2b（设计 D，2026-10-22 用户裁决）：GitHub 形态、build 记着 PR 的任务，人在
-// cairn 里点合并 = server 经 GitHub REST 合并这张 PR（PUT pulls/{n}/merge，sha 绑本 build
-// 最后推送的提交、squash、标题取 PR 标题、同仓 issue 来源带 closes 行），不再派机器合并步。
-// GitHub 形态没有 PR、托管仓与本地仓照旧派合并步。失败方式先于实现列出（AGENTS.md 测试
-// 规则），编号同 docs/verify/1403/seg2b-failure-modes.txt：
-//   D1 合并成功 → 一次 PUT（请求体逐字段）、宣告行 + 合并行 + 完成行、done、停掉没人领的
-//      verify 步、不建合并步、应答 {delegated:true}
-//   D2 closes 行只给本仓 issue 来源（大小写不敏感）；别的仓、编排来源、无来源、畸形不带
-//   D3 未连接 GitHub / 连接解不开 → 409 请连接，零出站、零行、零步
-//   D4 PR head 不是最后推送的提交 → 409 点名两个短 SHA，不 PUT
-//   D5 没有 checkpoint / 不是 40 位 SHA → 409，零出站
-//   D6 PR 已合并 → 409 说对账会收尾，不 PUT；下一轮对账收尾
-//   D7 PR 关闭未合并 → 409，不 PUT
-//   D8 不是本 build 的 PR（head 仓不同 / head 仓为 null / head 分支不是工作分支）→ 409，不 PUT
-//   D9 目标不是默认分支 → 409，不 PUT
-//   D10 PUT 405/409/422/404/403（无限流信号）→ 409 带 GitHub 的 message（清洗、截断），
-//       零行、相位不变；再点一次再发一次 PUT
-//   D11 PUT 401 → 409 请重新连接
-//   D12 PUT 200 但 merged=false → 按拒绝
-//   D13 PUT 超时 / 网络错 / 5xx → 202、宣告行 + 一行「没有明确答复」、留在 review；之后
-//       对账读到已合并 → 收尾一次；读到 open → 不动（限流 429 / 带限流信号的 403 不在这里：
-//       GitHub 没有处理，409，见 D40）
-//   D14 PUT 200 应答体读不出 → 同 D13
-//   D15 同一 build 两次并发点合并 → 一次 GET、一次 PUT，另一次 409
-//   D16 PUT 在飞时对账 sweep（PR 已合并）→ 对账不读不写；只有 cairn 的合并行与一行完成行
-//   D17 GET 在飞时人关卡 → 重读 409、不 PUT；PUT 在飞时人关卡、GitHub 合并成功 → 落两行、
-//       不抛、相位留 closed
-//   D18 failed 可恢复：合并 → 恢复后 done；拒绝 → 仍 failed、零行；无明确答复 → 恢复到
-//       review 并落行
-//   D19 failed 不可恢复 → 既有 409，零出站
-//   D20 权限闸先于任何出站（#1217 守卫见 second-pr-guard.test.ts）
-//   D21 building 等相位 → 409，零出站；done → 非法相位转移
-//   D22 githubRepo 带 `.` / `..` 段 → 照旧合并步，零出站
-//   D23 本地仓（托管同路）→ 照旧合并步，步完成即 done
-//   D24 GitHub 形态无 PR → 照旧合并步，步完成即 done
-//   D25 合并步在 GitHub 形态、有 PR 的 build 上完成 → 留 review、不落完成行、一行点名
-//       PR；之后 GitHub 上合并 → 对账收尾
-//   D26 token 只进 Authorization 头：不进 URL、错误文案、会话行
-//   D27 REST 线形不变：202 {delegated:true}；拒绝 = 409 {error}
-//   D28 合并请求在飞时对账把它当在飞步：不读不写
-//   D29 GitHub 文本（合并提交、拒绝 message）进行与文案前按对账同一规则清洗
-//   D30 build 不是任务的当前 build（重跑之后旧 build 的 PR 还开着）→ 409，零出站
-//   D31 本 build 有步在跑（已领取的 verify 步之后还会推提交）→ 409，零出站；没人领的
-//       verify / review 步不挡（收尾时停掉，D1）
-//   D32 failed 卡上的拒绝文案不说「对账会收尾」（对账只读 review 卡）：指向看板拖到已完成
-//   D33 连接在但解不开 → 请重新连接 GitHub
-//   D34 合并步在到不了 done 的相位完成（#931 返工复用同一 build）→ 照旧抛非法相位转移、
-//       不落行
-//   D35 遗留合并步在 PR 已于 GitHub 合并之后推了「默认分支并进工作分支」的提交 → 那不是
-//       本 build 的交付提交（合并步不算最后推送的工作），对账照常收尾
-//   D36 合并步把默认分支并进工作分支并推送（开着的 PR 的 head 是它）→ 经 API 合并的 sha 绑它
-//       （分支上 cairn 最后推送的提交；对账的「交付包含」核对不算合并步，D35）
-//   D37 failed 卡的 PR 已在 GitHub 合并 → 恢复到 review、落一行、202、不发合并；对账收尾
-//       （看板上把 failed 卡拖到已完成会走合并弹层，再到这里：不能再让它 409）
-//   D38 PR 作者对仓库没有写权限（author_association 不是 OWNER / MEMBER / COLLABORATOR）
-//       → 409，不发合并（daemon 记的是分支上编号最大的开着的 PR，不看是谁开的）
-//   D39 failed 卡上已合并的 PR 不是本 build 的（fork、作者没有写权限、合进别的分支）→ 409，
-//       卡留在 failed（恢复到 review 只给对账能收尾的那种）
-//   D3c server 没有密钥箱 → 409 点名 server 的密钥，不说「连接 GitHub」
-//   D40 PUT 被限流（429，或带限流信号的 403）= GitHub 没有处理这次合并：409 带 GitHub 的
-//       message 与解除时刻（知道时），不落行、不恢复 failed 卡（2026-10-22 用户裁决，
-//       https://github.com/xiechimon/cairn/issues/1403#issuecomment-6344983763）
-//   D41 PR 标题里有关票关键字 + 引用（close/closes/closed/fix/fixes/fixed/resolve/resolves/
-//       resolved，大小写不敏感，可带冒号，后跟 #N、GH-N、owner/repo#N 或链接）→ 提交标题
-//       不用 PR 标题，用 cairn 自己的「Merge pull request #n」：PR 标题由有写权限标记的
-//       人（含只读成员）定，进了默认分支上的 squash 提交就会关掉任意 issue，绕过 D2
-//   D41c 关票形态只验 PR 标题本身（#1403 段 3，#1509 pr-gate 第 4 轮）：以 fix / close /
-//       resolve 结尾的标题拼上「 (#n)」后不再误命中，保留 PR 标题
-//   D42 没有 closes 行时也传 commit_message（cairn 自己的一行）：不传时 GitHub 按仓库
-//       设置取正文（PR 正文或各提交 message），D41 的同一条路从正文进来
-//   D43 closes 行取 PR 读之后重读的任务行：读的网络窗里自建 issue 补上了 sourceRef（重试）
-//       → 带上它
-//   D44 PR 读本身失败（404、限流 429 / 带限流信号的 403、5xx、超时、网络错、200 但应答体
-//       不是 JSON 对象）→ 409「读不到」，不 PUT、零行；failed 卡留在 failed（#1509 pr-gate
-//       第 2 轮 tests 建议；票的第一条失败方式）
-//   S1  列表读的失败分类：404 / 429 不读应答体，没带限流头的 403 才读（二级限流写在 message）
-
 import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
@@ -101,9 +24,7 @@ afterAll(() => {
   for (const d of disposables) d();
 });
 
-/** 本 build 最后推送的提交（build 步回报的 checkpointCommit）。 */
 const CP = '1a2b3c4d'.repeat(5);
-/** GitHub 合并成功时落在 base 上的提交。 */
 const MERGE_SHA = '9f8e7d6c'.repeat(5);
 const TOKEN = 'gho_merge_test_token';
 const REPO_ID = 4242;
@@ -117,17 +38,14 @@ type Answer =
 interface PullFake {
   state: 'open' | 'closed';
   merged: boolean;
-  /** null = 响应里没有 title。 */
   title?: string | null;
   headSha?: string;
   headRef?: string;
-  /** null = head.repo 为 null（fork 已删）。 */
   headRepoId?: number | null;
   baseRef?: string;
   defaultBranch?: string;
   mergeCommitSha?: string | null;
   mergedBy?: string | null;
-  /** author_association（缺省 OWNER）。 */
   authorAssociation?: string;
 }
 
@@ -149,7 +67,6 @@ function reply(status: number, text: string, headers: Record<string, string> = {
   };
 }
 
-/** 超时 / 网络错的 Answer 抛成 fetch 会抛的错；其余原样留给调用方应答。 */
 function throwIfFault(a: Answer): asserts a is Exclude<Answer, 'timeout' | 'network'> {
   if (a === 'timeout') {
     throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
@@ -157,21 +74,15 @@ function throwIfFault(a: Answer): asserts a is Exclude<Answer, 'timeout' | 'netw
   if (a === 'network') throw new TypeError('fetch failed');
 }
 
-/** 假 GitHub：pulls/{n} 读、pulls/{n}/merge 写；对账要的 compare / 分支 PR 列表 /
- * check-runs 给最小应答。合并成功（200 + merged:true）时把 PR 翻成已合并，同 GitHub。 */
 class GithubFake {
   requests: Recorded[] = [];
   mergeAnswer: Answer = {
     status: 200,
     body: { sha: MERGE_SHA, merged: true, message: 'Pull Request successfully merged' },
   };
-  /** 非 null = pulls/{n} 读不按 pulls 表应答，改答这个（读失败注入位，D44）。 */
   getAnswer: Answer | null = null;
-  /** pulls/{n} 读到达、应答之前调用（网络窗竞态注入位）。 */
   onGet: (() => Promise<void> | void) | null = null;
-  /** merge 写到达、应答之前调用。 */
   onPut: (() => Promise<void> | void) | null = null;
-  /** compare 的 status（对账核对 checkpoint 是否在合并里；缺省 identical）。 */
   compareStatus = 'identical';
   constructor(
     readonly pulls: Record<number, PullFake>,
@@ -247,18 +158,12 @@ interface WorldOpts {
   phase?: Phase;
   repoKind?: 'github' | 'local';
   githubRepo?: string;
-  /** null = build 上没有 PR。 */
   prNumber?: number | null;
-  /** 本 build 执行步回报的 checkpointCommit；null = 执行步没回报。 */
   checkpoint?: string | null;
-  /** 执行步的状态（缺省 done）。 */
   buildStepStatus?: 'done' | 'failed';
-  /** 缺省 true：团队连着 GitHub。 */
   connected?: boolean;
-  /** build 槽 Agent 的工具开关（缺省两开关齐备）。 */
   tools?: string[];
   source?: { kind: 'github-issue' | 'github-issue-self' | 'orchestration'; ref: string } | null;
-  /** 本 build 有一条没人领的 verify 步。 */
   pendingVerify?: boolean;
   pull?: Partial<PullFake>;
 }
@@ -418,12 +323,10 @@ async function refusal(p: Promise<unknown>): Promise<HttpError> {
   throw new Error('expected requestMerge to refuse');
 }
 
-/** 没有 closes 行时 squash 提交的正文（D42）。 */
 const PLAIN_BODY = 'Merged by cairn.';
 
 const MERGED_ROW = `PR #201 已由 cairn 经 GitHub 合并（squash，合并提交 ${MERGE_SHA.slice(0, 7)}）`;
 
-/** 拒绝之后的世界：零行、零合并步、相位不变。 */
 function expectUntouched(w: World, phase: Phase = 'review'): void {
   expect(w.systemRows()).toEqual([]);
   expect(w.userRows()).toEqual([]);
@@ -518,13 +421,9 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     ['a keyword followed by a word', 'Fix the login flow'],
     ['a keyword inside another word', 'Add a prefix #9 to the log'],
     ['a reference with no keyword', 'Follow up on #9'],
-    // [2b-D41c] (#1403 segment 3, from the #1509 pr-gate): the shape is tested on the title
-    // alone; with " (#201)" appended, a trailing keyword would match "(#2" and drop the title.
     ['[2b-D41c] a title ending in "fix"', 'Add CI fix'],
     ['[2b-D41c] a title ending in "close"', 'Make dialog close'],
     ['[2b-D41c] a title ending in "resolved"', 'Bug resolved'],
-    // Formerly a [2b-D41] case: "fixed (#201)" can only name this PR itself, which the merge
-    // closes anyway, so the title is kept.
     ['[2b-D41c] a keyword at the end, before the appended (#n)', 'Rename the handler; fixed'],
   ])(
     '[2b-D41b] a PR title without a closing shape (%s) keeps the PR title',
@@ -577,7 +476,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(err.status).toBe(409);
     expect(err.message).toContain('连接 GitHub');
     expect(err.message).toContain('PR #201');
-    // without a connection the reconcile reads anonymously: only a public repository is readable
     expect(err.message).toContain('私有仓库');
     expect(w.fake.requests).toEqual([]);
     expectUntouched(w);
@@ -639,8 +537,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       const err = await refusal(requestMerge(w.deps, w.buildId));
       expect(err.status).toBe(409);
       expect(err.message).toContain(label);
-      // a review step does not commit: the refusal does not say it will push
-      // #1487 (main): a merge step in flight is refused before any other check, with its own text
       expect(err.message.includes('推送')).toBe(kind !== 'review' && kind !== 'merge');
       expect(w.fake.requests).toEqual([]);
       expect(w.systemRows()).toEqual([]);
@@ -676,12 +572,11 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
   ] as const)(
     '[2b-D32] failed card, %s → the refusal says how this card gets finished (the reconcile reads only review cards)',
     async (_name, o, next) => {
-      // restorable (the PR is recorded on the build) even without a checkpoint
       const w = makeWorld({ phase: 'failed', ...o });
       const err = await refusal(requestMerge(w.deps, w.buildId));
       expect(err.status).toBe(409);
       expect(err.message).toContain(next);
-      expect(err.message).not.toContain('拖到已完成'); // the board's done dialog merges a failed card
+      expect(err.message).not.toContain('拖到已完成');
       expectUntouched(w, 'failed');
     },
   );
@@ -749,12 +644,10 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(err.status).toBe(409);
     expect(err.message).toContain(head.slice(0, 7));
     expect(err.message).toContain(CP.slice(0, 7));
-    // GitHub's PR head can lag a fresh push for a moment
     expect(err.message).toContain('还没同步');
     expect(w.fake.gets()).toHaveLength(1);
     expect(w.fake.puts()).toEqual([]);
     expectUntouched(w);
-    // the refusal leaves nothing behind: a second press reads the PR again
     await refusal(requestMerge(w.deps, w.buildId));
     expect(w.fake.gets()).toHaveLength(2);
   });
@@ -781,7 +674,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.status).toBe(409);
     expect(err.message).toContain('已在 GitHub 合并');
-    // the reconcile checks before it finishes (own PR, default branch, last pushed commit)
     expect(err.message).toContain('核对不上');
     expect(err.message).toContain('不勾合并');
     expect(w.fake.puts()).toEqual([]);
@@ -1083,18 +975,15 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const w = makeWorld();
     w.fake.mergeAnswer = { status: 502, raw: '' };
     await requestMerge(w.deps, w.buildId);
-    // 前提：合并确实经 API 发过、落了「没有明确答复」行（否则下面的「不动」什么也没证明）。
     expect(w.fake.puts()).toHaveLength(1);
     const before = w.systemRows();
     expect(before).toHaveLength(1);
     expect(before[0]).toContain('没有明确答复');
     const sent = w.fake.requests.length;
     await w.sweep();
-    // 对账读了这张 PR（读到 open）……
     expect(w.fake.requests.slice(sent).map((r) => `${r.method} ${r.url}`)).toContain(
       'GET https://api.github.com/repos/octo/demo/pulls/201',
     );
-    // ……然后什么也没动。
     expect(w.phase()).toBe('review');
     expect(w.systemRows()).toEqual(before);
     expect(w.steps().filter((r) => r.kind === 'merge')).toEqual([]);
@@ -1319,7 +1208,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
 
   test('[2b-D35] a leftover merge step pushes a merge of the default branch after the PR merged on GitHub → that commit is not the build’s last pushed work; the sweep finishes the card', async () => {
     const w = makeWorld({ pull: { state: 'closed', merged: true, mergedBy: 'octo' } });
-    w.fake.compareStatus = 'behind'; // the merge step's commit is not in the merged head
+    w.fake.compareStatus = 'behind';
     const mergeStepId = `step-merge-left-${w.buildId}`;
     w.s.db
       .insert(stepTable)
@@ -1328,7 +1217,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
         buildId: w.buildId,
         kind: 'merge',
         status: 'claimed',
-        // its done report carries the commit it pushed (finishStep writes it before completeStep)
         checkpointCommit: 'cafe0123'.repeat(5),
         lastHeartbeatAt: Date.now(),
         createdAt: Date.now(),

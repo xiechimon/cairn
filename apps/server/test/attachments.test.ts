@@ -1,15 +1,3 @@
-// 附件全链 contract 测试（#310，r9 §3.1）。失败方式清单（先固化，代码是让
-// 场景通过的手段）：
-// ① grant 端：缺字段/超 size/空 fileName/穿越字符/未知 kind → 400；合法 → 200
-//   {uploadUrl, grant, key} 且 grant 是 base64url(payload) + "." + base64url(hmac)。
-// ② upload 端：缺 grant/伪造 grant/过期 grant/size 不一致/mime 不一致 → 401/409；
-//   合法 → 201、文件落盘、DB 行 ready。
-// ③ read 端：合法 id → 200 binary + content-type；不存在 → 404。
-// ④ 工具端（chief-tools/mcp-face case 'attachment'）：合法 id → JSON 含
-//   {fileName, mimeType, sizeBytes, encoding, content}；text/* → utf8，其他 → base64；
-//   未知 id → 抛错。
-// ⑤ 幂等：同 grant 上传二次 = 201（覆盖写），DB 行状态 ready 不漂。
-
 import { readFileSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
@@ -22,8 +10,6 @@ type TestServer = ReturnType<typeof bootServer>;
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
-/** 走 grant + upload 全链上传一份附件；chief-tools/mcp-face/worker-step
- *  工具面测试共用。 */
 async function uploadOne(
   s: TestServer,
   fileName: string,
@@ -62,8 +48,8 @@ async function callMultipart(
   return app.request(path, { method: 'POST', body: form });
 }
 
-describe('attachments — grant 端', () => {
-  test('合法请求 → 200 {uploadUrl, grant, key}；grant 是 base64url(payload).hmac', async () => {
+describe('attachments -- grant side', () => {
+  test('valid request -> 200 {uploadUrl, grant, key}; grant is base64url(payload).hmac', async () => {
     const s = bootServer();
     try {
       const res = await req(s.app, 'POST', '/api/uploads/grant', {
@@ -80,7 +66,6 @@ describe('attachments — grant 端', () => {
       };
       expect(body.uploadUrl).toBe('/api/uploads');
       expect(body.grant.split('.').length).toBe(2);
-      // key = `<attachmentsDir-relative>` = `<teamId>/<id>.<ext>`（r9 §4）
       expect(body.key).toMatch(/^[^/]+\/[^/]+\.md$/);
     } finally {
       s.dispose();
@@ -88,15 +73,15 @@ describe('attachments — grant 端', () => {
   });
 
   test.each([
-    { body: {}, label: '空 body' },
-    { body: { kind: 'attachment' }, label: '缺 fileName/mimeType/size' },
+    { body: {}, label: 'empty body' },
+    { body: { kind: 'attachment' }, label: 'missing fileName/mimeType/size' },
     {
       body: { kind: 'attachment', fileName: 'x.md', mimeType: 'text/markdown', size: 0 },
       label: 'size=0',
     },
     {
       body: { kind: 'attachment', fileName: 'x.md', mimeType: 'text/markdown', size: -1 },
-      label: 'size 负',
+      label: 'negative size',
     },
     {
       body: {
@@ -105,19 +90,19 @@ describe('attachments — grant 端', () => {
         mimeType: 'text/markdown',
         size: MAX_BYTES + 1,
       },
-      label: '超 10MiB',
+      label: 'over 10MiB',
     },
     {
       body: { kind: 'attachment', fileName: '', mimeType: 'text/markdown', size: 1 },
-      label: 'fileName 空',
+      label: 'empty fileName',
     },
     {
       body: { kind: 'attachment', fileName: '../etc/passwd', mimeType: 'text/plain', size: 1 },
-      label: 'fileName 穿越',
+      label: 'fileName traversal',
     },
     {
       body: { kind: 'attachment', fileName: 'a/b.md', mimeType: 'text/markdown', size: 1 },
-      label: 'fileName 含斜杠',
+      label: 'fileName with slash',
     },
     {
       body: {
@@ -126,13 +111,13 @@ describe('attachments — grant 端', () => {
         mimeType: 'application/x-msdownload',
         size: 1,
       },
-      label: 'exe mime 拒',
+      label: 'exe mime rejected',
     },
     {
       body: { kind: 'junk', fileName: 'x.md', mimeType: 'text/markdown', size: 1 },
-      label: '未知 kind',
+      label: 'unknown kind',
     },
-  ])('$label → 400', async (case_) => {
+  ])('$label -> 400', async (case_) => {
     const s = bootServer();
     try {
       const res = await req(s.app, 'POST', '/api/uploads/grant', case_.body);
@@ -143,7 +128,7 @@ describe('attachments — grant 端', () => {
   });
 });
 
-describe('attachments — upload 端', () => {
+describe('attachments -- upload side', () => {
   async function grant(
     s: TestServer,
     body: Partial<{ fileName: string; mimeType: string; size: number }> = {},
@@ -163,7 +148,7 @@ describe('attachments — upload 端', () => {
     };
   }
 
-  test('合法 grant + 合法文件 → 201；文件落盘；DB 行 ready', async () => {
+  test('valid grant + valid file -> 201; file on disk; DB row ready', async () => {
     const s = bootServer();
     try {
       const g = await grant(s);
@@ -190,7 +175,7 @@ describe('attachments — upload 端', () => {
     }
   });
 
-  test('缺 grant → 401', async () => {
+  test('missing grant -> 401', async () => {
     const s = bootServer();
     try {
       const bytes = new TextEncoder().encode('x');
@@ -206,7 +191,7 @@ describe('attachments — upload 端', () => {
     }
   });
 
-  test('grant 签名被改 → 401', async () => {
+  test('grant signature altered -> 401', async () => {
     const s = bootServer();
     try {
       const g = await grant(s);
@@ -227,7 +212,7 @@ describe('attachments — upload 端', () => {
     }
   });
 
-  test('grant 过期（exp -1ms） → 401', async () => {
+  test('grant expired (exp -1ms) -> 401', async () => {
     const s = bootServer();
     try {
       const payload = {
@@ -253,7 +238,7 @@ describe('attachments — upload 端', () => {
     }
   });
 
-  test('size 不匹配 grant.sizeBytes → 409', async () => {
+  test('size does not match grant.sizeBytes -> 409', async () => {
     const s = bootServer();
     try {
       const g = await grant(s, { size: 5 });
@@ -270,7 +255,7 @@ describe('attachments — upload 端', () => {
     }
   });
 
-  test('mime 不一致 → 409', async () => {
+  test('mime mismatch -> 409', async () => {
     const s = bootServer();
     try {
       const g = await grant(s, { mimeType: 'text/markdown' });
@@ -287,7 +272,7 @@ describe('attachments — upload 端', () => {
     }
   });
 
-  test('同 grant 上传二次 → 201 幂等（覆盖写）', async () => {
+  test('uploading twice with the same grant -> 201 idempotent (overwrite)', async () => {
     const s = bootServer();
     try {
       const g = await grant(s, { size: 7 });
@@ -318,8 +303,8 @@ describe('attachments — upload 端', () => {
   });
 });
 
-describe('attachments — read 端', () => {
-  test('合法 id → 200 + binary', async () => {
+describe('attachments -- read side', () => {
+  test('valid id -> 200 + binary', async () => {
     const s = bootServer();
     try {
       const grantRes = await req(s.app, 'POST', '/api/uploads/grant', {
@@ -352,7 +337,7 @@ describe('attachments — read 端', () => {
     }
   });
 
-  test('不存在 id → 404', async () => {
+  test('nonexistent id -> 404', async () => {
     const s = bootServer();
     try {
       const r = await s.app.request('/api/attachments/does-not-exist');
@@ -441,7 +426,7 @@ describe('attachments — chief-tools / mcp-face tool', () => {
     }
   });
 
-  test('chief-tools attachment 未知 id → 抛 404', async () => {
+  test('chief-tools attachment unknown id -> throws 404', async () => {
     const s = bootServer();
     try {
       const { executeChiefTool } = await import('../src/services/chief-tools.js');
@@ -474,7 +459,7 @@ describe('attachments — chief-tools / mcp-face tool', () => {
   });
 });
 
-describe('attachments — worker-step relay（#310/r9 §3.1：spec `attachment:` token 解析路径）', () => {
+describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachment:` token parse path)', () => {
   test('worker attachment text/* → utf8', async () => {
     const s = bootServer();
     try {
@@ -536,7 +521,7 @@ describe('attachments — worker-step relay（#310/r9 §3.1：spec `attachment:`
     }
   });
 
-  test('worker attachment 未知 id → 抛 404', async () => {
+  test('worker attachment unknown id -> throws 404', async () => {
     const s = bootServer();
     try {
       const { executeWorkerMemoryTool } = await import('../src/services/chief-tools.js');
@@ -560,9 +545,7 @@ describe('attachments — worker-step relay（#310/r9 §3.1：spec `attachment:`
     }
   });
 
-  test('worker attachment 跨团队 → 404（teamId 不一致即查不到）', async () => {
-    // #310：worker attachment 走团队归属校验。构造两个 team，team A 查 team B
-    // 的 attachmentId 应得 404（不暴露 teamId 隔墙）。
+  test('worker attachment cross-team -> 404 (mismatched teamId is not found)', async () => {
     const sA = bootServer();
     const sB = bootServer();
     try {

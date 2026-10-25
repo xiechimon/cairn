@@ -9,8 +9,8 @@ afterAll(() => {
   for (const server of servers) server.dispose();
 });
 
-describe('#1626 信息类卡', () => {
-  test('报告存成可取回附件，卡的合并入口拒绝', async () => {
+describe('#1626 info cards', () => {
+  test('report stored as a retrievable attachment, the card merge entry refuses', async () => {
     const server = bootServer();
     servers.push(server);
     const project = await req(server.app, 'POST', '/api/projects', { name: 'info' });

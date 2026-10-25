@@ -1,9 +1,3 @@
-// #1404 S4b: readGateGithubFacts, the gate's GitHub shell (merge-gate/github-facts.ts). It turns the raw
-// responses of the injected port into the GitHub half of GateInputs under #1479's contract (the comments at
-// GateInputs in readiness.ts). Failure modes first: docs/verify/1404/s4b-failure-modes.txt, B-1 to B-45; the
-// F numbers below are the ones that file names. The port here is a fake GitHub that serves GitHub-shaped
-// bodies, pages them by the requested page and per_page, and logs every call.
-
 import { type CompareFile, MERGE_GATE_STATUS_CONTEXT } from '@cairn/shared';
 import {
   EVIDENCE_PREFIX,
@@ -97,7 +91,6 @@ const FILES = [
   ghFile('apps/server/test/x.test.ts'),
   ghFile(SHOT, { status: 'added', additions: 0, deletions: 0, changes: 0, patch: undefined }),
 ];
-/** A linear chain of commits on top of BASE. */
 const chain = (...shas: string[]) =>
   shas.map((sha, k) => ({ sha, parents: [{ sha: k === 0 ? BASE : (shas[k - 1] as string) }] }));
 
@@ -134,7 +127,6 @@ interface Fake {
 const slice = <T>(list: T[], o: { page: number; perPage: number }) =>
   list.slice((o.page - 1) * o.perPage, o.page * o.perPage);
 
-/** A compare that pages `commits` (files on page 1 only), as GitHub does. */
 const comparePages =
   (commits: unknown[], files: unknown[] = FILES, extra: Record<string, unknown> = {}) =>
   (_b: string, _h: string, o: { page: number; perPage: number }): GateRaw =>
@@ -292,7 +284,6 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
       expect(names(f.log)).toEqual(['pull']);
       expect(f.notes.join(' ')).toMatch(/pull request/);
     }
-    // The repository name is compared without case (GitHub names are case-insensitive).
     const f = await read({
       pull: () =>
         ok(
@@ -365,7 +356,6 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
     const first = fakeGithub();
     await readGateGithubFacts(first.port, REQ, cache);
     expect(first.log[0]).toEqual(['pull', 7, { etag: null }]);
-    // Change the cached raw body: a 304 must show the change (the projection is not cached).
     const key = [...cache.bodies.keys()].find((k) => k.startsWith('pull:')) as string;
     const entry = cache.bodies.get(key) as { etag: string; body: Record<string, unknown> };
     cache.bodies.set(key, { etag: entry.etag, body: { ...entry.body, draft: true } });
@@ -373,21 +363,17 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
     const f = await readGateGithubFacts(second.port, REQ, cache);
     expect(second.log[0]).toEqual(['pull', 7, { etag: '"pr1"' }]);
     expect(f.pr?.draft).toBe(true);
-    // A response without an etag leaves nothing to send next time.
     const c2 = newGateReadCache();
     await read({ pull: () => ok(prBody(), null) }, c2);
     const third = fakeGithub();
     await readGateGithubFacts(third.port, REQ, c2);
     expect(third.log[0]).toEqual(['pull', 7, { etag: null }]);
-    // A response without an etag clears the entry an earlier response left.
     const c3 = newGateReadCache();
     await read({}, c3);
     await read({ pull: () => ok(prBody(), null) }, c3);
     const fourth = fakeGithub();
     await readGateGithubFacts(fourth.port, REQ, c3);
     expect(fourth.log[0]).toEqual(['pull', 7, { etag: null }]);
-    // A cached runs page that was not the whole list is not reused: no etag is sent, and a
-    // not-modified answer (which the transport only gives when an etag was sent) is not trusted.
     const runs = Array.from({ length: 150 }, (_, k) => run(`job ${k}`, { id: k + 1 }));
     const c4 = newGateReadCache();
     await read({ checkRuns: runPages(runs) }, c4);
@@ -398,7 +384,6 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
       { filter: 'latest', page: 1, perPage: 100, etag: null },
     ]);
     expect(partial.checks).toBeNull();
-    // A not-modified with nothing cached is not used.
     const g = await read({ pull: () => ({ kind: 'not-modified' }) });
     expect(g.pr).toBeNull();
   });
@@ -424,7 +409,6 @@ describe('readGateGithubFacts: conditional reads across a push (F19, pr-gate run
   test('F19 the check-runs and status ETags of the old head are never sent for the new head', async () => {
     const NEWER = 'd'.repeat(40);
     const cache = newGateReadCache();
-    // First evaluation at HEAD: single, complete pages with ETags, so a later read at HEAD may be conditional.
     await read(
       {
         checkRuns: (_s, o) =>
@@ -434,7 +418,6 @@ describe('readGateGithubFacts: conditional reads across a push (F19, pr-gate run
       },
       cache,
     );
-    // The author pushes NEWER: the PR now names it as its head.
     const pushed = (sha: string) =>
       read(
         {
@@ -455,7 +438,6 @@ describe('readGateGithubFacts: conditional reads across a push (F19, pr-gate run
       ['checkRuns', NEWER, { filter: 'latest', page: 1, perPage: 100, etag: null }],
       ['combinedStatus', NEWER, { page: 1, perPage: 100, etag: null }],
     ]);
-    // Back at HEAD (the same URLs as the first evaluation): its own ETags are still the ones sent.
     const back = await pushed(HEAD);
     expect(back.log.filter(([n]) => n === 'checkRuns' || n === 'combinedStatus')).toEqual([
       ['checkRuns', HEAD, { filter: 'latest', page: 1, perPage: 100, etag: '"runs-head"' }],
@@ -495,13 +477,11 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
     expect(c.files).toHaveLength(3);
     expect(c.commits).toHaveLength(150);
     expect(c.totalCommits).toBe(150);
-    // files repeated on a later page are not added.
     const g = await read({
       compare: (b, h, o) =>
         ok({ ...(comparePages(commits)(b, h, o) as { body: object }).body, files: FILES }),
     });
     expect((g.compare as { files: unknown[] }).files).toHaveLength(3);
-    // readCompareAt: S5a reads the compare at a verdict's own head.
     const p = fakeGithub();
     const r = await readCompareAt(p.port, BASE, OTHER);
     expect(p.log).toEqual([['compare', BASE, OTHER, { page: 1, perPage: 100 }]]);
@@ -555,7 +535,6 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
         String(behind),
       ).toBeNull();
     }
-    // A later page that disagrees with page 1 on total_commits: the pages are not one read.
     const commits = chain(
       ...Array.from({ length: 120 }, (_, k) => k.toString(16).padStart(40, '0')),
     );
@@ -571,7 +550,6 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
   test('F9 paging: all pages, as read; stop at an empty page or the 10-page cap; one failed page is unreadable', async () => {
     const many = (n: number) =>
       chain(...Array.from({ length: n }, (_, k) => k.toString(16).padStart(40, '0')));
-    // Duplicates and order are passed as read (readiness judges them).
     const dup = [...many(100), ...many(100).slice(0, 20)];
     const d = await read({
       compare: (_b, _h, o) =>
@@ -583,7 +561,6 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
         }),
     });
     expect((d.compare as { commits: unknown[] }).commits).toHaveLength(120);
-    // An empty page before total_commits is reached: stop, pass the short list.
     const short = await read({
       compare: (_b, _h, o) =>
         ok({
@@ -597,11 +574,9 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
       100,
     );
     expect(short.log.filter(([n]) => n === 'compare')).toHaveLength(2);
-    // Cap: at most 10 pages.
     const big = await read({ compare: comparePages(many(2000)) });
     expect(big.log.filter(([n]) => n === 'compare')).toHaveLength(10);
     expect((big.compare as { commits: unknown[] }).commits).toHaveLength(1000);
-    // A failed page: nothing partial.
     for (const failure of [NOT_FOUND, fail({ kind: 'timeout' }), fail({ kind: 'not-json' })]) {
       const f = await read({
         compare: (b, h, o) => (o.page === 2 ? failure : comparePages(many(150))(b, h, o)),
@@ -639,7 +614,6 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
     expect(
       await required({ branch: () => ok(branchBody({ protection: { enabled: true } })) }),
     ).toEqual([]);
-    // enforcement_level off: GitHub does not require them (code review, finding 7).
     expect(
       await required({
         branch: () =>
@@ -708,7 +682,6 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
       expect(await required({ rules: () => ok(bad) }), JSON.stringify(bad)).toBeNull();
     }
     expect(await required({ rules: () => NOT_FOUND })).toBeNull();
-    // Paging: a full page asks for the next; five full pages is the cap (null, not a partial list).
     const full = Array.from({ length: 100 }, () => ({ type: 'deletion' }));
     const two = await read({ rules: (_n, o) => ok(o.page === 1 ? full : [rules[2]]) });
     expect(two.checks?.required).toEqual(['check', 'pr-evidence', 'lint']);
@@ -743,7 +716,6 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
     expect(f.checks?.complete).toBe(true);
     expect(f.log.filter(([n]) => n === 'checkRuns')).toHaveLength(2);
     expect(f.log.filter(([n]) => n === 'combinedStatus')).toHaveLength(2);
-    // Short count (an empty page before total_count).
     expect((await read({ checkRuns: runPages(runs.slice(0, 100), 150) })).checks?.complete).toBe(
       false,
     );
@@ -751,11 +723,9 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
       (await read({ combinedStatus: statusPages(statuses.slice(0, 100), HEAD, 150) })).checks
         ?.complete,
     ).toBe(false);
-    // A page whose total_count differs.
     const drift = (_s: string, o: { page: number; perPage: number }) =>
       ok({ total_count: o.page === 1 ? 150 : 151, check_runs: slice(runs, o) });
     expect((await read({ checkRuns: drift })).checks?.complete).toBe(false);
-    // The cap: 10 pages of runs, 5 pages of statuses.
     const lots = Array.from({ length: 1200 }, (_, k) => run(`job ${k}`, { id: k + 1 }));
     const capped = await read({ checkRuns: runPages(lots) });
     expect(capped.checks?.complete).toBe(false);
@@ -764,7 +734,6 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
     const cappedS = await read({ combinedStatus: statusPages(lotsS) });
     expect(cappedS.checks?.complete).toBe(false);
     expect(cappedS.log.filter(([n]) => n === 'combinedStatus')).toHaveLength(5);
-    // A combined-status page at another commit: not one read.
     const shaDrift = (_s: string, o: { page: number; perPage: number }) =>
       ok({
         sha: o.page === 1 ? HEAD : OTHER,
@@ -792,7 +761,6 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
       ['check', 'success'],
       ['lint', 'failure'],
     ]);
-    // Older first in the list, newer later: the newer still wins.
     const g = await read({
       checkRuns: runPages([
         run('pr-evidence', { id: 5, conclusion: 'failure' }),
@@ -800,7 +768,6 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
       ]),
     });
     expect(g.checks?.runs.map((r) => r.conclusion)).toEqual(['success']);
-    // A ruleset binding (integration_id) orders the same way.
     const h = await read({
       rules: () =>
         ok([
@@ -858,8 +825,6 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
     expect(f.ownStatus).toEqual({ state: 'pending', description: 'waiting' });
     const none = await read();
     expect(none.ownStatus).toBeNull();
-    // A status read that is not complete may have the gate's own status on an unread page: unreadable,
-    // so the planner does not write blind (code review, finding 2).
     const partial = await read({ combinedStatus: statusPages([status('ci', 'success')], HEAD, 2) });
     expect(partial.checks?.complete).toBe(false);
     expect(partial.ownStatus).toBe('unreadable');
@@ -872,7 +837,6 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
 
 describe('readGateGithubFacts: evidence presence (F16, F17)', () => {
   test('F16 only qualifying links are probed, at their own commit; stop at the first present; at most 5 probes', async () => {
-    // A link at EARLIER (a commit of this PR) where the file did not exist yet.
     const early = await read({
       pull: () => ok(prBody({ body: `evidence: ${link(EARLIER)}` })),
       contents: (_path, ref) => (ref === EARLIER ? listing('other.png') : listing('shot.png')),
@@ -881,17 +845,14 @@ describe('readGateGithubFacts: evidence presence (F16, F17)', () => {
     expect(early.log.filter(([n]) => n === 'contents')).toEqual([
       ['contents', 'docs/verify/1404', EARLIER],
     ]);
-    // Links that do not qualify are not probed: another commit, a file the PR does not touch.
     const none = await read({
       pull: () =>
         ok(prBody({ body: `${link(MAIN)} ${link(HEAD, 'docs/verify/1404/untouched.png')}` })),
     });
     expect(none.evidence).toEqual([]);
     expect(names(none.log)).not.toContain('contents');
-    // Stop after the first present one.
     const both = await read({ pull: () => ok(prBody({ body: `${link(HEAD)} ${link(EARLIER)}` })) });
     expect(both.evidence).toEqual([{ sha: HEAD, path: SHOT, present: true }]);
-    // At most 5 (sha, directory) probes; links in the same directory at the same commit share one.
     const files = [
       ...FILES,
       ...Array.from({ length: 8 }, (_, k) =>
@@ -907,7 +868,6 @@ describe('readGateGithubFacts: evidence presence (F16, F17)', () => {
       contents: () => listing('nothing.png'),
     });
     expect(capped.log.filter(([n]) => n === 'contents')).toHaveLength(5);
-    // Links past the probe cap are unknown (null), not absent (code review, finding 4).
     expect(capped.evidence.map((e) => e.present)).toEqual([
       false,
       false,
@@ -974,13 +934,11 @@ describe('readGateGithubFacts: evidence presence (F16, F17)', () => {
     expect(await probe(() => listing(...thousand.slice(1), 'shot.png'))).toEqual([
       { sha: HEAD, path: SHOT, present: true },
     ]);
-    // Remembered: a second evaluation with the same cache does not probe a present file again.
     const cache = newGateReadCache();
     await read({}, cache);
     const again = await read({ contents: () => NOT_FOUND }, cache);
     expect(names(again.log)).not.toContain('contents');
     expect(again.evidence).toEqual([{ sha: HEAD, path: SHOT, present: true }]);
-    // Absent is not remembered.
     const c2 = newGateReadCache();
     await read({ contents: () => NOT_FOUND }, c2);
     const later = await read({}, c2);

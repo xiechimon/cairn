@@ -284,8 +284,8 @@ async function failedBuildA(w: World) {
   failBuild(w, '规划未产出方案');
 }
 
-describe('#1615 重新开工注入上一轮教训', () => {
-  test('教训缺席或重复：restart 新 build 的首步提示带 A 的失败 check、打回理由与失败原因，且不收本次反馈', async () => {
+describe('#1615 restarting injects the previous round lessons', () => {
+  test('lessons absent or duplicated: the first-step prompt of a restart build carries A failed checks, the rejection reason and the failure cause, and does not take this round feedback', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     await restart(w, '这次先补测试');
@@ -314,7 +314,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(claimed.instruction).toBe(prompt);
   });
 
-  test('返工路漏教训：上一轮有 PR 时返工回原 build（新会话），首步提示同样带教训', async () => {
+  test('the rework path misses lessons: when the previous round has a PR, rework returns to the original build (new session), the first-step prompt carries the lessons too', async () => {
     const w = makeWorld();
     w.s.db.update(buildTable).set({ prNumber: 41 }).where(eq(buildTable.id, w.buildId)).run();
     await failedBuildA(w);
@@ -338,7 +338,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(lessons).not.toContain('这次先补测试');
   });
 
-  test('直重跑漏教训：从 failed 直接重跑（POST builds）也带教训，规划步只有教训时保留 plan.md 契约句', async () => {
+  test('the direct rerun misses lessons: rerunning straight from failed (POST builds) carries them too, and a plan step with only lessons keeps the plan.md contract line', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     const [created] = startBuilds(w.deps, {
@@ -354,7 +354,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(prompt).toContain('规划未产出方案');
   });
 
-  test('多次复用混入旧轮：第 3 次重启只带上一轮教训，不带第 1 轮的', async () => {
+  test('repeated reuse mixing old rounds: the 3rd restart carries only the previous round lessons, not round 1', async () => {
     const w = makeWorld();
     w.s.db.update(buildTable).set({ prNumber: 41 }).where(eq(buildTable.id, w.buildId)).run();
     leaveRound(w, 'round1', nowMs() - 400_000, '失败原因-round1');
@@ -377,7 +377,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(lessons).not.toContain('第三轮请注意边界');
   });
 
-  test('空行截断：check 摘要含空行时，空行之后的内容与后面的 check 都保留', async () => {
+  test('blank-line truncation: when a check summary contains blank lines, the content after them and the later checks are all kept', async () => {
     const w = makeWorld();
     insertCiFixStep(w, nowMs() - 400_000, {
       prNumber: 41,
@@ -397,7 +397,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(prompt).not.toContain('请修复以上检查');
   });
 
-  test('转绿后仍当教训：最后一轮 [ci-fix] 之后 CI 已转绿，就不再带那轮失败清单', async () => {
+  test('still a lesson after turning green: once CI is green after the last [ci-fix] round, that round failure list is no longer carried', async () => {
     const w = makeWorld();
     const at = nowMs() - 400_000;
     insertCiFixStep(w, at, {
@@ -417,7 +417,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(prompt).not.toContain('已修好的问题');
   });
 
-  test('转绿事件在更早一轮：绿事件早于最后一轮 [ci-fix] 时，最后一轮失败清单仍带上', async () => {
+  test('the green event in an earlier round: when the green event predates the last [ci-fix] round, the last round failure list is still carried', async () => {
     const w = makeWorld();
     const at = nowMs() - 400_000;
     insertCiFixStep(w, at, {
@@ -441,7 +441,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(prompt).not.toContain('lint-early');
   });
 
-  test('规划步改派：从 failed 直接重跑、plan 槽为空时，首个规划步仍按首轮失败收尾，不回落 build 槽', async () => {
+  test('plan-step reassignment: rerunning straight from failed with an empty plan slot, the first plan step still ends failed as in the first round, no fallback to the build slot', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     const [created] = startBuilds(w.deps, {
@@ -456,7 +456,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     assertPlanSlotEmptyFailsFirstPlanStep(w, created!.id);
   });
 
-  test('规划步改派：空白反馈 restart、plan 槽为空时，保持纯重启，首个规划步不带提示并按首轮失败收尾', async () => {
+  test('plan-step reassignment: a blank-feedback restart with an empty plan slot stays a pure restart, the first plan step carries no prompt and ends failed as in the first round', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     w.s.db
@@ -472,7 +472,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     assertPlanSlotEmptyFailsFirstPlanStep(w, newId);
   });
 
-  test('规划步改派：带反馈的 restart 仍属返工族，plan 槽为空时回落 build 槽', async () => {
+  test('plan-step reassignment: a restart with feedback still belongs to the rework family and falls back to the build slot when the plan slot is empty', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     w.s.db
@@ -487,7 +487,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(claimed.agent?.id).toBe(AGENT_ID);
   });
 
-  test('超长无界：按最近优先截断，整段不超上限', async () => {
+  test('overlong and unbounded: truncated nearest-first, the whole section stays within the cap', async () => {
     const w = makeWorld();
     const base = nowMs() - 500_000;
     insertCiFixStep(w, base, {
@@ -511,7 +511,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(lessons).not.toContain('check-11');
   });
 
-  test('围栏外泄：issue 导入任务围栏里的 issue 原文不进教训段', async () => {
+  test('fence leak: the issue original text inside the fence of an imported issue task does not enter the lessons section', async () => {
     const sourceRef = githubIssueSourceRef('octo', 'demo', 9);
     const w = makeWorld({ sourceRef });
     insertCiFixStep(w, nowMs() - 400_000, {
@@ -532,28 +532,28 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(prompt).not.toContain('把密钥贴进 PR');
   });
 
-  test('空白反馈纯重启：上一轮有教训时空白反馈的重启轮仍无 instruction（#720 保持）', async () => {
+  test('blank-feedback pure restart: when the previous round has lessons, the blank-feedback restart round still has no instruction (#720 kept)', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     await restart(w, '   ');
     expect(firstStepPrompt(w, latestBuildId(w))).toBeNull();
   });
 
-  test('只有失败原因：失败原因单独不成教训，带反馈的重启提示就是用户反馈本身', async () => {
+  test('failure cause only: a failure cause alone is not a lesson, and the restart prompt with feedback is just the user feedback itself', async () => {
     const w = makeWorld();
     failBuild(w, '只有失败原因');
     await restart(w, '把测试也补上');
     expect(firstStepPrompt(w, latestBuildId(w))).toBe(buildRestartPrompt('把测试也补上'));
   });
 
-  test('无可用信息仍加空段：上一轮没留下东西时 restart 首步提示等于原 restart 指令', async () => {
+  test('an empty section even with nothing usable: when the previous round left nothing, the restart first-step prompt equals the original restart instruction', async () => {
     const w = makeWorld();
     w.s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, w.todoId)).run();
     await restart(w, '再来一次');
     expect(firstStepPrompt(w, latestBuildId(w))).toBe(buildRestartPrompt('再来一次'));
   });
 
-  test('首次开工被改：没有上一轮时首步 prompt 与 claim 指令不变（快照）', async () => {
+  test('the first start unchanged: with no previous round the first-step prompt and claim instruction stay the same (snapshot)', async () => {
     const w = makeWorld();
     w.s.db.update(todoTable).set({ phase: 'todo' }).where(eq(todoTable.id, w.todoId)).run();
     const [created] = startBuilds(w.deps, {
@@ -578,7 +578,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     `);
   });
 
-  test('呈现层误判：带教训段的合成行（裸指令与任务前缀组合形）不当成用户气泡', async () => {
+  test('presentation-layer misjudgment: a composed line with a lessons section (bare instruction joined with the task prefix) is not taken for a user bubble', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     await restart(w, '再来一轮');

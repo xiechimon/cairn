@@ -1,19 +1,3 @@
-// #1259 agent 归属机闭环：agent.machineId 单源——步只投归属机（worker 闸 +
-// chief 主力机投递）；runtime 真闸（enabledRuntimes）保留不变；换绑即改派。
-// 失败方式（先于实现固化，仓测试纪律）：
-// 1. worker 归属机闸：绑 A → A 领、B 空手；换绑 B → B 领（改派即时生效）；
-//    未设归属机 → 任何机器都领不到（留 pending，sweep 的可见失败归
-//    build-abandoned-sweep.test.ts）。
-// 2. runtime 真闸（#682 语义不变）：归属机未开步所需 runtime → 领不到；
-//    开回 → 领到（PATCH 热写秒级生效）。
-// 3. chief 步投递（#1260）：去处 = 绑定 Agent 的归属机——Agent 绑 B → 唯
-//    B 可领 chief 步；Agent 换绑 A → A 领（chief 行不再持机器槽）。
-// 4. PATCH /chief 退役槽：machineId/model/compactionModel 不再受理（schema
-//    面归 chief-demotion.test.ts 与 shared records 测试）。
-// 5. GET /chief orchestration 封套：homeMachineId（= 绑定 Agent 的归属机）
-//    + running/waiting 计数（waiting = 归属机当前不可执行的 pending 回合）。
-// 6. 0022 回填（存量 [] 机器行 → ['pi']）幂等，与本票解耦保留。
-
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -60,7 +44,6 @@ afterAll(() => {
   for (const dir of temps) rmSync(dir, { recursive: true, force: true });
 });
 
-/** 带 Bearer 的请求（machine wire 面，g2t2 同律——helpers.req 不带鉴权头）。 */
 function call(
   app: TestServer['app'],
   method: string,
@@ -79,7 +62,6 @@ function call(
   );
 }
 
-/** 注册一台机器换 claim token（enroll 缺省 enabledRuntimes=['pi']，#682）。 */
 async function enroll(s: TestServer, name: string): Promise<string> {
   const key = await issueApiKey(s);
   const res = await call(s.app, 'POST', '/api/machine/enroll', {
@@ -129,7 +111,7 @@ interface World {
 
 async function setupWorld(): Promise<World> {
   const s = bootServer({ claimHoldMs: 200 });
-  temps.push(''); // dispose 由 bootServer 拥有的目录自身管理；空占位避免误删
+  temps.push('');
   const tokenA = await enroll(s, 'home-mbp');
   const tokenB = await enroll(s, 'home-other');
   const machineAId = s.db
@@ -142,7 +124,6 @@ async function setupWorld(): Promise<World> {
     .from(machineTable)
     .where(eq(machineTable.name, 'home-other'))
     .get()!.id;
-  // #1259：agent 出生即绑归属机（worker 面缺省形态）。
   seedAgent(s, AGENT_ID, 'stub-gw', machineAId);
   seedAgent(s, CC_AGENT_ID, 'claude-code', machineAId);
   const projectId = await postProject(s.app, 'home-proj');
@@ -168,20 +149,17 @@ async function startBuild(s: TestServer, projectId: string, todoId: string): Pro
   return ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id as string;
 }
 
-describe('#1259 worker 归属机闸', () => {
-  test('绑 A → A 领、B 空手；换绑 B → B 领（改派即时生效）', async () => {
+describe('#1259 worker home-machine gate', () => {
+  test('bound to A -> A claims, B comes up empty; rebound to B -> B claims (reassignment immediate)', async () => {
     const w = await setupWorld();
     const todoId = await createTodo(w.s, w.projectId);
     await startBuild(w.s, w.projectId, todoId);
 
-    // 别机空手。
     expect(await claim(w.s.app, w.tokenB)).toBeNull();
-    // 归属机领到。
     const got = await claim(w.s.app, w.tokenA);
     expect(got).not.toBeNull();
     expect(got!.step.machineId).toBe(w.machineAId);
 
-    // 换绑 B：下一条步 B 领、A 空手。
     const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
       machineId: w.machineBId,
     });
@@ -194,7 +172,7 @@ describe('#1259 worker 归属机闸', () => {
     expect(got2!.step.machineId).toBe(w.machineBId);
   });
 
-  test('未设归属机 → 任何机器都领不到（留 pending）', async () => {
+  test('no home machine set -> no machine can claim it (stays pending)', async () => {
     const w = await setupWorld();
     seedAgent(w.s, 'agent-homeless', 'stub-gw', null);
     const todoId = await createTodo(w.s, w.projectId);
@@ -209,7 +187,7 @@ describe('#1259 worker 归属机闸', () => {
   });
 });
 
-describe('#1312 续接会话的异机标记', () => {
+describe('#1312 other-machine mark on a resumed session', () => {
   async function finishPlan(w: World, stepId: string, sessionId: string): Promise<void> {
     const urlsRes = await call(w.s.app, 'POST', `/api/machine/upload-urls/${stepId}`, {
       cred: w.tokenA,
@@ -234,7 +212,7 @@ describe('#1312 续接会话的异机标记', () => {
     expect(doneRes.status).toBe(200);
   }
 
-  test('同机续接不带 priorMachineId；换绑后领取带上一轮机器', async () => {
+  test('same-machine resume carries no priorMachineId; claim after rebind carries the previous-round machine', async () => {
     const w = await setupWorld();
     const todoId = await createTodo(w.s, w.projectId);
     const buildRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
@@ -284,10 +262,9 @@ describe('#1312 续接会话的异机标记', () => {
   });
 });
 
-describe('#682 runtime 真闸（语义不变，归属机版）', () => {
-  test('归属机未开步所需 runtime → 领不到；开回 → 领到（PATCH 热写）', async () => {
+describe('#682 runtime real gate (semantics unchanged, home-machine version)', () => {
+  test('home machine without the step-needed runtime -> cannot claim; enabled back -> claims (PATCH hot write)', async () => {
     const w = await setupWorld();
-    // 关掉 A 的 pi：agent（stub-gw → pi 档）的步领不到。
     const off = await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
       enabledRuntimes: [],
     });
@@ -296,7 +273,6 @@ describe('#682 runtime 真闸（语义不变，归属机版）', () => {
     await startBuild(w.s, w.projectId, todoId);
     expect(await claim(w.s.app, w.tokenA)).toBeNull();
 
-    // 开回 → 领到（热写秒级生效）。
     const on = await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
       enabledRuntimes: ['pi'],
     });
@@ -305,9 +281,8 @@ describe('#682 runtime 真闸（语义不变，归属机版）', () => {
     expect(got).not.toBeNull();
   });
 
-  test('claude-code agent 步在只开 pi 的归属机上领不到；换绑到双开机器领到', async () => {
+  test('a claude-code agent step cannot be claimed on a pi-only home machine; rebind to a dual-enabled machine claims', async () => {
     const w = await setupWorld();
-    // B 开双 runtime。
     const dual = await req(w.s.app, 'PATCH', `/api/machines/${w.machineBId}`, {
       enabledRuntimes: ['pi', 'claude-code'],
     });
@@ -319,14 +294,11 @@ describe('#682 runtime 真闸（语义不变，归属机版）', () => {
       withPlan: false,
     });
     expect(res.status).toBe(201);
-    // A 只开 pi：领不到 claude-code 步。
     expect(await claim(w.s.app, w.tokenA)).toBeNull();
-    // 换绑校验（#1259 模型闸）：B 未上报模型清单 → 400 拒。
     const denied = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${CC_AGENT_ID}`, {
       machineId: w.machineBId,
     });
     expect(denied.status).toBe(400);
-    // B 上报含该模型的清单 → 换绑放行 → 领到。
     w.s.db
       .update(machineTable)
       .set({
@@ -347,7 +319,7 @@ describe('#682 runtime 真闸（语义不变，归属机版）', () => {
   });
 });
 
-describe('#1260 chief 步投递 = 绑定 Agent 归属机', () => {
+describe('#1260 chief step delivery = bound Agent home machine', () => {
   function bindChief(w: World): void {
     const chiefId = `chief-${w.s.user.id}-${w.s.team.id}`;
     w.s.db
@@ -363,10 +335,9 @@ describe('#1260 chief 步投递 = 绑定 Agent 归属机', () => {
       .run();
   }
 
-  test('Agent 绑 B → 唯 B 可领 chief 步；Agent 换绑 A → A 领（改派即时生效）', async () => {
+  test('Agent bound to B -> only B can claim the chief step; Agent rebound to A -> A claims (reassignment immediate)', async () => {
     const w = await setupWorld();
     bindChief(w);
-    // Agent 换绑 B：chief 步只投 B。
     const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
       machineId: w.machineBId,
     });
@@ -379,7 +350,6 @@ describe('#1260 chief 步投递 = 绑定 Agent 归属机', () => {
     expect(got).not.toBeNull();
     expect(got!.step.kind).toBe('chief');
 
-    // 换回 A：新回合 A 领、B 空手。
     const back = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
       machineId: w.machineAId,
     });
@@ -394,7 +364,7 @@ describe('#1260 chief 步投递 = 绑定 Agent 归属机', () => {
   });
 });
 
-describe('#895 GET /chief orchestration 封套（spec 21 A5；#1260 换源）', () => {
+describe('#895 GET /chief orchestration envelope (spec 21 A5; #1260 re-source)', () => {
   interface OrchestrationBlock {
     orchestration: {
       homeMachineId: string | null;
@@ -408,8 +378,6 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5；#1260 换源）', 
     return (await res.json()) as OrchestrationBlock;
   }
 
-  /** 改写 POST 已入队的 chief 步（封套计数的事实源——每线程恰好一步，不
-   *  另插行以免重复计数）。 */
   function setChiefStep(
     s: TestServer,
     threadId: string,
@@ -423,19 +391,16 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5；#1260 换源）', 
       .run();
   }
 
-  test('失败方式 G：投影——homeMachineId + running（claimed）/ waiting（归属机不可执行的 pending）计数', async () => {
+  test('failure mode G: projection -- homeMachineId + running (claimed) / waiting (pending not executable by its home machine) counts', async () => {
     const w = await setupWorld();
-    // chief 绑定 AGENT_ID（出生绑 A）→ homeMachineId = A。
     await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
       agent: { agentId: AGENT_ID },
     });
-    // running：A 上一个 claimed chief 步。
     const t1 = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
       content: '回合一',
     });
     const thread1 = ((await t1.json()) as { thread: { id: string } }).thread.id;
     setChiefStep(w.s, thread1, { status: 'claimed', machineId: w.machineAId });
-    // waiting：归属机 A 离线（直写 DB），新回合 pending → 计入 A 的 waiting。
     w.s.db
       .update(machineTable)
       .set({ online: false })
@@ -452,9 +417,8 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5；#1260 换源）', 
     expect(activityA?.waiting).toBe(1);
   });
 
-  test('失败方式 H：waiting 判据——归属机在线但 runtime 闸关也计入（T3 缝隙可见性）', async () => {
+  test('failure mode H: waiting criterion -- home machine online but runtime gate off also counts (T3 gap visibility)', async () => {
     const w = await setupWorld();
-    // B 只开 claude-code；chief 绑定 agent = stub-gw → pi 档；Agent 换绑 B。
     await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
       agent: { agentId: AGENT_ID },
     });
@@ -480,7 +444,7 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5；#1260 换源）', 
     expect(activityB?.waiting).toBe(1);
   });
 
-  test('回归红线：chief 未绑定 Agent + 无 chief 步 → homeMachineId null + activity 空', async () => {
+  test('regression red line: chief with no Agent bound + no chief step -> homeMachineId null + activity empty', async () => {
     const w = await setupWorld();
     const body = await getEnvelope(w);
     expect(body.orchestration.homeMachineId).toBeNull();
@@ -488,13 +452,11 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5；#1260 换源）', 
   });
 });
 
-describe('#682 0022 回填（存量 [] 机器行 → [pi]）', () => {
+describe('#682 0022 backfill (legacy [] machine rows -> [pi])', () => {
   function readJournal(folder: string): { entries: { idx: number; tag: string }[] } {
     return JSON.parse(readFileSync(join(folder, 'meta', '_journal.json'), 'utf8'));
   }
 
-  /** 定位含 machine.enabledRuntimes 回填 UPDATE 的 migration（不写死序号，
-   * 撞号纪律同 agent-tool-backfill.test.ts）。 */
   function pinMigrationIdx(): number {
     const journal = readJournal(MIGRATIONS_FOLDER);
     const idx = journal.entries.findIndex((entry) =>
@@ -502,7 +464,7 @@ describe('#682 0022 回填（存量 [] 机器行 → [pi]）', () => {
         readFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), 'utf8'),
       ),
     );
-    expect(idx, 'journal 里找不到 enabledRuntimes 回填 migration').toBeGreaterThan(0);
+    expect(idx, 'enabledRuntimes backfill migration missing from journal').toBeGreaterThan(0);
     return idx;
   }
 
@@ -516,9 +478,7 @@ describe('#682 0022 回填（存量 [] 机器行 → [pi]）', () => {
       const snapshot = join(MIGRATIONS_FOLDER, 'meta', `${entry.tag}_snapshot.json`);
       try {
         cpSync(snapshot, join(dir, 'meta', `${entry.tag}_snapshot.json`));
-      } catch {
-        /* snapshot 缺位先例（agent-tool-backfill 同律） */
-      }
+      } catch {}
     }
     const full = readJournal(MIGRATIONS_FOLDER);
     writeFileSync(
@@ -553,7 +513,7 @@ describe('#682 0022 回填（存量 [] 机器行 → [pi]）', () => {
     return JSON.parse(row.enabledRuntimes);
   }
 
-  test('升级前旧库 → 补跑全量 migration：[] 行回填 [pi]，已开 claude-code 行不动', () => {
+  test('pre-upgrade legacy db -> full backfill migration rerun: [] rows backfilled [pi], already claude-code-enabled rows untouched', () => {
     const dbPath = buildPrePinDb();
     const sqlite = new Database(dbPath);
     const db = drizzle(sqlite, { schema });
@@ -563,12 +523,10 @@ describe('#682 0022 回填（存量 [] 机器行 → [pi]）', () => {
     expect(readRuntimes(dbPath, 'm-legacy-cc')).toEqual(['claude-code']);
   });
 
-  test('回填 UPDATE 幂等（防御性重放不重复；ALTER 段不在重放面）', () => {
+  test('backfill UPDATE idempotent (defensive replay produces no duplicates; ALTER section not in the replay surface)', () => {
     const dbPath = buildPrePinDb();
     const entry = readJournal(MIGRATIONS_FOLDER).entries[pinMigrationIdx()]!;
     const sql = readFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), 'utf8');
-    // 幂等面只覆盖回填 UPDATE（ALTER 段双跑必然 duplicate column——迁移框架
-    // 用 journal 保证单跑，重放防护只需数据语句自身幂等，0018 同律）。
     const updateStmt = sql
       .split('--> statement-breakpoint')
       .map((s) => s.trim())

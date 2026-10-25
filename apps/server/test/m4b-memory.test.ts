@@ -1,9 +1,3 @@
-// memory 写路径 worker 侧（02 §4.4/r5 §6，M4b）：`save_memory` 经 worker 步
-// remoteTools relay 服务端执行——触发 = spec 指令 + Agent 裁量（宿主面 = 只给
-// 工具，不加蒸馏钩子），写入时点 = 执行步进行中（非任务结束钩子），三级溯源
-// （sourceTodo/sourceBuild 缺省 = 运行中上下文），配额 100，零自动写入语义
-// （步收尾不产记忆——r5 §6「任务结束自动蒸馏」证伪的结构性守住）。
-
 import {
   type ClaimedStep,
   MEMORY_QUOTA_PER_AGENT,
@@ -53,7 +47,7 @@ async function world() {
       modelId: 'm',
     })
     .run();
-  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+  bindAllAgents(s);
 
   const projectId = await postProject(s.app);
   const spec = '完成后请用你的记忆工具保存一条与本项目相关的一句话经验';
@@ -84,14 +78,14 @@ async function relay(
   return call(app, 'POST', `/api/machine/tool/${stepId}`, { cred: token, body: { name, params } });
 }
 
-describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端执行）', () => {
-  test('claim 载荷 = 记忆三件套 + 附件读 remoteTools（02 §4.4 + #310/r9 §3.1 worker 侧 attachment 工具 = spec `attachment:` token 解析路径）', async () => {
+describe('worker step memory relay (r5 section 6 write path = agent tool -> server executes)', () => {
+  test('claim payload = memory trio + attachment read remoteTools (02 section 4.4 + #310/r9 section 3.1 worker-side attachment tools = spec `attachment:` token parse path)', async () => {
     const { s, step } = await world();
     expect(step.remoteTools?.map((t) => t.name)).toEqual(WORKER_REMOTE_TOOLS.map((t) => t.name));
     s.dispose();
   });
 
-  test('save_memory 执行步进行中写入：三级溯源缺省 = 运行中 todo/build/project', async () => {
+  test('save_memory during an execution step: three-level provenance defaults to the running todo/build/project', async () => {
     const { s, token, step, projectId, todoId } = await world();
     const res = await relay(s.app, token, step.step.id, 'save_memory', {
       title: 'README 只在末尾追加小节',
@@ -103,11 +97,10 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     expect(saved).toMatchObject({
       agentId: AGENT_ID,
       teamId: s.team.id,
-      projectId, // 缺省 = 运行中项目（r5 §6 样本 projectId 在场）
-      sourceTodoId: todoId, // 缺省 = 运行中 todo（r5 §6 实测样本）
-      sourceBuildId: step.step.buildId, // buildId ≡ conversationId
+      projectId,
+      sourceTodoId: todoId,
+      sourceBuildId: step.step.buildId,
     });
-    // GET memories REST 面读回（02 §4.4 列表 API 保形）。
     const list = await call(s.app, 'GET', `/api/teams/${s.team.id}/agents/${AGENT_ID}/memories`);
     const rows = (await list.json()) as unknown[];
     expect(rows).toHaveLength(1);
@@ -115,7 +108,7 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     s.dispose();
   });
 
-  test('候选重试返回 HTTP 409，更新历史可从 REST 读取', async () => {
+  test('candidate retry returns HTTP 409, updated history readable over REST', async () => {
     const { s, token, step } = await world();
     try {
       const first = await relay(s.app, token, step.step.id, 'save_memory', {
@@ -156,7 +149,7 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     }
   });
 
-  test('REST 删除候选后，同正文重试按新增处理', async () => {
+  test('after REST deletes the candidate, retrying the same body is treated as a new entry', async () => {
     const { s, token, step } = await world();
     try {
       const first = await relay(s.app, token, step.step.id, 'save_memory', {
@@ -182,9 +175,8 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     }
   });
 
-  test('显式 sourceTodoId/projectId 参数优先（跨任务记录经验 [设计]）', async () => {
+  test('explicit sourceTodoId/projectId params win (recording cross-task experience [design])', async () => {
     const { s, token, step } = await world();
-    // 显式值须是本队真实行（#1470 团队归属）：另建一个本队项目与任务。
     const otherProject = await postProject(s.app, 'other');
     const otherTodoRes = await call(s.app, 'POST', `/api/projects/${otherProject}/todos`, {
       body: { title: '另一任务', spec: '' },
@@ -204,7 +196,7 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     s.dispose();
   });
 
-  test('memories / delete_memory：只及本 Agent 条目（越权防御）', async () => {
+  test('memories / delete_memory: only this Agent entries (out-of-scope defense)', async () => {
     const { s, token, step } = await world();
     await relay(s.app, token, step.step.id, 'save_memory', { title: 't', content: 'c' });
     const listRes = await relay(s.app, token, step.step.id, 'memories', {});
@@ -218,11 +210,8 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     s.dispose();
   });
 
-  test('chief 51 词表不外溢：worker 步 relay 非记忆工具 = 400（组织/执行面 Chief 专属）', async () => {
+  test('chief 51-vocabulary does not leak out: worker step relay with a non-memory tool = 400 (org/execution surfaces chief-only)', async () => {
     const { s, token, step } = await world();
-    // set_remote_shell 随 XMON-115 入列：worker 步不得自授 shell（写入点 =
-    // chief 会话专属，组织面）。models 随 #627 入列：读侧候选清单同为
-    // chief 专属（worker 步的模型面由 assignment 决定，无自选语义）。
     for (const name of ['create_todo', 'run_builds', 'projects', 'set_remote_shell', 'models']) {
       const res = await relay(s.app, token, step.step.id, name, {});
       expect(res.status, name).toBe(400);
@@ -231,7 +220,7 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     s.dispose();
   });
 
-  test(`配额 ${MEMORY_QUOTA_PER_AGENT}/Agent：超限 = 409（UI 「记忆 · n/100」同源）`, async () => {
+  test(`quota ${MEMORY_QUOTA_PER_AGENT}/Agent: over = 409 (UI "memory n/100" same source)`, async () => {
     const { s, token, step } = await world();
     const now = Date.now();
     for (let i = 0; i < MEMORY_QUOTA_PER_AGENT; i++) {
@@ -260,22 +249,20 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     s.dispose();
   });
 
-  test('零自动写入语义：步收尾（done）不产记忆——「任务结束自动蒸馏」证伪守住（r5 §6）', async () => {
+  test('zero auto-write semantics: step wrap-up (done) produces no memory -- "auto-distill when task ends" disproven and held (r5 section 6)', async () => {
     const { s, token, step } = await world();
-    // 不调任何记忆工具，直接收尾（status success → review park）。
     const done = await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {
       cred: token,
       body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
     });
     expect(done.status).toBe(200);
     expect(s.db.select().from(agentMemory).all()).toHaveLength(0);
-    // build 行无记忆钩子副作用（结构性：写路径唯一入口 = relay 工具）。
     const builds = s.db.select().from(buildTable).all();
     expect(builds).toHaveLength(1);
     s.dispose();
   });
 
-  test('读侧注入形（04 附录 A 验证面）：下一轮 claim 载荷 agent.memories 携带已存条目', async () => {
+  test('read-side injection shape (04 appendix A verification surface): next-round claim payload agent.memories carries stored entries', async () => {
     const { s, token, step, todoId, projectId } = await world();
     await relay(s.app, token, step.step.id, 'save_memory', {
       title: '注入验证',
@@ -285,15 +272,13 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
       cred: token,
       body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
     });
-    // 同项目第二个任务 → claim：注入位 = agent.memories（宿主每步开跑注入
-    // systemPrompt 的载荷半；daemon 半 = composeWorkerSystemPrompt，apps/daemon runner）。
     const step2 = await claimNextTask(s, token, projectId);
     expect(step2.todo?.id).not.toBe(todoId);
     expect(step2.agent?.memories).toEqual([{ title: '注入验证', content: '第二轮应见我' }]);
     s.dispose();
   });
 
-  test('读侧按项目收窄（#1494）：别的项目的条目不注入，全局条目（projectId 空）照常注入', async () => {
+  test('read-side narrows by project (#1494): entries from other projects not injected, global entries (empty projectId) still injected', async () => {
     const { s, token, step, projectId } = await world();
     await relay(s.app, token, step.step.id, 'save_memory', { title: '项目一', content: 'p1' });
     await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {
@@ -321,7 +306,7 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     s.dispose();
   });
 
-  test('失效条目不进 claim 载荷；只有真正注入的条目记下 lastInjectedAt', async () => {
+  test('invalidated entries do not enter the claim payload; only actually-injected entries record lastInjectedAt', async () => {
     const { s, token, step, projectId } = await world();
     await relay(s.app, token, step.step.id, 'save_memory', { title: '项目一', content: 'p1' });
     await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {

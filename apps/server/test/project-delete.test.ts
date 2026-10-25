@@ -1,14 +1,3 @@
-// DELETE /api/projects/{id} 级联语义 E2E（#189 删除区复活前置；路由 = REST 同名
-// DELETE [推断]，项目设置危险操作区 UI 证据 r2 24c，wire 未采——登记
-// wire.test.ts INFERRED_ROUTES）。
-// 级联取舍（实现注记同文）：级联删（拒绝非空所需逐 todo 手删 UI 不存在）；
-// 清图 = step（无 FK 手动清，deleteTodo 同律）→ schedule（无 FK 列）→ tag →
-// todo（FK cascade 随行 build/plan/todo_tag）→ chief watch 摘除（JSON 列无 FK，
-// 陈旧 watch 不自愈）→ agentMemory.projectId 置 null（记忆属 Agent 资产，清
-// 作用域留本体）→ project 行；message/tokenUsage 无 FK 孤儿 = deleteTodo 既有
-// 面同口径（document_diff 已随 #1029 死 schema 退役删表）。托管 bare repo 磁盘面随行清（repoName 复用安全：
-// uniqueRepoName 只查库行，留目录 = 同名新项目在旧库上 reinit/seed 冲突）。
-
 import { existsSync } from 'node:fs';
 import { projectRecordSchema, todoRecordSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
@@ -31,8 +20,8 @@ async function expectErrorShape(res: Response, status: number): Promise<void> {
   expect(Object.keys(body)).toEqual(['error']);
 }
 
-describe('DELETE /api/projects/{id}（#189）', () => {
-  test('未知 id → 404 {error}；删除后复删 → 404', async () => {
+describe('DELETE /api/projects/{id} (#189)', () => {
+  test('unknown id -> 404 {error}; deleting again after deletion -> 404', async () => {
     const s = bootServer();
     await expectErrorShape(await req(s.app, 'DELETE', '/api/projects/nope'), 404);
     const projectId = await postProject(s.app);
@@ -41,7 +30,7 @@ describe('DELETE /api/projects/{id}（#189）', () => {
     s.dispose();
   });
 
-  test('空项目（未绑 repo）→ 204，列表面即时消失', async () => {
+  test('an empty project (no repo bound) -> 204, gone from the list immediately', async () => {
     const s = bootServer();
     const projectId = await postProject(s.app);
     expect((await req(s.app, 'DELETE', `/api/projects/${projectId}`)).status).toBe(204);
@@ -49,12 +38,11 @@ describe('DELETE /api/projects/{id}（#189）', () => {
       await req(s.app, 'GET', `/api/projects?teamId=${s.team.id}`)
     ).json()) as unknown[];
     expect(list).toHaveLength(0);
-    // 子读面随行 404
     await expectErrorShape(await req(s.app, 'GET', `/api/projects/${projectId}/todos`), 404);
     s.dispose();
   });
 
-  test('级联：todo/build/step/plan/tag/schedule 随行清；watch 摘除；记忆置 null 留存', async () => {
+  test('cascade: todo/build/step/plan/tag/schedule rows cleared; watch detached; memories kept with project set to null', async () => {
     const s = bootServer();
     const projectId = await postProject(s.app);
     const todoDoc = todoRecordSchema.parse(
@@ -62,7 +50,6 @@ describe('DELETE /api/projects/{id}（#189）', () => {
         await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: 'a', spec: '' })
       ).json(),
     );
-    // build + step（POST builds 入队规划步）
     const started = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       todoIds: [todoDoc.id],
       assignment: { plan: null, build: null },
@@ -70,7 +57,6 @@ describe('DELETE /api/projects/{id}（#189）', () => {
     });
     const buildId = ((await started.json()) as { builds: { id: string }[] }).builds[0]?.id;
     expect(buildId).toBeDefined();
-    // plan 行（FK cascade 自 build 的钉点）
     s.db
       .insert(planTable)
       .values({
@@ -81,9 +67,7 @@ describe('DELETE /api/projects/{id}（#189）', () => {
         createdAt: Date.now(),
       })
       .run();
-    // tag（projectId FK 挡路钉点）
     s.db.insert(tagTable).values({ id: 'tag-del-1', projectId, name: 'x' }).run();
-    // schedule（无 FK 列，经 API 造）
     const sched = await req(s.app, 'POST', '/api/schedules', {
       todoId: todoDoc.id,
       kind: 'daily',
@@ -91,7 +75,6 @@ describe('DELETE /api/projects/{id}（#189）', () => {
       tz: 'UTC',
     });
     expect(sched.status).toBe(201);
-    // chief watch（JSON 列，直插一行含该 todo 的 watch）
     s.db
       .insert(chief)
       .values({
@@ -115,7 +98,6 @@ describe('DELETE /api/projects/{id}（#189）', () => {
         ],
       })
       .run();
-    // 记忆（projectId 作用域 + source 溯源槽）
     s.db
       .insert(agentMemory)
       .values({
@@ -134,7 +116,6 @@ describe('DELETE /api/projects/{id}（#189）', () => {
 
     expect((await req(s.app, 'DELETE', `/api/projects/${projectId}`)).status).toBe(204);
 
-    // 读面
     expect(
       (await (await req(s.app, 'GET', `/api/todos?teamId=${s.team.id}`)).json()) as unknown[],
     ).toHaveLength(0);
@@ -144,24 +125,21 @@ describe('DELETE /api/projects/{id}（#189）', () => {
     expect(
       (await (await req(s.app, 'GET', `/api/schedules?team=${s.team.id}`)).json()) as unknown[],
     ).toHaveLength(0);
-    // 库面
     expect(s.db.select().from(todoTable).all()).toHaveLength(0);
     expect(s.db.select().from(buildTable).all()).toHaveLength(0);
     expect(s.db.select().from(stepTable).all()).toHaveLength(0);
     expect(s.db.select().from(planTable).all()).toHaveLength(0);
     expect(s.db.select().from(tagTable).all()).toHaveLength(0);
     expect(s.db.select().from(projectTable).all()).toHaveLength(0);
-    // watch 摘除（chief 行本体留存）
     const chiefRow = s.db.select().from(chief).all()[0];
     expect(chiefRow?.watches).toHaveLength(0);
-    // 记忆留存、作用域置 null（溯源槽悬空 = deleteTodo 既有面，不收窄）
     const mem = s.db.select().from(agentMemory).all();
     expect(mem).toHaveLength(1);
     expect(mem[0]?.projectId).toBeNull();
     s.dispose();
   });
 
-  test('托管形态：bare repo 磁盘随行清；同名新项目复用 repoName 安全', async () => {
+  test('hosted shape: the bare repo directory is cleared with it; a new project reusing the same repoName is safe', async () => {
     const s = bootServer();
     const created = projectRecordSchema.parse(
       await (
@@ -175,8 +153,6 @@ describe('DELETE /api/projects/{id}（#189）', () => {
     expect((await req(s.app, 'DELETE', `/api/projects/${created.id}`)).status).toBe(204);
     expect(existsSync(dir)).toBe(false);
 
-    // 复用安全钉点：uniqueRepoName 只查库行——目录若残留，同名新项目会在旧库
-    // 上 reinit/seed 冲突；清盘后同名再建拿到原名 + 全新空库。
     const again = projectRecordSchema.parse(
       await (
         await req(s.app, 'POST', '/api/projects', { name: 'Hosted Repo', repoKind: 'hosted' })
@@ -187,7 +163,7 @@ describe('DELETE /api/projects/{id}（#189）', () => {
     s.dispose();
   });
 
-  test('隔离：删 A 不伤 B（同团队邻项目 todo 留存）', async () => {
+  test('isolation: deleting A does not hurt B (the neighboring project todos in the same team survive)', async () => {
     const s = bootServer();
     const a = await postProject(s.app, 'a');
     const b = await postProject(s.app, 'b');

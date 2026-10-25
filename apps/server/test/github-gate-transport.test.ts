@@ -1,10 +1,3 @@
-// #1404 S4a: the merge gate's GitHub transport in lib/github.ts. The functions send one request
-// built from the caller's arguments and hand the response back unread; the gate (S4b) decides
-// what a response means. Failure modes first: docs/verify/1404/s4a-failure-modes.txt (FM-1 to
-// FM-20); the T numbers below are the ones that file names.
-// Live shapes: apps/server/test/fixtures/github/gate-*.json, captured read-only with gh api on
-// 2026-10-22 (docs/verify/1404/s4a-github-shapes.txt). The status POST runs against a stub only.
-
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -30,7 +23,6 @@ const HEAD = 'f9c4f852292592395e882e1d900ca215a1aafce5';
 const SHA = '39a108e80bcd5d82e980599abf32d059b2fbad8c';
 const MAIN = '93b9ce215b5ee101cf5e511ddd2cb8d212d04e71';
 const T = 10_000;
-/** Built from code points so no formatter turns them into raw invisible characters. */
 const RLO = String.fromCharCode(0x202e);
 const ZWSP = String.fromCharCode(0x200b);
 
@@ -46,13 +38,10 @@ interface Call {
 interface Reply {
   status: number;
   headers?: Record<string, string>;
-  /** JSON-encoded unless it is a string, which is sent as is. */
   body?: unknown;
-  /** json() / text() reject with this instead of returning. */
   bodyError?: unknown;
 }
 
-/** A Response stand-in whose body can be read once, like the real one. */
 function reply(r: Reply): Awaited<ReturnType<FetchLike>> {
   const headers = new Map(Object.entries(r.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
   const text =
@@ -72,7 +61,6 @@ function reply(r: Reply): Awaited<ReturnType<FetchLike>> {
   };
 }
 
-/** A fetch that records every call and answers with `answer`. */
 function stub(answer: Reply | ((call: Call) => Promise<Awaited<ReturnType<FetchLike>>>)) {
   const calls: Call[] = [];
   const fetch: FetchLike = (input, init) => {
@@ -85,7 +73,6 @@ function stub(answer: Reply | ((call: Call) => Promise<Awaited<ReturnType<FetchL
 
 const OK = { status: 200, body: { ok: true } };
 
-/** Every transport function with valid arguments, so a table can run a case through all of them. */
 const ALL: Array<[string, (f: FetchLike, token?: string) => Promise<GithubRawResult>]> = [
   ['pull', (f, t = TOKEN) => githubPullRaw(f, t, O, R, 1479, { etag: null, timeoutMs: T })],
   ['branch', (f, t = TOKEN) => githubBranchRaw(f, t, O, R, 'main', { etag: null, timeoutMs: T })],
@@ -141,7 +128,6 @@ const invalid = (field: string): GithubRawResult => ({
 
 describe('#1404 S4a gate transport: what is refused before any request', () => {
   test.each(ALL)('T2 %s: a missing or header-unsafe token sends nothing', async (_n, call) => {
-    // 123 and null: callers outside TypeScript's reach; '123' would pass the character check.
     const bads: unknown[] = [
       '',
       ' ',
@@ -353,7 +339,6 @@ describe('#1404 S4a gate transport: what is refused before any request', () => {
         (f) => githubPullRaw(f, TOKEN, O, R, n, { etag: null, timeoutMs: T }),
       ]);
     }
-    // Every paged read checks page and per_page itself.
     const paged: Array<(f: FetchLike, page: number, perPage: number) => Promise<GithubRawResult>> =
       [
         (f, page, perPage) =>
@@ -390,7 +375,6 @@ describe('#1404 S4a gate transport: what is refused before any request', () => {
           timeoutMs: T,
         }),
     ]);
-    // 2 ** 31 and 2 ** 33: beyond the timer limit, AbortSignal.timeout would throw (code review, finding 1).
     for (const timeoutMs of [0, -5, Number.NaN, 1.5, Number.POSITIVE_INFINITY, 2 ** 31, 2 ** 33]) {
       cases.push([
         'timeoutMs',
@@ -583,7 +567,6 @@ describe('#1404 S4a gate transport: what is sent', () => {
       expect(await call(withTag.fetch, etag)).toEqual({ kind: 'not-modified' });
       expect(withTag.calls[0]?.init.headers?.['if-none-match']).toBe(etag);
 
-      // No etag sent: a 304 is not "unchanged since what you have", it is a status.
       const without = stub({ status: 304 });
       expect(await call(without.fetch, null)).toEqual({
         kind: 'failed',
@@ -819,8 +802,6 @@ describe('#1404 S4a gate transport: what comes back', () => {
   );
 
   test('T12 nothing in a body is projected, filtered or defaulted', async () => {
-    // A check-runs page with a malformed row and unknown fields: githubCommitCheckRuns skips such
-    // rows; the gate transport must not.
     const body = {
       total_count: 3,
       check_runs: [{ name: 'check', head_sha: SHA }, null, 'x', { extra: { nested: [1, 2] } }],
@@ -836,7 +817,6 @@ describe('#1404 S4a gate transport: what comes back', () => {
     });
     expect(r).toEqual({ kind: 'ok', status: 200, etag: null, link: null, body });
     for (const odd of [null, 0, 'text', [], false]) {
-      // JSON-encoded here: the stub sends a string body verbatim.
       const s = stub({ status: 200, body: JSON.stringify(odd) });
       expect(await githubPullRaw(s.fetch, TOKEN, O, R, 1, { etag: null, timeoutMs: T })).toEqual({
         kind: 'ok',
@@ -1029,8 +1009,6 @@ describe('#1404 S4a gate transport: what comes back', () => {
         failure: { kind: 'status', status: 404, message },
       });
     }
-    // An error body whose read times out is a timeout, unless the headers already say rate-limited
-    // (code review, finding 3: a header-less secondary-limit 403 must not turn into a plain status).
     const slow403 = stub({ status: 403, bodyError: new DOMException('timed out', 'TimeoutError') });
     expect(
       await githubPullRaw(slow403.fetch, TOKEN, O, R, 1, { etag: null, timeoutMs: T }),
@@ -1049,7 +1027,6 @@ describe('#1404 S4a gate transport: what comes back', () => {
       kind: 'failed',
       failure: { kind: 'rate-limited', status: 429, resetAt: null, retryAfterSeconds: 30 },
     });
-    // An error body that cannot be read for another reason still gives a status.
     const broken = stub({ status: 502, bodyError: new TypeError('terminated') });
     expect(await githubPullRaw(broken.fetch, TOKEN, O, R, 1, { etag: null, timeoutMs: T })).toEqual(
       {

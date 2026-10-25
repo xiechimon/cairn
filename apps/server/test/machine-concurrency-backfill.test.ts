@@ -1,14 +1,3 @@
-// #1241 机器并发覆盖位回填 migration：存量 maxConcurrent 非默认值 = 用户经 PATCH
-// 写过，回填为覆盖（心跳不再用推荐值改它）；恰为默认 3 的存量行与默认无从区分，
-// 按未覆盖处理（吃推荐值）。
-//
-// 失败方式（先于实现固化，仓测试纪律）：
-// B1 非默认存量值没转成覆盖 → 升级后首拍心跳把用户的数改成推荐值（用户值不持久）。
-// B2 默认 3 的存量行被标成覆盖 → 存量机器永远吃不到推荐值（功能对存量失效）。
-//
-// 定位律承 agent-skills-split-backfill（#1169）：按内容找含 maxConcurrentOverridden
-// 回填 UPDATE 的那条，迁移序号不写死（撞号纪律：合并期重编号后零改动）。
-
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -40,15 +29,14 @@ function findBackfillEntry(): { idx: number; tag: string } {
   const entry = readJournal(MIGRATIONS_FOLDER).entries.find((e) =>
     OVERRIDE_MARKER.test(readFileSync(join(MIGRATIONS_FOLDER, `${e.tag}.sql`), 'utf8')),
   );
-  expect(entry, 'journal 里找不到 maxConcurrentOverridden 回填 migration').toBeTruthy();
+  expect(entry, 'maxConcurrentOverridden backfill migration missing from journal').toBeTruthy();
   return entry!;
 }
 
-/** 复制 migrations 目录并截到回填那条之前 = 升级前旧库形态。 */
 function preBackfillMigrations(): string {
   const journal = readJournal(MIGRATIONS_FOLDER);
   const backfillIdx = journal.entries.findIndex((e) => e.tag === findBackfillEntry().tag);
-  expect(backfillIdx, '回填 migration 应在 journal 内').toBeGreaterThan(0);
+  expect(backfillIdx, 'backfill migration should be in the journal').toBeGreaterThan(0);
   const dir = temp('cairn-migrations-pre-concurrency-');
   mkdirSync(join(dir, 'meta'));
   for (const entry of journal.entries.slice(0, backfillIdx)) {
@@ -88,8 +76,8 @@ function readFlags(dbPath: string, id: string): { maxConcurrentOverridden: numbe
   return row;
 }
 
-describe('#1241 机器并发覆盖位回填（存量用户值持久 + 默认行吃推荐值）', () => {
-  test('升级前旧库 → 补跑回填：B1 非默认值转覆盖，B2 默认 3 不覆盖', () => {
+describe('#1241 machine concurrency override-bit backfill (legacy user values persist + default rows take the recommendation)', () => {
+  test('pre-upgrade legacy db -> backfill rerun: B1 non-default value becomes override, B2 default 3 not overridden', () => {
     const dbPath = buildPreBackfillDb([
       { id: 'cc-user-5', maxConcurrent: 5 },
       { id: 'cc-user-16', maxConcurrent: 16 },

@@ -1,23 +1,3 @@
-// 模型降级链 + provider 熔断（#1493）：machine done(failed) → plan/build 步
-// 换到下一个健康备选重派；审核/验证/合并步只等不换。失败方式枚举先于实现
-// （AGENTS.md 测试规则 3，票面「失败方式」逐条落到下面）：
-//   X1 不换：主模型额度用完时步挂起等额度，配了备选也不用。断言步回
-//      pending、fallback.model = 第一个备选、claim 载荷改发备选模型、凭证
-//      改发备选 provider。
-//   X2 死循环：备选全挂后链继续转。断言链走完回落 waiting_quota，tried 封顶。
-//   X3 弱模型放行：review / merge 步被降级。断言只等不换（负对照）。
-//   X4 显式模型被换：agent 没配备选也被换。断言旧行为（waiting_quota）。
-//   X5 限流也换：429 换模型丢上下文。断言 capacity 不换。
-//   X6 会话串台：换模型后续用旧 provider 的会话。断言 claim session=new。
-//   X7 熔断失明：open 的 provider 仍被选为备选。断言跳过它选下一个。
-//   X8 runtime 闸漏判：选了归属机没开 runtime 的备选，步卡 pending。断言跳过。
-//   X9 不可见：换模型零痕迹。断言会话流 system 行 + model_fallback 通知。
-//   X10 404 / 认证失败不换：断言两类都换。
-//   X11 0 token 静默成功：断言重试一次，第二次按失败收尾；daemon 没说「无
-//      输出」或没上报 usage 都不判（pi 对不回 usage 的 relay 也报 0 token）。
-//   X12 降级后续不上自己的会话：备选上跑出的会话在挂起释放后被丢弃。断言
-//      续接本步在备选上的会话。
-
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
@@ -198,8 +178,8 @@ function stepRow(w: World, stepId: string) {
   return w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
 }
 
-describe('模型降级链（#1493）', () => {
-  test('X1+X6+X9：主模型额度用完 → 换第一个备选重派（新会话、凭证跟着换、可见）', async () => {
+describe('model fallback chain (#1493)', () => {
+  test('X1+X6+X9: primary model quota exhausted -> re-dispatch on the first fallback (fresh session, credential switches, visible)', async () => {
     const w = await setupWorld();
     const buildId = await startBuild(w);
     const first = await claim(w);
@@ -212,7 +192,6 @@ describe('模型降级链（#1493）', () => {
     expect(row.machineId).toBeNull();
     expect(row.fallback?.model).toEqual({ provider: 'relay-b', modelId: 'model-b' });
     expect(row.fallback?.tried).toEqual(['relay-a/model-a', 'relay-b/model-b']);
-    // todo 不判死、build 无错误。
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
     expect(todoRow.phase).toBe('building');
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
@@ -222,9 +201,7 @@ describe('模型降级链（#1493）', () => {
     expect(again.stepId).toBe(first.stepId);
     expect(again.provider).toBe('relay-b');
     expect(again.modelId).toBe('model-b');
-    // X6：换 provider = 新会话（不续 relay-a 的 sess-relay-a）。
     expect(again.session.action).toBe('new');
-    // 凭证跟着换：token 端点下发 relay-b 的 provider 配置。
     const tokRes = await call(w.s.app, 'GET', `/api/machine/token/${again.stepId}`, {
       cred: w.token,
     });
@@ -232,7 +209,6 @@ describe('模型降级链（#1493）', () => {
     const tok = (await tokRes.json()) as { provider: { providerId: string } | null };
     expect(tok.provider?.providerId).toBe('relay-b');
 
-    // X9：会话流 system 行 + model_fallback 通知。
     const notes = w.s.db
       .select()
       .from(messageTable)
@@ -248,7 +224,7 @@ describe('模型降级链（#1493）', () => {
     expect(notif.map((n) => n.type)).toContain('model_fallback');
   });
 
-  test('X2：备选全挂 → 回落 waiting_quota，不死循环', async () => {
+  test('X2: all fallbacks down -> fall back to waiting_quota, no infinite loop', async () => {
     const w = await setupWorld();
     await startBuild(w);
     const a = await claim(w);
@@ -262,11 +238,10 @@ describe('模型降级链（#1493）', () => {
     const row = stepRow(w, a.stepId);
     expect(row.status).toBe('waiting_quota');
     expect(row.fallback?.tried).toHaveLength(3);
-    // 链走完停在最后一个备选上等额度（不回绕重试主模型）。
     expect(row.fallback?.model).toEqual({ provider: 'relay-c', modelId: 'model-c' });
   });
 
-  test('X12：降级后的步挂起等额度、释放重领时续它自己在备选上的会话', async () => {
+  test('X12: the degraded step suspends waiting for quota, resumes its own fallback session on release/claim', async () => {
     const w = await setupWorld([{ provider: 'relay-b', modelId: 'model-b' }]);
     await startBuild(w);
     const a = await claim(w);
@@ -311,7 +286,7 @@ describe('模型降级链（#1493）', () => {
     },
   );
 
-  test('X4：agent 没配备选 → 旧行为（waiting_quota）', async () => {
+  test('X4: agent has no fallbacks -> old behavior (waiting_quota)', async () => {
     const w = await setupWorld(null);
     await startBuild(w);
     const c = await claim(w);
@@ -321,7 +296,7 @@ describe('模型降级链（#1493）', () => {
     expect(row.fallback).toBeNull();
   });
 
-  test('X5：限流（capacity）不换模型', async () => {
+  test('X5: rate limit (capacity) does not switch models', async () => {
     const w = await setupWorld();
     await startBuild(w);
     const c = await claim(w);
@@ -335,7 +310,7 @@ describe('模型降级链（#1493）', () => {
     expect(row.fallback).toBeNull();
   });
 
-  test('X7：open 的 provider 不被选为备选', async () => {
+  test('X7: an open provider is not chosen as fallback', async () => {
     const w = await setupWorld();
     for (let i = 0; i < 5; i++) providerHealth.recordFailure('relay-b');
     expect(providerHealth.state('relay-b')).toBe('open');
@@ -348,7 +323,7 @@ describe('模型降级链（#1493）', () => {
     });
   });
 
-  test('X8：归属机没开对应 runtime 的备选直接跳过', async () => {
+  test('X8: a fallback whose runtime is not enabled on the home machine is skipped directly', async () => {
     const w = await setupWorld([
       { provider: 'claude-code', modelId: 'claude-sonnet' },
       { provider: 'relay-c', modelId: 'model-c' },
@@ -362,7 +337,7 @@ describe('模型降级链（#1493）', () => {
     });
   });
 
-  test('X10：模型 404 与认证失败也换', async () => {
+  test('X10: model 404 and auth failure also switch', async () => {
     for (const errorMessage of [
       'POST /v1/messages 404 model_not_found',
       'Error: 401 {"type":"error","error":{"type":"authentication_error"}}',
@@ -377,7 +352,7 @@ describe('模型降级链（#1493）', () => {
     }
   });
 
-  test('熔断计数：额度用完记 provider 连败，成功清零', async () => {
+  test('circuit-breaker count: quota exhaustion records a provider streak of failures, success clears it', async () => {
     const w = await setupWorld();
     await startBuild(w);
     const a = await claim(w);
@@ -395,12 +370,12 @@ describe('模型降级链（#1493）', () => {
   });
 });
 
-describe('0 token 静默失败（#1493）', () => {
+describe('0 token silent failure (#1493)', () => {
   const zeroUsage = [
     { model: 'relay-a/model-a', input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   ];
 
-  test('X11：成功但 0 token 且无输出 → 同模型重试一次，再来一次按失败收尾', async () => {
+  test('X11: success but 0 tokens and no output -> retry once on the same model, one more turns into failure wrap-up', async () => {
     const w = await setupWorld(null);
     const buildId = await startBuild(w);
     const a = await claim(w);
@@ -419,7 +394,7 @@ describe('0 token 静默失败（#1493）', () => {
     expect(buildRow.errorMessage).toContain('0 token');
   });
 
-  test('X11 负对照：0 token 但 daemon 没说无输出（不回 usage 的 relay）不判', async () => {
+  test('X11 negative control: 0 token but daemon did not say no output (relay returning no usage) not judged', async () => {
     const w = await setupWorld(null);
     await startBuild(w);
     const a = await claim(w);
@@ -428,7 +403,7 @@ describe('0 token 静默失败（#1493）', () => {
     expect(stepRow(w, a.stepId).fallback).toBeNull();
   });
 
-  test('X11 负对照：没上报 usage（老 daemon）不判', async () => {
+  test('X11 negative control: no usage reported (legacy daemon) not judged', async () => {
     const w = await setupWorld(null);
     await startBuild(w);
     const a = await claim(w);
@@ -438,8 +413,8 @@ describe('0 token 静默失败（#1493）', () => {
   });
 });
 
-describe('agent 写面（#1493）', () => {
-  test('PATCH fallbackModels：落库 + 记录投影 + 超过 5 个 400 + null 清空', async () => {
+describe('agent write surface (#1493)', () => {
+  test('PATCH fallbackModels: persisted + record projection + more than 5 -> 400 + null clears', async () => {
     const w = await setupWorld(null);
     const path = `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`;
     const six = Array.from({ length: 6 }, (_, i) => ({ provider: 'relay-b', modelId: `m${i}` }));

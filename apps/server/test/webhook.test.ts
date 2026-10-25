@@ -1,47 +1,3 @@
-// #1137 GitHub webhook 事件入口 tracer：receiver 全场景 + token mgmt +
-// token-auth 豁免面。失败方式清单（先列后写，代码是让场景通过的手段）：
-//
-// A created 全链
-//  A1 触发 label（cairn）labeled 事件 → 202 {result:'created'}，todo 行
-//     sourceKind/sourceRef 落值 + chief_thread/chief_message/step 行（派发段）
-//     + webhook_token.lastUsedAt 回写（落库段）；
-//  A2 响应封套过 shared webhookReceiverResponseSchema（请求段对账）。
-// B 重复/去重双层
-//  B1 同 X-GitHub-Delivery 60s 窗口内二次投递 → 202 duplicate，无第二个
-//     todo、无第二条 chief 线程；
-//  B2 同 issue 不同 delivery（重放）→ importGithubIssue 409 → 202
-//     duplicate（持久闸，不透 409 给 GitHub）。
-// C ignored / noop
-//  C1 ping 事件 → 202 ignored，零副作用（GitHub 建 webhook 首发）；
-//  C2 未知事件（push）→ 202 ignored；
-//  C3 非 labeled action / 非触发 label → 202 ignored；
-//  C4 载荷形坏（缺 issue.number）→ 202 ignored（不 400）。
-// D misconfigured / 上游
-//  D1 repo 无映射项目 → 202 misconfigured；
-//  D2 GitHub 未连接 → 202 misconfigured（#1459 起在 teamGithubToken 就拒；
-//     importGithubIssue 自己的 404 收敛由 W16 覆盖：连接在权限读期间被删）；
-//  D3 上游瞬时失败（网络 502）→ 502 直透（唯一喂 GitHub 重试的分支）。
-// E token 面
-//  E1 错 token → 401（{error} 同形），不写 lastUsedAt；
-//  E2 吊销后投递 → 401；
-//  E3 token mgmt：创建一次性明文 + 列表掩码（keyHash 永不出）+ 删除 204/
-//     404；属他 team 的删除 → 404。
-// F token-auth 豁免面
-//  F1 CAIRN_TOKEN 开：receiver 免 Bearer 可达（错 token 仍 401——自有闸）；
-//  F2 CAIRN_TOKEN 开：token mgmt 端点仍要 Bearer（401 无凭证）；
-//  F3 /api/webhookfoo 段边界不豁免（401）。
-// W #1459 打标人按 D5 核 + 计入在飞上限（清单 docs/verify/1459/failure-modes.txt，
-//   W 编号对位）：sender 在仓库上 triage 及以上才导入，权限读与缓存复用 #1406
-//   轮询器的；读不到 / 没 token / 到上限 = 不导入、记日志、202 带原因。
-//   W4b（合入 #1406 round 4 后）：permission 读遇限流（429 / 带限流信号的
-//   403）在 lib 里抛 GithubRateLimitedError；webhook 照读不到处理：202 ignored，
-//   原因码 rate-limited（日志带 status 与重置时刻），不缓存，限流过后照判。
-//   round 2（#1477 pr-gate run 1）：打标人权限类的三种拒收 202 只答
-//   SENDER_REFUSED_DETAIL，细节进日志行的 detail；W15 轮询器的在飞现数含
-//   webhook 正在导入的那条；W16 导入自己的 404；W17 存量 githubRepo 形坏；
-//   W18 编排抛错时审计行照写。
-// 出站纪律：githubFetch 注入 mock，测试面零真实出站。
-
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type Phase, type TodoSourceKind, webhookReceiverResponseSchema } from '@cairn/shared';
@@ -74,10 +30,8 @@ const GH_TOKEN = 'ghp_webhook_test_token';
 const REPO = 'octo/alpha';
 const ISSUE_PATH = `/repos/${REPO}/issues/7`;
 const LABELS_PATH = `/repos/${REPO}/labels`;
-/** 缺省打标人（webhook sender）：仓主，permission 应答 admin。 */
 const SENDER = 'octo';
 const permissionPath = (login: string) => `/repos/${REPO}/collaborators/${login}/permission`;
-/** permission 应答形状取 GitHub OpenAPI 示例（#1406 夹具，代理拦 collaborators 路径）。 */
 const PERMISSION_EXAMPLE = JSON.parse(
   readFileSync(
     join(import.meta.dirname, 'fixtures/issue-intake/permission-admin.docs-example.json'),
@@ -112,8 +66,6 @@ const ISSUE_DETAIL = {
 };
 const LABELS_FULL = [{ name: 'cairn', color: '0075ca', description: null }];
 
-/** labeled 事件载荷（GitHub issues webhook 原形的消费子集）。sender = 打标人
- * （缺省仓主；null = 载荷不带 sender）；author = issue 作者（issue.user）。 */
 function labeledPayload(
   labelName = 'cairn',
   opts: { sender?: string | null; issue?: number; author?: string } = {},
@@ -154,9 +106,6 @@ type MockRoute = {
   headers?: Record<string, string>;
 };
 
-/** ghMock：按 pathname 分发（github-issues.test.ts 同族，此处收窄为静态路由；
- * routes 按引用持有，用例可在 boot 之后增改。throws = 网络失败 / 超时；
- * headers = 应答头（键小写）。 */
 function ghMock(routes: Record<string, MockRoute>): {
   impl: FetchLike;
   calls: string[];
@@ -215,7 +164,6 @@ let token: { id: string; plaintext: string };
 let projectId: string;
 
 beforeEach(async () => {
-  // 投递去重册是模块级内存态（跨 bootServer 存续）——用例间清零隔离。
   resetWebhookDeliveryWindow();
   routes = defaultRoutes();
   mock = ghMock(routes);
@@ -225,7 +173,6 @@ beforeEach(async () => {
     { teamId: s.team.id, login: 'octo', accessToken: GH_TOKEN, scope: 'repo' },
   );
   projectId = await postGithubProject(s.app);
-  // chief 绑定 Agent（orchestrateTodo 前置；orchestration-source 同形 seed）。
   s.db
     .insert((await import('../src/db/schema.js')).agent)
     .values({
@@ -259,8 +206,8 @@ afterEach(() => {
 
 const DELIVERY = 'deadbeef-delivery-1';
 
-describe('A created 全链（请求/落库/派发三段 tracer）', () => {
-  test('A1/A2 触发 label → 202 created；todo + chief 派发行 + lastUsedAt 三段落值', async () => {
+describe('the A created full chain (request/storage/dispatch, three tracer segments)', () => {
+  test('A1/A2 the trigger label -> 202 created; todo + the chief dispatch row + lastUsedAt, values in all three segments', async () => {
     const res = await post(s.app, `/api/webhook/github/${token.plaintext}`, labeledPayload(), {
       'x-github-event': 'issues',
       'x-github-delivery': DELIVERY,
@@ -271,7 +218,6 @@ describe('A created 全链（请求/落库/派发三段 tracer）', () => {
     expect(body.deliveryId).toBe(DELIVERY);
     expect(body.todoId).toBeDefined();
     expect(body.threadId?.startsWith('chief-')).toBe(true);
-    // 落库段：todo 行来源两列 + token lastUsedAt。
     const todoRow = s.db.select().from(todoTable).where(eq(todoTable.id, body.todoId!)).get();
     expect(todoRow?.sourceKind).toBe('github-issue');
     expect(todoRow?.sourceRef).toBe(`github:${REPO}#7`);
@@ -282,7 +228,6 @@ describe('A created 全链（请求/落库/派发三段 tracer）', () => {
       .where(eq(webhookTokenTable.id, token.id))
       .get();
     expect(tokenRow?.lastUsedAt).not.toBeNull();
-    // 派发段：chief_thread + 首条 user 消息（spec 逐字内嵌）+ pending 步。
     const threadRow = s.db
       .select()
       .from(chiefThreadTable)
@@ -303,8 +248,8 @@ describe('A created 全链（请求/落库/派发三段 tracer）', () => {
   });
 });
 
-describe('B 去重双层', () => {
-  test('B1 同 delivery 60s 窗口二次投递 → duplicate，无双建', async () => {
+describe('B two-layer dedupe', () => {
+  test('B1 the same delivery delivered twice within the 60s window -> duplicate, no double creation', async () => {
     const first = await post(s.app, `/api/webhook/github/${token.plaintext}`, labeledPayload(), {
       'x-github-event': 'issues',
       'x-github-delivery': DELIVERY,
@@ -320,7 +265,7 @@ describe('B 去重双层', () => {
     expect(s.db.select().from(chiefThreadTable).all()).toHaveLength(1);
   });
 
-  test('B2 同 issue 不同 delivery（重放）→ duplicate（sourceRef 持久闸）', async () => {
+  test('B2 the same issue with a different delivery (replay) -> duplicate (the sourceRef persistent gate)', async () => {
     await post(s.app, `/api/webhook/github/${token.plaintext}`, labeledPayload(), {
       'x-github-event': 'issues',
       'x-github-delivery': DELIVERY,
@@ -335,8 +280,8 @@ describe('B 去重双层', () => {
   });
 });
 
-describe('C ignored / noop（GitHub 重试风暴防御）', () => {
-  test('C1 ping 事件 → 202 ignored，零副作用零出站', async () => {
+describe('C ignored / noop (defense against GitHub retry storms)', () => {
+  test('C1 a ping event -> 202 ignored, zero side effects, zero outbound', async () => {
     const res = await post(
       s.app,
       `/api/webhook/github/${token.plaintext}`,
@@ -353,7 +298,7 @@ describe('C ignored / noop（GitHub 重试风暴防御）', () => {
     expect(mock.calls).toHaveLength(0);
   });
 
-  test('C2 未知事件（push）→ 202 ignored', async () => {
+  test('C2 an unknown event (push) -> 202 ignored', async () => {
     const res = await post(
       s.app,
       `/api/webhook/github/${token.plaintext}`,
@@ -363,7 +308,7 @@ describe('C ignored / noop（GitHub 重试风暴防御）', () => {
     expect(webhookReceiverResponseSchema.parse(await res.json()).result).toBe('ignored');
   });
 
-  test('C3 非 labeled / 非触发 label → 202 ignored，零出站', async () => {
+  test('C3 not labeled / not the trigger label -> 202 ignored, zero outbound', async () => {
     const opened = await post(
       s.app,
       `/api/webhook/github/${token.plaintext}`,
@@ -384,7 +329,7 @@ describe('C ignored / noop（GitHub 重试风暴防御）', () => {
     expect(mock.calls).toHaveLength(0);
   });
 
-  test('C4 载荷形坏（缺 issue.number）→ 202 ignored（不 400）', async () => {
+  test('C4 a malformed payload (missing issue.number) -> 202 ignored (not 400)', async () => {
     const res = await post(
       s.app,
       `/api/webhook/github/${token.plaintext}`,
@@ -396,10 +341,9 @@ describe('C ignored / noop（GitHub 重试风暴防御）', () => {
   });
 });
 
-describe('D misconfigured / 上游瞬时失败', () => {
-  test('D1 repo 无映射项目 → 202 misconfigured', async () => {
+describe('D misconfigured / upstream transient failure', () => {
+  test('D1 a repo with no mapped project -> 202 misconfigured', async () => {
     await req(s.app, 'DELETE', `/api/projects/${await postGithubProject(s.app)}`);
-    // 删掉两个项目，repo 无映射
     const projects = s.db
       .select()
       .from((await import('../src/db/schema.js')).project)
@@ -416,7 +360,7 @@ describe('D misconfigured / 上游瞬时失败', () => {
     expect(mock.calls).toHaveLength(0);
   });
 
-  test('D2 GitHub 未连接 → 202 misconfigured', async () => {
+  test('D2 GitHub not connected -> 202 misconfigured', async () => {
     s.db
       .delete((await import('../src/db/schema.js')).githubConnection)
       .where(eq((await import('../src/db/schema.js')).githubConnection.teamId, s.team.id))
@@ -429,7 +373,7 @@ describe('D misconfigured / 上游瞬时失败', () => {
     expect(body.result).toBe('misconfigured');
   });
 
-  test('D3 上游瞬时失败（issue 详情 502 族）→ 502 直透', async () => {
+  test('D3 an upstream transient failure (the issue detail 502 family) -> 502 passed through', async () => {
     const failing = ghMock(defaultRoutes({ [ISSUE_PATH]: { status: 500, body: {} } }));
     s.dispose();
     s = bootServer({ githubFetch: failing.impl });
@@ -444,13 +388,12 @@ describe('D misconfigured / 上游瞬时失败', () => {
       'x-github-delivery': DELIVERY,
     });
     expect(res.status).toBe(502);
-    // 半成品防御：无 todo 行。
     expect(s.db.select().from(todoTable).all()).toHaveLength(0);
   });
 });
 
-describe('E token 面', () => {
-  test('E1 错 token → 401 {error} 同形，不写 lastUsedAt、零出站', async () => {
+describe('E the token surface', () => {
+  test('E1 a wrong token -> 401 {error} same shape, lastUsedAt unwritten, zero outbound', async () => {
     const res = await post(s.app, '/api/webhook/github/pacm_wh_wrong_value', labeledPayload(), {
       'x-github-event': 'issues',
       'x-github-delivery': DELIVERY,
@@ -467,7 +410,7 @@ describe('E token 面', () => {
     expect(mock.calls).toHaveLength(0);
   });
 
-  test('E2 吊销后投递 → 401', async () => {
+  test('E2 a delivery after revocation -> 401', async () => {
     const del = await req(s.app, 'DELETE', `/api/teams/${s.team.id}/webhook-tokens/${token.id}`);
     expect(del.status).toBe(204);
     const res = await post(s.app, `/api/webhook/github/${token.plaintext}`, labeledPayload(), {
@@ -477,7 +420,7 @@ describe('E token 面', () => {
     expect(res.status).toBe(401);
   });
 
-  test('E3 token mgmt：创建一次性明文 + 列表掩码 + 删除 404/跨 team', async () => {
+  test('E3 token mgmt: one-time plaintext on create + masked in the list + deletion 404 / cross-team', async () => {
     const created = await createWebhookToken(s.app, s.team.id, 'second');
     expect(created.plaintext).toMatch(/^cairn_wh_[0-9a-f]{36}$/);
     const list = (await (
@@ -488,7 +431,6 @@ describe('E token 面', () => {
     expect(raw).not.toContain('tokenHash');
     expect(raw).not.toContain(created.plaintext);
     expect(list.every((row) => typeof row.masked === 'string')).toBe(true);
-    // 删除不存在 id → 404；再删已删 → 404。
     expect((await req(s.app, 'DELETE', `/api/teams/${s.team.id}/webhook-tokens/nope`)).status).toBe(
       404,
     );
@@ -500,7 +442,7 @@ describe('E token 面', () => {
     ).toBe(404);
   });
 
-  test('E3 requireTeam 闸：错 team id → 404', async () => {
+  test('E3 the requireTeam gate: a wrong team id -> 404', async () => {
     expect((await req(s.app, 'GET', '/api/teams/other-team/webhook-tokens')).status).toBe(404);
     expect(
       (await req(s.app, 'POST', '/api/teams/other-team/webhook-tokens', { name: 'x' })).status,
@@ -508,7 +450,7 @@ describe('E token 面', () => {
   });
 });
 
-describe('F token-auth 豁免面（CAIRN_TOKEN 开）', () => {
+describe('F the token-auth exempt surface (CAIRN_TOKEN on)', () => {
   function bootAuthed(): TestServer {
     const authed = bootServer({ authToken: 'gate-token', githubFetch: mock.impl });
     upsertGithubConnection(
@@ -518,9 +460,8 @@ describe('F token-auth 豁免面（CAIRN_TOKEN 开）', () => {
     return authed;
   }
 
-  test('F1 receiver 免 Bearer 可达（自有 token 闸照常：错值 401）', async () => {
+  test('F1 the receiver is reachable without a Bearer (its own token gate works as usual: a wrong value 401)', async () => {
     const authed = bootAuthed();
-    // token mgmt 要 Bearer（F2 钉的面），这里直插行取得 receiver 凭证。
     const { createWebhookToken: createRow } = await import('../src/services/webhook-tokens.js');
     const authedToken = createRow({ db: authed.db }, { teamId: authed.team.id, name: 'authed' });
     const res = await post(
@@ -532,7 +473,7 @@ describe('F token-auth 豁免面（CAIRN_TOKEN 开）', () => {
         'x-github-delivery': DELIVERY,
       },
     );
-    expect(res.status).toBe(202); // 穿闸达 receiver（ping = ignored）
+    expect(res.status).toBe(202);
     const wrong = await post(
       authed.app,
       '/api/webhook/github/wrong',
@@ -541,11 +482,11 @@ describe('F token-auth 豁免面（CAIRN_TOKEN 开）', () => {
         'x-github-event': 'ping',
       },
     );
-    expect(wrong.status).toBe(401); // receiver 自有闸
+    expect(wrong.status).toBe(401);
     authed.dispose();
   });
 
-  test('F2 token mgmt 端点仍要 Bearer（无凭证 401，闸形状）', async () => {
+  test('F2 the token mgmt endpoints still want a Bearer (no credential 401, the gate shape)', async () => {
     const authed = bootAuthed();
     expect(
       (await req(authed.app, 'GET', `/api/teams/${authed.team.id}/webhook-tokens`)).status,
@@ -556,7 +497,7 @@ describe('F token-auth 豁免面（CAIRN_TOKEN 开）', () => {
     authed.dispose();
   });
 
-  test('F3 /api/webhookfoo 段边界不豁免 → 401', async () => {
+  test('F3 the /api/webhookfoo segment boundary is not exempt -> 401', async () => {
     const authed = bootAuthed();
     const res = await post(authed.app, '/api/webhookfoo/x', {});
     expect(res.status).toBe(401);
@@ -564,8 +505,8 @@ describe('F token-auth 豁免面（CAIRN_TOKEN 开）', () => {
   });
 });
 
-describe('服务面直达（delivery 头缺省 + logger 静默）', () => {
-  test('无 delivery 头 → 不进去重册，仍正常分诊', async () => {
+describe('direct service-surface call (delivery header absent + silent logger)', () => {
+  test('no delivery header -> not entered into the dedupe ledger, still triaged normally', async () => {
     const response = await receiveGithubWebhook(
       {
         db: s.db,
@@ -580,12 +521,8 @@ describe('服务面直达（delivery 头缺省 + logger 静默）', () => {
   });
 });
 
-// #1406：webhook 与 issue 轮询器同时导入同一 issue。importGithubIssue 在第一次
-// GitHub 读之前占住 sourceRef，第二路拿 409（webhook 面 = 202 duplicate），
-// 只建一张卡、只编排一次。
-describe('#1406 webhook 与另一路导入同一 issue 并发', () => {
-  test('webhook 投递与直接导入同时进来：一张卡，后到的一路 409', async () => {
-    // 详情读卡在闸门上 20ms：先占位的一路握着占位等 GitHub，另一路此时进门。
+describe('#1406 the webhook and another import path race on the same issue', () => {
+  test('a webhook delivery and a direct import arrive together: one card, the later path 409s', async () => {
     let open: () => void = () => {};
     const gate = new Promise<void>((r) => {
       open = r;
@@ -619,7 +556,6 @@ describe('#1406 webhook 与另一路导入同一 issue 并发', () => {
     expect(hookResult.status).toBe('fulfilled');
     const hookBody = (hookResult as PromiseFulfilledResult<{ result: string }>).value;
     if (hookBody.result === 'created') {
-      // webhook 先占位：直接导入那一路 409。
       expect(directResult.status).toBe('rejected');
       const reason = (directResult as PromiseRejectedResult).reason;
       expect(reason).toBeInstanceOf(HttpError);
@@ -633,18 +569,12 @@ describe('#1406 webhook 与另一路导入同一 issue 并发', () => {
   });
 });
 
-// —— #1459 打标人按 D5 核 + 计入在飞上限 ————————————————————————————————————
-// W 编号对位 docs/verify/1459/failure-modes.txt。
-
 const REFUSED_LOG = 'github webhook import refused';
-/** 打标人权限类拒收（不到 triage / 读不到 / 遇限流）对 URL token 持有人一律答这
- * 一句：哪一种、哪个账号、什么权限只进日志行（round 2：202 不当权限查询口）。 */
 const SENDER_REFUSED_DETAIL = 'sender not confirmed for import (reason in the server log)';
 const CAP_DETAIL = `project at the in-flight cap (${ISSUE_INTAKE_IN_FLIGHT_CAP} open github-issue tasks)`;
 
 type LogLine = Record<string, unknown>;
 
-/** HTTP 面投递（状态码 + 封套；非 202 时原样给 JSON）。 */
 async function deliverHttp(
   body: unknown,
   deliveryId: string,
@@ -662,8 +592,6 @@ async function deliverHttp(
   };
 }
 
-/** 服务面直达（带可捕获的 pino 日志：每行解析成对象）。 */
-/** 可捕获的 pino 日志（每行解析成对象）。 */
 function captureLogger(): { logger: pino.Logger; lines: LogLine[] } {
   const lines: LogLine[] = [];
   const logger = pino(
@@ -694,7 +622,6 @@ const issueTasks = () =>
 
 let taskSeq = 900;
 
-/** 直插一张来源卡（在飞上限场景；webhook 导入的形状：createdBy = seed 用户）。 */
 function insertIssueTask(
   n: number,
   phase: Phase,
@@ -719,7 +646,6 @@ function insertIssueTask(
     .run();
 }
 
-/** issue 详情读卡在闸门上（并发场景：先占位的一路握着占位等 GitHub）。 */
 function gatedFetch(paths: string[]): { impl: FetchLike; open: () => void } {
   let open: () => void = () => {};
   const gate = new Promise<void>((r) => {
@@ -732,8 +658,6 @@ function gatedFetch(paths: string[]): { impl: FetchLike; open: () => void } {
   return { impl, open };
 }
 
-/** 轮询器看到的带 ready-for-agent 的 open issue 与它的 labeled 事件（#1406
- * events-1406.json 的形状，actor = login）。 */
 function listForPoller(n: number, labeler: string): void {
   routes[`/repos/${REPO}/issues`] = {
     body: [
@@ -763,8 +687,8 @@ function listForPoller(n: number, labeler: string): void {
   };
 }
 
-describe('#1459 W 打标人（sender）按 D5 核', () => {
-  test('W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志', async () => {
+describe('#1459 W the labeler (sender) is checked per D5', () => {
+  test('W1 an external author auto-labeled via the issue template (sender = the author, permission 404) -> 202 ignored, no import, no issue read, logged', async () => {
     routes[permissionPath('outsider')] = { status: 404, body: { message: 'Not Found' } };
     const payload = labeledPayload('cairn', { sender: 'outsider', author: 'outsider' });
     const http = await deliverHttp(payload, 'w1-http');
@@ -788,12 +712,11 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
         detail: `outsider is below triage on ${REPO}`,
       }),
     ]);
-    // 404 是明确的否定答案：TTL 内不重读（与轮询器同一缓存律）。
     expect(permissionReads()).toHaveLength(1);
     expect(issueTasks()).toHaveLength(0);
   });
 
-  test('W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入', async () => {
+  test('W2 the labeler has only read (role read, triage false) -> 202 ignored, no import', async () => {
     routes[permissionPath('reader')] = { body: permissionBody('reader', 'read', 'read', false) };
     const http = await deliverHttp(labeledPayload('cairn', { sender: 'reader' }), 'w2');
     expect(http.status).toBe(202);
@@ -802,7 +725,6 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
       deliveryId: 'w2',
       detail: SENDER_REFUSED_DETAIL,
     });
-    // 202 只有那一句：哪种拒收由日志行的原因码钉（读到 read，不是读不到）。
     const direct = await deliverDirect(labeledPayload('cairn', { sender: 'reader' }), 'w2-direct');
     expect(refusals(direct.lines)).toEqual([
       expect.objectContaining({ sender: 'reader', reason: 'sender-below-triage' }),
@@ -855,7 +777,6 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
           detail: `permission of ${SENDER} on ${REPO} unreadable`,
         }),
       ]);
-      // 读不到不进缓存：第二次投递重读。
       expect(permissionReads()).toHaveLength(2);
       expect(issueReads()).toHaveLength(0);
       expect(issueTasks()).toHaveLength(0);
@@ -911,7 +832,6 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
         deliveryId: 'w4b-direct',
         detail: SENDER_REFUSED_DETAIL,
       });
-      // 限流的细节（状态码、重置时刻）只进日志行。
       const prefix = `github rate limited reading the permission of ${SENDER} on ${REPO}`;
       const [line] = refusals(direct.lines);
       expect(refusals(direct.lines)).toEqual([
@@ -929,11 +849,9 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
           new RegExp(`^${prefix} \\(resets at \\d{4}-\\d\\d-\\d\\dT[^)]+Z\\)$`),
         );
       } else expect(line?.detail).toBe(`${prefix} (resets at ${reset})`);
-      // 限流不进缓存：第二次投递重读；没读 issue、没建卡。
       expect(permissionReads()).toHaveLength(2);
       expect(issueReads()).toHaveLength(0);
       expect(issueTasks()).toHaveLength(0);
-      // 限流过后（新投递）照判：读到 admin → 导入。
       routes[permissionPath(SENDER)] = { body: permissionBody(SENDER, 'admin', 'admin') };
       const after = await deliverHttp(labeledPayload(), 'w4b-after');
       expect(after.body.result).toBe('created');
@@ -942,7 +860,7 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
     },
   );
 
-  test('W5a 团队没有 GitHub 连接 → 202 misconfigured，零出站（不匿名读），记日志', async () => {
+  test('W5a the team has no GitHub connection -> 202 misconfigured, zero outbound (no anonymous read), logged', async () => {
     s.db.delete(githubConnectionTable).where(eq(githubConnectionTable.teamId, s.team.id)).run();
     const http = await deliverHttp(labeledPayload(), 'w5a');
     expect(http.status).toBe(202);
@@ -959,7 +877,7 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
     expect(issueTasks()).toHaveLength(0);
   });
 
-  test('W5b 连接 token 解不开（密文坏）→ 202 misconfigured（不是 500），零出站，记日志', async () => {
+  test('W5b the connection token does not decrypt (broken ciphertext) -> 202 misconfigured (not 500), zero outbound, logged', async () => {
     s.db
       .update(githubConnectionTable)
       .set({ accessTokenCipher: 'not-a-sealed-token' })
@@ -980,7 +898,7 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
     expect(issueTasks()).toHaveLength(0);
   });
 
-  test('W12a 载荷不带 sender → 202 ignored，零出站，记日志', async () => {
+  test('W12a the payload has no sender -> 202 ignored, zero outbound, logged', async () => {
     const payload = labeledPayload('cairn', { sender: null });
     const http = await deliverHttp(payload, 'w12a');
     expect(http.status).toBe(202);
@@ -995,7 +913,7 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
     expect(issueTasks()).toHaveLength(0);
   });
 
-  test('W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored', async () => {
+  test('W12b the sender is a ghost (the placeholder account GitHub uses when it cannot resolve a person, permission 404) -> 202 ignored', async () => {
     routes[permissionPath('ghost')] = { status: 404, body: { message: 'Not Found' } };
     const http = await deliverHttp(labeledPayload('cairn', { sender: 'ghost' }), 'w12b');
     expect(http.status).toBe(202);
@@ -1004,7 +922,6 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
       deliveryId: 'w12b',
       detail: SENDER_REFUSED_DETAIL,
     });
-    // 404 是明确的否定答案：原因码是不到 triage，不是读不到。
     const direct = await deliverDirect(labeledPayload('cairn', { sender: 'ghost' }), 'w12b-direct');
     expect(refusals(direct.lines)).toEqual([
       expect.objectContaining({ sender: 'ghost', reason: 'sender-below-triage' }),
@@ -1012,14 +929,14 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
     expect(issueTasks()).toHaveLength(0);
   });
 
-  test('W13 webhook 导入的卡 createdBy 仍是 seed 用户（轮询器的关闭对账不碰）', async () => {
+  test('W13 a webhook-imported card still has createdBy = the seed user (untouched by the poller close reconcile)', async () => {
     const http = await deliverHttp(labeledPayload(), 'w13');
     expect(http.body.result).toBe('created');
     const row = s.db.select().from(todoTable).where(eq(todoTable.id, http.body.todoId!)).get();
     expect(row?.createdBy).toBe(s.user.id);
   });
 
-  test('W14a 同一 sender 两次投递（不同 issue）：permission 只读一次（与轮询器同一缓存）', async () => {
+  test('W14a two deliveries from the same sender (different issues): permission is read once (the same cache as the poller)', async () => {
     routes[`/repos/${REPO}/issues/8`] = { body: { ...ISSUE_DETAIL, number: 8 } };
     const first = await deliverHttp(labeledPayload('cairn', { issue: 7 }), 'w14a-1');
     const second = await deliverHttp(labeledPayload('cairn', { issue: 8 }), 'w14a-2');
@@ -1027,12 +944,11 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
     expect(permissionReads()).toEqual([permissionPath(SENDER)]);
   });
 
-  test('W14b webhook 读到的答案轮询器直接用：轮询器领同一打标人的 issue 不再读 permission', async () => {
+  test('W14b the poller reuses the answer the webhook read: claiming an issue from the same labeler reads no permission again', async () => {
     const hook = await deliverHttp(labeledPayload(), 'w14b');
     expect(hook.body.result).toBe('created');
     expect(permissionReads()).toEqual([permissionPath(SENDER)]);
     listForPoller(8, SENDER);
-    // 触发闸（#1491）的人在用 / 冷却 / 预算关掉：本用例钉的是 permission 缓存。
     s.db
       .update(projectTable)
       .set({ autonomy: { enabled: true, quietMinutes: 0, cooldownMinutes: 0, dailyBudgetUsd: 0 } })
@@ -1046,8 +962,8 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
   });
 });
 
-describe('#1459 W 计入在飞上限', () => {
-  test('W6 项目到上限（todo / building / failed 三张）→ 202 ignored，零出站，记日志', async () => {
+describe('#1459 W counted toward the in-flight cap', () => {
+  test('W6 the project is at its cap (todo / building / failed, three cards) -> 202 ignored, zero outbound, logged', async () => {
     insertIssueTask(101, 'todo');
     insertIssueTask(102, 'building');
     insertIssueTask(103, 'failed');
@@ -1062,7 +978,7 @@ describe('#1459 W 计入在飞上限', () => {
     expect(issueTasks()).toHaveLength(ISSUE_INTAKE_IN_FLIGHT_CAP);
   });
 
-  test('W6b done / closed 的卡与自建 issue 卡不计入 → 202 created', async () => {
+  test('W6b done / closed cards and self-created issue cards do not count -> 202 created', async () => {
     insertIssueTask(101, 'done');
     insertIssueTask(102, 'closed');
     insertIssueTask(103, 'building', 'github-issue-self');
@@ -1070,7 +986,7 @@ describe('#1459 W 计入在飞上限', () => {
     expect(http.body.result).toBe('created');
   });
 
-  test('W8 差一位到上限时两条投递同时到（批量打标）→ 只导入一条，另一条 202 ignored 到上限', async () => {
+  test('W8 one slot below the cap, two deliveries arrive together (batch labeling) -> only one imported, the other 202 ignored at cap', async () => {
     insertIssueTask(101, 'todo');
     insertIssueTask(102, 'building');
     routes[`/repos/${REPO}/issues/8`] = { body: { ...ISSUE_DETAIL, number: 8 } };
@@ -1087,8 +1003,8 @@ describe('#1459 W 计入在飞上限', () => {
   });
 });
 
-describe('#1459 W 并发与重投', () => {
-  test('W7 webhook 与轮询器同时导入同一 issue → 一张卡（另一路 409）', async () => {
+describe('#1459 W concurrency and redelivery', () => {
+  test('W7 the webhook and the poller import the same issue simultaneously -> one card (the other path 409s)', async () => {
     listForPoller(7, SENDER);
     const gated = gatedFetch([ISSUE_PATH]);
     const intake = createIssueIntake({ ...s.svc, box: s.secretBox }, { githubFetch: gated.impl });
@@ -1103,7 +1019,7 @@ describe('#1459 W 并发与重投', () => {
     expect(s.db.select().from(chiefThreadTable).all()).toHaveLength(1);
   });
 
-  test('W9 被拒的投递重投（同 X-GitHub-Delivery）：窗口内 202 duplicate，窗口外照判 202 ignored，始终不导入', async () => {
+  test('W9 a rejected delivery redelivered (same X-GitHub-Delivery): 202 duplicate within the window, still judged 202 ignored outside it, never imported', async () => {
     routes[permissionPath('outsider')] = { status: 404, body: { message: 'Not Found' } };
     const payload = labeledPayload('cairn', { sender: 'outsider', author: 'outsider' });
     const first = await deliverHttp(payload, 'w9');
@@ -1112,7 +1028,6 @@ describe('#1459 W 并发与重投', () => {
     const inWindow = await deliverHttp(payload, 'w9');
     expect(inWindow.status).toBe(202);
     expect(inWindow.body.result).toBe('duplicate');
-    // GitHub 的 Redeliver 沿用原 delivery id；窗口过后重新判定。
     resetWebhookDeliveryWindow();
     const later = await deliverHttp(payload, 'w9');
     expect(later.status).toBe(202);
@@ -1121,16 +1036,13 @@ describe('#1459 W 并发与重投', () => {
   });
 });
 
-// —— #1459 round 2（pr-gate run 1 on #1477）————————————————————————————————
-
-describe('#1459 round 2 W 存量 githubRepo 形坏', () => {
+describe('#1459 round 2 W legacy malformed githubRepo', () => {
   test.each([
     ['../user', '~proj-dotdot-owner'],
     ['owner/..', '~proj-dotdot-repo'],
   ])(
     'W17 项目存的 githubRepo 是 %s（含 . / .. 段）→ 202 misconfigured，零出站，不进权限缓存，记日志',
     async (githubRepo, id) => {
-      // 直插（REST 面会拒的存量形状：#1466 之前建的行）。
       s.db
         .insert(projectTable)
         .values({ id, name: id, teamId: s.team.id, repoKind: 'github', githubRepo })
@@ -1144,15 +1056,14 @@ describe('#1459 round 2 W 存量 githubRepo 形坏', () => {
       expect(refusals(direct.lines)).toEqual([
         expect.objectContaining({ projectId: id, reason: 'malformed-repo' }),
       ]);
-      // 团队 token 不出站到改写过的路径；也没有权限读进缓存。
       expect(mock.calls).toEqual([]);
       expect(issueTasks()).toHaveLength(0);
     },
   );
 });
 
-describe('#1459 round 2 W 审计行', () => {
-  test('W18 导入成功后编排抛错（总管没绑 Agent，409）→ 卡已建，「import accepted」审计行照写', async () => {
+describe('#1459 round 2 W audit rows', () => {
+  test('W18 the orchestration throws after a successful import (the chief has no bound agent, 409) -> the card exists, the import accepted audit row is still written', async () => {
     s.db.update(chiefTable).set({ agentId: null }).where(eq(chiefTable.teamId, s.team.id)).run();
     const { logger, lines } = captureLogger();
     const run = receiveGithubWebhook(
@@ -1168,14 +1079,13 @@ describe('#1459 round 2 W 审计行', () => {
   });
 });
 
-describe('#1459 round 2 W 在飞现数与导入的 404', () => {
-  test('W15 webhook 的导入还在等 GitHub 时轮询器扫一轮：差一位到上限，轮询器把那条在飞的算进去，不读列表、不领', async () => {
+describe('#1459 round 2 W the live in-flight count and the import 404', () => {
+  test('W15 the webhook import is still waiting on GitHub while the poller sweeps: one slot below the cap, the poller counts the in-flight one, reads no list, claims nothing', async () => {
     insertIssueTask(101, 'todo');
     insertIssueTask(102, 'building');
     listForPoller(8, SENDER);
     const gated = gatedFetch([ISSUE_PATH]);
     const hook = deliverDirect(labeledPayload(), 'w15', gated.impl);
-    // webhook 已落导入占位、卡在 #7 的详情读上。
     await vi.waitFor(() => expect(importsInFlightFor(projectId)).toBe(1));
     const intake = createIssueIntake({ ...s.svc, box: s.secretBox }, { githubFetch: mock.impl });
     const tally = await intake.sweep();
@@ -1191,7 +1101,7 @@ describe('#1459 round 2 W 在飞现数与导入的 404', () => {
     ).toEqual([`github:${REPO}#101`, `github:${REPO}#102`, `github:${REPO}#7`].sort());
   });
 
-  test('W16 权限读的 await 期间团队的 GitHub 连接被删 → 导入自己的 404 收成 202 misconfigured，不建卡', async () => {
+  test('W16 the team GitHub connection is deleted while the permission read awaits -> the import own 404 becomes 202 misconfigured, no card created', async () => {
     const dropping: FetchLike = async (input, init) => {
       if (new URL(String(input)).pathname === permissionPath(SENDER)) {
         s.db.delete(githubConnectionTable).where(eq(githubConnectionTable.teamId, s.team.id)).run();
@@ -1210,8 +1120,8 @@ describe('#1459 round 2 W 在飞现数与导入的 404', () => {
   });
 });
 
-describe('#1459 round 2 W review 发现', () => {
-  test('W19 导入时 GitHub 说 issue 不存在（详情读 404，连接还在）→ 202 misconfigured 说 issue 读不到，不说连接没了，记日志', async () => {
+describe('#1459 round 2 W review findings', () => {
+  test('W19 during import GitHub says the issue does not exist (detail read 404, the connection intact) -> 202 misconfigured saying the issue is unreadable, not that the connection is gone, logged', async () => {
     routes[ISSUE_PATH] = { status: 404, body: { message: 'Not Found' } };
     const direct = await deliverDirect(labeledPayload(), 'w19');
     expect(direct.response).toEqual({
@@ -1234,7 +1144,6 @@ describe('#1459 round 2 W review 发现', () => {
     ['_alice'],
     ['-alice'],
     ['alice_'],
-    // 至多 39 个字符（EMU 的含下划线与短码）：40 个的一律拒。
     ['a'.repeat(40)],
     [`${'a'.repeat(31)}_abcdefgh`],
     [`${'a'.repeat(40)}[bot]`],
@@ -1245,13 +1154,11 @@ describe('#1459 round 2 W review 发现', () => {
     expect(refusals(direct.lines)).toEqual([
       expect.objectContaining({ reason: login === '' ? 'no-sender' : 'sender-malformed' }),
     ]);
-    // 团队 token 不出站（`..` 会把权限读改写成别的路径）。
     expect(mock.calls).toEqual([]);
     expect(issueTasks()).toHaveLength(0);
   });
 
-  test('W20b bot 账号（login 带 [bot]）照常读权限', async () => {
-    // 路径里的方括号经 encodeURIComponent 编码。
+  test('W20b a bot account (login with [bot]) still gets its permission read', async () => {
     routes[`/repos/${REPO}/collaborators/octo-helper%5Bbot%5D/permission`] = {
       status: 404,
       body: { message: 'Not Found' },
@@ -1265,14 +1172,10 @@ describe('#1459 round 2 W review 发现', () => {
     expect(permissionReads()).toHaveLength(1);
   });
 
-  // GitHub 文档（Enterprise Managed Users 的用户名）：GitHub.com 上托管账号的用户名
-  // 是 IDP-USERNAME_SHORT-CODE（例 mona-cat_octo），开通 SAML 的设置账号是
-  // SHORT-CODE_admin。这些人照轮询器的判据读权限（#1496 pr-gate 建议 1 / 9）。
   test.each([
     ['alice_acme', 'User'],
     ['mona-cat_octo', 'User'],
     ['octo_admin', 'User'],
-    // 正好 39 个字符（含下划线与八位短码）。
     [`${'a'.repeat(30)}_abcdefgh`, 'User'],
     ['octo-builder[bot]', 'Bot'],
   ])(
@@ -1291,8 +1194,8 @@ describe('#1459 round 2 W review 发现', () => {
   );
 });
 
-describe('#1459 round 3 W 日志里的 sender', () => {
-  test('W22 sender-malformed 的 sender 很长（载荷里没有长度上限）→ 日志行只记前 64 个字符与总长', async () => {
+describe('#1459 round 3 W the sender in logs', () => {
+  test('W22 a very long sender on sender-malformed (the payload has no length cap) -> the log line records only the first 64 characters and the total length', async () => {
     const login = `${'.'.repeat(1000)}/x`;
     const payload = { ...labeledPayload(), sender: { login, type: 'User' } };
     const direct = await deliverDirect(payload, 'w22');
@@ -1308,10 +1211,7 @@ describe('#1459 round 3 W 日志里的 sender', () => {
   });
 });
 
-// #1491 触发闸：打标是人明确要的，webhook 不让路、不冷却；总开关关了或当天
-// 预算满（读不到同算满）→ 202 ignored，不建卡、不读 GitHub，原因记进
-// autonomy_state；导入成功记一次开跑（轮询器冷却从这里起算）。
-describe('#1491 W 触发闸', () => {
+describe('#1491 W the trigger gate', () => {
   function setAutonomy(over: Record<string, unknown>): void {
     s.db
       .update(projectTable)
@@ -1336,7 +1236,7 @@ describe('#1491 W 触发闸', () => {
       .get();
   }
 
-  test('W-gate1 项目关了后台自动任务 → 202 ignored，零出站、不建卡，原因可查', async () => {
+  test('W-gate1 the project turned off background auto tasks -> 202 ignored, zero outbound, no card, the reason queryable', async () => {
     setAutonomy({ enabled: false });
     const http = await deliverHttp(labeledPayload(), 'wg1');
     expect(http.status).toBe(202);
@@ -1350,7 +1250,7 @@ describe('#1491 W 触发闸', () => {
     expect(intakeState()?.lastBlockedReason).toBe('disabled');
   });
 
-  test('W-gate2 当天预算满 → 202 ignored；花费读不到同样不领', async () => {
+  test('W-gate2 the day budget is full -> 202 ignored; an unreadable spend claims nothing either', async () => {
     setAutonomy({});
     insertIssueTask(901, 'done');
     const todoId = `todo-wh-${taskSeq}`;
@@ -1376,8 +1276,7 @@ describe('#1491 W 触发闸', () => {
     expect(issueTasks().filter((t) => t.phase !== 'done')).toHaveLength(0);
   });
 
-  test('W-gate3 人刚在用、冷却中都不拦 webhook；导入记一次开跑', async () => {
-    // beforeEach 建项目、建 token 都是人的写操作（刚刚）；再记一次「上次开跑」。
+  test('W-gate3 recent human use and cooldown do not block the webhook; the import records one start', async () => {
     setAutonomy({ dailyBudgetUsd: 0 });
     s.db
       .insert(autonomyStateTable)

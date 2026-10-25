@@ -1,9 +1,3 @@
-// spec 12 / #359 G2-T1：github_connection DAO（增 / 重认证覆盖 / 断开删行）+
-// `GET /api/github/repos?q=` 代理（lib/github.ts 缝 → GitHub `GET /user/repos`）。
-// token 纪律（#359 AC）：accessToken 只以 SecretBox `v1:` 信封密文落列——
-// 明文不进表任何列、不进出站 URL、仅出现在 Authorization 头；repos 封套
-// 永不带 token 或密文。失败方式先于实现枚举（仓测试纪律）。
-
 import { githubReposResponseSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
@@ -39,7 +33,6 @@ interface CapturedCall {
   headers: Record<string, string>;
 }
 
-/** GitHub 出站 mock（helpers.githubFetch 注入位）：记录调用面 + 定值应答。 */
 function mockGithub(payload: unknown, status = 200, headers: Record<string, string> = {}) {
   const calls: CapturedCall[] = [];
   const impl: FetchLike = async (input, init) => {
@@ -58,11 +51,11 @@ function mockGithub(payload: unknown, status = 200, headers: Record<string, stri
 const REPOS_PAYLOAD = [
   { id: 1, name: 'alpha', full_name: 'octo/alpha', private: false, owner: { login: 'octo' } },
   { id: 2, name: 'beta-app', full_name: 'octo/beta-app', private: true, owner: { login: 'octo' } },
-  { id: 'bad-entry', name: 42 }, // 畸形条目：跳过不入封套
+  { id: 'bad-entry', name: 42 },
 ];
 
-describe('github_connection DAO（重认证覆盖 / 断开删行）', () => {
-  test('增：行落库，token 仅以 v1: 信封密文存，明文不落任何列', () => {
+describe('github_connection DAO (reauth overwrite / disconnect deletes the row)', () => {
+  test('create: row persisted, token stored only as a v1: envelope ciphertext, plaintext in no column', () => {
     const s = bootServer();
     try {
       seedConnection(s);
@@ -77,7 +70,6 @@ describe('github_connection DAO（重认证覆盖 / 断开删行）', () => {
       expect(row?.login).toBe('octo');
       expect(row?.scope).toBe('repo');
       expect(typeof row?.createdAt).toBe('number');
-      // 整行序列化扫描：明文 token 不落表（plaintext 列不存在）
       expect(JSON.stringify(row)).not.toContain(TOKEN);
       expect(openGithubToken(depsOf(s), s.team.id)).toBe(TOKEN);
     } finally {
@@ -85,7 +77,7 @@ describe('github_connection DAO（重认证覆盖 / 断开删行）', () => {
     }
   });
 
-  test('重认证 = 覆盖：teamId 单行，新 token/login/scope 生效', () => {
+  test('reauth = overwrite: single row per teamId, new token/login/scope take effect', () => {
     const s = bootServer();
     try {
       seedConnection(s);
@@ -104,7 +96,7 @@ describe('github_connection DAO（重认证覆盖 / 断开删行）', () => {
     }
   });
 
-  test('断开 = 删行；再断幂等不抛', () => {
+  test('disconnect = delete row; disconnecting again is idempotent and does not throw', () => {
     const s = bootServer();
     try {
       seedConnection(s);
@@ -116,7 +108,7 @@ describe('github_connection DAO（重认证覆盖 / 断开删行）', () => {
     }
   });
 
-  test('无行时 open → null（未连接语义，代理端点 404 的数据面）', () => {
+  test('open with no row -> null (not-connected semantics, data surface behind the proxy endpoint 404)', () => {
     const s = bootServer();
     try {
       expect(openGithubToken(depsOf(s), s.team.id)).toBeNull();
@@ -126,8 +118,8 @@ describe('github_connection DAO（重认证覆盖 / 断开删行）', () => {
   });
 });
 
-describe('GET /api/github/repos?q= 代理（spec 12 数据契约面）', () => {
-  test('未连接 → 404 {error}', async () => {
+describe('GET /api/github/repos?q= proxy (spec 12 data-contract surface)', () => {
+  test('not connected -> 404 {error}', async () => {
     const { impl } = mockGithub(REPOS_PAYLOAD);
     const s = bootServer({ githubFetch: impl });
     try {
@@ -140,7 +132,7 @@ describe('GET /api/github/repos?q= 代理（spec 12 数据契约面）', () => {
     }
   });
 
-  test('已连接 → {repos:[{id,owner,name,full_name,private}]}，畸形条目跳过', async () => {
+  test('connected -> {repos:[{id,owner,name,full_name,private}]}, malformed entries skipped', async () => {
     const { impl } = mockGithub(REPOS_PAYLOAD);
     const s = bootServer({ githubFetch: impl });
     try {
@@ -148,7 +140,7 @@ describe('GET /api/github/repos?q= 代理（spec 12 数据契约面）', () => {
       const res = await req(s.app, 'GET', '/api/github/repos');
       expect(res.status).toBe(200);
       const body = await res.json();
-      const parsed = githubReposResponseSchema.parse(body); // 封套单源 = shared
+      const parsed = githubReposResponseSchema.parse(body);
       expect(parsed.repos).toEqual([
         { id: 1, owner: 'octo', name: 'alpha', full_name: 'octo/alpha', private: false },
         { id: 2, owner: 'octo', name: 'beta-app', full_name: 'octo/beta-app', private: true },
@@ -158,7 +150,7 @@ describe('GET /api/github/repos?q= 代理（spec 12 数据契约面）', () => {
     }
   });
 
-  test('出站纪律：token 仅进 Authorization 头，不进 URL；accept = github json', async () => {
+  test('outbound discipline: token goes only into the Authorization header, not the URL; accept = github json', async () => {
     const { impl, calls } = mockGithub(REPOS_PAYLOAD);
     const s = bootServer({ githubFetch: impl });
     try {
@@ -175,7 +167,7 @@ describe('GET /api/github/repos?q= 代理（spec 12 数据契约面）', () => {
     }
   });
 
-  test('q 过滤：大小写不敏感 full_name 子串；空 q = 全量；无命中 = 空数组', async () => {
+  test('q filter: case-insensitive full_name substring; empty q = all; no hit = empty array', async () => {
     const { impl } = mockGithub(REPOS_PAYLOAD);
     const s = bootServer({ githubFetch: impl });
     try {
@@ -197,7 +189,7 @@ describe('GET /api/github/repos?q= 代理（spec 12 数据契约面）', () => {
     }
   });
 
-  test('teamId 非 seed 团队 → 404（requireTeam 闸）', async () => {
+  test('teamId not the seed team -> 404 (requireTeam gate)', async () => {
     const { impl } = mockGithub(REPOS_PAYLOAD);
     const s = bootServer({ githubFetch: impl });
     try {
@@ -209,7 +201,7 @@ describe('GET /api/github/repos?q= 代理（spec 12 数据契约面）', () => {
     }
   });
 
-  test('上游 401（token 失效）→ 502 {error}；403 + ratelimit 余量 0 → 429', async () => {
+  test('upstream 401 (token invalid) -> 502 {error}; 403 + ratelimit remaining 0 -> 429', async () => {
     const unauthorized = mockGithub({}, 401);
     const s1 = bootServer({ githubFetch: unauthorized.impl });
     try {
@@ -231,7 +223,7 @@ describe('GET /api/github/repos?q= 代理（spec 12 数据契约面）', () => {
     }
   });
 
-  test('上游应答非数组 → 502', async () => {
+  test('upstream response not an array -> 502', async () => {
     const { impl } = mockGithub({ message: 'Bad credentials' }, 200);
     const s = bootServer({ githubFetch: impl });
     try {

@@ -1,26 +1,3 @@
-// 合并就绪闸 S1（#1404）：补丁摘要 patchDigest（ADR 0021 D3）。
-// 失败方式先行：
-// - 同一补丁算出两个摘要：顺序 / 区域设置。排序固定按 UTF-16 码元（换成 localeCompare
-//   摘要就变）；码元序与码点序分得开的一组（补充平面的 emoji 挨着 U+E000–U+FFFF 的
-//   字符）的期望值由按 UTF-16 码元排序的 Python 算出。
-// - 元组撞车：文件名含制表符或换行；空 blob sha 被当成字符串 'null' 哈希。
-// - 只绑 head 上的 blob：合入 main 解冲突保留本 PR 的版本，blob 不变，补丁却从「A 改
-//   B」变成「C 改回 B」。元组第五位 patchSha 绑补丁本身；没有 patch 时为 null，不是
-//   空串的哈希。
-// - 改名移进 docs/verify/ 把代码删除藏起来。
-// - compare 截到 300 个文件仍被当成完整列表（300 个上限按整张列表算，证据条目也计入）；
-//   compare 给的条目比 changed_files 少或多都算对不上。
-// - 形状不对的响应被当成能用：增删行数为负；改名或复制条目缺 previous_filename（不然
-//   原名不进路径判定）；status 不在取值表里；filename 不是字符串或为空串
-//   （compareFileSchema 要求至少一个字符）。
-// - 800 行 / 40 文件只数一部分：按整张补丁算，证据也计入，改名与复制记两个文件；
-//   compare 不给 patch 的条目（二进制）要能认出来。
-// 夹具 test/fixtures/merge-gate-compare-sample.json 是一次真实的只读 compare
-// 响应（xiechimon/cairn 52d2cdc...b4b1f96，per_page=1；patch 有则换成一句占位、
-// 无则仍缺）；去掉 patch 后与 docs/verify/1404/compare-sample.json 同一份，放在
-// 测试目录里是因为摘要不计 docs/verify/，测试读的夹具不能落在摘要之外。夹具的
-// 摘要绑的是占位文本的 patchSha，不是真实补丁的。
-
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type CompareFile, compareFileSchema, GATE_LIMITS } from '@cairn/shared';
@@ -31,7 +8,6 @@ import {
   isEvidencePath,
 } from '../src/services/merge-gate/digest.js';
 
-/** 单测里直接给的 patchSha（computePatchDigest 不重算它）；真实值见夹具的测试。 */
 const PATCH_SHA = 'c'.repeat(64);
 
 const file = (over: Partial<CompareFile> & { filename: string }): CompareFile => ({
@@ -57,29 +33,28 @@ const base: CompareFile[] = [
 ];
 
 describe('computePatchDigest', () => {
-  test('带版本前缀，同一组文件任意顺序算出同一个摘要', () => {
+  test('with the version prefix, the same set of files in any order yields the same digest', () => {
     const a = computePatchDigest(base);
     const b = computePatchDigest([...base].reverse());
     expect(a.patchDigest).toMatch(/^pd2:[0-9a-f]{64}$/);
     expect(b.patchDigest).toBe(a.patchDigest);
   });
 
-  test('改一个 blob sha，摘要就变', () => {
+  test('change one blob sha and the digest changes', () => {
     const changed = base.map((f) =>
       f.filename === 'apps/server/src/a.ts' ? { ...f, sha: '9'.repeat(40) } : f,
     );
     expect(computePatchDigest(changed).patchDigest).not.toBe(computePatchDigest(base).patchDigest);
   });
 
-  test('status、filename、blob sha 都不变、只有 patchSha 变：摘要就变', () => {
+  test('status, filename and blob sha unchanged, only patchSha changed: the digest changes', () => {
     const changed = base.map((f) =>
       f.filename === 'apps/server/src/a.ts' ? { ...f, patchSha: 'd'.repeat(64) } : f,
     );
     expect(computePatchDigest(changed).patchDigest).not.toBe(computePatchDigest(base).patchDigest);
   });
 
-  // 期望值由独立的 Python 按 D3 修订后的元组算出（docs/verify/1404/digest-crosscheck-2.txt）。
-  test('没有 patch 的条目元组第五位是 JSON null（不是空串、不是字符串 "null"），对上独立算出的摘要', () => {
+  test('for an entry without a patch the fifth tuple slot is JSON null (not an empty string, not the string "null"), matching an independently computed digest', () => {
     const files = [
       file({ filename: 'apps/server/src/a.ts', sha: '1'.repeat(40) }),
       file({
@@ -96,7 +71,7 @@ describe('computePatchDigest', () => {
     );
   });
 
-  test('只改 docs/verify/ 下的证据，摘要不变', () => {
+  test('touching only evidence under docs/verify/ leaves the digest unchanged', () => {
     const more = [
       ...base,
       file({ filename: 'docs/verify/1404/extra.png', status: 'added', sha: '4'.repeat(40) }),
@@ -104,7 +79,7 @@ describe('computePatchDigest', () => {
     expect(computePatchDigest(more).patchDigest).toBe(computePatchDigest(base).patchDigest);
   });
 
-  test('改名跨过 docs/verify/ 边界（进或出）都计入摘要', () => {
+  test('a rename crossing the docs/verify/ boundary (in or out) counts in the digest', () => {
     const into = [
       ...base,
       file({
@@ -134,7 +109,7 @@ describe('computePatchDigest', () => {
     expect(computePatchDigest(inside).patchDigest).toBe(computePatchDigest(base).patchDigest);
   });
 
-  test('previous_filename 进摘要：同名同 sha 的改名来源不同，摘要不同', () => {
+  test('previous_filename enters the digest: same name and sha with different rename origins give different digests', () => {
     const fromA = [
       file({ filename: 'apps/x.ts', previousFilename: 'apps/a.ts', status: 'renamed' }),
     ];
@@ -144,13 +119,13 @@ describe('computePatchDigest', () => {
     expect(computePatchDigest(fromA).patchDigest).not.toBe(computePatchDigest(fromB).patchDigest);
   });
 
-  test('只有仓根的 docs/verify/ 算证据', () => {
+  test('only docs/verify/ at the repo root counts as evidence', () => {
     expect(isEvidencePath('docs/verify/1404/a.txt')).toBe(true);
     expect(isEvidencePath('apps/docs/verify/1404/a.txt')).toBe(false);
     expect(isEvidencePath('docs/verifyx/a.txt')).toBe(false);
   });
 
-  test('文件名含制表符或换行不会与别的元组撞车', () => {
+  test('file names containing tabs or newlines never collide with other tuples', () => {
     const a = [file({ filename: 'a\tmodified\tb', sha: '1'.repeat(40) })];
     const b = [
       file({ filename: 'a', status: 'modified', sha: '1'.repeat(40) }),
@@ -165,11 +140,7 @@ describe('computePatchDigest', () => {
     expect(computePatchDigest(c).patchDigest).not.toBe(computePatchDigest(d).patchDigest);
   });
 
-  // 期望值由 Python 的 sorted()（按码点；BMP 内与 UTF-16 码元同序）独立算出，
-  // 见 docs/verify/1404/digest-crosscheck-2.txt。
-  // 码元序：B.ts < a-b.ts < a.b.ts < a/b.ts（'B' 0x42 < 'a' 0x61；'-' 0x2D < '.' 0x2E
-  // < '/' 0x2F）；localeCompare 把 a 排在 B 前。
-  test('排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要', () => {
+  test('sorting is by UTF-16 code units, locale-independent: a mixed case-and-punctuation set matches an independently computed digest', () => {
     const files = [
       file({ filename: 'apps/web/src/a/b.ts', sha: '1'.repeat(40) }),
       file({ filename: 'apps/web/src/a.b.ts', sha: '2'.repeat(40) }),
@@ -181,10 +152,7 @@ describe('computePatchDigest', () => {
     expect(computePatchDigest([...files].reverse()).patchDigest).toBe(expected);
   });
 
-  // 期望值由 Python 按 UTF-16 码元排序（key=s.encode('utf-16-be')）独立算出，按码点
-  // 排序的值一并给出（docs/verify/1404/digest-crosscheck-3.txt）。U+1F600 是代理对
-  // D83D DE00：按码元排在 U+FF21 之前，按码点排在之后。
-  test('补充平面字符挨着 U+E000–U+FFFF 的字符：按 UTF-16 码元排，不按码点', () => {
+  test('supplementary-plane characters next to U+E000-U+FFFF characters: sorted by UTF-16 code unit, not code point', () => {
     const files = [
       file({ filename: 'apps/web/src/\u{FF21}.ts', sha: '1'.repeat(40) }),
       file({ filename: 'apps/web/src/\u{1F600}.ts', sha: '2'.repeat(40) }),
@@ -196,13 +164,13 @@ describe('computePatchDigest', () => {
     expect(byCodeUnit).not.toBe(byCodePoint);
   });
 
-  test('非删除条目的 sha 为空：摘要不可得', () => {
+  test('a non-deletion entry with an empty sha: no digest', () => {
     const r = computePatchDigest([...base, file({ filename: 'apps/sub', sha: null })]);
     expect(r.patchDigest).toBeNull();
     expect(r.unavailable).toBe('null-sha');
   });
 
-  test('删除条目的 sha 为空也照常计算（真实响应里删除条目带旧 blob sha）', () => {
+  test('a deletion entry with an empty sha still computes (real responses carry the old blob sha on deletions)', () => {
     const r = computePatchDigest([
       ...base,
       file({ filename: 'apps/gone.ts', status: 'removed', sha: null }),
@@ -210,7 +178,7 @@ describe('computePatchDigest', () => {
     expect(r.patchDigest).toMatch(/^pd2:/);
   });
 
-  test('299 个文件照常；300 个即视为截断，摘要不可得', () => {
+  test('299 files compute as usual; 300 is treated as truncated, no digest', () => {
     const many = (n: number) =>
       Array.from({ length: n }, (_, i) => file({ filename: `apps/f${i}.ts` }));
     expect(GATE_LIMITS.compareFileCap).toBe(300);
@@ -220,7 +188,7 @@ describe('computePatchDigest', () => {
     expect(r.unavailable).toBe('truncated');
   });
 
-  test('300 的上限按整张列表算，证据条目也计入：299 个代码文件加 1 个 docs/verify 条目即视为截断', () => {
+  test('the 300 cap counts the whole list, evidence entries included: 299 code files plus 1 docs/verify entry is truncated', () => {
     const files = [
       ...Array.from({ length: 299 }, (_, i) => file({ filename: `apps/f${i}.ts` })),
       file({ filename: 'docs/verify/1404/run.txt', status: 'added' }),
@@ -231,7 +199,7 @@ describe('computePatchDigest', () => {
     expect(r.unavailable).toBe('truncated');
   });
 
-  test('与 PR 的 changed_files 对不上即视为截断', () => {
+  test('a mismatch with the PR changed_files is treated as truncated', () => {
     const r = computePatchDigest(base, { expectedFileCount: base.length + 1 });
     expect(r.patchDigest).toBeNull();
     expect(r.unavailable).toBe('count-mismatch');
@@ -240,25 +208,25 @@ describe('computePatchDigest', () => {
     );
   });
 
-  test('compare 给的条目比 changed_files 多：同样对不上，摘要不可得', () => {
+  test('compare hands back more entries than changed_files: same mismatch, no digest', () => {
     const r = computePatchDigest(base, { expectedFileCount: base.length - 1 });
     expect(r.patchDigest).toBeNull();
     expect(r.unavailable).toBe('count-mismatch');
   });
 
-  test('空文件列表：摘要不可得（没有可绑定的补丁）', () => {
+  test('an empty file list: no digest (no patch to bind)', () => {
     const r = computePatchDigest([]);
     expect(r.patchDigest).toBeNull();
     expect(r.unavailable).toBe('empty');
   });
 
-  test('只有证据的补丁：证据之外没有文件，摘要不可得', () => {
+  test('an evidence-only patch: no files outside evidence, no digest', () => {
     const r = computePatchDigest([file({ filename: 'docs/verify/1404/a.txt', status: 'added' })]);
     expect(r.patchDigest).toBeNull();
     expect(r.unavailable).toBe('empty');
   });
 
-  test('行数与文件数按整张补丁算，docs/verify/ 的证据也计入；摘要照旧不计证据', () => {
+  test('line and file counts cover the whole patch, docs/verify/ evidence included; the digest still excludes evidence', () => {
     const r = computePatchDigest(base);
     expect(r.countedFiles).toBe(3);
     expect(r.countedLines).toBe(2 + 5 + 20);
@@ -266,7 +234,7 @@ describe('computePatchDigest', () => {
     expect(r.excluded.map((f) => f.filename)).toEqual(['docs/verify/1404/run.txt']);
   });
 
-  test('改名（带 previous_filename 的条目）记两个文件，纯改名行数为 0，证据里的改名也算', () => {
+  test('a rename (entry with previous_filename) counts two files, a pure rename has zero lines, evidence renames count too', () => {
     const r = computePatchDigest([
       file({ filename: 'apps/server/src/c.ts', additions: 3, deletions: 2 }),
       file({
@@ -290,8 +258,7 @@ describe('computePatchDigest', () => {
     expect(r.countedLines).toBe(5);
   });
 
-  // pr-gate 的 --no-renames 不开复制检测，复制只记新增的一个；这里记两个，严的一侧。
-  test('复制（copied，带 previous_filename）同改名一样记两个文件', () => {
+  test('a copy (copied, with previous_filename) counts two files like a rename', () => {
     const r = computePatchDigest([
       file({
         filename: 'apps/server/src/b.ts',
@@ -303,12 +270,12 @@ describe('computePatchDigest', () => {
   });
 });
 
-describe('真实 compare 响应夹具', () => {
+describe('real compare response fixtures', () => {
   const sample = JSON.parse(
     readFileSync(join(import.meta.dirname, 'fixtures/merge-gate-compare-sample.json'), 'utf8'),
   ) as unknown;
 
-  test('解析出 58 个文件，删除条目带旧 blob sha，证据目录里有可执行文件', () => {
+  test('parses 58 files, deletion entries carry the old blob sha, the evidence directory holds an executable', () => {
     const files = compareFilesFromResponse(sample);
     expect(files).not.toBeNull();
     expect(files?.length).toBe(58);
@@ -318,9 +285,7 @@ describe('真实 compare 响应夹具', () => {
     expect(files?.some((f) => f.filename === 'docs/verify/paper-shell-merge/probe.mjs')).toBe(true);
   });
 
-  // patchSha 的期望值是占位文本 "(patch trimmed)" 的 sha256，由 Python 与 sha256sum
-  // 独立算出（docs/verify/1404/digest-crosscheck-2.txt）。
-  test('compare 不给 patch 的正是 20 张 PNG（二进制），patchSha 为 null；其余 38 个条目的 patchSha 是 patch 文本的 sha256', () => {
+  test('the entries compare leaves without a patch are exactly the 20 PNGs (binary), patchSha null; the other 38 entries have patchSha = sha256 of the patch text', () => {
     const files = compareFilesFromResponse(sample) ?? [];
     const noPatch = files.filter((f) => f.patchSha === null).map((f) => f.filename);
     expect(noPatch.length).toBe(20);
@@ -336,17 +301,13 @@ describe('真实 compare 响应夹具', () => {
     ).toBe(true);
   });
 
-  test('解析出的每个条目都合 @cairn/shared 的 compareFileSchema，且没有词表之外的字段', () => {
+  test('every parsed entry satisfies @cairn/shared compareFileSchema, with no fields outside the vocabulary', () => {
     for (const f of compareFilesFromResponse(sample) ?? []) {
       expect(compareFileSchema.parse(f), f.filename).toEqual(f);
     }
   });
 
-  // 期望值由一段独立的 Python 按 D3 修订后的五元组算出（docs/verify/1404/digest-crosscheck-2.txt；
-  // 四元组时的版本见 digest-crosscheck.txt），不是从本实现回填的。
-  // 文件数与行数按整张补丁：58 个文件（无改名），846 + 证据里两个 .mjs 的 40 + 46 行
-  // （PNG 记 0 行）；独立复算见 docs/verify/1404/s1-r3-red-green.txt。
-  test('摘要与独立实现一致，证据目录的 22 个文件不进摘要但计入文件数与行数', () => {
+  test('the digest matches an independent implementation, the 22 evidence files stay out of the digest but count in files and lines', () => {
     const files = compareFilesFromResponse(sample) ?? [];
     const r = computePatchDigest(files);
     expect(r.kept.length).toBe(36);
@@ -359,11 +320,7 @@ describe('真实 compare 响应夹具', () => {
     expect(computePatchDigest([...files].reverse()).patchDigest).toBe(r.patchDigest);
   });
 
-  // pr-gate 第三轮（#1420）的场景：合并基上 f=A，PR 改成 B，main 同时改成 C；PR 合入
-  // main 解冲突保留 B。之前三点 compare 是「A 改 B」，之后合并基到了 main，是「C 改回 B」，
-  // 悄悄撤掉 main 的改动；status、filename、head blob 一样都不变。两个摘要的期望值由
-  // Python 独立算出（docs/verify/1404/digest-crosscheck-2.txt）。
-  test('合入 main 解冲突保留本 PR 版本：status、filename、blob 不变，补丁文本变了，摘要不同', () => {
+  test('merging into main resolving conflicts in this PR favor: status, filename and blob unchanged, the patch text changed, different digest', () => {
     const entryWith = (patch: string) => ({
       sha: 'b'.repeat(40),
       filename: 'apps/server/src/f.ts',
@@ -385,7 +342,7 @@ describe('真实 compare 响应夹具', () => {
     expect(d1).toBe('pd2:8fbd0cd1a687deb947080913ea2a509bde7ae97783fdeaf158747ebb33160239');
   });
 
-  test('响应形状不对（缺 files、files 非数组、条目缺字段）返回 null', () => {
+  test('a malformed response (missing files, files not an array, entries missing fields) returns null', () => {
     expect(compareFilesFromResponse(null)).toBeNull();
     expect(compareFilesFromResponse({ status: 'ahead' })).toBeNull();
     expect(compareFilesFromResponse({ files: 'x' })).toBeNull();
@@ -402,7 +359,7 @@ describe('真实 compare 响应夹具', () => {
     ...over,
   });
 
-  test('previous_filename 映射到 previousFilename；缺省为 null', () => {
+  test('previous_filename maps to previousFilename; absent is null', () => {
     expect(compareFilesFromResponse({ files: [entry()] })?.[0]?.previousFilename).toBe(
       'apps/server/src/b.ts',
     );
@@ -410,14 +367,14 @@ describe('真实 compare 响应夹具', () => {
     expect(compareFilesFromResponse({ files: [plain] })?.[0]?.previousFilename).toBeNull();
   });
 
-  test('sha 缺失、previous_filename 为空串或非字符串：形状不对，返回 null', () => {
+  test('sha missing, previous_filename an empty string or not a string: malformed, returns null', () => {
     const { sha: _, ...noSha } = entry();
     expect(compareFilesFromResponse({ files: [noSha] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ previous_filename: '' })] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ previous_filename: 7 })] })).toBeNull();
   });
 
-  test('改名或复制条目缺 previous_filename（缺省或 null）：形状不对，返回 null，原名不能悄悄丢掉', () => {
+  test('a rename or copy entry missing previous_filename (absent or null): malformed, returns null, the original name must not be silently dropped', () => {
     for (const status of ['renamed', 'copied']) {
       const { previous_filename: _, ...noPrev } = entry({ status });
       expect(compareFilesFromResponse({ files: [noPrev] }), status).toBeNull();
@@ -429,9 +386,7 @@ describe('真实 compare 响应夹具', () => {
     ).toBe('apps/server/src/b.ts');
   });
 
-  // 期望值由 Python 与 sha256sum 独立算出（docs/verify/1404/digest-crosscheck-2.txt）；
-  // 非 ASCII 的一条钉住按 UTF-8 编码取哈希。
-  test('patch 是非空字符串时 patchSha 是它的 sha256（hex）；缺省、空串、null、非字符串都为 null', () => {
+  test('when patch is a non-empty string patchSha is its sha256 (hex); absent, empty string, null and non-strings are all null', () => {
     const patchSha = (over: Record<string, unknown>) =>
       compareFilesFromResponse({ files: [entry(over)] })?.[0]?.patchSha;
     expect(patchSha({ patch: '@@ -1 +1 @@\n-a\n+b' })).toBe(
@@ -446,7 +401,7 @@ describe('真实 compare 响应夹具', () => {
     expect(patchSha({ patch: 7 })).toBeNull();
   });
 
-  test('status 不在 COMPARE_FILE_STATUSES 里、filename 不是字符串：形状不对，返回 null', () => {
+  test('status outside COMPARE_FILE_STATUSES, filename not a string: malformed, returns null', () => {
     expect(compareFilesFromResponse({ files: [entry({ status: 'modified' })] })).toHaveLength(1);
     expect(compareFilesFromResponse({ files: [entry({ status: 'deleted' })] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ status: 'Modified' })] })).toBeNull();
@@ -454,11 +409,11 @@ describe('真实 compare 响应夹具', () => {
     expect(compareFilesFromResponse({ files: [entry({ filename: ['apps/a.ts'] })] })).toBeNull();
   });
 
-  test('filename 为空串：形状不对，返回 null（compareFileSchema 要求至少一个字符）', () => {
+  test('filename an empty string: malformed, returns null (compareFileSchema requires at least one character)', () => {
     expect(compareFilesFromResponse({ files: [entry({ filename: '' })] })).toBeNull();
   });
 
-  test('additions、deletions 或 changes 为负：形状不对，返回 null（与 compareFileSchema 的非负一致）', () => {
+  test('additions, deletions or changes negative: malformed, returns null (consistent with compareFileSchema non-negative)', () => {
     expect(compareFilesFromResponse({ files: [entry({ additions: -1 })] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ deletions: -1 })] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ changes: -1 })] })).toBeNull();

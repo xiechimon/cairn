@@ -1,23 +1,3 @@
-// spec 13 升级护栏（#367 T1 skill + #368 T2 mcp_server 合流）：两张登记制表在
-// drop migration 应用**前**把现存行导出到 `<legacyExportDir>/legacy-export-<ts>.json`
-// （release note 指向的保底副本），再清 agent 授权列（skills / mcpServers 清为
-// '[]'——旧 id/slug 随表失效，死引用不留），最后 DROP TABLE。
-//
-// 导出发生在 openDbWithHandle 的 migrate 之前（pre-migration 钩子），仅当旧库
-// 里表仍存在且有行时落盘——新库/已迁移库/空表 = 不落（噪音闸）。
-//
-// 失败方式先行枚举——
-// L1 旧库（两表各有行 + agent 两列死引用）→ 打开即迁移：两表消失 / agent
-//    skills 与 mcpServers 均为 '[]' / legacy-export-*.json 恰一份且两表行齐
-//    （skill.files 还原为对象；mcp_server.credentialKeys/args 还原；headersCipher
-//    保持密文——明文永不扩散）。
-// L2 旧库两表零行 → 不落文件，表照删。
-// L3 全新库（0000 建表 → 同轮 drop）→ 干净迁移、不落文件。
-// L4 未传 legacyExportDir（内存测试形态）→ 不落文件、迁移照常。
-// L5 文件名形 = legacy-export-<ISO ts 冒号点换连字符>.json；二次启动幂等（表已
-//    drop = 不再产出第二份）。
-// L6 :memory: → 不尝试导出、不炸。
-
 import {
   cpSync,
   existsSync,
@@ -48,15 +28,10 @@ afterAll(() => {
   for (const dir of temps) rmSync(dir, { recursive: true, force: true });
 });
 
-// —— 旧库构造（migration 序号不写死——撞号纪律：按「含 DROP 退役表的那条」定位，
-// 合并期重编号后本测试零改动）———————————————————————————————————————————————
-
 function readJournal(folder: string): { entries: { idx: number; tag: string }[] } {
   return JSON.parse(readFileSync(join(folder, 'meta', '_journal.json'), 'utf8'));
 }
 
-/** 复制 migrations 目录并截掉「第一条 drop 退役表起」的尾部 = 升级前旧库形态
- * （两票的 drop 都在尾部；截最早一条 = 两表俱在）。 */
 function trimmedMigrations(): string {
   const journal = readJournal(MIGRATIONS_FOLDER);
   const dropIdx = journal.entries.findIndex((entry) =>
@@ -64,18 +39,15 @@ function trimmedMigrations(): string {
       readFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), 'utf8'),
     ),
   );
-  expect(dropIdx, 'journal 里找不到 drop 退役表的 migration').toBeGreaterThan(0);
+  expect(dropIdx, 'drop retired-table migration missing from journal').toBeGreaterThan(0);
   const dir = temp('cairn-migrations-old-');
   mkdirSync(join(dir, 'meta'));
   for (const entry of journal.entries.slice(0, dropIdx)) {
     cpSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
-    // snapshot 文件随带（drizzle-kit 链校验用；runtime migrator 只读 journal+sql）
     const snapshot = join(MIGRATIONS_FOLDER, 'meta', `${entry.tag}_snapshot.json`);
     try {
       cpSync(snapshot, join(dir, 'meta', `${entry.tag}_snapshot.json`));
-    } catch {
-      /* 0008 型 snapshot 缺位先例（db-check.mjs 注）：跳过可接受 */
-    }
+    } catch {}
   }
   writeJournal(dir, journal.entries.slice(0, dropIdx));
   return dir;
@@ -97,7 +69,6 @@ interface LegacyWorld {
   dbPath: string;
 }
 
-/** 建旧库：迁移到 drop 前 + seed team + 插两表行与带死引用的 agent 行。 */
 function buildLegacyDb(opts: { skillRows?: number; mcpRows?: number } = {}): LegacyWorld {
   const skillRows = opts.skillRows ?? 2;
   const mcpRows = opts.mcpRows ?? 1;
@@ -191,25 +162,19 @@ function exportFiles(homeDir: string): string[] {
     .sort();
 }
 
-// —— 用例 ————————————————————————————————————————————————————————————————————
-
-describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
-  test('L1/L5：旧库两表有行 → 导出落盘内容齐、mcpServers 清空 + skills 列迁移退役、两表消失', () => {
+describe('legacy-export migration guardrail (skill + mcp_server table retirement)', () => {
+  test('L1/L5: legacy db two tables with rows -> export content complete on disk, mcpServers cleared + skills column migration retired, both tables gone', () => {
     const { dbPath } = buildLegacyDb({ skillRows: 2, mcpRows: 1 });
     const home = temp('cairn-legacy-home-');
     const { db, close } = openDbWithHandle(dbPath, { legacyExportDir: home });
     try {
       expect(tableExists(dbPath, 'skill')).toBe(false);
       expect(tableExists(dbPath, 'mcp_server')).toBe(false);
-      // #1169：skills 列由 0034 读取迁移后 DROP；0013 已把旧值清成 '[]'，按票面
-      // 条文 [] → skillsAllowlist NULL（不限制）、defaultSkill null。mcpServers
-      // 清空（#368）不受影响。
       expect(agentColumn(dbPath, 'ag-1', 'skillsAllowlist')).toBeNull();
       expect(agentColumn(dbPath, 'ag-1', 'defaultSkill')).toBeNull();
       expect(agentColumn(dbPath, 'ag-1', 'mcpServers')).toBe('[]');
       const files = exportFiles(home);
       expect(files).toHaveLength(1);
-      // L5 文件名形：legacy-export-<ISO ts>.json（冒号/点已换连字符，跨平台安全）
       expect(files[0]).toMatch(/^legacy-export-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/);
       const body = JSON.parse(readFileSync(join(home, files[0] ?? ''), 'utf8')) as {
         exportedAt: number;
@@ -223,9 +188,7 @@ describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
       const firstSkill = body.tables.skill.find((r) => r.id === 'sk-1');
       expect(firstSkill).toBeDefined();
       expect(firstSkill?.name).toBe('技能1');
-      // files 列还原为对象（导出 = 人可读保底副本，非 JSON 字符串套娃）
       expect(firstSkill?.files).toEqual({ 'SKILL.md': '# 技能1\n内容', 'helper.sh': 'echo hi' });
-      // mcp_server：JSON 列还原、密文列保持密文（明文永不扩散）
       expect(body.tables.mcp_server).toHaveLength(1);
       expect(body.tables.mcp_server[0]).toMatchObject({
         id: 'm-1',
@@ -235,14 +198,13 @@ describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
         args: [],
         headersCipher: 'cipher-text',
       });
-      // 迁移后的库可正常查询（drizzle 面回归）
       expect(db).toBeDefined();
     } finally {
       close();
     }
   });
 
-  test('L2：旧库两表零行 → 不落文件，表照删', () => {
+  test('L2: legacy db two tables zero rows -> no file, tables still dropped', () => {
     const { dbPath } = buildLegacyDb({ skillRows: 0, mcpRows: 0 });
     const home = temp('cairn-legacy-home-');
     const { close } = openDbWithHandle(dbPath, { legacyExportDir: home });
@@ -255,7 +217,7 @@ describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
     }
   });
 
-  test('L3：全新库 → 干净迁移、不落文件（同轮建表即删不算升级数据）', () => {
+  test('L3: fresh db -> clean migration, no file (building then dropping tables in the same round is not upgrade data)', () => {
     const dir = temp('cairn-fresh-db-');
     const dbPath = join(dir, 'server.db');
     const home = temp('cairn-legacy-home-');
@@ -269,15 +231,12 @@ describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
     }
   });
 
-  test('L4：未传 legacyExportDir（内存/测试形态）→ 不落文件、迁移照常', () => {
+  test('L4: no legacyExportDir passed (in-memory/test form) -> no file, migration as usual', () => {
     const { dbPath } = buildLegacyDb({ skillRows: 1, mcpRows: 1 });
     const { close } = openDbWithHandle(dbPath);
     try {
       expect(tableExists(dbPath, 'skill')).toBe(false);
       expect(tableExists(dbPath, 'mcp_server')).toBe(false);
-      // #1169：skills 列由 0034 读取迁移后 DROP；0013 已把旧值清成 '[]'，按票面
-      // 条文 [] → skillsAllowlist NULL（不限制）、defaultSkill null。mcpServers
-      // 清空（#368）不受影响。
       expect(agentColumn(dbPath, 'ag-1', 'skillsAllowlist')).toBeNull();
       expect(agentColumn(dbPath, 'ag-1', 'defaultSkill')).toBeNull();
       expect(agentColumn(dbPath, 'ag-1', 'mcpServers')).toBe('[]');
@@ -286,7 +245,7 @@ describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
     }
   });
 
-  test('L5b：二次启动幂等——表已 drop = 不再产出第二份', () => {
+  test('L5b: second boot idempotent -- tables already dropped = no second artifact', () => {
     const { dbPath } = buildLegacyDb({ skillRows: 1, mcpRows: 1 });
     const home = temp('cairn-legacy-home-');
     openDbWithHandle(dbPath, { legacyExportDir: home }).close();
@@ -295,7 +254,7 @@ describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
     expect(exportFiles(home)).toHaveLength(1);
   });
 
-  test('L6：:memory: 不尝试导出、不炸', () => {
+  test('L6: :memory: does not attempt an export, does not blow up', () => {
     expect(() => openMemoryDb()).not.toThrow();
   });
 });

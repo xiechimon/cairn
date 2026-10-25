@@ -1,20 +1,3 @@
-// failed→review 恢复（#702 / #519 B-C17）：build 步已真实交付（分支/PR 在）
-// 而后续审核步失败时，failed 相位不再锁死已完成 build 的合并路——相位机加
-// 条件边 failed→review，恢复闸（build 腿 done 且产物在）进服务端判定，merge
-// 与「只重跑审核」两出口共用同一条恢复。
-// 失败方式枚举先于实现固化（票面四条照抄，#702「先列失败方式，再写实现」）：
-//   1. failed 一律锁死合并（现状 409「illegal phase transition: failed ->
-//      done」→ PR 孤儿化、人被迫 gh CLI 手动合并）。设计决定：failed→review
-//      恢复（仅 build 腿 done 时合法）——恢复落 review 关口，merge/审核重跑
-//      照正常流程走。
-//   2. 半完成 build 被误放行：出路只对「build 步 done 且产物在（PR/分支在）」
-//      的任务开放，条件进服务端判定——负例：build 腿未 done / done 但零产物
-//      （无 checkpointCommit 且无 PR）→ merge 409 + 审核发起 409。
-//   3. 新边被泛用：failed→review 只服务「已完成交付物的收尾」——恢复 ≠ done、
-//      更 ≠ 审核通过；合并仍走 202 委派合并步（人工接受未完成 AI 审核的交付
-//      物，责任在人）；手动改相面（PATCH phase）不收这条边。
-//   4. 重跑语义被破坏：failed→queued（r3 §3.7 新 conv/新 build）原路不动。
-
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -44,8 +27,6 @@ const AGENT_ID = 'agent-702-1';
 const REVIEW_AGENT_ID = 'agent-702-reviewer';
 const PLAN_FILE_NAME = 'plan.md';
 
-/** 播种用 git 提交身份（与 review.test 同款；宿主 git 无全局身份时 commit 会因
- * user.email 缺位失败）。 */
 const GIT_ENV = {
   GIT_AUTHOR_NAME: 'restore-probe',
   GIT_AUTHOR_EMAIL: 'probe@localhost',
@@ -89,8 +70,6 @@ interface World {
   confirm(buildId: string): Promise<void>;
   startReview(buildId: string, agentId?: string): Promise<Response>;
   merge(buildId: string): Promise<Response>;
-  /** 往托管 bare repo 的 conv 分支推一次真实改动，返回推上去的 HEAD sha
-   *（build 步 done 回传该 sha = checkpointCommit，即「分支在」的产物信号）。 */
   seedConvChanges(buildId: string): Promise<string>;
   todoRow(): ReturnType<typeof loadTodoRow>;
   stepsOf(buildId: string): ReturnType<typeof loadStepsOf>;
@@ -125,8 +104,6 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
       updatedAt: Date.now(),
     })
     .run();
-  // build 槽 agent 直接授合并/推送两开关（XMON-77 闸在 requestMerge 收口，
-  // 本票测试聚焦相位恢复，不重复权限负例——machine-wire 已钉）。
   s.db
     .insert(agentTable)
     .values({
@@ -154,7 +131,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     body: { teamId: s.team.id, name: 'restore-mbp', cliVersion: '0.1.0' },
   });
 
-  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+  bindAllAgents(s);
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string };
   let projectId: string;
@@ -280,9 +257,6 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
   };
 }
 
-/** 走到 B-C17 死锁形态：build 步 done（交付产物在）+ 审核步 failed →
- * todo failed。commit 参数缺省 = 推一条真实 conv 分支取 sha（hosted）；传
- * null = build 步 done 但零产物（无 checkpointCommit）。 */
 async function driveToDeadlock(
   w: World,
   opts: { buildCommit?: string | null } = {},
@@ -303,7 +277,6 @@ async function driveToDeadlock(
     ...(commit !== null ? { commit } : {}),
   });
   expect(w.todoRow().phase).toBe('review');
-  // 审核发起 → 审核步撞墙（#519 实测：540s 流墙）→ failed 相位。
   const reviewRes = await w.startReview(buildId);
   expect(reviewRes.status).toBe(202);
   const reviewClaimed = await w.claim();
@@ -316,17 +289,16 @@ async function driveToDeadlock(
   return buildId;
 }
 
-describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
-  describe('失败方式 1 正向：出路开放（build 已交付）', () => {
+describe('#702 failed->review restore (B-C17 deadlock shape)', () => {
+  describe('failure mode 1 positive: exit open (build delivered)', () => {
     let w: World;
     beforeEach(async () => {
       w = await setupWorld({ hosted: true });
     });
 
-    test('#519 形态实走：build done + review failed → 产品内 merge 202 → 合并步 → done（PR 不孤儿化）', async () => {
+    test('#519 shape run through: build done + review failed -> in-product merge 202 -> merge step -> done (PR not orphaned)', async () => {
       try {
         const buildId = await driveToDeadlock(w);
-        // 死锁形态就位：build 腿 done（checkpointCommit 在）+ todo failed。
         const buildStep = w
           .stepsOf(buildId)
           .filter((s) => s.kind === 'build')
@@ -334,12 +306,9 @@ describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
         expect(buildStep.status).toBe('done');
         expect(buildStep.checkpointCommit).toBeTruthy();
 
-        // 修前形态 = 409「illegal phase transition: failed -> done」；修后 =
-        // 恢复 review 关口 + 正常合并委派（202，机器合并步走起）。
         const mergeRes = await w.merge(buildId);
         expect(mergeRes.status).toBe(202);
         expect(await mergeRes.json()).toEqual({ delegated: true });
-        // 恢复落 review（不是 done——完成仍由合并步落地，02 §4.2 主时序）。
         expect(w.todoRow().phase).toBe('review');
         const mergeStep = w
           .stepsOf(buildId)
@@ -348,8 +317,6 @@ describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
         expect(mergeStep).toBeDefined();
         expect(mergeStep?.status).toBe('pending');
 
-        // 机器领合并步 → done（commit = conv 分支 HEAD）→ done 相位 +
-        // bare repo main fast-forward 落地（合并动作 100% 在产品内）。
         const mergeClaimed = await w.claim();
         expect(mergeClaimed.kind).toBe('merge');
         const sha = buildStep.checkpointCommit!;
@@ -365,16 +332,14 @@ describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
       }
     });
 
-    test('只重跑审核：failed（build 腿 done）发起 AI 审核 → 202 + 审核步入队 + 相位回 review', async () => {
+    test('only rerun the review: failed (build leg done) starting an AI review -> 202 + review step enqueued + phase back to review', async () => {
       try {
         const buildId = await driveToDeadlock(w);
-        // 修前 = 409「AI 审核仅在待确认/审核关口允许，当前相位 failed」。
         const res = await w.startReview(buildId);
         expect(res.status).toBe(202);
         expect(w.todoRow().phase).toBe('review');
         const reviewSteps = w.stepsOf(buildId).filter((s) => s.kind === 'review');
         expect(reviewSteps).toHaveLength(2);
-        // 第一条 = 撞墙死掉的那轮（failed）；新一条 pending 等机器领。
         expect(reviewSteps[0]?.status).toBe('failed');
         expect(reviewSteps[1]?.status).toBe('pending');
       } finally {
@@ -383,13 +348,13 @@ describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
     });
   });
 
-  describe('失败方式 2 负例：半完成 build 不放行', () => {
+  describe('failure mode 2 counterexample: half-finished build not allowed', () => {
     let w: World;
     beforeEach(async () => {
       w = await setupWorld();
     });
 
-    test('build 步本身 failed（腿未完成）→ merge 409 + 审核发起 409', async () => {
+    test('build step itself failed (legs unfinished) -> merge 409 + review start 409', async () => {
       try {
         const buildId = await w.startBuild(false);
         const buildClaimed = await w.claim();
@@ -403,17 +368,15 @@ describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
         expect(mergeRes.status).toBe(409);
         const reviewRes = await w.startReview(buildId);
         expect(reviewRes.status).toBe(409);
-        // 无合并步入队（出路没开，不是开了又退）。
         expect(w.stepsOf(buildId).filter((s) => s.kind === 'merge')).toHaveLength(0);
       } finally {
         w.s.dispose();
       }
     });
 
-    test('build done 但零产物（无 commit、无 PR）→ merge 409 + 审核发起 409', async () => {
+    test('build done but zero artifacts (no commit, no PR) -> merge 409 + review start 409', async () => {
       try {
         const buildId = await driveToDeadlock(w, { buildCommit: null });
-        // build 腿 done，但 checkpointCommit 空、prUrl 空——B-C11 同族形态。
         const buildStep = w
           .stepsOf(buildId)
           .filter((s) => s.kind === 'build')
@@ -433,18 +396,17 @@ describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
     });
   });
 
-  describe('失败方式 3：新边不泛用', () => {
+  describe('failure mode 3: the new edge is not generalized', () => {
     let w: World;
     beforeEach(async () => {
       w = await setupWorld();
     });
 
-    test('恢复落 review 不落 done；合并仍是 202 委派合并步（人工责任语义在 spec 02 §4.2）', async () => {
+    test('restore lands review not done; merge is still a 202 delegated merge step (human responsibility semantics in spec 02 section 4.2)', async () => {
       try {
         const buildId = await driveToDeadlock(w, { buildCommit: 'sha-702-probe' });
         const mergeRes = await w.merge(buildId);
         expect(mergeRes.status).toBe(202);
-        // 恢复 = 回审核关口等人工决策，不是直接完成——done 只能由合并步落地。
         expect(w.todoRow().phase).toBe('review');
         expect(w.stepsOf(buildId).filter((s) => s.kind === 'merge')).toHaveLength(1);
       } finally {
@@ -452,7 +414,7 @@ describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
       }
     });
 
-    test('手动改相面不收这条边：PATCH phase=review（from failed）→ 409', async () => {
+    test('manual phase-change surface does not accept this edge: PATCH phase=review (from failed) -> 409', async () => {
       try {
         await driveToDeadlock(w, { buildCommit: 'sha-702-probe' });
         expect(w.todoRow().phase).toBe('failed');
@@ -467,13 +429,13 @@ describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
     });
   });
 
-  describe('失败方式 4：重跑语义不动（failed→queued）', () => {
+  describe('failure mode 4: rerun semantics unchanged (failed->queued)', () => {
     let w: World;
     beforeEach(async () => {
       w = await setupWorld();
     });
 
-    test('restart 动作照旧：202 + 新 build + 相位 queued（r3 §3.7）', async () => {
+    test('restart action as before: 202 + new build + phase queued (r3 section 3.7)', async () => {
       try {
         const buildId = await driveToDeadlock(w, { buildCommit: 'sha-702-probe' });
         expect(w.todoRow().phase).toBe('failed');

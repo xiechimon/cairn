@@ -1,17 +1,3 @@
-// #1473 回报只对当前这次领取生效（verify-step-claim F2 / P2 的 server 半）。
-// 失败方式（先于实现固化）：
-//   1. 重领后旧回报叠写：步被扫尾放回 pending、同机重领，在飞那份的 done 落
-//      账后，再来一份 done（重放 / 第二个执行者）又把步和卡片改一遍
-//      （review → failed）。
-//   2. 迟到回报复活已停的步：卡已关、扫尾把失联步停掉（stopped），原执行者
-//      迟到的 done 仍把步写成 done / failed。
-//   3. 迟到回报不回收凭证：上一条拒写时连 per-step git 凭证也留着（XMON-59
-//      重放契约：重报答 ok，凭证随步收尾回收）；已放回 pending 的步回 404，
-//      daemon 留着一份永远不会被 recover 的 journal。
-//   4. await 窗口内换了领取：success 回报过了所有权校验后在 GitHub 探测里
-//      等待，期间步被放回 pending 又被领走，await 回来照写 done——新领取
-//      被旧回报收掉。
-
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -44,7 +30,6 @@ const PRIOR_PR = 777;
 
 interface WorldOpts {
   githubFetch?: FetchLike;
-  /** 同 todo 带一张更早的 PR（finishStep 回填新 PR 时会去 GitHub 探测它）。 */
   priorPr?: boolean;
 }
 
@@ -135,7 +120,6 @@ function makeWorld(opts: WorldOpts = {}) {
   const stepRow = () => s.db.select().from(stepTable).where(eq(stepTable.id, STEP)).get()!;
   const todoRow = () => s.db.select().from(todoTable).where(eq(todoTable.id, CARD_ID)).get()!;
   const claim = () => claimStep(deps, MACHINE, teamId, 10, 'http://localhost');
-  // 扫尾时刻取「领取后 120s+」：在线机器、心跳从未推进 → 放回 pending。
   const sweep = () =>
     sweepAbandonedBuildSteps(
       s.svc,
@@ -150,11 +134,10 @@ function makeWorld(opts: WorldOpts = {}) {
   return { s, deps, teamId, stepRow, todoRow, claim, sweep, credentialCount };
 }
 
-/** claimedAt 是毫秒粒度：重领前让时钟走一格，两次领取可分辨。 */
 const tick = () => new Promise((r) => setTimeout(r, 5));
 
-describe('#1473 回报只对当前这次领取生效', () => {
-  test('放回后同机重领：在飞那份的回报落账，之后的回报不再改动', async () => {
+describe('#1473 a report counts only for the current claim', () => {
+  test('released and re-claimed by the same machine: the in-flight claim report is booked, later reports change nothing', async () => {
     const w = makeWorld();
     expect((await w.claim())?.step.id).toBe(STEP);
     w.sweep();
@@ -173,7 +156,7 @@ describe('#1473 回报只对当前这次领取生效', () => {
     expect(buildRow?.errorMessage ?? null).toBeNull();
   });
 
-  test('卡已关、扫尾停掉的步：迟到回报不改步，git 凭证被回收', async () => {
+  test('the card closed and the step stopped by the sweep: a late report changes nothing, the git credential is reclaimed', async () => {
     const w = makeWorld();
     await w.claim();
     issueStepGitCredential(w.deps, { teamId: w.teamId, stepId: STEP });
@@ -192,7 +175,7 @@ describe('#1473 回报只对当前这次领取生效', () => {
     expect(w.credentialCount()).toBe(0);
   });
 
-  test('已放回 pending 的步：原执行者的回报答 ok、不写，凭证被回收；他团队机器仍 404', async () => {
+  test('a step released back to pending: the original runner report gets ok without writing, the credential reclaimed; another team machine still 404', async () => {
     const w = makeWorld();
     await w.claim();
     issueStepGitCredential(w.deps, { teamId: w.teamId, stepId: STEP });
@@ -213,7 +196,7 @@ describe('#1473 回报只对当前这次领取生效', () => {
     expect(w.credentialCount()).toBe(0);
   });
 
-  test('GitHub 探测期间步被放回又被领走：回报 409，新领取保持 claimed', async () => {
+  test('the step was released and re-claimed during the GitHub probe: the report 409s, the new claim stays claimed', async () => {
     let gateProbe = false;
     let probeEntered!: () => void;
     const entered = new Promise<void>((r) => {

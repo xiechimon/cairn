@@ -1,40 +1,3 @@
-// XMON-109 S1：技能库写路径（spec 13 回摆——「网页上传建技能 / chief 自动
-// 安装制作技能」两件 Out of Scope 移入 scope）。三入口同落 services/skills.ts
-// 写路径 + skill_audit 审计行：REST（member 执行者）、worker relay（agent 行
-// tools 开关执法，requestMerge 403 同形）、chief relay（免开关，leader 拍板）。
-// machine-wire GET /api/machine/skills/{stepId} = S2 daemon 物化消费契约
-// （per-step 凭证 + agent.skillsAllowlist 白名单交集 + 按需拉；null = 全量，#1169）。
-//
-// 失败方式先行枚举（仓规：先列失败方式再写实现）——
-// V 校验面（create/update 共用闸，全 400 可读文本）：V1 files 无 SKILL.md /
-//   V2 SKILL.md frontmatter 缺 name / 缺 description（各各自点名）/
-//   V3 frontmatter 与 body 声明不一致（frontmatter 是唯一真值）/
-//   V4 目录名非法（'..'、'a/b'、反斜杠、'-x'、空、>64）/
-//   V5 单文件超 MAX_SKILL_FILE_BYTES / V6 总量超 MAX_SKILL_TOTAL_BYTES /
-//   V7 路径逃逸（'../x'、'.'/'..' 段、空段）/ V8 重复 path。
-// C create：C1 正常 → 201 + 目录落盘 + GET 立即可见 / C2 目录名已占用 → 409 /
-//   C3 他目录同 id（frontmatter 同名）→ 409。
-// U update：U1 未知 id → 404 / U2 覆写语义（列出者覆写、未列者保留）/
-//   U3 写面只落本 skill 子目录（逃逸/落点已是目录/穿越符号链接 → 400）/
-//   U4 改名 = SKILL.md 新 frontmatter；撞他 id → 409；无 SKILL.md 改名 → 400 /
-//   U5 无 SKILL.md 的更新：name/description 声明须与现 frontmatter 一致。
-// A 审计：A1 REST 双动作各一行（actor member、字段齐、bytes = 写入字节数）/
-//   A2 worker relay（actor agent）/ A3 chief relay（actor = 绑定 agent）。
-// R worker relay：R1 claim 词表恒列 create_skill/update_skill /
-//   R2 无开关 → 403 文本点名「创建技能」/ R3 有开关 create → 落盘 + 审计 /
-//   R4 update 同律（无开关 → 403 点名「更新技能」，有 → 落盘 + 审计）。
-//   （无 agent 步的 409 拒绝 = 纵深防御面：agent 空槽步不入 claim 候选，
-//   公开 wire 构造不出来，与记忆三件套 409 同处境，不单测。）
-// K chief relay：K1 create_skill 免开关可用 + 审计行 / K2 update_skill 同律 /
-//   K3 未知 skillId → 404。
-// M machine-wire（#920 清单 + 按需拉）：M1 白名单技能清单（agent.skillsAllowlist ∩
-//   现扫；每文件 path/sizeBytes/sha256，selection=whitelist）/ M2 白名单外
-//   技能不列 / M3 非本步凭证（他机 token）→ 404 / M4 未知 stepId → 404 /
-//   M5 超限文件不再让整包失败（分发面无字节闸：真实 size 入清单、字节完整
-//   下发）/ M6 chief 步 = 全量信任面（selection=all）/ M7 白名单空集 = 空
-//   清单不炸 / M8 file 端点原始字节下发（含二进制诚实）/ M9 file 端点清单
-//   外·白名单外·逃逸形 404 不泄存在性 / M10 file 端点归属面 404。
-
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -62,8 +25,6 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, skillAudit } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
-
-// —— 脚手架（隔离技能根 + 技能 body 组装）——————————————————————————————————
 
 const roots: string[] = [];
 function makeRoot(): string {
@@ -113,10 +74,8 @@ async function errorText(res: Response): Promise<string> {
   return ((await res.json()) as { error?: string }).error ?? '';
 }
 
-// —— V 校验面 + C create + U update（REST 写面）———————————————————————————
-
-describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () => {
-  test('C1：正常 create → 201 record + 落盘 + GET 立即可见（无缓存现扫）', async () => {
+describe('the REST write surface (POST /api/skills + PUT teams/{id}/skills/{sid})', () => {
+  test('C1: a normal create -> 201 record + written to disk + immediately visible on GET (no cache, rescanned)', async () => {
     const skillsDir = makeRoot();
     const s = bootServer({ skillsDir });
     try {
@@ -142,7 +101,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('V1：files 无 SKILL.md → 400 点名', async () => {
+  test('V1: files without SKILL.md -> 400 naming it', async () => {
     const s = bootServer({ skillsDir: makeRoot() });
     try {
       const res = await req(s.app, 'POST', '/api/skills', {
@@ -157,7 +116,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('V2：frontmatter 缺 name / 缺 description → 400 各自点名', async () => {
+  test('V2: frontmatter missing name / description -> 400 naming each', async () => {
     const s = bootServer({ skillsDir: makeRoot() });
     try {
       const noName = await req(s.app, 'POST', '/api/skills', {
@@ -180,7 +139,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('V3：frontmatter 与 body 声明不一致 → 400（frontmatter 是唯一真值）', async () => {
+  test('V3: the frontmatter and body declarations disagree -> 400 (frontmatter is the single source of truth)', async () => {
     const s = bootServer({ skillsDir: makeRoot() });
     try {
       const res = await req(s.app, 'POST', '/api/skills', {
@@ -197,7 +156,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('V4：目录名非法（..、子路径、反斜杠、-x、空、超 64 字符）→ 400', async () => {
+  test('V4: an illegal directory name (.., subpath, backslash, -x, empty, over 64 characters) -> 400', async () => {
     const s = bootServer({ skillsDir: makeRoot() });
     try {
       for (const name of ['..', 'a/b', 'a\\b', '-x', '', 'x'.repeat(65)]) {
@@ -214,7 +173,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('V5/V6：单文件超 512k / 总量超 MAX_SKILL_TOTAL_BYTES → 400 点名上限', async () => {
+  test('V5/V6: one file over 512k / the total over MAX_SKILL_TOTAL_BYTES -> 400 naming the cap', async () => {
     const s = bootServer({ skillsDir: makeRoot() });
     try {
       const big = 'x'.repeat(MAX_SKILL_FILE_BYTES + 1);
@@ -229,7 +188,6 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
       expect(perFileError).toContain('big.txt');
       expect(perFileError).toContain(`${MAX_SKILL_FILE_BYTES}`);
 
-      // 总量超限用例：每份都低于单文件上限，只让总和破 2M（避开 V5 抢先命中）。
       const total = await req(
         s.app,
         'POST',
@@ -251,7 +209,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('V7/V8：路径逃逸与重复 path → 400（先全量校验后落盘，无半写）', async () => {
+  test('V7/V8: path escape and duplicate paths -> 400 (validate everything before writing, no half-written state)', async () => {
     const skillsDir = makeRoot();
     const s = bootServer({ skillsDir });
     try {
@@ -282,9 +240,9 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('C2/C3：目录已占用 → 409；他目录同 id → 409 点名来源目录', async () => {
+  test('C2/C3: the directory is taken -> 409; the same id in another directory -> 409 naming the source directory', async () => {
     const skillsDir = makeRoot();
-    mkdirSync(join(skillsDir, 'busy')); // 空目录占位（非技能）
+    mkdirSync(join(skillsDir, 'busy'));
     mkdirSync(join(skillsDir, 'other'));
     writeFileSync(join(skillsDir, 'other', 'SKILL.md'), skillMd('clash', '既有技能'));
     const s = bootServer({ skillsDir });
@@ -301,7 +259,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('U1：PUT 未知 id → 404', async () => {
+  test('U1: PUT an unknown id -> 404', async () => {
     const s = bootServer({ skillsDir: makeRoot() });
     try {
       const res = await req(
@@ -316,7 +274,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('U2：update 覆写语义——列出者覆写、未列者保留 → 200', async () => {
+  test('U2: the update overwrite semantics -- listed files overwrite, unlisted files stay -> 200', async () => {
     const skillsDir = makeRoot();
     const dir = join(skillsDir, 'pkg');
     mkdirSync(dir);
@@ -337,13 +295,13 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
       });
       expect(readFileSync(join(dir, 'SKILL.md'), 'utf8')).toBe(skillMd('pkg', '新描述'));
       expect(readFileSync(join(dir, 'extra.md'), 'utf8')).toBe('新增\n');
-      expect(readFileSync(join(dir, 'note.txt'), 'utf8')).toBe('旧笔记'); // 未列保留
+      expect(readFileSync(join(dir, 'note.txt'), 'utf8')).toBe('旧笔记');
     } finally {
       s.dispose();
     }
   });
 
-  test('U3：update 写面只落本 skill 子目录（逃逸/落点已是目录/穿越符号链接 → 400）', async () => {
+  test('U3: the update write surface only writes inside this skill subdirectory (escape / target already a directory / through a symlink -> 400)', async () => {
     const skillsDir = makeRoot();
     const dir = join(skillsDir, 'victim');
     mkdirSync(dir);
@@ -370,7 +328,6 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
       );
       expect(isDir.status).toBe(400);
 
-      // linked → 技能根外的目录：写 sub/x 会经符号链接出域 → 拒绝
       const throughLink = await req(
         s.app,
         'PUT',
@@ -384,7 +341,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('U4：改名 = SKILL.md 新 frontmatter（目录不动，id 随 frontmatter）；撞他 id → 409；无 SKILL.md 改名 → 400', async () => {
+  test('U4: renaming = new frontmatter in SKILL.md (the directory stays, the id follows the frontmatter); colliding with another id -> 409; renaming without SKILL.md -> 400', async () => {
     const skillsDir = makeRoot();
     const dir = join(skillsDir, 'old-name');
     mkdirSync(dir);
@@ -401,11 +358,9 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
       );
       expect(renamed.status).toBe(200);
       expect(skillRecordSchema.parse(await renamed.json())).toMatchObject({ id: 'fresh-id' });
-      // 旧 id 解析不到、新 id 可见（目录名不变，id 随 frontmatter）
       expect((await req(s.app, 'GET', `/api/teams/${s.team.id}/skills/old-name`)).status).toBe(404);
       expect((await req(s.app, 'GET', `/api/teams/${s.team.id}/skills/fresh-id`)).status).toBe(200);
 
-      // fresh-id 再改名撞 taken → 409
       const collide = await req(
         s.app,
         'PUT',
@@ -414,7 +369,6 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
       );
       expect(collide.status).toBe(409);
 
-      // 不带 SKILL.md 的更新试图改名 → 400（frontmatter 才能改身份）
       const noMd = await req(s.app, 'PUT', `/api/teams/${s.team.id}/skills/fresh-id`, {
         name: 'another-id',
         description: '新描述',
@@ -426,7 +380,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('U5：无 SKILL.md 的更新——声明须与现 frontmatter 一致，不一致 → 400', async () => {
+  test('U5: an update without SKILL.md -- the declaration must match the current frontmatter, otherwise 400', async () => {
     const skillsDir = makeRoot();
     const dir = join(skillsDir, 'fixed');
     mkdirSync(dir);
@@ -452,7 +406,7 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
     }
   });
 
-  test('A1：REST 双动作各落一行审计（actor member、字段齐、bytes = 写入字节数）', async () => {
+  test('A1: both REST actions write an audit row each (actor member, all fields, bytes = the bytes written)', async () => {
     const skillsDir = makeRoot();
     const s = bootServer({ skillsDir });
     try {
@@ -481,11 +435,9 @@ describe('REST 写面（POST /api/skills + PUT teams/{id}/skills/{sid}）', () =
   });
 });
 
-// —— R worker relay（写词执法：agent 行 tools 开关，requestMerge 403 同形）———
-
 const WORKER_AGENT_ID = 'agent-skill-writer';
 
-describe('worker relay 技能写词（POST /api/machine/tool/{stepId}）', () => {
+describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})', () => {
   async function workerWorld(opts: { tools: string[] }) {
     const skillsDir = makeRoot();
     const s = bootServer({ skillsDir, claimHoldMs: 250 });
@@ -508,7 +460,7 @@ describe('worker relay 技能写词（POST /api/machine/tool/{stepId}）', () =>
         skillsAllowlist: null,
       })
       .run();
-    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+    bindAllAgents(s);
 
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -537,7 +489,7 @@ describe('worker relay 技能写词（POST /api/machine/tool/{stepId}）', () =>
       body: { name: 'create_skill', params: body },
     });
 
-  test('R1：claim 词表恒列 create_skill / update_skill（worker 恒列）', async () => {
+  test('R1: the claim vocabulary always lists create_skill / update_skill (workers always do)', async () => {
     const { s, step } = await workerWorld({ tools: [] });
     try {
       expect(step.remoteTools?.map((t) => t.name)).toContain('create_skill');
@@ -547,7 +499,7 @@ describe('worker relay 技能写词（POST /api/machine/tool/{stepId}）', () =>
     }
   });
 
-  test('R2：无「创建技能」开关 → 403 文本点名开关（Agent 详情页权限 tab）', async () => {
+  test('R2: without the create-skill toggle -> 403 with the toggle named (the Agent detail page permissions tab)', async () => {
     const { s, token, step } = await workerWorld({ tools: [] });
     try {
       const res = await relay(s.app, token, step.step.id, createBody('denied', '无权'));
@@ -560,7 +512,7 @@ describe('worker relay 技能写词（POST /api/machine/tool/{stepId}）', () =>
     }
   });
 
-  test('R3：有开关 create_skill → 200 落盘 + 审计行（actor agent）', async () => {
+  test('R3: with the create_skill toggle -> 200 written to disk + an audit row', async () => {
     const { s, skillsDir, token, step } = await workerWorld({
       tools: [AGENT_TOOL_SKILL_CREATE],
     });
@@ -583,7 +535,7 @@ describe('worker relay 技能写词（POST /api/machine/tool/{stepId}）', () =>
     }
   });
 
-  test('R4：update_skill 同律——无「更新技能」→ 403；有 → 200 落盘 + 审计', async () => {
+  test('R4: update_skill follows the same rule -- without update-skill -> 403; with it -> 200 written to disk + audited', async () => {
     const { s, skillsDir, token, step } = await workerWorld({ tools: [] });
     try {
       mkdirSync(join(skillsDir, 'seeded'));
@@ -625,9 +577,7 @@ describe('worker relay 技能写词（POST /api/machine/tool/{stepId}）', () =>
   });
 });
 
-// —— K chief relay（组织面新增两词，chief 免开关）———————————————————————————
-
-describe('chief relay 技能写词（免开关，actor = 绑定 agent）', () => {
+describe('the chief relay skill-write verbs (no toggle, actor = the bound agent)', () => {
   const CHIEF_AGENT_ID = 'agent-chief-bound';
 
   function setup() {
@@ -641,7 +591,7 @@ describe('chief relay 技能写词（免开关，actor = 绑定 agent）', () =>
         displayName: '总管绑定',
         provider: 'p',
         modelId: 'm',
-        tools: [], // chief 免开关：tools 空 也必须可用
+        tools: [],
         defaultSkill: null,
         skillsAllowlist: null,
       })
@@ -667,7 +617,7 @@ describe('chief relay 技能写词（免开关，actor = 绑定 agent）', () =>
     return { s, skillsDir, ctx, deps };
   }
 
-  test('K1：create_skill 免开关可用 + 审计行（actor = 绑定 agent）', async () => {
+  test('K1: create_skill works without the toggle + an audit row (actor = the bound agent)', async () => {
     const { s, skillsDir, deps, ctx } = setup();
     try {
       const text = await executeChiefTool(
@@ -693,7 +643,7 @@ describe('chief relay 技能写词（免开关，actor = 绑定 agent）', () =>
     }
   });
 
-  test('K2：update_skill 免开关可用 + 审计行', async () => {
+  test('K2: update_skill works without the toggle + an audit row', async () => {
     const { s, skillsDir, deps, ctx } = setup();
     try {
       mkdirSync(join(skillsDir, 'chief-skill'));
@@ -713,7 +663,7 @@ describe('chief relay 技能写词（免开关，actor = 绑定 agent）', () =>
     }
   });
 
-  test('K3：update_skill 未知 skillId → 404', async () => {
+  test('K3: update_skill with an unknown skillId -> 404', async () => {
     const { s, deps, ctx } = setup();
     try {
       await expect(
@@ -727,9 +677,9 @@ describe('chief relay 技能写词（免开关，actor = 绑定 agent）', () =>
     }
   });
 
-  test('K1 附：无绑定 agent 时 actor = member（userId）', async () => {
+  test('K1 addendum: without a bound agent the actor = the member (userId)', async () => {
     const { s, deps, ctx } = setup();
-    ctx.chiefAgentId = null; // 无绑定：审计落 member 面
+    ctx.chiefAgentId = null;
     try {
       await executeChiefTool(deps, ctx, 'create_skill', createBody('user-made', '人建'));
       const rows = s.db.select().from(skillAudit).all();
@@ -740,10 +690,7 @@ describe('chief relay 技能写词（免开关，actor = 绑定 agent）', () =>
   });
 });
 
-// —— M machine-wire（#920 清单 + 按需拉：GET /api/machine/skills/{stepId} +
-// 同前缀 /file；S2 daemon 消费契约）———————————————————————————————————————
-
-describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{stepId}[/file]）', () => {
+describe('machine-wire skill listing and on-demand fetch (GET /api/machine/skills/{stepId}[/file])', () => {
   async function claimWorld(
     opts: { defaultSkill?: string | null; skillsAllowlist?: string[] | null; root?: string } = {},
   ) {
@@ -775,7 +722,7 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
         skillsAllowlist: opts.skillsAllowlist ?? null,
       })
       .run();
-    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+    bindAllAgents(s);
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       body: { title: '', spec: '干活\n\n现在的情况：没技能' },
@@ -812,7 +759,7 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
     return createHash('sha256').update(bytes).digest('hex');
   }
 
-  test('M1/M2：白名单交集出清单（dirName + 逐文件 path/sizeBytes/sha256）；白名单外不列', async () => {
+  test('M1/M2: the whitelist intersection produces the listing; outside the whitelist is not listed', async () => {
     const { s, token, step, skillsDir } = await claimWorld({ skillsAllowlist: ['alpha', 'ghost'] });
     try {
       const res = await pkg(s.app, token, step.step.id);
@@ -823,7 +770,6 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
       const alpha = body.skills[0]!;
       expect(alpha).toMatchObject({ id: 'alpha', name: 'alpha', dirName: 'alpha' });
       expect(alpha.files.map((f) => f.path).sort()).toEqual(['SKILL.md', 'helper.md']);
-      // 清单三元组 = 盘上真值（sizeBytes/sha256 逐文件对拍）。
       for (const f of alpha.files) {
         const onDisk = readFileSync(join(skillsDir, 'alpha', f.path));
         expect(f.sizeBytes).toBe(onDisk.byteLength);
@@ -834,23 +780,21 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
     }
   });
 
-  test('M3/M4/M10：非本步凭证（他机 token）→ 404；未知 stepId → 404（清单与 file 双面）', async () => {
+  test('M3/M4/M10: a credential of another step (another machine token) -> 404; an unknown stepId -> 404 (both the listing and file surfaces)', async () => {
     const { s, token, step } = await claimWorld({ skillsAllowlist: ['alpha'] });
     try {
-      // 同 apiKey 重注册会复用 machineId（r3 §1.2），他机须另发一把 key。
       const key2 = await issueApiKey(s);
       const enroll2 = await call(s.app, 'POST', '/api/machine/enroll', {
         cred: key2,
         body: { teamId: s.team.id, name: 'other-machine', cliVersion: '0.1.0' },
       });
 
-      bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+      bindAllAgents(s);
       const { token: token2 } = (await enroll2.json()) as { token: string };
       const notYours = await pkg(s.app, token2, step.step.id);
       expect(notYours.status).toBe(404);
       const unknown = await pkg(s.app, token, 'no-such-step');
       expect(unknown.status).toBe(404);
-      // file 端点同闸（ownedStep 单源）。
       const fileNotYours = await fileGet(s.app, token2, step.step.id, 'alpha', 'SKILL.md');
       expect(fileNotYours.status).toBe(404);
       const fileUnknown = await fileGet(s.app, token, 'no-such-step', 'alpha', 'SKILL.md');
@@ -860,9 +804,7 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
     }
   });
 
-  test('M5：超限文件不再让整包失败——超单文件闸的资产真实 size 入清单、字节完整下发；总量超旧包闸照常出清单', async () => {
-    // fat：白名单内技能带一个超旧单文件上限（512,000）的文件——#920 根因
-    // 形态（archify/assets/template.html 727,976 字节同形）。
+  test('M5: an over-limit file no longer fails the whole package -- an asset past the per-file gate enters the listing with its real size and is delivered byte-complete; a total over the old package gate still gets a listing', async () => {
     const fatRoot = makeRoot();
     mkdirSync(join(fatRoot, 'fat'));
     writeFileSync(join(fatRoot, 'fat', 'SKILL.md'), skillMd('fat', '大'));
@@ -890,7 +832,6 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
       fatWorld.s.dispose();
     }
 
-    // heavy：总量超旧整包上限（2,000,000）——分发面不再设总量闸，照常出清单。
     const heavyRoot = makeRoot();
     mkdirSync(join(heavyRoot, 'heavy'));
     writeFileSync(join(heavyRoot, 'heavy', 'SKILL.md'), skillMd('heavy', '重'));
@@ -904,7 +845,7 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
       const res = await pkg(heavyWorld.s.app, heavyWorld.token, heavyWorld.step.step.id);
       expect(res.status).toBe(200);
       const body = machineSkillsManifestResponseSchema.parse(await res.json());
-      expect(body.skills[0]!.files).toHaveLength(6); // SKILL.md + p0..p4
+      expect(body.skills[0]!.files).toHaveLength(6);
       expect(body.skills[0]!.files.reduce((n, f) => n + f.sizeBytes, 0)).toBeGreaterThan(
         MAX_SKILL_TOTAL_BYTES,
       );
@@ -913,7 +854,7 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
     }
   });
 
-  test('M6：chief 步 = 全量目录（信任面不受白名单约束）', async () => {
+  test('M6: a chief step = the full directory (the trust surface is not bound by the whitelist)', async () => {
     const skillsDir = makeRoot();
     for (const name of ['alpha', 'beta']) {
       mkdirSync(join(skillsDir, name));
@@ -935,12 +876,11 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
         provider: 'p',
         modelId: 'stub-model',
         tools: [],
-        // chief 即使行上白名单为空也拿全量（信任面）；#1169 两槽 null 形。
         defaultSkill: null,
         skillsAllowlist: null,
       })
       .run();
-    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+    bindAllAgents(s);
 
     await call(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, {
       body: { agent: { agentId: WORKER_AGENT_ID, thinkingLevel: null } },
@@ -966,7 +906,7 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
     }
   });
 
-  test('M7：显式勾空（skillsAllowlist: []）= 空清单不炸（selection=whitelist）', async () => {
+  test('M7: an explicit empty selection (skillsAllowlist: []) = an empty listing, no crash (selection=whitelist)', async () => {
     const { s, token, step } = await claimWorld({ skillsAllowlist: [] });
     try {
       const res = await pkg(s.app, token, step.step.id);
@@ -978,9 +918,7 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
     }
   });
 
-  test('M8（#1169）：worker 步 skillsAllowlist=null（不限制）→ selection=all 全量清单', async () => {
-    // 失败方式：null 被读成空交集（selection=whitelist + 空清单）→ 不限制
-    // agent 的技能面塌缩成全拒（daemon 物化面）。
+  test('M8 (#1169): a worker step with skillsAllowlist=null (unrestricted) -> selection=all, the full listing', async () => {
     const { s, token, step } = await claimWorld({ skillsAllowlist: null });
     try {
       const res = await pkg(s.app, token, step.step.id);
@@ -993,7 +931,7 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
     }
   });
 
-  test('M8：file 端点原始字节下发——文本逐字节、二进制诚实（非 utf8 不损坏）', async () => {
+  test('M8: the file endpoint serves raw bytes -- text byte for byte, binaries honest (non-utf8 not corrupted)', async () => {
     const root = makeRoot();
     mkdirSync(join(root, 'bin'));
     writeFileSync(join(root, 'bin', 'SKILL.md'), skillMd('bin', '二进制'));
@@ -1006,7 +944,6 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toContain('application/octet-stream');
       expect(Buffer.from(await res.arrayBuffer())).toEqual(png);
-      // 清单侧同真值：sizeBytes/sha256 按盘上原始字节计。
       const manifestRes = await pkg(s.app, token, step.step.id);
       const body = machineSkillsManifestResponseSchema.parse(await manifestRes.json());
       const entry = body.skills[0]!.files.find((f) => f.path === 'assets/logo.png');
@@ -1020,7 +957,7 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
     }
   });
 
-  test('M9：file 端点 404 面——白名单外技能 / 清单外路径（未知文件、目录、符号链接）/ 逃逸形，一律不泄存在性', async () => {
+  test('M9: the file endpoint 404 surface -- skills outside the whitelist / paths outside the listing (unknown file, directory, symlink) / escape forms, none leaks existence', async () => {
     const root = makeRoot();
     for (const name of ['alpha', 'beta']) {
       mkdirSync(join(root, name));
@@ -1034,20 +971,19 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
     const stepId = step.step.id;
     try {
       const cases: [string, string][] = [
-        ['beta', 'SKILL.md'], // 白名单外技能
-        ['alpha', 'no-such.md'], // 清单外未知文件
-        ['alpha', 'refs'], // 目录不是文件
-        ['alpha', 'refs/inner.md/../SKILL.md'], // 穿越形（规范化后也不受理）
-        ['alpha', '../beta/SKILL.md'], // 逃逸技能目录
-        ['alpha', '/etc/hosts'], // 绝对路径
-        ['../alpha', 'SKILL.md'], // dirName 逃逸
-        ['alpha', 'leak.txt'], // 符号链接不入清单（listSkillFiles 语义）
+        ['beta', 'SKILL.md'],
+        ['alpha', 'no-such.md'],
+        ['alpha', 'refs'],
+        ['alpha', 'refs/inner.md/../SKILL.md'],
+        ['alpha', '../beta/SKILL.md'],
+        ['alpha', '/etc/hosts'],
+        ['../alpha', 'SKILL.md'],
+        ['alpha', 'leak.txt'],
       ];
       for (const [dirName, path] of cases) {
         const res = await fileGet(s.app, token, stepId, dirName, path);
         expect(res.status, `${dirName}/${path}`).toBe(404);
       }
-      // 清单内正路照常 200（对照面）。
       const ok = await fileGet(s.app, token, stepId, 'alpha', 'refs/inner.md');
       expect(ok.status).toBe(200);
       expect(Buffer.from(await ok.arrayBuffer()).toString('utf8')).toBe('inner\n');
