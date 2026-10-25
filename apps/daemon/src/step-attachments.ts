@@ -103,17 +103,20 @@ export interface ResolveStepImagesOpts {
   client: AttachmentDownloader;
   materializeDir: string;
   log: (line: string) => void;
+  imageSupport?: boolean | null;
 }
 
 export interface ResolvedStepImages {
   text: string;
   images: DeliveredImage[];
+  skippedNoVision: number;
 }
 
 type Outcome =
   | { kind: 'inline'; anchor: string; image: DeliveredImage }
   | { kind: 'materialized'; note: string }
   | { kind: 'unavailable'; note: string }
+  | { kind: 'noVision'; note: string }
   | { kind: 'untouched' };
 
 interface TokenLine {
@@ -135,11 +138,16 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
   const tokens = tokenLinesOf(lines);
   const bodies = tokens.flatMap((t) => (t === null ? [] : [t.body]));
   const images: DeliveredImage[] = [];
-  if (bodies.length === 0) return { text: opts.text, images };
+  if (bodies.length === 0) return { text: opts.text, images, skippedNoVision: 0 };
   const refs = parseAttachmentTokenLines(bodies.join('\n'));
   const outcomes = new Map<string, Outcome>();
+  let skippedNoVision = 0;
   for (const ref of refs) {
-    const outcome = await resolveOne(ref, opts);
+    const outcome =
+      opts.imageSupport === false && isImageAttachmentExt(ref.ext)
+        ? noVision(ref.key, opts.log)
+        : await resolveOne(ref, opts);
+    if (outcome.kind === 'noVision') skippedNoVision += 1;
     outcomes.set(ref.line, outcome);
     if (outcome.kind === 'inline') images.push(outcome.image);
   }
@@ -166,12 +174,20 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
       outLines.push(line);
     } else if (outcome.kind === 'materialized') {
       emit(outcome.note);
+    } else if (outcome.kind === 'noVision') {
+      outLines.push(line);
+      emit(outcome.note);
     } else {
       outLines.push(line);
       emit(outcome.note);
     }
   }
-  return { text: outLines.join('\n'), images };
+  return { text: outLines.join('\n'), images, skippedNoVision };
+}
+
+function noVision(key: string, log: (line: string) => void): Outcome {
+  log(`attachment not delivered (model does not support images): ${key}`);
+  return { kind: 'noVision', note: `[图片附件 ${key} 未被模型读取 — 该图片未下载]` };
 }
 
 function unavailable(
