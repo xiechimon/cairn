@@ -98,30 +98,23 @@
     },
     {
       "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "ring-1 ring-border [&>svg:first-child]:text-(--card-button)",
+      "anchor": "bg-(--hover-1) font-medium text-foreground [&>svg:first-child]:text-(--card-button)",
       "role": "indicator",
-      "reason": "Active sidebar row icon. DESIGN.md 侧栏: active row = sheet + hairline + accent icon.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
+      "reason": "Active sidebar row icon. DESIGN.md shell: active row = flat --hover-1 fill + accent icon.",
+      "contrast": "measured 2026-10-25 in the fixture build (light / dark): 9.14 / 6.90 on the composited --hover-1 row; non-text glyph, 3:1 gate"
     },
     {
       "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "const RAIL_ACTIVE = `bg-background text-(--card-button)",
+      "anchor": "const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button)",
       "role": "indicator",
       "reason": "Collapsed-rail twin of the active row icon (icon-only rows).",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
+      "contrast": "measured 2026-10-25 in the fixture build (light / dark): same fill as the expanded active row (9.14 / 6.90); non-text glyph, 3:1 gate"
     },
     {
       "file": "apps/web/src/board/sidebar.tsx",
       "anchor": "${RAIL_BTN} text-(--card-button)",
       "role": "indicator",
       "reason": "Rail 新任务 plus glyph. DESIGN.md 侧栏: 新任务 carries a terracotta plus.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
-    },
-    {
-      "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "size-4 flex-none text-(--card-button)",
-      "role": "indicator",
-      "reason": "Expanded 新任务 button plus glyph (DESIGN.md 侧栏 item 2).",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
     },
     {
@@ -158,6 +151,27 @@
       "role": "indicator",
       "reason": "Runtime head 未安装 / 未登录 state = needs you (DESIGN.md: accent only for needs-you); carried with a CircleAlert icon and the label, so the state does not rely on color.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 12px text)"
+    },
+    {
+      "file": "apps/web/src/board/board.tsx",
+      "anchor": "flex-none text-(--card-button)",
+      "role": "action-link",
+      "reason": "Needs-you strip row action (回复/确认计划/审阅/重试): the same accent text action the task card shows, lifted into the strip above the board.",
+      "contrast": "measured 2026-10-25 in the fixture build (light / dark): 12.26 / 6.11 on --card"
+    },
+    {
+      "file": "apps/web/src/board/board.tsx",
+      "anchor": "mt-1.5 block text-right text-meta text-(--card-button)",
+      "role": "action-link",
+      "reason": "Needs-you strip 查看全部 link to the needs-me view.",
+      "contrast": "measured 2026-10-25 in the fixture build (light / dark): 11.07 / 6.97 on --background"
+    },
+    {
+      "file": "apps/web/src/board/board.tsx",
+      "anchor": "<BrandMark className=\"size-5 text-(--card-button)\" />",
+      "role": "indicator",
+      "reason": "Spiral brand mark at the start of the board new-task bar.",
+      "contrast": "measured 2026-10-25 in the fixture build (light / dark): 12.26 / 6.11 on --card; non-text glyph, 3:1 gate"
     }
   ]
 }

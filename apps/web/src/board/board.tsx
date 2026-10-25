@@ -114,19 +114,6 @@ function NeedsYouSummary({ count }: { count: number }) {
   );
 }
 
-function SinceLastSeen({ done, failed }: { done: number; failed: number }) {
-  const { t } = useI18n();
-  if (done === 0 && failed === 0) return null;
-  return (
-    <span
-      data-testid="board-since-last-seen"
-      className="mx-auto block w-full max-w-190 px-4 pt-2 text-right text-meta text-content-tertiary"
-    >
-      {t('上次查看后：{done} 个完成，{failed} 个新失败', { done, failed })}
-    </span>
-  );
-}
-
 function NeedsYouStrip({
   todos,
   projectNames,
@@ -351,20 +338,27 @@ export function BoardSurface({
 
       {banner != null && <div className="flex-none px-[17px] pt-3">{banner}</div>}
       {onNewTask != null && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           data-testid="board-new-task-bar"
-          className="board-new-task-bar mx-auto mt-3 flex h-11 w-full max-w-190 items-center gap-3 rounded-(--radius-composer) bg-card px-3.5 text-left text-ui text-content-tertiary shadow-(--shadow-composer) transition-[box-shadow] duration-(--dur-fast) ease-(--ease-standard) hover:shadow-(--shadow-composer-hover)"
+          className="board-new-task-bar mx-auto mt-3 flex h-11 w-full justify-start font-normal hover:bg-card hover:text-content-tertiary dark:hover:bg-card active:not-aria-[haspopup]:translate-y-0 max-w-190 items-center gap-3 rounded-(--radius-composer) bg-card px-3.5 text-left text-ui text-content-tertiary shadow-(--shadow-composer) transition-[box-shadow] duration-(--dur-fast) ease-(--ease-standard) hover:shadow-(--shadow-composer-hover)"
           onClick={onNewTask}
         >
           <BrandMark className="size-5 text-(--card-button)" />
           <span className="min-w-0 flex-1 truncate">{t('新任务：接下来让 agent 做什么？')}</span>
           <Kbd>C</Kbd>
-        </button>
+        </Button>
       )}
       {onlyColumn == null && (
         <>
-          <SinceLastSeen done={sinceLastSeen.done} failed={sinceLastSeen.failed} />
+          {(sinceLastSeen.done > 0 || sinceLastSeen.failed > 0) && (
+            <span
+              data-testid="board-since-last-seen"
+              className="mx-auto block w-full max-w-190 px-4 pt-2 text-right text-meta text-content-tertiary"
+            >
+              {t('上次查看后：{done} 个完成，{failed} 个新失败', sinceLastSeen)}
+            </span>
+          )}
           <NeedsYouStrip
             todos={attentionTodos}
             projectNames={fixture.projectNames}
