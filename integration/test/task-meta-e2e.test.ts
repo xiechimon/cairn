@@ -52,7 +52,7 @@ beforeAll(async () => {
   });
   projectId = (project.body as { id: string }).id;
   browser = await chromium.launch();
-  page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
+  page = await browser.newPage({ viewport: { width: 1440, height: 732 }, locale: 'zh-CN' });
 }, 180_000);
 
 afterAll(async () => {

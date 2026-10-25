@@ -303,7 +303,7 @@ beforeAll(async () => {
     throw new Error(`enroll → ${res.status} ${JSON.stringify(body)}`);
   machineToken = body.token;
   browser = await chromium.launch();
-  page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
+  page = await browser.newPage({ viewport: { width: 1440, height: 732 }, locale: 'zh-CN' });
 }, 300_000);
 
 afterAll(async () => {

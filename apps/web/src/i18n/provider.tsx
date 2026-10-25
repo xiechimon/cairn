@@ -22,10 +22,16 @@ interface I18nValue {
 
 const I18nContext = createContext<I18nValue | null>(null);
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  // #1091：获取点走安全缝——provider 在整棵树的根部，这里的裸 `localStorage`
-  // 实参在 Storage 不可用环境会让首渲染抛错、全树卸载（白屏），不是组件级错误。
-  const [locale, setLocaleState] = useState<Locale>(() => readStoredLocale(safeLocalStorage()));
+export function I18nProvider({
+  children,
+  initialLocale,
+}: {
+  children: ReactNode;
+  initialLocale?: Locale;
+}) {
+  const [locale, setLocaleState] = useState<Locale>(
+    () => initialLocale ?? readStoredLocale(safeLocalStorage()),
+  );
   const setLocale = useCallback((next: Locale) => {
     persistLocale(next, safeLocalStorage());
     applyLocaleLang(next);
