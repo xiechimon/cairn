@@ -34,6 +34,7 @@
 - **No inline imports** (`await import()`, `import("pkg").Type`, dynamic type imports); top-level only.
 - `apps/daemon/src/backend/` is the GitOps / MCP / LLM provider seam; other modules import it as an interface boundary and must not reach around it.
 - **Ask first** before removing a feature or code that looks intentional.
+- Before offering or estimating a move or rename of a path, grep every consumer of that path (product code, agent prompts, CI, skills, generators) and price the option from that list.
 
 ## Commands
 
@@ -94,6 +95,7 @@ Commit conventions:
 
 Worktrees (cairn is designed for many lanes, hence the emphasis):
 - **Create worktrees with absolute paths**: `git worktree add "$(git rev-parse --show-toplevel)/.claude/worktrees/<name>"` (run from the main checkout). A relative path plus cwd drift (after a heredoc or `cd`) nests the worktree inside `apps/web/src/.claude/worktrees/`, where the vite watcher triggers a reload storm that kills the dev server.
+- **A new worktree has no git hooks until husky runs in it**: `core.hooksPath` is the relative `.husky/_`, which `pnpm install` generates through the `prepare` script. After `pnpm install --ignore-scripts` (or no install), git finds no hooks and `git push` skips `pnpm prepush` without a word. Run `pnpm exec husky` in the worktree before the first commit, and check that `.husky/_/pre-push` exists.
 - Branch lanes from `origin/main` (local main is often behind). When PRs collide on merge order, merge only when GitHub reports CLEAN; on conflict, rebase and re-verify.
 - **Commit before handing off mid-task** (an M7 lesson): before a worktree changes hands (main line ↔ lane or lane ↔ lane), commit what you have. Uncommitted work gets overwritten by the next person's `merge --abort` or merge attempt and cannot be recovered (during the M7 merge phase, one round of drizzle conflict resolution for #309 was lost this way).
 - **Drizzle migration numbering**: concurrent tickets that add tables will collide on sequence numbers. The number is always taken from the tail of main **at merge time**; lanes do not reserve a fixed number during development (tickets do not hard-code it), and on conflict at merge time renumber to main's tail + 1.

@@ -516,7 +516,7 @@ describe('M5 web E2E：主时序全链（01 §7.4 脊柱，UI 零 reload）', ()
     // 00/15/30/45）→ 保存。#946/#910 载体：顶栏动作/弹层/频率 tab/保存走
     // role+文案语义位（类名别名退役面）。
     await page.goto(`${server.url}/app/schedules`);
-    await page.getByRole('button', { name: '新建', exact: true }).click();
+    await page.getByRole('button', { name: '新建定时', exact: true }).click();
     await pexpect(page.getByRole('dialog', { name: '新建定时' })).toBeVisible();
     // 频率分段 = SegmentedRadio（选一个存下来的值）：载体 role=radio（集成层
     // 同 PR 迁移，#735 教训）。

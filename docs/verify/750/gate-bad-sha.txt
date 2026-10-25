@@ -1,4 +1,0 @@
-pr-evidence: scanned 1 image link(s)
-FAIL unreachable (HTTP 404): [screenshot](https://raw.githubusercontent.com/xiechimon/pacman/0000000000000000000000000000000000000000/docs/verify/308/2026-09-28T08-59-10-880Z-stop-button/00-detail-fresh.png)
-pr-evidence: RED (1 problem(s))
-exit=1

@@ -66,6 +66,10 @@ const BOARD = [
   'live-project-name',
   'shadcn-primitives',
   'storage-unavailable',
+  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
+  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
+  // chief FAB/drawer, search panel, dialogs.
+  'mobile-narrow',
 ];
 const SIDEBAR = [
   'sidebar-',
@@ -84,6 +88,10 @@ const SIDEBAR = [
   'registry-focus-ring',
   'shadcn-primitives',
   'storage-unavailable',
+  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
+  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
+  // chief FAB/drawer, search panel, dialogs.
+  'mobile-narrow',
 ];
 const DETAIL = [
   'detail-',
@@ -131,6 +139,10 @@ const DETAIL = [
   'spec-flow',
   'thinking-row-truncate',
   'hotkeys-ready',
+  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
+  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
+  // chief FAB/drawer, search panel, dialogs.
+  'mobile-narrow',
 ];
 // #1428: one ring per edge — the chief window and the FAB are probed there.
 const CHIEF = [
@@ -143,6 +155,10 @@ const CHIEF = [
   'storage-unavailable',
   'z-ladder',
   'hotkeys-ready',
+  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
+  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
+  // chief FAB/drawer, search panel, dialogs.
+  'mobile-narrow',
 ];
 const AGENT = ['agent-', 'team-create-agent', 'registry-focus-ring', 'resource-back-spa'];
 const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models'];
@@ -181,6 +197,10 @@ const OVERLAYS = [
   'live-agent-model-line',
   'live-project-name',
   'shadcn-primitives',
+  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
+  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
+  // chief FAB/drawer, search panel, dialogs.
+  'mobile-narrow',
 ];
 const PAGES = [
   'project-',
@@ -196,6 +216,10 @@ const PAGES = [
   'page-scroll',
   'registry-focus-ring',
   'resource-back-spa',
+  // #1684: the narrow-screen (360/390px) walkthrough spec rides every
+  // chrome family — board topbar/sidebar, shell pages, detail head/composer,
+  // chief FAB/drawer, search panel, dialogs.
+  'mobile-narrow',
 ];
 const RESOURCES = [
   'machine-',

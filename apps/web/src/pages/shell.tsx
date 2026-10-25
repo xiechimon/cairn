@@ -124,7 +124,7 @@ export function PageShell({
             {bleed ? (
               children
             ) : (
-              <div data-testid="page-col" className="mx-auto w-192 pt-4">
+              <div data-testid="page-col" className="mx-auto w-192 max-w-full pt-4">
                 {children}
               </div>
             )}

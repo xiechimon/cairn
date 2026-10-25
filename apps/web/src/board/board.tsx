@@ -312,7 +312,7 @@ export function BoardSurface({
   return (
     <div className="board-main relative flex min-w-0 flex-1 flex-col">
       <header className="board-topbar flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap">
-        <h1 className="flex-none font-heading text-page font-medium text-foreground">
+        <h1 className="board-topbar-title flex-none font-heading text-page font-medium text-foreground">
           {t('工作台')}
         </h1>
         <NeedsYouSummary count={viewTodos('pending').length} />
@@ -326,7 +326,7 @@ export function BoardSurface({
           <Button
             variant="ghost"
             size="sm"
-            className={TOPBAR_TEXT_BUTTON}
+            className={`board-topbar-schedule ${TOPBAR_TEXT_BUTTON}`}
             render={<Link to={{ pathname: '/app/schedules', search }} />}
           >
             <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />

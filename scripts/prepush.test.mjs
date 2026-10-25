@@ -105,6 +105,20 @@ test('local gates default their base to the merge-base, not the moving origin/ma
     );
 });
 
+test('affected e2e gets only code paths, so a bulk evidence prune fits on the command line', () => {
+  const evidence = Array.from({ length: 5000 }, (_, i) => `docs/verify/${i}/shot.png`);
+  const e2e = (paths) =>
+    prepushPlan(paths)
+      .filter((args) => args.includes('e2e:affected'))
+      .map((args) => args.join(' '));
+  assert.deepEqual(e2e([...evidence, 'scripts/evidence-prune.mjs']), [
+    'pnpm --filter @cairn/web e2e:affected -- scripts/evidence-prune.mjs',
+  ]);
+  assert.deepEqual(e2e([...evidence, 'README.md', '.github/workflows/ci.yml']), [
+    'pnpm --filter @cairn/web e2e:affected -- .github/workflows/ci.yml',
+  ]);
+});
+
 test('e2e coverage check passes on the real suite and names an unmapped spec', () => {
   const ciCommands = prepushPlan(['apps/web/src/main.tsx'], 'ci').map((args) => args.join(' '));
   assert.ok(ciCommands.includes('node scripts/e2e-affected.mjs --check-coverage'));

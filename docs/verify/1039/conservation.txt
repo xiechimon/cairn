@@ -1,4 +1,0 @@
-input chunks: skill=34, map-unique=13, micro=2 (map fragments total=24)
-output: 40 files, 49 sections
-CONSERVATION PASS: every original chain chunk appears exactly once as a section body on disk
-POINTER PASS: both files carry 变更历史 pointer; no Last updated / 前序 tokens remain

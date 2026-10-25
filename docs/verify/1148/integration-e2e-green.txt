@@ -1,9 +1,0 @@
-
- RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0290-1148-daemon-chief-pacman-port-base-env/integration
-
-
- Test Files  1 passed (1)
-      Tests  3 passed (3)
-   Start at  22:29:52
-   Duration  15.07s (tests 92%, import 5%, transform 3%)
-

@@ -1,7 +1,0 @@
-now=2026-10-11T08:14:52.610197000Z (claim 08:13:36 +60s)
-id|kind|status|machineId|checkpointCommit|beat
-TtN_wZrvyJjn9dmOOlOuP|plan|done|DHS9BRFaSnKYVHx38VyOm|f6285e881b135a0d14054975f9d9b57735e6bdd2|2026-10-11 08:07:38
-L3_QTJec_jboloLB8PPir|build|done|DHS9BRFaSnKYVHx38VyOm|f6285e881b135a0d14054975f9d9b57735e6bdd2|2026-10-11 08:14:08
-origin conv tip pre-freeze:
-f6285e881b135a0d14054975f9d9b57735e6bdd2	refs/heads/pacman/conv-01a129ff-6c0f-7847-9c59-27693d47ece3
-=== FREEZE leg6 at 2026-10-11T08:15:00.047661000Z ===

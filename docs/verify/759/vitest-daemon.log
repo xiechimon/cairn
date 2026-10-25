@@ -1,9 +1,0 @@
-
- RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0136-759/apps/daemon
-
-
- Test Files  2 passed (2)
-      Tests  27 passed (27)
-   Start at  11:58:37
-   Duration  1.70s (import 50%, tests 31%, transform 19%)
-

@@ -1,10 +1,3 @@
-// 客户端状态——02 §6.4：localStorage 键名清单 r2 §1.5 实测，直接作复刻契约
-// （键名前缀 = 品牌位，brand.ts localStoragePrefix 槽）。
-// 命名规范（r2 §1.5 要点，原形 `tds.cache.<entity>-v<N>:<scope…>`），scope 为
-// userId/teamId 组合 → cache-first + 版本化 + 多租户分片。
-// 替换相位（D3 已触发 2026-09-23，#109）：`cairn-` / `cairn.` 同形替换
-// （素材替换计划 §2）；source 列 = r2/r5 观测出处（原键形证据）。
-
 export interface ClientStateKey {
   readonly key: string;
   readonly valueShape: string;
@@ -78,13 +71,8 @@ export const LOCAL_STORAGE_KEYS: readonly ClientStateKey[] = [
   },
 ];
 
-/** 缓存键命名规范（r2 §1.5 要点原文形状）。 */
 export const CACHE_KEY_PATTERN = '<brand>.cache.<entity>-v<N>:<scope…>';
 
-/** 非品牌第三方键（r2 §1.5 实测同表）：复刻处置各归其面——
- * nextauth.message = todos.dev 认证库痕迹，复刻无 auth 库（01 §4.2 认证行：
- * httpOnly cookie 自设），处置归 M2 [推断]；mp_ 与 __mpq_ 前缀族 = 埋点，
- * 复刻埋点端点可空实现（02 §6.1）。 */
 export const THIRD_PARTY_CLIENT_KEYS = [
   {
     key: 'nextauth.message',

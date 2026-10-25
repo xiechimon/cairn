@@ -1,22 +1,9 @@
-// 技能注入三前置条件的机器断言（#1186）。判定源 = 授权面（skillsAllowlist /
-// defaultSkill）× 实际注入名集（scan + 字节预算之后）× 技能事实
-// （classifySkillFact）。期望声明（「这张票应该用技能 X」）不在本层。
-// 失败方式枚举见 test/skill-injection-check.test.ts（A1–A12、F1）。
-//
-// 红 = 授权面与实际注入互相矛盾。黄 = 授权且已注入，但模型一次都没用。
-// 黄不得升红。断言不改步结果、不改 deny 语义（#1169：null 不限制、[] 显式
-// 全拒、数组白名单）。
-
 import { z } from 'zod';
 import type { ToolCallRecord } from './agent-backend.js';
 import { classifySkillFact, type SkillFact } from './skill-facts.js';
 
-/** 落库 system 行 kind。web mapper 对未知 system kind 退场，不渲染成裸 JSON。 */
 export const SKILL_INJECTION_CHECK_KIND = 'skill_injection_check';
 
-/** 目录构造之后的名集：injected = 进了 catalog 的名字；omitted = 字节预算
- * 丢掉的全名（不是日志 100 名截断）；unrendered = disableModelInvocation
- * 有意不渲染的名字（不是故障）。 */
 export interface SkillsInjectionNames {
   injected: string[];
   omitted: string[];
@@ -49,10 +36,8 @@ export interface SkillInjectionVerdict {
 }
 
 export interface SkillInjectionInput {
-  /** null = 不限制；[] = 显式全拒；数组 = 白名单。 */
   skillsAllowlist: readonly string[] | null;
   defaultSkill: string | null;
-  /** undefined = 没有选择收窄（chief / 旧 server 未携带 skillInjection）。 */
   requested: readonly string[] | undefined;
   names: SkillsInjectionNames;
   facts: readonly SkillFact[];
@@ -155,8 +140,6 @@ function asToolCall(value: unknown): ToolCallRecord | null {
   };
 }
 
-/** transcript 行 → 技能事实。行形 = `{kind:'toolcall', call}` 对象，或该
- * 对象的 JSON 串（daemon 上传与 system 行两种落库形）。非工具行跳过。 */
 export function skillFactsFromContents(contents: readonly unknown[]): SkillFact[] {
   const facts: SkillFact[] = [];
   for (const content of contents) {

@@ -1,7 +1,0 @@
-scenario: an unavailable base sha exits 2 instead of quietly gating against the branch-supplied baseline
-scratch worktree: /tmp/debt-gate-851-scenarios @ dcf0115
-
-$ node scripts/ui-debt-gate.mjs --base 0000000000000000000000000000000000000000
-[ui-debt-gate] D4 base sha 0000000000000000000000000000000000000000 is not available locally; fetch it first (CI: git fetch --depth=1 origin <sha>). Refusing to fall back to the branch baseline.
-exit=2
-

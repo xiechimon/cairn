@@ -1,3 +1,0 @@
-[skills] filtered: unauthorized-skill not in agent allowlist
-[skills] cap: description truncated for longdesc
-[skills] loaded: 4 skills from /tmp/pacman-923-skills

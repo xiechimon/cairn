@@ -1,5 +1,0 @@
-{
-  "chip": "执行中",
-  "reused": true,
-  "tail": "readme): append r7 rebaseline probe line），本次 commit message 使用 docs(readme): append r8 probe manual-revision line。 验证 执行 cat README.md 或 tail -1 README.md，确认最后一行为 r8 probe manual-revision。 执行 git diff README.md，确认只新增了一行 +r8 probe manual-revision，没有改动其他内容。\n完成\n运行在 xmonsMac-3574.local 上\n确认\n1s\n连接机器...\n1"
-}

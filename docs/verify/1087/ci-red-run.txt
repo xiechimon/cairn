@@ -1,7 +1,0 @@
-# CI red run (the planted-probe commit 023ebcd6): diagram-text-fit job log
-# run: https://github.com/xiechimon/pacman/actions/runs/37886450963
-
-diagram-text-fit	Check diagram label text fit (docs/verify/**/*.drawio.svg)	2026-10-09T04:59:49.8249008Z FAIL docs/verify/1087/red-probe.drawio.svg: needs 129.6px in a 58.0px box (9 lines @ 12.0px): 'spec hook: dialog.locator(\'[role="listbox"][aria-label="时"]\')→ matches'
-diagram-text-fit	Check diagram label text fit (docs/verify/**/*.drawio.svg)	2026-10-09T04:59:49.8250615Z FAIL docs/verify/1087/red-probe.drawio.svg: needs 273.6px in a 58.0px box (19 lines @ 12.0px): 'old compound hook dialog.locator(\'[role="listbox"][aria-label="时"]\')→ '
-diagram-text-fit	Check diagram label text fit (docs/verify/**/*.drawio.svg)	2026-10-09T04:59:49.8252003Z FAIL docs/verify/1087/red-probe.drawio.svg: needs 273.6px in a 74.0px box (19 lines @ 12.0px): "repinned (#1075's new paradigm, same law as m5-web-e2e):dialog button["
-job conclusion: fail

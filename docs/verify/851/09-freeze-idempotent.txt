@@ -1,8 +1,0 @@
-scenario: re-freezing an unchanged tree reports no numeric change
-scratch worktree: /tmp/debt-gate-851-scenarios @ dcf0115
-
-$ node scripts/ui-debt-gate.mjs --write
-[ui-debt-gate] baseline frozen: 20 per-face css files / 11412 lines; 76 bare control(s) in 30 file(s). Written to scripts/ui-debt-baseline.json.
-[ui-debt-gate] no numeric change vs previous baseline.
-exit=0
-

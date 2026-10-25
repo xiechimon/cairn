@@ -390,3 +390,47 @@
     border-color: transparent;
   }
 }
+
+@media (max-width: 640px) {
+  .board-sidebar--collapsed {
+    width: 48px;
+  }
+  .rail-row {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .board-topbar-title,
+  .board-topbar-schedule {
+    display: none;
+  }
+  .board-topbar button {
+    min-height: 44px;
+  }
+
+  [data-testid="page-topbar"] :is(button, a) {
+    min-height: 44px;
+  }
+  .detail-head :is(button, a) {
+    min-height: 44px;
+  }
+
+  .composer-tool,
+  .composer-send,
+  .composer-stop,
+  .chat-copy {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .chief-fab {
+    min-width: 44px;
+    min-height: 44px;
+    right: max(0.5rem, env(safe-area-inset-right));
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  .chief-drawer {
+    right: max(0.5rem, env(safe-area-inset-right));
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+}

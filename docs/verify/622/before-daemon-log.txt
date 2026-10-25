@@ -1,9 +1,0 @@
-[pacman] Proxy: http://127.0.0.1:7890
-Loading pi runtime…
-Enrolled in team PcYupj8XGvDEY8phHboa9 (machine x4OirdO2xP82xLRPHf6G4)
-claim step=qUJtKwsHSDhAoCrPuAGXO
-using model claude-code/sonnet
-[workspace] 准备工作区...
-[workspace] Cloning /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-622-user-ILWL3M/repo (branch: main)
-[workspace] Worktree added (pacman/conv-01a0fbf7-ba2a-7cb0-afb7-7778a50f1c38 from origin/main)
-[step] failed: model claude-code/sonnet not found

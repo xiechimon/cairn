@@ -1,2 +1,0 @@
-
-148 targets compared across 30 views; 0 diff(s), 458 pixel-verified-inert.

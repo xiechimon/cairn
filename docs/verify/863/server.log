@@ -1,8 +1,0 @@
-[06:10:49] INFO (49299): attachment gc: 0 pending, 0 orphan, 0 bytes reclaimed
-    pending: 0
-    orphan: 0
-    reclaimedBytes: 0
-[06:10:49] INFO (49299): pacman-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 pacman start --api-key <key> --team <teamId>
-    port: 8795
-    dataDir: "/tmp/pacman-t2-863/server-home-3/server"
-    teamId: "Axz7zTTDnVFDOkwv3Ud5o"

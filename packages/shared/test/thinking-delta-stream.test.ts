@@ -1,7 +1,3 @@
-// #1308：会话流要能携带 thinking_delta，载荷与 text_delta 同形
-// { type:'thinking_delta', text }。修前 discriminated union 没有这一支，
-// safeParse 失败，思考正文进不了会话流。
-
 import { describe, expect, it } from 'vitest';
 import {
   conversationStreamEventSchema,

@@ -19,10 +19,6 @@
 //   - 覆盖层 chip 留 Task 6（detail 渲染面），此处只接管"选文件→返回 token"
 //     的 wire，不动 textarea 几何
 //
-// #304（08 册 C5 裁决）:语音输入功能不做——原站工具条首钮(语音)移除
-// 不渲染,wontfix 理由 = local-first 无语音输入面;#146 chief 面
-// 同律先例;Mic 图标随之出账(generate-icons PRUNED)。
-//
 // #311: the 提及 button now opens a MentionPicker popover and the
 // textarea tracks `@`-prefixed token positions to expose an inline
 // agents-only listbox (r9 §3.2). Both paths route through

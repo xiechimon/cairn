@@ -1,52 +1,26 @@
-// verify 步数据形态（#1250 / ADR 0018 层 1）：Verifier persona 的输入材料
-// 组装与终轮 JSON verdict。与 records/review.ts 同族——server 组装材料、
-// daemon 收尾时从会话末轮提取 verdict 回传（machineDoneBody.verifyVerdict）。
-// 与 review 的分野：agent 不走 prompt meta header（verify 步走 assignment.verify
-// 槽，与 plan/build 同形——ADR 0018 决策 1）；工作区不是只读检出而是会话分支
-// 的可写工作区（证据包要提交进 docs/verify/ 并回贴 PR body）。
-
 import { z } from 'zod';
 import type { DocumentDiffFile } from './document-diff.js';
 
-/** 单条证据条目（verdict.evidence）：路径 + 可选说明。path = 证据包内相对
- * 仓根的文件路径（如 docs/verify/1250/e2e.json）。 */
 export const verifyEvidenceSchema = z.object({
   path: z.string().min(1),
   note: z.string().optional(),
-  /** 对应方案 Verification 清单的第几项（从 1 起，#1492）。缺省 = 老 verdict
-   *  或无清单任务，不对应具体清单项。 */
   item: z.coerce.number().int().min(1).optional(),
 });
 export type VerifyEvidence = z.infer<typeof verifyEvidenceSchema>;
 
-/** 验证结论（agent 终轮输出）：pass/fail + 一段总结 + 证据条目清单。 */
 export const verifyVerdictSchema = z.object({
-  /** 本轮交付是否通过验证（如实报——失败是有效结论，不是本步的错误）。 */
   passed: z.boolean(),
-  /** 一段总结：跑了什么、对账结果（CI / PR body / 证据包）。 */
   conclusion: z.string(),
-  /** 证据条目（缺省 = 无证据——「跑过但零产物」按未通过处理由人裁量）。 */
   evidence: z.array(verifyEvidenceSchema).default([]),
 });
 export type VerifyVerdict = z.infer<typeof verifyVerdictSchema>;
 
-/** verify 步 prompt（server 组装单源；agentId 不在 prompt 里——assignment 槽
- * 承载）。材料 = 任务文本 + 方案全文 + 交付面（PR）+ 变更概览（审核关口可
- * 得时）。工作区段如实：会话分支的可写检出（证据要提交推送），与 review 步
- * 的只读检出段（records/review.ts CHECKOUT_SECTION）刻意不同。 */
 export function buildVerifyStepPrompt(args: {
-  /** 证据包目录的票号段（github 关联任务 = issue 号；否则 todo seqNum）。 */
   ticketRef: string;
-  /** 任务文本（title+spec，buildTaskPromptText 同形由调用方组装）。 */
   taskText: string;
-  /** 方案全文（无方案轮传空串——直执行任务照常可验）。 */
   planText: string;
-  /** 方案 Verification 清单（#1492，plan.ts planVerificationItems 解析）。缺省或
-   *  空 = 无清单（直执行任务、老方案），不出清单段。 */
   verificationItems?: readonly string[];
-  /** 本轮交付的 PR（无 PR 传 null——hosted/local 形态如实说明）。 */
   pr: { number: number; url: string | null } | null;
-  /** 变更面（审核关口可得时传；单文件级 diff 概览）。 */
   changes?: readonly DocumentDiffFile[];
 }): string {
   const prSection =
@@ -113,16 +87,11 @@ export function buildVerifyStepPrompt(args: {
   return sections.join('\n');
 }
 
-/** 清单对账（#1492，server 收尾时调用）：方案有 Verification 清单时，清单里
- *  每一项都要有 evidence 对应（item 序号）；缺证据的项点名进结论、passed 置
- *  false——Verifier 漏验不能以「通过」落进合并闸。无清单 = 原样返回。 */
 export function reconcileVerifyVerdict(
   verdict: VerifyVerdict,
   items: readonly string[],
 ): VerifyVerdict {
   if (items.length === 0) return verdict;
-  // 版本墙：证据一条都没带序号 = 旧 daemon（schema 剥掉了 item）或 agent 没按
-  // 清单编号——无从逐项对账，如实写明，不替它判失败（hasChanges 缺省同律 fail-open）。
   if (!verdict.evidence.some((e) => e.item !== undefined)) {
     return { ...verdict, conclusion: `证据未按清单编号，未逐项对账。${verdict.conclusion}` };
   }

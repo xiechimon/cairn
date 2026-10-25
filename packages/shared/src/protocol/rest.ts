@@ -1,20 +1,11 @@
-// web 协议面 REST 词表——02 §6.1（观测清单原样；`{id}` 归一；复刻全实现）+
-// 02 各节回填补项（§4.3 chief、§4.4 memories、§6.3 search [设计]）+ r5 §8
-// 端点补录。机器面 13 端点见 protocol/machine-api.ts；SSE 三通道见
-// protocol/sse.ts。
-// DELETE 面：r3 未逐一抓取——[推断] REST 同名 DELETE（02 §6.1），以 r2 §6 UI
-// 删除流为准补齐，不发明新路径；M2 实现期重放补采（04 册附录 A）。
-
 export interface RestEndpoint {
   readonly method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly path: string;
-  /** 查询参数词表（02 §6.1 `?…=` 归一）。 */
   readonly query?: readonly string[];
   readonly note?: string;
 }
 
 export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
-  // —— GET（02 §6.1 观测清单原样）——
   { method: 'GET', path: '/api/auth/session', note: '保形返回 seed 用户（02 §2.1）' },
   { method: 'GET', path: '/api/user/me' },
   { method: 'GET', path: '/api/teams', note: '恒 seed 一行（02 §2.2）' },
@@ -85,7 +76,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   },
   { method: 'GET', path: '/api/whats-new', note: '形状保留、内容自选（02 §6.1）' },
   { method: 'GET', path: '/api/search', query: ['q'], note: '⌘K [设计] 自设（02 §6.3）' },
-  // —— POST ——
   {
     method: 'POST',
     path: '/api/projects/{id}/todos',
@@ -104,8 +94,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'POST', path: '/api/builds/{id}/merge', note: '→ 202 {delegated:true}（r3 §3.6）' },
   { method: 'POST', path: '/api/builds/{id}/steps', note: '确认/驳回回路（02 §4.2/r5 §4）' },
   { method: 'POST', path: '/api/teams/{id}/providers' },
-  // spec 13（#368）复刻面分歧：MCP 改本地 config 只读制，管理写端点
-  // （POST/PATCH/DELETE）已从 app 撤除；本行 = 原产品观测记录保留。
   { method: 'POST', path: '/api/teams/{id}/mcp-servers' },
   { method: 'POST', path: '/api/teams/{id}/agents', note: '→ 201 {id}（r5 §1/§8 补录）' },
   {
@@ -136,12 +124,9 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/_mp/api/track',
     note: '埋点端点（r3 §8.2 PostHog 风格 base64 batch）；复刻可空实现（02 §6.1）',
   },
-  // —— PATCH ——
   { method: 'PATCH', path: '/api/teams/{id}/providers/{pid}' },
   { method: 'PATCH', path: '/api/teams/{id}/agents/{aid}' },
   { method: 'PATCH', path: '/api/teams/{id}/chief', note: '绑定 Agent（r5 §2 抓包）' },
-  // —— OAuth 握手面（#231 [设计]：todos.dev 此面 wire 未采；形状 = 授权 URL
-  // 签发 + callback 收码 302 回跳，族表 = records/provider.ts OAUTH_FAMILIES）——
   {
     method: 'POST',
     path: '/api/teams/{id}/providers/oauth/{preset}/authorize',
@@ -155,37 +140,22 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   },
 ];
 
-/** DELETE 面规则（02 §6.1 [推断]）：同名 REST DELETE；资源面 = r2 §6 UI 删除流
- * + chief 组织工具词（r5 §3.1 delete_todos/delete_secrets/delete_agents/
- * unschedule_todo）。不发明新路径；M2 重放补采后收紧。
- * skills 已出列（spec 13 #367：技能 = 本地目录只读投影，删除 = 删目录，
- * 无 REST 删除面）。 */
 export const DELETE_FACE = {
   status: '[推断]',
   rule: 'REST 同名 DELETE（02 §6.1）',
   resources: [
-    'teams/{id}/machines', // 移除机器（r3 §1.2 限额弹窗「请移除一台」）
-    'teams/{id}/agents/{aid}', // 删除 Agent（r3 §4 概览按钮入口；确认文案与删除
-    // 语义 XMON-19 直读原版产线 bundle + todos.dev 官方 docs 补采——canon 见
-    // services/agents.ts 注记）
-    'teams/{id}/skills', // 技能删除流（r2 §6.1）；spec 13 #367 复刻面已撤管理写面——观测记录保留
-    'teams/{id}/mcp-servers', // 卡片更多菜单 编辑/删除（r3 §5.1）；spec 13 #368 复刻面已撤管理写面——观测记录保留
-    'teams/{id}/agents/{aid}/memories', // 记忆条目卡删除图标（r5 §6 UI 实测；02 §4.4「列表/删除 API 保形」）
-    'teams/{id}/providers', // 「可以替换或删除」（r2 §6.5）
-    'teams/{id}/secrets', // 「保存后只能覆盖或删除」（r2 §6.3）
-    'todos', // delete_todos（r5 §3.1）
-    'schedules', // unschedule_todo（r5 §3.1）；once 触发后自动出队（r3 §9）
+    'teams/{id}/machines',
+    'teams/{id}/agents/{aid}',
+    'teams/{id}/skills',
+    'teams/{id}/mcp-servers',
+    'teams/{id}/agents/{aid}/memories',
+    'teams/{id}/providers',
+    'teams/{id}/secrets',
+    'todos',
+    'schedules',
   ],
 } as const;
 
-/** 复刻不实现的观测端点（divergence 登记，wire diff 白名单化用，04 §1/§3）。
- * /api/push = todos.dev Web Push 订阅上传（r5 §1 实测 400）；R1 终裁：
- * Web Push/VAPID 不进 spec，sw.js push handler 保留文件形状、服务端不投
- * push（02 §9.1、04 §5）。
- * （POST /api/skills 曾为 spec 13 #367 的有意 divergence：技能改本地目录
- * 只读投影、无上传面；XMON-109 回摆——写路径进 scope，端点回到词表
- * WEB_REST_ENDPOINTS，本登记出列。POST /api/skills/scan 曾为 #223 [设计]
- * 自设端点，非观测词表成员，已删不入本登记。） */
 export const NON_REPLICATED_ENDPOINTS = [
   {
     method: 'POST',

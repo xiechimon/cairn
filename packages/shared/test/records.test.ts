@@ -1,9 +1,3 @@
-// Record-schema seam: every schema must accept the verbatim wire samples
-// observed in the research canon (r3/r5/r2 as cited per case) and reject
-// values outside the canonical vocabulary. Sample values are the real
-// observed ones (team BoZYfvqKSGanlxsXVbXSa, machine TlZ2sSD4EJCxjNJqVhdo_,
-// conv 01a0b86f-…, gateway r3-gw) with credentials形态-only per r3 §0 hygiene.
-
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_TOOL_COPY,
@@ -74,7 +68,7 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
     expect(todoRecordSchema.parse(sample)).toEqual(sample);
   });
 
-  it('来源两列（#446 / ADR 0005 D6）：github-issue + 引用串过闸，未知种类拒', () => {
+  it('two source columns (#446 / ADR 0005 D6): github-issue + reference string pass, unknown kinds rejected', () => {
     const imported = {
       ...sample,
       sourceKind: 'github-issue',
@@ -85,32 +79,29 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
     expect(githubIssueSourceRef('octo', 'alpha', 7)).toBe('github:octo/alpha#7');
   });
 
-  it('编排来源（#640 / r14 §5.3）：orchestration 过闸 + chief ref 严格互逆', () => {
+  it('orchestration source (#640 / r14 §5.3): orchestration passes + chief ref strictly mutual', () => {
     const dispatched = {
       ...sample,
       sourceKind: 'orchestration',
       sourceRef: 'chief:01a0b86f-04f9-72a8-bba4-75c5cfd6598f',
     };
     expect(todoRecordSchema.parse(dispatched)).toEqual(dispatched);
-    // 单源格式：写入面 = chief 线程 id 剥前缀加 scheme；解析面严格互逆。
     expect(orchestrationSourceRef('chief-01a0b86f-04f9-72a8-bba4-75c5cfd6598f')).toBe(
       'chief:01a0b86f-04f9-72a8-bba4-75c5cfd6598f',
     );
     expect(parseOrchestrationSourceRef('chief:01a0b86f-04f9-72a8-bba4-75c5cfd6598f')).toEqual({
       threadId: 'chief-01a0b86f-04f9-72a8-bba4-75c5cfd6598f',
     });
-    // 非 chief 线程 id 拒写（防裸 uuid / build id 混入格式位）。
     expect(() => orchestrationSourceRef('01a0b86f-04f9-72a8-bba4-75c5cfd6598f')).toThrow();
-    // 畸形 ref 降级 null（scheme 错 / 空段），github 形不串档。
     expect(parseOrchestrationSourceRef('github:octo/alpha#7')).toBeNull();
     expect(parseOrchestrationSourceRef('chief:')).toBeNull();
   });
 
-  it('rejects the作废 exec猜测 (r3 §3.0 正名 building)', () => {
+  it('rejects the retired exec guess (r3 §3.0 renamed building)', () => {
     expect(todoRecordSchema.safeParse({ ...sample, phase: 'exec' }).success).toBe(false);
   });
 
-  it('parses the create body verbatim (r3 §3.1 抓包 {title, spec})', () => {
+  it('parses the create body verbatim (r3 §3.1 capture {title, spec})', () => {
     expect(createTodoBodySchema.parse({ title: 't', spec: 's' })).toEqual({
       title: 't',
       spec: 's',
@@ -126,9 +117,9 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
   });
 });
 
-describe('build record (02 §6.2, r5 §3.4/§7.2 SSE 实测)', () => {
+describe('build record (02 §6.2, r5 §3.4/§7.2 SSE measured)', () => {
   const sample = {
-    id: '01a0b86f-04f9-72a8-bba4-75c5cfd6598f', // buildId ≡ conversationId (r3 §3.0)
+    id: '01a0b86f-04f9-72a8-bba4-75c5cfd6598f',
     todoId: 'todo_01',
     withPlan: false,
     prevPhase: 'todo',
@@ -158,7 +149,7 @@ describe('build record (02 §6.2, r5 §3.4/§7.2 SSE 实测)', () => {
     );
   });
 
-  it('start body = {todoIds[], assignment, withPlan} (r5 §3.4 抓包)', () => {
+  it('start body = {todoIds[], assignment, withPlan} (r5 §3.4 capture)', () => {
     expect(
       startBuildsBodySchema.parse({
         todoIds: ['todo_01'],
@@ -174,8 +165,8 @@ describe('build record (02 §6.2, r5 §3.4/§7.2 SSE 实测)', () => {
   });
 });
 
-describe('steps action body (02 §4.2 确认回路, r5 §4 抓包)', () => {
-  it('parses the revision (驳回) body verbatim', () => {
+describe('steps action body (02 §4.2 confirm loop, r5 §4 capture)', () => {
+  it('parses the revision (rejection) body verbatim', () => {
     expect(
       buildStepActionBodySchema.parse({
         action: 'revision',
@@ -195,7 +186,7 @@ describe('steps action body (02 §4.2 确认回路, r5 §4 抓包)', () => {
   });
 });
 
-describe('schedule record (r3 §8.3 实测原样)', () => {
+describe('schedule record (r3 §8.3 measured verbatim)', () => {
   const sample = {
     id: 'sch_01',
     teamId: 'BoZYfvqKSGanlxsXVbXSa',
@@ -219,7 +210,7 @@ describe('schedule record (r3 §8.3 实测原样)', () => {
     expect(scheduleRecordSchema.parse(sample)).toEqual(sample);
   });
 
-  it('accepts the [推断] recurring kinds (02 §6.2 候选词 hourly/daily/weekly)', () => {
+  it('accepts the [inferred] recurring kinds (02 §6.2 candidates hourly/daily/weekly)', () => {
     for (const kind of ['hourly', 'daily', 'weekly'] as const) {
       expect(scheduleRecordSchema.safeParse({ ...sample, kind }).success).toBe(true);
     }
@@ -227,7 +218,7 @@ describe('schedule record (r3 §8.3 实测原样)', () => {
   });
 });
 
-describe('provider record (r3 §2 实测原样, key 打码)', () => {
+describe('provider record (r3 §2 measured verbatim, key masked)', () => {
   const sample = {
     kind: 'custom',
     providerId: 'r3-gw',
@@ -261,12 +252,12 @@ describe('provider record (r3 §2 实测原样, key 打码)', () => {
     ).toBe(false);
   });
 
-  it('never models apiKey — 只写不读 (02 §8/r3 §2)', () => {
+  it('never models apiKey -- write-only (02 §8/r3 §2)', () => {
     const shape = providerRecordSchema.shape;
     expect('apiKey' in shape).toBe(false);
   });
 
-  it('preset目录 is the 38-item r3 §2 list with oauth only on the two订阅项', () => {
+  it('preset catalog is the 38-item r3 §2 list with oauth only on the two subscription items', () => {
     expect(PROVIDER_PRESET_IDS).toHaveLength(38);
     expect(PROVIDER_PRESET_IDS).toContain('github-copilot');
     expect(PROVIDER_PRESET_IDS).toContain('openai-codex');
@@ -274,7 +265,7 @@ describe('provider record (r3 §2 实测原样, key 打码)', () => {
   });
 });
 
-describe('mcp-server record (r3 §5.1 实测原样)', () => {
+describe('mcp-server record (r3 §5.1 measured verbatim)', () => {
   it('parses the observed record', () => {
     const sample = {
       teamId: 'BoZYfvqKSGanlxsXVbXSa',
@@ -294,7 +285,7 @@ describe('mcp-server record (r3 §5.1 实测原样)', () => {
   });
 });
 
-describe('agent record (r3 §4 实测原样)', () => {
+describe('agent record (r3 §4 measured verbatim)', () => {
   const sample = {
     id: 'TVv0DxUu3jTIhYpeWh6mn',
     displayName: 'r3-builder',
@@ -315,17 +306,11 @@ describe('agent record (r3 §4 实测原样)', () => {
     expect(agentRecordSchema.parse(sample)).toEqual(sample);
   });
 
-  it('rejects unobserved status values ([推断] note guards the enum)', () => {
+  it('rejects unobserved status values ([inferred] note guards the enum)', () => {
     expect(agentRecordSchema.safeParse({ ...sample, status: 'archived' }).success).toBe(false);
   });
 
-  // #1169 拆字段失败方式（先于实现固化）：
-  // 1. null 被读成全拒 → 「不限制」塌缩成「全拒」，新建 agent 出生即残废
-  //    （本票主修位）。schema 两态都必须可承载：null/[]/子集三态不得混淆。
-  // 2. 单值写进数组位 → defaultSkill 收到 ['x']，消费面 skills[0] 复活。
-  // 3. 旧 skills 字段残留在 wire → 两消费面（概览 Select / deny 白名单）
-  //    有一处还读旧名 = 拆字段不完整。
-  it('skillsAllowlist 三态：null（不限制）/ []（显式全拒）/ 子集，互不塌缩', () => {
+  it('skillsAllowlist three states: null (no restriction) / [] (explicit deny-all) / subset, none collapsing into another', () => {
     expect(
       agentRecordSchema.parse({ ...sample, skillsAllowlist: null }).skillsAllowlist,
     ).toBeNull();
@@ -335,7 +320,7 @@ describe('agent record (r3 §4 实测原样)', () => {
     ).toEqual(['deploy']);
   });
 
-  it('defaultSkill 单值槽：string 与 null 过；数组（含单元素）拒', () => {
+  it('defaultSkill single-value slot: string and null pass; arrays (even single-element) rejected', () => {
     expect(agentRecordSchema.parse({ ...sample, defaultSkill: 'deploy' }).defaultSkill).toBe(
       'deploy',
     );
@@ -346,23 +331,15 @@ describe('agent record (r3 §4 实测原样)', () => {
     );
   });
 
-  it('旧 skills 字段下线：schema 无此槽（读写面同名迁移，无兼容残留）', () => {
+  it('old skills field retired: schema has no such slot (same-name migration on read/write surfaces, no compatibility residue)', () => {
     expect('skills' in agentRecordSchema.shape).toBe(false);
     expect('defaultSkill' in agentRecordSchema.shape).toBe(true);
     expect('skillsAllowlist' in agentRecordSchema.shape).toBe(true);
   });
 });
 
-describe('agent 权限开关词表（XMON-84 用户拍板 B：六档全保留）', () => {
-  // 失败方式（先于实现固化）：
-  // 1. 词表恢复不全（六档缺任一）→ UI 少摆开关，用户拍板 B 未被执行。
-  // 2. AGENT_TOOL_COPY 键与词表脱钩 → 某档无副文案（渲染面 undefined）。
-  // 3. filterAgentTools 误伤词表内值（如把恢复的四档也丢掉）→ 授权面静默失能。
-  // 4. filterAgentTools 放行词表外值（自造档）→ 死存储永不清退。
-  // 5. AGENT_TOOL_DEFAULTS 漏「推送分支」→ 新建 Agent 默认推不了工作分支
-  //    （B4 不破坏交付判据）；混入「合并分支」→ 新建即可发布（越权）。
-
-  it('开关词表 = 六档全保留（用户拍板 B；两执法档 + 四待本体档）', () => {
+describe('agent permission-toggle vocabulary (XMON-84 user decision B: all six tiers kept)', () => {
+  it('toggle vocabulary = all six tiers kept (user decision B; two enforcement tiers + four pending-ontology tiers)', () => {
     expect([...AGENT_TOOL_SWITCHES]).toEqual([
       '远程 shell',
       '合并分支',
@@ -374,18 +351,18 @@ describe('agent 权限开关词表（XMON-84 用户拍板 B：六档全保留）
     expect(Object.keys(AGENT_TOOL_COPY)).toEqual([...AGENT_TOOL_SWITCHES]);
   });
 
-  it('filterAgentTools：词表内全保留 + 顺序保持，词表外（自造档）静默丢弃', () => {
+  it('filterAgentTools: in-vocabulary kept all + order preserved; out-of-vocabulary (custom tiers) silently dropped', () => {
     expect(
       filterAgentTools(['推送分支', '远程 shell', '合并分支', '创建标签', '自造档', '更新技能']),
     ).toEqual(['推送分支', '远程 shell', '合并分支', '创建标签', '更新技能']);
     expect(filterAgentTools([])).toEqual([]);
   });
 
-  it('新建默认集 = [推送分支]（不破坏交付；合并/四无本体档不默认开）', () => {
+  it('new default set = [push branch] (delivery unbroken; merge/four no-ontology tiers off by default)', () => {
     expect([...AGENT_TOOL_DEFAULTS]).toEqual(['推送分支']);
   });
 
-  it('读侧宽：存量行的词表内值仍可 parse（清退走写侧过滤，不炸读面）', () => {
+  it('read side lenient: in-vocabulary values in existing rows still parse (retirement enforced on the write side, read side does not blow up)', () => {
     const row = {
       id: 'xmon84-legacy',
       displayName: 'legacy-agent',
@@ -405,7 +382,7 @@ describe('agent 权限开关词表（XMON-84 用户拍板 B：六档全保留）
   });
 });
 
-describe('notification (02 §9.1, r5 §7.2 实测改判)', () => {
+describe('notification (02 §9.1, r5 §7.2 measured override)', () => {
   const sample = {
     teamId: 'BoZYfvqKSGanlxsXVbXSa',
     userId: 'usr_mon',
@@ -424,7 +401,7 @@ describe('notification (02 §9.1, r5 §7.2 实测改判)', () => {
     expect(notificationRecordSchema.parse(sample)).toEqual(sample);
   });
 
-  it('accepts chief_message with snippet = 消息全文', () => {
+  it('accepts chief_message with snippet = full message text', () => {
     expect(
       notificationRecordSchema.safeParse({
         ...sample,
@@ -436,7 +413,7 @@ describe('notification (02 §9.1, r5 §7.2 实测改判)', () => {
     ).toBe(true);
   });
 
-  it('rejects types outside the three-event matrix (done/failed 无 in-app 事件)', () => {
+  it('rejects types outside the three-event matrix (done/failed have no in-app events)', () => {
     expect(notificationRecordSchema.safeParse({ ...sample, type: 'build_done' }).success).toBe(
       false,
     );
@@ -445,7 +422,7 @@ describe('notification (02 §9.1, r5 §7.2 实测改判)', () => {
     );
   });
 
-  it('channels 恒 ["in_app"] (r5 §7.2 实测 + R1 divergence 04 §5)', () => {
+  it('channels always ["in_app"] (r5 §7.2 measured + R1 divergence 04 §5)', () => {
     expect(notificationRecordSchema.safeParse({ ...sample, channels: ['web_push'] }).success).toBe(
       false,
     );
@@ -458,8 +435,8 @@ describe('notification (02 §9.1, r5 §7.2 实测改判)', () => {
   });
 });
 
-describe('agent memory (02 §4.4, r5 §6 实测改判)', () => {
-  it('parses the observed entry with three-level溯源', () => {
+describe('agent memory (02 §4.4, r5 §6 measured override)', () => {
+  it('parses the observed entry with three-level provenance', () => {
     const sample = {
       id: 'mem_01',
       agentId: 'SPn3bR8GalngsJm1ge-Sh',
@@ -476,7 +453,7 @@ describe('agent memory (02 §4.4, r5 §6 实测改判)', () => {
   });
 });
 
-describe('chief (02 §4.3, r5 §2/§3 实测)', () => {
+describe('chief (02 §4.3, r5 §2/§3 measured)', () => {
   it('parses the thread record verbatim (r5 §3.6)', () => {
     const sample = {
       id: 'chief-01a0c86f-c1fb-7171-9666-64a3db176b5b',
@@ -529,12 +506,10 @@ describe('chief (02 §4.3, r5 §2/§3 实测)', () => {
       ],
       wakes: [],
     };
-    // r5 原样封套不带 orchestration（#895 加法契约：optional——老封套/老
-    // web 忽略即退化现状，不以 fixture 补键糊成破坏性契约）。
     expect(chiefGetResponseSchema.parse(sample)).toEqual(sample);
   });
 
-  it('parses the chief GET envelope with the orchestration block（#895；#1260 homeMachineId 换源）', () => {
+  it('parses the chief GET envelope with the orchestration block (#895; #1260 homeMachineId source switch)', () => {
     const sample = {
       chief: {
         id: 'chief-usr_mon-BoZYfvqKSGanlxsXVbXSa',
@@ -557,7 +532,7 @@ describe('chief (02 §4.3, r5 §2/§3 实测)', () => {
     expect(chiefGetResponseSchema.parse(sample)).toEqual(sample);
   });
 
-  it('parses the PATCH chief body verbatim（r5 §2 抓包；#1260 起 thinkingLevel 覆盖键剥离）', () => {
+  it('parses the PATCH chief body verbatim (r5 §2 capture; from #1260 thinkingLevel override keys stripped)', () => {
     expect(
       patchChiefBodySchema.parse({
         agent: { agentId: 'TVv0DxUu3jTIhYpeWh6mn', thinkingLevel: null },
@@ -565,10 +540,8 @@ describe('chief (02 §4.3, r5 §2/§3 实测)', () => {
     ).toEqual({ agent: { agentId: 'TVv0DxUu3jTIhYpeWh6mn' } });
   });
 
-  it('PATCH chief body 退役槽（#1260）：machineId/model/compactionModel 被剥离；仅剩退役槽的 body 被 refine 拒', () => {
-    // 合法槽照常。
+  it('PATCH chief body retired slots (#1260): machineId/model/compactionModel stripped; a body with only retired slots is rejected by refine', () => {
     expect(patchChiefBodySchema.parse({ charter: '常设指示' })).toEqual({ charter: '常设指示' });
-    // 退役槽混入被剥离（zod 非 strict）。
     expect(
       patchChiefBodySchema.parse({
         charter: 'x',
@@ -576,15 +549,14 @@ describe('chief (02 §4.3, r5 §2/§3 实测)', () => {
         model: { provider: 'pi', modelId: 'm' },
       }),
     ).toEqual({ charter: 'x' });
-    // 只剩退役槽 = 空 body 同判，refine 拒。
     expect(patchChiefBodySchema.safeParse({ machineId: 'm-1' }).success).toBe(false);
     expect(patchChiefBodySchema.safeParse({ compactionModel: null }).success).toBe(false);
     expect(patchChiefBodySchema.safeParse({}).success).toBe(false);
   });
 });
 
-describe('team record (r2 §1.5 teams-v1 缓存实测值)', () => {
-  it('parses with plan field保留 (02 §2.4/A3: shape kept, never gates)', () => {
+describe('team record (r2 §1.5 teams-v1 cache measured values)', () => {
+  it('parses with plan field kept (02 §2.4/A3: shape kept, never gates)', () => {
     const sample = {
       id: 'BoZYfvqKSGanlxsXVbXSa',
       name: "Xmon Dai's team",
@@ -595,7 +567,7 @@ describe('team record (r2 §1.5 teams-v1 缓存实测值)', () => {
     expect(teamRecordSchema.parse(sample)).toEqual(sample);
   });
 
-  it('member rows accept the embedded actor full record (r5 §1: agent 列表走 members)', () => {
+  it('member rows accept the embedded actor full record (r5 §1: agent list goes through members)', () => {
     const agentRow = {
       id: 'mem_01',
       teamId: 'BoZYfvqKSGanlxsXVbXSa',
@@ -615,16 +587,16 @@ describe('team record (r2 §1.5 teams-v1 缓存实测值)', () => {
         defaultSkill: null,
         skillsAllowlist: null,
         mcpServers: [],
-        activeTaskCount: 1, // r5 §1 实测增量字段
+        activeTaskCount: 1,
       },
     };
     const parsed = teamMemberSchema.parse(agentRow);
-    expect(parsed).toEqual(agentRow); // loose：未采余量字段原样保留
+    expect(parsed).toEqual(agentRow);
     expect(teamMemberSchema.safeParse({ ...agentRow, memberType: 'bot' }).success).toBe(false);
   });
 });
 
-describe('daemon local state files (02 §5.3, r3 §1.3 实测)', () => {
+describe('daemon local state files (02 §5.3, r3 §1.3 measured)', () => {
   it('machine.json = {machineId, token(64hex), teamId, serverUrl}', () => {
     const sample = {
       machineId: 'TlZ2sSD4EJCxjNJqVhdo_',
@@ -652,7 +624,7 @@ describe('daemon local state files (02 §5.3, r3 §1.3 实测)', () => {
   });
 });
 
-describe('team stream SSE events (02 §1.2, r5 §7.2 实测扩充)', () => {
+describe('team stream SSE events (02 §1.2, r5 §7.2 measured extension)', () => {
   const todoDoc = todoRecordSchema.parse({
     id: 'todo_01',
     teamId: 't',
@@ -725,7 +697,7 @@ describe('team stream SSE events (02 §1.2, r5 §7.2 实测扩充)', () => {
   });
 });
 
-describe('search response (02 §6.3 [设计] 自设 wire)', () => {
+describe('search response (02 §6.3 [design] self-set wire)', () => {
   it('parses the three-bucket shape verbatim', () => {
     expect(
       searchResponseSchema.parse({
@@ -737,24 +709,24 @@ describe('search response (02 §6.3 [设计] 自设 wire)', () => {
   });
 });
 
-describe('chiefThreadTitle (#757：附件 token 行不裸路径)', () => {
-  it('纯文本首句照旧截断', () => {
+describe('chiefThreadTitle (#757: attachment token lines never bare paths)', () => {
+  it('plain-text first sentence truncated as before', () => {
     expect(chiefThreadTitle('帮 r3-lifecycle 写一份构建文档吧')).toBe('帮 r3-lifecyc…');
   });
 
-  it('首行是附件 token 行时取其后首个正文行', () => {
+  it('when the first line is an attachment token line, the first body line after it is used', () => {
     expect(
       chiefThreadTitle('![pasted-image-1.png](attachment:team-1/att-1.png)\n看看这个报错'),
     ).toBe('看看这个报错');
   });
 
-  it('全是 token 行时取首个 token 的文件名（12 字同律截断）', () => {
+  it("all-token lines take the first token's file name (same 12-char truncation rule)", () => {
     expect(chiefThreadTitle('![pasted-image-1.png](attachment:team-1/att-1.png)')).toBe(
       'pasted-image…',
     );
   });
 
-  it('行中内联 token 只留文件名（仍受 12 字截断）', () => {
+  it('inline tokens keep only the file name (still subject to 12-char truncation)', () => {
     expect(chiefThreadTitle('看这个 ![a.png](attachment:t/i.png) 很重要')).toBe(
       '看这个 a.png 很重…',
     );

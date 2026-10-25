@@ -8,8 +8,6 @@
 |---|---|
 | `spec/` | 编号规范（测试分层、PR 流程等），工程规则的正本 |
 | `adr/` | 架构决策记录（ADR），按编号排序；已裁决的事不在评审里重辩，推翻要走新 ADR |
-| `design/` | 设计参考与对照稿 |
-| `a3/` | todos.dev 对照审计报告（逐页 / 逐面） |
 | `pr-review.md` | PR 评审流程（五步流程 + 六节评分卡） |
 | `ops-db-backup.md` | server DB 备份与恢复（脚本 `scripts/ops/backup-server-db.sh`，调度模板与演练纪律） |
 | `feature-map.md` | 功能地图（当前状态活册），由 `scripts/generate-feature-map.mjs` 机械抽取生成，勿手改；重生成跑脚本，校验加 `--check` |
@@ -21,5 +19,5 @@
 
 | 目录 | 内容 | 纪律 |
 |---|---|---|
-| `verify/<票号>/` | 随 PR 提交的验证证据（截图、探针输出、机制图） | **只增不改、不外迁**。已合 PR 的 body 里嵌着钉 SHA 的 raw 永久链指向这里的文件；删除或移动省不了体积（历史永存），只会打断旧证据链。裁决全文见 [`adr/0015-验证证据留存仓内-存量不可搬.md`](adr/0015-验证证据留存仓内-存量不可搬.md) |
+| `verify/<ticket>/` | Verification evidence committed with each PR (screenshots, probe output, mechanism diagrams) | Lands with its PR; a weekly run removes folders older than 14 days from `main` and records their last commit in `verify/pruned.json` (`git show <sha>:docs/verify/<ticket>/`). Merged PR bodies keep working because their raw links pin a commit. Decision: [`adr/0022-prune-merged-evidence-weekly.md`](adr/0022-prune-merged-evidence-weekly.md) |
 | `research/` | 按票归档的调研笔记（`r*.md`、实测记录） | 写完归档。可当史料引用，不当现行规范读 |

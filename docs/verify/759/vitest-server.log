@@ -1,9 +1,0 @@
-
- RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0136-759/apps/server
-
-
- Test Files  2 passed (2)
-      Tests  40 passed (40)
-   Start at  11:58:35
-   Duration  984ms (import 39%, transform 36%, tests 24%)
-

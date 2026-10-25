@@ -1,10 +1,3 @@
-// record 形状 22 表投影（01 §6 表清单 = M2 Drizzle schema 面；03 M1
-// 「record 形状（02 §6.2，24 表投影源）」；M4a 回写 +1：`chief` 记录本体
-// ——02 §4.3/r5 §3.6 GET /chief 的 chief 字段投影，原清单仅列线程面两表；
-// spec 13 #367 回写 −1：`skill` 表退役——SkillRecord 仍是 wire 形状
-// （records/skill.ts），但投影源改本地目录现扫，无表位、不入本 registry）。
-// `todo_tag` 为纯 join 表，无 wire record 形状，不在投影面。
-
 import type { z } from 'zod';
 import { agentRecordSchema } from './agent.js';
 import { apiKeyRecordSchema } from './api-key.js';
@@ -41,7 +34,6 @@ export * from './machine.js';
 export * from './machine-capabilities.js';
 export * from './mcp-server.js';
 export * from './memory.js';
-// #1404：合并就绪闸词表（摘要、D4 路径类别、策略、status context）。
 export * from './merge-gate.js';
 export * from './message.js';
 export * from './model-source.js';
@@ -67,13 +59,6 @@ export * from './user.js';
 export * from './verify.js';
 export * from './whats-new.js';
 
-/** 表名 → record schema（22 张，键序 = 01 §6 清单序；快照测试的遍历源）。
- * skill 已出列（spec 13 #367）——record 形状仍在 records/skill.ts，投影源 =
- * 本地目录现扫；mcp_server 已出表集（spec 13 #368 本地 config 只读制）——
- * McpServerRecord wire 形状保留（mcp-server.js 单源）作 GET 读端点投影，
- * 但两者都不再有表位。document_diff 已出列（#1029 死 schema 退役）——
- * documentDiffSchema wire 形状保留（document-diff.js 单源）作 diff 端点
- * 响应投影，表位随 drop migration 摘除。 */
 export const RECORD_SCHEMAS = {
   user: userRecordSchema,
   team: teamRecordSchema,
@@ -95,8 +80,6 @@ export const RECORD_SCHEMAS = {
   token_usage: tokenUsageSchema,
   chief: chiefRecordSchema,
   chief_thread: chiefThreadSchema,
-  // chief_message = 线程消息行（records/message.ts 同族 role/content 形状，
-  // r5 §3.6；独立列细节归 M2 按 record 形状展开）。
   chief_message: messageRecordSchema,
   whats_new: whatsNewRecordSchema,
 } as const satisfies Record<string, z.ZodType>;

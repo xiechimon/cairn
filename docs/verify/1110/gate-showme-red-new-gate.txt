@@ -1,9 +1,0 @@
-$ python3 scripts/pr-evidence-gate.py docs/verify/1110/fixture-showme-body.md
-pr-evidence: sections: 0/2 answered
-FAIL missing-section: Upstream
-FAIL missing-section: Verified
-pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).
-pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-pacman/SKILL.md.
-pr-evidence: scanned 0 image link(s)
-pr-evidence: RED (2 problem(s))
-exit=1

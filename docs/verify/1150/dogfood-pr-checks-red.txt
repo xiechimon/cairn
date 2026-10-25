@@ -1,6 +1,0 @@
-# dogfood PR checks — RED state (build step done reporting)
-Sat Oct 10 21:48:37 CST 2026
-gate	fail	4s	https://github.com/xiechimon/pacman-1150-dogfood/actions/runs/38057087825/job/114227667951	
-gate	fail	5s	https://github.com/xiechimon/pacman-1150-dogfood/actions/runs/38057093454/job/114227684594	
-
-PR #1 state=OPEN head=pacman/conv-01a12611-01cd-7292-b47c-4164950a2650@c5d7e42ae727644eb320969e57dd0d34aecfa87b

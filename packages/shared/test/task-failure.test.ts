@@ -1,25 +1,3 @@
-// 失败分类器（#1257 + #1261 两套同源测试共存）：daemon 与 server 双端消费的
-// 单一事实源——#1257 classifyStepFailure（daemon 侧 network 桶决定会话续跑
-// 重试，server 侧 quota 桶决定「等额度」挂起）与 #1261 classifyAgentFailure
-// （daemon 检测面 + parseRetryAfterMs）。规则序与词表对齐 Multica
-// taskfailure/classify.go（quota 先于 network：额度致死的流断文案归 quota
-// 不归 network）。
-// 失败方式先于实现固化（AGENTS.md 测试规则 3）：
-//   1. quota：402（数字边界）、usage-limit 403、insufficient balance、
-//      monthly usage limit、you've hit your limit（直撇/弯撇）、quota、credits
-//   2. capacity：429/529（数字边界）、rate limit、overloaded、
-//      concurrent request limit（语义先于 403/token 词面）
-//   3. network：stream disconnected / connection reset|closed|refused /
-//      mid-response / error sending request / dial tcp / dns / i/o timeout /
-//      deadline exceeded / request timed out.
-//   4. other：401 unauthorized、model not found、上下文超长（token limit 归
-//      上下文不归 quota）、provider 5xx、空串
-//   5. 桶序：quota > capacity > network（同串多语义时按 Multica 序收口）
-//   6. 数字边界：402913 / 15290ms / exit status 4030 不误触桶
-//   7.（#1261）classifyAgentFailure 四桶：quota/capacity 与 #1257 同义，
-//      provider_network = #1257 network；F5 Retry-After 解析（秒数/冒号/
-//      日期形态降级 null）；F6 脏输入（空串/大小写/JSON 内嵌）不抛不误报。
-
 import { describe, expect, test } from 'vitest';
 import {
   AGENT_FAILURE_KINDS,
@@ -30,8 +8,8 @@ import {
   STEP_FAILURE_KINDS,
 } from '../src/task-failure.js';
 
-describe('classifyStepFailure（#1257 三桶分类）', () => {
-  test('失败方式 1：quota 桶', () => {
+describe('classifyStepFailure (#1257 three-bucket classification)', () => {
+  test('failure mode 1: quota bucket', () => {
     expect(classifyStepFailure('402 Payment Required')).toBe('quota');
     expect(classifyStepFailure('HTTP 402: insufficient credits')).toBe('quota');
     expect(classifyStepFailure('403 usage limit reached')).toBe('quota');
@@ -44,12 +22,11 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
     expect(classifyStepFailure('credits exhausted')).toBe('quota');
   });
 
-  test('失败方式 2：capacity 桶', () => {
+  test('failure mode 2: capacity bucket', () => {
     expect(classifyStepFailure('429 Too Many Requests')).toBe('capacity');
     expect(classifyStepFailure('529 overloaded')).toBe('capacity');
     expect(classifyStepFailure('rate limit exceeded')).toBe('capacity');
     expect(classifyStepFailure('The server is overloaded')).toBe('capacity');
-    // 语义先于 403/token 词面（Multica concurrentRequestLimitWitness）。
     expect(
       classifyStepFailure(
         'access token expired: 403 concurrent request limit reached. Try again later',
@@ -57,8 +34,7 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
     ).toBe('capacity');
   });
 
-  test('失败方式 3：network 桶', () => {
-    // 用户实测原串（#54 relay 断流）。
+  test('failure mode 3: network bucket', () => {
     expect(classifyStepFailure('upstream stream disconnected: connection reset by peer')).toBe(
       'network',
     );
@@ -70,14 +46,12 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
     expect(classifyStepFailure('dns lookup failed for api.example.com')).toBe('network');
     expect(classifyStepFailure('read: i/o timeout')).toBe('network');
     expect(classifyStepFailure('context deadline exceeded')).toBe('network');
-    // pi/OpenAI SDK 裸串（Multica BHD-135）。
     expect(classifyStepFailure('Request timed out.')).toBe('network');
     expect(classifyStepFailure('connectionECONNRESET')).toBe('network');
   });
 
-  test('失败方式 4：other 桶（auth / 上下文 / 5xx / 空）', () => {
+  test('failure mode 4: other bucket (auth / context / 5xx / empty)', () => {
     expect(classifyStepFailure('401 unauthorized')).toBe('other');
-    // token limit 归上下文不归 quota（Multica 规则序）。
     expect(classifyStepFailure('maximum context length exceeded')).toBe('other');
     expect(classifyStepFailure('tokens per minute limit reached: token limit')).toBe('other');
     expect(classifyStepFailure('500 internal error')).toBe('other');
@@ -86,8 +60,7 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
     expect(classifyStepFailure('   ')).toBe('other');
   });
 
-  test('失败方式 4a：model_unavailable 桶（/v1/messages 404 / model not found）', () => {
-    // #1288：运行时撞 /v1/messages 404 = 模型已被上游下架。
+  test('failure mode 4a: model_unavailable bucket (/v1/messages 404 / model not found)', () => {
     expect(classifyStepFailure('404: /v1/messages not found')).toBe('model_unavailable');
     expect(
       classifyStepFailure('POST http://relay/v1/messages -> 404 model gpt-5.6-luna not found'),
@@ -96,13 +69,10 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
     expect(classifyStepFailure('model_not_found: deepseek-v4.1-flash')).toBe('model_unavailable');
     expect(classifyStepFailure('model unavailable for this account')).toBe('model_unavailable');
     expect(classifyStepFailure('404: no such model')).toBe('model_unavailable');
-    // 数字边界不误触：404913 tokens 不带 model 词面 = other。
     expect(classifyStepFailure('input tokens: 404913 exceeds nothing')).toBe('other');
   });
 
-  test('失败方式 5：桶序 quota > capacity > network', () => {
-    // 额度致死常以流断文案浮出（#1257 评论 1：含额度用完致死的流）——
-    // quota 词面在串里即归 quota，不被 network 桶抢走。
+  test('failure mode 5: bucket order quota > capacity > network', () => {
     expect(
       classifyStepFailure('upstream stream disconnected: connection reset by peer (402 quota)'),
     ).toBe('quota');
@@ -111,16 +81,15 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
     );
   });
 
-  test('失败方式 6：数字边界（402913 / 15290ms / 4030 不误触）', () => {
+  test('failure mode 6: numeric boundaries (402913 / 15290ms / 4030 no false trigger)', () => {
     expect(classifyStepFailure('input tokens: 402913 exceeds nothing')).toBe('other');
     expect(classifyStepFailure('request failed after 15290ms')).toBe('other');
     expect(classifyStepFailure('exited with error: exit status 4030')).toBe('other');
-    // 边界正例对拍：同样的数字带分隔边界时必须命中。
     expect(classifyStepFailure('HTTP error 429')).toBe('capacity');
     expect(classifyStepFailure('code=402 billing')).toBe('quota');
   });
 
-  test('词表封闭（枚举单源）', () => {
+  test('vocabulary closed (enum single source)', () => {
     expect(STEP_FAILURE_KINDS).toEqual([
       'quota',
       'capacity',
@@ -131,8 +100,8 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
   });
 });
 
-describe('classifyAgentFailure（#1261 四桶，F1-F4）', () => {
-  test('quota：402（含 #882 诊断行形态）', () => {
+describe('classifyAgentFailure (#1261 four buckets, F1-F4)', () => {
+  test('quota: 402 (including #882 diagnostic-line shape)', () => {
     expect(classifyAgentFailure('402: {"message":"Payment required"}')).toBe('quota');
     expect(
       classifyAgentFailure(
@@ -141,7 +110,7 @@ describe('classifyAgentFailure（#1261 四桶，F1-F4）', () => {
     ).toBe('quota');
   });
 
-  test('quota：usage limit / 余额 / 欠费文案（中英）', () => {
+  test('quota: usage limit / balance / overdue-copy messages (Chinese and English)', () => {
     expect(classifyAgentFailure('usage limit reached, please wait until 7pm UTC')).toBe('quota');
     expect(classifyAgentFailure('403: {"type":"usage_limit_reached"}')).toBe('quota');
     expect(classifyAgentFailure('额度不足，请充值后重试')).toBe('quota');
@@ -149,14 +118,14 @@ describe('classifyAgentFailure（#1261 四桶，F1-F4）', () => {
     expect(classifyAgentFailure('account balance is insufficient')).toBe('quota');
   });
 
-  test('capacity：429/529/限流文案', () => {
+  test('capacity: 429/529/rate-limit messages', () => {
     expect(classifyAgentFailure('429: Too Many Requests')).toBe('capacity');
     expect(classifyAgentFailure('529: overloaded')).toBe('capacity');
     expect(classifyAgentFailure('rate limit exceeded for this key')).toBe('capacity');
     expect(classifyAgentFailure('当前分组上游负载已饱和，请稍后再试')).toBe('capacity');
   });
 
-  test('provider_network：连接重置 / 上游流断（#1257 家族）', () => {
+  test('provider_network: connection reset / upstream stream break (#1257 family)', () => {
     expect(classifyAgentFailure('upstream stream disconnected: connection reset by peer')).toBe(
       'provider_network',
     );
@@ -165,7 +134,7 @@ describe('classifyAgentFailure（#1261 四桶，F1-F4）', () => {
     );
   });
 
-  test('other：协议错 / 工具失败 / 空串不误报（F1/F6）', () => {
+  test('other: protocol errors / tool failures / empty string no false positive (F1/F6)', () => {
     expect(classifyAgentFailure('400: {"message":"Model does not support this protocol."}')).toBe(
       'other',
     );
@@ -174,17 +143,17 @@ describe('classifyAgentFailure（#1261 四桶，F1-F4）', () => {
     expect(classifyAgentFailure('session abc not found')).toBe('other');
   });
 
-  test('优先级：quota 先于 capacity（同文并见 402+429 时）', () => {
+  test('priority: quota before capacity (402+429 in the same text)', () => {
     expect(classifyAgentFailure('429 then 402: out of credit')).toBe('quota');
   });
 
-  test('词表封闭（枚举单源）', () => {
+  test('vocabulary closed (enum single source)', () => {
     expect(AGENT_FAILURE_KINDS).toEqual(['quota', 'capacity', 'provider_network', 'other']);
   });
 });
 
 describe('parseRetryAfterMs（#1261 F5）', () => {
-  test('裸秒数 / 冒号形态 / with 单位', () => {
+  test('bare seconds / colon forms / with units', () => {
     expect(parseRetryAfterMs('retry-after: 120')).toBe(120_000);
     expect(parseRetryAfterMs('Retry-After: 30')).toBe(30_000);
     expect(parseRetryAfterMs('retry after 45 seconds')).toBe(45_000);
@@ -192,19 +161,19 @@ describe('parseRetryAfterMs（#1261 F5）', () => {
     expect(parseRetryAfterMs('please retry-after 2 minutes')).toBe(120_000);
   });
 
-  test('HTTP 日期 / 非法值 → null（不造数值）', () => {
+  test('HTTP date / invalid value -> null (no fabricated numbers)', () => {
     expect(parseRetryAfterMs('retry-after: Wed, 21 Oct 2026 07:28:00 GMT')).toBeNull();
     expect(parseRetryAfterMs('retry-after: soon')).toBeNull();
     expect(parseRetryAfterMs('no header here')).toBeNull();
     expect(parseRetryAfterMs('')).toBeNull();
   });
 
-  test('数值上限：过大的秒数收口（防 bogus relay 值把探测排到数年后）', () => {
+  test('numeric cap: excessive seconds clamped (prevents bogus relay values from scheduling probes years out)', () => {
     expect(parseRetryAfterMs('retry-after: 999999999')).toBeNull();
   });
 });
 
-describe('isProviderAuthFailure（#1493 降级链触发：认证失败）', () => {
+describe('isProviderAuthFailure (#1493 degradation-chain trigger: auth failure)', () => {
   test.each([
     '401 Unauthorized: missing or bad api key',
     'Error: 401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}',
@@ -212,7 +181,7 @@ describe('isProviderAuthFailure（#1493 降级链触发：认证失败）', () =
     'incorrect api key',
     'invalid_api_key',
     'API key expired',
-  ])('命中：%s', (msg) => {
+  ])('matches: %s', (msg) => {
     expect(isProviderAuthFailure(msg)).toBe(true);
   });
 
@@ -224,12 +193,11 @@ describe('isProviderAuthFailure（#1493 降级链触发：认证失败）', () =
     '400: bad protocol',
     'Error: 403 usage limit reached',
     'Not logged in · Please run /login',
-    // git / GitHub 凭证失败：与模型 provider 无关，换模型没用。
     "remote: Unauthorized\nfatal: unable to access 'https://github.com/x/y.git/': The requested URL returned error: 401",
     '401 Unauthorized',
     'gh: Bad credentials (HTTP 401)',
     'see PR #401',
-  ])('不命中：%s', (msg) => {
+  ])('does not match: %s', (msg) => {
     expect(isProviderAuthFailure(msg)).toBe(false);
   });
 });

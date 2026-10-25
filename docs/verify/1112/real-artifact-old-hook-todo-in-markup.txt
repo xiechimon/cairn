@@ -1,6 +1,0 @@
-Blocked (comment discipline): banned vocabulary in staged additions.
-   This is allowed ONLY when the wording is deliberate (per pacman CLAUDE.md).
-   Fix the offending lines; if this addition is intentional, commit with:
-     PACMAN_ALLOW_BANNED_VOCAB=1 git commit ...
-  +<svg data-note="TODO fix later" xmlns="http://www.w3.org/2000/svg" style="background: transparent; background-color: transparent; color-scheme: light dark;" xmlns:xlink="http://www.w3.org/1999/xlin... [truncated 824441 chars]
-old-todo rc=1

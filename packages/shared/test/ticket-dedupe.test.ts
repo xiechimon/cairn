@@ -1,11 +1,3 @@
-// 票去重键（#1492，供 #1407 纠错票 / 园丁票开票前查重）。外部行为 = 「同一
-// 类问题不重复开票，不同问题不被合成一张」。失败方式先于实现固化：
-//   1. 同类别 + 同路径集合 → 同一个键（路径顺序、重复、前导 ./ 与大小写
-//      不同的类别写法都不影响）。
-//   2. 同类别、不同路径 → 不同键（撞车会把两个问题合成一张）。
-//   3. 键能写进 issue body 并原样读回；查重只认 open 票里的标记。
-//   4. 正文里只提到同名文字、没有标记的票不算重复。
-
 import { describe, expect, test } from 'vitest';
 import {
   findDuplicateTicket,
@@ -15,7 +7,7 @@ import {
 } from '../src/records/ticket-dedupe.js';
 
 describe('ticketDedupeKey', () => {
-  test('失败方式 1：路径顺序 / 重复 / ./ 前缀 / 类别大小写不影响键', () => {
+  test('failure mode 1: path order / duplicates / ./ prefix / category case do not affect the key', () => {
     const a = ticketDedupeKey({ category: 'Missing-Test', paths: ['b/y.ts', 'a/x.ts'] });
     const b = ticketDedupeKey({
       category: 'missing-test',
@@ -24,19 +16,19 @@ describe('ticketDedupeKey', () => {
     expect(a).toBe(b);
   });
 
-  test('失败方式 2：同类别不同路径 → 不同键', () => {
+  test('failure mode 2: same category with different paths -> different keys', () => {
     const a = ticketDedupeKey({ category: 'missing-test', paths: ['apps/server/src/a.ts'] });
     const b = ticketDedupeKey({ category: 'missing-test', paths: ['apps/web/src/b.ts'] });
     expect(a).not.toBe(b);
   });
 
-  test('不同类别同路径 → 不同键', () => {
+  test('different categories with same path -> different keys', () => {
     const a = ticketDedupeKey({ category: 'missing-test', paths: ['a.ts'] });
     const b = ticketDedupeKey({ category: 'stale-doc', paths: ['a.ts'] });
     expect(a).not.toBe(b);
   });
 
-  test('类别不能为空', () => {
+  test('category must not be empty', () => {
     expect(() => ticketDedupeKey({ category: '  ', paths: ['a.ts'] })).toThrow();
   });
 });
@@ -45,13 +37,13 @@ describe('findDuplicateTicket', () => {
   const key = ticketDedupeKey({ category: 'missing-test', paths: ['apps/server/src/a.ts'] });
   const other = ticketDedupeKey({ category: 'missing-test', paths: ['apps/web/src/b.ts'] });
 
-  test('失败方式 3：标记写进 body 能原样读回', () => {
+  test('failure mode 3: marker written into body reads back verbatim', () => {
     const body = `问题描述……\n\n${ticketDedupeMarker(key)}\n`;
     expect(parseTicketDedupeKey(body)).toBe(key);
     expect(parseTicketDedupeKey('没有标记')).toBeNull();
   });
 
-  test('open 票里有同键标记 → 返回那张票；两个不同问题互不命中', () => {
+  test('an open ticket with the same key marker -> that ticket returned; two different problems never match', () => {
     const issues = [
       { number: 10, state: 'open', body: `x\n${ticketDedupeMarker(other)}` },
       { number: 11, state: 'open', body: `y\n${ticketDedupeMarker(key)}` },
@@ -60,12 +52,12 @@ describe('findDuplicateTicket', () => {
     expect(findDuplicateTicket(other, issues)?.number).toBe(10);
   });
 
-  test('已关闭的同键票不算重复（问题复发要重新开）', () => {
+  test('closed tickets with the same key do not count as duplicates (a recurring problem needs a new ticket)', () => {
     const issues = [{ number: 12, state: 'closed', body: ticketDedupeMarker(key) }];
     expect(findDuplicateTicket(key, issues)).toBeNull();
   });
 
-  test('失败方式 4：正文只提到同样的文字、没有标记 → 不算重复', () => {
+  test('failure mode 4: body merely mentions the same text without the marker -> not a duplicate', () => {
     const issues = [
       { number: 13, state: 'open', body: `missing-test apps/server/src/a.ts ${key}` },
     ];

@@ -1,7 +1,8 @@
 <div align="center">
-  <img src="apps/web/public/logo.svg" alt="Cairn app icon" width="112" height="112">
-
-  <h1>Cairn</h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/img/banner-dark.webp">
+    <img alt="Cairn: agents stacking a cairn on a mountain path while a person waits at the gate" src="site/img/banner-light.webp" width="100%">
+  </picture>
 
   <p><b>You write the tickets. Agents build them on your machines. You gate what merges.</b></p>
 
@@ -14,6 +15,8 @@
   </p>
 
   <p>
+    <a href="https://github.com/xiechimon/cairn/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/xiechimon/cairn/ci.yml?branch=main&style=flat-square&label=CI"></a>
+    <a href="https://www.npmjs.com/package/@xiechimon/cairn"><img alt="npm version" src="https://img.shields.io/npm/v/@xiechimon/cairn?style=flat-square&color=173a2f&label=npm"></a>
     <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-173a2f?style=flat-square">
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-173a2f?style=flat-square">
     <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
@@ -26,6 +29,39 @@
 </picture>
 
 ## Highlights
+
+<table align="center">
+  <tr>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-chief-dark.webp">
+        <img alt="Chief agent" src="site/img/crew-chief-light.webp" width="120" height="120">
+      </picture>
+      <br><sub><b>Chief</b> dispatches</sub>
+    </td>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-coder-dark.webp">
+        <img alt="Coder agent" src="site/img/crew-coder-light.webp" width="120" height="120">
+      </picture>
+      <br><sub><b>Coders</b> build</sub>
+    </td>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-reviewer-dark.webp">
+        <img alt="Reviewer agent" src="site/img/crew-reviewer-light.webp" width="120" height="120">
+      </picture>
+      <br><sub><b>Reviewer</b> checks the diff</sub>
+    </td>
+    <td align="center" width="25%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-you-dark.webp">
+        <img alt="You" src="site/img/crew-you-light.webp" width="120" height="120">
+      </picture>
+      <br><sub><b>You</b> gate the merge</sub>
+    </td>
+  </tr>
+</table>
 
 - **Multi-agent orchestration.** Each agent has its own model, role, skills, MCP servers, secrets and memory. A chief agent only dispatches, so its context stays clean; coder and reviewer agents do the work.
 - **Human gates, enforced.** Every run stops twice for you: at the plan and at the diff. The AI reviewer can block a merge, not just comment on it.

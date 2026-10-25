@@ -21,9 +21,6 @@ import type { TeamAgentCard } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { TeamAgentsEmpty } from './team-agent-grid.js';
 
-/** 皇冠字形：逐字抄自参考产品 chart 根节点（`text-indigo-600`，描边 2.5）。
- *  与同栏位图标不同，它不属于 r7 图标清单（icons/ 由 generate-icons.mjs
- *  从那份清单生成），故留在此处而不入 icons/。 */
 function CrownGlyph(props: SVGProps<SVGSVGElement>) {
   return (
     <svg

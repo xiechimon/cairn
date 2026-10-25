@@ -1,8 +1,0 @@
-[08:03:01] INFO (96090): attachment gc: 0 pending, 0 orphan, 0 bytes reclaimed
-    pending: 0
-    orphan: 0
-    reclaimedBytes: 0
-[08:03:01] INFO (96090): pacman-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 pacman start --api-key <key> --team <teamId>
-    port: 8791
-    dataDir: "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0281-1136/.claude/verify-run/home/server"
-    teamId: "BBSYn3TwVchXpTOZ9QQAL"
