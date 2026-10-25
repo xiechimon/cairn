@@ -1,8 +1,16 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
+import { scrubGitEnv } from './scrub-git-env.mjs';
 
 const root = resolve(import.meta.dirname, '..');
+
+export const prepushModules = [
+  'scripts/prepush.mjs',
+  'scripts/heavy-slots.mjs',
+  'scripts/english-only-gate.mjs',
+  'scripts/scrub-git-env.mjs',
+];
 
 export const selfTests = [
   'scripts/prepush.test.mjs',
@@ -36,13 +44,27 @@ export function prepushPlan(paths, mode = 'local') {
     : [
         ...required,
         ...localOnly,
-        ...(paths.some((path) => /^scripts\/(prepush|heavy-slots|english-only-gate)/.test(path))
+        ...(paths.some((path) =>
+          /^scripts\/(prepush|heavy-slots|english-only-gate|scrub-git-env)/.test(path),
+        )
           ? [['node', '--test', ...selfTests]]
           : []),
         ['node', 'scripts/prepush-vitest.mjs'],
         ...advisory,
         ['pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', ...paths],
       ];
+}
+
+export function runPlan(plan, { cwd, env }) {
+  for (const [command, ...commandArgs] of plan) {
+    console.log(`[prepush] ${command} ${commandArgs.join(' ')}`);
+    const result = spawnSync(command, commandArgs, {
+      cwd,
+      stdio: 'inherit',
+      env: scrubGitEnv({ ...env }),
+    });
+    if (result.status !== 0) process.exit(result.status ?? 1);
+  }
 }
 
 export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main') {
@@ -85,14 +107,6 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
       ? [['pnpm', '--filter', '@cairn/web', 'e2e', `--shard=${args[1]}`]]
       : prepushPlan(changedPaths(), args[0]?.slice(2) ?? 'local');
   const lease = plan.length > 0 ? await acquireSlot() : null;
-  for (const [command, ...commandArgs] of plan) {
-    console.log(`[prepush] ${command} ${commandArgs.join(' ')}`);
-    const result = spawnSync(command, commandArgs, {
-      cwd: root,
-      stdio: 'inherit',
-      env: leaseEnv(lease),
-    });
-    if (result.status !== 0) process.exit(result.status ?? 1);
-  }
+  runPlan(plan, { cwd: root, env: leaseEnv(lease) });
   console.log(`[prepush] PASS (${plan.length} checks)`);
 }

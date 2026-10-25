@@ -16,6 +16,7 @@ import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { skipsQueue, slotCount, slotResources } from './heavy-slots.mjs';
+import { prepushModules } from './prepush.mjs';
 
 const moduleUrl = pathToFileURL(resolve('scripts/heavy-slots.mjs')).href;
 const cli = resolve('scripts/heavy-slots.mjs');
@@ -425,8 +426,7 @@ test('prepush queues for a slot in local mode and starts once the holder is kill
       { cwd: repo, stdio: 'pipe' },
     );
   try {
-    for (const file of ['prepush.mjs', 'heavy-slots.mjs', 'english-only-gate.mjs'])
-      copyFileSync(join('scripts', file), join(repo, 'scripts', file));
+    for (const file of prepushModules) copyFileSync(file, join(repo, file));
     git('init');
     writeFileSync(join(repo, 'README.md'), 'first\n');
     git('add', 'README.md');
