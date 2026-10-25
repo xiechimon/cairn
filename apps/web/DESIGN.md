@@ -240,31 +240,31 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
 - 要：一个弹窗选一档宽、提示靠左操作靠右、菜单行等高。不要：深色或模糊背板、整宽提交条、灰色底色带脚、outline 次按钮、12px 字的小灰菜单。
 - `e2e/paper-overlays.spec.ts` 钉背板颜色、三档宽、分栏脚、菜单行高与分组选择器；`e2e/color-freeze.spec.ts` 钉 `dialog-backdrop` / `menu-hover`。
 
-## 动效
+## Motion
 
-纸面是安静的。动效只有四类，每类定一个时长一个缓动；取值走 `src/styles/tokens.css` 的 motion 槽（`--dur-fast` / `--dur-overlay` / `--ease-standard` / `--ease-pop` / `--ease-out-expo` / `--spring-snappy`）或 tw-animate-css 的缺省档。新面先在下表对号入座，对不上就不加动效；要加新槽，同一个 PR 里必须带上消费点。
+The paper is quiet. Motion comes in four kinds, each with one duration and one easing; values come from the motion slots in `src/styles/tokens.css` (`--dur-fast` / `--dur-overlay` / `--dur-window` / `--ease-standard` / `--ease-pop` / `--ease-out-expo` / `--ease-drawer` / `--spring-snappy`) or the tw-animate-css defaults. A new surface first finds its row in the table below; if none fits, it gets no motion. A new slot must ship with its consumer in the same PR.
 
-| 类 | 面 | 时长 | 缓动 | 动的属性 |
+| Kind | Surface | Duration | Easing | Animated properties |
 |---|---|---|---|---|
-| 微交互 | 行 / 卡 / 按钮的 hover 与 press 染色、分段控件、折叠箭头 | 150ms（`--dur-fast`） | `--ease-standard`（tw `ease-out` 同档） | `background-color` / `color` / `box-shadow` / `transform` |
-| 微交互 | 任务卡 hover 抬升与投影 | 200ms | `--ease-out-expo` | `box-shadow` / `translate` |
-| Overlay motion | Dialog, confirmation surface, ⌘K | 200ms in and out (`--dur-overlay` / `duration-200`) | Default tw `ease` | `opacity` + `scale(.95→1)` |
-| Chief window motion | Chief window grows from and returns to the lower-right launcher | 320ms in (`--dur-window`), 200ms out (`--dur-overlay`) | `--ease-drawer` (`cubic-bezier(.32,.72,0,1)`) | `opacity` + `scale(.4→1)`, origin at the launcher center |
-| 弹层进出 | 菜单、弹层、Select | 进出各 100ms | tw 缺省 `ease` | `opacity` + `scale(.95→1)` + 8px 位移 |
-| 弹层进出 | Tooltip | 进出各 150ms（tw-animate 缺省） | tw 缺省 `ease` | `opacity` + `scale(.95→1)` + 8px 位移 |
-| 弹层进出 | 内联小弹层（提及、斜杠、chip） | 进 100ms，无出场 | tw 缺省 `ease` | `opacity` + `scale(.98→1)` |
-| 内容到达 | 新卡上板 / 换列 / 筛选命中 | 150ms | `--ease-pop` | `opacity` + `translateY(4px→0)` |
-| 内容到达 | 对话消息入场 | 380ms（`--spring-snappy-dur`） | `--spring-snappy` | `opacity` + `translateY` |
-| 内容到达 | 流式字符显现 | 350ms | `--ease-out-expo` | `opacity` |
-| 内容到达 | 保存勾衰减 | 2.5s | `--ease-out-expo` | `opacity` + `scale` |
-| Loop | Running task card footer: the spiral mark spins (same as the busy chief button) | 2.4s per turn | `linear` | `transform: rotate`; static under reduced motion |
-| 循环 | 在飞 spinner 呼吸 | 3.6s | `ease-in-out` | `opacity` + `scale` |
+| Micro-interaction | Hover and press tint on rows, cards and buttons; segmented controls; disclosure chevrons | 150ms (`--dur-fast`) | `--ease-standard` (same as tw `ease-out`) | `background-color` / `color` / `box-shadow` / `transform` |
+| Micro-interaction | Task card hover lift and shadow | 200ms | `--ease-out-expo` | `box-shadow` / `translate` |
+| Overlay | Dialog, confirmation surface, ⌘K | 200ms in and out (`--dur-overlay` / `duration-200`) | Default tw `ease` | `opacity` + `scale(.95→1)` |
+| Overlay | Chief window grows from and returns to the lower-right launcher | 320ms in (`--dur-window`), 200ms out (`--dur-overlay`) | `--ease-drawer` (`cubic-bezier(.32,.72,0,1)`) | `opacity` + `scale(.4→1)`, origin at the launcher center |
+| Overlay | Menu, popover, Select | 100ms in and out | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
+| Overlay | Tooltip | 150ms in and out (tw-animate default) | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
+| Overlay | Inline popovers (mention, slash, chip) | 100ms in, no exit | Default tw `ease` | `opacity` + `scale(.98→1)` |
+| Arrival | New card on the board, column change, filter hit | 150ms | `--ease-pop` | `opacity` + `translateY(4px→0)` |
+| Arrival | Conversation message entry | 380ms (`--spring-snappy-dur`) | `--spring-snappy` | `opacity` + `translateY` |
+| Arrival | Streaming text reveal | 350ms | `--ease-out-expo` | `opacity` |
+| Arrival | Saved check fade | 2.5s | `--ease-out-expo` | `opacity` + `scale` |
+| Loop | Running task card footer and busy chief launcher: the spiral mark spins | 2.4s per turn | `linear` | `transform: rotate`; static under reduced motion |
+| Loop | In-flight spinner pulse | 3.6s | `ease-in-out` | `opacity` + `scale` |
 
-- 只动 `opacity` / `transform` / 阴影 / 颜色，不动布局属性（width / height / top）。
-- 瞬切不过渡：按压（`:active` 压暗、卡面 bg tint）、粗指针下的一切、拖拽落位（`dropAnimation` 为 null，对齐参考站）、侧栏展开 / 收起、主题切换（`.theme-suppress` 关过渡两帧）。
-- `prefers-reduced-motion`：全站 keyframe 动画压到 0.01ms、循环只跑一次（`motion.css` 全站法）；过渡不动。
-- 没有的东西：路由转场、列表 FLIP、列间飞行、弹簧曲线家族（只留消息入场这一条 `--spring-snappy`）。
-- 钉扎：`e2e/cds-motion.spec.ts` 钉 motion 槽的存活与退役、`anim-*` 类名；`e2e/card-press.spec.ts` 钉按压瞬切；`e2e/color-freeze.spec.ts` 钉 `--ease-out-expo`。
+- Animate only `opacity` / `transform` / shadow / color, never layout properties (width / height / top).
+- Instant, no transition: press (`:active` darkening, card background tint), everything under a coarse pointer, drop placement (`dropAnimation` is null, matching the reference sites), sidebar expand / collapse, theme switch (`.theme-suppress` turns transitions off for two frames).
+- `prefers-reduced-motion`: every keyframe animation shrinks to 0.01ms and loops run once (the site-wide rule in `motion.css`); transitions are untouched.
+- Not used: route transitions, list FLIP, cross-column flights, a spring family (only message entry uses `--spring-snappy`).
+- Pins: `e2e/cds-motion.spec.ts` pins the motion slots and `anim-*` class names; `e2e/card-press.spec.ts` pins instant press; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
 
 ## 暗色
 

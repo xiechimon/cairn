@@ -93,3 +93,32 @@ test('a 390px needs-you row shows the whole title and keeps its actions on scree
   expect(fit.clipped).toBe(false);
   expect(fit.buttonsInside).toBe(true);
 });
+
+test('a short phone screen scrolls the strip away to reach the last board group', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 640 });
+  await page.goto('/app?scenario=board-drag-matrix');
+  await expect(page.getByTestId('needs-you-strip')).toBeVisible();
+  const lastCard = page.locator('.board-column[data-column="done"] .todo-card-title').last();
+  await lastCard.scrollIntoViewIfNeeded();
+  const box = await lastCard.boundingBox();
+  const bar = await page.getByTestId('board-new-task-bar').boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(bar!.y);
+  const stripTop = await page.getByTestId('needs-you-strip').evaluate((el) => el.getBoundingClientRect().top);
+  expect(stripTop).toBeLessThan(0);
+});
+
+test('the phone chief launcher clears the new-task bar on the board and sits in the corner elsewhere', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app?scenario=01');
+  const onBoard = await page.locator('.chief-fab').boundingBox();
+  const bar = await page.getByTestId('board-new-task-bar').boundingBox();
+  expect(onBoard!.y + onBoard!.height).toBeLessThanOrEqual(bar!.y);
+  await page.goto('/app/schedules?scenario=11');
+  const elsewhere = await page.locator('.chief-fab').boundingBox();
+  expect(844 - (elsewhere!.y + elsewhere!.height)).toBeLessThan(16);
+});

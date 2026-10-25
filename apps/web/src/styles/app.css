@@ -25,7 +25,6 @@
   --text-meta--line-height: calc(16 / 12);
   --text-caption: var(--type-caption);
   --text-caption--line-height: calc(16 / 11.5);
-  --animate-breath: card-breath 2.4s ease-in-out infinite;
 }
 
 @layer base {
@@ -313,13 +312,18 @@
     max-width: none;
   }
 
+  .board-main {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .board-scroller {
+    flex: none;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
     grid-auto-rows: auto;
     align-content: start;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: visible;
     padding-bottom: 72px;
   }
 
@@ -360,10 +364,16 @@
     min-width: 44px;
     min-height: 44px;
     right: max(0.5rem, env(safe-area-inset-right));
-    bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + 60px);
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
   .chief-drawer {
     right: max(0.5rem, env(safe-area-inset-right));
     bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  body:has(.board-new-task-bar) .chief-fab {
+    bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + 60px);
+  }
+  body:has(.board-new-task-bar) .chief-drawer {
+    transform-origin: calc(100% - 1.25rem) calc(100% - 60px - 1.25rem);
   }
 }
