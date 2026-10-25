@@ -479,6 +479,9 @@ export const agentMemory = sqliteTable('agent_memory', {
   history: json<{ title: string; content: string; updatedAt: number }[]>('history')
     .notNull()
     .default(sql`'[]'`),
+  invalidAt: epochMs('invalidAt'),
+  supersededBy: text('supersededBy'),
+  lastInjectedAt: epochMs('lastInjectedAt'),
   createdAt: epochMs('createdAt').notNull(),
   updatedAt: epochMs('updatedAt').notNull(),
 });

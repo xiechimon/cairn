@@ -35,7 +35,6 @@ import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
-  agentMemory,
   build,
   chief,
   chiefMessage,
@@ -64,7 +63,12 @@ import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
-import { deleteMemoryEntry, saveMemoryEntry, updateMemoryEntry } from './memory.js';
+import {
+  deleteMemoryEntry,
+  listMemoryEntries,
+  saveMemoryEntry,
+  updateMemoryEntry,
+} from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { getModelSources } from './providers.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
@@ -1037,13 +1041,13 @@ export async function executeChiefTool(
     }
     case 'memories': {
       if (ctx.chiefAgentId === null) return json([]);
-      const rows = db
-        .select()
-        .from(agentMemory)
-        .where(and(eq(agentMemory.agentId, ctx.chiefAgentId), eq(agentMemory.teamId, ctx.teamId)))
-        .orderBy(asc(agentMemory.createdAt))
-        .all();
-      return json(rows);
+      return json(
+        listMemoryEntries(
+          db,
+          { agentId: ctx.chiefAgentId, teamId: ctx.teamId },
+          bool(params, 'includeInvalid', false),
+        ),
+      );
     }
     case 'watch_todos': {
       const todoIds = strArr(params, 'todoIds');
@@ -1292,13 +1296,13 @@ export async function executeWorkerMemoryTool(
       return json({ deleted: memoryId });
     }
     case 'memories': {
-      const rows = db
-        .select()
-        .from(agentMemory)
-        .where(and(eq(agentMemory.agentId, ctx.agentId), eq(agentMemory.teamId, ctx.teamId)))
-        .orderBy(asc(agentMemory.createdAt))
-        .all();
-      return json(rows);
+      return json(
+        listMemoryEntries(
+          db,
+          { agentId: ctx.agentId, teamId: ctx.teamId },
+          bool(params, 'includeInvalid', false),
+        ),
+      );
     }
     case 'attachment': {
       // #310 / r9 §3.1：worker 步读附件，与 chief-tools / mcp-face 同源。

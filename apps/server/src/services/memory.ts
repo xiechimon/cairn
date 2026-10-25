@@ -37,6 +37,58 @@ export function overlaps(left: string, right: string): boolean {
 
 type MemoryTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
+const stillValid = isNull(agentMemory.invalidAt);
+
+export function listMemoryEntries(
+  db: Db | MemoryTx,
+  scope: { agentId: string; teamId: string },
+  includeInvalid = false,
+) {
+  return db
+    .select()
+    .from(agentMemory)
+    .where(
+      and(
+        eq(agentMemory.agentId, scope.agentId),
+        eq(agentMemory.teamId, scope.teamId),
+        includeInvalid ? undefined : stillValid,
+      ),
+    )
+    .orderBy(asc(agentMemory.createdAt), asc(agentMemory.id))
+    .all();
+}
+
+export function injectMemories(db: Db, scope: { agentId: string; projectId?: string }) {
+  return db.transaction((tx) => {
+    const rows = tx
+      .select({ id: agentMemory.id, title: agentMemory.title, content: agentMemory.content })
+      .from(agentMemory)
+      .where(
+        and(
+          eq(agentMemory.agentId, scope.agentId),
+          stillValid,
+          scope.projectId === undefined
+            ? undefined
+            : or(eq(agentMemory.projectId, scope.projectId), isNull(agentMemory.projectId)),
+        ),
+      )
+      .orderBy(asc(agentMemory.createdAt), asc(agentMemory.id))
+      .all();
+    if (rows.length > 0) {
+      tx.update(agentMemory)
+        .set({ lastInjectedAt: nowMs() })
+        .where(
+          inArray(
+            agentMemory.id,
+            rows.map((row) => row.id),
+          ),
+        )
+        .run();
+    }
+    return rows.map(({ title, content }) => ({ title, content }));
+  });
+}
+
 export function memoriesInScope(
   tx: MemoryTx,
   scope: { agentId: string; teamId: string; projectId: string | null },
@@ -49,6 +101,7 @@ export function memoriesInScope(
       and(
         eq(agentMemory.agentId, scope.agentId),
         eq(agentMemory.teamId, scope.teamId),
+        stillValid,
         everyProject
           ? undefined
           : scope.projectId === null
@@ -75,12 +128,7 @@ export function saveMemoryEntry(
 ) {
   validateMemoryText(input.title, input.content);
   return db.transaction((tx) => {
-    const count = tx
-      .select({ n: sql<number>`count(*)` })
-      .from(agentMemory)
-      .where(eq(agentMemory.agentId, input.agentId))
-      .get();
-    if ((count?.n ?? 0) >= MEMORY_QUOTA_PER_AGENT) {
+    if (listMemoryEntries(tx, input).length >= MEMORY_QUOTA_PER_AGENT) {
       throw new HttpError(409, `memory quota exceeded (${MEMORY_QUOTA_PER_AGENT}/agent)`);
     }
     const rows = memoriesInScope(tx, input);
@@ -149,6 +197,14 @@ export function updateMemoryEntry(
       )
       .get();
     if (!row) throw new HttpError(404, `memory ${input.memoryId}`);
+    if (row.invalidAt !== null) {
+      throw new HttpError(
+        409,
+        row.supersededBy === null
+          ? `memory ${row.id} is no longer valid`
+          : `memory ${row.id} was superseded by ${row.supersededBy}; update that one`,
+      );
+    }
     validateMemoryText(row.title, input.content);
     if (row.content === input.content) return row;
     const duplicate = memoriesInScope(tx, row, row.projectId === null).find(
@@ -157,19 +213,32 @@ export function updateMemoryEntry(
     if (duplicate) {
       throw new HttpError(409, `memory ${duplicate.id} already has this content`);
     }
-    return tx
-      .update(agentMemory)
-      .set({
+    const now = Math.max(nowMs(), row.updatedAt + 1);
+    const successor = tx
+      .insert(agentMemory)
+      .values({
+        id: newRecordId(),
+        agentId: row.agentId,
+        teamId: row.teamId,
+        title: row.title,
         content: input.content,
+        projectId: row.projectId,
+        sourceTodoId: row.sourceTodoId,
+        sourceBuildId: row.sourceBuildId,
         history: [
           ...row.history,
           { title: row.title, content: row.content, updatedAt: row.updatedAt },
         ],
-        updatedAt: Math.max(nowMs(), row.updatedAt + 1),
+        createdAt: now,
+        updatedAt: now,
       })
-      .where(eq(agentMemory.id, row.id))
       .returning()
       .get();
+    tx.update(agentMemory)
+      .set({ invalidAt: now, supersededBy: successor.id })
+      .where(eq(agentMemory.id, row.id))
+      .run();
+    return successor;
   });
 }
 

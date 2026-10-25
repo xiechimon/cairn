@@ -12,5 +12,9 @@ test('记忆工具发布更新入口与候选、强制写入和历史语义', ()
     expect(update?.parameters).toMatchObject({ required: ['memoryId', 'content'] });
     expect(update?.description).toContain('history');
     expect(tools.find((t) => t.name === 'memories')?.description).toContain('history');
+    expect(tools.find((t) => t.name === 'memories')?.parameters).toMatchObject({
+      properties: { includeInvalid: { type: 'boolean' } },
+    });
+    expect(update?.description).toContain('superseded');
   }
 });

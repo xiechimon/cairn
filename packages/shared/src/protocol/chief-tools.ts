@@ -755,7 +755,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'update_memory',
     description:
-      'Update your memory content by memoryId, preserving old values in history. Read history with memories. GitHub issue fence text is rejected.',
+      'Update your memory content by memoryId: the old entry is marked invalid and superseded by a new entry (returned) that keeps the old values in history. Only valid entries can be updated. GitHub issue fence text is rejected.',
     parameters: obj({ memoryId: str('Memory id.'), content: str('Replacement memory body.') }, [
       'memoryId',
       'content',
@@ -768,8 +768,14 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'memories',
-    description: 'List the memory entries of the agent running the chief, including history.',
-    parameters: obj({}),
+    description:
+      'List the currently valid memory entries of the agent running the chief, including history. Set includeInvalid:true to also list superseded entries.',
+    parameters: obj({
+      includeInvalid: {
+        type: 'boolean',
+        description: 'Also list invalidated entries; default false.',
+      },
+    }),
     replaySafe: true,
   },
   {
@@ -842,7 +848,7 @@ export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'update_memory',
     description:
-      'Update your memory content by memoryId, preserving old values in history. Read history with memories. GitHub issue fence text is rejected.',
+      'Update your memory content by memoryId: the old entry is marked invalid and superseded by a new entry (returned) that keeps the old values in history. Only valid entries can be updated. GitHub issue fence text is rejected.',
     parameters: obj({ memoryId: str('Memory id.'), content: str('Replacement memory body.') }, [
       'memoryId',
       'content',
@@ -855,8 +861,14 @@ export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'memories',
-    description: 'List your own memory entries, including history.',
-    parameters: obj({}),
+    description:
+      'List your own currently valid memory entries, including history. Set includeInvalid:true to also list superseded entries.',
+    parameters: obj({
+      includeInvalid: {
+        type: 'boolean',
+        description: 'Also list invalidated entries; default false.',
+      },
+    }),
     replaySafe: true,
   },
 ];
