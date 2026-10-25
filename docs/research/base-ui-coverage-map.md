@@ -515,7 +515,7 @@ grep -rn "@base-ui/react" apps/web/src --include='*.tsx'
 grep -rlE "components/ui/<p>\.js'|from '\./<p>\.js'|from '\./ui/<p>\.js'" apps/web/src --include='*.tsx'
 
 # 已装官方件目录（§1.4，主检出 pnpm 实体路径）
-ls /Users/xmon/Code/AgentProjects/pacman/node_modules/.pnpm/@base-ui+react@1.8.0_*/node_modules/@base-ui/react/
+ls <repo>/node_modules/.pnpm/@base-ui+react@1.8.0_*/node_modules/@base-ui/react/
 
 # 域 css 体量（§2 表）
 find apps/web/src -name '*.css' | sort | while read f; do \

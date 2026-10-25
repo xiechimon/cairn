@@ -21,8 +21,9 @@ re-renders in place; kickstart as printed to apply).
 ## Premise (read before rebooting)
 
 - The job starts the equivalent of `pnpm dev:daemon`
-  (`tsx src/cli.ts start -f`) from the main checkout, with fnm node 24
-  pinned by absolute path. No login shell, no PATH guessing.
+  (`tsx src/cli.ts start -f`) from the main checkout, with the node found
+  on PATH at install time (or `--node PATH`) pinned by absolute path. No
+  login shell, no PATH guessing at run time.
 - The dev server on `:8787` is NOT managed here. If it is down, the daemon
   logs claim backoff and attaches once the server is up — start the server
   (`pnpm dev` in the main checkout) after a reboot; the daemon needs no kick.
