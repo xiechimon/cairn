@@ -1,14 +1,3 @@
-// Resource pages on the Paper page patterns
-// (apps/web/DESIGN.md 页面模式). Failure modes pinned here:
-// 1. An empty state grows a tinted icon tile again (orange / beige block).
-// 2. A list falls back to one card per item, or its rows lose the 52px
-//    settings-row height or the 20px card corner.
-// 3. The machines page brings back the full-width dashed 添加机器 bar.
-// 4. The providers runtime tabs fall back to their own pill skin instead of
-//    the Paper segmented face (canvas track, white chosen tab with a ring).
-// 5. A create dialog brings back a full-width submit bar.
-// 6. A status loses its label (online = green dot + 在线).
-
 import { expect, type Page, test } from '@playwright/test';
 
 const light = async (page: Page, url: string) => {
@@ -57,7 +46,7 @@ for (const [name, url, rows] of [
   });
 }
 
-test('machines: 添加机器 sits in the top bar, no dashed full-width bar', async ({ page }) => {
+test('machines: `添加机器` sits in the top bar, no dashed full-width bar', async ({ page }) => {
   await light(page, '/app/resources/machines?scenario=06');
   const add = page.getByTestId('page-topbar').getByRole('button', { name: '添加机器' });
   await expect(add).toBeVisible();

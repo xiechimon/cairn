@@ -2,7 +2,6 @@ import { expect, test } from '@playwright/test';
 import { spiralAvatarSvg, spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
 import { pressAndExpect } from './helpers.js';
 
-
 const USER_SRC = spiralAvatarUrl('Xmon Dai');
 const AGENT_SRC = spiralAvatarUrl('r3-builder');
 
@@ -26,7 +25,7 @@ test('sidebar avatar chips (expanded + rail) and user-menu head share one seeded
   await expect(page.locator('.rail-user img')).toHaveAttribute('src', USER_SRC);
 });
 
-test('team agent card seeds by agent displayName — user/agent srcs differ (不同名不同像)', async ({
+test('team agent card seeds by agent displayName — user/agent srcs differ (different names, different avatars)', async ({
   page,
 }) => {
   await page.goto('/app/team?scenario=12');
@@ -77,7 +76,7 @@ test('live members projection: two agents → two distinct seeded srcs; avatarUr
   await expect(gamma.locator('img')).toHaveAttribute('src', override);
 });
 
-test('detail chip popover: user row + 执行对话 agent row both seeded', async ({ page }) => {
+test('detail chip popover: user row + `执行对话` agent row both seeded', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=19');
   const popover = page.getByRole('dialog', { name: '任务分配' });
   await expect(popover).toBeVisible();
@@ -99,7 +98,7 @@ test('create-agent dialog: empty name keeps the static asset; typing previews th
   await expect(img).toHaveAttribute('src', spiralAvatarUrl('nova'));
 });
 
-test('unreachable avatarUrl override → img onError falls back to the static asset (不裂图)', async ({
+test('unreachable avatarUrl override → img onError falls back to the static asset (no broken image)', async ({
   page,
 }) => {
   await page.route('**/avatars.invalid/**', (route) => route.abort());
@@ -153,7 +152,7 @@ test('no avatar surface reaches a third-party avatar host', async ({ page }) => 
   expect(hits).toEqual([]);
 });
 
-test('search agent rows + project task rows are seeded (Agent 列表 / 任务行头像位)', async ({
+test('search agent rows + project task rows are seeded (`Agent 列表` / task-row avatar slots)', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01');

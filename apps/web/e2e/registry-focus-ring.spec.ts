@@ -20,8 +20,7 @@ const SKILLS = '/app/resources/skills?scenario=01';
 const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks';
 const MACHINES = '/app/resources/machines?scenario=06';
 const ACCEPT = '/app?scenario=34';
-// The board card (Paper PR 3) and the detail head status (Paper PR 7) no
-// longer render a Badge; the run-history 当前 marker in the detail pane does.
+
 const BADGES = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=57f';
 const SCHEDULES = '/app/schedules?scenario=r3-92';
 

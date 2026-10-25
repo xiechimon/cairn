@@ -144,7 +144,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     });
 
-    test('board cards show the summed amount, 「—」 with a reason, or nothing', async ({ page }) => {
+    test('board cards show the summed amount, `—` with a reason, or nothing', async ({ page }) => {
       await stubWorld(page);
       await page.goto('/app');
       await expect(card(page, NEVER_RAN.id)).toBeVisible();
@@ -170,7 +170,7 @@ for (const theme of ['light', 'dark'] as const) {
       }
     });
 
-    test('detail: total plus 缓存读取 / 输入 / 输出 from the cost columns', async ({ page }) => {
+    test('detail: total plus `缓存读取` / `输入` / `输出` from the cost columns', async ({ page }) => {
       await stubWorld(page);
       const cost = await openTokenSection(page, PRICED.id);
       await expect(cost).toBeVisible();
@@ -199,7 +199,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(layout).toEqual({ overlaps: 0, clipped: 0, outside: 0 });
     });
 
-    test('detail: no price source reads 「—」 and says why, never $0.00', async ({ page }) => {
+    test('detail: no price source reads `—` and says why, never $0.00', async ({ page }) => {
       await stubWorld(page);
       const cost = await openTokenSection(page, UNPRICED.id);
       await expect(cost).toBeVisible();

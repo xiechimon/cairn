@@ -1,20 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Project settings and new project on the Paper page patterns (DESIGN.md
-// 「页面模式」: settings list + form layout).
-//
-// Failure modes, each pinned below:
-//  P1 the project identity goes back into the card as a centered avatar block
-//     instead of the 56px header circle above the card
-//  P2 the settings card leaves --radius-card (registry rounded-xl 14px)
-//  P3 rows drift to per-row heights, or a divider lands on the card edge
-//  P4 删除 sits inside the settings card again, or the button turns back into
-//     a pill / a non-32px box
-//  P5 目标分支 becomes a real control (button / Select) with nothing behind it
-//  N1 the avatar placeholder is a beige tile again instead of a white ring circle
-//  N2 inputs span the whole column instead of the 520px form stack
-//  N3 创建项目 is a full-width bar instead of a right-aligned 32px default button
-
 const SETTINGS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c';
 const NEW_PROJECT = '/app/project/new?scenario=01';
 

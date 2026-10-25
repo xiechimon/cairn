@@ -100,12 +100,10 @@ async function stubStack(page: Page, rows: StubMachine[]) {
   return { pending, state };
 }
 
-// #1241 设计 A：触发面 = aria-label 定位（行内不再有可见来源词）；来源状态
-// 载体 = 触发钮自身的 data-concurrency-source（原内嵌 span 的载体迁移）。
 const trigger = (page: Page, id: string) =>
   page.locator(`button[aria-label^="并发上限"][data-machine-id="${id}"]`);
 
-test('选数即标手动：PATCH 在途时来源已是手动，回执后仍是手动', async ({ page }) => {
+test('picking a number marks manual: while the PATCH is in flight the source is already manual, still manual after receipt', async ({ page }) => {
   const { pending, state } = await stubStack(page, [machine({ id: 'm-1' })]);
   await page.goto('/app/resources/machines');
   await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'measured');
@@ -116,7 +114,7 @@ test('选数即标手动：PATCH 在途时来源已是手动，回执后仍是�
 
   await expect.poll(() => pending.length).toBe(1);
   await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'manual');
-  // aria-label 携带现值与来源（可见词已撤，语义走可及名 + title）。
+
   await expect(trigger(page, 'm-1')).toHaveAttribute('aria-label', '并发上限 5，手动');
 
   pending.shift()!();
@@ -124,7 +122,7 @@ test('选数即标手动：PATCH 在途时来源已是手动，回执后仍是�
   await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'manual');
 });
 
-test('恢复推荐（有指纹）：PATCH 在途时来源先复判为推荐', async ({ page }) => {
+test('`恢复推荐` (with fingerprint): while the PATCH is in flight the source is first re-judged as recommended', async ({ page }) => {
   const { pending } = await stubStack(page, [
     machine({ id: 'm-1', maxConcurrent: 5, maxConcurrentOverridden: true, concurrencySource: 'manual' }),
   ]);
@@ -139,7 +137,7 @@ test('恢复推荐（有指纹）：PATCH 在途时来源先复判为推荐', as
   pending.shift()!();
 });
 
-test('恢复推荐（无指纹）：PATCH 在途时来源先复判为估算，不说成推荐', async ({ page }) => {
+test('`恢复推荐` (no fingerprint): while the PATCH is in flight the source is first re-judged as estimated, not called recommended', async ({ page }) => {
   const { pending } = await stubStack(page, [
     machine({
       id: 'm-1',

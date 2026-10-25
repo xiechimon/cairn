@@ -1,20 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Paper board sheet (paper-redesign-plan PR 7): the board route wears the
-// same inset sheet as PageShell, so hopping between the board and any other
-// route keeps the main panel still. Failure modes pinned here:
-//   1. the board sheet box drifts from the PageShell sheet box (expanded or rail);
-//   2. the two sheets look different (radius, fill, ring);
-//   3. the 10px gaps are not canvas (root left at the sheet color);
-//   4. the sheet becomes <main> and the board header loses role=banner;
-//   5. the 总管设置 swap renders outside the sheet, on bare canvas;
-//   6. the sheet casts an outer shadow, which reads as a grey halo in the
-//      10px canvas gaps (DESIGN.md: the sheet is the hairline ring only);
-//   7. on a 2x screen the sheet or card outline thins to 0.5px (--hairline)
-//      instead of one CSS pixel;
-//   8. a child with a background covers the sheet ring (the board scroller
-//      did, below the top bar), so the ring is an ::after layer above them.
-
 const BOARD = '/app?scenario=01';
 const SCHEDULES = '/app/schedules?scenario=11';
 
@@ -80,7 +65,7 @@ test('board header stays the banner, at the top of the sheet', async ({ page }) 
   expect(box).toEqual({ x: 248, y: 10, width: 1182, height: 56 });
 });
 
-test('总管设置 swaps in inside the same sheet', async ({ page }) => {
+test('chief settings swaps in inside the same sheet', async ({ page }) => {
   await page.goto('/app?scenario=101');
   const heading = page.locator('.board-sheet').getByRole('heading', { name: '总管设置' });
   await expect(heading).toBeVisible();

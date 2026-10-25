@@ -1,18 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// #1242 项目身份可变面：设置页名称/描述编辑接 PATCH + local→github 转换卡。
-// live 数据分支打桩（project-settings-local-path.spec 同律：teams / user me /
-// projects 供数，其余 GET 一律 500，应用既有 isError 耐受）。钉四条：
-//  · 名称/描述编辑写回：保存 → PATCH /api/projects/{id} {name} /
-//    {description}（描述清空 = **显式 null**，#1169 序列化坑族同律）；
-//    invalidate 重取回显新名（侧栏/卡面同源的 projects 面收敛）。
-//  · 失败可见（票面验收 3）：PATCH 500 → 错误 toast 可见，不静默。
-//  · local→github 转换（票面验收 1 的 UI 半）：githubRepo + localPath
-//    （预填现值——local 绑定路径就地转加速位）三键上 wire；成功后
-//    invalidate 重取 → 转换卡卸载、基本信息卡的加速位行上线。
-//  · 形态门槛：github/hosted 项目不显示转换卡；空 owner/repo 形状 → 中性
-//    提示行（预检闸，非 toast）。
-
 const TEAM_ID = 'team-1';
 const LOCAL_PROJECT_ID = 'proj-ident-local';
 const GITHUB_PROJECT_ID = 'proj-ident-github';
@@ -44,8 +31,6 @@ interface Stub {
   patches: { raw: string; body: Record<string, unknown> }[];
 }
 
-/** 启动面 + projects 读写面；PATCH 落桩态（invalidate 重取回显新真值）。
- * failNext = 下一次 PATCH 返 500（失败可见钉）。 */
 async function stubWorld(
   page: Page,
   initial: WireProject[],
@@ -78,7 +63,6 @@ async function stubWorld(
   return stub;
 }
 
-/** 桩侧 PATCH 应用（name/description/repoKind/githubRepo/localPath 五字段）。 */
 function applyPatch(p: WireProject, body: Record<string, unknown>): WireProject {
   const next: WireProject = { ...p };
   if (body.name !== undefined) next.name = String(body.name);
@@ -115,15 +99,13 @@ test('settings: name and description edits reach PATCH; description clear writes
   await nameSave.click();
   await refetched;
   expect(stub.patches[0]?.body).toEqual({ name: 'cairn-main' });
-  // invalidate 重取回显新名（名称纯显示面——数据源即侧栏/卡面同源）
+
   await expect(nameInput).toHaveValue('cairn-main');
 
   const descInput = page.getByRole('textbox', { name: DESC_FIELD });
   await expect(descInput).toHaveValue('');
   await descInput.fill('迁移期的主项目');
-  // 落定信号 = invalidate 触发的列表重取（local-path spec 同律：mutation
-  // onSuccess 的草稿复位与后续 fill 同拍竞速，不等待会把清空输入覆写回
-  // server 真值——草稿被复位成 null，保存钮永远禁用）。
+
   const descRefetched = page.waitForResponse(
     (r) => r.url().includes('/api/projects') && r.request().method() === 'GET',
   );
@@ -133,7 +115,6 @@ test('settings: name and description edits reach PATCH; description clear writes
   await expect(stub.patches.length).toBe(2);
   expect(stub.patches[1]?.body).toEqual({ description: '迁移期的主项目' });
 
-  // 清空保存：显式 null——键在 wire 上（#1169 同族序列化坑）
   await descInput.fill('');
   await page.getByRole('button', { name: '保存描述' }).click();
   await expect(stub.patches.length).toBe(3);
@@ -147,7 +128,7 @@ test('settings: identity save failure is visible (toast, not silent)', async ({ 
   const nameInput = page.getByRole('textbox', { name: NAME_FIELD });
   await nameInput.fill('改名失败可见');
   await page.getByRole('button', { name: '保存名称' }).click();
-  // #638 同律：失败 = toast 可见（默认 toast 面带错误文案）。
+
   const toast = page.getByText('保存失败，请重试。');
   await expect(toast).toBeVisible();
 });
@@ -162,13 +143,12 @@ test('settings: local project shows conversion card; submit carries repoKind/git
   await expect(card).toBeVisible();
   const repoInput = page.getByRole('textbox', { name: 'GitHub 仓库（owner/repo）' });
   const pathInput = page.getByRole('textbox', { name: '本机加速路径' });
-  // localPath 预填现值（local 绑定路径就地转加速位）
+
   await expect(pathInput).toHaveValue('/Users/who/code/cairn');
-  // 转换钮：空 repo 禁用
+
   const convert = page.getByRole('button', { name: '转换' });
   await expect(convert).toBeDisabled();
 
-  // 形状预检：半截 owner/repo → 中性提示行（非 toast）
   await repoInput.fill('no-slash');
   await convert.click();
   await expect(page.getByText('GitHub 仓库格式应为 owner/repo。')).toBeVisible();
@@ -185,7 +165,7 @@ test('settings: local project shows conversion card; submit carries repoKind/git
     githubRepo: 'xiechimon/cairn',
     localPath: '/Users/who/code/cairn',
   });
-  // invalidate 重取 → 形态切面：转换卡卸载，基本信息卡加速位行上线
+
   await expect(page.getByText('转换为 GitHub 形态', { exact: true })).toHaveCount(0);
   await expect(page.getByText('本机加速路径', { exact: true })).toBeVisible();
 });

@@ -30,8 +30,6 @@ const viewport = (page: Page) => page.getByTestId('chief-body');
  * #1009 A1: MessageScrollerViewport carries chief-body). */
 const scrollTopOf = (page: Page) => viewport(page).evaluate((el) => el.scrollTop);
 
-/** settle the enter/exit animation before measuring (zoom-in-95 keeps the
- * transform on the box mid-flight, chief-panel.spec 同律). */
 async function settled(page: Page) {
   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 }

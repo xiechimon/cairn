@@ -139,12 +139,6 @@ function instrument(require) {
 
   const CHAIN_PROPS = new Set(['not', 'resolves', 'rejects']);
 
-  // Matchers whose expected/actual pair is a visual baseline worth tabulating:
-  // computed-style and geometry value comparisons plus the one web-first
-  // computed-style matcher. Behavioral/presence matchers (toBeVisible,
-  // toHaveCount, toHaveText, toBeDisabled, …) only get their locator moved
-  // under 裁定 3, never a value re-pin, so they are delegated untouched and
-  // not recorded — this keeps the dump to the ~visual-probe surface.
   const VISUAL_MATCHERS = new Set([
     'toBe',
     'toEqual',

@@ -631,17 +631,7 @@
   },
   {
     "path": "apps/web/e2e/account-team-cleanse.spec.ts",
-    "line": "//   cairn.teamMembersLayout — chart drops the stats bar + grid's 创建",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/account-team-cleanse.spec.ts",
     "line": "  // the choice survives a reload (cairn.teamMembersLayout)",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/board-dnd.spec.ts",
-    "line": "//     250ms flight was a cairn invention; the reference snaps).",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
@@ -650,68 +640,8 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/e2e/checkbox-unified.spec.ts",
-    "line": "// verify-cairn 的 drive-stop 探针 + 截图证据覆盖，见 docs/verify/XMON-72/。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/checkbox-unified.spec.ts",
-    "line": "// CAIRN_E2E_EVIDENCE=docs/verify/<ticket> 再跑，见 e2e/evidence.ts）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/chief-draft-persist.spec.ts",
-    "line": "// 受控态并写穿 localStorage（键 = cairn.chief-draft，品牌前缀照",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/chief-draft-persist.spec.ts",
-    "line": "// cairn.chief-open 先例；Multica packages/core/chat/store.ts 的",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/chief-draft-persist.spec.ts",
-    "line": "//     零读零写 cairn.chief-draft——预植键不被消费也不被改写，草稿",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/chief-draft-persist.spec.ts",
-    "line": "  // cairn.chief-open=1，后续 reload 窗自开（D5 已验面，本 spec 顺带倚靠）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/chief-panel.spec.ts",
-    "line": "//      localStorage cairn.chief-open on the live face, default closed.",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/chief-panel.spec.ts",
-    "line": "//      canon — both single-sourced from @cairn/shared.",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/chief-panel.spec.ts",
-    "line": "    // two idle shapes. Values verbatim from @cairn/shared",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/collapse-family.spec.ts",
-    "line": "// group rides the observed original key shape (cairn.sidebarProjectsCollapsed,",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/e2e/composer-wire-reject.spec.ts",
     "line": "// CAIRN_E2E_EVIDENCE=docs/verify/<ticket> — see e2e/evidence.ts).",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/dead-buttons.spec.ts",
-    "line": "  // 「暂无方案」占位即模式切换证据(live plan 内容归 verify-cairn)",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/detail-queued-exit.spec.ts",
-    "line": "// detail page. Cairn never times out a queued step (#1257), so without one a",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
@@ -725,23 +655,8 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/e2e/hotkeys.spec.ts",
-    "line": "//     live fire / scope / input-guard faces ride the verify-cairn probe",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/live-agent-model-line.spec.ts",
-    "line": "// live. Evidence shots (CAIRN_E2E_EVIDENCE) sit before the assertions so",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/e2e/live-project-name.spec.ts",
     "line": "// ?scenario= = live. Evidence shots (CAIRN_E2E_EVIDENCE) sit before the",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/live-server-reap.spec.ts",
-    "line": "// 判据与实现无关：按 CAIRN_HOME=<本次 home> 反查整机进程环境——包装层、",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
@@ -750,83 +665,8 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/e2e/machine-add-dialog.spec.ts",
-    "line": "// (展开 → `cairn start --api-key <key> --team <teamId>` + 获取 API key →",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/machines-local.spec.ts",
-    "line": "// live 面全链真值 = .claude/skills/verify-cairn/scripts/drive-machines-local.mjs",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/machines-local.spec.ts",
-    "line": "// 2. 「Cairn 托管机器」facade 行已除（负向）",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/merge-reject.spec.ts",
-    "line": "// CAIRN_E2E_EVIDENCE=docs/verify/<ticket> 再跑，见 e2e/evidence.ts）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/notify-click.spec.ts",
-    "line": "// 11. 帐号开关关档（#1031 本地偏好覆盖 cairn.notifyEnabled=0）不落到通知",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/notify-click.spec.ts",
-    "line": "    // localStorage 的 cairn.notifyEnabled（帐号页开关「关」的落地面）。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/paper-overlays.spec.ts",
-    "line": "// Screenshots: CAIRN_E2E_EVIDENCE=docs/verify/paper-overlays.",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/e2e/probe-dump-instrument.mjs",
     "line": "// NODE_OPTIONS=\"--import <this file>\"; inert unless CAIRN_PROBE_DUMP_FILE",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/probe-dump.mjs",
-    "line": "//   pnpm --filter @cairn/web probe:dump                    # full suite",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/probe-dump.mjs",
-    "line": "//   pnpm --filter @cairn/web probe:dump -- --specs sidebar-visual accent-typo",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/project-files-local.spec.ts",
-    "line": "// .test.ts F2/F3/F4）+ verify-cairn live 面——fixture 模式下 tree query 恒",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/project-new-fs-pick.spec.ts",
-    "line": "// 原生真路径（探测两态 / 对话框回填 / 取消退出码）走 verify-cairn 人工面。",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/project-new-github.spec.ts",
-    "line": "// cairn probe）。github 选态三面：未认证 = 认证钮 + 手动兜底链接；已认证 =",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/project-new-github.spec.ts",
-    "line": "  // typeahead：单字符前缀命中 xiechimon/cairn（fixture 第三行）；两次",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/project-new-repo.spec.ts",
-    "line": "// precedent; the real-server three-state validation is verify-cairn's",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/project-tasks-toolbar.spec.ts",
-    "line": "// client-state key (cairn.projectTasksLayout, teamMembersLayout twin), the",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
@@ -835,23 +675,8 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/e2e/providers-tabs.spec.ts",
-    "line": "// （显示名 → 模型 id，data-runtime/data-model-id 契约句柄）。「Cairn",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/e2e/storage-unavailable.spec.ts",
     "line": "  // writes cairn.sidebar-collapsed on every click).",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/theme-toggle.spec.ts",
-    "line": "// under `cairn-theme`, segment aria-checked following the stored value.",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/e2e/token-gate.spec.ts",
-    "line": "// 本 spec 起真 apps/server 进程（CAIRN_HOME scratch 目录 + 托管 fixture 构建的",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {

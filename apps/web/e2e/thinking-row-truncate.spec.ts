@@ -1,19 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// #1034 详情对话面同源缺陷：thinking 行（transcript.tsx case 'thinking'）
-// 曾既无 flex 也无宽度上限——chat-row / chat-text 是零规则的死类名，20px
-// 头像槽（-mt-1 骑顶设计）直接压在文字上；行内 ThinkingRow 的钮在
-// w-fit + nowrap 下解成整段文本宽，冲出线程列。修法 = 对齐 robot 行
-// （transcript.tsx :419）的工具类 + #772 截断律（min-w-0 flex-auto truncate）。
-// chief 面的长预览截断另钉 chief-stream-markdown.spec F-R21。
-// 每条测试钉一个失败方式：
-//  T1 行不是 flex → 头像与文字列水平重叠（bug 本体：头像压字）
-//  T2 chat-text 无宽度上限（max-width none / min-width auto）→ 钮宽无界
-//  T3 长预览（> PREVIEW_CHARS=150，字符切片已触发）没有 CSS 截断 →
-//     省略号缺位、可见宽 == 内容宽、钮宽 > 文字列宽
-//  T4 页面级横向溢出；以及截断修法砸掉展开交互（点不开全文）
-// 数据面 = live 打桩（transcript-user-words.spec 的 stubWorld 纪律）。
-
 const TEAM_ID = 'team-1';
 const USER_ID = 'user-1';
 const AGENT_ID = 'agent-1';
@@ -74,8 +60,6 @@ const WIRE_BUILD = {
   createdAt: 0,
 };
 
-/** 长思考（> PREVIEW_CHARS=150，单行无换行点）：字符切片先触发（预览以
- *  字面 … 收尾），CSS 截断必须接力——两级各司其职（#1034 口径）。 */
 const LONG_THINKING =
   '用户这句「你好」是纯招呼，没有任务实体：先不路由看板，也不建卡。接下来要做的事分三步——第一步核对会话历史里有没有未收口的执行步，第二步看定时器有没有到点要唤起的复盘，第三步再判断这句招呼背后是不是藏着一个新需求的开头；如果三步都空，就只回一句招呼，等用户把真实意图说出来再动手。另外留意中英混排时省略号的落点，别让截断把行尾标点吃掉半个，视觉上会显得字被切坏而不是被收纳。';
 
@@ -161,12 +145,11 @@ async function stubWorld(page: Page) {
   await expect(page.getByTestId('transcript-col')).toBeVisible();
 }
 
-/** 被测行：thinking 行 = 唯一带展开钮的 agent 行。 */
 function thinkingRow(page: Page) {
   return page.locator('div.chat-row--agent', { hasText: '用户这句' });
 }
 
-test('T1: 行是 flex，头像与文字列水平不重叠（改前：头像压在文字上）', async ({ page }) => {
+test('T1: the row is flex, avatar and text column do not overlap horizontally (before: avatar pressed on the text)', async ({ page }) => {
   await stubWorld(page);
   const row = thinkingRow(page);
   await expect(row).toHaveCount(1);
@@ -178,13 +161,13 @@ test('T1: 行是 flex，头像与文字列水平不重叠（改前：头像压�
     return { display: getComputedStyle(el).display, gap: t.left - a.right, avatarW: a.width };
   });
   expect(layout.display).toBe('flex');
-  // robot 行同距（ml-[11px]）：负值 = 重叠（改前形态），0 = 贴死，11 = 对齐 :419。
+
   expect(layout.gap).toBe(12);
-  // 头像槽 flex-none 生效：20px 槽不被文字挤压。
+
   expect(layout.avatarW).toBe(20);
 });
 
-test('T2: chat-text 有宽度上限与 min-w-0——robot 行 :419 同款工具类', async ({ page }) => {
+test('T2: chat-text has a width cap and min-w-0 — same utility classes as the robot row :419', async ({ page }) => {
   await stubWorld(page);
   const cs = await thinkingRow(page)
     .locator('.chat-text')
@@ -192,12 +175,12 @@ test('T2: chat-text 有宽度上限与 min-w-0——robot 行 :419 同款工具�
       const s = getComputedStyle(el);
       return { maxWidth: s.maxWidth, minWidth: s.minWidth };
     });
-  // 改前：死类名零规则 → max-width none（钮宽无界的根）+ min-width auto。
+
   expect(cs.maxWidth).not.toBe('none');
   expect(cs.minWidth).toBe('0px');
 });
 
-test('T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽', async ({ page }) => {
+test('T3: long previews really truncate — character slicing then CSS ellipsis takes over, button width ≤ text column width', async ({ page }) => {
   await stubWorld(page);
   const row = thinkingRow(page);
   const btn = row.getByRole('button', { name: '展开思考' });
@@ -215,24 +198,24 @@ test('T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮�
       colW: Math.round(col.getBoundingClientRect().width),
     };
   });
-  // 字符切片仍管「预览多长」（#1034 口径：切片可留）：预览 = 前 150 字符 + 字面 …。
+
   expect(m.labelText.endsWith('…')).toBe(true);
   expect(m.labelText.length).toBeLessThan(LONG_THINKING.length);
-  // 宽度截断由 CSS 承担：ellipsis 生效 + 可见宽 < 内容宽。
+
   expect(m.textOverflow).toBe('ellipsis');
   expect(m.overflowX).toBe('hidden');
   expect(m.labelScroll).toBeGreaterThan(m.labelClient);
   expect(m.btnW).toBeLessThanOrEqual(m.colW);
 });
 
-test('T4: 页面级零横向溢出；展开交互不被截断修法砸掉', async ({ page }) => {
+test('T4: zero page-level horizontal overflow; the expand interaction is not broken by the truncation fix', async ({ page }) => {
   await stubWorld(page);
   const row = thinkingRow(page);
   const pageOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(pageOverflow).toBeLessThanOrEqual(0);
-  // 截断只动折叠态预览；点开仍见全文（pre 走 pre-wrap + break-words）。
+
   await row.getByRole('button', { name: '展开思考' }).click();
   await expect(row.locator('pre')).toHaveText(LONG_THINKING);
 });

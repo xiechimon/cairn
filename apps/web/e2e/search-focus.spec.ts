@@ -2,28 +2,11 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { pressAndExpect } from './helpers.js';
 import { decodePng, type DecodedPng } from './png.js';
 
-// Issue #137 acceptance: ⌘K opens the panel with the input *already*
-// focused — typing lands without a second click and filters the fixture
-// todos — and the 常亮互斥 rule holds: while the panel is open it is the
-// only lit focus surface (the page-layer selected pill dims under the
-// scrim), and the page layer restores on close. Rides the plain board
-// scenario ('01'); every open state here comes from the hotkey, never the
-// fixture flag.
-//
-// #949 载体（#910 裁定 1/3）：面板 = role dialog + 可及名「搜索」；输入 =
-// 面板 scope 的 textbox；scrim 无 role（Base UI Backdrop，data-slot 不作
-// 钉扎载体）→ 暗角点击走视口坐标（scrim 铺满视口，旧 .search-scrim 定位
-// 点击的同值用户路径）；页层选中 pill = aria-current="page"（#943 已立的
-// 一级状态载体），pill 层 = 行的 ::before utility（#414/#943 同构）。
-
 const BOARD = '/app?scenario=01';
 
 const panel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 const input = (page: Page) => panel(page).getByRole('textbox');
-/** 页层常亮 pill（aria-current = #943 立的一级状态载体）。includeHidden：
- *  ⌘K 面板是 modal——开着时 Base UI 给背景挂 aria-hidden，缺省 role 引擎
- *  会把 complementary 整个滤掉，而本断言恰恰要在 scrim 下读它（旧
- *  .sidebar-row--selected CSS locator 无此过滤，载体等价性靠本开关保住）。 */
+
 const litPill = (page: Page) =>
   page.getByRole('complementary', { includeHidden: true }).locator('[aria-current="page"]');
 
@@ -86,7 +69,6 @@ test('⌘K focuses the input — direct typing produces results', async ({ page 
   const rows = panel(page).locator('[data-row-kind="todo"]');
   await expect(rows.first()).toContainText('r3 lifecycle probe');
 
-  // and the empty-state 前往 group is gone — real filtering, not a repaint
   await expect(panel(page).getByText('前往', { exact: true })).toHaveCount(0);
 });
 
@@ -105,7 +87,7 @@ test('mid-exit reopen refocuses the retained input', async ({ page }) => {
   await expect(input(page)).toBeFocused();
 });
 
-test('scrim 可点关: clicking the dark area closes the panel', async ({ page }) => {
+test('scrim clickable to close: clicking the dark area closes the panel', async ({ page }) => {
   await page.goto(BOARD);
   await openPanel(page);
 
@@ -116,7 +98,7 @@ test('scrim 可点关: clicking the dark area closes the panel', async ({ page }
   await expect(panel(page)).toBeHidden();
 });
 
-test('常亮互斥: page-layer pill dims while the panel is open, restores on close', async ({
+test('always-on mutual exclusion: page-layer pill dims while the panel is open, restores on close', async ({
   page,
 }) => {
   await page.goto(BOARD);
@@ -128,8 +110,7 @@ test('常亮互斥: page-layer pill dims while the panel is open, restores on cl
   // poll, don't snapshot: the pill's background-color rides the 150ms
   // sidebar transition, so an immediate read lands mid-fade
   await expect.poll(() => pillBg(pill)).toBe(TRANSPARENT); // extinguished
-  // #159: at rest the panel lights no row of its own (no fixed 常亮) — the
-  // hovered row becomes the single lit surface while the page pill stays dim
+
   await expect(panel(page).locator('[data-selected]')).toHaveCount(0);
   const row = panel(page).getByRole('button').first();
   await row.hover();
@@ -140,7 +121,7 @@ test('常亮互斥: page-layer pill dims while the panel is open, restores on cl
   await expect.poll(() => pillBg(pill)).not.toBe(TRANSPARENT); // restored
 });
 
-test('常亮互斥 holds on the collapsed rail form', async ({ page }) => {
+test('always-on mutual exclusion holds on the collapsed rail form', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('cairn.sidebar-collapsed', '1');
   });

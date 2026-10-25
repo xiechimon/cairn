@@ -1,23 +1,3 @@
-// #841 `/` slash completion on the chief drawer composer. Same registry as
-// the detail face (#731, 正本 = detail/composer.tsx `slash:` block) — the
-// drawer had zero completion wiring, so `/clear` went out as plain text and
-// opened a chief round ("处理中... 3s") instead of clearing the input.
-//
-// Failure modes pinned here:
-//   F1  Enter on a highlighted execute row runs it WITHOUT sending: `/clear`
-//       empties the input, shows the 已清空 toast, and posts nothing to the
-//       chief threads endpoint (the ticket's必现场面).
-//   F2  conditional builtins: the drawer has no review/stop handles, so those
-//       two rows must be absent (rule 47 — omitted, never a dead row).
-//   F3  mid-prompt accept inserts literal text, never runs.
-//   F4  key preservation: Tab never runs; Enter with no highlight keeps the
-//       chief send semantics (one POST).
-//   F5  drawer close retires the slash + help open state (no stale reopen).
-//
-// Data face = live face stubbed (composer-slash.spec discipline): no
-// ?scenario= means the real API branch; the surfaces under test get their
-// own stubs and every other GET falls through to a tolerated 500.
-
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
 
@@ -111,7 +91,7 @@ async function openDrawer(page: Page) {
   );
   await page.goto('/app');
   await membersLoaded;
-  // #950 载体：.chief-fab → aria-label 总管钮；.chief-composer-input → testid。
+
   await page.getByRole('button', { name: '总管', exact: true }).click();
   const drawer = page.locator('.chief-drawer');
   await expect(drawer).toBeVisible();

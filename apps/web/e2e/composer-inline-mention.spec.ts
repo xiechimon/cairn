@@ -538,21 +538,12 @@ test('geometry: the listbox stays anchored above the composer (#688 ladder untou
   expect(Math.abs(lb.x - cb.x)).toBeLessThanOrEqual(8);
 });
 
-// #760: `@` 文件候选面（Claude Code 主候选面同构）。
-//
-// Candidate source = `GET /api/projects/:id/files`（全递归路径表）；插入形 =
-// 裸路径 + 尾随空格（CC rules 26-29），不走 scheme wire。分区规则：同一列表、
-// 同一 fuzzy 分排序，ties 时 agents 在前（roster 序），总 cap 15 不动。
-// 无文件面（未 stub = 500 → 空集）即本文件既有全部用例：#728 手感（触发 /
-// 过滤 / 键盘 / 关闭集）不回归，只是空 query 的 roster 从 agents-only 长成
-// 五类（+todo +project）。
 const FILES = [
   { path: 'apps/web/src/ui/button.tsx', type: 'blob', size: 120 },
   { path: 'apps/web/src/ui', type: 'tree', size: null },
   { path: 'docs/spec/19-foo.md', type: 'blob', size: 40 },
 ];
 
-/** openDetail + files 面 stub（等 files 取到再打字，免冷缓存竞态）。 */
 async function openDetailWithFiles(page: Page) {
   const opened = await openDetail(page);
   await page.route(`**/api/projects/${PROJECT_ID}/files*`, (route) =>
@@ -563,8 +554,7 @@ async function openDetailWithFiles(page: Page) {
   const filesLoaded = page.waitForResponse(
     (r) => r.url().includes(`/api/projects/${PROJECT_ID}/files`) && r.status() === 200,
   );
-  // 重进一次让 files 查询挂上 stub（openDetail 的首次请求已走 500  fallback →
-  // 空集；reload 后 stub 生效）。react-query 对 500 不重试（retry: false）。
+
   await page.reload();
   await filesLoaded;
   const input = page.locator('[data-testid="composer-card"] textarea');
@@ -576,7 +566,7 @@ async function openDetailWithFiles(page: Page) {
 test('files: empty query lists entities then files in roster order', async ({ page }) => {
   const { input, rows } = await openDetailWithFiles(page);
   await input.fill('@');
-  // 3 agents + todo + project（roster 序）+ 3 files（枚举序），总 cap 15 未触发
+
   await expect(rows).toHaveCount(8);
   await expect(rows.nth(0)).toContainText('builder');
   await expect(rows.nth(2)).toContainText('deploy-bot');
@@ -589,12 +579,11 @@ test('files: empty query lists entities then files in roster order', async ({ pa
 
 test('files: fuzzy filters both faces, agents keep ties', async ({ page }) => {
   const { input, rows } = await openDetailWithFiles(page);
-  // "butt" 是 button.tsx 的子序列；agents 无人命中 → 只有文件行
+
   await input.fill('@butt');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('apps/web/src/ui/button.tsx');
 
-  // 既有 agents 查询不受文件面污染（"bld" 只命中 builder）
   await input.fill('@bld');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('builder');
@@ -608,7 +597,7 @@ test('files: Enter inserts the bare path with a trailing space and sends on seco
   await expect(rows).toHaveCount(1);
   await input.press('ArrowDown');
   await input.press('Enter');
-  // 裸路径 + 尾随空格（CC rule 26），@query 无残留
+
   await expect(input).toHaveValue('apps/web/src/ui/button.tsx ');
   await expect(listbox).toBeHidden();
   expect(sent).toHaveLength(0);
@@ -622,7 +611,7 @@ test('files: Enter inserts the bare path with a trailing space and sends on seco
 test('files: directory row inserts with a trailing slash', async ({ page }) => {
   const { input, rows } = await openDetailWithFiles(page);
   await input.fill('@ui/');
-  // button.tsx 与 ui/ 目录都命中（同一 fuzzy 分，stub 序）；第二行是目录
+
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(1)).toContainText('apps/web/src/ui/');
   await input.press('ArrowDown');
@@ -631,12 +620,6 @@ test('files: directory row inserts with a trailing slash', async ({ page }) => {
   await expect(input).toHaveValue('apps/web/src/ui/ ');
 });
 
-// #812：选中即渲染 chip（composer 内确认 strip，与 transcript 的
-// .mention-chip 同形 + 新 chip 轻过渡 pop）。失败方式编号：
-//   C6 strip 与 listbox 叠挂（listbox 开着时 strip 让路，选中落定才现形）
-//   C7 空 draft / 无 chip 时 strip 零节点（fixture 面 DOM 字节不变）
-//   C8 pop 只播一次（无关编辑不重播——key 稳定，已有 chip 去 fresh 态）
-//   C9 动效机制实物（#746：断言 computed animation-name，非只读类名）
 test('chips: Enter-select renders the file chip with a fresh pop', async ({ page }) => {
   const { input, rows } = await openDetailWithFiles(page);
   await input.fill('@butt');
@@ -647,9 +630,9 @@ test('chips: Enter-select renders the file chip with a fresh pop', async ({ page
   await expect(strip).toBeVisible();
   await expect(strip.locator('.mention-chip')).toHaveCount(1);
   await expect(strip.locator('.mention-chip')).toContainText('apps/web/src/ui/button.tsx');
-  // 新 chip 带 fresh 态（轻过渡的挂载钩子）。
+
   await expect(strip.locator('[data-fresh]')).toHaveCount(1);
-  // C9：过渡真在播——编译产物里有该 animation（类名写了≠生效，#656 前例）。
+
   const animationName = await strip
     .locator('[data-fresh]')
     .evaluate((el) => getComputedStyle(el).animationName);
@@ -668,7 +651,7 @@ test('chips: agent select renders the agent chip', async ({ page }) => {
   await expect(strip.locator('.mention-chip--agent')).toContainText('builder');
 });
 
-test('chips: Tab and click render the identical chip (accept 路径一致）', async ({
+test('chips: Tab and click render the identical chip (identical accept path)', async ({
   page,
 }) => {
   const { input, rows } = await openDetailWithFiles(page);
@@ -698,12 +681,10 @@ test('chips: editing the path retires the chip; the pop plays only once (C8)', a
   const strip = page.getByTestId('composer-card').getByRole('status', { name: '提及' });
   await expect(strip.locator('[data-fresh]')).toHaveCount(1);
 
-  // 无关编辑（尾随空格后加字）：chip 留，fresh 退。
   await input.press('x');
   await expect(strip.locator('.mention-chip')).toHaveCount(1);
   await expect(strip.locator('[data-fresh]')).toHaveCount(0);
 
-  // 把路径吃掉：chip 退，strip 卸载（C7）。
   await input.fill('');
   await expect(strip).toHaveCount(0);
 });
@@ -717,7 +698,6 @@ test('chips: the strip yields while the listbox is open (C6)', async ({ page }) 
   const strip = page.getByTestId('composer-card').getByRole('status', { name: '提及' });
   await expect(strip).toBeVisible();
 
-  // 再开一次 @：listbox 现形期间 strip 让路，不叠挂。
   await input.pressSequentially('@');
   await expect(listbox).toBeVisible();
   await expect(strip).toHaveCount(0);
@@ -727,8 +707,6 @@ test('chips: the strip yields while the listbox is open (C6)', async ({ page }) 
   await expect(strip).toBeVisible();
 });
 
-// #848: 内联 @ 开五类（#727 D3 落地）。popover 的五类词表在内联面同一
-// fuzzy 手感下可触发、可插入、落 chip；`/` 菜单与 popover 的键位不动。
 const FIVE_KIND = {
   skills: [{ id: 'skill-1', name: 'code-review', description: 'Reviews code' }],
   machines: [{ id: 'machine-1', name: 'mea' }],
@@ -737,7 +715,7 @@ const FIVE_KIND = {
 test('five-kind: bare @ lists all five kinds in roster order', async ({ page }) => {
   const { input, rows } = await openDetail(page, AGENTS, FIVE_KIND);
   await input.fill('@');
-  // agents ×3 → todo → skill → project → machine（buildInlineRows 拼装序）
+
   await expect(rows).toHaveCount(7);
   await expect(rows.nth(0)).toContainText('builder');
   await expect(rows.nth(3)).toContainText('#9 内联提及探针');
@@ -771,7 +749,7 @@ test('five-kind: todo Enter-inserts the plain #seq token without sending', async
   await expect(rows.first()).toContainText('#9 内联提及探针');
   await input.press('ArrowDown');
   await input.press('Enter');
-  // todo wire 形是纯文本 #seq（serializeMention 既有语义，不走 scheme 链）
+
   await expect(input).toHaveValue('#9 ');
   expect(sent).toHaveLength(0);
   await input.press('Enter');

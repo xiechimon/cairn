@@ -264,7 +264,6 @@ async function stubDetailSurface(page: Page) {
   });
 }
 
-// #945/#910 重钉：composer 输入面 = composer-card testid 域内 textarea 元素载体。
 const COMPOSER = '[data-testid="composer-card"] textarea';
 const TOKEN_1 = '![pasted-image-1.png](attachment:team-1/att-1.png)';
 const TOKEN_2 = '![pasted-image-2.png](attachment:team-1/att-2.png)';

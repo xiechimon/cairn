@@ -1,54 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Issue #360/#361 (spec 12 新建项目支持本地仓库与 GitHub 认证选仓, parent
-// #352): the 仓库 selector lists exactly the two repo forms the web create
-// surface offers — GitHub 仓库 (#361: the auth-gated picker face — 未认证 =
-// 认证 GitHub 钮 + 手动输入 owner/repo 兜底链接, the owner/repo input sits
-// behind the link; the picker 弹层 itself is pinned by
-// project-new-github.spec.ts) and 本地文件夹 (absolute local path input).
-// The hosted row is gone from the form (server REST/MCP still accept hosted;
-// untouched submit now creates a repo-less project). Each test pins one
-// failure mode:
-//
-// menu face (fixture):
-// 1. the trigger lists exactly GitHub 仓库 + 本地文件夹 — no hosted row
-// 2. the GitHub row swaps the trigger for the auth face; the manual
-//    fallback link reveals the owner/repo input
-// 3. the 本地文件夹 row swaps the trigger for the path input; swap reopens
-// 4. switching forms drops the other face's input (no stale state on submit)
-// 5. Escape closes the popover
-//
-// name backfill (fixture):
-// 6. local path backfills basename (trailing slash tolerated), and keeps
-//    following the path while the name is still the last backfill
-// 7. a manual name edit stops the backfill; clearing resumes it
-// 8. github owner/repo backfills the repo segment once the ref is valid
-//
-// focus ring (fixture):
-// 9. the name input's focus-visible ring is the shared input primitive's
-//    brand ring (outline none + focus-ring border + 1px ring), not the UA blue
-//
-// submit + error face (live build, stubbed network — skills-readonly
-// precedent; the real-server three-state validation is verify-cairn's
-// local-repo-api feature):
-// 10. untouched submit posts a repo-less body (no kind) and navigates on 201
-// 11. local/github submits carry kind + localPath / kind + githubRepo
-// 12. empty local path / invalid github ref keep 创建项目 disabled
-// 13. a 400 localPath error renders the localized red error row via the
-//     structured reason code (#386), blocks navigation, and clears once the
-//     path is edited; reasonless / unclassified 400s show the server message
-//     verbatim
-
 const NEW_PROJECT = '/app/project/new?scenario=01';
 const NEW_PROJECT_LIVE = '/app/project/new';
 
-/** shadcn.css 值正本: --destructive 暗 #ffabb7（E 色板暗侧值，Paper 暗色轮
- *  #1396 沿用；--danger 并流别名已退役，消费直引 --destructive，#1002）. */
 const DANGER = 'rgb(255, 171, 183)';
 
-// #946/#910 载体：#prj-new-name / #prj-new-repo 的 id 与 label 配对是语义
-// 资产（原样保留）；菜单 = role=menu（aria-label 仓库），行 = menuitemradio；
-// 认证钮/兜底链接/swap/提交 = role=button + 文案；错误行 = role=alert。
 async function openMenu(page: Page) {
   await page.goto(NEW_PROJECT);
   await page.locator('#prj-new-repo').click();
@@ -63,10 +19,6 @@ async function selectRow(page: Page, label: string) {
   await expect(page.getByRole('menu', { name: '仓库' })).not.toBeVisible();
 }
 
-/** #361: the github face is auth-gated — the owner/repo input sits behind
- *  the 手动输入 owner/repo fallback link (fixture 01 = unconnected, so the
- *  link renders immediately; live stubs the connection GET to 500, the link
- *  appears once the status query settles). Returns the revealed input. */
 async function revealManualRepoInput(page: Page) {
   const link = page.getByRole('button', { name: '手动输入 owner/repo' });
   await expect(link).toBeVisible();
@@ -137,7 +89,7 @@ async function selectLiveRow(page: Page, label: string) {
 
 // ——— menu face (fixture) ———
 
-test('the 选择仓库 trigger lists exactly GitHub 仓库 and 本地文件夹', async ({ page }) => {
+test('the `选择仓库` trigger lists exactly `GitHub 仓库` and `本地文件夹`', async ({ page }) => {
   const menu = await openMenu(page);
   const rows = menu.getByRole('menuitemradio');
   await expect(rows).toHaveCount(2);
@@ -154,9 +106,7 @@ test('the GitHub row swaps the trigger for the auth face; manual link reveals th
   page,
 }) => {
   await selectRow(page, 'GitHub 仓库');
-  // #361：github 未认证选态 = 认证钮面；owner/repo input 收进手动兜底链接后。
-  // 载体说明：认证钮持 id=prj-new-repo（续作控件单 id 律），label「仓库」的
-  // htmlFor 关联使其可及名 = 仓库（内容文案不参与命名）——面判定走 id + 文案。
+
   await expect(page.locator('#prj-new-repo')).toBeVisible();
   await expect(page.locator('#prj-new-repo')).toHaveText('认证 GitHub');
   const input = await revealManualRepoInput(page);
@@ -165,7 +115,7 @@ test('the GitHub row swaps the trigger for the auth face; manual link reveals th
   await expect(input).toHaveValue('xiechimon/cairn');
 });
 
-test('the 本地文件夹 row swaps the trigger for the path input; swap reopens', async ({ page }) => {
+test('the `本地文件夹` row swaps the trigger for the path input; swap reopens', async ({ page }) => {
   await selectRow(page, '本地文件夹');
   const input = page.locator('#prj-new-repo');
   await expect(input).toHaveAttribute('aria-label', '本地文件夹');
@@ -234,10 +184,6 @@ test('github owner/repo backfills the repo segment once valid', async ({ page })
   await expect(name).toHaveValue('Renamed');
 });
 
-// ——— focus ring (fixture) ———
-
-// #1244：名称输入框的 focus 环是 #388 全局 2px outline，不是 UA 蓝框，
-// 也不是退役的 3px 灰 box-shadow。
 test('the name input focus ring is the global outline, not the UA default', async ({ page }) => {
   await page.goto(NEW_PROJECT);
   const name = page.locator('#prj-new-name');
@@ -291,7 +237,7 @@ test('local and github submits carry kind + their wire field', async ({ page }) 
   ]);
 });
 
-test('empty local path / invalid github ref keep 创建项目 disabled', async ({ page }) => {
+test('empty local path / invalid github ref keep `创建项目` disabled', async ({ page }) => {
   await stubBoot(page);
   await stubCreateProject(page, () => ({ json: okProject }));
   await page.goto(NEW_PROJECT_LIVE);

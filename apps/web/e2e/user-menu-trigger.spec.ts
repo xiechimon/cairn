@@ -1,43 +1,13 @@
 import { type Locator, expect, type Page, test } from '@playwright/test';
 
-// Issue #127 acceptance: the sidebar avatar chips (expanded + rail shapes)
-// open the user-menu popover on a real click — toggle on the chip, close on
-// outside click and Esc, the anchored-overlay family affordances.
-// #943/#910: the chips ride the一级 role carrier — both shapes are the
-// button whose accessible name is the fixture user (aria-label = USER_NAME,
-// fixtures.ts 'Xmon Dai'); the .sidebar-user/.rail-user class pins retired.
-// #163 replaces the frozen-capture geometry assertion (224×244 @ (8,410),
-// r7 17/16d) with the anchoring law — precedent: #135 re-cut the
-// visual-polish assertions with 裁决 v2. The menu is bottom-anchored above
-// the avatar chip: 224 wide, its left edge on the chip's left edge (Paper
-// Grouped sidebar: the chip sits inside the 12px sidebar padding),
-// the bottom edge rides a viewport-height-invariant distance, and the panel
-// never covers the chip at any viewport height (the dogfood symptom: the
-// frozen top:410px buried the avatar on short windows). Both chip shapes
-// obey the same law.
-// The 外观 segment (#122) is reachable from the
-// click-opened menu, so the theme switch is no longer behind a
-// fixture-only door. Rides menu-less scenarios ('01', '17b'): every open
-// state here comes from the trigger, never the fixture flag.
-
 const BOARD = '/app?scenario=01';
 const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
-/** 用户 chip 的一级载体：aria-label = fixture USER_NAME（'Xmon Dai'），
- *  展开态与 rail 态同名同钮（#127 两态共开合面）。 */
+
 const USER_NAME = 'Xmon Dai';
 
 const menu = (page: Page) => page.locator('.user-menu');
 const userChip = (page: Page) => page.getByRole('button', { name: USER_NAME });
 
-/** #656: the menu rides an enter keyframe (scale .98 + fade) — geometry/
- *  hit-test reads must wait for it to settle, otherwise they catch a
- *  mid-animation box (precedent: checkbox-unified / dead-buttons settle waits).
- *  #854: the transition moved off the panel onto the primitive's Popup wrapper
- *  (the panel is now its static child), so the wait has to watch the ancestor
- *  that actually animates — reading the panel's own animations returns an empty
- *  list and the sample lands mid-scale (measured 222.59 against the 224 box).
- *  #943/#910 裁定 1: data-slot 不作 spec 钉扎载体——动画等待改爬直接父级
- *  （Popup wrapper 就是 .user-menu 的 parentElement，#854 的「静态子」结构）。 */
 async function expectMenuSettled(page: Page) {
   await expect(menu(page)).toBeVisible();
   await menu(page).evaluate((el) =>
@@ -74,16 +44,6 @@ async function expectMenuOnTop(page: Page) {
   expect(top).toBe(true);
 }
 
-/** #163 anchoring law, #388 收紧, #610 裁决 v3: capture width/x stand, and
- *  the menu bottom hugs the trigger ROW's top edge — the account row carries
- *  a visible border-t seam since #414, and the #388 anchor (img top + 4px)
- *  put the panel bottom 6px BELOW the row top, so the opaque panel hid that
- *  seam across its width and its shadow smeared the row face (dogfood #610:
- *  「盖到我这个线上」). The family baseline gap (4px) is therefore measured
- *  against the row box top, the visible structural edge; against the img the
- *  law keeps only its #163 half — the panel never covers the avatar.
- *  Returns the menu-bottom distance from the viewport bottom
- *  (the anchoring invariant: it must not depend on the viewport height). */
 async function expectAnchoredAboveChip(page: Page, chip: Locator) {
   const box = await menu(page).boundingBox();
   const row = await chip.boundingBox();
@@ -161,7 +121,7 @@ test('#163 anchoring: bottom distance is viewport-invariant, the chip is never c
       await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
       await page.reload();
     }
-    // 两态同钮同名（#910 一级载体下 shape 差异对 spec 不可见）
+
     const chip = userChip(page);
 
     await chip.click();
@@ -185,7 +145,7 @@ test('#163 anchoring: bottom distance is viewport-invariant, the chip is never c
   }
 });
 
-test('外观 row works from the click-opened menu and the choice survives reopen', async ({
+test('appearance row works from the click-opened menu and the choice survives reopen', async ({
   page,
 }) => {
   await page.goto(BOARD);
@@ -258,7 +218,7 @@ test('#1245 floating menu is a single skin and stays inside the viewport', async
   expect(sample!.shellRing).not.toContain('1px');
   expect(sample!.shellBg).toBe('rgba(0, 0, 0, 0)');
   expect(sample!.panelBg).not.toBe('rgba(0, 0, 0, 0)');
-  // Paper menu face (DESIGN.md 弹窗与菜单): no caret on the panel.
+
   expect(sample!.arrowContent).toBe('none');
   expect(sample!.side).toBe('top');
   expect(sample!.panelTop).toBeGreaterThanOrEqual(0);

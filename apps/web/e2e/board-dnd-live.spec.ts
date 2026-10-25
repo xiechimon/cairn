@@ -1,18 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// #753 acceptance: committed-drop optimistic PATCH + invalidate for the newly
-// enabled pairs — 已完成(有变更)→待处理（重开落位，写 review）on the LIVE data
-// branch（无 ?scenario= 即真 API 面；数据面打桩承 merge-reject 的 stubBoot
-// 纪律：teams / user me / projects / todos 供数，其余 GET 一律 500，应用既有
-// isError 耐受）。钉两条路：
-//  · 成功路：落位同帧发 PATCH {phase:'review'}，乐观缓存让卡停在落点（无
-//    闪回源列），invalidate 重取收敛到 server 真值；
-//  · 失败路：409 = 乐观值作废，重取回真值（卡片弹回 = 真值）+ toast 点名
-//    失败（#638 弹回只讲结果不讲原因，toast 补原因）。
-// #943/#910 重钉：卡 = [data-todo-id] 属性载体、列表 = [data-column-list]、
-// 浮层 = data-testid="drag-overlay"、列计数 = data-testid="column-count"、
-// 动作钮 = role+name 一级载体。断言语义与数值不动。
-
 const TEAM_ID = 'team-1';
 const CARD_ID = 'todo-753';
 const PROJECT_ID = 'proj-753';
@@ -57,10 +44,6 @@ interface Stub {
   patches: { body: Record<string, unknown> }[];
 }
 
-/** 启动面打桩（merge-reject stubBoot 同款）+ todos 读写面。mode='ok'：PATCH
- *  落库（本地 state 翻 review，后续 GET 返回新真值）；mode='409'：PATCH 拒，
- *  state 不动（invalidate 重取 = 原相位，弹回即真值）。initialPhase（#901
- *  done 闸面）：缺省 done（重开对拍），'review' = 闸相位有变更卡。 */
 async function stubWorld(page: Page, mode: 'ok' | '409', initialPhase = 'done'): Promise<Stub> {
   const stub: Stub = { patches: [] };
   let current = wireCard(initialPhase, 1);
@@ -107,7 +90,7 @@ async function dragCardToColumn(page: Page, columnListId: string): Promise<void>
   );
 }
 
-test('live: done(有变更)→待处理 fires PATCH phase=review, optimistic landing never flashes back', async ({
+test('live: done(with changes)→`待处理` fires PATCH phase=review, optimistic landing never flashes back', async ({
   page,
 }) => {
   const stub = await stubWorld(page, 'ok');
@@ -136,17 +119,9 @@ test('live: done(有变更)→待处理 fires PATCH phase=review, optimistic lan
   await page.mouse.up();
   await page.waitForTimeout(700);
 
-  // the optimistic PATCH fired with the reopen phase (载体 = 手动改相面)
   expect(stub.patches.length).toBeGreaterThanOrEqual(1);
   expect(stub.patches[0]?.body.phase).toBe('review');
 
-  // no post-commit frame rendered the card back in the source column, and it
-  // settled in 待处理 (invalidate 重取收敛后仍在——server 真值同相).
-  // NOTE: the trace arms BEFORE mouse.up, and the source card stays pinned in
-  // its home slot for the whole gesture (draggable-card never writes the
-  // transform back) — pre-commit done frames are the drag state, not a
-  // flash-back. The real regression shape is pending → done, so only frames
-  // AFTER the first pending landing count.
   const trace = await page.evaluate(
     () => (window as unknown as { __flashTrace: { t: number; col: string | null }[] }).__flashTrace,
   );
@@ -159,7 +134,7 @@ test('live: done(有变更)→待处理 fires PATCH phase=review, optimistic lan
   ).toBeVisible();
   await expect(page.locator('[data-column="pending"]').getByTestId('column-count')).toHaveText('1');
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('0');
-  // the reopened card reads as the review gate (Paper footer action link 审阅)
+
   await expect(
     page
       .locator(`[data-column="pending"] [data-todo-id="${CARD_ID}"]`)
@@ -167,7 +142,7 @@ test('live: done(有变更)→待处理 fires PATCH phase=review, optimistic lan
   ).toHaveText('审阅');
 });
 
-test('live: PATCH 409 = 乐观值作废，卡片弹回源列 + toast 点名失败（#638）', async ({ page }) => {
+test('live: PATCH 409 = optimistic value voided, card bounces back to the source column + toast names the failure (#638)', async ({ page }) => {
   const stub = await stubWorld(page, '409');
   await page.goto('/app');
   await expect(page.locator(`[data-column="done"] [data-todo-id="${CARD_ID}"]`)).toBeVisible();
@@ -175,26 +150,21 @@ test('live: PATCH 409 = 乐观值作废，卡片弹回源列 + toast 点名失�
   await dragCardToColumn(page, 'pending');
   await page.mouse.up();
 
-  // the bounce-back IS the truth: server refused, invalidate refetch returns
-  // the original phase, the card renders back in 已完成
   await expect(
     page.locator(`[data-column="done"] [data-todo-id="${CARD_ID}"]`),
     'card bounced back to 已完成',
   ).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('1');
   await expect(page.locator('[data-column="pending"]').getByTestId('column-count')).toHaveText('0');
-  // and the toast names the failure (#638: 弹回只讲结果，toast 讲原因)
+
   await expect(page.locator('[data-sonner-toast]').first()).toBeVisible();
   await expect(page.locator('[data-sonner-toast]').first()).toContainText('移动任务失败');
   expect(stub.patches.length).toBeGreaterThanOrEqual(1);
 });
 
-// ---- done 落位闸 (#901)：review(有变更) 卡拖向已完成不静默发 PATCH——先开
-// 确认弹层（确认前零请求），确认后才走既有乐观 PATCH 提交路。 ----
-
 const doneDialog = (page: Page) => page.getByRole('dialog', { name: '把任务标记为已完成？' });
 
-test('live: review(有变更)→已完成 开 done 闸，取消 = 零 PATCH、卡停源列 (#901)', async ({
+test('live: review(with changes)→`已完成` opens the done gate, cancel = zero PATCHes, card stays in source column (#901)', async ({
   page,
 }) => {
   const stub = await stubWorld(page, 'ok', 'review');
@@ -206,15 +176,12 @@ test('live: review(有变更)→已完成 开 done 闸，取消 = 零 PATCH、�
   await dragCardToColumn(page, 'done');
   await page.mouse.up();
 
-  // 落位不开 PATCH，开弹层；卡片停在源列（确认前零提交）。
   await expect(doneDialog(page)).toBeVisible();
   expect(stub.patches).toEqual([]);
   await expect(
     page.locator(`[data-column="pending"] [data-todo-id="${CARD_ID}"]`),
   ).toBeVisible();
 
-  // footer 锚定 dismiss（关闭）：DialogShell 右上角 X 钮 aria-label 同为
-  // 「关闭」，dialog 级按名取钮会双命中（strict mode）。
   await doneDialog(page)
     .getByTestId('dialog-foot')
     .getByRole('button', { name: '关闭' })
@@ -225,7 +192,7 @@ test('live: review(有变更)→已完成 开 done 闸，取消 = 零 PATCH、�
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('0');
 });
 
-test('live: review(有变更)→已完成 确认后发 PATCH phase=done，乐观落位 (#901)', async ({
+test('live: review(with changes)→`已完成` confirm sends PATCH phase=done, optimistic landing (#901)', async ({
   page,
 }) => {
   const stub = await stubWorld(page, 'ok', 'review');

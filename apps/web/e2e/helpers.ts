@@ -1,22 +1,12 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-// e2e 共享测试工具（非断言面）。放这里的判据 = 多个 spec 逐字节复用同一段
-// 桩；单 spec 专用的桩仍留在各自文件（house pattern）。
-
 declare global {
   interface Window {
-    /** stubNotification 的 requestPermission() 调用计数——通知面 spec 断言用。 */
+
     __permCalls: number;
   }
 }
 
-/** 替换 window.Notification：permission 读 `initial`，直到 requestPermission()
- *  把它落到 `resolution`（镜像真 API——属性反映授权决定），调用次数计入
- *  window.__permCalls。headless chromium 的真权限 API 不可靠（grantPermissions
- *  不翻 Notification.permission、requestPermission 恒 resolve default），桩是
- *  稳定表达 granted/denied/default 三态的唯一通道。
- *  通知面三 spec 共用（notify-banner / account-team-cleanse /
- *  account-controls）——曾是逐字节相同的三份副本，抽成单源防漂移。 */
 export function stubNotification(
   page: Page,
   initial: string,
@@ -44,13 +34,6 @@ export function stubNotification(
   );
 }
 
-/** 等到某一帧整页没有在跑的 CSS 过渡，再读计算样式。焦点环（outline-offset /
- *  -width / -color、box-shadow）与分段控件的 hover 墨色都走 150ms 过渡，过渡
- *  中读数会读到中间值（CI 实测 outline-offset `1px`，#1427）。过渡可能挂在
- *  被测元素之外（input-group 外壳经 :has() 跟随），聚焦后的重渲染也可能晚一帧
- *  再起新过渡，所以按帧复查整页；被打断的过渡用 allSettled 吞掉。20 轮仍有
- *  过渡在跑即抛错，让超时显形，而不是带着中间值往下读。
- *  registry-focus-ring / segmented-controls / a11y-axe 共用。 */
 export async function settleTransitions(page: Page): Promise<void> {
   const settled = await page.evaluate(async () => {
     const frame = () =>

@@ -1,11 +1,3 @@
-// #1308 思考增量的消费面：在飞思考文本投影成既有 kind:'thinking' 行，
-// 空缓冲不产行，回合不在飞时不挂（与 text_delta 打字面同一道门）。
-// 失败方式：
-//   1. liveThinking 非空但 transcript / chief 不产 thinking 行 → 只有相位标签。
-//   2. 空串也产行 → 空思考折页噪声。
-//   3. 步已收仍挂在飞思考 → 与落库行叠成两份。
-//   4. 思考行挤掉 streaming / 打字行 → 相位兜底或正文增量消失。
-
 import type { BuildRecord, StepJournalRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapChief, mapTranscript } from '../src/api/mappers.js';
@@ -52,27 +44,27 @@ function transcript(liveThinking: string, steps: StepJournalRow[]) {
   });
 }
 
-describe('mapTranscript 在飞思考（#1308）', () => {
-  test('非空思考文本挂 thinking 行，streaming 相位行仍在', () => {
+describe('mapTranscript in-flight thinking (#1308)', () => {
+  test('non-empty thinking text hangs a thinking row, the streaming phase row stays', () => {
     const items = transcript('REASONING-MARKER-1308', [claimed()]);
     const thinking = items.filter((item) => item.kind === 'thinking');
     expect(thinking).toEqual([{ kind: 'thinking', text: 'REASONING-MARKER-1308' }]);
     expect(items.some((item) => item.kind === 'streaming')).toBe(true);
   });
 
-  test('空思考不产 thinking 行', () => {
+  test('empty thinking produces no thinking row', () => {
     const items = transcript('   ', [claimed()]);
     expect(items.some((item) => item.kind === 'thinking')).toBe(false);
     expect(items.some((item) => item.kind === 'streaming')).toBe(true);
   });
 
-  test('步已收不挂在飞思考', () => {
+  test('a settled step hangs no in-flight thinking', () => {
     const items = transcript('REASONING-MARKER-1308', []);
     expect(items.some((item) => item.kind === 'thinking')).toBe(false);
   });
 });
 
-describe('mapChief 在飞思考（#1308）', () => {
+describe('mapChief in-flight thinking (#1308)', () => {
   const ENV = {
     chief: {
       id: 'chief-u1-t1',
@@ -124,7 +116,7 @@ describe('mapChief 在飞思考（#1308）', () => {
     });
   }
 
-  test('回合在飞且思考非空：thinking 行在存在行之前', () => {
+  test('turn in flight and thinking non-empty: thinking row before the presence row', () => {
     const stream = chief('REASONING-MARKER-1308').stream ?? [];
     const thinkingAt = stream.findIndex((item) => item.kind === 'thinking');
     const streamingAt = stream.findIndex((item) => item.kind === 'streaming');
@@ -132,13 +124,13 @@ describe('mapChief 在飞思考（#1308）', () => {
     expect(streamingAt).toBeGreaterThan(thinkingAt);
   });
 
-  test('空思考不产 thinking 行，存在行仍在', () => {
+  test('empty thinking produces no thinking row, the presence row stays', () => {
     const stream = chief('').stream ?? [];
     expect(stream.some((item) => item.kind === 'thinking')).toBe(false);
     expect(stream.at(-1)).toMatchObject({ kind: 'streaming' });
   });
 
-  test('回合已收不挂在飞思考', () => {
+  test('a settled turn hangs no in-flight thinking', () => {
     const stream = chief('REASONING-MARKER-1308', false).stream ?? [];
     expect(stream.some((item) => item.kind === 'thinking')).toBe(false);
   });

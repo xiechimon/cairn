@@ -1,19 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-// Paper settings list (DESIGN.md「设置列表」): avatar and name above one white
-// card of 52px rows on the account page and the agent overview.
-//
-// Failure modes, each pinned below:
-//  F1 rows drift back to per-row height tiers (the old 49 / 57 / 41 / 41px)
-//  F2 a row hidden with CSS stays a sibling and draws a divider at the card
-//     top, doubling the card outline there
-//  F3 a divider under the last row doubles the card's bottom edge
-//  F4 dividers between rows go missing or are thicker than 1px
-//  F5 rows carry their own fill again (the beige two-tone card)
-//  F6 the name is repeated as a row inside the card
-//  F7 the card outline drops below one CSS pixel on a 2x screen
-//  F8 the selected density segment goes back to the cool grey fill
-
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
 
 test.beforeEach(async ({ page }) => {

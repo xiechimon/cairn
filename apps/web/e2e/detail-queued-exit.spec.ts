@@ -1,25 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
-// #1446: a queued task (started, waiting for a machine) has a way out from its
-// detail page. Cairn never times out a queued step (#1257), so without one a
-// task whose home machine never returns stays queued. 更多 gains 停止 for a
-// queued task (POST /api/builds/:id/stop, back to 待开始) and 关闭 is enabled
-// (PATCH phase=closed; the server stops the pending step first, #1445).
-// Live face, no ?scenario= (stubLiveBoot discipline from schedules-live.spec.ts).
-// Failure modes pinned here:
-//   1. a queued task's 更多 has no 停止, and 关闭 is disabled;
-//   2. 停止 opens the running-turn dialog (its "discard this round" checkbox
-//      means nothing for a step that never ran) or sends nothing;
-//   3. 关闭 sends nothing;
-//   4. the change leaks to planning / building: a menu 停止 appears or 关闭
-//      turns on (their stop stays in the composer, 关闭 stays off mid-run);
-//   5. a synchronous stop ({delegated:false}: the server stopped the step on
-//      the spot) leaves the page's 正在停止… flag set. A waiting_quota step
-//      never counts as running, so nothing clears it, and the next step on the
-//      same build (plan done → 确认 → build step) reads 正在停止… instead of
-//      处理中….
-
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const PROJECT = {
@@ -106,7 +87,7 @@ async function openMore(page: Page, todoId: string, chip: string) {
   await expect(menu(page)).toBeVisible();
 }
 
-test('queued: 更多 offers 停止, and confirming it stops the build', async ({ page }) => {
+test('queued: `更多` offers `停止`, and confirming it stops the build', async ({ page }) => {
   const sent = await stubLiveBoot(page);
   await openMore(page, QUEUED.id, '排队中');
   await evidencePanelShot(page, 'queued-more-menu.png', menu(page));
@@ -123,7 +104,7 @@ test('queued: 更多 offers 停止, and confirming it stops the build', async ({
   ]);
 });
 
-test('queued: a synchronous stop leaves no 正在停止… behind', async ({ page }) => {
+test('queued: a synchronous stop leaves no `正在停止…` behind', async ({ page }) => {
   const sent = await stubLiveBoot(page);
   const buildId = QUEUED.latestBuildId;
   const step = (id: string, kind: string, status: string, createdAt: number) => ({
@@ -181,7 +162,7 @@ test('queued: a synchronous stop leaves no 正在停止… behind', async ({ pag
   await expect(page.getByTestId('live-row')).not.toContainText('正在停止');
 });
 
-test('queued: 更多 > 关闭 is enabled and closes the task', async ({ page }) => {
+test('queued: `更多` > `关闭` is enabled and closes the task', async ({ page }) => {
   const sent = await stubLiveBoot(page);
   await openMore(page, QUEUED.id, '排队中');
   await expect(row(page, '关闭')).toBeEnabled();
@@ -191,7 +172,7 @@ test('queued: 更多 > 关闭 is enabled and closes the task', async ({ page }) 
   ]);
 });
 
-test('planning: no menu 停止, 关闭 stays disabled', async ({ page }) => {
+test('planning: no menu `停止`, `关闭` stays disabled', async ({ page }) => {
   await stubLiveBoot(page);
   await openMore(page, PLANNING.id, '规划中');
   await expect(row(page, '复制链接')).toBeVisible();

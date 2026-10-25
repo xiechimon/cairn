@@ -147,8 +147,7 @@ test('detail face: a rejected steer (409) keeps the draft word for word', async 
   });
 
   await page.goto(`/app/todo/${CARD_ID}`);
-  // #945/#910 重钉：composer 输入面 = composer-card testid 域内的 textarea
-  // 元素载体（.composer-input 类名别名残留 DOM 至终账票）。
+
   const input = page.locator('[data-testid="composer-card"] textarea');
   await expect(input).toBeVisible();
   await input.fill(DETAIL_DRAFT);
@@ -172,8 +171,7 @@ test('detail face: an accepted steer clears the draft', async ({ page }) => {
   });
 
   await page.goto(`/app/todo/${CARD_ID}`);
-  // #945/#910 重钉：composer 输入面 = composer-card testid 域内的 textarea
-  // 元素载体（.composer-input 类名别名残留 DOM 至终账票）。
+
   const input = page.locator('[data-testid="composer-card"] textarea');
   await expect(input).toBeVisible();
   await input.fill(DETAIL_DRAFT);
@@ -194,7 +192,7 @@ async function openChiefDrawer(page: Page) {
     return route.fulfill({ json: [] });
   });
   await page.goto('/app');
-  // #950 载体：.chief-fab → aria-label 总管钮；.chief-composer-input → testid。
+
   await page.getByRole('button', { name: '总管', exact: true }).click();
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();

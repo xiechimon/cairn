@@ -1,18 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
-// #1434: a drop into 执行中 is a start intent (POST /api/todos/:id/orchestrate),
-// and the server starts only todo / failed tasks. A queued card (started,
-// waiting for a machine) must not start again; since #1447 it sits in 执行中,
-// so 执行中 is its own column. Live face, no ?scenario=: startTask only fires on the live data
-// path, and page.route answers it (stubWorld discipline from
-// board-dnd-live.spec.ts).
-// Failure modes pinned here:
-//   1. 执行中 lights up as a drop target while a queued card hovers it;
-//   2. releasing the queued card there sends the orchestrate POST, which
-//      answers 409 and shows the 未能开始编排 toast;
-//   3. the fix also stops a todo card from starting by a drop into 执行中.
-
 const TEAM_ID = 'team-1';
 const PROJECT_ID = 'proj-1434';
 const QUEUED_ID = 'todo-queued-1434';
@@ -111,15 +99,13 @@ async function dragCardOver(page: Page, cardId: string, columnListId: string): P
 const building = (page: Page) => page.locator('.board-column[data-column="building"]');
 const todoColumn = (page: Page) => page.locator('.board-column[data-column="todo"]');
 
-test('a queued card does not light 执行中, and a drop there sends no start', async ({ page }) => {
+test('a queued card does not light `执行中`, and a drop there sends no start', async ({ page }) => {
   const stub = await stubWorld(page);
   await page.goto('/app');
   await expect(building(page).locator(`[data-todo-id="${QUEUED_ID}"]`)).toBeVisible();
 
   await dragCardOver(page, QUEUED_ID, 'building');
-  // Drag state has settled: 已完成 is a valid target for a queued card (the
-  // in-flight done gate), so its tint proves the negative reads below see a
-  // committed drag, not the frame before it.
+
   await expect(page.locator('.board-column[data-column="done"]')).toHaveAttribute(
     'data-drop-valid',
     'true',
@@ -139,7 +125,7 @@ test('a queued card does not light 执行中, and a drop there sends no start', 
   await expect(page.locator('[data-sonner-toast]', { hasText: '当前 queued' })).toHaveCount(0);
 });
 
-test('a todo card still lights 执行中, and a drop there sends the start', async ({ page }) => {
+test('a todo card still lights `执行中`, and a drop there sends the start', async ({ page }) => {
   const stub = await stubWorld(page);
   await page.goto('/app');
   await expect(todoColumn(page).locator(`[data-todo-id="${FRESH_ID}"]`)).toBeVisible();

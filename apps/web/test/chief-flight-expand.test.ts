@@ -1,16 +1,3 @@
-// #822 在飞存在行展开面：mapChief 把已有 wire 数据投影进视图模型——
-// activeRun.tool.toolName → runningTool，本轮尚未归属的工具行 → streaming
-// 行的 tools。不新增任何 wire 面（数据源 = 本就拉取的 threads + messages）。
-// 失败方式先行枚举：
-//   F-E1 activeRun 带 tool 位 → runningTool = 该工具名（展开面首行）
-//   F-E2 activeRun 无 tool 位（{phase:'chief'}）→ runningTool 缺省（面板走 fallback）
-//   F-E3 本轮工具行（user 行之后的 toolcall）→ streaming.tools（展开面工具表）
-//   F-E4 上轮工具行（user 行之前）→ 归属上轮 robot 行，不进 streaming.tools（回合边界）
-//   F-E5 空闲（activeRun null）→ 无 streaming 行、无 runningTool（现状锁）
-//   F-E6 打字窗口（liveText 非空）→ typing 行，无 streaming 行（#651/#739 F1 互斥锁）
-//   F-E7 工具行文本 = pillOf 投影（`bash <命令>` 族），不是裸工具名——一排
-//        「Bash」读不出跑了什么；裸名只在无 command/file_path/path 时出现
-
 import type { ChiefGetResponse, ChiefThread } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapChief, type MessageRow } from '../src/api/mappers.js';
@@ -85,8 +72,8 @@ function streamingOf(opts: {
   };
 }
 
-describe('mapChief 在飞展开面投影（#822 F-E1..E6）', () => {
-  test('F-E1 activeRun 带 tool 位 → runningTool = 该工具名', () => {
+describe('mapChief in-flight expand-face projection (#822 F-E1..E6)', () => {
+  test('F-E1 activeRun with a tool slot → runningTool = that tool name', () => {
     const { chief, streaming } = streamingOf({
       activeRun: { phase: 'chief', tool: { toolName: 'machines' } },
       messages: [USER],
@@ -95,7 +82,7 @@ describe('mapChief 在飞展开面投影（#822 F-E1..E6）', () => {
     expect(chief.runningTool).toBe('machines');
   });
 
-  test('F-E2 activeRun 无 tool 位 → runningTool 缺省（面板走 fallback 行）', () => {
+  test('F-E2 activeRun without a tool slot → runningTool defaults (panel walks the fallback row)', () => {
     const { chief, streaming } = streamingOf({
       activeRun: { phase: 'chief' },
       messages: [USER],
@@ -105,7 +92,7 @@ describe('mapChief 在飞展开面投影（#822 F-E1..E6）', () => {
     expect(chief.runningTool).toBeUndefined();
   });
 
-  test('F-E3 本轮工具行（user 行之后）→ streaming.tools', () => {
+  test('F-E3 this-turn tool rows (after the user row) → streaming.tools', () => {
     const { streaming } = streamingOf({
       activeRun: { phase: 'chief' },
       messages: [USER, toolMsg('m5', 'todo_write')],
@@ -115,7 +102,7 @@ describe('mapChief 在飞展开面投影（#822 F-E1..E6）', () => {
     expect(streaming[0]?.tools?.[0]?.seconds).toBe(2);
   });
 
-  test('F-E7 工具行文本带命令（pillOf 投影），不是裸工具名', () => {
+  test('F-E7 tool row text carries the command (pillOf projection), not a bare tool name', () => {
     const { streaming } = streamingOf({
       activeRun: { phase: 'chief' },
       messages: [
@@ -132,7 +119,7 @@ describe('mapChief 在飞展开面投影（#822 F-E1..E6）', () => {
     ]);
   });
 
-  test('F-E4 上轮工具行（user 行之前）→ 归属上轮 robot 行，不进 streaming.tools', () => {
+  test('F-E4 last-turn tool rows (before the user row) → belong to the last robot row, not into streaming.tools', () => {
     const { chief, streaming } = streamingOf({
       activeRun: { phase: 'chief' },
       messages: [
@@ -147,14 +134,14 @@ describe('mapChief 在飞展开面投影（#822 F-E1..E6）', () => {
     expect(robots[0]?.tools?.map((t) => t.label)).toEqual(['todo_write']);
   });
 
-  test('F-E5 空闲（activeRun null）→ 无 streaming 行、无 runningTool', () => {
+  test('F-E5 idle (activeRun null) → no streaming row, no runningTool', () => {
     const { chief, streaming } = streamingOf({ activeRun: null, messages: [USER] });
     expect(streaming).toHaveLength(0);
     expect(chief.running).toBeUndefined();
     expect(chief.runningTool).toBeUndefined();
   });
 
-  test('F-E6 打字窗口（liveText 非空）→ typing 行，无 streaming 行', () => {
+  test('F-E6 typing window (liveText non-empty) → typing row, no streaming row', () => {
     const { chief, streaming } = streamingOf({
       activeRun: { phase: 'chief', tool: { toolName: 'machines' } },
       messages: [USER],
@@ -163,8 +150,7 @@ describe('mapChief 在飞展开面投影（#822 F-E1..E6）', () => {
     expect(streaming).toHaveLength(0);
     const last = chief.stream?.[chief.stream.length - 1];
     expect(last).toMatchObject({ kind: 'robot', typing: true });
-    // 打字行不带展开面——runningTool 仍可投影（typing 接管后 streaming 缺席，
-    // 面板无处挂载，F-R16 e2e 钉收敛）。
+
     expect(chief.runningTool).toBe('machines');
   });
 });

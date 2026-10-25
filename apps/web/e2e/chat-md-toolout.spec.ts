@@ -1,29 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-// Issue #469: the chat column renders two things the flat `.chat-para` /
-// `.chat-note` path could not — (A) a tool call's stdout as its own
-// left-aligned mono block tied to the tool group, and (B) an agent reply's
-// block markdown (heading / ordered+unordered nested lists / code fence)
-// with inline `.chat-code` chips preserved. Each test pins one failure way
-// of the rework:
-//   A1 tool output stays collapsed behind the group toggle (not flattened
-//      into a centered dim note)
-//   A2 expanded output is a standalone block per tool call, verbatim stdout
-//   A3 output block is left aligned, mono, normal contrast (not a note)
-//   B1 heading renders as a heading element, not literal `##`
-//   B2 ordered list renders ordinals; unordered renders bullets
-//   B3 nested list items indent past their parent
-//   B4 code fence renders as a mono block, no literal ``` leak
-//   B5 inline code keeps the existing mono chip
-//   B6 no raw markdown syntax survives as literal prose
-//
-// #945/#910 重钉：detail.css 退役——工具输出 = tool-output testid、note =
-// transcript-note、组 toggle = role=button+「工具过程」文案、md 列表项 =
-// md-item-ordered / md-item-bullet testid（零 CSS 结构钩转二级载体）、
-// 序号 = md-ordinal、围栏 = md-code、标题 = role=heading、agent 文本 =
-// agent-text、inline code chip = agent-text 域内 <code> 元素（一级元素
-// 载体，类名别名残留 DOM 至终账票）。
-
 const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout';
 
 const toggle = (page: import('@playwright/test').Page) =>
@@ -52,7 +28,7 @@ test('A1: tool output is collapsed behind the group toggle by default', async ({
   await expect(
     page.getByTestId('transcript-note').filter({ hasText: 'hello from cairn' }),
   ).toHaveCount(0);
-  // the collapsible tool group toggle (完成 Ns ▸ row) is present
+
   await expect(toggle(page)).toBeVisible();
 });
 
@@ -111,7 +87,7 @@ test('B2: ordered list renders ordinals and unordered list renders bullets', asy
   await expect(ordered.first().getByTestId('md-ordinal')).toContainText('1.');
 
   const bullets = page.getByTestId('md-item-bullet');
-  // 子项 A / 子项 B (nested under step 1) + 顶层要点 + 嵌套要点
+
   await expect(bullets).toHaveCount(4);
   await expect(page.getByTestId('md-item-bullet').filter({ hasText: '顶层要点' })).toHaveCount(1);
 });

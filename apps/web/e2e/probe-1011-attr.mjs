@@ -1,9 +1,3 @@
-// #1011 归因微探针：行环的墨到底画在哪、被谁裁。
-//   A = 行聚焦（环在）
-//   B = 行聚焦 + row.style.boxShadow='none'  → diff(A,B) = 行 box-shadow 的全部墨
-//   C = 行聚焦 + listbox.style.overflow='visible' → diff(A,C) = 裁剪原本藏掉的墨
-// 若 diff(A,C) 为空 => 环从未被裁（#883 的裁剪判据在当前几何下不成立）。
-// 用法：node e2e/probe-1011-attr.mjs <baseURL> <outDir> [scenario] [triggerName] [dialogName] [key]
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -93,8 +87,7 @@ const clip = {
 await page.keyboard.press('Tab');
 await page.waitForTimeout(400);
 const shotA = await page.screenshot({ clip });
-// 行左缘+上缘放大帧（菜单还在、行还聚焦时拍——抽屉面单行，第二次 Tab 会
-// 让弹层随焦点外出而关，补拍就空了）
+
 const zoomRow = await page.evaluate(() => {
   const rr = document.activeElement.getBoundingClientRect();
   return { left: rr.left, top: rr.top, h: rr.height, right: rr.right };

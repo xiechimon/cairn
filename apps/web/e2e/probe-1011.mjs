@@ -1,17 +1,3 @@
-// #1011 再评探针：model picker 两面的行焦点环渲染实测 + 行内缩实测。
-// 判据形态（全部取运行时真值，不读源码推断）：
-//   1. 几何：focused row rect vs listbox clip rect vs dialog rect（行盒缘 ==
-//      裁剪盒缘 => 画在盒外的环必被裁）；
-//   2. 像素：同一 clip 区域「开面即拍（鼠标模态、清单容器无环）」vs「Tab 到
-//      行（环在）」两帧逐像素 diff；变化像素按「行盒外左/右/上/下」四条带
-//      计数 = 环的四段各自有没有墨（被裁的段计数归零）；diff 染红叠加导出；
-//   3. 阳性对照：触发钮自身（弹层外，无裁剪祖先）focus-visible 环完整可见；
-//   4. 键盘导航压测（break-ui 焦点面）：Tab 进入首行、再 Tab、Shift+Tab 回退、
-//      Escape 关面焦点归还，逐步记录 activeElement 与 :focus-visible。
-// 基线帧必须在任何键盘输入之前拍：清单容器 tabIndex=-1，键盘模态下程序聚焦
-// 会让它吃到焦点环（#1095 前是 UA 蓝环、之后是仓内配方环；:focus-visible
-// 命中），基线就不干净。
-// 用法：node e2e/probe-1011.mjs <baseURL> <outDir>
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,7 +7,6 @@ const OUT = process.argv[3] ?? '/tmp/evidence-1011';
 const DSF = 4;
 mkdirSync(OUT, { recursive: true });
 
-/** 浏览器页内 diff 两张 data-URL PNG：变化像素数、bbox、四带计数、染红叠加图。 */
 async function diffPngs(browser, base64A, base64B, bands) {
   const page = await browser.newPage();
   const out = await page.evaluate(
@@ -133,14 +118,8 @@ async function probeFace(browser, face) {
 
   const r = { scenario, triggerName, dialogName };
 
-  // —— 相位 A：环渲染实测。必须先于本 context 内任何键盘输入：基线帧要鼠标
-  //    模态（开面零环）。旧序把导航压测放前面，压测的 Tab/Escape 把输入模态
-  //    留在键盘，第二次开面的容器程序焦点命中 :focus-visible 吃环——基线帧
-  //    带环，base-vs-focused 的 diff 归因全错（#1095 实测踩到）。导航压测移
-  //    到相位 B，顺带拍键盘模态开面的容器环帧。 ——
   await openMenu();
-  // 基线帧：开面即拍——此刻焦点在清单容器但输入模态是鼠标，:focus-visible
-  // 不命中，全菜单零环。
+
   const menuBox = await menu.boundingBox();
   const clip = {
     x: Math.max(0, menuBox.x - 8),
@@ -152,7 +131,7 @@ async function probeFace(browser, face) {
   writeFileSync(join(OUT, `${key}-menu-base-no-ring.png`), baseShot);
 
   await page.keyboard.press('Tab');
-  await page.waitForTimeout(400); // Button 底座 transition-all：等环落定
+  await page.waitForTimeout(400);
   const rowState = await active();
   r.focusLandedOnRow = rowState?.role === 'option';
   if (!r.focusLandedOnRow) {
@@ -211,7 +190,6 @@ async function probeFace(browser, face) {
   const focusedShot = await page.screenshot({ clip });
   writeFileSync(join(OUT, `${key}-menu-focused-row1.png`), focusedShot);
 
-  // 四带：行盒外 0.5–4px 的左/右/上/下条带（shot 坐标 = (css - clip) * DSF）
   const g = r.geo;
   const sx = (v) => (v - clip.x) * DSF;
   const sy = (v) => (v - clip.y) * DSF;
@@ -228,7 +206,6 @@ async function probeFace(browser, face) {
     Buffer.from(diff1.overlay.split(',')[1], 'base64'),
   );
 
-  // 第二行（中部行）：上下段在内容区内、左右段仍贴裁剪盒
   await page.keyboard.press('Tab');
   await page.waitForTimeout(400);
   const row2State = await active();
@@ -249,7 +226,6 @@ async function probeFace(browser, face) {
     r.ringRow2 = { skipped: 'single-row face', focusAfterSecondTab: row2State };
   }
 
-  // 行左缘/上缘放大帧（肉眼复核带计数）
   const zoomClip = {
     x: g.row.left - 8,
     y: g.row.top - 8,
@@ -258,16 +234,10 @@ async function probeFace(browser, face) {
   };
   writeFileSync(join(OUT, `${key}-row1-left-edge-zoom.png`), await page.screenshot({ clip: zoomClip }));
 
-  // —— 相位 B：键盘导航压测（第二次开面；此刻输入模态已是键盘，开面时容器
-  //    程序焦点命中 :focus-visible——顺带拍容器环帧，#1095 附带修的容器焦点
-  //    配方（UA 蓝环 → 仓内 --focus-ring 内描）的证据帧就是它）。 ——
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached' });
   await page.waitForTimeout(200);
-  // 键盘开面（focus + Enter，不用 openMenu 的鼠标 click）：鼠标 click 会把
-  // 输入模态拉回 mouse，容器程序焦点就不命中 :focus-visible，容器环帧拍不到
-  // （#1095 实测：两面一真一假）。键盘路径下触发钮先 focus-visible，程序焦点
-  // 移进容器按「前一焦点有环则继环」启发式必命中。
+
   await trigger.focus();
   await page.keyboard.press('Enter');
   await menu.waitFor({ state: 'visible' });
@@ -285,7 +255,6 @@ async function probeFace(browser, face) {
   nav.push({ step: 'menu-still-open', open: await menu.count() });
   r.nav = nav;
 
-  // —— 相位 C：阳性对照（触发钮环，弹层外无裁剪祖先） ——
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached' });
   await page.waitForTimeout(400);

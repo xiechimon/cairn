@@ -1,46 +1,6 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
 
-// Composer attachment strip (issue #757): the visible face for both ends of
-// the paste → upload → token window. While the grant/upload is in flight the
-// draft holds no token — the strip must already show a placeholder card (the
-// ticket's "渲染一下"); once tokens land the same strip shows the settled
-// chips (AttachmentChip reuse); clicking an image card opens the preview
-// lightbox instead of a new tab.
-//
-// Failure modes pinned here:
-//  1. empty window — with the grant held, a paste must paint a placeholder
-//     card (blob-URL thumbnail at chip size + 上传中 badge) in the same
-//     tick; the draft stays text-only (ATTACHMENT_LINE anchoring untouched).
-//  2. layout continuity — the placeholder box and the settled chip box are
-//     identical (same bytes, same classes), so landing the token moves
-//     nothing.
-//  3. failed upload — the placeholder leaves with the toast; the draft
-//     survives; the strip unmounts (no orphan card).
-//  4. settled preview — clicking the settled image chip opens the
-//     .attachment-preview dialog with the image; Esc closes it, draft kept.
-//  5. in-flight preview — clicking the placeholder previews the local bytes
-//     (blob URL) before any server round trip.
-//  6. three faces — detail composer, new-task dialog, chief drawer all mount
-//     the same strip (detail asserts the full chain; new-task and chief pin
-//     placeholder → settled → preview).
-//
-// Data face = live face stubbed (composer-paste.spec discipline): no
-// ?scenario= means the real API branch; grant/upload get deterministic
-// stubs and every other GET falls through to a tolerated 500. The settled
-// thumbnail and the preview image read stub returns real PNG bytes so the
-// <img> elements actually paint (naturalWidth > 0) instead of asserting on
-// broken-image boxes.
-//
-// #948 载体重钉（#910 裁定 1/2）：per-face 类名 locator 换语义载体——strip =
-// getByRole('status', { name: '附件' })，占位卡 = data-testid
-// "attachment-pending"（button/span 双形无恒 role，二级载体），预览 =
-// getByRole('dialog', { name })，缩略/预览图 = getByRole('img', { name })；
-// 浮列锚 = data-testid "composer-float"（结构钩子）。pastePng 的 querySelector
-// 靶换 [data-testid=new-task-spec]（原生 textarea 断言原样 = 行为断言语义不动）。
-// 跨域面锚（.composer-input / .chief-* / .sidebar-new-task）是各自域的残留
-// 别名，随各自域票重钉，本 spec 不动。
-
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
@@ -280,15 +240,12 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip with 
 
   await pastePng(page, COMPOSER, art.b64);
 
-  // FM1: the in-flight card is already there — blob thumbnail + 上传中 —
-  // while the draft holds no token yet.
   const strip = page.getByTestId('composer-float').getByRole('status', { name: '附件' });
   await expect(strip).toBeVisible();
   const placeholder = strip.getByTestId('attachment-pending');
   await expect(placeholder).toBeVisible();
   await expect(placeholder.getByText('上传中')).toHaveText('上传中');
-  // 粘贴文件名走 #729 counter 重命名（pasted-image-N.png），非 dispatch 的
-  // 原始 name——名称锚取落定 token 同源的 canonical 名。
+
   const thumb = placeholder.getByRole('img', { name: 'pasted-image-1.png' });
   await expect
     .poll(() => thumb.evaluate((el) => (el as HTMLImageElement).naturalWidth))
@@ -506,7 +463,7 @@ async function openChief(page: Page, art: TestArt) {
   );
   await page.goto('/app');
   await membersLoaded;
-  // #950 载体：.chief-fab → aria-label 总管钮；.chief-composer-input → testid。
+
   await page.getByRole('button', { name: '总管', exact: true }).click();
   const drawer = page.locator('.chief-drawer');
   await expect(drawer).toBeVisible();
@@ -521,7 +478,6 @@ test('chief face: placeholder → settled chip → preview', async ({ page }) =>
   const { drawer, input } = await openChief(page, art);
   art.b64 = await renderTestCard(page);
 
-  // pastePng 走 querySelector 串（helper 契约），testid 属性选择器 = getByTestId 等价面。
   await pastePng(page, '[data-testid="chief-composer-input"]', art.b64);
 
   const strip = drawer.getByRole('status', { name: '附件' });

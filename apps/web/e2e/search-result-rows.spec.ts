@@ -1,18 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { pressAndExpect } from './helpers.js';
 
-// Issue #159: 搜索结果行——点击即跳 + 常亮改 hover 跟随。Every panel row is
-// a live SPA hop carrying the current ?search= along (#121 convention) and
-// closing the panel: todo result → 详情, 前往 row → its route. The lit row
-// follows the mouse at rest (no fixed 常亮 default row); ↑↓ moves a
-// keyboard cursor (Enter hops to it), and a real pointer move hands the
-// highlight back to hover (让位). Rides the plain board scenario ('01') —
-// every open state comes from the hotkey, never the fixture flag.
-//
-// #949 载体（#910 裁定 1/3）：面板 = role dialog + 可及名「搜索」；结果行
-// 族 = data-row-kind（todo/nav，旧 .search-row--todo 类继任）；键盘光标
-// 选中态 = data-selected（状态类断言归行为，载体换 data-*）。
-
 const BOARD = '/app?scenario=01';
 /** Matches the fixture probe pair r3-legacy-1 / r3-legacy-2 (title
  *  includes()), fixture order — nothing else on scenario 01. */
@@ -51,7 +39,7 @@ async function searchProbe(page: Page) {
   await expect(todoRows(page).first()).toContainText(PROBE);
 }
 
-test('结果行点击 → 面板关闭 + 跳 todo 详情', async ({ page }) => {
+test('clicking a result row → panel closes + jumps to the todo detail', async ({ page }) => {
   await page.goto(BOARD);
   await searchProbe(page);
 
@@ -62,7 +50,7 @@ test('结果行点击 → 面板关闭 + 跳 todo 详情', async ({ page }) => {
   await expect(page.locator('.detail-shell')).toHaveAttribute('data-todo-id', 'r3-legacy-1');
 });
 
-test('前往行点击 → 面板关闭 + 跳对应路由', async ({ page }) => {
+test('clicking a go-to row → panel closes + jumps to the matching route', async ({ page }) => {
   await page.goto(BOARD);
   await openPanel(page);
 
@@ -71,7 +59,7 @@ test('前往行点击 → 面板关闭 + 跳对应路由', async ({ page }) => {
   await expect(panel(page)).toBeHidden();
 });
 
-test('静息无常亮;hover 哪行亮哪行,且只亮一行', async ({ page }) => {
+test('idle: no always-on; hovering a row lights exactly that one row', async ({ page }) => {
   await page.goto(BOARD);
   await searchProbe(page);
 
@@ -89,7 +77,7 @@ test('静息无常亮;hover 哪行亮哪行,且只亮一行', async ({ page }) =
   await expect.poll(() => rowBg(first)).toBe(TRANSPARENT);
 });
 
-test('↑↓ 键盘光标接管高亮;Enter 跳光标行', async ({ page }) => {
+test('↑↓ keyboard cursor takes over the highlight; Enter jumps to the cursor row', async ({ page }) => {
   await page.goto(BOARD);
   await searchProbe(page);
 
@@ -109,7 +97,7 @@ test('↑↓ 键盘光标接管高亮;Enter 跳光标行', async ({ page }) => {
   await expect(panel(page)).toBeHidden();
 });
 
-test('鼠标一动让位:键盘光标交还 hover', async ({ page }) => {
+test('mouse movement yields: keyboard cursor hands back to hover', async ({ page }) => {
   await page.goto(BOARD);
   await searchProbe(page);
 

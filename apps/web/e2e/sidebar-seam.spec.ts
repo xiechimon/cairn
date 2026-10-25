@@ -1,30 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Issue #135 acceptance (dogfood 裁决 v2, revising #123's 柔边不画缝):
-// CDS PR-3: vertical seam retires to surface-1 + soft hairline shadow; the
-// top divider still runs the FULL viewport width:
-// the sidebar's team-row divider sits on the same pixel row (y43..44) as
-// every shell's topbar border-bottom, crossing at the seam. Geometry law:
-// expanded team-row 43px + .sidebar-nav border-top 1px; the r7 12 active
-// pill (y6..38, 32px) survives via the --active margin, untouched; the
-// rail toggle grows to 44px so its divider aligns with the topbar border
-// too (r7 03's y42..43 divider realigned by the 裁决, registered in
-// 01 §8). Viewport is the e2e canon 1440×732.
-// #943/#910 重钉：本域载体换语义钩子——侧栏 = aside（complementary）、
-// nav 段 = aside nav、团队头行 = data-testid="team-row"（二级：无 role 的
-// 结构探针位）、rail 展开钮 = button[aria-label="展开侧边栏"]、board 顶栏 =
-// [data-route="board"] 的首个 header（banner）。.res-topbar 属
-// pages/resources 域，留待各自批次重钉。探针期望值不动（几何零改动）。
-//
-// Paper Grouped sidebar (DESIGN.md 侧栏) retires the full-width divider law:
-// the sidebar sits on canvas with no internal rule (the mockup has none),
-// so nothing inside it aligns to the topbar border any more. Paper board
-// sheet: every route (board, pages, resources, and since the Paper detail PR
-// the task detail too) draws its edge with the sheet's own ring, so the
-// sidebar carries no seam anywhere. What
-// stays everywhere is no solid border and a route-invariant workspace row:
-// the /app/team active face repaints, it does not move.
-
 const SEAM_VARIANTS = ['light', 'dark'] as const;
 
 const teamRowBox = (page: Page) =>

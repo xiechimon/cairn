@@ -1,18 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Issue #147 acceptance: the sidebar collapse family is live and persists.
-// The 项目 / 资源 GroupHeaders hide their sub-rows (r2 §1.1) and flip their
-// aria to 展开… (r6), in the expanded sidebar and in the rail alike. Every
-// collapse survives a reload through its localStorage key — the project
-// group rides the observed original key shape (cairn.sidebarProjectsCollapsed,
-// r2 §1.5), the resource group the [推断] twin.
-// (#351 裁定：看板列收起全家随 6→4 列收敛删除——列收起钮/窄条/持久键
-// 不复存在，本 spec 只保留侧栏族。)
-
-// Paper Grouped sidebar: 资源 folds by default (absent key = folded, "0" =
-// open); 项目 keeps the #147 shape (absent = open, "1" = folded). Headers
-// carry aria-expanded; the rail chevrons keep their 收起/展开 aria-label.
-
 const projectRows = (page: Page) => page.locator('[data-testid="project-row"]');
 const skills = (page: Page) => page.getByRole('complementary').getByRole('link', { name: '技能' });
 
@@ -35,9 +22,9 @@ test('sidebar group collapse hides sub-rows, flips aria, survives reload', async
         .evaluate((el) => getComputedStyle(el).rotate),
     )
     .toBe('-90deg');
-  // the 新建项目 plus stays reachable on the folded header
+
   await expect(page.getByRole('link', { name: '新建项目' })).toBeVisible();
-  // the 资源 fold is independent (folded by default)
+
   await expect(skills(page)).toHaveCount(0);
 
   await page.reload();

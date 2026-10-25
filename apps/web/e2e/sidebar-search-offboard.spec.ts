@@ -1,17 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Issue #134 residual AC: the ⌘K search row must open the shared panel on
-// EVERY route, not just the board. The implementation landed with #129's
-// AppSidebar (board/detail keep their own fixture-driven panels via
-// searchPanel={false}; every other shell rides AppSidebar's internal
-// SearchPanel); these cases pin the off-board wiring so a future shell
-// that bypasses AppSidebar — or drops the internal panel — goes red.
-// Real click on the sidebar search row, panel opens (role=dialog),
-// Esc closes it (useSearchState contract). The collapse-toggle AC of #134
-// is already asserted in shell-consistency.spec.ts ("the collapse toggle
-// works off-board and the state rides back").
-
-// #949: 面板载体 = role dialog + 可及名（.search-panel 类钉退役）
 const panel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
 for (const [name, url] of [
@@ -22,8 +10,6 @@ for (const [name, url] of [
     await page.goto(url);
     await expect(panel(page)).toBeHidden();
 
-    // #910 一级载体：侧栏（complementary）里的 搜索 行钮（可及名 = 「搜索 ⌘K」，
-    // 子串命中）。旧 .sidebar-row 类名钉退役（#943）。
     await page.getByRole('complementary').getByRole('button', { name: '搜索' }).click();
     await expect(panel(page)).toBeVisible();
 

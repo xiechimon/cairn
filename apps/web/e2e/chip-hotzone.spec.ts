@@ -15,9 +15,7 @@ import { expect, test } from '@playwright/test';
 const DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 
 const chip = (page: import('@playwright/test').Page) => page.locator('.detail-chip');
-// #949 载体：chevron = 触发钮内无 role 的结构钩子 → 二级 testid；popover =
-// role dialog + 可及名「任务分配」（.chip-popover/.detail-chip-chevron 类钉随
-// overlays.css 清零退役；.detail-chip 规则住 detail.css，归 #945，保留）。
+
 const chevron = (page: import('@playwright/test').Page) => page.getByTestId('chip-chevron');
 const popover = (page: import('@playwright/test').Page) =>
   page.getByRole('dialog', { name: '任务分配' });

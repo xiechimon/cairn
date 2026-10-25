@@ -1,10 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Paper Grouped sidebar (apps/web/DESIGN.md 侧栏, plan PR 5): five parts top
-// to bottom at 248px, 需要我处理 = the board filtered to the 待处理 column
-// (plan 已定问题 1), active row = sheet + hairline + accent icon, 资源 folded
-// by default and persisted, user row second line = machine status.
-
 const sidebar = (page: Page) => page.getByRole('complementary');
 const columns = (page: Page) => page.locator('[data-column]');
 
@@ -58,7 +53,7 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   expect(asideBottom - userBottom).toBeLessThanOrEqual(16);
 });
 
-test('新任务 button opens the new-task dialog and shows the C key', async ({ page }) => {
+test('`新任务` button opens the new-task dialog and shows the C key', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const button = page.locator('.sidebar-new-task');
   await expect(button.locator('kbd')).toHaveText('C');
@@ -66,7 +61,7 @@ test('新任务 button opens the new-task dialog and shows the C key', async ({ 
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('需要我处理 badge counts the 待处理 column and filters the board to it', async ({ page }) => {
+test('`需要我处理` badge counts the `待处理` column and filters the board to it', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const pendingCount = await page
     .locator('[data-column="pending"] [data-testid="column-count"]')
@@ -120,7 +115,7 @@ test('active row = sheet fill + hairline ring + accent icon', async ({ page }) =
   expect(m.icon).toBe('rgb(23, 58, 47)');
 });
 
-test('资源 folds by default, opens to an indented sub-list, survives reload', async ({ page }) => {
+test('`资源` folds by default, opens to an indented sub-list, survives reload', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const toggle = sidebar(page).getByRole('button', { name: '资源' });
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -147,7 +142,7 @@ test('资源 folds by default, opens to an indented sub-list, survives reload', 
   );
 });
 
-test('a resource route lights the folded 资源 row', async ({ page }) => {
+test('a resource route lights the folded `资源` row', async ({ page }) => {
   await page.goto('/app/resources/skills?scenario=06');
   const toggle = sidebar(page).getByRole('button', { name: '资源' });
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -224,7 +219,7 @@ test('user row second line reads machines online and running count', async ({ pa
   );
 });
 
-test('collapsed rail keeps 需要我处理 with its badge and the expand toggle', async ({ page }) => {
+test('collapsed rail keeps `需要我处理` with its badge and the expand toggle', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=01');
   const aside = sidebar(page);

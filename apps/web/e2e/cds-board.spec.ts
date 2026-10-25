@@ -36,6 +36,6 @@ test('CDS board: bare columns, cards at --radius-card 20px + panel-shadow', asyn
   expect(m.cardRadius).toBe('20px');
   expect(m.radiusCard).toBe('20px');
   expect(m.cardShadow).toContain(m.panelShadow);
-  // Paper column header (DESIGN.md 看板列): 36px incl. the rule line.
+
   expect(m.headerH).toBe(36);
 });

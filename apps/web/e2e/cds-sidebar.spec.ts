@@ -23,7 +23,6 @@ test('CDS sidebar: 248px tier-1 surface, no seam, rounded rows, scroll-fade', as
     };
   });
 
-  // Paper Grouped sidebar (DESIGN.md 布局: 侧栏 248px)
   expect(m.width).toBe(248);
   expect(m.borderRightW).toBe('0px');
   // Paper board sheet (PR 7): the sheet's own ring is the edge; a sidebar

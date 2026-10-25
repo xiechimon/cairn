@@ -1,33 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// Issue #688: the z ladder — active surfaces must paint above the docked
-// chief drawer. The drawer is persistent chrome (a docked flex column, ADR
-// 0004); the new-task dialog is an active modal. They used to collide in the
-// root stacking order (drawer z 30 over the dialog family's 20/21), so the
-// drawer's 418px band covered the dialog's right edge — including its close
-// button and footer actions — and stayed lit above the modal scrim.
-// The reference product (todos.dev, live capture 2026-10-03) puts every
-// dialog on a fixed z 9999 portal host above low-z chrome and leaves the
-// open drawer mounted, dimmed and non-interactive underneath.
-//
-// Failure modes pinned here (fixture face, board route, scenario 111 =
-// drawer open). No test asserts a z-index VALUE — a value can move without
-// the painting order moving; every assertion is a hit-test, a real click,
-// or real typing:
-//   1. the dialog is covered: points inside the panel (right edge, corners,
-//      footer) must hit-test inside the dialog subtree, not the drawer;
-//   2. the scrim does not own the viewport: a point over the drawer must
-//      hit the dialog backdrop while the dialog is open;
-//   3. the dialog is not interactive in the overlapped band: the close
-//      button must receive an unforced click (Playwright's actionability
-//      hit-test fails when the drawer intercepts);
-//   4. the drawer must survive underneath (user ruling 2026-10-03: raise
-//      the dialog only — the drawer stays open, is not collapsed, and does
-//      not steal focus back): visible while the dialog is open, still open
-//      after the dialog closes, focus in the dialog and typing works.
-
-// #948 载体重钉（#910 裁定 1）：dialog/关闭钮/正文框换 role+name 一级载体；
-// .chief-drawer 是 chief 域残留别名（#950 面），data-slot scrim 钉原样。
 const drawer = (page: Page) => page.locator('.chief-drawer');
 const dialog = (page: Page) => page.getByRole('dialog', { name: '新建任务' });
 

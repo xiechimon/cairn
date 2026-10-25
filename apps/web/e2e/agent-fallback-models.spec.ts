@@ -90,7 +90,7 @@ async function pickModel(page: Page, slot: number, modelName: string) {
 
 const addButton = (page: Page) => page.getByRole('button', { name: '添加备用模型' });
 
-test('空链：规则文案写清，只有添加入口，没有备选行', async ({ page }) => {
+test('empty chain: rule copy is clear, only an add entry, no candidate rows', async ({ page }) => {
   const agentId = await createAgent('fb-empty');
   await openDetail(page, agentId);
   const section = page.locator('.agent-fallback');
@@ -101,7 +101,7 @@ test('空链：规则文案写清，只有添加入口，没有备选行', async
   await expect(addButton(page)).toBeEnabled();
 });
 
-test('添加：选完模型才落库，刷新后回读同一条', async ({ page }) => {
+test('add: lands in the store only after model selection, reload reads back the same row', async ({ page }) => {
   const agentId = await createAgent('fb-add');
   await openDetail(page, agentId);
   await addButton(page).click();
@@ -120,7 +120,7 @@ test('添加：选完模型才落库，刷新后回读同一条', async ({ page 
   await expect(page.getByRole('combobox', { name: '备用 1 模型' })).toContainText('Relay M1');
 });
 
-test('改：换掉某一行的模型，其余行保持原序', async ({ page }) => {
+test('change: swapping the model of one row keeps the remaining rows in original order', async ({ page }) => {
   const agentId = await createAgent('fb-edit', [piModel('m1'), piModel('m2')]);
   await openDetail(page, agentId);
   await pickModel(page, 1, 'Relay M3');
@@ -130,7 +130,7 @@ test('改：换掉某一行的模型，其余行保持原序', async ({ page }) 
   await expect(page.getByRole('combobox', { name: '备用 2 模型' })).toContainText('Relay M2');
 });
 
-test('排序：上移下移改变落库顺序，首行不能再上移、末行不能再下移', async ({ page }) => {
+test('reorder: move up/down changes the stored order, first row cannot move up further, last row cannot move down further', async ({ page }) => {
   const agentId = await createAgent('fb-order', [piModel('m1'), piModel('m2'), piModel('m3')]);
   await openDetail(page, agentId);
   await expect(page.getByRole('button', { name: '上移备用 1' })).toBeDisabled();
@@ -150,7 +150,7 @@ test('排序：上移下移改变落库顺序，首行不能再上移、末行�
   await expect(page.getByRole('combobox', { name: '备用 3 模型' })).toContainText('Relay M2');
 });
 
-test('删除：删中间一行后顺延，删到空时发 null 而不是空数组', async ({ page }) => {
+test('delete: deleting a middle row shifts the rest up, deleting down to empty sends null instead of an empty array', async ({ page }) => {
   const agentId = await createAgent('fb-remove', [piModel('m1'), piModel('m2'), piModel('m3')]);
   await openDetail(page, agentId);
   await page.getByRole('button', { name: '删除备用 2' }).click();
@@ -169,7 +169,7 @@ test('删除：删中间一行后顺延，删到空时发 null 而不是空数�
   await expect(page.getByRole('combobox', { name: '备用 1 模型' })).toHaveCount(0);
 });
 
-test('上限：满 5 个后添加被禁用，服务端对第 6 个返回 400 且原链不变', async ({ page }) => {
+test('cap: at 5 entries add is disabled, server returns 400 for the 6th and the chain stays unchanged', async ({ page }) => {
   const agentId = await createAgent('fb-cap');
   await openDetail(page, agentId);
   for (let slot = 1; slot <= FALLBACK_MODELS_MAX; slot++) {
@@ -191,7 +191,7 @@ test('上限：满 5 个后添加被禁用，服务端对第 6 个返回 400 且
   expect(await savedFallbackModels(agentId)).toHaveLength(FALLBACK_MODELS_MAX);
 });
 
-test('半选的行不落库：只选了运行时、没选模型时，库里仍是原链', async ({ page }) => {
+test('half-selected rows are not stored: with only a runtime picked and no model, the store keeps the original chain', async ({ page }) => {
   const agentId = await createAgent('fb-draft', [piModel('m1')]);
   await openDetail(page, agentId);
   await addButton(page).click();
@@ -205,7 +205,7 @@ test('半选的行不落库：只选了运行时、没选模型时，库里仍�
   await expect(draftRow).not.toContainText('选完模型后才会保存');
 });
 
-test('被删的模型：该行置灰并说明，且不被静默丢掉', async ({ page }) => {
+test('deleted model: the row greys out with an explanation and is not silently dropped', async ({ page }) => {
   const agentId = await createAgent('fb-gone', [piModel('m1'), piModel('gone-model')]);
   await openDetail(page, agentId);
   const live = page.locator('.agent-fallback-row').nth(0);
@@ -217,7 +217,7 @@ test('被删的模型：该行置灰并说明，且不被静默丢掉', async ({
   expect(await savedFallbackModels(agentId)).toEqual([piModel('m1'), piModel('gone-model')]);
 });
 
-test('dead 模型：该行置灰并标已下架', async ({ page }) => {
+test('dead model: the row greys out and is marked delisted', async ({ page }) => {
   const agentId = await createAgent('fb-dead', [piModel('m1'), piModel('m2')]);
   await page.route(`**/api/teams/${teamId}/model-sources`, async (route) => {
     const res = await route.fetch();
@@ -236,7 +236,7 @@ test('dead 模型：该行置灰并标已下架', async ({ page }) => {
   await expect(page.locator('.agent-fallback-row').nth(0)).not.toContainText('已下架');
 });
 
-test('归属机没开备选所需的 runtime：编辑时给出提示，已配的备选仍保留', async ({ page }) => {
+test('owner machine missing the runtime a fallback needs: editing shows a hint, already-configured fallbacks are kept', async ({ page }) => {
   const agentId = await createAgent('fb-runtime', [
     piModel('m1'),
     { provider: 'claude-code', modelId: 'claude-opus-4-5' },
@@ -257,7 +257,7 @@ interface Box {
 }
 
 for (const width of [1280, 560]) {
-  test(`排版 ${width}px：runtime 标签不折行，说明文字与右侧控件不重叠`, async ({ page }) => {
+  test(`typography ${width}px: runtime label does not wrap, description text does not overlap the right-side controls`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     const agentId = await createAgent('fb-layout', [
       piModel('m1'),

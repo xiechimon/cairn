@@ -1,31 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-// Issue #470: 对话正文字号提阶 + 行宽上限. Agent replies are reading text —
-// the capture-faithful 13px ink steps up to 15px on a unitless 1.6 (the
-// product is the same 24px line pitch the r8 rows carried, so row geometry
-// does not drift), and a 68ch measure cap keeps wide-screen paragraphs and
-// centered notes inside the 60–75 character comfort band. The composer
-// placeholder steps 13 → 14px: one notch under the body, hierarchy intact.
-// Paper PR 7 moves the body onto the six type keys: 14px (text-card-title) on
-// the same unitless 1.6, placeholder 13.5px (text-ui), still one notch apart.
-// Each test pins one failure way of the rework:
-//   1. body ink/pitch falls back to the old 13px fixed-pitch recipe
-//   2. line-height declared in px again (stops scaling with the size)
-//   3. the 68ch cap is missing or resolves to a different measure
-//   4. the note loses its centered look inside the cap
-//   5. placeholder ties with the body and the hierarchy collapses
-//   6. bubble / avatar / footer geometry gets dragged along
-//   7. a rule creeps back between a user turn and the agent row
-//
-// #945/#910 重钉：detail.css 退役，载体换语义/二级制——agent 文本 =
-// data-testid="agent-text"（无 role 的行内结构位）、note =
-// transcript-note、列 = transcript-col、气泡 = user-bubble、头像 =
-// msg-avatar、action 行 = msg-actions、agent 行 = data-row="agent"
-// （裁定 3：状态载体走 data-*）、占位行 = composer-placeholder testid。
-// 「行高声明必须 unitless」的意图保留：探针从钉 `.chat-text` 选择器文本
-// 改为「命中该元素的规则里存在 line-height:1.6 声明」——载体从类名换成
-// 元素匹配，律不变（leading-[1.6] utility 即新声明位）。
-
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
 
@@ -45,7 +19,7 @@ test('chat body reads at 14px (text-card-title) on a unitless 1.6', async ({ pag
   // scan the stylesheets for a rule that matches THIS element and declares
   // line-height: 1.6 (the leading-[1.6] utility is that rule)
   const declared = await text.evaluate((el) => {
-    // utilities 住在 @layer 块里——递归下钻（老探针扫的是 unlayered 平铺规则）
+
     const scan = (rules: CSSRuleList): string | null => {
       for (const rule of rules) {
         if (
@@ -169,12 +143,7 @@ test('bubble / avatar / footer keep their own geometry (#470 scope fence)', asyn
 test('turn boundary is air, not a rule: no divider between a user turn and the agent row', async ({
   page,
 }) => {
-  // XMON-55 P5 follow-up. P3 marked every 用户→agent boundary with a full-bleed
-  // 1px rule; across a transcript that reads as a document <hr> rather than a
-  // change of speaker, and the user asked for it gone. The boundary is carried
-  // by the avatar swap, the centered stamp and air. This pins the three ways
-  // the air-only boundary can regress: a rule creeps back, the gap collapses,
-  // or the gap balloons until the transcript reads as scattered fragments.
+
   await page.goto(DONE);
   const probe = await page.evaluate(() => {
     // every element in the transcript that paints a horizontal line
@@ -186,10 +155,7 @@ test('turn boundary is air, not a rule: no divider between a user turn and the a
         return (top > 0 || bot > 0) && el.getBoundingClientRect().height > 0;
       })
       .map((el) => el.className);
-    // every 用户→agent boundary: an agent row whose preceding row-carrier
-    // ends with the user turn's action row (data-row/data-testid carriers,
-    // #910 裁定 3). #1009 A2：行骨架换骑 MessageScrollerItem——边界判定改在
-    // 载体层（Item 的最后一个子节点 = 用户行的收尾 action row），行内断言不变。
+
     const turns = [...document.querySelectorAll('[data-slot="message-scroller-item"]')]
       .filter((item) => {
         const prev = item.previousElementSibling;

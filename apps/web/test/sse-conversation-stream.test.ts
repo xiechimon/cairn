@@ -1,14 +1,3 @@
-// #740 conversation stream 订阅重置语义（客户端半）：流（重）建立时先清
-// liveTextStore 再消费事件——服务端 subscribe 补发是「当前段快照」，客户端
-// 旧缓冲（断线前 / 关抽屉前累积的）必须先作废，否则补发叠加成双份。
-// 失败方式清单（票面 ① 的客户端半 + 既有面保持）：
-// 1. 双份文本：进场前残留的旧缓冲未清 → 补发后 = 旧 + 补发（双份）。
-// 2. 断线重连：重建流时旧缓冲未清 → 补发 + 断线前文本叠加（双份）。
-// 3. 接缝：补发（快照）与后续 live 增量必须精确拼接——不重不断。
-// 4. 既有面保持：assistant 文本行事件记 handoff 不清缓冲（#857；工具行不记）
-//    + 失效重取；step 终态清缓冲；重连 resync 仍全量失效重取（#462）。
-// 服务端半（hub 缓冲/补发/清空点）见 apps/server/test/conv-stream-catchup.test.ts。
-
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { activityStore } from '../src/api/activity.js';
@@ -17,7 +6,6 @@ import { liveTextStore } from '../src/api/live-text.js';
 import { liveThinkingStore } from '../src/api/live-thinking.js';
 import { startConversationStream } from '../src/api/sse.js';
 
-/** 替身 EventSource：sse-connection.test.ts 同款（静态 OPEN 量必须留着）。 */
 class FakeEventSource {
   static readonly CONNECTING = 0;
   static readonly OPEN = 1;
@@ -50,7 +38,6 @@ function freshClient(): QueryClient {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
-/** 起流（清零instances 后），返回当前连接替身。 */
 function startStream(qc: QueryClient): FakeEventSource {
   FakeEventSource.instances = [];
   startConversationStream(CONV, qc, {});
@@ -78,14 +65,14 @@ afterEach(() => {
   agentTodoStore.clear(CONV);
 });
 
-describe('进场先清：补发即快照（失败方式 1）', () => {
-  it('订阅前残留的旧缓冲在首事件可能到达前已被清空', () => {
-    // 关抽屉 / 上一次订阅留下的残段。
+describe('clear on entry: a replay is a snapshot (failure mode 1)', () => {
+  it('stale buffer from before the subscription is cleared before the first event can arrive', () => {
+
     liveTextStore.append(CONV, '旧缓冲');
     const qc = freshClient();
     FakeEventSource.instances = [];
     startConversationStream(CONV, qc, {});
-    // 清点在 connect 之前：任何事件（含补发）都还没可能被消费。
+
     expect(liveTextStore.get(CONV)).toBe('');
     const es = FakeEventSource.instances[0] as FakeEventSource;
     es.fireOpen();
@@ -94,31 +81,29 @@ describe('进场先清：补发即快照（失败方式 1）', () => {
   });
 });
 
-describe('断线重连：重建即清（失败方式 2）', () => {
-  it('看门狗重建后旧缓冲作废，补发快照不叠加双份', () => {
+describe('reconnect: rebuild clears (failure mode 2)', () => {
+  it('after a watchdog rebuild the stale buffer is void, a replayed snapshot does not stack a double copy', () => {
     const qc = freshClient();
     const invalidate = vi.spyOn(qc, 'invalidateQueries');
     const es = startStream(qc);
     es.push({ type: 'text_delta', text: '断线前' });
     expect(liveTextStore.get(CONV)).toBe('断线前');
 
-    // 完全静默 20s → 看门狗重建连接（#462 同路径：open() → onopen → resync）。
     vi.advanceTimersByTime(20_000);
     const rebuilt = FakeEventSource.instances[1] as FakeEventSource;
     expect(rebuilt).toBeDefined();
     rebuilt.fireOpen();
-    // resync：清缓冲（旧段作废）+ 全量失效重取（既有 #462 面保持）。
+
     expect(liveTextStore.get(CONV)).toBe('');
     expect(invalidate).toHaveBeenCalled();
 
-    // 服务端在新订阅上补发当前段快照（含断线窗口内流掉的增量）。
     rebuilt.push({ type: 'text_delta', text: '断线前后缀' });
     expect(liveTextStore.get(CONV)).toBe('断线前后缀');
   });
 });
 
-describe('接缝：补发快照 + live 增量（失败方式 3）', () => {
-  it('一条补发与后续增量精确拼接——不重不断', () => {
+describe('seam: replayed snapshot + live increments (failure mode 3)', () => {
+  it('one replay and the following increments splice exactly — no overlap, no break', () => {
     const qc = freshClient();
     const es = startStream(qc);
     es.push({ type: 'text_delta', text: '前缀' });
@@ -127,8 +112,8 @@ describe('接缝：补发快照 + live 增量（失败方式 3）', () => {
   });
 });
 
-describe('既有面保持（失败方式 4；#857 收敛交接改写清语义）', () => {
-  it('message 事件（assistant 文本行）：记 handoff 不清缓冲 + messages/plans 失效重取', () => {
+describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote the clear semantics)', () => {
+  it('message event (assistant text row): records handoff, does not clear the buffer + messages/plans invalidated and refetched', () => {
     const qc = freshClient();
     const invalidate = vi.spyOn(qc, 'invalidateQueries');
     const es = startStream(qc);
@@ -137,9 +122,9 @@ describe('既有面保持（失败方式 4；#857 收敛交接改写清语义）
       type: 'message',
       message: { id: 'm1', role: 'assistant', content: '终稿', createdAt: 1 },
     });
-    // 重取在飞：缓冲保留（打字面不闪清）。
+
     expect(liveTextStore.get(CONV)).toBe('段');
-    // 收敛前读数 = 全缓冲；收敛（messages 含 m1）后 = 空（落库行接管）。
+
     expect(liveTextStore.getVisible(CONV, new Set())).toBe('段');
     expect(liveTextStore.getVisible(CONV, new Set(['m1']))).toBe('');
     const keys = invalidate.mock.calls.map(([filters]) => filters as { queryKey?: string[] });
@@ -147,7 +132,7 @@ describe('既有面保持（失败方式 4；#857 收敛交接改写清语义）
     expect(keys.some((f) => f.queryKey?.[0] === 'plans')).toBe(true);
   });
 
-  it('message 事件（工具行）：不记 handoff，缓冲保留', () => {
+  it('message event (tool row): does not record handoff, buffer kept', () => {
     const qc = freshClient();
     const es = startStream(qc);
     es.push({ type: 'text_delta', text: '段' });
@@ -160,12 +145,12 @@ describe('既有面保持（失败方式 4；#857 收敛交接改写清语义）
         createdAt: 1,
       },
     });
-    // 前缀尚无落库行覆盖：即使 messages 已含该工具行，文本仍保留。
+
     expect(liveTextStore.get(CONV)).toBe('段');
     expect(liveTextStore.getVisible(CONV, new Set(['m-tool']))).toBe('段');
   });
 
-  it('step 事件：失效重取、不动缓冲', () => {
+  it('step event: invalidates and refetches, buffer untouched', () => {
     const qc = freshClient();
     const invalidate = vi.spyOn(qc, 'invalidateQueries');
     const es = startStream(qc);
@@ -178,7 +163,7 @@ describe('既有面保持（失败方式 4；#857 收敛交接改写清语义）
     expect(invalidate).toHaveBeenCalled();
   });
 
-  it('handlers 透传：onMessage/onStep 照常收到载荷', () => {
+  it('handlers pass through: onMessage/onStep receive payloads as usual', () => {
     const qc = freshClient();
     const onMessage = vi.fn();
     const onStep = vi.fn();
@@ -201,15 +186,8 @@ describe('既有面保持（失败方式 4；#857 收敛交接改写清语义）
   });
 });
 
-// —— #905 活动相位单槽（W2/W3 客户端半）————————————————————————————
-// 失败方式：
-//   1. activity 事件不入槽 → 活行永远黑盒（消费侧读不到）。
-//   2. 步终态（done/failed/stopped）不清槽 → 死相位跨步残留，下一跑步
-//      头上挂上一跑的「思考中」（消费侧 stepId 过滤是第二道防线，这里是
-//      第一道）。
-//   3. 流重建（resync）不清槽 → 陈旧相位在新订阅的 hub 补发到达前抢先呈现。
-describe('活动相位单槽（#905）', () => {
-  it('activity 事件入槽；后到覆盖先到（单槽语义）', () => {
+describe('activity phase single slot (#905)', () => {
+  it('activity events enter the slot; later overrides earlier (single-slot semantics)', () => {
     const es = startStream(freshClient());
     es.push({
       type: 'activity',
@@ -228,7 +206,7 @@ describe('活动相位单槽（#905）', () => {
     });
   });
 
-  it('step 终态（done/failed/stopped）清槽；claimed 不清', () => {
+  it('step final state (done/failed/stopped) clears the slot; claimed does not', () => {
     for (const status of ['done', 'failed', 'stopped'] as const) {
       activityStore.clear(CONV);
       const es = startStream(freshClient());
@@ -249,13 +227,13 @@ describe('活动相位单槽（#905）', () => {
     expect(activityStore.get(CONV)).not.toBeNull();
   });
 
-  it('流重建即清槽：新订阅先作废旧相位，hub 补发接管', () => {
+  it('stream rebuild clears the slot: the new subscription voids the old phase first, the hub replay takes over', () => {
     activityStore.set(CONV, { stepId: 's0', phase: 'thinking', at: 50 });
     const qc = freshClient();
     FakeEventSource.instances = [];
     startConversationStream(CONV, qc, {});
     expect(activityStore.get(CONV)).toBeNull();
-    // 补发到达即入槽（server hub 的 lastActivity 快照）。
+
     const es = FakeEventSource.instances[0] as FakeEventSource;
     es.fireOpen();
     es.push({ type: 'activity', activity: { stepId: 's1', phase: 'tool', tool: 'read', at: 300 } });
@@ -263,14 +241,7 @@ describe('活动相位单槽（#905）', () => {
   });
 });
 
-// —— #1308 思考增量（客户端半）——————————————————————————————————————————
-// 失败方式：
-//   1. thinking_delta 不进 liveThinkingStore → 会话只有「模型思考中...」标签。
-//   2. 思考增量误入 text_delta 通道，或正文增量误入思考缓冲。
-//   3. 订阅 / 重连不清旧思考缓冲 → 补发快照叠成双份。
-//   4. 思考段行到达不记 handoff → 落库行与在飞行叠成两份。
-//   5. 步终态不清思考缓冲 → 下一跑残留上一跑的推理文本。
-describe('思考增量（#1308）', () => {
+describe('thinking increments (#1308)', () => {
   const thinkingRow = {
     id: 'm-think',
     role: 'assistant' as const,
@@ -278,21 +249,21 @@ describe('思考增量（#1308）', () => {
     createdAt: 1,
   };
 
-  it('thinking_delta 只进思考缓冲，不进正文缓冲', () => {
+  it('thinking_delta enters only the thinking buffer, not the body buffer', () => {
     const es = startStream(freshClient());
     es.push({ type: 'thinking_delta', text: 'REASONING-MARKER-1308' });
     expect(liveThinkingStore.get(CONV)).toBe('REASONING-MARKER-1308');
     expect(liveTextStore.get(CONV)).toBe('');
   });
 
-  it('text_delta 不进思考缓冲', () => {
+  it('text_delta does not enter the thinking buffer', () => {
     const es = startStream(freshClient());
     es.push({ type: 'text_delta', text: 'answer' });
     expect(liveTextStore.get(CONV)).toBe('answer');
     expect(liveThinkingStore.get(CONV)).toBe('');
   });
 
-  it('订阅前残留的思考缓冲在补发前已清空', () => {
+  it('stale thinking buffer from before the subscription is cleared before the replay', () => {
     liveThinkingStore.append(CONV, '旧思考');
     FakeEventSource.instances = [];
     startConversationStream(CONV, freshClient(), {});
@@ -303,11 +274,11 @@ describe('思考增量（#1308）', () => {
     expect(liveThinkingStore.get(CONV)).toBe('补发思考');
   });
 
-  it('activity resetLive 清掉在飞思考（回落轮）', () => {
+  it('activity resetLive clears the in-flight thinking (fallback round)', () => {
     const es = startStream(freshClient());
     es.push({ type: 'thinking_delta', text: '旧轮思考' });
     expect(liveThinkingStore.get(CONV)).toBe('旧轮思考');
-    // 普通 starting 不得清（首轮 / 节流重发）。
+
     es.push({
       type: 'activity',
       activity: { stepId: 's1', phase: 'starting', at: 1 },
@@ -320,7 +291,7 @@ describe('思考增量（#1308）', () => {
     expect(liveThinkingStore.get(CONV)).toBe('');
   });
 
-  it('重连 resync 作废旧思考缓冲，补发快照不叠加', () => {
+  it('reconnect resync voids the old thinking buffer, a replayed snapshot does not stack', () => {
     const es = startStream(freshClient());
     es.push({ type: 'thinking_delta', text: '断线前' });
     vi.advanceTimersByTime(20_000);
@@ -331,7 +302,7 @@ describe('思考增量（#1308）', () => {
     expect(liveThinkingStore.get(CONV)).toBe('断线前后缀');
   });
 
-  it('思考段行记 handoff：messages 含该行后可见缓冲为空', () => {
+  it('thinking segment rows record the handoff: once the row is in messages the visible buffer is empty', () => {
     const es = startStream(freshClient());
     es.push({ type: 'thinking_delta', text: 'REASONING-MARKER-1308' });
     es.push({ type: 'message', message: thinkingRow });
@@ -341,7 +312,7 @@ describe('思考增量（#1308）', () => {
     expect(liveTextStore.get(CONV)).toBe('');
   });
 
-  it('正文行不记思考 handoff', () => {
+  it('body rows do not record the thinking handoff', () => {
     const es = startStream(freshClient());
     es.push({ type: 'thinking_delta', text: '仍在飞' });
     es.push({
@@ -351,7 +322,7 @@ describe('思考增量（#1308）', () => {
     expect(liveThinkingStore.getVisible(CONV, new Set(['m-text']))).toBe('仍在飞');
   });
 
-  it('step 终态清思考缓冲；claimed 不清', () => {
+  it('step final state clears the thinking buffer; claimed does not', () => {
     const es = startStream(freshClient());
     es.push({ type: 'thinking_delta', text: '段' });
     es.push({
@@ -367,13 +338,13 @@ describe('思考增量（#1308）', () => {
   });
 });
 
-describe('agent 待办清单单槽（#1524）', () => {
+describe('agent todo list single slot (#1524)', () => {
   const todoEvent = (items: { text: string; state: 'todo' | 'doing' | 'done' }[]) => ({
     type: 'agent_todo' as const,
     todo: { stepId: 's1', at: 100, items },
   });
 
-  it('agent_todo 事件入槽；后到覆盖先到（整表替换）', () => {
+  it('agent_todo events enter the slot; later overrides earlier (whole-table replacement)', () => {
     const es = startStream(freshClient());
     es.push(todoEvent([{ text: '第一条', state: 'todo' }]));
     expect(agentTodoStore.get(CONV)).toMatchObject({
@@ -387,7 +358,7 @@ describe('agent 待办清单单槽（#1524）', () => {
     });
   });
 
-  it('step 终态（done/failed/stopped）清槽；claimed 不清', () => {
+  it('step final state (done/failed/stopped) clears the slot; claimed does not', () => {
     for (const status of ['done', 'failed', 'stopped'] as const) {
       agentTodoStore.clear(CONV);
       const es = startStream(freshClient());
@@ -408,7 +379,7 @@ describe('agent 待办清单单槽（#1524）', () => {
     expect(agentTodoStore.get(CONV)).not.toBeNull();
   });
 
-  it('流重建即清槽：新订阅先作废旧清单，hub 补发接管', () => {
+  it('stream rebuild clears the slot: the new subscription voids the old list first, the hub replay takes over', () => {
     agentTodoStore.set(CONV, { stepId: 's0', at: 50, items: [{ text: '旧', state: 'todo' }] });
     FakeEventSource.instances = [];
     startConversationStream(CONV, freshClient(), {});

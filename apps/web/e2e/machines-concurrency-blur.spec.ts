@@ -56,7 +56,6 @@ function machine(over: Partial<StubMachine> & { id: string }): StubMachine {
   };
 }
 
-// #1342 Bugbot 回归：失焦提交与 恢复推荐 / ± 竞态；未编辑的超区间值失焦被夹值保存。
 async function stubStack(page: Page, rows: StubMachine[], opts: { hold?: boolean } = {}) {
   const bodies: { maxConcurrent?: number | null }[] = [];
   const pending: (() => void)[] = [];
@@ -107,7 +106,7 @@ const input = (page: Page) => page.getByTestId('machine-concurrency-input');
 const manual5 = () =>
   machine({ id: 'm-1', maxConcurrent: 5, maxConcurrentOverridden: true, concurrencySource: 'manual' });
 
-test('编辑后点 恢复推荐：只发一次 PATCH（null），不先存手动值', async ({ page }) => {
+test('edit then click `恢复推荐`: sends exactly one PATCH (null), does not save a manual value first', async ({ page }) => {
   const { bodies } = await stubStack(page, [manual5()]);
   await page.goto('/app/resources/machines');
   await trigger(page, 'm-1').click();
@@ -118,7 +117,7 @@ test('编辑后点 恢复推荐：只发一次 PATCH（null），不先存手动
   expect(bodies).toEqual([{ maxConcurrent: null }]);
 });
 
-test('编辑后点 +：只发一次 PATCH（草稿 + 1）', async ({ page }) => {
+test('edit then click +: sends exactly one PATCH (draft + 1)', async ({ page }) => {
   const { bodies } = await stubStack(page, [manual5()]);
   await page.goto('/app/resources/machines');
   await trigger(page, 'm-1').click();
@@ -129,7 +128,7 @@ test('编辑后点 +：只发一次 PATCH（草稿 + 1）', async ({ page }) => 
   expect(bodies).toEqual([{ maxConcurrent: 8 }]);
 });
 
-test('未编辑的超区间值：聚焦再失焦不发 PATCH、不夹值', async ({ page }) => {
+test('out-of-range value left unedited: focus then blur sends no PATCH, does not clamp', async ({ page }) => {
   const { bodies } = await stubStack(page, [
     machine({
       id: 'm-1',
@@ -151,7 +150,7 @@ test('未编辑的超区间值：聚焦再失焦不发 PATCH、不夹值', async
   await expect(trigger(page, 'm-1')).toHaveAttribute('aria-label', '并发上限 12，手动');
 });
 
-test('连续两次写：后一次等前一次回执再发（按序，最终 = 最后意图）', async ({ page }) => {
+test('two consecutive writes: the second waits for the first receipt (ordered, final = last intent)', async ({ page }) => {
   const { bodies, pending, state } = await stubStack(page, [manual5()], { hold: true });
   await page.goto('/app/resources/machines');
   await trigger(page, 'm-1').click();
@@ -169,10 +168,7 @@ test('连续两次写：后一次等前一次回执再发（按序，最终 = �
   await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'measured');
 });
 
-// #1346 Bugbot 回归：PATCH 在途（串行队列里排着、乐观写尚未发生）时连点 +，
-// 每一下都必须以最后一次请求的值为基数，草稿不回弹。第一下立即发出（乐观写生效），
-// 第二、三下排队——旧代码第三下以旧 value 4 为基数，两次都发 5。
-test('PATCH 在途时连点 + 三下：3 → 6，草稿不回弹，最终落库 6', async ({ page }) => {
+test('three + clicks while a PATCH is in flight: 3 → 6, draft does not bounce back, final stored value 6', async ({ page }) => {
   const { bodies, pending, state } = await stubStack(
     page,
     [machine({ id: 'm-1', maxConcurrent: 3, maxConcurrentOverridden: true, concurrencySource: 'manual' })],

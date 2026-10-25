@@ -2,30 +2,30 @@ import { describe, expect, it } from 'vitest';
 import { substantiveChangesOf } from '../src/detail/empty-commit.js';
 
 describe('substantiveChangesOf', () => {
-  it('查询未完成或失败 = 未知，不把空集当成零改动', () => {
+  it('query unfinished or failed = unknown, an empty set is not read as zero changes', () => {
     expect(substantiveChangesOf({ files: [], reported: true }, false)).toBeNull();
     expect(substantiveChangesOf(undefined, true)).toBeNull();
     expect(substantiveChangesOf(null, true)).toBeNull();
   });
 
-  it('响应没有 reported（旧 server / 未上报折叠成 files:[]）= 未知', () => {
+  it('response without reported (old server / unreported folded into files:[]) = unknown', () => {
     expect(substantiveChangesOf({ files: [] }, true)).toBeNull();
     expect(substantiveChangesOf({ files: [], reported: false }, true)).toBeNull();
   });
 
-  it('已上报且文件集为空、没有 changed = 没有实质改动（空提交）', () => {
+  it('reported with an empty file set and no changed = no substantive changes (empty commit)', () => {
     expect(substantiveChangesOf({ files: [], reported: true }, true)).toBe(false);
   });
 
-  it('changed false = git diff 没有文件头，空提交', () => {
+  it('changed false = git diff has no file headers, empty commit', () => {
     expect(substantiveChangesOf({ files: [], reported: true, changed: false }, true)).toBe(false);
   });
 
-  it('changed true = git 有文件头，解析器丢掉的改动仍要合并', () => {
+  it('changed true = git has file headers, changes the parser lost must still merge', () => {
     expect(substantiveChangesOf({ files: [], reported: true, changed: true }, true)).toBe(true);
   });
 
-  it('已上报且有文件 = 有实质改动', () => {
+  it('reported with files = has substantive changes', () => {
     expect(substantiveChangesOf({ files: [{ path: 'README.md' }], reported: true }, true)).toBe(
       true,
     );

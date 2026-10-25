@@ -1,18 +1,6 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import { pressAndExpect } from './helpers.js';
 
-// ⌘K live face, the frame before GET /api/search answers. While the server
-// query is in flight (250ms debounce + round trip) the rows come from the
-// client-side filter over the live todo set; each todo row's second line
-// must be that todo's own live project name, never the fixture capture
-// project (r3-lifecycle), and the 项目 group must come from the live
-// project list, never the fixture project. The search route is held open so
-// the pre-response frame is the one under assertion, then released to show
-// the server frame agrees.
-//
-// Boot stubs follow schedules-live.spec.ts: teams + user me succeed, every
-// other GET 500s into the app's isError tolerance; no ?scenario= = live.
-
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const FIXTURE_PROJECT = 'r3-lifecycle';
@@ -133,7 +121,6 @@ test('live, projects loaded: pre-response rows carry each todo’s own project',
   await expect(todoRow(page, 'search probe beta')).not.toContainText('verify-1400');
   await expect(panel(page)).not.toContainText(FIXTURE_PROJECT);
 
-  // 项目 group from the live list: a project-name query lists the live hit
   await typeQuery(page, 'atlas');
   await expect.poll(() => search.queries()).toContain('atlas');
   await expect(projectRows(page)).toHaveCount(1);

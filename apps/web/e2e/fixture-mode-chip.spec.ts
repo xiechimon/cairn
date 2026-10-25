@@ -22,7 +22,7 @@ async function stubLiveBoot(page: Page) {
   await page.route('**/api/user/me', (route) => route.fulfill({ json: USER }));
 }
 
-test('fixture mode shows the 示例数据 chip naming the scenario, site-wide (#1037)', async ({
+test('fixture mode shows the `示例数据` chip naming the scenario, site-wide (#1037)', async ({
   page,
 }) => {
   await page.goto('/app/schedules?scenario=11');

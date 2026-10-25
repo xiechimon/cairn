@@ -1,18 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// 简报卡随流（#827 Q3）：live 线程列首的 spec 卡住进滚动列（.chat-col 内），
-// 不再钉在列首视口。fixture 面无 spec 数据源，本 spec 走 live 面打桩
-// （spec-brief-card.stubWorld 同律：todo 带 latestBuildId + spec，messages
-// 长 thread；其余端点 500）。钉住的失败方式：
-//  1. spec 卡回到滚动列之外（.detail-center 直接子节点 = 旧钉住形）
-//  2. 滚到底简报卡仍在视口（没随流滚走）/ 滚到顶简报卡不在列首（流序错位）
-//  3. 超长无断点行撑过中栏（#827 第二轮：flex min-width 陷阱，chat-col 横滚 +
-//     接缝裁切）——200 字符链接行 scrollWidth 必须等于 clientWidth
-// 时序坑（#1009 A2 换装后改写）：.chat-col 从 column-reverse 换骑 registry
-// MessageScroller，滚动端口是普通纵向容器——scrollTop 0 = 顶/最旧，
-// scrollHeight - clientHeight = 底/最新。零位移只影响坐标约定，流序与
-// 「卡随流滚走」的语义不动。
-
 const TEAM_ID = 'team-1';
 const FLOW_ID = 'todo-flow-1';
 const BUILD_ID = 'build-flow-1';
@@ -74,7 +61,6 @@ function wireMessages() {
   };
 }
 
-/** live thread 面打桩（spec-brief-card.stubWorld 同律 + build/会话分支）。 */
 async function stubFlow(page: Page) {
   const json = (body: unknown, status = 200) => ({
     status,
@@ -104,7 +90,7 @@ async function stubFlow(page: Page) {
   });
 }
 
-test('1. 简报卡住进滚动列：.chat-col 内可见，不再是 .detail-center 直接子节点', async ({
+test('1. brief card lives in the scrolling column: visible inside .chat-col, no longer a direct child of .detail-center', async ({
   page,
 }) => {
   await stubFlow(page);
@@ -114,25 +100,25 @@ test('1. 简报卡住进滚动列：.chat-col 内可见，不再是 .detail-cent
   await expect(page.locator('.detail-center > .spec-block')).toHaveCount(0);
 });
 
-test('2. 简报卡随流滚走：滚到底出视口，滚到顶回列首', async ({ page }) => {
+test('2. brief card scrolls away with the flow: out of the viewport at the bottom, back to the column top at the top', async ({ page }) => {
   await stubFlow(page);
   await page.goto(`/app/todo/${FLOW_ID}`);
   const list = page.locator('.chat-col');
   const spec = page.locator('.chat-col .spec-block');
   await expect(spec).toBeAttached();
   const chatTop = (await list.boundingBox())!.y;
-  // 最新端（普通滚动容器 = scrollHeight 侧）：简报卡滚出视口上方
+
   await list.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
   const bottomTop = await spec.evaluate((el) => el.getBoundingClientRect().top);
   expect(bottomTop).toBeLessThan(chatTop);
-  // 最旧端（scrollTop 0）：简报卡回到列首视口内
+
   await list.evaluate((el) => el.scrollTo({ top: 0 }));
   const topTop = await spec.evaluate((el) => el.getBoundingClientRect().top);
   expect(topTop).toBeGreaterThanOrEqual(chatTop - 1);
   expect(Math.abs(topTop - bottomTop)).toBeGreaterThan(200);
 });
 
-test('3. 超长无断点行包进中栏：chat 横向 scrollWidth 等于 clientWidth', async ({ page }) => {
+test('3. extra-long unbreakable lines wrap into the middle column: chat horizontal scrollWidth equals clientWidth', async ({ page }) => {
   await stubFlow(page);
   await page.goto(`/app/todo/${FLOW_ID}`);
   const metrics = await page.locator('.chat-col').evaluate((el) => ({

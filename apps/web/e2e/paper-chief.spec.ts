@@ -1,31 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-// Chief window, 总管设置 and the question card on the Paper patterns
-// (DESIGN.md, issue #1398). The window keeps its ADR 0013 frame (380x600,
-// --radius-window, FAB); what changes is what sits inside it.
-//
-// Failure modes, each pinned below:
-//  W1 the thread title drifts off the dialog heading face (16px serif 500)
-//     or off the 16px window inset
-//  W2 the gate banner goes back to a tinted block, or 设置 leaves the 32px
-//     primary button shape
-//  W3 the hero title leaves the heading face, example cards go back to
-//     tinted blocks, or their icons sit on a tinted tile again
-//  W4 the thread switcher leaves the Paper menu face (10px corners, 32px
-//     rows, 13.5px text)
-//  W5 stream meta leaves the type keys (12px notes and foot, 11.5px tool
-//     rows, 13.5px composer)
-//  S1 总管设置 loses the Paper top bar (56px, hairline, serif 18px title on
-//     the left) or the 768px column
-//  S2 the Agent tab goes back to two tinted blocks instead of one
-//     --radius-card settings card of >= 52px rows
-//  S3 empty tabs drop out of the settings card, or 编辑 leaves the 32px
-//     primary button
-//  Q1 the question card leaves the card face (--radius-card, card ground),
-//     or its status stops being icon + colour + word
-//  Q2 question and option text leave the type keys (14px 500 question,
-//     13.5px options, 11.5px step header)
-
 const GATED = '/app?scenario=100';
 const READY = '/app?scenario=111';
 const THREAD = '/app?scenario=114';

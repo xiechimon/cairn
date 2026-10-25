@@ -2,9 +2,9 @@ import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
 const drawer = (page: Page) => page.locator('.chief-drawer');
-// #1260: 模型行只读载体 = data-testid（行无 role 语义，aria 无处挂）。
+
 const modelRow = (page: Page) => page.getByTestId('chief-model-row');
-// 行内 span 序：0 = 包装 span，1 = 运行时 mark，2 = 模型名。
+
 const modelName = (page: Page) => modelRow(page).locator('span').nth(2);
 
 test.describe('chief drawer model row (#615)', () => {
@@ -15,17 +15,15 @@ test.describe('chief drawer model row (#615)', () => {
     const row = modelRow(page);
     await expect(row).toBeVisible();
     await expect(modelName(page)).toHaveText('claude-sonnet-5 · 默认');
-    // 覆盖槽退役：行不是控制件——旧 #615/#950 载体（总管主模型钮）与
-    // 模型 popover 均不存在；点行无任何开面。
+
     await expect(page.getByRole('button', { name: '总管主模型' })).toHaveCount(0);
     await row.click();
     await expect(page.getByRole('dialog', { name: '模型' })).toHaveCount(0);
     await expect(drawer(page)).toBeVisible();
   });
 
-  test('the row is readable in both themes (#751 A 同律)', async ({ page }) => {
-    // #751 A 同律：断渲染对（计算字色 × 实际背景），不断 CSS 值。行是
-    // tertiary 12px 小字——AA 正文档 4.5:1 是地板。
+  test('the row is readable in both themes (#751 A same law)', async ({ page }) => {
+
     for (const theme of ['dark', 'light'] as const) {
       await page.goto('/app?scenario=111');
       await page.evaluate((t) => localStorage.setItem('cairn-theme', t), theme);
@@ -60,20 +58,15 @@ test.describe('chief drawer model row (#615)', () => {
     }
   });
 
-
-
-
   test('the model row carries the runtime mark, not an agent avatar', async ({ page }) => {
     await page.goto('/app?scenario=fab-avatar');
-    // ADR 0013 D4：fab-avatar 捕获形 = 关窗态（FAB 头像面）——模型行面先开窗
+
     await page.locator('.chief-fab').click();
     await expect(drawer(page)).toBeVisible();
     await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
     const row = modelRow(page);
     await expect(row).toBeVisible();
-    // #615 返工裁决：行首 = 运行时标记（fixture 未录 provider 位 = pi 正典
-    // π 字形），不是 Agent 头像——头像脸归 FAB / 消息流各自的面。#1260 只读
-    // 行同律：mark 槽 = 行内首个 span（结构载体；svg 存在 + 无 img）。
+
     await expect(row.locator('span').first().locator('svg')).toHaveCount(1);
     await expect(row.locator('img')).toHaveCount(0);
 
@@ -103,8 +96,6 @@ test.describe('chief drawer model row (#615)', () => {
     const footClip = await page.evaluate(() => navigator.clipboard.readText());
     expect(footClip).toContain('已创建并派工');
 
-    // 用户行两钮（复制 + 恢复到此处）皆为真按钮；裸 glyph 子节点零残留
-    // （#615 返工：恢复钮按用户裁决闭环复活，不再按二分律删除）
     await expect(page.getByTestId('chief-msg-tools').getByRole('button')).toHaveCount(2);
     await expect(page.getByTestId('chief-msg-tools').locator('> svg')).toHaveCount(0);
     await expect(page.getByTestId('chief-msg-foot').locator('> svg')).toHaveCount(0);
@@ -116,22 +107,20 @@ test.describe('chief drawer model row (#615)', () => {
     await page.goto('/app?scenario=114');
     await expect(drawer(page)).toBeVisible();
 
-    // 恢复钮（参考站 live aria 正词「恢复到此处」）→ 破坏性确认层先行
     const restore = page
       .getByTestId('chief-msg-tools')
       .getByRole('button', { name: '恢复到此处' });
     await expect(restore).toBeVisible();
     await restore.first().click();
-    // #950: 确认层载体 = dialog role + 可及名（DialogShell aria-label=title）。
+
     const confirm = page.getByRole('dialog', { name: '恢复到此处' });
     await expect(confirm).toBeVisible();
     await expect(confirm).toContainText('恢复到此处？');
-    // fixture accept 律：确认只关窗（零请求），流不变
+
     await confirm.getByRole('button', { name: '恢复到此处' }).click();
     await expect(confirm).toHaveCount(0);
     await expect(page.getByTestId('chief-msg')).toHaveCount(2);
 
-    // foot 折叠箭头 = 过程披露：展开出该回合工具行（Multica OuterProcessFold 同族）
     const foot = page.getByTestId('chief-msg-foot');
     const fold = foot.getByRole('button', { name: '展开过程' });
     await expect(fold).toBeVisible();
@@ -141,7 +130,7 @@ test.describe('chief drawer model row (#615)', () => {
     await expect(tools).toBeVisible();
     await expect(tools.locator('div')).toHaveCount(2);
     await expect(tools).toContainText('create_todo');
-    // 收起回折叠态
+
     await foot.getByRole('button', { name: '收起过程' }).click();
     await expect(tools).toHaveCount(0);
   });

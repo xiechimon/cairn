@@ -139,7 +139,7 @@ async function openDetail(page: Page) {
   await page.goto(`/app/todo/${CARD_ID}`);
   await membersLoaded;
   await skillsLoaded;
-  const input = page.locator('[data-testid="composer-card"] textarea'); // #945/#910 重钉
+  const input = page.locator('[data-testid="composer-card"] textarea');
   await expect(input).toBeVisible();
   await expect(input).toBeEditable();
   const menu = page.locator('.slash-menu');

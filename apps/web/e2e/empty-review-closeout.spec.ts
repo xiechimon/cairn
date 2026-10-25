@@ -1,10 +1,5 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 
-// #1313：review 卡只有空提交（hasChanges 仍为真，因为 countAhead>0，但已上报的
-// diff 文件集为空）时，「完成」不得再强制合并、也不得因缺合并授权而禁用。
-// 有文件改动的卡照旧走合并勾选 + 缺授权禁用。changes 未带 reported 的旧响应
-// 不能被当成空提交（否则没上报的卡会悄悄跳过合并）。
-
 const TEAM_ID = 'team-1';
 const AGENT_ID = 'agent-1';
 const CARD_ID = 'todo-1';
@@ -160,7 +155,7 @@ async function openDetail(page: Page) {
   return dialog;
 }
 
-test('看板：已上报空 diff 的 review 卡完成不合并、不拦授权', async ({ page }) => {
+test('board: a review card with a reported empty diff completes without merging and without blocking authorization', async ({ page }) => {
   await stubBoot(page);
   await stubSurface(page, { files: [], reported: true }, ['推送分支']);
   let merges = 0;
@@ -186,7 +181,7 @@ test('看板：已上报空 diff 的 review 卡完成不合并、不拦授权', 
   expect(donePhase).toBe('done');
 });
 
-test('详情：已上报空 diff 的 review 卡同样不展示合并行且完成可点', async ({ page }) => {
+test('detail: a review card with a reported empty diff likewise shows no merge row and completion is clickable', async ({ page }) => {
   await stubBoot(page);
   await stubSurface(page, { files: [], reported: true }, ['推送分支']);
   const dialog = await openDetail(page);
@@ -195,7 +190,7 @@ test('详情：已上报空 diff 的 review 卡同样不展示合并行且完成
   await expect(dialog.getByRole('button', { name: '完成', exact: true })).toBeEnabled();
 });
 
-test('有文件改动的卡仍展示合并行，缺授权时完成禁用', async ({ page }) => {
+test('cards with real file changes still show the merge row; completion disabled when authorization is missing', async ({ page }) => {
   await stubBoot(page);
   await stubSurface(page, { files: [FILE_DIFF], reported: true }, ['推送分支']);
   const dialog = await openBoard(page);
@@ -206,7 +201,7 @@ test('有文件改动的卡仍展示合并行，缺授权时完成禁用', async
   );
 });
 
-test('git 仍有文件头但解析文件集为空时不跳过合并', async ({ page }) => {
+test('git still has file headers but the parsed file set is empty: merge is not skipped', async ({ page }) => {
   await stubBoot(page);
   await stubSurface(page, { files: [], reported: true, changed: true }, ['推送分支']);
   const dialog = await openBoard(page);
@@ -215,7 +210,7 @@ test('git 仍有文件头但解析文件集为空时不跳过合并', async ({ p
   await expect(dialog.getByText(EMPTY_NOTE)).toHaveCount(0);
 });
 
-test('changes 未上报（无 reported）不当成空提交，合并行与授权闸保留', async ({ page }) => {
+test('changes not reported (no reported key) is not treated as an empty commit; merge row and authorization gate stay', async ({ page }) => {
   await stubBoot(page);
   await stubSurface(page, { files: [] }, ['推送分支']);
   const dialog = await openBoard(page);
