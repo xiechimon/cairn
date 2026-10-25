@@ -1,8 +1,0 @@
-{
-  "kind": "review_verdict",
-  "verdict": {
-    "conclusion": "判定提取失败",
-    "findings": []
-  },
-  "extractionError": "审核步输出中未找到 verdict JSON（agent 未按契约输出）"
-}

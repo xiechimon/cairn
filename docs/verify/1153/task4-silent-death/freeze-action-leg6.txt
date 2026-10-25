@@ -1,9 +1,0 @@
-unit=pacman-daemon.service cgroup=/user.slice/user-1000.slice/user@1000.service/app.slice/pacman-daemon.service mainpid=684219 ts=2026-10-11T08:15:04.235238252Z
-pids: 684219 684237 684279 
-STOPPED 2026-10-11T08:15:04.243000918Z count=3
-    PID STAT COMMAND
- 684219 Tsl  node
-=== CONT A (leg6 void freeze) at 2026-10-11T08:15:46.291793000Z ===
-CONTINUED 2026-10-11T08:15:50.448143216Z
-    PID STAT COMMAND
- 684219 Ssl  node

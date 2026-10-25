@@ -1,6 +1,0 @@
-2026-10-07 14:37:45 [recover] no pending steps found
-2026-10-07 14:37:45 new session 01a11515-149c-79be-85fa-a62f3a6016d5
-2026-10-07 14:37:46 [recover] 1 pending step(s) found — resuming
-2026-10-07 14:37:47 [step] continue session unavailable (01a11515-152d-7255-bd51-0baccb296a5a) — falling back to new session
-2026-10-07 14:37:47 new session 01a11515-149c-79be-85fa-a62f3a6016d5
-2026-10-07 14:37:47 finished (0 running)

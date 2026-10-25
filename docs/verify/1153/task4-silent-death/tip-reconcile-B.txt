@@ -1,9 +1,0 @@
-== server-side step row ==
-id|status|machineId|checkpointCommit
-i2FOCZdcvffp4UArNgB0z|claimed|Pakgtz1UfmlmMqC2Pq4xe|
-== B worktree tip ==
-e56694c33cc9bb08d931df9f0f4c8462e819f41f
-?? AGENTS.md
-pacman/conv-01a129e3-6cae-7f46-ad82-f47d555700ac
-== origin conv branch tip ==
-e56694c33cc9bb08d931df9f0f4c8462e819f41f	refs/heads/pacman/conv-01a129e3-6cae-7f46-ad82-f47d555700ac

@@ -1,4 +1,0 @@
-claim step=VzeAex2yCTF5EpctNWBfU
-new session chief-01a0fc13-c33a-7eb7-ae09-b2a2db92b016
-[step] error: 400: {"message":"Model does not support this protocol."} (retryable=false)
-[step] step failed: 400: {"message":"Model does not support this protocol."}

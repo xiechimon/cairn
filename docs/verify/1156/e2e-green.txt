@@ -1,5 +1,0 @@
-# Green state: same assertion on the fixed code (className="size-16")
-# command: env -u http_proxy -u https_proxy -u all_proxy NO_PROXY=* E2E_PORT=8411 pnpm --filter @pacman/web exec playwright test agent-detail.spec.ts
-
-  ✓  36 e2e/agent-detail.spec.ts:592:1 › 概览：六个字段行长在同一张模板卡里，头像头在卡内 (183ms)
-  39 passed (12.7s)

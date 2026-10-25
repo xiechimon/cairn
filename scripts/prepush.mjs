@@ -18,11 +18,14 @@ export const selfTests = [
   'scripts/english-only-gate.test.mjs',
 ];
 
+const DOCS = /^(docs\/|.*\.md$|LICENSE$)/;
+
 export function prepushPlan(paths, mode = 'local') {
   const advisory = [['node', 'scripts/ui-dead-class-gate.mjs', '--compile']];
   if (mode === 'advisory') return advisory;
   const language = ['node', 'scripts/english-only-gate.mjs'];
-  if (paths.every((path) => /^(docs\/|.*\.md$|LICENSE$)/.test(path))) return [language];
+  const codePaths = paths.filter((path) => !DOCS.test(path));
+  if (codePaths.length === 0) return [language];
   const required = [
     language,
     ['node', 'scripts/ui-debt-gate.mjs'],
@@ -51,7 +54,7 @@ export function prepushPlan(paths, mode = 'local') {
           : []),
         ['node', 'scripts/prepush-vitest.mjs'],
         ...advisory,
-        ['pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', ...paths],
+        ['pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', ...codePaths],
       ];
 }
 

@@ -111,15 +111,26 @@ function collectSpecRefs() {
 // Source 2: landed evidence directories.
 function collectVerifyDirs() {
   const dir = join(REPO_ROOT, 'docs', 'verify');
-  const numeric = new Set();
-  const other = [];
+  const numeric = new Map();
+  const other = new Map();
   if (!existsSync(dir)) return { numeric, other };
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    if (/^\d+$/.test(entry.name)) numeric.add(String(Number(entry.name)));
-    else other.push(entry.name);
+  const place = (name, anchor) => {
+    if (/^\d+$/.test(name)) numeric.set(String(Number(name)), anchor);
+    else other.set(name, anchor);
+  };
+  const ledgerPath = join(dir, 'pruned.json');
+  if (existsSync(ledgerPath)) {
+    for (const [name, sha] of Object.entries(JSON.parse(readFileSync(ledgerPath, 'utf8')))) {
+      place(name, `${sha.slice(0, 9)}:docs/verify/${name}/`);
+    }
   }
-  return { numeric, other: other.sort() };
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) place(entry.name, `docs/verify/${entry.name}/`);
+  }
+  return {
+    numeric,
+    other: new Map([...other].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
+  };
 }
 
 function walkTestFiles(dir, out) {
@@ -266,7 +277,7 @@ const { refs: testRefs, fileCount: testFileCount } = collectTestRefs();
 const { repo, tickets } = fetchTickets();
 const ciJobs = collectCiSurface();
 
-const union = [...new Set([...specRefs.keys(), ...verifyNumeric, ...testRefs.keys()])];
+const union = [...new Set([...specRefs.keys(), ...verifyNumeric.keys(), ...testRefs.keys()])];
 
 const rows = [];
 const prRefs = [];
@@ -287,7 +298,7 @@ for (const num of union.sort(byNum)) {
     continue;
   }
   const anchors = [];
-  if (verifyNumeric.has(num)) anchors.push(`docs/verify/${num}/`);
+  if (verifyNumeric.has(num)) anchors.push(verifyNumeric.get(num));
   anchors.push(...sources.tests);
   const anchored = anchors.length > 0;
   const status =
@@ -364,7 +375,9 @@ out.push('| open | 在跑 | 待开 |');
 out.push('');
 out.push('### 0.4 验证锚规则');
 out.push('');
-out.push('- `docs/verify/<票号>/` 目录存在 → 该路径入锚；');
+out.push(
+  '- `docs/verify/<票号>/` 目录存在 → 该路径入锚；已被每周清理移出工作区的目录（`docs/verify/pruned.json`）→ `<sha>:docs/verify/<票号>/` 入锚，`git show` 可读；',
+);
 out.push('- CI 测试面里引用该票号的文件 → 逐个路径入锚（这些文件由 §0.5 的 CI job 执行）；');
 out.push('- 两者皆无 → 锚列标 `[未验证]`，行进 §3.1 补活清单。');
 out.push('');
@@ -440,7 +453,7 @@ out.push(`| 锚 = 仅测试引用 | ${withTests} |`);
 out.push(`| 无锚（\`[未验证]\`） | ${withNone} |`);
 out.push(`| 被引用的 PR（不生成行，§3.2） | ${prRefs.length} |`);
 out.push(`| 解析不到的票号（§3.3） | ${unresolved.length} |`);
-out.push(`| 非 GitHub 票号的证据目录（§3.4） | ${verifyOther.length} |`);
+out.push(`| 非 GitHub 票号的证据目录（§3.4） | ${verifyOther.size} |`);
 out.push(`| 扫描面：spec 册 / 测试文件 | ${specFileCount} / ${testFileCount} |`);
 out.push('');
 
@@ -522,13 +535,13 @@ out.push(
   '`docs/verify/` 下这些目录名不是本仓 GitHub 票号（历史 tracker / 线程编号 / 变体目录），`gh issue list` 解析不到；证据本体在仓内可查。',
 );
 out.push('');
-if (verifyOther.length === 0) {
+if (verifyOther.size === 0) {
   out.push('（无。）');
 } else {
   out.push('| 目录 | 路径 |');
   out.push('|---|---|');
-  for (const name of verifyOther) {
-    out.push(`| ${cell(name)} | \`docs/verify/${name}/\` |`);
+  for (const [name, anchor] of verifyOther) {
+    out.push(`| ${cell(name)} | \`${anchor}\` |`);
   }
 }
 out.push('');

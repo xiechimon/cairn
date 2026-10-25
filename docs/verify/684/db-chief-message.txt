@@ -1,2 +1,0 @@
-0JkR75Jqqv0vbRPjEoJxj|user|"帮我看看现在的任务情况"
-chief-err-K8Bmp0PMcSVQvhiUr9EVe|system|"{\"kind\":\"chief_turn_error\",\"message\":\"本轮无人认领：团队当前没有在线机器（等待 120 秒超时）。请确认执行机 daemon 在线后重发。\"}"

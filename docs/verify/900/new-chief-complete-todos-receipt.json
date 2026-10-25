@@ -1,9 +1,0 @@
-{
-  "transitioned": [],
-  "skipped": [
-    "Mi_tQPDfKvZ3ZmAo5f63I"
-  ],
-  "reasons": {
-    "Mi_tQPDfKvZ3ZmAo5f63I": "待确认/审核关口的 done 落地必须由人过闸（发起合并，或用户在看板确认）。把卡停在当前关口，用 notify_user 唤醒用户处理。"
-  }
-}

@@ -1,6 +1,0 @@
-now=2026-10-11T08:28:08.124362000Z (claim 08:27:23 +45s)
-id|kind|status|machineId|checkpointCommit|beat
-6Iup9vnFfgmARDHMZdrS2|plan|done|DHS9BRFaSnKYVHx38VyOm|fc19473a1f3007e3b8dfac9442ea9a505eb983f5|2026-10-11 08:26:43
-C4p6CiAtLoUaXnp1ZIpk4|build|done|DHS9BRFaSnKYVHx38VyOm|fc19473a1f3007e3b8dfac9442ea9a505eb983f5|2026-10-11 08:27:54
-origin conv tip pre-freeze:
-=== FREEZE leg7 at 2026-10-11T08:28:15.526143000Z ===

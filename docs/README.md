@@ -19,5 +19,5 @@
 
 | 目录 | 内容 | 纪律 |
 |---|---|---|
-| `verify/<票号>/` | 随 PR 提交的验证证据（截图、探针输出、机制图） | **只增不改、不外迁**。已合 PR 的 body 里嵌着钉 SHA 的 raw 永久链指向这里的文件；删除或移动省不了体积（历史永存），只会打断旧证据链。裁决全文见 [`adr/0015-验证证据留存仓内-存量不可搬.md`](adr/0015-验证证据留存仓内-存量不可搬.md) |
+| `verify/<ticket>/` | Verification evidence committed with each PR (screenshots, probe output, mechanism diagrams) | Lands with its PR; a weekly run removes folders older than 14 days from `main` and records their last commit in `verify/pruned.json` (`git show <sha>:docs/verify/<ticket>/`). Merged PR bodies keep working because their raw links pin a commit. Decision: [`adr/0022-prune-merged-evidence-weekly.md`](adr/0022-prune-merged-evidence-weekly.md) |
 | `research/` | 按票归档的调研笔记（`r*.md`、实测记录） | 写完归档。可当史料引用，不当现行规范读 |

@@ -1,3 +1,0 @@
-$ node scripts/ui-drift-gate.mjs   # G2-ALLOW entry dropped by #854 (union with #855's G4)
-[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, 6 chip variants single-sourced (25 css files scanned); 5 bare <input> site(s), 5 deliberate-native.
-exit=0

@@ -1,7 +1,0 @@
-# Reverse evidence: the shipped (origin/main) 1084 diagram through the new gate.
-# source: git show origin/main:docs/verify/1084/hook-migration.drawio.svg
-
-FAIL hook-migration-main.drawio.svg: needs 129.6px in a 58.0px box (9 lines @ 12.0px): 'spec hook: dialog.locator(\'[role="listbox"][aria-label="时"]\')→ matches'
-FAIL hook-migration-main.drawio.svg: needs 273.6px in a 58.0px box (19 lines @ 12.0px): 'old compound hook dialog.locator(\'[role="listbox"][aria-label="时"]\')→ '
-FAIL hook-migration-main.drawio.svg: needs 273.6px in a 74.0px box (19 lines @ 12.0px): "repinned (#1075's new paradigm, same law as m5-web-e2e):dialog button["
-exit=1

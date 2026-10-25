@@ -1,9 +1,0 @@
-
- RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0103-717-m5-ci-dump/apps/web
-
-
- Test Files  1 passed (1)
-      Tests  6 passed (6)
-   Start at  01:49:29
-   Duration  133ms (import 34%, transform 34%, tests 28%, worker 4%)
-

@@ -1,4 +1,0 @@
-[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); 5 css + 193 tsx scanned. Baseline: in-tree only, frozen from 7257cbc709df.
-[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 30 components/ui file(s).
-[ui-registry-gate] note: no base sha on this run (push event or local check) — the S5 ratchet has nothing to compare against; a status downgrade landing straight on main is guarded by review only (same posture as debt-gate D3 on main).
-[ui-registry-gate] PASS: 30 file(s) in apps/web/src/components/ui = 21 registry (14 pristine vs pinned snapshot / 7 registered deviations) + 9 adapters; snapshot shadcn@4.21.3 fetched 2026-10-07; ledger frozen from 7a4434e39260; comparison: in-tree only.
