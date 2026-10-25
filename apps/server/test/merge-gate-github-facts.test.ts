@@ -5,7 +5,11 @@
 // bodies, pages them by the requested page and per_page, and logs every call.
 
 import { type CompareFile, MERGE_GATE_STATUS_CONTEXT } from '@cairn/shared';
-import { MERGE_BLOCKERS } from '@cairn/shared/merge-gate';
+import {
+  EVIDENCE_PREFIX,
+  HARNESS_REGRESSION_RESULT_NAME,
+  MERGE_BLOCKERS,
+} from '@cairn/shared/merge-gate';
 import { describe, expect, test } from 'vitest';
 import { compareFilesFromResponse } from '../src/services/merge-gate/digest.js';
 import { gateStatusFor } from '../src/services/merge-gate/gate-status.js';
@@ -252,6 +256,7 @@ describe('readGateGithubFacts: the honest read', () => {
       complete: true,
     });
     expect(f.evidence).toEqual([{ sha: HEAD, path: SHOT, present: true }]);
+    expect(f.harnessEvalText).toBeNull();
     expect(f.baseBehindBy).toBe(0);
     expect(f.ownStatus).toBeNull();
     expect(f.rateLimited).toBeNull();
@@ -1020,6 +1025,53 @@ describe('readGateGithubFacts: rate limits, throws, concurrency (F18)', () => {
   });
 });
 
+describe('readGateGithubFacts: harness regression at head', () => {
+  const HARNESS_FILE = 'apps/server/src/services/chief.ts';
+  const HARNESS_RESULT = `${EVIDENCE_PREFIX}${REQ.ticketRef}/${HARNESS_REGRESSION_RESULT_NAME}`;
+  const HARNESS_TEXT = '{"decision_ok":0.95}';
+
+  test('touches harness: file text at the PR head is harnessEvalText', async () => {
+    const f = await read({
+      compare: comparePages(chain(EARLIER, HEAD), [...FILES, ghFile(HARNESS_FILE)]),
+      contents: (path, ref) => {
+        if (path === HARNESS_RESULT && ref === HEAD)
+          return ok({
+            type: 'file',
+            encoding: 'base64',
+            content: Buffer.from(HARNESS_TEXT, 'utf8')
+              .toString('base64')
+              .replace(/(.{8})/g, '$1\n'),
+            name: HARNESS_REGRESSION_RESULT_NAME,
+            path: HARNESS_RESULT,
+          });
+        if (path === 'docs/verify/1404' && ref === HEAD) return listing('shot.png');
+        return NOT_FOUND;
+      },
+    });
+    expect(f.harnessEvalText).toBe(HARNESS_TEXT);
+    expect(f.log.filter(([n]) => n === 'contents')).toEqual([
+      ['contents', 'docs/verify/1404', HEAD],
+      ['contents', HARNESS_RESULT, HEAD],
+    ]);
+  });
+
+  test('touches harness: missing file is null', async () => {
+    const f = await read({
+      compare: comparePages(chain(EARLIER, HEAD), [...FILES, ghFile(HARNESS_FILE)]),
+    });
+    expect(f.harnessEvalText).toBeNull();
+    expect(f.log.filter(([n, p]) => n === 'contents' && p === HARNESS_RESULT)).toEqual([
+      ['contents', HARNESS_RESULT, HEAD],
+    ]);
+  });
+
+  test('does not touch harness: does not fetch the file', async () => {
+    const f = await read();
+    expect(f.harnessEvalText).toBeNull();
+    expect(f.log.filter(([n, p]) => n === 'contents' && p === HARNESS_RESULT)).toEqual([]);
+  });
+});
+
 describe('readGateGithubFacts into mergeReadiness: a truncated compare (pr-gate run 1 on #1525, suggestion 3)', () => {
   test('300 files on page 1 and changed_files 301: compare-truncated, a human blocker, no digest', async () => {
     const files = Array.from({ length: 300 }, (_, k) => ghFile(`apps/server/src/f${k}.ts`));
@@ -1039,6 +1091,7 @@ describe('readGateGithubFacts into mergeReadiness: a truncated compare (pr-gate 
       checks: f.checks,
       compare: f.compare,
       evidence: f.evidence,
+      harnessEvalText: f.harnessEvalText,
       verdicts: [],
       round: null,
       availability: { reviewerPerspectives: ['correctness'], verifier: true, decider: true },

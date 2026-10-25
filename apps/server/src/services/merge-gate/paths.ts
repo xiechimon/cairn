@@ -12,6 +12,7 @@
 
 import {
   AUTO_MERGE_PATH_GLOBS,
+  CHIEF_DISPATCH_HARNESS_PATHS,
   type CompareFile,
   EVIDENCE_EXECUTABLE_EXTENSIONS,
   EVIDENCE_PREFIX,
@@ -66,6 +67,17 @@ const SAFE_PATH = /^[\p{L}\p{M}\p{N}._/@+%-]+$/u;
 
 const matches = (path: string, res: readonly RegExp[]) => res.some((re) => re.test(path));
 const isTestPath = (path: string) => TEST_DIR_RE.test(path) || TEST_FILE_RE.test(path);
+const HARNESS_NAMES = new Set(CHIEF_DISPATCH_HARNESS_PATHS.map((p) => p.toLowerCase()));
+
+export function touchesHarness(files: readonly CompareFile[]): boolean {
+  return files.some((f) => {
+    const names =
+      f.previousFilename !== null && f.previousFilename !== f.filename
+        ? [f.filename, f.previousFilename]
+        : [f.filename];
+    return names.some((name) => HARNESS_NAMES.has(name.toLowerCase()));
+  });
+}
 
 export interface PathFindings {
   /** 命中保护类别 ①–⑤ 的路径，以及名字里有 SAFE_PATH 白名单外字符、不判类的路径

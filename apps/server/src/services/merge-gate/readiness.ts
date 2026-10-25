@@ -7,9 +7,12 @@
 
 import type { Phase } from '@cairn/shared';
 import {
+  CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
   type CompareFile,
   EVIDENCE_PREFIX,
   GATE_LIMITS,
+  type HarnessRegressionResult,
+  harnessRegressionResultSchema,
   MERGE_BLOCKERS,
   MERGE_GATE_STATUS_CONTEXT,
   type MergeBlocker,
@@ -19,7 +22,7 @@ import {
 } from '@cairn/shared/merge-gate';
 import { computePatchDigest } from './digest.js';
 import { parseRawEvidenceLinks, qualifyingEvidenceLinks } from './evidence-link.js';
-import { classifyPaths } from './paths.js';
+import { classifyPaths, touchesHarness } from './paths.js';
 
 /** 一条判定在闸眼里的样子。patchDigest = 判定绑定的补丁摘要；判定 head 与
  * server 派步时写下的 expectedHeadSha 对不上时为 null（不算数）。 */
@@ -161,6 +164,7 @@ export interface GateInputs {
     gateRoundsExhausted: boolean;
   } | null;
   availability: { reviewerPerspectives: string[]; verifier: boolean; decider: boolean };
+  harnessEvalText?: string | null;
 }
 
 const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
@@ -420,6 +424,23 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block('evidence-outside-ticket', ...names(paths.otherTicketEvidence));
     if (paths.executableEvidence.length > 0)
       block('evidence-executable', ...names(paths.executableEvidence));
+    if (D !== null && touchesHarness(compare.files)) {
+      let parsed: HarnessRegressionResult | null = null;
+      if (i.harnessEvalText != null && i.harnessEvalText !== '') {
+        try {
+          const raw: unknown = JSON.parse(i.harnessEvalText);
+          const r = harnessRegressionResultSchema.safeParse(raw);
+          if (r.success) parsed = r.data;
+        } catch {
+          parsed = null;
+        }
+      }
+      if (parsed === null) block('harness-regression-missing');
+      else if (parsed.patchDigest !== D) block('harness-regression-stale');
+      else if (parsed.decision_ok < CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER) {
+        block('harness-regression-below-threshold', String(parsed.decision_ok));
+      }
+    }
   }
 
   // 来源与证据链。链接要钉在本 PR 的提交上（base..head），且指向本 PR 增改的文件

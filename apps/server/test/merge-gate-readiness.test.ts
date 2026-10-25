@@ -41,6 +41,7 @@
 
 import {
   type BlockerClass,
+  CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
   type CompareFile,
   MERGE_BLOCKER_CODES,
   MERGE_BLOCKERS,
@@ -114,6 +115,16 @@ const FILES = [
   file('apps/server/test/ci-loop.test.ts'),
 ];
 const D = computePatchDigest(FILES).patchDigest as string;
+const HARNESS_SHA = 'ab'.repeat(32);
+const TRACE_DIGEST = 'cd'.repeat(32);
+const harnessEvalJson = (over: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    patchDigest: D,
+    harness_sha: HARNESS_SHA,
+    decision_ok: 0.955,
+    trace_digest: TRACE_DIGEST,
+    ...over,
+  });
 const opaque = (filename: string, over: Partial<CompareFile> = {}) =>
   file(filename, { status: 'added', additions: 0, deletions: 0, patchSha: null, ...over });
 /** 本 PR 加的证据：一张截图（没有行数、没有 patch，不进摘要）。每份文件列表都带着
@@ -236,6 +247,9 @@ const CLASS: Record<MergeBlockerCode, BlockerClass> = {
   'opaque-file': 'human',
   'evidence-outside-ticket': 'human',
   'evidence-executable': 'human',
+  'harness-regression-missing': 'human',
+  'harness-regression-stale': 'human',
+  'harness-regression-below-threshold': 'human',
   'issue-ref-missing': 'human',
   'evidence-link-missing': 'transient',
   'verify-missing': 'transient',
@@ -429,6 +443,30 @@ const ROWS: Row[] = [
     (i) => setFiles(i, [...FILES, file('docs/verify/1404/probe.mjs', { status: 'added' })]),
   ],
   [
+    'harness-regression-missing',
+    (i) => {
+      setFiles(i, [...FILES, file('apps/server/src/services/chief.ts')]);
+    },
+  ],
+  [
+    'harness-regression-stale',
+    (i) => {
+      setFiles(i, [...FILES, file('apps/server/src/services/chief.ts')]);
+      i.harnessEvalText = harnessEvalJson({ patchDigest: `pd2:${'0'.repeat(64)}` });
+    },
+  ],
+  [
+    'harness-regression-below-threshold',
+    (i) => {
+      setFiles(i, [...FILES, file('apps/server/src/services/chief.ts')]);
+      const d = computePatchDigest(compare(i).files).patchDigest as string;
+      i.harnessEvalText = harnessEvalJson({
+        patchDigest: d,
+        decision_ok: Math.max(0, CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER - 0.01),
+      });
+    },
+  ],
+  [
     'issue-ref-missing',
     (i) => {
       i.issueNumber = null;
@@ -573,6 +611,65 @@ describe('mergeReadiness：每个 blocker 一真一假', () => {
       expect(r.ready).toBe(false);
     });
   }
+});
+
+describe('mergeReadiness：harness 回归评测', () => {
+  test('非 harness PR 不受影响', () => {
+    const i = green();
+    i.harnessEvalText = 'not-json';
+    expect(codesOf(i)).toEqual([]);
+    expect(mergeReadiness(i).ready).toBe(true);
+  });
+
+  test('命中 harness 路径但没有结果：harness-regression-missing', () => {
+    const i = green();
+    setFiles(i, [...FILES, file('apps/server/src/services/chief.ts')]);
+    expect(codesOf(i)).toEqual(['harness-regression-missing']);
+  });
+
+  test('结果绑在旧 patchDigest 上：harness-regression-stale', () => {
+    const i = green();
+    setFiles(i, [...FILES, file('packages/shared/src/protocol/chief-tools.ts')]);
+    i.harnessEvalText = harnessEvalJson({ patchDigest: D });
+    expect(codesOf(i)).toEqual(['harness-regression-stale']);
+  });
+
+  test('decision_ok 低于基线置信区间下限：harness-regression-below-threshold', () => {
+    const i = green();
+    setFiles(i, [...FILES, file('apps/daemon/src/backend/pi.ts')]);
+    const d = computePatchDigest(compare(i).files).patchDigest as string;
+    i.harnessEvalText = harnessEvalJson({
+      patchDigest: d,
+      decision_ok: CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER - 0.001,
+    });
+    expect(codesOf(i)).toEqual(['harness-regression-below-threshold']);
+  });
+
+  test('格式、摘要、harness_sha 与阈值都过：ready', () => {
+    const i = green();
+    setFiles(i, [...FILES, file('apps/server/src/services/chief.ts')]);
+    const d = computePatchDigest(compare(i).files).patchDigest as string;
+    i.harnessEvalText = harnessEvalJson({
+      patchDigest: d,
+      decision_ok: CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
+    });
+    expect(codesOf(i)).toEqual([]);
+    expect(mergeReadiness(i).ready).toBe(true);
+  });
+
+  test('结果缺 harness_sha 或不是 JSON：harness-regression-missing', () => {
+    const i = green();
+    setFiles(i, [...FILES, file('apps/server/src/services/chief.ts')]);
+    const d = computePatchDigest(compare(i).files).patchDigest as string;
+    i.harnessEvalText = JSON.stringify({
+      patchDigest: d,
+      decision_ok: 0.99,
+      trace_digest: TRACE_DIGEST,
+    });
+    expect(codesOf(i)).toEqual(['harness-regression-missing']);
+    i.harnessEvalText = '{';
+    expect(codesOf(i)).toEqual(['harness-regression-missing']);
+  });
 });
 
 describe('mergeReadiness：设计点名的组合', () => {

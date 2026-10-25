@@ -30,12 +30,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   AUTO_MERGE_PATH_GLOBS,
+  CHIEF_DISPATCH_HARNESS_PATHS,
   type CompareFile,
   MERGE_GATE_SOURCE_GLOBS,
   PROTECTED_PATH_GLOBS,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { classifyPaths, globToRegExp } from '../src/services/merge-gate/paths.js';
+import { classifyPaths, globToRegExp, touchesHarness } from '../src/services/merge-gate/paths.js';
 
 const f = (filename: string, over: Partial<CompareFile> = {}): CompareFile => ({
   status: 'modified',
@@ -641,6 +642,33 @@ function prGateArray(source: string, name: string): string[] {
     return [m[1]];
   });
 }
+
+describe('chief-dispatch harness 路径', () => {
+  test('_state.json.harness_paths 与 CHIEF_DISPATCH_HARNESS_PATHS 逐项同序', () => {
+    const st = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, '../../../.claude/hillclimb/chief-dispatch/_state.json'),
+        'utf8',
+      ),
+    ) as { harness_paths: string[] };
+    expect(st.harness_paths).toEqual([...CHIEF_DISPATCH_HARNESS_PATHS]);
+  });
+
+  test('touchesHarness：清单内为真，清单外为假', () => {
+    expect(touchesHarness([f('apps/server/src/services/chief.ts')])).toBe(true);
+    expect(touchesHarness([f('packages/shared/src/protocol/chief-tools.ts')])).toBe(true);
+    expect(touchesHarness([f('apps/daemon/src/backend/pi.ts')])).toBe(true);
+    expect(touchesHarness([f('apps/server/src/services/ci-loop.ts')])).toBe(false);
+    expect(
+      touchesHarness([
+        f('apps/web/src/x.ts', {
+          status: 'renamed',
+          previousFilename: 'apps/server/src/services/chief.ts',
+        }),
+      ]),
+    ).toBe(true);
+  });
+});
 
 describe('与 .claude/workflows/pr-gate.js 同一份清单', () => {
   const prGate = () =>
