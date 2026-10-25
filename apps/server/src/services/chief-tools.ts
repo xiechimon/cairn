@@ -28,6 +28,7 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import {
   advanceSplitWaves,
   applyBuildStepAction,
@@ -1071,6 +1072,9 @@ export async function executeWorkerMemoryTool(
     case 'attachment': {
       const { readAttachmentMeta } = await import('./attachments.js');
       const attachmentId = str(params, 'attachmentId');
+      if (!todoAuthorizesAttachment(db, ctx.todoId, attachmentId)) {
+        throw new HttpError(404, `attachment ${attachmentId}`);
+      }
       return json(
         readAttachmentMeta({ db, attachmentsDir: ctx.attachmentsDir }, ctx.teamId, attachmentId),
       );

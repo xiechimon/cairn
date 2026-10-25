@@ -77,6 +77,7 @@ import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { newMachineToken } from '../lib/keys.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
+import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import {
@@ -1075,8 +1076,16 @@ export function machineAttachmentDownload(
   attachmentId: string,
   tokenTeamId: string | undefined,
 ): MachineAttachmentResponse {
-  ownedStep(deps, machineId, stepId);
+  const stepRow = ownedStep(deps, machineId, stepId);
   if (tokenTeamId !== machineTeamId) throw new NotFoundError(`attachment ${attachmentId}`);
+  const buildRow = deps.db
+    .select({ todoId: build.todoId })
+    .from(build)
+    .where(eq(build.id, stepRow.buildId))
+    .get();
+  if (buildRow === undefined || !todoAuthorizesAttachment(deps.db, buildRow.todoId, attachmentId)) {
+    throw new NotFoundError(`attachment ${attachmentId}`);
+  }
   const meta = readAttachmentMeta(
     { db: deps.db, attachmentsDir: deps.attachmentsDir },
     machineTeamId,

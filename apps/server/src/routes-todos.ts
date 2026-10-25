@@ -16,6 +16,7 @@ import {
   requireProject,
   svcOf,
 } from './routes-helpers.js';
+import { attachmentIdsInUserText } from './services/attachment-authorization.js';
 import {
   advanceSplitWaves,
   prepareStopForDone,
@@ -77,6 +78,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       ...(body.output !== undefined ? { output: body.output } : {}),
       createdBy: ctx.user.id,
       ownerId: ctx.user.id,
+      userSpecAttachmentIds: attachmentIdsInUserText(body.spec, row.teamId),
     });
     return c.json(record, 201);
   });
@@ -98,7 +100,12 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     }
     let record: TodoRecord | null;
     try {
-      record = updateTodo(svc, id, body, { manualPhase: true });
+      record = updateTodo(svc, id, body, {
+        manualPhase: true,
+        ...(body.spec !== undefined && prior !== null
+          ? { userSpecAttachmentIds: attachmentIdsInUserText(body.spec, prior.teamId) }
+          : {}),
+      });
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;
