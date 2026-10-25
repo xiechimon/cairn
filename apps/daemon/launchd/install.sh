@@ -5,6 +5,7 @@
 #   install.sh --uninstall             bootout + remove the plist (leaves logs)
 #   install.sh --label NAME            job label override (test jobs)
 #   install.sh --repo DIR              checkout override (default: main checkout)
+#   install.sh --node PATH             node binary override (default: node on PATH)
 #   install.sh --home DIR              CAIRN_HOME override (default: ~/.cairn)
 #   install.sh --server URL            CAIRN_SERVER override (test jobs)
 #
@@ -19,8 +20,8 @@
 set -eu
 
 LABEL="com.xiechimon.cairn-daemon"
-REPO="/Users/xmon/Code/AgentProjects/cairn"
-NODE_BIN="/Users/xmon/.local/share/fnm/node-versions/v24.14.0/installation/bin/node"
+REPO=""
+NODE_BIN=""
 HOME_DIR="$HOME/.cairn"
 SERVER_URL=""
 UNINSTALL=0
@@ -29,6 +30,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --label) LABEL="$2"; shift 2 ;;
     --repo) REPO="$2"; shift 2 ;;
+    --node) NODE_BIN="$2"; shift 2 ;;
     --home) HOME_DIR="$2"; shift 2 ;;
     --server) SERVER_URL="$2"; shift 2 ;;
     --uninstall) UNINSTALL=1; shift ;;
@@ -46,6 +48,8 @@ DOMAIN_TARGET="gui/$UID_N"
 DEST="$HOME/Library/LaunchAgents/$LABEL.plist"
 RUN_DEST="$HOME_DIR/cairn-daemon-run.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
+[ -n "$REPO" ] || REPO="$(dirname "$(git -C "$HERE" rev-parse --path-format=absolute --git-common-dir)")"
+[ -n "$NODE_BIN" ] || NODE_BIN="$(command -v node || true)"
 TEMPLATE="$HERE/com.xiechimon.cairn-daemon.plist.template"
 RUN_SRC="$HERE/cairn-daemon-run.sh"
 
@@ -66,7 +70,7 @@ if [ ! -f "$TEMPLATE" ] || [ ! -f "$RUN_SRC" ]; then
   exit 1
 fi
 if [ ! -x "$NODE_BIN" ]; then
-  echo "node not executable: $NODE_BIN (fnm default moved? edit NODE_BIN in $0)" >&2
+  echo "node not executable: $NODE_BIN (pass --node PATH)" >&2
   exit 1
 fi
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME_DIR"

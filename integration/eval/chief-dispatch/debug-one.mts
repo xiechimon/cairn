@@ -6,7 +6,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RosterAgent } from './grade.mts';
-import { bootStack, driveTurn, relayKey, resolveFromRoot, seedWorld } from './stack.mts';
+import {
+  bootStack,
+  driveTurn,
+  relayBaseUrl,
+  relayKey,
+  resolveFromRoot,
+  seedWorld,
+} from './stack.mts';
 
 const FLOW = process.argv[2];
 const CASE_ID = process.argv[3];
@@ -25,7 +32,7 @@ if (c === undefined) throw new Error(`${CASE_ID} 不在 ${flowDir}/cases.json �
 const stack = await bootStack();
 try {
   const world = await seedWorld(stack, {
-    relayBaseUrl: process.env.CAIRN_EVAL_RELAY_URL ?? 'http://112.80.47.186:8783/v1',
+    relayBaseUrl: relayBaseUrl(),
     relayKey: relayKey(),
     roster: d.roster,
     chiefModelId: 'glm-5.3',

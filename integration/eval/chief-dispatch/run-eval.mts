@@ -40,6 +40,7 @@ import {
   disposeLeftovers,
   driveTurn,
   REPO_ROOT,
+  relayBaseUrl,
   relayKey,
   resolveFromRoot,
   type SeededWorld,
@@ -53,7 +54,6 @@ import {
 let ARGS: ReturnType<typeof parseArgs>;
 let ROSTER: RosterAgent[] = [];
 let CHIEF_MODEL = 'glm-5.3';
-const RELAY_BASE_URL = process.env.CAIRN_EVAL_RELAY_URL ?? 'http://112.80.47.186:8783/v1';
 
 /** relay 各模型的挂牌价（OpenRouter 列表价，$/1M token，2026-09-29 拉取）。
  * relay 自己不报成本，`models.json` 里 cost 全是 0，所以只能外部取价。 */
@@ -86,7 +86,7 @@ async function freshStack(input: EvalCase): Promise<{ stack: Stack; world: Seede
   const stack = await bootStack();
   try {
     const world = await seedWorld(stack, {
-      relayBaseUrl: RELAY_BASE_URL,
+      relayBaseUrl: relayBaseUrl(),
       relayKey: relayKey(),
       roster: ROSTER,
       chiefModelId: CHIEF_MODEL,

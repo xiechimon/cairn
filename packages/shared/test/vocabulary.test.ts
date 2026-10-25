@@ -637,7 +637,6 @@ describe('machine wire (02 §5 canonical, wire 层进 CI)', () => {
 describe('PUBLISHED_PACKAGES', () => {
   it('安装命令和启动命令来自同一个已发布的包（包名与命令名成对）', () => {
     const pairs: Record<string, string> = {
-      '@xiechimon/pacman-cli': 'pacman',
       '@xiechimon/cairn-cli': 'cairn',
     };
     expect(pairs[PUBLISHED_PACKAGES.cli.name]).toBe(PUBLISHED_PACKAGES.cli.command);
