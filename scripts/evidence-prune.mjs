@@ -63,7 +63,8 @@ const codeRefs = spawnSync(
     maxBuffer: 256 * 1024 * 1024,
   },
 );
-if (codeRefs.status !== 0 && codeRefs.status !== 1) throw new Error(`git grep failed: ${codeRefs.stderr}`);
+if (codeRefs.status !== 0 && codeRefs.status !== 1)
+  throw new Error(`git grep failed: ${codeRefs.stderr}`);
 const referenced = new Set([...codeRefs.stdout.matchAll(FOLDER_REF)].map((match) => match[1]));
 
 const now = values.now ? Date.parse(values.now) : Date.now();
