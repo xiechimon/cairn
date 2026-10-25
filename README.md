@@ -52,8 +52,6 @@ Real work that agents shipped inside Cairn, each with a recording, the pull requ
 - **Repos** — git repositories hosted by the server itself (push/pull with an API key) or connected from GitHub.
 - **Live everything** — SSE streams for board and conversation updates, notifications, token-usage accounting per build and model.
 
-Cairn (formerly pacman) began as a clean-room study of todos.dev's public interface (see [Origins](#origins)) and is now an independent product.
-
 ## Quickstart
 
 Requirements: Node.js 22 or 24 (LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to source compilation and need a build toolchain).
@@ -152,7 +150,3 @@ pnpm test         # vitest
 ## License
 
 Apache-2.0 — see [LICENSE](./LICENSE).
-
-## Origins
-
-cairn began as a clean-room study of todos.dev's public interface and protocols — an exploration of agent-workspace design. It is now an independent project with its own roadmap, and uses no code or assets from todos.dev.

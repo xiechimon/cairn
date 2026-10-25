@@ -52,8 +52,6 @@
 - **仓库** — server 自托管 git 仓（API key 走 push/pull），或从 GitHub 接入。
 - **全实时** — 看板与会话走 SSE 流、通知、按 build × 模型记账 token 用量。
 
-Cairn（原名 pacman）起步于对 todos.dev 公开界面的 clean-room 研究（见[渊源](#渊源)），现为独立产品。
-
 ## 快速开始
 
 环境要求：Node.js 22 或 24（LTS 线自带 better-sqlite3 预编译产物；其它版本可能回退源码编译，需要构建工具链）。
@@ -151,7 +149,3 @@ pnpm test         # vitest
 ## 许可
 
 Apache-2.0 — 见 [LICENSE](./LICENSE)。
-
-## 渊源
-
-cairn 起步于对 todos.dev 公开界面与协议的 clean-room 研究——一次 agent-workspace 设计探索。现为独立项目，有自己的路线图，不使用 todos.dev 的任何代码或素材。
