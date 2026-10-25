@@ -4,6 +4,12 @@ import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
+export const selfTests = [
+  'scripts/prepush.test.mjs',
+  'scripts/heavy-slots.test.mjs',
+  'scripts/english-only-gate.test.mjs',
+];
+
 export function prepushPlan(paths, mode = 'local') {
   const advisory = [['node', 'scripts/ui-dead-class-gate.mjs', '--compile']];
   if (mode === 'advisory') return advisory;
@@ -30,6 +36,9 @@ export function prepushPlan(paths, mode = 'local') {
     : [
         ...required,
         ...localOnly,
+        ...(paths.some((path) => /^scripts\/(prepush|heavy-slots|english-only-gate)/.test(path))
+          ? [['node', '--test', ...selfTests]]
+          : []),
         ['node', 'scripts/prepush-vitest.mjs'],
         ...advisory,
         ['pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', ...paths],
