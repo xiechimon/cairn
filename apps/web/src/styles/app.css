@@ -315,7 +315,9 @@
 
   .board-scroller {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto;
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    align-content: start;
     overflow-x: hidden;
     overflow-y: auto;
     padding-bottom: 72px;

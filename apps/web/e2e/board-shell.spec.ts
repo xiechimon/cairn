@@ -1,19 +1,37 @@
 import { expect, test } from '@playwright/test';
 
-test('needs-you strip shows attention rows with a working action and hides when empty', async ({
+test('needs-you strip lists the pending cards, opens a task, and stays out of the needs-me view', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01');
   const strip = page.getByTestId('needs-you-strip');
+  const pendingCards = page.locator('.board-column[data-column="pending"] .todo-card-title');
   await expect(strip).toBeVisible();
-  await expect(strip.locator('div').filter({ hasText: '待' }).first()).toBeVisible();
-  const action = strip.getByRole('button').first();
-  await expect(action).toBeVisible();
-  await action.click();
-  await expect(page).toHaveURL(/\/app/);
+  const rows = strip.getByRole('link', { name: '打开' });
+  await expect(rows).toHaveCount(await pendingCards.count());
+  await expect(strip).toContainText((await pendingCards.first().textContent()) ?? '');
+  await rows.first().click();
+  await expect(page).toHaveURL(/\/app\/todo\/[^/?]+/);
+
+  await page.goto('/app?scenario=01&column=pending');
+  await expect(page.getByTestId('needs-you-strip')).toBeHidden();
 
   await page.goto('/app?scenario=board-tags-empty');
   await expect(page.getByTestId('needs-you-strip')).toBeHidden();
+});
+
+test('since-last-seen counts tasks finished after the stored visit and hides when nothing changed', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('cairn.board.lastSeenAt', '0'));
+  await page.goto('/app?scenario=01');
+  await expect(page.getByTestId('board-since-last-seen')).toContainText(/[1-9]\d* 个完成/);
+
+  await page.addInitScript(() =>
+    localStorage.setItem('cairn.board.lastSeenAt', String(Date.now() + 60_000)),
+  );
+  await page.goto('/app?scenario=01');
+  await expect(page.getByTestId('board-since-last-seen')).toBeHidden();
 });
 
 test('the new-task bar opens the existing new-task surface', async ({ page }) => {
@@ -22,21 +40,34 @@ test('the new-task bar opens the existing new-task surface', async ({ page }) =>
   await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
 });
 
-test('a 390px board stacks columns without horizontal scrolling or empty columns', async ({
+test('a 390px board stacks non-empty columns tightly with no horizontal scroll', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app?scenario=01');
   const scroller = page.getByTestId('board-scroller');
-  await expect(scroller).toBeVisible();
-  const metrics = await scroller.evaluate((element) => ({
-    scrollWidth: element.scrollWidth,
-    clientWidth: element.clientWidth,
-    visibleColumns: [...element.querySelectorAll('.board-column')].filter(
+  await expect(scroller.locator('.todo-card-title').first()).toBeVisible();
+  const metrics = await scroller.evaluate((element) => {
+    const shown = [...element.querySelectorAll<HTMLElement>('.board-column')].filter(
       (column) => getComputedStyle(column).display !== 'none',
-    ).length,
-  }));
+    );
+    const gaps = shown.slice(1).map((column, i) => {
+      const above = shown[i].getBoundingClientRect();
+      const lastCard = [...shown[i].querySelectorAll('.todo-card-title')].pop()?.closest('[class*="group/card"]');
+      const bottom = lastCard?.getBoundingClientRect().bottom ?? above.bottom;
+      return column.getBoundingClientRect().top - bottom;
+    });
+    return {
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      shown: shown.map((column) => column.dataset.column),
+      emptyShown: shown.filter((column) => column.querySelector('.todo-card-title') == null).length,
+      gaps,
+    };
+  });
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
-  expect(metrics.visibleColumns).toBeLessThan(4);
+  expect(metrics.emptyShown).toBe(0);
+  expect(metrics.shown.length).toBeGreaterThan(1);
+  for (const gap of metrics.gaps) expect(gap).toBeLessThan(48);
   await expect(page.locator('[data-column-empty-new]')).toBeHidden();
 });

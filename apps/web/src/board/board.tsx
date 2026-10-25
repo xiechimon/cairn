@@ -14,11 +14,13 @@ import { cn } from 'cn';
 import { Activity, CircleAlert, CircleCheck, CircleDashed, Clock, Plus } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
+import { useLiveData } from '../api/provider.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
+import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSessionStorage, safeSetItem } from '../safe-storage.js';
@@ -116,7 +118,10 @@ function SinceLastSeen({ done, failed }: { done: number; failed: number }) {
   const { t } = useI18n();
   if (done === 0 && failed === 0) return null;
   return (
-    <span data-testid="board-since-last-seen" className="text-meta text-content-tertiary">
+    <span
+      data-testid="board-since-last-seen"
+      className="mx-auto block w-full max-w-190 px-4 pt-2 text-right text-meta text-content-tertiary"
+    >
       {t('上次查看后：{done} 个完成，{failed} 个新失败', { done, failed })}
     </span>
   );
@@ -132,6 +137,7 @@ function NeedsYouStrip({
   onAction?: (todo: TodoRecord) => void;
 }) {
   const { t } = useI18n();
+  const { live } = useLiveData();
   const attentionTodos = todos.filter((todo) => cardFace(todo).kind === 'attention');
   if (attentionTodos.length === 0) return null;
   return (
@@ -142,7 +148,7 @@ function NeedsYouStrip({
           {t('等你处理')} · {attentionTodos.length}
         </span>
       </div>
-      <div className="divide-y divide-border rounded-(--radius-card) bg-(--hover-1)">
+      <div className="divide-y divide-border overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)">
         {attentionTodos.slice(0, 5).map((todo) => {
           const face = cardFace(todo);
           if (face.kind !== 'attention') return null;
@@ -152,8 +158,13 @@ function NeedsYouStrip({
               <div className="min-w-0 flex-1">
                 <div className="truncate text-ui text-foreground">{todo.title}</div>
                 <div className="truncate text-meta text-content-tertiary">
-                  {projectNames?.[todo.projectId] ?? t('项目')} · #{todo.seqNum} ·{' '}
-                  {t(attention.label)}
+                  {[
+                    projectNames?.[todo.projectId] ?? (live ? undefined : PROJECT_NAME),
+                    `#${todo.seqNum}`,
+                    t(attention.label),
+                  ]
+                    .filter((part) => part != null)
+                    .join(' · ')}
                 </div>
               </div>
               <Button
@@ -176,7 +187,7 @@ function NeedsYouStrip({
           );
         })}
       </div>
-      {todos.filter((todo) => cardFace(todo).kind === 'attention').length > 5 && (
+      {todos.length > 5 && (
         <Link
           className="mt-1.5 block text-right text-meta text-(--card-button)"
           to="?column=pending"
@@ -318,7 +329,7 @@ export function BoardSurface({
         <h1 className="board-topbar-title flex-none font-heading text-page font-medium text-foreground">
           {t('工作台')}
         </h1>
-        <NeedsYouSummary count={attentionTodos.length} />
+        <NeedsYouSummary count={viewTodos('pending').length} />
         <FilterChips chips={filters.chips} onClearAll={filters.onClear} />
         <div className="board-topbar-actions ml-auto flex flex-none items-center gap-0.5">
           <FilterPanel
@@ -343,7 +354,7 @@ export function BoardSurface({
         <button
           type="button"
           data-testid="board-new-task-bar"
-          className="board-new-task-bar mx-auto mt-3 flex h-11 w-full max-w-190 items-center gap-3 rounded-(--radius-control) border border-border bg-card px-3.5 text-left text-ui text-content-tertiary shadow-(--panel-shadow)"
+          className="board-new-task-bar mx-auto mt-3 flex h-11 w-full max-w-190 items-center gap-3 rounded-(--radius-composer) bg-card px-3.5 text-left text-ui text-content-tertiary shadow-(--shadow-composer) transition-[box-shadow] duration-(--dur-fast) ease-(--ease-standard) hover:shadow-(--shadow-composer-hover)"
           onClick={onNewTask}
         >
           <BrandMark className="size-5 text-(--card-button)" />
@@ -351,14 +362,16 @@ export function BoardSurface({
           <Kbd>C</Kbd>
         </button>
       )}
-      <div className="mx-auto flex w-full max-w-190 justify-end px-4 pt-2">
-        <SinceLastSeen done={sinceLastSeen.done} failed={sinceLastSeen.failed} />
-      </div>
-      <NeedsYouStrip
-        todos={attentionTodos}
-        projectNames={fixture.projectNames}
-        onAction={onAction}
-      />
+      {onlyColumn == null && (
+        <>
+          <SinceLastSeen done={sinceLastSeen.done} failed={sinceLastSeen.failed} />
+          <NeedsYouStrip
+            todos={attentionTodos}
+            projectNames={fixture.projectNames}
+            onAction={onAction}
+          />
+        </>
+      )}
 
       <DndContext
         sensors={desktop ? sensors : []}
