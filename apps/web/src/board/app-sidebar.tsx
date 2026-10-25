@@ -12,7 +12,7 @@
 // page-anchored save semantics; every other route rides the internal
 // global dialog (useNewTaskSurface, live save path shared with the board).
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
@@ -34,6 +34,8 @@ function readCollapsed(storage: Storage | null): boolean {
     return false;
   }
 }
+
+const NARROW_QUERY = '(max-width: 640px)';
 
 export interface AppSidebarProps {
   fixture: FixtureSet;
@@ -80,6 +82,14 @@ export function AppSidebar({
   // for the project-group fold), and the fixture build injects it like the
   // theme key so the rail capture stays deterministic.
   const [collapsed, setCollapsed] = useState(() => readCollapsed(safeLocalStorage()));
+  const narrow = useSyncExternalStore(
+    (onStoreChange) => {
+      const mql = window.matchMedia(NARROW_QUERY);
+      mql.addEventListener('change', onStoreChange);
+      return () => mql.removeEventListener('change', onStoreChange);
+    },
+    () => window.matchMedia(NARROW_QUERY).matches,
+  );
   const toggle = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -110,7 +120,7 @@ export function AppSidebar({
   return (
     <>
       <BoardSidebar
-        collapsed={collapsed}
+        collapsed={collapsed || narrow}
         onToggle={toggle}
         attention={attentionCount(resolvedTodos)}
         running={countInColumn(resolvedTodos, 'building')}

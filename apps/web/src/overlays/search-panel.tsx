@@ -337,13 +337,6 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
   const kbd = cursor != null;
 
   return (
-    // #453：视口根面走 DialogShell 的 `viewportRoot` 变体——面板自带 fixed
-    // 几何（520×440 / top 146 / 居中负边距，r7 §3.5 实测），scrim 归壳的
-    // Backdrop 位（皮肤经 backdropClassName 给），模态机制（焦点圈定 /
-    // 滚动锁 / Esc 层栈）由壳承载。z 档 = #688 阶梯的 --z-modal（背板由壳
-    // 减一 = --z-modal-scrim 同值；面板与 scrim 的 z utility 是容器
-    // stacking context 万一退化时仍压得住的兜底，与适配层入参读同一条
-    // 阶梯，不存在第二套真值）。
     // #844 二段关闭闪：进场走 VIEWPORT_POP_ANIM keyframe（group/dlgvp 读壳
     // Popup 开态），退场走指定式 transition（opacity + scale 100ms，
     // group-data-closed/dlgvp 终态按住到卸载窗结束——一次性 exit keyframe
@@ -360,7 +353,7 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
       zIndex="var(--z-modal)"
     >
       <div
-        className={`fixed top-36.5 left-1/2 z-(--z-modal) flex h-110 w-130 -ml-65 flex-col overflow-hidden ${DIALOG_FACE} origin-top transition-[opacity,scale] group-data-closed/dlgvp:scale-[0.98] group-data-closed/dlgvp:opacity-0 motion-reduce:transition-none ${VIEWPORT_POP_ANIM}`}
+        className={`search-panel fixed top-36.5 left-1/2 z-(--z-modal) flex h-110 w-130 max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col overflow-hidden ${DIALOG_FACE} origin-top transition-[opacity,scale] group-data-closed/dlgvp:scale-[0.98] group-data-closed/dlgvp:opacity-0 motion-reduce:transition-none ${VIEWPORT_POP_ANIM}`}
         role="dialog"
         aria-label={t('搜索')}
         // entering the panel (incl. a synthetic pointer jump straight onto
