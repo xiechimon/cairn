@@ -1,15 +1,25 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parseArgs } from 'node:util';
 import { ZodError } from 'zod';
+import { loadConfig } from './config.js';
 import { parsePacks, pushPacks, resolveTarget, TrajectoryPushError } from './trajectory-push.js';
 
 try {
-  const files = process.argv.slice(2);
-  if (files.length === 0) throw new TrajectoryPushError('Use <packs.jsonl> [<packs.jsonl> ...]');
+  const { values, positionals: files } = parseArgs({
+    options: { force: { type: 'boolean' } },
+    allowPositionals: true,
+  });
+  if (files.length === 0)
+    throw new TrajectoryPushError('Use [--force] <packs.jsonl> [<packs.jsonl> ...]');
   const target = resolveTarget(process.env);
   const packs = files.flatMap((file) => parsePacks(readFileSync(file, 'utf8')));
-  const result = await pushPacks(packs, target);
+  const result = await pushPacks(packs, target, {
+    ledgerPath: join(loadConfig().dataDir, 'trajectory-pushes.jsonl'),
+    force: values.force === true,
+  });
   console.log(
-    `pushed=${result.pushed} spans=${result.spans} redacted=${result.redacted} endpoint=${target.url.origin}${target.url.pathname}`,
+    `pushed=${result.pushed} spans=${result.spans} redacted=${result.redacted} skipped_already_pushed=${result.skippedAlreadyPushed} endpoint=${target.url.origin}${target.url.pathname}`,
   );
 } catch (error) {
   const reason =
