@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fa6a22ae-bc34-4bbd-b1bb-ab685e979694",
+  "id": "964bb58d-7756-40c1-8ec8-b4cd91b59a87",
   "prevId": "11f9cca2-0260-46bd-a6ac-8a0aa5714464",
   "tables": {
     "agent": {
@@ -2245,6 +2245,14 @@
           "notNull": true,
           "autoincrement": false
         },
+        "splitPolicy": {
+          "name": "splitPolicy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'human'"
+        },
         "description": {
           "name": "description",
           "type": "text",
@@ -3278,22 +3286,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'code'"
-        },
-        "userSpecAttachmentIds": {
-          "name": "userSpecAttachmentIds",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
-        },
-        "userMessageAttachmentIds": {
-          "name": "userMessageAttachmentIds",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
         }
       },
       "indexes": {
