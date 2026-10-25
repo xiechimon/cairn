@@ -842,7 +842,19 @@ export async function applyBuildStepAction(
     }
     const assignment = todoRecord.assignment ?? { plan: null, build: null };
     const feedbackText = body.feedback.trim() === '' ? null : body.feedback;
-    const reworkTarget = latestPrBuild(deps.db, row.todoId);
+    const preservedStep = deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, row.id),
+          eq(step.kind, 'build'),
+          eq(step.status, 'failed'),
+          isNotNull(step.checkpointCommit),
+        ),
+      )
+      .get();
+    const reworkTarget = preservedStep !== undefined ? row : latestPrBuild(deps.db, row.todoId);
     const prClosed: 'merged' | 'closed' | null =
       reworkTarget !== null ? await probeReworkTargetPr(deps, reworkTarget, todoRecord) : null;
     if (reworkTarget !== null && prClosed === null) {
@@ -1658,6 +1670,7 @@ export function applyStepFailure(
   stepRow: typeof step.$inferSelect,
   rawErrorMessage: string,
   report?: VerdictReport,
+  preservedCommits?: readonly string[],
 ): void {
   const { db } = deps;
   const errorMessage =
@@ -1680,6 +1693,7 @@ export function applyStepFailure(
       role: 'system',
       content: buildFallbackReport({
         reason: errorMessage,
+        ...(preservedCommits !== undefined ? { commits: preservedCommits } : {}),
         ...(files !== undefined ? { files } : {}),
         pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
       }),

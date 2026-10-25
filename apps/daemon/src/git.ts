@@ -471,6 +471,14 @@ export const gitPrim = {
     return Number.isNaN(n) ? 0 : n;
   },
 
+  async commitsAhead(dir: string, defaultBranch: string): Promise<string[]> {
+    const output = await runGitOk(
+      ['rev-list', '--reverse', `refs/remotes/origin/${defaultBranch}..HEAD`],
+      { cwd: dir, timeoutMs: META_TIMEOUT_MS },
+    );
+    return output.split('\n').filter((line) => line !== '');
+  },
+
   async branchesWithNewCommits(
     dir: string,
     baseCommit: string,

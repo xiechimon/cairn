@@ -1633,7 +1633,13 @@ export async function finishStep(
     emitRuntimeStepSpan(deps.db, stepId);
     return;
   }
-  applyStepFailure(deps, stepRow, outcome.errorMessage ?? `step ${outcome.status}`, verdictReport);
+  applyStepFailure(
+    deps,
+    stepRow,
+    outcome.errorMessage ?? `step ${outcome.status}`,
+    verdictReport,
+    body.preservedCommits,
+  );
   publishStepStatus(deps, stepId);
   emitRuntimeStepSpan(deps.db, stepId);
 }
