@@ -1,21 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
-// Issue #615/#1260 (总管抽屉 fixture 面回归): #1260 总管降级后模型行 =
-// 绑定 Agent 自身模型的只读展示（chief 行 model/compaction/thinkingLevel
-// 覆盖槽退役——改模型去 Agent 设置面）。本 spec 钉 fixture 面：
-//   1. the model row is a read-only display: the bound Agent's model name +
-//      runtime mark render, and no picker control / model popover exists
-//      (the #615/#950 control carrier 总管主模型 retired with the slot).
-//   2. the row stays readable in both themes (rendered-pair contrast).
-//   3. the row carries the runtime mark (RuntimePi block pi / RuntimeClaudeCode
-//      brand star), not an agent avatar; unbound renders no model row.
-//   4. the message-row copy glyphs are real clipboard buttons; 恢复 / foot
-//      chevron had no backend and no local-first object face, so per the
-//      #306/#146 二分律 they are gone, not inert.
-//   5. the gear is reachable off-board: wake shells render it and it lands
-//      on the board settings view via the ?chief=settings deep link.
-
 const drawer = (page: Page) => page.locator('.chief-drawer');
 // #1260: 模型行只读载体 = data-testid（行无 role 语义，aria 无处挂）。
 const modelRow = (page: Page) => page.getByTestId('chief-model-row');

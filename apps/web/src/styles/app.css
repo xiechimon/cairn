@@ -377,6 +377,9 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .chat-row-icons .chat-copy {
+    transition: opacity var(--dur-fast) var(--ease-standard);
+  }
   [data-slot="message-scroller-item"]:not(:hover, :focus-within) .chat-row-icons .chat-copy {
     opacity: 0;
   }
@@ -385,8 +388,5 @@
     .chat-copy
     ~ .border-l {
     border-color: transparent;
-  }
-  .chat-row-icons .chat-copy {
-    transition: opacity var(--dur-fast) var(--ease-standard);
   }
 }
