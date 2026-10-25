@@ -929,9 +929,8 @@ export const EN: Record<string, string> = {
   需要访问令牌: 'Access token required',
   '服务端已开启令牌鉴权，输入访问令牌后继续使用。':
     'This server has token authentication enabled. Enter your access token to continue.',
-  // #1048 令牌来源指引（{tokenVar} 经 BRAND 槽 ENV_VARS.token 插值）
-  '令牌由部署方在服务端用环境变量 {tokenVar} 设定，页面无法读出它的值：自己部署的服务，去启动它的环境里找这个变量（systemd 部署看单元 EnvironmentFile 指向的文件）；别人部署的，向部署者索取。删除该变量并重启服务端即可关闭令牌鉴权。':
-    'The token is set on the server by whoever deployed it, as the {tokenVar} environment variable — this page cannot read its value. If you deployed the server yourself, look for that variable in the environment it was started from (for systemd, the file the unit EnvironmentFile points at); if someone else deployed it, ask them. Remove the variable and restart the server to turn token authentication off.',
+  '令牌从哪来：在运行服务端的机器上执行 `cairn token` 查看当前令牌（`cairn token --rotate` 换发新令牌；令牌存于服务端 {tokenFile} 文件，设了 {tokenVar} 环境变量则以环境变量为准）。本地自行部署时，服务端启动日志还会打印一次性登录链接；容器/托管部署（{requireTokenVar}）的日志是共享的，不会打印令牌值和登录链接，请向部署者索取。删除环境变量或令牌文件并重启服务端即可关闭令牌鉴权。':
+    'Where the token comes from: run `cairn token` on the machine running the server to see the current token (`cairn token --rotate` issues a new one; it is stored in the {tokenFile} file on the server, and the {tokenVar} environment variable wins when set). On a local self-hosted deployment, the server log also prints a one-time login link at startup; container/hosted deployments ({requireTokenVar}) keep shared logs free of the token value and the login link, so ask the deployer for access. Remove the environment variable or the token file and restart the server to turn token authentication off.',
   访问令牌: 'Access token',
   进入: 'Continue',
   '令牌无效，请重试。': 'Invalid token — please try again.',

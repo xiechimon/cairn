@@ -29,11 +29,15 @@ import {
   CONFIRM_ANNOUNCEMENT,
   checkPlanContract,
   conversationBranch,
+  EVIDENCE_PREFIX,
+  GATE_LIMITS,
   hasBlockingFinding,
   isPlanContractRewritePrompt,
   MERGE_ANNOUNCEMENT,
   type PlanContractCheck,
   parseGithubIssueSourceRef,
+  parseReviewPromptMeta,
+  parseVerifyPromptMeta,
   personaByRole,
   planVerificationItems,
   REVIEW_ANNOUNCEMENT,
@@ -47,11 +51,25 @@ import {
   type VerifyVerdict,
   withRetryLessons,
 } from '@cairn/shared';
-import { and, asc, desc, eq, gte, inArray, isNotNull, ne, notInArray, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
   build,
+  gateVerdict,
   machine,
   message,
   plan as planTable,
@@ -84,6 +102,9 @@ import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import { storeInfoReport } from './info-handoff.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { readCompareAt } from './merge-gate/github-facts.js';
+import { bindGateVerdict } from './merge-gate/verdict.js';
+import { githubGatePort } from './merge-gate-github.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
@@ -618,6 +639,11 @@ export function startBuilds(
   return created;
 }
 
+function ticketRefOf(todoRow: { sourceRef: string | null; seqNum: number }): string {
+  const linked = todoRow.sourceRef !== null ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
+  return String(linked?.issueNumber ?? todoRow.seqNum);
+}
+
 export function maybeEnqueueVerifyStep(
   deps: BuildDeps,
   todoRow: typeof todo.$inferSelect,
@@ -642,15 +668,16 @@ export function maybeEnqueueVerifyStep(
   if (existing !== undefined) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined) return;
-  const linked = todoRow.sourceRef !== null ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
-  const ticketRef = String(linked?.issueNumber ?? todoRow.seqNum);
+  const ticketRef = ticketRefOf(todoRow);
   const planRow = latestPlanRow(deps, buildId);
+  const expectedHeadSha = dispatchHeadSha(deps, buildId);
   const prompt = buildVerifyStepPrompt({
     ticketRef,
     taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
     planText: planRow?.content ?? '',
     verificationItems: planVerificationItems(planRow?.content ?? ''),
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
+    ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
   });
   insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
   enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
@@ -970,11 +997,13 @@ export async function applyBuildStepAction(
       );
     }
     insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
+    const expectedHeadSha = gate === 'review' ? dispatchHeadSha(deps, buildId) : null;
     const promptArgs = {
       gate,
       planText,
       ...(changes !== undefined ? { changes } : {}),
       checkout,
+      ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
     } as const;
     if (body.agentId === undefined) {
       const currentTodo = todoRecord;
@@ -1201,6 +1230,190 @@ export function lastPushedCheckpoint(
   );
 }
 
+function dispatchHeadSha(deps: BuildDeps, buildId: string): string | null {
+  const rows = deps.db
+    .select({ commit: step.checkpointCommit })
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        notInArray(step.kind, ['review', 'merge', 'verify']),
+        eq(step.status, 'done'),
+        isNotNull(step.checkpointCommit),
+      ),
+    )
+    .orderBy(
+      desc(
+        sql`coalesce(${step.finishedAt}, ${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`,
+      ),
+      desc(step.createdAt),
+    )
+    .all();
+  for (const row of rows) {
+    if (row.commit !== null && isFullSha(row.commit)) return row.commit;
+  }
+  return null;
+}
+
+export interface VerdictReport {
+  reportedHeadSha: string | null;
+  driftedHeads: readonly string[];
+}
+
+function expectedHeadOf(stepRow: typeof step.$inferSelect): string | null {
+  const expected =
+    stepRow.kind === 'review'
+      ? (parseReviewPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null)
+      : stepRow.kind === 'verify'
+        ? (parseVerifyPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null)
+        : null;
+  return expected !== null && isFullSha(expected) ? expected : null;
+}
+
+export function reportedVerdictHeads(
+  stepRow: typeof step.$inferSelect,
+  reported: { gateHeadSha?: string | undefined; commit?: string | null | undefined },
+): VerdictReport {
+  const candidates = [reported.gateHeadSha, reported.commit].filter(
+    (sha): sha is string => typeof sha === 'string' && isFullSha(sha),
+  );
+  const expected = expectedHeadOf(stepRow);
+  const driftedHeads = expected === null ? [] : candidates.filter((sha) => sha !== expected);
+  const pick = stepRow.kind === 'verify' ? driftedHeads.at(-1) : driftedHeads[0];
+  return { reportedHeadSha: pick ?? candidates[0] ?? null, driftedHeads };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+const verdictDigestsInFlight = new Set<Promise<void>>();
+
+export async function flushVerdictDigests(): Promise<void> {
+  await Promise.all([...verdictDigestsInFlight]);
+}
+
+function persistGateVerdict(
+  deps: BuildDeps,
+  stepRow: typeof step.$inferSelect,
+  todoRow: typeof todo.$inferSelect | undefined,
+  facts: { stepFailed: boolean; extracted: boolean; blocked: boolean; report: VerdictReport },
+): void {
+  if (stepRow.kind !== 'review' && stepRow.kind !== 'verify') return;
+  const expectedHeadSha = expectedHeadOf(stepRow);
+  if (expectedHeadSha === null) return;
+  const perspective =
+    stepRow.kind === 'review' && todoRow !== undefined
+      ? (agentForStep(deps.db, todoRow, 'review', stepRow.prompt)?.persona ?? null)
+      : null;
+  const bound = bindGateVerdict({
+    kind: stepRow.kind,
+    perspective,
+    expectedHeadSha,
+    reportedHeadSha: facts.report.reportedHeadSha,
+    stepFailed: facts.stepFailed,
+    extracted: facts.extracted,
+    blocked: facts.blocked,
+  });
+  if (bound === null) return;
+  const inserted = deps.db
+    .insert(gateVerdict)
+    .values({
+      stepId: stepRow.id,
+      buildId: stepRow.buildId,
+      kind: bound.kind,
+      perspective: bound.perspective,
+      outcome: bound.outcome,
+      patchDigest: null,
+      headSha: bound.headSha,
+      expectedHeadSha: bound.expectedHeadSha,
+      createdAt: nowMs(),
+    })
+    .onConflictDoNothing({ target: gateVerdict.stepId })
+    .run();
+  if (inserted.changes === 0) return;
+  const driftedHeads = facts.report.driftedHeads;
+  const pending = (async (): Promise<void> => {
+    const row = deps.db.select().from(gateVerdict).where(eq(gateVerdict.stepId, stepRow.id)).get();
+    if (row === undefined || row.patchDigest !== null || row.headSha === null) return;
+    const expected = row.expectedHeadSha;
+    const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+    if (buildRow?.prNumber == null) return;
+    const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+    if (todoRow === undefined) return;
+    const repo = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
+    if (repo === null) return;
+    const access = teamGithubToken(deps, todoRow.teamId);
+    if (!('token' in access)) return;
+    const port = githubGatePort(
+      deps.githubFetch ?? fetch,
+      access.token,
+      repo.owner,
+      repo.repo,
+      10_000,
+    );
+    let pathsAfterExpected: string[] | null = null;
+    if (row.kind === 'verify' && driftedHeads.length > 0) {
+      const names = new Set<string>();
+      for (const head of driftedHeads) {
+        const read = await readCompareAt(port, expected, head);
+        const files = typeof read.compare === 'object' ? read.compare.files : null;
+        if (files === null || files.length === 0 || files.length >= GATE_LIMITS.compareFileCap) {
+          return;
+        }
+        for (const f of files) {
+          names.add(f.filename);
+          if (f.previousFilename !== null) names.add(f.previousFilename);
+        }
+      }
+      pathsAfterExpected = [...names];
+    } else if (row.headSha !== expected) {
+      return;
+    }
+    let baseSha: string | null = null;
+    const pull = await port.pull(buildRow.prNumber, { etag: null });
+    const base = asRecord(pull.kind === 'ok' ? asRecord(pull.body)?.base : null);
+    if (typeof base?.sha === 'string' && isFullSha(base.sha)) {
+      baseSha = base.sha;
+    } else if (typeof base?.ref === 'string' && base.ref !== '') {
+      const branch = await port.branch(base.ref, { etag: null });
+      const commit = asRecord(branch.kind === 'ok' ? asRecord(branch.body)?.commit : null);
+      if (typeof commit?.sha === 'string' && isFullSha(commit.sha)) baseSha = commit.sha;
+    }
+    if (baseSha === null) return;
+    const delivery = await readCompareAt(port, baseSha, expected);
+    if (typeof delivery.compare !== 'object') return;
+    const bound = bindGateVerdict({
+      kind: row.kind,
+      perspective: row.perspective,
+      expectedHeadSha: expected,
+      reportedHeadSha: row.headSha,
+      stepFailed: false,
+      extracted: true,
+      blocked: false,
+      compareFiles: delivery.compare.files,
+      pathsAfterExpected,
+      evidenceDir: `${EVIDENCE_PREFIX}${ticketRefOf(todoRow)}/`,
+    });
+    if (bound?.patchDigest == null) return;
+    deps.db
+      .update(gateVerdict)
+      .set({ patchDigest: bound.patchDigest })
+      .where(
+        and(
+          eq(gateVerdict.stepId, row.stepId),
+          eq(gateVerdict.createdAt, row.createdAt),
+          isNull(gateVerdict.patchDigest),
+        ),
+      )
+      .run();
+  })()
+    .catch(() => undefined)
+    .finally(() => verdictDigestsInFlight.delete(pending));
+  verdictDigestsInFlight.add(pending);
+}
 function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; failed: boolean } {
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
@@ -1437,6 +1650,7 @@ export function applyStepFailure(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   rawErrorMessage: string,
+  report?: VerdictReport,
 ): void {
   const { db } = deps;
   const errorMessage =
@@ -1466,6 +1680,14 @@ export function applyStepFailure(
     });
   }
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
+  const failedStep = finished ?? stepRow;
+  persistGateVerdict(deps, failedStep, todoRow, {
+    stepFailed: true,
+    extracted: false,
+    blocked: false,
+    report: report ?? reportedVerdictHeads(failedStep, { commit: failedStep.checkpointCommit }),
+  });
   if (todoRow && canTransitionPhase(todoRow.phase, 'failed')) {
     setTodoPhase(deps, todoRow.id, 'failed');
   }
@@ -1648,6 +1870,7 @@ export function completeStep(
     verifyVerdict?: VerifyVerdict;
     verifyVerdictError?: string;
     report?: string;
+    verdictReport?: VerdictReport;
   } = {},
 ): void {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
@@ -1701,7 +1924,7 @@ export function completeStep(
         .where(eq(build.id, stepRow.buildId))
         .run();
     }
-    applyStepFailure(deps, stepRow, gateFailure);
+    applyStepFailure(deps, stepRow, gateFailure, outcome.verdictReport);
     if (refuseDriftRecord) {
       const cleared = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
       if (cleared) publishBuild(deps, cleared);
@@ -1792,6 +2015,14 @@ export function completeStep(
       }),
       createdAt: nowMs(),
     });
+    persistGateVerdict(deps, stepRow, todoRow, {
+      stepFailed: false,
+      extracted: outcome.findings !== undefined,
+      blocked: outcome.findings !== undefined && hasBlockingFinding(outcome.findings),
+      report:
+        outcome.verdictReport ??
+        reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),
+    });
     if (hasBlockingFinding(verdict)) {
       const revisionInFlight = deps.db
         .select({ id: step.id })
@@ -1856,6 +2087,14 @@ export function completeStep(
           : {}),
       }),
       createdAt: nowMs(),
+    });
+    persistGateVerdict(deps, stepRow, todoRow, {
+      stepFailed: false,
+      extracted: outcome.verifyVerdict !== undefined,
+      blocked: outcome.verifyVerdict !== undefined && !verdict.passed,
+      report:
+        outcome.verdictReport ??
+        reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),
     });
     return;
   }

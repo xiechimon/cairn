@@ -85,6 +85,7 @@ import {
   failStepWithEvents,
   mergedPrElsewhere,
   NotFoundError,
+  reportedVerdictHeads,
   toBuildRecord,
 } from './builds.js';
 import {
@@ -1571,6 +1572,10 @@ export async function finishStep(
     }
     return;
   }
+  const verdictReport = reportedVerdictHeads(stepRow, {
+    gateHeadSha: body.gateHeadSha,
+    commit: body.commit,
+  });
   if (zeroUsage) {
     if (!(stepRow.fallback?.zeroUsageRetried ?? false)) {
       requeueStep(
@@ -1585,7 +1590,7 @@ export async function finishStep(
       );
       return;
     }
-    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE);
+    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictReport);
     publishStepStatus(deps, stepId);
     return;
   }
@@ -1602,6 +1607,7 @@ export async function finishStep(
         ? { verifyVerdictError: outcome.verifyVerdictError }
         : {}),
       ...(outcome.report !== undefined ? { report: outcome.report } : {}),
+      verdictReport,
     });
     publishStepStatus(deps, stepId);
     return;
@@ -1611,7 +1617,7 @@ export async function finishStep(
     publishStepStatus(deps, stepId);
     return;
   }
-  applyStepFailure(deps, stepRow, outcome.errorMessage ?? `step ${outcome.status}`);
+  applyStepFailure(deps, stepRow, outcome.errorMessage ?? `step ${outcome.status}`, verdictReport);
   publishStepStatus(deps, stepId);
 }
 

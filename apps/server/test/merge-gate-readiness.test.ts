@@ -528,6 +528,17 @@ const classesOf = (i: GateInputs) =>
   mergeReadiness(i).blockers.map((b) => [b.code, b.class, ...b.detail]);
 
 describe('mergeReadiness: one true and one false leg per blocker', () => {
+  test('a local project reuses the same gate logic and the default human policy still blocks the autonomous path', () => {
+    const input = green();
+    input.build = { ...input.build, isGithubPr: false, repoKind: 'local' };
+    input.pr = null;
+    input.evidence = [];
+    input.policy = { ...input.policy, mergePolicy: 'human' };
+    const result = mergeReadiness(input);
+    expect(result.blockers.map((blocker) => blocker.code)).toContain('policy-human');
+    expect(result.blockers.map((blocker) => blocker.code)).not.toContain('not-applicable');
+    expect(result.headSha).toBe(HEAD);
+  });
   test('all-green baseline: ready, no blockers (the false leg of every blocker)', () => {
     const r = mergeReadiness(green());
     expect(r.blockers).toEqual([]);

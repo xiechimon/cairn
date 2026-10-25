@@ -15,6 +15,7 @@ import {
   type ProjectRecord,
   type ProjectTreeResponse,
   parseGithubRepoRef,
+  projectMergeConfigSchema,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -172,6 +173,10 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     ...(row.repoName !== null ? { repoName: row.repoName } : {}),
     ...(row.githubRepo !== null ? { githubRepo: row.githubRepo } : {}),
     ...(row.localPath !== null ? { localPath: row.localPath } : {}),
+    ...projectMergeConfigSchema.parse({
+      mergePolicy: (row.autonomy as { mergePolicy?: unknown } | null)?.mergePolicy,
+      localChecks: (row.autonomy as { localChecks?: unknown } | null)?.localChecks,
+    }),
     ...(row.repoKind === 'hosted' && row.repoName !== null && origin !== undefined
       ? { cloneUrl: hostedCloneUrl(origin, row.teamId, row.repoName) }
       : {}),

@@ -126,23 +126,20 @@ test('auth off: zero gate page, zero token attached, behavior unchanged', async 
   }
 });
 
-test('#1048 gate page guide: the zh face tells where the token comes from (variable name / EnvironmentFile / restart to disable)', async ({
+test('#1048 gate page guide: the zh face tells where the token comes from (cairn token command / server log / variable name)', async ({
   page,
 }) => {
   await page.goto(`${authed.base}/app`);
   const help = page.locator('.token-gate-help');
   await expect(help).toBeVisible();
 
+  await expect(help).toContainText('cairn token');
+  await expect(help).toContainText('日志');
   await expect(help).toContainText(ENV_VARS.token);
-
-  await expect(help).toContainText('EnvironmentFile');
-
-  await expect(help).toContainText('重启');
-
   expect(await help.innerText()).not.toMatch(new RegExp(`${ENV_VARS.token}\\s*=`));
 });
 
-test('#1048 gate page guide: the en face keeps the same facts undistorted (variable name interpolated through the dictionary template)', async ({ page }) => {
+test('#1048 gate page guide: the en face keeps the same facts undistorted (command name / log / variable name interpolated through the dictionary template)', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('cairn.locale', 'en');
     localStorage.setItem('cairn-locale', 'en');
@@ -152,7 +149,28 @@ test('#1048 gate page guide: the en face keeps the same facts undistorted (varia
   await expect(help).toBeVisible();
 
   await expect(help).toContainText(ENV_VARS.token);
-  await expect(help).toContainText('EnvironmentFile');
-  await expect(help).toContainText(/restart/i);
+  await expect(help).toContainText('cairn token');
+  await expect(help).toContainText(/log/i);
   expect(await help.innerText()).not.toMatch(new RegExp(`${ENV_VARS.token}\\s*=`));
+});
+
+test('#1708 login link: /app#token=<valid> signs in and strips the fragment', async ({ page }) => {
+  await recordEventSourceUrls(page);
+  await page.goto(`${authed.base}/app#token=${GATE_TOKEN}`);
+
+  await expect(page.locator('.board-sidebar')).toBeVisible();
+  await expect(page.locator('.token-gate')).toHaveCount(0);
+  expect(new URL(page.url()).hash).toBe('');
+  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBe(GATE_TOKEN);
+});
+
+test('#1708 login link: an invalid fragment token lands the gate error copy and still strips the fragment', async ({
+  page,
+}) => {
+  await page.goto(`${authed.base}/app#token=wrong-fragment-token`);
+
+  await expect(page.locator('.token-gate')).toBeVisible();
+  await expect(page.locator('.token-gate-error')).toHaveText('令牌无效，请重试。');
+  expect(new URL(page.url()).hash).toBe('');
+  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
 });

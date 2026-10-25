@@ -28,6 +28,7 @@ export const reviewPromptMetaSchema = z.object({
   kind: z.literal('review'),
   agentId: z.string(),
   gate: reviewGateSchema.optional(),
+  expectedHeadSha: z.string().optional(),
 });
 export type ReviewPromptMeta = z.infer<typeof reviewPromptMetaSchema>;
 
@@ -51,8 +52,14 @@ export function buildReviewStepPrompt(args: {
   changes?: readonly DocumentDiffFile[];
   checkout?: boolean;
   focus?: string;
+  expectedHeadSha?: string;
 }): string {
-  const meta: ReviewPromptMeta = { kind: 'review', agentId: args.agentId, gate: args.gate };
+  const meta: ReviewPromptMeta = {
+    kind: 'review',
+    agentId: args.agentId,
+    gate: args.gate,
+    ...(args.expectedHeadSha !== undefined ? { expectedHeadSha: args.expectedHeadSha } : {}),
+  };
   const focusNote =
     args.focus !== undefined && args.focus.trim() !== ''
       ? `\n\n## 用户关注点\n${args.focus.trim()}`

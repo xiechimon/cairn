@@ -1,4 +1,4 @@
-const TILE_COLORS = ['#c06a43', '#7d8b5a', '#6b7a8f', '#a0784a', '#8a6a9a', '#4f8a8b'] as const;
+const TILE_COLORS = ['#c06a43', '#788656', '#6b7a8f', '#a0784a', '#8a6a9a', '#4f8a8b'] as const;
 const SPIRAL_CREAM = '#f2ead7';
 const SPIN_STYLE =
   '<style>@keyframes spin{to{transform:rotate(360deg)}}.spin{transform-origin:50px 50px;animation:spin 2.4s linear infinite}@media (prefers-reduced-motion:reduce){.spin{animation:none}}</style>';

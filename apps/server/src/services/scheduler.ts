@@ -7,7 +7,7 @@ import { nowMs } from '../lib/ids.js';
 import {
   ATTACHMENT_GC_INTERVAL_MS,
   type GcLogger,
-  sweepAttachments,
+  sweepAttachmentBatches,
   sweepStepSessions,
 } from './attachment-gc.js';
 import {
@@ -85,6 +85,28 @@ export function createScheduler(
       : null;
   let intakeTimer: NodeJS.Timeout | null = null;
   let lastGcAt = 0;
+  let gcImmediate: NodeJS.Immediate | null = null;
+  let gcBatches: ReturnType<typeof sweepAttachmentBatches> | null = null;
+
+  function advanceGc(): void {
+    if (!gc || !gcBatches) return;
+    try {
+      if (gcBatches.next().done) {
+        gcBatches = null;
+        gcImmediate = null;
+        return;
+      }
+      gcImmediate = setImmediate(advanceGc);
+      gcImmediate.unref();
+    } catch (err) {
+      gcBatches = null;
+      gcImmediate = null;
+      gc.logger.info(
+        { err: err instanceof Error ? err.message : String(err) },
+        'attachment gc failed (scheduler continues)',
+      );
+    }
+  }
 
   function cancelGateBuild(db: Db, hub: TeamStreamHub, todoId: string): void {
     const todoRow = db.select().from(todo).where(eq(todo.id, todoId)).get();
@@ -137,13 +159,19 @@ export function createScheduler(
     sweepAbandonedBuildSteps(deps, now);
     sweepZombieQueuedTodos(deps, now);
     sweepQuotaWaitSteps(deps, now);
-    if (gc !== undefined && gc !== null && now - lastGcAt >= ATTACHMENT_GC_INTERVAL_MS) {
+    if (
+      gc !== undefined &&
+      gc !== null &&
+      gcBatches === null &&
+      now - lastGcAt >= ATTACHMENT_GC_INTERVAL_MS
+    ) {
       lastGcAt = now;
       try {
-        sweepAttachments(
+        gcBatches = sweepAttachmentBatches(
           { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },
           now,
         );
+        advanceGc();
         sweepStepSessions(
           { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },
           now,
@@ -180,6 +208,9 @@ export function createScheduler(
       }
     },
     stop() {
+      if (gcImmediate !== null) clearImmediate(gcImmediate);
+      gcImmediate = null;
+      gcBatches = null;
       if (timer !== null) {
         clearInterval(timer);
         timer = null;

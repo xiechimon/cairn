@@ -14,6 +14,7 @@ import type {
   ModelRef,
   PersonaRole,
   Phase,
+  ProjectMergeConfig,
   ProjectRepoKind,
   ProviderApi,
   ProviderCompat,
@@ -65,38 +66,42 @@ export const project = sqliteTable('project', {
   repoName: text('repoName'),
   githubRepo: text('githubRepo'),
   localPath: text('localPath'),
-  autonomy: json<AutonomySettings | null>('autonomy'),
+  autonomy: json<(AutonomySettings & Partial<ProjectMergeConfig>) | null>('autonomy'),
 });
 
-export const todo = sqliteTable('todo', {
-  id: text('id').primaryKey(),
-  teamId: text('teamId')
-    .notNull()
-    .references(() => team.id),
-  projectId: text('projectId')
-    .notNull()
-    .references(() => project.id),
-  title: text('title').notNull(),
-  spec: text('spec').notNull().default(''),
-  phase: text('phase').$type<Phase>().notNull().default('todo'),
-  phaseAt: epochMs('phaseAt').notNull(),
-  seqNum: integer('seqNum').notNull(),
-  orderIndex: real('orderIndex').notNull().default(0),
-  assignment: json<Assignment | null>('assignment'),
-  latestBuildId: text('latestBuildId'),
-  lastRunAt: epochMs('lastRunAt'),
-  hasChanges: bool('hasChanges').notNull().default(false),
-  hasPlan: bool('hasPlan').notNull().default(false),
-  sourceTodo: text('sourceTodo'),
-  blockedBy: json<string[]>('blockedBy'),
-  v: integer('v').notNull().default(1),
-  createdBy: text('createdBy'),
-  ownerId: text('ownerId'),
-  sourceBuildId: text('sourceBuildId'),
-  sourceKind: text('sourceKind').$type<TodoSourceKind | null>(),
-  sourceRef: text('sourceRef'),
-  output: text('output').$type<TodoOutputKind>().notNull().default('code'),
-});
+export const todo = sqliteTable(
+  'todo',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    projectId: text('projectId')
+      .notNull()
+      .references(() => project.id),
+    title: text('title').notNull(),
+    spec: text('spec').notNull().default(''),
+    phase: text('phase').$type<Phase>().notNull().default('todo'),
+    phaseAt: epochMs('phaseAt').notNull(),
+    seqNum: integer('seqNum').notNull(),
+    orderIndex: real('orderIndex').notNull().default(0),
+    assignment: json<Assignment | null>('assignment'),
+    latestBuildId: text('latestBuildId'),
+    lastRunAt: epochMs('lastRunAt'),
+    hasChanges: bool('hasChanges').notNull().default(false),
+    hasPlan: bool('hasPlan').notNull().default(false),
+    sourceTodo: text('sourceTodo'),
+    blockedBy: json<string[]>('blockedBy'),
+    v: integer('v').notNull().default(1),
+    createdBy: text('createdBy'),
+    ownerId: text('ownerId'),
+    sourceBuildId: text('sourceBuildId'),
+    sourceKind: text('sourceKind').$type<TodoSourceKind | null>(),
+    sourceRef: text('sourceRef'),
+    output: text('output').$type<TodoOutputKind>().notNull().default('code'),
+  },
+  (t) => [index('todo_phase_idx').on(t.phase)],
+);
 
 export const tag = sqliteTable('tag', {
   id: text('id').primaryKey(),
@@ -160,31 +165,39 @@ export interface StepFallbackRow {
   zeroUsageRetried: boolean;
 }
 
-export const step = sqliteTable('step', {
-  id: text('id').primaryKey(),
-  buildId: text('buildId').notNull(),
-  kind: text('kind').$type<StepKind>().notNull(),
-  machineId: text('machineId'),
-  status: text('status')
-    .$type<'pending' | 'claimed' | 'done' | 'failed' | 'stopped' | 'waiting_quota'>()
-    .notNull()
-    .default('pending'),
-  quotaBlock: json<QuotaWaitRow>('quotaBlock'),
-  fallback: json<StepFallbackRow>('fallback'),
-  sessionId: text('sessionId'),
-  checkpointCommit: text('checkpointCommit'),
-  claimedAt: epochMs('claimedAt'),
-  lastHeartbeatAt: epochMs('lastHeartbeatAt'),
-  finishedAt: epochMs('finishedAt'),
-  prompt: text('prompt'),
-  freshSession: bool('freshSession').notNull().default(false),
-  skillInjection: json<SkillInjectionRecord>('skillInjection'),
-  blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
-  holdReason: text('holdReason'),
-  holdUntil: epochMs('holdUntil'),
-  holdCount: integer('holdCount').notNull().default(0),
-  createdAt: epochMs('createdAt').notNull(),
-});
+export const step = sqliteTable(
+  'step',
+  {
+    id: text('id').primaryKey(),
+    buildId: text('buildId').notNull(),
+    kind: text('kind').$type<StepKind>().notNull(),
+    machineId: text('machineId'),
+    status: text('status')
+      .$type<'pending' | 'claimed' | 'done' | 'failed' | 'stopped' | 'waiting_quota'>()
+      .notNull()
+      .default('pending'),
+    quotaBlock: json<QuotaWaitRow>('quotaBlock'),
+    fallback: json<StepFallbackRow>('fallback'),
+    sessionId: text('sessionId'),
+    checkpointCommit: text('checkpointCommit'),
+    claimedAt: epochMs('claimedAt'),
+    lastHeartbeatAt: epochMs('lastHeartbeatAt'),
+    finishedAt: epochMs('finishedAt'),
+    prompt: text('prompt'),
+    freshSession: bool('freshSession').notNull().default(false),
+    skillInjection: json<SkillInjectionRecord>('skillInjection'),
+    blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
+    holdReason: text('holdReason'),
+    holdUntil: epochMs('holdUntil'),
+    holdCount: integer('holdCount').notNull().default(0),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    index('step_status_kind_idx').on(t.status, t.kind),
+    index('step_buildId_status_idx').on(t.buildId, t.status),
+    index('step_kind_idx').on(t.kind),
+  ],
+);
 
 export const message = sqliteTable('message', {
   id: text('id').primaryKey(),
@@ -245,38 +258,46 @@ export const plan = sqliteTable('plan', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
-export const schedule = sqliteTable('schedule', {
-  id: text('id').primaryKey(),
-  teamId: text('teamId')
-    .notNull()
-    .references(() => team.id),
-  projectId: text('projectId').notNull(),
-  todoId: text('todoId').notNull(),
-  kind: text('kind').$type<'once' | 'hourly' | 'daily' | 'weekly'>().notNull(),
-  at: epochMs('at'),
-  tz: text('tz').notNull(),
-  nextRunAt: epochMs('nextRunAt'),
-  createdBy: text('createdBy').notNull(),
-});
+export const schedule = sqliteTable(
+  'schedule',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    projectId: text('projectId').notNull(),
+    todoId: text('todoId').notNull(),
+    kind: text('kind').$type<'once' | 'hourly' | 'daily' | 'weekly'>().notNull(),
+    at: epochMs('at'),
+    tz: text('tz').notNull(),
+    nextRunAt: epochMs('nextRunAt'),
+    createdBy: text('createdBy').notNull(),
+  },
+  (t) => [index('schedule_nextRunAt_idx').on(t.nextRunAt)],
+);
 
-export const notification = sqliteTable('notification', {
-  id: text('id').primaryKey(),
-  teamId: text('teamId').notNull(),
-  userId: text('userId').notNull(),
-  type: text('type')
-    .$type<'plan_ready' | 'build_review' | 'chief_message' | 'quota_wait' | 'model_fallback'>()
-    .notNull(),
-  entityId: text('entityId').notNull(),
-  entityRef: json<{ title: string; projectId: string | null; seqNum: number | null }>(
-    'entityRef',
-  ).notNull(),
-  agentName: text('agentName').notNull(),
-  agentAvatarUrl: text('agentAvatarUrl'),
-  snippet: text('snippet'),
-  readAt: epochMs('readAt'),
-  createdAt: epochMs('createdAt').notNull(),
-  channels: json<['in_app']>('channels').notNull().default(['in_app']),
-});
+export const notification = sqliteTable(
+  'notification',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId').notNull(),
+    userId: text('userId').notNull(),
+    type: text('type')
+      .$type<'plan_ready' | 'build_review' | 'chief_message' | 'quota_wait' | 'model_fallback'>()
+      .notNull(),
+    entityId: text('entityId').notNull(),
+    entityRef: json<{ title: string; projectId: string | null; seqNum: number | null }>(
+      'entityRef',
+    ).notNull(),
+    agentName: text('agentName').notNull(),
+    agentAvatarUrl: text('agentAvatarUrl'),
+    snippet: text('snippet'),
+    readAt: epochMs('readAt'),
+    createdAt: epochMs('createdAt').notNull(),
+    channels: json<['in_app']>('channels').notNull().default(['in_app']),
+  },
+  (t) => [index('notification_type_readAt_idx').on(t.type, t.readAt)],
+);
 
 export const agent = sqliteTable(
   'agent',
@@ -424,25 +445,29 @@ export const webhookToken = sqliteTable(
   (t) => [uniqueIndex('webhook_token_tokenHash_unique').on(t.tokenHash)],
 );
 
-export const machine = sqliteTable('machine', {
-  id: text('id').primaryKey(),
-  teamId: text('teamId')
-    .notNull()
-    .references(() => team.id),
-  name: text('name').notNull(),
-  online: bool('online').notNull().default(false),
-  tokenHash: text('tokenHash'),
-  apiKeyId: text('apiKeyId'),
-  latestCliVersion: text('latestCliVersion'),
-  kind: text('kind').notNull().default('remote'),
-  enabledRuntimes: json<string[]>('enabledRuntimes').notNull().default(sql`'[]'`),
-  shellEnabled: bool('shellEnabled').notNull().default(false),
-  claudeCodeReport: json<ClaudeCodeReport | null>('claudeCodeReport'),
-  maxConcurrent: integer('maxConcurrent').notNull().default(3),
-  maxConcurrentOverridden: bool('maxConcurrentOverridden').notNull().default(false),
-  lastSeenAt: epochMs('lastSeenAt'),
-  capabilities: json<MachineCapabilities | null>('capabilities'),
-});
+export const machine = sqliteTable(
+  'machine',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    name: text('name').notNull(),
+    online: bool('online').notNull().default(false),
+    tokenHash: text('tokenHash'),
+    apiKeyId: text('apiKeyId'),
+    latestCliVersion: text('latestCliVersion'),
+    kind: text('kind').notNull().default('remote'),
+    enabledRuntimes: json<string[]>('enabledRuntimes').notNull().default(sql`'[]'`),
+    shellEnabled: bool('shellEnabled').notNull().default(false),
+    claudeCodeReport: json<ClaudeCodeReport | null>('claudeCodeReport'),
+    maxConcurrent: integer('maxConcurrent').notNull().default(3),
+    maxConcurrentOverridden: bool('maxConcurrentOverridden').notNull().default(false),
+    lastSeenAt: epochMs('lastSeenAt'),
+    capabilities: json<MachineCapabilities | null>('capabilities'),
+  },
+  (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
+);
 
 export const shellCommand = sqliteTable('shell_command', {
   id: text('id').primaryKey(),

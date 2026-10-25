@@ -179,6 +179,14 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await expect(page.locator('.chief-drawer')).toBeVisible();
   });
 
+  test('F-R24: unbound chief reply rows wear the spiral face; the page has zero dashed-face glyphs', async ({
+    page,
+  }) => {
+    const stream = page.getByTestId('chief-stream');
+    await expect(stream.getByTestId('chief-msg').locator('> svg').first()).toBeVisible();
+    await expect(page.locator('svg circle[stroke-dasharray]')).toHaveCount(0);
+  });
+
   test('F-R1/R2/R3: robot markdown rows share the block parser — bold/heading/list/fence/chip all render, zero star leakage', async ({
     page,
   }) => {

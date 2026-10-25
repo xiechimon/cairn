@@ -109,19 +109,29 @@ function splitItems(section: { head: string; lines: string[] }): {
   });
   const items: { text: string; fenced: boolean; indent: number | null }[] = [];
   if (section.head !== '') items.push({ text: section.head, fenced: false, indent: null });
-  let fence: string[] | null = null;
+  let fence: { lines: string[]; owner: (typeof items)[number] | null } | null = null;
   for (const raw of section.lines) {
     const line = raw.trim();
     if (fence !== null) {
-      fence.push(raw);
+      fence.lines.push(raw);
       if (line.startsWith('```')) {
-        items.push({ text: fence.join('\n'), fenced: true, indent: null });
+        if (fence.owner !== null) {
+          fence.owner.text = `${fence.owner.text}\n${fence.lines.join('\n')}`;
+        } else {
+          items.push({ text: fence.lines.join('\n'), fenced: true, indent: null });
+        }
         fence = null;
       }
       continue;
     }
     if (line.startsWith('```')) {
-      fence = [raw];
+      const prev = items[items.length - 1];
+      const indent = raw.length - line.length;
+      const owner =
+        hasList && prev !== undefined && !prev.fenced && prev.indent != null && indent > prev.indent
+          ? prev
+          : null;
+      fence = { lines: [raw], owner };
       continue;
     }
     if (line === '') continue;
@@ -137,7 +147,10 @@ function splitItems(section: { head: string; lines: string[] }): {
     if (!hasList) items.push({ text: line, fenced: false, indent: null });
     else if (prev !== undefined && !prev.fenced) prev.text = `${prev.text} ${line}`;
   }
-  if (fence !== null) items.push({ text: fence.join('\n'), fenced: true, indent: null });
+  if (fence !== null) {
+    if (fence.owner !== null) fence.owner.text = `${fence.owner.text}\n${fence.lines.join('\n')}`;
+    else items.push({ text: fence.lines.join('\n'), fenced: true, indent: null });
+  }
   return items.map(({ text, fenced }) => ({ text, fenced }));
 }
 
@@ -150,7 +163,10 @@ export function checkPlanContract(content: string): PlanContractCheck {
   const unanchored: number[] = [];
   items.forEach((item, i) => {
     if (item.fenced) return;
-    if (VAGUE_PATTERN.test(item.text.replace(/`[^`]*`/g, ''))) vague.push(i + 1);
+    if (
+      VAGUE_PATTERN.test(item.text.replace(/^\s*```[\s\S]*?^\s*```/gm, '').replace(/`[^`]*`/g, ''))
+    )
+      vague.push(i + 1);
     else if (!ANCHOR_PATTERNS.some((p) => p.test(item.text))) unanchored.push(i + 1);
   });
   const named = (ns: number[]) => ns.map((n) => `第 ${n} 项`).join('、');
