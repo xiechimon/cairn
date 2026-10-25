@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { checkPlanContract, planVerificationItems } from '../src/records/plan.js';
+import plan1606Verification from './fixtures/plan1606-verification.md?raw';
 
 const GOOD = [
   '## Context',
@@ -145,10 +146,67 @@ describe('checkPlanContract does not over-block common styles (#1492 failure mod
   });
 });
 
+describe('checkPlanContract indented fence inside a list item (#1728)', () => {
+  test('the real plan from #1606 passes and yields 9 items', () => {
+    const r = checkPlanContract(plan1606Verification);
+    expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+    if (r.ok) expect(r.items).toHaveLength(9);
+  });
+
+  test('a fence indented deeper than the list item joins that item, and indented text after it continues it', () => {
+    const r = checkPlanContract(
+      [
+        '## Verification',
+        '1. Run the test file:',
+        '',
+        '   ```sh',
+        '   pnpm exec vitest run packages/shared/test/plan-contract.test.ts',
+        '   ```',
+        '',
+        '   Assert: exit code 0.',
+        '2. `pnpm lint` passes',
+      ].join('\n'),
+    );
+    expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+    if (r.ok) {
+      expect(r.items).toHaveLength(2);
+      expect(r.items[0]).toContain('vitest run packages/shared/test/plan-contract.test.ts');
+      expect(r.items[0]).toContain('exit code 0');
+    }
+  });
+
+  test('a top-level fence stays its own item', () => {
+    const r = checkPlanContract(
+      '## Verification\n```sh\npnpm lint\n```\n- 新测试 `apps/x.test.ts` 通过\n',
+    );
+    expect(r).toEqual({
+      ok: true,
+      items: ['```sh\npnpm lint\n```', '新测试 `apps/x.test.ts` 通过'],
+    });
+  });
+});
+
 describe('planVerificationItems (checklist input for the verify step)', () => {
   test('valid plan returns the checklist; invalid or no section returns empty array (old plans not backfilled)', () => {
     expect(planVerificationItems(GOOD)).toHaveLength(3);
     expect(planVerificationItems('## Context\n只写了背景\n')).toEqual([]);
     expect(planVerificationItems('## Verification\n- 确认没问题\n')).toEqual([]);
+  });
+});
+
+describe('vague words inside a nested code block', () => {
+  test('does not flag a command that searches for TODO', () => {
+    const plan = [
+      '## Verification',
+      '',
+      '1. Scan the new doc for leftover markers:',
+      '',
+      '   ```sh',
+      '   grep -n TODO docs/ops/failure-attribution.md',
+      '   ```',
+      '',
+      '   Assert: no output.',
+    ].join('\n');
+    expect(checkPlanContract(plan)).toMatchObject({ ok: true });
   });
 });
