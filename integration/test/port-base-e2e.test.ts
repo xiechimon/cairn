@@ -1,15 +1,3 @@
-// #1148 E2E（真 server + 真 daemon + pi + stub LLM）：chief 满载立即被领 +
-// 端口基座分段 + env 兜底取值序。三条验收（票面）：
-//   1. 上限 1、一个 worker 在跑时：chief 回合立即被领（不被卡）；第二个
-//      worker 不领。
-//   2. 两个并发 worker 步的环境里 CAIRN_PORT_BASE 不同段（槽位 ×100：
-//      20000/20100/20200…）。
-//   3. env 覆盖生效序（env > DB > 默认）实测一遍（DB 2 / env 1 → 实际 1）。
-// 失败方式（先于实现固化，实现前本文件全红）：
-//   - chief 满载饿死回归：cap 1 + worker 在跑时 chief 步不被领。
-//   - 端口基座串槽：并发 worker 步 env 同段（或无 env）。
-//   - env 与 DB 打架时取值序漂移：env=1 不压 DB=2。
-
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -104,6 +92,8 @@ async function bootStack(opts: {
   return stack;
 }
 
+let lastFailedStack: Stack | null = null;
+
 afterAll(async () => {
   for (const s of stacks) {
     if (s === lastFailedStack) {
@@ -126,10 +116,6 @@ afterAll(async () => {
   }
 });
 
-/** 失败栈的 diag 出口（waitFor 抛错时登记，afterAll 打印）。 */
-let lastFailedStack: Stack | null = null;
-
-/** 发起单 build 步（withPlan:false → 首步即 build，agent 直执行）。 */
 async function startBuild(
   stack: Stack,
   title: string,
@@ -152,12 +138,8 @@ function stepsOf(stack: Stack, buildId: string) {
   return stack.server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
 }
 
-describe('#1148 E2E：端口基座分段（两个并发 worker 步不同段）', () => {
-  test('两个并发 worker 步的 bash 环境里 CAIRN_PORT_BASE = 20000 / 20100', async () => {
-    // stub 按请求序派发（不知请求来自哪个步）——两步并发时序交错不定，故
-    // 头部铺 6 个 bash 槽（bash = 变更类工具，#703 产物闸过；两步各至少跑
-    // 一次）、尾段 content 恒重复（收尾）。任一交错序下两步都「bash ≥1 次 +
-    // content 收尾」。
+describe('#1148 E2E: port base segmentation (two concurrent worker steps in different segments)', () => {
+  test('two concurrent worker steps see CAIRN_PORT_BASE = 20000 / 20100 in their bash env', async () => {
     const bashProbe = {
       toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
     };
@@ -174,7 +156,6 @@ describe('#1148 E2E：端口基座分段（两个并发 worker 步不同段）',
     });
     const t1 = await startBuild(stack, '端口探针一');
     const t2 = await startBuild(stack, '端口探针二');
-    // 两步都跑到 done（cap 默认 3 → 两步并发）。
     try {
       await waitFor(() => stepsOf(stack, t1.buildId)[0]?.status === 'done', 120_000);
       await waitFor(() => stepsOf(stack, t2.buildId)[0]?.status === 'done', 120_000);
@@ -182,57 +163,44 @@ describe('#1148 E2E：端口基座分段（两个并发 worker 步不同段）',
       lastFailedStack = stack;
       throw err;
     }
-    // 并行 canon 行：两步各发射一行（(1 running) / (2 running)）。
     const lines = stack.lines();
     expect(lines.some((l) => l.includes('(1 running)'))).toBe(true);
     expect(lines.some((l) => l.includes('(2 running)'))).toBe(true);
-    // 端口基座真值：bash 工具结果随第二轮请求回传 stub——两个不同段。
     const flat = JSON.stringify(stack.stub.requests.map((r) => r.messages));
     const found = [...flat.matchAll(/PB=(\d{5})/g)].map((m) => m[1]);
     expect(new Set(found)).toEqual(new Set(['20000', '20100']));
   }, 150_000);
 });
 
-describe('#1260 E2E：chief 占机器并发槽（上限 1）', () => {
-  test('worker 在跑（cap 1）时 chief 排队等空位，空位即领；后来的 worker FIFO 在其后', async () => {
+describe('#1260 E2E: chief occupies the machine concurrency slot (cap 1)', () => {
+  test('while a worker runs (cap 1) the chief queues for a free slot; a later worker is FIFO behind it', async () => {
     const stack = await bootStack({
       responses: [
-        // worker r1：延迟的 bash 轮（占住唯一 worker 槽 6s）。
         {
           delayMs: 6_000,
           toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
         },
-        // chief r1：延迟 2s 的收尾文本（拉宽 claimed 观察窗——慢 runner 上纯
-        // 文本回合可在一个轮询间隔（100ms）内跑完，status 窗口会被跳过）。
         { delayMs: 2_000, content: '收到，已了解当前进度。' },
-        // worker r2：收尾文本。
         { content: '探针完成。' },
-        // 第二个 worker 的两轮。
         {
           toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
         },
         { content: '探针完成。' },
       ],
     });
-    // 上限 1（DB 写位 = 机器页同面）。
     stack.server.db
       .update(machineTable)
       .set({ maxConcurrent: 1 })
       .where(eq(machineTable.id, stack.machineId))
       .run();
-    // 绑定 chief agent（r5 §2）。
     const patch = await api(stack.server.url, 'PATCH', `/api/teams/${stack.server.teamId}/chief`, {
       agent: { agentId: AGENT_ID, thinkingLevel: null },
     });
     expect(patch.status).toBe(200);
 
-    // worker 1 在跑（唯一槽被占）。
     const w1 = await startBuild(stack, '并发探针一');
     await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'claimed', 30_000);
 
-    // chief 回合入队（满载时）→ 排队等空位：#1260 起 chief 占机器并发槽，
-    // cap 1 被 worker 占满即同槽互斥（旧「chief 不占槽满载立即领」语义已
-    // 退役——本测试就是它的反向钉）。
     const sent = await api(
       stack.server.url,
       'POST',
@@ -241,18 +209,13 @@ describe('#1260 E2E：chief 占机器并发槽（上限 1）', () => {
     );
     expect(sent.status).toBe(201);
     const threadId = (sent.body as { thread: { id: string } }).thread.id;
-    // 满载窗口内 chief 留 pending（worker 的 6s bash 占着唯一槽）。
     await new Promise((r) => setTimeout(r, 1_500));
     expect(stepsOf(stack, threadId)[0]?.status).toBe('pending');
 
-    // 第二个 worker 也不领（排在 chief 之后：FIFO 以入队时刻为序）。
     const w2 = await startBuild(stack, '并发探针二');
     await new Promise((r) => setTimeout(r, 1_500));
     expect(stepsOf(stack, w2.buildId)[0]?.status).toBe('pending');
 
-    // worker 收尾释放槽 → chief 空位即领（状态面与 daemon.log 持久面双取
-    // 一：极快回合的 claimed→done 可能整段落在一个轮询间隔里，日志行是
-    // 窗口无关的被领证据）。
     await waitFor(
       () =>
         stepsOf(stack, threadId)[0]?.status === 'claimed' ||
@@ -261,7 +224,6 @@ describe('#1260 E2E：chief 占机器并发槽（上限 1）', () => {
     );
     await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'done', 120_000);
 
-    // chief 收尾（快速文本轮）后线程闭环；空位再释放 → w2 被领并跑完。
     await waitFor(() => {
       const chiefSteps = stack.server.db
         .select()
@@ -274,25 +236,22 @@ describe('#1260 E2E：chief 占机器并发槽（上限 1）', () => {
   }, 240_000);
 });
 
-describe('#1148 E2E：env 兜底取值序（env > DB > 默认）', () => {
-  test('DB 2 / env 1 → 同刻只跑 1 个 worker（env 压 DB，server 闸按自报收窄）', async () => {
+describe('#1148 E2E: env fallback precedence (env > DB > default)', () => {
+  test('DB 2 / env 1 → only 1 worker runs at a time (env beats DB; server gate narrows to self-report)', async () => {
     const stack = await bootStack({
       capEnv: { [DAEMON_MAX_CONCURRENT_ENV]: '1' },
       responses: [
-        // worker 1 r1：延迟 bash 轮（占住 env=1 的唯一位 6s）。
         {
           delayMs: 6_000,
           toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
         },
         { content: '探针完成。' },
-        // worker 2 的两轮（env 位释放后照跑）。
         {
           toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
         },
         { content: '探针完成。' },
       ],
     });
-    // DB 行给 2（env 1 应压过它——取值序 env > DB）。
     stack.server.db
       .update(machineTable)
       .set({ maxConcurrent: 2 })
@@ -301,10 +260,8 @@ describe('#1148 E2E：env 兜底取值序（env > DB > 默认）', () => {
     const w1 = await startBuild(stack, 'env 探针一');
     await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'claimed', 30_000);
     const w2 = await startBuild(stack, 'env 探针二');
-    // env=1：worker 1 在飞期间 worker 2 留 pending（DB 的 2 不生效——env 压 DB）。
     await new Promise((r) => setTimeout(r, 1_500));
     expect(stepsOf(stack, w2.buildId)[0]?.status).toBe('pending');
-    // worker 1 收尾 → 空位 → worker 2 被领并跑完。
     await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'done', 120_000);
     await waitFor(() => stepsOf(stack, w2.buildId)[0]?.status === 'done', 120_000);
   }, 240_000);

@@ -1,17 +1,22 @@
 #!/bin/sh
-# 双包 pack 冒烟（#264/#299）：`npm pack`（发布真身形态；prepack 自建 bundle +
-# web dist）→ manifest 断言（双包）→ 仓外临时目录装主包 tarball → 裸 `node` 起
-# → 断言 `/api/user/me` 200 + `/app` 200 + 数据根隔离（临时 CAIRN_HOME）。
-# 失败方式枚举 = spec #260 Testing Decisions + 首发 0.1.0 事故（#266）固化：
-#   1. bundle 缺依赖（external 误伤）→ 裸 node 起不来 → 红
-#   2. web dist 未进包 / webDir 解析错 → /app 非 200 → 红
-#   3. migration 未进包 → 首启 migrate 崩 → 红
-#   4. tarball 含 src/test → 内容清单断言红
-#   5. dependencies 残留 catalog:/workspace:（npm 原样打包、装包静默崩）→ 红
-#   6. bin 路径带 ./ 前缀（npm publish 判 invalid 静默摘除、npx 无入口）→ 红
-# 仓外安装 = 规避 npm 沿目录树爬到仓根解析 `catalog:` 的祖先坑；探针一律
-# 不碰真实 ~/.cairn。cli 包断言 manifest+内容清单（不起进程——enroll 链
-# 归 e2e/首发实测）。
+# Dual-package pack smoke (#264/#299): `npm pack` (the real publish shape; prepack
+# builds the bundle + web dist) → manifest assertions (both packages) → install the
+# main tarball in a temp dir outside the repo → boot with bare `node`
+# → assert `/api/user/me` 200 + `/app` 200 + data-root isolation (temp CAIRN_HOME).
+# Failure-mode enumeration fixed from spec #260 Testing Decisions + the 0.1.0 first-
+# release incident (#266):
+#   1. bundle missing a dependency (external misjudged) → bare node fails to boot → red
+#   2. web dist not in the package / webDir misresolved → /app not 200 → red
+#   3. migrations not in the package → first-boot migrate crashes → red
+#   4. tarball contains src/test → content-list assertion red
+#   5. dependencies still carry catalog:/workspace: (npm packs verbatim, install
+#      fails silently) → red
+#   6. bin path carries a ./ prefix (npm publish deems it invalid and silently
+#      strips it, leaving npx without an entry) → red
+# Installing outside the repo avoids npm's ancestor-resolution pitfall where it
+# climbs the directory tree to the repo root to resolve `catalog:`; probes never
+# touch the real ~/.cairn. The cli package gets manifest + content-list assertions
+# (no process boot — the enroll chain belongs to e2e / first-release live runs).
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -23,21 +28,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "== pack @xiechimon/cairn（prepack: web build + esbuild bundle + stage-web） =="
-# npm pack = npm publish 的真身形态：pnpm pack 会替换 catalog:/workspace:，npm 不会——
-# 断言必须测发布形态（首发 0.1.0 坏包教训，#299）。
+echo "== pack @xiechimon/cairn (prepack: web build + esbuild bundle + stage-web) =="
+# npm pack is the real shape of npm publish: pnpm pack rewrites catalog:/workspace:,
+# npm does not — assertions must test the publish shape (the broken 0.1.0 first-release
+# package, #299).
 (cd "$ROOT/apps/server" && npm pack --pack-destination "$WORK" >/dev/null)
 
 TGZ=$(find "$WORK" -maxdepth 1 -name 'xiechimon-cairn-*.tgz' ! -name '*-cli-*' | head -n1)
-[ -n "$TGZ" ] || { echo "FAIL: server tarball 未产出"; exit 1; }
+[ -n "$TGZ" ] || { echo "FAIL: server tarball not produced"; exit 1; }
 
-echo "== pack @xiechimon/cairn-cli（prepack: esbuild bundle） =="
+echo "== pack @xiechimon/cairn-cli (prepack: esbuild bundle) =="
 (cd "$ROOT/apps/daemon" && npm pack --pack-destination "$WORK" >/dev/null)
 
 TGZ_CLI=$(find "$WORK" -maxdepth 1 -name 'xiechimon-cairn-cli-*.tgz' | head -n1)
-[ -n "$TGZ_CLI" ] || { echo "FAIL: cli tarball 未产出"; exit 1; }
+[ -n "$TGZ_CLI" ] || { echo "FAIL: cli tarball not produced"; exit 1; }
 
-echo "== tarball manifest 断言（双包） =="
+echo "== tarball manifest assertions (both packages) =="
 assert_manifest() {
   tar -xzf "$1" -O package/package.json | node -e "
 let s='';
@@ -45,47 +51,47 @@ process.stdin.on('data',d=>s+=d).on('end',()=>{
   const p=JSON.parse(s);
   const deps=Object.entries(p.dependencies||{});
   const bad=deps.filter(([,v])=>/workspace:|catalog:/.test(v));
-  if (bad.length) { console.error('FAIL: '+p.name+' dependencies 残留 workspace/catalog: '+JSON.stringify(bad)); process.exit(1); }
-  if (!p.bin || !p.bin.cairn) { console.error('FAIL: '+p.name+' bin.cairn 缺'); process.exit(1); }
+  if (bad.length) { console.error('FAIL: '+p.name+' dependencies still carry workspace/catalog: '+JSON.stringify(bad)); process.exit(1); }
+  if (!p.bin || !p.bin.cairn) { console.error('FAIL: '+p.name+' missing bin.cairn'); process.exit(1); }
   const binBad=Object.entries(p.bin).filter(([,v])=>String(v).startsWith('./'));
-  if (binBad.length) { console.error('FAIL: '+p.name+' bin 路径带 ./ 前缀（npm publish 会静默摘除 bin）: '+JSON.stringify(binBad)); process.exit(1); }
+  if (binBad.length) { console.error('FAIL: '+p.name+' bin path carries a ./ prefix (npm publish silently strips such bins): '+JSON.stringify(binBad)); process.exit(1); }
   console.log('ok: '+p.name+'@'+p.version+' deps = ' + (deps.map(([k])=>k).join(', ') || '(none)'));
 })"
 }
 assert_manifest "$TGZ"
 assert_manifest "$TGZ_CLI"
 
-echo "== cli tarball 内容断言 =="
+echo "== cli tarball content assertions =="
 LIST_CLI=$(tar -tzf "$TGZ_CLI")
 for want in '^package/dist/cli.mjs$' '^package/LICENSE$'; do
-  if printf '%s\n' "$LIST_CLI" | grep -q "$want"; then :; else echo "FAIL: cli tarball 缺 $want"; exit 1; fi
+  if printf '%s\n' "$LIST_CLI" | grep -q "$want"; then :; else echo "FAIL: cli tarball missing $want"; exit 1; fi
 done
-if printf '%s\n' "$LIST_CLI" | grep -q '^package/src/'; then echo "FAIL: cli src 泄漏进 tarball"; exit 1; fi
-echo "ok: cli bundle/LICENSE 在位、无 src 泄漏"
+if printf '%s\n' "$LIST_CLI" | grep -q '^package/src/'; then echo "FAIL: cli src leaked into the tarball"; exit 1; fi
+echo "ok: cli bundle/LICENSE present, no src leak"
 
-echo "== tarball 内容断言 =="
+echo "== tarball content assertions =="
 LIST=$(tar -tzf "$TGZ")
 for want in '^package/dist/index.mjs$' '^package/web/index.html$' '^package/drizzle/meta/_journal.json$' '^package/drizzle/0000' '^package/LICENSE$'; do
-  if printf '%s\n' "$LIST" | grep -q "$want"; then :; else echo "FAIL: tarball 缺 $want"; exit 1; fi
+  if printf '%s\n' "$LIST" | grep -q "$want"; then :; else echo "FAIL: tarball missing $want"; exit 1; fi
 done
-if printf '%s\n' "$LIST" | grep -q '^package/src/'; then echo "FAIL: src 泄漏进 tarball"; exit 1; fi
-if printf '%s\n' "$LIST" | grep -q '^package/test/'; then echo "FAIL: test 泄漏进 tarball"; exit 1; fi
-echo "ok: bundle/web dist/migrations/LICENSE 在位、无 src/test 泄漏（$(printf '%s\n' "$LIST" | wc -l | tr -d ' ') 条目）"
+if printf '%s\n' "$LIST" | grep -q '^package/src/'; then echo "FAIL: src leaked into the tarball"; exit 1; fi
+if printf '%s\n' "$LIST" | grep -q '^package/test/'; then echo "FAIL: test leaked into the tarball"; exit 1; fi
+echo "ok: bundle/web dist/migrations/LICENSE present, no src/test leak ($(printf '%s\n' "$LIST" | wc -l | tr -d ' ') entries)"
 
-echo "== 仓外安装（$WORK/install） =="
+echo "== install outside the repo ($WORK/install) =="
 mkdir "$WORK/install"
 cd "$WORK/install"
 npm init -y >/dev/null 2>&1
 npm install "$TGZ" --no-audit --no-fund >/dev/null 2>&1
 echo "ok: npm install $(basename "$TGZ")"
 
-echo "== 裸 node 起（隔离 CAIRN_HOME） =="
+echo "== boot with bare node (isolated CAIRN_HOME) =="
 PKG="$WORK/install/node_modules/@xiechimon/cairn"
 PORT=""
 for candidate in 8395 8396 8397 8398; do
   if ! lsof -iTCP:$candidate -sTCP:LISTEN >/dev/null 2>&1; then PORT=$candidate; break; fi
 done
-[ -n "$PORT" ] || { echo "FAIL: 8395-8398 全被占用"; exit 1; }
+[ -n "$PORT" ] || { echo "FAIL: ports 8395-8398 all in use"; exit 1; }
 echo "using port $PORT"
 PORT=$PORT CAIRN_HOME="$WORK/home" node "$PKG/dist/index.mjs" > "$WORK/server.out" 2>&1 &
 SERVER_PID=$!
@@ -103,20 +109,20 @@ wait_200() {
 }
 
 if ! wait_200 /api/user/me; then
-  echo "FAIL: /api/user/me 未就绪（起不来或超时）——server 输出尾部："
+  echo "FAIL: /api/user/me not ready (failed to boot or timed out) — server output tail:"
   tail -8 "$WORK/server.out" || true
   exit 1
 fi
 me_body=$(curl -s --noproxy '*' "http://127.0.0.1:$PORT/api/user/me")
-case "$me_body" in *'"displayName":"Owner"'*) echo "ok: /api/user/me 200 + seed 生效";; *) echo "FAIL: me body 异常: $me_body"; exit 1;; esac
+case "$me_body" in *'"displayName":"Owner"'*) echo "ok: /api/user/me 200 + seed effective";; *) echo "FAIL: me body unexpected: $me_body"; exit 1;; esac
 
 if ! wait_200 /app; then
-  echo "FAIL: /app 非 200（web dist 未进包或 webDir 解析错）——server 输出尾部："
+  echo "FAIL: /app not 200 (web dist missing from the package or webDir misresolved) — server output tail:"
   tail -8 "$WORK/server.out" || true
   exit 1
 fi
-echo "ok: /app 200（webDir 包内探测生效）"
+echo "ok: /app 200 (in-package webDir detection works)"
 
 kill "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=""
-echo "PASS: 主包 pack 冒烟全绿"
+echo "PASS: main-package pack smoke all green"

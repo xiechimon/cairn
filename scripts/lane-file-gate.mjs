@@ -1,50 +1,4 @@
 #!/usr/bin/env node
-// Lane file gate (#1199): herdr lane threads draft PROGRESS.md / BLOCKED.md
-// at the worktree root and the files keep riding PR branches into main —
-// #1189 merged BLOCKED.md into main (c7a5a2d6), and #1153's branch carried
-// PROGRESS.md into review (PR #1198, deleted by 701b5588). Written warnings
-// did not hold; this gate makes the failure loud instead.
-// #1203 adds plan.md: the cairn plan step's handoff file — the product now
-// writes it outside the repo checkout (daemon CAIRN_HOME plans dir), so a
-// root plan.md is always a leak. Two leaks already happened: kanban conv card
-// #24 committed plan.md at the repo root (PR #1201 first version), and PR
-// #1168 landed one on main.
-//
-// What counts as a violation: PROGRESS.md, BLOCKED.md, or plan.md tracked at
-// the repository root. Root-anchored (git pathspec :(top)) and
-// case-insensitive: same-named docs in subdirectories are unaffected, and a
-// lowercase progress.md at the root would collide with PROGRESS.md on macOS's
-// case-insensitive filesystem, so case variants fail the gate too.
-//
-// What it inspects — the tracked set, two legs:
-//   Leg 1 (always)  `git ls-files` over root-anchored names: the tracked set
-//                   of the tested tree. Covers the staged-but-uncommitted
-//                   shape (git add -A swept it in), committed branch tips,
-//                   and fresh checkout trees (index = HEAD there). Given a
-//                   main that carries none of the three — which the removal
-//                   of BLOCKED.md and plan.md in their respective PRs
-//                   enforces — "tracked at root" is exactly the issue's
-//                   `origin/main...HEAD --diff-filter=A` set.
-//   Leg 2 (PR runs) with a base sha (--base flag or LANE_FILE_BASE_SHA,
-//                   fetched in the ci.yml step the same way the #851
-//                   ui-debt-gate takes UI_DEBT_BASE_SHA):
-//                   `git diff --name-only --diff-filter=A <base> HEAD`,
-//                   filtered to root-anchored names. Two-dot (tree-to-tree)
-//                   rather than three-dot: identical for added-detection,
-//                   and it needs no merge-base, so it works on the
-//                   depth-1-fetched base.
-//
-// The remedy the failure prints: move lane process files under
-// .herdr-project/<lane>/ — those paths are untracked by policy; delete
-// plan.md — it is the cairn plan handoff, which lives outside the checkout.
-//
-// Usage:
-//   node scripts/lane-file-gate.mjs                # leg 1
-//   node scripts/lane-file-gate.mjs --base <sha>   # legs 1 + 2
-//   LANE_FILE_BASE_SHA=<sha> node scripts/lane-file-gate.mjs  # same
-//
-// Exit codes: 0 = clean, 1 = violations, 2 = operational error (git
-// plumbing failure; fail-closed, same stance as the drizzle chain guard).
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
@@ -73,7 +27,6 @@ function parseArgs(argv) {
 const args = parseArgs(process.argv.slice(2));
 const baseSha = args.base || process.env.LANE_FILE_BASE_SHA || '';
 
-// Root-anchored, case-insensitive filter over a newline list of paths.
 function rootLaneFiles(list) {
   return list.split('\n').filter((p) => p.includes('/') === false && NAMES.has(p.toLowerCase()));
 }
@@ -81,7 +34,6 @@ function rootLaneFiles(list) {
 const violations = [];
 
 try {
-  // Leg 1: tracked set of the tested tree.
   const tracked = git(['ls-files', '-z', '--', ...PATHSPECS]);
   violations.push(
     ...tracked
@@ -92,7 +44,6 @@ try {
   const leg1Count = violations.length;
   console.log(`lane-file-gate leg 1 (tracked at repo root): ${leg1Count} hit(s)`);
 
-  // Leg 2: added-only diff against the PR base sha.
   if (baseSha) {
     const added = git(['diff', '--name-only', '--diff-filter=A', baseSha, 'HEAD']);
     const leg2Hits = rootLaneFiles(added);

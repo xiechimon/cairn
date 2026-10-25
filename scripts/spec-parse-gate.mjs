@@ -1,41 +1,5 @@
 #!/usr/bin/env node
 
-// #1052 spec-parse gate: every e2e/integration spec must PARSE in seconds —
-// no test execution, no fixture build, no browser launch.
-//
-// Failure mode (real, 2026-10-08): a conflict-resolution pass over
-// apps/web/e2e/chief-stream-markdown.spec.ts dropped one `  });`. biome
-// only warns on it, and apps/web/tsconfig.json includes src+test but not
-// e2e/ — the specs sit in no tsc project — so `pnpm lint` and
-// `pnpm typecheck` both stayed green. The first red signal was the CI e2e
-// shard dying at collection time (SyntaxError), which is minutes away
-// (fixture build + shard boot). Conflict-resolution nights touch specs
-// repeatedly; paying a full CI round per dropped brace is the cost this
-// gate removes.
-//
-// What this checks, both halves:
-//   1. apps/web/e2e/** — `playwright test --list` parses and collects
-//      every spec without running anything (measured: ~1.6s for
-//      109 files / 849 tests; webServer never launches, dist/ is never
-//      written). Coverage invariant: the file count playwright reports
-//      must equal the *.spec.* count on disk — a spec whose test() calls
-//      broke in a way that collects zero tests silently vanishes from
-//      --list, and that silence is exactly the failure shape this gate
-//      exists to kill.
-//   2. integration/test/** — `tsc --noEmit` on the integration project,
-//      whose tsconfig deliberately includes test/ and eval/ ("default
-//      coverage, explicit exceptions"). Parse errors surface as TS1xxx
-//      with file:line. This half already runs inside `pnpm typecheck`;
-//      it repeats here (~0.5s) so one command answers "do all specs
-//      parse" for both spec territories.
-//
-// Not its job: running the tests (CI e2e shards / vitest integration
-// step own that), building fixtures, launching browsers.
-//
-// Usage: node scripts/spec-parse-gate.mjs   (or: pnpm spec:parse)
-// Exit 0 when both halves collect clean; exit 1 with the parser's own
-// file:line output above (paste that into the PR as failure-path evidence).
-
 import { spawnSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -46,10 +10,6 @@ const WEB_E2E_DIR = join(WEB_DIR, 'e2e');
 const INTEGRATION_DIR = join(REPO_ROOT, 'integration');
 const INTEGRATION_TEST_DIR = join(INTEGRATION_DIR, 'test');
 
-// Mirrors playwright's default testMatch `**/*.@(spec|test).?(c|m)[jt]s?(x)`
-// restricted to what this repo actually has; if a new spec extension shows
-// up on disk it counts, and the collection invariant below forces the
-// playwright side to see it too.
 const SPEC_FILE_RE = /\.(spec|test)\.[cm]?[jt]sx?$/;
 
 function walk(dir, out = []) {
@@ -80,8 +40,6 @@ function dumpCaptured(output) {
   if (output.stderr) process.stderr.write(output.stderr);
 }
 
-// --- 1. apps/web/e2e: playwright collection (parse-only) ---------------------
-
 const diskSpecs = walk(WEB_E2E_DIR);
 if (diskSpecs.length === 0) {
   console.log(
@@ -103,8 +61,6 @@ if (web.res.status !== 0) {
 
 const total = /Total:\s+(\d+)\s+tests?\s+in\s+(\d+)\s+files?/.exec(web.res.stdout ?? '');
 if (!total) {
-  // Fail closed: if the summary line shape ever changes, an unparsed
-  // summary must not degrade into a silent pass.
   dumpCaptured(web.res);
   console.log(
     '[spec-parse-gate] FAIL: could not find the "Total: N tests in M files" ' +
@@ -120,8 +76,6 @@ if (collectedTests === 0 || collectedFiles !== diskSpecs.length) {
       .split('\n')
       .map((line) => line.match(/^\s*(\S+\.(?:spec|test)\.[cm]?[jt]sx?):\d+:\d+\s+›/)?.[1])
       .filter(Boolean)
-      // playwright prints paths relative to testDir; tolerate a cwd-relative
-      // form too so the diff list stays accurate if that ever changes.
       .map((p) => p.replace(/^e2e\//, '')),
   );
   const missing = diskSpecs.map((p) => relative(WEB_E2E_DIR, p)).filter((p) => !collected.has(p));
@@ -143,8 +97,6 @@ console.log(
   `[spec-parse-gate] apps/web/e2e: ${collectedTests} tests in ${collectedFiles} files ` +
     `collected, disk count matches (${web.seconds}s)`,
 );
-
-// --- 2. integration/test: tsc parse ------------------------------------------
 
 const integrationSpecs = walk(INTEGRATION_TEST_DIR);
 if (integrationSpecs.length === 0) {

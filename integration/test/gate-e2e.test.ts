@@ -1,14 +1,3 @@
-// #929 命令闸 E2E（tool_call 阻断缝）：真 server + 真 daemon + stub LLM 全链。
-// 双向证据（票面验收：只测一侧等于没测）：
-// ① 放行路径——合法 bash 照跑（真改动落 README.md，过 review 闸到 done）；
-// ② 拒绝路径——`rm -rf /` 被 DEFAULT_BASH_PATTERNS 拒：[gate] canon 行 +
-//    拒绝文案进 transcript 工具行（模型可见 reason，非空 tool error）；
-// ③ 覆盖面——MCP 工具调用过同一条闸（#929 新获能力立证）：注入规则表
-//    reject `mcp__demo__echo` → 调用被拒 + [gate] 行 + 外部 server 零到达
-//    （block 先于执行）。
-// 无人值守安全（④）由实现面保证（gateToolCallHandler 签名无 ctx/ui，纯
-// event 进纯裁决出）；本文件在真栈上钉 ①②③ 的行为面。
-
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -65,13 +54,9 @@ beforeAll(async () => {
     'utf8',
   );
   stub = await startStubLlm([
-    // 轮 1（bash 拒绝路径）：不可逆形态 → tool_call 闸拒（模型拿到 reason）。
     { toolCall: { name: 'bash', arguments: { command: 'rm -rf /' } } },
-    // 轮 2（放行路径 + 覆盖面）：MCP echo 被注入规则拒 → 模型改道真改动。
     { toolCall: { name: 'mcp__demo__echo', arguments: { text: 'gate-probe' } } },
-    // 轮 3：真做一处改动（#703 闸 2——执行步无改动过不了 review 闸）。
     { toolCall: { name: 'bash', arguments: { command: 'printf "gate probe\\n" >> README.md' } } },
-    // 轮 4：收尾。
     { content: '闸双向验证完成。' },
   ]);
   server = await bootRealServer({
@@ -93,8 +78,6 @@ beforeAll(async () => {
   );
   paths = statePaths(config.home, config.workspacesDir);
   const logger = createDaemonLogger({ logFile: paths.daemonLog });
-  // 注入带规则表的 backend（PiBackendOpts.gateRules；machine-loop 同款配置面
-  // ——覆盖面立证的唯一注入缝，产品馈源 = 将来服务端统一下发表）。
   handle = await runMachine({
     config,
     paths,
@@ -134,9 +117,8 @@ afterAll(async () => {
   );
 });
 
-describe('#929 命令闸 tool_call 缝 E2E：双向 + MCP 覆盖面', () => {
-  test('拒绝与放行各得其所：bash 不可逆形态拒（reason 进 transcript）、MCP 调用过同一闸、合法 bash 改动落地', async () => {
-    // per-Agent MCP 授权：demo 勾上（MCP 工具注册进会话面，覆盖面才有对象）。
+describe('#929 command gate tool_call seam E2E: both directions + MCP coverage', () => {
+  test('reject and allow each land where they should: irreversible bash form denied (reason into transcript), MCP call passes the same gate, legal bash change lands', async () => {
     const authed = await api(
       server.url,
       'PATCH',
@@ -161,8 +143,6 @@ describe('#929 命令闸 tool_call 缝 E2E：双向 + MCP 覆盖面', () => {
 
     await waitFor(() => server.todoPhase(world.todoId) === 'review', 150_000);
 
-    // 拒绝路径（bash 面）：[gate] canon 行 + 拒绝文案进 transcript 工具行
-    // （模型可见同义 reason——不是空 tool error）。
     const lines = logLines();
     expect(lines.some((l) => l.includes('[gate] ask: rule=ask-rm-rf-root command=rm -rf /'))).toBe(
       true,
@@ -176,16 +156,12 @@ describe('#929 命令闸 tool_call 缝 E2E：双向 + MCP 覆盖面', () => {
     expect(transcript).toContain('command gate (ask-rm-rf-root)');
     expect(transcript).toContain('requires approval, and this daemon runs unattended');
 
-    // 覆盖面（MCP 过同一条闸）：注入规则拒 mcp__demo__echo → [gate] 行 +
-    // 工具面拒绝文案进 transcript + 外部 server 零到达（block 先于执行）。
     expect(
       lines.some((l) => l.includes('[gate] reject: rule=deny-echo tool=mcp__demo__echo')),
     ).toBe(true);
     expect(transcript).toContain('tool gate (deny-echo)');
     expect(external.calls).toEqual([]);
 
-    // 放行路径：合法 bash 照跑（真改动过 review 闸——phase=review 即执行步
-    // 完成；改动面由 review 闸与 worktree 落地共同证明）。
     expect(transcript).toContain('gate probe');
     const todoRow = server.db.select().from(todoTable).where(eq(todoTable.id, world.todoId)).get();
     expect(todoRow?.phase).toBe('review');

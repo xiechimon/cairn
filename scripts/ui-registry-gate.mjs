@@ -1,78 +1,5 @@
 #!/usr/bin/env node
 
-// Registry gate for apps/web/src/components/ui (#989, map #980): the
-// primitives layer is registry-sourced, and the proof is mechanical.
-//
-// The claim this gate enforces, per #985's ruling (live upstream diffing was
-// measured and rejected: batch `add --diff` truncates at 5 of 16 files, cold
-// npx costs ~67s, upstream releases would redden an untouched main):
-//
-//   Every file under components/ui is either
-//     (a) byte-for-byte the pinned upstream registry item after the documented
-//         normalization pipeline (status: pristine — proven against the
-//         vendored snapshot), or
-//     (b) a registered deviation from a named upstream item, with a reason
-//         (status: deviated), or
-//     (c) a registered local adapter built on registry items, with a reason
-//         (kind: adapter) —
-//   and every file's content hash is frozen in the ledger, so a silent
-//   overwrite becomes a visible ledger diff in the same PR.
-//
-// Scope is exactly components/ui — hand-rolled skins in domain directories
-// are NOT this gate's business (they are covered by ui-debt-gate D1/D2 and
-// ui-drift-gate G1–G5 plus review); pretending otherwise was premortem #3 in
-// #985 and the output says so.
-//
-// Inputs (all vendored, zero network, zero node_modules — runs pre-install):
-//   scripts/ui-registry.json           manifest + hash ledger (--write freezes)
-//   scripts/ui-upstream-snapshots.json vendored upstream content + hashes
-//                                      (scripts/ui-registry-refresh.mjs, dev-time)
-//   scripts/ui-normalize.mjs           the shared comment-strip/line-normalize
-//                                      sha256 pipeline both sides hash through
-//
-// Gates (default check mode):
-//   S1  A file exists under components/ui that the manifest does not
-//       register. Hand-rolled primitives are red; registration is a
-//       deliberate, reviewed manifest edit.
-//   S2  The manifest registers a file that no longer exists — a stale entry
-//       means the ledger is not tracking the tree (fail-closed housekeeping).
-//   S3  A registered file's content hash differs from its ledger entry: an
-//       edit landed without a same-PR re-freeze. The re-freeze (`--write`) is
-//       the #851 muscle memory; the ledger diff is the review face.
-//   S4  A `pristine` entry's hash no longer equals the pinned upstream
-//       snapshot hash. Either the file drifted (register the deviation with a
-//       reason) or upstream moved and the snapshot was refreshed (adopt the
-//       upstream content, or register the local edit as a deviation).
-//   S5  Status ratchet against the base ref (--base <sha> or
-//       UI_REGISTRY_BASE_SHA; CI passes the PR base sha, reusing the fetch the
-//       debt-gate step already made). During map #980 an existing entry may
-//       only move UP: pristine→deviated or registry→adapter downgrades are
-//       red, and re-freezing inside the PR cannot hide them (same stance as
-//       debt-gate D3 — the comparison runs against the BASE manifest).
-//       Brand-new registrations pass mechanically (manifest diff + #939's
-//       human layer carry that review) but are named in the output.
-//       Bootstrap: a base without the manifest (the PR introducing the gate)
-//       skips S5.
-//   S6  Fail-closed structural validation: malformed manifest/snapshot JSON,
-//       unknown kind/status values, registry entries without upstreamItem or
-//       status, deviated/adapter entries without a reason, malformed hashes,
-//       pristine entries whose upstream item is absent from the snapshot, a
-//       missing snapshot file, or an empty/missing source directory all end
-//       red with exit 2 — a broken gate must never pass silently.
-//
-// Hash semantics note (#985): hashes are unordered — the ratchet (S5) applies
-// to kinds/statuses, never to hash values. Comment-only edits do not move the
-// hash (scripts/ui-normalize.mjs strips comments before hashing), so
-// provenance headers can be maintained without ledger churn; code edits always
-// move it.
-//
-// Usage:
-//   node scripts/ui-registry-gate.mjs                 # check
-//   node scripts/ui-registry-gate.mjs --write         # re-freeze ledger hashes
-//   node scripts/ui-registry-gate.mjs --base <sha>    # check + S5 against <sha>
-//
-// Exit codes: 0 = green, 1 = violations, 2 = operational error.
-
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
@@ -94,8 +21,6 @@ function die6(message) {
   process.exit(2);
 }
 
-// --- tree scan ----------------------------------------------------------------
-
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -113,8 +38,6 @@ function scanTree() {
   if (files.length === 0) die6(`scan found no files under ${UI_REL}`);
   return files;
 }
-
-// --- validation ---------------------------------------------------------------
 
 function validateManifest(m, label) {
   const problems = [];
@@ -219,8 +142,6 @@ function loadSnapshot(manifest) {
   return parsed;
 }
 
-// --- base manifest (S5) ---------------------------------------------------------
-
 function git(args) {
   return execFileSync('git', args, {
     cwd: REPO_ROOT,
@@ -262,9 +183,6 @@ function currentSha() {
   }
 }
 
-/** The pristine/deviated/adapter tally shared by the check and --write
- *  outputs. With snapshotItems (write mode) it also counts pristine entries
- *  whose frozen hash no longer equals the pinned snapshot. */
 function tally(entries, snapshotItems = null) {
   let pristine = 0;
   let deviated = 0;
@@ -282,8 +200,6 @@ function tally(entries, snapshotItems = null) {
   return { pristine, deviated, adapters, pristineBroken };
 }
 
-// --- check ----------------------------------------------------------------------
-
 function check(baseSha) {
   const treeFiles = scanTree();
   const manifest = loadManifest();
@@ -293,7 +209,6 @@ function check(baseSha) {
   const failures = [];
   const newcomers = [];
 
-  // S1/S2: manifest <-> tree coverage.
   const treeSet = new Set(treeFiles);
   for (const file of treeFiles) {
     if (!Object.hasOwn(entries, file)) {
@@ -310,7 +225,6 @@ function check(baseSha) {
     }
   }
 
-  // S3: content hash ledger.
   for (const file of treeFiles) {
     const entry = entries[file];
     if (!entry) continue;
@@ -322,11 +236,10 @@ function check(baseSha) {
     }
   }
 
-  // S4: pristine claims vs the vendored snapshot.
   for (const [file, entry] of Object.entries(entries)) {
     if (entry.kind !== 'registry' || entry.status !== 'pristine') continue;
     const snapItem = snapshot.items[entry.upstreamItem];
-    if (!snapItem) continue; // already caught by S6 validation
+    if (!snapItem) continue;
     if (entry.hash !== snapItem.hash) {
       failures.push(
         `S4 ${file}: registered pristine against upstream item "${entry.upstreamItem}" but the ledger hash no longer equals the pinned snapshot hash (${snapItem.hash.slice(0, 12)}…, ${snapshot.cli} fetched ${String(snapshot.fetchedAt).slice(0, 10)}) — the file drifted from upstream, or upstream moved. Either adopt the upstream content (node scripts/ui-registry-refresh.mjs shows the diff surface) or register the deviation with a reason and re-freeze.`,
@@ -334,7 +247,6 @@ function check(baseSha) {
     }
   }
 
-  // S5: status/kind ratchet against the base manifest.
   let baseMode = 'in-tree only';
   if (baseSha) {
     const loaded = loadBaseManifest(baseSha);
@@ -380,7 +292,6 @@ function check(baseSha) {
     process.exit(1);
   }
 
-  // --- green output ------------------------------------------------------------
   const { pristine, deviated, adapters } = tally(entries);
   if (baseMode === 'in-tree only') {
     console.log(
@@ -398,8 +309,6 @@ function check(baseSha) {
   );
   process.exit(0);
 }
-
-// --- write ----------------------------------------------------------------------
 
 function write() {
   const treeFiles = scanTree();
@@ -460,8 +369,6 @@ function write() {
     );
   }
 }
-
-// --- CLI ------------------------------------------------------------------------
 
 const argv = process.argv.slice(2);
 let writeMode = false;

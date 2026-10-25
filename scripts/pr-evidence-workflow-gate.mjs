@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-// PR evidence workflow shape gate (2026-10-21, after #1435): pr-evidence is a
-// required status check on main and carries the needs-decision guard, so its
-// shape has load-bearing parts that a routine edit can silently defeat:
-//
-//   - a job-level `if:` (or a `paths:` filter on the trigger) makes GitHub
-//     report the skipped job as a passing check, which supersedes an earlier
-//     red run and lets auto-merge through;
-//   - a job-level `name:` renames the check, and branch protection then waits
-//     forever for a context nobody reports;
-//   - dropping `labeled` / `unlabeled` / `auto_merge_enabled` /
-//     `ready_for_review` from the trigger list leaves a labelled PR green
-//     until the next push or body edit.
-//
-// Zero-dependency on purpose (runs pre-install in the check job, like
-// lane-file-gate.mjs): the file is read line by line against the two-space
-// indentation the workflow uses, not parsed as YAML.
 import { readFileSync } from 'node:fs';
 
 const file = process.argv[2] ?? '.github/workflows/pr-evidence.yml';

@@ -1,21 +1,3 @@
-// spec 12 / #362 G2-T2 集成 E2E：local 形态全生命周期实跑（m3b-demo 同构
-// harness = 真 server + 真 daemon + stub LLM + 真 git）——
-// 规划 → 确认 → 执行（bash 真改文件 + commit + push 回用户仓库）→ merge 202
-// delegated → 合并步（git merge origin/main + push；#1211：落地 = conv 分支
-// 落用户仓库，用户主检出的分支/工作树零触碰——合并到默认分支由用户自取）。
-// 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
-//   1. 镜像 clone 落 <workspacesRoot>/<projectId>/repo，对象文件走硬链接
-//      （nlink ≥ 2，近零成本）；托管存储面零写入（reposDir 无 bare repo——
-//      applyMergeLanding hosted-only）
-//   2. build 步收尾：conv 分支 cairn/conv-<buildId> push 回用户仓库
-//      refs/heads（非 bare 收 push），携带探针行；用户工作树未被触碰
-//      （reflog/main/HEAD/status 与种子态一致）
-//   3. merge 步收尾：conv 分支 tip = merge 步 checkpointCommit 落用户仓库
-//      refs/heads；用户当前分支 HEAD/reflog 零变化、工作树无探针行、status
-//      干净（#1211：用户仓库只多 cairn/ 分支）
-//   4. 脏工作区变体：用户对同一文件有未提交改动 → merge 步照常 done（落地
-//      不读用户工作区）；用户 HEAD 不动、脏文件原样（永不动用户工作树）
-
 import {
   existsSync,
   mkdtempSync,
@@ -62,7 +44,6 @@ let handle: MachineHandle;
 let paths: StatePaths;
 let home: string;
 
-/** 用户本机 git 工作树仓种子（local 形态 clone 源 + 落地面）。 */
 async function seedUserRepo(): Promise<string> {
   const dir = join(mkdtempSync(join(tmpdir(), 'cairn-g2t2-user-')), 'repo');
   await runGit(['init', '-b', 'main', dir]);
@@ -77,7 +58,6 @@ async function headOf(dir: string): Promise<string> {
   return r.stdout.trim();
 }
 
-/** `git reflog main` 原文（#1211 判据：用户主检出 reflog 零新增）。 */
 async function reflogMain(dir: string): Promise<string> {
   const r = await runGit(['reflog', 'main'], { cwd: dir });
   return r.stdout;
@@ -100,8 +80,6 @@ function logLines(): string[] {
   return daemonLogLines(paths.daemonLog);
 }
 
-/** 一轮生命周期消耗的 stub 轮次（plan toolCall + plan 收尾 + build toolCall +
- * build 收尾 + merge 收尾文本）。 */
 function lifecycleTurns(probeLine: string) {
   return [
     {
@@ -153,13 +131,13 @@ afterAll(async () => {
   );
 });
 
-describe('G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回用户仓库 = 落地，主检出零触碰）', () => {
+describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to the user repo = delivery, main checkout untouched)', () => {
   let userRepo: string;
   let projectId: string;
   let todoId: string;
   let buildId: string;
 
-  test('失败方式 1-3：plan/build → conv 分支 push 回用户仓库 → merge → conv 分支更新即落地，用户主检出零变化（#1211）', async () => {
+  test('failure modes 1-3: plan/build → conv branch pushed back to the user repo → merge → conv branch update lands delivery, user main checkout unchanged (#1211)', async () => {
     userRepo = await seedUserRepo();
     const headSeed = await headOf(userRepo);
     const reflogSeed = await reflogMain(userRepo);
@@ -182,12 +160,10 @@ describe('G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回�
 
     await waitFor(() => server.todoPhase(todoId) === 'confirm', 120_000);
 
-    // —— 失败方式 1：镜像 clone 落 <workspacesRoot>/<projectId>/repo，硬链接面 ——
     const baseRepo = join(paths.workspacesDir, projectId, 'repo');
     expect(existsSync(join(baseRepo, '.git'))).toBe(true);
     const objectLinks = nlinksUnder(join(baseRepo, '.git', 'objects'));
     expect(objectLinks.filter((n) => n >= 2).length).toBeGreaterThan(0);
-    // 托管存储面零写入（applyMergeLanding hosted-only；local 不落 server reposDir）。
     const hostedDir = join(server.reposDir, server.teamId);
     expect(existsSync(hostedDir) ? readdirSync(hostedDir) : []).toEqual([]);
 
@@ -197,19 +173,16 @@ describe('G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回�
     expect(confirmed.status).toBe(202);
     await waitFor(() => server.todoPhase(todoId) === 'review', 120_000);
 
-    // —— 失败方式 2：conv 分支已 push 回用户仓库（非 bare 收 push），带探针行 ——
     const branch = `cairn/conv-${buildId}`;
     const branchSha = await systemGitOps.resolveCommit(userRepo, `refs/heads/${branch}`);
     expect(branchSha).toMatch(/^[0-9a-f]{40}$/);
     const readme = await systemGitOps.readFileAt(userRepo, branchSha!, 'README.md');
     expect(new TextDecoder().decode(readme!.content)).toContain('g2t2 probe line');
     expect(logLines().some((l) => l.includes(`pushed ${branch}`))).toBe(true);
-    // build 步后用户主检出零触碰：HEAD/reflog 停种子态、工作树无探针行。
     expect(await headOf(userRepo)).toBe(headSeed);
     expect(await reflogMain(userRepo)).toBe(reflogSeed);
     expect(readFileSync(join(userRepo, 'README.md'), 'utf8')).not.toContain('g2t2 probe line');
 
-    // —— 失败方式 3：merge 202 delegated → 合并步 → conv 分支更新即落地 ——
     const mergeRes = await api(server.url, 'POST', `/api/builds/${buildId}/merge`, {});
     expect(mergeRes.status).toBe(202);
     expect(mergeRes.body).toEqual({ delegated: true });
@@ -218,11 +191,8 @@ describe('G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回�
     const steps = server.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
     const mergeStep = steps.find((s) => s.kind === 'merge')!;
     expect(mergeStep.status).toBe('done');
-    // 落地面：用户仓库 refs/heads 的 conv 分支 = merge 步 checkpoint（#1211：
-    // 分支即交付，合并到默认分支由用户自取）。
     const landed = await systemGitOps.resolveCommit(userRepo, `refs/heads/${branch}`);
     expect(landed).toBe(mergeStep.checkpointCommit);
-    // 主检出零变化：main HEAD/reflog 停种子态、工作树无探针行、status 干净。
     expect(await headOf(userRepo)).toBe(headSeed);
     expect(await reflogMain(userRepo)).toBe(reflogSeed);
     expect(readFileSync(join(userRepo, 'README.md'), 'utf8')).not.toContain('g2t2 probe line');
@@ -230,7 +200,7 @@ describe('G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回�
     expect(status.stdout.trim()).toBe('');
   }, 200_000);
 
-  test('失败方式 4：脏工作区 → merge 步照常 done（#1211：落地不读用户工作区）；用户 HEAD/脏文件原样', async () => {
+  test('failure mode 4: dirty workspace → merge step still done (#1211: delivery does not read the user workspace); user HEAD/dirty files unchanged', async () => {
     const dirtyRepo = await seedUserRepo();
     const world = await seedWorld(
       server.url,
@@ -250,7 +220,6 @@ describe('G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回�
     await api(server.url, 'POST', `/api/builds/${dirtyBuildId}/steps`, { action: 'confirm' });
     await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
 
-    // 用户对同一文件叠加未提交改动——merge 步不读用户工作区，照常落地。
     writeFileSync(join(dirtyRepo, 'README.md'), '# user repo\nUSER UNCOMMITTED WORK\n');
     const headBefore = await headOf(dirtyRepo);
 
@@ -270,7 +239,6 @@ describe('G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回�
       .where(eq(stepTable.buildId, dirtyBuildId))
       .all();
     expect(steps.find((s) => s.kind === 'merge')!.status).toBe('done');
-    // conv 分支照常落用户仓库；用户工作树永不被触碰：HEAD 不动、脏文件原样。
     const dirtyLanded = await systemGitOps.resolveCommit(
       dirtyRepo,
       `refs/heads/cairn/conv-${dirtyBuildId}`,

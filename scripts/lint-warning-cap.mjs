@@ -1,46 +1,5 @@
 #!/usr/bin/env node
 
-// Permanent lint-warning ratchet (#1192): biome ci . reports warnings
-// without erroring; without a cap, the warning count silently grows as
-// new code lands (2026-10-11 main measured 53 warnings, up from 27 six
-// weeks earlier — #1180 shipped 7 warnings in one file alone). This gate
-// pins a warning cap that may only go down: clearing the existing debt
-// is one PR (this one), thereafter each PR either stays at or below
-// the cap, or red.
-//
-// Format mirrors the existing ratchet gates (ui-debt-gate.mjs,
-// ui-dead-class-gate.mjs) — script + JSON baseline + CI step. Reads
-// biome's standard summary output (the "Found N warnings" line emitted
-// by every biome ci run); the baseline file is `lint-warning-baseline.json`
-// at scripts/, frozen by `--write` from a clean tree.
-//
-//   default check mode: parse biome ci . output, extract warning count,
-//                       compare to baseline; exit 1 if over.
-//   --write:             freeze baseline from a clean tree (run after
-//                       dropping warnings in a PR to keep the ledger
-//                       accurate).
-//   --base <sha>:        with a base ref (env LINT_WARNING_BASE_SHA on
-//                       CI), the in-tree baseline must not exceed the
-//                       base's baseline. Branch cannot lift its own
-//                       ceiling to legalize new debt. Bootstrap: a base
-//                       without the file skips D3.
-//
-// What it does NOT do:
-//   - promote warnings to errors (#1192 out-of-scope)
-//   - touch info diagnostics (the one noUselessConstructor info on main
-//     is not part of the ratchet; only warnings are pinned)
-//   - refactor files just to clear a warning (behavior-preserving only)
-//
-// Usage:
-//   node scripts/lint-warning-cap.mjs                  # check against baseline
-//   node scripts/lint-warning-cap.mjs --write          # freeze baseline from tree
-//   node scripts/lint-warning-cap.mjs --base <sha>     # check + D3 against <sha>
-//   LINT_WARNING_BASE_SHA=<sha> node scripts/lint-warning-cap.mjs
-//
-// Exit codes: 0 = at or below baseline, 1 = violations, 2 = operational
-// error (biome invocation failure, missing/malformed baseline, base sha
-// not fetched). Fail-closed.
-
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -50,9 +9,6 @@ const BASELINE_PATH = join(REPO_ROOT, 'scripts/lint-warning-baseline.json');
 const BASELINE_REL = 'scripts/lint-warning-baseline.json';
 const CAP_KEY = 'maxWarnings';
 
-// ANSI escape sequence: ESC (`\u001b`) followed by `[`, parameters, and a final
-// letter. The character class form sidesteps biome's noControlCharactersInRegex
-// because no literal control character appears in the source.
 const ANSI_RE = new RegExp(`${String.fromCharCode(0x1b)}\\[[0-9;]*m`, 'g');
 
 function stripAnsi(text) {
@@ -81,36 +37,24 @@ function biomeCi() {
       cwd: REPO_ROOT,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
-      // biome ci exits non-zero on warnings too? No — only on errors. Warnings
-      // are reported via the summary line; exit is 0 when only warnings exist.
     });
     return { status: 0, stdout: stripAnsi(out), stderr: '' };
   } catch (err) {
     const stdout = stripAnsi(err.stdout ?? '');
     const stderr = stripAnsi(err.stderr ?? '');
     const status = typeof err.status === 'number' ? err.status : 1;
-    // biome ci exits 1 when an error is found. Warnings still surface in stdout;
-    // a nonzero status does not mean the warning-count line is unparseable, but
-    // it does mean biome saw an error — let the check call surface both.
     return { status, stdout, stderr };
   }
 }
 
 function parseWarningCount(stdout) {
-  // biome ci emits "Found N warnings" on its summary line. When the count is
-  // zero it sometimes omits the line entirely; an error run also leaves the
-  // warning line out. Distinguish both by checking the absence of "errors":
-  // if no error line and no warning line, the tree is clean (0/0).
   const errorMatch = /Found\s+(\d+)\s+errors?\.?/.exec(stdout);
   if (errorMatch) {
-    // Error-severity diagnostics exist; warning count may or may not be
-    // printed. Refuse to guess — let the check path decide based on run.status.
     const warningMatch = /Found\s+(\d+)\s+warnings?\.?/.exec(stdout);
     return warningMatch ? Number(warningMatch[1]) : 0;
   }
   const warningMatch = /Found\s+(\d+)\s+warnings?\.?/.exec(stdout);
   if (warningMatch) return Number(warningMatch[1]);
-  // Neither line printed, no errors: tree is clean (zero warnings).
   if (/No fixes applied|Checked\s+\d+\s+files/.test(stdout)) return 0;
   return null;
 }
@@ -229,7 +173,6 @@ function check(baseSha) {
     );
   }
 
-  // D3: in-tree baseline must not sit higher than the base's.
   if (baseSha && effective !== inTree && inTree[CAP_KEY] > effective[CAP_KEY]) {
     failures.push(
       `${BASELINE_REL} ${CAP_KEY} raised vs base: ${effective[CAP_KEY]} -> ${inTree[CAP_KEY]}`,
@@ -263,7 +206,6 @@ function check(baseSha) {
   process.exit(0);
 }
 
-// --- CLI ---------------------------------------------------------------------
 const argv = process.argv.slice(2);
 let writeMode = false;
 let baseSha = process.env.LINT_WARNING_BASE_SHA || '';

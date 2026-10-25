@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-// Test spawn gate: test code must not start processes through a package
-// manager. `corepack` / `pnpm` / `npx` / `npm` / `yarn` resolve to corepack's
-// node shim, which exits on SIGTERM without forwarding it, so `child.kill()`
-// reaches only the shim and the real process tree is reparented to PID 1.
-//
-// Flagged: async `spawn` / `exec` / `execFile` whose literal command is one
-// of those, in tracked files under apps/web/e2e, apps/*/test,
-// packages/*/test and integration. The Sync variants block until the whole
-// child exits and are allowed. A command held in a variable is out of reach
-// here and stays a review concern.
-//
-// Fix: spawn `process.execPath` with `--import tsx` (integration/test/
-// crash-recover.test.ts), or boot servers through apps/web/e2e/live-server.ts.
-//
-// Exit codes: 0 = clean, 1 = violations, 2 = operational error (git failure,
-// or the territories matched no files, which would make a pass vacuous).
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';

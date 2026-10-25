@@ -1,14 +1,3 @@
-// M4a Chief E2E（真 server + 真 daemon + pi + stub LLM）：验证 daemon 侧 chief
-// 执行缝——claim chief 步 → pi 会话挂 remoteTools（defineTool customTools 映射，
-// parameters = 原始 JSON Schema）→ 模型调 relay 工具 → POST /machine/tool/{stepId}
-// {name,params} → 服务端 executeChiefTool → {text} 回 pi → 收尾文本 → done →
-// finishChiefTurn（thread sessionId/lastTurnAt）+ transcript 落 chief_message +
-// chief_message 通知。这是「pi customTools 接受原始 JSON Schema 参数」缝的实证
-// （04 §1 A4：不冒充实测——此测跑通即坐实该缝）。
-//
-// stub 工具轮用读侧 `projects`（无动态参数，replaySafe）——create_todo 的溯源
-// 落库已在 server 侧 m4a-chief-loop.test.ts 直证；本测证 pi↔relay 往返本身。
-
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -48,9 +37,7 @@ function logLines(): string[] {
 
 beforeAll(async () => {
   stub = await startStubLlm([
-    // chief 回合轮 1：调用 relay 读工具 `projects`（pi customTool → relay → server）。
     { toolCall: { name: 'projects', arguments: {} } },
-    // 轮 2：拿到工具结果后收尾文本。
     { content: '已查看团队项目清单。有什么可以帮你的？' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
@@ -85,15 +72,13 @@ afterAll(async () => {
   );
 });
 
-describe('M4a Chief E2E：pi 会话 + remoteTools relay 往返（02 §4.3/r5 §3.1）', () => {
-  test('绑定 → 发消息 → claim chief 步 → pi relay 工具 → done → chief_message 落库', async () => {
-    // 绑定 chief agent（PATCH /chief，r5 §2）。
+describe('M4a Chief E2E: pi session + remoteTools relay round trip (02 §4.3/r5 §3.1)', () => {
+  test('bind → send message → claim chief step → pi relay tool → done → chief_message persisted', async () => {
     const patch = await api(server.url, 'PATCH', `/api/teams/${server.teamId}/chief`, {
       agent: { agentId: AGENT_ID, thinkingLevel: null },
     });
     expect(patch.status).toBe(200);
 
-    // 发消息 → 建线程 + chief 步入队 + 机器 wake。
     const sent = await api(server.url, 'POST', `/api/teams/${server.teamId}/chief/threads`, {
       content: '团队里现在有哪些项目？',
     });
@@ -101,26 +86,21 @@ describe('M4a Chief E2E：pi 会话 + remoteTools relay 往返（02 §4.3/r5 §3
     threadId = (sent.body as { thread: { id: string } }).thread.id;
     expect(threadId.startsWith('chief-')).toBe(true);
 
-    // daemon 领 chief 步 → pi 会话（new session chief-…）→ relay projects → 收尾。
     await waitFor(() => {
       const th = server.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
       return th?.lastTurnAt != null && th.activeRun === null;
     }, 120_000);
 
-    // daemon.log canon：conv = chief-<threadId>（r5 §3.1）。
     const lines = logLines();
     expect(lines.some((l) => l.includes(`for conv ${threadId}`))).toBe(true);
     expect(lines.some((l) => l.includes(`new session ${threadId}`))).toBe(true);
     expect(lines.some((l) => l.includes('using model stub-gw/stub-model'))).toBe(true);
 
-    // chief 步收尾 done。
     const steps = server.db.select().from(stepTable).where(eq(stepTable.buildId, threadId)).all();
     expect(steps.some((st) => st.kind === 'chief' && st.status === 'done')).toBe(true);
-    // thread.sessionId 落值（continue session 复用面）。
     const th = server.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get()!;
     expect(th.sessionId).not.toBe('');
 
-    // chief_message 落库：assistant 收尾文本（transcript 上传 → chief 分支）。
     const msgs = server.db
       .select()
       .from(chiefMessage)
@@ -128,10 +108,8 @@ describe('M4a Chief E2E：pi 会话 + remoteTools relay 往返（02 §4.3/r5 §3
       .all();
     const flat = JSON.stringify(msgs.map((m) => m.content));
     expect(flat).toContain('已查看团队项目清单');
-    // relay 工具行落库（projects 调用，live reportTool → chief_message）。
     expect(flat).toContain('projects');
 
-    // chief_message 通知（r5 §7.2：snippet = 消息全文）。
     const notif = server.db
       .select()
       .from(notificationTable)
@@ -140,7 +118,6 @@ describe('M4a Chief E2E：pi 会话 + remoteTools relay 往返（02 §4.3/r5 §3
     expect(notif).toBeDefined();
     expect(notif!.snippet).toContain('已查看团队项目清单');
 
-    // token 记账：buildId = chief conv id（context.tokens 数据源）。
     const usage = server.db.select().from(tokenUsage).where(eq(tokenUsage.buildId, threadId)).all();
     expect(usage.length).toBeGreaterThanOrEqual(1);
   }, 150_000);

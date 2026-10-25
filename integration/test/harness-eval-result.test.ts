@@ -12,7 +12,7 @@ import {
 } from '../eval/chief-dispatch/harness-eval-result.mts';
 
 describe('harness-eval-result', () => {
-  test('decisionOkRate 是通过行占比', () => {
+  test('decisionOkRate is the share of passing rows', () => {
     expect(decisionOkRate([])).toBeNull();
     expect(
       decisionOkRate([
@@ -23,7 +23,7 @@ describe('harness-eval-result', () => {
     ).toBeCloseTo(2 / 3);
   });
 
-  test('traceDigest 跟文件名排序，与内容绑定', () => {
+  test('traceDigest sorts by file name and binds to content', () => {
     const a = { name: 'b.json', body: new TextEncoder().encode('one') };
     const b = { name: 'a.json', body: new TextEncoder().encode('two') };
     expect(traceDigest([a, b])).toBe(traceDigest([b, a]));
@@ -31,7 +31,7 @@ describe('harness-eval-result', () => {
     expect(traceDigest([])).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  test('buildHarnessEvalResult 写出闸要的字段', () => {
+  test('buildHarnessEvalResult writes the fields the gate requires', () => {
     const row = buildHarnessEvalResult({
       patchDigest: `pd2:${'1'.repeat(64)}`,
       harness_sha: '2'.repeat(64),

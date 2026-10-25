@@ -15,7 +15,10 @@ export function slotCount(env) {
   const raw = env.CAIRN_HEAVY_SLOTS;
   if (raw === undefined || raw === '') return { count: DEFAULT_SLOTS };
   if (/^[1-9]\d*$/.test(raw.trim())) return { count: Number(raw) };
-  return { count: 1, warning: `CAIRN_HEAVY_SLOTS=${raw} 不是正整数，按 1 处理` };
+  return {
+    count: 1,
+    warning: `CAIRN_HEAVY_SLOTS=${raw} is not a positive integer; treating it as 1`,
+  };
 }
 
 export function skipsQueue(env) {
@@ -143,7 +146,7 @@ export async function acquireSlot({ env = process.env, wait = true, log = consol
         if (holderState(path).pid === process.pid) unlinkSync(path);
       };
       process.once('exit', release);
-      log(`[heavy-slots] 拿到名额 ${slot}/${count}`);
+      log(`[heavy-slots] acquired slot ${slot}/${count}`);
       return { slot, owner: process.pid, release };
     }
     return null;
@@ -180,7 +183,7 @@ export async function acquireSlot({ env = process.env, wait = true, log = consol
         if (lease) return lease;
       }
       if (position !== announced) {
-        log(`[heavy-slots] 排队中，第 ${position} 位（${count} 个名额都被占用）`);
+        log(`[heavy-slots] queued, position ${position} (all ${count} slots are busy)`);
         announced = position;
       }
       await sleep(POLL_MS);

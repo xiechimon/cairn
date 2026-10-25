@@ -4,8 +4,8 @@ least one task-list item, and no task may be unchecked at merge time.
 
 What happened: PRs merged with unchecked `- [ ]` boxes (#1234, #1235) and
 with prose-only Acceptance bullets that carry no machine-judgeable
-completion signal (#1229, #1233). The user's ruling: 「有些 pr tasks 你都
-没做完你就 merge 了，以后不要出现了」.
+completion signal (#1229, #1233). The user's ruling: "you merged while some
+PR tasks were still unfinished — this must never happen again".
 
 The gate judges only the `## Acceptance` section, extracted with the same
 parsing as pr-evidence-gate.py: fence-stripped text (a checklist quoted in

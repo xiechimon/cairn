@@ -103,8 +103,8 @@ afterAll(async () => {
   if (home) rmSync(home, { recursive: true, force: true });
 });
 
-describe('#1626 信息类快车道：info 卡报告递给下游 code 卡', () => {
-  test('info 卡只读产出报告附件，不推分支不进合并；下游 code 卡简报带报告并照常交付', async () => {
+describe('#1626 info-class fast lane: info card report handed to the downstream code card', () => {
+  test('info card only produces a report attachment, no branch push or merge; downstream code card brief carries the report and delivers as usual', async () => {
     const project = await api(server.url, 'POST', '/api/projects', {
       name: PROJECT,
       teamId: server.teamId,

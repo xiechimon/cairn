@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-// PWA manifest screenshots capture (素材替换计划 §3.2 / D8, #249): the two
-// manifest `screenshots` entries ship real captures of the UI at the sizes
-// the manifest declares (narrow 780×1688, wide 2560×1600). Run against a
-// fixture-mode build so the ?scenario= fixture parameter stays live:
-//
-//   pnpm --filter @cairn/web exec vite build --mode fixture
-//   pnpm --filter @cairn/web exec vite preview --host 127.0.0.1 --port 8392 --strictPort &
-//   node scripts/capture-pwa-screenshots.mjs http://127.0.0.1:8392
-//
-// (--host 127.0.0.1: vite preview binds IPv6-only by default and the
-// 127.0.0.1 base URL then never connects)
-//
-// Writes apps/web/public/screenshots/{narrow,wide}.png (the manifest srcs).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -19,19 +6,15 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const BASE_URL = process.argv[2] ?? 'http://127.0.0.1:8392';
-// fileURLToPath, not .pathname — percent-decodes spaces in the checkout path
 const OUT_DIR = resolve(fileURLToPath(new URL('../apps/web/public/screenshots', import.meta.url)));
-const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
+const THEME_KEY = 'cairn-theme';
 mkdirSync(OUT_DIR, { recursive: true });
 
 const SHOTS = [
-  // narrow folds the populated 执行中 column past the viewport — scroll the
-  // board rail right so the capture shows cards, not two empty columns
   { name: 'narrow', width: 780, height: 1688, scrollRight: true },
   { name: 'wide', width: 2560, height: 1600 },
 ];
 
-/** Settle: finite animations finished (2s cap). */
 async function settle(page) {
   await page.evaluate(
     () =>

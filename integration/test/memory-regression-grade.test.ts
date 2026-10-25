@@ -104,15 +104,15 @@ function afterUpdate(c: MemoryCase, successorContent: string): MemoryRowLite[] {
     });
 }
 
-describe('用例数据', () => {
-  test('三类各 6 到 8 条', () => {
+describe('case data', () => {
+  test('each of the three classes has 6 to 8 entries', () => {
     for (const kind of ['conflict', 'leak', 'stale'] as const) {
       expect(byClass(kind).length, kind).toBeGreaterThanOrEqual(6);
       expect(byClass(kind).length, kind).toBeLessThanOrEqual(8);
     }
   });
 
-  test('id 唯一、记忆 key 在用例内唯一、invalidatedBy 指向同例里存在的记忆', () => {
+  test('ids unique, memory keys unique within a case, invalidatedBy points at a memory in the same case', () => {
     expect(new Set(cases.map((c) => c.id)).size).toBe(cases.length);
     for (const c of cases) {
       const keys = c.memories.map((m) => m.key);
@@ -123,7 +123,7 @@ describe('用例数据', () => {
     }
   });
 
-  test('判据词不在题面里，否则 spec 里引用用户原文就白得分', () => {
+  test('criterion words absent from the prompt, otherwise quoting the user verbatim in the spec would score for free', () => {
     for (const c of cases) {
       const prompt = lower(c.prompt);
       for (const marker of [...c.expect.include.flat(), ...c.expect.exclude]) {
@@ -132,7 +132,7 @@ describe('用例数据', () => {
     }
   });
 
-  test('排除词不能出现在场景仓里，否则读仓库本身就会触发误判', () => {
+  test('exclusion words must not appear in the scenario repo, otherwise reading the repo itself triggers a false positive', () => {
     for (const c of cases) {
       for (const marker of c.expect.exclude) {
         expect(repoText.includes(lower(marker)), `${c.id}: ${marker}`).toBe(false);
@@ -140,7 +140,7 @@ describe('用例数据', () => {
     }
   });
 
-  test('过期类每例带一条无关记忆 keep，用来发现误伤', () => {
+  test('every stale-class case carries one unrelated keep memory to surface collateral damage', () => {
     for (const c of byClass('stale'))
       expect(
         c.memories.map((m) => m.key),
@@ -148,7 +148,7 @@ describe('用例数据', () => {
       ).toContain('keep');
   });
 
-  test('过期类：每组必含词能在仓库实况里找到，排除词只出现在过期记忆里', () => {
+  test('stale class: every required-word group is findable in the live repo, exclusion words appear only in the stale memory', () => {
     for (const c of byClass('stale')) {
       for (const group of c.expect.include) {
         expect(
@@ -166,7 +166,7 @@ describe('用例数据', () => {
     }
   });
 
-  test('冲突类：第一条是旧条且含排除词，第二条是新条且含全部必含词，新条创建得更晚', () => {
+  test('conflict class: first entry is the old one carrying exclusion words, second is the new one carrying all required words and created later', () => {
     for (const c of byClass('conflict')) {
       const [oldMem, newMem] = c.memories;
       if (oldMem === undefined || newMem === undefined) throw new Error(`${c.id} 缺记忆`);
@@ -184,13 +184,13 @@ describe('用例数据', () => {
     }
   });
 
-  test('冲突类两种形态都有：旧条被标失效、旧条仅较早', () => {
+  test('conflict class has both shapes: old entry invalidated, old entry merely earlier', () => {
     const invalidated = byClass('conflict').filter((c) => c.memories[0]?.invalidatedBy);
     expect(invalidated.length).toBeGreaterThanOrEqual(3);
     expect(byClass('conflict').length - invalidated.length).toBeGreaterThanOrEqual(3);
   });
 
-  test('跨项目类：别的项目的记忆自己点名项目，排除词只出现在它里面', () => {
+  test('cross-project class: the other project memory names its own project, exclusion words appear only inside it', () => {
     for (const c of byClass('leak')) {
       const foreign = c.memories.filter((m) => m.scope !== null && m.scope !== 'eval-project');
       expect(c.prompt, c.id).toContain('eval-project');
@@ -203,7 +203,7 @@ describe('用例数据', () => {
     }
   });
 
-  test('跨项目类：必含词非空，且能从仓库实况或本项目记忆得到，空任务不能过', () => {
+  test('cross-project class: required words non-empty and derivable from the live repo or this project memory; an empty task must not pass', () => {
     for (const c of byClass('leak')) {
       expect(c.expect.include.length, c.id).toBeGreaterThan(0);
       const own = lower(
@@ -221,17 +221,17 @@ describe('用例数据', () => {
     }
   });
 
-  test('metrics 声明了 decision_ok 与 memory_write_ok', () => {
+  test('metrics declare decision_ok and memory_write_ok', () => {
     expect(state.metrics.map((m) => m.id)).toEqual(['decision_ok', 'memory_write_ok']);
   });
 
-  test('isMemoryCase 区分记忆用例与派发用例', () => {
+  test('isMemoryCase separates memory cases from dispatch cases', () => {
     expect(isMemoryCase(cases[0] as MemoryCase)).toBe(true);
     expect(isMemoryCase({ expect: { kind: 'dispatch' } })).toBe(false);
   });
 });
 
-describe('gradeMemoryCase：夹具终态', () => {
+describe('gradeMemoryCase: fixture end state', () => {
   test.each(cases.map((c) => [c.id, c] as const))('%s 期望行为全做对 → decision_ok=1', (_id, c) => {
     const memoryAfter =
       c.expect.kind === 'stale'
@@ -278,13 +278,13 @@ describe('gradeMemoryCase：夹具终态', () => {
     },
   );
 
-  test('没有产出任务时说明里点明原因', () => {
+  test('states the reason in the explanation when no task was produced', () => {
     const c = cases[0] as MemoryCase;
     const g = gradeMemoryCase(c, { evidence: turn(), memoryAfter: seededRows(c) });
     expect(g.explanation.decision_ok).toContain('没有产出任务');
   });
 
-  test('步没有走到 done 的回合不得得分', () => {
+  test('a turn whose step never reached done scores nothing', () => {
     const c = cases[0] as MemoryCase;
     const g = gradeMemoryCase(c, {
       evidence: withSpec(oracleSpec(c), { stepStatus: 'failed' }),
@@ -293,7 +293,7 @@ describe('gradeMemoryCase：夹具终态', () => {
     expect(g.grade.decision_ok).toBe(0);
   });
 
-  test('必含词分组：每组至少命中一个别名才算', () => {
+  test('required-word groups: at least one alias hit per group counts', () => {
     const c = byClass('conflict')[0] as MemoryCase;
     const partial: MemoryCase = {
       ...c,
@@ -311,7 +311,7 @@ describe('gradeMemoryCase：夹具终态', () => {
     expect(hitBoth.grade.decision_ok).toBe(1);
   });
 
-  test('冲突与跨项目类不产出 memory_write_ok', () => {
+  test('conflict and cross-project classes produce no memory_write_ok', () => {
     for (const c of [...byClass('conflict'), ...byClass('leak')]) {
       const g = gradeMemoryCase(c, {
         evidence: withSpec(oracleSpec(c)),
@@ -322,30 +322,30 @@ describe('gradeMemoryCase：夹具终态', () => {
   });
 });
 
-describe('gradeMemoryCase：memory_write_ok（过期类读记忆表终态）', () => {
+describe('gradeMemoryCase: memory_write_ok (stale class reads the memory table end state)', () => {
   const c = byClass('stale')[0] as MemoryCase;
   const fact = c.expect.include.map((g) => g[0]).join(' ');
   const staleId = memoryIdFor(c.id, staleKeyOf(c));
   const evidence = withSpec(oracleSpec(c));
 
-  test('过期条被删除 → 1', () => {
+  test('stale entry deleted → 1', () => {
     const memoryAfter = seededRows(c).filter((r) => r.id !== staleId);
     expect(gradeMemoryCase(c, { evidence, memoryAfter }).grade.memory_write_ok).toBe(1);
   });
 
-  test('过期条被取代，且后继条写的是仓库实况 → 1', () => {
+  test('stale entry superseded and the successor states live repo facts → 1', () => {
     expect(
       gradeMemoryCase(c, { evidence, memoryAfter: afterUpdate(c, fact) }).grade.memory_write_ok,
     ).toBe(1);
   });
 
-  test('过期条处理对了，但顺手把无关的记忆也删了 → 0', () => {
+  test('stale entry handled correctly but unrelated memories deleted along the way → 0', () => {
     const keepId = memoryIdFor(c.id, 'keep');
     const memoryAfter = afterUpdate(c, fact).filter((r) => r.id !== keepId);
     expect(gradeMemoryCase(c, { evidence, memoryAfter }).grade.memory_write_ok).toBe(0);
   });
 
-  test('只另存了一条正确的新记忆，过期条仍有效 → 0', () => {
+  test('only a new correct memory saved, stale entry still active → 0', () => {
     const memoryAfter = seededRows(c).concat({
       id: 'extra',
       title: 'x',
@@ -356,25 +356,25 @@ describe('gradeMemoryCase：memory_write_ok（过期类读记忆表终态）', (
     expect(gradeMemoryCase(c, { evidence, memoryAfter }).grade.memory_write_ok).toBe(0);
   });
 
-  test('记忆表原样没动 → 0', () => {
+  test('memory table untouched → 0', () => {
     expect(gradeMemoryCase(c, { evidence, memoryAfter: seededRows(c) }).grade.memory_write_ok).toBe(
       0,
     );
   });
 
-  test('被取代了，但后继条抄的还是过期事实 → 0', () => {
+  test('superseded, but the successor copies the stale facts → 0', () => {
     const memoryAfter = afterUpdate(c, `${fact} ${c.expect.exclude[0]}`);
     expect(gradeMemoryCase(c, { evidence, memoryAfter }).grade.memory_write_ok).toBe(0);
   });
 
-  test('后继条自己又被标失效（链上最新一条才算数）→ 0', () => {
+  test('the successor itself later invalidated (latest in the chain counts) → 0', () => {
     const memoryAfter = afterUpdate(c, fact).map((r) =>
       r.id === `${staleId}-v2` ? { ...r, invalidAt: 3 } : r,
     );
     expect(gradeMemoryCase(c, { evidence, memoryAfter }).grade.memory_write_ok).toBe(0);
   });
 
-  test('连续修正两次：沿取代链走到最新一条，它是仓库实况 → 1', () => {
+  test('corrected twice in a row: walk the supersede chain to the latest entry; it states live repo facts → 1', () => {
     const v3 = `${staleId}-v3`;
     const memoryAfter = afterUpdate(c, `${fact} 草稿`)
       .map((r) => (r.id === `${staleId}-v2` ? { ...r, invalidAt: 3, supersededBy: v3 } : r))
@@ -382,28 +382,28 @@ describe('gradeMemoryCase：memory_write_ok（过期类读记忆表终态）', (
     expect(gradeMemoryCase(c, { evidence, memoryAfter }).grade.memory_write_ok).toBe(1);
   });
 
-  test('取代链成环 → 0，不死循环', () => {
+  test('supersede chain cycles → 0, no infinite loop', () => {
     const memoryAfter = afterUpdate(c, fact).map((r) =>
       r.id === `${staleId}-v2` ? { ...r, invalidAt: 3, supersededBy: staleId } : r,
     );
     expect(gradeMemoryCase(c, { evidence, memoryAfter }).grade.memory_write_ok).toBe(0);
   });
 
-  test('被标失效但后继条根本不存在 → 0', () => {
+  test('marked invalidated but no successor exists → 0', () => {
     const memoryAfter = seededRows(c).map((r) =>
       r.id === staleId ? { ...r, invalidAt: 2, supersededBy: 'ghost' } : r,
     );
     expect(gradeMemoryCase(c, { evidence, memoryAfter }).grade.memory_write_ok).toBe(0);
   });
 
-  test('写对了记忆但产出仍用旧事实：两个指标互相独立', () => {
+  test('memory written correctly but the output still uses stale facts: the two metrics are independent', () => {
     const wrongOutput = withSpec(`${oracleSpec(c)}\n- ${c.expect.exclude[0]}`);
     const g = gradeMemoryCase(c, { evidence: wrongOutput, memoryAfter: afterUpdate(c, fact) });
     expect(g.grade.decision_ok).toBe(0);
     expect(g.grade.memory_write_ok).toBe(1);
   });
 
-  test('产出对但没修正记忆：decision_ok=1 而 memory_write_ok=0', () => {
+  test('output correct but memory not fixed: decision_ok=1 while memory_write_ok=0', () => {
     const g = gradeMemoryCase(c, { evidence, memoryAfter: seededRows(c) });
     expect(g.grade.decision_ok).toBe(1);
     expect(g.grade.memory_write_ok).toBe(0);

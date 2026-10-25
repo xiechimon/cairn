@@ -121,9 +121,9 @@ test('a bad slot count gets a warning and a single slot', async () => {
   try {
     const holder = startHolder(env);
     await until(holder, 'out', /SLOT 1/);
-    assert.match(holder.err, /CAIRN_HEAVY_SLOTS.*按 1 处理/);
+    assert.match(holder.err, /CAIRN_HEAVY_SLOTS.*positive integer/);
     const second = startHolder(env);
-    await until(second, 'err', /排队中，第 1 位/);
+    await until(second, 'err', /queued, position 1/);
     assert.doesNotMatch(second.out, /SLOT/);
   } finally {
     cleanup();
@@ -136,13 +136,13 @@ test('waiters see their queue position and are served first-come first-served', 
     const holder = startHolder(env);
     await until(holder, 'out', /SLOT 1/);
     const first = startHolder(env);
-    await until(first, 'err', /排队中，第 1 位/);
+    await until(first, 'err', /queued, position 1/);
     const second = startHolder(env);
-    await until(second, 'err', /排队中，第 2 位/);
+    await until(second, 'err', /queued, position 2/);
     holder.child.kill('SIGKILL');
     await until(first, 'out', /SLOT 1/, 5_000);
     assert.doesNotMatch(second.out, /SLOT/);
-    await until(second, 'err', /排队中，第 2 位[\s\S]*排队中，第 1 位/);
+    await until(second, 'err', /queued, position 2[\s\S]*queued, position 1/);
   } finally {
     cleanup();
   }
@@ -154,7 +154,7 @@ test('kill -9 on the holder frees the slot for the queued process within 5 secon
     const holder = startHolder(env);
     await until(holder, 'out', /SLOT 1/);
     const waiter = startHolder(env);
-    await until(waiter, 'err', /排队中/);
+    await until(waiter, 'err', /queued, position/);
     const killedAt = Date.now();
     holder.child.kill('SIGKILL');
     await until(waiter, 'out', /SLOT 1/, 5_000);
@@ -242,7 +242,7 @@ test('two killed holders and several waiters: stale entries are reclaimed withou
     const holders = [startHolder(env), startHolder(env)];
     await Promise.all(holders.map((holder) => until(holder, 'out', /SLOT \d/)));
     const waiters = Array.from({ length: 4 }, () => startHolder(env, { lingerMs: 1_500 }));
-    await Promise.all(waiters.map((waiter) => until(waiter, 'err', /排队中/)));
+    await Promise.all(waiters.map((waiter) => until(waiter, 'err', /queued, position/)));
     for (const holder of holders) holder.child.kill('SIGKILL');
     await Promise.all(waiters.map((waiter) => until(waiter, 'out', /SLOT \d/, 15_000)));
     const early = waiters.map((waiter) => waiter.out.match(/SLOT (\d)/)[1]);
@@ -279,7 +279,7 @@ test('run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass', 
       peak = Math.max(peak, active.size);
     }
     assert.equal(peak, 2);
-    assert.ok(jobs.filter((j) => /排队中/.test(j.err)).length >= 2);
+    assert.ok(jobs.filter((j) => /queued, position/.test(j.err)).length >= 2);
   } finally {
     cleanup();
   }
@@ -328,7 +328,7 @@ test('an inherited slot variable that no live process holds is ignored', () => {
     );
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /slot=1/);
-    assert.doesNotMatch(result.stderr, /排队中/);
+    assert.doesNotMatch(result.stderr, /queued, position/);
   } finally {
     cleanup();
   }
@@ -344,7 +344,7 @@ test('an inherited slot whose lock belongs to someone else is not reused', async
       [cli, 'run', '--', process.execPath, '-e', 'console.log("ran")'],
       { env: { ...env, CAIRN_HEAVY_SLOT: '1', CAIRN_HEAVY_SLOT_OWNER: String(process.pid) } },
     );
-    await until(borrower, 'err', /排队中，第 1 位/);
+    await until(borrower, 'err', /queued, position 1/);
     assert.doesNotMatch(borrower.out, /ran/);
   } finally {
     cleanup();
@@ -370,7 +370,7 @@ test('CI skips the queue even when every slot is taken', async () => {
     );
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /slot=undefined/);
-    assert.doesNotMatch(result.stderr, /排队中/);
+    assert.doesNotMatch(result.stderr, /queued, position/);
   } finally {
     cleanup();
   }
@@ -408,7 +408,7 @@ test('e2e:affected queues for a slot, but a dry run never waits', async () => {
     });
     assert.equal(dry.status, 0, dry.stderr);
     const queued = watch(process.execPath, ['scripts/e2e-affected.mjs', spec], { env });
-    await until(queued, 'err', /排队中，第 1 位/);
+    await until(queued, 'err', /queued, position 1/);
     assert.doesNotMatch(queued.out + queued.err, /Running \d+ test/);
   } finally {
     cleanup();
@@ -440,7 +440,7 @@ test('prepush queues for a slot in local mode and starts once the holder is kill
       cwd: repo,
       env: prepushEnv,
     });
-    await until(prepush, 'err', /排队中，第 1 位/);
+    await until(prepush, 'err', /queued, position 1/);
     assert.doesNotMatch(prepush.out, /\[prepush\]/);
     const killedAt = Date.now();
     holder.child.kill('SIGKILL');
