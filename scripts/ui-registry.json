@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "60192f20c0e39875acfeec30d73cd8f6197907bf",
+    "sha": "5877e7f850ff222fe8ec95dff4b24654aad7a5a1",
     "date": "2026-10-26"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -107,7 +107,7 @@
       "kind": "registry",
       "upstreamItem": "kbd",
       "status": "pristine",
-      "hash": "dce1eb66f72890574d59506c3e2afa7589df2ce7a6d859782ffa69e16476451c"
+      "hash": "859f588805884b92d3a81ae250443fc87702c6a0b018c4dd3f1a4d4fd16e09d7"
     },
     "label.tsx": {
       "kind": "registry",
