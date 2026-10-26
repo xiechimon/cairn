@@ -24,7 +24,7 @@ The criterion = the static charter prose of the system-prompt dispatch-judgment 
 Preconditions: `launch.mjs` already started the isolated stack (fresh DB); proxy env all unset.
 
 - One-command full chain (12 assertions): `env -u http_proxy -u https_proxy -u all_proxy
-  VERIFY_REPO_ROOT=<worktree> node .claude/skills/verify-cairn/scripts/drive-903-dispatch-judgment.mjs`
+  VERIFY_REPO_ROOT=<worktree> node docs/verify/903/drive-903-dispatch-judgment.mjs`
   -> console PASS/FAIL + `evidence:<dir>` (result.json + 1 screenshot + 5 API/SQLite JSON).
 - Chain: the browser pins the settings-slot dead state (U1) -> REST pins PATCH 400 + the envelope no-key (A1/A2) ->
   three legs each open a chief thread: the fake machine claims the chief step (E1 takes the systemPrompt judgment section +
