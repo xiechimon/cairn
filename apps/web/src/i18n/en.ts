@@ -21,6 +21,21 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
+  '思考 {n} 次': 'Thought {n} times',
+  '读了 {n} 个文件': 'Read {n} files',
+  '搜索 {n} 次': 'Searched {n} times',
+  '跑了 {n} 条命令': 'Ran {n} commands',
+  '改了 {n} 个文件': 'Edited {n} files',
+  '调用 {n} 个工具': 'Called {n} tools',
+  '已加载 {n} 个技能': 'Loaded {n} skills',
+  '还有 {n} 行': '{n} more lines',
+  '，': ', ',
+  无输出: 'No output',
+  读取: 'Read',
+  运行: 'Run',
+  修改: 'Edit',
+  调用: 'Call',
+
   // —— shared chrome / sidebar (r2 §1.1) ——
   搜索: 'Search',
   // #351 看板更名工作台：'Workbench'（不用 'Workspace'，避撞 daemon workspaces 概念）

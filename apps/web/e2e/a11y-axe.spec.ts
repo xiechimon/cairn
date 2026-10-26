@@ -67,7 +67,7 @@ const PAGES: AuditPage[] = [
   {
     name: 'detail tool calls',
     url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28',
-    ready: (p) => p.getByTestId('tool-pill').first(),
+    ready: (p) => p.getByTestId('work-call').first(),
   },
   { name: 'chief window', url: '/app?scenario=100', ready: (p) => p.locator('.chief-drawer') },
   { name: 'schedules list', url: '/app/schedules?scenario=r3-93', ready: (p) => p.locator('.sched-card').first() },

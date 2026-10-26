@@ -47,20 +47,20 @@ function transcript(liveThinking: string, steps: StepJournalRow[]) {
 describe('mapTranscript in-flight thinking (#1308)', () => {
   test('non-empty thinking text hangs a thinking row, the streaming phase row stays', () => {
     const items = transcript('REASONING-MARKER-1308', [claimed()]);
-    const thinking = items.filter((item) => item.kind === 'thinking');
-    expect(thinking).toEqual([{ kind: 'thinking', text: 'REASONING-MARKER-1308' }]);
+    const thinking = items.filter((item) => item.kind === 'work');
+    expect(thinking).toEqual([{ kind: 'work', id: 'live-thinking', steps: [{ kind: 'think', id: 'live-thinking', text: 'REASONING-MARKER-1308', seconds: null }] }]);
     expect(items.some((item) => item.kind === 'streaming')).toBe(true);
   });
 
   test('empty thinking produces no thinking row', () => {
     const items = transcript('   ', [claimed()]);
-    expect(items.some((item) => item.kind === 'thinking')).toBe(false);
+    expect(items.some((item) => item.kind === 'work')).toBe(false);
     expect(items.some((item) => item.kind === 'streaming')).toBe(true);
   });
 
   test('a settled step hangs no in-flight thinking', () => {
     const items = transcript('REASONING-MARKER-1308', []);
-    expect(items.some((item) => item.kind === 'thinking')).toBe(false);
+    expect(items.some((item) => item.kind === 'work')).toBe(false);
   });
 });
 

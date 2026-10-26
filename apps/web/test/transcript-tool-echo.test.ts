@@ -70,9 +70,9 @@ test('F1: set_task_meta echo renders no row (title truth lives in the head)', ()
   ]);
   expect(notes(items)).toEqual([]);
   // the tool group itself stays (process disclosure law) — one pill, no JSON row
-  const groups = items.filter((i): i is Extract<TranscriptItem, { kind: 'tools' }> => i.kind === 'tools');
+  const groups = items.filter((i): i is Extract<TranscriptItem, { kind: 'work' }> => i.kind === 'work');
   expect(groups).toHaveLength(1);
-  expect(groups[0]?.pills).toEqual(['set_task_meta']);
+  expect(groups[0]?.steps).toEqual([expect.objectContaining({ label: 'set_task_meta' })]);
 });
 
 test('F2: memory-write echo becomes a human-readable note', () => {
@@ -106,9 +106,9 @@ test('F5: pure-JSON tool output hangs no slab; terminal text output stays', () =
     toolMessage(toolCall('set_task_meta', META_JSON), NOW - 6_000),
     toolMessage(toolCall('bash', 'probe ok\n'), NOW - 4_000),
   ]);
-  const group = items.find((i): i is Extract<TranscriptItem, { kind: 'tools' }> => i.kind === 'tools');
-  expect(group?.pills).toEqual(['set_task_meta', 'bash']);
-  expect(group?.outputs).toEqual([null, 'probe ok\n']);
+  const group = items.find((i): i is Extract<TranscriptItem, { kind: 'work' }> => i.kind === 'work');
+  expect(group?.steps).toEqual([expect.objectContaining({ label: 'set_task_meta' }), expect.objectContaining({ label: 'bash' })]);
+  expect(group?.steps.map((step) => step.kind === 'call' ? step.output : null)).toEqual([null, 'probe ok\n']);
 });
 
 test('F6: a bash echo ending in a newline pairs with its toolcall and leaves no note', () => {

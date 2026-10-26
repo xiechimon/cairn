@@ -65,6 +65,8 @@ class RecordingClient implements MachineApi {
   rows: TranscriptRow[] = [];
   activities: StepActivityReport[] = [];
   doneBodies: MachineDoneBody[] = [];
+  tools: ToolCallRecord[] = [];
+  uploads: TranscriptUpload[] = [];
 
   async enroll(): Promise<never> {
     throw new Error('unused');
@@ -80,7 +82,9 @@ class RecordingClient implements MachineApi {
     return null;
   }
   async heartbeat() {}
-  async tool(_stepId: string, _call: ToolCallRecord) {}
+  async tool(_stepId: string, call: ToolCallRecord) {
+    this.tools.push(structuredClone(call));
+  }
   async transcriptDelta(_stepId: string, text: string) {
     this.deltas.push(text);
   }
@@ -128,11 +132,9 @@ class RecordingClient implements MachineApi {
       })),
     };
   }
-  async putUpload(
-    _url: string,
-    _headers: Record<string, string>,
-    _body: TranscriptUpload | string,
-  ) {}
+  async putUpload(_url: string, _headers: Record<string, string>, body: TranscriptUpload | string) {
+    if (typeof body !== 'string') this.uploads.push(body);
+  }
   async done(_stepId: string, body: MachineDoneBody) {
     this.doneBodies.push(body);
   }
@@ -175,7 +177,7 @@ function backendOf(script: StepEvent[] | AsyncIterable<StepEvent>): AgentBackend
   };
 }
 
-async function run(script: StepEvent[] | AsyncIterable<StepEvent>) {
+async function run(script: StepEvent[] | AsyncIterable<StepEvent>, now?: () => number) {
   const home = mkdtempSync(join(tmpdir(), 'cairn-runner-think-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const client = new RecordingClient();
@@ -189,6 +191,7 @@ async function run(script: StepEvent[] | AsyncIterable<StepEvent>) {
       workspacesDir: join(home, 'workspaces'),
       mcpConfigPath: join(home, 'claude.json'),
       heartbeatIntervalMs: 60_000,
+      ...(now !== undefined ? { now } : {}),
     },
     claimedStep(),
   );
@@ -233,5 +236,66 @@ describe('runner thinking_delta throttled forwarding (#1308)', () => {
     ]);
     expect(client.thinking).toEqual([]);
     expect(client.deltas).toEqual(['answer']);
+  });
+});
+
+describe('runner tool call timestamps', () => {
+  test('persists and relays independent start and end times for overlapping calls', async () => {
+    let time = 1_000;
+    async function* script(): AsyncIterable<StepEvent> {
+      yield { type: 'toolcall_end', call: { id: 'a', name: 'Read', arguments: {} } };
+      time = 1_100;
+      yield { type: 'toolcall_end', call: { id: 'b', name: 'Read', arguments: {} } };
+      time = 1_200;
+      yield { type: 'toolcall_end', call: { id: 'a', name: 'Read', arguments: {} } };
+      time = 2_000;
+      yield { type: 'toolcall_end', call: { id: 'a', name: 'Read', arguments: {}, result: 'a' } };
+      time = 2_500;
+      yield { type: 'toolcall_end', call: { id: 'b', name: 'Read', arguments: {}, result: 'b' } };
+      time = 3_000;
+      yield { type: 'toolcall_end', call: { id: 'c', name: 'Read', arguments: {}, result: '' } };
+      yield { type: 'done', usage: [] };
+    }
+    const client = await run(script(), () => time);
+    expect(client.tools.map(({ id, startedAt, endedAt }) => ({ id, startedAt, endedAt }))).toEqual([
+      { id: 'a', startedAt: 1_000, endedAt: undefined },
+      { id: 'b', startedAt: 1_100, endedAt: undefined },
+      { id: 'a', startedAt: 1_000, endedAt: undefined },
+      { id: 'a', startedAt: 1_000, endedAt: 2_000 },
+      { id: 'b', startedAt: 1_100, endedAt: 2_500 },
+      { id: 'c', startedAt: undefined, endedAt: 3_000 },
+    ]);
+    expect(
+      client.uploads[0]?.messages
+        .filter((row) => ['a', 'b', 'c'].includes(row.id))
+        .map((row) => row.content),
+    ).toEqual([
+      {
+        kind: 'toolcall',
+        call: {
+          id: 'a',
+          name: 'Read',
+          arguments: {},
+          result: 'a',
+          startedAt: 1_000,
+          endedAt: 2_000,
+        },
+      },
+      {
+        kind: 'toolcall',
+        call: {
+          id: 'b',
+          name: 'Read',
+          arguments: {},
+          result: 'b',
+          startedAt: 1_100,
+          endedAt: 2_500,
+        },
+      },
+      {
+        kind: 'toolcall',
+        call: { id: 'c', name: 'Read', arguments: {}, result: '', endedAt: 3_000 },
+      },
+    ]);
   });
 });

@@ -146,76 +146,48 @@ async function stubWorld(page: Page) {
 }
 
 function thinkingRow(page: Page) {
-  return page.locator('div.chat-row--agent', { hasText: '用户这句' });
+  return page.getByTestId('work-think');
 }
 
-test('T1: the row is flex, avatar and text column do not overlap horizontally (before: avatar pressed on the text)', async ({ page }) => {
+test('T1: thinking shares a work block with a compact row and no avatar overlap', async ({ page }) => {
   await stubWorld(page);
   const row = thinkingRow(page);
   await expect(row).toHaveCount(1);
-  const layout = await row.evaluate((el) => {
-    const avatar = el.querySelector('[data-testid="msg-avatar"]') as HTMLElement;
-    const text = el.querySelector('.chat-text') as HTMLElement;
-    const a = avatar.getBoundingClientRect();
-    const t = text.getBoundingClientRect();
-    return { display: getComputedStyle(el).display, gap: t.left - a.right, avatarW: a.width };
-  });
-  expect(layout.display).toBe('flex');
-
-  expect(layout.gap).toBe(12);
-
-  expect(layout.avatarW).toBe(20);
+  const height = await row.evaluate((el) => el.getBoundingClientRect().height);
+  expect(height).toBeGreaterThanOrEqual(26);
+  expect(height).toBeLessThanOrEqual(28);
+  await expect(page.getByTestId('work-summary')).toContainText('思考 1 次');
 });
 
-test('T2: chat-text has a width cap and min-w-0 — same utility classes as the robot row :419', async ({ page }) => {
+test('T2: the work block stays inside the transcript width', async ({ page }) => {
   await stubWorld(page);
-  const cs = await thinkingRow(page)
-    .locator('.chat-text')
-    .evaluate((el) => {
-      const s = getComputedStyle(el);
-      return { maxWidth: s.maxWidth, minWidth: s.minWidth };
-    });
-
-  expect(cs.maxWidth).not.toBe('none');
-  expect(cs.minWidth).toBe('0px');
+  const bounds = await page.getByTestId('work-block').evaluate((el) => {
+    const col = el.closest('[data-testid="transcript-col"]')!;
+    return { right: el.getBoundingClientRect().right, columnRight: col.getBoundingClientRect().right };
+  });
+  expect(bounds.right).toBeLessThanOrEqual(bounds.columnRight);
 });
 
-test('T3: long previews really truncate — character slicing then CSS ellipsis takes over, button width ≤ text column width', async ({ page }) => {
+test('T3: the long preview stays on one line and hides while full thinking is open', async ({ page }) => {
   await stubWorld(page);
   const row = thinkingRow(page);
-  const btn = row.getByRole('button', { name: '展开思考' });
-  const m = await btn.evaluate((el) => {
-    const label = el.querySelector('span') as HTMLElement;
-    const cs = getComputedStyle(label);
-    const col = el.closest('.chat-text') as HTMLElement;
-    return {
-      textOverflow: cs.textOverflow,
-      overflowX: cs.overflowX,
-      labelClient: label.clientWidth,
-      labelScroll: label.scrollWidth,
-      labelText: label.textContent ?? '',
-      btnW: Math.round(el.getBoundingClientRect().width),
-      colW: Math.round(col.getBoundingClientRect().width),
-    };
-  });
-
-  expect(m.labelText.endsWith('…')).toBe(true);
-  expect(m.labelText.length).toBeLessThan(LONG_THINKING.length);
-
-  expect(m.textOverflow).toBe('ellipsis');
-  expect(m.overflowX).toBe('hidden');
-  expect(m.labelScroll).toBeGreaterThan(m.labelClient);
-  expect(m.btnW).toBeLessThanOrEqual(m.colW);
+  await expect(page.getByTestId('thinking-body')).toHaveCount(0);
+  const collapsedHeight = await row.evaluate((el) => el.getBoundingClientRect().height);
+  expect(collapsedHeight).toBeLessThanOrEqual(28);
+  await row.click();
+  await expect(page.getByTestId('thinking-body')).toHaveText(LONG_THINKING);
+  await expect(row.locator('.work-preview')).toBeHidden();
+  await row.click();
+  await expect(page.getByTestId('thinking-body')).toHaveCount(0);
 });
 
-test('T4: zero page-level horizontal overflow; the expand interaction is not broken by the truncation fix', async ({ page }) => {
+test('T4: full thinking preserves whitespace without horizontal page overflow', async ({ page }) => {
   await stubWorld(page);
-  const row = thinkingRow(page);
+  await thinkingRow(page).click();
+  await expect(page.getByTestId('thinking-body')).toHaveText(LONG_THINKING);
+  expect(await page.getByTestId('thinking-body').evaluate((el) => getComputedStyle(el).whiteSpace)).toBe('pre-wrap');
   const pageOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(pageOverflow).toBeLessThanOrEqual(0);
-
-  await row.getByRole('button', { name: '展开思考' }).click();
-  await expect(row.locator('pre')).toHaveText(LONG_THINKING);
 });
