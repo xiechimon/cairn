@@ -22,6 +22,7 @@ import {
   type BuildDeps,
   startBuilds,
   sweepAbandonedBuildSteps,
+  sweepPlanAutoConfirm,
   sweepZombieQueuedTodos,
   toBuildRecord,
 } from './builds.js';
@@ -202,6 +203,7 @@ export function createScheduler(
     sweepAbandonedChiefSteps(deps, now);
     sweepAbandonedBuildSteps(deps, now);
     sweepZombieQueuedTodos(deps, now);
+    sweepPlanAutoConfirm(deps, now);
     sweepQuotaWaitSteps(deps, now);
     void sweepFailedRetries(deps).catch(() => {});
     if (

@@ -7,7 +7,7 @@ import { classifyPaths } from '../src/services/merge-gate/paths.js';
 const REPO_ROOT = join(import.meta.dirname, '../../..');
 const OWNER = '@xiechimon';
 const EVAL_ROOTS = ['integration/eval/', '.claude/hillclimb/'];
-const GITHUB_UNSUPPORTED_PATTERN = /[!\[\]\\]|^#/;
+const GITHUB_UNSUPPORTED_PATTERN = /[![\]\\]|^#/;
 const TOKEN_SHAPES = [/gh[pousr]_[A-Za-z0-9]{20,}/, /github_pat_[A-Za-z0-9_]{20,}/];
 
 const read = (path: string) => readFileSync(join(REPO_ROOT, path), 'utf8');

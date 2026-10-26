@@ -232,6 +232,10 @@ beforeAll(async () => {
   });
   expect(project.status).toBe(201);
   projectId = (project.body as { id: string }).id;
+  const policy = await api(server.url, 'PATCH', `/api/projects/${projectId}/merge-policy`, {
+    mergePolicy: 'human',
+  });
+  expect(policy.status).toBe(200);
   const key = await api(server.url, 'POST', `/api/teams/${server.teamId}/api-keys`, {
     name: 'done-dialog-m1-key',
     gitAccess: false,

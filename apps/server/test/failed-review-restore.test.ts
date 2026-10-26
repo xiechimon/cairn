@@ -134,16 +134,11 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
   bindAllAgents(s);
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string };
-  let projectId: string;
-  if (opts.hosted) {
-    const hostedRes = await call(s.app, 'POST', '/api/projects', {
-      body: { name: 'restore-hosted', repoKind: 'hosted' },
-    });
-    expect(hostedRes.status).toBe(201);
-    projectId = ((await hostedRes.json()) as { id: string }).id;
-  } else {
-    projectId = await postProject(s.app);
-  }
+  const projectId = await postProject(
+    s.app,
+    opts.hosted ? 'restore-hosted' : 'demo',
+    opts.hosted ? { repoKind: 'hosted' } : {},
+  );
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '恢复探针', spec: '走完 build 腿后让审核步失败' },
   });
