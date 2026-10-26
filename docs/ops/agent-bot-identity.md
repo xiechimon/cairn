@@ -1,33 +1,33 @@
-# agent 改用 GitHub App cairnwright 推送与开 PR
+# The agent pushes and opens PRs as the GitHub App cairnwright
 
-issue #1666。目标：派活方的推送与开 PR 不再用 ian（xiechimon）的身份，这样打开「Require review from Code Owners」后 ian 能批准 App 开的 PR。本文只写事实。
+Issue #1666. Goal: pushes and PRs made on behalf of dispatched work no longer use ian's (xiechimon's) identity, so that after enabling "Require review from Code Owners" ian can approve PRs opened by the App. This document records facts only.
 
-## App 与 bot 用户
+## The App and the bot user
 
-- App：`cairnwright`。原名 `cairn-bot` 被现有 GitHub 账号占用，先用过 `cairn-bot-xmon`，2026-10-25 改名为 `cairnwright`。
-- App ID `5462173`，installation ID `174994433`。
-- 只装在 `xiechimon/cairn` 一个仓库。
-- 权限：Contents、Pull requests、Issues、Workflows 读写，Metadata 只读。无 webhook。
-- bot 用户：`cairnwright[bot]`，id `347615582`（`gh api /users/cairnwright%5Bbot%5D --jq .id`，`[` `]` 写成 `%5B` `%5D`）。
-- noreply 邮箱：`347615582+cairnwright[bot]@users.noreply.github.com`。
+- App: `cairnwright`. The original name `cairn-bot` was taken by an existing GitHub account; `cairn-bot-xmon` was used first, and it was renamed to `cairnwright` on 2026-10-25.
+- App ID `5462173`, installation ID `174994433`.
+- Installed only on the single repository `xiechimon/cairn`.
+- Permissions: Contents, Pull requests, Issues, Workflows read/write; Metadata read-only. No webhook.
+- Bot user: `cairnwright[bot]`, id `347615582` (`gh api /users/cairnwright%5Bbot%5D --jq .id`, with `[` `]` written as `%5B` `%5D`).
+- Noreply email: `347615582+cairnwright[bot]@users.noreply.github.com`.
 
-## 私钥
+## Private key
 
-- 文件：`~/.cairn/cairnwright.private-key.pem`，权限 600。
-- 只在本机进程内读：不复制、不进仓库、不打印、不交给 agent。
+- File: `~/.cairn/cairnwright.private-key.pem`, mode 600.
+- Read only inside processes on this machine: never copied, never committed to the repo, never printed, never handed to an agent.
 
-## 换 token 的工具
+## The token-swapping tool
 
-在仓库外的 `~/.cairn/tools/app-token/`，仓库不加依赖。
+Lives outside the repo at `~/.cairn/tools/app-token/`; the repo gains no dependency.
 
-- `token.mjs`：用 GitHub 官方 `@octokit/auth-app`（v8）写成。读 `~/.cairn/cairn-bot.json`（字段 `appSlug`、`appId`、`installationId`、`privateKeyPath`），换一枚一小时有效的 installation token。
-- `as-bot.sh <命令>`：调 `token.mjs` 换 token，只放进该命令的进程环境后 `exec` 该命令：
-  - `GH_TOKEN`：给 `gh`。
-  - git 的 http extraheader：经 `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` / `GIT_CONFIG_VALUE_n` 环境变量注入，不进命令行参数。同时把 `credential.helper` 置空，推送不走 `gh auth git-credential`。
-  - git 作者与提交者：`GIT_AUTHOR_*`、`GIT_COMMITTER_*` 设为 `cairnwright[bot]` 与上面的 noreply 邮箱。
-- gh 全局默认账号仍是 xiechimon，没跑过 `gh auth login` 或 `gh auth switch`。
+- `token.mjs`: written with GitHub's official `@octokit/auth-app` (v8). Reads `~/.cairn/cairn-bot.json` (fields `appSlug`, `appId`, `installationId`, `privateKeyPath`) and exchanges for a one-hour installation token.
+- `as-bot.sh <command>`: calls `token.mjs` to swap a token, places it only in that command's process environment, and then `exec`s the command:
+  - `GH_TOKEN`: for `gh`.
+  - git's http extraheader: injected through the `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` / `GIT_CONFIG_VALUE_n` environment variables, never through command-line arguments. `credential.helper` is also cleared so pushes do not go through `gh auth git-credential`.
+  - git author and committer: `GIT_AUTHOR_*`, `GIT_COMMITTER_*` set to `cairnwright[bot]` and the noreply email above.
+- gh's global default account is still xiechimon; neither `gh auth login` nor `gh auth switch` has been run.
 
-用法：
+Usage:
 
 ```sh
 ~/.cairn/tools/app-token/as-bot.sh git commit ...
@@ -35,46 +35,46 @@ issue #1666。目标：派活方的推送与开 PR 不再用 ian（xiechimon）�
 ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head <branch> ...
 ```
 
-## 实测
+## Measured
 
-2026-10-25 用 App 推送测试分支并开 PR（#1670 用旧名，#1672 用新名）：PR 作者显示 `app/cairnwright`（`is_bot=true`），提交作者 `cairnwright[bot]`。两个测试 PR 已关闭，分支已删。
+On 2026-10-25 the App pushed a test branch and opened PRs (#1670 under the old name, #1672 under the new one): the PR author shows `app/cairnwright` (`is_bot=true`) and the commit author is `cairnwright[bot]`. Both test PRs have been closed and the branches deleted.
 
-## 要换的位置
+## What was switched
 
-已改走 `as-bot.sh`（派活方）：
+Now going through `as-bot.sh` (the dispatching side):
 
-- 提交（git 作者与提交者）。
-- 推送。
-- 开 PR（`gh pr create`）。
-- 开自动合并（`gh pr merge --auto`）。
+- Committing (git author and committer).
+- Pushing.
+- Opening PRs (`gh pr create`).
+- Enabling auto-merge (`gh pr merge --auto`).
 
-agent（codex、pi、grok）自己不提交、不推送。
+The agents (codex, pi, grok) themselves never commit and never push.
 
-其它写远端的脚本要以 App 身份跑时，同样在命令前加 `as-bot.sh`：`scripts/cleanup-merged-branches.sh`（`git push origin --delete`、`gh pr list`）。
+Other scripts that write to the remote should likewise prefix their commands with `as-bot.sh` when they need the App identity: `scripts/cleanup-merged-branches.sh` (`git push origin --delete`, `gh pr list`).
 
-不用换：
+Not switched:
 
-- `scripts/dispatch-agent.mjs`：只 `spawn` 派给它的命令，不提交、不推送、不开 PR。
-- `scripts/dispatch-dedupe.mjs`：`gh pr list --repo xiechimon/cairn`、`git ls-remote --heads origin` 只读查重，用 xiechimon 的 gh 登录。
-- `~/.local/bin/ai-route`（链到 `~/.agents/automation/ai-route/ai-route.py`）：只起 `codex app-server`、pi、grok 子进程，没有 git commit、git push、gh 调用。
-- CI 里的 `GITHUB_TOKEN`：不属于这些身份。
+- `scripts/dispatch-agent.mjs`: only `spawn`s the commands given to it; it never commits, pushes, or opens PRs.
+- `scripts/dispatch-dedupe.mjs`: read-only duplicate checks via `gh pr list --repo xiechimon/cairn` and `git ls-remote --heads origin`, using xiechimon's gh login.
+- `~/.local/bin/ai-route` (symlinked to `~/.agents/automation/ai-route/ai-route.py`): only spawns `codex app-server`, pi, and grok child processes; no git commit, git push, or gh calls.
+- `GITHUB_TOKEN` in CI: belongs to none of these identities.
 
-合并、审批、改标签这类需要人身份的操作仍用 xiechimon 的 gh 登录，不走 App token。
+Merging, approving, and label changes — operations that need a human identity — still use xiechimon's gh login and never go through the App token.
 
-## token 的约束
+## Token constraints
 
-- 一小时过期，每次现换，不缓存。
-- 不写进文件、不进仓库、不进日志、不进 PR 与 issue 文字；本文不含任何令牌值。
-- 不把 token 或 `.pem` 交给 agent 进程：换 token 与推送由派活方在命令前缀里完成。
+- One-hour expiry; exchanged fresh each time, never cached.
+- Never written to a file, never committed to the repo, never logged, never put into PR or issue text; this document contains no token value.
+- Neither the token nor the `.pem` is handed to an agent process: token swapping and pushing are done by the dispatching side through the command prefix.
 
-## Code Owners 审核
+## Code Owners review
 
-`.github/CODEOWNERS` 把 `integration/eval/**`、`.claude/hillclimb/**` 和 CODEOWNERS 文件自身的 owner 设为 `@xiechimon`。这些路径合并闸本来就判给人审（`.claude/**`、`.github/**` 在保护清单里；`integration/eval/**` 在可自动合并集之外）。
+`.github/CODEOWNERS` sets the owner of `integration/eval/**`, `.claude/hillclimb/**`, and the CODEOWNERS file itself to `@xiechimon`. The merge gate already routes these paths to human review (`.claude/**` and `.github/**` are on the protected list; `integration/eval/**` is outside the auto-mergeable set).
 
-「Require review from Code Owners」要在 App 能开 PR 之后才打开。原因：PR 作者若是 xiechimon，ian 不能批准自己的 PR，而 CODEOWNERS 里 owner 也是 xiechimon，打开后碰这些路径的 PR 永远拿不到有效的 code owner 审核。App 开的 PR，作者是 `cairnwright[bot]`，ian 才能批准。App 开 PR 已在 2026-10-25 实测成功。
+"Require review from Code Owners" is to be enabled only after the App can open PRs. Reason: if the PR author is xiechimon, ian cannot approve his own PR, and the owner in CODEOWNERS is also xiechimon — once enabled, PRs touching these paths would never obtain a valid code-owner review. For PRs opened by the App the author is `cairnwright[bot]`, which ian can approve. App-opened PRs were measured working on 2026-10-25.
 
-开启条件与方式：
+Conditions and how to enable:
 
-- 条件：#1669 合入 main，且 ian 本人确认。
-- 设置：`required_approving_review_count=0` 加 `require_code_owner_reviews=true`。这样只有碰 CODEOWNERS 路径的 PR 需要 ian 批准，其它 PR 不要求审核。
-- 改之前保存 main 分支保护的当前快照，以便回退。
+- Condition: #1669 merged into main, and ian personally confirms.
+- Setting: `required_approving_review_count=0` plus `require_code_owner_reviews=true`. This way only PRs touching CODEOWNERS paths need ian's approval; other PRs require no review.
+- Before changing it, save a snapshot of the current main branch protection so it can be rolled back.

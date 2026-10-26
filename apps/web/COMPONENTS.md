@@ -1,15 +1,15 @@
-# 复用清单（cairn web）
+# Reuse inventory (cairn web)
 
-> 这份文件只回答一个问题：**要写一个新的 UI 件之前，先看这里——已有的能不能直接用。**
-> 「长什么样」（颜色 / 字号 / 圆角 / 阴影 / 动效 / 各件的视觉规格）在 [DESIGN.md](./DESIGN.md)；本文件管「**有哪些、在哪、该复用谁**」。
-> 三条机器门钉住它不腐烂（`test/ui-reuse-inventory.test.ts`）：新轨每件必须登记、清单里的件必须真实存在、旧轨终态（`src/ui/` 目录不得复活）。
+> This file answers exactly one question: **before writing a new UI piece, look here first — can an existing one be used directly?**
+> "What it looks like" (colors / font sizes / radii / shadows / motion / the visual spec of each piece) lives in [DESIGN.md](./DESIGN.md); this file governs "**what exists, where, and what to reuse**".
+> Three machine gates keep it from rotting (`test/ui-reuse-inventory.test.ts`): every new-track piece must be registered, every piece in the inventory must really exist, and the old track's final state must hold (the `src/ui/` directory must not resurrect).
 
-## 一、单轨（旧轨已退役）
+## 1. Single track (the old track is retired)
 
-| 轨 | 位置 | 状态 |
+| Track | Location | State |
 |---|---|---|
-| **唯一轨** | `src/components/ui/` | **新代码一律落这里。** shadcn 件 + Base UI 基（#410 裁决），带仓内偏离记录 |
-| ~~旧轨~~ | ~~`src/ui/`~~ | **已整目录删除（#952，spec/22 §5 退役正典表执行完毕）**：`chip`→`status-chip.tsx`（#942）、`input`→`components/ui/input.tsx`（#944）、`dialog.css` 表单族→utility 等值迁移 + `dialog-shell.tsx` 机制内联（#952）。机器门钉住目录不得复活 |
+| **The only track** | `src/components/ui/` | **All new code lands here.** shadcn pieces + Base UI base (#410 ruling), with in-repo deviation records |
+| ~~Old track~~ | ~~`src/ui/`~~ | **Deleted as a whole directory (#952, the spec/22 §5 retirement canonical table fully executed)**: `chip`→`status-chip.tsx` (#942), `input`→`components/ui/input.tsx` (#944), the `dialog.css` form family → equivalent utility-class migration + the `dialog-shell.tsx` mechanism inlined (#952). Machine gates pin the directory against resurrecting |
 | Overlay family | `src/overlay/` | Mounts on the shared shell (see section three); **never hand-roll OverlayMount + useEscClose** |
 
 <!-- inventory:old-track-frozen -->
@@ -17,89 +17,89 @@
 ```
 <!-- /inventory:old-track-frozen -->
 
-（上面这段是机器门读的终态名单：旧轨已删空，名单恒空；`src/ui/` 目录重新出现即报错。）
+(The block above is the final-state list the machine gate reads: the old track is fully deleted and the list is permanently empty; the reappearance of the `src/ui/` directory is an error.)
 
-## 二、新轨原语（34）
+## 2. New-track primitives (34)
 
 <!-- inventory:new-track -->
 ```text
-alert-dialog-shell.tsx   # 确认面共用底座（删除确认 / 丢草稿确认），走 Base UI AlertDialog
+alert-dialog-shell.tsx   # shared base for confirm surfaces (delete confirm / discard-draft confirm), built on Base UI AlertDialog
 alert-dialog.tsx
-attachment.tsx           # shadcn Attachment 族（Attachment/Media/Content/Title/Description/Actions/Trigger/Group）：附件卡片原语（#1009 B 段附件面消费；别手写附件盒）
-avatar.tsx               # shadcn Avatar 族（Root/Image/Fallback/Badge/Group，底座 Base UI，上游发丝环在位）；头像消费别直接用三件套，走 seeded-avatar.tsx
-badge.tsx                # 计数 / 标签 pill；任务状态语义色族见 DESIGN.md
-bubble.tsx               # shadcn Bubble 族（Bubble/Content/Group/Reactions）：聊天流消息气泡（#1009 A1 chief 消息流 / A2 detail 对话列消费）；皮肤走 variant 档 + 消费点中和，别发明底色
-button.tsx               # registry 同源 + 仓内语义映射（type=button 默认、data-variant/data-size 观测点，#411）；主 CTA = default 档（brand 档已退役，#982/#991）
+attachment.tsx           # shadcn Attachment family (Attachment/Media/Content/Title/Description/Actions/Trigger/Group): attachment card primitive (#1009 phase B attachment surface consumer; do not hand-write attachment boxes)
+avatar.tsx               # shadcn Avatar family (Root/Image/Fallback/Badge/Group, Base UI base, upstream hairline ring intact); avatar consumers do not use the raw trio — go through seeded-avatar.tsx
+badge.tsx                # count / label pill; the task-status semantic color family is in DESIGN.md
+bubble.tsx               # shadcn Bubble family (Bubble/Content/Group/Reactions): chat-stream message bubbles (#1009 A1 chief message stream / A2 detail conversation column consumers); skinning goes through the variant tiers + neutralization at the consumer — do not invent background colors
+button.tsx               # registry-same-source + in-repo semantic mapping (type=button default, data-variant/data-size observation points, #411); primary CTA = default tier (the brand tier is retired, #982/#991)
 card.tsx
-checkbox.tsx             # 复选（registry 同源 + 一件零皮肤语义映射：indeterminate 渲染横杠，#952/#982）；行盒 = 消费点 label 包裹；**别直接摆裸 `<input type="checkbox">`**——浏览器自带方框与仓内复选行不同族
-dialog-shell.tsx         # 对话框共用底座（e2e 载体 = role=dialog 可及名 + dialog-head/-body/-foot testid，spec/22 §5.5）
+checkbox.tsx             # checkbox (registry-same-source + a one-piece zero-skin semantic mapping: indeterminate renders a dash, #952/#982); the row box = the consumer's label wrap; **do not place a bare `<input type="checkbox">`** — the browser's built-in box is a different family from the in-repo checkbox row
+dialog-shell.tsx         # shared dialog base (e2e vehicle = role=dialog accessible name + dialog-head/-body/-foot testids, spec/22 §5.5)
 dialog.tsx
-dropdown-menu.tsx        # 仓内语义映射：z 走 --z-dialog 单梯（#733）、Content 透出 anchor（#454）；动效 = 上游默认（#991 Q9）
+dropdown-menu.tsx        # in-repo semantic mapping: z goes through the single --z-dialog ladder (#733), Content exposes anchor (#454); motion = upstream defaults (#991 Q9)
 empty.tsx
-field.tsx                # 表单行组合（FieldGroup/Field/FieldLabel/FieldContent/FieldError…）：表单布局一律用它，别拿 div + space-y 手排
+field.tsx                # form row composition (FieldGroup/Field/FieldLabel/FieldContent/FieldError…): all form layouts use it, do not hand-arrange with div + space-y
 input.tsx
-input-group.tsx          # 输入组合件（InputGroupInput/InputGroupAddon/InputGroupButton…）：输入框里要挂按钮/图标/前后缀时用它，别把裸 Input 塞进自制盒子
-kbd.tsx                  # 按键角标原语（文档正文里的 ⌘K 角标）；悬浮快捷键提示 = TooltipContent 内放 Kbd（官网组合，#1008）
-label.tsx                # 表单标签原语（配合 field.tsx 的 FieldLabel 使用；独立 label 场景直用）
-marker.tsx               # shadcn Marker 族（Marker/Icon/Content，separator/border 档）：聊天流内标注行（系统提示/失败行/分隔等居中 annotation）
-message-scroller.tsx     # shadcn MessageScroller 族（Provider/Root/Viewport/Content/Item/Button + useMessageScroller hooks）：聊天流滚动容器唯一实现（autoScroll 贴底跟随 + jump-to-latest + messageId 贯通）；别再手写 overflow-y-auto 对话列
-message.tsx              # shadcn Message 族（Message/Avatar/Content/Header/Footer/Group）：聊天流消息行骨架（头像列 + 内容列）；行皮肤归 bubble/marker
-panel.tsx                # 静息内容容器消解（Panel/PanelHead/PanelRow/PanelLabel/PanelValue）：贴在页面里的方框一律用它；皮肤档 quiet/outlined，per-face 数值留属地 css
-popover.tsx              # 仓内语义映射：z 走 --z-dialog 单梯（#733）；动效 = 上游默认（#991 Q9）
-seeded-avatar.tsx        # dicebear 种子头像适配层（src 覆盖 > name 种子 > 兜底换图，img 常驻 DOM；Root 定尺盒，几何走消费点 className size-N，#983/#1003）；头像一律用它
-select.tsx               # 单选下拉（registry 同源 compound 族：Select/SelectTrigger/SelectValue/SelectContent/SelectItem，#1010 回源，XMON-75 手写形退役；清空档 = value=null 的 SelectItem，几何/锚位归 Base UI Positioner 默认）；**别再用原生 `<select>`**——它弹的是系统菜单，跟自制弹层并排就是两套弹窗
-separator.tsx            # 语义分隔线（field.tsx 的 registryDependency）：替代 <hr> 与 border-t div
+input-group.tsx          # input composition piece (InputGroupInput/InputGroupAddon/InputGroupButton…): use it when a button/icon/prefix/suffix must live inside the input — do not stuff a bare Input into a homemade box
+kbd.tsx                  # key-cap primitive (the ⌘K cap in doc body text); floating shortcut hints = Kbd inside TooltipContent (the official-site composition, #1008)
+label.tsx                # form label primitive (used with field.tsx's FieldLabel; use directly for standalone label cases)
+marker.tsx               # shadcn Marker family (Marker/Icon/Content, separator/border tiers): annotation rows inside the chat stream (system notes / failure rows / separators, etc., centered annotations)
+message-scroller.tsx     # shadcn MessageScroller family (Provider/Root/Viewport/Content/Item/Button + useMessageScroller hooks): the single implementation of the chat-stream scroll container (autoScroll bottom-follow + jump-to-latest + messageId pass-through); do not hand-write overflow-y-auto conversation columns anymore
+message.tsx              # shadcn Message family (Message/Avatar/Content/Header/Footer/Group): the chat-stream message row skeleton (avatar column + content column); row skinning belongs to bubble/marker
+panel.tsx                # dissolves resting content containers (Panel/PanelHead/PanelRow/PanelLabel/PanelValue): every box pinned into a page goes through it; skin tiers quiet/outlined, per-face numbers stay in the local css
+popover.tsx              # in-repo semantic mapping: z goes through the single --z-dialog ladder (#733); motion = upstream defaults (#991 Q9)
+seeded-avatar.tsx        # dicebear seeded-avatar adapter layer (src override > name seed > fallback image swap, img permanently in the DOM; Root is a fixed-size box, geometry via consumer className size-N, #983/#1003); always use it for avatars
+select.tsx               # single-select dropdown (registry-same-source compound family: Select/SelectTrigger/SelectValue/SelectContent/SelectItem, #1010 re-sourced, the XMON-75 hand-written form retired; the clear tier = a SelectItem with value=null, geometry/anchoring left to Base UI Positioner defaults); **do not use the native `<select>` anymore** — it pops the system menu, and sitting next to homemade popups that is two popup systems
+separator.tsx            # semantic divider (registryDependency of field.tsx): replaces <hr> and border-t divs
 skeleton.tsx             # first-load placeholder drawn in the card shape while data has not arrived; use it instead of a spinner or empty copy (no existing primitive covers this)
-status-chip.tsx          # 任务状态五态 chip（idle/plan/confirm/done/failed，皮肤 = --chip-* token 对）；落在 badge.tsx 上，状态载体 data-tone；替旧轨 ui/chip.tsx（正典表 spec/22 §5.2，#942）
+status-chip.tsx          # the five-state task-status chip (idle/plan/confirm/done/failed, skin = --chip-* token pairs); lands on badge.tsx, the state vehicle is data-tone; replaces the old-track ui/chip.tsx (canonical table spec/22 §5.2, #942)
 switch.tsx
-tabs.tsx                 # default/line 两档走上游原生 data-[variant] 机制 + TabsIndicator 零 chrome 透传（#644，去留归 #1009）；segmented/bare 手写档已退役（#991），分段控制器皮肤 = pages/parts.ts 的 SEG_* 配方
-tag-chip.tsx             # 用户数据色标签 chip（tag.color 走 inline style 白字）；落在 badge.tsx 上，别新建皮肤件
-textarea.tsx             # 多行输入（registry 同源）；**别摆裸 `<textarea>`**——老 .dlg-form-textarea 族已退役（spec/22 §5.3）
-toaster.tsx              # toast 原语（sonner，shadcn 官方配方；#631）：App 根挂一次 <Toaster />，任意处 imperative `toast.*`；**失败反馈别再造静默 catch**——异常/toast 一律走它
-tooltip.tsx              # hover/focus 信息气泡（官网形态；z 走 --z-dialog 单梯）；快捷键提示 chip = Tooltip+Kbd 组合（#983 判决，#1008 已落地，kbd-hint.tsx 退役）；App 根已挂全站 TooltipProvider（delay=0）
+tabs.tsx                 # default/line tiers ride the upstream native data-[variant] mechanism + zero-chrome TabsIndicator pass-through (#644, keep-or-go belongs to #1009); the segmented/bare hand-written tiers are retired (#991), the segmented control skin = the SEG_* recipes in pages/parts.ts
+tag-chip.tsx             # user-data-colored tag chip (tag.color via inline style with white text); lands on badge.tsx, do not create a new skin piece
+textarea.tsx             # multi-line input (registry-same-source); **do not place a bare `<textarea>`** — the old .dlg-form-textarea family is retired (spec/22 §5.3)
+toaster.tsx              # toast primitive (sonner, the official shadcn recipe; #631): mount <Toaster /> once at the App root, then imperative `toast.*` anywhere; **do not build another silent catch for failure feedback** — exceptions/toasts always go through it
+tooltip.tsx              # hover/focus info bubble (official-site form; z goes through the single --z-dialog ladder); the shortcut hint chip = the Tooltip+Kbd composition (#983 ruling, landed in #1008, kbd-hint.tsx retired); the App root already mounts a site-wide TooltipProvider (delay=0)
 ```
 <!-- /inventory:new-track -->
 
-**上游同源纪律（#989 正典）**：`components/ui/` 只许 registry 同源件 + 零皮肤适配层。每件的同源状态（pristine / deviated + 理由）以 `scripts/ui-registry.json` hash 账本为**唯一事实源**，CI 闸机械核对；重拉上游走 `node scripts/ui-registry-refresh.mjs`（CLI pin + R1–R5 重写 + biome 归一），**禁止**手改件内容绕过账本——改一处没重冻账本，check job 即红。
+**Upstream-same-source discipline (#989 canonical)**: `components/ui/` may only contain registry-same-source pieces + zero-skin adapter layers. Each piece's same-source state (pristine / deviated + reason) has the `scripts/ui-registry.json` hash ledger as its **single source of truth**, checked mechanically by the CI gate; re-pulling upstream goes through `node scripts/ui-registry-refresh.mjs` (CLI pin + R1–R5 rewrite + biome normalization), and **hand-editing a piece's contents to bypass the ledger is forbidden** — changing a piece without re-freezing the ledger turns the check job red.
 
-## 三、什么时候用哪个
+## 3. Which one to use when
 
-| 要做的面 | 用什么 | 别做什么 |
+| Surface to build | Use | Do not |
 |---|---|---|
-| 按钮 / 图标按钮 | `components/ui/button.tsx` | 别新写 `<button>` + 自造类 |
-| 输入框 | `components/ui/input.tsx` | 别摆裸 `<input>`（deliberate-native 标记除外） |
-| 多行输入 | `components/ui/textarea.tsx` | 别摆裸 `<textarea>` / 别沿用 `.dlg-form-textarea` 老类 |
-| 任务状态 chip（五态） | `components/ui/status-chip.tsx`（退役正典表 = spec/22 §5，#942） | 别新写 `.chip--*` 类族（ui-drift-gate G3 钉） |
-| 开关 | `components/ui/switch.tsx` | — |
-| 标签页 | `components/ui/tabs.tsx` | — |
-| 计数 / 标签 pill | `components/ui/badge.tsx`（状态色族） | 状态五态走 `status-chip.tsx`，别混两种载体 |
-| 空态 | `components/ui/empty.tsx` | 别每处自写空态文案块 |
-| 确认对话框 | `components/ui/alert-dialog-shell.tsx` | 别手搓 `OverlayMount` + `useEscClose` |
-| 普通对话框 | `components/ui/dialog-shell.tsx` | 消费点只改 import 路径即可（API 逐字相同） |
-| 锚定浮层（下拉 / 菜单 / popover） | `dropdown-menu.tsx`（菜单族）/ `popover.tsx`（面板族，跨组件锚走 Content 的 `anchor`）/ `dialog.tsx`（居中模态族） | 别自造定位壳（floating-shell.tsx 已随 #1010 删除） |
-| **单选下拉**（选一个值出来） | `components/ui/select.tsx`（registry compound 族，#1010） | 别用原生 `<select>`（弹系统菜单，与自制弹层并排两套）、别各面自写触发钮+弹层 |
-| 复选 | `components/ui/checkbox.tsx` | 别摆裸 `<input type="checkbox">`——浏览器自带方框与仓内复选行不同族 |
-| **静息方框**（页面里不动的卡 / 面板 / 设置块） | `components/ui/panel.tsx`（`Panel` + `PanelHead` / `PanelRow` / `PanelLabel` / `PanelValue`） | 别新起 `.xxx-card` 手写类——皮肤（描边 / 底色 / 圆角）只住 Panel 一处 |
-| 布局块（要自带皮肤的容器） | `components/ui/card.tsx`（shadcn 布局壳；消费点自覆盖 `ring-0` / `py-0` / 圆角） | 别拿它当视觉原件——它的 `ring-1` + `rounded-xl` + `bg-card` 与仓内需求错配，真卡是 per-face 类族 |
-| **头像** | `components/ui/seeded-avatar.tsx`（dicebear 种子 + 兜底换图，img 常驻 DOM；尺寸走 SeededAvatar 的 `className="size-N"`，Root 定尺盒） | 别直接用 `avatar.tsx` 三件套——种子/兜底语义会抄散 |
-| 表单行组合 | `components/ui/field.tsx`（FieldGroup + Field + FieldLabel） | 别拿 `div` + `space-y-*` / `grid gap-*` 手排表单 |
-| 输入框带按钮/图标 | `components/ui/input-group.tsx` | 别把裸 `Input` 塞进自制组合盒 |
-| hover 信息气泡 | `components/ui/tooltip.tsx` | — |
-| 分隔线 | `components/ui/separator.tsx` | 别用 `<hr>` / `border-t` div |
-| 快捷键提示 chip | `tooltip.tsx` + `kbd.tsx` 消费点现场组合（TooltipContent 内放 Kbd，#1008/#983 判决） | 别自写绝对定位 + 显隐；文档正文里的按键角标直用 `kbd.tsx` |
-| 标签 chip（用户数据色） | `components/ui/tag-chip.tsx` | 状态色族仍走 `badge.tsx`；别混两种色来源 |
-| **toast / 轻量失败反馈** | `toast.*`（imperative；`components/ui/toaster.tsx` 已在 App 根挂载） | 别静默吞 mutation 错误；**面内已有 scoped 红字行 canon 的（XMON-80/P2）继续走面内，不叠 toast** |
+| Button / icon button | `components/ui/button.tsx` | Do not write a new `<button>` + homemade classes |
+| Input | `components/ui/input.tsx` | Do not place a bare `<input>` (except deliberate-native markings) |
+| Multi-line input | `components/ui/textarea.tsx` | Do not place a bare `<textarea>` / do not keep using the old `.dlg-form-textarea` classes |
+| Task-status chip (five states) | `components/ui/status-chip.tsx` (retirement canonical table = spec/22 §5, #942) | Do not write a new `.chip--*` class family (pinned by ui-drift-gate G3) |
+| Switch | `components/ui/switch.tsx` | — |
+| Tabs | `components/ui/tabs.tsx` | — |
+| Count / label pill | `components/ui/badge.tsx` (the status color family) | The five task states go through `status-chip.tsx`; do not mix the two vehicles |
+| Empty state | `components/ui/empty.tsx` | Do not hand-write an empty-state copy block per site |
+| Confirm dialog | `components/ui/alert-dialog-shell.tsx` | Do not hand-roll `OverlayMount` + `useEscClose` |
+| Regular dialog | `components/ui/dialog-shell.tsx` | Consumers only change the import path (the API is verbatim the same) |
+| Anchored floating surface (dropdown / menu / popover) | `dropdown-menu.tsx` (menu family) / `popover.tsx` (panel family, cross-component anchoring via the Content's `anchor`) / `dialog.tsx` (centered modal family) | Do not build a homemade positioning shell (floating-shell.tsx was deleted with #1010) |
+| **Single-select dropdown** (pick one value) | `components/ui/select.tsx` (registry compound family, #1010) | Do not use the native `<select>` (pops the system menu — two systems next to homemade popups), do not hand-write trigger-button + popup per surface |
+| Checkbox | `components/ui/checkbox.tsx` | Do not place a bare `<input type="checkbox">` — the browser's built-in box is a different family from the in-repo checkbox row |
+| **Resting box** (a card / panel / settings block sitting still on a page) | `components/ui/panel.tsx` (`Panel` + `PanelHead` / `PanelRow` / `PanelLabel` / `PanelValue`) | Do not start a new hand-written `.xxx-card` class — the skin (border / background / radius) lives only in Panel |
+| Layout block (a container that wants its own skin) | `components/ui/card.tsx` (the shadcn layout shell; consumers self-override `ring-0` / `py-0` / radius) | Do not use it as a visual primitive — its `ring-1` + `rounded-xl` + `bg-card` mismatches in-repo needs; a real card is a per-face class family |
+| **Avatar** | `components/ui/seeded-avatar.tsx` (dicebear seed + fallback image swap, img permanently in the DOM; sizes via SeededAvatar's `className="size-N"`, Root is a fixed-size box) | Do not use the `avatar.tsx` trio directly — the seed/fallback semantics would be copied apart |
+| Form row composition | `components/ui/field.tsx` (FieldGroup + Field + FieldLabel) | Do not hand-arrange forms with `div` + `space-y-*` / `grid gap-*` |
+| Input with button/icon | `components/ui/input-group.tsx` | Do not stuff a bare `Input` into a homemade composition box |
+| Hover info bubble | `components/ui/tooltip.tsx` | — |
+| Divider | `components/ui/separator.tsx` | Do not use `<hr>` / `border-t` divs |
+| Shortcut hint chip | the `tooltip.tsx` + `kbd.tsx` composition assembled at the consumer (Kbd inside TooltipContent, the #1008/#983 ruling) | Do not hand-write absolute positioning + show/hide; the key caps in doc body text use `kbd.tsx` directly |
+| Tag chip (user data color) | `components/ui/tag-chip.tsx` | The status color family still goes through `badge.tsx`; do not mix the two color sources |
+| **Toast / lightweight failure feedback** | `toast.*` (imperative; `components/ui/toaster.tsx` is already mounted at the App root) | Do not silently swallow mutation errors; **surfaces that already have an in-surface scoped red-line canon (XMON-80/P2) keep going in-surface and do not stack toast on top** |
 
-## 四、消费现状（2026-09-30 快照，仅供判断，不进门）
+## 4. Consumption snapshot (2026-09-30 snapshot, for judgment only, not gated)
 
-- `Button` 消费点最广（22/38 面），是原语层的骨干；`Card` 消费 0——**真实卡片是 7 个 per-face 类族**，说明「Card」这个原语抽象与仓内实际需求错配。**迁移时以消费点为准，不以原语名号为准。**
-- 弹层族实测 **19 个挂载文件**（共享壳 14 消费点 + 2 手工壳，见 #418），整族先迁、排在各域之前，避免半迁移的缝合线在每个域重复出现。
-- 类名钉扎 872 处 / 302 distinct，视觉回归靠 computed-style 探针（无位图基线）。
+- `Button` has the widest consumer base (22/38 surfaces) and is the backbone of the primitive layer; `Card` has 0 consumers — **real cards are 7 per-face class families**, showing that the "Card" primitive abstraction mismatches in-repo actual needs. **When migrating, follow the consumers, not the primitive names.**
+- The overlay family measured **19 mounting files** (14 consumers of the shared shells + 2 handmade shells, see #418); migrate the whole family first, ahead of every domain, so the seam of a half-migration does not repeat in every domain.
+- Class-name pinning: 872 occurrences / 302 distinct; visual regression relies on computed-style probes (no bitmap baselines).
 
-## 五、指针
+## 5. Pointers
 
-- **#417** — 全站铺开 shadcn/ui 的批次表与验收口径（本文件的迁移期前提）
-- **#409** — 散件分级盘点（低 2 / 中 9 / 高 3）
-- **#410** — primitives 选型裁决（Base UI / `@base-ui/react`）
-- **#418** — 弹层族实测对照矩阵
-- [DESIGN.md](./DESIGN.md) — 视觉身份与各件视觉规格；跨 shell 的缝色 `--border-default` 与 focus 环 canon 是契约，改动走视觉 spec
+- **#417** — the batch table and acceptance criteria for rolling shadcn/ui out across the site (the migration-period premise of this file)
+- **#409** — the per-piece tiered audit (low 2 / medium 9 / high 3)
+- **#410** — the primitives selection ruling (Base UI / `@base-ui/react`)
+- **#418** — the measured overlay-family comparison matrix
+- [DESIGN.md](./DESIGN.md) — the visual identity and the per-piece visual specs; the cross-shell seam color `--border-default` and the focus-ring canon are contracts, and changes go through the visual spec
