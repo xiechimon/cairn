@@ -3,6 +3,7 @@
 // second event that closes the drawer; it does not pass through an
 // intermediate open (#1266). The browser half of that regression is
 // e2e/chief-toggle-flash.spec.ts.
+import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,7 +119,16 @@ describe('single landing file', () => {
 
   test('#1266 flash spec stays in this regression set', () => {
     const spec = readFileSync(join(webRoot, 'e2e/chief-toggle-flash.spec.ts'), 'utf8');
-    expect(spec).toContain('gesture-machine');
     expect(spec).toContain('opacityTransitions');
+    const affected = spawnSync(
+      process.execPath,
+      [
+        join(webRoot, '../../scripts/e2e-affected.mjs'),
+        '--dry-run',
+        'apps/web/src/overlay/gesture-machine.ts',
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(affected.stdout).toContain('chief-toggle-flash.spec.ts');
   });
 });

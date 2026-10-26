@@ -186,7 +186,7 @@ const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 const FILE_RULES = new Map([
   ['apps/web/src/overlay/chip-popover.tsx', OVERLAYS],
-  ['apps/web/src/overlay/gesture-machine.ts', OVERLAYS],
+  ['apps/web/src/overlay/gesture-machine.ts', [...OVERLAYS, 'chief-toggle-flash']],
   ['apps/web/src/overlay/hotkeys.ts', OVERLAYS],
   ['apps/web/src/overlay/plan-dropdown.tsx', OVERLAYS],
   ['apps/web/src/overlay/search-panel.tsx', OVERLAYS],
