@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8195f9bc-b221-41f5-8b8e-d4a71ac4fba2",
+  "id": "e071d4f5-f97d-451c-bf9b-656e0af9cace",
   "prevId": "fa6a22ae-bc34-4bbd-b1bb-ab685e979694",
   "tables": {
     "agent": {
@@ -3299,6 +3299,22 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'code'"
+        },
+        "userSpecAttachmentIds": {
+          "name": "userSpecAttachmentIds",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
+        "userMessageAttachmentIds": {
+          "name": "userMessageAttachmentIds",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
         }
       },
       "indexes": {
