@@ -981,7 +981,6 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
     name: m.name,
     online: m.online,
     enabledRuntimes: m.enabledRuntimes,
-    shellEnabled: m.shellEnabled,
     ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),
     ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),

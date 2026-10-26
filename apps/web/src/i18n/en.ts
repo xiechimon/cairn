@@ -1039,10 +1039,6 @@ export const EN: Record<string, string> = {
   可跑: 'Runnable',
   不可跑: 'Not runnable',
   '暂无机器。': 'No machines yet.',
-  // XMON-113：机器行 shell 开关的副文案（机器侧半边；{tool} 插值 = 上面那条
-  // AGENT_TOOL_SHELL 的 en 值，两层开关共用同一词）。
-  '已授权「{tool}」的 Agent 可在该机器上执行命令。':
-    'Agents you have granted {tool} to can run commands on this machine.',
   // #895 机器页三态读标注（spec 21 A8；orchestration 块 join 行集）+ chief
   // 设置 Agent tab「机器」槽的描述（A6）。徽标/状态 = 机器与总管编排的
   // 关系面，非机器自身状态。
@@ -1059,7 +1055,6 @@ export const EN: Record<string, string> = {
     'Which team skills this Agent may read. Unrestricted reads everything; once restricted, only the checked skills are readable and every unchecked one is denied. Unrestricted and nothing-checked are two different states, switchable either way.',
   // shared canon（packages/shared/src/records/agent.ts、memory.ts），经 t()
   // 消费、不作字面量出现——i18n-coverage COMPUTED_KEYS 登记。
-  '远程 shell': 'Remote shell',
   合并分支: 'Merge branches',
   创建标签: 'Create tags',
   推送分支: 'Push branches',
@@ -1067,8 +1062,6 @@ export const EN: Record<string, string> = {
   更新技能: 'Update skills',
   运行时: 'Runtime',
   '内置 (pi)': 'Built-in (pi)',
-  '允许该 Agent 在团队中已开启 shell 访问的机器上执行命令。':
-    'Allow this Agent to run commands on machines where shell access is enabled for the team.',
   '允许该 Agent 通过合并分支进行发布（例如将 develop 合并进 main）。':
     'Let this Agent publish by merging branches (for example develop into main).',
   '允许该 Agent 创建 git tag，这可能触发发布流程。':

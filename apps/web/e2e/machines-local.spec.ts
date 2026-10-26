@@ -43,32 +43,20 @@ test('per-runtime brand mark: both present + brightness split = enabledRuntimes 
   await expect(cc).toHaveAttribute('data-enabled', 'false');
 });
 
-test('inline control face = shell switch + two concurrency selectors (XMON-113 + #1108; dead buttons still none)', async ({
+test('inline control face = concurrency selector, no remote-shell switch (#1796)', async ({
   page,
 }) => {
   await page.goto(MACHINES);
-  await expect(page.locator(`${LOCAL_ROW} [role="switch"]`)).toHaveCount(1);
+  await expect(page.locator(`${LOCAL_ROW} [role="switch"]`)).toHaveCount(0);
+  await expect(page.locator(`${LOCAL_ROW} [data-machine-col="shell"]`)).toHaveCount(0);
+  await expect(page.locator(LOCAL_ROW)).not.toContainText('远程 shell');
+  await expect(page.locator(LOCAL_ROW)).not.toContainText('Remote shell');
 
   await expect(page.locator(`${LOCAL_ROW} button[aria-label^="并发上限"]`)).toHaveCount(1);
 
   await expect(page.locator(`${LOCAL_ROW} button`)).toHaveCount(1);
 
   await expect(page.locator(`${LOCAL_ROW} [data-runtime] [role="switch"]`)).toHaveCount(0);
-});
-
-test('sub-row hint removed, re-hung on the shell switch-cluster tooltip (#1175)', async ({ page }) => {
-  await page.goto(MACHINES);
-  const hint = page.locator('[data-slot="tooltip-content"]');
-
-  await expect(page.locator(LOCAL_ROW)).not.toContainText(
-    '已授权「远程 shell」的 Agent 可在该机器上执行命令。',
-  );
-  await expect(hint).toHaveCount(0);
-  await expect(page.locator(LOCAL_ROW)).not.toContainText('· max');
-
-  await page.locator(`${LOCAL_ROW} [data-slot="tooltip-trigger"]`).hover();
-  await expect(hint).toBeVisible();
-  await expect(hint).toHaveText('已授权「远程 shell」的 Agent 可在该机器上执行命令。');
 });
 
 test('local row not deletable: no delete-class control in the row (negative)', async ({ page }) => {

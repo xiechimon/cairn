@@ -1,6 +1,5 @@
 import type { ClaimedStep } from '@cairn/shared';
 import {
-  AGENT_TOOL_SHELL,
   AGENT_TOOL_TAG,
   appendMergedPrGuard,
   buildMergedPrGuardInstruction,
@@ -9,7 +8,6 @@ import {
   CHIEF_REMOTE_TOOLS,
   formatSkillRouteSection,
   LOCAL_TOOL_CREATE_TAG,
-  LOCAL_TOOL_REMOTE_SHELL,
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
   type SkillInjectionRecord,
@@ -127,14 +125,8 @@ function claimMcpSlugs(
   return [...agentSlugs];
 }
 
-function claimLocalTools(
-  machineRow: { shellEnabled: boolean },
-  agentTools: readonly string[],
-): string[] {
+function claimLocalTools(agentTools: readonly string[]): string[] {
   const tools: string[] = [];
-  if (agentTools.includes(AGENT_TOOL_SHELL) && machineRow.shellEnabled) {
-    tools.push(LOCAL_TOOL_REMOTE_SHELL);
-  }
   if (agentTools.includes(AGENT_TOOL_TAG)) {
     tools.push(LOCAL_TOOL_CREATE_TAG);
   }
@@ -411,7 +403,7 @@ async function tryClaim(
         tools: [...agentRow.tools],
       },
       remoteTools: [...(isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS)],
-      localTools: claimLocalTools(machineRow, agentRow.tools),
+      localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }

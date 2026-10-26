@@ -96,7 +96,7 @@ describe('member_activity: only a member’s successful writes count', () => {
     ['POST', '/api/projects', 409, false],
     ['POST', '/api/mcp', 200, false],
     ['POST', '/api/machine/claim', 200, false],
-    ['POST', '/api/webhook/github/tok', 202, false],
+    ['POST', '/api/webhook/github/tok', 202, true],
     ['GET', '/api/oauth/callback', 302, false],
     ['POST', '/api/machinefoo', 200, true],
     ['POST', '/git/team/repo', 200, false],

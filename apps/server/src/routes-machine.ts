@@ -11,8 +11,6 @@ import {
   machineEnrollStartBodySchema,
   machineHeartbeatBodySchema,
   machinePresenceBodySchema,
-  machineShellPrecheckBodySchema,
-  machineShellResultBodySchema,
   machineSyncResultBodySchema,
   machineThinkingDeltaBodySchema,
   machineToolBodySchema,
@@ -33,7 +31,6 @@ import { newRecordId } from './lib/ids.js';
 import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
-import { precheckShellCommand, reportShellResult } from './services/machine-shell.js';
 import {
   createUploadUrls,
   getStepSession,
@@ -462,19 +459,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         ...(body.errorMessage !== undefined ? { errorMessage: body.errorMessage } : {}),
       },
     );
-    return c.json({ ok: true as const });
-  });
-
-  app.post('/api/machine/shell/:stepId', async (c) => {
-    const row = me(c);
-    const body = parseWith(machineShellPrecheckBodySchema, await jsonBody(c), 'body');
-    return c.json(precheckShellCommand(deps, row.id, c.req.param('stepId'), body));
-  });
-
-  app.post('/api/machine/shell/:runId/result', async (c) => {
-    const row = me(c);
-    const body = parseWith(machineShellResultBodySchema, await jsonBody(c), 'body');
-    reportShellResult(deps, row.id, c.req.param('runId'), body);
     return c.json({ ok: true as const });
   });
 }

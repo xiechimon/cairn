@@ -12,8 +12,6 @@ import {
   type MachineHeartbeatBody,
   type MachineRecord,
   type MachineRecoverResponse,
-  type MachineShellPrecheckResponse,
-  type MachineShellResultBody,
   type MachineSkillsManifestResponse,
   type MachineSteerResponse,
   type MachineStopResponse,
@@ -29,8 +27,6 @@ import {
   machineOkResponseSchema,
   machineRecordSchema,
   machineRecoverResponseSchema,
-  machineShellPrecheckResponseSchema,
-  machineShellResultResponseSchema,
   machineSkillsManifestResponseSchema,
   machineSteerResponseSchema,
   machineStopResponseSchema,
@@ -127,8 +123,6 @@ export interface MachineApi {
   steer(stepId: string): Promise<string | null>;
   stop(stepId: string): Promise<boolean | null>;
   syncResult(syncId: string, body: MachineSyncResultBody): Promise<void>;
-  shellPrecheck(stepId: string, command: string): Promise<MachineShellPrecheckResponse>;
-  shellResult(runId: string, body: MachineShellResultBody): Promise<void>;
   stream(
     signal: AbortSignal,
     onEvent: (ev: MachineStreamEvent) => void,
@@ -518,59 +512,6 @@ export class MachineClient implements MachineApi {
       body,
       parse: (raw) => machineSyncResultResponseSchema.parse(raw),
     });
-  }
-
-  async shellPrecheck(stepId: string, command: string): Promise<MachineShellPrecheckResponse> {
-    const token = this.opts.getToken?.();
-    const res = await this.fetchImpl(this.url(`/api/machine/shell/${stepId}`), {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ command }),
-      signal: AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS),
-    });
-    const raw = (await res.json().catch(() => null)) as { error?: string } | null;
-    if (!res.ok) {
-      const msg =
-        typeof raw?.error === 'string' ? raw.error : `shell precheck failed (HTTP ${res.status})`;
-      throw new MachineApiError(res.status, msg);
-    }
-    return machineShellPrecheckResponseSchema.parse(raw);
-  }
-
-  async shellResult(runId: string, body: MachineShellResultBody): Promise<void> {
-    const delays = [...REMOTE_TOOL_RETRY_DELAYS_MS];
-    let lastErr: unknown;
-    for (let attempt = 0; attempt <= delays.length; attempt++) {
-      try {
-        const token = this.opts.getToken?.();
-        const res = await this.fetchImpl(this.url(`/api/machine/shell/${runId}/result`), {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            ...(token ? { authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS),
-        });
-        if (res.ok) {
-          machineShellResultResponseSchema.parse(await res.json().catch(() => null));
-          return;
-        }
-        const err = new MachineApiError(res.status, await res.text());
-        if (res.status < 500) throw err;
-        lastErr = err;
-      } catch (err) {
-        if (err instanceof MachineApiError && err.status < 500) throw err;
-        lastErr = err;
-      }
-      const delay = delays[attempt];
-      if (delay === undefined) break;
-      await new Promise((r) => setTimeout(r, delay));
-    }
-    throw lastErr instanceof Error ? lastErr : new Error('shell result writeback failed');
   }
 
   async stream(

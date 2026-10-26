@@ -25,7 +25,6 @@ export const REVIEW_FANOUT_ROLES: readonly PersonaRole[] = [
 export const agentStatusSchema = z.enum(['active']);
 
 export const AGENT_TOOL_SWITCHES = [
-  '远程 shell',
   '合并分支',
   '创建标签',
   '推送分支',
@@ -39,8 +38,6 @@ export const AGENT_TOOL_PUSH: AgentToolSwitch = '推送分支';
 export const AGENT_TOOL_SKILL_CREATE: AgentToolSwitch = '创建技能';
 export const AGENT_TOOL_SKILL_UPDATE: AgentToolSwitch = '更新技能';
 
-export const AGENT_TOOL_SHELL: AgentToolSwitch = '远程 shell';
-
 export const AGENT_TOOL_TAG: AgentToolSwitch = '创建标签';
 
 export const AGENT_TOOL_DEFAULTS: readonly AgentToolSwitch[] = [AGENT_TOOL_PUSH];
@@ -48,7 +45,6 @@ export const AGENT_TOOL_DEFAULTS: readonly AgentToolSwitch[] = [AGENT_TOOL_PUSH]
 export const AGENT_DESC_MAX_LENGTH = 2000;
 
 export const AGENT_TOOL_COPY: Record<(typeof AGENT_TOOL_SWITCHES)[number], string> = {
-  '远程 shell': '允许该 Agent 在团队中已开启 shell 访问的机器上执行命令。',
   合并分支: '允许该 Agent 通过合并分支进行发布（例如将 develop 合并进 main）。',
   创建标签: '允许该 Agent 创建 git tag，这可能触发发布流程。',
   推送分支: '允许该 Agent 随时提交并推送其工作分支（自行合并发布改动时需要）。',

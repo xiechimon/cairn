@@ -13,7 +13,6 @@ export const machineRecordSchema = z.object({
   latestCliVersion: z.string().nullable(),
   kind: z.enum(['local', 'remote']),
   enabledRuntimes: z.array(z.string()),
-  shellEnabled: z.boolean(),
   maxConcurrent: z.number().int().optional(),
   maxConcurrentOverridden: z.boolean().optional(),
   recommendedConcurrent: z.number().int().optional(),
@@ -26,7 +25,6 @@ export type MachineRecord = z.infer<typeof machineRecordSchema>;
 
 export const patchMachineBodySchema = z.object({
   enabledRuntimes: z.array(z.enum(MACHINE_RUNTIMES)).optional(),
-  shellEnabled: z.boolean().optional(),
   maxConcurrent: z.number().int().min(1).max(16).nullable().optional(),
 });
 export type PatchMachineBody = z.infer<typeof patchMachineBodySchema>;

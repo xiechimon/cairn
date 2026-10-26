@@ -13,7 +13,6 @@ function isExempt(pathname: string): boolean {
   if (pathname === '/api/machine' || pathname.startsWith('/api/machine/')) return true;
   if (pathname === '/api/mcp') return true;
   if (pathname === '/api/oauth/callback') return true;
-  if (pathname === '/api/webhook' || pathname.startsWith('/api/webhook/')) return true;
   return false;
 }
 
