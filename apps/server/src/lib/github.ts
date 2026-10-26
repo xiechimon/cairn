@@ -280,10 +280,10 @@ export async function githubBranchPulls(
   token: string | null,
   owner: string,
   repo: string,
-  opts: { head: string; base: string },
+  opts: { head: string; base?: string; state?: 'open' | 'all' },
 ): Promise<GithubBranchPull[] | null> {
   const url = listUrl(owner, repo, 'pulls', {
-    state: 'all',
+    state: opts.state ?? 'all',
     head: opts.head,
     base: opts.base,
     per_page: 10,

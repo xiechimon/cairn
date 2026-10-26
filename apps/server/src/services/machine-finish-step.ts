@@ -5,6 +5,7 @@ import {
   CHANGES_DIFF_MAX_BYTES,
   CHIEF_TURN_ERROR_KIND,
   classifyStepFailure,
+  conversationBranch,
   SKILL_INJECTION_CHECK_KIND,
   type SkillInjectionFacts,
   secondPrWarningNoteRowId,
@@ -24,21 +25,31 @@ import {
   tokenUsage,
 } from '../db/schema.js';
 import { conflict } from '../lib/errors.js';
+import { githubBranchPulls } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
 import {
   applyStepFailure,
   applyStoppedStep,
   completeStep,
+  enqueueStep,
   mergedPrElsewhere,
   reportedVerdictHeads,
   toBuildRecord,
 } from './builds.js';
 import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
 import { cancelPendingQuestions } from './chief-questions.js';
+import {
+  buildCiFixPrompt,
+  CI_FIX_PROMPT_HEAD,
+  CI_FIX_ROUNDS_MAX,
+  countMarkedRounds,
+  deadLoopMessage,
+} from './ci-loop.js';
 import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
-import { diffTextNamesAFile, parseUnifiedDiff } from './git.js';
+import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
+import { githubTokenOrNull } from './github-connection.js';
 import {
   agentForStep,
   isChiefConversation,
@@ -190,6 +201,40 @@ export async function finishStep(
   }
   const stepRow = ownedStep(deps, machineId, stepId);
   revokeStepGitCredential(deps, stepId);
+  if (stepRow.kind === 'build') {
+    const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+    const todoRow = buildRow
+      ? db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
+      : undefined;
+    const project = todoRow ? projectOfTodo(db, todoRow) : null;
+    const repo = project ? githubRepoOfProject(project) : null;
+    if (repo !== null && todoRow) {
+      const token = await githubTokenOrNull(deps, todoRow.teamId);
+      const branch = conversationBranch(stepRow.buildId);
+      const pulls = await githubBranchPulls(
+        deps.githubFetch ?? fetch,
+        token,
+        repo.owner,
+        repo.repo,
+        { head: `${repo.owner}:${branch}`, state: 'open' },
+      );
+      const own = pulls
+        ?.filter(
+          (pull) =>
+            pull.state === 'open' &&
+            pull.headRef === branch &&
+            pull.headRepoId !== null &&
+            pull.headRepoId === pull.baseRepoId,
+        )
+        .sort((a, b) => b.number - a.number)[0];
+      if (own)
+        body = {
+          ...body,
+          prNumber: own.number,
+          prUrl: `https://github.com/${repo.owner}/${repo.repo}/pull/${own.number}`,
+        };
+    }
+  }
   let priorMerged: { prNumber: number; prUrl: string | null } | null = null;
   if (body.prUrl !== undefined && body.prNumber !== undefined) {
     const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
@@ -408,6 +453,41 @@ export async function finishStep(
       return;
     }
     applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictReport);
+    publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
+    return;
+  }
+  if (
+    stepRow.kind === 'build' &&
+    outcome.status === 'success' &&
+    outcome.pushHookOutput !== undefined &&
+    worker !== null &&
+    worker.todoRow.phase === 'building' &&
+    worker.todoRow.latestBuildId === stepRow.buildId
+  ) {
+    const rounds = countMarkedRounds(db, stepRow.buildId, CI_FIX_PROMPT_HEAD);
+    if (rounds >= CI_FIX_ROUNDS_MAX) {
+      applyStepFailure(deps, stepRow, deadLoopMessage(rounds), verdictReport);
+    } else {
+      db.update(step).set({ status: 'done', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
+      const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+      const prompt =
+        buildRow?.prNumber != null
+          ? buildCiFixPrompt({
+              prNumber: buildRow.prNumber,
+              prUrl: buildRow.prUrl,
+              round: rounds + 1,
+              failures: [{ name: 'local pre-push hook', conclusion: 'failure', summary: null }],
+            })
+          : `${CI_FIX_PROMPT_HEAD} Local pre-push hook rejected the closing push (round ${rounds + 1}/${CI_FIX_ROUNDS_MAX}).`;
+      enqueueStep(
+        deps,
+        stepRow.buildId,
+        'build',
+        worker.todoRow.teamId,
+        `${prompt}\n\n${outcome.pushHookOutput}\n\nFix the hook failures and push the same branch ${conversationBranch(stepRow.buildId)}. Do not create another branch or PR, bypass hooks, or merge the PR.`,
+      );
+    }
     publishStepStatus(deps, stepId);
     emitRuntimeStepSpan(deps.db, stepId);
     return;
