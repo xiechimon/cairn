@@ -16,6 +16,8 @@ export const ciOnlyScripts = {
   'scripts/css-mechanism-gate.mjs': 'greps the apps/web/dist build the CI e2e step writes',
   'scripts/issue-label-gate.mjs': 'reads issue labels through the GitHub token',
   'scripts/feature-map-staleness-gate.mjs': 'advisory job that never blocks a merge',
+  'scripts/npm-command-gate.mjs': 'verifies package names against the npm registry (network)',
+  'scripts/check-closing-keyword.mjs': 'reads the PR event payload (GITHUB_EVENT_PATH)',
 };
 
 export const selfTests = [
@@ -36,6 +38,8 @@ export const localOnly = [
   ['node', 'scripts/ui-registry-gate.mjs'],
   ['node', 'scripts/ui-consumer-shape-gate.mjs'],
   ['node', 'scripts/pr-gate-selfcheck.mjs'],
+  ['node', 'scripts/lane-file-gate.mjs'],
+  ['node', 'scripts/lint-warning-cap.mjs'],
 ];
 
 const DOCS = /^(docs\/|.*\.md$|LICENSE$)/;
