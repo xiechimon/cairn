@@ -54,6 +54,8 @@ decision_ok  168/176 = 95.5%   95%CI [92.4%, 98.5%]
 成本 $9.16   链路失败 16 条（8.3%，全 harness_error，已隔离不计分）
 ```
 
+The 168/176 figure is the mean over scored rows. The same run scheduled 192 turns. Family s finished 7/18, under the 80% coverage line, so a report built from these files withholds that headline. The grid is in "Symptom-family failures" below.
+
 **This eval is saturated and can no longer measure improvement.** The 4.5-point headroom is
 smaller than the ±7.5-point noise floor.
 
@@ -122,15 +124,90 @@ If the mismatch rate were unchanged (21%), the probability of 21/21 correct by c
 
 ### Scoring boundary: which turns do not count
 
-Chain failures **always land in `errors.jsonl` and are never scored**. Both observed shapes must
-be intercepted in the runner; otherwise failures concentrate on a few cases and look like "the
-model systematically cannot do this thing":
+A turn that ends with `step` other than `done`, or with zero input and zero output tokens, is a
+`harness_error`. The runner retries that class up to `MAX_INFRA_RETRIES` (2 further attempts; the
+constant is imported from `integration/eval/adoption/judge.mts`). Each attempt still gets the
+existing HTTP 429/5xx backoff. A turn that is still a `harness_error` after that budget is
+appended to `errors.jsonl` and stays out of the per-case mean.
 
-1. **Zero tokens**: the turn never reached the model (latency pinned neatly at the ~30s timeout
-   signature).
-2. **`step != done`**: the model ran and produced output, but the step ended in failure. **Token
-   counts alone cannot catch this shape** — there was a case whose 3/3 were all failed steps,
-   misread as "it systematically does not dispatch"; it was actually a chain problem.
+The HTML report prints coverage for every family as `scored/expected`. The family is the leading
+letters of the case id (`s01` is family `s`). Expected is the case count in that family times the
+rep count, and the rep count is one more than the highest integer `rep` seen in results or
+errors. Scored is the number of distinct result rows. When any family has `scored * 5 < expected
+* 4` (under 80%; a family at exactly 80% still counts), the variants-table headline cell is
+`withheld` and the coverage section names the families. The `--write-verify` JSON keeps the raw
+scored `decision_ok` rate.
+
+Two shapes still have to be read as chain failures. Leaving them out of one family and then
+printing a mean over the remaining rows overstates quality:
+
+1. **Zero tokens**: the turn never reached the model (latency pinned near the ~30s signature).
+2. **`step != done`**: the model ran and produced output, but the step ended in failure. Token
+   counts alone miss this shape.
+
+### Symptom-family failures on the 2026-09-29 baseline
+
+Measured from `baseline/errors.jsonl` (16 rows) and `baseline/results.jsonl` (176 rows) for
+glm-5.3, reps 0, 1, and 2. Scheduled work is 64 cases × 3 reps = 192 turns. Every error row is
+`failure_class=harness_error` and the message records `step=failed`. `decision_ok` among the 176
+scored rows is 168.
+
+Scored rows over the full grid, then `decision_ok` among scored rows:
+
+- d 18/18, decision_ok 17/18
+- c 17/18, decision_ok 17/17
+- f 18/18, decision_ok 17/18
+- o 16/18, decision_ok 13/16
+- n 36/36, decision_ok 36/36
+- e 24/24, decision_ok 24/24
+- m 16/18, decision_ok 15/16
+- s 7/18, decision_ok 7/7
+- h 24/24, decision_ok 22/24
+
+Only family s is under 80%. c at 17/18, o at 16/18, and m at 16/18 stay eligible for a headline.
+s01 has zero scored rows.
+
+The 11 s-family error rows:
+
+| case | rep | input/output | step latency |
+|---|---|---|---|
+| s01 | 0 | 0/0 | 34.2s |
+| s01 | 1 | 0/0 | 34.2s |
+| s01 | 2 | 12525/3881 | 152.3s |
+| s02 | 0 | 11694/2076 | 159.4s |
+| s02 | 1 | 0/0 | 35.3s |
+| s03 | 0 | 0/0 | 34.2s |
+| s04 | 1 | 0/0 | 34.2s |
+| s05 | 0 | 0/0 | 34.2s |
+| s05 | 1 | 0/0 | 34.2s |
+| s06 | 0 | 0/0 | 34.4s |
+| s06 | 2 | 0/0 | 51.6s |
+
+Nine of the eleven rows recorded 0/0 tokens. Eight of those finished between 34.2s and 35.3s;
+s06 rep 2 finished at 51.6s. Two rows reached the model at the bench's normal per-turn size (the
+cost section cites 10,957 input tokens) and still ended `step=failed`: s01 rep 2 and s02 rep 0.
+Both rows have output tokens.
+
+The 6–7k input sizes in the issue text are c04 (6125/1178, 51.4s) and o02 (7285/856, 42.5s).
+Those rows sit outside s01–s06.
+
+What the recorded fields support:
+
+- A 0/0 row is a turn that never reached the model. A context-size failure records input tokens;
+  these rows record none. `STREAM_TIMEOUTS_MS.streamFirstEvent` is 300s, so a ~34s finish is a
+  different timer. `settleChiefTurn` waits 30s for the step to become claimed or terminal, and
+  the stored message is the harness wrapper written after that wait returned `step=failed`. The
+  `step` table has no `errorMessage` column. `machine-finish-step` stores the chief failure text
+  as a system message, and the 2026-09-29 runner did not copy that text into `errors.jsonl`. The
+  database from that run is gone, so the provider string is not in these files.
+- s01 rep 2 and s02 rep 0 are the second shape: the model ran, produced output, and the step
+  still failed, at a normal input size.
+
+That is the transient step-failure path. #1786 tracks provider network errors and git connection
+resets that fail the step. #1795 is the reliability umbrella and names #1786. The product retry
+stays on those tickets. This eval change retries `harness_error` inside the runner. When all
+three attempts still fail, the error row remains and a family under 80% coverage withholds the
+headline.
 
 ## How to run
 
@@ -174,8 +251,10 @@ before rerunning, then allow it with `--approve-harness`. If a run dies, just re
 3. **The relay does not report cost.** `cost_usd` is computed on the spot from OpenRouter list
    prices, not measured from an actual bill.
 4. **Chain failure rate ~5%.** Of 108 turns, 5 never reached the model (zero tokens) or hit
-   `fetch failed`. They landed in errors.jsonl and are unscored, but repeated runs leave gaps in
-   the grid.
+   `fetch failed`. They landed in errors.jsonl and were left out of the mean. The 2026-09-29 full
+   grid later recorded 16 harness errors in 192 turns, and family s finished 7/18. The runner now
+   retries `harness_error` up to `MAX_INFRA_RETRIES`, and a family under 80% coverage suppresses
+   the headline.
 
 ## Relay availability (measured 2026-09-29; four request classes, one request of each per model)
 

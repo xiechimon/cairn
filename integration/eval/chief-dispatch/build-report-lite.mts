@@ -12,6 +12,12 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import {
+  type FamilyCoverage,
+  familyCoverage,
+  formatCoverage,
+  withheldFamilies,
+} from './family-coverage.mts';
 
 type ResultRow = {
   prompt_id?: unknown;
@@ -118,6 +124,21 @@ function loadRows(p: string, warnings: string[], dir: string): RowsById {
 }
 
 type ErrorCounts = { total: number; byClass: Record<string, number> };
+function loadJsonl(p: string): Record<string, unknown>[] {
+  const rows: Record<string, unknown>[] = [];
+  for (const line of readText(p).split('\n')) {
+    if (!line.trim()) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      parsed = null;
+    }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+      rows.push(parsed as Record<string, unknown>);
+  }
+  return rows;
+}
 function countErrors(vdir: string): ErrorCounts {
   let total = 0;
   const byClass: Record<string, number> = Object.create(null);
@@ -183,6 +204,12 @@ type Agg = {
   nTest: number;
   truncated: number;
 };
+
+function declaredCaseIds(flow: string): string[] {
+  const parsed = readJSON<{ cases?: { id?: unknown }[] }>(join(flow, 'cases.json'), {});
+  const cases = Array.isArray(parsed.cases) ? parsed.cases : [];
+  return cases.map((entry) => (entry?.id == null ? '' : String(entry.id))).filter((id) => id);
+}
 
 function build(flowArg: string) {
   const flow = resolve(flowArg);
@@ -323,6 +350,14 @@ function build(flowArg: string) {
     return { id: pid, split: splitOf[pid] || '', tags, prompt: String(first.prompt ?? ''), per };
   });
 
+  const caseIds = declaredCaseIds(flow);
+  const coverage: Record<string, FamilyCoverage[]> = Object.create(null);
+  for (const v of variants) {
+    const scored = Object.values(rows[v] ?? NO_ROWS).flat();
+    const errors = loadJsonl(join(flow, v, 'errors.jsonl'));
+    coverage[v] = familyCoverage({ caseIds, results: scored, errors });
+  }
+
   const agg: Record<string, Agg> = {};
   for (const v of variants) {
     const all = cases.map((c) => c.per[v]?.mean).filter(isNum);
@@ -364,6 +399,7 @@ function build(flowArg: string) {
     variants,
     header,
     agg,
+    coverage,
     cases,
     primary,
     metrics: metrics.map((m) => m.id),
@@ -379,6 +415,7 @@ type RenderInput = {
   variants: string[];
   header: Record<string, Header>;
   agg: Record<string, Agg>;
+  coverage: Record<string, FamilyCoverage[]>;
   cases: CaseRow[];
   primary: string;
   metrics: string[];
@@ -391,6 +428,7 @@ function render({
   variants,
   header,
   agg,
+  coverage,
   cases,
   primary,
   metrics,
@@ -405,6 +443,9 @@ function render({
     .map((v) => {
       const h = header[v] as Header,
         a = agg[v] as Agg;
+      const covered = coverage[v] ?? [];
+      const withheld = withheldFamilies(covered);
+      const headline = withheld.length > 0 ? 'withheld' : fmt(a.all);
       const err = h.errors.total
         ? h.errors.total +
           ' (' +
@@ -425,8 +466,10 @@ function render({
         '</td><td>' +
         esc(h.model) +
         '</td>' +
-        '<td class="num">' +
-        fmt(a.all) +
+        '<td class="num" data-headline="' +
+        esc(headline) +
+        '">' +
+        esc(headline) +
         '</td><td class="num">' +
         a.n +
         '</td>' +
@@ -439,6 +482,18 @@ function render({
       );
     })
     .join('\n');
+
+  const coverageSection = variants
+    .map((v) => {
+      const covered = coverage[v] ?? [];
+      const withheld = withheldFamilies(covered);
+      const note =
+        withheld.length > 0
+          ? `<p>headline withheld: ${withheld.map((family) => esc(family)).join(', ')}</p>`
+          : '';
+      return `<h3>${esc(v)}</h3><p>${esc(formatCoverage(covered))}</p>${note}`;
+    })
+    .join('');
 
   const caseRows = cases
     .map((c) => {
@@ -530,6 +585,9 @@ function render({
     '</tr></thead><tbody>' +
     variantRows +
     '</tbody></table></section>' +
+    '<section><h2>Coverage</h2>' +
+    coverageSection +
+    '</section>' +
     '<section><h2>Cases</h2><p class="hint">Click a column header to sort. Per-case values are the mean of <code>' +
     esc(primary) +
     '</code> over status-ok reps.</p>' +
