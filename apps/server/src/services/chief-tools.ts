@@ -994,7 +994,18 @@ export async function confirmBuild(
   if (!deps.db.select().from(build).where(eq(build.id, buildId)).get()) {
     throw new HttpError(404, `build ${buildId}`);
   }
-  await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
+  try {
+    await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
+  } catch (err) {
+    if (
+      err instanceof HttpError &&
+      err.status === 409 &&
+      err.message.endsWith('当前相位 building')
+    ) {
+      return;
+    }
+    throw err;
+  }
 }
 
 export interface WorkerMemoryCtx {

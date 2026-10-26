@@ -4,7 +4,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ProjectRepoKind, Scheduler } from '@cairn/shared';
+import type { MergePolicy, ProjectRepoKind, Scheduler } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -224,6 +224,7 @@ export async function seedWorld(
     repoKind?: ProjectRepoKind;
     projectName?: string;
     localPath?: string;
+    mergePolicy?: MergePolicy;
   } = {},
 ): Promise<WorldIds> {
   const name = opts.projectName ?? 'it-project';
@@ -234,6 +235,13 @@ export async function seedWorld(
     ...(opts.localPath !== undefined ? { localPath: opts.localPath } : {}),
   });
   const projectId = (project.body as { id: string }).id;
+  const mergePolicy = opts.mergePolicy ?? 'human';
+  const patched = await api(url, 'PATCH', `/api/projects/${projectId}/merge-policy`, {
+    mergePolicy,
+  });
+  if (patched.status !== 200) {
+    throw new Error(`seedWorld merge-policy: ${patched.status} ${JSON.stringify(patched.body)}`);
+  }
   const res = await api(url, 'POST', `/api/projects/${projectId}/todos`, todo);
   const todoId = (res.body as { id: string }).id;
   return { projectId, todoId };
