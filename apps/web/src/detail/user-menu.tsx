@@ -25,7 +25,7 @@ interface UserMenuProps {
 }
 
 const ROWS = [
-  { label: '帐号', href: '/app/account', Icon: User },
+  { label: '账号', href: '/app/account', Icon: User },
   { label: 'API 密钥', href: '/app/api-keys', Icon: KeyRound },
   { label: 'MCP', href: '/app/resources/mcp-servers', Icon: Plug },
 ];

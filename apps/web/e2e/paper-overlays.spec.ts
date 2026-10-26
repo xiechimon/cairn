@@ -194,7 +194,7 @@ test('user menu rides the same Paper menu face', async ({ page }) => {
   await settle(menu.locator('..'));
   await expect(menu).toHaveCSS('border-top-left-radius', '18px');
   await expect(menu).toHaveCSS('padding-top', '6px');
-  for (const label of ['帐号', 'API 密钥', 'MCP']) {
+  for (const label of ['账号', 'API 密钥', 'MCP']) {
     const row = menu.locator('a.user-menu-row', { hasText: label });
     expect((await row.boundingBox())?.height).toBe(32);
     await expect(row).toHaveCSS('font-size', '13.5px');

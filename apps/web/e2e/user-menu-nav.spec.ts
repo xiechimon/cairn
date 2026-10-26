@@ -14,7 +14,7 @@ async function openMenu(page: Page) {
 }
 
 const NAV_ROWS = [
-  { label: '帐号', url: '/app/account?scenario=01', route: '[data-route="account"]' },
+  { label: '账号', url: '/app/account?scenario=01', route: '[data-route="account"]' },
   { label: 'API 密钥', url: '/app/api-keys?scenario=01', route: '[data-route="api-keys"]' },
   {
     label: 'MCP',

@@ -16,7 +16,7 @@ test('user menu drops its dead rows — `反馈` (#149), `新功能/快捷键` (
     await expect(menu).not.toContainText(dead);
   }
 
-  for (const live of ['外观', '帐号', 'API 密钥', 'MCP']) {
+  for (const live of ['外观', '账号', 'API 密钥', 'MCP']) {
     await expect(menu).toContainText(live);
   }
   await expect(menu.locator('a.user-menu-row')).toHaveCount(3);

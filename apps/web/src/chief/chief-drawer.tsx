@@ -16,6 +16,7 @@ import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../ap
 import { useLiveData } from '../api/provider.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
@@ -523,7 +524,7 @@ function ChiefDrawerInner({
         </JumpToLatestButton>
       </MessageScroller>
 
-      <div className="chief-composer [&>.attachment-strip]:mt-2 mx-4 my-2.5 rounded-(--radius-composer) border-0 bg-(--secondary) px-3 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)">
+      <div className="chief-composer [&>.attachment-strip]:mt-2 mx-4 my-2.5 rounded-(--radius-composer) border-0 bg-card dark:bg-(--secondary) px-3 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)">
         <div className="relative">
           <Textarea
             ref={attachComposer}
@@ -611,25 +612,28 @@ function ChiefDrawerInner({
           accept="text/*,image/*,application/json,application/pdf,application/xml"
         />
         <div className="mt-2.5 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('添加附件')}
-            className={TOOL_BTN_CLS}
-            disabled={attaching || onAttachment == null}
-            onClick={openFilePicker}
+          <IconTooltip
+            label={t('添加附件')}
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`${TOOL_BTN_CLS} disabled:pointer-events-auto`}
+                disabled={attaching || onAttachment == null}
+                onClick={openFilePicker}
+              />
+            }
           >
             <Paperclip width={16} height={16} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('提及')}
-            className={TOOL_BTN_CLS}
-            onClick={togglePicker}
+          </IconTooltip>
+          <IconTooltip
+            label={t('提及')}
+            trigger={
+              <Button variant="ghost" size="icon" className={TOOL_BTN_CLS} onClick={togglePicker} />
+            }
           >
             <Grid2x2 width={16} height={16} />
-          </Button>
+          </IconTooltip>
           <Button
             variant="ghost"
             size="icon"
