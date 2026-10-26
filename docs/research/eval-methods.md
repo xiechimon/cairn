@@ -1,281 +1,281 @@
-# eval-methods — agent / LLM 评测方法论与市面做法
+# eval-methods — agent / LLM evaluation methodology and the state of the market
 
-- 性质：方法论调研，不是研究票产物（仓内 `r<N>-*.md` 是按研究票编号的，这份不是）。无实施计划。
-- 对象：① 评测方法论本身；② pi（`@earendil-works/pi-*`，pacman daemon 内嵌的 agent runtime）在评测上的做法；③ 市面做法（2026-09 现状）。
-- 抓取日期：2026-09-30（分数、版本号均以该日抓到的页面为准）。联网通道 `agent-reach`（`web` = Jina Reader、`exa_search`、`github` = gh CLI）。
-- 标记约定：`measured` = 亲手读到代码/抓到原文核过；`inferred` = 由原文或代码推导；`guess` = 无一手证据。`[一手]` / `[二手]` 标注来源性质。
-- 引用约定：pi 结论引用本地已安装包（0.86.0）；路径把 `node_modules/.pnpm/@earendil-works+<pkg>@<ver>_<peerhash>/node_modules/@earendil-works/<pkg>/` 缩写成 `~pi-<pkg>/`。
-- 入库标注（2026-10-03）：S7.9 / S8 引用的 `apps/daemon/src/backend/pi.ts` 行号为 2026-09-30 基线；#657（relay protocol-400 自适配）落地后整体后移（`stopReason` 声明现于 :313，message_end 分支现于 :418-422，`toMessageRecord` 现于 :348-355）。所述行为已于 2026-10-03 逐条复核仍成立；`integration/eval/chief-dispatch/run-eval.mts:121` 未漂移；pi 三包仍钉 0.86.0。
-
----
-
-## S0 结论速览
-
-1. 评测不是"一个分数"，是一台装置：**反复问同一个问题、自动判对错**，好让"改动后到底变好还是变坏"变成可看的数。装置只有三个零件：**任务 / 裁判 / 重复**。`measured`
-2. 骨架在全球已收敛成**四段式**：数据集 → 执行器（跑 trial）→ 裁判（code / model / human）→ 聚合。八家 harness 与三家厂商文档在这个骨架上高度同构，差异全在**裁判形态**与**聚合统计的严谨度**。`measured`
-3. 最承重的单条原则：**判环境终态，不判它说的话**（outcome）。transcript 是叙述，环境才是答案。`measured`
-4. 最大的两处分歧：**聚合统计**（只有 Inspect AI 把置信区间做成一等公民 API）与**判据来源**（Anthropic 人定题 / Google 逐题生成 adaptive rubrics / OpenAI 平台 API 化 grader）。`measured`
-5. 主流 agent benchmark 处于**可信度危机**：Berkeley RDI 对 8 个榜单打出 73%–100% 可利用度；OpenAI 公开停报 SWE-bench Verified（138 题审计 59.4% 有实质缺陷）。根因全在判分那一格。`measured`
-6. 判分器必须按"**能否被绕过**"来设计——问的不是"它判不判得对"，而是"通过它是否真的必须解题"。`measured`（原则）/ `inferred`（推论）
-7. **pi 有自己的评测包 `packages/evals`**（`@earendil-works/pi-evals`，`private: true` 未发 npm）：host evals + documentation-lift evals（成对 A/B 报 lift）。**本地安装的三个 pi 包不含它——只查 `node_modules/` 会得出"pi 不做评测"的错误结论**（本次首轮侦察即栽在这里）。`measured`
-8. pi **有** `stopReason`（7 态 + `rawStopReason` + `responseModel`）；pacman 的 `metrics.md` 记的"缺 finish_reason"是**宿主侧投影丢弃**，不是上游缺失。`measured`
+- Nature: methodology research, not a research-ticket artifact (in-repo `r<N>-*.md` files are numbered by research ticket; this one is not). No implementation plan.
+- Subjects: ① evaluation methodology itself; ② pi (`@earendil-works/pi-*`, the agent runtime embedded in the pacman daemon) and how it approaches evaluation; ③ the state of the market (as of 2026-09).
+- Capture date: 2026-09-30 (scores and version numbers are as captured on that day). Online channels: `agent-reach` (`web` = Jina Reader, `exa_search`, `github` = gh CLI).
+- Marking convention: `measured` = read the code / captured the original text and verified it myself; `inferred` = derived from the original text or code; `guess` = no first-hand evidence. `[first-hand]` / `[secondhand]` mark the nature of the source.
+- Citation convention: pi conclusions cite the locally installed packages (0.86.0); the path `node_modules/.pnpm/@earendil-works+<pkg>@<ver>_<peerhash>/node_modules/@earendil-works/<pkg>/` is abbreviated as `~pi-<pkg>/`.
+- Check-in note (2026-10-03): the `apps/daemon/src/backend/pi.ts` line numbers cited in S7.9 / S8 are on the 2026-09-30 baseline; after #657 (relay protocol-400 self-adaptation) landed, everything shifted back (the `stopReason` declaration now at :313, the message_end branch now at :418-422, `toMessageRecord` now at :348-355). The described behaviors were re-verified item by item on 2026-10-03 and still hold; `integration/eval/chief-dispatch/run-eval.mts:121` has not drifted; the three pi packages remain pinned at 0.86.0.
 
 ---
 
-## S1 骨架：四段式
+## S0 Quick conclusions
+
+1. Evaluation is not "a score" but a device: **ask the same question repeatedly and automatically judge right or wrong**, so that "did the change make things better or worse" becomes a visible number. The device has only three parts: **task / judge / repetition**. `measured`
+2. The skeleton has converged worldwide into a **four-stage form**: dataset → executor (runs trials) → judge (code / model / human) → aggregation. Eight harnesses and three vendors' docs are highly isomorphic on this skeleton; the differences are all in **the judge's form** and **the rigor of the aggregation statistics**. `measured`
+3. The single most load-bearing principle: **judge the environment's end state, not what it said** (outcome). The transcript is the narrative; the environment is the answer. `measured`
+4. The two biggest points of disagreement: **aggregation statistics** (only Inspect AI makes confidence intervals a first-class API) and **where the judging criteria come from** (Anthropic: humans write tasks / Google: per-task generated adaptive rubrics / OpenAI: platform API-ized graders). `measured`
+5. Mainstream agent benchmarks are in a **credibility crisis**: Berkeley RDI scored 8 leaderboards at 73%–100% exploitability; OpenAI publicly stopped reporting SWE-bench Verified (an audit of 138 tasks found 59.4% with substantive defects). The root cause sits entirely in the judging cell. `measured`
+6. A grader must be designed against "**can it be gamed**" — the question is not "does it judge correctly" but "does passing it really require solving the problem". `measured` (principle) / `inferred` (corollary)
+7. **pi has its own evaluation package `packages/evals`** (`@earendil-works/pi-evals`, `private: true`, never published to npm): host evals + documentation-lift evals (paired A/B reporting lift). **The three locally installed pi packages do not include it — searching only `node_modules/` leads to the wrong conclusion that "pi does no evaluation"** (this reconnaissance's first round fell exactly there). `measured`
+8. pi **does have** `stopReason` (7 states + `rawStopReason` + `responseModel`); the "missing finish_reason" recorded in pacman's `metrics.md` is a **host-side projection drop**, not an upstream gap. `measured`
+
+---
+
+## S1 The skeleton: the four-stage form
 
 ```
-数据集 ──→ 执行器（跑 trial）──→ 裁判 ──→ 聚合
-              │                    │          │
-         agent harness         code/model/human   metric + 阈值 + 报告
-         + 模型
+dataset ──→ executor (runs trials) ──→ judge ──→ aggregation
+              │                         │            │
+         agent harness            code/model/human   metric + threshold + report
+         + model
               │
-       留下 transcript（它说了什么）+ 环境终态（世界被改成什么样）
+       leaves a transcript (what it said) + the environment's end state (what the world became)
 ```
 
-词汇表（Anthropic 工程长文口径，见 [[Demystifying Evals for AI Agents]]）：**task**（输入 + 成功标准）→ 多次尝试为 **trial** → **grader** 给某个方面打分（一个 task 可挂多个 grader）→ **transcript / trace / trajectory** 是 trial 的完整记录 → **outcome = 环境终态** → **evaluation harness** 端到端跑 → **evaluation suite** 是共享大目标的一组 task。
+Glossary (per the Anthropic engineering long-form, see [[Demystifying Evals for AI Agents]]): a **task** (input + success criteria) → multiple attempts are **trials** → a **grader** scores some aspect (one task can carry multiple graders) → the **transcript / trace / trajectory** is the complete record of a trial → the **outcome** = the environment's end state → an **evaluation harness** runs end to end → an **evaluation suite** is a set of tasks sharing one larger goal.
 
-四条主线从这四段长出来：
+Four main lines grow out of these four stages:
 
-| 主线 | 要点 |
+| Main line | Key points |
 |---|---|
-| 标尺怎么立 | 任务镜像生产；更强模型必涨分；前沿留 headroom 但差距不能来自歧义题；跑分间低方差（环境残留会把答案递给 agent） |
-| 判什么 | outcome 优先；只判结果无法定位失败步骤 → 另开过程通道 |
-| 谁来判 | code → model → human，按"最便宜够用"选；裁判不能是被测模型 |
-| 判几次、怎么读 | 一次不算数；pass@k vs pass^k 在 k 大时讲相反的故事 |
+| How the ruler is set | Tasks mirror production; a stronger model must score higher; frontier keeps headroom but the gap must not come from ambiguous tasks; low variance between runs (environment residue hands the answer to the agent) |
+| What to judge | outcome first; judging only the result cannot localize the failing step → open a separate process channel |
+| Who judges | code → model → human, chosen by "cheapest that suffices"; the judge must not be the model under test |
+| How many times, how to read | one run does not count; pass@k vs pass^k tell opposite stories at large k |
 
-`measured`（[[Demystifying Evals for AI Agents]]、[[Anthropic Eval 与 Hillclimb]]，本次已与一手源核对一致）
+`measured` ([[Demystifying Evals for AI Agents]], ``[[Anthropic Eval and Hillclimb]]``, cross-checked against first-hand sources this time)
 
 ---
 
-## S2 市面 harness 与平台
+## S2 Market harnesses and platforms
 
-### S2.1 八家的核心抽象（均为一手文档）
+### S2.1 Core abstractions of the eight (all first-hand docs)
 
-| 项目 | 任务单位 | 裁判形态 | 轨迹/过程判分 | 置信区间叙事 |
+| Project | Task unit | Judge form | Trajectory/process judging | Confidence-interval narrative |
 |---|---|---|---|---|
-| **Inspect AI**（UK AISI） | `Sample`（input/choices/target/sandbox）；单元 `Task(dataset, solver, scorer, metrics)` | 四类 scorer：启发式抽取 / 文本相似度 / 模型判定 / 另一套 rubric；`multi_scorer()` 组合；人类以 Human Agent / Intervention 存在 | 内置 ReAct / Deep Agent / inspect_swe（跑 Claude Code、Codex CLI）/ Agent Bridge | **有，且最完整**：`ci()`、`ci_wilson()`、`bootstrap_stderr()`、`stderr(cluster=)`、`krippendorff_alpha()` |
-| **promptfoo** | YAML test case（`vars` + `assert` 列表），`assert-set` 支持 AND / threshold 后 OR | 确定性指标 + 模型辅助（`llm-rubric` / factuality / answer-relevance / select-best / classifiers） | 有：确定性 `trajectory:tool-used` / `tool-args-match` / `tool-sequence`，模型判 `trajectory:goal-success`（`not-` 前缀判"禁止达成"，且 judge 传输/解析失败仍计失败，避免坏裁判被静默读成通过） | 文档阴性 |
-| **DeepEval** | `LLMTestCase` / `EvaluationDataset` 的 `Golden`；四种用法（端到端 / 轨迹级 / 组件级 / 一次性） | 50+ 指标，多数 LLM-as-judge（G-Eval / DAG / QAG）；`JevEval` 用 decision model 打校准概率；`strict_mode` 转二值，`flaky=True` 让噪声指标不参与 pass/fail | 有：TaskCompletion / StepEfficiency / PlanAdherence / PlanQuality / ToolCorrectness / ArgumentCorrectness | 文档阴性 |
-| **Braintrust** | Data（examples）/ Task / Evaluators 三段式；playground → experiment（不可变快照）→ CI | `autoevals` + LLM-as-judge + 自定义代码；judge 选型纪律明写"先看多出来的 reasoning 是否真把与人的一致度提高到值得付延迟和成本" | 有（remote evals / sandboxes；online scoring 评 trace） | 文档阴性 |
-| **LangSmith** | dataset examples（inputs + reference outputs）离线 / 生产 run 在线两轨 | 五类：human（annotation queue + assertions）/ code / LLM-as-judge / **decision model**（SemIf 或 Jev，typed questions 各自成为独立 feedback）/ pairwise；dataset 支持 splits（含 train/val/test 切分） | 开源包 `agentevals`：`strict` / `unordered` / `subset` / `superset` 四种确定性轨迹匹配 + LLM 裁判 | 文档阴性（全文检索 `confidence interval` 命中为零） |
-| **Langfuse** | 在线 trace / 离线 dataset 两轨 | LLM-as-judge、**Jev as a judge**（experimental）、code evaluators、annotation queue、user feedback | — | 只做裁判一致性分析（混淆矩阵 + Cohen's Kappa + F1 + Pearson + Kappa 分档解释） |
-| **Arize Phoenix / AX** | — | **`Score` 对象**统一三类裁判：必填 `name` / `kind`（llm/code/human）/ `direction`；特色是 structured output via tool calling——强制裁判调用工具而非自由文本 | 有：Tool Selection / Tool Invocation / Tool Response Handling + `evaluate_path_length`（收敛评估，`avg(minimum steps / steps taken)`） | 文档阴性 |
-| **Harbor** | `Task`（instruction + 沙箱 + verifier）/ `Dataset` = 一个 benchmark / `Trial` / `Job` | verifier 是 `tests/test.sh`，**必须写 `/logs/verifier/reward.txt` 或 `reward.json`**；官方明说可在此实现任何验证方式含 LLM/agent judge；RewardKit 提供 programmatic + judge-based 两类 criteria；separate verifier environment 改善 agent 与 verifier 的安全边界（且只有独立 verifier 才能对已跑 trial regrade） | 自定 ATIF（Agent Trajectory Interchange Format），v1.8，目标是一份表示跨 agent 通用 | 文档阴性（只有聚合逻辑：默认对 reward 取均值，缺 reward 与缺维度均按 0 计） |
+| **Inspect AI** (UK AISI) | `Sample` (input/choices/target/sandbox); unit `Task(dataset, solver, scorer, metrics)` | Four scorer kinds: heuristic extraction / text similarity / model judgment / another rubric set; `multi_scorer()` composition; humans exist as Human Agent / Intervention | Built-in ReAct / Deep Agent / inspect_swe (runs Claude Code, Codex CLI) / Agent Bridge | **Yes, and the most complete**: `ci()`, `ci_wilson()`, `bootstrap_stderr()`, `stderr(cluster=)`, `krippendorff_alpha()` |
+| **promptfoo** | YAML test case (`vars` + `assert` list), `assert-set` supports AND / threshold-then-OR | Deterministic metrics + model-assisted (`llm-rubric` / factuality / answer-relevance / select-best / classifiers) | Yes: deterministic `trajectory:tool-used` / `tool-args-match` / `tool-sequence`, model-judged `trajectory:goal-success` (the `not-` prefix judges "forbidden achievement", and judge transport/parse failures still count as failure, so a broken judge is not silently read as a pass) | Docs-negative |
+| **DeepEval** | `Golden` of `LLMTestCase` / `EvaluationDataset`; four usage modes (end-to-end / trajectory-level / component-level / one-off) | 50+ metrics, mostly LLM-as-judge (G-Eval / DAG / QAG); `JevEval` uses a decision model to emit calibrated probabilities; `strict_mode` goes binary, `flaky=True` keeps noisy metrics out of pass/fail | Yes: TaskCompletion / StepEfficiency / PlanAdherence / PlanQuality / ToolCorrectness / ArgumentCorrectness | Docs-negative |
+| **Braintrust** | Data (examples) / Task / Evaluators three-stage; playground → experiment (immutable snapshot) → CI | `autoevals` + LLM-as-judge + custom code; judge-selection discipline written out: "first check whether the extra reasoning genuinely raises agreement with humans enough to be worth the latency and cost" | Yes (remote evals / sandboxes; online scoring evaluates traces) | Docs-negative |
+| **LangSmith** | Dataset examples (inputs + reference outputs) offline / production runs online, two tracks | Five kinds: human (annotation queue + assertions) / code / LLM-as-judge / **decision model** (SemIf or Jev, typed questions each becoming independent feedback) / pairwise; datasets support splits (incl. train/val/test splits) | Open-source package `agentevals`: `strict` / `unordered` / `subset` / `superset` four deterministic trajectory matches + LLM judges | Docs-negative (zero hits for a full-text `confidence interval` search) |
+| **Langfuse** | Online traces / offline datasets, two tracks | LLM-as-judge, **Jev as a judge** (experimental), code evaluators, annotation queue, user feedback | — | Does judge-consistency analysis only (confusion matrix + Cohen's Kappa + F1 + Pearson + Kappa band explanations) |
+| **Arize Phoenix / AX** | — | A unified **`Score` object** for the three judge kinds: required `name` / `kind` (llm/code/human) / `direction`; the specialty is structured output via tool calling — forcing the judge to call a tool instead of free text | Yes: Tool Selection / Tool Invocation / Tool Response Handling + `evaluate_path_length` (convergence evaluation, `avg(minimum steps / steps taken)`) | Docs-negative |
+| **Harbor** | `Task` (instruction + sandbox + verifier) / `Dataset` = one benchmark / `Trial` / `Job` | The verifier is `tests/test.sh`, **must write `/logs/verifier/reward.txt` or `reward.json`**; officially states any verification method can be implemented there including LLM/agent judges; RewardKit provides programmatic + judge-based criteria kinds; a separate verifier environment improves the safety boundary between agent and verifier (and only an independent verifier can regrade an already-run trial) | Custom ATIF (Agent Trajectory Interchange Format), v1.8, aiming at one representation common across agents | Docs-negative (only aggregation logic: mean of rewards by default, missing rewards and missing dimensions both count as 0) |
 
-`measured`（各格来源见附录 B）
+`measured` (sources per cell in Appendix B)
 
-**生态收敛的实测证据**：Inspect 的 eval 注册表渲染出 162 条记录，其中 86 条标 `inspect_harbor`、76 条标 `inspect_evals`——AISI 的 harness 直接把 Harbor registry 里的 benchmark 当自家评测跑。`measured` `[一手] https://inspect.aisi.org.uk/evals/index.html`
+**Measured evidence of ecosystem convergence**: Inspect's eval registry renders 162 records, of which 86 are tagged `inspect_harbor` and 76 `inspect_evals` — AISI's harness directly runs benchmarks from the Harbor registry as its own evals. `measured` `[first-hand] https://inspect.aisi.org.uk/evals/index.html`
 
-### S2.2 三家厂商的取向差异
+### S2.2 The three vendors' orientation differences
 
-| 维度 | Anthropic | OpenAI | Google |
+| Dimension | Anthropic | OpenAI | Google |
 |---|---|---|---|
-| 判据来源 | 人定题，rubric 逐条可核对；任务判据 = "两个领域专家独立看会不会给出同一个 pass/fail" | 平台 API 化 grader（JSON：string check / text similarity / score_model / python），返回 0-1 支持部分分；用专家答案调 grader | adaptive rubrics：**为每条 prompt 现场生成 pass/fail 判据再验证**，文档标 recommended |
-| 过程/轨迹判分 | transcript 可再判（code heuristics + 模型裁判评工具调用与协作） | trace grading 曾为产品能力 | ADK 成体系 criteria：`tool_trajectory_avg_score` / `rubric_based_tool_use_quality_v1` / `multi_turn_*` 等 |
-| 会话与用户模拟 | 对话 agent 章节给出做法 | 未找到公开一手细节 | user simulation + environment simulation（拦工具调用注入 mock / 503 / 延迟尖峰）是产品能力 |
-| 统计口径 | pass@k vs pass^k 明确选型；要求报置信区间 | 连续 0-1 分 + pass_threshold | 聚合 pass rate + 逐条判据明细 |
-| 公开资产 | 工程博客 + 方法论 | 论文级 benchmark repo（PaperBench / SWE-Lancer / EVMbench） | eval_hub（README 只有一行）+ skill |
+| Where criteria come from | Humans write tasks, rubrics checkable item by item; a task's criterion = "two domain experts independently looking would give the same pass/fail" | Platform API-ized graders (JSON: string check / text similarity / score_model / python), returning 0-1 supporting partial credit; graders tuned with expert answers | Adaptive rubrics: **generate the pass/fail criteria on the spot for each prompt and then verify**; docs mark it recommended |
+| Process/trajectory judging | Transcripts can be re-judged (code heuristics + model judges for tool calls and collaboration) | Trace grading was once a product capability | ADK's systematic criteria: `tool_trajectory_avg_score` / `rubric_based_tool_use_quality_v1` / `multi_turn_*`, etc. |
+| Conversation and user simulation | The conversational-agent chapter gives the practice | No public first-hand details found | User simulation + environment simulation (intercept tool calls to inject mocks / 503 / latency spikes) is a product capability |
+| Statistical caliber | pass@k vs pass^k selection made explicit; confidence intervals required in reports | Continuous 0-1 scores + pass_threshold | Aggregated pass rate + per-criterion details |
+| Public assets | Engineering blog + methodology | Paper-grade benchmark repos (PaperBench / SWE-Lancer / EVMbench) | eval_hub (README one line) + a skill |
 
-`measured`（每格有 S2.1 / 附录 B 的一手来源支撑；"未找到"是检索阴性）
+`measured` (each cell backed by a first-hand source in S2.1 / Appendix B; "not found" means search-negative)
 
-**OpenAI 在退，不是进**：Evals 与 Agent Builder 产品 **2026-11-30 起下线**，graders API 同步弃用，`simple-evals` 自 2025-07 冻结。`measured` `[一手] https://openai.com/index/introducing-agentkit/`
+**OpenAI is retreating, not advancing**: the Evals and Agent Builder products go **offline from 2026-11-30**, the graders API is deprecated in sync, and `simple-evals` has been frozen since 2025-07. `measured` `[first-hand] https://openai.com/index/introducing-agentkit/`
 
-**2026 年新出现且跨平台一致的东西**：decision model 当裁判。TypeSafe 的 Jev（返回带概率的 typed answer，不生成文本）同时出现在 Langfuse、LangSmith、DeepEval 三家官方文档里，定位一致——便宜、快、确定性、可校准，用来替掉"自由文本打分"那一段。`measured`
+**What emerged new in 2026 and is consistent across platforms**: decision models as judges. TypeSafe's Jev (returns typed answers with probabilities, generates no text) appears simultaneously in the official docs of Langfuse, LangSmith, and DeepEval, with the same positioning — cheap, fast, deterministic, calibratable, replacing the "free-text scoring" segment. `measured`
 
 ---
 
-## S3 统计口径
+## S3 Statistical calibers
 
 ### S3.1 pass@k vs pass^k
 
-- **pass@k** 出处：HumanEval，NeurIPS 2019。k 次 i.i.d. 试验中**至少一次**成功。
-- **pass^k** 出处：τ-bench，arXiv 2406.12045。k 次**全部**成功；无偏估计式 `pass^k = E_task[C(c,k)/C(n,k)]`。
-- k=1 时两者相同；k=10 时 pass@k 趋 100% 而 pass^k 趋 0%。选型：一次成功就值钱的工具用 pass@k；要求每次都靠谱的面向用户 agent 用 pass^k。`measured`
+- **pass@k** origin: HumanEval, NeurIPS 2019. At least one success in k i.i.d. trials.
+- **pass^k** origin: τ-bench, arXiv 2406.12045. All k trials succeed; unbiased estimator `pass^k = E_task[C(c,k)/C(n,k)]`.
+- At k=1 the two coincide; at k=10 pass@k approaches 100% while pass^k approaches 0%. Selection: tools where one success is worth money use pass@k; user-facing agents that must be reliable every time use pass^k. `measured`
 
-**口径不一致（引用必须注明来源）**：Anthropic 博客把 pass^k 写成 `p^k`（独立性假设），τ-bench 原文用有限样本无偏估计 `C(c,k)/C(n,k)`；每 task 多 trial 且 n≥k 时两者**不相等**。`inferred`（两处原文均已读到）
+**Inconsistent calibers (citations must state the source)**: the Anthropic blog writes pass^k as `p^k` (independence assumption), while the τ-bench original uses the finite-sample unbiased estimator `C(c,k)/C(n,k)`; the two are **not equal** when each task has multiple trials and n≥k. `inferred` (both originals read)
 
-### S3.2 置信区间方法学：无共识，按 N 分档
+### S3.2 Confidence-interval methodology: no consensus, tiered by N
 
-| 立场 | 出处 | 主张 |
+| Position | Source | Claim |
 |---|---|---|
-| A（大 N） | Evan Miller，arXiv 2411.00640 | super-population 框架；naive SE = `sqrt(Var(s)/n)`，二值退化为 `sqrt(p(1-p)/n)`；题干共享 passage / 同题多语言时**必须用 clustered SE**；**bootstrap 不必要**；同题重复采样 K 次降方差上限 2/3；配对分析必须同时报跨模型相关系数才可复算 |
-| B（小 N） | Bowyer 等，ICML 2025 Spotlight Position，arXiv 2503.01747 | N 十几到几十时 **CLT 区间校准极差**，甚至延伸到 [0,1] 之外或塌缩到零；只有 **Bayesian credible interval 与 Wilson CI** 覆盖率正确；CLT 与 bootstrap 覆盖率都远低于名义值；聚类场景同样失败 |
+| A (large N) | Evan Miller, arXiv 2411.00640 | Super-population framework; naive SE = `sqrt(Var(s)/n)`, degenerating to `sqrt(p(1-p)/n)` for binaries; when tasks share passages / the same task appears in multiple languages, **clustered SE is mandatory**; **bootstrap unnecessary**; resampling the same task K times lowers the variance ceiling by 2/3; paired analysis must also report the cross-model correlation to be recomputable |
+| B (small N) | Bowyer et al., ICML 2025 Spotlight Position, arXiv 2503.01747 | With N in the teens-to-dozens, **CLT intervals are extremely badly calibrated**, even extending beyond [0,1] or collapsing to zero; only **Bayesian credible intervals and Wilson CI** have correct coverage; CLT and bootstrap coverage both fall far below nominal; clustering scenarios fail the same way |
 
-**不要把任一方当普适结论**：两者针对不同 N。bootstrap 在两方那里都被判为"不必要"或"最差之一"。`measured`
+**Do not take either side as universal**: they target different N. Bootstrap is judged "unnecessary" by one side and "among the worst" by the other. `measured`
 
-**未找到**：pass^k 的置信区间没有专门一手论文（τ-bench 与 TRAIL 都只给点估计）；"步骤效率"的统计显著性检验亦未见一手方案。`measured`（检索阴性）
-
----
-
-## S4 裁判可靠性（LLM-as-judge）
-
-- **基础（MT-Bench，arXiv 2306.05685）**：GPT-4 judge 与人类专家 agreement 85%（setup S2 无 tie），高于人类彼此 81%。**口径警告**：agreement 定义是"各随机取一人、在随机一题上投票一致的概率"，人类-human agreement 因此是偏低估计。**引用 85% 必须带 S2 与该定义，否则高估。** `measured`
-- **位置偏差**：GPT-4 zero-shot 换序一致性 65.0%（偏第一个 30.0%）、Claude-v1 23.8%（偏前 75.0%）；few-shot 把 GPT-4 拉到 77.5%，但原文强调 "high consistency may not imply high accuracy"。系统量化见 arXiv 2406.07791（15 judge / 15 万+ 实例）：位置偏差**不是随机波动**，偏好方向在同一 judge 不同 task 间高度波动。`measured`
-- **自偏好**：GPT-4 +10%、Claude-v1 +25% win rate；根因假设是**困惑度**——对低困惑度输出给分更高，无论是否自己生成（arXiv 2410.21819）。更严谨版引入 gold judgments 作质量代理（arXiv 2506.02592）。`measured`
-- **rubric vs Likert**：CheckEval（arXiv 2403.18771）把低一致性归因于 "subjective evaluation criteria combined with Likert scale scoring"，改用**分解的二元 checklist** 后跨 12 个 evaluator model 平均 agreement 提升 0.45。`measured`
-- **反向证据（推翻"pairwise 更稳"）**：arXiv 2504.14716（COLM 2025）——pairwise 偏好可被嵌入的 distractor feature 翻转**约 35%**，绝对打分仅约 9%。`measured`
-- **jury / panel**：PoLL（arXiv 2404.18796）用 3 个**不同模型家族**的小模型组 panel，与人类相关性优于单个大 judge 且便宜 7 倍以上。`measured`
-- **落地形态是"校准"而不是"共识算法"**：Langfuse 给 Cohen's Kappa 等一致性指标与校准工作流，Arize 把 "align evaluators" 列为独立步骤，Anthropic 要求"先读一批已打分的 transcript 再相信评测器"。`measured`
+**Not found**: no dedicated first-hand paper on confidence intervals for pass^k (both τ-bench and TRAIL give point estimates only); nor a first-hand significance test for "step efficiency". `measured` (search-negative)
 
 ---
 
-## S5 过程 / 轨迹评测
+## S4 Judge reliability (LLM-as-judge)
 
-### S5.1 已商品化（五家均有官方一手文档）
-
-判据收敛成六类可操作的量：**工具选择/参数、轨迹序列匹配、步骤效率、计划质量、目标推进、承重步骤定位**。`measured`
-
-- `agentevals`（LangChain，MIT）：`strict` / `unordered` / `subset` / `superset`。**subset / superset 这对正是"步骤效率"与"最小充分步骤"的可操作判据。**
-- promptfoo：确定性 `trajectory:tool-*` + 模型判 `trajectory:goal-success`。
-- DeepEval：`ToolCorrectnessMetric`（集合比对 + "是否最优工具"取最小值）、`StepEfficiency`、`PlanAdherence`、`PlanQuality`。
-- Arize AX：按 trace 聚 tool-calling span → 取有序工具调用列表 → LLM judge 判 correct/incorrect。理由原文："即使最终答案对，糟糕的步骤序列也会浪费时间、钱或把用户暴露在风险里"。
-- Google ADK：`tool_trajectory_avg_score`（精确匹配，默认阈值 1.0）/ `rubric_based_tool_use_quality_v1` / `multi_turn_trajectory_quality_v1` 等。
-
-**基建已标准化到 OpenTelemetry**：`gen_ai.operation.name` 的 well-known values 含 `create_agent` / `invoke_agent` / `execute_tool` / **`plan`**（规划阶段本身被建模成一个 operation）；但这些 agent/tool 约定当前标 **Development（非 Stable）**。`measured`
-
-### S5.2 承重步骤定位仍是难题
-
-- **TRAIL**（Patronus AI，arXiv 2505.08638，MIT）：148 条人工标注 trace / 1987 个 OTel span，575 个至少含一个错误。**最好的 Gemini-2.5-pro 只有 11%**。`measured`
-- **AgentRx**（Microsoft，arXiv 2602.02475，EMNLP Findings 2026）：人工基准 170 条失败轨迹、每条标一个 critical failure step。方法链 `Raw logs → Trajectory IR → Invariants → Checker → Judge → Reports`（合成约束 → 逐步核验 → 可审计违规日志 → LLM judge 定位）。step localization 相对 prior work 平均提升 **75%**。需 Azure/TRAPI 凭据，不是纯本地。`measured`
-- **AgentProcessBench**（arXiv 2603.14465）：1000 条轨迹 / 8509 个人工标注 step / IAA 89.1%；ternary labeling。结论之一：弱 policy model 因**提前终止**呈现虚高的"正确步比例"。动机原文值得记："tool-use failures frequently induce irreversible side effects"——工具调用失败常产生不可逆副作用，所以逐步核验比数学推理里的回退更关键。`measured`
-- **Agent-as-a-Judge**（Meta/KAUST，arXiv 2410.10934）：用 agentic 系统评测 agentic 系统；与人类共识对齐 90% vs LLM-as-a-Judge 70%；相对三名人类专家省 97.7% 时间 / 97.6% 成本。**组件消融最有价值**：仅 ask 65.03% → +graph 75.95% → +read 82.24% → +locate 90.44%；再加 search 反而降到 86.06%。即**直接读文件内容 + 定位相关文件是承重能力**。`measured`
-
-### S5.3 reward hacking 检测（2026 新）
-
-- **Reward Hacking Benchmark**（arXiv 2605.02964，ICML 2026）：多步工具任务里埋"自然主义捷径"（跳过验证步、从邻近 metadata 反推答案、篡改评测相关函数）。13 个前沿模型 exploit rate 0%（Claude Sonnet 4.5）～13.9%（DeepSeek-R1-Zero）。**72% 的 reward hacking 片段带显式 CoT 理由**（模型常把 exploit 框定为合法解题）。简单环境加固把 exploit rate 降 5.7 个百分点（相对降 87.7%）且不损任务成功率。`measured`
-- **METR** 点名两种检测方法："high-scoring heuristic" 与 LLM "monitor"；任务级 reward hack 计数 RE-Bench 30.4% / HCAST 0.7%。`measured`
+- **Baseline (MT-Bench, arXiv 2306.05685)**: GPT-4 judge agreement with human experts is 85% (setup S2, no ties), higher than human-human 81%. **Caliber warning**: the agreement definition is "the probability that two randomly picked people vote the same on a random question", so human-human agreement is an underestimate. **Citing 85% must carry the S2 setup and this definition, otherwise it is overestimated.** `measured`
+- **Position bias**: GPT-4 zero-shot order-swap consistency 65.0% (30.0% bias to the first), Claude-v1 23.8% (75.0% bias to the former); few-shot pulls GPT-4 to 77.5%, but the original emphasizes "high consistency may not imply high accuracy". Systematic quantification in arXiv 2406.07791 (15 judges / 150k+ instances): position bias **is not random noise**; preference direction varies highly across tasks for the same judge. `measured`
+- **Self-preference**: GPT-4 +10%, Claude-v1 +25% win rate; the hypothesized root cause is **perplexity** — higher scores go to low-perplexity outputs regardless of who generated them (arXiv 2410.21819). A more rigorous variant introduces gold judgments as a quality proxy (arXiv 2506.02592). `measured`
+- **rubric vs Likert**: CheckEval (arXiv 2403.18771) attributes low agreement to "subjective evaluation criteria combined with Likert scale scoring"; switching to a **decomposed binary checklist** lifts the average agreement across 12 evaluator models by 0.45. `measured`
+- **Counter-evidence (refuting "pairwise is more stable")**: arXiv 2504.14716 (COLM 2025) — pairwise preferences can be flipped by an embedded distractor feature in **~35%** of cases, while absolute scoring only ~9%. `measured`
+- **Jury / panel**: PoLL (arXiv 2404.18796) uses a panel of 3 **different-model-family** small models, achieving better correlation with humans than a single large judge at over 7× lower cost. `measured`
+- **The landing form is "calibration", not a "consensus algorithm"**: Langfuse provides Cohen's Kappa and other consistency metrics plus calibration workflows, Arize lists "align evaluators" as a separate step, Anthropic requires "read a batch of already-scored transcripts before trusting the evaluator". `measured`
 
 ---
 
-## S6 benchmark 可信度危机
+## S5 Process / trajectory evaluation
 
-### S6.1 判分可被直接绕过（Berkeley RDI，`[一手]` 但属自测，未见独立复现）
+### S5.1 Already commoditized (all five have official first-hand docs)
 
-对 8 个榜单打出 **73%–100%** 可利用度：`measured`
+Criteria have converged into six operationalizable quantities: **tool selection/arguments, trajectory sequence matching, step efficiency, plan quality, goal progression, load-bearing-step localization**. `measured`
 
-| 榜单 | 攻击 | 根因 |
+- `agentevals` (LangChain, MIT): `strict` / `unordered` / `subset` / `superset`. **The subset/superset pair is precisely the operationalizable criterion for "step efficiency" and "minimal sufficient steps".**
+- promptfoo: deterministic `trajectory:tool-*` + model-judged `trajectory:goal-success`.
+- DeepEval: `ToolCorrectnessMetric` (set comparison + "was it the optimal tool" taking the minimum), `StepEfficiency`, `PlanAdherence`, `PlanQuality`.
+- Arize AX: cluster tool-calling spans by trace → take the ordered tool-call list → LLM judge scores correct/incorrect. The original rationale, worth remembering: "even when the final answer is right, a bad step sequence wastes time, money, or exposes the user to risk".
+- Google ADK: `tool_trajectory_avg_score` (exact match, default threshold 1.0) / `rubric_based_tool_use_quality_v1` / `multi_turn_trajectory_quality_v1`, etc.
+
+**Infrastructure has standardized onto OpenTelemetry**: the well-known values of `gen_ai.operation.name` include `create_agent` / `invoke_agent` / `execute_tool` / **`plan`** (the planning phase itself is modeled as an operation); but these agent/tool conventions are currently marked **Development (not Stable)**. `measured`
+
+### S5.2 Load-bearing-step localization is still hard
+
+- **TRAIL** (Patronus AI, arXiv 2505.08638, MIT): 148 human-labeled traces / 1987 OTel spans, 575 containing at least one error. **The best Gemini-2.5-pro reaches only 11%.** `measured`
+- **AgentRx** (Microsoft, arXiv 2602.02475, EMNLP Findings 2026): a human benchmark of 170 failed trajectories, each labeled with one critical failure step. The method chain `Raw logs → Trajectory IR → Invariants → Checker → Judge → Reports` (synthesized constraints → step-by-step verification → auditable violation logs → LLM judge localization). Step localization improves over prior work by **75%** on average. Requires Azure/TRAPI credentials; not purely local. `measured`
+- **AgentProcessBench** (arXiv 2603.14465): 1000 trajectories / 8509 human-labeled steps / IAA 89.1%; ternary labeling. One conclusion: weak policy models show inflated "correct-step ratios" due to **early termination**. The original motivation is worth recording: "tool-use failures frequently induce irreversible side effects" — a failed tool call often has irreversible side effects, so step-by-step verification matters more than backtracking in math reasoning. `measured`
+- **Agent-as-a-Judge** (Meta/KAUST, arXiv 2410.10934): agentic systems evaluating agentic systems; 90% alignment with human consensus vs 70% for LLM-as-a-Judge; 97.7% time / 97.6% cost savings versus three human experts. **The component ablation is the most valuable part**: ask only 65.03% → +graph 75.95% → +read 82.24% → +locate 90.44%; adding search actually drops it to 86.06%. That is, **directly reading file contents + locating relevant files is the load-bearing capability**. `measured`
+
+### S5.3 Reward-hacking detection (new in 2026)
+
+- **Reward Hacking Benchmark** (arXiv 2605.02964, ICML 2026): multi-step tool tasks seeded with "naturalistic shortcuts" (skipping verification steps, back-deriving answers from neighboring metadata, tampering with evaluation-related functions). 13 frontier models show exploit rates from 0% (Claude Sonnet 4.5) to 13.9% (DeepSeek-R1-Zero). **72% of reward-hacking segments carry explicit CoT justifications** (the model often frames the exploit as legitimate problem solving). Simple environment hardening cuts the exploit rate by 5.7 percentage points (a relative 87.7% reduction) without hurting task success. `measured`
+- **METR** names two detection methods: a "high-scoring heuristic" and an LLM "monitor"; per-task reward-hack counts: RE-Bench 30.4% / HCAST 0.7%. `measured`
+
+---
+
+## S6 The benchmark credibility crisis
+
+### S6.1 Judging can be bypassed directly (Berkeley RDI, `[first-hand]` but self-tested, no independent replication seen)
+
+Scored 8 leaderboards at **73%–100%** exploitability: `measured`
+
+| Leaderboard | Attack | Root cause |
 |---|---|---|
-| SWE-bench Verified / Pro | 10 行 `conftest.py`（pytest hook 把每个测试结果改写成 passed）→ Verified 500/500、Pro 731/731 满分 | patch 与测试跑在同一容器 |
-| Terminal-Bench 2.0 | 89 题中 82 题在验证时 `curl` 装 `uv`；agent 阶段把 `/usr/bin/curl` 换成 wrapper，验证阶段木马化 `uvx`，探测到 pytest 就输出伪造 "3 passed" | Harbor 默认 `allow_internet=true` 且无任务覆盖 |
-| WebArena | `goto file:///proc/self/cwd/config_files/{task_id}.json` 读出 gold 答案，812 题约 100% 满分且不改一行代码 | 任务 config 带参考答案落本地文件系统，Playwright 从未禁 `file://` |
-| OSWorld | gold 参考文件托管在任务配置内嵌的公开 HuggingFace URL，VM 有不受限外网，agent 直接 wget 形成 gold-vs-gold 比对 | 判分器对来自 VM 的字符串调用 `eval()` |
-| GAIA | `normalize_str` 去掉全部空白与标点 → `"D.R M.A.R.T.I.N L.U.T.H.E.R K.I.N.G J.R"` 与 `"Dr. Martin Luther King Jr."` 归一化后相同判满分；100% 分有拦截，但每题故意漏答一题即可约 98% 绕过 | 归一化过宽 + 拦截条件写成 `if all scores == 1.0` |
+| SWE-bench Verified / Pro | 10 lines of `conftest.py` (a pytest hook rewriting every test outcome to passed) → Verified 500/500, Pro 731/731 full marks | The patch and the tests run in the same container |
+| Terminal-Bench 2.0 | 82 of 89 tasks `curl`-install `uv` at verification; the agent phase replaces `/usr/bin/curl` with a wrapper, the verification phase trojans `uvx`, which prints a forged "3 passed" when it detects pytest | Harbor defaults `allow_internet=true` with no per-task override |
+| WebArena | `goto file:///proc/self/cwd/config_files/{task_id}.json` reads the gold answer; ~100% full marks on 812 tasks without changing a line of code | Task configs with reference answers land in the local filesystem; Playwright never blocks `file://` |
+| OSWorld | Gold reference files hosted at public HuggingFace URLs embedded in the task config; the VM has unrestricted internet, so the agent directly wgets them, forming a gold-vs-gold comparison | The judge calls `eval()` on strings coming from the VM |
+| GAIA | `normalize_str` strips all whitespace and punctuation → `"D.R M.A.R.T.I.N L.U.T.H.E.R K.I.N.G J.R"` and `"Dr. Martin Luther King Jr."` normalize identically and score full marks; the 100% gate does intercept, but deliberately leaving one question unanswered per task bypasses at ~98% | Over-wide normalization + the intercept written as `if all scores == 1.0` |
 
-### S6.2 OpenAI 停报 SWE-bench Verified（分量最重的一手）
+### S6.2 OpenAI stops reporting SWE-bench Verified (the heaviest first-hand item)
 
-对 138 道"o3 跑 64 次仍不稳定解出"的题做审计（每题至少 6 名资深工程师独立复核），**59.4% 存在实质缺陷**：35.5% narrow test（钉死实现细节、误杀功能正确的解）、18.8% wide test（检查了题面没说的额外功能）、5.1% 其他。并用自动化红队证明 GPT-5.2 / Claude Opus 4.5 / Gemini 3 Flash 都能被诱导**逐字复现 gold patch**。结论：Verified 的进步越来越反映训练期曝光度而非工程能力，公开建议改报 SWE-bench Pro。`measured` `[一手] https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/`
+Auditing the 138 tasks that "o3 still cannot solve stably after 64 runs" (each reviewed independently by at least 6 senior engineers), **59.4% have substantive defects**: 35.5% narrow tests (pinning implementation details, killing functionally correct solutions), 18.8% wide tests (checking functionality the prompt never stated), 5.1% other. An automated red team additionally proves GPT-5.2 / Claude Opus 4.5 / Gemini 3 Flash can all be induced to **reproduce the gold patch verbatim**. Conclusion: Verified progress increasingly reflects training-time exposure rather than engineering capability; the public recommendation is to report SWE-bench Pro instead. `measured` `[first-hand] https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/`
 
-### S6.3 污染与饱和
+### S6.3 Contamination and saturation
 
-- SWE-bench Illusion（arXiv 2506.12286）：只给 issue 描述、不给仓库结构，让模型猜问题文件路径——SoTA 在 Verified 上最高 76%，在非 SWE-bench 仓库上仅 ≤53%。`measured`
-- SWE-bench Pro（Scale AI）三集设计动机明写：数据污染、任务多样性不足、问题过度简化、评测不可复现；头部模型 public set 约 23%、private 14.9–17.8%，而同一批模型在 Verified 上 70%+。`measured`
-- 榜单普遍饱和：Verified 榜首 79.20%、Terminal-Bench 2.0 榜首 58.2% ± 2.8%（2026-09-30 抓取）。`measured`
-- **跨 harness 分数可比性未决**：`SWE-bench/experiments` issue #462 指出 `metadata.yaml` 不记 harness 版本/镜像，而榜单条目跨约两年；**不应默认可比**。`measured`
-- τ-bench 判分方差（官方仓 issue #57，第三方分析非 Sierra 口径）：43%–64% 的任务在同一系统自己的多次 trial 之间结果翻转；ICC(1) 仅 0.41–0.53；airline 域 n=50、power .80 的**最小可检测差异 23.77pp**，而已发布 airline 榜全榜跨度只有 23.5pp——**单次运行几乎分不开榜首与榜尾**。`measured`
+- SWE-bench Illusion (arXiv 2506.12286): give only the issue description, no repository structure, and let the model guess the path of the problem file — SoTA peaks at 76% on Verified but only ≤53% on non-SWE-bench repositories. `measured`
+- SWE-bench Pro (Scale AI) states its three-set design motivation explicitly: data contamination, insufficient task diversity, over-simplified problems, non-reproducible evaluation; head models score ~23% on the public set and 14.9–17.8% on the private set, while the same batch scores 70%+ on Verified. `measured`
+- Leaderboards are generally saturated: Verified top 79.20%, Terminal-Bench 2.0 top 58.2% ± 2.8% (captured 2026-09-30). `measured`
+- **Cross-harness score comparability is unresolved**: `SWE-bench/experiments` issue #462 points out that `metadata.yaml` records neither the harness version nor the image, while leaderboard entries span about two years; **comparability should not be assumed**. `measured`
+- τ-bench judging variance (official repo issue #57, a third-party analysis, not Sierra's own caliber): 43%–64% of tasks flip outcomes between repeated trials of the same system; ICC(1) only 0.41–0.53; for the airline domain with n=50 and power .80 the **minimum detectable difference is 23.77pp**, while the published airline leaderboard spans only 23.5pp — **a single run can barely separate the top from the bottom**. `measured`
 
-**教益不是"benchmark 不可信"**，是判分器要按"能否被绕过"设计。设计裁判时该问的是：**通过它是否真的必须解题。**`inferred`
+**The lesson is not "benchmarks are untrustworthy"; it is that graders must be designed against "can it be gamed".** When designing a judge, the question to ask is: **does passing it really require solving the problem.** `inferred`
 
 ---
 
-## S7 pi（pacman 的 agent runtime）在评测上的做法
+## S7 How pi (pacman's agent runtime) does evaluation
 
-一手源分两层：① 本地已安装的 pi 0.86.0 bundled types + 包内 `docs/` / `examples/` / `README.md`；② 上游 monorepo `earendil-works/pi` 的 `packages/evals`（经 `gh` 读源码，见附录 B）。
+First-hand sources in two layers: ① the locally installed pi 0.86.0 bundled types + in-package `docs/` / `examples/` / `README.md`; ② the upstream monorepo `earendil-works/pi`'s `packages/evals` (source read via `gh`, see Appendix B).
 
-**先记一条方法教训**：`packages/evals` 是 `private: true`，**不发 npm**，所以它不在本地 `node_modules/` 里。只查已安装依赖会得出"pi 不做评测"的错误结论——本次首轮侦察正是这么栽的。查一个项目的实践，装好的包不等于它的全部。
+**A methodological lesson first**: `packages/evals` is `private: true` and **never published to npm**, so it is not in the local `node_modules/`. Checking only installed dependencies yields the wrong conclusion that "pi does no evaluation" — this reconnaissance's first round fell exactly there. To study a project's practice, the installed packages are not the whole of it.
 
-1. **pi 有独立的评测包 `packages/evals`**（`@earendil-works/pi-evals`，README 自称 "Behavioral evals for Pi's coding agent, built with `vitest-evals`"）。依赖 `vitest-evals` 0.15.0 + `@vitest-evals/core` + Braintrust 的 `autoevals` 0.3.0。脚本分两条：`eval:host`（vitest 跑本机）与 `eval:docs`（Docker 成对比较）。`measured`（`packages/evals/package.json`、`README.md`）
-2. **两类 eval**：`*.docs.eval.ts` 是 **documentation-lift eval**——每条用例在隔离的 `without_docs` 与 `with_docs` 两个容器里各跑一次，**报 lift**；其余 `*.eval.ts` 是 host eval，普通 vitest-evals 套件，不做成对比较。`measured`（`README.md`「File conventions」）
-3. **docs-lift runner 的执行纪律**（README 逐条列，是这套东西最值得抄的部分）：
-   1. 一次性挂载仓库做 Docker build，用仓内的 consumer-install 机制打包 workspace 包，再从 staged runtime 建两个镜像
-   2. **在两个镜像里各自发现选中的用例，并要求 cohort 完全一致**（防止一侧少跑几条而显得 lift 很高）
-   3. 执行前先**规划出每一个 `(case, variant, model, runNumber)` 臂**
-   4. 每个臂在**全新容器**里跑；失败或缺失的臂**记录下来，其余 cohort 继续**
-   5. 从 Vitest 原生 JSON 读结果，**精确配对**（pair exact arms）后算 lift
-   6. **blocked pairs 会扣住头条 lift，进程以非零码退出**——不让缺失臂把头条分刷高
-   7. **重复顺序按 run number 交替，以降低顺序偏置**
-   `measured`（`README.md`「The runner」）
-4. **判据形态**：host eval 用普通 `expect`——精确输出（`toBe("Paris")`）、`errors` 必须为空、`usage` 必须匹配 `PI_PROVIDER`/`PI_MODEL`、`totalTokens > 0`；开放处用 `createJudge`（vitest-evals 的 LLM 裁判）与 `autoevals` 的 `Levenshtein`。harness 是 `createPiCodingAgentHarness({ noTools: "all" })`，即**对工具面做脚本化控制**。`measured`（`evals/smoke.eval.ts`、`evals/tui.docs.eval.ts`）
-5. **另有测试替身 `fauxProvider()`**（pi-ai 层，公共导出）：脚本化内存 provider，`setResponses([...])` 按序应答、`state.callCount`、`tokensPerSecond`、多模型用于切换测试。用途是"不起真模型驱一个回合"，不是评测框架。`measured`（`~pi-ai/dist/providers/faux.d.ts:1-100`、`README.md:1252-1330`）
-6. `pi-agent-core` 的 `conformance/` 与 `benchmark/` 目录，领域是**会话存储后端契约**（`createStorageConformance` / `STORAGE_BENCHMARK_DATASETS`），不是 agent 行为。`measured`
-7. pi 官方另把"evaluation research"的出口指向外部仓 `badlogic/pi-share-hf`（把 session 发到 Hugging Face datasets）。`measured`（`~pi-coding-agent/docs/usage.md:142`）
-8. **`stopReason` 是有的，而且比 `finish_reason` 更全**：
+1. **pi has a dedicated evaluation package `packages/evals`** (`@earendil-works/pi-evals`, README self-describes as "Behavioral evals for Pi's coding agent, built with `vitest-evals`"). It depends on `vitest-evals` 0.15.0 + `@vitest-evals/core` + Braintrust's `autoevals` 0.3.0. Two script routes: `eval:host` (vitest on the local machine) and `eval:docs` (paired comparison in Docker). `measured` (`packages/evals/package.json`, `README.md`)
+2. **Two eval kinds**: `*.docs.eval.ts` are **documentation-lift evals** — each case runs once in an isolated `without_docs` container and once in a `with_docs` container, **reporting lift**; the remaining `*.eval.ts` are host evals, ordinary vitest-evals suites without paired comparison. `measured` (`README.md` "File conventions")
+3. **The docs-lift runner's execution discipline** (listed item by item in the README; the most worth-copying part of this setup):
+   1. Mount the repository once for the Docker build, package the workspace packages via the in-repo consumer-install mechanism, then build two images from the staged runtime
+   2. **Discover the selected cases in each image independently and require the cohorts to be identical** (prevents one side running fewer cases and inflating the lift)
+   3. **Plan out every `(case, variant, model, runNumber)` arm before executing**
+   4. Each arm runs in a **brand-new container**; failed or missing arms are **recorded while the rest of the cohort continues**
+   5. Read results from Vitest's native JSON, **pair exactly** (pair exact arms) before computing lift
+   6. **Blocked pairs hold back the headline lift, and the process exits non-zero** — missing arms are not allowed to inflate the headline score
+   7. **Repeat ordering alternates by run number to reduce order bias**
+   `measured` (`README.md` "The runner")
+4. **Criteria forms**: host evals use ordinary `expect` — exact output (`toBe("Paris")`), `errors` must be empty, `usage` must match `PI_PROVIDER`/`PI_MODEL`, `totalTokens > 0`; open-ended spots use `createJudge` (vitest-evals' LLM judge) and `autoevals`' `Levenshtein`. The harness is `createPiCodingAgentHarness({ noTools: "all" })`, i.e. **scripted control over the tool surface**. `measured` (`evals/smoke.eval.ts`, `evals/tui.docs.eval.ts`)
+5. **There is also a test double `fauxProvider()`** (pi-ai layer, public export): a scripted in-memory provider, `setResponses([...])` answers in order, `state.callCount`, `tokensPerSecond`, multiple models for switch testing. Its purpose is "drive one turn without starting a real model", not an evaluation framework. `measured` (`~pi-ai/dist/providers/faux.d.ts:1-100`, `README.md:1252-1330`)
+6. `pi-agent-core`'s `conformance/` and `benchmark/` directories belong to the **session-storage backend contract** domain (`createStorageConformance` / `STORAGE_BENCHMARK_DATASETS`), not agent behavior. `measured`
+7. pi officially points the "evaluation research" outlet to the external repo `badlogic/pi-share-hf` (sending sessions to Hugging Face datasets). `measured` (`~pi-coding-agent/docs/usage.md:142`)
+8. **`stopReason` exists, and is richer than `finish_reason`**:
 
 ```ts
 // ~pi-ai/dist/types.d.ts:292
 export type StopReason = "pending" | "stop" | "length" | "toolUse" | "error" | "aborted" | "deferred";
 ```
 
-挂在 `AssistantMessage.stopReason`（`:365`），另附 `rawStopReason`（provider 原值，`:368`）、`responseModel`（上游实际回的模型，`:359`）、`endTurn`（`:369`）。会持久化进 session JSONL，遥测里是一等属性 `pi.ai.response.stop_reason`。`measured`
+Hung off `AssistantMessage.stopReason` (:365), plus `rawStopReason` (the provider's original value, :368), `responseModel` (the model the upstream actually returned, :359), `endTurn` (:369). It persists into the session JSONL and is a first-class telemetry property `pi.ai.response.stop_reason`. `measured`
 
-9. **pacman 侧是宿主投影丢弃**（不是上游缺失）：`PiMessageLike` 声明了 `stopReason?: string`（`apps/daemon/src/backend/pi.ts:216`），但 `message_end` 分支只认 `'aborted'` 与 `'error'`（`pi.ts:321-329`），`'length'` 落进通用路径；`toMessageRecord` 又把载荷裁成 `{role, content}`（`pi.ts:251-258`）。harness 因此合成 `stop_reason`（`integration/eval/chief-dispatch/run-eval.mts:121`）。`measured`（本次逐行复核）
-10. **两条并存的事件路径**：pacman 用的 `AgentSession`（约 15 型事件 + extensions hooks）；上游另有更完整的 `AgentHarness`（约 30 型事件 + 12 个强类型 hook + 事件总线 + OTel 式遥测 schema，60+ 属性含 `pi.ai.response.stop_reason`），但 pi-coding-agent 自己没用它。`measured`
-11. **`agent_end` ≠ 回合结束**：pi 之后还可能 auto-retry / auto-compact / 消费排队 follow-up；正确信号是 extensions 的 `agent_settled`（原文："Use `agent_settled` for status integrations that need to know Pi will not continue running automatically."）。`measured`
+9. **The pacman side is a host projection drop** (not an upstream gap): `PiMessageLike` declares `stopReason?: string` (`apps/daemon/src/backend/pi.ts:216`), but the `message_end` branch only recognizes `'aborted'` and `'error'` (`pi.ts:321-329`), with `'length'` falling into the generic path; `toMessageRecord` further trims the payload to `{role, content}` (`pi.ts:251-258`). The harness therefore synthesizes `stop_reason` (`integration/eval/chief-dispatch/run-eval.mts:121`). `measured` (re-verified line by line this time)
+10. **Two coexisting event paths**: pacman uses `AgentSession` (~15 event types + extension hooks); upstream additionally has the more complete `AgentHarness` (~30 event types + 12 strongly-typed hooks + an event bus + an OTel-style telemetry schema, 60+ attributes including `pi.ai.response.stop_reason`), but pi-coding-agent itself does not use it. `measured`
+11. **`agent_end` ≠ turn end**: pi may still auto-retry / auto-compact / consume queued follow-ups afterwards; the correct signal is the extension `agent_settled` (original text: "Use `agent_settled` for status integrations that need to know Pi will not continue running automatically."). `measured`
 
 ---
 
-## S8 与 pacman chief-dispatch 的对照（方法论层）
+## S8 Comparison with pacman chief-dispatch (methodology level)
 
-`integration/eval/chief-dispatch/` 那一套是教科书式的 **outcome 通道**：
+The `integration/eval/chief-dispatch/` setup is a textbook **outcome channel**:
 
-| 方法论要求 | pacman 现状 |
+| Methodology requirement | pacman current state |
 |---|---|
-| 判环境终态不判叙述 | 判 `todo.assignment.build.agentId`，读 drizzle 不读 transcript（`grade.mts:26,39-63`） |
-| 裁判先验证再花钱 | `oracle-check.mts` 喂 oracle（必过）/ null（必挂）/ misroute（必挂）三种构造回合过真判分函数，零成本 |
-| 低方差 = 隔离环境 | 每例全新栈 + 全新 home / skills 根 / 机器注册（`stack.mts:142-231`） |
-| 基础设施噪音不能伪装成模型波动 | `dead = 零 token 或 step != done` → 落 `errors.jsonl` 不计分（`run-eval.mts:104-110`） |
-| harness 改动要有人看 diff | `harness_sha` 门，不符 exit 2，`--approve-harness` 放行（`run-eval.mts:227-269`） |
+| Judge the environment's end state, not the narrative | Judges `todo.assignment.build.agentId`, reading drizzle rather than the transcript (`grade.mts:26,39-63`) |
+| Verify the judge before spending money | `oracle-check.mts` feeds oracle (must pass) / null (must fail) / misroute (must fail) three constructed turns through the real grading function, at zero cost |
+| Low variance = isolated environments | Each case gets a fresh stack + fresh home / skills root / machine registration (`stack.mts:142-231`) |
+| Infrastructure noise must not masquerade as model fluctuation | `dead = zero tokens or step != done` → lands in `errors.jsonl`, not counted (`run-eval.mts:104-110`) |
+| Harness changes need a human reading the diff | `harness_sha` gate; mismatch exits 2, `--approve-harness` overrides (`run-eval.mts:227-269`) |
 
-方法论地图上缺的两格：
+The two missing cells on the methodology map:
 
-1. **只有 outcome 通道，没有过程通道**。失败只有两类形态（名字/id 错位、该派未派），因为 outcome 分把"抽样错 / 分类错 / 算术错 / 某一步前提没测"压成了同一个 0。`metrics.md` 记的"已饱和、测不出改进"与 TRACES 说的"标量把五种成因压成一个数字"是同一个病。
-2. **capability 轨与 regression 轨没分开**。`metrics.md` 已意识到该转回归门，但套件里没有独立的 capability 轨。
+1. **Only an outcome channel, no process channel**. Failures come in only two shapes (name/id mismatch, should-have-dispatched-but-didn't), because the outcome score compresses "sampling error / classification error / arithmetic error / a missing precondition in some step" into the same 0. The "saturated, cannot measure improvements" recorded in `metrics.md` and TRACES's "scalars compress five causes into one number" are the same disease.
+2. **The capability track and the regression track are not separated**. `metrics.md` already recognizes the need to turn into a regression gate, but the suite has no independent capability track.
 
-一处**记录有误**需要勘正：`metrics.md:138-142` 的缺口① 写"pacman 目前不上报模型的 `finish_reason`，runner 只能用征兆当截断特征"。实际上游有更全的字段（本页 S7.8），是宿主投影丢弃（S7.9）。
-
----
-
-## 附录 A：存疑与未核验（引用前须复核）
-
-1. **τ-bench 细分分数** `pass^1 ≈ 61%（retail）/ ≈ 35%（airline）` 只见于搜索结果抽取片段，原文（v5 HTML 与 PDF）经 Jina 都只返约 1.8KB 抓取失败；摘要级数字（`<50%`、`pass^8 <25% in retail`）已直接核对。`inferred`
-2. **pass^k 口径不一致**：Anthropic 用 `p^k`，τ-bench 用 `C(c,k)/C(n,k)`，n 有限时不等——引用必须注明来源。（本页 S3.1 已标注）
-3. **CI 方法**：Miller 与 Bowyer 是两个对立阵营且针对不同 N，不要把任一方当普适结论。
-4. **Berkeley RDI 的 73%–100% 可利用度**是自建扫描 agent 的自测，未见独立复现；OSWorld 与 GAIA 的数字同源，交叉印证弱。
-5. **H2O.ai "约 5% GAIA ground truth 有误"** 是参赛厂商单方声明，未见 GAIA 作者确认。
-6. **Epoch AI "约 10% 任务有严重错误"** 与官方 issue #177 的"32/369 ≈ 9% infeasible"**不是同一口径**，不要混用。
-7. **未核验、不要引用**：arXiv 2609.11028（BenchShield）、2609.19101。SAJA（ACL 2026 Industry）只返回校对模板，仅标题可用。
-8. **Harbor 是否有置信区间功能未证实**（文档阴性）；其指标口径取自仓库内 `docs-mintlify` mdx 源码而非渲染页。
-9. **Anthropic `Demystifying evals` 附录的框架名单**（Harbor / Braintrust / LangSmith / Langfuse / Arize）是 2026-01-09 快照，**不含** Inspect AI / promptfoo / DeepEval——厂商视角与社区视角不同。
-
-**抓取失败清单**（本次）：huggingface.co 全域被 Jina 匿名封禁（403）→ GAIA 当前榜分与 TB2.0 / CORE-Bench 数据集卡未取得；τ-bench 全文；Harbor 文档站子页（改仓库 mdx 成功）；`docs.smith.langchain.com` 轨迹页重定向（改 `langchain-ai/docs` 仓 mdx）；Langfuse 文档需加 `.md` 后缀；`tbench.ai/docs/*` 子页 404。
+One **erroneous record** needs correction: gap ① in `metrics.md:138-142` says "pacman currently does not report the model's `finish_reason`; the runner can only use symptoms as truncation features". In fact the upstream has the richer fields (S7.8 in this document); it is a host-side projection drop (S7.9).
 
 ---
 
-## 附录 B：来源
+## Appendix A: Doubts and unverified items (re-verify before citing)
 
-**方法论正本**
-- https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents （2026-01-09）
-- https://claude.dev/blog/automating-eval-design-and-hillclimbing/ （2026-09-28）
+1. The **τ-bench subscores** `pass^1 ≈ 61% (retail) / ≈ 35% (airline)` appear only in search-result snippets; the original (v5 HTML and PDF) returned only ~1.8KB via Jina and failed to capture. The summary-level numbers (`<50%`, `pass^8 <25% in retail`) were verified directly. `inferred`
+2. **pass^k caliber inconsistency**: Anthropic uses `p^k`, τ-bench uses `C(c,k)/C(n,k)`; they differ for finite n — citations must state the source. (Marked in S3.1 of this document.)
+3. **CI methods**: Miller and Bowyer are two opposing camps targeting different N; do not take either as universal.
+4. **Berkeley RDI's 73%–100% exploitability** is self-tested with a self-built scanning agent, with no independent replication seen; the OSWorld and GAIA numbers come from the same source, so cross-confirmation is weak.
+5. **H2O.ai's "about 5% of GAIA ground truth is wrong"** is a single participating vendor's claim, not confirmed by the GAIA authors.
+6. **Epoch AI's "about 10% of tasks have serious errors"** and the official issue #177's "32/369 ≈ 9% infeasible" are **not the same caliber**; do not mix them.
+7. **Unverified, do not cite**: arXiv 2609.11028 (BenchShield), 2609.19101. SAJA (ACL 2026 Industry) returned only a proof template; only the title is usable.
+8. **Whether Harbor has a confidence-interval feature is unconfirmed** (docs-negative); its metric caliber is taken from the in-repo `docs-mintlify` mdx source rather than the rendered pages.
+9. **The framework list in Anthropic's `Demystifying evals` appendix** (Harbor / Braintrust / LangSmith / Langfuse / Arize) is a 2026-01-09 snapshot and **does not include** Inspect AI / promptfoo / DeepEval — the vendor view and the community view differ.
 
-**S2 harness / 平台（按节序）**
-- Inspect：https://inspect.aisi.org.uk/ 、 `/datasets.html`、`/scorers.html`、`/metrics.html`、`/agents.html`、`/agent-bridge.html`、`/evals/index.html`
-- promptfoo：https://www.promptfoo.dev/docs/configuration/expected-outputs/ 、 `/expected-outputs/model-graded/`
-- DeepEval：https://docs.confident-ai.com/docs/metrics-introduction 、 `/metrics-tool-correctness`
-- Braintrust：https://www.braintrust.dev/docs/guides/evals 、 `/evaluate/llm-as-a-judge`
-- LangSmith：https://docs.smith.langchain.com/evaluation 、 `/langsmith/decision-model-evaluator` 、 https://github.com/langchain-ai/agentevals
-- Langfuse：https://langfuse.com/docs/evaluation/overview.md 、 `/evaluation/evaluation-methods/jev-as-a-judge.md` 、 `/evaluation/scores/score-analytics.md`
-- Arize：https://docs.arize.com/phoenix/evaluation/evals 、 https://arize.com/docs/ax/evaluate/evaluators/trace-and-session-evals/trace-level-evaluations/agent-trajectory-evaluations
-- Harbor：https://github.com/harbor-framework/harbor （`docs-mintlify/core-concepts/*.mdx`、`rfcs/0001-trajectory-format.md`）、 https://www.tbench.ai/
-- 厂商：https://openai.com/index/introducing-agentkit/ 、 https://platform.openai.com/docs/guides/graders 、 https://deploymentsafety.openai.com/gpt-6-astra/evaluating-auto-review 、 https://cloud.google.com/vertex-ai/generative-ai/docs/models/evaluation-overview 、 https://cloud.google.com/gemini-enterprise-agent-platform/optimize/evaluation/agent-evaluation 、 https://google.github.io/adk-docs/evaluate/
+**Failed-capture list** (this time): huggingface.co is entirely blocked to anonymous Jina (403) → current GAIA leaderboard scores and the TB2.0 / CORE-Bench dataset cards not obtained; τ-bench full text; Harbor docs-site subpages (the repo mdx worked instead); `docs.smith.langchain.com` trajectory page redirect (worked around with the `langchain-ai/docs` repo mdx); Langfuse docs need a `.md` suffix; `tbench.ai/docs/*` subpages 404.
 
-**S3 统计**：https://arxiv.org/abs/2411.00640 、 https://arxiv.org/abs/2503.01747 、 https://arxiv.org/abs/2406.12045
+---
 
-**S4 judge 可靠性**：https://arxiv.org/abs/2306.05685 、 https://arxiv.org/abs/2406.07791 、 https://arxiv.org/abs/2410.21819 、 https://arxiv.org/abs/2403.18771 、 https://arxiv.org/abs/2504.14716 、 https://arxiv.org/abs/2404.18796
+## Appendix B: Sources
 
-**S5 过程评测**：https://arxiv.org/abs/2505.08638 、 https://arxiv.org/abs/2602.02475 、 https://arxiv.org/abs/2603.14465 、 https://arxiv.org/abs/2410.10934 、 https://arxiv.org/abs/2605.02964 、 https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/
+**Methodology canonical copies**
+- https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents (2026-01-09)
+- https://claude.dev/blog/automating-eval-design-and-hillclimbing/ (2026-09-28)
 
-**S6 benchmark**：https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/ 、 https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/ 、 https://arxiv.org/abs/2506.12286 、 https://scale.com/research/swe_bench_pro 、 https://www.swebench.com/ 、 https://github.com/SWE-bench/experiments/issues/462 、 https://github.com/sierra-research/tau-bench/issues/57 、 https://github.com/xlang-ai/OSWorld/issues/177
+**S2 harnesses / platforms (in section order)**
+- Inspect: https://inspect.aisi.org.uk/ , `/datasets.html`, `/scorers.html`, `/metrics.html`, `/agents.html`, `/agent-bridge.html`, `/evals/index.html`
+- promptfoo: https://www.promptfoo.dev/docs/configuration/expected-outputs/ , `/expected-outputs/model-graded/`
+- DeepEval: https://docs.confident-ai.com/docs/metrics-introduction , `/metrics-tool-correctness`
+- Braintrust: https://www.braintrust.dev/docs/guides/evals , `/evaluate/llm-as-a-judge`
+- LangSmith: https://docs.smith.langchain.com/evaluation , `/langsmith/decision-model-evaluator` , https://github.com/langchain-ai/agentevals
+- Langfuse: https://langfuse.com/docs/evaluation/overview.md , `/evaluation/evaluation-methods/jev-as-a-judge.md` , `/evaluation/scores/score-analytics.md`
+- Arize: https://docs.arize.com/phoenix/evaluation/evals , https://arize.com/docs/ax/evaluate/evaluators/trace-and-session-evals/trace-level-evaluations/agent-trajectory-evaluations
+- Harbor: https://github.com/harbor-framework/harbor (`docs-mintlify/core-concepts/*.mdx`, `rfcs/0001-trajectory-format.md`), https://www.tbench.ai/
+- Vendors: https://openai.com/index/introducing-agentkit/ , https://platform.openai.com/docs/guides/graders , https://deploymentsafety.openai.com/gpt-6-astra/evaluating-auto-review , https://cloud.google.com/vertex-ai/generative-ai/docs/models/evaluation-overview , https://cloud.google.com/gemini-enterprise-agent-platform/optimize/evaluation/agent-evaluation , https://google.github.io/adk-docs/evaluate/
 
-**S7 pi**：① 本地 `node_modules/.pnpm/@earendil-works+pi-*@0.86.0/**`（bundled types + `docs/` + `README.md`）；② 上游 monorepo `packages/evals`（经 `gh api repos/earendil-works/pi/contents/...` 读 `README.md` / `package.json` / `evals/smoke.eval.ts` / `evals/tui.docs.eval.ts`）
+**S3 statistics**: https://arxiv.org/abs/2411.00640 , https://arxiv.org/abs/2503.01747 , https://arxiv.org/abs/2406.12045
 
-**S8 pacman**：`integration/eval/chief-dispatch/{stack,grade}.mts`、`run-eval.mts`、`.claude/hillclimb/chief-dispatch/{metrics.md,_state.json}`、`apps/daemon/src/backend/pi.ts`
+**S4 judge reliability**: https://arxiv.org/abs/2306.05685 , https://arxiv.org/abs/2406.07791 , https://arxiv.org/abs/2410.21819 , https://arxiv.org/abs/2403.18771 , https://arxiv.org/abs/2504.14716 , https://arxiv.org/abs/2404.18796
+
+**S5 process evaluation**: https://arxiv.org/abs/2505.08638 , https://arxiv.org/abs/2602.02475 , https://arxiv.org/abs/2603.14465 , https://arxiv.org/abs/2410.10934 , https://arxiv.org/abs/2605.02964 , https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/
+
+**S6 benchmarks**: https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/ , https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/ , https://arxiv.org/abs/2506.12286 , https://scale.com/research/swe_bench_pro , https://www.swebench.com/ , https://github.com/SWE-bench/experiments/issues/462 , https://github.com/sierra-research/tau-bench/issues/57 , https://github.com/xlang-ai/OSWorld/issues/177
+
+**S7 pi**: ① local `node_modules/.pnpm/@earendil-works+pi-*@0.86.0/**` (bundled types + `docs/` + `README.md`); ② upstream monorepo `packages/evals` (via `gh api repos/earendil-works/pi/contents/...` reading `README.md` / `package.json` / `evals/smoke.eval.ts` / `evals/tui.docs.eval.ts`)
+
+**S8 pacman**: `integration/eval/chief-dispatch/{stack,grade}.mts`, `run-eval.mts`, `.claude/hillclimb/chief-dispatch/{metrics.md,_state.json}`, `apps/daemon/src/backend/pi.ts`
