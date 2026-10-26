@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const aside = sidebar(page);
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(248);
 
@@ -54,48 +54,45 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
 });
 
 test('`新任务` row opens the new-task dialog without a sidebar key badge', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const button = page.locator('.sidebar-new-task');
   await expect(button.locator('kbd')).toHaveCount(0);
   await button.click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('`需要我处理` badge counts the `待处理` column and opens the needs-me inbox', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+test('`工作台` badge counts the `待处理` column; `看板` opens the four-column board and back', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=01&view=board');
   const pendingCount = await page
     .locator('[data-column="pending"] [data-testid="column-count"]')
     .textContent();
-  const needsMe = sidebar(page).getByRole('link', { name: /需要我处理/ });
-  await expect(needsMe.getByTestId('attention-badge')).toHaveText(pendingCount ?? '');
+  const home = sidebar(page).getByRole('link', { name: /工作台/ });
+  const kanban = sidebar(page).getByRole('link', { name: '看板' });
+  await expect(home.getByTestId('attention-badge')).toHaveText(pendingCount ?? '');
   await expect(columns(page)).toHaveCount(4);
+  await expect(kanban).toHaveAttribute('aria-current', 'page');
 
-  await needsMe.click();
-  await expect(page).toHaveURL(/[?&]column=pending/);
+  await home.click();
+  await expect(page).not.toHaveURL(/view=/);
   await expect(page).toHaveURL(/[?&]scenario=01/);
   await expect(columns(page)).toHaveCount(0);
-  await expect(page.getByTestId('needs-you-inbox')).toBeVisible();
-  await expect(needsMe).toHaveAttribute('aria-current', 'page');
-  const board = sidebar(page).getByRole('link', { name: '工作台' });
-  await expect(board).not.toHaveAttribute('aria-current', 'page');
+  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await expect(home).toHaveAttribute('aria-current', 'page');
+  await expect(kanban).not.toHaveAttribute('aria-current', 'page');
 
   await page.reload();
-  await expect(page.getByTestId('needs-you-inbox')).toBeVisible();
+  await expect(page.getByTestId('home-sections')).toBeVisible();
 
-  await page.getByRole('button', { name: '清除待处理筛选' }).click();
+  await kanban.click();
+  await expect(page).toHaveURL(/[?&]view=board/);
   await expect(columns(page)).toHaveCount(4);
-  await expect(page).not.toHaveURL(/column=/);
-
-  await needsMe.click();
-  await expect(page.getByTestId('needs-you-inbox')).toBeVisible();
-  await board.click();
-  await expect(columns(page)).toHaveCount(4);
-  await expect(board).toHaveAttribute('aria-current', 'page');
-  await expect(page).not.toHaveURL(/column=/);
+  await expect(kanban).toHaveAttribute('aria-current', 'page');
 });
 
 test('active row = sheet fill + hairline ring + accent icon', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const m = await page.evaluate(() => {
     const row = document.querySelector('aside a[aria-current="page"]');
     const main = document.querySelector('.board-sheet');
@@ -122,7 +119,7 @@ test('active row = sheet fill + hairline ring + accent icon', async ({ page }) =
 });
 
 test('`资源` folds by default, opens to an indented sub-list, survives reload', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const toggle = sidebar(page).getByRole('button', { name: '资源' });
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(sidebar(page).getByRole('link', { name: '技能' })).toHaveCount(0);
@@ -163,7 +160,7 @@ test('a resource route lights the folded `资源` row', async ({ page }) => {
 test('project rows: tile colors follow --project-tile-N in order, open-task counts', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-repos');
+  await page.goto('/app?scenario=board-repos&view=board');
   const rows = page.locator('[data-testid="project-row"]');
   await expect(rows).toHaveCount(3);
   const probe = await rows.evaluateAll((els) => {
@@ -192,7 +189,7 @@ test('project rows: tile colors follow --project-tile-N in order, open-task coun
 });
 
 test('long project names truncate and keep the count visible', async ({ page }) => {
-  await page.goto('/app?scenario=board-repos');
+  await page.goto('/app?scenario=board-repos&view=board');
   const m = await page
     .locator('[data-testid="project-row"]')
     .first()
@@ -216,7 +213,7 @@ test('long project names truncate and keep the count visible', async ({ page }) 
 });
 
 test('user row second line reads machines online and running count', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const running = await page
     .locator('[data-column="building"] [data-testid="column-count"]')
     .textContent();
@@ -225,16 +222,16 @@ test('user row second line reads machines online and running count', async ({ pa
   );
 });
 
-test('collapsed rail keeps `需要我处理` with its badge and the expand toggle', async ({ page }) => {
+test('collapsed rail keeps `工作台` with its badge dot and the expand toggle', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const aside = sidebar(page);
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(40);
-  const needsMe = aside.getByRole('link', { name: /需要我处理/ });
-  await expect(needsMe).toBeVisible();
-  await needsMe.click();
-  await expect(page.getByTestId('needs-you-inbox')).toBeVisible();
-  await expect(needsMe).toHaveAttribute('aria-current', 'page');
+  const home = aside.getByRole('link', { name: /工作台/ });
+  await expect(home).toBeVisible();
+  await home.click();
+  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await expect(home).toHaveAttribute('aria-current', 'page');
   await aside.getByRole('button', { name: '展开侧边栏' }).click();
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(248);
 });

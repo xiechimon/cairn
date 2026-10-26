@@ -49,7 +49,7 @@ async function openTypePopover(page: Page) {
 test('legacy scenario (no projectNames) renders no repo section; top bar two buttons = bare filter button + new-task capsule', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
 
   await expect(chipsBar(page)).toHaveCount(0);
   const banner = page.getByRole('banner');

@@ -24,7 +24,7 @@ async function resolveVar(page: Page, prop: string, value: string) {
 for (const theme of ['light', 'dark'] as const) {
   test(`press tints the whole card one surface step (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
     const card = page.locator('[data-column="done"] [data-todo-id]').first();
     const box = await card.boundingBox();
     if (box == null) throw new Error('done card missing');
@@ -58,7 +58,7 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 test('card face is selection- and native-drag-locked (no `小链接` anywhere)', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const card = page.locator('[data-column="done"] [data-todo-id]').first();
   await expect(card).toHaveCSS('user-select', 'none');
   const link = card.getByRole('link');
@@ -109,7 +109,7 @@ test('card face is selection- and native-drag-locked (no `小链接` anywhere)',
 });
 
 test('plain click on a done card still navigates to the detail route', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const card = page.locator('[data-column="done"] [data-todo-id]').first();
   const id = await card.getAttribute('data-todo-id');
   await card.click();

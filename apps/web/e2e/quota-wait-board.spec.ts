@@ -32,7 +32,7 @@ test('detail header chip says `等额度` not `执行中` (header half of the ca
 });
 
 test('no-suspend baseline: 01 scenario board has zero banners and zero chips (legacy zero regression)', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await expect(page.locator('[data-quota-banner]')).toHaveCount(0);
   await expect(page.locator('[data-todo-quota]')).toHaveCount(0);
 });

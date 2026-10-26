@@ -94,7 +94,7 @@ test('card top/bottom edges held by block padding: first card top edge and scrol
 });
 
 test('legacy scenario zero drift: 01 column hugs the viewport, column bottom does not pass the scroller bottom edge', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const probe = await page.evaluate(() => {
     const scroller = document.querySelector('[data-testid="board-scroller"]');
     const columns = [...document.querySelectorAll('[data-column]')];

@@ -146,7 +146,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     test('board cards show the summed amount, `—` with a reason, or nothing', async ({ page }) => {
       await stubWorld(page);
-      await page.goto('/app');
+      await page.goto('/app?view=board');
       await expect(card(page, NEVER_RAN.id)).toBeVisible();
       await evidencePanelShot(page, `card-cost-${theme}.png`, card(page, PRICED.id));
 

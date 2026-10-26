@@ -64,7 +64,7 @@ test('board header stays the banner, at the top of the sheet', async ({ page }) 
 });
 
 test('chief settings swaps in inside the same sheet', async ({ page }) => {
-  await page.goto('/app?scenario=101');
+  await page.goto('/app?scenario=101&view=board');
   const heading = page.locator('.board-sheet').getByRole('heading', { name: '总管设置' });
   await expect(heading).toBeVisible();
   await expect(page.locator('.board-main')).toHaveCount(0);
