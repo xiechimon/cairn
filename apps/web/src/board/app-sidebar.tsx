@@ -133,7 +133,7 @@ export function AppSidebar({
               onClickCapture={(event) => {
                 if ((event.target as Element).closest('a[href]') != null) closeDrawer();
               }}
-              className="app-drawer top-0 left-0 flex h-full w-72 max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 shadow-xl ring-0 duration-200 ease-(--ease-standard) sm:max-w-[85vw] data-open:slide-in-from-left data-open:zoom-in-100 data-closed:slide-out-to-left data-closed:zoom-out-100 [&>.board-sidebar]:w-full"
+              className="top-0 left-0 flex h-full w-72 max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 shadow-xl ring-0 duration-200 ease-(--ease-standard) sm:max-w-[85vw] data-open:slide-in-from-left data-open:zoom-in-100 data-closed:slide-out-to-left data-closed:zoom-out-100 [&>.board-sidebar]:w-full"
             >
               <DialogTitle className="sr-only">{t('侧边栏')}</DialogTitle>
               <BoardSidebar

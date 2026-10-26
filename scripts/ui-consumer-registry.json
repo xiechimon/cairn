@@ -19,7 +19,7 @@
     },
     {
       "file": "apps/web/src/board/app-sidebar.tsx",
-      "anchor": "app-drawer top-0 left-0",
+      "anchor": "top-0 left-0 flex h-full w-72",
       "kind": "deviation",
       "reason": "Phone sidebar drawer: a full-height Dialog panel pinned to the left screen edge, as on claude.ai mobile. Its top, left and bottom edges sit on the viewport edge, where rounded corners would leave slivers of the page showing, so the box stays square; the sidebar inside keeps its own surface."
     }
