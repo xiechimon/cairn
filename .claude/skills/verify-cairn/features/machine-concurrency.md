@@ -24,7 +24,7 @@ One machine runs N rounds at once (N = `machine.maxConcurrent`, DB NOT NULL defa
 
 ## Driving conventions
 
-- The driving entry = `scripts/drive-1108-concurrency.mjs` (gated stub LLM + real daemon; four families 15 checks: the parallel canon line / stub request-interval overlap, the gate-block-queue-keep, turnQueue / queue-row / read annotation, slot handoff, PATCH range). Evidence `docs/verify/1108/` (with the rerun-recipe README).
+- The driving entry = `docs/verify/1108/drive-1108-concurrency.mjs` (gated stub LLM + real daemon; four families 15 checks: the parallel canon line / stub request-interval overlap, the gate-block-queue-keep, turnQueue / queue-row / read annotation, slot handoff, PATCH range). Evidence `docs/verify/1108/` (with the rerun-recipe README).
 - Unit face: server `test/machine-concurrency.test.ts` (gate/projection/write face 9) + `test/machine-pin.test.ts` (#1259 home-machine version: steps only dispatch to the agent's home machine, pin filtering retired - the session-affinity family retired and deleted with #1259); daemon `test/machine-loop.test.ts` parallel loop P1-P5; web `test/activity-live-row.test.ts` queue label Q1-Q6.
 - e2e face: `machines-local.spec.ts` (the in-row live control = the concurrency selector; the shell-switch pairing retired with #1796) + `machines-concurrency-control.spec.ts` C1-C4 (PATCH single field / read annotation / old-shape exit) + `dead-buttons.spec.ts` (zero dead buttons narrowing the pin).
 

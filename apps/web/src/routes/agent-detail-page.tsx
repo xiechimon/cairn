@@ -671,7 +671,7 @@ export function AgentDetailPage() {
               )}
             </section>
 
-            <section className="agent-perm-group agent-machine-fit flex flex-col gap-2">
+            <section className="agent-perm-group flex flex-col gap-2">
               <h3 className="m-0 text-card-title font-medium text-foreground">{t('机器匹配')}</h3>
               <p className={SETTINGS_HINT_CLS}>
                 {t(
@@ -691,13 +691,11 @@ export function AgentDetailPage() {
                   {mcpOptions.map((server) => (
                     <SettingsRow
                       key={server.id}
-                      className="agent-required-mcp-row"
                       label={server.name}
                       hint={t('要求执行机已安装该 MCP 服务器')}
                       hintClassName="agent-perm-hint"
                     >
                       <Switch
-                        className="agent-required-mcp-switch"
                         aria-label={t('要求安装 {name}', { name: server.name })}
                         checked={(agent.requiredCapabilities?.mcpServers ?? []).includes(server.id)}
                         onCheckedChange={(checked) => toggleRequiredMcp(server.id, checked)}
@@ -716,7 +714,6 @@ export function AgentDetailPage() {
                     machineFitQ.data.machines.map((m) => (
                       <SettingsRow
                         key={m.machineId}
-                        className="agent-fit-row"
                         label={m.name}
                         hint={machineFitHint(m, t)}
                         hintClassName="agent-perm-hint"
