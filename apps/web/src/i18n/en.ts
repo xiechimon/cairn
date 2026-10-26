@@ -21,13 +21,13 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
-  '思考 {n} 次': 'Thought {n} times',
-  '读了 {n} 个文件': 'Read {n} files',
-  '搜索 {n} 次': 'Searched {n} times',
-  '跑了 {n} 条命令': 'Ran {n} commands',
-  '改了 {n} 个文件': 'Edited {n} files',
-  '调用 {n} 个工具': 'Called {n} tools',
-  '已加载 {n} 个技能': 'Loaded {n} skills',
+  '思考 {n} 次': 'Thinking: {n}',
+  '读了 {n} 个文件': 'Files read: {n}',
+  '搜索 {n} 次': 'Searches: {n}',
+  '跑了 {n} 条命令': 'Commands: {n}',
+  '改了 {n} 个文件': 'Files edited: {n}',
+  '调用 {n} 个工具': 'Tool calls: {n}',
+  '已加载 {n} 个技能': 'Skills loaded: {n}',
   '还有 {n} 行': '{n} more lines',
   '，': ', ',
   无输出: 'No output',

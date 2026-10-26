@@ -131,7 +131,19 @@ async function stubWorld(page: Page) {
         return route.fulfill(json({ unreadThreadIds: [] }));
       }
       if (path === `/api/builds/${BUILD_ID}`) return route.fulfill(json(WIRE_BUILD));
-      if (path === `/api/builds/${BUILD_ID}/steps`) return route.fulfill(json([]));
+      if (path === `/api/builds/${BUILD_ID}/steps`)
+        return route.fulfill(
+          json([
+            {
+              id: 'step-tr-1',
+              buildId: BUILD_ID,
+              kind: 'build',
+              machineId: null,
+              createdAt: 1000,
+              status: 'claimed',
+            },
+          ]),
+        );
       if (path === `/api/builds/${BUILD_ID}/plans`) return route.fulfill(json([]));
       if (path === `/api/builds/${BUILD_ID}/usage`) return route.fulfill(json([]));
       if (path === `/api/builds/${BUILD_ID}/changes`) {
@@ -173,7 +185,7 @@ test('work groups consecutive thinking and calls, with only the last block expan
   const block = page.getByTestId('work-block').first();
   const read = block.getByTestId('work-call').first();
   await expect(read).toContainText('读');
-  await expect(read).toContainText('src/main.ts L10–30');
+  await expect(read).toContainText('src/main.ts L10–29');
   await expect(read).toContainText('1.3s');
   await expect(read).not.toContainText('/home/user');
   await read.click();

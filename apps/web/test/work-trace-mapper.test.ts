@@ -22,7 +22,7 @@ test('thinking and calls form maximal runs separated by assistant prose and note
   ]);
   expect(items.map((item) => item.kind)).toEqual(['work', 'robot', 'work', 'note', 'work']);
   const first = items[0];
-  expect(first).toMatchObject({ kind: 'work', steps: [ { kind: 'think', text: 'Full reasoning', seconds: null }, { action: 'read', target: 'src/main.ts L2–10', seconds: 1.5 } ] });
+  expect(first).toMatchObject({ kind: 'work', steps: [ { kind: 'think', text: 'Full reasoning', seconds: null }, { action: 'read', target: 'src/main.ts L2–9', seconds: 1.5 } ] });
   expect(items[2]).toMatchObject({ steps: [{ action: 'search', description: 'Find target', command: 'rg target src' }] });
   expect(items[4]).toMatchObject({ steps: [{ action: 'run', description: 'pnpm lint' }] });
 });
@@ -55,4 +55,16 @@ test('a skill summary does not split historical calls from live thinking', () =>
   expect(blocks[0]?.steps.map((step) => step.kind)).toEqual(['call', 'think']);
   expect(items.some((item) => item.kind === 'skills')).toBe(true);
   expect(items.at(-1)?.kind).toBe('streaming');
+});
+
+test('a call left without a result only spins while its step is still running', () => {
+  const unfinished: MessageRow = { id: 'cut', role: 'assistant', createdAt: 1000, content: { kind: 'toolcall', call: { id: 'cut', name: 'Bash', arguments: { command: 'sleep 60' } } } };
+  const stepOf = (status: 'claimed' | 'stopped') => ({ id: 'step', buildId: 'build', kind: 'build' as const, machineId: null, createdAt: 500, status, checkpointCommit: null, skillInjection: null });
+  const at = (status: 'claimed' | 'stopped') => mapTranscript({ messages: [unfinished], steps: [stepOf(status)], plans: [], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '' });
+  expect(at('claimed')[0]).toMatchObject({ steps: [{ running: true }] });
+  expect(at('stopped')[0]).toMatchObject({ steps: [{ running: false }] });
+});
+
+test('backend search tools count as searches', () => {
+  expect(render([call('g', 'grep', { pattern: 'mergeBuild', path: 'apps/web' }, 1000)])[0]).toMatchObject({ steps: [{ action: 'search', description: 'grep mergeBuild apps/web' }] });
 });

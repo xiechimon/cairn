@@ -560,6 +560,9 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       toolNameByResult.set(pairedText, paired.name);
   }
 
+  const stepRunning = steps.some(
+    (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
+  );
   const entries: TimelineEntry[] = [];
   let previousAt: number | null = null;
   for (const m of messages) {
@@ -568,7 +571,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     previousAt = m.createdAt;
     const call = toolCallOfContent(m.content);
     if (call !== null) {
-      entries.push({ at: m.createdAt, item: { kind: '__work__', step: workCall(call, seconds) } });
+      entries.push({
+        at: m.createdAt,
+        item: { kind: '__work__', step: workCall(call, seconds, stepRunning) },
+      });
       continue;
     }
     const text = textOfContent(m.content).trim();
@@ -771,7 +777,11 @@ function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string 
   }
 }
 
-function workCall(call: ToolCallRecord, fallbackSeconds: number | null): WorkStep {
+function workCall(
+  call: ToolCallRecord,
+  fallbackSeconds: number | null,
+  stepRunning: boolean,
+): WorkStep {
   const args = (call.arguments ?? {}) as Record<string, unknown>;
   const name = call.name.toLowerCase();
   const path = String(args.file_path ?? args.path ?? '').replace(
@@ -789,14 +799,18 @@ function workCall(call: ToolCallRecord, fallbackSeconds: number | null): WorkSte
     label: call.name,
     output: output !== null && isJsonPlumbing(output) ? null : output,
     error: call.isError === true,
-    running: call.result === undefined,
+    running: call.result === undefined && stepRunning,
     seconds,
   };
   if (name === 'read') {
+    const offset = typeof args.offset === 'number' ? args.offset : null;
+    const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : null;
     const range =
-      typeof args.offset === 'number'
-        ? ` L${args.offset}–${args.offset + (typeof args.limit === 'number' ? args.limit : 0)}`
-        : '';
+      offset === null && limit === null
+        ? ''
+        : limit === null
+          ? ` L${offset}+`
+          : ` L${offset ?? 1}–${(offset ?? 1) + limit - 1}`;
     return { ...base, action: 'read', target: path + range };
   }
   if (name === 'edit' || name === 'write' || name === 'multiedit') {
@@ -817,6 +831,14 @@ function workCall(call: ToolCallRecord, fallbackSeconds: number | null): WorkSte
       target: path,
       diff: { added: added.length, removed: removed.length },
       changes: { removed, added },
+    };
+  }
+  if (name === 'grep' || name === 'find' || name === 'ls' || name === 'glob') {
+    const pattern = typeof args.pattern === 'string' ? args.pattern : '';
+    return {
+      ...base,
+      action: 'search',
+      description: [call.name, pattern, path].filter((part) => part !== '').join(' '),
     };
   }
   if (name === 'bash') {

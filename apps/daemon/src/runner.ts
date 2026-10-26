@@ -1180,6 +1180,7 @@ async function runClaimedStep(
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
     runningToolCalls.clear();
+    toolStartedAt.clear();
     armWatchdog(streamTimeouts.first, 'first');
     armBodyTimeout();
     if (pass === 0) armDurationCap();
@@ -1231,15 +1232,15 @@ async function runClaimedStep(
           case 'toolcall_end': {
             const eventTime = now();
             if (ev.call.result === undefined) {
-              const startedAt = toolStartedAt.get(ev.call.id) ?? eventTime;
+              const startedAt = ev.call.startedAt ?? toolStartedAt.get(ev.call.id) ?? eventTime;
               toolStartedAt.set(ev.call.id, startedAt);
               ev.call = { ...ev.call, startedAt };
             } else {
-              const startedAt = toolStartedAt.get(ev.call.id) ?? ev.call.startedAt;
+              const startedAt = ev.call.startedAt ?? toolStartedAt.get(ev.call.id);
               ev.call = {
                 ...ev.call,
                 ...(startedAt !== undefined ? { startedAt } : {}),
-                endedAt: eventTime,
+                endedAt: ev.call.endedAt ?? eventTime,
               };
               toolStartedAt.delete(ev.call.id);
             }

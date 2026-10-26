@@ -165,22 +165,25 @@ export function WorkTrace({
   const [disclosure, setDisclosure] = useState<{ defaultExpanded: boolean; open: boolean } | null>(
     null,
   );
-  const running = item.steps.some((step) => step.kind === 'call' && step.running);
   const expanded =
-    running ||
-    (disclosure?.defaultExpanded === defaultExpanded ? disclosure.open : defaultExpanded);
+    disclosure?.defaultExpanded === defaultExpanded ? disclosure.open : defaultExpanded;
   const counts = { think: 0, read: 0, search: 0, run: 0, edit: 0, tool: 0 };
   let seconds: number | null = null;
+  const readPaths = new Set<string>();
+  const editPaths = new Set<string>();
   for (const step of item.steps) {
-    counts[step.kind === 'think' ? 'think' : step.action] += 1;
+    if (step.kind === 'call' && step.action === 'read')
+      readPaths.add((step.target ?? '').replace(/ L\d.*$/, ''));
+    else if (step.kind === 'call' && step.action === 'edit') editPaths.add(step.target ?? '');
+    else counts[step.kind === 'think' ? 'think' : step.action] += 1;
     if (step.seconds !== null) seconds = (seconds ?? 0) + step.seconds;
   }
   const summary = [
     counts.think > 0 ? t('思考 {n} 次', { n: counts.think }) : null,
-    counts.read > 0 ? t('读了 {n} 个文件', { n: counts.read }) : null,
+    readPaths.size > 0 ? t('读了 {n} 个文件', { n: readPaths.size }) : null,
     counts.search > 0 ? t('搜索 {n} 次', { n: counts.search }) : null,
     counts.run > 0 ? t('跑了 {n} 条命令', { n: counts.run }) : null,
-    counts.edit > 0 ? t('改了 {n} 个文件', { n: counts.edit }) : null,
+    editPaths.size > 0 ? t('改了 {n} 个文件', { n: editPaths.size }) : null,
     counts.tool > 0 ? t('调用 {n} 个工具', { n: counts.tool }) : null,
   ]
     .filter((part) => part !== null)
