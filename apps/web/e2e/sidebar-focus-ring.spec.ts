@@ -1,17 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { settleTransitions } from './helpers.js';
 
-// A sidebar row clicked with the mouse and then given Escape painted a
-// focus ring that the scrolling nav cut in half.
-//
-// Failure modes this file pins:
-// 1. Mouse focus followed by Escape (Chromium flips :focus-visible on)
-//    paints a ring.
-// 2. A keyboard-focused sidebar row or rail row paints a ring that an
-//    overflow ancestor clips.
-// 3. Escape after Tab hides the ring a keyboard user relies on.
-// 4. The transcript scroller ring is clipped by its own panel.
-
 const SIDEBAR_COLLAPSED_KEY = 'cairn.sidebar-collapsed';
 
 interface RingReport {
