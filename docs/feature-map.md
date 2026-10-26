@@ -77,22 +77,22 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 
 | Item | Count |
 |---|---|
-| Map rows (issues) | 625 |
-| of which Differentiation surface | 92 |
-| of which Runtime axis | 141 |
-| of which General surface | 392 |
-| status Done | 492 |
+| Map rows (issues) | 629 |
+| of which Differentiation surface | 93 |
+| of which Runtime axis | 142 |
+| of which General surface | 394 |
+| status Done | 496 |
 | status In progress | 5 |
 | status Not started | 16 |
 | status Unverified | 112 |
 | anchors = evidence directory + test reference | 222 |
-| anchors = evidence directory only | 168 |
-| anchors = test reference only | 107 |
+| anchors = evidence directory only | 170 |
+| anchors = test reference only | 109 |
 | no anchor (`[unverified]`) | 128 |
-| referenced PRs (no rows, §3.2) | 99 |
+| referenced PRs (no rows, §3.2) | 97 |
 | unresolvable ticket numbers (§3.3) | 0 |
 | evidence directories that are not GitHub ticket numbers (§3.4) | 94 |
-| scan surface: spec volumes / test files | 31 / 583 |
+| scan surface: spec volumes / test files | 31 / 580 |
 
 ## 2. Feature map
 
@@ -143,7 +143,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#892](https://github.com/xiechimon/cairn/issues/892) `research: 量闸 —— 真闭环实测里数 withPlan 分布 + 找闸被跳过的路径` | Differentiation surface | Unverified | [unverified] |
 | [#900](https://github.com/xiechimon/cairn/issues/900) `server: chief 不得自过 review 闸（complete_todos 纳入权限模型）` | Differentiation surface | Done | `060088f32:docs/verify/900/`<br>`apps/server/test/gate-actor.test.ts` |
 | [#901](https://github.com/xiechimon/cairn/issues/901) `web+server: 从 confirm/review 拖向 done 要求确认弹层 + 落审计行` | Differentiation surface | Done | `apps/server/test/gate-actor.test.ts`<br>`apps/web/e2e/board-dnd-live.spec.ts`<br>`apps/web/e2e/board-dnd.spec.ts` |
-| [#902](https://github.com/xiechimon/cairn/issues/902) `server: 过闸动作记 actor（announcement 行）` | Differentiation surface | Done | `apps/server/test/gate-actor.test.ts`<br>`apps/web/test/transcript-user-words.test.ts` |
+| [#902](https://github.com/xiechimon/cairn/issues/902) `server: 过闸动作记 actor（announcement 行）` | Differentiation surface | Done | `docs/verify/902/`<br>`apps/server/test/gate-actor.test.ts`<br>`apps/web/test/transcript-user-words.test.ts` |
 | [#903](https://github.com/xiechimon/cairn/issues/903) `chief: 派发的 plan/直执行选择权交还 charter 或人` | Differentiation surface | Done | `docs/verify/903/`<br>`apps/server/test/chief-dispatch.test.ts`<br>`apps/server/test/chief-settings.test.ts`<br>`apps/web/e2e/chief-settings.spec.ts`<br>`packages/shared/test/chief-tools.test.ts` |
 | [#904](https://github.com/xiechimon/cairn/issues/904) `test: plan.md 落库通道全链验证（withPlan build → plan 表 → confirm 有物可看）` | Differentiation surface | Done | `docs/verify/904/` |
 | [#929](https://github.com/xiechimon/cairn/issues/929) `daemon: 命令闸改用 pi 原生 tool_call 阻断缝（现在在复刻 bash 工具换 operations）` | Differentiation surface | Done | `apps/daemon/test/command-gate.test.ts`<br>`integration/test/gate-e2e.test.ts` |
@@ -165,7 +165,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1195](https://github.com/xiechimon/cairn/issues/1195) `build artifact gate reports zero-changes when the agent commits on a non-conv branch (PR delivered anyway)` | Differentiation surface | Done | `docs/verify/1195/`<br>`apps/daemon/test/runner-branch-drift.test.ts`<br>`apps/daemon/test/workspace.test.ts`<br>`apps/server/test/artifact-gate.test.ts`<br>`apps/server/test/pr-reconcile.test.ts` |
 | [#1203](https://github.com/xiechimon/cairn/issues/1203) `plan.md handoff collides with repo checkout: move it out of the repo and backstop with lane-file-gate` | Differentiation surface | Done | `apps/daemon/test/runner-local.test.ts`<br>`packages/shared/test/plan-first-round-prompt.test.ts` |
 | [#1204](https://github.com/xiechimon/cairn/issues/1204) `Rework loop broken: change-request from review fails with 'plan 步无指派 Agent' when assignment.plan is null; rework also drops session context` | Differentiation surface | Done | `apps/server/test/rework-plan-fallback.test.ts` |
-| [#1208](https://github.com/xiechimon/cairn/issues/1208) `Machine pin from composer is ignored by dispatch: plan and build steps both run on the unpinned machine` | Differentiation surface | Done | `84a4eba01:docs/verify/1208/` |
+| [#1208](https://github.com/xiechimon/cairn/issues/1208) `Machine pin from composer is ignored by dispatch: plan and build steps both run on the unpinned machine` | Differentiation surface | Done | `docs/verify/1208/` |
 | [#1236](https://github.com/xiechimon/cairn/issues/1236) `web: 完成任务确认 dialog 点击后相位不变（rework 卡必现，普通卡亦曾现）` | Differentiation surface | Done | `a41d24e8c:docs/verify/1236/`<br>`integration/test/done-dialog-e2e.test.ts` |
 | [#1240](https://github.com/xiechimon/cairn/issues/1240) `ci: pr-tasks-gate — PR body tasks must exist and be all checked before merge; template seeds the checklist` | Differentiation surface | Done | `docs/verify/1240/` |
 | [#1248](https://github.com/xiechimon/cairn/issues/1248) `docs: ADR 0018 多 agent 团队——角色 agent 流水线 + chief 拆票 + 机器能力闸（含 agent 与机器/skills/MCP 的协调模型）` | Differentiation surface | Done | `docs/verify/1248/` |
@@ -179,7 +179,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1440](https://github.com/xiechimon/cairn/issues/1440) `合并闸：人类裁决待定时 PR 仍被 auto-merge 合入（#1435 事故，needs-decision 标签 + pr-evidence 必需检查）` | Differentiation surface | Done | `docs/verify/1440/` |
 | [#1442](https://github.com/xiechimon/cairn/issues/1442) `web: axe-core accessibility gate in e2e, and the violations it finds` | Differentiation surface | Done | `docs/verify/1442/`<br>`apps/web/e2e/a11y-axe.spec.ts` |
 | [#1457](https://github.com/xiechimon/cairn/issues/1457) `shared: one rule for which phases can start, so the board cannot offer a drop the server rejects` | Differentiation surface | Done | `docs/verify/1457/`<br>`apps/server/test/github-reads.test.ts`<br>`apps/web/test/columns.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
-| [#1491](https://github.com/xiechimon/cairn/issues/1491) `server: 后台自动任务的触发闸（冷却、日预算、人在用就让路、没变化就休眠）` | Differentiation surface | Done | `docs/verify/1491/`<br>`apps/server/test/issue-intake.test.ts`<br>`apps/server/test/webhook.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
+| [#1491](https://github.com/xiechimon/cairn/issues/1491) `server: 后台自动任务的触发闸（冷却、日预算、人在用就让路、没变化就休眠）` | Differentiation surface | Done | `docs/verify/1491/`<br>`apps/server/test/issue-intake.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
 | [#1492](https://github.com/xiechimon/cairn/issues/1492) `server,daemon: plan 结构契约（Verification 必须可机器校验）+ 报告兜底 + 票 dedupeKey` | Differentiation surface | Done | `docs/verify/1492/`<br>`apps/server/test/artifact-gate.test.ts`<br>`apps/server/test/persona-split-verify.test.ts`<br>`packages/shared/test/plan-contract.test.ts`<br>`packages/shared/test/verify-prompt.test.ts` |
 | [#1533](https://github.com/xiechimon/cairn/issues/1533) `错误台账 L1：pnpm prepush 一键闸 + AGENTS.md 台账规则 + 纠错触发补 ci-fix 转绿` | Differentiation surface | Done | `docs/verify/1533/`<br>`apps/server/test/ci-loop.test.ts` |
 | [#1541](https://github.com/xiechimon/cairn/issues/1541) `Review finding: PR body names an issue but no branch commit carries the closing keyword` | Differentiation surface | Done | `docs/verify/1541/` |
@@ -192,6 +192,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1728](https://github.com/xiechimon/cairn/issues/1728) `shared: plan contract checker splits a code block nested in a Verification list item into its own item` | Differentiation surface | Done | `packages/shared/test/plan-contract.test.ts` |
 | [#1730](https://github.com/xiechimon/cairn/issues/1730) `server: a GitHub project cannot follow a repo rename; PATCH rejects githubRepo` | Differentiation surface | Done | `apps/server/test/project-identity.test.ts` |
 | [#1753](https://github.com/xiechimon/cairn/issues/1753) `Implement ADR 0026: autonomous by default, protected paths need an independent review instead of a human` | Differentiation surface | Done | `docs/verify/1753/` |
+| [#1802](https://github.com/xiechimon/cairn/issues/1802) `server(rework): retry lessons carry the verify verdict and a "verified, keep working" list` | Differentiation surface | Done | `apps/server/test/retry-lessons.test.ts` |
 | [#16](https://github.com/xiechimon/cairn/issues/16) `研究：上游核心近读 — agent loop / bus / session / memory` | Runtime axis | Done | `apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts` |
 | [#25](https://github.com/xiechimon/cairn/issues/25) `设计：agent core TS 化（loop / runner / bus / session / memory）` | Runtime axis | Unverified | [unverified] |
 | [#37](https://github.com/xiechimon/cairn/issues/37) `研究：协议面与 executor 行为观察（API/WS 词表、MCP、tds start、BYOK/OAuth 面）` | Runtime axis | Unverified | [unverified] |
@@ -214,7 +215,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#354](https://github.com/xiechimon/cairn/issues/354) `verify feature map 扩三面（providers tabs / machines 本机行+switches / picker dialog）` | Runtime axis | Done | `56f09fc48:docs/verify/354/` |
 | [#356](https://github.com/xiechimon/cairn/issues/356) `providers runtime tabs + model-sources 端点` | Runtime axis | Done | `72cec7f67:docs/verify/356/` |
 | [#357](https://github.com/xiechimon/cairn/issues/357) `machines 本地化（本机基线 + per-runtime switches + schema 两列）` | Runtime axis | Done | `7dd2d82bb:docs/verify/357/` |
-| [#368](https://github.com/xiechimon/cairn/issues/368) `T2: MCP 本地 config 面（~/.claude.json + machine-wire slug 化 + drop mcp_server 表）` | Runtime axis | Done | `b26e7774b:docs/verify/368/`<br>`apps/web/e2e/dead-buttons.spec.ts`<br>`packages/shared/test/vocabulary.test.ts` |
+| [#368](https://github.com/xiechimon/cairn/issues/368) `T2: MCP 本地 config 面（~/.claude.json + machine-wire slug 化 + drop mcp_server 表）` | Runtime axis | Done | `b26e7774b:docs/verify/368/`<br>`apps/web/e2e/dead-buttons.spec.ts` |
 | [#371](https://github.com/xiechimon/cairn/issues/371) `T3: skills 执行面注入（daemon loadSkills + catalog 注入 systemPrompt + read 工具白名单）` | Runtime axis | Done | `apps/daemon/test/config-state.test.ts` |
 | [#372](https://github.com/xiechimon/cairn/issues/372) `T4: skills catalog per-agent 运行时筛选（daemon 按 agent.skills 白名单过滤）` | Runtime axis | Done | `apps/daemon/test/machine-step-exec.test.ts`<br>`apps/daemon/test/skills-catalog.test.ts` |
 | [#423](https://github.com/xiechimon/cairn/issues/423) `第一片落地执行` | Runtime axis | Done | `839f59ebf:docs/verify/423/` |
@@ -275,7 +276,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1050](https://github.com/xiechimon/cairn/issues/1050) `daemon,shared,web: claude-code 可用性事实源——探二进制与版本，providers 页五态` | Runtime axis | Done | `docs/verify/1050/`<br>`apps/daemon/test/skills-native-plugin.test.ts`<br>`apps/server/test/model-sources.test.ts`<br>`apps/web/e2e/providers-tabs.spec.ts` |
 | [#1056](https://github.com/xiechimon/cairn/issues/1056) `chief: 悬浮窗草稿跨整页刷新持久化（Multica 对齐，#1009 A0 实审 spin-off）` | Runtime axis | Done | `e231c1aed:docs/verify/1056/`<br>`apps/web/e2e/chief-draft-persist.spec.ts` |
 | [#1065](https://github.com/xiechimon/cairn/issues/1065) `daemon: 僵尸认领——机器被杀后服务端 waitWake 仍在 75s 内替死机器认领新步` | Runtime axis | Done | `docs/verify/1065/`<br>`apps/server/test/machine-zombie-claim.test.ts` |
-| [#1108](https://github.com/xiechimon/cairn/issues/1108) `server+daemon+web: 机器并发上限与排队可见——超 N 才排队，排队呈现位次与等待对象` | Runtime axis | Done | `70261033c:docs/verify/1108/`<br>`apps/daemon/test/machine-parallel.test.ts`<br>`apps/server/test/machine-concurrency.test.ts`<br>`apps/web/e2e/dead-buttons.spec.ts`<br>`apps/web/e2e/machines-local.spec.ts`<br>`apps/web/e2e/queued-action.spec.ts`<br>`apps/web/test/activity-live-row.test.ts` |
+| [#1108](https://github.com/xiechimon/cairn/issues/1108) `server+daemon+web: 机器并发上限与排队可见——超 N 才排队，排队呈现位次与等待对象` | Runtime axis | Done | `docs/verify/1108/`<br>`apps/daemon/test/machine-parallel.test.ts`<br>`apps/server/test/machine-concurrency.test.ts`<br>`apps/web/e2e/dead-buttons.spec.ts`<br>`apps/web/e2e/queued-action.spec.ts`<br>`apps/web/test/activity-live-row.test.ts` |
 | [#1125](https://github.com/xiechimon/cairn/issues/1125) `server: split routes.ts into per-domain registration modules (routes-machine.ts precedent)` | Runtime axis | Done | `5da6e72be:docs/verify/1125/` |
 | [#1128](https://github.com/xiechimon/cairn/issues/1128) `test: split chief.test.ts and machine-loop.test.ts by scenario` | Runtime axis | Done | `d3d0faff7:docs/verify/1128/` |
 | [#1136](https://github.com/xiechimon/cairn/issues/1136) `server: 机器行陈旧判定——presence 落 lastSeenAt + 阈值扫掠翻 offline` | Runtime axis | Done | `45779a43e:docs/verify/1136/`<br>`apps/server/test/machine-stale-sweep.test.ts` |
@@ -285,8 +286,8 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1148](https://github.com/xiechimon/cairn/issues/1148) `daemon: chief 步不占并发槽 + 端口基座 PACMAN_PORT_BASE + 上限 env 兜底` | Runtime axis | Done | `4000e4f37:docs/verify/1148/`<br>`apps/daemon/test/machine-parallel-chief.test.ts`<br>`apps/daemon/test/skills-hard-block.test.ts`<br>`apps/server/test/machine-concurrency-chief.test.ts`<br>`integration/test/port-base-e2e.test.ts` |
 | [#1149](https://github.com/xiechimon/cairn/issues/1149) `daemon: 环境生命周期钩子 .agents/setup 与 .agents/resume` | Runtime axis | Done | `c7a5a2d6b:docs/verify/1149/`<br>`apps/daemon/test/config-state.test.ts`<br>`apps/daemon/test/workspace-hooks.test.ts`<br>`apps/daemon/test/workspace.test.ts` |
 | [#1152](https://github.com/xiechimon/cairn/issues/1152) `docs: localPath 降级「单机器缓存」标注 + 机器可丢 ADR` | Runtime axis | Done | `cd2a7a6d4:docs/verify/1152/` |
-| [#1171](https://github.com/xiechimon/cairn/issues/1171) `物化团队技能落进 CLI 原生技能目录（claude 后端 Skill 机制原生可见）` | Runtime axis | Done | `21a10d3c8:docs/verify/1171/` |
-| [#1175](https://github.com/xiechimon/cairn/issues/1175) `web: 机器行「已授权远程 shell」常驻副行改挂 shell 开关的 tooltip（hover 弹出）` | Runtime axis | Done | `11d8e4111:docs/verify/1175/`<br>`apps/web/e2e/machines-local.spec.ts` |
+| [#1171](https://github.com/xiechimon/cairn/issues/1171) `物化团队技能落进 CLI 原生技能目录（claude 后端 Skill 机制原生可见）` | Runtime axis | Done | `docs/verify/1171/` |
+| [#1175](https://github.com/xiechimon/cairn/issues/1175) `web: 机器行「已授权远程 shell」常驻副行改挂 shell 开关的 tooltip（hover 弹出）` | Runtime axis | Done | `11d8e4111:docs/verify/1175/` |
 | [#1186](https://github.com/xiechimon/cairn/issues/1186) `skills: 技能注入面三前置条件的机器断言（真实派发收尾核对；只做机器可判那半）` | Runtime axis | Done | `docs/verify/1186/`<br>`apps/daemon/test/skills-catalog.test.ts`<br>`apps/server/test/skill-injection-check.test.ts`<br>`packages/shared/test/skill-injection-check.test.ts` |
 | [#1210](https://github.com/xiechimon/cairn/issues/1210) `local-repo projects cannot build on remote machines: chief silently re-dispatches to the repo host` | Runtime axis | Done | `docs/verify/1210/`<br>`apps/daemon/test/runner-local.test.ts`<br>`apps/daemon/test/workspace-local-unreachable.test.ts` |
 | [#1213](https://github.com/xiechimon/cairn/issues/1213) `双执行源落地：github 形态项目加挂 localPath 同机加速位（ADR 0017）` | Runtime axis | Done | `docs/verify/1213/`<br>`apps/daemon/test/workspace-source.test.ts`<br>`apps/server/test/project-dual-source.test.ts` |
@@ -307,7 +308,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1398](https://github.com/xiechimon/cairn/issues/1398) `web: Chief 编排区 Paper 页面（抽屉、问题卡、设置）` | Runtime axis | Done | `docs/verify/1398/`<br>`apps/web/e2e/chief-thread-switcher-scroll.spec.ts` |
 | [#1402](https://github.com/xiechimon/cairn/issues/1402) `verify: 自举闭环 P1 验证 CLI 收敛（vp.mjs 子命令 + feature map 到达路径 + archive）` | Runtime axis | Done | `docs/verify/1402/` |
 | [#1405](https://github.com/xiechimon/cairn/issues/1405) `server: 自举闭环 P4 自治合并执行器（mergePolicy、sha 绑定合并、急停、熔断、日上限）` | Runtime axis | Not started | [unverified] |
-| [#1406](https://github.com/xiechimon/cairn/issues/1406) `server,daemon: 自举闭环 P5 自主进料与仓规内化（issue 轮询、chief GitHub 读工具、PR 评论回灌）` | Runtime axis | In progress | `docs/verify/1406/`<br>`apps/daemon/test/step-attachments.test.ts`<br>`apps/server/test/github-issues.test.ts`<br>`apps/server/test/issue-intake.test.ts`<br>`apps/server/test/persona-repo-rules.test.ts`<br>`apps/server/test/webhook.test.ts`<br>`packages/shared/test/chief-tools.test.ts`<br>`packages/shared/test/persona.test.ts` |
+| [#1406](https://github.com/xiechimon/cairn/issues/1406) `server,daemon: 自举闭环 P5 自主进料与仓规内化（issue 轮询、chief GitHub 读工具、PR 评论回灌）` | Runtime axis | In progress | `docs/verify/1406/`<br>`apps/daemon/test/step-attachments.test.ts`<br>`apps/server/test/github-issues.test.ts`<br>`apps/server/test/issue-intake.test.ts`<br>`apps/server/test/persona-repo-rules.test.ts`<br>`packages/shared/test/chief-tools.test.ts`<br>`packages/shared/test/persona.test.ts` |
 | [#1408](https://github.com/xiechimon/cairn/issues/1408) `ops: 自举闭环 P7 长期宿主自部署与回滚（待宿主）` | Runtime axis | Not started | [unverified] |
 | [#1434](https://github.com/xiechimon/cairn/issues/1434) `web: dragging a queued card into 执行中 lights the column, then the start fails with 未能开始编排` | Runtime axis | Done | `docs/verify/1434/`<br>`apps/web/test/columns.test.ts` |
 | [#1445](https://github.com/xiechimon/cairn/issues/1445) `server: closing a task leaves its build step claimable, so a machine can run a closed task` | Runtime axis | Done | `docs/verify/1445/`<br>`apps/server/test/close-stops-active-steps.test.ts` |
@@ -333,6 +334,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1635](https://github.com/xiechimon/cairn/issues/1635) `daemon: git 子进程访问本机 server 时绕过全局 http.proxy（本机 integration 假红的根因）` | Runtime axis | Done | `apps/daemon/test/git-loopback-proxy.test.ts` |
 | [#1683](https://github.com/xiechimon/cairn/issues/1683) `server: Dockerfile + Railway 一键部署模板` | Runtime axis | In progress | `docs/verify/1683/` |
 | [#1808](https://github.com/xiechimon/cairn/issues/1808) `daemon: upgrade pi from 1.0.4 to 1.4.0 (compaction summary output cap, truncated-output session corruption)` | Runtime axis | Done | `apps/daemon/test/pi-compaction-ceiling.test.ts` |
+| [#1829](https://github.com/xiechimon/cairn/issues/1829) `daemon+server: a build whose final push is blocked by the repo pre-push hook fails outright, and a PR the agent opened is never recorded, so ci-loop never sees it` | Runtime axis | Done | `apps/daemon/test/git.test.ts`<br>`apps/daemon/test/runner-delivery.test.ts`<br>`apps/server/test/ci-loop.test.ts` |
 | [#10](https://github.com/xiechimon/cairn/issues/10) `Kernel: MCP agent channel` | General surface | Done | `apps/web/e2e/overlay-focus.spec.ts` |
 | [#11](https://github.com/xiechimon/cairn/issues/11) `Kernel: HTTP API surface` | General surface | Done | `packages/shared/test/records.test.ts` |
 | [#12](https://github.com/xiechimon/cairn/issues/12) `Kernel: SPA three screens` | General surface | Done | `apps/daemon/test/runner-issue-fence.test.ts`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/board-queued-drop.spec.ts`<br>`apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts`<br>`apps/web/test/mention-token.test.ts`<br>`packages/shared/test/issue-fence.test.ts` |
@@ -433,7 +435,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#363](https://github.com/xiechimon/cairn/issues/363) `撤 board topbar 的「看板指南」帮助按钮` | General surface | Done | `8299961ba:docs/verify/363/`<br>`apps/web/e2e/dead-buttons.spec.ts` |
 | [#365](https://github.com/xiechimon/cairn/issues/365) `资源面本地化：skills 与 MCP 只读本地 / spec: docs/spec/13` | General surface | Unverified | [unverified] |
 | [#366](https://github.com/xiechimon/cairn/issues/366) `详情页重设计：去 文档\|聊天 tabs，对齐 todos.dev 现行 3-pane 布局` | General surface | Done | `a7e318911:docs/verify/366/`<br>`apps/web/e2e/segmented-controls.spec.ts` |
-| [#367](https://github.com/xiechimon/cairn/issues/367) `T1: skills 本地目录面（删 GitHub 扫描 + folder 上传 + skill 表）` | General surface | Done | `6f8089804:docs/verify/367/`<br>`apps/daemon/test/skills-catalog.test.ts`<br>`apps/daemon/test/skills-hard-block.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
+| [#367](https://github.com/xiechimon/cairn/issues/367) `T1: skills 本地目录面（删 GitHub 扫描 + folder 上传 + skill 表）` | General surface | Done | `6f8089804:docs/verify/367/`<br>`apps/daemon/test/skills-catalog.test.ts`<br>`apps/daemon/test/skills-hard-block.test.ts` |
 | [#385](https://github.com/xiechimon/cairn/issues/385) `codex preset 行 authorize 404：OAuth 族表只武装 github-copilot` | General surface | Done | `e5c85a4a4:docs/verify/385/` |
 | [#386](https://github.com/xiechimon/cairn/issues/386) `server 400 校验错误 reason code 化：消除 web 子串分类耦合` | General surface | Done | `fbb0e801c:docs/verify/386/`<br>`apps/server/test/fs-list.test.ts`<br>`apps/server/test/project-local.test.ts`<br>`apps/web/e2e/project-new-repo.spec.ts` |
 | [#387](https://github.com/xiechimon/cairn/issues/387) `dicebear Lorelei 头像系统：Agent/用户按名种子化生成` | General surface | Done | `b5fcfd219:docs/verify/387/` |
@@ -571,12 +573,12 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#944](https://github.com/xiechimon/cairn/issues/944) `域施工·resources：resources.css 806 行清零 + 17 裸控件与老原语 4 处退役（验收模板 v2 首验）` | General surface | Done | `cafa9e119:docs/verify/944/` |
 | [#945](https://github.com/xiechimon/cairn/issues/945) `域施工·detail-a：detail.css 2147 行清零 + 本域 spec 重钉` | General surface | Done | `d4f626497:docs/verify/945/` |
 | [#946](https://github.com/xiechimon/cairn/issues/946) `域施工·pages：pages.css 2058 行清零 + 本域 spec 重钉` | General surface | Done | `26c0823dc:docs/verify/946/` |
-| [#947](https://github.com/xiechimon/cairn/issues/947) `域施工·secondary：secondary.css 850 行清零 + 手工 toggle→Switch` | General surface | Done | `4db2e6c16:docs/verify/947/` |
+| [#947](https://github.com/xiechimon/cairn/issues/947) `域施工·secondary：secondary.css 850 行清零 + 手工 toggle→Switch` | General surface | Done | `docs/verify/947/` |
 | [#948](https://github.com/xiechimon/cairn/issues/948) `域施工·overlay/ 族：四件 CSS 1322 行清零 + new-task/more-menu/mention-picker shadcn 化` | General surface | Done | `docs/verify/948/` |
 | [#949](https://github.com/xiechimon/cairn/issues/949) `域施工·overlays/ 族：overlays.css 541 行清零 + search-panel chip×3 退役` | General surface | Done | `docs/verify/949/`<br>`apps/web/e2e/search-focus.spec.ts` |
 | [#950](https://github.com/xiechimon/cairn/issues/950) `域施工·chief：chief.css 1621 行清零（开工先重侦察，装不下即拆票）` | General surface | Done | `b0003125c:docs/verify/950/`<br>`apps/web/e2e/chief-composer-tools.spec.ts` |
-| [#951](https://github.com/xiechimon/cairn/issues/951) `域施工·detail-b：detail/overlays.css 794 行清零（detail 域收尾，域内串行）` | General surface | Done | `dff26b8ef:docs/verify/951/` |
-| [#952](https://github.com/xiechimon/cairn/issues/952) `散件收尾：routes/components 残余清零 + ui/ 目录终删 + toggle 删槽 + spec-22 撞号处置` | General surface | Done | `90169aa8b:docs/verify/952/`<br>`apps/web/test/ui-reuse-inventory.test.ts` |
+| [#951](https://github.com/xiechimon/cairn/issues/951) `域施工·detail-b：detail/overlays.css 794 行清零（detail 域收尾，域内串行）` | General surface | Done | `docs/verify/951/` |
+| [#952](https://github.com/xiechimon/cairn/issues/952) `散件收尾：routes/components 残余清零 + ui/ 目录终删 + toggle 删槽 + spec-22 撞号处置` | General surface | Done | `docs/verify/952/`<br>`apps/web/test/ui-reuse-inventory.test.ts` |
 | [#953](https://github.com/xiechimon/cairn/issues/953) `sealed 封版：全量 e2e + 探针整体重钉封版 + t-0909 退役 + #908 关图核账` | General surface | Done | `a0475e0fe:docs/verify/953/` |
 | [#966](https://github.com/xiechimon/cairn/issues/966) `CI flake（第二次命中）：runner-local.test.ts:289「失败方式 3」5s vitest 默认超时` | General surface | Done | `b2343e46b:docs/verify/966/` |
 | [#983](https://github.com/xiechimon/cairn/issues/983) `手写件与适配层判决表：8 个本地文件逐个定替换、适配改写或退役` | General surface | Done | `apps/web/e2e/hotkeys.spec.ts`<br>`apps/web/e2e/shadcn-primitives.spec.ts` |
@@ -594,10 +596,10 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1012](https://github.com/xiechimon/cairn/issues/1012) `波 2：sealed 封版——全量 e2e + 探针封版 + #980 关图核账` | General surface | Done | `docs/verify/1012/` |
 | [#1013](https://github.com/xiechimon/cairn/issues/1013) `波 0（docs-only）：延迟入账——ADR 0009 D3② 修订、品牌槽位闭合、docs/spec 余册标注` | General surface | Unverified | [unverified] |
 | [#1030](https://github.com/xiechimon/cairn/issues/1030) `web+server: 给本地仓库项目开 Files tab（推翻 spec 12 的 out-of-scope）` | General surface | Done | `1068e3565:docs/verify/1030/`<br>`apps/server/test/project-local.test.ts` |
-| [#1031](https://github.com/xiechimon/cairn/issues/1031) `web: /app/account 两个控件点不动（改名未接线 + 通知开关单向空操作）` | General surface | Done | `4417b8ab6:docs/verify/1031/`<br>`apps/server/test/user-patch.test.ts`<br>`apps/web/e2e/account-team-cleanse.spec.ts`<br>`apps/web/e2e/notify-click.spec.ts` |
+| [#1031](https://github.com/xiechimon/cairn/issues/1031) `web: /app/account 两个控件点不动（改名未接线 + 通知开关单向空操作）` | General surface | Done | `docs/verify/1031/`<br>`apps/server/test/user-patch.test.ts`<br>`apps/web/e2e/account-team-cleanse.spec.ts`<br>`apps/web/e2e/notify-click.spec.ts` |
 | [#1032](https://github.com/xiechimon/cairn/issues/1032) `web: 总管设置-记忆无法下滑（容器缺 overflow-y-auto），同类 6 处页面一并收口` | General surface | Done | `9d023aaa8:docs/verify/1032/`<br>`apps/web/e2e/page-scroll.spec.ts` |
-| [#1033](https://github.com/xiechimon/cairn/issues/1033) `web: 主管聊天巨幅头像（#950 退役 chief.css 留下的死类名 → 头像无尺寸约束）` | General surface | Done | `1b875feeb:docs/verify/1033/`<br>`apps/web/e2e/chief-stream-markdown.spec.ts` |
-| [#1034](https://github.com/xiechimon/cairn/issues/1034) `web: 聊天思考行不截断（w-fit + nowrap 撑成整段文本宽；那个 … 是 JS 切的不是 CSS）` | General surface | Done | `9973abfff:docs/verify/1034/`<br>`apps/web/e2e/chief-stream-markdown.spec.ts` |
+| [#1033](https://github.com/xiechimon/cairn/issues/1033) `web: 主管聊天巨幅头像（#950 退役 chief.css 留下的死类名 → 头像无尺寸约束）` | General surface | Done | `docs/verify/1033/`<br>`apps/web/e2e/chief-stream-markdown.spec.ts` |
+| [#1034](https://github.com/xiechimon/cairn/issues/1034) `web: 聊天思考行不截断（w-fit + nowrap 撑成整段文本宽；那个 … 是 JS 切的不是 CSS）` | General surface | Done | `docs/verify/1034/`<br>`apps/web/e2e/chief-stream-markdown.spec.ts` |
 | [#1035](https://github.com/xiechimon/cairn/issues/1035) `web: 110% 缩放看板不自适应（280px 列地板在窄视口接管；按 data-chief-open 劈开）` | General surface | Done | `docs/verify/1035/`<br>`apps/web/e2e/board-zoom-fit.spec.ts` |
 | [#1036](https://github.com/xiechimon/cairn/issues/1036) `web: 扫全仓 #950 退役 chief.css 留下的死类名（零命中类名 → 布局静默塌掉）` | General surface | Done | `a9563f9f8:docs/verify/1036/` |
 | [#1037](https://github.com/xiechimon/cairn/issues/1037) `web: 新建定时「部分按钮点不动」（fixture 面哑按钮 + live 面假行 + 对话框无上限）` | General surface | Done | `fffe67fb4:docs/verify/1037/`<br>`apps/web/e2e/dead-buttons.spec.ts`<br>`apps/web/e2e/dialog-viewport.spec.ts`<br>`apps/web/e2e/fixture-mode-chip.spec.ts`<br>`apps/web/e2e/schedules-live.spec.ts` |
@@ -609,11 +611,11 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1079](https://github.com/xiechimon/cairn/issues/1079) `ci: PR 模板收成单正本（七节·标题精简）+ 验收节 + 失败路径加严` | General surface | Done | `docs/verify/1079/` |
 | [#1084](https://github.com/xiechimon/cairn/issues/1084) `web: select.tsx 退役（#1010）打坏 main——schedules-live e2e 仍在点旧的手写 select` | General surface | Done | `docs/verify/1084/` |
 | [#1091](https://github.com/xiechimon/cairn/issues/1091) `web: harden boot-time storage reads against unavailable localStorage` | General surface | Done | `docs/verify/1091/`<br>`apps/web/e2e/storage-unavailable.spec.ts` |
-| [#1094](https://github.com/xiechimon/cairn/issues/1094) `web: 总管主题切换器列表无高度上限——长列表冲出抽屉，尾部条目点不到` | General surface | Done | `13385fb2a:docs/verify/1094/`<br>`apps/web/e2e/chief-thread-switcher-scroll.spec.ts` |
+| [#1094](https://github.com/xiechimon/cairn/issues/1094) `web: 总管主题切换器列表无高度上限——长列表冲出抽屉，尾部条目点不到` | General surface | Done | `docs/verify/1094/`<br>`apps/web/e2e/chief-thread-switcher-scroll.spec.ts` |
 | [#1095](https://github.com/xiechimon/cairn/issues/1095) `web: model picker 行焦点环被 listbox 裁剪 + 两面行内缩不统一（#883 重切）` | General surface | Done | `5de41c8b3:docs/verify/1095/` |
 | [#1097](https://github.com/xiechimon/cairn/issues/1097) `web+server: 项目 Files 面不区分文件夹，点文件夹必「文件加载失败」` | General surface | Done | `50ee70ff7:docs/verify/1097/`<br>`apps/server/test/project-local.test.ts` |
 | [#1102](https://github.com/xiechimon/cairn/issues/1102) `web+server: 项目「历史」列表加提交详情面（点一行看该提交的 diff）` | General surface | Done | `439d9c21c:docs/verify/1102/` |
-| [#1104](https://github.com/xiechimon/cairn/issues/1104) `run_builds 无指派 build 静默卡死：chief 入口 400 打回，其他入口步 Fail 落 errorMessage` | General surface | Done | `cdd581a20:docs/verify/1104/`<br>`apps/server/test/rework-plan-fallback.test.ts`<br>`apps/server/test/unassigned-build.test.ts` |
+| [#1104](https://github.com/xiechimon/cairn/issues/1104) `run_builds 无指派 build 静默卡死：chief 入口 400 打回，其他入口步 Fail 落 errorMessage` | General surface | Done | `docs/verify/1104/`<br>`apps/server/test/rework-plan-fallback.test.ts`<br>`apps/server/test/unassigned-build.test.ts` |
 | [#1106](https://github.com/xiechimon/cairn/issues/1106) `server: 派发管线技能注入——目录粗分发 + description 细触发注入任务 brief` | General surface | Done | `docs/verify/1106/`<br>`apps/daemon/test/skills-catalog.test.ts`<br>`apps/server/test/skill-inject-claim.test.ts`<br>`apps/web/test/injected-skills-row.test.ts`<br>`packages/shared/test/skill-injection-check.test.ts` |
 | [#1110](https://github.com/xiechimon/cairn/issues/1110) `pr: 全局 /pr 技能模板与仓 PR 模板不一致，每条 lane 都要手改一次 body（今天三连）` | General surface | Done | `27fcf0801:docs/verify/1110/` |
 | [#1112](https://github.com/xiechimon/cairn/issues/1112) `hooks: 禁词钩子按子串扫 staged 内容，被 base64 误伤（drawio svg 回退层含 TODO）` | General surface | Done | `2cb488400:docs/verify/1112/` |
@@ -629,7 +631,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1156](https://github.com/xiechimon/cairn/issues/1156) `web: agent 详情页头像缺少定尺 class 被裁（SeededAvatar 漏传 size-16）+ e2e 只钉存在不钉几何` | General surface | Done | `a7a15adbd:docs/verify/1156/` |
 | [#1157](https://github.com/xiechimon/cairn/issues/1157) `web: ResourceShell 返回键是裸 <a> 而非 <Link>，点返回整个 SPA 重新加载（15 个面同吃）` | General surface | Done | `c32091212:docs/verify/1157/`<br>`apps/web/e2e/title-band-clicks.spec.ts` |
 | [#1166](https://github.com/xiechimon/cairn/issues/1166) `verify-pacman: drive.mjs api-key + search probes use retired class selectors (stale since the per-face migration)` | General surface | Done | `a6897f92f:docs/verify/1166/` |
-| [#1169](https://github.com/xiechimon/cairn/issues/1169) `agent.skills 拆字段：「默认携带」与「授权白名单」分家，修复新建 agent 出生即全拒` | General surface | Done | `b6e0b021c:docs/verify/1169/`<br>`apps/daemon/test/machine-step-exec.test.ts`<br>`apps/server/test/agent-skills-split-backfill.test.ts`<br>`apps/server/test/machine-wire.test.ts`<br>`apps/server/test/skill-inject-claim.test.ts`<br>`apps/server/test/skill-write.test.ts`<br>`apps/server/test/skills-local.test.ts` |
+| [#1169](https://github.com/xiechimon/cairn/issues/1169) `agent.skills 拆字段：「默认携带」与「授权白名单」分家，修复新建 agent 出生即全拒` | General surface | Done | `docs/verify/1169/`<br>`apps/daemon/test/machine-step-exec.test.ts`<br>`apps/server/test/agent-skills-split-backfill.test.ts`<br>`apps/server/test/machine-wire.test.ts`<br>`apps/server/test/skill-inject-claim.test.ts`<br>`apps/server/test/skill-write.test.ts`<br>`apps/server/test/skills-local.test.ts` |
 | [#1170](https://github.com/xiechimon/cairn/issues/1170) `技能导入通道：server 支持本地路径与 GitHub URL 导入 + refresh 重拉` | General surface | Done | `docs/verify/1170/` |
 | [#1174](https://github.com/xiechimon/cairn/issues/1174) `web: 项目设置页补删除入口（端点与 mutation 已存在，纯接线）` | General surface | Done | `367910ee0:docs/verify/1174/`<br>`apps/web/e2e/project-settings-delete.spec.ts` |
 | [#1181](https://github.com/xiechimon/cairn/issues/1181) `verify-pacman: drive-hotkeys / drive-newtask-key 仍等退役的 .search-panel（#1166 同款欠账）` | General surface | Done | `docs/verify/1181/` |
@@ -682,7 +684,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1446](https://github.com/xiechimon/cairn/issues/1446) `web: a queued task can be stopped or closed from its detail page` | General surface | Done | `docs/verify/1446/` |
 | [#1448](https://github.com/xiechimon/cairn/issues/1448) `web: e2e specs share pressUntil instead of private hotkey retry loops` | General surface | Done | `docs/verify/1448/` |
 | [#1455](https://github.com/xiechimon/cairn/issues/1455) `scripts: e2e-affected runs the full e2e suite when only an apps/web unit test changes` | General surface | Done | `docs/verify/1455/` |
-| [#1459](https://github.com/xiechimon/cairn/issues/1459) `server: webhook 的 pacman 触发不核打标人，与 D5 不一致` | General surface | Done | `docs/verify/1459/`<br>`apps/server/test/github-reads.test.ts`<br>`apps/server/test/webhook.test.ts` |
+| [#1459](https://github.com/xiechimon/cairn/issues/1459) `server: webhook 的 pacman 触发不核打标人，与 D5 不一致` | General surface | Done | `docs/verify/1459/`<br>`apps/server/test/github-reads.test.ts` |
 | [#1463](https://github.com/xiechimon/cairn/issues/1463) `e2e-affected: an e2e helper change selects the specs that use it, not the full suite` | General surface | Done | `docs/verify/1463/` |
 | [#1466](https://github.com/xiechimon/cairn/issues/1466) `server,shared: githubRepo 接受 . 与 ..（GitHub 请求路径可被改写），requireProjectRow 不核团队` | General surface | Done | `docs/verify/1466/`<br>`apps/daemon/test/github-probe.test.ts`<br>`apps/server/test/github-repo-dot-segments.test.ts`<br>`apps/server/test/pr-reconcile.test.ts`<br>`apps/server/test/project-team-guard.test.ts`<br>`packages/shared/test/github-repo-ref.test.ts` |
 | [#1470](https://github.com/xiechimon/cairn/issues/1470) `Multi-team ownership checks left after #1466: MCP run_builds and schedule_todo, conversation, usage, save_memory, clone URLs` | General surface | Done | `docs/verify/1470/`<br>`apps/server/test/team-ownership-1470.test.ts` |
@@ -703,6 +705,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1526](https://github.com/xiechimon/cairn/issues/1526) `自定义 provider 模型的上下文和最大输出写死 128K/16K，1M 模型被浪费` | General surface | Done | `docs/verify/1526/`<br>`apps/daemon/test/pi-config-effect.test.ts`<br>`packages/shared/test/records.test.ts` |
 | [#1527](https://github.com/xiechimon/cairn/issues/1527) `功能地图：生成物移出 spec 编号序列、CI 加 --check、每日刷新` | General surface | Done | `docs/verify/1527/` |
 | [#1532](https://github.com/xiechimon/cairn/issues/1532) `E2 附：同模型不同 harness 的页面生成对比评测（题库、打分细则、基线）` | General surface | Not started | [unverified] |
+| [#1535](https://github.com/xiechimon/cairn/issues/1535) `错误台账 L2：从轨迹里检测「出错又修好」并生成候选防护` | General surface | Done | `docs/verify/1535/` |
 | [#1570](https://github.com/xiechimon/cairn/issues/1570) `观测-2 pnpm traj:push：轨迹包转 OTLP 推 Langfuse` | General surface | Not started | [unverified] |
 | [#1571](https://github.com/xiechimon/cairn/issues/1571) `观测-3 人审判定与结果标签同步为 Langfuse score` | General surface | Not started | [unverified] |
 | [#1572](https://github.com/xiechimon/cairn/issues/1572) `观测-4 运行时 OTel span（默认关）：server、Claude Code 子进程、pi` | General surface | Unverified | [unverified] |
@@ -724,6 +727,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1710](https://github.com/xiechimon/cairn/issues/1710) `site, readme: final artwork (banner, crew, share card)` | General surface | Done | `docs/verify/1710/` |
 | [#1731](https://github.com/xiechimon/cairn/issues/1731) `server: GitHub OAuth connection ignores refresh tokens, so expiring user tokens break the connection` | General surface | Done | `apps/server/test/github-token-refresh.test.ts` |
 | [#1744](https://github.com/xiechimon/cairn/issues/1744) `上下文顶格时压缩请求自身 400 且不可恢复：整步无恢复路径` | General surface | In progress | `apps/daemon/test/pi-compaction-ceiling.test.ts` |
+| [#1796](https://github.com/xiechimon/cairn/issues/1796) `chore: remove zero-use features (what's new notice, GitHub webhook receiver and tokens, remote shell commands)` | General surface | Done | `apps/server/test/machine-shell.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/machines-local.spec.ts`<br>`packages/shared/test/retired-zero-use.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
 | [#1800](https://github.com/xiechimon/cairn/issues/1800) `server: retry a failed task once automatically and fold stale failures out of "needs you"` | General surface | Done | `apps/server/test/needs-you.test.ts` |
 
 ## 3. Rows without anchors and rows that cannot be resolved (follow-up work)
@@ -870,8 +874,7 @@ The row-set criterion = issues (§0.1). These PR numbers are referenced by the t
 | PR | Title | State | Referenced by |
 |---|---|---|---|
 | [#88](https://github.com/xiechimon/cairn/pull/88) | `web(71): 路由批 C — schedules + project 三页像素面 + parity 矩阵加行（#71）` | closed | tests ×1 |
-| [#101](https://github.com/xiechimon/cairn/pull/101) | `daemon(80): M3b daemon 深面 — worktree 契约 + step 三类 + merge 202（单机生命周期实跑）` | closed | tests ×3 |
-| [#102](https://github.com/xiechimon/cairn/pull/102) | `server(81): M4a Chief 编排 — remoteTools relay + 措辞→spec + 驳回 v2 + 双 Agent 分派（#81）` | closed | tests ×1 |
+| [#101](https://github.com/xiechimon/cairn/pull/101) | `daemon(80): M3b daemon 深面 — worktree 契约 + step 三类 + merge 202（单机生命周期实跑）` | closed | tests ×2 |
 | [#108](https://github.com/xiechimon/cairn/pull/108) | `web(83): M5 汇合 — fixture 切真 API + live streaming 真 SSE + E2E 主时序全链（含 M6 终验）` | closed | spec ×1 |
 | [#115](https://github.com/xiechimon/cairn/pull/115) | `deps(107): pi 0.85.1 → 0.86.0——首个 D6 升级窗口（Breaking 三条全缝外）` | closed | spec ×1 |
 | [#117](https://github.com/xiechimon/cairn/pull/117) | `chore(104): TypeScript 5.9.3→7.0.2 全线抬升 —— 工具链共存核实 + i18n 门 TS7 scanner 改写` | closed | spec ×1 |
@@ -907,7 +910,6 @@ The row-set criterion = issues (§0.1). These PR numbers are referenced by the t
 | [#535](https://github.com/xiechimon/cairn/pull/535) | `XMON-14: 补 shadcn 三原语落点——avatar / tag-chip / kbd 三件落位 + 21 处消费面切换` | closed | spec ×1 |
 | [#536](https://github.com/xiechimon/cairn/pull/536) | `XMON-15: Agent 详情「进行中」列表——载荷形状按原件钉死，接界面 + 空态` | closed | spec ×1 |
 | [#547](https://github.com/xiechimon/cairn/pull/547) | `web(xmon-28): B3 · agent 详情页与模型选择器裸 button 切 components/ui/Button` | closed | spec ×1 |
-| [#573](https://github.com/xiechimon/cairn/pull/573) | `server(XMON-77/84): Agent 权限六开关 + 合并/推送执法 + 推送分支默认开` | closed | tests ×1 |
 | [#574](https://github.com/xiechimon/cairn/pull/574) | `web(XMON-22): 弹层内容族切 shadcn — 9 裸钮收口 + 残余逐处声明` | closed | tests ×2 |
 | [#617](https://github.com/xiechimon/cairn/pull/617) | `web(t-0024): 模型槽两级选择器——先运行时/服务商、再它名下的模型` | closed | spec ×1 |
 | [#635](https://github.com/xiechimon/cairn/pull/635) | `fix(web): close the chief conversation failure loop with sonner toasts` | closed | tests ×1 |
