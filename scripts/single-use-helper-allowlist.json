@@ -8,5 +8,55 @@
     "path": "apps/web/src/board/board.tsx",
     "name": "NeedsYouStrip",
     "reason": "React component with its own hooks and an early return when nothing needs attention; inlining it would put conditional hook-free JSX and the attention filter inside the 300-line BoardSurface render"
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "workerSkillInjection",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "claimCandidates",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "claimChiefCandidates",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "claimLocalTools",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "buildChiefClaim",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "holdStepForQuota",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "recordSkillInjectionCheck",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "workerStepContext",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-step-token.ts",
+    "name": "githubExecCredential",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-step-token.ts",
+    "name": "chiefStepToken",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
   }
 ]
