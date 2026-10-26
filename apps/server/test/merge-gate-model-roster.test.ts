@@ -2,7 +2,11 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
-import { canonicalModelId, modelVendor } from '../src/services/merge-gate/model-identity.js';
+import {
+  canonicalModelId,
+  modelsAreIndependent,
+  modelVendor,
+} from '../src/services/merge-gate/model-identity.js';
 import { deriveModelRoster, type RosterModel } from '../src/services/merge-gate/model-roster.js';
 import { MODEL_ALIASES, MODEL_VENDORS } from '../src/services/merge-gate/model-roster-data.js';
 
@@ -36,6 +40,23 @@ describe('merge-gate model roster', () => {
       vendors: MODEL_VENDORS,
       aliases: MODEL_ALIASES,
     });
+  });
+
+  test('hosted GLM spellings retain their maker and cannot review each other independently', () => {
+    const ids = ['glm-5.2', 'glm-5-2', 'mistral/zai-glm-5-2', 'zai-glm-5-3'];
+    for (const id of ids) {
+      expect(modelVendor(id)).toBe('Z.ai');
+      expect(modelsAreIndependent('glm-5.2', id)).toBe(false);
+    }
+    expect(canonicalModelId('glm-5-2')).toBe(canonicalModelId('glm-5.2'));
+    expect(canonicalModelId('mistral/zai-glm-5-2')).toBe(canonicalModelId('glm-5.2'));
+    expect(modelsAreIndependent('glm-5-2', 'mistral-large-4')).toBe(true);
+    const roster = deriveModelRoster([
+      { provider: 'mistral', models: [{ id: 'glm-5-2' }, { id: 'zai-glm-5-3' }] },
+      { provider: 'zai', models: [{ id: 'glm-5.2' }, { id: 'glm-5.3' }] },
+    ]);
+    expect(Object.values(roster.vendors)).toEqual(['Z.ai', 'Z.ai', 'Z.ai', 'Z.ai']);
+    expect(roster.aliases).toMatchObject({ 'glm-5-2': 'glm-5.2', 'zai-glm-5-3': 'glm-5.3' });
   });
 
   test('relay aliases and spellings resolve to one upstream id and vendor', () => {
