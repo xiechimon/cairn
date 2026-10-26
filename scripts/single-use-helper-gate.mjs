@@ -44,6 +44,20 @@ try {
   )
     .split('\0')
     .filter((path) => /\.(ts|tsx|mjs)$/.test(path));
+  const renamedFrom = new Map();
+  const renames = git(
+    'diff',
+    '--name-status',
+    '-z',
+    '-M',
+    '--diff-filter=R',
+    base,
+    '--',
+    'apps',
+    'packages',
+    'scripts',
+  ).split('\0');
+  for (let i = 0; i + 2 < renames.length; i += 3) renamedFrom.set(renames[i + 2], renames[i + 1]);
   const files = [...new Set([...changedFiles, ...allowlist.map((entry) => entry.path)])];
   let violations = 0;
   if (files.length) {
@@ -75,9 +89,10 @@ try {
         '--no-ext-diff',
         '--no-textconv',
         '--unified=0',
+        '-M',
         base,
         '--',
-        path,
+        ...(renamedFrom.has(path) ? [renamedFrom.get(path), path] : [path]),
       ).split('\n')) {
         const hunk = /^@@ .* \+(\d+)/.exec(patchLine);
         if (hunk) line = Number(hunk[1]);

@@ -97,7 +97,7 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import type { MentionGroups } from '../overlay/mention-picker.js';
 import type { FileMentionEntry } from '../overlay/mention-token.js';
 import { MoreMenu } from '../overlay/more-menu.js';
-import { SearchPanel, useSearchState } from '../overlays/search-panel.js';
+import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
 import { safeLocalStorage } from '../safe-storage.js';

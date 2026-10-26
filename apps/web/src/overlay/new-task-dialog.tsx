@@ -19,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, ChevronDown, Grid2x2, Paperclip, X } from '../icons/index.js';
-import { isEditableTarget, useChordHotkey, useProjectCycleHotkey } from '../overlays/hotkeys.js';
+import { isEditableTarget, useChordHotkey, useProjectCycleHotkey } from '../overlay/hotkeys.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import {
   createPastedNameCounter,

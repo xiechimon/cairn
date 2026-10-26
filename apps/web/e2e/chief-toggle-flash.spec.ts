@@ -1,38 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// #1266, hung on the gesture-machine regression set (#1267): the second ⌘J
-// (the minimizing press) must not repaint the chief window. The state half
-// of that press is reduceGesture chief/toggle in
-// apps/web/src/overlays/gesture-machine.ts. Failure modes pinned here, from
-// the measured repro (CDP screencast + passive style-event log on the
-// fixture build):
-//   1. post-exit opacity bounce (the reported flash): the exit keyframe
-//      ends with fill-mode none, so the computed opacity snaps back to the
-//      base value; the element's incidental `transition: all` (the
-//      duration-* utility sets transition-duration and transition-property
-//      defaults to all) turns that snap-back into a painted 200ms re-fade —
-//      the closed window flashes back to ~full brightness and fades out
-//      again. Mechanical signature: a `transitionrun` for `opacity` on the
-//      aside during the close, and a +12 luminance spike in painted frames.
-//      Pre-#1234 this was invisible: preflight's [hidden] display:none
-//      stopped painting before the bounce; the #1067 visibility park keeps
-//      the box painted, so the bounce became user-visible.
-//   2. remount: the toggle must keep the SAME popup node (keepMounted park
-//      contract, ADR 0013 D6/#1067 — draft/scroll/thread state ride node
-//      identity). A remount would also flash and would lose the park.
-//   3. over-fix guards: the intended enter/exit keyframe motion must keep
-//      playing (a fix that deletes animate-out would silence mode 1 by
-//      killing the motion), and the closed window must stay parked in the
-//      DOM with the hidden attribute (a fix that unmounts or drops hidden
-//      would break #1067 scroll retention and the a11y park).
-//
-// Heisenbug warning for future edits: reading computed styles of the aside
-// (getComputedStyle, Playwright visibility polling, rAF style samplers)
-// forces synchronous style recalculation and can collapse the two-recalc
-// bounce window into one — masking the flash. Between the press and the
-// assertion window this spec must stay passive: waitForTimeout only, and
-// the detectors below are passive event listeners.
-
 const drawer = (page: Page) => page.locator('.chief-drawer');
 
 interface Recorder {
