@@ -31,6 +31,7 @@ import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
+import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { readStoredTheme } from '../theme.js';
 import { withColumnParam } from './columns.js';
@@ -123,13 +124,11 @@ export function BrandMark({ className = 'size-4' }: { className?: string }) {
 
 const FOCUS =
   'outline-none focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2';
-const FOCUS_INSET =
-  'outline-none focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:-outline-offset-2';
 
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
 
-const ROW = `flex h-9 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui text-content-secondary no-underline transition-[background-color,color] duration-150 ease-out ${FOCUS_INSET}`;
+const ROW = `flex h-9 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui text-content-secondary no-underline transition-[background-color,color] duration-150 ease-out ${FOCUS_RING_INSET}`;
 const ROW_IDLE = 'hover:bg-sidebar-hover hover:text-foreground [&>svg:first-child]:text-icon';
 const ROW_ACTIVE = `bg-(--hover-1) font-medium text-foreground [&>svg:first-child]:text-(--card-button) ${SEARCH_OPEN_DIM}`;
 
@@ -138,7 +137,7 @@ const ROW_BTN =
 
 const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--radius-control) border-none bg-transparent p-0 text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0 ${FOCUS}`;
 
-const RAIL_ROW = `rail-row relative flex size-8 flex-none items-center justify-center rounded-(--cds-radius-lg) text-content-tertiary no-underline transition-[background-color,box-shadow,color] duration-150 ease-out hover:bg-sidebar-hover hover:text-foreground ${FOCUS_INSET}`;
+const RAIL_ROW = `rail-row relative flex size-8 flex-none items-center justify-center rounded-(--cds-radius-lg) text-content-tertiary no-underline transition-[background-color,box-shadow,color] duration-150 ease-out hover:bg-sidebar-hover hover:text-foreground ${FOCUS_RING_INSET}`;
 const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button) hover:bg-(--hover-1) hover:text-(--card-button) ${SEARCH_OPEN_DIM}`;
 const RAIL_BTN =
   'cursor-pointer border-none bg-transparent p-0 dark:hover:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-content-tertiary aria-expanded:hover:bg-sidebar-hover aria-expanded:hover:text-foreground active:not-aria-[haspopup]:translate-y-0';
