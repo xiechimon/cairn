@@ -112,6 +112,7 @@ not carry the closing keyword for the parent ticket.
   errors; use `gh api -X PATCH repos/xiechimon/cairn/pulls/<n> -F
   body=@/tmp/pr.md`, then re-read with `gh pr view <n> --json body` and
   compare.
+- Pin raw links to a short SHA (8 characters). From a cloud session the egress proxy wraps URLs that carry a full 40-character SHA in backticks, which breaks the embed (#1771). Read the stored body back after creating or editing the PR.
 - Image links must be the embedded `![label](url)` form and must not sit
   inside fenced code blocks — a link in a fence renders nowhere.
 - Bodies are in English, with no Chinese mixed in. Quote a Chinese UI label
