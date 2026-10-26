@@ -82,6 +82,20 @@
     outline-offset: 2px;
   }
 
+  html[data-pointer-focus]
+    :is(
+      button,
+      a,
+      [role="button"],
+      summary,
+      [role="checkbox"],
+      [role="switch"],
+      [role="tab"],
+      [tabindex]:not(input, textarea, select)
+    ):focus-visible {
+    outline: none;
+  }
+
   :is(
     button,
     a,

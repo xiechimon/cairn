@@ -4,6 +4,9 @@ import { MessageScrollerViewport } from '../ui/message-scroller.js';
 
 type Props = React.ComponentProps<typeof MessageScrollerViewport>;
 
+const INSET_FOCUS_RING =
+  'outline-none focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:-outline-offset-2';
+
 export function FadeScrollerViewport({ className, ref, ...props }: Props) {
   const fadeRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(fadeRef);
@@ -20,7 +23,7 @@ export function FadeScrollerViewport({ className, ref, ...props }: Props) {
   return (
     <MessageScrollerViewport
       ref={setRefs}
-      className={['scroll-fade', className].filter(Boolean).join(' ')}
+      className={['scroll-fade', INSET_FOCUS_RING, className].filter(Boolean).join(' ')}
       {...props}
     />
   );
