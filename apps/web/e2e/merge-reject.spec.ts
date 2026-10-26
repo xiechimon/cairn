@@ -41,7 +41,7 @@ const WIRE_CARD = {
   title: '合并可见化探针',
   spec: '',
   phase: 'review',
-  phaseAt: 0,
+  phaseAt: Date.now(),
   seqNum: 9,
   orderIndex: 0,
   tagIds: [],

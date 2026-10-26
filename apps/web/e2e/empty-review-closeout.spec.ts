@@ -42,7 +42,7 @@ const WIRE_CARD = {
   title: '空提交收口',
   spec: '',
   phase: 'review',
-  phaseAt: 0,
+  phaseAt: Date.now(),
   seqNum: 9,
   orderIndex: 0,
   tagIds: [],
