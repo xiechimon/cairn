@@ -83,6 +83,8 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
       'stream disconnected',
       'connection closed',
       'mid-response',
+      'connection error',
+      'fetch failed',
       'connection reset',
       'econnreset',
       'etimedout',
@@ -106,6 +108,41 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
 }
 
 const httpAuthCodeRe = digitBounded('401');
+
+const PROVIDER_5XX_PATTERNS: readonly RegExp[] = [
+  /\bhttp(?:\s+status)?[ :]?5xx\b/,
+  /\b(?:error|status|returned)[:\s]+(?:http\s+)?5xx\b/,
+  /\bhttp(?:\s+status)?[ :]?5\d\d\b/,
+  /\bstatus[ :]5\d\d\b/,
+  /\b5\d\d\s+(?:internal server error|bad gateway|service unavailable|gateway timeout|server error)/,
+  /->\s*(?:http\s+)?5(?:xx|\d\d)\b/,
+  /\bprovider response:.*\b5\d\d\b/,
+];
+
+const GIT_ERROR_PREFIX_RE = /^git \w+ failed \([^)]*\)/;
+
+const GIT_PROGRESS_RE =
+  /\b(?:enumerating|counting|compressing|writing|receiving|resolving) objects:/;
+
+const ACCOUNT_EXHAUSTION_PHRASES = [
+  'quota exhausted',
+  'quota has been exhausted',
+  'credits exhausted',
+  'credit exhausted',
+  'insufficient balance',
+  'insufficient_balance',
+  'no credits left',
+  'all available accounts exhausted',
+  'accounts exhausted',
+] as const;
+
+export function isProviderOutage(rawError: string): boolean {
+  const lower = rawError.trim().toLowerCase();
+  if (lower === '') return false;
+  if (GIT_ERROR_PREFIX_RE.test(lower) || GIT_PROGRESS_RE.test(lower)) return false;
+  if (containsAny(lower, ACCOUNT_EXHAUSTION_PHRASES)) return true;
+  return PROVIDER_5XX_PATTERNS.some((re) => re.test(lower));
+}
 
 export function isProviderAuthFailure(rawError: string): boolean {
   const lower = rawError.trim().toLowerCase();
@@ -135,7 +172,7 @@ const CAPACITY_PATTERN =
   /\b(?:429|529)\b|rate[_\s-]?limit|too\s+many\s+requests|overloaded|请求过于频繁|限流|负载(?:已)?饱和/i;
 
 const NETWORK_PATTERN =
-  /connection\s+(?:reset|refused|closed)|upstream\s+stream\s+disconnected|ECONNREFUSED|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|network\s+error|temporarily\s+unavailable/i;
+  /connection\s+(?:error|reset|refused|closed)|upstream\s+stream\s+disconnected|ECONNREFUSED|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|network\s+error|temporarily\s+unavailable/i;
 
 export function classifyAgentFailure(message: string): AgentFailureKind {
   if (message === '') return 'other';

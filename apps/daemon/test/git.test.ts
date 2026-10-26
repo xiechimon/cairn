@@ -6,11 +6,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 import {
+  GIT_NET_RETRY_DELAYS_MS,
   type GitFallbackReason,
   GitPushHookError,
   gitCredentialEnv,
   gitPrim,
   isGitAuthFailure,
+  isGitTransientNetFailure,
   machineGitEnv,
   runGit,
   runGitOk,
@@ -509,6 +511,66 @@ describe('isGitAuthFailure — auth-failure detection (fallback trigger)', () =>
   });
 });
 
+describe('isGitTransientNetFailure — permanent failures short-circuit (#1786)', () => {
+  test('transient shapes that main retried stay transient', () => {
+    expect(isGitTransientNetFailure('fatal: the remote end hung up unexpectedly')).toBe(true);
+    expect(isGitTransientNetFailure('fatal: early EOF')).toBe(true);
+    expect(
+      isGitTransientNetFailure(
+        'error: RPC failed; HTTP 502 curl 22 The requested URL returned error: 502',
+      ),
+    ).toBe(true);
+    expect(isGitTransientNetFailure('error: transfer closed with 3 bytes remaining to read')).toBe(
+      true,
+    );
+  });
+
+  test('a permanent 403 or TLS failure is not transient', () => {
+    expect(
+      isGitTransientNetFailure(
+        "fatal: unable to access 'https://github.com/o/r.git/': The requested URL returned error: 403",
+      ),
+    ).toBe(false);
+    expect(
+      isGitTransientNetFailure(
+        "fatal: unable to access 'https://github.com/o/r.git/': SSL certificate problem: unable to get local issuer certificate",
+      ),
+    ).toBe(false);
+    expect(
+      isGitTransientNetFailure(
+        "fatal: unable to access 'https://x/': The requested URL returned error: 404",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('isGitTransientNetFailure — retry only connection loss and timeouts (#1786)', () => {
+  test('transient git network errors', () => {
+    expect(isGitTransientNetFailure('Recv failure: Connection reset by peer')).toBe(true);
+    expect(
+      isGitTransientNetFailure(
+        'fatal: unable to access: Failed to connect to github.com port 443: Connection refused',
+      ),
+    ).toBe(true);
+    expect(isGitTransientNetFailure('git fetch timed out after 480000ms')).toBe(true);
+    expect(
+      isGitTransientNetFailure('git push failed (signal SIGTERM): Enumerating objects: 12, done.'),
+    ).toBe(true);
+    expect(isGitTransientNetFailure('git clone failed (signal SIGKILL): ')).toBe(true);
+  });
+
+  test('non-transient git errors', () => {
+    expect(
+      isGitTransientNetFailure(
+        "fatal: unable to access 'https://x/': The requested URL returned error: 403",
+      ),
+    ).toBe(false);
+    expect(
+      isGitTransientNetFailure('fatal: SSL certificate problem: self signed certificate'),
+    ).toBe(false);
+  });
+});
+
 describe('withGitNetRetries — deterministic auth-failure short circuit (#1225: 401 retries never flip red)', () => {
   test('auth failures do not burn the retry budget (throw on first occurrence)', async () => {
     const op = vi.fn(async () => {
@@ -528,6 +590,80 @@ describe('withGitNetRetries — deterministic auth-failure short circuit (#1225:
     });
     await expect(withGitNetRetries(op)).resolves.toBeUndefined();
     expect(op).toHaveBeenCalledTimes(3);
+  });
+
+  test('the remote end hung up unexpectedly retries with the full budget', {
+    timeout: 15_000,
+  }, async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const pending = withGitNetRetries(async () => {
+        calls += 1;
+        if (calls < 3) throw new Error('fatal: the remote end hung up unexpectedly');
+      });
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toBeUndefined();
+      expect(calls).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test.each([
+    "fatal: unable to access 'https://github.com/o/r.git/': The requested URL returned error: 403",
+    "fatal: unable to access 'https://github.com/o/r.git/': SSL certificate problem: unable to get local issuer certificate",
+    "fatal: repository '/tmp/definitely-not-here/repo' does not exist",
+    "fatal: '/tmp/definitely-not-here/repo' does not appear to be a git repository",
+  ])('a permanent failure (%s) is not retried', async (message) => {
+    const op = vi.fn(async () => {
+      throw new Error(message);
+    });
+    await expect(withGitNetRetries(op)).rejects.toThrow();
+    expect(op).toHaveBeenCalledTimes(1);
+  });
+
+  test('a push that fails twice with connection reset and then succeeds does not throw', async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const pending = withGitNetRetries(async () => {
+        calls += 1;
+        if (calls < 3) throw new Error('Recv failure: Connection reset by peer');
+      });
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toBeUndefined();
+      expect(calls).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('a connection reset retries through 2s, 4s, 8s and 16s, and the fifth attempt can succeed', async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const pending = withGitNetRetries(async () => {
+        calls += 1;
+        if (calls < 5) throw new Error('Recv failure: Connection reset by peer');
+      });
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toBeUndefined();
+      expect(calls).toBe(5);
+      expect([...GIT_NET_RETRY_DELAYS_MS]).toEqual([2_000, 4_000, 8_000, 16_000]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('a non-transient git error is not retried', async () => {
+    const op = vi.fn(async () => {
+      throw new Error(
+        "fatal: unable to access 'https://github.com/o/r.git/': The requested URL returned error: 403",
+      );
+    });
+    await expect(withGitNetRetries(op)).rejects.toThrow('error: 403');
+    expect(op).toHaveBeenCalledTimes(1);
   });
 });
 
