@@ -606,6 +606,9 @@ describe('the 0.0.0.0 bare-bind WARN (failure modes 9/10)', () => {
     expect(loadConfig().host).toBe('0.0.0.0');
     vi.stubEnv(ENV_VARS.token, '');
     expect(loadConfig().authToken).toBeNull();
+    vi.stubEnv('HOST', '');
+    expect(loadConfig().authToken).toBeNull();
+    expect(loadConfig().host).toBeNull();
     vi.unstubAllEnvs();
     vi.stubEnv(ENV_VARS.home, home);
     expect(loadConfig().authToken).toBeNull();

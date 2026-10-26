@@ -64,6 +64,7 @@ const INFERRED_ROUTES = [
   'GET /api/builds/{id}/changes',
   'GET /api/builds/{id}/changes/file',
   'GET /api/builds/{id}/usage',
+  'GET /api/builds/{id}/gate',
   'POST /api/uploads/grant',
   'POST /api/uploads/upload',
   'GET /api/attachments/{id}',
@@ -140,6 +141,7 @@ const M5_ROUTES = [
   'GET /api/builds/{id}/changes',
   'GET /api/builds/{id}/changes/file',
   'GET /api/builds/{id}/usage',
+  'GET /api/builds/{id}/gate',
 ];
 
 function normalizePath(path: string): string {
