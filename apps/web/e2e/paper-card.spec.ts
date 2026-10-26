@@ -98,13 +98,13 @@ test('running footer spiral spins, and stops under reduced motion', async ({ pag
   await expect(spinner).toHaveCSS('animation-name', 'none');
 });
 
-test('column header: serif name, fixed status icon, plus only on `待开始` and it opens new task', async ({
+test('column header: sans name, fixed status icon, plus only on `待开始` and it opens new task', async ({
   page,
 }) => {
   await page.goto(MATRIX);
   const name = page.locator('[data-column="todo"] .board-column-name');
   const family = await name.evaluate((el) => getComputedStyle(el).fontFamily);
-  expect(family).toContain('sourceSerif4');
+  expect(family).toContain('inter');
   for (const id of ['todo', 'building', 'pending', 'done']) {
     await expect(page.locator(`[data-column="${id}"] header svg`).first()).toBeVisible();
   }
