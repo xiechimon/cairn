@@ -299,3 +299,65 @@ describe('runner tool call timestamps', () => {
     ]);
   });
 });
+
+test('a tool call that finishes after a provider network retry keeps its start time', async () => {
+  let time = 1_000;
+  const handleOf = (events: AsyncIterable<StepEvent>): AgentSessionHandle => ({
+    sessionId: 'pi-sess-retry',
+    events,
+    async steer() {},
+    async stop() {},
+    usage: () => [],
+  });
+  const backend: AgentBackend = {
+    capabilities: PI_CAPABILITIES,
+    async createSession(): Promise<AgentSessionHandle> {
+      return handleOf(
+        (async function* (): AsyncIterable<StepEvent> {
+          yield {
+            type: 'toolcall_end',
+            call: { id: 'slow', name: 'Bash', arguments: { command: 'pnpm test' } },
+          };
+          time = 4_000;
+          yield { type: 'error', error: { message: 'connection refused', retryable: true } };
+        })(),
+      );
+    },
+    async continueSession(): Promise<AgentSessionHandle> {
+      return handleOf(
+        (async function* (): AsyncIterable<StepEvent> {
+          time = 9_000;
+          yield {
+            type: 'toolcall_end',
+            call: { id: 'slow', name: 'Bash', arguments: { command: 'pnpm test' }, result: 'ok' },
+          };
+          yield { type: 'done', usage: [] };
+        })(),
+      );
+    },
+  } as AgentBackend;
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-retry-'));
+  const paths = statePaths(home, join(home, 'workspaces'));
+  const client = new RecordingClient();
+  await runStep(
+    {
+      client,
+      journal: new StepJournal(paths.outboxDir),
+      backendFor: () => backend,
+      logger: logger(),
+      paths,
+      workspacesDir: join(home, 'workspaces'),
+      mcpConfigPath: join(home, 'claude.json'),
+      heartbeatIntervalMs: 60_000,
+      now: () => time,
+    },
+    claimedStep(),
+  );
+  const rows = client.uploads
+    .flatMap((upload) => upload.messages)
+    .filter((row) => row.id === 'slow');
+  expect(rows.at(-1)?.content).toMatchObject({
+    kind: 'toolcall',
+    call: { id: 'slow', result: 'ok', startedAt: 1_000, endedAt: 9_000 },
+  });
+});

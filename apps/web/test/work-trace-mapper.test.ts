@@ -67,3 +67,9 @@ test('a call left without a result only spins while its step is still running', 
 test('backend search tools count as searches', () => {
   expect(render([call('g', 'grep', { pattern: 'mergeBuild', path: 'apps/web' }, 1000)])[0]).toMatchObject({ steps: [{ action: 'search', description: 'grep mergeBuild apps/web' }] });
 });
+
+test('a running call with only a start time shows no duration instead of the gap before it', () => {
+  const live: MessageRow = { id: 'live', role: 'assistant', createdAt: 9000, content: { kind: 'toolcall', call: { id: 'live', name: 'Bash', arguments: { command: 'pnpm test' }, startedAt: 8500 } } };
+  const items = mapTranscript({ messages: [{ id: 'think', role: 'assistant', content: [{ type: 'thinking', thinking: 'plan' }], createdAt: 1000 }, live], steps: [{ id: 'step', buildId: 'build', kind: 'build', machineId: null, createdAt: 500, status: 'claimed', checkpointCommit: null, skillInjection: null }], plans: [], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '' });
+  expect(items[0]).toMatchObject({ steps: [{ kind: 'think' }, { running: true, seconds: null }] });
+});

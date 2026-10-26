@@ -1180,7 +1180,6 @@ async function runClaimedStep(
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
     runningToolCalls.clear();
-    toolStartedAt.clear();
     armWatchdog(streamTimeouts.first, 'first');
     armBodyTimeout();
     if (pass === 0) armDurationCap();

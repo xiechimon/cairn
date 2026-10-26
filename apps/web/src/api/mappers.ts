@@ -560,9 +560,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       toolNameByResult.set(pairedText, paired.name);
   }
 
-  const stepRunning = steps.some(
-    (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
-  );
+  const stepRunning = steps.some((s) => s.status === 'claimed');
   const entries: TimelineEntry[] = [];
   let previousAt: number | null = null;
   for (const m of messages) {
@@ -792,7 +790,9 @@ function workCall(
   const seconds =
     call.startedAt !== undefined && call.endedAt !== undefined
       ? Math.max(0, (call.endedAt - call.startedAt) / 1000)
-      : fallbackSeconds;
+      : call.startedAt !== undefined
+        ? null
+        : fallbackSeconds;
   const base = {
     kind: 'call' as const,
     id: call.id,
