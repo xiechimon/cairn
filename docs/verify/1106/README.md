@@ -1,61 +1,57 @@
-# #1106 派发技能注入——验证证据
+# #1106 dispatch skill injection — verification evidence
 
-票面：派发管线技能注入（目录粗分发 + description 细触发注入任务 brief）。
-机制：worker 步 claim（= 任务 brief 的组装投递位，#823 chief 路由同位）时，
-服务端对「任务文本（title+spec）× 授予集」做规则选择（候选基 = 授予集正本，
-server 现扫只联接描述——daemon 本机库的授予技能以 id/名参与点名），结果随
-同一次 claim 原子落 step 行（`skillInjection` 列，含每条命中的规则与原因），
-ids 经 claim 载荷 `agent.injectedSkills` 透传 daemon 收窄目录注入（daemon
-半由 apps/daemon 单测钉住，见下）。
+Ticket: skill injection into the dispatch pipeline (coarse distribution by catalog + description-triggered injection into the task brief).
+Mechanism: at a worker step's claim (= the assembly-and-delivery slot of the task brief, the same position as the #823 chief route),
+the server runs a rule selection over "task text (title+spec) × the granted set" (the candidate base = the granted set's canon;
+the server's live scan only joins descriptions — a granted skill from the daemon's local library participates by id/name),
+and the result lands atomically with the same claim on the step row (the `skillInjection` column, carrying each hit's rule and reason);
+the ids pass through the claim payload's `agent.injectedSkills` to the daemon, which narrows the catalog injection (the daemon half is pinned by apps/daemon unit tests, see below).
 
-探针：`.claude/skills/verify-pacman/scripts/drive-1106-skill-inject.mjs`
-（wire 相位——live 栈 + 裸 HTTP 扮机器 + 浏览器详情面；无 daemon/LLM 依赖）。
-fixture：21 个授予技能（票面 ≥20 量级；前端/测试/调试域 + 求职/知识库无关族）。
+Probe: `.claude/skills/verify-pacman/scripts/drive-1106-skill-inject.mjs`
+(wire phase — live stack + bare HTTP playing the machine + a browser detail face; no daemon/LLM dependency).
+fixture: 21 granted skills (the ticket's ≥20 magnitude; front-end / testing / debugging domains + a job-hunting / knowledge-base unrelated family).
 
-## 结果
+## Results
 
-| 腿 | 栈 | 结果 |
+| leg | stack | result |
 |---|---|---|
-| after | 本分支（8791/5273） | 17/17 PASS（`after/result.json`） |
-| before | origin/main 一次性 worktree（8793/5275） | 8/17——9 FAIL = 机制缺席基线（`before/result.json`：payload 无 `injectedSkills`、step 表无 `skillInjection` 列、详情面无 injected-skills 行） |
+| after | this branch (8791/5273) | 17/17 PASS (`after/result.json`) |
+| before | a throwaway origin/main worktree (8793/5275) | 8/17 — the 9 FAILs = the mechanism-absent baseline (`before/result.json`: the payload has no `injectedSkills`, the step table has no `skillInjection` column, the detail face has no injected-skills row) |
 
-## 验收 → 实物路径
+## Acceptance → artifact path
 
-| 票面验收 | 判据（result.json check 名） | 实物 |
+| ticket acceptance | criterion (the result.json check name) | artifact |
 |---|---|---|
-| 1 ≥20 技能只注入相关 | 「注入只含相关技能」：domain 任务注入 = [better-colors, better-layout, better-typography, kami]（前端域），求职/知识库 12 族零注入 | `after/claim-domain.json`（agent.injectedSkills vs agent.skills=21） |
-| 2 agent 可答「为何没用未注入技能」 | 注入 ⊆ 授予 + 未注入技能 description 不进 brief（选择面只有 4/21） | `after/claim-domain.json`；daemon 目录收窄单测 `apps/daemon/test/skills-catalog.test.ts` #1106 块（选中条目全文、未选条目 filtered 出目录、deny 面不收窄） |
-| 3 零命中正常派发 | claim 200 + `injectedSkills=[]` + step 行 `hits=[]` + 授权集仍全量 | `after/steps-zero.json`、`after/claim-domain.json` 对照 |
-| 4 选择过程详情面可查 | steps REST + SQLite step 行带规则与原因；浏览器 DOM 断言 + 截图 | `after/steps-domain.json`、`after/result.json`（SQLite 行一致性 check）、`after/detail-domain.png`（注入行含技能与原因）、`after/detail-zero.png`（「未注入技能」占位） |
-| 细触发：显式点名 | 任务文本点名 tdd → 注入含 tdd、rule=explicit-mention、原因点名任务文本 | `after/claim-mention.json`、`after/result.json` |
+| 1 ≥20 skills, only the relevant ones injected | "the injection contains only relevant skills": a domain task's injection = [better-colors, better-layout, better-typography, kami] (the front-end domain), the 12 job-hunting / knowledge-base family zero injections | `after/claim-domain.json` (agent.injectedSkills vs agent.skills=21) |
+| 2 the agent can answer "why wasn't an uninjected skill used" | the injection ⊆ the granted set + the uninjected skills' descriptions do not enter the brief (the selection face sees only 4/21) | `after/claim-domain.json`; the daemon catalog-narrowing unit test `apps/daemon/test/skills-catalog.test.ts` #1106 block (selected entries' full text, unselected entries filtered out of the catalog, the deny face not narrowed) |
+| 3 zero hits dispatch normally | claim 200 + `injectedSkills=[]` + the step row `hits=[]` + the authorized set still full | `after/steps-zero.json`, contrasted with `after/claim-domain.json` |
+| 4 the selection process inspectable on the detail face | the steps REST + the SQLite step row carry the rules and reasons; a browser DOM assertion + a screenshot | `after/steps-domain.json`, `after/result.json` (the SQLite row consistency check), `after/detail-domain.png` (the injection row with skills and reasons), `after/detail-zero.png` (the `未注入技能` placeholder) |
+| fine trigger: an explicit mention | the task text names tdd → the injection contains tdd, rule=explicit-mention, the reason names the task text | `after/claim-mention.json`, `after/result.json` |
 
-## 命中原因实物（after/result.json）
+## Hit-reason artifacts (after/result.json)
 
-domain 任务（「修复看板卡片的字号过小与换行溢出」）四条命中均为 domain 规则，
-原因同时点名任务侧与技能侧关键词，例：
+A domain task ("fix the board card's font size being too small and the line-wrap overflow") has four hits, all domain rules,
+each reason naming both the task-side and the skill-side keywords, e.g.:
 
-> better-typography — 任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「ui」）
+> better-typography — the task text and the skill share the domain "front-end UI" (the task hits `字号`, the skill description hits `ui`)
 
-零命中任务（「把首页轮播图换成静态图」）：`hits=[]` 落库（配置事实非故障），
-详情面渲染「未注入技能（任务文本未命中任何技能）」。
+The zero-hit task ("replace the homepage carousel with a static image"): `hits=[]` lands in the DB (a configuration fact, not a failure),
+and the detail face renders `未注入技能（任务文本未命中任何技能）`.
 
-## daemon 半（注入收窄 + 描述全文）单测钉面
+## The daemon half (injection narrowing + description full text), unit-test pin faces
 
-wire 相位证到「选择正本落库 + ids 进载荷」；daemon 侧目录按选择收窄、
-未选条目 `filtered: ... not in injected selection`、选中条目 description
-超 200 字不截断、`injectedSkills` 缺省回落白名单全量（旧 server 零回归）、
-deny 面（#917 授权硬挡）不受选择影响——由 `apps/daemon/test/skills-catalog.test.ts`
-「注入选择收窄（#1106）」块 7 用例钉住（34/34 绿）。
+The wire phase proves "the selection canon lands in the DB + the ids enter the payload"; on the daemon side,
+the catalog narrows per the selection, unselected entries get `filtered: ... not in injected selection`, a selected entry's description over 200 characters is not truncated, a missing `injectedSkills` falls back to the whitelist's full catalog (zero regression on an old server), and the deny face (#917 authorized hard-block) is unaffected by the selection — pinned by the `apps/daemon/test/skills-catalog.test.ts` `注入选择收窄（#1106）` block's 7 cases (34/34 green).
 
-## 复跑配方（自足可复现）
+## Rerun recipe (self-sufficient and reproducible)
 
 ```sh
-# after 腿（本分支）：
-node .claude/skills/verify-pacman/scripts/launch.mjs                 # 8791/5273，全新库
+# after leg (this branch):
+node .claude/skills/verify-pacman/scripts/launch.mjs                 # 8791/5273, fresh library
 node .claude/skills/verify-pacman/scripts/drive-1106-skill-inject.mjs   # 17/17
 node .claude/skills/verify-pacman/scripts/cleanup.mjs
 
-# before 腿（origin/main 一次性 worktree，8793/5275）：
+# before leg (a throwaway origin/main worktree, 8793/5275):
 git worktree add --detach /tmp/pacman-1106-before origin/main
 (cd /tmp/pacman-1106-before && corepack pnpm install --prefer-offline)
 VERIFY_REPO_ROOT=/tmp/pacman-1106-before VERIFY_PORT=8793 VERIFY_WEB_PORT=5275 \
@@ -63,16 +59,16 @@ VERIFY_REPO_ROOT=/tmp/pacman-1106-before VERIFY_PORT=8793 VERIFY_WEB_PORT=5275 \
 SERVER=http://127.0.0.1:8793 WEB_URL=http://127.0.0.1:5275 \
   SKILLS_DIR=/tmp/pacman-1106-before/.claude/verify-run/home/skills \
   DB=/tmp/pacman-1106-before/.claude/verify-run/home/server/server.db \
-  node <本仓>/.claude/skills/verify-pacman/scripts/drive-1106-skill-inject.mjs   # 8/17（9 FAIL = 基线）
+  node <this repo>/.claude/skills/verify-pacman/scripts/drive-1106-skill-inject.mjs   # 8/17 (9 FAIL = baseline)
 
-# 单测面：
-(cd packages/shared && corepack pnpm exec vitest run)   # 323（含 skill-inject 17）
+# unit-test faces:
+(cd packages/shared && corepack pnpm exec vitest run)   # 323 (incl. skill-inject 17)
 (cd apps/server && corepack pnpm exec vitest run test/skill-inject-claim.test.ts)  # 5
 (cd apps/daemon && corepack pnpm exec vitest run test/skills-catalog.test.ts)      # 34
 (cd apps/web && corepack pnpm exec vitest run test/injected-skills-row.test.ts)    # 5
 (cd apps/web && corepack pnpm exec playwright test e2e/skill-inject.spec.ts)       # 3
 ```
 
-探针环境前提：全新库（launch 自清）；技能 fixture 由探针自建（21 个 SKILL.md
-落 `<RUN_DIR>/home/skills`）；机器面 = enroll 换 token 的裸 HTTP 扮机器
-（不依赖 daemon/LLM）。
+Probe environment prerequisites: a fresh library (launch self-cleans); the skill fixture is self-built by the probe (21 SKILL.md files
+land in `<RUN_DIR>/home/skills`); the machine face = a bare-HTTP machine playing with a per-enroll token
+(no daemon/LLM dependency).

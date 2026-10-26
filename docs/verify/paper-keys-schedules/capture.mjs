@@ -1,5 +1,5 @@
 // Paper API keys and schedules evidence: both pages empty and populated, and
-// the 新建定时 dialog. Light and dark, 1440x900 at DPR 2, from a fixture
+// the `新建定时` dialog. Light and dark, 1440x900 at DPR 2, from a fixture
 // build served by vite preview.
 //   node docs/verify/paper-keys-schedules/capture.mjs <label> <baseUrl>
 // label = before | after.

@@ -1,4 +1,4 @@
-# #1225 mea 实测证据：daemon clone/push 凭据降级
+# #1225 mea live evidence: daemon clone/push credential degrade
 
 Run date: 2026-10-12. Machine: mea (WSL2, the ticket's incident machine; gh
 logged in as xiechimon, `~/.gitconfig` wires `credential.https://github.com`

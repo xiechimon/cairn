@@ -1,3 +1,4 @@
+```
 # Probe dump — old baseline → new measured (#921)
 
 Run 2026-10-09T06:12:07.335Z · commit `243bb137` · port 8404 · playwright 1.63.0 · workers 4
@@ -150,3 +151,5 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | spec-brief-card.spec.ts | 212 | not.toBe | rgb(238, 232, 228) | rgb(179, 174, 170) | — | 6. 有序列表序号与正文区分、与首行基线对齐、双位数不 jog 内容列 (#814 rework) |
 | spec-brief-card.spec.ts | 213 | toBeLessThanOrEqual | ≤ 1 | 0 | — | 6. 有序列表序号与正文区分、与首行基线对齐、双位数不 jog 内容列 (#814 rework) |
 | spec-brief-card.spec.ts | 217 | toBeLessThanOrEqual | ≤ 1 | 0 | — | 6. 有序列表序号与正文区分、与首行基线对齐、双位数不 jog 内容列 (#814 rework) |
+
+```

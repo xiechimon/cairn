@@ -1,4 +1,4 @@
-# #1628 重检查名额
+# 1628 heavy-check slot count
 
-- `demo-slots.sh` / `demo-slots.log`：名额 2、同时起 4 条的演示。用轻量替身命令（各跑 2 秒的 node 脚本）代替完整 prepush，因为机器负载已很高，不真起 4 条全量 prepush。A 段结果：4 条全部退出码 0，同一时刻最多 2 条在跑，另 2 条打印「排队中」后依次跑完。B 段：`kill -9` 持锁者后，排队者在 111 ms 内拿到名额（验收线 5 秒）。
-- omarchy 上完整 prepush 加 `e2e:affected` 的峰值内存实测：待宿主。据此定 omarchy 的 `CAIRN_HEAVY_SLOTS`，初值 3。
+- `demo-slots.sh` / `demo-slots.log`: a demo of slot count 2 with 4 launched at once. A lightweight stand-in command (a node script that runs for 2 seconds each) replaces the full prepush, because the machine load is already high and 4 full prepushes are not really launched. Segment A result: all 4 exit with code 0, at most 2 are running at any moment, and the other 2 print `排队中` and run one after another. Segment B: after `kill -9` on the lock holder, the queued one takes the slot within 111 ms (the acceptance line is 5 seconds).
+- The peak-memory measurement of the full prepush plus `e2e:affected` on omarchy: pending a host. From this, omarchy's `CAIRN_HEAVY_SLOTS` is set, initial value 3.

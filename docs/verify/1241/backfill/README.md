@@ -1,16 +1,16 @@
-# #1241 存量回填（mon 裁定：旧默认 3 且未手动覆盖 → 跟推荐）
+# #1241 backfill of existing rows (mon's ruling: old default 3 and not manually overridden → follow the recommendation)
 
-脚本 `backfill-verify.mjs`（node22，server 8801 / web 5291，PACMAN_HOME `/tmp/bf-1241-home`）：
+Script `backfill-verify.mjs` (node22, server 8801 / web 5291, PACMAN_HOME `/tmp/bf-1241-home`):
 
-1. 用 origin/main（`9b027a5c`，无 #1241）起 server，注册 3 台机器：两台留默认 3，一台 PATCH 成 5（`api-before-main.json`）。
-2. 停 main；给 `bf-legacy-fingerprinted` 写入一份硬件指纹（12 核 / 36 GiB），模拟当前 daemon 已上报过一拍（main 不存 hardware）。
-3. 用本分支在**同一库**上起 server：迁移 0043 + 启动回填 `backfillMachineConcurrency`（`api-after-branch-start1.json`、截图）。
-4. 再重启一次：结果不变（`api-after-branch-start2.json`），幂等。
+1. Start the server from origin/main (`9b027a5c`, without #1241) and register 3 machines: two left at the default 3, one PATCHed to 5 (`api-before-main.json`).
+2. Stop main; write a hardware fingerprint (12 cores / 36 GiB) for `bf-legacy-fingerprinted`, simulating the current daemon having reported one beat (main does not store hardware).
+3. Start the server from this branch on the **same database**: migration 0043 + the startup backfill `backfillMachineConcurrency` (`api-after-branch-start1.json`, screenshots).
+4. Restart once more: the result is unchanged (`api-after-branch-start2.json`) — idempotent.
 
-| 机器 | main 上 | 本分支启动后 |
+| machine | on main | after this branch starts |
 |---|---|---|
-| bf-legacy-fingerprinted（旧默认 3，有指纹） | 3 | **12**，推荐（measured） |
-| bf-legacy-blank（旧默认 3，无指纹） | 3 | 3，估算 |
-| bf-manual-5（手动 5） | 5 | 5，手动（不动） |
+| bf-legacy-fingerprinted (old default 3, has fingerprint) | 3 | **12**, recommended (measured) |
+| bf-legacy-blank (old default 3, no fingerprint) | 3 | 3, estimated |
+| bf-manual-5 (manual 5) | 5 | 5, manual (untouched) |
 
-已知边界：在 main 上**手动设成恰好 3** 的机器与旧默认无法区分，按未覆盖处理（mon 已接受）。
+Known boundary: a machine **manually set to exactly 3** on main is indistinguishable from the old default and is treated as not overridden (mon accepted this).

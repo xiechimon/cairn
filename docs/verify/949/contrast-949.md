@@ -1,15 +1,17 @@
-# #949 overlays/ 域 better-colors 对比度实测（不许估）
+# #949 overlays/ domain better-colors contrast measurement (no estimating)
 
-测量面：verify-pacman live 栈（8795/5277，独立 PACMAN_HOME），`drive-949-overlays.mjs` E 段；
-渲染对取真实元素 computed color，token 解析对走 var() probe-div；透明/半透明底合成到真实画布。
-WCAG 2.x 相对亮度公式；文本地板 4.5、非文本 UI 地板 3.0；report-only = spec/22 §1.3 软发丝线族（报数不判红）。
+Measurement face: the verify-pacman live stack (8795/5277, isolated PACMAN_HOME), section E of `drive-949-overlays.mjs`;
+rendered pairs take real-element computed colors, token-resolved pairs walk a var() probe-div; transparent/semi-transparent
+bases are composited onto the real canvas. WCAG 2.x relative-luminance formula; text floor 4.5, non-text UI floor 3.0;
+report-only = the spec/22 §1.3 soft-hairline family (reported, never judged red).
 
-**消费面换槽（#908 裁决 2 授权，token 值冻结不动）**：`--text-dim × --popover-bg` 实测亮模 2.89:1 <
-该槽 canon 地板 3（§1.8 的 3.05:1 是 on `--background` 对；popover 底更亮把它压穿）——时间列/序号/放大镜
-三个消费点换 `--text-tertiary`（亮 4.97 / 暗 7.35，见下表 row-time / popover-seq / input-icon 行），
-#943 notify-banner 同判例。
+**Consumer-face slot swap (authorized by #908 ruling 2, token values frozen)**: `--text-dim × --popover-bg` measured
+2.89:1 in light < the slot's canon floor 3 (§1.8's 3.05:1 is the on `--background` pair; the brighter popover base
+presses it through the floor) — the three consumption points (time column / sequence number / magnifier) swap to
+`--text-tertiary` (light 4.97 / dark 7.35, see the row-time / popover-seq / input-icon rows below),
+the same precedent as the #943 notify-banner.
 
-## dark（27 对门控 + 3 对 report-only）
+## dark (27 gated pairs + 3 report-only pairs)
 
 | face | fg | bg | ratio | floor | verdict |
 | --- | --- | --- | --- | --- | --- |
@@ -44,7 +46,7 @@ WCAG 2.x 相对亮度公式；文本地板 4.5、非文本 UI 地板 3.0；repor
 | focus-ring | rgb(216 156 252) | rgb(37 34 29) | 7.61:1 | 3 | PASS |
 | sidebar-dim-row | rgb(211 207 199) | rgb(30 27 22) | 11.05:1 | 4.5 | PASS |
 
-## light（27 对门控 + 3 对 report-only）
+## light (27 gated pairs + 3 report-only pairs)
 
 | face | fg | bg | ratio | floor | verdict |
 | --- | --- | --- | --- | --- | --- |
@@ -79,4 +81,4 @@ WCAG 2.x 相对亮度公式；文本地板 4.5、非文本 UI 地板 3.0；repor
 | focus-ring | rgb(127 45 167) | rgb(239 233 225) | 6.14:1 | 3 | PASS |
 | sidebar-dim-row | rgb(53 49 42) | rgb(244 239 231) | 11.3:1 | 4.5 | PASS |
 
-结论：门控 27 对 × 双主题全过，域最低 4.5:1。report-only 三对与 §1.7/1.8 表值逐位吻合（1.06–1.2 软发丝线族）。
+Conclusion: all 27 gated pairs × both themes pass, domain minimum 4.5:1. The three report-only pairs match the §1.7/1.8 table values digit by digit (the 1.06-1.2 soft-hairline family).

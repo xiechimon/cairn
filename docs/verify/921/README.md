@@ -3,7 +3,7 @@
 One full end-to-end run of the probe-dump collector
 (`apps/web/e2e/probe-dump.mjs` + `apps/web/e2e/probe-dump-instrument.mjs`)
 against the fixture stack on the current main UI. The tool is the collection
-half of the visual re-pin workflow (#910 裁定 5: script-assisted collection,
+half of the visual re-pin workflow (#910 ruling 5: script-assisted collection,
 human-reviewed diff); it never rewrites specs — a human reviews the DRIFT rows
 and separates expected drift (new canon) from suspected regression.
 

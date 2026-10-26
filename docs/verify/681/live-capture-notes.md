@@ -1,16 +1,16 @@
-# t-0059 遗留：i18n-coverage 扫描器自旋（#681 的活体现场）
+# t-0059 leftover: the i18n-coverage scanner spinning (the living scene of #681)
 
-2026-10-03 协调者清场时实测到的**孤儿进程**，正是 #681 描述的死循环的**活体实例**。
+The **orphan processes** measured by the coordinator during the 2026-10-03 cleanup are exactly the **living instance** of the infinite loop #681 describes.
 
-## 事实
+## Facts
 
-- `pid 85912`（父）→ `85919`（vitest fork worker），ppid=1（已孤儿），启动 2026-10-03 04:27:32，
-  实测时已跑 **9h40m，持续 ~84–91% CPU**（独占一核）。
-- 命令行 = `vitest run apps/web/test/i18n-coverage.test.ts --reporter=dot`，
+- `pid 85912` (parent) → `85919` (a vitest fork worker), ppid=1 (already orphaned), started 2026-10-03 04:27:32;
+  at measurement time it had been running **9h40m at a steady ~84-91% CPU** (hogging one core).
+- Command line = `vitest run apps/web/test/i18n-coverage.test.ts --reporter=dot`,
   cwd = `.../worktrees/pacman/hp-pacman-t-0059-todo-chip-scheme-mention-chip-todo/apps/web`
-  ——该 worktree **已被删除**（cwd 悬空），线程 t-0059 早已 resolve。
+  — that worktree **had already been deleted** (a dangling cwd), and the thread t-0059 was long resolved.
 
-## `sample(1)` 抓到的热栈（`sample.txt`，4s / 1ms 间隔，3189 个样本全在同一处）
+## The hot stack caught by `sample(1)` (`sample.txt`, 4s / 1ms interval, all 3189 samples at the same spot)
 
 ```
 Builtins_RunMicrotasks
@@ -19,16 +19,16 @@ Builtins_AsyncFunctionAwaitResolveClosure
 Builtins_InterpreterEntryTrampoline
 Builtins_ArrayPrototypeFlatMap          ← apps/web/test/i18n-coverage.test.ts:293 `files.flatMap(scan)`
 Builtins_FlattenIntoArrayWithMapFn
-??? (in <unknown binary>)               ← JIT 后的 JS：即 mapFn `scan()` 本体
-  3189/3189 样本停在这里（无推进、无 IO、无分配抖动）
+??? (in <unknown binary>)               ← post-JIT JS: i.e. the mapFn `scan()` body itself
+  3189/3189 samples stop here (no progress, no IO, no allocation churn)
 ```
 
-## 读法（一条结论、一条排除）
+## How to read it (one conclusion, one exclusion)
 
-- **结论**：自旋在 **`scan(file)` 内部**——`flatMap` 只是调用者（它的迭代长度是固定的，不会因数组增长而变长）。
-- **排除**：不是 flatMap 遍历被增长数组拖死，也不是 IO / GC；是**纯 JS 计算自旋，且不推进**——与 #681 的「zero-advance」判断吻合。
+- **Conclusion**: it spins **inside `scan(file)`** — `flatMap` is only the caller (its iteration length is fixed and cannot grow with the array).
+- **Excluded**: not the flatMap traversal being dragged down by a growing array, and not IO / GC; it is a **pure-JS computation spin that makes no progress** — matching #681's "zero-advance" judgment.
 
-## 复现上下文
+## Reproduction context
 
-- 触发面是 t-0059 的分支内容（该票补了 `todo:` / 提及 chip 的 **SCHEME 正则**）——`#` 出现在正则字面量里，正是 #681 的触发器。
-- **main 不复现**（main 的 CI 绿，且 i18n-coverage 属 light 项目每次 `pnpm test` 都会跑）→ 该自旋由**特定的正则字面量形态**触发，不是全仓常态。
+- The trigger face is t-0059's branch content (that ticket added the **SCHEME regexes** for `todo:` / mention chips) — a `#` appears in the regex literal, exactly #681's trigger.
+- **Not reproducible on main** (main's CI is green, and i18n-coverage is a light project that runs on every `pnpm test`) → the spin is triggered by a **specific regex-literal shape**, not a repo-wide normal state.

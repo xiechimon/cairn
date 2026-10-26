@@ -223,7 +223,7 @@ Not fixed: re-verifying after a person moves the card to review by hand (not thr
 
 ## 16. Merge of segment 2b at efea0f26 (2026-10-22): migration renumbered to 0046
 
-Segment 2b's head efea0f26 merges main c99de106, which carries `0045_model_fallback_chain` (#1493) and S4a's gate transport (#1503). The merge took main's `0045_snapshot.json` and `_journal.json` and removed this branch's `0045_step_finished_at.sql`. `pnpm db:generate --name step_finished_at` on the merged schema then produced `apps/server/drizzle/0046_step_finished_at.sql` (``ALTER TABLE `step` ADD `finishedAt` integer;``), which is the tail after main's 0045, as the CLAUDE.md drizzle rule requires. `pnpm db:check` passes ("snapshot 链线性、无父子冲突"). If main gains another migration before this branch lands, it is renumbered again at that merge.
+Segment 2b's head efea0f26 merges main c99de106, which carries `0045_model_fallback_chain` (#1493) and S4a's gate transport (#1503). The merge took main's `0045_snapshot.json` and `_journal.json` and removed this branch's `0045_step_finished_at.sql`. `pnpm db:generate --name step_finished_at` on the merged schema then produced `apps/server/drizzle/0046_step_finished_at.sql` (``ALTER TABLE `step` ADD `finishedAt` integer;``), which is the tail after main's 0045, as the CLAUDE.md drizzle rule requires. `pnpm db:check` passes (`snapshot 链线性、无父子冲突`). If main gains another migration before this branch lands, it is renumbered again at that merge.
 
 The other conflicts: `lib/github.ts` (both sides appended at the end of the check-runs section; both kept: `githubRequiredChecks` and S4a's raw gate transport) and spec 02 (this branch's segment-3 bullet kept, segment 2b's updated merge bullet taken from 2b: this branch had not changed it).
 

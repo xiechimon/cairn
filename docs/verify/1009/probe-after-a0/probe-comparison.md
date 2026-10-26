@@ -1,3 +1,4 @@
+```
 # Probe dump — old baseline → new measured (#921)
 
 Run 2026-10-08T06:20:13.780Z · commit `159cc3dd` · port 8397 · playwright 1.63.0 · workers 4
@@ -126,3 +127,5 @@ Expected drift → re-pin the spec value to “new measured”. Suspected regres
 | chief-stream-markdown.spec.ts | 829 | toEqual | {"display":"flex","grow":"1","minW":"0px","imgW":24,"imgH":24,"colRightOfImg":"true","colBesideImg":"true"} | {"__fn":"() => thinking.evaluate(row => {\n      var _row$querySelector;\n      const img = (_row$querySelecto… | — | F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数 |
 | chief-stream-markdown.spec.ts | 846 | toHaveCSS | display: flex | flex | — | F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数 |
 | chief-stream-markdown.spec.ts | 847 | toHaveCSS | flex-grow: 1 | 1 | — | F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数 |
+
+```

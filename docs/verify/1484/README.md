@@ -41,19 +41,19 @@ The branch's first version (`86923c68`) wrote the helper as `credential.<scheme>
 
 | test | what it pins |
 |---|---|
-| 失败方式 1 (6 cases) | protocol and host for github.com, `github.com:443`, a hosted `127.0.0.1:8787`, a URL with userinfo and an uppercase host, `pacman_server:8787`, `[::1]:8787`; the empty reset stays first |
-| 失败方式 2 (5 cases) | `''`, a local path, an scp-style URL, `file://`, `ssh://`: only the reset, no helper, no `PACMAN_GIT_CRED_*`, the token nowhere in the env |
-| 失败方式 3/4 | real `git credential fill`: the bound host gets the token; another port, `https` instead of `http`, another host get none; a `credential.<same host>.helper` in the global config is reset |
-| 失败方式 1/3 | real `git credential fill` with `url=` (git parses the URL itself): `pacman_server:8787`, `GitHub.com` and an explicit port get the token when bound as written; another `_` host and a dropped port get none |
-| 失败方式 5, set-url | two HTTP servers that challenge for Basic auth: with origin on the bound host the token arrives (control); after `git remote set-url` to the other server, `push`, `tagPush` and `fetch` send it nothing |
-| 失败方式 5, insteadOf | `url.<other>.insteadOf <bound>` in the repo config: `push` and `tagPush` send nothing to either server |
-| 失败方式 6 | with `GIT_TRACE`, the logged `run_command` lines (the helper's `sh -c`) do not contain the password, while `credential fill` still returns it |
-| 失败方式 7 | an http binding asked with `protocol=https` for the same host gets the token; an https binding asked with `protocol=http` gets none |
-| 失败方式 8 (3 cases) | a password with LF, a password with CR, a username with LF: `gitCredentialEnv` throws (`line break`) |
+| `失败方式 1 (6 cases)` | protocol and host for github.com, `github.com:443`, a hosted `127.0.0.1:8787`, a URL with userinfo and an uppercase host, `pacman_server:8787`, `[::1]:8787`; the empty reset stays first |
+| `失败方式 2 (5 cases)` | `''`, a local path, an scp-style URL, `file://`, `ssh://`: only the reset, no helper, no `PACMAN_GIT_CRED_*`, the token nowhere in the env |
+| `失败方式 3/4` | real `git credential fill`: the bound host gets the token; another port, `https` instead of `http`, another host get none; a `credential.<same host>.helper` in the global config is reset |
+| `失败方式 1/3` | real `git credential fill` with `url=` (git parses the URL itself): `pacman_server:8787`, `GitHub.com` and an explicit port get the token when bound as written; another `_` host and a dropped port get none |
+| `失败方式 5, set-url` | two HTTP servers that challenge for Basic auth: with origin on the bound host the token arrives (control); after `git remote set-url` to the other server, `push`, `tagPush` and `fetch` send it nothing |
+| `失败方式 5, insteadOf` | `url.<other>.insteadOf <bound>` in the repo config: `push` and `tagPush` send nothing to either server |
+| `失败方式 6` | with `GIT_TRACE`, the logged `run_command` lines (the helper's `sh -c`) do not contain the password, while `credential fill` still returns it |
+| `失败方式 7` | an http binding asked with `protocol=https` for the same host gets the token; an https binding asked with `protocol=http` gets none |
+| `失败方式 8 (3 cases)` | a password with LF, a password with CR, a username with LF: `gitCredentialEnv` throws (`line break`) |
 
 `apps/daemon/test/credentials.test.ts` (new) pins `pushCredential`: bound to `cloneUrl`; `git: null` stays null; no repo gives `null`. `apps/daemon/test/workspace.test.ts` has two #1484 tests:
-- "复用基座时 origin 已偏离 cloneUrl" repoints a reused base's origin from a worktree and expects the next `prepare` to point it back and fetch.
-- "比较的是 origin 的原始配置值" sets an `insteadOf` that rewrites `cloneUrl` and expects no re-point on reuse.
+- `复用基座时 origin 已偏离 cloneUrl` repoints a reused base's origin from a worktree and expects the next `prepare` to point it back and fetch.
+- `比较的是 origin 的原始配置值` sets an `insteadOf` that rewrites `cloneUrl` and expects no re-point on reuse.
 
 Fixtures that build a git credential now carry a URL:
 - the one their test pushes to (`tag-tool.test.ts` binds to its HTTP git server);

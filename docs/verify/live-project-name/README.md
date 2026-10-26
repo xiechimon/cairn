@@ -32,9 +32,9 @@ node docs/verify/live-project-name/newtask-save-probe.mjs http://127.0.0.1:<prev
 
 `before/` is `origin/main`, `after/` is this branch. Same spec, same stubs, captured with `PACMAN_E2E_EVIDENCE`.
 
-- `board-pending.png`, `board-loaded.png`: the 待开始 column with `/api/projects` held, then released.
+- `board-pending.png`, `board-loaded.png`: the `待开始` column with `/api/projects` held, then released.
 - `drag-pending.png`: the lifted card while held.
-- `chip-popover-loaded.png`, `chip-popover-pending.png`: the 任务分配 popover on `/app/todo/todo-1`.
+- `chip-popover-loaded.png`, `chip-popover-pending.png`: the `任务分配` popover on `/app/todo/todo-1`.
 - `newtask-pending.png`, `newtask-loaded.png`: the new-task dialog head while held; the head and project listbox after release.
 
 ```sh

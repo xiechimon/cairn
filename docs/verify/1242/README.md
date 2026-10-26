@@ -1,43 +1,43 @@
-# #1242 项目身份可变面 — verify-pacman 证据
+# #1242 project identity mutable faces — verify-pacman evidence
 
-probe：`.claude/skills/verify-pacman/scripts/drive-1242-project-identity.mjs`（纯 live 栈 + 假机器 wire + 浏览器真用户路径，零 daemon 零 LLM）。两遍独立运行 16/16 PASS（2026-10-12T20-25-06 / 2026-10-12T20-25-28 两时间戳目录同判据；仓内归档取第二遍）。
+probe: `.claude/skills/verify-pacman/scripts/drive-1242-project-identity.mjs` (pure live stack + fake machine wire + a real-browser user path, zero daemon zero LLM). Two independent runs at 16/16 PASS (the two timestamped directories 2026-10-12T20-25-06 / 2026-10-12T20-25-28 carry the same criteria; the in-repo archive takes the second run).
 
-## 复跑配方
+## Rerun recipe
 
 ```sh
-node .claude/skills/verify-pacman/scripts/launch.mjs     # 全新库（依赖：local 项目创建闸 + 假机器 enroll 顺序）
+node .claude/skills/verify-pacman/scripts/launch.mjs     # fresh library (depends on: the local-project creation gate + the fake machine enroll order)
 node .claude/skills/verify-pacman/scripts/drive-1242-project-identity.mjs
 node .claude/skills/verify-pacman/scripts/cleanup.mjs
 ```
 
-出站前置：转换腿的可达性校验真调 `GET api.github.com/repos/octocat/Hello-World`（公开仓匿名梯；本机直连已验 200，无 token 依赖）。`agent` 创建先 `machine/enroll` 拿 machineId（#1259 起归属机必填）。
+Outbound prerequisite: the conversion leg's reachability check really calls `GET api.github.com/repos/octocat/Hello-World` (a public-repo anonymous ladder; verified 200 on a direct connection from this machine, no token dependency). `agent` creation first takes a machineId via `machine/enroll` (the home machine is required since #1259).
 
-## 判读表（16 checks ↔ 票面验收）
+## Reading table (16 checks ↔ ticket acceptance)
 
-| 腿 | check | 票面对应 |
+| leg | check | ticket mapping |
 |---|---|---|
-| S0 | 铺底：local 项目（scratch 真 git 仓）+ 3 todo + 假机器 | — |
-| C1 | 转换前 claim 载荷 repo = `{kind:local, cloneUrl:<本机路径>}` | 转换前基线 |
-| A1 | 空 body → 400（五键全缺 = 静默 no-op 族判死） | 失败方式 4 |
-| A2 | 未知字段 → 400（strict 明示拒绝） | 失败方式 4 |
-| B1 | 设置页改名 → PATCH 落库 + invalidate 回显 | 改法 3 / 验收 2 |
-| B2 | 改名生效于侧栏与卡面（01-board-renamed.png） | 验收 2 |
-| C1/C2 | 描述落值 / 清空 → 列 null（空 ≡ null） | 改法 3 |
-| D1 | 有在飞 build 时转换 → 409 + toast 可见（02-convert-409-toast.png） | 失败方式 1 / 验收 3、4 |
-| D2 | 409 后行未动（仍 local） | 失败方式 1 |
-| E1 | 转换落库：repoKind=github + githubRepo + localPath 保留（local 绑定转加速位） | 改法 2 / 验收 1 |
-| E2 | 转换后设置页：转换卡卸载、加速位行上线（03-settings-converted.png） | 改法 3 |
-| E3 | record cloneUrl 切 https 派生（04-project-record.json） | 改法 2 |
-| E4 | 注记：改名 1 行 + 转换 2 行（05-system-notes.json；#902 坑：content 是 json 列，JSON.parse 后比对） | 改法 4 |
-| E5 | todo 详情 transcript 可见注记行（06-transcript-note.png） | 改法 4（板面可见） |
-| F1 | 转换后 claim 载荷 repo = `{kind:github, cloneUrl, localPath}` | 改法 2（既有步按新形态解析）/ 验收 1（clone 臂 + 加速臂） |
+| S0 | bedding: a local project (a scratch real git repo) + 3 todos + a fake machine | — |
+| C1 | the pre-conversion claim payload's repo = `{kind:local, cloneUrl:<local path>}` | pre-conversion baseline |
+| A1 | an empty body → 400 (all five keys missing = the silent no-op family judged dead) | failure mode 4 |
+| A2 | an unknown field → 400 (strict explicit refusal) | failure mode 4 |
+| B1 | renaming on the settings page → PATCH persisted + invalidate re-read | remedy 3 / acceptance 2 |
+| B2 | the rename takes effect in the sidebar and on the card (01-board-renamed.png) | acceptance 2 |
+| C1/C2 | the description lands / clearing → the column reads null (empty ≡ null) | remedy 3 |
+| D1 | converting while a build is in flight → 409 + a visible toast (02-convert-409-toast.png) | failure mode 1 / acceptance 3, 4 |
+| D2 | after the 409 the row is untouched (still local) | failure mode 1 |
+| E1 | the conversion persists: repoKind=github + githubRepo + localPath retained (the local binding becomes an accelerator slot) | remedy 2 / acceptance 1 |
+| E2 | the post-conversion settings page: the conversion card unmounts, the accelerator-slot row comes online (03-settings-converted.png) | remedy 3 |
+| E3 | the record's cloneUrl switches to the https derivation (04-project-record.json) | remedy 2 |
+| E4 | notes: 1 rename row + 2 conversion rows (05-system-notes.json; the #902 pit: content is a json column, compare after JSON.parse) | remedy 4 |
+| E5 | the todo detail's transcript shows the note row (06-transcript-note.png) | remedy 4 (visible on the board) |
+| F1 | the post-conversion claim payload's repo = `{kind:github, cloneUrl, localPath}` | remedy 2 (existing steps parse the new shape) / acceptance 1 (the clone arm + the accelerator arm) |
 
-## 实测坑（三条，changelog 同文）
+## Measured pitfalls (three, same text in the changelog)
 
-1. claim 响应解包：worker 步的 `body.step` 是 ClaimedStep 全形（project/todo 面在内），其 `.step` 字段是内层步位——套用 drive-903 的 chief 双包解包（`payload?.step ?? payload`）会把 claimed 解成内层步对象，`project.repo` 恒 undefined。
-2. 探针读输入值必须轮询收敛（e2e toHaveValue 同语义）：invalidate 重取的 React 重渲染比网络回包晚一拍，单次 `inputValue()` 读的是点击前旧态。
-3. 探针判据必须等 invalidateAll 重取收敛后再截图/读值（waitForResponse 拿 GET /api/projects 回包）——#1251 坑①同源。
+1. claim response unwrapping: a worker step's `body.step` is the full ClaimedStep shape (the project/todo faces included), and its `.step` field is the inner step position — applying drive-903's chief double-wrap unwrap (`payload?.step ?? payload`) unwraps the claimed envelope into the inner step object and `project.repo` is constantly undefined.
+2. a probe reading an input value must poll for convergence (the same semantics as e2e's toHaveValue): the invalidate-triggered React re-render lags the network response by a beat, and a single `inputValue()` reads the pre-click old state.
+3. a probe criterion must wait for the invalidateAll refetch to settle before screenshotting/reading (waitForResponse on the GET /api/projects response) — same source as pitfall ① of #1251.
 
-## mea 双机验收面（票面验收 1 的真机半）
+## mea dual-machine acceptance face (the real-machine half of ticket acceptance 1)
 
-票面「转后在 mea 可建卡施工（clone 臂）且本机走 localPath 加速臂」的机器半已由 F1 的 claim 载荷双臂判据钉死（daemon 双条件选源逻辑 = #1213 的 ADR 0017 既有面，本票不改）；用户实机上的 pacman 主实例转换由用户在 UI 自行执行（本 PR 合并部署后）。
+The machine half of the ticket's "after converting, cards can be built on mea (the clone arm) and this machine walks the localPath accelerator arm" is pinned by F1's dual-arm claim-payload criterion (the daemon's dual-condition source-selection logic = the existing ADR 0017 face from #1213, unchanged by this ticket); the conversion of the pacman main instance on the user's real machine is performed by the user in the UI themselves (after this PR merges and deploys).

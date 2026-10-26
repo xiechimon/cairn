@@ -1,3 +1,4 @@
+```
 # Probe dump — old baseline → new measured (#921)
 
 Run 2026-10-05T23:18:57.288Z · commit `034bf7d5` · port 8402 · playwright 1.63.0 · workers 4
@@ -71,3 +72,5 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | search-focus.spec.ts | 221 | toBeGreaterThanOrEqual | ≥ 14 | 16 | — | the caret is not clipped where it meets the input edge |
 | search-result-rows.spec.ts | 100 | toBe | rgba(0, 0, 0, 0) | {"__fn":"() => rowBg(first)"} | — | 静息无常亮;hover 哪行亮哪行,且只亮一行 |
 | search-result-rows.spec.ts | 138 | toBe | rgba(0, 0, 0, 0) | {"__fn":"() => rowBg(second)"} | — | 鼠标一动让位:键盘光标交还 hover |
+
+```

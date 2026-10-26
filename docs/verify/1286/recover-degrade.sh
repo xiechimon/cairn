@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# #1286 recover 面降级实证
-# 实物一：单测 5 失败方式全绿（真 runner 降级链）；实物二：真 pi 后端缺 .jsonl
-# → SessionNotResumableError（issue 报告的三连跪真实触发条件）。
+# #1286 recover-face degrade evidence.
+# Evidence 1: the 5 unit-test failure modes all green (real runner degrade chain);
+# evidence 2: a real pi backend missing the .jsonl triggers
+# SessionNotResumableError (the real trigger condition of the three failures in the issue report).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
