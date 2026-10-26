@@ -16,6 +16,12 @@
       "anchor": "rounded-none border-0 border-b border-border",
       "kind": "deviation",
       "reason": "ResourceRow button form (#1416): a full-width Button row inside the settings card. It draws the row divider itself because the Button's transparent border hides the card's divide-y rule (last:border-b-0 keeps the last row clean), and a divider on a rounded box would curl up at both ends, so the box stays square. The card's --radius-card corners stay the visible shape."
+    },
+    {
+      "file": "apps/web/src/board/app-sidebar.tsx",
+      "anchor": "top-0 left-0 flex h-full w-72",
+      "kind": "deviation",
+      "reason": "Phone sidebar drawer: a full-height Dialog panel pinned to the left screen edge, as on claude.ai mobile. Its top, left and bottom edges sit on the viewport edge, where rounded corners would leave slivers of the page showing, so the box stays square; the sidebar inside keeps its own surface."
     }
   ],
   "brandInkText": [

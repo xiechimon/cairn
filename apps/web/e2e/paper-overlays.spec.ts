@@ -92,7 +92,7 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
   await evidenceShot(page, 'delete-confirm-s.png');
 });
 
-test('dialog face: sheet surface, 16px corners, 16px serif title, 28px close', async ({ page }) => {
+test('dialog face: sheet surface, 16px corners, 16px sans title, 28px close', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, SECRETS, '添加密钥');
   await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f7f1e1'));

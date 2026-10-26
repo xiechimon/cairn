@@ -54,8 +54,8 @@ colors-dark:
   online-ring: '#283b29'
   project-tiles: ['#da8f72', '#9eac76', '#8ba8c6', '#cca26e', '#b19ac4', '#6eb3b2']
 typography:
-  page-title:   { fontFamily: serif, fontSize: 18px, fontWeight: '500' }
-  heading:      { fontFamily: serif, fontSize: 16px, fontWeight: '500' }
+  page-title:   { fontFamily: sans, fontSize: 18px, fontWeight: '500' }
+  heading:      { fontFamily: sans, fontSize: 16px, fontWeight: '500' }
   brand:        { fontFamily: serif, fontSize: 16px, fontWeight: '600' }
   card-title:   { fontFamily: sans, fontSize: 14px, fontWeight: '500', lineHeight: '1.5' }
   ui:           { fontFamily: sans, fontSize: 13.5px, fontWeight: '400' }
@@ -109,8 +109,8 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
 
 ## 字体（Hybrid）
 
-- **衬线只给标题**：页面标题（顶栏「工作台」）、列标题（待开始 / 执行中…）、侧栏品牌名。字体 `var(--font-source-serif)`，中文落到 Songti SC。
-- **其余全部无衬线**：卡片标题、导航、按钮、元信息。字体 Inter，中文落到 PingFang SC。卡片标题不用衬线：14px 宋体太细、中西混排显乱，这是定稿时否掉 Serif 方案的原因。
+- **Serif only for the brand**: the sidebar brand name and the chief panel greeting (`var(--font-source-serif)`, Chinese falls back to Songti SC). This matches claude.ai, which keeps serif for its wordmark and greeting.
+- **Everything else is sans**: page titles, task titles, column headings, dialog titles, card titles, navigation, buttons, meta. Font Inter, Chinese falls back to PingFang SC. A serif Latin title next to sans Chinese reads as two styles in one line, which is why titles are sans.
 - **六档字号**，不许出现第七档：18 页面标题 / 16 列标题与品牌 / 14 卡片标题 / 13.5 界面文字 / 12 元信息 / 11.5 徽章与分组标签。代码里用对应 Tailwind 主题键 `text-page` / `text-heading` / `text-card-title` / `text-ui` / `text-meta` / `text-caption`（标题字体 `font-heading`），不写 `text-[13px]` 这类任意值；`scripts/ui-debt-gate.mjs` D5 只许任意值总数下降。
 - **字重三档**：400 正文、500 卡片标题与激活项、600 计数徽章与品牌。不用 700。
 - 已完成任务的标题降到 400 + `ink-3`，表示「已经不需要看」。
@@ -141,7 +141,7 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
 5. **底部**：「资源」一行（技能 / MCP / 密钥 / 机器 / 模型服务折叠在里面，点击展开为缩进子列表）；用户行 = 头像 + 名字 + 第二行「● 2 台机器在线 · 执行中 N」。
 
 ### Board columns
-- Column header: status icon + serif column name + `ink-3` count; hovering the `待开始` column shows a plus on the right (new tasks land only in that column; other columns get no plus). A `rule` line sits below.
+- Column header: status icon + sans column name + `ink-3` count; hovering the `待开始` column shows a plus on the right (new tasks land only in that column; other columns get no plus). A `rule` line sits below.
 - An empty column says what is missing in one plain sentence (`还没有待开始的任务`, `没有在跑的任务`, `没有等你处理的事`, `最近 7 天还没有完成的任务`), never a bare `暂无`. The empty `待开始` column instead shows one dashed ghost card, `写下想做的事` with the `C` key cap, which opens the new-task dialog.
 - While the first board read is in flight, each column shows two skeleton cards (registry `Skeleton`) in the card shape, so the layout does not jump when data lands.
 
@@ -290,11 +290,11 @@ Cairn UI rules (source: apps/web/DESIGN.md):
 - Look: warm paper, dense, calm. Three layers: canvas #f3eee5 → sheet #fbf9f5 → white cards. Hairline rings, almost no shadow. Elevation is three tokens with the ring baked in: --e1 card/row, --e2 menu/popover, --e3 dialog/floating window. Never add a second ring or a raw shadow; --top (dark-only inset top highlight) rides e2/e3 only.
 - Dark (:root default): the same ladder, lighter with elevation: canvas #1a1612 → sheet #24201b → card #2f2a26 → popover #37322d (menus and dialogs). Ink #ece7df / #c5c0b9 / #aca7a0. Accent #f0926d with dark text on it (badge, project tiles). Running #7fb980. Only token values differ between themes.
 - One accent: terracotta (accent) only for "needs you", action links, count badges, active icons. Green (running) only for running/online. Everything else is ink greys.
-- Type: serif (--font-source-serif) only for page title, column headings, brand. Everything else sans (Inter / PingFang). Sizes only 18/16/14/13.5/12/11.5. Weights 400/500/600.
+- Type: serif (--font-source-serif) only for the brand name and the chief greeting. Everything else sans (Inter / PingFang). Sizes only 18/16/14/13.5/12/11.5. Weights 400/500/600.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
 - Every status = icon + color + label. Lucide icons, stroke 1.75.
 - Primary button = shadcn default Button in ink, 8px corners, 32px tall. Card actions = terracotta text links. No solid buttons on cards.
-- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 16px serif title + optional 12px sub-line, split footer (12px ink-3 hint left, actions right, ink primary). Menus: white, 10px corners, 4px padding, 32px rows, 13.5px text, 15px ink-3 icons, #f6f2ec hover, danger rows in destructive.
+- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 16px sans title + optional 12px sub-line, split footer (12px ink-3 hint left, actions right, ink primary). Menus: white, 10px corners, 4px padding, 32px rows, 13.5px text, 15px ink-3 icons, #f6f2ec hover, danger rows in destructive.
 - Segmented controls only from components/segmented.tsx: SegmentedTabs for view switches, SegmentedRadio for value pickers. Canvas track, white selected option with a 1px ring, inset keyboard ring. Never hand-roll role=tab/radio or restyle TabsList.
 - One card corner: --radius-card (10px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
 - Sidebar = Grouped: workspace row (16px spiral mark from logo-mark.svg in ink, serif name), New task button, Workbench / Needs me / Schedules, Projects, collapsed Resources, user row with machine status.
@@ -311,6 +311,6 @@ The application shell is edge-to-edge: the main surface has no sheet margin, rou
 
 The board top bar has no bottom rule. Its primary action is a centered new-task bar with the spiral brand mark, the translated prompt `新任务：接下来让 agent 做什么？`, and a `C` key badge. The bar opens the existing new-task surface. When attention cards exist, the `needs-you-strip` appears below it, capped at five rows. Each row exposes the task title, project and sequence metadata, the attention label, the same primary action as the task card, and an `打开` link. A last-seen summary uses `cairn.board.lastSeenAt` and only renders when completion or failure transitions occurred since that timestamp.
 
-On phones up to 640px, board columns become one vertical list, empty columns and the old empty start ghost are hidden, and horizontal board scrolling is disabled. The new-task bar is fixed above the safe-area inset at the bottom of the viewport, with the chief launcher above it. The needs-you strip remains before the board list.
+On phones up to 640px, the sidebar folds into a drawer opened by a 44px menu button at the top left (top bars reserve 52px for it; the task detail page keeps its back chevron instead). Board columns become one vertical list, empty columns and the old empty start ghost are hidden, and horizontal board scrolling is disabled. The new-task bar is fixed above the safe-area inset at the bottom of the viewport, with the chief launcher above it. The needs-you strip remains before the board list.
 
 The chief launcher in the lower-right corner sits on the card surface (`bg-card`) with body ink and the `--fab-shadow` (= `--e2`) elevation, rising to `--e3` on hover. The unread dot is a 6px `--card-button` fill inside the pill, and the pill label (`N 条新消息`, `思考中…`) uses `text-content-secondary`. No dark brand disc: the page keeps one calm surface family.
