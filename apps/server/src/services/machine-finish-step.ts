@@ -34,6 +34,7 @@ import {
   completeStep,
   enqueueStep,
   mergedPrElsewhere,
+  noteDeliveredPlanResidual,
   reportedVerdictHeads,
   toBuildRecord,
 } from './builds.js';
@@ -196,6 +197,13 @@ export async function finishStep(
           ?.teamId;
     if (found.machineId === machineId || released) {
       revokeStepGitCredential(deps, stepId);
+      if (body.status === 'failed') {
+        noteDeliveredPlanResidual(
+          deps,
+          found,
+          body.errorMessage?.trim() ? body.errorMessage : 'no reason reported',
+        );
+      }
       return;
     }
   }

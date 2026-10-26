@@ -12,6 +12,7 @@ import {
   agent as agentTable,
   build as buildTable,
   message as messageTable,
+  plan as planTable,
   provider as providerTable,
   step as stepTable,
   todo as todoTable,
@@ -575,6 +576,156 @@ describe('build step fallback report (#1492)', () => {
         .messagesOf(buildId)
         .filter((m) => m.role === 'system' && String(m.content).startsWith('构建步兜底报告'));
       expect(reports).toHaveLength(0);
+    } finally {
+      w.s.dispose();
+    }
+  });
+});
+
+const STREAM_TIMEOUT = 'stream timeout (arm=duration, cap=3600000ms)';
+
+function residualNote(stepId: string, reason: string): string {
+  return `Plan step ${stepId} reported a failure after the plan was delivered and the confirm gate was parked: ${reason}. The delivered plan and the confirm gate are unchanged.`;
+}
+
+async function deliverPlanToConfirm(
+  w: World,
+): Promise<{ buildId: string; planStepId: string; machineId: string }> {
+  const buildId = await w.startBuild(true);
+  const first = await w.claim();
+  await w.done(first.step.id, { status: 'success', sessionId: 'pi-1' });
+  const second = await w.claim();
+  await w.uploadPlan(second.step.id, GOOD_PLAN);
+  await w.done(second.step.id, { status: 'success', sessionId: 'pi-1' });
+  expect(w.todoRow().phase).toBe('confirm');
+  expect(w.todoRow().hasPlan).toBe(true);
+  const machineId = second.step.machineId;
+  if (machineId === null) throw new Error('delivered plan step has no machine');
+  return { buildId, planStepId: second.step.id, machineId };
+}
+
+function planContent(w: World, buildId: string): string {
+  return w.s.db.select().from(planTable).where(eq(planTable.buildId, buildId)).get()?.content ?? '';
+}
+
+describe('delivered plan stays parked when a residual plan segment fails', () => {
+  test('a later claimed plan step killed by the duration cap does not leave confirm', async () => {
+    const w = await setupWorld();
+    try {
+      const { buildId, machineId } = await deliverPlanToConfirm(w);
+      const before = planContent(w, buildId);
+      const residualId = 'step-residual-1745';
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: residualId,
+          buildId,
+          kind: 'plan',
+          status: 'claimed',
+          machineId,
+          sessionId: 'pi-1',
+          freshSession: false,
+          claimedAt: Date.now(),
+          createdAt: Date.now(),
+        })
+        .run();
+      await w.done(residualId, { status: 'failed', errorMessage: STREAM_TIMEOUT });
+      expect(w.todoRow().phase).toBe('confirm');
+      expect(w.todoRow().hasPlan).toBe(true);
+      expect(w.buildRow(buildId).errorMessage).toBeNull();
+      expect(planContent(w, buildId)).toBe(before);
+      expect(w.stepRow(residualId).status).toBe('failed');
+      expect(w.messagesOf(buildId).map((m) => m.content)).toContain(
+        residualNote(residualId, STREAM_TIMEOUT),
+      );
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a late failure report on the plan step that already parked the gate leaves a note', async () => {
+    const w = await setupWorld();
+    try {
+      const { buildId, planStepId } = await deliverPlanToConfirm(w);
+      const before = planContent(w, buildId);
+      await w.done(planStepId, { status: 'failed', errorMessage: STREAM_TIMEOUT });
+      await w.done(planStepId, { status: 'failed', errorMessage: STREAM_TIMEOUT });
+      expect(w.todoRow().phase).toBe('confirm');
+      expect(w.todoRow().hasPlan).toBe(true);
+      expect(w.buildRow(buildId).errorMessage).toBeNull();
+      expect(w.stepRow(planStepId).status).toBe('done');
+      expect(planContent(w, buildId)).toBe(before);
+      const notes = w
+        .messagesOf(buildId)
+        .filter((m) => m.content === residualNote(planStepId, STREAM_TIMEOUT));
+      expect(notes).toHaveLength(1);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a plan step that fails while still planning fails the card', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = await w.startBuild(true);
+      const planStep = await w.claim();
+      expect(w.todoRow().phase).toBe('planning');
+      await w.done(planStep.step.id, { status: 'failed', errorMessage: STREAM_TIMEOUT });
+      expect(w.todoRow().phase).toBe('failed');
+      expect(w.buildRow(buildId).errorMessage).toBe(STREAM_TIMEOUT);
+      expect(w.stepRow(planStep.step.id).status).toBe('failed');
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a revision plan step that fails after the gate was reopened fails the card', async () => {
+    const w = await setupWorld();
+    try {
+      const { buildId } = await deliverPlanToConfirm(w);
+      const res = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
+        body: {
+          action: 'revision',
+          side: 'plan',
+          feedback: 'Replan the verification command.',
+          clientMessageId: '3f9a0c2e-0000-4000-8000-000000001745',
+        },
+      });
+      expect(res.status).toBe(202);
+      expect(w.todoRow().phase).toBe('planning');
+      const revision = await w.claim();
+      expect(revision.step.kind).toBe('plan');
+      await w.done(revision.step.id, { status: 'failed', errorMessage: STREAM_TIMEOUT });
+      expect(w.todoRow().phase).toBe('failed');
+      expect(w.buildRow(buildId).errorMessage).toBe(STREAM_TIMEOUT);
+      expect(w.todoRow().hasPlan).toBe(true);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a build step that fails while the card is at confirm still fails the card', async () => {
+    const w = await setupWorld();
+    try {
+      const { buildId, machineId } = await deliverPlanToConfirm(w);
+      const buildStepId = 'step-build-at-confirm-1745';
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: buildStepId,
+          buildId,
+          kind: 'build',
+          status: 'claimed',
+          machineId,
+          freshSession: false,
+          claimedAt: Date.now(),
+          createdAt: Date.now(),
+        })
+        .run();
+      await w.done(buildStepId, { status: 'failed', errorMessage: STREAM_TIMEOUT });
+      expect(w.todoRow().phase).toBe('failed');
+      expect(w.buildRow(buildId).errorMessage).toBe(STREAM_TIMEOUT);
+      expect(w.stepRow(buildStepId).status).toBe('failed');
     } finally {
       w.s.dispose();
     }

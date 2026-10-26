@@ -1667,6 +1667,49 @@ function enqueueReviewRevision(
   enqueueStep(deps, args.buildId, 'plan', args.teamId, args.revisePrompt);
 }
 
+export function noteDeliveredPlanResidual(
+  deps: BuildDeps,
+  stepRow: typeof step.$inferSelect,
+  reason: string,
+): boolean {
+  if (stepRow.kind !== 'plan') return false;
+  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  if (!buildRow) return false;
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (todoRow?.phase !== 'confirm') return false;
+  const planRow = deps.db
+    .select({ id: planTable.id })
+    .from(planTable)
+    .where(eq(planTable.buildId, stepRow.buildId))
+    .get();
+  if (planRow === undefined) return false;
+  const id = `plan-residual-${stepRow.id}`;
+  const content = `Plan step ${stepRow.id} reported a failure after the plan was delivered and the confirm gate was parked: ${reason}. The delivered plan and the confirm gate are unchanged.`;
+  const createdAt = nowMs();
+  const inserted = deps.db
+    .insert(message)
+    .values({
+      id,
+      conversationId: stepRow.buildId,
+      role: 'system',
+      content,
+      createdAt,
+      actor: null,
+    })
+    .onConflictDoNothing()
+    .run();
+  if (inserted.changes > 0) {
+    deps.convHub?.publishMessage(stepRow.buildId, {
+      id,
+      role: 'system',
+      content,
+      createdAt,
+      actor: null,
+    });
+  }
+  return true;
+}
+
 export function applyStepFailure(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
@@ -1683,6 +1726,15 @@ export function applyStepFailure(
     .run();
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
+  if (
+    noteDeliveredPlanResidual(
+      deps,
+      stepRow,
+      rawErrorMessage.trim() === '' ? 'no reason reported' : rawErrorMessage,
+    )
+  ) {
+    return;
+  }
   db.update(build).set({ errorMessage }).where(eq(build.id, buildRow.id)).run();
   if (stepRow.kind === 'build') {
     const changes = buildRow.changes;
