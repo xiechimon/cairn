@@ -212,7 +212,6 @@ export const EN: Record<string, string> = {
   由定时发起: 'Started by schedule',
   收起: 'Collapse',
   // #933: the collapsed tool group's identity label (transcript action row).
-  工具过程: 'Tool process',
   尚无描述: 'No description yet',
   '{y}年{mo}月{d}日 {hh}:{mm} 创建': 'Created {monthShort} {d}, {y} {hh}:{mm}',
 
@@ -712,7 +711,6 @@ export const EN: Record<string, string> = {
   '挡下：{n}': 'Blocked: {n}',
   // #1106 dispatch skill injection: detail-face lookup row (reasons ride as
   // server data, not t() keys — same law as note #634).
-  '注入技能：': 'Injected skills: ',
   '未注入技能（任务文本未命中任何技能）': 'No skills injected (task text matched none)',
   // #1288：模型活性标注——dead 模型置灰 +「已下架」（不隐藏）。
   已下架: 'Delisted',
