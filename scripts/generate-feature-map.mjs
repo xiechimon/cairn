@@ -40,6 +40,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { loadRepoEvalCoverage, renderEvalCoverage } from './eval-coverage.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const DOC_NAME = 'feature-map.md';
@@ -273,6 +274,18 @@ if (mode !== undefined && mode !== '--check') {
   fail(`unknown argument "${mode}" (usage: generate-feature-map.mjs [--check])`);
 }
 const checkOnly = mode === '--check';
+
+let coverage;
+try {
+  coverage = loadRepoEvalCoverage(REPO_ROOT);
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
+}
+if (coverage.unlisted.length > 0) {
+  fail(
+    `hillclimb flow ${coverage.unlisted.map((name) => `"${name}"`).join(', ')} has no capability row`,
+  );
+}
 
 const specRefs = collectSpecRefs();
 const { numeric: verifyNumeric, other: verifyOther } = collectVerifyDirs();
@@ -585,6 +598,8 @@ if (verifyOther.size === 0) {
     out.push(`| ${cell(name)} | \`${anchor}\` |`);
   }
 }
+out.push('');
+out.push(renderEvalCoverage(coverage.rows, repo).trimEnd());
 out.push('');
 
 const content = out.join('\n');

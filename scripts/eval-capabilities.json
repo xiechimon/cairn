@@ -1,0 +1,37 @@
+[
+  {
+    "capability": "dispatch",
+    "flow": "chief-dispatch"
+  },
+  {
+    "capability": "memory use",
+    "flow": "memory-regression"
+  },
+  {
+    "capability": "learn from correction",
+    "flow": "learn"
+  },
+  {
+    "capability": "review",
+    "ticket": 1779
+  },
+  {
+    "capability": "planning",
+    "ticket": 1780
+  },
+  {
+    "capability": "coding"
+  },
+  {
+    "capability": "machine claim",
+    "testsOnly": true
+  },
+  {
+    "capability": "intake",
+    "testsOnly": true
+  },
+  {
+    "capability": "merge gate rules",
+    "testsOnly": true
+  }
+]
