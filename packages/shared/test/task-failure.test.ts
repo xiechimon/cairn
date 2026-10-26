@@ -4,6 +4,7 @@ import {
   classifyAgentFailure,
   classifyStepFailure,
   isProviderAuthFailure,
+  isProviderOutage,
   parseRetryAfterMs,
   STEP_FAILURE_KINDS,
 } from '../src/task-failure.js';
@@ -97,6 +98,15 @@ describe('classifyStepFailure (#1257 three-bucket classification)', () => {
       'network',
       'other',
     ]);
+  });
+});
+
+describe('isProviderOutage (#1786 provider 5xx and exhaustion)', () => {
+  test('503 exhausted and bare 5xx codes trigger fallback', () => {
+    expect(isProviderOutage('503 All available accounts exhausted')).toBe(true);
+    expect(isProviderOutage('upstream error: HTTP 502 Bad Gateway')).toBe(true);
+    expect(isProviderOutage('')).toBe(false);
+    expect(isProviderOutage('429 rate limited')).toBe(false);
   });
 });
 

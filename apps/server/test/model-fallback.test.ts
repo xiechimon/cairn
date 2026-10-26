@@ -296,18 +296,113 @@ describe('model fallback chain (#1493)', () => {
     expect(row.fallback).toBeNull();
   });
 
-  test('X5: rate limit (capacity) does not switch models', async () => {
+  test('a step whose first model answers 503 exhausted continues on the fallback model and succeeds', async () => {
     const w = await setupWorld();
-    await startBuild(w);
-    const c = await claim(w);
-    await done(w, c.stepId, {
+    const buildId = await startBuild(w);
+    const first = await claim(w);
+    expect(first.provider).toBe('relay-a');
+    expect(first.modelId).toBe('model-a');
+    await done(w, first.stepId, {
+      status: 'failed',
+      errorMessage: '503 All available accounts exhausted',
+      sessionId: 'sess-relay-a',
+    });
+
+    const switched = stepRow(w, first.stepId);
+    expect(switched.status).toBe('pending');
+    expect(switched.fallback?.model).toEqual({ provider: 'relay-b', modelId: 'model-b' });
+    const again = await claim(w);
+    expect(again.stepId).toBe(first.stepId);
+    expect(again.provider).toBe('relay-b');
+    expect(again.modelId).toBe('model-b');
+    expect(again.session.action).toBe('new');
+    await done(w, again.stepId, {
+      status: 'success',
+      sessionId: 'sess-relay-b',
+      usage: [{ model: 'relay-b/model-b', input: 8, output: 3, cacheRead: 0, cacheWrite: 0 }],
+    });
+
+    expect(stepRow(w, first.stepId).status).toBe('done');
+    const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
+    expect(buildRow.errorMessage).toBeNull();
+    const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
+    expect(todoRow.phase).toBe('review');
+  });
+
+  test('a rate-limited first model continues on the fallback model and succeeds', async () => {
+    const w = await setupWorld();
+    const buildId = await startBuild(w);
+    const first = await claim(w);
+    await done(w, first.stepId, {
       status: 'failed',
       errorMessage: '429 rate limited',
       quotaBlock: { kind: 'capacity', providerId: 'relay-a', reason: '429 rate limited' },
     });
-    const row = stepRow(w, c.stepId);
+    const switched = stepRow(w, first.stepId);
+    expect(switched.status).toBe('pending');
+    expect(switched.fallback?.model).toEqual({ provider: 'relay-b', modelId: 'model-b' });
+    const again = await claim(w);
+    expect(again.provider).toBe('relay-b');
+    await done(w, again.stepId, {
+      status: 'success',
+      usage: [{ model: 'relay-b/model-b', input: 4, output: 2, cacheRead: 0, cacheWrite: 0 }],
+    });
+    expect(stepRow(w, first.stepId).status).toBe('done');
+    const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
+    expect(buildRow.errorMessage).toBeNull();
+  });
+
+  test('503 exhausted with no fallback left fails the step', async () => {
+    const w = await setupWorld([{ provider: 'relay-b', modelId: 'model-b' }]);
+    await startBuild(w);
+    const first = await claim(w);
+    await done(w, first.stepId, {
+      status: 'failed',
+      errorMessage: '503 All available accounts exhausted',
+    });
+    expect(stepRow(w, first.stepId).status).toBe('pending');
+    const second = await claim(w);
+    expect(second.provider).toBe('relay-b');
+    await done(w, second.stepId, {
+      status: 'failed',
+      errorMessage: '503 All available accounts exhausted',
+    });
+    const row = stepRow(w, first.stepId);
+    expect(row.status).toBe('failed');
+    expect(row.fallback?.model).toEqual({ provider: 'relay-b', modelId: 'model-b' });
+  });
+
+  test('X5: rate limit with no fallbacks still waits, and an exhausted chain waits on the last model', async () => {
+    const bare = await setupWorld(null);
+    await startBuild(bare);
+    const only = await claim(bare);
+    await done(bare, only.stepId, {
+      status: 'failed',
+      errorMessage: '429 rate limited',
+      quotaBlock: { kind: 'capacity', providerId: 'relay-a', reason: '429 rate limited' },
+    });
+    const held = stepRow(bare, only.stepId);
+    expect(held.status).toBe('waiting_quota');
+    expect(held.fallback).toBeNull();
+
+    const w = await setupWorld([{ provider: 'relay-b', modelId: 'model-b' }]);
+    await startBuild(w);
+    const first = await claim(w);
+    await done(w, first.stepId, {
+      status: 'failed',
+      errorMessage: '429 rate limited',
+      quotaBlock: { kind: 'capacity', providerId: 'relay-a', reason: '429 rate limited' },
+    });
+    const second = await claim(w);
+    expect(second.provider).toBe('relay-b');
+    await done(w, second.stepId, {
+      status: 'failed',
+      errorMessage: '429 rate limited',
+      quotaBlock: { kind: 'capacity', providerId: 'relay-b', reason: '429 rate limited' },
+    });
+    const row = stepRow(w, first.stepId);
     expect(row.status).toBe('waiting_quota');
-    expect(row.fallback).toBeNull();
+    expect(row.fallback?.model).toEqual({ provider: 'relay-b', modelId: 'model-b' });
   });
 
   test('X7: an open provider is not chosen as fallback', async () => {

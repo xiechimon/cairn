@@ -8,8 +8,10 @@ import { describe, expect, test, vi } from 'vitest';
 import {
   type GitFallbackReason,
   gitCredentialEnv,
+  GIT_NET_RETRY_DELAYS_MS,
   gitPrim,
   isGitAuthFailure,
+  isGitTransientNetFailure,
   machineGitEnv,
   runGit,
   runGitOk,
@@ -508,6 +510,23 @@ describe('isGitAuthFailure — auth-failure detection (fallback trigger)', () =>
   });
 });
 
+describe('isGitTransientNetFailure — retry only connection loss and timeouts (#1786)', () => {
+  test('transient git network errors', () => {
+    expect(isGitTransientNetFailure('Recv failure: Connection reset by peer')).toBe(true);
+    expect(
+      isGitTransientNetFailure(
+        'fatal: unable to access: Failed to connect to github.com port 443: Connection refused',
+      ),
+    ).toBe(true);
+    expect(isGitTransientNetFailure('git fetch timed out after 480000ms')).toBe(true);
+  });
+
+  test('non-transient git errors', () => {
+    expect(isGitTransientNetFailure('push failed (128): bad object')).toBe(false);
+    expect(isGitTransientNetFailure('merge conflict against origin/main (aborted)')).toBe(false);
+  });
+});
+
 describe('withGitNetRetries — deterministic auth-failure short circuit (#1225: 401 retries never flip red)', () => {
   test('auth failures do not burn the retry budget (throw on first occurrence)', async () => {
     const op = vi.fn(async () => {
@@ -527,6 +546,47 @@ describe('withGitNetRetries — deterministic auth-failure short circuit (#1225:
     });
     await expect(withGitNetRetries(op)).resolves.toBeUndefined();
     expect(op).toHaveBeenCalledTimes(3);
+  });
+
+  test('a push that fails twice with connection reset and then succeeds does not throw', async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const pending = withGitNetRetries(async () => {
+        calls += 1;
+        if (calls < 3) throw new Error('Recv failure: Connection reset by peer');
+      });
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toBeUndefined();
+      expect(calls).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('a connection reset retries through 2s, 4s, 8s and 16s, and the fifth attempt can succeed', async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const pending = withGitNetRetries(async () => {
+        calls += 1;
+        if (calls < 5) throw new Error('Recv failure: Connection reset by peer');
+      });
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toBeUndefined();
+      expect(calls).toBe(5);
+      expect([...GIT_NET_RETRY_DELAYS_MS]).toEqual([2_000, 4_000, 8_000, 16_000]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('a non-transient git error is not retried', async () => {
+    const op = vi.fn(async () => {
+      throw new Error('push failed (128): bad object');
+    });
+    await expect(withGitNetRetries(op)).rejects.toThrow('bad object');
+    expect(op).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -106,6 +106,14 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
 }
 
 const httpAuthCodeRe = digitBounded('401');
+const httpServerErrorRe = digitBounded('5\\d\\d');
+
+export function isProviderOutage(rawError: string): boolean {
+  const lower = rawError.trim().toLowerCase();
+  if (lower === '') return false;
+  if (lower.includes('exhausted')) return true;
+  return httpServerErrorRe.test(lower);
+}
 
 export function isProviderAuthFailure(rawError: string): boolean {
   const lower = rawError.trim().toLowerCase();

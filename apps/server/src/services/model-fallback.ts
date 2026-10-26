@@ -1,6 +1,7 @@
 import {
   classifyStepFailure,
   isProviderAuthFailure,
+  isProviderOutage,
   type MachineDoneBody,
   type ModelRef,
   type StepKind,
@@ -17,12 +18,19 @@ type StepRow = typeof step.$inferSelect;
 
 export const FALLBACK_STEP_KINDS: readonly StepKind[] = ['plan', 'build'];
 
-export type FallbackTrigger = 'quota' | 'model_unavailable' | 'auth';
+export type FallbackTrigger =
+  | 'quota'
+  | 'model_unavailable'
+  | 'auth'
+  | 'capacity'
+  | 'provider_outage';
 
 const TRIGGER_TEXT: Record<FallbackTrigger, string> = {
   quota: '额度用完',
   model_unavailable: '模型不可用',
   auth: '认证失败',
+  capacity: '限流',
+  provider_outage: '服务暂时不可用',
 };
 
 export function modelKey(m: ModelRef): string {
@@ -38,12 +46,16 @@ export function effectiveModel(
 
 export function fallbackTriggerOf(outcome: MachineDoneBody): FallbackTrigger | null {
   if (outcome.status !== 'failed') return null;
-  if (outcome.quotaBlock !== undefined) return outcome.quotaBlock.kind === 'quota' ? 'quota' : null;
+  if (outcome.quotaBlock !== undefined) {
+    return outcome.quotaBlock.kind === 'quota' ? 'quota' : 'capacity';
+  }
   const msg = outcome.errorMessage ?? '';
   const kind = classifyStepFailure(msg);
   if (kind === 'quota') return 'quota';
   if (kind === 'model_unavailable') return 'model_unavailable';
+  if (kind === 'capacity') return 'capacity';
   if (kind === 'other' && isProviderAuthFailure(msg)) return 'auth';
+  if (isProviderOutage(msg)) return 'provider_outage';
   return null;
 }
 
@@ -53,7 +65,9 @@ export function isProviderFailure(outcome: MachineDoneBody): boolean {
   const msg = outcome.errorMessage ?? '';
   const kind = classifyStepFailure(msg);
   return (
-    kind === 'quota' || kind === 'capacity' || (kind === 'other' && isProviderAuthFailure(msg))
+    kind === 'quota' ||
+    kind === 'capacity' ||
+    (kind === 'other' && (isProviderAuthFailure(msg) || isProviderOutage(msg)))
   );
 }
 
