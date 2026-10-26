@@ -1,34 +1,45 @@
 #!/usr/bin/env node
-// verify probe — #1009 A1 原型（chat 原语装件：chief 消息流换装 shadcn
-// MessageScroller / Message / Bubble / Marker 五件）的位形 smoke + 交互契约钉
-// （fixture 面）。
+// verify probe — configuration smoke + interaction-contract pins for the
+// #1009 A1 prototype (chat-primitive fitting: the chief message stream refitted
+// with the shadcn MessageScroller / Message / Bubble / Marker five-piece set),
+// fixture face.
 //
-// 跑法（fixture 栈先在跑）：
+// How to run (fixture stack must already be up):
 //   cd apps/web && pnpm exec vite build --mode fixture
 //   pnpm exec vite preview --host 127.0.0.1 --port ${E2E_PORT:-8403} --strictPort &
 //   E2E_PORT=8403 node docs/verify/1009/drive-1009-a1-smoke.mjs
 //
-// 失败方式先行清单（A1 面枚举，每条一个断言组）：
-//  F1 结构翻面破载体：chief-body/chief-stream testid 必须随迁到原语
-//     Viewport/Content（overflowY auto 面 = F-R6/R8 pin 的载体）→ S1
-//  F2 中和失效：Item 的 [content-visibility:auto] 未钉回 visible（离屏行
-//     跳布局，探针/e2e 随滚动相位漂）、Content 未翻 block+gap-0（行距
-//     双倍）→ S2
-//  F3 Bubble 皮失控：user 行必须落 --secondary 槽（原 BUBBLE_CLS 等值）、
-//     零边框（F-R16 44px 药丸 canon）、14px/24px 节奏；robot 行 ghost 档
-//     裸文本（bg transparent、零 padding）→ S3
-//  F4 Marker 面漂移：note 行居中 12px、机器名下划线保留 → S4
-//  F5 hero/gate 迁出滚动区破面：111 面 examples 在位、流零行、composer
-//     草稿面 #860 grow 律（120px 顶格，XMON-102 固定轨已被 #860 取代）→ S5
-//  F6 滚动律回归：打开落底（defaultScrollPosition=end）→ S6；jump-to-
-//     latest 上翻浮出/点击落底/落底退场（#991 Q6 随原语带入）→ S7；
-//     最小化重开落底（display:none 丢滚动位——判据翻面留 HITL 裁决）→ S8
-//  F7 行载体守恒：chief-msg 联合选择器计数、chief-msg-col/foot/tools、
-//     复制/恢复钮 aria 面原样（重钉账的「行为语义不动」判据）→ S9
-//  F8 id 贯通面：fixture 捕获形无源 message id → Item 不带 messageId
-//     （live 面 id pin 归 e2e live-mock，F-R21/#742 面）→ S10
+// Failure-mode-first list (A1 face enumeration, one assertion group per line):
+//  F1 structural flip breaks the carrier: chief-body/chief-stream testids must
+//     move with the primitives to Viewport/Content (the overflowY:auto face =
+//     the carrier pinned by F-R6/R8) → S1
+//  F2 neutralization failure: Item's [content-visibility:auto] not pinned back
+//     to visible (off-screen rows skip layout, probe/e2e drifts with scroll
+//     phase), Content not flipped to block+gap-0 (double row spacing) → S2
+//  F3 Bubble skin out of control: user rows must land on the --secondary slot
+//     (equal to the old BUBBLE_CLS), zero border (F-R16 44px pill canon),
+//     14px/24px rhythm; robot rows ghost-tier bare text (bg transparent, zero
+//     padding) → S3
+//  F4 Marker face drift: note rows centered 12px, machine-name underline
+//     retained → S4
+//  F5 hero/gate moved out of the scroll area breaking the face: the 111 face
+//     keeps examples in place with zero stream rows, composer draft face #860
+//     grow law (120px cap, the XMON-102 fixed track already superseded by #860)
+//     → S5
+//  F6 scroll-law regressions: opening lands at the bottom
+//     (defaultScrollPosition=end) → S6; jump-to-latest float-on-upscroll /
+//     click-to-bottom / hide-at-bottom (#991 Q6 carried in with the primitives)
+//     → S7; reopen lands at the bottom (display:none loses the scroll position
+//     — the criterion inverts, left to a HITL ruling) → S8
+//  F7 row-carrier conservation: chief-msg union-selector counts, chief-msg-col/
+//     foot/tools, copy/restore button aria faces unchanged (the "behavior
+//     semantics do not move" criterion of the re-pin ledger) → S9
+//  F8 id-through face: the fixture capture shape has source-less message ids →
+//     Item carries no messageId (the live-face id pin belongs to e2e live-mock,
+//     the F-R21/#742 face) → S10
 //
-// 证据落本目录：a1-*.png + result-a1-fixture-smoke.json（量测原值，人审面）。
+// Evidence lands in this directory: a1-*.png + result-a1-fixture-smoke.json
+// (measured raw values, human-review face).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -65,7 +76,7 @@ async function shot(page, file) {
 const drawer = (page) => page.locator('.chief-drawer');
 const body = (page) => page.getByTestId('chief-body');
 
-/** 进场 fade+scale 落定谓词（ADR 0013 D7；A0 同款）——几何采样前置。 */
+/** Entry fade+scale settled predicate (ADR 0013 D7; same as A0) — prerequisite for geometry sampling. */
 async function settled(page) {
   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 }
@@ -74,7 +85,7 @@ mkdirSync(SCRIPT_DIR, { recursive: true });
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: VIEWPORT });
 
-// ——— S1/S2/S3/S4/S9/S10：线程捕获面（scenario 114，2 msg + 2 note）———
+// ——— S1/S2/S3/S4/S9/S10: thread capture face (scenario 114, 2 msg + 2 note) ———
 await page.goto(`${BASE}/app?scenario=114`);
 await settled(page);
 check('S1 结构', 'scroller 四件套 data-slot 在位', await page.evaluate(() => ({
@@ -128,7 +139,7 @@ const bubbleFaces = await page.evaluate(() => {
   };
 });
 check('S3 Bubble 皮', 'user 行底 = --secondary 槽（原 BUBBLE_CLS 等值）', bubbleFaces.userBg, (v) => {
-  // rgb 归一后与 token 对（token 是 hex）
+  // normalize rgb and compare against the token pair (the token is hex)
   const hex = bubbleFaces.token;
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   if (!m) return false;
@@ -183,10 +194,13 @@ check(
 );
 await shot(page, 'a1-01-thread-114.png');
 
-// ——— S6 打开落底 + S7 jump-to-latest + S8 D6 滚动保留 ———
-// 载体面 = chief-md（溢出 117px）：114 面只溢 19px < scrollEdgeThreshold 80，
-// 「近底」判定恒成立、jump 钮永不 active（阈值律使然，不是断链）——jump 面
-// 必须用溢出超阈值的面取证。dicebear 桩同 e2e 配方（外网防悬置）。
+// ——— S6 open-lands-at-bottom + S7 jump-to-latest + S8 D6 scroll retention ———
+// Carrier face = chief-md (overflows by 117px): the 114 face overflows only
+// 19px < scrollEdgeThreshold 80, the "near bottom" judgment always holds and the
+// jump button is never active (the threshold law at work, not a broken link) —
+// the jump face must be evidenced on a face whose overflow exceeds the
+// threshold. The dicebear stub follows the e2e recipe (guard against external
+// network hangs).
 await page.route('**/api.dicebear.com/**', (route) =>
   route.fulfill({
     contentType: 'image/svg+xml',
@@ -226,17 +240,20 @@ await page.getByRole('button', { name: '最小化' }).click();
 await page.waitForTimeout(600);
 await page.keyboard.press('Meta+j');
 await settled(page);
-// S8 判据翻面（A1 实测裁决点）：Base UI keepMounted 关态 = hidden 属性 =
-// display:none——浏览器丢弃滚动位置，D6「滚动存活」在最小化面物理不可达
-// （A0 期同样如此，只是当时未取证到这一面；Multica 原形态是 opacity+
-// inert 常驻不 display:none，滚动才真保）。A1 的 provider 在重开时按
-// defaultScrollPosition=end 落底 = chat 面通行律（与旧 dock 时代「打开
-// 落底」行为一致）——本检查钉这个事实判据；「重开落底 vs 真滚动保留
-// （需换 inert 常驻载体）」留 HITL 实审裁决。
+// S8 criterion inversion (the A1 measured ruling point): Base UI keepMounted's
+// closed state = the hidden attribute = display:none — the browser discards the
+// scroll position, so D6's "scroll survival" is physically unreachable on the
+// minimize face (same in the A0 period, just not evidenced then; the Multica
+// original shape is opacity + resident inert without display:none, which is what
+// truly preserves scroll). The A1 provider lands at
+// defaultScrollPosition=end on reopen = the chat-face universal law (consistent
+// with the old dock era's "open lands at bottom" behavior) — this check pins
+// that factual criterion; "reopen-lands-at-bottom vs true scroll retention
+// (needs a resident-inert carrier swap)" is left to a HITL live ruling.
 check('S8 重开落底', '最小化重开 = 落底看最新（chat 通行律；滚动位随 display:none 丢弃）', await atBottom(), true);
 await shot(page, 'a1-03-reopen-bottom.png');
 
-// ——— S5：hero 面（111）———
+// ——— S5: hero face (111) ———
 await page.goto(`${BASE}/app?scenario=111`);
 await settled(page);
 check('S5 hero', 'examples 在位、流零行', await page.evaluate(() => ({
@@ -253,9 +270,11 @@ check(
   { h: '120px', ov: 'auto' },
 );
 await shot(page, 'a1-04-hero-111.png');
-// S5b：空 composer 面（114）= 基座轨实测值——两条 check 的读数即 XMON-102
-// 重钉（grow 语义）的钉扎值来源（实审裁决 3：「截图上是多少就钉多少」，
-// spec 注释引用本 json 的 S5/S5b 行 + a1-04/a1-01 截图）。
+// S5b: the empty-composer face (114) = the base-track measured values — the
+// readings of these two checks are the source of the pinned values for the
+// XMON-102 re-pin (grow semantics) (live-review ruling 3: "pin whatever the
+// screenshot shows"; the spec comment references the S5/S5b rows of this json
+// + the a1-04/a1-01 screenshots).
 await page.goto(`${BASE}/app?scenario=114`);
 await settled(page);
 check(

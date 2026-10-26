@@ -231,6 +231,9 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     );
     expect(prompt).toContain('优先文档 Agent');
     expect(prompt).toContain('agents:');
+    expect(prompt).toContain('autonomous');
+    expect(prompt).toContain('ADR 0026');
+    expect(prompt).not.toContain('合并（merge）动作只由人触发');
     expect(prompt).toContain('措辞→spec');
   });
 

@@ -4,47 +4,47 @@ direction: Paper Dense · Grouped sidebar · Hybrid type
 reference: docs/board-paper-r5.html?v=3
 reference-dark: docs/board-paper-dark.html
 colors:
-  # 亮色为基准主题（定稿值）；暗色值在 colors-dark，规则见「暗色」一节
-  canvas: '#f3eee5'        # 应用底色：侧栏与主面板之外的纸面
-  sheet: '#fbf9f5'         # 主面板（圆角纸张）
-  card: '#ffffff'          # 任务卡
-  hover: '#ebe4d8'         # 侧栏行 hover
-  line: '#ece5da'          # 卡片发丝环
-  rule: '#e6dfd2'          # 列标题下划线
-  divider: '#eee7dc'       # 顶栏下边线
-  ink: '#2b2620'           # 标题、正文、主按钮底
-  ink-2: '#5e564d'         # 次级文字（导航、按钮、说明）
-  ink-3: '#746a5f'         # 元信息（项目、时间、计数）
-  ink-4: '#b0a597'         # 仅装饰图标，不用于文字
-  icon: '#9a9086'          # 带文字标签的图标（侧栏导航、列标题）
-  accent: '#b4532a'        # 赭红：需要你处理、操作链接、计数徽章、激活图标
-  accent-hover: '#f6ebe3'  # 操作链接 hover 底
-  menu-hover: '#f6f2ec'    # 菜单行 hover 底
-  backdrop: 'rgba(43, 38, 32, 0.14)'  # 弹窗背板（浅墨 dim，无 blur）
-  running: '#5f8f5a'       # 执行中图标、在线点
-  running-text: '#4f7049'  # 执行中说明文字
+  # Light is the baseline theme (final values); dark values live in colors-dark, rules in the "Dark" section
+  canvas: '#f3eee5'        # app background: the paper outside the sidebar and main panel
+  sheet: '#fbf9f5'         # main panel (rounded paper)
+  card: '#ffffff'          # task card
+  hover: '#ebe4d8'         # sidebar row hover
+  line: '#ece5da'          # card hairline ring
+  rule: '#e6dfd2'          # column heading underline
+  divider: '#eee7dc'       # topbar bottom border
+  ink: '#2b2620'           # headings, body text, primary button background
+  ink-2: '#5e564d'         # secondary text (nav, buttons, descriptions)
+  ink-3: '#746a5f'         # meta information (project, time, counts)
+  ink-4: '#b0a597'         # decorative icons only, never text
+  icon: '#9a9086'          # icons with a text label (sidebar nav, column headings)
+  accent: '#b4532a'        # terracotta: needs-your-attention, action links, count badges, active icons
+  accent-hover: '#f6ebe3'  # action link hover background
+  menu-hover: '#f6f2ec'    # menu row hover background
+  backdrop: 'rgba(43, 38, 32, 0.14)'  # dialog backdrop (light-ink dim, no blur)
+  running: '#5f8f5a'       # running icon, online dot
+  running-text: '#4f7049'  # running description text
   running-bar: '#7ea476'
   running-track: '#ebe5da'
   online-ring: '#dfe9da'
   project-tiles: ['#c06a43', '#7d8b5a', '#6b7a8f', '#a0784a', '#8a6a9a', '#4f8a8b']
 colors-dark:
-  # 暗色（:root 默认）：同一阶梯的暖深纸面，海拔越高越亮；实测表 docs/verify/1396/contrast.txt
+  # Dark (:root default): the same ladder as warm deep paper, brighter with elevation; measurements in docs/verify/1396/contrast.txt
   canvas: '#1a1612'
   sheet: '#24201b'
   card: '#2f2a26'
-  popover: '#37322d'       # 菜单与弹窗：卡片之上再亮一档（亮色里 popover 与 card 同为白）
-  hover: 'rgb(255 252 248 / 0.05)'  # 侧栏行 hover：暖白 5% 盖在 canvas 上
-  line: '#3e3a34'          # 发丝环、列标题下划线、顶栏下边线同一条
+  popover: '#37322d'       # menus and dialogs: one more step brighter than the card (in light, popover and card are both white)
+  hover: 'rgb(255 252 248 / 0.05)'  # sidebar row hover: warm white at 5% over canvas
+  line: '#3e3a34'          # hairline ring, column heading underline, and topbar bottom border are the same line
   rule: '#3e3a34'
   divider: '#3e3a34'
   ink: '#ece7df'
   ink-2: '#c5c0b9'
   ink-3: '#aca7a0'
-  ink-4: '#7a756f'         # 仅装饰图标，不用于文字
+  ink-4: '#7a756f'         # decorative icons only, never text
   icon: '#908b85'
-  accent: '#f0926d'        # 赭红提亮；其上的字是 on-accent 深墨，不是白
+  accent: '#f0926d'        # terracotta brightened; text on it is the on-accent deep ink, not white
   on-accent: '#1a1612'
-  accent-hover: '#46362f'  # 赭红 12% 染进卡底
+  accent-hover: '#46362f'  # terracotta at 12% dyed into the card background
   menu-hover: '#403b36'
   backdrop: 'rgba(0, 0, 0, 0.45)'
   running: '#7fb980'
@@ -54,8 +54,8 @@ colors-dark:
   online-ring: '#283b29'
   project-tiles: ['#da8f72', '#9eac76', '#8ba8c6', '#cca26e', '#b19ac4', '#6eb3b2']
 typography:
-  page-title:   { fontFamily: serif, fontSize: 18px, fontWeight: '500' }
-  heading:      { fontFamily: serif, fontSize: 16px, fontWeight: '500' }
+  page-title:   { fontFamily: sans, fontSize: 18px, fontWeight: '500' }
+  heading:      { fontFamily: sans, fontSize: 16px, fontWeight: '500' }
   brand:        { fontFamily: serif, fontSize: 16px, fontWeight: '600' }
   card-title:   { fontFamily: sans, fontSize: 14px, fontWeight: '500', lineHeight: '1.5' }
   ui:           { fontFamily: sans, fontSize: 13.5px, fontWeight: '400' }
@@ -69,8 +69,8 @@ fonts:
 rounded:
   tile: 5px
   control: 8px
-  card: 10px         # --radius-card：所有卡片类表面同一个角
-  menu: 10px         # --radius-popover：菜单、弹层、下拉
+  card: 10px         # --radius-card: one corner for every card-like surface
+  menu: 10px         # --radius-popover: menus, floating surfaces, dropdowns
   sheet: 16px
   full: 9999px
 spacing:
@@ -87,61 +87,61 @@ spacing:
   menu-row-height: 32px
 ---
 
-## 方向
+## Direction
 
-cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，每天打开看板几十次，核心问题是「哪些事等我处理」。
+Cairn is an orchestration board for multi-lane coding agents. The user is a keyboard-first engineer who opens the board dozens of times a day; the core question is "what is waiting for me".
 
-定稿方向：**纸面、紧凑、一个强调色**。暖白纸面分三层（canvas 底 → sheet 主面板 → 白色卡片），层级靠底色深浅加发丝环，不靠重阴影。彩色只有两个：赭红 `accent` 表示「需要你」与可操作，绿色 `running` 表示「正在跑」。其余一律墨色阶梯。
+Final direction: **paper, dense, one accent color**. The warm white paper splits into three layers (canvas base → sheet main panel → white cards); hierarchy comes from background depth plus hairline rings, not heavy shadows. There are only two colors: terracotta `accent` means "needs you" and is actionable; green `running` means "running". Everything else is the ink ladder.
 
-参考 mockup：[`docs/board-paper-r5.html`](docs/board-paper-r5.html)，浏览器打开后按 `3` 切到定稿的 Hybrid 版（静态 HTML，数字键 1–4 切换对比稿）。mockup 与本文件不一致时以本文件为准。
+Reference mockup: [`docs/board-paper-r5.html`](docs/board-paper-r5.html); open it in a browser and press `3` to switch to the final Hybrid version (static HTML; number keys 1–4 switch between comparison drafts). When the mockup and this file disagree, this file wins.
 
-## 颜色
+## Colors
 
-- **三层纸面**：`canvas`（应用底，侧栏直接坐在上面）→ `sheet`（主面板，16px 圆角 + `line` 1px 描边）→ `card`（纯白任务卡）。
-- **描边一律 1 个 CSS 像素**：主面板、任务卡、激活导航项、新任务按钮在高分屏上也是 1px（不跟 `--hairline` 降到 0.5px），描边要看得清。
-- **投影三档梯**（`tokens.css`，#1428）：`--e1` 卡与行、`--e2` 菜单与弹层、`--e3` 对话框与浮窗。每档末尾自带 1px 环（亮色三档都是 `line`；暗色 e2/e3 用 `--ring-inset-highlight`，`line` 在弹层底上看不见），面上不再另画描边；自己画 `--edge-ring` 的面（通知条、总管窗、FAB）取同档的池 `--cds-shadow-sm` / `-md` / `-lg`，一条边只有一个环。`--panel-shadow` / `--shadow-popover` / `--dialog-shadow` 这些旧槽名是别名；hover / focus 槽是状态，不是档。
-- **墨色四级**：`ink` 标题与正文；`ink-2` 导航、按钮、说明；`ink-3` 元信息；`ink-4` 只给装饰图标。文字最浅用到 `ink-3`。
-- **对比度（实测，WCAG 2.x）**：`ink` 在卡片 14.99、`ink-2` 7.21、`ink-3` 5.29、`accent` 4.99、`running-text` 5.61；`ink-3` 在 canvas 4.58。白字在 `accent` 底 4.99。`ink-4` 只有 2.42，所以不许当文字色。`ink-3` 在 `--secondary`（亮模 `#ebe4d8`，与 shadcn 面变量 `--muted`、`--accent` 同值，后者不是品牌色 `accent`；输入框卡、diff 区块头、工具调用 pill 这类二级底）上只有 4.19，那里的文字最浅用 `ink-2`（5.7）（#1442，`e2e/a11y-axe.spec.ts` 守着；axe 不查原生 `::placeholder`，输入框占位字只靠这条）。
-- **强调色纪律**：`accent` 只用于：需要你处理的状态与计数、卡片上的操作链接、激活导航项的图标、计数徽章底色。不做装饰、不做大面积底色。
-- **状态不只靠颜色**：每个状态都是「图标 + 颜色 + 文字」三件套（失败 ⊗ 失败 / 待确认 ☰ 待确认 / 待审阅 ⑂ 待审阅），色弱用户靠图标和文字也能分辨。
-- **主按钮是墨色，不是彩色**：shadcn Button default 档，`ink` 底 + `sheet` 字，8px 圆角（`control`）。赭红不做主按钮底色。
-- 颜色只住在 token 文件（`src/styles/shadcn.css` / `tokens.css`），组件里写 token 名，不写 hex（`scripts/ui-drift-gate.mjs` G2 已经钉住）。
+- **Three paper layers**: `canvas` (app background; the sidebar sits directly on it) → `sheet` (main panel, 16px radius + `line` 1px border) → `card` (pure-white task card).
+- **Borders are always 1 CSS pixel**: the main panel, task cards, the active nav item, and the new-task button stay 1px on high-density screens too (they do not follow `--hairline` down to 0.5px); borders must be visible.
+- **Three-tier shadow ladder** (`tokens.css`, #1428): `--e1` cards and rows, `--e2` menus and floating surfaces, `--e3` dialogs and floating windows. Each tier carries its own 1px ring at the end (in light all three use `line`; in dark, e2/e3 use `--ring-inset-highlight`, where `line` is invisible on the surface base), and no extra border is drawn on the surface; surfaces that draw their own `--edge-ring` (the notification strip, the chief window, the FAB) take the pool of the same tier: `--cds-shadow-sm` / `-md` / `-lg` — one ring per edge. Old slot names like `--panel-shadow` / `--shadow-popover` / `--dialog-shadow` are aliases; the hover / focus slots are states, not tiers.
+- **Four ink steps**: `ink` headings and body text; `ink-2` nav, buttons, descriptions; `ink-3` meta information; `ink-4` decorative icons only. The lightest text ever uses is `ink-3`.
+- **Contrast (measured, WCAG 2.x)**: on the card, `ink` is 14.99, `ink-2` 7.21, `ink-3` 5.29, `accent` 4.99, `running-text` 5.61; `ink-3` on canvas is 4.58. White text on the `accent` background is 4.99. `ink-4` is only 2.42, so it must never be a text color. `ink-3` on `--secondary` (light mode `#ebe4d8`, the same value as the shadcn surface variables `--muted` and `--accent` — the latter is not the brand color `accent`; the secondary backgrounds are input-box cards, diff block headers, tool-call pills, and the like) is only 4.19, so text there bottoms out at `ink-2` (5.7) (#1442, guarded by `e2e/a11y-axe.spec.ts`; axe does not check the native `::placeholder`, so input placeholder text relies on this rule alone).
+- **Accent discipline**: `accent` is used only for: needs-your-attention states and counts, action links on cards, icons of the active nav item, and count-badge backgrounds. It is never decorative and never a large-area background.
+- **Status is never color alone**: every status is a triple of "icon + color + text" (failed ⊗ failed / awaiting confirmation ☰ awaiting confirmation / awaiting review ⑂ awaiting review); color-blind users can tell them apart by icon and text.
+- **The primary button is ink, not color**: the shadcn Button default tier, `ink` background + `sheet` text, 8px radius (`control`). Terracotta is never the primary-button background.
+- Colors live only in the token files (`src/styles/shadcn.css` / `tokens.css`); components write token names, never hex values (`scripts/ui-drift-gate.mjs` G2 already pins this).
 
-## 字体（Hybrid）
+## Typography (Hybrid)
 
-- **衬线只给标题**：页面标题（顶栏「工作台」）、列标题（待开始 / 执行中…）、侧栏品牌名。字体 `var(--font-source-serif)`，中文落到 Songti SC。
-- **其余全部无衬线**：卡片标题、导航、按钮、元信息。字体 Inter，中文落到 PingFang SC。卡片标题不用衬线：14px 宋体太细、中西混排显乱，这是定稿时否掉 Serif 方案的原因。
-- **六档字号**，不许出现第七档：18 页面标题 / 16 列标题与品牌 / 14 卡片标题 / 13.5 界面文字 / 12 元信息 / 11.5 徽章与分组标签。代码里用对应 Tailwind 主题键 `text-page` / `text-heading` / `text-card-title` / `text-ui` / `text-meta` / `text-caption`（标题字体 `font-heading`），不写 `text-[13px]` 这类任意值；`scripts/ui-debt-gate.mjs` D5 只许任意值总数下降。
-- **字重三档**：400 正文、500 卡片标题与激活项、600 计数徽章与品牌。不用 700。
-- 已完成任务的标题降到 400 + `ink-3`，表示「已经不需要看」。
+- **Serif only for the brand**: the sidebar brand name and the chief panel greeting (`var(--font-source-serif)`, Chinese falls back to Songti SC). This matches claude.ai, which keeps serif for its wordmark and greeting.
+- **Everything else is sans**: page titles, task titles, column headings, dialog titles, card titles, navigation, buttons, meta. Font Inter, Chinese falls back to PingFang SC. A serif Latin title next to sans Chinese reads as two styles in one line, which is why titles are sans.
+- **Six font sizes, no seventh allowed**: 18 page title / 16 column headings and brand / 14 card title / 13.5 UI text / 12 meta / 11.5 badges and group labels. In code, use the corresponding Tailwind theme keys `text-page` / `text-heading` / `text-card-title` / `text-ui` / `text-meta` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
+- **Three font weights**: 400 body text, 500 card titles and active items, 600 count badges and brand. 700 is not used.
+- The title of a completed task drops to 400 + `ink-3`, meaning "no longer needs to be read".
 
-## 布局与间距
+## Layout and spacing
 
-- 4px 网格。常用值：4 / 8 / 12 / 16 / 24。卡片内边距 12×14，卡片间距 8，列间距 16，看板内边距 18×24。
-- 顶栏 56px：左侧衬线页面标题 + 「⚠ N 项等你处理」；右侧文字按钮（筛选、定时）+ 墨色主按钮「新任务」。所有顶栏元素 `nowrap`，窄窗口不换行。
-- 侧栏 248px，坐在 `canvas` 上；主面板是右侧一张 `sheet`，四周留 10px。
-- 一屏只有一个主操作（墨色主按钮），其余操作是文字按钮或卡片内的赭红链接。
+- 4px grid. Common values: 4 / 8 / 12 / 16 / 24. Card padding 12×14, card gap 8, column gap 16, board padding 18×24.
+- Top bar 56px: serif page title on the left + "⚠ N items need your attention"; text buttons on the right (filter, schedules) + the ink primary button "New task". All top-bar elements are `nowrap` and do not wrap in narrow windows.
+- Sidebar 248px, sitting on `canvas`; the main panel is one `sheet` on the right with 10px around it.
+- One screen has only one primary action (the ink primary button); the rest are text buttons or terracotta links inside cards.
 
-## 图标
+## Icons
 
-- 图标库 lucide（`components.json` 已配置），描边 1.75。
-- 尺寸：元信息 12、卡片操作与状态 13、顶栏按钮 14、列标题 15、侧栏导航 16。
-- 颜色：元信息图标与折叠箭头 `ink-4`（`text-content-dim`）；带文字标签的图标（侧栏导航、列标题）用 `icon` `#9a9086`（`text-icon`）；没有文字标签的纯图标按钮（搜索、收起侧栏、收起后的侧栏图标）用 `ink-3`，保住 3:1 的非文本对比；激活导航项与「需要你」相关图标 `accent`；执行中相关图标 `running`。
-- 形状：工作台 = 三栏（Columns3），收起/展开侧栏 = 面板（PanelLeft，不带箭头）。
-- 列标题图标固定：待开始 = 虚线圆、执行中 = 脉搏线、待处理 = 感叹圆、已完成 = 勾圆。
+- Icon library lucide (configured in `components.json`), stroke 1.75.
+- Sizes: meta 12, card actions and status 13, top-bar buttons 14, column headings 15, sidebar nav 16.
+- Colors: meta icons and collapse arrows use `ink-4` (`text-content-dim`); icons with a text label (sidebar nav, column headings) use `icon` `#9a9086` (`text-icon`); pure-icon buttons without a text label (search, collapse sidebar, collapsed sidebar icons) use `ink-3`, preserving the 3:1 non-text contrast; icons of the active nav item and anything "needs you" use `accent`; running-related icons use `running`.
+- Shapes: workbench = three columns (Columns3); collapse/expand sidebar = panel (PanelLeft, no arrow).
+- Column heading icons are fixed: `待开始` = dashed circle, `执行中` = pulse line, `待处理` = exclamation circle, `已完成` = check circle.
 
-## 组件
+## Components
 
-### 侧栏（Grouped）
-从上到下：
-1. **工作区行**：螺旋标记（`public/logo-mark.svg` 作 mask，16px，取行墨色 `ink`）+ 衬线品牌名 + 下拉箭头；右侧两个图标按钮：搜索（⌘K）、收起侧栏。
-2. **新任务按钮**：白底（`sheet`）、发丝环、赭红加号、右侧键帽 `C`。它是动作，不是导航项。
-3. **工作导航**：工作台、需要我处理（右侧赭红计数徽章）、定时。激活项 = `sheet` 底 + 发丝环 + 赭红图标。
-4. **项目**：分组标签「项目」+ 右侧加号；每个项目一行 = 彩色首字母方块（`project-tiles` 按序取色）+ 名称 + 未完成数。
-5. **底部**：「资源」一行（技能 / MCP / 密钥 / 机器 / 模型服务折叠在里面，点击展开为缩进子列表）；用户行 = 头像 + 名字 + 第二行「● 2 台机器在线 · 执行中 N」。
+### Sidebar (Grouped)
+From top to bottom:
+1. **Workspace row**: spiral mark (`public/logo-mark.svg` as a mask, 16px, taking the row ink `ink`) + serif brand name + dropdown arrow; two icon buttons on the right: search (⌘K) and collapse sidebar.
+2. **New-task button**: white background (`sheet`), hairline ring, terracotta plus, key cap `C` on the right. It is an action, not a nav item.
+3. **Work nav**: workbench, needs my attention (terracotta count badge on the right), schedules. Active item = `sheet` background + hairline ring + terracotta icon.
+4. **Projects**: group label "Projects" + plus on the right; each project is one row = colored first-letter tile (colors taken in order from `project-tiles`) + name + unfinished count.
+5. **Footer**: one "Resources" row (skills / MCP / keys / machines / providers collapsed inside, expanding into an indented sub-list on click); user row = avatar + name + second line "● 2 machines online · N running".
 
 ### Board columns
-- Column header: status icon + serif column name + `ink-3` count; hovering the `待开始` column shows a plus on the right (new tasks land only in that column; other columns get no plus). A `rule` line sits below.
+- Column header: status icon + sans column name + `ink-3` count; hovering the `待开始` column shows a plus on the right (new tasks land only in that column; other columns get no plus). A `rule` line sits below.
 - An empty column says what is missing in one plain sentence (`还没有待开始的任务`, `没有在跑的任务`, `没有等你处理的事`, `最近 7 天还没有完成的任务`), never a bare `暂无`. The empty `待开始` column instead shows one dashed ghost card, `写下想做的事` with the `C` key cap, which opens the new-task dialog.
 - While the first board read is in flight, each column shows two skeleton cards (registry `Skeleton`) in the card shape, so the layout does not jump when data lands.
 
@@ -158,16 +158,16 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
   - Done: no footer, title demoted.
 - No solid buttons on cards.
 
-### 按钮
-- 主按钮：shadcn Button default 档，墨底，8px 圆角（`rounded-md`，即 `control`），高 32。
-- 次按钮：文字按钮，hover 出浅底。
-- 卡片操作：赭红文字链接 + 图标，hover 出 `accent-hover` 底。
+### Buttons
+- Primary button: shadcn Button default tier, ink background, 8px radius (`rounded-md`, i.e. `control`), 32px tall.
+- Secondary button: a text button that gains a light background on hover.
+- Card actions: terracotta text links + icon, with the `accent-hover` background on hover.
 
-### 选择器与 ⌘K
-- 选中行（键盘光标或鼠标所在行）：白卡（`card`）+ `line` 发丝环 + 最多一档极轻投影（0 1px 2px）。不铺 hover 色、不带赭红。
+### Selector and ⌘K
+- The selected row (keyboard cursor or hovered row): white card (`card`) + `line` hairline ring + at most one extremely light shadow (0 1px 2px). No hover tint, no terracotta.
 
-### 设置列表（帐号页、Agent 概览）
-见下节「页面模式 · 设置列表」。
+### Settings lists (account page, agent overview)
+See "Page patterns · Settings list" below.
 
 ### Conversation
 - User turns sit on the right with no avatar: a `--secondary` bubble, at most `min(80%, 56ch)` wide, 32px tall for one line, with a tighter bottom-right corner. Their action row aligns right. Agent and chief turns keep the avatar on the left.
@@ -175,70 +175,70 @@ cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，�
 - The plan preview fades out at the bottom with a mask instead of a hard cut.
 - The composer is a white card (`--card`) with the warm `--shadow-composer` ladder and a `--border-soft` ring; it is the one white surface in the conversation because it is where you act. The idle send button has no fill; only the stop button gets the `seg-active` square.
 
-## 页面模式
+## Page patterns
 
-设置、资源、团队、项目这类页面共用下面几件。新页面先拼这几件，不在页面里另做一套卡片、空态或表单。件都在 `src/components/`，取值全部走 token 与六档字号。
+Pages like settings, resources, team, and project share the pieces below. A new page composes these pieces first and does not build its own cards, empty states, or forms inside the page. All pieces live in `src/components/`; all values go through tokens and the six font sizes.
 
-### 卡片圆角：一个角
-- **token**：`--radius-card` = 10px（`rounded.card`），类名 `rounded-(--radius-card)`，或 `settings-list.tsx` 导出的 `CARD_RADIUS_CLS`。
-- **用在**：所有卡片类表面——任务卡、拖拽中的卡、设置卡、团队 / Agent 卡、成组的资源行卡、一次性提示卡。
-- **不在此列**：弹窗与 ⌘K 面板是 sheet 档 16px（`--edge-radius`）；菜单与弹层用 `--radius-popover`（也是 10px，见下节「弹窗与菜单」）；控件 8px（`rounded-md`）；项目方块 5px。
-- registry `Card` 自带 `rounded-xl`（14px），用作卡片时必须换成 `--radius-card`。
-- 要：一页里所有卡同一个角。不要：页面里写 12px / 14px 的卡，或一页混两种卡角。
+### Card radius: one corner
+- **Token**: `--radius-card` = 10px (`rounded.card`), the class `rounded-(--radius-card)`, or `CARD_RADIUS_CLS` exported by `settings-list.tsx`.
+- **Used on**: every card-like surface — task cards, cards being dragged, settings cards, team / agent cards, grouped resource-row cards, one-off notice cards.
+- **Not in this list**: dialogs and the ⌘K panel are the sheet tier at 16px (`--edge-radius`); menus and floating surfaces use `--radius-popover` (also 10px, see "Dialogs and menus" below); controls are 8px (`rounded-md`); project tiles are 5px.
+- The registry `Card` ships with `rounded-xl` (14px), which must be replaced with `--radius-card` when used as a card.
+- Do: one corner for all cards on a page. Do not: write 12px / 14px cards into a page, or mix two card corners on one page.
 
-### 空态
-件：`src/components/empty-state.tsx` 的 `EmptyState`（底座是 registry `Empty`）。
-- **图标**：lucide 线条图标，24px，描边 1.75，`ink-3`（`text-content-tertiary`），不垫底块。
-- **标题**：`h2`，`text-card-title` 500 `ink`。
-- **说明**：`text-meta` `ink-3`，最宽 320px（约 44ch），居中，`text-balance`。
-- **主操作**（可选）：shadcn Button default 档，墨底 32px 8px 角（`DIALOG_PRIMARY_BUTTON`）。一个空态最多一个主操作。
-- **提示行**（可选）：主操作下方一行 `text-meta` `ink-3`，前面可带 12px 图标（`ink-4`），用来说明只读或权限原因。
-- **用在**：列表页没有数据时（API 密钥、定时、技能、MCP、密钥……）。文案由调用方先翻译再传入。
-- 要：裸图标 + 标题 + 一句说明。不要：带色块底的图标方块（橙色、米色都不要）、`size="sm"` 小按钮、两个并排主按钮、「查看文档」外链。
+### Empty state
+Piece: `EmptyState` in `src/components/empty-state.tsx` (the base is the registry `Empty`).
+- **Icon**: a lucide line icon, 24px, stroke 1.75, `ink-3` (`text-content-tertiary`), no background tile.
+- **Title**: `h2`, `text-card-title` 500 `ink`.
+- **Description**: `text-meta` `ink-3`, at most 320px wide (about 44ch), centered, `text-balance`.
+- **Primary action** (optional): shadcn Button default tier, ink background, 32px, 8px corner (`DIALOG_PRIMARY_BUTTON`). An empty state has at most one primary action.
+- **Hint line** (optional): one `text-meta` `ink-3` line below the primary action, optionally preceded by a 12px icon (`ink-4`), explaining read-only or permission reasons.
+- **Used on**: list pages with no data (API keys, schedules, skills, MCP, keys…). The copy is translated by the caller before being passed in.
+- Do: a bare icon + title + one sentence. Do not: an icon tile with a colored background (neither orange nor beige), a `size="sm"` small button, two side-by-side primary buttons, or a "View docs" external link.
 
-### 设置列表
-件：`src/components/settings-list.tsx`。帐号页的「编辑名称」头部在 `src/components/profile-card.tsx`（`ProfileHeader`，组合 `SettingsHeader`）。
-- **头部在卡上方**（`SettingsHeader`）：56px 白底圆形头像（`line` 1px 环）+ 衬线标题（`text-page` 500）+ 下方 `text-meta` `ink-3` 说明；右侧一个可选操作（通常是文字按钮）。名字不在卡里重复成一行。行内改名时 `editor` 替换标题、说明与操作。
-- **一张卡**（`SettingsCard`）：白底、`line` 1px 外环、`--radius-card`，行不带底色（不做双色卡）。
-- **行**（`SettingsRow`）：最小高 52px、左右 16px；左侧 `text-ui` `ink` 标签（可带一行 `text-meta` `ink-3` 说明），右侧控件。内容两行时行自然长高。不走 `SettingsRow` 的自定义行用 `SETTINGS_ROW_CLS`。
-- **分隔线只画在已渲染的行之间**：卡上 `divide-y`，行按条件渲染，不用 CSS 隐藏。被隐藏的行仍是兄弟节点，会在卡顶画出第二条边。
-- **控件带框，一类一种**：下拉 = 白底 + `line` 1px 环 + 8px 圆角 + 高 32（`SETTINGS_SELECT_TRIGGER_CLS`，与表单 `FORM_CONTROL_CLS` 同一串）；单选分段 = `SettingsSegmented`（即 `SegmentedRadio`，见下节「分段控件」）；开关 = shadcn Switch，开态墨色。
-- **危险操作**（`SettingsDangerZone`）：页面最后单独一张卡，一行：左侧标签 + 说明，右侧 Button `variant="destructive"`，32px 8px 角（标准按钮形）。点了先弹确认层，不直接删除。
-- 要：头部 + 一张卡 + 等高行。不要：头像大块占一行、行铺底色、圆角药丸形删除按钮、危险操作混在普通设置卡里。
+### Settings list
+Pieces: `src/components/settings-list.tsx`. The account page's "edit name" header is in `src/components/profile-card.tsx` (`ProfileHeader`, composing `SettingsHeader`).
+- **Header above the card** (`SettingsHeader`): 56px white circular avatar (`line` 1px ring) + serif title (`text-page` 500) + a `text-meta` `ink-3` description below; one optional action on the right (usually a text button). The name is not repeated as a row inside the card. For inline renaming, `editor` replaces the title, description, and action.
+- **One card** (`SettingsCard`): white background, `line` 1px outer ring, `--radius-card`; rows carry no background color (no two-tone cards).
+- **Row** (`SettingsRow`): minimum height 52px, 16px left and right; a `text-ui` `ink` label on the left (optionally with one `text-meta` `ink-3` description line), controls on the right. Rows with two-line content grow naturally. Custom rows that do not go through `SettingsRow` use `SETTINGS_ROW_CLS`.
+- **Dividers are drawn only between rendered rows**: `divide-y` on the card, rows rendered conditionally, never hidden with CSS. A hidden row is still a sibling node and would draw a second border at the top of the card.
+- **Controls are framed, one kind each**: dropdown = white background + `line` 1px ring + 8px radius + 32px tall (`SETTINGS_SELECT_TRIGGER_CLS`, the same string as the form's `FORM_CONTROL_CLS`); single-choice segmented = `SettingsSegmented` (i.e. `SegmentedRadio`, see "Segmented control" below); switch = shadcn Switch with ink on-state.
+- **Danger zone** (`SettingsDangerZone`): a separate card at the very end of the page, one row: label + description on the left, a Button with `variant="destructive"` on the right, 32px 8px corner (the standard button shape). Clicking opens a confirm layer first; it never deletes directly.
+- Do: header + one card + equal-height rows. Do not: a large avatar occupying a row, rows with background tints, a rounded-pill delete button, or danger actions mixed into ordinary settings cards.
 
-### 表单
-件：`src/components/form-layout.tsx`（底座是 registry `Field` 家族）。
-- **栈**（`FormStack`）：字段竖排，字段间 16px，最宽 520px，靠左。
-- **字段**（`FormField`）：标签在上（`text-ui` 500 `ink`，`htmlFor` 指向控件），控件，可选帮助文字（`text-meta` `ink-3`）在下。
-- **控件**：Input / SelectTrigger 加 `FORM_CONTROL_CLS`：高 32、白底、`line` 1px 环、8px 圆角、`text-ui`。
+### Forms
+Piece: `src/components/form-layout.tsx` (the base is the registry `Field` family).
+- **Stack** (`FormStack`): fields stacked vertically, 16px between fields, at most 520px wide, left-aligned.
+- **Field** (`FormField`): label on top (`text-ui` 500 `ink`, `htmlFor` pointing at the control), the control, and an optional help line (`text-meta` `ink-3`) below.
+- **Controls**: Input / SelectTrigger with `FORM_CONTROL_CLS`: 32px tall, white background, `line` 1px ring, 8px radius, `text-ui`.
 - **Action row** (`FormActions`): the last row of the form, right-aligned; an optional text button (such as `取消`) on the left, the shadcn Button default primary on the right. When the form cannot submit, the button's own `disabled` state paints it `secondary` with secondary ink at full opacity (`DIALOG_PRIMARY_BUTTON`); no separate gray bar.
-- 要：窄栏、标签在上、主按钮靠右。不要：撑满整列的输入框、整宽的灰色提交条、标签和输入框左右并排的双栏表单。
+- Do: a narrow column, labels on top, the primary button on the right. Do not: inputs spanning the whole column, full-width gray submit bars, or two-column forms with labels beside inputs.
 
-### 分段控件
-件：`src/components/segmented.tsx`。一种外观，两种语义：
-- **`SegmentedTabs`**：切换视图——每个选项控制一块面板或一条路由（Agent 概览 / 记忆 / 权限、项目 任务 | 文件、文件 | 历史、列表 | 网格、团队 网格 | 组织图、模型服务 runtime、分支弹窗、总管设置）。底座是 registry `Tabs`，保留 `tablist` / `tab` 语义。
-- **`SegmentedRadio`**：在表单或设置里选一个值（帐号页的密度、用户菜单的外观 / 密度、定时频率）。`radiogroup` / `radio` 语义，方向键移动并选中，roving tabindex。选「改了会存下来的值」用它；选「看哪块内容」用 tabs。
-- **放不下就换下拉**：选项文字按 12px 内边距排不进所在栏宽时，不缩字、不截断，改用表单 Select（`SelectTrigger` + `FORM_CONTROL_CLS`）。例：新建模型服务的 API 协议（三个协议名约需 460px，弹窗栏宽 416）。
-- **外观**：轨道高 32、内衬 2、8px 角，底色 `canvas` 一个纸色 token；选项高 28、6px 角，文字选项左右 12，纯图标选项是 28 的正方形（必须带 `ariaLabel`）。未选中 `ink-2` 字、hover 变 `ink`、不铺底；选中 = 白底（`card`）+ `line` 1px 环 + 一层极轻投影，字 500 `ink`。不用赭红。禁用项用原语自带的半透明。
-- **焦点**：鼠标点击不出环。键盘 `:focus-visible` 是 2px `--focus-ring` 环，**内描**在选项盒里（`outline-offset: -2px`，`styles/app.css` 的 `[data-segmented="option"]` 规则）：选项之间只隔 2px，外描会压到邻居。
-- **滑动**：`slide` 让白签以一条 150ms 的底层 pill 在选项间滑动（只有总管设置用，#644）。
-- 要：所有分段都从这两件拼；e2e 句柄用 `className`（轨道）和 `optionHandle`（选项）挂。不要：手写 `role="radiogroup"` / `role="tab"`，或在页面里直接用 `TabsList` / `TabsTrigger` 另调一套皮肤——`scripts/ui-drift-gate.mjs` G7 会拦下。
+### Segmented control
+Piece: `src/components/segmented.tsx`. One appearance, two semantics:
+- **`SegmentedTabs`**: switches views — each option controls a panel or a route (agent overview / memory / permissions, project tasks | files, files | history, list | grid, team grid | org chart, provider runtime, branch dialog, chief settings). The base is the registry `Tabs`, keeping `tablist` / `tab` semantics.
+- **`SegmentedRadio`**: picks a value in a form or settings (density on the account page, appearance / density in the user menu, schedule frequency). `radiogroup` / `radio` semantics; arrow keys move and select, roving tabindex. Use it for "selecting a value that will be persisted"; use tabs for "which block to look at".
+- **If it does not fit, switch to a dropdown**: when the option labels at 12px padding do not fit the column width, do not shrink the text and do not truncate — use the form Select instead (`SelectTrigger` + `FORM_CONTROL_CLS`). Example: the API protocol in the new-provider dialog (the three protocol names need about 460px; the dialog column is 416px wide).
+- **Appearance**: track 32px tall, 2px inset, 8px radius, background `canvas` — one paper token; options 28px tall, 6px radius, 12px left/right padding for text options, and pure-icon options are 28px squares (must carry an `ariaLabel`). Unselected text is `ink-2`, turning to `ink` on hover, with no background tint; the selected option = white background (`card`) + `line` 1px ring + one extremely light shadow, text 500 `ink`. Terracotta is not used. Disabled items use the primitive's own translucency.
+- **Focus**: mouse clicks show no ring. Keyboard `:focus-visible` is a 2px `--focus-ring` ring, **inset** inside the option box (`outline-offset: -2px`, the `[data-segmented="option"]` rule in `styles/app.css`): options are only 2px apart, and an outer ring would press onto the neighbor.
+- **Sliding**: `slide` makes the white tab slide between options on a 150ms underlying pill (only chief settings uses it, #644).
+- Do: assemble every segmented control from these two pieces; e2e handles attach via `className` (track) and `optionHandle` (option). Do not: hand-write `role="radiogroup"` / `role="tab"`, or restyle `TabsList` / `TabsTrigger` directly in a page — `scripts/ui-drift-gate.mjs` G7 will block it.
 
-### 弹窗与菜单
-件：`src/components/ui/dialog-shell.tsx`（`DialogShell` + 导出的 `DIALOG_*` 件、`DialogFootRow`、`dialogWidth`）、`alert-dialog-shell.tsx`（确认面）、`dropdown-menu.tsx` / `popover.tsx`（菜单与弹层）。`dialog.tsx` / `alert-dialog.tsx` / `select.tsx` 是 pristine registry 件，它们的 Paper 皮肤住在 `styles/app.css` 的 `[data-slot=…]` 规则与 token 上。
-- **背板**：一层浅墨 dim `--dialog-backdrop`（亮 `rgba(43,38,32,.14)`），不加 blur。所有弹窗、确认面、⌘K 同一层，不做深色幕布。
-- **面**：`sheet` 底（`--dialog-surface`）、16px 角（`--edge-radius`）、`--dialog-shadow`（= `--e3`：两层软投影 + 1px `line` 环）。
-- **三档宽**（`size`，`--dialog-w-*`，窄屏 `min(100% - 2rem, …)` 收口）：
-  - S 400：密钥、API 密钥、删除与其它确认、短表单。
-  - M 480：技能、多数新建表单（Agent、定时、章程、审核、请求修改）。
-  - L 640：多步流程与长列表（添加机器、模型服务选择器、GitHub issue、原始错误、附件预览、新建任务）。
-- **头**：16px 衬线标题（`text-heading`）+ 可选一行 12px `ink-3` 副行（`subtitle`）；右上角 28px ghost 关闭钮。关闭钮在 DOM 里排最后，初始焦点落在第一个字段上。
-- **体**：唯一的滚动盒（`min-h-0`），左右 20px 内边距同时是焦点环的房间。面板封顶 `100vh - 64px`，矮视口里滚的是体，脚永远在屏内。
-- **脚（分栏）**：左边一条 12px `ink-3` 提示或状态（`hint`：文档链接、快捷键、等待状态、页码），右边操作组。主操作是 shadcn Button default（墨底 32px 8px 角，`DIALOG_PRIMARY_BUTTON`），次操作是 ghost 文字按钮（`DIALOG_TEXT_BUTTON`），危险确认换 `destructive`。没有提示时操作照样靠右。不画底色带、不画分隔线。
-- **分组选择器**（模型服务）：顶部搜索框，下面按小标题分组（`text-caption` 500 `ink-3`），每行 40px = 22px 首字母方块（白底 + `line` 环）+ 名称 + 右侧 `ink-3` 标签（OAuth / 暂未开通）。hover 与键盘焦点 = 选择器选中行（白卡 + 发丝环）。禁用行字降到 `ink-3`、不出 hover。搜索跨组过滤，空组整组隐藏；「其他 · 自定义端点」始终在。
-- **菜单**（Paper menu，`DropdownMenu` / `Popover` / Select 弹层同一张面）：白底、10px 角（`--radius-popover`）、4px 内衬、`--shadow-popover`（= `--e2`：软投影 + 1px 环）。行高 32、6px 角、13.5px 字、15px `ink-3` 图标、hover `menu-hover`；快捷键提示靠右 `text-caption` `ink-3`；分隔线 1px、左右内缩 6px；分组标签 `text-caption` 500 `ink-3`。危险行字与图标走 `destructive`，hover `danger-soft`。菜单里的分段控件用 `SegmentedRadio` / `SegmentedTabs`，不手搓。
-- 要：一个弹窗选一档宽、提示靠左操作靠右、菜单行等高。不要：深色或模糊背板、整宽提交条、灰色底色带脚、outline 次按钮、12px 字的小灰菜单。
-- `e2e/paper-overlays.spec.ts` 钉背板颜色、三档宽、分栏脚、菜单行高与分组选择器；`e2e/color-freeze.spec.ts` 钉 `dialog-backdrop` / `menu-hover`。
+### Dialogs and menus
+Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIALOG_*` pieces, `DialogFootRow`, `dialogWidth`), `alert-dialog-shell.tsx` (confirm surfaces), `dropdown-menu.tsx` / `popover.tsx` (menus and floating surfaces). `dialog.tsx` / `alert-dialog.tsx` / `select.tsx` are pristine registry pieces; their Paper skin lives in the `[data-slot=…]` rules and tokens of `styles/app.css`.
+- **Backdrop**: one layer of light-ink dim `--dialog-backdrop` (light `rgba(43,38,32,.14)`), no blur. All dialogs, confirm surfaces, and ⌘K share this layer; there is no dark curtain.
+- **Surface**: `sheet` background (`--dialog-surface`), 16px radius (`--edge-radius`), `--dialog-shadow` (= `--e3`: two soft shadows + a 1px `line` ring).
+- **Three widths** (`size`, `--dialog-w-*`, clamped with `min(100% - 2rem, …)` on narrow screens):
+  - S 400: keys, API keys, delete and other confirmations, short forms.
+  - M 480: skills, most new-entity forms (agent, schedule, charter, review, request changes).
+  - L 640: multi-step flows and long lists (add machine, provider selector, GitHub issue, raw error, attachment preview, new task).
+- **Head**: 16px serif title (`text-heading`) + an optional 12px `ink-3` subtitle line (`subtitle`); a 28px ghost close button in the top-right corner. The close button is last in the DOM, and initial focus lands on the first field.
+- **Body**: the single scrolling box (`min-h-0`), with 20px left/right padding that also serves as room for the focus ring. The panel is capped at `100vh - 64px`; in short viewports the body scrolls and the foot stays on screen.
+- **Foot (split)**: a 12px `ink-3` hint or status on the left (`hint`: doc links, shortcuts, waiting states, page numbers), the action group on the right. The primary action is the shadcn Button default (ink background, 32px, 8px corner, `DIALOG_PRIMARY_BUTTON`), the secondary action is a ghost text button (`DIALOG_TEXT_BUTTON`), and danger confirmations switch to `destructive`. With no hint the actions still align right. No background band, no divider line.
+- **Grouped selector** (providers): a search box on top, then groups under small headings (`text-caption` 500 `ink-3`); each row is 40px = a 22px first-letter tile (white background + `line` ring) + name + an `ink-3` tag on the right (OAuth / not yet enabled). Hover and keyboard focus = the selector's selected row (white card + hairline ring). Disabled rows drop the text to `ink-3` and show no hover. Search filters across groups and whole empty groups hide; "Other · custom endpoint" is always there.
+- **Menus** (the Paper menu — `DropdownMenu` / `Popover` / the Select popup are the same surface): white background, 10px radius (`--radius-popover`), 4px padding, `--shadow-popover` (= `--e2`: soft shadow + 1px ring). Rows are 32px tall, 6px radius, 13.5px text, 15px `ink-3` icons, hover `menu-hover`; shortcut hints right-aligned in `text-caption` `ink-3`; dividers 1px, inset 6px left and right; group labels `text-caption` 500 `ink-3`. Danger rows use `destructive` for text and icon, hover `danger-soft`. Segmented controls inside menus use `SegmentedRadio` / `SegmentedTabs`; do not hand-roll them.
+- Do: one width tier per dialog, hints left and actions right, equal-height menu rows. Do not: a dark or blurred backdrop, full-width submit bars, a gray-background foot band, outline secondary buttons, or small gray 12px menus.
+- `e2e/paper-overlays.spec.ts` pins the backdrop color, the three widths, the split foot, the menu row height, and the grouped selector; `e2e/color-freeze.spec.ts` pins `dialog-backdrop` / `menu-hover`.
 
 ## Motion
 
@@ -266,44 +266,44 @@ The paper is quiet. Motion comes in four kinds, each with one duration and one e
 - Not used: route transitions, list FLIP, cross-column flights, a spring family (only message entry uses `--spring-snappy`).
 - Pins: `e2e/cds-motion.spec.ts` pins the motion slots and `anim-*` class names; `e2e/card-press.spec.ts` pins instant press; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
 
-## 暗色
+## Dark
 
-暗色是 `:root` 默认（`.light` 是亮色）。定稿 mockup：[`docs/board-paper-dark.html`](docs/board-paper-dark.html)，数字键 1–6 切看板 / 详情 / 设置 / 弹窗 / 菜单 / 色板（色板页从渲染色实时算对比度）。值在 frontmatter `colors-dark`，实测表 `docs/verify/1396/contrast.txt`（`docs/verify/1396/palette.mjs` 用 OKLCH 定义、换算 sRGB 再量）。
+Dark is the `:root` default (`.light` is the light theme). Final mockup: [`docs/board-paper-dark.html`](docs/board-paper-dark.html); number keys 1–6 switch between board / detail / settings / dialog / menu / palette (the palette page computes contrast live from the rendered colors). Values live in the `colors-dark` frontmatter; the measurement table is `docs/verify/1396/contrast.txt` (`docs/verify/1396/palette.mjs` defines colors in OKLCH, converts to sRGB, and then measures).
 
-- **同一阶梯，方向反过来**：暗色里海拔越高越亮——`canvas` #1a1612 → `sheet` #24201b → `card` #2f2a26 → `popover` #37322d。四档同一色相（OKLCH 色相 70、色度 0.011），是奶油纸的深端，不是中性灰。亮色里菜单与弹窗和卡片同色（白）；暗色里投影弱，菜单与弹窗比卡片再亮一档，靠亮度差加发丝环分层。侧栏经 `--surface-1` 坐在 `canvas` 上，两侧同形。
-- **发丝环照画**：`line` #3e3a34 在卡上 1.26、在 sheet 上 1.43，和亮色一样是一个 CSS 像素，不靠投影。
-- **墨色阶梯倒过来**：`ink` #ece7df 标题正文、`ink-2` #c5c0b9 导航按钮、`ink-3` #aca7a0 元信息、`icon` #908b85 带标签图标；`ink-4` #7a756f 只做装饰。
-- **对比度（实测，WCAG 2.x）**：卡上 `ink` 11.53、`ink-2` 7.85、`ink-3` 5.94、`icon` 4.20（非文本门 3）、`accent` 6.11、`running-text` 7.87、`destructive` 7.95；canvas 上 `ink-3` 7.53；菜单 hover 行上 `ink-3` 4.63。`ink-4` 在卡上 3.11，仍只做装饰。
-- **赭红上的字是深墨**：`accent` 提亮到 #f0926d 后白字只有 2.32，所以计数徽章、项目方块上的字走 `--text-on-accent` = canvas 深墨（徽章 7.74，六块方块 6.98 起）。亮色里是白字，这是两侧唯一一处反向。
-- **强调色 hover 底是深染不是浅染**：`accent-hover` #46362f = 赭红 12% 染进卡底，链接在上面 4.94（亮色 4.25）。`spot-soft` 选中底同法，上面的字 `spot-text-on-tint` #fbc3a7 淡赭红 7.02。
-- **执行中绿提亮**：图标 #7fb980（卡上 6.18）、文字 #99ce9a（7.87）、进度条 #70a971 压轨道 4.09；轨道就是发丝线。
-- **弹窗背板**：黑 45%，无 blur；弹窗面 = `popover`，和菜单同一档。
-- **状态色不在本阶梯里**：chip、diff、列点、`badge-attention`、`destructive` #ffabb7 沿用 E 色板暗侧值（亮色那轮同样只换了 Paper 槽），每个文字对都在新卡底上重测过 4.5。
-- **新增语义 token 的规则**：必须同时在 `.light` 与 `:root` 两处定义；暗侧从本阶梯取值并实测，不取「最近的现有档」。
+- **The same ladder, direction reversed**: in dark, higher elevation is brighter — `canvas` #1a1612 → `sheet` #24201b → `card` #2f2a26 → `popover` #37322d. The four steps share one hue (OKLCH hue 70, chroma 0.011): the deep end of cream paper, not a neutral gray. In light, menus and floating surfaces share the card color (white); in dark shadows are weak, so menus and floating surfaces are one brightness step above the card, layered by brightness difference plus hairline rings. The sidebar sits on `canvas` through `--surface-1`, the same shape on both sides.
+- **Hairline rings stay drawn**: `line` #3e3a34 is 1.26 on the card and 1.43 on the sheet — the same single CSS pixel as in light, without relying on shadows.
+- **The ink ladder inverts**: `ink` #ece7df headings and body, `ink-2` #c5c0b9 nav and buttons, `ink-3` #aca7a0 meta, `icon` #908b85 labeled icons; `ink-4` #7a756f is decorative only.
+- **Contrast (measured, WCAG 2.x)**: on the card, `ink` 11.53, `ink-2` 7.85, `ink-3` 5.94, `icon` 4.20 (the 3 non-text gate), `accent` 6.11, `running-text` 7.87, `destructive` 7.95; `ink-3` on canvas 7.53; `ink-3` on a hovered menu row 4.63. `ink-4` is 3.11 on the card and remains decorative only.
+- **Text on terracotta is deep ink**: with `accent` brightened to #f0926d, white text is only 2.32, so text on count badges and project tiles goes through `--text-on-accent` = the canvas deep ink (badge 7.74, the six tiles 6.98 and up). Light mode uses white text — this is the single place where the two sides reverse.
+- **Accent hover backgrounds are deep-dyed, not light-dyed**: `accent-hover` #46362f = terracotta at 12% dyed into the card background, with links on it at 4.94 (4.25 in light). The `spot-soft` selection background uses the same method; text on it is `spot-text-on-tint` #fbc3a7, pale terracotta at 7.02.
+- **The running green brightens**: icon #7fb980 (6.18 on the card), text #99ce9a (7.87), progress bar #70a971 pressing on its track at 4.09; the track is simply the hairline.
+- **Dialog backdrop**: black at 45%, no blur; the dialog surface is `popover`, the same tier as menus.
+- **Status colors are not in this ladder**: chip, diff, column dots, `badge-attention`, and `destructive` #ffabb7 keep the dark-side values of the E palette (the light round likewise changed only the Paper slots); every text pair was re-measured at 4.5 on the new card background.
+- **Rule for new semantic tokens**: they must be defined in both `.light` and `:root`; the dark side takes values from this ladder and is measured — never "the closest existing tier".
 
-暗色多一条 `--top`（`inset 0 1px 0` 8% 白的顶部高光），只拼进 `--e2` / `--e3` 的池，让抬起的面读成被照亮的纸；亮色是零 alpha 的空操作（白卡上本来就看不见；不写 `none`，`none` 混进逗号列表会让整条 box-shadow 失效）。暗色三档的投影明度是收梯前的旧值（#1396 定稿只翻了颜色槽，没动投影）；环色跟着 `colors-dark` 走：e1 用 `line`，e2 / e3 用 `--ring-inset-highlight`。
+Dark adds one more slot, `--top` (an `inset 0 1px 0` top highlight at 8% white), spliced only into the `--e2` / `--e3` pools so lifted surfaces read as illuminated paper; in light it is a zero-alpha no-op (it is invisible on white cards anyway; it is not written as `none`, because `none` mixed into a comma list would invalidate the whole box-shadow). The three dark shadow tiers keep the pre-ladder-compression brightness values (#1396 finalized only the color slots, not the shadows); the ring colors follow `colors-dark`: e1 uses `line`, e2 / e3 use `--ring-inset-highlight`.
 
-## 给 agent 的美学约束（粘贴进提示词）
+## Aesthetic constraints for agents (paste into prompts)
 
 ```text
 Cairn UI rules (source: apps/web/DESIGN.md):
 - Look: warm paper, dense, calm. Three layers: canvas #f3eee5 → sheet #fbf9f5 → white cards. Hairline rings, almost no shadow. Elevation is three tokens with the ring baked in: --e1 card/row, --e2 menu/popover, --e3 dialog/floating window. Never add a second ring or a raw shadow; --top (dark-only inset top highlight) rides e2/e3 only.
 - Dark (:root default): the same ladder, lighter with elevation: canvas #1a1612 → sheet #24201b → card #2f2a26 → popover #37322d (menus and dialogs). Ink #ece7df / #c5c0b9 / #aca7a0. Accent #f0926d with dark text on it (badge, project tiles). Running #7fb980. Only token values differ between themes.
 - One accent: terracotta (accent) only for "needs you", action links, count badges, active icons. Green (running) only for running/online. Everything else is ink greys.
-- Type: serif (--font-source-serif) only for page title, column headings, brand. Everything else sans (Inter / PingFang). Sizes only 18/16/14/13.5/12/11.5. Weights 400/500/600.
+- Type: serif (--font-source-serif) only for the brand name and the chief greeting. Everything else sans (Inter / PingFang). Sizes only 18/16/14/13.5/12/11.5. Weights 400/500/600.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
 - Every status = icon + color + label. Lucide icons, stroke 1.75.
 - Primary button = shadcn default Button in ink, 8px corners, 32px tall. Card actions = terracotta text links. No solid buttons on cards.
-- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 16px serif title + optional 12px sub-line, split footer (12px ink-3 hint left, actions right, ink primary). Menus: white, 10px corners, 4px padding, 32px rows, 13.5px text, 15px ink-3 icons, #f6f2ec hover, danger rows in destructive.
+- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 16px sans title + optional 12px sub-line, split footer (12px ink-3 hint left, actions right, ink primary). Menus: white, 10px corners, 4px padding, 32px rows, 13.5px text, 15px ink-3 icons, #f6f2ec hover, danger rows in destructive.
 - Segmented controls only from components/segmented.tsx: SegmentedTabs for view switches, SegmentedRadio for value pickers. Canvas track, white selected option with a 1px ring, inset keyboard ring. Never hand-roll role=tab/radio or restyle TabsList.
 - One card corner: --radius-card (10px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
 - Sidebar = Grouped: workspace row (16px spiral mark from logo-mark.svg in ink, serif name), New task button, Workbench / Needs me / Schedules, Projects, collapsed Resources, user row with machine status.
 - Use components/ui primitives and tokens; no hex in components.
 ```
 
-## 迁移状态
+## Migration status
 
-代码里的现状与本文件不一致的地方，按 `apps/web/docs/paper-redesign-plan.md` 的顺序逐步落地。新写的代码直接按本文件取值。
+Where the code's current state disagrees with this file, land the changes step by step in the order of `apps/web/docs/paper-redesign-plan.md`. New code takes its values directly from this file.
 
 ## Current shell and board surface
 
@@ -311,6 +311,6 @@ The application shell is edge-to-edge: the main surface has no sheet margin, rou
 
 The board top bar has no bottom rule. Its primary action is a centered new-task bar with the spiral brand mark, the translated prompt `新任务：接下来让 agent 做什么？`, and a `C` key badge. The bar opens the existing new-task surface. When attention cards exist, the `needs-you-strip` appears below it, capped at five rows. Each row exposes the task title, project and sequence metadata, the attention label, the same primary action as the task card, and an `打开` link. A last-seen summary uses `cairn.board.lastSeenAt` and only renders when completion or failure transitions occurred since that timestamp.
 
-On phones up to 640px, board columns become one vertical list, empty columns and the old empty start ghost are hidden, and horizontal board scrolling is disabled. The new-task bar is fixed above the safe-area inset at the bottom of the viewport, with the chief launcher above it. The needs-you strip remains before the board list.
+On phones up to 640px, the sidebar folds into a drawer opened by a 44px menu button at the top left (top bars reserve 52px for it; the task detail page keeps its back chevron instead). Board columns become one vertical list, empty columns and the old empty start ghost are hidden, and horizontal board scrolling is disabled. The new-task bar is fixed above the safe-area inset at the bottom of the viewport, with the chief launcher above it. The needs-you strip remains before the board list.
 
 The chief launcher in the lower-right corner sits on the card surface (`bg-card`) with body ink and the `--fab-shadow` (= `--e2`) elevation, rising to `--e3` on hover. The unread dot is a 6px `--card-button` fill inside the pill, and the pill label (`N 条新消息`, `思考中…`) uses `text-content-secondary`. No dark brand disc: the page keeps one calm surface family.

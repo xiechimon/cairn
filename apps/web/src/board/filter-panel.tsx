@@ -45,7 +45,7 @@ function CheckBox({ state }: { state: 'off' | 'on' | 'mixed' }) {
   return (
     <span
       aria-hidden
-      className={`flex size-4 flex-none items-center justify-center rounded-[4px] border transition-colors ${
+      className={`flex size-4 flex-none items-center justify-center rounded-(--cds-radius-sm) border transition-colors ${
         state === 'off'
           ? 'border-input'
           : state === 'on'
@@ -69,7 +69,7 @@ export function FilterChips({
   const { t } = useI18n();
   if (chips.length === 0) return null;
   return (
-    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="-m-1 flex min-w-0 items-center gap-1.5 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {chips.map((chip) => (
         <Button
           key={chip.key}
@@ -123,15 +123,13 @@ function DimensionSection({
     <section className="flex flex-col" data-dimension={dimension.key}>
       {divided && <Separator className="-mx-1 mt-1 mb-1" />}
       <header className={`flex items-baseline gap-1.5 px-2 pb-1 ${divided ? 'pt-1' : 'pt-1.5'}`}>
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground">
-          {t(dimension.name)}
-        </span>
-        <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+        <span className="text-caption font-medium text-content-tertiary">{t(dimension.name)}</span>
+        <span className="ml-auto text-caption text-content-tertiary tabular-nums">
           {t('已选 {n}/{m}', { n: dimension.selected.length, m: dimension.choices.length })}
         </span>
       </header>
       {!actionable ? (
-        <EmptyDescription className="px-1.5 pt-1 pb-2 text-xs">
+        <EmptyDescription className="px-2 pt-0.5 pb-2 text-meta">
           {dimension.key === 'repo' ? t('本作用域内没有可选的仓库') : t('本作用域内没有可选的类型')}
         </EmptyDescription>
       ) : (
@@ -147,7 +145,7 @@ function DimensionSection({
           )}
           <div className="flex items-center">
             {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-            <label className="inline-flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-(--cds-radius-sm) px-2 text-xs text-foreground transition-colors hover:bg-accent-soft">
+            <label className="inline-flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-(--radius-menu-item) px-2 text-xs text-foreground transition-colors hover:bg-accent-soft">
               <Checkbox
                 checked={allSelected}
                 indeterminate={someSelected && !allSelected}
@@ -184,7 +182,7 @@ function DimensionSection({
                       : { 'data-tag': choice.value })}
                     role="option"
                     aria-selected={active}
-                    className={`${alias} h-7 min-w-0 flex-1 justify-start gap-2 rounded-(--cds-radius-sm) border-none px-2 text-xs font-normal text-foreground hover:bg-accent-soft dark:hover:bg-accent-soft active:not-aria-[haspopup]:translate-y-0 ${
+                    className={`${alias} h-7 min-w-0 flex-1 justify-start gap-2 rounded-(--radius-menu-item) border-none px-2 text-xs font-normal text-foreground hover:bg-accent-soft dark:hover:bg-accent-soft active:not-aria-[haspopup]:translate-y-0 ${
                       active ? 'bg-accent' : ''
                     }`}
                     onClick={() => dimension.onToggle(choice.value)}
@@ -273,7 +271,7 @@ export function FilterPanel({ dimensions, totalSelected, onClearAll }: FilterPan
         side="bottom"
         sideOffset={6}
         aria-label={t('筛选')}
-        className="type-filter-popover w-[268px] gap-0 p-1"
+        className="type-filter-popover w-[268px] gap-0 p-(--menu-pad)"
       >
         {dimensions.map((dimension, index) => (
           <DimensionSection

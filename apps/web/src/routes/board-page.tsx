@@ -28,6 +28,7 @@ import {
 import { moveTodo, resetTodoLocal } from '../board/dnd.js';
 import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import type { FilterChip, FilterDimension } from '../board/filter-panel.js';
+import { BOARD_VIEW_PARAM } from '../board/home.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import {
@@ -52,7 +53,7 @@ import type { FixtureSet, OverlayState, TodoRecord } from '../fixtures/records.j
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
-import { SearchPanel, useSearchState } from '../overlays/search-panel.js';
+import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 
 interface ReorderPatch {
@@ -81,6 +82,7 @@ export function BoardPage() {
 
   const rawTags = searchParams.get('tags');
   const onlyColumn = parseColumnParam(searchParams.get(COLUMN_PARAM));
+  const boardView = searchParams.get(BOARD_VIEW_PARAM) === 'board';
   const rawProjects = searchParams.get('projects');
   const selectedProjects = useMemo(() => parseProjectsParam(rawProjects), [rawProjects]);
   const selectedProjectSet = useMemo(() => new Set(selectedProjects), [selectedProjects]);
@@ -553,9 +555,7 @@ export function BoardPage() {
       <AppSidebar
         fixture={fixture}
         todos={todos}
-        selected={
-          chiefView === 'settings' ? 'none' : onlyColumn === 'pending' ? 'attention' : 'board'
-        }
+        selected={chiefView === 'settings' ? 'none' : boardView ? 'kanban' : 'board'}
         searchPanel={false}
         onSearch={() => search.setOpen(true)}
         onNewTask={openNewTask}
@@ -597,6 +597,7 @@ export function BoardPage() {
             onDoneIntent={openDoneGate}
             filters={filters}
             onlyColumn={onlyColumn}
+            boardView={boardView}
             tagsById={tagIndex.tagById}
             onNewTask={openNewTask}
             loading={live && !todosQ.isSuccess}

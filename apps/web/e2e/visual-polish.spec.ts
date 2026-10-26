@@ -60,7 +60,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const card = await edgeContract(page, '.todo-card');
 
@@ -75,7 +75,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const column = await edgeContract(page, '.board-column');
 
@@ -88,7 +88,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=notify-banner');
+    await page.goto('/app?scenario=notify-banner&view=board');
 
     const banner = await edgeContract(page, '.board-notify-banner');
 
@@ -117,7 +117,7 @@ for (const theme of ['light', 'dark'] as const) {
 
   test(`sidebar sits on canvas beside the sheet, no seam of its own (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const probe = await page.evaluate(() => {
       const sidebar = document.querySelector('.board-sidebar');
@@ -144,7 +144,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const metrics = await page.locator('.board-scroller').evaluate((el) => {
       el.scrollLeft = 400;
@@ -184,7 +184,7 @@ test('collapsed rail draws no seam either (Paper PR 7)', async ({ page }) => {
     localStorage.setItem('cairn-theme', 'dark');
     localStorage.setItem('cairn.sidebar-collapsed', '1');
   });
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
 
   const rail = await page.locator('.board-sidebar--collapsed').evaluate((el) => {
     const cs = getComputedStyle(el);

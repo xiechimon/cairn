@@ -22,17 +22,17 @@ Agent card (light, from the metrics files):
 Grid/chart switch (light): before a `--muted` track (#ebe4d8, 28px, 10px
 corners) with a `--background` chip; after a `--canvas` track (#f3eee5, 32px,
 8px corners) with a white chip and a 1px `--border` ring, the SettingsSegmented
-look, moved into the top bar next to 设置 and the 创建 Agent primary.
+look, moved into the top bar next to `设置` and the `创建 Agent` primary.
 
 | file | what it shows |
 | --- | --- |
-| `before-light-team-grid.png`, `after-light-team-grid.png` | team grid, light: dashed 创建 Agent card gone, action in the top bar |
+| `before-light-team-grid.png`, `after-light-team-grid.png` | team grid, light: dashed `创建 Agent` card gone, action in the top bar |
 | `before-dark-team-grid.png`, `after-dark-team-grid.png` | team grid, dark |
 | `before-light-team-chart.png`, `after-light-team-chart.png` | org chart, light: Paper nodes, no dashed create node |
 | `before-dark-team-chart.png`, `after-dark-team-chart.png` | org chart, dark |
-| `before-light-agent-permissions.png`, `after-light-agent-permissions.png` | agent 权限 tab, light: card-title group heads, empty 密钥 row centred |
-| `before-dark-agent-permissions.png`, `after-dark-agent-permissions.png` | agent 权限 tab, dark |
-| `before-light-agent-memory.png`, `after-light-agent-memory.png` | agent 记忆 tab with no memories: EmptyState |
-| `before-dark-agent-memory.png`, `after-dark-agent-memory.png` | agent 记忆 tab, dark |
-| `before-light-create-agent.png`, `after-light-create-agent.png` | create-agent dialog, light: FormField labels, boxed controls, 取消 + 创建 row |
+| `before-light-agent-permissions.png`, `after-light-agent-permissions.png` | agent `权限` tab, light: card-title group heads, empty `密钥` row centred |
+| `before-dark-agent-permissions.png`, `after-dark-agent-permissions.png` | agent `权限` tab, dark |
+| `before-light-agent-memory.png`, `after-light-agent-memory.png` | agent `记忆` tab with no memories: EmptyState |
+| `before-dark-agent-memory.png`, `after-dark-agent-memory.png` | agent `记忆` tab, dark |
+| `before-light-create-agent.png`, `after-light-create-agent.png` | create-agent dialog, light: FormField labels, boxed controls, `取消` + `创建` row |
 | `before-dark-create-agent.png`, `after-dark-create-agent.png` | create-agent dialog, dark |

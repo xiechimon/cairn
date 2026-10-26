@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const STRESS = '/app?scenario=board-stress';
+const STRESS = '/app?scenario=board-stress&view=board';
 const NATURAL_FLOOR = 200;
 
 const ZOOM_LEVELS = [

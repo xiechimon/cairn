@@ -1,8 +1,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const TAGS = '/app?scenario=board-tags';
-const EMPTY = '/app?scenario=board-tags-empty';
-const REPOS = '/app?scenario=board-repos';
+const TAGS = '/app?scenario=board-tags&view=board';
+const EMPTY = '/app?scenario=board-tags-empty&view=board';
+const REPOS = '/app?scenario=board-repos&view=board';
 
 const PRJ_CANON = 'ZAQczKCu0MOAzC1ZqcFlX';
 
@@ -49,7 +49,7 @@ async function openTypePopover(page: Page) {
 test('legacy scenario (no projectNames) renders no repo section; top bar two buttons = bare filter button + new-task capsule', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
 
   await expect(chipsBar(page)).toHaveCount(0);
   const banner = page.getByRole('banner');

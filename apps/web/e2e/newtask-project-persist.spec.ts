@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const STORAGE_KEY = 'cairn.newTaskProjectId'; // mirrored: new-task-dialog.tsx
-const BOARD = '/app?scenario=newtask-projects';
+const BOARD = '/app?scenario=newtask-projects&view=board';
 const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=newtask-projects';
 
 /** Seed the memory before any navigation (and keep it across reloads). */

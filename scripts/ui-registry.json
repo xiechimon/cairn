@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "112706bba9ebe85be242453258714ec9284594f8",
-    "date": "2026-10-25"
+    "sha": "1b84a9bf84690b0ff1e70d6333f67f11e8a37503",
+    "date": "2026-10-26"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -64,7 +64,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers.",
-      "hash": "8cd1d956bca73a2a8053db457adda79775652d830a0e5cc500c3b8e98caf21cb"
+      "hash": "4a228cb26ed1301fb36c4af62ce78c11de191f6cf4b7082891e74b41ebdf5e4e"
     },
     "dialog.tsx": {
       "kind": "registry",
@@ -76,8 +76,8 @@
       "kind": "registry",
       "upstreamItem": "dropdown-menu",
       "status": "deviated",
-      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #454 anchor prop exposed for call-site positioning (project-new-page, 1 consumer). Icon seam retired to lucide per the components.json iconLibrary contract (#982); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu (apps/web/DESIGN.md 弹窗与菜单): popup --radius-popover (10px) + --shadow-popover; items h-8, 6px corners, text-ui, 15px ink-3 icons, menu-hover focus fill, danger-soft destructive fill; separators inset 6px; caption labels and shortcut hints.",
-      "hash": "318456d3472a8bb5f48b6328e11375fa6225a9b9fe42877202246d0e57a77978"
+      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #454 anchor prop exposed for call-site positioning (project-new-page, 1 consumer). Icon seam retired to lucide per the components.json iconLibrary contract (#982); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu: popup and items take the shared menu classes from menu.ts (--radius-popover, --menu-pad padding, --shadow-popover; items h-8 with --radius-menu-item pills, text-ui, 15px ink-3 icons, menu-hover focus fill), danger-soft destructive fill; caption labels and shortcut hints.",
+      "hash": "572cc9028018e6a600bfccb93dce5dc642512d7d10340dabea115fd4d5e4f5f2"
     },
     "empty.tsx": {
       "kind": "registry",
@@ -120,6 +120,11 @@
       "upstreamItem": "marker",
       "status": "pristine",
       "hash": "59574fed3eb44e6bf6601fe1f8c5df0a9ecb41bd70065dc02f3f0060cd52e5ed"
+    },
+    "menu.ts": {
+      "kind": "adapter",
+      "reason": "Shared Paper menu classes (surface, item, indicator, separator) consumed by dropdown-menu.tsx and the hand-built menus outside components/ui, so every menu uses one padding token and the concentric --radius-menu-item.",
+      "hash": "8a1fbe09e916d3d14a403d5f4ee58b230fc453b3e56c5a8da3a66b9dc6fd8d74"
     },
     "message-scroller.tsx": {
       "kind": "registry",

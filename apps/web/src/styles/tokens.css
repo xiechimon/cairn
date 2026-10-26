@@ -71,6 +71,8 @@
   --cds-radius-xl: 12px;
   --cds-radius-2xl: 16px;
   --radius-popover: 18px;
+  --menu-pad: 6px;
+  --radius-menu-item: calc(var(--radius-popover) - var(--menu-pad));
   --dialog-w-s: 400px;
   --dialog-w-m: 480px;
   --dialog-w-l: 640px;
@@ -197,8 +199,8 @@
   --cds-shadow-md: 0 8px 24px rgb(31 27 24 / 0.1), 0 2px 6px rgb(31 27 24 / 0.05);
   --cds-shadow-lg: 0 16px 40px rgb(31 27 24 / 0.16), 0 2px 6px rgb(31 27 24 / 0.06);
   --e1: var(--cds-shadow-sm), 0 0 0 1px var(--border);
-  --e2: var(--cds-shadow-md), 0 0 0 1px var(--border);
-  --e3: var(--cds-shadow-lg), 0 0 0 1px var(--border);
+  --e2: var(--cds-shadow-md), 0 0 0 1px var(--border-soft);
+  --e3: var(--cds-shadow-lg), 0 0 0 1px var(--border-soft);
   --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 4px 14px rgb(80 60 30 / 0.07);
   --shadow-composer:
     0 1px 2px rgb(80 60 30 / 0.04), 0 6px 24px rgb(80 60 30 / 0.06),

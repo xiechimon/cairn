@@ -12,6 +12,14 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHIEF_DISPATCH_HARNESS_PATHS } from '@cairn/shared';
 import {
+  isLearnCase,
+  LEARN_ARMS,
+  type LearnArm,
+  type LearnCase,
+  learnHeadlineFromRows,
+} from '../learn/grade.mts';
+import { runLearnCase } from '../learn/run.mts';
+import {
   gradeMemoryCase,
   isMemoryCase,
   type MemoryCase,
@@ -52,7 +60,7 @@ const PRICES: Record<string, { in: number; out: number; cacheRead: number }> = {
   'deepseek-v4-pro': { in: 0.955, out: 1.911, cacheRead: 0.08 },
 };
 
-type EvalCase = Case | MemoryCase;
+type EvalCase = Case | MemoryCase | LearnCase;
 
 async function loadCases(): Promise<EvalCase[]> {
   const d = JSON.parse(readFileSync(join(ARGS.flow, 'cases.json'), 'utf8')) as {
@@ -64,7 +72,7 @@ async function loadCases(): Promise<EvalCase[]> {
   return d.cases;
 }
 
-async function freshStack(input: EvalCase): Promise<{ stack: Stack; world: SeededWorld }> {
+async function freshStack(input: Case | MemoryCase): Promise<{ stack: Stack; world: SeededWorld }> {
   const stack = await bootStack();
   try {
     const world = await seedWorld(stack, {
@@ -94,7 +102,29 @@ async function runCase(
   truncated: boolean;
   agentIds: Record<string, string>;
   memoryAfter: MemoryRowLite[];
+  grade?: { grade: Record<string, number>; explanation: Record<string, string> };
 }> {
+  if (isLearnCase(input)) {
+    const learned = await runLearnCase(input, {
+      arm: ARGS.arm,
+      roster: ROSTER,
+      model: CHIEF_MODEL,
+      timeoutMs: ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000,
+    });
+    const truncated = learned.truncated;
+    return {
+      output: learned.output,
+      transcript: buildTranscript(learned.evidence),
+      model: learned.model,
+      usage: learned.usage,
+      stop_reason: learned.stop_reason,
+      evidence: learned.evidence,
+      truncated,
+      agentIds: learned.agentIds,
+      memoryAfter: [],
+      grade: learned.grade,
+    };
+  }
   const { stack, world } = await freshStack(input);
   try {
     const timeoutMs = ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000;
@@ -119,6 +149,7 @@ async function runCase(
       truncated,
       agentIds: world.agentIds,
       memoryAfter: readMemoryRows(stack.server, world.chiefAgentId),
+      grade: undefined,
     };
   } finally {
     await stack.close();
@@ -169,6 +200,8 @@ function parseArgs(argv: string[]) {
     approveHarness: false,
     writeVerify: undefined as string | undefined,
     patchDigest: undefined as string | undefined,
+    arm: 'all' as LearnArm,
+    caseIds: [] as string[],
   };
   const val = (i: number): string => {
     const v = argv[i];
@@ -190,6 +223,8 @@ function parseArgs(argv: string[]) {
     else if (k === '--approve-harness') a.approveHarness = true;
     else if (k === '--write-verify') a.writeVerify = val(++i);
     else if (k === '--patch-digest') a.patchDigest = val(++i);
+    else if (k === '--arm') a.arm = val(++i) as LearnArm;
+    else if (k === '--case') a.caseIds.push(val(++i));
     else if (k === '-h' || k === '--help') {
       usage();
       process.exit(0);
@@ -198,6 +233,11 @@ function parseArgs(argv: string[]) {
       usage();
       process.exit(2);
     }
+  }
+  if (!(LEARN_ARMS as readonly string[]).includes(a.arm)) {
+    console.error(`--arm must be one of ${LEARN_ARMS.join(', ')}, got '${a.arm}'`);
+    usage();
+    process.exit(2);
   }
   if (!/^(baseline|v[1-9]\d*)$/.test(a.variant)) {
     console.error(`--variant must be 'baseline' or 'v<N>', got '${a.variant}'`);
@@ -220,7 +260,7 @@ function parseArgs(argv: string[]) {
 }
 function usage() {
   console.error(
-    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
+    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
   );
 }
 
@@ -371,7 +411,22 @@ async function main() {
       } catch {}
     }
 
-  const cases = await loadCases();
+  let cases = await loadCases();
+  if (ARGS.caseIds.length > 0) {
+    const known = new Set(cases.map((c) => c.id));
+    for (const id of ARGS.caseIds) {
+      if (!known.has(id)) {
+        console.error(`unknown case '${id}'`);
+        process.exit(2);
+      }
+    }
+    const want = new Set(ARGS.caseIds);
+    cases = cases.filter((c) => want.has(c.id));
+  }
+  if (ARGS.arm !== 'all' && !cases.some((c) => isLearnCase(c))) {
+    console.error(`--arm ${ARGS.arm} applies to learn cases only`);
+    process.exit(2);
+  }
   const seen = new Map<string, string>();
   for (const c of cases) {
     const k = pathSafeId(c.id).toLowerCase();
@@ -443,10 +498,16 @@ async function main() {
               }
             }
             const g = await withBackoff(
-              async () =>
-                isMemoryCase(c)
+              async () => {
+                if (isLearnCase(c)) {
+                  if (run.grade === undefined)
+                    throw new Error(`learn case ${c.id} returned no grade`);
+                  return run.grade;
+                }
+                return isMemoryCase(c)
                   ? gradeMemoryCase(c, { evidence: run.evidence, memoryAfter: run.memoryAfter })
-                  : gradeCase(c, run, ROSTER),
+                  : gradeCase(c, run, ROSTER);
+              },
               judgeRetry,
               deadline,
             );
@@ -458,14 +519,15 @@ async function main() {
         const row = {
           prompt_id: safeId,
           rep,
-          prompt: c.prompt,
+          prompt: isLearnCase(c) ? c.round2 : c.prompt,
           tags: c.tags,
           meta:
-            safeId !== String(c.id) || appRetry.count || judgeRetry.count
+            safeId !== String(c.id) || appRetry.count || judgeRetry.count || isLearnCase(c)
               ? {
                   ...(safeId !== String(c.id) ? { original_id: String(c.id) } : {}),
                   ...(appRetry.count ? { retries: appRetry.count } : {}),
                   ...(judgeRetry.count ? { judge_retries: judgeRetry.count } : {}),
+                  ...(isLearnCase(c) ? { arm: ARGS.arm } : {}),
                 }
               : undefined,
           model: run.model,
@@ -551,6 +613,20 @@ async function main() {
     });
     mkdirSync(dirname(ARGS.writeVerify), { recursive: true });
     writeFileSync(ARGS.writeVerify, `${JSON.stringify(result, null, 2)}\n`);
+  }
+  if (cases.some((c) => isLearnCase(c)) && existsSync(resultsPath)) {
+    const headline = learnHeadlineFromRows(
+      parseResultsJsonl(readFileSync(resultsPath, 'utf8')).flatMap((row) => {
+        const grade = (row as { grade?: Record<string, number> }).grade;
+        return grade === undefined ? [] : [{ grade }];
+      }),
+    );
+    if (headline !== null) {
+      const gap = headline.gapClosed === null ? 'n/a' : headline.gapClosed.toFixed(3);
+      console.error(
+        `learn headline: repeat_rate=${headline.repeatRate.toFixed(3)} gap_closed=${gap}`,
+      );
+    }
   }
   process.exit(fail ? 1 : 0);
 }

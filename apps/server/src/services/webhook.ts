@@ -21,12 +21,14 @@ import { githubRepoOfProject } from './git.js';
 import { teamGithubToken } from './github-connection.js';
 import { importGithubIssue } from './github-issues.js';
 import { hasRepoTriage, ISSUE_INTAKE_IN_FLIGHT_CAP, projectAtInFlightCap } from './issue-intake.js';
+import type { OAuthClientConfig } from './oauth.js';
 import { type OrchestrateDeps, orchestrateTodo } from './orchestrate.js';
 import { verifyWebhookToken } from './webhook-tokens.js';
 
 export interface WebhookDeps extends OrchestrateDeps {
   box: SecretBox;
   githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
   logger?: Logger;
 }
 
@@ -181,14 +183,16 @@ export async function receiveGithubWebhook(
       gate: gate.reason,
     });
   }
-  const access = teamGithubToken(deps, tokenRow.teamId);
+  const access = await teamGithubToken(deps, tokenRow.teamId);
   if ('reason' in access) {
     return refuse(
       access.reason,
       'misconfigured',
       access.reason === 'token-unreadable'
         ? 'github token unreadable'
-        : 'github connection not found',
+        : access.reason === 'github-disconnected'
+          ? 'github connection disconnected (refresh failed); reconnect GitHub'
+          : 'github connection not found',
     );
   }
   const githubFetch = deps.githubFetch ?? fetch;
@@ -240,7 +244,7 @@ export async function receiveGithubWebhook(
       });
     }
     if (err instanceof HttpError && err.status === 404) {
-      if ('reason' in teamGithubToken(deps, tokenRow.teamId)) {
+      if ('reason' in (await teamGithubToken(deps, tokenRow.teamId))) {
         return refuse('no-github-connection', 'misconfigured', 'github connection not found');
       }
       return refuse(

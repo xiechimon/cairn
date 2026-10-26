@@ -1,33 +1,33 @@
-# /name 派发机制实证（mock session fixture）
+# /name dispatch mechanism evidence (mock session fixture)
 
-> 参照 spec 14 验收先例：mock pi session 捕获 fixture，不依赖真实模型调用。
+> Following the spec 14 acceptance precedent: a mock pi session capture fixture, no real model call involved.
 
-## 实证目标
+## Evidence goal
 
-证明 runner 在组装 worker prompt 时，对 `/<skill-name>` 模式做了确定性展开：
+Prove that the runner performs a deterministic expansion of the `/<skill-name>` pattern while assembling the worker prompt:
 
-1. prompt 含 `/verify-pacman`（可见集内）→ 前置「先调用 Skill 工具加载 verify-pacman」指令 + `dispatch: /verify-pacman` 日志
-2. prompt 含 `/no-such-skill`（可见集外）→ no-op + `unknown-dispatch: no-such-skill` 日志
-3. prompt 无 slash-skill → no-op 零日志
+1. the prompt contains `/verify-pacman` (inside the visible set) → the "call the Skill tool to load verify-pacman first" instruction is prepended + a `dispatch: /verify-pacman` log
+2. the prompt contains `/no-such-skill` (outside the visible set) → no-op + an `unknown-dispatch: no-such-skill` log
+3. the prompt has no slash-skill → no-op, zero logs
 
-## 单测实证（test/runner-*.test.ts 面）
+## Unit-test evidence (the test/runner-*.test.ts face)
 
-`/name` 展开的判定逻辑（可见集校验 + 正则提取 + 前置指令拼接）在 runner.ts 的 runStep 内联实现。其行为面由单测钉住：
+The `/name` expansion's judgment logic (visible-set validation + regex extraction + prepended-instruction composition) is inlined in runner.ts's runStep. Its behavior face is pinned by unit tests:
 
-- `skills-worktree.test.ts` — `collectVisibleSkillNames` / `collectVisibleSkillFileMap` 与 catalog 同扫描面的可见集判定（五态）
-- `skill-tool.test.ts` — `buildSkillLoadTool` 入参校验 + invoke 日志（三态）
+- `skills-worktree.test.ts` — the visible-set judgment of `collectVisibleSkillNames` / `collectVisibleSkillFileMap` on the same scan surface as the catalog (five states)
+- `skill-tool.test.ts` — `buildSkillLoadTool` input validation + invoke logs (three states)
 
-## 真实派一步的预期 transcript 片段
+## Expected transcript fragment of a real dispatched step
 
-真派一步带 `/verify-pacman` 的 worker prompt 时，期望 transcript 含以下形状（Skill 工具调用记录）：
+When a real dispatched step's worker prompt carries `/verify-pacman`, the transcript is expected to contain the following shape (the Skill tool invocation record):
 
 ```jsonc
-// 1. 前置指令出现在 user prompt 首段（runner 拼接，非模型自决）
+// 1. the prepended instruction appears at the head of the user prompt (runner-composed, not model-decided)
 {
   "type": "user",
   "content": [
     "Before proceeding, use the Skill tool to load \"verify-pacman\".\n\n",
-    "<原任务 prompt>"
+    "<original task prompt>"
   ]
 }
 
@@ -38,20 +38,20 @@
   "arguments": { "skill": "verify-pacman" }
 }
 
-// 3. SKILL.md 全文作为 tool_result 返回
+// 3. the SKILL.md full text returned as a tool_result
 {
   "type": "tool_result",
   "name": "Skill",
   "content": "---\nname: verify-pacman\ndescription: ...\n---\n..."
 }
 
-// 4. [skills] 日志行
+// 4. the [skills] log lines
 // [skills] dispatch: /verify-pacman
 // [skills] invoke: verify-pacman
 ```
 
-## 判定依据
+## Judgment basis
 
-- transcript 工具调用记录含 `Skill` 工具 + `arguments.skill = "verify-pacman"` = Skill 工具被确定性调用（不是 read 裸读）
-- shared/skill-facts.ts 的 `skillCallName` 对 `Skill` 工具的识别分支（`arguments.skill`）使活动行显示 `skill: verify-pacman`
-- `[skills] dispatch` / `[skills] invoke` / `[skills] unknown-dispatch` 三日志行落 daemon.log
+- the transcript's tool-call record contains the `Skill` tool + `arguments.skill = "verify-pacman"` = the Skill tool was invoked deterministically (not a bare read)
+- the `Skill`-tool recognition branch of `skillCallName` in shared/skill-facts.ts (`arguments.skill`) makes the live row display `skill: verify-pacman`
+- the three log lines `[skills] dispatch` / `[skills] invoke` / `[skills] unknown-dispatch` land in daemon.log

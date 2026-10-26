@@ -37,6 +37,7 @@ const BOARD = [
   'shadcn-primitives',
   'storage-unavailable',
   'mobile-narrow',
+  'focus-ring-clip',
 ];
 const SIDEBAR = [
   'sidebar-',
@@ -58,6 +59,7 @@ const SIDEBAR = [
   'mobile-narrow',
 ];
 const DETAIL = [
+  'composer-tool-tips',
   'detail-',
   'chat-',
   'transcript-',
@@ -102,6 +104,7 @@ const DETAIL = [
   'mobile-narrow',
 ];
 const CHIEF = [
+  'composer-tool-tips',
   'chief-',
   'composer-wire-reject',
   'elevation-',
@@ -185,6 +188,11 @@ const SHARED_SURFACE_ONLY = ['cds-motion', 'color-freeze', 'fixture-mode-chip'];
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 const FILE_RULES = new Map([
+  ['apps/web/src/overlay/chip-popover.tsx', OVERLAYS],
+  ['apps/web/src/overlay/gesture-machine.ts', [...OVERLAYS, 'chief-toggle-flash']],
+  ['apps/web/src/overlay/hotkeys.ts', OVERLAYS],
+  ['apps/web/src/overlay/plan-dropdown.tsx', OVERLAYS],
+  ['apps/web/src/overlay/search-panel.tsx', OVERLAYS],
   ['apps/web/src/board/sidebar.tsx', SIDEBAR],
   ['apps/web/src/board/app-sidebar.tsx', SIDEBAR],
   ['apps/web/src/routes/board-page.tsx', BOARD],
@@ -193,7 +201,7 @@ const FILE_RULES = new Map([
   ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/agent-fallback-models.tsx', AGENT],
-  ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-']],
+  ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-', 'focus-ring-clip']],
   ['apps/web/src/routes/api-keys-page.tsx', ['user-menu-']],
   ['apps/web/src/routes/create-agent-dialog.tsx', AGENT],
   ['apps/web/src/routes/machine-authorize-page.tsx', ['machine-']],
@@ -228,7 +236,6 @@ const DIR_RULES = [
   { prefix: 'apps/web/src/chief/', specs: CHIEF },
   { prefix: 'apps/web/src/detail/', specs: DETAIL },
   { prefix: 'apps/web/src/overlay/', specs: OVERLAY },
-  { prefix: 'apps/web/src/overlays/', specs: OVERLAYS },
   { prefix: 'apps/web/src/pages/', specs: PAGES },
   { prefix: 'apps/web/src/resources/', specs: RESOURCES },
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },

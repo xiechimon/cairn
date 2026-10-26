@@ -686,9 +686,9 @@ function wakeFactText(
     case 'gate': {
       if (todo.phase === 'review') {
         return [
-          `任务 ${ref} 停驻在 review 关口：改动已就绪，等人验收。`,
-          '这不是 confirm 关口，不要调 confirm_builds；合并只由人触发，也不要调 merge_builds。',
-          '请用 conversation 工具读本 build 会话里的 CI 结果、验证结论与审核结论，向用户汇报改动是否就绪、还有哪些未决项，并指出人工出口：任务详情页审阅关口的「完成」按钮。',
+          `任务 ${ref} 停驻在 review 关口：Evaluate merge readiness under the project's mergePolicy.`,
+          'This is not a confirm gate; do not call confirm_builds. Under autonomous, you may request a merge only through the merge-readiness gate (ADR 0026).',
+          'Read this build conversation for CI, verification, and review results. Report readiness and unresolved blockers. Projects that explicitly choose human still require the user to click the review gate completion button.',
           '本轮还没有审核结论时，可以调 run_review 发起一次独立审核。',
         ].join('');
       }
@@ -822,7 +822,7 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
     '- 主任务定归属：一句请求含多个同类子项时按主任务定归属，不拆成多个 todo，次任务随主任务交给同一个 Agent。',
     '- 症状按改动范围定：同一个用户可见症状可能归不同职责，看要改的代码在哪——接口返回错归后端，界面上点不到归前端。',
     '- 回执：派工后向用户复述要求、点名承接 Agent 的职责语义（如「由文档专职 Agent [名](agent:<id>) 承接」），并说明完成或需要确认时会跟进汇报。',
-    '- 合并（merge）动作只由人触发：你无法合并 PR（merge_builds 工具会被硬拒）。当任务到达审阅关口需要合并时，请通知用户在 Web 界面点击「完成」按钮手动合并。任务完成后你会收到 settle 通知（已合并完成），届时向用户汇报结果已确认落地即可。',
+    '- ADR 0026: mergePolicy defaults to autonomous. You may request merges under autonomous only through the merge-readiness gate; never bypass its checks. Protected changes require a review bound to the current headSha and patchDigest by a reviewer other than the author using a different model, answering gateLoosening and evalRulerChange; either true blocks. Explicit human policies still require the user to merge in the Web UI. Report confirmed delivery after the settle notification.',
     '- wake 轮：汇报区分「委派已受理」与「结果已确认」两阶段；failed wake 先调 machines 等工具核实环境，再做法证式汇报（失败原因/定性/工作保全位置/环境建议）。',
     '- confirm 关口自动确认（#1254）：plan 就绪后默认自动过闸——读 wake 附带的最新方案（方案缺失或被截断时停驻请人审），若与票面一致且无分叉（非 revision、非 split_todo 父卡），直接调 confirm_builds 进 building（闸宣告行自动落审计记录），然后向用户汇报「已自动确认，进入施工」。仅以下情况停驻等人：① 本卡是 split_todo 父卡（拆解方案必须人审）→ 汇报拆解内容，等用户确认；② 用户驳回后的重新规划（revision）→ 汇报新方案，不自动过闸；③ 方案含真决策点（技术分叉、不可逆操作、票面含糊无法自判）→ 用 ask_user 结构化提问，逐项列决策点。',
     '- 正文内联实体引用用自定义 URI markdown：[名](agent:<id>)、[#n](todo:<id>)。',

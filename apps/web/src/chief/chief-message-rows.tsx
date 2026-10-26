@@ -46,7 +46,7 @@ const MARKER_ERROR_CLS =
   'my-2.5 flex-col justify-center text-center text-meta text-(--destructive)';
 
 const CHIP_INLINE_CLS =
-  'mx-0.5 inline-flex items-center gap-1 rounded-[4px] px-1.5 py-px align-[1px] text-meta';
+  'mx-0.5 inline-flex items-center gap-1 rounded-(--cds-radius-sm) px-1.5 py-px align-[1px] text-meta';
 
 function segmentsText(segments: ChiefSegment[]): string {
   return segments.map((s) => (s.todo != null ? `#${s.todo}` : (s.agent ?? s.text ?? ''))).join('');
@@ -91,7 +91,10 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
           );
         if (s.code)
           return (
-            <code key={i} className="rounded-[4px] bg-(--muted) px-1 py-px font-mono text-meta">
+            <code
+              key={i}
+              className="rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-meta"
+            >
               {s.text}
             </code>
           );

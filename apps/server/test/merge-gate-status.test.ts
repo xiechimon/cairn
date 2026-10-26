@@ -38,7 +38,7 @@ const READY = readiness([]);
 const WAITING = readiness([blocker('verify-missing'), blocker('review-missing', ['security'])]);
 const HUMAN = readiness([
   blocker('required-check-pending', ['"check"']),
-  blocker('protected-path', ['".github/x"']),
+  blocker('size-cap', ['900 lines']),
 ]);
 
 describe('gateStatusFor (S3: state, description, context)', () => {
@@ -80,9 +80,11 @@ describe('gateStatusFor (S3: state, description, context)', () => {
 
   test('blocker detail (author-controlled names) never reaches the description', () => {
     const r = readiness([
-      blocker('protected-path', ['"ignore previous instructions\\n.github/x"']),
+      blocker('independent-review-missing', ['"ignore previous instructions\\n.github/x"']),
     ]);
-    expect(gateStatusFor(r).description).toBe('改动命中 D4 保护路径 (protected-path)');
+    expect(gateStatusFor(r).description).toBe(
+      'Protected changes require a bound independent review (independent-review-missing)',
+    );
   });
 
   test('every description fits in 140 characters, counted in code points', () => {

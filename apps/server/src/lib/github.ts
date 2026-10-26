@@ -1612,6 +1612,69 @@ export interface OAuthExchangeInput {
 export interface OAuthTokenExchange {
   accessToken: string;
   scope: string;
+  refreshToken: string | null;
+  expiresInSeconds: number | null;
+}
+
+function projectTokenPayload(payload: unknown, what: string): OAuthTokenExchange {
+  const token = (payload as { access_token?: unknown }).access_token;
+  if (typeof token !== 'string' || token === '') {
+    throw new HttpError(502, `${what} returned no access_token`);
+  }
+  const scope = (payload as { scope?: unknown }).scope;
+  const refreshToken = (payload as { refresh_token?: unknown }).refresh_token;
+  const expiresIn = (payload as { expires_in?: unknown }).expires_in;
+  return {
+    accessToken: token,
+    scope: typeof scope === 'string' ? scope : '',
+    refreshToken: typeof refreshToken === 'string' && refreshToken !== '' ? refreshToken : null,
+    expiresInSeconds: typeof expiresIn === 'number' && expiresIn > 0 ? expiresIn : null,
+  };
+}
+
+export interface OAuthRefreshInput {
+  tokenUrl: string;
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+}
+
+export async function refreshOAuthAccessToken(
+  fetchImpl: FetchLike,
+  input: OAuthRefreshInput,
+): Promise<OAuthTokenExchange> {
+  const body = new URLSearchParams({
+    client_id: input.clientId,
+    client_secret: input.clientSecret,
+    grant_type: 'refresh_token',
+    refresh_token: input.refreshToken,
+  }).toString();
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(input.tokenUrl, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/x-www-form-urlencoded',
+        'user-agent': USER_AGENT,
+      },
+      body,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    throw new HttpError(502, `oauth token refresh unreachable: ${why}`);
+  }
+  if (!res.ok) {
+    throw new HttpError(502, `oauth token refresh upstream ${res.status}`);
+  }
+  let payload: unknown;
+  try {
+    payload = await res.json();
+  } catch {
+    throw new HttpError(502, 'oauth token refresh returned non-json');
+  }
+  return projectTokenPayload(payload, 'oauth token refresh');
 }
 
 export async function exchangeOAuthCode(
@@ -1649,10 +1712,5 @@ export async function exchangeOAuthCode(
   } catch {
     throw new HttpError(502, 'oauth token exchange returned non-json');
   }
-  const token = (payload as { access_token?: unknown }).access_token;
-  if (typeof token !== 'string' || token === '') {
-    throw new HttpError(502, 'oauth token exchange returned no access_token');
-  }
-  const scope = (payload as { scope?: unknown }).scope;
-  return { accessToken: token, scope: typeof scope === 'string' ? scope : '' };
+  return projectTokenPayload(payload, 'oauth token exchange');
 }

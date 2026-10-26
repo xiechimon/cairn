@@ -113,7 +113,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
             </Button>
           </span>
         </div>
-        <div className="max-h-66 overflow-y-auto rounded-md border border-border bg-card px-2 py-1 dark:bg-input/30">
+        <div className="max-h-66 scroll-py-2 overflow-y-auto rounded-md border border-border bg-card px-2 py-1 dark:bg-input/30">
           <div className="flex items-center gap-2 py-1 text-meta text-content-tertiary">
             <span className="flex-1" />
             <span className="w-8 text-center">{t('读')}</span>

@@ -1,27 +1,24 @@
-# #1260 总管降级为普通 agent live 验收证据
+# #1260 chief demotion to a regular agent, live acceptance evidence
 
-probe：`drive-1259-1260-binding.mjs`（与 #1259 共用一栈一脚本；栈 =
-launch.mjs 隔离实例 + 全新库；零 daemon、零 LLM——chief 回合数据面与真
-机器同形，claim 全走真 machine wire）。结果：**27/27 checks PASS**；
-证据实物在 `docs/verify/1259/`（两票共用一栈一跑，截图与 JSON 同份）。
+probe: `drive-1259-1260-binding.mjs` (shares one stack and one script with #1259; stack =
+a launch.mjs isolated instance + a fresh library; zero daemon, zero LLM — the chief-round data face is the same shape as a real machine's, and all claims go through the real machine wire). Result: **27/27 checks PASS**;
+the artifacts live in `docs/verify/1259/` (the two tickets share one stack and one run; the screenshots and JSON are the same copies).
 
-## 场景
+## Scenario
 
-chief 绑定铺底 agent（归属机 `verify-home-1259`）后，chief 步的去处、槽位、
-模型全部读该 agent 的自身配置。
+After the chief binds a bedding agent (home machine `verify-home-1259`), the chief step's destination, slot and model all read that agent's own configuration.
 
-| 腿 | 动作 | 判据（证据文件） |
+| leg | action | criterion (evidence files) |
 |---|---|---|
-| A4 路由降级 | chief 回合入队 → 别机空手、归属机领到 | `a-claims.json`：chief 步 kind=chief、machineId=home、载荷 modelId=绑定 Agent 自身值（无覆盖槽） |
-| B 占槽 | 归属机 maxConcurrent=1 + chief 步在跑 → 再 claim 空手 | result.json `B1`（chief 步占机器槽，满载即排队） |
-| F4 抽屉 | 模型行只读（绑定 Agent 自身模型值，无覆盖触发钮） | `f4-chief-drawer.png` + result.json `F4`（`总管主模型` 按钮计数 = 0） |
-| F5 设置面 | Agent tab 只读信息卡「模型与归属机跟随绑定 Agent」在位；压缩模型/机器选择器退役 | `f5-chief-settings.png` + result.json `F5` |
+| A4 route demotion | a chief round is enqueued → another machine claims empty-handed, the home machine claims it | `a-claims.json`: the chief step's kind=chief, machineId=home, the payload's modelId = the bound agent's own value (no override slot) |
+| B slot occupancy | home machine maxConcurrent=1 + a chief step running → another claim comes back empty | result.json `B1` (a chief step occupies a machine slot; at full capacity it queues) |
+| F4 drawer | the model row is read-only (the bound agent's own model value, no override trigger button) | `f4-chief-drawer.png` + result.json `F4` (the `总管主模型` button count = 0) |
+| F5 settings face | the Agent tab's read-only info card `模型与归属机跟随绑定 Agent` is present; the compaction-model / machine selectors are retired | `f5-chief-settings.png` + result.json `F5` |
 
-亲和三件套（#863/#862 T1/#895）与覆盖槽（model/compactionModel/thinkingLevel）
-的退役面 = grep 零命中 + wire 面 400（server `chief-settings.test.ts` 退役槽族
-用例；`machine-concurrency-chief.test.ts` 翻转钉占槽语义）。
+The affinity trio (#863/#862 T1/#895) and the override slots (model/compactionModel/thinkingLevel)
+retirement faces = zero grep hits + wire-face 400s (the server `chief-settings.test.ts` retired-slot family cases; `machine-concurrency-chief.test.ts` flips and pins the slot-occupancy semantics).
 
-## 复跑配方
+## Rerun recipe
 
 ```sh
 node .claude/skills/verify-pacman/scripts/launch.mjs
@@ -29,14 +26,14 @@ node .claude/skills/verify-pacman/scripts/drive-1259-1260-binding.mjs
 node .claude/skills/verify-pacman/scripts/cleanup.mjs
 ```
 
-## 单元 / e2e 面
+## Unit / e2e faces
 
-- server：`test/chief-demotion.test.ts`（9 条失败方式先行：路由换源/占机器槽/
- 占 Agent 槽/无继承/退役槽 wire/sweep 挂起面——#1257 裁决后为挂起断言，
- 步留 pending 不产失败行）+ `chief-abandoned-sweep` /
- `machine-pin` / `chief-settings` 翻转重写；`chief-affinity` /
- `chief-model-slot` 随机制退役删除。
-- shared：快照重生 = 纯退役槽删除（chief 记录四键 + PATCH 槽 + claim 载荷
- reworkContext）。
-- web：`chief-settings.spec.ts` 收编（选择器族测试删、信息卡钉新增）+
- `chief-send-fallback.spec.ts` 随回落链删除。
+- server: `test/chief-demotion.test.ts` (9 failure-mode-first cases: route source swap / machine-slot occupancy /
+  agent-slot occupancy / no inheritance / retired-slot wire / the sweep hang face — after the #1257 ruling it is a hang assertion,
+  the step stays pending and produces no failure row) + `chief-abandoned-sweep` /
+  `machine-pin` / `chief-settings` flip rewrites; `chief-affinity` /
+  `chief-model-slot` deleted with the mechanism's retirement.
+- shared: the snapshot rebirth = pure retired-slot deletion (the chief record's four keys + the PATCH slots + the claim payload's
+  reworkContext).
+- web: `chief-settings.spec.ts` absorbed (the selector-family tests deleted, the info-card pin added) +
+  `chief-send-fallback.spec.ts` deleted with the fallback chain.

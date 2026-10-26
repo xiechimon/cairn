@@ -1,3 +1,4 @@
+```
 # Probe dump — old baseline → new measured (#921)
 
 Run 2026-10-09T04:20:16.695Z · commit `3f91585a` · port 8404 · playwright 1.63.0 · workers 4
@@ -107,3 +108,5 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | thinking-row-truncate.spec.ts | 234 | toBeLessThanOrEqual | ≤ 0 | 0 | — | T4: 页面级零横向溢出；展开交互不被截断修法砸掉 |
 | transcript-user-words.spec.ts | 235 | toBe | 24 | 24 | — | 5. 单段短消息气泡保持 24px 药丸高度（几何不漂移） |
 | transcript-user-words.spec.ts | 236 | toBe | 15px | 15px | — | 5. 单段短消息气泡保持 24px 药丸高度（几何不漂移） |
+
+```

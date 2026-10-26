@@ -4,10 +4,10 @@ import {
   ChartColumn,
   ChevronDown,
   ChevronRight,
-  CircleAlert,
   Clock,
   Columns3,
   EllipsisVertical,
+  Inbox,
   KeyRound,
   Layers,
   type LucideIcon,
@@ -31,14 +31,16 @@ import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
+import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { readStoredTheme } from '../theme.js';
 import { withColumnParam } from './columns.js';
+import { withoutBoardView } from './home.js';
 import { ProjectAvatar } from './project-avatar.js';
 
 export type SidebarSelected =
   | 'board'
-  | 'attention'
+  | 'kanban'
   | 'schedules'
   | 'team'
   | 'none'
@@ -127,7 +129,7 @@ const FOCUS =
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
 
-const ROW = `flex h-9 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui text-content-secondary no-underline transition-[background-color,color] duration-150 ease-out ${FOCUS}`;
+const ROW = `flex h-9 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui text-content-secondary no-underline transition-[background-color,color] duration-150 ease-out ${FOCUS_RING_INSET}`;
 const ROW_IDLE = 'hover:bg-sidebar-hover hover:text-foreground [&>svg:first-child]:text-icon';
 const ROW_ACTIVE = `bg-(--hover-1) font-medium text-foreground [&>svg:first-child]:text-(--card-button) ${SEARCH_OPEN_DIM}`;
 
@@ -136,7 +138,7 @@ const ROW_BTN =
 
 const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--radius-control) border-none bg-transparent p-0 text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0 ${FOCUS}`;
 
-const RAIL_ROW = `rail-row relative flex size-8 flex-none items-center justify-center rounded-(--cds-radius-lg) text-content-tertiary no-underline transition-[background-color,box-shadow,color] duration-150 ease-out hover:bg-sidebar-hover hover:text-foreground ${FOCUS}`;
+const RAIL_ROW = `rail-row relative flex size-8 flex-none items-center justify-center rounded-(--cds-radius-lg) text-content-tertiary no-underline transition-[background-color,box-shadow,color] duration-150 ease-out hover:bg-sidebar-hover hover:text-foreground ${FOCUS_RING_INSET}`;
 const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button) hover:bg-(--hover-1) hover:text-(--card-button) ${SEARCH_OPEN_DIM}`;
 const RAIL_BTN =
   'cursor-pointer border-none bg-transparent p-0 dark:hover:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-content-tertiary aria-expanded:hover:bg-sidebar-hover aria-expanded:hover:text-foreground active:not-aria-[haspopup]:translate-y-0';
@@ -197,8 +199,10 @@ export function BoardSidebar({
   const { t } = useI18n();
   const { user } = useLiveData();
   const { search, pathname } = useLocation();
-  const plain = withColumnParam(search, null);
-  const attentionSearch = withColumnParam(search, 'pending');
+  const plain = withoutBoardView(withColumnParam(search, null));
+  const kanbanParams = new URLSearchParams(plain);
+  kanbanParams.set('view', 'board');
+  const kanbanSearch = `?${kanbanParams}`;
   const projectRows = useMemo(
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
     [projects],
@@ -222,7 +226,7 @@ export function BoardSidebar({
   useScrollFade(navRef, { enabled: !collapsed });
   const resourceListId = useId();
   const machineStatusId = useId();
-  const attentionLabel = attention > 0 ? `${t('需要我处理')} ${attention}` : t('需要我处理');
+  const homeLabel = attention > 0 ? `${t('工作台')} ${attention}` : t('工作台');
 
   const userAvatar = (
     <SeededAvatar
@@ -289,22 +293,20 @@ export function BoardSidebar({
           </TooltipContent>
         </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
-          <Link
-            {...railLink({ pathname: '/app', search: plain }, selected === 'board', t('工作台'))}
-          >
-            <Columns3 className={ICON} strokeWidth={STROKE} />
-          </Link>
-          <Link
-            {...railLink(
-              { pathname: '/app', search: attentionSearch },
-              selected === 'attention',
-              attentionLabel,
-            )}
-          >
-            <CircleAlert className={ICON} strokeWidth={STROKE} />
+          <Link {...railLink({ pathname: '/app', search: plain }, selected === 'board', homeLabel)}>
+            <Inbox className={ICON} strokeWidth={STROKE} />
             {attention > 0 && (
               <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)" />
             )}
+          </Link>
+          <Link
+            {...railLink(
+              { pathname: '/app', search: kanbanSearch },
+              selected === 'kanban',
+              t('看板'),
+            )}
+          >
+            <Columns3 className={ICON} strokeWidth={STROKE} />
           </Link>
           <Link
             {...railLink(
@@ -401,7 +403,7 @@ export function BoardSidebar({
           aria-current={selected === 'team' ? 'page' : undefined}
         >
           <BrandMark />
-          <span className="truncate font-heading text-heading font-semibold">
+          <span className="truncate font-serif text-heading font-semibold">
             {BRAND.manifestName}
           </span>
           <ChevronDown
@@ -453,13 +455,13 @@ export function BoardSidebar({
         className={`flex min-h-0 flex-1 flex-col gap-px overflow-y-auto ${scrollFadeClassName()}`}
       >
         <Link {...navLink({ pathname: '/app', search: plain }, selected === 'board')}>
-          <Columns3 className={ICON} strokeWidth={STROKE} />
+          <Inbox className={ICON} strokeWidth={STROKE} />
           <span className="truncate">{t('工作台')}</span>
-        </Link>
-        <Link {...navLink({ pathname: '/app', search: attentionSearch }, selected === 'attention')}>
-          <CircleAlert className={ICON} strokeWidth={STROKE} />
-          <span className="truncate">{t('需要我处理')}</span>
           {attention > 0 && <AttentionBadge count={attention} />}
+        </Link>
+        <Link {...navLink({ pathname: '/app', search: kanbanSearch }, selected === 'kanban')}>
+          <Columns3 className={ICON} strokeWidth={STROKE} />
+          <span className="truncate">{t('看板')}</span>
         </Link>
         <Link {...navLink({ pathname: '/app/schedules', search: plain }, selected === 'schedules')}>
           <Clock className={ICON} strokeWidth={STROKE} />
@@ -513,7 +515,7 @@ export function BoardSidebar({
                 {count > 0 && (
                   <span
                     data-testid="project-count"
-                    className="flex-none text-caption tabular-nums text-content-tertiary group-hover/row:text-content-secondary"
+                    className={`flex-none text-caption tabular-nums ${active ? 'text-content-secondary' : 'text-content-tertiary group-hover/row:text-content-secondary'}`}
                   >
                     {count}
                   </span>

@@ -29,7 +29,6 @@ export const EN: Record<string, string> = {
   项等你处理: 'waiting on you',
   没有等你处理的事: 'Nothing is waiting on you',
   定时: 'Schedules',
-  需要我处理: 'Needs me',
   '{n} 台机器在线': '{n} machines online',
   '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
@@ -37,10 +36,16 @@ export const EN: Record<string, string> = {
   新建项目: 'New project',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
   '新任务：接下来让 agent 做什么？': 'New task: What should the agent do next?',
-  等你处理: 'Waiting on you',
-  查看全部: 'View all',
   '上次查看后：{done} 个完成，{failed} 个新失败':
     '{done} completed, {failed} new failures since last visit',
+  '较早的 {count} 条': '{count} older',
+  '超过 7 天没动': 'untouched for over 7 days',
+  需要你: 'Needs you',
+  在跑: 'Running',
+  做完了: 'Done',
+  看板: 'Board',
+  打开看板: 'Open the board',
+  '还没开始的 {count} 条': '{count} not started',
   技能: 'Skills',
   密钥: 'Secrets',
   机器: 'Machines',
@@ -48,6 +53,7 @@ export const EN: Record<string, string> = {
   用量: 'Usage',
   收起侧边栏: 'Collapse sidebar',
   展开侧边栏: 'Expand sidebar',
+  侧边栏: 'Sidebar',
   '收起{label}': 'Collapse {label}',
   '展开{label}': 'Expand {label}',
   总管: 'Chief',
@@ -201,7 +207,7 @@ export const EN: Record<string, string> = {
   '{y}年{mo}月{d}日 {hh}:{mm} 创建': 'Created {monthShort} {d}, {y} {hh}:{mm}',
 
   // —— user-menu popover (r7 §3.5; 新功能/快捷键 行随 #163 隐去，键同删） ——
-  帐号: 'Account',
+  账号: 'Account',
   'API 密钥': 'API keys',
   外观: 'Appearance',
   浅色: 'Light',
@@ -914,6 +920,7 @@ export const EN: Record<string, string> = {
   搜索仓库: 'Search repositories',
   没有匹配的仓库: 'No matching repositories',
   断开连接: 'Disconnect',
+  'GitHub 连接已断开': 'GitHub connection disconnected',
   已连接: 'Connected',
   '手动输入 owner/repo': 'Enter owner/repo manually',
   // wayfinder #181 add-machine dialog family (r2 11b verbatim copy; the
@@ -953,7 +960,8 @@ export const EN: Record<string, string> = {
   // spec 非空承载（附件 token 注入后归 spec）,标签 add 仍为桩（本票不动）。
   // （#640：开始任务 dialog 统一面的 规划/执行/在线/离线/选择 Agent 五键随
   // 选择面撤销退役——开始入口不再有 dialog 选择器。）
-  '放弃新建任务？未保存的内容将丢失。': 'Discard this new task? Unsaved content will be lost.',
+  '放弃新建任务？': 'Discard this new task?',
+  '未保存的内容将丢失。': 'Unsaved content will be lost.',
   继续编辑: 'Keep editing',
   放弃并关闭: 'Discard and close',
 

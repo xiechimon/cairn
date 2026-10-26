@@ -1121,6 +1121,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "conclusion": {
           "type": "string",
         },
+        "evalRulerChange": {
+          "type": "boolean",
+        },
         "findings": {
           "default": [],
           "items": {
@@ -1163,6 +1166,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "type": "object",
           },
           "type": "array",
+        },
+        "gateLoosening": {
+          "type": "boolean",
         },
       },
       "required": [
@@ -4016,6 +4022,9 @@ exports[`body/envelope schema snapshots > githubConnectionStatus > githubConnect
     "connected": {
       "type": "boolean",
     },
+    "disconnectReason": {
+      "type": "string",
+    },
     "login": {
       "type": "string",
     },
@@ -5384,6 +5393,9 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "output": {
                   "type": "number",
                 },
+                "priced": {
+                  "type": "boolean",
+                },
                 "total": {
                   "type": "number",
                 },
@@ -6309,9 +6321,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
   "compare-truncated: human, compare 文件列表被截断",
   "patch-unbindable: human, 补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）",
   "size-cap: human, 补丁超过 800 行或 40 个文件",
-  "protected-path: human, 改动命中 D4 保护路径",
+  "independent-review-missing: transient, Protected changes require a bound independent review",
   "outside-auto-merge: human, 改动在可自动合并集之外",
-  "test-deleted: human, 删除了测试",
   "opaque-file: human, 证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）",
   "evidence-outside-ticket: human, 改动了别的票的证据目录",
   "evidence-executable: human, 证据目录里新增或改动了可执行文件",
@@ -8831,6 +8842,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "output": {
           "type": "number",
         },
+        "priced": {
+          "type": "boolean",
+        },
         "total": {
           "type": "number",
         },
@@ -8929,19 +8943,34 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tok
       "type": "integer",
     },
     "costCacheRead": {
-      "type": "number",
+      "type": [
+        "number",
+        "null",
+      ],
     },
     "costCacheWrite": {
-      "type": "number",
+      "type": [
+        "number",
+        "null",
+      ],
     },
     "costInput": {
-      "type": "number",
+      "type": [
+        "number",
+        "null",
+      ],
     },
     "costOutput": {
-      "type": "number",
+      "type": [
+        "number",
+        "null",
+      ],
     },
     "costTotal": {
-      "type": "number",
+      "type": [
+        "number",
+        "null",
+      ],
     },
     "input": {
       "maximum": 9007199254740991,

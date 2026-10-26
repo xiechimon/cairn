@@ -160,6 +160,7 @@ export async function executeMcpTool(
     machineHub: deps.machineHub,
     user: deps.user,
     box: deps.box,
+    oauthClient: deps.oauthClient,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
   const mcpActor: TransitionActor = { kind: 'user', name: deps.user.displayName };

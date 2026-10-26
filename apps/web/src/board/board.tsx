@@ -1,4 +1,3 @@
-import { canOrchestrate } from '@cairn/shared';
 import {
   closestCorners,
   DndContext,
@@ -12,16 +11,22 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { cn } from 'cn';
-import { Activity, CircleAlert, CircleCheck, CircleDashed, Clock, Plus } from 'lucide-react';
+import {
+  Activity,
+  ChevronRight,
+  CircleAlert,
+  CircleCheck,
+  CircleDashed,
+  Clock,
+  Plus,
+} from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
-import { useLiveData } from '../api/provider.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
-import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSessionStorage, safeSetItem } from '../safe-storage.js';
@@ -29,10 +34,10 @@ import {
   type BoardColumnDef,
   COLUMNS,
   canDropOnColumn,
-  cardFace,
   needsDoneGate,
   needsResetGate,
   sortColumnTodos,
+  splitStale,
   withColumnParam,
 } from './columns.js';
 import { DRAG_THRESHOLD_PX } from './dnd.js';
@@ -45,9 +50,9 @@ import {
   FilterPanel,
   TOPBAR_TEXT_BUTTON,
 } from './filter-panel.js';
+import { HomeSections, NeedsYouInbox, withoutBoardView } from './home.js';
 import { BrandMark } from './sidebar.js';
 import { cardTag } from './tag-filter.js';
-import { ATTENTION } from './todo-card.js';
 
 export interface BoardFilters {
   dimensions: readonly FilterDimension[];
@@ -72,6 +77,7 @@ interface BoardProps {
   banner?: ReactNode;
   filters: BoardFilters;
   onlyColumn?: string | null;
+  boardView?: boolean;
   tagsById?: ReadonlyMap<string, TagChipData>;
   onNewTask?: () => void;
   loading?: boolean;
@@ -91,6 +97,7 @@ function ColumnIcon({ status }: { status: BoardColumnDef['status'] }) {
 
 function NeedsYouSummary({ count }: { count: number }) {
   const { t } = useI18n();
+  const { search } = useLocation();
   if (count === 0) {
     return (
       <span data-testid="needs-you" className="min-w-0 truncate text-ui text-content-tertiary">
@@ -99,9 +106,10 @@ function NeedsYouSummary({ count }: { count: number }) {
     );
   }
   return (
-    <span
+    <Link
       data-testid="needs-you"
-      className="flex min-w-0 items-center gap-1.5 text-ui text-content-tertiary"
+      to={withColumnParam(search, 'pending')}
+      className="flex min-w-0 items-center gap-1.5 rounded-(--radius-control) text-ui text-content-tertiary no-underline hover:text-content-secondary"
     >
       <CircleAlert
         aria-hidden
@@ -112,7 +120,7 @@ function NeedsYouSummary({ count }: { count: number }) {
         <span className="font-semibold tabular-nums text-(--card-button)">{count}</span>{' '}
         {t('项等你处理')}
       </span>
-    </span>
+    </Link>
   );
 }
 
@@ -123,94 +131,18 @@ function readLastSeenAt(): number {
   return Number.isFinite(parsed) ? parsed : Date.now();
 }
 
-function NeedsYouStrip({
-  todos,
-  projectNames,
-  onAction,
-  orchestrationOf,
-}: {
-  todos: TodoRecord[];
-  projectNames?: Record<string, string>;
-  onAction?: (todo: TodoRecord) => void;
-  orchestrationOf?: (todo: TodoRecord) => CardOrchestration | null;
-}) {
+function StalePendingLink({ count }: { count: number }) {
   const { t } = useI18n();
-  const { live } = useLiveData();
   const { search } = useLocation();
-  if (todos.length === 0) return null;
   return (
-    <section data-testid="needs-you-strip" className="mx-auto w-full max-w-190 px-4 pt-3">
-      <div className="mb-1.5 flex items-center gap-2 text-ui font-medium text-foreground">
-        <span className="size-2 rounded-full bg-(--card-button)" />
-        <span>
-          {t('等你处理')} · {todos.length}
-        </span>
-      </div>
-      <div className="divide-y divide-border overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)">
-        {todos.slice(0, 5).map((todo) => {
-          const face = cardFace(todo);
-          const attention = face.kind === 'attention' ? ATTENTION[face.need] : null;
-          const orchestration = canOrchestrate(todo.phase)
-            ? (orchestrationOf?.(todo) ?? null)
-            : null;
-          return (
-            <div
-              key={todo.id}
-              data-testid="needs-you-row"
-              className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
-            >
-              <div className="min-w-0 grow basis-64">
-                <div className="line-clamp-2 text-ui wrap-break-word text-foreground">
-                  {todo.title}
-                </div>
-                <div className="text-meta text-content-tertiary">
-                  {[
-                    projectNames?.[todo.projectId] ?? (live ? undefined : PROJECT_NAME),
-                    `#${todo.seqNum}`,
-                    attention == null ? undefined : t(attention.label),
-                  ]
-                    .filter((part) => part != null)
-                    .join(' · ')}
-                </div>
-              </div>
-              <div className="ml-auto flex flex-none items-center gap-1">
-                {orchestration != null && orchestration.error === undefined ? (
-                  <span className="px-2 text-meta text-content-tertiary">{t('编排中')}</span>
-                ) : (
-                  attention != null &&
-                  orchestration == null && (
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      className="flex-none text-(--card-button)"
-                      onClick={() => onAction?.(todo)}
-                    >
-                      {t(attention.action)}
-                    </Button>
-                  )
-                )}
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  className="flex-none text-content-secondary"
-                  render={<Link to={`/app/todo/${todo.id}`} />}
-                >
-                  {t('打开')}
-                </Button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {todos.length > 5 && (
-        <Link
-          className="mt-1.5 block text-right text-meta text-(--card-button)"
-          to={withColumnParam(search, 'pending')}
-        >
-          {t('查看全部')}
-        </Link>
-      )}
-    </section>
+    <Link
+      data-testid="column-stale-pending"
+      to={withColumnParam(search, 'pending')}
+      className="flex flex-none items-center gap-1.5 rounded-(--radius-card) px-2 py-2 text-meta text-content-tertiary no-underline hover:bg-secondary hover:text-content-secondary"
+    >
+      <span className="min-w-0 flex-1 truncate">{t('较早的 {count} 条', { count })}</span>
+      <ChevronRight aria-hidden strokeWidth={1.75} className="size-3.25 flex-none" />
+    </Link>
   );
 }
 
@@ -227,6 +159,7 @@ export function BoardSurface({
   banner,
   filters,
   onlyColumn = null,
+  boardView = false,
   tagsById,
   onNewTask,
   loading = false,
@@ -276,7 +209,7 @@ export function BoardSurface({
     };
   }, []);
   useEffect(() => {
-    if (onlyColumn != null) return;
+    if (!boardView || onlyColumn != null) return;
     const cols = COLUMNS.map(
       (column) => sortColumnTodos(column, visibleTodos.filter(column.accepts)).length,
     );
@@ -284,8 +217,9 @@ export function BoardSurface({
     try {
       localStorage.setItem('cairn-boot-shape', JSON.stringify({ cols }));
     } catch {}
-  }, [visibleTodos, onlyColumn]);
+  }, [visibleTodos, onlyColumn, boardView]);
 
+  const home = !boardView && onlyColumn == null;
   const showFilterEmpty =
     filters.active && visibleColumns.every((c) => !visibleTodos.some((todo) => c.accepts(todo)));
 
@@ -336,14 +270,17 @@ export function BoardSurface({
     if (column == null) return [];
     return sortColumnTodos(column, visibleTodos.filter(column.accepts));
   };
+  const pendingTodos = viewTodos('pending');
+  const pendingSplit = splitStale(pendingTodos, fixture.now);
+  const staleCount = pendingSplit.stale.length;
 
   return (
     <div className="board-main relative flex min-w-0 flex-1 flex-col">
       <header className="board-topbar flex h-14 flex-none items-center gap-3 px-6 whitespace-nowrap">
         <h1 className="board-topbar-title flex-none font-heading text-page font-medium text-foreground">
-          {t('工作台')}
+          {t(boardView ? '看板' : '工作台')}
         </h1>
-        <NeedsYouSummary count={viewTodos('pending').length} />
+        {!home && <NeedsYouSummary count={pendingSplit.fresh.length} />}
         <FilterChips chips={filters.chips} onClearAll={filters.onClear} />
         <div className="board-topbar-actions ml-auto flex flex-none items-center gap-0.5">
           <FilterPanel
@@ -355,7 +292,7 @@ export function BoardSurface({
             variant="ghost"
             size="sm"
             className={`board-topbar-schedule ${TOPBAR_TEXT_BUTTON}`}
-            render={<Link to={{ pathname: '/app/schedules', search }} />}
+            render={<Link to={{ pathname: '/app/schedules', search: withoutBoardView(search) }} />}
           >
             <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
             {t('定时')}
@@ -376,140 +313,154 @@ export function BoardSurface({
           <Kbd>C</Kbd>
         </Button>
       )}
-      {onlyColumn == null && (
-        <>
-          {(sinceLastSeen.done > 0 || sinceLastSeen.failed > 0) && (
-            <span
-              data-testid="board-since-last-seen"
-              className="mx-auto block w-full max-w-190 px-4 pt-2 text-right text-meta text-content-tertiary"
-            >
-              {t('上次查看后：{done} 个完成，{failed} 个新失败', sinceLastSeen)}
-            </span>
-          )}
-          <NeedsYouStrip
-            todos={viewTodos('pending')}
-            projectNames={fixture.projectNames}
-            onAction={onAction}
-            orchestrationOf={orchestrationOf}
-          />
-        </>
+      {onlyColumn == null && (sinceLastSeen.done > 0 || sinceLastSeen.failed > 0) && (
+        <span
+          data-testid="board-since-last-seen"
+          className="mx-auto block w-full max-w-190 px-4 pt-2 text-right text-meta text-content-tertiary"
+        >
+          {t('上次查看后：{done} 个完成，{failed} 个新失败', sinceLastSeen)}
+        </span>
       )}
 
-      <DndContext
-        sensors={desktop ? sensors : []}
-        collisionDetection={closestCorners}
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDragEnd={onDragEnd}
-        onDragCancel={onDragCancel}
-      >
-        <div
-          data-testid="board-scroller"
-          className="board-scroller grid min-h-0 flex-1 grid-cols-[repeat(4,minmax(var(--board-col-min),1fr))] grid-rows-[minmax(0,1fr)] gap-3.5 overflow-x-auto overflow-y-hidden bg-background px-[17px] pt-3 pb-[13px]"
+      {home && !showFilterEmpty ? (
+        <HomeSections
+          todos={visibleTodos}
+          now={fixture.now}
+          projectNames={fixture.projectNames}
+          onAction={onAction}
+          orchestrationOf={orchestrationOf}
+          loading={loading}
+        />
+      ) : onlyColumn === 'pending' && !showFilterEmpty ? (
+        <NeedsYouInbox
+          todos={pendingTodos}
+          now={fixture.now}
+          projectNames={fixture.projectNames}
+          onAction={onAction}
+          orchestrationOf={orchestrationOf}
+          loading={loading}
+        />
+      ) : (
+        <DndContext
+          sensors={desktop ? sensors : []}
+          collisionDetection={closestCorners}
+          onDragStart={onDragStart}
+          onDragOver={onDragOver}
+          onDragEnd={onDragEnd}
+          onDragCancel={onDragCancel}
         >
-          {showFilterEmpty && (
-            <div className="board-filter-empty col-span-4 flex h-full flex-col items-center justify-center gap-3">
-              <span className="text-sm text-muted-foreground">{t('没有匹配筛选条件的任务')}</span>
-              {filters.summary !== '' && (
-                <span className="text-xs text-muted-foreground">
-                  {t('筛选生效：{summary}', { summary: filters.summary })}
-                </span>
-              )}
-              <Button variant="outline" size="sm" onClick={filters.onClear}>
-                {t('清除筛选')}
-              </Button>
-            </div>
-          )}
-          {!showFilterEmpty &&
-            visibleColumns.map((column) => {
-              const todos = viewTodos(column.id);
-              return (
-                <section
-                  key={column.id}
-                  className={cn(
-                    'board-column group/column relative flex h-full flex-col bg-background',
-                    isValidDropTarget(column.id) && 'rounded-(--radius-card) bg-(--drop-tint-base)',
-                    dropColumnId === column.id && 'bg-(--drop-tint-hover)',
-                  )}
-                  aria-label={t(column.name)}
-                  data-column={column.id}
-                  data-empty={todos.length === 0 && !loading ? 'true' : undefined}
-                  data-drop-valid={isValidDropTarget(column.id) ? 'true' : undefined}
-                  data-drop={dropColumnId === column.id ? 'true' : undefined}
-                >
-                  <header className="mx-1 mb-1 flex h-9 flex-none items-center gap-2 border-b border-border px-1">
-                    <ColumnIcon status={column.status} />
-                    <h2 className="board-column-name font-heading text-heading font-medium text-foreground">
-                      {t(column.name)}
-                    </h2>
-                    <span
-                      data-testid="column-count"
-                      className="text-meta tabular-nums text-content-tertiary"
-                    >
-                      {todos.length}
-                    </span>
-                    {column.label && (
-                      <span className="text-meta text-content-tertiary">{t(column.label)}</span>
+          <div
+            data-testid="board-scroller"
+            className="board-scroller grid min-h-0 flex-1 grid-cols-[repeat(4,minmax(var(--board-col-min),1fr))] grid-rows-[minmax(0,1fr)] gap-3.5 overflow-x-auto overflow-y-hidden bg-background px-[17px] pt-3 pb-[13px]"
+          >
+            {showFilterEmpty && (
+              <div className="board-filter-empty col-span-4 flex h-full flex-col items-center justify-center gap-3">
+                <span className="text-sm text-muted-foreground">{t('没有匹配筛选条件的任务')}</span>
+                {filters.summary !== '' && (
+                  <span className="text-xs text-muted-foreground">
+                    {t('筛选生效：{summary}', { summary: filters.summary })}
+                  </span>
+                )}
+                <Button variant="outline" size="sm" onClick={filters.onClear}>
+                  {t('清除筛选')}
+                </Button>
+              </div>
+            )}
+            {!showFilterEmpty &&
+              visibleColumns.map((column) => {
+                const todos = column.id === 'pending' ? pendingSplit.fresh : viewTodos(column.id);
+                const listed = todos.length + (column.id === 'pending' ? staleCount : 0);
+                return (
+                  <section
+                    key={column.id}
+                    className={cn(
+                      'board-column group/column relative flex h-full flex-col bg-background',
+                      isValidDropTarget(column.id) &&
+                        'rounded-(--radius-card) bg-(--drop-tint-base)',
+                      dropColumnId === column.id && 'bg-(--drop-tint-hover)',
                     )}
-                    {column.id === 'todo' && onNewTask != null && (
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        className="ml-auto text-content-tertiary opacity-0 transition-opacity duration-150 ease-out group-hover/column:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
-                        aria-label={t('新建任务')}
-                        onClick={onNewTask}
+                    aria-label={t(column.name)}
+                    data-column={column.id}
+                    data-empty={listed === 0 && !loading ? 'true' : undefined}
+                    data-drop-valid={isValidDropTarget(column.id) ? 'true' : undefined}
+                    data-drop={dropColumnId === column.id ? 'true' : undefined}
+                  >
+                    <header className="mx-1 mb-1 flex h-9 flex-none items-center gap-2 border-b border-border px-1">
+                      <ColumnIcon status={column.status} />
+                      <h2 className="board-column-name font-heading text-heading font-medium text-foreground">
+                        {t(column.name)}
+                      </h2>
+                      <span
+                        data-testid="column-count"
+                        className="text-meta tabular-nums text-content-tertiary"
                       >
-                        <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
-                      </Button>
-                    )}
-                  </header>
-                  <ColumnList
-                    columnId={column.id}
-                    empty={
-                      column.id === 'todo' && onNewTask != null ? (
+                        {todos.length}
+                      </span>
+                      {column.label && (
+                        <span className="text-meta text-content-tertiary">{t(column.label)}</span>
+                      )}
+                      {column.id === 'todo' && onNewTask != null && (
                         <Button
                           variant="ghost"
-                          data-column-empty-new=""
+                          size="icon-xs"
+                          className="ml-auto text-content-tertiary opacity-0 transition-opacity duration-150 ease-out group-hover/column:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+                          aria-label={t('新建任务')}
                           onClick={onNewTask}
-                          className="h-auto w-full justify-start gap-2 rounded-(--radius-card) border border-dashed border-border bg-transparent px-3.5 py-3 text-left text-ui font-normal text-content-tertiary transition-colors duration-150 ease-out hover:border-content-dim hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent"
                         >
-                          <Plus aria-hidden strokeWidth={1.75} className="size-3.5 flex-none" />
-                          <span className="min-w-0 flex-1 truncate">{t('写下想做的事')}</span>
-                          <Kbd>C</Kbd>
+                          <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
                         </Button>
-                      ) : (
-                        t(EMPTY_COPY[column.id] ?? '暂无')
-                      )
-                    }
-                    count={todos.length}
-                    loading={loading}
-                  >
-                    {todos.map((todo) => (
-                      <DraggableCard
-                        key={todo.id}
-                        todo={todo}
-                        now={fixture.now}
-                        onAction={onAction}
-                        onBranch={onBranch}
-                        hasBranch={hasBranch == null ? undefined : hasBranch(todo)}
-                        orchestration={orchestrationOf?.(todo) ?? null}
-                        projectName={fixture.projectNames?.[todo.projectId]}
-                        tag={tagsById == null ? null : cardTag(todo, tagsById)}
-                      />
-                    ))}
-                  </ColumnList>
-                </section>
-              );
-            })}
-        </div>
-        <DragOverlay dropAnimation={null} style={{ willChange: 'transform' }}>
-          {dragged != null && (
-            <div data-testid="drag-overlay">
-              <DragCard todo={dragged} projectName={fixture.projectNames?.[dragged.projectId]} />
-            </div>
-          )}
-        </DragOverlay>
-      </DndContext>
+                      )}
+                    </header>
+                    <ColumnList
+                      columnId={column.id}
+                      empty={
+                        column.id === 'todo' && onNewTask != null ? (
+                          <Button
+                            variant="ghost"
+                            data-column-empty-new=""
+                            onClick={onNewTask}
+                            className="h-auto w-full justify-start gap-2 rounded-(--radius-card) border border-dashed border-border bg-transparent px-3.5 py-3 text-left text-ui font-normal text-content-tertiary transition-colors duration-150 ease-out hover:border-content-dim hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent"
+                          >
+                            <Plus aria-hidden strokeWidth={1.75} className="size-3.5 flex-none" />
+                            <span className="min-w-0 flex-1 truncate">{t('写下想做的事')}</span>
+                          </Button>
+                        ) : (
+                          t(EMPTY_COPY[column.id] ?? '暂无')
+                        )
+                      }
+                      count={listed}
+                      loading={loading}
+                    >
+                      {todos.map((todo) => (
+                        <DraggableCard
+                          key={todo.id}
+                          todo={todo}
+                          now={fixture.now}
+                          onAction={onAction}
+                          onBranch={onBranch}
+                          hasBranch={hasBranch == null ? undefined : hasBranch(todo)}
+                          orchestration={orchestrationOf?.(todo) ?? null}
+                          projectName={fixture.projectNames?.[todo.projectId]}
+                          tag={tagsById == null ? null : cardTag(todo, tagsById)}
+                        />
+                      ))}
+                      {column.id === 'pending' && staleCount > 0 && (
+                        <StalePendingLink count={staleCount} />
+                      )}
+                    </ColumnList>
+                  </section>
+                );
+              })}
+          </div>
+          <DragOverlay dropAnimation={null} style={{ willChange: 'transform' }}>
+            {dragged != null && (
+              <div data-testid="drag-overlay">
+                <DragCard todo={dragged} projectName={fixture.projectNames?.[dragged.projectId]} />
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+      )}
     </div>
   );
 }

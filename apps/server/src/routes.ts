@@ -39,6 +39,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
         attachmentsDir: ctx.attachmentsDir,
         mcpConfigPath: ctx.mcpConfigPath,
         skillsDir: ctx.skillsDir,
+        oauthClient: ctx.oauthClient,
         ...(ctx.convHub !== undefined ? { convHub: ctx.convHub } : {}),
         ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
       },

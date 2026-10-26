@@ -1,3 +1,4 @@
+```
 # Probe dump — old baseline → new measured (#921)
 
 Run 2026-10-09T13:46:17.687Z · commit `e87186d3` · port 8400 · playwright 1.63.0 · workers 4
@@ -930,3 +931,5 @@ Expected drift → re-pin the spec value to “new measured”. Suspected regres
 | visual-polish.spec.ts | 232 | toBe | 1px | 1px | — | collapsed rail keeps the same drawn-seam treatment (#135 裁决 v2) |
 | visual-polish.spec.ts | 233 | toBe | none | none | — | collapsed rail keeps the same drawn-seam treatment (#135 裁决 v2) |
 | z-ladder.spec.ts | 64 | toEqual | ["true","true","true","true","true"] | ["true","true","true","true","true"] | — | every probe point of the new-task panel hit-tests inside the panel |
+
+```

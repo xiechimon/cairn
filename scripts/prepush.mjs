@@ -22,10 +22,12 @@ export const selfTests = [
   'scripts/prepush.test.mjs',
   'scripts/heavy-slots.test.mjs',
   'scripts/english-only-gate.test.mjs',
+  'scripts/doc-reader-tests.test.mjs',
 ];
 
 export const localOnly = [
   ['node', 'scripts/ci-job-structure-gate.mjs'],
+  ['node', 'scripts/feature-map-staleness-gate.mjs'],
   ['node', 'scripts/comment-discipline-gate.mjs'],
   ['node', 'scripts/single-use-helper-gate.mjs'],
   ['node', 'scripts/baseline-ratchet-gate.mjs'],
@@ -43,7 +45,11 @@ export function prepushPlan(paths, mode = 'local') {
   if (mode === 'advisory') return advisory;
   const language = ['node', 'scripts/english-only-gate.mjs'];
   const codePaths = paths.filter((path) => !DOCS.test(path));
-  if (codePaths.length === 0) return [language];
+  const docPaths = paths.filter((path) => DOCS.test(path));
+  if (codePaths.length === 0)
+    return mode === 'ci'
+      ? [language]
+      : [language, ['node', 'scripts/doc-reader-tests.mjs', ...docPaths]];
   const required = [
     language,
     ['node', 'scripts/ui-debt-gate.mjs'],
@@ -60,11 +66,14 @@ export function prepushPlan(paths, mode = 'local') {
         ...required,
         ...localOnly,
         ...(paths.some((path) =>
-          /^scripts\/(prepush|heavy-slots|english-only-gate|scrub-git-env)/.test(path),
+          /^scripts\/(prepush|heavy-slots|english-only-gate|scrub-git-env|doc-reader-tests)/.test(
+            path,
+          ),
         )
           ? [['node', '--test', ...selfTests]]
           : []),
         ['node', 'scripts/prepush-vitest.mjs'],
+        ...(docPaths.length ? [['node', 'scripts/doc-reader-tests.mjs', ...docPaths]] : []),
         ...(paths.some((path) => path.startsWith('apps/web/'))
           ? [['pnpm', '--filter', '@cairn/web', 'test']]
           : []),

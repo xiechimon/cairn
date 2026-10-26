@@ -19,6 +19,7 @@ export {
   boardDefault,
   boardDragMatrix,
   boardGithubPicker,
+  boardInbox,
   boardMachinePicker,
   boardOverflow,
   boardProjectPicker,

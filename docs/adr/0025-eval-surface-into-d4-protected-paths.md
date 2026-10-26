@@ -4,7 +4,7 @@
 
 ## Problem Statement
 
-spec 29 (evaluation & data loop, `docs/spec/29-评测与数据闭环.md`) makes the repository's own evaluation surface the ruler that decides whether harness changes — prompts, skills, tool descriptions, context assembly, routing — actually help. That surface is: the bench suites under `integration/eval/`, the hillclimb ledger under `.claude/hillclimb/`, and the trajectory exporter that produces the ground-truth packs every judge reads.
+spec 29 (evaluation & data loop, `docs/spec/29-evaluation-and-data-loop.md`) makes the repository's own evaluation surface the ruler that decides whether harness changes — prompts, skills, tool descriptions, context assembly, routing — actually help. That surface is: the bench suites under `integration/eval/`, the hillclimb ledger under `.claude/hillclimb/`, and the trajectory exporter that produces the ground-truth packs every judge reads.
 
 ADR 0021 D4 protected the merge gate's own source and agent-steering files, but not the ruler. An agent whose merge is judged by these tools could edit the judge, the bench cases, or the exporter to make itself pass: soften `judge.mts`'s paired-z gate, add favorable cases, or drop fields from the pack schema so failure attribution goes blind. The chief-dispatch harness regression gate (#1578) already binds harness-changing PRs to a measured result, but nothing stops the PR from changing the measurement itself — the harness-regression result is only trustworthy if the harness that computes it cannot be patched in the same PR.
 
