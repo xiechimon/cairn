@@ -410,8 +410,6 @@ export function BoardSurface({
   const pendingTodos = viewTodos('pending');
   const pendingSplit = splitStale(pendingTodos, fixture.now);
   const staleCount = pendingSplit.stale.length;
-  const columnTodos = (columnId: string): TodoRecord[] =>
-    columnId === 'pending' ? pendingSplit.fresh : viewTodos(columnId);
 
   return (
     <div className="board-main relative flex min-w-0 flex-1 flex-col">
@@ -498,7 +496,7 @@ export function BoardSurface({
             )}
             {!showFilterEmpty &&
               visibleColumns.map((column) => {
-                const todos = columnTodos(column.id);
+                const todos = column.id === 'pending' ? pendingSplit.fresh : viewTodos(column.id);
                 const listed = todos.length + (column.id === 'pending' ? staleCount : 0);
                 return (
                   <section
