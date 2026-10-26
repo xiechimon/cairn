@@ -2,6 +2,7 @@ import {
   createTodoBodySchema,
   githubIssueEchoSchema,
   IN_PROGRESS_PHASES,
+  needsYouQuerySchema,
   phaseSchema,
   type TodoRecord,
 } from '@cairn/shared';
@@ -23,6 +24,7 @@ import {
   stopActiveStepsAfterExit,
 } from './services/builds.js';
 import { readSourceIssueEcho } from './services/github-issues.js';
+import { listNeedsYou } from './services/needs-you.js';
 import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
 import {
@@ -52,6 +54,11 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/todos', (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
     return c.json(listTodos(svc, { teamId }));
+  });
+
+  app.get('/api/needs-you', (c) => {
+    const teamId = c.req.query('teamId') ?? ctx.team.id;
+    return c.json(needsYouQuerySchema.parse(listNeedsYou(svc, teamId)));
   });
 
   app.get('/api/todos/:id', (c) => {
