@@ -316,3 +316,10 @@ describe('stale pending (folded after 7 days untouched)', () => {
     expect(attentionCount(set, now)).toBe(2);
   });
 });
+
+test('a card waiting on a reply never folds, however long its phase has run', () => {
+  const now = 30 * 24 * 60 * 60 * 1000;
+  const asking = { ...todo(1, 'review', true), phaseAt: now - 20 * 24 * 60 * 60 * 1000 };
+  expect(isStalePending(asking, now)).toBe(false);
+  expect(attentionCount([asking], now)).toBe(1);
+});

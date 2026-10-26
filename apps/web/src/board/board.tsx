@@ -40,10 +40,10 @@ import {
   COLUMNS,
   canDropOnColumn,
   cardFace,
-  isStalePending,
   needsDoneGate,
   needsResetGate,
   sortColumnTodos,
+  splitStale,
   withColumnParam,
 } from './columns.js';
 import { DRAG_THRESHOLD_PX } from './dnd.js';
@@ -210,11 +210,15 @@ function NeedsYouRows({ todos, now, projectNames, onAction, orchestrationOf }: N
   );
 }
 
-function NeedsYouInbox({ todos, now, ...rowProps }: NeedsYouRowsProps) {
+function NeedsYouInbox({
+  todos,
+  now,
+  loading,
+  ...rowProps
+}: NeedsYouRowsProps & { loading: boolean }) {
   const { t } = useI18n();
   const [showStale, setShowStale] = useState(false);
-  const fresh = todos.filter((todo) => !isStalePending(todo, now));
-  const stale = todos.filter((todo) => isStalePending(todo, now));
+  const { fresh, stale } = splitStale(todos, now);
   return (
     <section
       data-testid="needs-you-inbox"
@@ -223,6 +227,11 @@ function NeedsYouInbox({ todos, now, ...rowProps }: NeedsYouRowsProps) {
       <div className="mx-auto flex w-full max-w-198 flex-col gap-5 px-4 pt-4">
         {fresh.length > 0 ? (
           <NeedsYouRows todos={fresh} now={now} {...rowProps} />
+        ) : loading ? (
+          <div className="flex flex-col gap-2.5 rounded-(--radius-card) bg-card px-3.5 py-3 shadow-(--e1)">
+            <Skeleton className="bg-accent h-3.5 w-3/5" />
+            <Skeleton className="bg-accent h-3 w-2/5" />
+          </div>
         ) : (
           <div className="flex flex-col items-center gap-1 py-10 text-center">
             <CircleCheck aria-hidden strokeWidth={1.5} className="size-6 text-content-dim" />
@@ -399,11 +408,10 @@ export function BoardSurface({
     return sortColumnTodos(column, visibleTodos.filter(column.accepts));
   };
   const pendingTodos = viewTodos('pending');
-  const staleCount = pendingTodos.filter((todo) => isStalePending(todo, fixture.now)).length;
+  const pendingSplit = splitStale(pendingTodos, fixture.now);
+  const staleCount = pendingSplit.stale.length;
   const columnTodos = (columnId: string): TodoRecord[] =>
-    columnId === 'pending'
-      ? pendingTodos.filter((todo) => !isStalePending(todo, fixture.now))
-      : viewTodos(columnId);
+    columnId === 'pending' ? pendingSplit.fresh : viewTodos(columnId);
 
   return (
     <div className="board-main relative flex min-w-0 flex-1 flex-col">
@@ -411,7 +419,7 @@ export function BoardSurface({
         <h1 className="board-topbar-title flex-none font-heading text-page font-medium text-foreground">
           {t('工作台')}
         </h1>
-        <NeedsYouSummary count={pendingTodos.length - staleCount} />
+        <NeedsYouSummary count={pendingSplit.fresh.length} />
         <FilterChips chips={filters.chips} onClearAll={filters.onClear} />
         <div className="board-topbar-actions ml-auto flex flex-none items-center gap-0.5">
           <FilterPanel
@@ -460,6 +468,7 @@ export function BoardSurface({
           projectNames={fixture.projectNames}
           onAction={onAction}
           orchestrationOf={orchestrationOf}
+          loading={loading}
         />
       ) : (
         <DndContext
@@ -490,6 +499,7 @@ export function BoardSurface({
             {!showFilterEmpty &&
               visibleColumns.map((column) => {
                 const todos = columnTodos(column.id);
+                const listed = todos.length + (column.id === 'pending' ? staleCount : 0);
                 return (
                   <section
                     key={column.id}
@@ -501,7 +511,7 @@ export function BoardSurface({
                     )}
                     aria-label={t(column.name)}
                     data-column={column.id}
-                    data-empty={todos.length === 0 && !loading ? 'true' : undefined}
+                    data-empty={listed === 0 && !loading ? 'true' : undefined}
                     data-drop-valid={isValidDropTarget(column.id) ? 'true' : undefined}
                     data-drop={dropColumnId === column.id ? 'true' : undefined}
                   >
@@ -548,7 +558,7 @@ export function BoardSurface({
                           t(EMPTY_COPY[column.id] ?? '暂无')
                         )
                       }
-                      count={todos.length}
+                      count={listed}
                       loading={loading}
                     >
                       {todos.map((todo) => (

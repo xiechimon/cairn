@@ -122,13 +122,21 @@ export function cardFace(todo: TodoRecord): CardFace {
 export const STALE_PENDING_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function isStalePending(todo: TodoRecord, now: number): boolean {
-  return now - todo.phaseAt > STALE_PENDING_MS;
+  return todo.awaitingReply !== true && now - todo.phaseAt > STALE_PENDING_MS;
+}
+
+export function splitStale(
+  todos: TodoRecord[],
+  now: number,
+): { fresh: TodoRecord[]; stale: TodoRecord[] } {
+  const fresh: TodoRecord[] = [];
+  const stale: TodoRecord[] = [];
+  for (const todo of todos) (isStalePending(todo, now) ? stale : fresh).push(todo);
+  return { fresh, stale };
 }
 
 export function attentionCount(todos: TodoRecord[], now: number): number {
-  const pending = COLUMNS.find((c) => c.id === 'pending');
-  if (pending == null) return 0;
-  return todos.filter((todo) => pending.accepts(todo) && !isStalePending(todo, now)).length;
+  return countInColumn(splitStale(todos, now).fresh, 'pending');
 }
 
 export function countInColumn(todos: TodoRecord[], columnId: string): number {
