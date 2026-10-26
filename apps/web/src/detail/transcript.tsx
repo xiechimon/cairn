@@ -9,15 +9,7 @@ import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import {
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Copy,
-  ExternalLink,
-  FileTab,
-  Terminal,
-} from '../icons/index.js';
+import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
 import { ChatMarkdown, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
 import { InjectedSkills, WorkTrace } from './work-trace.js';
@@ -75,45 +67,21 @@ function ActionRow({
   bare,
   copy,
   t,
-  toggle,
-  label,
   align = 'start',
 }: {
   seconds?: number;
   bare?: boolean;
   copy?: string;
   t: TFunc;
-  toggle?: { expanded: boolean; onToggle: () => void };
-  label?: string;
   align?: 'start' | 'end';
 }) {
   const tail = (
     <>
-      {label != null && (
-        <span className="inline-flex items-center gap-2 text-meta whitespace-nowrap text-(--text-secondary)">
-          <Terminal width={12} height={12} />
-          {label}
-        </span>
-      )}
       {(seconds != null || bare === true) && (
         <span className="border-l border-(--input) pl-2 text-meta whitespace-nowrap text-(--text-tertiary)">
           {seconds != null ? formatElapsed(seconds, t) : t('完成')}
         </span>
       )}
-      {toggle != null &&
-        (toggle.expanded ? (
-          <ChevronDown
-            width={10}
-            height={10}
-            className="chat-foot-chevron text-(--text-tertiary)"
-          />
-        ) : (
-          <ChevronRight
-            width={10}
-            height={10}
-            className="chat-foot-chevron text-(--text-tertiary)"
-          />
-        ))}
     </>
   );
   return (
@@ -133,18 +101,7 @@ function ActionRow({
           <Copy width={13} height={13} />
         </Button>
       )}
-      {toggle == null ? (
-        tail
-      ) : (
-        <Button
-          variant="ghost"
-          className="chat-row-icons--toggle h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-[length:inherit] leading-[inherit] font-normal hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit aria-expanded:bg-transparent aria-expanded:text-inherit active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-          aria-expanded={toggle.expanded}
-          onClick={toggle.onToggle}
-        >
-          {tail}
-        </Button>
-      )}
+      {tail}
     </div>
   );
 }
