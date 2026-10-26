@@ -21,7 +21,7 @@
 
 | 类别 | 首次来源 | 级别 | 防护 | 拦截 | 复发 | 备注 |
 |---|---|---|---|---|---|---|
-| A web PR was pushed before the ui-debt and dead-class gates ran; CI went red twice | PR #1523 (2026-10-22) | 2 | `pnpm prepush` and CI share `scripts/prepush.mjs`; `scripts/prepush.test.mjs` checks the same entry | 2 | 0 | #1533: the `mt-[3px]` negative control tripped D5, and the static check turned green after removal; dead-class stays advisory in CI |
+| A web PR was pushed before the ui-debt and dead-class gates ran; CI went red twice | PR #1523 (2026-10-22) | 2 | `pnpm prepush` and CI share `scripts/prepush.mjs`; `scripts/prepush.test.mjs` checks the same entry | 4 | 0 | #1533: the `mt-[3px]` negative control tripped D5, and the static check turned green after removal; dead-class stays advisory in CI |
 | 误称 e2e 本地跑不了，其实记忆里已有绕法 | Claude 线程 (2026-10-22) | 5 | 记忆：先查记忆再说做不了 | 0 | 0 | 机器检查做不到，属判断错误 |
 | 只把图放进文件库、没有直接附在回复里 | Claude 线程 (2026-10-22) | 5 | 记忆 | 0 | 0 | 机器检查做不到 |
 | 开 PR 后挂着等 CI，不收工 | Claude 线程 (2026-10-22) | 3 | 项目指令：开 PR 打开 auto-merge 后收工 | 0 | 0 | 行为类，CI 不看线程动作 |
@@ -164,3 +164,4 @@
 
 | A queued verification or snapshot update was treated as completed before its result arrived | #1753 (2026-10-25) | 3 | Read the command completion and its output before applying the next dependent change or reporting completion | 2 | 0 | The original source was restored before the queued negative-control tests ran; their completed logs showed the old protected-path blockers, the human-only chief prompt, and dropped review answers. A premature snapshot-update report was corrected while the updater was still waiting for the lock. Repository checks cannot inspect what an agent observed in an earlier turn. |
 | `single-use-helper-gate` diffed a moved file against nothing, so every helper in `src/overlays/*` counted as newly added when the folder merged into `src/overlay/` | overlay folder merge (2026-10-26) | 2 | `scripts/single-use-helper-gate.mjs` diffs renamed files against their old path (`-M`); `scripts/single-use-helper-gate.test.mjs` moves a file with a helper and expects green; negative control: the test fails on the old gate | 0 | 0 | |
+| A disabled button's kbd hint shipped at 1.08:1 contrast; axe stayed green because WCAG exempts disabled controls and aria-hidden text | PR #1766 (2026-10-26) | 2 | `apps/web/e2e/contrast-probe.ts`, run by every `a11y-axe.spec.ts` test: kbd hints, disabled controls (3:1), placeholders and all text | 1 | 0 | Negative control: the pre-fix build reds 3 tests (kbd 1.08 and 1.25, disabled `保存` 2.21, sidebar count 4.18), the fix turns them green |
