@@ -209,7 +209,7 @@ export function WorkTrace({
         {expanded && (
           <Button
             variant="ghost"
-            className="size-6 flex-none p-1 text-(--text-tertiary)"
+            className="size-6 flex-none border-0 p-1 text-(--text-tertiary)"
             aria-label={t('复制')}
             onClick={() => {
               void navigator.clipboard.writeText(

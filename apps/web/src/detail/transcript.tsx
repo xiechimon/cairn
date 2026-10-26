@@ -667,7 +667,12 @@ export function Transcript({
   for (const item of workItems) {
     for (const step of item.steps) {
       ids.add(step.id);
-      if (live && previous.current.live && !previous.current.ids.has(step.id))
+      if (
+        live &&
+        previous.current.live &&
+        previous.current.ids.size > 0 &&
+        !previous.current.ids.has(step.id)
+      )
         entering.add(step.id);
     }
   }
