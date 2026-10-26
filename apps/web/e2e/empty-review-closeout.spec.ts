@@ -136,7 +136,7 @@ async function stubSurface(
 }
 
 async function openBoard(page: Page) {
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   const card = page.locator(`.todo-card[data-todo-id="${CARD_ID}"]`);
   await expect(card).toBeVisible();
   await card.locator('.todo-card-action').click();

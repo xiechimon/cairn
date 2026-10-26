@@ -5,7 +5,7 @@
     "reason": "改名前就存在的闭包：用循环内的状态，内联会把 SSE 回调撑长；改名 PR 触碰该文件才被闸扫到"
   },
   {
-    "path": "apps/web/src/board/board.tsx",
+    "path": "apps/web/src/board/home.tsx",
     "name": "NeedsYouInbox",
     "reason": "React component with its own fold state hook; inlining it would put useState and the fresh/stale split inside the 300-line BoardSurface render"
   },

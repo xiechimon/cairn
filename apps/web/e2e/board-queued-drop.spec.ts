@@ -101,7 +101,7 @@ const todoColumn = (page: Page) => page.locator('.board-column[data-column="todo
 
 test('a queued card does not light `执行中`, and a drop there sends no start', async ({ page }) => {
   const stub = await stubWorld(page);
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await expect(building(page).locator(`[data-todo-id="${QUEUED_ID}"]`)).toBeVisible();
 
   await dragCardOver(page, QUEUED_ID, 'building');
@@ -127,7 +127,7 @@ test('a queued card does not light `执行中`, and a drop there sends no start'
 
 test('a todo card still lights `执行中`, and a drop there sends the start', async ({ page }) => {
   const stub = await stubWorld(page);
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await expect(todoColumn(page).locator(`[data-todo-id="${FRESH_ID}"]`)).toBeVisible();
 
   await dragCardOver(page, FRESH_ID, 'building');
@@ -151,7 +151,7 @@ test('a context length failure replaces orchestration with a reason and retry', 
     toolDefHashes: {}, toolResultHashes: {}, activeRun: failed ? null : { phase: 'chief' },
     turnQueue: null, lastTurnError: failed ? reason : null,
   }] }));
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   const card = page.locator(`[data-todo-id="${FRESH_ID}"]`).first();
   await expect(card.locator('[data-orchestrating="true"]')).toBeVisible();
   failed = true;

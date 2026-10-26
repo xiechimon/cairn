@@ -94,7 +94,7 @@ test('live: done(with changes)→`待处理` fires PATCH phase=review, optimisti
   page,
 }) => {
   const stub = await stubWorld(page, 'ok');
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await expect(page.locator(`[data-column="done"] [data-todo-id="${CARD_ID}"]`)).toBeVisible();
 
   await dragCardToColumn(page, 'pending');
@@ -144,7 +144,7 @@ test('live: done(with changes)→`待处理` fires PATCH phase=review, optimisti
 
 test('live: PATCH 409 = optimistic value voided, card bounces back to the source column + toast names the failure (#638)', async ({ page }) => {
   const stub = await stubWorld(page, '409');
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await expect(page.locator(`[data-column="done"] [data-todo-id="${CARD_ID}"]`)).toBeVisible();
 
   await dragCardToColumn(page, 'pending');
@@ -168,7 +168,7 @@ test('live: review(with changes)→`已完成` opens the done gate, cancel = zer
   page,
 }) => {
   const stub = await stubWorld(page, 'ok', 'review');
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await expect(
     page.locator(`[data-column="pending"] [data-todo-id="${CARD_ID}"]`),
   ).toBeVisible();
@@ -196,7 +196,7 @@ test('live: review(with changes)→`已完成` confirm sends PATCH phase=done, o
   page,
 }) => {
   const stub = await stubWorld(page, 'ok', 'review');
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await expect(
     page.locator(`[data-column="pending"] [data-todo-id="${CARD_ID}"]`),
   ).toBeVisible();
