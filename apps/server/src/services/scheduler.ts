@@ -32,6 +32,7 @@ import {
   type IssueIntakeLogger,
 } from './issue-intake.js';
 import { sweepStaleMachines } from './machines.js';
+import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
@@ -184,6 +185,7 @@ export function createScheduler(
     sweepAbandonedBuildSteps(deps, now);
     sweepZombieQueuedTodos(deps, now);
     sweepQuotaWaitSteps(deps, now);
+    void sweepFailedRetries(deps).catch(() => {});
     if (
       gc !== undefined &&
       gc !== null &&

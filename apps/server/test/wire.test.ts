@@ -52,6 +52,7 @@ const INFERRED_ROUTES = [
   'POST /api/todos/{id}/orchestrate',
   'POST /api/todos/{id}/stop-and-done',
   'POST /api/todos/{id}/reset',
+  'GET /api/needs-you',
   'DELETE /api/machines/{id}',
   'POST /api/machines/{id}/evacuate',
   'DELETE /api/teams/{id}/agents/{aid}/memories/{mid}',
