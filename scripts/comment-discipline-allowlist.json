@@ -783,5 +783,10 @@
     "path": "apps/web/src/pointer-focus.ts",
     "line": "// for an element that was focused by a mouse click.",
     "reason": "browser quirk: Chromium focus-visible heuristic treats Escape as keyboard input"
+  },
+  {
+    "path": "integration/vitest.config.ts",
+    "line": "    // vite build empties apps/web/dist first, so files that each run it must not run in parallel (#349).",
+    "reason": "external quirk: vite build empties its outDir before writing, so parallel builds into one dist clobber each other"
   }
 ]
