@@ -12,7 +12,7 @@ import type {
   ToolCallRecord,
   TranscriptRow,
 } from '@cairn/shared';
-import { machineRecordSchema, parseReportedCapabilities } from '@cairn/shared';
+import { claudeLoginSchema, machineRecordSchema, parseReportedCapabilities } from '@cairn/shared';
 import { and, asc, eq, isNotNull, lt } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { apiKey, build, machine, steerPending, step, stopPending, todo } from '../db/schema.js';
@@ -141,6 +141,7 @@ export { machineRunningCount } from './dispatch-eligibility.js';
 
 export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?: number) {
   const recommendation = recommendMachineConcurrency(row.capabilities?.hardware);
+  const login = claudeLoginSchema.safeParse(row.claudeCodeReport?.login);
   return machineRecordSchema.parse({
     id: row.id,
     name: row.name,
@@ -156,6 +157,7 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     concurrencySource: row.maxConcurrentOverridden ? 'manual' : recommendation.source,
     ...(runningSteps !== undefined ? { runningSteps } : {}),
     capabilities: row.capabilities,
+    ...(login.success ? { claudeLogin: login.data } : {}),
   });
 }
 

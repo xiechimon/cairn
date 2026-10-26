@@ -10,6 +10,8 @@ import type {
 import {
   CLAIM_BACKOFF_CAP_MS,
   CLAIM_POLL_INTERVAL_MS,
+  type ClaudeLogin,
+  classifyClaudeCodeLogin,
   isBackendRuntimeId,
   ORPHAN_WORKTREE_TTL_MS,
 } from '@cairn/shared';
@@ -17,7 +19,11 @@ import { createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
-import { type ClaudeCodeAuthProbe, probeClaudeCodeAuth } from './claude-code-auth.js';
+import {
+  type ClaudeCodeAuthProbe,
+  probeClaudeCodeAuth,
+  readDefaultClaudeOauthExpiresAt,
+} from './claude-code-auth.js';
 import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
 import type { DaemonConfig } from './config.js';
@@ -50,6 +56,7 @@ export interface MachineLoopOpts {
   claudeCodeBackend?: AgentBackend;
   geminiBackend?: AgentBackend;
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
+  readClaudeOauthExpiresAt?: () => number | null;
   capabilitiesProbe?: () => MachineCapabilities;
   fetchImpl?: typeof fetch;
   client?: MachineApi;
@@ -148,15 +155,28 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       : 'claude binary: not found on PATH or well-known dirs',
   );
   let claudeAuth: ClaudeCodeAuthProbe | null = null;
-  const probeAuthAndRemember = async (): Promise<ClaudeCodeAuthProbe> => {
-    const probe = await (opts.claudeCodeAuthProbe ?? probeClaudeCodeAuth)();
-    claudeAuth = probe;
-    return probe;
+  let claudeLogin: ClaudeLogin | null = null;
+  let loginProbe: Promise<ClaudeCodeAuthProbe> | null = null;
+  const readExpiresAt = opts.readClaudeOauthExpiresAt ?? readDefaultClaudeOauthExpiresAt;
+  const probeAuthAndRemember = (): Promise<ClaudeCodeAuthProbe> => {
+    if (loginProbe) return loginProbe;
+    const pending = (async () => {
+      const probe = await (opts.claudeCodeAuthProbe ?? probeClaudeCodeAuth)();
+      claudeAuth = probe;
+      const expiresAt = probe.state === 'unknown' ? null : readExpiresAt();
+      claudeLogin = classifyClaudeCodeLogin(probe.state, expiresAt, Date.now());
+      return probe;
+    })();
+    loginProbe = pending.finally(() => {
+      loginProbe = null;
+    });
+    return loginProbe;
   };
   const claudeReport = () =>
     readClaudeCodeReport(undefined, {
       bin: claudeBin,
       ...(claudeAuth !== null ? { auth: claudeAuth } : {}),
+      ...(claudeLogin !== null ? { login: claudeLogin } : {}),
     });
   claudeAuth = await probeAuthAndRemember();
 
@@ -477,12 +497,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   const presenceTimer = setInterval(() => {
     void refreshCap();
-    client
-      .presence({
-        cliVersion: DAEMON_VERSION,
-        claudeCode: claudeReport(),
-        capabilities: capabilitiesReport(),
-      })
+    void probeAuthAndRemember()
+      .then(() =>
+        client.presence({
+          cliVersion: DAEMON_VERSION,
+          claudeCode: claudeReport(),
+          capabilities: capabilitiesReport(),
+        }),
+      )
       .catch((err: unknown) => {
         logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
       });

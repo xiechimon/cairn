@@ -1,4 +1,4 @@
-import { MACHINE_RUNTIMES, type MachineRuntime } from '@cairn/shared';
+import { claudeLoginNotice, MACHINE_RUNTIMES, type MachineRuntime } from '@cairn/shared';
 import { cn } from 'cn';
 import { Monitor, Plus as PlusIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -390,6 +390,29 @@ export function MachinesPage() {
         <ResourceList>
           {machines.map((machine) => {
             const chief = chiefState(machine);
+            const notice = claudeLoginNotice(machine.claudeLogin, Date.now());
+            const loginWarning =
+              notice === null
+                ? null
+                : notice.kind === 'expired'
+                  ? t(
+                      '{name} 上的 Claude Code 登录已过期。在该机器上运行 `claude auth login` 重新登录。',
+                      { name: machine.name },
+                    )
+                  : notice.days === null
+                    ? t(
+                        '{name} 上的 Claude Code 登录将在不到 1 天内过期。在该机器上运行 `claude auth login` 重新登录。',
+                        { name: machine.name },
+                      )
+                    : notice.days === 1
+                      ? t(
+                          '{name} 上的 Claude Code 登录将在 1 天后过期。在该机器上运行 `claude auth login` 重新登录。',
+                          { name: machine.name },
+                        )
+                      : t(
+                          '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该机器上运行 `claude auth login` 重新登录。',
+                          { name: machine.name, days: notice.days },
+                        );
             return (
               <ResourceRow
                 key={rowKey(machine)}
@@ -503,6 +526,16 @@ export function MachinesPage() {
                     </span>
                   )}
                 </span>
+                {loginWarning !== null && (
+                  <span
+                    className="basis-full text-meta"
+                    data-testid="claude-login-warning"
+                    data-login={notice?.kind === 'expired' ? 'expired' : 'expiring'}
+                    role="status"
+                  >
+                    {loginWarning}
+                  </span>
+                )}
               </ResourceRow>
             );
           })}

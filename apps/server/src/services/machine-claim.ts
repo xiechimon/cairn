@@ -6,6 +6,7 @@ import {
   buildMergedPrGuardNote,
   buildTaskPromptText,
   CHIEF_REMOTE_TOOLS,
+  claudeLoginBlocksClaim,
   claudeRateBlock,
   formatSkillRouteSection,
   LOCAL_TOOL_CREATE_TAG,
@@ -148,6 +149,14 @@ function claimLocalTools(agentTools: readonly string[]): string[] {
   return tools;
 }
 
+function claudeCodeLoginBlocks(
+  machineRow: typeof machine.$inferSelect,
+  provider: string | null | undefined,
+): boolean {
+  if (stepRuntimeFor(provider) !== 'claude-code') return false;
+  return claudeLoginBlocksClaim(machineRow.claudeCodeReport?.login, nowMs());
+}
+
 function buildChiefClaim(
   deps: MachineDeps,
   machineId: string,
@@ -159,6 +168,7 @@ function buildChiefClaim(
   if (!agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
   if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
+  if (claudeCodeLoginBlocks(machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const claimedAt = nowMs();
   const res = deps.db
@@ -340,6 +350,7 @@ async function tryClaim(
       if (runtime !== 'claude-code' || !claudeBlocked(agentRow.machineId)) continue;
     }
     if (!runtimeGatePasses(machineRow, model.provider)) continue;
+    if (claudeCodeLoginBlocks(machineRow, model.provider)) continue;
     if (!capabilityGatePasses(machineRow, agentRow)) continue;
     if (
       agentRow.maxConcurrentTasks !== null &&

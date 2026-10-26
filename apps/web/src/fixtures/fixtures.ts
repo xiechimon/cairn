@@ -123,6 +123,7 @@ export {
 } from './r8-overlay.js';
 export {
   machinesChiefState,
+  machinesClaudeLogin,
   resourcesCcBinGone,
   resourcesCcLegacy,
   resourcesCcLoggedOut,

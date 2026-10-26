@@ -1095,6 +1095,14 @@ export const EN: Record<string, string> = {
   可跑: 'Runnable',
   不可跑: 'Not runnable',
   '暂无机器。': 'No machines yet.',
+  '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该机器上运行 `claude auth login` 重新登录。':
+    'Claude Code login on {name} expires in {days} days. On that machine run `claude auth login`.',
+  '{name} 上的 Claude Code 登录将在 1 天后过期。在该机器上运行 `claude auth login` 重新登录。':
+    'Claude Code login on {name} expires in 1 day. On that machine run `claude auth login`.',
+  '{name} 上的 Claude Code 登录将在不到 1 天内过期。在该机器上运行 `claude auth login` 重新登录。':
+    'Claude Code login on {name} expires in less than a day. On that machine run `claude auth login`.',
+  '{name} 上的 Claude Code 登录已过期。在该机器上运行 `claude auth login` 重新登录。':
+    'Claude Code login on {name} has expired. On that machine run `claude auth login`.',
   // #895 机器页三态读标注（spec 21 A8；orchestration 块 join 行集）+ chief
   // 设置 Agent tab「机器」槽的描述（A6）。徽标/状态 = 机器与总管编排的
   // 关系面，非机器自身状态。
