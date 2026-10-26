@@ -213,22 +213,6 @@
   border-radius: var(--cds-radius-lg);
 }
 
-[data-slot="select-content"] {
-  border-radius: var(--radius-popover);
-  box-shadow: var(--shadow-popover);
-}
-
-[data-slot="select-item"] {
-  height: 2rem;
-  border-radius: var(--cds-radius-md);
-  padding-block: 0;
-  font-size: var(--type-ui);
-}
-
-[data-slot="select-item"][data-highlighted] {
-  background-color: var(--menu-hover);
-}
-
 [data-slot="dialog-overlay"],
 [data-slot="alert-dialog-overlay"] {
   background-color: var(--dialog-backdrop);

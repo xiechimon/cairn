@@ -85,7 +85,7 @@ for (const theme of ['light', 'dark'] as const) {
     test('each rung is its pool plus one ring, ring last', async ({ page }) => {
       await page.goto('/app?scenario=01');
       await page.waitForSelector('.board-sidebar');
-      const ringColor = theme === 'light' ? 'border' : 'ring-inset-highlight';
+      const ringColor = theme === 'light' ? 'border-soft' : 'ring-inset-highlight';
       const borderRing = await ringIn(page, 'border');
       const tierRing = await ringIn(page, ringColor);
       for (const [rung, poolName] of RUNGS) {
@@ -94,9 +94,6 @@ for (const theme of ['light', 'dark'] as const) {
         expect(value, rung).not.toBe('none');
         expect(value.startsWith(`${pool}, `), `${rung} starts with its pool`).toBe(true);
         expect(rings(value), `${rung} ring count`).toBe(1);
-        // e1 rings in --border on both sides; e2/e3 ring in the light-side
-        // --border and the dark-side --ring-inset-highlight (the dialog's
-        // pre-ladder ring colour).
         const want = rung === 'e1' ? borderRing : tierRing;
         expect(value.endsWith(want), `${rung} ends with its ring`).toBe(true);
       }

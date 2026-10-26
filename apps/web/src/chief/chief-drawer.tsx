@@ -424,7 +424,7 @@ function ChiefDrawerInner({
         )}
         {threadsOpen && (
           <div
-            className="absolute top-8 left-3 z-[5] max-h-55 w-66 overflow-y-auto rounded-(--radius-popover) bg-(--popover) p-1 shadow-(--shadow-popover)"
+            className="absolute top-8 left-3 z-[5] max-h-55 w-66 overflow-y-auto rounded-(--radius-popover) bg-(--popover) p-(--menu-pad) shadow-(--shadow-popover)"
             role="menu"
           >
             {(chief.threads ?? []).map((thread, index) => (
@@ -433,7 +433,7 @@ function ChiefDrawerInner({
                 role="menuitem"
                 key={thread.title}
                 aria-current={thread.active ? 'true' : undefined}
-                className="h-8 w-full cursor-pointer justify-start gap-2 rounded-sm border-none bg-transparent px-2 text-left text-ui font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-[current=true]:bg-(--menu-hover) aria-[current=true]:font-medium aria-[current=true]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+                className="h-8 w-full cursor-pointer justify-start gap-2 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-[current=true]:bg-(--menu-hover) aria-[current=true]:font-medium aria-[current=true]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
                 onClick={
                   onThread != null
                     ? () => {
