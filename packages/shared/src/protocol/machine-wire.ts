@@ -318,6 +318,7 @@ export const machineDoneBodySchema = z.object({
   sessionId: z.string().optional(),
   usage: z.array(modelUsageSchema).optional(),
   hasChanges: z.boolean().optional(),
+  pushHookOutput: z.string().optional(),
   workBranchDrift: z.object({ expected: z.string().min(1), actual: z.string().min(1) }).optional(),
   commit: z.string().optional(),
   preservedCommits: z.array(z.string().regex(/^[0-9a-f]{40,64}$/)).optional(),

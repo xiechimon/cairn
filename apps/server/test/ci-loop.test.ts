@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
+  machine as machineTable,
   project as projectTable,
   step as stepTable,
   todo as todoTable,
@@ -19,6 +20,7 @@ import {
   createCiPoller,
 } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { finishStep } from '../src/services/machine-finish-step.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer, type TestServer } from './helpers.js';
 
@@ -936,4 +938,150 @@ describe('#1533 ci-fix turns green reconciliation ticket', () => {
     expect(writes).toBe(2);
     expect(lists).toBe(3);
   });
+});
+
+describe('#1829 closing push and agent-opened PR recovery', () => {
+  test.each([0, CI_FIX_ROUNDS_MAX - 1, CI_FIX_ROUNDS_MAX])(
+    'a pre-push rejection after %i ci-fix rounds uses the shared round cap and preserves hook output',
+    async (fixRounds) => {
+      const w = makePrWorld({ fixRounds });
+      w.s.db
+        .update(buildTable)
+        .set({ prNumber: null, prUrl: null })
+        .where(eq(buildTable.id, w.buildId))
+        .run();
+      const machineId = `machine-${w.buildId}`;
+      w.s.db
+        .insert(machineTable)
+        .values({ id: machineId, teamId: w.teamId, name: 'builder', tokenHash: machineId })
+        .run();
+      const stepId = `closing-${w.buildId}`;
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: stepId,
+          buildId: w.buildId,
+          kind: 'build',
+          status: 'claimed',
+          machineId,
+          createdAt: w.base,
+        })
+        .run();
+      const hookOutput = 'pre-push: lint failed: README.md:12 invalid evidence link';
+      await finishStep(
+        {
+          ...w.s.svc,
+          reposDir: w.s.reposDir,
+          attachmentsDir: w.s.attachmentsDir,
+          box: w.s.secretBox,
+          githubFetch: async () => res(200, '', []),
+        },
+        machineId,
+        stepId,
+        {
+          status: 'success',
+          noOutput: true,
+          hasChanges: true,
+          pushHookOutput: hookOutput,
+        },
+      );
+      if (fixRounds === CI_FIX_ROUNDS_MAX) {
+        expect(w.todoRow().phase).toBe('failed');
+        expect(w.fixRoundSteps()).toHaveLength(CI_FIX_ROUNDS_MAX);
+        return;
+      }
+      expect(w.todoRow().phase).toBe('building');
+      expect(w.buildRow().errorMessage).toBeNull();
+      expect(w.fixRoundSteps()).toHaveLength(fixRounds + 1);
+      expect(w.fixRoundSteps().at(-1)).toMatchObject({
+        status: 'pending',
+        prompt: expect.stringContaining(hookOutput),
+      });
+      expect(w.fixRoundSteps().at(-1)?.prompt).toContain('same branch');
+    },
+  );
+
+  test.each(['open', 'closed', 'foreign branch', 'fork', 'unreadable'])(
+    'agent-opened PR discovery: %s',
+    async (state) => {
+      const w = makePrWorld({
+        checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+      });
+      w.s.db
+        .update(buildTable)
+        .set({ prNumber: null, prUrl: null })
+        .where(eq(buildTable.id, w.buildId))
+        .run();
+      const machineId = `machine-${w.buildId}`;
+      w.s.db
+        .insert(machineTable)
+        .values({ id: machineId, teamId: w.teamId, name: 'builder', tokenHash: machineId })
+        .run();
+      const stepId = `closing-${w.buildId}`;
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: stepId,
+          buildId: w.buildId,
+          kind: 'build',
+          status: 'claimed',
+          machineId,
+          createdAt: w.base,
+        })
+        .run();
+      const githubFetch: FetchLike = async (input, init) => {
+        if (String(input).includes('/pulls?')) {
+          expect(new URL(String(input)).searchParams.get('head')).toBe(
+            `octo:${conversationBranch(w.buildId)}`,
+          );
+          expect(new URL(String(input)).searchParams.get('state')).toBe('open');
+          if (state === 'unreadable') return res(503, '', {});
+          return res(200, '', [
+            {
+              number: w.prNumber,
+              state: state === 'closed' ? 'closed' : 'open',
+              head: {
+                ref: state === 'foreign branch' ? 'other' : conversationBranch(w.buildId),
+                repo: { id: state === 'fork' ? 2 : 1 },
+              },
+              base: { ref: 'main', repo: { id: 1 } },
+            },
+          ]);
+        }
+        if (String(input).includes('/rules/branches/'))
+          return res(200, '', [
+            {
+              type: 'required_status_checks',
+              parameters: { required_status_checks: [{ context: 'lint' }] },
+            },
+          ]);
+        return w.mock.fetch(input, init);
+      };
+      await finishStep(
+        {
+          ...w.s.svc,
+          reposDir: w.s.reposDir,
+          attachmentsDir: w.s.attachmentsDir,
+          box: w.s.secretBox,
+          githubFetch,
+        },
+        machineId,
+        stepId,
+        { status: 'success', hasChanges: true },
+      );
+      if (state !== 'open') {
+        expect(w.buildRow().prNumber).toBeNull();
+        expect(w.todoRow().phase).toBe('review');
+        return;
+      }
+      expect(w.buildRow().prNumber).toBe(w.prNumber);
+      expect(
+        w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.prUrl,
+      ).toBe(`https://github.com/octo/demo/pull/${w.prNumber}`);
+      expect(w.todoRow().phase).toBe('building');
+      await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+      expect(w.fixRoundSteps()).toHaveLength(1);
+      expect(w.fixRoundSteps()[0]?.prompt).toContain('lint');
+    },
+  );
 });

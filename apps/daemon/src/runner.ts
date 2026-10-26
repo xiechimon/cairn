@@ -80,7 +80,7 @@ import {
   probeClaudeCodeAuth,
 } from './claude-code-auth.js';
 import { clearCredentials, pushCredential } from './credentials.js';
-import { withGitCredentialFallback } from './git.js';
+import { GitPushHookError, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { computeHarnessHash } from './harness-hash.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
@@ -916,6 +916,7 @@ async function runClaimedStep(
 
   let usage: AgentTokenUsage = [];
   let lastError: string | null = null;
+  let closingPushHookError: GitPushHookError | null = null;
   let lastModelError: string | null = null;
   let messageSeq = 0;
   let sawChangeTool = false;
@@ -1610,7 +1611,18 @@ async function runClaimedStep(
       }
       hasChanges = headAhead > 0 || artifactBranches.length > 0;
     } catch (err) {
+      if (err instanceof GitPushHookError) closingPushHookError = err;
       lastError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  let pushHookOutput: string | null = null;
+  if (claimed.step.kind === 'build' && closingPushHookError !== null) {
+    pushHookOutput = stripAnsiEscapes(closingPushHookError.message);
+    lastError = null;
+    if (ws !== null && deps.workspace) {
+      headCommit = await deps.workspace.headCommit(ws.cwd);
+      hasChanges = true;
     }
   }
 
@@ -1749,6 +1761,7 @@ async function runClaimedStep(
     hasChanges,
     ...(headCommit !== null ? { commit: headCommit } : {}),
     ...(preservedCommits.length > 0 ? { preservedCommits } : {}),
+    ...(pushHookOutput !== null ? { pushHookOutput } : {}),
     ...(reviewExtraction?.status === 'ok' ? { findings: reviewExtraction.verdict } : {}),
     ...(reviewExtraction?.status === 'failed' ? { findingsError: reviewExtraction.reason } : {}),
     ...(verifyExtraction?.status === 'ok' ? { verifyVerdict: verifyExtraction.verdict } : {}),
