@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -20,6 +18,7 @@ import {
   PLAN_FILE_NAME,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -177,7 +176,7 @@ function handle(sessionId: string): AgentSessionHandle {
 }
 
 async function setup(claimed: ClaimedStep, backend: AgentBackend) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-plan-'));
+  const home = makeTestTempDir('cairn-runner-plan-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger } = captureLogger();

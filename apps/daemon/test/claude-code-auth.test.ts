@@ -1,7 +1,8 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   claudeCodeAuthFailureMessage,
   parseClaudeCodeAuthStatus,
@@ -79,19 +80,15 @@ describe('probeClaudeCodeAuth', () => {
   });
 
   test('failure mode 6b: real subprocess rc=1 + JSON stdout → verdict as usual (not folded into unknown by the exit code)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-auth-'));
+    const dir = makeTestTempDir('cairn-cc-auth');
     const stub = join(dir, 'claude');
     writeFileSync(
       stub,
       `#!/bin/sh\necho '${statusJson({ loggedIn: false, authMethod: 'none' })}'\nexit 1\n`,
     );
     chmodSync(stub, 0o755);
-    try {
-      const probe = await probeClaudeCodeAuth({ command: stub, timeoutMs: 5_000 });
-      expect(probe).toEqual({ state: 'not-logged-in', provider: 'firstParty' });
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    const probe = await probeClaudeCodeAuth({ command: stub, timeoutMs: 5_000 });
+    expect(probe).toEqual({ state: 'not-logged-in', provider: 'firstParty' });
   });
 
   test('injected run: run throws → unknown (reason kept in the reason field)', async () => {

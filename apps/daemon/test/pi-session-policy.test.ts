@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test } from 'vitest';
+import { cleanupTestDirs, makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   daemonSettingsManager,
   detectTrustProtectedResources,
@@ -13,8 +13,13 @@ import {
   TRUST_PROTECTED_ENTRIES,
 } from '../src/backend/pi.js';
 
+const dirs: string[] = [];
+afterAll(() => cleanupTestDirs(dirs.splice(0)));
+
 function worktree(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-trust-'));
+  const dir = makeTestTempDir('cairn-trust');
+  dirs.push(dir);
+  return dir;
 }
 
 function plant(dir: string, rel: string, content = 'x'): void {

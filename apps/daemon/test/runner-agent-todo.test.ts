@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -16,6 +14,7 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -166,7 +165,7 @@ function backendOf(script: StepEvent[]): AgentBackend {
 }
 
 async function run(script: StepEvent[]) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-todo-'));
+  const home = makeTestTempDir('cairn-runner-todo-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const client = new RecordingClient();
   await runStep(

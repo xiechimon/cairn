@@ -1,5 +1,5 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import type { AgentBackend, StepEvent } from '@cairn/shared';
 import { conversationBranch, machineDoneBodySchema } from '@cairn/shared';
@@ -20,10 +20,11 @@ import { agent, build, machine, message, step, todo } from '../../apps/server/sr
 import { applyBuildStepAction } from '../../apps/server/src/services/builds.js';
 import { claimStep, finishStep } from '../../apps/server/src/services/machines.js';
 import { bootServer, req } from '../../apps/server/test/helpers.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 async function failedBuild(failure: 'duration' | 'idle' | 'crash' = 'duration') {
   const s = bootServer();
-  const home = mkdtempSync(join(tmpdir(), 'cairn-1739-'));
+  const home = makeTestTempDir('cairn-1739-');
   const logger = createDaemonLogger({ logFile: join(home, 'daemon.log') });
   const paths = statePaths(home, join(home, 'workspaces'));
   const workspace = new WorkspaceManager({ logger });

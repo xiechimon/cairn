@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { parseSkillFrontmatter, skillRecordSchema } from '@cairn/shared';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
@@ -11,7 +12,7 @@ import { bootServer, insertMachine, req, type TestServer } from './helpers.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-skills-'));
+  const root = makeTestTempDir('cairn-skills-');
   roots.push(root);
   return root;
 }

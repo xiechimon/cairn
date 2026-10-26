@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { MergePolicy, ProjectRepoKind } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createApp } from '../src/app.js';
 import type { AppContext } from '../src/context.js';
 import { openMemoryDb } from '../src/db/client.js';
@@ -43,15 +44,14 @@ export function bootServer(
   const convHub = new ConversationStreamHub();
   const secretBox = createEphemeralSecretBox();
   const ownReposDir = opts.reposDir === undefined;
-  const reposDir = opts.reposDir ?? mkdtempSync(join(tmpdir(), 'cairn-server-repos-'));
+  const reposDir = opts.reposDir ?? makeTestTempDir('cairn-server-repos-');
   const ownAttDir = opts.attachmentsDir === undefined;
-  const attachmentsDir = opts.attachmentsDir ?? mkdtempSync(join(tmpdir(), 'cairn-att-'));
+  const attachmentsDir = opts.attachmentsDir ?? makeTestTempDir('cairn-att-');
   const ownSkillsDir = opts.skillsDir === undefined;
-  const skillsDir = opts.skillsDir ?? mkdtempSync(join(tmpdir(), 'cairn-skills-'));
+  const skillsDir = opts.skillsDir ?? makeTestTempDir('cairn-skills-');
   const ownSkillSourcesDir = opts.skillSourcesPath === undefined;
   const skillSourcesPath =
-    opts.skillSourcesPath ??
-    join(mkdtempSync(join(tmpdir(), 'cairn-skill-sources-')), 'skill-sources.json');
+    opts.skillSourcesPath ?? join(makeTestTempDir('cairn-skill-sources-'), 'skill-sources.json');
   const oauthStates: AppContext['oauthStates'] = new Map();
   const app = createApp({
     db,

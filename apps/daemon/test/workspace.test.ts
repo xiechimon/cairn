@@ -2,7 +2,6 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   rmSync,
   utimesSync,
@@ -17,6 +16,7 @@ import {
   RemoteBranchDivergedError,
 } from '@cairn/shared';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
@@ -84,8 +84,8 @@ function seedHook(name: 'setup' | 'resume', body: string): void {
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'cairn-ws-root-'));
-  originDir = join(mkdtempSync(join(tmpdir(), 'cairn-ws-origin-')), 'repo.git');
+  root = makeTestTempDir('cairn-ws-root-');
+  originDir = join(makeTestTempDir('cairn-ws-origin-'), 'repo.git');
   seedDir = join(tmpdir(), `cairn-ws-seed-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });

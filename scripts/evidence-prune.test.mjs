@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { scrubGitEnv } from './scrub-git-env.mjs';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const script = resolve(import.meta.dirname, 'evidence-prune.mjs');
 const NOW = '2026-10-25T12:00:00Z';
@@ -12,7 +13,7 @@ const daysAgo = (days) => new Date(Date.parse(NOW) - days * 86400000).toISOStrin
 const env = scrubGitEnv({ ...process.env });
 
 const fixture = () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'evidence-prune-'));
+  const cwd = makeTestTempDir('evidence-prune-');
   const git = (date, ...args) =>
     execFileSync('git', args, {
       cwd,
@@ -152,7 +153,7 @@ test('nothing due leaves the tree unchanged', () => {
 
 test('refuses a shallow clone, where every folder looks freshly committed', () => {
   const repo = fixture();
-  const shallow = mkdtempSync(join(tmpdir(), 'evidence-prune-shallow-'));
+  const shallow = makeTestTempDir('evidence-prune-shallow-');
   try {
     repo.commit(daysAgo(30), { 'docs/verify/100/shot.png': 'a' });
     repo.commit(daysAgo(1), { 'docs/verify/200/shot.png': 'b' });

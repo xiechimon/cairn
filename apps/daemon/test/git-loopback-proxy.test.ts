@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { cleanupTestDirs, makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { gitPrim, runGit } from '../src/git.js';
 import { stubOutInheritedGitConfig } from './git-config-env.js';
 
@@ -77,7 +77,7 @@ describe('git subprocess reaches the loopback server bypassing the global http.p
   beforeEach(async () => {
     stubOutInheritedGitConfig();
     for (const name of PROXY_ENV_NAMES) vi.stubEnv(name, undefined);
-    tmp = mkdtempSync(join(tmpdir(), 'cairn-git-loopback-proxy-'));
+    tmp = makeTestTempDir('cairn-git-loopback-proxy');
 
     const work = join(tmp, 'work');
     mkdirSync(work);
@@ -117,7 +117,7 @@ describe('git subprocess reaches the loopback server bypassing the global http.p
     await closeServer(proxy.server);
     await closeServer(gitServer4.server);
     if (gitServer6) await closeServer(gitServer6.server);
-    rmSync(tmp, { recursive: true, force: true });
+    cleanupTestDirs([tmp]);
   });
 
   test('precondition: the global proxy really hijacks git without the exemption (rule out false green)', async () => {

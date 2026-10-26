@@ -1,10 +1,24 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync } from 'node:fs';
+import { mkdirSync, realpathSync, symlinkSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test } from 'vitest';
+import { cleanupTestDirs, makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 // macOS spawn cwd is symlink-resolved; transcript slug must match or resume misses.
 import { sdkTranscriptPath } from '../src/backend/claude-code.js';
+
+const dirs: string[] = [];
+const links: string[] = [];
+afterAll(() => {
+  cleanupTestDirs(dirs.splice(0));
+  cleanupTestDirs(links.splice(0));
+});
+
+function tmpDir(prefix: string): string {
+  const dir = makeTestTempDir(prefix);
+  dirs.push(dir);
+  return dir;
+}
 
 function cliProjectSlug(resolved: string): string {
   const flat = resolved.replace(/[^a-zA-Z0-9]/g, '-');
@@ -18,8 +32,9 @@ function cliProjectSlug(resolved: string): string {
 
 describe('sdkTranscriptPath path resolution (A7 resume preflight)', () => {
   test('failure mode 10: slug of a symlinked cwd = slug of the real path', () => {
-    const real = mkdtempSync(join(tmpdir(), 'cairn-cc-path-'));
+    const real = tmpDir('cairn-cc-path');
     const link = join(tmpdir(), `cairn-cc-link-${randomUUID()}`);
+    links.push(link);
     symlinkSync(real, link);
     const throughLink = sdkTranscriptPath(link, 'sess-1');
     const direct = sdkTranscriptPath(real, 'sess-1');
@@ -34,7 +49,7 @@ describe('sdkTranscriptPath path resolution (A7 resume preflight)', () => {
   });
 
   test('failure mode 12: non-alphanumeric cwd characters replaced with - per the CLI rule', () => {
-    const parent = mkdtempSync(join(tmpdir(), 'cairn-cc-slug-'));
+    const parent = tmpDir('cairn-cc-slug');
     const cwd = join(parent, 'dot.hidden_dir');
     mkdirSync(cwd);
     const resolved = realpathSync(cwd);
@@ -48,7 +63,7 @@ describe('sdkTranscriptPath path resolution (A7 resume preflight)', () => {
   });
 
   test('failure mode 13: sanitized cwd over 200 truncated with a path hash appended', () => {
-    const parent = mkdtempSync(join(tmpdir(), 'cairn-cc-long-'));
+    const parent = tmpDir('cairn-cc-long');
     const cwd = join(parent, 'p'.repeat(220));
     mkdirSync(cwd);
     const resolved = realpathSync(cwd);
@@ -63,7 +78,7 @@ describe('sdkTranscriptPath path resolution (A7 resume preflight)', () => {
   });
 
   test('failure mode 14: config dir overrides a valid project name; invalid names and missing config dir do not override', () => {
-    const parent = mkdtempSync(join(tmpdir(), 'cairn-cc-over-'));
+    const parent = tmpDir('cairn-cc-over');
     const cwd = join(parent, 'dot.hidden_dir');
     mkdirSync(cwd);
     const resolved = realpathSync(cwd);

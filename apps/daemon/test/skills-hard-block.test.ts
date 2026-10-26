@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   buildClaudeSdkOptions,
   buildSkillDenyRules,
@@ -16,7 +17,7 @@ import {
 } from '../src/backend/skills.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `cairn-hardblock-${tag}-`));
+  return makeTestTempDir(`cairn-hardblock-${tag}-`);
 }
 
 function writeSkill(root: string, dirName: string, name?: string): string {

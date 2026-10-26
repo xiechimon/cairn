@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -13,6 +11,7 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
 import { StepJournal } from '../src/journal.js';
@@ -180,7 +179,7 @@ async function setup(
     machineName?: string;
   } = {},
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-runtime-'));
+  const home = makeTestTempDir('cairn-runner-runtime-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(opts.tokenProvider ?? null);
@@ -326,7 +325,7 @@ describe('runner runtime-step session continuation (spec 17 A7)', () => {
       ...claimedStep({ provider: 'claude-code', modelId: 'claude-sonnet-4-5' }),
       session: { action: 'continue' as const, sessionId: 'sdk-session-uuid' },
     };
-    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-runtime-'));
+    const home = makeTestTempDir('cairn-runner-runtime-');
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
     const client = new FakeClient(null);

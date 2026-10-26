@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+
 import { basename, dirname, join } from 'node:path';
 import {
   DEFAULT_AUTONOMY_SETTINGS,
@@ -8,6 +8,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { project } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { expandHomePath } from '../src/services/git.js';
@@ -17,7 +18,7 @@ const s = bootServer();
 const tempRoots: string[] = [];
 
 function tempDir(prefix: string): string {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
+  const dir = makeTestTempDir(prefix);
   tempRoots.push(dir);
   return dir;
 }

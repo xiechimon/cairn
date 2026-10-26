@@ -1,8 +1,9 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   cleanupBriefFile,
   locateMarkerBlock,
@@ -16,7 +17,7 @@ afterEach(() => {
 });
 
 function freshDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-brief-'));
+  const dir = makeTestTempDir('cairn-brief-');
   dirs.push(dir);
   return dir;
 }

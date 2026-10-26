@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -12,6 +10,7 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -175,7 +174,7 @@ function probingBackend(probe: Probe): AgentBackend {
 }
 
 async function setup(kind: ClaimedStep['step']['kind'], secrets: Record<string, string>) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-secret-channel-'));
+  const home = makeTestTempDir('cairn-secret-channel-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();

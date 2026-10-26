@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { Agent, createServer as createTcpServer, request } from 'node:http';
-import { tmpdir } from 'node:os';
+
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type ClaimedStep, claimedStepSchema, ENV_VARS, PLAN_FILE_NAME } from '@cairn/shared';
@@ -14,6 +14,7 @@ import {
   step as stepTable,
 } from '../../apps/server/src/db/schema.js';
 import { createApiKey } from '../../apps/server/src/services/api-keys.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -184,7 +185,7 @@ describe('#1026/#1028 final-report failure recovery (real process restarts)', ()
       { content: '规划完成。' },
     ]);
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 500 });
-    home = mkdtempSync(join(tmpdir(), 'cairn-plan-uploads-'));
+    home = makeTestTempDir('cairn-plan-uploads-');
     proxyHandle = await startProxy(server.url);
     const { buildId } = await startBuild(
       '幂等恢复探针',
@@ -247,7 +248,7 @@ describe('#1026/#1028 final-report failure recovery (real process restarts)', ()
   }, 240_000);
 
   test('server shutdown in the final window → same-port reopen → old URL 404 (explainable) → reissued URL persists → daemon restart fast-path replays', async () => {
-    const dbPath = join(mkdtempSync(join(tmpdir(), 'cairn-plan-restart-')), 'cairn.db');
+    const dbPath = join(makeTestTempDir('cairn-plan-restart-'), 'cairn.db');
     let serverClosed = false;
     stub = await startStubLlm(
       [
@@ -270,7 +271,7 @@ describe('#1026/#1028 final-report failure recovery (real process restarts)', ()
     );
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 500, dbPath });
     const port = Number(new URL(server.url).port);
-    home = mkdtempSync(join(tmpdir(), 'cairn-plan-restart-home-'));
+    home = makeTestTempDir('cairn-plan-restart-home-');
 
     const probeKey = createApiKey(
       { db: server.db },

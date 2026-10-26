@@ -15,6 +15,7 @@ const projects =
 
 export default defineConfig({
   test: {
+    globalSetup: ['./scripts/tmpdir-sweep.mjs'],
     projects,
   },
 });

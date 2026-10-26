@@ -3,16 +3,16 @@ import {
   chmodSync,
   cpSync,
   existsSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+
 import { join } from 'node:path';
 import { type BoundGitCredentials, conversationBranch } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
@@ -94,7 +94,7 @@ function nlinksUnder(dir: string): number[] {
 }
 
 beforeEach(async () => {
-  const base = mkdtempSync(join(tmpdir(), 'cairn-local-exec-'));
+  const base = makeTestTempDir('cairn-local-exec-');
   userRepo = join(base, 'user-repo');
   root = join(base, 'workspaces');
   logger = fakeLogger();
@@ -176,7 +176,7 @@ describe('per-step credential argv discipline (spec 12 G2-T2: capturing fork+exe
   beforeEach(() => {
     const realGit = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim();
     expect(realGit).not.toBe('');
-    shimDir = mkdtempSync(join(tmpdir(), 'cairn-git-shim-'));
+    shimDir = makeTestTempDir('cairn-git-shim-');
     argvLog = join(shimDir, 'argv.log');
     envLog = join(shimDir, 'env.log');
     writeFileSync(
@@ -198,10 +198,10 @@ describe('per-step credential argv discipline (spec 12 G2-T2: capturing fork+exe
   });
 
   test('failure mode 5: token never enters argv throughout credential-bearing clone/fetch/push; carried by the env credential.helper (positive control)', async () => {
-    const bareRemote = join(mkdtempSync(join(tmpdir(), 'cairn-cred-remote-')), 'origin.git');
+    const bareRemote = join(makeTestTempDir('cairn-cred-remote-'), 'origin.git');
     await runGit(['init', '--bare', bareRemote]);
     await runGit(['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd: bareRemote });
-    const seedDir = join(mkdtempSync(join(tmpdir(), 'cairn-cred-seed-')), 'seed');
+    const seedDir = join(makeTestTempDir('cairn-cred-seed-'), 'seed');
     await runGit(['clone', bareRemote, seedDir]);
     writeFileSync(join(seedDir, 'README.md'), '# cred probe\n');
     await runGit(['checkout', '-B', 'main'], { cwd: seedDir });
@@ -209,7 +209,7 @@ describe('per-step credential argv discipline (spec 12 G2-T2: capturing fork+exe
     await runGit(['commit', '-m', 'seed'], { cwd: seedDir, env: commitEnv(IDENTITY) });
     await runGit(['push', 'origin', 'main'], { cwd: seedDir });
 
-    const credRoot = mkdtempSync(join(tmpdir(), 'cairn-cred-ws-'));
+    const credRoot = makeTestTempDir('cairn-cred-ws-');
     const cloneDir = join(credRoot, 'clone');
     await gitPrim.clone(bareRemote, cloneDir, PROBE_CRED);
     await gitPrim.fetch(cloneDir, PROBE_CRED);

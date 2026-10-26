@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, readFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 
 const selector = 'scripts/e2e-affected.mjs';
 const selectorDeps = ['scripts/heavy-slots.mjs'];
@@ -36,7 +37,7 @@ for (const [file, code] of [
 }
 
 test('discovers committed, staged and untracked additions from the base', () => {
-  const root = mkdtempSync(join(tmpdir(), 'probe-reach-'));
+  const root = makeTestTempDir('probe-reach-');
   const gate = '.claude/skills/verify-cairn/scripts/vp-registry-gate.mjs';
   const registry = '.claude/skills/verify-cairn/vp-registry.json';
   const run = (command, args, env = {}) => spawnSync(command, args, {

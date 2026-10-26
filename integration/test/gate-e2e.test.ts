@@ -1,5 +1,5 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -14,6 +14,7 @@ import {
   statePaths,
 } from '../../apps/daemon/src/state.js';
 import { message as messageTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -42,7 +43,7 @@ function logLines(): string[] {
 
 beforeAll(async () => {
   external = await startExternalMcp();
-  home = mkdtempSync(join(tmpdir(), 'cairn-gate-home-'));
+  home = makeTestTempDir('cairn-gate-home-');
   mcpConfig = join(home, 'claude.json');
   writeFileSync(
     mcpConfig,

@@ -1,12 +1,13 @@
-import { existsSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync } from 'node:fs';
+
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { StepJournal, TranscriptBuffer } from '../src/journal.js';
 
 function tmp(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-journal-'));
+  return makeTestTempDir('cairn-journal-');
 }
 
 const claimed: ClaimedStep = {

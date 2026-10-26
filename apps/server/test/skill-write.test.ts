@@ -1,14 +1,6 @@
 import { createHash } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import {
   AGENT_TOOL_SKILL_CREATE,
@@ -22,13 +14,14 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { agent as agentTable, skillAudit } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-skills-'));
+  const root = makeTestTempDir('cairn-skills-');
   roots.push(root);
   return root;
 }

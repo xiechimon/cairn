@@ -1,8 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   buildOutcomeBackfill,
   build as buildTable,
@@ -59,7 +60,7 @@ interface RepoFixture {
 }
 
 async function makeRepo(): Promise<RepoFixture> {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-backfill-repo-'));
+  const dir = makeTestTempDir('cairn-backfill-repo-');
   dirs.push(dir);
   await gitOk(['init', '-b', 'main'], dir);
   await gitOk(['config', 'user.name', 'probe'], dir);

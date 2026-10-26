@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -13,6 +11,7 @@ import type {
   WorktreeOps,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -229,7 +228,7 @@ async function waitFor(fn: () => boolean, timeoutMs = 3_000): Promise<void> {
 }
 
 async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean; recovered?: boolean }) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-stop-'));
+  const home = makeTestTempDir('cairn-runner-stop-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
@@ -311,7 +310,7 @@ describe('runner stop close-out (M7 #308)', () => {
 
 describe('runner heartbeat answers 410 = this step no longer exists on the server → stop (#1488)', () => {
   async function heartbeatSetup(fail: () => Error) {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-hb-'));
+    const home = makeTestTempDir('cairn-runner-hb-');
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger, lines } = captureLogger();
     let beats = 0;

@@ -1,9 +1,18 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ProviderCompat, ProviderConfig } from '@cairn/shared';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
+import { cleanupTestDirs, makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { adaptProviderCompat, materializeProvider } from '../src/backend/pi.js';
+
+const dirs: string[] = [];
+afterEach(() => cleanupTestDirs(dirs.splice(0)));
+
+function tempDir(prefix: string): string {
+  const dir = makeTestTempDir(prefix);
+  dirs.push(dir);
+  return dir;
+}
 
 const RELAY_400 = '400: {"message":"Model does not support this protocol.","type":"server_error"}';
 
@@ -26,7 +35,7 @@ function loadCompat(path: string, providerId: string): ProviderCompat | undefine
 
 describe('materializeProvider config changes take effect immediately (#708 failure mode 3)', () => {
   test('failure mode 1: server compat deletes the knob the learning slot filled → learning voided, old shape does not flow back', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
+    const dir = tempDir('cairn-cfg');
     const path = join(dir, 'models.json');
     adaptProviderCompat(gateway('cfg-remove'), RELAY_400);
     materializeProvider(path, gateway('cfg-remove'));
@@ -39,7 +48,7 @@ describe('materializeProvider config changes take effect immediately (#708 failu
   });
 
   test('failure mode 2: server compat unchanged → learning fills the slot as before (tuition paid once, zero regression)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
+    const dir = tempDir('cairn-cfg');
     const path = join(dir, 'models.json');
     adaptProviderCompat(gateway('cfg-stable'), RELAY_400);
     materializeProvider(path, gateway('cfg-stable'));
@@ -51,7 +60,7 @@ describe('materializeProvider config changes take effect immediately (#708 failu
   });
 
   test('failure mode 3: after voiding, hitting the error again → can relearn (voiding is not a permanent ban)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
+    const dir = tempDir('cairn-cfg');
     const path = join(dir, 'models.json');
     adaptProviderCompat(gateway('cfg-relearn'), RELAY_400);
     materializeProvider(path, gateway('cfg-relearn'));
@@ -79,7 +88,7 @@ describe('materializeProvider config changes take effect immediately (#708 failu
   });
 
   test('failure mode 4: server compat explicitly rewrites the knob value → materialization takes the new explicit value', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
+    const dir = tempDir('cairn-cfg');
     const path = join(dir, 'models.json');
     adaptProviderCompat(gateway('cfg-rewrite'), RELAY_400);
     materializeProvider(path, gateway('cfg-rewrite'));
@@ -100,7 +109,7 @@ describe('materializeProvider cost declaration slot (#927)', () => {
   }
 
   test('model declares cost → models.json entry = declared price (overrides the zero default)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cost-'));
+    const dir = tempDir('cairn-cost');
     const path = join(dir, 'models.json');
     materializeProvider(
       path,
@@ -115,7 +124,7 @@ describe('materializeProvider cost declaration slot (#927)', () => {
   });
 
   test('price undeclared → zero-price default unchanged (zero regression for existing materialized output)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cost-'));
+    const dir = tempDir('cairn-cost');
     const path = join(dir, 'models.json');
     materializeProvider(path, providerWith('cost-none', [{ id: 'm2', name: 'M2' }]));
     expect(loadModels(path, 'cost-none')[0]).toMatchObject({
@@ -137,7 +146,7 @@ describe('materializeProvider context/output cap declaration slots (#1526)', () 
   }
 
   test('model declares contextWindow=1000000 → models.json entry = declared value (1M context no longer truncated by the 128k default)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-ctxwin-'));
+    const dir = tempDir('cairn-ctxwin');
     const path = join(dir, 'models.json');
     materializeProvider(
       path,
@@ -153,7 +162,7 @@ describe('materializeProvider context/output cap declaration slots (#1526)', () 
   });
 
   test('undeclared → 128k/16k defaults unchanged (behavior unchanged when unconfigured)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-ctxwin-'));
+    const dir = tempDir('cairn-ctxwin');
     const path = join(dir, 'models.json');
     materializeProvider(path, providerWith('ctx-none', [{ id: 'm2', name: 'M2' }]));
     expect(loadModels(path, 'ctx-none')[0]).toMatchObject({
@@ -164,7 +173,7 @@ describe('materializeProvider context/output cap declaration slots (#1526)', () 
   });
 
   test('two models on one provider with only one declaring → overrides are per-model, no cross-talk', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-ctxwin-'));
+    const dir = tempDir('cairn-ctxwin');
     const path = join(dir, 'models.json');
     materializeProvider(
       path,

@@ -1,8 +1,9 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { LocalRepoUnreachableError } from '@cairn/shared';
 import { beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { commitEnv, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { localRepoUnreachableMessage, WorkspaceManager } from '../src/workspace.js';
@@ -38,13 +39,13 @@ let logger: ReturnType<typeof fakeLogger>;
 let ws: WorkspaceManager;
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'cairn-lu-root-'));
+  root = makeTestTempDir('cairn-lu-root-');
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });
 });
 
 async function seedUserRepo(): Promise<string> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'cairn-lu-repo-')), 'repo');
+  const dir = join(makeTestTempDir('cairn-lu-repo-'), 'repo');
   await runGit(['init', '-b', 'main', dir]);
   writeFileSync(join(dir, 'README.md'), '# user repo\n');
   await runGit(['add', '-A'], { cwd: dir });
@@ -77,7 +78,7 @@ describe('local-shape execution surface fail-loud (#1210 C fallback)', () => {
   });
 
   test('L2 path exists but is not a git repo → LocalRepoUnreachableError(not_git)', async () => {
-    const plain = mkdtempSync(join(tmpdir(), 'cairn-lu-plain-'));
+    const plain = makeTestTempDir('cairn-lu-plain-');
     writeFileSync(join(plain, 'notes.txt'), 'not a repo\n');
     const err = await ws.prepare(localPrepareInput(plain, true)).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(LocalRepoUnreachableError);

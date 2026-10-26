@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -15,6 +13,7 @@ import type {
 } from '@cairn/shared';
 import { LOCAL_TOOL_CREATE_TAG } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -206,7 +205,7 @@ function fakeWorkspace(): WorktreeOps {
 async function setup(claimed: ClaimedStep) {
   probeMock.mockReset();
   probeMock.mockResolvedValue(null);
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-tag-'));
+  const home = makeTestTempDir('cairn-runner-tag-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);

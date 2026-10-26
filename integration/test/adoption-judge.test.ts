@@ -1,7 +1,8 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   type AdoptionVerdict,
   type CasePair,
@@ -250,7 +251,7 @@ describe('judgeAdoption', () => {
     ],
   ])('verdict for %s survives a write to disk and read back unchanged', (_name, pairs) => {
     const verdict = judgeAdoption(pairs);
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-adoption-verdict-'));
+    const dir = makeTestTempDir('cairn-adoption-verdict-');
     dirs.push(dir);
     const path = join(dir, 'verdict.json');
     writeFileSync(path, JSON.stringify(verdict));
@@ -420,7 +421,7 @@ describe('generalizationReport', () => {
 
 describe('readSealedOnce', () => {
   const ledger = (): string => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-adoption-sealed-'));
+    const dir = makeTestTempDir('cairn-adoption-sealed-');
     dirs.push(dir);
     return join(dir, 'nested', 'sealed-reads.json');
   };

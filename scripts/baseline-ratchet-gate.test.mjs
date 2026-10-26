@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+
 import { dirname, join, resolve } from 'node:path';
 import test, { after, before } from 'node:test';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const gate = resolve(import.meta.dirname, 'baseline-ratchet-gate.mjs');
 const repoRoot = resolve(import.meta.dirname, '..');
@@ -46,7 +47,7 @@ const files = ({ warnings = 0, controls = 3, text = 5, staleness = 4, allowed = 
 });
 
 const withRepo = (base, body) => {
-  const cwd = mkdtempSync(join(tmpdir(), 'ratchet-gate-'));
+  const cwd = makeTestTempDir('ratchet-gate-');
   const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' });
   const write = (tree) => {
     for (const [path, json] of Object.entries(tree)) {

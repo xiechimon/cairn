@@ -1,6 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rmSync } from 'node:fs';
+
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -16,6 +15,7 @@ import {
   machine as machineTable,
   step as stepTable,
 } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -46,7 +46,7 @@ async function bootStack(opts: {
 }): Promise<Stack> {
   const stub = await startStubLlm(opts.responses);
   const server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  const home = mkdtempSync(join(tmpdir(), 'cairn-1148-home-'));
+  const home = makeTestTempDir('cairn-1148-home-');
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'pb-mbp' },
     {},

@@ -7,6 +7,7 @@
     "CI job structure gate (#1557)",
     "UI registry gate (#989)",
     "UI consumer shape gate (#1054)",
+    "Pre-install deps gate (#1749)",
     "Install dependencies",
     "Prepush checks (#1533)",
     "Prepush self-test",

@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -12,6 +12,7 @@ import type {
   WorktreeOps,
 } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -231,7 +232,7 @@ async function setup(
 ) {
   probeMock.mockReset();
   probeMock.mockResolvedValue(null);
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-cred-'));
+  const home = makeTestTempDir('cairn-runner-cred-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();

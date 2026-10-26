@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -13,6 +11,7 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -211,7 +210,7 @@ async function runNetworkCase(
   lines: string[];
   opened: { kind: 'new' | 'continue'; sessionId: string | null }[];
 }> {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-net-'));
+  const home = makeTestTempDir('cairn-runner-net-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();

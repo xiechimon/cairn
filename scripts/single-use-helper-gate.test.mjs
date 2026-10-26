@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const script = resolve('scripts/single-use-helper-gate.mjs');
 
 test('checks added helpers with symbol references and named exemptions', () => {
-  const cwd = mkdtempSync(resolve(tmpdir(), 'single-use-gate-'));
+  const cwd = makeTestTempDir('single-use-gate-');
   const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
   const run = () =>
     spawnSync(process.execPath, [script], {
@@ -108,7 +109,7 @@ test('checks added helpers with symbol references and named exemptions', () => {
 });
 
 test('does not flag an existing large function when a parameter or body changes', () => {
-  const cwd = mkdtempSync(resolve(tmpdir(), 'single-use-gate-runner-'));
+  const cwd = makeTestTempDir('single-use-gate-runner-');
   const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
   const baseline = readFileSync('apps/daemon/src/runner.ts', 'utf8');
   try {
@@ -145,7 +146,7 @@ test('does not flag an existing large function when a parameter or body changes'
 });
 
 test('a moved file is judged by its changed lines, not as a new file', () => {
-  const cwd = mkdtempSync(resolve(tmpdir(), 'single-use-gate-move-'));
+  const cwd = makeTestTempDir('single-use-gate-move-');
   const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
   const source = [
     'function helper(value: number) {',

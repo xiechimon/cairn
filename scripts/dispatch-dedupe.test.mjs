@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { findTicketConflicts, mentionsTicket } from './dispatch-dedupe.mjs';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const SCRIPT = fileURLToPath(new URL('./dispatch-agent.mjs', import.meta.url));
 
@@ -132,9 +133,9 @@ function runCli(args, statusDir) {
 
 test('start --ticket refuses when another git workdir in tmp holds the ticket, --force overrides', () => {
   const ticket = String(900000000 + (process.pid % 99999));
-  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-dedupe-status-'));
-  const rival = mkdtempSync(join(tmpdir(), `pm-${ticket}-`));
-  const selfDir = mkdtempSync(join(tmpdir(), 'dispatch-dedupe-self-'));
+  const statusDir = makeTestTempDir('dispatch-dedupe-status-');
+  const rival = makeTestTempDir(`pm-${ticket}-`);
+  const selfDir = makeTestTempDir('dispatch-dedupe-self-');
   mkdirSync(join(rival, '.git'));
   try {
     const command = [process.execPath, '-e', 'setTimeout(() => {}, 30000)'];
@@ -161,7 +162,7 @@ test('start --ticket refuses when another git workdir in tmp holds the ticket, -
 });
 
 test('start rejects a non-numeric ticket', () => {
-  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-dedupe-status-'));
+  const statusDir = makeTestTempDir('dispatch-dedupe-status-');
   try {
     const result = runCli(['start', 'bad', '--ticket', 'abc', '--', 'true'], statusDir);
     assert.equal(result.status, 2);

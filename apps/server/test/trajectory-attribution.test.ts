@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
+
 import { join, resolve } from 'node:path';
 import { trajectoryPackSchema } from '@cairn/shared';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -61,7 +62,7 @@ afterEach(async () => {
 });
 
 function scratch() {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-attr-'));
+  const dir = makeTestTempDir('cairn-attr-');
   dirs.push(dir);
   return dir;
 }

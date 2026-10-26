@@ -1,17 +1,15 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
+import { cleanupTestDirs, makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { githubRepoRefOf, probeGithubPr } from '../src/github-probe.js';
 
-const disposables: string[] = [];
-afterAll(() => {
-  for (const d of disposables) rmSync(d, { recursive: true, force: true });
-});
+const dirs: string[] = [];
+afterAll(() => cleanupTestDirs(dirs.splice(0)));
 
 function fakeGh(stdout: string): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-gh-probe-'));
-  disposables.push(dir);
+  const dir = makeTestTempDir('cairn-gh-probe');
+  dirs.push(dir);
   const path = join(dir, 'gh');
   writeFileSync(path, `#!/bin/sh\necho '${stdout.replace(/'/g, "'\\''")}'\n`, {
     mode: 0o755,
@@ -20,8 +18,8 @@ function fakeGh(stdout: string): string {
 }
 
 function failingGh(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-gh-probe-'));
-  disposables.push(dir);
+  const dir = makeTestTempDir('cairn-gh-probe');
+  dirs.push(dir);
   const path = join(dir, 'gh');
   writeFileSync(path, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
   return path;

@@ -102,6 +102,16 @@ jobs:
       - name: UI consumer shape gate (#1054)
         run: node scripts/ui-consumer-shape-gate.mjs
 
+      # Pre-install deps gate (#1749): steps above run `node` with no node_modules
+      # yet, so a file they reach may import only node builtins and repo files.
+      # #1880 reds six jobs at once when a shared test helper imports vitest.
+      # Walks the import closure of every pre-install node invocation in every
+      # workflow. Zero-dependency, before install.
+      - name: Pre-install deps gate (#1749)
+        run: |
+          node --test scripts/preinstall-deps-gate.test.mjs
+          node scripts/preinstall-deps-gate.mjs
+
       # After e2e moved to sharded jobs (#693), ffmpeg followed; chromium stays here —
       # integration vitest's four e2e suites (m5-web-e2e etc.) launch real Chromium in-job
       # (2026-10-03: removing it fails browserType.launch executable doesn't exist).

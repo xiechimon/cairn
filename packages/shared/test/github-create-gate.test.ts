@@ -1,13 +1,13 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { acquireGithubCreateSlot, parseGithubCreateRateLimit } from '../src/github-create-gate.js';
 
 test('reservations respect spacing and a rolling hourly cap', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'github-create-'));
+  const dir = makeTestTempDir('github-create-');
   let now = 1000;
   const delays: string[] = [];
   try {
@@ -46,7 +46,7 @@ test('limits honor headers and secondary messages without retrying permissions',
 });
 
 test('an abandoned lock fails closed instead of waiting forever', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'github-create-locked-'));
+  const dir = makeTestTempDir('github-create-locked-');
   let now = 0;
   try {
     await mkdir(join(dir, 'lock'));
@@ -66,7 +66,7 @@ test('an abandoned lock fails closed instead of waiting forever', async () => {
 });
 
 test('separate CLI processes reserve the same on-disk window', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'github-create-cli-'));
+  const home = makeTestTempDir('github-create-cli-');
   try {
     const run = () =>
       promisify(execFile)(

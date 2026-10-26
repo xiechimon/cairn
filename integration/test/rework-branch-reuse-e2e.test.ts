@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join, resolve } from 'node:path';
 import {
   appendPlanLocationNote,
@@ -24,6 +24,7 @@ import {
   todo as todoTable,
 } from '../../apps/server/src/db/schema.js';
 import { runGit, systemGitOps } from '../../apps/server/src/lib/git.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -129,7 +130,7 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试执行 Agent：按任务要求用 bash 工具完成文件改动，然后简短汇报。',
   });
-  home = mkdtempSync(join(tmpdir(), 'cairn-rework-reuse-home-'));
+  home = makeTestTempDir('cairn-rework-reuse-home-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

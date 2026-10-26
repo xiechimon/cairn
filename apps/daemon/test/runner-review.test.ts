@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -15,6 +13,7 @@ import type {
 } from '@cairn/shared';
 import { buildReviewStepPrompt, type DocumentDiffFile } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { builtinToolNames, PI_CAPABILITIES, sessionToolNames } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -252,7 +251,7 @@ async function setupWithBackend(
   opts: { rewindError?: string },
   backendFor: (captured: SessionOpts[]) => AgentBackend,
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-review-'));
+  const home = makeTestTempDir('cairn-runner-review-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const calls: string[] = [];
   const client = new FakeClient();

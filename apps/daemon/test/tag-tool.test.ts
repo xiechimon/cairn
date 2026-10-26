@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
+
 import { join } from 'node:path';
 import type { BoundGitCredentials, GitCredentials } from '@cairn/shared';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { commitEnv, runGit } from '../src/git.js';
 import { buildCreateTagTool } from '../src/tag-tool.js';
 
@@ -15,7 +16,7 @@ const PROBE_CRED: GitCredentials = { username: 'x-access-token', password: PROBE
 
 const dirs: string[] = [];
 function workdir(prefix: string): string {
-  const dir = mkdtempSync(join(tmpdir(), `cairn-tag-${prefix}-`));
+  const dir = makeTestTempDir(`cairn-tag-${prefix}-`);
   dirs.push(dir);
   return dir;
 }

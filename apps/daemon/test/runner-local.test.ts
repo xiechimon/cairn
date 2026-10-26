@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -15,6 +15,7 @@ import type {
 } from '@cairn/shared';
 import { LocalRepoUnreachableError, PLAN_FILE_NAME } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -274,7 +275,7 @@ async function setup(
 ) {
   probeMock.mockReset();
   probeMock.mockResolvedValue(null);
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-local-'));
+  const home = makeTestTempDir('cairn-runner-local-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
@@ -316,14 +317,14 @@ describe('runner repo shape wiring (spec 12 G2-T2)', () => {
   test('failure mode 2 (#1211 truth surface): local merge step through the real git chain → user repo only gains the conv branch, HEAD/reflog/worktree unchanged', async () => {
     probeMock.mockReset();
     probeMock.mockResolvedValue(null);
-    const userRepo = mkdtempSync(join(tmpdir(), 'cairn-user-main-'));
+    const userRepo = makeTestTempDir('cairn-user-main-');
     seedUserRepo(userRepo);
     const git = (...args: string[]) =>
       execFileSync('git', ['-C', userRepo, ...args], { encoding: 'utf8' });
     const headBefore = git('rev-parse', 'HEAD').trim();
     const reflogBefore = git('reflog', 'main');
 
-    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-merge-real-'));
+    const home = makeTestTempDir('cairn-runner-merge-real-');
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
     const client = new FakeClient();
@@ -461,7 +462,7 @@ describe('runner permission gate: merge branch / push branch (XMON-77)', () => {
 
 describe('runner plan step handoff location (#1203: plan.md moved out of the repo checkout)', () => {
   function gitCheckout(): string {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-plan-checkout-'));
+    const dir = makeTestTempDir('cairn-plan-checkout-');
     const git = (...args: string[]) =>
       execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
     git('init', '-b', 'main');
@@ -521,7 +522,7 @@ describe('runner plan step handoff location (#1203: plan.md moved out of the rep
     probeMock.mockReset();
     probeMock.mockResolvedValue(null);
     const checkout = gitCheckout();
-    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-plan-local-'));
+    const home = makeTestTempDir('cairn-runner-plan-local-');
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
     const client = new FakeClient();
@@ -586,7 +587,7 @@ describe('runner plan step handoff location (#1203: plan.md moved out of the rep
     probeMock.mockReset();
     probeMock.mockResolvedValue(null);
     const checkout = gitCheckout();
-    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-plan-rewind-'));
+    const home = makeTestTempDir('cairn-runner-plan-rewind-');
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
     const client = new FakeClient();

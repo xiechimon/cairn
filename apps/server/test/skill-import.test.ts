@@ -1,7 +1,6 @@
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   realpathSync,
@@ -10,7 +9,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+
 import { dirname, join } from 'node:path';
 import {
   type ClaimedStep,
@@ -20,13 +19,14 @@ import {
 } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { agent as agentTable, skillAudit } from '../src/db/schema.js';
 import { readSkillSource, writeSkillSource } from '../src/services/skill-source-store.js';
 import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-skills-'));
+  const root = makeTestTempDir('cairn-skills-');
   roots.push(root);
   return root;
 }

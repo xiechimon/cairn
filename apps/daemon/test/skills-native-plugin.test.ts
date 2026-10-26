@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -15,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { MachineSkillsManifestResponse } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   buildClaudeSdkOptions,
   claudeVersionAtLeast,
@@ -29,7 +29,7 @@ import {
 } from '../src/team-skills.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `cairn-native-plugin-${tag}-`));
+  return makeTestTempDir(`cairn-native-plugin-${tag}-`);
 }
 
 function writeSkill(root: string, dirName: string, name?: string): string {

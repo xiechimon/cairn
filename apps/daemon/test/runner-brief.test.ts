@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -13,6 +13,7 @@ import type {
   WorktreeOps,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -235,7 +236,7 @@ async function run(opts: {
   workspace?: WorktreeOps;
   seed?: (cwd: string) => void;
 }): Promise<{ client: FakeClient; lines: string[]; cwd: string }> {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-brief-'));
+  const home = makeTestTempDir('cairn-runner-brief-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const cwd = join(workspacesDir, opts.claimed.conversationId);
@@ -336,7 +337,7 @@ describe('brief wiring: erase covers every exit', () => {
 
 describe('brief wiring: post-push marker detection (#958 gate 4)', () => {
   test('agent commits the marker into history itself → named in the transcript + log line', async () => {
-    const cwdForWs = mkdtempSync(join(tmpdir(), 'cairn-brief-leak-'));
+    const cwdForWs = makeTestTempDir('cairn-brief-leak-');
     mkdirSync(cwdForWs, { recursive: true });
     const { ws, calls } = fakeWorkspace(cwdForWs, { briefLeak: ['AGENTS.md'] });
     const { backend } = stubBackend({});
@@ -353,7 +354,7 @@ describe('brief wiring: post-push marker detection (#958 gate 4)', () => {
   });
 
   test('branch clean → no naming line (negative case, avoids reading "not detected" as "detection passed")', async () => {
-    const cwdForWs = mkdtempSync(join(tmpdir(), 'cairn-brief-clean-'));
+    const cwdForWs = makeTestTempDir('cairn-brief-clean-');
     mkdirSync(cwdForWs, { recursive: true });
     const { ws, calls } = fakeWorkspace(cwdForWs);
     const { backend } = stubBackend({});
@@ -370,7 +371,7 @@ describe('brief wiring: post-push marker detection (#958 gate 4)', () => {
 describe('brief wiring: failure gate', () => {
   test('erase failure → no commitAll, closes as failed, transcript lands a line (failure mode 4)', async () => {
     const claimed = claimedStep({ repoBound: true });
-    const cwdForWs = mkdtempSync(join(tmpdir(), 'cairn-brief-wt-'));
+    const cwdForWs = makeTestTempDir('cairn-brief-wt-');
     const { ws, calls } = fakeWorkspace(cwdForWs);
     mkdirSync(cwdForWs, { recursive: true });
     const { backend } = stubBackend({

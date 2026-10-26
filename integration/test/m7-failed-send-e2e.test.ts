@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
+
 import { join } from 'node:path';
 import {
   appendPlanLocationNote,
@@ -21,6 +21,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -75,7 +76,7 @@ beforeAll(async () => {
     { content: '已按反馈调整，重启轮方案就绪。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'cairn-m7-restart-home-'));
+  home = makeTestTempDir('cairn-m7-restart-home-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

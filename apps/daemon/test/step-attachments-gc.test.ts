@@ -1,13 +1,14 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { STEP_ATTACHMENTS_TTL_MS, sweepStepAttachments } from '../src/step-attachments.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 
 function tmpRoot(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-step-att-'));
+  return makeTestTempDir('cairn-step-att-');
 }
 
 function putStep(root: string, stepId: string, mtimeAgoMs: number): void {

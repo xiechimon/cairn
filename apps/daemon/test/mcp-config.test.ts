@@ -1,12 +1,17 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MCP_NOT_IN_CONFIG_CANON } from '@cairn/shared';
-import { describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test } from 'vitest';
+import { cleanupTestDirs, makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { notInConfigLine, resolveMcpEndpoints } from '../src/backend/mcp-config.js';
 
+const dirs: string[] = [];
+afterAll(() => cleanupTestDirs(dirs.splice(0)));
+
 function cfg(content: unknown): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-mcp-daemon-cfg-'));
+  const dir = makeTestTempDir('cairn-mcp-daemon-cfg');
+  dirs.push(dir);
   const p = join(dir, 'claude.json');
   writeFileSync(p, typeof content === 'string' ? content : JSON.stringify(content), 'utf8');
   return p;

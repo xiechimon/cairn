@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -14,6 +14,7 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -209,7 +210,7 @@ function recordingBackend(): { backend: AgentBackend; sessions: SessionOpts[] } 
 }
 
 async function setup(outcome: SkillsOutcome) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-team-'));
+  const home = makeTestTempDir('cairn-runner-team-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(outcome);

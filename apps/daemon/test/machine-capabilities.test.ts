@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
-import { cpus, tmpdir, totalmem } from 'node:os';
+import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { cpus, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { machineHardwareSchema } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
+import { cleanupTestDirs, makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   createMachineCapabilitiesProbe,
   probeMachineCapabilities,
@@ -11,16 +12,11 @@ import {
 
 const tmpDirs: string[] = [];
 function tmpRoot(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-caps-'));
+  const dir = makeTestTempDir('cairn-caps');
   tmpDirs.push(dir);
   return dir;
 }
-afterEach(() => {
-  while (tmpDirs.length > 0) {
-    const dir = tmpDirs.pop();
-    if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
-  }
-});
+afterEach(() => cleanupTestDirs(tmpDirs.splice(0)));
 
 describe('probeMachineCapabilities (one-shot probe, whole function)', () => {
   test('failure mode 1: both sources missing → empty set, no throw', () => {

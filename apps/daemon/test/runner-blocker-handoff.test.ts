@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   appendBlockerHandoff,
@@ -12,6 +10,7 @@ import {
   PLAN_FILE_NAME,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import { buildTaskPrompt, runStep } from '../src/runner.js';
@@ -85,7 +84,7 @@ function claimed(opts: {
 async function deliver(
   step: ClaimedStep,
 ): Promise<{ prompt: string; systemPrompt: string; home: string }> {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-blocker-handoff-'));
+  const home = makeTestTempDir('cairn-blocker-handoff-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { backend, created } = fakeBackend([{ type: 'done', usage: [] }]);

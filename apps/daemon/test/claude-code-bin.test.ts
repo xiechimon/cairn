@@ -1,7 +1,8 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { parseClaudeVersion, probeClaudeBin, resolveCommandPath } from '../src/claude-code-bin.js';
 
 function makeStub(dir: string, name: string, script: string): string {
@@ -37,7 +38,7 @@ describe('parseClaudeVersion', () => {
 
 describe('resolveCommandPath', () => {
   test('failure mode 1: not on PATH → null', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       expect(resolveCommandPath('claude', { PATH: dir })).toBeNull();
     } finally {
@@ -46,7 +47,7 @@ describe('resolveCommandPath', () => {
   });
 
   test('PATH hit → absolute path', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\n');
       expect(resolveCommandPath('claude', { PATH: `${dir}:/nowhere` })).toBe(stub);
@@ -56,7 +57,7 @@ describe('resolveCommandPath', () => {
   });
 
   test('failure mode 1b: hit file without the execute bit → skipped', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       writeFileSync(join(dir, 'claude'), '#!/bin/sh\necho 2.1.289\n');
       expect(resolveCommandPath('claude', { PATH: dir })).toBeNull();
@@ -66,7 +67,7 @@ describe('resolveCommandPath', () => {
   });
 
   test('failure mode 9: absolute path skips the PATH scan — returned as-is when it exists and is executable', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\n');
       expect(resolveCommandPath(stub, { PATH: '/nowhere' })).toBe(stub);
@@ -82,7 +83,7 @@ describe('resolveCommandPath', () => {
 
 describe('probeClaudeBin well-known fallback (#1290)', () => {
   test('failure mode 10: empty PATH + fake claude in well-known → found, source names well-known', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "2.1.289 (Claude Code)"\n');
       const info = await probeClaudeBin({
@@ -96,8 +97,8 @@ describe('probeClaudeBin well-known fallback (#1290)', () => {
   });
 
   test('failure mode 11: on PATH → no fallback (stubs in well-known dirs are not hit)', async () => {
-    const pathDir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-path-'));
-    const fallbackDir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-fallback-'));
+    const pathDir = makeTestTempDir('cairn-cc-bin-path-');
+    const fallbackDir = makeTestTempDir('cairn-cc-bin-fallback-');
     try {
       const pathStub = makeStub(pathDir, 'claude', '#!/bin/sh\necho 2.1.289\n');
       makeStub(fallbackDir, 'claude', '#!/bin/sh\necho 9.9.9\n');
@@ -113,7 +114,7 @@ describe('probeClaudeBin well-known fallback (#1290)', () => {
   });
 
   test('failure mode 12: empty PATH + empty well-known → null (no throw)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       const info = await probeClaudeBin({
         command: 'cairn-no-such-claude',
@@ -127,7 +128,7 @@ describe('probeClaudeBin well-known fallback (#1290)', () => {
   });
 
   test('failure mode 13: file in a well-known dir without the execute bit → skipped', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       writeFileSync(join(dir, 'claude'), '#!/bin/sh\necho 2.1.289\n');
       const info = await probeClaudeBin({
@@ -141,7 +142,7 @@ describe('probeClaudeBin well-known fallback (#1290)', () => {
   });
 
   test('absolute-path commands skip the fallback (explicit-path criterion unchanged)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\n');
       const info = await probeClaudeBin({
@@ -158,7 +159,7 @@ describe('probeClaudeBin well-known fallback (#1290)', () => {
 
 describe('probeClaudeBin', () => {
   test('success: real subprocess stub → {path, version}', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "2.1.289 (Claude Code)"\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
@@ -169,7 +170,7 @@ describe('probeClaudeBin', () => {
   });
 
   test('failure mode 8: non-zero exit but version on stdout → taken as usual', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\nexit 1\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
@@ -184,7 +185,7 @@ describe('probeClaudeBin', () => {
   });
 
   test('failure mode 3: timeout → null (a hung process must not stall the presence beat)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\nsleep 10\n');
       const started = Date.now();
@@ -197,7 +198,7 @@ describe('probeClaudeBin', () => {
   });
 
   test('failure mode 4: output but no version number → path still reported, version null', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "hello from a wrapper"\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
@@ -226,7 +227,7 @@ describe('probeClaudeBin', () => {
   });
 
   test('CAIRN_CLAUDE_BIN override: command name taken from the env var (bare names resolved via PATH)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const dir = makeTestTempDir('cairn-cc-bin-');
     const prev = process.env.CAIRN_CLAUDE_BIN;
     try {
       const stub = makeStub(dir, 'my-claude', '#!/bin/sh\necho 2.1.289\n');

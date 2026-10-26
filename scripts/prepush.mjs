@@ -63,6 +63,10 @@ export function prepushPlan(paths, mode = 'local') {
   const required = [
     language,
     ['node', 'scripts/ui-debt-gate.mjs'],
+    ['node', 'scripts/tmpdir-sweep-gate.mjs'],
+    ['node', '--test', 'scripts/tmpdir-sweep-gate.test.mjs'],
+    ['node', 'scripts/preinstall-deps-gate.mjs'],
+    ['node', '--test', 'scripts/preinstall-deps-gate.test.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],

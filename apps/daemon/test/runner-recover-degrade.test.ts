@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+
 import { dirname, join } from 'node:path';
 import type {
   AgentBackend,
@@ -21,6 +21,7 @@ import {
   PLAN_FILE_NAME,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { SessionNotResumableError } from '../src/backend/errors.js';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal, type StepJournalEntry } from '../src/journal.js';
@@ -231,7 +232,7 @@ async function runRecover(
   backend: AgentBackend,
   resume: { sessionId: string | null; prompt: string | null },
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-recover-degrade-'));
+  const home = makeTestTempDir('cairn-runner-recover-degrade-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = captureLogger();
@@ -265,7 +266,7 @@ async function runExec(
     }) => void;
   },
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-exec-'));
+  const home = makeTestTempDir('cairn-runner-exec-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = captureLogger();

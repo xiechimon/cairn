@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { conversationBranch, diffFileContentSchema } from '@cairn/shared';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { build as buildTable, todo as todoTable } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { bootServer, req } from './helpers.js';
@@ -58,7 +59,7 @@ async function setupWorld() {
   insertBuild(s, projectId, BUILD_ID, 'todo-full');
   insertBuild(s, projectId, NO_BRANCH_BUILD_ID, 'todo-nobranch');
 
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-diff-full-'));
+  const dir = makeTestTempDir('cairn-diff-full-');
   dirs.push(dir);
   const bareDir = join(s.reposDir, s.team.id, 'diff-full.git');
   const repoDir = join(dir, 'repo');

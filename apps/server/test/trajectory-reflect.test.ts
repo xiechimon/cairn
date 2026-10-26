@@ -1,12 +1,13 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
+
 import { join, resolve } from 'node:path';
 import { ISSUE_FENCE_OPEN, type TrajectoryPack } from '@cairn/shared';
 import { applyPatch } from 'diff';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
 import {
   agent,
@@ -79,7 +80,7 @@ afterEach(async () => {
 });
 
 function scratch() {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-reflect-'));
+  const dir = makeTestTempDir('cairn-reflect-');
   dirs.push(dir);
   return dir;
 }

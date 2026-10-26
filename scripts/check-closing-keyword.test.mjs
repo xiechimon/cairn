@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync } from 'node:fs';
+
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const script = resolve('scripts/check-closing-keyword.mjs');
 
 test('requires each declared issue to have a closing line in branch commits', () => {
-  const cwd = mkdtempSync(resolve(tmpdir(), 'closing-keyword-'));
+  const cwd = makeTestTempDir('closing-keyword-');
   const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
   try {
     git('init');

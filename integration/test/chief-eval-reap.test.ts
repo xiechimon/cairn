@@ -1,8 +1,9 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { reapEscapees } from '../eval/chief-dispatch/stack.mts';
 
 const alive = (pid: number): boolean => {
@@ -19,7 +20,7 @@ describe('reapEscapees', () => {
   const pids: number[] = [];
 
   const makeHome = (): string => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-eval-chief-test-'));
+    const home = makeTestTempDir('cairn-eval-chief-test-');
     homes.push(home);
     return home;
   };

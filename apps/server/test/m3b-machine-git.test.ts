@@ -1,11 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
+
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema, machineTokenResponseSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   agent as agentTable,
   apiKey as apiKeyTable,
@@ -505,7 +506,7 @@ describe('#1487 merge step in flight when the card leaves review: success report
 
 describe('hosted repo provision seed commit (M3b [design]: empty repo cannot worktree)', () => {
   test('init bare immediately establishes refs/heads/main (empty-tree seed)', async () => {
-    const dir = join(mkdtempSync(join(tmpdir(), 'cairn-seed-')), 'x.git');
+    const dir = join(makeTestTempDir('cairn-seed-'), 'x.git');
     disposables.push(() => rmSync(dir, { recursive: true, force: true }));
     await systemGitOps.initBareRepo(dir);
     expect(await systemGitOps.resolveCommit(dir, 'refs/heads/main')).toBeNull();

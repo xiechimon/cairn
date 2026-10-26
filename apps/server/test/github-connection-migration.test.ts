@@ -1,10 +1,11 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterAll, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 
 const REFRESH_TAG = '0057_github_connection_refresh';
@@ -42,7 +43,7 @@ test('a database that already has the user-attachment migration gains the GitHub
   expect(entry.when).toBeGreaterThan(Math.max(...earlier.map((item) => item.when)));
 
   const cut = journal.entries.findIndex((item) => item.tag === REFRESH_TAG);
-  const prior = mkdtempSync(join(tmpdir(), 'cairn-migrations-pre-github-refresh-'));
+  const prior = makeTestTempDir('cairn-migrations-pre-github-refresh-');
   temps.push(prior);
   mkdirSync(join(prior, 'meta'));
   for (const item of journal.entries.slice(0, cut)) {

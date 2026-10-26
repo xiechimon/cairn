@@ -1,6 +1,5 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+
 import { CHIEF_WATCH_REASON_DISPATCH } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -15,6 +14,7 @@ import {
   chiefThread,
   step as stepTable,
 } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -138,7 +138,7 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试 Agent：按指令使用工具，然后简短汇报。',
   });
-  home = mkdtempSync(join(tmpdir(), 'cairn-m4b-wake-home-'));
+  home = makeTestTempDir('cairn-m4b-wake-home-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

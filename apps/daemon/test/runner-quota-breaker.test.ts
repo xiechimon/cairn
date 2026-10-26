@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -13,6 +11,7 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -203,7 +202,7 @@ function quotaCycles(n: number, message: string): StepEvent[] {
 }
 
 async function runQuotaCase(script: StepEvent[], providerId = 'gw-quota') {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-quota-'));
+  const home = makeTestTempDir('cairn-runner-quota-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(providerId);

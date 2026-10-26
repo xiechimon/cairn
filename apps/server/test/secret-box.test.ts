@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+
 import { dirname, join } from 'node:path';
 import { SECRET_BOX_ENVELOPE_VERSION } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   createEphemeralSecretBox,
   createKeyfileSecretBox,
@@ -11,7 +12,7 @@ import {
 
 const tmpDirs: string[] = [];
 function tmpKeyfile(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-secretbox-'));
+  const dir = makeTestTempDir('cairn-secretbox-');
   tmpDirs.push(dir);
   return join(dir, 'server', 'secretbox.key');
 }

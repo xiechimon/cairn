@@ -1,7 +1,8 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { normalizedRepoRef, WorkspaceManager } from '../src/workspace.js';
@@ -59,7 +60,7 @@ async function advanceTruth(): Promise<string> {
 }
 
 async function makeUserRepo(): Promise<string> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'cairn-dual-user-')), 'repo');
+  const dir = join(makeTestTempDir('cairn-dual-user-'), 'repo');
   await runGit(['clone', truthDir, dir]);
   return dir;
 }
@@ -76,9 +77,9 @@ function prepareInput(localPath: string | null) {
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'cairn-dual-root-'));
-  truthDir = join(mkdtempSync(join(tmpdir(), 'cairn-dual-truth-')), 'truth.git');
-  seedDir = join(mkdtempSync(join(tmpdir(), 'cairn-dual-seed-')), 'seed');
+  root = makeTestTempDir('cairn-dual-root-');
+  truthDir = join(makeTestTempDir('cairn-dual-truth-'), 'truth.git');
+  seedDir = join(makeTestTempDir('cairn-dual-seed-'), 'seed');
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });
   await seedTruth();
@@ -116,7 +117,7 @@ describe('dual execution-source selection (github-shape localPath acceleration s
 
   test('D2 origin mismatch → fall back (against mistaken absorption)', async () => {
     const userRepo = await makeUserRepo();
-    const other = join(mkdtempSync(join(tmpdir(), 'cairn-dual-other-')), 'truth.git');
+    const other = join(makeTestTempDir('cairn-dual-other-'), 'truth.git');
     await runGit(['init', '--bare', other]);
     await runGit(['remote', 'set-url', 'origin', other], { cwd: userRepo });
     const prepared = await ws.prepare(prepareInput(userRepo));

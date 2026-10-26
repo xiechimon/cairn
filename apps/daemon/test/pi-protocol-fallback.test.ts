@@ -1,5 +1,5 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -13,6 +13,7 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   adaptProviderCompat,
   materializeProvider,
@@ -93,7 +94,7 @@ describe('materializeProvider (compat materialized into models.json)', () => {
   }
 
   test('failure mode 6: no compat (neither explicit nor learned) → entry has no compat key (same shape as before)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
+    const dir = makeTestTempDir('cairn-mat-');
     const path = join(dir, 'models.json');
     materializeProvider(path, gateway('mat-bare'));
     const entry = load(path)['mat-bare'];
@@ -103,7 +104,7 @@ describe('materializeProvider (compat materialized into models.json)', () => {
   });
 
   test('wire compat materialized verbatim (maxTokensField / supportsStore / supportsDeveloperRole)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
+    const dir = makeTestTempDir('cairn-mat-');
     const path = join(dir, 'models.json');
     materializeProvider(
       path,
@@ -124,7 +125,7 @@ describe('materializeProvider (compat materialized into models.json)', () => {
 
   test('failure modes 4/5: learning slot merged into materialization (later steps get the clean shape directly); explicit beats learning', () => {
     adaptProviderCompat(gateway('mat-learn'), RELAY_400);
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
+    const dir = makeTestTempDir('cairn-mat-');
     const path = join(dir, 'models.json');
     materializeProvider(path, gateway('mat-learn'));
     expect(load(path)['mat-learn']).toMatchObject({
@@ -307,7 +308,7 @@ async function runFallbackCase(
   opts?: { withAdapt?: boolean; providerId?: string },
 ) {
   const providerId = opts?.providerId ?? 'gw-fb';
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-fb-'));
+  const home = makeTestTempDir('cairn-runner-fb-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(providerId);

@@ -1,5 +1,5 @@
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { existsSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
   BRAND,
@@ -8,7 +8,8 @@ import {
   MACHINE_TOKEN_PATTERN,
   WORKSPACE_HOOK_TIMEOUT_MS,
 } from '@cairn/shared';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
+import { cleanupTestDirs, makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { DEFAULT_SERVER_URL, loadDaemonConfig, WorkspacesDirError } from '../src/config.js';
 import {
   ensureStateDirs,
@@ -23,8 +24,13 @@ import {
   writeDaemonJson,
 } from '../src/state.js';
 
+const dirs: string[] = [];
+afterEach(() => cleanupTestDirs(dirs.splice(0)));
+
 function tmp(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
+  const dir = makeTestTempDir('cairn-cfg');
+  dirs.push(dir);
+  return dir;
 }
 
 describe('loadDaemonConfig (Settings seam precedence)', () => {

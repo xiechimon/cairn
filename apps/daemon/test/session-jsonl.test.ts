@@ -1,8 +1,9 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SESSION_JSONL_MAX_BYTES } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { readSessionJsonlForUpload } from '../src/session-jsonl.js';
 
 function capture(): { lines: string[]; log: (msg: string) => void } {
@@ -29,14 +30,14 @@ describe('readSessionJsonlForUpload（#1512）', () => {
   });
 
   test('failure mode 3: read failure → null + log', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-session-unreadable-'));
+    const dir = makeTestTempDir('cairn-session-unreadable-');
     const { lines, log } = capture();
     expect(readSessionJsonlForUpload(dir, log)).toBeNull();
     expect(lines.some((l) => l.includes('read failed'))).toBe(true);
   });
 
   test('failure mode 4: over the cap → skipped + log, not truncated', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-session-oversize-'));
+    const dir = makeTestTempDir('cairn-session-oversize-');
     const file = join(dir, 'session.jsonl');
     writeFileSync(file, 'x'.repeat(40));
     const { lines, log } = capture();
@@ -45,7 +46,7 @@ describe('readSessionJsonlForUpload（#1512）', () => {
   });
 
   test('failure mode 5: under the cap → returned as-is', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-session-ok-'));
+    const dir = makeTestTempDir('cairn-session-ok-');
     const file = join(dir, 'session.jsonl');
     const body = '{"type":"assistant","stopReason":"length"}\n';
     writeFileSync(file, body);

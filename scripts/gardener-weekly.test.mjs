@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { PATTERNS, rankBaselines } from './gardener-weekly.mjs';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const script = resolve(import.meta.dirname, 'gardener-weekly.mjs');
 const NOW = '2026-10-24T12:00:00Z';
@@ -31,7 +32,7 @@ const baselineFiles = ({ warnings, controls, staleness, comments, helpers }) => 
 });
 
 const fixture = () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'gardener-'));
+  const cwd = makeTestTempDir('gardener-');
   const git = (date, ...args) =>
     execFileSync('git', args, {
       cwd,

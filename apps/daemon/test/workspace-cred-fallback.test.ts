@@ -1,8 +1,8 @@
-import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
@@ -92,8 +92,8 @@ function cloneSpyFailsForToken(): { calls: (BoundGitCredentials | null)[] } {
 
 beforeEach(async () => {
   vi.restoreAllMocks();
-  root = mkdtempSync(join(tmpdir(), 'cairn-ws-cred-root-'));
-  originDir = join(mkdtempSync(join(tmpdir(), 'cairn-ws-cred-origin-')), 'repo.git');
+  root = makeTestTempDir('cairn-ws-cred-root-');
+  originDir = join(makeTestTempDir('cairn-ws-cred-origin-'), 'repo.git');
   seedDir = join(
     tmpdir(),
     `cairn-ws-cred-seed-${Date.now()}-${Math.random().toString(36).slice(2)}`,

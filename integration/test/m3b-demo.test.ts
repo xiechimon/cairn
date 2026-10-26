@@ -1,5 +1,5 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -16,6 +16,7 @@ import {
   tokenUsage,
 } from '../../apps/server/src/db/schema.js';
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -80,7 +81,7 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试执行 Agent：按任务要求用 bash 工具完成文件改动，然后简短汇报。',
   });
-  home = mkdtempSync(join(tmpdir(), 'cairn-m3b-home-'));
+  home = makeTestTempDir('cairn-m3b-home-');
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'm3b-mbp' },
     {},

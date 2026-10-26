@@ -1,11 +1,12 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
+
 import { join, resolve } from 'node:path';
 import { trajectoryPackSchema } from '@cairn/shared';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
 import { agent, build, message, project, step, team, todo } from '../src/db/schema.js';
 import { DONE_ROW, prClosedUnmergedRow } from '../src/services/delivery-rows.js';
@@ -68,7 +69,7 @@ afterEach(async () => {
 });
 
 function seedInstance(builds: BuildSeed[]) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-outcome-'));
+  const home = makeTestTempDir('cairn-outcome-');
   homes.push(home);
   const opened = openDbWithHandle(join(home, 'server/server.db'));
   const db = opened.db;

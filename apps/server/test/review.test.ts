@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+
 import { dirname, join } from 'node:path';
 import {
   claimedStepSchema,
@@ -13,6 +13,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   agent as agentTable,
   build as buildTable,
@@ -226,7 +227,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     const projRow = s.db.select().from(projectTable).where(eq(projectTable.id, projectId)).get();
     expect(projRow?.repoName).toBeTruthy();
     const bareDir = join(s.reposDir, s.team.id, `${projRow?.repoName}.git`);
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-review-511-'));
+    const dir = makeTestTempDir('cairn-review-511-');
     dirs.push(dir);
     const repoDir = join(dir, 'repo');
     const git = async (args: string[]) => {

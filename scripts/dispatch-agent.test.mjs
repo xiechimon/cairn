@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const SCRIPT = fileURLToPath(new URL('./dispatch-agent.mjs', import.meta.url));
 
@@ -30,8 +31,8 @@ async function waitUntilDead(pid) {
 }
 
 test('start verifies the process and writes the status file', async () => {
-  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
-  const workDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-cwd-'));
+  const statusDir = makeTestTempDir('dispatch-agent-test-');
+  const workDir = makeTestTempDir('dispatch-agent-cwd-');
   try {
     const result = runCli(
       [
@@ -60,7 +61,7 @@ test('start verifies the process and writes the status file', async () => {
 });
 
 test('check reports alive while the job runs and missing after it exits', async () => {
-  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
+  const statusDir = makeTestTempDir('dispatch-agent-test-');
   try {
     const start = runCli(
       ['start', 'short', '--', process.execPath, '-e', 'setTimeout(() => {}, 3000)'],
@@ -82,7 +83,7 @@ test('check reports alive while the job runs and missing after it exits', async 
 });
 
 test('a job started with the old nohup syntax is reported missing', async () => {
-  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
+  const statusDir = makeTestTempDir('dispatch-agent-test-');
   try {
     const toolCall = spawn(
       '/bin/bash',
@@ -113,7 +114,7 @@ test('a job started with the old nohup syntax is reported missing', async () => 
 });
 
 test('the boundary teardown kills the old-style job and spares the dispatched job', async () => {
-  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
+  const statusDir = makeTestTempDir('dispatch-agent-test-');
   try {
     const toolCall = spawn(
       '/bin/bash',
@@ -149,7 +150,7 @@ test('the boundary teardown kills the old-style job and spares the dispatched jo
 });
 
 test('start reports missing when the command dies immediately', () => {
-  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
+  const statusDir = makeTestTempDir('dispatch-agent-test-');
   try {
     const result = runCli(
       ['start', 'instant', '--', process.execPath, '-e', 'process.exit(3)'],
@@ -164,7 +165,7 @@ test('start reports missing when the command dies immediately', () => {
 });
 
 test('start reports missing when the command cannot spawn', () => {
-  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
+  const statusDir = makeTestTempDir('dispatch-agent-test-');
   try {
     const result = runCli(['start', 'ghost', '--', '/no/such/binary'], statusDir);
     assert.equal(result.status, 1);

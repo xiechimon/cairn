@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { buildTaskPromptText } from '@cairn/shared';
 import { asc, eq } from 'drizzle-orm';
@@ -14,6 +14,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { AGENT_ID, api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
@@ -41,7 +42,7 @@ let home: string;
 beforeAll(async () => {
   stub = await startStubLlm([{ status: 400 }, { content: '重启轮照常执行。' }]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'cairn-restart-blank-home-'));
+  home = makeTestTempDir('cairn-restart-blank-home-');
   const paths: StatePaths = statePaths(home, join(home, 'workspaces'));
   const logger = createDaemonLogger({ logFile: paths.daemonLog });
   const config = loadDaemonConfig(

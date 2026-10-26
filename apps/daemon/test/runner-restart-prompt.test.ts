@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -20,6 +20,7 @@ import {
   PLAN_FILE_NAME,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -183,7 +184,7 @@ async function setup(
   backend: AgentBackend,
   options: { skill?: string; observeClient?: (client: FakeClient) => void } = {},
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-restart-'));
+  const home = makeTestTempDir('cairn-runner-restart-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger } = captureLogger();

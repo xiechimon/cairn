@@ -1,6 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -13,6 +10,7 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
 } from '@cairn/shared';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
 import { loadDaemonConfig } from '../src/config.js';
@@ -22,7 +20,7 @@ import { runMachine } from '../src/machine-loop.js';
 import { ensureStateDirs, type StatePaths, saveMachineJson, statePaths } from '../src/state.js';
 
 function tmpHome(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-loop-'));
+  return makeTestTempDir('cairn-loop-');
 }
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {

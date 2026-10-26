@@ -1,10 +1,11 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterAll, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
@@ -24,7 +25,7 @@ test('legacy db upgrade keeps all stored memories valid: three columns added but
     ),
   );
   expect(cut, 'migration adding invalidAt missing from journal').toBeGreaterThan(0);
-  const oldMigrations = mkdtempSync(join(tmpdir(), 'cairn-migrations-pre-invalidation-'));
+  const oldMigrations = makeTestTempDir('cairn-migrations-pre-invalidation-');
   mkdirSync(join(oldMigrations, 'meta'));
   for (const entry of journal.entries.slice(0, cut)) {
     cpSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(oldMigrations, `${entry.tag}.sql`));
@@ -33,7 +34,7 @@ test('legacy db upgrade keeps all stored memories valid: three columns added but
     join(oldMigrations, 'meta', '_journal.json'),
     JSON.stringify({ ...journal, entries: journal.entries.slice(0, cut) }),
   );
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-memory-legacy-'));
+  const dir = makeTestTempDir('cairn-memory-legacy-');
   temps.push(oldMigrations, dir);
   const dbPath = join(dir, 'server.db');
   const sqlite = new Database(dbPath);

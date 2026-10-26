@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -23,6 +23,7 @@ import { createApiKey } from '../../apps/server/src/services/api-keys.js';
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
 import { createScheduler } from '../../apps/server/src/services/scheduler.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 export const AGENT_ID = 'agent-it-1';
 
@@ -56,9 +57,9 @@ export async function bootRealServer(opts: {
   const machineHub = new MachineWakeHub();
   const convHub = new ConversationStreamHub();
   const secretBox = createEphemeralSecretBox();
-  const reposDir = mkdtempSync(join(tmpdir(), 'cairn-it-repos-'));
-  const attachmentsDir = mkdtempSync(join(tmpdir(), 'cairn-it-att-'));
-  const skillsDir = mkdtempSync(join(tmpdir(), 'cairn-it-skills-'));
+  const reposDir = makeTestTempDir('cairn-it-repos-');
+  const attachmentsDir = makeTestTempDir('cairn-it-att-');
+  const skillsDir = makeTestTempDir('cairn-it-skills-');
   const app = createApp({
     db,
     hub,
@@ -76,10 +77,7 @@ export async function bootRealServer(opts: {
     reposDir,
     attachmentsDir,
     skillsDir,
-    skillSourcesPath: join(
-      mkdtempSync(join(tmpdir(), 'cairn-it-skill-sources-')),
-      'skill-sources.json',
-    ),
+    skillSourcesPath: join(makeTestTempDir('cairn-it-skill-sources-'), 'skill-sources.json'),
     webDir: opts.webDir ?? null,
     authToken: null,
     tailscaleUsers: [],

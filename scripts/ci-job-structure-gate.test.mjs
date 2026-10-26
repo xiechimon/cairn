@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join, resolve } from 'node:path';
 import test from 'node:test';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const gate = resolve(import.meta.dirname, 'ci-job-structure-gate.mjs');
 const workflow = readFileSync(resolve(import.meta.dirname, '../.github/workflows/ci.yml'), 'utf8');
@@ -13,7 +14,7 @@ const baseline = readFileSync(
 );
 
 const runGate = (workflowText, baselineText = baseline) => {
-  const directory = mkdtempSync(join(tmpdir(), 'ci-job-structure-'));
+  const directory = makeTestTempDir('ci-job-structure-');
   try {
     writeFileSync(join(directory, 'ci.yml'), workflowText);
     writeFileSync(join(directory, 'baseline.json'), baselineText);

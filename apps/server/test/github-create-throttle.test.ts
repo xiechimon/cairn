@@ -1,7 +1,6 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rm } from 'node:fs/promises';
 import { afterEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { githubCreateIssue } from '../src/lib/github.js';
 
 afterEach(() => {
@@ -9,7 +8,7 @@ afterEach(() => {
 });
 
 test('parallel creates share slots and an explicit secondary limit retries successfully', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'github-create-server-'));
+  const home = makeTestTempDir('github-create-server-');
   vi.stubEnv('CAIRN_HOME', home);
   vi.stubEnv('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS', '30');
   const calls: number[] = [];

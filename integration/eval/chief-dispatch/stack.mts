@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, readFileSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,6 +31,7 @@ import {
   type RealServer,
   waitFor,
 } from '../../../integration/test/helpers.js';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -129,8 +130,8 @@ export async function bootStack(): Promise<Stack> {
     providerBaseUrl: 'http://127.0.0.1:9/v1',
     claimHoldMs: 1_000,
   });
-  const home = mkdtempSync(join(tmpdir(), 'cairn-eval-chief-'));
-  const skillsDir = mkdtempSync(join(tmpdir(), 'cairn-eval-skills-'));
+  const home = makeTestTempDir('cairn-eval-chief-');
+  const skillsDir = makeTestTempDir('cairn-eval-skills-');
   const mcpConfigPath = join(tmpdir(), `cairn-eval-mcp-${randomUUID()}.json`);
   let claimsParked = false;
   const parkedClaimReleases: Array<() => void> = [];
@@ -234,7 +235,7 @@ export function seedRepoContent(
   const repoName = (row as { repoName?: string | null } | undefined)?.repoName;
   if (!repoName) throw new Error(`项目 ${projectId} 无 repoName，无法种内容`);
   const bare = repoDirFor(stack.server.reposDir, stack.server.teamId, repoName);
-  const work = mkdtempSync(join(tmpdir(), 'cairn-eval-repo-'));
+  const work = makeTestTempDir('cairn-eval-repo-');
   const git = (...args: string[]): string => {
     const r = spawnSync('git', args, { cwd: work, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`git ${args.join(' ')} 失败: ${r.stderr || r.stdout}`);

@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync } from 'node:fs';
+
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
@@ -12,6 +12,7 @@ import {
   plan as planTable,
   step as stepTable,
 } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
@@ -222,7 +223,7 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     webDir: WEB_DIST,
   });
-  const userRepo = mkdtempSync(join(tmpdir(), 'cairn-done-dialog-repo-'));
+  const userRepo = makeTestTempDir('cairn-done-dialog-repo-');
   spawnSync('git', ['init', '-b', 'main'], { cwd: userRepo });
   const project = await api(server.url, 'POST', '/api/projects', {
     name: 'done-dialog-probe',

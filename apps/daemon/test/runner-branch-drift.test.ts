@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -14,6 +12,7 @@ import type {
 } from '@cairn/shared';
 import { buildWorkBranchNote, conversationBranch } from '@cairn/shared';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
@@ -249,7 +248,7 @@ async function runOnce(opts: RunOpts): Promise<{
   probeMock.mockImplementation(
     async (o: { branch: string }) => opts.probeByBranch?.[o.branch] ?? null,
   );
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-drift-'));
+  const home = makeTestTempDir('cairn-runner-drift-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();

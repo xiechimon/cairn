@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DAEMON_LOG_PREFIXES } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   appendSkillsCatalog,
   buildSkillsCatalog,
@@ -11,7 +12,7 @@ import {
 import { createDaemonLogger, isLogPrefix } from '../src/log.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `cairn-skills-${tag}-`));
+  return makeTestTempDir(`cairn-skills-${tag}-`);
 }
 
 function writeSkill(

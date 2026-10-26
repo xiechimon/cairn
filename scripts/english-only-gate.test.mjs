@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileViolations, textViolations } from './english-only-gate.mjs';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const script = resolve('scripts/english-only-gate.mjs');
 
@@ -43,7 +44,7 @@ test('code checks comments only; UI strings and exempt paths pass', () => {
 });
 
 test('diff mode reds added Chinese lines and Chinese commit messages only', () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'english-gate-'));
+  const cwd = makeTestTempDir('english-gate-');
   const git = (...args) =>
     execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=T', ...args], {
       cwd,
@@ -93,7 +94,7 @@ test('diff mode reds added Chinese lines and Chinese commit messages only', () =
 });
 
 test('--text checks a PR body file', () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'english-gate-text-'));
+  const cwd = makeTestTempDir('english-gate-text-');
   try {
     writeFileSync(join(cwd, 'body.md'), '## What\n\nAdds an「图片素材」section.\n');
     const red = spawnSync(process.execPath, [script, '--text', join(cwd, 'body.md')], {

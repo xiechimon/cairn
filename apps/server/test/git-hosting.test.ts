@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
+
 import { join } from 'node:path';
 import { BRAND, conversationBranch, type ProjectRecord } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { runGit } from '../src/lib/git.js';
 import { newUuidv7 } from '../src/lib/ids.js';
 import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
@@ -21,7 +22,7 @@ const GIT_ENV = {
 
 const dirs: string[] = [];
 function workdir(prefix: string): string {
-  const dir = mkdtempSync(join(tmpdir(), `cairn-git-${prefix}-`));
+  const dir = makeTestTempDir(`cairn-git-${prefix}-`);
   dirs.push(dir);
   return dir;
 }

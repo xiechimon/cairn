@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
+
 import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   type GitFallbackReason,
   GitPushHookError,
@@ -40,7 +41,7 @@ describe('gitCredentialEnv — per-step credential env injection (02 §8, nothin
   });
 
   test('the empty-value reset makes the inline credential beat global helpers (real git credential fill)', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-git-cred-'));
+    const home = makeTestTempDir('cairn-git-cred-');
     const staleHelper = join(home, 'stale-helper.sh');
     writeFileSync(staleHelper, '#!/bin/sh\necho username=git\necho password=STALE_REVOKED\n');
     chmodSync(staleHelper, 0o755);
@@ -132,7 +133,7 @@ describe("gitCredentialEnv — appended after the parent environment's GIT_CONFI
   });
 
   test("failure modes 1/4: real git — parent's keys still apply, parent's credential.helper is reset", () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-git-cred-parent-'));
+    const home = makeTestTempDir('cairn-git-cred-parent-');
     const staleHelper = join(home, 'stale-helper.sh');
     writeFileSync(staleHelper, '#!/bin/sh\necho username=git\necho password=STALE_REVOKED\n');
     chmodSync(staleHelper, 0o755);
@@ -194,7 +195,7 @@ async function basicAuthRemote(): Promise<{ base: string; seen: string[]; close:
 }
 
 function seededWorktree(originUrl: string): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-git-scope-'));
+  const dir = makeTestTempDir('cairn-git-scope-');
   const git = (...args: string[]) => {
     const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
@@ -240,7 +241,7 @@ describe('gitCredentialEnv — the helper answers only for the host the credenti
   });
 
   test('failure modes 3/4: real git — bound host gets the token, other hosts do not, global helper for the same host is reset', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-git-scope-home-'));
+    const home = makeTestTempDir('cairn-git-scope-home-');
     const staleHelper = join(home, 'stale-helper.sh');
     writeFileSync(staleHelper, '#!/bin/sh\necho username=git\necho password=STALE_REVOKED\n');
     chmodSync(staleHelper, 0o755);
@@ -274,7 +275,7 @@ describe('gitCredentialEnv — the helper answers only for the host the credenti
   });
 
   test('failure modes 1/3: real git — hostnames with _, original letter case, and ports match as usual, git itself takes the host from the URL', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-git-scope-url-'));
+    const home = makeTestTempDir('cairn-git-scope-url-');
     const base: NodeJS.ProcessEnv = {
       ...envWithoutGitConfig(),
       HOME: home,
@@ -302,7 +303,7 @@ describe('gitCredentialEnv — the helper answers only for the host the credenti
   });
 
   test("failure mode 7: http binding redirected to the same host's https still answered; https does not downgrade to http", () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-git-scope-upgrade-'));
+    const home = makeTestTempDir('cairn-git-scope-upgrade-');
     const base: NodeJS.ProcessEnv = {
       ...envWithoutGitConfig(),
       HOME: home,
@@ -329,7 +330,7 @@ describe('gitCredentialEnv — the helper answers only for the host the credenti
   });
 
   test("failure mode 6: credential values never enter the helper's sh -c command line (run_command recorded by GIT_TRACE)", () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-git-argv-'));
+    const home = makeTestTempDir('cairn-git-argv-');
     const trace = join(home, 'trace.log');
     const base: NodeJS.ProcessEnv = {
       ...envWithoutGitConfig(),
@@ -393,7 +394,7 @@ describe('gitCredentialEnv — the helper answers only for the host the credenti
 
 describe('gitCredentialEnv — username and password in the helper are handed to git verbatim (#1485)', () => {
   const fillPassword = (cred: typeof CRED): { username?: string; password?: string } => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-git-quote-'));
+    const home = makeTestTempDir('cairn-git-quote-');
     const base: NodeJS.ProcessEnv = {
       ...envWithoutGitConfig(),
       HOME: home,
@@ -433,7 +434,7 @@ describe('gitCredentialEnv — username and password in the helper are handed to
   });
 
   test('$(touch …) inside the password is not executed', () => {
-    const marker = join(mkdtempSync(join(tmpdir(), 'cairn-git-quote-marker-')), 'ran');
+    const marker = join(makeTestTempDir('cairn-git-quote-marker-'), 'ran');
     fillPassword({ ...CRED, password: `x$(touch ${marker})` });
     expect(existsSync(marker)).toBe(false);
   });
@@ -453,7 +454,7 @@ describe("machineGitEnv — execution machine's local credential env (#1225 fall
   });
 
   test('on the machine path global helpers answer normally (real git credential fill, mirror image of the reset tests)', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-git-machine-'));
+    const home = makeTestTempDir('cairn-git-machine-');
     const machineHelper = join(home, 'machine-helper.sh');
     writeFileSync(machineHelper, '#!/bin/sh\necho username=git\necho password=MACHINE_OWN_TOKEN\n');
     chmodSync(machineHelper, 0o755);
@@ -645,7 +646,7 @@ function gitOk(dir: string, args: string[]): string {
 }
 
 function dirtyRepo(objectFormat?: 'sha256'): { dir: string; sha: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-reset-hard-'));
+  const dir = makeTestTempDir('cairn-reset-hard-');
   const init = ['init', '-b', 'main'];
   if (objectFormat) init.push('--object-format=sha256');
   gitOk(dir, init);
@@ -690,7 +691,7 @@ describe('resetHard — git 2.43 rejects reset --end-of-options (#1316)', () => 
 
 describe('#1829 local pre-push rejection', () => {
   test('real hook rejection is identified and preserves both output streams without retrying', async () => {
-    const remote = mkdtempSync(join(tmpdir(), 'cairn-hook-remote-'));
+    const remote = makeTestTempDir('cairn-hook-remote-');
     gitOk(remote, ['init', '--bare']);
     const dir = seededWorktree(remote);
     gitOk(dir, ['config', 'core.hooksPath', join(dir, '.git', 'hooks')]);

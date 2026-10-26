@@ -1,23 +1,16 @@
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  realpathSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { chmodSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { FS_LIST_MAX_ENTRIES } from '@cairn/shared';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { HttpError } from '../src/lib/errors.js';
 import { listDir } from '../src/services/fs-list.js';
 import { bootServer, req } from './helpers.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-fs-list-'));
+  const root = makeTestTempDir('cairn-fs-list-');
   roots.push(root);
   return root;
 }

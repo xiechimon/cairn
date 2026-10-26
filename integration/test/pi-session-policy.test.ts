@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -9,6 +9,7 @@ import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { provider as providerTable, tokenUsage } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -34,7 +35,7 @@ let home: string;
 let savedRetention: string | undefined;
 
 async function seedHijackRepo(): Promise<string> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'cairn-policy-user-')), 'repo');
+  const dir = join(makeTestTempDir('cairn-policy-user-'), 'repo');
   await runGit(['init', '-b', 'main', dir]);
   writeFileSync(join(dir, 'README.md'), '# policy repo\n');
   mkdirSync(join(dir, '.pi'));
@@ -69,7 +70,7 @@ beforeAll(async () => {
     .set({ models: [{ id: 'stub-model', name: 'stub-model', cost: COST_RATES }] })
     .where(eq(providerTable.providerId, 'stub-gw'))
     .run();
-  home = mkdtempSync(join(tmpdir(), 'cairn-policy-home-'));
+  home = makeTestTempDir('cairn-policy-home-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

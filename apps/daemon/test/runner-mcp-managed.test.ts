@@ -1,5 +1,5 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -13,6 +13,7 @@ import type {
   WorktreeOps,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -192,7 +193,7 @@ function capturingBackend(captured: SessionOpts[]): AgentBackend {
 
 async function run(claimed: ClaimedStep, localConfig?: Record<string, unknown>) {
   const captured: SessionOpts[] = [];
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-mcp-'));
+  const home = makeTestTempDir('cairn-runner-mcp-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();

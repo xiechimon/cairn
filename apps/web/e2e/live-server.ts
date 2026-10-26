@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { rmSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+
+import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ENV_VARS } from '@cairn/shared';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 
 const SERVER_DIR = resolve(import.meta.dirname, '..', '..', 'server');
 const TETHER = pathToFileURL(resolve(import.meta.dirname, 'live-server-tether.mjs')).href;
@@ -69,7 +70,7 @@ export async function bootLiveServer(
   token: string | null,
   tailscaleUsers?: string,
 ): Promise<LiveServer> {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-e2e-home-'));
+  const home = makeTestTempDir('cairn-e2e-home-');
   const port = await freePort();
   const child = spawn(process.execPath, ['--import', 'tsx', '--import', TETHER, 'src/index.ts'], {
     cwd: SERVER_DIR,

@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { buildRecordSchema } from '@cairn/shared';
 import Database from 'better-sqlite3';
@@ -7,6 +7,7 @@ import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import { build, step, todo } from '../src/db/schema.js';
 import { applyBuildStepAction } from '../src/services/builds.js';
@@ -31,7 +32,7 @@ async function world() {
 
 describe('#1513 build provenance and human feedback', () => {
   test('upgrades an existing build without losing its data', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-provenance-migration-'));
+    const dir = makeTestTempDir('cairn-provenance-migration-');
     const sqlite = new Database(':memory:');
     try {
       mkdirSync(join(dir, 'meta'));

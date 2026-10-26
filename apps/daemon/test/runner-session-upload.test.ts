@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
@@ -13,6 +13,7 @@ import type {
 } from '@cairn/shared';
 import { SESSION_FILE_NAME, SESSION_JSONL_MAX_BYTES } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -129,7 +130,7 @@ function backendWithSession(sessionFile?: string): AgentBackend {
 }
 
 async function setup(backend: AgentBackend, client: FakeClient = new FakeClient()) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-session-'));
+  const home = makeTestTempDir('cairn-runner-session-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = (() => {
@@ -185,7 +186,7 @@ async function setup(backend: AgentBackend, client: FakeClient = new FakeClient(
 
 describe('session JSONL upload at step close (#1512)', () => {
   test('failure mode 1: readable session file → original uploaded with the transcript', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-'));
+    const dir = makeTestTempDir('cairn-pi-session-');
     const sessionFile = join(dir, 'sess.jsonl');
     const body = '{"type":"assistant","stopReason":"length"}\n';
     writeFileSync(sessionFile, body);
@@ -206,7 +207,7 @@ describe('session JSONL upload at step close (#1512)', () => {
   });
 
   test('failure mode 3: over the cap → step succeeds, visible in logs, no session.jsonl request', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-big-'));
+    const dir = makeTestTempDir('cairn-pi-session-big-');
     const sessionFile = join(dir, 'sess.jsonl');
     writeFileSync(sessionFile, 'x'.repeat(SESSION_JSONL_MAX_BYTES + 1));
     const { client, lines } = await setup(backendWithSession(sessionFile));
@@ -216,7 +217,7 @@ describe('session JSONL upload at step close (#1512)', () => {
   });
 
   test('failure mode 4: session PUT fails → transcript still uploaded, done still reported', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-put-'));
+    const dir = makeTestTempDir('cairn-pi-session-put-');
     const sessionFile = join(dir, 'sess.jsonl');
     writeFileSync(sessionFile, '{"ok":1}\n');
     const client = new FakeClient();

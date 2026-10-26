@@ -1,18 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+
 import { join, resolve } from 'node:path';
 import { CONFIRM_ANNOUNCEMENT, MERGE_ANNOUNCEMENT, trajectoryPackSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
 import {
   agent,
@@ -34,7 +27,7 @@ afterEach(() => {
 });
 
 function fixture(spec = 'Implement export') {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-traj-'));
+  const home = makeTestTempDir('cairn-traj-');
   homes.push(home);
   const dbPath = join(home, 'server/server.db');
   const opened = openDbWithHandle(dbPath);
@@ -203,7 +196,7 @@ test.each([
 });
 
 test('missing database fails without creating a database', () => {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-traj-missing-'));
+  const home = makeTestTempDir('cairn-traj-missing-');
   homes.push(home);
   expect(run(home, ['--build', 'build-1']).status).not.toBe(0);
 });

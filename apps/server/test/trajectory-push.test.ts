@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
+
 import { join, resolve } from 'node:path';
 import { type TrajectoryPack, trajectoryPackSchema } from '@cairn/shared';
 import { afterEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -174,7 +175,7 @@ function piPack(): TrajectoryPack {
 }
 
 function writePacks(packs: TrajectoryPack[]) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-push-'));
+  const home = makeTestTempDir('cairn-push-');
   homes.push(home);
   const file = join(home, 'packs.jsonl');
   writeFileSync(file, `${packs.map((p) => JSON.stringify(p)).join('\n')}\n`);
@@ -182,7 +183,7 @@ function writePacks(packs: TrajectoryPack[]) {
 }
 
 function newHome() {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-push-home-'));
+  const home = makeTestTempDir('cairn-push-home-');
   homes.push(home);
   return home;
 }
@@ -424,7 +425,7 @@ test.each([
 
 test('rejects bad input before sending anything', async () => {
   const { received, endpoint } = await receiver();
-  const home = mkdtempSync(join(tmpdir(), 'cairn-push-'));
+  const home = makeTestTempDir('cairn-push-');
   homes.push(home);
   const file = join(home, 'bad.jsonl');
   writeFileSync(file, `${JSON.stringify(piPack())}\n${JSON.stringify({ buildId: 'x' })}\n`);

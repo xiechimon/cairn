@@ -1,5 +1,5 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, rmSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -9,6 +9,7 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { build as buildTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -44,7 +45,7 @@ function userTexts(messages: { role: string; content?: unknown }[]): string[] {
 }
 
 beforeAll(async () => {
-  home = mkdtempSync(join(tmpdir(), 'cairn-info-fastlane-home-'));
+  home = makeTestTempDir('cairn-info-fastlane-home-');
   const reportsDir = join(home, 'reports');
   stub = await startStubLlm([
     {

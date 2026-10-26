@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join, resolve } from 'node:path';
 import { DB_TABLES, INTERNAL_ONLY_TABLES, todoRecordSchema } from '@cairn/shared';
 import Database from 'better-sqlite3';
@@ -7,6 +7,7 @@ import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { type Db, MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
@@ -21,7 +22,7 @@ const H2 = '2'.repeat(40);
 
 const temps: string[] = [];
 function temp(prefix: string): string {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
+  const dir = makeTestTempDir(prefix);
   temps.push(dir);
   return dir;
 }

@@ -6,5 +6,9 @@
   {
     "file": "apps/daemon/test/workspace-hooks.test.ts",
     "reason": "本机环境相关，main 上同样红"
+  },
+  {
+    "file": "apps/server/test/merge-gate-model-roster.test.ts",
+    "reason": "Checked-in pi 1.4.0 roster snapshot does not match the installed catalogs. The same assertion fails on main CI run 40351380688. Issue 1855 refreshes that snapshot."
   }
 ]

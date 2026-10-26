@@ -5,19 +5,19 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { skipsQueue, slotCount, slotPortHolder, slotResources } from './heavy-slots.mjs';
 import { prepushModules } from './prepush.mjs';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 const moduleUrl = pathToFileURL(resolve('scripts/heavy-slots.mjs')).href;
 const cli = resolve('scripts/heavy-slots.mjs');
@@ -32,7 +32,7 @@ test.afterEach(() => {
 const SANDBOX_PORT_BASE = 20000 + (process.pid % 1000) * 20;
 
 function sandbox(slots) {
-  const dir = mkdtempSync(join(tmpdir(), 'heavy-slots-test-'));
+  const dir = makeTestTempDir('heavy-slots-test-');
   const env = {
     ...process.env,
     CAIRN_HEAVY_SLOTS: String(slots),

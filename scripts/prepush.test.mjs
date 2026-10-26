@@ -1,15 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import {
-  copyFileSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
@@ -20,6 +11,7 @@ import {
   runPlan,
   selfTests,
 } from './prepush.mjs';
+import { makeTestTempDir } from './test-tmpdir.mjs';
 
 test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
@@ -80,6 +72,8 @@ test('local code checks include both UI gates and affected e2e', () => {
     'node scripts/english-only-gate.mjs',
     'node scripts/lessons-ledger-gate.mjs',
     'node scripts/ui-debt-gate.mjs',
+    'node scripts/tmpdir-sweep-gate.mjs',
+    'node --test scripts/tmpdir-sweep-gate.test.mjs',
     'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs --compile',
     'node scripts/comment-discipline-gate.mjs',
@@ -221,6 +215,8 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
     'pnpm typecheck',
     'pnpm spec:parse',
     'node scripts/ui-debt-gate.mjs',
+    'node scripts/tmpdir-sweep-gate.mjs',
+    'node --test scripts/tmpdir-sweep-gate.test.mjs',
     'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs',
   ]) {
@@ -229,7 +225,7 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
 });
 
 test('CLI skips real document changes and rejects a missing base', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-'));
+  const directory = makeTestTempDir('cairn-prepush-');
   process.env.CAIRN_HEAVY_SLOTS_DIR = join(directory, 'heavy-slots');
   const runGit = (args) =>
     execFileSync(
@@ -302,7 +298,7 @@ const runPrepushCi = (cwd) => {
 };
 
 test('a stale local origin/main is refreshed by fetch before computing changes', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-stale-'));
+  const directory = makeTestTempDir('cairn-prepush-stale-');
   const remote = join(directory, 'remote.git');
   const upstream = join(directory, 'upstream');
   const work = join(directory, 'work');
@@ -336,7 +332,7 @@ test('a stale local origin/main is refreshed by fetch before computing changes',
 });
 
 test('fetch failure falls back to the local origin/main and prints a stale notice', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-offline-'));
+  const directory = makeTestTempDir('cairn-prepush-offline-');
   const work = join(directory, 'work');
   try {
     gitIn(directory, ['init', work]);
@@ -375,7 +371,7 @@ test('prepush vitest only forgives files listed as known local red', async () =>
 });
 
 test('plan children do not inherit the git hook repository binding', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-hook-env-'));
+  const directory = makeTestTempDir('cairn-prepush-hook-env-');
   const victim = join(directory, 'victim');
   const scratch = join(directory, 'scratch');
   try {

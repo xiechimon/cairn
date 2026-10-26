@@ -1,12 +1,5 @@
-import {
-  existsSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -17,6 +10,7 @@ import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-lo
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { build as buildTable, step as stepTable } from '../../apps/server/src/db/schema.js';
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -45,7 +39,7 @@ let paths: StatePaths;
 let home: string;
 
 async function seedUserRepo(): Promise<string> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'cairn-g2t2-user-')), 'repo');
+  const dir = join(makeTestTempDir('cairn-g2t2-user-'), 'repo');
   await runGit(['init', '-b', 'main', dir]);
   writeFileSync(join(dir, 'README.md'), '# user repo\n');
   await runGit(['add', '-A'], { cwd: dir });
@@ -102,7 +96,7 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试执行 Agent：按任务要求用 bash 工具完成文件改动，然后简短汇报。',
   });
-  home = mkdtempSync(join(tmpdir(), 'cairn-g2t2-home-'));
+  home = makeTestTempDir('cairn-g2t2-home-');
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'g2t2-mbp' },
     {},

@@ -1,12 +1,12 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENV_VARS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { step as stepTable } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -87,7 +87,7 @@ describe('crash recovery (T2: AgentSession seam × host durable orchestration)',
       { content: '恢复后续跑完成。' },
     ]);
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 500 });
-    home = mkdtempSync(join(tmpdir(), 'cairn-crash-home-'));
+    home = makeTestTempDir('cairn-crash-home-');
     const world = await seedWorld(server.url, server.teamId, {
       title: '崩溃恢复探针',
       spec: '写一行崩溃恢复探针。',

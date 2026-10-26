@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+
 import { join } from 'node:path';
 import {
   agentTaskSchema,
@@ -10,6 +10,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   agent as agentTable,
   plan as planTable,
@@ -504,7 +505,7 @@ describe('[inferred] build detail read surface (M5 overlay data source, register
 });
 
 describe('SPA static same-origin hosting (02/A1)', () => {
-  const webDir = mkdtempSync(join(tmpdir(), 'cairn-web-dir-'));
+  const webDir = makeTestTempDir('cairn-web-dir-');
   afterAll(() => rmSync(webDir, { recursive: true, force: true }));
   mkdirSync(join(webDir, 'assets'), { recursive: true });
   writeFileSync(join(webDir, 'index.html'), '<!doctype html><title>spa</title>');
