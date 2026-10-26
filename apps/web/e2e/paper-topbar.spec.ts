@@ -16,7 +16,7 @@ test('bar geometry: 56px, sans page title, summary N = the `待处理` column co
   expect(box?.height).toBe(56);
 
   const title = topbar(page).getByRole('heading', { level: 1 });
-  await expect(title).toHaveText('工作台');
+  await expect(title).toHaveText('看板');
   const titleStyle = await title.evaluate((el) => {
     const cs = getComputedStyle(el);
     return { family: cs.fontFamily, weight: cs.fontWeight };

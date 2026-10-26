@@ -50,7 +50,7 @@ import {
   FilterPanel,
   TOPBAR_TEXT_BUTTON,
 } from './filter-panel.js';
-import { HomeSections, NeedsYouInbox } from './home.js';
+import { HomeSections, NeedsYouInbox, withoutBoardView } from './home.js';
 import { BrandMark } from './sidebar.js';
 import { cardTag } from './tag-filter.js';
 
@@ -292,7 +292,7 @@ export function BoardSurface({
             variant="ghost"
             size="sm"
             className={`board-topbar-schedule ${TOPBAR_TEXT_BUTTON}`}
-            render={<Link to={{ pathname: '/app/schedules', search }} />}
+            render={<Link to={{ pathname: '/app/schedules', search: withoutBoardView(search) }} />}
           >
             <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
             {t('定时')}

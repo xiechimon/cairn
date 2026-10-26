@@ -35,6 +35,7 @@ import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { readStoredTheme } from '../theme.js';
 import { withColumnParam } from './columns.js';
+import { withoutBoardView } from './home.js';
 import { ProjectAvatar } from './project-avatar.js';
 
 export type SidebarSelected =
@@ -198,13 +199,10 @@ export function BoardSidebar({
   const { t } = useI18n();
   const { user } = useLiveData();
   const { search, pathname } = useLocation();
-  const plain = withColumnParam(search, null);
+  const plain = withoutBoardView(withColumnParam(search, null));
   const kanbanParams = new URLSearchParams(plain);
   kanbanParams.set('view', 'board');
   const kanbanSearch = `?${kanbanParams}`;
-  const homeParams = new URLSearchParams(plain);
-  homeParams.delete('view');
-  const homeSearch = `?${homeParams}`;
   const projectRows = useMemo(
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
     [projects],
@@ -295,9 +293,7 @@ export function BoardSidebar({
           </TooltipContent>
         </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
-          <Link
-            {...railLink({ pathname: '/app', search: homeSearch }, selected === 'board', homeLabel)}
-          >
+          <Link {...railLink({ pathname: '/app', search: plain }, selected === 'board', homeLabel)}>
             <Inbox className={ICON} strokeWidth={STROKE} />
             {attention > 0 && (
               <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)" />
@@ -458,7 +454,7 @@ export function BoardSidebar({
         ref={navRef}
         className={`flex min-h-0 flex-1 flex-col gap-px overflow-y-auto ${scrollFadeClassName()}`}
       >
-        <Link {...navLink({ pathname: '/app', search: homeSearch }, selected === 'board')}>
+        <Link {...navLink({ pathname: '/app', search: plain }, selected === 'board')}>
           <Inbox className={ICON} strokeWidth={STROKE} />
           <span className="truncate">{t('工作台')}</span>
           {attention > 0 && <AttentionBadge count={attention} />}

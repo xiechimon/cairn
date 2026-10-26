@@ -28,6 +28,12 @@ import { relativeTime } from './rel-time.js';
 import { ATTENTION } from './todo-card.js';
 
 export const BOARD_VIEW_PARAM = 'view';
+
+export function withoutBoardView(search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete(BOARD_VIEW_PARAM);
+  return `?${params}`;
+}
 const DONE_PREVIEW = 5;
 
 export interface RowContext {
