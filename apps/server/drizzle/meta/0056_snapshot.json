@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "92465fba-8b47-422c-ae6f-56d44e4c20dd",
+  "id": "fa6a22ae-bc34-4bbd-b1bb-ab685e979694",
   "prevId": "11f9cca2-0260-46bd-a6ac-8a0aa5714464",
   "tables": {
     "agent": {
@@ -2244,14 +2244,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "splitPolicy": {
-          "name": "splitPolicy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'human'"
         },
         "description": {
           "name": "description",
