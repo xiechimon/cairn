@@ -51,11 +51,6 @@
   },
   {
     "path": "apps/server/src/services/machine-step-token.ts",
-    "name": "githubExecCredential",
-    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
-  },
-  {
-    "path": "apps/server/src/services/machine-step-token.ts",
     "name": "chiefStepToken",
     "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
   }

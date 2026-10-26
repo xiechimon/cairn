@@ -577,6 +577,9 @@ export const githubConnection = sqliteTable('github_connection', {
     .references(() => team.id, { onDelete: 'cascade' }),
   login: text('login').notNull(),
   accessTokenCipher: text('accessTokenCipher').notNull(),
+  refreshTokenCipher: text('refreshTokenCipher'),
+  accessTokenExpiresAt: epochMs('accessTokenExpiresAt'),
+  disconnectedReason: text('disconnectedReason'),
   scope: text('scope').notNull(),
   createdAt: epochMs('createdAt').notNull(),
 });

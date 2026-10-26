@@ -487,7 +487,7 @@ export function createCiPoller(
       tally.reviewSkipped += 1;
       return;
     }
-    const token = githubTokenOrNull(deps, target.teamId);
+    const token = await githubTokenOrNull(deps, target.teamId);
     const entry = pullCache.get(key) ?? null;
     let pull: GithubPull | null;
     let readAt = now;
@@ -787,7 +787,7 @@ export function createCiPoller(
       tally.skipped += 1;
       return;
     }
-    const grindToken = githubTokenOrNull(deps, target.teamId);
+    const grindToken = await githubTokenOrNull(deps, target.teamId);
     if (grindToken === null) recordGrindAnonRead(now);
     const pullEntry = grindPullCache.get(key) ?? null;
     const pullPage = await githubPull(

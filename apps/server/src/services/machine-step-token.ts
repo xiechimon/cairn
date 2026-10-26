@@ -9,14 +9,14 @@ import {
   resolveStepCredentials,
 } from './credentials.js';
 import { projectOfTodo } from './git.js';
-import { openGithubToken } from './github-connection.js';
+import { githubTokenOrNull } from './github-connection.js';
 import { agentForStep, isChiefConversation, type MachineDeps, ownedStep } from './machine-deps.js';
 
-export function stepToken(
+export async function stepToken(
   deps: MachineDeps,
   machineId: string,
   stepId: string,
-): MachineTokenResponse {
+): Promise<MachineTokenResponse> {
   const owned = ownedStep(deps, machineId, stepId);
   if (isChiefConversation(owned.buildId)) return chiefStepToken(deps, stepId, owned.buildId);
   const bundle = resolveStepCredentials({ db: deps.db, box: deps.box }, stepId);
@@ -30,12 +30,16 @@ export function stepToken(
   const agentRow =
     stepRow && todoRow ? agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) : null;
   const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
-  const git =
-    projectRow?.repoKind === 'hosted' && todoRow
-      ? issueStepGitCredential(deps, { teamId: todoRow.teamId, stepId })
-      : projectRow?.repoKind === 'github' && todoRow
-        ? githubExecCredential(deps, todoRow.teamId)
+  let git: GitCredentials | null = null;
+  if (projectRow?.repoKind === 'hosted' && todoRow) {
+    git = issueStepGitCredential(deps, { teamId: todoRow.teamId, stepId });
+  } else if (projectRow?.repoKind === 'github' && todoRow) {
+    const githubToken = await githubTokenOrNull(deps, todoRow.teamId);
+    git =
+      githubToken !== null
+        ? { username: GITHUB_ACCESS_TOKEN_USERNAME, password: githubToken }
         : null;
+  }
   return {
     provider: toProviderConfig(
       bundle.provider,
@@ -44,11 +48,6 @@ export function stepToken(
     secrets: bundle.secrets,
     git,
   };
-}
-
-function githubExecCredential(deps: MachineDeps, teamId: string): GitCredentials | null {
-  const token = openGithubToken({ db: deps.db, box: deps.box }, teamId);
-  return token !== null ? { username: GITHUB_ACCESS_TOKEN_USERNAME, password: token } : null;
 }
 
 export function toProviderConfig(

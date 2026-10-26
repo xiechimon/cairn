@@ -18,6 +18,7 @@ import { seed } from './db/seed.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
+import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { backfillPersonas } from './services/personas.js';
@@ -59,6 +60,10 @@ const reposDir = reposDirOf(config);
 mkdirSync(reposDir, { recursive: true });
 const attachmentsDir = attachmentsDirOf(config);
 mkdirSync(attachmentsDir, { recursive: true });
+const githubFetch = refreshingGithubFetch(
+  { db, box: secretBox, oauthClient: config.githubOauth },
+  globalThis.fetch,
+);
 const app = createApp(
   {
     db,
@@ -74,6 +79,7 @@ const app = createApp(
     enrollments: new Map(),
     oauthStates: new Map(),
     oauthClient: config.githubOauth,
+    githubFetch,
     reposDir,
     attachmentsDir,
     skillsDir: config.skillsDir,
@@ -90,11 +96,21 @@ warnInsecureBind(logger, config);
 logTokenAuthStartup(logger, config);
 
 const scheduler = createScheduler(
-  { db, hub, machineHub, user: seeded.user, convHub, box: secretBox, reposDir },
+  {
+    db,
+    hub,
+    machineHub,
+    user: seeded.user,
+    convHub,
+    box: secretBox,
+    reposDir,
+    githubFetch,
+    oauthClient: config.githubOauth,
+  },
   { tickMs: config.schedulerTickMs },
   { attachmentsDir, logger },
-  { githubFetch: globalThis.fetch, logger },
-  issueIntakeRunOf(config, { githubFetch: globalThis.fetch, logger }),
+  { githubFetch, logger },
+  issueIntakeRunOf(config, { githubFetch, logger }),
   trajectoryOutcomeRunOf(config, { logger }),
 );
 scheduler.start();

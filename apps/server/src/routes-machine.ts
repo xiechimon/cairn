@@ -151,6 +151,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     mcpConfigPath: ctx.mcpConfigPath,
     skillsDir: ctx.skillsDir,
     convHub: ctx.convHub,
+    oauthClient: ctx.oauthClient,
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
   };
 
@@ -374,9 +375,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     );
   });
 
-  app.get('/api/machine/token/:stepId', (c) => {
+  app.get('/api/machine/token/:stepId', async (c) => {
     const row = me(c);
-    return c.json(stepToken(deps, row.id, c.req.param('stepId')));
+    return c.json(await stepToken(deps, row.id, c.req.param('stepId')));
   });
 
   app.get('/api/machine/skills/:stepId', (c) => {

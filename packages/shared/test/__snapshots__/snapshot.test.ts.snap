@@ -4022,6 +4022,9 @@ exports[`body/envelope schema snapshots > githubConnectionStatus > githubConnect
     "connected": {
       "type": "boolean",
     },
+    "disconnectReason": {
+      "type": "string",
+    },
     "login": {
       "type": "string",
     },

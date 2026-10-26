@@ -734,7 +734,7 @@ export function createIssueIntake(
     now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
-    const got = teamGithubToken(deps, teamId);
+    const got = await teamGithubToken(deps, teamId);
     if ('reason' in got) {
       tally.skipped += projects.length;
       log({ teamId, reason: got.reason }, 'issue intake team skipped');

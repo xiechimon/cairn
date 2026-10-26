@@ -915,6 +915,7 @@ export const EN: Record<string, string> = {
   搜索仓库: 'Search repositories',
   没有匹配的仓库: 'No matching repositories',
   断开连接: 'Disconnect',
+  'GitHub 连接已断开': 'GitHub connection disconnected',
   已连接: 'Connected',
   '手动输入 owner/repo': 'Enter owner/repo manually',
   // wayfinder #181 add-machine dialog family (r2 11b verbatim copy; the

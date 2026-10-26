@@ -18,7 +18,8 @@ import { githubRepoReachable } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import { isGithubRepoRef, removeHostedRepoDir, validateGithubLocalSlotPath } from './git.js';
-import { openGithubToken } from './github-connection.js';
+import { teamGithubToken } from './github-connection.js';
+import type { OAuthClientConfig } from './oauth.js';
 import { insertMessageRow } from './transcript.js';
 
 type ProjectRow = typeof project.$inferSelect;
@@ -53,6 +54,7 @@ export interface ProjectPatchDeps {
   db: Db;
   box: SecretBox;
   githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
   convHub?: ConversationStreamHub;
   logger?: { info(obj: object, msg: string): void };
 }
@@ -198,9 +200,14 @@ export async function updateProject(
     const slash = ref.indexOf('/');
     const owner = ref.slice(0, slash);
     const repo = ref.slice(slash + 1);
-    const token = openGithubToken({ db, box: deps.box }, row.teamId);
+    const access = await teamGithubToken(deps, row.teamId);
     const fetchImpl = deps.githubFetch ?? fetch;
-    const probe = await githubRepoReachable(fetchImpl, token, owner, repo);
+    const probe = await githubRepoReachable(
+      fetchImpl,
+      'token' in access ? access.token : null,
+      owner,
+      repo,
+    );
     if (!probe.reachable) {
       throw new HttpError(400, `invalid body at githubRepo: repository not reachable: ${ref}`);
     }

@@ -9,6 +9,7 @@ import { upsertChiefMessage } from './chief.js';
 import { agentForStep as agentForStepEligibility } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import type { OAuthClientConfig } from './oauth.js';
 
 export function isChiefConversation(id: string): boolean {
   return isChiefConversationId(id);
@@ -26,6 +27,7 @@ export interface MachineDeps {
   mcpConfigPath?: string;
   convHub?: ConversationStreamHub;
   githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
 }
 
 export function publishStepStatus(deps: MachineDeps, stepId: string): void {
