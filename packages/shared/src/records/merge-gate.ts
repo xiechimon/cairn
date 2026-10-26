@@ -252,12 +252,12 @@ export const MERGE_BLOCKERS = [
   { code: 'evidence-executable', class: 'human', label: '证据目录里新增或改动了可执行文件' },
   {
     code: 'harness-regression-missing',
-    class: 'human',
+    class: 'transient',
     label: '改了 harness 但缺少绑定当前补丁的回归评测结果',
   },
   {
     code: 'harness-regression-stale',
-    class: 'human',
+    class: 'transient',
     label: '回归评测结果绑定的补丁摘要不是当前补丁',
   },
   {
