@@ -242,7 +242,7 @@ describe('runner thinking_delta throttled forwarding (#1308)', () => {
 describe('runner tool call timestamps', () => {
   test('persists and relays independent start and end times for overlapping calls', async () => {
     let time = 1_000;
-    async function* script(): AsyncIterable<StepEvent> {
+    const events = (async function* (): AsyncIterable<StepEvent> {
       yield { type: 'toolcall_end', call: { id: 'a', name: 'Read', arguments: {} } };
       time = 1_100;
       yield { type: 'toolcall_end', call: { id: 'b', name: 'Read', arguments: {} } };
@@ -255,8 +255,8 @@ describe('runner tool call timestamps', () => {
       time = 3_000;
       yield { type: 'toolcall_end', call: { id: 'c', name: 'Read', arguments: {}, result: '' } };
       yield { type: 'done', usage: [] };
-    }
-    const client = await run(script(), () => time);
+    })();
+    const client = await run(events, () => time);
     expect(client.tools.map(({ id, startedAt, endedAt }) => ({ id, startedAt, endedAt }))).toEqual([
       { id: 'a', startedAt: 1_000, endedAt: undefined },
       { id: 'b', startedAt: 1_100, endedAt: undefined },

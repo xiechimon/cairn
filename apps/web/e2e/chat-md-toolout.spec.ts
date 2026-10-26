@@ -5,19 +5,6 @@ const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout';
 const toggle = (page: Page) =>
   page.getByRole('button', { name: /跑了 2 条命令/ });
 
-/** Computed color of a `color: var(--foreground)` probe — the "normal
- *  contrast" reference the tool output must match (and the note's dim
- *  ink must not). */
-async function primaryInk(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const probe = document.createElement('span');
-    probe.style.color = 'var(--foreground)';
-    document.body.appendChild(probe);
-    const c = getComputedStyle(probe).color;
-    probe.remove();
-    return c;
-  });
-}
 
 test('A1: tool output is collapsed behind individual calls by default', async ({ page }) => {
   await page.goto(ROUTE);
@@ -50,7 +37,14 @@ test('A3: the output block is left aligned, mono, normal contrast — not a chat
   await page.goto(ROUTE);
   if ((await toggle(page).getAttribute('aria-expanded')) !== 'true') await toggle(page).click();
   for (const call of await page.getByTestId('work-call').all()) await call.click();
-  const ink = await primaryInk(page);
+  const ink = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--foreground)';
+    document.body.appendChild(probe);
+    const c = getComputedStyle(probe).color;
+    probe.remove();
+    return c;
+  });
   const box = await page.getByTestId('tool-output').first().evaluate((el) => {
     const cs = getComputedStyle(el);
     return {

@@ -58,5 +58,15 @@
     "path": "apps/server/src/services/machine-step-token.ts",
     "name": "chiefStepToken",
     "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/web/src/api/mappers.ts",
+    "name": "workCall",
+    "reason": "Classifies one tool call into a work step across six tool families; inlining puts 70 lines of branching inside the mapTranscript message loop"
+  },
+  {
+    "path": "apps/web/src/detail/work-trace.tsx",
+    "name": "WorkStepRow",
+    "reason": "React component with its own open-state hook, rendered inside the steps map; inlining would call hooks from the loop"
   }
 ]
