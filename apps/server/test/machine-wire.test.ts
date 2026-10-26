@@ -524,11 +524,11 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
         output: 980,
         cacheRead: 100,
         cacheWrite: 50,
-        costInput: 0,
-        costOutput: 0,
-        costCacheRead: 0,
-        costCacheWrite: 0,
-        costTotal: 0,
+        costInput: null,
+        costOutput: null,
+        costCacheRead: null,
+        costCacheWrite: null,
+        costTotal: null,
       },
     ]);
 
