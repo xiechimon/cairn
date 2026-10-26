@@ -395,4 +395,28 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
     const { events } = feed([API_RETRY]);
     expect(events).toEqual([{ type: 'auto_retry_start', attempt: 2 }]);
   });
+
+  test('rate_limit_event is kept on the map state and emits no step event', () => {
+    const msg = {
+      type: 'rate_limit_event',
+      rate_limit_info: {
+        status: 'rejected',
+        rateLimitType: 'five_hour',
+        utilization: 1,
+        resetsAt: 1_700_000_000,
+      },
+      uuid: '11111111-1111-4111-8111-111111111111',
+      session_id: 'sdk-sess-uuid-1',
+    } as SDKMessage;
+    const { events, state } = feed([msg]);
+    expect(events).toEqual([]);
+    expect(state.rateLimits).toEqual([
+      {
+        status: 'rejected',
+        rateLimitType: 'five_hour',
+        utilization: 1,
+        resetsAt: 1_700_000_000,
+      },
+    ]);
+  });
 });

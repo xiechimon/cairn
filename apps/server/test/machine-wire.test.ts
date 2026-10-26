@@ -155,7 +155,7 @@ function normalizePath(path: string): string {
   return path.replaceAll(/:([A-Za-z]+)/g, '{$1}');
 }
 
-describe('machine-surface routes = 02 section 5 vocabulary (13 endpoints single-source match)', () => {
+describe('machine-surface routes = 02 section 5 vocabulary (14 endpoints single-source match)', () => {
   const s = bootServer();
   const have = new Set(
     s.app.routes
@@ -163,11 +163,11 @@ describe('machine-surface routes = 02 section 5 vocabulary (13 endpoints single-
       .map((r) => `${r.method} ${normalizePath(r.path)}`),
   );
 
-  test('implementation surface covers all 13 MACHINE_WIRE endpoints (verb+path one by one)', () => {
+  test('implementation surface covers all 14 MACHINE_WIRE endpoints (verb+path one by one)', () => {
     for (const w of MACHINE_WIRE) {
       expect(have.has(`${w.method} ${w.path}`), `${w.method} ${w.path}`).toBe(true);
     }
-    expect(MACHINE_WIRE).toHaveLength(13);
+    expect(MACHINE_WIRE).toHaveLength(14);
     expect(MACHINE_ENDPOINTS.map((e) => e.path)).toEqual(MACHINE_WIRE.map((w) => w.path));
   });
 

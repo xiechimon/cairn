@@ -23,6 +23,7 @@ import type {
   AgentTodoItem,
   AgentTokenUsage,
   BriefChannel,
+  ClaudeRateLimitNotice,
   DeliveredImage,
   LocalToolDef,
   McpEndpoint,
@@ -89,6 +90,7 @@ export interface ClaudeMapState {
   interrupted: boolean;
   usage: AgentTokenUsage;
   sessionId: string | null;
+  rateLimits: ClaudeRateLimitNotice[];
   modelId?: string;
   authFailed?: boolean;
   machineName?: string;
@@ -103,6 +105,7 @@ export function createClaudeMapState(opts?: {
     interrupted: false,
     usage: [],
     sessionId: null,
+    rateLimits: [],
     ...(opts?.modelId !== undefined ? { modelId: opts.modelId } : {}),
     ...(opts?.machineName !== undefined ? { machineName: opts.machineName } : {}),
   };
@@ -310,6 +313,37 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
       }
       return [{ type: 'error', error: { message, retryable: isRetryableError(message) } }];
     }
+    case 'rate_limit_event': {
+      const info = (
+        msg as {
+          rate_limit_info?: {
+            status?: string;
+            rateLimitType?: string;
+            utilization?: number;
+            resetsAt?: number;
+          };
+        }
+      ).rate_limit_info;
+      if (
+        info?.status !== 'allowed' &&
+        info?.status !== 'allowed_warning' &&
+        info?.status !== 'rejected'
+      ) {
+        return [];
+      }
+      const notice: ClaudeRateLimitNotice = { status: info.status };
+      if (typeof info.rateLimitType === 'string' && info.rateLimitType.trim() !== '') {
+        notice.rateLimitType = info.rateLimitType.trim();
+      }
+      if (typeof info.utilization === 'number' && Number.isFinite(info.utilization)) {
+        notice.utilization = info.utilization;
+      }
+      if (typeof info.resetsAt === 'number' && Number.isFinite(info.resetsAt)) {
+        notice.resetsAt = info.resetsAt;
+      }
+      state.rateLimits.push(notice);
+      return [];
+    }
     default:
       return [];
   }
@@ -373,6 +407,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private readonly state: ClaudeMapState;
   private readonly q: Query;
   private readonly abort: AbortController;
+  private readonly onClaudeRateLimit: ((notice: ClaudeRateLimitNotice) => void) | undefined;
   private closed = false;
   private stopping = false;
 
@@ -384,6 +419,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
       state: ClaudeMapState;
       abort: AbortController;
       input: AsyncQueue<SDKUserMessage>;
+      onClaudeRateLimit?: (notice: ClaudeRateLimitNotice) => void;
     },
   ) {
     this.q = q;
@@ -392,6 +428,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     this.state = opts.state;
     this.abort = opts.abort;
     this.input = opts.input;
+    this.onClaudeRateLimit = opts.onClaudeRateLimit;
     this.events = this.queue.iterable();
     void this.pump();
   }
@@ -399,7 +436,12 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private async pump(): Promise<void> {
     try {
       for await (const msg of this.q) {
-        for (const ev of mapClaudeMessage(msg, this.state)) {
+        const before = this.state.rateLimits.length;
+        const events = mapClaudeMessage(msg, this.state);
+        for (const notice of this.state.rateLimits.slice(before)) {
+          this.onClaudeRateLimit?.(notice);
+        }
+        for (const ev of events) {
           this.queue.push(ev);
           if (TERMINAL_EVENT_TYPES.includes(ev.type)) {
             this.finish();
@@ -943,7 +985,16 @@ export class ClaudeCodeBackend implements AgentBackend {
     const input = new AsyncQueue<SDKUserMessage>();
     if (opts.prompt !== undefined) input.push(buildUserMessage(opts.prompt, opts.promptImages));
     const q = query({ prompt: input.iterable(), options: sdkOptions });
-    return new ClaudeSessionHandle(q, { sessionId, cwd: opts.cwd, state, abort, input });
+    return new ClaudeSessionHandle(q, {
+      sessionId,
+      cwd: opts.cwd,
+      state,
+      abort,
+      input,
+      ...(opts.onClaudeRateLimit !== undefined
+        ? { onClaudeRateLimit: opts.onClaudeRateLimit }
+        : {}),
+    });
   }
 }
 

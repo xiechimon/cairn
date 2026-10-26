@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { modelUsageSchema, providerConfigSchema, toolCallRecordSchema } from '../agent-backend.js';
 import { agentTodoReportSchema } from '../agent-todo.js';
 import { blockerHandoffSchema } from '../blocker-handoff-record.js';
+import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
 import { machineRecordSchema } from '../records/machine.js';
 import { messageRoleSchema, transcriptRowSchema } from '../records/message.js';
@@ -509,6 +510,12 @@ export const MACHINE_WIRE = [
     method: 'POST',
     path: '/api/machine/presence',
     request: machinePresenceBodySchema,
+    response: machineOkResponseSchema,
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/rate-limit',
+    request: claudeRateLimitReportSchema,
     response: machineOkResponseSchema,
   },
   { method: 'POST', path: '/api/machine/recover', response: machineRecoverResponseSchema },

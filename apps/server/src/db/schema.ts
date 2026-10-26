@@ -8,6 +8,7 @@ import type {
   BuildEvidence,
   ChiefWatch,
   ClaudeCodeReport,
+  ClaudeRateLimitWindow,
   DocumentDiffFile,
   MachineCapabilities,
   MemoryCandidateStatus,
@@ -168,6 +169,7 @@ export interface QuotaWaitRow {
   lastAt: number;
   attempts: number;
   probeAt: number;
+  source?: 'claude_rate_limit';
 }
 
 export interface StepFallbackRow {
@@ -455,6 +457,7 @@ export const machine = sqliteTable(
     kind: text('kind').notNull().default('remote'),
     enabledRuntimes: json<string[]>('enabledRuntimes').notNull().default(sql`'[]'`),
     claudeCodeReport: json<ClaudeCodeReport | null>('claudeCodeReport'),
+    claudeRateLimits: json<ClaudeRateLimitWindow[] | null>('claudeRateLimits'),
     maxConcurrent: integer('maxConcurrent').notNull().default(3),
     maxConcurrentOverridden: bool('maxConcurrentOverridden').notNull().default(false),
     lastSeenAt: epochMs('lastSeenAt'),

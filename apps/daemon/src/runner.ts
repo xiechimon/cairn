@@ -47,6 +47,7 @@ import {
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
   LocalRepoUnreachableError,
+  normalizeClaudeResetsAt,
   noVisionSignalOf,
   PLAN_FILE_NAME,
   parseRetryAfterMs,
@@ -59,6 +60,7 @@ import {
   skillCallName,
   stepTakesSecrets,
   stripAnsiEscapes,
+  subscriptionKeyOf,
   transcriptPromptRowId,
 } from '@cairn/shared';
 import { createActivityTracker } from './activity.js';
@@ -1217,6 +1219,32 @@ async function runClaimedStep(
     await sealSegment();
   };
   let handle: AgentSessionHandle | null = null;
+  sessionOpts.onClaudeRateLimit = (notice) => {
+    const machineId = claimed.step.machineId;
+    if (machineId !== null) {
+      void client
+        .reportClaudeRateLimit?.({
+          machineId,
+          status: notice.status,
+          ...(notice.rateLimitType !== undefined ? { rateLimitType: notice.rateLimitType } : {}),
+          ...(notice.utilization !== undefined ? { utilization: notice.utilization } : {}),
+          ...(notice.resetsAt !== undefined ? { resetsAt: notice.resetsAt } : {}),
+        })
+        .catch((err: unknown) => {
+          logger.step(
+            `claude rate limit report failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+    }
+    if (notice.status !== 'rejected' || quotaTrip !== null) return;
+    const until = normalizeClaudeResetsAt(notice.resetsAt);
+    quotaTrip = {
+      kind: 'quota',
+      reason: `Claude subscription ${subscriptionKeyOf(notice.rateLimitType)} rejected`,
+      retryAfterMs: until !== null && until > Date.now() ? Math.max(1, until - Date.now()) : null,
+    };
+    void handle?.stop();
+  };
   const openSession = (): Promise<AgentSessionHandle> => {
     if (continueId === null) return backend.createSession(sessionOpts);
     return backend.continueSession(continueId, sessionOpts).catch(async (err: unknown) => {

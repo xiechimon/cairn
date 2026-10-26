@@ -56,6 +56,7 @@ import {
   countMarkedRounds,
   deadLoopMessage,
 } from './ci-loop.js';
+import { recoverClaudeRateLimitFailure } from './claude-rate-limit.js';
 import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
@@ -392,6 +393,7 @@ export async function finishStep(
       .run();
   }
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
+  if (recoverClaudeRateLimitFailure(deps, stepRow, outcome)) return;
   const worker = workerStepContext(deps, stepRow);
   const zeroUsage = worker !== null && isZeroUsageSilentSuccess(stepRow.kind, outcome);
   if (worker?.agentRow) {
