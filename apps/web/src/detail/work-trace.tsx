@@ -58,7 +58,7 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
     >
       <Button
         variant="ghost"
-        className="flex h-7 min-h-7 w-full min-w-0 cursor-pointer justify-start gap-2 rounded-md border-0 bg-transparent px-1.5 text-left text-[13px] leading-5 font-normal text-(--text-secondary) hover:bg-(--secondary) hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-secondary) dark:hover:bg-(--secondary) [&_svg]:size-3.5 [&_svg]:flex-none [&_svg]:text-(--text-tertiary) [&_strong]:flex-none [&_strong]:font-semibold [&_strong]:text-(--foreground)"
+        className="flex h-7 min-h-7 w-full min-w-0 cursor-pointer justify-start gap-2 rounded-md border-0 bg-transparent px-1.5 text-left text-ui leading-5 font-normal text-(--text-secondary) hover:bg-(--secondary) hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-secondary) dark:hover:bg-(--secondary) [&_svg]:size-3.5 [&_svg]:flex-none [&_svg]:text-(--text-tertiary) [&_strong]:flex-none [&_strong]:font-semibold [&_strong]:text-(--foreground)"
         data-testid={step.kind === 'think' ? 'work-think' : 'work-call'}
         aria-expanded={open}
         aria-label={step.kind === 'think' ? t(open ? '收起思考' : '展开思考') : undefined}
@@ -78,25 +78,25 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
               className={
                 step.description !== undefined
                   ? 'min-w-0 flex-1 truncate'
-                  : 'min-w-0 flex-1 truncate font-mono text-[12px]'
+                  : 'min-w-0 flex-1 truncate font-mono text-meta'
               }
             >
               {step.description ?? step.target}
             </span>
             {step.command !== undefined && (
-              <span className="max-w-[45%] flex-[0_1_auto] truncate font-mono text-[11.5px] text-(--text-tertiary)">
+              <span className="max-w-[45%] flex-[0_1_auto] truncate font-mono text-caption text-(--text-tertiary)">
                 {step.command.split('\n')[0]}
               </span>
             )}
             {step.diff !== undefined && (
-              <span className="flex flex-none gap-1 font-mono text-[11px]">
+              <span className="flex flex-none gap-1 font-mono text-caption">
                 <span className="text-(--diff-add-fg)">+{step.diff.added}</span>
                 <span className="text-destructive">−{step.diff.removed}</span>
               </span>
             )}
           </>
         )}
-        <span className="flex-none text-[12px] tabular-nums text-(--text-tertiary)">
+        <span className="flex-none text-meta tabular-nums text-(--text-tertiary)">
           {formatWorkDuration(step.seconds)}
         </span>
         {step.kind === 'call' &&
@@ -115,18 +115,18 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
       {open &&
         (step.kind === 'think' ? (
           <div
-            className="mt-0.5 mb-1.5 ml-5 border-l-2 border-(--border) py-0.5 pl-3 text-[13px] whitespace-pre-wrap text-(--text-secondary) [overflow-wrap:anywhere]"
+            className="mt-0.5 mb-1.5 ml-5 border-l-2 border-(--border) py-0.5 pl-3 text-ui whitespace-pre-wrap text-(--text-secondary) [overflow-wrap:anywhere]"
             data-testid="thinking-body"
           >
             {step.text.trim()}
           </div>
         ) : (
-          <div className="mt-1 mb-2 ml-[22px] overflow-hidden rounded-lg border border-(--border) bg-(--muted) font-mono">
-            <div className="work-code-header border-b border-(--border) px-2.5 py-1.5 text-[11.5px] whitespace-pre-wrap [overflow-wrap:anywhere]">
+          <div className="mt-1 mb-2 ml-6 overflow-hidden rounded-lg border border-(--border) bg-(--muted) font-mono">
+            <div className="work-code-header border-b border-(--border) px-2.5 py-1.5 text-caption whitespace-pre-wrap [overflow-wrap:anywhere]">
               {step.command !== undefined ? `$ ${step.command}` : (step.target ?? step.label)}
             </div>
             <pre
-              className="m-0 max-h-60 overflow-auto px-2.5 py-2 text-left font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere]"
+              className="m-0 max-h-60 overflow-auto px-2.5 py-2 text-left font-mono text-caption leading-5 whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere]"
               data-testid="tool-output"
             >
               {changeLines !== null
@@ -193,7 +193,7 @@ export function WorkTrace({
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"
-          className="flex h-7 min-h-7 w-full min-w-0 cursor-pointer justify-start gap-2 rounded-md border-0 bg-transparent px-1.5 text-left text-[13px] leading-5 font-normal text-(--text-secondary) hover:bg-(--secondary) hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-secondary) dark:hover:bg-(--secondary) [&_svg]:size-3.5 [&_svg]:flex-none [&_svg]:text-(--text-tertiary) [&_strong]:flex-none [&_strong]:font-semibold [&_strong]:text-(--foreground) h-auto flex-1"
+          className="flex h-7 min-h-7 w-full min-w-0 cursor-pointer justify-start gap-2 rounded-md border-0 bg-transparent px-1.5 text-left text-ui leading-5 font-normal text-(--text-secondary) hover:bg-(--secondary) hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-secondary) dark:hover:bg-(--secondary) [&_svg]:size-3.5 [&_svg]:flex-none [&_svg]:text-(--text-tertiary) [&_strong]:flex-none [&_strong]:font-semibold [&_strong]:text-(--foreground) h-auto flex-1"
           data-testid="work-summary"
           aria-expanded={expanded}
           onClick={() => setDisclosure({ defaultExpanded, open: !expanded })}
@@ -202,7 +202,7 @@ export function WorkTrace({
           <span className="min-w-0 flex-1 truncate" title={summary}>
             {summary}
           </span>
-          <span className="flex-none text-[12px] tabular-nums text-(--text-tertiary)">
+          <span className="flex-none text-meta tabular-nums text-(--text-tertiary)">
             {formatWorkDuration(seconds)}
           </span>
         </Button>
@@ -230,7 +230,7 @@ export function WorkTrace({
         )}
       </div>
       {expanded && (
-        <div className="mt-0.5 mb-1.5 ml-[5px] border-l border-(--border) pl-3">
+        <div className="mt-0.5 mb-1.5 ml-1 border-l border-(--border) pl-3">
           {item.steps.map((step) => (
             <WorkStepRow key={step.id} step={step} enter={entering.has(step.id)} t={t} />
           ))}
@@ -249,10 +249,10 @@ export function InjectedSkills({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mx-auto mt-3.5 max-w-[68ch] text-center text-[12px] text-(--text-tertiary)">
+    <div className="mx-auto mt-3.5 max-w-[68ch] text-center text-meta text-(--text-tertiary)">
       <Button
         variant="secondary"
-        className="h-6 rounded-[5px] px-[7px] text-[12px] font-normal"
+        className="h-6 rounded-(--cds-radius-sm) px-2 text-meta font-normal"
         data-testid="injected-skills-chip"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
