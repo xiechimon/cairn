@@ -5,7 +5,12 @@ import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import { agent as agentTable, chief as chiefTable, step as stepTable } from '../src/db/schema.js';
+import {
+  agent as agentTable,
+  chief as chiefTable,
+  skillAudit,
+  step as stepTable,
+} from '../src/db/schema.js';
 import {
   bindAllAgents,
   bootServer,
@@ -184,6 +189,14 @@ describe('#1106 dispatch skill injection (worker claim selection)', () => {
     const restStep = rest.find((st) => st.id === got!.step.id);
     expect(restStep?.skillInjection?.hits.map((h) => h.id)).toEqual(injected);
     expect(restStep?.skillInjection?.hits.length).toBe(injected.length);
+    const audits = w.s.db.select().from(skillAudit).all();
+    expect(audits.map((row) => row.action)).toEqual(injected.map(() => 'inject'));
+    expect(audits.map((row) => row.skillId).sort()).toEqual([...injected].sort());
+    for (const row of audits) {
+      expect(row.actorType).toBe('agent');
+      expect(row.actorId).toBe(AGENT_ID);
+      expect(row.bytes).toBeGreaterThan(0);
+    }
   });
 
   test('failure mode 2: a zero-hit task -> normal dispatch: claim succeeds + injectedSkills=[] + hits=[] (zero injection is not a failure)', async () => {
@@ -196,6 +209,7 @@ describe('#1106 dispatch skill injection (worker claim selection)', () => {
     expect(got?.agent?.injectedSkills).toEqual([]);
     expect(got?.agent?.skillsAllowlist).toEqual(GRANTED);
     expect(stepRow(w.s, got!.step.id).skillInjection).toEqual({ hits: [] });
+    expect(w.s.db.select().from(skillAudit).all()).toEqual([]);
   });
 
   test('failure mode 3: the task text names an ungranted skill -> not selected (grants bound the candidates, nothing invented)', async () => {
@@ -273,6 +287,7 @@ describe('#1106 chief steps bypass the selection surface (a live claim)', () => 
     const row = stepRow(w.s, got!.step.id);
     expect(row.skillInjection).toBeNull();
     expect(row.buildId).toBe(body.thread.id);
+    expect(w.s.db.select().from(skillAudit).all()).toEqual([]);
   });
 });
 

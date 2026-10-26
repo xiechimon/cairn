@@ -140,10 +140,18 @@ describe('domain-grouping dual signal (task and skill hit the same domain)', () 
     expect(ids).not.toContain('ask-matt');
   });
   it('multi-domain hit = union (skills of each domain injected when the task spans domains)', () => {
-    const hits = selectSkillsForTask('给部署脚本补安全扫描的单元测试', granted);
+    const hits = selectSkillsForTask('给部署脚本补安全扫描的单元测试', [
+      ...granted,
+      {
+        id: 'deploy-runbook',
+        name: 'deploy-runbook',
+        description: '部署与 docker 上线步骤',
+      },
+    ]);
     const ids = hits.map((h) => h.id);
     expect(ids).toContain('tdd');
-    expect(ids).toContain('contributor');
+    expect(ids).toContain('deploy-runbook');
+    expect(ids).not.toContain('contributor');
   });
 });
 
@@ -173,6 +181,72 @@ describe('output shape (determinism + explainability)', () => {
     expect(selectSkillsForTask('Add Vitest Coverage', granted).map((h) => h.id)).toEqual(
       selectSkillsForTask('add VITEST coverage', granted).map((h) => h.id),
     );
+  });
+});
+
+describe('loose keyword rejection (#1799)', () => {
+  const aihot: SkillInjectCandidate = {
+    id: 'aihot',
+    name: 'aihot',
+    description:
+      '查 AIHOT 中文 AI 资讯/精选/热点/日报：今天或最近的 AI 新闻、大模型与产品发布、AI 论文。必须走 aihot.news 匿名只读 API',
+  };
+
+  it('ci, a docs path, and the word API do not inject a news skill', () => {
+    const hits = selectSkillsForTask(
+      'Fix the CI script in docs/verify/1178/README.md and mention the API',
+      [aihot],
+    );
+    expect(hits).toEqual([]);
+  });
+
+  it('a deploy task does not inject a skill whose only deploy word is 发布', () => {
+    const hits = selectSkillsForTask('给部署脚本补 docker 上线步骤', [
+      aihot,
+      {
+        id: 'deploy-runbook',
+        name: 'deploy-runbook',
+        description: '部署与 docker 上线步骤',
+      },
+    ]);
+    expect(hits.map((h) => h.id)).toEqual(['deploy-runbook']);
+  });
+
+  it('PR, reproduce, and buttonVariants are not explicit skill mentions', () => {
+    expect(
+      selectSkillsForTask('Open a PR to reproduce the buttonVariants ghost variant', [
+        { id: 'pr', name: 'pr', description: 'Write a pull request body' },
+        { id: 'variant', name: 'variant', description: 'Inspect component variants' },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('an adjacent declaration still names a short skill id', () => {
+    const hits = selectSkillsForTask('用 pr 技能写说明', [
+      { id: 'pr', name: 'pr', description: 'Write a pull request body' },
+    ]);
+    expect(hits.map((h) => h.id)).toEqual(['pr']);
+    expect(hits[0]?.rule).toBe('explicit-mention');
+  });
+
+  it('a slash path does not open the docs domain', () => {
+    expect(
+      selectSkillsForTask('See docs/verify/1178/README.md for the gate', [
+        {
+          id: 'humanizer-zh',
+          name: 'humanizer-zh',
+          description: '编辑中文文章、评论和文档中的空话',
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('the boilerplate word 失败 does not open debugging', () => {
+    expect(
+      selectSkillsForTask('如果失败就停', [
+        { id: 'why', name: 'why', description: '解释错误原因' },
+      ]),
+    ).toEqual([]);
   });
 });
 

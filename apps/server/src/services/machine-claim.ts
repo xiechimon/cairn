@@ -17,8 +17,8 @@ import {
   WORKER_REMOTE_TOOLS_GITHUB,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
-import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
-import { nowMs } from '../lib/ids.js';
+import { agent, build, chief, chiefThread, machine, skillAudit, step, todo } from '../db/schema.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { chiefClaimContext, parseChiefTrigger } from './chief.js';
@@ -316,6 +316,21 @@ async function tryClaim(
       .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
       .run();
     if (res.changes === 0) continue;
+    if (skillInjection.hits.length > 0) {
+      db.insert(skillAudit)
+        .values(
+          skillInjection.hits.map((hit) => ({
+            id: newRecordId(),
+            skillId: hit.id,
+            actorType: 'agent',
+            actorId: agentRow.id,
+            action: 'inject',
+            bytes: Buffer.byteLength(hit.reason),
+            createdAt: claimedAt,
+          })),
+        )
+        .run();
+    }
     if (guardPr !== null) {
       upsertMessage(deps, {
         id: mergedPrGuardNoteRowId(cand.stepRow.buildId),

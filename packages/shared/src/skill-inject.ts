@@ -33,8 +33,6 @@ const SKILL_INJECT_DOMAINS: readonly SkillInjectDomain[] = [
     id: 'frontend',
     label: '前端界面',
     keywords: [
-      'ui',
-      'ux',
       'css',
       '界面',
       '页面',
@@ -100,9 +98,7 @@ const SKILL_INJECT_DOMAINS: readonly SkillInjectDomain[] = [
       'bug',
       'bugs',
       '报错',
-      '错误',
       '崩溃',
-      '失败',
       'debug',
       'debugging',
       '调试',
@@ -124,7 +120,6 @@ const SKILL_INJECT_DOMAINS: readonly SkillInjectDomain[] = [
     id: 'backend',
     label: '后端接口',
     keywords: [
-      'api',
       '接口',
       '端点',
       'endpoint',
@@ -194,7 +189,6 @@ const SKILL_INJECT_DOMAINS: readonly SkillInjectDomain[] = [
     label: '部署运维',
     keywords: [
       '部署',
-      '发布',
       '上线',
       'deploy',
       'deployment',
@@ -207,8 +201,6 @@ const SKILL_INJECT_DOMAINS: readonly SkillInjectDomain[] = [
       '监控',
       'monitor',
       'observability',
-      'ci',
-      'cd',
       'infrastructure',
     ],
   },
@@ -245,7 +237,6 @@ const SKILL_INJECT_DOMAINS: readonly SkillInjectDomain[] = [
       '提交',
       'commit',
       'commits',
-      'pr',
       'pull request',
       '冲突',
       'conflict',
@@ -274,8 +265,12 @@ const SKILL_INJECT_DOMAINS: readonly SkillInjectDomain[] = [
 
 const CJK_RE = /[㐀-䶿一-鿿豈-﫿]/;
 
+const MENTION_CUES = new Set(['用', 'use', 'skill', 'skills', '技能']);
+
 function fold(text: string): { spaced: string; compact: string } {
   const spaced = text
+    .replace(/https?:\/\/[^\s)>\]]+/gi, ' ')
+    .replace(/(?:[\w.@+-]+\/)+[\w.@+-]+/g, ' ')
     .normalize('NFKC')
     .toLowerCase()
     .replace(/[^0-9a-z㐀-䶿一-鿿豈-﫿]+/g, ' ')
@@ -315,10 +310,35 @@ function mentionsSkill(
   foldedTask: { spaced: string; compact: string },
   skill: SkillInjectCandidate,
 ): string | null {
+  const hay = foldedTask.spaced.split(' ').filter((token) => token !== '');
   for (const key of [skill.id, skill.name]) {
     const normalized = fold(key);
     if (normalized.compact.length < 2) continue;
-    if (foldedTask.compact.includes(normalized.compact)) return key;
+    if (CJK_RE.test(key)) {
+      if (foldedTask.compact.includes(normalized.compact)) return key;
+      continue;
+    }
+    const needle = normalized.spaced.split(' ').filter((token) => token !== '');
+    let at = -1;
+    for (let i = 0; i + needle.length <= hay.length; i++) {
+      let matches = needle.length > 0;
+      for (let j = 0; j < needle.length; j++) {
+        if (hay[i + j] !== needle[j]) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) {
+        at = i;
+        break;
+      }
+    }
+    if (at < 0) continue;
+    const declared =
+      needle.length >= 2 ||
+      MENTION_CUES.has(hay[at - 1] ?? '') ||
+      MENTION_CUES.has(hay[at + needle.length] ?? '');
+    if (declared) return key;
   }
   return null;
 }
