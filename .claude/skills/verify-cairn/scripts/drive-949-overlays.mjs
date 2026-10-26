@@ -489,7 +489,7 @@ for (const theme of ['dark', 'light']) {
 
 const result = {
   ticket: 949,
-  domain: 'overlays/',
+  domain: 'overlay/',
   stack: { API, WEB },
   todo: { id: SEEDED_ID, title: SEEDED_TITLE, query: QUERY },
   checks,

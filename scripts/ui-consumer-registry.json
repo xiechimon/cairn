@@ -27,7 +27,7 @@
       "contrast": "docs/verify/988/ (sealed) re-attested in docs/verify/1055/colors/incremental.md"
     },
     {
-      "file": "apps/web/src/overlays/chip-popover.tsx",
+      "file": "apps/web/src/overlay/chip-popover.tsx",
       "anchor": "ml-auto flex text-(--card-button)",
       "role": "selection-mark",
       "reason": "Check mark on the assigned-agent row = selection indicator (#987: brand ink is for 选中标记/小徽标 only). Wave-1 0bfbdefa kept the spot-emphasis usages on a user-approved ruling.",

@@ -30,7 +30,7 @@ import {
   ensureGestureKeys,
   type GestureEvent,
   getGestureStore,
-} from '../overlays/gesture-machine.js';
+} from '../overlay/gesture-machine.js';
 
 export type { ChiefView };
 

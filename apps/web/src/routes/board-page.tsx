@@ -52,7 +52,7 @@ import type { FixtureSet, OverlayState, TodoRecord } from '../fixtures/records.j
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
-import { SearchPanel, useSearchState } from '../overlays/search-panel.js';
+import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 
 interface ReorderPatch {

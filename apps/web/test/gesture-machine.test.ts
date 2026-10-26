@@ -11,7 +11,7 @@ import {
   createGestureStore,
   reduceGesture,
   type GestureState,
-} from '../src/overlays/gesture-machine.js';
+} from '../src/overlay/gesture-machine.js';
 
 const webRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -100,7 +100,7 @@ describe('single landing file', () => {
     );
     const hits: string[] = [];
     for (const path of src) {
-      if (path.endsWith(`${join('overlays', 'gesture-machine.ts')}`)) continue;
+      if (path.endsWith(`${join('overlay', 'gesture-machine.ts')}`)) continue;
       const text = readFileSync(path, 'utf8');
       if (
         text.includes('setChiefView((') ||
