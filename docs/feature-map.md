@@ -91,7 +91,7 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 | no anchor (`[unverified]`) | 128 |
 | referenced PRs (no rows, §3.2) | 99 |
 | unresolvable ticket numbers (§3.3) | 0 |
-| evidence directories that are not GitHub ticket numbers (§3.4) | 91 |
+| evidence directories that are not GitHub ticket numbers (§3.4) | 92 |
 | scan surface: spec volumes / test files | 31 / 576 |
 
 ## 2. Feature map
@@ -760,7 +760,7 @@ These rows have neither a `docs/verify/<ticket>/` directory nor a CI-test-surfac
 | [#991](https://github.com/xiechimon/cairn/issues/991) | `批次表：全量原型一次性落地 + 实审后挂跑施工的车道编排` | `docs/spec/06-open-source-and-divergence.md`<br>`docs/spec/11-model-service-and-machine-localization.md`<br>`docs/spec/18-positioning-and-differentiation.md`<br>`docs/spec/22-color-and-geometry-token-scale-canonical-table.md`<br>`docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md` |
 | [#1405](https://github.com/xiechimon/cairn/issues/1405) | `server: 自举闭环 P4 自治合并执行器（mergePolicy、sha 绑定合并、急停、熔断、日上限）` | `docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md` |
 | [#1408](https://github.com/xiechimon/cairn/issues/1408) | `ops: 自举闭环 P7 长期宿主自部署与回滚（待宿主）` | `docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md` |
-| [#1569](https://github.com/xiechimon/cairn/issues/1569) | `观测-1 本机自托管 Langfuse：compose 与运维说明` | `docs/spec/29-评测与数据闭环.md` |
+| [#1569](https://github.com/xiechimon/cairn/issues/1569) | `观测-1 本机自托管 Langfuse：compose 与运维说明` | `docs/spec/29-evaluation-and-data-loop.md` |
 | [#1607](https://github.com/xiechimon/cairn/issues/1607) | `research: 用 ACP 做通用执行面，接入 codex / gemini / hermes 等外部 agent` | `docs/spec/18-positioning-and-differentiation.md` |
 | [#34](https://github.com/xiechimon/cairn/issues/34) | `Map: todos.dev 1:1 复刻（pacman）— 像素级 UI + 功能平价 spec` | `docs/spec/00-foundation-decisions.md`<br>`docs/spec/01-stack-v2.md`<br>`docs/spec/02-architecture-parity.md`<br>`docs/spec/03-ROADMAP.md`<br>`docs/spec/04-acceptance-criteria.md` |
 | [#35](https://github.com/xiechimon/cairn/issues/35) | `研究：todos.dev 公开站全量盘点（页面/文案/设计 token/PWA/定价边界）` | `docs/spec/00-foundation-decisions.md`<br>`docs/spec/02-architecture-parity.md` |
@@ -842,22 +842,22 @@ These rows have neither a `docs/verify/<ticket>/` directory nor a CI-test-surfac
 | [#1013](https://github.com/xiechimon/cairn/issues/1013) | `波 0（docs-only）：延迟入账——ADR 0009 D3② 修订、品牌槽位闭合、docs/spec 余册标注` | `docs/spec/06-open-source-and-divergence.md`<br>`docs/spec/11-model-service-and-machine-localization.md`<br>`docs/spec/18-positioning-and-differentiation.md` |
 | [#1407](https://github.com/xiechimon/cairn/issues/1407) | `skills,server: 自举闭环 P6 纠错回路与园丁（correct skill、纠错票触发、每周园丁定时任务）` | `docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md` |
 | [#1409](https://github.com/xiechimon/cairn/issues/1409) | `ops: 自举闭环 P8 毕业（shadow 十张零误放 → 演练仓五条负对照 → 本仓 autonomous）（待宿主）` | `docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md` |
-| [#1510](https://github.com/xiechimon/cairn/issues/1510) | `spec 29 评测与数据闭环 + ADR 0022 评测面入保护路径` | `docs/spec/29-评测与数据闭环.md` |
-| [#1514](https://github.com/xiechimon/cairn/issues/1514) | `E0-4 pnpm traj:export 只读导出 + 脱敏` | `docs/spec/29-评测与数据闭环.md` |
-| [#1515](https://github.com/xiechimon/cairn/issues/1515) | `E1-1 合并后第 7 天回填结果标签` | `docs/spec/29-评测与数据闭环.md` |
-| [#1516](https://github.com/xiechimon/cairn/issues/1516) | `E1-2 打回与回滚自动生成「失败回放」候选评测题` | `docs/spec/29-评测与数据闭环.md` |
-| [#1517](https://github.com/xiechimon/cairn/issues/1517) | `E2-1 pacman-bench v0：从已合并 PR 选 30 题` | `docs/spec/29-评测与数据闭环.md` |
-| [#1518](https://github.com/xiechimon/cairn/issues/1518) | `E2-2 pacman-bench 隔离跑分器` | `docs/spec/29-评测与数据闭环.md` |
-| [#1519](https://github.com/xiechimon/cairn/issues/1519) | `E2-3 回归评测接入 CI` | `docs/spec/29-评测与数据闭环.md` |
-| [#1532](https://github.com/xiechimon/cairn/issues/1532) | `E2 附：同模型不同 harness 的页面生成对比评测（题库、打分细则、基线）` | `docs/spec/29-评测与数据闭环.md` |
-| [#1570](https://github.com/xiechimon/cairn/issues/1570) | `观测-2 pnpm traj:push：轨迹包转 OTLP 推 Langfuse` | `docs/spec/29-评测与数据闭环.md` |
-| [#1571](https://github.com/xiechimon/cairn/issues/1571) | `观测-3 人审判定与结果标签同步为 Langfuse score` | `docs/spec/29-评测与数据闭环.md` |
-| [#1572](https://github.com/xiechimon/cairn/issues/1572) | `观测-4 运行时 OTel span（默认关）：server、Claude Code 子进程、pi` | `docs/spec/29-评测与数据闭环.md` |
-| [#1573](https://github.com/xiechimon/cairn/issues/1573) | `观测-5 pacman-bench 镜像为 Langfuse dataset 与实验` | `docs/spec/29-评测与数据闭环.md` |
-| [#1576](https://github.com/xiechimon/cairn/issues/1576) | `记忆-3 记忆回归评测：冲突、跨项目泄漏、过期三类用例` | `docs/spec/29-评测与数据闭环.md` |
-| [#1578](https://github.com/xiechimon/cairn/issues/1578) | `RSI-1 改 harness 的 PR 必须附回归评测结果，否则不能自动合并` | `docs/spec/29-评测与数据闭环.md` |
-| [#1579](https://github.com/xiechimon/cairn/issues/1579) | `RSI-2 用现成 GEPA 跑一轮提示词自动优化，变体与分数（含失败）全部存档` | `docs/spec/29-评测与数据闭环.md` |
-| [#1614](https://github.com/xiechimon/cairn/issues/1614) | `RSI-2 缺回归评测结果时自动派 Agent 跑，不再等人` | `docs/spec/29-评测与数据闭环.md` |
+| [#1510](https://github.com/xiechimon/cairn/issues/1510) | `spec 29 评测与数据闭环 + ADR 0022 评测面入保护路径` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1514](https://github.com/xiechimon/cairn/issues/1514) | `E0-4 pnpm traj:export 只读导出 + 脱敏` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1515](https://github.com/xiechimon/cairn/issues/1515) | `E1-1 合并后第 7 天回填结果标签` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1516](https://github.com/xiechimon/cairn/issues/1516) | `E1-2 打回与回滚自动生成「失败回放」候选评测题` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1517](https://github.com/xiechimon/cairn/issues/1517) | `E2-1 pacman-bench v0：从已合并 PR 选 30 题` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1518](https://github.com/xiechimon/cairn/issues/1518) | `E2-2 pacman-bench 隔离跑分器` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1519](https://github.com/xiechimon/cairn/issues/1519) | `E2-3 回归评测接入 CI` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1532](https://github.com/xiechimon/cairn/issues/1532) | `E2 附：同模型不同 harness 的页面生成对比评测（题库、打分细则、基线）` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1570](https://github.com/xiechimon/cairn/issues/1570) | `观测-2 pnpm traj:push：轨迹包转 OTLP 推 Langfuse` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1571](https://github.com/xiechimon/cairn/issues/1571) | `观测-3 人审判定与结果标签同步为 Langfuse score` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1572](https://github.com/xiechimon/cairn/issues/1572) | `观测-4 运行时 OTel span（默认关）：server、Claude Code 子进程、pi` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1573](https://github.com/xiechimon/cairn/issues/1573) | `观测-5 pacman-bench 镜像为 Langfuse dataset 与实验` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1576](https://github.com/xiechimon/cairn/issues/1576) | `记忆-3 记忆回归评测：冲突、跨项目泄漏、过期三类用例` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1578](https://github.com/xiechimon/cairn/issues/1578) | `RSI-1 改 harness 的 PR 必须附回归评测结果，否则不能自动合并` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1579](https://github.com/xiechimon/cairn/issues/1579) | `RSI-2 用现成 GEPA 跑一轮提示词自动优化，变体与分数（含失败）全部存档` | `docs/spec/29-evaluation-and-data-loop.md` |
+| [#1614](https://github.com/xiechimon/cairn/issues/1614) | `RSI-2 缺回归评测结果时自动派 Agent 跑，不再等人` | `docs/spec/29-evaluation-and-data-loop.md` |
 | [#1625](https://github.com/xiechimon/cairn/issues/1625) | `local 形态自动合并：ADR 0021 合并策略扩到本地项目` | `docs/spec/18-positioning-and-differentiation.md` |
 
 ### 3.2 Referenced PRs (no rows)
@@ -1011,6 +1011,7 @@ These directory names under `docs/verify/` are not GitHub ticket numbers of this
 | live-project-name | `docs/verify/live-project-name/` |
 | menu-surfaces | `docs/verify/menu-surfaces/` |
 | menu-surfaces-2 | `docs/verify/menu-surfaces-2/` |
+| needs-me-inbox | `docs/verify/needs-me-inbox/` |
 | old-daemon-text | `docs/verify/old-daemon-text/` |
 | paper-board-sheet | `docs/verify/paper-board-sheet/` |
 | paper-card | `docs/verify/paper-card/` |
