@@ -473,6 +473,9 @@ export const boardInbox: FixtureSet = {
       'done',
       5 * 60 * 60_000,
     ),
+    inboxProbe('inbox-done-2', 108, '修复看板拖拽列的直角与圆角不一致', 'done', 20 * 60 * 60_000),
+    inboxProbe('inbox-done-3', 109, '模型下拉在窄屏下被截断', 'closed', 2 * INBOX_DAY_MS),
+    inboxProbe('inbox-done-4', 110, '记忆候选流程接上评测', 'done', 3 * INBOX_DAY_MS),
   ],
   now: INBOX_NOW,
 };
