@@ -77,22 +77,22 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 
 | Item | Count |
 |---|---|
-| Map rows (issues) | 629 |
-| of which Differentiation surface | 93 |
+| Map rows (issues) | 633 |
+| of which Differentiation surface | 94 |
 | of which Runtime axis | 142 |
-| of which General surface | 394 |
-| status Done | 496 |
-| status In progress | 5 |
+| of which General surface | 397 |
+| status Done | 499 |
+| status In progress | 6 |
 | status Not started | 16 |
 | status Unverified | 112 |
 | anchors = evidence directory + test reference | 222 |
-| anchors = evidence directory only | 170 |
-| anchors = test reference only | 109 |
+| anchors = evidence directory only | 172 |
+| anchors = test reference only | 111 |
 | no anchor (`[unverified]`) | 128 |
 | referenced PRs (no rows, §3.2) | 97 |
 | unresolvable ticket numbers (§3.3) | 0 |
 | evidence directories that are not GitHub ticket numbers (§3.4) | 94 |
-| scan surface: spec volumes / test files | 31 / 580 |
+| scan surface: spec volumes / test files | 31 / 583 |
 
 ## 2. Feature map
 
@@ -192,6 +192,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1728](https://github.com/xiechimon/cairn/issues/1728) `shared: plan contract checker splits a code block nested in a Verification list item into its own item` | Differentiation surface | Done | `packages/shared/test/plan-contract.test.ts` |
 | [#1730](https://github.com/xiechimon/cairn/issues/1730) `server: a GitHub project cannot follow a repo rename; PATCH rejects githubRepo` | Differentiation surface | Done | `apps/server/test/project-identity.test.ts` |
 | [#1753](https://github.com/xiechimon/cairn/issues/1753) `Implement ADR 0026: autonomous by default, protected paths need an independent review instead of a human` | Differentiation surface | Done | `docs/verify/1753/` |
+| [#1791](https://github.com/xiechimon/cairn/issues/1791) `server: plans that pass the contract check wait at confirm forever unless the chief happens to be watching` | Differentiation surface | Done | `apps/server/test/plan-server-auto-confirm.test.ts` |
 | [#1802](https://github.com/xiechimon/cairn/issues/1802) `server(rework): retry lessons carry the verify verdict and a "verified, keep working" list` | Differentiation surface | Done | `apps/server/test/retry-lessons.test.ts` |
 | [#16](https://github.com/xiechimon/cairn/issues/16) `研究：上游核心近读 — agent loop / bus / session / memory` | Runtime axis | Done | `apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts` |
 | [#25](https://github.com/xiechimon/cairn/issues/25) `设计：agent core TS 化（loop / runner / bus / session / memory）` | Runtime axis | Unverified | [unverified] |
@@ -727,6 +728,9 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1710](https://github.com/xiechimon/cairn/issues/1710) `site, readme: final artwork (banner, crew, share card)` | General surface | Done | `docs/verify/1710/` |
 | [#1731](https://github.com/xiechimon/cairn/issues/1731) `server: GitHub OAuth connection ignores refresh tokens, so expiring user tokens break the connection` | General surface | Done | `apps/server/test/github-token-refresh.test.ts` |
 | [#1744](https://github.com/xiechimon/cairn/issues/1744) `上下文顶格时压缩请求自身 400 且不可恢复：整步无恢复路径` | General surface | In progress | `apps/daemon/test/pi-compaction-ceiling.test.ts` |
+| [#1762](https://github.com/xiechimon/cairn/issues/1762) `server: Tailscale Serve identity header signs the owner in without the access token (loopback-only trust)` | General surface | In progress | `apps/server/test/token-auth.test.ts`<br>`apps/web/e2e/token-gate.spec.ts` |
+| [#1777](https://github.com/xiechimon/cairn/issues/1777) `eval: record real-model baselines for chief-dispatch and memory-regression, rerun weekly` | General surface | Done | `docs/verify/1777/` |
+| [#1782](https://github.com/xiechimon/cairn/issues/1782) `eval(skills): skill routing precision and paired outcome eval` | General surface | Done | `docs/verify/1782/` |
 | [#1796](https://github.com/xiechimon/cairn/issues/1796) `chore: remove zero-use features (what's new notice, GitHub webhook receiver and tokens, remote shell commands)` | General surface | Done | `apps/server/test/machine-shell.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/machines-local.spec.ts`<br>`packages/shared/test/retired-zero-use.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
 | [#1800](https://github.com/xiechimon/cairn/issues/1800) `server: retry a failed task once automatically and fold stale failures out of "needs you"` | General surface | Done | `apps/server/test/needs-you.test.ts` |
 
@@ -1077,3 +1081,29 @@ These directory names under `docs/verify/` are not GitHub ticket numbers of this
 | xmon-16 | `90ab48936:docs/verify/xmon-16/` |
 | xmon-18 | `65d9294a7:docs/verify/xmon-18/` |
 | xmon-20 | `a671901e0:docs/verify/xmon-20/` |
+
+## Eval coverage
+
+Model-driven capabilities and whether a real-model eval has a score.
+Case counts are the `cases` array in the flow `cases.json`.
+The latest score is the primary metric (the first id in `_state.json` `metrics`,
+otherwise `decision_ok`) over graded rows in the newest variant directory
+(`baseline`, then `v1`, `v2`, ...) that has a `results.jsonl`.
+The date is that file's git commit date.
+Status is `scored`, `built-not-run`, `none`, or `tests only, no eval needed`.
+A directory under `.claude/hillclimb/` that contains `cases.json` and is not named
+by a capability makes the generator fail.
+The feature-map staleness gate flags a scored flow whose date is more than 30 days
+before today.
+
+| Capability | Eval flow | Cases | Latest score | Date | Model | Status |
+|---|---|---|---|---|---|---|
+| dispatch | `chief-dispatch` | 64 | 29/30 (96.7%) | 2026-10-26 | `glm-5.3` | scored |
+| memory use | `memory-regression` | 21 |  |  |  | built-not-run |
+| learn from correction | `learn` | 10 |  |  |  | built-not-run |
+| review |  |  |  |  |  | none ([#1779](https://github.com/xiechimon/cairn/issues/1779)) |
+| planning |  |  |  |  |  | none ([#1780](https://github.com/xiechimon/cairn/issues/1780)) |
+| coding |  |  |  |  |  | none |
+| machine claim |  |  |  |  |  | tests only, no eval needed |
+| intake |  |  |  |  |  | tests only, no eval needed |
+| merge gate rules |  |  |  |  |  | tests only, no eval needed |

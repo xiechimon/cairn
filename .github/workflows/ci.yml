@@ -314,6 +314,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
 
       - name: Feature map staleness gate (#1160)
         run: node scripts/feature-map-staleness-gate.mjs
