@@ -1,3 +1,4 @@
+import { demoFixture } from './demo.js';
 import {
   agentDelete,
   agentDetail,
@@ -106,7 +107,9 @@ import type { FixtureSet } from './records.js';
 
 export const SCENARIO_PARAM = 'scenario';
 
-const SCENARIOS_ENABLED = import.meta.env.DEV || import.meta.env.MODE === 'fixture';
+export const SCENARIOS_ENABLED = import.meta.env.DEV || import.meta.env.MODE === 'fixture';
+
+const DEMO_ENABLED = import.meta.env.MODE === 'demo';
 
 export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
   ? ({
@@ -285,6 +288,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
   : {};
 
 export function resolveScenario(search: URLSearchParams): FixtureSet {
+  if (DEMO_ENABLED) return demoFixture;
   if (!SCENARIOS_ENABLED) return boardDefault;
   const id = search.get(SCENARIO_PARAM);
   return (id != null ? SCENARIOS[id] : undefined) ?? boardDefault;

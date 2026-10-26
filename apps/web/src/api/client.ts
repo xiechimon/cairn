@@ -1,3 +1,4 @@
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { awaitGate, demandGate, readStoredToken } from './auth.js';
 
 export class ApiError extends Error {
@@ -44,6 +45,9 @@ function demandIfCurrent(sentWith: string | null): void {
 }
 
 async function request<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+  if (init?.method != null && init.method !== 'GET' && blockDemoWrite()) {
+    return new Promise<T>(() => {});
+  }
   let token = readStoredToken();
   const first = await send(path, token, init);
   if (first.status !== 401) return settle<T>(first);

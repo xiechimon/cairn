@@ -22,6 +22,7 @@ import { chiefTurnErrorOfContent, mapChief } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { chiefDefault } from '../fixtures/fixtures.js';
 import type { ChiefContent, FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -273,7 +274,11 @@ export function useChiefSurface(
             throw error;
           });
       }
-    : undefined;
+    : DEMO_MODE
+      ? () => {
+          blockDemoWrite();
+        }
+      : undefined;
   const onThread = live ? (_title: string, index: number) => setActiveThreadIdx(index) : undefined;
   const onNewThread = live ? () => setActiveThreadIdx(NEW_THREAD) : undefined;
 
