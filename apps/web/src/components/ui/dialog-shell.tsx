@@ -80,6 +80,7 @@ interface DialogShellProps {
   onEscapeWhileNested?: () => void;
   viewportRoot?: boolean;
   backdropClassName?: string;
+  initialFocus?: DialogPrimitive.Popup.Props['initialFocus'];
 }
 
 function useReturnFocus(open: boolean) {
@@ -124,6 +125,7 @@ export function DialogShell({
   onBackdropClick,
   onEscapeWhileNested,
   viewportRoot = false,
+  initialFocus,
   backdropClassName,
 }: DialogShellProps) {
   const { t } = useI18n();
@@ -185,6 +187,7 @@ export function DialogShell({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange} modal>
       <DialogContent
+        initialFocus={initialFocus}
         finalFocus={restore}
         showCloseButton={false}
         aria-label={title}

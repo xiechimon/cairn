@@ -45,7 +45,7 @@ function CheckBox({ state }: { state: 'off' | 'on' | 'mixed' }) {
   return (
     <span
       aria-hidden
-      className={`flex size-4 flex-none items-center justify-center rounded-[4px] border transition-colors ${
+      className={`flex size-4 flex-none items-center justify-center rounded-(--cds-radius-sm) border transition-colors ${
         state === 'off'
           ? 'border-input'
           : state === 'on'
@@ -123,15 +123,13 @@ function DimensionSection({
     <section className="flex flex-col" data-dimension={dimension.key}>
       {divided && <Separator className="-mx-1 mt-1 mb-1" />}
       <header className={`flex items-baseline gap-1.5 px-2 pb-1 ${divided ? 'pt-1' : 'pt-1.5'}`}>
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground">
-          {t(dimension.name)}
-        </span>
-        <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+        <span className="text-caption font-medium text-content-tertiary">{t(dimension.name)}</span>
+        <span className="ml-auto text-caption text-content-tertiary tabular-nums">
           {t('已选 {n}/{m}', { n: dimension.selected.length, m: dimension.choices.length })}
         </span>
       </header>
       {!actionable ? (
-        <EmptyDescription className="px-1.5 pt-1 pb-2 text-xs">
+        <EmptyDescription className="px-2 pt-0.5 pb-2 text-meta">
           {dimension.key === 'repo' ? t('本作用域内没有可选的仓库') : t('本作用域内没有可选的类型')}
         </EmptyDescription>
       ) : (

@@ -1,11 +1,17 @@
 import type { ClipboardEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertDialog, AlertDialogContent } from '../components/ui/alert-dialog.js';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_HEAD_CLS,
   DIALOG_PANEL_CLS,
   DIALOG_PRIMARY_BUTTON,
+  DIALOG_SUBTITLE_CLS,
   DIALOG_TEXT_BUTTON,
   DIALOG_TITLE_CLS,
   DialogFootRow,
@@ -546,10 +552,17 @@ export function NewTaskDialog({
         <AlertDialogContent
           className={DISCARD_PANEL_CLS}
           style={{ width: dialogWidth('s') }}
-          aria-label={t('放弃新建任务？未保存的内容将丢失。')}
+          aria-label={t('放弃新建任务？')}
         >
           <div data-testid="dialog-head" className={DIALOG_HEAD_CLS}>
-            <div className={DIALOG_TITLE_CLS}>{t('放弃新建任务？未保存的内容将丢失。')}</div>
+            <div className="min-w-0 flex-1">
+              <AlertDialogTitle className={DIALOG_TITLE_CLS}>
+                {t('放弃新建任务？')}
+              </AlertDialogTitle>
+              <AlertDialogDescription className={DIALOG_SUBTITLE_CLS}>
+                {t('未保存的内容将丢失。')}
+              </AlertDialogDescription>
+            </div>
           </div>
           <DialogFootRow>
             <Button

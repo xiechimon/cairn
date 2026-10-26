@@ -954,7 +954,8 @@ export const EN: Record<string, string> = {
   // spec 非空承载（附件 token 注入后归 spec）,标签 add 仍为桩（本票不动）。
   // （#640：开始任务 dialog 统一面的 规划/执行/在线/离线/选择 Agent 五键随
   // 选择面撤销退役——开始入口不再有 dialog 选择器。）
-  '放弃新建任务？未保存的内容将丢失。': 'Discard this new task? Unsaved content will be lost.',
+  '放弃新建任务？': 'Discard this new task?',
+  '未保存的内容将丢失。': 'Unsaved content will be lost.',
   继续编辑: 'Keep editing',
   放弃并关闭: 'Discard and close',
 

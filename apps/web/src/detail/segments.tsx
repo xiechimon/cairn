@@ -6,8 +6,9 @@ import { mentionChipClass } from '../overlay/mention-chip.js';
 import { AGENTS_HREF } from '../routes/agent-detail-page.js';
 
 const CODE_SKIN: Record<string, string> = {
-  'chat-code': 'mx-0.5 rounded-[4px] bg-(--muted) px-1 py-px font-mono text-caption leading-3',
-  'doc-code': 'mx-0.5 rounded-[4px] bg-(--muted) px-1 py-px font-mono text-caption',
+  'chat-code':
+    'mx-0.5 rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-caption leading-3',
+  'doc-code': 'mx-0.5 rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-caption',
 };
 const CODE_LINK_SKIN = 'bg-(--chip-plan-bg) text-(--chip-plan-fg)';
 
