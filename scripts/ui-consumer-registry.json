@@ -160,17 +160,17 @@
     },
     {
       "file": "apps/web/src/board/board.tsx",
-      "anchor": "flex-none text-(--card-button)",
+      "anchor": "flex-none gap-1 text-(--card-button)",
       "role": "action-link",
-      "reason": "Needs-you strip row action (回复/确认计划/审阅/重试): the same accent text action the task card shows, lifted into the strip above the board.",
+      "reason": "Needs-me inbox row action (回复/确认计划/审阅/重试): the same accent text action the task card shows.",
       "contrast": "measured 2026-10-25 in the fixture build (light / dark): 12.26 / 6.11 on --card"
     },
     {
       "file": "apps/web/src/board/board.tsx",
-      "anchor": "mt-1.5 block text-right text-meta text-(--card-button)",
-      "role": "action-link",
-      "reason": "Needs-you strip 查看全部 link to the needs-me view.",
-      "contrast": "measured 2026-10-25 in the fixture build (light / dark): 11.07 / 6.97 on --background"
+      "anchor": "mt-0.5 size-3.75 flex-none self-start text-(--card-button)",
+      "role": "indicator",
+      "reason": "Needs-me inbox row status glyph (failed / plan / review / reply). DESIGN.md 图标: needs-you icons take the accent; non-text glyph, 3:1 gate.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, measured in PR #1369)"
     },
     {
       "file": "apps/web/src/board/board.tsx",

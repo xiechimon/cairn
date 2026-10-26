@@ -103,7 +103,7 @@ export function AppSidebar({
   const openNewTask = onNewTask ?? openInternalNewTask;
   useNewTaskHotkey(openNewTask);
   const sidebarProps = {
-    attention: attentionCount(resolvedTodos),
+    attention: attentionCount(resolvedTodos, live ? Date.now() : fixture.now),
     running: countInColumn(resolvedTodos, 'building'),
     machinesOnline,
     projectCounts,

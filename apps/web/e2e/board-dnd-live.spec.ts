@@ -24,7 +24,7 @@ function wireCard(phase: string, v: number) {
     title: 'reopen 探针',
     spec: 'reopen 探针',
     phase,
-    phaseAt: 0,
+    phaseAt: Date.now(),
     seqNum: 9,
     orderIndex: 0,
     tagIds: [],

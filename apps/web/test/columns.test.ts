@@ -2,6 +2,7 @@ import { BOARD_DROP_PHASES, canOrchestrate, PHASE_VALUES } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   attentionCount,
+  isStalePending,
   canDropOnColumn,
   cardFace,
   COLUMNS,
@@ -174,7 +175,7 @@ describe('`待处理` column collection (confirm ∪ review ∪ failed, #351)', 
       todo(9, 'closed'),
     ];
     expect(set.filter(pending.accepts)).toHaveLength(4);
-    expect(attentionCount(set)).toBe(set.filter(pending.accepts).length);
+    expect(attentionCount(set, 0)).toBe(set.filter(pending.accepts).length);
   });
 });
 
@@ -288,4 +289,37 @@ describe('needsDoneGate (#1247 `待处理`/in-flight dragged toward `已完成`)
       expect(needsDoneGate({ ...todo(1, phase), hasChanges: false }), phase).toBe(false);
     }
   });
+});
+
+describe('stale pending (folded after 7 days untouched)', () => {
+  const now = 30 * 24 * 60 * 60 * 1000;
+  const aged = (seq: number, phase: TodoRecord['phase'], days: number) => ({
+    ...todo(seq, phase),
+    phaseAt: now - days * 24 * 60 * 60 * 1000,
+  });
+
+  test('a pending card counts while fresh and folds once it is past 7 days', () => {
+    expect(isStalePending(aged(1, 'failed', 6.9), now)).toBe(false);
+    expect(isStalePending(aged(2, 'failed', 7.1), now)).toBe(true);
+    expect(isStalePending(aged(3, 'confirm', 13), now)).toBe(true);
+  });
+
+  test('attentionCount leaves out stale pending cards and non-pending phases', () => {
+    const set = [
+      aged(1, 'failed', 1),
+      aged(2, 'review', 2),
+      aged(3, 'failed', 14),
+      aged(4, 'confirm', 13),
+      aged(5, 'building', 30),
+      aged(6, 'done', 1),
+    ];
+    expect(attentionCount(set, now)).toBe(2);
+  });
+});
+
+test('a card waiting on a reply never folds, however long its phase has run', () => {
+  const now = 30 * 24 * 60 * 60 * 1000;
+  const asking = { ...todo(1, 'review', true), phaseAt: now - 20 * 24 * 60 * 60 * 1000 };
+  expect(isStalePending(asking, now)).toBe(false);
+  expect(attentionCount([asking], now)).toBe(1);
 });

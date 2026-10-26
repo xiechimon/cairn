@@ -6,8 +6,13 @@
   },
   {
     "path": "apps/web/src/board/board.tsx",
-    "name": "NeedsYouStrip",
-    "reason": "React component with its own hooks and an early return when nothing needs attention; inlining it would put conditional hook-free JSX and the attention filter inside the 300-line BoardSurface render"
+    "name": "NeedsYouInbox",
+    "reason": "React component with its own fold state hook; inlining it would put useState and the fresh/stale split inside the 300-line BoardSurface render"
+  },
+  {
+    "path": "apps/web/src/board/board.tsx",
+    "name": "StalePendingLink",
+    "reason": "React component with its own i18n and location hooks, rendered inside the pending column's map; inlining would call hooks from the column loop"
   },
   {
     "path": "apps/server/src/services/machine-claim.ts",
