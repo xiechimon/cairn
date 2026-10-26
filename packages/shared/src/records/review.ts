@@ -17,6 +17,8 @@ export type ReviewFinding = z.infer<typeof reviewFindingSchema>;
 
 export const reviewVerdictSchema = z.object({
   conclusion: z.string(),
+  gateLoosening: z.boolean().optional(),
+  evalRulerChange: z.boolean().optional(),
   findings: z.array(reviewFindingSchema).default([]),
 });
 export type ReviewVerdict = z.infer<typeof reviewVerdictSchema>;
@@ -79,6 +81,7 @@ export function buildReviewStepPrompt(args: {
     JSON.stringify(
       {
         conclusion: '<一句话结论：方案是否通过、关键风险概览>',
+        ...(args.gate === 'review' ? { gateLoosening: false, evalRulerChange: false } : {}),
         findings: [
           {
             id: '1',
@@ -95,6 +98,11 @@ export function buildReviewStepPrompt(args: {
       2,
     ),
     '```',
+    ...(args.gate === 'review'
+      ? [
+          'Answer gateLoosening and evalRulerChange explicitly with booleans. gateLoosening asks whether this change loosens a gate, check, or protected-path list. evalRulerChange asks whether it changes how the eval ruler measures. Either true blocks merging under ADR 0026; do not omit an answer or assume false.',
+        ]
+      : []),
     '注意：line 是数字行号（如 42），不要写成字符串；没有行号时省略该字段。',
     '',
     '## 待审核方案',

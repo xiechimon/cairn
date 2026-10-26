@@ -19,6 +19,11 @@ import { classifyPaths, touchesHarness } from './paths.js';
 
 export interface GateVerdictView {
   kind: 'review' | 'verify' | 'decision';
+  headSha?: string | null;
+  reviewerId?: string | null;
+  reviewerModel?: string | null;
+  gateLoosening?: boolean | null;
+  evalRulerChange?: boolean | null;
   perspective: string | null;
   patchDigest: string | null;
   outcome:
@@ -49,6 +54,7 @@ export interface GateCompareCommit {
 }
 
 export interface GateInputs {
+  author?: { id: string; model: string } | null;
   policy: { mergePolicy: MergePolicy; autonomyPaused: boolean; dailyCapReached: boolean };
   build: {
     isGithubPr: boolean;
@@ -317,10 +323,34 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block('size-cap', `${digest.countedLines} lines, ${digest.countedFiles} files`);
     }
     const paths = classifyPaths(compare.files, i.ticketRef);
-    if (paths.protected.length > 0) block('protected-path', ...names(paths.protected));
+    const reviewRequired = [...paths.protected, ...paths.deletedTests];
+    if (reviewRequired.length > 0) {
+      const independent = i.verdicts.filter(
+        (v) =>
+          v.kind === 'review' &&
+          head !== null &&
+          v.headSha === head &&
+          D !== null &&
+          v.patchDigest === D &&
+          i.author?.id.trim() &&
+          i.author.model.trim() &&
+          v.reviewerId?.trim() &&
+          v.reviewerId !== i.author.id &&
+          v.reviewerModel?.trim() &&
+          v.reviewerModel !== i.author.model &&
+          typeof v.gateLoosening === 'boolean' &&
+          typeof v.evalRulerChange === 'boolean' &&
+          (v.outcome === 'pass' || v.outcome === 'block'),
+      );
+      if (!independent.some((v) => v.outcome === 'pass')) {
+        block('independent-review-missing', ...names(reviewRequired));
+      }
+      if (independent.some((v) => v.gateLoosening || v.evalRulerChange)) {
+        block('review-blocking', 'Independent review reports gate loosening or eval ruler change');
+      }
+    }
     if (paths.outsideAutoMerge.length > 0)
       block('outside-auto-merge', ...names(paths.outsideAutoMerge));
-    if (paths.deletedTests.length > 0) block('test-deleted', ...names(paths.deletedTests));
     if (paths.opaque.length > 0) block('opaque-file', ...names(paths.opaque));
     if (paths.otherTicketEvidence.length > 0)
       block('evidence-outside-ticket', ...names(paths.otherTicketEvidence));

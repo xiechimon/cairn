@@ -4,6 +4,7 @@ import {
   buildReviewStepPrompt,
   parseReviewPromptMeta,
   type ReviewPromptMeta,
+  reviewVerdictSchema,
 } from '../src/records/review.js';
 
 const PLAN = '# plan\n\n## Changes\n- 加一个 parseInput\n';
@@ -134,5 +135,29 @@ describe('buildReviewStepPrompt gate branching (#511)', () => {
     expect(parseMeta(withSha).expectedHeadSha).toBe(sha);
     const without = buildReviewStepPrompt({ agentId: 'a1', gate: 'confirm', planText: PLAN });
     expect(parseMeta(without).expectedHeadSha).toBeUndefined();
+  });
+});
+
+describe('ADR 0026 review questions', () => {
+  test('review output retains both answers and rejects non-boolean answers', () => {
+    const verdict = {
+      conclusion: 'Reviewed',
+      findings: [],
+      gateLoosening: true,
+      evalRulerChange: false,
+    };
+    expect(reviewVerdictSchema.parse(verdict)).toEqual(verdict);
+    expect(reviewVerdictSchema.safeParse({ ...verdict, gateLoosening: 'false' }).success).toBe(
+      false,
+    );
+    expect(reviewVerdictSchema.safeParse({ ...verdict, evalRulerChange: null }).success).toBe(
+      false,
+    );
+  });
+
+  test('the review prompt requires explicit answers to both protected-change questions', () => {
+    const prompt = buildReviewStepPrompt({ agentId: 'reviewer', gate: 'review', planText: PLAN });
+    expect(prompt).toContain('gateLoosening');
+    expect(prompt).toContain('evalRulerChange');
   });
 });
