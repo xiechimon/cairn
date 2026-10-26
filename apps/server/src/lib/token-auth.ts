@@ -1,6 +1,9 @@
 import { timingSafeEqual } from 'node:crypto';
+import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Hono } from 'hono';
 import { sha256Hex } from './crypto.js';
+
+const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
 const STREAM_PATH_PATTERNS = [
   /^\/api\/teams\/[^/]+\/stream$/,
@@ -24,13 +27,28 @@ function makeVerifier(token: string): (provided: string) => boolean {
   };
 }
 
-export function registerTokenAuth(app: Hono, token: string | null): void {
+export function registerTokenAuth(
+  app: Hono,
+  token: string | null,
+  tailscaleUsers: string[] = [],
+): void {
   if (token === null) return;
   const verify = makeVerifier(token);
+  const allowedTailscaleUsers = new Set(tailscaleUsers);
   app.use('*', async (c, next) => {
     const url = new URL(c.req.url);
     const pathname = url.pathname;
     if (isExempt(pathname)) return next();
+    const tailscaleLogin = c.req.header('tailscale-user-login');
+    if (tailscaleLogin !== undefined && allowedTailscaleUsers.has(tailscaleLogin)) {
+      let peerAddress: string | undefined;
+      try {
+        peerAddress = getConnInfo(c).remote.address;
+      } catch (error) {
+        if (!(error instanceof TypeError)) throw error;
+      }
+      if (peerAddress !== undefined && LOOPBACK_PEER_ADDRESSES.has(peerAddress)) return next();
+    }
     const authorization = c.req.header('authorization');
     if (authorization !== undefined) {
       const match = /^Bearer\s+(.+)$/i.exec(authorization);

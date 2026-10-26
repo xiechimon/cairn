@@ -31,6 +31,7 @@ export function bootServer(
     oauthClient?: AppContext['oauthClient'];
     oauthFetch?: AppContext['oauthFetch'];
     authToken?: string | null;
+    tailscaleUsers?: string[];
     mcpConfigPath?: string;
   } = {},
 ) {
@@ -78,6 +79,7 @@ export function bootServer(
     skillSourcesPath,
     ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
     authToken: opts.authToken ?? null,
+    tailscaleUsers: opts.tailscaleUsers ?? [],
     mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
   });
   return {

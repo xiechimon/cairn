@@ -12,6 +12,7 @@ import {
   missingRequiredTokenError,
   reposDirOf,
   warnInsecureBind,
+  warnTailscaleBind,
 } from './config.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
@@ -93,6 +94,7 @@ const app = createApp(
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,
     authToken: config.authToken,
+    tailscaleUsers: config.tailscaleUsers,
     mcpConfigPath: config.mcpConfigPath,
     logger,
   },
@@ -100,6 +102,7 @@ const app = createApp(
 );
 
 warnInsecureBind(logger, config);
+warnTailscaleBind(logger, config);
 logTokenAuthStartup(logger, config);
 
 const scheduler = createScheduler(

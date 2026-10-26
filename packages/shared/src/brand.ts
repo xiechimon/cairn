@@ -53,6 +53,7 @@ export const ENV_VARS = {
   githubOauthClientSecret: 'CAIRN_GITHUB_OAUTH_CLIENT_SECRET',
   token: 'CAIRN_TOKEN',
   requireToken: 'CAIRN_REQUIRE_TOKEN',
+  tailscaleUsers: 'CAIRN_TAILSCALE_USERS',
   skillsDir: 'CAIRN_SKILLS_DIR',
   mcpConfig: 'CAIRN_MCP_CONFIG',
   customModelReasoning: 'CAIRN_CUSTOM_MODEL_REASONING',

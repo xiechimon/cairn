@@ -21,6 +21,7 @@ Things that went wrong during the work and were later fixed, one row per categor
 
 | Category | First seen | Level | Protection | Intercepted | Recurred | Notes |
 |---|---|---|---|---|---|---|
+| Identity authentication read connection metadata before checking that a socket existed, causing 500 instead of token fallback | #1762 (2026-10-26) | 2 | `apps/server/test/token-auth.test.ts` verifies missing peer metadata returns 401 without a token and 200 with a valid token | 1 | 0 | Negative control returned 500; guarding the connection metadata makes both assertions pass |
 | A web PR was pushed before the ui-debt and dead-class gates ran; CI went red twice | PR #1523 (2026-10-22) | 2 | `pnpm prepush` and CI share `scripts/prepush.mjs`; `scripts/prepush.test.mjs` checks the same entry | 2 | 0 | #1533: the `mt-[3px]` negative control tripped D5, and the static check turned green after removal; dead-class stays advisory in CI |
 | Claimed e2e could not run locally when memory already held the workaround | Claude thread (2026-10-22) | 5 | Memory: check memory before saying something cannot be done | 0 | 0 | Not machine-checkable; a judgment error |
 | Put the images only into the file library without attaching them directly in the reply | Claude thread (2026-10-22) | 5 | Memory | 0 | 0 | Not machine-checkable |

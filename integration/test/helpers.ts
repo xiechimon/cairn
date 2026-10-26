@@ -82,6 +82,7 @@ export async function bootRealServer(opts: {
     ),
     webDir: opts.webDir ?? null,
     authToken: null,
+    tailscaleUsers: [],
     mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-it-mcp-${randomUUID()}.json`),
   });
   const scheduler = opts.scheduler

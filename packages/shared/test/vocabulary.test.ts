@@ -438,6 +438,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       githubOauthClientSecret,
       token,
       requireToken,
+      tailscaleUsers,
       mcpConfig,
       skillsDir,
       customModelReasoning,
@@ -459,6 +460,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(githubOauthClientSecret).toBe('CAIRN_GITHUB_OAUTH_CLIENT_SECRET');
     expect(token).toBe('CAIRN_TOKEN');
     expect(requireToken).toBe('CAIRN_REQUIRE_TOKEN');
+    expect(tailscaleUsers).toBe('CAIRN_TAILSCALE_USERS');
     expect(mcpConfig).toBe('CAIRN_MCP_CONFIG');
     expect(skillsDir).toBe('CAIRN_SKILLS_DIR');
     expect(customModelReasoning).toBe('CAIRN_CUSTOM_MODEL_REASONING');
