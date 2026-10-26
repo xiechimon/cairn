@@ -46,7 +46,6 @@ export const EN: Record<string, string> = {
   做完了: 'Done',
   看板: 'Board',
   打开看板: 'Open the board',
-  '在看板里看全部 {count} 条': 'See all {count} on the board',
   '还没开始的 {count} 条': '{count} not started',
   技能: 'Skills',
   密钥: 'Secrets',

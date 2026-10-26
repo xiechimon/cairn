@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-const MATRIX = '/app?scenario=board-drag-matrix';
+const MATRIX = '/app?scenario=board-drag-matrix&view=board';
 const card = (page: Page, id: string) => page.locator(`[data-todo-id="${id}"]`);
 
 async function settle(locator: Locator) {

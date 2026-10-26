@@ -77,7 +77,7 @@ interface BoardProps {
   banner?: ReactNode;
   filters: BoardFilters;
   onlyColumn?: string | null;
-  home?: boolean;
+  boardView?: boolean;
   tagsById?: ReadonlyMap<string, TagChipData>;
   onNewTask?: () => void;
   loading?: boolean;
@@ -159,7 +159,7 @@ export function BoardSurface({
   banner,
   filters,
   onlyColumn = null,
-  home = false,
+  boardView = false,
   tagsById,
   onNewTask,
   loading = false,
@@ -209,7 +209,7 @@ export function BoardSurface({
     };
   }, []);
   useEffect(() => {
-    if (onlyColumn != null) return;
+    if (!boardView || onlyColumn != null) return;
     const cols = COLUMNS.map(
       (column) => sortColumnTodos(column, visibleTodos.filter(column.accepts)).length,
     );
@@ -217,8 +217,9 @@ export function BoardSurface({
     try {
       localStorage.setItem('cairn-boot-shape', JSON.stringify({ cols }));
     } catch {}
-  }, [visibleTodos, onlyColumn]);
+  }, [visibleTodos, onlyColumn, boardView]);
 
+  const home = !boardView && onlyColumn == null;
   const showFilterEmpty =
     filters.active && visibleColumns.every((c) => !visibleTodos.some((todo) => c.accepts(todo)));
 
@@ -277,7 +278,7 @@ export function BoardSurface({
     <div className="board-main relative flex min-w-0 flex-1 flex-col">
       <header className="board-topbar flex h-14 flex-none items-center gap-3 px-6 whitespace-nowrap">
         <h1 className="board-topbar-title flex-none font-heading text-page font-medium text-foreground">
-          {t(home || onlyColumn != null ? '工作台' : '看板')}
+          {t(boardView ? '看板' : '工作台')}
         </h1>
         {!home && <NeedsYouSummary count={pendingSplit.fresh.length} />}
         <FilterChips chips={filters.chips} onClearAll={filters.onClear} />
@@ -321,7 +322,7 @@ export function BoardSurface({
         </span>
       )}
 
-      {home ? (
+      {home && !showFilterEmpty ? (
         <HomeSections
           todos={visibleTodos}
           now={fixture.now}

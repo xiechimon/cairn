@@ -36,10 +36,10 @@ const phaseChip = (page: Page) => page.getByTestId('phase-chip');
 const searchDialog = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
 const PAGES: AuditPage[] = [
-  { name: 'board', url: '/app?scenario=board-drag-matrix', ready: (p) => p.locator('[data-todo-id]').first() },
+  { name: 'board', url: '/app?scenario=board-drag-matrix&view=board', ready: (p) => p.locator('[data-todo-id]').first() },
   {
     name: 'board search',
-    url: '/app?scenario=01',
+    url: '/app?scenario=01&view=board',
     open: async (page) => {
       await pressAndExpect(page, 'Meta+k', searchDialog(page));
       await page.keyboard.type('probe');
@@ -48,13 +48,13 @@ const PAGES: AuditPage[] = [
   },
   {
     name: 'new task dialog',
-    url: '/app?scenario=01',
+    url: '/app?scenario=01&view=board',
     open: (page) => page.locator('.sidebar-new-task').click(),
     ready: (p) => p.getByRole('dialog', { name: '新建任务' }),
   },
   {
     name: 'new task dialog filled',
-    url: '/app?scenario=01',
+    url: '/app?scenario=01&view=board',
     open: async (page) => {
       await page.locator('.sidebar-new-task').click();
       await page.keyboard.type('probe');
@@ -69,7 +69,7 @@ const PAGES: AuditPage[] = [
     url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28',
     ready: (p) => p.getByTestId('tool-pill').first(),
   },
-  { name: 'chief window', url: '/app?scenario=100', ready: (p) => p.locator('.chief-drawer') },
+  { name: 'chief window', url: '/app?scenario=100&view=board', ready: (p) => p.locator('.chief-drawer') },
   { name: 'schedules list', url: '/app/schedules?scenario=r3-93', ready: (p) => p.locator('.sched-card').first() },
   { name: 'schedules form', url: '/app/schedules?scenario=r3-92', ready: (p) => p.getByRole('dialog', { name: '新建定时' }) },
   {

@@ -52,7 +52,7 @@ test('board renders exactly the four #351 columns, retired names and collapse fa
 }) => {
   await page.goto('/app?scenario=01&view=board');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('工作台');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('看板');
 
   await expect(page.locator('.board-column')).toHaveCount(4);
   for (const [id, name] of [

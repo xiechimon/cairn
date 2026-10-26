@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const BOARD = '/app?scenario=01';
+const BOARD = '/app?scenario=01&view=board';
 const SCHEDULES = '/app/schedules?scenario=11';
 
 const sheetOf = (page: Page, selector: string) =>

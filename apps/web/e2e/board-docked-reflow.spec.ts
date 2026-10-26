@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const STRESS = '/app?scenario=board-stress';
+const STRESS = '/app?scenario=board-stress&view=board';
 const FLOOR = 200;
 
 const drawer = (page: Page) => page.locator('.chief-drawer');

@@ -1,10 +1,10 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { pressAndExpect } from './helpers.js';
 
-const BOARD = '/app?scenario=01';
+const BOARD = '/app?scenario=01&view=board';
 const SCHEDULES = '/app/schedules?scenario=01';
 
-const PROJECTS = '/app?scenario=newtask-projects';
+const PROJECTS = '/app?scenario=newtask-projects&view=board';
 
 const FIRST_PROJECT_ID = 'ZAQczKCu0MOAzC1ZqcFlX';
 const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24b&tab=tasks';

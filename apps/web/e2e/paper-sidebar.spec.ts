@@ -36,9 +36,7 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
     await top(page, '[data-testid="team-row"]'),
     await top(page, '.sidebar-new-task'),
     await aside.getByRole('link', { name: '工作台' }).evaluate((el) => el.getBoundingClientRect().top),
-    await aside
-      .getByRole('link', { name: /需要我处理/ })
-      .evaluate((el) => el.getBoundingClientRect().top),
+    await aside.getByRole('link', { name: '看板' }).evaluate((el) => el.getBoundingClientRect().top),
     await aside.getByRole('link', { name: '定时' }).evaluate((el) => el.getBoundingClientRect().top),
     await top(page, '[data-testid="project-group"]'),
     await aside.getByRole('button', { name: '资源' }).evaluate((el) => el.getBoundingClientRect().top),

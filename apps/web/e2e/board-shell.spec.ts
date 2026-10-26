@@ -27,6 +27,22 @@ test('home splits work into needs-you, running and done, and folds week-old and 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('看板');
 });
 
+test('a project filter keeps home; a filter that matches nothing shows the filter-empty state', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=board-repos&projects=r2-inventory');
+  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await expect(page.locator('[data-column]')).toHaveCount(0);
+  await expect(page.getByRole('complementary').getByRole('link', { name: /工作台/ })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  await page.goto('/app?scenario=board-repos&projects=no-such-project');
+  await expect(page.getByTestId('home-sections')).toHaveCount(0);
+  await expect(page.getByText('没有匹配筛选条件的任务')).toBeVisible();
+});
+
 test('the needs-me inbox lists recent pending cards as rows and folds week-old ones', async ({
   page,
 }) => {

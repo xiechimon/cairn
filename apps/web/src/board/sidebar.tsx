@@ -203,7 +203,6 @@ export function BoardSidebar({
   const kanbanSearch = `?${kanbanParams}`;
   const homeParams = new URLSearchParams(plain);
   homeParams.delete('view');
-  homeParams.delete('projects');
   const homeSearch = `?${homeParams}`;
   const projectRows = useMemo(
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),

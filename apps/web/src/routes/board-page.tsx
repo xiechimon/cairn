@@ -555,13 +555,7 @@ export function BoardPage() {
       <AppSidebar
         fixture={fixture}
         todos={todos}
-        selected={
-          chiefView === 'settings'
-            ? 'none'
-            : boardView || selectedProjects.length > 0
-              ? 'kanban'
-              : 'board'
-        }
+        selected={chiefView === 'settings' ? 'none' : boardView ? 'kanban' : 'board'}
         searchPanel={false}
         onSearch={() => search.setOpen(true)}
         onNewTask={openNewTask}
@@ -603,7 +597,7 @@ export function BoardPage() {
             onDoneIntent={openDoneGate}
             filters={filters}
             onlyColumn={onlyColumn}
-            home={onlyColumn == null && !boardView && selectedProjects.length === 0}
+            boardView={boardView}
             tagsById={tagIndex.tagById}
             onNewTask={openNewTask}
             loading={live && !todosQ.isSuccess}

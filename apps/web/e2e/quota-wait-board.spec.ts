@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const QUOTA = '/app?scenario=quota-wait';
+const QUOTA = '/app?scenario=quota-wait&view=board';
 
 test('suspended card carries the `等额度` chip, plain building cards do not (two pins of the card state)', async ({ page }) => {
   await page.goto(QUOTA);

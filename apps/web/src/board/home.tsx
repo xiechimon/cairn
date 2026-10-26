@@ -1,4 +1,4 @@
-import { canOrchestrate, IN_PROGRESS_PHASES } from '@cairn/shared';
+import { canOrchestrate } from '@cairn/shared';
 import { cn } from 'cn';
 import {
   Activity,
@@ -23,7 +23,7 @@ import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { PHASE_UI } from '../phase.js';
-import { cardFace, STALE_PENDING_MS, splitStale } from './columns.js';
+import { COLUMNS, cardFace, STALE_PENDING_MS, sortColumnTodos, splitStale } from './columns.js';
 import { relativeTime } from './rel-time.js';
 import { ATTENTION } from './todo-card.js';
 
@@ -38,6 +38,40 @@ export interface RowContext {
 }
 
 const ACTION_CLASS = 'flex-none gap-1 text-(--card-button)';
+
+function RowAction({
+  orchestration,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  orchestration: CardOrchestration | null;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) {
+  const { t } = useI18n();
+  const failed = orchestration?.error !== undefined;
+  if (orchestration != null && !failed) {
+    return <span className="px-2 text-meta text-content-tertiary">{t('编排中')}</span>;
+  }
+  const ActionIcon = failed ? RotateCcw : Icon;
+  return (
+    <Button variant="ghost" size="xs" className={ACTION_CLASS} onClick={onClick}>
+      <ActionIcon aria-hidden strokeWidth={1.75} className="size-3.25" />
+      {t(failed ? '重试' : label)}
+    </Button>
+  );
+}
+
+function orchestrationFor(ctx: RowContext, todo: TodoRecord): CardOrchestration | null {
+  return canOrchestrate(todo.phase) ? (ctx.orchestrationOf?.(todo) ?? null) : null;
+}
+
+function columnTodos(columnId: string, todos: TodoRecord[]): TodoRecord[] {
+  const column = COLUMNS.find((c) => c.id === columnId);
+  return column == null ? [] : sortColumnTodos(column, todos.filter(column.accepts));
+}
 
 function TaskRow({
   todo,
@@ -138,24 +172,17 @@ function useProjectName(projectNames?: Record<string, string>) {
   return (todo: TodoRecord) => projectNames?.[todo.projectId] ?? (live ? undefined : PROJECT_NAME);
 }
 
-function NeedsYouRows({
-  todos,
-  now,
-  projectNames,
-  onAction,
-  orchestrationOf,
-}: RowContext & { todos: TodoRecord[] }) {
+function NeedsYouRows({ todos, ...ctx }: RowContext & { todos: TodoRecord[] }) {
   const { t } = useI18n();
-  const projectOf = useProjectName(projectNames);
+  const projectOf = useProjectName(ctx.projectNames);
   return (
     <RowList>
       {todos.map((todo) => {
         const face = cardFace(todo);
         if (face.kind !== 'attention') return null;
         const attention = ATTENTION[face.need];
-        const orchestration = canOrchestrate(todo.phase) ? (orchestrationOf?.(todo) ?? null) : null;
+        const orchestration = orchestrationFor(ctx, todo);
         const orchestrationFailed = orchestration?.error !== undefined;
-        const ActionIcon = orchestrationFailed ? RotateCcw : attention.actionIcon;
         return (
           <TaskRow
             key={todo.id}
@@ -171,22 +198,15 @@ function NeedsYouRows({
               projectOf(todo),
               `#${todo.seqNum}`,
               t(orchestrationFailed ? '编排失败' : attention.label),
-              relativeTime(todo.phaseAt, now, t),
+              relativeTime(todo.phaseAt, ctx.now, t),
             ]}
             trailing={
-              orchestration != null && !orchestrationFailed ? (
-                <span className="px-2 text-meta text-content-tertiary">{t('编排中')}</span>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  className={ACTION_CLASS}
-                  onClick={() => onAction?.(todo)}
-                >
-                  <ActionIcon aria-hidden strokeWidth={1.75} className="size-3.25" />
-                  {t(orchestrationFailed ? '重试' : attention.action)}
-                </Button>
-              )
+              <RowAction
+                orchestration={orchestration}
+                icon={attention.actionIcon}
+                label={attention.action}
+                onClick={() => ctx.onAction?.(todo)}
+              />
             }
           />
         );
@@ -298,19 +318,12 @@ export function HomeSections({
   const { t } = useI18n();
   const { search } = useLocation();
   const projectOf = useProjectName(ctx.projectNames);
-  const byPhaseAt = (x: TodoRecord, y: TodoRecord) => y.phaseAt - x.phaseAt;
-  const needsYou = todos.filter((todo) => cardFace(todo).kind === 'attention').sort(byPhaseAt);
-  const running = todos
-    .filter((todo) => (IN_PROGRESS_PHASES as readonly string[]).includes(todo.phase))
-    .sort(byPhaseAt);
-  const notStarted = todos.filter((todo) => todo.phase === 'todo').sort(byPhaseAt);
-  const done = todos
-    .filter(
-      (todo) =>
-        (todo.phase === 'done' || todo.phase === 'closed') &&
-        ctx.now - todo.phaseAt <= STALE_PENDING_MS,
-    )
-    .sort(byPhaseAt);
+  const needsYou = columnTodos('pending', todos);
+  const running = columnTodos('building', todos);
+  const notStarted = columnTodos('todo', todos);
+  const done = columnTodos('done', todos).filter(
+    (todo) => ctx.now - todo.phaseAt <= STALE_PENDING_MS,
+  );
   const boardSearch = new URLSearchParams(search);
   boardSearch.set(BOARD_VIEW_PARAM, 'board');
   const needsYouFresh = splitStale(needsYou, ctx.now).fresh.length;
@@ -385,15 +398,12 @@ export function HomeSections({
                       relativeTime(todo.phaseAt, ctx.now, t),
                     ]}
                     trailing={
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        className={ACTION_CLASS}
+                      <RowAction
+                        orchestration={orchestrationFor(ctx, todo)}
+                        icon={Play}
+                        label="开始"
                         onClick={() => ctx.onAction?.(todo)}
-                      >
-                        <Play aria-hidden strokeWidth={1.75} className="size-3.25" />
-                        {t('开始')}
-                      </Button>
+                      />
                     }
                   />
                 ))}
@@ -441,9 +451,7 @@ export function HomeSections({
             to={{ search: `?${boardSearch}` }}
             className="flex items-center gap-1 self-end rounded-(--radius-control) px-1 text-meta text-content-tertiary no-underline hover:text-content-secondary"
           >
-            {done.length > DONE_PREVIEW
-              ? t('在看板里看全部 {count} 条', { count: done.length })
-              : t('打开看板')}
+            {t('打开看板')}
             <ChevronRight aria-hidden strokeWidth={1.75} className="size-3.25" />
           </Link>
         </HomeSection>

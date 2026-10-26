@@ -47,7 +47,7 @@ test('active filter: summary follows the narrowed column, badge + chip stay, pop
   await page.goto('/app?scenario=board-repos&view=board');
   await expect(summary(page)).toHaveText('1 项等你处理');
 
-  await page.goto('/app?scenario=board-repos&projects=r2-inventory');
+  await page.goto('/app?scenario=board-repos&projects=r2-inventory&view=board');
   await expect(pendingCount(page)).toHaveText('0');
   await expect(summary(page)).toHaveText('没有等你处理的事');
   await expect(page.getByTestId('filter-count')).toHaveText('1');

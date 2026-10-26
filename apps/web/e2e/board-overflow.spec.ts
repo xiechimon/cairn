@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const OVERFLOW = '/app?scenario=board-overflow';
+const OVERFLOW = '/app?scenario=board-overflow&view=board';
 const list = (page: Page, column = 'todo') => page.locator(`[data-column-list="${column}"]`);
 
 test('overflow column bottom does not exit the viewport: column hugs the scroller visible height (row height pinned)', async ({ page }) => {
