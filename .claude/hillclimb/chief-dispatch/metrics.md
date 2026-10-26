@@ -148,6 +148,40 @@ pnpm --filter @cairn/integration exec tsx eval/chief-dispatch/run-eval.mts \
 node integration/eval/chief-dispatch/build-report-lite.mts .claude/hillclimb/chief-dispatch/
 ```
 
+### Prompt-set ablation (#1831)
+
+`run-eval.mts --prompt-set current|cut` selects which standing rules the Chief runs with
+(default `current`). The switch rewrites `step.chief.systemPrompt` in the machine-claim
+response inside the eval stack (`stack.mts`), so production prompts (`chief.ts`) stay
+untouched and both arms share the identical dynamic inventory (charter, roster, memories).
+
+- `current`: the composed production prompt, byte-identical to what the server sends.
+- `cut`: the `## 工作约定` section is replaced by `prompt-set.mts`'s `CUT_CONVENTIONS` —
+  41% of the current rules' length. Kept: dispatch/receipt judgment the bench grades and no
+  gate enforces, plus the third-party-data fence. Cut: gate-enforced rules (ADR 0026
+  merge policy), rules for turns this bench never drives (wake rounds, confirm auto-pass,
+  skill routing), and worked examples inside long rules.
+
+A missing `## 工作约定` marker throws instead of silently running the cut arm with the current
+prompt, so a chief.ts restructure cannot fake an arm. Row `meta.prompt_set` records the arm;
+`compare-prompt-sets.mts` warns on rows whose recorded arm contradicts the variant directory.
+
+```sh
+# two arms (run the current arm into baseline/, the cut arm into v1/; same models, same reps)
+pnpm --filter @cairn/integration exec tsx eval/chief-dispatch/run-eval.mts \
+  --flow .claude/hillclimb/chief-dispatch --variant baseline --model glm-5.3 --reps 1 --prompt-set current
+pnpm --filter @cairn/integration exec tsx eval/chief-dispatch/run-eval.mts \
+  --flow .claude/hillclimb/chief-dispatch --variant v1 --model glm-5.3 --reps 1 --prompt-set cut
+
+# pass rate + tokens per task for both sets → markdown on stdout (or --out PATH)
+pnpm --filter @cairn/integration exec tsx eval/chief-dispatch/compare-prompt-sets.mts \
+  .claude/hillclimb/chief-dispatch --current baseline --cut v1
+```
+
+The report gives per-arm pass rate with a 95% Wilson interval, receipt rate, in/out/cache-read
+tokens and cost per task with a 95% CI half-width, the cut − current difference, and a
+per-case table.
+
 After changing the harness (runner / judgeCase / cases.json / scenario seeds / `chief.ts`), the
 next run refuses because `harness_sha` no longer matches — this is deliberate: review the diff
 before rerunning, then allow it with `--approve-harness`. If a run dies, just rerun; completed

@@ -1,0 +1,7 @@
+[v9] 1 of 1 (id,rep) to run
+[v9] 1/1 done (1 ok, 0 failed), 1s elapsed, ~0s left
+[v9] done - 1 ok, 0 failed -> /mnt/fast/lanes/cairn-1831/.claude/hillclimb/chief-dispatch/v9/results.jsonl
+[v9] 收尾清掉 2 个残留 scratch 目录
+stub session carried the cut rules (kept marker present, dropped markers [none])
+row meta.prompt_set=cut
+runner switch verified on the real runner path (stub relay); scratch variant removed

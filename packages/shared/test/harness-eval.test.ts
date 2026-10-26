@@ -41,4 +41,13 @@ describe('CHIEF_DISPATCH_HARNESS_PATHS', () => {
     expect(CHIEF_DISPATCH_HARNESS_PATHS).toContain('apps/daemon/src/backend/pi.ts');
     expect(HARNESS_REGRESSION_RESULT_NAME).toBe('harness-regression.json');
   });
+
+  test('contains the prompt-set ablation modules (#1831)', () => {
+    expect(CHIEF_DISPATCH_HARNESS_PATHS).toContain(
+      'integration/eval/chief-dispatch/prompt-set.mts',
+    );
+    expect(CHIEF_DISPATCH_HARNESS_PATHS).toContain(
+      'integration/eval/chief-dispatch/compare-prompt-sets.mts',
+    );
+  });
 });

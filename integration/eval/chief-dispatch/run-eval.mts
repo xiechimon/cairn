@@ -33,6 +33,7 @@ import {
   parseResultsJsonl,
   traceDigest,
 } from './harness-eval-result.mts';
+import { PROMPT_SET_IDS, type PromptSetId } from './prompt-set.mts';
 import {
   bootStack,
   disposeLeftovers,
@@ -73,7 +74,7 @@ async function loadCases(): Promise<EvalCase[]> {
 }
 
 async function freshStack(input: Case | MemoryCase): Promise<{ stack: Stack; world: SeededWorld }> {
-  const stack = await bootStack();
+  const stack = await bootStack({ promptSet: ARGS.promptSet });
   try {
     const world = await seedWorld(stack, {
       relayBaseUrl: relayBaseUrl(),
@@ -109,6 +110,7 @@ async function runCase(
       arm: ARGS.arm,
       roster: ROSTER,
       model: CHIEF_MODEL,
+      promptSet: ARGS.promptSet,
       timeoutMs: ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000,
     });
     const truncated = learned.truncated;
@@ -202,6 +204,7 @@ function parseArgs(argv: string[]) {
     patchDigest: undefined as string | undefined,
     arm: 'all' as LearnArm,
     caseIds: [] as string[],
+    promptSet: 'current' as PromptSetId,
   };
   const val = (i: number): string => {
     const v = argv[i];
@@ -225,6 +228,7 @@ function parseArgs(argv: string[]) {
     else if (k === '--patch-digest') a.patchDigest = val(++i);
     else if (k === '--arm') a.arm = val(++i) as LearnArm;
     else if (k === '--case') a.caseIds.push(val(++i));
+    else if (k === '--prompt-set') a.promptSet = val(++i) as PromptSetId;
     else if (k === '-h' || k === '--help') {
       usage();
       process.exit(0);
@@ -236,6 +240,11 @@ function parseArgs(argv: string[]) {
   }
   if (!(LEARN_ARMS as readonly string[]).includes(a.arm)) {
     console.error(`--arm must be one of ${LEARN_ARMS.join(', ')}, got '${a.arm}'`);
+    usage();
+    process.exit(2);
+  }
+  if (!(PROMPT_SET_IDS as readonly string[]).includes(a.promptSet)) {
+    console.error(`--prompt-set must be one of ${PROMPT_SET_IDS.join(', ')}, got '${a.promptSet}'`);
     usage();
     process.exit(2);
   }
@@ -260,7 +269,7 @@ function parseArgs(argv: string[]) {
 }
 function usage() {
   console.error(
-    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
+    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--prompt-set current|cut] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
   );
 }
 
@@ -521,15 +530,13 @@ async function main() {
           rep,
           prompt: isLearnCase(c) ? c.round2 : c.prompt,
           tags: c.tags,
-          meta:
-            safeId !== String(c.id) || appRetry.count || judgeRetry.count || isLearnCase(c)
-              ? {
-                  ...(safeId !== String(c.id) ? { original_id: String(c.id) } : {}),
-                  ...(appRetry.count ? { retries: appRetry.count } : {}),
-                  ...(judgeRetry.count ? { judge_retries: judgeRetry.count } : {}),
-                  ...(isLearnCase(c) ? { arm: ARGS.arm } : {}),
-                }
-              : undefined,
+          meta: {
+            ...(safeId !== String(c.id) ? { original_id: String(c.id) } : {}),
+            ...(appRetry.count ? { retries: appRetry.count } : {}),
+            ...(judgeRetry.count ? { judge_retries: judgeRetry.count } : {}),
+            ...(isLearnCase(c) ? { arm: ARGS.arm } : {}),
+            prompt_set: ARGS.promptSet,
+          },
           model: run.model,
           usage: run.usage,
           stop_reason: run.stop_reason,

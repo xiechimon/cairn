@@ -44,6 +44,8 @@
   ],
   "harness_paths": [
     "integration/eval/chief-dispatch/stack.mts",
+    "integration/eval/chief-dispatch/prompt-set.mts",
+    "integration/eval/chief-dispatch/compare-prompt-sets.mts",
     "apps/daemon/src/backend/pi.ts",
     "apps/server/src/services/chief-tools.ts",
     "packages/shared/src/protocol/chief-tools.ts",
@@ -78,5 +80,5 @@
     "integration/eval/chief-dispatch/repo-seed/packages/shared/package.json",
     "integration/eval/chief-dispatch/repo-seed/packages/shared/src/protocol.ts"
   ],
-  "harness_sha": "17e76d90a6895e571f69ca01ddd2afd86c244d4c38da79eab0a78c7a34aed411"
+  "harness_sha": "dc6a6bf14980e97a7463ea62bf2df1afc1144a17c7bf34f9f7400c7d0c486d74"
 }

@@ -116,6 +116,8 @@ const CHIEF_DISPATCH_DIR = 'integration/eval/chief-dispatch';
 
 export const CHIEF_DISPATCH_HARNESS_PATHS = [
   `${CHIEF_DISPATCH_DIR}/stack.mts`,
+  `${CHIEF_DISPATCH_DIR}/prompt-set.mts`,
+  `${CHIEF_DISPATCH_DIR}/compare-prompt-sets.mts`,
   'apps/daemon/src/backend/pi.ts',
   'apps/server/src/services/chief-tools.ts',
   'packages/shared/src/protocol/chief-tools.ts',
