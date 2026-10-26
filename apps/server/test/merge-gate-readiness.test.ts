@@ -1758,7 +1758,7 @@ describe('ADR 0026 independent protected-path review', () => {
   function protectedInput() {
     const i = green();
     setFiles(i, [file('.github/workflows/ci.yml')]);
-    return { ...i, author: { id: 'writer', model: 'writer-model' } };
+    return { ...i, author: { id: 'writer', model: 'claude-opus-5-5' } };
   }
 
   function independent(i: GateInputs) {
@@ -1766,10 +1766,17 @@ describe('ADR 0026 independent protected-path review', () => {
       ...v('review', 'pass', 'security', computePatchDigest(compare(i).files).patchDigest),
       headSha: HEAD,
       reviewerId: 'reviewer',
-      reviewerModel: 'reviewer-model',
+      reviewerModel: 'gpt-5.5',
       gateLoosening: false,
       evalRulerChange: false,
     };
+  }
+
+  function reviewedBy(authorModel: string, reviewerModel: string) {
+    const i = protectedInput();
+    i.author = { id: 'writer', model: authorModel };
+    i.verdicts.push({ ...independent(i), reviewerModel });
+    return i;
   }
 
   test('protected paths require an independent verdict bound to this head and patch', () => {
@@ -1786,7 +1793,7 @@ describe('ADR 0026 independent protected-path review', () => {
     { patchDigest: 'pd2:old' },
     { reviewerId: 'writer' },
     { reviewerId: '' },
-    { reviewerModel: 'writer-model' },
+    { reviewerModel: 'claude-opus-5-5' },
     { reviewerModel: '' },
     { gateLoosening: undefined },
     { evalRulerChange: undefined },
@@ -1811,7 +1818,7 @@ describe('ADR 0026 independent protected-path review', () => {
     for (const author of [
       undefined,
       null,
-      { id: '', model: 'writer-model' },
+      { id: '', model: 'claude-opus-5-5' },
       { id: 'writer', model: '' },
     ]) {
       const i: GateInputs = { ...protectedInput(), author };
@@ -1839,5 +1846,71 @@ describe('ADR 0026 independent protected-path review', () => {
     expect(codesOf(i)).toEqual(['independent-review-missing']);
     i.verdicts.push(independent(i));
     expect(mergeReadiness(i).ready).toBe(true);
+  });
+
+  test('a provider prefix or a variant suffix is still the same model', () => {
+    expect(codesOf(reviewedBy('anthropic/claude-opus-5-5', 'claude-opus-5-5'))).toContain(
+      'independent-review-missing',
+    );
+    expect(codesOf(reviewedBy('claude-opus-5-5[1m]', 'claude-opus-5-5'))).toContain(
+      'independent-review-missing',
+    );
+    expect(codesOf(reviewedBy('claude-opus-5-5[1M]', 'CLAUDE-OPUS-5-5'))).toContain(
+      'independent-review-missing',
+    );
+    expect(codesOf(reviewedBy('claude-opus-5-5 ', 'claude-opus-5-5'))).toContain(
+      'independent-review-missing',
+    );
+  });
+
+  test('a radius relay alias is the same upstream model', () => {
+    expect(codesOf(reviewedBy('radius/balanced', 'kimi-k3'))).toContain(
+      'independent-review-missing',
+    );
+    expect(codesOf(reviewedBy('cheap', 'deepseek-v4.1-flash'))).toContain(
+      'independent-review-missing',
+    );
+    expect(codesOf(reviewedBy('precise[1m]', 'openai/gpt-5.6-sol'))).toContain(
+      'independent-review-missing',
+    );
+  });
+
+  test('the same vendor blocks, and the blocker names that vendor', () => {
+    const anthropic = reviewedBy('claude-opus-5-5', 'claude-sonnet-5-5');
+    expect(codesOf(anthropic)).toContain('independent-review-missing');
+    expect(detailOf(anthropic, 'independent-review-missing')).toContain(
+      'reviewer shares author vendor Anthropic',
+    );
+    const google = reviewedBy('gemini-2.5-pro', 'google/gemini-2.5-flash');
+    expect(detailOf(google, 'independent-review-missing')).toContain(
+      'reviewer shares author vendor Google',
+    );
+    const moonshot = reviewedBy('moonshotai/kimi-k2.6', 'kimi-k3');
+    expect(detailOf(moonshot, 'independent-review-missing')).toContain(
+      'reviewer shares author vendor Moonshot',
+    );
+  });
+
+  test('an id with no known vendor blocks instead of passing', () => {
+    const authorUnknown = reviewedBy('not-a-real-model', 'gpt-5.5');
+    expect(codesOf(authorUnknown)).toContain('independent-review-missing');
+    expect(detailOf(authorUnknown, 'independent-review-missing')).toContain(
+      'author vendor unknown',
+    );
+    const reviewerUnknown = reviewedBy('claude-opus-5-5', 'not-a-real-model');
+    expect(detailOf(reviewerUnknown, 'independent-review-missing')).toContain(
+      'reviewer vendor unknown',
+    );
+    expect(detailOf(reviewerUnknown, 'independent-review-missing')).toContain(
+      'author vendor Anthropic',
+    );
+  });
+
+  test('different vendors still pass after prefix and suffix normalization', () => {
+    expect(
+      mergeReadiness(reviewedBy('anthropic/claude-opus-5-5[1m]', 'openai/gpt-5.5')).ready,
+    ).toBe(true);
+    expect(mergeReadiness(reviewedBy('google/gemini-2.5-pro[1m]', 'gpt-5.5')).ready).toBe(true);
+    expect(mergeReadiness(reviewedBy('radius/balanced', 'openai/gpt-5.5')).ready).toBe(true);
   });
 });
