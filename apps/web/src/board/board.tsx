@@ -475,7 +475,6 @@ export function BoardSurface({
                         >
                           <Plus aria-hidden strokeWidth={1.75} className="size-3.5 flex-none" />
                           <span className="min-w-0 flex-1 truncate">{t('写下想做的事')}</span>
-                          <Kbd>C</Kbd>
                         </Button>
                       ) : (
                         t(EMPTY_COPY[column.id] ?? '暂无')

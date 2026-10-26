@@ -55,7 +55,8 @@ export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?:
 export const DIALOG_PRIMARY_BUTTON =
   'rounded-md text-ui disabled:bg-secondary disabled:text-content-secondary disabled:opacity-100';
 
-export const DIALOG_TEXT_BUTTON = 'gap-1.5 px-3 text-ui font-normal text-content-secondary';
+export const DIALOG_TEXT_BUTTON =
+  'gap-1.5 px-3 text-ui font-normal text-content-secondary disabled:text-content-tertiary disabled:opacity-100';
 
 export const PICKER_ROW_SELECTED =
   'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';

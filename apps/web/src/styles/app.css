@@ -149,6 +149,12 @@
     outline-offset: 2px;
   }
 
+  @media (pointer: coarse) {
+    [data-slot="kbd"] {
+      display: none;
+    }
+  }
+
   [data-slot="badge"]:focus-visible:not([aria-invalid="true"]):not(.border-border) {
     --tw-ring-shadow: 0 0 transparent;
     border-color: transparent;
