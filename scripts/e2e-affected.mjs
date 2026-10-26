@@ -58,6 +58,7 @@ const SIDEBAR = [
   'mobile-narrow',
 ];
 const DETAIL = [
+  'composer-tool-tips',
   'detail-',
   'chat-',
   'transcript-',
@@ -102,6 +103,7 @@ const DETAIL = [
   'mobile-narrow',
 ];
 const CHIEF = [
+  'composer-tool-tips',
   'chief-',
   'composer-wire-reject',
   'elevation-',

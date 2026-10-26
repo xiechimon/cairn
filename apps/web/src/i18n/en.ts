@@ -202,7 +202,7 @@ export const EN: Record<string, string> = {
   '{y}年{mo}月{d}日 {hh}:{mm} 创建': 'Created {monthShort} {d}, {y} {hh}:{mm}',
 
   // —— user-menu popover (r7 §3.5; 新功能/快捷键 行随 #163 隐去，键同删） ——
-  帐号: 'Account',
+  账号: 'Account',
   'API 密钥': 'API keys',
   外观: 'Appearance',
   浅色: 'Light',

@@ -17,6 +17,7 @@
 // derived from either live REST hooks or the fixture set.
 
 import { useLayoutEffect, useState } from 'react';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
@@ -251,33 +252,45 @@ export function Composer({
         className="composer-toolbar absolute bottom-3 left-2.5 flex items-center"
         data-testid="composer-toolbar"
       >
-        <Button
-          variant="ghost"
-          className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto`}
-          aria-label={t('添加附件')}
-          disabled={attaching || !onAttachment}
-          onClick={openFilePicker}
+        <IconTooltip
+          label={t('添加附件')}
+          trigger={
+            <Button
+              variant="ghost"
+              className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto`}
+              disabled={attaching || !onAttachment}
+              onClick={openFilePicker}
+            />
+          }
         >
           <Paperclip width={16} height={16} />
-        </Button>
+        </IconTooltip>
         {aiReview && (
-          <Button
-            variant="ghost"
-            className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
-            aria-label={t('AI 审核')}
-            onClick={onReview}
+          <IconTooltip
+            label={t('AI 审核')}
+            trigger={
+              <Button
+                variant="ghost"
+                className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
+                onClick={onReview}
+              />
+            }
           >
             <SearchPlus width={16} height={16} />
-          </Button>
+          </IconTooltip>
         )}
-        <Button
-          variant="ghost"
-          className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
-          aria-label={t('提及')}
-          onClick={togglePicker}
+        <IconTooltip
+          label={t('提及')}
+          trigger={
+            <Button
+              variant="ghost"
+              className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
+              onClick={togglePicker}
+            />
+          }
         >
           <Grid2x2 width={16} height={16} />
-        </Button>
+        </IconTooltip>
       </div>
       {streaming && (
         <Button
