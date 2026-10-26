@@ -17,6 +17,7 @@ import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
+import { startFeishuRuntime } from './services/feishu-runtime.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
@@ -71,6 +72,10 @@ const githubFetch = refreshingGithubFetch(
   { db, box: secretBox, oauthClient: config.githubOauth },
   globalThis.fetch,
 );
+const feishu = startFeishuRuntime(
+  { db, hub, machineHub, user: seeded.user, convHub, box: secretBox, reposDir },
+  seeded.team.id,
+);
 const app = createApp(
   {
     db,
@@ -80,6 +85,7 @@ const app = createApp(
     secretBox,
     user: seeded.user,
     team: seeded.team,
+    feishu,
     pingIntervalMs: config.pingIntervalMs,
     claimHoldMs: config.claimHoldMs,
     uploads: new Map(),
@@ -140,6 +146,7 @@ const server = serve(
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     scheduler.stop();
+    feishu.stop();
     killInFlightPick();
     server.close();
     close();

@@ -33,6 +33,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams/{id}/agents/{aid}/memories', note: '02 §4.4/r5 §6 实测' },
   { method: 'GET', path: '/api/teams/{id}/chief' },
   { method: 'GET', path: '/api/teams/{id}/chief/threads' },
+  {
+    method: 'GET',
+    path: '/api/teams/{id}/feishu',
+    note: 'Feishu approval bot status; the app secret is never returned',
+  },
   { method: 'GET', path: '/api/projects', query: ['teamId'] },
   { method: 'GET', path: '/api/projects/{id}/todos' },
   { method: 'GET', path: '/api/projects/{id}/branches' },
@@ -111,6 +116,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     method: 'POST',
     path: '/api/teams/{id}/skills/import',
     note: '#1170：导入通道——body {localPath} 或 {url} 二选一（本地目录 / GitHub 公共仓子目录）；落盘复用 createLocalSkill 校验；SSRF/路径守卫见 services/skill-import.ts',
+  },
+  {
+    method: 'PUT',
+    path: '/api/teams/{id}/feishu',
+    note: 'Save the Feishu bot credentials, the bound open id, and the Cairn origin used on the card',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/teams/{id}/feishu',
+    note: 'Unbind the Feishu bot and delete its stored credentials',
   },
   {
     method: 'POST',

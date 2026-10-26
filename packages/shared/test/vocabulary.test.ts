@@ -494,7 +494,9 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 
 describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity)', () => {
   it('DB table registry is the 01 §6 list + chief + steer/stop_pending + attachment + branch_sync + github_connection − skill − mcp_server − document_diff + skill_audit + shell_command + webhook_token + the four gate tables + autonomy_state + member_activity (37 incl. the todo_tag join)', () => {
-    expect(DB_TABLES).toHaveLength(41);
+    expect(DB_TABLES).toHaveLength(42);
+    expect(DB_TABLES).toContain('feishu_binding');
+    expect(INTERNAL_ONLY_TABLES).toContain('feishu_binding');
     expect(DB_TABLES).toContain('autonomy_state');
     expect(DB_TABLES).toContain('member_activity');
     expect(DB_TABLES).toContain('build_feedback');

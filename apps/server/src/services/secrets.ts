@@ -41,6 +41,7 @@ export function listSecrets(deps: SecretDeps, teamId: string): SecretRecord[] {
     .where(eq(secret.teamId, teamId))
     .orderBy(asc(secret.name))
     .all()
+    .filter((row) => !row.name.startsWith('feishu.bot.'))
     .map(toSecretRecord);
 }
 

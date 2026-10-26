@@ -96,6 +96,10 @@
               {
                 "group": ["@opentelemetry/*", "@opentelemetry/*/*"],
                 "message": "Seam discipline (observability-4): OpenTelemetry packages may only be consumed through the thin bridge module apps/daemon/src/backend/otel.ts, and only when CAIRN_OTEL_ENDPOINT is configured."
+              },
+              {
+                "group": ["@larksuiteoapi/node-sdk", "@larksuiteoapi/node-sdk/*"],
+                "message": "The Feishu SDK is consumed only through apps/server/src/services/feishu-socket.ts."
               }
             ],
             "paths": {
@@ -133,7 +137,10 @@
       }
     },
     {
-      "includes": ["apps/server/src/services/mcp-face.ts"],
+      "includes": [
+        "apps/server/src/services/mcp-face.ts",
+        "apps/server/src/services/feishu-socket.ts"
+      ],
       "linter": {
         "rules": {
           "style": {

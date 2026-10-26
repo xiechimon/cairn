@@ -414,6 +414,13 @@
       "when": 1793005785278,
       "tag": "0058_token_usage_cost_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1793037912068,
+      "tag": "0059_feishu_binding",
+      "breakpoints": true
     }
   ]
 }

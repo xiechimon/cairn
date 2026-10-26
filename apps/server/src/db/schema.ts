@@ -695,6 +695,21 @@ export const memberActivity = sqliteTable('member_activity', {
   at: epochMs('at').notNull(),
 });
 
+export const feishuBinding = sqliteTable(
+  'feishu_binding',
+  {
+    teamId: text('teamId')
+      .primaryKey()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id),
+    openId: text('openId').notNull(),
+    cairnOrigin: text('cairnOrigin').notNull(),
+  },
+  (t) => [uniqueIndex('feishu_binding_openId_unique').on(t.openId)],
+);
+
 export const buildFeedback = sqliteTable(
   'build_feedback',
   {

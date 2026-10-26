@@ -40,6 +40,7 @@ export const DB_TABLES = [
   'build_outcome_backfill',
   'memory_save_conflict',
   'memory_candidate',
+  'feishu_binding',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -65,4 +66,5 @@ export const INTERNAL_ONLY_TABLES = [
   'build_outcome_backfill',
   'memory_save_conflict',
   'memory_candidate',
+  'feishu_binding',
 ] as const;

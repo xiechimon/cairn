@@ -1201,4 +1201,18 @@ export const EN: Record<string, string> = {
   '已下架，运行时会跳过该备选': 'Delisted; this fallback is skipped at run time',
   '归属机 {machine} 未开启 {runtime} runtime，运行时会跳过该备选':
     'Home machine {machine} has the {runtime} runtime off; this fallback is skipped at run time',
+  飞书审批: 'Feishu approval',
+  '用飞书卡片批准或驳回合并。只接受已绑定的飞书用户。':
+    'Approve or reject a merge from a Feishu card. Only a bound Feishu user is accepted.',
+  '应用 ID': 'App ID',
+  应用密钥: 'App secret',
+  '飞书用户 ID': 'Feishu user ID',
+  'Cairn 地址': 'Cairn URL',
+  留空则保持现有密钥: 'Leave blank to keep the current secret',
+  '卡片上的「打开 Cairn」链接使用这个地址': 'The Open Cairn link on the card uses this address',
+  解绑: 'Unbind',
+  飞书审批已保存: 'Feishu approval saved',
+  飞书审批已解绑: 'Feishu approval unbound',
+  '保存飞书审批失败，请重试。': 'Could not save Feishu approval. Try again.',
+  '解绑飞书审批失败，请重试。': 'Could not unbind Feishu approval. Try again.',
 };

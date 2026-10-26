@@ -44,6 +44,7 @@ import {
   runtimeGatePasses,
 } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { notifyFeishuReview } from './feishu-hook.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { hasGithubConnection, teamGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -69,6 +70,7 @@ function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: P
   if (from === to) return;
   if (to === 'confirm' || to === 'review') notifyTodoPhase(deps, record, to);
   triggerChiefWakes(deps, record, to);
+  notifyFeishuReview(deps, record, to);
 }
 
 export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {

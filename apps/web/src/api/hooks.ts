@@ -372,6 +372,20 @@ export const useCapabilities = (enabled: boolean) =>
     staleTime: Number.POSITIVE_INFINITY,
   });
 
+export interface FeishuBotStatus {
+  configured: boolean;
+  appId: string | null;
+  openId: string | null;
+  cairnOrigin: string | null;
+}
+
+export const useFeishuBot = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['feishu-bot', teamId],
+    queryFn: () => api.get<FeishuBotStatus>(`/api/teams/${teamId}/feishu`),
+    enabled: enabled && teamId !== undefined,
+  });
+
 export const useGithubConnection = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['github-connection', teamId],
@@ -790,6 +804,19 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     disconnectGithub: useMutation({
       mutationFn: () => api.del<void>(`/api/teams/${teamId}/github/connection`),
+      onSuccess: invalidateAll,
+    }),
+    saveFeishuBot: useMutation({
+      mutationFn: (body: {
+        appId: string;
+        appSecret: string;
+        openId: string;
+        cairnOrigin: string;
+      }) => api.put<FeishuBotStatus>(`/api/teams/${teamId}/feishu`, body),
+      onSuccess: invalidateAll,
+    }),
+    unbindFeishuBot: useMutation({
+      mutationFn: () => api.del<void>(`/api/teams/${teamId}/feishu`),
       onSuccess: invalidateAll,
     }),
     deleteProvider: useMutation({

@@ -42,4 +42,5 @@ export interface AppContext {
   authToken: string | null;
   mcpConfigPath: string;
   logger?: Logger;
+  feishu?: { reload(): void };
 }

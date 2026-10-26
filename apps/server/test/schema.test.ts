@@ -13,13 +13,14 @@ describe('the 37-table migration (the 01 §6 list)', () => {
     const tables = Object.values(schema).filter((v) => is(v, SQLiteTable));
     const names = tables.map((t) => getTableConfig(t as SQLiteTable).name).sort();
     expect(names).toEqual([...DB_TABLES].sort());
-    expect(names).toHaveLength(41);
+    expect(names).toHaveLength(42);
     expect(names).toContain('chief');
     expect(names).toContain('attachment');
     expect(names).toContain('branch_sync');
     expect(names).toContain('github_connection');
     expect(names).toContain('shell_command');
     expect(names).toContain('gate_verdict');
+    expect(names).toContain('feishu_binding');
   });
 
   test('the migration SQL is committed and covers every table (accumulated across migrations)', () => {
@@ -37,6 +38,29 @@ describe('the 37-table migration (the 01 §6 list)', () => {
 
   test('the migrations apply cleanly to an in-memory db', () => {
     expect(() => openMemoryDb()).not.toThrow();
+  });
+
+  test('the latest snapshot lists every schema table and column', () => {
+    const journal = JSON.parse(
+      readFileSync(resolve(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
+    ) as { entries: { idx: number; tag: string }[] };
+    const last = [...journal.entries].sort((a, b) => a.idx - b.idx).at(-1);
+    expect(last).toBeDefined();
+    const snap = JSON.parse(
+      readFileSync(
+        resolve(MIGRATIONS_FOLDER, 'meta', `${String(last?.idx).padStart(4, '0')}_snapshot.json`),
+        'utf8',
+      ),
+    ) as { tables: Record<string, { columns: Record<string, unknown> }> };
+    const tables = Object.values(schema).filter((v) => is(v, SQLiteTable));
+    for (const table of tables) {
+      const config = getTableConfig(table as SQLiteTable);
+      const snapTable = snap.tables[config.name];
+      expect(snapTable, config.name).toBeDefined();
+      for (const column of config.columns) {
+        expect(snapTable?.columns[column.name], `${config.name}.${column.name}`).toBeDefined();
+      }
+    }
   });
 });
 

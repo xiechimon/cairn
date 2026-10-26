@@ -6546,6 +6546,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "build_outcome_backfill",
   "memory_save_conflict",
   "memory_candidate",
+  "feishu_binding",
 ]
 `;
 
@@ -6634,6 +6635,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   {
     "method": "GET",
     "path": "/api/teams/{id}/chief/threads",
+  },
+  {
+    "method": "GET",
+    "note": "Feishu approval bot status; the app secret is never returned",
+    "path": "/api/teams/{id}/feishu",
   },
   {
     "method": "GET",
@@ -6804,6 +6810,16 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "#1170：导入通道——body {localPath} 或 {url} 二选一（本地目录 / GitHub 公共仓子目录）；落盘复用 createLocalSkill 校验；SSRF/路径守卫见 services/skill-import.ts",
     "path": "/api/teams/{id}/skills/import",
+  },
+  {
+    "method": "PUT",
+    "note": "Save the Feishu bot credentials, the bound open id, and the Cairn origin used on the card",
+    "path": "/api/teams/{id}/feishu",
+  },
+  {
+    "method": "DELETE",
+    "note": "Unbind the Feishu bot and delete its stored credentials",
+    "path": "/api/teams/{id}/feishu",
   },
   {
     "method": "POST",

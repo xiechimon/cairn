@@ -4,6 +4,7 @@ import { registerAgentRoutes } from './routes-agents.js';
 import { registerBuildRoutes } from './routes-builds.js';
 import { registerChiefRoutes } from './routes-chief.js';
 import { registerCoreRoutes } from './routes-core.js';
+import { registerFeishuRoutes } from './routes-feishu.js';
 import { registerGitHostingRoutes } from './routes-git-hosting.js';
 import { registerProjectRoutes } from './routes-projects.js';
 import { registerResourceRoutes } from './routes-resources.js';
@@ -23,6 +24,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerResourceRoutes(app, ctx);
   registerGitHostingRoutes(app, ctx);
   registerWebhookRoutes(app, ctx);
+  registerFeishuRoutes(app, ctx);
 
   app.post('/api/analytics/first-touch', () => new Response(null, { status: 204 }));
   app.post('/_mp/api/track', () => new Response(null, { status: 204 }));
