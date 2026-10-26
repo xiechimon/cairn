@@ -73,3 +73,17 @@ test('a running call with only a start time shows no duration instead of the gap
   const items = mapTranscript({ messages: [{ id: 'think', role: 'assistant', content: [{ type: 'thinking', thinking: 'plan' }], createdAt: 1000 }, live], steps: [{ id: 'step', buildId: 'build', kind: 'build', machineId: null, createdAt: 500, status: 'claimed', checkpointCommit: null, skillInjection: null }], plans: [], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '' });
   expect(items[0]).toMatchObject({ steps: [{ kind: 'think' }, { running: true, seconds: null }] });
 });
+
+test('a call cut off in an earlier step stays unfinished when the same build resumes', () => {
+  const cut: MessageRow = { id: 'old', role: 'assistant', createdAt: 1000, content: { kind: 'toolcall', call: { id: 'old', name: 'Bash', arguments: { command: 'pnpm test' } } } };
+  const live: MessageRow = { id: 'new', role: 'assistant', createdAt: 6000, content: { kind: 'toolcall', call: { id: 'new', name: 'Bash', arguments: { command: 'pnpm lint' }, startedAt: 6000 } } };
+  const items = mapTranscript({
+    messages: [cut, live],
+    steps: [
+      { id: 'failed', buildId: 'build', kind: 'build', machineId: null, createdAt: 500, status: 'failed', checkpointCommit: null, skillInjection: null },
+      { id: 'resumed', buildId: 'build', kind: 'build', machineId: null, createdAt: 5000, status: 'claimed', checkpointCommit: null, skillInjection: null },
+    ],
+    plans: [], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '',
+  });
+  expect(items[0]).toMatchObject({ steps: [{ running: false, unfinished: true }, { running: true, unfinished: false }] });
+});

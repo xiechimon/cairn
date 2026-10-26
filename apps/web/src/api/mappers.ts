@@ -560,7 +560,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       toolNameByResult.set(pairedText, paired.name);
   }
 
-  const stepRunning = steps.some((s) => s.status === 'claimed');
+  const claimedSince = steps.find((s) => s.status === 'claimed')?.createdAt ?? null;
   const entries: TimelineEntry[] = [];
   let previousAt: number | null = null;
   for (const m of messages) {
@@ -571,7 +571,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     if (call !== null) {
       entries.push({
         at: m.createdAt,
-        item: { kind: '__work__', step: workCall(call, seconds, stepRunning) },
+        item: {
+          kind: '__work__',
+          step: workCall(call, seconds, claimedSince !== null && m.createdAt >= claimedSince),
+        },
       });
       continue;
     }
