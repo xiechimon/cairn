@@ -1,202 +1,202 @@
-# R14 · 编排拆分的父卡去留：三路取证与建议（XMON-98 拍板点 1）
+# R14 · Keep or drop the parent card in orchestration splits: three-way evidence and recommendation (XMON-98 decision point 1)
 
-> 票：XMON-98「保存并开始」后 agent 行为（Multica 票，平台已停用；决策链由 r12 承接）。本篇只闭合拍板点 1（父卡去留），其余拍板点 2–7 维持 r12 §5.1 已拍裁决。
-> **前置裁决（用户 2026-10-02 原话，经协调线程转达）**：「关于开始任务这边的执行与规划，用不同的 agent，你这个按钮不要再给我了。开始任务时，你也不要再给我选择，直接默认、直接执行、直接去规划。我的一个总管 agent 可以直接开始规划，然后根据实际的活儿，派发给前端 agent、后端 agent，或者什么验证 agent 之类的 agent。」——r12 那道「直接执行 vs 先后台编排」的题就此答死：**编排为唯一默认路径**，开始任务面不再给用户二选一。本篇的建议建立在这个前提上（父卡即这段编排过程的对象）；入口面按钮/开关的移除属实现票，不在本篇。
-> 性质：决策材料，非实现。只读调研 + 参考站最小写实验（已清理），产品代码零改动。
-> 代码基线：`origin/main` = `ee636a5`（2026-10-02；本分支即此 tip）。P 侧行号全部在此基线逐行核实。
-> 前序：`r12-save-and-start-behavior.md` §5.2 给出双方立场（用户「只要子卡、不要父卡」vs 反提案「父记录=会话、看板不渲染、子卡带来源字段」），本篇按用户要求做三路实证后拍建议——todos.dev 怎么做 / 其他同类怎么做 / herdr 当前怎么做，然后给推荐与反例批判。
-> 取证执行：三路各一条独立调研线程（L-A/L-B/L-C），证据原文与截图归档 `docs/research/assets/r14/`。
+> Ticket: XMON-98 "agent behavior after Save and start" (Multica ticket; platform decommissioned; the decision chain is carried by r12). This document closes only decision point 1 (keep or drop the parent card); decision points 2–7 stay with the rulings already made in r12 §5.1.
+> **Prior ruling (user's verbatim words of 2026-10-02, relayed via the coordination thread)**: "On the execution-vs-planning question for starting tasks — different agents for each — stop giving me this button. And when starting a task, stop giving me a choice: default it, execute directly, plan directly. One chief agent can start planning right away, then dispatch to a frontend agent, a backend agent, a verification agent, or whatever agent fits the actual work." — the r12 question "direct execution vs orchestrate-first" is thus answered for good: **orchestration is the only default path**, and the start-task surface no longer offers the user a choice. This document's recommendations build on that premise (the parent is the object of this orchestration round); removing the entry-point buttons/switches belongs to an implementation ticket and is out of scope here.
+> Nature: decision material, not implementation. Read-only research + minimal write experiments on the reference site (cleaned up afterwards), zero product-code changes.
+> Code baseline: `origin/main` = `ee636a5` (2026-10-02; this branch is at that tip). All P-side line numbers verified line by line on this baseline.
+> Preceding work: `r12-save-and-start-behavior.md` §5.2 gives both positions (user: "child cards only, no parent card" vs counter-proposal "parent record = conversation, not rendered on the board, child cards carry source fields"); per the user's request, this document makes the recommendation after three-way evidence — how todos.dev does it / how other similar products do it / how herdr currently does it — followed by the recommendation and a critique of counterexamples.
+> Evidence collection: one independent research thread per route (L-A/L-B/L-C); verbatim evidence and screenshots archived at `docs/research/assets/r14/`.
 
-## 0. 阅读约定
+## 0. Reading conventions
 
-出处四类，逐条标注：
+Four kinds of sources, marked per item:
 
-- **P**（pacman 代码）= `路径:行号`，2026-10-02 在 `ee636a5` 逐行核实。
-- **L-A / L-B / L-C**（三路取证）= 调研线程产物，正本归档：
-  - L-A `docs/research/assets/r14/raw/xmon98-laneA-todos.md`（todos.dev：仓内归档重解析 + 活体 API/浏览器取证 + 拆分实验）；
-  - L-B `docs/research/assets/r14/raw/xmon98-laneB-others.md`（Multica 官方文档快照一手 + GitHub/Linear 官方 docs live 抓取，留档同目录 `xmon98-gh-*.md` / `xmon98-linear*.md`）；
-  - L-C `docs/research/assets/r14/raw/xmon98-laneC-herdr.md`（herdr/herdr-projects 本机只读取证）。
-- **W**（wiki 转引）= `~/.agents/wiki/wiki/todos.dev 与 Multica 对照.md`（2026-09-30 两边官方文档全量精读产物），本篇引用、未重拉原文。
-- 未经复核的转引标 `[转引]`，判断标 `[推断]`；L 系证据分级沿用各产物自身的 `[实测]/[归档转引]/[推断]` 标注。
+- **P** (pacman code) = `path:line`, verified line by line on `ee636a5` on 2026-10-02.
+- **L-A / L-B / L-C** (the three evidence routes) = research-thread artifacts, archived canonical copies:
+  - L-A `docs/research/assets/r14/raw/xmon98-laneA-todos.md` (todos.dev: in-repo archive re-parsing + live API/browser evidence + a split experiment);
+  - L-B `docs/research/assets/r14/raw/xmon98-laneB-others.md` (Multica official-docs snapshot first-hand + GitHub/Linear official docs live capture; archived in the same directory as `xmon98-gh-*.md` / `xmon98-linear*.md`);
+  - L-C `docs/research/assets/r14/raw/xmon98-laneC-herdr.md` (herdr/herdr-projects local read-only evidence).
+- **W** (wiki citation) = `~/.agents/wiki/wiki/todos.dev 与 Multica 对照.md` (a 2026-09-30 full close-reading of both official docs sets), cited here without re-pulling the originals.
+- Unverified citations are marked `[cited]`; judgments are marked `[inference]`; L-series evidence keeps the `[measured]/[archive-cited]/[inference]` grading from each artifact itself.
 
-截图索引（`docs/research/assets/r14/`）：参考站活体捕获（2026-10-02）——`11-todo12-card-zoom.png`（看板卡「由总管创建」芯片特写）、`15-board-after-split.png`（拆分实验后看板）、`14-chief-round1-receipt.png`（拆分回执）、`12-chief-chat-expanded.png`（chief 会话面板全貌）、`03-todo12-detail.png`（详情页全文——零来源呈现）、`10-cdp-board.png`、`06-board-with-chief-created-chip.png`、`13-chief-gap-exp-round1.png`；用户供给——`07-start-task-dialog-user-shot.png`（当前「开始任务」弹窗，即前置裁决中要撤掉选择的面：双分支按钮与指派选择器，代码面 `overlays.tsx:322,329`，载荷 #318）。
+Screenshot index (`docs/research/assets/r14/`): live captures on the reference site (2026-10-02) — `11-todo12-card-zoom.png` (board card `由总管创建` chip close-up), `15-board-after-split.png` (board after the split experiment), `14-chief-round1-receipt.png` (split receipt), `12-chief-chat-expanded.png` (chief conversation panel full view), `03-todo12-detail.png` (detail page full text — zero source presentation), `10-cdp-board.png`, `06-board-with-chief-created-chip.png`, `13-chief-gap-exp-round1.png`; user-supplied — `07-start-task-dialog-user-shot.png` (the current "start task" dialog, i.e. the surface whose choices the prior ruling removes: the two-branch buttons and the assignment picker, code side `overlays.tsx:322,329`, payload #318).
 
-## 1. 判定问题与既定约束
+## 1. The question under ruling and standing constraints
 
-**前提（用户 2026-10-02 已拍）**：编排是唯一默认路径——每个「开始任务」（含「保存并开始」）都过总管编排回合：总管直接规划，按活的类型派给前端 / 后端 / 验证等专职 agent，入口不给选择。这同时修正 r12 §5.1 拍板点 4 的后半句（「对话框加用户开关」作废——入口无开关），并把「每次开始都产生一个编排回合」变成常态。据此本篇的问题重述为：**这段编排过程的对象（父）该不该出现在看板；派发出去的专职 agent 各自的任务卡怎么归属**——这才是父卡问题的实质。
+**Premise (ruled by the user on 2026-10-02)**: orchestration is the only default path — every "start task" (including "Save and start") goes through a chief orchestration round: the chief plans directly and dispatches to dedicated frontend / backend / verification agents by the actual work, with no choice at the entry point. This simultaneously corrects the second half of r12 §5.1 decision point 4 ("add a user switch to the dialog" is void — no switch at the entry), and makes "every start produces an orchestration round" the norm. The question of this document is restated accordingly: **should the object of this orchestration round (the parent) appear on the board; and how do the task cards of the dispatched dedicated agents belong** — that is the real substance of the parent-card question.
 
-三个候选形态：（a）父卡对象并渲染看板；（b）父记录存在但不渲染；（c）父不存在、只有子卡。连带：数据面怎么表达归属、完成判定挂哪、原文锚点在哪。
+Three candidate shapes: (a) the parent-card object exists and is rendered on the board; (b) a parent record exists but is not rendered; (c) no parent at all, only child cards. Corollaries: how the data plane expresses belonging, where the completion judgment hangs, and where the original-text anchor lives.
 
-**P 侧既定事实**（约束面，全部 2026-10-02 在 `ee636a5` 重核）：
+**Standing P-side facts** (constraint surface, all re-verified on `ee636a5` on 2026-10-02):
 
-1. `todo.sourceTodo` 休眠列存在但恒写 null（`apps/server/src/db/schema.ts:81`；`apps/server/src/services/todos.ts:224`）。激活它 = 把父子关系抬进领域模型。
-2. 来源家族已有：`sourceKind` 枚举现仅 `['github-issue','github-issue-self']`（`packages/shared/src/records/todo.ts:43`），`sourceRef` 形如 `github:owner/repo#123`（格式单源 #446）；详情页有来源面板（`apps/web/src/detail/source-issue.tsx:26`——`sourceKind === null` 即整块不渲染）；看板卡片当前无来源标识。
-3. `CONTEXT.md:31` 现裁决：「无 Goal 概念——工作单元只有一个，即 todo」；「来源」词条定义为「todo 的**外部**出处」。
-4. Chief 建卡溯源已实装且对齐参考站：`create_todo` 落 `createdBy = ctx.chiefAgentId`、`sourceBuildId = ctx.chiefId`（`apps/server/src/services/chief-tools.ts:369-375`）——但 `sourceBuildId` 是 chief **实例** id（`chief-<userId>-<teamId>`，跨全部请求共用），**答得出「谁建的」、答不出「哪次请求拆的」**；`create_todo` 工具无 sourceKind 参数面。
-5. Chief 会话面板已存在（`apps/web/src/overlays/hotkeys.ts:89-94` ⌘J 抽屉；#619 刚做过总管抽屉闭环）——「整个请求」的聚合视图有现成落点。
-6. 相位九值无「编排中」（`apps/web/src/phase.ts`）；Build≡Conversation（执行与消息流同一实体两面，CONTEXT.md 边界裁决）；GitHub-backed 项目每 todo fire-and-forget 建镜像 issue（`apps/server/src/services/todos.ts:242`）。
+1. The `todo.sourceTodo` dormant column exists but is always written null (`apps/server/src/db/schema.ts:81`; `apps/server/src/services/todos.ts:224`). Activating it = elevating parent-child relationships into the domain model.
+2. A source family already exists: the `sourceKind` enum currently has only `['github-issue','github-issue-self']` (`packages/shared/src/records/todo.ts:43`), and `sourceRef` looks like `github:owner/repo#123` (single-source format #446); the detail page has a source panel (`apps/web/src/detail/source-issue.tsx:26` — when `sourceKind === null` the whole block is not rendered); board cards currently show no source indicator.
+3. `CONTEXT.md:31` current ruling: "no Goal concept — there is only one unit of work, the todo"; the `来源` (source) entry is defined as "the **external** origin of a todo".
+4. Chief card-creation traceability is implemented and aligned with the reference site: `create_todo` writes `createdBy = ctx.chiefAgentId`, `sourceBuildId = ctx.chiefId` (`apps/server/src/services/chief-tools.ts:369-375`) — but `sourceBuildId` is the chief **instance** id (`chief-<userId>-<teamId>`, shared across all requests), so it **answers "who created it" but not "which request split it"**; the `create_todo` tool has no sourceKind parameter surface.
+5. The chief conversation panel already exists (`apps/web/src/overlays/hotkeys.ts:89-94` ⌘J drawer; #619 just completed the chief-drawer closed loop) — there is a ready landing point for a "whole request" aggregation view.
+6. The nine phase values have no "orchestrating" (`apps/web/src/phase.ts`); Build ≡ Conversation (execution and message stream are two faces of the same entity, CONTEXT.md boundary ruling); GitHub-backed projects fire-and-forget a mirror issue per todo (`apps/server/src/services/todos.ts:242`).
 
-## 2. 三路取证
+## 2. The three evidence routes
 
-### 2.1 todos.dev（参考站——语义轴对齐对象）
+### 2.1 todos.dev (the reference site — the semantic-axis alignment target)
 
-来源：L-A（环境：team free 档，chief 绑定 Agent r3-builder，tds CLI 0.1.53；活体含唯一写操作=拆分缺口实验，r98 标记，事后已清理——实验卡删除、daemon 停、参考站回到实验前状态）。
+Sources: L-A (environment: team free tier, chief bound to Agent r3-builder, tds CLI 0.1.53; the live portion contains a single write operation = the split-gap experiment, marked r98, cleaned up afterwards — experiment cards deleted, daemon stopped, reference site restored to its pre-experiment state).
 
-1. **父概念四层全无** [L-A 实测]：
-   - API：todo doc 字段集 20 键（19+v）无 parent/parentId/goalId/epicId 任何形态——活体 `GET /api/teams/{id}/progress` 重放 + r5 时代抓包 5 张 doc 交叉验证（字段集两代一致）。
-   - Chief 工具词表：49 键（活体 `toolDefHashes`）无 create_parent/goal/epic/subtask 类工具。
-   - docs/MCP 能力面：写工具 13 件、能力六组，无 parent 概念（`r3-protocol-executor.md:208,216`）。
-   - UI：看板 6 相位列平铺卡片（`r2-app-ui-inventory.md:147-165`）、详情页字段清单、新建表单均无父引用；营销站 21 条功能卡无 epic/goal/milestone 字样（`r1-site-inventory.md:124-125`）。
-2. **拆分实验** [L-A 实测]：自然措辞「一份文档 + 一个代码功能」（两件互不依赖的跨类型交付物）→ Chief 回合 46s 拆 **2 张 todo**（#23/#24），按职责文本分派（代码→r3-builder、文档→r5-scribe），派工即 `withPlan:false` 直接执行 + 自动挂 watch。看板渲染 = **2 张平级卡落相位列、随相位各漂各列**（#23→review、#24→failed），无父行/分组/容器卡，唯一共同视觉是同项目芯片（`15-board-after-split.png`）。回执在会话线程内，列两张卡的实体芯片（`14-chief-round1-receipt.png`）。
-   - 对照 r5 时代「三件同类小事」→ **1 张** todo（标题 `+` 连接，`r5-chief-behavior.md:60`）——**拆不拆是 Chief 按请求结构自裁**：同类小事项合并、跨类型可独立验收的交付物拆开，无用户确认闸。
-3. **溯源三层** [L-A 实测]：
-   - 机器字段：`createdBy` = chief 绑定 Agent id（人手建卡该字段=用户 id，活样本对照）；`sourceBuildId` = **chief 记录 id，不是线程 id**——#12（线程 A）与 #23/#24（线程 r98）三卡同值。「子卡→具体哪次会话」的链接只存在于 ①会话消息里的 `[#N](todo:<id>)` 实体引用、②watch 记录的 `threadId`（watch 在 settle/failed 后自动解除——解除后即无持久链接）。
-   - spec 结构：`> 归一化改写后的本子任务相关片段`（非逐字全文，「第一件/第二件」被剥掉、冠以请求主题）+ `要求：` bullet + **兄弟任务的文字交叉引用**（无数据字段）。逐字原话只保存在 chief 会话的 user 消息里。r5 §3.2（#11 spec 三段式）同构。
-   - 可见呈现：看板卡底行一枚「**由总管创建**」芯片（`11-todo12-card-zoom.png`；2026-10-02 新观测，r5 时代无此芯片——UI 演进新增）；**详情页零来源**（`03-todo12-detail.png` 全文核）。
-4. **容器 = chief 会话** [L-A 实测]：入口两处（侧栏「工作台」+ 看板头「展开总管聊天」，`12-chief-chat-expanded.png`）；user 消息逐字存原话（唯一逐字存档处）；gate/settle/failed 的全部 wake 汇报回流该线程（r5 §3.5：review 停关 1 秒内 chief 领 wake step 在线程内汇报）。无任何其他「请求级」视图：看板不聚合、项目页任务 tab 平列表、搜索无请求分组。
+1. **The parent concept is absent on all four layers** [L-A measured]:
+   - API: the todo doc field set of 20 keys (19+v) has no parent/parentId/goalId/epicId in any form — verified by replaying live `GET /api/teams/{id}/progress` + cross-checking 5 docs captured in the r5 era (the field set is identical across both generations).
+   - Chief tool vocabulary: the 49-key live `toolDefHashes` has no create_parent/goal/epic/subtask-style tool.
+   - docs/MCP capability surface: 13 write tools, six capability groups, no parent concept (`r3-protocol-executor.md:208,216`).
+   - UI: the board's 6 phase columns tile cards flat (`r2-app-ui-inventory.md:147-165`); detail-page field lists and the new-task form have no parent reference; the marketing site's 21 feature cards contain no epic/goal/milestone wording (`r1-site-inventory.md:124-125`).
+2. **The split experiment** [L-A measured]: a natural phrasing "one document + one code feature" (two independently deliverable cross-type artifacts) → the chief round split it into **2 todos** (#23/#24) in 46s, dispatched by responsibility text (code → r3-builder, document → r5-scribe), dispatch = `withPlan:false` direct execution + automatic watch. Board rendering = **2 flat sibling cards landing in phase columns, drifting column by column with their phases** (#23→review, #24→failed), no parent row/grouping/container card; the only shared visual is the same-project chip (`15-board-after-split.png`). The receipt lives in the conversation thread and lists entity chips of both cards (`14-chief-round1-receipt.png`).
+   - Contrast with the r5-era "three small same-type items" → **1** todo (title joined with `+`, `r5-chief-behavior.md:60`) — **whether to split is the chief's own judgment by request structure**: same-type small items are merged; cross-type independently verifiable deliverables are split; there is no user confirmation gate.
+3. **Three-layer traceability** [L-A measured]:
+   - Machine fields: `createdBy` = the chief-bound Agent id (a manually created card carries the user id in this field, live sample contrast); `sourceBuildId` = **the chief record id, not the thread id** — cards #12 (thread A) and #23/#24 (thread r98) share the same value across three cards and two threads. The link "child card → which specific conversation" exists only in ① the `[#N](todo:<id>)` entity references inside conversation messages and ② the watch record's `threadId` (the watch auto-detaches after settle/failed — after detachment there is no persistent link).
+   - spec structure: `> a normalized rewrite of the relevant fragment of this subtask` (not the verbatim full text — "the first item / the second item" is stripped and replaced by the request topic) + `要求：` bullets + **textual cross-references between sibling tasks** (no data fields). The verbatim original words are kept only in the chief conversation's user message. r5 §3.2 (#11 spec three-section shape) is isomorphic.
+   - Visible presentation: a single `**由总管创建**` chip on the board card's bottom row (`11-todo12-card-zoom.png`; newly observed on 2026-10-02, absent in the r5 era — a UI-evolution addition); **zero source on the detail page** (full-text check of `03-todo12-detail.png`).
+4. **The container = the chief conversation** [L-A measured]: two entry points (sidebar `工作台` + board header `展开总管聊天`, `12-chief-chat-expanded.png`); user messages store the original words verbatim (the only verbatim archive); all wake reports of gate/settle/failed flow back to that thread (r5 §3.5: within 1 second of a review stop the chief receives a wake step and reports inside the thread). There is no other "request-level" view: the board does not aggregate, the project page's tasks tab is a flat list, search has no request grouping.
 
-### 2.2 其他同类（Multica + GitHub sub-issues + Linear）
+### 2.2 Other similar products (Multica + GitHub sub-issues + Linear)
 
-来源：L-B（Multica = wiki raw 官方文档快照一手复核，`~/.agents/wiki/raw/sources/2026-09/2026-09-30-todos-vs-multica-docs/multica/`；GitHub 四页 + Linear 两页 = 2026-10-02 agent-reach Jina live 抓取复核，留档 `assets/r14/raw/xmon98-gh-*.md`、`xmon98-linear*.md`）。取证细节（issues.txt/cli.txt 行号、REST 端点、Display Options 引文）全在 L-B 原文，本节只收裁决相关结论。
+Sources: L-B (Multica = first-hand re-review of the wiki raw official-docs snapshot, `~/.agents/wiki/raw/sources/2026-09/2026-09-30-todos-vs-multica-docs/multica/`; GitHub four pages + Linear two pages = 2026-10-02 agent-reach Jina live captures, archived as `assets/r14/raw/xmon98-gh-*.md`, `xmon98-linear*.md`). Collection details (issues.txt/cli.txt line numbers, REST endpoints, Display Options quotes) are all in the L-B original text; this section keeps only the ruling-relevant conclusions.
 
-1. **三家共同形态**：父 = 一张真实 issue（渲染成卡/条目）；子 = 完整 issue（自己的编号/assignee/状态/执行历史）；**归属一律存子票上的显式关系字段**（Multica `--parent`/`--stage`、GitHub REST+gh CLI+Projects 字段、Linear parent 字段+属性继承）。没有一家把父做成纯会话或纯记录。
-2. **分歧只在两条轴**：父子状态联动（Multica 无 / GitHub 无 / Linear 团队级可选双向）× 看板折叠（不折叠 / 不折叠 / 可隐藏子票）。
-3. **Multica 的窄化**（issues.txt:101 原话「Parent and child statuses do not affect each other」）：父卡语义被窄化为三件事——总目标正本（「the parent issue keeps the overall goal」）、leader 核收线程（XMON-92 活样本：派发回执/核销汇报全落父票评论区，核收权在 leader）、stage 屏障唤醒锚点（最早未完成 stage 的子票全关时通知父票订阅者并唤醒 leader）。父票翻 `in_review` 归 leader、`done` 归人或 PR；通知只冒泡状态变更不冒泡评论。
-4. **GitHub 的窄化**：纯数据关系 + 只读聚合——子票区嵌父票描述底部、`Sub-issues · 1/3 (33%)` 进度行、子票头部常驻回链；Projects 里父与子**各自是独立 item**，靠 group by "Parent issue" / filter 表达层级；无状态联动记载。上限 100 子票 / 8 层嵌套。
-5. **Linear 的窄化**：子票显示是视图层开关（列表里只显示父与无父票）；rollup 是团队级 opt-in（子全 done→父 done / 父 done→子全 done，双向可分别开）；拆票是父票详情页一等动作（保存一张自动开下一张）；**「父转 project」**= 容器升级官方先例（父大到不该是一张卡时换容器类型并解除父子关系）。
-6. **L-B 对 pacman 的判词**：反提案（来源字段 + 会话容器）在 issue 系家族里无先例，等于把 Multica 父卡的三职能（原话锚点/核收线程/唤醒锚点）拆出去另设容器——「属无人走过的形态，落地时三承接点需自证」。
+1. **The shared shape across all three**: the parent = a real issue (rendered as a card/entry); children = full issues (their own number/assignee/status/execution history); **belonging is always stored in an explicit relationship field on the child** (Multica `--parent`/`--stage`, GitHub REST+gh CLI+Projects fields, Linear parent field + attribute inheritance). No one makes the parent a pure conversation or a pure record.
+2. **The disagreement is on exactly two axes**: parent-child status coupling (Multica none / GitHub none / Linear team-level optional bidirectional) × board folding (no folding / no folding / sub-issues hideable).
+3. **Multica's narrowing** (issues.txt:101 verbatim "Parent and child statuses do not affect each other"): the parent card's semantics are narrowed to three duties — the canonical copy of the overall goal ("the parent issue keeps the overall goal"), the leader's acceptance thread (the XMON-92 live sample: dispatch receipts and acceptance reports all land in the parent ticket's comment section, acceptance authority with the leader), and the stage-barrier wake anchor (when all children of the earliest unfinished stage close, parent subscribers are notified and the leader is woken). Flipping the parent to `in_review` belongs to the leader, `done` to a human or PR; notifications bubble status changes only, not comments.
+4. **GitHub's narrowing**: a pure data relationship + read-only aggregation — the sub-issues area embedded at the bottom of the parent description, a `Sub-issues · 1/3 (33%)` progress line, a permanent backlink in the child header; in Projects, parent and child are **independent items each**, the hierarchy expressed via group by "Parent issue" / filters; no status coupling on record. Limit: 100 children / 8 nesting levels.
+5. **Linear's narrowing**: child display is a view-layer switch (the list shows only parents and parentless tickets); rollup is a team-level opt-in (all children done → parent done / parent done → all children done, each direction separately switchable); splitting is a first-class action on the parent detail page (saving one auto-opens the next); **"parent converts to project"** = the official precedent of container upgrade (when a parent grows beyond what a card should be, switch the container type and dissolve the parent-child relationship).
+6. **L-B's verdict on pacman**: the counter-proposal (source fields + conversation container) has no precedent in the issue-family — it amounts to splitting Multica parent's three duties (original-text anchor / acceptance thread / wake anchor) out into a separate container — "an untrodden shape; the three landing points must prove themselves at implementation time".
 
-### 2.3 herdr / herdr-projects（用户自己的协调系统）
+### 2.3 herdr / herdr-projects (the user's own coordination system)
 
-来源：L-C（只读取证：`--help` / list / show / overview / context + Read；herdr client 0.9.3 / server 0.9.1 / 插件 0.2.34；取样项目 = pacman 本身，本调研线程即其 t-0033 线程——自己就是活样本）。
+Sources: L-C (read-only evidence: `--help` / list / show / overview / context + Read; herdr client 0.9.3 / server 0.9.1 / plugins 0.2.34; sampled project = pacman itself, and this research thread is its t-0033 thread — the sample is alive).
 
-1. **对象**：项目 = 磁盘文件夹（PROJECT.md/TASKS.md/memory/threads/…）+ 一个 cwd 钉在文件夹里的常驻 coordinator agent；线程 = `threads/t-NNNN.toml` + `.task.md`（任务书 + 全部 follow-up prompt）+ report `.md` 三件套挂一个 herdr pane。
-2. **父/子词汇不存在**：线程记录 48 字段里**零个父引用**；唯一连结是 TASKS.md 任务行行尾可选后缀 `· t-NNNN`——**做完即删的指针**，历史沉淀在线程记录里（resolved 27 条 overview 永久在列）。
-3. **项目从不渲染成卡/行**：四个界面（TUI 侧边栏分组头、projects popup scope、tab bar 计数、overview 标题行）全部是容器形态；状态（idle/working/blocked、percent）全长在线程上；工作单元永远是线程。
-4. **完成判定外包**：任务行由用户口述/coordinator 删、PR merged 由 ticker 自动 resolve——没有「全子绿=父解决」自动聚合语义。
-5. **结构差** [L-C 推断]：herdr 的会话容器是 **per-project 常驻 coordinator**，不是 per-request；per-request 溯源靠 per-thread `.task.md` 任务书 + 命名嵌 slug（记录目录/worktree 名/thread_dir 名/sidebar token 四处重复、零引用字段）——等价于 sourceKind 路线而不带字段。
+1. **Objects**: a project = a disk folder (PROJECT.md/TASKS.md/memory/threads/…) + a resident coordinator agent whose cwd is pinned to the folder; a thread = `threads/t-NNNN.toml` + `.task.md` (the task brief + all follow-up prompts) + a report `.md` triple hanging off one herdr pane.
+2. **The parent/child vocabulary does not exist**: zero parent references among the thread record's 48 fields; the only link is the optional `· t-NNNN` suffix at the end of a task line in TASKS.md — a **delete-on-completion pointer**; history settles in thread records (27 resolved entries permanently listed in overview).
+3. **A project is never rendered as a card/row**: all four surfaces (TUI sidebar group header, projects popup scope, tab bar counts, overview title row) are container forms; status (idle/working/blocked, percent) all lives on threads; the unit of work is always the thread.
+4. **Completion judgment is outsourced**: task lines are deleted on the user's word / by the coordinator; PR merges are auto-resolved by the ticker — there is no automatic "all children green = parent solved" aggregation semantics.
+5. **Structural difference** [L-C inference]: herdr's conversation container is a **per-project resident coordinator**, not per-request; per-request traceability relies on the per-thread `.task.md` brief + naming-embedded slugs (repeated in four places: record directory / worktree name / thread_dir name / sidebar token, zero reference fields) — equivalent to the sourceKind route but without the field.
 
-## 3. 交叉对照
+## 3. Cross comparison
 
-| 轴 | todos.dev（参考站） | Multica | GitHub sub-issues | Linear | herdr |
+| Axis | todos.dev (reference site) | Multica | GitHub sub-issues | Linear | herdr |
 |---|---|---|---|---|---|
-| 父对象 | **无**（四层零概念） | issue（一等部件） | issue | issue | **无**（项目=文件夹+常驻会话） |
-| 父在看板 | —（看板只有 todo） | 五视图同渲普通卡 | 父子各自独立 item | 可视图层隐藏子票 | 项目=分组头/scope/计数 |
-| 归属存哪 | 子卡机器字段（chief **记录级**）+会话实体引用+watch threadId（瞬态） | 子票 `--parent`/`--stage` | 子票 parent 关系（REST/CLI/Projects） | 子票 parent+属性继承 | 磁盘布局+命名（4 处、零字段）+任务行后缀（易逝） |
-| 状态联动 | — | 零联动（leader 协议管父） | 零联动（只读聚合） | 团队级可选双向 | —（人+ticker） |
-| 请求容器 | chief 会话（逐字原话+回执+全 wake 回流） | 父票评论区 | 父票描述底部子票区 | 父票描述下方 | coordinator 常驻会话（per-project） |
-| 完成判定 | — | leader 人工核收 | 计数显示（不联动） | opt-in 计数 auto-close | 人+ticker（PR merged 自动 resolve） |
-| 可见溯源 UI | 看板卡「由总管创建」芯片 | 子票挂父票下（关系即显示） | 子票头部常驻回链 | 子票列表+filter | 侧边栏分组 |
+| Parent object | **none** (zero concept on all four layers) | issue (first-class part) | issue | issue | **none** (project = folder + resident conversation) |
+| Parent on the board | — (board has only todos) | rendered as an ordinary card in all five views | parent and child independent items each | view layer can hide children | project = group header / scope / counts |
+| Where belonging is stored | child-card machine fields (chief **record-level**) + in-conversation entity references + watch threadId (transient) | child `--parent`/`--stage` | child parent relationship (REST/CLI/Projects) | child parent + attribute inheritance | disk layout + naming (4 places, zero fields) + task-line suffix (ephemeral) |
+| Status coupling | — | zero coupling (leader protocol manages the parent) | zero coupling (read-only aggregation) | team-level optional bidirectional | — (human + ticker) |
+| Request container | chief conversation (verbatim original words + receipts + all wakes flowing back) | parent ticket comment section | sub-issues area at the bottom of the parent description | below the parent description | resident coordinator conversation (per-project) |
+| Completion judgment | — | leader's manual acceptance | count display (no coupling) | opt-in count auto-close | human + ticker (PR merged auto-resolve) |
+| Visible traceability UI | board card `由总管创建` chip | children hang under the parent (relationship is the display) | permanent backlink in child header | child list + filter | sidebar grouping |
 
-**两极**：参考站与 herdr（**容器非卡**：会话/文件夹是父，子才是可见工作对象）vs issue 系三家（**父=卡 + 语义窄化**：状态不联动、显示可关、聚合只读）。pacman 的语义轴已钉在 todos.dev（spec 18 定位两轴：语义对齐 todos 三点核心），且看板模型（相位列=执行单元）与 issue 系（自由状态+视图自由分组）不同构——这决定了下面的取向。
+**The two poles**: the reference site and herdr (**container is not a card**: the conversation/folder is the parent, only children are the visible work objects) vs the three issue-family products (**parent = card + narrowed semantics**: no status coupling, display switchable, aggregation read-only). pacman's semantic axis is pinned to todos.dev (spec 18 positioning, two axes: the "semantic alignment with todos" core of three points), and its board model (phase columns = execution units) is not isomorphic to the issue family (free status + free view grouping) — this decides the orientation below.
 
-## 4. 别的做法错在哪
+## 4. Where the other approaches go wrong
 
-先立界：三家在自己的语境里都自洽（issue 是人手写的规划对象、父票先于工作存在、视图层自由分组）。下面列的是**对 pacman 语境**的错处——pacman 的入口是「对话框里一句请求」，拆分发生在 agent 侧、产物落相位机看板。
+Boundary first: all three are self-consistent in their own contexts (issues are human-written planning objects, the parent ticket exists before the work, grouping is free at the view layer). What follows lists what is wrong **for pacman's context** — pacman's entry point is "one sentence of request in a dialog", the split happens on the agent side, and the artifacts land on a phase-machine board.
 
-**Multica（父卡=看板实体，三职能全压父卡）**：
-1. **状态双轨**：父票有自己的状态、平台不联动，leader 协议被迫背一条「只在整体达成时翻 in_review」的责任——父状态是可从子票推导的信息的劣化副本，多出一类 drift 失败（父 in_progress 而子全绿），而修正它靠 prompt 纪律不靠机制。
-2. **原文锚点被混流掩埋**：父票线程既是编排会话载体（派发回执/核收汇报/兜底唤醒全落评论区），原话就和新事件流共线——XMON-92 活样本里用户原话被派发回执顶到深处。锚点要的是稳定地址，不是热闹地址。
-3. **看板上多一个不可执行位**：pacman 相位九值没有一个能描述父卡——它没有自己的 plan/build/review，落哪列都是谎；且每请求核销次数 +1（先父后子），正是用户直觉要删的噪音。
+**Multica (parent card = board entity, all three duties pressed onto the parent card)**:
+1. **Dual state tracks**: the parent ticket has its own state and the platform does not couple it, so the leader protocol is forced to carry a responsibility of "flip to in_review only when the whole is done" — the parent state is a degraded copy of information derivable from the children, adding a class of drift failures (parent in_progress while all children are green), and correcting it relies on prompt discipline rather than mechanism.
+2. **The original-text anchor is buried by mixed traffic**: the parent ticket thread is both the orchestration conversation carrier (dispatch receipts / acceptance reports / fallback wakes all land in the comment section) and the anchor — the original words share a line with the new event stream. In the XMON-92 live sample, the user's original words were pushed deep by dispatch receipts. An anchor needs a stable address, not a busy address.
+3. **One more non-executable slot on the board**: none of pacman's nine phase values can describe a parent card — it has no plan/build/review of its own, so any column it lands in is a lie; and the review count per request grows by one (parent first, then children), precisely the noise the user's intuition wants deleted.
 
-**GitHub sub-issues（纯数据关系+只读聚合）**：
-1. **WIP 双计**：父与子在 Projects 里各自是独立 item——3 子任务请求 = 4 行；父票带进度显示却无执行语义，占位不干活。
-2. **计数聚合给假完整感**：`1/3 (33%)` 只数已关子票——**漏拆的那张根本不在分母里**。r12 §5.4 死因 4（错拆/漏拆静默通过）在计数 rollup 下不是被对冲而是被放大。
+**GitHub sub-issues (pure data relationship + read-only aggregation)**:
+1. **Double WIP counting**: parent and child are independent items in Projects — a 3-subtask request = 4 rows; the parent ticket carries a progress display but has no execution semantics, occupying space without doing work.
+2. **Count aggregation gives a false sense of completeness**: `1/3 (33%)` only counts closed children — **the card that was never split out is not in the denominator at all**. r12 §5.4 death cause 4 (wrong/incomplete decomposition passing silently) is not hedged but amplified under count rollups.
 
-**Linear（可隐藏+可选联动）**：
-1. 双向 auto-close 把上一条公式化到极致：**子全 done → 父自动 done**——把语义核收降维成计数闸，「全绿=解决」恰是要防的假信号。
-2. 但它贡献两个**正向**反例：子票显示做成视图层开关（显示问题不上升为对象模型问题）；「父转 project」官方承认卡不是万能容器——容器大到不该是一张卡时换容器类型，而不是让父卡膨胀。
+**Linear (hideable + optional coupling)**:
+1. Bidirectional auto-close formalizes the previous formula to the extreme: **all children done → parent auto-done** — reducing semantic acceptance to a counting gate, and "all green = solved" is exactly the false signal to guard against.
+2. But it contributes two **positive** counterexamples: child display as a view-layer switch (a display problem does not have to be elevated into the object model); and "parent converts to project" officially admits a card is not a universal container — when the container grows beyond what a card should be, switch the container type rather than letting the parent card bloat.
 
-**herdr（正向样本）**：容器=会话/文件夹、子=工作单元、任务行=做完即删的指针——「父是容器、子才可见」在 27 条 resolved 线程的日用量下运转良好。完成判定外包给人+ticker，不做计数聚合。
+**herdr (positive sample)**: container = conversation/folder, children = units of work, task lines = delete-on-completion pointers — "the parent is a container, only children are visible" runs well under daily use with 27 resolved threads. Completion judgment is outsourced to human + ticker, with no count aggregation.
 
-**todos.dev（推荐形态，两处欠账 pacman 应补而非照抄）** [推断]：
-1. **per-request 链接不持久**：`sourceBuildId` 只到 chief 记录级；「子卡→哪次会话」靠会话内实体引用与 watch threadId 传递，watch 在 settle/failed 后自动解除——重拆/聚合场景下链接即失。pacman 若照抄，驳回重拆与「按请求看全貌」都只能靠文本搜索。
-2. **详情页零来源**：卡片芯片之外，从子卡详情页找不到「这张卡从哪来」——发现路径依赖用户知道去开 chief 面板。
+**todos.dev (the recommended shape, with two debts pacman should close rather than copy)** [inference]:
+1. **The per-request link is not persistent**: `sourceBuildId` only reaches chief-record granularity; "child card → which conversation" is carried by in-conversation entity references and the watch threadId, and the watch auto-detaches after settle/failed — the link is lost in re-split/aggregation scenarios. If pacman copies this, rejection-driven re-decomposition and "see the whole request" both degrade to text search.
+2. **Zero source on the detail page**: beyond the card chip, the child card's detail page offers no way to find "where did this card come from" — the discovery path assumes the user knows to open the chief panel.
 
-## 5. 建议
+## 5. Recommendation
 
-**一句话：父卡不引入、看板不渲染任何父容器；「父」= 编排会话（chief conversation）+ 子卡持久来源字段（sourceKind 家族扩 `orchestration`，sourceRef = 编排会话 id）；不激活 sourceTodo、不加相位、不做计数 rollup。**
+**In one sentence: no parent card is introduced, and the board renders no parent container; the "parent" = the orchestration conversation (chief conversation) + a persistent source field on child cards (the sourceKind family extended with `orchestration`, sourceRef = the orchestration conversation id); do not activate sourceTodo, do not add a phase, do not build count rollups.**
 
-即 r12 §5.2 反提案路线，本篇三路取证后确认成立，且比参考站多走一步（per-request 持久字段——补它的两处欠账）。
+That is the counter-proposal route from r12 §5.2, confirmed after the three-way evidence in this document, and going one step further than the reference site (a per-request persistent field — closing its two debts).
 
-**前置裁决给这条结论加的码**：编排既然是每次开始的常态，父卡就不再是「复杂请求的附属品」而是**每任务恒 +1 的看板对象**——单任务裁定（总管判不拆，1 张卡指派一个专职 agent）也要配一张父卡才自洽，等于给产品加一道人人可见的仪式对象。反过来，容器=会话在这前提下**渲染成本恒为零**：不拆时就是一张普通卡（无容器语义），拆了才会话面板多一轮线索——编排的可见性随拆分发生才出现，正好匹配「拆分是总管自裁、多数请求不拆」的实测形态（§2.1.2：同类合并、跨类型才拆）。专职 agent 派发机制现成：职责文本权重分派（r5 §3.3 实测 + pacman chief 系统提示分派策略段）。
+**What the prior ruling adds to this conclusion**: since orchestration is now the norm on every start, the parent card stops being "an accessory of complex requests" and becomes a **+1 board object on every task** — even a single-task verdict (the chief judges no split, one card assigned to one dedicated agent) needs a parent card to be self-consistent, which amounts to adding a ceremonial object visible to everyone. Conversely, under this premise **the container-as-conversation has constantly zero render cost**: with no split it is just an ordinary card (no container semantics), and only when a split happens does the conversation panel gain a round of traces — orchestration visibility appears exactly when a split occurs, matching the measured shape "splitting is the chief's own judgment, most requests are not split" (§2.1.2: same-type merges into one, cross-type splits into two). The dedicated-agent dispatch mechanism is ready-made: responsibility-text-weighted dispatch (r5 §3.3 measured + the dispatch-policy section in pacman's chief system prompt).
 
-### 5.1 对象面：不引入父卡
+### 5.1 Object plane: no parent card
 
-- 对齐参考站四层零概念实测（§2.1.1）+ 用户直觉（父卡=核销次数+占位噪音）；前置裁决下（每任务都编排）这层直觉从「噪音偶尔出现」升级为「噪音恒定出现」，不引入的结论更硬。
-- `CONTEXT.md`「无 Goal 概念」裁决不动——会话不是 todo，不新增工作单元类；看板保持「一卡 = 一可执行工作单元」。
-- 不加「编排中」相位：父卡没有自己的 plan/build/review，九相位无一适用（§4 Multica 错处 3）；单任务裁定不拆时 = 1 张卡由总管指派专职 agent 直接执行（withPlan 沿 r12 拍板点 5 = false），看板体验与一张普通卡一致、无容器语义。
+- Aligns with the reference site's measured zero-concept-on-all-four-layers (§2.1.1) + the user's intuition (parent card = +1 review count + occupying noise); under the prior ruling (orchestration on every start), this intuition upgrades from "occasional noise" to "constant noise", making the no-parent conclusion harder.
+- The CONTEXT.md "no Goal concept" ruling stays untouched — a conversation is not a todo, no new unit-of-work class is added; the board keeps "one card = one executable unit of work".
+- No "orchestrating" phase: a parent card has no plan/build/review of its own, and none of the nine phases applies (Multica error #3 in §4); a single-task verdict with no split = 1 card that the chief assigns to a dedicated agent for direct execution (withPlan follows r12 decision point 5 = false), and the board experience is identical to an ordinary card, with no container semantics.
 
-### 5.2 容器面：编排会话
+### 5.2 Container plane: the orchestration conversation
 
-三承接点全有现成机制（对 L-B 判词「三承接点需自证」的正面回答，全部 P 侧已核）：
+All three landing points have ready-made mechanisms (the head-on answer to L-B's verdict "the three landing points must prove themselves", all verified on the P side):
 
-| Multica 压在父卡上的职能 | pacman 承接物 | 依据 |
+| The duty Multica presses onto the parent card | pacman's landing point | Basis |
 |---|---|---|
-| 总目标正本 | 会话 user 消息（逐字、稳定地址）+ 子卡 spec 内嵌归一化片段 | 参考站同构（§2.1.3：逐字原话只在会话，子卡 spec 是归一化引语）；spec 三段式 = r5 §3.2 实测样本 |
-| 核收线程 | 会话本身：拆分回执列实体芯片，gate/settle/failed wake 全回流 | r5 §3.5 实测（review 停关 1s 内会话内汇报）；pacman chief 会话面板已存在（P 事实 5） |
-| 唤醒锚点 | 派工即自动 watch（带 threadId）+ set_wake 定时兜底 | r12 §1.3b（49 词表含 watch/wake，`run_builds` 派工即 watch 现成）；参考站活体同构（§2.1.2） |
+| Canonical copy of the overall goal | the conversation's user message (verbatim, stable address) + the normalized fragment embedded in each child card's spec | isomorphic to the reference site (§2.1.3: verbatim original words live only in the conversation; child-card specs are normalized quotations); the spec three-section shape = the r5 §3.2 measured sample |
+| Acceptance thread | the conversation itself: split receipts list entity chips, and all gate/settle/failed wakes flow back | r5 §3.5 measured (chief reports inside the thread within 1s of a review stop); pacman's chief conversation panel already exists (P fact 5) |
+| Wake anchor | automatic watch on dispatch (carrying threadId) + set_wake scheduled fallback | r12 §1.3b (the 49-word table includes watch/wake; `run_builds` auto-watch on dispatch is ready); live isomorphic on the reference site (§2.1.2) |
 
-编排 prompt 纪律（拆分护栏，进实现票）：**拆分粒度 = 核销次数**——按可独立验收的成果拆（参考站实测：跨类型交付物拆 2、同类小事并 1）；子卡 spec 必须内嵌原文片段引语 + 兄弟任务文字交叉引用（参考站 spec 结构同构，§2.1.3）。
+Orchestration prompt discipline (decomposition guardrail, to go into the implementation ticket): **decomposition granularity = number of reviews** — decompose by independently verifiable outcomes (measured on the reference site: cross-type deliverables split into 2, same-type small items merge into 1); each child card's spec must embed the original-text fragment quotation + textual cross-references between sibling tasks (isomorphic to the reference site's spec structure, §2.1.3).
 
-### 5.3 数据面：来源家族扩一档（比参考站多走的一步）
+### 5.3 Data plane: one more entry in the source family (the step beyond the reference site)
 
-- `TASK_SOURCE_KINDS` + `'orchestration'`；`sourceRef` = 编排会话 id（per-request 粒度，格式沿 #446 单源纪律在实现票定死，形如 `chief:<conversationId>`）。
-- **为何比参考站多**：参考站实测证明实例级字段不足以答「哪次请求」（§2.1.3：三卡跨两线程同值；watch 解除后链接消失）。pacman 的驳回重拆（回到原话重新拆）、按请求聚合、来源面板都需要持久查询能力——成本是一个枚举值 + 一个 ref 格式，零 migration、零新对象。
-- `createdBy`/`sourceBuildId` 维持现语义（谁建的）；`sourceKind='orchestration'` + `sourceRef` 答「哪次请求拆的」——三层各答一问，不混。
-- `todo.sourceTodo` 保持休眠：激活 = 把父子抬进领域模型，正面撞「无 Goal 概念」裁决，还要回答「父 todo 的 phase 语义」这个无解题。留作记录在案的备选，重开触发条件见 §5.6。
+- `TASK_SOURCE_KINDS` + `'orchestration'`; `sourceRef` = the orchestration conversation id (per-request granularity; the format follows #446's single-source discipline and is fixed in the implementation ticket, shaped like `chief:<conversationId>`).
+- **Why one step beyond the reference site**: the reference-site measurement proves an instance-level field cannot answer "which request" (§2.1.3: three cards share the same value across two threads; the link disappears after the watch detaches). pacman's rejection-driven re-decomposition, per-request aggregation, and source panel all need persistent queryability — the cost is one enum value + one ref format, zero migration, zero new objects.
+- `createdBy`/`sourceBuildId` keep their current semantics (who created it); `sourceKind='orchestration'` + `sourceRef` answer "which request split it" — three layers each answer one question, not mixed.
+- `todo.sourceTodo` stays dormant: activating it = elevating parent-child into the domain model, head-on contradicting the "no Goal concept" ruling, and having to answer the unanswerable "what is the phase semantics of a parent todo". Kept on file as a recorded alternative; reopening triggers in §5.6.
 
-### 5.4 UI 面：对齐参考站已演进出的事实
+### 5.4 UI plane: align with facts the reference site has already evolved
 
-- **看板卡片「由总管创建」芯片**：参考站 2026-10 已新增的可见溯源（§2.1.3、`11-todo12-card-zoom.png`）——pacman 直接对齐，回答「agent 拆的卡与人手建的卡怎么区分」。
-- **详情页来源面板加 orchestration 渲染**：链到编排会话面板。这里比参考站多给（它详情页零来源）——因为 pacman 的 sourceRef 有会话粒度、来源面板家族已存在（`source-issue.tsx` 同族），成本是一格渲染。
-- T0 反馈（点击「保存并开始」后「我的东西去哪了」）沿用 r12 §5.3 已定的短命 toast。
+- **The board card `由总管创建` chip**: the reference site added this visible traceability in 2026-10 (§2.1.3, `11-todo12-card-zoom.png`) — pacman aligns directly, answering "how to tell agent-created cards from manually created ones".
+- **The detail-page source panel gains an orchestration rendering**: linking to the orchestration conversation panel. This is one step more than the reference site (which has zero source on the detail page) — because pacman's sourceRef has conversation granularity and the source-panel family already exists (`source-issue.tsx` same family), the cost is one rendering cell.
+- T0 feedback (after clicking `保存并开始`, "where did my thing go") follows the short-lived toast already fixed in r12 §5.3.
 
-### 5.5 完成判定：会话内自检，不做计数闸
+### 5.5 Completion judgment: in-conversation self-check, no counting gate
 
-- 最后一子卡 settle → chief 在会话内发覆盖度自检总结（对照原话逐条核拆分完整性）——**消息不是闸**；发现缺口走 `notify_user`（不只静默在会话里说）。
-- 不采纳 Linear 式 auto-close（§4：计数闸给假完整感）；核收权在人——对齐 Multica leader 核收语义，但不为它付一张父卡。
+- When the last child card settles, the chief posts a coverage self-check summary in the conversation (checking decomposition completeness against the original words item by item) — **a message, not a gate**; gaps go through `notify_user` (not just silently in the conversation).
+- Linear-style auto-close is not adopted (§4: counting gates give false completeness); acceptance authority stays with the human — aligning with the Multica leader acceptance semantics, without paying a parent card for it.
 
-### 5.6 明确不做清单与重开条件
+### 5.6 Explicit do-not list and reopening conditions
 
-不做：父 todo 对象、「编排中」相位、看板父子分组/折叠、父子状态联动、计数 rollup、激活 sourceTodo。
+Do not: a parent todo object, an "orchestrating" phase, board parent-child grouping/folding, parent-child status coupling, count rollups, activating sourceTodo.
 
-**重开父卡路线的触发条件**（记录在案）：将来出现「请求级甘特/泳道/portfolio 视图」这类**跨请求、时间轴维度**的需求（Linear convert-to-project 位——容器大到不该是会话时换容器，届时再议父子对象）。看板内的请求级聚合不构成触发条件——那是 filter 能答的问题（见 premortem 3 的护栏）。
+**Trigger conditions for reopening the parent-card route** (on file): a future need for **cross-request, timeline-dimension** views such as request-level Gantt/swimlane/portfolio (the Linear convert-to-project position — when the container grows beyond what a conversation should be, switch containers and revisit parent-child objects then). Request-level aggregation inside the board does not constitute a trigger — that is a question a filter can answer (see the guardrail in premortem 3).
 
-### 5.7 影响面（实现票范围；本 PR 零码改）
+### 5.7 Impact surface (implementation-ticket scope; zero code change in this PR)
 
-- **入口面（前置裁决的落地，另开实现票）**：卡片级「开始任务」双分支撤销（`overlays.tsx:322,329` 的「先做规划/立即执行」两钮 + 指派选择，载荷 #318）——单按钮直发总管编排回合；新建对话框「保存并开始」同语义（首步入队编排步，替换现状写死的 `withPlan:true` plan 步，`use-new-task-surface.ts:165`）。用户参考截图：`assets/r14/07-start-task-dialog-user-shot.png`。
-- `packages/shared`：`TASK_SOURCE_KINDS` +1 值（`records/todo.ts:43`）→ zod schema JSON 投影变 → **snapshot.test 必红**，本地 `vitest run test/snapshot.test.ts -u` 更新后逐块核 diff 再推（动 shared schema 槽的既定纪律）。
-- `CONTEXT.md`：「来源」词条「外部出处」→「出处（含编排来源）」；「无 Goal 概念」不动。
-- server：编排步接线处（`startBuilds` withPlan 分叉，r12 §5.3 系统视角时序）+ `create_todo` 落 `sourceKind`/`sourceRef`（工具 schema 加可选参数，或编排步建卡路径 server 侧自动落——实现票定）；拆分纪律句进编排 prompt。
-- web：卡片「由总管创建」芯片 + 详情来源面板 orchestration 渲染（链会话面板）。
-- 兼容性：zod enum 扩值——旧版本 daemon/CLI parse 新值会 validation 失败；自托管单用户滚动升级风险低，实现票核一遍版本交错窗口。
-- 无 DB migration：`sourceKind`/`sourceRef` 列已在；`sourceTodo` 不动。
-- GitHub 镜像面（开放问题）：GitHub-backed 项目每 todo fire-and-forget 建镜像 issue（P 事实 6）；子卡镜像天然各自独立 issue、无父 issue 可挂。将来要 GitHub 侧聚合时，在镜像层加 sub-issue 关系即可（外部表达，不动 pacman 模型）——不在本裁决范围。
+- **Entry surface (the landing of the prior ruling, a separate implementation ticket)**: the card-level "start task" two-branch is withdrawn (the `先做规划/立即执行` two buttons + the assignment picker at `overlays.tsx:322,329`, payload #318) — a single button sends the chief orchestration round directly; the new-task dialog's `保存并开始` gets the same semantics (the first step enqueues an orchestration step, replacing today's hardcoded `withPlan:true` plan step, `use-new-task-surface.ts:165`). User reference screenshot: `assets/r14/07-start-task-dialog-user-shot.png`.
+- `packages/shared`: `TASK_SOURCE_KINDS` +1 value (`records/todo.ts:43`) → the zod schema JSON projection changes → **snapshot.test will go red**; update locally with `vitest run test/snapshot.test.ts -u`, then verify the diff block by block before pushing (the standing discipline for touching the shared schema slot).
+- `CONTEXT.md`: the `来源` entry goes from "external origin" to "origin (including orchestration origin)"; "no Goal concept" untouched.
+- server: the orchestration-step wiring point (the `startBuilds` withPlan fork, r12 §5.3 system-view timeline) + `create_todo` writing `sourceKind`/`sourceRef` (either an optional tool-schema parameter or the orchestration-step card-creation path writing it server-side automatically — the implementation ticket decides); the decomposition-discipline sentence goes into the orchestration prompt.
+- web: the card `由总管创建` chip + the detail source panel's orchestration rendering (linking to the conversation panel).
+- Compatibility: a zod enum extension — an older daemon/CLI parsing the new value fails validation; the self-hosted single-user rolling-upgrade risk is low, and the implementation ticket re-checks the version-skew window.
+- No DB migration: the `sourceKind`/`sourceRef` columns already exist; `sourceTodo` is untouched.
+- GitHub mirror surface (open question): GitHub-backed projects fire-and-forget a mirror issue per todo (P fact 6); child mirrors are naturally independent issues with no parent issue to attach to. If GitHub-side aggregation is ever wanted, add the sub-issue relationship at the mirror layer (external expression, pacman's model untouched) — out of scope for this ruling.
 
-### 5.8 为何不是另外两条路（反方最佳论证与回应）
+### 5.8 Why not the other two roads (the strongest counterarguments and responses)
 
-1. **「父卡+窄化是主流，反提案无先例」（L-B 判词）**——回应：pacman 语义轴钉在 todos.dev（spec 18），参考站本身就是容器形态且日活运营中；「无先例」只在 issue 系家族内成立，pacman 不在那个家族（相位机看板 vs 自由状态+视图分组，§3）。herdr 作为用户日用系统给出了容器形态的第二个活样本。父卡路线的四个代价（新工作单元类 / 相位语义无解 / 核销 +1 / 状态双轨或计数闸）换一个「看板内聚合显示」，而聚合已有会话面板承接。前置裁决（编排常态化）把这杆秤再压一档：四个代价从「复杂请求才付」变成「每个任务都付」。
-2. **「纯子卡零容器」（用户直觉的极端版）**——回应：丢三样（r12 §5.2：原文锚点/完成判定/溯源区分），参考站也不这么走（它有 chief 会话容器）。本建议保住用户直觉的实质（看板只见子卡、零额外核销），容器挂在用户看不见的层。
+1. **"Parent card + narrowing is the mainstream; the counter-proposal has no precedent" (L-B verdict)** — response: pacman's semantic axis is pinned to todos.dev (spec 18), and the reference site is itself the container shape, running in daily production; "no precedent" holds only inside the issue family, and pacman is not in that family (phase-machine board vs free status + view grouping, §3). herdr, as the user's daily system, is a second live sample of the container shape. The parent-card route pays four costs (a new unit-of-work class / unanswerable phase semantics / +1 review / dual state tracks or counting gates) for an "in-board aggregation display", while aggregation is already served by the conversation panel. The prior ruling (orchestration as the norm) tips the scale once more: the four costs go from "paid only for complex requests" to "paid for every task".
+2. **"Pure child cards, zero container" (the extreme version of the user's intuition)** — response: three things are lost (r12 §5.2: the original-text anchor / completion judgment / traceability distinction), and the reference site does not go this way either (it has the chief conversation container). This recommendation keeps the substance of the user's intuition (the board shows only child cards, zero extra reviews), with the container attached at a layer the user does not see.
 
-### 5.9 Premortem（假设三个月后失败，最可能死因与护栏）
+### 5.9 Premortem (suppose it fails three months later — the most likely causes of death and guardrails)
 
-1. **漏拆静默通过**（全绿 ≠ 解决）→ 护栏：最后一 settle 的会话内覆盖度自检 + 缺口 `notify_user`（§5.5）。
-2. **用户找不到「我的请求去哪了」**（会话面板入口深）→ 护栏：卡片芯片 + 详情来源面板链会话 + T0 toast（§5.4）。
-3. **聚合可扫视性不足**（放弃看板 rollup 的代价显形）→ 护栏：先会话面板；不够再加「按来源会话过滤」的看板 filter——视图层解决，不上升为对象模型（Linear 启示，§4）。
-4. **sourceRef 格式漂移/两处写** → 护栏：#446 单源纪律，格式实现票定死（§5.3）。
+1. **Incomplete decomposition passes silently** (all green ≠ solved) → guardrails: the coverage self-check in the conversation at the last settle + `notify_user` for gaps (§5.5).
+2. **The user cannot find "where did my request go"** (the conversation panel entry is buried) → guardrails: the card chip + the detail source panel linking the conversation + the T0 toast (§5.4).
+3. **Aggregation scannability is insufficient** (the cost of giving up board rollups becomes visible) → guardrail: conversation panel first; if not enough, add a board filter "by source conversation" — solved at the view layer, not elevated into the object model (the Linear lesson, §4).
+4. **sourceRef format drift / written in two places** → guardrail: #446 single-source discipline; the format is fixed in the implementation ticket (§5.3).
 
-## 6. 证据核对明细
+## 6. Evidence verification details
 
-- **P 侧**：全部 file:line 于 2026-10-02 在 `ee636a5` 逐条核实（sourceTodo 休眠 / sourceKind 家族 / CONTEXT.md 裁决 / create_todo 溯源 / ⌘J 抽屉 / 相位九值 / 镜像 issue）。
-- **L-A**：todos.dev 活体（API 重放 + ego-browser/CDP 截图 + 拆分实验全记录）；实验写操作已清理（实验卡 DELETE 204 ×2、回读 progress 复原、daemon 停）；黑屏废片已剔除，归档 8 张有效截图均走 CDP 捕获。仓内引用 r1/r2/r3/r5/r5b/r8 + `assets/r5/raw/` 重解析。
-- **L-B**：Multica 六页官方快照一手复核（行号钉死）；GitHub 四页 + Linear 两页 agent-reach Jina live 抓取复核；两处原 `[转引]`（Linear display-options、GitHub Copilot 页）已补抓升复核，留档在 `assets/r14/raw/`。
-- **L-C**：全程只读（`--help`/list/show/overview/context + Read），无任何写状态命令。
-- **用户裁决（前置）**：2026-10-02 原话经协调线程转达（见篇头引用），指导本篇问题的重述；供给截图 `07-start-task-dialog-user-shot.png` 归档于 `assets/r14/`（读图通道对本调研不可用，弹窗结构按代码面 `overlays.tsx:322,329` 与 r12 §1.3 描述引用）。
-- **W**：wiki 页转引（官方文档精读产物），未重拉原文。
-- 未核实事项就地标注（`[推断]`）；三路取证线程的原始产物全文归档 `docs/research/assets/r14/raw/`，本篇只收裁决相关结论。
+- **P side**: all file:line references verified one by one on `ee636a5` on 2026-10-02 (sourceTodo dormancy / sourceKind family / CONTEXT.md ruling / create_todo traceability / ⌘J drawer / nine phases / mirror issues).
+- **L-A**: todos.dev live (API replays + ego-browser/CDP screenshots + full split-experiment record); the experiment's write operations were cleaned up (experiment cards DELETE 204 ×2, progress re-read back to original, daemon stopped); black-screen duds were discarded, and the 8 archived valid screenshots were all captured via CDP. In-repo citations r1/r2/r3/r5/r5b/r8 + re-parsing of `assets/r5/raw/`.
+- **L-B**: six-page Multica official snapshot re-verified first-hand (line numbers pinned); GitHub four pages + Linear two pages re-verified via agent-reach Jina live capture; the two originally `[cited]` spots (Linear display-options, GitHub Copilot page) were re-captured and upgraded to verified, archived in `assets/r14/raw/`.
+- **L-C**: read-only throughout (`--help`/list/show/overview/context + Read), no state-changing command.
+- **User ruling (prior)**: verbatim 2026-10-02 words relayed via the coordination thread (quoted at the head of this document), guiding the restatement of the question here; the supplied screenshot `07-start-task-dialog-user-shot.png` is archived under `assets/r14/` (the image channel was unavailable to this research; the dialog structure is referenced per the code side `overlays.tsx:322,329` and the description in r12 §1.3).
+- **W**: wiki-page citations (a close-reading artifact of the official docs), originals not re-pulled.
+- Unverified items are marked in place (`[inference]`); the full original artifacts of the three evidence threads are archived at `docs/research/assets/r14/raw/`, and this document keeps only the ruling-relevant conclusions.
 
-## 7. 相关文档
+## 7. Related documents
 
 - `r12-save-and-start-behavior.md` — 本票前序（§5.1 已拍裁决 2–7、§5.2 双方立场）
 - `r5-chief-behavior.md` — 参考站 Chief 行为一手观察（spec 三段式 / watch 回路 / 线程形状）

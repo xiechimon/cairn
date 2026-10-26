@@ -1,313 +1,313 @@
-<!-- XMON-11 | 来源：research/migration-surface @ def4b57 | 正文逐字未改，偏差以「偏差标注」块就地插入 -->
+<!-- XMON-11 | source: research/migration-surface @ def4b57 | the body text is verbatim unchanged; deviations are inserted in place as `Deviation annotation` blocks -->
 
-> **入仓说明（XMON-11；父票 XMON-3 裁决 A4=A）**
-> 本文件是 #409 的迁移面盘点报告。正文**逐字取自** `research/migration-surface` 分支的 `def4b57`
-> （`docs/research/migration-surface.md`，2026-09-29 17:49 +0800；报告自述基线 `origin/main @ 8c30775`）。
-> 并入 `main` 的理由：每片验收的第 3 件要按本文件的 §3 与附录 A/B 摘 e2e 清单，底账得在主干可查。
-> **正文不作改写**——它是 #409 时点的快照，价值在于能与当前树逐条对照；凡与当前树不符处，一律以
-> 「偏差标注」块**就地**标出，不改原文。每个标注块都写明复核所依据的 commit。
-> 本次复核 commit：`9a0613b`（2026-10-01 00:13 +0800），比报告基线晚 **77 个 commit**。
+> **Check-in note (XMON-11; parent ticket XMON-3 ruling A4=A)**
+> This file is #409's migration-surface inventory report. The body is **taken verbatim from** `research/migration-surface` branch's `def4b57`
+> (`docs/research/migration-surface.md`, 2026-09-29 17:49 +0800; the report self-declares baseline `origin/main @ 8c30775`).
+> Reason for merging into `main`: every acceptance's third item must extract an e2e list per this file's §3 and appendices A/B, so the ledger must be queryable on the trunk.
+> **The body is not rewritten** — it is a snapshot at the #409 point in time, whose value lies in being comparable line by line against the current tree; wherever it disagrees with the current tree,
+> a `Deviation annotation` block is marked **in place**, the original text unchanged. Every annotation block states the commit the recheck was based on.
+> This recheck commit: `9a0613b` (2026-10-01 00:13 +0800), **77 commits** later than the report's baseline.
 
-# 迁移面盘点：ui 原语消费矩阵 + css 依赖图 + 三面钉扎点清单
+# Migration surface inventory: ui primitive consumption matrix + css dependency graph + three-surface pin-point list
 
-> 票：#409（地图 #406「apps/web 组件架构切换到 shadcn/ui」的研究票）。
-> 目的：为切片策略与 e2e 重钉策略供事实——原语谁在用、23 个 css 谁依赖谁、
-> 三面钉扎（web e2e 类名断言 / integration locator / 视觉几何断言）各钉了哪些
-> 选择子、散件 css 收编难度分级。
-> 方法：纯本地读码（grep + 逐文件抄录 import 语句），未起服务未跑测试。
-> 基线：`origin/main @ 8c30775`（2026-09-29，#394 新建任务无标题面 + #401 快捷键组已合入）。
-> 140 tsx / 23 css（与地图笔记一致）。
+> Ticket: #409 (the research ticket for map #406 `apps/web component architecture switch to shadcn/ui`).
+> Purpose: supply facts for the slicing strategy and the e2e re-pinning strategy — who consumes which primitive, which of the 23 css depend on which others,
+> what selectors the three-surface pinning (web e2e class assertions / integration locator / visual geometry assertions) pins,
+> and a difficulty grading for absorbing the piecemeal css files.
+> Method: pure local code reading (grep + transcribing import statements file by file); no server started, no tests run.
+> Baseline: `origin/main @ 8c30775` (2026-09-29; #394 new-task-no-title surface + #401 shortcut groups already merged).
+> 140 tsx / 23 css (consistent with the map notes).
 
-## 偏差总览（复核 @ `9a0613b`，2026-10-01）
+## Deviation overview (recheck @ `9a0613b`, 2026-10-01)
 
-本文件成文于 `8c30775`。到 `9a0613b` 之间隔了 77 个 commit（`git log --oneline 8c30775..HEAD` 共 **77** 行），
-地图 #406 下的搬迁已大面积开工——报告写作时「迁移未起、先分级再排期」的前提不再成立。以下是打掉正文判断的几笔：
+This file was written at `8c30775`. Between it and `9a0613b` lie 77 commits (`git log --oneline 8c30775..HEAD` is **77** lines in total),
+and the migration under map #406 has already broken ground in a large area — the report's premise of `migration not started, grade before scheduling` no longer holds. The following commits invalidate the body's judgments:
 
-| commit | 内容 | 失效的正文处 |
+| commit | Content | Invalidated body section |
 |---|---|---|
-| `84ff110` | web(414) 主界面 shadcn 化——`components/ui/` 适配层进仓 + 四列对账 (#416) | §1 原语矩阵、§2.2 原语层 |
-| `cfa962e` | web(435) 值正本并流 `shadcn.css` + `tokens.css` 降别名层 + 清 16 死 token (#449) | §2.1 token 口径、附录 C |
-| `f73fef6` | web(419) mention-picker 悬空 token 重接仓内单源 (#427) | §2.1「5 个悬空 token」整条 |
-| `dfc5809` | web(425) B1 弹层族收编 shadcn/Base UI——三适配层 + 基切换 (#454) | §1.1 律 2、§2.2 `ui/dialog.css` |
-| `aa1314b` | web(426) token-gate + machine-authorize 两件切 shadcn 件（B2 热身） (#474) | §4 两件「低难度」散件 |
-| `839f59e` | web(423) resources 域全切 shadcn——第一片真域 (#481) | §4 resources 行 |
-| `2b6bf61` | web(453) search-panel（⌘K）迁 DialogShell 视口根变体 (#467) | §2.3 域层 import 边 |
-| `3511dc3` | web(468) ⌘J 改 toggle + `KbdHint` 原语进仓 (#475) | §1 原语清单 |
-| `06f7ef9` `fd25629` `7ccdcf2` `417f714` `8f6825c` `2234522` 等 | 看板 / 详情 / 总管 / 侧栏接连搬迁与重排 | §3 三面钉扎的全部计数、附录 A |
+| `84ff110` | web(414) main surface shadcn-ized — `components/ui/` adapter layer enters the repo + four-column reconciliation (#416) | §1 primitive matrix, §2.2 primitive layer |
+| `cfa962e` | web(435) value canonical merged into `shadcn.css` + `tokens.css` demoted to alias layer + cleaned 16 dead tokens (#449) | §2.1 token caliber, appendix C |
+| `f73fef6` | web(419) mention-picker dangling tokens reconnected to the in-repo single source (#427) | §2.1 `5 dangling tokens` whole item |
+| `dfc5809` | web(425) B1 popover family absorbed into shadcn/Base UI — three adapter layers + shell swap (#454) | §1.1 law 2, §2.2 `ui/dialog.css` |
+| `aa1314b` | web(426) token-gate + machine-authorize both switched to shadcn components (B2 warm-up) (#474) | §4 two `low difficulty` pieces |
+| `839f59e` | web(423) resources domain fully switched to shadcn — the first real domain (#481) | §4 resources row |
+| `2b6bf61` | web(453) search-panel (⌘K) migrated to the DialogShell viewport-root variant (#467) | §2.3 domain-layer import edges |
+| `3511dc3` | web(468) ⌘J changed to toggle + the `KbdHint` primitive enters the repo (#475) | §1 primitive list |
+| `06f7ef9` `fd25629` `7ccdcf2` `417f714` `8f6825c` `2234522` etc. | board / detail / chief / sidebar moving and reordering one after another | all §3 three-surface counts, appendix A |
 
-**读法**：本文件的**方法**没过期（口径、css 三层骨架、家族律、收编分级口径）；过期的是**数字**与**成员表**。
-引用任何数字前先看对应节的「偏差标注」。
+**How to read**: this file's **method** is not outdated (calibers, the three-layer css skeleton, the family laws, the absorption-grading caliber); what is outdated are the **numbers** and **member tables**.
+Read the corresponding section's `Deviation annotation` before citing any number.
 
-## 0. 口径
+## 0. Caliber
 
-- **import 文件数** = grep `ui/<name>` 命中且不在 `ui/` 目录内的 tsx/ts 文件数（已人工复核排除纯注释提及）。
-- **JSX 实点数** = `<Component` 出现次数（props 折行导致的行尾断行已计入）。
-- **css 依赖边** = 逐文件抄录 `^import .*\.css` 原文（45 条），不走 basename 猜测——`detail/overlays.css` 与 `overlays/overlays.css` 同名不同物，basename 匹配会把两者消费面混为一谈（本盘点中途实测撞上一次，已纠正）。
-- **钉扎点** = `locator('.…')` 类名选择子（web e2e 与 integration 同口径）；几何断言 = `boundingBox` 调用点 + 视觉 spec 内 `page.evaluate` 探针的 expect。
+- **import file count** = the number of tsx/ts files whose grep of `ui/<name>` hits and which are outside the `ui/` directory (manually rechecked to exclude pure comment mentions).
+- **JSX instance count** = occurrences of `<Component` (line-end breaks caused by prop folding are counted).
+- **css dependency edge** = transcribing the `^import .*\.css` original text file by file (45 edges), no basename guessing — `detail/overlays.css` and `overlays/overlays.css` are same-name but different objects, and basename matching would conflate their two consumption surfaces (this inventory actually hit that once mid-way and corrected it).
+- **Pin point** = `locator('.…')` class selector (web e2e and integration use the same caliber); geometry assertion = `boundingBox` call sites + the `page.evaluate` probe expects inside the visual spec.
 
-## 1. ui/ 原语消费矩阵
+## 1. ui/ primitive consumption matrix
 
-`apps/web/src/ui/` 共 7 原语 6 css（avatar 无 css，纯行为原语：dicebear 生成 + onError 兜底，视觉尺寸由消费面 per-face css 给定）。
+`apps/web/src/ui/` has 7 primitives 6 css (avatar has no css, a pure behavior primitive: dicebear generation + onError fallback, visual size given by the consumption surface's per-face css).
 
-| 原语 | 样式 | import 文件 | JSX 实点 | 消费文件分布 |
+| Primitive | Style | import files | JSX instances | Consumption file distribution |
 |---|---|---|---|---|
-| Button | button.css (41 decl) | **22** | **38** / 21 文件 | 全域：board 3、chief 2、detail 5、overlay 4、pages 3、resources 2、routes 3 |
-| Card | card.css (6 decl) | **0** | **0** | **死原语**——见 §1.1 |
-| Chip | chip.css (25 decl) | 2 | 2 | detail/dhead.tsx、resources/parts.tsx |
-| DialogShell | dialog.css (126 decl) | 11 | 11 | 11 个 dialog 各 1 处壳（chief 2、detail 4、resources 3、routes 2） |
-| Input | input.css (24 decl) | 6 | 12 | token-gate、search-panel、4 个创建 dialog（create-provider 一处 6 点） |
-| TagChip | tag-chip.css (14 decl) | 1 | 1 | 仅 detail/fresh-block.tsx |
-| Avatar | —（无 css） | 9 | 12 | sidebar、todo-card、detail 2、overlays 2、pages 1、routes 2 |
+| Button | button.css (41 decl) | **22** | **38** / 21 files | everywhere: board 3, chief 2, detail 5, overlay 4, pages 3, resources 2, routes 3 |
+| Card | card.css (6 decl) | **0** | **0** | **dead primitive** — see §1.1 |
+| Chip | chip.css (25 decl) | 2 | 2 | detail/dhead.tsx, resources/parts.tsx |
+| DialogShell | dialog.css (126 decl) | 11 | 11 | 11 dialogs 1 shell each (chief 2, detail 4, resources 3, routes 2) |
+| Input | input.css (24 decl) | 6 | 12 | token-gate, search-panel, 4 create dialogs (create-provider one place 6 points) |
+| TagChip | tag-chip.css (14 decl) | 1 | 1 | only detail/fresh-block.tsx |
+| Avatar | — (no css) | 9 | 12 | sidebar, todo-card, detail 2, overlays 2, pages 1, routes 2 |
 
-Button 消费 Top：overlay/new-task-dialog 6 点、detail/overlays 5 点。
+Button consumption top: overlay/new-task-dialog 6 points, detail/overlays 5 points.
 
-> **偏差标注（复核 @ `9a0613b`）**——矩阵已失真，起因是原语层**分叉成了两层**：
+> **Deviation annotation (recheck @ `9a0613b`)** — the matrix is already distorted, because the primitive layer **forked into two layers**:
 >
-> 1. `apps/web/src/ui/` 仍是老原语层：`button` / `card` / `chip` / `input` / `tag-chip` / `kbd-hint`（六件各带同名 css）
->    + `avatar`（无 css）。
-> 2. `apps/web/src/components/ui/` 是 #414 起进仓的 **shadcn 适配层**，共 14 件：`alert-dialog` `alert-dialog-shell`
+> 1. `apps/web/src/ui/` is still the old primitive layer: `button` / `card` / `chip` / `input` / `tag-chip` / `kbd-hint` (six pieces each with same-name css)
+>    + `avatar` (no css).
+> 2. `apps/web/src/components/ui/` is the **shadcn adapter layer** entered since #414, 14 pieces in total: `alert-dialog` `alert-dialog-shell`
 >    `badge` `button` `card` `dialog` `dialog-shell` `dropdown-menu` `empty` `floating-shell` `input` `popover`
->    `switch` `tabs`。**同一语义名两层并存**——`Button` 就是两套，消费方各引各的。
-> 3. `DialogShell` 已从 `ui/` 移出到 `components/ui/dialog-shell.tsx`（`ui/dialog.css` 改由它自引）；
->    新增 `ui/kbd-hint.tsx`（#468）；`ui/avatar.tsx` 已从 `ui/README.md` 的原语表退出。
+>    `switch` `tabs`. **The same semantic name coexists in two layers** — `Button` is two sets, consumers import their own.
+> 3. `DialogShell` has moved out of `ui/` to `components/ui/dialog-shell.tsx` (`ui/dialog.css` is now self-imported by it);
+>    added `ui/kbd-hint.tsx` (#468); `ui/avatar.tsx` has left `ui/README.md`'s primitive table.
 >
-> 现值（口径同左：import 路径精确匹配；JSX 用词边界 `<Name\b`，比原文的前缀匹配略少算）：
+> Current values (same caliber as left: import path exact-match; JSX uses the word boundary `<Name\b`, slightly under-counting the original text's prefix match):
 
-| 原语 | 定义位置 | import 文件数 | JSX 实点 |
+| Primitive | Definition site | import file count | JSX instances |
 |---|---|---|---|
-| Button | `ui/button.tsx`（老层） | 18 | 两层混计 |
-| Button | `components/ui/button.tsx`（shadcn 层） | 8（6 业务 + `dialog.tsx` / `alert-dialog.tsx` 两个同层适配件） | 两层混计 |
+| Button | `ui/button.tsx` (old layer) | 18 | two layers counted together |
+| Button | `components/ui/button.tsx` (shadcn layer) | 8 (6 business + `dialog.tsx` / `alert-dialog.tsx` two same-layer adapters) | two layers counted together |
 | Chip | `ui/chip.tsx` | 1 | 1 |
-| Card | `ui/card.tsx`（老层） | **0**（已死） | 0 |
-| Card | `components/ui/card.tsx`（shadcn 层） | 4 | 5 |
-| Input | `ui/input.tsx`（老层） | 8 | 14 |
-| Input | `components/ui/input.tsx`（shadcn 层） | 2 | 2 |
+| Card | `ui/card.tsx` (old layer) | **0** (dead) | 0 |
+| Card | `components/ui/card.tsx` (shadcn layer) | 4 | 5 |
+| Input | `ui/input.tsx` (old layer) | 8 | 14 |
+| Input | `components/ui/input.tsx` (shadcn layer) | 2 | 2 |
 | TagChip | `ui/tag-chip.tsx` | 6 | 4 |
 | KbdHint | `ui/kbd-hint.tsx` | 3 | 3 |
 | Avatar | `ui/avatar.tsx` | 12 | 15 |
 | DialogShell | `components/ui/dialog-shell.tsx` | 16 | 14 |
 
-> 全仓 `<Button` 共 **49** 处，老层 / 新层混在一起，本次未逐层拆——搬走的面已改用 tailwind 工具类，
-> 原语计数对切片成本的指示力已不如原文时点。
+> Repo-wide `<Button` is **49** occurrences, old-layer / new-layer mixed, not split per layer this round — the moved surfaces already use tailwind utility classes,
+> and the primitive count's power to indicate slicing cost is weaker than at the original point in time.
 
-### 1.1 四个原生事实（直接影响选型/切片）
+### 1.1 Four native facts (directly affecting selection / slicing)
 
-1. **Card 是死原语**。`ui/card.tsx` 导出 `Card`（tone: card/inset/elevated），全仓 0 import、0 JSX；card.css 仅被 card.tsx 自引。真实「卡片」是 **7 个 per-face 类族**，全部绕开原语直写域 css：
-   - `res-card`/`res-rowcard`（resources.css：machines/secrets/skills/mcp-servers 4 页行卡）
-   - `prj-set-card`（pages.css：项目设置）、`prj-task-card`（pages.css：项目任务卡）
-   - `sched-card`（pages.css：定时列表卡）、`team-agent-card`（secondary.css：团队网格卡）
-   - `account-card`（secondary.css）、`authorize-card`（machine-authorize.css）
-   迁移含义：shadcn Card 落地不是「替换 Card 原语」，而是**新立组件 + 收编 7 族散写**；card.tsx/card.css 可直接退役。
-2. **DialogShell 族有一个出族大户**。overlay/new-task-dialog.tsx 在 #394（无标题单字段面）后**不再用 DialogShell**——手搓 OverlayMount + ClickCatcher + Esc 三件套（家族律 #67/#127 的原始形态），仅保留 `.new-task-dialog` 类名作 e2e 锚。它同时是 TagChip 的原第二大消费面，#394 固定标签词表后 TagChip 只剩 fresh-block 一处。**弹窗族实际 = DialogShell 11 壳 + new-task-dialog 1 个手工壳**，迁移时这第 12 个面要么收编回族要么单独立项。
-3. **per-face 类名 = e2e 定位别名**（ui/README 规则 2 明文）。例：dhead.tsx 渲染 `<Chip variant={tone} className="detail-chip--{tone}">` 且外层保留 `.detail-chip` 基类——e2e 按 `.detail-chip` 定位点击。同类别名遍布全仓（token-gate-input/-submit、fresh-tag-chip、new-task-dialog…）。**迁移组件时类名别名必须原样保留或 e2e 同步重钉**，这是三面钉扎（§3）与组件层之间的契约面。
-4. **1 处死 import**：routes/account-page.tsx 引 `Button` 从未渲染（#148 账户页净化残留，lint 未拦）。
+1. **Card is a dead primitive.** `ui/card.tsx` exports `Card` (tone: card/inset/elevated), repo-wide 0 import, 0 JSX; card.css is imported only by card.tsx itself. The real `card`s are **7 per-face class families**, all bypassing the primitive and writing domain css directly:
+   - `res-card`/`res-rowcard` (resources.css: the machines/secrets/skills/mcp-servers 4-page row cards)
+   - `prj-set-card` (pages.css: project settings), `prj-task-card` (pages.css: project task card)
+   - `sched-card` (pages.css: schedule list card), `team-agent-card` (secondary.css: team grid card)
+   - `account-card` (secondary.css), `authorize-card` (machine-authorize.css)
+   Migration meaning: landing shadcn Card is not `replacing the Card primitive` but **creating a new component + absorbing the 7 scattered families**; card.tsx/card.css can retire directly.
+2. **The DialogShell family has one big deserter.** overlay/new-task-dialog.tsx **no longer uses DialogShell** after #394 (the title-less single-field surface) — hand-rolled OverlayMount + ClickCatcher + Esc three-piece set (the family law #67/#127 original shape), only keeping the `.new-task-dialog` class name as the e2e anchor. It is also TagChip's former second-largest consumption surface; after #394 fixed the tag vocabulary, TagChip has only fresh-block left. **The dialog family actually = DialogShell 11 shells + new-task-dialog 1 hand-rolled shell**; at migration this 12th surface either gets absorbed back into the family or becomes its own work item.
+3. **per-face class name = e2e locate alias** (ui/README rule 2 in writing). Example: dhead.tsx renders `<Chip variant={tone} className="detail-chip--{tone}">` and keeps the outer `.detail-chip` base class — e2e locates clicks by `.detail-chip`. Same-family aliases are all over the repo (token-gate-input/-submit, fresh-tag-chip, new-task-dialog…). **When migrating a component the class alias must be kept verbatim or e2e re-pinned in sync** — this is the contract surface between the three-surface pinning (§3) and the component layer.
+4. **1 dead import**: routes/account-page.tsx imports `Button` that is never rendered (#148 account-page cleanup residue, lint did not catch).
 
-> **偏差标注（复核 @ `9a0613b`）**——四条原生事实里三条已翻案：
+> **Deviation annotation (recheck @ `9a0613b`)** — three of the four native facts have been overturned:
 >
-> - **律 1「Card 是死原语」→ 半失效**。老 `ui/card.tsx` 现在确实是死的（0 消费），但 #414 进的
->   shadcn `components/ui/card.tsx` 已被 4 个文件消费：`board/todo-card.tsx`、`overlay/token-gate.tsx`、
->   `resources/parts.tsx`、`routes/machine-authorize-page.tsx`（5 处 JSX）。原文「Card 落地 = 新立组件
->   + 收编 7 族散写」的方向对；「card.tsx/card.css 可直接退役」只对**老层**成立。
-> - **律 2「new-task-dialog 出族」→ 已收回**。`overlay/new-task-dialog.tsx` 现 `import { DialogShell }
->   from '../components/ui/dialog-shell.js'`（第 30 行，渲染在第 227 行）。弹窗族已是 **12 壳同在 DialogShell 内**，
->   不再是「11 壳 + 1 手工壳」，原文「这第 12 个面要么收编回族要么单独立项」的岔路已走掉。
-> - **律 3（per-face 类名 = e2e 定位别名）→ 仍成立，且已升格为仓级政策**。`ui/dialog.css` 头注写明
->   **#411 别名优先政策**：#425 换壳机制时 `.dlg-*` 类名「原样不动」。`.dlg` 在 e2e 的钉扎处数 67 → **69**。
-> - **律 4「account-page.tsx 死 import」→ 已清**（`routes/account-page.tsx` 现无 `Button` import）。
+> - **Law 1 `Card is a dead primitive` → half-invalid.** The old `ui/card.tsx` is indeed dead now (0 consumption), but #414's
+>   shadcn `components/ui/card.tsx` is consumed by 4 files: `board/todo-card.tsx`, `overlay/token-gate.tsx`,
+>   `resources/parts.tsx`, `routes/machine-authorize-page.tsx` (5 JSX positions). The original `Card landing = new component
+>   + absorb 7 scattered families` direction is right; `card.tsx/card.css can retire directly` holds only for the **old layer**.
+> - **Law 2 `new-task-dialog deserter` → already reclaimed.** `overlay/new-task-dialog.tsx` now `import { DialogShell }
+>   from '../components/ui/dialog-shell.js'` (line 30, rendered at line 227). The dialog family is now **12 shells all inside DialogShell**,
+>   no longer `11 shells + 1 hand-rolled shell`; the original `this 12th surface either absorb or separate` fork has been walked.
+> - **Law 3 (per-face class name = e2e locate alias) → still holds, and has been promoted to a repo-level policy.** `ui/dialog.css`'s header notes the
+>   **#411 alias-first policy**: at the #425 shell-swap mechanism the `.dlg-*` class names were `kept verbatim`. `.dlg`'s e2e pin sites went 67 → **69**.
+> - **Law 4 `account-page.tsx dead import` → already cleaned** (`routes/account-page.tsx` has no `Button` import now).
 
-另：overlay/token-gate.tsx 源码注释提及「样式本体在 ui/input.css / ui/button.css」，易被 grep 误读为直引 css——实测只 import 组件，无 seam 违规。
+Also: overlay/token-gate.tsx's source comment mentions `the style body lives in ui/input.css / ui/button.css`, easily mis-read by grep as a direct css import — measured it only imports components, no seam violation.
 
-## 2. css 依赖图
+## 2. css dependency graph
 
-23 个 css 分三层。依赖边全部来自 tsx 顶部静态 import（无任何 css `@import` 他 css；唯一 `@import` 是 app.css 引 tailwindcss）。
+The 23 css files fall into three layers. Dependency edges all come from static imports at the top of tsx (no css `@import`s another css; the only `@import` is app.css importing tailwindcss).
 
-> **偏差标注（复核 @ `9a0613b`）**——三层骨架还在，成员换了：
+> **Deviation annotation (recheck @ `9a0613b`)** — the three-layer skeleton is still there, the members changed:
 >
-> - css 总数仍 **23**，但增删各 3：**删** `board/sidebar.css`、`overlay/token-gate.css`、`routes/machine-authorize.css`；
->   **增** `styles/shadcn.css`、`ui/kbd-hint.css`、`routes/agent-detail.css`。`board/sidebar.css` 的
->   `.sidebar-row` / `.rail-row` 规则现落在 `overlays/overlays.css`。
-> - `@import` 不再是「唯一 app.css 引 tailwindcss」：`styles/app.css` 现为 `@import "tailwindcss"` +
->   `@import "./shadcn.css"` 两条。`shadcn.css` 不直接被任何 tsx 引，只经 app.css 注入。
-> - 静态 `^import .*\.css` 边数 **45 → 37**。
+> - css total is still **23**, but 3 added and 3 removed: **removed** `board/sidebar.css`, `overlay/token-gate.css`, `routes/machine-authorize.css`;
+>   **added** `styles/shadcn.css`, `ui/kbd-hint.css`, `routes/agent-detail.css`. `board/sidebar.css`'s
+>   `.sidebar-row` / `.rail-row` rules now live in `overlays/overlays.css`.
+> - `@import` is no longer `the only app.css importing tailwindcss`: `styles/app.css` is now `@import "tailwindcss"` +
+>   `@import "./shadcn.css"` two lines. `shadcn.css` is not directly imported by any tsx, injected only through app.css.
+> - Static `^import .*\.css` edge count **45 → 37**.
 
-### 2.1 全局层（main.tsx 直引 4 件）
+### 2.1 Global layer (main.tsx directly imports 4 files)
 
-| 文件 | 体量 | 角色 |
+| File | Size | Role |
 |---|---|---|
-| styles/tokens.css | 16.4K，119 个 distinct token（:root = dark 默认 L11，.light 镜像 L231） | 唯一 token 源 |
+| styles/tokens.css | 16.4K, 119 distinct tokens (:root = dark default L11, .light mirror L231) | the only token source |
 | styles/fonts.css | 22 decl | @font-face + --font-inter |
-| styles/motion.css | 35 decl | 动效 token/关键帧 |
-| styles/app.css | tailwind @import + `@theme inline` 映射（--color-* → tokens.css 变量）+ 全局 focus 环收编（#388） | tailwind v4 入口 |
+| styles/motion.css | 35 decl | motion tokens/keyframes |
+| styles/app.css | tailwind @import + `@theme inline` mapping (--color-* → tokens.css variables) + global focus-ring absorption (#388) | tailwind v4 entry |
 
-token 流通实测（全 src grep `var(--`）：
+Token flow measured (full src grep `var(--`):
 
-- **119 定义 / 109 被消费 / 19 个死 token**（defined-but-unused）：`--active-text` `--blue-400` `--card-ghost-border` `--chip-active-bg` `--chip-active-border` `--col-dot-building` `--col-dot-confirm` `--col-dot-idle` `--col-dot-planning` `--col-dot-review` `--disabled-fg` `--indigo-400` `--nav-bg` `--send-disabled` `--space-1..4` `--space-6`。col-dot 五态整族 + space 间距族全灭——迁移前可先清。
-- **5 个被消费但全仓无定义**（无 fallback，共 20 处 var() 引用）：`--surface-base` `--border` `--ring` `--text` `--text-muted`——**全部由 overlay/mention-picker.css 独占**。该文件系 #311 从参考应用移植时带入的对岸 token 名，#334 只 token 化了圆角；css 变量未定义且无 fallback = IACVT（background/border 这类非继承属性落 initial——面板底色透明、边框消失；color 经继承侥幸不显坏）。**这是现存缺陷也是迁移必答题**：mention-picker 无论迁不迁都得重接 token。
-- detail.css 的 `var(--color-danger, #dc2626)` / `var(--color-warning, #f59e0b)` 带 fallback，属自足写法，不在缺陷列；fonts.css 的 --font-inter 与 detail.css 的 --detail-pane-right 为本地定义本地用。
-- tsx 内联 `style` 消费 `var(--`：**0 处**——token 消费 100% 走 css 文件，组件层无内联 token 耦合。
+- **119 defined / 109 consumed / 19 dead tokens** (defined-but-unused): `--active-text` `--blue-400` `--card-ghost-border` `--chip-active-bg` `--chip-active-border` `--col-dot-building` `--col-dot-confirm` `--col-dot-idle` `--col-dot-planning` `--col-dot-review` `--disabled-fg` `--indigo-400` `--nav-bg` `--send-disabled` `--space-1..4` `--space-6`. The col-dot five-state whole family + the space spacing family are fully dead — cleanable before migration.
+- **5 consumed but undefined repo-wide** (no fallback, 20 var() references in total): `--surface-base` `--border` `--ring` `--text` `--text-muted` — **all held exclusively by overlay/mention-picker.css**. That file is the opposite-shore token names carried in when #311 ported from the reference app; #334 only tokenized the radius; css variables undefined and no fallback = IACVT (background/border these non-inherited properties fall to initial — panel background transparent, border disappears; color survives unbroken by inheritance luckily). **This is an existing defect and a migration must-answer**: mention-picker must reconnect tokens whether or not it migrates.
+- detail.css's `var(--color-danger, #dc2626)` / `var(--color-warning, #f59e0b)` carry fallbacks, a self-sufficient form, not on the defect list; fonts.css's --font-inter and detail.css's --detail-pane-right are locally defined locally used.
+- tsx inline `style` consuming `var(--`: **0 places** — token consumption is 100% through css files, no inline token coupling at the component layer.
 
-> **偏差标注（复核 @ `9a0613b`）**——token 管道整体换过（`#435`，落地 `#412` P2b 裁定）：
+> **Deviation annotation (recheck @ `9a0613b`)** — the token pipeline has been wholly replaced (`#435`, landing `#412` P2b ruling):
 >
-> - **值正本搬家**：颜色 token 的唯一持值文件已是 `styles/shadcn.css`（shadcn 官方语义词表 + 仓内补位族并存）；
->   `tokens.css` 退为**别名层 + 非颜色层**（motion / 字体栈 / 阴影 / 圆角仍归它）。逐名归属见
->   `docs/research/412-token-mapping.md`。
-> - **计数口径变了**，原文的「119 定义 / 109 被消费」不再可比。现值：`tokens.css` + `shadcn.css` 共定义 **153** 名；
->   全 src 消费 **129** 名（只按 `var(--x)` 判）/ **135** 名（连 tailwind 简写 `-(--x)` 一起判）。
-> - **死 token：19 → 0**。原文那 19 名整族已被 `#449` 清掉（`--col-dot-*` 只剩 idle/confirm/building 三态、且都被消费）。
->   复核口径：`tokens.css` + `shadcn.css` 的 defined-but-unused，**同时算 `var(--x)` 与 tailwind 简写 `-(--x)` 两种消费形态**，
->   并剔除 tailwind `@theme` 命名空间（`--color-*` / `--radius-*`，经工具类间接消费，不该记死）。
->   只按 `var(--` 单形态判会把 `--badge-attention`（消费在 `board/todo-card.tsx:123` 的 `bg-(--badge-attention)`）误记成死。
->   全仓 css 范围内唯一 defined-but-unused 的是 `styles/fonts.css:37` 的 `--font-jetbrains-mono`。
-> - **悬空 token：5 → 0**。`overlay/mention-picker.css` 里的 `--border` / `--text` / `--text-muted` /
->   `--surface-base` / `--ring` 已由 `#427` 重接仓内单源，该文件现 **0 处**引用它们。原文「这是现存缺陷也是迁移必答题」已结。
-> - **全局层四件体量也变了**：`tokens.css` 16.4K → **5.9K**（111 行，颜色值已迁出）；新增 `styles/shadcn.css`
->   **15.6K**（355 行），它不直接被 tsx 引、只经 `styles/app.css` 的 `@import "./shadcn.css"` 注入
->   （TW4 只在含 `@import "tailwindcss"` 的样式表里吃 `@theme`）。`fonts.css` 1.0K / `motion.css` 4.8K / `app.css` 4.3K。
-> - 自足 fallback（非缺陷）仍只有 `detail/detail.css` 的 `--color-danger` / `--color-warning`（各 2 处，带 hex fallback）。
+> - **Value canonical moved**: the only value-holding file for color tokens is already `styles/shadcn.css` (shadcn official semantic vocabulary + in-repo fill-in families coexisting);
+>   `tokens.css` demoted to **alias layer + non-color layer** (motion / font stack / shadow / radius still belong to it). Name-by-name attribution see
+>   `docs/research/412-token-mapping.md`.
+> - **Counting caliber changed**, the original `119 defined / 109 consumed` is no longer comparable. Current: `tokens.css` + `shadcn.css` define **153** names in total;
+>   full-src consumption **129** names (judged by `var(--x)` only) / **135** names (judging tailwind shorthand `-(--x)` too).
+> - **Dead tokens: 19 → 0.** The original 19 names were cleaned as whole families by `#449` (`--col-dot-*` left with the idle/confirm/building three states only, all consumed).
+>   Recheck caliber: tokens.css + shadcn.css defined-but-unused, **counting both `var(--x)` and tailwind shorthand `-(--x)` consumption forms**,
+>   and excluding the tailwind `@theme` namespace (`--color-*` / `--radius-*`, consumed indirectly through utility classes and not to be counted dead).
+>   Judging only by the `var(--` single form would mis-record `--badge-attention` (consumed at `board/todo-card.tsx:123`'s `bg-(--badge-attention)`) as dead.
+>   Repo-wide within css the only defined-but-unused is `styles/fonts.css:37`'s `--font-jetbrains-mono`.
+> - **Dangling tokens: 5 → 0.** `overlay/mention-picker.css`'s `--border` / `--text` / `--text-muted` /
+>   `--surface-base` / `--ring` were reconnected to the in-repo single source by `#427`; that file now references them **0 times**. The original `this is an existing defect and a migration must-answer` is closed.
+> - **Global-layer four-file sizes also changed**: `tokens.css` 16.4K → **5.9K** (111 lines, color values migrated out); added `styles/shadcn.css`
+>   **15.6K** (355 lines), not directly imported by tsx, injected only through `styles/app.css`'s `@import "./shadcn.css"`
+>   (TW4 consumes `@theme` only in a stylesheet containing `@import "tailwindcss"`). `fonts.css` 1.0K / `motion.css` 4.8K / `app.css` 4.3K.
+> - The self-sufficient fallbacks (non-defect) remain only `detail/detail.css`'s `--color-danger` / `--color-warning` (2 each, with hex fallback).
 
-### 2.2 原语层（ui/ 6 件，各随 tsx 自引）
+### 2.2 Primitive layer (ui/ 6 files, each self-imported with its tsx)
 
-button.css ← button.tsx；card.css ← card.tsx（死）；chip.css ← chip.tsx + **tag-chip.tsx 双引**；dialog.css ← dialog-shell.tsx；input.css ← input.tsx；tag-chip.css ← tag-chip.tsx。
+button.css ← button.tsx; card.css ← card.tsx (dead); chip.css ← chip.tsx + **tag-chip.tsx double-import**; dialog.css ← dialog-shell.tsx; input.css ← input.tsx; tag-chip.css ← tag-chip.tsx.
 
-> **偏差标注（复核 @ `9a0613b`）**——原语层现 7 件 css（原 6 件 + `kbd-hint.css`），边有一处变：
-> `dialog.css ← components/ui/dialog-shell.tsx`（定义它的 tsx 换了目录）。其余照旧：
-> `button.css ← button.tsx`、`card.css ← card.tsx`（**死**）、`chip.css ← chip.tsx + tag-chip.tsx 双引`、
-> `input.css ← input.tsx`、`tag-chip.css ← tag-chip.tsx`、`kbd-hint.css ← kbd-hint.tsx`。
+> **Deviation annotation (recheck @ `9a0613b`)** — the primitive layer is now 7 css files (original 6 + `kbd-hint.css`), with one edge changed:
+> `dialog.css ← components/ui/dialog-shell.tsx` (the tsx defining it changed directory). The rest unchanged:
+> `button.css ← button.tsx`, `card.css ← card.tsx` (**dead**), `chip.css ← chip.tsx + tag-chip.tsx double-import`,
+> `input.css ← input.tsx`, `tag-chip.css ← tag-chip.tsx`, `kbd-hint.css ← kbd-hint.tsx`.
 >
-> 另：`#425` 之后 `ui/dialog.css` 已不含壳级规则——`.dlg-backdrop` / `.dlg` / `.dlg-head` / `.dlg-title` /
-> `.dlg-close` / `.dlg-body` / `.dlg-foot` 随适配层退役，壳机制换 Base UI Dialog、几何改由适配层工具类承载
-> （值与原规则逐条对齐）。本文件现只留 `dlg-form-*` 表单族、选择器驱动的退场配方
-> （`.dlg-shell[data-ending-style]` / `.dlg-viewport[data-ending-style]`）与视口根容器，以及各 per-face 弹窗类。
+> Also: after `#425` `ui/dialog.css` no longer holds shell-level rules — `.dlg-backdrop` / `.dlg` / `.dlg-head` / `.dlg-title` /
+> `.dlg-close` / `.dlg-body` / `.dlg-foot` retired with the adapter layer; the shell mechanism switched to Base UI Dialog and geometry is carried by adapter-layer utility classes
+> (values aligned with the old rules one by one). This file now only keeps the `dlg-form-*` form family, the selector-driven exit recipe
+> (`.dlg-shell[data-ending-style]` / `.dlg-viewport[data-ending-style]`) and the viewport root container, plus each per-face dialog class.
 
-### 2.3 域层（13 件散件）——import 边全表
+### 2.3 Domain layer (13 pieces) — the full import-edge table
 
-| css | decl 数 | import 它的 tsx | 覆盖界面 |
+| css | decl count | tsx importing it | Covered surface |
 |---|---|---|---|
-| board/board.css | 257 | board/board.tsx、routes/board-page.tsx | 看板列/拖拽/topbar |
-| board/sidebar.css | 241 | board/sidebar.tsx | 侧栏树 + rail 窄栏（经 shell 复用于全域） |
-| chief/chief.css | 464 | chief/chief-drawer.tsx、chief/chief-settings.tsx | 总管抽屉 + 设置 |
-| detail/detail.css | 852 | routes/todo-detail-page.tsx（路由级单引） | 任务详情 3 pane + transcript/diff/spec-block |
-| detail/overlays.css | 404 | detail/{accept-dialog, branch-dialog, right-pane, stop-confirm-dialog}.tsx | 详情域弹层内容 + 右 pane 静止 section（dlg-* 内容族） |
-| overlay/overlay.css | 278 | overlay/{new-task-dialog, delete-confirm, delete-project-confirm, more-menu}.tsx | 弹层批 A（#66）：新建任务 + 删除确认 + ⋯菜单（#394 后瘦身） |
-| overlay/mention-picker.css | 223 | overlay/mention-picker.tsx、detail/segments.tsx | 提及弹层（死 token 面，§2.1） |
-| overlay/token-gate.css | 30 | overlay/token-gate.tsx | token 闸页（最小散件） |
-| overlays/overlays.css | 241 | overlays/{search-panel, chip-popover, plan-dropdown, dismiss}.tsx | 弹层批 B（#67）：⌘K 搜索 + 状态 popover + 方案下拉 |
-| pages/pages.css | 899 | pages/{project-new, project, project-settings, schedules}-page.tsx | 4 个 pages/* 页（最大散件） |
-| resources/resources.css | 326 | resources/shell.tsx（shell 模式单引） | machines/providers/secrets/skills/mcp-servers 5 页 |
-| routes/machine-authorize.css | 41 | routes/machine-authorize-page.tsx | 授权机器页（独立小件） |
-| secondary/secondary.css | 389 | secondary/shell.tsx（shell 模式单引） | account/team/api-keys 3 页 |
+| board/board.css | 257 | board/board.tsx, routes/board-page.tsx | board columns/drag/topbar |
+| board/sidebar.css | 241 | board/sidebar.tsx | sidebar tree + rail narrow bar (reused globally through shell) |
+| chief/chief.css | 464 | chief/chief-drawer.tsx, chief/chief-settings.tsx | chief drawer + settings |
+| detail/detail.css | 852 | routes/todo-detail-page.tsx (route-level single import) | task detail 3 panes + transcript/diff/spec-block |
+| detail/overlays.css | 404 | detail/{accept-dialog, branch-dialog, right-pane, stop-confirm-dialog}.tsx | detail-domain popover content + right-pane static section (dlg-* content family) |
+| overlay/overlay.css | 278 | overlay/{new-task-dialog, delete-confirm, delete-project-confirm, more-menu}.tsx | popover batch A (#66): new task + delete confirm + ⋯menu (slimmed after #394) |
+| overlay/mention-picker.css | 223 | overlay/mention-picker.tsx, detail/segments.tsx | mention popover (dead-token surface, §2.1) |
+| overlay/token-gate.css | 30 | overlay/token-gate.tsx | token-gate page (smallest piece) |
+| overlays/overlays.css | 241 | overlays/{search-panel, chip-popover, plan-dropdown, dismiss}.tsx | popover batch B (#67): ⌘K search + status popover + plan dropdown |
+| pages/pages.css | 899 | pages/{project-new, project, project-settings, schedules}-page.tsx | 4 pages/* pages (largest piece) |
+| resources/resources.css | 326 | resources/shell.tsx (shell-mode single import) | machines/providers/secrets/skills/mcp-servers 5 pages |
+| routes/machine-authorize.css | 41 | routes/machine-authorize-page.tsx | machine-authorize page (independent small piece) |
+| secondary/secondary.css | 389 | secondary/shell.tsx (shell-mode single import) | account/team/api-keys 3 pages |
 
-结构观察：
-- **shell 模式两处**：resources/shell.tsx 与 secondary/shell.tsx 各自单引域 css 并内嵌 AppSidebar——routes/ 下 account/team/api-keys 三页自身 0 css import，样式全经 secondary.css 注入。
-- **路由级直引两处**：todo-detail-page.tsx 引 detail.css、board-page.tsx 引 board.css（域组件自身不引，由路由兜底）。
-- **overlay/ 与 overlays/ 是两个目录**（弹层分批 #66/#67 的历史形态），加 detail/overlays.css 共三个「overlays」命名物——迁移时命名归一可顺带做。
+Structure observations:
+- **Shell mode two places**: resources/shell.tsx and secondary/shell.tsx each single-import the domain css and embed AppSidebar — the routes/ account/team/api-keys three pages have 0 css imports themselves, their styles injected wholly through secondary.css.
+- **Route-level direct import two places**: todo-detail-page.tsx imports detail.css, board-page.tsx imports board.css (domain components themselves do not import, the route holds the bottom line).
+- **overlay/ and overlays/ are two directories** (the popover batch #66/#67 historical shape), plus detail/overlays.css makes three "overlays"-named objects — name normalization can be done incidentally at migration.
 
-> **偏差标注（复核 @ `9a0613b`）**——域层仍 13 件，成员换了两件：
+> **Deviation annotation (recheck @ `9a0613b`)** — the domain layer is still 13 pieces, two members changed:
 >
-> - **删**：`overlay/token-gate.css`、`routes/machine-authorize.css`（`#474` 两件都切了 shadcn 件）。
-> - **增**：`routes/agent-detail.css`（由 `routes/agent-detail-page.tsx` 路由级直引，与 detail.css / board.css 同形）。
-> - `board/sidebar.css` 除名后 `board/board.css` 自身也瘦成「#414 试点后的残留层」：只剩跨域共用件
->   （`.project-avatar` / `.chief-fab`）、未迁的 `.board-notify-banner*`、行为态规则（拖拽锁选 / 升层阴影 / 落点染色）。
-> - 三条结构观察仍成立、各多一例：**shell 模式**仍是 `resources/shell.tsx` / `secondary/shell.tsx` 两处；
->   **路由级直引** 2 处 → **3 处**（+`routes/agent-detail-page.tsx` → `agent-detail.css`）；
->   **三处 overlays 命名物**（`overlay/`、`overlays/`、`detail/overlays.css`）仍未归一。
-> - 上面那张「import 它的 tsx」全表已整体过期；现值以 `grep -rn --include='*.tsx' --include='*.ts' -E "^import .*\.css"` 的 **37** 条边为准。
+> - **Removed**: `overlay/token-gate.css`, `routes/machine-authorize.css` (`#474` switched both to shadcn components).
+> - **Added**: `routes/agent-detail.css` (route-level direct import by `routes/agent-detail-page.tsx`, same shape as detail.css / board.css).
+> - After `board/sidebar.css` was delisted, `board/board.css` itself also slimmed into `the residual layer after the #414 pilot`: only the cross-domain shared pieces
+>   (`.project-avatar` / `.chief-fab`), the un-migrated `.board-notify-banner*`, and behavior-state rules (drag lock-select / lift shadow / drop-tint).
+> - The three structure observations still hold, each gaining one example: **shell mode** still `resources/shell.tsx` / `secondary/shell.tsx` two places;
+>   **route-level direct import** 2 → **3** (+`routes/agent-detail-page.tsx` → `agent-detail.css`);
+>   **three overlays-named objects** (`overlay/`, `overlays/`, `detail/overlays.css`) still not normalized.
+> - The `tsx importing it` full table above is wholly outdated; current values follow the **37** edges of `grep -rn --include='*.tsx' --include='*.ts' -E "^import .*\.css"`.
 
-## 3. 三面钉扎点清单
+## 3. Three-surface pin-point list
 
-### 3.1 web e2e 类名断言（apps/web/e2e/，50 个 spec，1278 个 expect）
+### 3.1 web e2e class assertions (apps/web/e2e/, 50 specs, 1278 expects)
 
-- **872 处 `.locator('.…')` 类名钉扎，钉 302 个 distinct 选择子**（含 `.x .y` 复合与 `[attr]` 组合）。46/50 个 spec 有类名钉扎。
-- 非类名定位极少：getByRole ×8、getByText ×3、getByLabel/Placeholder ×0、data-testid ×0；locator 内 aria-label 组合 ×43。**类名是唯一规模化定位机制**——shadcn 切换（类名全换）对这面是全面重钉，无侥幸面。
-- 钉扎密度 Top 5 spec：dead-buttons 119（76 distinct，全站死钮普查面）、provider-add-dialog 51、chief-settings 49、project-tasks-toolbar 36、detail-3pane 34 / dialog-viewport 34。
-- 选择子族分布（300 distinct 按前缀）：prj-* 42、dlg-* 35、chief-* 23、res-* 18、board-* 18、new-task-* 14、sched-* 13、sidebar-* 11、detail-* 10、team-* 9、delete-* 9、doc-* 8、search-* 7、diff-* 6、account-* 6、token-gate-* 5、rail-* 5、overlay-* 5、chat-* 5……（全量按文件清单见附录 A）
-- 单选择子热度 Top：`.dlg` ×67（11 个 DialogShell 共享壳类，最热单点）、`.dlg-provider-preset` ×20、`.sidebar-row` ×17、`.dlg-title` ×16、`.diff-expand` ×12、`.chief-pick-row` ×11。
+- **872 `.locator('.…')` class pins, pinning 302 distinct selectors** (including `.x .y` composites and `[attr]` combinations). 46/50 specs have class pins.
+- Non-class locate is rare: getByRole ×8, getByText ×3, getByLabel/Placeholder ×0, data-testid ×0; aria-label combinations inside locator ×43. **The class name is the only scaled locating mechanism** — the shadcn switch (class names all replaced) is a full-scale re-pin on this surface, no lucky surface.
+- Pin-density top 5 specs: dead-buttons 119 (76 distinct, the full-site dead-button census surface), provider-add-dialog 51, chief-settings 49, project-tasks-toolbar 36, detail-3pane 34 / dialog-viewport 34.
+- Selector-family distribution (300 distinct by prefix): prj-* 42, dlg-* 35, chief-* 23, res-* 18, board-* 18, new-task-* 14, sched-* 13, sidebar-* 11, detail-* 10, team-* 9, delete-* 9, doc-* 8, search-* 7, diff-* 6, account-* 6, token-gate-* 5, rail-* 5, overlay-* 5, chat-* 5…… (full per-file list in appendix A)
+- Single-selector heat top: `.dlg` ×67 (the 11 DialogShell shared shell class, the hottest single point), `.dlg-provider-preset` ×20, `.sidebar-row` ×17, `.dlg-title` ×16, `.diff-expand` ×12, `.chief-pick-row` ×11.
 
-> **偏差标注（复核 @ `9a0613b`）**——这一面是本次复核里涨得最猛的，原文的计数全部过期：
+> **Deviation annotation (recheck @ `9a0613b`)** — this surface grew the most in this recheck; the original counts are all outdated:
 
-| 项 | 原文 @ `8c30775` | 现值 @ `9a0613b` |
+| Item | Original @ `8c30775` | Current @ `9a0613b` |
 |---|---|---|
-| spec 数 | 50 | **66** |
-| `expect(` 处数 | 1278 | **1871** |
-| `locator('.…')` 处数 | 872 | **1200** |
-| distinct 选择子 | 302 | **479** |
-| 有类名钉扎的 spec | 46 / 50 | **61 / 66** |
+| spec count | 50 | **66** |
+| `expect(` sites | 1278 | **1871** |
+| `locator('.…')` sites | 872 | **1200** |
+| distinct selectors | 302 | **479** |
+| specs with class pins | 46 / 50 | **61 / 66** |
 | getByRole / getByText | 8 / 3 | 13 / 8 |
 | getByLabel / getByPlaceholder | 0 / 0 | 0 / 0 |
-| `data-testid` | 0 | **首次出现**：`e2e/github-issue-writeback.spec.ts` 用 `[data-testid="source-issue-*"]` |
-| locator 内 aria-label 组合 | 43 | 53 |
+| `data-testid` | 0 | **first appearance**: `e2e/github-issue-writeback.spec.ts` uses `[data-testid="source-issue-*"]` |
+| aria-label combos in locator | 43 | 53 |
 
-> 结论方向没变：**类名仍是唯一规模化定位机制**。密度 Top 5 换成 dead-buttons **127 处 / 95 distinct**、
-> `agent-detail` **77 / 41**、`provider-add-dialog` 51、`chief-settings` 49、`project-new-dir-browser` 38
-> （`detail-3pane` 与 `dialog-viewport` 各 36 并列其后）。最热单点 `.dlg` 67 → **69**。
+> The conclusion's direction is unchanged: **the class name is still the only scaled locating mechanism**. Density top 5 changes to dead-buttons **127 sites / 95 distinct**,
+> `agent-detail` **77 / 41**, `provider-add-dialog` 51, `chief-settings` 49, `project-new-dir-browser` 38
+> (`detail-3pane` and `dialog-viewport` tie at 36 right behind). The hottest single point `.dlg` 67 → **69**.
 >
-> 族分布重算（口径：从 distinct 选择子串直接取 `^\.[a-z0-9]+-` 前缀，复合选择子若不以带 `-` 的类开头则不归类——
-> 与原文「首类归并」口径**不完全等同**，仅供量级参考）：`prj-*` 52、`dlg-*` 38、`agent-*` 35、`chief-*` 29、
-> `team-*` 26、`board-*` 25、`res-*` 23、`chat-*` 18、`detail-*` 15、`new-*` 14、`sidebar-*` 12、`sched-*` 12。
-> `agent-*` 自成一族（配套 `routes/agent-detail.css` + #497 等），原文的族表里没有它。原文那张表按任何口径重算都会全变，不逐格复刻。
+> Family distribution recomputed (caliber: take the `^\.[a-z0-9]+-` prefix directly from the distinct selector string, composites not starting with a `-`-bearing class are unclassified —
+> not **fully identical** to the original `first-class merge` caliber, for magnitude reference only): `prj-*` 52, `dlg-*` 38, `agent-*` 35, `chief-*` 29,
+> `team-*` 26, `board-*` 25, `res-*` 23, `chat-*` 18, `detail-*` 15, `new-*` 14, `sidebar-*` 12, `sched-*` 12.
+> `agent-*` is its own new family (paired with `routes/agent-detail.css` + #497 etc.), absent from the original family table. The original table would change wholesale under any caliber recomputation, not reproduced cell by cell.
 
-### 3.2 integration locator（integration/test/，vitest + playwright）
+### 3.2 integration locator (integration/test/, vitest + playwright)
 
-- 3 个文件用类名 locator，共 **59 处钉 40 个 distinct 选择子**：m5-web-e2e.test.ts 38（28 distinct）、task-meta-e2e.test.ts 13（12 distinct）、m7-branch-dialog-e2e.test.ts 8（6 distinct）。其余 13 个 integration 测试不打 UI。
-- 与 web e2e 高度同族（.todo-card/.board-new-task/.new-task-*/.dlg-*/.detail-*/.sched-*/.doc-*），即同一批类名被两面同钉——改一处类名两面齐碎。
-- 非类名：getByRole ×2，其余个别文本定位。
+- 3 files use class locators, **59 sites pinning 40 distinct selectors** in total: m5-web-e2e.test.ts 38 (28 distinct), task-meta-e2e.test.ts 13 (12 distinct), m7-branch-dialog-e2e.test.ts 8 (6 distinct). The other 13 integration tests do not hit UI.
+- Highly same-family with web e2e (.todo-card/.board-new-task/.new-task-*/.dlg-*/.detail-*/.sched-*/.doc-*), i.e. the same batch of class names is pinned by both surfaces — changing one class name shatters both surfaces.
+- Non-class: getByRole ×2, the rest isolated text locates.
 
-> **偏差标注（复核 @ `9a0613b`）**——钉扎处数**一字未动**：仍是 3 个文件、**59 处**。变的是 distinct 与分母：
+> **Deviation annotation (recheck @ `9a0613b`)** — the pin site count **has not moved a character**: still 3 files, **59 sites**. What changed is distinct and the denominator:
 >
-> - distinct **40 → 36**：m5-web-e2e 28 → **24**、task-meta-e2e 12 → **10**、m7-branch-dialog-e2e 6 → **6**。
-> - `integration/test/` 现有 **17** 个 `*.test.ts`（原文 16）；仍是同样 3 个打 UI、其余 14 个不打。
-> - 「与 web e2e 高度同族、两面同钉、改一处齐碎」的判断仍成立。
+> - distinct **40 → 36**: m5-web-e2e 28 → **24**, task-meta-e2e 12 → **10**, m7-branch-dialog-e2e 6 → **6**.
+> - `integration/test/` now has **17** `*.test.ts` (the original 16); still the same 3 hit UI, the other 14 do not.
+> - The `highly same-family with web e2e, pinned by both surfaces, change one and both shatter` judgment still holds.
 
-### 3.3 视觉几何断言
+### 3.3 Visual geometry assertions
 
-- **`toHaveScreenshot` 全仓 0 处**——「视觉 spec」不落截图基线，全部是**数值几何/计算样式断言**，重钉 = 改数字与选择子，不涉及位图再基线化。
-- 专职视觉 spec 两个，均走 `page.evaluate` 探针（getComputedStyle + getBoundingClientRect）：
-  - visual-polish.spec.ts：30 expects，4 个 evaluate 探针。钉卡片/列/通知条/菜单的 border=0 + radius=12px + shadow/ring 配方（#161 边缘家族）、侧栏与主区同底（#390）、scrollbar 形态、rail borderRight/shadow。
-  - sidebar-visual.spec.ts：19 expects，7 个探针。钉 .sidebar-row 选中态 inset（top/bottom 2px、radius 6px）、行宽=侧栏 clientWidth、sidebarWidth=240、online-dot 定位、hover 配色一致性。
-- **boundingBox 36 处散在 8 个行为 spec**：board-dnd 10（拖拽几何）、providers-tabs 6、shell-consistency 5、dialog-viewport 4、chief-panel 3、segmented-controls 3、user-menu-trigger 3、collapse-family 2。
-- 视觉面探针选择子集中在 sidebar/board 两族（.board-sidebar .sidebar-row* .sidebar-online-dot .sidebar-kbd .board-topbar .board-main .board-scroller）——**侧栏是几何钉扎最密的域**。
+- **`toHaveScreenshot` 0 places repo-wide** — the `visual specs` do not land screenshot baselines; all are **numeric geometry / computed-style assertions**, so re-pinning = changing numbers and selectors, no bitmap re-baselining involved.
+- Two dedicated visual specs, both through `page.evaluate` probes (getComputedStyle + getBoundingClientRect):
+  - visual-polish.spec.ts: 30 expects, 4 evaluate probes. Pins card/column/notification-bar/menu border=0 + radius=12px + shadow/ring recipe (#161 edge family), sidebar and main same-base (#390), scrollbar shape, rail borderRight/shadow.
+  - sidebar-visual.spec.ts: 19 expects, 7 probes. Pins .sidebar-row selected-state inset (top/bottom 2px, radius 6px), row-width = sidebar clientWidth, sidebarWidth=240, online-dot positioning, hover color consistency.
+- **boundingBox 36 sites across 8 behavior specs**: board-dnd 10 (drag geometry), providers-tabs 6, shell-consistency 5, dialog-viewport 4, chief-panel 3, segmented-controls 3, user-menu-trigger 3, collapse-family 2.
+- Visual-surface probe selectors concentrate in the sidebar/board two families (.board-sidebar .sidebar-row* .sidebar-online-dot .sidebar-kbd .board-topbar .board-main .board-scroller) — **the sidebar is the densest geometry-pinned domain**.
 
-> **偏差标注（复核 @ `9a0613b`）**：
+> **Deviation annotation (recheck @ `9a0613b`)**:
 >
-> - `toHaveScreenshot` 仍**全仓 0 处**——「视觉 spec 不落截图基线」是本次复核里少数**完全没变**的事实。
-> - `visual-polish.spec.ts`：30 expects → **31**；`page.evaluate` 探针 4 → **1**（探针收敛了）。
->   `sidebar-visual.spec.ts`：19 expects / 7 探针，**与原文逐字一致**。
-> - `boundingBox`：**36 处散在 8 个 spec → 63 处散在 13 个 spec**。新增的 6 个 spec：
->   `agent-create-model`、`agent-detail`、`board-overflow`、`chief-fab`、`skills-readonly`、`team-org-chart`。
+> - `toHaveScreenshot` still **0 places repo-wide** — `visual specs do not land screenshot baselines` is one of the few facts in this recheck that **did not change at all**.
+> - `visual-polish.spec.ts`: 30 expects → **31**; `page.evaluate` probes 4 → **1** (probes converged).
+>   `sidebar-visual.spec.ts`: 19 expects / 7 probes, **verbatim identical to the original**.
+> - `boundingBox`: **36 sites across 8 specs → 63 sites across 13 specs**. The 6 added specs:
+>   `agent-create-model`, `agent-detail`, `board-overflow`, `chief-fab`, `skills-readonly`, `team-org-chart`.
 
-### 3.4 三面合流的重钉含义
+### 3.4 The re-pinning meaning of the three-surface convergence
 
-- 最热重钉单点 = `.dlg`（67 处 web e2e + integration 同族）——它钉的是 ui/dialog.css 的壳基类，11 个 DialogShell 消费面共享；shadcn Dialog 换壳时壳类别名策略（保留 .dlg 还是全面换钉）是第一裁决。
-- per-face 别名（§1.1 律 3）与三面钉扎是同一份契约的两端：组件层换实现时别名保留 ⇒ 三面零改动；别名不保留 ⇒ 853+59+几何面同步重钉。**重钉策略票可直接据此量化两案成本**。
+- The hottest re-pin single point = `.dlg` (67 web e2e sites + integration same-family) — it pins ui/dialog.css's shell base class, shared by 11 DialogShell consumption surfaces; whether the shadcn Dialog shell swap keeps the alias (keep `.dlg` or re-pin wholesale) is the first ruling.
+- The per-face alias (§1.1 law 3) and the three-surface pinning are the two ends of one contract: the component layer changes implementation and the alias survives ⇒ all three surfaces zero changes; the alias does not survive ⇒ 853+59+geometry surfaces re-pin in sync. **The re-pinning-strategy ticket can quantify the two options' costs directly from this.**
 
-> **偏差标注（复核 @ `9a0613b`）**——结论仍成立，但已被执行验证过一轮：`.dlg` 别名确实被保留（69 处钉扎零改动），
-> `#411 别名优先政策`把它写成了仓级规则。原文「重钉策略票可直接据此量化两案成本」这一步已被 `#425` 的选择
-> （换壳机制 + 保别名）走掉，两案不再并列。
+> **Deviation annotation (recheck @ `9a0613b`)** — the conclusion still holds, and has been validated for one round by execution: the `.dlg` alias is indeed kept (69 pin sites zero changes),
+> and the `#411 alias-first policy` wrote it into a repo-level rule. The original `the re-pinning-strategy ticket can quantify the two options' costs directly` step has been walked by #425's choice
+> (shell-swap mechanism + keep alias); the two options no longer stand side by side.
 
-## 4. 「一域一样式」散件分布与收编难度分级
+## 4. `one domain one style` piecemeal distribution and absorption difficulty grading
 
-视觉密度口径：声明中含 color/background/shadow/border/radius/font/outline/opacity/filter 的比例（全仓域 css 无纯布局壳——最低 sidebar 26% 也带实色配方）。
+Visual-density caliber: the proportion of declarations containing color/background/shadow/border/radius/font/outline/opacity/filter (repo-wide domain css has no pure layout shell — the lowest sidebar 26% still carries a solid-color recipe).
 
-| css | decl | 视觉占比 | 覆盖 | 收编难度 | 理由 |
+| css | decl | visual % | cover | absorption difficulty | Reason |
 |---|---|---|---|---|---|
-| overlay/token-gate.css | 30 | 47% | 单页 | **低** | 已 Button/Input 原语化，余量仅壳布局 |
-| routes/machine-authorize.css | 41 | 51% | 单页 | **低** | 单页单卡（authorize-card 族 1 处） |
-| overlay/mention-picker.css | 223 | 48% | 提及弹层 | **中（须先修）** | 死 token 面（§2.1），迁前须重接 token 才有真基线 |
-| board/board.css | 257 | 28% | 看板 | **中** | 布局为主（列/拖拽/滚动），但 board-dnd 10 处 boundingBox 钉拖拽几何 |
-| board/sidebar.css | 241 | 26% | 侧栏+rail | **中** | 全仓最几何敏感：sidebar-visual 19 expects + collapse/shell 两 spec 同钉 |
-| overlays/overlays.css | 241 | 36% | 搜索/popover/下拉 | **中** | search-* 7 + chip-popover + plan-dropdown 族；⌘K 面板形态独立 |
-| resources/resources.css | 326 | 33% | 5 页 | **中** | res-* 18 选择子 / res-card 行卡族；5 页同族收编一次到位 |
-| overlay/overlay.css | 278 | 34% | 新建任务+删除+菜单 | **中** | #394 后瘦身；new-task-dialog 18.6K 且已出 DialogShell 族（§1.1 律 2），单独立项感强 |
-| secondary/secondary.css | 389 | 37% | 3 页 | **中** | account/team/keys 三页 + team-agent-card/account-card 两卡族 |
-| detail/overlays.css | 404 | 41% | 详情弹层内容 | **中** | 壳已上提 ui/dialog.css，余 dlg-* 内容族随 DialogShell 迁移顺带 |
-| chief/chief.css | 464 | 38% | 总管 | **高** | chief-* 22 选择子 + chief-settings 49 处钉扎（单 spec 密度第 3） |
-| detail/detail.css | 852 | 33% | 任务详情全域 | **高** | 最大技术深度：transcript/diff/spec-block 组件级视觉（diff-* 族双 spec 同钉）+ todo-detail-page.tsx 41K 全仓最大单文件 |
-| pages/pages.css | 899 | 38% | 4 页 | **高** | 最大散件：prj-* 42 选择子（族最大户）+ sched-* 13，project-new github/repo 双流程 |
+| overlay/token-gate.css | 30 | 47% | single page | **low** | already Button/Input-primitivized, remainder only shell layout |
+| routes/machine-authorize.css | 41 | 51% | single page | **low** | single page single card (authorize-card family 1 site) |
+| overlay/mention-picker.css | 223 | 48% | mention popover | **medium (must fix first)** | dead-token surface (§2.1), must reconnect tokens before migration to have a real baseline |
+| board/board.css | 257 | 28% | board | **medium** | layout-heavy (columns/drag/scroll), but board-dnd 10 boundingBox sites pin drag geometry |
+| board/sidebar.css | 241 | 26% | sidebar+rail | **medium** | repo-wide most geometry-sensitive: sidebar-visual 19 expects + collapse/shell two specs co-pin |
+| overlays/overlays.css | 241 | 36% | search/popover/dropdown | **medium** | search-* 7 + chip-popover + plan-dropdown family; ⌘K panel shape independent |
+| resources/resources.css | 326 | 33% | 5 pages | **medium** | res-* 18 selectors / res-card row cards; 5-page same-family absorbed in one go |
+| overlay/overlay.css | 278 | 34% | new task + delete + menu | **medium** | slimmed after #394; new-task-dialog 18.6K and already desertered DialogShell family (§1.1 law 2), strongly standalone |
+| secondary/secondary.css | 389 | 37% | 3 pages | **medium** | account/team/keys three pages + team-agent-card/account-card two card families |
+| detail/overlays.css | 404 | 41% | detail popover content | **medium** | shell already lifted to ui/dialog.css, the dlg-* content family follows the DialogShell migration |
+| chief/chief.css | 464 | 38% | chief | **high** | chief-* 22 selectors + chief-settings 49 pin sites (single-spec density #3) |
+| detail/detail.css | 852 | 33% | task detail everywhere | **high** | largest technical depth: transcript/diff/spec-block component-level vision (diff-* family double-spec co-pin) + todo-detail-page.tsx 41K the repo's largest single file |
+| pages/pages.css | 899 | 38% | 4 pages | **high** | largest piece: prj-* 42 selectors (biggest family) + sched-* 13, project-new github/repo dual flow |
 
-分级合计：**低 2 / 中 9（含 1 个须先修）/ 高 3**——13 件域散件无一件是纯布局壳。
-建议切片顺序（供蓝图票参考，非裁决）：低难度两件（token-gate、machine-authorize）当试点热身——面小、钉扎少（token-gate spec 16 处但选择子只 6 个）、已部分原语化；中难度里 resources 或 secondary 当第一个「真域」（shell 模式单引 css，收编边界整齐）；高三件（chief/detail/pages）留到 token 管道与重钉策略稳定后。
+Grading total: **low 2 / medium 9 (including 1 must-fix-first) / high 3** — of the 13 domain pieces none is a pure layout shell.
+Suggested slice order (for the blueprint ticket's reference, not a ruling): the two low-difficulty pieces (token-gate, machine-authorize) as the pilot warm-up — small surface, few pins (token-gate spec 16 sites but only 6 selectors), already partly primitivized; among medium difficulty, resources or secondary as the first `real domain` (shell-mode single css import, clean absorption boundary); the three high pieces (chief/detail/pages) left until the token pipeline and re-pinning strategy stabilize.
 
-> **偏差标注（复核 @ `9a0613b`）**——分级的**方法**（视觉密度口径、四档难度）仍可用，但成员表与切片建议已被执行进度盖过：
+> **Deviation annotation (recheck @ `9a0613b`)** — the grading's **method** (visual-density caliber, four difficulty tiers) is still usable, but the member table and slice suggestion have been overtaken by execution progress:
 >
 > - **原文建议的切片顺序基本被照做**：`#474` 先做两件低难度热身（token-gate、machine-authorize），
 >   `#481` 接着做第一个「真域」resources（原文是「resources 或 secondary」二选一，取的是 resources）。
@@ -320,41 +320,41 @@ button.css ← button.tsx；card.css ← card.tsx（死）；chip.css ← chip.t
 >   的取数命令（`grep -cE '^[[:space:]]*[-a-zA-Z]+[[:space:]]*:.*;'`）；视觉占比口径同原文（decl 行里属性命中
 >   color/background/shadow/border/radius/font/outline/opacity/filter 等的比例）：
 
-| css | decl @ `8c30775` | decl @ `9a0613b` | 视觉占比 @ `9a0613b`（原文值） | 状态 |
+| css | decl @ `8c30775` | decl @ `9a0613b` | visual % @ `9a0613b` (original value) | status |
 |---|---|---|---|---|
-| pages/pages.css | 899 | 1094 | 38%（38%） | 未迁 |
-| detail/detail.css | 852 | 955 | 33%（33%） | 未迁 |
-| secondary/secondary.css | 389 | 491 | 34%（37%） | 未迁 |
-| chief/chief.css | 464 | 470 | 37%（38%） | 未迁 |
-| detail/overlays.css | 404 | 420 | 41%（41%） | 壳已上提，内容族未迁 |
-| resources/resources.css | 326 | 363 | 35%（33%） | 域已切 shadcn（#481），本文件仍在 |
-| overlays/overlays.css | 241 | 238 | 37%（36%） | 未迁（sidebar 规则并入此处） |
-| overlay/overlay.css | 278 | 240 | 35%（34%） | 未迁 |
-| overlay/mention-picker.css | 223 | 227 | 49%（48%） | 未迁（悬空 token 已修，#427） |
-| board/board.css | 257 | **64** | 35%（28%） | 看板已迁 shadcn（#414），本文件成残留层 |
-| board/sidebar.css | 241 | **—** | —（26%） | **文件已删**，规则并入 overlays/overlays.css |
-| ui/dialog.css | 126 | 93 | 44% | 壳级规则已退役（#425），余表单族与 per-face 类 |
-| overlay/token-gate.css | 30 | **—** | —（47%） | **文件已删**（#474 切 shadcn 件） |
-| routes/machine-authorize.css | 41 | **—** | —（51%） | **文件已删**（#474 切 shadcn 件） |
-| routes/agent-detail.css | — | 185 | 40% | **新增**，原文分级里没有它 |
-| styles/shadcn.css | — | 210 | —（值文件，该口径不适用） | **新增**（#435 值正本） |
-| ui/kbd-hint.css | — | 21 | 38% | **新增**（#468） |
+| pages/pages.css | 899 | 1094 | 38%(38%) | not migrated |
+| detail/detail.css | 852 | 955 | 33%(33%) | not migrated |
+| secondary/secondary.css | 389 | 491 | 34%(37%) | not migrated |
+| chief/chief.css | 464 | 470 | 37%(38%) | not migrated |
+| detail/overlays.css | 404 | 420 | 41%(41%) | shell lifted, content family not migrated |
+| resources/resources.css | 326 | 363 | 35%(33%) | domain switched to shadcn (#481), this file still exists |
+| overlays/overlays.css | 241 | 238 | 37%(36%) | not migrated (sidebar rules merged here) |
+| overlay/overlay.css | 278 | 240 | 35%(34%) | not migrated |
+| overlay/mention-picker.css | 223 | 227 | 49%(48%) | not migrated (dangling tokens fixed, #427) |
+| board/board.css | 257 | **64** | 35%(28%) | board migrated to shadcn (#414), this file is now the residual layer |
+| board/sidebar.css | 241 | **—** | —(26%) | **file deleted**, rules merged into overlays/overlays.css |
+| ui/dialog.css | 126 | 93 | 44% | shell-level rules retired (#425), form family and per-face classes remain |
+| overlay/token-gate.css | 30 | **—** | —(47%) | **file deleted** (#474 switched to shadcn components) |
+| routes/machine-authorize.css | 41 | **—** | —(51%) | **file deleted** (#474 switched to shadcn components) |
+| routes/agent-detail.css | — | 185 | 40% | **added**, not in the original grading |
+| styles/shadcn.css | — | 210 | —(value file, this caliber does not apply) | **added** (#435 value canonical) |
+| ui/kbd-hint.css | — | 21 | 38% | **added** (#468) |
 
-> 视觉占比复算值与原文逐行落在 ±3 个百分点内，说明原文口径可复现；`board/board.css` 的 28% → 35% 是文件瘦身后
-> 分母变小所致，不是配方变多。
+> The visual-% recomputed values fall within ±3 percentage points of the original line by line, showing the original caliber is reproducible; `board/board.css`'s 28% → 35% is the file's denominator shrinking after slimming,
+> not more recipes.
 
-## 附录 A：web e2e 类名钉扎按文件全表（46 spec，基线 8c30775）
+## Appendix A: web e2e class pins per-file full table (46 specs, baseline 8c30775)
 
-列 = spec（去 .spec.ts）｜钉扎处数｜distinct 数｜distinct 选择子（首类，复合选择子按首类归并）。
+Columns = spec (without .spec.ts)|pin sites|distinct count|distinct selectors (first class, composites merged by first class).
 
-> **偏差标注（复核 @ `9a0613b`）**——本附录是 `8c30775` 时点的 46 spec 全表，**不能当现行清单用**：
-> 现 e2e 共 **66** 个 spec、其中 **61** 个有类名钉扎，表内每行的「处 / distinct / 选择子」都可能已变
-> （例：dead-buttons 119 → 127 处、76 → 95 distinct；新增 `agent-detail`、`agent-create-model`、`project-new-dir-browser`、
-> `team-org-chart`、`skills-readonly` 等一批 spec 整行缺位）。
-> **本表保留原样**——它的价值正是「与当前树对照」。要现行清单，按 §3.1 偏差块的口径重跑一遍。
-> 附录标题里的「基线 8c30775」是原文自带的，未改。
+> **Deviation annotation (recheck @ `9a0613b`)** — this appendix is the 46-spec full table at the `8c30775` point in time, **not to be used as the current list**:
+> current e2e is **66** specs, of which **61** have class pins; every row's `sites / distinct / selectors` may have changed
+> (example: dead-buttons 119 → 127 sites, 76 → 95 distinct; added `agent-detail`, `agent-create-model`, `project-new-dir-browser`,
+> `team-org-chart`, `skills-readonly` and a batch of specs are missing whole rows).
+> **This table is kept as-is** — its value is exactly `comparison against the current tree`. For a current list, re-run per the §3.1 deviation block's caliber.
+> The appendix title's `baseline 8c30775` is the original's own, unchanged.
 
-| spec | 处 | distinct | 选择子 |
+| spec | sites | distinct | selectors |
 |---|---|---|---|
 | account-team-cleanse | 21 | 12 | .account-avatar .account-card .account-delete .account-logout .account-swap .account-switch .secondary-link .team-agent-card .team-chart-empty .team-create-agent .team-layout-tab .team-members |
 | avatar-dicebear | 21 | 15 | .chip-popover .chip-popover-row .chip-popover-section--selected .dlg-agent-avatar .prj-task-avatar .rail-user .search-panel .search-row-icon--agent .sidebar-row .sidebar-user .team-agent-avatar .team-agent-card .team-create-agent .todo-agent-avatar .user-menu-head |
@@ -403,30 +403,30 @@ button.css ← button.tsx；card.css ← card.tsx（死）；chip.css ← chip.t
 | user-menu-trigger | 8 | 4 | .rail-user .sidebar-user .user-menu .user-menu-seg |
 | visual-polish | 2 | 2 | .board-scroller .board-sidebar--collapsed |
 
-## 附录 B：integration 类名钉扎按文件全表（3 spec，基线 8c30775）
+## Appendix B: integration class pins per-file full table (3 specs, baseline 8c30775)
 
-| spec | 处 | distinct | 选择子 |
+| spec | sites | distinct | selectors |
 |---|---|---|---|
 | m5-web-e2e | 38 | 28 | .board-column .board-column-name .board-new-task .chat-bubble .chat-note .chat-plan-title .chat-scheduled .composer-input .composer-send .detail-chip .detail-head-action .detail-shell .dlg-accept-done .doc-file-row .doc-pane-select .doc-range-chip .doc-range-wrap .new-task-spec .new-task-start .page-new-action .sched-card .sched-form .sched-form-freq-tab .sched-form-save .todo-card .todo-card-link .todo-card-title .version-menu-row |
 | task-meta-e2e | 13 | 12 | .board-new-task .detail-shell .fresh-tags .new-task-dialog .new-task-input .new-task-save .new-task-spec .new-task-tag-add .new-task-tags .todo-card .todo-card-link .todo-card-title |
 | m7-branch-dialog-e2e | 8 | 6 | .detail-right .dlg-branch-value .dlg-dir--input .dlg-machine .dlg-machine-menu .plan-dropdown-row |
 
-> **偏差标注（复核 @ `9a0613b`）**——处数列（38 / 13 / 8 = 59）**与现值完全一致**；distinct 列现值：
-> m5-web-e2e 28 → **24**、task-meta-e2e 12 → **10**、m7-branch-dialog-e2e 6 → **6**（合计 40 → **36**）。
+> **Deviation annotation (recheck @ `9a0613b`)** — the site count column (38 / 13 / 8 = 59) **is fully identical to the current value**; the distinct column current:
+> m5-web-e2e 28 → **24**, task-meta-e2e 12 → **10**, m7-branch-dialog-e2e 6 → **6** (total 40 → **36**).
 
-## 附录 C：死 token 与悬空 token 全单
+## Appendix C: dead tokens and dangling tokens full list
 
-- 死 token（tokens.css 定义、全 src 零消费，19）：--active-text、--blue-400、--card-ghost-border、--chip-active-bg、--chip-active-border、--col-dot-building、--col-dot-confirm、--col-dot-idle、--col-dot-planning、--col-dot-review、--disabled-fg、--indigo-400、--nav-bg、--send-disabled、--space-1、--space-2、--space-3、--space-4、--space-6。
-- 悬空 token（消费但全仓无定义，5，均在 overlay/mention-picker.css）：--border（5 处）、--text（5 处）、--text-muted（5 处）、--surface-base（4 处）、--ring（1 处）。
-- 自足 fallback（非缺陷）：detail.css 的 --color-danger/--color-warning（各 2 处，均带 hex fallback）；fonts.css 的 --font-inter 与 detail.css 的 --detail-pane-right 为本地定义本地用。
+- Dead tokens (defined in tokens.css, zero consumption full src, 19): --active-text, --blue-400, --card-ghost-border, --chip-active-bg, --chip-active-border, --col-dot-building, --col-dot-confirm, --col-dot-idle, --col-dot-planning, --col-dot-review, --disabled-fg, --indigo-400, --nav-bg, --send-disabled, --space-1, --space-2, --space-3, --space-4, --space-6.
+- Dangling tokens (consumed but undefined repo-wide, 5, all in overlay/mention-picker.css): --border (5 sites), --text (5 sites), --text-muted (5 sites), --surface-base (4 sites), --ring (1 site).
+- Self-sufficient fallbacks (non-defect): detail.css's --color-danger/--color-warning (2 each, all with hex fallback); fonts.css's --font-inter and detail.css's --detail-pane-right are locally defined locally used.
 
-> **偏差标注（复核 @ `9a0613b`）**——三条现状：
+> **Deviation annotation (recheck @ `9a0613b`)** — three current states:
 >
-> - **死 token：19 → 0**。`#449` 清掉 16 名。原文 19 名里 `--col-dot-*` 五态现只剩 idle / confirm / building 三个
->   定义（planning / review 已删），且三个**都有活消费点**（`src/board/columns.ts:52,60,67` 的 `dot:` 值）——
->   定义见 `styles/shadcn.css:143–145`（`.light` 镜像 283–285）。按 §2.1 偏差块的复合口径重跑，`tokens.css` +
->   `shadcn.css` 范围内 defined-but-unused 为 **0**；全仓 css 范围内只剩 `styles/fonts.css:37` 的 `--font-jetbrains-mono`。
-> - **悬空 token：5 → 0**。整条已由 `#427` 解决，`overlay/mention-picker.css` 现 0 处引用它们。
-> - **自足 fallback**：`detail/detail.css` 的 `--color-danger` / `--color-warning` 仍在（各 2 处，带 hex fallback）；
->   新增一处同性质写法 `secondary/secondary.css:429` 的 `var(--card-border-hover, var(--text-tertiary))`。
->   `--font-inter` / `--detail-pane-right` 不变。
+> - **Dead tokens: 19 → 0.** `#449` cleaned 16 names. Of the original 19, the `--col-dot-*` five states now only have the idle / confirm / building three
+>   definitions (planning / review deleted), and all three **have live consumption sites** (`src/board/columns.ts:52,60,67`'s `dot:` values) —
+>   definitions at `styles/shadcn.css:143–145` (`.light` mirror 283–285). Re-run under §2.1 deviation block's composite caliber, within `tokens.css` +
+>   `shadcn.css` the defined-but-unused is **0**; repo-wide within css only `styles/fonts.css:37`'s `--font-jetbrains-mono` remains.
+> - **Dangling tokens: 5 → 0.** The whole item was resolved by `#427`; `overlay/mention-picker.css` now references them 0 times.
+> - **Self-sufficient fallbacks**: `detail/detail.css`'s `--color-danger` / `--color-warning` are still there (2 each, with hex fallback);
+>   one added same-nature form `secondary/secondary.css:429`'s `var(--card-border-hover, var(--text-tertiary))`.
+>   `--font-inter` / `--detail-pane-right` unchanged.

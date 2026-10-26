@@ -1,32 +1,32 @@
-# R11 · pacman ↔ Multica runtime 模型能力差距盘点
+# R11 · pacman ↔ Multica runtime-model capability gap inventory
 
-> 目的：票 #518——拿 runtime 研究票（#517 / `docs/research/r10-multica-runtime.md`）的结论，逐项对照 pacman 的现状，
-> 出能力差距清单：缺什么、多什么、哪里形状不同。
-> 对照基准：`docs/research/r10-multica-runtime.md`（467 行，源码级实测，含 14 条文档/源码不一致；Multica 克隆 HEAD
-> `43b0571f992567a919c7f1f699ff160922594b94`，2026-09-29 23:27:27 -0700）。
-> pacman 侧证据：`origin/main` = `c95ee5f`（本票独立 worktree，未动主检出）。
-> 地图：#515。上位研究：#517（已关闭）。盘点时间：2026-09-30（本地 Asia/Shanghai）。
+> Purpose: ticket #518 — take the conclusions of the runtime research ticket (#517 / `docs/research/r10-multica-runtime.md`),
+> compare them item by item against pacman's current state, and produce a capability-gap list: what is missing, what is extra, where the shapes differ.
+> Comparison baseline: `docs/research/r10-multica-runtime.md` (467 lines, source-level measurement, containing 14 doc/source inconsistencies; Multica clone HEAD
+> `43b0571f992567a919c7f1f699ff160922594b94`, 2026-09-29 23:27:27 -0700).
+> pacman-side evidence: `origin/main` = `c95ee5f` (this ticket's independent worktree; the main checkout untouched).
+> Map: #515. Upstream research: #517 (closed). Inventory date: 2026-09-30 (local Asia/Shanghai).
 
-## 0. 阅读约定
+## 0. Reading conventions
 
-- 出处两类，逐条标注：
-  - **P**（pacman）= 本票在 `c95ee5f` 工作树上逐行读到的 `路径:行号`；
-  - **M**（Multica）= 转引 r10 的 `路径:行号`。**本票未重新克隆 Multica 源码复核**，M 侧的精确性以 r10 为准
-    （r10 §0 已声明其出处纪律：文档侧记 D、源码侧记 C，无出处不写）。
-- 四栏格式（票面指定）：**现状（文件:行号）· Multica 的做法 · 差距性质 · 是否属本图要修的范围**。
-- 「差距性质」三值：`缺` / `形状不同` / `pacman 有意不同`。
-- 「属本图要修的范围」按地图 #515 已裁的边界判定，取值：
-  - `属·阻塞#519`——#519（控制面搬上常开主机 + 跑通闭环）会直接撞上的；
-  - `属·本图要定`——#515 `Not yet specified` 里明说等本图研究回收后再判的；
-  - `不属·有意不同`——02 册 / 01 册已锁的 divergence，本图不重开；
-  - `不属·本图 Out of scope`——#515 已明列排除的。
-- 全篇无 emoji；命令、常量、数值原样照抄。
-- 一处命名陷阱先钉死（r10 §0 同款）：Multica 的「permission」有三层，本票只谈**第三层**
-  `agent_runtime.visibility`（谁能在谁的机器上起 agent）。pacman 侧没有对应层（§G20）。
+- Two kinds of sources, marked per item:
+  - **P** (pacman) = `path:line` read line by line on the `c95ee5f` working tree by this ticket;
+  - **M** (Multica) = cited from r10's `path:line`. **This ticket did not re-clone the Multica source for re-verification**; the M-side precision rests on r10
+    (r10 §0 already declares its sourcing discipline: docs-side marked D, source-side marked C, nothing written without a source).
+- Four-column format (per the ticket): **current state (file:line) · how Multica does it · gap nature · whether it is in scope for this plan to fix**.
+- "Gap nature" takes three values: `missing` / `different shape` / `intentionally different in pacman`.
+- "In scope for this plan to fix" is judged by the boundary already ruled in map #515, taking values:
+  - `in-scope · blocking #519` — #519 (control plane moved to an always-on host + a closed loop running) will hit it directly;
+  - `in-scope · for this plan to decide` — items #515 marked `Not yet specified`, explicitly waiting for this plan's research to come back before ruling;
+  - `out · intentionally different` — divergence already locked by volume 02 / volume 01, not reopened by this plan;
+  - `out · out of scope for this plan` — explicitly excluded by #515.
+- No emoji anywhere; commands, constants, and values copied verbatim.
+- One naming trap pinned first (same as r10 §0): Multica's "permission" has three layers, and this ticket discusses only the **third layer**,
+  `agent_runtime.visibility` (who can start an agent on whose machine). pacman has no corresponding layer (§G20).
 
 ---
 
-## 1. 结论先行
+## 1. Conclusions first
 
 1. **pacman 没有 runtime 这个对象。** server 侧只有 `machine` 一行 = 一台注册主机，
    runtime（一台电脑 × 一个 CLI 工具）在 pacman 里不存在行、不存在 id、不存在列表
@@ -79,40 +79,40 @@
 
 ---
 
-## 2. A 面 · runtime 身份与注册（G1–G4）
+## 2. Surface A · runtime identity and registration (G1–G4)
 
-| # | 现状（文件:行号） | Multica 的做法 | 差距性质 | 是否属本图要修的范围 |
+| # | Current state (file:line) | How Multica does it | Gap nature | In scope for this plan to fix |
 |---|---|---|---|---|
-| **G1** | machine 表只有 `id/teamId/name/online/tokenHash/apiKeyId/latestCliVersion/kind/enabledRuntimes` 八列，无 provider / profile / owner / lastSeen 列（`apps/server/src/db/schema.ts:398-417`）；`kind` 只分 `local`/`remote`（`packages/shared/src/records/machine.ts:31`） | runtime 是 `agent_runtime` 表的一行 = (workspace, daemon, provider, profile)（r10 §2.2，`server/pkg/db/queries/runtime.sql:63`、`:95`） | 缺 | 属·本图要定（#515 `Not yet specified`「多 backend 先接哪个 CLI：等 runtime 研究拿到协议族与能力差异矩阵」） |
-| **G2** | 无 profile 维：全仓无 `runtimeProfile` / `runtime_profile` / `customProfile` 任何标识（穷举 grep 零命中） | 两条部分唯一索引把 profile 抬成第四维，内置与自定义实例并存（r10 §2.2、D13，迁移 120/121） | 缺 | 不属·本图 Out of scope（自用单机场景无自定义 wrapper 诉求；未被 #515 任何一节要求） |
-| **G3** | 注册幂等 = 应用层查 `(apiKeyId, teamId)` 命中即更新，否则 insert 新行（`apps/server/src/services/machines.ts:437-442`、`:461-474`） | DB 层 `ON CONFLICT ... DO UPDATE`，冲突键即两条唯一索引；重启幂等（r10 §2.2/D13） | 形状不同 | 属·本图要定（副作用具体：「换一把 apiKey 重注册同一台机器」在 pacman 会**多一行机器**，Multica 不会；#519 要用 api-key 路径注册另一台机，容易踩） |
-| **G4** | daemon 只在 `machine.json` 缺席时才 enroll（`apps/daemon/src/machine-loop.ts:114-135`）；重启不重注册、不刷新 `latestCliVersion`（只有 presence 会刷，`:139`、`:310`） | 重启即重新注册并 reclaim 上次未干净结束的 run（r10 §5.1 一致项） | 形状不同 | 不属（比 Multica 更幂等，且 `presence` 已承担版本刷新；无缺口） |
+| **G1** | The machine table has only eight columns — `id/teamId/name/online/tokenHash/apiKeyId/latestCliVersion/kind/enabledRuntimes` — no provider / profile / owner / lastSeen columns (`apps/server/src/db/schema.ts:398-417`); `kind` only splits `local`/`remote` (`packages/shared/src/records/machine.ts:31`) | A runtime is a row of the `agent_runtime` table = (workspace, daemon, provider, profile) (r10 §2.2, `server/pkg/db/queries/runtime.sql:63`, `:95`) | missing | in-scope · for this plan to decide (#515 `Not yet specified` "which CLI to connect first for multi-backend: wait for the runtime research to produce the protocol-family and capability-difference matrix") |
+| **G2** | No profile dimension: nothing named `runtimeProfile` / `runtime_profile` / `customProfile` anywhere in the repo (exhaustive grep, zero hits) | Two partial unique indexes elevate profile into a fourth dimension, with built-in and custom instances coexisting (r10 §2.2, D13, migrations 120/121) | missing | out · out of scope for this plan (no custom-wrapper demand in the single-machine self-use scenario; not requested by any section of #515) |
+| **G3** | Registration idempotency = the application layer looks up `(apiKeyId, teamId)`, updates on hit, otherwise inserts a new row (`apps/server/src/services/machines.ts:437-442`, `:461-474`) | DB-level `ON CONFLICT ... DO UPDATE` with the two unique indexes as the conflict key; idempotent across restarts (r10 §2.2/D13) | different shape | in-scope · for this plan to decide (the side effect is concrete: "re-registering the same machine with a different apiKey" creates **an extra machine row** in pacman, while Multica does not; #519 will register another machine via the api-key path and can easily step on this) |
+| **G4** | The daemon enrolls only when `machine.json` is absent (`apps/daemon/src/machine-loop.ts:114-135`); a restart neither re-registers nor refreshes `latestCliVersion` (only presence refreshes it, `:139`, `:310`) | Restart triggers re-registration and reclaims runs that did not end cleanly last time (r10 §5.1 consistency item) | different shape | out (more idempotent than Multica, and `presence` already carries version refresh; no gap) |
 
 ---
 
-## 3. B 面 · 侦测、协议族与多 backend（G5–G7）
+## 3. Surface B · probing, protocol families, and multi-backend (G5–G7)
 
-| # | 现状（文件:行号） | Multica 的做法 | 差距性质 | 是否属本图要修的范围 |
+| # | Current state (file:line) | How Multica does it | Gap nature | In scope for this plan to fix |
 |---|---|---|---|---|
-| **G5** | 无任何 CLI 侦测：daemon 启动即 `Loading pi runtime…`，backend 恒为 `createPiBackend`（`apps/daemon/src/machine-loop.ts:84-101`）；全仓无 `lookPath` / `which` / PATH 扫描（穷举 grep 零命中）。机器对上只报 `cliVersion`（`packages/shared/src/protocol/machine-wire.ts:81-83`） | daemon 启动扫 PATH 侦测 26 个命令名，带登录-shell 兜底与 30 分钟缓存（r10 §3.2） | 缺 | 属·本图要定（这正是 wiki [[pacman 的编排器坐标与借鉴清单]] B1「machine 能力广告」；#519 单机形态不阻塞，但多机路由的前置） |
-| **G6** | 单引擎内嵌：pi 是本仓依赖，`AgentBackend` 缝已存在但只有 pi 一个实现（`packages/shared/src/agent-backend.ts:190`、`apps/daemon/src/backend/pi.ts:507`、`docs/spec/01-stack-v2.md:126`） | 25 个协议族白名单 + 每族一个后端（r10 §4.2，`server/pkg/agent/agent.go:364-390`） | 缺 | 属·本图要定（#515 明列「多 backend 先接哪个 CLI」等本图） |
-| **G7** | `enabledRuntimes` 存得下读得出但无执行面：写入 `apps/server/src/routes.ts:1203`（PATCH），schema 投影 `apps/server/src/services/machines.ts:368`；claim（`apps/server/src/services/machines.ts:581-597`）与 daemon 执行（`apps/daemon/src/machine-loop.ts:361`）两侧都不读 | `agent_runtime.visibility` 是绑定闸（`canUseRuntimeForAgent`，r10 §8.2） | 形状不同 | 属·本图要定（开关已在 UI 上承诺了「本机跑 pi 还是 Claude Code」，但两个位置都不生效） |
+| **G5** | No CLI probing at all: the daemon starts with `Loading pi runtime…`, the backend is always `createPiBackend` (`apps/daemon/src/machine-loop.ts:84-101`); no `lookPath` / `which` / PATH scanning anywhere (exhaustive grep, zero hits). A machine reports only `cliVersion` (`packages/shared/src/protocol/machine-wire.ts:81-83`) | The daemon scans PATH at startup to probe 26 command names, with a login-shell fallback and a 30-minute cache (r10 §3.2) | missing | in-scope · for this plan to decide (this is exactly wiki ``[[pacman's own coordinates and borrowing list]]`` B1 "machine capability advertisement"; not blocking for #519's single-machine shape, but a prerequisite for multi-machine routing) |
+| **G6** | Single embedded engine: pi is a dependency of this repo, the `AgentBackend` seam exists but has only the pi implementation (`packages/shared/src/agent-backend.ts:190`, `apps/daemon/src/backend/pi.ts:507`, `docs/spec/01-stack-v2.md:126`) | A 25-family protocol whitelist + one backend per family (r10 §4.2, `server/pkg/agent/agent.go:364-390`) | missing | in-scope · for this plan to decide (#515 explicitly lists "which CLI to connect first for multi-backend" for this plan) |
+| **G7** | `enabledRuntimes` can be stored and read but has no execution surface: written at `apps/server/src/routes.ts:1203` (PATCH), schema projection at `apps/server/src/services/machines.ts:368`; neither the claim side (`apps/server/src/services/machines.ts:581-597`) nor the daemon execution (`apps/daemon/src/machine-loop.ts:361`) reads it | `agent_runtime.visibility` is a binding gate (`canUseRuntimeForAgent`, r10 §8.2) | different shape | in-scope · for this plan to decide (the switch already promises "run pi or Claude Code on this machine" in the UI, but it takes effect at neither position) |
 
 ---
 
-## 4. C 面 · 在线判定与心跳（G8–G10）
+## 4. Surface C · online decision and heartbeat (G8–G10)
 
-| # | 现状（文件:行号） | Multica 的做法 | 差距性质 | 是否属本图要修的范围 |
+| # | Current state (file:line) | How Multica does it | Gap nature | In scope for this plan to fix |
 |---|---|---|---|---|
-| **G8** | `online` 只在机器 wake SSE 流 abort 时翻 false（`apps/server/src/routes-machine.ts:240-246` → `markOffline`，`apps/server/src/services/machines.ts:543`，全仓唯一调用点）；`markPresence` 无条件置 true（`apps/server/src/services/machines.ts:521-541`）。**无陈旧阈值、无扫掠、无 `last_seen_at`**。两个可复现后果：①没有 FIN 的断开（网络分区 / 断电 / 拔网线）→ 永久在线；②daemon 自身重连（`apps/daemon/src/machine-loop.ts:278-306` 断线重连循环**不补发 presence**）→ 旧流 abort 先置离线，最长 30s 后靠下一拍 presence 翻回 | 150s 陈旧阈值 + 30s 扫掠 ≈ 180s 判离线；Redis TTL 热路径 + 最多 60s 落一次 `last_seen_at`（r10 §5.2/D11） | 缺 | **属·阻塞#519**（#519 要求的正是「笔记本可关机、控制面不掉链子」，而这两个后果一个把活机器判成死的、一个把死机器判成活的） |
-| **G9** | `step.lastHeartbeatAt` 由 `heartbeat/{stepId}` 写（`apps/server/src/services/machines.ts:897-900`，daemon 每 30s 打一拍 `apps/daemon/src/runner.ts:416-419`），但**全仓无任何读点**（穷举 grep：只有写入与 schema 定义） | 心跳年龄是排队释放与失败回收的判据（r10 §5.3：`ExpireStaleQueuedTasks` 直接读心跳年龄） | 缺 | **属·阻塞#519**（步级活性数据已在线，缺的是判定与动作用它） |
-| **G10** | presence 节奏 30s（`apps/daemon/src/machine-loop.ts:313`），server 侧无状态机、无落库节奏 | 心跳 15s（r10 §5.2） | 形状不同 | 不属（纯数值差异；真正的缺口是 G8） |
+| **G8** | `online` flips to false only when the machine's wake SSE stream aborts (`apps/server/src/routes-machine.ts:240-246` → `markOffline`, `apps/server/src/services/machines.ts:543`, the only call site in the repo); `markPresence` unconditionally sets it true (`apps/server/src/services/machines.ts:521-541`). **No staleness threshold, no sweep, no `last_seen_at`**. Two reproducible consequences: ① a disconnect without FIN (network partition / power loss / unplugged cable) → online forever; ② the daemon's own reconnect (`apps/daemon/src/machine-loop.ts:278-306` — the reconnect loop **does not re-send presence**) → the old stream's abort flips offline first, and it takes up to 30s for the next presence beat to flip it back | A 150s staleness threshold + 30s sweep ≈ 180s to decide offline; a Redis TTL hot path + `last_seen_at` persisted at most once per 60s (r10 §5.2/D11) | missing | **in-scope · blocking #519** (what #519 demands is exactly "the laptop can power off while the control plane keeps working", and these two consequences judge live machines dead and dead machines live) |
+| **G9** | `step.lastHeartbeatAt` is written by `heartbeat/{stepId}` (`apps/server/src/services/machines.ts:897-900`; the daemon beats every 30s, `apps/daemon/src/runner.ts:416-419`), but **there is no read point anywhere in the repo** (exhaustive grep: only the write and the schema definition) | Heartbeat age is the criterion for queue release and failure recovery (r10 §5.3: `ExpireStaleQueuedTasks` reads the heartbeat age directly) | missing | **in-scope · blocking #519** (the step-level liveness data is already online; what is missing is the decision and actions that consume it) |
+| **G10** | Presence cadence 30s (`apps/daemon/src/machine-loop.ts:313`); no state machine and no persistence cadence on the server side | Heartbeat 15s (r10 §5.2) | different shape | out (a pure numeric difference; the real gap is G8) |
 
 ---
 
-## 5. D 面 · claim、并发与派发（G11–G13）
+## 5. Surface D · claim, concurrency, and dispatch (G11–G13)
 
-| # | 现状（文件:行号） | Multica 的做法 | 差距性质 | 是否属本图要修的范围 |
+| # | Current state (file:line) | How Multica does it | Gap nature | In scope for this plan to fix |
 |---|---|---|---|---|
 | **G11** | Serial: the claim loop `await client.claim(...)` → `await runStep(...)` executes in order, one step per round (`apps/daemon/src/machine-loop.ts:342-362`, `running` always passed as 1, `:361`); no concurrency gate server-side (`apps/server/src/services/machines.ts:744-745`, #503 comment verbatim "machine claiming is not bound by the cap") | daemon 20 / agent 6 double gate; claims rejected when `running >= agent.MaxConcurrentTasks` (r10 §5.4) | pacman deliberately different | Not in scope · deliberate (`docs/spec/02-architecture-parity.md:15` A3 already ruled "the concurrency-cap concept is removed wholesale with #503"); but the status quo is **serial**, not "uncapped" — this layer of difference deserves its own row on the map, see §9 |
 | **G12** | claim 候选只筛 `status='pending'` + team + `pinnedMachineId`（`apps/server/src/services/machines.ts:581-597`），**不看机器能不能跑这一步的模型** | runtime 与 agent 绑定，任务路由到匹配的 runtime（r10 §2.1/§8） | 缺 | 属·本图要定（= G5 的另一面；单机不阻塞，第二台机器一上就出问题） |
@@ -120,29 +120,29 @@
 
 ---
 
-## 6. E 面 · 宽限、回收与孤儿（G14–G16）
+## 6. Surface E · grace, recovery, and orphans (G14–G16)
 
-| # | 现状（文件:行号） | Multica 的做法 | 差距性质 | 是否属本图要修的范围 |
+| # | Current state (file:line) | How Multica does it | Gap nature | In scope for this plan to fix |
 |---|---|---|---|---|
-| **G14** | 无重连宽限、无排队过期：无对应常量、无对应 sweep（穷举 grep：`grace` / `stale` / `expire` 在 `apps/server/src` 无机器面命中） | 默认 3h 宽限（下界 150s 夹紧）；排队 run 需同时满足「runtime 证明不了自己活着」+「自己排满一个宽限」（r10 §5.3/D3） | 缺 | **属·阻塞#519**（G8+G13 的动作面） |
-| **G15** | 无 offline runtime 的进行中任务失败与自动重试 | `FailTasksForOfflineRuntimes` 批量 500；重试宽限终局路径（r10 §5.3） | 缺 | 属·阻塞#519（同 G13；pacman 的答复是「人工重跑」，但机器掉线场景下人是看不到的——步永远停在 claimed） |
-| **G16** | machine 行无回收；唯一的时间回收是**worktree** 孤儿 TTL 7×24h（`packages/shared/src/protocol/executor.ts:126`、`apps/daemon/src/workspace.ts:159-185`，上线一次 + 每 24h 一轮 `apps/daemon/src/machine-loop.ts:191-193`） | runtime 行 7 天 GC，判据三条（offline + 7 天 + 无未归档 user agent + 无非终态 task），每小时一轮（r10 §5.4/D4） | 缺 | 不属·本图 Out of scope（自用单团队，机器行不会堆积；worktree TTL 已覆盖真正会涨的那个面） |
+| **G14** | No reconnect grace, no queue expiry: no corresponding constants and no corresponding sweep (exhaustive grep: `grace` / `stale` / `expire` have no machine-surface hits in `apps/server/src`) | Default 3h grace (clamped below by 150s); a queued run must satisfy both "the runtime cannot prove itself alive" and "it has been parked for a full grace window" (r10 §5.3/D3) | missing | **in-scope · blocking #519** (the action surface of G8+G13) |
+| **G15** | No failure and automatic retry of in-progress tasks on offline runtimes | `FailTasksForOfflineRuntimes` in batches of 500; the retry-grace terminal path (r10 §5.3) | missing | in-scope · blocking #519 (same as G13; pacman's answer is "manual rerun", but a human cannot see it when the machine is offline — the step stays claimed forever) |
+| **G16** | No GC of machine rows; the only time-based recovery is the **worktree** orphan TTL of 7×24h (`packages/shared/src/protocol/executor.ts:126`, `apps/daemon/src/workspace.ts:159-185`, one round at startup + one every 24h, `apps/daemon/src/machine-loop.ts:191-193`) | Runtime rows GC after 7 days with three criteria (offline + 7 days + no unarchived user agents + no non-terminal tasks), hourly (r10 §5.4/D4) | missing | out · out of scope for this plan (single-team self-use; machine rows will not pile up; the worktree TTL already covers the surface that actually grows) |
 
 ---
 
-## 7. F 面 · 任务级凭据与环境（G17–G19）
+## 7. Surface F · per-task credentials and environment (G17–G19)
 
-| # | 现状（文件:行号） | Multica 的做法 | 差距性质 | 是否属本图要修的范围 |
+| # | Current state (file:line) | How Multica does it | Gap nature | In scope for this plan to fix |
 |---|---|---|---|---|
-| **G17** | `token/{stepId}` 下发 `{provider, env, git}`（`packages/shared/src/protocol/machine-wire.ts:339-354`，服务端组装 `apps/server/src/services/machines.ts:1183-1215`）；daemon 内存持有、步收尾 `clearCredentials`（`apps/daemon/src/credentials.ts:22-31`）。**没有任务级 API 身份**：agent 侧工具全经 `tool/{stepId}` relay 由 daemon 持机器 token 代发（`packages/shared/src/protocol/machine-wire.ts:314-334`、`apps/daemon/src/machine-client.ts:254-300`、`apps/daemon/src/backend/pi.ts:566-594`） | `mat_` token 绑 `(task, agent, workspace, runtime owner)`，硬编 24h，注入 agent 进程；伪造 `X-Agent-ID` 改不了 actor（r10 §6.2/D12） | 缺 | 不属·本图 Out of scope（pacman 的 agent 不直接调自己的 API，没有可伪造的 actor 面；#515 未要求） |
-| **G18** | `creds.env` 下发即丢弃：消费点只有 `creds.provider`（`apps/daemon/src/runner.ts:251`）与 `creds.git`（`apps/daemon/src/runner.ts:286`、`:642`），`creds.env` 仅被置空（`apps/daemon/src/credentials.ts:29`）。`SessionOpts` 亦无 env 字段（`packages/shared/src/agent-backend.ts:141-176`） | 13 个 `MULTICA_*` 变量注入 agent 进程，另有 `isBlockedEnvKey` 前缀封禁 + 精确名单（r10 §6.3） | 缺 | 属·本图要定（已有票 **#508** 在办，本票不重开；但 #519 若撞上「密钥没送到」的 UI 文案，处置已在 #508 定死为「对齐 git 的 per-step 纪律」，不得直接接 env 明文注入） |
-| **G19** | 无环境变量命名空间与黑名单纪律（穷举 grep：无 `isBlockedEnvKey` 等价物、无 `MULTICA_` 式前缀封禁；daemon 侧只有 `PI_OFFLINE`/`PI_CODING_AGENT_DIR` 两处自设，`apps/daemon/src/backend/pi.ts:514-515`） | `MULTICA_` 整段封禁 + `HOME/PATH/CODEX_HOME/...` 精确名单，唯一例外 `HERMES_HOME`（r10 §6.3） | 缺 | 属·本图要定（G18 的同一条，落点在 #508） |
+| **G17** | `token/{stepId}` delivers `{provider, env, git}` (`packages/shared/src/protocol/machine-wire.ts:339-354`, assembled server-side at `apps/server/src/services/machines.ts:1183-1215`); the daemon holds them in memory and `clearCredentials` at step wrap-up (`apps/daemon/src/credentials.ts:22-31`). **There is no per-task API identity**: agent-side tools are all relayed through `tool/{stepId}` by the daemon holding the machine token (`packages/shared/src/protocol/machine-wire.ts:314-334`, `apps/daemon/src/machine-client.ts:254-300`, `apps/daemon/src/backend/pi.ts:566-594`) | The `mat_` token binds `(task, agent, workspace, runtime owner)`, hardcoded to 24h, injected into the agent process; forging `X-Agent-ID` cannot change the actor (r10 §6.2/D12) | missing | out · out of scope for this plan (pacman's agent does not call its own API directly, so there is no forgeable actor surface; not requested by #515) |
+| **G18** | `creds.env` is delivered and then dropped: the only consumption points are `creds.provider` (`apps/daemon/src/runner.ts:251`) and `creds.git` (`apps/daemon/src/runner.ts:286`, `:642`); `creds.env` is only nulled (`apps/daemon/src/credentials.ts:29`). `SessionOpts` has no env field either (`packages/shared/src/agent-backend.ts:141-176`) | 13 `MULTICA_*` variables injected into the agent process, plus an `isBlockedEnvKey` prefix ban + an exact-name list (r10 §6.3) | missing | in-scope · for this plan to decide (ticket **#508** is already in progress and not reopened here; but if #519 hits a "the secret never arrived" UI message, the handling is already fixed by #508 as "align with git's per-step discipline" — direct plaintext env injection is not allowed) |
+| **G19** | No environment-variable namespace or blocklist discipline (exhaustive grep: no `isBlockedEnvKey` equivalent, no `MULTICA_`-style prefix ban; the daemon sets only `PI_OFFLINE`/`PI_CODING_AGENT_DIR` itself, `apps/daemon/src/backend/pi.ts:514-515`) | The entire `MULTICA_` segment is banned + an exact list of `HOME/PATH/CODEX_HOME/...`, with the single exception `HERMES_HOME` (r10 §6.3) | missing | in-scope · for this plan to decide (same line as G18; the landing point is #508) |
 
 ---
 
-## 8. G 面 · 权限、profile、模型源、传输与发行（G20–G25）
+## 8. Surface G · permissions, profiles, model sources, transport, and distribution (G20–G25)
 
-| # | 现状（文件:行号） | Multica 的做法 | 差距性质 | 是否属本图要修的范围 |
+| # | Current state (file:line) | How Multica does it | Gap nature | In scope for this plan to fix |
 |---|---|---|---|---|
 | **G20** | Machines have no owner, no visibility: the schema's eight columns have no `ownerId`/`visibility`; single-user seed + auto login (`docs/spec/02-architecture-parity.md:14` A2) | `agent_runtime.owner_id` + `visibility`; owner-exclusive sharing, no admin bypass; ownerless runtimes can never be bound (r10 §8.2) | pacman deliberately different | Not in scope · deliberate (local-first single user, locked in 02/A2) |
 | **G21** | 无自定义 runtime profile：无命令字段、无 `fixed_args`、无参数排序问题（全仓零命中） | `runtime_profile` + `fixed_args` 排在 Multica 参数**之前**，位置不可回退（r10 §7.3） | 缺 | 不属·本图 Out of scope（自用场景不接 wrapper CLI；若 G6 落地多 backend，此条须重判） |
@@ -153,12 +153,12 @@
 
 ---
 
-## 9. pacman 多出来的（反向清单）
+## 9. What pacman has extra (reverse list)
 
-以下各项 Multica 的 runtime 模型里**没有对应物**（r10 全文未出现），是 pacman 侧的执行面增量。
-多数是 02/08 册按 todos 语义有意锁定的，仅列事实与性质，不重复四栏。
+The items below have **no counterparts** in Multica's runtime model (they never appear in r10) and are execution-plane increments on the pacman side.
+Most are intentionally locked by volumes 02/08 per todos semantics; only facts and their nature are listed, without repeating the four columns.
 
-| 项 | pacman 出处 | 性质 |
+| Item | pacman source | Nature |
 |---|---|---|
 | Per-step worktree contract: base clone + `worktree add -b` + reuse/recover/stale three steps + `projectLock` serialization + anti-fork guardrails | `apps/daemon/src/workspace.ts:66-114`, `docs/spec/02-architecture-parity.md:183-195` | Deliberate (todos semantics); Multica's daemon hands no git credentials down and does no worktree |
 | 每步 commit + push + merge 落地（hosted / github / local 三形态） | `apps/daemon/src/runner.ts:606-660`、`apps/daemon/src/workspace.ts:137-140` | 有意；见上 |
@@ -175,82 +175,82 @@
 
 ---
 
-## 10. 属本图要修的范围：判定汇总
+## 10. In-scope-for-this-plan summary of the rulings
 
-25 条差距按四项取值归拢（判据见 §0）；每条的完整四栏在 §2–§8。
+The 25 gaps grouped by their four-value ruling (criteria in §0); the full four columns for each are in §2–§8.
 
-**属·阻塞 #519（控制面搬上常开主机 + 跑通闭环会直接撞上）——六条**
+**in-scope · blocking #519 (the control plane moving to an always-on host + a running closed loop will hit these directly) — six items**
 
-- **G8 / G9 / G14 / G15**：机器与步的活性判定整条链缺失。「在线」靠 SSE 连接状态定义，
-  「步卡住」没有任何判据（`lastHeartbeatAt` 写而不读），也没有宽限与回收。
-  #519 的场景正是「笔记本中途关机、控制面在常开主机上」，这条链是它的第一根承重墙。
-- **G13**：步与机器硬绑定且无重派。机器掉线 = 该步永久 `claimed`，闭环卡死。
-- **G22**：模型源读 server 主机而非执行主机。分机之后 providers 页直接指错机器。
+- **G8 / G9 / G14 / G15**: the entire chain of machine and step liveness decisions is missing. "Online" is defined by SSE connection state,
+  there is no criterion for "a step is stuck" (`lastHeartbeatAt` written but never read), and there is no grace and no recovery.
+  #519's scenario is exactly "the laptop powers off mid-way while the control plane stays up"; this chain is its first load-bearing wall.
+- **G13**: steps are hard-bound to machines with no redispatch. A machine dropping offline = the step stays `claimed` forever, and the loop is jammed.
+- **G22**: the model source is read from the server host rather than the execution host. After the split, the providers page points at the wrong machine.
 
-**属·本图要定（#515 `Not yet specified` 明说等本图研究回收后再判）——九条**
+**in-scope · for this plan to decide (#515 `Not yet specified` explicitly says to wait for this plan's research before ruling) — nine items**
 
-- **G1**：runtime 不是对象，只有 machine 行。
-- **G3**：注册幂等键在应用层，换 key 重注册会多一行机器。
-- **G5 / G12**：机器能力不上报 + claim 不看能力。这是 wiki B1「machine 能力广告」的完整形态，
-  也是 #515「多 backend 先接哪个 CLI」的前置。
-- **G6**：单引擎内嵌、只有 `AgentBackend` 缝。
-- **G7**：`enabledRuntimes` 开关无执行面。
-- **G18 / G19**：env 注入与命名空间纪律——**已有票 #508**，本图不重开，只登记落点。
-- **G23**：版本门只有一条且比的是 daemon 版本。
+- **G1**: a runtime is not an object; only a machine row exists.
+- **G3**: the registration idempotency key lives in the application layer; re-registering with a different key creates an extra machine.
+- **G5 / G12**: machine capability is not advertised + claim does not check capability. This is the complete form of wiki B1 "machine capability advertisement",
+  and the prerequisite for #515's "which CLI to connect first for multi-backend".
+- **G6**: a single embedded engine, with only the `AgentBackend` seam.
+- **G7**: the `enabledRuntimes` switch has no execution surface.
+- **G18 / G19**: env injection and namespace discipline — **ticket #508 already exists**; this plan does not reopen it, only registers the landing point.
+- **G23**: only one version gate, and it compares the daemon's version.
 
-**不属·有意不同（02/01 册已锁）——五条**
+**out · intentionally different (locked by volumes 02/01) — five items**
 
 - G11 (concurrency cap removal, `docs/spec/02-architecture-parity.md:15` A3), G20 (single user, no owner/visibility, A2),
   G24 (all SSE, no WS, A1), G25 (pure-JS npm distribution + pi 0.86.0, volume 01 §8), G4 (no re-registration on restart, better than Multica).
 
-**不属·本图 Out of scope——四条**
+**out · out of scope for this plan — four items**
 
-- G2（自定义 profile）、G16（runtime 7 天 GC）、G17（任务级 `mat_` 身份）、G21（自定义 runtime profile）。
+- G2 (custom profiles), G16 (runtime 7-day GC), G17 (per-task `mat_` identity), G21 (custom runtime profile).
 
-**单列：一条数值差异、两条「性质判定本身要地图拍板」**
+**Listed separately: one numeric difference, two "the nature judgment itself needs the map to rule"**
 
-- **G10**（presence 30s vs 15s）：纯数值差异，且 pacman 侧的 30s 是复刻期自设值而非上游观测值
-  （`apps/daemon/src/machine-loop.ts:46-47` 注释自认「r3 未采具体值 [设计]」）——不算差异，无动作。
-- **G11 的补充**：02/A3 摘除的是「并发**上限**」，现状是执行侧**串行**
-  （`apps/daemon/src/machine-loop.ts:361` 一轮一步）。摘除上限的理由是「自用不需要限流」，
-  但串行意味着**多台机器不并行、单台机器一次只能跑一步**。自用场景下这可能是可接受取舍，
-  也可能正是 #519 会撞上的「闭环慢」——本票不下判，交地图。
-- **G5 与 G7 是一件事的两面**：机器不上报能力（G5）与开关不生效（G7）合起来，
-  使「本机跑 pi 还是 Claude Code」这个已在 UI 上承诺的设置**没有任何执行面**。
-
----
-
-## 11. 未查到 / 未深挖
-
-按票面纪律，这一节只写**没查实**的东西，不用想象补全：
-
-1. **Multica 侧的行号未在本票复核**——全部转引 r10。r10 自身的出处纪律（§0）是「无出处不写」，
-   但它是上一票的产物；本票未重新克隆比对。[转引]
-2. **Multica 的 daemon 是否有 worktree/git 契约**——r10 只提到 `MULTICA_TASK_WORKSPACES_ROOT` 变量存在
-   （§6.3），未展开 daemon 侧的工作区实现。§9「每步 worktree 是 pacman 独有」这一判断建立在
-   **r10 未出现**之上，不是「已确认 Multica 没有」。[未查到]
-3. **Multica 是否有 steer/stop/sync 的对应能力**——r10 七面无此主题，未查到。
-   §9 把它记为 pacman 增量同样是「r10 未出现」口径。[未查到]
-4. **pacman 侧 `creds.env` 的最终形态**——#508 已开票但未落地；本票只登记现状（下发即丢弃），
-   不预判 #508 的裁决细节。[事实陈述]
-5. **`machine.enabledRuntimes` 是否曾有执行面**——本票只读了 `c95ee5f` 的现状；
-   git 历史未逐条回溯它是否曾参与 claim。[未深挖]
-6. **presence 30s 的观测来源**——代码注释自称「r3 未采具体值 [设计]」（`apps/daemon/src/machine-loop.ts:46-47`），
-   即它本身是复刻期自设值而非上游观测值。这与 Multica 的 15s 不构成「差异」，只构成两个自设值。
-   [事实陈述]
-7. **wiki 侧的口径冲突**：wiki 页 [[pacman 的编排器坐标与借鉴清单]] B1 段写
-   「`presence` 已带 `maxConcurrent` + `cliVersion`」，但 #503 已把 `maxConcurrent` 连概念摘除
-   （`apps/server/src/services/machines.ts:744-745`、`packages/shared/src/protocol/machine-wire.ts:96-98`
-   「#503 起空体」）。**该 wiki 页此处已过时**：`presence` 现在只带 `cliVersion`
-   （`packages/shared/src/protocol/machine-wire.ts:81-83`）。[已核实冲突]
+- **G10** (presence 30s vs 15s): a pure numeric difference, and pacman's 30s is a self-set replication-era value rather than an upstream observation
+  (the comment at `apps/daemon/src/machine-loop.ts:46-47` admits "r3 did not capture a specific value [design]") — not counted as a difference, no action.
+- **A supplement to G11**: what 02/A3 removed was the "concurrency **cap**"; the current state is **serial execution** on the execution side
+  (`apps/daemon/src/machine-loop.ts:361`, one step per round). The reason for removing the cap was "self-use does not need throttling",
+  but serial means **multiple machines do not run in parallel, and a single machine runs only one step at a time**. Under self-use this may be an acceptable trade-off,
+  or it may be exactly the "slow closed loop" that #519 will hit — this ticket makes no ruling and hands it to the map.
+- **G5 and G7 are two faces of one thing**: machines do not advertise capabilities (G5) and the switch does not take effect (G7); together they mean
+  the "run pi or Claude Code on this machine" setting already promised in the UI **has no execution surface at all**.
 
 ---
 
-## 附：一句话版（给地图用）
+## 11. Not found / not dug deep
 
-pacman 的 runtime 模型比 Multica 少一整层：**没有 runtime 对象**（只有 machine 行）、**没有机器能力广告**
-（presence 只报 cliVersion，claim 不看能力）、**没有活性判定**（online 靠 SSE 连接状态，步的 `lastHeartbeatAt`
-写而不读，无宽限、无回收）、**没有任务级身份**（`token/{stepId}` 只有 provider/env/git；agent 经 daemon relay 说话）；
-多出来的是执行面本身（worktree 契约、per-step git 凭证、产物上传、steer/stop/sync、review 只读检出、chief、
-supervisor 保活），其中多数是 02/08 册按 todos 语义有意锁的。分机（#519）会直接撞上的四条：
-机器永久在线（G8/G9）、步永久挂着（G13）、无宽限与回收（G14/G15）、模型源读控制面主机而非执行主机（G22）。
+Per the ticket's discipline, this section contains only what was **not verified**, without imagination filling the gaps:
+
+1. **Multica-side line numbers were not re-verified by this ticket** — all cited from r10. r10's own sourcing discipline (§0) is "write nothing without a source",
+   but it is the previous ticket's product; this ticket did not re-clone and compare. [cited]
+2. **Whether Multica's daemon has a worktree/git contract** — r10 only mentions the existence of the `MULTICA_TASK_WORKSPACES_ROOT` variable
+   (§6.3) without expanding the daemon-side workspace implementation. The §9 judgment "the per-step worktree is unique to pacman" rests on
+   **absence from r10**, not on "confirmed Multica has none". [not found]
+3. **Whether Multica has a counterpart for steer/stop/sync** — r10's seven surfaces do not cover this topic; not found.
+   Recording it as a pacman increment in §9 is likewise on the "absent from r10" caliber. [not found]
+4. **The final shape of pacman's `creds.env`** — #508 is opened but not landed; this ticket registers only the current state (delivered and then dropped),
+   without predicting #508's ruling details. [statement of fact]
+5. **Whether `machine.enabledRuntimes` ever had an execution surface** — this ticket read only the `c95ee5f` current state;
+   git history was not traced item by item for whether it ever participated in claims. [not dug deep]
+6. **The observation source of the 30s presence** — the code comment itself says "r3 did not capture a specific value [design]" (`apps/daemon/src/machine-loop.ts:46-47`),
+   i.e. it is itself a replication-era self-set value rather than an upstream observation. Against Multica's 15s this constitutes not a "difference" but two self-set values.
+   [statement of fact]
+7. **A caliber conflict on the wiki side**: the wiki page ``[[pacman's own coordinates and borrowing list]]`` section B1 says
+   "`presence` already carries `maxConcurrent` + `cliVersion`", but #503 removed `maxConcurrent` along with the concept
+   (`apps/server/src/services/machines.ts:744-745`, `packages/shared/src/protocol/machine-wire.ts:96-98` "empty since #503").
+   **That wiki page is outdated on this point**: `presence` now carries only `cliVersion`
+   (`packages/shared/src/protocol/machine-wire.ts:81-83`). [verified conflict]
+
+---
+
+## Attached: one-sentence version (for the map)
+
+pacman's runtime model is missing an entire layer compared with Multica's: **no runtime object** (only a machine row), **no machine capability advertisement**
+(presence reports only cliVersion; claim does not check capability), **no liveness decision** (online is defined by SSE connection state; a step's `lastHeartbeatAt`
+is written but never read; no grace and no recovery), **no per-task identity** (`token/{stepId}` carries only provider/env/git; the agent speaks through the daemon relay);
+what it has extra is the execution plane itself (the worktree contract, per-step git credentials, artifact upload, steer/stop/sync, review read-only checkout, the chief,
+supervisor keep-alive), most of which are intentionally locked by volumes 02/08 per todos semantics. The four items a machine split (#519) will hit directly:
+machines online forever (G8/G9), steps hanging forever (G13), no grace and no recovery (G14/G15), and the model source read from the control-plane host rather than the execution host (G22).
