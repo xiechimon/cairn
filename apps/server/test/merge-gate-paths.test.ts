@@ -221,6 +221,7 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
 
   const EVAL_SURFACE_PATHS = [
     'integration/eval/adoption/judge.mts',
+    'integration/eval/adoption/sealed-ledger.mts',
     'integration/eval/chief-dispatch/grade.mts',
     'integration/eval/memory-regression/grade.mts',
     '.claude/hillclimb/chief-dispatch/cases.json',

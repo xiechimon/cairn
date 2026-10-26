@@ -291,6 +291,7 @@ const cases = [
     () =>
       eachProtected([
         'integration/eval/adoption/judge.mts',
+        'integration/eval/adoption/sealed-ledger.mts',
         'integration/eval/chief-dispatch/grade.mts',
         '.claude/hillclimb/chief-dispatch/cases.json',
         'apps/server/src/trajectory-export.ts',
