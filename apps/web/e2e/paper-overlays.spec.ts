@@ -165,8 +165,8 @@ test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px pa
   await expect(menu).toBeVisible();
   await settle(menu);
   await expect(menu).toHaveCSS('border-top-left-radius', '18px');
-  await expect(menu).toHaveCSS('padding-top', '4px');
-  await expect(menu).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(menu).toHaveCSS('padding-top', '6px');
+  await expect(menu).toHaveCSS('background-color', 'rgb(255, 253, 246)');
 
   const rows = menu.getByRole('menuitem');
   const count = await rows.count();
@@ -193,7 +193,7 @@ test('user menu rides the same Paper menu face', async ({ page }) => {
   await expect(menu).toBeVisible();
   await settle(menu.locator('..'));
   await expect(menu).toHaveCSS('border-top-left-radius', '18px');
-  await expect(menu).toHaveCSS('padding-top', '4px');
+  await expect(menu).toHaveCSS('padding-top', '6px');
   for (const label of ['帐号', 'API 密钥', 'MCP']) {
     const row = menu.locator('a.user-menu-row', { hasText: label });
     expect((await row.boundingBox())?.height).toBe(32);

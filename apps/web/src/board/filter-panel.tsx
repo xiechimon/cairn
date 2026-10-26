@@ -147,7 +147,7 @@ function DimensionSection({
           )}
           <div className="flex items-center">
             {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-            <label className="inline-flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-(--cds-radius-sm) px-2 text-xs text-foreground transition-colors hover:bg-accent-soft">
+            <label className="inline-flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-(--radius-menu-item) px-2 text-xs text-foreground transition-colors hover:bg-accent-soft">
               <Checkbox
                 checked={allSelected}
                 indeterminate={someSelected && !allSelected}
@@ -184,7 +184,7 @@ function DimensionSection({
                       : { 'data-tag': choice.value })}
                     role="option"
                     aria-selected={active}
-                    className={`${alias} h-7 min-w-0 flex-1 justify-start gap-2 rounded-(--cds-radius-sm) border-none px-2 text-xs font-normal text-foreground hover:bg-accent-soft dark:hover:bg-accent-soft active:not-aria-[haspopup]:translate-y-0 ${
+                    className={`${alias} h-7 min-w-0 flex-1 justify-start gap-2 rounded-(--radius-menu-item) border-none px-2 text-xs font-normal text-foreground hover:bg-accent-soft dark:hover:bg-accent-soft active:not-aria-[haspopup]:translate-y-0 ${
                       active ? 'bg-accent' : ''
                     }`}
                     onClick={() => dimension.onToggle(choice.value)}
@@ -273,7 +273,7 @@ export function FilterPanel({ dimensions, totalSelected, onClearAll }: FilterPan
         side="bottom"
         sideOffset={6}
         aria-label={t('筛选')}
-        className="type-filter-popover w-[268px] gap-0 p-1"
+        className="type-filter-popover w-[268px] gap-0 p-(--menu-pad)"
       >
         {dimensions.map((dimension, index) => (
           <DimensionSection

@@ -155,7 +155,7 @@ function MachineConcurrencySelect({
         side="bottom"
         sideOffset={8}
         aria-label={t('并发上限')}
-        className="w-52 rounded-lg bg-popover p-1.5 shadow-(--shadow-popover)"
+        className="w-52 p-(--menu-pad)"
       >
         <div className="flex items-baseline justify-between px-1">
           <span className="text-meta text-content-tertiary">{t('并发上限')}</span>
