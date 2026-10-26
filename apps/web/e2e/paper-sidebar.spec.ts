@@ -61,7 +61,7 @@ test('`新任务` row opens the new-task dialog without a sidebar key badge', as
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('`需要我处理` badge counts the `待处理` column and filters the board to it', async ({ page }) => {
+test('`需要我处理` badge counts the `待处理` column and opens the needs-me inbox', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const pendingCount = await page
     .locator('[data-column="pending"] [data-testid="column-count"]')
@@ -73,21 +73,21 @@ test('`需要我处理` badge counts the `待处理` column and filters the boar
   await needsMe.click();
   await expect(page).toHaveURL(/[?&]column=pending/);
   await expect(page).toHaveURL(/[?&]scenario=01/);
-  await expect(columns(page)).toHaveCount(1);
-  await expect(columns(page)).toHaveAttribute('data-column', 'pending');
+  await expect(columns(page)).toHaveCount(0);
+  await expect(page.getByTestId('needs-you-inbox')).toBeVisible();
   await expect(needsMe).toHaveAttribute('aria-current', 'page');
   const board = sidebar(page).getByRole('link', { name: '工作台' });
   await expect(board).not.toHaveAttribute('aria-current', 'page');
 
   await page.reload();
-  await expect(columns(page)).toHaveCount(1);
+  await expect(page.getByTestId('needs-you-inbox')).toBeVisible();
 
   await page.getByRole('button', { name: '清除待处理筛选' }).click();
   await expect(columns(page)).toHaveCount(4);
   await expect(page).not.toHaveURL(/column=/);
 
   await needsMe.click();
-  await expect(columns(page)).toHaveCount(1);
+  await expect(page.getByTestId('needs-you-inbox')).toBeVisible();
   await board.click();
   await expect(columns(page)).toHaveCount(4);
   await expect(board).toHaveAttribute('aria-current', 'page');
@@ -233,7 +233,7 @@ test('collapsed rail keeps `需要我处理` with its badge and the expand toggl
   const needsMe = aside.getByRole('link', { name: /需要我处理/ });
   await expect(needsMe).toBeVisible();
   await needsMe.click();
-  await expect(columns(page)).toHaveCount(1);
+  await expect(page.getByTestId('needs-you-inbox')).toBeVisible();
   await expect(needsMe).toHaveAttribute('aria-current', 'page');
   await aside.getByRole('button', { name: '展开侧边栏' }).click();
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(248);

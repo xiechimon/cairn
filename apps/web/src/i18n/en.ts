@@ -37,10 +37,10 @@ export const EN: Record<string, string> = {
   新建项目: 'New project',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
   '新任务：接下来让 agent 做什么？': 'New task: What should the agent do next?',
-  等你处理: 'Waiting on you',
-  查看全部: 'View all',
   '上次查看后：{done} 个完成，{failed} 个新失败':
     '{done} completed, {failed} new failures since last visit',
+  '较早的 {count} 条': '{count} older',
+  '超过 7 天没动': 'untouched for over 7 days',
   技能: 'Skills',
   密钥: 'Secrets',
   机器: 'Machines',

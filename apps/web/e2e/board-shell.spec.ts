@@ -1,23 +1,40 @@
 import { expect, test } from '@playwright/test';
 
-test('needs-you strip lists the pending cards, opens a task, and stays out of the needs-me view', async ({
+test('the needs-me inbox lists recent pending cards as rows and folds week-old ones', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=01');
-  const strip = page.getByTestId('needs-you-strip');
-  const pendingCards = page.locator('.board-column[data-column="pending"] .todo-card-title');
-  await expect(strip).toBeVisible();
-  const rows = strip.getByRole('link', { name: '打开' });
-  await expect(rows).toHaveCount(await pendingCards.count());
-  await expect(strip).toContainText((await pendingCards.first().textContent()) ?? '');
-  await rows.first().click();
+  await page.goto('/app?scenario=board-inbox');
+  await expect(page.getByTestId('needs-you-strip')).toHaveCount(0);
+  const pendingColumn = page.locator('.board-column[data-column="pending"]');
+  await expect(pendingColumn.getByTestId('column-count')).toHaveText('4');
+  await expect(page.getByTestId('needs-you')).toHaveText('4 项等你处理');
+  await expect(page.getByTestId('attention-badge')).toHaveText('4');
+  await pendingColumn.getByTestId('column-stale-pending').click();
+  await expect(page).toHaveURL(/[?&]column=pending/);
+
+  const inbox = page.getByTestId('needs-you-inbox');
+  const rows = inbox.getByTestId('needs-you-row');
+  await expect(rows).toHaveCount(4);
+  for (const row of await rows.all()) await expect(row.getByRole('button')).toHaveCount(1);
+  const stale = inbox.getByTestId('needs-you-stale').getByRole('button', { name: /较早的 5 条/ });
+  await expect(stale).toHaveAttribute('aria-expanded', 'false');
+  await stale.click();
+  await expect(rows).toHaveCount(9);
+  await expect(inbox).toContainText('16 天前');
+
+  await rows.first().getByRole('link').click();
   await expect(page).toHaveURL(/\/app\/todo\/[^/?]+/);
+});
 
-  await page.goto('/app?scenario=01&column=pending');
-  await expect(page.getByTestId('needs-you-strip')).toBeHidden();
-
-  await page.goto('/app?scenario=board-tags-empty');
-  await expect(page.getByTestId('needs-you-strip')).toBeHidden();
+test('the needs-me inbox shares its edges with the new-task bar', async ({ page }) => {
+  await page.goto('/app?scenario=board-inbox&column=pending');
+  const list = await page.getByTestId('needs-you-row').first().evaluate((el) => {
+    const box = el.parentElement!.getBoundingClientRect();
+    return { left: box.left, right: box.right };
+  });
+  const bar = (await page.getByTestId('board-new-task-bar').boundingBox())!;
+  expect(Math.abs(list.left - bar.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(list.right - (bar.x + bar.width))).toBeLessThanOrEqual(1);
 });
 
 test('since-last-seen counts tasks finished after the stored visit and hides when nothing changed', async ({
@@ -76,7 +93,7 @@ test('a 390px needs-you row shows the whole title and keeps its actions on scree
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=board-inbox&column=pending');
   const row = page.getByTestId('needs-you-row').first();
   await expect(row).toBeVisible();
   const fit = await row.evaluate((element) => {
@@ -92,22 +109,28 @@ test('a 390px needs-you row shows the whole title and keeps its actions on scree
   });
   expect(fit.clipped).toBe(false);
   expect(fit.buttonsInside).toBe(true);
+
+  await page.getByTestId('needs-you-stale').getByRole('button').click();
+  const lastRow = page.getByTestId('needs-you-row').last();
+  await page.locator('.board-main').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  const rowBox = (await lastRow.boundingBox())!;
+  const bar = (await page.getByTestId('board-new-task-bar').boundingBox())!;
+  expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(bar.y);
 });
 
-test('a short phone screen scrolls the strip away to reach the last board group', async ({
+test('a short phone screen scrolls the board as one page to reach the last group', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 640 });
   await page.goto('/app?scenario=board-drag-matrix');
-  await expect(page.getByTestId('needs-you-strip')).toBeVisible();
   const lastCard = page.locator('.board-column[data-column="done"] .todo-card-title').last();
   await lastCard.scrollIntoViewIfNeeded();
   const box = await lastCard.boundingBox();
   const bar = await page.getByTestId('board-new-task-bar').boundingBox();
   expect(box).not.toBeNull();
   expect(box!.y + box!.height).toBeLessThanOrEqual(bar!.y);
-  const stripTop = await page.getByTestId('needs-you-strip').evaluate((el) => el.getBoundingClientRect().top);
-  expect(stripTop).toBeLessThan(0);
+  const pageScroll = await page.locator('.board-main').evaluate((el) => el.scrollTop);
+  expect(pageScroll).toBeGreaterThan(0);
 });
 
 test('the phone chief launcher clears the new-task bar on the board and sits in the corner elsewhere', async ({
@@ -121,21 +144,4 @@ test('the phone chief launcher clears the new-task bar on the board and sits in 
   await page.goto('/app/schedules?scenario=11');
   const elsewhere = await page.locator('.chief-fab').boundingBox();
   expect(844 - (elsewhere!.y + elsewhere!.height)).toBeLessThan(16);
-});
-
-test('needs-you strip shares its left and right edges with the new-task bar', async ({ page }) => {
-  await page.goto('/app?scenario=01');
-  const edges = await page.evaluate(() => {
-    const strip = document.querySelector('[data-testid="needs-you-strip"]') as HTMLElement;
-    const bar = document.querySelector('[data-testid="board-new-task-bar"]') as HTMLElement;
-    const s = strip.getBoundingClientRect();
-    const cs = getComputedStyle(strip);
-    const b = bar.getBoundingClientRect();
-    return {
-      left: s.left + Number.parseFloat(cs.paddingLeft) - b.left,
-      right: b.right - (s.right - Number.parseFloat(cs.paddingRight)),
-    };
-  });
-  expect(Math.abs(edges.left)).toBeLessThanOrEqual(1);
-  expect(Math.abs(edges.right)).toBeLessThanOrEqual(1);
 });

@@ -337,6 +337,12 @@
     padding-bottom: 72px;
   }
 
+  .board-inbox {
+    flex: none;
+    overflow: visible;
+    padding-bottom: 72px;
+  }
+
   .board-column[data-empty="true"] {
     display: none;
   }
