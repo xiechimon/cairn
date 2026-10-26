@@ -1712,7 +1712,7 @@ describe('opt-in wiring: index.ts takes the intake run slot via issueIntakeRunOf
     const src = readFileSync(join(import.meta.dirname, '../src/index.ts'), 'utf8');
     const call = /createScheduler\(([\s\S]*?)\n\);/.exec(src)?.[1] ?? '';
     const args = call.split('\n').filter((l) => l.trim() !== '');
-    expect(args.at(-2)?.trim()).toMatch(/^issueIntakeRunOf\(config, /);
+    expect(args.at(-3)?.trim()).toMatch(/^issueIntakeRunOf\(config, /);
   });
 });
 
