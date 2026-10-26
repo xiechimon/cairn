@@ -69,7 +69,7 @@ export function FilterChips({
   const { t } = useI18n();
   if (chips.length === 0) return null;
   return (
-    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="-m-1 flex min-w-0 items-center gap-1.5 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {chips.map((chip) => (
         <Button
           key={chip.key}
