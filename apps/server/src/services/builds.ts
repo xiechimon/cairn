@@ -107,6 +107,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGatePort } from './merge-gate-github.js';
+import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
@@ -129,6 +130,7 @@ export interface BuildDeps {
   reposDir?: string;
   box?: SecretBox;
   githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
   attachmentsDir?: string;
 }
 
@@ -756,7 +758,7 @@ async function probePullState(
   const repoRef = githubRepoOfProject(projRow);
   if (repoRef === null) return null;
   const { owner, repo } = repoRef;
-  const token = githubTokenOrNull(deps, teamId);
+  const token = await githubTokenOrNull(deps, teamId);
   return githubPullState(deps.githubFetch ?? fetch, token, owner, repo, prNumber, timeoutMs);
 }
 
@@ -1364,7 +1366,7 @@ function persistGateVerdict(
     if (todoRow === undefined) return;
     const repo = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
     if (repo === null) return;
-    const access = teamGithubToken(deps, todoRow.teamId);
+    const access = await teamGithubToken(deps, todoRow.teamId);
     if (!('token' in access)) return;
     const port = githubGatePort(
       deps.githubFetch ?? fetch,
@@ -1506,7 +1508,7 @@ async function mergeThroughGithub(
   const hint = gate.failed
     ? '在 GitHub 上合并后再点一次合并：cairn 把卡恢复到审核关口，由对账核对后收尾'
     : 'cairn 对账读到合并后核对并收尾（核对不上时在时间线说明，由人处理，例如完成时不勾合并）';
-  const access = teamGithubToken(deps, gate.todoRow.teamId);
+  const access = await teamGithubToken(deps, gate.todoRow.teamId);
   if ('reason' in access) {
     if (access.reason === 'no-secret-box') {
       throw new HttpError(

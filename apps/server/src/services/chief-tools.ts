@@ -51,6 +51,7 @@ import {
   updateMemoryEntry,
 } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
+import type { OAuthClientConfig } from './oauth.js';
 import { getModelSources } from './providers.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
@@ -72,6 +73,7 @@ export interface ChiefToolDeps {
   skillsDir: string;
   mcpConfigPath?: string;
   githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
 }
 
 export interface ChiefToolCtx {
@@ -994,6 +996,7 @@ function buildDeps(deps: ChiefToolDeps) {
     reposDir: deps.reposDir,
     box: deps.box,
     githubFetch: deps.githubFetch,
+    oauthClient: deps.oauthClient,
   };
 }
 export async function confirmBuild(
