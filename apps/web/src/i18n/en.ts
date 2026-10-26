@@ -29,7 +29,6 @@ export const EN: Record<string, string> = {
   项等你处理: 'waiting on you',
   没有等你处理的事: 'Nothing is waiting on you',
   定时: 'Schedules',
-  需要我处理: 'Needs me',
   '{n} 台机器在线': '{n} machines online',
   '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
