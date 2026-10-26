@@ -123,7 +123,7 @@
     },
     "menu.ts": {
       "kind": "adapter",
-      "reason": "Shared Paper menu classes (surface, item, indicator, separator) consumed by dropdown-menu.tsx, select.tsx and the hand-built menus outside components/ui, so every menu uses one padding token and the concentric --radius-menu-item.",
+      "reason": "Shared Paper menu classes (surface, item, indicator, separator) consumed by dropdown-menu.tsx and the hand-built menus outside components/ui, so every menu uses one padding token and the concentric --radius-menu-item.",
       "hash": "8a1fbe09e916d3d14a403d5f4ee58b230fc453b3e56c5a8da3a66b9dc6fd8d74"
     },
     "message-scroller.tsx": {
@@ -158,9 +158,8 @@
     "select.tsx": {
       "kind": "registry",
       "upstreamItem": "select",
-      "status": "deviated",
-      "reason": "Paper menu: popup and items take the shared menu classes from menu.ts (MENU_SURFACE_CLS padding --menu-pad, --radius-popover, --shadow-popover; items h-8 with --radius-menu-item pills, menu-hover highlight, indicator inset to the row padding), so the select list matches DropdownMenu.",
-      "hash": "b54ec21789aa21dbbc8045d2af54b30bd332a485434ce406905ffd40c449784b"
+      "status": "pristine",
+      "hash": "ab19e7f4d786d003373d4b1750be5efda931d18d388cbb163b83e2d29e7a93de"
     },
     "separator.tsx": {
       "kind": "registry",
