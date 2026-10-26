@@ -24,30 +24,12 @@ export function findLowContrast(page: Page): Promise<LowContrast[]> {
       const a = top[3];
       return [top[0] * a + bottom[0] * (1 - a), top[1] * a + bottom[1] * (1 - a), top[2] * a + bottom[2] * (1 - a), 1];
     };
-    const backdrop = (el: Element): Rgba => {
-      const layers: Rgba[] = [];
-      for (let e: Element | null = el; e; e = e.parentElement) {
-        const layer = parse(getComputedStyle(e).backgroundColor);
-        if (layer[3] > 0) layers.push(layer);
-        if (layer[3] >= 1) break;
-      }
-      return layers.reduceRight<Rgba>((under, layer) => blend(layer, under), [255, 255, 255, 1]);
-    };
-    const opacity = (el: Element) => {
-      let value = 1;
-      for (let e: Element | null = el; e; e = e.parentElement) value *= Number(getComputedStyle(e).opacity);
-      return value;
-    };
     const luminance = ([r, g, b]: Rgba) => {
       const channel = (v: number) => {
         const s = v / 255;
         return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
       };
       return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-    };
-    const contrast = (a: Rgba, b: Rgba) => {
-      const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-      return (hi + 0.05) / (lo + 0.05);
     };
 
     const found: LowContrast[] = [];
@@ -56,11 +38,23 @@ export function findLowContrast(page: Page): Promise<LowContrast[]> {
       const box = el.getBoundingClientRect();
       const style = getComputedStyle(el);
       if (box.width === 0 || box.height === 0 || style.visibility === 'hidden') return;
-      const alpha = opacity(el);
+      let alpha = 1;
+      const layers: Rgba[] = [];
+      let opaque = false;
+      for (let e: Element | null = el; e; e = e.parentElement) {
+        alpha *= Number(getComputedStyle(e).opacity);
+        if (opaque) continue;
+        const layer = parse(getComputedStyle(e).backgroundColor);
+        if (layer[3] > 0) layers.push(layer);
+        opaque = layer[3] >= 1;
+      }
       if (alpha === 0 || el.closest('.sr-only')) return;
-      const under = backdrop(el);
+      const under = layers.reduceRight<Rgba>((below, layer) => blend(layer, below), [255, 255, 255, 1]);
       const ink = parse(color);
-      const ratio = contrast(blend([ink[0], ink[1], ink[2], ink[3] * alpha], under), under);
+      const [hi, lo] = [luminance(blend([ink[0], ink[1], ink[2], ink[3] * alpha], under)), luminance(under)].sort(
+        (x, y) => y - x,
+      );
+      const ratio = (hi + 0.05) / (lo + 0.05);
       const size = Number.parseFloat(style.fontSize);
       const large = size >= 24 || (Number(style.fontWeight) >= 700 && size >= 18.66);
       const need = kind === 'disabled' || large ? 3 : 4.5;
