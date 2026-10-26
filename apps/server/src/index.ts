@@ -24,6 +24,7 @@ import { backfillMachineConcurrency, seedLocalMachine } from './services/machine
 import { backfillPersonas } from './services/personas.js';
 import { createScheduler, issueIntakeRunOf, trajectoryOutcomeRunOf } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
+import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 
 const config = loadConfig();
 const logger = pino({
@@ -46,6 +47,7 @@ const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
 backfillPersonas(db);
+backfillTokenUsageCost(db);
 const concurrencyBackfilled = backfillMachineConcurrency(db);
 if (concurrencyBackfilled > 0) {
   logger.info(
