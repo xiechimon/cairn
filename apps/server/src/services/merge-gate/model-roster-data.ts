@@ -55,7 +55,7 @@ export const MODEL_VENDORS: Readonly<Record<string, string>> = {
   'gemma-4-31b-it': 'Google',
   'glm-4.6v': 'Z.ai',
   'glm-4.7': 'Z.ai',
-  'glm-5-2': 'Mistral',
+  'glm-5-2': 'Z.ai',
   'glm-5-turbo': 'Z.ai',
   'glm-5.2': 'Z.ai',
   'glm-5.2-highspeed': 'Z.ai',
@@ -159,12 +159,15 @@ export const MODEL_VENDORS: Readonly<Record<string, string>> = {
   'ring-2.6-1t': 'Ant Ling',
   'voxtral-small-2507': 'Mistral',
   'voxtral-small-latest': 'Mistral',
-  'zai-glm-5-2': 'Mistral',
-  'zai-glm-5-3': 'Mistral',
+  'zai-glm-5-2': 'Z.ai',
+  'zai-glm-5-3': 'Z.ai',
 };
 
 export const MODEL_ALIASES: Readonly<Record<string, string>> = {
   balanced: 'kimi-k3',
   cheap: 'deepseek-v4.1-flash',
+  'glm-5-2': 'glm-5.2',
   precise: 'gpt-5.6-sol',
+  'zai-glm-5-2': 'glm-5.2',
+  'zai-glm-5-3': 'glm-5.3',
 };
