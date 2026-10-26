@@ -401,7 +401,7 @@ export function BoardSidebar({
           aria-current={selected === 'team' ? 'page' : undefined}
         >
           <BrandMark />
-          <span className="truncate font-heading text-heading font-semibold">
+          <span className="truncate font-serif text-heading font-semibold">
             {BRAND.manifestName}
           </span>
           <ChevronDown

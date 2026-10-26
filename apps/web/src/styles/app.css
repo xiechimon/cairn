@@ -12,7 +12,7 @@
   --color-surface-tertiary: var(--surface-tertiary);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-heading: var(--font-source-serif);
+  --font-heading: var(--font-sans);
   --text-page: var(--type-page);
   --text-page--line-height: calc(24 / 18);
   --text-heading: var(--type-heading);
@@ -291,15 +291,12 @@
 }
 
 @media (max-width: 640px) {
-  .board-sidebar--collapsed {
-    width: 48px;
-  }
-  .rail-row {
-    min-width: 44px;
-    min-height: 44px;
+  .board-topbar,
+  [data-testid="page-topbar"],
+  [data-testid="chief-settings-topbar"] {
+    padding-left: 52px;
   }
 
-  .board-topbar-title,
   .board-topbar-schedule {
     display: none;
   }
@@ -311,7 +308,7 @@
     position: fixed;
     right: 8px;
     bottom: max(8px, env(safe-area-inset-bottom));
-    left: 56px;
+    left: 8px;
     z-index: var(--z-docked);
     margin: 0;
     width: auto;

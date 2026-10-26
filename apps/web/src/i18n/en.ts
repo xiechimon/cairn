@@ -48,6 +48,7 @@ export const EN: Record<string, string> = {
   用量: 'Usage',
   收起侧边栏: 'Collapse sidebar',
   展开侧边栏: 'Expand sidebar',
+  侧边栏: 'Sidebar',
   '收起{label}': 'Collapse {label}',
   '展开{label}': 'Expand {label}',
   总管: 'Chief',

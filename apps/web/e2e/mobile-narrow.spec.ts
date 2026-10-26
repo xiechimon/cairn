@@ -9,12 +9,26 @@ for (const width of [360, 390]) {
       await page.setViewportSize({ width, height: 800 });
     });
 
-    test('M1 看板：rail 侧栏 + 顶栏动作留在视口内 + 无页面级横滚', async ({ page }) => {
+    test('M1 board: sidebar folds into a menu drawer, top bar actions stay on screen, no page scroll', async ({
+      page,
+    }) => {
       await page.goto('/app');
-      const rail = page.locator('.board-sidebar--collapsed');
-      await expect(rail).toBeVisible();
-      const railBox = (await rail.boundingBox()) as { width: number };
-      expect(railBox.width, 'rail 宽度').toBeLessThanOrEqual(48);
+      await expect(page.locator('.board-sidebar')).toHaveCount(0);
+      await expect(page.locator('.board-topbar-title')).toBeVisible();
+      const menu = page.getByRole('button', { name: '展开侧边栏' });
+      const menuBox = (await menu.boundingBox()) as { width: number; height: number };
+      expect(menuBox.width).toBeGreaterThanOrEqual(44);
+      expect(menuBox.height).toBeGreaterThanOrEqual(44);
+      await menu.click();
+      const drawer = page.getByRole('dialog', { name: '侧边栏' });
+      await expect(drawer.getByRole('link', { name: '定时' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(drawer).toBeHidden();
+      await menu.click();
+      await drawer.getByRole('link', { name: '定时' }).click();
+      await expect(page).toHaveURL(/\/app\/schedules/);
+      await expect(drawer).toBeHidden();
+      await page.goto('/app');
       for (const name of ['筛选', '新任务']) {
         const box = (await page
           .getByRole('button', { name: new RegExp(name) })
