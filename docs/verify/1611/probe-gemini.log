@@ -1,0 +1,11 @@
+/home/ian/lanes/cairn-1611/apps/daemon/src/backend/acp.ts:352
+      throw new Error(
+            ^
+
+Error: Gemini login failed: run gemini and complete its login flow. Gemini API key is missing or not configured.
+    at GeminiBackend.open (/home/ian/lanes/cairn-1611/apps/daemon/src/backend/acp.ts:352:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async <anonymous> (/home/ian/lanes/cairn-1611/apps/daemon/scripts/probe-gemini-acp.ts:16:7)
+
+Node.js v26.8.2
+PROBE_EXIT:1

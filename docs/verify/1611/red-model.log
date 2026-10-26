@@ -1,0 +1,44 @@
+
+ RUN  v5.0.1 /home/ian/lanes/cairn-1611
+
+ ❯ |@xiechimon/cairn-cli| test/acp-stdio.test.ts (10 tests | 1 failed | 9 skipped) 13ms
+   ❯ Gemini stdio execution (10)
+     × applies the advertised model configuration before prompting 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > applies the advertised model configuration before prompting
+AssertionError: expected [ { type: 'error', error: { …(2) } } ] to deep equally contain { type: 'done', usage: [] }
+
+- Expected:
+{
+  "type": "done",
+  "usage": [],
+}
+
++ Received:
+[
+  {
+    "error": {
+      "message": "Model was not configured",
+      "retryable": false,
+    },
+    "type": "error",
+  },
+]
+
+ ❯ test/acp-stdio.test.ts:81:50
+     79|   test('applies the advertised model configuration before prompting', …
+     80|     const handle = await backend({ ACP_CONFIG: 'yes' }).createSession(…
+     81|     expect(await Array.fromAsync(handle.events)).toContainEqual({ type…
+       |                                                  ^
+     82|   });
+     83|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  09:32:26
+   Duration  462ms (transform 66%, import 30%, tests 3%, worker 1%)
