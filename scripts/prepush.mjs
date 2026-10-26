@@ -35,6 +35,7 @@ export const localOnly = [
   ['node', 'scripts/comment-discipline-gate.mjs'],
   ['node', 'scripts/single-use-helper-gate.mjs'],
   ['node', 'scripts/baseline-ratchet-gate.mjs'],
+  ['node', 'scripts/lint-warning-cap.mjs'],
   ['node', 'scripts/test-spawn-gate.mjs'],
   ['node', 'scripts/pr-evidence-workflow-gate.mjs'],
   ['node', 'scripts/ui-registry-gate.mjs'],

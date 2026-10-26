@@ -1,0 +1,9 @@
+{
+  "schema": "hillclimb/v2",
+  "metrics": [{ "id": "plan_ok", "label": "plan ok", "kind": "binary", "better": "higher" }],
+  "perf_fields": [
+    { "id": "in_tokens", "label": "in tok", "kind": "number", "better": "lower" },
+    { "id": "out_tokens", "label": "out tok", "kind": "number", "better": "lower" },
+    { "id": "wall_ms", "label": "wall ms", "kind": "number", "better": "lower" }
+  ]
+}

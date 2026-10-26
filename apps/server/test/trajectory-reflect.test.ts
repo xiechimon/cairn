@@ -491,6 +491,33 @@ test('human confirmation promotes only with two builds of evidence', async () =>
   expect(again.stderr).toContain('already promoted');
 });
 
+test('confirm and dismiss accept a candidate id that starts with a dash', async () => {
+  const h = home(['build-a']);
+  const opened = openDbWithHandle(join(h.dir, 'server/server.db'));
+  opened.db
+    .insert(memoryCandidate)
+    .values({
+      id: '-candidate-with-leading-dash',
+      agentId: 'agent-1',
+      teamId: 'team-1',
+      projectId: 'project-1',
+      title: lesson('build-a').title,
+      content: lesson('build-a').content,
+      buildIds: ['build-a'],
+      evidence: [{ buildId: 'build-a', stepId: 'build-a-step-1', messageIndex: 1 }],
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    .run();
+  opened.close();
+  const early = await curate(h, ['--confirm', '-candidate-with-leading-dash']);
+  expect(early.status, early.stderr).toBe(1);
+  expect(early.stderr).toContain('needs evidence from 2 different builds (has 1)');
+  const dismissed = await curate(h, ['--dismiss', '-candidate-with-leading-dash']);
+  expect(dismissed.status, dismissed.stderr).toBe(0);
+  expect(dismissed.stdout.trim()).toBe('dismissed=-candidate-with-leading-dash');
+});
+
 test('guard candidates go to a local JSONL pool, merged across runs', async () => {
   const h = home(['build-a', 'build-b']);
   const guard = {

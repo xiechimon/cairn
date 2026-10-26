@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { attachment } from '../src/db/schema.js';
-import { signAttachmentGrant } from '../src/lib/attachments-token.js';
+import { ATTACHMENT_GRANT_TTL_MS, signAttachmentGrant } from '../src/lib/attachments-token.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { bootServer, postProject, req } from './helpers.js';
 
@@ -148,6 +148,14 @@ describe('attachments -- upload side', () => {
     };
   }
 
+  function tamperGrantSignature(token: string): string {
+    const parts = token.split('.');
+    const head = parts[0] ?? '';
+    const sig = parts[1] ?? '';
+    const first = sig[0] ?? '';
+    return `${head}.${first === 'A' ? 'B' : 'A'}${sig.slice(1)}`;
+  }
+
   test('valid grant + valid file -> 201; file on disk; DB row ready', async () => {
     const s = bootServer();
     try {
@@ -195,15 +203,42 @@ describe('attachments -- upload side', () => {
     const s = bootServer();
     try {
       const g = await grant(s);
-      const parts = g.grant.split('.');
-      const head = parts[0] ?? '';
-      const sig = parts[1] ?? '';
-      const tampered = `${head}.${sig.slice(0, -2)}AA`;
+      const tampered = tamperGrantSignature(g.grant);
       const bytes = new TextEncoder().encode('x');
       const res = await callMultipart(
         s.app,
         `${g.uploadUrl}/upload`,
         { grant: tampered },
+        { name: 'file', filename: 'spec.md', mimeType: 'text/markdown', bytes },
+      );
+      expect(res.status).toBe(401);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('grant signature altered -> 401 for a sig whose base64url tail is AA', async () => {
+    const s = bootServer();
+    try {
+      let token = '';
+      for (let i = 0; i < 20000 && token === ''; i += 1) {
+        const candidate = signAttachmentGrant(s.secretBox, {
+          attachmentId: newRecordId(),
+          teamId: s.team.id,
+          key: 'attachments/x/y.md',
+          sizeBytes: 8,
+          mimeType: 'text/markdown',
+          scope: 'message',
+          exp: Date.now() + ATTACHMENT_GRANT_TTL_MS,
+        });
+        if (candidate.split('.')[1]?.endsWith('AA')) token = candidate;
+      }
+      expect(token).toBeTruthy();
+      const bytes = new TextEncoder().encode('x');
+      const res = await callMultipart(
+        s.app,
+        '/api/uploads/upload',
+        { grant: tamperGrantSignature(token) },
         { name: 'file', filename: 'spec.md', mimeType: 'text/markdown', bytes },
       );
       expect(res.status).toBe(401);

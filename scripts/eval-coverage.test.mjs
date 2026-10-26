@@ -2,9 +2,14 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { loadEvalCoverage, renderEvalCoverage, staleScoredFlows } from './eval-coverage.mjs';
+import {
+  loadEvalCoverage,
+  loadRepoEvalCoverage,
+  renderEvalCoverage,
+  staleScoredFlows,
+} from './eval-coverage.mjs';
 
 const repo = 'xiechimon/cairn';
 
@@ -48,6 +53,15 @@ test('a hillclimb flow with no capability row fails the coverage check', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('the real repo names every on-disk hillclimb flow in eval-capabilities', () => {
+  const coverage = loadRepoEvalCoverage(resolve(import.meta.dirname, '..'));
+  assert.deepEqual(
+    coverage.unlisted,
+    [],
+    'an on-disk hillclimb flow with no capability row reddens the feature-map gate',
+  );
 });
 
 test('coverage rows report scored, built-not-run, none, and tests only', () => {

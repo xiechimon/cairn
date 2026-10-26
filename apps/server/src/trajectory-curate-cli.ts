@@ -5,6 +5,7 @@ import { redactSecrets } from '@cairn/shared';
 import { ZodError } from 'zod';
 import { loadConfig } from './config.js';
 import { openDbWithHandle } from './db/client.js';
+import { argvEqualsForm } from './lib/argv-equals-form.js';
 import {
   CurateError,
   confirmCandidate,
@@ -24,6 +25,7 @@ try {
       force: { type: 'boolean', default: false },
       'out-dir': { type: 'string' },
     },
+    args: argvEqualsForm(process.argv.slice(2), ['in', 'confirm', 'dismiss', 'out-dir']),
   });
   const modes = [values.in, values.confirm, values.dismiss].filter((v) => v !== undefined);
   if (modes.length !== 1 || modes[0] === '') throw new CurateError(USAGE);

@@ -77,22 +77,22 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 
 | Item | Count |
 |---|---|
-| Map rows (issues) | 633 |
-| of which Differentiation surface | 94 |
-| of which Runtime axis | 142 |
+| Map rows (issues) | 635 |
+| of which Differentiation surface | 95 |
+| of which Runtime axis | 143 |
 | of which General surface | 397 |
-| status Done | 499 |
-| status In progress | 6 |
+| status Done | 500 |
+| status In progress | 7 |
 | status Not started | 16 |
 | status Unverified | 112 |
 | anchors = evidence directory + test reference | 222 |
-| anchors = evidence directory only | 172 |
+| anchors = evidence directory only | 174 |
 | anchors = test reference only | 111 |
 | no anchor (`[unverified]`) | 128 |
 | referenced PRs (no rows, §3.2) | 97 |
 | unresolvable ticket numbers (§3.3) | 0 |
 | evidence directories that are not GitHub ticket numbers (§3.4) | 94 |
-| scan surface: spec volumes / test files | 31 / 583 |
+| scan surface: spec volumes / test files | 31 / 586 |
 
 ## 2. Feature map
 
@@ -194,6 +194,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1753](https://github.com/xiechimon/cairn/issues/1753) `Implement ADR 0026: autonomous by default, protected paths need an independent review instead of a human` | Differentiation surface | Done | `docs/verify/1753/` |
 | [#1791](https://github.com/xiechimon/cairn/issues/1791) `server: plans that pass the contract check wait at confirm forever unless the chief happens to be watching` | Differentiation surface | Done | `apps/server/test/plan-server-auto-confirm.test.ts` |
 | [#1802](https://github.com/xiechimon/cairn/issues/1802) `server(rework): retry lessons carry the verify verdict and a "verified, keep working" list` | Differentiation surface | Done | `apps/server/test/retry-lessons.test.ts` |
+| [#1908](https://github.com/xiechimon/cairn/issues/1908) `scripts: e2e-affected and preview servers must take a heavy slot instead of defaulting to slot 1's port` | Differentiation surface | Done | `docs/verify/1908/` |
 | [#16](https://github.com/xiechimon/cairn/issues/16) `研究：上游核心近读 — agent loop / bus / session / memory` | Runtime axis | Done | `apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts` |
 | [#25](https://github.com/xiechimon/cairn/issues/25) `设计：agent core TS 化（loop / runner / bus / session / memory）` | Runtime axis | Unverified | [unverified] |
 | [#37](https://github.com/xiechimon/cairn/issues/37) `研究：协议面与 executor 行为观察（API/WS 词表、MCP、tds start、BYOK/OAuth 面）` | Runtime axis | Unverified | [unverified] |
@@ -336,6 +337,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1683](https://github.com/xiechimon/cairn/issues/1683) `server: Dockerfile + Railway 一键部署模板` | Runtime axis | In progress | `docs/verify/1683/` |
 | [#1808](https://github.com/xiechimon/cairn/issues/1808) `daemon: upgrade pi from 1.0.4 to 1.4.0 (compaction summary output cap, truncated-output session corruption)` | Runtime axis | Done | `apps/daemon/test/pi-compaction-ceiling.test.ts` |
 | [#1829](https://github.com/xiechimon/cairn/issues/1829) `daemon+server: a build whose final push is blocked by the repo pre-push hook fails outright, and a PR the agent opened is never recorded, so ci-loop never sees it` | Runtime axis | Done | `apps/daemon/test/git.test.ts`<br>`apps/daemon/test/runner-delivery.test.ts`<br>`apps/server/test/ci-loop.test.ts` |
+| [#1833](https://github.com/xiechimon/cairn/issues/1833) `daemon: throttle bulk issue and PR creation by the bot` | Runtime axis | Done | `docs/verify/1833/` |
 | [#10](https://github.com/xiechimon/cairn/issues/10) `Kernel: MCP agent channel` | General surface | Done | `apps/web/e2e/overlay-focus.spec.ts` |
 | [#11](https://github.com/xiechimon/cairn/issues/11) `Kernel: HTTP API surface` | General surface | Done | `packages/shared/test/records.test.ts` |
 | [#12](https://github.com/xiechimon/cairn/issues/12) `Kernel: SPA three screens` | General surface | Done | `apps/daemon/test/runner-issue-fence.test.ts`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/board-queued-drop.spec.ts`<br>`apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts`<br>`apps/web/test/mention-token.test.ts`<br>`packages/shared/test/issue-fence.test.ts` |
@@ -729,7 +731,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1731](https://github.com/xiechimon/cairn/issues/1731) `server: GitHub OAuth connection ignores refresh tokens, so expiring user tokens break the connection` | General surface | Done | `apps/server/test/github-token-refresh.test.ts` |
 | [#1744](https://github.com/xiechimon/cairn/issues/1744) `上下文顶格时压缩请求自身 400 且不可恢复：整步无恢复路径` | General surface | In progress | `apps/daemon/test/pi-compaction-ceiling.test.ts` |
 | [#1762](https://github.com/xiechimon/cairn/issues/1762) `server: Tailscale Serve identity header signs the owner in without the access token (loopback-only trust)` | General surface | In progress | `apps/server/test/token-auth.test.ts`<br>`apps/web/e2e/token-gate.spec.ts` |
-| [#1777](https://github.com/xiechimon/cairn/issues/1777) `eval: record real-model baselines for chief-dispatch and memory-regression, rerun weekly` | General surface | Done | `docs/verify/1777/` |
+| [#1777](https://github.com/xiechimon/cairn/issues/1777) `eval: record real-model baselines for chief-dispatch and memory-regression, rerun weekly` | General surface | In progress | `docs/verify/1777/` |
 | [#1782](https://github.com/xiechimon/cairn/issues/1782) `eval(skills): skill routing precision and paired outcome eval` | General surface | Done | `docs/verify/1782/` |
 | [#1796](https://github.com/xiechimon/cairn/issues/1796) `chore: remove zero-use features (what's new notice, GitHub webhook receiver and tokens, remote shell commands)` | General surface | Done | `apps/server/test/machine-shell.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/machines-local.spec.ts`<br>`packages/shared/test/retired-zero-use.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
 | [#1800](https://github.com/xiechimon/cairn/issues/1800) `server: retry a failed task once automatically and fold stale failures out of "needs you"` | General surface | Done | `apps/server/test/needs-you.test.ts` |
@@ -1103,7 +1105,7 @@ before today.
 | project routing | `project-routing` | 13 |  |  |  | built-not-run |
 | learn from correction | `learn` | 10 |  |  |  | built-not-run |
 | review |  |  |  |  |  | none ([#1779](https://github.com/xiechimon/cairn/issues/1779)) |
-| planning |  |  |  |  |  | none ([#1780](https://github.com/xiechimon/cairn/issues/1780)) |
+| planning | `plan` | 2 |  |  |  | built-not-run |
 | coding |  |  |  |  |  | none |
 | machine claim |  |  |  |  |  | tests only, no eval needed |
 | intake |  |  |  |  |  | tests only, no eval needed |

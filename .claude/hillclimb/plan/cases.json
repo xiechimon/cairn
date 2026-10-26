@@ -1,0 +1,37 @@
+{
+  "schema": "hillclimb/v2",
+  "metrics": [
+    { "id": "plan_ok", "label": "plan ok", "kind": "binary", "better": "higher" }
+  ],
+  "perf_fields": [
+    { "id": "in_tokens", "label": "in tok", "kind": "number", "better": "lower" },
+    { "id": "out_tokens", "label": "out tok", "kind": "number", "better": "lower" },
+    { "id": "wall_ms", "label": "wall ms", "kind": "number", "better": "lower" }
+  ],
+  "cases": [
+    {
+      "id": "plan-001",
+      "tags": ["plan"],
+      "prompt": "Export button does nothing on Safari.",
+      "expect": {
+        "include": [["download attribute", "blob url", "safari"], ["test"]],
+        "exclude": ["more logging"],
+        "minTodos": 1,
+        "maxTodos": 4
+      }
+    },
+    {
+      "id": "plan-002",
+      "tags": ["plan", "revision"],
+      "prompt": "Export button does nothing on Safari.",
+      "priorPlan": "Add logging to the export handler.",
+      "feedback": "Find the cause: it is the download attribute on a blob URL.",
+      "expect": {
+        "include": [["download attribute", "blob url"], ["test"]],
+        "exclude": ["more logging", "only logging"],
+        "minTodos": 1,
+        "maxTodos": 4
+      }
+    }
+  ]
+}
