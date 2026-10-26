@@ -1,9 +1,4 @@
 #!/usr/bin/env -S pnpm exec tsx
-// 只验证场景搭建——不起模型、不花钱。两件事都是「静默失败」型，只能摊开看：
-//   ① 场景仓的种子内容有没有真的进仓（种失败时 git 仍返回 0）。
-//   ② chief 系统提示词渲染成什么样（分派靠模型抄 roster 里的 agentId，
-//      渲染形态直接决定它抄不抄得对）。
-
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

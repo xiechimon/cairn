@@ -1,14 +1,4 @@
 #!/usr/bin/env -S pnpm exec tsx
-// chief-dispatch 评测 runner（从 claude-api skill 的 runner-scaffold.mjs 长出来；
-// 脚手架以下的部分未改动——resume / 抖动退避 / 每 case 墙钟硬顶 / served-model
-// 断言 / harness 完整性闸 / errors 侧车 都是脚手架原装）。
-//
-//   pnpm --filter @cairn/integration exec tsx eval/chief-dispatch/run-eval.mts \
-//     --flow .claude/hillclimb/chief-dispatch --variant baseline --model glm-5.3 --reps 3
-//
-// 判什么：chief 回合结束后的**环境终态**——新建 todo 行的 assignment.build.agentId
-// （派给谁），不读 transcript。判分口径与「工作约定」逐条对应。
-
 import { createHash } from 'node:crypto';
 import {
   appendFileSync,
@@ -55,8 +45,6 @@ let ARGS: ReturnType<typeof parseArgs>;
 let ROSTER: RosterAgent[] = [];
 let CHIEF_MODEL = 'glm-5.3';
 
-/** relay 各模型的挂牌价（OpenRouter 列表价，$/1M token，2026-09-29 拉取）。
- * relay 自己不报成本，`models.json` 里 cost 全是 0，所以只能外部取价。 */
 const PRICES: Record<string, { in: number; out: number; cacheRead: number }> = {
   'glm-5.3': { in: 1.4, out: 4.4, cacheRead: 0.26 },
   'kimi-k3': { in: 3.0, out: 15.0, cacheRead: 0.3 },
@@ -76,12 +64,6 @@ async function loadCases(): Promise<EvalCase[]> {
   return d.cases;
 }
 
-/** 每例一条全新栈（进程内 server + daemon），判完立刻关掉。
- *
- * 不复用栈是刻意的：chief 派工会真创建一个 build 步并入队，daemon 会去领它。
- * 复用栈就必须在例间删行，而在 daemon 手里删步会 404 打死进程（实测）；
- * 全新栈 + 判完即关则让那次下游执行根本没机会跑起来，同时白得「每 trial
- * 干净隔离」——每例的库、home、skills 根、机器注册都是新的。 */
 async function freshStack(input: EvalCase): Promise<{ stack: Stack; world: SeededWorld }> {
   const stack = await bootStack();
   try {
@@ -110,8 +92,6 @@ async function runCase(
   stop_reason: string;
   evidence: TurnEvidence;
   truncated: boolean;
-  /** 本 case 实际跑的那条栈上 key→agentId 的映射（每条栈 id 随机，判分必须
-   * 用同一条栈的映射反查，不能用全局表）。 */
   agentIds: Record<string, string>;
   memoryAfter: MemoryRowLite[];
 }> {
@@ -119,13 +99,6 @@ async function runCase(
   try {
     const timeoutMs = ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000;
     const ev = await driveTurn(stack, input.prompt, { timeoutMs });
-    // 链路失败一律落 errors.jsonl，绝不计分——把基础设施问题算成模型失败会
-    // 让头条分数凭空掉几个点，而且失败会集中到某几条用例上，看起来像「模型
-    // 系统性不会做这件事」。两种实测形态：
-    //   ① 零 token：回合根本没跑到模型（延迟整齐卡在 ~30s 的超时特征）。
-    //   ② step=failed：模型跑了、也出了话，但步以失败收场。只看 token 抓不到
-    //      这一种——实测有过某条用例 3/3 全是 failed step，被误读成「它系统性
-    //      不派工」。
     const dead = (ev.usage.input === 0 && ev.usage.output === 0) || ev.stepStatus !== 'done';
     if (dead) {
       const e = new Error(
@@ -134,8 +107,6 @@ async function runCase(
       e.failure_class = 'harness_error';
       throw e;
     }
-    // 截断的可观测特征：回合「正常结束」但既没调工具也没吐正文。cairn 目前
-    // 不上报模型 finish_reason，只能靠这个特征判定——见交付说明的已知缺口。
     const truncated =
       ev.toolCalls.length === 0 && ev.assistantText === '' && ev.stepStatus === 'done';
     return {
@@ -154,7 +125,6 @@ async function runCase(
   }
 }
 
-/** chief 会话的 Turn[]（SCHEMA.md 形）——供报告点进去看完整往返。 */
 function buildTranscript(ev: TurnEvidence): { role: string; content: string; name?: string }[] {
   const turns: { role: string; content: string; name?: string }[] = [];
   for (const c of ev.toolCalls) {
@@ -357,10 +327,6 @@ function pathSafeId(id: string): string {
   return `${cleaned.slice(0, 120)}-${createHash('sha256').update(raw).digest('hex').slice(0, 8)}`;
 }
 
-// 窄口径兜底：本 runner 会主动拆掉跑到一半的 daemon，被拆的 daemon 下次写日志
-// 会 ENOENT。那个异步异常会打死整个进程（实测两次），但它是我们亲手制造的拆除
-// 噪声，不是评测结果的一部分。只吞这一种（scratch 目录下的 daemon.log ENOENT），
-// 别的照旧抛出——不用宽口径 handler 掩盖真问题。
 process.on('uncaughtException', (err: NodeJS.ErrnoException) => {
   const inScratch = typeof err?.path === 'string' && err.path.includes('cairn-eval-');
   if (err?.code === 'ENOENT' && inScratch) {
@@ -442,10 +408,6 @@ async function main() {
       const { c, rep } = task;
       const safeId = pathSafeId(c.id);
       const t0 = Date.now();
-      // 赋值在下面那个 async IIFE 里，而 tsc 的控制流分析看不穿闭包边界：它会把
-      // `let x: T | null = null` 一路当成 null，读取处 `x?.model` 就落到 never 上
-      // 报 TS2339。装在对象字段里避开的是「变量按赋值收窄」这条规则——属性收窄
-      // 只由显式守卫触发，不追赋值。
       const lastRun: { run: Awaited<ReturnType<typeof runCase>> | null } = { run: null };
       let rowWritten = false;
       const deadline = ARGS.timeoutS > 0 ? t0 + ARGS.timeoutS * 1000 : Infinity;
@@ -465,10 +427,6 @@ async function main() {
             );
             lastRun.run = run;
             const latency_s = (Date.now() - tAttempt) / 1000;
-            // served-model 断言：跑分必须由请求的那个模型产出。容忍 alias→snapshot
-            // 的日期后缀解析；别的差异（另一档快照、兄弟模型、静默换模）一律判失败。
-            // 注意这只能发现「daemon 选了别的模型」——模型 id 是 cairn 自己记的账，
-            // 不是上游响应回显的，relay 静默换模它看不出来（见 metrics.md 已知缺口）。
             if (ctx.model && run.model && run.model !== ctx.model) {
               const base = ctx.model.replace(/-latest$|-0$/, '');
               const rest = String(run.model).startsWith(base)

@@ -1,19 +1,3 @@
-// chief 回合的过程评分：只读外部可见面（工具实参、落库行、正文），零模型调用。
-//
-// 为什么要有这一层：结果判据（grade.mts）输出 decision_ok / receipt_ok 两个布尔
-// 加一句 why。metrics.md 记录的主失败形态——正文写对了名字、实参却是另一个
-// Agent 的 id——只落在 receipt_ok=0 上，从分数本身看不出是「名字点错了」还是
-// 「id 抄错了」。本模块把那一个 0 拆成定位到具体调用/具体行的 finding。
-//
-// 与 TRACES 的 process verification 同纪律（判据不看模型思维链、不读私有推理），
-// 但只做可程序化的那几维：语义维（Alternatives 的论证质量、Scope）显式记
-// unobserved，不假装覆盖——用规则判语义会退化成关键词匹配，比不做更坏。
-//
-// 三态而非二态：每条检查的 ok 取 true / false / null。null = 这一回合里观测不到
-// 这个信号（没派工、没工具报错、空回合）。未观测既不算通过也不算失败——把它折进
-// 「通过」会让空回合凭空白得分数，折进「失败」会把链路方差记到模型账上。
-// metrics.md 的「无回答 ≠ 否定回答」是同一条纪律在结果侧的写法。
-
 import type { Case, RosterAgent } from './grade.mts';
 import type { TurnEvidence } from './stack.mts';
 
@@ -27,13 +11,9 @@ export type ProcessDimension =
 
 export interface ProcessFinding {
   dimension: ProcessDimension;
-  /** 稳定 id，跨 run 可聚合（如 "tools.attribution_consistent"）。 */
   check: string;
-  /** null = 本回合观测不到该信号。 */
   ok: boolean | null;
-  /** 定位信息。原始 id 一并记入：agentId 每条栈随机，事后无法从 key 反推。 */
   detail: string;
-  /** 出问题的落点（todo 行 id 或工具调用下标），便于点进去复核。 */
   locus?: string;
 }
 
@@ -45,7 +25,6 @@ export interface ProcessScore {
 export interface ProcessInput {
   evidence: TurnEvidence;
   roster: RosterAgent[];
-  /** 本回合所在那条栈的 key→agentId 映射（每条栈 id 随机，不可用全局表）。 */
   agentIds: Record<string, string>;
   expect: Case['expect'];
 }
@@ -67,8 +46,6 @@ const dimOf = (check: string): ProcessDimension => {
   return d as ProcessDimension;
 };
 
-/** 递归收集 agentId 字段。run_builds 的实参是 unknown，形状由模型决定——它可能
- * 把 assignment 套在任何深度上，所以按字段名深挖而不是按固定路径取。 */
 function collectAgentIds(value: unknown, out: string[] = []): string[] {
   if (Array.isArray(value)) {
     for (const v of value) collectAgentIds(v, out);
@@ -83,7 +60,6 @@ function collectAgentIds(value: unknown, out: string[] = []): string[] {
   return out;
 }
 
-/** 键序稳定的序列化——用来判「同参数重复调用」。 */
 function stable(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
   if (v !== null && typeof v === 'object') {
@@ -95,7 +71,6 @@ function stable(v: unknown): string {
   return JSON.stringify(v) ?? 'undefined';
 }
 
-/** 正文里的 `[名字](agent:id)` 引用。 */
 function textAgentRefs(text: string): { name: string; id: string }[] {
   const refs: { name: string; id: string }[] = [];
   const re = /\[([^\]]{0,40})\]\(agent:([^)\s]+)\)/g;
@@ -131,12 +106,10 @@ export function scoreTrace(input: ProcessInput): ProcessScore {
     nameById.set(id, r.displayName);
     namesById.push(r.displayName);
   }
-  /** 同一显示名对应多个 Agent 时无法从正文反推是谁——不猜。 */
   const ambiguousNames = new Set(
     namesById.filter((n, i) => namesById.indexOf(n) !== i && n !== ''),
   );
 
-  // --- 落库/实参里的分派槽 ------------------------------------------------
   const rowIds: { id: string; locus: string }[] = [];
   for (const row of evidence.createdTodoRows) {
     for (const [slot, agentId] of [
@@ -156,7 +129,6 @@ export function scoreTrace(input: ProcessInput): ProcessScore {
     assignedIds.map((id) => nameById.get(id)).filter((n): n is string => n !== undefined),
   );
 
-  // --- tools.assignment_resolvable ---------------------------------------
   if (rowIds.length === 0) {
     add('tools.assignment_resolvable', null, '本回合没有分派槽（未派工）');
   } else {
@@ -171,7 +143,6 @@ export function scoreTrace(input: ProcessInput): ProcessScore {
     );
   }
 
-  // --- tools.attribution_consistent（承重检查） ---------------------------
   const mentionedInText = new Set(
     namesById.filter((n) => n !== '' && evidence.assistantText.includes(n)),
   );
@@ -214,7 +185,6 @@ export function scoreTrace(input: ProcessInput): ProcessScore {
     );
   }
 
-  // --- tools（补充：正文引用 id 的存在性） --------------------------------
   const allRefs = textAgentRefs(evidence.assistantText);
   const ghostRefs = allRefs.filter((r) => !idSet.has(r.id));
   if (allRefs.length === 0) {
@@ -229,7 +199,6 @@ export function scoreTrace(input: ProcessInput): ProcessScore {
     );
   }
 
-  // --- repair -------------------------------------------------------------
   const erroredIdx = evidence.toolCalls
     .map((c, i) => ({ c, i }))
     .filter((x) => x.c.isError === true);
@@ -264,7 +233,6 @@ export function scoreTrace(input: ProcessInput): ProcessScore {
     );
   }
 
-  // --- coherence ----------------------------------------------------------
   add(
     'coherence.step_completed',
     evidence.stepStatus === 'done',
@@ -286,7 +254,6 @@ export function scoreTrace(input: ProcessInput): ProcessScore {
     );
   }
 
-  // --- alternatives -------------------------------------------------------
   if (expect.kind !== 'hold') {
     add('alternatives.hold_honest', null, '非该守住的场景（派工类由 decision_ok 判）');
   } else {
@@ -303,7 +270,6 @@ export function scoreTrace(input: ProcessInput): ProcessScore {
     }
   }
 
-  // 语义维：需要模型裁判，本模块不做——显式记未观测，避免「六维都覆盖了」的假象。
   add('alternatives.argument_quality', null, '需模型裁判（候选是否被摆出并比较），本模块不做');
   add('scope.limits_stated', null, '需模型裁判（结论边界是否声明），本模块不做');
 
@@ -320,7 +286,6 @@ export function scoreTrace(input: ProcessInput): ProcessScore {
   return { findings, byDimension };
 }
 
-/** 一行摘要（报告与终端共用）。未观测单独计数，不混进通过率。 */
 export function summarize(s: ProcessScore): string {
   const cells = DIMENSIONS.map((d) => {
     const c = s.byDimension[d];
