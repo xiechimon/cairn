@@ -2,6 +2,7 @@ packages:
   - apps/*
   - packages/*
   - integration
+  - site
 
 allowBuilds:
   # pi 传递依赖（@earendil-works/* 的下游）无需 postinstall 构建脚本。
