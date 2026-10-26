@@ -26,6 +26,7 @@ import {
   DefaultResourceLoader,
   defineTool,
   type ExtensionUIContext,
+  generateSummary,
   type InlineExtension,
   type McpServerConfig,
   ModelRuntime,
@@ -153,6 +154,37 @@ export function piSessionPolicyLine(env: NodeJS.ProcessEnv): string {
 
 export function buildPiSessionSettings() {
   return { compaction: { enabled: true }, retry: PI_RETRY_SETTINGS };
+}
+
+export async function summarizeCompactionTranscript(
+  transcript: string,
+  fetchImpl: typeof fetch,
+  caps: { contextWindow: number; maxTokens: number },
+): Promise<string> {
+  const previous = globalThis.fetch;
+  globalThis.fetch = fetchImpl;
+  try {
+    return await generateSummary(
+      [{ role: 'user', content: transcript, timestamp: 1 }],
+      {
+        id: 'ceiling',
+        name: 'ceiling',
+        api: 'openai-completions',
+        provider: 'openai',
+        baseUrl: 'http://127.0.0.1:9/v1',
+        reasoning: false,
+        input: ['text'],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: caps.contextWindow,
+        maxTokens: caps.maxTokens,
+        compat: { maxTokensField: 'max_tokens', supportsStore: false },
+      },
+      daemonSettingsManager().getCompactionSettings().reserveTokens,
+      'test-key',
+    );
+  } finally {
+    globalThis.fetch = previous;
+  }
 }
 
 interface PiImageContent {
