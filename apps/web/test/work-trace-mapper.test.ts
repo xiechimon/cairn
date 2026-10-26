@@ -60,8 +60,8 @@ test('a skill summary does not split historical calls from live thinking', () =>
 test('a call left without a result only spins while its step is still running', () => {
   const unfinished: MessageRow = { id: 'cut', role: 'assistant', createdAt: 1000, content: { kind: 'toolcall', call: { id: 'cut', name: 'Bash', arguments: { command: 'sleep 60' } } } };
   const at = (status: 'claimed' | 'stopped') => mapTranscript({ messages: [unfinished], steps: [{ id: 'step', buildId: 'build', kind: 'build' as const, machineId: null, createdAt: 500, status, checkpointCommit: null, skillInjection: null }], plans: [], build: null, todo: todo(12, 'building'), machineName: null, userName: 'Ian', liveText: '' });
-  expect(at('claimed')[0]).toMatchObject({ steps: [{ running: true }] });
-  expect(at('stopped')[0]).toMatchObject({ steps: [{ running: false }] });
+  expect(at('claimed')[0]).toMatchObject({ steps: [{ running: true, unfinished: false }] });
+  expect(at('stopped')[0]).toMatchObject({ steps: [{ running: false, unfinished: true }] });
 });
 
 test('backend search tools count as searches', () => {

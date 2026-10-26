@@ -2,6 +2,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  CircleDashed,
   Copy,
   FileText,
   LoaderCircle,
@@ -106,6 +107,8 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
               data-testid="work-spinner"
               aria-label={t('执行中')}
             />
+          ) : step.unfinished ? (
+            <CircleDashed data-testid="work-unfinished" aria-label={t('未完成')} />
           ) : step.error ? (
             <X className="!text-destructive" aria-label={t('失败')} />
           ) : (
@@ -129,6 +132,14 @@ function WorkStepRow({ step, enter, t }: { step: WorkStep; enter: boolean; t: TF
               className="m-0 max-h-60 overflow-auto px-2.5 py-2 text-left font-mono text-caption leading-5 whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere]"
               data-testid="tool-output"
             >
+              {step.kind === 'call' &&
+                step.error &&
+                changeLines !== null &&
+                step.output !== null && (
+                  <span className="block text-destructive" data-testid="edit-error">
+                    {step.output}
+                  </span>
+                )}
               {changeLines !== null
                 ? changeLines.slice(0, 40).map((line, index) => (
                     <span

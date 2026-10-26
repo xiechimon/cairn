@@ -147,6 +147,7 @@ function probeTools(expanded: boolean): TranscriptItem {
         output: null,
         error: false,
         running: false,
+        unfinished: false,
         diff: { added: 1, removed: 0 },
         changes: { added: ['r7 rebaseline probe'], removed: [] },
       },
@@ -161,6 +162,7 @@ function probeTools(expanded: boolean): TranscriptItem {
         output: null,
         error: false,
         running: false,
+        unfinished: false,
       },
     ],
   };

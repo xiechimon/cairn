@@ -290,6 +290,7 @@ export type WorkStep =
       output: string | null;
       error: boolean;
       running: boolean;
+      unfinished: boolean;
       seconds: number | null;
     };
 

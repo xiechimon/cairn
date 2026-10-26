@@ -625,6 +625,7 @@ const MD_TOOLOUT_TRANSCRIPT: TranscriptItem[] = [
       output: MD_TOOL_OUTPUTS[index] ?? null,
       error: false,
       running: false,
+      unfinished: false,
     })),
   },
   { kind: 'robot', markdown: MD_SAMPLE, footer: { seconds: 12 } },

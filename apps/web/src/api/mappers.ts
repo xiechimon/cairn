@@ -800,6 +800,7 @@ function workCall(
     output: output !== null && isJsonPlumbing(output) ? null : output,
     error: call.isError === true,
     running: call.result === undefined && stepRunning,
+    unfinished: call.result === undefined && !stepRunning,
     seconds,
   };
   if (name === 'read') {

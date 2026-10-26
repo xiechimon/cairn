@@ -31,6 +31,7 @@ export const EN: Record<string, string> = {
   '还有 {n} 行': '{n} more lines',
   '，': ', ',
   无输出: 'No output',
+  未完成: 'Not finished',
   读取: 'Read',
   运行: 'Run',
   修改: 'Edit',

@@ -79,6 +79,7 @@ const MESSAGES = [
   msg('assistant', call('read-1', 'Read', { file_path: '/home/user/.pacman-chief/workspaces/run-1/src/main.ts', offset: 10, limit: 20 }, 'export const ready = true;', 1250), 2400),
   msg('assistant', call('search-1', 'Bash', { command: 'rg ready src', description: 'Find readiness checks' }, 'src/main.ts:1:ready', 2300), 4700),
   msg('assistant', call('run-1', 'Bash', { command: 'pnpm test', description: 'Verify changes' }, Array.from({ length: 45 }, (_, i) => `output line ${i + 1}`).join('\n'), 12000), 16700),
+  msg('assistant', { kind: 'toolcall', call: { id: 'edit-0', name: 'Edit', arguments: { file_path: 'src/other.ts', old_string: 'missing line', new_string: 'replacement' }, result: 'old_string not found in src/other.ts', isError: true, startedAt: 2000, endedAt: 2400 } }, 17000),
   msg('assistant', call('edit-1', 'Edit', { file_path: '/home/user/.pacman-chief/workspaces/run-1/src/main.ts', old_string: 'old line', new_string: 'new line\nsecond line' }, 'updated', 1500), 18200),
   msg('assistant', call('tool-1', 'mcp__docs__lookup', { query: 'ready' }, 'reference found', 1000), 19200),
   msg('assistant', [{ type: 'text', text: 'The checks passed.' }], 20000),
@@ -86,7 +87,7 @@ const MESSAGES = [
   msg('assistant', call('running-1', 'Bash', { command: 'pnpm lint', description: 'Check formatting' }), 22000),
 ];
 
-async function stubWorld(page: Page) {
+async function stubWorld(page: Page, stepStatus: 'claimed' | 'stopped' = 'claimed') {
   const json = (body: unknown, status = 200) => ({
     status,
     contentType: 'application/json',
@@ -140,7 +141,7 @@ async function stubWorld(page: Page) {
               kind: 'build',
               machineId: null,
               createdAt: 1000,
-              status: 'claimed',
+              status: stepStatus,
             },
           ]),
         );
@@ -177,7 +178,7 @@ test('work groups consecutive thinking and calls, with only the last block expan
   await expect(summaries.first()).toContainText('读了 1 个文件');
   await expect(summaries.first()).toContainText('搜索 1 次');
   await expect(summaries.first()).toContainText('跑了 1 条命令');
-  await expect(summaries.first()).toContainText('改了 1 个文件');
+  await expect(summaries.first()).toContainText('改了 2 个文件');
   await expect(summaries.first()).toContainText('调用 1 个工具');
   await expect(summaries.first()).toHaveAttribute('aria-expanded', 'false');
   await expect(summaries.last()).toHaveAttribute('aria-expanded', 'true');
@@ -215,6 +216,18 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
   await expect(block.getByTestId('tool-output').last()).toContainText('old line');
   await expect(block.getByTestId('tool-output').last()).toContainText('new line');
   await expect(block.getByTestId('work-call').last()).toContainText('docs · lookup');
+  const failed = block.getByTestId('work-call').filter({ hasText: 'src/other.ts' });
+  await expect(failed.getByLabel('失败')).toBeVisible();
+  await failed.click();
+  await expect(block.getByTestId('edit-error')).toHaveText('old_string not found in src/other.ts');
+});
+
+test('a call cut off by a stopped run shows as unfinished, not done', async ({ page }) => {
+  await stubWorld(page, 'stopped');
+  const cut = page.getByTestId('work-call').filter({ hasText: 'Check formatting' });
+  await expect(cut.getByTestId('work-unfinished')).toBeVisible();
+  await expect(cut.getByLabel('已完成')).toHaveCount(0);
+  await expect(page.getByTestId('work-spinner')).toHaveCount(0);
 });
 
 for (const reducedMotion of ['reduce', 'no-preference'] as const) {
