@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "f2cdf40fc6d8f760ca572fcb872709ac056f9c35",
-    "date": "2026-10-20"
+    "sha": "f3886df5ad86b1bff4e3bf49a6138028b1f845e6",
+    "date": "2026-10-26"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
   "perFaceCss": {},
@@ -15,7 +15,7 @@
   },
   "arbitraryValues": {
     "textTotal": 16,
-    "spacingTotal": 15,
+    "spacingTotal": 14,
     "files": {
       "board/board.tsx": {
         "text": 0,
@@ -45,20 +45,20 @@
         "text": 1,
         "spacing": 0
       },
+      "overlay/chip-popover.tsx": {
+        "text": 1,
+        "spacing": 0
+      },
       "overlay/more-menu.tsx": {
+        "text": 0,
+        "spacing": 1
+      },
+      "overlay/plan-dropdown.tsx": {
         "text": 0,
         "spacing": 1
       },
       "overlay/token-gate.tsx": {
         "text": 2,
-        "spacing": 1
-      },
-      "overlay/chip-popover.tsx": {
-        "text": 1,
-        "spacing": 1
-      },
-      "overlay/plan-dropdown.tsx": {
-        "text": 0,
         "spacing": 1
       },
       "pages/project-new-page.tsx": {
