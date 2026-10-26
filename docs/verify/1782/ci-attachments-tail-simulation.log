@@ -1,0 +1,6 @@
+# Statistical shape of the tamper recipe sig.slice(0, -2) + AA against 32-byte HMAC-SHA256 MACs
+# A 32-byte MAC encodes to 43 base64url chars; the last char carries 2 padding bits the decoder discards.
+# Weak tails (second-to-last char A, last char in {A,B,C,D}): 169 of 200000 = 0.0845%
+# Tamper decodes to identical MAC bytes: 169 of 200000 = 0.0845%
+# Theoretical: (1/64) * (4/64) = 1/1024 = 0.0977%
+# Example tail shapes that survive: sig ends ...AA, ...AB, ...AC, ...AD

@@ -77,12 +77,10 @@ test('local code checks include both UI gates and affected e2e', () => {
     assert.ok(commands.includes(command), command);
 });
 
-test('every single-script CI step also runs in local prepush or is listed as CI-only', () => {
+test('every CI node scripts step also runs in local prepush or is listed as CI-only', () => {
   const local = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   const ciScripts = [
-    ...readFileSync('.github/workflows/ci.yml', 'utf8').matchAll(
-      /run: node (scripts\/[\w-]+\.mjs)\n/g,
-    ),
+    ...readFileSync('.github/workflows/ci.yml', 'utf8').matchAll(/node (scripts\/[\w-]+\.mjs)\n/g),
   ].map((match) => match[1]);
   assert.ok(ciScripts.includes('scripts/ui-registry-gate.mjs'));
   for (const script of ciScripts)
