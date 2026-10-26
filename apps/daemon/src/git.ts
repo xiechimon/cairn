@@ -128,6 +128,23 @@ export function isGitAuthFailure(message: string): boolean {
   );
 }
 
+const GIT_PERMANENT_FAILURE_PATTERNS: readonly RegExp[] = [
+  /returned error: (?:403|404)\b/,
+  /\berror: (?:403|404)\b/,
+  /ssl certificate problem/,
+  /server certificate verification failed/,
+  /repository not found/,
+  /repository '[^']*' does not exist/,
+  /does not appear to be a git repository/,
+  /not a git repository/,
+];
+
+export function isGitTransientNetFailure(message: string): boolean {
+  const lower = message.toLowerCase();
+  if (isGitAuthFailure(message)) return false;
+  return !GIT_PERMANENT_FAILURE_PATTERNS.some((re) => re.test(lower));
+}
+
 export type GitFallbackReason = string;
 
 export interface GitCredentialFallbackOpts {
@@ -595,7 +612,7 @@ export const gitPrim = {
   },
 };
 
-export const GIT_NET_RETRY_DELAYS_MS = [1_000, 5_000] as const;
+export const GIT_NET_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
 
 export async function withGitNetRetries<T>(fn: () => Promise<T>): Promise<T> {
   let lastErr: unknown;
@@ -604,11 +621,9 @@ export async function withGitNetRetries<T>(fn: () => Promise<T>): Promise<T> {
       return await fn();
     } catch (err) {
       lastErr = err;
-      if (
-        err instanceof GitPushHookError ||
-        isGitAuthFailure(err instanceof Error ? err.message : String(err))
-      )
-        break;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (err instanceof GitPushHookError || isGitAuthFailure(msg)) break;
+      if (!isGitTransientNetFailure(msg)) break;
       const delay = GIT_NET_RETRY_DELAYS_MS[i];
       if (delay === undefined) break;
       await new Promise((r) => setTimeout(r, delay));

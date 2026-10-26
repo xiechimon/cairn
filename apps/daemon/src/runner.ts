@@ -131,12 +131,9 @@ export interface RunStepOptions {
   retryStormMax?: number;
   streamTimeouts?: { first: number; idle: number; body: number };
   streamDurationCapMs?: number;
-  providerNetworkFinalWaitMs?: number;
 }
 
-export const PROVIDER_NETWORK_MAX_ATTEMPTS = 3;
-
-export const PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS = 5_000;
+export const PROVIDER_NETWORK_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
 
 export { RETRY_STORM_MAX };
 
@@ -921,8 +918,10 @@ async function runClaimedStep(
     retryAfterMs: number | null;
   } | null = null;
   let networkRetries = 0;
-  const providerNetworkFinalWaitMs =
-    opts.providerNetworkFinalWaitMs ?? PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS;
+  const networkRetryDelays =
+    claimed.step.kind === 'plan' || claimed.step.kind === 'build'
+      ? PROVIDER_NETWORK_RETRY_DELAYS_MS
+      : [0, 5_000];
   const envFirstMs = envPositiveMs(STREAM_FIRST_EVENT_ENV);
   const envIdleMs = envPositiveMs(STREAM_IDLE_ENV);
   const streamTimeouts = {
@@ -1369,7 +1368,6 @@ async function runClaimedStep(
       }
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
-      break;
     }
     stop.detach();
     {
@@ -1380,17 +1378,14 @@ async function runClaimedStep(
         lastError !== null &&
         !stopPending &&
         classifyStepFailure(failureText) === 'network' &&
-        networkRetries < PROVIDER_NETWORK_MAX_ATTEMPTS - 1
+        networkRetries < networkRetryDelays.length
       ) {
+        const delay = networkRetryDelays[networkRetries] ?? 0;
         networkRetries += 1;
-        if (networkRetries === PROVIDER_NETWORK_MAX_ATTEMPTS - 1) {
-          logger.step(
-            `provider network retry ${networkRetries}: waiting ${providerNetworkFinalWaitMs}ms before final attempt`,
-          );
-          await new Promise((r) => setTimeout(r, providerNetworkFinalWaitMs));
-        } else {
-          logger.step(`provider network retry ${networkRetries}: resuming session immediately`);
-        }
+        logger.step(
+          `provider network retry ${networkRetries}: waiting ${delay}ms before ${networkRetries === networkRetryDelays.length ? 'final' : 'next'} attempt`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
         continueId = handle.sessionId;
         deps.sessionHandles?.delete(stepId);
         continue;
