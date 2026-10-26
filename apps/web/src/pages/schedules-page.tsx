@@ -279,7 +279,7 @@ function ScheduleForm({
           </>
         )}
         <div className={FORM_LABEL_CLS}>{t('时间')}</div>
-        <div className="grid grid-cols-2">
+        <div className="flex items-center gap-2">
           <SchedSelect
             value={hour}
             options={HOURS.map((h) => ({ value: h, label: h }))}

@@ -54,3 +54,14 @@ test('`新建定时` footer: text `取消` left of a 32px primary `保存`, no o
   const [c, s] = await Promise.all([cancel.boundingBox(), save.boundingBox()]);
   expect(c!.x + c!.width).toBeLessThanOrEqual(s!.x);
 });
+
+test('`新建定时` hour and minute selects sit side by side', async ({ page }) => {
+  await light(page, '/app/schedules?scenario=r3-92');
+  const dialog = page.getByRole('dialog', { name: '新建定时' });
+  const [hour, minute] = await Promise.all([
+    dialog.getByRole('combobox', { name: '时' }).boundingBox(),
+    dialog.getByRole('combobox', { name: '分' }).boundingBox(),
+  ]);
+  expect(minute!.x - (hour!.x + hour!.width)).toBeLessThanOrEqual(12);
+  expect(minute!.y).toBe(hour!.y);
+});
