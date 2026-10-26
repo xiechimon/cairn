@@ -58,6 +58,9 @@ test('`新建定时` footer: text `取消` left of a 32px primary `保存`, no o
 test('`新建定时` hour and minute selects sit side by side', async ({ page }) => {
   await light(page, '/app/schedules?scenario=r3-92');
   const dialog = page.getByRole('dialog', { name: '新建定时' });
+  await dialog.evaluate((el) =>
+    Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)),
+  );
   const [hour, minute] = await Promise.all([
     dialog.getByRole('combobox', { name: '时' }).boundingBox(),
     dialog.getByRole('combobox', { name: '分' }).boundingBox(),
