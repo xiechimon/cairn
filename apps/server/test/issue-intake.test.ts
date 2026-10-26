@@ -2366,19 +2366,33 @@ describe('21 labels applied through a GitHub App do not count as human', () => {
     ]);
   });
 
-  test('a label applied for the owner by an authorized app (claude) (the real event of #1406) -> not claimed, permission unread, one log line', async () => {
+  test('a label applied for the owner through the trusted claude app (the real event of #1406) -> claimed as the owner, permission read', async () => {
     const w = await makeWorld({ list: [1406] });
     w.gh.state.events.set(1406, EVENTS_1406);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1406]);
+    expect(w.gh.permissionReads().length).toBeGreaterThan(0);
+    const taken = w.logs.filter((l) => l.msg === 'issue intake candidate taken');
+    expect(taken.map((l) => l.obj)).toEqual([
+      expect.objectContaining({ issue: 1406, labeler: OWNER }),
+    ]);
+  });
+
+  test('a label applied for the owner through an untrusted app (cairnwright) -> not claimed, permission unread, one log line', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.events.set(1406, [
+      viaApp(labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 100), 'cairnwright'),
+    ]);
     const tally = await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([]);
     expect(tally?.notEligible).toBe(1);
     expect(w.gh.permissionReads()).toHaveLength(0);
     expect(chiefThreads(w.s)).toHaveLength(0);
     const lines = w.logs.filter((l) =>
-      l.msg.includes('label applied through app claude, not taken'),
+      l.msg.includes('label applied through app cairnwright, not taken'),
     );
     expect(lines.map((l) => l.obj)).toEqual([
-      expect.objectContaining({ issue: 1406, labeler: OWNER, viaApp: 'claude' }),
+      expect.objectContaining({ issue: 1406, labeler: OWNER, viaApp: 'cairnwright' }),
     ]);
   });
 
@@ -2403,7 +2417,7 @@ describe('21 labels applied through a GitHub App do not count as human', () => {
     w.gh.state.events.set(1406, [
       labelEvent('labeled', OWNER, '2026-10-20T20:00:00Z', 100),
       labelEvent('unlabeled', OWNER, '2026-10-20T20:10:00Z', 101),
-      viaApp(labelEvent('labeled', OWNER, '2026-10-20T20:20:00Z', 102), 'claude'),
+      viaApp(labelEvent('labeled', OWNER, '2026-10-20T20:20:00Z', 102), 'cairnwright'),
     ]);
     await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([]);

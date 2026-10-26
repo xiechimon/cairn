@@ -59,6 +59,8 @@ export const ISSUE_INTAKE_INTERVAL_MS = 300_000;
 
 export const ISSUE_INTAKE_LABEL = 'ready-for-agent';
 
+export const ISSUE_INTAKE_TRUSTED_LABEL_APPS: readonly string[] = ['claude'];
+
 export const ISSUE_INTAKE_IN_FLIGHT_CAP = 3;
 
 export const ISSUE_INTAKE_MAX_LIST_PAGES = 3;
@@ -211,7 +213,14 @@ function newestLabeler(data: IssueHistory): { labeler: string } | AppLabel | { r
   const unlabeled = newestOf(data.events, forLabel('unlabeled'));
   if (labeled === null) return { reason: 'no-labeled-event' };
   if (unlabeled !== null && later(unlabeled, labeled)) return { reason: 'label-removed' };
-  if (labeled.viaApp !== null) {
+  if (
+    labeled.viaApp !== null &&
+    !(
+      ISSUE_INTAKE_TRUSTED_LABEL_APPS.includes(labeled.viaApp) &&
+      labeled.actor !== null &&
+      !labeled.actor.endsWith('[bot]')
+    )
+  ) {
     return { reason: 'label-via-app', labeler: labeled.actor, viaApp: labeled.viaApp };
   }
   if (labeled.actor === null) return { reason: 'labeler-deleted' };
