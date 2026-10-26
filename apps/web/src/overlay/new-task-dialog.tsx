@@ -525,7 +525,7 @@ export function NewTaskDialog({
                 {t('保存并开始')}
                 <Kbd
                   aria-hidden="true"
-                  className="h-4 min-w-0 rounded-sm bg-primary-foreground/15 px-1 text-caption font-normal text-primary-foreground/80"
+                  className="h-4 min-w-0 rounded-sm bg-current/10 px-1 text-caption font-normal text-current"
                 >
                   {START_SHORTCUT_LABEL}
                 </Kbd>
