@@ -26,6 +26,7 @@ export const selfTests = [
 
 export const localOnly = [
   ['node', 'scripts/ci-job-structure-gate.mjs'],
+  ['node', 'scripts/feature-map-staleness-gate.mjs'],
   ['node', 'scripts/comment-discipline-gate.mjs'],
   ['node', 'scripts/single-use-helper-gate.mjs'],
   ['node', 'scripts/baseline-ratchet-gate.mjs'],
