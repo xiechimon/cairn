@@ -10,7 +10,7 @@
 |---|---|---|
 | **唯一轨** | `src/components/ui/` | **新代码一律落这里。** shadcn 件 + Base UI 基（#410 裁决），带仓内偏离记录 |
 | ~~旧轨~~ | ~~`src/ui/`~~ | **已整目录删除（#952，spec/22 §5 退役正典表执行完毕）**：`chip`→`status-chip.tsx`（#942）、`input`→`components/ui/input.tsx`（#944）、`dialog.css` 表单族→utility 等值迁移 + `dialog-shell.tsx` 机制内联（#952）。机器门钉住目录不得复活 |
-| 弹层族 | `src/overlay/` + `src/overlays/` | 挂在共享壳上（见第三节），**不自己手搓 OverlayMount + useEscClose** |
+| Overlay family | `src/overlay/` | Mounts on the shared shell (see section three); **never hand-roll OverlayMount + useEscClose** |
 
 <!-- inventory:old-track-frozen -->
 ```text

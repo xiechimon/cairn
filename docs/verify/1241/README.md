@@ -1,109 +1,103 @@
-# #1241 机器推荐并发：实时环境证据
+# #1241 machine-recommended concurrency: live-environment evidence
 
-分支 `concurrency-1241`（worktree `/workspace/wt-1241`，issue #1241，#1241 PR 待合并）。
+Branch `concurrency-1241` (worktree `/workspace/wt-1241`, issue #1241, the #1241 PR pending merge).
 
-驱动探针：`.claude/skills/verify-pacman/scripts/drive-1241-recommended-concurrency.mjs`
-（`scripts/drive.mjs` 注册的同一族定制 probe；五断言族 A 推荐 / B 依据 / C 手动 / D 恢复推荐 / E 估算）。
+Driver probe: `.claude/skills/verify-pacman/scripts/drive-1241-recommended-concurrency.mjs`
+(a custom probe registered to the same family as `scripts/drive.mjs`; the five assertion families A recommendation / B basis / C manual / D restore-recommendation / E estimate).
 
-## 实时环境
+## Live environment
 
-| 维度 | 值 |
+| dimension | value |
 |---|---|
-| 主机 | `grok-bot-vm-481311088`（Linux x86_64，Docker 容器） |
-| 核数 | 8（`os.cpus().length`） |
-| 总内存 | 16 002 MiB（≈ 15.6 GiB，`os.totalmem()`） |
-| 可用内存 | 4 931 MiB（≈ 4.8 GiB） |
-| 公式 | `min(8, floor(16002 / 2048)) = min(8, 7) = 7` |
-| 推荐值（measured） | 7 |
-| 估算值（estimate，无指纹） | 3（`CONSERVATIVE_CONCURRENCY`） |
+| host | `grok-bot-vm-481311088` (Linux x86_64, a Docker container) |
+| cores | 8 (`os.cpus().length`) |
+| total memory | 16,002 MiB (≈ 15.6 GiB, `os.totalmem()`) |
+| available memory | 4,931 MiB (≈ 4.8 GiB) |
+| the formula | `min(8, floor(16002 / 2048)) = min(8, 7) = 7` |
+| the recommended value (measured) | 7 |
+| the estimated value (estimate, no fingerprint) | 3 (`CONSERVATIVE_CONCURRENCY`) |
 
-## 端口与栈
+## Ports and stacks
 
-本机端口舰队中 8791 已被 `sand-egress-tun`（pid 363，系统服务，禁杀）占用，按
-skill「端口与车道纪律」换用 `8796` / `5278`（任务规约内的 fallback），同栈对照
-before / after，避免端口漂移串扰。
+In the local port fleet, 8791 is already held by `sand-egress-tun` (pid 363, a system service, must not be killed), so per the skill's "ports and lane discipline" we switch to `8796` / `5278` (a fallback within the task spec), with the before/after comparison on the same stack to avoid port-drift cross-interference.
 
-| 栈 | REPO_ROOT | RUN_DIR | server | web |
+| stack | REPO_ROOT | RUN_DIR | server | web |
 |---|---|---|---|---|
-| before | `/tmp/wt-1241-before`（origin/main HEAD `9b027a5c`） | `/tmp/wt-1241-before/.claude/verify-run` | 8796 | 5278 |
-| after | `/workspace/wt-1241`（`concurrency-1241` `6cf9cd74`） | `/workspace/wt-1241/.claude/verify-run` | 8796 | 5278 |
+| before | `/tmp/wt-1241-before` (origin/main HEAD `9b027a5c`) | `/tmp/wt-1241-before/.claude/verify-run` | 8796 | 5278 |
+| after | `/workspace/wt-1241` (`concurrency-1241` `6cf9cd74`) | `/workspace/wt-1241/.claude/verify-run` | 8796 | 5278 |
 
-## 公式（apps/server/src/services/dispatch-eligibility.ts）
+## The formula (apps/server/src/services/dispatch-eligibility.ts)
 
 ```
 recommended = clamp(min(cpuCores, floor(memoryTotalMb / 2048)), 1, 16)
 ```
 
-常量：`CONCURRENCY_FLOOR = 1`、`CONCURRENCY_CEILING = 16`、`MEMORY_GB_PER_SLOT = 2`、
-`CONSERVATIVE_CONCURRENCY = 3`。**口径 = 总内存**（`memoryTotalMb`，非 `memoryAvailableMb`），
-依据弹层文案「总内存 15.6 GiB」与 B1 断言对齐；可用内存仅展示于依据块副位。
+Constants: `CONCURRENCY_FLOOR = 1`, `CONCURRENCY_CEILING = 16`, `MEMORY_GB_PER_SLOT = 2`,
+`CONSERVATIVE_CONCURRENCY = 3`. **The convention = total memory** (`memoryTotalMb`, not `memoryAvailableMb`),
+per the basis popover's copy `总内存 15.6 GiB` and aligned with the B1 assertion; the available memory is only shown in a secondary position of the basis block.
 
-## 优先级（issue #1241 评论，2026-10-12 binding）
+## Priority (the issue #1241 comment, binding 2026-10-12)
 
 ```
-用户 PATCH 数字  >  公式（measured，有指纹）  >  保守估算（estimate，无指纹）
+a user-patched number  >  the formula (measured, has fingerprint)  >  the conservative estimate (estimate, no fingerprint)
 ```
 
-| 状态 | maxConcurrentOverridden | maxConcurrent | concurrencySource | 推荐字段下发 |
+| state | maxConcurrentOverridden | maxConcurrent | concurrencySource | recommended field sent |
 |---|---|---|---|---|
-| 用户写过 | true | 用户值 | manual | 公式值 |
-| 未覆盖，有指纹 | false | 公式值 | measured | 公式值 |
-| 未覆盖，无指纹 | false | 3 | estimate | 3 |
+| user-written | true | the user value | manual | the formula value |
+| not overridden, has fingerprint | false | the formula value | measured | the formula value |
+| not overridden, no fingerprint | false | 3 | estimate | 3 |
 
-PATCH `null` = 清除覆盖，立即按当前指纹重算；心跳缺 `hardware` 沿用上拍指纹，
-不把已测推荐打回估算；负载暂停仅挡新 claim、覆盖时不生效。
+PATCH `null` = clear the override and immediately recompute per the current fingerprint; a heartbeat missing `hardware` keeps the previous beat's fingerprint and does not push an already-measured recommendation back to an estimate; a load pause only blocks new claims and does not take effect on override.
 
-## 证据清单
+## Evidence list
 
 `docs/verify/1241/`
-- `before/` —— origin/main 一次性 worktree 栈实测
-  - `00-before-machines-page.png`：双机并排（真机 + 估算机），均「并发 3」无标注
-  - `api-machines-t0.json`、`db-machine-t0.json`：双真值字段 `maxConcurrent=3`、无
-    `recommendedConcurrent` / `concurrencySource`
-  - `daemon-console.log`：daemon 启动与上线行（无 fingerprint 字段）
-  - `result.json`：3/3 PASS（O1 / O2 / O3）
-- `after/` —— concurrency-1241 实测（同一端口 8796/5278，同主机指纹）
-  - `01-recommended-tag.png`：真机控件「并发 7 推荐」、估算机「并发 3 估算」
-  - `02-basis-popover.png`：依据弹层「推荐 7 · 依据：核 8 · 总内存 15.6 GiB · 负载 1.01」
-  - `03-manual-override.png`：选 4 后「并发 4 手动」
-  - `04-after-reset.png`：恢复推荐后回到「并发 7 推荐」
-  - `05-estimate-basis.png`：估算机弹层「未收到能力指纹，按保守默认 3 估算」
+- `before/` — measured on a throwaway origin/main worktree stack
+  - `00-before-machines-page.png`: the two machines side by side (the real machine + the estimate machine), both `并发 3` with no annotation
+  - `api-machines-t0.json`, `db-machine-t0.json`: both ground-truth fields `maxConcurrent=3`, no `recommendedConcurrent` / `concurrencySource`
+  - `daemon-console.log`: the daemon's startup and online lines (no fingerprint field)
+  - `result.json`: 3/3 PASS (O1 / O2 / O3)
+- `after/` — measured on concurrency-1241 (the same ports 8796/5278, the same host fingerprint)
+  - `01-recommended-tag.png`: the real machine's control reads `并发 7 推荐`, the estimate machine's `并发 3 估算`
+  - `02-basis-popover.png`: the basis popover `推荐 7 · 依据：核 8 · 总内存 15.6 GiB · 负载 1.01`
+  - `03-manual-override.png`: after picking 4, `并发 4 手动`
+  - `04-after-reset.png`: after restoring the recommendation it returns to `并发 7 推荐`
+  - `05-estimate-basis.png`: the estimate machine's popover `未收到能力指纹，按保守默认 3 估算`
   - `api-machines-t0.json` / `api-machines-after-manual.json` /
-    `api-machines-after-heartbeat.json` / `api-machines-after-reset.json`：四时点
-    API 真值，覆盖 `concurrencySource` 三态 + 公式值与用户值并存 + 心跳不覆盖
-  - `db-machine-*.json`：四时点 SQLite 行级真值（`maxConcurrentOverridden` 0/1 切换、
-    `capabilities.hardware` 字段落库）
-  - `daemon-console.log`：真 daemon 上线行（含 hardware 字段上报）
-  - `result.json`：20/20 PASS（A0..A5 / B1 / C0..C4 / D0..D3 / E0 / E2..E4）
+    `api-machines-after-heartbeat.json` / `api-machines-after-reset.json`: the four-time-point API ground truth, covering the `concurrencySource` three states + the formula value and the user value coexisting + the heartbeat not overriding
+  - `db-machine-*.json`: the four-time-point SQLite row-level ground truth (the `maxConcurrentOverridden` 0/1 switch, the `capabilities.hardware` field persisted)
+  - `daemon-console.log`: the real daemon's online line (carrying the hardware field report)
+  - `result.json`: 20/20 PASS (A0..A5 / B1 / C0..C4 / D0..D3 / E0 / E2..E4)
 
-## 双向对照（before vs after）
+## Two-way contrast (before vs after)
 
-| 维度 | before（origin/main） | after（concurrency-1241） | 判据 |
+| dimension | before (origin/main) | after (concurrency-1241) | criterion |
 |---|---|---|---|
-| 真机 UI 控件 | 「并发 3」 | 「并发 7 推荐」 | O1 红 / A1 红 |
-| 估算机 UI 控件 | 「并发 3」 | 「并发 3 估算」 | O2 红 / E0 红 |
-| 真机 API `recommendedConcurrent` | 字段缺失 | 7（公式值） | O3 红 / A2 红 |
-| 真机 API `concurrencySource` | 字段缺失 | `"measured"` | O3 红 / A0 红 |
-| 依据弹层 | 无 | 「依据：核 8 · 总内存 15.6 GiB · 负载 1.01」 | — / B1 红 |
-| PATCH 数字 → 手动 | 不支持该语义（无来源字段） | 「并发 4 手动」、SQLite `maxConcurrentOverridden=1` | — / C0/C1/C2/C3 |
-| 心跳覆盖手动值 | — | 30 s 后仍是 4（覆盖值持久） | — / C4 |
-| 恢复推荐 | — | 「并发 7 推荐」、`overridden=0` | — / D1/D2/D3 |
-| 估算机 capabilities | （无字段） | null，公式不执行，值固定 3 | — / E2/E3/E4 |
+| real machine UI control | `并发 3` | `并发 7 推荐` | O1 red / A1 red |
+| estimate machine UI control | `并发 3` | `并发 3 估算` | O2 red / E0 red |
+| real machine API `recommendedConcurrent` | field missing | 7 (the formula value) | O3 red / A2 red |
+| real machine API `concurrencySource` | field missing | `"measured"` | O3 red / A0 red |
+| the basis popover | none | `依据：核 8 · 总内存 15.6 GiB · 负载 1.01` | — / B1 red |
+| PATCH a number → manual | the semantics unsupported (no source field) | `并发 4 手动`, SQLite `maxConcurrentOverridden=1` | — / C0/C1/C2/C3 |
+| heartbeat overriding the manual value | — | still 4 after 30s (the override value persists) | — / C4 |
+| restore the recommendation | — | `并发 7 推荐`, `overridden=0` | — / D1/D2/D3 |
+| estimate machine capabilities | (no field) | null, the formula not executed, the value pinned at 3 | — / E2/E3/E4 |
 
-## 失败方式逐条钉死
+## Failure-mode-first, item by item
 
-| 失败模式 | 探针断言 | 判据字段 |
+| failure mode | probe assertion | criterion field |
 |---|---|---|
-| 公式漂移（floor→ceil、内存口径错） | A2 | `recommendedConcurrent === min(cpuCores, floor(memoryTotalMb/2048))` |
-| 依据吃可用内存 | B1 | 弹层文案含「总内存 15.6 GiB」（非 4.8） |
-| 心跳覆盖手动值 | C4 | `maxConcurrent === 4` 且 `lastSeenAt` 前进 |
-| 恢复推荐后 `overridden` 残留 | D2 / D3 | API+SQLite 均 `maxConcurrentOverridden === false/0` |
-| 无指纹机被说成推荐 | E0 / E2 | `data-concurrency-source="estimate"`、API `capabilities=null` |
+| formula drift (floor→ceil, wrong memory convention) | A2 | `recommendedConcurrent === min(cpuCores, floor(memoryTotalMb/2048))` |
+| the basis eats the available memory | B1 | the popover copy contains `总内存 15.6 GiB` (not 4.8) |
+| a heartbeat overriding the manual value | C4 | `maxConcurrent === 4` and `lastSeenAt` advancing |
+| the `overridden` residue after restoring the recommendation | D2 / D3 | both API and SQLite read `maxConcurrentOverridden === false/0` |
+| a no-fingerprint machine called a recommendation | E0 / E2 | `data-concurrency-source="estimate"`, API `capabilities=null` |
 
-## 复跑配方
+## Rerun recipe
 
 ```sh
-# before 栈（origin/main 一次性 worktree）
+# before stack (a throwaway origin/main worktree)
 VERIFY_REPO_ROOT=/tmp/wt-1241-before VERIFY_PORT=8796 VERIFY_WEB_PORT=5278 \
   VERIFY_RUN_DIR=/tmp/wt-1241-before/.claude/verify-run \
   node /workspace/wt-1241/.claude/skills/verify-pacman/scripts/launch.mjs
@@ -112,7 +106,7 @@ VERIFY_REPO_ROOT=/tmp/wt-1241-before VERIFY_RUN_DIR=/tmp/wt-1241-before/.claude/
 VERIFY_RUN_DIR=/tmp/wt-1241-before/.claude/verify-run \
   node /workspace/wt-1241/.claude/skills/verify-pacman/scripts/cleanup.mjs
 
-# after 栈（concurrency-1241）
+# after stack (concurrency-1241)
 VERIFY_REPO_ROOT=/workspace/wt-1241 VERIFY_PORT=8796 VERIFY_WEB_PORT=5278 \
   VERIFY_RUN_DIR=/workspace/wt-1241/.claude/verify-run \
   node /workspace/wt-1241/.claude/skills/verify-pacman/scripts/launch.mjs
@@ -122,29 +116,24 @@ VERIFY_RUN_DIR=/workspace/wt-1241/.claude/verify-run \
   node /workspace/wt-1241/.claude/skills/verify-pacman/scripts/cleanup.mjs
 ```
 
-## 实测坑
+## Measured pitfalls
 
-1. **端口 8791 占用**：`sand-egress-tun`（pid 363，系统服务）已占 8791，不能杀，按
-   skill 纪律换 8796/5278。
-2. **核心 `pnpm` 不可用**：`/home/box/.cache/corepack/pnpm/12.5.1/bin/pnpm.cjs` 文件
-   缺失；用 `/tmp/1241-bin/pnpm`（指向 `/usr/local/share/corepack/pnpm/10.34.6/bin/pnpm.cjs`）
-   启动 pre-commit 钩子；`corepack pnpm exec tsx` 在 `apps/<pkg>/` 子包下可解析
-   `node_modules/.bin/tsx`，跨子包桥迁可用。
-3. **同跑需重 launch**：`vite` 的 `**/.claude/**` watch 忽略不会罩住 `apps/web/src`，
-   但 worktree 自带的 `.claude/verify-pacman/scripts/` 不在 watch 范围，栈运行中改
-   probe 脚本不会热生效——重 launch 即可（launch 走 detached 重读 `launch.mjs`）。
-## 终版（option A + 弹性区间 + 步进输入，`39e2da21`）
+1. **Port 8791 occupied**: `sand-egress-tun` (pid 363, a system service) already holds 8791 and must not be killed; per the skill's discipline we moved to 8796/5278.
+2. **The core `pnpm` unusable**: `/home/box/.cache/corepack/pnpm/12.5.1/bin/pnpm.cjs` file missing; use `/tmp/1241-bin/pnpm` (pointing at `/usr/local/share/corepack/pnpm/10.34.6/bin/pnpm.cjs`) to start the pre-commit hook; `corepack pnpm exec tsx` resolves `node_modules/.bin/tsx` under the `apps/<pkg>/` subpackages, and the cross-subpackage bridge works.
+3. **A co-running change needs a re-launch**: vite's `**/.claude/**` watch-ignore does not cover `apps/web/src`, but the worktree's own `.claude/verify-pacman/scripts/` is outside the watch scope — editing a probe script while the stack runs does not take effect hot; a re-launch suffices (launch re-reads `launch.mjs` in a detached process).
 
-证据目录 `final/`（探针 32/32 PASS，server 8799 / web 5279，node22）。
+## The final version (option A + the elastic range + the stepper input, `39e2da21`)
+
+The evidence directory `final/` (probe 32/32 PASS, server 8799 / web 5279, node22).
 
 ```
-range.max   = clamp(round(memoryTotalMb / 1024), 1, 16)      # 每槽 1 GiB
-recommended = clamp(min(cpuCores, round(memoryTotalMb / 2048)), 1, 16)  # 每槽 2 GiB
-无指纹      = range 1..8，recommended 3（估算）
+range.max   = clamp(round(memoryTotalMb / 1024), 1, 16)      # 1 GiB per slot
+recommended = clamp(min(cpuCores, round(memoryTotalMb / 2048)), 1, 16)  # 2 GiB per slot
+no fingerprint      = range 1..8, recommended 3 (estimate)
 ```
 
-| 机器 | 硬件 | 可选 | 推荐 |
+| machine | hardware | selectable | recommended |
 |---|---|---|---|
-| grok-bot-vm / verify-1241-real | 8 核 / 15.6 GiB | 1–16 | 8 |
-| verify-1241-36gb（假机器） | 12 核 / 36 GiB | 1–16 | 12 |
-| verify-1241-estimate（无指纹） | — | 1–8 | 3 |
+| grok-bot-vm / verify-1241-real | 8 cores / 15.6 GiB | 1-16 | 8 |
+| verify-1241-36gb (a fake machine) | 12 cores / 36 GiB | 1-16 | 12 |
+| verify-1241-estimate (no fingerprint) | — | 1-8 | 3 |

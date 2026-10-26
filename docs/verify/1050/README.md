@@ -1,59 +1,50 @@
-# #1050 claude 二进制事实源 · 实跑证据
+# #1050 claude binary as the source of truth · live-run evidence
 
-复跑配方（隔离栈，不碰 8787/5173 上的活跃 dev 栈）：
+Rerun recipe (isolated stack; does not touch the active dev stack on 8787/5173):
 
 ```bash
-cd <worktree 绝对路径>
+cd <absolute worktree path>
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
   VERIFY_REPO_ROOT=$PWD node .claude/skills/verify-pacman/scripts/launch.mjs
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
   VERIFY_REPO_ROOT=$PWD node .claude/skills/verify-pacman/scripts/drive-1050-claude-bin.mjs
 ```
 
-探针自起 daemon（独立 `PACMAN_HOME` scratch）并自回收；两条腿各用一台
-scratch home，同一 machine 名 `probe-1050`（腿 B 覆盖腿 A 的上报，正是要的
-单向性：后报的事实取代先报的）。
+The probe starts the daemon itself (an isolated `PACMAN_HOME` scratch) and self-recycles; the two legs each use a scratch home, with the same machine name `probe-1050` (leg B overwrites leg A's report — exactly the one-way-ness wanted: the later-reported fact supersedes the earlier).
 
-## 结果：13/13 PASS
+## Result: 13/13 PASS
 
-腿 A（stub claude 前置进 PATH，`--version` 报 `9.9.9-probe`、`auth status` 报已登录）
+Leg A (a stub claude placed first in PATH, `--version` answering `9.9.9-probe`, `auth status` answering logged-in)
 
-- `A1` daemon.log：`[machine] claude binary: <path> (9.9.9-probe)`
-- `A2` machine 行 `claudeCodeReport.bin = {path, version: "9.9.9-probe"}`
-- `A3` machine 行 `claudeCodeReport.auth.state = "logged-in"`
-- `A4` `GET /model-sources` 的 claude-code 段带 `bin`/`auth`（server 透传）
-- `A5` providers 页细字行：`claude 9.9.9-probe · <path>`
-- `A6` 页面 `data-auth="logged-in"`，无「未登录」角标
+- `A1` daemon.log: `[machine] claude binary: <path> (9.9.9-probe)`
+- `A2` machine row `claudeCodeReport.bin = {path, version: "9.9.9-probe"}`
+- `A3` machine row `claudeCodeReport.auth.state = "logged-in"`
+- `A4` the claude-code section of `GET /model-sources` carries `bin`/`auth` (server pass-through)
+- `A5` the providers page's fine-print line: `claude 9.9.9-probe · <path>`
+- `A6` the page has `data-auth="logged-in"`, no `未登录` badge
 
-腿 B（同机，`PACMAN_CLAUDE_BIN` 指不存在的路径；`~/.claude/settings.json` 不动）
+Leg B (same machine, `PACMAN_CLAUDE_BIN` pointing at a nonexistent path; `~/.claude/settings.json` untouched)
 
-- `B1` daemon.log：`[machine] claude binary: not found on PATH`
-- `B2` machine 行 `bin` 键在、值为 **null**（探过了没有）
-- `B3` `GET /model-sources` 段同样 `bin: null`
-- `B4` **页面回「未安装」**——这台机器此刻 `installed:true`（settings.json 在、五个模型槽照常解出）却仍然说未安装。这是本票要消的那类假绿：改动前它说「已安装在 DESKTOP-N9CSRE4」。
-- `B5` 页面无细字行、不写「未知」
+- `B1` daemon.log: `[machine] claude binary: not found on PATH`
+- `B2` machine row has the `bin` key with the value **null** (probed, and absent)
+- `B3` the `GET /model-sources` section likewise `bin: null`
+- `B4` **the page answers `未安装`** — this machine is `installed:true` at this very moment (settings.json present, the five model slots still resolving) and still says not installed. This is the class of false green this ticket eliminates: before the change it said `已安装在 DESKTOP-N9CSRE4`.
+- `B5` the page has no fine-print line and does not write `未知`
 
-## 判读要点
+## Reading points
 
-- `bin` 的三态在 wire 上**不合并**：对象 = 探到了；`null` = 探过了没有；键缺席
-  = 没探过（老 daemon）。页面据此三分：装了 / 未安装 / 退回「只看 installed」
-  的旧行为。`B2`/`B3` 钉的是「探过了没有」不可退化成缺席——退回缺席就退回假绿。
-- 页面判据优先级 = **二进制 > 配置文件**。配置文件在而二进制没了时说话的是
-  二进制（`B4`）；二进制在而没写配置时说「已安装，未配置模型槽」（fixture
-  `10-cc-noconfig` 的 e2e 钉住，补法句与「没装」不同）。
-- 本探针真跑的 claude 是 **stub**（版本 9.9.9-probe 一眼可辨），所以证据里
-  的版本与路径都是探针做的，不是本机真 claude 的读数。
-- 杠 B 的模型槽来自本机真 `~/.claude/settings.json`（隔离栈的 daemon 读的是
-  真正的 home），故 `model-sources-b.json` 里能看到真实槽位——这不是泄漏，
-  与 `docs/verify/707` 同面。
+- The `bin` three states are **not merged** on the wire: an object = probed and found; `null` = probed and not found; the key absent = never probed (an old daemon). The page branches on these three accordingly: installed / not installed / the old "look at installed only" fallback behavior. `B2`/`B3` pin that "probed and not found" must not degrade to absent — degrading to absent would degrade back to the false green.
+- The page's judgment priority = **binary > config file**. When the config file is present but the binary is gone, the binary speaks (`B4`); when the binary is present but no config is written, it says "installed, model slots not configured" (pinned by the `10-cc-noconfig` fixture's e2e, with a different remedial sentence than "not installed").
+- The claude this probe really runs is a **stub** (version 9.9.9-probe is unmistakable), so the versions and paths in the evidence are the probe's own, not readings of this machine's real claude.
+- Leg B's model slots come from this machine's real `~/.claude/settings.json` (the isolated stack's daemon reads the real home), so `model-sources-b.json` shows the real slots — this is not a leak, the same face as `docs/verify/707`.
 
-## 文件
+## Files
 
-| 文件 | 内容 |
+| file | content |
 |---|---|
-| `01-installed-logged-in.png` | 腿 A header 卡截图（细字行 + 版本 + 路径） |
-| `02-binary-missing.png` | 腿 B header 卡截图（未安装 + 指引） |
-| `result.json` | 13 条 check 的逐条结果与 detail |
-| `daemon-a.log` / `daemon-b.log` | 两条腿的 daemon 输出（探测行在此） |
-| `model-sources-a.json` / `model-sources-b.json` | API 封套原文（bin/auth 二态对照） |
-| `page-a.txt` / `page-b.txt` | header 卡 innerText 原文 |
+| `01-installed-logged-in.png` | leg A header card screenshot (fine-print line + version + path) |
+| `02-binary-missing.png` | leg B header card screenshot (not installed + guidance) |
+| `result.json` | the 13 checks itemized with results and details |
+| `daemon-a.log` / `daemon-b.log` | the two legs' daemon output (the probe lines live here) |
+| `model-sources-a.json` / `model-sources-b.json` | the API envelope verbatim (the bin/auth two-state contrast) |
+| `page-a.txt` / `page-b.txt` | the header card's innerText verbatim |

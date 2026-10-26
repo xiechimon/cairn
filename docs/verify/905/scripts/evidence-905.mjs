@@ -9,7 +9,7 @@
 // a toolcall record with result, transcript deltas. On the before stack the
 // activity posts are rejected (old server has no 4th shape → 400) and the old
 // web ignores activity events — the row stays the reported black box
-// (处理中... + 本步：规划中) for the whole run. That rejection is recorded in
+// (`处理中...` + `本步：规划中`) for the whole run. That rejection is recorded in
 // result.json instead of being hidden.
 //
 //   usage: VERIFY_REPO_ROOT=<stack repo> EVIDENCE_TAG=before|after \

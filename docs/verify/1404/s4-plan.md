@@ -15,8 +15,8 @@ Sources read: `docs/spec/28` §3 (D1 to D4, D7) and §4 P3/P4; ADR 0021 (D3, D4,
 | Check runs | `:1263-1295` `githubCommitCheckRuns`: conditional GET `commits/{ref}/check-runs?per_page=100`, no paging (tail dropped, `:1253-1255`), malformed rows skipped silently (`:1284`), projects name/status/conclusion/output only. Caller `ci-loop.ts:947-955` reads by branch name `conversationBranch(cand.buildId)`. | No `head_sha`, `app.id`, `id`, `total_count`; no paging; reads by ref name. |
 | Combined status | none | Needed: `commits/{sha}/status` with `sha`, `statuses[]`, `total_count`. |
 | Required check list | none on main (a stale draft `githubRequiredChecks` exists only on the abandoned branch `claude/bootstrap-p2c`) | `GateInputs.checks.required` has no source. |
-| File presence at a SHA (raw 404) | none | Handed to S4 by readiness (round 3 `readiness.ts:422`, pinned by test "readiness 不判链接的文件在那个提交上是否已存在（raw 404）：交给 S4 外壳", round 3 test line 1161). |
-| Commit status write | none. Writes today: `githubCreateIssue` `:1200`, `githubUpdateIssueTitle` `:1217`, both through `writeJson` (`:1171-1195`, POST/PATCH only); header exhaustive-write rule `:13-16` ("唯二"). P2 segment 2b adds `PUT pulls/{n}/merge` as the third and rewrites the header to "只此三处". | The status POST becomes the fourth api.github.com write endpoint. |
+| File presence at a SHA (raw 404) | none | Handed to S4 by readiness (round 3 `readiness.ts:422`, pinned by test `readiness 不判链接的文件在那个提交上是否已存在（raw 404）：交给 S4 外壳`, round 3 test line 1161). |
+| Commit status write | none. Writes today: `githubCreateIssue` `:1200`, `githubUpdateIssueTitle` `:1217`, both through `writeJson` (`:1171-1195`, POST/PATCH only); header exhaustive-write rule `:13-16` (`唯二`). P2 segment 2b adds `PUT pulls/{n}/merge` as the third and rewrites the header to `只此三处`. | The status POST becomes the fourth api.github.com write endpoint. |
 | Failure classes | `GithubListFailure` (`:648-653`: timeout, network, rate-limited, status, malformed) with `getListPage` (`:696-728`); `GithubRateLimitedError` (`:420-438`) with reset and retry-after parsing in `intakeGet` (`:912-950`); `isRateLimited` / `isRateLimitedResponse` (`:399-415`); `nextPageUrl` (`:968-974`). | Reusable; the gate needs the rate-limit timing on reads. |
 | Gate source | `services/merge-gate/{digest,evidence-link,paths,readiness}.ts`; `compareFilesFromResponse` (`digest.ts:100`) already turns a compare body into `CompareFile[]`; `parseRawEvidenceLinks` (`evidence-link.ts:82`). Main's `GateInputs.compare` is still `{files, commits: string[]}` (`readiness.ts:96`); #1479 replaces it. | No I/O shell. |
 | Tables | S3 (#1469): `gate_digest`, `gate_round`, `gate_verdict`, `gate_state` (`db/schema.ts:806-913`). | `gate_state` has no "last status written" column. S4 does not need one (section 4.6). |
@@ -154,7 +154,7 @@ Any `rate-limited` failure stops the evaluation: the inputs not yet read are unr
 - New `GateInputs.evidence: { sha: string; path: string; present: boolean | null }[]` (required field, so every caller decides).
 - `evidence-link.ts` gains `qualifyingEvidenceLinks(body, {owner, repo, ticketRef}, compare)`: links pinned at a commit of `compare.commits` to a path the compare adds or changes (status not `removed`). Readiness switches to this helper, so the shell and readiness use one rule.
 - The shell probes qualifying links in body order, at most 5 distinct `(sha, directory)` pairs per evaluation, and stops at the first present file. Probe: `contents(dirname(path), sha)` (a directory listing returns metadata only, while a file read returns up to 1 MB of base64). Present = an entry with `type: 'file'`, exact `name` and exact `path`. 200 without the entry gives false, except when the listing has 1,000 entries (the documented directory cap, F9), which gives null. 404 gives false. Any other failure gives null. A present result is memoized per `(owner/repo, sha, path)` for the process lifetime (a commit's tree never changes); absent and unknown results are not memoized.
-- Readiness: `evidence-link-missing` unless some qualifying link has `present === true`; the detail says "not at the linked commit" or "presence unreadable". The test "readiness 不判链接的文件……交给 S4 外壳" is rewritten to the new input, with a true and a false leg.
+- Readiness: `evidence-link-missing` unless some qualifying link has `present === true`; the detail says "not at the linked commit" or "presence unreadable". The test `readiness 不判链接的文件……交给 S4 外壳` is rewritten to the new input, with a true and a false leg.
 
 ### 4.6 The `pacman/merge-gate` commit status
 
@@ -165,7 +165,7 @@ S4a ships the transport `githubCreateCommitStatus`. S4b ships, in `merge-gate/ga
 
 "Only when the value changes" is answered by GitHub itself: the combined status read at the head already returns the current `pacman/merge-gate` entry, so S4 needs no database column and the rule holds across server restarts. A value written by someone else (an agent with `gh`) differs from the gate's and is overwritten on the next evaluation.
 
-S7 owns: the scheduler call, the per-team rate limit (GitHub's secondary limit is 80 content-generating requests per minute and 500 per hour, and GitHub advises at least one second between mutative requests; proposed limit: serial, at least 2 s apart, at most 120 writes per team per hour, at most 20 per SHA tracked in memory, under GitHub's 1,000 per SHA and context), the handling of 403/404 (token user without push access: stop writing for that team and notify), and the integration test "`pacman/merge-gate` status 写入 head SHA 的集成测试（假 GitHub）" from #1404's acceptance list.
+S7 owns: the scheduler call, the per-team rate limit (GitHub's secondary limit is 80 content-generating requests per minute and 500 per hour, and GitHub advises at least one second between mutative requests; proposed limit: serial, at least 2 s apart, at most 120 writes per team per hour, at most 20 per SHA tracked in memory, under GitHub's 1,000 per SHA and context), the handling of 403/404 (token user without push access: stop writing for that team and notify), and the integration test `pacman/merge-gate status 写入 head SHA 的集成测试（假 GitHub）` from #1404's acceptance list.
 
 ### 4.7 Request budget per evaluation
 
@@ -325,8 +325,8 @@ General:
 53. A forged transport returns a response for another resource; it is caught wherever the response names itself (PR `number` and base repo, compare commits' own head, run `head_sha`, status `sha`). A wholly fabricated consistent response cannot be caught in the gate (open question 1).
 
 Ticket failure modes that S4 serves:
-- "判定在推送之后才落库": the compare reader is a separate export, `readCompareAt(port, baseSha, headSha)`, so S5a can compute the digest at a verdict's own head.
-- "compare 文件列表被截断": the shell never pages files, and passes `changed_files`. Readiness turns 300 files, or a mismatched count, into `compare-truncated`.
+- `判定在推送之后才落库`: the compare reader is a separate export, `readCompareAt(port, baseSha, headSha)`, so S5a can compute the digest at a verdict's own head.
+- `compare 文件列表被截断`: the shell never pages files, and passes `changed_files`. Readiness turns 300 files, or a mismatched count, into `compare-truncated`.
 
 ## 7. Files to touch
 

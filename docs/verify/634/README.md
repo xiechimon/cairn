@@ -22,7 +22,7 @@ static div — it needs the live stack.
 
 `result.json` carries the per-check ok list.
 
-## Follow-up (the「复制 | 完成 Ns ›」row)
+## Follow-up (the `复制 | 完成 Ns ›` row)
 
 Re-measured against the live reference on 2026-10-02: the footer copy is a
 real button (robot row copies the message markdown, the user-row icon pair

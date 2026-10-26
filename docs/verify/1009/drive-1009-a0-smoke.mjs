@@ -1,31 +1,45 @@
 #!/usr/bin/env node
-// verify probe — #1009 A0 原型（ADR 0013 壳形态反转：贴右竖板 → Multica 式
-// 悬浮窗）的位形 smoke + 交互契约钉（fixture 面；premortem 护栏 1 =「五路由
-// 位形 smoke：每路由一张窗开截图 + boundingBox 断言」）。
+// verify probe — configuration smoke + interaction-contract pins for the #1009
+// A0 prototype (ADR 0013 shell-shape inversion: right-docked vertical panel →
+// Multica-style floating window), fixture face; premortem guardrail 1 = "five-
+// route configuration smoke: one window-open screenshot per route + boundingBox
+// assertions".
 //
-// 跑法（fixture 栈先在跑）：
+// How to run (fixture stack must already be up):
 //   cd apps/web && pnpm exec vite build --mode fixture
 //   pnpm exec vite preview --host 127.0.0.1 --port ${E2E_PORT:-8403} --strictPort &
 //   E2E_PORT=8403 node docs/verify/1009/drive-1009-a0-smoke.mjs
 //
-// 失败方式先行清单（ADR 0013 premortem + A0 面枚举，每条一个断言组）：
-//  F1 挂载上提拆坏五壳：窗压侧栏 / 被壳裁切 / 落错包含块 → S2/S3 逐路由
-//     boundingBox（380×600 @ right/bottom 8，视口 1440×732）+ 侧栏不压断言
-//  F2 inert 常驻破契约：关闭后窗必须「在 DOM 但不可见不可交互」→ S4；
-//     Esc 永不关面板（D3，只收内层弹层）→ S5；⌘J 可开可关（#468）→ S5
-//  F3 状态保持：最小化保草稿（D6）→ S6；跨路由常驻不重挂（D6）→ S7
-//  F4 让位退役残留：窗开合前后内容列宽零变化（D1：覆盖层无让位）→ S8；
-//     detail RightPane 与窗共存（D7 反转互斥）→ S8e
-//  F5 fixture 确定性：scenario 捕获形窗开（111）几何同款 → S9；fixture 面
-//     永不写 pacman.chief-open（持久化是 live 面专属）→ S11
-//  F6 抑制路由长出新面：agent-detail / machine-authorize 零 FAB 零窗 → S10
-//  F7 关闭模型：Minimize 钮（Minus，无 X）是唯一钮面收起 → S4；设置视图
-//     内容交换承载不变（D9：board gear → swap，窗收起）→ S12
-//  F8 FAB 互斥与几何：窗开 FAB 不渲染（D4）→ S2；40px 正圆 @ 8px inset、
-//     与窗同角 → S1；detail 族 unreadOnly 门（#443 保留）→ S8e
-//  F9 z 律：窗/FAB 走 --z-floating 新 rung（15），活动层恒压过它（#688）→ S13
+// Failure-mode-first list (ADR 0013 premortem + A0 face enumeration, one
+// assertion group per line):
+//  F1 mount-lift breaks the five shells: window overlaps sidebar / clipped by a
+//     shell / lands in the wrong containing block → S2/S3 per-route
+//     boundingBox (380x600 @ right/bottom 8, viewport 1440x732) + no-sidebar-
+//     overlap assertion
+//  F2 resident inert breaks the contract: after close the window must be "in
+//     the DOM but invisible and inert" → S4; Escape never closes the panel
+//     (D3, collapses only inner popovers) → S5; ⌘J opens and closes (#468) → S5
+//  F3 state retention: minimize keeps the draft (D6) → S6; resident across
+//     routes without remounting (D6) → S7
+//  F4 yield-retirement residue: content column width unchanged across window
+//     open/close (D1: overlay yields nothing) → S8; detail RightPane coexists
+//     with the window (D7 inversion of mutual exclusion) → S8e
+//  F5 fixture determinism: scenario capture shape opens the window (111) with
+//     the same geometry → S9; the fixture face never writes
+//     pacman.chief-open (persistence is live-face-only) → S11
+//  F6 suppressed routes grow no new face: agent-detail / machine-authorize have
+//     zero FAB and zero window → S10
+//  F7 close model: the Minimize button (Minus, no X) is the only button-face
+//     collapse → S4; settings-view content swap keeps the carrier (D9: board
+//     gear → swap, window collapsed) → S12
+//  F8 FAB exclusion and geometry: no FAB rendered while the window is open
+//     (D4) → S2; 40px perfect circle @ 8px inset, same corner as the window →
+//     S1; detail-family unreadOnly gate (#443 retained) → S8e
+//  F9 z-order law: window/FAB ride the new --z-floating rung (15), the active
+//     layer always stacks above it (#688) → S13
 //
-// 证据落本目录：截图 + result.json（全部量测原值，人审面）。
+// Evidence lands in this directory: screenshots + result.json (all measured raw
+// values, human-review face).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -36,7 +50,7 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.E2E_PORT ?? '8403';
 const BASE = `http://127.0.0.1:${PORT}`;
 const VIEWPORT = { width: 1440, height: 732 };
-// ADR 0013 D2（Multica 原值）：窗 380×600 @ right/bottom 8；D4：FAB 40 @ 8。
+// ADR 0013 D2 (Multica original values): window 380x600 @ right/bottom 8; D4: FAB 40 @ 8.
 const WIN = { w: 380, h: 600, inset: 8 };
 const FAB = { size: 40, inset: 8 };
 
@@ -54,10 +68,12 @@ async function shot(page, file) {
   await page.screenshot({ path: join(SCRIPT_DIR, file) });
 }
 
-/** 模式闸门事实（api/mode.ts）：fixture 面 = URL 带 ?scenario=；裸 URL 在
- *  fixture build 的 preview 上同样是 live 面（API 打空）——D5 的开态持久化
- *  在 live 面生效（写 localStorage），所以裸 URL 段之间必须清存储，否则上一
- *  段开过的窗会在下一段加载时自动复开（这正是 S11 要正面钉的行为）。 */
+/** Mode-gate fact (api/mode.ts): the fixture face = a URL carrying ?scenario=;
+ *  a bare URL on the fixture build's preview is likewise the live face (the API
+ *  answers empty) — D5's open-state persistence takes effect on the live face
+ *  (writes localStorage), so storage must be cleared between bare-URL segments,
+ *  otherwise a window opened in the previous segment reopens automatically on
+ *  the next segment's load (exactly the behavior S11 pins head-on). */
 async function gotoClean(page, url) {
   await page
     .evaluate(() => {
@@ -80,8 +96,9 @@ async function openWindow(page) {
   await settleWindow(page);
 }
 
-/** 等窗真开且进场动画（fade+zoom 0.95→1，--dur-overlay 200ms）落定——
- *  boundingBox 含 transform，动画中途量会读到缩放值。 */
+/** Wait for the window to be truly open and the entry animation (fade+zoom
+ *  0.95→1, --dur-overlay 200ms) to settle — boundingBox includes the transform,
+ *  so measuring mid-animation reads the scaled value. */
 async function settleWindow(page) {
   await page.waitForFunction(() => {
     const el = document.querySelector('.chief-drawer');
@@ -96,7 +113,7 @@ async function main() {
   const ctx = await browser.newContext({ viewport: VIEWPORT, colorScheme: 'dark' });
   const page = await ctx.newPage();
 
-  // ---- S1 board FAB 几何（D4：40px 正圆，距内容区右/下各 8px）----
+  // ---- S1 board FAB geometry (D4: 40px perfect circle, 8px from the content area's right/bottom) ----
   await gotoClean(page, `${BASE}/app`);
   await fab(page).waitFor({ state: 'visible' });
   let box = await fabBox(page);
@@ -104,11 +121,11 @@ async function main() {
   check('S1', 'fab right inset 8', VIEWPORT.width - (box.x + box.width), FAB.inset);
   check('S1', 'fab bottom inset 8', VIEWPORT.height - (box.y + box.height), FAB.inset);
   const fabRadius = await fab(page).evaluate((el) => getComputedStyle(el).borderRadius);
-  // rounded-full 的计算值 = 50% 折算成超大 px（浏览器序列化形态），判「≥ 半宽即正圆」
+  // rounded-full computes to 50% serialized as a huge px value (browser serialization shape): >= half the width counts as a perfect circle
   check('S1', 'fab round (radius >= half size)', fabRadius, (r) => Number.parseFloat(r) >= FAB.size / 2);
   await shot(page, '01-board-fab-closed.png');
 
-  // ---- S2 窗开几何/皮肤（D2 Multica 原值）+ S2b FAB 互斥（D4）----
+  // ---- S2 window-open geometry/skin (D2 Multica original values) + S2b FAB exclusion (D4) ----
   await openWindow(page);
   box = await windowBox(page);
   check('S2', 'window 380x600', { w: box.width, h: box.height }, { w: WIN.w, h: WIN.h });
@@ -135,26 +152,27 @@ async function main() {
     (s) => s.includes('inset') && s.split(/,(?![^(]*\))/).length >= 3,
   );
   check('S2', 'window bg 不透明非玻璃（D2）', { bg: skin.bg, backdrop: skin.backdrop }, (v) => {
-    // rgb( 三段 = 不透明；rgba( 四段才看 alpha
+    // rgb( with three components = opaque; only rgba( with four components needs an alpha check
     const m = /^rgba?\(([^)]+)\)$/.exec(v.bg);
     if (m == null) return false;
     const parts = m[1].split(',').map((s) => Number.parseFloat(s.trim()));
     const opaque = parts.length === 3 || parts[3] === 1;
     return opaque && (v.backdrop === 'none' || v.backdrop === '');
   });
-  check('S2b', 'FAB hidden while window open（D4 互斥）', await fab(page).isVisible(), false);
+  check('S2b', 'FAB hidden while window open (D4 exclusion)', await fab(page).isVisible(), false);
 
-  // ---- S3 不压侧栏（D2 包含块 = 侧栏右侧内容区）----
+  // ---- S3 no sidebar overlap (D2 containing block = the content area right of the sidebar) ----
   const sidebar = await page.locator('.board-sidebar').boundingBox();
   check('S3', 'window never overlaps sidebar', box.x >= sidebar.x + sidebar.width, true);
   await shot(page, '02-board-window-open.png');
 
-  // ---- S13 z 律（#688：活动面恒压过常驻窗）----
-  // 载体注意：悬浮窗自己就是 Base UI Dialog（role=dialog 的 aside）——
-  // 新建任务 dialog 要用「非 .chief-drawer 的 role=dialog」定位。
+  // ---- S13 z-order law (#688: the active face always stacks above the resident window) ----
+  // Carrier note: the floating window is itself a Base UI Dialog (an aside with
+  // role=dialog) — locate the new-task dialog as "the role=dialog that is not
+  // .chief-drawer".
   const taskDialog = page.locator('[role="dialog"]:not(.chief-drawer)').first();
-  await page.evaluate(() => document.activeElement?.blur()); // C 是裸键：先离开 composer（输入态守卫律）
-  await page.keyboard.press('c'); // 新建任务 dialog（C 裸键，board 全局面）
+  await page.evaluate(() => document.activeElement?.blur()); // C is a bare key: leave the composer first (input-state guard law)
+  await page.keyboard.press('c'); // new-task dialog (C bare key, board-global)
   await taskDialog.waitFor({ state: 'visible' });
   const dialogZ = await taskDialog.evaluate((el) => {
     let node = el;
@@ -172,7 +190,7 @@ async function main() {
   await taskDialog.waitFor({ state: 'hidden' });
   check('S13b', 'window survives the dialog Esc（D3：Esc 只收它自己的层）', await win(page).isVisible(), true);
 
-  // ---- S4 最小化（D3/D6：Minus 钮、无 X；关 = 在 DOM 但 hidden/inert）----
+  // ---- S4 minimize (D3/D6: Minus button, no X; closed = in the DOM but hidden/inert) ----
   const minimize = win(page).getByRole('button', { name: '最小化' });
   check('S4', 'Minimize 钮在位（无 X：关闭 aria 钮不存在）', {
     minimize: await minimize.isVisible(),
@@ -188,18 +206,18 @@ async function main() {
   check('S4', 'FAB back after minimize（互斥反转）', await fab(page).isVisible(), true);
   await shot(page, '04-board-minimized.png');
 
-  // ---- S5 Esc 永不关（D3）+ ⌘J toggle（#468 保留）----
+  // ---- S5 Escape never closes (D3) + ⌘J toggle (#468 retained) ----
   await page.keyboard.press('Meta+j');
   await settleWindow(page);
   check('S5', '⌘J opens', await win(page).isVisible(), true);
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(400); // 退场动画窗（--dur-overlay 200ms）余量
+  await page.waitForTimeout(400); // headroom for the exit animation (--dur-overlay 200ms)
   check('S5', 'Escape never closes the window（D3）', await win(page).isVisible(), true);
   await page.keyboard.press('Meta+j');
   await win(page).waitFor({ state: 'hidden' });
-  check('S5', '⌘J toggles shut（最小化语义）', await fab(page).isVisible(), true);
+  check('S5', '⌘J toggles shut (minimize semantics)', await fab(page).isVisible(), true);
 
-  // ---- S6 草稿保持（D6：最小化不销毁）----
+  // ---- S6 draft retention (D6: minimize does not destroy) ----
   await openWindow(page);
   const composer = page.getByTestId('chief-composer-input');
   await composer.fill('draft-probe-a0');
@@ -208,14 +226,14 @@ async function main() {
   await openWindow(page);
   check('S6', 'draft survives minimize', await composer.inputValue(), 'draft-probe-a0');
 
-  // ---- S7 跨路由常驻（D6：路由切换不重挂，窗与草稿都还在）----
+  // ---- S7 resident across routes (D6: no remount on route switch, window and draft both survive) ----
   await page.getByRole('link', { name: '定时', exact: true }).first().click();
   await page.waitForURL('**/app/schedules**');
   check('S7', 'window still open after route switch', await win(page).isVisible(), true);
   check('S7', 'draft survives route switch', await composer.inputValue(), 'draft-probe-a0');
   await shot(page, '05-schedules-window-open.png');
 
-  // ---- S8 让位退役（D1：窗开合不改内容列宽）+ 四壳位形 ----
+  // ---- S8 yield retirement (D1: window open/close does not change the content column width) + four shell configs ----
   const shells = [
     { name: 'schedules', url: '/app/schedules?scenario=r3-93', col: '.page-main-col', shot: '06-schedules-shell.png' },
     { name: 'skills', url: '/app/resources/skills', col: '.res-main-col', shot: '07-skills-shell.png' },
@@ -234,7 +252,7 @@ async function main() {
     await shot(page, s.shot);
   }
 
-  // ---- S8b board 列宽（#1035 两态随让位退役 → 单态零变轨）----
+  // ---- S8b board column widths (#1035: the two states retire with yield retirement → single state, zero drift) ----
   await gotoClean(page, `${BASE}/app`);
   const scroller = page.getByTestId('board-scroller');
   const trackWidths = () =>
@@ -246,19 +264,19 @@ async function main() {
   const colsAfter = await trackWidths();
   check('S8b', 'board column tracks identical with window open (yield retired)', { colsBefore, colsAfter }, (v) => JSON.stringify(v.colsBefore) === JSON.stringify(v.colsAfter));
 
-  // ---- S8e detail：RightPane 与窗共存（D7 互斥反转）+ unreadOnly FAB（#443）----
+  // ---- S8e detail: RightPane coexists with the window (D7 inversion of mutual exclusion) + unreadOnly FAB (#443) ----
   await page.goto(`${BASE}/app/todo/16?scenario=detail-unread`, { waitUntil: 'networkidle' });
   await fab(page).waitFor({ state: 'visible' });
   const fabBadge = await page.locator('.fab-badge').textContent().catch(() => null);
-  check('S8e', 'detail FAB gated on unread, badge = 3（#443 保留）', fabBadge?.trim(), '3');
+  check('S8e', 'detail FAB gated on unread, badge = 3 (#443 retained)', fabBadge?.trim(), '3');
   await openWindow(page);
-  check('S8e', 'detail RightPane coexists with open window（互斥退役）', await page.locator('.detail-right').isVisible(), true);
+  check('S8e', 'detail RightPane coexists with open window (exclusion retired)', await page.locator('.detail-right').isVisible(), true);
   const dbox = await windowBox(page);
   check('S8e', 'detail window geometry 380x600@8', { w: dbox.width, h: dbox.height }, { w: 380, h: 600 });
   await shot(page, '09-detail-window-rightpane.png');
 
-  // ---- S9 fixture 捕获形（scenario view=drawer 零点击自开）----
-  // 111 = chiefReady（hero 示例面）；114 = chiefThread（线程消息流面）。
+  // ---- S9 fixture capture shape (scenario view=drawer opens itself with zero clicks) ----
+  // 111 = chiefReady (hero examples face); 114 = chiefThread (thread message-stream face).
   await page.goto(`${BASE}/app?scenario=111`, { waitUntil: 'networkidle' });
   await settleWindow(page);
   const fbox = await windowBox(page);
@@ -272,7 +290,7 @@ async function main() {
   check('S9', 'fixture 114 window geometry 380x600', { w: tbox.width, h: tbox.height }, { w: 380, h: 600 });
   await shot(page, '10b-fixture-114-thread.png');
 
-  // ---- S10 抑制路由（覆盖面 = 现状：agent-detail / machine-authorize 无 chief 面）----
+  // ---- S10 suppressed routes (coverage = current state: agent-detail / machine-authorize have no chief face) ----
   for (const url of ['/app/resources/agents/r3-builder?scenario=agent-detail', '/app/machines/authorize']) {
     await gotoClean(page, `${BASE}${url}`);
     await page.waitForTimeout(200);
@@ -280,8 +298,8 @@ async function main() {
   }
   await shot(page, '11-agent-detail-suppressed.png');
 
-  // ---- S11 开态持久化双面语义（D5 live 面持久化 + 默认关；F5 fixture 面零读写）----
-  // live 面（preview 上的裸 URL 即 live 模式，API 打空——mode.ts 闸门事实）：
+  // ---- S11 open-state persistence, two-face semantics (D5 live face persists + default closed; F5 fixture face zero read/write) ----
+  // Live face (a bare URL on preview is live mode, the API answers empty — the mode.ts gate fact):
   await gotoClean(page, `${BASE}/app`);
   check('S11', 'live face default = closed（never pops uninvited）', {
     fab: await fab(page).isVisible(),
@@ -292,11 +310,11 @@ async function main() {
   await shot(page, '13-live-window-open.png');
   await page.goto(`${BASE}/app`, { waitUntil: 'networkidle' });
   await settleWindow(page);
-  check('S11', 'reload restores the persisted open state（D5，0004 D9 反转）', await win(page).isVisible(), true);
+  check('S11', 'reload restores the persisted open state (D5, 0004 D9 inversion)', await win(page).isVisible(), true);
   await win(page).getByRole('button', { name: '最小化' }).click();
   await win(page).waitFor({ state: 'hidden' });
   check('S11', 'minimize writes pacman.chief-open=0', await storedOpen(page), '0');
-  // fixture 面（?scenario=）零读写——采集确定性：
+  // Fixture face (?scenario=) zero read/write — collection determinism:
   await page.evaluate(() => localStorage.removeItem('pacman.chief-open'));
   await page.goto(`${BASE}/app?scenario=111`, { waitUntil: 'networkidle' });
   await settleWindow(page);
@@ -305,14 +323,14 @@ async function main() {
   await page.waitForTimeout(300);
   check('S11', 'fixture face writes nothing', await storedOpen(page), null);
 
-  // ---- S12 board gear → 设置视图内容交换（D9 承载不变）----
+  // ---- S12 board gear → settings-view content swap (D9 carrier unchanged) ----
   await page.goto(`${BASE}/app?scenario=111`, { waitUntil: 'networkidle' });
   await settleWindow(page);
   await win(page).getByRole('button', { name: '总管设置' }).click();
   await page.getByRole('heading', { name: '总管设置' }).waitFor({ state: 'visible' });
   check('S12', 'gear swaps board content to settings view', await page.getByRole('heading', { name: '总管设置' }).isVisible(), true);
-  await win(page).waitFor({ state: 'hidden' }); // 退场动画（--dur-overlay）播完才落 hidden
-  check('S12', 'settings swap closes the window（三态单值）', await win(page).isVisible(), false);
+  await win(page).waitFor({ state: 'hidden' }); // wait for the exit animation (--dur-overlay) to finish before hidden settles
+  check('S12', 'settings swap closes the window (three states, one value)', await win(page).isVisible(), false);
   await shot(page, '12-board-settings-swap.png');
 
   await browser.close();

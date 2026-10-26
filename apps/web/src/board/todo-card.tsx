@@ -236,7 +236,7 @@ export function TodoCard({
             <Button
               variant="ghost"
               size="icon-xs"
-              className="todo-card-branch relative z-10 size-5 text-content-dim"
+              className="todo-card-branch relative z-10 size-5 text-content-dim after:absolute after:-inset-0.5"
               aria-label={t('分支与 PR')}
               onClick={() => onBranch(todo)}
             >

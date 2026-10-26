@@ -1,3 +1,4 @@
+```
 ### 1.5 组件件面实测（真实 shadcn 件消费多槽，量渲染对）
 
 #### 暗模 (dark)
@@ -253,3 +254,5 @@
 | `--danger` | 不变 | `#9e2c49` | `#9e2c49` | `--danger on --background` | 6.43:1 | 3 | PASS |
 | `--card-border` | 不变 | `#eae4e0` | `#eae4e0` | `--card-border on --card` | 1.06:1 | — | report-only |
 
+
+```

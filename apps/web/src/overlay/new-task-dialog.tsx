@@ -19,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, ChevronDown, Grid2x2, Paperclip, X } from '../icons/index.js';
-import { isEditableTarget, useChordHotkey, useProjectCycleHotkey } from '../overlays/hotkeys.js';
+import { isEditableTarget, useChordHotkey, useProjectCycleHotkey } from '../overlay/hotkeys.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import {
   createPastedNameCounter,
@@ -525,7 +525,7 @@ export function NewTaskDialog({
                 {t('保存并开始')}
                 <Kbd
                   aria-hidden="true"
-                  className="h-4 min-w-0 rounded-sm bg-primary-foreground/15 px-1 text-caption font-normal text-primary-foreground/80"
+                  className="h-4 min-w-0 rounded-sm bg-current/10 px-1 text-caption font-normal text-current"
                 >
                   {START_SHORTCUT_LABEL}
                 </Kbd>

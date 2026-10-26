@@ -8,7 +8,7 @@ Code-review follow-ups use the same function:
 
 - Closing replaces a pending stop-and-done reservation (#1247) for the build. Without that, the stop report would rewrite the closed card to done.
 - A card reopened before the stop report arrives keeps its reopened phase (the `keep` reservation). Before, the gate fallback overwrote it.
-- A raw `PATCH` from queued / planning / building to todo stops the active step too. #1447 moved queued into 执行中, so `canBoardDrop` now lets a raw PATCH move it to 待开始, as it already did for planning / building (the web uses `/reset` for that drop). queued → done is left as it was: #1247 pins that a raw PATCH done keeps the pending step (`persona-split-verify.test.ts`, "manual done leaves the pending step running"), and stop-and-done is the entry point that stops.
+- A raw `PATCH` from queued / planning / building to todo stops the active step too. #1447 moved queued into `执行中`, so `canBoardDrop` now lets a raw PATCH move it to `待开始`, as it already did for planning / building (the web uses `/reset` for that drop). queued → done is left as it was: #1247 pins that a raw PATCH done keeps the pending step (`persona-split-verify.test.ts`, "manual done leaves the pending step running"), and stop-and-done is the entry point that stops.
 
 ## Server test: `apps/server/test/close-stops-active-steps.test.ts`
 

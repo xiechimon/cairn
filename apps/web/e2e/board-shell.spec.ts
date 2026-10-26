@@ -122,3 +122,20 @@ test('the phone chief launcher clears the new-task bar on the board and sits in 
   const elsewhere = await page.locator('.chief-fab').boundingBox();
   expect(844 - (elsewhere!.y + elsewhere!.height)).toBeLessThan(16);
 });
+
+test('needs-you strip shares its left and right edges with the new-task bar', async ({ page }) => {
+  await page.goto('/app?scenario=01');
+  const edges = await page.evaluate(() => {
+    const strip = document.querySelector('[data-testid="needs-you-strip"]') as HTMLElement;
+    const bar = document.querySelector('[data-testid="board-new-task-bar"]') as HTMLElement;
+    const s = strip.getBoundingClientRect();
+    const cs = getComputedStyle(strip);
+    const b = bar.getBoundingClientRect();
+    return {
+      left: s.left + Number.parseFloat(cs.paddingLeft) - b.left,
+      right: b.right - (s.right - Number.parseFloat(cs.paddingRight)),
+    };
+  });
+  expect(Math.abs(edges.left)).toBeLessThanOrEqual(1);
+  expect(Math.abs(edges.right)).toBeLessThanOrEqual(1);
+});

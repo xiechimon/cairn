@@ -1,124 +1,124 @@
-# #1012 sealed 封版证据（#980 地图终点票）
+# #1012 sealed freeze evidence (#980 map terminal ticket)
 
-封版树 = 本 PR 分支（基线 main `e87186d3`，开工时与 origin/main 逐 sha 相同）。
-本票是核账面不是施工面：树内改动仅三处注记（`ci.yml` 两条闸注释、
-`ui-debt-gate.mjs` 头注释）+ 本证据目录，零行为改动。
+The sealed tree = this PR branch (baseline main `e87186d3`, sha-identical to origin/main at kickoff).
+This ticket is the audit ledger, not the build face: the tree changes only three annotation spots (`ci.yml` two gate comments,
+the `ui-debt-gate.mjs` header comment) + this evidence directory, zero behavior change.
 
-## ⚠️ 封版状态：provisional（协调者指令，2026-10-09）
+## ⚠️ Freeze state: provisional (coordinator instruction, 2026-10-09)
 
-- **#1011（#883 model picker 再评）仍 OPEN，判定由并行车道 t-0261 测量中。**
-  本票「子票全闭」结论**待 #1011 关闭后补**——本目录任何读数都不声称子票已全闭。
-- **合并闸：#1011 关闭之前本 PR 不合并**（合并权在协调者）。
-- **探针底片（`probe-sealed/`）先留档不定终态**：若 #1011 判定为
-  「未自解 → 重切修复票」，修复落地会改渲染面，底片需在其后重切；
-  是否重跑由协调者裁决。若判定为「自解」（零码改动），本底片即成终态。
+- **#1011 (#883 model picker re-review) is still OPEN, its verdict being measured by the parallel lane t-0261.**
+  This ticket's "all subtickets closed" conclusion is **backfilled after #1011 closes** — no reading in this directory claims all subtickets are closed.
+- **Merge gate: this PR does not merge before #1011 closes** (the merge right is the coordinator's).
+- **The probe baseline (`probe-sealed/`) is archived first, not finalized**: if #1011 is judged
+  "not self-resolved → re-cut a fix ticket", the fix landing changes the render face and the baseline must be re-cut after that;
+  whether to rerun is the coordinator's call. If judged "self-resolved" (zero code change), this baseline becomes final.
 
-## 目录
+## Directory
 
-| 路径 | 内容 |
+| Path | Content |
 | --- | --- |
-| `audit-sealed.sh` / `audit-sealed.txt` | 树内核账可复跑脚本（`bash docs/verify/1012/audit-sealed.sh`，rc=0 全过）+ 本次输出：五闸 PASS、账本终数、债基线地板、正典注记、闸裁决落 CI、手写壳退役面 |
-| `e2e-full.log` | 全量 e2e 封版复跑原始日志：**862 passed / 0 failed（5.3m）**，E2E_PORT 8399（开跑前 lsof 核过无占用），树 `e87186d3` |
-| `probe-sealed/` | **新底片（provisional）** = run-4 全量落档（`probe-comparison.md` + `probe-dump.json` + `probe-records.ndjson` + `probe-run.log`）——取代 `docs/verify/953/probe-sealed/` 成为后续三方 diff 基准（基准是约定不是代码指针：old-baseline 列取自 spec 内联期望值，换底片零代码改动） |
-| `flake-attribution/` | 四轮探针运行的全部非绿读数归因档案（见下「运行账」） |
-| `gates.txt` | 五闸单轮全量输出（registry / debt / drift / consumer-shape / dead-class，全 PASS rc=0） |
+| `audit-sealed.sh` / `audit-sealed.txt` | in-tree audit rerun script (`bash docs/verify/1012/audit-sealed.sh`, rc=0 all pass) + this run's output: five gates PASS, ledger final counts, debt baseline floor, canonical annotations, gate verdicts landed in CI, handwritten shell retired face |
+| `e2e-full.log` | full e2e freeze rerun raw log: **862 passed / 0 failed (5.3m)**, E2E_PORT 8399 (lsof-verified unoccupied before start), tree `e87186d3` |
+| `probe-sealed/` | **the new baseline (provisional)** = run-4 full archive (`probe-comparison.md` + `probe-dump.json` + `probe-records.ndjson` + `probe-run.log`) — replaces `docs/verify/953/probe-sealed/` as the subsequent three-way diff baseline (the baseline is a convention, not a code pointer: the old-baseline column is taken from the spec's inline expected values, swapping the baseline is zero code change) |
+| `flake-attribution/` | the four-round probe runs' full non-green reading attribution archive (see the "run ledger" below) |
+| `gates.txt` | the five-gates single-round full output (registry / debt / drift / consumer-shape / dead-class, all PASS rc=0) |
 
-## 票面五项对账
+## Ticket five-item reconciliation
 
-### 1. 全量 e2e + 探针封版
+### 1. Full e2e + probe freeze
 
-**全量 e2e 本地一次全绿**：862/862（5.3m，`e2e-full.log`），与波 1 收口 862/862 同口径。
+**Full e2e green in one local pass**: 862/862 (5.3m, `e2e-full.log`), the same figure as the wave-1 close-out 862/862.
 
-**探针封版 = run-4**（port 8400，树 `e87186d3`）：visual **894 行 — KEPT 894 / DRIFT 0 /
-VIOLATION 0 / NOT-RUN 0**——底片只载 canonical 值，零 flake 值混入。tests 账面 861/1，
-唯一红 = `provider-oauth.spec.ts:99`（`page.waitForLoadState` 30s 超时，负载 flake 签名），
-该 spec 不贡献 visual 行（NOT-RUN 0 可证覆盖面完整），同树隔离重跑 **7/7 绿**
-（`flake-attribution/rerun-provider-oauth.log`）。
+**The probe freeze = run-4** (port 8400, tree `e87186d3`): visual **894 rows — KEPT 894 / DRIFT 0 /
+VIOLATION 0 / NOT-RUN 0** — the baseline only carries canonical values, zero flake values mixed in. tests ledger 861/1,
+the only red = `provider-oauth.spec.ts:99` (`page.waitForLoadState` 30s timeout, load-flake signature),
+that spec contributes no visual rows (NOT-RUN 0 proves full coverage), same-tree isolated rerun **7/7 green**
+(`flake-attribution/rerun-provider-oauth.log`).
 
-四轮运行账（同一棵树，全部归因档案在 `flake-attribution/`）：
+Four-round run ledger (same tree, all attribution archives in `flake-attribution/`):
 
-| 轮 | port | tests | visual rows | 处置 |
+| Round | port | tests | visual rows | Disposition |
 | --- | --- | --- | --- | --- |
-| run-1 | 8397 | 861/1（page-scroll 5s 可见超时） | 891：KEPT 891 / 0 DRIFT / 0 VIOLATION / 0 NOT-RUN | 红已归因 flake（隔离重跑 5/5 绿 ×2）；产物被 run-2 覆写，仅存日志 + 汇总头 |
-| run-2 | 8400 | 856/6（4× 30s 超时 + board-dnd 帧采样 + fs-pick 计数） | 894：892 KEPT / **1 DRIFT** | **作废**——被本线程自己的并发工作污染（spec:parse 的 tsc + playwright --list 与探针并跑），时长膨胀 7.7m→12.7m；产物存 `run2-contended/` 留归因 |
-| run-3 | 8400 | 861/1（board-dnd:844 帧采样 t=8ms） | 894：893 KEPT / **1 DRIFT** | DRIFT 行 = 同一 board-dnd 断言，**harness 竞态非视觉漂移**（分析见下）；日志存 `run3/` |
-| **run-4** | 8400 | 861/1（provider-oauth 负载超时，隔离 7/7 绿） | **894：KEPT 894 / 0 / 0 / 0** | **入档为新底片** |
+| run-1 | 8397 | 861/1 (page-scroll 5s visible timeout) | 891: KEPT 891 / 0 DRIFT / 0 VIOLATION / 0 NOT-RUN | the red attributed to flake (isolated rerun 5/5 green ×2); artifacts overwritten by run-2, only the log + summary header survive |
+| run-2 | 8400 | 856/6 (4× 30s timeout + board-dnd frame sampling + fs-pick count) | 894: 892 KEPT / **1 DRIFT** | **voided** — polluted by this thread's own concurrent work (spec:parse's tsc + playwright --list ran alongside the probe), duration inflated 7.7m→12.7m; artifacts kept in `run2-contended/` for attribution |
+| run-3 | 8400 | 861/1 (board-dnd:844 frame sampling t=8ms) | 894: 893 KEPT / **1 DRIFT** | the DRIFT row = the same board-dnd assertion, **harness race, not visual drift** (analysis below); the log kept in `run3/` |
+| **run-4** | 8400 | 861/1 (provider-oauth load timeout, isolated 7/7 green) | **894: KEPT 894 / 0 / 0 / 0** | **archived as the new baseline** |
 
-**board-dnd:844 竞态分析（run-2/run-3 的唯一 DRIFT 源）**：该测试在 `mouse.up()` 之前
-就把 rAF 帧采样器种进页面（`t0` = evaluate 时刻）。仪表化（probe preload 记录每次
-evaluate）拉长 Playwright 客户端回程后，首个采样帧可以落在 mouse.up 派发**之前**——
-t=8ms 的 `col:todo` 帧是「提交尚未发生」的前提交态，不是 #398 律要抓的「提交后闪回源列」。
-判据：同树无仪表化全量 e2e 绿（862/0）、run-1 仪表化下也绿、失败帧恒为首帧（t≤11ms）。
-产品面无回归。**跟进建议（归协调者裁决，不在本核账票夹带）**：给该 spec 的采样器加
-「丢弃 mouse-up 派发前的帧」或改为 up 后种采样器；同族先例 = #398（同 spec 的
-高负载 flake 票）。
+**board-dnd:844 race analysis (the sole DRIFT source in run-2/run-3)**: the test seeds the rAF frame sampler into the page before `mouse.up()`
+(`t0` = the evaluate moment). After instrumentation (the probe preload records every
+evaluate) lengthens the Playwright client round-trip, the first sampled frame can land **before** mouse.up dispatches —
+the t=8ms `col:todo` frame is the pre-commit "commit not yet happened" state, not the "post-commit flash-back to the source column" that the #398 rule catches.
+Criteria: the same-tree non-instrumented full e2e green (862/0), run-1 green under instrumentation too, the failing frame is always the first frame (t≤11ms).
+No product-face regression. **Follow-up suggestion (the coordinator's call, not smuggled into this audit ticket)**: give that spec's sampler a
+"drop the frame before mouse-up dispatch" guard or seed the sampler after up; the same-family precedent = #398 (the same spec's
+high-load flake ticket).
 
-### 2. hash 账本终审（#989 闸面）
+### 2. Hash ledger final review (#989 gate face)
 
-`ui-registry-gate` PASS，**对账零漂移**（in-tree comparison，非刷新——本票未跑
-`ui-registry-refresh.mjs`，账本零改动）：
+`ui-registry-gate` PASS, **reconciliation zero drift** (in-tree comparison, not refresh — this ticket does not run
+`ui-registry-refresh.mjs`, ledger zero change):
 
-- **终数 = 33 文件 = 26 registry（19 pristine / 7 registered deviations）+ 7 adapters**；
-  vendored 快照 shadcn@4.21.3（2026-10-08 fetch）；账本冻结自 `a0659279`。
-- adapters 七件（#983 判决的零皮肤适配层）：`alert-dialog-shell` `dialog-shell` `panel`
-  `seeded-avatar` `status-chip` `tag-chip` `toaster`。
-- **口径注记**：任务书引「30 条 = 14 pristine / 7 deviated / 9 adapters」是 #1003 刷新时点账；
-  波 1 / 波 2 各票按 #989 纪律在同 PR 重冻账本（select 退役入 pristine、chat 原语与
-  tooltip 等入册、手写壳退役出册），封版时点权威账 = 上述 33 文件终数。
+- **Final count = 33 files = 26 registry (19 pristine / 7 registered deviations) + 7 adapters**;
+  vendored snapshot shadcn@4.21.3 (fetched 2026-10-08); the ledger frozen from `a0659279`.
+- The seven adapters (the #983-verdict zero-skin adaptation layer): `alert-dialog-shell` `dialog-shell` `panel`
+  `seeded-avatar` `status-chip` `tag-chip` `toaster`.
+- **Criterion annotation**: the task book's "30 items = 14 pristine / 7 deviated / 9 adapters" is the #1003 refresh-time ledger;
+  the wave-1 / wave-2 tickets re-froze the ledger in their own PRs per the #989 discipline (select retired into pristine, chat primitives and
+  tooltip etc. registered, the handwritten shell retired out of the ledger); the freeze-time authoritative ledger = the 33-file final count above.
 
-### 3. #980 关图核账
+### 3. #980 closure map audit
 
-- **Decisions so far 每关票一行**：核账发现 7 张已关票缺行（#1004–#1008、#1010、#1013），
-  已补齐并 `gh api PATCH` 写入 #980 body，回读逐字节比对 **MATCH**。
-  补行后 21 张已关子票全部有行（#981–#991、#1002–#1010、#1013）。
-- **子票全闭**：23 张子票，21 张 CLOSED。**待闭 2 张 = #1011（t-0261 判定中）+
-  #1012（本票，随本 PR 合并关闭）**。#1011 关闭前本项不成立、也不声称成立。
-- **Not yet specified 为空**：✓（正文「（无——…）」，#991 毕业后纯执行期）。
-- **Out of scope 核对**：✓。逐 PR 文件面扫描 14 张波次 PR
-  （#1021/#1045/#1057–#1062/#1066/#1069/#1072/#1075/#1088/#1090）：
-  改动面 = apps/web + docs + scripts + .github + 验证工具（verify-pacman skill scripts），
-  外加三处已授权例外——`biome.json`+`pnpm-lock.yaml`（#1003 依赖授权，
-  PACMAN_ALLOW_LOCKFILE_CHANGE 过闸）、`integration/test/m5-web-e2e.test.ts`
-  （F-R21 段序 pin 的测试基建面，#1003 票内）、`.claude/skills/verify-pacman/`（验证工具）。
-  **零 apps/server / apps/daemon / packages 语义改动**——后端 out-of-scope 声明成立；
-  动效只消费不重设计（ADR 0009 面）✓；Base UI 保持（registry 账本可证）✓；
-  composer 未组件化 ✓；todos.dev 像素对拍未复活（parity/ 仍不存在）✓。
+- **Decisions so far, one row per closed ticket**: the audit found 7 closed tickets missing rows (#1004–#1008, #1010, #1013),
+  backfilled and written to the #980 body via `gh api PATCH`, read back byte-for-byte **MATCH**.
+  After backfill, all 21 closed subtickets have rows (#981–#991, #1002–#1010, #1013).
+- **All subtickets closed**: 23 subtickets, 21 CLOSED. **2 pending = #1011 (t-0261 judging) +
+  #1012 (this ticket, closes with this PR's merge)**. Before #1011 closes this item does not hold, and is not claimed to hold.
+- **Not yet specified empty**: ✓ (the body reads "(none —…)", after #991 graduates, a pure execution period).
+- **Out of scope check**: ✓. Per-PR file-face scan of the 14 wave PRs
+  (#1021/#1045/#1057–#1062/#1066/#1069/#1072/#1075/#1088/#1090):
+  the change face = apps/web + docs + scripts + .github + verification tooling (verify-pacman skill scripts),
+  plus three authorized exceptions — `biome.json`+`pnpm-lock.yaml` (#1003 dependency authorization,
+  PACMAN_ALLOW_LOCKFILE_CHANGE passed the gate), `integration/test/m5-web-e2e.test.ts`
+  (the F-R21 sequence pin's test-infrastructure face, inside the #1003 ticket), `.claude/skills/verify-pacman/` (verification tooling).
+  **Zero apps/server / apps/daemon / packages semantic change** — the backend out-of-scope declaration holds;
+  motion consumed, not redesigned (ADR 0009 face) ✓; Base UI kept (provable by the registry ledger) ✓;
+  the composer not componentized ✓; the todos.dev pixel contrast shot not resurrected (parity/ still absent) ✓.
 
-### 4. 历史正典处置核账
+### 4. Historical canonical disposition audit
 
-- **#909 色板退位存档句**：✓——#909 内 2026-10-07「推翻记录」评论在档
-  （C · 纸兰退位为历史参考、E · 暖灰玫定版、C 资产正本地位不变条款齐）。
-- **spec/22 superseded 标注**：✓——头部 superseded-in-part（ADR 0012 / #980）四面①–④在档。
-- **余册标注（#1013 入账核对）**：✓——ADR 0009 头部 superseded-in-part（D3②，#991 Q9）+
-  修订条目；ADR 0012 修订节（Q9 F8 指针 + Q10 品牌槽位闭合）；docs/spec/06
-  superseded-in-part（parity harness 面）；spec/11 叠加注（承载形态换锚）；spec/18
-  余册核账封口（无失效面）。全部经 `audit-sealed.sh` 机器复核（ALL CHECKS PASS）。
-- **#851 闸去留判定**：**保留，转为永久回归闸**（裁决落 `ci.yml` 两闸注释 +
-  `ui-debt-gate.mjs` 头注，纯注记零行为改动，改后 debt/drift 两闸复跑 PASS）。理由：
-  1. **覆盖面正交，退役即失守**：#989 registry 闸的面到 `components/ui` 边界为止；
-     consumer-shape 闸判几何盒行；dead-class 闸判类 token。debt 闸的 D1（per-face CSS
-     零新增）与 D2（裸 button/input/select/textarea 总量）没有第二道闸承载；drift 闸的
-     G1–G4/G6（.btn 选择子、hex 字面量、chip 异地重定义、deliberate-native 标记、
-     品牌墨台账）同样唯一。G5 与 registry 账本互补——账本钉文件 hash，看不见
-     registered-deviated 文件里的颜色内容。
-  2. **基线已在地板，棘轮纯防回潮**：0 per-face 文件、3 裸控件（全部 deliberate-native
-     豁免的隐藏 file 触发器，#953 终账裁决）——「非 registry 新增为零」（验收模板 v3 ⑦）
-     的机械载体就是这两道闸；退役零收益、失守整面。
-  3. **保留成本为零**：纯源码扫描、零依赖、秒级，D3/S5 双棘轮已防「分支内重冻抬天花板」。
+- **The #909 palette abdication archival sentence**: ✓ — the #909 2026-10-07 "overturn record" comment is on file
+  (C · paper-blue abdicated to historical reference, E · warm-gray-rose finalized, the C asset original status-unchanged clauses all present).
+- **spec/22 superseded annotation**: ✓ — the header superseded-in-part (ADR 0012 / #980) four faces ①–④ on file.
+- **Remaining-volume annotation (#1013 ledger check)**: ✓ — ADR 0009 header superseded-in-part (D3②, #991 Q9) +
+  revision entry; ADR 0012 revision section (Q9 F8 pointer + Q10 brand-slot closure); docs/spec/06
+  superseded-in-part (the parity harness face); spec/11 overlay annotation (host-form anchor swap); spec/18
+  remaining-volume audit closure (no invalidated face). All machine-rechecked by `audit-sealed.sh` (ALL CHECKS PASS).
+- **The #851 gate keep-or-drop verdict**: **kept, turned into a permanent regression gate** (the verdict lands in the `ci.yml` two gate comments +
+  the `ui-debt-gate.mjs` header note, pure annotation zero behavior change; after the change the debt/drift two gates rerun PASS). Reasons:
+  1. **Coverage orthogonal, retiring loses the face**: the #989 registry gate's face stops at the `components/ui` boundary;
+     the consumer-shape gate judges geometry box rows; the dead-class gate judges class tokens. debt's D1 (per-face CSS
+     zero-add) and D2 (the bare button/input/select/textarea count) have no second gate carrying them; drift's
+     G1–G4/G6 (.btn selector, hex literals, chip re-definition elsewhere, deliberate-native marker,
+     brand-ink ledger) are likewise unique. G5 complements the registry ledger — the ledger pins file hashes and cannot see
+     the color content inside registered-deviated files.
+  2. **Baseline already at the floor, the ratchet purely prevents backsliding**: 0 per-face files, 3 bare controls (all deliberate-native-
+     exempted hidden file triggers, the #953 final-ledger verdict) — "zero non-registry additions" (acceptance template v3 ⑦)'s
+     mechanical carrier is exactly these two gates; retiring has zero benefit, losing them loses the whole face.
+  3. **Keeping costs zero**: pure source scan, zero dependencies, sub-second, the D3/S5 dual ratchets already prevent "re-freeze raising the ceiling in-branch".
 
-### 5. 证据归档 + 关票口径
+### 5. Evidence archiving + closing criterion
 
-- 本目录即归档；PR body 引 raw 永久链。
-- 本 PR commit message 带 `closes #1012`；**#980 由用户在合并后关闭**（地图关闭是用户仪式），
-  本 PR 不携带 #980 尾标。#1011 不由本票处置。
+- This directory is the archive; the PR body cites raw permanent links.
+- This PR's commit message carries `closes #1012`; **#980 is closed by the user after the merge** (closing the map is the user's ritual),
+  this PR carries no #980 trailing tag. #1011 is not disposed of by this ticket.
 
-## 全量运行账（封版复跑汇总）
+## Full run ledger (freeze rerun summary)
 
-| 运行 | 结果 | 证据 |
+| Run | Result | Evidence |
 | --- | --- | --- |
-| e2e 全量（8399） | **862/862（5.3m）** | `e2e-full.log` |
-| probe run-4（8400，入档底片） | visual **894 KEPT / 0 DRIFT / 0 VIOLATION / 0 NOT-RUN**；tests 861/1（provider-oauth 负载 flake，隔离 7/7 绿） | `probe-sealed/` + `flake-attribution/rerun-provider-oauth.log` |
-| probe run-1/2/3 | 891 全 KEPT（run-1）；run-2 作废（自污染）；run-3 = board-dnd harness 竞态（归因见上） | `flake-attribution/` |
-| 五闸 | 全 PASS rc=0 | `gates.txt` |
-| audit-sealed.sh | ALL CHECKS PASS（rc=0） | `audit-sealed.txt` |
-| 本地三闸 | lint 0 error / typecheck 五包绿 / spec:parse PASS（862 tests / 112 files） | 会话记录（run-2 前跑完） |
+| e2e full (8399) | **862/862 (5.3m)** | `e2e-full.log` |
+| probe run-4 (8400, archived baseline) | visual **894 KEPT / 0 DRIFT / 0 VIOLATION / 0 NOT-RUN**; tests 861/1 (provider-oauth load flake, isolated 7/7 green) | `probe-sealed/` + `flake-attribution/rerun-provider-oauth.log` |
+| probe run-1/2/3 | 891 all KEPT (run-1); run-2 voided (self-pollution); run-3 = board-dnd harness race (attribution above) | `flake-attribution/` |
+| the five gates | all PASS rc=0 | `gates.txt` |
+| audit-sealed.sh | ALL CHECKS PASS (rc=0) | `audit-sealed.txt` |
+| local three gates | lint 0 error / typecheck five packages green / spec:parse PASS (862 tests / 112 files) | session record (finished before run-2) |

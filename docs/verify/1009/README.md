@@ -1,399 +1,398 @@
-# #1009 A0 证据（ADR 0013 壳形态反转：贴右竖板 → Multica 式悬浮窗）
+# #1009 A0 evidence (ADR 0013 shell-form reversal: docked right panel → Multica-style floating window)
 
-> 阶段：**实审通过（2026-10-08 用户「全按推荐走」）→ 施工段**。原型证据（§1–§5）+
-> 施工证据（§6–§8：载体重钉 ⑨、探针重钉清零、better-colors 增量实测）同册归档。
-> 复跑配方见各节命令；栈纪律 = verify-pacman SKILL.md（隔离 live 栈，绝不碰 8787/5173）。
+> Phase: **review passed (2026-10-08, user "go with all recommendations") → build phase**. Prototype evidence (§1–§5) +
+> build evidence (§6–§8: carrier repin ⑨, probe repin zeroed, better-colors incremental measurement) archived in one volume.
+> Rerun recipes are the per-section commands; stack discipline = verify-pacman SKILL.md (isolated live stack, never touch 8787/5173).
 
-## 0. 结论速览
+## 0. Conclusion summary
 
-| 面 | 结果 | 产物 |
+| Face | Result | Artifacts |
 |---|---|---|
-| fixture 位形 smoke（五路由 + 交互契约，50 checks） | **50/50 PASS** | `drive-1009-a0-smoke.mjs` + `result-a0-fixture-smoke.json` + 截图 01–13 |
-| live 栈取证（真数据，24 checks） | **24/24 PASS** | `drive-1009-a0-live.mjs`（skill scripts/ 内）+ `result-a0-live.json` + `live-*.png` |
-| chief 域 + 邻接 e2e（17 spec / 179 用例）原型态 | 136 绿 / 43 红（红 = 重钉账，逐条分类见 §3） | `e2e-domain-status.txt` + `e2e-failed-list.txt` |
-| 同域 e2e 重钉后 | **178 绿 / 0 红**（43 红全数重钉，见 §6） | 重跑命令同 §1 |
-| 视觉探针三方 diff（开工侦察 vs 原型后 vs #953 封版） | KEPT 52 / DRIFT 5 / NOT-RUN 33 / VIOLATION 0 | `probe-pre-a0/` + `probe-after-a0/` |
-| 视觉探针重钉后（验收模板 v3 第 2 项） | **KEPT 109 / DRIFT 0 / NOT-RUN 0 / VIOLATION 0**（91 用例全绿） | `probe-repinned/` |
-| better-colors 增量实测（验收模板 v3 第 3 项） | **双模 14 对全过**（下限 4.5 正文 / 3 UI 字形） | `measure-a0-colors.mjs` + `colors-a0.json` |
-| 单测（web 全量 468） | 全绿（含 i18n-coverage 新键「最小化」） | — |
-| typecheck / lint | 全绿 | — |
+| fixture shape smoke (five routes + interaction contracts, 50 checks) | **50/50 PASS** | `drive-1009-a0-smoke.mjs` + `result-a0-fixture-smoke.json` + screenshots 01–13 |
+| live stack forensics (real data, 24 checks) | **24/24 PASS** | `drive-1009-a0-live.mjs` (in the skill scripts/) + `result-a0-live.json` + `live-*.png` |
+| chief domain + adjacent e2e (17 specs / 179 cases) prototype state | 136 green / 43 red (red = repin ledger, individually classified in §3) | `e2e-domain-status.txt` + `e2e-failed-list.txt` |
+| same-domain e2e after repin | **178 green / 0 red** (all 43 red repinned, see §6) | rerun command same as §1 |
+| visual probe three-way diff (start recon vs prototype vs #953 freeze) | KEPT 52 / DRIFT 5 / NOT-RUN 33 / VIOLATION 0 | `probe-pre-a0/` + `probe-after-a0/` |
+| visual probe after repin (acceptance template v3 item 2) | **KEPT 109 / DRIFT 0 / NOT-RUN 0 / VIOLATION 0** (91 cases all green) | `probe-repinned/` |
+| better-colors incremental measurement (acceptance template v3 item 3) | **both modes 14 pairs all pass** (floor 4.5 body / 3 UI glyphs) | `measure-a0-colors.mjs` + `colors-a0.json` |
+| unit tests (web full 468) | all green (including the i18n-coverage new key `最小化`) | — |
+| typecheck / lint | all green | — |
 
-## 1. 复跑配方
+## 1. Rerun recipe
 
 ```sh
-# fixture smoke（preview 栈）
+# fixture smoke (preview stack)
 cd apps/web && pnpm exec vite build --mode fixture
-pnpm exec vite preview --host 127.0.0.1 --port 8403 --strictPort &   # 跑前 lsof 查占用
+pnpm exec vite preview --host 127.0.0.1 --port 8403 --strictPort &   # lsof-check the port before running
 E2E_PORT=8403 node docs/verify/1009/drive-1009-a0-smoke.mjs
 
-# live 取证（隔离栈）
+# live forensics (isolated stack)
 node .claude/skills/verify-pacman/scripts/launch.mjs
 VERIFY_EVIDENCE_DIR=$PWD/docs/verify/1009 \
   node .claude/skills/verify-pacman/scripts/drive-1009-a0-live.mjs
 node .claude/skills/verify-pacman/scripts/cleanup.mjs
 
-# 域 e2e 现状（红 = 重钉账，非回归——见 §3 分类）
+# domain e2e current state (red = repin ledger, not regression — see the §3 classification)
 cd apps/web && E2E_PORT=8403 pnpm exec playwright test chief-panel chief-stream-markdown \
   chief-send-fallback chief-composer-tools chief-drawer-slash chief-drawer-model chief-fab \
   chief-settings hotkeys shell-consistency z-ladder board-docked-reflow board-zoom-fit \
   detail-3pane detail-narrow machines-chief-state overlay-focus
 
-# 探针三方 diff
+# probe three-way diff
 pnpm --filter @pacman/web probe:dump --specs chief-panel chief-stream-markdown \
   chief-send-fallback chief-composer-tools chief-drawer-slash chief-drawer-model \
   chief-fab chief-settings --out docs/verify/1009/probe-after-a0
 ```
 
-## 2. registry 逐件对照表（协调者 2026-10-08 口径更正：判据 = `scripts/ui-upstream-snapshots.json`）
+## 2. Registry item-by-item comparison table (coordinator 2026-10-08 corrected criterion: the judge = `scripts/ui-upstream-snapshots.json`)
 
-本轮（A0 原型）**对 `components/ui/` 零写入**。逐件对照：
+This round (A0 prototype) makes **zero writes to `components/ui/`**. Item-by-item comparison:
 
-| 件 | 上游快照形态 | 本地形态 | 判定 |
+| Item | Upstream snapshot form | Local form | Verdict |
 |---|---|---|---|
-| `button.tsx` | base-nova registry（快照 hash `1df2d803…`） | 未改；消费点沿用 #950 七通道中和 utility（HEAD_ICON_BTN_CLS 等，先于本轮存在） | ledger `deviated` 已登记（#411/#425 语义映射零皮肤）——本轮未新增偏离 |
-| `dialog-shell.tsx`（adapter） | 非 registry 件（本地组合层） | 未改（rewind 确认层消费点原样） | ledger `adapter` 已登记；**L3/#1006 已翻面为 registry dialog 组合——合并序撞上时 rewind 消费点按 L3 示范对齐（去自携 padding 包装、裸内容进 DialogFooter），归属施工面** |
-| `message-scroller / message / bubble / attachment / marker`（A1 五件） | base-nova registry，`ui-registry-refresh.mjs --items` 管线产物 | 已 vendored 至 `/tmp/a1-primitives-1009/`（**未提交**，A0/A1 分段纪律）；与快照**逐字节同源**（hash 即管线 hash：ed1dd557 / dc60c69f / b6812e3f / 33d34435 / 59574fed） | A1 段登记（pristine）；本轮不进 commit |
-| 悬浮窗本体（`chief-drawer.tsx` aside） | **非 registry 件**——承载机制 = Base UI 非模态 Dialog + Portal（ADR 0013 D10/F11，不触 0012 D3） | 几何/皮肤 = ADR 0013 D2 整套 Multica 原值（380×600、8px inset、12px 圆角、`--floating-shadow` 双主题原值、不透明卡底、edge-ring 发丝环） | 依据 = ADR 0013（用户 2026-10-08 十三问定案），非「方角/圆角」形容词判读 |
-| FAB（`chief-root.tsx`） | 非 registry 件（应用面 launcher） | 40px 正圆 / 8px inset / floating-shadow + edge-ring = ADR 0013 D4 Multica 原值 | 同上 |
+| `button.tsx` | base-nova registry (snapshot hash `1df2d803…`) | unchanged; consumer sites keep using the #950 seven-channel neutralization utilities (HEAD_ICON_BTN_CLS etc., predating this round) | ledger `deviated` already registered (#411/#425 semantic mapping zero skins) — no new deviation this round |
+| `dialog-shell.tsx` (adapter) | not a registry item (local composition layer) | unchanged (rewind confirmed the consumer sites are as-is) | ledger `adapter` already registered; **L3/#1006 has already flipped to the registry dialog composition — when the merge order collides, rewind the consumer sites to follow the L3 example (drop the self-carried padding wrapper, feed bare content into DialogFooter), owned by the build face** |
+| `message-scroller / message / bubble / attachment / marker` (A1 five items) | base-nova registry, produced by the `ui-registry-refresh.mjs --items` pipeline | vendored to `/tmp/a1-primitives-1009/` (**uncommitted**, the A0/A1 phased discipline); **byte-for-byte identical** to the snapshot (the hash is the pipeline hash: ed1dd557 / dc60c69f / b6812e3f / 33d34435 / 59574fed) | registered in the A1 phase (pristine); not committed this round |
+| floating window body (`chief-drawer.tsx` aside) | **not a registry item** — the host mechanism = Base UI non-modal Dialog + Portal (ADR 0013 D10/F11, does not touch 0012 D3) | geometry/skin = the ADR 0013 D2 full set of Multica original values (380×600, 8px inset, 12px radius, `--floating-shadow` dual-theme original value, opaque card base, edge-ring hairline ring) | basis = ADR 0013 (the user's 2026-10-08 thirteen-question decision), not the "square/round corner" adjective reading |
+| FAB (`chief-root.tsx`) | not a registry item (application-face launcher) | 40px circle / 8px inset / floating-shadow + edge-ring = the ADR 0013 D4 Multica original values | same as above |
 
-**本轮没有任何「改得更方」的动作**：窗 12px 圆角与 FAB 正圆均取自 ADR 钉死的 Multica 原值；
-消费点中和 utility（rounded-none 族）全部先于本轮存在（#950 七通道配方），未扩未改。
-12px 圆角落点记票：一次性 arbitrary 值（§3.1(a)），**不**消费 #983 退役面 token
-`--radius-popover`（ADR 0012 D4 明令）；窗是该值唯一消费点，若施工面裁决提 token 再迁。
+**This round has no "make it squarer" action**: the window's 12px radius and the FAB's full circle both come from the Multica original values pinned by ADR;
+the consumer-site neutralization utilities (the rounded-none family) all predate this round (#950 seven-channel recipe), not extended, not changed.
+The 12px radius ticks a one-off arbitrary value (§3.1(a)) and does **not** consume the #983 retired token
+`--radius-popover` (ADR 0012 D4 explicit); the window is the only consumer site of that value, so migrate it to a token only if the build face rules so.
 
-## 3. e2e 43 红分类（重钉账，ADR 0013 D11 / 票面 ⑨；行为断言语义一字不动）
+## 3. The 43-red classification (repin ledger, ADR 0013 D11 / ticket ⑨; behavior assertion semantics unchanged word-for-word)
 
-| spec | 红数 | 分类 |
+| spec | red count | classification |
 |---|---|---|
-| board-docked-reflow | 8 | 整 spec 钉已退役的停靠让位态（0004 D8 废）——重钉为「覆盖层零让位」语义 |
-| chief-panel | 11 | docked 418 几何 pin ×6 + 让位 pin + Esc 关窗 pin（D3 反转）+ 刷新不持久 pin（D5 反转）+ D7 互斥 pin |
-| hotkeys | 9 | `data-chief-open` 标记族 + count-0 断言族（D6「关 = 在 DOM 但 inert」新契约） |
-| shell-consistency | 5 | 族 FAB 类名/几何（48×48/16 族律退役，D4） |
-| chief-fab | 5 | 同上 + unreadOnly 门载体 |
-| chief-stream-markdown | 2 | F-R16 气泡几何随窗宽 418→380 重钉；F-R18 进场动画 settle 谓词（scale 动画期间 boundingBox 读缩放值——重钉加等待谓词，同 #984 对 A2 的预警形态） |
-| detail-3pane | 1 | 418 chief dock 态 pin（D7 互斥退役） |
-| chief-drawer-model | 1 | 关窗回收 popover 的 count 载体族 |
-| board-zoom-fit | 1 | `data-chief-open` 两态地板切换（#1035 面随让位退役收敛单态） |
+| board-docked-reflow | 8 | the whole spec pins the retired docked reflow state (0004 D8 deprecated) — repinned to "overlay zero reflow" semantics |
+| chief-panel | 11 | docked 418 geometry pins ×6 + reflow pin + Esc-close-window pin (D3 reversed) + refresh-not-persistent pin (D5 reversed) + D7 mutual-exclusion pin |
+| hotkeys | 9 | the `data-chief-open` marker family + the count-0 assertion family (D6 "closed = in DOM but inert" new contract) |
+| shell-consistency | 5 | the FAB class/geometry family (48×48/16 family rule retired, D4) |
+| chief-fab | 5 | same as above + the unreadOnly gate carrier |
+| chief-stream-markdown | 2 | F-R16 bubble geometry repinned as the window width goes 418→380; F-R18 entrance-animation settle predicate (during scale the boundingBox reads the scaled value — repin adds a wait predicate, the same shape as #984's warning for A2) |
+| detail-3pane | 1 | the 418 chief dock state pin (D7 mutual exclusion retired) |
+| chief-drawer-model | 1 | the count carrier family for the popover reclaimed on window close |
+| board-zoom-fit | 1 | `data-chief-open` two-state floor switch (#1035 face retires the reflow state and converges to a single state) |
 
-**非重钉的真回归：0**——43 红逐条对到上表；136 绿覆盖设置面/ composer 面/ slash 面/
-发送回落/ machines-chief-state/ overlay-focus/ z-ladder/ detail-narrow 等行为契约。
+**Non-repin real regressions: 0** — all 43 reds map one-by-one to the table above; the 136 greens cover the settings face / composer face / slash face /
+send fallback / machines-chief-state / overlay-focus / z-ladder / detail-narrow and other behavior contracts.
 
-## 4. 本轮工程裁决记录（施工面/实审可翻）
+## 4. This round's build verdict records (build face / review may overturn)
 
-1. **z 新 rung = `--z-floating: 15`**（--z-docked 之上、--z-backdrop-low 之下）：#688 律
-   「活动面恒压常驻面」原样成立；F8 单点裁决 = 渲染中的 registry 弹层件经已登记 deviation
-   骑 --z-dialog，未渲染件（ui/dialog、ui/alert-dialog）保持上游 z-50 原文（永不竞争）。
-2. **clearance 预约制度落地**：`--chief-launcher-size/inset/clearance` + `pe-/pb-/above-chief-launcher`
-   三 utility（app.css @utility，Multica base.css 同形）。本轮零消费点：右下角落位经 smoke
-   逐路由核对无吸底元素被撞（detail composer 发送钮在中心列、board 无吸底条）；消费点
-   出现时按 Multica 三分类选 utility。
-3. **autofocus 只认 closed→open 迁移**（MUL-5522 同律）：持久化开态的加载不抢焦点；
-   keepMounted 后节点常驻，旧「OverlayMount 滞后一帧 ref callback 首焦」径退役。
-4. **草稿跨整页刷新不持久**（与现状 main 同行为）：D5 只持久化开态；Multica 的草稿
-   per-workspace 持久化如需对齐另票。
-5. **抑制路由集 = agent 详情 + 机器授权**（覆盖面 = 现状，不发明新面）：根 host 保持
-   hook 实例存活（状态跨绕行保留）但不渲染 launcher/窗、解除 ⌘J 注册。全站统一覆盖
-   （含这两路由）是否为终态 = 实审裁决点。
-6. **scrollAnchor（registry anchoring）A1 再裁**：A1 设计侦察已定「不挂 anchor、发送跳最新
-   走 useMessageScroller().scrollToEnd」以保 #873 跟随律；anchoring 作为增强面留实审裁决。
+1. **The new z rung = `--z-floating: 15`** (above --z-docked, below --z-backdrop-low): the #688 rule
+   "the active face always sits above the persistent face" holds as-is; the F8 single-point verdict = the registry overlay items being rendered ride
+   --z-dialog through an already-registered deviation; the non-rendered items (ui/dialog, ui/alert-dialog) keep the upstream z-50 original text (never competing).
+2. **Clearance reservation system landed**: `--chief-launcher-size/inset/clearance` + `pe-/pb-/above-chief-launcher`
+   three utilities (app.css @utility, same shape as Multica base.css). Zero consumer sites this round: the bottom-right corner placement was checked route-by-route
+   via smoke, no bottom-docked element gets hit (the detail composer send button is in the center column, board has no bottom-docked bar); when a consumer
+   site appears, pick the utility per the Multica three-category classification.
+3. **autofocus only recognizes the closed→open transition** (same rule as MUL-5522): a persistent-open load does not steal focus;
+   after keepMounted the node stays resident, so the old "OverlayMount lags one frame then the ref callback first-focus" path retires.
+4. **Drafts do not persist across a full page refresh** (same behavior as current main): D5 persists only the open state; Multica's per-workspace
+   draft persistence, if aligning, is a separate ticket.
+5. **The suppressed route set = agent detail + machine authorization** (coverage = the current state, no new faces invented): the root host keeps
+   the hook instance alive (state survives the detour) but does not render the launcher/window and unregisters ⌘J. Whether the whole-site uniform coverage
+   (including these two routes) is the terminal state is a review decision point.
+6. **scrollAnchor (registry anchoring) A1 re-decided**: the A1 design recon already decided "no anchor, send-jumps-to-latest
+   goes through useMessageScroller().scrollToEnd" to keep the #873 follow rule; anchoring as an enhancement face is left to the review decision.
 
-## 5. 截图清单
+## 5. Screenshot list
 
-fixture：01 board FAB 关态 / 02 board 窗开 / 03 新建任务 dialog 压窗（z 律）/ 04 最小化后 /
-05 schedules 窗开（SPA 常驻）/ 06–08 pages·resources·secondary 三壳窗开 / 09 detail 窗开+右栏共存 /
-10·10b fixture 111 hero·114 线程捕获形 / 11 抑制路由 / 12 设置视图内容交换 / 13 live 窗开。
-live：live-01 真线程窗开 / live-03 刷新恢复开态 / live-05 schedules 常驻 / live-06 detail 覆盖位形 /
-live-07 设置深链 / live-09 抑制路由。
+fixture: 01 board FAB closed state / 02 board window open / 03 new-task dialog presses the window (z rule) / 04 after minimize /
+05 schedules window open (SPA resident) / 06–08 pages·resources·secondary three-shell window open / 09 detail window open + right column coexist /
+10·10b fixture 111 hero·114 thread capture shape / 11 suppressed route / 12 settings view content swap / 13 live window open.
+live: live-01 real thread window open / live-03 refresh restores the open state / live-05 schedules resident / live-06 detail overlay placement /
+live-07 settings deep link / live-09 suppressed route.
 
-## 6. 施工段：载体重钉（验收模板 v3 第 1 项，ADR 0013 D11）
+## 6. Build phase: carrier repin (acceptance template v3 item 1, ADR 0013 D11)
 
-43 红全数重钉后同域 17 spec **178 绿 / 0 红**。逐族处置（行为断言语义一字不动，
-只换载体/换已裁决行为）：
+After repinning all 43 reds, the same-domain 17 specs are **178 green / 0 red**. Per-family disposition (behavior assertion semantics unchanged word-for-word,
+only the carrier / the already-decided behavior swapped in):
 
-| spec | 原红 | 处置 |
+| spec | original red | disposition |
 |---|---|---|
-| chief-panel | 11 | 整 describe 翻面「floating form」：418 docked 几何 → 380×600@8 + fixed + radius token + z15 + 双层投影 + 不压侧栏；让位 pin → 零让位对拍；Esc 关窗 → Esc 永不关（D3）+ 内层先收保留；D9 刷新即关 → D5 刷新恢复（live-mock 桩面，fixture 面零存储律另钉）；count-0 → hidden+count1 |
-| hotkeys | 9 | count-0 族 → toBeHidden；escapeUntilHidden(drawer) → toggleUntilHidden（⌘J 是唯一键盘收起）；pressesStayClosed(drawer) → pressesStayHidden 新helper（count-0 律留给 dialog 族）；FAB 互斥注释翻 D4 |
-| board-docked-reflow | 8 | 整 spec 翻面「覆盖层零 reflow」：停靠地板/让位横滚 pin → 开合零几何跳变对拍（1440/1024/RTL/最坏数据/卡宽/滚动条披露九条失败方式重写）；FLOOR 280 → 200 单态 |
-| shell-consistency | 5 | 五族 FAB 类名载体 → 单实例 .chief-fab；「close returns」→ Minimize 收起；关态 count-0 → hidden+count1 |
-| chief-fab | 5 | .detail-fab → .chief-fab；48×48/right504/bottom104 → 40×40@8 fixed（D4）；fab-avatar 捕获形翻关窗态（fixture view drawer→none，D4 互斥的捕获面必然） |
-| chief-stream-markdown | 2 | F-R16/F-R18 加进场动画 settle 谓词（fade+scale 期间 boundingBox 含 transform）；44px 药丸值不变（380 宽下单行不 wrap，实测保真） |
-| detail-3pane | 1 | 488/418 两态 composer 宽 → 单态 488 + 开窗零位移对拍（D7 互斥退役） |
-| chief-drawer-model | 1 | 关窗回收 popover 的 count-0 → hidden 载体（portaled 弹层 open 态清零后节点归零不变） |
-| board-zoom-fit | 1 | data-chief-open 活翻 pin → 开窗零地板复活对拍（两态退役） |
+| chief-panel | 11 | the whole describe flipped to "floating form": 418 docked geometry → 380×600@8 + fixed + radius token + z15 + dual-layer shadow + no side-column squeeze; reflow pin → zero-reflow contrast shot; Esc-closes-window → Esc never closes (D3) + inner layer closes first kept; D9 refresh-closes → D5 refresh-restores (live-mock stub face; the fixture face zero-storage rule pinned separately); count-0 → hidden+count1 |
+| hotkeys | 9 | the count-0 family → toBeHidden; escapeUntilHidden(drawer) → toggleUntilHidden (⌘J is the only keyboard collapse); pressesStayClosed(drawer) → pressesStayHidden new helper (the count-0 rule stays for the dialog family); the FAB mutual-exclusion comment folded into D4 |
+| board-docked-reflow | 8 | the whole spec flipped to "overlay zero reflow": docked floor / reflow horizontal-scroll pins → open/close zero-geometry-jump contrast shots (nine failure modes rewritten: 1440/1024/RTL/worst-case data/card width/scrollbar disclosure); FLOOR 280 → 200 single state |
+| shell-consistency | 5 | the five-family FAB class carriers → single-instance .chief-fab; "close returns" → Minimize collapse; the closed-state count-0 → hidden+count1 |
+| chief-fab | 5 | .detail-fab → .chief-fab; 48×48/right504/bottom104 → 40×40@8 fixed (D4); the fab-avatar capture shape flipped to the closed-window state (fixture view drawer→none; the D4 mutual-exclusion capture face is inevitable) |
+| chief-stream-markdown | 2 | F-R16/F-R18 add the entrance-animation settle predicate (fade+scale means boundingBox carries the transform); the 44px pill value unchanged (does not wrap on one line at 380 width, measured true) |
+| detail-3pane | 1 | the 488/418 two-state composer width → single-state 488 + open-window zero-displacement contrast shot (D7 mutual exclusion retired) |
+| chief-drawer-model | 1 | the closed-window-reclaimed popover count-0 → hidden carrier (the portaled overlay open-state count hits zero and the node count still returns to zero) |
+| board-zoom-fit | 1 | the data-chief-open live-flip pin → open-window zero-floor-resurrection contrast shot (two-state retired) |
 
-## 7. 施工段：探针重钉清零（验收模板 v3 第 2 项）
+## 7. Build phase: probe repin zeroed (acceptance template v3 item 2)
 
-`probe-repinned/`：重钉后 chief 域 8 spec 全绿 93 用例，visual rows **KEPT 114 /
-DRIFT 0 / NOT-RUN 0 / VIOLATION 0**（对照表清零）。三方 diff 链：
-`probe-pre-a0/`（开工侦察，旧壳 104 KEPT）→ `probe-after-a0/`（原型态 52 KEPT /
-5 DRIFT / 33 NOT-RUN = 重钉工作面）→ `probe-repinned/`（清零）。人审 diff =
-本册 §3 分类表 + §6 处置表（DRIFT 5 条全部落在「已裁决退役面」，无一条疑似回归）。
+`probe-repinned/`: after repin the chief domain 8 specs are all green, 93 cases, visual rows **KEPT 114 /
+DRIFT 0 / NOT-RUN 0 / VIOLATION 0** (comparison table zeroed). The three-way diff chain:
+`probe-pre-a0/` (start recon, old shell 104 KEPT) → `probe-after-a0/` (prototype state 52 KEPT /
+5 DRIFT / 33 NOT-RUN = the repin work face) → `probe-repinned/` (zeroed). The human-review diff =
+this volume's §3 classification table + §6 disposition table (all 5 DRIFT lines fall into "already-decided retired face", none suspected regression).
 
-**合并 origin/main 后刷新**（merge `520140f3`，带入 #1004/#1034/#903/#1050）：
-FAB ⌘J 提示载体随 #1004 的 kbd-hint 退役面迁移——该消费点原在 board-page 内联钮
-（#1004 已翻成 registry Tooltip+Kbd），A0 把 FAB 迁到根 host `chief-root.tsx`，
-形态随迁（Tooltip side=top + Kbd，静息不挂载）；hotkeys 的 wake-family 提示 pin
-同载体重钉（单实例 FAB 后「共享消费点」语义 = 同一路由无关载体）。本 dump 为
-迁移后重跑产物（91→93 用例 = main 在域内 spec 新增 2 条）。域 e2e 合并后
-191/191 绿（含 #1004 的 shadcn-primitives / sidebar-visual）、web 单测 468/468、
-typecheck / lint 全绿。
+**Refresh after merging origin/main** (merge `520140f3`, bringing in #1004/#1034/#903/#1050):
+the FAB ⌘J hint carrier migrates with #1004's kbd-hint retired face — that consumer site used to be the board-page inline button
+(#1004 already flipped it to registry Tooltip+Kbd); A0 dropped the FAB into the root host `chief-root.tsx`,
+and its form follows (Tooltip side=top + Kbd, not mounted at rest); the hotkeys wake-family hint pin
+is repinned with the same carrier (after single-instance FAB, the "shared consumer site" semantics = the same route-independent carrier). This dump is
+the post-migration rerun artifact (91→93 cases = main added 2 specs in-domain). After the merge the domain e2e is
+191/191 green (including #1004's shadcn-primitives / sidebar-visual), web units 468/468,
+typecheck / lint all green.
 
-**全量批（CI 分片 2/3 暴露，域集外 5 例，修复 `b12251ec`）**：真回归 1 例 =
-#634 detail Esc 分层守卫 query 任意在挂载 `[role=dialog]`，被 A0 常驻窗永远命中
-→ 守卫排除 `.chief-drawer`（D3 窗从不拥有 Esc 键；detail-esc E1–E3 绿）。载体重钉
-4 例 = dead-buttons 第三头钮 关闭→最小化（D3）、notify-click T4b count-0→
-hidden+count1（D6）、page-scroll 等卸载→等在场（设置面窗内交换）、
-agent-identity-chip 24px 几何撞 D7 进场缩放 → settle 谓词（3x repeat 绿）。
-**本地全量收口 848/848**（§0 旧口径「826 绿」为合并前数，作废）。
+**Full batch (CI shards 2/3 exposed, 5 cases outside the domain set, fixed by `b12251ec`)**: 1 real regression =
+#634 detail Esc layered guard queries any-mounted `[role=dialog]`, hit forever by the A0 resident window
+→ the guard excludes `.chief-drawer` (the D3 window never owns the Esc key; detail-esc E1–E3 green). 4 carrier
+repins = dead-buttons third-head button close→minimize (D3), notify-click T4b count-0→
+hidden+count1 (D6), page-scroll wait-unmount→wait-present (settings-face in-window swap),
+agent-identity-chip 24px geometry hits the D7 entrance scale → settle predicate (3x repeat green).
+**Local full run closed at 848/848** (§0's old "826 green" figure was the pre-merge number, void).
 
-## 8. 施工段：better-colors 增量实测（验收模板 v3 第 3 项）
+## 8. Build phase: better-colors incremental measurement (acceptance template v3 item 3)
 
-`measure-a0-colors.mjs` + `colors-a0.json`：A0 新合成面 = 窗 chrome + FAB 族
-（token 零新增颜色值，全既有槽的新组合）。双模 14 对全过：dark 正文 13:1 /
-UI 字形 7.18:1 / 徽标 8.14:1；light 正文 16.14:1 / UI 6.31:1 / 徽标 7.38:1；
-FAB 字形 16.14:1、⌘J chip 10.73:1。下限照 spec/22 §1.8 / #950 先例（正文 4.5、
-UI 字形 3）。全局色板不重测（#988 双模 109 对 0 fail 封账）。
+`measure-a0-colors.mjs` + `colors-a0.json`: the A0 new composite face = window chrome + the FAB family
+(zero new token color values, all new combinations of existing slots). Both modes 14 pairs all pass: dark body 13:1 /
+UI glyphs 7.18:1 / badge 8.14:1; light body 16.14:1 / UI 6.31:1 / badge 7.38:1;
+FAB glyphs 16.14:1, ⌘J chip 10.73:1. The floors follow spec/22 §1.8 / the #950 precedent (body 4.5,
+UI glyphs 3). The global palette is not re-measured (#988 both-mode 109 pairs 0 fail, closed).
 
-## 9. 手写面退役对账声明（验收模板 v3 第 5 项，#983 判决表逐条）
+## 9. Handwritten shell retirement reconciliation declaration (acceptance template v3 item 5, #983 verdict table item by item)
 
-落在 chief 域的 #983 判决行：
-- **panel→Card / dialog-shell 零皮化 / status-chip / tag-chip / seeded-avatar /
-  kbd-hint→Tooltip+Kbd / floating-shell 族拆**：均**不属 A0 段**（属 #1008 L5 与
-  波 2 / 施工批次）——A0 对它们零触碰，现状消费点原样（chief 域内 seeded-avatar /
-  kbd-hint / dialog-shell 消费点保持既有形态）。**合并后例外一条**：board FAB 的
-  ⌘J 提示消费点已被 main 的 #1004 翻成 registry Tooltip+Kbd，A0 把该 FAB 迁进
-  `chief-root.tsx` 时**承接 #1004 形态**（不是本票新做退役；完整版仍归 #1060/L5，
-  本票未触碰其余 kbd-hint 消费点）。
-- **F8 registry 弹层件写死 z-50 的接法单点裁决**：随 A0 出（tokens.css --z-floating
-  注记）——渲染中件经已登记 deviation 骑 --z-dialog，未渲染件保持上游 z-50 原文。
-- **dialog-shell 翻面交叉（L3/#1006 实审通报）**：rewind 确认层是 dialog-shell 常规
-  消费点；L3 合入后按示范对齐（去自携 padding、裸内容进 DialogFooter）——归属
-  A0 施工面与 #1006 的合并序协调，本 PR 不动（动了撞当前 main）。
+The #983 verdict rows that fall in the chief domain:
+- **panel→Card / dialog-shell zero-skin / status-chip / tag-chip / seeded-avatar /
+  kbd-hint→Tooltip+Kbd / floating-shell family split**: all **not in the A0 phase** (owned by #1008 L5 and
+  wave 2 / build batches) — A0 touches none of them; the current consumer sites stay as-is (the seeded-avatar /
+  kbd-hint / dialog-shell consumer sites in the chief domain keep their existing form). **One post-merge exception**: the board FAB's
+  ⌘J hint consumer site has already been flipped by main's #1004 to registry Tooltip+Kbd; when A0 dropped that FAB into
+  `chief-root.tsx` it **inherited the #1004 form** (not a new retirement made by this ticket; the full version still belongs to #1060/L5,
+  this ticket does not touch the remaining kbd-hint consumer sites).
+- **The F8 registry overlay items hard-coding z-50 single-point verdict**: ships with A0 (the tokens.css --z-floating
+  annotation) — the rendered items ride --z-dialog through an already-registered deviation, the non-rendered items keep the upstream z-50 original text.
+- **The dialog-shell flip cross (L3/#1006 review notice)**: rewind confirmed the layer is a regular dialog-shell
+  consumer site; after L3 merges, follow the example (drop the self-carried padding, feed bare content into DialogFooter) — owned by
+  the A0 build face and the #1006 merge-order coordination; this PR does not move (moving it would collide with current main).
 
-## 10. 未迁残留声明（验收模板 v3 第 6 项）
+## 10. Unmigrated residue declaration (acceptance template v3 item 6)
 
-- 标识符残留：`chief-drawer.tsx` 文件名 / `ChiefDrawer` 组件名 / `.chief-drawer`
-  类钩（hotkeys 守卫 + e2e scope 锚）——ADR 0013 D13 记名，更名随后续施工批次；
-- `--chief-shadow` 剩抽屉头切换器 popover 单消费点（悬浮窗改骑 --floating-shadow）；
-  `--dur-drawer` 零消费（motion registry 镜像保留）；`--edge-radius`/`--radius-popover`
-  仍属 #983 退役面待批；
-- A1 五件原语 vendoring 暂存 `/tmp/a1-primitives-1009/`（未提交，A0 合并后启用）；
-- 草稿跨整页刷新持久化 = #1056（实审裁决 4 另票）；
-- registry anchoring（scrollAnchor）= 实审裁决 2 不采（保 #873 跟随律）。
+- Identifier residue: the `chief-drawer.tsx` file name / the `ChiefDrawer` component name / the `.chief-drawer`
+  class hook (the hotkeys guard + e2e scope anchor) — recorded under ADR 0013 D13; renaming follows in a later build batch;
+- `--chief-shadow` keeps a single consumer site in the drawer-header switcher popover (the floating window now rides --floating-shadow);
+  `--dur-drawer` zero consumers (kept as the motion registry mirror); `--edge-radius`/`--radius-popover`
+  still belong to the #983 retired face, pending approval;
+- the A1 five-primitive vendoring staging at `/tmp/a1-primitives-1009/` (uncommitted, enabled after A0 merges);
+- draft persistence across a full page refresh = #1056 (review decision 4, a separate ticket);
+- registry anchoring (scrollAnchor) = review decision 2 rejected (keep the #873 follow rule).
 
-## 11. A1 段原型（chat 原语装件 + chief 消息流换装）
+## 11. The A1 phase prototype (chat primitive install + chief message stream dress swap)
 
-> 状态：**实审三裁决已回（2026-10-08）→ 施工段完毕，PR #1066 CI 磨绿中**。A0 已合并（squash `99ffb54a`，PR #1062）。
-> A1 范围（票面）：五件原语装件（MessageScroller/Message/Bubble/Attachment/Marker）
-> + 消息流替换 + 滚动模型替换 + 行 id 贯通 + Bubble 默认皮几何中和；
-> jump-to-latest 随原语带入（#991 Q6，实审过目）；composer 输入区不在射程（#991 Q7）。
+> State: **the three review decisions are back (2026-10-08) → build phase done, PR #1066 CI greening**. A0 merged (squash `99ffb54a`, PR #1062).
+> A1 scope (ticket): five-primitive install (MessageScroller/Message/Bubble/Attachment/Marker)
+> + message stream swap + scroll model swap + row id threading + Bubble default-skin geometry neutralization;
+> jump-to-latest comes in with the primitive (#991 Q6, shown to the review); the composer input area is out of range (#991 Q7).
 
-### 11.1 装件链（验收模板 v3 第 7 项）
+### 11.1 Install chain (acceptance template v3 item 7)
 
 `node scripts/ui-registry-refresh.mjs --items message-scroller,message,bubble,attachment,marker`
-（shadcn@4.21.3 view → R1–R5 改写 → biome 归一 → 快照账本）——五件 hash 与开工侦察
-暂存（/tmp/a1-primitives-1009/）**逐字节同源**：ed1dd557 / dc60c69f / b6812e3f /
-33d34435 / 59574fed。落 `components/ui/` + 账本 `pristine` ×5（35 entries = 26 registry
-〔19 pristine〕+ 9 adapters，frozen from d62bc480）→ gate PASS（幂等复验 no change）→
-COMPONENTS.md new-track 登记 5 行（30→35）→ inventory 闸 4/4 绿。
+(shadcn@4.21.3 view → R1–R5 rewrite → biome normalize → snapshot ledger) — the five hashes are **byte-for-byte identical** to the start-recon
+staging (/tmp/a1-primitives-1009/): ed1dd557 / dc60c69f / b6812e3f /
+33d34435 / 59574fed. Lands in `components/ui/` + ledger `pristine` ×5 (35 entries = 26 registry
+(19 pristine) + 9 adapters, frozen from d62bc480) → gate PASS (idempotent re-verify no change) →
+COMPONENTS.md new-track registered 5 rows (30→35) → inventory gate 4/4 green.
 
-### 11.2 换装面（结构映射）
+### 11.2 The dress-swap face (structure mapping)
 
-| 现状面 | 换装后 | 中和（消费点 className/style，文件 pristine 零触碰） |
+| Current face | After swap | Neutralization (consumer-site className/style, primitive file pristine zero-touch) |
 |---|---|---|
-| body div（overflow-y auto，bodyRef + useChatFollow） | `MessageScroller` Root/Viewport/Content/Item | Root `h-auto min-h-0 flex-1`（原语 size-full 的 h-full 会顶爆 flex 链）；Viewport 承接 chief-body testid（F-R6/R8 overflowY auto 面 = 原语自带） |
-| chief-stream div（px-17 pt-3.5） | Content + chief-stream testid | `block gap-0`（行距留行 margin——原语 flex gap-6 会双倍行距） |
-| 行 div（key=index） | Item（key/messageId = 源 chief_message id） | inline style `content-visibility: visible`（原语 auto 会让离屏行跳布局——探针/e2e 随滚动相位漂；380px 窗数十行规模，确定性 > 虚拟化收益） |
-| user 行气泡（BUBBLE_CLS div） | Message + MessageContent + `Bubble variant=secondary` + BubbleContent（chief-bubble testid 随迁） | 二次档 --secondary 底 = 原槽位（--secondary-foreground 双主题与 --foreground 等值，#1002 色板实测）；`border-0`（原语 border-transparent 吃 2px——F-R16 44px 药丸 canon）；rounded-(--radius-popover)/px-3/py-2.5/leading-6/w-full（80% cap 退役） |
-| robot 行裸文本 | Message + `Bubble variant=ghost` + BubbleContent | ghost 档 p-0/bg-transparent/rounded-none = 裸文本面；w-full + leading-6 补正 |
-| note/error 行（居中 div） | `Marker` + MarkerContent（error 带 role=alert 二段面） | 居中/12px/墨色钉回现状 |
-| thinking/tool/streaming 行 | Message 骨架 + 既有行件（ThinkingRow/ToolActivityRow/LiveRow 共享件不动，A2 面） | `.chief-msg` 类载体保留（F-R19/R20 联合选择器） |
-| gate/hero（滚动区内） | 移出滚动区（flex-none 兄弟） | 两面只在无流状态出场——移出后视觉等价 |
-| — | `MessageScrollerButton direction=end`（jump-to-latest，#991 Q6 随原语带入） | children 覆写 = 仓 ArrowDown 字形（生成器新增）+ t('滚动到最新') sr-only（pristine 面英文字面量不进 i18n 账） |
+| body div (overflow-y auto, bodyRef + useChatFollow) | `MessageScroller` Root/Viewport/Content/Item | Root `h-auto min-h-0 flex-1` (the primitive size-full's h-full would blow out the flex chain); Viewport carries the chief-body testid (the F-R6/R8 overflowY auto face = supplied by the primitive) |
+| chief-stream div (px-17 pt-3.5) | Content + chief-stream testid | `block gap-0` (row spacing is left as row margin — the primitive flex gap-6 would double the row spacing) |
+| row div (key=index) | Item (key/messageId = the source chief_message id) | inline style `content-visibility: visible` (the primitive auto would make offscreen rows jump layouts — probes/e2e drift with the scroll phase; at the 380px window's tens-of-rows scale, determinism > virtualization benefit) |
+| user row bubble (BUBBLE_CLS div) | Message + MessageContent + `Bubble variant=secondary` + BubbleContent (chief-bubble testid migrates along) | the secondary tier --secondary base = the original slot (--secondary-foreground equals --foreground in both themes, measured on the #1002 palette); `border-0` (the primitive border-transparent eats 2px — the F-R16 44px pill canon); rounded-(--radius-popover)/px-3/py-2.5/leading-6/w-full (the 80% cap retired) |
+| robot row bare text | Message + `Bubble variant=ghost` + BubbleContent | ghost tier p-0/bg-transparent/rounded-none = the bare-text face; w-full + leading-6 correction |
+| note/error row (centered div) | `Marker` + MarkerContent (error carries role=alert two-segment face) | centered/12px/ink pinned to the current state |
+| thinking/tool/streaming row | Message skeleton + existing row items (ThinkingRow/ToolActivityRow/LiveRow shared items untouched, A2 face) | the `.chief-msg` class carrier kept (the F-R19/R20 joint selectors) |
+| gate/hero (inside the scroll area) | moved out of the scroll area (flex-none sibling) | the two faces only appear in the no-stream state — visually equivalent after the move |
+| — | `MessageScrollerButton direction=end` (jump-to-latest, #991 Q6 comes in with the primitive) | children override = the repo ArrowDown glyph (new in the generator) + `t('滚动到最新')` sr-only (the pristine-face English literal does not enter the i18n ledger) |
 
-**滚动律映射（#873 逐条 → 原语机制，实审裁决 2 = 不采 scrollAnchor）**：
-贴底阈值 80px = `scrollEdgeThreshold={80}`（FOLLOW_THRESHOLD 同值）；关窗解除武装 =
-`autoScroll={open}`（旧 active 同律）；打开落底 = `defaultScrollPosition="end"`；
-切线程落底 = threadTitle 守卫 effect → `scrollToEnd()`（旧 resetDep 等价）；
-发送跳最新 = wire.onSend 里 `scrollToEnd()`（旧 requestFollow 等价）。
-useChatFollow 本体保留（详情页对话列 = A2 段的替换面，本段不动）。
+**Scroll-rule mapping (#873 item by item → primitive mechanism, review decision 2 = no scrollAnchor)**:
+bottom-detection threshold 80px = `scrollEdgeThreshold={80}` (same value as FOLLOW_THRESHOLD); window close disarms =
+`autoScroll={open}` (same rule as the old active); open lands at bottom = `defaultScrollPosition="end"`;
+thread switch lands at bottom = the threadTitle guard effect → `scrollToEnd()` (equivalent to the old resetDep);
+send jumps to latest = `scrollToEnd()` inside wire.onSend (equivalent to the old requestFollow).
+useChatFollow itself is kept (the detail-page conversation column = the A2-phase swap face, untouched this phase).
 
-**行 id 贯通（票面「mapper 视图侧」）**：`ChiefStreamItem` robot/thinking/tool 三 kind
-扩 `id?: string`；collectChiefStream 三投影点 `id: m.id`（每行源 message 互异，直投
-不冲突；wire 零触碰——ADR 0011 封段在写入端）。单测契约同步（chief-segments
-F2/F4/F6 toEqual 含 id，7/7 绿）。fixture 捕获形无 id → key 回落 index、Item 无
-messageId（S10 钉）；live 面 messageId pin 归施工段 e2e（live-mock 桩带 id）。
+**Row id threading (ticket's "mapper view side")**: `ChiefStreamItem` robot/thinking/tool three kinds
+extend `id?: string`; collectChiefStream's three projection points `id: m.id` (each row's source message is distinct, so direct projection
+without collision; wire zero-touch — ADR 0011 seals the segment on the write side). Unit-test contracts synced (chief-segments
+F2/F4/F6 toEqual include id, 7/7 green). fixture capture shape has no id → key falls back to index, Item has no
+messageId (S10 pinned); live-face messageId pins belong to the build-phase e2e (the live-mock stub carries id).
 
-**Provider 拆分**：Dialog 壳（Root/Portal/Popup/aside）+ `MessageScrollerProvider` 住
-外层 ChiefDrawer；threadsOpen 状态上提（Root onOpenChange 的 Esc 代收要读写它）；
-整列窗内容下沉 ChiefDrawerInner（hook 面消费 useMessageScroller——同组件 hook 吃不到
-自己渲染树的 context，拆分点即此）。
+**Provider split**: the Dialog shell (Root/Portal/Popup/aside) + `MessageScrollerProvider` lives
+in the outer ChiefDrawer; the threadsOpen state is lifted (Root's onOpenChange Esc-handling needs to read/write it);
+the whole-column window content sinks into ChiefDrawerInner (the hook face consumes useMessageScroller — a hook in the same component cannot read
+its own render tree's context; the split point is exactly that).
 
-### 11.3 原型态账面
+### 11.3 Prototype-state ledger
 
-- 域 e2e 24 spec：**247 绿 / 2 红**——两条红都是重钉账（行为断言语义不动）：
-  ① hero 面 `chief-stream` count-0 → 常驻 Content 载体（D6 同族：容器常驻、行零个）；
-  ② XMON-102「草稿/空面等高 60px」→ **#860 grow 律已取代固定轨**（chief-drawer
-  growCap:120 注记原文 "the XMON-102 fixed-height law is superseded"）。实证：A1 前
-  scrollHeight=120 而 inline height=''——grow 副作用因隐藏挂载时序在 fixture 面
-  **从未触发**（另检出 A0 态 worktree 建 build 实测），XMON-102 pin 钉的是副作用
-  未触发的意外面；A1 挂载结构下首次触发 = 律的真面目（草稿面 120px 顶格 + 盒内
-  滚动）。施工段按 #860 语义重钉。
-- 探针三方链：`probe-a1-pre/`（开工基线 KEPT 119/140 行）→ `probe-after-a1/`
-  **KEPT 115 / DRIFT 1 / NOT-RUN 3 / VIOLATION 0**——DRIFT+NOT-RUN 四条全部落在
-  XMON-102 那一个测试（304 断言 + 其后续 308–310），其余几何/皮肤行全 KEPT
-  （44px 药丸、行节奏、chip 几何、头像 24px 逐值保住）。
-- fixture smoke（`drive-1009-a1-smoke.mjs`）：**19/19 PASS**（S1 结构/S2 中和/S3
-  Bubble 皮/S4 Marker/S5 hero+grow/S6 打开落底/S7 jump-to-latest 三面/S8 重开落底/
-  S9 载体守恒/S10 id 面）。
-- 单测 468 全绿（chief-segments 契约更新后 7/7）；typecheck / lint 干净。
-- 截图：a1-01 线程面 / a1-02 jump 钮浮出 / a1-03 重开落底 / a1-04 hero+grow 面 /
-  a1-05 identity chip 面 / a1-06 dark / a1-07 light。
+- Domain e2e 24 specs: **247 green / 2 red** — both reds are repin-ledger (behavior assertion semantics unchanged):
+  ① the hero face `chief-stream` count-0 → resident Content carrier (same D6 family: container resident, zero rows);
+  ② XMON-102 "draft/empty face equal-height 60px" → **the #860 grow rule already superseded the fixed track** (the chief-drawer
+  growCap:120 annotation original text "the XMON-102 fixed-height law is superseded"). Proof: before A1
+  scrollHeight=120 while inline height='' — the grow side effect **never fired** on the fixture face due to hidden-mount timing (also found by building a worktree in the A0 state), so the XMON-102 pin was pinning an accidental face where the side effect never fired;
+  A1's mount structure fires it for the first time = the rule's true face (draft face 120px top-capped + in-box
+  scrolling). The build phase repins per the #860 semantics.
+- Probe three-way chain: `probe-a1-pre/` (start baseline KEPT 119/140 rows) → `probe-after-a1/`
+  **KEPT 115 / DRIFT 1 / NOT-RUN 3 / VIOLATION 0** — the four DRIFT+NOT-RUN rows all fall on
+  that single XMON-102 test (the 304 assertion + its follow-ups 308–310); the rest of the geometry/skin rows are all KEPT
+  (44px pill, row rhythm, chip geometry, avatar 24px value-by-value preserved).
+- fixture smoke (`drive-1009-a1-smoke.mjs`): **19/19 PASS** (S1 structure/S2 neutralization/S3
+  Bubble skin/S4 Marker/S5 hero+grow/S6 open-lands-bottom/S7 jump-to-latest three faces/S8 reopen-lands-bottom/
+  S9 carrier conservation/S10 id face).
+- Units 468 all green (chief-segments contract updated, 7/7); typecheck / lint clean.
+- Screenshots: a1-01 thread face / a1-02 jump button surfacing / a1-03 reopen lands bottom / a1-04 hero+grow face /
+  a1-05 identity chip face / a1-06 dark / a1-07 light.
 
-### 11.4 实审裁决点（滚动实审过目）
+### 11.4 Review decision points (shown to the scroll review)
 
-1. **jump-to-latest 按钮形态本体**（#991 Q6：删除才是定制——原语默认皮 = 仓
-   Button secondary/icon-sm 档、底缘居中、上翻浮出/近底退场）：a1-02 截图。
-2. **S8 判据翻面**：最小化重开 = **落底看最新**（chat 通行律，与旧 dock 时代一致）。
-   实测发现：Base UI keepMounted 关态 = `hidden` = display:none——浏览器丢弃滚动
-   位置，A0 宣称的 D6「滚动存活」在最小化面物理不可达（A0 期同样如此，未取证到
-   这一面；草稿/线程态存活不受影响）。Multica 原形态 = opacity+inert 常驻**不**
-   display:none，滚动才真保。若要真保留需换壳层关态载体（超 A1 射程）——采「重开
-   落底」还是开壳层票，请裁决。
-3. **#860 grow 律在 fixture 面首发**（XMON-102 重钉）：草稿 6 行面 composer 120px
-   顶格（a1-04）——按 #860 已裁决律重钉，还是维持固定轨（需关 fixture 面 grow），
-   请确认。
+1. **The jump-to-latest button form itself** (#991 Q6: deleting it is the only customization — the primitive default skin = the repo
+   Button secondary/icon-sm tier, bottom-edge centered, surfaces on scroll-up / retires near the bottom): screenshot a1-02.
+2. **The S8 criterion flip**: minimize + reopen = **lands at bottom to see the latest** (the chat universal rule, same as the old dock era).
+   Measured finding: Base UI keepMounted closed state = `hidden` = display:none — the browser discards the scroll
+   position, so the A0-claimed D6 "scroll survives" is physically unreachable on the minimize face (the A0 phase was the same, not evidenced on
+   this face; the draft/thread state survival is unaffected). Multica's original form = opacity+inert resident, **not**
+   display:none, which is why scroll truly survives. To truly preserve it we would need a different shell-layer closed-state carrier (beyond A1's range) — take "reopen
+   lands at bottom" or open a shell-layer ticket, please decide.
+3. **The #860 grow rule first fires on the fixture face** (the XMON-102 repin): the draft 6-row face composer 120px
+   top-capped (a1-04) — repin per the already-decided #860 rule, or keep the fixed track (requires turning grow off on the fixture face),
+   please confirm.
 
-### 11.5 A1 未消费原语面（残留声明预登）
+### 11.5 A1's unconsumed primitive faces (residue declaration pre-registered)
 
 MessageAvatar/MessageHeader/MessageFooter/MessageGroup/BubbleGroup/BubbleReactions/
-MarkerIcon/Attachment 全族（B 段消费）——头像槽仍走 recipes 单源 span（原语自带
-bg-muted/min-w-8 皮，中和成本高于收益，A2 再裁）；`scroll-fade-b`/`scrollbar-thin`/
-`scrollbar-gutter-stable` 是 shadcn hosted utility 死类（仓未 vendor，零生效零副作用）。
+MarkerIcon/Attachment full family (B-phase consumers) — the avatar slot still goes through the recipes single-source span (the primitive carries a
+built-in bg-muted/min-w-8 skin; neutralization cost > benefit, re-decided in A2); `scroll-fade-b`/`scrollbar-thin`/
+`scrollbar-gutter-stable` are shadcn hosted-utility dead classes (not vendored in the repo, zero effect zero side effect).
 
-### 11.6 施工段（实审裁决落地 + CI 磨绿，2026-10-08/09）
+### 11.6 Build phase (review decisions landed + CI greening, 2026-10-08/09)
 
-**实审三裁决（用户「三条都按你的建议」+ 第三条加硬口径）**：
-① jump-to-latest 采纳 registry 默认形态；② reopen 语义采「重新打开落在最新」，
-Multica inert/opacity 载体另开壳票 **#1067**（display:none 物理不可达事实已写进票面，
-本票不做）；③ XMON-102 重钉到 #860 grow 语义，**钉扎值以证据实测读数为准**
-（「截图上是多少就钉多少」，不许钉推定/理论常数）。
+**The three review decisions (user "all three follow your suggestion" + a hard criterion on the third)**:
+① jump-to-latest adopts the registry default form; ② the reopen semantics adopt "reopen lands at the latest",
+the Multica inert/opacity carrier opens a separate shell ticket **#1067** (the display:none physically-unreachable fact is written into the ticket,
+this ticket does not do it); ③ XMON-102 repins to the #860 grow semantics, **the pinned value is the evidence-measured reading**
+("pin whatever the screenshot shows", no estimated/theoretical constants allowed).
 
-**G5 判红与登记偏离（bubble.tsx tinted 档）**：ui-drift-gate G5 抓 pristine 文件里
-上游 tinted 档的相对色 `oklch(from var(--primary) …)`——运行时依赖 --primary、
-折不了静态 token 值，且 #851「颜色走语义槽」无豁免出口。处置 = **不新造 token 槽**
-（协调者明令拿不准就别自拍槽；本处置也没拍）：按 button.tsx 既有偏离先例改写为
-`color-mix(in_oklch, var(--primary) p%, var(--card))` 双 token 混色（同文件上游
-secondary/muted hover 的括号习语），配比按上游 L 目标值（base 0.93 light / 0.30
-dark，hover 0.88 / 0.35）对 #988 实测 token L 值（card 0.9426/0.2553、primary
-0.1706/0.9346）反推：light 2%/8%、dark 7%/14%，四面 |ΔL| ≤ 0.005。账本
-bubble.tsx → **deviated**（第 8 个登记偏离，reason 含完整推导），hash 重冻
-`a1b3b663…`，registry gate + drift gate 双 PASS。与 #988 色板账零冲突（不动任何
-token 值）、与 #1055 品牌墨裁决零冲突（text-foreground 原样，墨槽未挪用）。
-tinted 档本车道零消费（A1 只吃 secondary/ghost）。
+**G5 verdict red and registered deviation (bubble.tsx tinted tier)**: ui-drift-gate G5 caught, in a pristine file,
+the upstream tinted tier's relative color `oklch(from var(--primary) …)` — it depends on --primary at runtime,
+cannot be folded into a static token value, and #851 "colors go through semantic slots" has no exemption exit. Disposition = **do not mint a new token slot**
+(the coordinator's explicit order: don't self-mint a slot when unsure; this disposition mints none): rewrite it as
+`color-mix(in_oklch, var(--primary) p%, var(--card))` two-token mix per button.tsx's existing deviation precedent (the same file's upstream
+secondary/muted hover parenthesized idiom), the ratio back-solved from the upstream L target values (base 0.93 light / 0.30
+dark, hover 0.88 / 0.35) against the #988 measured token L values (card 0.9426/0.2553, primary
+0.1706/0.9346): light 2%/8%, dark 7%/14%, all four faces |ΔL| ≤ 0.005. Ledger
+bubble.tsx → **deviated** (the 8th registered deviation, reason carries the full derivation), hash re-frozen
+`a1b3b663…`, registry gate + drift gate both PASS. Zero conflict with the #988 palette ledger (no token
+value moved), zero conflict with the #1055 brand-ink verdict (text-foreground as-is, the ink slot not re-appropriated).
+The tinted tier has zero consumers in this lane (A1 only eats secondary/ghost).
 
-**两条重钉账落地（e2e）**：
-- hero 面 `chief-stream` count-0 → 常驻 Content 载体律（D6 同族）：容器 count-1 +
-  Item 零个 + 行载体零个（行为语义「hero 面无流」不动）。
-- XMON-102 → 更名「composer grows with a restored draft to the six-line cap
-  (#860 supersedes XMON-102)」：drafted 120 / empty 60，**值来源 = 实测渲染**
-  （smoke S5/S5b 两行录于 result-a1-fixture-smoke.json，截图对照 a1-04 / a1-01），
-  spec 注释注明非 growCap 常数推定（数值恰合同为实测结果）。overflowY auto 两面保留。
-- 新增 **F-R23**：live 面行 id 贯通 pin——四条 Item 的 data-message-id 逐一
-  对到桩消息 id（m1/m2/m3/m9，存储序）；fixture 面 id 缺省回落 index（S10 已钉）。
+**Two repin-ledger landings (e2e)**:
+- hero face `chief-stream` count-0 → resident Content carrier rule (same D6 family): container count-1 +
+  zero Items + zero row carriers (the behavior semantic "hero face has no stream" unchanged).
+- XMON-102 → renamed "composer grows with a restored draft to the six-line cap
+  (#860 supersedes XMON-102)": drafted 120 / empty 60, **the value source = measured rendering**
+  (smoke S5/S5b two rows recorded in result-a1-fixture-smoke.json, screenshots a1-04 / a1-01),
+  the spec annotation states it is not a growCap constant estimate (the values happen to coincide with the measured result). overflowY auto kept on both faces.
+- New **F-R23**: live-face row id threading pin — the four Items' data-message-id map one-by-one
+  to the stub message ids (m1/m2/m3/m9, storage order); the fixture face defaults id to index (S10 already pinned).
 
-**better-colors 增量（模板 v3 第 3 项）**：A1 新合成面 = **零**——user 气泡走
-secondary 档（--secondary 既有槽，A0 册 §8 已双模实测过同槽族）、robot 走 ghost
-（透明底无新对）、marker/jump 钮全既有墨槽；tinted 偏离色零消费不渲染、无可测面。
-故本段不重测（#988 全局 109 对封账 + A0 增量 14 对面不变）。
+**better-colors increment (template v3 item 3)**: the A1 new composite face = **zero** — the user bubble goes through the
+secondary tier (--secondary existing slot, the A0 volume §8 already measured the same slot family in both modes), robot goes through ghost
+(transparent base, no new pair), marker/jump button all existing ink slots; the tinted deviation color zero consumers not rendered, no measurable face.
+So this phase does not re-measure (#988 global 109 pairs closed + the A0 increment 14 pairs unchanged).
 
-**收口账面**：本地全量 e2e **849/849**（含 F-R23 新增；main 同期并入 #1007 pages
-大改——全量网兜住零交互红）、根 vitest **2251/2251（206 文件）**、typecheck /
-lint / registry gate / drift gate / inventory 全绿、探针重钉后
-**KEPT 121 / DRIFT 0 / NOT-RUN 0 / VIOLATION 0**（probe-after-a1 重跑覆盖原型态
-dump；三方链 = probe-a1-pre 基线 → 原型 DRIFT 1 → 施工清零）。
+**Close-out ledger**: local full e2e **849/849** (including the new F-R23; main in the same period merged the #1007 pages
+big change — the full net caught zero interaction reds), root vitest **2251/2251 (206 files)**, typecheck /
+lint / registry gate / drift gate / inventory all green, probe after repin
+**KEPT 121 / DRIFT 0 / NOT-RUN 0 / VIOLATION 0** (probe-after-a1 rerun covers the prototype-state dump;
+the three-way chain = probe-a1-pre baseline → prototype DRIFT 1 → build zeroed).
 
-## 12. A2 原型（detail 对话列 → MessageScroller，2026-10-09）
+## 12. The A2 prototype (detail conversation column → MessageScroller, 2026-10-09)
 
-分支 `hp/pacman/t-0239-1-l6-chief-1009` 已并 origin/main（合并 `cb655e29`，
-含 #1006 detail-b / #1010 select / #1037 / #1026 等 11 提交），原型提交
-`14be5ed4`。波 1 其余五道（#1004–#1008）与 #1010 已合并，本票是 frontier 唯一
-未闭票。
+Branch `hp/pacman/t-0239-1-l6-chief-1009` merged to origin/main (merge `cb655e29`,
+with #1006 detail-b / #1010 select / #1037 / #1026 etc. 11 commits), prototype commit
+`14be5ed4`. The remaining five wave-1 lanes (#1004–#1008) and #1010 have merged; this ticket is the frontier's only
+unclosed ticket.
 
-### 12.1 换装面（结构映射）
+### 12.1 The dress-swap face (structure mapping)
 
-| 现状面 | 换装后 | 中和（消费点，原语文件 pristine 零触碰） |
+| Current face | After swap | Neutralization (consumer site, primitive file pristine zero-touch) |
 |---|---|---|
-| `.chat-col`（`flex-col-reverse` + `overflow-y-auto` + `chatColRef`） | `MessageScroller` Root > Viewport（testid `transcript-col`） | Root `h-auto min-h-0 flex-1`（原语 `size-full` 的 h-full 顶爆 detail-center flex 链）；Viewport 承接 `chat-col` 类与 19/16/16/19 内垫（detail-3pane 的 `colPadBottom` / detail-narrow 的横滚断言读这里） |
-| `.chat-pin.mb-auto`（column-reverse 的底部钉） | `MessageScrollerContent` `block gap-0` | 行距语义留在行自身 margin；原语默认 `flex gap-6` 会双倍行距 |
-| 行（`key=index`，无锚） | `MessageScrollerItem`（`key`/`messageId` = 源 message id） | inline style `content-visibility: visible`（原语 `auto` 会让离屏行跳布局，探针/e2e 随滚动相位漂） |
-| `useChatFollow`（`reversed: true`） | Provider 原生 `autoScroll` + `defaultScrollPosition="end"` | 阈值 80 = `scrollEdgeThreshold={80}`（FOLLOW_THRESHOLD 同值，A1 同律） |
-| `requestFollow()`（onSend） | 列的 imperative handle `scrollToEnd()` | 页面经 `transcriptColRef` 调用；Provider 与消费者不同组件（hook 吃不到自己渲染树的 context） |
-| — | `MessageScrollerButton direction="end"`（jump-to-latest） | 随原语带入（#991 Q6），children 覆写为仓 ArrowDown + `t('滚动到最新')` sr-only |
+| `.chat-col` (`flex-col-reverse` + `overflow-y-auto` + `chatColRef`) | `MessageScroller` Root > Viewport (testid `transcript-col`) | Root `h-auto min-h-0 flex-1` (the primitive `size-full`'s h-full blows out the detail-center flex chain); Viewport carries the `chat-col` class and the 19/16/16/19 padding (detail-3pane's `colPadBottom` / detail-narrow's horizontal-scroll assertions read here) |
+| `.chat-pin.mb-auto` (the column-reverse bottom pin) | `MessageScrollerContent` `block gap-0` | row spacing semantics stay in the row's own margin; the primitive default `flex gap-6` would double the row spacing |
+| row (`key=index`, no anchor) | `MessageScrollerItem` (`key`/`messageId` = the source message id) | inline style `content-visibility: visible` (the primitive `auto` would make offscreen rows jump layouts; probes/e2e drift with the scroll phase) |
+| `useChatFollow` (`reversed: true`) | Provider-native `autoScroll` + `defaultScrollPosition="end"` | threshold 80 = `scrollEdgeThreshold={80}` (same value as FOLLOW_THRESHOLD, same rule as A1) |
+| `requestFollow()` (onSend) | the column's imperative handle `scrollToEnd()` | the page calls via `transcriptColRef`; Provider and consumer are different components (a hook can't read its own render tree's context) |
+| — | `MessageScrollerButton direction="end"` (jump-to-latest) | comes in with the primitive (#991 Q6), children override to the repo ArrowDown + `t('滚动到最新')` sr-only |
 
-**行 id 贯通（票面「mapper 视图侧」）**：`TranscriptItem` 的 user / robot /
-thinking / note / review 五 kind 扩 `id?: string`；`mapTranscript` 五处投影
-`id: m.id`（run / plan / tools 组等合成行无 id → key 回落 index）。wire 零触碰
-（ADR 0011 封段在写入端）。
+**Row id threading (ticket's "mapper view side")**: `TranscriptItem`'s user / robot /
+thinking / note / review five kinds extend `id?: string`; `mapTranscript`'s five projection points
+`id: m.id` (synthesized rows like run / plan / tools groups have no id → key falls back to index). wire zero-touch
+(ADR 0011 seals the segment on the write side).
 
-**滚动律映射（#873 逐条 → 原语机制，与 A1 同律）**：贴底阈值 80px =
-`scrollEdgeThreshold`；增长只在读者贴最新端时拖动 = 原语 `autoScroll`；开列落
-最新 = `defaultScrollPosition="end"`（旧 hook `bind→scrollToNewest` 等价）；读者
-自己发出去的那条永远跳到最新 = `scrollToEnd()`。
+**Scroll-rule mapping (#873 item by item → primitive mechanism, same rule as A1)**: bottom-detection threshold 80px =
+`scrollEdgeThreshold`; growth only drags while the reader is at the latest end = the primitive `autoScroll`; open-column lands
+at latest = `defaultScrollPosition="end"` (equivalent to the old hook `bind→scrollToNewest`); the reader's own
+send always jumps to latest = `scrollToEnd()`.
 
-### 12.2 原型态账面
+### 12.2 Prototype-state ledger
 
-- 域 e2e **120 绿 / 2 红**（11 spec：detail-3pane / detail-narrow /
+- Domain e2e **120 green / 2 red** (11 specs: detail-3pane / detail-narrow /
   chat-type-measure / transcript-user-words / thinking-row-truncate / spec-flow /
   dead-buttons / attachment-strip / attachment-title / composer-paste /
-  chief-panel / chief-stream-markdown）
-- 两条红 = 载体重钉账（行为断言语义一字不动，归施工段）：
-  ① **spec-flow 2**「简报卡随流滚走」——旧列是 `column-reverse`（scrollTop 0 =
-     最新，读旧端用负 top）；换装后是普通滚动容器（最新 = `scrollHeight`，最旧 =
-     0）。断言语义（简报卡随流、最旧端在列首、最新端滚出视口）不变，只翻坐标约定。
-  ② **chat-type-measure「turn boundary is air」**——探针走 agent 行的
-     `previousElementSibling`；行现嵌在 `MessageScrollerItem` 里，载体要多走一层。
-     它断言的「边界只有空气、无横线」不变。
-- 探针三方 diff（`probe-a2-pre` → `probe-after-a2`，同 8 spec）：比较行 83
-  —— **KEPT 76 / DRIFT 1 / NOT-RUN 6 / VIOLATION 0**。唯一 DRIFT = spec-flow 的
-  滚动约定行（上①）；全部几何行 KEPT（列宽 / 行盒 / 排版 / 内垫逐值不变）。
-- 截图：`a2-detail-confirm-17b.png`（confirm 相 + 简报卡）、
-  `a2-detail-done-36.png`（done 相多轮会话），复跑配方见 `shoot-a2.mjs`。
+  chief-panel / chief-stream-markdown)
+- The two reds = carrier-repin ledger (behavior assertion semantics unchanged word-for-word, owned by the build phase):
+  ① **spec-flow 2** "brief card scrolls with the stream" — the old column is `column-reverse` (scrollTop 0 =
+     latest, the old end read with a negative top); after the swap it is a normal scroll container (latest = `scrollHeight`, oldest =
+     0). The assertion semantics (brief card follows the stream, the oldest end at the column head, the latest end scrolls out of view) unchanged, only the coordinate convention flips.
+  ② **chat-type-measure "turn boundary is air"** — the probe walks the agent row's
+     `previousElementSibling`; the row is now embedded in a `MessageScrollerItem`, so the carrier needs one more level.
+     Its assertion "the boundary is only air, no horizontal line" unchanged.
+- Probe three-way diff (`probe-a2-pre` → `probe-after-a2`, same 8 specs): compared rows 83
+  —— **KEPT 76 / DRIFT 1 / NOT-RUN 6 / VIOLATION 0**. The only DRIFT = spec-flow's
+  scroll-convention row (the ① above); all geometry rows KEPT (column width / row box / typography / padding value-by-value unchanged).
+- Screenshots: `a2-detail-confirm-17b.png` (confirm phase + brief card),
+  `a2-detail-done-36.png` (done phase multi-turn session), rerun recipe in `shoot-a2.mjs`.
 
-### 12.3 待实审裁决
+### 12.3 Pending review decisions
 
-1. **滚动轴向反转**（`column-reverse` → 普通容器）——视觉契约不变（短会话顶对齐、
-   长会话开在最新行、简报卡随流），但凡驱动旧坐标的自定义脚本/e2e 需同步翻。
-   请确认接受。
-2. **jump-to-latest 钮落在详情列**（A1 只落在总管窗）。详情列宽 712px、内容端
-   恒可见，此钮的收益待判；#991 Q6 的「删除才是定制」口径在宽列上是否仍成立。
-3. **`useChatFollow` 本体退役**——详情页是本 hook 最后一个消费者，A2 后它成
-   死代码（含 `apps/web/test/chat-follow.test.ts`）。施工段拟整件删除（#873 单源
-   律由原语承接）；若希望保留观察期请指明。
+1. **Scroll-axis reversal** (`column-reverse` → normal container) — the visual contract unchanged (short session top-aligned,
+   long session opens at the latest row, brief card follows the stream), but any custom script/e2e that drives the old coordinates must flip in sync.
+   Please confirm acceptance.
+2. **The jump-to-latest button lands in the detail column** (A1 only landed it in the chief window). The detail column is 712px wide and the content end
+   is always visible; this button's benefit is yet to be judged; whether #991 Q6's "deleting it is the only customization" still holds on a wide column.
+3. **`useChatFollow` itself retires** — the detail page is this hook's last consumer, so after A2 it becomes
+   dead code (including `apps/web/test/chat-follow.test.ts`). The build phase plans to delete the whole item (#873 single-source
+   rule carried by the primitive); to keep an observation window, please say so.
 
-## 13. B 原型（附件面 → registry Attachment 卡，2026-10-09）
+## 13. The B prototype (attachment face → registry Attachment card, 2026-10-09)
 
-### 13.1 换装面
+### 13.1 The dress-swap face
 
-| 现状面 | 换装后 | 中和 |
+| Current face | After swap | Neutralization |
 |---|---|---|
-| `chat-markdown.tsx` AttachmentChip（`<a class="spec-chip …">` / `<Button>` + `SPEC_CHIP`/`SPEC_CHIP_IMG` utilities） | `overlay/attachment-card.tsx` 单源卡（`Attachment` 原语 + `AttachmentTrigger`/`Media`/`Content`/`Title`） | `.spec-chip` 族降为零规则钩子（挂触发钮上）——spec-brief-card 的 `a.spec-chip`/`img.spec-chip-img` 与 chief-composer-tools 的 `.spec-chip` 定位子原样存活 |
-| `attachment-strip.tsx` 在途占位卡（`<Button>`/`<span>` chip + 上传中 badge） | 同一卡 `state="uploading"` | 上传中 badge 改绝对定位——多一行会改盒、破「落定零位移」契约 |
-| 落定 chip（`AttachmentChip`） | 同一卡 `state="done"` | 根盒 `border-0`：原语 1px 缝线会让 root 盒比触发钮盒每边大 1px（占位读 root、落定读触发钮 → 2px 落差），去框后 root ≡ trigger |
-| 缩略几何（`SPEC_CHIP_IMG`：`max-h-40 max-w-full`） | 原语 `AttachmentMedia` image 档（`aspect-square w-10 object-cover`） | 常量退役；缩略由原语供给 |
+| `chat-markdown.tsx` AttachmentChip (`<a class="spec-chip …">` / `<Button>` + `SPEC_CHIP`/`SPEC_CHIP_IMG` utilities) | `overlay/attachment-card.tsx` single-source card (`Attachment` primitive + `AttachmentTrigger`/`Media`/`Content`/`Title`) | the `.spec-chip` family demotes to zero-rule hooks (hung on the trigger button) — spec-brief-card's `a.spec-chip`/`img.spec-chip-img` and chief-composer-tools' `.spec-chip` locator children survive as-is |
+| `attachment-strip.tsx` in-flight placeholder card (`<Button>`/`<span>` chip + uploading badge) | the same card `state="uploading"` | the uploading badge switches to absolute positioning — an extra row would change the box and break the "settle with zero displacement" contract |
+| settled chip (`AttachmentChip`) | the same card `state="done"` | root box `border-0`: the primitive 1px seam would make the root box 1px larger per side than the trigger button box (the placeholder reads root, the settled reads trigger → a 2px drop); after removing the frame, root ≡ trigger |
+| thumbnail geometry (`SPEC_CHIP_IMG`: `max-h-40 max-w-full`) | primitive `AttachmentMedia` image tier (`aspect-square w-10 object-cover`) | the constant retires; the thumbnail comes from the primitive |
 
-三宿主面（detail composer / new-task dialog / chief 抽屉 composer）共用 `AttachmentStrip` → `AttachmentCard`，一处改三面生效。
+The three host faces (detail composer / new-task dialog / chief drawer composer) share `AttachmentStrip` → `AttachmentCard`; one change takes effect in all three faces.
 
-### 13.2 账面
+### 13.2 Ledger
 
-- 域 e2e **122 绿 / 0 红**（10 spec：attachment-strip / attachment-title / spec-brief-card / chief-composer-tools / composer-paste / dead-buttons / chief-panel / chief-stream-markdown / detail-3pane / transcript-user-words）——**无重钉**：`FM2` 盒等值契约（占位盒 ≡ 落定盒）按设计保住
-- 全量本地 e2e **862/862 绿**；web units 464/464
-- 探针（`probe-after-b`，7 spec）：**KEPT 126 / DRIFT 0 / NOT-RUN 0 / VIOLATION 0**
-- typecheck / lint / registry 闸 / drift 闸 / consumer-shape 闸全绿（consumer 文件数 212→213，新增 `attachment-card.tsx`）
+- Domain e2e **122 green / 0 red** (10 specs: attachment-strip / attachment-title / spec-brief-card / chief-composer-tools / composer-paste / dead-buttons / chief-panel / chief-stream-markdown / detail-3pane / transcript-user-words) — **no repin**: the `FM2` box-equality contract (placeholder box ≡ settled box) preserved by design
+- Local full e2e **862/862 green**; web units 464/464
+- Probe (`probe-after-b`, 7 specs): **KEPT 126 / DRIFT 0 / NOT-RUN 0 / VIOLATION 0**
+- typecheck / lint / registry gate / drift gate / consumer-shape gate all green (consumer file count 212→213, new `attachment-card.tsx`)
 
-### 13.3 待实审裁决
+### 13.3 Pending review decisions
 
-1. **卡形从紧凑 chip 变 registry 卡片**（缩略块 + 文件名行）。几何契约未动，但观感明显不同——图 `b-card.drawio.svg` + 截图 `b-after/` 对照 `docs/verify/757/`。请确认卡形采纳。
-2. **`.spec-chip` 钩子保留**（零规则类，非皮肤）——为免 spec-brief-card / chief-composer-tools 一次载体重钉。若希望彻底清掉这些类名，需另开载体重钉（本段不做）。
-3. **#1009 的关闭时点**——B 是四段串行的最后一段，B 合并落地后 #1009 即完成、#1011/#1012 解除 blocking。按协调者口径：**本段 PR 与 commit 均不带关票关键字**（squash 消息由合并指令管住），#1009 由协调者在四段全落后关闭。确认此口径无误即放行施工段。
+1. **The card shape changes from compact chip to registry card** (thumbnail block + filename row). The geometry contract is untouched, but the look is clearly different — the `b-card.drawio.svg` figure + `b-after/` screenshots against `docs/verify/757/`. Please confirm the card shape adoption.
+2. **The `.spec-chip` hook kept** (zero-rule class, not a skin) — to avoid one-shot carrier repins for spec-brief-card / chief-composer-tools. To fully purge these class names, a separate carrier repin is needed (not done this phase).
+3. **The close point of #1009** — B is the last of the four serial phases; after B merges, #1009 is done and #1011/#1012 lift blocking. Per the coordinator: **this phase's PR and commit both carry no closing keyword** (the squash message is governed by the merge instruction), #1009 is closed by the coordinator after all four phases land. Confirm this criterion is correct and the build phase is released.

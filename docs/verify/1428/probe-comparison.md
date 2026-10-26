@@ -1,3 +1,4 @@
+```
 # Probe dump — old baseline → new measured (#921)
 
 Run 2026-10-21T02:39:21.642Z · commit `66c7985c` · port 8397 · playwright 1.63.0 · workers 4
@@ -1624,3 +1625,5 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | visual-polish.spec.ts | 228 | toBe | 0px | 0px | — | collapsed rail draws no seam either (Paper PR 7) |
 | visual-polish.spec.ts | 229 | toBe | none | none | — | collapsed rail draws no seam either (Paper PR 7) |
 | z-ladder.spec.ts | 64 | toEqual | ["true","true","true","true","true"] | ["true","true","true","true","true"] | — | every probe point of the new-task panel hit-tests inside the panel |
+
+```

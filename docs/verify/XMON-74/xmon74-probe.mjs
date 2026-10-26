@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-// XMON-74/XMON-115 live 闭环探针（一次性，不进仓）：隔离栈上走真 HTTP +
-// 真 UI + 真 SQLite，证明 chief set_remote_shell 授权环全链能跑：
-// A. REST 建 agent → 默认 tools = ['推送分支']（XMON-74 Q1 live 证据）
-// B. UI 权限 tab 截图：远程 shell OFF / 推送分支 ON（默认态）
-// C. chief 线程 → 机器 claim：remoteTools = 50 词表含 set_remote_shell；
-//    machine.shellEnabled=false → localTools 无 remote_shell（双闸关）
-// D. relay set_remote_shell(enabled=true) → agent.tools 落「远程 shell」；
-//    REST GET 与 SQLite 行同值（双入口单真相）
-// E. relay(enabled=false) 撤回；不存在 agentId → 404 不写
-// F. UI 权限 tab 截图：chief 写点后「远程 shell」开关 ON
-// G. PATCH machine.shellEnabled=true → 新 chief 步 claim：localTools 含
-//    remote_shell（双闸开，执法面消费同一开关字段）
+// XMON-74/XMON-115 live closed-loop probe (one-off, not committed to the repo):
+// exercises real HTTP + real UI + real SQLite on an isolated stack to prove the
+// whole chief set_remote_shell authorization ring works:
+// A. create agent over REST → default tools = [`推送分支`] (XMON-74 Q1 live evidence)
+// B. UI permissions tab screenshot: remote shell OFF / `推送分支` ON (default state)
+// C. chief thread → machine claim: remoteTools = the 50-entry vocabulary incl.
+//    set_remote_shell; machine.shellEnabled=false → no remote_shell in localTools
+//    (both gates closed)
+// D. relay set_remote_shell(enabled=true) → agent.tools gains `远程 shell`;
+//    REST GET and the SQLite row agree (two entries, one truth)
+// E. relay(enabled=false) revokes; a nonexistent agentId → 404, no write
+// F. UI permissions tab screenshot: after the chief's write the `远程 shell` switch is ON
+// G. PATCH machine.shellEnabled=true → new chief-step claim: localTools includes
+//    remote_shell (both gates open; the enforcement face consumes the same switch field)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
@@ -67,7 +69,7 @@ const send = async (url, method, body, cred) => {
   return { status: res.status, json, text };
 };
 
-// —— A. setup：team / api key / machine enroll / agent / chief 绑定 / 线程 ——
+// —— A. setup: team / api key / machine enroll / agent / chief bind / thread ——
 const teams = (await send(`${SERVER}/api/teams`, 'GET')).json;
 const teamId = teams[0].id;
 const keyRes = await send(`${SERVER}/api/teams/${teamId}/api-keys`, 'POST', {
@@ -92,15 +94,16 @@ save('00-enroll-me.json', { enroll: enroll.json, me: meRes.json });
 check('machine-enrolled-shell-off', machineId && meRes.json?.shellEnabled === false,
   `machineId=${machineId} shellEnabled=${meRes.json?.shellEnabled}`);
 
-// chief 派发要求绑定 agent 带模型（chief.ts requireBoundAgent 409），照
-// drive-agent-detail 配方先建 custom provider 再建 agent。
+// chief dispatch requires the bound agent to carry a model (chief.ts
+// requireBoundAgent 409); following the drive-agent-detail recipe, create the
+// custom provider first, then the agent.
 await send(`${SERVER}/api/teams/${teamId}/providers`, 'POST', {
   providerId: 'xmon74-gw',
   label: 'xmon74-gw',
   baseUrl: 'https://gw.invalid/v1',
   api: 'anthropic-messages',
   models: [{ id: 'stub-model', name: 'stub-model' }],
-}); // 409 = 重跑已存在，忽略
+}); // 409 = already exists on rerun, ignore
 const AGENT_NAME = 'XMON-74 权限闭环验证';
 const created = await send(`${SERVER}/api/teams/${teamId}/agents`, 'POST', {
   displayName: AGENT_NAME,
@@ -108,7 +111,7 @@ const created = await send(`${SERVER}/api/teams/${teamId}/agents`, 'POST', {
   modelId: 'stub-model',
 });
 const agentId = created.json?.id;
-// 创建响应 = 201 {id}（r5 §1），全记录走 GET。
+// The create response = 201 {id} (r5 §1); the full record goes through GET.
 const createdGet = await send(`${SERVER}/api/teams/${teamId}/agents/${agentId}`, 'GET');
 save('01-agent-created-defaults.json', { create: created.json, get: createdGet.json });
 check(
@@ -129,7 +132,7 @@ const thread1 = await send(`${SERVER}/api/teams/${teamId}/chief/threads`, 'POST'
 });
 check('chief-thread-queued', thread1.status === 201, `status=${thread1.status}`);
 
-// —— B. UI 默认态截图 ——————————————————————————————————————————————
+// —— B. UI default-state screenshots ————————————————————————————————
 const browser = await chromium.launch();
 const page = await browser.newPage({
   viewport: { width: 1440, height: 732 },
@@ -161,11 +164,11 @@ check(
 );
 await shot(page, '02-perms-default.png');
 
-// —— C. claim #1：50 词表 + 双闸关 ————————————————————————————————
+// —— C. claim #1: the 50-entry vocabulary + both gates closed ——————————
 const claim1 = await send(`${SERVER}/api/machine/tasks/claim`, 'POST', {}, token);
 const claim1Body = claim1.json?.step;
 if (!claim1Body) throw new Error(`claim1 空: ${claim1.text}`);
-const step1 = claim1Body; // ClaimedStep 信封：id 在 .step.id
+const step1 = claim1Body; // ClaimedStep envelope: the id lives at .step.id
 const remoteNames = (step1.remoteTools ?? []).map((t) => t.name ?? t);
 save('03-claim1-remoteTools.json', {
   stepId: step1.step.id,
@@ -182,7 +185,7 @@ check(
   `localTools=${JSON.stringify(step1.localTools ?? [])}`,
 );
 
-// —— D. relay 授权 + 双入口单真相 ————————————————————————————————
+// —— D. relay authorization + two entries, one truth ———————————————————
 const relay = async (name, params) =>
   send(`${SERVER}/api/machine/tool/${step1.step.id}`, 'POST', { name, params }, token);
 const grant = await relay('set_remote_shell', { agentId, enabled: true });
@@ -208,7 +211,7 @@ check(
   `agent.tools=${sqliteRow.tools}`,
 );
 
-// —— E. 撤回 + 越权守卫 ————————————————————————————————————————————
+// —— E. revocation + out-of-authority guard ————————————————————————————
 const revoke = await relay('set_remote_shell', { agentId, enabled: false });
 const revokePayload = JSON.parse(revoke.json?.text ?? 'null');
 check(
@@ -232,8 +235,9 @@ save('07-relay-revoke-guard-regrant.json', {
   regrant: { status: regrant.status, text: regrant.json?.text },
 });
 
-// 双闸 live 证据的派工前置：chief 亲手（同一 step1 relay 面）建两个 todo 并
-// run_builds 直派给验证 agent → 两个 pending worker 步，供 G 阶段先后 claim。
+// Dispatch setup for the both-gates live evidence: the chief itself creates two
+// todos (over the same step1 relay face) and run_builds assigns them straight to
+// the verify agent → two pending worker steps, claimed one after the other in phase G.
 const todoSpec = 'XMON-74 双闸验证：README 补一行说明。';
 const mkTodo = async (title) => {
   const r = await relay('create_todo', { projectId, title, spec: todoSpec });
@@ -250,18 +254,21 @@ check(
   `run1=${run1.status} run2=${run2.status}`,
 );
 
-// —— F. UI 截图：chief 写点反映到权限 tab ————————————————
+// —— F. UI screenshot: the chief's write shows up in the permissions tab ————————
 await openPermsTab();
 const shellAfter = await switchState(/shell/i);
 check('ui-shell-on-after-chief-grant', shellAfter?.checked === 'true',
   `${shellAfter?.label}=${shellAfter?.checked}`);
 await shot(page, '08-perms-chief-granted.png');
 
-// —— G. worker 步双闸 live 证据：chief 步按设计不携带 localTools（无本机执行
-// 面，XMON-108 R1；预检端点对 chief 步 409），双闸消费点在 worker claim
-// （claimLocalTools = agent「远程 shell」开关 ∩ machine.shellEnabled）。
-// E 阶段已由 chief relay 直派两个 worker 步：步一在机器闸关时 claim（agent
-// 开关已开仍不给词 = fail-closed），开机器闸后步二 claim 拿到 remote_shell。
+// —— G. worker-step both-gates live evidence: by design the chief step carries no
+// localTools (no local execution face, XMON-108 R1; the preflight endpoint 409s
+// chief steps); the both-gates consumption point is the worker claim
+// (claimLocalTools = the agent `远程 shell` switch ∩ machine.shellEnabled).
+// Phase E already had the chief relay-assign two worker steps directly: step one
+// is claimed with the machine gate closed (the agent switch is already on but the
+// word is still withheld = fail-closed); after opening the machine gate, step two's
+// claim gets remote_shell.
 const doneBody = {
   status: 'success',
   sessionId: 'xmon74-verify-session',

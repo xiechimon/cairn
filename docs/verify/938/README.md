@@ -1,75 +1,59 @@
-# #938 验证证据索引 —— squash 合并下的清场脚本
+# #938 verification evidence index — the cleanup script under squash merges
 
-对象：`scripts/cleanup-merged-branches.sh`（判据 = GitHub merged PR 列表，不猜祖先关系）。
-验收方式：本仓真实分支残留上的实跑（squash 合并下无法用祖先关系构造判据，故双向都用
-真分支：真已合残留 → 该清；真未合分支 → 不该动）。失败方式枚举正本 = 脚本头注释
-（9 条），本目录 transcript 与之对应。
+Object: `scripts/cleanup-merged-branches.sh` (criterion = the GitHub merged-PR list, no ancestor guessing).
+Acceptance method: real runs against this repo's real branch residue (under squash merges no criterion can be constructed from ancestor relations, so both directions use real branches: truly-merged residue → should be cleaned; truly-unmerged branches → must not be touched). The failure-mode enumeration canon = the script's header comment (9 items); this directory's transcripts correspond to it.
 
-## 脚本版本注记
+## Script version notes
 
-验收跨三个脚本状态，transcript 按版本前缀区分：
+The acceptance spans three script states; transcripts are distinguished by version prefix:
 
-| 版本 | 内容 | Transcripts |
+| version | content | transcripts |
 |---|---|---|
-| v1 | 初版（无守卫 9） | `t2/t3/t4-*-t0194.txt`、`full-dry-run-prefix-v1.txt` |
-| v2 | + 守卫 9（tip == merged headRefOid） | `t1-*`、`t5-*`、`t7-*`、`t9-*`、`r1/r2/r3-*`、`full-dry-run.txt` |
-| v3（随 PR 交付版） | 评审修整：`keep()`/`lookup()` 收敛、变更型 git 调用 `</dev/null`、per-op 日志截断、`OPEN_LIMIT` 可覆写 | `v3-*.txt` |
+| v1 | first version (without guard 9) | `t2/t3/t4-*-t0194.txt`, `full-dry-run-prefix-v1.txt` |
+| v2 | + guard 9 (tip == merged headRefOid) | `t1-*`, `t5-*`, `t7-*`, `t9-*`, `r1/r2/r3-*`, `full-dry-run.txt` |
+| v3 (the version delivered with the PR) | review tidy-ups: `keep()`/`lookup()` convergence, change-making git calls get `</dev/null`, per-op log truncation, `OPEN_LIMIT` overridable | `v3-*.txt` |
 
-v1→v2 只加守卫（KEEP 方向收紧，不改已证的清理路径）；v2→v3 是纯管线重构（判定逻辑
-零变化，由 v3 全仓 dry-run 与 v2 决策一致佐证）。票面点名 fixture（t-0194）跑于 v1，
-其 tip 经审计 == merged head（见下），守卫 9 对它 no-op，判定与终版一致。
+v1→v2 only adds the guard (the KEEP direction tightens, the already-proven cleanup path is unchanged); v2→v3 is a pure pipeline refactor (zero change to the decision logic, corroborated by the v3 whole-repo dry-run agreeing with v2's decisions). The ticket-named fixture (t-0194) ran on v1; its tip was audited == the merged head (see below), guard 9 is a no-op for it, and the judgment matches the final version.
 
-## 验收矩阵（票面双向 + 幂等 + 守卫红/绿）
+## Acceptance matrix (ticket two-way + idempotency + guard red/green)
 
-| 面 | 主证（终版 v3） | 补充/历史 | 结果 |
+| face | primary evidence (final v3) | supplementary/historical | result |
 |---|---|---|---|
-| 该清：正例四连环 = dry 三面计划 → 弄脏 KEEP → 净跑 CLEANED（worktree+本地+远端）→ 四重消失核验 → 幂等重跑 | `v3-positive-fourface-impl105.txt`（impl/105-react-router-8，PR #118） | `t3-clean-{dry,yes}-t0194.txt` + `t4-idempotent-t0194.txt`（票面点名 fixture，v1；yes 篇尾附会话捕获的三面消失核验） | 全 PASS，exit 0 |
-| 不该动：未合分支 + worktree，dry 与 `--yes` 双跑 | `t1-unmerged-keep-{dry,yes}.txt`（v2；yes 篇尾附 fixture 三面完好核验） | — | KEEP「not in the GitHub merged-PR list」，零改动 |
-| 不该动：活跃车道（有机实案，非构造） | `v3-keep-active-lane-open-pr.txt` | — | KEEP「open PR #1014 still uses this branch name」（守卫 2 实证） |
-| 脏 worktree 守卫 + `--force-dirty` | `v3-positive-fourface-impl105.txt` §2 | `t5-dirty-keep-force-dirty-impl104.txt`（v2 全链：KEEP → force CLEANED → 幂等） | 无 flag 必 KEEP，有 flag 才丢弃 |
-| 守卫 9 红/绿：合并后同分支续跑 | `v3-full-dry-run.txt` 内 7 条有机 KEEP（见下节） | `t9-oid-guard-impl106.txt`（v2 构造红/绿：空提交越过合并头 → KEEP；还原 tip → CLEANED） | tip != merged head 必 KEEP |
-| 失败方式 1：无 gh / gh 网络死 / git 网络死 | `v3-r1-no-gh-abort.txt`、`v3-r2-gh-network-abort.txt`、`v3-r3-git-network-abort.txt` | `r1/r2/r3-*`（v2） | 三路 exit 2 中止，绝不降级猜测；验收当晚代理多次真实抖动，中止路径被天然反复实锤 |
-| 失败方式 7：执行中远端删除网络断（天然实锤） | — | `t7-remote-delete-network-fail-impl104.txt`（v1）：worktree+本地已删、push 断 → 单行 FAIL、exit 1；残面由 t5 终跑补全 | 单点失败不扩散、如实报告 |
-| 全仓 dry-run（只读） | `v3-full-dry-run.txt`：218 WOULD-CLEAN / 67 KEEP | `full-dry-run.txt`（v2：219/68）、`full-dry-run-prefix-v1.txt`（v1：229/61） | exit 0 |
+| should clean: the positive four-link chain = three dry faces planned → dirtied KEEP → clean run CLEANED (worktree + local + remote) → four-way disappearance verification → idempotent rerun | `v3-positive-fourface-impl105.txt` (impl/105-react-router-8, PR #118) | `t3-clean-{dry,yes}-t0194.txt` + `t4-idempotent-t0194.txt` (the ticket-named fixture, v1; the yes run appends the session-captured three-face disappearance verification) | all PASS, exit 0 |
+| must not touch: unmerged branch + worktree, dry and `--yes` double run | `t1-unmerged-keep-{dry,yes}.txt` (v2; the yes run appends the fixture's three-faces-intact verification) | — | KEEP "not in the GitHub merged-PR list", zero changes |
+| must not touch: an active lane (a real organic case, not constructed) | `v3-keep-active-lane-open-pr.txt` | — | KEEP "open PR #1014 still uses this branch name" (guard 2 proven) |
+| dirty-worktree guard + `--force-dirty` | `v3-positive-fourface-impl105.txt` §2 | `t5-dirty-keep-force-dirty-impl104.txt` (v2 full chain: KEEP → force CLEANED → idempotent) | KEEP without the flag, discard only with the flag |
+| guard 9 red/green: continued runs on the same branch after merging | 7 organic KEEPs in `v3-full-dry-run.txt` (below) | `t9-oid-guard-impl106.txt` (v2 constructed red/green: an empty commit past the merge head → KEEP; tip restored → CLEANED) | tip != merged head must KEEP |
+| failure mode 1: no gh / gh network dead / git network dead | `v3-r1-no-gh-abort.txt`, `v3-r2-gh-network-abort.txt`, `v3-r3-git-network-abort.txt` | `r1/r2/r3-*` (v2) | all three abort with exit 2, never degrade to guessing; the acceptance evening's proxy flapped for real many times, so the abort path was hammered organically |
+| failure mode 7: the remote delete's network breaks mid-run (organic) | — | `t7-remote-delete-network-fail-impl104.txt` (v1): worktree + local already deleted, push broken → single-line FAIL, exit 1; the remaining face was completed by t5's final run | a single-point failure does not spread, reported faithfully |
+| whole-repo dry-run (read-only) | `v3-full-dry-run.txt`: 218 WOULD-CLEAN / 67 KEEP | `full-dry-run.txt` (v2: 219/68), `full-dry-run-prefix-v1.txt` (v1: 229/61) | exit 0 |
 
-三轮全仓 dry 的差额可逐条对账：v1 229 = v2 219 + 3（ci/e2e-merge-gate-762、impl/104、
-impl/106 在两轮之间被验收实跑清掉）+ 7（守卫 9 上线翻成 KEEP）；KEEP 61 + 7 = 68。
-v3 218 = 219 − 1（impl/105 被 v3 正例清掉）；67 = 68 − 1（负例 fixture 分支已撤）。
+The deltas across the three whole-repo dry runs reconcile line by line: v1's 229 = v2's 219 + 3 (ci/e2e-merge-gate-762, impl/104, impl/106 were really cleaned by the acceptance runs in between) + 7 (flipped to KEEP when guard 9 landed); KEEP 61 + 7 = 68. v3's 218 = 219 − 1 (impl/105 was cleaned by the v3 positive run); 67 = 68 − 1 (the negative-case fixture branch was withdrawn).
 
-## 已删 tip 的 OID 审计
+## OID audit of the deleted tips
 
-`oid-audit-deleted-tips.txt`：验收过程真删的每条分支（t-0194、ci/e2e-merge-gate-762、
-impl/104、impl/106、impl/105），被删 tip 与对应 merged PR 的 head.sha **5/5 全 40 位
-hex 相等** —— 清掉的全部是已落地工作的残留，零未合提交损失。审计通道 = GitHub REST
-（`pulls/<n>` → `.head.sha`）经直连主机取数，不经本机代理。
+`oid-audit-deleted-tips.txt`: every branch really deleted during the acceptance (t-0194, ci/e2e-merge-gate-762, impl/104, impl/106, impl/105) — the deleted tip and the corresponding merged PR's head.sha are **5/5 exactly equal on all 40 hex digits** — everything cleaned was residue of landed work, zero unmerged-commit loss. The audit channel = GitHub REST (`pulls/<n>` → `.head.sha`) fetched over a direct connection from this host, bypassing the local proxy.
 
-## 守卫 9 的有机证据（v3 全仓 dry-run）
+## Guard 9's organic evidence (v3 whole-repo dry-run)
 
-`v3-full-dry-run.txt` 中 7 条 KEEP 带「has commits past the merged head」：
-`pacman/conv-01a10c27-…`、`ui-reuse`、`web/442-chief-hotkey-cmdj`、
-`web/443-444-chief-fab`、`web/445-board-topbar`、`web/448-mention-center`、
-`xmon-18-status-row` —— 都是合并后本地又长过提交的真分支；若无守卫 9，它们会进清理计划。
+The 7 KEEPs carrying "has commits past the merged head" in `v3-full-dry-run.txt`:
+`pacman/conv-01a10c27-…`, `ui-reuse`, `web/442-chief-hotkey-cmdj`,
+`web/443-444-chief-fab`, `web/445-board-topbar`, `web/448-mention-center`,
+`xmon-18-status-row` — all real branches that grew commits locally after merging; without guard 9 they would have entered the cleanup plan.
 
-## 验收期清场副作用记录（如实）
+## Cleanup side-effects during acceptance (recorded faithfully)
 
-验收在真实残留上实跑，共回收 5 条已合残留：`hp/pacman/t-0194-932-320px-933`（三面）、
-`ci/e2e-merge-gate-762`（三面；早期 harness 的选支过滤器未排除已带 worktree 的分支而
-选中它——该 worktree 干净、无 herdr workspace 锚定、PR #764 已合，核验为无害正当回收）、
-`impl/104-ts-upgrade`（三面）、`impl/106-tailwind-4`（本地+远端）、
-`impl/105-react-router-8`（三面）。负例 fixture（`hp/pacman/t-0222-938-negfixture`，
-无 PR 的自建分支）验收后手工撤除。终版 harness 改为显式点名分支，不再按模式选支。
+The acceptance really ran on real residue and reclaimed 5 merged branches in total: `hp/pacman/t-0194-932-320px-933` (three faces), `ci/e2e-merge-gate-762` (three faces; the early harness's branch-picker filter did not exclude branches that already carried a worktree and picked it — that worktree was clean, had no herdr workspace anchor, and PR #764 was merged, verified as a harmless legitimate reclamation), `impl/104-ts-upgrade` (three faces), `impl/106-tailwind-4` (local + remote), `impl/105-react-router-8` (three faces). The negative-case fixture (`hp/pacman/t-0222-938-negfixture`, a self-made branch with no PR) was manually withdrawn after the acceptance. The final-version harness names branches explicitly and no longer picks by pattern.
 
-## 复现
+## Reproduction
 
 ```sh
-# 全仓计划（只读）
+# whole-repo plan (read-only)
 bash scripts/cleanup-merged-branches.sh
-# 单分支 dry → 执行 → 幂等
+# single-branch dry → execute → idempotent
 bash scripts/cleanup-merged-branches.sh <merged-branch>
 bash scripts/cleanup-merged-branches.sh --yes <merged-branch>
 bash scripts/cleanup-merged-branches.sh --yes <merged-branch>   # nothing to clean
 ```
 
-harness（`scripts/acceptance-battery-v2.sh` / `-v3.sh`）是**本机历史记录**：入口 `cd`
-为本机 worktree 绝对路径，且 fixture 消费真实已合残留（跑一遍即清掉），复跑需有同类
-残留分支在册。
+The harnesses (`scripts/acceptance-battery-v2.sh` / `-v3.sh`) are **this machine's history**: the entry `cd` is an absolute path to a local worktree, and the fixtures consume real merged residue (one run cleans them), so a rerun needs similar residue branches on record.

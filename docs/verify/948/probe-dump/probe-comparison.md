@@ -1,3 +1,4 @@
+```
 # Probe dump — old baseline → new measured (#921)
 
 Run 2026-10-06T00:00:23.318Z · commit `ffe9e34e` · port 8401 · playwright 1.63.0 · workers 4
@@ -64,3 +65,5 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | overlay-focus.spec.ts | 97 | toBe | rgb(216, 156, 252) | rgb(216, 156, 252) | — | Tab focus keeps the brand ring (keyboard reachability preserved) |
 | overlay-focus.spec.ts | 126 | toHaveCSS | animation-name: enter | enter | — | backdrop click closes; entry rides the tw-animate-css fade |
 | z-ladder.spec.ts | 64 | toEqual | ["true","true","true","true","true"] | ["true","true","true","true","true"] | — | every probe point of the new-task panel hit-tests inside the panel |
+
+```

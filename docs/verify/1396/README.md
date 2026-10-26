@@ -11,7 +11,7 @@ JSON show the same light colours before and after.
 | `mockup-*.png` | the six views of `apps/web/docs/board-paper-dark.html` (`shoot-mockup.mjs`), approved 2026-10-21 before any token change |
 | `fixture/{before,after}-{dark,light}-*.png` | vite dev with `?scenario=` (no dist), 1440x900: board (board-overflow), detail (26), account (13), resources (06), new-task dialog (01, opened by click), user menu (27d), more menu (27, opened by click). before = main faed603d, after = this branch |
 | `fixture/*-probe.json` | runtime token values plus the painted background of sidebar / sheet / card / body |
-| `live/{dark,light}-*.png` | verify-pacman stack (server 8791, vite dev 5273, fresh library): task created through the sidebar button, detail opened from its card, user menu opened from the user row, account page; `dark-flip-*` are the real 外观 clicks (浅色 then 深色) inside the menu |
+| `live/{dark,light}-*.png` | verify-pacman stack (server 8791, vite dev 5273, fresh library): task created through the sidebar button, detail opened from its card, user menu opened from the user row, account page; `dark-flip-*` are the real `外观` clicks (`浅色` then `深色`) inside the menu |
 | `live/live-probe.json` | painted colours per theme and across the flip |
 | `e2e-affected.log` | `pnpm --filter @pacman/web e2e:affected` (shared styles changed, so the full web suite ran: 1085 passed) |
 | `verified-before.txt` / `verified-after.txt` | the four re-pinned specs (color-freeze, accent-typo, segmented-controls, spec-brief-card) run with main's `shadcn.css` / `tokens.css` in place (failing) and with this branch's (passing), `E2E_PORT=8398` |

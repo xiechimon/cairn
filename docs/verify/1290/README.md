@@ -1,10 +1,10 @@
-# #1290 verify evidence — claude 二进制探测 well-known 回落 + launchd PATH
+# #1290 verify evidence — claude binary probe well-known fallback + launchd PATH
 
-两个问题面各自的实物：
+The artifacts for each of the two problem faces:
 
-## 1. 探测回落（`probe-narrow-path.json`）
+## 1. The probe fallback (`probe-narrow-path.json`)
 
-复现命令（窄 PATH 模拟 launchd 环境，HOME 保留以解析 `~/.local/bin`）：
+Reproduction command (a narrow PATH simulating the launchd environment, HOME kept to resolve `~/.local/bin`):
 
 ```sh
 env -i HOME="$HOME" PATH=/usr/bin:/bin \
@@ -12,22 +12,22 @@ env -i HOME="$HOME" PATH=/usr/bin:/bin \
   apps/daemon/node_modules/tsx/dist/cli.mjs /tmp/1290-probe-narrow-path.mts
 ```
 
-实测输出要点：
+Measured output, key points:
 
-- `probeWithFallback`：`PATH=/usr/bin:/bin` 下探到 `/opt/homebrew/bin/claude`
-  （version 2.1.294），`source: "well-known"`——回落命中且来源点名。
-- `probePathOnlyControl`（`wellKnownDirs: []`，即改动前的纯 PATH 行为）：
-  同一窄 PATH 下 `null`——正是 issue 里 launchd 报的 `not found`。
-- `probe-narrow-path-old-code.json`：同命令跑 origin/main 的
-  `claude-code-bin.ts`（git show 抽出的旧版），窄 PATH 下探测返回
-  `null`——旧代码在 launchd 环境下必丢 homebrew 装的 claude 的直接实物。
+- `probeWithFallback`: under `PATH=/usr/bin:/bin` it probes `/opt/homebrew/bin/claude`
+  (version 2.1.294), `source: "well-known"` — the fallback hits and names its source.
+- `probePathOnlyControl` (`wellKnownDirs: []`, i.e. the pure-PATH behavior before the change):
+  `null` under the same narrow PATH — exactly the `not found` launchd reported in the issue.
+- `probe-narrow-path-old-code.json`: the same command running origin/main's
+  `claude-code-bin.ts` (the old version extracted via git show) returns
+  `null` under the narrow PATH — the direct artifact that the old code inevitably lost a homebrew-installed claude in the launchd environment.
 
-## 2. launchd 模板（`plist-render-lint.log`）
+## 2. The launchd template (`plist-render-lint.log`)
 
-用 install.sh 的 sed 渲染管线把 `com.xiechimon.pacman-daemon.plist.template`
-渲染到 /tmp 下的副本，渲染后 PATH 串含 `/opt/homebrew/bin:/usr/local/bin`
-（@NODE_DIR@ 之后），`plutil -lint` 通过。
+Using install.sh's sed rendering pipeline to render `com.xiechimon.pacman-daemon.plist.template`
+into a copy under /tmp, the rendered PATH string contains `/opt/homebrew/bin:/usr/local/bin`
+(after @NODE_DIR@), and `plutil -lint` passes.
 
-单测面：`apps/daemon/test/claude-code-bin.test.ts` 失败方式 10–13
-（PATH 空 + well-known 有桩 → 探到且 source 点名；PATH 有 → 不走回落；
-全空 → null；无执行位 → 跳过；绝对路径命令不走回落）。
+Unit-test face: `apps/daemon/test/claude-code-bin.test.ts` failure modes 10-13
+(empty PATH + a well-known stub → probed and the source named; PATH present → the fallback is not taken;
+all empty → null; no execute bit → skipped; an absolute-path command does not go through the fallback).

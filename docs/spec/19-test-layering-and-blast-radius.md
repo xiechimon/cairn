@@ -89,7 +89,7 @@ Conclusion: five of the six already have a different-shaped pacman equivalent, c
 
 ## Global Gesture Single Source (#1267)
 
-When the thread-task template's blast-radius item references this file, the global gesture's single source is `apps/web/src/overlays/gesture-machine.ts`.
+When the thread-task template's blast-radius item references this file, the global gesture's single source is `apps/web/src/overlay/gesture-machine.ts`.
 
 ⌘J, Escape close-layer, and the chief-drawer open/close next state are computed only in that file's `reduceGesture`. Consumption points dispatch events, do not hold their own open/close booleans, and do not register a second window-level Escape or ⌘J listener. New global gestures add into that file's event table and `bindGestureKeys`.
 

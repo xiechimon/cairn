@@ -15,9 +15,9 @@ import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hoo
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
+import { useNewTaskHotkey } from '../overlay/hotkeys.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
-import { useNewTaskHotkey } from '../overlays/hotkeys.js';
-import { SearchPanel, useSearchState } from '../overlays/search-panel.js';
+import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { attentionCount, countInColumn, openCountByProject } from './columns.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';

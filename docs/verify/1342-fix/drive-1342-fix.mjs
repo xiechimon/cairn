@@ -39,7 +39,7 @@ const input = () => page.getByTestId('machine-concurrency-input');
 await page.goto(`${W}/app/resources/machines`); await trig(manualId).waitFor();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// A: edit 7, then 恢复推荐 → exactly one PATCH {maxConcurrent:null}
+// A: edit 7, then `恢复推荐` → exactly one PATCH {maxConcurrent:null}
 await trig(manualId).click(); await input().fill('7'); await sleep(300);
 await page.screenshot({ path: join(OUT, '01-edited-draft-before-reset.png') });
 let n0 = patches.length; await page.getByTestId('machine-concurrency-reset').click(); await sleep(1500);

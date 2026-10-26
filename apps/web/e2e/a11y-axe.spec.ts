@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { findLowContrast } from './contrast-probe.js';
 import { pressAndExpect, settleTransitions } from './helpers.js';
 
 // #1442: axe-core (WCAG 2.1 A/AA) over the main pages, light and dark. Any
@@ -16,9 +17,6 @@ import { pressAndExpect, settleTransitions } from './helpers.js';
 //     for its own body content (`ready`), not the shell heading, first.
 //  5. A false dark run: the stored theme does not take. The test checks
 //     <html data-theme> before scanning.
-//
-// axe does not check `::placeholder` contrast, so native placeholders on
-// --secondary (composer, chief composer) are held by DESIGN.md, not here.
 
 // Every test opens its own page, so the file runs in parallel (the config
 // default is one worker per file).
@@ -53,6 +51,15 @@ const PAGES: AuditPage[] = [
     url: '/app?scenario=01',
     open: (page) => page.locator('.sidebar-new-task').click(),
     ready: (p) => p.getByRole('dialog', { name: '新建任务' }),
+  },
+  {
+    name: 'new task dialog filled',
+    url: '/app?scenario=01',
+    open: async (page) => {
+      await page.locator('.sidebar-new-task').click();
+      await page.keyboard.type('probe');
+    },
+    ready: (p) => p.locator('.new-task-start:enabled'),
   },
   { name: 'detail fresh', url: '/app/todo/fresh-probe?scenario=23', ready: phaseChip },
   { name: 'detail confirm', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b', ready: phaseChip },
@@ -125,6 +132,7 @@ for (const theme of ['light', 'dark'] as const) {
         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
       }));
       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+      expect(await findLowContrast(page), `low contrast outside axe on ${p.name} (${theme})`).toEqual([]);
     });
   }
 }

@@ -414,6 +414,7 @@ export function MachinesPage() {
             return (
               <ResourceRow
                 key={rowKey(machine)}
+                className="flex-wrap gap-y-2"
                 data-machine-id={machine.id}
                 data-kind={machine.kind ?? 'remote'}
               >
@@ -425,7 +426,7 @@ export function MachinesPage() {
                   </RowTitle>
                   {machine.online !== undefined && <OnlineStatus on={machine.online !== false} />}
                 </RowText>
-                <span className="flex flex-none items-center gap-5">
+                <span className="ml-auto flex flex-wrap items-center justify-end gap-x-5 gap-y-2">
                   {machine.kind === 'local' ? (
                     <span className="flex items-center gap-4">
                       {MACHINE_RUNTIMES.map((runtime) => {

@@ -53,9 +53,9 @@ import {
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { AttachmentStrip } from '../overlay/attachment-strip.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
+import { useChiefNewThreadHotkey } from '../overlay/hotkeys.js';
 import { type MentionGroups, MentionInline, MentionPicker } from '../overlay/mention-picker.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
-import { useChiefNewThreadHotkey } from '../overlays/hotkeys.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
 
 const WINDOW_CLS =

@@ -139,7 +139,7 @@ function NeedsYouStrip({
   const { search } = useLocation();
   if (todos.length === 0) return null;
   return (
-    <section data-testid="needs-you-strip" className="mx-auto w-full max-w-190 px-4 pt-3">
+    <section data-testid="needs-you-strip" className="mx-auto w-full max-w-198 px-4 pt-3">
       <div className="mb-1.5 flex items-center gap-2 text-ui font-medium text-foreground">
         <span className="size-2 rounded-full bg-(--card-button)" />
         <span>
@@ -475,7 +475,6 @@ export function BoardSurface({
                         >
                           <Plus aria-hidden strokeWidth={1.75} className="size-3.5 flex-none" />
                           <span className="min-w-0 flex-1 truncate">{t('写下想做的事')}</span>
-                          <Kbd>C</Kbd>
                         </Button>
                       ) : (
                         t(EMPTY_COPY[column.id] ?? '暂无')

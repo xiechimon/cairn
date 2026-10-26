@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, ChevronLeft, EllipsisVertical } from '../icons/index.js';
-import { type ChipAgentModel, ChipPopover } from '../overlays/chip-popover.js';
+import { type ChipAgentModel, ChipPopover } from '../overlay/chip-popover.js';
 import { PHASE_STATUS, PHASE_UI, RUNNING_INK } from '../phase.js';
 
 interface DetailHeadProps {

@@ -46,7 +46,7 @@ _Avoid_：**Workspace** —— 它不是领域实体，仅指执行机本地的�
 | 主力机 | Primary machine | `chief.machineId` | chief 的默认执行机器（#895）：chief 新线程钉选缺省链的第二级（`todo.machineId` → 本槽 → null），钉选语义同 `todo.machineId`——确定性、无自动回退，解除归用户；null = 自动（任何在线机器认领 + 会话亲和）。只辖 chief 线程的钉选，不辖 worker 派发。设定面在 chief 设置 Agent tab「机器」槽（PATCH /chief），machines 页只读三态标注（总管主机 / 回合进行中 / 等待机器）。 |
 | `记忆` | Memory | `memory` | Experience entries an agent accumulates while working. The todos.dev write path is unmeasured [black box]; the replica uses a minimal mechanism (02-architecture-parity §4.4, all marked [inferred], pending #46 calibration). |
 
-边界裁决：Agent ≠ Machine（一个是配置好的角色，一个是承载它的物理主机）。Chief 是单独概念，不作为普通 Agent 的子类型混称。**总管面板是布局的一列，不是浮层**（ADR 0004）——界面词「总管面板」指贴右竖板；形态事实归 ADR，此处只钉术语。
+Boundary: Agent ≠ Machine (one is a configured role, the other the physical host that carries it). Chief is its own concept, never called a kind of Agent. The chief panel is a floating window (ADR 0013, superseding ADR 0004's right-docked column); its vocabulary is in "Chief panel and machine binding" below.
 
 ## 资源与配置
 
@@ -73,3 +73,21 @@ _Avoid_：**Workspace** —— 它不是领域实体，仅指执行机本地的�
 | 记录流 | Transcript | `transcript` | build 的有序消息与工具调用记录；是 build 的一面（facet），非独立可操作实体。 |
 | 段 | Segment | `segment`（行形 `msg-<stepId>-<n>`） | 一次回合内模型输出的**一段连续同类型增量**（`text` 或 `thinking`）。工具调用是独立记录，不是段。段在**写入端**封口（类型变化 / 工具到达 / 消息结束 / 步收尾），流式期与落库期同源——同一个段既是流式期即时出现的那条行，也是终稿里的那条行。 |
 | Token 用量 | Token usage | `tokenUsage` | 按「build × model × 输入/输出/缓存读/缓存写」统计的记账读数；值对象，无自身生命周期。 |
+
+## Chief panel and machine binding
+
+Moved from the former `GLOSSARY.md`. Each entry names the canonical UI word and the words to avoid.
+
+| UI word | English | Definition | Avoid |
+|---|---|---|---|
+| `总管` | Chief | The resident orchestration agent, one per user × team: it plans tasks, dispatches builds and talks with people. | `主管`, boss |
+| `总管面板` | Chief panel | The chief's only conversation surface, shaped as a floating window (ADR 0013). | `抽屉`, drawer, `竖板`, `主管` pane (the first three name the retired right-docked panel; code identifiers such as `chief-drawer.tsx` are cleaned up with #1009 A0) |
+| `悬浮窗` | Floating window | A floating card window anchored to the bottom right of the content area: no modal, no scrim, resident across pages, open state persisted (closed by default). Follows the Multica floating chat window. | `悬浮卡`, `浮窗`, `浮层` |
+| `常驻` | Resident | How the floating window exists: mounted once in the root layout, not remounted on route change, kept (inert) when closed, open state kept across reloads. | `常开`, `永挂` |
+| `最小化` | Minimize | The floating window's only way to collapse: it returns to the bottom-right FAB and keeps its draft, scroll and thread. It is not a destructive close. | `关闭` (for the floating window), `收起` |
+| `贴右竖板` | Right-docked panel | Historical (ADR 0004, retired): a full-height panel docked to the right edge that pushed the content column aside. Appears in old tickets and ADRs; not used in new copy. | |
+| `让位` | Yield | Historical (ADR 0004 D2/D7/D8, retired): the content column narrowing or pushing the right pane away when the panel opened. The floating window overlays, so nothing yields. | |
+| `归属机` | Home machine | The one machine an agent is bound to: all of that agent's steps go to it, and it is required when the agent is created. The only answer to which machine an agent belongs to (ADR 0019). | `绑定机`, `钉选` (the retired mechanism below) |
+| `换绑` | Rebind | Moving an agent's home machine to another machine. The target must be able to run the agent (runtime and models present), otherwise the rebind is refused. | `迁移` (short for whole-machine migration, a different thing), `改派` |
+| `整机迁移` | Machine migration | Rebinding every agent of one machine to another in one go. Agents that pass the check move; the rest stay with the reason listed. A partial migration is a normal outcome, not a failure. | `撤离`, evacuate (kept in code identifiers, not in copy) |
+| `钉选` | Pin | Historical (ADR 0018 decision 4, retired): four separate ways to name an execution machine on a task, build, chief thread or schedule. All retired when home machines landed; appears in old tickets. | |

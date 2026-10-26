@@ -1,156 +1,156 @@
-# 机器执行面：「同一份代码放任意机器跑」是怎么实现的
+# The machine execution plane: how "the same code runs on any machine" is implemented
 
-> 目的：回答用户 2026-10-02 的提问「这个项目可以任意放到任意机器上运行。我想知道这个功能到底是怎么实现的」。
-> 来源：herdr 线程 t-0047 只读调研（2026-10-02 取数：仓内逐链路读源 + crabbox / Multica 一手拉取对拍 + 本机与 mea 进程/端口实测）。
-> 基线：入库时全部 `路径:行号` 已重锚到 `origin/main = 37edab2a`（2026-10-03）并逐条抽验；行号随代码漂移，以基线 SHA 为准。
-> 时效：crabbox / Multica 侧为 2026-10-02 快照（crabbox HEAD pushedAt 2026-10-02T10:39Z，1440 星；multica HEAD pushedAt 2026-10-02T14:25Z，51848 星，经 `gh` CLI 直接拉 README / 架构文档 / 源码抽查）。Multica 机制细节转引仓内 r10 / r13（fresh-clone 源码逐行）与 r3（worktree 契约实测），本文未重爬其源码；mea 上的 Multica 部署已于 2026-10-02 停用，不影响其作为对照样本的效力。
-> 引用约定：无标注的 `路径:行号` = 本仓一手证据；`[推断]` = 无直接出处的推断，不写无出处的断言。
-> 关联：工程票 #682（机器派发闭环）引用本文；r10 / r11 / r13 为 Multica runtime 模型的正本研究。
+> Purpose: answer the user's question of 2026-10-02 — "this project can run on any machine. I want to know how this feature is actually implemented".
+> Sources: herdr thread t-0047 read-only research (data collected 2026-10-02: link-by-link source reading in the repo + first-hand crabbox / Multica fetches for cross-checking + local process/port measurements on this machine and mea).
+> Baseline: all `path:line` references were re-anchored to `origin/main = 37edab2a` (2026-10-03) at commit time and spot-checked one by one; line numbers drift with the code — the baseline SHA is authoritative.
+> Freshness: the crabbox / Multica side is a 2026-10-02 snapshot (crabbox HEAD pushedAt 2026-10-02T10:39Z, 1440 stars; multica HEAD pushedAt 2026-10-02T14:25Z, 51848 stars; README / architecture docs / source sampled directly via the `gh` CLI). Multica mechanism details are cited from in-repo r10 / r13 (fresh-clone, line-by-line source) and r3 (worktree contract measured); this document does not re-crawl its source. The Multica deployment on mea was decommissioned on 2026-10-02, which does not affect its value as a comparison sample.
+> Citation convention: an unmarked `path:line` = first-hand evidence from this repo; `[推断]` = an inference without a direct source; no sourceless assertions.
+> Related: engineering ticket #682 (machine dispatch closed loop) cites this document; r10 / r11 / r13 are the canonical research on the Multica runtime model.
 
-## 0. 结论先行
+## 0. Conclusions first
 
-1. **「任意机器」的执行面已经完整存在**：enroll / claim / worktree / 回传全链路在位，本机（macOS）与 mea（WSL2 Linux）同码各跑一套 server + daemon 是活证据（§3）。
-2. **机制本质四句话**：代码不随任务搬运，git 是单源；执行机是主动出网认领任务的 daemon，server 不需要反向连机器；认证与步级 git 凭证全部由 server 下发、按步短命；控制面走 HTTP/SSE，数据面走 git（§1）。
-3. **「没闭环」缺的不是执行面，是入口到派发的接线**：钉选机器列（`build.pinnedMachineId`）在库里、claim 过滤在服务里，但三条任务入口（新建任务 UI / REST body / chief 编排链）都写不到它——目前唯一写入方是定时器。另有五处治理缺口（§4，全部收进 #682）。
-4. **派发模型的谱系**：pacman ≈ Multica 的派发骨架（daemon 出网 + claim 长轮询 + per-conversation worktree + 任务级凭证），但把 Multica 的「agent 绑 runtime」解耦成「assignment 选 agent、机器另行钉选」；crabbox 则代表另一极端——机器选择就是调用时的一个显式 flag，没有队列也没有绑定（§5）。
+1. **The "any machine" execution plane already exists in full**: the enroll / claim / worktree / report-back chain is all in place; the same code running a server + daemon each on this machine (macOS) and mea (WSL2 Linux) is living proof (§3).
+2. **The mechanism in four sentences**: code never travels with the task — git is the single source; the execution machine is a daemon that reaches out and claims tasks, so the server never needs inbound connectivity to machines; authentication and per-step git credentials are all issued by the server and short-lived per step; the control plane rides HTTP/SSE and the data plane rides git (§1).
+3. **What "not closed-loop" is missing is not the execution plane but the wiring from entry points to dispatch**: the pinned-machine column (`build.pinnedMachineId`) is in the database and the claim filter is in the service, but none of the three task entry points (new-task UI / REST body / chief orchestration chain) can write it — the only writer today is the scheduler. There are also five governance gaps (§4, all collected into #682).
+4. **The lineage of the dispatch model**: pacman ≈ Multica's dispatch skeleton (daemon dials out + claim long-polling + per-conversation worktree + per-task credentials), but decouples Multica's "agent bound to runtime" into "assignment picks the agent, the machine is pinned separately"; crabbox represents the other extreme — machine choice is just an explicit flag at call time, with no queue and no binding (§5).
 
-## 1. 机制四支柱
+## 1. The four pillars of the mechanism
 
-**支柱一：git 是代码单源，代码从不随任务搬运。**
-任务执行前，执行机从 claim 载荷里的 `cloneUrl` 现场 clone 基座仓并开 per-conversation worktree（`apps/daemon/src/workspace.ts:66-114`）。`cloneUrl` 三形态由 server 侧 `projectRepoRef` 单点派生（`apps/server/src/services/git.ts:115-130`）：
+**Pillar one: git is the single source of code; code never travels with the task.**
+Before executing a task, the execution machine clones the base repository on the spot from the `cloneUrl` in the claim payload and opens a per-conversation worktree (`apps/daemon/src/workspace.ts:66-114`). The three forms of `cloneUrl` are derived at a single point on the server side, `projectRepoRef` (`apps/server/src/services/git.ts:115-130`):
 
-- hosted = `<origin>/git/<teamId>/<repoName>`（server 上的 bare repo + `git http-backend` CGI，`git.ts:100-102`）；
-- github = `https://github.com/<repo>.git`（`git.ts:132-135`）；
-- local = 用户仓库绝对路径（`git.ts:125-127`）。
+- hosted = `<origin>/git/<teamId>/<repoName>` (a bare repo on the server + `git http-backend` CGI, `git.ts:100-102`);
+- github = `https://github.com/<repo>.git` (`git.ts:132-135`);
+- local = the user's absolute repository path (`git.ts:125-127`).
 
-所以「任意机器」不需要预装项目，只需要 daemon + git + 网络可达。
+So "any machine" needs no pre-installed project — only daemon + git + network reachability.
 
-**支柱二：执行机 = 主动出网的 daemon，不需要公网入站。**
-机器上跑同一个 npm 包（`@xiechimon/pacman-cli`），`pacman start --server <url>` 指向任意 server（`apps/daemon/src/cli.ts:101`；config 优先级 = 显式入参 > env > 默认，`apps/daemon/src/config.ts:1-3`）。所有工作都走 daemon → server 的 HTTP 长轮询 + SSE 出网连接；server 从不反向连机器。
+**Pillar two: the execution machine = a daemon that dials out; no public inbound needed.**
+The machine runs the same npm package (`@xiechimon/pacman-cli`), and `pacman start --server <url>` points at any server (`apps/daemon/src/cli.ts:101`; config precedence = explicit argument > env > default, `apps/daemon/src/config.ts:1-3`). All work goes over daemon → server HTTP long-polling + SSE outbound connections; the server never connects back to machines.
 
-**支柱三：认证与凭证全部由 server 下发、按步短命。**
-机器注册换 64hex token，服务端只存哈希（`packages/shared/src/protocol/machine-wire.ts:41-45`）；每步执行前 daemon 再调 `GET /api/machine/token/{stepId}` 取**步级** git 凭证（托管 repo key / GitHub x-access-token），内存持有不落盘（`apps/daemon/src/runner.ts:267-268`、`apps/server/src/routes-machine.ts:313-315`）。机器上没有长期凭据。
+**Pillar three: authentication and credentials are all issued by the server and short-lived per step.**
+Machine registration trades for a 64-hex token; the server stores only the hash (`packages/shared/src/protocol/machine-wire.ts:41-45`); before each step the daemon calls `GET /api/machine/token/{stepId}` to fetch a **per-step** git credential (hosted repo key / GitHub x-access-token), held in memory and never written to disk (`apps/daemon/src/runner.ts:267-268`, `apps/server/src/routes-machine.ts:313-315`). There are no long-lived credentials on the machine.
 
-**支柱四：控制面在 HTTP/SSE，数据面在 git。**
-指令、心跳、事件走 server；代码产出靠每步收尾 `commitAll + push` conv 分支回到 git 远端（`runner.ts:803-838`）。任意机器都能从 origin 恢复代码上下文——这是「任意机器可接力」的底层原因（会话上下文的例外见 §4-7）。
+**Pillar four: the control plane is HTTP/SSE, the data plane is git.**
+Instructions, heartbeats, and events go over the server; code output returns to the git remote via `commitAll + push` of the conv branch at the end of each step (`runner.ts:803-838`). Any machine can recover the code context from origin — this is the underlying reason "any machine can pick up where another left off" (the exception for conversation context is §4-7).
 
-## 2. 全链路逐环（新建任务 → 远端机器执行 → 回传）
+## 2. The full chain, link by link (new task → remote machine execution → report-back)
 
-### 环 0 · 机器上线（enroll，三路径）
+### Link 0 · machine online (enroll, three paths)
 
-- Web「添加机器」弹窗给 CLI 命令：`npm install -g @xiechimon/pacman-cli@latest` + `pacman start`（浏览器授权）或 `pacman start --api-key <key> --team <teamId>`（无头路径），`apps/web/src/resources/create-machine-dialog.tsx:35-37`。
-- 目标机器上 daemon 启动：无 `machine.json` 即注册——POST `/api/machine/enroll`（Bearer apiKey，`apps/daemon/src/machine-client.ts:178-190`、`apps/daemon/src/machine-loop.ts:141-173`）；浏览器授权流 = enroll/start + poll + 授权页确认（`machine-client.ts:192-214`、`apps/server/src/routes-machine.ts:136-204`）。
-- server 落 `machine` 行：`enrollMachine` upsert，token 存哈希（`apps/server/src/services/machines.ts:449-490`）；按 hostname 判 local/remote（本机律 seed，`machines.ts:400-405`）；server 启动时 seed 本机行 kind='local'（`machines.ts:422-447`、`apps/server/src/index.ts:39`）。
-- 之后 daemon 进入三段常驻：presence 心跳 30s（`machine-loop.ts:347-351`）→ wake SSE 订阅（断线持续重连，`machine-loop.ts:265-345`、`routes-machine.ts:235-256`；断流即 markOffline，`machines.ts:571-577`）→ claim 长轮询主循环（`machine-loop.ts:380-401`）。
+- The web "add machine" dialog hands over CLI commands: `npm install -g @xiechimon/pacman-cli@latest` + `pacman start` (browser authorization) or `pacman start --api-key <key> --team <teamId>` (headless path), `apps/web/src/resources/create-machine-dialog.tsx:35-37`.
+- On the target machine the daemon starts: with no `machine.json` it registers — POST `/api/machine/enroll` (Bearer apiKey, `apps/daemon/src/machine-client.ts:178-190`, `apps/daemon/src/machine-loop.ts:141-173`); the browser authorization flow = enroll/start + poll + authorization-page confirmation (`machine-client.ts:192-214`, `apps/server/src/routes-machine.ts:136-204`).
+- The server writes the `machine` row: `enrollMachine` upsert, token stored as hash (`apps/server/src/services/machines.ts:449-490`); local/remote decided by hostname (local-machine rule seed, `machines.ts:400-405`); on server startup a local row with kind='local' is seeded (`machines.ts:422-447`, `apps/server/src/index.ts:39`).
+- The daemon then enters its three resident loops: presence heartbeat 30s (`machine-loop.ts:347-351`) → wake SSE subscription (reconnects persistently, `machine-loop.ts:265-345`, `routes-machine.ts:235-256`; a dropped stream marks it offline, `machines.ts:571-577`) → claim long-polling main loop (`machine-loop.ts:380-401`).
 
-### 环 1 · 新建任务（web）
+### Link 1 · new task (web)
 
-- 新建任务 dialog 只提交**正文 + 项目 id** 两个字段（`apps/web/src/overlay/new-task-dialog.tsx:273`）——无机器、无 agent、无标题。
-- 「保存」= `POST /api/projects/:id/todos`（`apps/web/src/overlay/use-new-task-surface.ts:112-136` → `apps/server/src/routes.ts:1079-1092`）；「保存并开始」= 创建后**直发总管编排回合** `POST /api/todos/:id/orchestrate`（`use-new-task-surface.ts:139-172` → `routes.ts:586-603` → `sendChiefMessage`，#640 裁决后这是唯一默认路径）。手工启动面在任务详情页：`POST /api/projects/:id/builds`（`apps/web/src/routes/todo-detail-page.tsx:486-497` → `routes.ts:1094-1110`）。
+- The new-task dialog submits only **body + project id** (`apps/web/src/overlay/new-task-dialog.tsx:273`) — no machine, no agent, no title.
+- "Save" = `POST /api/projects/:id/todos` (`apps/web/src/overlay/use-new-task-surface.ts:112-136` → `apps/server/src/routes.ts:1079-1092`); "save and start" = after creation, **directly sends a chief orchestration turn** `POST /api/todos/:id/orchestrate` (`use-new-task-surface.ts:139-172` → `routes.ts:586-603` → `sendChiefMessage`; after the #640 ruling this is the only default path). The manual start surface is on the task detail page: `POST /api/projects/:id/builds` (`apps/web/src/routes/todo-detail-page.tsx:486-497` → `routes.ts:1094-1110`).
 
-### 环 2 · 入队（todo → build → step）
+### Link 2 · enqueue (todo → build → step)
 
-- `startBuilds`（`apps/server/src/services/builds.ts:342-394`）：每 todo 落一条 `build` 行（buildId ≡ conversationId，UUIDv7）+ 入队首步（plan 或 build），todo 相位 → queued。**build 行带 `pinnedMachineId` 列**（`apps/server/src/db/schema.ts:132`、`packages/shared/src/records/build.ts:21-22` 注释原文「钉选机器；null = 自动」），服务层参数已支持（`builds.ts:351`、`373`）——但当前唯一写入方是定时器（`apps/server/src/services/scheduler.ts:60-66`，`schedule.machineId` 透传；schedule 侧写入面 = chief 的 `schedule_todo` 工具，`packages/shared/src/protocol/chief-tools.ts:450-465`）。
-- orchestrate 路径：chief 线程 + chief 步入队（`chief-<threadId>` 为会话键，`routes.ts:599`），无 build、无机器语义。
+- `startBuilds` (`apps/server/src/services/builds.ts:342-394`): one `build` row per todo (buildId ≡ conversationId, UUIDv7) + the first step enqueued (plan or build), todo phase → queued. **The build row carries a `pinnedMachineId` column** (`apps/server/src/db/schema.ts:132`, `packages/shared/src/records/build.ts:21-22` with the original comment "pin machine; null = auto"), and the service-layer parameter is already supported (`builds.ts:351`, `373`) — but the only writer today is the scheduler (`apps/server/src/services/scheduler.ts:60-66`, passing through `schedule.machineId`; the schedule-side write surface = chief's `schedule_todo` tool, `packages/shared/src/protocol/chief-tools.ts:450-465`).
+- The orchestrate path: chief thread + chief step enqueued (session key `chief-<threadId>`, `routes.ts:599`), no build, no machine semantics.
 
-### 环 3 · 认领（claim，多机派发的核心）
+### Link 3 · claim (the core of multi-machine dispatch)
 
-- daemon 主循环长轮询 `POST /api/machine/tasks/claim`（server hold ~75s + wake 即时唤醒；`machine-loop.ts:380-401` → `machine-client.ts:239-250` → `routes-machine.ts:227-232`）。
-- server `claimStep / tryClaim`（`machines.ts:949`、`793-830`）选步：
-  - **worker 步候选**（`claimCandidates`，`machines.ts:609-625`）：`step.status='pending'` 且 **`build.pinnedMachineId IS NULL OR = 本机`**（`machines.ts:619`）——钉选过滤已经实现；未钉选的步全团队任何在线机器都能抢，FIFO 按 createdAt。
-  - **chief 步候选**（`claimChiefCandidates`，`machines.ts:629-637`）：无 build/todo 行，**没有任何机器过滤**。
-  - 原子领取：`UPDATE step SET status='claimed', machineId, ... WHERE status='pending'`（`machines.ts:826-830`）；worker 步还要求 todo 已指派带模型的 agent（`machines.ts:822`），chief 步要求 chief 绑定了带模型的 agent（`machines.ts:730-738`）。
-- claim 载荷组装：worker 侧（`machines.ts:860-944`）携带 conversationId、会话 new/continue 判定（continue 读 server 侧 prior sessionId，`machines.ts:835-855`）、todo（title/spec）、**project + repo（cloneUrl 由 `projectRepoRef` 派生）**、agent（模型/记忆/技能白名单/权限开关）、remoteTools、localTools（双闸判定 `machines.ts:696-718`）、mcpServers（CLI 版本门 `machines.ts:669-690`）；chief 侧对应组装在 `machines.ts:750-790`。
+- The daemon main loop long-polls `POST /api/machine/tasks/claim` (server holds ~75s + wake for instant wakeup; `machine-loop.ts:380-401` → `machine-client.ts:239-250` → `routes-machine.ts:227-232`).
+- The server `claimStep / tryClaim` (`machines.ts:949`, `793-830`) selects a step:
+  - **worker-step candidates** (`claimCandidates`, `machines.ts:609-625`): `step.status='pending'` AND **`build.pinnedMachineId IS NULL OR = this machine`** (`machines.ts:619`) — the pin filter is already implemented; unpinned steps can be grabbed by any online machine in the team, FIFO by createdAt.
+  - **chief-step candidates** (`claimChiefCandidates`, `machines.ts:629-637`): no build/todo row, **no machine filter at all**.
+  - Atomic claim: `UPDATE step SET status='claimed', machineId, ... WHERE status='pending'` (`machines.ts:826-830`); worker steps additionally require the todo to have an assigned agent with a model (`machines.ts:822`), chief steps require the chief to have an agent with a model bound (`machines.ts:730-738`).
+- Claim payload assembly: the worker side (`machines.ts:860-944`) carries conversationId, the new/continue session decision (continue reads the server-side prior sessionId, `machines.ts:835-855`), todo (title/spec), **project + repo (cloneUrl derived by `projectRepoRef`)**, agent (model/memory/skill allowlist/permission switches), remoteTools, localTools (dual-gate decision `machines.ts:696-718`), mcpServers (CLI version gate `machines.ts:669-690`); the chief-side assembly is at `machines.ts:750-790`.
 
-### 环 4 · 执行（在认领机器上）
+### Link 4 · execution (on the claiming machine)
 
-`runStep`（`apps/daemon/src/runner.ts:217` 起）：
+`runStep` (from `apps/daemon/src/runner.ts:217`):
 
-1. 步级凭证：`client.token(stepId)` → `pushCredential`（内存，`runner.ts:267-268`）。runtime 步（claude-code）零凭据注入——认证靠执行机本地登录 / `ANTHROPIC_API_KEY`（`runner.ts:258-277` 注释）。
-2. worktree：`workspace.prepare({projectId, conversationId, cloneUrl, credentials})`（`runner.ts:334-340`）→ 基座 clone/fetch 到 `<workspacesRoot>/<projectId>/repo`，任务 worktree `<workspacesRoot>/<conversationId>`、分支 `pacman/conv-<conversationId>`、base 二择 origin/conv 或 origin/default（`workspace.ts:66-114`）；projectLock 串行化同项目操作（`workspace.ts:50-64`）。
-3. 后端解析：`backendFor(agent.provider)`——pi 默认，claude-code 惰性构造（spec 17 A3，`machine-loop.ts:109-130`）；MCP slug 在执行机本地 `~/.claude.json` 解析端点，凭证不跨 wire（`runner.ts:376-384`）。
-4. 会话：`backend.createSession`（`runner.ts:586-591`），systemPrompt = chief 合成 / worker 职责+记忆（`runner.ts:361-368`）。运行中：heartbeat 与工具行/流式回传（`routes-machine.ts:278-309`）、steer/stop 经 wake SSE 拉取-确认（`machine-loop.ts:274-309`）。
-5. 崩溃恢复：daemon 侧 StepJournal（`apps/daemon/src/journal.ts:32-107`）+ 重启时 `client.recover()` 对账续跑（`machine-loop.ts:234-263`）。
+1. Per-step credential: `client.token(stepId)` → `pushCredential` (in memory, `runner.ts:267-268`). Runtime steps (claude-code) get zero credential injection — authentication relies on the execution machine's local login / `ANTHROPIC_API_KEY` (comment at `runner.ts:258-277`).
+2. Worktree: `workspace.prepare({projectId, conversationId, cloneUrl, credentials})` (`runner.ts:334-340`) → base clone/fetch to `<workspacesRoot>/<projectId>/repo`, task worktree `<workspacesRoot>/<conversationId>`, branch `pacman/conv-<conversationId>`, base chosen between origin/conv or origin/default (`workspace.ts:66-114`); projectLock serializes operations on the same project (`workspace.ts:50-64`).
+3. Backend resolution: `backendFor(agent.provider)` — pi by default, claude-code constructed lazily (spec 17 A3, `machine-loop.ts:109-130`); the MCP slug resolves endpoints against the local `~/.claude.json` on the execution machine, credentials never cross the wire (`runner.ts:376-384`).
+4. Session: `backend.createSession` (`runner.ts:586-591`), systemPrompt = chief-synthesized / worker role + memory (`runner.ts:361-368`). While running: heartbeat and tool-line/streaming report-back (`routes-machine.ts:278-309`), steer/stop via wake SSE fetch-and-ack (`machine-loop.ts:274-309`).
+5. Crash recovery: the daemon-side StepJournal (`apps/daemon/src/journal.ts:32-107`) + `client.recover()` reconciliation on restart to resume (`machine-loop.ts:234-263`).
 
-### 环 5 · 回传与闭环
+### Link 5 · report-back and closed loop
 
-- 收尾：`commitAll`（`runner.ts:803`）→（合并步）merge `origin/<default>` → `push` conv 分支（带步级凭证，`runner.ts:838`）→ transcript/plan 上传（`runner.ts:860-895`）→ `done`（status/sessionId/usage/hasChanges/checkpoint commit，`runner.ts:900-910`）→ server `finishStep` 推进 todo 相位。local 形态合并落地 = conv 分支 push 回用户仓库（#1211：用户主检出的分支永不被推进）。
-- 停止/丢弃 = rewind 到步起点 checkpoint；审核步只读检出 + 收尾强制回退——两条路共用同一处回退护栏（`runner.ts:743-765`）。
+- Wrap-up: `commitAll` (`runner.ts:803`) → (merge step) merge `origin/<default>` → `push` the conv branch (with the per-step credential, `runner.ts:838`) → transcript/plan upload (`runner.ts:860-895`) → `done` (status/sessionId/usage/hasChanges/checkpoint commit, `runner.ts:900-910`) → server `finishStep` advances the todo phase. For the local form, the merge lands by pushing the conv branch back to the user's repository (#1211: the branch of the user's main checkout is never advanced).
+- Stop/discard = rewind to the step-start checkpoint; review steps check out read-only + force-rewind at wrap-up — both paths share the same rewind guardrail (`runner.ts:743-765`).
 
-## 3. 「任意机器」的实测证据
+## 3. Measured evidence for "any machine"
 
-2026-10-02 取证（ps / lsof / systemctl 实测）：
+Evidence collected 2026-10-02 (ps / lsof / systemctl measured):
 
-- 本机 macOS：server 监听 :8787 + daemon 在跑，完成全部环。
-- mea（WSL2）：`pacman-dev-server.service`（active，node 跑 `/home/measure/pacman/apps/server/src/index.ts`）与 `pacman-daemon.service`（active，enrolled to local server :8787）。
+- This machine (macOS): server listening on :8787 + daemon running, completing all links.
+- mea (WSL2): `pacman-dev-server.service` (active, node running `/home/measure/pacman/apps/server/src/index.ts`) and `pacman-daemon.service` (active, enrolled to local server :8787).
 
-同一份代码在 macOS 与 Linux（WSL2）两套部署各自完成 server + daemon 全环——「任意机器部署」本身没有缺口；「没闭环」特指**任务的机器定向**（§4）。
+The same code completing the full server + daemon chain in two deployments on macOS and Linux (WSL2) respectively — "deploy on any machine" itself has no gap; "not closed-loop" refers specifically to **machine targeting of tasks** (§4).
 
-## 4. 缺口清单（对照 §2 逐环点名）
+## 4. Gap list (named link by link against §2)
 
-执行面（环 0/3/4/5）全在，缺口集中在**入口与治理**。1-6 与 9 已收进工程票 #682；7、8 是多机成型后的已知边界。
+The execution plane (links 0/3/4/5) is fully present; the gaps concentrate in **entry points and governance**. Items 1–6 and 9 are collected into engineering ticket #682; 7 and 8 are known boundaries once multiple machines exist.
 
-| # | 缺口 | 现状证据 | 定性 |
+| # | Gap | Evidence of current state | Classification |
 |---|---|---|---|
-| 1 | 新建任务无机器入口 | dialog 只提交 spec+projectId（`new-task-dialog.tsx:273`）；`use-new-task-surface.ts:112-172` 无机器参数 | 入口环 |
-| 2 | REST 面无机器参数 | `startBuildsBodySchema` 仅 todoIds/assignment/withPlan（`records/build.ts:38-43`）；orchestrate 路由无 body 面（`routes.ts:586-603`） | 入口环 |
-| 3 | chief 编排链无机器语义 | chief 步 claim 无 pin 过滤（`machines.ts:629-637`）；chief 的 `machines` 工具只能读；`run_builds` 工具无 machineId 参数（`protocol/chief-tools.ts:472-493`，handler `services/chief-tools.ts:671-700` 调 startBuilds 不传 pin） | 编排环 |
-| 4 | pin 已建但成孤岛 | 列（`schema.ts:132`）+ claim 过滤（`machines.ts:619`）+ 服务参数（`builds.ts:351,373`）都在，唯一写入方 = 定时器（`scheduler.ts:66`）；连 schedule 的 web 创建面也没暴露 machineId（web 全树仅 branch-dialog 有机器选择，`apps/web/src/detail/branch-dialog.tsx:200-206`） | 接线环 |
-| 5 | per-runtime 开关写而不读 | `enabledRuntimes` 只有 PATCH 写（`routes.ts:1272-1284`）和 web 映射，claim/dispatch 无任何消费（全树 grep 证实）——machines 页「决定本机跑 pi 还是 Claude Code 任务」的 A8 承诺未兑现 | 治理环 |
-| 6 | pin 机器离线 = 步无限等待 | `claimCandidates` 只过滤归属，无 liveness 条件；pending 步无超时/无 sweeper（并发门已摘除，`machines.ts:802-803`，#503）——与 Multica 的 reconnect-grace / queued-expiry 体系对照是空缺（§5） | 治理环 |
-| 7 | 多机轮换丢会话 | conv 会话文件存执行机本地（pi sessionDir；continue 判定读 server 侧 prior sessionId，`machines.ts:835-855`）；换机器认领同 build 下一步 = SessionNotResumable 降级 new session。worktree 经 git 无碍，**丢的是对话上下文**——机器亲和是正确性项不是优化项 | 执行环约束 |
-| 8 | local 形态项目锁机器 | `projectRepoRef` local = server 侧绝对路径（`git.ts:125-127`）——只有路径可达的机器能执行；远程机器 prepare 失败即 failStep | 执行环约束 |
-| 9 | claude-code 运行时凭据不跨机 | runtime 步零凭据注入（`runner.ts:258-277`）；远程机器需各自登录 claude / 配 `ANTHROPIC_API_KEY`，且无预检暴露这个缺口 | 凭据环 |
-| 10 | 并发/负载面 | 机器领活无上限（#503 摘除，`machines.ts:802-803`）；无能力匹配（除 MCP 版本门与 shell 双闸） | 派发环（多机后才显形） |
+| 1 | New task has no machine entry | the dialog submits only spec+projectId (`new-task-dialog.tsx:273`); `use-new-task-surface.ts:112-172` has no machine parameter | entry-link |
+| 2 | REST surface has no machine parameter | `startBuildsBodySchema` only has todoIds/assignment/withPlan (`records/build.ts:38-43`); the orchestrate route has no body surface (`routes.ts:586-603`) | entry-link |
+| 3 | The chief orchestration chain has no machine semantics | chief-step claim has no pin filter (`machines.ts:629-637`); chief's `machines` tool is read-only; the `run_builds` tool has no machineId parameter (`protocol/chief-tools.ts:472-493`, handler `services/chief-tools.ts:671-700` calls startBuilds without passing a pin) | orchestration-link |
+| 4 | The pin exists but is an island | the column (`schema.ts:132`) + claim filter (`machines.ts:619`) + service parameter (`builds.ts:351,373`) are all there; the only writer = the scheduler (`scheduler.ts:66`); even the web creation surface for schedules exposes no machineId (only branch-dialog has a machine picker anywhere in the web tree, `apps/web/src/detail/branch-dialog.tsx:200-206`) | wiring-link |
+| 5 | The per-runtime switch is written but never read | `enabledRuntimes` has only a PATCH write (`routes.ts:1272-1284`) and a web mapping; nothing in claim/dispatch consumes it (whole-tree grep confirmed) — the A8 promise on the machines page "decide whether this machine runs pi or Claude Code tasks" is unfulfilled | governance-link |
+| 6 | A pinned machine offline = the step waits forever | `claimCandidates` filters only ownership, with no liveness condition; pending steps have no timeout and no sweeper (the concurrency gate was removed, `machines.ts:802-803`, #503) — compared against Multica's reconnect-grace / queued-expiry system this is a hole (§5) | governance-link |
+| 7 | Multi-machine rotation loses the session | conv session files live on the execution machine's local disk (pi sessionDir; the continue decision reads the server-side prior sessionId, `machines.ts:835-855`); a different machine claiming the next step of the same build degrades to SessionNotResumable → new session. The worktree is fine via git; **what is lost is the conversation context** — machine affinity is a correctness item, not an optimization | execution-link constraint |
+| 8 | The local form of project pins the machine | `projectRepoRef` local = a server-side absolute path (`git.ts:125-127`) — only a machine that can reach that path can execute; a remote machine failing prepare fails the step | execution-link constraint |
+| 9 | claude-code runtime credentials do not cross machines | runtime steps get zero credential injection (`runner.ts:258-277`); remote machines each need their own claude login / `ANTHROPIC_API_KEY`, and no preflight surfaces this gap | credential-link |
+| 10 | Concurrency/load surface | machines have no claim cap (#503 removed it, `machines.ts:802-803`); no capability matching (except the MCP version gate and the shell dual-gate) | dispatch-link (only appears with multiple machines) |
 
-## 5. 三方对照：crabbox / Multica / pacman
+## 5. Three-way comparison: crabbox / Multica / pacman
 
-### crabbox（github.com/openclaw/crabbox，Go，MIT）
+### crabbox (github.com/openclaw/crabbox, Go, MIT)
 
-模型 =「warm a box, sync the diff, run the suite」，纯远程命令执行器：
+Model = "warm a box, sync the diff, run the suite" — a pure remote command executor:
 
-- 一条命令的完整生命周期（README + docs/how-it-works.md）：`crabbox run --provider docker -- <cmd>` = 租一个 box（lease，`cbx_` + 12hex，一次性 per-lease SSH key）→ **rsync 同步脏工作树**（git seed + 指纹跳过无变化；不要求先 commit）→ SSH 执行命令流式回传 → 拿退出码 → 释放。
-- **机器选择 = 调用时 flag**：`--provider <docker|ssh|aws|hetzner|...>`，复用 warm box 用 `--id <box>` / `--slug`。16+ provider 矩阵。没有队列、没有认领循环、没有任务概念——每次调用无状态（warm lease 除外）。
-- 四种执行模式（docs/architecture.md、`internal/cli/provider_backend.go:1959` `loadBackend`）：brokered（coordinator 管租约）/ direct SSH / registered direct / delegated（沙箱服务自管执行）。
-- **coordinator（可选）只管控制面**：持有 provider 凭证、租约状态、用量、花费上限；**数据面 = CLI ↔ runner 直连 SSH+rsync，文件与命令输出不经 coordinator**（how-it-works.md 原文 "your files, commands, and output never traverse it"）。无 coordinator 也能全功能用本机容器/自有主机。
-- 无 agent/编排概念：谁来选机器、跑什么命令，完全是调用方（人或 agent skill）的事。
+- The full lifecycle of one command (README + docs/how-it-works.md): `crabbox run --provider docker -- <cmd>` = rent a box (lease, `cbx_` + 12hex, one-off per-lease SSH key) → **rsync-sync the dirty worktree** (git seed + fingerprint-skip when unchanged; no commit required first) → execute the command over SSH with streamed output → take the exit code → release.
+- **Machine choice = a flag at call time**: `--provider <docker|ssh|aws|hetzner|...>`, reuse a warm box with `--id <box>` / `--slug`. A 16+ provider matrix. No queue, no claim loop, no task concept — every call is stateless (warm leases aside).
+- Four execution modes (docs/architecture.md, `internal/cli/provider_backend.go:1959` `loadBackend`): brokered (coordinator manages leases) / direct SSH / registered direct / delegated (the sandbox service self-manages execution).
+- **The coordinator (optional) manages only the control plane**: it holds provider credentials, lease state, usage, and spend caps; **the data plane = CLI ↔ runner direct SSH+rsync, files and command output never traverse the coordinator** (how-it-works.md, verbatim: "your files, commands, and output never traverse it"). Without a coordinator, local containers / your own hosts work with full functionality.
+- No agent/orchestration concept: who picks the machine and what commands run is entirely the caller's business (human or agent skill).
 
-### Multica（github.com/multica-ai/multica，Go；机制细节转引 r10 / r13，2026-10-02 在 HEAD 抽查对拍仍成立：`server/internal/daemon/wsrpc.go:346-349` tasks.claim RPC 与 `daemon.go` runtimeIndex 均在位）
+### Multica (github.com/multica-ai/multica, Go; mechanism details cited from r10 / r13; the 2026-10-02 spot-check against HEAD still holds: `server/internal/daemon/wsrpc.go:346-349` tasks.claim RPC and `daemon.go` runtimeIndex both present)
 
-模型 = agent 绑 runtime 的排队执行：
+Model = queued execution with agents bound to runtimes:
 
-- **runtime = 一台电脑 + 一个 AI 工具**（r10 引 concepts.txt:33 "The agent is the identity; the runtime is the computer that executes it"）。机器上的 daemon 主动出网（WS `GET /api/daemon/ws`）注册：`agent_runtime` 表 upsert，唯一键 `(workspace_id, daemon_id, provider)`，`ON CONFLICT DO UPDATE` 幂等重注册（r10 引 runtime.sql:63-116）。daemon 用 `exec.LookPath` 探针自动发现本机 26 个 CLI（r10，agents_probe.go）。
-- **机器选择发生在 agent 创建/绑定时刻**：agent 表带 `runtime_id` 外键（r10 引 agents-create.txt:7）。任务触发产生 run，run 进队，**由 agent 绑定的 runtime 认领**；复制 agent 可 `--runtime-id` 迁机。
-- 派发（r13 逐跳实证）：`pollLoop` → 批量 `tasks.claim` WS-RPC `{daemon_id, runtime_ids, max_tasks}` → `handleTask` 查 `runtimeIndex[task.RuntimeID]` → `agent.ResolveBackend` 起进程 → 事件流回传。会话连续性是显式设计：conversation "routes subsequent runs to a runtime that can access that session"（r10 引 chat.txt:41-43）。
-- 配套机器治理（r10 §5 全数字实证）：心跳 15s → Redis TTL 键 + 60s 落库，150s 陈旧 + 30s 扫掠 ≈ 3 分钟判离线；重连宽限 3h；`dispatched` 5 分钟超时；并发 = daemon 20 ∩ agent 6；离线 7 天 + 无未归档 agent + 无非终态 task 才 GC。
-- 凭据：daemon token `mdt_`；**任务级 token `mat_`**（认领时铸造，绑 (task, agent, workspace, owner)，24h，注进 agent 进程代替 PAT——r10 §6）。代码面：per-conversation worktree + `tds/conv-*` 分支 + 每步收尾 push（r3 §1.4 实测；pacman 的 worktree 契约即由此复刻）。
+- **runtime = one computer + one AI tool** (r10 citing concepts.txt:33 "The agent is the identity; the runtime is the computer that executes it"). The daemon on the machine dials out (WS `GET /api/daemon/ws`) to register: upsert into the `agent_runtime` table, unique key `(workspace_id, daemon_id, provider)`, idempotent re-registration via `ON CONFLICT DO UPDATE` (r10 citing runtime.sql:63-116). The daemon probes and auto-discovers 26 CLIs on the machine with `exec.LookPath` (r10, agents_probe.go).
+- **Machine choice happens at agent creation/binding time**: the agent table carries a `runtime_id` foreign key (r10 citing agents-create.txt:7). A task trigger produces a run, the run is enqueued, and **the runtime bound to the agent claims it**; copying an agent can migrate machines with `--runtime-id`.
+- Dispatch (r13 hop-by-hop evidence): `pollLoop` → batched `tasks.claim` WS-RPC `{daemon_id, runtime_ids, max_tasks}` → `handleTask` looks up `runtimeIndex[task.RuntimeID]` → `agent.ResolveBackend` spawns the process → event stream report-back. Session continuity is explicit design: conversation "routes subsequent runs to a runtime that can access that session" (r10 citing chat.txt:41-43).
+- Companion machine governance (all numbers evidenced in r10 §5): heartbeat 15s → Redis TTL key + 60s DB write, 150s stale + 30s sweep ≈ 3 minutes to mark offline; reconnect grace 3h; `dispatched` 5-minute timeout; concurrency = daemon 20 ∩ agent 6; GC only after 7 days offline + no unarchived agents + no non-terminal tasks.
+- Credentials: daemon token `mdt_`; **task-level token `mat_`** (minted at claim time, bound to (task, agent, workspace, owner), 24h, injected into the agent process in place of a PAT — r10 §6). Code surface: per-conversation worktree + `tds/conv-*` branches + push at each step's wrap-up (r3 §1.4 measured; pacman's worktree contract was replicated from this).
 
-### 对照结论
+### Comparison conclusions
 
-- **pacman ≈ Multica 的派发骨架**（daemon 出网 + claim 长轮询 + per-conv worktree + 步级凭证），但把「agent↔runtime 绑定」解耦成「assignment 选 agent、机器另行钉选」——machine record 注释明言「一个机器可承载多个 Agent 的步，不是 Agent 的属性」（`packages/shared/src/records/machine.ts:5`）。钉选面只做了数据层（build 列），没做入口层（§4-1~4）。
-- **治理厚度差一档**：Multica 有完整的活性/宽限/超时/回收体系（上节数字），pacman 的 pending 步无超时无 sweeper（§4-6）——单机无感，多机后是第一风险。
-- **crabbox 的启示是另一个方向**：机器选择可以就是调用时的一个显式参数，不必有绑定关系——这正是「新建任务里直接选机器」的形态，也是 #682 采用的粒度（任务级 pin，不做 agent 绑定）。
-- **同构哲学**：crabbox「coordinator 只管控制面，数据面 CLI↔runner 直连，files/commands/output never traverse it」与 pacman「控制面 HTTP/SSE、数据面 git」是同一个设计判断——中央服务只管账本与凭证，字节流走点对点通道。
+- **pacman ≈ Multica's dispatch skeleton** (daemon dials out + claim long-polling + per-conv worktree + per-step credentials), but decouples the "agent↔runtime binding" into "assignment picks the agent, the machine is pinned separately" — the machine record comment states plainly "one machine can carry steps of multiple Agents; it is not an attribute of an Agent" (`packages/shared/src/records/machine.ts:5`). The pin surface was only built at the data layer (build column), not the entry layer (§4-1~4).
+- **One tier thinner on governance**: Multica has a full liveness/grace/timeout/GC system (numbers above); pacman's pending steps have no timeout and no sweeper (§4-6) — invisible on a single machine, the first risk once multiple machines exist.
+- **crabbox's lesson points the other way**: machine choice can simply be an explicit parameter at call time, with no binding relationship — this is exactly the shape of "pick a machine directly in the new-task dialog", and it is the granularity #682 adopts (task-level pin, no agent binding).
+- **The same design philosophy**: crabbox's "coordinator manages only the control plane, the data plane is CLI↔runner direct, files/commands/output never traverse it" and pacman's "control plane HTTP/SSE, data plane git" are the same design judgment — the central service keeps only the ledger and the credentials; byte streams travel point-to-point.
 
-## 6. 工程含义（已收进 #682）
+## 6. Engineering implications (collected into #682)
 
-t-0047 对「新建任务里直接选机器」的可行性判定：**高**——钉选的执行语义已全在库里（列 + claim 过滤 + 服务参数 + restart 已按「不继承 pin」处理，`builds.ts:437`）；web 侧机器数据在新建任务面已加载（mention picker 用，`use-new-task-surface.ts:90`）；UI 有现成先例（项目 chip 弹层、`branch-dialog.tsx:200-206` 机器下拉）。方案要点（正本在 #682 票面）：`todo.machineId` 单源 → startBuilds 缺省继承 → chief 线程加机器亲和 → `enabledRuntimes` 变真闸 → pin 离线 = 标注等待、**不做自动 fallback**（pin 的语义就是确定性）。
+t-0047's feasibility verdict on "pick a machine directly in the new-task dialog": **high** — the execution semantics of pinning are already all in the codebase (column + claim filter + service parameter + restart already handles "do not inherit pin", `builds.ts:437`); machine data is already loaded on the new-task surface on the web side (used by the mention picker, `use-new-task-surface.ts:90`); the UI has an existing precedent (project chip popover, `branch-dialog.tsx:200-206` machine dropdown). Key points of the plan (the canonical copy is on the #682 ticket): `todo.machineId` as single source → startBuilds inherits by default → chief thread gains machine affinity → `enabledRuntimes` becomes a real gate → pin offline = marked waiting, **no automatic fallback** (the semantics of a pin is determinism).
 
-被否掉的替代方案（记录判断，防重议）：
+Rejected alternatives (judgment on the record, to prevent re-litigation):
 
-- **Multica 式 agent 绑机器**：与 pacman 的正交设计相悖（`records/machine.ts:5` 注释），且与 assignment 双槽叠加后组合爆炸。
-- **纯 chief prompt 遵嘱（不改数据面）**：脆弱——LLM 可能不执行注入指令，无回读校验面；钉选必须落库走 claim 过滤才算数。
-- **claim 时全自动调度（标签/负载匹配）**：用户要的是确定性选择不是调度器；自动匹配留给 `enabledRuntimes` 闸与后续。
+- **Multica-style agent-to-machine binding**: contradicts pacman's orthogonal design (comment at `records/machine.ts:5`), and combining it with the assignment double-slot causes combinatorial explosion.
+- **Pure chief prompt instruction (no data-plane change)**: fragile — the LLM may not follow the injected instruction, and there is no read-back verification surface; a pin only counts when it lands in the database and goes through the claim filter.
+- **Fully automatic scheduling at claim time (label/load matching)**: the user wants deterministic choice, not a scheduler; automatic matching is left to the `enabledRuntimes` gate and later work.
 
-## 附录 · 取证方法与野外经验
+## Appendix · evidence collection method and field experience
 
-取证方式（可复用于同类机制调研）：
+Collection method (reusable for similar mechanism research):
 
-- 仓内侧：逐链路读源，file:line 均为基线工作区现行代码；进程/端口在本机与 mea 实测。
-- 对照侧：crabbox / Multica 经 `gh` CLI 当日直接拉 README、架构文档与源码抽查，并与仓内 r3 / r10 / r13 一手研究交叉对拍，不转抄二手文档。Multica 证据地基优先读 r10 / r13（fresh-clone 源码逐行）与 r3（worktree 契约实测），不必重新爬源码。
+- In-repo side: link-by-link source reading; all file:line references are current code in the baseline workspace; processes/ports measured on this machine and mea.
+- Comparison side: crabbox / Multica fetched same-day via the `gh` CLI for READMEs, architecture docs, and source sampling, cross-checked against the in-repo first-hand research r3 / r10 / r13, with no copying of secondhand documents. For Multica evidence the preferred ground is r10 / r13 (fresh-clone, line-by-line source) and r3 (worktree contract measured); no need to re-crawl the source.
 
-mea（WSL2）侧侦察的三条野外经验：
+Three field lessons from reconnaissance on mea (WSL2):
 
-- **WSL2 探 Windows 宿主侧要用全路径**：从 WSL2 内调 Windows 二进制（如 `powershell.exe`）探宿主环境时按全路径（`/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`）调用——非交互 ssh 会话里 WSL interop 的 PATH 追加不一定在位，裸命令名会找不到。
-- **scp 多源会吞文件**：一条 scp 命令带多个远端源路径时会静默丢文件；关键证据分条传，传完在接收端点数核对。
-- **shim 类服务的流量正本在 `/tmp` 而非 journal**：转发 shim（如 pi-relay-shim）常覆写日志钩子，journal 里只剩一行启动记录；真实流量账在它自己写的 `/tmp/*.log`（逐请求一行）。侦察这类服务先找它的文件日志，别拿 journal 判「无流量」。
+- **Probing the Windows host from WSL2 requires full paths**: when calling Windows binaries (e.g. `powershell.exe`) from inside WSL2 to inspect the host environment, invoke them by full path (`/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`) — in non-interactive ssh sessions the WSL interop PATH append is not necessarily present, and a bare command name will not be found.
+- **scp with multiple sources silently swallows files**: an scp command with several remote source paths silently drops files; transfer key evidence one by one and count the received files on the receiving end to verify.
+- **For shim-type services the traffic record lives in `/tmp`, not the journal**: forwarding shims (e.g. pi-relay-shim) often override logging hooks, leaving only a one-line startup record in the journal; the real traffic log is in the shim's own `/tmp/*.log` (one line per request). When reconnoitering such services, find its file logs first — do not conclude "no traffic" from the journal.

@@ -53,11 +53,11 @@
         "text": 2,
         "spacing": 1
       },
-      "overlays/chip-popover.tsx": {
+      "overlay/chip-popover.tsx": {
         "text": 1,
         "spacing": 0
       },
-      "overlays/plan-dropdown.tsx": {
+      "overlay/plan-dropdown.tsx": {
         "text": 0,
         "spacing": 1
       },

@@ -513,7 +513,7 @@ export function BoardSidebar({
                 {count > 0 && (
                   <span
                     data-testid="project-count"
-                    className="flex-none text-caption tabular-nums text-content-tertiary group-hover/row:text-content-secondary"
+                    className={`flex-none text-caption tabular-nums ${active ? 'text-content-secondary' : 'text-content-tertiary group-hover/row:text-content-secondary'}`}
                   >
                     {count}
                   </span>
