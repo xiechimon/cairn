@@ -309,16 +309,16 @@ Suggested slice order (for the blueprint ticket's reference, not a ruling): the 
 
 > **Deviation annotation (recheck @ `9a0613b`)** — the grading's **method** (visual-density caliber, four difficulty tiers) is still usable, but the member table and slice suggestion have been overtaken by execution progress:
 >
-> - **原文建议的切片顺序基本被照做**：`#474` 先做两件低难度热身（token-gate、machine-authorize），
->   `#481` 接着做第一个「真域」resources（原文是「resources 或 secondary」二选一，取的是 resources）。
->   这两件低难度散件在表里**已不存在**，resources 也不再是待收编项。
-> - **中难度里的一件已消前提**：`overlay/mention-picker.css` 的「须先修」（悬空 token）由 `#427` 消除。
-> - **成员表变了**：删 2（token-gate / machine-authorize）、增 1（`routes/agent-detail.css`，未在原文分级里）、
->   `board/sidebar.css` 除名。
-> - 高三件（chief / detail / pages）**仍在原地**；按 `#522`（`docs/417`）的批次表，铺开仍在推进中。
+> - **The original slice order was largely followed**: `#474` did two low-difficulty warm-ups (token-gate, machine-authorize),
+>   `#481` then the first real domain resources (original said resources or secondary; resources was chosen).
+>   Those two low pieces **no longer appear** in the table; resources is no longer pending absorption.
+> - **One medium item lost its prerequisite**: `overlay/mention-picker.css` dangling tokens fixed by `#427`.
+> - **Membership changed**: removed 2 (token-gate / machine-authorize), added 1 (`routes/agent-detail.css`, not in original grading),
+>   `board/sidebar.css` dropped.
+> - The three high pieces (chief / detail / pages) **remain**; per `#522` (`docs/417`) batch table, rollout continues.
 > - Both columns of the original were recomputed under **the same convention** and can be compared directly. The decl convention is taken from this repo's `docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md` §7
->   的取数命令（`grep -cE '^[[:space:]]*[-a-zA-Z]+[[:space:]]*:.*;'`）；视觉占比口径同原文（decl 行里属性命中
->   color/background/shadow/border/radius/font/outline/opacity/filter 等的比例）：
+>   count command (`grep -cE '^[[:space:]]*[-a-zA-Z]+[[:space:]]*:.*;'`); visual share uses the original rule (decl lines whose properties hit
+>   color/background/shadow/border/radius/font/outline/opacity/filter):
 
 | css | decl @ `8c30775` | decl @ `9a0613b` | visual % @ `9a0613b` (original value) | status |
 |---|---|---|---|---|

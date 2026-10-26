@@ -10,7 +10,7 @@ import {
   secondPrWarningNoteRowId,
   skillFactsFromContents,
 } from '@cairn/shared';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   type agent,
   build,
@@ -66,6 +66,7 @@ import {
 import { markModelDead } from './model-liveness.js';
 import { notifyModelFallback } from './notifications.js';
 import { applyQuotaWaitStep } from './quota-wait.js';
+import { costFromRates, ratesForModel } from './token-usage-cost.js';
 
 function holdStepForQuota(
   deps: MachineDeps,
@@ -270,35 +271,51 @@ export async function finishStep(
   }
   const outcome: MachineDoneBody =
     landingError !== null ? { ...body, status: 'failed', errorMessage: landingError } : body;
+  const usageTeamId = stepTeamId(deps, stepRow);
   for (const u of outcome.usage ?? []) {
-    const cost = u.cost;
+    const prior = db
+      .select()
+      .from(tokenUsage)
+      .where(and(eq(tokenUsage.buildId, stepRow.buildId), eq(tokenUsage.model, u.model)))
+      .get();
+    const tokens = {
+      input: (prior?.input ?? 0) + u.input,
+      output: (prior?.output ?? 0) + u.output,
+      cacheRead: (prior?.cacheRead ?? 0) + u.cacheRead,
+      cacheWrite: (prior?.cacheWrite ?? 0) + u.cacheWrite,
+    };
+    const rates = ratesForModel(db, usageTeamId, u.model);
+    const reported = u.cost;
+    const cost = rates
+      ? costFromRates(tokens, rates)
+      : reported !== undefined &&
+          (reported.input !== 0 ||
+            reported.output !== 0 ||
+            reported.cacheRead !== 0 ||
+            reported.cacheWrite !== 0 ||
+            reported.total !== 0)
+        ? {
+            costInput: (prior?.costInput ?? 0) + reported.input,
+            costOutput: (prior?.costOutput ?? 0) + reported.output,
+            costCacheRead: (prior?.costCacheRead ?? 0) + reported.cacheRead,
+            costCacheWrite: (prior?.costCacheWrite ?? 0) + reported.cacheWrite,
+            costTotal: (prior?.costTotal ?? 0) + reported.total,
+          }
+        : null;
     db.insert(tokenUsage)
       .values({
         buildId: stepRow.buildId,
         model: u.model,
-        input: u.input,
-        output: u.output,
-        cacheRead: u.cacheRead,
-        cacheWrite: u.cacheWrite,
-        costInput: cost?.input ?? 0,
-        costOutput: cost?.output ?? 0,
-        costCacheRead: cost?.cacheRead ?? 0,
-        costCacheWrite: cost?.cacheWrite ?? 0,
-        costTotal: cost?.total ?? 0,
+        ...tokens,
+        costInput: cost?.costInput ?? null,
+        costOutput: cost?.costOutput ?? null,
+        costCacheRead: cost?.costCacheRead ?? null,
+        costCacheWrite: cost?.costCacheWrite ?? null,
+        costTotal: cost?.costTotal ?? null,
       })
       .onConflictDoUpdate({
         target: [tokenUsage.buildId, tokenUsage.model],
-        set: {
-          input: sql`${tokenUsage.input} + ${u.input}`,
-          output: sql`${tokenUsage.output} + ${u.output}`,
-          cacheRead: sql`${tokenUsage.cacheRead} + ${u.cacheRead}`,
-          cacheWrite: sql`${tokenUsage.cacheWrite} + ${u.cacheWrite}`,
-          costInput: sql`${tokenUsage.costInput} + ${cost?.input ?? 0}`,
-          costOutput: sql`${tokenUsage.costOutput} + ${cost?.output ?? 0}`,
-          costCacheRead: sql`${tokenUsage.costCacheRead} + ${cost?.cacheRead ?? 0}`,
-          costCacheWrite: sql`${tokenUsage.costCacheWrite} + ${cost?.cacheWrite ?? 0}`,
-          costTotal: sql`${tokenUsage.costTotal} + ${cost?.total ?? 0}`,
-        },
+        set: cost === null ? tokens : { ...tokens, ...cost },
       })
       .run();
   }

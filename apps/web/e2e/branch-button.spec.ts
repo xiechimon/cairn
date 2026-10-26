@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('with-branch card: branch button visible and is the branch glyph, opens the branch and PR sheet', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const buttons = page.locator('.todo-card-branch');
   await expect(buttons.first()).toBeVisible();
   await expect(buttons.first().locator('svg circle')).toHaveCount(2);
@@ -13,7 +13,7 @@ test('with-branch card: branch button visible and is the branch glyph, opens the
 
 test('no-branch card: branch button not rendered', async ({ page }) => {
 
-  await page.goto('/app?scenario=22d');
+  await page.goto('/app?scenario=22d&view=board');
   await expect(page.locator('.todo-card-branch')).toHaveCount(3);
   const fresh = page.locator('[data-todo-id="r7-dark-fresh-probe-10"]');
   await expect(fresh.locator('.todo-card-branch')).toHaveCount(0);

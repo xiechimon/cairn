@@ -117,6 +117,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
       cacheRead: sql<number>`coalesce(sum(${tokenUsage.costCacheRead}), 0)`,
       cacheWrite: sql<number>`coalesce(sum(${tokenUsage.costCacheWrite}), 0)`,
       total: sql<number>`coalesce(sum(${tokenUsage.costTotal}), 0)`,
+      priced: sql<number>`count(${tokenUsage.costTotal})`,
     })
     .from(tokenUsage)
     .innerJoin(build, eq(build.id, tokenUsage.buildId))
@@ -159,6 +160,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
             cacheRead: usage.cacheRead,
             cacheWrite: usage.cacheWrite,
             total: usage.total,
+            ...(usage.priced > 0 ? (usage.total === 0 ? { priced: true } : {}) : { priced: false }),
           },
         }
       : {}),

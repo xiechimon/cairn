@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
 
-const BOARD = '/app?scenario=01';
+const BOARD = '/app?scenario=01&view=board';
 const TOKEN = '![pasted-image-1.png](attachment:team-1/att-1.png)';
 
 async function saveSpec(page: Page, spec: string) {

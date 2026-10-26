@@ -14,8 +14,8 @@
     "Install Playwright chromium",
     "Drizzle snapshot chain guard",
     "Drizzle migration drift check",
-    "Test (vitest，轻 project)",
-    "Test (vitest，集成栈单独跑)",
+    "Test (vitest, light project)",
+    "Test (vitest, integration stack)",
     "pr-gate self-check (#1401)",
     "Lint warning cap gate (#1192)"
   ],

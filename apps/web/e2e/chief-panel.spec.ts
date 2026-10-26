@@ -16,7 +16,7 @@ const SHEET_W = 1440 - 248;
 
 test.describe('chief panel floating form (ADR 0013)', () => {
   test('Esc never closes the panel on the board route (D3)', async ({ page }) => {
-    await page.goto('/app?scenario=111');
+    await page.goto('/app?scenario=111&view=board');
     await expect(drawer(page)).toBeVisible();
 
     await page.keyboard.press('Escape');
@@ -40,7 +40,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   test('Esc layers: the open thread switcher closes first, the panel survives both', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=116');
+    await page.goto('/app?scenario=116&view=board');
     await expect(drawer(page)).toBeVisible();
 
     await expect(page.getByRole('menu')).toBeVisible();
@@ -54,7 +54,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   });
 
   test('composer bar carries the attach + mention tools and the send button', async ({ page }) => {
-    await page.goto('/app?scenario=111');
+    await page.goto('/app?scenario=111&view=board');
 
     const bar = page.locator('.chief-composer');
 
@@ -68,7 +68,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   test('the panel floats as a 380x600 window anchored 8px off the corner (board)', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=111');
+    await page.goto('/app?scenario=111&view=board');
     await settled(page);
     const box = await drawer(page).boundingBox();
     expect(box).not.toBeNull();
@@ -111,7 +111,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   });
 
   test('board content never yields to the window (D1 overlay, no yield)', async ({ page }) => {
-    await page.goto('/app?scenario=111');
+    await page.goto('/app?scenario=111&view=board');
     await settled(page);
     const main = await page.locator('.board-main').boundingBox();
     expect(main).not.toBeNull();
@@ -132,7 +132,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   test('minimizing leaves the board grid at the same geometry (nothing to restore)', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=111');
+    await page.goto('/app?scenario=111&view=board');
     await settled(page);
     const openMain = await page.locator('.board-main').boundingBox();
 
@@ -214,7 +214,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   test('hero examples: the four canon prompt cards, inert on the fixture face', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=111');
+    await page.goto('/app?scenario=111&view=board');
 
     const examples = page.getByTestId('chief-examples');
     const cards = examples.getByRole('button');
@@ -270,7 +270,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   }) => {
 
     const placeholderAt = async (scenario: string) => {
-      await page.goto(`/app?scenario=${scenario}`);
+      await page.goto(`/app?scenario=${scenario}&view=board`);
       const composer = page.getByTestId('chief-composer-input');
       await expect(composer).toBeVisible();
       return composer.getAttribute('placeholder');
@@ -325,7 +325,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       route.fulfill({ json: { sources: [] } }),
     );
 
-    await page.goto('/app');
+    await page.goto('/app?view=board');
     await expect(drawer(page)).toBeHidden();
 
     await fab(page).click();

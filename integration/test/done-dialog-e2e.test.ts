@@ -181,7 +181,7 @@ async function driveToReview(spec: string, opts: { rework: boolean }) {
 }
 
 async function openDetailViaBoard(title: string): Promise<void> {
-  await page.goto(`${server.url}/app`);
+  await page.goto(`${server.url}/app?view=board`);
   await page.getByRole('link', { name: title }).click();
   await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
     timeout: 15_000,

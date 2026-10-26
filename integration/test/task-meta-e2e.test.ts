@@ -62,7 +62,7 @@ describe('spec 15 #394 title-less surface + fixed tag vocabulary (live UI → wi
   });
 
   test('dialog has no title input / no tag UI; first body line becomes the placeholder title; detail page has no tag add surface', async () => {
-    await page.goto(`${server.url}/app`);
+    await page.goto(`${server.url}/app?view=board`);
     await pexpect(
       page.getByRole('complementary').getByRole('button', { name: '新任务' }),
     ).toBeVisible({ timeout: 30_000 });

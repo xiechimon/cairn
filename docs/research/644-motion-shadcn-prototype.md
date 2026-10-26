@@ -1,17 +1,16 @@
 # 644 · Site-wide motion migration to shadcn: prototype and trade-offs
 
-> 状态：**已裁决**（2026-10-02，用户拍板**方向 B**：全站采用 shadcn 默认，显式推翻 #73
 > Status: **ruled** (2026-10-02, the user decided **direction B**: adopt shadcn defaults site-wide, explicitly overturning #73's
 > replication discipline). The ruling canonical copy = `docs/adr/0009-site-wide-motion-converges-on-shadcn-defaults.md`; per-domain construction is in the execution ticket
-> （票面引本原型 §4）。本文保留为裁决前的现状盘点与两向对比记录。
-> 取数时点：`hp/pacman/t-0041-tabs` @ 2026-10-02；tw-animate-css 1.4.0（dist 逐字读取）；
-> 参考站实测记录见 `docs/verify/644/reference-measurements.md`。
+> (ticket cites this prototype §4). This document keeps the pre-ruling inventory and A/B comparison.
+> Data snapshot: `hp/pacman/t-0041-tabs` @ 2026-10-02; tw-animate-css 1.4.0 (dist read verbatim);
+> reference-site measurements in `docs/verify/644/reference-measurements.md`.
 
 ## 0. Two facts that must be pinned down first
 
-1. `apps/web/src/styles/motion.css` 是**故意复刻参考站**的 transition registry（#73；文件头
-   注释写明数值逐条抄自参考站生产样式表 `docs/research/assets/r1/f965382e067739e9.css`）。
-   「迁到 shadcn」不是收拾残局，而是**对这条已生效决定的改判或重构**——所以本文给方向而不是直接动手。
+1. `apps/web/src/styles/motion.css` is an **intentional replica** of the reference site's transition registry (#73; file header
+   documents values copied from the reference production stylesheet `docs/research/assets/r1/f965382e067739e9.css`).
+   "Move to shadcn" is not cleanup but **revisiting an active decision** — so this doc presents directions rather than implementing.
 2. `docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md` **has no motion batch** (verified: §1's five batches are all
    structure/control migrations, and it states outright "per-domain migration is pure structure change, zero visual re-pinning"). Motion migration is **new scope**,
    needing the user's decision before appending a batch entry — it is not an already-scheduled item.

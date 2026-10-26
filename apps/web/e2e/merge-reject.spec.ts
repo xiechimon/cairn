@@ -128,7 +128,7 @@ async function stubMergeSurface(page: Page, tools: string[]) {
 async function openBoardAccept(page: Page, tools: string[]) {
   await stubBoot(page);
   await stubMergeSurface(page, tools);
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   const card = page.locator(`.todo-card[data-todo-id="${CARD_ID}"]`);
   await expect(card).toBeVisible();
   await card.locator('.todo-card-action').click();

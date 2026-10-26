@@ -4,10 +4,10 @@ import {
   ChartColumn,
   ChevronDown,
   ChevronRight,
-  CircleAlert,
   Clock,
   Columns3,
   EllipsisVertical,
+  Inbox,
   KeyRound,
   Layers,
   type LucideIcon,
@@ -35,11 +35,12 @@ import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { readStoredTheme } from '../theme.js';
 import { withColumnParam } from './columns.js';
+import { withoutBoardView } from './home.js';
 import { ProjectAvatar } from './project-avatar.js';
 
 export type SidebarSelected =
   | 'board'
-  | 'attention'
+  | 'kanban'
   | 'schedules'
   | 'team'
   | 'none'
@@ -198,8 +199,10 @@ export function BoardSidebar({
   const { t } = useI18n();
   const { user } = useLiveData();
   const { search, pathname } = useLocation();
-  const plain = withColumnParam(search, null);
-  const attentionSearch = withColumnParam(search, 'pending');
+  const plain = withoutBoardView(withColumnParam(search, null));
+  const kanbanParams = new URLSearchParams(plain);
+  kanbanParams.set('view', 'board');
+  const kanbanSearch = `?${kanbanParams}`;
   const projectRows = useMemo(
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
     [projects],
@@ -223,7 +226,7 @@ export function BoardSidebar({
   useScrollFade(navRef, { enabled: !collapsed });
   const resourceListId = useId();
   const machineStatusId = useId();
-  const attentionLabel = attention > 0 ? `${t('需要我处理')} ${attention}` : t('需要我处理');
+  const homeLabel = attention > 0 ? `${t('工作台')} ${attention}` : t('工作台');
 
   const userAvatar = (
     <SeededAvatar
@@ -290,22 +293,20 @@ export function BoardSidebar({
           </TooltipContent>
         </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
-          <Link
-            {...railLink({ pathname: '/app', search: plain }, selected === 'board', t('工作台'))}
-          >
-            <Columns3 className={ICON} strokeWidth={STROKE} />
-          </Link>
-          <Link
-            {...railLink(
-              { pathname: '/app', search: attentionSearch },
-              selected === 'attention',
-              attentionLabel,
-            )}
-          >
-            <CircleAlert className={ICON} strokeWidth={STROKE} />
+          <Link {...railLink({ pathname: '/app', search: plain }, selected === 'board', homeLabel)}>
+            <Inbox className={ICON} strokeWidth={STROKE} />
             {attention > 0 && (
               <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)" />
             )}
+          </Link>
+          <Link
+            {...railLink(
+              { pathname: '/app', search: kanbanSearch },
+              selected === 'kanban',
+              t('看板'),
+            )}
+          >
+            <Columns3 className={ICON} strokeWidth={STROKE} />
           </Link>
           <Link
             {...railLink(
@@ -454,13 +455,13 @@ export function BoardSidebar({
         className={`flex min-h-0 flex-1 flex-col gap-px overflow-y-auto ${scrollFadeClassName()}`}
       >
         <Link {...navLink({ pathname: '/app', search: plain }, selected === 'board')}>
-          <Columns3 className={ICON} strokeWidth={STROKE} />
+          <Inbox className={ICON} strokeWidth={STROKE} />
           <span className="truncate">{t('工作台')}</span>
-        </Link>
-        <Link {...navLink({ pathname: '/app', search: attentionSearch }, selected === 'attention')}>
-          <CircleAlert className={ICON} strokeWidth={STROKE} />
-          <span className="truncate">{t('需要我处理')}</span>
           {attention > 0 && <AttentionBadge count={attention} />}
+        </Link>
+        <Link {...navLink({ pathname: '/app', search: kanbanSearch }, selected === 'kanban')}>
+          <Columns3 className={ICON} strokeWidth={STROKE} />
+          <span className="truncate">{t('看板')}</span>
         </Link>
         <Link {...navLink({ pathname: '/app/schedules', search: plain }, selected === 'schedules')}>
           <Clock className={ICON} strokeWidth={STROKE} />

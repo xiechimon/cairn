@@ -198,9 +198,9 @@ Do not: a parent todo object, an "orchestrating" phase, board parent-child group
 
 ## 7. Related documents
 
-- `r12-save-and-start-behavior.md` — 本票前序（§5.1 已拍裁决 2–7、§5.2 双方立场）
-- `r5-chief-behavior.md` — 参考站 Chief 行为一手观察（spec 三段式 / watch 回路 / 线程形状）
-- `r2-app-ui-inventory.md` / `r1-site-inventory.md` — 参考站看板与站点清单
-- wiki [[todos.dev 与 Multica 对照]] — 对象面宽窄对照底座（L-B 的 Multica 一手来源）
-- `CONTEXT.md` — 「无 Goal 概念」「来源=外部出处」现裁决（§5.7 列出随实现票更新的词条）
+- `r12-save-and-start-behavior.md` — prior ticket (§5.1 rulings 2–7, §5.2 both sides)
+- `r5-chief-behavior.md` — reference-site Chief behavior (spec three-part / watch loop / thread shape)
+- `r2-app-ui-inventory.md` / `r1-site-inventory.md` — reference board and site inventory
+- wiki [[todos.dev vs Multica comparison]] — object-surface width baseline (Multica primary source for L-B)
+- `CONTEXT.md` — no Goal concept; source = external provenance (§5.7 lists terms updated with implementation tickets)
 - `docs/spec/18-positioning-and-differentiation.md` — the positioning canonical copy that pins the semantic axes to todos.dev (basis of §5.8 argument 1)

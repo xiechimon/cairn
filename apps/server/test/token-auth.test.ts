@@ -462,14 +462,19 @@ describe('the 0.0.0.0 bare-bind WARN (failure modes 9/10)', () => {
   });
 
   test('env mapping: CAIRN_TOKEN -> authToken (empty string = off); HOST -> host', () => {
-    vi.stubEnv('CAIRN_TOKEN', TOKEN);
+    const home = mkdtempSync(join(tmpdir(), 'cairn-token-env-'));
+    tmpDirs.push(home);
+    vi.stubEnv(ENV_VARS.home, home);
+    vi.stubEnv(ENV_VARS.token, TOKEN);
     vi.stubEnv('HOST', '0.0.0.0');
     expect(loadConfig().authToken).toBe(TOKEN);
     expect(loadConfig().host).toBe('0.0.0.0');
-    vi.stubEnv('CAIRN_TOKEN', '');
+    vi.stubEnv(ENV_VARS.token, '');
     expect(loadConfig().authToken).toBeNull();
     vi.unstubAllEnvs();
+    vi.stubEnv(ENV_VARS.home, home);
     expect(loadConfig().authToken).toBeNull();
     expect(loadConfig().host).toBeNull();
+    vi.unstubAllEnvs();
   });
 });

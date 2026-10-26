@@ -1,4 +1,3 @@
-import { canOrchestrate } from '@cairn/shared';
 import {
   closestCorners,
   DndContext,
@@ -18,20 +17,16 @@ import {
   CircleAlert,
   CircleCheck,
   CircleDashed,
-  CircleX,
   Clock,
   Plus,
-  RotateCcw,
 } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
-import { useLiveData } from '../api/provider.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
-import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSessionStorage, safeSetItem } from '../safe-storage.js';
@@ -39,7 +34,6 @@ import {
   type BoardColumnDef,
   COLUMNS,
   canDropOnColumn,
-  cardFace,
   needsDoneGate,
   needsResetGate,
   sortColumnTodos,
@@ -56,10 +50,9 @@ import {
   FilterPanel,
   TOPBAR_TEXT_BUTTON,
 } from './filter-panel.js';
-import { relativeTime } from './rel-time.js';
+import { HomeSections, NeedsYouInbox, withoutBoardView } from './home.js';
 import { BrandMark } from './sidebar.js';
 import { cardTag } from './tag-filter.js';
-import { ATTENTION } from './todo-card.js';
 
 export interface BoardFilters {
   dimensions: readonly FilterDimension[];
@@ -84,6 +77,7 @@ interface BoardProps {
   banner?: ReactNode;
   filters: BoardFilters;
   onlyColumn?: string | null;
+  boardView?: boolean;
   tagsById?: ReadonlyMap<string, TagChipData>;
   onNewTask?: () => void;
   loading?: boolean;
@@ -137,139 +131,6 @@ function readLastSeenAt(): number {
   return Number.isFinite(parsed) ? parsed : Date.now();
 }
 
-interface NeedsYouRowsProps {
-  todos: TodoRecord[];
-  now: number;
-  projectNames?: Record<string, string>;
-  onAction?: (todo: TodoRecord) => void;
-  orchestrationOf?: (todo: TodoRecord) => CardOrchestration | null;
-}
-
-function NeedsYouRows({ todos, now, projectNames, onAction, orchestrationOf }: NeedsYouRowsProps) {
-  const { t } = useI18n();
-  const { live } = useLiveData();
-  const { search } = useLocation();
-  return (
-    <div className="divide-y divide-border overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)">
-      {todos.map((todo) => {
-        const face = cardFace(todo);
-        if (face.kind !== 'attention') return null;
-        const attention = ATTENTION[face.need];
-        const orchestration = canOrchestrate(todo.phase) ? (orchestrationOf?.(todo) ?? null) : null;
-        const orchestrationFailed = orchestration?.error !== undefined;
-        const StatusIcon = orchestrationFailed ? CircleX : attention.icon;
-        const ActionIcon = orchestrationFailed ? RotateCcw : attention.actionIcon;
-        return (
-          <div
-            key={todo.id}
-            data-testid="needs-you-row"
-            className="relative flex min-h-14 items-center gap-3 px-3.5 py-2.5 transition-colors duration-(--dur-fast) ease-(--ease-standard) hover:bg-secondary/60"
-          >
-            <StatusIcon
-              aria-hidden
-              strokeWidth={1.75}
-              className="mt-0.5 size-3.75 flex-none self-start text-(--card-button)"
-            />
-            <div className="min-w-0 flex-1">
-              <Link
-                className="line-clamp-2 text-ui wrap-break-word text-foreground no-underline after:absolute after:inset-0 after:content-['']"
-                to={{ pathname: `/app/todo/${todo.id}`, search }}
-              >
-                {todo.title}
-              </Link>
-              <div className="text-meta text-content-tertiary">
-                {[
-                  projectNames?.[todo.projectId] ?? (live ? undefined : PROJECT_NAME),
-                  `#${todo.seqNum}`,
-                  t(orchestrationFailed ? '编排失败' : attention.label),
-                  relativeTime(todo.phaseAt, now, t),
-                ]
-                  .filter((part) => part != null)
-                  .join(' · ')}
-              </div>
-            </div>
-            <div className="relative z-10 flex flex-none items-center">
-              {orchestration != null && !orchestrationFailed ? (
-                <span className="px-2 text-meta text-content-tertiary">{t('编排中')}</span>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  className="flex-none gap-1 text-(--card-button)"
-                  onClick={() => onAction?.(todo)}
-                >
-                  <ActionIcon aria-hidden strokeWidth={1.75} className="size-3.25" />
-                  {t(orchestrationFailed ? '重试' : attention.action)}
-                </Button>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function NeedsYouInbox({
-  todos,
-  now,
-  loading,
-  ...rowProps
-}: NeedsYouRowsProps & { loading: boolean }) {
-  const { t } = useI18n();
-  const [showStale, setShowStale] = useState(false);
-  const { fresh, stale } = splitStale(todos, now);
-  return (
-    <section
-      data-testid="needs-you-inbox"
-      className="board-inbox min-h-0 flex-1 overflow-y-auto pb-10"
-    >
-      <div className="mx-auto flex w-full max-w-198 flex-col gap-5 px-4 pt-4">
-        {fresh.length > 0 ? (
-          <NeedsYouRows todos={fresh} now={now} {...rowProps} />
-        ) : loading ? (
-          <div className="flex flex-col gap-2.5 rounded-(--radius-card) bg-card px-3.5 py-3 shadow-(--e1)">
-            <Skeleton className="bg-accent h-3.5 w-3/5" />
-            <Skeleton className="bg-accent h-3 w-2/5" />
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-1 py-10 text-center">
-            <CircleCheck aria-hidden strokeWidth={1.5} className="size-6 text-content-dim" />
-            <span className="text-ui text-content-secondary">{t('没有等你处理的事')}</span>
-          </div>
-        )}
-        {stale.length > 0 && (
-          <div data-testid="needs-you-stale">
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-expanded={showStale}
-              className="-ml-2 gap-1.5 font-normal text-content-secondary aria-expanded:bg-transparent aria-expanded:text-content-secondary"
-              onClick={() => setShowStale((open) => !open)}
-            >
-              <ChevronRight
-                aria-hidden
-                strokeWidth={1.75}
-                className={cn(
-                  'size-3.5 transition-transform duration-(--dur-fast) ease-(--ease-standard)',
-                  showStale && 'rotate-90',
-                )}
-              />
-              {t('较早的 {count} 条', { count: stale.length })}
-              <span className="text-meta text-content-dim">{t('超过 7 天没动')}</span>
-            </Button>
-            {showStale && (
-              <div className="mt-1.5">
-                <NeedsYouRows todos={stale} now={now} {...rowProps} />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
 function StalePendingLink({ count }: { count: number }) {
   const { t } = useI18n();
   const { search } = useLocation();
@@ -298,6 +159,7 @@ export function BoardSurface({
   banner,
   filters,
   onlyColumn = null,
+  boardView = false,
   tagsById,
   onNewTask,
   loading = false,
@@ -347,7 +209,7 @@ export function BoardSurface({
     };
   }, []);
   useEffect(() => {
-    if (onlyColumn != null) return;
+    if (!boardView || onlyColumn != null) return;
     const cols = COLUMNS.map(
       (column) => sortColumnTodos(column, visibleTodos.filter(column.accepts)).length,
     );
@@ -355,8 +217,9 @@ export function BoardSurface({
     try {
       localStorage.setItem('cairn-boot-shape', JSON.stringify({ cols }));
     } catch {}
-  }, [visibleTodos, onlyColumn]);
+  }, [visibleTodos, onlyColumn, boardView]);
 
+  const home = !boardView && onlyColumn == null;
   const showFilterEmpty =
     filters.active && visibleColumns.every((c) => !visibleTodos.some((todo) => c.accepts(todo)));
 
@@ -415,9 +278,9 @@ export function BoardSurface({
     <div className="board-main relative flex min-w-0 flex-1 flex-col">
       <header className="board-topbar flex h-14 flex-none items-center gap-3 px-6 whitespace-nowrap">
         <h1 className="board-topbar-title flex-none font-heading text-page font-medium text-foreground">
-          {t('工作台')}
+          {t(boardView ? '看板' : '工作台')}
         </h1>
-        <NeedsYouSummary count={pendingSplit.fresh.length} />
+        {!home && <NeedsYouSummary count={pendingSplit.fresh.length} />}
         <FilterChips chips={filters.chips} onClearAll={filters.onClear} />
         <div className="board-topbar-actions ml-auto flex flex-none items-center gap-0.5">
           <FilterPanel
@@ -429,7 +292,7 @@ export function BoardSurface({
             variant="ghost"
             size="sm"
             className={`board-topbar-schedule ${TOPBAR_TEXT_BUTTON}`}
-            render={<Link to={{ pathname: '/app/schedules', search }} />}
+            render={<Link to={{ pathname: '/app/schedules', search: withoutBoardView(search) }} />}
           >
             <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
             {t('定时')}
@@ -459,7 +322,16 @@ export function BoardSurface({
         </span>
       )}
 
-      {onlyColumn === 'pending' && !showFilterEmpty ? (
+      {home && !showFilterEmpty ? (
+        <HomeSections
+          todos={visibleTodos}
+          now={fixture.now}
+          projectNames={fixture.projectNames}
+          onAction={onAction}
+          orchestrationOf={orchestrationOf}
+          loading={loading}
+        />
+      ) : onlyColumn === 'pending' && !showFilterEmpty ? (
         <NeedsYouInbox
           todos={pendingTodos}
           now={fixture.now}
