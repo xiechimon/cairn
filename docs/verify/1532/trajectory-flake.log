@@ -1,0 +1,75 @@
+# trajectory-reflect flake evidence (PR #1872, run 40375352852)
+
+Intermittent `check` failure of `apps/server/test/trajectory-reflect.test.ts`, first seen on
+this branch in https://github.com/xiechimon/cairn/actions/runs/40375352852 (job 121756803287),
+head `d44494cf` (CI merge commit `adaaafc`, tree identical: `git diff adaaafc d44494cf` is empty).
+
+## CI occurrences of this failure class (2026-10-26, all on code from main)
+
+- 09:55 main `260b8a4c` run 40303352406: `a dismissed candidate absorbs later recurrences and is
+  never promoted` fails with the exact signature below; it is the only failure of that run
+  (the roster mismatch had not landed yet).
+- 17:10 lane/1614 run 40366138199: sibling test `human confirmation promotes only with two
+  builds of evidence` fails with the same CLI catch-all message.
+- 18:10 lane/1532 run 40375352852: `a dismissed candidate absorbs later recurrences and is never
+  promoted` fails alongside the known roster failure.
+
+Runs 40363549951 (16:54) and 40369203330 (17:30) executed code identical to the 18:10 head
+(the three branch heads differ only under `docs/verify/1532/`) and the file passed both times,
+so the failure is nondeterministic, not a branch regression.
+
+## Local reproduction (under `flock /tmp/cairn-heavy.lock`)
+
+Single serial run of the file: 12/12 pass. Concurrent stress (8 parallel
+`pnpm exec vitest run test/trajectory-reflect.test.ts` per round, `apps/server`):
+
+- batch 1, unmodified tree: 48 runs, 4 exit-1 failures (3 logs inspected, all show the
+  catch-all assertion below on the dismissed-candidate test)
+- batch 2, tree with a temporary one-line stack print in the CLI fallback (reverted after the
+  run): 48 runs, 0 failures
+- batch 3, same temporary stack print: 80 runs, 3 exit-1 failures
+
+Total: 7 of 176 runs (4.0%) failed; the six inspected logs all failed inside
+`trajectory-reflect.test.ts` curate-CLI assertions (5x dismissed-candidate, 1x
+human-confirmation). With two candidate ids passed as argv values per file run, a 1/64
+dash-leading chance per id predicts ~3.1% per run, consistent with the observed rate.
+
+## Unmasked error (batch 3, temporary stack print since reverted)
+
+```
+ FAIL  test/trajectory-reflect.test.ts > a dismissed candidate absorbs later recurrences and is never promoted
+AssertionError: Experience curation failed: Invalid arguments or database/input/output I/O failed
+TypeError [ERR_PARSE_ARGS_INVALID_OPTION_VALUE]: Option '--dismiss' argument is ambiguous.
+Did you forget to specify the option argument for '--dismiss'?
+To specify an option argument starting with a dash use '--dismiss=-XYZ'.
+    at checkOptionLikeValue (node:internal/util/parse_args/parse_args:82:11)
+    at node:internal/util/parse_args/parse_args:378:9
+    at Array.forEach (<anonymous>)
+    at parseArgs (node:internal/util/parse_args/parse_args:374:3)
+    at <anonymous> (/mnt/fast/lanes/cairn-1532/apps/server/src/trajectory-curate-cli.ts:19:22)
+: expected 1 to be +0 // Object.is equality
+```
+
+## Mechanism
+
+`apps/server/src/lib/ids.ts` `newRecordId()` draws each of 21 characters from a 64-symbol
+alphabet `A-Za-z0-9-_`, so 1 in 64 ids begins with `-`. `trajectory-curate.ts` stores that id
+on every memory candidate. `trajectory-reflect.test.ts` reads the id and spawns the CLI with
+the id as a separate argv token; `node:util parseArgs` in strict mode treats a dash-leading
+token as an option, not a value, and throws `ERR_PARSE_ARGS_INVALID_OPTION_VALUE`. The CLI
+catch-all maps that to `Invalid arguments or database/input/output I/O failed` and exit 1.
+
+## Deterministic one-shot reproduction (unmodified tree, 2026-10-26)
+
+```
+$ cd apps/server
+$ CAIRN_HOME=<tmp> node --import tsx src/trajectory-curate-cli.ts --dismiss -Ab3xyz
+Experience curation failed: Invalid arguments or database/input/output I/O failed   (exit 1)
+$ CAIRN_HOME=<tmp> node --import tsx src/trajectory-curate-cli.ts --dismiss=-Ab3xyz
+Experience curation failed: Candidate -Ab3xyz not found   (exit 1)
+```
+
+The `=` form reaches the candidate lookup, proving the failure is purely the argv token shape.
+The same wall applies to any human running `--confirm`/`--dismiss` with a dash-leading id, so
+the main-side fix belongs in the CLI's argument handling (or the id alphabet), not only in the
+test helper.

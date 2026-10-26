@@ -1,0 +1,11 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1532
+
+pi-ai@1.0.4 derivation: 157 vendors, 3 aliases
+checked-in snapshot: 157 vendors, 3 aliases
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  10:59:58
+   Duration  163ms (transform 47%, tests 33%, import 16%, worker 4%)
+
