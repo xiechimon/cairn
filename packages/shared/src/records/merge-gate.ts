@@ -240,9 +240,12 @@ export const MERGE_BLOCKERS = [
     label: '补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）',
   },
   { code: 'size-cap', class: 'human', label: '补丁超过 800 行或 40 个文件' },
-  { code: 'protected-path', class: 'human', label: '改动命中 D4 保护路径' },
+  {
+    code: 'independent-review-missing',
+    class: 'transient',
+    label: 'Protected changes require a bound independent review',
+  },
   { code: 'outside-auto-merge', class: 'human', label: '改动在可自动合并集之外' },
-  { code: 'test-deleted', class: 'human', label: '删除了测试' },
   {
     code: 'opaque-file',
     class: 'human',

@@ -23,7 +23,7 @@ export const projectRecordSchema = z.object({
 export type ProjectRecord = z.infer<typeof projectRecordSchema>;
 
 export const projectMergeConfigSchema = z.object({
-  mergePolicy: mergePolicySchema.default('human'),
+  mergePolicy: mergePolicySchema.default('autonomous'),
   localChecks: z.array(z.string().min(1)).default([]),
 });
 export type ProjectMergeConfig = z.infer<typeof projectMergeConfigSchema>;
