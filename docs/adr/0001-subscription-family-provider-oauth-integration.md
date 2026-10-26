@@ -1,62 +1,72 @@
 # ADR 0001 · Subscription-family provider OAuth integration
 
-> Status: **Decided — not shipped in this round** (2026-09-28).
-> Source: #301 (product of the #284 decision); recorded per that ticket's acceptance criterion "ADR or an addition to volume 06".
-> Placement note: this repo's existing decision records live in the spec volumes (e.g. the P table in `09-frontend-style-unification-a6.md` and the D table in `06-open-source-and-divergence.md`); a separate `docs/adr/` is used here because spec numbers are occupied by parallel lanes (11/12 landed the same day), to avoid collisions. If these are unified later, they can be merged back into the spec volumes while keeping this file's number.
+> Status: Option A selected by the owner on 2026-10-26; implementation deferred.
+> Original decision: #301, following #284, recorded on 2026-09-28. Revised by #1846.
+> Owner decision: [central credentials, machine-local Claude logins](https://github.com/xiechimon/cairn/issues/1846#issuecomment-6420269738).
 
-## Problem Statement
+## Problem statement
 
-OAuth for subscription-type models (OpenAI Codex / SuperGrok / X Premium+) is **PKCE + loopback redirect on the local machine**, designed for local CLIs; pacman's OAuth handshake is **server-callback** (the authorization code returns to the server, see `startOAuthAuthorize` / `completeOAuthCallback` in `apps/server/src/services/oauth.ts`). Based on this, #284 disproved "add a row to the family table `OAUTH_FAMILIES`": adding a row would only produce a **dead button that can never complete** (rule #222: the web connect section only renders families present in the table).
+Cairn needs subscription access that works across machines without copying long-lived credentials to every daemon. The September design delivered refresh tokens to daemons so pi could refresh during long steps. That spreads credentials and lets several machines rotate the same refresh token independently.
 
-#301 was therefore framed as "the only architecture path that can actually unblock the subscription family"; the ticket's proposed direction was to move the authorization initiator from the server to the daemon. **This ADR re-ran the fact reconnaissance and concludes that premise does not hold** (see F1).
+For example, a step that runs longer than an access token's lifetime still needs renewed access. Giving the daemon the refresh token solves expiry by giving that machine continuing account access. A server refresh call solves expiry while keeping the long-lived credential in one place.
 
-## Recon facts (measured 2026-09-28, with sources for each)
+The original ADR also treated subscription OAuth as reuse of official CLI client IDs. Provider policy and supported integrations now differ, so a working endpoint or a backend capability declaration is insufficient evidence that Cairn may offer that login.
 
-| # | Fact | Source |
-|---|---|---|
-| F1 | **The device code flow is implemented and needs no loopback**: `login()` lets the caller choose between "Browser login (default)" and "Device code login (headless)"; the latter goes through `/api/accounts/deviceauth/usercode` + `/token` (verification page `/codex/device`) and polls | `@earendil-works/pi-ai@0.86.0` `dist/auth/oauth/openai-codex.js` (a direct dependency of this repo's daemon). ⇒ The authorization code never passes through a callback; the **premise "it must move to the daemon" disappears** |
-| F2 | `toAuth(credential)` = `{ apiKey: credential.access }` — an OAuth credential is **equivalent to an apiKey at request time** | Same as above. ⇒ No change needed on the downstream wire (`StepCredentialBundle.provider.apiKey`) |
-| F3 | `refresh(credential, signal)` is **pure HTTP** (carries the refresh_token); the executing machine is not involved | Same as above |
-| F4 | Seam discipline **hard-forbids importing pi-ai on the server side**: "may only be consumed through the AgentBackend seam — implementations live in `apps/daemon/src/backend/`" | `biome.json` `noRestrictedImports` (mechanical block) |
-| F5 | The seam's capability surface **already declares `oauthProviders: readonly string[]`** and the daemon already fills `['anthropic','openai-codex','github-copilot','xai']`; `providerConfigSchema.kind` already includes `'oauth'`. Both have **no consumption point anywhere in the repo** (declaration only, plus one test assertion) | `packages/shared/src/agent-backend.ts`, `apps/daemon/src/backend/pi.ts:49`, `apps/daemon/test/map-pi-event.test.ts:182` |
-| F6 | **There is no third-party-registrable client**: xAI explicitly "rejects loopback OAuth from non-allowlisted clients"; third parties **reuse the official Grok-CLI's public `client_id`** (`b1a00492-…`) + PKCE, and the `redirect_uri` host:port must exactly match the registered value (`127.0.0.1:56121`); codex has the same structure (pi uses the official Codex CLI's `app_EMoamEEZ73f0CkXaXp7hrann`) | `pi-xai-supergrok` package `constants.ts`; pi `openai-codex.js` |
-| F7 | xai **supports RFC 8628 device code**: official docs `grok login --device-auth` "for headless or remote environments"; the verification page `accounts.x.ai/oauth2/device` actually exists | xAI docs (`docs.x.ai/build/enterprise`), `accounts.x.ai` |
-| F8 | pi's refresh policy is "refresh when less than `minimumValidityMs` remains before expiry, and throw if it still expires too soon after refresh" — **the whole mechanism assumes the runtime holds the refresh_token** | `dist/auth/resolve.js` |
-| F9 | Today's github-copilot OAuth uses **this repo's own registered GitHub OAuth app** (`PACMAN_GITHUB_OAUTH_CLIENT_ID/SECRET`), which differs in nature from F6's "reuse someone else's public client" | `apps/server/src/services/oauth.ts` |
+## Provider facts and sources
+
+### OpenAI
+
+OpenAI offers official Sign in with ChatGPT for third-party tools and lists Pi as an open-source integration. This replaces the old blanket claim that subscription access requires borrowing the Codex CLI's public client. See [OpenAI's integration list](https://learn.chatgpt.com/docs/sign-in-with-chatgpt). [Issue #1846](https://github.com/xiechimon/cairn/issues/1846) records the launch date as 2026-09-29; the integration page does not independently date the launch.
+
+pi-ai already includes an `openai-chatgpt` login, distinct from legacy `openai-codex`. Its implementation exchanges and refreshes tokens over HTTP and exposes the access token as `apiKey`. See the [pinned upstream implementation](https://github.com/earendil-works/pi/blob/f9daca3480732d0042b1df3a6e27221f597a620d/packages/ai/src/auth/oauth/openai-chatgpt.ts). Upstream support does not establish that Cairn's pinned dependency has this login or authorize Cairn to reuse Pi's identity.
+
+The new flow must be evaluated on its own registration and redirect requirements. The old Codex device-code flow is not evidence that Sign in with ChatGPT supports device-code login.
+
+### Anthropic
+
+Anthropic prohibits third parties from offering Claude.ai login, routing subscription requests on users' behalf, or collecting, storing, or intermediating Claude.ai credentials or session tokens. See [Claude Code legal and compliance](https://code.claude.com/docs/en/legal-and-compliance), under authentication and credential use.
+
+Cairn never wires pi-ai's Anthropic OAuth. A library's ability to perform that login is not permission to expose it. This prohibition covers both centralized credentials and daemon-side pi-ai login.
+
+The owner explicitly keeps Claude logins on each machine through Anthropic's own flow. The central page may show each machine's Claude login state and a per-machine re-login entry. It must not import, synchronize, store, or intermediate those tokens. Anthropic API-key access remains a separate credential type.
+
+### xAI
+
+The supported OAuth integrations identified by #1846 are Hermes and OpenCode only. xAI documents [OpenCode subscription login](https://x.ai/news/grok-opencode), and Hermes documents its [xAI device-code flow](https://hermes-agent.nousresearch.com/docs/guides/xai-grok-oauth). These sources establish those integrations, not a general right for Cairn to register or reuse their client IDs. The exclusivity constraint comes from [the issue's research scope](https://github.com/xiechimon/cairn/issues/1846); the linked integration guides do not establish a complete client allowlist.
+
+A reachable authorization endpoint or device-code endpoint does not establish Cairn eligibility. Cairn must verify provider approval and client provenance before enabling xAI login. The earlier acceptance of borrowed official client IDs is superseded.
 
 ## Decision
 
-| ID | Decision |
-|---|---|
-| **O1** | **Add no family-table rows in this round**; `OAUTH_FAMILIES` stays single-family (github-copilot); the copilot status quo (server-callback) is untouched |
-| **O2** | The "reuse the official CLI's public client" pattern is **accepted** (F6 is an established fact of that ecosystem), but **not scheduled** — not shipped this round |
-| **O3** | **xai verification conclusion**: endpoints are complete (`auth.x.ai/oauth2/authorize|token`, scopes include `grok-cli:access api:access`) + RFC 8628 device code supported + **no third-party-registrable client** ⇒ handled per the ticket's acceptance criterion "if not possible → record and remove from the list": **not added to the family table**. `PROVIDER_XAI_PRESET.oauthLabel` stays — it is a fidelity field collected from the original site (no consumption point on the web side, produces no dead button) |
-| **O4** | If this is picked up later, the **design is already fixed** in the next section (this round's grilling already pinned down 5+ decision points; the person picking it up need not re-run them) |
-| **O5** | The seam's declared-but-unconsumed `oauthProviders` and `kind:'oauth'` **stay as they are**: they describe **backend capability** (pi can do OAuth for these 4 providers), not a product commitment; this ADR is their documentation |
+The owner chose option A: one central place for keys and permitted subscriptions, usable from every machine. This supersedes the issue body's earlier hold pending a decision. Claude remains the machine-local exception described above. This revision records the design and changes no product behavior.
 
-## If this is picked up later (warm start: the design grilling already pinned)
+The server is the only refresher. Refresh tokens never leave the server. The server performs the initial token exchange and stores refresh credentials encrypted at rest. A login flow that requires a daemon to receive a refresh token does not meet this design and must not be wired unchanged.
 
-Supporting facts: F1 (device code needs no loopback), F2 (OAuth degrades to apiKey), F5 (seam capability already declared), F8 (refresh mechanism lives in the runtime).
+For each step, the daemon receives only a short-lived access token and its expiry, with a 1-hour access window. The implementation must respect the provider's actual expiry and must not claim that Cairn can shorten the validity of a provider-issued bearer token. A provider whose issued lifetime cannot meet this boundary needs review before enablement.
 
-| Topic | Decided |
-|---|---|
-| Authorization flow | **device code as the primary**; add a `flow: 'server-callback' \| 'device-code'` field to the family table, leaving a landing point for future families that only support loopback |
-| Executor | **daemon executes login** (reuses pi, activating F5's `oauthProviders`; importing pi-ai on the server side violates seam discipline F4); user interaction (user_code + verification URL) goes through the **existing machine→server→web event channel** (same shape as steer/stop/sync) |
-| Credential landing point | **sealed on the server** (follows the existing topology and per-step delivery semantics in 02 §8); recommended to add a sealed column + `credentialKind` discriminator column (rather than reusing `apiKeyCipher` to stuff JSON, which would force every `openProviderKey` consumption point to add discrimination) |
-| Per-step delivery | **push all three of refresh + access + expires (in-memory state)**; the daemon side feeds pi's existing `InMemoryCredentialStore` so pi self-refreshes per F8 — pushing only access breaks on long steps that cross the TTL |
-| First-ship families | codex + xai (anthropic is in the F5 list but is scope expansion; separate ticket) |
-| CLI command | **No** `pacman auth <provider>`: the entry point is the web UI (device code naturally fits). If CLI-first is ever wanted, decide then |
+During a long step, the daemon makes an authenticated mid-step refresh call to the server before expiry. The server checks the requesting machine's assignment to the active step, refreshes centrally, and returns only the replacement access token and expiry. The daemon never receives a refresh token, runs a provider refresh grant, or uses pi's refresh-token store for this path.
 
-## Premortem (assuming this is picked up later: the three most likely failure modes + guardrails)
+Concurrent steps share one server-controlled refresh operation per credential. The server saves rotated refresh credentials before delivering replacement access tokens. On expiry, revocation, or refresh failure, the step reports an actionable credential failure or requests re-login. It must not fall back to copying refresh credentials to a machine.
 
-| Failure mode | Guardrail |
-|---|---|
-| **Public client rotated or banned** (F6: we are not the client owner; xAI has said it rejects non-allowlisted clients) | Register `clientProvenance: 'reused-official-cli'` in the family table to make the risk visible; on login failure give **diagnosable copy** (distinguish "credential expired" from "client rejected"); keep the API key path as a fallback, never the only dependency |
-| **Long step crosses the access TTL and the stream breaks** (F8: pi only self-refreshes when it holds the refresh_token) | Push all three credentials per the table above; if that cannot be done, refresh before the step and verify TTL > longest step (this is the **first thing** to do when picking it up) |
-| **UX regression: "connecting a subscription first requires an online machine"** (today copilot needs no daemon) | The UI states this constraint explicitly at that family's entry; document it; if the constraint is judged unacceptable, the alternative route = hand-written device-code HTTP on the server (3 REST calls + polling; does not touch pi-ai so it does not violate F4), family table carries the device endpoints |
+The existing `StepCredentialBundle.provider.apiKey` access-token representation can be reused, but expiry metadata and the refresh RPC need follow-up implementation. The server must preserve the pi-ai import boundary in `biome.json`: implement provider HTTP operations behind the server credential service rather than importing pi-ai into the server. Backend `oauthProviders` declarations describe capabilities, not product permissions.
 
-## Consequences
+No OAuth family-table rows are added by this ADR revision. Existing GitHub Copilot behavior and the API-key path remain unchanged. The web UI is the central entry point for permitted subscription credentials; this decision does not add a CLI authentication command.
 
-- **Positive**: closed with zero product code changes, no exposure to the reputational surface of reusing third-party clients; the story of the "declared-but-unconsumed OAuth seam capability" is fixed on record, so future readers will not assume codex/xai already work or are "one family-table row away".
-- **Negative**: the subscription family (using ChatGPT / Grok subscriptions as model sources) is unavailable this round; reviving the capability needs a new mainline (this ADR has already pinned the design, so the cost is well below starting from zero).
-- **Reopen triggers**: real usage demand for subscription-type models emerges; or a provider opens third-party client registration; or the product owner explicitly starts it.
+## Failure modes and required verification
+
+- A step crosses the token lifetime. Verify a real mid-step refresh returns access and expiry only, and the step continues without a daemon-held refresh token.
+- Two machines refresh the same credential. Verify central serialization and durable rotation prevent reuse of an invalidated refresh token.
+- A machine requests another step's credential or refreshes after completion. Verify the server rejects the request.
+- A provider revokes access or rejects the client. Report the distinction from ordinary expiry and retain API-key access as an alternative.
+- A login adapter returns a refresh token to the daemon. Reject that adapter for this path and inspect wire payloads, persisted credentials, and logs for leaks.
+- An upstream capability list includes Anthropic OAuth. Verify Cairn never exposes or invokes that login, and central Claude status contains no credentials.
+
+These are implementation acceptance requirements, not claims that the current product already enforces the revised design.
+
+## Consequences and schedule
+
+Central refresh limits long-lived credential storage to the server and avoids independent token rotation on several machines. The server becomes necessary for renewal during long steps and is a concentrated credential store, so refresh availability, encryption, and authorization are required parts of the implementation.
+
+The owner decision resolves option A, but it does not remove the time restriction. Follow-up implementation tickets for ChatGPT plan login, per-step tokens and refresh RPC, and xAI device-code login may be opened only after 2026-11-09 and only if option A remains selected. The owner comment says later follow-ups are tracked separately; this revision opens none. Provider eligibility must still be verified before shipping.
+
+The [linked research artifact](https://claude.ai/artifact/9vTv3YerDcNHULn1BFrqyt) is background supplied by the issue. Provider claims above use accessible primary sources where available and explicitly identify the remaining issue-sourced constraints.
