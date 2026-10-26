@@ -407,6 +407,13 @@
       "when": 1792988595997,
       "tag": "0057_github_connection_refresh",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1793005785278,
+      "tag": "0058_token_usage_cost_nullable",
+      "breakpoints": true
     }
   ]
 }

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
-import { formatUsd, NO_PRICE_REASON } from '../api/mappers.js';
+import { formatUsd, NO_PRICE_REASON, usageCostKnown } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
@@ -193,10 +193,10 @@ export function TodoCard({
             {todo.usageCost !== undefined && (
               <span
                 data-testid="card-cost"
-                title={todo.usageCost.total > 0 ? undefined : t(NO_PRICE_REASON)}
+                title={usageCostKnown(todo.usageCost) ? undefined : t(NO_PRICE_REASON)}
                 className={`${META_ITEM} tabular-nums`}
               >
-                {todo.usageCost.total > 0 ? formatUsd(todo.usageCost.total) : '—'}
+                {usageCostKnown(todo.usageCost) ? formatUsd(todo.usageCost.total) : '—'}
               </span>
             )}
             {face.kind === 'done' && face.canceled && (

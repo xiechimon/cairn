@@ -24,7 +24,17 @@ import {
 test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
     ['node', 'scripts/english-only-gate.mjs'],
+    ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons.md', 'AGENTS.md'],
   ]);
+  assert.deepEqual(prepushPlan(['docs/lessons.md'], 'ci'), [
+    ['node', 'scripts/english-only-gate.mjs'],
+  ]);
+  assert.deepEqual(
+    prepushPlan(['apps/server/src/app.ts', 'docs/ops/langfuse.md']).filter(
+      (args) => args[1] === 'scripts/doc-reader-tests.mjs',
+    ),
+    [['node', 'scripts/doc-reader-tests.mjs', 'docs/ops/langfuse.md']],
+  );
   assert.deepEqual(prepushPlan(['docs/lessons.md'], 'advisory'), [
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],
   ]);

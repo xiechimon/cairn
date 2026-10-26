@@ -64,6 +64,7 @@ export const usageCostSchema = z.object({
   cacheRead: z.number(),
   cacheWrite: z.number(),
   total: z.number(),
+  priced: z.boolean().optional(),
 });
 export type UsageCost = z.infer<typeof usageCostSchema>;
 

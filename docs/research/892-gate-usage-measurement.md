@@ -1,10 +1,10 @@
 # #892 measurement gate — withPlan distribution in a real closed loop, full enumeration of gate-bypass paths, and rubber-stamp signals
 
 > Settled item: `docs/spec/18-positioning-and-differentiation.md` §5 honest-list item 2, "withPlan usage unknown".
-> 结论先行：**担忧在数据里成立，且形态比「橡皮图章化」更差——是「物理绕过」而非「走过场」**。
-> 本机真跑数据 28 个 build / 17 张 done 卡里：confirm 闸 13 次进闸只有 3 次按了确认钮，
-> review 闸 6 次进闸只有 1 次走 merge 步放行；**15/17（88%）的 done 卡经看板手动改相
-> （拖拽）落地，两道闸全跳**。数据、口径、逐条路径全部可复算，见下。
+> Headline: **the concern holds in data, and the shape is worse than rubber-stamping — physical bypass, not ritual pass-through**.
+> Live data on this machine: 28 builds / 17 done cards — confirm gate entered 13 times but only 3 confirm presses,
+> review gate entered 6 times but only 1 merge-step release; **15/17 (88%) done landings via board drag (phase change),
+> both gates skipped**. Data, caliber, and per-path enumeration are reproducible below.
 
 ## 0. Ruling summary
 
@@ -182,11 +182,11 @@ Not recommended (the data does not support it): cutting the drag shortcut itself
 ## 7. Reconciliation against honesty-list item 2
 
 The original criterion in `docs/spec/18-positioning-and-differentiation.md` §5 item 2 — "count the withPlan distribution in a real closed-loop run" —
-本文件就是那个数。**该条从「未知」变为「已量，担忧成立」**：直执行 39%（chief 侧 100%）、
-confirm 放行率 3/13、review 正门放行 1/6、done 经拖拽 15/17、版本化方案文档 0 行。
-spec §5 第 2 条的更新随本 PR 落（把「使用率未知」改为已量结论 + 指针），第 1 条
-（「闸的价值命题与无人值守互为前提」）与第 5 条（Chief 存废）各拿到一枚新证据：
-定时器路径启用前就该先过 6 号改进票；Chief 在数据里是闸的主要绕行者而非消费者。
+This document is that count. **The item moves from unknown to measured — concern confirmed**: direct execution 39% (chief side 100%),
+confirm release 3/13, review front-door 1/6, done via drag 15/17, versioned plan documents 0 rows.
+spec §5 item 2 updates with this PR (unknown → measured conclusion + pointer); items 1
+(gate value proposition vs unattended operation) and 5 (Chief keep/remove) gain evidence:
+timer path should pass improvement #6 before enable; Chief in data is the main gate bypasser, not consumer.
 
 ## Appendix A: per-todo ledger (this machine, 2026-10-05 snapshot)
 

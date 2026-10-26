@@ -28,11 +28,11 @@ Reference rows (untouched, proving the measurement convention): todo-card = 14px
 | chief settings-face row buttons (44px, Button-carried) | 0px | 10px |
 | mention-picker insert button corner radius (Button-carried reference) | 10px | 10px (geometry untouched; what moved is the ink, see ../1055/) |
 
-其余无钉改动面（gate 横幅 / TURN_TOOLS / 切换器盘 / 示例卡 / icon tile /
-SEARCH_BOX / token-gate input / EMPTY_CARD / 章程块 / 虚线空态框）为类级
-A single-point change; basis and per-site reasoning in `docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md` §2;
-segmented-controls.spec 的 pill 追踪断言（位置/尺寸 ≤1px，无半径）与
-chief-settings.spec 的 inset 断言在改动后全绿（本分支 e2e:affected 663 passed）。
+Other unpinned faces (gate banner / TURN_TOOLS / switcher tray / sample card / icon tile /
+SEARCH_BOX / token-gate input / EMPTY_CARD / charter block / dashed empty state) changed at class level
+in a single point; basis and per-site reasoning in `docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md` §2;
+segmented-controls.spec pill tracking (position/size ≤1px, no radius) and chief-settings.spec inset assertions
+stayed green after the change (this branch e2e:affected 663 passed).
 
 ## Gate two-way verification (gate-demo-*.txt in this directory)
 
