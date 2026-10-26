@@ -60,7 +60,7 @@ export function TeamAgentGrid({
       {visible.length === 0 ? (
         <TeamAgentsEmpty onCreate={onCreate} />
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {visible.map((agent) => {
             const machine = machineOf(agent.machineId);
             const status: MachineStatus | null =
