@@ -358,19 +358,24 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
   }
 });
 
-test('prepush vitest only forgives files listed as known local red', async () => {
+test('prepush vitest only forgives known local red while the listed file still fails', async () => {
   const { unexpectedFailures } = await import('./prepush-vitest.mjs');
-  const known = [{ file: 'a/known.test.ts', reason: 'r' }];
+  const known = [
+    { file: 'a/known.test.ts', reason: 'r' },
+    { file: 'apps/server/test/token-auth.test.ts', reason: 'r' },
+  ];
   const report = {
     testResults: [
       { name: '/r/a/known.test.ts', status: 'failed' },
       { name: '/r/b/new.test.ts', status: 'failed' },
+      { name: '/r/apps/server/test/token-auth.test.ts', status: 'passed' },
       { name: '/r/c/ok.test.ts', status: 'passed' },
     ],
   };
   assert.deepEqual(unexpectedFailures(report, known, '/r'), {
     unexpected: ['b/new.test.ts'],
     knownFailed: ['a/known.test.ts'],
+    staleKnown: ['apps/server/test/token-auth.test.ts'],
   });
 });
 

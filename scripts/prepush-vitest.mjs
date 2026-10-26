@@ -10,9 +10,13 @@ export function unexpectedFailures(report, knownRed, cwd = root) {
   const failed = report.testResults
     .filter((result) => result.status === 'failed')
     .map((result) => relative(cwd, result.name));
+  const passed = report.testResults
+    .filter((result) => result.status === 'passed')
+    .map((result) => relative(cwd, result.name));
   return {
     unexpected: failed.filter((file) => !known.has(file)),
     knownFailed: failed.filter((file) => known.has(file)),
+    staleKnown: passed.filter((file) => known.has(file)),
   };
 }
 
@@ -40,12 +44,16 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     process.exit(run.status ?? 1);
   }
   const knownRed = JSON.parse(readFileSync(join(root, 'scripts/prepush-known-red.json'), 'utf8'));
-  const { unexpected, knownFailed } = unexpectedFailures(report, knownRed);
+  const { unexpected, knownFailed, staleKnown } = unexpectedFailures(report, knownRed);
   for (const file of knownFailed)
     console.log(
       `[prepush] known environment red locally (scripts/prepush-known-red.json): ${file}`,
     );
-  if (unexpected.length > 0) {
+  for (const file of staleKnown)
+    console.error(
+      `[prepush] stale known-red entry, the file passes here (scripts/prepush-known-red.json): ${file}`,
+    );
+  if (unexpected.length > 0 || staleKnown.length > 0) {
     for (const file of unexpected) console.error(`[prepush] FAIL: ${file}`);
     process.exit(1);
   }

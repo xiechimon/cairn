@@ -27,12 +27,17 @@ import {
   type GithubConditionalRead,
   type GithubIssueEvent,
   type GithubIssueEventsPage,
+  type GithubIssueTimelinePage,
   type GithubLabeledIssuesPage,
+  type GithubLinkedPull,
   GithubRateLimitedError,
   type GithubRepoPermission,
+  githubCloseIssue,
   githubCollaboratorPermission,
+  githubIssueClosingPulls,
   githubIssueEvents,
   githubIssueState,
+  githubIssueTimeline,
   githubOpenIssuesWithLabel,
 } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
@@ -282,6 +287,7 @@ export function createIssueIntake(
   const log = (obj: object, msg: string) => run.logger?.info(obj, msg);
   const listCache: EtagCache<GithubLabeledIssuesPage> = new Map();
   const eventsCache: EtagCache<GithubIssueEventsPage> = new Map();
+  const timelineCache: EtagCache<GithubIssueTimelinePage> = new Map();
   const stateCache: EtagCache<{ state: 'open' | 'closed' }> = new Map();
   const closerEventsCache: EtagCache<GithubIssueEventsPage> = new Map();
   const seenOpen = new Set<string>();
@@ -495,6 +501,103 @@ export function createIssueIntake(
       } else log(at, 'issue intake candidate not taken');
       return 'not-taken';
     }
+    const repoName = `${owner}/${repo}`.toLowerCase();
+    const issueKey = `${row.teamId}\u0000${owner}/${repo}#${issueNumber}`.toLowerCase();
+    const timelinePulls: GithubLinkedPull[] = [];
+    let timelineUrl: string | null = null;
+    let timelineReadable = true;
+    let timelineComplete = false;
+    for (let pageNo = 1; pageNo <= ISSUE_INTAKE_MAX_EVENT_PAGES; pageNo += 1) {
+      const key: string = `${issueKey}\u0001${timelineUrl ?? 'first'}`;
+      const page = await githubIssueTimeline(
+        run.githubFetch,
+        access.token,
+        owner,
+        repo,
+        issueNumber,
+        { url: timelineUrl, etag: etagFor(timelineCache, key) },
+      );
+      const data: GithubIssueTimelinePage | null = settle(timelineCache, key, page);
+      if (data === null) {
+        timelineReadable = false;
+        break;
+      }
+      timelinePulls.push(...data.pulls);
+      if (!data.more) {
+        timelineComplete = true;
+        break;
+      }
+      if (data.next === null) break;
+      timelineUrl = data.next;
+    }
+    const closing = await githubIssueClosingPulls(
+      run.githubFetch,
+      access.token,
+      owner,
+      repo,
+      issueNumber,
+    );
+    const byNumber = new Map<number, { state: 'open' | 'closed'; merged: boolean }>();
+    for (const pull of [...timelinePulls, ...(closing?.pulls ?? [])]) {
+      if (pull.repo.toLowerCase() !== repoName) continue;
+      const prev = byNumber.get(pull.number);
+      const open = pull.state === 'open' && !pull.merged;
+      if (prev === undefined) {
+        byNumber.set(pull.number, { state: pull.state, merged: pull.merged });
+        continue;
+      }
+      const prevOpen = prev.state === 'open' && !prev.merged;
+      if (open && !prevOpen) byNumber.set(pull.number, { state: 'open', merged: false });
+      else if (!prevOpen && !open && !pull.merged && prev.merged) {
+        byNumber.set(pull.number, { state: 'closed', merged: false });
+      }
+    }
+    const openNumbers = [...byNumber.entries()]
+      .filter(([, pull]) => pull.state === 'open' && !pull.merged)
+      .map(([number]) => number)
+      .sort((a, b) => a - b);
+    if (openNumbers.length > 0) {
+      for (const pr of openNumbers) {
+        log(
+          { projectId: row.id, issue: issueNumber, pr },
+          `issue intake skipped, open pull request #${pr}`,
+        );
+      }
+      return 'not-taken';
+    }
+    const readsComplete = timelineReadable && timelineComplete && closing?.complete;
+    if (!readsComplete) {
+      tally.unverifiable += 1;
+      log(
+        { projectId: row.id, issue: issueNumber, reason: 'links-unreadable' },
+        'issue intake candidate not taken',
+      );
+      return 'not-taken';
+    }
+    const mergedNumbers = [...byNumber.entries()]
+      .filter(([, pull]) => pull.merged)
+      .map(([number]) => number)
+      .sort((a, b) => a - b);
+    const abandoned = [...byNumber.values()].some((pull) => !pull.merged);
+    const mergedPr = mergedNumbers[0];
+    if (mergedPr !== undefined && !abandoned) {
+      try {
+        await githubCloseIssue(run.githubFetch, access.token, owner, repo, issueNumber);
+      } catch (err) {
+        if (err instanceof GithubRateLimitedError) throw err;
+        tally.errors += 1;
+        log(
+          { projectId: row.id, issue: issueNumber, pr: mergedPr, err: errText(err) },
+          'issue intake close on github failed',
+        );
+        return 'not-taken';
+      }
+      log(
+        { projectId: row.id, issue: issueNumber, pr: mergedPr },
+        `issue intake closed issue, linked pull request #${mergedPr} merged`,
+      );
+      return 'not-taken';
+    }
     if (projectAtInFlightCap(deps.db, row.id)) {
       tally.atCap += 1;
       return 'full';
@@ -624,6 +727,10 @@ export function createIssueIntake(
     for (const key of eventsCache.keys()) {
       const issueKey = key.split('\u0001')[0] ?? '';
       if (key.startsWith(`${listKey}#`) && !listed.has(issueKey)) eventsCache.delete(key);
+    }
+    for (const key of timelineCache.keys()) {
+      const issueKey = key.split('\u0001')[0] ?? '';
+      if (key.startsWith(`${listKey}#`) && !listed.has(issueKey)) timelineCache.delete(key);
     }
   }
 

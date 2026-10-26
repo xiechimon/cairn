@@ -825,11 +825,18 @@ async function intakeGet(
   url: string,
   token: string,
   etag: string | null | undefined,
+  init?: { method?: 'POST'; body?: string },
 ): Promise<{ status: number; etag: string | null; link: string | null; data: unknown } | null> {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
     res = await fetchImpl(url, {
-      headers: { ...authHeaders(token), ...(etag != null ? { 'if-none-match': etag } : {}) },
+      ...(init?.method !== undefined ? { method: init.method } : {}),
+      headers: {
+        ...authHeaders(token),
+        ...(etag != null ? { 'if-none-match': etag } : {}),
+        ...(init?.body !== undefined ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(init?.body !== undefined ? { body: init.body } : {}),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch {
@@ -978,6 +985,147 @@ export async function githubIssueEvents(
   };
 }
 
+export interface GithubLinkedPull {
+  number: number;
+  repo: string;
+  state: 'open' | 'closed';
+  merged: boolean;
+}
+
+export interface GithubIssueTimelinePage {
+  pulls: GithubLinkedPull[];
+  more: boolean;
+  next: string | null;
+  full: boolean;
+}
+
+export async function githubIssueTimeline(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  opts: { url?: string | null; etag?: string | null } = {},
+): Promise<GithubConditionalRead<GithubIssueTimelinePage> | null> {
+  const url =
+    opts.url ??
+    `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}/timeline` +
+      `?per_page=${INTAKE_PER_PAGE}`;
+  const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
+  if (got === null || got.notModified) return got;
+  if (!Array.isArray(got.data.body)) return null;
+  const pulls: GithubLinkedPull[] = [];
+  for (const raw of got.data.body as unknown[]) {
+    if (typeof raw !== 'object' || raw === null) return null;
+    const entry = raw as Record<string, unknown>;
+    const event = entry.event;
+    if (event !== 'cross-referenced' && event !== 'connected') continue;
+    const candidates: unknown[] = [];
+    const source = entry.source;
+    if (typeof source === 'object' && source !== null && 'issue' in source) {
+      candidates.push((source as { issue?: unknown }).issue);
+    }
+    const subject = entry.subject;
+    if (typeof subject === 'object' && subject !== null) {
+      if ('issue' in subject) candidates.push((subject as { issue?: unknown }).issue);
+      else candidates.push(subject);
+    }
+    if (candidates.length === 0) {
+      if (event === 'cross-referenced') return null;
+      continue;
+    }
+    for (const candidate of candidates) {
+      if (typeof candidate !== 'object' || candidate === null) return null;
+      const issue = candidate as Record<string, unknown>;
+      const pr = issue.pull_request;
+      if (pr === undefined || pr === null) continue;
+      if (typeof pr !== 'object') return null;
+      const number = issue.number;
+      const state = issue.state;
+      const fullName = (issue.repository as { full_name?: unknown } | undefined)?.full_name;
+      const mergedAt = (pr as { merged_at?: unknown }).merged_at;
+      if (typeof number !== 'number' || (state !== 'open' && state !== 'closed')) return null;
+      if (typeof fullName !== 'string' || fullName === '') return null;
+      pulls.push({
+        number,
+        repo: fullName,
+        state,
+        merged: typeof mergedAt === 'string' && mergedAt !== '',
+      });
+    }
+  }
+  return {
+    notModified: false,
+    etag: got.etag,
+    data: {
+      pulls,
+      more: (got.data.link ?? '').includes('rel="next"'),
+      next: nextPageUrl(got.data.link),
+      full: got.data.body.length >= INTAKE_PER_PAGE,
+    },
+  };
+}
+
+const ISSUE_CLOSING_PULLS_QUERY =
+  'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){' +
+  'issue(number:$number){closedByPullRequestsReferences(first:100,includeClosedPrs:true){' +
+  'pageInfo{hasNextPage}nodes{number state merged repository{nameWithOwner}}}}}}';
+
+export interface GithubClosingPulls {
+  pulls: GithubLinkedPull[];
+  complete: boolean;
+}
+
+export async function githubIssueClosingPulls(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+): Promise<GithubClosingPulls | null> {
+  const url = 'https://api.github.com/graphql';
+  const got = await intakeGet(fetchImpl, url, token, null, {
+    method: 'POST',
+    body: JSON.stringify({
+      query: ISSUE_CLOSING_PULLS_QUERY,
+      variables: { owner, name: repo, number: issueNumber },
+    }),
+  });
+  if (got === null || got.status < 200 || got.status >= 300) return null;
+  if (typeof got.data !== 'object' || got.data === null) return null;
+  const data = (got.data as { data?: unknown }).data;
+  if (typeof data !== 'object' || data === null) return null;
+  const repository = (data as { repository?: unknown }).repository;
+  if (typeof repository !== 'object' || repository === null) return null;
+  const issue = (repository as { issue?: unknown }).issue;
+  if (typeof issue !== 'object' || issue === null) return null;
+  const conn = (issue as { closedByPullRequestsReferences?: unknown })
+    .closedByPullRequestsReferences;
+  if (typeof conn !== 'object' || conn === null) return null;
+  const pageInfo = (conn as { pageInfo?: unknown; nodes?: unknown }).pageInfo;
+  const nodes = (conn as { nodes?: unknown }).nodes;
+  if (typeof pageInfo !== 'object' || pageInfo === null || !Array.isArray(nodes)) return null;
+  const hasNext = (pageInfo as { hasNextPage?: unknown }).hasNextPage;
+  if (typeof hasNext !== 'boolean') return null;
+  const pulls: GithubLinkedPull[] = [];
+  for (const node of nodes) {
+    if (node === null) continue;
+    if (typeof node !== 'object') return null;
+    const row = node as Record<string, unknown>;
+    const number = row.number;
+    const state = typeof row.state === 'string' ? row.state.toLowerCase() : '';
+    const merged = row.merged;
+    const nameWithOwner = (row.repository as { nameWithOwner?: unknown } | undefined)
+      ?.nameWithOwner;
+    if (typeof number !== 'number' || (state !== 'open' && state !== 'closed')) return null;
+    if (typeof merged !== 'boolean' || typeof nameWithOwner !== 'string' || nameWithOwner === '') {
+      return null;
+    }
+    pulls.push({ number, repo: nameWithOwner, state, merged });
+  }
+  return { pulls, complete: !hasNext };
+}
+
 export interface GithubRepoPermission {
   permission: string;
   roleName: string | null;
@@ -1097,6 +1245,31 @@ export async function githubUpdateIssueTitle(
 ): Promise<void> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
   await writeJson(fetchImpl, 'PATCH', url, token, { title });
+}
+
+export async function githubCloseIssue(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+): Promise<void> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      method: 'PATCH',
+      headers: { ...authHeaders(token), 'content-type': 'application/json' },
+      body: JSON.stringify({ state: 'closed' }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw mapFetchThrow(url, err);
+  }
+  if (res.ok) return;
+  const text = await res.text().catch(() => '');
+  if (isRateLimitedText(res, text)) throw rateLimitOf(url, res);
+  throw mapUpstreamStatus(url, res);
 }
 
 export type GithubMergeResult =

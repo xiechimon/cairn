@@ -1,0 +1,33 @@
+{
+  "label": "installed pi-ai 1.4.0",
+  "derivedVendorCount": 162,
+  "snapshotVendorCount": 157,
+  "addedByDerived": [
+    "claude-haiku-5-5",
+    "codestral-2508",
+    "gemini-4-argon",
+    "gemini-pro-latest",
+    "glm-5-2",
+    "labs-leanstral-1-5-1",
+    "minimax-m3.1-flash",
+    "ministral-14b-2512",
+    "ministral-3b-2512",
+    "ministral-8b-2512",
+    "mistral-large-4",
+    "muse-wonder-1.0",
+    "voxtral-small-2507"
+  ],
+  "missingFromDerived": [
+    "gpt-5.2-chat-latest",
+    "gpt-5.3-chat-latest",
+    "mimo-v2.5",
+    "mimo-v2.5-pro",
+    "mimo-v2.5-pro-ultraspeed",
+    "open-mistral-7b",
+    "open-mixtral-8x22b",
+    "open-mixtral-8x7b"
+  ],
+  "vendorValueChanged": [],
+  "aliasesEqual": true,
+  "snapshotEqualsDerived": false
+}
