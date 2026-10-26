@@ -2999,3 +2999,68 @@ describe('26 trigger gate (#1491)', () => {
     expect(await blockedReason(w)).toBe('in-flight-cap');
   });
 });
+
+describe('27 bug issues are orchestrated reproduce-first through intake (#1618)', () => {
+  const REPRODUCE_FIRST = '先完成复现步骤，再开始实现';
+
+  function labelOpen(w: World, n: number, names: string[]): void {
+    const issue = w.gh.state.open.find((i) => i.number === n) as RawIssue;
+    issue.labels = names.map((name) => ({ name, color: 'd73a4a' }));
+  }
+
+  function orchestrationText(w: World): string {
+    const threads = chiefThreads(w.s);
+    expect(threads).toHaveLength(1);
+    const messages = w.s.db
+      .select()
+      .from(chiefMessageTable)
+      .where(eq(chiefMessageTable.threadId, threads[0]?.id ?? ''))
+      .all();
+    return messages.map((m) => JSON.stringify(m.content)).join('\n');
+  }
+
+  test('27a an issue labeled Bug carries the reproduce-first block, an issue without it does not', async () => {
+    const withBug = await makeWorld({ list: [1406] });
+    labelOpen(withBug, 1406, ['Bug', LABEL]);
+    await withBug.intake.sweep();
+    expect(orchestrationText(withBug)).toContain(REPRODUCE_FIRST);
+
+    const plain = await makeWorld({ list: [1406] });
+    labelOpen(plain, 1406, ['enhancement', LABEL]);
+    await plain.intake.sweep();
+    expect(orchestrationText(plain)).not.toContain(REPRODUCE_FIRST);
+  });
+
+  test('27b edits and label toggles on the same issue never create a second card or thread', async () => {
+    const w = await makeWorld({ list: [1406] });
+    labelOpen(w, 1406, ['bug', LABEL]);
+    await w.intake.sweep();
+    const issue = w.gh.state.open.find((i) => i.number === 1406) as RawIssue;
+    w.gh.state.issues.set(1406, { ...issue, title: 'edited title', body: 'edited body' });
+    labelOpen(w, 1406, ['bug', 'needs-info', LABEL]);
+    await w.intake.sweep();
+    labelOpen(w, 1406, ['needs-info']);
+    await w.intake.sweep();
+    labelOpen(w, 1406, ['bug', 'needs-info', LABEL]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1406]);
+    expect(chiefThreads(w.s)).toHaveLength(1);
+  });
+
+  test('27c instructions in the issue body stay behind the fence start of the orchestration message', async () => {
+    const w = await makeWorld({ list: [1406] });
+    labelOpen(w, 1406, ['bug', LABEL]);
+    const issue = w.gh.state.open.find((i) => i.number === 1406) as RawIssue;
+    w.gh.state.issues.set(1406, { ...issue, body: BODY_WITH_INSTRUCTIONS });
+    await w.intake.sweep();
+    const text = orchestrationText(w);
+    expect(text).toContain(REPRODUCE_FIRST);
+    expect(text.indexOf('GitHub issue 原文')).toBeGreaterThan(-1);
+    expect(text.indexOf('INTAKE-BODY-MARKER-1406')).toBeGreaterThan(
+      text.indexOf('GitHub issue 原文'),
+    );
+    expect(text.indexOf('INTAKE-BODY-MARKER-1406')).toBeLessThan(
+      text.indexOf('GitHub issue 原文结束'),
+    );
+  });
+});
