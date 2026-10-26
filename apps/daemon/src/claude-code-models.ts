@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   type ClaudeAuthStateWire,
   type ClaudeCodeReport,
+  type ClaudeLogin,
   parseClaudeCodeModelSource,
 } from '@cairn/shared';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
@@ -12,6 +13,7 @@ import type { ClaudeBinInfo } from './claude-code-bin.js';
 export interface ClaudeCodeReportExtra {
   bin?: ClaudeBinInfo | null;
   auth?: ClaudeCodeAuthProbe;
+  login?: ClaudeLogin;
 }
 
 export function toWireAuth(probe: ClaudeCodeAuthProbe): ClaudeAuthStateWire {
@@ -41,5 +43,6 @@ export function readClaudeCodeReport(
     models: source.models,
     ...(extra.bin !== undefined ? { bin: extra.bin } : {}),
     ...(extra.auth ? { auth: toWireAuth(extra.auth) } : {}),
+    ...(extra.login !== undefined ? { login: extra.login } : {}),
   };
 }

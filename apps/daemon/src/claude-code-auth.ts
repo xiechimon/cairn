@@ -1,4 +1,7 @@
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 export type ClaudeCodeAuthProbe =
   | { state: 'logged-in'; method: string; provider: string }
@@ -79,6 +82,31 @@ export async function probeClaudeCodeAuth(
         err instanceof Error ? err.message : String(err)
       }`,
     };
+  }
+}
+
+export function parseClaudeOauthExpiresAt(raw: string): number | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+  const oauth = (parsed as { claudeAiOauth?: unknown }).claudeAiOauth;
+  if (typeof oauth !== 'object' || oauth === null || Array.isArray(oauth)) return null;
+  const expiresAt = (oauth as { expiresAt?: unknown }).expiresAt;
+  if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) return null;
+  return Math.trunc(expiresAt);
+}
+
+export function readDefaultClaudeOauthExpiresAt(): number | null {
+  try {
+    return parseClaudeOauthExpiresAt(
+      readFileSync(join(homedir(), '.claude', '.credentials.json'), 'utf8'),
+    );
+  } catch {
+    return null;
   }
 }
 

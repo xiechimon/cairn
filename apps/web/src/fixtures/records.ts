@@ -2,6 +2,7 @@ import {
   type AgentRecord,
   type AgentTask,
   type AgentTodoItem,
+  type ClaudeLogin,
   type DocumentDiffFile,
   type GithubRepoSummary,
   type MachineHardware,
@@ -250,6 +251,7 @@ export interface MachineRow {
   recommendedConcurrent?: number;
   concurrencyRange?: { min: number; max: number };
   concurrencySource?: 'measured' | 'estimate' | 'manual';
+  claudeLogin?: ClaudeLogin;
 }
 
 export interface ResourcesContent {

@@ -26,6 +26,7 @@ export * from './branch-sync.js';
 export * from './build.js';
 export * from './capabilities.js';
 export * from './chief.js';
+export * from './claude-login.js';
 export * from './common.js';
 export * from './document-diff.js';
 export * from './github.js';

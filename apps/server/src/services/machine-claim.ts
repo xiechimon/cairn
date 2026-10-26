@@ -6,6 +6,7 @@ import {
   buildMergedPrGuardNote,
   buildTaskPromptText,
   CHIEF_REMOTE_TOOLS,
+  claudeLoginBlocksClaim,
   formatSkillRouteSection,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
@@ -27,6 +28,7 @@ import {
   capabilityGatePasses,
   machineRunningCount,
   runtimeGatePasses,
+  stepRuntimeFor,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
 import { projectOfTodo, projectRepoRef } from './git.js';
@@ -133,6 +135,14 @@ function claimLocalTools(agentTools: readonly string[]): string[] {
   return tools;
 }
 
+function claudeCodeLoginBlocks(
+  machineRow: typeof machine.$inferSelect,
+  provider: string | null | undefined,
+): boolean {
+  if (stepRuntimeFor(provider) !== 'claude-code') return false;
+  return claudeLoginBlocksClaim(machineRow.claudeCodeReport?.login, nowMs());
+}
+
 function buildChiefClaim(
   deps: MachineDeps,
   machineId: string,
@@ -143,6 +153,7 @@ function buildChiefClaim(
 ): ClaimedStep | null {
   if (!agentRow.modelId) return null;
   if (!machineRow || !runtimeGatePasses(machineRow, agentRow.provider)) return null;
+  if (claudeCodeLoginBlocks(machineRow, agentRow.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const claimedAt = nowMs();
   const res = deps.db
@@ -268,6 +279,7 @@ async function tryClaim(
     if (agentRow.machineId !== machineId) continue;
     const model = effectiveModel(agentRow, cand.stepRow);
     if (!runtimeGatePasses(machineRow, model.provider)) continue;
+    if (claudeCodeLoginBlocks(machineRow, model.provider)) continue;
     if (!capabilityGatePasses(machineRow, agentRow)) continue;
     if (
       agentRow.maxConcurrentTasks !== null &&

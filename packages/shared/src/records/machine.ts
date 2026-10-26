@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { claudeLoginSchema } from './claude-login.js';
 import { recordId } from './common.js';
 import { machineCapabilitiesSchema } from './machine-capabilities.js';
 
@@ -20,6 +21,7 @@ export const machineRecordSchema = z.object({
   concurrencySource: z.enum(['measured', 'estimate', 'manual']).optional(),
   runningSteps: z.number().int().optional(),
   capabilities: machineCapabilitiesSchema.nullish(),
+  claudeLogin: claudeLoginSchema.optional(),
 });
 export type MachineRecord = z.infer<typeof machineRecordSchema>;
 

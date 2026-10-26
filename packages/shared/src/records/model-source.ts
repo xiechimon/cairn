@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { claudeLoginSchema } from './claude-login.js';
 
 export const MODEL_SOURCE_RUNTIMES = ['pi', 'claude-code', 'gemini'] as const;
 export const modelSourceRuntimeSchema = z.enum(MODEL_SOURCE_RUNTIMES);
@@ -99,6 +100,7 @@ export const claudeCodeReportSchema = z.object({
   models: z.array(modelSourceModelSchema),
   bin: claudeBinInfoSchema.nullable().optional(),
   auth: claudeAuthStateSchema.optional(),
+  login: claudeLoginSchema.optional(),
 });
 export type ClaudeCodeReport = z.infer<typeof claudeCodeReportSchema>;
 
