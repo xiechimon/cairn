@@ -1,0 +1,32 @@
+name: silent-revert-gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: silent-revert-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  silent-revert-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Test overlap lookup and silent revert detection
+        run: node --test scripts/github-overlap.test.mjs scripts/silent-revert-gate.test.mjs
+      - name: Check removed work from merged PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/silent-revert-gate.mjs

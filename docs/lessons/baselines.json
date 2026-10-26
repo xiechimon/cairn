@@ -115,6 +115,10 @@
     "Intercepts": 2,
     "Recurrences": 1
   },
+  "benchmark-verdict-provenance": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "biome-import-order": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -223,6 +227,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "commit-body-literal-newlines": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "completion-fixtures-called-public-github": {
     "Intercepts": 5,
     "Recurrences": 0
@@ -263,6 +271,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "deep-split-dependency-traversal": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "detached-new-branch-ref": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -291,8 +303,32 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "double-url-rewrite": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "drift-extra-row-attribution": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "drift-identifier-scope": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "drift-line-suffix-order": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "drift-relative-history": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "e2e-affected-arg-overflow": {
     "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "e2e-invalid-chief-stub": {
+    "Intercepts": 1,
     "Recurrences": 0
   },
   "e2e-non-retrying-count-assertion": {
@@ -318,6 +354,14 @@
   "eval-context-declaration": {
     "Intercepts": 4,
     "Recurrences": 1
+  },
+  "evaluator-filesystem-boundary": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "evaluator-workspace-sources": {
+    "Intercepts": 0,
+    "Recurrences": 0
   },
   "evidence-branch-audit-option": {
     "Intercepts": 0,
@@ -371,6 +415,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "fixture-implicit-merge-identity": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "fixture-missing-required-fields": {
     "Intercepts": 4,
     "Recurrences": 2
@@ -411,6 +459,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "git-status-leading-space": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "github-create-gate-eacces": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -439,9 +491,17 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "heading-extraction-before-item-splitting": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "historical-replay-input-contract": {
     "Intercepts": 1,
     "Recurrences": 1
+  },
+  "historical-seed-schema-drift": {
+    "Intercepts": 1,
+    "Recurrences": 0
   },
   "hook-git-dir-reach-test": {
     "Intercepts": 0,
@@ -456,6 +516,10 @@
     "Recurrences": 0
   },
   "ignored-skill-restaging": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "image-fallback-recovery-state": {
     "Intercepts": 0,
     "Recurrences": 0
   },
@@ -479,6 +543,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "internal-archive-links": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "json-import-attribute": {
     "Intercepts": 2,
     "Recurrences": 0
@@ -489,6 +557,14 @@
   },
   "literal-premise-weakens-controls": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "live-create-response-shape": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "live-ui-chief-seed": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "local-index-observation": {
@@ -599,6 +675,14 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "overlap-empty-planned-path": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "overlap-historical-branch-note": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "overwritten-verdict-history": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -623,6 +707,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "partial-seed-assertions": {
+    "Intercepts": 5,
+    "Recurrences": 0
+  },
   "patch-digest-fixture-hash": {
     "Intercepts": 2,
     "Recurrences": 0
@@ -634,6 +722,10 @@
   "pkill-f-vitest-by-name": {
     "Intercepts": 0,
     "Recurrences": 0
+  },
+  "placeholder-digest-satisfies-gate": {
+    "Intercepts": 1,
+    "Recurrences": 1
   },
   "platform-coupled-subprocess-tests": {
     "Intercepts": 0,
@@ -703,6 +795,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "push-oid-hook-bypass": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "ran-pnpm-in-parallel-while-reusing-dependencies-the-automatic-dependency": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -731,6 +827,14 @@
     "Intercepts": 2,
     "Recurrences": 0
   },
+  "rejected-split-confirm-contract": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "relay-wire-assumptions": {
+    "Intercepts": 1,
+    "Recurrences": 1
+  },
   "report-score-eligibility": {
     "Intercepts": 3,
     "Recurrences": 0
@@ -739,8 +843,16 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "reserved-secret-namespace": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "rest-projection-missing-field": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "restoration-fixture-parent": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "retry-test-faked-the-push-wrapper": {
@@ -783,6 +895,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "silent-revert-dash-header-parse": {
+    "Intercepts": 2,
+    "Recurrences": 0
+  },
   "single-use-adapter": {
     "Intercepts": 2,
     "Recurrences": 0
@@ -811,6 +927,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "source-only-push-refspec": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "spec-assumed-dialog": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -819,8 +939,32 @@
     "Intercepts": 2,
     "Recurrences": 0
   },
+  "split-home-model-eligibility": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "split-info-plan-output": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "split-pause-wiring": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "split-spec-path-extraction": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "squash-used-moving-remote-ref": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "stale-push-containment-proof": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "standalone-verifier-typecheck": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "startbuild-in-review": {

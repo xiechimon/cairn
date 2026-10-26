@@ -1,0 +1,28 @@
+✔ searches titles and bodies with alternative terms and includes same-file PRs (2.616042ms)
+✔ lookup errors stop creation rather than reporting no overlaps (0.945713ms)
+✔ duplicate ask eval: a rephrased request extends the existing item without creating an issue (0.415573ms)
+✔ an existing same-ask PR also extends its discussion, and unknown references fail closed (0.338469ms)
+✔ empty planned paths fail before querying GitHub instead of hiding file overlaps (0.283344ms)
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'rename'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'preserve'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+✔ names the merged PR and its removed line, and accepts an explicit reference only (94.85906ms)
+✔ unchanged added lines and commits outside the base interval do not fail (45.050784ms)
+✔ tracks a renamed file and distinguishes identical lines by position (68.120764ms)
+✔ renaming protected lines without removing them passes (53.482077ms)
+✔ a removed line beginning with two dashes is content, not a patch header (84.606265ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 421.170249

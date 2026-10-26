@@ -98,6 +98,8 @@ not carry the closing keyword for the parent ticket.
 
 ## Mechanics
 
+- Before opening a PR, follow `docs/agent-overlap.md`: search open issues, open PRs, and PRs merged in the last seven days, including PRs touching the changed files. Put the numbered overlap list and disposition under What. Extend an existing PR for the same ask. Explain intentional removal of recently merged work and name its PR for `silent-revert-gate`.
+
 - Write the body to a temp file; never inline multi-line markdown as
   `--body`.
 - Create from a worktree lane:
