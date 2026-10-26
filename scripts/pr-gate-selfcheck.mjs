@@ -1026,19 +1026,16 @@ const cases = [
         'apps/server/src/services/secrets.ts',
         'apps/server/src/services/credentials.ts',
         'apps/server/src/services/api-keys.ts',
-        'apps/server/src/services/webhook-tokens.ts',
         'apps/server/src/services/oauth.ts',
         'apps/server/src/routes-machine.ts',
         'apps/server/src/services/machines.ts',
         'apps/server/src/services/machine-relay.ts',
         'apps/daemon/src/credentials.ts',
         'apps/daemon/src/secret-channel.ts',
-        'apps/daemon/src/shell-channel.ts',
         'apps/daemon/src/machine-client.ts',
         'apps/daemon/src/backend/command-gate.ts',
         'apps/server/src/services/mcp-face.ts',
         'apps/server/src/services/mcp-servers.ts',
-        'apps/server/src/routes-webhook.ts',
         'apps/server/src/db/client.ts',
       ]),
   ],
@@ -1263,7 +1260,7 @@ const cases = [
       const expanded = patterns.flatMap(expandBraces);
       return (
         section.includes('ADR 0021 D4') &&
-        expanded.length >= 18 &&
+        expanded.length >= 16 &&
         expanded.every((p) => protectedGlobs.includes(p))
       );
     },

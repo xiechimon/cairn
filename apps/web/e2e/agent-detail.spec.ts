@@ -156,21 +156,21 @@ test('memory tab: empty state = icon + title + description', async ({ page }) =>
   await expect(empty).toContainText('Agent 会在工作中将值得沉淀的经验存入此处。');
 });
 
-test('permissions tab: all 6 tool switches render (r3 §4 full list, XMON-84 restored)', async ({ page }) => {
+test('permissions tab: all 5 tool switches render (remote shell retired, #1796)', async ({ page }) => {
   const detail = await openDetail(page);
   await detail.locator('.agent-tab').nth(2).click();
-  await expect(detail.locator('.agent-tool-switch')).toHaveCount(6);
+  await expect(detail.locator('.agent-tool-switch')).toHaveCount(5);
 });
 
-test('permissions tab: each of the 6 tiers carries a description subline', async ({ page }) => {
+test('permissions tab: each of the 5 tiers carries a description subline', async ({ page }) => {
   const detail = await openDetail(page);
   await detail.locator('.agent-tab').nth(2).click();
   const hints = detail.locator('.agent-perm-group').first().locator('.agent-perm-hint');
-  await expect(hints).toHaveCount(6);
-  await expect(hints.nth(1)).toHaveText(
+  await expect(hints).toHaveCount(5);
+  await expect(hints.nth(0)).toHaveText(
     '允许该 Agent 通过合并分支进行发布（例如将 develop 合并进 main）。',
   );
-  await expect(hints.nth(5)).toHaveText('允许该 Agent 修改团队技能库中已有的技能。');
+  await expect(hints.nth(4)).toHaveText('允许该 Agent 修改团队技能库中已有的技能。');
 });
 
 test('overview: runtime tier sits above the model, value derived from provider', async ({ page }) => {
@@ -682,8 +682,8 @@ test('permissions tab: five switch groups each live in their own template card (
 
   await expect(cards).toHaveCount(5);
 
-  await expect(cards.first().locator('.settings-row')).toHaveCount(6);
-  await expect(cards.first().locator('.agent-tool-switch')).toHaveCount(6);
+  await expect(cards.first().locator('.settings-row')).toHaveCount(5);
+  await expect(cards.first().locator('.agent-tool-switch')).toHaveCount(5);
 });
 
 test('memory/permission cards: first row has no background, no top border (no square-corner overflow, no 2px top edge)', async ({

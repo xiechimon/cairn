@@ -18,7 +18,6 @@ import { teamRecordSchema } from './team.js';
 import { todoRecordSchema } from './todo.js';
 import { tokenUsageSchema } from './token-usage.js';
 import { userRecordSchema } from './user.js';
-import { whatsNewRecordSchema } from './whats-new.js';
 
 export * from './agent.js';
 export * from './api-key.js';
@@ -58,7 +57,6 @@ export * from './todo.js';
 export * from './token-usage.js';
 export * from './user.js';
 export * from './verify.js';
-export * from './whats-new.js';
 
 export const RECORD_SCHEMAS = {
   user: userRecordSchema,
@@ -82,7 +80,6 @@ export const RECORD_SCHEMAS = {
   chief: chiefRecordSchema,
   chief_thread: chiefThreadSchema,
   chief_message: messageRecordSchema,
-  whats_new: whatsNewRecordSchema,
 } as const satisfies Record<string, z.ZodType>;
 
 export type RecordTableName = keyof typeof RECORD_SCHEMAS;

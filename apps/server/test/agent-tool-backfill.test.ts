@@ -95,7 +95,7 @@ describe('0018 push-branch backfill (XMON-84 B4 legacy rows preserved on deliver
     expect(readTools(dbPath, 'bf-empty')).toEqual(['推送分支']);
     expect(readTools(dbPath, 'bf-merge-only')).toEqual(['合并分支', '推送分支']);
     expect(readTools(dbPath, 'bf-has-push')).toEqual(['推送分支']);
-    expect(readTools(dbPath, 'bf-junk')).toEqual(['远程 shell', '自造档', '推送分支']);
+    expect(readTools(dbPath, 'bf-junk')).toEqual(['自造档', '推送分支']);
   });
 
   test('backfill SQL itself is idempotent (defensive replay produces no duplicates)', () => {

@@ -123,7 +123,6 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     latestCliVersion: row.latestCliVersion,
     kind: row.kind,
     enabledRuntimes: row.enabledRuntimes,
-    shellEnabled: row.shellEnabled,
     maxConcurrent: row.maxConcurrent,
     maxConcurrentOverridden: row.maxConcurrentOverridden,
     recommendedConcurrent: recommendation.value,

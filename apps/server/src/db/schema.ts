@@ -433,22 +433,6 @@ export const apiKey = sqliteTable('api_key', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
-export const webhookToken = sqliteTable(
-  'webhook_token',
-  {
-    id: text('id').primaryKey(),
-    teamId: text('teamId')
-      .notNull()
-      .references(() => team.id),
-    name: text('name'),
-    tokenHash: text('tokenHash').notNull(),
-    masked: text('masked').notNull(),
-    createdAt: epochMs('createdAt').notNull(),
-    lastUsedAt: epochMs('lastUsedAt'),
-  },
-  (t) => [uniqueIndex('webhook_token_tokenHash_unique').on(t.tokenHash)],
-);
-
 export const machine = sqliteTable(
   'machine',
   {
@@ -463,7 +447,6 @@ export const machine = sqliteTable(
     latestCliVersion: text('latestCliVersion'),
     kind: text('kind').notNull().default('remote'),
     enabledRuntimes: json<string[]>('enabledRuntimes').notNull().default(sql`'[]'`),
-    shellEnabled: bool('shellEnabled').notNull().default(false),
     claudeCodeReport: json<ClaudeCodeReport | null>('claudeCodeReport'),
     maxConcurrent: integer('maxConcurrent').notNull().default(3),
     maxConcurrentOverridden: bool('maxConcurrentOverridden').notNull().default(false),
@@ -472,21 +455,6 @@ export const machine = sqliteTable(
   },
   (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
 );
-
-export const shellCommand = sqliteTable('shell_command', {
-  id: text('id').primaryKey(),
-  stepId: text('stepId').notNull(),
-  machineId: text('machineId').notNull(),
-  agentId: text('agentId').notNull(),
-  teamId: text('teamId').notNull(),
-  command: text('command').notNull(),
-  status: text('status').$type<'denied' | 'running' | 'done' | 'failed'>().notNull(),
-  exitCode: integer('exitCode'),
-  output: text('output'),
-  errorMessage: text('errorMessage'),
-  createdAt: epochMs('createdAt').notNull(),
-  finishedAt: epochMs('finishedAt'),
-});
 
 export const tokenUsage = sqliteTable(
   'token_usage',
@@ -546,12 +514,6 @@ export const chiefMessage = sqliteTable('chief_message', {
     .references(() => chiefThread.id, { onDelete: 'cascade' }),
   role: text('role').$type<'system' | 'user' | 'assistant'>().notNull(),
   content: json<unknown>('content').notNull(),
-  createdAt: epochMs('createdAt').notNull(),
-});
-
-export const whatsNew = sqliteTable('whats_new', {
-  id: text('id').primaryKey(),
-  body: json<Record<string, unknown>>('body').notNull(),
   createdAt: epochMs('createdAt').notNull(),
 });
 

@@ -71,7 +71,7 @@ const RAW_TOOL_DEF_HASH_KEYS = [
   'workflow_runs',
 ];
 
-describe('53-item vocabulary', () => {
+describe('52-item vocabulary', () => {
   const rawKeys: string[] = RAW_TOOL_DEF_HASH_KEYS;
   const removed: readonly string[] = CHIEF_TOOLS_REMOVED;
   const added: readonly string[] = CHIEF_TOOLS_ADDED;
@@ -80,9 +80,9 @@ describe('53-item vocabulary', () => {
     ...added,
   ].sort();
 
-  it('raw key set is exactly 49; live vocabulary = raw - removals + additions = 53', () => {
+  it('raw key set is exactly 49; live vocabulary = raw - removals + additions = 52', () => {
     expect(rawKeys).toHaveLength(49);
-    expect(CHIEF_TOOL_COUNT).toBe(53);
+    expect(CHIEF_TOOL_COUNT).toBe(52);
     expect(CHIEF_TOOL_COUNT).toBe(rawKeys.length - removed.length + added.length);
   });
 
@@ -91,8 +91,8 @@ describe('53-item vocabulary', () => {
     expect(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort()).toEqual(expected);
   });
 
-  it('removal registry = delete_skills; addition registry = create_skill + update_skill + models + split_todo + update_memory (full two-way divergence); set_remote_shell rolled back (XMON-115)', () => {
-    expect(removed).toEqual(['delete_skills']);
+  it('removal registry = delete_skills + set_remote_shell; addition registry = create_skill + update_skill + models + split_todo + update_memory', () => {
+    expect(removed).toEqual(['delete_skills', 'set_remote_shell']);
     expect(added).toEqual([
       'create_skill',
       'update_skill',
@@ -100,9 +100,6 @@ describe('53-item vocabulary', () => {
       'split_todo',
       'update_memory',
     ]);
-    expect(CHIEF_TOOL_NAMES).toContain('set_remote_shell');
-    expect(CHIEF_TOOL_CATEGORIES.organize).toContain('set_remote_shell');
-    expect(CHIEF_REMOTE_TOOLS.find((t) => t.name === 'set_remote_shell')).toBeDefined();
     expect(CHIEF_TOOL_CATEGORIES.organize).toContain('split_todo');
     expect(CHIEF_REMOTE_TOOLS.find((t) => t.name === 'split_todo')).toBeDefined();
     for (const name of removed) {
@@ -115,9 +112,9 @@ describe('53-item vocabulary', () => {
     }
   });
 
-  it('groups = 16 read + 21 organize + 5 execute + 11 private (raw actuals - delete_skills + five additions)', () => {
+  it('groups = 16 read + 20 organize + 5 execute + 11 private', () => {
     expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(16);
-    expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(21);
+    expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(20);
     expect(CHIEF_TOOL_CATEGORIES.execute).toHaveLength(5);
     expect(CHIEF_TOOL_CATEGORIES.private).toHaveLength(11);
   });
@@ -139,13 +136,6 @@ describe('53-item vocabulary', () => {
       expect(remoteToolDefSchema.safeParse(def).success, def.name).toBe(true);
       expect(def.description.length, def.name).toBeGreaterThan(0);
     }
-  });
-
-  it('set_remote_shell definition form (XMON-115 rollback): agentId/enabled both required; write side not marked replaySafe', () => {
-    const def = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'set_remote_shell');
-    const params = def?.parameters as { required?: string[] } | undefined;
-    expect(params?.required).toEqual(['agentId', 'enabled']);
-    expect(def?.replaySafe).toBeUndefined();
   });
 
   it('run_builds definition form (#903): withPlan/dispatchReason both optional judgment params; only todoIds required', () => {

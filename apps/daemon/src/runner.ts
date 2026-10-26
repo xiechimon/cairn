@@ -46,7 +46,6 @@ import {
   isBackendRuntimeId,
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
-  LOCAL_TOOL_REMOTE_SHELL,
   LocalRepoUnreachableError,
   PLAN_FILE_NAME,
   parseRetryAfterMs,
@@ -90,7 +89,6 @@ import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
-import { buildRemoteShellTool } from './shell-channel.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { resolveStepImages } from './step-attachments.js';
@@ -636,14 +634,6 @@ async function runClaimedStep(
         onAudit: (line) => logger.step(line),
       })
     : null;
-  const remoteShellTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_REMOTE_SHELL)
-    ? buildRemoteShellTool({
-        wire: client,
-        stepId,
-        cwd,
-        onAudit: (line) => logger.step(line),
-      })
-    : null;
   const stepIdentity: CommitIdentity = {
     name: claimed.agent?.displayName ?? 'cairn-agent',
     email: `${claimed.step.machineId ?? 'machine'}@cairn.local`,
@@ -651,9 +641,7 @@ async function runClaimedStep(
   const createTagTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_CREATE_TAG)
     ? buildCreateTagTool({ repoDir: ws?.cwd ?? null, cred: creds.git, identity: stepIdentity })
     : null;
-  const localToolDefs = [secretTool, remoteShellTool, createTagTool].filter(
-    (t): t is LocalToolDef => t !== null,
-  );
+  const localToolDefs = [secretTool, createTagTool].filter((t): t is LocalToolDef => t !== null);
   const injectedForSession =
     agent.injectedSkills === undefined || agent.defaultSkill == null
       ? agent.injectedSkills

@@ -9,7 +9,6 @@ import { registerProjectRoutes } from './routes-projects.js';
 import { registerResourceRoutes } from './routes-resources.js';
 import { registerTodoRoutes } from './routes-todos.js';
 import { registerUploadRoutes } from './routes-uploads.js';
-import { registerWebhookRoutes } from './routes-webhook.js';
 import { handleMcpRequest } from './services/mcp-face.js';
 
 export function registerRoutes(app: Hono, ctx: AppContext): void {
@@ -22,7 +21,6 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerAgentRoutes(app, ctx);
   registerResourceRoutes(app, ctx);
   registerGitHostingRoutes(app, ctx);
-  registerWebhookRoutes(app, ctx);
 
   app.post('/api/analytics/first-touch', () => new Response(null, { status: 204 }));
   app.post('/_mp/api/track', () => new Response(null, { status: 204 }));

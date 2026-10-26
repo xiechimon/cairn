@@ -1,10 +1,8 @@
 import type { SecretBox, UserRecord } from '@cairn/shared';
 import {
   AGENT_TOOL_DEFAULTS,
-  AGENT_TOOL_SHELL,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
-  filterAgentTools,
   IN_PROGRESS_PHASES,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
@@ -651,17 +649,6 @@ export async function executeChiefTool(
         if (hit && deleteSecret(keysvc, ctx.teamId, hit.id)) deleted.push(n);
       }
       return json({ deleted });
-    }
-    case 'set_remote_shell': {
-      const agentId = str(params, 'agentId');
-      const row = requireTeamAgent(db, agentId, ctx.teamId);
-      const enabledParam = params.enabled;
-      if (typeof enabledParam !== 'boolean')
-        throw new HttpError(400, 'invalid params.enabled: expected boolean');
-      const tools = filterAgentTools(row.tools).filter((t) => t !== AGENT_TOOL_SHELL);
-      if (enabledParam) tools.push(AGENT_TOOL_SHELL);
-      db.update(agent).set({ tools }).where(eq(agent.id, agentId)).run();
-      return json({ agentId, remoteShell: enabledParam, tools });
     }
     case 'schedule_todo': {
       const todoId = str(params, 'todoId');

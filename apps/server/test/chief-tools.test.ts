@@ -1,9 +1,7 @@
 import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { agent as agentTable } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
-import { AGENT_ID, H, registerChiefHarness, relay, seedMachineReport } from './chief-harness.js';
+import { H, registerChiefHarness, relay, seedMachineReport } from './chief-harness.js';
 import { req } from './helpers.js';
 
 registerChiefHarness();
@@ -17,88 +15,6 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
       status = err instanceof HttpError ? err.status : 0;
     }
     expect(status).toBe(400);
-  });
-
-  test('set_remote_shell grant: REST writes a neighbor entry first -> chief adds the remote-shell switch word -> REST GET readback matches (acceptance #2)', async () => {
-    const patch = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/agents/${AGENT_ID}`, {
-      tools: ['推送分支'],
-    });
-    expect(patch.status).toBe(200);
-    const granted = (await relay('set_remote_shell', { agentId: AGENT_ID, enabled: true })) as {
-      agentId: string;
-      remoteShell: boolean;
-      tools: string[];
-    };
-    expect(granted).toEqual({
-      agentId: AGENT_ID,
-      remoteShell: true,
-      tools: ['推送分支', '远程 shell'],
-    });
-    const readback = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/agents/${AGENT_ID}`);
-    const record = (await readback.json()) as { tools: string[] };
-    expect(record.tools).toEqual(['推送分支', '远程 shell']);
-  });
-
-  test('revoke removes only the remote-shell switch word: neighbors and order untouched; repeat grant is idempotent', async () => {
-    H.s.db
-      .update(agentTable)
-      .set({ tools: ['远程 shell', '推送分支'] })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
-    const revoked = (await relay('set_remote_shell', { agentId: AGENT_ID, enabled: false })) as {
-      remoteShell: boolean;
-      tools: string[];
-    };
-    expect(revoked.remoteShell).toBe(false);
-    expect(revoked.tools).toEqual(['推送分支']);
-    expect(
-      H.s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get()!.tools,
-    ).toEqual(['推送分支']);
-    await relay('set_remote_shell', { agentId: AGENT_ID, enabled: true });
-    await relay('set_remote_shell', { agentId: AGENT_ID, enabled: true });
-    expect(
-      H.s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get()!.tools,
-    ).toEqual(['推送分支', '远程 shell']);
-  });
-
-  test('the write path goes through filterAgentTools: stale entries are swept on write (same rule as REST PATCH)', async () => {
-    H.s.db
-      .update(agentTable)
-      .set({ tools: ['自造档', '推送分支'] })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
-    await relay('set_remote_shell', { agentId: AGENT_ID, enabled: true });
-    expect(
-      H.s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get()!.tools,
-    ).toEqual(['推送分支', '远程 shell']);
-  });
-
-  test('missing or non-boolean enabled -> 400 and the row is not written (fail-closed; no pre-#573 default-true)', async () => {
-    for (const bad of [{ agentId: AGENT_ID }, { agentId: AGENT_ID, enabled: 'yes' }]) {
-      let status = 0;
-      try {
-        await relay('set_remote_shell', bad);
-      } catch (err) {
-        status = err instanceof HttpError ? err.status : 0;
-      }
-      expect(status).toBe(400);
-    }
-    expect(
-      H.s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get()!.tools,
-    ).toEqual([]);
-  });
-
-  test('unknown agentId -> 404 (same requireTeamAgent rule, no stray write)', async () => {
-    let status = 0;
-    let message = '';
-    try {
-      await relay('set_remote_shell', { agentId: 'agent-nope', enabled: true });
-    } catch (err) {
-      status = err instanceof HttpError ? err.status : 0;
-      message = err instanceof HttpError ? err.message : '';
-    }
-    expect(status).toBe(404);
-    expect(message).toContain('agent-nope');
   });
 
   test('models: no custom provider and claude-code not installed -> empty list without error', async () => {
