@@ -8,8 +8,8 @@ Payload under test: build step, `status=success`, `hasChanges=true`,
 
 | run | code | result |
 |---|---|---|
-| before | `2ced623f` (origin/main at branch start) | todo `review`, `errorMessage` null, PR stored, step `done`. Detail chip 审核. 6/6 checks in `before-result.json`. |
-| after | `65453701` | todo `failed`, error names both branches, `prUrl` and `prNumber` null, step `failed`. Detail chip 失败. 9/9 checks in `after-result.json`. |
+| before | `2ced623f` (origin/main at branch start) | todo `review`, `errorMessage` null, PR stored, step `done`. Detail chip `审核`. 6/6 checks in `before-result.json`. |
+| after | `65453701` | todo `failed`, error names both branches, `prUrl` and `prNumber` null, step `failed`. Detail chip `失败`. 9/9 checks in `after-result.json`. |
 
 Controls on both runs: zero changes still fails with `构建零改动`; drift with
 `hasChanges=false` still uses the no-commit wording; `hasChanges=true` without

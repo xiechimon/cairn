@@ -1,33 +1,28 @@
-# #1138 agent 级并发闸 — live 栈验证证据
+# #1138 agent-level concurrency gate — live-stack verification evidence
 
-probe = `drive-1138-agent-concurrency.mjs`（纯 live 栈 + 假机器 wire，零 daemon
-零 LLM 零浏览器——步只领不执行，provider 指向不可达端口；#1065 同族）。
-**12/12 PASS**（2026-10-11，隔离栈 8791/5273，scratch PACMAN_HOME 全新库）。
+probe = `drive-1138-agent-concurrency.mjs` (pure live stack + fake machine wire, zero daemon, zero LLM, zero browser — steps are only claimed, never executed; the provider points at an unreachable port; same family as #1065).
+**12/12 PASS** (2026-10-11, isolated stack 8791/5273, scratch PACMAN_HOME with a fresh library).
 
-## 判据族与证据文件
+## Criterion families and evidence files
 
-| 族 | 判据 | 证据 |
+| family | criterion | evidence |
 |---|---|---|
-| D 写面 | PATCH 0/51 → 400；1 → 落库（REST 记录 + SQLite 行双真值）；未设置 Agent 读 null | `result.json` D1–D3、`agent-rows.json` |
-| G 闸判 | A(cap=1) 首步在跑 → 二步留 pending 不进 claim；同批 B 候选照领（候选级 skip 无队头阻塞）；他机 claim 同被挡（agent 池跨机器、机器闸开着仍不发 = 两闸各自 gate） | `result.json` G1–G5、`step-rows.json` |
-| C 空位即领 | A1 done → 终态 + finishStep 团队 wake → 挂起中的 claim 即刻领走 A2 | `result.json` C1–C2 |
-| R 零值回归 | PATCH null 清回不限 → A2 在跑时新步照领（不设上限行为完全不变） | `result.json` R1–R2 |
+| D write face | PATCH 0/51 → 400; 1 → persisted (REST record + SQLite row, double ground truth); an unset Agent reads null | `result.json` D1-D3, `agent-rows.json` |
+| G gate judgment | A(cap=1) first step running → second step stays pending, never enters claim; same-batch B candidates still claim (candidate-level skip, no head-of-line blocking); other machines' claims are likewise blocked (the agent pool spans machines, and the machine gate being open still does not issue = the two gates each gate independently) | `result.json` G1-G5, `step-rows.json` |
+| C slot-claim | A1 done → terminal state + finishStep team wake → the hung claim immediately takes A2 | `result.json` C1-C2 |
+| R null-regression | PATCH null clears back to unlimited → new steps still claim while A2 is running (behavior with no limit set is completely unchanged) | `result.json` R1-R2 |
 
-claim 的「被挡」判别形态 = 长轮询真形态：挂起中的 claim 在预算内不返回
-（`G4: {"hung":true}`、G5 仍挂起）——daemon 侧的观感就是「claim 不发步」；
-wake 后同一条挂起 claim 即刻返回 A2（C1 的 `woken.body.step.step.id` = A2）。
+The "blocked" judgment shape of claim = the long-poll true shape: a hung claim does not return within the budget (`G4: {"hung":true}`, G5 still hung) — from the daemon's viewpoint that is exactly "claim issues no step"; after the wake the same hung claim returns A2 immediately (C1's `woken.body.step.step.id` = A2).
 
-## 复跑配方
+## Rerun recipe
 
 ```sh
-# worktree 车道：栈与脚本都从 worktree 路径跑
+# worktree lane: run both the stack and the script from the worktree path
 VERIFY_REPO_ROOT=<worktree> node <worktree>/.claude/skills/verify-pacman/scripts/launch.mjs
 node <worktree>/.claude/skills/verify-pacman/scripts/drive-1138-agent-concurrency.mjs
 node <worktree>/.claude/skills/verify-pacman/scripts/cleanup.mjs
 ```
 
-## 单元/受影响面
+## Unit tests / affected surfaces
 
-`apps/server/test/agent-concurrency.test.ts`（先红后绿，8/8：上限即闸 /
-分池不队头阻塞 / 零值回归 / 空位即领 / 跨机归账 / chief 不占槽 / review
-meta 归账 / PATCH 写面）；受影响面 9 文件 103 测试 + shared records 56 全绿。
+`apps/server/test/agent-concurrency.test.ts` (red first, then green, 8/8: the cap is the gate / sub-pools do not head-of-line-block / null regression / slot-claim / cross-machine accounting / chief takes no slot / review meta accounting / PATCH write face); affected surfaces: 9 files, 103 tests + shared records 56 all green.

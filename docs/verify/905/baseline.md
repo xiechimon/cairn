@@ -1,19 +1,17 @@
-# #905 取证基线 — 「规划中」步的时长分布与可用信号
+# #905 evidence baseline — the duration distribution and available signals of "planning" steps
 
-改形态之前先量真实形态（票面要求 1）。两部分：
-A. 真跑数据里规划步有多久、首个可见信号来得多慢；
-B. 那段时间线上实际存在哪些信号、逐个判能否安全暴露给 UI。
+Measure the real shape before changing the shape (ticket requirement 1). Two parts:
+A. how long planning steps really take in real-run data, and how slow the first visible signal is;
+B. which signals actually exist on that timeline, judging one by one whether they can be safely exposed to the UI.
 
-## A. 时长分布（本机真跑数据，2026-09-23 … 2026-10-02）
+## A. Duration distribution (local real-run data, 2026-09-23 … 2026-10-02)
 
-数据源 = 用户本机部署的 server DB（`~/.pacman/server/server.db`，只读查询）。
-步时长以该步 transcript 行的首末 `createdAt` 跨度计（行 id 内嵌 stepId，
-`msg-<stepId>-N` / 工具行 id = toolCall id；prompt 行 `createdAt` = claim 时刻，
-故跨度 ≈ claim → 末次模型输出的真实时长）。
+Data source = the server DB of the user's local deployment (`~/.pacman/server/server.db`, read-only queries).
+Step duration is measured as the first-to-last `createdAt` span of that step's transcript rows (row ids embed the stepId, `msg-<stepId>-N` / tool row id = the toolCall id; the prompt row's `createdAt` = the claim moment, so the span ≈ the real claim → last-model-output duration).
 
-39 个 done 的 plan 步，跨度分布（秒）：
+39 done plan steps, span distribution (seconds):
 
-| 分位 | 值 |
+| percentile | value |
 |---|---|
 | min | 3s |
 | p25 | 9s |
@@ -22,52 +20,37 @@ B. 那段时间线上实际存在哪些信号、逐个判能否安全暴露给 U
 | p90 | 67s |
 | max | 137s |
 
-长尾全部来自真实用户任务（09-29/09-30 的 137s / 95s / 89s / 76s / 67s / 56s / 45s）；
-10-02 傍晚那批 7–12s 的密集步是验证栈跑的痕迹。结论：**规划步常规十几秒，
-但真实任务下 1–2 分钟不是异常**——用户截图里的「8s 处理中」正是长尾步的开头，
-而 UI 在该窗口内零信息。
+The whole tail comes from real user tasks (137s / 95s / 89s / 76s / 67s / 56s / 45s on 09-29/09-30); the dense batch of 7-12s steps on the evening of 10-02 is verify-stack traces. Conclusion: **planning steps are routinely a dozen-plus seconds, but 1-2 minutes under real tasks is not anomalous** — the "8s processing" in the user's screenshot is exactly the start of a tail step, and the UI gives zero information in that window.
 
-首个落库信号（prompt 行之后第一行 transcript）：plan 步平均 4s、最大 35s
-（build 步平均 2s / 最大 7s；merge 步平均 16s / 最大 18s）。
-⚠️ 该口径**低估**黑盒窗口：`text_delta` 是瞬态流不落库，落库行只在工具完成 /
-消息终局时出现——模型思考期（`thinking_delta`）在 DB 里完全不可见，
-只能靠下面的信号盘点确认它存在。
+The first persisted signal (the first transcript row after the prompt row): plan steps average 4s, max 35s (build steps average 2s / max 7s; merge steps average 16s / max 18s).
+⚠️ This metric **underestimates** the black-box window: `text_delta` is a transient stream that never lands in the DB, and persisted rows only appear when a tool completes / a message ends — the model's thinking phase (`thinking_delta`) is completely invisible in the DB, and can only be confirmed to exist through the signal inventory below.
 
-## B. 信号盘点（那段时间线上实际有什么）
+## B. Signal inventory (what actually exists on that timeline)
 
-取证路径 = 读码钉死（file:line 为本仓 origin/main @ 67509706）：
+Evidence path = pinned by code reading (file:line at this repo's origin/main @ 67509706):
 
-| 信号 | 产生处 | 现在到哪一层 | UI 可见？ | 能否安全暴露 |
+| signal | produced at | currently reaches | UI-visible? | can it be safely exposed |
 |---|---|---|---|---|
-| `text_delta`（模型流式正文） | pi/claude-code backend → runner（`runner.ts:811`，250ms 聚合 `TRANSCRIPT_DELTA_FLUSH_MS`） | → server `reportTranscriptDelta`（`machines.ts:1097`）→ SSE `text_delta` → liveTextStore | ✅ 已可见（打字面） | 已暴露 |
-| `thinking_delta`（模型思考流） | 两 backend 都发（`pi.ts:437`、`claude-code.ts:183`） | **runner 的 switch 无 case，直接丢弃** | ❌ | **内容不暴露**（思维链可含敏感中间推理，且票面只要「在干什么」）；**「正在思考」这个事实 + 事件到达时刻可安全暴露**——它是思考期唯一的活动证据 |
-| `toolcall_end` 无 result（调用块流完，工具开始执行，名字已知） | `pi.ts` 映射（调用块完成即发；`tool_execution_end` 才带 result） | runner 只在 `result !== undefined` 时回传（`runner.ts:834`）→ 无 result 的那半被丢 | ❌ 工具跑完才出现 | ✅ 工具名+参数摘要本就随终稿落库展示；「开始执行」时刻暴露无新增泄露 |
-| `toolcall_end` 带 result | 同上 | → `client.tool` → server 落库 + SSE `message` | ✅ 已可见 | 已暴露 |
-| `auto_retry_start/end`（协议 400 自动重试） | backend | runner 只写日志（`runner.ts:875`） | ❌ | ✅ 「自动重试中（第 N 轮）」直接回答「为什么久」 |
-| `compaction_start/end`（上下文压缩） | backend | runner 只写日志（`runner.ts:890`） | ❌ | ✅ 同上 |
-| `message_end`（轮边界） | backend | runner 落本地 transcript 缓冲，终稿步末上传 | ❌（live 期间） | ✅ 作为「等模型下一轮」的相位事实 |
-| heartbeat（30s，`runner.ts:658`） | daemon | server 只更新 `step.lastHeartbeatAt`，不发 SSE | ❌ | ✅ 但 30s 粒度太粗，只够判 daemon 活着，不够「在动 vs 卡住」 |
-| chief `activeRun.tool`（r5 §3.5 形状） | — | **全库无写入方**（Multica 取证残留 [推断] 形状；`chief.ts:416` 只写 `{phase}`） | 面板行恒空 | 死代码位——本次由真信号接管 |
+| `text_delta` (model streaming body) | pi/claude-code backend → runner (`runner.ts:811`, 250ms aggregation `TRANSCRIPT_DELTA_FLUSH_MS`) | → server `reportTranscriptDelta` (`machines.ts:1097`) → SSE `text_delta` → liveTextStore | ✅ already visible (typing face) | already exposed |
+| `thinking_delta` (model thinking stream) | both backends emit it (`pi.ts:437`, `claude-code.ts:183`) | **the runner's switch has no case, it is dropped outright** | ❌ | **content not exposed** (chain-of-thought can contain sensitive intermediate reasoning, and the ticket only asks "what is it doing"); **the fact "thinking" + the event's arrival moment can be safely exposed** — it is the only activity evidence during the thinking phase |
+| `toolcall_end` without result (the call block finishes streaming, the tool starts executing, the name is known) | mapped in `pi.ts` (emitted the moment the call block completes; only `tool_execution_end` carries the result) | the runner only returns when `result !== undefined` (`runner.ts:834`) — the no-result half is dropped | ❌ only appears once the tool finishes | ✅ the tool name + argument summary already land in the DB with the final text and get displayed; exposing the "started executing" moment leaks nothing new |
+| `toolcall_end` with result | same as above | → `client.tool` → server persists + SSE `message` | ✅ already visible | already exposed |
+| `auto_retry_start/end` (protocol 400 auto-retry) | backend | the runner only writes a log (`runner.ts:875`) | ❌ | ✅ "auto-retrying (round N)" directly answers "why so long" |
+| `compaction_start/end` (context compaction) | backend | the runner only writes a log (`runner.ts:890`) | ❌ | ✅ same |
+| `message_end` (round boundary) | backend | the runner lands it in a local transcript buffer, uploaded at the step's final text | ❌ (during live) | ✅ as the phase fact "waiting for the model's next round" |
+| heartbeat (30s, `runner.ts:658`) | daemon | the server only updates `step.lastHeartbeatAt`, emits no SSE | ❌ | ✅ but 30s granularity is too coarse — enough to tell the daemon is alive, not enough for "moving vs stuck" |
+| chief `activeRun.tool` (the r5 §3.5 shape) | — | **no writer anywhere in the DB** (a Multica forensics residue [inferred] shape; `chief.ts:416` writes only `{phase}`) | the panel row is always empty | dead code slot — taken over by real signals in this ticket |
 
-### 黑盒窗口的构成（改前）
+### The black-box window's composition (before the change)
 
-claim → 首个 text_delta 之间依次是：工作区准备（git worktree，秒级）→ 凭证/技能
-下发 → 会话开启 → 模型首 token 延迟 → **思考期（可达数十秒，`thinking_delta`
-全被丢弃）**。这整段 UI 只有「处理中… + 本步：规划中」；思考期结束后若模型直接
-调工具，工具执行期（`toolcall_end` 无 result 被丢）同样静默。用户看到的黑盒 =
-「preparing + starting + thinking + tool 执行」四种相位的叠加，而 daemon 侧
-**每一种都有事件到达**（runner 的看门狗正是靠它们重置，`runner.ts:812`）——
-信号存在，只是从未转发。
+claim → first text_delta consists of, in order: workspace preparation (git worktree, seconds) → credential/skill issuance → session open → model first-token latency → **the thinking phase (up to tens of seconds, `thinking_delta` all dropped)**. Through this whole stretch the UI shows only `处理中… + 本步：规划中`; and if the model goes straight to calling tools after the thinking phase, the tool-execution window (`toolcall_end` without result dropped) is likewise silent. The black box the user sees = the superposition of four phases — "preparing + starting + thinking + tool executing" — while on the daemon side **every one of them has events arriving** (the runner's watchdog resets off exactly these, `runner.ts:812`) — the signals exist, they were just never forwarded.
 
-### 判定
+### Judgment
 
-安全暴露面 = **相位（在做什么）+ 工具名 + 重试轮次 + 最近信号时刻**；
-不暴露 = thinking/text 内容增量的任何新面（text 已有既有暴露通道，thinking 内容
-不上 wire）。「在动 vs 卡住」判据 = 最近信号时刻的新鲜度：daemon 只在**真有
-事件到达**时刷新它，静默期不伪造心跳——数字持续增长即「卡住」的诚实呈现
-（#471 律：不挂会说谎的数）。
+Safe exposure face = **phase (what it is doing) + tool name + retry round + last-signal moment**;
+not exposed = any new face of thinking/text content increments (text already has its existing exposure channel, thinking content does not go on the wire). The "moving vs stuck" criterion = the freshness of the last-signal moment: the daemon refreshes it only when an event **really arrives**, never faking a heartbeat during silence — the number growing is the honest presentation of "stuck" (the #471 law: never mount a number that can lie).
 
-## 复现查询
+## Reproduce the queries
 
 ```sh
 sqlite3 "file:$HOME/.pacman/server/server.db?mode=ro" "

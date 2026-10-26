@@ -8,8 +8,8 @@ computed card box-shadow, the first three sidebar nav icon colors, the card
 meta icon color, and the orchestration text on the first card.
 
 Task #68 has a chief orchestration round queued, blocked on the offline
-machine `mea`. Before, the card laid a half-transparent disabled 编排中 button
-over its time. After, it shows a footer: 编排中 · 等 mea 上线, plus 查看会话.
+machine `mea`. Before, the card laid a half-transparent disabled `编排中` button
+over its time. After, it shows a footer: `编排中 · 等 mea 上线`, plus `查看会话`.
 
 | file | what it shows |
 | --- | --- |

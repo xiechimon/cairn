@@ -1,3 +1,4 @@
+```
 # Probe dump — old baseline → new measured (#921)
 
 Run 2026-10-08T16:01:01.985Z · commit `69adbb37` · port 8397 · playwright 1.63.0 · workers 4
@@ -145,3 +146,5 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | chief-stream-markdown.spec.ts | 1091 | toBeGreaterThan | > 294 | 774 | — | F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034） |
 | chief-stream-markdown.spec.ts | 1093 | toBeLessThanOrEqual | ≤ 298 | 298 | — | F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034） |
 | chief-stream-markdown.spec.ts | 1099 | toBeLessThanOrEqual | ≤ 0 | 0 | — | F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034） |
+
+```

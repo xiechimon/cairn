@@ -3,8 +3,8 @@
 //   VERIFY_REPO_ROOT=$PWD node .claude/skills/verify-pacman/scripts/launch.mjs
 //   node docs/verify/paper-card/live-probe.mjs <outDir>
 //   node .claude/skills/verify-pacman/scripts/cleanup.mjs
-// Real clicks: the 待开始 column plus opens the new-task dialog and saves the
-// first task; the hover 开始 link on a queued card starts it. The other cards
+// Real clicks: the `待开始` column plus opens the new-task dialog and saves the
+// first task; the hover `开始` link on a queued card starts it. The other cards
 // are seeded over REST and moved with the board's manual phase PATCH. Failed
 // and review cards need a real build (the manual PATCH answers 409), so the
 // fixture screenshots cover those two faces.
@@ -111,14 +111,14 @@ const titleLines = await page
   .evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
 check(titleLines === 2, `long title clamps to 2 lines (${titleLines})`);
 
-// 3. hover state + real click on the hover 开始 link
+// 3. hover state + real click on the hover `开始` link
 const queued = page.locator('[data-column="todo"] [data-todo-id]', { hasText: '按机器能力推荐并发上限' });
 await queued.locator('.todo-card-title').hover();
 await page.waitForTimeout(250);
 const start = queued.getByRole('button', { name: '开始' });
 check((await start.evaluate((el) => getComputedStyle(el).opacity)) === '1', 'hover reveals the 开始 link');
 await page.screenshot({ path: join(OUT, '02-board-hover.png') });
-// live 开始 = POST /api/todos/:id/orchestrate (#640: the phase stays until the chief acts)
+// live `开始` = POST /api/todos/:id/orchestrate (#640: the phase stays until the chief acts)
 const orchestrate = page.waitForResponse((r) => r.url().includes('/orchestrate'));
 await start.click();
 const orchestrated = await orchestrate;

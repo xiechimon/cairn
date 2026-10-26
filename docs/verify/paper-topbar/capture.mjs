@@ -24,7 +24,7 @@ const shots = [
   },
   { name: 'narrow-720', url: '/app?scenario=01', width: 720 },
   { name: 'compact', url: '/app?scenario=01', width: 1440, density: 'compact' },
-  // No fixture holds hundreds of 待处理 cards: this one rewrites the rendered
+  // No fixture holds hundreds of `待处理` cards: this one rewrites the rendered
   // count in the DOM to check the truncation path only (after bundle only).
   { name: 'narrow-720-dom-n12840', url: '/app?scenario=01', width: 720, bigN: '12840' },
 ];
