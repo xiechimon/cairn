@@ -50,6 +50,7 @@ export const AUTO_MERGE_PATH_GLOBS = [
   'packages/*/test/**',
   'integration/test/**',
   'docs/verify/**',
+  'docs/**/*.md',
 ] as const;
 
 export const PROTECTED_PATH_GLOBS = [
@@ -63,7 +64,11 @@ export const PROTECTED_PATH_GLOBS = [
   '**/CLAUDE*.md',
   '**/AGENTS*.md',
   'docs/pr-review.md',
+  'docs/lessons.md',
+  'docs/lessons/**',
+  'docs/agent-dispatch-prompts.md',
   'docs/adr/**',
+  'docs/spec/**',
   '**/scripts/**',
   '**/*.config.*',
   '**/biome.json',

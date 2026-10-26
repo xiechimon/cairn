@@ -976,6 +976,48 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
   });
 });
 
+describe('mergeReadiness: a docs-only patch (#1621) is a go under shadow; a protected doc mixed in stays with the user', () => {
+  const docsOnly = [
+    file('docs/ops/langfuse.md'),
+    file('docs/research/r9.md', { status: 'added', additions: 40, deletions: 0 }),
+  ];
+
+  test('only Markdown under docs/ changed under shadow: ready, no blockers', () => {
+    const i = green();
+    i.policy.mergePolicy = 'shadow';
+    setFiles(i, docsOnly);
+    const r = mergeReadiness(i);
+    expect(r.blockers).toEqual([]);
+    expect(r.ready).toBe(true);
+    expect(r.policy).toBe('shadow');
+  });
+
+  test('docs/spec or a case variant of docs/ADR mixed into the docs patch under shadow: protected-path stays with the user', () => {
+    for (const name of ['docs/spec/28-x.md', 'docs/ADR/0021-x.md', 'docs/\u{17F}pec/28-x.md']) {
+      const i = green();
+      i.policy.mergePolicy = 'shadow';
+      setFiles(i, [...docsOnly, file(name)]);
+      expect(classesOf(i), name).toEqual([['protected-path', 'human', `"${name}"`]]);
+    }
+  });
+
+  test('a non-Markdown file under docs mixed into the patch under shadow: outside-auto-merge stays with the user', () => {
+    const i = green();
+    i.policy.mergePolicy = 'shadow';
+    setFiles(i, [...docsOnly, file('docs/research/assets/r1/sw.js')]);
+    expect(classesOf(i)).toEqual([
+      ['outside-auto-merge', 'human', '"docs/research/assets/r1/sw.js"'],
+    ]);
+  });
+
+  test('a deleted test still stays with the user: a docs patch carrying a deleted test file', () => {
+    const i = green();
+    i.policy.mergePolicy = 'shadow';
+    setFiles(i, [...docsOnly, file('apps/server/test/old.test.ts', { status: 'removed' })]);
+    expect(codesOf(i)).toEqual(['test-deleted']);
+  });
+});
+
 describe('mergeReadiness: a malformed compare is left to a human, evidence must come from this PR, checks are trusted only when fully read', () => {
   test('compare read but malformed: the human compare-malformed, not the waitable patch-unavailable', () => {
     const a = green();
