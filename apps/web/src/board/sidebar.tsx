@@ -486,7 +486,7 @@ export function BoardSidebar({
             />
           </Button>
           <Link
-            className={`ml-auto flex size-5 items-center justify-center rounded-(--radius-control) text-content-tertiary hover:bg-sidebar-hover hover:text-foreground ${FOCUS}`}
+            className={`ml-auto flex size-6 items-center justify-center rounded-(--radius-control) text-content-tertiary hover:bg-sidebar-hover hover:text-foreground ${FOCUS}`}
             to={{ pathname: '/app/project/new', search: plain }}
             aria-label={t('新建项目')}
           >

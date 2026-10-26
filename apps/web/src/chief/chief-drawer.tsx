@@ -65,10 +65,10 @@ const WINDOW_MOTION_CLS =
   'origin-[calc(100%-1.25rem)_calc(100%-1.25rem)] transition-none ease-(--ease-drawer) data-closed:fill-mode-forwards data-open:animate-in data-open:fade-in-0 data-open:zoom-in-40 data-open:duration-(--dur-window) data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-40 data-closed:duration-(--dur-overlay)';
 
 const HEAD_ICON_BTN_CLS =
-  "size-5 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const TOOL_BTN_CLS =
-  "size-5 cursor-pointer text-(--text-tertiary) hover:text-(--text-secondary) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "size-6 cursor-pointer text-(--text-tertiary) hover:text-(--text-secondary) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const SEND_BTN_CLS =
   'ml-auto cursor-pointer rounded-md border-0 bg-transparent text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
@@ -363,7 +363,7 @@ function ChiefDrawerInner({
             </span>
             <ChevronDown width={12} height={12} />
           </Button>
-          <div className="ml-auto flex items-center gap-3.5">
+          <div className="ml-auto flex items-center gap-2.5">
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -610,7 +610,7 @@ function ChiefDrawerInner({
           onChange={onPickFiles}
           accept="text/*,image/*,application/json,application/pdf,application/xml"
         />
-        <div className="mt-2.5 flex items-center gap-4">
+        <div className="mt-2.5 flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
