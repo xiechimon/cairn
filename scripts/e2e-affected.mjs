@@ -37,6 +37,7 @@ const BOARD = [
   'shadcn-primitives',
   'storage-unavailable',
   'mobile-narrow',
+  'focus-ring-clip',
 ];
 const SIDEBAR = [
   'sidebar-',
@@ -200,7 +201,7 @@ const FILE_RULES = new Map([
   ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/agent-fallback-models.tsx', AGENT],
-  ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-']],
+  ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-', 'focus-ring-clip']],
   ['apps/web/src/routes/api-keys-page.tsx', ['user-menu-']],
   ['apps/web/src/routes/create-agent-dialog.tsx', AGENT],
   ['apps/web/src/routes/machine-authorize-page.tsx', ['machine-']],
