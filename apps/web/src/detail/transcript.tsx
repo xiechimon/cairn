@@ -297,7 +297,7 @@ function Row({
         <>
           <div className={`${ROW_BASE} chat-row--user justify-end ${margin}`}>
             <span
-              className={`chat-bubble anim-message-fade-up mt-1 min-h-6 min-w-0 max-w-[min(80%,56ch)] rounded-(--radius-bubble) rounded-br-[6px] bg-(--secondary) px-3.5 py-1 text-card-title leading-6 break-words text-(--foreground) ${
+              className={`chat-bubble anim-message-fade-up mt-1 min-h-6 min-w-0 max-w-[min(80%,56ch)] rounded-(--radius-bubble) rounded-br-(--cds-radius-md) bg-(--secondary) px-3.5 py-1 text-card-title leading-6 break-words text-(--foreground) ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'
@@ -310,7 +310,7 @@ function Row({
           </div>
           {item.seq != null && item.title != null && (
             <div className="mt-1.5 flex items-center justify-end" data-testid="taskline">
-              <span className="flex h-5 flex-none items-center rounded-[4px] bg-(--muted) px-2 text-caption text-(--text-secondary)">
+              <span className="flex h-5 flex-none items-center rounded-(--cds-radius-sm) bg-(--muted) px-2 text-caption text-(--text-secondary)">
                 #{item.seq}
               </span>
               <span className="ml-1 min-w-0 break-words text-card-title leading-5 font-medium text-(--foreground)">
@@ -474,7 +474,7 @@ function Row({
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
               <span
-                className={`chat-review-tag flex-shrink-0 rounded-[4px] bg-(--chip-plan-bg) px-1.5 py-px text-caption leading-[1.5] font-semibold text-(--chip-plan-fg)${
+                className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) bg-(--chip-plan-bg) px-1.5 py-px text-caption leading-[1.5] font-semibold text-(--chip-plan-fg)${
                   item.extractionError !== undefined
                     ? ' chat-review-tag--error bg-(--danger-soft) text-destructive'
                     : ''
@@ -559,7 +559,7 @@ function Row({
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
               <span
-                className={`chat-review-tag flex-shrink-0 rounded-[4px] px-1.5 py-px text-caption leading-[1.5] font-semibold ${
+                className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) px-1.5 py-px text-caption leading-[1.5] font-semibold ${
                   item.extractionError !== undefined
                     ? 'bg-(--danger-soft) text-destructive'
                     : item.passed
@@ -635,7 +635,7 @@ function FailRow({
       <ActionRow copy={[item.title, item.body].join('\n')} t={t} />
       <DialogShell title={t('原始错误')} open={rawOpen} onClose={() => setRawOpen(false)} size="l">
         <pre
-          className="m-0 rounded-[3px] border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-caption break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+          className="m-0 rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-caption break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
           data-testid="fail-raw-error"
         >
           {item.title}
@@ -694,7 +694,7 @@ function ToolsRow({ item, t }: { item: Extract<TranscriptItem, { kind: 'tools' }
               return (
                 <div key={`${i}-${pill}`} className="flex min-w-0 flex-col gap-1">
                   <div
-                    className="chat-tool-pill flex h-5 items-center gap-2 overflow-hidden rounded-[3px] border border-(--border) bg-(--secondary) pl-2.5 font-mono text-caption whitespace-nowrap text-(--text-secondary) [&_svg]:flex-none"
+                    className="chat-tool-pill flex h-5 items-center gap-2 overflow-hidden rounded-(--cds-radius-sm) border border-(--border) bg-(--secondary) pl-2.5 font-mono text-caption whitespace-nowrap text-(--text-secondary) [&_svg]:flex-none"
                     data-testid="tool-pill"
                   >
                     <Terminal width={12} height={12} />
@@ -702,7 +702,7 @@ function ToolsRow({ item, t }: { item: Extract<TranscriptItem, { kind: 'tools' }
                   </div>
                   {output != null && output !== '' && (
                     <pre
-                      className="m-0 max-h-60 overflow-auto rounded-[3px] border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-caption break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+                      className="m-0 max-h-60 overflow-auto rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-caption break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
                       data-testid="tool-output"
                     >
                       {output}

@@ -54,7 +54,7 @@ export function TokenGate() {
         role="dialog"
         aria-modal="true"
         aria-label={t('需要访问令牌')}
-        className="token-gate w-[360px] max-w-[calc(100vw-48px)] rounded-[12px] p-6 shadow-lg"
+        className="token-gate w-[360px] max-w-[calc(100vw-48px)] rounded-(--cds-radius-xl) p-6 shadow-lg"
       >
         <form className="flex flex-col gap-3" onSubmit={submit}>
           <h1 className="token-gate-title text-base font-semibold text-foreground">

@@ -24,7 +24,7 @@ export function ChipPopover({ todo, projectName, agentModel, onEditAssign }: Chi
       <div className="flex items-center gap-2 px-1.5">
         {project !== undefined && (
           <>
-            <span className="flex size-3 flex-none items-center justify-center rounded-[4px] bg-(--project-avatar-bg) text-[8px] font-medium text-(--project-avatar-fg)">
+            <span className="flex size-3 flex-none items-center justify-center rounded-(--cds-radius-sm) bg-(--project-avatar-bg) text-[8px] font-medium text-(--project-avatar-fg)">
               {project.charAt(0).toLowerCase()}
             </span>
             <span className="text-xs leading-4 text-(--text-tertiary)">{project}</span>

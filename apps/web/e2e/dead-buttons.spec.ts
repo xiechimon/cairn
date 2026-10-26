@@ -508,7 +508,7 @@ test('new-task dialog: the close control anchors to the head’s right edge (#57
 test('new-task dialog gates unsaved closes and resets on discard (#318)', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const dialog = page.getByRole('dialog', { name: '新建任务' });
-  const discard = page.getByRole('alertdialog', { name: '放弃新建任务？未保存的内容将丢失。' });
+  const discard = page.getByRole('alertdialog', { name: '放弃新建任务？' });
 
   await page.locator('.sidebar-new-task').click();
   await expect(dialog).toBeVisible();
@@ -520,7 +520,8 @@ test('new-task dialog gates unsaved closes and resets on discard (#318)', async 
   await dialog.getByRole('textbox').fill('未保存探针');
   await dialog.getByRole('button', { name: '关闭' }).click();
   await expect(discard).toBeVisible();
-  await expect(discard).toContainText('放弃新建任务？未保存的内容将丢失。');
+  await expect(discard).toContainText('放弃新建任务？');
+  await expect(discard).toContainText('未保存的内容将丢失。');
 
   await discard.getByRole('button', { name: '继续编辑' }).click();
   await expect(discard).toBeHidden();

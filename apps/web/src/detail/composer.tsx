@@ -36,7 +36,7 @@ const COMPOSER_INPUT =
 const COMPOSER_TOOL =
   'flex size-7.5 cursor-pointer items-center justify-center border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0';
 const COMPOSER_SQUARE =
-  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-[8px] border-none p-0 active:not-aria-[haspopup]:translate-y-0';
+  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-(--cds-radius-lg) border-none p-0 active:not-aria-[haspopup]:translate-y-0';
 
 interface ComposerProps {
   placeholder: string;
@@ -286,7 +286,7 @@ export function Composer({
           aria-label={t('停止')}
           onClick={onStop}
         >
-          <span className="size-2.5 rounded-[2px] bg-current" />
+          <span className="size-2.5 rounded-(--cds-radius-xs) bg-current" />
         </Button>
       )}
       <Button

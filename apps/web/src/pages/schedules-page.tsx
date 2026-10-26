@@ -1,6 +1,6 @@
 import { cn } from 'cn';
 import { Clock, Lightbulb, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, useSchedules, useTodos } from '../api/hooks.js';
 import { mapSchedules, toDisplayTodo } from '../api/mappers.js';
@@ -228,11 +228,15 @@ function ScheduleForm({
   onSave: () => void;
 }) {
   const { t } = useI18n();
+  const bodyRef = useRef<HTMLDivElement>(null);
   return (
     <DialogShell
       title={t('新建定时')}
       open={open}
       onClose={onClose}
+      initialFocus={() =>
+        document.activeElement?.matches(':focus-visible') === true ? true : bodyRef.current
+      }
       size="m"
       footer={
         <FormActions
@@ -242,7 +246,7 @@ function ScheduleForm({
         />
       }
     >
-      <div className="flex flex-col gap-3">
+      <div ref={bodyRef} tabIndex={-1} className="flex flex-col gap-3 outline-none">
         <div className={FORM_ROW_CLS}>
           <span className="text-ui text-content-secondary">{t('项目')}</span>
           <span className={FORM_ROW_VALUE_CLS}>{repo}</span>
@@ -253,6 +257,7 @@ function ScheduleForm({
             {todo == null ? '' : `#${todo.seqNum} ${todo.title}`}
           </span>
         </div>
+        <div className={FORM_LABEL_CLS}>{t('频率')}</div>
         <SegmentedRadio
           optionHandle="sched-form-freq-tab"
           label={t('频率')}

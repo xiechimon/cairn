@@ -1,7 +1,7 @@
 import { cn } from 'cn';
 
 const CHIP_BASE =
-  'mention-chip mx-0.5 inline-flex items-center gap-0.5 rounded-[3px] bg-(--spot-soft) px-1.5 py-px align-baseline font-sans text-xs leading-[1.4] font-medium text-(--spot-text-on-tint) no-underline';
+  'mention-chip mx-0.5 inline-flex items-center gap-0.5 rounded-(--cds-radius-sm) bg-(--spot-soft) px-1.5 py-px align-baseline font-sans text-xs leading-[1.4] font-medium text-(--spot-text-on-tint) no-underline';
 
 const KIND_CHIP_CLS: Record<string, string> = {
   todo: 'cursor-pointer',
@@ -18,7 +18,7 @@ export function mentionChipClass(kind: string | null | undefined): string {
 }
 
 const ICON_BASE =
-  'inline-flex size-7 shrink-0 items-center justify-center rounded-[6px] bg-(--surface-tertiary) text-(--foreground)';
+  'inline-flex size-7 shrink-0 items-center justify-center rounded-(--cds-radius-md) bg-(--surface-tertiary) text-(--foreground)';
 
 const KIND_ICON_CLS: Record<string, string> = {
   todo: 'bg-[color-mix(in_srgb,var(--spot-text-on-tint)_18%,transparent)] text-(--spot-text-on-tint)',
