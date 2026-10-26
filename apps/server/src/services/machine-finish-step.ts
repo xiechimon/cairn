@@ -6,6 +6,7 @@ import {
   CHIEF_TURN_ERROR_KIND,
   classifyStepFailure,
   conversationBranch,
+  QUOTA_BLOCK_REASON_MAX_CHARS,
   SKILL_INJECTION_CHECK_KIND,
   type SkillInjectionFacts,
   secondPrWarningNoteRowId,
@@ -398,6 +399,18 @@ export async function finishStep(
   }
   if (outcome.status === 'failed' && classifyStepFailure(outcome.errorMessage ?? '') === 'quota') {
     holdStepForQuota(deps, stepRow, outcome);
+    return;
+  }
+  if (
+    outcome.status === 'failed' &&
+    classifyStepFailure(outcome.errorMessage ?? '') === 'capacity'
+  ) {
+    const ran = worker?.agentRow ? effectiveModel(worker.agentRow, stepRow) : null;
+    applyQuotaWaitStep(deps, stepRow, {
+      kind: 'capacity',
+      providerId: ran?.provider ?? '',
+      reason: (outcome.errorMessage ?? '').slice(0, QUOTA_BLOCK_REASON_MAX_CHARS),
+    });
     return;
   }
   if (
