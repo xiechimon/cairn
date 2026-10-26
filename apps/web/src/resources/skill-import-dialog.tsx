@@ -6,6 +6,7 @@ import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../componen
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { FieldError } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 
 interface Fields {
@@ -57,6 +58,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
   const submit = () => {
     if (fields === null || !submittable) return;
     if (!live) {
+      blockDemoWrite();
       onClose();
       return;
     }

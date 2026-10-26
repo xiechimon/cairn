@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { useApiMutations } from '../api/hooks.js';
+import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import type { Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
@@ -76,12 +77,16 @@ export function useDetailComposer(input: DetailComposerInput) {
             .then(() => undefined);
         }
       }
-    : revisionAvailable && chain === 'idle'
+    : DEMO_MODE
       ? () => {
-          setChain('streaming');
-          window.setTimeout(() => setChain('landed'), 900);
+          blockDemoWrite();
         }
-      : undefined;
+      : revisionAvailable && chain === 'idle'
+        ? () => {
+            setChain('streaming');
+            window.setTimeout(() => setChain('landed'), 900);
+          }
+        : undefined;
 
   return { onSend, onAttachment };
 }

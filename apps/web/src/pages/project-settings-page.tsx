@@ -17,6 +17,7 @@ import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { isDeleted, markDeleted } from '../fixtures/deletions.js';
 import type { ProjectContent } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -382,6 +383,7 @@ export function ProjectSettingsPage() {
             }
             return;
           }
+          if (blockDemoWrite()) return;
           if (id !== undefined) markDeleted(id);
           navigate('/app');
         }}

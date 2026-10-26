@@ -21,6 +21,7 @@ import {
 } from '../components/ui/select.js';
 import { Switch } from '../components/ui/switch.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import {
   applyDensity,
   DENSITY_EVENT,
@@ -56,6 +57,7 @@ export function AccountPage() {
   const userName = live ? (sessionQ.data?.displayName ?? USER_NAME) : (fixtureName ?? USER_NAME);
   const commitName = (next: string) => {
     if (!live) {
+      if (blockDemoWrite()) return;
       setFixtureName(next);
       return;
     }

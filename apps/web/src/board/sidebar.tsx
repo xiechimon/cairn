@@ -26,6 +26,7 @@ import { Kbd } from '../components/ui/kbd.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
+import { DEMO_MODE } from '../demo/demo-gate.js';
 import { UserMenu } from '../detail/user-menu.js';
 import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
@@ -199,9 +200,14 @@ export function BoardSidebar({
   const { t } = useI18n();
   const { user } = useLiveData();
   const { search, pathname } = useLocation();
-  const plain = withoutBoardView(withColumnParam(search, null));
-  const kanbanParams = new URLSearchParams(plain);
-  kanbanParams.set('view', 'board');
+  const stripped = withoutBoardView(withColumnParam(search, null));
+  const baseParams = new URLSearchParams(stripped.startsWith('?') ? stripped.slice(1) : stripped);
+  const homeParams = new URLSearchParams(baseParams);
+  const kanbanParams = new URLSearchParams(baseParams);
+  if (DEMO_MODE) homeParams.set('view', 'home');
+  else kanbanParams.set('view', 'board');
+  const plain = `?${baseParams}`;
+  const homeSearch = `?${homeParams}`;
   const kanbanSearch = `?${kanbanParams}`;
   const projectRows = useMemo(
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
@@ -293,7 +299,9 @@ export function BoardSidebar({
           </TooltipContent>
         </Tooltip>
         <nav className="mt-2 flex min-h-0 flex-1 flex-col items-center gap-px overflow-y-auto">
-          <Link {...railLink({ pathname: '/app', search: plain }, selected === 'board', homeLabel)}>
+          <Link
+            {...railLink({ pathname: '/app', search: homeSearch }, selected === 'board', homeLabel)}
+          >
             <Inbox className={ICON} strokeWidth={STROKE} />
             {attention > 0 && (
               <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)" />
@@ -454,7 +462,7 @@ export function BoardSidebar({
         ref={navRef}
         className={`flex min-h-0 flex-1 flex-col gap-px overflow-y-auto ${scrollFadeClassName()}`}
       >
-        <Link {...navLink({ pathname: '/app', search: plain }, selected === 'board')}>
+        <Link {...navLink({ pathname: '/app', search: homeSearch }, selected === 'board')}>
           <Inbox className={ICON} strokeWidth={STROKE} />
           <span className="truncate">{t('工作台')}</span>
           {attention > 0 && <AttentionBadge count={attention} />}

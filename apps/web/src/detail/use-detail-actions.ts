@@ -5,6 +5,7 @@ import type { useApiMutations, useMachines, useMembers, useSteps } from '../api/
 import type { toDisplayTodo } from '../api/mappers.js';
 import { assignOptionsFromMembers, type ChiefAgentOption } from '../chief/chief-agent-dialog.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { markClosed } from '../fixtures/deletions.js';
 import type { OverlayState, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -144,6 +145,7 @@ export function useDetailActions(input: DetailActionsInput) {
       );
       return;
     }
+    if (blockDemoWrite()) return;
     markClosed(todo.id);
     navigate('/app');
   };
