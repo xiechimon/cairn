@@ -66,10 +66,10 @@ import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js
 import { ProjectMenu } from './project-menu.js';
 
 const HEAD_ICON_BTN_CLS =
-  "size-5 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const TOOL_BTN_CLS =
-  "size-5 cursor-pointer text-(--text-tertiary) hover:text-(--text-secondary) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "size-6 cursor-pointer text-(--text-tertiary) hover:text-(--text-secondary) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const PROJECT_CHIP_CLS =
   "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
@@ -442,7 +442,7 @@ export function ChiefConversation({
             </span>
             <ChevronDown width={12} height={12} />
           </Button>
-          <div className="ml-auto flex items-center gap-3.5">
+          <div className="ml-auto flex items-center gap-2.5">
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -712,7 +712,7 @@ export function ChiefConversation({
           onChange={onPickFiles}
           accept="text/*,image/*,application/json,application/pdf,application/xml"
         />
-        <div className="mt-2.5 flex items-center gap-4">
+        <div className="mt-2.5 flex items-center gap-3">
           <IconTooltip
             label={t('添加附件')}
             trigger={
