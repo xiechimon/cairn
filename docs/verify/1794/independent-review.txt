@@ -1,31 +1,31 @@
-PR: https://github.com/xiechimon/cairn/pull/1821 (original draft; replacement PR is expected)
-Reviewed source: c731d45d5d8e934bf80be1f3f8318b07e118c1ac; base origin/main 02eaff6bcaa04f73c1219770df6ee7f5b17dd197; old lane origin/lane/1794 d7ac947353c7a945e74794f12589d4a7a3fcffcc.
-Verdict: PASS for the staged source and security boundaries reviewed; not acceptance of the complete #1794 feature. Recheck source changes or a different base.
+PR: https://github.com/xiechimon/cairn/pull/1821 (original draft; staged replacement expected)
+Verdict: PASS for reviewed staged source at 8ace0879d72144e11a2d7a601ee68b9c872533f6. This does not satisfy the outstanding #1794 host acceptance. Observed origin/main 1fd226127d90e58b15f58f078bc9be651360c084; merge-base 961750ca248c3cf662d52e4536384f81a2bdd52c. Rebind this result if production source or the relevant base changes. A GitHub patchDigest was not independently computed.
 
 What it does:
-- Runs and displays the product gate, using protected I/O adapters and a pure policy core, and records and audits gate observations.
+- Adds product gate evaluation, a separate decision step, task-detail status, redacted trajectories and post-merge mismatch auditing through protected mechanical ports and a pure core.
 
 Good:
-- Review and decision require a stable actually observed checkout head; unknown or drifting heads do not bind. The server claim snapshots author model and identity. Step-bound safety payloads and review, decision and verification outcomes are rechecked in the protected core; the verification checklist is derived there from server plan text.
-- Final product review output is parsed in protected daemon code; an unfinished final response cannot recover an earlier passing example. Audit uncertainty prevents merged-to-done reconciliation and retries.
-- Machine adapters remain in existing category ⑤; pure gate import restrictions and protected-path lists were not relaxed. F15 did change: one protected adapter is excluded from its old blanket machine-file prohibition, with a transitive report import boundary, authenticated forged-record negative control, and a documented negative control for the prior CI-loop dependency.
+- Claim snapshots identify the actual author and reviewer; gate verdict payload and reviewer identity are persisted server-side in a first-write-only row. The protected core validates the stored kind and identity against the completed step, queued purpose and claim snapshot, then rechecks the typed payload. Machine transcript overwrites cannot change authorization. The nullable migration leaves old rows unknown and blocked.
+- Review and decision bind an observed stable checkout head and explicit safety booleans; strict final parsing rejects unfinished transcripts. A human-requested merge remains in review until terminal audit succeeds, and unavailable audit inputs retry.
+- The pure-core import rules and protected path lists did not change. The old F15 blanket machine-file prohibition did change: it now excludes the single protected server adapter and adds a transitive machine-report boundary plus real forged-record controls. The protected shared plan parser was mechanically moved and private helpers inlined; the author reports parity over 259 inputs across two APIs.
 
 Bad:
-- No further blocking defect found in the reviewed port, binding, outcome, audit, extraction, scheduling, storage and display changes. Original PR #1821 body currently claims full acceptance and contains a closing keyword; it is not the staged replacement PR and must not be used to close #1794.
-- Legacy daemons omitting observed review heads and old verification records lacking the original payload fail closed; rollout needs upgraded daemons and fresh review/verification.
+- No further blocking issue found in the reviewed staged change. Existing verification evidence compare cap is enforced by the existing builds.ts call path before protected binding; the pure binder does not independently validate compare completeness. No present bypass was demonstrated. Old daemons lacking observed heads and legacy rows without payload snapshots fail closed and need refreshed reviews/verification.
+- Original draft #1821 body claims acceptance and includes a closing keyword; the staged replacement needs accurate outstanding acceptance wording and must leave #1794 open.
 
 Ugly:
-- No additional high-impact issue found in the checked trust boundary. The mismatch audit requires readable merged facts, storage, and an issue port; unavailable prerequisites leave a task in review and retry.
+- No additional issue found in the reviewed machine-message, audit retry, head binding, identity, decision and policy boundaries. Without audit prerequisites, the merged task remains retryable in review.
 
 Tests:
-- Independent run: 4 files / 79 cases passed: merge-gate-product, merge-gate-tables, runner-review and merge-gate-imports; git diff --check passed. Author reports 684 cases across 26 files, one web mapping case, lint and typecheck green. The reviewer did not rerun the full suite or live host acceptance. code-review and security-review skills were unavailable; independent source/security review is a substitute and is not a claim those skills ran.
-- No live task PR has merged through this code. requestMerge is not wired to readiness; public review publication and autonomous merge execution are incomplete; the one-week timer comparison is pending. Keep #1794 open.
+- Independent run on 8ace: merge-gate-product, merge-gate-reconciliation, merge-gate-tables, runner-review, merge-gate-imports: 5 files and 96 tests passed. git diff --check against merge-base passed. Author reports 122 relevant cases, prior broader 1042, lint/typecheck and precommit green; full current-head prepush remains to be completed.
+- Existing screenshots use stubbed API states. No live Cairn task PR has merged via this code; requestMerge is not readiness-gated, public review publication and automatic merge execution are incomplete, and the one-week external timer comparison is pending.
+- Repository-named code-review/security-review skills unavailable; independent review is a substitute, not a claim those skills ran. No PR label/comment, push or merge was performed.
 
 Three questions:
-- Correctness: PASS for reviewed staged code, subject to stated integration and rollout limitations.
-- Gate loosening: the original F15 blanket test changed as stated; no protected path list or pure-core import allowlist loosening found. Runtime gate safety fields and blocking findings are checked in the protected core.
-- Eval ruler: no intentional measurement-threshold change found; the plan parser was moved to a protected module with legacy re-exports, and its source is documented as byte-identical.
+- Correctness: PASS for reviewed staged source, with the integration and rollout limitations above.
+- Gate loosening: F15 rule changed as described; no changes to protected-path lists or pure-core import allowlist. No further weakening found in reviewed controls.
+- Eval ruler: no intentional threshold or scoring change found. The moved parser's private helper inlining is covered by the author's parity checks.
 
-SHA-256: run.ts aae2c629c861f0b6b94beec01c74d74d070156200fab453baf715fab31623b67; verdict.ts c3210079a83a1fae1e6c3663a5ca0b4f9b0c6bfec6c064705683e5d615c81f09; audit.ts 0fd8a89d6dcbebdea39c460ef47e63ec41435a263d6f1ac2c1b6e35e66636f02; machine-gate-port.ts 3d191fbafac22fa468b121ff73fd621c9ef061914534336e14efd8197e905653; machine-gate-storage.ts 473a481c408f21883d288eb196ebb26b84298c535afe787809a70a18a8f2f066; daemon merge-decision.ts 62e43a50169a139e97c28065ce84dc2cf902a4a8619b8afc06937baf555657c7; shared merge-gate.ts 5db46011089c9b63b02194e8d047c405cd846e90afd21b85d36028c64128d5ca.
+SHA-256: merge-gate/run.ts b0ed982f08d2ddaa856b2f5e986d0b087088268715956f2b3911653e58924e8f; merge-gate/verdict.ts c3210079a83a1fae1e6c3663a5ca0b4f9b0c6bfec6c064705683e5d615c81f09; merge-gate/audit.ts 0fd8a89d6dcbebdea39c460ef47e63ec41435a263d6f1ac2c1b6e35e66636f02; machine-gate-port.ts 3adc25f18c89d48c4c94bc3de42375b58adcdf68cd78cf9f8fa263cdbaf93649; machine-gate-storage.ts 473a481c408f21883d288eb196ebb26b84298c535afe787809a70a18a8f2f066; machine-claim.ts 63b15e52c0f7d7c3de2c446d2c35e662bc02c1b11b91e5008a32b10131b69fc6; machine-deps.ts 7cf3df05336cc62b25d06ed1a822013c7a560ab8b901b553908b84607d6f9e14; builds.ts da2953d80c26e648722ac4e2167e6a4614d7d2fb3add19c8e5476786c9391223; daemon/merge-decision.ts 62e43a50169a139e97c28065ce84dc2cf902a4a8619b8afc06937baf555657c7.
 
-Scope qualification: this was an independent review of the changed gate surfaces and relevant call paths, not a claim that the entire long runner.ts and builds.ts files or every linked historical issue were read in full. No GitHub labels, comments, pushes or merges were performed.
+Review scope: read runner.ts and builds.ts in chunks, the product gate and machine adapters, relevant original call chains, linked #1794 and its comment, the #1404 design comment and relevant historical issues. This is not a claim that every line of every changed test and historical issue/comment was read without truncation; it is not a complete docs/pr-review.md full-read attestation.

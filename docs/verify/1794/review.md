@@ -58,3 +58,11 @@ No actual task PR merge, public review publication, autonomous merge executor or
 ## Follow-up full-file review
 
 A follow-up full-file review found two additional blockers after the earlier scoped snapshot: human GitHub merge success finished tasks before the poller's required audit, and machine transcript writes could replace the messages the gate trusted for reviewer identity and safety payloads. Those findings required further source changes. The earlier scoped PASS does not cover this later source. The current implementation leaves human merges in review for audit, stores immutable server-owned verdict facts, derives reviewer identity from server claim execution, and rejects cross-conversation transcript ID conflicts while retaining same-conversation recovery. Final source-bound review is recorded separately when complete.
+
+## Final source-bound review
+
+The independent reviewer reports PASS for production source `8ace0879d72144e11a2d7a601ee68b9c872533f6`, with no remaining blocking finding in its reviewed scope. It independently reran five files and 96 cases. The latest report, source hashes and qualifications are in `independent-review.txt`; this supersedes the earlier scoped snapshot for current source.
+
+The follow-up fixes also bind stored verdict kind, reviewer agent and model to the completed step, queued purpose and server claim. A normal review cannot satisfy a chief decision, and a forged stored identity cannot supply independence. The default Reviewer's blocking report now finishes successfully without an invalid building-to-planning phase transition.
+
+The reviewer read the runner and builds files in chunks and relevant gate, adapter and issue context. It does not attest to the complete repository full-read procedure for every changed test and historical comment. Named review skills remain unavailable. This is source review rather than live host acceptance; public review publication, readiness-gated human merging and the one-week timer comparison remain open.
