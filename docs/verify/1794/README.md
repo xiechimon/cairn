@@ -28,6 +28,8 @@ The nullable verdict payload and reviewer identity columns require a normal data
 
 The first normal push stopped at the single-use helper check (`helper-gate-red.txt`). After inlining, that same check reports zero (`helper-gate-green.txt`), and the parser, export binding, mapper, gate import, product and runner set passes 85 cases (`inline-related-tests.txt`). No helper allowlist exception was added.
 
+Gate evaluations and terminal audits make additional GitHub read requests. The legacy reconciliation and grind unit fixtures isolate that separate gate work so their original cache and grind-budget assertions remain unchanged; these are not assertions about the total poller request count. `legacy-grind-budget-red.txt` records the additional pull read found by the full check. Product-port and audit regressions cover the new reads and failure/retry behavior separately.
+
 Validation recorded during this change:
 
 - Server-owned snapshot, human-merge audit, legacy PR, machine and gate regressions: 1042 cases in 31 files passed (`snapshot-related-tests.txt`), plus 18 transcript/chief consumer cases (`transcript-consumers.txt`). `machine-forgery-red.txt` records actual completed-machine message attacks; `machine-forgery-green.txt` covers tool and upload recovery with immutable verdict facts. `chief-transcript-boundary.txt` covers the chief thread boundary. `human-merge-audit-red.txt` records the direct completion bypass before deferring it to the audit poller.

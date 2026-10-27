@@ -1,0 +1,33 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+ ❯ |@xiechimon/cairn| test/pr-seg3.test.ts (79 tests | 1 failed) 3408ms
+   ❯ #1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY (79)
+     × [s3-F1] the grind reads the PR, then the check runs of its head SHA (not the branch name) 165ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-seg3.test.ts > #1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY > [s3-F1] the grind reads the PR, then the check runs of its head SHA (not the branch name)
+AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/pr-seg3.test.ts:317:40
+    315|     w.fake.runs[HEAD] = [{ name: 'check' }];
+    316|     await w.poller.sweep();
+    317|     expect(w.fake.reads('/pulls/201')).toHaveLength(1);
+       |                                        ^
+    318|     expect(w.fake.reads('/check-runs')).toEqual([
+    319|       expect.stringContaining(`/repos/octo/demo/commits/${HEAD}/check-…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 78 passed (79)
+   Start at  12:07:03
+   Duration  6.10s (tests 59%, transform 30%, import 11%)
