@@ -285,6 +285,25 @@
         }
       }
     },
+    "chief-dispatch-recovery": {
+      "recipe": null,
+      "cases": {
+        "retry-failed-turn": {
+          "script": "docs/verify/1858/drive-retry.mjs",
+          "args": [],
+          "needs": [
+            "own-stack",
+            "stub-llm"
+          ],
+          "status": "current",
+          "purpose": "Run the real server, daemon, and eval CLI against a local provider that rejects once, then verify one successful infra retry and an unchanged decision grade.",
+          "usage": "Optional <output-directory>; defaults to VERIFY_EVIDENCE_DIR supplied by vp.mjs",
+          "evidence": {
+            "env": "VERIFY_EVIDENCE_DIR"
+          }
+        }
+      }
+    },
     "chief-drawer": {
       "recipe": null,
       "cases": {
