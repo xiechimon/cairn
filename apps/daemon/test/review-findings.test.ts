@@ -324,3 +324,11 @@ describe('product gate final verdict', () => {
     ).toBe('ok');
   });
 });
+
+test('a product verdict may have an explanatory prefix before terminal JSON', () => {
+  expect(
+    extractReviewVerdict([assistantMsg(`Review complete.\n\n${BLOCKING_VERDICT}`)], {
+      requireFinalVerdict: true,
+    }).status,
+  ).toBe('ok');
+});

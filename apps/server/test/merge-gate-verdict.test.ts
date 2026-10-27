@@ -2,7 +2,7 @@ import type { CompareFile } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { computePatchDigest } from '../src/services/merge-gate/digest.js';
 import { isFullSha } from '../src/services/merge-gate/readiness.js';
-import { bindGateVerdict } from '../src/services/merge-gate/verdict.js';
+import { bindGateVerdict, verificationItemsForPlan } from '../src/services/merge-gate/verdict.js';
 
 const HEAD = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
@@ -29,6 +29,8 @@ const base = {
   stepFailed: false,
   extracted: true,
   blocked: false,
+  reviewVerdict: { conclusion: 'Pass', gateLoosening: false, evalRulerChange: false, findings: [] },
+  verifyVerdict: { passed: true, conclusion: 'Pass', evidence: [] },
 };
 
 describe('bindGateVerdict: extraction failure does not count as pass', () => {
@@ -202,3 +204,32 @@ test.each([true, undefined])(
     expect(result?.outcome).toBe(gateLoosening === true ? 'block' : 'extraction_failed');
   },
 );
+
+test('review blocking comes from its payload rather than caller pass flags', () => {
+  const result = bindGateVerdict({
+    ...base,
+    reviewVerdict: {
+      conclusion: 'No-go',
+      findings: [{ id: 'blocking', severity: 'blocking', summary: 'Missing authorization' }],
+      gateLoosening: false,
+      evalRulerChange: false,
+    },
+  });
+  expect(result?.outcome).toBe('block');
+});
+
+test('verify blocking comes from its payload rather than caller pass flags', () => {
+  expect(
+    bindGateVerdict({
+      ...base,
+      kind: 'verify',
+      verifyVerdict: { passed: false, conclusion: 'Failed', evidence: [] },
+    })?.outcome,
+  ).toBe('block');
+});
+
+test('required verification plans stay unknown when missing or invalid', () => {
+  expect(verificationItemsForPlan(null, true)).toBeNull();
+  expect(verificationItemsForPlan('## Context\nMissing verification', true)).toBeNull();
+  expect(verificationItemsForPlan(null, false)).toEqual([]);
+});

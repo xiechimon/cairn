@@ -35,6 +35,7 @@ export interface GateRuntimePort {
   readProject(todo: TodoRow): ProjectRow | undefined;
   projectRepo(project: ProjectRow | undefined): { owner: string; repo: string } | null;
   projectPolicy(project: ProjectRow): MergePolicy;
+  readPlanContent(buildId: string): string | null;
   readSteps(buildId: string): (typeof step.$inferSelect)[];
   readAgents(teamId: string): (typeof agent.$inferSelect)[];
   readVerdicts(buildId: string): (typeof gateVerdict.$inferSelect)[];

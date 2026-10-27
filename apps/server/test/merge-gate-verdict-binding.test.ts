@@ -144,7 +144,12 @@ function attachGithubRepo(w: World, buildId: string) {
   );
 }
 
-const PASS_FINDINGS = { conclusion: 'pass', findings: [] as [] };
+const PASS_FINDINGS = {
+  conclusion: 'pass',
+  gateLoosening: false,
+  evalRulerChange: false,
+  findings: [] as [],
+};
 
 async function call(
   app: Hono,
@@ -480,6 +485,8 @@ describe('#1404 S5a verdict binding', () => {
       status: 'success',
       findings: {
         conclusion: 'changes needed',
+        gateLoosening: false,
+        evalRulerChange: false,
         findings: [{ id: '1', severity: 'blocking', summary: 'missing tests' }],
       },
     });

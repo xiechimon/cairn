@@ -1,4 +1,4 @@
-import type { MergeGateRun, MergeReadiness, ReviewVerdict } from '@cairn/shared';
+import type { MergeGateRun, MergeReadiness, ReviewVerdict, VerifyVerdict } from '@cairn/shared';
 import { mergeReadinessSchema } from '@cairn/shared/merge-gate';
 import { auditMergedGate, type GateAuditIssuePort } from './audit.js';
 import { computePatchDigest } from './digest.js';
@@ -7,9 +7,10 @@ import { type GateReadCache, newGateReadCache, readGateGithubFacts } from './git
 import type { GateGithubPort } from './github-port.js';
 import { type GateVerdictView, isFullSha, mergeReadiness } from './readiness.js';
 import type { GateRuntimePort } from './runtime-port.js';
-import { decisionVerdictFacts } from './verdict.js';
+import { reviewVerdictFacts, verificationItemsForPlan, verifyVerdictFacts } from './verdict.js';
 
 const REVIEW_VERDICT_KIND = 'review_verdict';
+const VERIFY_VERDICT_KIND = 'verify_verdict';
 const readCaches = new Map<string, GateReadCache>();
 const IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
 
@@ -99,6 +100,7 @@ export async function evaluateMergeGate(
     }
   }
   const answers = new Map<string, ReviewVerdict>();
+  const verifyAnswers = new Map<string, VerifyVerdict>();
   const reviewerModels = new Map<string, string | null>();
   const spoken = runtime.readMessages(buildId);
   const ambiguous = new Set<string>();
@@ -117,7 +119,17 @@ export async function evaluateMergeGate(
       stepId?: unknown;
       verdict?: unknown;
       modelId?: unknown;
+      gatePayload?: unknown;
     };
+    if (record.kind === VERIFY_VERDICT_KIND && typeof record.stepId === 'string') {
+      const verifyStep = steps.find((item) => item.id === record.stepId && item.kind === 'verify');
+      if (verifyStep?.status !== 'done') continue;
+      if (verifyAnswers.has(record.stepId)) ambiguous.add(record.stepId);
+      const verdict = runtime.parseVerifyVerdict(record.gatePayload);
+      if (verdict !== null) verifyAnswers.set(record.stepId, verdict);
+      else ambiguous.add(record.stepId);
+      continue;
+    }
     if (record.kind !== REVIEW_VERDICT_KIND || typeof record.stepId !== 'string') continue;
     const reviewStep = steps.find((item) => item.id === record.stepId && item.kind === 'review');
     if (reviewStep?.status !== 'done') continue;
@@ -128,11 +140,18 @@ export async function evaluateMergeGate(
       reviewerModels.set(record.stepId, typeof record.modelId === 'string' ? record.modelId : null);
     } else ambiguous.add(record.stepId);
   }
-  for (const id of ambiguous) answers.delete(id);
+  for (const id of ambiguous) {
+    answers.delete(id);
+    verifyAnswers.delete(id);
+  }
   const perspectiveOf = (prompt: string | null): string => {
     const id = runtime.parseReviewMeta(prompt)?.agentId;
     return (id !== undefined ? agents.get(id)?.persona : null) ?? 'review';
   };
+  const verificationItems = verificationItemsForPlan(
+    runtime.readPlanContent(buildId),
+    buildRow.withPlan,
+  );
   const views: GateVerdictView[] = stored.map((row) => {
     const reviewStep = steps.find((item) => item.id === row.stepId);
     const reviewerId =
@@ -140,16 +159,18 @@ export async function evaluateMergeGate(
         ? (runtime.parseReviewMeta(reviewStep.prompt)?.agentId ?? null)
         : null;
     const answer = answers.get(row.stepId);
-    const decision = decisionVerdictFacts(answer);
-    const outcome =
-      row.kind === 'decision' &&
-      (row.outcome === 'pass' || row.outcome === 'block' || row.outcome === 'extraction_failed')
-        ? !decision.extracted
-          ? 'extraction_failed'
-          : decision.blocked
-            ? 'block'
-            : row.outcome
-        : row.outcome;
+    const verifyAnswer = verifyAnswers.get(row.stepId);
+    const payload =
+      row.kind === 'verify'
+        ? verifyVerdictFacts(verifyAnswer, verificationItems)
+        : reviewVerdictFacts(answer);
+    const outcome = ['pass', 'block', 'extraction_failed'].includes(row.outcome)
+      ? !payload.extracted
+        ? 'extraction_failed'
+        : payload.blocked
+          ? 'block'
+          : row.outcome
+      : row.outcome;
     return {
       kind: row.kind,
       perspective: row.perspective ?? (reviewStep ? perspectiveOf(reviewStep.prompt) : null),

@@ -1381,6 +1381,9 @@ function persistGateVerdict(
     blocked: boolean;
     report: VerdictReport;
     reviewVerdict?: ReviewVerdict;
+    verifyVerdict?: VerifyVerdict;
+    planContent?: string | null;
+    planRequired?: boolean;
   },
 ): void {
   if (stepRow.kind !== 'review' && stepRow.kind !== 'verify') return;
@@ -1398,6 +1401,9 @@ function persistGateVerdict(
     stepFailed: facts.stepFailed,
     extracted: facts.extracted,
     ...(facts.reviewVerdict !== undefined ? { reviewVerdict: facts.reviewVerdict } : {}),
+    ...(facts.verifyVerdict !== undefined ? { verifyVerdict: facts.verifyVerdict } : {}),
+    ...(facts.planContent !== undefined ? { planContent: facts.planContent } : {}),
+    ...(facts.planRequired !== undefined ? { planRequired: facts.planRequired } : {}),
     blocked: facts.blocked,
   });
   if (bound === null) return;
@@ -2255,7 +2261,7 @@ export function completeStep(
     persistGateVerdict(deps, stepRow, todoRow, {
       stepFailed: false,
       extracted: outcome.findings !== undefined,
-      blocked: outcome.findings !== undefined && hasBlockingFinding(outcome.findings),
+      blocked: false,
       ...(outcome.findings !== undefined ? { reviewVerdict: outcome.findings } : {}),
       report:
         outcome.verdictReport ??
@@ -2303,12 +2309,10 @@ export function completeStep(
   }
   if (stepRow.kind === 'verify') {
     const latestPlan = latestPlanRow(deps, buildRow.id);
+    const verificationItems = planVerificationItems(latestPlan?.content ?? '');
     const verdict: VerifyVerdict =
       outcome.verifyVerdict !== undefined
-        ? reconcileVerifyVerdict(
-            outcome.verifyVerdict,
-            planVerificationItems(latestPlan?.content ?? ''),
-          )
+        ? reconcileVerifyVerdict(outcome.verifyVerdict, verificationItems)
         : {
             passed: false,
             conclusion:
@@ -2322,6 +2326,7 @@ export function completeStep(
         kind: VERIFY_VERDICT_KIND,
         stepId: stepRow.id,
         verdict,
+        gatePayload: outcome.verifyVerdict ?? null,
         ...(outcome.verifyVerdictError !== undefined
           ? { extractionError: outcome.verifyVerdictError }
           : {}),
@@ -2331,7 +2336,10 @@ export function completeStep(
     persistGateVerdict(deps, stepRow, todoRow, {
       stepFailed: false,
       extracted: outcome.verifyVerdict !== undefined,
-      blocked: outcome.verifyVerdict !== undefined && !verdict.passed,
+      blocked: false,
+      ...(outcome.verifyVerdict !== undefined ? { verifyVerdict: outcome.verifyVerdict } : {}),
+      planContent: latestPlan?.content ?? null,
+      planRequired: buildRow.withPlan,
       report:
         outcome.verdictReport ??
         reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),

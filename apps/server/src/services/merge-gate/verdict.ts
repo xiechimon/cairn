@@ -1,5 +1,5 @@
-import type { ReviewVerdict } from '@cairn/shared';
-import { type CompareFile, EVIDENCE_PREFIX } from '@cairn/shared/merge-gate';
+import type { ReviewVerdict, VerifyVerdict } from '@cairn/shared';
+import { type CompareFile, checkPlanContract, EVIDENCE_PREFIX } from '@cairn/shared/merge-gate';
 import { computePatchDigest } from './digest.js';
 import { type GateVerdictView, isFullSha } from './readiness.js';
 
@@ -11,6 +11,9 @@ export interface BindGateVerdictInput {
   stepFailed: boolean;
   extracted: boolean;
   reviewVerdict?: ReviewVerdict;
+  verifyVerdict?: VerifyVerdict;
+  planContent?: string | null;
+  planRequired?: boolean;
   blocked: boolean;
   compareFiles?: readonly CompareFile[] | null;
   pathsAfterExpected?: readonly string[] | null;
@@ -71,9 +74,15 @@ export function bindGateVerdict(input: BindGateVerdictInput): BoundGateVerdict |
   }
   const aligned = reported === input.expectedHeadSha || evidenceOnly;
   const files = input.compareFiles ?? null;
-  const decision = decisionVerdictFacts(input.reviewVerdict);
-  const extracted = input.kind === 'decision' ? decision.extracted : input.extracted;
-  const blocked = input.kind === 'decision' ? decision.blocked : input.blocked;
+  const payload =
+    input.kind === 'verify'
+      ? verifyVerdictFacts(
+          input.verifyVerdict,
+          verificationItemsForPlan(input.planContent ?? null, input.planRequired ?? false),
+        )
+      : reviewVerdictFacts(input.reviewVerdict);
+  const extracted = input.extracted && payload.extracted;
+  const blocked = input.blocked || payload.blocked;
   const outcome: GateVerdictView['outcome'] = input.stepFailed
     ? 'step_failed'
     : !extracted
@@ -93,7 +102,7 @@ export function bindGateVerdict(input: BindGateVerdictInput): BoundGateVerdict |
   };
 }
 
-export function decisionVerdictFacts(verdict: ReviewVerdict | undefined): {
+export function reviewVerdictFacts(verdict: ReviewVerdict | undefined): {
   extracted: boolean;
   blocked: boolean;
 } {
@@ -108,4 +117,27 @@ export function decisionVerdictFacts(verdict: ReviewVerdict | undefined): {
         verdict.evalRulerChange === true ||
         verdict.findings.some((finding) => finding.severity === 'blocking')),
   };
+}
+
+export function verifyVerdictFacts(
+  verdict: VerifyVerdict | undefined,
+  items: readonly string[] | null,
+): { extracted: boolean; blocked: boolean } {
+  const numbered = verdict?.evidence.some((entry) => entry.item !== undefined) ?? false;
+  const covered = new Set(verdict?.evidence.map((entry) => entry.item));
+  return {
+    extracted: verdict !== undefined && items !== null,
+    blocked:
+      verdict !== undefined &&
+      (!verdict.passed || (numbered && (items ?? []).some((_, index) => !covered.has(index + 1)))),
+  };
+}
+
+export function verificationItemsForPlan(
+  content: string | null,
+  required: boolean,
+): string[] | null {
+  if (content === null) return required ? null : [];
+  const parsed = checkPlanContract(content);
+  return parsed.ok ? parsed.items : null;
 }

@@ -5,7 +5,7 @@ import {
   reviewVerdictSchema,
   verifyVerdictSchema,
 } from '@cairn/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import {
   agent,
   build,
@@ -15,6 +15,7 @@ import {
   gateState,
   gateVerdict,
   message,
+  plan,
   step,
   todo,
 } from '../db/schema.js';
@@ -38,6 +39,13 @@ export function machineGatePort(deps: BuildDeps): GateRuntimePort {
     readProject: (row) => projectOfTodo(db, row),
     projectRepo: githubRepoOfProject,
     projectPolicy: (row) => projectMergeConfigOf(row).mergePolicy,
+    readPlanContent: (id) =>
+      db
+        .select({ content: plan.content })
+        .from(plan)
+        .where(eq(plan.buildId, id))
+        .orderBy(desc(plan.version))
+        .get()?.content ?? null,
     readSteps: (id) => db.select().from(step).where(eq(step.buildId, id)).all(),
     readAgents: (id) => db.select().from(agent).where(eq(agent.teamId, id)).all(),
     readVerdicts: (id) => db.select().from(gateVerdict).where(eq(gateVerdict.buildId, id)).all(),

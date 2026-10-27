@@ -42,7 +42,9 @@ export function extractFinalReviewVerdict(
   const fenceIsTerminal =
     terminalFence !== undefined &&
     finalText?.slice((terminalFence.index ?? 0) + terminalFence[0].length).trim() === '';
-  const raw = fenceIsTerminal ? terminalFence?.[1]?.trim() : finalText;
+  const raw = fenceIsTerminal
+    ? terminalFence?.[1]?.trim()
+    : finalText?.slice(Math.max(0, finalText.indexOf('{')));
   try {
     const parsed = reviewVerdictSchema.safeParse(JSON.parse(raw ?? ''));
     if (parsed.success) return { status: 'ok', verdict: parsed.data };

@@ -13,6 +13,7 @@ import {
   gateVerdict,
   machine,
   message,
+  plan,
   project,
   step,
   todo,
@@ -943,4 +944,108 @@ describe('merged terminal audit certainty', () => {
       );
     },
   );
+});
+
+test('a stored passing review cannot hide blocking findings in its bound message', async () => {
+  const { s, buildId, stepId } = await world();
+  completeStep(s.svc, stepId, { hasChanges: true });
+  const review = s.db
+    .select()
+    .from(step)
+    .where(eq(step.buildId, buildId))
+    .all()
+    .find((row) => row.kind === 'review');
+  const reviewId = review?.id ?? '';
+  s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
+  completeReview(s, reviewId, {
+    findings: {
+      conclusion: 'No-go',
+      gateLoosening: false,
+      evalRulerChange: false,
+      findings: [{ id: 'blocking', severity: 'blocking', summary: 'Missing authorization' }],
+    },
+  });
+  s.db.update(gateVerdict).set({ outcome: 'pass' }).where(eq(gateVerdict.stepId, reviewId)).run();
+  const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+  expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('review-blocking');
+});
+
+test('a stored passing verification cannot hide a failing verdict in its bound message', async () => {
+  const { s, buildId, stepId } = await world();
+  completeStep(s.svc, stepId, { hasChanges: true });
+  s.db
+    .insert(step)
+    .values({
+      id: 'failing-verify',
+      buildId,
+      kind: 'verify',
+      status: 'claimed',
+      prompt: JSON.stringify({ kind: 'verify', expectedHeadSha: HEAD }),
+      createdAt: 100,
+    })
+    .run();
+  completeStep(s.svc, 'failing-verify', {
+    verifyVerdict: { passed: false, conclusion: 'Verification failed', evidence: [] },
+    verdictReport: { reportedHeadSha: HEAD, driftedHeads: [] },
+  });
+  s.db
+    .update(gateVerdict)
+    .set({ outcome: 'pass' })
+    .where(eq(gateVerdict.stepId, 'failing-verify'))
+    .run();
+  const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+  expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('verify-failed');
+});
+
+test('empty caller criteria cannot hide evidence missing from the server plan', async () => {
+  const { s, buildId, stepId } = await world();
+  completeStep(s.svc, stepId, { hasChanges: true });
+  s.db
+    .insert(plan)
+    .values({
+      id: 'server-plan',
+      buildId,
+      version: 1,
+      content: '## Verification\n- `pnpm test first`\n- `pnpm test second`',
+      createdAt: 1,
+    })
+    .run();
+  s.db
+    .insert(step)
+    .values({
+      id: 'partial-verify',
+      buildId,
+      kind: 'verify',
+      status: 'claimed',
+      prompt: JSON.stringify({ kind: 'verify', expectedHeadSha: HEAD }),
+      createdAt: 100,
+    })
+    .run();
+  completeStep(s.svc, 'partial-verify', {
+    verifyVerdict: {
+      passed: true,
+      conclusion: 'Claimed pass',
+      evidence: [{ path: 'docs/verify/1794/shot.png', item: 1 }],
+    },
+    verdictReport: { reportedHeadSha: HEAD, driftedHeads: [] },
+  });
+  const record = s.db
+    .select()
+    .from(message)
+    .where(eq(message.conversationId, buildId))
+    .all()
+    .find((row) => String(row.content).includes('"stepId":"partial-verify"'));
+  const payload = JSON.parse(String(record?.content));
+  s.db
+    .update(message)
+    .set({ content: JSON.stringify({ ...payload, verificationItems: [] }) })
+    .where(eq(message.id, record?.id ?? ''))
+    .run();
+  s.db
+    .update(gateVerdict)
+    .set({ outcome: 'pass' })
+    .where(eq(gateVerdict.stepId, 'partial-verify'))
+    .run();
+  const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+  expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('verify-failed');
 });

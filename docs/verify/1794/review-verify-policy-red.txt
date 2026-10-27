@@ -1,0 +1,68 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+ ❯ |@xiechimon/cairn| test/merge-gate-product.test.ts (27 tests | 2 failed) 864ms
+   × a stored passing review cannot hide blocking findings in its bound message 36ms
+   × a stored passing verification cannot hide a failing verdict in its bound message 26ms
+ ❯ |@xiechimon/cairn| test/merge-gate-verdict.test.ts (18 tests | 2 failed) 8ms
+   × review blocking comes from its payload rather than caller pass flags 3ms
+   × verify blocking comes from its payload rather than caller pass flags 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-product.test.ts > a stored passing review cannot hide blocking findings in its bound message
+AssertionError: expected [ 'phase-not-review', …(3) ] to include 'review-blocking'
+ ❯ test/merge-gate-product.test.ts:957:62
+    955|   s.db.update(gateVerdict).set({ outcome: 'pass' }).where(eq(gateVerdi…
+    956|   const readiness = await evaluateMergeGate(s.svc, buildId, { port: sc…
+    957|   expect(readiness?.blockers.map((blocker) => blocker.code)).toContain…
+       |                                                              ^
+    958| });
+    959|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-product.test.ts > a stored passing verification cannot hide a failing verdict in its bound message
+AssertionError: expected [ 'phase-not-review', …(4) ] to include 'verify-failed'
+ ❯ test/merge-gate-product.test.ts:967:62
+    965|   s.db.update(gateVerdict).set({ outcome: 'pass' }).where(eq(gateVerdi…
+    966|   const readiness = await evaluateMergeGate(s.svc, buildId, { port: sc…
+    967|   expect(readiness?.blockers.map((blocker) => blocker.code)).toContain…
+       |                                                              ^
+    968| });
+    969|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-verdict.test.ts > review blocking comes from its payload rather than caller pass flags
+AssertionError: expected 'pass' to be 'block' // Object.is equality
+
+Expected: "block"
+Received: "pass"
+
+ ❯ test/merge-gate-verdict.test.ts:208:27
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-verdict.test.ts > verify blocking comes from its payload rather than caller pass flags
+AssertionError: expected 'pass' to be 'block' // Object.is equality
+
+Expected: "block"
+Received: "pass"
+
+ ❯ test/merge-gate-verdict.test.ts:212:135
+    210|
+    211| test('verify blocking comes from its payload rather than caller pass f…
+    212|   expect(bindGateVerdict({ ...base, kind: 'verify', verifyVerdict: { p…
+       |                                                                                                                                       ^
+    213| });
+    214|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 41 passed (45)
+   Start at  11:13:44
+   Duration  2.39s (transform 40%, tests 39%, import 20%)
