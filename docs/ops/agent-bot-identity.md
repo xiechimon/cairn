@@ -32,7 +32,7 @@ Usage:
 ```sh
 ~/.cairn/tools/app-token/as-bot.sh git commit ...
 ~/.cairn/tools/app-token/as-bot.sh git push origin <branch>
-~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head <branch> ...
+node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head <branch> ...
 ```
 
 ## Measured
@@ -78,3 +78,36 @@ Conditions and how to enable:
 - Condition: #1669 merged into main, and ian personally confirms.
 - Setting: `required_approving_review_count=0` plus `require_code_owner_reviews=true`. This way only PRs touching CODEOWNERS paths need ian's approval; other PRs require no review.
 - Before changing it, save a snapshot of the current main branch protection so it can be rolled back.
+
+## Create traffic throttle
+
+Run bot issue, PR, and issue-comment creation through the repository wrapper:
+
+```sh
+node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh issue create --repo xiechimon/cairn --title Example --body-file /tmp/issue.md
+node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head branch --body-file /tmp/pr.md
+node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh issue comment 123 --repo xiechimon/cairn --body-file /tmp/comment.md
+```
+
+The server issue creation path and this wrapper reserve attempts in the same
+`~/.cairn/github-create/state.json` sliding window. Set `CAIRN_HOME` identically
+for both processes when overriding the home directory. Defaults are 3000 ms
+between attempts and 300 attempts per rolling hour. Configure
+`CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS` and `CAIRN_GITHUB_CREATE_HOURLY_CAP`
+consistently across callers. Delays log their reason and duration. Failed attempts
+also consume slots so errors cannot produce an unthrottled burst.
+
+Only explicit rate-limit responses retry, at most three times after the initial
+attempt, with increasing waits. REST honors Retry-After seconds or dates and
+x-ratelimit-reset; the CLI honors Retry-After when gh includes it in stderr,
+otherwise secondary limits wait at least a minute. Network failures and ordinary
+permission failures are returned without replaying a potentially successful create.
+Keep reads, updates, commit statuses, pushes, and merges outside this wrapper.
+The external token wrapper is not modified by this repository; dispatchers must
+use this prefix for create commands. Acquire happens before token exchange.
+
+State writes use a lock directory and atomic rename. A process killed during a
+state transaction can leave the lock behind; acquisition fails closed after
+30 seconds rather than bypassing the cap. Inspect and remove an abandoned lock
+only after confirming no process is using it. Invalid state fails closed as well.
+Clock rollback retains future reservations and delays creation conservatively.

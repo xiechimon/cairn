@@ -1,6 +1,9 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { type ClaimedStep, todoRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
-import { describe, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import {
@@ -9,6 +12,17 @@ import {
 } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
 import { bindAllAgents, bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
+
+let throttleHome: string;
+beforeAll(async () => {
+  throttleHome = await mkdtemp(join(tmpdir(), 'github-writeback-'));
+  vi.stubEnv('CAIRN_HOME', throttleHome);
+  vi.stubEnv('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS', '0');
+});
+afterAll(async () => {
+  vi.unstubAllEnvs();
+  await rm(throttleHome, { recursive: true, force: true });
+});
 
 const TOKEN = 'ghp_writeback_token';
 const REPO = 'octo/alpha';
@@ -168,6 +182,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     expect(created.elapsedMs).toBeLessThan(2000);
     expect(created.record?.sourceKind).toBe('github-issue-self');
     expect(created.record?.sourceRef).toBeNull();
+    await vi.waitFor(() => expect(release).toBeDefined());
     release?.({
       ok: true,
       status: 201,
@@ -180,10 +195,10 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     s.dispose();
   });
 
-  test('W3/A2-A5 creation fails (permission 404 / rate limit 429 / network down / malformed response): the task is still created, stays not-yet-created, no unhandled rejection', async () => {
+  test('W3/A2-A5 creation fails (permission 404 / permission 403 / network down / malformed response): the task is still created, stays not-yet-created, no unhandled rejection', async () => {
     const failures: Array<{ key: string; res: GhResponse | 'throw' }> = [
       { key: '404', res: { status: 404, body: { message: 'Not Found' } } },
-      { key: '429', res: { status: 429, body: { message: 'rate limited' } } },
+      { key: '403', res: { status: 403, body: { message: 'Resource not accessible' } } },
       { key: 'network', res: 'throw' },
       { key: 'malformed', res: { status: 200, body: { id: 1 } } },
     ];
@@ -208,6 +223,37 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
       const after = await getTodo(s.app, created.id);
       expect(after.sourceKind, f.key).toBe('github-issue-self');
       expect(after.sourceRef, f.key).toBeNull();
+      s.dispose();
+    }
+  });
+
+  test('a secondary limit retries the pending task and backfills its source', async () => {
+    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE } });
+    let attempts = 0;
+    const s = bootServer({
+      githubFetch: async (input, init) => {
+        if (init?.method === 'POST' && attempts++ === 0) {
+          return {
+            ok: false,
+            status: 403,
+            headers: { get: (name) => (name === 'retry-after' ? '1' : null) },
+            json: async () => ({ message: 'secondary rate limit' }),
+            text: async () => 'secondary rate limit',
+          };
+        }
+        return mock.impl(input, init);
+      },
+    });
+    try {
+      seedConnection(s);
+      const projectId = await postGithubProject(s.app);
+      const created = await createTask(s.app, projectId);
+      expect(created.status).toBe(201);
+      expect(created.record?.sourceRef).toBeNull();
+      await flushSelfIssueWrites();
+      expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#101`);
+      expect(attempts).toBe(2);
+    } finally {
       s.dispose();
     }
   });
@@ -273,6 +319,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     const created = await createTask(s.app, projectId);
     const retry = await call(s.app, 'POST', `/api/todos/${created.id}/github-issue/retry`);
     expect(retry.status).toBe(409);
+    await vi.waitFor(() => expect(release).toBeDefined());
     release?.({
       ok: true,
       status: 201,
