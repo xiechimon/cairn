@@ -1147,10 +1147,13 @@ function collectChiefStream(
   pendingIds: ReadonlyMap<string, 'queued' | 'held'> = new Map(),
 ): {
   items: ChiefStreamItem[];
+  itemsAt: number[];
   trailingTools: ChiefToolRow[];
   pending: ChiefStreamItem[];
 } {
   const items: ChiefStreamItem[] = [];
+  const itemsAt: number[] = [];
+  let lastAt = 0;
   const pendingById = new Map<string, ChiefStreamItem>();
   let fallback: { model: string; stepId: string } | null = null;
   const postedTexts = new Set(
@@ -1160,6 +1163,8 @@ function collectChiefStream(
   );
   let pendingTools: ChiefToolRow[] = [];
   for (const m of messages) {
+    while (itemsAt.length < items.length) itemsAt.push(lastAt);
+    lastAt = m.createdAt;
     if (m.role === 'user' && fallback !== null) {
       const stepOfRow = m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
         ? m.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)
@@ -1268,11 +1273,12 @@ function collectChiefStream(
     });
     pendingTools = [];
   }
+  while (itemsAt.length < items.length) itemsAt.push(lastAt);
   const pending = [...pendingIds.keys()].flatMap((id) => {
     const item = pendingById.get(id);
     return item === undefined ? [] : [item];
   });
-  return { items, trailingTools: pendingTools, pending };
+  return { items, itemsAt, trailingTools: pendingTools, pending };
 }
 
 function autoCloseStrong(text: string): string {
@@ -1358,6 +1364,7 @@ export function mapChief(
         }
       : {}),
     threadTitle: active?.title ?? '新主题',
+    ...(active !== null ? { threadId: active.id } : {}),
     ...(opts.threads.length > 0
       ? {
           threads: opts.threads.map((t) => ({
@@ -1366,7 +1373,9 @@ export function mapChief(
           })),
         }
       : {}),
-    ...(active === null ? { examples: CHIEF_HERO_EXAMPLES } : { stream: chiefStream }),
+    ...(active === null
+      ? { examples: CHIEF_HERO_EXAMPLES }
+      : { stream: chiefStream, streamAt: collected?.itemsAt ?? [] }),
     ...(running ? { running: true } : {}),
     ...(opts.activity?.phase === 'tool' && opts.activity.tool != null
       ? { runningTool: opts.activity.tool }

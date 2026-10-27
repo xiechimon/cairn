@@ -614,6 +614,7 @@ export function BoardPage() {
                 now={fixtureWithTodos.now}
                 summary={<HomeSummary {...home} />}
                 below={home.sections}
+                brief={home.brief}
                 todoGlances={todoGlances}
                 onNewTask={openNewTask}
               />

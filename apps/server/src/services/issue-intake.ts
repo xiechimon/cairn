@@ -59,6 +59,8 @@ export const ISSUE_INTAKE_INTERVAL_MS = 300_000;
 
 export const ISSUE_INTAKE_LABEL = 'ready-for-agent';
 
+export const ISSUE_INTAKE_OWN_LANE_LABEL = 'by:cairn';
+
 export const ISSUE_INTAKE_TRUSTED_LABEL_APPS: readonly string[] = ['claude'];
 
 export const ISSUE_INTAKE_IN_FLIGHT_CAP = 3;
@@ -97,6 +99,7 @@ export interface IssueIntakeTally {
   candidates: number;
   claimed: number;
   atCap: number;
+  otherLane: number;
   notEligible: number;
   unverifiable: number;
   imported: number;
@@ -152,6 +155,7 @@ function emptyTally(): IssueIntakeTally {
     teams: 0,
     projects: 0,
     skipped: 0,
+    otherLane: 0,
     listNotModified: 0,
     listTruncated: 0,
     candidates: 0,
@@ -600,6 +604,15 @@ export function createIssueIntake(
         listed.add(`${listKey}#${issue.number}`);
         if (claimed.has(ref.toLowerCase())) {
           tally.claimed += 1;
+          continue;
+        }
+        if (
+          issue.labels.some((l) => {
+            const name = l.name.toLowerCase();
+            return name.startsWith('by:') && name !== ISSUE_INTAKE_OWN_LANE_LABEL;
+          })
+        ) {
+          tally.otherLane += 1;
           continue;
         }
         if (!atCap) atCap = projectAtInFlightCap(deps.db, row.id);
