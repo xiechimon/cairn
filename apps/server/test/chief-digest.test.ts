@@ -399,6 +399,33 @@ describe('chief long-chat digests (#1939)', () => {
     ).toBe(false);
   });
 
+  test('a rewind discards the digest even when the kept anchor shares the cutoff time', async () => {
+    const w = await setup();
+    w.s.db
+      .update(chiefMessage)
+      .set({ createdAt: YESTERDAY_EVENING })
+      .where(eq(chiefMessage.id, 'asst-1'))
+      .run();
+    w.plan(TODAY_0830);
+    const claimed = await w.claim();
+    if (!claimed) throw new Error('no digest step');
+    const anchor = w.s.db
+      .select()
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.threadId, w.threadId), eq(chiefMessage.role, 'user')))
+      .get();
+    expect(anchor?.createdAt).toBe(YESTERDAY_EVENING);
+    const rewound = await call(
+      w.s.app,
+      'POST',
+      `/api/teams/${w.teamId}/chief/threads/${w.threadId}/rewind`,
+      { body: { messageId: anchor?.id } },
+    );
+    expect(rewound.status).toBe(200);
+    await w.done(claimed.step.id, VALID_OUTPUT);
+    expect(w.digestRows()).toHaveLength(0);
+  });
+
   test('unparseable output counts as a failure', async () => {
     const w = await setup();
     w.plan(TODAY_0830);

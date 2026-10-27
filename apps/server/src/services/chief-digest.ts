@@ -31,7 +31,7 @@ export const CHIEF_DIGEST_INPUT_MAX_CHARS = 60_000;
 export const CHIEF_DIGEST_LOOKBACK_MS = 2 * 24 * 60 * 60_000;
 const CHIEF_DIGEST_ITEMS_MAX = 12;
 const CHIEF_DIGEST_TEXT_MAX = 400;
-const DIGEST_META_RE = /\nDigest thread=(\S+) until=(\d+) reason=(daily|threshold)$/;
+const DIGEST_META_RE = /\nDigest thread=(\S+) until=(\d+) last=(\S+) reason=(daily|threshold)$/;
 
 export const CHIEF_DIGEST_SYSTEM_PROMPT = [
   '你是总管的整理助手：只读地把总管和用户的对话整理成摘要。',
@@ -198,9 +198,9 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
           .filter((r) => r.role === 'user' && !r.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
           .map((r) => (extractText(r.content) ?? '').trim()),
       );
-      const lines: { at: number; text: string }[] = [];
+      const lines: { id: string; at: number; text: string }[] = [];
       for (const row of rows) {
-        const push = (text: string) => lines.push({ at: row.createdAt, text });
+        const push = (text: string) => lines.push({ id: row.id, at: row.createdAt, text });
         const content = row.content;
         if (content !== null && typeof content === 'object' && !Array.isArray(content)) {
           const { kind, call } = content as {
@@ -228,8 +228,8 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
         else if (!row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) || !postedTexts.has(text))
           push(`用户：${text}`);
       }
-      const until = lines.at(-1)?.at;
-      if (until === undefined) continue;
+      const last = lines.at(-1);
+      if (last === undefined) continue;
       let transcript = lines.map((l) => l.text).join('\n');
       if (transcript.length > CHIEF_DIGEST_INPUT_MAX_CHARS) {
         transcript = `（前面较早的部分太长，已略去）\n${transcript.slice(-CHIEF_DIGEST_INPUT_MAX_CHARS)}`;
@@ -262,7 +262,7 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
           kind: 'chief',
           machineId: null,
           status: 'pending',
-          prompt: `${DIGEST_PROMPT_HEAD}\n${transcript}\nDigest thread=${thread.id} until=${until} reason=${daily ? 'daily' : 'threshold'}`,
+          prompt: `${DIGEST_PROMPT_HEAD}\n${transcript}\nDigest thread=${thread.id} until=${last.at} last=${last.id} reason=${daily ? 'daily' : 'threshold'}`,
           createdAt: now,
           freshSession: true,
         })
@@ -339,11 +339,11 @@ export function finishChiefDigest(
     chiefRow !== undefined &&
     chiefDigestThreadId(chiefRow.id) === stepRow.buildId &&
     meta?.[2] !== undefined &&
+    meta[3] !== undefined &&
     db
       .select({ id: chiefMessage.id })
       .from(chiefMessage)
-      .where(and(eq(chiefMessage.threadId, thread.id), eq(chiefMessage.createdAt, Number(meta[2]))))
-      .limit(1)
+      .where(and(eq(chiefMessage.threadId, thread.id), eq(chiefMessage.id, meta[3])))
       .get() !== undefined;
   db.update(step)
     .set({ status: ok ? 'done' : 'failed', finishedAt: now })
@@ -354,7 +354,7 @@ export function finishChiefDigest(
   const rememberAs = prompt.includes(ISSUE_FENCE_OPEN) ? null : chiefRow.agentId;
   const content: ChiefDigestContent = {
     kind: CHIEF_DIGEST_KIND,
-    reason: meta[3] === 'daily' ? 'daily' : 'threshold',
+    reason: meta[4] === 'daily' ? 'daily' : 'threshold',
     coversUntil: until,
     madeAt: now,
     items: items.map((item): ChiefDigestItem => {
