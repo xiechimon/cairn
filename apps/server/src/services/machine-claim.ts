@@ -22,6 +22,7 @@ import { nowMs } from '../lib/ids.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { chiefClaimContext, parseChiefTrigger } from './chief.js';
+import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import {
   agentRunningCount,
   capabilityGatePasses,
@@ -142,7 +143,8 @@ function buildChiefClaim(
   machineRow?: typeof machine.$inferSelect,
 ): ClaimedStep | null {
   if (!agentRow.modelId) return null;
-  if (!machineRow || !runtimeGatePasses(machineRow, agentRow.provider)) return null;
+  const model = effectiveModel(agentRow, stepRow);
+  if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const claimedAt = nowMs();
   const res = deps.db
@@ -198,8 +200,8 @@ function buildChiefClaim(
       id: agentRow.id,
       displayName: agentRow.displayName,
       description: agentRow.description,
-      provider: agentRow.provider,
-      modelId: agentRow.modelId,
+      provider: model.provider,
+      modelId: model.modelId,
       thinkingLevel: agentRow.thinkingLevel,
       memories,
     },
@@ -234,6 +236,7 @@ async function tryClaim(
   const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
   for (const cand of chiefCands) {
     if (cand.stepRow.createdAt > earliestWorker) break;
+    if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
     if (
       cand.agentRow.maxConcurrentTasks !== null &&
       agentRunningCount(db, cand.agentRow.id) >= cand.agentRow.maxConcurrentTasks

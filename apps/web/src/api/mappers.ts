@@ -23,7 +23,9 @@ import {
   askUserQuestionContentSchema,
   BRAND,
   CHIEF_TURN_ERROR_KIND,
+  chiefModelFallbackContentSchema,
   chiefTurnErrorContentSchema,
+  chiefTurnStoppedContentSchema,
   classifySkillFact,
   classifyStepFailure,
   classifyUserText,
@@ -1139,14 +1141,27 @@ export function mapChiefStream(messages: MessageRow[], inlineTools = false): Chi
   return collectChiefStream(messages, inlineTools).items;
 }
 
+function systemJsonOf(content: unknown): unknown {
+  if (typeof content !== 'string') return null;
+  try {
+    return JSON.parse(content) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 function collectChiefStream(
   messages: MessageRow[],
   inlineTools = false,
+  pendingIds: ReadonlyMap<string, 'queued' | 'held'> = new Map(),
 ): {
   items: ChiefStreamItem[];
   trailingTools: ChiefToolRow[];
+  pending: ChiefStreamItem[];
 } {
   const items: ChiefStreamItem[] = [];
+  const pendingById = new Map<string, ChiefStreamItem>();
+  let fallbackModel: string | null = null;
   const postedTexts = new Set(
     messages
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
@@ -1154,11 +1169,37 @@ function collectChiefStream(
   );
   let pendingTools: ChiefToolRow[] = [];
   for (const m of messages) {
+    const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
+    if (pendingState !== undefined) {
+      const text = textOfContent(m.content).trim();
+      pendingById.set(m.id, {
+        kind: 'user',
+        text,
+        id: m.id,
+        markdown: text,
+        pending: pendingState,
+      });
+      continue;
+    }
     const turnError = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (turnError !== null) {
       pendingTools = [];
       items.push({ kind: 'error', text: turnError });
       continue;
+    }
+    if (m.role === 'system') {
+      const parsed = systemJsonOf(m.content);
+      const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
+      if (stopped.success) {
+        pendingTools = [];
+        items.push({ kind: 'stopped', todos: stopped.data.todos, id: m.id });
+        continue;
+      }
+      const fallback = chiefModelFallbackContentSchema.safeParse(parsed);
+      if (fallback.success) {
+        fallbackModel = fallback.data.to;
+        continue;
+      }
     }
     const call = toolCallOfContent(m.content);
     if (call !== null) {
@@ -1211,6 +1252,7 @@ function collectChiefStream(
       if (text === '') continue;
       if (m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) && postedTexts.has(text)) continue;
       pendingTools = [];
+      fallbackModel = null;
       items.push({ kind: 'user', text, id: m.id, markdown: text });
       continue;
     }
@@ -1221,10 +1263,15 @@ function collectChiefStream(
       seconds: '',
       id: m.id,
       ...(pendingTools.length > 0 ? { tools: pendingTools } : {}),
+      ...(fallbackModel !== null ? { fallbackModel } : {}),
     });
     pendingTools = [];
   }
-  return { items, trailingTools: pendingTools };
+  const pending = [...pendingIds.keys()].flatMap((id) => {
+    const item = pendingById.get(id);
+    return item === undefined ? [] : [item];
+  });
+  return { items, trailingTools: pendingTools, pending };
 }
 
 function autoCloseStrong(text: string): string {
@@ -1255,8 +1302,10 @@ export function mapChief(
     opts.activeThreadId !== null
       ? (opts.threads.find((t) => t.id === opts.activeThreadId) ?? null)
       : null;
-  const running = active?.activeRun != null;
-  const collected = active === null ? null : collectChiefStream(opts.messages, running);
+  const pendingIds = new Map((active?.pending ?? []).map((p) => [p.messageId, p.state] as const));
+  const parked = [...pendingIds.values()].includes('held');
+  const running = active?.activeRun != null && !parked;
+  const collected = active === null ? null : collectChiefStream(opts.messages, running, pendingIds);
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
   if (running) {
     if ((opts.liveThinking ?? '').trim() !== '') {
@@ -1292,6 +1341,7 @@ export function mapChief(
       }
     }
   }
+  chiefStream.push(...(collected?.pending ?? []));
   return {
     view: 'drawer',
     bound,
@@ -1323,6 +1373,8 @@ export function mapChief(
         ? { runningTool: active.activeRun.tool.toolName }
         : {}),
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
+    ...(env.outage != null ? { outage: env.outage } : {}),
+    ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),
   };
 }
 

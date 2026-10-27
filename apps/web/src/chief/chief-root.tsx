@@ -138,6 +138,9 @@ export function ChiefRoot() {
           onRewind={surface.onRewind}
           onAnswerQuestion={surface.onAnswerQuestion}
           onCancelQuestion={surface.onCancelQuestion}
+          onWithdraw={surface.onWithdraw}
+          onSteer={surface.onSteer}
+          onStop={surface.onStop}
         />
       )}
     </ChiefRootContext.Provider>

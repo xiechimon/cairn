@@ -614,6 +614,7 @@ export function BoardPage() {
                 summary={<HomeSummary {...home} />}
                 below={home.sections}
                 todoGlances={todoGlances}
+                onNewTask={openNewTask}
               />
             )}
             tagsById={tagIndex.tagById}
