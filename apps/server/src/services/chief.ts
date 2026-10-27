@@ -379,6 +379,27 @@ export function chiefBinding(
 
 const PICKED_PROJECT_OPEN = '【输入框选定项目：';
 
+function pickedProjectOf(
+  db: ChiefDeps['db'],
+  teamId: string,
+  projectId: string | null | undefined,
+): { id: string; name: string } | null {
+  if (projectId == null) return null;
+  return (
+    db
+      .select({ id: project.id, name: project.name })
+      .from(project)
+      .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+      .get() ?? null
+  );
+}
+
+function promptWithPickedProject(picked: { id: string; name: string } | null, content: string) {
+  return picked === null
+    ? content
+    : `${PICKED_PROJECT_OPEN}${picked.name.replace(/[【】\r\n]+/g, ' ').trim()}（id: ${picked.id}）】\n${content}`;
+}
+
 export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
@@ -389,14 +410,7 @@ export function sendChiefMessage(
 } {
   const chiefRow = ensureChief(deps, teamId);
   requireBoundAgent(deps, chiefRow);
-  const picked =
-    body.projectId == null
-      ? null
-      : (deps.db
-          .select({ id: project.id, name: project.name })
-          .from(project)
-          .where(and(eq(project.id, body.projectId), eq(project.teamId, teamId)))
-          .get() ?? null);
+  const picked = pickedProjectOf(deps.db, teamId, body.projectId);
   if (body.projectId != null && picked === null) {
     throw new HttpError(400, `project ${body.projectId} not in team`);
   }
@@ -448,16 +462,14 @@ export function sendChiefMessage(
       threadId: threadRow.id,
       role: 'user',
       content: body.content,
+      projectId: picked?.id ?? null,
       createdAt: now,
     })
     .run();
   deps.db.update(chiefThread).set({ updatedAt: now }).where(eq(chiefThread.id, threadRow.id)).run();
 
   enqueueChiefStep(deps, threadRow.id, {
-    prompt:
-      picked === null
-        ? body.content
-        : `${PICKED_PROJECT_OPEN}${picked.name.replace(/[【】\r\n]+/g, ' ').trim()}（id: ${picked.id}）】\n${body.content}`,
+    prompt: promptWithPickedProject(picked, body.content),
     trigger: 'user',
     id: message.id,
   });
@@ -545,7 +557,10 @@ export function rewindChiefThread(
   deps.convHub?.clearConversationBuffer(threadId);
   const content =
     typeof anchor.content === 'string' ? anchor.content : (extractText(anchor.content) ?? '');
-  enqueueChiefStep(deps, threadId, { prompt: content, trigger: 'user' });
+  enqueueChiefStep(deps, threadId, {
+    prompt: promptWithPickedProject(pickedProjectOf(deps.db, teamId, anchor.projectId), content),
+    trigger: 'user',
+  });
   const fresh = getChiefThread(deps, threadId);
   if (!fresh) throw new Error('chief thread missing after rewind');
   const projector = stepQueueProjector(deps.db, teamId);

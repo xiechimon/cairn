@@ -453,7 +453,9 @@ export function updateTodo(
   if (!record) return null;
   hub.publishTodoDoc(record.teamId, record);
   if (move?.closeIssueRef != null) scheduleMovedIssueClose(deps, row.teamId, move);
-  if (move?.sets.sourceKind === 'github-issue-self') scheduleSelfIssueCreate(deps, id);
+  if (move !== null && record.sourceKind === 'github-issue-self') {
+    scheduleSelfIssueCreate(deps, id);
+  }
   if (patch.phase !== undefined && !manualPhaseApplied) {
     notifyPhaseEntry(deps, record, row.phase, patch.phase);
   }
@@ -494,16 +496,17 @@ function planProjectMove(
     .where(and(eq(todo.projectId, target.id), eq(todo.phase, 'todo')))
     .get();
   const sets: ProjectMove['sets'] = { projectId: target.id, orderIndex: (orderRow?.n ?? -1) + 1 };
-  if (row.sourceKind === 'github-issue-self') {
-    sets.sourceKind =
-      planSelfIssue(deps, row.teamId, target.id) !== null ? 'github-issue-self' : null;
+  const targetOpensIssues = planSelfIssue(deps, row.teamId, target.id) !== null;
+  const dropsIssue = row.sourceKind === 'github-issue-self' && !targetOpensIssues;
+  if (dropsIssue) {
+    sets.sourceKind = null;
     sets.sourceRef = null;
-  } else if (row.sourceKind === null && planSelfIssue(deps, row.teamId, target.id) !== null) {
+  } else if (row.sourceKind === null && targetOpensIssues) {
     sets.sourceKind = 'github-issue-self';
   }
   return {
     sets,
-    closeIssueRef: row.sourceKind === 'github-issue-self' ? row.sourceRef : null,
+    closeIssueRef: dropsIssue ? row.sourceRef : null,
     targetName: target.name,
   };
 }
@@ -716,9 +719,16 @@ function scheduleSelfIssueCreate(deps: TodoDeps, todoId: string): void {
 async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoRecord | null> {
   const { db, hub, box } = deps;
   const row = getRow(deps, todoId);
-  if (row?.sourceKind !== 'github-issue-self' || row.sourceRef !== null) return null;
-  if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
+  if (row?.sourceKind !== 'github-issue-self') return null;
   const repoRef = githubRepoOfProject(projectOfTodo(db, row));
+  const replaced = row.sourceRef === null ? null : parseGithubIssueSourceRef(row.sourceRef);
+  const replacesOtherRepo =
+    replaced !== null &&
+    repoRef !== null &&
+    `${replaced.owner}/${replaced.repo}`.toLowerCase() !==
+      `${repoRef.owner}/${repoRef.repo}`.toLowerCase();
+  if (row.sourceRef !== null && !replacesOtherRepo) return null;
+  if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
   if (repoRef === null) throw new HttpError(404, 'project is not github-backed');
   const access = await teamGithubToken(deps, row.teamId);
   if (!('token' in access)) throw new HttpError(404, 'github connection not found');
@@ -728,7 +738,7 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
     body: row.spec,
   });
   const fresh = getRow(deps, todoId);
-  if (!fresh || fresh.sourceRef !== null) return null;
+  if (!fresh || fresh.sourceRef !== row.sourceRef) return null;
   const ref = githubIssueSourceRef(owner, repo, number);
   db.update(todo)
     .set({ sourceRef: ref, v: fresh.v + 1 })
@@ -736,6 +746,16 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
     .run();
   const record = getTodo(deps, todoId);
   if (record) hub.publishTodoDoc(record.teamId, record);
+  if (replaced !== null) {
+    await githubCloseIssue(
+      deps.githubFetch ?? fetch,
+      access.token,
+      replaced.owner,
+      replaced.repo,
+      replaced.issueNumber,
+      `Cairn：这个任务挪到了 ${owner}/${repo}#${number}，这里的 issue 关闭。`,
+    ).catch((error: unknown) => console.warn(`moved todo: closing ${row.sourceRef} failed`, error));
+  }
   return record;
 }
 
@@ -745,7 +765,6 @@ export async function retrySelfIssueCreate(deps: TodoDeps, todoId: string): Prom
   if (row.sourceKind !== 'github-issue-self') {
     throw new HttpError(404, 'todo has no self-created github issue');
   }
-  if (row.sourceRef !== null) throw new HttpError(409, 'github issue already created');
   if (selfIssueInFlight.has(todoId)) {
     throw new HttpError(409, 'github issue creation already in flight');
   }
