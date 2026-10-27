@@ -1,0 +1,11 @@
+[heavy-slots] queued, position 1 (all 1 slots are busy)
+[heavy-slots] acquired slot 1/1
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1906-evidence/cairn
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  23:49:11
+   Duration  96ms (transform 54%, import 22%, tests 15%, worker 9%)
+
