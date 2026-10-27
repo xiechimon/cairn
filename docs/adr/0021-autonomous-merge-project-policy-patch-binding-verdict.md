@@ -4,7 +4,7 @@
 >
 > Revision 2026-10-25 (D5, ian's decision in the project chat): a `ready-for-agent` label applied through the `claude` GitHub App by a human account (a Claude session acting for that person with their user token) counts as that person's own label, so the usual triage-or-above check on that account applies. Labels applied through any other app, including `cairnwright`, and labels whose actor is a bot account such as `claude[bot]`, are still not taken. The allowlist is `ISSUE_INTAKE_TRUSTED_LABEL_APPS` in `apps/server/src/services/issue-intake.ts`.
 >
-> Revision 2026-10-27 (D5, ian's decision in the project chat): an issue that also carries a `by:<lane>` label other than `by:cairn` (`by:pi`, `by:codex`, `by:grok`, ...) belongs to another dispatch lane and is skipped without reading its events, so automatic intake and the lanes never work the same ticket. Unlabeled and `by:cairn` issues are taken as before. The own-lane label is `ISSUE_INTAKE_OWN_LANE_LABEL` in `apps/server/src/services/issue-intake.ts`.
+> Revision 2026-10-27 (D5, ian's decision in the project chat): an issue that also carries a `by:<lane>` label other than `by:cairn` (`by:pi`, `by:codex`, `by:grok`, ...) belongs to another dispatch lane and is skipped without reading its events, so automatic intake and the lanes never work the same ticket. Issues held for a person (`waits-ian`, `needs-triage`, `ready-for-human`, `needs-decision`; `ISSUE_INTAKE_HOLD_LABELS`) are skipped the same way. Unlabeled and `by:cairn` issues are taken as before. The own-lane label is `ISSUE_INTAKE_OWN_LANE_LABEL` in `apps/server/src/services/issue-intake.ts`.
 
 ## Problem Statement
 

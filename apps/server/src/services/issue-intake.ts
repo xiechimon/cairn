@@ -61,6 +61,13 @@ export const ISSUE_INTAKE_LABEL = 'ready-for-agent';
 
 export const ISSUE_INTAKE_OWN_LANE_LABEL = 'by:cairn';
 
+export const ISSUE_INTAKE_HOLD_LABELS: readonly string[] = [
+  'waits-ian',
+  'needs-triage',
+  'ready-for-human',
+  'needs-decision',
+];
+
 export const ISSUE_INTAKE_TRUSTED_LABEL_APPS: readonly string[] = ['claude'];
 
 export const ISSUE_INTAKE_IN_FLIGHT_CAP = 3;
@@ -100,6 +107,7 @@ export interface IssueIntakeTally {
   claimed: number;
   atCap: number;
   otherLane: number;
+  held: number;
   notEligible: number;
   unverifiable: number;
   imported: number;
@@ -156,6 +164,7 @@ function emptyTally(): IssueIntakeTally {
     projects: 0,
     skipped: 0,
     otherLane: 0,
+    held: 0,
     listNotModified: 0,
     listTruncated: 0,
     candidates: 0,
@@ -606,13 +615,13 @@ export function createIssueIntake(
           tally.claimed += 1;
           continue;
         }
-        if (
-          issue.labels.some((l) => {
-            const name = l.name.toLowerCase();
-            return name.startsWith('by:') && name !== ISSUE_INTAKE_OWN_LANE_LABEL;
-          })
-        ) {
+        const labelNames = issue.labels.map((l) => l.name.toLowerCase());
+        if (labelNames.some((n) => n.startsWith('by:') && n !== ISSUE_INTAKE_OWN_LANE_LABEL)) {
           tally.otherLane += 1;
+          continue;
+        }
+        if (labelNames.some((n) => ISSUE_INTAKE_HOLD_LABELS.includes(n))) {
+          tally.held += 1;
           continue;
         }
         if (!atCap) atCap = projectAtInFlightCap(deps.db, row.id);
