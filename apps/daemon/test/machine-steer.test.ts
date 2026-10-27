@@ -53,6 +53,45 @@ describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.st
     await handle.done;
   });
 
+  test('failure mode: the turn ends while steer attachments download → dropped after the download, never acked', async () => {
+    const api = new FakeMachineApi();
+    const png = Buffer.from('89504e470d0a1a0a', 'hex');
+    const token = formatAttachmentToken('shot.png', 't1/id1.png');
+    api.steerResponse = `补一张图\n\n${token}`;
+    let downloadStarted = false;
+    let releaseDownload: () => void = () => {};
+    const downloadGate = new Promise<void>((r) => {
+      releaseDownload = r;
+    });
+    api.attachment = async (stepId: string, attachmentId: string) => {
+      api.attachmentCalls.push(`${stepId}:${attachmentId}`);
+      downloadStarted = true;
+      await downloadGate;
+      return {
+        fileName: 'shot.png',
+        mimeType: 'image/png',
+        sizeBytes: png.byteLength,
+        contentBase64: png.toString('base64'),
+      };
+    };
+    const steered: string[] = [];
+    const { backend, release } = gatedBackend(steered);
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    await waitFor(() => downloadStarted);
+    release();
+    await waitFor(() => api.doneBodies.length === 1);
+    releaseDownload();
+    await waitFor(() => lines.some((l) => l.includes('steer dropped (no live session)')));
+    expect(steered).toHaveLength(0);
+    expect(api.calls).not.toContain('steer-ack:s1');
+    await handle.stop();
+    await handle.done;
+  });
+
   test('failure mode: steer arriving while final uploads run (session already ended) is dropped and never acked', async () => {
     const api = new FakeMachineApi();
     api.steerResponse = '补一句';
