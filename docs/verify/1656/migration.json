@@ -1984,6 +1984,10 @@
   ],
   "recurrenceUpdates": {
     "1617-ticket-opened-without-spec-check.md": 1,
-    "1586-copied-node-modules-workspace-path.md": 1
+    "1586-copied-node-modules-workspace-path.md": 1,
+    "1513-fixture-missing-required-fields.md": 1
+  },
+  "interceptUpdates": {
+    "1513-fixture-missing-required-fields.md": 1
   }
 }

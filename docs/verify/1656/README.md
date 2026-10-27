@@ -14,7 +14,7 @@ Issue #1656, continuing PR #1658.
 
 ## Results
 
-The current main ledger has 165 rows. They map to 154 entry files, with every text field preserved and counters summed for merged categories. The orchestration recurrence adds one to the existing context-check entry. The #1671 lane adds one recurrence to the existing dependency-directory reuse entry. One additional entry records the absent remote-tracking reference encountered when creating this worktree.
+The current main ledger has 165 rows. They map to 154 entry files, with every text field preserved and counters summed for merged categories. The orchestration recurrence adds one to the existing context-check entry. The #1671 lane adds one recurrence to the existing dependency-directory reuse entry. The #1847 lane records one more required-fixture-field interception and recurrence. Additional entries record the absent remote-tracking reference encountered when creating this worktree and the shared completion-fixture network failure diagnosed by the #1847 lane, plus the recorded-free-cost backfill failure whose regression implementation belongs to PR #1873.
 
 Run `node --test docs/verify/1656/migration.test.mjs` to check every migrated field and counter against `migration.json`. This is a migration acceptance artifact, separate from the lasting gate tests so later ledger edits and evidence pruning remain possible.
 
@@ -31,3 +31,7 @@ The summary is generated only to stdout by `pnpm lessons:table`; no generated su
 Review checked the complete gate, parser tests, prepush integration, and migration mapping against main. No blocking findings remain in this change. Simplification keeps documentation-only checks in one list and preserves the existing document-reader runner. No merge-gate source, protected-path list, dependency, or lockfile changes appear relative to main.
 
 `prepush-blocked.log` records the actual complete prepush attempt. It passed the static gates and Node self-tests, then failed on eight Vitest files: six integration browser suites lacked the installed Playwright browser revision, and delivery-surface / step-claim-report hit public-network timeouts. The local code is committed; normal push remains blocked pending the shared environment and fixture repairs. No hook was bypassed.
+
+## Shared fixture correction
+
+The existing `githubFetch` port now supplies empty branch lists in the delivery and claim-report fixtures. Tests with their own concurrent-claim GitHub probe keep that probe. `network-fixtures.log` records both affected fixture files passing all 12 assertions after the same cases timed out in `prepush-blocked.log`. No timeout or production behavior changes.

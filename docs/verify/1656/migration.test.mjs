@@ -20,7 +20,7 @@ test('migration preserves every source row and sums counters when categories mer
   }
   for (const [name, [intercepts, recurrences]] of counts) {
     const text = entryText(name);
-    assert.match(text, new RegExp(`^Intercepts: ${intercepts}$`, 'm'), name);
+    assert.match(text, new RegExp(`^Intercepts: ${intercepts + (manifest.interceptUpdates[name] ?? 0)}$`, 'm'), name);
     assert.match(
       text,
       new RegExp(`^Recurrences: ${recurrences + (manifest.recurrenceUpdates[name] ?? 0)}$`, 'm'),

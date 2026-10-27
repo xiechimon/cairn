@@ -1,18 +1,18 @@
-✔ migration preserves every source row and sums counters when categories merge (11.917716ms)
-✔ every migrated entry passes and the old table is gone (25.815207ms)
-✔ level 5 entry without a reason is rejected (0.252718ms)
-✔ level outside 1 to 5 is rejected (0.201421ms)
-✔ pending upgrade without a ticket is rejected, with a ticket passes (0.135833ms)
-✔ the real bad note that sat on main without a ticket is rejected (0.162353ms)
-✔ file name without a ticket number is rejected (0.111728ms)
-✔ missing, reordered or malformed fields are rejected (0.304065ms)
-✔ a resurrected docs/lessons.md table is rejected (0.90178ms)
-✔ two parallel branches each adding an entry merge without conflict (177.457795ms)
-✔ the old single table does conflict when two branches append a row (121.987078ms)
-✔ both upgrade-pending word orders and the original Chinese marker require a ticket (0.473068ms)
-✔ table generation rejects malformed entries with the ledger diagnostic (0.319528ms)
-✔ generated table keeps existing escaped pipes inside their cell (0.272277ms)
-✔ the CLI can validate and render entries from a checkout path containing spaces (182.093753ms)
+✔ migration preserves every source row and sums counters when categories merge (64.176957ms)
+✔ every migrated entry passes and the old table is gone (110.488185ms)
+✔ level 5 entry without a reason is rejected (0.222232ms)
+✔ level outside 1 to 5 is rejected (0.218567ms)
+✔ pending upgrade without a ticket is rejected, with a ticket passes (0.148272ms)
+✔ the real bad note that sat on main without a ticket is rejected (0.162032ms)
+✔ file name without a ticket number is rejected (0.148592ms)
+✔ missing, reordered or malformed fields are rejected (0.48124ms)
+✔ a resurrected docs/lessons.md table is rejected (20.473399ms)
+✔ two parallel branches each adding an entry merge without conflict (310.829647ms)
+✔ the old single table does conflict when two branches append a row (261.615798ms)
+✔ both upgrade-pending word orders and the original Chinese marker require a ticket (0.50191ms)
+✔ table generation rejects malformed entries with the ledger diagnostic (0.363644ms)
+✔ generated table keeps existing escaped pipes inside their cell (0.331746ms)
+✔ the CLI can validate and render entries from a checkout path containing spaces (234.112797ms)
 ℹ tests 15
 ℹ suites 0
 ℹ pass 15
@@ -20,4 +20,4 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 803.153097
+ℹ duration_ms 1746.483537
