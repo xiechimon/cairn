@@ -14,7 +14,7 @@ Issue #1656, continuing PR #1658.
 
 ## Results
 
-The recorded main ledger has 165 rows. They map to 154 entry files, with every text field preserved and counters summed for merged categories. The orchestration recurrence adds one to the existing context-check entry. The #1671 lane adds one recurrence to the existing dependency-directory reuse entry. The #1847 lane records one more required-fixture-field interception and recurrence. Additional entries record the absent remote-tracking reference encountered when creating this worktree and the shared completion-fixture network failure diagnosed by the #1847 lane, plus the recorded-free-cost backfill failure whose regression implementation belongs to PR #1873.
+The recorded main ledger has 167 rows. They map to 154 entry files, with every text field preserved and counters summed for merged categories. The orchestration recurrence adds one to the existing context-check entry. The #1671 lane adds one recurrence to the existing dependency-directory reuse entry. The #1847 lane records one more required-fixture-field interception and recurrence. Additional entries record the absent remote-tracking reference encountered when creating this worktree and the shared completion-fixture network failure diagnosed by the #1847 lane, plus the recorded-free-cost backfill failure whose regression implementation belongs to PR #1873.
 
 Run `node --test docs/verify/1656/migration.test.mjs` to check every migrated field and counter against `migration.json`. The test reads the source ledger from its recorded main commit through Git and compares every source row with the manifest, so an omitted manifest row cannot pass. `migration-source-red.log` records that omission control. This is a migration acceptance artifact, separate from the lasting gate tests so later ledger edits and evidence pruning remain possible.
 
@@ -35,3 +35,7 @@ Review checked the complete gate, parser tests, prepush integration, and migrati
 ## Shared fixture correction
 
 The existing `githubFetch` port now supplies empty branch lists in the delivery and claim-report fixtures. Tests with their own concurrent-claim GitHub probe keep that probe. `network-fixtures.log` records both affected fixture files passing all 12 assertions after the same cases timed out in `prepush-blocked.log`. No timeout or production behavior changes.
+
+## Moving-main reconciliation
+
+Main advanced to the recorded source in `migration.json` while the push was queued. The queued push was stopped before remote updates. Both new source rows are preserved: shared scratch-path overwrites join the existing shared-output category, and leading-hyphen record IDs join the existing candidate-ID category. The source-row check now reconciles all 167 rows and retains 154 migrated categories.

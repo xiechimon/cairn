@@ -1,5 +1,5 @@
 {
-  "source": "a9388c56b8eec146ec22dffdb7c831255f9f4dbf",
+  "source": "6c2e93dddb40336a59277b628ad8d4a991e29442",
   "rows": [
     {
       "cells": [
@@ -1980,6 +1980,30 @@
         "Level 1 upgrade possible in its own ticket: route the gate through the `bootServer` test seam like `githubFetch` instead of process env, so a test file cannot forget the isolation; grep every consumer of a new process-wide seam before declaring its tests green, not just the files written in the same commit"
       ],
       "entry": "1905-a-new-file-backed-env-configured-seam-github-create-gate.md"
+    },
+    {
+      "cells": [
+        "A verification script was written to a bare shared `/tmp/roster-diff.mjs`; a parallel lane on the same machine overwrote that path mid-verification, so the next run printed the other lane's script output instead of the intended comparison",
+        "#1847 (2026-10-26)",
+        "3",
+        "Scratch verification scripts and their outputs live under a lane-scoped directory `/tmp/<ticket>/` (the convention `pnpm prepush` long-test logging already uses as `/tmp/<lane>.log`); read the output's shape before trusting a shared-path script run",
+        "0",
+        "0",
+        "The changed output shape exposed it before any false claim; a command-shape hook over every bash call is disproportionate for /tmp hygiene, so this stays a naming rule"
+      ],
+      "entry": "1656-copied-a-deliverable-to-the-root-of-the-shared-project.md"
+    },
+    {
+      "cells": [
+        "Generated record ids could start with `-` (the leading character was drawn from the 64-character alphabet), so a candidate id fed to the curate CLI in space form was read by node:util parseArgs as an unknown option once every 64 ids, and the run failed with the CLI's generic catch-all message; the trajectory-reflect dismissal test went red in CI on an otherwise green lane",
+        "#1873 (2026-10-26)",
+        "2",
+        "`apps/server/test/ids.test.ts` asserts over 5000 draws that `newRecordId` matches `^[A-Za-z0-9][A-Za-z0-9_-]{20}$`; the leading character now comes from a 62-character alphanumeric alphabet",
+        "1",
+        "0",
+        "Deterministic repro: `--dismiss -Repro0123456789abcd` exits 1 with the exact CI stderr, an alphanumeric-leading control id succeeds; a dash-leading value needs the `--flag=value` form; the failing surface is byte-identical on origin/main, so the flake is inherited, and the `--confirm` test in the same file has the same exposure"
+      ],
+      "entry": "1825-random-candidate-ids-beginning-with-a-hyphen-were-parsed-as.md"
     }
   ],
   "recurrenceUpdates": {
