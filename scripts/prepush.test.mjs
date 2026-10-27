@@ -22,11 +22,11 @@ import {
 } from './prepush.mjs';
 
 test('documentation skips code checks, unknown paths fail closed', () => {
-  assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
+  assert.deepEqual(prepushPlan(['docs/adr/0001.md', 'AGENTS.md']), [
     ['node', 'scripts/english-only-gate.mjs'],
-    ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons.md', 'AGENTS.md'],
+    ['node', 'scripts/doc-reader-tests.mjs', 'docs/adr/0001.md', 'AGENTS.md'],
   ]);
-  assert.deepEqual(prepushPlan(['docs/lessons.md'], 'ci'), [
+  assert.deepEqual(prepushPlan(['docs/adr/0001.md'], 'ci'), [
     ['node', 'scripts/english-only-gate.mjs'],
   ]);
   assert.deepEqual(
@@ -35,7 +35,7 @@ test('documentation skips code checks, unknown paths fail closed', () => {
     ),
     [['node', 'scripts/doc-reader-tests.mjs', 'docs/ops/langfuse.md']],
   );
-  assert.deepEqual(prepushPlan(['docs/lessons.md'], 'advisory'), [
+  assert.deepEqual(prepushPlan(['docs/adr/0001.md'], 'advisory'), [
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],
   ]);
   assert.ok(prepushPlan(['new-config']).length > 0);
@@ -51,6 +51,35 @@ test('changes to prepush scripts run the CI self-test files locally', () => {
   );
   assert.ok(
     readFileSync('.github/workflows/ci.yml', 'utf8').includes(`run: ${selfTest.join(' ')}\n`),
+  );
+});
+
+test('a ledger change runs the ledger gate in both modes', () => {
+  const language = ['node', 'scripts/english-only-gate.mjs'];
+  const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
+  const docReader = ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons/1656-new-entry.md'];
+  assert.deepEqual(prepushPlan(['docs/lessons/1656-new-entry.md'], 'local'), [
+    language,
+    docReader,
+    ledgerGate,
+  ]);
+  assert.deepEqual(prepushPlan(['docs/lessons/1656-new-entry.md'], 'ci'), [language, ledgerGate]);
+  assert.ok(
+    prepushPlan(['apps/web/src/main.tsx'], 'ci').some(
+      (args) => args.join(' ') === ledgerGate.join(' '),
+    ),
+  );
+});
+
+test('the retired summary table still triggers the ledger gate', () => {
+  const language = ['node', 'scripts/english-only-gate.mjs'];
+  const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
+  assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md'], 'ci'), [language, ledgerGate]);
+  assert.deepEqual(
+    prepushPlan(['docs/lessons.md'], 'local').filter(
+      (args) => args[0] === 'node' && args[1].includes('lessons-ledger'),
+    ),
+    [ledgerGate],
   );
 });
 

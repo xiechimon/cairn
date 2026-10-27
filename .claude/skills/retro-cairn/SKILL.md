@@ -1,6 +1,6 @@
 ---
 name: retro-cairn
-description: Use when wrapping up a task or after fixing an error: list the mistakes that appeared and got fixed along the way (including ones a user corrected), attribute them, turn them into recurrence-preventing safeguards, and record them in docs/lessons.md.
+description: Use when wrapping up a task or after fixing an error: list the mistakes that appeared and got fixed along the way (including ones a user corrected), attribute them, turn them into recurrence-preventing safeguards, and record them as an entry file under docs/lessons/.
 ---
 
 # retro-cairn: process error -> safeguard
@@ -18,9 +18,9 @@ Principle: a mistake that appeared during the process, even if fixed by the end,
 
 1. List the errors: list every "appeared and got fixed" point, one sentence describing the symptom. Ones a user corrected always count.
 2. Attribute: ask "why was it not stopped at the time", find the root cause (missing check, unclear rule, missing context, tool misuse).
-3. Choose a safeguard, working from level 1 downward asking "can this be done"; the ledger's five-rung ladder is the canonical source (`docs/lessons.md`): architecture or types > lint, script gates, tests, CI > rules > skills > memory. Levels 4 and 5 must note in the remark why a higher level cannot be done; if it cannot be done now, open a ticket and put the ticket number in the remark, do not write just "to be upgraded" (`node scripts/lessons-ledger-gate.mjs` checks this). A new machine check must use this real mistake as the negative control: the old error turning red under the new gate is what counts as landing it.
-4. Record: add a row to the `docs/lessons.md` ledger. One error kind per row, merge the same kind, do not open duplicate rows.
-5. Recurrence escalation: when the same kind appears again, increment "recurrences" and push the safeguard to a harder level, not add another line of text.
+3. Choose a safeguard, working from level 1 downward asking "can this be done"; the ledger's five-rung ladder is the canonical source (`docs/lessons/README.md`): architecture or types > lint, script gates, tests, CI > rules > skills > memory. Levels 4 and 5 must note in the remark why a higher level cannot be done; if it cannot be done now, open a ticket and put the ticket number in the remark, do not write just "pending upgrade" (`node scripts/lessons-ledger-gate.mjs` checks this). A new machine check must use this real mistake as the negative control: the old error turning red under the new gate is what counts as landing it.
+4. Record: create an entry file `docs/lessons/<ticket>-<short-name>.md` in the format of `docs/lessons/README.md`. One error kind per file, merge the same kind, do not open duplicate files; on recurrence update the original file's "Recurrences" count.
+5. Recurrence escalation: when the same kind appears again, increment "Recurrences" and push the safeguard to a harder level, not add another line of text.
 6. Report: when wrapping up, summarize in one or two sentences how many process errors were caught and what safeguard each became.
 
 ## Boundaries

@@ -9,6 +9,7 @@ export const prepushModules = [
   'scripts/prepush.mjs',
   'scripts/heavy-slots.mjs',
   'scripts/english-only-gate.mjs',
+  'scripts/lessons-ledger-gate.mjs',
   'scripts/scrub-git-env.mjs',
 ];
 
@@ -25,6 +26,7 @@ export const selfTests = [
   'scripts/heavy-slots.test.mjs',
   'scripts/english-only-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
+  'scripts/lessons-ledger-gate.test.mjs',
 ];
 
 export const localOnly = [
@@ -48,12 +50,17 @@ export function prepushPlan(paths, mode = 'local') {
   const advisory = [['node', 'scripts/ui-dead-class-gate.mjs', '--compile']];
   if (mode === 'advisory') return advisory;
   const language = ['node', 'scripts/english-only-gate.mjs'];
+  const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
   const codePaths = paths.filter((path) => !DOCS.test(path));
   const docPaths = paths.filter((path) => DOCS.test(path));
-  if (codePaths.length === 0)
-    return mode === 'ci'
-      ? [language]
-      : [language, ['node', 'scripts/doc-reader-tests.mjs', ...docPaths]];
+  const touchesLedger = paths.some((path) => path.startsWith('docs/lessons'));
+  if (codePaths.length === 0) {
+    const checks =
+      mode === 'ci'
+        ? [language]
+        : [language, ['node', 'scripts/doc-reader-tests.mjs', ...docPaths]];
+    return touchesLedger ? [...checks, ledgerGate] : checks;
+  }
   const required = [
     language,
     ['node', 'scripts/ui-debt-gate.mjs'],
@@ -63,6 +70,7 @@ export function prepushPlan(paths, mode = 'local') {
     ['pnpm', 'spec:parse'],
     ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
     ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
+    ledgerGate,
   ];
   return mode === 'ci'
     ? required
@@ -70,7 +78,7 @@ export function prepushPlan(paths, mode = 'local') {
         ...required,
         ...localOnly,
         ...(paths.some((path) =>
-          /^scripts\/(prepush|heavy-slots|english-only-gate|scrub-git-env|doc-reader-tests)/.test(
+          /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|scrub-git-env|doc-reader-tests)/.test(
             path,
           ),
         )
