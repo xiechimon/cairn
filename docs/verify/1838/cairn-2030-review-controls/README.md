@@ -4,6 +4,6 @@ The published candidate `d340e31521755e2c4d9d89797120a63933268d75` failed eight 
 
 Unclassified new plans now require prior art. Only an explicit `Kind: fix` can claim the small-fix exemption; existing feature indicators still require prior art. Existing saved, unclassified plans retain their verification checklist when read. Contract and evaluator share parsed decisions, including rejected choices.
 
-`compatibility.log` records 96 passing contract, prompt, evaluator and server auto-confirm cases. Existing small-fix fixtures carry explicit classification without changing their assertions. The historical #1606 fixture is unchanged and is classified only by its structural test input.
+`compatibility.log` records 96 passing contract, prompt, evaluator and server auto-confirm cases. Existing small-fix fixtures carry explicit classification without changing their assertions. `lifecycle.log` records 179 passing downstream cases across 11 suites. `integration.log` records 26 passing real daemon/server and browser cases across 12 integration files after classifying their small README probe plans. The historical #1606 fixture is unchanged and is classified only by its structural test input.
 
 The previous CI failed `history does not animate on first render (reduce)` in the unchanged web code. `animation-repeat.log` records 40 passing real-browser repetitions across reduced and normal motion. This does not establish the CI failure's cause, and the assertion was not changed.
