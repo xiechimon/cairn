@@ -34,7 +34,8 @@ interface WorldOpts {
 }
 
 function makeWorld(opts: WorldOpts = {}) {
-  const s = bootServer(opts.githubFetch !== undefined ? { githubFetch: opts.githubFetch } : {});
+  const githubFetch: FetchLike = opts.githubFetch ?? (async () => new Response('[]'));
+  const s = bootServer({ githubFetch });
   disposables.push(() => s.dispose());
   const teamId = s.team.id;
   const base = nowMs();
@@ -115,7 +116,7 @@ function makeWorld(opts: WorldOpts = {}) {
     box: s.secretBox,
     reposDir: s.reposDir,
     attachmentsDir: s.attachmentsDir,
-    ...(opts.githubFetch !== undefined ? { githubFetch: opts.githubFetch } : {}),
+    githubFetch,
   };
   const stepRow = () => s.db.select().from(stepTable).where(eq(stepTable.id, STEP)).get()!;
   const todoRow = () => s.db.select().from(todoTable).where(eq(todoTable.id, CARD_ID)).get()!;

@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const SCENARIO = '/app?scenario=chief-agent-chip';
+const SCENARIO = '/app?view=board&scenario=chief-agent-chip';
 const AGENT_HREF = '/app/resources/agents/r3-builder';
 
 function stubDicebear(page: Page) {
@@ -33,7 +33,7 @@ test.describe('drawer robot row identity chip (fixture, #741 gap 1)', () => {
     await expect(img).toBeVisible();
     await expect(chip.getByText('r3-builder')).toHaveText('r3-builder');
 
-    await expect(chip).toHaveAttribute('href', `${AGENT_HREF}?scenario=chief-agent-chip`);
+    await expect(chip).toHaveAttribute('href', `${AGENT_HREF}?view=board&scenario=chief-agent-chip`);
 
     const box = await img.boundingBox();
     expect(box?.width).toBe(24);
@@ -124,7 +124,7 @@ test.describe('lazy face zero change (#741 negative case)', () => {
     page,
   }) => {
     await stubDicebear(page);
-    await page.goto('/app?scenario=114');
+    await page.goto('/app?view=board&scenario=114');
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 
