@@ -144,9 +144,11 @@ export function combineTimeoutWithRootCause(timeoutText: string, rootCause: stri
 export const STREAM_DURATION_CAP_DEFAULT_MS = 3_600_000;
 
 export const STREAM_DURATION_CAP_ENV = 'CAIRN_STREAM_DURATION_CAP_MS';
+export const STREAM_IDLE_ENV = 'CAIRN_STREAM_IDLE_MS';
+export const STREAM_FIRST_EVENT_ENV = 'CAIRN_STREAM_FIRST_EVENT_MS';
 
-function envDurationCapMs(env: NodeJS.ProcessEnv): number | null {
-  const raw = env[STREAM_DURATION_CAP_ENV];
+function envPositiveMs(name: string): number | null {
+  const raw = process.env[name];
   if (raw === undefined) return null;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -920,12 +922,18 @@ async function runClaimedStep(
     claimed.step.kind === 'plan' || claimed.step.kind === 'build'
       ? PROVIDER_NETWORK_RETRY_DELAYS_MS
       : [0, 5_000];
+  const envFirstMs = envPositiveMs(STREAM_FIRST_EVENT_ENV);
+  const envIdleMs = envPositiveMs(STREAM_IDLE_ENV);
   const streamTimeouts = {
-    first: opts.streamTimeouts?.first ?? STREAM_TIMEOUTS_MS.streamFirstEvent,
-    idle: opts.streamTimeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
-    body: opts.streamTimeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
+    first: envFirstMs ?? opts.streamTimeouts?.first ?? STREAM_TIMEOUTS_MS.streamFirstEvent,
+    idle: envIdleMs ?? opts.streamTimeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
+    body: Math.max(
+      opts.streamTimeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
+      envFirstMs ?? 0,
+      envIdleMs ?? 0,
+    ),
   };
-  const absoluteDurationCapMs = envDurationCapMs(process.env);
+  const absoluteDurationCapMs = envPositiveMs(STREAM_DURATION_CAP_ENV);
   const streamDurationCapMs =
     absoluteDurationCapMs ?? opts.streamDurationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS;
   const progressResetsDuration = claimed.step.kind === 'build' && absoluteDurationCapMs === null;
@@ -1408,6 +1416,7 @@ async function runClaimedStep(
     }
     break;
   }
+  deps.sessionHandles?.delete(stepId);
   await sealSegment();
   flushDeltas();
   flushThinking();
@@ -1772,7 +1781,6 @@ async function runClaimedStep(
   } catch (err) {
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
-    deps.sessionHandles?.delete(stepId);
     return;
   }
 
@@ -1781,12 +1789,10 @@ async function runClaimedStep(
   } catch (err) {
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
-    deps.sessionHandles?.delete(stepId);
     return;
   }
   clearCredentials(creds);
   journal.remove(stepId);
-  deps.sessionHandles?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
 }
 

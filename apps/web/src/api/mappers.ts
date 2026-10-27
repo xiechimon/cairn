@@ -23,7 +23,9 @@ import {
   askUserQuestionContentSchema,
   BRAND,
   CHIEF_TURN_ERROR_KIND,
+  chiefModelFallbackContentSchema,
   chiefTurnErrorContentSchema,
+  chiefTurnStoppedContentSchema,
   classifySkillFact,
   classifyStepFailure,
   classifyUserText,
@@ -1142,11 +1144,18 @@ export function mapChiefStream(messages: MessageRow[], inlineTools = false): Chi
 function collectChiefStream(
   messages: MessageRow[],
   inlineTools = false,
+  pendingIds: ReadonlyMap<string, 'queued' | 'held'> = new Map(),
 ): {
   items: ChiefStreamItem[];
+  itemsAt: number[];
   trailingTools: ChiefToolRow[];
+  pending: ChiefStreamItem[];
 } {
   const items: ChiefStreamItem[] = [];
+  const itemsAt: number[] = [];
+  let lastAt = 0;
+  const pendingById = new Map<string, ChiefStreamItem>();
+  let fallback: { model: string; stepId: string } | null = null;
   const postedTexts = new Set(
     messages
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
@@ -1154,11 +1163,50 @@ function collectChiefStream(
   );
   let pendingTools: ChiefToolRow[] = [];
   for (const m of messages) {
+    while (itemsAt.length < items.length) itemsAt.push(lastAt);
+    lastAt = m.createdAt;
+    if (m.role === 'user' && fallback !== null) {
+      const stepOfRow = m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+        ? m.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)
+        : m.id;
+      if (stepOfRow !== fallback.stepId) fallback = null;
+    }
+    const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
+    if (pendingState !== undefined) {
+      const text = textOfContent(m.content).trim();
+      pendingById.set(m.id, {
+        kind: 'user',
+        text,
+        id: m.id,
+        markdown: text,
+        pending: pendingState,
+      });
+      continue;
+    }
     const turnError = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (turnError !== null) {
       pendingTools = [];
       items.push({ kind: 'error', text: turnError });
       continue;
+    }
+    if (m.role === 'system') {
+      let parsed: unknown = null;
+      try {
+        parsed = typeof m.content === 'string' ? JSON.parse(m.content) : null;
+      } catch {
+        parsed = null;
+      }
+      const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
+      if (stopped.success) {
+        pendingTools = [];
+        items.push({ kind: 'stopped', todos: stopped.data.todos, id: m.id });
+        continue;
+      }
+      const switched = chiefModelFallbackContentSchema.safeParse(parsed);
+      if (switched.success) {
+        fallback = { model: switched.data.to, stepId: switched.data.stepId };
+        continue;
+      }
     }
     const call = toolCallOfContent(m.content);
     if (call !== null) {
@@ -1221,10 +1269,16 @@ function collectChiefStream(
       seconds: '',
       id: m.id,
       ...(pendingTools.length > 0 ? { tools: pendingTools } : {}),
+      ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
     });
     pendingTools = [];
   }
-  return { items, trailingTools: pendingTools };
+  while (itemsAt.length < items.length) itemsAt.push(lastAt);
+  const pending = [...pendingIds.keys()].flatMap((id) => {
+    const item = pendingById.get(id);
+    return item === undefined ? [] : [item];
+  });
+  return { items, itemsAt, trailingTools: pendingTools, pending };
 }
 
 function autoCloseStrong(text: string): string {
@@ -1255,8 +1309,10 @@ export function mapChief(
     opts.activeThreadId !== null
       ? (opts.threads.find((t) => t.id === opts.activeThreadId) ?? null)
       : null;
-  const running = active?.activeRun != null;
-  const collected = active === null ? null : collectChiefStream(opts.messages, running);
+  const pendingIds = new Map((active?.pending ?? []).map((p) => [p.messageId, p.state] as const));
+  const parked = [...pendingIds.values()].includes('held');
+  const running = active?.activeRun != null && !parked;
+  const collected = active === null ? null : collectChiefStream(opts.messages, running, pendingIds);
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
   if (running) {
     if ((opts.liveThinking ?? '').trim() !== '') {
@@ -1292,6 +1348,7 @@ export function mapChief(
       }
     }
   }
+  chiefStream.push(...(collected?.pending ?? []));
   return {
     view: 'drawer',
     bound,
@@ -1307,6 +1364,7 @@ export function mapChief(
         }
       : {}),
     threadTitle: active?.title ?? '新主题',
+    ...(active !== null ? { threadId: active.id } : {}),
     ...(opts.threads.length > 0
       ? {
           threads: opts.threads.map((t) => ({
@@ -1315,7 +1373,9 @@ export function mapChief(
           })),
         }
       : {}),
-    ...(active === null ? { examples: CHIEF_HERO_EXAMPLES } : { stream: chiefStream }),
+    ...(active === null
+      ? { examples: CHIEF_HERO_EXAMPLES }
+      : { stream: chiefStream, streamAt: collected?.itemsAt ?? [] }),
     ...(running ? { running: true } : {}),
     ...(opts.activity?.phase === 'tool' && opts.activity.tool != null
       ? { runningTool: opts.activity.tool }
@@ -1323,6 +1383,8 @@ export function mapChief(
         ? { runningTool: active.activeRun.tool.toolName }
         : {}),
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
+    ...(env.outage != null ? { outage: env.outage } : {}),
+    ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),
   };
 }
 

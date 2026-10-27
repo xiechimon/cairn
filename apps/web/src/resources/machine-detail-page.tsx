@@ -117,6 +117,7 @@ export function MachineDetailPage() {
   return (
     <PageShell
       route={MACHINES_HREF}
+      taskPanel
       title={machine.name}
       back={MACHINES_HREF}
       selected={MACHINES_HREF}

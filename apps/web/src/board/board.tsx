@@ -30,6 +30,7 @@ import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSessionStorage, safeSetItem } from '../safe-storage.js';
+import { TaskPanelToggle } from '../task-panel/task-panel.js';
 import {
   type BoardColumnDef,
   COLUMNS,
@@ -50,7 +51,7 @@ import {
   FilterPanel,
   TOPBAR_TEXT_BUTTON,
 } from './filter-panel.js';
-import { HomeSections, NeedsYouInbox, withoutBoardView } from './home.js';
+import { DailyBrief, HomeSections, NeedsYouInbox, withoutBoardView } from './home.js';
 import { BrandMark } from './sidebar.js';
 import { cardTag } from './tag-filter.js';
 
@@ -86,6 +87,7 @@ interface BoardProps {
 
 export interface HomeOverview {
   sections: ReactNode;
+  brief: ReactNode;
   needsYou: number;
   running: number;
   doneToday: number;
@@ -321,6 +323,7 @@ export function BoardSurface({
             <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
             {t('定时')}
           </Button>
+          <TaskPanelToggle />
         </div>
       </header>
 
@@ -360,6 +363,15 @@ export function BoardSurface({
               onAction={onAction}
               orchestrationOf={orchestrationOf}
               loading={loading}
+            />
+          ),
+          brief: (
+            <DailyBrief
+              todos={visibleTodos}
+              now={fixture.now}
+              projectNames={fixture.projectNames}
+              onAction={onAction}
+              orchestrationOf={orchestrationOf}
             />
           ),
           needsYou: pendingSplit.fresh.length,

@@ -43,7 +43,8 @@ const BOARD = [
   'storage-unavailable',
   'mobile-narrow',
   'focus-ring-clip',
-  'chief-home-chat',
+  'chief-home-',
+  'task-panel',
 ];
 const SIDEBAR = [
   'sidebar-',
@@ -78,7 +79,7 @@ const DETAIL = [
   'spec-brief-',
   'spinner-',
   'chief-fab',
-  'chief-home-chat',
+  'chief-home-',
   'chief-stream-markdown',
   'composer-wire-reject',
   'user-menu-',
@@ -109,6 +110,7 @@ const DETAIL = [
   'thinking-row-truncate',
   'hotkeys-ready',
   'mobile-narrow',
+  'task-panel',
 ];
 const CHIEF = [
   'composer-tool-tips',
@@ -122,8 +124,15 @@ const CHIEF = [
   'z-ladder',
   'hotkeys-ready',
   'mobile-narrow',
+  'task-panel',
 ];
-const AGENT = ['agent-', 'team-create-agent', 'registry-focus-ring', 'resource-back-spa'];
+const AGENT = [
+  'agent-',
+  'team-create-agent',
+  'registry-focus-ring',
+  'resource-back-spa',
+  'task-panel',
+];
 const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models'];
 const OVERLAY = [
   'newtask-',
@@ -174,6 +183,7 @@ const PAGES = [
   'registry-focus-ring',
   'resource-back-spa',
   'mobile-narrow',
+  'task-panel',
 ];
 const RESOURCES = [
   'machine-',
@@ -190,6 +200,7 @@ const RESOURCES = [
   'registry-focus-ring',
   'resource-back-spa',
   'skill-import',
+  'task-panel',
 ];
 const SHARED_SURFACE_ONLY = ['cds-motion', 'color-freeze', 'fixture-mode-chip'];
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
@@ -240,6 +251,10 @@ const FILE_RULES = new Map([
 
 const DIR_RULES = [
   { prefix: 'apps/web/src/board/', specs: BOARD },
+  {
+    prefix: 'apps/web/src/task-panel/',
+    specs: [...BOARD, ...CHIEF, ...PAGES, ...RESOURCES, ...AGENT],
+  },
   { prefix: 'apps/web/src/chief/', specs: CHIEF },
   { prefix: 'apps/web/src/detail/', specs: DETAIL },
   { prefix: 'apps/web/src/overlay/', specs: OVERLAY },

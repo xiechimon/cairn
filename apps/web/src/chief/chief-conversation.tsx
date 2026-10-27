@@ -34,7 +34,7 @@ import {
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
-import type { ChiefContent, Phase } from '../fixtures/records.js';
+import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
   ArrowDown,
@@ -60,6 +60,7 @@ import { useChiefNewThreadHotkey } from '../overlay/hotkeys.js';
 import { type MentionGroups, MentionInline, MentionPicker } from '../overlay/mention-picker.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
+import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
 
 const HEAD_ICON_BTN_CLS =
   "size-5 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
@@ -71,6 +72,8 @@ const SEND_BTN_CLS =
   'ml-auto cursor-pointer rounded-md border-0 bg-transparent text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 const SEND_ON_CLS =
   'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent)';
+const STOP_ON_CLS =
+  'bg-(--foreground) text-(--background) hover:bg-(--foreground) hover:text-(--background) dark:hover:bg-(--foreground)';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
 const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
@@ -117,6 +120,10 @@ export interface ChiefConversationProps {
   onRewind?: (messageId: string) => void;
   onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancelQuestion?: (requestId: string) => void;
+  onWithdraw?: (messageId: string) => Promise<void>;
+  onSteer?: (messageId: string) => void;
+  onStop?: () => void;
+  onNewTask?: () => void;
   threadsOpen: boolean;
   setThreadsOpen: Dispatch<SetStateAction<boolean>>;
   hero?: ReactNode;
@@ -124,6 +131,7 @@ export interface ChiefConversationProps {
   heroCollapsed?: boolean;
   todoGlances?: ReadonlyMap<string, TodoGlance>;
   composerRef?: (node: HTMLTextAreaElement | null) => void;
+  day?: { earlier: number; today: ReactNode };
 }
 
 export function ChiefConversation({
@@ -138,6 +146,10 @@ export function ChiefConversation({
   onRewind,
   onAnswerQuestion,
   onCancelQuestion,
+  onWithdraw,
+  onSteer,
+  onStop,
+  onNewTask,
   threadsOpen,
   setThreadsOpen,
   hero,
@@ -145,6 +157,7 @@ export function ChiefConversation({
   heroCollapsed = false,
   todoGlances,
   composerRef,
+  day,
 }: ChiefConversationProps) {
   const { t } = useI18n();
   const { live, teamId, user } = useLiveData();
@@ -343,6 +356,40 @@ export function ChiefConversation({
   );
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = home && empty && !heroCollapsed;
+  const stopMode = chief.running === true && wire.draft === '' && onStop != null;
+  const withdraw =
+    onWithdraw == null
+      ? undefined
+      : (messageId: string, text: string) => {
+          onWithdraw(messageId).then(
+            () => {
+              setLiveDraft((cur) => (cur === '' ? text : `${cur}\n${text}`));
+              textareaRef.current?.focus({ preventScroll: true });
+            },
+            () => {},
+          );
+        };
+  const rows = (chief.stream ?? []).map((item, i) => ({ item, i }));
+  const streamRow = ({ item, i }: { item: ChiefStreamItem; i: number }) => (
+    <ChiefStreamRow
+      key={chiefStreamRowKey(item, i)}
+      item={item}
+      index={i}
+      bound={chief.bound}
+      agent={chief.agent}
+      runningTool={chief.runningTool}
+      user={user}
+      copiedKey={copiedKey}
+      onCopy={copyText}
+      toolsOpen={toolsOpen}
+      onToggleTools={toggleTools}
+      onRewindRequest={(index, id) => setRewindConfirm({ index, id })}
+      onAnswerQuestion={onAnswerQuestion}
+      onCancelQuestion={onCancelQuestion}
+      onWithdraw={withdraw}
+      onSteer={onSteer}
+    />
+  );
   return (
     <>
       <header
@@ -422,7 +469,21 @@ export function ChiefConversation({
                   <RuntimePi width={12} height={12} />
                 )}
               </span>
-              <span className="min-w-0 truncate">{chief.modelSlot}</span>
+              {chief.fallbackModel != null ? (
+                <>
+                  <span className="min-w-0 truncate">
+                    {t('备用模型 {model}', { model: chief.fallbackModel })}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    data-testid="chief-fallback-dot"
+                    className="ml-0.5 size-1.5 flex-none rounded-full bg-(--badge-attention)"
+                  />
+                  <span className="sr-only">{t('，主模型暂时用不了')}</span>
+                </>
+              ) : (
+                <span className="min-w-0 truncate">{chief.modelSlot}</span>
+              )}
             </span>
           </div>
         )}
@@ -510,24 +571,17 @@ export function ChiefConversation({
               data-testid="chief-stream"
             >
               <TodoGlanceContext.Provider value={glances}>
-                {chief.stream?.map((item, i) => (
-                  <ChiefStreamRow
-                    key={chiefStreamRowKey(item, i)}
-                    item={item}
-                    index={i}
-                    bound={chief.bound}
-                    agent={chief.agent}
-                    runningTool={chief.runningTool}
-                    user={user}
-                    copiedKey={copiedKey}
-                    onCopy={copyText}
-                    toolsOpen={toolsOpen}
-                    onToggleTools={toggleTools}
-                    onRewindRequest={(index, id) => setRewindConfirm({ index, id })}
-                    onAnswerQuestion={onAnswerQuestion}
-                    onCancelQuestion={onCancelQuestion}
-                  />
-                ))}
+                {day == null ? (
+                  rows.map(streamRow)
+                ) : (
+                  <>
+                    <div data-testid="chief-earlier" className="opacity-60">
+                      {rows.slice(0, day.earlier).map(streamRow)}
+                    </div>
+                    {day.today}
+                    {rows.slice(day.earlier).map(streamRow)}
+                  </>
+                )}
               </TodoGlanceContext.Provider>
             </MessageScrollerContent>
           </FadeScrollerViewport>
@@ -538,6 +592,13 @@ export function ChiefConversation({
         </MessageScroller>
       )}
 
+      {chief.outage != null ? (
+        <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} onNewTask={onNewTask} />
+      ) : (
+        chief.fallbackModel != null && (
+          <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
+        )
+      )}
       <div
         className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} [&>.attachment-strip]:mt-2 rounded-(--radius-composer) border-0 bg-card dark:bg-(--secondary) px-3 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
         style={home ? { viewTransitionName: 'chief-composer' } : undefined}
@@ -558,7 +619,11 @@ export function ChiefConversation({
             onCompositionEnd={handleCompositionEnd}
             onBlur={handleBlur}
             placeholder={t(
-              chief.running === true ? CHIEF_INPUT_PLACEHOLDER_STEERING : CHIEF_INPUT_PLACEHOLDER,
+              chief.outage != null
+                ? '可以继续说，总管恢复后会按顺序处理…'
+                : chief.running === true
+                  ? CHIEF_INPUT_PLACEHOLDER_STEERING
+                  : CHIEF_INPUT_PLACEHOLDER,
             )}
             {...(inlineOpen
               ? {
@@ -651,15 +716,27 @@ export function ChiefConversation({
           >
             <Grid2x2 width={16} height={16} />
           </IconTooltip>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('发送')}
-            className={wire.draft !== '' ? `${SEND_BTN_CLS} ${SEND_ON_CLS}` : SEND_BTN_CLS}
-            onClick={wire.send}
-          >
-            <ArrowUp width={16} height={16} />
-          </Button>
+          {stopMode ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t('停止总管这次回复')}
+              className={`${SEND_BTN_CLS} ${STOP_ON_CLS}`}
+              onClick={onStop}
+            >
+              <span className="size-2.5 rounded-(--cds-radius-xs) bg-current" />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t('发送')}
+              className={wire.draft !== '' ? `${SEND_BTN_CLS} ${SEND_ON_CLS}` : SEND_BTN_CLS}
+              onClick={wire.send}
+            >
+              <ArrowUp width={16} height={16} />
+            </Button>
+          )}
         </div>
         <MentionPicker
           open={pickerOpen}

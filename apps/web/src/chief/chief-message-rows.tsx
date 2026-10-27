@@ -17,6 +17,7 @@ import { useI18n } from '../i18n/provider.js';
 import { Check, ChevronDown, ChevronRight, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
+import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefSpiralFace } from './chief-spiral-face.js';
@@ -47,6 +48,9 @@ const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
 const MARKER_NOTE_CLS = 'my-2.5 justify-center text-center text-meta text-(--text-tertiary)';
 const MARKER_ERROR_CLS =
   'my-2.5 flex-col justify-center text-center text-meta text-(--destructive)';
+
+const PENDING_BTN_CLS =
+  'h-7 cursor-pointer rounded-(--radius-menu-item) px-2.5 text-meta font-normal text-(--text-secondary)';
 
 const CHIP_INLINE_CLS =
   'mx-0.5 inline-flex items-center gap-1 rounded-(--cds-radius-sm) px-1.5 py-px align-[1px] text-meta';
@@ -110,6 +114,7 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
 function HandoffRow({ todoId }: { todoId: string }) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
+  const openInPlace = useOpenTaskInPlace();
   return (
     <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
       <Marker className={MARKER_NOTE_CLS} data-testid="chief-handoff">
@@ -119,6 +124,7 @@ function HandoffRow({ todoId }: { todoId: string }) {
             to={`/app/todo/${todoId}`}
             className={`${mentionChipClass('todo')} cursor-pointer`}
             data-phase={glance?.phase}
+            onClick={(event) => openInPlace(event, todoId, glance)}
           >
             {glance != null && <TodoStatus phase={glance.phase} />}
             {glance?.seq != null ? `#${glance.seq}` : t('任务')}
@@ -137,6 +143,7 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
     case 'tool':
     case 'question':
     case 'handoff':
+    case 'stopped':
       return item.id ?? index;
     default:
       return index;
@@ -157,6 +164,36 @@ interface ChiefStreamRowProps {
   onRewindRequest: (index: number, id: string | null) => void;
   onAnswerQuestion?: ((input: { requestId: string; answers: AskUserAnswer[] }) => void) | undefined;
   onCancelQuestion?: ((requestId: string) => void) | undefined;
+  onWithdraw?: ((messageId: string, text: string) => void) | undefined;
+  onSteer?: ((messageId: string) => void) | undefined;
+}
+
+function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
+  const { t } = useI18n();
+  return (
+    <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
+      <Marker className={MARKER_NOTE_CLS} data-testid="chief-stopped">
+        <MarkerContent>
+          {todos.length === 0 ? (
+            t('已停止，没有建任务。')
+          ) : (
+            <>
+              {t('已停止。停之前已经建了任务')}
+              {todos.map((todo) => (
+                <Link
+                  key={todo.id}
+                  to={`/app/todo/${todo.id}`}
+                  className={`${mentionChipClass('todo')} cursor-pointer`}
+                >
+                  {`#${todo.seq} ${todo.title}`}
+                </Link>
+              ))}
+            </>
+          )}
+        </MarkerContent>
+      </Marker>
+    </MessageScrollerItem>
+  );
 }
 
 export function ChiefStreamRow({
@@ -173,8 +210,11 @@ export function ChiefStreamRow({
   onRewindRequest,
   onAnswerQuestion,
   onCancelQuestion,
+  onWithdraw,
+  onSteer,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
+  if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
@@ -204,7 +244,11 @@ export function ChiefStreamRow({
   if (item.kind === 'user')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={MSG_ROW_CLS} data-testid="chief-msg">
+        <Message
+          className={`${MSG_ROW_CLS} ${item.pending != null ? 'opacity-80' : ''}`}
+          data-testid={item.pending != null ? 'chief-pending' : 'chief-msg'}
+          data-pending={item.pending}
+        >
           <span className={AVATAR_IMG_CLS}>
             <SeededAvatar
               className="size-6"
@@ -223,30 +267,61 @@ export function ChiefStreamRow({
                 {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
               </BubbleContent>
             </Bubble>
-            <div className="mt-2 flex gap-2.5 text-(--text-tertiary)" data-testid="chief-msg-tools">
-              <Button
-                variant="ghost"
-                size="icon"
-                className={MSG_TOOL_BTN_CLS}
-                aria-label={t('复制')}
-                onClick={() => onCopy(`u${i}`, item.text)}
-              >
-                {copiedKey === `u${i}` ? (
-                  <Check width={13} height={13} />
-                ) : (
-                  <Copy width={13} height={13} />
+            {item.pending != null ? (
+              <div className="mt-1.5 flex flex-wrap items-center justify-end gap-1.5 text-meta text-(--text-tertiary)">
+                <span className="mr-auto">
+                  {item.pending === 'held'
+                    ? t('已存下，总管恢复后会处理')
+                    : t('排队中，总管回完上一条就看')}
+                </span>
+                {item.pending === 'queued' && item.id != null && onSteer != null && (
+                  <Button
+                    variant="outline"
+                    className={PENDING_BTN_CLS}
+                    onClick={() => onSteer(item.id ?? '')}
+                  >
+                    {t('现在插话')}
+                  </Button>
                 )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={MSG_TOOL_BTN_CLS}
-                aria-label={t('恢复到此处')}
-                onClick={() => onRewindRequest(i, item.id ?? null)}
+                {item.id != null && onWithdraw != null && (
+                  <Button
+                    variant="outline"
+                    className={PENDING_BTN_CLS}
+                    onClick={() => onWithdraw(item.id ?? '', item.text)}
+                  >
+                    {t('撤回')}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div
+                className="mt-2 flex gap-2.5 text-(--text-tertiary)"
+                data-testid="chief-msg-tools"
               >
-                <Restore width={13} height={13} />
-              </Button>
-            </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={MSG_TOOL_BTN_CLS}
+                  aria-label={t('复制')}
+                  onClick={() => onCopy(`u${i}`, item.text)}
+                >
+                  {copiedKey === `u${i}` ? (
+                    <Check width={13} height={13} />
+                  ) : (
+                    <Copy width={13} height={13} />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={MSG_TOOL_BTN_CLS}
+                  aria-label={t('恢复到此处')}
+                  onClick={() => onRewindRequest(i, item.id ?? null)}
+                >
+                  <Restore width={13} height={13} />
+                </Button>
+              </div>
+            )}
           </MessageContent>
         </Message>
       </MessageScrollerItem>
@@ -437,6 +512,11 @@ export function ChiefStreamRow({
                 )}
               </Button>
               {item.seconds !== '' && <span>{t('完成 {n}', { n: item.seconds })}</span>}
+              {item.fallbackModel != null && (
+                <span data-testid="chief-fallback-note">
+                  {t('由备用模型 {model} 回答', { model: item.fallbackModel })}
+                </span>
+              )}
               {(item.tools?.length ?? 0) > 0 && (
                 <Button
                   variant="ghost"

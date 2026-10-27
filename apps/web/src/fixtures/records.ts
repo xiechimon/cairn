@@ -454,7 +454,8 @@ export type ChiefStreamItem =
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;
     }
-  | { kind: 'user'; text: string; id?: string; markdown?: string }
+  | { kind: 'user'; text: string; id?: string; markdown?: string; pending?: 'queued' | 'held' }
+  | { kind: 'stopped'; todos: { id: string; seq: number; title: string }[]; id?: string }
   | {
       kind: 'robot';
       paragraphs?: ChiefSegment[][];
@@ -464,6 +465,7 @@ export type ChiefStreamItem =
       seconds: string;
       tools?: ChiefToolRow[];
       id?: string;
+      fallbackModel?: string;
     }
   | {
       kind: 'thinking';
@@ -518,11 +520,15 @@ export interface ChiefContent {
   agent?: { id?: string; displayName: string; avatarUrl: string | null };
   modelProvider?: string | null;
   threadTitle: string;
+  threadId?: string;
   threadsOpen?: boolean;
   threads?: ChiefThreadRef[];
   examples?: ChiefExample[];
   draft?: string;
   stream?: ChiefStreamItem[];
+  streamAt?: number[];
   running?: boolean;
   runningTool?: string;
+  outage?: { reason: 'quota' | 'capacity'; model: string | null; retryAt: number | null };
+  fallbackModel?: string;
 }

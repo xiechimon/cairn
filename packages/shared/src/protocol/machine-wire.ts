@@ -381,6 +381,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
     reason: '[设计] W3 steer 拉取-确认（06 册 D9；claimed 步单槽 pending，?stepId=）',
   },
   {
+    method: 'POST',
+    path: '/api/machine/steer/ack',
+    reason:
+      '[design] #1938 steer delivery ack: the chief keeps a steered message queued until the daemon reports it reached the live session (?stepId=)',
+  },
+  {
     method: 'GET',
     path: '/api/machine/stop',
     reason: '[设计] M7 #308 stop 拉取-确认（停止钮单槽 pending，?stepId=；steer 同律）',

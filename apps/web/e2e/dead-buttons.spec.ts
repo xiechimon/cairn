@@ -34,9 +34,10 @@ test('board topbar drops the `看板指南` button — right actions = `筛选` 
 
   const actions = page.locator('.board-topbar-actions');
   await expect(actions).toBeVisible();
-  await expect(actions.getByRole('button')).toHaveCount(1);
+  await expect(actions.getByRole('button')).toHaveCount(2);
   await expect(actions.getByRole('link')).toHaveCount(1);
   await expect(actions.getByRole('button', { name: '筛选', exact: true })).toBeVisible();
+  await expect(actions.getByRole('button', { name: '任务面板' })).toBeVisible();
   await expect(actions.getByRole('link', { name: '定时' })).toBeVisible();
   await expect(actions.getByRole('button', { name: '新任务' })).toHaveCount(0);
 
@@ -468,14 +469,19 @@ test('reuse panel `查看方案` flips the doc pane to the plan face (#318)', as
   await expect(page.locator('.doc-empty')).toContainText('暂无方案');
 });
 
-test('project task rows and cards are real links to the todo detail (#318)', async ({ page }) => {
+test('project task rows and cards are real links to the todo detail that open in the panel (#318, #1937)', async ({ page }) => {
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks');
   const row = page.locator('.prj-task-row').first();
   await expect(row).toBeVisible();
 
   await expect(row.locator('a.prj-task-link')).toHaveCount(1);
+  await expect(row.locator('a.prj-task-link')).toHaveAttribute(
+    'href',
+    /\/app\/todo\/[^?]+\?scenario=prj-tasks&tab=tasks/,
+  );
   await row.click();
-  await expect(page).toHaveURL(/\/app\/todo\/[^?]+\?scenario=prj-tasks&tab=tasks/);
+  await expect(page).toHaveURL(/[?&]task=[^&]+/);
+  await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
 
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks');
   await page.locator('.prj-tasks-view-btn').nth(1).click();
@@ -483,7 +489,7 @@ test('project task rows and cards are real links to the todo detail (#318)', asy
   await expect(card).toBeVisible();
   await expect(card.locator('a.prj-task-link')).toHaveCount(1);
   await card.click();
-  await expect(page).toHaveURL(/\/app\/todo\//);
+  await expect(page).toHaveURL(/[?&]task=[^&]+/);
 });
 
 test('new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)', async ({

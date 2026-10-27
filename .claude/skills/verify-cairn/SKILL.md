@@ -13,6 +13,18 @@ Control Glass entry (the clicks are in the scripts; this file does not restate t
 
 Change history: `changelog/` one file per ticket (`<date>-<ticket>.md`; the old "Last updated:" single-line chain retired per #1039 - every lane prepended an entry to the chain head, two lanes were bound to collide on the same hunk). A lane recording a new entry = **create a new file and commit it with the PR**, do not change this line, do not edit old entry files; the convention is in `changelog/README.md`. Order follows `git log --oneline -- .claude/skills/verify-cairn/`.
 
+## Evidence limits checklist
+
+Apply this checklist before reporting verification or handing off a delivery. For each acceptance claim, record the command, tested commit, app surface (fixture or live), provider mode (stub, real, or not exercised), artifact path, result and remaining limits. Mark an unavailable check as unverified rather than widening a narrower result.
+
+- Fixture screenshots cannot establish real-app behavior. Keep focused fixture UI and visual regression tests; label them as fixture evidence. Verify claims about the real app on an isolated live stack without `?scenario=`, using the relevant API, database or runtime observations alongside screenshots.
+- Stub-only runs cannot establish real-provider behavior. Keep deterministic stub regressions, including real-daemon protocol and orchestration checks; name the stubbed boundary and limit the claim to the exercised layers. A real-provider claim requires a real-provider run with recorded provider mode and runtime evidence; if credentials or access are unavailable, report that claim as unverified.
+- Local-only evidence cannot support a delivered verification claim. Commit supporting artifacts under `docs/verify/<issue>/` on the delivery branch and reference them from the PR body with commit-SHA-pinned raw links. A local run directory, external upload or another repository's or issue's archive is not that delivery's evidence. Preserve ordinary reference links as references; JSON, logs and Markdown evidence need readable links, not image embedding.
+- Mechanism claims require compiled or runtime evidence of the claimed effect, such as compiled CSS, observed animation state, actual wire payloads, runtime logs or schema snapshots. Source, configuration and installed dependencies alone do not establish that the mechanism took effect. Record the artifact and the assertion it supports.
+- Separate automated checks from review. The current `scripts/pr-evidence-gate.py` checks nonempty Verified/Upstream sections and embedding plus HTTP 200 for recognized image links. It does not establish evidence sufficiency, live-app origin, real-provider execution or correct repository/issue archive provenance. Reviewers must inspect these limits and compare claims with artifacts. Robust fixture-URL parsing and archive provenance enforcement are planned separately in #1982 and #1983; #1810 remains incomplete after this documentation change. Do not claim the gate detects stub-only runs without machine-readable provenance. Future automation needs explicit provenance and negative controls, not inference from a screenshot or a passing HTTP request.
+
+The implementer templates incorporate the same checklist in `docs/agent-dispatch-prompts.md#evidence-limits-checklist`. Apply it to every workflow below, including the stub LLM custom probes and fixture regressions.
+
 ## Fact base (interrogated 2026-09-25; after the feature faces evolve, run `/maintain-verification-skill` to correct)
 
 | Dimension | Fact |
