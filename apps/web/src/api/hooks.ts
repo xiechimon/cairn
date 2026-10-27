@@ -38,6 +38,7 @@ import type {
   PatchChiefBody,
   PatchMachineBody,
   PatchProjectBody,
+  PatchTeamBody,
   PatchUserBody,
   PlanRow,
   ProjectCommitDetailResponse,
@@ -574,6 +575,13 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (body: PatchUserBody) => api.patch<UserRecord>('/api/user/me', body),
       onSuccess: () => {
         void qc.invalidateQueries({ queryKey: ['session'] });
+      },
+    }),
+    patchTeam: useMutation({
+      mutationFn: (body: PatchTeamBody) =>
+        api.patch<TeamRecord>(`/api/teams/${encodeURIComponent(teamId ?? '')}`, body),
+      onSuccess: () => {
+        void qc.invalidateQueries({ queryKey: ['teams'] });
       },
     }),
     createTodo: useMutation({

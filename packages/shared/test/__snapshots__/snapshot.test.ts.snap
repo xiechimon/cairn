@@ -8495,6 +8495,61 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "firstPrReportPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "dismissedAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "due": {
+          "type": "boolean",
+        },
+        "enabled": {
+          "type": "boolean",
+        },
+        "firstPrAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "firstPrNumber": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+      },
+      "required": [
+        "enabled",
+        "due",
+        "dismissedAt",
+        "firstPrAt",
+        "firstPrNumber",
+      ],
+      "type": "object",
+    },
     "id": {
       "type": "string",
     },

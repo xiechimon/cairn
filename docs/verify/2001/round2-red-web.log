@@ -1,0 +1,79 @@
+[heavy-slots] acquired slot 1/2
+[WebServer] (node:174) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/mnt/fast/lanes/cairn-2001/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:296) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+(node:344) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/first-pr-report.spec.ts:92:1 › users enable the team prompt, persist it, and permanently dismiss the card through the UI (5.3s)
+(node:437) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 e2e/first-pr-report.spec.ts:115:1 › a failed team-setting save stays off and displays an error (5.3s)
+
+
+  1) e2e/first-pr-report.spec.ts:92:1 › users enable the team prompt, persist it, and permanently dismiss the card through the UI 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: getByRole('switch', { name: 'First-PR community prompt' })
+    Expected: "false"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveAttribute" getByRole('switch', { name: 'First-PR community prompt' }) with timeout 5000ms
+      - waiting for getByRole('switch', { name: 'First-PR community prompt' })
+
+
+       95 |   await page.goto('/app/account');
+       96 |   const setting = page.getByRole('switch', { name: 'First-PR community prompt' });
+    >  97 |   await expect(setting).toHaveAttribute('aria-checked', 'false');
+          |                         ^
+       98 |   await setting.click();
+       99 |   await expect(setting).toHaveAttribute('aria-checked', 'true');
+      100 |   await page.reload();
+        at /mnt/fast/lanes/cairn-2001/apps/web/e2e/first-pr-report.spec.ts:97:25
+
+    Error Context: test-results/first-pr-report-users-enab-9a0fb-iss-the-card-through-the-UI/error-context.md
+
+  2) e2e/first-pr-report.spec.ts:115:1 › a failed team-setting save stays off and displays an error 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: getByRole('switch', { name: 'First-PR community prompt' })
+    Expected: "false"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveAttribute" getByRole('switch', { name: 'First-PR community prompt' }) with timeout 5000ms
+      - waiting for getByRole('switch', { name: 'First-PR community prompt' })
+
+
+      120 |   await page.goto('/app/account');
+      121 |   const setting = page.getByRole('switch', { name: 'First-PR community prompt' });
+    > 122 |   await expect(setting).toHaveAttribute('aria-checked', 'false');
+          |                         ^
+      123 |   await setting.click();
+      124 |   await expect(page.locator('[data-sonner-toast]').first()).toContainText('保存失败，请重试。');
+      125 |   await expect(setting).toHaveAttribute('aria-checked', 'false');
+        at /mnt/fast/lanes/cairn-2001/apps/web/e2e/first-pr-report.spec.ts:122:25
+
+    Error Context: test-results/first-pr-report-a-failed-t-82199-s-off-and-displays-an-error/error-context.md
+
+  2 failed
+    e2e/first-pr-report.spec.ts:92:1 › users enable the team prompt, persist it, and permanently dismiss the card through the UI 
+    e2e/first-pr-report.spec.ts:115:1 › a failed team-setting save stays off and displays an error ─
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-2001/apps/web
+
