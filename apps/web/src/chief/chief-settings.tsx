@@ -114,8 +114,8 @@ export function ChiefSettings({
           {t('总管设置')}
         </h1>
       </header>
-      <div className="flex-1 overflow-x-hidden overflow-y-auto">
-        <div data-testid="chief-settings-col" className="mx-auto w-192 pt-4 pb-6">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto px-4">
+        <div data-testid="chief-settings-col" className="mx-auto w-192 max-w-full pt-4 pb-6">
           <SegmentedTabs
             slide
             value={tab}

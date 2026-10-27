@@ -26,7 +26,7 @@ async function stubBoot(page: Page) {
 
 async function openChiefComposer(page: Page) {
   await stubBoot(page);
-  await page.goto('/app');
+  await page.goto('/app?view=board');
 
   await page.getByRole('button', { name: '总管', exact: true }).click();
   const input = page.getByTestId('chief-composer-input');
@@ -136,7 +136,7 @@ test('fixture face: zero writes, zero reads (A0 S11 shape)', async ({ page }) =>
     ([key, value]) => localStorage.setItem(key, value),
     [DRAFT_KEY, 'SEEDED-BY-TEST'],
   );
-  await page.goto('/app?scenario=111');
+  await page.goto('/app?view=board&scenario=111');
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
 

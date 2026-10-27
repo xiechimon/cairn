@@ -115,6 +115,8 @@ function toUsageRows(
         outputTokens: number;
         cacheReadInputTokens: number;
         cacheCreationInputTokens: number;
+        costUSD?: number;
+        costBasis?: string;
       }
     >;
     usage?: {
@@ -122,28 +124,56 @@ function toUsageRows(
       output_tokens?: number;
       cache_read_input_tokens?: number;
       cache_creation_input_tokens?: number;
+      cache_creation?: {
+        ephemeral_5m_input_tokens?: number;
+        ephemeral_1h_input_tokens?: number;
+      };
     };
   },
   modelId: string | undefined,
 ): ModelUsage[] {
   const entries = Object.entries(msg.modelUsage ?? {});
   if (entries.length > 0) {
-    return entries.map(([key, mu]) => ({
-      model: `${USAGE_MODEL_PREFIX}/${key}`,
-      input: mu.inputTokens,
-      output: mu.outputTokens,
-      cacheRead: mu.cacheReadInputTokens,
-      cacheWrite: mu.cacheCreationInputTokens,
-    }));
+    return entries.map(([key, mu]) => {
+      const flat = msg.usage?.cache_creation_input_tokens ?? 0;
+      const nested = msg.usage?.cache_creation;
+      const nestedWrite =
+        (nested?.ephemeral_5m_input_tokens ?? 0) + (nested?.ephemeral_1h_input_tokens ?? 0);
+      const cacheWrite =
+        mu.cacheCreationInputTokens > 0
+          ? mu.cacheCreationInputTokens
+          : entries.length === 1 && flat > 0
+            ? flat
+            : entries.length === 1
+              ? nestedWrite
+              : 0;
+      const cost =
+        mu.costBasis === 'unknown' || typeof mu.costUSD !== 'number' || mu.costUSD === 0
+          ? undefined
+          : { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: mu.costUSD };
+      return {
+        model: `${USAGE_MODEL_PREFIX}/${key}`,
+        input: mu.inputTokens,
+        output: mu.outputTokens,
+        cacheRead: mu.cacheReadInputTokens,
+        cacheWrite,
+        ...(cost !== undefined ? { cost } : {}),
+      };
+    });
   }
   if (msg.usage && modelId !== undefined) {
+    const flat = msg.usage.cache_creation_input_tokens ?? 0;
+    const nested = msg.usage.cache_creation;
     return [
       {
         model: `${USAGE_MODEL_PREFIX}/${modelId}`,
         input: msg.usage.input_tokens ?? 0,
         output: msg.usage.output_tokens ?? 0,
         cacheRead: msg.usage.cache_read_input_tokens ?? 0,
-        cacheWrite: msg.usage.cache_creation_input_tokens ?? 0,
+        cacheWrite:
+          flat > 0
+            ? flat
+            : (nested?.ephemeral_5m_input_tokens ?? 0) + (nested?.ephemeral_1h_input_tokens ?? 0),
       },
     ];
   }

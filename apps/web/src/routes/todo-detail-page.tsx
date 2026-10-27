@@ -666,7 +666,7 @@ export function TodoDetailPage() {
 
   return (
     <div
-      className="detail-shell flex h-full overflow-hidden bg-(--surface-1) [--detail-pane-right:488px] max-[816px]:[--detail-pane-right:0px] [&>.board-sidebar]:max-[816px]:hidden"
+      className="detail-shell flex h-full overflow-hidden bg-(--surface-1) [--detail-pane-right:488px] max-[816px]:[--detail-pane-right:0px] [&>.app-menu-trigger]:hidden [&>.board-sidebar]:max-[816px]:hidden"
       data-route="todo-detail"
       data-todo-id={id}
     >

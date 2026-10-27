@@ -4,7 +4,7 @@ const drawer = (page: Page) => page.locator('.chief-drawer');
 const dialog = (page: Page) => page.getByRole('dialog', { name: '新建任务' });
 
 async function openDialogOverDrawer(page: Page) {
-  await page.goto('/app?scenario=111');
+  await page.goto('/app?scenario=111&view=board');
   await expect(drawer(page)).toBeVisible();
   // the docked panel slides in (anim-drawer) — wait for the entrance to
   // settle so hit-tests run against the resting geometry

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('CDS board: bare columns, cards at --radius-card 20px + panel-shadow', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await page.waitForSelector('.board-column');
   await page.waitForSelector('.todo-card');
 

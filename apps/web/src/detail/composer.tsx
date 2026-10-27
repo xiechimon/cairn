@@ -17,6 +17,7 @@
 // derived from either live REST hooks or the fixture set.
 
 import { useLayoutEffect, useState } from 'react';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
@@ -36,7 +37,7 @@ const COMPOSER_INPUT =
 const COMPOSER_TOOL =
   'flex size-7 cursor-pointer items-center justify-center border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0';
 const COMPOSER_SQUARE =
-  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-[8px] border-none p-0 active:not-aria-[haspopup]:translate-y-0';
+  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-(--cds-radius-lg) border-none p-0 active:not-aria-[haspopup]:translate-y-0';
 
 interface ComposerProps {
   placeholder: string;
@@ -251,33 +252,45 @@ export function Composer({
         className="composer-toolbar absolute bottom-3.5 left-2.5 flex items-center"
         data-testid="composer-toolbar"
       >
-        <Button
-          variant="ghost"
-          className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto`}
-          aria-label={t('添加附件')}
-          disabled={attaching || !onAttachment}
-          onClick={openFilePicker}
+        <IconTooltip
+          label={t('添加附件')}
+          trigger={
+            <Button
+              variant="ghost"
+              className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto`}
+              disabled={attaching || !onAttachment}
+              onClick={openFilePicker}
+            />
+          }
         >
           <Paperclip width={16} height={16} />
-        </Button>
+        </IconTooltip>
         {aiReview && (
-          <Button
-            variant="ghost"
-            className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
-            aria-label={t('AI 审核')}
-            onClick={onReview}
+          <IconTooltip
+            label={t('AI 审核')}
+            trigger={
+              <Button
+                variant="ghost"
+                className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
+                onClick={onReview}
+              />
+            }
           >
             <SearchPlus width={16} height={16} />
-          </Button>
+          </IconTooltip>
         )}
-        <Button
-          variant="ghost"
-          className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
-          aria-label={t('提及')}
-          onClick={togglePicker}
+        <IconTooltip
+          label={t('提及')}
+          trigger={
+            <Button
+              variant="ghost"
+              className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
+              onClick={togglePicker}
+            />
+          }
         >
           <Grid2x2 width={16} height={16} />
-        </Button>
+        </IconTooltip>
       </div>
       {streaming && (
         <Button
@@ -286,7 +299,7 @@ export function Composer({
           aria-label={t('停止')}
           onClick={onStop}
         >
-          <span className="size-2.5 rounded-[2px] bg-current" />
+          <span className="size-2.5 rounded-(--cds-radius-xs) bg-current" />
         </Button>
       )}
       <Button

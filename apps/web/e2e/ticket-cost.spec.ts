@@ -109,7 +109,10 @@ const NEVER_RAN = wireCard('todo-never-ran', 24, '没跑过的票', {
   latestBuildId: null,
   buildHistory: [],
 });
-const ALL = [PRICED, SUB_CENT, UNPRICED, NEVER_RAN];
+const FREE = wireCard('todo-free', 25, 'Known free', {
+  usageCost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, priced: true },
+});
+const ALL = [PRICED, SUB_CENT, UNPRICED, FREE, NEVER_RAN];
 
 async function stubWorld(page: Page) {
   await page.route('**/api/**', (route, request) => {
@@ -146,7 +149,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     test('board cards show the summed amount, `—` with a reason, or nothing', async ({ page }) => {
       await stubWorld(page);
-      await page.goto('/app');
+      await page.goto('/app?view=board');
       await expect(card(page, NEVER_RAN.id)).toBeVisible();
       await evidencePanelShot(page, `card-cost-${theme}.png`, card(page, PRICED.id));
 
@@ -155,9 +158,12 @@ for (const theme of ['light', 'dark'] as const) {
       const unpriced = card(page, UNPRICED.id).getByTestId('card-cost');
       await expect(unpriced).toHaveText('—');
       await expect(unpriced).toHaveAttribute('title', NO_PRICE_REASON);
+      const free = card(page, FREE.id).getByTestId('card-cost');
+      await expect(free).toHaveText('$0.00');
+      await expect(free).not.toHaveAttribute('title', NO_PRICE_REASON);
       await expect(card(page, NEVER_RAN.id).getByTestId('card-cost')).toHaveCount(0);
 
-      for (const todo of [PRICED, SUB_CENT, UNPRICED]) {
+      for (const todo of [PRICED, SUB_CENT, UNPRICED, FREE]) {
         const gaps = await card(page, todo.id).evaluate((root) => {
           const amount = root.querySelector('[data-testid="card-cost"]')?.getBoundingClientRect();
           const strip = root.querySelector('.todo-card-meta > div')?.getBoundingClientRect();
@@ -216,6 +222,14 @@ for (const theme of ['light', 'dark'] as const) {
     });
   });
 }
+
+test('detail: a known free price reads $0.00', async ({ page }) => {
+  await stubWorld(page);
+  const cost = await openTokenSection(page, FREE.id);
+  await expect(cost.getByTestId('cost-total')).toHaveText('$0.00');
+  await expect(cost.getByTestId('cost-output')).toHaveText('$0.00');
+  await expect(cost.getByText(NO_PRICE_REASON)).toHaveCount(0);
+});
 
 test('detail: a sub-cent total is not rounded to $0.00', async ({ page }) => {
   await stubWorld(page);

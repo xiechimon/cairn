@@ -28,8 +28,28 @@ export const EN: Record<string, string> = {
   // Paper 顶栏等你处理摘要：数字单独着色，后接本串（「3 项等你处理」→「3 waiting on you」）
   项等你处理: 'waiting on you',
   没有等你处理的事: 'Nothing is waiting on you',
+  '{greeting}，{name}': '{greeting}, {name}',
+  夜深了: 'Good night',
+  早上好: 'Good morning',
+  中午好: 'Good afternoon',
+  下午好: 'Good afternoon',
+  晚上好: 'Good evening',
+  与总管的对话: 'Conversation with the Chief',
+  '{running} 个任务运行中，今天合并了 {done} 个': '{running} tasks running, {done} merged today',
+  '，': ', ',
+  '{n} 项待你处理': '{n} waiting on you',
+  '，没有需要你的事': ', nothing needs you',
+  往上滑查看昨天的对话: "Scroll up for yesterday's conversation",
+  往上滑查看之前的对话: 'Scroll up for earlier conversation',
+  '过去 24 小时各项目的情况：': 'Projects in the last 24 hours:',
+  '过去 24 小时各项目没有新进展': 'No project activity in the last 24 hours',
+  '完成 {n} 个': '{n} done',
+  '{n} 个运行中': '{n} running',
+  '{n} 项待处理': '{n} waiting',
+  '有 {n} 件事需要你处理：': '{n} need you:',
+  今天的概况: "Today's overview",
+  已转给任务: 'Passed to task',
   定时: 'Schedules',
-  需要我处理: 'Needs me',
   '{n} 台机器在线': '{n} machines online',
   '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
@@ -37,10 +57,16 @@ export const EN: Record<string, string> = {
   新建项目: 'New project',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
   '新任务：接下来让 agent 做什么？': 'New task: What should the agent do next?',
-  等你处理: 'Waiting on you',
-  查看全部: 'View all',
   '上次查看后：{done} 个完成，{failed} 个新失败':
     '{done} completed, {failed} new failures since last visit',
+  '较早的 {count} 条': '{count} older',
+  '超过 7 天没动': 'untouched for over 7 days',
+  需要你: 'Needs you',
+  在跑: 'Running',
+  做完了: 'Done',
+  看板: 'Board',
+  打开看板: 'Open the board',
+  '还没开始的 {count} 条': '{count} not started',
   技能: 'Skills',
   密钥: 'Secrets',
   机器: 'Machines',
@@ -48,6 +74,7 @@ export const EN: Record<string, string> = {
   用量: 'Usage',
   收起侧边栏: 'Collapse sidebar',
   展开侧边栏: 'Expand sidebar',
+  侧边栏: 'Sidebar',
   '收起{label}': 'Collapse {label}',
   '展开{label}': 'Expand {label}',
   总管: 'Chief',
@@ -201,7 +228,7 @@ export const EN: Record<string, string> = {
   '{y}年{mo}月{d}日 {hh}:{mm} 创建': 'Created {monthShort} {d}, {y} {hh}:{mm}',
 
   // —— user-menu popover (r7 §3.5; 新功能/快捷键 行随 #163 隐去，键同删） ——
-  帐号: 'Account',
+  账号: 'Account',
   'API 密钥': 'API keys',
   外观: 'Appearance',
   浅色: 'Light',
@@ -914,6 +941,7 @@ export const EN: Record<string, string> = {
   搜索仓库: 'Search repositories',
   没有匹配的仓库: 'No matching repositories',
   断开连接: 'Disconnect',
+  'GitHub 连接已断开': 'GitHub connection disconnected',
   已连接: 'Connected',
   '手动输入 owner/repo': 'Enter owner/repo manually',
   // wayfinder #181 add-machine dialog family (r2 11b verbatim copy; the
@@ -953,7 +981,8 @@ export const EN: Record<string, string> = {
   // spec 非空承载（附件 token 注入后归 spec）,标签 add 仍为桩（本票不动）。
   // （#640：开始任务 dialog 统一面的 规划/执行/在线/离线/选择 Agent 五键随
   // 选择面撤销退役——开始入口不再有 dialog 选择器。）
-  '放弃新建任务？未保存的内容将丢失。': 'Discard this new task? Unsaved content will be lost.',
+  '放弃新建任务？': 'Discard this new task?',
+  '未保存的内容将丢失。': 'Unsaved content will be lost.',
   继续编辑: 'Keep editing',
   放弃并关闭: 'Discard and close',
 
@@ -1031,10 +1060,6 @@ export const EN: Record<string, string> = {
   可跑: 'Runnable',
   不可跑: 'Not runnable',
   '暂无机器。': 'No machines yet.',
-  // XMON-113：机器行 shell 开关的副文案（机器侧半边；{tool} 插值 = 上面那条
-  // AGENT_TOOL_SHELL 的 en 值，两层开关共用同一词）。
-  '已授权「{tool}」的 Agent 可在该机器上执行命令。':
-    'Agents you have granted {tool} to can run commands on this machine.',
   // #895 机器页三态读标注（spec 21 A8；orchestration 块 join 行集）+ chief
   // 设置 Agent tab「机器」槽的描述（A6）。徽标/状态 = 机器与总管编排的
   // 关系面，非机器自身状态。
@@ -1051,7 +1076,6 @@ export const EN: Record<string, string> = {
     'Which team skills this Agent may read. Unrestricted reads everything; once restricted, only the checked skills are readable and every unchecked one is denied. Unrestricted and nothing-checked are two different states, switchable either way.',
   // shared canon（packages/shared/src/records/agent.ts、memory.ts），经 t()
   // 消费、不作字面量出现——i18n-coverage COMPUTED_KEYS 登记。
-  '远程 shell': 'Remote shell',
   合并分支: 'Merge branches',
   创建标签: 'Create tags',
   推送分支: 'Push branches',
@@ -1059,8 +1083,6 @@ export const EN: Record<string, string> = {
   更新技能: 'Update skills',
   运行时: 'Runtime',
   '内置 (pi)': 'Built-in (pi)',
-  '允许该 Agent 在团队中已开启 shell 访问的机器上执行命令。':
-    'Allow this Agent to run commands on machines where shell access is enabled for the team.',
   '允许该 Agent 通过合并分支进行发布（例如将 develop 合并进 main）。':
     'Let this Agent publish by merging branches (for example develop into main).',
   '允许该 Agent 创建 git tag，这可能触发发布流程。':
@@ -1193,4 +1215,27 @@ export const EN: Record<string, string> = {
   '已下架，运行时会跳过该备选': 'Delisted; this fallback is skipped at run time',
   '归属机 {machine} 未开启 {runtime} runtime，运行时会跳过该备选':
     'Home machine {machine} has the {runtime} runtime off; this fallback is skipped at run time',
+  执行: 'Build',
+  合并: 'Merge',
+  待你处理: 'Waiting on you',
+  '需要你回答、确认或检查的任务会出现在这里。':
+    'Tasks that need your answer, confirmation or check show up here.',
+  运行中: 'Running',
+  没有运行中的任务: 'No running tasks',
+  没有待开始的任务: 'No tasks waiting to start',
+  还没有已完成的任务: 'No finished tasks yet',
+  '运行失败。可以在下方说明后重跑，或展开查看过程。':
+    'The run failed. Explain below to rerun it, or expand to see what happened.',
+  '方案已写好，确认后开始执行。': 'The plan is ready. Confirm it to start the build.',
+  '改动已完成，审阅后合并。': 'The changes are done. Review them to merge.',
+  'Agent 在等你的回复。': 'The agent is waiting for your reply.',
+  任务面板: 'Task panel',
+  关闭面板: 'Close panel',
+  未开始: 'Not started',
+  展开为整页: 'Open as full page',
+  找不到这个任务: 'This task was not found',
+  '进度 · {done}/{total}': 'Progress · {done}/{total}',
+  引导这个任务: 'Steer this task',
+  '回复 agent…': 'Reply to the agent…',
+  '引导这个任务…': 'Steer this task…',
 };

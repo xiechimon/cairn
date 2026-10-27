@@ -1,6 +1,0 @@
-[before] thread sent: 201
-[before] turn finished. ask rows = 0
-[before] chief_message contents contain ask tool result: true
-[before] any ask_user_question kind row: false
-[before] notification rows: 1
-[before] RED (no question row on main): true

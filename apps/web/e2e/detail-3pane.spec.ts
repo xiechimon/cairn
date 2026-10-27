@@ -248,8 +248,6 @@ test('fresh phase: the brief owns the whole center column, right pane collapses'
     .evaluate((el) => Math.round(el.getBoundingClientRect().width));
   expect(center).toBe(1440 - 248);
 
-  // the task title names the page twice: as the top bar's h1 (XMON-55 P1;
-  // Paper PR 7 makes it the serif page title) and as the brief's own heading
   const title = '在 README.md 末尾追加一行「r7 rebaseline probe」';
   await expect(page.getByRole('heading', { level: 1, name: title })).toHaveText(title);
   await expect(page.getByTestId('detail-title')).toHaveText(title);

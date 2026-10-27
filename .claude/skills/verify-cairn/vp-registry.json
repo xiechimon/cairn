@@ -55,7 +55,7 @@
       "recipe": null,
       "cases": {
         "rename-and-notify-toggle": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1031-account-controls.mjs",
+          "script": "docs/verify/1031/drive-1031-account-controls.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -93,7 +93,7 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         },
         "ui-cleanup-finale": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-952-finale.mjs",
+          "script": "docs/verify/952/drive-952-finale.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -207,7 +207,7 @@
           "purpose": "New-task dialog end to end: card on the board, GET /api/todos row and SQLite row; creates the default project when none exists."
         },
         "overlay-css-migration": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-948-overlay.mjs",
+          "script": "docs/verify/948/drive-948-overlay.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -272,7 +272,7 @@
       "recipe": "features/chief-dispatch-judgment.md",
       "cases": {
         "dispatch-judgment": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-903-dispatch-judgment.mjs",
+          "script": "docs/verify/903/drive-903-dispatch-judgment.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -306,7 +306,7 @@
       "recipe": null,
       "cases": {
         "a0-live": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1009-a0-live.mjs",
+          "script": "docs/verify/1009/drive-1009-a0-live.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -321,7 +321,7 @@
       "recipe": "features/chief-segments.md",
       "cases": {
         "avatar-geometry": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1033-avatar.mjs",
+          "script": "docs/verify/1033/drive-1033-avatar.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -365,7 +365,7 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         },
         "threads-scroll": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1094-threads-scroll.mjs",
+          "script": "docs/verify/1094/drive-1094-threads-scroll.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -411,7 +411,7 @@
           "usage": "[--skip-build]; env RUNNING_ID, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
         },
         "detail-live-migration": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-951-detail.mjs",
+          "script": "docs/verify/951/drive-951-detail.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -424,7 +424,7 @@
           "note": "static check by /code-review on #1411: reads .ui-checkbox input, a class apps/web/src no longer has."
         },
         "machine-pin": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1208-machine-pin.mjs",
+          "script": "docs/verify/1208/drive-1208-machine-pin.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -451,7 +451,7 @@
       "recipe": null,
       "cases": {
         "dual-source": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1213-dual-source.mjs",
+          "script": "docs/verify/1213/drive-1213-dual-source.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -516,7 +516,7 @@
       "recipe": null,
       "cases": {
         "gate-actor": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-902-gate-actor.mjs",
+          "script": "docs/verify/902/drive-902-gate-actor.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -710,7 +710,7 @@
       "recipe": "features/local-daemon-executor.md",
       "cases": {
         "local-unreachable": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1210-local-unreachable.mjs",
+          "script": "docs/verify/1210/drive-1210-local-unreachable.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -776,7 +776,7 @@
       "recipe": null,
       "cases": {
         "capability-gate": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1251-capability-gate.mjs",
+          "script": "docs/verify/1251/drive-1251-capability-gate.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -793,7 +793,7 @@
       "recipe": "features/machine-concurrency.md",
       "cases": {
         "agent-concurrency-cap": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1138-agent-concurrency.mjs",
+          "script": "docs/verify/1138/drive-1138-agent-concurrency.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -804,7 +804,7 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         },
         "cap-and-queue": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1108-concurrency.mjs",
+          "script": "docs/verify/1108/drive-1108-concurrency.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -828,7 +828,7 @@
           "usage": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME"
         },
         "zombie-claim": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1065-zombie-claim.mjs",
+          "script": "docs/verify/1065/drive-1065-zombie-claim.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -875,7 +875,7 @@
       "recipe": "features/mcp-servers.md",
       "cases": {
         "command-gate-mcp-bridge": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-929-930.mjs",
+          "script": "docs/verify/929-930/drive-929-930.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -963,7 +963,7 @@
       "recipe": "features/persona-verify.md",
       "cases": {
         "persona-verify": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1250-persona-verify.mjs",
+          "script": "docs/verify/1250/drive-1250-persona-verify.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1017,7 +1017,7 @@
       "recipe": null,
       "cases": {
         "pi-policy": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-925-pi-policy.mjs",
+          "script": "docs/verify/925/drive-925-pi-policy.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1035,7 +1035,7 @@
       "recipe": null,
       "cases": {
         "plan-chain": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-904-plan-chain.mjs",
+          "script": "docs/verify/904/drive-904-plan-chain.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1048,7 +1048,7 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         },
         "plan-first-round": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1025-plan-first-round.mjs",
+          "script": "docs/verify/1025/drive-1025-plan-first-round.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1185,7 +1185,7 @@
       "recipe": null,
       "cases": {
         "quota-wait-resume": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1261-quota-wait.mjs",
+          "script": "docs/verify/1261/drive-1261-quota-wait.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1348,7 +1348,7 @@
       "recipe": null,
       "cases": {
         "secondary-domain": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-947-secondary.mjs",
+          "script": "docs/verify/947/drive-947-secondary.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -1390,7 +1390,7 @@
       "recipe": "features/skills-injection.md",
       "cases": {
         "claim-injection": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1106-skill-inject.mjs",
+          "script": "docs/verify/1106/drive-1106-skill-inject.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -1401,7 +1401,7 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         },
         "injection-check": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1186-skill-injection.mjs",
+          "script": "docs/verify/1186/drive-1186-skill-injection.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1417,7 +1417,7 @@
           "note": "static spot-check by the #1402 inventory, not executed: Repo root is hardcoded to /workspace (reads /workspace/.claude/verify-run/ports.json) and ignores VERIFY_REPO_ROOT/VERIFY_RUN_DIR, so it does not run from a worktree lane as written."
         },
         "native-plugin": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1171-native-plugin.mjs",
+          "script": "docs/verify/1171/drive-1171-native-plugin.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1429,7 +1429,7 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         },
         "skill-read-facts": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-918-skill-facts.mjs",
+          "script": "docs/verify/918/drive-918-skill-facts.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1442,7 +1442,7 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         },
         "skills-manifest": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-920-skills-manifest.mjs",
+          "script": "docs/verify/920/drive-920-skills-manifest.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1454,7 +1454,7 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         },
         "skills-routing": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-919-skills-routing.mjs",
+          "script": "docs/verify/919/drive-919-skills-routing.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1468,7 +1468,7 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         },
         "skills-split": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1169-skills-split.mjs",
+          "script": "docs/verify/1169/drive-1169-skills-split.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1503,7 +1503,7 @@
       "recipe": null,
       "cases": {
         "hang-retry": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1257-hang-retry.mjs",
+          "script": "docs/verify/1257/drive-1257-hang-retry.mjs",
           "args": [],
           "needs": [
             "stack",
@@ -1595,7 +1595,7 @@
       "recipe": null,
       "cases": {
         "thinking-truncate": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1034-thinking-truncate.mjs",
+          "script": "docs/verify/1034/drive-1034-thinking-truncate.mjs",
           "args": [],
           "needs": [
             "stack"
@@ -1611,7 +1611,7 @@
       "recipe": null,
       "cases": {
         "unassigned-build": {
-          "script": ".claude/skills/verify-cairn/scripts/drive-1104-unassigned-build.mjs",
+          "script": "docs/verify/1104/drive-1104-unassigned-build.mjs",
           "args": [],
           "needs": [
             "stack",

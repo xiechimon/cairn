@@ -5,8 +5,113 @@
     "reason": "改名前就存在的闭包：用循环内的状态，内联会把 SSE 回调撑长；改名 PR 触碰该文件才被闸扫到"
   },
   {
+    "path": "apps/web/src/board/home.tsx",
+    "name": "NeedsYouInbox",
+    "reason": "React component with its own fold state hook; inlining it would put useState and the fresh/stale split inside the 300-line BoardSurface render"
+  },
+  {
     "path": "apps/web/src/board/board.tsx",
-    "name": "NeedsYouStrip",
-    "reason": "React component with its own hooks and an early return when nothing needs attention; inlining it would put conditional hook-free JSX and the attention filter inside the 300-line BoardSurface render"
+    "name": "StalePendingLink",
+    "reason": "React component with its own i18n and location hooks, rendered inside the pending column's map; inlining would call hooks from the column loop"
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "workerSkillInjection",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "claimCandidates",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "claimChiefCandidates",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "claimLocalTools",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "buildChiefClaim",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "holdStepForQuota",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "recordSkillInjectionCheck",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "workerStepContext",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-step-token.ts",
+    "name": "chiefStepToken",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/web/src/chief/chief-conversation.tsx",
+    "name": "readStoredChiefDraft",
+    "reason": "Moved unchanged from chief-drawer.tsx when the drawer body became the shared ChiefConversation; the try/catch around localStorage would bloat the useState initializer"
+  },
+  {
+    "path": "apps/web/src/chief/chief-conversation.tsx",
+    "name": "copyText",
+    "reason": "Moved unchanged from chief-drawer.tsx; passed as the onCopy callback of every message row, not called inline"
+  },
+  {
+    "path": "apps/web/src/chief/chief-conversation.tsx",
+    "name": "toggleTools",
+    "reason": "Moved unchanged from chief-drawer.tsx; passed as the onToggleTools callback of every message row, not called inline"
+  },
+  {
+    "path": "apps/web/src/chief/chief-message-rows.tsx",
+    "name": "HandoffRow",
+    "reason": "React component that reads TodoGlanceContext with its own hook; inlining it would put useContext inside the row switch"
+  },
+  {
+    "path": "apps/web/src/api/mappers.ts",
+    "name": "handoffTodoOf",
+    "reason": "Named predicate for a successful message_todo call; inlining it puts four guards inside the stream collection loop"
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "OpenPanel",
+    "reason": "React component mounted only while the panel is open; it owns the Escape listener and the focus effect, so inlining would run them behind the early return in TaskPanel."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "ListView",
+    "reason": "React component with its own fold state hooks, rendered only in the list branch; inlining would call useState conditionally."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "TaskRow",
+    "reason": "React component rendered inside the group map with its own i18n hook; inlining would call hooks from the loop."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "TaskDetail",
+    "reason": "React component keyed by task id so its composer ref and children reset per task; inlining loses the key boundary and calls hooks conditionally."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "LastSummary",
+    "reason": "React component that owns the messages query for one task, rendered only when the task is known; inlining would call the query hook conditionally."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "PanelComposer",
+    "reason": "React component that owns the steps query, mutations and draft state for one task, rendered only when the task is known; inlining would call those hooks conditionally."
   }
 ]

@@ -2,9 +2,9 @@
 
 The ruling canonical copy = `docs/adr/0014-chief-dispatch-verdict-authority-rests-with-chief-overridable.md` (rework round,
 overturning round 1's ADR 0013 settings-slot scheme). Probe =
-`.claude/skills/verify-pacman/scripts/drive-903-dispatch-judgment.mjs`，
-2026-10-08 live **12/12 PASS**（隔离栈 8795/5277，全新库，零 daemon 零 LLM，
-假机器走真 machine wire）。
+`.claude/skills/verify-pacman/scripts/drive-903-dispatch-judgment.mjs`,
+2026-10-08 live **12/12 PASS** (isolated stack 8795/5277, fresh DB, no daemon, no LLM,
+fake machine on real machine wire).
 
 Round-1 evidence (the settings-slot face: four ChiefDispatchSelect screenshots + PATCH round trips + clamp proof, 14/14 PASS) was invalidated wholesale when the settings slot was deleted by ADR 0014 D1 and has been removed from this directory — it can be recovered from git history at commit `c16714b3`, and its raw permanent links (pinned to the old SHA) still resolve.
 
@@ -13,7 +13,7 @@ Round-1 evidence (the settings-slot face: four ChiefDispatchSelect screenshots +
 | assertion | ruling | artifact |
 |---|---|---|
 | S0 bedding (project + three todos) | — | `result.json` ids |
-| U1 Agent tab has no `派发方式` row; the neighboring machine/compress-model rows are intact | D1 (no dummy controls left) | `01-settings-agent-no-dispatch-row.png` |
+| U1 Agent tab has no dispatch-mode row; the neighboring machine/compress-model rows are intact | D1 (no dummy controls left) | `01-settings-agent-no-dispatch-row.png` |
 | A1 PATCH dispatchWithPlan alone → 400 | D1 (slot dead state) | `patch-reject-and-envelope.json` |
 | A2 PATCH mixed payload → 200 with the key stripped, the envelope carries no dispatchWithPlan | D1 (contract face dead state) | same |
 | E1a systemPrompt dispatch-judgment section: Mika's discipline verbatim + the three signals + the review gate always present + dispatchReason + on-the-spot overturn affects only this one time; no hard-wired `withPlan:false` instruction, no settings-synthesis residue | D5/D3/D4 | `claim-e1.json` (the judgment section's two lines verbatim + the run_builds definition) |

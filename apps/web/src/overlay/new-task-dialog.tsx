@@ -1,11 +1,17 @@
 import type { ClipboardEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertDialog, AlertDialogContent } from '../components/ui/alert-dialog.js';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_HEAD_CLS,
   DIALOG_PANEL_CLS,
   DIALOG_PRIMARY_BUTTON,
+  DIALOG_SUBTITLE_CLS,
   DIALOG_TEXT_BUTTON,
   DIALOG_TITLE_CLS,
   DialogFootRow,
@@ -37,10 +43,10 @@ import { usePendingAttachments } from './pending-attachments.js';
 const PROJECT_CHIP_CLS =
   "new-task-project flex h-auto min-w-0 cursor-pointer items-center justify-start gap-2 border-none bg-transparent p-0 font-normal text-(--foreground) hover:bg-transparent hover:text-(--foreground) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg]:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
-const PROJECT_MENU_CLS = 'new-task-project-menu w-55 gap-0 rounded-lg p-1';
+const PROJECT_MENU_CLS = 'new-task-project-menu w-55 gap-0 p-(--menu-pad)';
 
 const OPTION_ROW_CLS =
-  'new-task-project-row flex h-8 w-full cursor-pointer items-center justify-start gap-2 rounded-md border-none bg-transparent px-2 text-left text-ui font-normal text-foreground aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 disabled:pointer-events-auto';
+  'new-task-project-row flex h-8 w-full cursor-pointer items-center justify-start gap-2 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 disabled:pointer-events-auto';
 
 const DISCARD_PANEL_CLS = `new-task-discard grid-rows-[auto_auto] data-[size=default]:max-w-none data-[size=default]:sm:max-w-none ${DIALOG_PANEL_CLS}`;
 
@@ -546,10 +552,17 @@ export function NewTaskDialog({
         <AlertDialogContent
           className={DISCARD_PANEL_CLS}
           style={{ width: dialogWidth('s') }}
-          aria-label={t('放弃新建任务？未保存的内容将丢失。')}
+          aria-label={t('放弃新建任务？')}
         >
           <div data-testid="dialog-head" className={DIALOG_HEAD_CLS}>
-            <div className={DIALOG_TITLE_CLS}>{t('放弃新建任务？未保存的内容将丢失。')}</div>
+            <div className="min-w-0 flex-1">
+              <AlertDialogTitle className={DIALOG_TITLE_CLS}>
+                {t('放弃新建任务？')}
+              </AlertDialogTitle>
+              <AlertDialogDescription className={DIALOG_SUBTITLE_CLS}>
+                {t('未保存的内容将丢失。')}
+              </AlertDialogDescription>
+            </div>
           </div>
           <DialogFootRow>
             <Button

@@ -92,7 +92,7 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
   await evidenceShot(page, 'delete-confirm-s.png');
 });
 
-test('dialog face: sheet surface, 16px corners, 16px serif title, 28px close', async ({ page }) => {
+test('dialog face: sheet surface, 16px corners, 16px sans title, 28px close', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, SECRETS, '添加密钥');
   await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f7f1e1'));
@@ -165,8 +165,8 @@ test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px pa
   await expect(menu).toBeVisible();
   await settle(menu);
   await expect(menu).toHaveCSS('border-top-left-radius', '18px');
-  await expect(menu).toHaveCSS('padding-top', '4px');
-  await expect(menu).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(menu).toHaveCSS('padding-top', '6px');
+  await expect(menu).toHaveCSS('background-color', 'rgb(255, 253, 246)');
 
   const rows = menu.getByRole('menuitem');
   const count = await rows.count();
@@ -193,8 +193,8 @@ test('user menu rides the same Paper menu face', async ({ page }) => {
   await expect(menu).toBeVisible();
   await settle(menu.locator('..'));
   await expect(menu).toHaveCSS('border-top-left-radius', '18px');
-  await expect(menu).toHaveCSS('padding-top', '4px');
-  for (const label of ['帐号', 'API 密钥', 'MCP']) {
+  await expect(menu).toHaveCSS('padding-top', '6px');
+  for (const label of ['账号', 'API 密钥', 'MCP']) {
     const row = menu.locator('a.user-menu-row', { hasText: label });
     expect((await row.boundingBox())?.height).toBe(32);
     await expect(row).toHaveCSS('font-size', '13.5px');

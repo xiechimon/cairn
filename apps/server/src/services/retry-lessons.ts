@@ -1,7 +1,25 @@
-import { buildRetryLessonsSection, REVIEW_VERDICT_KIND, reviewVerdictSchema } from '@cairn/shared';
+import {
+  buildRetryLessonsSection,
+  planVerificationItems,
+  REVIEW_VERDICT_KIND,
+  type ReviewVerdict,
+  reviewVerdictSchema,
+  VERIFY_VERDICT_KIND,
+  type VerifyVerdict,
+  verifyVerdictSchema,
+} from '@cairn/shared';
 import { and, desc, eq, gte, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, buildFeedback, gateVerdict, message, step } from '../db/schema.js';
+import {
+  build,
+  buildFeedback,
+  gateDigest,
+  gateState,
+  gateVerdict,
+  message,
+  plan,
+  step,
+} from '../db/schema.js';
 import { CI_FIX_GREEN_EVENT } from './ci-corrections.js';
 
 export const CI_FIX_PROMPT_HEAD = '[ci-fix]';
@@ -77,6 +95,8 @@ export function retryLessonsOf(db: Db, buildId: string): string | null {
     });
   }
 
+  const verifyFound: { at: number; verdict: VerifyVerdict }[] = [];
+  const reviewFound: { at: number; verdict: ReviewVerdict }[] = [];
   for (const row of db
     .select({ content: message.content, at: message.createdAt })
     .from(message)
@@ -88,16 +108,23 @@ export function retryLessonsOf(db: Db, buildId: string): string | null {
       ),
     )
     .all()) {
-    if (typeof row.content !== 'string' || !row.content.includes(REVIEW_VERDICT_KIND)) continue;
+    if (typeof row.content !== 'string') continue;
     let parsed: unknown;
     try {
       parsed = JSON.parse(row.content);
     } catch {
       continue;
     }
-    if ((parsed as { kind?: unknown } | null)?.kind !== REVIEW_VERDICT_KIND) continue;
+    const kind = (parsed as { kind?: unknown } | null)?.kind;
+    if (kind === VERIFY_VERDICT_KIND) {
+      const verdict = verifyVerdictSchema.safeParse((parsed as { verdict?: unknown }).verdict);
+      if (verdict.success) verifyFound.push({ at: row.at, verdict: verdict.data });
+      continue;
+    }
+    if (kind !== REVIEW_VERDICT_KIND) continue;
     const verdict = reviewVerdictSchema.safeParse((parsed as { verdict?: unknown }).verdict);
     if (!verdict.success) continue;
+    reviewFound.push({ at: row.at, verdict: verdict.data });
     const blocking = verdict.data.findings
       .filter((f) => f.severity === 'blocking')
       .map((f) => {
@@ -110,22 +137,137 @@ export function retryLessonsOf(db: Db, buildId: string): string | null {
     }
   }
 
-  for (const row of db
+  const gates = db
     .select()
     .from(gateVerdict)
-    .where(
-      and(
-        eq(gateVerdict.buildId, buildId),
-        eq(gateVerdict.outcome, 'block'),
-        gte(gateVerdict.createdAt, roundStart),
-      ),
-    )
+    .where(and(eq(gateVerdict.buildId, buildId), gte(gateVerdict.createdAt, roundStart)))
+    .all();
+  const digestAt: { at: number; digest: string }[] = [];
+  for (const row of gates) {
+    if (row.patchDigest !== null) digestAt.push({ at: row.createdAt, digest: row.patchDigest });
+  }
+  for (const row of db
+    .select({ at: gateDigest.createdAt, digest: gateDigest.patchDigest })
+    .from(gateDigest)
+    .where(and(eq(gateDigest.buildId, buildId), gte(gateDigest.createdAt, roundStart)))
     .all()) {
+    digestAt.push(row);
+  }
+  const state = db.select().from(gateState).where(eq(gateState.buildId, buildId)).get();
+  if (state?.patchDigest != null && state.patchDigest !== '' && state.evaluatedAt >= roundStart) {
+    digestAt.push({ at: state.evaluatedAt, digest: state.patchDigest });
+  }
+  digestAt.sort((a, b) => b.at - a.at);
+  const latestDigest = digestAt[0]?.digest ?? null;
+  const verifyItems = planVerificationItems(
+    db
+      .select({ content: plan.content })
+      .from(plan)
+      .where(eq(plan.buildId, buildId))
+      .orderBy(desc(plan.version))
+      .get()?.content ?? '',
+  );
+  const evidencePlace = (ev: VerifyVerdict['evidence'][number]): string => {
+    const label = (ev.item !== undefined ? verifyItems[ev.item - 1] : undefined)
+      ?.replace(/\s+/g, ' ')
+      .trim();
+    const head =
+      ev.item === undefined
+        ? ''
+        : `item ${ev.item}${label !== undefined && label !== '' ? ` ${label}` : ''}`;
+    const place = head === '' ? ev.path : `${head} (${ev.path})`;
+    const note = ev.note !== undefined && ev.note.trim() !== '' ? `: ${ev.note.trim()}` : '';
+    return `${place}${note}`;
+  };
+  const claimClosest = <T extends { at: number }, G extends { createdAt: number }>(
+    messages: readonly T[],
+    rows: readonly G[],
+  ): Map<G, T> => {
+    const remaining = [...messages].sort((a, b) => a.at - b.at);
+    const ordered = [...rows].sort((a, b) => a.createdAt - b.createdAt);
+    const claimed = new Map<G, T>();
+    for (const [index, row] of ordered.entries()) {
+      const next = ordered[index + 1];
+      let best: T | undefined;
+      let bestDist = Number.POSITIVE_INFINITY;
+      for (const candidate of remaining) {
+        const dist = Math.abs(candidate.at - row.createdAt);
+        const nextDist =
+          next === undefined ? Number.POSITIVE_INFINITY : Math.abs(candidate.at - next.createdAt);
+        if (nextDist < dist) continue;
+        if (dist < bestDist) {
+          best = candidate;
+          bestDist = dist;
+        }
+      }
+      if (best === undefined) continue;
+      remaining.splice(remaining.indexOf(best), 1);
+      claimed.set(row, best);
+    }
+    return claimed;
+  };
+  const verifyByGate = claimClosest(
+    verifyFound,
+    gates.filter((row) => row.kind === 'verify'),
+  );
+  const reviewByGate = claimClosest(
+    reviewFound,
+    gates.filter((row) => row.kind === 'review'),
+  );
+  const latestVerify = gates
+    .filter(
+      (row) => row.kind === 'verify' && latestDigest !== null && row.patchDigest === latestDigest,
+    )
+    .sort((a, b) => b.createdAt - a.createdAt)[0];
+  const keepParts: string[] = [];
+  if (latestVerify !== undefined) {
+    const found = verifyByGate.get(latestVerify);
+    if (found === undefined) {
+      if (latestVerify.outcome === 'block') {
+        const perspective =
+          latestVerify.perspective !== null ? `（${latestVerify.perspective} 视角）` : '';
+        dated.push({
+          at: latestVerify.createdAt,
+          text: `合并闸的 verify 判定为 block${perspective}`,
+        });
+      }
+    } else if (found.verdict.passed) {
+      for (const ev of found.verdict.evidence) keepParts.push(evidencePlace(ev));
+    } else {
+      const lines = [`Verifier conclusion: ${found.verdict.conclusion}`];
+      for (const ev of found.verdict.evidence) lines.push(`Failed: ${evidencePlace(ev)}`);
+      dated.push({ at: latestVerify.createdAt, text: lines.join('\n') });
+    }
+  }
+  const seenKeep = new Set<string>();
+  for (const row of gates
+    .filter(
+      (gate) =>
+        gate.kind === 'review' &&
+        gate.outcome === 'pass' &&
+        latestDigest !== null &&
+        gate.patchDigest === latestDigest,
+    )
+    .sort((a, b) => a.createdAt - b.createdAt)) {
+    const found = reviewByGate.get(row);
+    if (found === undefined) continue;
+    if (found.verdict.findings.some((f) => f.severity === 'blocking')) continue;
+    const part = `${row.perspective ?? 'review'} review`;
+    if (seenKeep.has(part)) continue;
+    seenKeep.add(part);
+    keepParts.push(part);
+  }
+  for (const row of gates) {
+    if (row.outcome !== 'block') continue;
+    if (row.kind === 'verify' && row.patchDigest !== null) continue;
     const perspective = row.perspective !== null ? `（${row.perspective} 视角）` : '';
     dated.push({ at: row.createdAt, text: `合并闸的 ${row.kind} 判定为 block${perspective}` });
   }
 
   const newestFirst = dated.sort((a, b) => b.at - a.at).map((d) => d.text);
+  if (keepParts.length > 0) {
+    newestFirst.push(`Verified on the previous patch, keep working: ${keepParts.join('; ')}`);
+  }
   if (newestFirst.length > 0 && buildRow.errorMessage !== null) {
     newestFirst.unshift(`失败原因：${buildRow.errorMessage}`);
   }

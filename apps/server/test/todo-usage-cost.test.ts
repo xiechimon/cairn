@@ -105,11 +105,12 @@ describe('todo.usageCost: persisted cost columns summed over every build of the 
       cacheRead: 0,
       cacheWrite: 0,
       total: 0,
+      priced: true,
     });
     s.dispose();
   });
 
-  test('a todo whose runs reported no cost carries zeros; a todo with no usage rows carries no key', async () => {
+  test('an explicit zero cost is a known free price; a todo with no usage rows carries no key', async () => {
     const { s, todoIds } = await worldWithTodos(2);
     const [unpriced, untouched] = todoIds as [string, string];
     insertBuild(s, 'build-unpriced', unpriced);
@@ -125,7 +126,14 @@ describe('todo.usageCost: persisted cost columns summed over every build of the 
         ...NO_COST,
       })
       .run();
-    expect((await readTodo(s, unpriced)).usageCost?.total).toBe(0);
+    expect((await readTodo(s, unpriced)).usageCost).toEqual({
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      total: 0,
+      priced: true,
+    });
     const bare = await readTodo(s, untouched);
     expect(bare.usageCost).toBeUndefined();
     expect('usageCost' in bare).toBe(false);

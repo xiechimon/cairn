@@ -40,7 +40,7 @@ test.describe('FAB icon follows the bound agent (#444)', () => {
   test('bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=fab-avatar');
+    await page.goto('/app?view=board&scenario=fab-avatar');
 
     const fab = page.getByRole('button', { name: '总管', exact: true });
     const img = fab.locator('img');
@@ -65,7 +65,7 @@ test.describe('FAB icon follows the bound agent (#444)', () => {
   });
 
   test('avatarUrl override wins over the generated face', async ({ page }) => {
-    await page.goto('/app?scenario=fab-avatar-override');
+    await page.goto('/app?view=board&scenario=fab-avatar-override');
     await expect(page.getByRole('button', { name: '总管', exact: true }).locator('img')).toHaveAttribute(
       'src',
       '/avatar-robot-2.svg',
@@ -83,7 +83,7 @@ test.describe('FAB icon follows the bound agent (#444)', () => {
 
 test.describe('chief unread badge cap (#1303)', () => {
   test('unread 100 renders 99+ and the tooltip names the thread count', async ({ page }) => {
-    await page.goto('/app?scenario=chief-unread-cap');
+    await page.goto('/app?view=board&scenario=chief-unread-cap');
     const fab = page.getByRole('button', { name: '总管', exact: true });
     await expect(fab.locator('.fab-badge')).toHaveText('99+');
     await fab.hover();
@@ -91,7 +91,7 @@ test.describe('chief unread badge cap (#1303)', () => {
   });
 
   test('unread 99 stays 99', async ({ page }) => {
-    await page.goto('/app?scenario=chief-unread-99');
+    await page.goto('/app?view=board&scenario=chief-unread-99');
     await expect(page.getByRole('button', { name: '总管', exact: true }).locator('.fab-badge')).toHaveText('99');
   });
 });
@@ -100,7 +100,7 @@ test.describe('chief FAB brand states', () => {
   test('idle: a 40px disc on the card surface with body ink, the spiral holds still, no label', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?view=board&scenario=01');
     const fab = page.getByRole('button', { name: '总管', exact: true });
     await expect(fab).not.toHaveAttribute('data-expanded');
     await expect(fab).toHaveText('');
@@ -123,7 +123,7 @@ test.describe('chief FAB brand states', () => {
   });
 
   test('busy: the pill says `思考中…` and the spiral spins', async ({ page }) => {
-    await page.goto('/app?scenario=chief-busy');
+    await page.goto('/app?view=board&scenario=chief-busy');
     const fab = page.getByRole('button', { name: '总管', exact: true });
     await expect(fab).toHaveAttribute('data-expanded', 'true');
     await expect(fab).toHaveText('思考中…');
@@ -135,13 +135,13 @@ test.describe('chief FAB brand states', () => {
   });
 
   test('unread: the pill names the count', async ({ page }) => {
-    await page.goto('/app?scenario=chief-unread-99');
+    await page.goto('/app?view=board&scenario=chief-unread-99');
     await expect(page.getByRole('button', { name: '总管', exact: true })).toHaveText('99 条新消息');
   });
 
   test('reduced motion: busy keeps the label but stops the spin', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/app?scenario=chief-busy');
+    await page.goto('/app?view=board&scenario=chief-busy');
     const fab = page.getByRole('button', { name: '总管', exact: true });
     await expect(fab).toHaveText('思考中…');
     const spin = await fab.evaluate((el) => getComputedStyle(el.querySelector('svg') as Element).animationName);

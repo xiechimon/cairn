@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-const MATRIX = '/app?scenario=board-drag-matrix';
+const MATRIX = '/app?scenario=board-drag-matrix&view=board';
 const card = (page: Page, id: string) => page.locator(`[data-todo-id="${id}"]`);
 
 async function settle(locator: Locator) {
@@ -24,7 +24,7 @@ test('needs-you footers: state flag + action link per state, no solid buttons', 
     await expect(link).toHaveAttribute('data-variant', 'ghost');
     await expect(footer).toHaveCSS('border-top-style', 'dashed');
   }
-  await page.goto('/app?scenario=board-tags');
+  await page.goto('/app?scenario=board-tags&view=board');
   await expect(card(page, 'tagfilter-plain')).toContainText('待审阅');
   await expect(card(page, 'tagfilter-plain').getByRole('button', { name: '审阅' })).toBeVisible();
   await expect(page.locator('[data-todo-id] [data-variant="default"]')).toHaveCount(0);
@@ -77,7 +77,7 @@ test('done card: title drops to 400 + ink-3, no footer', async ({ page }) => {
 test('meta row never wraps at the 200px column floor', async ({ page }) => {
   await page.setViewportSize({ width: 1152, height: 900 });
   for (const scenario of ['board-stress', 'board-tags', 'board-drag-matrix']) {
-    await page.goto(`/app?scenario=${scenario}`);
+    await page.goto(`/app?scenario=${scenario}&view=board`);
     await page.evaluate(() => document.fonts.ready);
     const heights = await page
       .getByTestId('board-scroller')
@@ -98,13 +98,13 @@ test('running footer spiral spins, and stops under reduced motion', async ({ pag
   await expect(spinner).toHaveCSS('animation-name', 'none');
 });
 
-test('column header: serif name, fixed status icon, plus only on `待开始` and it opens new task', async ({
+test('column header: sans name, fixed status icon, plus only on `待开始` and it opens new task', async ({
   page,
 }) => {
   await page.goto(MATRIX);
   const name = page.locator('[data-column="todo"] .board-column-name');
   const family = await name.evaluate((el) => getComputedStyle(el).fontFamily);
-  expect(family).toContain('sourceSerif4');
+  expect(family).toContain('inter');
   for (const id of ['todo', 'building', 'pending', 'done']) {
     await expect(page.locator(`[data-column="${id}"] header svg`).first()).toBeVisible();
   }

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const QUOTA = '/app?scenario=quota-wait';
+const QUOTA = '/app?scenario=quota-wait&view=board';
 
 test('suspended card carries the `等额度` chip, plain building cards do not (two pins of the card state)', async ({ page }) => {
   await page.goto(QUOTA);
@@ -28,11 +28,15 @@ test('board banner names the relay lane and the event type (banner half)', async
 test('detail header chip says `等额度` not `执行中` (header half of the card state)', async ({ page }) => {
   await page.goto(QUOTA);
   await page.locator('[data-todo-id="quota-waiting-1"] .todo-card-link').click();
+  await page
+    .getByRole('complementary', { name: '任务面板' })
+    .getByRole('link', { name: '展开为整页' })
+    .click();
   await expect(page.getByTestId('phase-chip')).toContainText('等额度');
 });
 
 test('no-suspend baseline: 01 scenario board has zero banners and zero chips (legacy zero regression)', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await expect(page.locator('[data-quota-banner]')).toHaveCount(0);
   await expect(page.locator('[data-todo-quota]')).toHaveCount(0);
 });

@@ -28,6 +28,7 @@ import {
 import { moveTodo, resetTodoLocal } from '../board/dnd.js';
 import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import type { FilterChip, FilterDimension } from '../board/filter-panel.js';
+import { BOARD_VIEW_PARAM } from '../board/home.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import {
@@ -37,6 +38,8 @@ import {
 } from '../board/repo-filter.js';
 import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { buildTagOptions, matchesTagFilter, parseTagParam } from '../board/tag-filter.js';
+import { ChiefHome } from '../chief/chief-home.js';
+import { HomeSummary } from '../chief/chief-home-summary.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { cardOrchestration } from '../chief/orchestration-inflight.js';
@@ -54,6 +57,7 @@ import { useI18n } from '../i18n/provider.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
+import { TaskPanel } from '../task-panel/task-panel.js';
 
 interface ReorderPatch {
   phase?: TodoRecord['phase'];
@@ -81,6 +85,7 @@ export function BoardPage() {
 
   const rawTags = searchParams.get('tags');
   const onlyColumn = parseColumnParam(searchParams.get(COLUMN_PARAM));
+  const boardView = searchParams.get(BOARD_VIEW_PARAM) === 'board';
   const rawProjects = searchParams.get('projects');
   const selectedProjects = useMemo(() => parseProjectsParam(rawProjects), [rawProjects]);
   const selectedProjectSet = useMemo(() => new Set(selectedProjects), [selectedProjects]);
@@ -548,14 +553,19 @@ export function BoardPage() {
     ? { ...fixture, todos, now: Date.now(), ...(projectNames ? { projectNames } : {}) }
     : { ...fixture, todos };
   const quotaInfos = quotaBannerInfo(todos);
+  const todoGlances = useMemo(
+    () =>
+      new Map(
+        todos.map((todo) => [todo.id, { phase: todo.phase, seq: todo.seqNum, title: todo.title }]),
+      ),
+    [todos],
+  );
   return (
     <div className="board-shell flex h-full overflow-hidden bg-(--surface-1)" data-route="board">
       <AppSidebar
         fixture={fixture}
         todos={todos}
-        selected={
-          chiefView === 'settings' ? 'none' : onlyColumn === 'pending' ? 'attention' : 'board'
-        }
+        selected={chiefView === 'settings' ? 'none' : boardView ? 'kanban' : 'board'}
         searchPanel={false}
         onSearch={() => search.setOpen(true)}
         onNewTask={openNewTask}
@@ -597,11 +607,23 @@ export function BoardPage() {
             onDoneIntent={openDoneGate}
             filters={filters}
             onlyColumn={onlyColumn}
+            boardView={boardView}
+            renderHome={(home) => (
+              <ChiefHome
+                surface={chief}
+                now={fixtureWithTodos.now}
+                summary={<HomeSummary {...home} />}
+                below={home.sections}
+                brief={home.brief}
+                todoGlances={todoGlances}
+              />
+            )}
             tagsById={tagIndex.tagById}
             onNewTask={openNewTask}
             loading={live && !todosQ.isSuccess}
           />
         )}
+        <TaskPanel fixture={fixtureWithTodos} />
       </div>
       <SearchPanel
         open={search.open}

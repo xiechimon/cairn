@@ -45,7 +45,7 @@ describe('adoption evaluator protection', () => {
     expect(adr).toContain('integration/eval/adoption/sealed-ledger.mts');
     expect(adr).toContain('integration/eval/**');
     const spec = readFileSync(
-      join(import.meta.dirname, '../../../docs/spec/29-评测与数据闭环.md'),
+      join(import.meta.dirname, '../../../docs/spec/29-evaluation-and-data-loop.md'),
       'utf8',
     );
     expect(spec).toContain('ADR 0025');

@@ -10,11 +10,15 @@
 // page-anchored save semantics; every other route rides the internal
 // global dialog (useNewTaskSurface, live save path shared with the board).
 
+import { PanelLeft } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { Button } from '../components/ui/button.js';
+import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
+import { useI18n } from '../i18n/provider.js';
 import { useNewTaskHotkey } from '../overlay/hotkeys.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
@@ -51,6 +55,7 @@ export function AppSidebar({
   onSearch,
   onNewTask,
 }: AppSidebarProps) {
+  const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const machinesQ = useMachines(teamId, live);
@@ -71,6 +76,8 @@ export function AppSidebar({
     },
     () => window.matchMedia(NARROW_QUERY).matches,
   );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
   const toggle = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -95,21 +102,59 @@ export function AppSidebar({
   const openInternalNewTask = useCallback(() => internalNewTaskApiRef.current?.openDialog(), []);
   const openNewTask = onNewTask ?? openInternalNewTask;
   useNewTaskHotkey(openNewTask);
+  const sidebarProps = {
+    attention: attentionCount(resolvedTodos, live ? Date.now() : fixture.now),
+    running: countInColumn(resolvedTodos, 'building'),
+    machinesOnline,
+    projectCounts,
+    onSearch: onSearch ?? (() => search.setOpen(true)),
+    onNewTask: openNewTask,
+    usageNav: fixture.usageNav === true,
+    selected,
+    projects,
+  };
   return (
     <>
-      <BoardSidebar
-        collapsed={collapsed || narrow}
-        onToggle={toggle}
-        attention={attentionCount(resolvedTodos)}
-        running={countInColumn(resolvedTodos, 'building')}
-        machinesOnline={machinesOnline}
-        projectCounts={projectCounts}
-        onSearch={onSearch ?? (() => search.setOpen(true))}
-        onNewTask={openNewTask}
-        usageNav={fixture.usageNav === true}
-        selected={selected}
-        projects={projects}
-      />
+      {narrow ? (
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="app-menu-trigger fixed top-1.5 left-1 z-(--z-floating) size-11 text-content-secondary"
+            aria-label={t('展开侧边栏')}
+            aria-expanded={drawerOpen}
+            onClick={() => setDrawerOpen(true)}
+          >
+            <PanelLeft className="size-4.5" strokeWidth={1.75} />
+          </Button>
+          <Dialog open={drawerOpen} onOpenChange={setDrawerOpen}>
+            <DialogContent
+              showCloseButton={false}
+              onClickCapture={(event) => {
+                if ((event.target as Element).closest('a[href]') != null) closeDrawer();
+              }}
+              className="top-0 left-0 flex h-full w-72 max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 shadow-xl ring-0 duration-200 ease-(--ease-standard) sm:max-w-[85vw] data-open:slide-in-from-left data-open:zoom-in-100 data-closed:slide-out-to-left data-closed:zoom-out-100 [&>.board-sidebar]:w-full"
+            >
+              <DialogTitle className="sr-only">{t('侧边栏')}</DialogTitle>
+              <BoardSidebar
+                {...sidebarProps}
+                collapsed={false}
+                onToggle={closeDrawer}
+                onSearch={() => {
+                  closeDrawer();
+                  sidebarProps.onSearch();
+                }}
+                onNewTask={() => {
+                  closeDrawer();
+                  openNewTask();
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : (
+        <BoardSidebar collapsed={collapsed} onToggle={toggle} {...sidebarProps} />
+      )}
       {searchPanel && (
         <SearchPanel
           open={search.open}

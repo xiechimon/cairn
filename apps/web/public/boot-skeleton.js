@@ -32,6 +32,19 @@
     }
     boot.appendChild(rail);
 
+    const params = new URLSearchParams(location.search);
+    if (params.get('view') !== 'board') {
+      const list = document.createElement('div');
+      list.style.cssText = 'width:100%;max-width:792px;margin:0 auto;padding:76px 16px 0;box-sizing:border-box';
+      for (let i = 0; i < 4; i += 1) {
+        const row = document.createElement('div');
+        row.style.cssText = `height:56px;border-radius:20px;margin-bottom:8px;background:${ink}`;
+        list.appendChild(row);
+      }
+      boot.appendChild(list);
+      return;
+    }
+
     const grid = document.createElement('div');
     grid.style.cssText =
       'display:grid;grid-template-columns:repeat(4,minmax(200px,1fr));gap:14px;padding:28px 17px 13px';

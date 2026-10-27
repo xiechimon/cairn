@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 test('avatar landing: sidebar portrait goes to the components/ui landing', async ({ page }) => {
-  await page.goto('/app?scenario=22d');
+  await page.goto('/app?scenario=22d&view=board');
   const faces = [page.locator('.sidebar-user')];
   for (const face of faces) {
     await expect(face.locator('[data-slot="avatar"]')).toHaveCount(1);
@@ -18,7 +18,7 @@ test('avatar landing: sidebar portrait goes to the components/ui landing', async
 test('avatar landing fixed-size box (#983/#1003): Root renders a real box carrying the upstream hairline ring, img geometry unchanged', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=22d');
+  await page.goto('/app?scenario=22d&view=board');
   const probe = await page.evaluate(() => {
     const root = document.querySelector('.sidebar-user [data-slot="avatar"]')!;
     const img = document.querySelector('.sidebar-user [data-slot="avatar-image"]')!;
@@ -46,7 +46,7 @@ test('avatar landing fixed-size box (#983/#1003): Root renders a real box carryi
 });
 
 test('kbd landing: floating hint = registry Tooltip+Kbd combo, not mounted at rest / floats on hover', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
 
   const fab = page.getByRole('button', { name: '总管', exact: true });
   const hint = page.locator('[data-slot="tooltip-content"] [data-slot="kbd"]');
@@ -58,7 +58,7 @@ test('kbd landing: floating hint = registry Tooltip+Kbd combo, not mounted at re
 });
 
 test('tag-chip landing: lands on the registry Badge, single 20px tier canon', async ({ page }) => {
-  await page.goto('/app?scenario=board-tags');
+  await page.goto('/app?scenario=board-tags&view=board');
   await expect(page.locator('.todo-card-tag')).toHaveCount(0);
   await page.locator('.board-type-filter').click();
   const option = page.locator('.type-filter-option[data-tag="bug"]');

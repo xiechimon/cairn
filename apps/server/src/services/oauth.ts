@@ -184,13 +184,14 @@ export async function completeOAuthCallback(
     throw new OAuthFlowError('exchange-failed', 'oauth client missing', entry.origin, entry.kind);
   }
   if (entry.kind === 'github-connection') {
-    const { accessToken, scope } = await exchangeToken(
+    const tokens = await exchangeToken(
       deps,
       deps.client,
       GITHUB_CONNECTION_OAUTH.tokenUrl,
       entry,
       input.code,
     );
+    const { accessToken, scope } = tokens;
     let login: string;
     try {
       login = await githubUserLogin(deps.fetch, accessToken);
@@ -205,7 +206,15 @@ export async function completeOAuthCallback(
     }
     upsertGithubConnection(
       { db: deps.db, box: deps.box },
-      { teamId: entry.teamId, login, accessToken, scope },
+      {
+        teamId: entry.teamId,
+        login,
+        accessToken,
+        scope,
+        refreshToken: tokens.refreshToken,
+        accessTokenExpiresAt:
+          tokens.expiresInSeconds === null ? null : Date.now() + tokens.expiresInSeconds * 1000,
+      },
     );
     return { kind: 'github-connection', origin: entry.origin };
   }

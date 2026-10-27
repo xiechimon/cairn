@@ -21,6 +21,7 @@ import {
   todo as todoTable,
   tokenUsage,
 } from '../../../apps/server/src/db/schema.js';
+import { cancelPendingQuestions } from '../../../apps/server/src/services/chief-questions.js';
 import { repoDirFor } from '../../../apps/server/src/services/git.js';
 import {
   api,
@@ -95,6 +96,7 @@ export interface Stack {
   skillsDir: string;
   logLines: () => string[];
   park: () => void;
+  unpark: () => void;
   close: () => Promise<void>;
 }
 
@@ -131,13 +133,23 @@ export async function bootStack(): Promise<Stack> {
   const skillsDir = mkdtempSync(join(tmpdir(), 'cairn-eval-skills-'));
   const mcpConfigPath = join(tmpdir(), `cairn-eval-mcp-${randomUUID()}.json`);
   let claimsParked = false;
+  const parkedClaimReleases: Array<() => void> = [];
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     if (claimsParked && init?.method === 'POST' && url.endsWith('/api/machine/tasks/claim')) {
       await new Promise<void>((resolve) => {
         const sig = init?.signal;
-        if (!sig || sig.aborted) return resolve();
-        sig.addEventListener('abort', () => resolve(), { once: true });
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          sig?.removeEventListener('abort', finish);
+          resolve();
+        };
+        if (!sig || sig.aborted) return finish();
+        sig.addEventListener('abort', finish, { once: true });
+        parkedClaimReleases.push(finish);
+        if (!claimsParked) finish();
       });
       return new Response(JSON.stringify({ step: null }), {
         status: 200,
@@ -180,6 +192,11 @@ export async function bootStack(): Promise<Stack> {
     park: () => {
       claimsParked = true;
     },
+    unpark: () => {
+      claimsParked = false;
+      const waiting = parkedClaimReleases.splice(0);
+      for (const release of waiting) release();
+    },
     close: async () => {
       const raceWith = async (p: unknown, ms: number): Promise<boolean> => {
         let settled = false;
@@ -206,7 +223,12 @@ export async function bootStack(): Promise<Stack> {
   };
 }
 
-export function seedRepoContent(stack: Stack, projectId: string, projectName: string): void {
+export function seedRepoContent(
+  stack: Stack,
+  projectId: string,
+  projectName: string,
+  seedDir: string = REPO_SEED_DIR,
+): void {
   const db = stack.server.db;
   const row = db.select().from(projectTable).where(eq(projectTable.id, projectId)).get();
   const repoName = (row as { repoName?: string | null } | undefined)?.repoName;
@@ -220,7 +242,7 @@ export function seedRepoContent(stack: Stack, projectId: string, projectName: st
   };
   try {
     git('clone', bare, '.');
-    cpSync(REPO_SEED_DIR, work, { recursive: true });
+    cpSync(seedDir, work, { recursive: true });
     git('add', '-A');
     git(
       '-c',
@@ -339,6 +361,7 @@ export interface TurnEvidence {
     id: string;
     title: string;
     spec: string;
+    projectId: string;
     buildAgentId: string | null;
     planAgentId: string | null;
     phase: string;
@@ -386,6 +409,65 @@ function pluckText(rows: { content: unknown }[]): string {
   return parts.join('\n').trim();
 }
 
+function stopStraySteps(stack: Stack): void {
+  const db = stack.server.db;
+  for (const row of db.select().from(stepTable).all()) {
+    if (row.kind === 'chief') continue;
+    if (row.status !== 'pending' && row.status !== 'waiting_quota') continue;
+    db.update(stepTable).set({ status: 'stopped' }).where(eq(stepTable.id, row.id)).run();
+  }
+}
+
+function chiefStepIds(stack: Stack, threadId: string): Set<string> {
+  return new Set(
+    stack.server.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, threadId))
+      .all()
+      .filter((row) => row.kind === 'chief')
+      .map((row) => row.id),
+  );
+}
+
+async function settleChiefTurn(
+  stack: Stack,
+  threadId: string,
+  knownChiefStepIds: Set<string>,
+  timeoutMs: number,
+): Promise<void> {
+  const db = stack.server.db;
+  stopStraySteps(stack);
+  stack.unpark();
+  const fresh = () =>
+    db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, threadId))
+      .all()
+      .filter((row) => row.kind === 'chief' && !knownChiefStepIds.has(row.id));
+  await waitFor(
+    () =>
+      fresh().some(
+        (row) =>
+          row.status === 'claimed' ||
+          row.status === 'done' ||
+          row.status === 'failed' ||
+          row.status === 'stopped',
+      ),
+    30_000,
+  );
+  stack.park();
+  await waitFor(() => {
+    cancelPendingQuestions({ db }, threadId, 'eval harness: no user is present to answer');
+    const thread = db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
+    const settled = fresh().some(
+      (row) => row.status === 'done' || row.status === 'failed' || row.status === 'stopped',
+    );
+    return settled && thread?.activeRun === null;
+  }, timeoutMs);
+}
+
 export async function driveTurn(
   stack: Stack,
   prompt: string,
@@ -413,18 +495,17 @@ export async function driveTurn(
     throw new Error(`发消息失败: ${sent.status} ${JSON.stringify(sent.body)}`);
   const threadId = (sent.body as { thread: { id: string } }).thread.id;
 
-  await waitFor(() => {
-    const s = db.select().from(stepTable).where(eq(stepTable.buildId, threadId)).all();
-    return s.some((x) => x.kind === 'chief' && x.status === 'claimed');
-  }, 30_000);
-  stack.park();
+  await settleChiefTurn(stack, threadId, new Set(), opts.timeoutMs);
+  return driveTurnEvidence(stack, threadId, before, Date.now() - t0);
+}
 
-  await waitFor(() => {
-    const th = db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
-    return th?.lastTurnAt != null && th.activeRun === null;
-  }, opts.timeoutMs);
-  const wallMs = Date.now() - t0;
-
+function driveTurnEvidence(
+  stack: Stack,
+  threadId: string,
+  beforeTodoIds: Set<string>,
+  wallMs: number,
+): TurnEvidence {
+  const db = stack.server.db;
   const steps = db.select().from(stepTable).where(eq(stepTable.buildId, threadId)).all();
   const chiefSteps = steps.filter((s) => s.kind === 'chief');
   const stepStatus = chiefSteps.at(-1)?.status ?? 'missing';
@@ -437,7 +518,7 @@ export async function driveTurn(
     .select()
     .from(todoTable)
     .all()
-    .filter((t) => !before.has(t.id));
+    .filter((t) => !beforeTodoIds.has(t.id));
   const builds = db.select().from(buildTable).all();
 
   const usageRows = db.select().from(tokenUsage).where(eq(tokenUsage.buildId, threadId)).all();
@@ -472,6 +553,7 @@ export async function driveTurn(
       id: t.id,
       title: t.title,
       spec: t.spec ?? '',
+      projectId: t.projectId,
       buildAgentId: assignmentOf(t).build,
       planAgentId: assignmentOf(t).plan,
       phase: t.phase,
@@ -485,5 +567,53 @@ export async function driveTurn(
     model,
     usage,
     wallMs,
+  };
+}
+
+export async function driveFollowUp(
+  stack: Stack,
+  threadId: string,
+  content: string,
+  opts: { timeoutMs: number },
+): Promise<TurnEvidence> {
+  const db = stack.server.db;
+  const before = new Set(
+    db
+      .select({ id: todoTable.id })
+      .from(todoTable)
+      .all()
+      .map((row) => row.id),
+  );
+  const knownChiefStepIds = chiefStepIds(stack, threadId);
+  const beforeUsage = db
+    .select()
+    .from(tokenUsage)
+    .where(eq(tokenUsage.buildId, threadId))
+    .all()
+    .reduce(
+      (acc, row) => ({
+        input: acc.input + row.input,
+        output: acc.output + row.output,
+        cacheRead: acc.cacheRead + row.cacheRead,
+        cacheWrite: acc.cacheWrite + row.cacheWrite,
+      }),
+      { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    );
+  const t0 = Date.now();
+  const sent = await api(stack.server.url, 'POST', `/api/conversations/${threadId}/messages`, {
+    content,
+  });
+  if (sent.status !== 201)
+    throw new Error(`follow-up failed: ${sent.status} ${JSON.stringify(sent.body)}`);
+  await settleChiefTurn(stack, threadId, knownChiefStepIds, opts.timeoutMs);
+  const evidence = await driveTurnEvidence(stack, threadId, before, Date.now() - t0);
+  return {
+    ...evidence,
+    usage: {
+      input: evidence.usage.input - beforeUsage.input,
+      output: evidence.usage.output - beforeUsage.output,
+      cacheRead: evidence.usage.cacheRead - beforeUsage.cacheRead,
+      cacheWrite: evidence.usage.cacheWrite - beforeUsage.cacheWrite,
+    },
   };
 }

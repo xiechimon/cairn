@@ -1,0 +1,24 @@
+Real prepush run on this machine at 2026-10-26 21:09, minutes after the change
+landed in the worktree (the passing run's log overwrote the tee'd original, so
+this file records it verbatim; the ps/lsof lines below were captured in the same
+minute, before the collision resolved):
+
+$ flock /tmp/cairn-heavy.lock pnpm prepush
+$ node scripts/prepush.mjs
+[heavy-slots] acquired slot 1/6
+[heavy-slots] slot 1's port 8398 is held by pid 3067630, cwd /mnt/fast/lanes/cairn-1786b/apps/web, command node /mnt/fast/lanes/cairn-1786b/apps/web/node_modules/.bin/../vite/bin/vite.js preview --outDir /tmp/cairn-heavy-slot-1/web-dist --host 127.0.0.1 --port 8398 --strictPort; anything on a leased slot's port is an orphan — kill the pid or free the port, then rerun
+[ELIFECYCLE] Command failed with exit code 1.
+
+The holder was not an orphan but lane 1786b's live full-suite e2e (playwright
+pid 3067211 running `--config /tmp/cairn-heavy-slot-1/playwright.slot.config.ts`,
+slot-1 lock pid 3030395 under /tmp, a `git push` of lane/1786b waiting behind
+it). The run failed in seconds naming the exact process, instead of failing
+minutes later at the e2e step with a bare port-in-use error — the #1908
+behavior on a real collision. The lane finished about three minutes later and
+released 8398; the passing prepush run is in prepush.log.
+
+$ ps -p 3067630 -o pid=,lstart=,etime=,command=
+3067630 Mon Oct 26 21:08:34 2026 00:33 node /mnt/fast/lanes/cairn-1786b/apps/web/node_modules/.bin/../vite/bin/vite.js preview --outDir /tmp/cairn-heavy-slot-1/web-dist --host 127.0.0.1 --port 8398 --strictPort
+
+$ cat /tmp/cairn-heavy-slots/slot-1.lock
+{"pid":3030395}

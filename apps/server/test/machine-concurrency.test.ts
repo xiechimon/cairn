@@ -389,7 +389,6 @@ describe('#1108 write surface and wire contract (PATCH validation / record proje
       latestCliVersion: null,
       kind: 'remote',
       enabledRuntimes: [],
-      shellEnabled: false,
     });
     expect(parsed.maxConcurrent).toBeUndefined();
     expect(parsed.runningSteps).toBeUndefined();

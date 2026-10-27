@@ -173,13 +173,20 @@ export function formatUsd(n: number): string {
   return n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`;
 }
 
+export function usageCostKnown(cost: UsageCost): boolean {
+  if (cost.priced === false) return false;
+  if (cost.priced === true) return true;
+  return cost.total > 0;
+}
+
 export function mapUsageCost(cost: UsageCost | undefined): UsageCostContent | null {
-  if (cost === undefined || cost.total <= 0) return null;
+  if (cost === undefined || !usageCostKnown(cost)) return null;
+  const split = cost.input + cost.output + cost.cacheRead + cost.cacheWrite > 0 || cost.total === 0;
   return {
     total: formatUsd(cost.total),
-    cacheRead: formatUsd(cost.cacheRead),
-    input: formatUsd(cost.input + cost.cacheWrite),
-    output: formatUsd(cost.output),
+    cacheRead: split ? formatUsd(cost.cacheRead) : '—',
+    input: split ? formatUsd(cost.input + cost.cacheWrite) : '—',
+    output: split ? formatUsd(cost.output) : '—',
   };
 }
 
@@ -974,7 +981,6 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
     name: m.name,
     online: m.online,
     enabledRuntimes: m.enabledRuntimes,
-    shellEnabled: m.shellEnabled,
     ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),
     ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
@@ -1122,6 +1128,13 @@ function stripWakeMarker(text: string): string {
   return text.replace(WAKE_MARKER_PREFIX_RE, '');
 }
 
+function handoffTodoOf(call: ToolCallRecord): string | null {
+  if (call.name !== 'message_todo' || call.result === undefined || call.isError === true)
+    return null;
+  const todoId = (call.arguments as { todoId?: unknown } | null)?.todoId;
+  return typeof todoId === 'string' && todoId !== '' ? todoId : null;
+}
+
 export function mapChiefStream(messages: MessageRow[], inlineTools = false): ChiefStreamItem[] {
   return collectChiefStream(messages, inlineTools).items;
 }
@@ -1131,9 +1144,12 @@ function collectChiefStream(
   inlineTools = false,
 ): {
   items: ChiefStreamItem[];
+  itemsAt: number[];
   trailingTools: ChiefToolRow[];
 } {
   const items: ChiefStreamItem[] = [];
+  const itemsAt: number[] = [];
+  let lastAt = 0;
   const postedTexts = new Set(
     messages
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
@@ -1141,6 +1157,8 @@ function collectChiefStream(
   );
   let pendingTools: ChiefToolRow[] = [];
   for (const m of messages) {
+    while (itemsAt.length < items.length) itemsAt.push(lastAt);
+    lastAt = m.createdAt;
     const turnError = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (turnError !== null) {
       pendingTools = [];
@@ -1169,6 +1187,9 @@ function collectChiefStream(
           ...(call.isError === true ? { error: true } : {}),
         });
       }
+      const handoffTodoId = handoffTodoOf(call);
+      if (handoffTodoId !== null)
+        items.push({ kind: 'handoff', todoId: handoffTodoId, id: `${m.id}:handoff` });
       continue;
     }
     const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;
@@ -1208,7 +1229,8 @@ function collectChiefStream(
     });
     pendingTools = [];
   }
-  return { items, trailingTools: pendingTools };
+  while (itemsAt.length < items.length) itemsAt.push(lastAt);
+  return { items, itemsAt, trailingTools: pendingTools };
 }
 
 function autoCloseStrong(text: string): string {
@@ -1291,6 +1313,7 @@ export function mapChief(
         }
       : {}),
     threadTitle: active?.title ?? '新主题',
+    ...(active !== null ? { threadId: active.id } : {}),
     ...(opts.threads.length > 0
       ? {
           threads: opts.threads.map((t) => ({
@@ -1299,7 +1322,9 @@ export function mapChief(
           })),
         }
       : {}),
-    ...(active === null ? { examples: CHIEF_HERO_EXAMPLES } : { stream: chiefStream }),
+    ...(active === null
+      ? { examples: CHIEF_HERO_EXAMPLES }
+      : { stream: chiefStream, streamAt: collected?.itemsAt ?? [] }),
     ...(running ? { running: true } : {}),
     ...(opts.activity?.phase === 'tool' && opts.activity.tool != null
       ? { runningTool: opts.activity.tool }

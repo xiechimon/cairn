@@ -14,7 +14,7 @@ async function tokenRadius(page: Page) {
 
 test('board task card and account settings card share --radius-card (R1–R3)', async ({ page }) => {
   await setTheme(page, 'light');
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await expect(page.locator('.todo-card').first()).toBeVisible();
   expect(await tokenRadius(page), 'R1').toBe('20px');
   await expect(page.locator('.todo-card').first(), 'R2').toHaveCSS('border-top-left-radius', '20px');

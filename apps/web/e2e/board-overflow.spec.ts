@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const OVERFLOW = '/app?scenario=board-overflow';
+const OVERFLOW = '/app?scenario=board-overflow&view=board';
 const list = (page: Page, column = 'todo') => page.locator(`[data-column-list="${column}"]`);
 
 test('overflow column bottom does not exit the viewport: column hugs the scroller visible height (row height pinned)', async ({ page }) => {
@@ -94,7 +94,7 @@ test('card top/bottom edges held by block padding: first card top edge and scrol
 });
 
 test('legacy scenario zero drift: 01 column hugs the viewport, column bottom does not pass the scroller bottom edge', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const probe = await page.evaluate(() => {
     const scroller = document.querySelector('[data-testid="board-scroller"]');
     const columns = [...document.querySelectorAll('[data-column]')];

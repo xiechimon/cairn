@@ -103,7 +103,7 @@ async function resolveStyle(page: Page, decls: Record<string, string>): Promise<
 test('`待开始` → `已完成`: silent commit, end-of-column landing, counts couple, teardown sweeps', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=22');
+  await page.goto('/app?scenario=22&view=board');
   const list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
   const to = { x: list.x + list.width / 2, y: list.y + 60 };
@@ -138,7 +138,7 @@ test('`待开始` → `已完成`: silent commit, end-of-column landing, counts 
 test('`待开始` → `执行中`: the drop fires orchestration directly — no dialog, no local phase write (#640)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=22');
+  await page.goto('/app?scenario=22&view=board');
   const list = await page.locator('[data-column-list="building"]').boundingBox();
   if (list == null) throw new Error('building list missing');
   const to = { x: list.x + list.width / 2, y: list.y + 60 };
@@ -163,7 +163,7 @@ test('`待开始` → `执行中`: the drop fires orchestration directly — no 
 });
 
 test('drop-tinted column keeps the card-family corner radius', async ({ page }) => {
-  await page.goto('/app?scenario=22');
+  await page.goto('/app?scenario=22&view=board');
   const list = await page.locator('[data-column-list="building"]').boundingBox();
   if (list == null) throw new Error('building list missing');
 
@@ -196,7 +196,7 @@ const MATRIX_CASES = [
 ] as const;
 
 test('per-source target matrix: the tint set follows the dragged card (#753)', async ({ page }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   for (const c of MATRIX_CASES) {
     await dragInSourceColumn(page, `[data-todo-id="${c.source}"]`);
     await settleDrag(page);
@@ -222,7 +222,7 @@ test('per-source target matrix: the tint set follows the dragged card (#753)', a
 });
 
 test('hover tier rides the hovered valid target for the new pairs (#753)', async ({ page }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
 
   const list = await page.locator('[data-column-list="pending"]').boundingBox();
   if (list == null) throw new Error('pending list missing');
@@ -244,7 +244,7 @@ test('hover tier rides the hovered valid target for the new pairs (#753)', async
 test('invalid pairs: no tint on the hovered target, release commits nothing (#753)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   const invalid = [
     { source: 'dm-confirm', target: 'building' },
     { source: 'dm-done-plain', target: 'pending' },
@@ -283,7 +283,7 @@ test('invalid pairs: no tint on the hovered target, release commits nothing (#75
 });
 
 test('`待开始` → `待处理` stays invalid (#351 pair kept inside the #753 matrix)', async ({ page }) => {
-  await page.goto('/app?scenario=22');
+  await page.goto('/app?scenario=22&view=board');
 
   await expect(
     page.locator('[data-column="pending"]').getByRole('button', { name: '回复' }),
@@ -313,7 +313,7 @@ test('`待开始` → `待处理` stays invalid (#351 pair kept inside the #753 
 test('`已完成`(with changes) → `待处理`: reopen commits review, lands after the pinned group', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=22');
+  await page.goto('/app?scenario=22&view=board');
   const list = await page.locator('[data-column-list="pending"]').boundingBox();
   if (list == null) throw new Error('pending list missing');
   const to = { x: list.x + list.width / 2, y: list.y + list.height - 24 };
@@ -340,7 +340,7 @@ test('`已完成`(with changes) → `待处理`: reopen commits review, lands af
 test('`待处理`(confirm) → `已完成` opens the confirm dialog, then lands first (#1247)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   let list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
   await dragTo(page, '[data-todo-id="dm-confirm"]', {
@@ -370,7 +370,7 @@ test('`待处理`(confirm) → `已完成` opens the confirm dialog, then lands 
 });
 
 test('`待处理`(confirm, with history) → `待开始`: opens the reset confirm gate, no silent phase change (#755)', async ({ page }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   const list = await page.locator('[data-column-list="todo"]').boundingBox();
   if (list == null) throw new Error('todo list missing');
   await dragTo(page, '[data-todo-id="dm-confirm"]', {
@@ -400,7 +400,7 @@ test('`待处理`(confirm, with history) → `待开始`: opens the reset confir
 test('`执行中` → `待开始`: opens the reset confirm gate — gesture only opens the gate, writes no phase (#755/#640)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   const list = await page.locator('[data-column-list="todo"]').boundingBox();
   if (list == null) throw new Error('todo list missing');
   await dragTo(page, '[data-todo-id="dm-building"]', {
@@ -425,7 +425,7 @@ test('`执行中` → `待开始`: opens the reset confirm gate — gesture only
 test('reset gate · confirm: started card confirms and lands in `待开始` (fixture local reset projection) (#755)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-reset-gate');
+  await page.goto('/app?scenario=board-reset-gate&view=board');
   const list = await page.locator('[data-column-list="todo"]').boundingBox();
   if (list == null) throw new Error('todo list missing');
   await dragTo(page, '[data-todo-id="rg-building"]', {
@@ -446,7 +446,7 @@ test('reset gate · confirm: started card confirms and lands in `待开始` (fix
 });
 
 test('reset gate · cancel: zero commits (card unchanged, counts unchanged, no request sent) (#755)', async ({ page }) => {
-  await page.goto('/app?scenario=board-reset-gate');
+  await page.goto('/app?scenario=board-reset-gate&view=board');
 
   const writes: string[] = [];
   page.on('request', (req) => {
@@ -473,7 +473,7 @@ test('reset gate · cancel: zero commits (card unchanged, counts unchanged, no r
 });
 
 test('reset gate · silent: a card with zero history dragged back to `待开始` sets no gate (#755)', async ({ page }) => {
-  await page.goto('/app?scenario=board-reset-gate');
+  await page.goto('/app?scenario=board-reset-gate&view=board');
   const list = await page.locator('[data-column-list="todo"]').boundingBox();
   if (list == null) throw new Error('todo list missing');
 
@@ -495,7 +495,7 @@ test('reset gate · silent: a card with zero history dragged back to `待开始`
 test('done gate · cancel: review(with changes) dragged to `已完成` opens the sheet, cancel commits nothing (card, counts, no write request) (#901)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   const writes: string[] = [];
   page.on('request', (req) => {
     if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method())) writes.push(req.url());
@@ -531,7 +531,7 @@ test('done gate · cancel: review(with changes) dragged to `已完成` opens the
 test('done gate · confirm: review(with changes) confirms and lands in `已完成` (fixture local commit, counts couple) (#901)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   const list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
   await dragTo(page, '[data-todo-id="dm-review"]', {
@@ -554,7 +554,7 @@ test('done gate · confirm: review(with changes) confirms and lands in `已完�
 test('done gate: no-change confirm cancel stays in `待处理`; building source opens stop-then-done (#1247)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   const list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
   const to = { x: list.x + list.width / 2, y: list.y + list.height - 24 };
@@ -583,7 +583,7 @@ test('done gate: no-change confirm cancel stays in `待处理`; building source 
 });
 
 test('failed → `已完成` can mark canceled (#1247)', async ({ page }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   const list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
   await dragTo(page, '[data-todo-id="dm-failed"]', {
@@ -601,7 +601,7 @@ test('failed → `已完成` can mark canceled (#1247)', async ({ page }) => {
 });
 
 test('first card in `已完成` column completes no earlier than the last card (#1247)', async ({ page }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   const doneOrder = await page
     .locator('[data-column="done"] [data-todo-id]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('data-todo-id')));
@@ -610,7 +610,7 @@ test('first card in `已完成` column completes no earlier than the last card (
 });
 
 test('failed → `已完成` opens the dialog; cancel leaves the card (#1247)', async ({ page }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   const list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
   await dragTo(page, '[data-todo-id="dm-failed"]', {
@@ -630,7 +630,7 @@ test('failed → `已完成` opens the dialog; cancel leaves the card (#1247)', 
 });
 
 test('cards from every column arm the drag gesture (#753)', async ({ page }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   for (const id of ['dm-todo', 'dm-building', 'dm-failed', 'dm-done-plain']) {
     await dragInSourceColumn(page, `[data-todo-id="${id}"]`);
     await settleDrag(page);
@@ -656,22 +656,22 @@ test('cards from every column arm the drag gesture (#753)', async ({ page }) => 
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('2');
 });
 
-test('click navigation survives sensor arming on the newly draggable columns (#753/#629)', async ({
+test('click opening survives sensor arming on the newly draggable columns (#753/#629, #1937)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-drag-matrix');
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   for (const id of ['dm-confirm', 'dm-done-changes']) {
     const card = page.locator(`[data-todo-id="${id}"]`);
     await card.click();
-    await page.waitForURL((u) => u.pathname === `/app/todo/${id}`);
-    expect(new URL(page.url()).pathname).toBe(`/app/todo/${id}`);
-    await page.goto('/app?scenario=board-drag-matrix');
+    await page.waitForURL((u) => u.searchParams.get('task') === id);
+    expect(new URL(page.url()).pathname).toBe('/app');
+    await page.goto('/app?scenario=board-drag-matrix&view=board');
     await expect(page.locator(`[data-todo-id="${id}"]`)).toBeVisible();
   }
 });
 
 test('same-column gesture: siblings never shift, drop is a no-op', async ({ page }) => {
-  await page.goto('/app?scenario=22');
+  await page.goto('/app?scenario=22&view=board');
 
   await page
     .locator('.todo-card')
@@ -725,7 +725,7 @@ test('same-column gesture: siblings never shift, drop is a no-op', async ({ page
 for (const theme of ['light', 'dark'] as const) {
   test(`lifted card rides the compact drag-tier recipe (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=22');
+    await page.goto('/app?scenario=22&view=board');
     const source = page.locator('[data-column="todo"] [data-todo-id]').first();
     const sourceBox = await source.boundingBox();
     if (sourceBox == null) throw new Error('probe card missing');
@@ -786,7 +786,7 @@ for (const theme of ['light', 'dark'] as const) {
 for (const theme of ['light', 'dark'] as const) {
   test(`valid targets tint base tier, hovered column tints hot (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=22');
+    await page.goto('/app?scenario=22&view=board');
     const list = await page.locator('[data-column-list="done"]').boundingBox();
     if (list == null) throw new Error('done list missing');
     const to = { x: list.x + list.width / 2, y: list.y + 60 };
@@ -839,7 +839,7 @@ for (const theme of ['light', 'dark'] as const) {
 // ---- committed drop must not flash home (bounce-effect regression, #398
 // era law kept): the first post-drag paint already reads the landing ----
 test('committed drop never flashes the card back to the source column', async ({ page }) => {
-  await page.goto('/app?scenario=22');
+  await page.goto('/app?scenario=22&view=board');
   const list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
   const to = { x: list.x + list.width / 2, y: list.y + 60 };
@@ -904,7 +904,7 @@ test('committed drop never flashes the card back to the source column', async ({
 // ---- no drop glide (#616): the overlay unmounts on the pointerup frame —
 // #391's 250ms flight was a cairn invention; the reference snaps ----
 test('overlay unmounts with the pointerup frame — no glide', async ({ page }) => {
-  await page.goto('/app?scenario=22');
+  await page.goto('/app?scenario=22&view=board');
   const list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
   const to = { x: list.x + list.width / 2, y: list.y + 60 };

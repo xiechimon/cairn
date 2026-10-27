@@ -14,7 +14,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 // unmount, and restore writes 600 back. The expected value is that clamped
 // max, min(leftAt, scrollHeight - clientHeight). Equality is exact: a
 // restore to any other offset still fails.
-const OVERFLOW = '/app?scenario=board-overflow';
+const OVERFLOW = '/app?scenario=board-overflow&view=board';
 const list = (page: Page) => page.locator('[data-column-list="todo"]');
 
 test('detail round trip keeps the column scroll position', async ({ page }) => {
@@ -39,6 +39,10 @@ test('detail round trip keeps the column scroll position', async ({ page }) => {
     return listEl instanceof HTMLElement ? listEl.scrollTop : 0;
   });
   expect(leftAt).toBeGreaterThan(200);
+  await page
+    .getByRole('complementary', { name: '任务面板' })
+    .getByRole('link', { name: '展开为整页' })
+    .evaluate((el: HTMLAnchorElement) => el.click());
   await page.waitForSelector('[data-route="todo-detail"]');
 
   await page.keyboard.press('Escape');

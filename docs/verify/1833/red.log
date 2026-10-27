@@ -1,0 +1,25 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1833
+
+ ❯ |@cairn/shared| test/github-create-gate.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/shared| test/github-create-gate.test.ts [ packages/shared/test/github-create-gate.test.ts ]
+Error: Cannot find module '../src/github-create-gate.js' imported from /mnt/fast/lanes/cairn-1833/packages/shared/test/github-create-gate.test.ts
+ ❯ test/github-create-gate.test.ts:5:1
+      3| import { join } from 'node:path';
+      4| import { expect, test } from 'vitest';
+      5| import { acquireGithubCreateSlot, parseGithubCreateRateLimit } from '.…
+       | ^
+      6|
+      7| test('concurrent callers share spacing and a rolling hourly cap', asyn…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:53:12
+   Duration  93ms (worker 96%, environment 4%)
+

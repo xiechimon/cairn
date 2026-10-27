@@ -6,6 +6,7 @@ import { SegmentedTabs } from '../components/segmented.js';
 import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft } from '../icons/index.js';
+import { TaskPanel, TaskPanelToggle } from '../task-panel/task-panel.js';
 
 export const SHEET_PANEL = 'relative isolate flex min-w-0 flex-1 overflow-hidden bg-background';
 
@@ -52,6 +53,7 @@ interface PageShellProps {
   actions?: ReactNode;
   onNewTask?: () => void;
   bleed?: boolean;
+  taskPanel?: boolean;
   children: ReactNode;
 }
 
@@ -67,6 +69,7 @@ export function PageShell({
   actions,
   onNewTask,
   bleed = false,
+  taskPanel = false,
   children,
 }: PageShellProps) {
   const { t } = useI18n();
@@ -92,11 +95,16 @@ export function PageShell({
               {title}
             </h1>
             {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
-            {actions != null && (
-              <div className="ml-auto flex flex-none items-center gap-0.5">{actions}</div>
+            {(actions != null || taskPanel) && (
+              <div className="ml-auto flex flex-none items-center gap-0.5">
+                {actions}
+                {taskPanel && <TaskPanelToggle />}
+              </div>
             )}
           </header>
-          <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+          <div
+            className={`flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto${bleed ? '' : ' px-4'}`}
+          >
             {bleed ? (
               children
             ) : (
@@ -106,6 +114,7 @@ export function PageShell({
             )}
           </div>
         </div>
+        {taskPanel && <TaskPanel fixture={fixture} />}
       </div>
     </div>
   );

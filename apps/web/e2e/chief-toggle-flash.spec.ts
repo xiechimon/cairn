@@ -65,7 +65,7 @@ async function normalizeClosed(page: Page) {
 
 test.describe('chief ⌘J toggle does not flash (#1266)', () => {
   test('second ⌘J minimizes without an opacity repaint or remount', async ({ page }) => {
-    await page.goto('/app?scenario=111');
+    await page.goto('/app?view=board&scenario=111');
     // the reported flow: summon with ⌘J, press again — the bounce needs the
     // toggle-opened path (a load-opened window does not reproduce it), so
     // normalize to closed first and summon with the chord like the user did.
@@ -93,7 +93,7 @@ test.describe('chief ⌘J toggle does not flash (#1266)', () => {
   test('summon-then-minimize cycle twice: node identity holds, zero opacity transitions', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=111');
+    await page.goto('/app?view=board&scenario=111');
     await normalizeClosed(page);
 
     await armRecorder(page);

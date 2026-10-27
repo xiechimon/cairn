@@ -10,7 +10,7 @@ const modelName = (page: Page) => modelRow(page).locator('span').nth(2);
 test.describe('chief drawer model row (#615)', () => {
 
   test('the model row is a read-only display of the bound Agent model (#1260)', async ({ page }) => {
-    await page.goto('/app?scenario=111');
+    await page.goto('/app?view=board&scenario=111');
     await expect(drawer(page)).toBeVisible();
     const row = modelRow(page);
     await expect(row).toBeVisible();
@@ -25,7 +25,7 @@ test.describe('chief drawer model row (#615)', () => {
   test('the row is readable in both themes (#751 A same law)', async ({ page }) => {
 
     for (const theme of ['dark', 'light'] as const) {
-      await page.goto('/app?scenario=111');
+      await page.goto('/app?view=board&scenario=111');
       await page.evaluate((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.reload();
       await expect(drawer(page)).toBeVisible();
@@ -59,7 +59,7 @@ test.describe('chief drawer model row (#615)', () => {
   });
 
   test('the model row carries the runtime mark, not an agent avatar', async ({ page }) => {
-    await page.goto('/app?scenario=fab-avatar');
+    await page.goto('/app?view=board&scenario=fab-avatar');
 
     await page.locator('.chief-fab').click();
     await expect(drawer(page)).toBeVisible();
@@ -70,7 +70,7 @@ test.describe('chief drawer model row (#615)', () => {
     await expect(row.locator('span').first().locator('svg')).toHaveCount(1);
     await expect(row.locator('img')).toHaveCount(0);
 
-    await page.goto('/app?scenario=100');
+    await page.goto('/app?view=board&scenario=100');
     await expect(drawer(page)).toBeVisible();
     await expect(modelRow(page)).toHaveCount(0);
     await expect(page.getByText('n/a', { exact: true })).toHaveCount(0);
@@ -80,7 +80,7 @@ test.describe('chief drawer model row (#615)', () => {
     page,
   }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-    await page.goto('/app?scenario=114');
+    await page.goto('/app?view=board&scenario=114');
     await expect(drawer(page)).toBeVisible();
 
     const copy = page.getByTestId('chief-msg-tools').getByRole('button', { name: '复制' });
@@ -104,7 +104,7 @@ test.describe('chief drawer model row (#615)', () => {
   test('restore button opens the rewind confirm; the foot chevron discloses tool rows', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=114');
+    await page.goto('/app?view=board&scenario=114');
     await expect(drawer(page)).toBeVisible();
 
     const restore = page

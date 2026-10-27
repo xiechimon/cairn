@@ -240,7 +240,6 @@ export interface MachineRow {
   online?: boolean;
   pill?: string;
   enabledRuntimes?: string[];
-  shellEnabled?: boolean;
   chiefHost?: boolean;
   chiefRunning?: boolean;
   chiefWaiting?: boolean;
@@ -441,6 +440,7 @@ export interface ChiefSegment {
 export type ChiefStreamItem =
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string }
+  | { kind: 'handoff'; todoId: string; id?: string }
   | {
       kind: 'question';
       id?: string;
@@ -518,11 +518,13 @@ export interface ChiefContent {
   agent?: { id?: string; displayName: string; avatarUrl: string | null };
   modelProvider?: string | null;
   threadTitle: string;
+  threadId?: string;
   threadsOpen?: boolean;
   threads?: ChiefThreadRef[];
   examples?: ChiefExample[];
   draft?: string;
   stream?: ChiefStreamItem[];
+  streamAt?: number[];
   running?: boolean;
   runningTool?: string;
 }

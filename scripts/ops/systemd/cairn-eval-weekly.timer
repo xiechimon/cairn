@@ -1,0 +1,9 @@
+[Unit]
+Description=Weekly Cairn real-model eval rerun, Monday 15:10 UTC
+
+[Timer]
+OnCalendar=Mon *-*-* 15:10:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

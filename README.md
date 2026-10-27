@@ -11,7 +11,7 @@
   <p>
     <a href="https://cairn.xmon.me">Website</a> ·
     <a href="#quickstart">Quickstart</a> ·
-    <a href="./README.zh.md">简体中文</a>
+    <a href="./README.zh.md">Simplified Chinese</a>
   </p>
 
   <p>
@@ -152,13 +152,18 @@ pnpm start        # builds the web UI and starts the server hosting it on the sa
 
 The watch-mode dev stack, one process each: `pnpm dev:web`, `pnpm dev:server`, `pnpm dev:daemon` (`pnpm dev` runs all three together).
 
+## Deployment
+
+Self-host the server on an always-on machine, then reach it from your phone over a private tailnet. Bind the server to `127.0.0.1`, proxy `tailscale serve` to `http://127.0.0.1:<port>`, and set `CAIRN_TAILSCALE_USERS` to let allowlisted Tailscale identities sign in without entering the access token. Full walkthrough: [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md). For a public-internet deployment instead, see the Railway template above.
+
 ## Configuration
 
 Server environment variables (all optional):
 
 | Variable | Default | Description |
 |---|---|---|
-| `CAIRN_TOKEN` | unset | Bearer token guarding `/api/*`. Set to enable authentication — the web UI asks for the token on first visit; unset means auth off (default). The two SSE stream endpoints additionally accept `?token=` (EventSource cannot set headers). Always set this when binding the server to a non-localhost interface. |
+| `CAIRN_TOKEN` | unset | Bearer token guarding `/api/*`. Set to enable authentication — the web UI asks for the token on first visit; unset means auth off (default). The two SSE stream endpoints additionally accept `?token=` (EventSource cannot set headers). Always set this when binding the server to a non-localhost interface. An allowlisted Tailscale Serve identity from a loopback peer is also accepted. |
+| `CAIRN_TAILSCALE_USERS` | unset | Comma-separated Tailscale user logins allowed through without `CAIRN_TOKEN` when `Tailscale-User-Login` arrives from a loopback peer. For same-host `tailscale serve`, set `HOST=127.0.0.1` and proxy to `http://127.0.0.1:<port>`; direct non-loopback requests, tagged devices, and Funnel traffic still need the token. A non-loopback bind with this allowlist logs a startup warning. |
 | `CAIRN_REQUIRE_TOKEN` | unset (the Docker image sets `1`) | `1`, `true` or `yes`: refuse to start (log the reason, exit 1) when `CAIRN_TOKEN` is unset or empty. |
 | `PORT` | `8787` | HTTP listen port. |
 | `HOST` | unset (all interfaces) | HTTP bind address. For split deployment (server on an always-on host, daemon on another machine pointing `CAIRN_SERVER` at it), set this to that host's LAN address and set `CAIRN_TOKEN` alongside. Explicit `0.0.0.0`/`::` with `CAIRN_TOKEN` unset logs a startup warning. |

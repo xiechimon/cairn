@@ -9,12 +9,26 @@ for (const width of [360, 390]) {
       await page.setViewportSize({ width, height: 800 });
     });
 
-    test('M1 看板：rail 侧栏 + 顶栏动作留在视口内 + 无页面级横滚', async ({ page }) => {
-      await page.goto('/app');
-      const rail = page.locator('.board-sidebar--collapsed');
-      await expect(rail).toBeVisible();
-      const railBox = (await rail.boundingBox()) as { width: number };
-      expect(railBox.width, 'rail 宽度').toBeLessThanOrEqual(48);
+    test('M1 board: sidebar folds into a menu drawer, top bar actions stay on screen, no page scroll', async ({
+      page,
+    }) => {
+      await page.goto('/app?view=board');
+      await expect(page.locator('.board-sidebar')).toHaveCount(0);
+      await expect(page.locator('.board-topbar-title')).toBeVisible();
+      const menu = page.getByRole('button', { name: '展开侧边栏' });
+      const menuBox = (await menu.boundingBox()) as { width: number; height: number };
+      expect(menuBox.width).toBeGreaterThanOrEqual(44);
+      expect(menuBox.height).toBeGreaterThanOrEqual(44);
+      await menu.click();
+      const drawer = page.getByRole('dialog', { name: '侧边栏' });
+      await expect(drawer.getByRole('link', { name: '定时' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(drawer).toBeHidden();
+      await menu.click();
+      await drawer.getByRole('link', { name: '定时' }).click();
+      await expect(page).toHaveURL(/\/app\/schedules/);
+      await expect(drawer).toBeHidden();
+      await page.goto('/app?view=board');
       for (const name of ['筛选', '新任务']) {
         const box = (await page
           .getByRole('button', { name: new RegExp(name) })
@@ -63,7 +77,7 @@ for (const width of [360, 390]) {
     });
 
     test('M4 总管：FAB ≥44px，开窗可最小化收回', async ({ page }) => {
-      await page.goto('/app');
+      await page.goto('/app?view=board');
       const fab = page.locator('.chief-fab');
       await expect(fab).toBeVisible();
       const fabBox = (await fab.boundingBox()) as { width: number; height: number };
@@ -101,6 +115,40 @@ for (const width of [360, 390]) {
       expect(box.x + box.width).toBeLessThanOrEqual(width);
       await page.getByRole('button', { name: '取消' }).click();
       await expect(dialog).toBeHidden();
+    });
+
+    test('M8 paper pages keep a side gutter and visible names', async ({ page }) => {
+      const pages = [
+        '/app/account?scenario=13',
+        '/app/resources/skills?scenario=skills-list',
+        '/app/resources/mcp-servers?scenario=07',
+        '/app/resources/machines?scenario=06',
+        '/app/resources/providers?scenario=10',
+        '/app/team?scenario=12',
+        '/app?scenario=101',
+      ];
+      for (const url of pages) {
+        await page.goto(url);
+        await page.locator('.settings-card, [data-testid="team-agent-grid"], [data-testid="chief-settings-col"]').first().waitFor();
+        const report = await page.evaluate(() => {
+          const rail = document.querySelector('.board-sidebar--collapsed')?.getBoundingClientRect();
+          const railRight = rail?.right ?? 0;
+          const col = document.querySelector('[data-testid="page-col"], [data-testid="chief-settings-col"]');
+          const problems: string[] = [];
+          for (const el of col?.querySelectorAll('*') ?? []) {
+            const box = el.getBoundingClientRect();
+            if (box.width <= 1 && box.height <= 1) continue;
+            if (getComputedStyle(el).visibility === 'hidden') continue;
+            if (box.left < railRight + 12 - 0.5 || box.right > innerWidth - 12 + 0.5) {
+              problems.push(`${el.className.toString().slice(0, 40)} ${Math.round(box.left)}-${Math.round(box.right)}`);
+            }
+            const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent?.trim());
+            if (hasText && box.width < 1) problems.push(`zero-width text "${el.textContent?.trim()}"`);
+          }
+          return problems.slice(0, 3);
+        });
+        expect(report, url).toEqual([]);
+      }
     });
 
     test('M7 审批弹层：合并对话框在视口内可关', async ({ page }) => {

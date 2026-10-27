@@ -281,7 +281,7 @@ function MachinePicker({
         <span>{cur?.name ?? t('选择机器')}</span>
         <ChevronDown width={12} height={12} />
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-(--anchor-width) min-w-44 gap-0 p-1">
+      <PopoverContent align="start" className="w-(--anchor-width) min-w-44 gap-0 p-(--menu-pad)">
         <div role="listbox" aria-label={t('目标机器')}>
           {list.length === 0 ? (
             <div className="px-1.5 py-1 text-sm text-(--text-tertiary)">{t('暂无在线机器')}</div>
@@ -290,7 +290,7 @@ function MachinePicker({
               <Button
                 variant="ghost"
                 key={m.id}
-                className="w-full justify-start font-normal"
+                className="w-full justify-start rounded-(--radius-menu-item) font-normal"
                 data-active={m.id === selected}
                 onClick={() => {
                   onSelect(m.id);

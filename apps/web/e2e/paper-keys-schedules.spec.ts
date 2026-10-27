@@ -54,3 +54,40 @@ test('`新建定时` footer: text `取消` left of a 32px primary `保存`, no o
   const [c, s] = await Promise.all([cancel.boundingBox(), save.boundingBox()]);
   expect(c!.x + c!.width).toBeLessThanOrEqual(s!.x);
 });
+
+test('`新建定时` hour and minute selects sit side by side', async ({ page }) => {
+  await light(page, '/app/schedules?scenario=r3-92');
+  const dialog = page.getByRole('dialog', { name: '新建定时' });
+  await dialog.evaluate((el) =>
+    Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)),
+  );
+  const [hour, minute] = await Promise.all([
+    dialog.getByRole('combobox', { name: '时' }).boundingBox(),
+    dialog.getByRole('combobox', { name: '分' }).boundingBox(),
+  ]);
+  expect(minute!.x - (hour!.x + hour!.width)).toBeLessThanOrEqual(12);
+  expect(minute!.y).toBe(hour!.y);
+});
+
+test('new schedule form: a pointer open shows no focus ring, a keyboard open lands on the frequency radio', async ({
+  page,
+}) => {
+  await light(page, '/app/schedules?scenario=01');
+  const open = page.locator('.sched-empty').getByRole('button', { name: '新建定时' });
+  const dialog = page.getByRole('dialog', { name: '新建定时' });
+  const ringed = () =>
+    page.evaluate(() => document.activeElement?.matches(':focus-visible') ?? false);
+
+  await open.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('频率', { exact: true })).toBeVisible();
+  await expect.poll(ringed).toBe(false);
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await open.focus();
+  await page.keyboard.press('Enter');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('radio', { checked: true })).toBeFocused();
+  await expect.poll(ringed).toBe(true);
+});

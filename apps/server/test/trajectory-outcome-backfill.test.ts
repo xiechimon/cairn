@@ -172,11 +172,11 @@ function backfilledRow(db: ReturnType<typeof bootServer>['db'], buildId: string)
     .get();
 }
 
-test('the last slot of createScheduler in index.ts comes from trajectoryOutcomeRunOf(config, ...)', () => {
+test('the second-to-last slot of createScheduler in index.ts comes from trajectoryOutcomeRunOf(config, ...)', () => {
   const src = readFileSync(join(import.meta.dirname, '../src/index.ts'), 'utf8');
   const call = /createScheduler\(([\s\S]*?)\n\);/.exec(src)?.[1] ?? '';
   const args = call.split('\n').filter((l) => l.trim() !== '');
-  expect(args.at(-1)?.trim()).toMatch(/^trajectoryOutcomeRunOf\(config, /);
+  expect(args.at(-2)?.trim()).toMatch(/^trajectoryOutcomeRunOf\(config, /);
 });
 
 test('a revert commit on main within 7 days backfills revertedWithin7d', async () => {

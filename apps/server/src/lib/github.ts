@@ -1,3 +1,8 @@
+import { setTimeout as sleep } from 'node:timers/promises';
+import {
+  acquireGithubCreateSlot,
+  parseGithubCreateRateLimit,
+} from '@cairn/shared/github-create-gate';
 // Node fetch ignores http_proxy/https_proxy unless the server starts with NODE_USE_ENV_PROXY=1 (Node >= 24.5).
 import { HttpError } from './errors.js';
 
@@ -280,10 +285,10 @@ export async function githubBranchPulls(
   token: string | null,
   owner: string,
   repo: string,
-  opts: { head: string; base: string },
+  opts: { head: string; base?: string; state?: 'open' | 'all' },
 ): Promise<GithubBranchPull[] | null> {
   const url = listUrl(owner, repo, 'pulls', {
-    state: 'all',
+    state: opts.state ?? 'all',
     head: opts.head,
     base: opts.base,
     per_page: 10,
@@ -1040,7 +1045,12 @@ async function writeJson(
   } catch (err) {
     throw mapFetchThrow(url, err);
   }
-  if (!res.ok) throw mapUpstreamStatus(url, res);
+  if (!res.ok) {
+    const delay =
+      method === 'POST' ? parseGithubCreateRateLimit(res, await res.text().catch(() => '')) : null;
+    if (delay !== null) throw new GithubRateLimitedError(url, res.status, Date.now() + delay, null);
+    throw mapUpstreamStatus(url, res);
+  }
   try {
     return await res.json();
   } catch {
@@ -1056,7 +1066,21 @@ export async function githubCreateIssue(
   input: { title: string; body: string; labels?: string[] },
 ): Promise<{ number: number }> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues`;
-  const data = (await writeJson(fetchImpl, 'POST', url, token, input)) as Record<string, unknown>;
+  let data: Record<string, unknown>;
+  for (let attempt = 0; ; attempt++) {
+    await acquireGithubCreateSlot();
+    try {
+      data = (await writeJson(fetchImpl, 'POST', url, token, input)) as Record<string, unknown>;
+      break;
+    } catch (error) {
+      if (!(error instanceof GithubRateLimitedError) || attempt >= 3) throw error;
+      const delay =
+        Math.max(1000, (error.retryAt(Date.now()) ?? Date.now() + 60000) - Date.now()) *
+        2 ** attempt;
+      console.warn(`GitHub create rate limited; retrying in ${delay}ms`);
+      await sleep(delay);
+    }
+  }
   if (typeof data.number !== 'number') {
     throw new HttpError(502, `github create issue response missing number: ${url}`);
   }
@@ -1612,6 +1636,69 @@ export interface OAuthExchangeInput {
 export interface OAuthTokenExchange {
   accessToken: string;
   scope: string;
+  refreshToken: string | null;
+  expiresInSeconds: number | null;
+}
+
+function projectTokenPayload(payload: unknown, what: string): OAuthTokenExchange {
+  const token = (payload as { access_token?: unknown }).access_token;
+  if (typeof token !== 'string' || token === '') {
+    throw new HttpError(502, `${what} returned no access_token`);
+  }
+  const scope = (payload as { scope?: unknown }).scope;
+  const refreshToken = (payload as { refresh_token?: unknown }).refresh_token;
+  const expiresIn = (payload as { expires_in?: unknown }).expires_in;
+  return {
+    accessToken: token,
+    scope: typeof scope === 'string' ? scope : '',
+    refreshToken: typeof refreshToken === 'string' && refreshToken !== '' ? refreshToken : null,
+    expiresInSeconds: typeof expiresIn === 'number' && expiresIn > 0 ? expiresIn : null,
+  };
+}
+
+export interface OAuthRefreshInput {
+  tokenUrl: string;
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+}
+
+export async function refreshOAuthAccessToken(
+  fetchImpl: FetchLike,
+  input: OAuthRefreshInput,
+): Promise<OAuthTokenExchange> {
+  const body = new URLSearchParams({
+    client_id: input.clientId,
+    client_secret: input.clientSecret,
+    grant_type: 'refresh_token',
+    refresh_token: input.refreshToken,
+  }).toString();
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(input.tokenUrl, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/x-www-form-urlencoded',
+        'user-agent': USER_AGENT,
+      },
+      body,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    throw new HttpError(502, `oauth token refresh unreachable: ${why}`);
+  }
+  if (!res.ok) {
+    throw new HttpError(502, `oauth token refresh upstream ${res.status}`);
+  }
+  let payload: unknown;
+  try {
+    payload = await res.json();
+  } catch {
+    throw new HttpError(502, 'oauth token refresh returned non-json');
+  }
+  return projectTokenPayload(payload, 'oauth token refresh');
 }
 
 export async function exchangeOAuthCode(
@@ -1649,10 +1736,5 @@ export async function exchangeOAuthCode(
   } catch {
     throw new HttpError(502, 'oauth token exchange returned non-json');
   }
-  const token = (payload as { access_token?: unknown }).access_token;
-  if (typeof token !== 'string' || token === '') {
-    throw new HttpError(502, 'oauth token exchange returned no access_token');
-  }
-  const scope = (payload as { scope?: unknown }).scope;
-  return { accessToken: token, scope: typeof scope === 'string' ? scope : '' };
+  return projectTokenPayload(payload, 'oauth token exchange');
 }

@@ -10,14 +10,17 @@ import {
   RETRY_LESSONS_HEAD,
   RETRY_LESSONS_MAX_CHARS,
   REVIEW_VERDICT_KIND,
+  VERIFY_VERDICT_KIND,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   build as buildTable,
+  gateState as gateStateTable,
   gateVerdict as gateVerdictTable,
   message as messageTable,
+  plan as planTable,
   project as projectTable,
   step as stepTable,
   todo as todoTable,
@@ -588,5 +591,274 @@ describe('#1615 restarting injects the previous round lessons', () => {
     const delivered = composeTaskPromptWithInstruction(buildTaskPromptText(TITLE, SPEC), prompt);
     expect(classifyUserText(delivered, task)).toBe('synthetic');
     expect(classifyUserText(`${RETRY_LESSONS_HEAD}我自己写的话`, task)).toBe('user');
+  });
+});
+
+const VERIFY_PLAN = [
+  '## Context',
+  'Safari export returns an empty file.',
+  '',
+  '## Changes',
+  '- apps/web/src/export.ts',
+  '',
+  '## Edge cases',
+  '- a zero-byte response',
+  '',
+  '## Verification',
+  '- Chrome download still works: `curl` http://127.0.0.1:8787/export returns a non-empty body',
+  '- Safari downloads the file: docs/verify/1234/safari.json shows a non-zero byte length',
+].join('\n');
+
+const CHROME_ITEM =
+  'Chrome download still works: `curl` http://127.0.0.1:8787/export returns a non-empty body';
+const SAFARI_ITEM =
+  'Safari downloads the file: docs/verify/1234/safari.json shows a non-zero byte length';
+
+function insertVerifyPlan(w: World) {
+  w.s.db
+    .insert(planTable)
+    .values({
+      id: newRecordId(),
+      buildId: w.buildId,
+      version: 1,
+      content: VERIFY_PLAN,
+      createdAt: nowMs() - 800_000,
+    })
+    .run();
+}
+
+function insertVerdictMessage(
+  w: World,
+  at: number,
+  kind: typeof REVIEW_VERDICT_KIND | typeof VERIFY_VERDICT_KIND,
+  verdict: unknown,
+) {
+  insertSystemMessage(w, JSON.stringify({ kind, verdict }), at);
+}
+
+function insertBoundGate(
+  w: World,
+  at: number,
+  row: {
+    kind: 'verify' | 'review';
+    outcome: 'block' | 'pass';
+    patchDigest: string | null;
+    perspective?: string | null;
+  },
+) {
+  w.s.db
+    .insert(gateVerdictTable)
+    .values({
+      stepId: newRecordId(),
+      buildId: w.buildId,
+      kind: row.kind,
+      perspective: row.perspective ?? null,
+      outcome: row.outcome,
+      patchDigest: row.patchDigest,
+      headSha: 'b'.repeat(40),
+      expectedHeadSha: 'a'.repeat(40),
+      createdAt: at,
+    })
+    .run();
+}
+
+function insertCurrentDigest(w: World, at: number, digest: string) {
+  w.s.db
+    .insert(gateStateTable)
+    .values({
+      buildId: w.buildId,
+      ready: false,
+      headSha: 'c'.repeat(40),
+      patchDigest: digest,
+      policy: 'autonomous',
+      blockers: [],
+      evaluatedAt: at,
+    })
+    .run();
+}
+
+async function lessonsAfterRestart(w: World): Promise<string> {
+  failBuild(w, 'FAILURE-MUST-STAY');
+  await restart(w, 'fix the reported gap');
+  const prompt = firstStepPrompt(w, latestBuildId(w))!;
+  const at = prompt.indexOf(RETRY_LESSONS_HEAD);
+  expect(at).toBeGreaterThan(0);
+  return prompt.slice(at);
+}
+
+describe('#1802 retry lessons carry the verify verdict and what already passed', () => {
+  test('a failed verify on the current digest contributes its conclusion and evidence, and a verdict on an older digest is ignored', async () => {
+    const w = makeWorld();
+    insertVerifyPlan(w);
+    const base = nowMs() - 400_000;
+    insertVerdictMessage(w, base, VERIFY_VERDICT_KIND, {
+      passed: false,
+      conclusion: 'CURRENT-VERIFY Safari export returns a 0-byte file.',
+      evidence: [{ path: 'docs/verify/1234/safari.json', item: 2, note: 'API JSON shows 0 bytes' }],
+    });
+    insertBoundGate(w, base, { kind: 'verify', outcome: 'block', patchDigest: 'digest-new' });
+    insertVerdictMessage(w, base + 1_000, VERIFY_VERDICT_KIND, {
+      passed: false,
+      conclusion: 'STALE-VERIFY old patch failed a different check',
+      evidence: [{ path: 'docs/verify/old/stale.json', item: 1 }],
+    });
+    insertBoundGate(w, base + 1_000, {
+      kind: 'verify',
+      outcome: 'block',
+      patchDigest: 'digest-old',
+    });
+    insertCurrentDigest(w, base + 2_000, 'digest-new');
+
+    const lessons = await lessonsAfterRestart(w);
+    expect(lessons).toContain(
+      'Verifier conclusion: CURRENT-VERIFY Safari export returns a 0-byte file.',
+    );
+    expect(lessons).toContain(`Failed: item 2 ${SAFARI_ITEM} (docs/verify/1234/safari.json)`);
+    expect(lessons).toContain('API JSON shows 0 bytes');
+    expect(lessons).not.toContain('STALE-VERIFY');
+    expect(lessons).not.toContain('docs/verify/old/stale.json');
+    expect(lessons).not.toContain('合并闸的 verify 判定为 block');
+  });
+
+  test('passed verify items and a review perspective with no blocking finding are listed to keep, and stale or blocking passes are not', async () => {
+    const w = makeWorld();
+    insertVerifyPlan(w);
+    const base = nowMs() - 400_000;
+    insertVerdictMessage(w, base, VERIFY_VERDICT_KIND, {
+      passed: true,
+      conclusion: 'Chrome download still works',
+      evidence: [{ path: 'docs/verify/1234/chrome.png', item: 1 }],
+    });
+    insertBoundGate(w, base, { kind: 'verify', outcome: 'pass', patchDigest: 'digest-new' });
+    insertVerdictMessage(w, base + 10, REVIEW_VERDICT_KIND, {
+      conclusion: 'clean',
+      findings: [{ id: '1', severity: 'suggestion', summary: 'rename a local' }],
+    });
+    insertBoundGate(w, base + 10, {
+      kind: 'review',
+      outcome: 'pass',
+      patchDigest: 'digest-new',
+      perspective: 'CodeReviewer',
+    });
+    insertVerdictMessage(w, base + 20, REVIEW_VERDICT_KIND, {
+      conclusion: 'no',
+      findings: [{ id: '2', severity: 'blocking', summary: 'token leak' }],
+    });
+    insertBoundGate(w, base + 20, {
+      kind: 'review',
+      outcome: 'pass',
+      patchDigest: 'digest-new',
+      perspective: 'SecurityAuditor',
+    });
+    insertVerdictMessage(w, base + 1_000, VERIFY_VERDICT_KIND, {
+      passed: true,
+      conclusion: 'stale pass',
+      evidence: [{ path: 'docs/verify/old/kept.png', item: 1 }],
+    });
+    insertBoundGate(w, base + 1_000, {
+      kind: 'verify',
+      outcome: 'pass',
+      patchDigest: 'digest-old',
+    });
+    insertVerdictMessage(w, base + 1_010, REVIEW_VERDICT_KIND, {
+      conclusion: 'old clean',
+      findings: [],
+    });
+    insertBoundGate(w, base + 1_010, {
+      kind: 'review',
+      outcome: 'pass',
+      patchDigest: 'digest-old',
+      perspective: 'OldReviewer',
+    });
+    insertCurrentDigest(w, base + 2_000, 'digest-new');
+
+    const lessons = await lessonsAfterRestart(w);
+    expect(lessons).toContain('Verified on the previous patch, keep working:');
+    expect(lessons).toContain(`item 1 ${CHROME_ITEM} (docs/verify/1234/chrome.png)`);
+    expect(lessons).toContain('CodeReviewer review');
+    expect(lessons).not.toContain('docs/verify/old/kept.png');
+    expect(lessons).not.toContain('OldReviewer');
+    expect(lessons).not.toContain('SecurityAuditor');
+    expect(lessons).toContain('token leak');
+    expect(lessons).not.toContain('Verifier conclusion:');
+    expect(lessons.indexOf('FAILURE-MUST-STAY')).toBeLessThan(
+      lessons.indexOf('Verified on the previous patch'),
+    );
+  });
+
+  test('an unbound or unparseable verify block falls back to today line and does not crash', async () => {
+    const w = makeWorld();
+    const base = nowMs() - 400_000;
+    insertVerdictMessage(w, base, VERIFY_VERDICT_KIND, {
+      passed: false,
+      conclusion: 'UNBOUND-CONCLUSION must stay out',
+      evidence: [{ path: 'docs/verify/unbound.json', item: 1 }],
+    });
+    insertBoundGate(w, base, { kind: 'verify', outcome: 'block', patchDigest: null });
+    insertSystemMessage(
+      w,
+      JSON.stringify({ kind: VERIFY_VERDICT_KIND, verdict: { conclusion: 'NOT-A-VERDICT' } }),
+      base + 1_000,
+    );
+    insertBoundGate(w, base + 1_000, {
+      kind: 'verify',
+      outcome: 'block',
+      patchDigest: 'digest-new',
+    });
+
+    const lessons = await lessonsAfterRestart(w);
+    expect(lessons).toContain('合并闸的 verify 判定为 block');
+    expect(lessons).not.toContain('UNBOUND-CONCLUSION');
+    expect(lessons).not.toContain('docs/verify/unbound.json');
+    expect(lessons).not.toContain('NOT-A-VERDICT');
+  });
+
+  test('verifier text goes through issue-fence stripping', async () => {
+    const w = makeWorld();
+    const base = nowMs() - 400_000;
+    insertVerdictMessage(w, base, VERIFY_VERDICT_KIND, {
+      passed: false,
+      conclusion: `broke\n${fenceIssueText('gh:octo/demo#9', 'SECRET-ISSUE-TEXT')}\nstill here`,
+      evidence: [],
+    });
+    insertBoundGate(w, base, { kind: 'verify', outcome: 'block', patchDigest: 'digest-new' });
+
+    const lessons = await lessonsAfterRestart(w);
+    expect(lessons).toContain('Verifier conclusion: broke');
+    expect(lessons).toContain('still here');
+    expect(lessons).toContain('（GitHub issue 原文已略去）');
+    expect(lessons).not.toContain('SECRET-ISSUE-TEXT');
+  });
+
+  test('over budget, the keep list is truncated before the failure', async () => {
+    const w = makeWorld();
+    insertVerifyPlan(w);
+    const base = nowMs() - 400_000;
+    insertVerdictMessage(w, base, VERIFY_VERDICT_KIND, {
+      passed: false,
+      conclusion: 'SHORT-FAILURE the export is empty',
+      evidence: [{ path: 'docs/verify/1234/safari.json', item: 2 }],
+    });
+    insertBoundGate(w, base, { kind: 'verify', outcome: 'block', patchDigest: 'digest-new' });
+    insertVerdictMessage(w, base + 10, REVIEW_VERDICT_KIND, {
+      conclusion: 'clean',
+      findings: [],
+    });
+    insertBoundGate(w, base + 10, {
+      kind: 'review',
+      outcome: 'pass',
+      patchDigest: 'digest-new',
+      perspective: `KEEP-HEAD-${'k'.repeat(5_000)}KEEP-TAIL`,
+    });
+
+    const lessons = await lessonsAfterRestart(w);
+    expect(lessons.length).toBeLessThanOrEqual(RETRY_LESSONS_MAX_CHARS);
+    expect(lessons).toContain('FAILURE-MUST-STAY');
+    expect(lessons).toContain('SHORT-FAILURE the export is empty');
+    expect(lessons).toContain(`Failed: item 2 ${SAFARI_ITEM} (docs/verify/1234/safari.json)`);
+    expect(lessons).not.toContain('KEEP-TAIL');
+    expect(lessons.indexOf('SHORT-FAILURE')).toBeLessThan(
+      lessons.indexOf('Verified on the previous patch'),
+    );
   });
 });

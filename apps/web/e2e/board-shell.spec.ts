@@ -1,41 +1,102 @@
 import { expect, test } from '@playwright/test';
 
-test('needs-you strip lists the pending cards, opens a task, and stays out of the needs-me view', async ({
+test('home splits work into needs-you, running and done, and folds week-old and not-started cards', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=01');
-  const strip = page.getByTestId('needs-you-strip');
-  const pendingCards = page.locator('.board-column[data-column="pending"] .todo-card-title');
-  await expect(strip).toBeVisible();
-  const rows = strip.getByRole('link', { name: '打开' });
-  await expect(rows).toHaveCount(await pendingCards.count());
-  await expect(strip).toContainText((await pendingCards.first().textContent()) ?? '');
-  await rows.first().click();
-  await expect(page).toHaveURL(/\/app\/todo\/[^/?]+/);
+  await page.goto('/app?scenario=board-inbox');
+  const needsYou = page.getByTestId('home-needs-you');
+  const running = page.getByTestId('home-running');
+  const done = page.getByTestId('home-done');
+  await expect(needsYou.getByTestId('home-section-count')).toHaveText('4');
+  await expect(needsYou.getByTestId('needs-you-row')).toHaveCount(4);
+  await expect(page.getByTestId('needs-you')).toHaveCount(0);
+  await needsYou.getByTestId('needs-you-stale').getByRole('button').click();
+  await expect(needsYou.getByTestId('needs-you-row')).toHaveCount(9);
 
-  await page.goto('/app?scenario=01&column=pending');
-  await expect(page.getByTestId('needs-you-strip')).toBeHidden();
+  await expect(running.getByTestId('home-section-count')).toHaveText('1');
+  await expect(running.getByTestId('home-running-row')).toContainText('执行中');
+  await expect(running.getByTestId('home-not-started-row')).toHaveCount(0);
+  await running.getByTestId('home-not-started').getByRole('button').click();
+  await expect(running.getByTestId('home-not-started-row').getByRole('button', { name: '开始' })).toBeVisible();
 
-  await page.goto('/app?scenario=board-tags-empty');
-  await expect(page.getByTestId('needs-you-strip')).toBeHidden();
+  await expect(done.getByTestId('home-section-count')).toHaveText('4');
+  await expect(done.getByTestId('home-done-row')).toHaveCount(4);
+  await expect(done.getByTestId('home-done-row').filter({ hasText: '已取消' })).toHaveCount(1);
+  await done.getByTestId('home-open-board').click();
+  await expect(page).toHaveURL(/[?&]view=board/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('看板');
+});
+
+test('a project filter keeps home; a filter that matches nothing shows the filter-empty state', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=board-repos&projects=r2-inventory');
+  await expect(page.getByTestId('home-sections')).toBeVisible();
+  await expect(page.locator('[data-column]')).toHaveCount(0);
+  await expect(page.getByRole('complementary').getByRole('link', { name: /工作台/ })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  await page.goto('/app?scenario=board-repos&projects=no-such-project');
+  await expect(page.getByTestId('home-sections')).toHaveCount(0);
+  await expect(page.getByText('没有匹配筛选条件的任务')).toBeVisible();
+});
+
+test('the needs-me inbox lists recent pending cards as rows and folds week-old ones', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=board-inbox&view=board');
+  await expect(page.getByTestId('needs-you-strip')).toHaveCount(0);
+  const pendingColumn = page.locator('.board-column[data-column="pending"]');
+  await expect(pendingColumn.getByTestId('column-count')).toHaveText('4');
+  await expect(page.getByTestId('needs-you')).toHaveText('4 项等你处理');
+  await expect(page.getByTestId('attention-badge')).toHaveText('4');
+  await pendingColumn.getByTestId('column-stale-pending').click();
+  await expect(page).toHaveURL(/[?&]column=pending/);
+
+  const inbox = page.getByTestId('needs-you-inbox');
+  const rows = inbox.getByTestId('needs-you-row');
+  await expect(rows).toHaveCount(4);
+  for (const row of await rows.all()) await expect(row.getByRole('button')).toHaveCount(1);
+  const stale = inbox.getByTestId('needs-you-stale').getByRole('button', { name: /较早的 5 条/ });
+  await expect(stale).toHaveAttribute('aria-expanded', 'false');
+  await stale.click();
+  await expect(rows).toHaveCount(9);
+  await expect(inbox).toContainText('16 天前');
+
+  await rows.first().getByRole('link').click();
+  await expect(page).toHaveURL(/[?&]task=[^&]+/);
+  await expect(page.getByRole('complementary', { name: '任务面板' }).getByTestId('task-panel-title')).toBeVisible();
+});
+
+test('the needs-me inbox shares its edges with the new-task bar', async ({ page }) => {
+  await page.goto('/app?scenario=board-inbox&column=pending');
+  const list = await page.getByTestId('needs-you-row').first().evaluate((el) => {
+    const box = el.parentElement!.getBoundingClientRect();
+    return { left: box.left, right: box.right };
+  });
+  const bar = (await page.getByTestId('board-new-task-bar').boundingBox())!;
+  expect(Math.abs(list.left - bar.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(list.right - (bar.x + bar.width))).toBeLessThanOrEqual(1);
 });
 
 test('since-last-seen counts tasks finished after the stored visit and hides when nothing changed', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.board.lastSeenAt', '0'));
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await expect(page.getByTestId('board-since-last-seen')).toContainText(/[1-9]\d* 个完成/);
 
   await page.addInitScript(() =>
     localStorage.setItem('cairn.board.lastSeenAt', String(Date.now() + 60_000)),
   );
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await expect(page.getByTestId('board-since-last-seen')).toBeHidden();
 });
 
 test('the new-task bar opens the existing new-task surface', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await page.getByTestId('board-new-task-bar').click();
   await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
 });
@@ -44,7 +105,7 @@ test('a 390px board stacks non-empty columns tightly with no horizontal scroll',
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const scroller = page.getByTestId('board-scroller');
   await expect(scroller.locator('.todo-card-title').first()).toBeVisible();
   const metrics = await scroller.evaluate((element) => {
@@ -76,7 +137,7 @@ test('a 390px needs-you row shows the whole title and keeps its actions on scree
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=board-inbox&column=pending');
   const row = page.getByTestId('needs-you-row').first();
   await expect(row).toBeVisible();
   const fit = await row.evaluate((element) => {
@@ -92,29 +153,42 @@ test('a 390px needs-you row shows the whole title and keeps its actions on scree
   });
   expect(fit.clipped).toBe(false);
   expect(fit.buttonsInside).toBe(true);
+
+  await page.getByTestId('needs-you-stale').getByRole('button').click();
+  const lastRow = page.getByTestId('needs-you-row').last();
+  await page.locator('.board-main').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  const rowBox = (await lastRow.boundingBox())!;
+  const bar = (await page.getByTestId('board-new-task-bar').boundingBox())!;
+  expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(bar.y);
 });
 
-test('a short phone screen scrolls the strip away to reach the last board group', async ({
+test('a 390px home scrolls as one page down to its last row', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app?scenario=board-inbox');
+  await page.getByTestId('chief-home').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect(page.getByTestId('home-done-row').last()).toBeInViewport();
+});
+
+test('a short phone screen scrolls the board as one page to reach the last group', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 640 });
-  await page.goto('/app?scenario=board-drag-matrix');
-  await expect(page.getByTestId('needs-you-strip')).toBeVisible();
+  await page.goto('/app?scenario=board-drag-matrix&view=board');
   const lastCard = page.locator('.board-column[data-column="done"] .todo-card-title').last();
   await lastCard.scrollIntoViewIfNeeded();
   const box = await lastCard.boundingBox();
   const bar = await page.getByTestId('board-new-task-bar').boundingBox();
   expect(box).not.toBeNull();
   expect(box!.y + box!.height).toBeLessThanOrEqual(bar!.y);
-  const stripTop = await page.getByTestId('needs-you-strip').evaluate((el) => el.getBoundingClientRect().top);
-  expect(stripTop).toBeLessThan(0);
+  const pageScroll = await page.locator('.board-main').evaluate((el) => el.scrollTop);
+  expect(pageScroll).toBeGreaterThan(0);
 });
 
 test('the phone chief launcher clears the new-task bar on the board and sits in the corner elsewhere', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const onBoard = await page.locator('.chief-fab').boundingBox();
   const bar = await page.getByTestId('board-new-task-bar').boundingBox();
   expect(onBoard!.y + onBoard!.height).toBeLessThanOrEqual(bar!.y);

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 import {
   type GitFallbackReason,
+  GitPushHookError,
   gitCredentialEnv,
   gitPrim,
   isGitAuthFailure,
@@ -685,4 +686,42 @@ describe('resetHard — git 2.43 rejects reset --end-of-options (#1316)', () => 
     await expect(gitPrim.resetHard(dir, 'does-not-exist')).rejects.toThrow();
     expect(readFileSync(join(dir, 'README.md'), 'utf8')).toBe('corrupted\n');
   });
+});
+
+describe('#1829 local pre-push rejection', () => {
+  test('real hook rejection is identified and preserves both output streams without retrying', async () => {
+    const remote = mkdtempSync(join(tmpdir(), 'cairn-hook-remote-'));
+    gitOk(remote, ['init', '--bare']);
+    const dir = seededWorktree(remote);
+    gitOk(dir, ['config', 'core.hooksPath', join(dir, '.git', 'hooks')]);
+    const hook = join(dir, '.git', 'hooks', 'pre-push');
+    const marker = join(dir, 'hook-calls');
+    writeFileSync(
+      hook,
+      `#!/bin/sh\necho called >> '${marker}'\necho 'lint stdout'\necho 'lint stderr' >&2\nexit 1\n`,
+    );
+    chmodSync(hook, 0o755);
+    const err = await withGitNetRetries(() => gitPrim.push(dir, 'main', null)).catch(
+      (error: unknown) => error,
+    );
+    expect(err).toMatchObject({ name: 'GitPushHookError' });
+    expect(String(err)).toContain('lint stdout');
+    expect(String(err)).toContain('lint stderr');
+    expect(readFileSync(marker, 'utf8')).toBe('called\n');
+    expect(gitOk(remote, ['for-each-ref', '--format=%(refname)'])).toBe('');
+  });
+});
+
+test('#1829 a hook rejection on the machine credential fallback retains its recovery type', async () => {
+  const hookError = new GitPushHookError('lint failed');
+  await expect(
+    withGitCredentialFallback(
+      async (cred) => {
+        if (cred !== null) throw new Error(MEA_AUTH_FAILURE);
+        throw hookError;
+      },
+      CRED,
+      { what: 'push', allowMachineFallback: true },
+    ),
+  ).rejects.toBe(hookError);
 });

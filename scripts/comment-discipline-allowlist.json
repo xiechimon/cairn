@@ -760,7 +760,7 @@
     "reason": "external quirk: Tailwind preflight gives [hidden] a display none !important that outranks the base layer"
   },
   {
-    "path": "apps/web/src/chief/chief-drawer.tsx",
+    "path": "apps/web/src/chief/chief-conversation.tsx",
     "line": "        {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}",
     "reason": "ui-drift-gate G4 marker: hidden file input is deliberately native"
   },
@@ -773,5 +773,20 @@
     "path": "apps/web/src/overlay/new-task-dialog.tsx",
     "line": "          {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}",
     "reason": "ui-drift-gate G4 marker: hidden file input is deliberately native"
+  },
+  {
+    "path": "apps/web/src/pointer-focus.ts",
+    "line": "// Chromium counts Escape as keyboard interaction and turns :focus-visible on",
+    "reason": "browser quirk: Chromium focus-visible heuristic treats Escape as keyboard input"
+  },
+  {
+    "path": "apps/web/src/pointer-focus.ts",
+    "line": "// for an element that was focused by a mouse click.",
+    "reason": "browser quirk: Chromium focus-visible heuristic treats Escape as keyboard input"
+  },
+  {
+    "path": "integration/vitest.config.ts",
+    "line": "    // vite build empties apps/web/dist first, so files that each run it must not run in parallel (#349).",
+    "reason": "external quirk: vite build empties its outDir before writing, so parallel builds into one dist clobber each other"
   }
 ]

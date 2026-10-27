@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const BOARD = '/app?scenario=01';
+const BOARD = '/app?scenario=01&view=board';
 
 async function openDialog(page: Page) {
   await page.goto(BOARD);

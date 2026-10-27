@@ -1,5 +1,6 @@
 import type { AskUserAnswer } from '@cairn/shared';
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useContext } from 'react';
+import { Link } from 'react-router';
 import type { CurrentUser } from '../api/provider.js';
 import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
@@ -10,10 +11,13 @@ import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
+import { TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import type { ChiefContent, ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, ChevronDown, ChevronRight, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
+import { mentionChipClass } from '../overlay/mention-chip.js';
+import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefSpiralFace } from './chief-spiral-face.js';
@@ -46,7 +50,7 @@ const MARKER_ERROR_CLS =
   'my-2.5 flex-col justify-center text-center text-meta text-(--destructive)';
 
 const CHIP_INLINE_CLS =
-  'mx-0.5 inline-flex items-center gap-1 rounded-[4px] px-1.5 py-px align-[1px] text-meta';
+  'mx-0.5 inline-flex items-center gap-1 rounded-(--cds-radius-sm) px-1.5 py-px align-[1px] text-meta';
 
 function segmentsText(segments: ChiefSegment[]): string {
   return segments.map((s) => (s.todo != null ? `#${s.todo}` : (s.agent ?? s.text ?? ''))).join('');
@@ -91,13 +95,40 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
           );
         if (s.code)
           return (
-            <code key={i} className="rounded-[4px] bg-(--muted) px-1 py-px font-mono text-meta">
+            <code
+              key={i}
+              className="rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-meta"
+            >
               {s.text}
             </code>
           );
         return s.strong ? <strong key={i}>{s.text}</strong> : <span key={i}>{s.text}</span>;
       })}
     </>
+  );
+}
+
+function HandoffRow({ todoId }: { todoId: string }) {
+  const { t } = useI18n();
+  const glance = useContext(TodoGlanceContext)?.get(todoId);
+  const openInPlace = useOpenTaskInPlace();
+  return (
+    <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
+      <Marker className={MARKER_NOTE_CLS} data-testid="chief-handoff">
+        <MarkerContent>
+          {t('已转给任务')}
+          <Link
+            to={`/app/todo/${todoId}`}
+            className={`${mentionChipClass('todo')} cursor-pointer`}
+            data-phase={glance?.phase}
+            onClick={(event) => openInPlace(event, todoId, glance)}
+          >
+            {glance != null && <TodoStatus phase={glance.phase} />}
+            {glance?.seq != null ? `#${glance.seq}` : t('任务')}
+          </Link>
+        </MarkerContent>
+      </Marker>
+    </MessageScrollerItem>
   );
 }
 
@@ -108,6 +139,7 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
     case 'thinking':
     case 'tool':
     case 'question':
+    case 'handoff':
       return item.id ?? index;
     default:
       return index;
@@ -155,6 +187,7 @@ export function ChiefStreamRow({
         </Marker>
       </MessageScrollerItem>
     );
+  if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'note')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>

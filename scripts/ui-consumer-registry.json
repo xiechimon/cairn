@@ -16,6 +16,12 @@
       "anchor": "rounded-none border-0 border-b border-border",
       "kind": "deviation",
       "reason": "ResourceRow button form (#1416): a full-width Button row inside the settings card. It draws the row divider itself because the Button's transparent border hides the card's divide-y rule (last:border-b-0 keeps the last row clean), and a divider on a rounded box would curl up at both ends, so the box stays square. The card's --radius-card corners stay the visible shape."
+    },
+    {
+      "file": "apps/web/src/board/app-sidebar.tsx",
+      "anchor": "top-0 left-0 flex h-full w-72",
+      "kind": "deviation",
+      "reason": "Phone sidebar drawer: a full-height Dialog panel pinned to the left screen edge, as on claude.ai mobile. Its top, left and bottom edges sit on the viewport edge, where rounded corners would leave slivers of the page showing, so the box stays square; the sidebar inside keeps its own surface."
     }
   ],
   "brandInkText": [
@@ -153,18 +159,25 @@
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 12px text)"
     },
     {
-      "file": "apps/web/src/board/board.tsx",
-      "anchor": "flex-none text-(--card-button)",
+      "file": "apps/web/src/board/home.tsx",
+      "anchor": "const ACTION_CLASS = 'flex-none gap-1 text-(--card-button)'",
       "role": "action-link",
-      "reason": "Needs-you strip row action (回复/确认计划/审阅/重试): the same accent text action the task card shows, lifted into the strip above the board.",
+      "reason": "Home and needs-me inbox row action (回复/确认计划/审阅/重试/开始): the same accent text action the task card shows.",
       "contrast": "measured 2026-10-25 in the fixture build (light / dark): 12.26 / 6.11 on --card"
     },
     {
-      "file": "apps/web/src/board/board.tsx",
-      "anchor": "mt-1.5 block text-right text-meta text-(--card-button)",
-      "role": "action-link",
-      "reason": "Needs-you strip 查看全部 link to the needs-me view.",
-      "contrast": "measured 2026-10-25 in the fixture build (light / dark): 11.07 / 6.97 on --background"
+      "file": "apps/web/src/board/home.tsx",
+      "anchor": "className=\"text-(--card-button)\"",
+      "role": "indicator",
+      "reason": "Needs-me inbox row status glyph (failed / plan / review / reply). DESIGN.md 图标: needs-you icons take the accent; non-text glyph, 3:1 gate.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, measured in PR #1369)"
+    },
+    {
+      "file": "apps/web/src/board/home.tsx",
+      "anchor": "tone=\"text-(--card-button)\"",
+      "role": "indicator",
+      "reason": "Home `需要你` section header alert-circle glyph. DESIGN.md 图标: needs-you icons take the accent; non-text glyph, 3:1 gate.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369)"
     },
     {
       "file": "apps/web/src/board/board.tsx",
@@ -172,6 +185,13 @@
       "role": "indicator",
       "reason": "Spiral brand mark at the start of the board new-task bar.",
       "contrast": "measured 2026-10-25 in the fixture build (light / dark): 12.26 / 6.11 on --card; non-text glyph, 3:1 gate"
+    },
+    {
+      "file": "apps/web/src/task-panel/task-panel.tsx",
+      "anchor": "const NEEDS_YOU_INK = 'text-(--card-button)'",
+      "role": "indicator",
+      "reason": "Task panel needs-you marks (#1937): the row status glyph and reason label, the waiting and failed stage glyphs, and the ask box label. DESIGN.md: accent only for needs-you; each carries an icon or a text label, so the state does not rely on color.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 12px text)"
     }
   ]
 }

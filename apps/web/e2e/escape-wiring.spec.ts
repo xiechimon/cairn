@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 import { pressAndExpect } from './helpers.js';
 
-const EMPTY = '/app?scenario=board-tags-empty';
+const EMPTY = '/app?scenario=board-tags-empty&view=board';
 
 const typeBtn = (page: Page) => page.locator('.board-type-filter');
 const typePopover = (page: Page) => page.locator('.type-filter-popover');

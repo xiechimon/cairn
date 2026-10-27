@@ -139,7 +139,7 @@ test.describe('board card', () => {
   test('projects pending: no project item, then each card’s own project', async ({ page }) => {
     await stubLiveBoot(page);
     const projects = await holdProjects(page);
-    await page.goto('/app');
+    await page.goto('/app?view=board');
 
     await expect(card(page, 'todo-0')).toContainText('project probe alpha');
     await expect.poll(projects.count).toBeGreaterThan(0);
@@ -162,7 +162,7 @@ test.describe('board card', () => {
   test('projects read failed: no project item', async ({ page }) => {
     await stubLiveBoot(page);
     const projects = await failProjects(page);
-    await page.goto('/app');
+    await page.goto('/app?view=board');
 
     await expect(card(page, 'todo-0').locator('.todo-card-meta')).toContainText('#1');
     await projects.settled();
@@ -192,7 +192,7 @@ test('drag overlay: no project while pending, the card’s own project once load
 }) => {
   const writes = await stubLiveBoot(page);
   const projects = await holdProjects(page);
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await expect(card(page, 'todo-0')).toContainText('project probe alpha');
   await expect.poll(projects.count).toBeGreaterThan(0);
 
@@ -264,7 +264,7 @@ test.describe('new-task dialog', () => {
   }) => {
     const writes = await stubLiveBoot(page);
     const projects = await holdProjects(page);
-    await page.goto('/app');
+    await page.goto('/app?view=board');
     await expect(card(page, 'todo-0')).toContainText('project probe alpha');
     await expect.poll(projects.count).toBeGreaterThan(0);
 
@@ -295,7 +295,7 @@ test.describe('new-task dialog', () => {
   test('projects read failed: no project chip', async ({ page }) => {
     await stubLiveBoot(page);
     const projects = await failProjects(page);
-    await page.goto('/app');
+    await page.goto('/app?view=board');
     await expect(card(page, 'todo-0')).toContainText('project probe alpha');
     await projects.settled();
 
@@ -314,7 +314,7 @@ test.describe('new-task dialog', () => {
       answered += 1;
       return route.fulfill({ json: [] });
     });
-    await page.goto('/app');
+    await page.goto('/app?view=board');
     await expect(card(page, 'todo-0')).toContainText('project probe alpha');
     await expect.poll(() => answered).toBeGreaterThan(0);
 

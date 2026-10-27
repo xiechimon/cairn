@@ -46,7 +46,6 @@ import {
   isBackendRuntimeId,
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
-  LOCAL_TOOL_REMOTE_SHELL,
   LocalRepoUnreachableError,
   PLAN_FILE_NAME,
   parseRetryAfterMs,
@@ -80,7 +79,7 @@ import {
   probeClaudeCodeAuth,
 } from './claude-code-auth.js';
 import { clearCredentials, pushCredential } from './credentials.js';
-import { withGitCredentialFallback } from './git.js';
+import { GitPushHookError, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { computeHarnessHash } from './harness-hash.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
@@ -90,7 +89,6 @@ import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
-import { buildRemoteShellTool } from './shell-channel.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { resolveStepImages } from './step-attachments.js';
@@ -149,9 +147,11 @@ export function combineTimeoutWithRootCause(timeoutText: string, rootCause: stri
 export const STREAM_DURATION_CAP_DEFAULT_MS = 3_600_000;
 
 export const STREAM_DURATION_CAP_ENV = 'CAIRN_STREAM_DURATION_CAP_MS';
+export const STREAM_IDLE_ENV = 'CAIRN_STREAM_IDLE_MS';
+export const STREAM_FIRST_EVENT_ENV = 'CAIRN_STREAM_FIRST_EVENT_MS';
 
-function envDurationCapMs(env: NodeJS.ProcessEnv): number | null {
-  const raw = env[STREAM_DURATION_CAP_ENV];
+function envPositiveMs(name: string): number | null {
+  const raw = process.env[name];
   if (raw === undefined) return null;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -636,14 +636,6 @@ async function runClaimedStep(
         onAudit: (line) => logger.step(line),
       })
     : null;
-  const remoteShellTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_REMOTE_SHELL)
-    ? buildRemoteShellTool({
-        wire: client,
-        stepId,
-        cwd,
-        onAudit: (line) => logger.step(line),
-      })
-    : null;
   const stepIdentity: CommitIdentity = {
     name: claimed.agent?.displayName ?? 'cairn-agent',
     email: `${claimed.step.machineId ?? 'machine'}@cairn.local`,
@@ -651,9 +643,7 @@ async function runClaimedStep(
   const createTagTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_CREATE_TAG)
     ? buildCreateTagTool({ repoDir: ws?.cwd ?? null, cred: creds.git, identity: stepIdentity })
     : null;
-  const localToolDefs = [secretTool, remoteShellTool, createTagTool].filter(
-    (t): t is LocalToolDef => t !== null,
-  );
+  const localToolDefs = [secretTool, createTagTool].filter((t): t is LocalToolDef => t !== null);
   const injectedForSession =
     agent.injectedSkills === undefined || agent.defaultSkill == null
       ? agent.injectedSkills
@@ -916,6 +906,7 @@ async function runClaimedStep(
 
   let usage: AgentTokenUsage = [];
   let lastError: string | null = null;
+  let closingPushHookError: GitPushHookError | null = null;
   let lastModelError: string | null = null;
   let messageSeq = 0;
   let sawChangeTool = false;
@@ -932,12 +923,18 @@ async function runClaimedStep(
   let networkRetries = 0;
   const providerNetworkFinalWaitMs =
     opts.providerNetworkFinalWaitMs ?? PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS;
+  const envFirstMs = envPositiveMs(STREAM_FIRST_EVENT_ENV);
+  const envIdleMs = envPositiveMs(STREAM_IDLE_ENV);
   const streamTimeouts = {
-    first: opts.streamTimeouts?.first ?? STREAM_TIMEOUTS_MS.streamFirstEvent,
-    idle: opts.streamTimeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
-    body: opts.streamTimeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
+    first: envFirstMs ?? opts.streamTimeouts?.first ?? STREAM_TIMEOUTS_MS.streamFirstEvent,
+    idle: envIdleMs ?? opts.streamTimeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
+    body: Math.max(
+      opts.streamTimeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
+      envFirstMs ?? 0,
+      envIdleMs ?? 0,
+    ),
   };
-  const absoluteDurationCapMs = envDurationCapMs(process.env);
+  const absoluteDurationCapMs = envPositiveMs(STREAM_DURATION_CAP_ENV);
   const streamDurationCapMs =
     absoluteDurationCapMs ?? opts.streamDurationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS;
   const progressResetsDuration = claimed.step.kind === 'build' && absoluteDurationCapMs === null;
@@ -1610,7 +1607,18 @@ async function runClaimedStep(
       }
       hasChanges = headAhead > 0 || artifactBranches.length > 0;
     } catch (err) {
+      if (err instanceof GitPushHookError) closingPushHookError = err;
       lastError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  let pushHookOutput: string | null = null;
+  if (claimed.step.kind === 'build' && closingPushHookError !== null) {
+    pushHookOutput = stripAnsiEscapes(closingPushHookError.message);
+    lastError = null;
+    if (ws !== null && deps.workspace) {
+      headCommit = await deps.workspace.headCommit(ws.cwd);
+      hasChanges = true;
     }
   }
 
@@ -1749,6 +1757,7 @@ async function runClaimedStep(
     hasChanges,
     ...(headCommit !== null ? { commit: headCommit } : {}),
     ...(preservedCommits.length > 0 ? { preservedCommits } : {}),
+    ...(pushHookOutput !== null ? { pushHookOutput } : {}),
     ...(reviewExtraction?.status === 'ok' ? { findings: reviewExtraction.verdict } : {}),
     ...(reviewExtraction?.status === 'failed' ? { findingsError: reviewExtraction.reason } : {}),
     ...(verifyExtraction?.status === 'ok' ? { verifyVerdict: verifyExtraction.verdict } : {}),

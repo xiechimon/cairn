@@ -5,12 +5,7 @@ import { resolve } from 'node:path';
 const HAN = /[\p{Script=Han}\u3000-\u303f\uff01-\uff60]/u;
 const PROSE = /\.(md|mdx|ya?ml)$/;
 const CODE = /\.(ts|tsx|js|jsx|mjs|cjs|css|scss|py|sh)$/;
-const EXEMPT = [
-  /^README\.zh\.md$/,
-  /^docs\/feature-map\.md$/,
-  /^apps\/web\/src\/i18n\//,
-  /(^|\/)zh(-CN)?\.(md|ya?ml)$/,
-];
+const EXEMPT = [/^README\.zh\.md$/, /^apps\/web\/src\/i18n\//, /(^|\/)zh(-CN)?\.(md|ya?ml)$/];
 
 export function stripQuoted(text) {
   return text

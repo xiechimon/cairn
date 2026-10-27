@@ -46,7 +46,7 @@ const FROZEN_HEX: Record<'dark' | 'light', Record<string, string>> = {
     foreground: '#1b2b24',
     card: '#fffdf6',
     'card-foreground': '#1b2b24',
-    popover: '#ffffff',
+    popover: '#fffdf6',
     'popover-foreground': '#2b2620',
     primary: '#173a2f',
     'primary-foreground': '#f2ead7',
