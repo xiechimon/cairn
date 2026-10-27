@@ -784,7 +784,7 @@ describe('#1492 the verify step issues verdicts by checklist', () => {
         buildId,
         version: 1,
         content:
-          '## Context\n探针\n\n## Verification\n- `pnpm lint` 通过\n- apps/server/test/x.test.ts 全绿\n',
+          'Kind: fix\n## Context\n探针\n\n## Verification\n- `pnpm lint` 通过\n- apps/server/test/x.test.ts 全绿\n',
         stepId: planClaimed.stepId,
         createdAt: Date.now(),
       })

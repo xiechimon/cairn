@@ -1,0 +1,53 @@
+
+ RUN  v5.0.1 /mnt/fast/cairn/workspaces/01a17e28-58b8-717b-96b2-8e801fc7b26c/apps/server
+
+ ❯ test/attachment-gc.test.ts (15 tests | 1 failed) 2530ms
+   ✓ attachment gc -- unreferenced ready items (2)
+     ✓ past grace -> file + row collected, stats record orphan + bytes 42ms
+     ✓ within grace -> kept (file + row both present, stats all zero) 27ms
+   ✓ attachment gc -- anything referenced is kept (5)
+     ✓ todo.spec whole-line token reference -> untouched 31ms
+     ✓ reference inside message.content JSON -> untouched 26ms
+     ✓ inline token (not whole-line shape) -> still counts as a reference, untouched 25ms
+     ✓ chief_message reference -> untouched 25ms
+     ✓ steer_pending / plan reference -> untouched 26ms
+   ✓ attachment gc -- delete-task semantics (R1) (2)
+     ✓ deleting the task itself does not touch attachments; orphans collected after grace 26ms
+     ✓ task deleted but attachment still referenced elsewhere -> untouched 26ms
+   ✓ attachment gc -- pending items (2)
+     ✓ pending past 24h -> row collected (no file, no reference, grant dead) 25ms
+     ✓ fresh pending -> kept (upload in flight) 25ms
+   ✓ attachment gc -- quota (R4: admission gate, referenced items not deleted) (1)
+     ✓ grant -> 400 when team usage is at 1GiB; old items unaffected 34ms
+   ❯ attachment gc -- scheduler cadence (3)
+     ✓ scheduler lookup plans use indexes for bounded tick scans 24ms
+     × a large transcript corpus does not block the event loop during a tick 2133ms
+     ✓ first tick scans; no rescan within 1h; scans again after 1h 33ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/attachment-gc.test.ts > attachment gc -- scheduler cadence > a large transcript corpus does not block the event loop during a tick
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/attachment-gc.test.ts:505:78
+    503|       scheduler.tick(Date.now());
+    504|       expect((await response).status).toBe(200);
+    505|       expect(logger.infos.some((line) => line.startsWith('attachment g…
+       |                                                                              ^
+    506|       const referenced = putAttachment(s, { createdAgo: ATTACHMENT_ORP…
+    507|       s.db
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 passed (15)
+   Start at  11:54:53
+   Duration  4.20s (tests 61%, transform 28%, import 11%)
+

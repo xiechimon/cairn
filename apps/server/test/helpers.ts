@@ -276,5 +276,5 @@ export function machineIdByName(s: TestServer, name: string): string {
 }
 
 export function withVerification(plan: string): string {
-  return `${plan}\n\n## Verification\n- \`pnpm test\` 通过\n`;
+  return `Kind: fix\n${plan}\n\n## Verification\n- \`pnpm test\` 通过\n`;
 }

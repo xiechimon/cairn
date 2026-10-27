@@ -149,8 +149,8 @@ async function setupWorld() {
 type World = Awaited<ReturnType<typeof setupWorld>>;
 
 const GOOD_PLAN =
-  '# 方案\nContext: x\n\n## Verification\n- `pnpm exec vitest run README.test.ts` 通过\n';
-const VAGUE_PLAN = '# 方案\nContext: x\n\n## Verification\n- 确认没问题\n';
+  '# 方案\nKind: fix\nContext: x\n\n## Verification\n- `pnpm exec vitest run README.test.ts` 通过\n';
+const VAGUE_PLAN = '# 方案\nKind: fix\nContext: x\n\n## Verification\n- 确认没问题\n';
 
 async function runTwoEmptyPlanRounds(w: World): Promise<{ buildId: string; secondStepId: string }> {
   const buildId = await w.startBuild(true);
