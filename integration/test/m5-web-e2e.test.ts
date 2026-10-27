@@ -20,6 +20,7 @@ const WEB_DIST = join(ROOT, 'apps/web/dist');
 const PLAN_MD = (marker: string) =>
   [
     '# 方案',
+    'Kind: fix',
     '',
     `Context: ${marker} 探针任务。`,
     'Changes: 在 README.md 追加一行探针。',

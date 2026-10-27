@@ -34,7 +34,7 @@ beforeAll(async () => {
         name: 'bash',
         arguments: {
           command:
-            "printf '# 方案\n\nContext: steer 探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\n' > plan.md",
+            "printf '# 方案\nKind: fix\n\nContext: steer 探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\n' > plan.md",
         },
       },
       delayMs: 8_000,

@@ -22,6 +22,7 @@ import {
   isBackendRuntimeId,
   isIssueSourcedTask,
   newChiefThreadId,
+  PLAN_PRIOR_ART_RULE,
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -871,6 +872,7 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
     '- 拆分：拆分粒度 = 核销次数——按可独立验收的成果拆，不按执行步骤拆；同类小事项合并一张卡（多子事项以 ` + ` 并入标题），跨类型、可各自独立验收的交付物才拆成多张。子卡 spec 必须内嵌用户原文片段（`> …` blockquote）并给兄弟任务文字交叉引用。',
     '- 编排回合（开始任务入口，消息形「开始任务 #n」+ 编排请求行）：先规划再派发——单一工作单元：直接 run_builds 派该任务（assignment 按职责文本选）；确含多个可独立验收的交付物：create_todo 拆子卡 + run_builds 逐个派发 + close_todos 关掉原卡（看板不留父卡），回执列全部子卡实体引用。',
     '- 派发判定（逐次派发自行判断，无团队设置槽，ADR 0014）：先规划还是直接修，由你自己判。判断纪律：当信息会实质改变结果、执行方式、权限或安全时才问；否则自己决定，并说出你决定了什么。可判信号（非硬规则）：有可复现步骤或失败测试的缺陷 → 直接修（run_builds 传 withPlan=false）；引入新能力、或改动跨包 → 先问（问 = ask_user 结构化提问：本回合会挂起等用户在问答卡上作答，一次可带最多 4 问；判不准且不便当面问时也可传 withPlan=true 先规划，方案停在确认关口，用户批准或打回即表态）；判不准 → 先规划（withPlan 缺省即先规划）。直接修只跳过方案确认闸，审阅关口恒在——完成后仍停在审阅关口等用户审。',
+    `- ${PLAN_PRIOR_ART_RULE}`,
     '- 派发回执：每次派发把判定理由写进 run_builds 的 dispatchReason 参数（随调用落 transcript，判定可审计），并在给用户的回执里写明「我判为直接修 / 先规划，因为 X」。用户可就地一句话推翻该判定——推翻只影响这一次派发（已开跑的先 cancel_builds 取消，再按相反模式重派），不外推为常设偏好。',
     '- 项目归属：create_todo 前先定 projectId。用户消息以「【输入框选定项目：X（id: …）】」起头时，本回合新建的任务都放 X，不再调查也不问，回执里说「放在 X（你选的）」。用户点名项目就用它；没点名时先查再定——对照 projects 的 name/description，必要时用 docs 读候选项目的文件、用 todos 看各项目已有任务，按证据选一个，并在回执里说「放在 X，因为 Y」。查完仍然分不出时才 ask_user，问题里只列仍然分不出的候选，不列已排除的项目，选项最后加一个「都不是」，本回合不建任务。一句话涉及多个项目时，每个项目一张 todo，spec 里写明彼此关系与先后顺序。只是提问、没要求改动时只回答，不建任务。',
     '- 换项目：用户说任务放错了项目时，还没开始的任务用 update_todo 传 projectId 挪过去（标签会清掉）；已经开始的任务不能挪，告诉用户可以关掉它，再在正确的项目里新建。',

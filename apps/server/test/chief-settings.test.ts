@@ -276,6 +276,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).toContain('有可复现步骤或失败测试的缺陷 → 直接修');
     expect(prompt).toContain('引入新能力、或改动跨包 → 先问');
     expect(prompt).toContain('判不准 → 先规划');
+    expect(prompt).toContain('Prior art');
     expect(prompt).toContain('审阅关口恒在');
     expect(prompt).toContain('dispatchReason');
     expect(prompt).toContain('就地一句话推翻');

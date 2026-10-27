@@ -45,6 +45,7 @@ const PR_URL = `https://github.com/demo-owner/demo-repo/pull/${PR_NUMBER}`;
 
 const PLAN_V1 = [
   '# 方案 v1',
+  'Kind: fix',
   '',
   'Context: 图标探针任务。',
   'Changes: README.md 追加一行。',
