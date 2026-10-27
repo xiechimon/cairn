@@ -1,0 +1,41 @@
+# Pre-fix live evidence (omarchy, captured read-only 2026-10-27)
+
+## $ stat ~/.cairn/github-create
+  File: /home/ian/.cairn/github-create
+  Size: 0         	Blocks: 0          IO Block: 4096   directory
+Device: 0,59	Inode: 4401652     Links: 1
+Access: (0500/dr-x------)  Uid: ( 1000/     ian)   Gid: ( 1000/     ian)
+Access: 2026-10-26 21:14:46.482579860 -0700
+Modify: 2026-10-26 21:08:33.978892479 -0700
+Change: 2026-10-26 21:08:33.979892465 -0700
+ Birth: 2026-10-26 19:40:23.543473825 -0700
+
+## $ mkdir ~/.cairn/github-create/lock  (nothing is written; the syscall fails on the unwritable parent)
+mkdir: cannot create directory ‘/home/ian/.cairn/github-create/lock’: Permission denied
+
+## journalctl --user-unit=cairn-server.service (the retry of card #100, 2026-10-27 15:28:57Z)
+Oct 27 08:28:57 omarchy node[3383137]: [15:28:57] ERROR (3383137): unhandled error
+Oct 27 08:28:57 omarchy node[3383137]:     err: {
+Oct 27 08:28:57 omarchy node[3383137]:       "type": "Error",
+Oct 27 08:28:57 omarchy node[3383137]:       "message": "EACCES: permission denied, mkdir '/home/ian/.cairn/github-create/lock'",
+Oct 27 08:28:57 omarchy node[3383137]:       "stack":
+Oct 27 08:28:57 omarchy node[3383137]:           Error: EACCES: permission denied, mkdir '/home/ian/.cairn/github-create/lock'
+Oct 27 08:28:57 omarchy node[3383137]:               at async mkdir (node:internal/fs/promises:1632:10)
+Oct 27 08:28:57 omarchy node[3383137]:               at async acquireGithubCreateSlot (/home/ian/Code/AgentProjects/cairn/packages/shared/src/github-create-gate.ts:62:7)
+Oct 27 08:28:57 omarchy node[3383137]:               at async githubCreateIssue (/home/ian/Code/AgentProjects/cairn/apps/server/src/lib/github.ts:1071:5)
+Oct 27 08:28:57 omarchy node[3383137]:               at async runSelfIssueCreate (/home/ian/Code/AgentProjects/cairn/apps/server/src/services/todos.ts:648:22)
+Oct 27 08:28:57 omarchy node[3383137]:       "errno": -13,
+Oct 27 08:28:57 omarchy node[3383137]:       "code": "EACCES",
+Oct 27 08:28:57 omarchy node[3383137]:       "syscall": "mkdir",
+Oct 27 08:28:57 omarchy node[3383137]:       "path": "/home/ian/.cairn/github-create/lock"
+Oct 27 08:28:57 omarchy node[3383137]:     }
+Oct 27 08:29:32 omarchy node[3383137]: [15:29:32] INFO (3383137): ci pr-checks sweep
+Oct 27 08:29:32 omarchy node[3383137]:     candidates: 0
+Oct 27 08:29:32 omarchy node[3383137]:     pending: 0
+Oct 27 08:29:32 omarchy node[3383137]:     appended: 0
+Oct 27 08:29:32 omarchy node[3383137]:     advanced: 0
+
+## live DB (read-only): card #100 has sourceRef NULL while pre-gate cards #90/#91 have refs
+90|Qcjl8GEdW1baSHJHj5ciM|github-issue-self|github:xiechimon/cairn#1745|closed
+91|g8OAC29Xr41CWtTE8lR9e|github-issue-self|github:xiechimon/cairn#1744|todo
+100|w2t0Xy9rI67EsALD6Fyy7|github-issue-self||building
