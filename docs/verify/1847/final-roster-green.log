@@ -1,0 +1,30 @@
+$ flock /tmp/cairn-heavy.lock pnpm exec vitest run \
+    apps/server/test/merge-gate-model-roster.test.ts apps/server/test/merge-gate-readiness.test.ts
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1847
+
+
+ Test Files  2 passed (2)
+      Tests  193 passed (193)
+ Start at  11:23:52
+ Duration  451ms (transform 59%, import 23%, tests 16%, worker 1%)
+
+
+$ node <script importing the repo's deriveModelRoster and model-roster-data over the installed catalog>
+
+derived vendors: 162
+checked vendors: 162
+derived aliases: 3
+checked aliases: 3
+onlyInDerived: []
+onlyInChecked: []
+deepEqual: true
+
+
+$ flock /tmp/cairn-heavy.lock env VITEST_PROJECT_SET=light pnpm test
+(CI parity: the exact "Test (vitest, light project)" step of the check job that was red on PR #1873)
+
+ Test Files  362 passed (362)
+      Tests  5131 passed (5131)
+ Start at  11:26:27
+ Duration  42.78s (tests 55%, import 39%, transform 6%)
