@@ -4,7 +4,7 @@ Real-model eval flows live in this directory. `scripts/eval-capabilities.json` n
 
 ## Weekly rerun
 
-The timer definition schedules `chief-dispatch` and `memory-regression` against `origin/main` every Monday. Its installation target is `~/.config/systemd/user/cairn-eval-weekly.timer`. Its service sources `~/.cairn/tools/eval-env.sh` before the script, which exports `CAIRN_EVAL_RELAY_URL` and `CAIRN_EVAL_RELAY_KEY` for pi's relay-186 channel (the same non-Claude models Cairn's agents use).
+The timer definition schedules `chief-dispatch`, `memory-regression` and `project-routing` against `origin/main` every Monday. Its installation target is `~/.config/systemd/user/cairn-eval-weekly.timer`. Its service sources `~/.cairn/tools/eval-env.sh` before the script, which exports `CAIRN_EVAL_RELAY_URL` and `CAIRN_EVAL_RELAY_KEY` for pi's relay-186 channel (the same non-Claude models Cairn's agents use).
 
 The key stays in the process environment. Do not print it, write it into the unit, or commit it.
 
