@@ -1,0 +1,23 @@
+✔ archived evidence passed (38.460923ms)
+✔ markdown fixture page (35.694566ms)
+✔ html fixture page (33.055191ms)
+✔ extensionless fixture page (33.767729ms)
+✔ fixture behind another query parameter (34.371112ms)
+✔ srcset fixture page (34.557361ms)
+✔ raw link outside the archive (40.50697ms)
+✔ raw link from another repository archive (35.55227ms)
+✔ uploaded attachment instead of an archive (32.579413ms)
+✔ attachment URL instead of an archive (34.968039ms)
+✔ release asset instead of an archive (34.912687ms)
+✔ external host image (32.563814ms)
+✔ archive for another issue (34.96215ms)
+✔ a body without a ticket only settles the repository (76.004166ms)
+✔ help names the environment the archive rule reads (36.623088ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 618.624255

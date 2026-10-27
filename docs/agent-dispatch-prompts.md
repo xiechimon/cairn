@@ -39,3 +39,10 @@ Implement the task below and verify it according to the repository rules. Do not
 ## pi
 
 Implement the task below and verify it according to the repository rules. Do not write comments; express intent through naming and code structure; exceptions follow the repository comment discipline. Write all repository content in English: comments, docs, test titles, commit messages and PR bodies. When you make a mistake during the task and fix it, apply the AGENTS.md "Lessons ledger" rule in the same round: add or update an entry file under `docs/lessons/` for the mistake category at the highest feasible protection level, and use the real mistake as the negative control for any new gate.
+
+## Not evidence (do not count as proof)
+
+- Screenshot URLs carrying `?scenario=` (fixture pages, not the real app).
+- Runs that passed only against a stub LLM.
+- Evidence not archived under `docs/verify/<issue>/`.
+- Reading source, config, or installed dependencies instead of the compiled output or runtime log.

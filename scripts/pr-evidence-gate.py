@@ -61,6 +61,24 @@ Fenced code blocks do not exempt image links: agents list evidence in
 code fences, and an image link in a fence renders nowhere (#940 keeps
 this a non-goal).
 
+Not evidence (#1810; source: https://x.com/thorstenball/status/2114386050638336082).
+The checklist the implementer prompt and the verify-cairn skill carry has
+three machine-checkable cases, judged on the full URL -- query included,
+never on the extension-shaped prefix a scanner happens to stop at:
+
+1. Fixture page: a `scenario` query parameter means the URL is a
+   `dist`-fixture route, not the real app, in markdown, `<img src>` and
+   `<source srcset>` alike. Extensionless URLs are scanned for it too.
+2. Unarchived evidence: an image whose URL does not resolve to
+   `docs/verify/<issue>/` inside the pull request's own repository. The
+   accepted form is a `raw.githubusercontent.com` link carrying
+   `/<repo>/<sha>/docs/verify/<issue>/<file>` with `PR_REPO` and
+   `PR_TICKET` from the environment; a different repository, a different
+   issue directory, an uploaded attachment (`user-images.githubusercontent.com`,
+   `github.com/user-attachments`) and a release asset all fail.
+3. External host images fail the same rule: an arbitrary public URL is
+   not a file committed to the branch.
+
 The link criteria are shared with the coordinator's reference
 implementation `scratch/pr-evidence-check.py` (outside this repo): same
 MD_LINK, IMG_EXT, IMG_URL, MEDIA_HOST_URL, TAIL_EXT,
@@ -71,6 +89,11 @@ scanner sweeps PRs that predate the template.
 Usage:
   PR_BODY='<pr body>' python3 scripts/pr-evidence-gate.py   # CI entry point
   python3 scripts/pr-evidence-gate.py path/to/body.md        # local testing
+
+Environment:
+  PR_REPO    owner/name of the repository the body is checked against
+  PR_TICKET  issue number whose docs/verify/<ticket>/ archive is required
+  PR_EVIDENCE_HTTP_CODE  skip the network probe and use this status
 
 Exit 0 when the body passes, 1 otherwise. Findings name the section or
 the URL (with its line for bare URLs).
@@ -89,6 +112,13 @@ MEDIA_HOST_URL = re.compile(
     r'https://(?:user-images\.githubusercontent\.com'
     r'|github\.com/user-attachments)/[^\s)\]>"`]*')
 TAIL_EXT = re.compile(r'\.[A-Za-z0-9]+$')
+# Query parameters are part of the URL: `?scenario=board` is the fixture
+# marker and the value after it is compared exactly, so `?scenario=`
+# followed by anything (including nothing) is a fixture route.
+SCENARIO_QUERY = re.compile(r'(?:^|[?&;])scenario(?:=[^&;]*)?(?:[&;]|$)')
+RAW_ARCHIVE = re.compile(
+    r'^https://raw\.githubusercontent\.com/(?P<repo>[^/]+/[^/]+)'
+    r'/[^/]+/(?P<path>docs/verify/(?P<ticket>[^/]+)/.+)$')
 
 
 def is_media_host_image(url):
@@ -167,10 +197,20 @@ def in_html_embed(ms, me, html_embed):
     (image extension is a suffix of the embed value), so a simple
     `[hs, he)` superset test is enough.
     """
+    return enclosing_embed(ms, me, html_embed) is not None
+
+
+def enclosing_embed(ms, me, html_embed):
+    """The `[start, end)` embed span containing [ms, me), or None.
+
+    The embed span carries the whole attribute URL, query and fragment
+    included; checks that read the URL (`?scenario=`, the archive path)
+    must judge that span, not the extension-truncated image match.
+    """
     for hs, he in html_embed:
         if hs <= ms and me <= he:
-            return True
-    return False
+            return hs, he
+    return None
 
 
 REQUIRED_SECTIONS = ('Upstream', 'Verified')
@@ -240,6 +280,33 @@ def section_verdicts(body):
     return verdicts
 
 
+def is_fixture_url(url):
+    """True when the URL's query marks a dist-fixture route."""
+    query = url.split('#', 1)[0]
+    if '?' not in query:
+        return False
+    return bool(SCENARIO_QUERY.search(query.split('?', 1)[1]))
+
+
+def archive_miss(repo, ticket):
+    """Why a URL is not `docs/verify/<ticket>/` in `repo`, or None.
+
+    `repo` and `ticket` come from the pull request under test; a body
+    is only evidence for itself, so an archive in another repository or
+    for another issue does not count.
+    """
+    def judge(url):
+        found = RAW_ARCHIVE.match(url.split('?', 1)[0].split('#', 1)[0])
+        if found is None:
+            return 'not a raw.githubusercontent.com archive path'
+        if repo and found.group('repo').lower() != repo.lower():
+            return f"archive repository is {found.group('repo')}, not {repo}"
+        if ticket and found.group('ticket') != ticket:
+            return f"archive issue is docs/verify/{found.group('ticket')}/, not docs/verify/{ticket}/"
+        return None
+    return judge
+
+
 def http_code(url):
     r = subprocess.run(
         ['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', '-m', '25', url],
@@ -281,13 +348,17 @@ def find_links(body):
                 if is_media_host_image(m.group(0))]
     matches.sort(key=lambda m: m.start())
 
-    links = []
+    links = [{'form': 'link', 'embedded': False, 'label': None,
+              'url': url, 'line': clean.count('\n', 0, start) + 1}
+             for start, url in extensionless_targets(clean, html_embed)]
     seen = set()
     for m in matches:
         ms, me = m.start(), m.end()
-        if in_html_embed(ms, me, html_embed):
+        embed = enclosing_embed(ms, me, html_embed)
+        if embed is not None:
+            hs, he = embed
             links.append({'form': 'html', 'embedded': True, 'label': None,
-                          'url': m.group(0),
+                          'url': clean[hs:he].split()[0],
                           'line': clean.count('\n', 0, ms) + 1})
             continue
         md = markdown_target(ms, me)
@@ -308,6 +379,27 @@ def find_links(body):
     return links
 
 
+def extensionless_targets(clean, html_embed):
+    """URLs in a rendered form whose path carries no image extension.
+
+    Rule 1 finds an image by its extension and rule 2 by its media
+    host, so a fixture route served as an extensionless path in an
+    `<img src>` or an `![label](...)` target would never be scanned.
+    Keeping them as targets lets the not-evidence checks judge them.
+    """
+    starts = {start for start, _ in html_embed}
+    starts.update(m.span('url')[0] for m in MD_LINK.finditer(clean))
+    found = []
+    for start in sorted(starts):
+        embed = enclosing_embed(start, start + 1, html_embed)
+        end = embed[1] if embed else len(clean)
+        url = re.split(r'[\s)"\'<>]', clean[start:end], maxsplit=1)[0]
+        path = url.split('?', 1)[0].split('#', 1)[0]
+        if url.startswith('https://') and not TAIL_EXT.search(path):
+            found.append((start, url))
+    return found
+
+
 def describe(link):
     if link['form'] == 'bare':
         return f"{link['url']} (bare URL, line {link['line']})"
@@ -317,6 +409,9 @@ def describe(link):
 
 
 def main():
+    if sys.argv[1:] in (['-h'], ['--help']):
+        print(__doc__.strip())
+        return 0
     if len(sys.argv) > 1:
         with open(sys.argv[1], encoding='utf-8') as f:
             body = f.read()
@@ -348,15 +443,28 @@ def main():
               "use the repo skill .claude/skills/pr-cairn/SKILL.md.")
 
     links = find_links(body)
+    in_archive = archive_miss(os.environ.get('PR_REPO', ''),
+                             os.environ.get('PR_TICKET', ''))
+    stub_code = os.environ.get('PR_EVIDENCE_HTTP_CODE', '')
 
     print(f"pr-evidence: scanned {len(links)} image link(s)")
     for link in links:
         if not link['embedded']:
             failures.append(link)
             print(f"FAIL not-embedded: {describe(link)}")
+        if is_fixture_url(link['url']):
+            failures.append(link)
+            print(f"FAIL fixture-page (scenario= query): {describe(link)}")
+        miss = in_archive(link['url'])
+        if miss:
+            failures.append(link)
+            print(f"FAIL not-archived ({miss}): {describe(link)}")
 
-    with cf.ThreadPoolExecutor(max_workers=8) as ex:
-        codes = list(ex.map(lambda link: (link, http_code(link['url'])), links))
+    if stub_code:
+        codes = [(link, stub_code) for link in links]
+    else:
+        with cf.ThreadPoolExecutor(max_workers=8) as ex:
+            codes = list(ex.map(lambda link: (link, http_code(link['url'])), links))
     for link, code in codes:
         if code != '200':
             failures.append(link)

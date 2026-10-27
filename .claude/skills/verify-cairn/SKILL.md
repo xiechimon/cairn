@@ -174,6 +174,15 @@ Archiving evidence into the PR only completes "performance"; "signature" is stil
 
 Undelivered boxes are **not checked**, write the gap in the acceptance record. "Closing the ticket != acceptance done" - checked boxes + in-repo evidence pointer is the reviewable terminal state.
 
+## Not evidence (hard rule)
+
+The following do not count as evidence, even when attached to a PR:
+
+- Screenshot URLs carrying `?scenario=` (fixture pages, not the real app).
+- Runs that passed only against a stub LLM.
+- Evidence not archived under `docs/verify/<issue>/`.
+- Reading source, config, or installed dependencies instead of the compiled output or runtime log.
+
 ## Mechanism takes effect acceptance: artifact criteria (hard rule)
 
 Mechanism-class changes (CSS/animation, on-disk/wire format, schema, config passthrough, service traffic) must be accepted on the **compiled artifact / runtime artifact**, not just source reading - "dependency installed, class written, config declared" none equal "took effect". Every "X takes effect" claim in an acceptance statement must answer **"where do I take X's artifact"**; **not obtainable = not accepted**. The truth trio (screenshot + API JSON + SQLite row) covers "is the functional behavior correct", this section covers "did the mechanism connect" - the same criterion hit three times in two days with three more same-shape cases (#746 summary), artifact-taking methods per class:

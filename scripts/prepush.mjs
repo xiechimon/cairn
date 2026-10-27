@@ -27,6 +27,7 @@ export const selfTests = [
   'scripts/english-only-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
   'scripts/lessons-ledger-gate.test.mjs',
+  'scripts/pr-evidence-gate.test.mjs',
 ];
 
 export const localOnly = [

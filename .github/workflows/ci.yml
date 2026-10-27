@@ -116,7 +116,7 @@ jobs:
         run: pnpm prepush --ci
 
       - name: Prepush self-test
-        run: node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/doc-reader-tests.test.mjs scripts/lessons-ledger-gate.test.mjs
+        run: node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/doc-reader-tests.test.mjs scripts/lessons-ledger-gate.test.mjs scripts/pr-evidence-gate.test.mjs
 
       # verify-cairn CLI self-test (#1402): vp.mjs dispatch, evidence, capture, links, archive rules.
       # Most drives use --dry-run; live ones use stub probes in a copied skill tree; archive/links

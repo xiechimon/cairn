@@ -77,6 +77,7 @@ jobs:
           jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-body.md"
           echo "labels=$(jq -r '[.labels[].name] | join(",")' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
           echo "draft=$(jq -r '.draft' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+          echo "ticket=$(jq -r '[.body // "" | scan("(?i)clos(?:e|es|ed)\\s+#([0-9]+)")[]] | first // ""' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
         id: pr
 
       - name: Refuse while a person has a decision pending (needs-decision label)
@@ -94,8 +95,16 @@ jobs:
       # !cancelled() so every gate's findings show in one run even when an
       # earlier step reds (#1240): a lane fixing a link problem should not
       # have to push again to discover a tasks problem.
-      - name: Check PR body evidence (sections + links embedded + reachable)
+      # PR_REPO and PR_TICKET are the archive provenance the gate checks
+      # (#1810): evidence must live in this repository's docs/verify/<issue>/
+      # for an issue this PR closes, or the run reds with FAIL not-archived.
+      # Both are read from the API, never from the event payload, so a body
+      # edited after the run was created cannot keep a stale archive green.
+      - name: Check PR body evidence (sections + links embedded + reachable + archived)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
+        env:
+          PR_REPO: ${{ github.repository }}
+          PR_TICKET: ${{ steps.pr.outputs.ticket }}
         run: python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md"
 
       - name: Check PR body tasks (Acceptance checklist exists and is fully checked)

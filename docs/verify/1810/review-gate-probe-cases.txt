@@ -1,0 +1,10 @@
+archived control         exit=0  
+markdown fixture         exit=1  FAIL fixture-page (scenario= query): [fixture](https://example.org/view.png?scenario=board) | FAIL not-archived (not a raw.githubusercontent.com archive path): [fixture](https://example.org/view.png?scenario=board)
+HTML fixture             exit=1  FAIL fixture-page (scenario= query): https://example.org/view.png?scenario=board (HTML <img>/<source>, line 7) | FAIL not-archived (not a raw.githubusercontent.com archive path): https://example.org/view.png?scenario=board (HTML <img>/<source>, line 7)
+extensionless fixture    exit=1  FAIL not-embedded: [None](https://example.org/view?scenario=board) | FAIL fixture-page (scenario= query): [None](https://example.org/view?scenario=board) | FAIL not-archived (not a raw.githubusercontent.com archive path): [None](https://example.org/view?scenario=board)
+second query parameter   exit=1  FAIL fixture-page (scenario= query): [fixture](https://example.org/view.png?theme=dark&scenario=board) | FAIL not-archived (not a raw.githubusercontent.com archive path): [fixture](https://example.org/view.png?theme=dark&scenario=board)
+unarchived raw           exit=1  FAIL not-archived (not a raw.githubusercontent.com archive path): [proof](https://raw.githubusercontent.com/xiechimon/cairn/abc1234/proof.png)
+external upload          exit=1  FAIL not-archived (not a raw.githubusercontent.com archive path): [proof](https://user-images.githubusercontent.com/123/proof.png)
+wrong archive issue      exit=1  FAIL not-archived (archive repository is other/repo, not xiechimon/cairn): [proof](https://raw.githubusercontent.com/other/repo/main/docs/verify/999/proof.png)
+
+7/8 red (1 expected green: the archived control)
