@@ -8,20 +8,21 @@ const filterBtn = (page: Page) => topbar(page).getByRole('button', { name: '筛�
 const schedulesLink = (page: Page) => topbar(page).getByRole('link', { name: '定时' });
 const newTaskBar = (page: Page) => page.getByTestId('board-new-task-bar');
 
-test('bar geometry: 56px, serif page title, summary N = the `待处理` column count', async ({
+test('bar geometry: 56px, sans page title, summary N = the `待处理` column count', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const box = await topbar(page).boundingBox();
   expect(box?.height).toBe(56);
 
   const title = topbar(page).getByRole('heading', { level: 1 });
-  await expect(title).toHaveText('工作台');
+  await expect(title).toHaveText('看板');
   const titleStyle = await title.evaluate((el) => {
     const cs = getComputedStyle(el);
     return { family: cs.fontFamily, weight: cs.fontWeight };
   });
-  expect(titleStyle.family).toContain('sourceSerif4');
+  expect(titleStyle.family).toContain('inter');
+  expect(titleStyle.family).not.toContain('sourceSerif4');
   expect(titleStyle.weight).toBe('500');
 
   const n = Number(await pendingCount(page).textContent());
@@ -34,7 +35,7 @@ test('bar geometry: 56px, serif page title, summary N = the `待处理` column c
 });
 
 test('N = 0 reads the quiet line, no accent icon', async ({ page }) => {
-  await page.goto('/app?scenario=board-tags-empty');
+  await page.goto('/app?scenario=board-tags-empty&view=board');
   await expect(pendingCount(page)).toHaveText('0');
   await expect(summary(page)).toHaveText('没有等你处理的事');
   await expect(summary(page).locator('svg')).toHaveCount(0);
@@ -43,10 +44,10 @@ test('N = 0 reads the quiet line, no accent icon', async ({ page }) => {
 test('active filter: summary follows the narrowed column, badge + chip stay, popover anchors under `筛选`', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=board-repos');
+  await page.goto('/app?scenario=board-repos&view=board');
   await expect(summary(page)).toHaveText('1 项等你处理');
 
-  await page.goto('/app?scenario=board-repos&projects=r2-inventory');
+  await page.goto('/app?scenario=board-repos&projects=r2-inventory&view=board');
   await expect(pendingCount(page)).toHaveText('0');
   await expect(summary(page)).toHaveText('没有等你处理的事');
   await expect(page.getByTestId('filter-count')).toHaveText('1');
@@ -64,7 +65,7 @@ test('active filter: summary follows the narrowed column, badge + chip stay, pop
 });
 
 test('`定时` is a client-side link to the schedules page, scenario kept', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await page.evaluate(() => {
     (window as unknown as { __spaCanary: string }).__spaCanary = 'alive';
   });
@@ -76,7 +77,7 @@ test('`定时` is a client-side link to the schedules page, scenario kept', asyn
 });
 
 test('the new-task bar opens the new-task dialog', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await expect(newTaskBar(page)).toBeVisible();
   await expect(newTaskBar(page)).toContainText('新任务：接下来让 agent 做什么？');
   await newTaskBar(page).click();
@@ -86,7 +87,7 @@ test('the new-task bar opens the new-task dialog', async ({ page }) => {
 test('keyboard: Tab reaches all three controls with a visible focus ring; Enter on `新任务` opens the dialog', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const targets = [filterBtn(page), schedulesLink(page), newTaskBar(page)];
   for (const target of targets) {
     let reached = false;
@@ -112,7 +113,7 @@ test('narrow window: the summary truncates, the controls stay on one row inside 
   // 680 = 432px of main beside the 248px Paper sidebar, the width the
   // summary is meant to clip at
   await page.setViewportSize({ width: 680, height: 732 });
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const bar = await topbar(page).boundingBox();
   if (bar == null) throw new Error('missing bar');
   expect(bar.height).toBe(56);

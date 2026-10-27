@@ -1,33 +1,33 @@
-# #1313 验证证据（空提交 review 收口）
+# #1313 verification evidence (empty-commit review close-out)
 
-- 探针：`.claude/skills/verify-pacman/scripts/drive-1313-empty-review.mjs`
-- 栈：server `127.0.0.1:8791` / web `127.0.0.1:5273` / PACMAN_HOME scratch
-- 执行 Agent 工具只有「推送分支」，缺「合并分支」
-- 空卡：`hasChanges: true`，`changesDiff: ''`
-- 对照卡：同一 `hasChanges`，diff 含 `README.md`
+- probe: `.claude/skills/verify-pacman/scripts/drive-1313-empty-review.mjs`
+- stack: server `127.0.0.1:8791` / web `127.0.0.1:5273` / a PACMAN_HOME scratch
+- the executing agent's tools are only `推送分支`, missing `合并分支`
+- the empty card: `hasChanges: true`, `changesDiff: ''`
+- the contrast card: the same `hasChanges`, the diff contains `README.md`
 
-## before（修复前栈）
+## before (the pre-fix stack)
 
-`before-result.json` 全部 ok。弹层仍展示「将改动合并到默认分支」，完成钮禁用。取消勾选后完成钮仍禁用。changes 响应是 `{ "files": [] }`，没有 `reported`。
+`before-result.json` all ok. The dialog still shows `将改动合并到默认分支`, the done button is disabled. Unchecking keeps the done button disabled. The changes response is `{ "files": [] }` with no `reported`.
 
-| 文件 | 内容 |
+| file | content |
 |---|---|
-| `before-empty-dialog.png` | 空卡，合并勾选开着，完成禁用，缺「合并分支」授权 |
-| `before-empty-unchecked.png` | 同一弹层取消勾选，完成仍禁用 |
-| `before-files-dialog.png` | 有文件的卡，合并行仍在 |
+| `before-empty-dialog.png` | the empty card, the merge checkbox on, done disabled, missing the `合并分支` grant |
+| `before-empty-unchecked.png` | the same dialog with the checkbox unchecked, done still disabled |
+| `before-files-dialog.png` | the card with files, the merge row still present |
 | `before-empty-changes.json` | `{ "files": [] }` |
-| `before-result.json` | 探针 checks |
+| `before-result.json` | the probe's checks |
 
-## after（修复后栈）
+## after (the post-fix stack)
 
-`after-result.json` 全部 ok。空卡不展示合并行，文案是「本轮没有文件改动，完成不会合并分支。」，完成可点。点击后相位 `done`，零 merge 步，时间线「标记为已完成」。有文件的卡仍展示合并行且完成禁用。
+`after-result.json` all ok. The empty card does not show the merge row, the copy is `本轮没有文件改动，完成不会合并分支。`, and done is clickable. After clicking, the phase is `done` with zero merge steps, and the timeline reads `标记为已完成`. The card with files still shows the merge row with done disabled.
 
-| 文件 | 内容 |
+| file | content |
 |---|---|
-| `after-empty-dialog.png` | 空卡，无合并行，完成可点 |
-| `after-empty-done-column.png` | 空卡落到已完成列 |
-| `after-files-dialog.png` | 有文件的卡仍走合并闸 |
+| `after-empty-dialog.png` | the empty card, no merge row, done clickable |
+| `after-empty-done-column.png` | the empty card lands in the done column |
+| `after-files-dialog.png` | the card with files still goes through the merge gate |
 | `after-empty-changes.json` | `{ "files": [], "reported": true }` |
-| `after-empty-steps.json` | 只有 build 步 |
-| `after-empty-messages.json` | 审计行「标记为已完成」 |
-| `after-result.json` | 探针 checks |
+| `after-empty-steps.json` | only the build step |
+| `after-empty-messages.json` | the audit row `标记为已完成` |
+| `after-result.json` | the probe's checks |

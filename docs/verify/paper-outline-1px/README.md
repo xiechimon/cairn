@@ -7,7 +7,7 @@ user's dev stack on 5173), `after` is this branch (a dev server on 5174).
 task card and the active sidebar row.
 
 On main, the sheet and card rings use `--hairline`, which is 0.5px at 2dppx,
-while the active row and 新任务 button use 1px. After, all four are 1px.
+while the active row and `新任务` button use 1px. After, all four are 1px.
 
 | file | what it shows |
 | --- | --- |

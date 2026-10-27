@@ -75,20 +75,20 @@ describe('wakeFacts — #1403 G9 review gate text', () => {
     expect(text).not.toContain('自动确认规则');
     expect(text).not.toMatch(/直接调 confirm_builds/);
     expect(text).toContain('review');
-    expect(text).toContain('merge_builds');
-    expect(text).toContain('「完成」');
+    expect(text).toContain('merge-readiness gate');
+    expect(text).toContain('completion button');
   });
 
   test('G1 review gate on a todo that has split children → still the review text', () => {
     const text = wakeFacts('gate', todo({ phase: 'review' }), null, { isSplitParent: true });
     expect(text).not.toContain('拆解方案必须人审');
     expect(text).not.toContain('自动确认规则');
-    expect(text).toContain('「完成」');
+    expect(text).toContain('completion button');
   });
 
   test('G2 the confirm gate keeps its auto-confirm rules', () => {
     const text = wakeFacts('gate', todo({ phase: 'confirm' }), null, { isSplitParent: false });
     expect(text).toContain('自动确认规则');
-    expect(text).not.toContain('「完成」');
+    expect(text).not.toContain('completion button');
   });
 });

@@ -81,7 +81,7 @@ function registerMemberActivity(app: Hono, ctx: AppContext): void {
 
 export function createApp(ctx: AppContext, logger?: Logger): Hono {
   const app = new Hono();
-  registerTokenAuth(app, ctx.authToken);
+  registerTokenAuth(app, ctx.authToken, ctx.tailscaleUsers);
   registerMemberActivity(app, ctx);
   registerRoutes(app, ctx);
   registerMachineRoutes(app, ctx);

@@ -18,7 +18,7 @@
    "dimension": "rules",
    "title": "Spec 28 section 8 ledger row for P3 is not updated in this PR",
    "severity": "suggestion",
-   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
    "line": 270,
    "evidence": "Spec 28 section 7.4 ledger rule: \"每期在自己的 PR 里改 §8 对应行（开 PR 后补 PR 号再推一次），PR 合并 = 该行在 main 上生效；跨上下文压缩时以 origin/main 上的 §8 加在飞 PR 为进度真值\". The D7 row repeats \"§7.4 要每期在自己的 PR 里改 §8 台账\". On main the P3 row reads \"#1420（S1…）、#1421（S2：mergeReadiness）；S3 起待开 … S1、S2 待用户合并\". The diff against main touches no file under docs/spec/.",
    "failurePath": "#1420 and #1421 merge, and neither PR edits the row. origin/main's section 8, which section 7.4 names as the progress record after context compaction, still says \"S1、S2 待用户合并\". No PR still in flight corrects it, so a resumed goal session reads S2 as unmerged. The PR is a user merge either way (D4 class 4), so adding docs/spec/28 to it changes no merge class."

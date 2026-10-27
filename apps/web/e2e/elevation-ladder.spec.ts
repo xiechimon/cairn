@@ -83,9 +83,9 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('each rung is its pool plus one ring, ring last', async ({ page }) => {
-      await page.goto('/app?scenario=01');
+      await page.goto('/app?scenario=01&view=board');
       await page.waitForSelector('.board-sidebar');
-      const ringColor = theme === 'light' ? 'border' : 'ring-inset-highlight';
+      const ringColor = theme === 'light' ? 'border-soft' : 'ring-inset-highlight';
       const borderRing = await ringIn(page, 'border');
       const tierRing = await ringIn(page, ringColor);
       for (const [rung, poolName] of RUNGS) {
@@ -94,16 +94,13 @@ for (const theme of ['light', 'dark'] as const) {
         expect(value, rung).not.toBe('none');
         expect(value.startsWith(`${pool}, `), `${rung} starts with its pool`).toBe(true);
         expect(rings(value), `${rung} ring count`).toBe(1);
-        // e1 rings in --border on both sides; e2/e3 ring in the light-side
-        // --border and the dark-side --ring-inset-highlight (the dialog's
-        // pre-ladder ring colour).
         const want = rung === 'e1' ? borderRing : tierRing;
         expect(value.endsWith(want), `${rung} ends with its ring`).toBe(true);
       }
     });
 
     test('pools hold the pre-ladder darkness; --top only in dark e2/e3', async ({ page }) => {
-      await page.goto('/app?scenario=01');
+      await page.goto('/app?scenario=01&view=board');
       await page.waitForSelector('.board-sidebar');
       const top = await slot(page, 'top');
       const e1 = await slot(page, 'e1');
@@ -130,7 +127,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('old slot names alias the ladder', async ({ page }) => {
-      await page.goto('/app?scenario=01');
+      await page.goto('/app?scenario=01&view=board');
       await page.waitForSelector('.board-sidebar');
       const pairs: Array<[string, string]> = [
         ['panel-shadow', 'e1'],
@@ -163,7 +160,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     test('one ring per edge on the rendered surfaces', async ({ page }) => {
       const edgeRing = await (async () => {
-        await page.goto('/app?scenario=01');
+        await page.goto('/app?scenario=01&view=board');
         await page.waitForSelector('.board-sidebar');
         return slot(page, 'edge-ring');
       })();
@@ -174,12 +171,12 @@ for (const theme of ['light', 'dark'] as const) {
       expect(card).not.toContain('inset');
 
       // pool + own --edge-ring: exactly one ring, and it is the inset one
-      await page.goto('/app?scenario=notify-banner');
+      await page.goto('/app?scenario=notify-banner&view=board');
       const banner = await surfaceShadow(page, '.board-notify-banner');
       expect(rings(banner)).toBe(1);
       expect(banner.startsWith(edgeRing)).toBe(true);
 
-      await page.goto('/app?scenario=111');
+      await page.goto('/app?scenario=111&view=board');
       const drawer = await surfaceShadow(page, '.chief-drawer');
       expect(rings(drawer)).toBe(1);
       expect(drawer).toContain(edgeRing);

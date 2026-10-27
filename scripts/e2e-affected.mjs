@@ -3,7 +3,12 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
-import { acquireSlot, leaseEnv, writeSlotPlaywrightConfig } from './heavy-slots.mjs';
+import {
+  acquireSlot,
+  leaseEnv,
+  slotPortReport,
+  writeSlotPlaywrightConfig,
+} from './heavy-slots.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const WEB_DIR = join(REPO_ROOT, 'apps/web');
@@ -37,6 +42,7 @@ const BOARD = [
   'shadcn-primitives',
   'storage-unavailable',
   'mobile-narrow',
+  'focus-ring-clip',
 ];
 const SIDEBAR = [
   'sidebar-',
@@ -58,6 +64,7 @@ const SIDEBAR = [
   'mobile-narrow',
 ];
 const DETAIL = [
+  'composer-tool-tips',
   'detail-',
   'chat-',
   'transcript-',
@@ -102,6 +109,7 @@ const DETAIL = [
   'mobile-narrow',
 ];
 const CHIEF = [
+  'composer-tool-tips',
   'chief-',
   'composer-wire-reject',
   'elevation-',
@@ -185,6 +193,11 @@ const SHARED_SURFACE_ONLY = ['cds-motion', 'color-freeze', 'fixture-mode-chip'];
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 const FILE_RULES = new Map([
+  ['apps/web/src/overlay/chip-popover.tsx', OVERLAYS],
+  ['apps/web/src/overlay/gesture-machine.ts', [...OVERLAYS, 'chief-toggle-flash']],
+  ['apps/web/src/overlay/hotkeys.ts', OVERLAYS],
+  ['apps/web/src/overlay/plan-dropdown.tsx', OVERLAYS],
+  ['apps/web/src/overlay/search-panel.tsx', OVERLAYS],
   ['apps/web/src/board/sidebar.tsx', SIDEBAR],
   ['apps/web/src/board/app-sidebar.tsx', SIDEBAR],
   ['apps/web/src/routes/board-page.tsx', BOARD],
@@ -193,7 +206,7 @@ const FILE_RULES = new Map([
   ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/agent-fallback-models.tsx', AGENT],
-  ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-']],
+  ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-', 'focus-ring-clip']],
   ['apps/web/src/routes/api-keys-page.tsx', ['user-menu-']],
   ['apps/web/src/routes/create-agent-dialog.tsx', AGENT],
   ['apps/web/src/routes/machine-authorize-page.tsx', ['machine-']],
@@ -228,7 +241,6 @@ const DIR_RULES = [
   { prefix: 'apps/web/src/chief/', specs: CHIEF },
   { prefix: 'apps/web/src/detail/', specs: DETAIL },
   { prefix: 'apps/web/src/overlay/', specs: OVERLAY },
-  { prefix: 'apps/web/src/overlays/', specs: OVERLAYS },
   { prefix: 'apps/web/src/pages/', specs: PAGES },
   { prefix: 'apps/web/src/resources/', specs: RESOURCES },
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },
@@ -383,6 +395,11 @@ function runPlaywright(specs, full) {
   const args = ['exec', 'playwright', 'test'];
   const env = { ...leaseEnv(lease), E2E_PORT: PORT };
   if (lease !== null) {
+    const conflict = slotPortReport({ slot: lease.slot });
+    if (conflict !== null) {
+      console.error(conflict);
+      process.exit(1);
+    }
     const slotRun = writeSlotPlaywrightConfig({
       slot: lease.slot,
       env: process.env,

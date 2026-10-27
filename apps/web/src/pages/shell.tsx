@@ -96,7 +96,9 @@ export function PageShell({
               <div className="ml-auto flex flex-none items-center gap-0.5">{actions}</div>
             )}
           </header>
-          <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+          <div
+            className={`flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto${bleed ? '' : ' px-4'}`}
+          >
             {bleed ? (
               children
             ) : (

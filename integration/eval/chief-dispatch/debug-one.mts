@@ -1,8 +1,4 @@
 #!/usr/bin/env -S pnpm exec tsx
-// 一次性探针：跑单条用例，把 roster→agentId 映射、run_builds 实参、todo 落库的
-// assignment、以及正文里点名的 Agent 全部摊开。用来区分「模型名/id 不一致」与
-// 「harness 映射错」。
-
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RosterAgent } from './grade.mts';

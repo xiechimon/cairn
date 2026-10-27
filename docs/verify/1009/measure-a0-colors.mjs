@@ -1,17 +1,22 @@
 #!/usr/bin/env node
-// better-colors 增量实测（验收模板 v3 第 3 项）——#1009 A0 新合成面的对比度
-// 真值测量（不许估）：悬浮窗 chrome 与 FAB 族是本轮唯一的新颜色合成面
-// （token 零新增颜色值——--card/--foreground/--text-tertiary/--card-button/
-// --text-on-accent 全是既有槽；全局色板 #988 已双模 109 对 0 fail 封账不重测）。
+// better-colors incremental measurement (acceptance template v3 item 3) — real
+// contrast measurement (no estimating) of #1009 A0's new composed faces: the
+// floating-window chrome and the FAB family are the only new color-composed
+// surfaces this round (zero new color token values — --card/--foreground/
+// --text-tertiary/--card-button/--text-on-accent are all existing slots; the
+// global palette #988 is sealed with 109 pairs 0 fail in both themes and is
+// not re-measured).
 //
-// 量法：fixture 栈真页面读 computed color / background-color，WCAG 2.1 相对
-// 亮度算对比度；双模各跑一遍（dark = :root 默认，light = 根元素挂 .light，
-// #106 反相规约）。下限照仓内正典（spec/22 §1.8 / #950 实测先例）：
-// 正文/小字 ≥ 4.5:1，UI 字形（图标钮/徽标图形）≥ 3:1。
+// Method: read computed color / background-color from real fixture-stack pages
+// and compute WCAG 2.1 relative-luminance contrast; run both themes (dark =
+// :root default, light = .light on the root element, the #106 inversion
+// convention). Floors follow the in-repo canon (spec/22 §1.8 / the #950
+// measurement precedent): body/small text ≥ 4.5:1, UI glyphs (icon buttons /
+// badge graphics) ≥ 3:1.
 //
-// 用法（fixture 栈先在跑）：
+// Usage (fixture stack must already be running):
 //   E2E_PORT=8403 node docs/verify/1009/measure-a0-colors.mjs
-// 证据落本目录 colors-a0.json。
+// Evidence lands in colors-a0.json in this directory.
 
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -23,7 +28,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'colors-a0.json');
 
 const PAIRS = [
-  // [面, 场景 URL, 选择器, 类别]
+  // [face, scenario URL, selector, kind]
   ['window body ink on card', '/app?scenario=111', '.chief-drawer', 'text'],
   ['minimize/header icon ink on card', '/app?scenario=111', '.chief-drawer button[aria-label="最小化"]', 'ui'],
   ['model row ink on card', '/app?scenario=111', '.chief-drawer button[aria-label="总管主模型"]', 'text'],
@@ -55,7 +60,7 @@ for (const theme of ['dark', 'light']) {
   for (const [name, url, selector, kind] of PAIRS) {
     await page.goto(`${BASE}${url}`, { waitUntil: 'networkidle' });
     if (theme === 'light') await page.evaluate(() => document.documentElement.classList.add('light'));
-    // FAB 与窗互斥（D4）：捕获形窗开的面先最小化，FAB 才在位
+    // FAB and window are mutually exclusive (D4): minimize an open captured-shape window first so the FAB is in place
     if (selector.startsWith('.chief-fab') && (await page.locator('.chief-drawer').isVisible())) {
       await page.locator('.chief-drawer button[aria-label="最小化"]').click();
       await page.locator('.chief-drawer').waitFor({ state: 'hidden' });
@@ -67,7 +72,7 @@ for (const theme of ['dark', 'light']) {
       continue;
     }
     const { color, bg } = await el.evaluate((node) => {
-      // 背景取自身或最近不透明祖先（窗/FAB _own 底即 --card/--card-button）
+      // background = own or nearest opaque ancestor (the window/FAB own background is --card/--card-button)
       let n = node;
       let background = 'rgba(0, 0, 0, 0)';
       while (n != null) {

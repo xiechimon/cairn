@@ -168,7 +168,7 @@ function collectConvStream(buildId: string): { types: Set<string>; stop(): void 
 }
 
 async function openBoard(): Promise<void> {
-  await page.goto(`${server.url}/app`);
+  await page.goto(`${server.url}/app?view=board`);
   await pexpect(
     page.getByRole('complementary').getByRole('button', { name: '新任务' }),
   ).toBeVisible({ timeout: 30_000 });
@@ -189,6 +189,12 @@ async function createAndStart(title: string): Promise<void> {
   }[];
   const created = todos.find((t) => t.title === title);
   if (!created) throw new Error(`createAndStart: todo not persisted (${title})`);
+  const policy = await api(server.url, 'PATCH', `/api/projects/${created.projectId}/merge-policy`, {
+    mergePolicy: 'human',
+  });
+  if (policy.status !== 200) {
+    throw new Error(`createAndStart merge-policy: ${policy.status}`);
+  }
   const started = await api(server.url, 'POST', `/api/projects/${created.projectId}/builds`, {
     todoIds: [created.id],
     assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },

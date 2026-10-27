@@ -1,9 +1,9 @@
 ---
-Category: Under multi-lane sharing, `pkill -f vitest` killed test processes by name and could hit another lane's run
+Category: On a shared machine with multiple lanes, `pkill -f vitest` was used to wrap up by name, possibly killing another lane's test processes
 Source: #1635 (2026-10-25)
 Level: 5
-Safeguard: memory convention: only reap by the PID or process group you started
+Safeguard: Memory convention: only wrap up by the PID or process group you started
 Intercepts: 0
 Recurrences: 0
-Notes: the processes live outside the repo with no ownership marker, so in-repo scripts cannot check them; for the next long run, watch a `tee` log for the completion marker instead
+Notes: The processes are outside the repo and carry no ownership marks, so in-repo scripts cannot see them; next long test will watch the completion marker through a `tee` log instead
 ---

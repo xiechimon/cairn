@@ -1,17 +1,21 @@
-// #1225 mea 实测 probe：daemon clone/push 凭据降级全链（票验收 1/2 + 证据面）。
-// 形状照 drive-1213-dual-source.mjs（verify-pacman 技能）改：不起 web、不起
-// vite——纯 server + daemon + stub LLM + HTTP/fs/SQLite 三真值。
+// #1225 mea live probe: the daemon clone/push credential-degrade full chain
+// (ticket acceptance 1/2 + evidence face). Modeled on drive-1213-dual-source.mjs
+// (verify-pacman skill): no web, no vite — pure server + daemon + stub LLM +
+// HTTP/fs/SQLite ground truth.
 //
-// 腿 1（票验收 1）：github_connection 置坏 token → build 步 clone/push 逐个
-//   auth 失败 → 降级执行机本机 git 凭据（mea 的 gh helper）→ 步 success、
-//   transcript 凭据来源行 = machine、daemon.log 两段降级行 + pushed 行、
-//   origin 上 conv 分支真值存在。
-// 腿 2（票验收 2）：connection 换真 token（gh auth token，不回显）→ 新 build
-//   → 无降级行、来源行 = integration（集成有效时行为不变）。
+// Leg 1 (ticket acceptance 1): github_connection set to a bad token → build-step
+//   clone/push fail auth one by one → degrade to the executor machine's local
+//   git credentials (mea's gh helper) → step success, transcript credential-
+//   source line = machine, two degrade lines + a pushed line in daemon.log, and
+//   the conv branch exists on origin.
+// Leg 2 (ticket acceptance 2): connection swapped to a real token (gh auth
+//   token, never echoed) → new build → no degrade lines, source line =
+//   integration (behavior unchanged while the integration is healthy).
 //
-// env：MEA_REPO（仓克隆根）、EVIDENCE_DIR、PORT（缺省 8791）。
-// 凭据纪律：token 值只经 stdin 管道进 seed 脚本；日志/证据零回显（腿 1 的
-// 坏 token 是探针自造串，可点名；腿 2 真 token 永不落任何面）。
+// env: MEA_REPO (repo clone root), EVIDENCE_DIR, PORT (default 8791).
+// Credential discipline: token values enter the seed script only through the
+// stdin pipe; zero echo in logs/evidence (leg 1's bad token is a probe-invented
+// string and may be named; leg 2's real token never lands on any face).
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -112,8 +116,9 @@ async function waitStepTerminal(buildId, timeoutMs = 240_000) {
   }
 }
 
-// —— stub LLM（925 形改）：请求里已带 tool 结果 → 收尾文本；否则 → bash 写
-//    marker 文件（产物闸：有提交才有 push）。两腿共用，产物文件名带腿号。
+// —— stub LLM (925 shape modified): if the request already carries tool results
+//    → closing text; otherwise → bash writes a marker file (artifact gate: no
+//    commit, no push). Shared by both legs; artifact file names carry the leg number.
 
 let stubLeg = 1;
 function startStubLlm() {
@@ -196,7 +201,7 @@ function startStubLlm() {
   return new Promise((r) => server.listen(0, '127.0.0.1', () => r({ server, requests, port: server.address().port })));
 }
 
-// —— connection seed（tsx 腿）：token 经 stdin 进，不进 argv/日志 ——————————
+// —— connection seed (tsx leg): the token enters via stdin, not argv/logs ————————
 
 const SEED_SCRIPT = `
 import { openDb } from '${join(REPO, 'apps/server/src/db/client.js')}';
@@ -240,7 +245,7 @@ function deleteRemoteBranch(branch) {
   return r.code === 0;
 }
 
-// —— 进程句柄 ——————————————————————————————————————————————————————————
+// —— process handles ————————————————————————————————————————————————————
 
 let stubHandle = null;
 let serverProc = null;
@@ -251,9 +256,11 @@ function spawnServer() {
   const env = { ...process.env, PORT: String(PORT), PACMAN_HOME: SERVER_HOME };
   const out = join(EVIDENCE, 'server-console.log');
   writeFileSync(out, '');
-  // detached = 新进程组：收尾 kill(-pid) 砍整棵树（pnpm wrapper → tsx → esbuild
-  // 服务）。只杀 wrapper 会孤儿化 tsx 子进程——占着端口与已删 inode 的 DB，
-  // 下一轮 probe 的就绪探针打到旧栈（#950 同款假绿，本机实测两轮撞过）。
+  // detached = new process group: the closing kill(-pid) takes the whole tree
+  // (pnpm wrapper → tsx → esbuild service). Killing only the wrapper orphans
+  // the tsx child — holding the port and the DB at a deleted inode, so the next
+  // probe round's readiness probe hits the old stack (#950's same false green,
+  // hit in two local runs).
   serverProc = spawn('node', [PNPM, 'exec', 'tsx', 'src/index.ts'], {
     cwd: join(REPO, 'apps/server'),
     env,
@@ -265,8 +272,9 @@ function spawnServer() {
 }
 
 function spawnDaemon(apiKey, name) {
-  // 故意不剥代理 env（票失败方式 4：mea 的 HTTP_PROXY/NO_PROXY 语义原样
-  // 透传给 git——github.com 走 127.0.0.1:7890，server 走 127.0.0.1 直连）。
+  // Deliberately do not strip the proxy env (ticket failure mode 4: mea's
+  // HTTP_PROXY/NO_PROXY semantics pass through to git as-is — github.com goes
+  // through 127.0.0.1:7890, the server connects directly at 127.0.0.1).
   const env = { ...process.env, PACMAN_HOME: DAEMON_HOME };
   const out = join(EVIDENCE, `daemon-console-${name}.log`);
   writeFileSync(out, '');
@@ -329,8 +337,8 @@ async function stopProcesses() {
   killGroupForce(serverProc);
 }
 
-/** 上轮残留清扫：杀挂在本仓克隆上的 server/daemon 进程树 + 等端口释放。
- *  （本 probe 自身 cmdline 不含仓路径，pkill 模式不会误伤自己。） */
+/** Sweep leftovers from the previous round: kill server/daemon process trees hung on this repo clone + wait for the port to release.
+ *  (This probe's own cmdline does not contain the repo path, so the pkill pattern cannot hit itself.) */
 function sweepLeftovers() {
   run('bash', ['-c', "pkill -f 'pacman-1225-repo/apps/(server|daemon)' || true"], { timeout: 10_000 });
   run('bash', ['-c', `sleep 1; ss -tln | grep ':${PORT} ' && exit 1 || exit 0`], { timeout: 15_000 });
@@ -341,19 +349,21 @@ const pushedBranches = [];
 // —— main ——————————————————————————————————————————————————————————————
 
 try {
-  // -1) 上轮残留清扫 + 端口占用预检（旧栈占位 = 就绪探针打到旧库的假绿，
-  //     本机实测两轮撞过；宁停不将错就错）。
+  // -1) sweep leftovers from the previous round + port-occupied precheck (an
+  //     old stack holding the port = the readiness probe hits the old library's
+  //     false green, hit twice in local runs; stop rather than compound the error).
   sweepLeftovers();
   const portBusy = run('bash', ['-c', `ss -tln | grep -q ':${PORT} '`], { timeout: 10_000 });
   if (portBusy.code === 0) throw new Error(`port ${PORT} still occupied after sweep`);
   check('端口预检', true, `port ${PORT} free`);
 
-  // 0) 前置自检：mea 机器凭据路在位（gh helper fill 出 username；注意 fill
-  //    会回显 protocol/host/username/password 四行，password 只判存在不落盘）。
+  // 0) precheck: mea's machine-credential path is in place (gh helper fill
+  //    yields username; note fill echoes four lines protocol/host/username/
+  //    password — password is only checked for existence, never persisted).
   const fill = run('bash', ['-c', "printf 'protocol=https\\nhost=github.com\\n\\n' | git credential fill | grep -c '^username='"], { timeout: 15_000 });
   check('mea 机器凭据在位（git credential fill → username）', fill.code === 0 && fill.out.trim() === '1', fill.out.trim() || fill.err);
 
-  // 1) stub LLM + server。
+  // 1) stub LLM + server.
   stubHandle = await startStubLlm();
   const stubUrl = `http://127.0.0.1:${stubHandle.port}/v1`;
   spawnServer();
@@ -371,7 +381,7 @@ try {
   );
   check('server 起在隔离 PACMAN_HOME', true, `${SERVER} home=${SERVER_HOME}`);
 
-  // 2) seed：team / provider / agent / api-key。
+  // 2) seed: team / provider / agent / api-key.
   const teams = await jfetch('GET', '/api/teams');
   TEAM_ID = teams.body[0]?.id ?? teams.body.teams?.[0]?.id;
   if (!TEAM_ID) throw new Error(`no team: ${JSON.stringify(teams.body).slice(0, 200)}`);
@@ -405,20 +415,25 @@ try {
   const agentId = agentRes.body?.id ?? agentRes.body?.agent?.id;
   if (!agentId) throw new Error(`agent create failed: ${agentRes.status}`);
 
-  // 3) 项目 + 坏 connection（腿 1 前置）。
+  // 3) project + bad connection (leg 1 prerequisite).
   const projRes = await jfetch('POST', '/api/projects', {
     body: { name: `probe-1225-${TS}`, teamId: TEAM_ID, kind: 'github', githubRepo: GH_REPO },
   });
   const projectId = projRes.body?.id;
   check('github 项目创建（repo=xiechimon/pacman）', projRes.status === 201 && Boolean(projectId), `${projRes.status}`);
 
-  // —— 基座预物化（探针侧，与凭据序无关）：pacman 仓 447MB，daemon 全量
-  //    clone 走 mea 代理实测 ~2min，会越过 server 步失联扫尾的 120s 心跳窗
-  //    （步被释放重领 → 双 runStep 抢同一工作区 → 探针假红）。预先把基座
-  //    clone 到 daemon workspaces 落位，daemon prepare 即走 fetch 面（秒级）
-  //    ——心跳窗不再暴露。clone/fetch 匿名优先（公共仓不触发凭据挑战），
-  //    降级路的活证据 = push（认证挑战面），与票面现象（push 死、clone 活）
-  //    同形；clone 半的降级序由 workspace-cred-fallback 单测钉。
+  // —— Pre-materialize the base (probe side, independent of the credential
+  //    sequence): the pacman repo is 447MB and a full daemon clone through the
+  //    mea proxy measured ~2min, which overshoots the server step's 120s
+  //    heartbeat window for sweeping lost steps (step released and re-claimed →
+  //    two runSteps race on one workspace → probe false red). Clone the base
+  //    into the daemon workspaces ahead of time so daemon prepare takes the
+  //    fetch face (seconds) — the heartbeat window is no longer exposed.
+  //    clone/fetch prefer anonymous (public repo triggers no credential
+  //    challenge); the live evidence of the degrade path = push (the auth-
+  //    challenge face), same shape as the ticket phenomenon (push dead, clone
+  //    alive); the clone half of the degrade order is pinned by the
+  //    workspace-cred-fallback unit test.
   const baseDir = join(DAEMON_HOME, 'workspaces', projectId, 'repo');
   run('mkdir', ['-p', join(DAEMON_HOME, 'workspaces', projectId)]);
   const preseed = run('git', ['clone', GH_CLONE_URL, baseDir], { timeout: 300_000 });
@@ -429,7 +444,7 @@ try {
   check('github_connection 置坏 token（login=probe-1225-bad）', connStatus.body?.login === 'probe-1225-bad', JSON.stringify(connStatus.body).slice(0, 120));
   save('connection-status-leg1.json', connStatus.body);
 
-  // 4) 腿 1：daemon（自然 env，代理透传）+ build。
+  // 4) leg 1: daemon (natural env, proxy passed through) + build.
   const keyRes = await jfetch('POST', `/api/teams/${TEAM_ID}/api-keys`, {
     body: { name: `probe-1225-${TS}`, gitAccess: false, mcpAccess: false, toolGrants: { read: [], write: [] } },
   });
@@ -457,8 +472,10 @@ try {
 
   const lines1 = daemonLogLines();
   save('leg1-daemon-relevant.log', lines1.filter((l) => /machine credentials|pushed|auth failed|Cloning|Repo source|step /.test(l)).join('\n'));
-  // 公共仓 clone/fetch 匿名优先（git 仅在 401 挑战后上凭据）——降级路的活
-  // 证据 = push（唯一认证挑战面，票面现象同形）；clone 半归单测钉。
+  // Public-repo clone/fetch prefer anonymous (git presents credentials only
+  // after a 401 challenge) — the live evidence of the degrade path = push (the
+  // only auth-challenge face, same shape as the ticket phenomenon); the clone
+  // half is pinned by the unit test.
   const pushFallback = lines1.find((l) => l.includes('push auth failed (per-step token)'));
   check('腿 1：daemon.log push 降级行（per-step token → machine credentials）', Boolean(pushFallback), (pushFallback ?? '<missing>').slice(0, 260));
   const pushedLine = lines1.find((l) => l.includes(`pushed pacman/conv-${build1Id}`));
@@ -479,7 +496,7 @@ try {
   check('腿 1：origin 上 conv 分支真值存在', remoteSha1 !== null && /^[0-9a-f]{40}$/.test(remoteSha1 ?? ''), `sha=${remoteSha1}`);
   check('腿 1：daemon.log 不含坏 token 值（凭据值零回显）', !lines1.join('\n').includes(BAD_TOKEN));
 
-  // 5) 腿 2：真 token connection → 新 build → integration 路。
+  // 5) leg 2: real-token connection → new build → integration path.
   stubLeg = 2;
   const ghToken = run('gh', ['auth', 'token'], { timeout: 15_000 });
   if (ghToken.code !== 0 || ghToken.out === '') throw new Error('gh auth token failed');
@@ -505,8 +522,9 @@ try {
 
   const lines2 = daemonLogLines();
   save('leg2-daemon-relevant.log', lines2.filter((l) => /machine credentials|pushed|auth failed|Cloning|Repo source/.test(l)).join('\n'));
-  // 腿 2 不得新增降级行：降级行计数与腿 1 收尾时持平（腿 1 的行数在上方
-  // lines1 已拍快照——用「machine credentials」全文计数比对）。
+  // Leg 2 must add no degrade lines: the degrade-line count stays flat versus
+  // leg 1's close-out (leg 1's line count was snapshotted above as lines1 —
+  // compare by whole-text count of "machine credentials").
   const fallbackCount1 = lines1.filter((l) => l.includes('machine credentials')).length;
   const fallbackCount2 = lines2.filter((l) => l.includes('machine credentials')).length;
   check('腿 2：无新增降级行（集成有效 = 单发即成）', fallbackCount2 === fallbackCount1, `leg1=${fallbackCount1} leg2=${fallbackCount2}`);
@@ -524,15 +542,15 @@ try {
   const remoteSha2 = remoteBranchSha(branch2);
   check('腿 2：origin 上 conv 分支真值存在', remoteSha2 !== null && /^[0-9a-f]{40}$/.test(remoteSha2 ?? ''), `sha=${remoteSha2}`);
 
-  // 凭据值零回显（腿 2 真 token 形状）。
+  // Zero echo of credential values (leg 2 real-token shape).
   const allLog = `${lines2.join('\n')}\n${serverLogLines().join('\n')}`;
   check('腿 2：daemon/server 日志不含真 token（gho_/github_pat_ 零命中）', !/gho_[A-Za-z0-9]{20,}/.test(allLog) && !/github_pat_[A-Za-z0-9_]{20,}/.test(allLog));
 } finally {
   await stopProcesses();
-  // 端口释放断言：旧栈残留是本 probe 的头号假绿源（打到已删 inode 的旧库）。
+  // Port-release assertion: old-stack residue is this probe's number-one false-green source (hitting the old library at a deleted inode).
   const released = run('bash', ['-c', `ss -tln | grep -q ':${PORT} '`], { timeout: 10_000 });
   check('收尾端口释放（无旧栈残留）', released.code !== 0, `port ${PORT} ${released.code === 0 ? 'STILL BUSY' : 'released'}`);
-  // 远端分支清理（探针产物，不留仓上）。
+  // Remote branch cleanup (probe artifacts, left off the repo).
   const cleanupResults = [];
   for (const b of pushedBranches) cleanupResults.push(`${b}: ${deleteRemoteBranch(b) ? 'deleted' : 'FAILED'}`);
   save('cleanup-remote-branches.txt', `${cleanupResults.join('\n')}\n`);

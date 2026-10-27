@@ -7,7 +7,7 @@ import { Label } from '../components/ui/label.js';
 import type { BuildOverlayContent, PaneView, RunHistoryRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { BarChart3, Check, Download, History, X } from '../icons/index.js';
-import { type DocTypeLabel, PaneTypeSelect } from '../overlays/plan-dropdown.js';
+import { type DocTypeLabel, PaneTypeSelect } from '../overlay/plan-dropdown.js';
 import { BranchSyncFields, READONLY_BOX, SyncButton, useBranchSyncState } from './branch-dialog.js';
 import { PANE_HEAD } from './docpane.js';
 

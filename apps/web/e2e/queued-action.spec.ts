@@ -125,7 +125,7 @@ test('detail: a todo task keeps its `开始`', async ({ page }) => {
 test('board: the queued card renders no `开始`, the todo card shows it on hover', async ({
   page,
 }) => {
-  await page.goto('/app');
+  await page.goto('/app?view=board');
 
   const running = page.locator('.board-column[data-column="building"]');
   const queued = running.locator(`[data-todo-id="${QUEUED_ID}"]`);

@@ -1,9 +1,9 @@
 ---
-Category: When inserting a new component in front of an existing one, the neighbouring `ClaudeMark` JSDoc was left sitting on the new component's head
+Category: When inserting a new component in front of an existing one, the neighboring `ClaudeMark`'s JSDoc was left on the new component's head as well
 Source: #1611 (2026-10-25)
 Level: 3
-Safeguard: review diffs by walking each comment against the declaration it sits next to
+Safeguard: When reviewing the diff, compare each comment against the declaration it sits next to, one by one
 Intercepts: 0
 Recurrences: 0
-Notes: whether a comment fits its declaration is not machine-checkable; the comment was moved back to `ClaudeMark`
+Notes: Whether comment content fits the declaration cannot be machine-checked; the comment has been moved back to `ClaudeMark`
 ---

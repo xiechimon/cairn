@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const FIELDS = [
   'Category',
@@ -54,7 +54,7 @@ export function checkEntry(fileName, text) {
     violations.push(
       `${fileName}: Level ${fields.Level} must state in Notes why a higher level is not feasible`,
     );
-  if (/pending upgrade/i.test(fields.Notes) && !/#\d+/.test(fields.Notes))
+  if (/pending upgrade|upgrade pending|待升/i.test(fields.Notes) && !/#\d+/.test(fields.Notes))
     violations.push(`${fileName}: "pending upgrade" in Notes must carry a ticket number`);
   return violations;
 }
@@ -81,9 +81,11 @@ export function checkLedgerRoot(root) {
 }
 
 export function renderTable(entries) {
+  const violations = entries.flatMap(({ name, text }) => checkEntry(name, text));
+  if (violations.length > 0) throw new Error(violations.join('\n'));
   const rows = entries.map(({ name, text }) => {
     const { fields } = parseEntry(text);
-    return `| ${[name.replace(/\.md$/, ''), ...FIELDS.map((key) => fields[key])].map((value) => value.replaceAll('|', '\\|')).join(' | ')} |`;
+    return `| ${[name.replace(/\.md$/, ''), ...FIELDS.map((key) => fields[key])].map((value) => value.replaceAll('\\|', '|').replaceAll('|', '\\|')).join(' | ')} |`;
   });
   return [`| File | ${FIELDS.join(' | ')} |`, `|${'---|'.repeat(FIELDS.length + 1)}`, ...rows].join(
     '\n',
@@ -91,7 +93,7 @@ export function renderTable(entries) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const root = new URL('..', import.meta.url).pathname;
+  const root = fileURLToPath(new URL('..', import.meta.url));
   if (process.argv[2] === '--table') {
     console.log(renderTable(ledgerEntries(root)));
     process.exit(0);

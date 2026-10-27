@@ -108,7 +108,6 @@ export class FakeMachineApi implements MachineApi {
       latestCliVersion: null,
       kind: 'remote' as const,
       enabledRuntimes: [],
-      shellEnabled: false,
       ...this.mePatch,
     };
   }

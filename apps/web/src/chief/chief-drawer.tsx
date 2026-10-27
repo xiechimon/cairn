@@ -16,6 +16,7 @@ import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../ap
 import { useLiveData } from '../api/provider.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
@@ -53,9 +54,9 @@ import {
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { AttachmentStrip } from '../overlay/attachment-strip.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
+import { useChiefNewThreadHotkey } from '../overlay/hotkeys.js';
 import { type MentionGroups, MentionInline, MentionPicker } from '../overlay/mention-picker.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
-import { useChiefNewThreadHotkey } from '../overlays/hotkeys.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
 
 const WINDOW_CLS =
@@ -424,7 +425,7 @@ function ChiefDrawerInner({
         )}
         {threadsOpen && (
           <div
-            className="absolute top-8 left-3 z-[5] max-h-55 w-66 overflow-y-auto rounded-(--radius-popover) bg-(--popover) p-1 shadow-(--shadow-popover)"
+            className="absolute top-8 left-3 z-[5] max-h-55 w-66 overflow-y-auto rounded-(--radius-popover) bg-(--popover) p-(--menu-pad) shadow-(--shadow-popover)"
             role="menu"
           >
             {(chief.threads ?? []).map((thread, index) => (
@@ -433,7 +434,7 @@ function ChiefDrawerInner({
                 role="menuitem"
                 key={thread.title}
                 aria-current={thread.active ? 'true' : undefined}
-                className="h-8 w-full cursor-pointer justify-start gap-2 rounded-sm border-none bg-transparent px-2 text-left text-ui font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-[current=true]:bg-(--menu-hover) aria-[current=true]:font-medium aria-[current=true]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+                className="h-8 w-full cursor-pointer justify-start gap-2 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-[current=true]:bg-(--menu-hover) aria-[current=true]:font-medium aria-[current=true]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
                 onClick={
                   onThread != null
                     ? () => {
@@ -468,7 +469,7 @@ function ChiefDrawerInner({
       {chief.examples && (
         <div className="flex-none">
           <h2
-            className={`text-center font-heading text-heading font-medium text-(--foreground) ${
+            className={`text-center font-serif text-heading font-medium text-(--foreground) ${
               chief.bound ? 'mt-14' : 'mt-16'
             }`}
           >
@@ -523,7 +524,7 @@ function ChiefDrawerInner({
         </JumpToLatestButton>
       </MessageScroller>
 
-      <div className="chief-composer [&>.attachment-strip]:mt-2 mx-4 my-2.5 rounded-(--radius-composer) border-0 bg-(--secondary) px-3 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)">
+      <div className="chief-composer [&>.attachment-strip]:mt-2 mx-4 my-2.5 rounded-(--radius-composer) border-0 bg-card dark:bg-(--secondary) px-3 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)">
         <div className="relative">
           <Textarea
             ref={attachComposer}
@@ -611,25 +612,28 @@ function ChiefDrawerInner({
           accept="text/*,image/*,application/json,application/pdf,application/xml"
         />
         <div className="mt-2.5 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('添加附件')}
-            className={TOOL_BTN_CLS}
-            disabled={attaching || onAttachment == null}
-            onClick={openFilePicker}
+          <IconTooltip
+            label={t('添加附件')}
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`${TOOL_BTN_CLS} disabled:pointer-events-auto`}
+                disabled={attaching || onAttachment == null}
+                onClick={openFilePicker}
+              />
+            }
           >
             <Paperclip width={16} height={16} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('提及')}
-            className={TOOL_BTN_CLS}
-            onClick={togglePicker}
+          </IconTooltip>
+          <IconTooltip
+            label={t('提及')}
+            trigger={
+              <Button variant="ghost" size="icon" className={TOOL_BTN_CLS} onClick={togglePicker} />
+            }
           >
             <Grid2x2 width={16} height={16} />
-          </Button>
+          </IconTooltip>
           <Button
             variant="ghost"
             size="icon"

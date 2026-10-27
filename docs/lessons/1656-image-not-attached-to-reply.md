@@ -1,9 +1,9 @@
 ---
-Category: An image went only into the file library, not attached to the reply directly
+Category: Put the images only into the file library without attaching them directly in the reply
 Source: Claude thread (2026-10-22)
 Level: 5
-Safeguard: memory
+Safeguard: Memory
 Intercepts: 0
 Recurrences: 0
-Notes: no machine check is possible
+Notes: Not machine-checkable
 ---

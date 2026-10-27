@@ -1,8 +1,10 @@
+import { cn } from 'cn';
 import { KeyRound, Plug, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { SegmentedRadio } from '../components/segmented.js';
+import { MENU_ITEM_CLS, MENU_SEPARATOR_CLS, MENU_SURFACE_CLS } from '../components/ui/menu.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import {
   applyDensity,
@@ -23,21 +25,26 @@ interface UserMenuProps {
 }
 
 const ROWS = [
-  { label: '帐号', href: '/app/account', Icon: User },
+  { label: '账号', href: '/app/account', Icon: User },
   { label: 'API 密钥', href: '/app/api-keys', Icon: KeyRound },
   { label: 'MCP', href: '/app/resources/mcp-servers', Icon: Plug },
 ];
 
-const PANEL =
-  'user-menu absolute bottom-12 left-2 z-10 flex w-56 flex-col rounded-(--radius-popover) bg-popover p-1 shadow-(--shadow-popover)';
+const PANEL = `user-menu absolute bottom-12 left-2 z-10 flex w-60 flex-col ${MENU_SURFACE_CLS}`;
 const PANEL_FLOATING = 'relative bottom-auto left-auto z-auto';
 
-const SEG_ROW_CLS = 'user-menu-row flex h-9 items-center pr-1.5 pl-2.5 text-ui text-foreground';
+const SEG_ROW_CLS = 'user-menu-row flex flex-col gap-1.5 px-1 pt-1.5 pb-1';
 
-const NAV_ROW_CLS =
-  'user-menu-row flex h-8 items-center gap-2.5 rounded-(--cds-radius-md) px-2.5 text-ui text-foreground no-underline outline-none hover:bg-menu-hover focus-visible:bg-menu-hover [&_svg]:size-3.75 [&_svg]:flex-none [&_svg]:text-content-tertiary';
+const SEG_LABEL_CLS = 'px-1.5 text-caption font-medium text-content-tertiary';
 
-const SEPARATOR_CLS = 'mx-1.5 my-1 h-px bg-border';
+const SEG_TRACK_CLS = 'user-menu-seg w-full';
+
+const SEG_OPTION_CLS = 'min-w-0 flex-1 px-2';
+
+const NAV_ROW_CLS = cn(
+  MENU_ITEM_CLS,
+  'user-menu-row cursor-pointer no-underline hover:bg-menu-hover focus-visible:bg-menu-hover',
+);
 
 export function UserMenu({
   theme: initialTheme,
@@ -87,9 +94,10 @@ export function UserMenu({
         </span>
       </div>
       <div className={SEG_ROW_CLS}>
-        {t('外观')}
+        <span className={SEG_LABEL_CLS}>{t('外观')}</span>
         <SegmentedRadio
-          className="user-menu-seg ml-auto"
+          className={SEG_TRACK_CLS}
+          optionHandle={SEG_OPTION_CLS}
           label={t('外观')}
           value={theme}
           onChange={select}
@@ -100,9 +108,10 @@ export function UserMenu({
         />
       </div>
       <div className={SEG_ROW_CLS} data-testid="density-row">
-        {t('密度')}
+        <span className={SEG_LABEL_CLS}>{t('密度')}</span>
         <SegmentedRadio
-          className="user-menu-seg ml-auto"
+          className={SEG_TRACK_CLS}
+          optionHandle={SEG_OPTION_CLS}
           label={t('密度')}
           value={density}
           onChange={selectDensity}
@@ -112,7 +121,7 @@ export function UserMenu({
           ]}
         />
       </div>
-      <div className={SEPARATOR_CLS} aria-hidden />
+      <div className={MENU_SEPARATOR_CLS} aria-hidden />
       {ROWS.map(({ label, href, Icon }) => (
         <Link key={label} className={NAV_ROW_CLS} to={{ pathname: href, search }}>
           <Icon aria-hidden />

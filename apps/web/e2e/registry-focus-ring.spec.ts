@@ -18,7 +18,7 @@ const AGENT =
   '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06';
 const SKILLS = '/app/resources/skills?scenario=01';
 const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks';
-const MACHINES = '/app/resources/machines?scenario=06';
+const AGENT_PERMS = '/app/resources/agents/r3-builder?scenario=agent-detail';
 const ACCEPT = '/app?scenario=34';
 
 const BADGES = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=57f';
@@ -183,7 +183,8 @@ test.describe('#1244 registry focus outline', () => {
     expectGlobalOutline(unchecked);
     expect(unchecked.borderTopColor).toBe(hexToRgb(unchecked.inputColor));
 
-    await themed(page, 'dark', MACHINES);
+    await themed(page, 'dark', AGENT_PERMS);
+    await page.locator('.agent-detail .agent-tab').nth(2).click();
     const sw = page.locator('[data-slot="switch"]').first();
     await expect(sw).toBeVisible();
     await focusKeyboard(sw);

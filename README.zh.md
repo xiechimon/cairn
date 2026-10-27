@@ -152,13 +152,18 @@ pnpm start        # 构建 web UI 并由 server 同源托管
 
 watch 模式开发栈，每进程一条：`pnpm dev:web`、`pnpm dev:server`、`pnpm dev:daemon`（`pnpm dev` 三进程一起跑）。
 
+## 部署
+
+把 server 自托管在常开机上，手机经私有 tailnet 随时连回看板。将 server 绑到 `127.0.0.1`，用 `tailscale serve` 反代到 `http://127.0.0.1:<端口>`，并设 `CAIRN_TAILSCALE_USERS` 让白名单内的 Tailscale 身份免输入访问令牌直接登录。完整 walkthrough 见 [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md)。要走公网路线，见上文 Railway 模板。
+
 ## 配置
 
 server 环境变量（全部可选）：
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `CAIRN_TOKEN` | 未设 | 守护 `/api/*` 的 Bearer token。设 = 开鉴权（web 首访出 token 门页）；未设 = 关（默认）。两条 SSE stream 端点额外接受 `?token=`（EventSource 设不了 header）。绑非 localhost 接口时务必设。 |
+| `CAIRN_TOKEN` | 未设 | 守护 `/api/*` 的 Bearer token。设 = 开鉴权（web 首访出 token 门页）；未设 = 关（默认）。两条 SSE stream 端点额外接受 `?token=`（EventSource 设不了 header）。绑非 localhost 接口时务必设。来自环回对端的白名单 Tailscale Serve 身份同样放行。 |
+| `CAIRN_TAILSCALE_USERS` | 未设 | 逗号分隔的 Tailscale 用户登录名；环回对端的 `Tailscale-User-Login` 命中名单时免 `CAIRN_TOKEN` 放行。同机 `tailscale serve` 部署请设 `HOST=127.0.0.1` 并反代到 `http://127.0.0.1:<端口>`；非环回直连、打标签设备与 Funnel 流量仍需 token。设了名单但绑定地址非环回时启动日志 WARN。 |
 | `CAIRN_REQUIRE_TOKEN` | 未设（Docker 镜像内为 `1`） | `1` / `true` / `yes`：`CAIRN_TOKEN` 未设或为空时拒绝启动（打印原因，退出码 1）。 |
 | `PORT` | `8787` | HTTP 监听端口。 |
 | `HOST` | 未设（全部接口） | HTTP 绑定地址。分体部署（server 在常开主机、daemon 在另一台机器用 `CAIRN_SERVER` 指过来）时设为该主机的局域网/内网地址，并同设 `CAIRN_TOKEN`。显式 `0.0.0.0`/`::` 且 `CAIRN_TOKEN` 未设 → 启动日志 WARN。 |

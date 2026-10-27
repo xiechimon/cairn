@@ -50,7 +50,7 @@
    "dimension": "rules",
    "title": "Three commit subjects have no ticket, and the AGENTS.md squash recipe that ADR 0021 D2 points to returns one of them for this PR",
    "severity": "suggestion",
-   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
    "line": 35,
    "failurePath": "ca088ce, 3944905 and 662cbd9 have subjects of the form `docs: spec 28 ...` with no `(1401)`, which breaks AGENTS.md:61. ADR 0021 D2 (line 35) tells a person merging in the GitHub UI or CLI to follow the AGENTS.md squash recipe. That recipe (AGENTS.md:70) takes `gh api repos/xiechimon/pacman/pulls/<n>/commits -q '.[0].commit.message'`, which returns ca088ce for #1410. A merger who follows it lands the subject `docs: spec 28 自举闭环计划…` on main, with no `closes #1401`, so #1401 stays open. Two things guard against this: the PR body's Issues section supplies a ready squash message, and the repo default (PR_TITLE + COMMIT_MESSAGES) would carry e5414a2's `closes #1401`. History cannot be rewritten because force-push is banned. The merger must use the body's message, not `.[0]`. D2 could also say that the recipe only works when the first commit carries the ticket and the closing line. Run 9 raised this too, and it is still open.",
    "evidence": "git log subjects: ca088ce 'docs: spec 28 自举闭环计划（…）', 3944905 'docs: spec 28 补云端会话变体（…）', 662cbd9 'docs: spec 28 加 workflow 编排（…）'. `gh api repos/xiechimon/pacman/pulls/1410/commits --jq '.[0].sha'` = ca088ce. `closes #1401` appears only in e5414a2. Repo settings: squash_merge_commit_title=PR_TITLE, squash_merge_commit_message=COMMIT_MESSAGES."
@@ -77,7 +77,7 @@
    "dimension": "rules",
    "title": "Spec 28's per-phase flow and goal prompts list every step except /code-review and /security-review",
    "severity": "suggestion",
-   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
    "line": 78,
    "failurePath": "§4 (line 78) and the two goal prompts (lines 209 and 233) spell out each phase step: tests first, then lint, typecheck, spec:parse, vitest --changed, e2e:affected, verify-pacman, pr-pacman, pr-gate, merge. None of them includes the /code-review self-review AGENTS.md:87 requires before opening a PR and again after fixes. They also leave out /security-review, which AGENTS.md:89-92 requires when a diff touches apps/server/src/services/mcp-face.ts and the other listed files. P4 (line 133) will edit the #1256 block that lives in mcp-face.ts. The prompts do say 「遵守 CLAUDE.md / AGENTS.md 全部规则」, so the rule is covered by reference. Still, an unattended goal session that follows the explicit step list can open and gate a PR without either review.",
    "evidence": "spec 28 lines 78, 209 and 233 at head contain no `code-review` or `security-review`. AGENTS.md:87, 89 and 92 at main. ADR 0021 F1 / spec 28 G1 place the #1256 block in mcp-face.ts:365."
@@ -122,7 +122,7 @@
    "dimension": "tests",
    "title": "ADR 0021 premortem names 'agent changes tests to pass its own gate' but D4 covers only deleting tests, not weakening them in place",
    "severity": "suggestion",
-   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
    "line": 54,
    "failurePath": "The premortem row 'agent 改测试或改闸，让自己过闸' is guarded by 'D4 保护路径与「删测试即 human」'. A PR that edits apps/server/test/x.test.ts to drop an assertion is not a deletion and stays inside the auto-merge set (apps/*/test/**). D4 routes it to auto-merge; only a reviewer's judgment (pr-gate's tests dimension, and later P3's automated review) stands between it and a merge. The row overstates what D4 enforces in code for P3/P4 to build on.",
    "evidence": "pr-gate.js:339-341 checks only allDeleted. AUTO_MERGE (pr-gate.js:35-43) includes apps/*/test/**, packages/*/test/** and integration/test/**."
@@ -175,15 +175,15 @@
   ".claude/workflows/pr-gate.js",
   ".github/workflows/ci.yml",
   ".gitignore",
-  "docs/adr/0018-多agent团队三层与机器能力闸.md",
-  "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+  "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+  "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
   "docs/pr-review.md",
   "scripts/pr-gate-selfcheck.mjs",
-  "docs/spec/28-自举闭环-自写自合.md"
+  "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md"
  ],
  "mergedBy": "user",
  "humanReasons": [
-  "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-多agent团队三层与机器能力闸.md, docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-自举闭环-自写自合.md",
+  "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md, docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
   "4473 lines changed (over 800)"
  ],
  "missing": [],

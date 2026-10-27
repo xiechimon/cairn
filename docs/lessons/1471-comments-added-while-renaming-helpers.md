@@ -1,9 +1,9 @@
 ---
-Category: New explanatory comments were written while renaming or rewriting e2e helper functions; the comment-discipline check reported 14 lines
+Category: When renaming or rewriting e2e helper functions, new explanatory comments were written along the way; the comment-discipline check reported 14 lines
 Source: #1471 (2026-10-24)
 Level: 2
-Safeguard: `scripts/comment-discipline-gate.mjs` runs at every wrap-up; real mistake as negative control: 14 new comment lines across helpers.ts, hotkeys.spec.ts and five search specs reported red, 0 lines after removal
+Safeguard: `scripts/comment-discipline-gate.mjs` is always run at wrap-up; the real mistake as negative control: the 14 new comment lines in helpers.ts, hotkeys.spec.ts, and five search specs were reported red, 0 after deletion
 Intercepts: 1
 Recurrences: 0
-Notes: the check covers it, no further safeguard needed; the check is still advisory in CI
+Notes: Already covered, no additional protection needed; the check is still advisory in CI
 ---

@@ -1,48 +1,41 @@
-# #1251 能力上报 + 派发能力闸 + 可见 pending 成因 —— live 验收
+# #1251 capability reporting + dispatch capability gate + visible pending causes — live acceptance
 
-探针：`.claude/skills/verify-pacman/scripts/drive-1251-capability-gate.mjs`
-（假机器 wire + 浏览器真点击 + 一段真 daemon 腿；零 LLM）。
-结果：`result.json` 15/15 PASS（checks 逐条 ok，无约数）。
-归档证据为合入 #1257（pending 挂起律）后的合并树复跑产物——能力挡的 pending
-步在新律下不失败收尾，可见成因由 queue.blocked（步级）与 todo waitingOn
-（板面）承担；本探针判据面（claim 闸 / 读面 / 真 daemon 上报）两律同形。
+Probe: `.claude/skills/verify-pacman/scripts/drive-1251-capability-gate.mjs`
+(fake machine wire + real-browser clicks + one real-daemon leg; zero LLM).
+Result: `result.json` 15/15 PASS (checks itemized ok, no rounding).
+The archived evidence is the product of a rerun on the merged tree after #1257 (the pending hang law) landed — a capability-blocked pending step does not close as failed under the new law; the visible cause is carried by queue.blocked (step level) and todo waitingOn (board level); this probe's criterion faces (claim gate / read faces / real-daemon reporting) are the same shape under both laws.
 
-## 复跑配方
+## Rerun recipe
 
 ```sh
-# 1. server 侧 MCP 投影词表 fixture（probe 的 UI 腿要拨 figma 要求开关，
-#    词表不确定就止步提示重 launch）：
+# 1. the server-side MCP projection vocabulary fixture (the probe's UI leg flips the figma-required switch;
+#    if the vocabulary is uncertain it stops with a hint to re-launch):
 printf '%s' '{"mcpServers":{"figma":{"type":"http","url":"https://mcp.figma.com/mcp"},"ctx":{"type":"stdio","command":"npx","args":["-y","@upstash/context7-mcp"]}}}' \
   > /tmp/pacman-1251-server-mcp.json
-# 2. 隔离栈（端口按车道纪律先 lsof 查占用）：
+# 2. the isolated stack (lsof-check the ports per lane discipline first):
 PACMAN_MCP_CONFIG=/tmp/pacman-1251-server-mcp.json \
 VERIFY_PORT=8803 VERIFY_WEB_PORT=5283 VERIFY_REPO_ROOT=<worktree> \
   node .claude/skills/verify-pacman/scripts/launch.mjs
-# 3. 跑探针（依赖全新库；重验 = cleanup + 重 launch）：
+# 3. run the probe (requires a fresh library; re-verify = cleanup + re-launch):
 VERIFY_PORT=8803 VERIFY_WEB_PORT=5283 VERIFY_REPO_ROOT=<worktree> \
   node .claude/skills/verify-pacman/scripts/drive-1251-capability-gate.mjs
-# 4. 收尾：cleanup.mjs（证据不删）；归档 = cp 进 docs/verify/1251/ 随 PR。
+# 4. close out: cleanup.mjs (the evidence is not deleted); archiving = cp into docs/verify/1251/ with the PR.
 ```
 
-## 判读
+## Reading
 
-| 文件 | 实物 |
+| file | artifact |
 |---|---|
-| `r2-heartbeat-tolerance.json` | 心跳红线：presence 的 capabilities 坏形状三形各 200 {ok:true}，行保留旧值 |
-| `g2-machine-fit-blocked.json` / `g2-agent-machine-fit-blocked.png` | machine-fit 三态：缺项机 canRun=false + missing 可读形 + mcpGaps 对账；未上报机 missing=null 且 canRun=true（fail-open）；浏览器权限 tab 机器匹配段同态（开关 ON、红「不可跑」、缺项修法行） |
-| `g5-queue-blocked.json` / `g6-queue-blocked-row.png` | steps 读面 queue.blocked = capability-missing + 详情页排队行文案「没有机器满足能力要求（缺 MCP server "figma"）——装齐后下一拍心跳即解锁」 |
-| `g8-machine-fit-clear.json` / `g8-agent-machine-fit-clear.png` | presence 补装 figma 后同机即领（修法即时闭环）+ fit 清零态 |
-| `g9-machines-capability-annotation.png` | 机器页读标注两态：「MCP 2 · 本机技能 0」计数形 vs「能力清单未上报（旧版 daemon）」 |
-| `d1-daemon-log-tail.txt` | 真 daemon 腿日志尾（注册/上线序列行）；SQLite 真值在 result.json 的 D1 detail（probe-mcp 小写归一 + 坏条目跳过 + probe-local-skill） |
+| `r2-heartbeat-tolerance.json` | the heartbeat red line: three bad shapes of presence capabilities each get 200 {ok:true}, the row keeps the old values |
+| `g2-machine-fit-blocked.json` / `g2-agent-machine-fit-blocked.png` | the machine-fit three states: a machine missing an entry has canRun=false + a readable missing shape + mcpGaps reconciliation; a non-reporting machine has missing=null and canRun=true (fail-open); the browser permissions tab's machine-fit section shows the same state (switch ON, red `不可跑`, the missing-entry remedy line) |
+| `g5-queue-blocked.json` / `g6-queue-blocked-row.png` | the steps read face queue.blocked = capability-missing + the detail page's queue line `没有机器满足能力要求（缺 MCP server "figma"）——装齐后下一拍心跳即解锁` |
+| `g8-machine-fit-clear.json` / `g8-agent-machine-fit-clear.png` | after the presence installs figma, the same machine claims immediately (the remedy closes the loop instantly) + the fit cleared state |
+| `g9-machines-capability-annotation.png` | the machines page reads the annotation in two states: the `MCP 2 · 本机技能 0` count shape vs `能力清单未上报（旧版 daemon）` |
+| `d1-daemon-log-tail.txt` | the real-daemon leg's log tail (the register/online sequence lines); the SQLite ground truth is in result.json's D1 detail (probe-mcp lowercased + bad entries skipped + probe-local-skill) |
 
-## 实测坑（首跑暴露，已修进探针）
+## Measured pitfalls (exposed on the first run, fixed into the probe)
 
-1. **截图与 API 判据不同源 = 假证据**：PATCH 成功 → invalidateAll 触发整页重取，
-   首跑 g2 截图抢在重取收敛前，拍到点击前旧态（开关 OFF、fit「可跑」）而 API
-   判据已 PASS。修法 = 截图前等 UI 收敛（开关 aria-checked=true + 「不可跑」
-   判定词 waitFor）。任何「点击后截图」的探针同律。
-2. **run_builds 自动 watch 插 chief gate 回合步**（drive-1250 同坑）：空手判定
-   与解锁后认领都要能区分「领到 gate 回合（收掉再领）」与「领到被闸步（硬失败）」。
-3. **claim 空手证据 = 客户端 5s 截断 + SQLite 步仍 pending 双保险**：server hold
-   ≈75s，等满太慢；#1065 保证截断的请求不替死机领步。
-4. **机器页路由是 `/app/resources/machines`** 不是 `/app/machines`（首跑超时根因）。
+1. **A screenshot and an API criterion from different sources = false evidence**: a successful PATCH → invalidateAll triggers a whole-page refetch; the first run's g2 screenshot raced ahead of the refetch settling and captured the pre-click old state (switch OFF, fit `可跑`) while the API criterion already passed. The fix = wait for the UI to settle before screenshotting (waitFor on the switch's aria-checked=true + the `不可跑` judgment word). The same law applies to any "click then screenshot" probe.
+2. **run_builds auto-watch inserts a chief gate round step** (same gotcha as drive-1250): both the empty-hand judgment and the post-unlock claim must distinguish "claimed a gate round (collect it and claim again)" from "claimed a gated step (hard failure)".
+3. **The empty-hand evidence for a claim = the client's 5s cut + the SQLite step still pending, double insurance**: the server hold is ≈75s and waiting it out is too slow; #1065 guarantees a cut request does not claim steps on behalf of a dead machine.
+4. **The machines page route is `/app/resources/machines`**, not `/app/machines` (the first run's timeout root cause).

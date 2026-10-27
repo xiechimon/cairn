@@ -121,7 +121,7 @@ export const STREAM_TIMEOUTS_MS = {
   streamBodyTimeout: 540_000,
 } as const;
 
-export const MACHINE_CUSTOM_TOOLS = ['web_fetch', 'remote_shell', 'push_branch'] as const;
+export const MACHINE_CUSTOM_TOOLS = ['web_fetch', 'push_branch'] as const;
 
 export const WEB_FETCH_CHAR_LIMIT = 8_000;
 

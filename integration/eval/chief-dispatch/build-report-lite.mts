@@ -1,24 +1,4 @@
 #!/usr/bin/env node
-// Lite report builder for the build-eval / hillclimb loop: a single static
-// report.html with no vendored runtime, fonts, or markdown engine.
-//
-//   node build-report-lite.mts .claude/hillclimb/<flow>/
-//
-// Reads the same on-disk layout as build-report.mjs (baseline/, v<N>/,
-// results.jsonl, errors.jsonl, change.md, summary.json, traces/, _state.json)
-// and derives the same numbers: per-variant mean of the primary metric over
-// status-ok rows, per-case means, split (train/val/test) from _state.json,
-// failed-attempt counts from errors.jsonl. It also writes
-// trajectory/scores.tsv exactly as the full builder does, so hillclimb's
-// per-round bookkeeping is identical whichever builder ran.
-//
-// What it deliberately does not do: render markdown, inline transcripts or
-// attachments, or execute anything from the data. Every string from disk is
-// HTML-escaped; traces are linked by relative path, not embedded. Sorting is
-// a few lines of inline script over the rendered table only.
-//
-// Runs under node or bun. Node builtins only.
-
 import {
   closeSync,
   constants as FS,
@@ -33,9 +13,6 @@ import {
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-// Everything read from disk is untrusted JSON, so fields are typed wide
-// (optional / unknown) and narrowed at use. Internal shapes (rows, agg,
-// cases) are exact so the compiler catches wiring mistakes.
 type ResultRow = {
   prompt_id?: unknown;
   id?: unknown;
@@ -91,7 +68,6 @@ const tsvCell = (s: string): string => {
   return /^[=+\-@]/.test(flat) ? `'${flat}` : flat;
 };
 
-// Variant directories: exactly `baseline` or `v<N>`, numeric order.
 function discoverVariants(flow: string): string[] {
   const names = readdirSync(flow, { withFileTypes: true })
     .filter((e) => e.isDirectory() && /^(baseline|v\d+)$/.test(e.name))
@@ -100,8 +76,6 @@ function discoverVariants(flow: string): string[] {
   return names.sort((a, b) => rank(a) - rank(b));
 }
 
-// Mirrors the full adapter: an object of numeric/boolean grades, a bare
-// boolean, or a bare number (-> {score}).
 function coerceScores(g: unknown): Record<string, number> {
   if (g && typeof g === 'object' && !Array.isArray(g)) {
     const out: Record<string, number> = {};
@@ -113,11 +87,8 @@ function coerceScores(g: unknown): Record<string, number> {
   return {};
 }
 
-/** results.jsonl rows for one variant, keyed by the data-supplied prompt id. */
 type RowsById = Record<string, ResultRow[]>;
-/** Variant dir name -> its rows. Every entry of `variants` gets one. */
 type Rows = Record<string, RowsById>;
-/** Stand-in for a variant with no rows entry. Never mutated. */
 const NO_ROWS: RowsById = {};
 
 function loadRows(p: string, warnings: string[], dir: string): RowsById {
@@ -165,9 +136,6 @@ function countErrors(vdir: string): ErrorCounts {
   return { total, byClass };
 }
 
-// Inferred metrics, mirroring the full builder's inferMetrics: any
-// explanation for a key -> judge, all-0/1 values -> binary, else float;
-// first-seen order.
 type MetricKind = 'judge' | 'binary' | 'float';
 function inferMetrics(rows: Rows, variants: string[]): { id: string; kind: MetricKind }[] {
   const seen = new Map<string, { binary: boolean; judge: boolean }>();
@@ -188,8 +156,6 @@ function inferMetrics(rows: Rows, variants: string[]): { id: string; kind: Metri
   }));
 }
 
-// _state.json drives the split, the declared metrics and the `best` marker.
-// Read as untrusted JSON: every field optional/unknown, narrowed at use.
 type FlowState = {
   metrics?: unknown;
   criteria?: unknown;
@@ -197,22 +163,11 @@ type FlowState = {
   [key: string]: unknown;
 };
 
-/** A metric id, plus the kind declared alongside it in _state.json if any. */
 type Metric = { id: string; kind?: unknown };
-
-/** summary.json, written by the loop; only `model` is read out of it. */
 type Summary = { model?: unknown };
-
-/** One row of the variants table. `model` is whatever summary.json held. */
 type Header = { change: string; model: unknown; errors: ErrorCounts };
-
-/** A trace link under a case cell. `rep` is whatever results.jsonl held. */
 type Trace = { rep: unknown; rel: string };
-
-/** One variant's numbers for one case. */
 type CasePer = { mean: number | null; reps: number; truncated: number; traces: Trace[] };
-
-/** One row of the cases table; `per` is keyed by variant dir name. */
 type CaseRow = {
   id: string;
   split: string;
@@ -221,7 +176,6 @@ type CaseRow = {
   per: Record<string, CasePer>;
 };
 
-/** One row of the variants table's aggregates. */
 type Agg = {
   all: number | null;
   n: number;
@@ -238,8 +192,6 @@ function build(flowArg: string) {
   if (!variants.length)
     throw new Error(`no variant directories (baseline/, v1/, ...) under ${flow}`);
   const warnings: string[] = [];
-  // Same warning the full builder gives: a mis-named variant dir is the usual
-  // reason the header shows one variant fewer than expected.
   const nonVariant = new Set([
     'trajectory',
     'attachments',
@@ -273,10 +225,6 @@ function build(flowArg: string) {
   const rows: Rows = Object.create(null);
   for (const v of variants) rows[v] = loadRows(join(flow, v, 'results.jsonl'), warnings, v);
 
-  // Same as the full builder: drop non-baseline variants with zero result
-  // rows (a vN/ holding only change.md while the run warms up would render a
-  // blank column), and refuse to build when the first variant itself has none
-  // rather than overwrite a good trajectory/scores.tsv with a header-only file.
   for (let i = variants.length - 1; i > 0; i--) {
     const v = variants[i] as string;
     if (Object.keys(rows[v] ?? NO_ROWS).length) continue;
@@ -297,7 +245,6 @@ function build(flowArg: string) {
         .split('\n')
         .find((l) => l.trim()) || '';
     const summary: Summary = readJSON<Summary>(join(vdir, 'summary.json'), {}) || {};
-    // Model: summary.json wins, else the most common row.model (what the app called).
     const tally: Record<string, number> = Object.create(null);
     for (const reps of Object.values(rows[v] ?? NO_ROWS))
       for (const r of reps)
@@ -310,13 +257,6 @@ function build(flowArg: string) {
     };
   }
 
-  // Metrics: _state.json `metrics` (or the legacy `criteria` key) wins,
-  // keeping each declared `kind`; else inferred from grade keys. Primary is
-  // the first declared-or-inferred binary metric, else the first - the same
-  // selection the full builder's lib/adapter.mjs makes, so both builders
-  // report the same metric's numbers on the same flow.
-  // Declared entries are bare ids or {id, kind}: the id is only ever used as a
-  // property key or a label, so it is normalized to a string here.
   const metricsCfg = state.metrics || state.criteria;
   const declared: Metric[] = (Array.isArray(metricsCfg) ? metricsCfg : [])
     .map((m: unknown): Metric => {
@@ -329,7 +269,6 @@ function build(flowArg: string) {
   if (!metrics.length) metrics.push({ id: 'score', kind: 'float' });
   const primary = (metrics.find((m) => m.kind === 'binary') || metrics[0])?.id ?? '';
 
-  // Cases: union of ids across variants, in first-seen order.
   const ids: string[] = [];
   const seenId = new Set<string>();
   for (const v of variants)
@@ -384,7 +323,6 @@ function build(flowArg: string) {
     return { id: pid, split: splitOf[pid] || '', tags, prompt: String(first.prompt ?? ''), per };
   });
 
-  // Per-variant aggregate: mean over cases that have a value, per split.
   const agg: Record<string, Agg> = {};
   for (const v of variants) {
     const all = cases.map((c) => c.per[v]?.mean).filter(isNum);
@@ -402,7 +340,6 @@ function build(flowArg: string) {
     };
   }
 
-  // trajectory/scores.tsv - same shape as the full builder.
   mkdirSync(join(flow, 'trajectory'), { recursive: true });
   const tsv: string[] = [['id', 'split', ...variants].join('\t')];
   for (const c of cases)
@@ -415,9 +352,6 @@ function build(flowArg: string) {
     );
   writeFileSync(join(flow, 'trajectory', 'scores.tsv'), `${tsv.join('\n')}\n`);
 
-  // _state.json's `best` is {round, test_score}; map the round to a variant
-  // name the way the full builder does (0 = baseline), and drop it when the
-  // named variant isn't on disk.
   let best: string | null = null;
   const bestRound = state.best?.round;
   if (typeof bestRound === 'number' && Number.isInteger(bestRound)) {
@@ -440,7 +374,6 @@ function build(flowArg: string) {
   return { variants: variants.length, cases: cases.length, warnings };
 }
 
-/** Everything render() needs; all of it is built above in build(). */
 type RenderInput = {
   flow: string;
   variants: string[];
@@ -470,7 +403,6 @@ function render({
 
   const variantRows = variants
     .map((v) => {
-      // build() fills both records for every entry of `variants`.
       const h = header[v] as Header,
         a = agg[v] as Agg;
       const err = h.errors.total
@@ -512,7 +444,6 @@ function render({
     .map((c) => {
       const cells = variants
         .map((v) => {
-          // build() fills c.per for every entry of `variants`.
           const p = c.per[v] as CasePer;
           const links = p.traces
             .map((t) => `<a href="${esc(t.rel)}">rep${esc(t.rep)}</a>`)
@@ -662,7 +593,6 @@ try {
       ' cases) and trajectory/scores.tsv',
   );
 } catch (e) {
-  // A thrown value is untrusted too: prefer its `message`, else stringify it.
   const msg = (e as { message?: unknown })?.message;
   console.error(`build-report-lite: ${String(msg || e)}`);
   process.exit(1);

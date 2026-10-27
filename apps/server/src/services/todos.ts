@@ -45,9 +45,10 @@ import {
 } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { hasGithubConnection, openGithubToken } from './github-connection.js';
+import { hasGithubConnection, teamGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodoPhase } from './notifications.js';
+import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import { insertGateAnnouncement } from './transcript.js';
 
@@ -61,6 +62,7 @@ export interface TodoDeps {
   convHub?: ConversationStreamHub;
   box?: SecretBox;
   githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
 }
 
 function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: Phase): void {
@@ -115,6 +117,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
       cacheRead: sql<number>`coalesce(sum(${tokenUsage.costCacheRead}), 0)`,
       cacheWrite: sql<number>`coalesce(sum(${tokenUsage.costCacheWrite}), 0)`,
       total: sql<number>`coalesce(sum(${tokenUsage.costTotal}), 0)`,
+      priced: sql<number>`count(${tokenUsage.costTotal})`,
     })
     .from(tokenUsage)
     .innerJoin(build, eq(build.id, tokenUsage.buildId))
@@ -157,6 +160,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
             cacheRead: usage.cacheRead,
             cacheWrite: usage.cacheWrite,
             total: usage.total,
+            ...(usage.priced > 0 ? (usage.total === 0 ? { priced: true } : {}) : { priced: false }),
           },
         }
       : {}),
@@ -247,6 +251,7 @@ export function createTodo(
     sourceRef?: string;
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
+    userSpecAttachmentIds?: string[];
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -315,6 +320,9 @@ export function createTodo(
           ? orchestrationSourceRef(input.orchestration.threadId)
           : null),
       output: input.output ?? 'code',
+      ...(input.userSpecAttachmentIds !== undefined
+        ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
+        : {}),
     })
     .run();
   for (const tagId of tagIds) {
@@ -343,7 +351,7 @@ export function updateTodo(
       verify?: NonNullable<Assignment['verify']>;
     };
   },
-  opts: { manualPhase?: boolean } = {},
+  opts: { manualPhase?: boolean; userSpecAttachmentIds?: string[] } = {},
 ): TodoRecord | null {
   const { db, hub } = deps;
   const row = getRow(deps, id);
@@ -351,7 +359,10 @@ export function updateTodo(
 
   const sets: Partial<TodoRow> = {};
   if (patch.title !== undefined) sets.title = patch.title;
-  if (patch.spec !== undefined) sets.spec = patch.spec;
+  if (patch.spec !== undefined) {
+    sets.spec = patch.spec;
+    sets.userSpecAttachmentIds = opts.userSpecAttachmentIds ?? [];
+  }
   if (patch.orderIndex !== undefined) sets.orderIndex = patch.orderIndex;
   if (patch.assignment !== undefined) {
     const merged: NonNullable<TodoRow['assignment']> = {
@@ -572,6 +583,7 @@ export function resetTodo(
       hasChanges: false,
       latestBuildId: null,
       lastRunAt: null,
+      userMessageAttachmentIds: [],
       v: row.v + 1,
     })
     .where(eq(todo.id, id))
@@ -630,10 +642,10 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
   if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
   const repoRef = githubRepoOfProject(projectOfTodo(db, row));
   if (repoRef === null) throw new HttpError(404, 'project is not github-backed');
-  const token = openGithubToken({ db, box }, row.teamId);
-  if (token === null) throw new HttpError(404, 'github connection not found');
+  const access = await teamGithubToken(deps, row.teamId);
+  if (!('token' in access)) throw new HttpError(404, 'github connection not found');
   const { owner, repo } = repoRef;
-  const { number } = await githubCreateIssue(deps.githubFetch ?? fetch, token, owner, repo, {
+  const { number } = await githubCreateIssue(deps.githubFetch ?? fetch, access.token, owner, repo, {
     title: row.title,
     body: row.spec,
   });
@@ -676,17 +688,17 @@ export async function writebackSelfIssueTitle(
   todoId: string,
   title: string,
 ): Promise<void> {
-  const { db, box } = deps;
+  const { box } = deps;
   if (!box) return;
   const row = getRow(deps, todoId);
   if (row?.sourceKind !== 'github-issue-self' || row.sourceRef === null) return;
   const parsed = parseGithubIssueSourceRef(row.sourceRef);
   if (parsed === null) return;
-  const token = openGithubToken({ db, box }, row.teamId);
-  if (token === null) return;
+  const access = await teamGithubToken(deps, row.teamId);
+  if (!('token' in access)) return;
   await githubUpdateIssueTitle(
     deps.githubFetch ?? fetch,
-    token,
+    access.token,
     parsed.owner,
     parsed.repo,
     parsed.issueNumber,

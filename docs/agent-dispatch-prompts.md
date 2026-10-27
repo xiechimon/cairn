@@ -1,6 +1,6 @@
 # Agent dispatch prompt templates
 
-Append the task, scope and acceptance commands after the matching template; all three executors follow AGENTS.md.
+Append the task, scope and acceptance commands after the matching template; all three executors follow AGENTS.md. Before interpreting a ticket or dispatching work, read its body, comments, linked PRs and relevant specs.
 
 ## Starting tasks and reporting (#1556)
 

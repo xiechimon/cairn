@@ -27,6 +27,7 @@ export const serverConfigSchema = z.object({
   webDir: z.string().nullable(),
   githubOauth: z.object({ clientId: z.string(), clientSecret: z.string() }).nullable(),
   authToken: z.string().nullable(),
+  tailscaleUsers: z.array(z.string()),
   requireToken: z.boolean(),
   host: z.string().nullable(),
   mcpConfigPath: z.string(),
@@ -116,6 +117,10 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
         ? { clientId: oauthId, clientSecret: oauthSecret }
         : null,
     authToken: envToken ?? fileToken,
+    tailscaleUsers: (process.env[ENV_VARS.tailscaleUsers] ?? '')
+      .split(',')
+      .map((login) => login.trim())
+      .filter((login) => login !== ''),
     requireToken: envFlag(ENV_VARS.requireToken),
     host: envStr('HOST'),
     mcpConfigPath: resolve(
@@ -131,6 +136,14 @@ export function insecureBindWarning(config: ServerConfig): string | null {
   if (config.authToken !== null) return null;
   if (config.host === null || !ANY_INTERFACE_HOSTS.has(config.host)) return null;
   return `绑定 ${config.host}（全网卡可达）且 ${ENV_VARS.token} 未设——API 面裸奔于所有网络接口；设 ${ENV_VARS.token}=<token> 开启 Bearer 鉴权，或 HOST=127.0.0.1 收回本机`;
+}
+
+const LOOPBACK_BIND_HOSTS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
+
+export function tailscaleBindWarning(config: ServerConfig): string | null {
+  if (config.tailscaleUsers.length === 0) return null;
+  if (config.host !== null && LOOPBACK_BIND_HOSTS.has(config.host)) return null;
+  return `${ENV_VARS.tailscaleUsers} is set but HOST=${config.host ?? 'all interfaces'} is not loopback-only; set HOST=127.0.0.1 and proxy tailscale serve to http://127.0.0.1:${config.port}. Identity headers from non-loopback peers are ignored`;
 }
 
 export function missingRequiredTokenError(config: ServerConfig): string | null {
@@ -172,6 +185,11 @@ export function logTokenAuthStartup(
 
 export function warnInsecureBind(logger: { warn(msg: string): void }, config: ServerConfig): void {
   const message = insecureBindWarning(config);
+  if (message !== null) logger.warn(message);
+}
+
+export function warnTailscaleBind(logger: { warn(msg: string): void }, config: ServerConfig): void {
+  const message = tailscaleBindWarning(config);
   if (message !== null) logger.warn(message);
 }
 

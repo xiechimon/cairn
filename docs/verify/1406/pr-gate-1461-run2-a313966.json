@@ -36,7 +36,7 @@
    "dimension": "rules",
    "title": "Spec 28 §4 P5a still says every closed issue closes its task, and does not mention the opt-in switch",
    "severity": "suggestion",
-   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
    "line": 142,
    "failurePath": "docs/pr-review.md step 5 asks for docs/spec to change when behavior changes. Spec 28 §4 P5a (lines 139 and 142) still says the poller runs and that 被领的 issue 在 GitHub 上关了 → 对账收尾为 closed. At this head the poller is off unless PACMAN_ISSUE_INTAKE is set (config.ts envFlag, scheduler.ts issueIntakeRunOf). Its reconcile closes a task only on an open-to-closed change this process saw, by a closer with triage or above (issue-intake.ts:549-558). A task is left open when its outside author closed the issue, when the issue closed while the server was down, or when the task is in review. Someone who reads spec 28 as the P5 design, for example segment 2/3 or the P8 rollout, would expect every claimed issue that closes to close its task, and to be polled without opt-in. Only the README and the §8 ledger row record the narrower rule and the switch.",
    "evidence": "The PR changes only the §8 rows of spec 28 (diff hunk @@ -264,12 +264,12 @@). Line 142 at head: '被领的 issue 在 GitHub 上关了 → 对账收尾为 `closed`'."
@@ -137,11 +137,11 @@
   }
  ],
  "protectedPaths": [
-  "docs/spec/28-自举闭环-自写自合.md"
+  "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md"
  ],
  "mergedBy": "user",
  "humanReasons": [
-  "protected paths: docs/spec/28-自举闭环-自写自合.md",
+  "protected paths: docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
   "outside the auto-merge set (product source, tests, docs/verify): README.md, README.zh.md",
   "6423 lines changed (over 800)",
   "44 files changed (over 40)"

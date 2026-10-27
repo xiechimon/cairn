@@ -1,6 +1,6 @@
 # Live chip popover: the assigned agent's own model line
 
-Bug: the detail chip popover's 执行对话 row (`overlays/chip-popover.tsx`) rendered `AGENT_MODEL_LINE` (`claude-sonnet-5 · 默认`, a fixture capture constant from `apps/web/src/fixtures/core.ts`) on every live todo. An unassigned todo read `未指派 · claude-sonnet-5 · 默认`. An agent on another model still read `claude-sonnet-5`.
+Bug: the detail chip popover's `执行对话` row (`overlays/chip-popover.tsx`) rendered `AGENT_MODEL_LINE` (`claude-sonnet-5 · 默认`, a fixture capture constant from `apps/web/src/fixtures/core.ts`) on every live todo. An unassigned todo read `未指派 · claude-sonnet-5 · 默认`. An agent on another model still read `claude-sonnet-5`.
 
 Live now: `todo-detail-page.tsx` joins `todo.agent.id` against its existing members query (`useMembers`) and passes `{ modelId, thinkingLevel }` through `DetailHead` to `ChipPopover`. The row reads `<agent> · <modelId> · <thinkingLevel>`, with `默认` (en: `Default`) for a null thinking level. The model segment is absent when the todo is unassigned, members are pending or failed, or the agent has no `modelId`. Fixture mode keeps `AGENT_MODEL_LINE`.
 

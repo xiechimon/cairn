@@ -43,6 +43,8 @@ export const BRAND = {
 } as const;
 
 export const ENV_VARS = {
+  githubCreateMinIntervalMs: 'CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS',
+  githubCreateHourlyCap: 'CAIRN_GITHUB_CREATE_HOURLY_CAP',
   server: 'CAIRN_SERVER',
   apiKey: 'CAIRN_API_KEY',
   team: 'CAIRN_TEAM',
@@ -53,6 +55,7 @@ export const ENV_VARS = {
   githubOauthClientSecret: 'CAIRN_GITHUB_OAUTH_CLIENT_SECRET',
   token: 'CAIRN_TOKEN',
   requireToken: 'CAIRN_REQUIRE_TOKEN',
+  tailscaleUsers: 'CAIRN_TAILSCALE_USERS',
   skillsDir: 'CAIRN_SKILLS_DIR',
   mcpConfig: 'CAIRN_MCP_CONFIG',
   customModelReasoning: 'CAIRN_CUSTOM_MODEL_REASONING',

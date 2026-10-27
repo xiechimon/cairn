@@ -27,7 +27,7 @@ const PIP_ON_CLS = 'bg-primary';
 const HINT_CLS = 'flex-1 text-caption text-content-tertiary';
 const BIG_CLS = 'text-card-title font-medium text-foreground';
 const NUM_CLS =
-  'grid size-5 shrink-0 place-items-center rounded-[5px] border text-caption leading-none font-semibold';
+  'grid size-5 shrink-0 place-items-center rounded-(--cds-radius-sm) border text-caption leading-none font-semibold';
 const NUM_OFF_CLS = 'bg-card text-content-tertiary';
 const NUM_ON_CLS = 'border-transparent bg-primary text-primary-foreground';
 const OPT_CLS =

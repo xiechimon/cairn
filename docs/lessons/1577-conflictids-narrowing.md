@@ -1,9 +1,9 @@
 ---
-Category: `'conflictIds' in result` was used to distinguish promotion results; the two branch object shapes were not mutually exclusive and tsc reported possibly undefined when reading fields
+Category: Used `'conflictIds' in result` to distinguish promote outcomes; the two branch object shapes were not mutually exclusive, so tsc reported possibly-undefined when reading fields
 Source: #1577 (2026-10-25)
 Level: 1
-Safeguard: `promote` returns a union discriminated by an explicit `promoted: true / false` field, and callers narrow on the discriminator
+Safeguard: `promote` returns a union discriminated by an explicit `promoted: true / false` field, and callers narrow on the discriminant
 Intercepts: 1
 Recurrences: 0
-Notes: real negative control: `pnpm typecheck` reported TS18048 with the `in` style and passed with the discriminated union
+Notes: Real negative control: `pnpm typecheck` reports TS18048 under the `in` form, passing after the discriminated union
 ---

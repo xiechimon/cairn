@@ -2,6 +2,7 @@ import {
   createTodoBodySchema,
   githubIssueEchoSchema,
   IN_PROGRESS_PHASES,
+  needsYouQuerySchema,
   phaseSchema,
   type TodoRecord,
 } from '@cairn/shared';
@@ -16,12 +17,14 @@ import {
   requireProject,
   svcOf,
 } from './routes-helpers.js';
+import { attachmentIdsInUserText } from './services/attachment-authorization.js';
 import {
   advanceSplitWaves,
   prepareStopForDone,
   stopActiveStepsAfterExit,
 } from './services/builds.js';
 import { readSourceIssueEcho } from './services/github-issues.js';
+import { listNeedsYou } from './services/needs-you.js';
 import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
 import {
@@ -53,6 +56,11 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     return c.json(listTodos(svc, { teamId }));
   });
 
+  app.get('/api/needs-you', (c) => {
+    const teamId = c.req.query('teamId') ?? ctx.team.id;
+    return c.json(needsYouQuerySchema.parse(listNeedsYou(svc, teamId)));
+  });
+
   app.get('/api/todos/:id', (c) => {
     const id = c.req.param('id');
     const record = getTodo(svc, id);
@@ -77,6 +85,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       ...(body.output !== undefined ? { output: body.output } : {}),
       createdBy: ctx.user.id,
       ownerId: ctx.user.id,
+      userSpecAttachmentIds: attachmentIdsInUserText(body.spec, row.teamId),
     });
     return c.json(record, 201);
   });
@@ -98,7 +107,12 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     }
     let record: TodoRecord | null;
     try {
-      record = updateTodo(svc, id, body, { manualPhase: true });
+      record = updateTodo(svc, id, body, {
+        manualPhase: true,
+        ...(body.spec !== undefined && prior !== null
+          ? { userSpecAttachmentIds: attachmentIdsInUserText(body.spec, prior.teamId) }
+          : {}),
+      });
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;

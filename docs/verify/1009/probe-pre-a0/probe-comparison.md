@@ -1,3 +1,4 @@
+```
 # Probe dump — old baseline → new measured (#921)
 
 Run 2026-10-08T04:41:22.084Z · commit `034cd149` · port 8403 · playwright 1.63.0 · workers 4
@@ -128,3 +129,5 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | chief-stream-markdown.spec.ts | 725 | toBe | 14px | 14px | — | F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效 |
 | chief-stream-markdown.spec.ts | 735 | toBe | 0px | 0px | — | F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效 |
 | chief-stream-markdown.spec.ts | 736 | toBe | 0px | 0px | — | F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效 |
+
+```

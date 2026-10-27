@@ -41,7 +41,7 @@ export async function drainCiCorrections(deps: BuildDeps, githubFetch: FetchLike
     .all();
   for (const event of events) {
     const ref = githubRepoOfProject(projectOfTodo(deps.db, event));
-    const token = githubTokenOrNull(deps, event.teamId);
+    const token = await githubTokenOrNull(deps, event.teamId);
     if (ref === null || token === null) continue;
     const prompts = deps.db
       .select({ prompt: step.prompt })

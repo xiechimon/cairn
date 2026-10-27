@@ -361,13 +361,14 @@ describe('runner runtime-step tool surface (spec 17 A10 / after #647 T4 wiring)'
     const claimed = {
       ...claimedStep({ provider: 'claude-code', modelId: 'claude-sonnet-4-5' }),
       remoteTools: workerRemoteTools,
-      localTools: ['remote_shell'],
+      localTools: ['create_tag'],
     };
     const { client, lines, sessions } = await setup(claimed);
     expect(sessions).toHaveLength(1);
     expect(sessions[0]?.remoteTools).toHaveLength(2);
     expect(typeof sessions[0]?.executeRemoteTool).toBe('function');
-    expect((sessions[0]?.localTools ?? []).map((t) => t.name)).toContain('remote_shell');
+    expect((sessions[0]?.localTools ?? []).map((t) => t.name)).toContain('create_tag');
+    expect((sessions[0]?.localTools ?? []).map((t) => t.name)).not.toContain('remote_shell');
     expect((sessions[0]?.localTools ?? []).length).toBeGreaterThanOrEqual(2);
     expect(lines.some((l) => l.includes('T4'))).toBe(false);
     expect(client.doneBodies[0]?.body.status).toBe('success');
@@ -394,12 +395,13 @@ describe('runner runtime-step tool surface (spec 17 A10 / after #647 T4 wiring)'
     const claimed = {
       ...claimedStep({ provider: 'stub-gw', modelId: 'stub-model' }),
       remoteTools: workerRemoteTools,
-      localTools: ['remote_shell'],
+      localTools: ['create_tag'],
     };
     const { lines, sessions } = await setup(claimed);
     expect(sessions[0]?.remoteTools).toHaveLength(2);
     expect(typeof sessions[0]?.executeRemoteTool).toBe('function');
-    expect((sessions[0]?.localTools ?? []).map((t) => t.name)).toContain('remote_shell');
+    expect((sessions[0]?.localTools ?? []).map((t) => t.name)).toContain('create_tag');
+    expect((sessions[0]?.localTools ?? []).map((t) => t.name)).not.toContain('remote_shell');
     expect((sessions[0]?.localTools ?? []).length).toBeGreaterThanOrEqual(2);
     expect(lines.some((l) => l.includes('T4'))).toBe(false);
   });

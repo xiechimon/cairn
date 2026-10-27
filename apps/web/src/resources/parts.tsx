@@ -62,7 +62,7 @@ export function ResourceRow({
       {...mark}
       className={cn(
         SETTINGS_ROW_CLS,
-        'h-auto w-full rounded-none border-0 border-b border-border text-left font-normal last:border-b-0 hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent',
+        'h-auto w-full rounded-none border-0 border-b border-border text-left font-normal first:rounded-t-(--radius-card) last:rounded-b-(--radius-card) last:border-b-0 hover:bg-menu-hover active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-menu-hover',
         className,
       )}
       onClick={onOpen}

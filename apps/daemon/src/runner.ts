@@ -46,7 +46,6 @@ import {
   isBackendRuntimeId,
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
-  LOCAL_TOOL_REMOTE_SHELL,
   LocalRepoUnreachableError,
   PLAN_FILE_NAME,
   parseRetryAfterMs,
@@ -80,7 +79,7 @@ import {
   probeClaudeCodeAuth,
 } from './claude-code-auth.js';
 import { clearCredentials, pushCredential } from './credentials.js';
-import { withGitCredentialFallback } from './git.js';
+import { GitPushHookError, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { computeHarnessHash } from './harness-hash.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
@@ -90,7 +89,6 @@ import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
-import { buildRemoteShellTool } from './shell-channel.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { resolveStepImages } from './step-attachments.js';
@@ -636,14 +634,6 @@ async function runClaimedStep(
         onAudit: (line) => logger.step(line),
       })
     : null;
-  const remoteShellTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_REMOTE_SHELL)
-    ? buildRemoteShellTool({
-        wire: client,
-        stepId,
-        cwd,
-        onAudit: (line) => logger.step(line),
-      })
-    : null;
   const stepIdentity: CommitIdentity = {
     name: claimed.agent?.displayName ?? 'cairn-agent',
     email: `${claimed.step.machineId ?? 'machine'}@cairn.local`,
@@ -651,9 +641,7 @@ async function runClaimedStep(
   const createTagTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_CREATE_TAG)
     ? buildCreateTagTool({ repoDir: ws?.cwd ?? null, cred: creds.git, identity: stepIdentity })
     : null;
-  const localToolDefs = [secretTool, remoteShellTool, createTagTool].filter(
-    (t): t is LocalToolDef => t !== null,
-  );
+  const localToolDefs = [secretTool, createTagTool].filter((t): t is LocalToolDef => t !== null);
   const injectedForSession =
     agent.injectedSkills === undefined || agent.defaultSkill == null
       ? agent.injectedSkills
@@ -916,6 +904,7 @@ async function runClaimedStep(
 
   let usage: AgentTokenUsage = [];
   let lastError: string | null = null;
+  let closingPushHookError: GitPushHookError | null = null;
   let lastModelError: string | null = null;
   let messageSeq = 0;
   let sawChangeTool = false;
@@ -937,8 +926,10 @@ async function runClaimedStep(
     idle: opts.streamTimeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
     body: opts.streamTimeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
   };
+  const absoluteDurationCapMs = envDurationCapMs(process.env);
   const streamDurationCapMs =
-    opts.streamDurationCapMs ?? envDurationCapMs(process.env) ?? STREAM_DURATION_CAP_DEFAULT_MS;
+    absoluteDurationCapMs ?? opts.streamDurationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS;
+  const progressResetsDuration = claimed.step.kind === 'build' && absoluteDurationCapMs === null;
   let timedOut = false;
   let timeoutArm: StreamTimeoutArm | null = null;
   const runningToolCalls = new Set<string>();
@@ -966,6 +957,7 @@ async function runClaimedStep(
     bodyTimeout.unref?.();
   };
   const armDurationCap = () => {
+    if (durationCap && absoluteDurationCapMs !== null) return;
     if (durationCap) clearTimeout(durationCap);
     durationCap = setTimeout(() => tripTimeout('duration'), streamDurationCapMs);
     durationCap.unref?.();
@@ -1190,6 +1182,7 @@ async function runClaimedStep(
         activity.noteEvent();
         switch (ev.type) {
           case 'text_delta': {
+            if (progressResetsDuration) armDurationCap();
             sawProgress = true;
             zeroProgressRetries = 0;
             activity.setPhase('responding');
@@ -1203,6 +1196,7 @@ async function runClaimedStep(
             break;
           }
           case 'thinking_delta': {
+            if (progressResetsDuration) armDurationCap();
             sawProgress = true;
             zeroProgressRetries = 0;
             activity.setPhase('thinking');
@@ -1216,12 +1210,14 @@ async function runClaimedStep(
             break;
           }
           case 'thinking': {
+            if (progressResetsDuration) armDurationCap();
             activity.setPhase('thinking');
             const sealedFull = segments.replace('thinking', ev.text);
             if (sealedFull !== null) await emitSegment(sealedFull);
             break;
           }
           case 'toolcall_end': {
+            if (progressResetsDuration) armDurationCap();
             sawProgress = true;
             zeroProgressRetries = 0;
             if (ev.call.name && CHANGE_TOOLS.has(ev.call.name.toLowerCase())) {
@@ -1287,6 +1283,7 @@ async function runClaimedStep(
               );
             }
             if (ev.message.role === 'assistant' && ev.message.stopReason !== 'error') {
+              if (progressResetsDuration) armDurationCap();
               sawProgress = true;
               zeroProgressRetries = 0;
             }
@@ -1363,15 +1360,8 @@ async function runClaimedStep(
         }
       }
     } catch (err) {
-      if (watchdog) clearTimeout(watchdog);
-      if (bodyTimeout) clearTimeout(bodyTimeout);
-      if (durationCap) clearTimeout(durationCap);
-      flushDeltas();
-      flushThinking();
-      cleanupBriefOnce();
-      clearCredentials(creds);
-      await failStep(deps, heartbeat, stepId, err instanceof Error ? err.message : String(err));
-      return;
+      lastError = err instanceof Error ? err.message : String(err);
+      break;
     }
     stop.detach();
     {
@@ -1609,7 +1599,56 @@ async function runClaimedStep(
       }
       hasChanges = headAhead > 0 || artifactBranches.length > 0;
     } catch (err) {
+      if (err instanceof GitPushHookError) closingPushHookError = err;
       lastError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  let pushHookOutput: string | null = null;
+  if (claimed.step.kind === 'build' && closingPushHookError !== null) {
+    pushHookOutput = stripAnsiEscapes(closingPushHookError.message);
+    lastError = null;
+    if (ws !== null && deps.workspace) {
+      headCommit = await deps.workspace.headCommit(ws.cwd);
+      hasChanges = true;
+    }
+  }
+
+  let preservedCommits: string[] = [];
+  if (
+    claimed.step.kind === 'build' &&
+    lastError !== null &&
+    !stopped &&
+    ws !== null &&
+    ws.readonly !== true &&
+    deps.workspace &&
+    !briefCleanupFailed
+  ) {
+    const git = deps.workspace;
+    try {
+      const currentBranch = await git.currentBranch?.(ws.cwd);
+      const pushAllowed =
+        claimed.agent?.tools === undefined || claimed.agent.tools.includes(AGENT_TOOL_PUSH);
+      if (
+        currentBranch === ws.branch &&
+        pushAllowed &&
+        (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0
+      ) {
+        await withGitCredentialFallback((cred) => git.push(ws.cwd, ws.branch, cred), creds.git, {
+          what: 'push',
+          allowMachineFallback: repo?.kind === 'github',
+        });
+        headCommit = await git.headCommit(ws.cwd);
+        preservedCommits =
+          (await git.commitsAhead?.(ws.cwd, ws.defaultBranch)) ??
+          (headCommit === null ? [] : [headCommit]);
+        hasChanges = true;
+        logger.raw(`pushed ${ws.branch}`);
+      }
+    } catch (err) {
+      logger.step(
+        `failed build preservation failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -1637,7 +1676,7 @@ async function runClaimedStep(
     ws !== null &&
     ws.readonly !== true &&
     repo !== null &&
-    lastError === null &&
+    (lastError === null || preservedCommits.length > 0) &&
     !stopped &&
     !isReview
   ) {
@@ -1667,13 +1706,20 @@ async function runClaimedStep(
         }
       }
     }
-    if (repo.kind !== 'hosted' && deps.workspace?.diffAgainstDefault) {
-      const diff = await deps.workspace.diffAgainstDefault(ws.cwd, ws.defaultBranch);
-      changesDiff = diff.length <= CHANGES_DIFF_MAX_BYTES ? diff : null;
-      if (changesDiff === null && diff.length > 0) {
-        logger.step(
-          `changes diff ${diff.length}B over ${CHANGES_DIFF_MAX_BYTES}B cap — projection falls back to empty`,
-        );
+    if (
+      (repo.kind !== 'hosted' || preservedCommits.length > 0) &&
+      deps.workspace?.diffAgainstDefault
+    ) {
+      try {
+        const diff = await deps.workspace.diffAgainstDefault(ws.cwd, ws.defaultBranch);
+        changesDiff = diff.length <= CHANGES_DIFF_MAX_BYTES ? diff : null;
+        if (changesDiff === null && diff.length > 0) {
+          logger.step(
+            `changes diff ${diff.length}B over ${CHANGES_DIFF_MAX_BYTES}B cap — projection falls back to empty`,
+          );
+        }
+      } catch (err) {
+        logger.step(`changes diff failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
@@ -1702,6 +1748,8 @@ async function runClaimedStep(
     usage: [...usage],
     hasChanges,
     ...(headCommit !== null ? { commit: headCommit } : {}),
+    ...(preservedCommits.length > 0 ? { preservedCommits } : {}),
+    ...(pushHookOutput !== null ? { pushHookOutput } : {}),
     ...(reviewExtraction?.status === 'ok' ? { findings: reviewExtraction.verdict } : {}),
     ...(reviewExtraction?.status === 'failed' ? { findingsError: reviewExtraction.reason } : {}),
     ...(verifyExtraction?.status === 'ok' ? { verifyVerdict: verifyExtraction.verdict } : {}),

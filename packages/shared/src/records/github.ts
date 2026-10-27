@@ -24,6 +24,7 @@ export const githubConnectionStatusSchema = z.object({
   connected: z.boolean(),
   login: z.string().optional(),
   scope: z.string().optional(),
+  disconnectReason: z.string().optional(),
 });
 export type GithubConnectionStatus = z.infer<typeof githubConnectionStatusSchema>;
 

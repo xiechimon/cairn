@@ -238,7 +238,9 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
               merged: signals.merged,
               revertedWithin7d: signals.revertedWithin7d,
               fixedByLaterPr: signals.fixedByLaterPr,
-              costTotal: usage.length ? usage.reduce((sum, u) => sum + u.costTotal, 0) : null,
+              costTotal: usage.some((u) => u.costTotal !== null)
+                ? usage.reduce((sum, u) => sum + (u.costTotal ?? 0), 0)
+                : null,
             },
           });
           const cleaned = redactSecrets(pack);

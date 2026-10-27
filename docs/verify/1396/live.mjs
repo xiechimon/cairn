@@ -2,7 +2,7 @@
 // Live evidence for the dark Paper round (#1396) on the verify-pacman stack
 // (fresh library, vite dev at baseUrl). Real clicks only: a task is created
 // through the sidebar New task button, the detail opens from its card, the
-// user menu opens from the user row, and the theme is flipped from the 外观
+// user menu opens from the user row, and the theme is flipped from the `外观`
 // control inside that menu. Both themes; the dark run also records the flip.
 //   node docs/verify/1396/live.mjs <baseUrl>
 import { mkdirSync, writeFileSync } from 'node:fs';

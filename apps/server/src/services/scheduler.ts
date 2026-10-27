@@ -1,9 +1,12 @@
+import { join } from 'node:path';
 import { ENV_VARS, type Scheduler } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
+import type { ServerConfig } from '../config.js';
 import type { Db } from '../db/client.js';
 import { build, schedule, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
+import { exportTrajectories } from '../trajectory-export.js';
 import {
   OUTCOME_BACKFILL_INTERVAL_MS,
   type OutcomeBackfillLogger,
@@ -19,6 +22,7 @@ import {
   type BuildDeps,
   startBuilds,
   sweepAbandonedBuildSteps,
+  sweepPlanAutoConfirm,
   sweepZombieQueuedTodos,
   toBuildRecord,
 } from './builds.js';
@@ -32,6 +36,7 @@ import {
   type IssueIntakeLogger,
 } from './issue-intake.js';
 import { sweepStaleMachines } from './machines.js';
+import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
@@ -73,6 +78,18 @@ export interface TrajectoryOutcomeRun {
   logger: OutcomeBackfillLogger;
 }
 
+export interface TrajectoryExportRun {
+  logger: OutcomeBackfillLogger;
+  config: ServerConfig;
+}
+
+export function trajectoryExportRunOf(
+  config: ServerConfig,
+  run: { logger: OutcomeBackfillLogger },
+): TrajectoryExportRun {
+  return { logger: run.logger, config };
+}
+
 export function trajectoryOutcomeRunOf(
   config: { trajectoryOutcomeBackfill: boolean },
   run: TrajectoryOutcomeRun,
@@ -95,6 +112,7 @@ export function createScheduler(
   ci?: CiPollRun | null,
   intake?: IssueIntakeRun | null,
   outcome?: TrajectoryOutcomeRun | null,
+  exportRun?: TrajectoryExportRun | null,
 ): Scheduler {
   let timer: NodeJS.Timeout | null = null;
   const ciPoller =
@@ -112,6 +130,8 @@ export function createScheduler(
   let gcBatches: ReturnType<typeof sweepAttachmentBatches> | null = null;
   let outcomeTimer: NodeJS.Timeout | null = null;
   let outcomeSweeping = false;
+  let exportTimer: NodeJS.Timeout | null = null;
+  let exportSweeping = false;
 
   function advanceGc(): void {
     if (!gc || !gcBatches) return;
@@ -183,7 +203,9 @@ export function createScheduler(
     sweepAbandonedChiefSteps(deps, now);
     sweepAbandonedBuildSteps(deps, now);
     sweepZombieQueuedTodos(deps, now);
+    sweepPlanAutoConfirm(deps, now);
     sweepQuotaWaitSteps(deps, now);
+    void sweepFailedRetries(deps).catch(() => {});
     if (
       gc !== undefined &&
       gc !== null &&
@@ -246,8 +268,35 @@ export function createScheduler(
         outcomeTimer = setInterval(sweep, OUTCOME_BACKFILL_INTERVAL_MS);
         outcomeTimer.unref?.();
       }
+      if (exportRun !== undefined && exportRun !== null) {
+        const cfg = exportRun.config;
+        const sweep = () => {
+          if (exportSweeping) return;
+          exportSweeping = true;
+          const date = new Date().toISOString().slice(0, 10);
+          const out = join(cfg.dataDir, 'trajectory-exports', `${date}.jsonl`);
+          try {
+            const res = exportTrajectories(cfg, { out });
+            exportRun.logger.info({ ...res, date }, 'trajectory daily export');
+          } catch (err) {
+            exportRun.logger.info(
+              { err: err instanceof Error ? err.message : String(err), date },
+              'trajectory daily export failed (scheduler continues)',
+            );
+          } finally {
+            exportSweeping = false;
+          }
+        };
+        sweep();
+        exportTimer = setInterval(sweep, OUTCOME_BACKFILL_INTERVAL_MS);
+        exportTimer.unref?.();
+      }
     },
     stop() {
+      if (exportTimer !== null) {
+        clearInterval(exportTimer);
+        exportTimer = null;
+      }
       if (outcomeTimer !== null) {
         clearInterval(outcomeTimer);
         outcomeTimer = null;

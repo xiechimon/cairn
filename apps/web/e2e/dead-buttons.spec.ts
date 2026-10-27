@@ -7,7 +7,7 @@ test('feedback route is gone — old URL redirects to the board', async ({ page 
 });
 
 test('user menu drops its dead rows — `反馈` (#149), `新功能/快捷键` (#163)', async ({ page }) => {
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await page.locator('.sidebar-user').click();
   const menu = page.locator('.user-menu');
   await expect(menu).toBeVisible();
@@ -16,7 +16,7 @@ test('user menu drops its dead rows — `反馈` (#149), `新功能/快捷键` (
     await expect(menu).not.toContainText(dead);
   }
 
-  for (const live of ['外观', '帐号', 'API 密钥', 'MCP']) {
+  for (const live of ['外观', '账号', 'API 密钥', 'MCP']) {
     await expect(menu).toContainText(live);
   }
   await expect(menu.locator('a.user-menu-row')).toHaveCount(3);
@@ -25,7 +25,7 @@ test('user menu drops its dead rows — `反馈` (#149), `新功能/快捷键` (
 test('board topbar drops the `看板指南` button — right actions = `筛选` / `定时`, `新任务` lives in the new-task bar (#363, claude shell)', async ({
   page,
 }) => {
-  await page.goto('/app');
+  await page.goto('/app?view=board');
 
   await expect(page.locator('.board-guide')).toHaveCount(0);
   await expect(page.locator('.board-guide-wrap')).toHaveCount(0);
@@ -50,9 +50,9 @@ test('board topbar drops the `看板指南` button — right actions = `筛选` 
 test('board renders exactly the four #351 columns, retired names and collapse family gone', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('工作台');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('看板');
 
   await expect(page.locator('.board-column')).toHaveCount(4);
   for (const [id, name] of [
@@ -183,7 +183,7 @@ test('composer toolbar drops the `语音输入` button, keeps attachment + menti
 });
 
 test('new-task dialog tools drop the `语音输入` button, keep two live tools', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await page.locator('.sidebar-new-task').click();
 
   const tools = page.getByTestId('new-task-tools');
@@ -302,7 +302,7 @@ test('project settings drops the avatar `更换` ink (#307, supersedes the #177 
 test('chief drawer drops the ⋮ `更多` button — thread view keeps three head actions (#306)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=114');
+  await page.goto('/app?scenario=114&view=board');
   const drawer = page.locator('.chief-drawer');
 
   const actions = drawer
@@ -489,7 +489,7 @@ test('project task rows and cards are real links to the todo detail (#318)', asy
 test('new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const dialog = page.getByRole('dialog', { name: '新建任务' });
   await page.locator('.sidebar-new-task').click();
   await expect(dialog).toBeVisible();
@@ -506,9 +506,9 @@ test('new-task dialog: the close control anchors to the head’s right edge (#57
 });
 
 test('new-task dialog gates unsaved closes and resets on discard (#318)', async ({ page }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   const dialog = page.getByRole('dialog', { name: '新建任务' });
-  const discard = page.getByRole('alertdialog', { name: '放弃新建任务？未保存的内容将丢失。' });
+  const discard = page.getByRole('alertdialog', { name: '放弃新建任务？' });
 
   await page.locator('.sidebar-new-task').click();
   await expect(dialog).toBeVisible();
@@ -520,7 +520,8 @@ test('new-task dialog gates unsaved closes and resets on discard (#318)', async 
   await dialog.getByRole('textbox').fill('未保存探针');
   await dialog.getByRole('button', { name: '关闭' }).click();
   await expect(discard).toBeVisible();
-  await expect(discard).toContainText('放弃新建任务？未保存的内容将丢失。');
+  await expect(discard).toContainText('放弃新建任务？');
+  await expect(discard).toContainText('未保存的内容将丢失。');
 
   await discard.getByRole('button', { name: '继续编辑' }).click();
   await expect(discard).toBeHidden();

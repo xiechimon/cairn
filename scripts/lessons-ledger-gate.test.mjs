@@ -13,7 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { checkEntry, checkLedgerRoot, ledgerEntries } from './lessons-ledger-gate.mjs';
+import { checkEntry, checkLedgerRoot, ledgerEntries, renderTable } from './lessons-ledger-gate.mjs';
 
 const repoRoot = join(import.meta.dirname, '..');
 const lessonsDir = join(repoRoot, 'docs/lessons');
@@ -80,6 +80,17 @@ test('missing, reordered or malformed fields are rejected', () => {
   assert.ok(checkEntry(gateEntry, withField(text, 'Recurrences', 'many')).length >= 1);
   assert.ok(checkEntry(gateEntry, withField(text, 'Intercepts', '-1')).length >= 1);
   assert.ok(checkEntry(gateEntry, text.replace(/^---\n/, '')).length >= 1);
+  assert.ok(
+    checkEntry(
+      gateEntry,
+      text.replace(/Category:([^\n]*)\nSource:([^\n]*)/, 'Source:$2\nCategory:$1'),
+    ).some((problem) => problem.includes('fields must be in the order')),
+  );
+  assert.ok(
+    checkEntry(gateEntry, text.replace(/^Level:/m, 'Source: duplicate\nLevel:')).some((problem) =>
+      problem.includes('duplicate field'),
+    ),
+  );
 });
 
 test('a resurrected docs/lessons.md table is rejected', () => {
@@ -170,6 +181,52 @@ test('the old single table does conflict when two branches append a row', () => 
     git('checkout', '-q', 'lane-a');
     assert.throws(() => git('merge', '-q', '--no-edit', 'lane-b'));
     assert.equal(git('diff', '--name-only', '--diff-filter=U').trim(), 'lessons.md');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('both upgrade-pending word orders and the original Chinese marker require a ticket', () => {
+  for (const note of ['upgrade pending to level 2', '待升至 level 2']) {
+    assert.equal(checkEntry(gateEntry, withField(entryText(gateEntry), 'Notes', note)).length, 1);
+  }
+});
+
+test('table generation rejects malformed entries with the ledger diagnostic', () => {
+  assert.throws(
+    () => renderTable([{ name: gateEntry, text: 'broken' }]),
+    /missing leading --- frontmatter/,
+  );
+});
+
+test('generated table keeps existing escaped pipes inside their cell', () => {
+  const text = withField(entryText(gateEntry), 'Notes', String.raw`git commit \| tail`);
+  assert.ok(renderTable([{ name: gateEntry, text }]).includes(String.raw`git commit \| tail`));
+  assert.ok(!renderTable([{ name: gateEntry, text }]).includes(String.raw`git commit \\| tail`));
+});
+
+test('the CLI can validate and render entries from a checkout path containing spaces', () => {
+  const root = mkdtempSync(join(tmpdir(), 'lessons checkout '));
+  try {
+    mkdirSync(join(root, 'scripts'));
+    mkdirSync(join(root, 'docs/lessons'), { recursive: true });
+    cpSync(
+      join(repoRoot, 'scripts/lessons-ledger-gate.mjs'),
+      join(root, 'scripts/lessons-ledger-gate.mjs'),
+    );
+    cpSync(join(lessonsDir, gateEntry), join(root, 'docs/lessons', gateEntry));
+    assert.match(
+      execFileSync(process.execPath, [join(root, 'scripts/lessons-ledger-gate.mjs')], {
+        encoding: 'utf8',
+      }),
+      /lessons ledger ok/,
+    );
+    assert.match(
+      execFileSync(process.execPath, [join(root, 'scripts/lessons-ledger-gate.mjs'), '--table'], {
+        encoding: 'utf8',
+      }),
+      /File.*Category.*Source/,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

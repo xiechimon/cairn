@@ -1,9 +1,9 @@
 ---
-Category: The cloud container's Playwright was missing `chromium_headless_shell-1243`; all integration browser cases went red in pre-push, looking like broken code
+Category: Playwright in the cloud container lacked `chromium_headless_shell-1243`, so integration browser cases were all red at pre-push and looked like broken code
 Source: Claude thread (2026-10-23)
 Level: 2
-Safeguard: the SessionStart hook from #1395 (`.claude/hooks/session-start.sh`) symlinks the missing browser revision to the preinstalled one in cloud containers
+Safeguard: The `#1395` SessionStart hook (`.claude/hooks/session-start.sh`) symlinks the missing browser revision to the preinstalled one in cloud containers
 Intercepts: 0
 Recurrences: 0
-Notes: the old note claimed the hook automation was unfinished, but #1395 (2026-10-20) had already landed; corrected and raised to level 2 with #1630; judging visual assertions against the old chromium by eye is a judgment error no machine check can make
+Notes: The old note called the hook automation unfinished; in fact #1395 (2026-10-20) had long landed, corrected and raised to level 2 with #1630; treating visual assertions on an old chromium as CI-authoritative is a judgment error no machine check can catch
 ---

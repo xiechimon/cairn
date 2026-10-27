@@ -39,7 +39,6 @@ import {
 import { createScheduler, issueIntakeRunOf } from '../src/services/scheduler.js';
 import { createSplitTodo } from '../src/services/todo-split.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { receiveGithubWebhook } from '../src/services/webhook.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const OWNER = 'xiechimon';
@@ -1712,7 +1711,7 @@ describe('opt-in wiring: index.ts takes the intake run slot via issueIntakeRunOf
     const src = readFileSync(join(import.meta.dirname, '../src/index.ts'), 'utf8');
     const call = /createScheduler\(([\s\S]*?)\n\);/.exec(src)?.[1] ?? '';
     const args = call.split('\n').filter((l) => l.trim() !== '');
-    expect(args.at(-2)?.trim()).toMatch(/^issueIntakeRunOf\(config, /);
+    expect(args.at(-3)?.trim()).toMatch(/^issueIntakeRunOf\(config, /);
   });
 });
 
@@ -2166,60 +2165,35 @@ describe('18 pins of the existing criteria', () => {
 });
 
 describe('20 the close reconcile only touches poller-claimed cards (createdBy = the agent bound to the chief)', () => {
-  async function threeWays() {
-    const w = await makeWorld({ list: [1394, 1406, 1407] });
-    const tokenRes = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/webhook-tokens`, {
-      name: 'hook',
-    });
-    expect(tokenRes.status).toBe(201);
-    const token = ((await tokenRes.json()) as { plaintext: string }).plaintext;
-    const hook = await w.s.app.request(`/api/webhook/github/${token}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-github-event': 'issues',
-        'x-github-delivery': `intake-r3b-${w.s.team.id}`,
-      },
-      body: JSON.stringify({
-        action: 'labeled',
-        issue: { number: 1406, title: 'webhook' },
-        label: { name: 'cairn' },
-        repository: { full_name: REPO },
-        sender: { login: OWNER, type: 'User' },
-      }),
-    });
-    expect(hook.status).toBe(202);
+  async function pollerAndManual() {
+    const w = await makeWorld({ list: [1394, 1407] });
     const hand = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/github/issues/import`, {
       number: 1407,
     });
     expect(hand.status).toBe(201);
     const tally = await w.intake.sweep();
     expect(tally?.imported).toBe(1);
-    expect(takenNumbers(w.s)).toEqual([1394, 1406, 1407]);
+    expect(takenNumbers(w.s)).toEqual([1394, 1407]);
     return w;
   }
 
-  test('createdBy: poller-claimed cards record the agent bound to the chief (same value read back over REST); manual and webhook imports remain the seed user', async () => {
-    const w = await threeWays();
+  test('createdBy: poller-claimed cards record the agent bound to the chief (same value read back over REST); a manual import remains the seed user', async () => {
+    const w = await pollerAndManual();
     const polled = todoOf(w.s, 1394);
     expect(polled?.createdBy).toBe(CHIEF_AGENT_ID);
     const shown = await req(w.s.app, 'GET', `/api/todos/${polled?.id}`);
     expect(((await shown.json()) as { createdBy: string | null }).createdBy).toBe(CHIEF_AGENT_ID);
-    expect(todoOf(w.s, 1406)?.createdBy).toBe(w.s.user.id);
     expect(todoOf(w.s, 1407)?.createdBy).toBe(w.s.user.id);
   });
 
-  test('the issues of all three cards closed by the owner -> only the poller-claimed one closes; webhook and manual cards untouched, issue states unread', async () => {
-    const w = await threeWays();
-    for (const n of [1394, 1406, 1407]) closeOnGithub(w, n, OWNER);
-    const reads1406 = w.gh.issueReads(1406).length;
+  test('the issues of both cards closed by the owner -> only the poller-claimed one closes; the manual card stays open and its issue state is unread', async () => {
+    const w = await pollerAndManual();
+    for (const n of [1394, 1407]) closeOnGithub(w, n, OWNER);
     const reads1407 = w.gh.issueReads(1407).length;
     const tally = await w.intake.sweep();
     expect(todoOf(w.s, 1394)?.phase).toBe('closed');
-    expect(todoOf(w.s, 1406)?.phase).toBe('todo');
     expect(todoOf(w.s, 1407)?.phase).toBe('todo');
     expect(tally?.closed).toBe(1);
-    expect(w.gh.issueReads(1406)).toHaveLength(reads1406);
     expect(w.gh.issueReads(1407)).toHaveLength(reads1407);
   });
 
@@ -2366,19 +2340,33 @@ describe('21 labels applied through a GitHub App do not count as human', () => {
     ]);
   });
 
-  test('a label applied for the owner by an authorized app (claude) (the real event of #1406) -> not claimed, permission unread, one log line', async () => {
+  test('a label applied for the owner through the trusted claude app (the real event of #1406) -> claimed as the owner, permission read', async () => {
     const w = await makeWorld({ list: [1406] });
     w.gh.state.events.set(1406, EVENTS_1406);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1406]);
+    expect(w.gh.permissionReads().length).toBeGreaterThan(0);
+    const taken = w.logs.filter((l) => l.msg === 'issue intake candidate taken');
+    expect(taken.map((l) => l.obj)).toEqual([
+      expect.objectContaining({ issue: 1406, labeler: OWNER }),
+    ]);
+  });
+
+  test('a label applied for the owner through an untrusted app (cairnwright) -> not claimed, permission unread, one log line', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.events.set(1406, [
+      viaApp(labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 100), 'cairnwright'),
+    ]);
     const tally = await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([]);
     expect(tally?.notEligible).toBe(1);
     expect(w.gh.permissionReads()).toHaveLength(0);
     expect(chiefThreads(w.s)).toHaveLength(0);
     const lines = w.logs.filter((l) =>
-      l.msg.includes('label applied through app claude, not taken'),
+      l.msg.includes('label applied through app cairnwright, not taken'),
     );
     expect(lines.map((l) => l.obj)).toEqual([
-      expect.objectContaining({ issue: 1406, labeler: OWNER, viaApp: 'claude' }),
+      expect.objectContaining({ issue: 1406, labeler: OWNER, viaApp: 'cairnwright' }),
     ]);
   });
 
@@ -2403,7 +2391,7 @@ describe('21 labels applied through a GitHub App do not count as human', () => {
     w.gh.state.events.set(1406, [
       labelEvent('labeled', OWNER, '2026-10-20T20:00:00Z', 100),
       labelEvent('unlabeled', OWNER, '2026-10-20T20:10:00Z', 101),
-      viaApp(labelEvent('labeled', OWNER, '2026-10-20T20:20:00Z', 102), 'claude'),
+      viaApp(labelEvent('labeled', OWNER, '2026-10-20T20:20:00Z', 102), 'cairnwright'),
     ]);
     await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([]);
@@ -2527,85 +2515,6 @@ describe('22 split parent cards: no close reconcile while children are unfinishe
     expect(phaseOf(w, parentId)).toBe('building');
     expect(tally?.closed).toBe(0);
     expect(tally?.closeSkipped).toBe(1);
-  });
-});
-
-describe('23 the same issue referenced with different case: webhook and poller create one card', () => {
-  async function twoCases() {
-    const w = await makeWorld({ list: [1406] });
-    w.s.db
-      .update(projectTable)
-      .set({ githubRepo: 'Xiechimon/Cairn' })
-      .where(eq(projectTable.id, w.projectId))
-      .run();
-    w.s.db
-      .insert(projectTable)
-      .values({
-        id: '~proj-lower-case',
-        name: 'lower case',
-        teamId: w.s.team.id,
-        repoKind: 'github',
-        githubRepo: REPO,
-        autonomy: GATES_OFF,
-      })
-      .run();
-    const res = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/webhook-tokens`, {
-      name: 'hook',
-    });
-    const { plaintext } = (await res.json()) as { plaintext: string };
-    const deliver = () => {
-      seq += 1;
-      return receiveGithubWebhook(
-        { ...w.s.svc, box: w.s.secretBox, githubFetch: w.gh.impl },
-        {
-          token: plaintext,
-          event: 'issues',
-          deliveryId: `intake-case-${seq}`,
-          body: {
-            action: 'labeled',
-            issue: { number: 1406, title: 'case' },
-            label: { name: 'cairn' },
-            repository: { full_name: REPO },
-            sender: { login: OWNER, type: 'User' },
-          },
-        },
-      );
-    };
-    return { w, deliver };
-  }
-
-  test('the poller claims github:Xiechimon/Cairn#1406 first, the webhook then delivers github:xiechimon/cairn#1406 -> one card, the webhook records duplicate', async () => {
-    const { w, deliver } = await twoCases();
-    await w.intake.sweep();
-    expect(issueTodos(w.s).map((t) => t.sourceRef)).toEqual(['github:Xiechimon/Cairn#1406']);
-    const hook = await deliver();
-    expect(hook.result).toBe('duplicate');
-    expect(issueTodos(w.s)).toHaveLength(1);
-    expect(chiefThreads(w.s)).toHaveLength(1);
-  });
-
-  test('while a webhook import is in flight (holding the placeholder waiting on GitHub) the poller imports the same issue in another case -> one card, the poller records claimed', async () => {
-    const { w, deliver } = await twoCases();
-    let open: () => void = () => {};
-    const gate = new Promise<void>((r) => {
-      open = r;
-    });
-    w.gh.setOnCall(async (path) => {
-      if (path.toLowerCase() === `/repos/${REPO}/issues/1406`) await gate;
-    });
-    const hook = deliver();
-    const sweep = w.intake.sweep();
-    await vi.waitFor(() => {
-      expect(w.gh.permissionReads(OWNER).length).toBeGreaterThan(0);
-    });
-    await new Promise((r) => setTimeout(r, 20));
-    open();
-    const [hookResult, tally] = await Promise.all([hook, sweep]);
-    expect(issueTodos(w.s).map((t) => t.sourceRef)).toEqual(['github:xiechimon/cairn#1406']);
-    expect(hookResult.result).toBe('created');
-    expect(tally?.claimed).toBe(1);
-    expect(tally?.imported).toBe(0);
-    expect(chiefThreads(w.s)).toHaveLength(1);
   });
 });
 

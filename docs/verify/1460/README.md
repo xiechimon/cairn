@@ -12,24 +12,24 @@ The reset still clears every helper configured before it, including one the pare
 
 | test | what it pins |
 |---|---|
-| 失败方式 1 | parent with 3 entries: kept as they are, reset at 3, helper at 4, `COUNT=5` |
-| 失败方式 1, count spelling | parent count `' 2'` or `'+2'`, which git accepts: same append, `COUNT=4` |
-| 失败方式 2 | no parent `GIT_CONFIG_*`: `COUNT=2`, reset at 0, helper at 1 (unchanged) |
-| 失败方式 3 (5 cases) | parent count `abc`, `-1`, `1x`, a missing KEY, a missing VALUE: entries start at 0, `COUNT=2` |
-| 失败方式 1/4, real git | parent sets `pacman.probe=kept` and a `credential.helper` that answers `STALE_REVOKED`: `git config --get pacman.probe` prints `kept`, and `git credential fill` returns the step token, not the stale one |
-| 失败方式 5 | the production composition: `process.env` stubbed with one entry, `gitCredentialEnv(cred)` with the default parent, then `runGitOk(['config', '--get', 'pacman.probe'])` prints `kept` |
+| `失败方式 1` | parent with 3 entries: kept as they are, reset at 3, helper at 4, `COUNT=5` |
+| `失败方式 1, count spelling` | parent count `' 2'` or `'+2'`, which git accepts: same append, `COUNT=4` |
+| `失败方式 2` | no parent `GIT_CONFIG_*`: `COUNT=2`, reset at 0, helper at 1 (unchanged) |
+| `失败方式 3 (5 cases)` | parent count `abc`, `-1`, `1x`, a missing KEY, a missing VALUE: entries start at 0, `COUNT=2` |
+| `失败方式 1/4, real git` | parent sets `pacman.probe=kept` and a `credential.helper` that answers `STALE_REVOKED`: `git config --get pacman.probe` prints `kept`, and `git credential fill` returns the step token, not the stale one |
+| `失败方式 5` | the production composition: `process.env` stubbed with one entry, `gitCredentialEnv(cred)` with the default parent, then `runGitOk(['config', '--get', 'pacman.probe'])` prints `kept` |
 
-`apps/daemon/test/workspace-hooks.test.ts` "失败方式 7b" runs a hook with credentials while the parent has one entry. The hook sees `GIT_CONFIG_COUNT=3`, and `git config --get pacman.probe` inside the hook prints `kept`.
+`apps/daemon/test/workspace-hooks.test.ts` `失败方式 7b` runs a hook with credentials while the parent has one entry. The hook sees `GIT_CONFIG_COUNT=3`, and `git config --get pacman.probe` inside the hook prints `kept`.
 
 Three existing tests assumed the helper sits at a fixed slot, and they pass in this container only because the old code overwrote the container's entries:
-- `workspace-hooks.test.ts` "失败方式 7" and `workspace.test.ts` "钩子消费步级凭据" assert `cred=2`. They now strip inherited `GIT_CONFIG_*` around the run and restore with `vi.unstubAllEnvs()`, as #1458 did for the null-credential run. The strip is one helper, `apps/daemon/test/git-config-env.ts` `stubOutInheritedGitConfig()`, used by all four tests that need it.
-- `local-executor.test.ts` "失败方式 5" recorded only `GIT_CONFIG_VALUE_1` from its git shim and checked it for the token. Here index 1 is the container's own entry, so the first whole-suite run on the fix failed there. The shim now records the last slot, `GIT_CONFIG_VALUE_$((GIT_CONFIG_COUNT - 1))`, which is where the helper always sits. The check is the same: the token travels in the environment and never in argv.
+- `workspace-hooks.test.ts` `失败方式 7` and `workspace.test.ts` `钩子消费步级凭据` assert `cred=2`. They now strip inherited `GIT_CONFIG_*` around the run and restore with `vi.unstubAllEnvs()`, as #1458 did for the null-credential run. The strip is one helper, `apps/daemon/test/git-config-env.ts` `stubOutInheritedGitConfig()`, used by all four tests that need it.
+- `local-executor.test.ts` `失败方式 5` recorded only `GIT_CONFIG_VALUE_1` from its git shim and checked it for the token. Here index 1 is the container's own entry, so the first whole-suite run on the fix failed there. The shim now records the last slot, `GIT_CONFIG_VALUE_$((GIT_CONFIG_COUNT - 1))`, which is where the helper always sits. The check is the same: the token travels in the environment and never in argv.
 
 ## Runs
 
 | file | what | result |
 |---|---|---|
-| `old-leg.txt` | `git.ts` from origin/main, this branch's tests | 6 failed, 63 passed. `expected '2' to be '5'` (and `'4'` for the two count spellings); real git `expected '' to be 'kept'`; runGit `expected '2' to be '3'`; hook `expected 'cred=2\nprobe=\n' to contain 'cred=3'`. 失败方式 2 and 3 pass on both sides: they pin behaviour that does not change |
+| `old-leg.txt` | `git.ts` from origin/main, this branch's tests | 6 failed, 63 passed. `expected '2' to be '5'` (and `'4'` for the two count spellings); real git `expected '' to be 'kept'`; runGit `expected '2' to be '3'`; hook `expected 'cred=2\nprobe=\n' to contain 'cred=3'`. `失败方式 2` and `失败方式 3` pass on both sides: they pin behaviour that does not change |
 | `new-leg.txt` | this branch | 69 passed |
 | `control-red.txt` A | the KEY / VALUE presence loop removed (any decimal count trusted) | the missing-KEY and missing-VALUE cases fail (`expected '4' to be '2'`, `'3'`) |
 | `control-red.txt` B | the empty reset removed (helper alone at n) | 13 failed, among them the real-git case: `git credential fill` returns the parent's stale helper's answer instead of the step token |

@@ -1,9 +1,3 @@
-// chief-dispatch 评测的驱动层：起真 server + 真 daemon（进程内），seed 团队编制，
-// 驱动一个 chief 回合，然后把「环境终态」读回来。
-//
-// 判分口径：读 end state（todo 行 + build 行的 assignment），不读 transcript——
-// 对 agent 类应用，transcript 是叙述，环境才是答案。
-
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -39,18 +33,11 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** 仓根（本模块在 integration/eval/chief-dispatch/ 下）。flow 路径与
- * `_state.json.harness_paths` 都锚在这里而不是 cwd：runner 常从
- * `pnpm --filter @cairn/integration exec tsx …` 里被调用，那个 cwd 是
- * integration/，锚 cwd 会把 flow 解析到错地方，还会让 harness 哈希随调用位置
- * 漂移——同一份 harness 在不同 cwd 下算出不同的 sha，闸就废了。 */
 export const REPO_ROOT = resolve(HERE, '../../..');
 export const resolveFromRoot = (p: string): string => (isAbsolute(p) ? p : resolve(REPO_ROOT, p));
 
-/** 场景仓库的内容源（真实文件，进 harness 哈希，可逐条审）。 */
 const REPO_SEED_DIR = join(HERE, 'repo-seed');
 
-/** daemon 没在限时内停干净时留下的目录（收尾统一清，见 disposeLeftovers）。 */
 const LEFTOVERS: string[] = [];
 
 export function disposeLeftovers(): number {
@@ -64,23 +51,16 @@ export function disposeLeftovers(): number {
   return n;
 }
 
-/** 反查并清掉「逃逸进程」，返回处理掉的 pid 数。
- *
- * 被测 agent 会在 workspaces/<uuid>/ 下用 `nohup vite &` 起 dev server：它不在
- * harness 持有的任何 handle 里，close() 的 handle.stop()/server.close() 够不着，
- * 而 disposeLeftovers() 只 rmSync 目录——rmSync 不杀进程。实测评测跑完后 vite 以
- * ppid=1 的孤儿形态继续 LISTEN 5173，跑 N 轮就从 5173 排到 5173+N，把后续本机
- * dev 一路往后挤。只能在删目录前按 home 路径反查。 */
+/** Reverse-lookup and kill "escapee" processes left running after a trial; returns the number of pids reaped. */
 export async function reapEscapees(home: string): Promise<number> {
-  // pgrep -f 是子串匹配，tmpdir() 的 /var/folders/... 足以命中 cmdline 里的
-  // /private/var/folders/...（macOS symlink），不必先 realpath——实测 2026-09-29
-  // 两种 pattern 都命中同一 pid。反过来直接用 home 更稳：realpathSync 在目录已
-  // 删时会抛，而 home 字符串始终可用。
+  // pgrep -f substring-matches, so tmpdir()'s /var/folders/... already hits the
+  // /private/var/folders/... form in cmdline (macOS symlinks /var to /private/var);
+  // realpathSync throws once the directory is gone, the home string does not.
   let out = '';
   try {
     out = execFileSync('pgrep', ['-f', home], { encoding: 'utf8' });
   } catch {
-    return 0; // pgrep 无匹配时退出码 1，属正常
+    return 0; // pgrep exits 1 when nothing matches
   }
   const pids = out
     .split('\n')
@@ -90,19 +70,14 @@ export async function reapEscapees(home: string): Promise<number> {
   for (const pid of pids) {
     try {
       process.kill(pid, 'SIGTERM');
-    } catch {
-      /* 已退出 */
-    }
+    } catch {}
   }
-  // 给 TERM 时间收尾，再对赖着不走的补 KILL（kill 0 先探活，避免打到复用的 pid）。
   await new Promise((r) => setTimeout(r, 1_000));
   for (const pid of pids) {
     try {
       process.kill(pid, 0);
       process.kill(pid, 'SIGKILL');
-    } catch {
-      /* TERM 已经够了 */
-    }
+    } catch {}
   }
   return pids.length;
 }
@@ -117,16 +92,13 @@ export interface RosterAgent {
 export interface Stack {
   server: RealServer;
   home: string;
-  /** 隔离的技能根（空目录）——诊断脚本合成 chief 系统提示词时要用。 */
   skillsDir: string;
   logLines: () => string[];
-  /** 关掉 daemon 的领活口（chief 步领走后调用；#503 后接替并发门占位）。 */
   park: () => void;
+  unpark: () => void;
   close: () => Promise<void>;
 }
 
-/** relay 凭据：优先 CAIRN_EVAL_RELAY_KEY，回落本机 ~/.claude/settings.json。
- * 密钥永不落盘、永不进仓——runner 只在进程内持有。 */
 export function relayKey(): string {
   const fromEnv = process.env.CAIRN_EVAL_RELAY_KEY;
   if (fromEnv && fromEnv !== '') return fromEnv;
@@ -152,32 +124,31 @@ export function relayBaseUrl(): string {
 }
 
 export async function bootStack(): Promise<Stack> {
-  // providerBaseUrl 只喂给 helpers 自带的 stub-gw 行；本评测不使用它，真 provider
-  // 由 seedWorld 经 REST 建（key 走服务端 SecretBox 密封）。
   const server = await bootRealServer({
     providerBaseUrl: 'http://127.0.0.1:9/v1',
     claimHoldMs: 1_000,
   });
   const home = mkdtempSync(join(tmpdir(), 'cairn-eval-chief-'));
-  // 两条隔离护栏，缺一条评测就在测用户的机器而不是被测对象：
-  // - skillsDir 默认 ~/.agents/skills：不经隔离，用户本机 80 个技能的清单会
-  //   经 daemon 的 <available_skills> 注入 chief 系统提示词（实测污染 50 条）。
-  // - mcpConfigPath 默认 ~/.claude.json：不经隔离，daemon 会真的 spawn 用户
-  //   配置的 MCP server 进程。
   const skillsDir = mkdtempSync(join(tmpdir(), 'cairn-eval-skills-'));
   const mcpConfigPath = join(tmpdir(), `cairn-eval-mcp-${randomUUID()}.json`);
-  // claim 占位闸（接替 #503 摘除的 maxConcurrent=1 + 占位步机制）：park 后
-  // daemon 的 claim POST 在 harness 的 fetch 缝挂起，signal abort（停机或
-  // claimTimeout 护栏）时返回 {step:null}——chief 步领走后 flip，chief 派出的
-  // worker 步自此永远领不走，评测不会真去 clone 仓库烧模型。
   let claimsParked = false;
+  const parkedClaimReleases: Array<() => void> = [];
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     if (claimsParked && init?.method === 'POST' && url.endsWith('/api/machine/tasks/claim')) {
       await new Promise<void>((resolve) => {
         const sig = init?.signal;
-        if (!sig || sig.aborted) return resolve();
-        sig.addEventListener('abort', () => resolve(), { once: true });
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          sig?.removeEventListener('abort', finish);
+          resolve();
+        };
+        if (!sig || sig.aborted) return finish();
+        sig.addEventListener('abort', finish, { once: true });
+        parkedClaimReleases.push(finish);
+        if (!claimsParked) finish();
       });
       return new Response(JSON.stringify({ step: null }), {
         status: 200,
@@ -205,7 +176,6 @@ export async function bootStack(): Promise<Stack> {
     paths,
     logger,
     idleSleepPrevention: false,
-    // 空 proxyEnv：relay 实测有代理/无代理均直连可达，本地回环不需要绕。
     proxyEnv: {},
     fetchImpl,
     claimBackoffBaseMs: 50,
@@ -221,13 +191,12 @@ export async function bootStack(): Promise<Stack> {
     park: () => {
       claimsParked = true;
     },
+    unpark: () => {
+      claimsParked = false;
+      const waiting = parkedClaimReleases.splice(0);
+      for (const release of waiting) release();
+    },
     close: async () => {
-      // 判完立刻关栈 = 让 daemon 来不及执行 chief 刚派出去的 build。关栈失败
-      // 不该污染这一例的判分（该例的行已经写好了），吞掉即可。
-      //
-      // 每步都有界：daemon 常正忙着给被派出去的 build 克隆工作区，无界等待会
-      // 让每例白花 40 秒（实测 5 例 668s vs 单回合 62s）。迟到的那点清理进程
-      // 随下的 rmSync 一起消失，不影响下一例（下一例是全新栈）。
       const raceWith = async (p: unknown, ms: number): Promise<boolean> => {
         let settled = false;
         await Promise.race([
@@ -246,25 +215,13 @@ export async function bootStack(): Promise<Stack> {
       await raceWith(handle.stop(), 15_000);
       await raceWith(handle.done, 15_000);
       await raceWith(server.close(), 5_000);
-      // daemon 停了不等于环境干净：被测 agent 用 nohup 起的 dev server 逃出了
-      // harness 的 handle，得按 home 路径反查清掉（见 reapEscapees）。
       const reaped = await reapEscapees(home);
-      if (reaped > 0) console.error(`[stack] 清掉 ${reaped} 个逃逸进程`);
-      // 一律推迟到整轮结束再删。曾经在 close 里直接 rm：那时 daemon 还在写
-      // home/daemon.log，被删后它下次写日志 ENOENT，未捕获异常打死整个 runner
-      // （实测两次）。stop() 返回 ≠ 主循环已退出，靠限时等它退出是不可靠的，
-      // 索性不在运行期删。占位机制生效后 daemon 不再 clone 仓库，home 很小，
-      // 攒到收尾再清没有磁盘压力。
+      if (reaped > 0) console.error(`[stack] reaped ${reaped} escapee process(es)`);
       LEFTOVERS.push(home, skillsDir);
     },
   };
 }
 
-/** 给场景项目的托管仓种真实内容。
- *
- * 不种内容的后果实测过：仓库为空时「把使用说明重写一版」这类请求在环境里
- * 根本不成立——称职的总管会花 20+ 次调用探测、确认仓库是空的，然后正确地
- * 拒绝派工并反问用户要原稿。那测的是场景缺陷，不是模型能力。 */
 export function seedRepoContent(stack: Stack, projectId: string, projectName: string): void {
   const db = stack.server.db;
   const row = db.select().from(projectTable).where(eq(projectTable.id, projectId)).get();
@@ -296,9 +253,6 @@ export function seedRepoContent(stack: Stack, projectId: string, projectName: st
   }
 }
 
-/** chief 的思考档位。默认 null = 用绑定 Agent 自己的设置；`CAIRN_EVAL_CHIEF_THINKING`
- * 可覆盖（off/minimal/low/medium/high/xhigh/max），用来量「降档位省多少、质量掉不掉」
- * ——一个参数、可一键回退，不动任何产品代码。 */
 function chiefThinkingLevel(): string | null {
   const v = process.env.CAIRN_EVAL_CHIEF_THINKING;
   return v !== undefined && v !== '' ? v : null;
@@ -312,8 +266,6 @@ export interface SeededWorld {
   projectId: string;
 }
 
-/** 建真 provider（指向 relay）+ 四个编制 Agent + 绑定总管 + 一个项目。
- * 总管用 chiefModelId；四个 Agent 只当 roster 标签，评测里从不被调用。 */
 export async function seedWorld(
   stack: Stack,
   opts: { relayBaseUrl: string; relayKey: string; roster: RosterAgent[]; chiefModelId: string },
@@ -333,9 +285,6 @@ export async function seedWorld(
   if (prov.status !== 201)
     throw new Error(`建 provider 失败: ${prov.status} ${JSON.stringify(prov.body)}`);
 
-  // helpers 会 seed 一个集成测试用的 Agent（agent-it-1，职责文案是写给 stub LLM
-  // 的）。它不属于场景编制，却会出现在 chief 的团队资源清单里——多一个不该有的
-  // 分派候选，也让「按顺序数条目」多一个错位机会。清掉。
   server.db.delete(agentTable).where(eq(agentTable.id, HELPER_BOOTSTRAP_AGENT_ID)).run();
 
   const machineRow = server.db.select().from(machineTable).all()[0];
@@ -355,7 +304,6 @@ export async function seedWorld(
     agentIds[a.key] = (res.body as { id: string }).id;
   }
 
-  // 总管自己也是一个 Agent（复用 roster 里同模型的那个，省一次建行）。
   const chiefKey =
     opts.roster.find((a) => a.modelId === opts.chiefModelId)?.key ?? opts.roster[0]?.key;
   if (chiefKey === undefined) throw new Error('roster 为空，无法确定总管 agent');
@@ -385,9 +333,6 @@ export async function seedWorld(
   };
 }
 
-/** 清掉上一例留下的一切可被下一例看见的状态。agent_memory 必须在列——
- * 它经 composeChiefSystemPrompt 进系统提示词，不清理就会跨用例累积、悄悄
- * 改变后续用例的输入。 */
 export function resetTurnState(stack: Stack): void {
   const db = stack.server.db;
   db.delete(buildTable).run();
@@ -406,8 +351,6 @@ export interface TurnEvidence {
   runBuildsArgs: unknown[];
   assistantText: string;
   createdTodoIds: string[];
-  /** 派工结果落在 todo.assignment 上（build 表没有 assignment 列）——
-   * `run_builds` 的 assignment 参数经 startBuilds 写进被派 todo 行。 */
   createdTodoRows: {
     id: string;
     title: string;
@@ -459,7 +402,64 @@ function pluckText(rows: { content: unknown }[]): string {
   return parts.join('\n').trim();
 }
 
-/** 驱动一个 chief 回合并读回环境终态。 */
+function stopStraySteps(stack: Stack): void {
+  const db = stack.server.db;
+  for (const row of db.select().from(stepTable).all()) {
+    if (row.kind === 'chief') continue;
+    if (row.status !== 'pending' && row.status !== 'waiting_quota') continue;
+    db.update(stepTable).set({ status: 'stopped' }).where(eq(stepTable.id, row.id)).run();
+  }
+}
+
+function chiefStepIds(stack: Stack, threadId: string): Set<string> {
+  return new Set(
+    stack.server.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, threadId))
+      .all()
+      .filter((row) => row.kind === 'chief')
+      .map((row) => row.id),
+  );
+}
+
+async function settleChiefTurn(
+  stack: Stack,
+  threadId: string,
+  knownChiefStepIds: Set<string>,
+  timeoutMs: number,
+): Promise<void> {
+  const db = stack.server.db;
+  stopStraySteps(stack);
+  stack.unpark();
+  const fresh = () =>
+    db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, threadId))
+      .all()
+      .filter((row) => row.kind === 'chief' && !knownChiefStepIds.has(row.id));
+  await waitFor(
+    () =>
+      fresh().some(
+        (row) =>
+          row.status === 'claimed' ||
+          row.status === 'done' ||
+          row.status === 'failed' ||
+          row.status === 'stopped',
+      ),
+    30_000,
+  );
+  stack.park();
+  await waitFor(() => {
+    const thread = db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
+    const settled = fresh().some(
+      (row) => row.status === 'done' || row.status === 'failed' || row.status === 'stopped',
+    );
+    return settled && thread?.activeRun === null;
+  }, timeoutMs);
+}
+
 export async function driveTurn(
   stack: Stack,
   prompt: string,
@@ -487,19 +487,17 @@ export async function driveTurn(
     throw new Error(`发消息失败: ${sent.status} ${JSON.stringify(sent.body)}`);
   const threadId = (sent.body as { thread: { id: string } }).thread.id;
 
-  // 等 chief 步被领走后再关领活口：反过来会把 chief 步自己也堵在门外。
-  await waitFor(() => {
-    const s = db.select().from(stepTable).where(eq(stepTable.buildId, threadId)).all();
-    return s.some((x) => x.kind === 'chief' && x.status === 'claimed');
-  }, 30_000);
-  stack.park();
+  await settleChiefTurn(stack, threadId, new Set(), opts.timeoutMs);
+  return driveTurnEvidence(stack, threadId, before, Date.now() - t0);
+}
 
-  await waitFor(() => {
-    const th = db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
-    return th?.lastTurnAt != null && th.activeRun === null;
-  }, opts.timeoutMs);
-  const wallMs = Date.now() - t0;
-
+function driveTurnEvidence(
+  stack: Stack,
+  threadId: string,
+  beforeTodoIds: Set<string>,
+  wallMs: number,
+): TurnEvidence {
+  const db = stack.server.db;
   const steps = db.select().from(stepTable).where(eq(stepTable.buildId, threadId)).all();
   const chiefSteps = steps.filter((s) => s.kind === 'chief');
   const stepStatus = chiefSteps.at(-1)?.status ?? 'missing';
@@ -512,7 +510,7 @@ export async function driveTurn(
     .select()
     .from(todoTable)
     .all()
-    .filter((t) => !before.has(t.id));
+    .filter((t) => !beforeTodoIds.has(t.id));
   const builds = db.select().from(buildTable).all();
 
   const usageRows = db.select().from(tokenUsage).where(eq(tokenUsage.buildId, threadId)).all();
@@ -526,8 +524,6 @@ export async function driveTurn(
     { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   );
 
-  // token_usage.model 记的是 `<provider>/<model>`（pi 的 usage key 形），剥前缀
-  // 才是能对价格表、能跟 --model 比对的裸模型 id。
   const rawModel = usageRows.find((r) => r.model !== '')?.model ?? null;
   const model = rawModel !== null ? (rawModel.split('/').at(-1) ?? rawModel) : null;
 
@@ -562,5 +558,53 @@ export async function driveTurn(
     model,
     usage,
     wallMs,
+  };
+}
+
+export async function driveFollowUp(
+  stack: Stack,
+  threadId: string,
+  content: string,
+  opts: { timeoutMs: number },
+): Promise<TurnEvidence> {
+  const db = stack.server.db;
+  const before = new Set(
+    db
+      .select({ id: todoTable.id })
+      .from(todoTable)
+      .all()
+      .map((row) => row.id),
+  );
+  const knownChiefStepIds = chiefStepIds(stack, threadId);
+  const beforeUsage = db
+    .select()
+    .from(tokenUsage)
+    .where(eq(tokenUsage.buildId, threadId))
+    .all()
+    .reduce(
+      (acc, row) => ({
+        input: acc.input + row.input,
+        output: acc.output + row.output,
+        cacheRead: acc.cacheRead + row.cacheRead,
+        cacheWrite: acc.cacheWrite + row.cacheWrite,
+      }),
+      { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    );
+  const t0 = Date.now();
+  const sent = await api(stack.server.url, 'POST', `/api/conversations/${threadId}/messages`, {
+    content,
+  });
+  if (sent.status !== 201)
+    throw new Error(`follow-up failed: ${sent.status} ${JSON.stringify(sent.body)}`);
+  await settleChiefTurn(stack, threadId, knownChiefStepIds, opts.timeoutMs);
+  const evidence = await driveTurnEvidence(stack, threadId, before, Date.now() - t0);
+  return {
+    ...evidence,
+    usage: {
+      input: evidence.usage.input - beforeUsage.input,
+      output: evidence.usage.output - beforeUsage.output,
+      cacheRead: evidence.usage.cacheRead - beforeUsage.cacheRead,
+      cacheWrite: evidence.usage.cacheWrite - beforeUsage.cacheWrite,
+    },
   };
 }

@@ -11,7 +11,7 @@ async function openPanel(page: Page) {
 }
 
 test('board: the fresh task sits in `待开始`, `待处理` holds the review card', async ({ page }) => {
-  await page.goto('/app?scenario=22');
+  await page.goto('/app?scenario=22&view=board');
   const todoColumn = page.locator('.board-column[data-column="todo"]');
   const pendingColumn = page.locator('.board-column[data-column="pending"]');
   await expect(todoColumn.locator('.board-column-name')).toHaveText('待开始');
@@ -26,7 +26,7 @@ test('detail header: the fresh task chip reads the column word `待开始`', asy
 });
 
 test('search rows: fresh reads `待开始`, review `审核`, done `已完成`', async ({ page }) => {
-  await page.goto('/app?scenario=22');
+  await page.goto('/app?scenario=22&view=board');
   await openPanel(page);
   await page.keyboard.type('probe');
   const rows = panel(page).locator('[data-row-kind="todo"]');

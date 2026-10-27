@@ -1,6 +1,6 @@
 # Round 5 (#1404 S1, pr-gate run 3 on #1420): the expected digests in apps/server/test/merge-gate-digest.test.ts after
 # ADR 0021 D3 was amended on PR #1410 (origin/claude/nice-faraday-o329b3, line 36 of
-# docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md): the tuple is [status, filename, previous_filename, blobSha,
+# docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md): the tuple is [status, filename, previous_filename, blobSha,
 # patchSha], patchSha = sha256 (hex) of the file's compare `patch` text, null when there is no patch.
 # Computed by the Python below, written from that D3 text and the earlier crosscheck (digest-crosscheck.txt, which this
 # file does not replace), not from the TypeScript output. The fixture is the test copy with patch placeholders

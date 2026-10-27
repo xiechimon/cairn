@@ -1,9 +1,9 @@
 ---
-Category: `pkill -f <pattern>` used to reap background vite matched the shell's own command line and killed the whole command together with the following steps
-Source: Claude thread (2026-10-23)
+Category: Killing a background vite with `pkill -f <pattern>` matches the agent's own shell command line and kills the whole command plus its later steps
+Source: Claude thread (2026-10-23); recurred 2026-10-26 (menu surfaces thread, killed a running full e2e; sidebar focus ring thread, killed a rebuild)
 Level: 5
-Safeguard: memory: record the PID when starting a background process (`echo $! > pidfile`) and reap by PID, never `pkill -f`; start `node_modules/.bin/vite` directly instead of through pnpm
+Safeguard: memory: record the PID when starting a background process (`echo $! > pidfile`) and kill by PID, never `pkill -f`; start `node_modules/.bin/vite` directly, not through pnpm
 Intercepts: 0
-Recurrences: 0
-Notes: an agent-level shell operation the repo gates cannot see
+Recurrences: 2
+Notes: agent-side shell action outside the repo, no repo gate can see it
 ---

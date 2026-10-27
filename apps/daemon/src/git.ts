@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
 import { loopbackNoProxy } from './proxy.js';
@@ -149,12 +150,14 @@ export async function withGitCredentialFallback(
     return 'integration';
   } catch (err) {
     const first = err instanceof Error ? err.message : String(err);
-    if (!opts.allowMachineFallback || !isGitAuthFailure(first)) throw err;
+    if (err instanceof GitPushHookError || !opts.allowMachineFallback || !isGitAuthFailure(first))
+      throw err;
     opts.onFallback?.(first);
     try {
       await op(null);
       return 'machine';
     } catch (err2) {
+      if (err2 instanceof GitPushHookError) throw err2;
       const second = err2 instanceof Error ? err2.message : String(err2);
       throw new Error(
         `git ${opts.what} authentication failed on both credential paths — ` +
@@ -179,6 +182,13 @@ const NET_TIMEOUT_MS = 480_000;
 
 const BRANCH_SCAN_SKEW_MS = 2_000;
 const BRANCH_SCAN_MAX_REVS = 20;
+
+export class GitPushHookError extends Error {
+  constructor(output: string) {
+    super(output);
+    this.name = 'GitPushHookError';
+  }
+}
 
 export const gitPrim = {
   async clone(url: string, dir: string, cred: BoundGitCredentials | null): Promise<void> {
@@ -420,11 +430,53 @@ export const gitPrim = {
   },
 
   async push(dir: string, branch: string, cred: BoundGitCredentials | null): Promise<void> {
-    await runGitOk(['push', '--end-of-options', 'origin', `refs/heads/${branch}`], {
-      cwd: dir,
-      env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
-      timeoutMs: NET_TIMEOUT_MS,
-    });
+    const traceDir = mkdtempSync(join(tmpdir(), 'cairn-push-'));
+    const traceFile = join(traceDir, 'trace.jsonl');
+    try {
+      const result = await runGit(['push', '--end-of-options', 'origin', `refs/heads/${branch}`], {
+        cwd: dir,
+        env: {
+          ...(cred ? gitCredentialEnv(cred) : machineGitEnv()),
+          GIT_TRACE2_EVENT: traceFile,
+        },
+        timeoutMs: NET_TIMEOUT_MS,
+      });
+      if (result.code === 0) return;
+      const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n');
+      const hooks = new Set<number>();
+      for (const line of readFileSync(traceFile, 'utf8').split('\n')) {
+        if (line === '') continue;
+        const event = JSON.parse(line) as {
+          event?: string;
+          child_class?: string;
+          hook_name?: string;
+          child_id?: number;
+          code?: number;
+          sid?: string;
+        };
+        if (event.sid?.includes('/')) continue;
+        if (
+          event.event === 'child_start' &&
+          event.child_class === 'hook' &&
+          event.hook_name === 'pre-push' &&
+          event.child_id !== undefined
+        )
+          hooks.add(event.child_id);
+        if (
+          event.event === 'child_exit' &&
+          event.child_id !== undefined &&
+          hooks.has(event.child_id) &&
+          event.code !== undefined &&
+          event.code !== 0
+        )
+          throw new GitPushHookError(output);
+      }
+      throw new Error(
+        `git push failed (${result.code ?? `signal ${result.signal ?? 'unknown'}`}): ${output}`,
+      );
+    } finally {
+      rmSync(traceDir, { recursive: true, force: true });
+    }
   },
 
   async tagCreate(
@@ -469,6 +521,14 @@ export const gitPrim = {
     if (r.code !== 0) return 0;
     const n = Number.parseInt(r.stdout.trim(), 10);
     return Number.isNaN(n) ? 0 : n;
+  },
+
+  async commitsAhead(dir: string, defaultBranch: string): Promise<string[]> {
+    const output = await runGitOk(
+      ['rev-list', '--reverse', `refs/remotes/origin/${defaultBranch}..HEAD`],
+      { cwd: dir, timeoutMs: META_TIMEOUT_MS },
+    );
+    return output.split('\n').filter((line) => line !== '');
   },
 
   async branchesWithNewCommits(
@@ -544,7 +604,11 @@ export async function withGitNetRetries<T>(fn: () => Promise<T>): Promise<T> {
       return await fn();
     } catch (err) {
       lastErr = err;
-      if (isGitAuthFailure(err instanceof Error ? err.message : String(err))) break;
+      if (
+        err instanceof GitPushHookError ||
+        isGitAuthFailure(err instanceof Error ? err.message : String(err))
+      )
+        break;
       const delay = GIT_NET_RETRY_DELAYS_MS[i];
       if (delay === undefined) break;
       await new Promise((r) => setTimeout(r, delay));

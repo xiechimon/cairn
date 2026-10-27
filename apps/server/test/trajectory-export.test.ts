@@ -684,3 +684,10 @@ test('time window export skips each dirty build by reason and keeps the clean on
   expect(failed.stderr).toContain('input.model');
   expect(existsSync(single)).toBe(false);
 });
+
+test('the last slot of createScheduler in index.ts comes from trajectoryExportRunOf(config, ...)', () => {
+  const src = readFileSync(join(import.meta.dirname, '../src/index.ts'), 'utf8');
+  const call = /createScheduler\(([\s\S]*?)\n\);/.exec(src)?.[1] ?? '';
+  const args = call.split('\n').filter((l) => l.trim() !== '');
+  expect(args.at(-1)?.trim()).toMatch(/^trajectoryExportRunOf\(config, /);
+});

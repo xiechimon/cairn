@@ -16,7 +16,8 @@ import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubRepoIssue, githubRepoIssues, githubRepoLabels } from '../lib/github.js';
 import { githubRepoOfProject } from './git.js';
-import { openGithubToken } from './github-connection.js';
+import { teamGithubToken } from './github-connection.js';
+import type { OAuthClientConfig } from './oauth.js';
 import { normalizeGithubLabelColor, resolveProjectTagIds, syncGithubLabels } from './tags.js';
 import { createTodo, type TodoDeps } from './todos.js';
 
@@ -26,6 +27,7 @@ export interface GithubIssueFaceDeps {
   db: Db;
   box: SecretBox;
   githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
 }
 
 function requireGithubRepo(row: ProjectRow): GithubRepoRef {
@@ -34,10 +36,10 @@ function requireGithubRepo(row: ProjectRow): GithubRepoRef {
   return ref;
 }
 
-function requireToken(deps: GithubIssueFaceDeps, teamId: string): string {
-  const token = openGithubToken({ db: deps.db, box: deps.box }, teamId);
-  if (token === null) throw notFound('github connection');
-  return token;
+async function requireToken(deps: GithubIssueFaceDeps, teamId: string): Promise<string> {
+  const access = await teamGithubToken(deps, teamId);
+  if (!('token' in access)) throw notFound('github connection');
+  return access.token;
 }
 
 function claimedSourceRefs(db: Db, teamId: string, refs: string[]): Set<string> {
@@ -66,7 +68,7 @@ export async function listProjectGithubIssues(
   opts: { state: GithubIssueState; page: number },
 ): Promise<GithubIssuesResponse> {
   const { owner, repo } = requireGithubRepo(row);
-  const token = requireToken(deps, row.teamId);
+  const token = await requireToken(deps, row.teamId);
   const fetchImpl = deps.githubFetch ?? fetch;
   const { issues, hasMore } = await githubRepoIssues(fetchImpl, token, owner, repo, opts);
   const claimed = claimedSourceRefs(
@@ -108,7 +110,6 @@ export async function importGithubIssue(
   opts: { createdBy?: string } = {},
 ): Promise<TodoRecord> {
   const { owner, repo } = requireGithubRepo(row);
-  const token = requireToken(deps, row.teamId);
   const fetchImpl = deps.githubFetch ?? fetch;
   const ref = githubIssueSourceRef(owner, repo, issueNumber);
   if (claimedSourceRefs(deps.db, row.teamId, [ref]).has(ref.toLowerCase())) {
@@ -120,6 +121,7 @@ export async function importGithubIssue(
   }
   importsInFlight.set(claim, row.id);
   try {
+    const token = await requireToken(deps, row.teamId);
     const detail = await githubRepoIssue(fetchImpl, token, owner, repo, issueNumber);
     const repoLabels = await githubRepoLabels(fetchImpl, token, owner, repo);
     syncGithubLabels(deps.db, row.id, [...repoLabels, ...detail.labels]);
@@ -162,7 +164,7 @@ export async function readSourceIssueEcho(
   }
   const parsed = parseGithubIssueSourceRef(row.sourceRef);
   if (!parsed) throw notFound('source issue');
-  const token = requireToken(deps, row.teamId);
+  const token = await requireToken(deps, row.teamId);
   const detail = await githubRepoIssue(
     deps.githubFetch ?? fetch,
     token,

@@ -1,30 +1,30 @@
-# 本机自托管 Langfuse v4（#1569）
+# Self-hosted Langfuse v4 on this machine (#1569)
 
-OTel 是对外数据格式。Langfuse 自托管只负责看与标（trace、score、标注队列、实验对比）。本机 sqlite + 轨迹包仍是唯一真值；回放、判分统计、CI 门、harness 自我优化闭环不经过这里。
+OTel is the outward data format. Self-hosted Langfuse is only responsible for viewing and annotating (traces, scores, the annotation queue, experiment comparisons). The local sqlite + trajectory packs remain the only source of truth; replay, grading statistics, CI gates, and the harness self-improvement loop do not go through here.
 
-这是开发者侧可选件，compose 在 `ops/langfuse/`，**不进产品安装路径**。Cairn 本体不依赖本栈，未配置时行为不变。不用 Langfuse 云。
+This is an optional developer-side component; the compose lives in `ops/langfuse/` and **does not enter the product install path**. Cairn itself does not depend on this stack, and behavior is unchanged when it is not configured. Langfuse Cloud is not used.
 
-默认部署机器是 **omarchy**（常开）。其它常开机按同一套步骤即可。
+The default deployment machine is **omarchy** (always on). Any other always-on machine follows the same steps.
 
-对照：官方 compose 走浮动 tag（`langfuse:4`、`clickhouse-server:25.12`、`redis:7`）。本仓钉死具体版本，见文末「镜像钉」。
+Comparison: the official compose uses floating tags (`langfuse:4`, `clickhouse-server:25.12`, `redis:7`). This repo pins exact versions; see "Pinned images" at the end.
 
-## 环境前置
+## Environment prerequisites
 
-- Docker Engine + Compose v2 插件。
-- 建议 4 核、8 GiB 内存、本栈独占约 15 GiB 空闲盘（官方对外 VM 口径是 16 GiB RAM / 100 GiB 盘，那是高流量；omarchy 本机开发用不到）。
-- 主机口 `3000`（UI + OTLP）和 `9090`（MinIO，浏览器传媒体才用）空闲。冲突时改 `.env` 的 `LANGFUSE_WEB_PORT` / `MINIO_API_PORT`，并同步改 `NEXTAUTH_URL` 与 `LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT`。
-- 所有已发布端口绑在 `BIND_ADDRESS`（默认 `127.0.0.1`）。Postgres / ClickHouse / Redis / worker 不对外发布，只走 compose 网络。
+- Docker Engine + the Compose v2 plugin.
+- Recommended: 4 cores, 8 GiB of memory, and about 15 GiB of free disk dedicated to this stack (the official public-VM sizing is 16 GiB RAM / 100 GiB disk, which targets high traffic; omarchy local development does not need that).
+- Host ports `3000` (UI + OTLP) and `9090` (MinIO, only used when the browser uploads media) must be free. On conflict, change `LANGFUSE_WEB_PORT` / `MINIO_API_PORT` in `.env`, and update `NEXTAUTH_URL` and `LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT` accordingly.
+- All published ports bind to `BIND_ADDRESS` (default `127.0.0.1`). Postgres / ClickHouse / Redis / the worker are not published; they only talk on the compose network.
 
-## 起栈（omarchy）
+## Starting the stack (omarchy)
 
-在 omarchy 上从仓库根：
+On omarchy, from the repo root:
 
 ```sh
 cd ops/langfuse
 cp .env.example .env
 ```
 
-`.env.example` 里的口令是占位符，不是密钥。拷完后至少换掉这些，再 `compose up`：
+The passwords in `.env.example` are placeholders, not secrets. After copying, replace at least these before `compose up`:
 
 ```sh
 python3 - <<'PY'
@@ -56,7 +56,7 @@ print("INIT user password:", repl["LANGFUSE_INIT_USER_PASSWORD"])
 PY
 ```
 
-只给本机用、且接受 example 占位符时，可以跳过这段，直接起栈。绑定 LAN 之前必须换口令。
+If it is only for this machine and you accept the example placeholders, you can skip this block and start the stack directly. The passwords must be replaced before binding to the LAN.
 
 ```sh
 docker compose up -d
@@ -64,21 +64,21 @@ docker compose ps
 curl -sf "http://127.0.0.1:3000/api/public/health"
 ```
 
-`langfuse-web` 第一次会跑 Postgres / ClickHouse migration，omarchy 实测约 8 分钟，期间 health 连接被重置属正常。health 回 JSON 且 `docker compose ps` 六件套都是 healthy / running 后再往下。UI：`http://127.0.0.1:3000`。
+On first start `langfuse-web` runs the Postgres / ClickHouse migrations; measured about 8 minutes on omarchy, during which health connections being reset is normal. Continue only after health returns JSON and all six containers in `docker compose ps` are healthy / running. UI: `http://127.0.0.1:3000`.
 
-## 建项目、拿公私钥
+## Creating the project and getting the key pair
 
-无头初始化（`.env` 里的 `LANGFUSE_INIT_*`）在**空库首次启动**时写入：组织 `cairn-dev`、项目 `cairn-local`、一对 pk/sk、用户 `dev@example.com`。之后改 `.env` 里的 INIT 值不会覆盖已有项目。密钥以当时写入库的那对为准——用上面脚本生成的，启动时打印过；用 example 原值则是 `pk-lf-local-dev-not-a-secret` / `sk-lf-local-dev-replace-me`。
+Headless initialization (the `LANGFUSE_INIT_*` values in `.env`) is written on **first start with an empty database**: organization `cairn-dev`, project `cairn-local`, one pk/sk pair, and the user `dev@example.com`. Changing the INIT values in `.env` afterwards does not overwrite the existing project. The keys in effect are the pair written into the database at that time — if you generated them with the script above, they were printed at startup; if you kept the example values, they are `pk-lf-local-dev-not-a-secret` / `sk-lf-local-dev-replace-me`.
 
-也可以在 UI 里做：打开 `http://127.0.0.1:3000` → Sign up（无内置管理员）→ 建组织与项目 → Project Settings → API Keys → 建一对。username = public key（`pk-lf-…`），password = secret key（`sk-lf-…`）。
+You can also do it in the UI: open `http://127.0.0.1:3000` → Sign up (there is no built-in admin) → create the organization and project → Project Settings → API Keys → create a pair. username = public key (`pk-lf-…`), password = secret key (`sk-lf-…`).
 
-## OTLP 入口
+## The OTLP endpoint
 
-路径：`POST /api/public/otel/v1/traces`（OTLP/HTTP JSON，不支持 gRPC）。
+Path: `POST /api/public/otel/v1/traces` (OTLP/HTTP JSON; gRPC is not supported).
 
-鉴权：HTTP Basic，username = public key，password = secret key。v4 实时入库还要带 `x-langfuse-ingestion-version: 4`；不带这个头，界面上可能晚大约 10 分钟才看见。
+Auth: HTTP Basic, username = public key, password = secret key. For v4 real-time ingestion also send `x-langfuse-ingestion-version: 4`; without this header the UI may lag by about 10 minutes.
 
-把 `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` 换成上一节拿到的那对：
+Swap `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` for the pair obtained in the previous section:
 
 ```sh
 export LANGFUSE_HOST="http://127.0.0.1:3000"
@@ -108,27 +108,27 @@ curl -sS -X POST "$LANGFUSE_HOST/api/public/otel/v1/traces" \
 JSON
 ```
 
-HTTP 2xx 即接收（入队，worker 异步写 ClickHouse，几秒内可查）。打开 UI → Traces，应能看到名为 `cairn-langfuse-selfhost-probe` 的一条。这就是本票的验收动作。
+HTTP 2xx means accepted (queued; the worker writes to ClickHouse asynchronously and it is queryable within seconds). Open the UI → Traces; you should see one entry named `cairn-langfuse-selfhost-probe`. That is this ticket's acceptance action.
 
-命令行复核：v4 默认 events_only 模式，旧的 `GET /api/public/traces` 与 `/api/public/observations` 返回 404，要用 v2 接口：
+Verifying from the command line: v4 defaults to events_only mode; the old `GET /api/public/traces` and `/api/public/observations` return 404, so use the v2 API:
 
 ```sh
 curl -sS -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" \
   "$LANGFUSE_HOST/api/public/v2/observations?traceId=$TRACE_ID"
 ```
 
-返回的 `data[0].name` 是 `cairn-langfuse-selfhost-probe` 即通过。
+If the returned `data[0].name` is `cairn-langfuse-selfhost-probe`, it passes.
 
-Collector / SDK 等价配置：
+Equivalent Collector / SDK configuration:
 
 ```sh
 OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:3000/api/public/otel"
 OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic $(printf '%s' "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" | base64 | tr -d '\n'),x-langfuse-ingestion-version=4"
 ```
 
-## 推送轨迹包（#1570）
+## Pushing trajectory packs (#1570)
 
-`pnpm traj:export` 产出的 JSONL 轨迹包，用 `pnpm traj:push` 转成 OTLP/HTTP JSON 推到上面的入口。只用公开协议，不带 Langfuse SDK，未配置 `CAIRN_OTEL_ENDPOINT` 时直接报错退出，Cairn 其它行为不受影响。
+The JSONL trajectory packs produced by `pnpm traj:export` are converted by `pnpm traj:push` into OTLP/HTTP JSON and pushed to the endpoint above. It uses only the public protocol, carries no Langfuse SDK, and exits with an error when `CAIRN_OTEL_ENDPOINT` is not configured; nothing else in Cairn is affected.
 
 ```sh
 export CAIRN_OTEL_ENDPOINT="http://127.0.0.1:3000/api/public/otel"
@@ -137,28 +137,28 @@ pnpm traj:export --build <buildId> --out /tmp/pack.jsonl
 pnpm traj:push /tmp/pack.jsonl
 ```
 
-`CAIRN_OTEL_ENDPOINT` 末尾的 `/v1/traces` 可写可不写。`CAIRN_OTEL_HEADERS` 是逗号分隔的 `name=value`。endpoint 里内嵌的 `user:password@` 会转成 Basic 头，不会出现在输出里。
+The trailing `/v1/traces` on `CAIRN_OTEL_ENDPOINT` is optional. `CAIRN_OTEL_HEADERS` is a comma-separated list of `name=value`. A `user:password@` embedded in the endpoint is converted into the Basic header and never appears in the output.
 
-树结构：一个 build 一个 trace，根 span `invoke_agent`；每个 step 一个子 span；step 下每次模型回合是 `chat`，每次工具调用是 `execute_tool`。trace id 取 buildId 的哈希，span id 取 buildId、stepId、回合序号的哈希，同一个包重推得到完全相同的 id，Langfuse 按 id 合并，条数不变。字段名集中在 `apps/server/src/genai-conventions.ts`，约定改名只改这一处。推送前整个请求过 `redactSecrets`，打码条数在输出的 `redacted=` 里。
+Tree structure: one build is one trace with the root span `invoke_agent`; each step is one child span; under a step, every model turn is a `chat` and every tool call is an `execute_tool`. The trace id is a hash of the buildId, and the span id is a hash of the buildId, stepId, and turn index, so re-pushing the same pack yields exactly the same ids — Langfuse merges by id and the count does not change. Field names are centralized in `apps/server/src/genai-conventions.ts`; renaming a convention only changes that one place. Before pushing, the whole request goes through `redactSecrets`; the masked count is in the `redacted=` of the output.
 
-## 绑定本机或内网
+## Binding to this machine or the LAN
 
-默认 `BIND_ADDRESS=127.0.0.1`，只有 omarchy 本机进程能打到 UI 和 OTLP。
+By default `BIND_ADDRESS=127.0.0.1`, so only processes on omarchy itself can reach the UI and OTLP.
 
-其它开发机要从 LAN 看时，把 `BIND_ADDRESS` 设成 omarchy 的内网地址（例如 `10.0.0.12`），并改：
+When another dev machine needs to view it over the LAN, set `BIND_ADDRESS` to omarchy's LAN address (for example `10.0.0.12`) and also change:
 
 ```
 NEXTAUTH_URL=http://10.0.0.12:3000
 LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT=http://10.0.0.12:9090
 ```
 
-`NEXTAUTH_URL` 必须等于浏览器里打开的那个 origin，否则登录回调会坏。不要绑 `0.0.0.0` 对公网；不要用 Langfuse Cloud。换绑后 `docker compose up -d` 让 web / minio 重建端口映射。
+`NEXTAUTH_URL` must equal the origin you open in the browser, otherwise the login callback breaks. Do not bind `0.0.0.0` to the public internet; do not use Langfuse Cloud. After rebinding, run `docker compose up -d` to recreate the port mappings for web / minio.
 
-## 备份
+## Backup
 
-Langfuse 的数据散在三处，缺一块就对不上：Postgres（用户、项目、密钥）、ClickHouse（trace / observation / score）、MinIO（事件载荷与媒体）。Redis 只是队列，可以不备。官方 compose 没有自带备份，本机用 volume 快照。
+Langfuse's data is scattered across three places, and missing one piece breaks the rest: Postgres (users, projects, keys), ClickHouse (trace / observation / score), MinIO (event payloads and media). Redis is only a queue and can be skipped. The official compose ships no backup; locally we use volume snapshots.
 
-在 `ops/langfuse/`：
+In `ops/langfuse/`:
 
 ```sh
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
@@ -184,42 +184,42 @@ docker run --rm \
 docker compose start minio
 ```
 
-volume 名带项目前缀 `cairn-langfuse_`。`docker volume ls | grep cairn-langfuse` 对一下。ClickHouse 必须停写再打 tar，否则文件半截。Postgres 走 `pg_dump`，不用停。
+Volume names carry the project prefix `cairn-langfuse_`; verify with `docker volume ls | grep cairn-langfuse`. ClickHouse must be stopped from writing before the tar, otherwise files are captured half-written. Postgres goes through `pg_dump` and needs no stop.
 
-恢复：空栈 `docker compose up -d` 等到 healthy → 停 web/worker → 灌 postgres（`gunzip -c postgres.sql.gz | docker compose exec -T postgres psql -U langfuse langfuse`）→ 停 clickhouse/minio，把 tar 解进对应 volume → 再起全栈。先在副本上练，别直接覆盖 omarchy 活库。
+Recovery: bring up an empty stack with `docker compose up -d` and wait until healthy → stop web/worker → load postgres (`gunzip -c postgres.sql.gz | docker compose exec -T postgres psql -U langfuse langfuse`) → stop clickhouse/minio and untar the archives into the corresponding volumes → start the whole stack again. Practice on a copy first; do not overwrite omarchy's live database directly.
 
-## 清理
+## Cleanup
 
-- 界面：项目 Settings → Data Retention，按天数丢掉旧 trace / observation / score / 媒体。这是清应用数据的主开关；不要自己给 ClickHouse 表加 TTL，也不要给 MinIO media 前缀加 lifecycle（引用会断）。
-- ClickHouse 系统表（`trace_log`、`text_log`、`metric_log` 等）Langfuse 不读，默认无 TTL，盘涨常见是它们而不是业务表。`docker compose exec clickhouse clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --query "SELECT table, formatReadableSize(sum(bytes)) FROM system.parts WHERE active GROUP BY table ORDER BY sum(bytes) DESC"`。确认是系统表再按 [Langfuse FAQ](https://langfuse.com/faq/all/reduce-clickhouse-disk-size) 关 log 或加 TTL。
-- 停栈留盘：`docker compose down`。
-- 删掉全部 volume（不可逆）：`docker compose down -v`。
-- 容器 stdout 已在 compose 里按 20m × 3 文件转；不要用外部工具截 Docker 的 json-file。
+- UI: project Settings → Data Retention, dropping old traces / observations / scores / media by day count. This is the main switch for clearing application data; do not add TTLs to ClickHouse tables yourself, and do not add lifecycle rules to the MinIO media prefix (references would break).
+- ClickHouse system tables (`trace_log`, `text_log`, `metric_log`, etc.) are not read by Langfuse, have no TTL by default, and disk growth is usually them rather than the business tables. `docker compose exec clickhouse clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --query "SELECT table, formatReadableSize(sum(bytes)) FROM system.parts WHERE active GROUP BY table ORDER BY sum(bytes) DESC"`. Confirm it is the system tables before disabling logs or adding TTLs per the [Langfuse FAQ](https://langfuse.com/faq/all/reduce-clickhouse-disk-size).
+- Stop the stack but keep data: `docker compose down`.
+- Delete all volumes (irreversible): `docker compose down -v`.
+- Container stdout is already rotated in compose at 20m × 3 files; do not use an external tool to truncate Docker's json-file.
 
-## 磁盘占用预估
+## Disk usage estimate
 
-| 项 | 约数 | 说明 |
+| Item | Approximate | Notes |
 |---|---|---|
-| 镜像 | 压缩约 1.6 GiB，展开约 5–7 GiB | web+worker 各 ~300 MiB 压缩；ClickHouse ~250 MiB；Postgres / Redis / MinIO 其余 |
-| 空库刚起 | volume 合计 1–2 GiB | ClickHouse 系统表先占一块 |
-| omarchy 轻量开发 | 每月再 +1–5 GiB | 看 span 是否带大段 input/output |
-| 官方对外 VM | 起手 100 GiB | 高流量观测，不是本机默认 |
+| Images | ~1.6 GiB compressed, ~5–7 GiB unpacked | web+worker ~300 MiB compressed each; ClickHouse ~250 MiB; Postgres / Redis / MinIO the rest |
+| Empty database just started | 1–2 GiB total across volumes | ClickHouse system tables take a chunk first |
+| Omarchy light development | +1–5 GiB per month | Depends on whether spans carry large input/output |
+| Official public VM | 100 GiB to start | High-traffic observability, not the local default |
 
-起栈前留 15 GiB；盘到 80% 先开 retention，再查系统表。本栈不是真值，丢了可以再推 OTLP，不必按 server sqlite 那套 RPO 护。
+Leave 15 GiB before starting; at 80% disk, enable retention first, then check the system tables. This stack is not a source of truth — if lost, the OTLP can be pushed again, so it does not need the RPO discipline of the server sqlite.
 
-## 与 Cairn 的关系
+## Relationship to Cairn
 
-`ops/langfuse/` 不进安装包、不进 `apps/` / `packages/`、不加产品依赖。Cairn 未配置 Langfuse 时行为与现在相同。后续观测票如果要往这里推 span，走环境变量，缺省关闭。
+`ops/langfuse/` does not enter the install package, `apps/`, or `packages/`, and adds no product dependency. Cairn behaves exactly the same when Langfuse is not configured. If a later observability ticket wants to push spans here, it goes through environment variables and defaults to off.
 
-## 镜像钉
+## Pinned images
 
-| 服务 | 镜像 |
+| Service | Image |
 |---|---|
 | langfuse-web | `docker.io/langfuse/langfuse:4.68.0` |
 | langfuse-worker | `docker.io/langfuse/langfuse-worker:4.68.0` |
 | Postgres | `docker.io/library/postgres:17.11` |
-| ClickHouse | `docker.io/clickhouse/clickhouse-server:25.12.11`（不要漂到 26.x，query analyzer 不兼容） |
+| ClickHouse | `docker.io/clickhouse/clickhouse-server:25.12.11` (do not drift to 26.x, the query analyzer is incompatible) |
 | Redis | `docker.io/library/redis:7.4.11` |
-| MinIO | `cgr.dev/chainguard/minio@sha256:73297936408b731668ca0e835ac9add1a35cb6026a125c2f0cd476d9ef48222c`（MinIO 官方已不发容器镜像，Langfuse 官方 compose 也改用 Chainguard 版；Chainguard 免费档只有 `latest`，所以按摘要钉死） |
+| MinIO | `cgr.dev/chainguard/minio@sha256:73297936408b731668ca0e835ac9add1a35cb6026a125c2f0cd476d9ef48222c` (MinIO no longer publishes container images, and the official Langfuse compose also switched to the Chainguard build; the Chainguard free tier only has `latest`, so it is pinned by digest) |
 
-升级：改本表与 `ops/langfuse/docker-compose.yml` 同一组 tag，停栈、`docker compose pull`、`up -d`。Langfuse 同大版本会自己跑 migration；大版本先读官方 upgrade。
+Upgrade: change this table and the same set of tags in `ops/langfuse/docker-compose.yml`, stop the stack, `docker compose pull`, `up -d`. Langfuse runs migrations by itself within the same major version; for a major version, read the official upgrade guide first.

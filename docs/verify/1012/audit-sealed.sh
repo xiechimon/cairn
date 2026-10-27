@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# #1012 sealed 封版核账 — rerunnable in-tree audit (shape of #953's
+# #1012 sealed-version ledger audit — rerunnable in-tree audit (shape of #953's
 # audit-terminal-state.py). Tracker-level facts (issue states, #980 body rows,
 # #909 abdication comment) live on GitHub and are checked in the README's
 # audit record; everything machine-decidable inside the tree is checked here.
@@ -41,19 +41,19 @@ check "debt baseline: 0 per-face css files, 3 bare controls (all deliberate-nati
 
 echo
 echo "== canon annotations (#1013 / ADR 0012 / spec-22 face) =="
-grep -q 'superseded-in-part（2026-10-07，ADR 0012 / #980）' docs/spec/22*.md
+grep -q 'superseded-in-part（2026-10-07，ADR 0012 / '"#"'980）' docs/spec/22*.md
 check "spec/22 superseded-in-part header (ADR 0012 / #980)" $?
-grep -q 'superseded-in-part（2026-10-08，ADR 0012 / #991 Q9 / #1013）' docs/adr/0009*.md
+grep -q 'superseded-in-part（2026-10-08，ADR 0012 / '"#"'991 Q9 / '"#"'1013）' docs/adr/0009*.md
 check "ADR 0009 D3(ii) superseded-in-part header (#1013)" $?
 grep -q '^## 修订' docs/adr/0012*.md
 check "ADR 0012 revision section present" $?
 grep -q '#991 Q9' docs/adr/0012*.md && grep -q '#991 Q10' docs/adr/0012*.md
 check "ADR 0012 revision closes #991 Q9 + Q10" $?
-grep -q 'superseded-in-part（2026-10-08，#1013 / #991 Q13 余册核账）' docs/spec/06*.md
+grep -q 'superseded-in-part（2026-10-08，'"#"'1013 / '"#"'991 Q13 余册核账）' docs/spec/06*.md
 check "spec/06 superseded-in-part header (#1013)" $?
-grep -q 'superseded-in-part（2026-10-08，ADR 0012 / #980 / #1013 增补）' docs/spec/11*.md
+grep -q 'superseded-in-part（2026-10-08，ADR 0012 / '"#"'980 / '"#"'1013 增补）' docs/spec/11*.md
 check "spec/11 stacked superseded header (#1013)" $?
-grep -q '余册核账封口（2026-10-08，#1013 / #991 Q13）' docs/spec/18*.md
+grep -q '余册核账封口（2026-10-08，'"#"'1013 / '"#"'991 Q13）' docs/spec/18*.md
 check "spec/18 audit-closure header (#1013)" $?
 
 echo

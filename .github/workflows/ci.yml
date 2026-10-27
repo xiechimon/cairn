@@ -1,25 +1,22 @@
 name: ci
 
-# push 只留 main 与 prototype/**（#500）。`web/**` 曾在此列，导致每条车道分支
-# 每次 push 触发两条同 workflow 的 run：push 一条、pull_request 一条，跑的是
-# 同一个 head sha。近 30 条 run 里 5 条 web/** 分支全部 1:1 双跑，且结论会分歧
-# ——web/sidebar-head-polish 的 push run 红、pull_request run 绿（m5 存量 flake），
-# 把 commit status 钉成 UNSTABLE 并误导归因。
+# push only on main and prototype/** (#500). `web/**` used to be listed, so each lane branch
+# push fired two workflow runs (push + pull_request) on the same head sha. In the last 30 runs,
+# all five `web/**` branches double-ran 1:1 and conclusions diverged — e.g. web/sidebar-head-polish
+# push run red, pull_request run green (m5 flake), pinning commit status UNSTABLE and misleading blame.
 #
-# 不用 concurrency 按 sha 去重：push 的 github.sha 与 pull_request 的
-# event.pull_request.head.sha 是同一个值，两者落进同一 group，
-# cancel-in-progress 会让后注册的那条取消先注册的——谁存活不确定；若存活的是
-# push run，PR 页面只剩一条 cancelled，合并闸反而更糊。收敛触发面才是确定解。
+# No concurrency dedupe by sha: push github.sha and pull_request head sha are identical, so both
+# land in one group and cancel-in-progress drops whichever registered second — survivor is
+# nondeterministic; if the push run survives, the PR shows only cancelled runs and merge gating
+# gets worse. Narrowing the trigger surface is the deterministic fix.
 #
-# 保留 prototype/**：那两个分支（42-pixel-replica / shadcn-visual-tokens）无
-# 开 PR，push run 是它们唯一的 CI 来源；摘掉等于零覆盖。web/** 车道一律开 PR，
-# 由无条件的 pull_request 触发覆盖（lane/** docs/** 本就不在列，同一口径）。
-# 副作用：web/** 分支在「已 push、未开 PR」的窗口内没有 CI——需要早看信号就开
-# draft PR，pull_request 对 draft 同样触发。
+# Keep prototype/**: those two branches (42-pixel-replica / shadcn-visual-tokens) never open PRs;
+# push runs are their only CI. web/** lanes always open PRs, covered by unconditional pull_request
+# (lane/** docs/** were never listed — same rule). Side effect: web/** has no CI between push and
+# PR — open a draft PR early; pull_request fires for drafts too.
 #
-# 第三方 action 一律钉完整 commit SHA + 尾注版本号（#1076）：浮动 tag 可被上游
-# 重指（或仓库接管后重指），等于 CI 里跑的第三方代码可变；尾注里的版本号是
-# Dependabot 升级时解析的锚点，别删。
+# Third-party actions pinned to full commit SHA + trailing version (#1076): floating tags can be
+# retargeted upstream; trailing version is Dependabot's anchor — do not delete.
 on:
   push:
     branches: [main, 'prototype/**']
@@ -41,12 +38,11 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      # 冲突标记闸（2026-10-08）：合并冲突标记被提交进 main 过一次
-      # （`.claude/skills/verify-cairn/SKILL.md` 里嵌套的 `<<<<<<<`，由解冲突
-      # 脚本只处理最外层所致）。这种破损**不报错、不影响构建、也没人读得出来**
-      # ——只有机器能替人抓住。只认带引用名的 `<<<<<<< ` / `>>>>>>> `（行首 +
-      # 空格），不认裸 `=======`（markdown 的 setext 标题就是一行等号，会误伤）。
-      # 零依赖，故意排在 install 之前：一分钟内红。
+      # Conflict marker gate (2026-10-08): merge conflict markers landed on main once
+      # (nested `<<<<<<<` in `.claude/skills/verify-cairn/SKILL.md` — resolver only handled
+      # the outermost layer). Breakage does not fail build and is easy to miss — machine catch.
+      # Only `<<<<<<< ` / `>>>>>>> ` with ref names at line start + space; not bare `=======`
+      # (markdown setext headings). Zero deps, before install: red within a minute.
       - name: Conflict markers
         run: |
           if git grep -nE '^(<<<<<<< |>>>>>>> )' -- . ; then
@@ -88,28 +84,28 @@ jobs:
           node --test scripts/ci-job-structure-gate.test.mjs
           node scripts/ci-job-structure-gate.mjs
 
-      # components/ui registry 闸（#989，地图 #980）：白名单清单 + 内容 hash
-      # 账本 + pristine 件对照 vendored 上游快照 + 状态棘轮（S5 对照 base
-      # manifest，复用上面已 fetch 的 base sha）。手写原语进 components/ui
-      # 即红；已登记文件被覆写而同 PR 未重冻账本也红。零网络、零依赖
-      # （shadcn CLI 只存在于按需刷新脚本 scripts/ui-registry-refresh.mjs，
-      # live diff 形态已被 #985 实测否掉），同样排在 install 之前。
+      # components/ui registry gate (#989, map #980): allowlist + content-hash ledger +
+      # pristine files vs vendored upstream snapshot + state ratchet (S5 vs base manifest,
+      # reuses fetched base sha). Hand-written primitives in components/ui fail; registered
+      # file overwritten without ledger refresh in the same PR fails. Zero network/deps
+      # (shadcn CLI only in scripts/ui-registry-refresh.mjs; live diff rejected in #985),
+      # before install.
       - name: UI registry gate (#989)
         env:
           UI_REGISTRY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/ui-registry-gate.mjs
 
-      # 消费点方角盒闸（#1054，ADR 0012 D1）：registry 闸的面到 components/ui
-      # 为止，消费点画盒的几何没有任何闸判——本闸补上：每个「看得见的方形盒」
-      # 消费行必须接 registry 依据 / 骑件默认 / 在 scripts/ui-consumer-registry.json
-      # 登记偏离理由，台账 diff 即评审面。零依赖，同样排在 install 之前。
+      # UI consumer square-box gate (#1054, ADR 0012 D1): registry gate stops at components/ui;
+      # visible square-box geometry at consumers had no gate — this gate requires each visible
+      # box line to cite registry basis / component default / deviation registered in
+      # scripts/ui-consumer-registry.json; ledger diff is the review surface. Zero deps, before install.
       - name: UI consumer shape gate (#1054)
         run: node scripts/ui-consumer-shape-gate.mjs
 
-      # e2e 迁去独立分片 job（#693）后 ffmpeg 随迁；chromium 留在本 job——
-      # integration vitest 的四个 e2e 套件（m5-web-e2e 等）在场内起真
-      # Chromium（2026-10-03 实测摘掉即红：browserType.launch executable
-      # doesn't exist）。「check 不再需要浏览器面」是误判，浏览器面有两层。
+      # After e2e moved to sharded jobs (#693), ffmpeg followed; chromium stays here —
+      # integration vitest's four e2e suites (m5-web-e2e etc.) launch real Chromium in-job
+      # (2026-10-03: removing it fails browserType.launch executable doesn't exist).
+      # "check no longer needs a browser" was wrong — two browser layers exist.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -120,26 +116,24 @@ jobs:
         run: pnpm prepush --ci
 
       - name: Prepush self-test
-        run: node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/lessons-ledger-gate.test.mjs
+        run: node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/doc-reader-tests.test.mjs scripts/lessons-ledger-gate.test.mjs
 
-      # verify-cairn 入口自测（#1402）：vp.mjs 的分派、证据、capture、links 与归档
-      # 规则。drive 多走 --dry-run；要真跑的几条在自建的 skill 副本里配桩探针跑，
-      # archive / links 在自建的空仓根里跑，都不起栈。capture 那条连一个关着的
-      # 端口：有浏览器时记下导航失败，没有浏览器（本 job 此时还没装 chromium）时
-      # 记下启动失败，两条路都要写出 result.json。其中一条跑注册表闸
-      # （vp-registry-gate.mjs）：scripts/ 下没登记的脚本、新加的 drive-<票号>
-      # 脚本、feature map 缺 vp.mjs drive 行，都在这里红。
+      # verify-cairn CLI self-test (#1402): vp.mjs dispatch, evidence, capture, links, archive rules.
+      # Most drives use --dry-run; live ones use stub probes in a copied skill tree; archive/links
+      # run in an empty temp root without starting the stack. capture hits a closed port — records
+      # navigation failure with a browser, startup failure without (chromium not installed yet);
+      # both write result.json. One leg runs vp-registry-gate.mjs: unlisted scripts/, new drive-<ticket>
+      # scripts, feature map missing vp.mjs drive rows.
       - name: verify-cairn CLI self-test (#1402)
         run: node .claude/skills/verify-cairn/scripts/vp-selftest.mjs
 
       - name: Install Playwright chromium
         run: pnpm exec playwright install chromium --with-deps
 
-      # migration 纪律（01 §6）：drizzle-kit 生成、进 repo、CI 校验 drift——
-      # schema 改动未带 migration 再生成 = 红。
-      # 前置护栏：drizzle-kit 撞到 snapshot 链断裂时**只打印、退出码仍 0**，
-      # 且不再生成任何迁移——下面这步的 git diff 就恒为空，闸静默失效。
-      # db:check 直接校验链不变量把这种情况变成硬失败。
+      # Migration discipline (01 §6): drizzle-kit generate, commit, CI drift check —
+      # schema change without regenerated migration fails.
+      # Guard: broken snapshot chain prints only, exit 0, generates nothing — git diff below stays
+      # empty and the gate silently passes. db:check enforces chain invariants as a hard fail.
       - name: Drizzle snapshot chain guard
         run: pnpm --filter @xiechimon/cairn db:check
 
@@ -149,14 +143,14 @@ jobs:
           git add -N apps/server/drizzle
           git diff --exit-code apps/server/drizzle
 
-      # 集成栈单独一步（2026-09-30）：它在场内起真 server + 真 daemon +
-      # Chromium，与轻 project 同跑时在 2 vCPU runner 上争核假红——实测：同 sha
-      # 连跑两次同点同败、纯文档提交也红、本地同一条 10.9s 过。分组清单在根
-      # vitest.config.ts（light + integration 精确等于全量，无泄漏）。
-      - name: Test (vitest，轻 project)
+      # Integration stack runs alone (2026-09-30): real server + daemon + Chromium in-process;
+      # with light projects on a 2 vCPU runner it false-reds — same sha twice same fail, docs-only
+      # red, local same test 10.9s pass. Project split in root vitest.config.ts (light +
+      # integration = full set, no leak).
+      - name: Test (vitest, light project)
         run: VITEST_PROJECT_SET=light pnpm test
 
-      - name: Test (vitest，集成栈单独跑)
+      - name: Test (vitest, integration stack)
         run: VITEST_PROJECT_SET=integration pnpm test
 
       # pr-gate self-check (#1401): .claude/workflows/pr-gate.js decides ADR
@@ -185,18 +179,14 @@ jobs:
           node scripts/lint-warning-cap.mjs
 
 
-  # e2e 全量归 CI（#693 分层职责）：本地开发期只跑受影响面
-  # （pnpm --filter @cairn/web e2e:affected），全量唯一执行点在这。
-  # 4 分片并行（playwright --shard，按测试精确切分、并集 = 全量 83 spec，
-  # 覆盖面不降）：单 shard ≈ setup + fixture build + 1/4 测试量 ≈ 2 分钟，
-  # 远小于原 check job 里串行的 223s e2e 步。独立 job/runner 也顺带消掉了
-  # 「与 check job 同 runner 互写 apps/web/dist」的约束（token-gate 与
-  # webServer 都在各自 runner 的 dist 上工作）。fail-fast 关闭：一个 shard
-  # 红不掩盖其余 shard 的结果。
+  # Full e2e only in CI (#693): local dev uses e2e:affected; this is the sole full run.
+  # Four parallel shards (playwright --shard; union = full 83 specs, coverage unchanged):
+  # ~2 min/shard vs 223s serial e2e in old check job. Separate jobs/runners avoid
+  # check job clobbering apps/web/dist. fail-fast off so one red shard does not hide others.
   e2e:
     runs-on: ubuntu-latest
-    # 分片正常 5 到 10 分钟；装包类步骤卡住时不再无限挂着占住合并（整个 job 的
-    # 兜底，不是对测试时长的限制）。
+    # Shards normally 5–10 minutes; job timeout stops install hangs from blocking merges forever
+    # (whole-job backstop, not a per-test cap).
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -213,44 +203,36 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      # 不再 apt 装 ffmpeg（2026-10-22 实测）：e2e 分片里没有任何 spec / 脚本调
-      # 系统 ffmpeg（grep apps/web/e2e scripts integration 零命中；唯一的消费者是
-      # 本地的 verify-cairn 驱动脚本）；录像用的 ffmpeg 由下面
-      # `playwright install chromium` 自带。这一步反而是 CI 的拖慢点：run
-      # 39808252360 的 e2e (3) 停在 apt-get install 上 42 分钟没进测试，e2e (1)
-      # 同一步等了 14 分钟，而四个分片的测试本体只要 2 到 3 分钟。此前
-      # （2026-10-07）去掉 apt-get update 治的是同一个病的一半。
+      # No apt ffmpeg (2026-10-22): no e2e spec/script calls system ffmpeg (grep zero hits);
+      # only local verify-cairn drivers use it; playwright install chromium bundles ffmpeg.
+      # apt-get install was the slowdown — run 39808252360 e2e (3) stuck 42m on apt, tests 2–3m.
+      # Removing apt-get update (2026-10-07) fixed half the same issue.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright chromium
         run: pnpm exec playwright install chromium --with-deps
 
-      # 分隔符的位置是有判据的（#765）：pnpm 把 `--` 原样转给脚本，`e2e -- --shard=…`
-      # 于是 playwright 收到一个 `--` 位置参数、`--shard` 根本没进解析——四条分片
-      # 各跑全量 688 用例（实测 4m03–5m32/shard），分片形同虚设。去掉 `--`（pnpm
-      # 会把脚本名之后的未知 flag 直接转发）后每分片 173/171/…，并集 = 全量。
+      # `--` placement matters (#765): pnpm forwards `--` to the script, so `e2e -- --shard=…`
+      # made playwright see `--` as a positional arg and ignore --shard — four shards each ran
+      # all 688 cases. Without `--`, pnpm forwards flags after the script name; union = full set.
       - name: E2E (shard ${{ matrix.shard }}/4, #693)
         run: pnpm prepush --e2e-shard ${{ matrix.shard }}/4
 
-      # 编译产物闸（#747）：上面的 E2E 步经 webServer fixture-build 已写出
-      # apps/web/dist，本步只做 grep 断言，不另付全构建。防的是 #656/#677
-      # 的真故障：tw-animate-css 装了、类名写了但没 @import，全族编译成空。
+      # CSS mechanism gate (#747): E2E step already wrote apps/web/dist via webServer fixture-build;
+      # this step grep-asserts only. Catches #656/#677: tw-animate-css installed, classes present,
+      # but no @import — animations compile empty.
       - name: CSS mechanism gate (#747)
         run: node scripts/css-mechanism-gate.mjs
 
-  # 分片聚合闸（#693）：分支保护的 required contexts 不编码 matrix 基数——
-  # 名单写死 e2e (1..4) 的话，将来分片数一调，名单就静默失配（新增分片不
-  # 阻塞合并 = 覆盖面实际下降）。本 job 名固定 e2e-gate、needs 全部分片，
-  # 保护名单只引它；分片数调整不再触碰仓库设置。
+  # Shard aggregate gate (#693): branch protection required contexts do not encode matrix size —
+  # hard-coding e2e (1..4) silently mismatches when shard count changes. Fixed job e2e-gate
+  # needs all shards; protection lists only this job.
   #
-  # `if: always()` 与那句显式判定都不是可选装饰（#762）：只写 `needs` 时，
-  # 任一 shard 失败会让本 job **整个 skip**，而分支保护对 `skipped` 与
-  # `successful` / `neutral` 同等放行（GitHub 文档 about-protected-branches
-  # 「Require status checks before merging」）——闸恰好在唯一需要它的时刻是
-  # 开的。always() 保证它永远上报，再按 `needs.e2e.result` 显式判定：只有全
-  # 绿放行，failure / cancelled / skipped 一律失败（fail-closed）。将来若给
-  # e2e 加 paths 过滤让整层跳过，会在这里响亮地红，而不是静默丢掉覆盖面。
+  # `if: always()` and explicit result check are required (#762): with only `needs`, a failed shard
+  # skips this job entirely, and branch protection treats `skipped` like success. always() always
+  # reports; fail unless needs.e2e.result is success (fail-closed). Future paths-filter skip on e2e
+  # fails loudly here instead of silently dropping coverage.
   e2e-gate:
     needs: e2e
     if: always()
@@ -261,8 +243,8 @@ jobs:
           echo "e2e result: ${{ needs.e2e.result }}"
           [ "${{ needs.e2e.result }}" = "success" ]
 
-  # 发布产物冒烟（#264，spec #260 Testing Decisions 失败方式枚举的 CI 守）：
-  # 独立 job/runner，不与任何 e2e shard 共享 runner（各自写自己的 dist）。
+  # Pack smoke (#264, spec #260 failure-mode CI guard): separate job/runner from e2e shards
+  # (each writes its own dist).
   pack-smoke:
     runs-on: ubuntu-latest
     steps:
@@ -282,12 +264,10 @@ jobs:
       - name: Pack smoke (main package tarball, bare node)
         run: scripts/pack-smoke.sh
 
-  # 死类名闸（#1036，advisory）：TSX 渲染的类名与活样式表（Tailwind 编译物 +
-  # src/**/*.css 选择子）求差集，零命中且零 spec/verify 引用即红——#950 退役
-  # chief.css 留下的死类名不报错、不红 CI、布局静默塌掉，只有机器能替人抓住。
-  # **故意不进分支保护 required contexts**（仓规：必需检查一律等合完之后再
-  # 加）：本 job 红灯可见但不拦合并，跑干净一段时间后再由用户决定是否收紧。
-  # 需要 node_modules（@tailwindcss/postcss 现场编译 ~0.5s，不依赖 dist）。
+  # Dead class gate (#1036, advisory): TSX class names minus live stylesheets (Tailwind output +
+  # src/**/*.css selectors); zero hits and zero spec/verify refs fails — #950 chief.css retirement
+  # left dead classes that silently break layout. Intentionally not a required context: visible red,
+  # does not block merge until user tightens. Needs node_modules (@tailwindcss/postcss ~0.5s compile).
   dead-class-gate:
     runs-on: ubuntu-latest
     steps:
@@ -311,12 +291,10 @@ jobs:
           PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: pnpm prepush --advisory
 
-  # 票标签闸（advisory）：每张 open issue 必须带「一个分类 + 一个状态」双标签
-  # （bug|enhancement + needs-triage|needs-info|ready-for-agent|ready-for-human|
-  # wontfix）。自建票开票即打双标签的规矩（10-05 定）靠 agent 自觉会漏——
-  # #1056/#1067 实漏，故上机器。wayfinder:* 车道票在排除面。
-  # 故意不进分支保护 required contexts（同 dead-class-gate 口径）。
-  # 只读 gh api，无需 node_modules。
+  # Issue label gate (advisory): each open issue needs one category + one status label
+  # (bug|enhancement + needs-triage|needs-info|ready-for-agent|ready-for-human|wontfix).
+  # Agent discipline missed (#1056/#1067); machine enforced. wayfinder:* lanes excluded.
+  # Not a required context (same as dead-class-gate). gh api only, no node_modules.
   issue-label-gate:
     runs-on: ubuntu-latest
     steps:
@@ -327,20 +305,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/issue-label-gate.mjs
 
-  # feature-map 陈旧闸（#1160，advisory）：verify-cairn feature map
-  # （.claude/skills/verify-cairn/features/*.md）引用的仓内路径 / .类名 /
-  # [data-*] 选择子 / CSS 声明形，必须能在当前树命中。avatars.md 陈旧的
-  # 「Root 走 display:contents」条目掩护了 #1156（头像被裁本该被 map 拦住）
-  # ——map 过期靠人记忆维护必漏，过期可见是机器活。
-  # 存量陈旧冻结在 scripts/feature-map-staleness-baseline.json，只对新增红；
-  # baseline 条目转绿反过来红、要求删除。
-  # 故意不进分支保护 required contexts（同 dead-class-gate 口径）：红灯可见
-  # 但不拦合并，跑干净一段时间后再由用户决定是否收紧。
-  # 纯 node stdlib、只读仓内文件，无需 node_modules。
+  # Feature map staleness gate (#1160, advisory): verify-cairn feature map paths / .class /
+  # [data-*] / CSS declarations must resolve in the tree. Stale avatars.md hid #1156.
+  # Baseline frozen in scripts/feature-map-staleness-baseline.json — new stale only;
+  # baseline entry going green fails until removed. Advisory, not required context.
+  # Node stdlib only, read-only repo files.
   feature-map-gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
 
       - name: Feature map staleness gate (#1160)
         run: node scripts/feature-map-staleness-gate.mjs

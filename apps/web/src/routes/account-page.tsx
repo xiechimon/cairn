@@ -77,7 +77,7 @@ export function AccountPage() {
   const notifyOn = notifyPref === null ? permission === 'granted' : notifyPref === 'on';
   const notifyBlocked = notifyOn && permission === 'denied';
   return (
-    <PageShell route="account" fixture={fixture} selected="none" title={t('帐号')}>
+    <PageShell route="account" fixture={fixture} selected="none" title={t('账号')}>
       <div className="flex flex-col gap-6">
         <ProfileHeader
           className="account-header"

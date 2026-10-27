@@ -16,7 +16,7 @@ One file per entry exists so parallel lanes each add their own file and merges d
 
 File name: ticket number, a hyphen, and a lowercase English short name, e.g. `1566-prepush-stale-origin-main.md`. For a thread-internal mistake without a ticket, use the current task's ticket number.
 
-The body is seven fields in a fixed order, kept in the leading frontmatter, one field per line:
+The entry has seven fields in a fixed order in leading frontmatter, one field per line. Any text after the closing delimiter is excluded from validation and table generation:
 
 ```
 ---

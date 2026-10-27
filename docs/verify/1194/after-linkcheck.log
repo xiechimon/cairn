@@ -35,7 +35,7 @@ HTTP 200
 body: # A3-detail 收编报告（detail 域 → ui/ 原语）
 
 ## rendered page on the fix commit
-GET https://github.com/xiechimon/pacman/blob/85fdd838abd39a2876599f6bafff45fffff27e00/docs/spec/09-前端风格统一-A6.md
+GET https://github.com/xiechimon/pacman/blob/85fdd838abd39a2876599f6bafff45fffff27e00/docs/spec/09-frontend-style-unification-a6.md
 HTTP 200
 
 anchor text: docs/a3/diff-audit.md

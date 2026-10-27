@@ -1,0 +1,26 @@
+name: commit-author
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  commit-author:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Commits on main are never authored by the bot account
+        run: |
+          author=$(git log -1 --format='%an <%ae>')
+          echo "author: $author"
+          case "$author" in
+            *"cairnwright[bot]"*)
+              echo "::error::main commit $(git rev-parse --short HEAD) is authored by cairnwright[bot]. Bot-opened PRs must merge by rebase from one commit authored by Cairnwright (~/.cairn/tools/merge-pr.sh); human PRs use the default squash."
+              exit 1
+              ;;
+          esac

@@ -2,6 +2,7 @@
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { daysBetween, loadRepoEvalCoverage, staleScoredFlows } from './eval-coverage.mjs';
 
 const ROOT = process.cwd();
 const FEATURES_DIR_DEFAULT = '.claude/skills/verify-cairn/features';
@@ -60,12 +61,13 @@ function stripComments(text, isCss) {
 }
 
 function parseArgs(argv) {
-  const args = { noBaseline: false, writeBaseline: false, dir: null };
+  const args = { noBaseline: false, writeBaseline: false, dir: null, today: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--no-baseline') args.noBaseline = true;
     else if (a === '--write-baseline') args.writeBaseline = true;
     else if (a === '--dir') args.dir = argv[++i];
+    else if (a === '--today') args.today = argv[++i];
     else if (a === '--help' || a === '-h') args.help = true;
     else {
       console.error(`feature-map-gate: unknown arg ${a}`);
@@ -79,7 +81,7 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     console.log(
-      'usage: node scripts/feature-map-staleness-gate.mjs [--no-baseline] [--write-baseline] [--dir <features-dir>]',
+      'usage: node scripts/feature-map-staleness-gate.mjs [--no-baseline] [--write-baseline] [--dir <features-dir>] [--today YYYY-MM-DD]',
     );
     return 0;
   }
@@ -226,6 +228,30 @@ function main() {
   }
 
   const all = [...violations.values()];
+  const today = args.today ?? new Date().toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) {
+    console.error('feature-map-gate: --today must be YYYY-MM-DD');
+    return 2;
+  }
+  let evalFailed = false;
+  try {
+    const coverage = loadRepoEvalCoverage(ROOT);
+    if (coverage.unlisted.length > 0) {
+      evalFailed = true;
+      const listed = coverage.unlisted.map((name) => `"${name}"`).join(', ');
+      console.log(`feature-map-gate: hillclimb flow ${listed} has no capability row`);
+    }
+    for (const row of staleScoredFlows(coverage.rows, today)) {
+      evalFailed = true;
+      const age = daysBetween(row.date, today);
+      console.log(
+        `feature-map-gate: eval score for ${row.flow} is ${age} days old (${row.date}); re-run the flow`,
+      );
+    }
+  } catch (error) {
+    console.error(`feature-map-gate: ${error instanceof Error ? error.message : error}`);
+    return 1;
+  }
   if (args.writeBaseline) {
     let prev = { entries: [] };
     if (existsSync(join(ROOT, BASELINE_PATH)))
@@ -249,7 +275,7 @@ function main() {
     console.log(
       `feature-map-gate: baseline written — ${entries.length} entries (${mdFiles.length} md files, ${refsChecked} refs checked)`,
     );
-    return 0;
+    return evalFailed ? 1 : 0;
   }
 
   let baseline = { entries: [] };
@@ -266,7 +292,7 @@ function main() {
     ? []
     : baseline.entries.filter((e) => !allKeys.has(`${e.file}\u0000${e.kind}\u0000${e.symbol}`));
 
-  if (fresh.length === 0 && staleBaseline.length === 0) {
+  if (fresh.length === 0 && staleBaseline.length === 0 && !evalFailed) {
     console.log(
       `feature-map-gate: OK (${mdFiles.length} md files, ${refsChecked} refs checked, ${baseKeys.size} frozen in baseline)`,
     );

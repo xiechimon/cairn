@@ -1,9 +1,9 @@
 ---
-Category: A test spread the GitHub port's unknown response body directly; the runtime test failed even though it compiled
+Category: A test spread the GitHub port's unknown response body directly; it passed compilation but failed at runtime
 Source: #1405 P4-0 (2026-10-24)
 Level: 1
-Safeguard: keep the `unknown` boundary on `GateRaw.body`; fixtures override fields through the typed `extra` parameter of `comparePages`; `pnpm typecheck` blocks spreading the unknown body
-Intercepts: 1
+Safeguard: The unknown boundary of GateRaw.body is kept; fixtures override fields through comparePages's typed extra parameter; pnpm typecheck intercepts unknown-body spreads
+Intercepts: 2
 Recurrences: 0
-Notes: real negative control: spreading `res.body` reports TS2698; passing with the `extra` parameter did not widen the port type
+Notes: Real negative control: spreading res.body errors TS2698; passing after switching to the extra parameter, without loosening the port type
 ---

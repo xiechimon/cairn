@@ -1,0 +1,23 @@
+✔ migration preserves every source row and sums counters when categories merge (6.695455ms)
+✔ every migrated entry passes and the old table is gone (11.269299ms)
+✔ level 5 entry without a reason is rejected (0.179603ms)
+✔ level outside 1 to 5 is rejected (0.196268ms)
+✔ pending upgrade without a ticket is rejected, with a ticket passes (0.139692ms)
+✔ the real bad note that sat on main without a ticket is rejected (0.187885ms)
+✔ file name without a ticket number is rejected (0.128014ms)
+✔ missing, reordered or malformed fields are rejected (0.267476ms)
+✔ a resurrected docs/lessons.md table is rejected (0.711861ms)
+✔ two parallel branches each adding an entry merge without conflict (39.850113ms)
+✔ the old single table does conflict when two branches append a row (21.721554ms)
+✔ both upgrade-pending word orders and the original Chinese marker require a ticket (0.276931ms)
+✔ table generation rejects malformed entries with the ledger diagnostic (0.259384ms)
+✔ generated table keeps existing escaped pipes inside their cell (0.261026ms)
+✔ the CLI can validate and render entries from a checkout path containing spaces (65.887183ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 246.415361

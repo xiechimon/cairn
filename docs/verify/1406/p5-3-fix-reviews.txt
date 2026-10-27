@@ -78,4 +78,4 @@ services/machine*, daemon {credentials,secret-channel,shell-channel,machine-clie
 services/{mcp-face,mcp-servers}, routes-webhook). This diff touches none of them:
   apps/daemon/src/step-attachments.ts, packages/shared/src/records/prompts.ts,
   apps/server/src/services/chief.ts, apps/server/src/services/chief-tools.ts,
-  docs/spec/02-架构平价.md, tests and docs/verify/1406.
+  docs/spec/02-architecture-parity.md, tests and docs/verify/1406.

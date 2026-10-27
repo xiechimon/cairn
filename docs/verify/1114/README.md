@@ -35,11 +35,11 @@ full suite belongs to CI.
   the test.
 - `repeat-runs.txt` — command: `E2E_PORT=8417 pnpm exec playwright test
   e2e/board-dnd.spec.ts --repeat-each=6` (whole spec file, 25 tests x 6 =
-  150). 150 passed (33.1s). Proves ticket acceptance "负载下连跑多轮稳定".
+  150). 150 passed (33.1s). Proves ticket acceptance "stable across consecutive runs under load".
 - `counterexample-red.txt` — one probe run with the injection swapped to a
   POST-landing synthetic flash (`{t:700,done},{t:701,todo}`); the anchored
   assertion goes red on `{"t":701,"col":"todo"}`. Proves ticket acceptance
-  "拖拽真坏了仍能抓到" — the anchor is weaker only for pre-landing frames,
+  "still catches a real drag breakage" — the anchor is weaker only for pre-landing frames,
   a real done→todo flash-back is still caught. The counterexample injection
   is NOT in the committed test; the committed injection is the pre-commit
   race reproducer.

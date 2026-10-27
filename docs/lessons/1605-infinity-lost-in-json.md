@@ -1,9 +1,9 @@
 ---
-Category: A number in the verdict structure hit ±Infinity and `JSON.stringify` wrote it as null; the persisted verdict lost the significance digits and read back different from memory
+Category: Numbers in the verdict structure reached ±Infinity, `JSON.stringify` wrote them as null, the persisted significance numbers were lost, and the verdict read back differed from the one in memory
 Source: #1605 (2026-10-25)
 Level: 2
-Safeguard: the "verdict survives a persist-read round trip unchanged" case in `integration/test/adoption-judge.test.ts` covers zero variance, too-few samples and no valid pairings; the structure keeps z finite and carries `meanSign` and `degenerate` fields
+Safeguard: `integration/test/adoption-judge.test.ts`'s "the verdict read back from disk equals the original exactly" case covers zero-variance, too-few-samples, and no-valid-pairs boundaries; the structure now keeps z always finite with `meanSign` and `degenerate` fields
 Intercepts: 0
 Recurrences: 0
-Notes: negative control: changing the zero-variance z back to `meanSign * Infinity` turned 4 cases red (including the uniform gain and uniform drop round trips); all 45 green with finite numbers. No structure written to disk may carry Infinity / NaN
+Notes: Negative control: writing zero-variance z back as `meanSign * Infinity` turns 4 cases red (including the uniform gain and uniform drop disk read-backs); all 45 green after making it finite. Structures that go to disk must not hold Infinity / NaN
 ---

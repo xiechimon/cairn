@@ -1,8 +1,8 @@
-# #943 board/sidebar 域对比度实测（better-colors，不许估）
+# #943 board/sidebar domain contrast measurement (better-colors, no estimating)
 
-测法：`drive-943-board-sidebar.mjs`（运行产物在 live-stack/drive-943-board-sidebar/）在 live 栈（8795/5277，独立 PACMAN_HOME）上取**渲染元素 computed color**（导航行/选中行 pill 合成面/kbd 角标/列头/卡标题/筛选钮）与 **token 解析对**（probe-div 走 var() 解析，态色与双面件），WCAG 2.x 相对亮度公式算比值。透明/半透明底一律合成到实际画布（--background 或侧栏底）再算。floor：文本 4.5、非文本 UI 3.0。双主题各 16 对。
+Method: `drive-943-board-sidebar.mjs` (run artifacts in live-stack/drive-943-board-sidebar/) takes **rendered-element computed colors** (nav rows / selected-row pill composite face / kbd badges / column headers / card titles / filter buttons) and **token-resolved pairs** (a probe-div walking var() resolution, for state colors and dual-face components) on the live stack (8795/5277, isolated PACMAN_HOME), computing ratios with the WCAG 2.x relative-luminance formula. Transparent/semi-transparent bases are always composited onto the actual canvas (--background or the sidebar base) before computing. Floors: text 4.5, non-text UI 3.0. 16 pairs per theme.
 
-| 面 | 类型 | 暗模 fg / bg / 比值 | 亮模 fg / bg / 比值 | floor | 判定 |
+| face | kind | dark fg / bg / ratio | light fg / bg / ratio | floor | verdict |
 |---|---|---|---|---|---|
 | `sidebar-nav-text` | text | `rgb(179 175 168)` on `rgb(30 27 22)` = **7.86** | `rgb(53 49 42)` on `rgb(244 239 231)` = **11.3** | 4.5 | PASS |
 | `sidebar-selected-pill` | text | `rgb(179 175 168)` on `rgb(53 50 45)` = **5.88** | `rgb(53 49 42)` on `rgb(222 218 210)` = **9.26** | 4.5 | PASS |
@@ -21,12 +21,12 @@
 | `filter-chip` | text | `rgb(30 27 22)` on `rgb(237 233 225)` = **14.17** | `rgb(244 239 231)` on `rgb(18 15 9)` = **16.71** | 4.5 | PASS |
 | `drop-tint-border` | ui | `rgb(216 156 252)` on `rgb(30 27 22)` = **8.24** | `rgb(127 45 167)` on `rgb(244 239 231)` = **6.47** | 3 | PASS |
 
-**结论：双模 16 对 × 2 = 32 实测全过，0 未过；全域最低比值 4.5:1（亮模 project-avatar，贴 4.5 线过）。**
+**Conclusion: 16 pairs × 2 themes = 32 measurements all pass, 0 failures; the domain's lowest ratio is 4.5:1 (light project-avatar, passing exactly on the 4.5 line).**
 
-## 实测抓出并修掉的一处（本票唯一色面改动）
+## The one spot caught by measurement and fixed (this ticket's only color-face change)
 
-`notify-banner` 正文旧配对 `--text-dim × --surface-secondary`：暗 3.12:1 / 亮 **2.73:1**——低于 spec/22 §1.7 给 `--text-dim` 定的 floor 3（正典门控对是 text-dim × --background；本面底是 surface-secondary，配对是 #114 面自造、未进正典账）。12px 正文按 AA 需 4.5。处置：换角色正确的次级文本 token `--muted-foreground`（仓内 todo-card 时间/列计数同款习语），修后暗 6.55 / 亮 10.12（上表 notify-body 行）。token 值零改动（shadcn.css 冻结），只动消费面的槽引用。
+The `notify-banner` body used to pair `--text-dim × --surface-secondary`: dark 3.12:1 / light **2.73:1** — below the floor 3 that spec/22 §1.7 sets for `--text-dim` (the canon gated pair is text-dim × --background; this face's base is surface-secondary, the pair is self-made by the #114 face and never entered the canon ledger). 12px body text needs 4.5 under AA. Disposition: swap to the role-correct secondary-text token `--muted-foreground` (the same idiom as the in-repo todo-card time/column counts), after which dark 6.55 / light 10.12 (the notify-body row above). Token values untouched (shadcn.css frozen) — only the consumer-face slot reference moved.
 
-## 观察（不改，记录在案）
+## Observation (unchanged, recorded)
 
-`sidebar-selected-pill` 行 fg = muted-foreground：选中行的 `text-foreground`（ROW_SELECTED）与行基底 `text-muted-foreground`（ROW_BASE）在无 tailwind-merge 的模板串里共存，编译序让 muted 恒胜——**#414 以来的既有渲染态**（选中信号由 pill 承担，本票探针双模 5.88/9.26 全过）。类名载体退役后此冲突面归 #952/#953 终账，不在本票动（动了是视觉语义变更，越 D2 授权外的行为面）。
+The `sidebar-selected-pill` row's fg = muted-foreground: the selected row's `text-foreground` (ROW_SELECTED) and the row base's `text-muted-foreground` (ROW_BASE) coexist in a template string without tailwind-merge, and compile order makes muted always win — **the existing rendered state since #414** (the selection signal is carried by the pill; this ticket's probe passes at 5.88/9.26 in both themes). After the class-name carrier retires, this conflict face goes to the #952/#953 final ledger and is not touched in this ticket (touching it would be a visual-semantics change, a behavior face beyond D2's authorization).

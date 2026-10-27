@@ -55,7 +55,8 @@ export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?:
 export const DIALOG_PRIMARY_BUTTON =
   'rounded-md text-ui disabled:bg-secondary disabled:text-content-secondary disabled:opacity-100';
 
-export const DIALOG_TEXT_BUTTON = 'gap-1.5 px-3 text-ui font-normal text-content-secondary';
+export const DIALOG_TEXT_BUTTON =
+  'gap-1.5 px-3 text-ui font-normal text-content-secondary disabled:text-content-tertiary disabled:opacity-100';
 
 export const PICKER_ROW_SELECTED =
   'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';
@@ -79,6 +80,7 @@ interface DialogShellProps {
   onEscapeWhileNested?: () => void;
   viewportRoot?: boolean;
   backdropClassName?: string;
+  initialFocus?: DialogPrimitive.Popup.Props['initialFocus'];
 }
 
 function useReturnFocus(open: boolean) {
@@ -123,6 +125,7 @@ export function DialogShell({
   onBackdropClick,
   onEscapeWhileNested,
   viewportRoot = false,
+  initialFocus,
   backdropClassName,
 }: DialogShellProps) {
   const { t } = useI18n();
@@ -184,6 +187,7 @@ export function DialogShell({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange} modal>
       <DialogContent
+        initialFocus={initialFocus}
         finalFocus={restore}
         showCloseButton={false}
         aria-label={title}

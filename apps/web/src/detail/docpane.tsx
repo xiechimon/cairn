@@ -30,7 +30,7 @@ import {
   Restore,
   UnfoldVertical,
 } from '../icons/index.js';
-import { type DocTypeLabel, PaneTypeSelect } from '../overlays/plan-dropdown.js';
+import { type DocTypeLabel, PaneTypeSelect } from '../overlay/plan-dropdown.js';
 import { Segments } from './segments.js';
 import { computeHunkWordDiff } from './word-diff.js';
 

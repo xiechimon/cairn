@@ -4,7 +4,7 @@ Live stack: vite `http://127.0.0.1:5273/app`, server `127.0.0.1:8791`, viewport 
 
 ## Before
 
-Drawer starts hidden. First Meta+J opens it (`data-open`, text starts 新主题). Second Meta+J hides the same node. Opacity `transitionrun` count is 0 (the #1266 fill-mode fix already on main). Escape after a reopen leaves the drawer open. Idle keydown registrations: 16, of which 8 are on `window`. Numbers: `before-report.json`.
+Drawer starts hidden. First Meta+J opens it (`data-open`, text starts `新主题`). Second Meta+J hides the same node. Opacity `transitionrun` count is 0 (the #1266 fill-mode fix already on main). Escape after a reopen leaves the drawer open. Idle keydown registrations: 16, of which 8 are on `window`. Numbers: `before-report.json`.
 
 ![board closed](before-closed.png)
 

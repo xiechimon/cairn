@@ -240,7 +240,6 @@ export interface MachineRow {
   online?: boolean;
   pill?: string;
   enabledRuntimes?: string[];
-  shellEnabled?: boolean;
   chiefHost?: boolean;
   chiefRunning?: boolean;
   chiefWaiting?: boolean;

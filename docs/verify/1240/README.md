@@ -1,8 +1,8 @@
 # docs/verify/1240 — pr-tasks gate evidence
 
-Issue #1240. User's ruling: 「有些 pr tasks 你都没做完你就 merge 了，以后
-不要出现了」. The gate judges the PR body's `## Acceptance` section: it
-must carry at least one task-list item, and none may be unchecked.
+Issue #1240. User's ruling: "some pr tasks were not done when you merged; this
+must not happen again". The gate judges the PR body's `## Acceptance` section:
+it must carry at least one task-list item, and none may be unchecked.
 
 Built fixture-first: `expected-verdicts.md` recorded every verdict before
 `scripts/pr-tasks-gate.py` existed. Any mismatch between an expectation
@@ -25,8 +25,8 @@ and a recorded run means the script is wrong, not the expectation.
 | template-untouched | RED unchecked-task (live seed unchecked) | RED unchecked-task line 43 |
 
 11/11 match. The four scenarios the ticket asked for pair up as:
-无 tasks 红 (no-section, prose-only) / 有空框红 (unchecked) / 全勾绿
-(all-checked) / 代码块含空框绿-or-red (codeblock-task: the fenced box is
+no-tasks red (no-section, prose-only) / unchecked-box red (unchecked) / all-checked green
+(all-checked) / codeblock-with-unchecked-box green-or-red (codeblock-task: the fenced box is
 not counted as a task, so the gate reds on no-tasks, never on the fenced
 box itself).
 

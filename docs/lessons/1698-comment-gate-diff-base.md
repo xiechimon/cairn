@@ -5,5 +5,5 @@ Level: 2
 Safeguard: `scripts/comment-discipline-gate.mjs` diffs against `git merge-base origin/main HEAD` when no base is given; CI still passes the exact PR base in `COMMENT_DISCIPLINE_BASE_SHA` (its checkout is shallow, so a merge-base there fails)
 Intercepts: 0
 Recurrences: 0
-Notes: negative control: branch head d5123a6 behind main ad4bf4e reported `packages/shared/src/brand.ts:143` with the old gate and 0 lines with the fix; a planted `// planted comment` in `apps/web/src/i18n/locale.ts` still reports 1 line
+Notes: Negative control: branch head d5123a6 behind main ad4bf4e reported `packages/shared/src/brand.ts:143` with the old gate and 0 lines with the fix; a planted `// planted comment` in `apps/web/src/i18n/locale.ts` still reports 1 line
 ---

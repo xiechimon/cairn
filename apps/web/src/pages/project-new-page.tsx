@@ -133,6 +133,7 @@ export function ProjectNewPage() {
     ? (connectionQ.data?.connected ?? false)
     : (fixtureAuth ?? fixture.github?.connected === true);
   const login = live ? connectionQ.data?.login : fixture.github?.login;
+  const disconnectReason = live ? (connectionQ.data?.disconnectReason ?? null) : null;
   const reposQ = useGithubRepos(live && githubSelected && connected && !manualRepo);
   const repos = live ? (reposQ.data?.repos ?? []) : (fixture.github?.repos ?? []);
   const query = repoQuery.trim().toLowerCase();
@@ -601,6 +602,11 @@ export function ProjectNewPage() {
           {showGithubField && oauthError !== null && (
             <div className={`${FIELD_NOTE_CLS} text-destructive`} role="alert">
               {oauthError}
+            </div>
+          )}
+          {showGithubField && disconnectReason !== null && (
+            <div className={`${FIELD_NOTE_CLS} text-destructive`} role="alert">
+              {t('GitHub 连接已断开')}：{disconnectReason}
             </div>
           )}
           {showGithubField && !connected && !connectionPending && (

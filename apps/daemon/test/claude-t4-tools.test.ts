@@ -54,13 +54,13 @@ describe('parametersToShape (failure modes 2/3)', () => {
     });
   });
 
-  test('boolean/number slots (set_remote_shell enabled / set_wake at)', () => {
-    const shell = roundTrip(byName('set_remote_shell').parameters);
-    const enabled = must(
-      (shell.properties as Record<string, Record<string, unknown>>).enabled,
-      'enabled',
+  test('boolean/number slots (run_builds withPlan / set_wake at)', () => {
+    const builds = roundTrip(byName('run_builds').parameters);
+    const withPlan = must(
+      (builds.properties as Record<string, Record<string, unknown>>).withPlan,
+      'withPlan',
     );
-    expect(enabled.type).toBe('boolean');
+    expect(withPlan.type).toBe('boolean');
     const wake = roundTrip(byName('set_wake').parameters);
     const at = must((wake.properties as Record<string, Record<string, unknown>>).at, 'at');
     expect(at.type).toBe('number');

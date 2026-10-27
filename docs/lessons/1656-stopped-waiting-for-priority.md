@@ -1,9 +1,9 @@
 ---
-Category: Stopped to wait for ian to set priorities
+Category: Stopped while waiting for ian to set priorities
 Source: Claude thread (2026-10-22)
 Level: 5
-Safeguard: memory: pick the order and go
+Safeguard: Memory: pick an order and just do it
 Intercepts: 0
 Recurrences: 0
-Notes: no machine check is possible; a judgment error
+Notes: Not machine-checkable; a judgment error
 ---

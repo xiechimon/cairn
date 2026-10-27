@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
+import { acquireSlot, leaseEnv, slotPortReport } from './heavy-slots.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -17,17 +17,21 @@ export const ciOnlyScripts = {
   'scripts/css-mechanism-gate.mjs': 'greps the apps/web/dist build the CI e2e step writes',
   'scripts/issue-label-gate.mjs': 'reads issue labels through the GitHub token',
   'scripts/feature-map-staleness-gate.mjs': 'advisory job that never blocks a merge',
+  'scripts/npm-command-gate.mjs': 'verifies package names against the npm registry (network)',
+  'scripts/check-closing-keyword.mjs': 'reads the PR event payload (GITHUB_EVENT_PATH)',
 };
 
 export const selfTests = [
   'scripts/prepush.test.mjs',
   'scripts/heavy-slots.test.mjs',
   'scripts/english-only-gate.test.mjs',
+  'scripts/doc-reader-tests.test.mjs',
   'scripts/lessons-ledger-gate.test.mjs',
 ];
 
 export const localOnly = [
   ['node', 'scripts/ci-job-structure-gate.mjs'],
+  ['node', 'scripts/feature-map-staleness-gate.mjs'],
   ['node', 'scripts/comment-discipline-gate.mjs'],
   ['node', 'scripts/single-use-helper-gate.mjs'],
   ['node', 'scripts/baseline-ratchet-gate.mjs'],
@@ -36,6 +40,8 @@ export const localOnly = [
   ['node', 'scripts/ui-registry-gate.mjs'],
   ['node', 'scripts/ui-consumer-shape-gate.mjs'],
   ['node', 'scripts/pr-gate-selfcheck.mjs'],
+  ['node', 'scripts/lane-file-gate.mjs'],
+  ['node', 'scripts/lint-warning-cap.mjs'],
 ];
 
 const DOCS = /^(docs\/|.*\.md$|LICENSE$)/;
@@ -46,10 +52,14 @@ export function prepushPlan(paths, mode = 'local') {
   const language = ['node', 'scripts/english-only-gate.mjs'];
   const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
   const codePaths = paths.filter((path) => !DOCS.test(path));
-  if (codePaths.length === 0)
-    return paths.some((path) => path.startsWith('docs/lessons/'))
-      ? [language, ledgerGate]
-      : [language];
+  const docPaths = paths.filter((path) => DOCS.test(path));
+  if (codePaths.length === 0) {
+    const checks = [language];
+    if (paths.some((path) => path === 'docs/lessons.md' || path.startsWith('docs/lessons/')))
+      checks.push(ledgerGate);
+    if (mode !== 'ci') checks.push(['node', 'scripts/doc-reader-tests.mjs', ...docPaths]);
+    return checks;
+  }
   const required = [
     language,
     ['node', 'scripts/ui-debt-gate.mjs'],
@@ -67,13 +77,14 @@ export function prepushPlan(paths, mode = 'local') {
         ...required,
         ...localOnly,
         ...(paths.some((path) =>
-          /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|scrub-git-env)/.test(
+          /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|scrub-git-env|doc-reader-tests)/.test(
             path,
           ),
         )
           ? [['node', '--test', ...selfTests]]
           : []),
         ['node', 'scripts/prepush-vitest.mjs'],
+        ...(docPaths.length ? [['node', 'scripts/doc-reader-tests.mjs', ...docPaths]] : []),
         ...(paths.some((path) => path.startsWith('apps/web/'))
           ? [['pnpm', '--filter', '@cairn/web', 'test']]
           : []),
@@ -134,6 +145,13 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
       ? [['pnpm', '--filter', '@cairn/web', 'e2e', `--shard=${args[1]}`]]
       : prepushPlan(changedPaths(), args[0]?.slice(2) ?? 'local');
   const lease = plan.length > 0 ? await acquireSlot() : null;
+  if (lease !== null && plan.some((step) => step.includes('e2e:affected'))) {
+    const conflict = slotPortReport({ slot: lease.slot });
+    if (conflict !== null) {
+      console.error(conflict);
+      process.exit(1);
+    }
+  }
   runPlan(plan, { cwd: root, env: leaseEnv(lease) });
   console.log(`[prepush] PASS (${plan.length} checks)`);
 }

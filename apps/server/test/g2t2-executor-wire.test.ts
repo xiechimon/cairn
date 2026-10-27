@@ -10,7 +10,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
-import { agent as agentTable, apiKey as apiKeyTable } from '../src/db/schema.js';
+import { agent as agentTable, apiKey as apiKeyTable, githubConnection } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bindAllAgents, bootServer, issueApiKey, type TestServer } from './helpers.js';
@@ -50,8 +50,11 @@ interface WireWorld {
   ): Promise<{ raw: string; git: { username: string; password: string } | null }>;
 }
 
-async function setupWorld(projectBody: Record<string, unknown>): Promise<WireWorld> {
-  const s = bootServer({ claimHoldMs: 200 });
+async function setupWorld(
+  projectBody: Record<string, unknown>,
+  bootOpts: Parameters<typeof bootServer>[0] = {},
+): Promise<WireWorld> {
+  const s = bootServer({ claimHoldMs: 200, ...bootOpts });
   disposables.push(() => s.dispose());
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
@@ -152,5 +155,49 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
     const { raw } = await w.tokenOf(claimed.step.id);
     expect(raw.split(GH_TOKEN)).toHaveLength(2);
     expect(JSON.stringify(claimed)).not.toContain(GH_TOKEN);
+  });
+
+  test('github project with an expired access token -> token git carries the refreshed access token', async () => {
+    const refreshed = 'ghu_refreshed_for_machine';
+    const refreshBodies: string[] = [];
+    const w = await setupWorld(
+      { name: 'g2t2-gh-expired', kind: 'github', githubRepo: 'octo/delta' },
+      {
+        oauthClient: { clientId: 'cid', clientSecret: 'cs' },
+        githubFetch: async (_input, init) => {
+          refreshBodies.push(init?.body ?? '');
+          const payload = {
+            access_token: refreshed,
+            refresh_token: 'ghr_next',
+            expires_in: 28_800,
+          };
+          return {
+            ok: true,
+            status: 200,
+            headers: { get: () => null },
+            json: async () => payload,
+            text: async () => JSON.stringify(payload),
+          };
+        },
+      },
+    );
+    upsertGithubConnection(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.s.team.id,
+        login: 'octo',
+        accessToken: GH_TOKEN,
+        scope: 'repo',
+        refreshToken: 'ghr_first',
+        accessTokenExpiresAt: Date.now() - 1000,
+      },
+    );
+    const claimed = await w.claim();
+    const { git } = await w.tokenOf(claimed.step.id);
+    expect(git).toEqual({ username: GITHUB_ACCESS_TOKEN_USERNAME, password: refreshed });
+    expect(refreshBodies).toHaveLength(1);
+    expect(refreshBodies[0]).toContain('refresh_token=ghr_first');
+    const row = w.s.db.select().from(githubConnection).get();
+    expect(row?.disconnectedReason).toBeNull();
   });
 });

@@ -1,9 +1,9 @@
 ---
-Category: Reading all history records by buildId to compose the "prior round" content mixed lessons from rounds 1 and 2 into round 3 after the same build was reworked and reused
+Category: Building the "previous round" by reading all history for a buildId mixed rounds 1 and 2 into round 3 once the same build was reused for rework several times
 Source: #1615 re-review (2026-10-24)
 Level: 2
-Safeguard: the "multiple reuses mix in old rounds" case in `apps/server/test/retry-lessons.test.ts` builds two reuses and asserts round 3 only contains round 2's content; the implementation bounds by the previous restart feedback's timestamp
+Safeguard: `apps/server/test/retry-lessons.test.ts` "reuse mixes in old rounds" seeds two reuses and asserts the third contains only the previous round; the implementation bounds by the time of the last restart feedback
 Intercepts: 1
 Recurrences: 0
-Notes: negative control: without the time bound the case goes red (blocking-round1 appears), green with the bound
+Notes: Negative control: without the time bound the case is red (blocking-round1 appears), with it green
 ---

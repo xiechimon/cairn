@@ -101,11 +101,11 @@
  "protectedPaths": [
   "apps/server/src/services/merge-gate/readiness.ts",
   "packages/shared/src/records/merge-gate.ts",
-  "docs/spec/28-自举闭环-自写自合.md"
+  "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md"
  ],
  "mergedBy": "user",
  "humanReasons": [
-  "protected paths: apps/server/src/services/merge-gate/readiness.ts, packages/shared/src/records/merge-gate.ts, docs/spec/28-自举闭环-自写自合.md",
+  "protected paths: apps/server/src/services/merge-gate/readiness.ts, packages/shared/src/records/merge-gate.ts, docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
   "5519 lines changed (over 800)"
  ],
  "missing": [],
