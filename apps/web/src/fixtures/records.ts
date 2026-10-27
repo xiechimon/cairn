@@ -274,6 +274,25 @@ export interface DocBlock {
   segments: DocSegment[];
 }
 
+export type WorkStep =
+  | { kind: 'think'; id: string; text: string; seconds: number | null }
+  | {
+      kind: 'call';
+      id: string;
+      action: 'read' | 'search' | 'run' | 'edit' | 'tool';
+      label: string;
+      target?: string;
+      description?: string;
+      command?: string;
+      diff?: { added: number; removed: number };
+      changes?: { removed: string[]; added: string[] };
+      output: string | null;
+      error: boolean;
+      running: boolean;
+      unfinished: boolean;
+      seconds: number | null;
+    };
+
 export type TranscriptItem =
   | { kind: 'run'; at?: string; machine?: string; cancelled?: boolean }
   | {
@@ -303,13 +322,7 @@ export type TranscriptItem =
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'injected-skills'; skills: { id: string; reason: string }[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number }
-  | {
-      kind: 'tools';
-      seconds: number;
-      expanded: boolean;
-      pills: string[];
-      outputs?: (string | null)[];
-    }
+  | { kind: 'work'; id: string; steps: WorkStep[]; expanded?: boolean }
   | { kind: 'elapsed'; seconds: number }
   | {
       kind: 'note';

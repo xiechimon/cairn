@@ -132,7 +132,40 @@ export const PROBE_TOOL_PILLS = [
 export const PROBE_TOOL_CALL_LABEL = `调用工具：${PROBE_TOOL_PILLS[1]}`;
 
 function probeTools(expanded: boolean): TranscriptItem {
-  return { kind: 'tools', seconds: 19, expanded, pills: PROBE_TOOL_PILLS };
+  return {
+    kind: 'work',
+    id: 'probe-work',
+    expanded,
+    steps: [
+      {
+        kind: 'call',
+        id: 'probe-edit',
+        action: 'edit',
+        label: 'edit',
+        target: 'README.md',
+        seconds: 9,
+        output: null,
+        error: false,
+        running: false,
+        unfinished: false,
+        diff: { added: 1, removed: 0 },
+        changes: { added: ['r7 rebaseline probe'], removed: [] },
+      },
+      {
+        kind: 'call',
+        id: 'probe-bash',
+        action: 'run',
+        label: 'bash',
+        description: 'Verify README.md',
+        command: PROBE_TOOL_PILLS[1]?.replace(/^bash /, ''),
+        seconds: 10,
+        output: null,
+        error: false,
+        running: false,
+        unfinished: false,
+      },
+    ],
+  };
 }
 
 const PROBE_MERGE_ROUND: TranscriptItem[] = [

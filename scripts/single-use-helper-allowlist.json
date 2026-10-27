@@ -138,5 +138,15 @@
     "path": "apps/web/src/chief/chief-message-rows.tsx",
     "name": "StoppedRow",
     "reason": "React component with its own i18n hook; inlining it would call the hook from inside the row switch"
+  },
+  {
+    "path": "apps/web/src/api/mappers.ts",
+    "name": "workCall",
+    "reason": "Classifies one tool call into a work step across six tool families; inlining puts 70 lines of branching inside the mapTranscript message loop"
+  },
+  {
+    "path": "apps/web/src/detail/work-trace.tsx",
+    "name": "WorkStepRow",
+    "reason": "React component with its own open-state hook, rendered inside the steps map; inlining would call hooks from the loop"
   }
 ]
