@@ -205,3 +205,73 @@ describe('Verification checklist item-by-item judgment (#1492)', () => {
     expect(reconcileVerifyVerdict(v, [])).toEqual(v);
   });
 });
+
+test('motion changes require a recording path in the verification evidence (#1783)', () => {
+  const prompt = buildVerifyStepPrompt({
+    ticketRef: '1783',
+    taskText: 'Verify',
+    planText: '',
+    pr: null,
+    changes: [
+      {
+        path: 'apps/web/src/card.tsx',
+        additions: 1,
+        deletions: 0,
+        hunks: [{ header: '@@', lines: ['+onDragStart={drag}'] }],
+      },
+    ],
+  });
+  expect(prompt).toContain('recording');
+  expect(prompt).toContain('--video');
+  expect(prompt).toContain('5 MiB');
+});
+
+test('verification dispatch without a supplied diff instructs the verifier to inspect recording triggers (#1783)', () => {
+  const prompt = buildVerifyStepPrompt({
+    ticketRef: '1783',
+    taskText: 'Verify',
+    planText: '',
+    pr: null,
+  });
+  expect(prompt).toContain('Inspect the added lines');
+  expect(prompt).toContain('apps/web/src/styles/motion.css');
+  expect(prompt).toContain('onDrag');
+  expect(prompt).toContain('recording');
+});
+
+test('a change whose hunks add no motion line does not demand a recording (#1783)', () => {
+  const prompt = buildVerifyStepPrompt({
+    ticketRef: '1783',
+    taskText: 'Verify',
+    planText: '',
+    pr: null,
+    changes: [
+      {
+        path: 'apps/web/src/card.tsx',
+        additions: 1,
+        deletions: 0,
+        hunks: [{ header: '@@', lines: ['+  <p>New copy</p>'] }],
+      },
+    ],
+  });
+  expect(prompt).not.toContain('Animated or interactive UI changed');
+});
+
+test('a change to the motion token file alone demands a recording (#1783)', () => {
+  const prompt = buildVerifyStepPrompt({
+    ticketRef: '1783',
+    taskText: 'Verify',
+    planText: '',
+    pr: null,
+    changes: [
+      {
+        path: 'apps/web/src/styles/motion.css',
+        additions: 1,
+        deletions: 0,
+        hunks: [{ header: '@@', lines: ['+  --motion-dur: 200ms;'] }],
+      },
+    ],
+  });
+  expect(prompt).toContain('Animated or interactive UI changed');
+  expect(prompt).toContain('docs/verify/1783/');
+});
