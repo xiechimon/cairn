@@ -1,0 +1,260 @@
+[
+  {
+    "doc": "docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md",
+    "name": "apps/web/src/board/sidebar.css",
+    "kind": "path",
+    "line": 18
+  },
+  {
+    "doc": "docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md",
+    "name": "apps/web/src/overlay/overlay.css",
+    "kind": "path",
+    "line": 18
+  },
+  {
+    "doc": "docs/adr/0004-chief-panel-docked-right-rail.md",
+    "name": "apps/web/src/chief/chief.css",
+    "kind": "path",
+    "line": 17
+  },
+  {
+    "doc": "docs/adr/0004-chief-panel-docked-right-rail.md",
+    "name": "apps/web/src/chief/chief.css",
+    "kind": "path",
+    "line": 18
+  },
+  {
+    "doc": "docs/adr/0009-site-wide-motion-converges-on-shadcn-defaults.md",
+    "name": "docs/research/assets/r1/f965382e067739e9.css",
+    "kind": "path",
+    "line": 12
+  },
+  {
+    "doc": "docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md",
+    "name": "library/t-0909/reports/contrast.md",
+    "kind": "path",
+    "line": 26
+  },
+  {
+    "doc": "docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md",
+    "name": "library/t-0909/scripts/gen-palettes.mjs",
+    "kind": "path",
+    "line": 34
+  },
+  {
+    "doc": "docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md",
+    "name": "library/t-0909/src/themes/c.css",
+    "kind": "path",
+    "line": 34
+  },
+  {
+    "doc": "docs/adr/0011-chief-process-segments-in-real-time-at-event-boundaries.md",
+    "name": "docs/verify/857/tail-samples.jsonl",
+    "kind": "path",
+    "line": 18
+  },
+  {
+    "doc": "docs/adr/0013-chief-panel-floating-window.md",
+    "name": "docs/verify/953/probe-sealed/probe-dump.json",
+    "kind": "path",
+    "line": 26
+  },
+  {
+    "doc": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
+    "name": "apps/server/src/routes-webhook.ts",
+    "kind": "path",
+    "line": 41
+  },
+  {
+    "doc": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
+    "name": "docs/lessons.md",
+    "kind": "path",
+    "line": 41
+  },
+  {
+    "doc": "docs/spec/00-foundation-decisions.md",
+    "name": "docs/research/r9-pi-sdk.md",
+    "kind": "path",
+    "line": 4
+  },
+  {
+    "doc": "docs/spec/00-foundation-decisions.md",
+    "name": "docs/research/r3-protocol-executor.md",
+    "kind": "path",
+    "line": 60
+  },
+  {
+    "doc": "docs/spec/01-stack-v2.md",
+    "name": "docs/research/r1-site-inventory.md",
+    "kind": "path",
+    "line": 5
+  },
+  {
+    "doc": "docs/spec/02-architecture-parity.md",
+    "name": "docs/research/r3-protocol-executor.md",
+    "kind": "path",
+    "line": 4
+  },
+  {
+    "doc": "docs/spec/03-ROADMAP.md",
+    "name": ".claude/skills/verify-pacman/SKILL.md",
+    "kind": "path",
+    "line": 77
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "parity/diff-regions.mjs",
+    "kind": "path",
+    "line": 36
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "parity/match-text.mjs",
+    "kind": "path",
+    "line": 36
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "parity/matrix.mjs",
+    "kind": "path",
+    "line": 38
+  },
+  {
+    "doc": "docs/spec/08-m7-feature-closed-loop.md",
+    "name": "docs/research/r9-attachments-mentions.md",
+    "kind": "path",
+    "line": 110
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/ui/button.tsx",
+    "kind": "path",
+    "line": 42
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/ui/button.css",
+    "kind": "path",
+    "line": 45
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/detail/detail.css",
+    "kind": "path",
+    "line": 51
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/chief/chief.css",
+    "kind": "path",
+    "line": 56
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/overlays/overlays.css",
+    "kind": "path",
+    "line": 58
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/board/sidebar.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/chief/chief.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/detail/overlays.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/overlay/mention-picker.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/overlay/overlay.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/pages/pages.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/resources/resources.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/secondary/secondary.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "docs/a3/diff-audit.md",
+    "kind": "path",
+    "line": 112
+  },
+  {
+    "doc": "docs/spec/10-m7-acceptance-report.md",
+    "name": ".claude/skills/verify-pacman/SKILL.md",
+    "kind": "path",
+    "line": 4
+  },
+  {
+    "doc": "docs/spec/11-model-service-and-machine-localization.md",
+    "name": "apps/web/src/chief/chief-model-select.tsx",
+    "kind": "path",
+    "line": 104
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "library/t-0909/src/themes/c.css",
+    "kind": "path",
+    "line": 3
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "apps/web/src/secondary/secondary.css",
+    "kind": "path",
+    "line": 204
+  },
+  {
+    "doc": "docs/spec/19-test-layering-and-blast-radius.md",
+    "name": ".claude/skills/verify-pacman/SKILL.md",
+    "kind": "path",
+    "line": 31
+  },
+  {
+    "doc": "docs/spec/21-single-machine-orchestration-defaults.md",
+    "name": "docs/research/r5-chief-behavior.md",
+    "kind": "path",
+    "line": 7
+  },
+  {
+    "doc": "docs/spec/asset-replacement-plan.md",
+    "name": "docs/research/r1-site-inventory.md",
+    "kind": "path",
+    "line": 4
+  },
+  {
+    "doc": "docs/spec/asset-replacement-plan.md",
+    "name": "scripts/generate-icons.mjs",
+    "kind": "path",
+    "line": 83
+  }
+]

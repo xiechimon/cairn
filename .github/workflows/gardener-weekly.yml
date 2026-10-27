@@ -18,7 +18,7 @@ jobs:
 
       - name: Gardener weekly sweep (#1617)
         run: |
-          node scripts/gardener-weekly.mjs --out gardener-summary
+          node scripts/gardener-weekly.mjs --drift --out gardener-summary
           cat gardener-summary/weekly-*.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload gardener summary (#1617)

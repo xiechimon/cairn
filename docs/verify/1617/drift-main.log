@@ -1,0 +1,49 @@
+## Spec/ADR drift at HEAD
+
+Scanned 58 docs under docs/spec and docs/adr. 43 missing names: 43 paths, 0 identifiers.
+
+| doc | missing | kind | line |
+| --- | --- | --- | --- |
+| docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md | `apps/web/src/board/sidebar.css` | path | 18 |
+| docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md | `apps/web/src/overlay/overlay.css` | path | 18 |
+| docs/adr/0004-chief-panel-docked-right-rail.md | `apps/web/src/chief/chief.css` | path | 17 |
+| docs/adr/0004-chief-panel-docked-right-rail.md | `apps/web/src/chief/chief.css` | path | 18 |
+| docs/adr/0009-site-wide-motion-converges-on-shadcn-defaults.md | `docs/research/assets/r1/f965382e067739e9.css` | path | 12 |
+| docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md | `library/t-0909/reports/contrast.md` | path | 26 |
+| docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md | `library/t-0909/scripts/gen-palettes.mjs` | path | 34 |
+| docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md | `library/t-0909/src/themes/c.css` | path | 34 |
+| docs/adr/0011-chief-process-segments-in-real-time-at-event-boundaries.md | `docs/verify/857/tail-samples.jsonl` | path | 18 |
+| docs/adr/0013-chief-panel-floating-window.md | `docs/verify/953/probe-sealed/probe-dump.json` | path | 26 |
+| docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md | `apps/server/src/routes-webhook.ts` | path | 41 |
+| docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md | `docs/lessons.md` | path | 41 |
+| docs/spec/00-foundation-decisions.md | `docs/research/r9-pi-sdk.md` | path | 4 |
+| docs/spec/00-foundation-decisions.md | `docs/research/r3-protocol-executor.md` | path | 60 |
+| docs/spec/01-stack-v2.md | `docs/research/r1-site-inventory.md` | path | 5 |
+| docs/spec/02-architecture-parity.md | `docs/research/r3-protocol-executor.md` | path | 4 |
+| docs/spec/03-ROADMAP.md | `.claude/skills/verify-pacman/SKILL.md` | path | 77 |
+| docs/spec/04-acceptance-criteria.md | `parity/diff-regions.mjs` | path | 36 |
+| docs/spec/04-acceptance-criteria.md | `parity/match-text.mjs` | path | 36 |
+| docs/spec/04-acceptance-criteria.md | `parity/matrix.mjs` | path | 38 |
+| docs/spec/08-m7-feature-closed-loop.md | `docs/research/r9-attachments-mentions.md` | path | 110 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/ui/button.tsx` | path | 42 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/ui/button.css` | path | 45 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/detail/detail.css` | path | 51 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/chief/chief.css` | path | 56 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/overlays/overlays.css` | path | 58 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/board/sidebar.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/chief/chief.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/detail/overlays.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/overlay/mention-picker.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/overlay/overlay.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/pages/pages.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/resources/resources.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/secondary/secondary.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `docs/a3/diff-audit.md` | path | 112 |
+| docs/spec/10-m7-acceptance-report.md | `.claude/skills/verify-pacman/SKILL.md` | path | 4 |
+| docs/spec/11-model-service-and-machine-localization.md | `apps/web/src/chief/chief-model-select.tsx` | path | 104 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `library/t-0909/src/themes/c.css` | path | 3 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `apps/web/src/secondary/secondary.css` | path | 204 |
+| docs/spec/19-test-layering-and-blast-radius.md | `.claude/skills/verify-pacman/SKILL.md` | path | 31 |
+| docs/spec/21-single-machine-orchestration-defaults.md | `docs/research/r5-chief-behavior.md` | path | 7 |
+| docs/spec/asset-replacement-plan.md | `docs/research/r1-site-inventory.md` | path | 4 |
+| docs/spec/asset-replacement-plan.md | `scripts/generate-icons.mjs` | path | 83 |

@@ -406,5 +406,5 @@ jobs:
           BASELINE_RATCHET_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch --depth=1 origin "$BASELINE_RATCHET_BASE_SHA"
-          node --test scripts/baseline-ratchet-gate.test.mjs scripts/gardener-weekly.test.mjs scripts/evidence-prune.test.mjs
+          node --test scripts/baseline-ratchet-gate.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs
           node scripts/baseline-ratchet-gate.mjs

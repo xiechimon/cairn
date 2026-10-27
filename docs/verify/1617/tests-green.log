@@ -1,0 +1,27 @@
+✔ a spec naming an existing path and an existing exported function reports nothing (65.623208ms)
+✔ a spec naming a deleted path reports it once with its line number (59.855705ms)
+✔ a renamed function is reported as a missing identifier (64.330181ms)
+✔ names inside fenced code blocks and URLs are ignored (54.380369ms)
+✔ a table row marked superseded is ignored (62.90712ms)
+✔ short or common words in backticks are not treated as identifiers (47.966073ms)
+✔ a path that never existed in the repo is not reported (47.918126ms)
+✔ a relative path resolving under a tracked file is not reported (50.240199ms)
+✔ a path with a line-range suffix is checked without the range (52.140282ms)
+✔ a directory reference is not reported as a missing path (47.687798ms)
+✔ ranks growth by the 7-day delta and stock by current count (1.00269ms)
+✔ report lists every category with its 7-day change, sorted, and writes the summary file (79.61815ms)
+✔ a baseline file born inside the window reports its whole count as growth (76.457692ms)
+✔ refuses a shallow clone, whose history would fake every delta as growth (70.090242ms)
+✔ a write pattern added 3+ times in the window with no gate becomes a candidate ticket (82.369763ms)
+✔ two new sites stay below the threshold and write no candidate (75.924537ms)
+✔ a pattern that a gate already covers never becomes a candidate (79.356749ms)
+✔ the watchlist patterns compile and each has a suggested rule when ungated (0.223222ms)
+✔ with --drift the report appends the spec/ADR drift section and writes the JSON (100.219592ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 618.405292

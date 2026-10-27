@@ -1,0 +1,408 @@
+✖ a spec naming an existing path and an existing exported function reports nothing (39.503749ms)
+✖ a spec naming a deleted path reports it once with its line number (41.251306ms)
+✖ a renamed function is reported as a missing identifier (46.711437ms)
+✖ names inside fenced code blocks and URLs are ignored (43.697914ms)
+✖ a table row marked superseded is ignored (43.945028ms)
+✖ short or common words in backticks are not treated as identifiers (35.490337ms)
+✖ a path that never existed in the repo is not reported (35.950753ms)
+✖ a relative path resolving under a tracked file is not reported (34.762749ms)
+✖ a path with a line-range suffix is checked without the range (37.3266ms)
+✖ a directory reference is not reported as a missing path (34.832236ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 0
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 441.798194
+
+✖ failing tests:
+
+test at doc-drift.test.mjs:46:1
+✖ a spec naming an existing path and an existing exported function reports nothing (39.503749ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.test.mjs:55:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at doc-drift.test.mjs:64:1
+✖ a spec naming a deleted path reports it once with its line number (41.251306ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.test.mjs:74:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at doc-drift.test.mjs:89:1
+✖ a renamed function is reported as a missing identifier (46.711437ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.test.mjs:98:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at doc-drift.test.mjs:108:1
+✖ names inside fenced code blocks and URLs are ignored (43.697914ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.test.mjs:119:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at doc-drift.test.mjs:127:1
+✖ a table row marked superseded is ignored (43.945028ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.test.mjs:138:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at doc-drift.test.mjs:146:1
+✖ short or common words in backticks are not treated as identifiers (35.490337ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.test.mjs:153:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at doc-drift.test.mjs:161:1
+✖ a path that never existed in the repo is not reported (35.950753ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.test.mjs:169:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at doc-drift.test.mjs:177:1
+✖ a relative path resolving under a tracked file is not reported (34.762749ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.test.mjs:185:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at doc-drift.test.mjs:193:1
+✖ a path with a line-range suffix is checked without the range (37.3266ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.test.mjs:201:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at doc-drift.test.mjs:209:1
+✖ a directory reference is not reported as a missing path (34.832236ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/tmp/ai-route-tmp/run-5hh971kk/tmp.nDijo5QWIz/doc-drift.test.mjs:217:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
