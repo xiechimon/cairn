@@ -1,3 +1,4 @@
+import { canMoveTodoProject } from '@cairn/shared';
 import { useApiMutations, useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectMenu } from '../chief/project-menu.js';
@@ -5,17 +6,6 @@ import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-
-function canMoveProject(todo: TodoRecord): boolean {
-  return (
-    todo.phase === 'todo' &&
-    todo.latestBuildId == null &&
-    todo.lastRunAt == null &&
-    !todo.hasChanges &&
-    !todo.hasPlan &&
-    todo.sourceKind !== 'github-issue'
-  );
-}
 
 export function MoveProjectLine({ todo }: { todo: TodoRecord }) {
   const { t } = useI18n();
@@ -27,7 +17,7 @@ export function MoveProjectLine({ todo }: { todo: TodoRecord }) {
     name: p.name,
     description: p.description,
   }));
-  if (!live || projects.length < 2 || !canMoveProject(todo)) return null;
+  if (!live || projects.length < 2 || !canMoveTodoProject(todo)) return null;
   return (
     <div data-testid="task-panel-move" className="mt-1 text-meta text-content-tertiary">
       {t('还没开始，放错了可以')}

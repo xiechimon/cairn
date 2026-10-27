@@ -449,7 +449,7 @@ export function sendChiefMessage(
     prompt:
       picked === null
         ? body.content
-        : `${PICKED_PROJECT_OPEN}${picked.name}（id: ${picked.id}）】\n${body.content}`,
+        : `${PICKED_PROJECT_OPEN}${picked.name.replace(/[【】\r\n]+/g, ' ').trim()}（id: ${picked.id}）】\n${body.content}`,
     trigger: 'user',
   });
   const projector = stepQueueProjector(deps.db, teamId);

@@ -9,10 +9,12 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
+  canMoveTodoProject,
   DONE_ANNOUNCEMENT,
   derivePlaceholderTitle,
   githubIssueSourceRef,
   IN_PROGRESS_PHASES,
+  isStartedTodo,
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
@@ -25,6 +27,7 @@ import {
   machine,
   message,
   plan as planTable,
+  schedule,
   steerPending,
   step,
   stopPending,
@@ -237,6 +240,21 @@ export function getTodo(deps: TodoDeps, id: string): TodoRecord | null {
   return row ? toTodoRecord(deps, row) : null;
 }
 
+function assertTagsInProject(db: Db, projectId: string, tagIds: readonly string[]): void {
+  if (tagIds.length === 0) return;
+  const owned = new Set(
+    db
+      .select({ id: tag.id })
+      .from(tag)
+      .where(and(eq(tag.projectId, projectId), inArray(tag.id, [...tagIds])))
+      .all()
+      .map((r) => r.id),
+  );
+  for (const tagId of tagIds) {
+    if (!owned.has(tagId)) throw new HttpError(400, `tag ${tagId} not in project`);
+  }
+}
+
 export function createTodo(
   deps: TodoDeps,
   input: {
@@ -256,19 +274,7 @@ export function createTodo(
 ): TodoRecord {
   const { db, hub } = deps;
   const tagIds = [...new Set(input.tagIds ?? [])];
-  if (tagIds.length > 0) {
-    const owned = new Set(
-      db
-        .select({ id: tag.id })
-        .from(tag)
-        .where(and(eq(tag.projectId, input.projectId), inArray(tag.id, tagIds)))
-        .all()
-        .map((r) => r.id),
-    );
-    for (const tagId of tagIds) {
-      if (!owned.has(tagId)) throw new HttpError(400, `tag ${tagId} not in project`);
-    }
-  }
+  assertTagsInProject(db, input.projectId, tagIds);
   const seqRow = db
     .select({ n: max(todo.seqNum) })
     .from(todo)
@@ -361,7 +367,7 @@ export function updateTodo(
   const sets: Partial<TodoRow> = {};
   const move =
     patch.projectId !== undefined && patch.projectId !== row.projectId
-      ? planProjectMove(deps, row, patch.projectId)
+      ? planProjectMove(deps, row, patch.projectId, patch.tagIds ?? [])
       : null;
   if (move !== null) Object.assign(sets, move.sets);
   if (patch.title !== undefined) sets.title = patch.title;
@@ -415,8 +421,12 @@ export function updateTodo(
     sets.v = row.v + 1;
     db.update(todo).set(sets).where(eq(todo.id, id)).run();
   }
-  if (move !== null && patch.tagIds === undefined) {
-    db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
+  if (move !== null) {
+    db.update(schedule)
+      .set({ projectId: move.sets.projectId })
+      .where(eq(schedule.todoId, id))
+      .run();
+    if (patch.tagIds === undefined) db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
   }
   if (patch.tagIds !== undefined) {
     db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
@@ -458,14 +468,22 @@ interface ProjectMove {
   targetName: string;
 }
 
-function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): ProjectMove {
+function planProjectMove(
+  deps: TodoDeps,
+  row: TodoRow,
+  projectId: string,
+  tagIds: readonly string[],
+): ProjectMove {
   const target = projectOfTodo(deps.db, { projectId, teamId: row.teamId });
   if (target === undefined) throw new HttpError(404, `project ${projectId}`);
-  if (row.phase !== 'todo' || isStartedTodoRow(row)) {
-    throw new HttpError(409, '这张卡已经开始了，不能换项目');
-  }
-  if (row.sourceKind === 'github-issue') {
-    throw new HttpError(409, '从 GitHub issue 导入的任务不能换项目');
+  assertTagsInProject(deps.db, target.id, tagIds);
+  if (!canMoveTodoProject(row)) {
+    throw new HttpError(
+      409,
+      row.sourceKind === 'github-issue'
+        ? '从 GitHub issue 导入的任务不能换项目'
+        : '这张卡已经开始了，不能换项目',
+    );
   }
   if (selfIssueInFlight.has(row.id)) {
     throw new HttpError(409, '正在给这张卡开 GitHub issue，稍后再换项目');
@@ -504,9 +522,11 @@ function scheduleMovedIssueClose(deps: TodoDeps, teamId: string, move: ProjectMo
             parsed.issueNumber,
             `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
           )
-        : undefined,
+        : console.warn(`moved todo: no GitHub token to close ${move.closeIssueRef}`),
     )
-    .catch(() => undefined);
+    .catch((error: unknown) =>
+      console.warn(`moved todo: closing ${move.closeIssueRef} failed`, error),
+    );
 }
 
 export function setTodoPhase(
@@ -585,17 +605,6 @@ export function settleSplitOnDone(deps: TodoDeps, childId: string): void {
   }
 }
 
-export function isStartedTodoRow(row: {
-  phase: Phase;
-  latestBuildId: string | null;
-  lastRunAt: number | null;
-  hasChanges: boolean;
-  hasPlan: boolean;
-}): boolean {
-  if ((IN_PROGRESS_PHASES as readonly string[]).includes(row.phase)) return true;
-  return row.latestBuildId != null || row.lastRunAt != null || row.hasChanges || row.hasPlan;
-}
-
 export function resetTodo(
   deps: TodoDeps & { convHub?: ConversationStreamHub },
   id: string,
@@ -612,7 +621,7 @@ export function resetTodo(
   if (expected?.buildId !== undefined && expected.buildId !== row.latestBuildId) {
     return { stale: true, record: current };
   }
-  if (!isStartedTodoRow(row)) return { stale: false, record: current };
+  if (!isStartedTodo(row)) return { stale: false, record: current };
 
   const buildRows = db.select().from(build).where(eq(build.todoId, id)).all();
   const buildIds = buildRows.map((b) => b.id);

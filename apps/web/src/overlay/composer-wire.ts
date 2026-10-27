@@ -92,7 +92,6 @@ export interface ComposerWire {
   inlineListboxId: string;
   inlineListboxRef: RefObject<HTMLDivElement | null>;
   closeInline: () => void;
-  insertToken: (token: MentionToken) => void;
   acceptInlineRow: (row: InlineCompletionRow) => void;
   slashOpen: boolean;
   slashQuery: string;
@@ -110,7 +109,6 @@ export interface ComposerWire {
   helpRows: SlashRow[];
   helpSkillCount: number;
   insertTokens: (tokens: MentionToken[]) => void;
-  insertFile: (path: string) => void;
   groups: MentionGroups;
 }
 
@@ -443,8 +441,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     insertTokensAt(tokens, inlineOpen ? inlineRangeRef.current : null);
   };
 
-  const insertToken = (token: MentionToken) => insertTokens([token]);
-
   const acceptInlineRow = (row: InlineCompletionRow) => {
     if (row.kind === 'file') {
       insertFile(row.label);
@@ -668,10 +664,8 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     inlineListboxId,
     inlineListboxRef,
     closeInline,
-    insertToken,
     acceptInlineRow,
     insertTokens,
-    insertFile,
     groups,
     slashOpen,
     slashQuery,

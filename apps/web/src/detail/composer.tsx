@@ -95,9 +95,8 @@ export function Composer({
     setInlineHighlight,
     inlineListboxId,
     inlineListboxRef,
-    insertToken,
+    acceptInlineRow,
     insertTokens,
-    insertFile,
     groups,
     slashOpen,
     slashQuery,
@@ -194,18 +193,7 @@ export function Composer({
             query={inlineQuery}
             highlight={inlineHighlight}
             onHover={setInlineHighlight}
-            onPick={(row) => {
-              if (row.kind === 'file') {
-                insertFile(row.label);
-              } else {
-                insertToken({
-                  kind: row.kind,
-                  id: row.id,
-                  label: row.label,
-                  ...(row.seq !== undefined ? { seq: row.seq } : {}),
-                });
-              }
-            }}
+            onPick={acceptInlineRow}
             listboxRef={inlineListboxRef}
             listboxId={inlineListboxId}
           />

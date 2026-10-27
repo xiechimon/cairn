@@ -1108,8 +1108,8 @@ export async function githubCloseIssue(
   comment: string,
 ): Promise<void> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
-  await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
   await writeJson(fetchImpl, 'PATCH', url, token, { state: 'closed', state_reason: 'not_planned' });
+  await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
 }
 
 export type GithubMergeResult =
