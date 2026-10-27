@@ -12,6 +12,7 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
+  CHIEF_DIGEST_GROUP_LABELS,
   CHIEF_DIGEST_ROW_ID_PREFIX,
   CHIEF_REMOTE_TOOLS,
   CHIEF_WATCH_REASON_DISPATCH,
@@ -776,7 +777,11 @@ export function fireDueChiefWakes(deps: ChiefDeps, now: number): void {
   }
 }
 
-export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string): string {
+export function composeChiefSystemPrompt(
+  deps: ChiefResourceDeps,
+  teamId: string,
+  threadId?: string,
+): string {
   const chiefRow = ensureChief(deps, teamId);
   const agentRow = chiefRow.agentId
     ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
@@ -822,7 +827,7 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
       ? memories.map((m) => `- ${m.title}：${m.content}`).join('\n')
       : '（尚无记忆）',
     '',
-    ...chiefDigestSection(deps.db, chiefRow.id),
+    ...(threadId !== undefined ? chiefDigestSection(deps.db, threadId) : []),
     '## 工作约定',
     '- 措辞→spec：把用户口语请求变换为 todo——title = 动词短语提炼；spec = 三段式：① 用户原文 blockquote（`> …`）② `要求：` bullet 展开（文件位置/内容要点/读者对象）③ 需要时 `补充信息（探测得出，非用户确认）：` bullet（先探测仓库/资源再写事实，显式标注非用户确认）。',
     '- 拆分：拆分粒度 = 核销次数——按可独立验收的成果拆，不按执行步骤拆；同类小事项合并一张卡（多子事项以 ` + ` 并入标题），跨类型、可各自独立验收的交付物才拆成多张。子卡 spec 必须内嵌用户原文片段（`> …` blockquote）并给兄弟任务文字交叉引用。',
@@ -854,21 +859,13 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
 
 const CHIEF_DIGEST_PROMPT_DIGESTS = 3;
 
-const DIGEST_GROUP_LABELS = {
-  decided: '决定',
-  done: '完成',
-  open: '还开着',
-  remembered: '记住了',
-} as const;
-
-function chiefDigestSection(db: Db, chiefId: string): string[] {
+function chiefDigestSection(db: Db, threadId: string): string[] {
   const rows = db
     .select({ content: chiefMessage.content })
     .from(chiefMessage)
-    .innerJoin(chiefThread, eq(chiefMessage.threadId, chiefThread.id))
     .where(
       and(
-        eq(chiefThread.chiefId, chiefId),
+        eq(chiefMessage.threadId, threadId),
         like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`),
       ),
     )
@@ -883,7 +880,7 @@ function chiefDigestSection(db: Db, chiefId: string): string[] {
     if (!parsed.success) continue;
     for (const item of parsed.data.items) {
       lines.push(
-        `- [${DIGEST_GROUP_LABELS[item.group]}] ${item.text}${item.reason !== '' ? `（${item.reason}）` : ''}`,
+        `- [${CHIEF_DIGEST_GROUP_LABELS[item.group]}] ${item.text}${item.reason !== '' ? `（${item.reason}）` : ''}`,
       );
     }
   }
@@ -902,7 +899,7 @@ export function chiefClaimContext(
   const threadRow = getChiefThread(deps, threadId);
   if (!threadRow) return null;
   return {
-    systemPrompt: composeChiefSystemPrompt(deps, threadRow.teamId),
+    systemPrompt: composeChiefSystemPrompt(deps, threadRow.teamId, threadId),
     sessionId: threadRow.sessionId !== '' ? threadRow.sessionId : null,
     trigger: 'user',
   };

@@ -1176,6 +1176,7 @@ function collectChiefStream(
     }
     const digest = m.role === 'system' ? chiefDigestOfContent(m.content) : null;
     if (digest !== null) {
+      if (digest.items.length === 0) continue;
       pendingTools = [];
       items.push({
         kind: 'digest',

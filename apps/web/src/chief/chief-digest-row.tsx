@@ -1,5 +1,5 @@
-import type { ChiefDigestGroup, ChiefDigestItem } from '@cairn/shared';
-import { CHIEF_DIGEST_GROUPS } from '@cairn/shared';
+import type { ChiefDigestItem } from '@cairn/shared';
+import { CHIEF_DIGEST_GROUP_LABELS, CHIEF_DIGEST_GROUPS } from '@cairn/shared';
 import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations, useMemories } from '../api/hooks.js';
@@ -11,13 +11,6 @@ import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, ExternalLink, Trash2 } from '../icons/index.js';
 import { AGENTS_HREF } from '../routes/agent-detail-page.js';
-
-const GROUP_LABELS: Record<ChiefDigestGroup, string> = {
-  decided: '决定',
-  done: '完成',
-  open: '还开着',
-  remembered: '记住了',
-};
 
 const DIVIDER_CLS =
   "my-3 flex items-center gap-3 text-meta text-content-tertiary before:h-px before:flex-1 before:bg-border before:content-[''] after:h-px after:flex-1 after:bg-border after:content-['']";
@@ -153,7 +146,7 @@ export function ChiefDigestRow({
           return (
             <div key={group} data-testid="chief-digest-group" className={GROUP_CLS}>
               <span className="pt-px text-meta text-content-tertiary">
-                {t(GROUP_LABELS[group])}
+                {t(CHIEF_DIGEST_GROUP_LABELS[group])}
               </span>
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                 {groupItems.map((item, index) => (

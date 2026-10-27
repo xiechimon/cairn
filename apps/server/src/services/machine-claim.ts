@@ -238,7 +238,11 @@ async function tryClaim(
   );
   const full = running >= workerCap;
   const workerCands = full ? [] : claimCandidates(deps, machineId, teamId);
-  const chiefCands = full ? [] : claimChiefCandidates(deps, machineId, teamId);
+  const chiefCands = full
+    ? []
+    : claimChiefCandidates(deps, machineId, teamId).sort(
+        (a, b) => Number(isChiefDigestStep(a.stepRow)) - Number(isChiefDigestStep(b.stepRow)),
+      );
   const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
   for (const cand of chiefCands) {
     if (cand.stepRow.createdAt > earliestWorker) break;

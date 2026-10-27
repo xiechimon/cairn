@@ -62,6 +62,12 @@ export const CHIEF_DIGEST_KIND = 'chief_digest';
 export const CHIEF_DIGEST_ROW_ID_PREFIX = 'chief-digest-';
 export const CHIEF_DIGEST_GROUPS = ['decided', 'done', 'open', 'remembered'] as const;
 export const chiefDigestGroupSchema = z.enum(CHIEF_DIGEST_GROUPS);
+export const CHIEF_DIGEST_GROUP_LABELS = {
+  decided: '决定',
+  done: '完成',
+  open: '还开着',
+  remembered: '记住了',
+} as const satisfies Record<(typeof CHIEF_DIGEST_GROUPS)[number], string>;
 export type ChiefDigestGroup = z.infer<typeof chiefDigestGroupSchema>;
 
 export const chiefDigestItemSchema = z.object({
@@ -77,7 +83,7 @@ export const chiefDigestContentSchema = z.object({
   reason: z.enum(['daily', 'threshold']),
   coversUntil: z.number(),
   madeAt: z.number(),
-  items: z.array(chiefDigestItemSchema).min(1),
+  items: z.array(chiefDigestItemSchema),
 });
 export type ChiefDigestContent = z.infer<typeof chiefDigestContentSchema>;
 

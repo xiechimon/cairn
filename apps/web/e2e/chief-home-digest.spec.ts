@@ -159,6 +159,15 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
     await expect(stream.getByTestId('chief-digest-card')).toContainText('上面内容的摘要');
   });
 
+  test('a digest with nothing worth keeping shows no divider', async ({ page }) => {
+    const empty = { ...digestRow('daily'), content: JSON.stringify({ kind: 'chief_digest', reason: 'daily', coversUntil: 12, madeAt: 1, items: [] }) };
+    await mockDigest(page, [...HISTORY.slice(0, 3), empty, ...HISTORY.slice(3)]);
+    await page.goto('/app');
+    const stream = page.getByTestId('chief-home').getByTestId('chief-stream');
+    await expect(stream).toContainText('已经补给它了');
+    await expect(stream.getByTestId('chief-digest')).toHaveCount(0);
+  });
+
   test('phone width: the open card fits the screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockDigest(page, withDigest('daily'));
