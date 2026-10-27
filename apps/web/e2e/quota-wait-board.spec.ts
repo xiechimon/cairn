@@ -28,6 +28,10 @@ test('board banner names the relay lane and the event type (banner half)', async
 test('detail header chip says `等额度` not `执行中` (header half of the card state)', async ({ page }) => {
   await page.goto(QUOTA);
   await page.locator('[data-todo-id="quota-waiting-1"] .todo-card-link').click();
+  await page
+    .getByRole('complementary', { name: '任务面板' })
+    .getByRole('link', { name: '展开为整页' })
+    .click();
   await expect(page.getByTestId('phase-chip')).toContainText('等额度');
 });
 

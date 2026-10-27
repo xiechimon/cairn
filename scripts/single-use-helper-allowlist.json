@@ -83,5 +83,35 @@
     "path": "apps/web/src/api/mappers.ts",
     "name": "handoffTodoOf",
     "reason": "Named predicate for a successful message_todo call; inlining it puts four guards inside the stream collection loop"
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "OpenPanel",
+    "reason": "React component mounted only while the panel is open; it owns the Escape listener and the focus effect, so inlining would run them behind the early return in TaskPanel."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "ListView",
+    "reason": "React component with its own fold state hooks, rendered only in the list branch; inlining would call useState conditionally."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "TaskRow",
+    "reason": "React component rendered inside the group map with its own i18n hook; inlining would call hooks from the loop."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "TaskDetail",
+    "reason": "React component keyed by task id so its composer ref and children reset per task; inlining loses the key boundary and calls hooks conditionally."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "LastSummary",
+    "reason": "React component that owns the messages query for one task, rendered only when the task is known; inlining would call the query hook conditionally."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "PanelComposer",
+    "reason": "React component that owns the steps query, mutations and draft state for one task, rendered only when the task is known; inlining would call those hooks conditionally."
   }
 ]

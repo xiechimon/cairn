@@ -30,6 +30,7 @@ import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSessionStorage, safeSetItem } from '../safe-storage.js';
+import { TaskPanelToggle } from '../task-panel/task-panel.js';
 import {
   type BoardColumnDef,
   COLUMNS,
@@ -321,6 +322,7 @@ export function BoardSurface({
             <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
             {t('定时')}
           </Button>
+          <TaskPanelToggle />
         </div>
       </header>
 

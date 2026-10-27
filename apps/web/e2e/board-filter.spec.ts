@@ -46,14 +46,15 @@ async function openTypePopover(page: Page) {
   await expect(typePopover(page)).toBeVisible();
 }
 
-test('legacy scenario (no projectNames) renders no repo section; top bar two buttons = bare filter button + new-task capsule', async ({
+test('legacy scenario (no projectNames) renders no repo section; top bar buttons = bare filter button + task panel toggle + new-task capsule', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01&view=board');
 
   await expect(chipsBar(page)).toHaveCount(0);
   const banner = page.getByRole('banner');
-  await expect(banner.getByRole('button')).toHaveCount(1);
+  await expect(banner.getByRole('button')).toHaveCount(2);
+  await expect(banner.getByRole('button', { name: '任务面板' })).toBeVisible();
   await expect(typeBtn(page)).toBeVisible();
   await expect(page.getByTestId('board-new-task-bar')).toBeVisible();
 
