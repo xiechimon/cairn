@@ -1,4 +1,4 @@
-import { checkPlanContract } from '@cairn/shared';
+import { checkPlanContract, planPriorArtLines } from '@cairn/shared';
 
 export interface PriorArtGrade {
   score: number;
@@ -6,11 +6,25 @@ export interface PriorArtGrade {
 }
 
 const REUSES_CRONER =
-  /\breuse\b[\s\S]{0,160}\bcroner\b|\bcroner\b[\s\S]{0,160}\breuse\b|复用[\s\S]{0,80}croner/i;
+  /^(?:(?:we\s+)?(?:will\s+|choose\s+to\s+|plan\s+to\s+)?)re-?use\s+croner\b|^(?:决定)?复用\s*croner\b/i;
+const REJECTS_CRONER = /\b(?:not|never)\s+re-?use\s+croner\b|不复用\s*croner\b/i;
 
 export function gradePlanPriorArt(plan: string): PriorArtGrade {
   const contract = checkPlanContract(plan);
-  if (contract.ok && REUSES_CRONER.test(plan)) {
+  const decisions = (planPriorArtLines(plan) ?? [])
+    .filter((line) => !line.startsWith('>'))
+    .map((line) =>
+      line
+        .replace(/[`*_]/g, '')
+        .replace(/^(?:[-•]\s+|\d+[.)]\s+)/, '')
+        .replace(/^(?:decision|决策|决定)\s*[:：]\s*/i, ''),
+    );
+  const reusesCroner =
+    !decisions.some((line) => REJECTS_CRONER.test(line)) &&
+    decisions.some((line) =>
+      line.split(/[;；。]/).some((clause) => REUSES_CRONER.test(clause.trim())),
+    );
+  if (contract.ok && reusesCroner) {
     return { score: 1, explanation: 'reuses croner and the prior-art contract passes' };
   }
   if (!contract.ok) {

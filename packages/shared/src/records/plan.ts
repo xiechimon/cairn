@@ -183,6 +183,23 @@ export function planNeedsPriorArt(content: string): boolean {
   return FEATURE_PLAN.test(prose.join('\n'));
 }
 
+export function planPriorArtLines(content: string): string[] | undefined {
+  const prior = namedSection(content.replace(/\r\n?/g, '\n'), 'prior art');
+  if (prior === undefined) return undefined;
+  const prose: string[] = [];
+  if (prior.head !== '') prose.push(prior.head);
+  let inFence = false;
+  for (const raw of prior.lines) {
+    const line = raw.trim();
+    if (line.startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (!inFence && line !== '') prose.push(line);
+  }
+  return prose;
+}
+
 export function checkPlanContract(content: string): PlanContractCheck {
   const normalized = content.replace(/\r\n?/g, '\n');
   const section = namedSection(normalized, 'verification');
@@ -215,20 +232,9 @@ export function checkPlanContract(content: string): PlanContractCheck {
     }
   }
   if (planNeedsPriorArt(normalized)) {
-    const prior = namedSection(normalized, 'prior art');
-    if (prior === undefined) problems.push('功能方案缺少 Prior art 小节');
+    const prose = planPriorArtLines(normalized);
+    if (prose === undefined) problems.push('功能方案缺少 Prior art 小节');
     else {
-      const prose: string[] = [];
-      if (prior.head !== '') prose.push(prior.head);
-      let inFence = false;
-      for (const raw of prior.lines) {
-        const line = raw.trim();
-        if (line.startsWith('```')) {
-          inFence = !inFence;
-          continue;
-        }
-        if (!inFence && line !== '') prose.push(line);
-      }
       if (!prose.some((line) => SOURCE_LINK.test(line)))
         problems.push('Prior art 小节至少要有一条来源链接');
       if (!prose.some((line) => DECISION_CHOICE.test(line) && DECISION_REASON.test(line)))

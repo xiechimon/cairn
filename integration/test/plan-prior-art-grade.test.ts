@@ -28,3 +28,49 @@ describe('plan prior-art eval (#1838)', () => {
     expect(reuse.explanation.length).toBeGreaterThan(0);
   });
 });
+
+const featurePlan = (decision: string, extra = '') => `## Context
+Kind: feature
+${extra}
+## Prior art
+- Source: https://github.com/hexagon/croner
+${decision}
+## Changes
+- Implement the selected scheduler.
+## Verification
+- Run pnpm lint.
+`;
+
+describe('prior-art decision scoring', () => {
+  test.each([
+    'Decision: do not reuse croner because we will build a hand-written parser.',
+    'Decision: never reuse croner because we will build a hand-written parser.',
+    'Decision: we will not reuse croner because we will build a hand-written parser.',
+    'Decision: build a hand-written parser because the croner reuse example is unsuitable.',
+    'Decision: reuse another-library because it is maintained; croner is only a reference.',
+    '> Decision: reuse croner because it is maintained.\nDecision: build a parser because the example is unsuitable.',
+    '```text\nDecision: reuse croner because it is maintained.\n```\nDecision: build a parser because the example is unsuitable.',
+  ])('does not award reuse credit to %s', (decision) => {
+    expect(gradePlanPriorArt(featurePlan(decision)).score).toBe(0.5);
+  });
+
+  test('ignores reuse claims outside the prior-art decision', () => {
+    expect(
+      gradePlanPriorArt(
+        featurePlan(
+          'Decision: build a parser because the library is unsuitable.',
+          'An earlier proposal said to reuse croner.',
+        ),
+      ).score,
+    ).toBe(0.5);
+  });
+
+  test.each([
+    'Decision: reuse `croner` because it is maintained.',
+    'Decision: we will reuse croner rather than build a parser.',
+    'Reuse croner because it is maintained.',
+    'Decision: do not hand-roll; reuse croner because it is maintained.',
+  ])('preserves affirmative reuse credit for %s', (decision) => {
+    expect(gradePlanPriorArt(featurePlan(decision)).score).toBe(1);
+  });
+});
