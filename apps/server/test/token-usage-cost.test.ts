@@ -305,14 +305,51 @@ describe('token usage cost at write time', () => {
     }
   });
 
-  test('backfill prices legacy zero rows when the rate is known and clears the rest once', async () => {
+  test.each(['paid', 'removed'] as const)(
+    'startup backfill preserves recorded costs when free model pricing becomes %s',
+    async (pricing) => {
+      const w = await world();
+      try {
+        const todoId = await createTodo(w.s, w.projectId, 'Historical cost');
+        await startBuild(w.s, w.projectId, todoId);
+        const claimed = await claimStep(w.s.app, w.token);
+        await reportDone(w.s.app, w.token, claimed.stepId, [
+          { model: FREE_MODEL, ...TOKENS },
+          { model: PRICED_MODEL, ...TOKENS },
+          { model: REPORTED_MODEL, ...TOKENS, cost: REPORTED_COST },
+        ]);
+        const before = w.s.db.select().from(tokenUsage).all();
+        w.s.db
+          .update(providerTable)
+          .set({
+            models:
+              pricing === 'paid'
+                ? [
+                    { id: 'free-model', name: 'Free', cost: RATES },
+                    { id: 'org/stub-model', name: 'Stub', cost: FREE_RATES },
+                  ]
+                : [],
+          })
+          .where(eq(providerTable.id, 'prov-cost'))
+          .run();
+        backfillTokenUsageCost(w.s.db);
+        backfillTokenUsageCost(w.s.db);
+        expect(w.s.db.select().from(tokenUsage).all()).toEqual(before);
+        expect((await readTodo(w.s, todoId)).usageCost?.total).toBeCloseTo(0.0942, 9);
+      } finally {
+        w.s.dispose();
+      }
+    },
+  );
+
+  test('backfill fills missing costs once and preserves recorded zero and partial costs', async () => {
     const w = await world();
     try {
-      const todoId = await createTodo(w.s, w.projectId, 'Legacy rows');
+      const todoId = await createTodo(w.s, w.projectId, 'Missing costs');
       w.s.db
         .insert(buildTable)
         .values({
-          id: 'build-legacy',
+          id: 'build-missing',
           todoId,
           withPlan: false,
           triggerSource: 'user',
@@ -322,9 +359,12 @@ describe('token usage cost at write time', () => {
       w.s.db
         .insert(tokenUsage)
         .values([
+          { buildId: 'build-missing', model: PRICED_MODEL, ...TOKENS },
+          { buildId: 'build-missing', model: UNKNOWN_MODEL, ...TOKENS },
+          { buildId: 'build-missing', model: FREE_MODEL, ...TOKENS },
           {
-            buildId: 'build-legacy',
-            model: PRICED_MODEL,
+            buildId: 'build-missing',
+            model: 'stub-gw/recorded-zero',
             ...TOKENS,
             costInput: 0,
             costOutput: 0,
@@ -333,47 +373,43 @@ describe('token usage cost at write time', () => {
             costTotal: 0,
           },
           {
-            buildId: 'build-legacy',
-            model: 'stub-gw/missing',
-            ...TOKENS,
-            costInput: 0,
-            costOutput: 0,
-            costCacheRead: 0,
-            costCacheWrite: 0,
-            costTotal: 0,
-          },
-          {
-            buildId: 'build-legacy',
-            model: REPORTED_MODEL,
+            buildId: 'build-missing',
+            model: 'stub-gw/partial',
             ...TOKENS,
             costInput: 0.01,
-            costOutput: 0.02,
-            costCacheRead: 0,
-            costCacheWrite: 0,
-            costTotal: 0.03,
-          },
-          {
-            buildId: 'build-legacy',
-            model: FREE_MODEL,
-            ...TOKENS,
-            costInput: 0,
-            costOutput: 0,
-            costCacheRead: 0,
-            costCacheWrite: 0,
-            costTotal: 0,
           },
         ])
         .run();
+      const preserved = w.s.db
+        .select()
+        .from(tokenUsage)
+        .all()
+        .filter((row) => row.model.endsWith('/recorded-zero') || row.model.endsWith('/partial'));
       backfillTokenUsageCost(w.s.db);
       expectRates(usageRow(w.s, PRICED_MODEL)!, 1);
-      expectUnknown(usageRow(w.s, 'stub-gw/missing')!);
-      expect(usageRow(w.s, REPORTED_MODEL)?.costTotal).toBe(0.03);
+      expectUnknown(usageRow(w.s, UNKNOWN_MODEL)!);
       expect(usageRow(w.s, FREE_MODEL)?.costTotal).toBe(0);
+      w.s.db
+        .update(providerTable)
+        .set({
+          models: [
+            { id: 'org/stub-model', name: 'Stub', cost: FREE_RATES },
+            { id: 'free-model', name: 'Free', cost: RATES },
+            { id: 'org/unknown-model', name: 'Now priced', cost: RATES },
+            { id: 'recorded-zero', name: 'Recorded zero', cost: RATES },
+            { id: 'partial', name: 'Partial', cost: RATES },
+          ],
+        })
+        .where(eq(providerTable.id, 'prov-cost'))
+        .run();
       backfillTokenUsageCost(w.s.db);
       expectRates(usageRow(w.s, PRICED_MODEL)!, 1);
-      expectUnknown(usageRow(w.s, 'stub-gw/missing')!);
-      expect(usageRow(w.s, REPORTED_MODEL)?.costTotal).toBe(0.03);
+      expectRates(usageRow(w.s, UNKNOWN_MODEL)!, 1);
       expect(usageRow(w.s, FREE_MODEL)?.costTotal).toBe(0);
+      for (const row of preserved) expect(usageRow(w.s, row.model)).toEqual(row);
+      const after = w.s.db.select().from(tokenUsage).all();
+      backfillTokenUsageCost(w.s.db);
+      expect(w.s.db.select().from(tokenUsage).all()).toEqual(after);
     } finally {
       w.s.dispose();
     }
