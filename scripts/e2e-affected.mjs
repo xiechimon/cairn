@@ -43,7 +43,7 @@ const BOARD = [
   'storage-unavailable',
   'mobile-narrow',
   'focus-ring-clip',
-  'chief-home-chat',
+  'chief-home-',
   'task-panel',
 ];
 const SIDEBAR = [
@@ -79,7 +79,7 @@ const DETAIL = [
   'spec-brief-',
   'spinner-',
   'chief-fab',
-  'chief-home-chat',
+  'chief-home-',
   'chief-stream-markdown',
   'composer-wire-reject',
   'user-menu-',

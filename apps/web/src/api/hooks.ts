@@ -751,6 +751,29 @@ export function useApiMutations(teamId: string | undefined) {
         ),
       onSuccess: invalidateAll,
     }),
+    chiefWithdraw: useMutation({
+      mutationFn: (input: { threadId: string; messageId: string }) =>
+        api.del<{ ok: boolean }>(
+          `/api/teams/${teamId}/chief/threads/${input.threadId}/messages/${input.messageId}`,
+        ),
+      onSuccess: invalidateAll,
+    }),
+    chiefSteer: useMutation({
+      mutationFn: (input: { threadId: string; messageId: string }) =>
+        api.post<{ steered: boolean }>(
+          `/api/teams/${teamId}/chief/threads/${input.threadId}/messages/${input.messageId}/steer`,
+          {},
+        ),
+      onSuccess: invalidateAll,
+    }),
+    chiefStop: useMutation({
+      mutationFn: (input: { threadId: string }) =>
+        api.post<{ delegated: boolean }>(
+          `/api/teams/${teamId}/chief/threads/${input.threadId}/stop`,
+          {},
+        ),
+      onSuccess: invalidateAll,
+    }),
     chiefAnswerQuestion: useMutation({
       mutationFn: (input: { threadId: string; requestId: string; answers: AskUserAnswer[] }) =>
         api.post<AskUserQuestionContent>(

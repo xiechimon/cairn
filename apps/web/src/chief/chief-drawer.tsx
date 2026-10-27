@@ -26,6 +26,9 @@ interface DrawerProps {
   onRewind?: (messageId: string) => void;
   onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancelQuestion?: (requestId: string) => void;
+  onWithdraw?: (messageId: string) => Promise<void>;
+  onSteer?: (messageId: string) => void;
+  onStop?: () => void;
 }
 
 export function ChiefDrawer(props: DrawerProps) {

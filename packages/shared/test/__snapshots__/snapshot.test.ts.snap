@@ -7486,6 +7486,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "fallbackModel": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "id": {
       "type": "string",
     },
@@ -7506,6 +7512,29 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
         "string",
         "null",
       ],
+    },
+    "pending": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "messageId": {
+            "type": "string",
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "held",
+            ],
+            "type": "string",
+          },
+        },
+        "required": [
+          "messageId",
+          "state",
+        ],
+        "type": "object",
+      },
+      "type": "array",
     },
     "pendingSessionResumeAt": {
       "anyOf": [
