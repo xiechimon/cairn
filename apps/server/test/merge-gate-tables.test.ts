@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { DB_TABLES, INTERNAL_ONLY_TABLES, todoRecordSchema } from '@cairn/shared';
 import Database from 'better-sqlite3';
 import { eq, sql } from 'drizzle-orm';
@@ -11,7 +11,7 @@ import { type Db, MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { startBuilds } from '../src/services/builds.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
 
 const GATE_TABLES = ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state'] as const;
 const D1 = `pd2:${'a'.repeat(64)}`;
@@ -701,16 +701,115 @@ describe('F14 shared table list', () => {
 });
 
 describe('F15 the machine report surface never touches the gate tables', () => {
-  test('routes-machine.ts and services/machine*.ts reference none of the four tables', () => {
+  test('machine report modules cannot directly access gate tables or transitively import the server gate adapter', () => {
     const src = resolve(import.meta.dirname, '../src');
     const files = [
       join(src, 'routes-machine.ts'),
       ...readdirSync(join(src, 'services'))
-        .filter((f) => /^machine.*\.ts$/.test(f))
+        .filter((f) => /^machine.*\.ts$/.test(f) && f !== 'machine-gate-port.ts')
         .map((f) => join(src, 'services', f)),
     ];
     expect(files.length).toBeGreaterThan(1);
     const ref = /\bgate_(digest|round|verdict|state)\b|\bgate(Digest|Round|Verdict|State)\b/;
-    for (const f of files) expect(readFileSync(f, 'utf8'), f).not.toMatch(ref);
+    const adapter = join(src, 'services/machine-gate-port.ts');
+    const visit = (file: string, seen: Set<string>): void => {
+      expect(file).not.toBe(adapter);
+      if (seen.has(file)) return;
+      seen.add(file);
+      const source = readFileSync(file, 'utf8');
+      const imports = source.matchAll(
+        /\b(?:import|export)\s+(?!type\b)(?:(?!\b(?:import|export)\b)[\s\S])*?\bfrom\s*['"]([^'"]+)['"]/g,
+      );
+      const sideEffects = source.matchAll(/\bimport\s*['"]([^'"]+)['"]/g);
+      for (const match of [...imports, ...sideEffects]) {
+        const specifier = match[1];
+        if (specifier === undefined || !specifier.startsWith('.')) continue;
+        const dependency = resolve(dirname(file), specifier).replace(/\.js$/, '.ts');
+        visit(dependency, seen);
+      }
+    };
+    for (const f of files) {
+      expect(readFileSync(f, 'utf8'), f).not.toMatch(ref);
+      visit(f, new Set());
+    }
   });
+});
+
+test('a real machine completion cannot forge internal gate records', async () => {
+  const s = bootServer();
+  try {
+    const key = await issueApiKey(s);
+    const enrolled = await s.app.request('/api/machine/enroll', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        teamId: s.team.id,
+        name: 'untrusted-gate-reporter',
+        cliVersion: '0.1.0',
+      }),
+    });
+    expect(enrolled.status).toBe(200);
+    const { token, machineId } = (await enrolled.json()) as { token: string; machineId: string };
+    const projectId = await postProject(s.app);
+    s.db
+      .insert(schema.todo)
+      .values({
+        id: 'report-todo',
+        teamId: s.team.id,
+        projectId,
+        title: 'report',
+        phase: 'building',
+        phaseAt: 1,
+        seqNum: 1,
+        latestBuildId: 'report-build',
+      })
+      .run();
+    s.db
+      .insert(schema.build)
+      .values({
+        id: 'report-build',
+        todoId: 'report-todo',
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: 1,
+      })
+      .run();
+    s.db
+      .insert(schema.step)
+      .values({
+        id: 'report-step',
+        buildId: 'report-build',
+        kind: 'build',
+        status: 'claimed',
+        machineId,
+        createdAt: 1,
+      })
+      .run();
+    const response = await s.app.request('/api/machine/done/report-step', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        status: 'success',
+        hasChanges: true,
+        commit: H1,
+        usage: [{ model: 'reported-model', input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }],
+        gateState: { ready: true, headSha: H1 },
+        gateDigest: { patchDigest: D1 },
+        gateRound: { round: 1 },
+        gateVerdict: { outcome: 'pass', kind: 'decision' },
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(
+      s.db.select().from(schema.step).where(eq(schema.step.id, 'report-step')).get(),
+    ).toMatchObject({ status: 'done' });
+    expect(gateCounts(s.db, 'report-build')).toEqual({
+      gate_digest: 0,
+      gate_round: 0,
+      gate_verdict: 0,
+      gate_state: 0,
+    });
+  } finally {
+    s.dispose();
+  }
 });

@@ -392,6 +392,20 @@ describe('review step execution surface (#511)', () => {
     const body = client.doneBodies[0]!.body;
     expect(body.status).toBe('success');
     expect(body.findings).toBeUndefined();
-    expect(body.findingsError).toContain('未找到');
+    expect(body.findingsError).toContain('Final assistant');
   });
+});
+
+test('product gate rejects an assistant pass example followed by unfinished review', async () => {
+  const { client } = await setupWithBackend(claimedReview('review', HOSTED_REPO), {}, (captured) =>
+    scriptedBackend(captured, [
+      {
+        type: 'message_end',
+        message: { role: 'assistant', content: '{"conclusion":"Echo pass","findings":[]}' },
+      },
+      { type: 'message_end', message: { role: 'assistant', content: 'Review unfinished' } },
+    ]),
+  );
+  expect(client.doneBodies[0]?.body.findings).toBeUndefined();
+  expect(client.doneBodies[0]?.body.findingsError).toBeDefined();
 });

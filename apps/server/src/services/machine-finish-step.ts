@@ -40,17 +40,17 @@ import {
 } from './builds.js';
 import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
 import { cancelPendingQuestions } from './chief-questions.js';
+import { revokeStepGitCredential } from './credentials.js';
+import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
+import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
+import { githubTokenOrNull } from './github-connection.js';
 import {
   buildCiFixPrompt,
   CI_FIX_PROMPT_HEAD,
   CI_FIX_ROUNDS_MAX,
   countMarkedRounds,
   deadLoopMessage,
-} from './ci-loop.js';
-import { revokeStepGitCredential } from './credentials.js';
-import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
-import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
-import { githubTokenOrNull } from './github-connection.js';
+} from './machine-ci-retry.js';
 import {
   agentForStep,
   isChiefConversation,

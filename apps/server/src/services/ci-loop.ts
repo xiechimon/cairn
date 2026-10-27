@@ -1,6 +1,5 @@
 import { conversationBranch } from '@cairn/shared';
-import { and, desc, eq, isNotNull, like, ne } from 'drizzle-orm';
-import type { Db } from '../db/client.js';
+import { and, desc, eq, isNotNull, ne } from 'drizzle-orm';
 import { build, step, todo } from '../db/schema.js';
 import {
   type FetchLike,
@@ -38,14 +37,28 @@ import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import { githubText } from './github-text.js';
+import {
+  buildCiFixPrompt,
+  CI_FIX_ROUNDS_MAX,
+  type CiCheckFailure,
+  countMarkedRounds,
+  deadLoopMessage,
+} from './machine-ci-retry.js';
 import { evaluateProductGate as evaluateMergeGate } from './machine-gate-port.js';
-import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD, CI_FIX_PUSH_RULE } from './retry-lessons.js';
+import { CI_FIX_PROMPT_HEAD } from './retry-lessons.js';
+
+export {
+  buildCiFixPrompt,
+  CI_FIX_ROUNDS_MAX,
+  type CiCheckFailure,
+  countMarkedRounds,
+  deadLoopMessage,
+} from './machine-ci-retry.js';
+
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
 export const CI_POLL_INTERVAL_MS = 60_000;
-
-export const CI_FIX_ROUNDS_MAX = 3;
 
 export const CI_EMPTY_CHECKS_GRACE_MS = 300_000;
 
@@ -71,20 +84,12 @@ export const CI_MERGE_CONFLICT_ROUNDS_MAX = 2;
 
 export const CI_REQUIRED_CHECKS_TTL_MS = 600_000;
 
-const CI_FIX_SUMMARY_MAX = 800;
-
 export interface CiPollLogger {
   info(obj: object, msg: string): void;
 }
 
 export interface CiPoller {
   sweep(now?: number): Promise<void>;
-}
-
-export interface CiCheckFailure {
-  name: string;
-  conclusion: string;
-  summary: string | null;
 }
 
 export type CheckVerdict =
@@ -146,40 +151,6 @@ export function buildMergeConflictPrompt(args: {
     `请在本分支上执行 git fetch origin ${quote(args.defaultBranch)}，再 git merge ${quote(`origin/${args.defaultBranch}`)}，解决冲突后提交，并推送到同一分支。`,
     '不要 rebase、不要 force-push、不要新开分支或 PR；推送后 CI 会重跑，系统会继续轮询。',
   ].join('\n');
-}
-
-export function buildCiFixPrompt(args: {
-  prNumber: number;
-  prUrl: string | null;
-  round: number;
-  failures: CiCheckFailure[];
-}): string {
-  const failures = args.failures
-    .map((f) => {
-      const summary = f.summary !== null ? `：${f.summary.slice(0, CI_FIX_SUMMARY_MAX)}` : '';
-      return `- ${f.name}（${f.conclusion}）${summary}`;
-    })
-    .join('\n');
-  return [
-    `${CI_FIX_PROMPT_HEAD} CI 修复轮（第 ${args.round} 轮）：PR #${args.prNumber}${args.prUrl ? `（${args.prUrl}）` : ''} 的 CI 检查未通过。`,
-    '',
-    CI_FIX_FAILURES_HEAD,
-    failures,
-    '',
-    CI_FIX_PUSH_RULE,
-  ].join('\n');
-}
-
-export function countMarkedRounds(db: Db, buildId: string, head: string): number {
-  return db
-    .select({ id: step.id })
-    .from(step)
-    .where(and(eq(step.buildId, buildId), eq(step.kind, 'build'), like(step.prompt, `${head}%`)))
-    .all().length;
-}
-
-export function deadLoopMessage(rounds: number): string {
-  return `CI 检查连续 ${rounds} 轮自动修复仍未通过（死循环闸：连续 ${CI_FIX_ROUNDS_MAX} 轮）——停止追加修复步，转人工处理。`;
 }
 
 interface PrChecksCacheEntry {
@@ -691,6 +662,21 @@ export function createCiPoller(
           return;
         }
       }
+      try {
+        const audited = await evaluateMergeGate(
+          { ...deps, githubFetch: run.githubFetch },
+          cand.buildId,
+          { requireAudit: true },
+        );
+        if (audited === null) throw new Error('Merged PR audit returned no result');
+      } catch (err) {
+        hintOnce(
+          cand.buildId,
+          `PR #${prNumber} 已在 GitHub 合并，但审计尚未确认；任务留在审核关口，稍后重试。`,
+          since,
+        );
+        throw err;
+      }
       const detail = [
         pull.mergeCommitSha === null
           ? null
@@ -1038,7 +1024,14 @@ export function createCiPoller(
     );
     for (const cand of reviewCandidates) {
       try {
-        await evaluateMergeGate({ ...deps, githubFetch: run.githubFetch }, cand.buildId);
+        try {
+          await evaluateMergeGate({ ...deps, githubFetch: run.githubFetch }, cand.buildId);
+        } catch (err) {
+          run.logger?.info(
+            { err: err instanceof Error ? err.message : String(err) },
+            'merge gate evaluation deferred before reconciliation',
+          );
+        }
         await reconcileOne(cand, now, tally);
       } catch (err) {
         tally.errors += 1;

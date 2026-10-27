@@ -1305,6 +1305,7 @@ async function runClaimedStep(
             } else {
               await sealFromContent(ev.message.content);
             }
+            sealedInMessage = false;
             break;
           }
           case 'error':
@@ -1737,7 +1738,11 @@ async function runClaimedStep(
       (existsSync(planPath) ? readAt(planPath) : readAt(join(cwd, PLAN_FILE_NAME))) ?? null;
   }
   const reviewExtraction =
-    claimed.step.kind === 'review' ? extractReviewVerdict(transcript.messages()) : null;
+    claimed.step.kind === 'review'
+      ? extractReviewVerdict(transcript.messages(), {
+          requireFinalVerdict: reviewGate === 'review',
+        })
+      : null;
   const verifyExtraction =
     claimed.step.kind === 'verify' ? extractVerifyVerdict(transcript.messages()) : null;
   const sessionIdForDone = handle?.sessionId ?? continueId;

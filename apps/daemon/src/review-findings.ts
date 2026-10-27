@@ -51,7 +51,27 @@ export function extractCodeFence(text: string): string | null {
 
 export function extractReviewVerdict(
   messages: readonly TranscriptMessageLike[],
+  options: { requireFinalVerdict?: boolean } = {},
 ): ReviewVerdictExtraction {
+  if (options.requireFinalVerdict) {
+    const finalText = messages
+      .filter((message) => message.role === 'assistant')
+      .map((message) => contentToText(message.content).trim())
+      .filter((text) => text !== '')
+      .at(-1);
+    const terminalFence = [...(finalText ?? '').matchAll(/```(?:json)?\s*\n([\s\S]*?)```/gi)].at(
+      -1,
+    );
+    const fenceIsTerminal =
+      terminalFence !== undefined &&
+      finalText?.slice((terminalFence.index ?? 0) + terminalFence[0].length).trim() === '';
+    const raw = fenceIsTerminal ? terminalFence?.[1]?.trim() : finalText;
+    try {
+      const parsed = reviewVerdictSchema.safeParse(JSON.parse(raw ?? ''));
+      if (parsed.success) return { status: 'ok', verdict: parsed.data };
+    } catch {}
+    return { status: 'failed', reason: 'Final assistant output must end with valid verdict JSON' };
+  }
   const finalLineVerdict = messages
     .filter((message) => message.role === 'assistant')
     .flatMap((message) => [

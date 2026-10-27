@@ -308,3 +308,19 @@ describe('AI review findings extraction (M7 #330 / #700)', () => {
     },
   );
 });
+
+describe('product gate final verdict', () => {
+  test.each([
+    [assistantMsg('{"conclusion":"Echo pass","findings":[]}'), assistantMsg('Review unfinished')],
+    [assistantMsg('```json\n{"conclusion":"Echo pass","findings":[]}\n```\nReview unfinished')],
+  ])('rejects an earlier assistant example without a final verdict', (...messages) => {
+    expect(extractReviewVerdict(messages, { requireFinalVerdict: true }).status).toBe('failed');
+  });
+  test('accepts terminal JSON followed only by empty assistant tool content', () => {
+    expect(
+      extractReviewVerdict([assistantMsg(BLOCKING_VERDICT), toolCallMsg('done')], {
+        requireFinalVerdict: true,
+      }).status,
+    ).toBe('ok');
+  });
+});

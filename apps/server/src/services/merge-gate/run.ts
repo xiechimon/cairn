@@ -31,18 +31,27 @@ export function readMergeGateState(
 export async function evaluateMergeGate(
   runtime: GateRuntimePort,
   buildId: string,
-  opts: { port?: GateGithubPort; now?: number; auditPort?: GateAuditIssuePort } = {},
+  opts: {
+    port?: GateGithubPort;
+    now?: number;
+    auditPort?: GateAuditIssuePort;
+    requireAudit?: boolean;
+  } = {},
 ): Promise<MergeReadiness | null> {
+  const unavailable = (): null => {
+    if (opts.requireAudit) throw new Error('Merged PR audit prerequisites unavailable');
+    return null;
+  };
   const buildRow = runtime.readBuild(buildId);
-  if (buildRow?.prNumber == null) return null;
+  if (buildRow?.prNumber == null) return unavailable();
   const todoRow = runtime.readTodo(buildRow.todoId);
-  if (todoRow === undefined) return null;
+  if (todoRow === undefined) return unavailable();
   const projectRow = runtime.readProject(todoRow);
   const repo = runtime.projectRepo(projectRow);
-  if (repo === null || projectRow === undefined) return null;
+  if (repo === null || projectRow === undefined) return unavailable();
   let port = opts.port ?? null;
   if (port === null) port = await runtime.githubPort(todoRow.teamId, repo);
-  if (port === null) return null;
+  if (port === null) return unavailable();
   const linked = todoRow.sourceRef !== null ? runtime.parseIssueRef(todoRow.sourceRef) : null;
   const ticketRef = String(linked?.issueNumber ?? todoRow.seqNum);
   let cache = readCaches.get(todoRow.teamId);
@@ -62,6 +71,9 @@ export async function evaluateMergeGate(
     cache,
   );
   const head = facts.pr !== null && isFullSha(facts.pr.headSha) ? facts.pr.headSha : null;
+  if (opts.requireAudit && (!facts.pr?.merged || head === null || !runtime.hasAuditStorage)) {
+    throw new Error('Merged PR audit requires readable merged facts and durable storage');
+  }
   const digest =
     head !== null && typeof facts.compare === 'object'
       ? computePatchDigest(facts.compare.files, {
@@ -325,17 +337,17 @@ export async function evaluateMergeGate(
       let auditPort = opts.auditPort;
       if (auditPort === undefined)
         auditPort = (await runtime.auditPort(todoRow.teamId, repo, buildRow.prNumber)) ?? undefined;
-      if (auditPort !== undefined)
-        mismatchIssue = await auditMergedGate(
-          runtime.readRuns,
-          {
-            buildId,
-            prNumber: buildRow.prNumber,
-            headSha: readiness.headSha,
-            merged: true,
-          },
-          auditPort,
-        );
+      if (auditPort === undefined) throw new Error('Merged PR audit issue port unavailable');
+      mismatchIssue = await auditMergedGate(
+        runtime.readRuns,
+        {
+          buildId,
+          prNumber: buildRow.prNumber,
+          headSha: readiness.headSha,
+          merged: true,
+        },
+        auditPort,
+      );
     }
     const reviewers: MergeGateRun['reviewers'] = stored.map((verdict) => {
       const output = spoken

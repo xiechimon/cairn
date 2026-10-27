@@ -19,10 +19,14 @@ import {
 } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machine-claim.js';
-import { evaluateProductGate as evaluateMergeGate } from '../src/services/machine-gate-port.js';
+import {
+  evaluateProductGate as evaluateMergeGate,
+  machineGatePort,
+} from '../src/services/machine-gate-port.js';
 import { readGateRuns } from '../src/services/machine-gate-storage.js';
 import { compareFilesFromResponse, computePatchDigest } from '../src/services/merge-gate/digest.js';
 import type { GateGithubPort, GateRaw } from '../src/services/merge-gate/github-port.js';
+import { evaluateMergeGate as evaluateCoreGate } from '../src/services/merge-gate/run.js';
 import { bootServer, postProject, type TestServer } from './helpers.js';
 
 const HEAD = 'a'.repeat(40);
@@ -888,4 +892,42 @@ describe('in-product merge gate', () => {
     const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
     expect(result?.blockers.map((item) => item.code)).toContain('independent-review-missing');
   });
+});
+
+describe('merged terminal audit certainty', () => {
+  test.each(['github-port', 'pull-facts', 'storage', 'audit-port', 'still-open'])(
+    'refuses terminal reconciliation without %s',
+    async (missing) => {
+      const { s, buildId } = await world();
+      const port = scriptedPort([]);
+      const originalPull = port.pull;
+      port.pull = async (...args) => {
+        if (missing === 'pull-facts') return { kind: 'failed', failure: { kind: 'network' } };
+        const raw = await originalPull(...args);
+        return raw.kind === 'ok'
+          ? {
+              ...raw,
+              body: { ...(raw.body as object), merged: missing !== 'still-open', state: 'closed' },
+            }
+          : raw;
+      };
+      const runtime = {
+        ...machineGatePort(s.svc),
+        githubPort: async () => (missing === 'github-port' ? null : port),
+        hasAuditStorage: missing !== 'storage',
+        auditPort: async () =>
+          missing === 'audit-port'
+            ? null
+            : {
+                readIssuePage: async () => ({ issues: [], hasMore: false }),
+                createIssue: async () => 99,
+              },
+        readRuns: () => [],
+        appendRun: () => {},
+      };
+      await expect(evaluateCoreGate(runtime, buildId, { requireAudit: true })).rejects.toThrow(
+        'audit',
+      );
+    },
+  );
 });

@@ -1,0 +1,36 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+ ❯ |@xiechimon/cairn| test/merge-gate-tables.test.ts (26 tests | 1 failed | 25 skipped) 55ms
+   ❯ F15 the machine report surface never touches the gate tables (1)
+     × machine report modules cannot directly access gate tables or transitively import the server gate adapter 51ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-tables.test.ts > F15 the machine report surface never touches the gate tables > machine report modules cannot directly access gate tables or transitively import the server gate adapter
+AssertionError: expected '/workspace/cairn-1794/apps/server/src…' not to be '/workspace/cairn-1794/apps/server/src…' // Object.is equality
+ ❯ visit test/merge-gate-tables.test.ts:716:24
+    714|     const adapter = join(src, 'services/machine-gate-port.ts');
+    715|     const visit = (file: string, seen: Set<string>): void => {
+    716|       expect(file).not.toBe(adapter);
+       |                        ^
+    717|       if (seen.has(file)) return;
+    718|       seen.add(file);
+ ❯ visit test/merge-gate-tables.test.ts:728:9
+ ❯ visit test/merge-gate-tables.test.ts:728:9
+ ❯ visit test/merge-gate-tables.test.ts:728:9
+ ❯ visit test/merge-gate-tables.test.ts:728:9
+ ❯ visit test/merge-gate-tables.test.ts:728:9
+ ❯ test/merge-gate-tables.test.ts:733:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 25 skipped (26)
+   Start at  10:57:22
+   Duration  4.25s (transform 71%, import 28%, tests 1%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 2.88s · 71% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
