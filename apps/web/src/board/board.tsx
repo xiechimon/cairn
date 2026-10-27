@@ -51,7 +51,7 @@ import {
   FilterPanel,
   TOPBAR_TEXT_BUTTON,
 } from './filter-panel.js';
-import { HomeSections, NeedsYouInbox, withoutBoardView } from './home.js';
+import { DailyBrief, HomeSections, NeedsYouInbox, withoutBoardView } from './home.js';
 import { BrandMark } from './sidebar.js';
 import { cardTag } from './tag-filter.js';
 
@@ -85,21 +85,12 @@ interface BoardProps {
   renderHome?: (home: HomeOverview) => ReactNode;
 }
 
-export interface ProjectGlance {
-  projectId: string;
-  name: string;
-  tone: number;
-  needsYou: number;
-  running: number;
-  doneToday: number;
-}
-
 export interface HomeOverview {
   sections: ReactNode;
+  brief: ReactNode;
   needsYou: number;
   running: number;
   doneToday: number;
-  byProject: ProjectGlance[];
 }
 
 const COLUMN_ICON = {
@@ -295,34 +286,6 @@ export function BoardSurface({
   const staleCount = pendingSplit.stale.length;
   const chatHome = home && renderHome != null;
   const startOfToday = new Date(fixture.now).setHours(0, 0, 0, 0);
-  const homeBuckets = {
-    needsYou: pendingSplit.fresh,
-    running: viewTodos('building'),
-    doneToday: visibleTodos.filter((todo) => todo.phase === 'done' && todo.phaseAt >= startOfToday),
-  };
-  const projectOrder = Object.keys(fixture.projectNames ?? {});
-  const projectGlances = new Map<string, ProjectGlance>();
-  if (projectOrder.length > 1) {
-    for (const [key, todos] of Object.entries(homeBuckets) as [
-      keyof typeof homeBuckets,
-      TodoRecord[],
-    ][]) {
-      for (const todo of todos) {
-        const name = fixture.projectNames?.[todo.projectId];
-        if (name == null) continue;
-        const row = projectGlances.get(todo.projectId) ?? {
-          projectId: todo.projectId,
-          name,
-          tone: projectOrder.indexOf(todo.projectId),
-          needsYou: 0,
-          running: 0,
-          doneToday: 0,
-        };
-        row[key] += 1;
-        projectGlances.set(todo.projectId, row);
-      }
-    }
-  }
   const filterEmpty = (
     <>
       <span className="text-sm text-muted-foreground">{t('没有匹配筛选条件的任务')}</span>
@@ -402,10 +365,20 @@ export function BoardSurface({
               loading={loading}
             />
           ),
-          needsYou: homeBuckets.needsYou.length,
-          running: homeBuckets.running.length,
-          doneToday: homeBuckets.doneToday.length,
-          byProject: [...projectGlances.values()].sort((x, y) => x.tone - y.tone),
+          brief: (
+            <DailyBrief
+              todos={visibleTodos}
+              now={fixture.now}
+              projectNames={fixture.projectNames}
+              onAction={onAction}
+              orchestrationOf={orchestrationOf}
+            />
+          ),
+          needsYou: pendingSplit.fresh.length,
+          running: viewTodos('building').length,
+          doneToday: visibleTodos.filter(
+            (todo) => todo.phase === 'done' && todo.phaseAt >= startOfToday,
+          ).length,
         })
       ) : home && !showFilterEmpty ? (
         <HomeSections

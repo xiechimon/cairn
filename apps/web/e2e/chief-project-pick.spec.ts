@@ -261,18 +261,6 @@ test.describe('the home composer picks a project (T6 #2009)', () => {
     await expect(input(page)).toBeVisible();
     await expect(chip(page)).toHaveCount(0);
   });
-
-  test('the home summary lists one line per project', async ({ page }) => {
-    await mockLive(page);
-    await page.goto('/app');
-    const lines = page.getByTestId('chief-home-project');
-    await expect(lines).toHaveCount(2);
-    await expect(lines.nth(0)).toContainText('cairn');
-    await expect(lines.nth(0)).toContainText('今天合并 1 个');
-    await expect(lines.nth(1)).toContainText('cairn-site');
-    await expect(lines.nth(1)).toContainText('1 个在跑');
-    await shot(page, 'home-by-project.png');
-  });
 });
 
 test.describe('moving a task to another project (T6 #2009)', () => {

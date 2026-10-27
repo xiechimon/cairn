@@ -36,7 +36,7 @@ import {
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
-import type { ChiefContent, Phase } from '../fixtures/records.js';
+import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
   ArrowDown,
@@ -131,6 +131,7 @@ export interface ChiefConversationProps {
   heroCollapsed?: boolean;
   todoGlances?: ReadonlyMap<string, TodoGlance>;
   composerRef?: (node: HTMLTextAreaElement | null) => void;
+  day?: { earlier: number; today: ReactNode };
 }
 
 export function ChiefConversation({
@@ -152,6 +153,7 @@ export function ChiefConversation({
   heroCollapsed = false,
   todoGlances,
   composerRef,
+  day,
 }: ChiefConversationProps) {
   const { t } = useI18n();
   const { live, teamId, user } = useLiveData();
@@ -373,6 +375,25 @@ export function ChiefConversation({
   );
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = home && empty && !heroCollapsed;
+  const rows = (chief.stream ?? []).map((item, i) => ({ item, i }));
+  const streamRow = ({ item, i }: { item: ChiefStreamItem; i: number }) => (
+    <ChiefStreamRow
+      key={chiefStreamRowKey(item, i)}
+      item={item}
+      index={i}
+      bound={chief.bound}
+      agent={chief.agent}
+      runningTool={chief.runningTool}
+      user={user}
+      copiedKey={copiedKey}
+      onCopy={copyText}
+      toolsOpen={toolsOpen}
+      onToggleTools={toggleTools}
+      onRewindRequest={(index, id) => setRewindConfirm({ index, id })}
+      onAnswerQuestion={onAnswerQuestion}
+      onCancelQuestion={onCancelQuestion}
+    />
+  );
   return (
     <>
       <header
@@ -540,24 +561,17 @@ export function ChiefConversation({
               data-testid="chief-stream"
             >
               <TodoGlanceContext.Provider value={glances}>
-                {chief.stream?.map((item, i) => (
-                  <ChiefStreamRow
-                    key={chiefStreamRowKey(item, i)}
-                    item={item}
-                    index={i}
-                    bound={chief.bound}
-                    agent={chief.agent}
-                    runningTool={chief.runningTool}
-                    user={user}
-                    copiedKey={copiedKey}
-                    onCopy={copyText}
-                    toolsOpen={toolsOpen}
-                    onToggleTools={toggleTools}
-                    onRewindRequest={(index, id) => setRewindConfirm({ index, id })}
-                    onAnswerQuestion={onAnswerQuestion}
-                    onCancelQuestion={onCancelQuestion}
-                  />
-                ))}
+                {day == null ? (
+                  rows.map(streamRow)
+                ) : (
+                  <>
+                    <div data-testid="chief-earlier" className="opacity-60">
+                      {rows.slice(0, day.earlier).map(streamRow)}
+                    </div>
+                    {day.today}
+                    {rows.slice(day.earlier).map(streamRow)}
+                  </>
+                )}
               </TodoGlanceContext.Provider>
             </MessageScrollerContent>
           </FadeScrollerViewport>
