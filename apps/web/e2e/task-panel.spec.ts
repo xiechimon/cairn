@@ -180,12 +180,18 @@ test.describe('task panel hosts', () => {
     await expect(page.locator('[data-column]')).toHaveCount(4);
     expect(new URL(page.url()).searchParams.get('view')).toBe('board');
     await expect(card.locator('.todo-card-link')).toHaveAttribute('href', /\/app\/todo\/inbox-running/);
-    const opened = page.context().waitForEvent('page');
+    await page.evaluate(() => {
+      window.addEventListener(
+        'click',
+        (event) => {
+          document.body.dataset.leftToBrowser = String(!event.defaultPrevented);
+          event.preventDefault();
+        },
+        { once: true },
+      );
+    });
     await card.locator('.todo-card-link').click({ modifiers: ['ControlOrMeta'] });
-    const tab = await opened;
-    await tab.waitForLoadState();
-    expect(new URL(tab.url()).pathname).toBe('/app/todo/inbox-running');
-    await tab.close();
+    await expect(page.locator('body')).toHaveAttribute('data-left-to-browser', 'true');
     expect(new URL(page.url()).pathname).toBe('/app');
     await expect(panel(page).getByTestId('task-panel-title')).toContainText('verify-cairn');
     await shot(page, 'board-task.png');
