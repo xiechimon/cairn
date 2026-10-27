@@ -98,7 +98,14 @@ type Row = { id: string; role: string; content: unknown; createdAt: number };
 
 async function mockLive(
   page: Page,
-  state: { threads: (typeof THREAD)[]; messages: Row[]; rejectSend?: boolean },
+  state: {
+    threads: (typeof THREAD)[];
+    messages: Row[];
+    rejectSend?: boolean;
+    todos?: unknown[];
+    projects?: unknown[];
+    sendAt?: number;
+  },
 ) {
   await page.addInitScript(() => {
     window.__es = [];
@@ -160,10 +167,24 @@ async function mockLive(
         watches: [],
         wakes: [],
       });
+    if (p === `/api/conversations/${THREAD.id}/messages` && request.method() === 'POST') {
+      const content = (request.postDataJSON() as { content: string }).content;
+      sent.push(content);
+      state.messages = [
+        ...state.messages,
+        {
+          id: `n${state.messages.length + 1}`,
+          role: 'user',
+          content,
+          createdAt: state.sendAt ?? Date.now(),
+        },
+      ];
+      return json({ thread: THREAD }, 201);
+    }
     if (p === `/api/conversations/${THREAD.id}/messages`) return json({ messages: state.messages });
     if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
-    if (p === '/api/todos') return json([TASK]);
-    if (p === '/api/projects') return json([PROJECT]);
+    if (p === '/api/todos') return json(state.todos ?? [TASK]);
+    if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
     if (p === '/api/teams/t1/members' || p === '/api/teams/t1/machines' || p === '/api/skills')
       return json([]);
     return json([]);
@@ -300,5 +321,205 @@ test.describe('home is one continuous chief chat (T1)', () => {
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(width).toBeLessThanOrEqual(390);
     await evidenceShot(page, 'home-chat-phone.png');
+  });
+});
+
+const DAY = 24 * 60 * 60 * 1000;
+const startOfToday = () => new Date().setHours(0, 0, 0, 0);
+const yesterdayHistory = (): Row[] => {
+  const base = startOfToday() - 10 * 60 * 60 * 1000;
+  return HISTORY.map((row, i) => ({ ...row, createdAt: base + i * 60_000 }));
+};
+const SITE = { ...PROJECT, id: 'proj-2', name: 'cairn-site', repoName: 'cairn-site' };
+const dayTasks = () => [
+  TASK,
+  {
+    ...TASK,
+    id: 'todo-2',
+    seqNum: 12,
+    title: '首页问候语对齐原型',
+    phase: 'review',
+    phaseAt: Date.now() - 2 * 60 * 60 * 1000,
+  },
+  {
+    ...TASK,
+    id: 'todo-3',
+    projectId: 'proj-2',
+    seqNum: 4,
+    title: '官网作品区换成真实截图',
+    phase: 'done',
+    phaseAt: Date.now() - 3 * 60 * 60 * 1000,
+  },
+  {
+    ...TASK,
+    id: 'todo-4',
+    projectId: 'proj-2',
+    seqNum: 2,
+    title: '上周合并的旧任务',
+    phase: 'done',
+    phaseAt: Date.now() - 3 * DAY,
+  },
+];
+
+test.describe('the first open of each day starts on a clean home (T3)', () => {
+  test('yesterday stays above, dimmed, and today opens on the greeting, the date and a per-project brief', async ({
+    page,
+  }) => {
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: yesterdayHistory(),
+      todos: dayTasks(),
+      projects: [PROJECT, SITE],
+    });
+    await page.goto('/app');
+    const home = page.getByTestId('chief-home');
+    await expect(home).toHaveAttribute('data-layout', 'day');
+    const today = home.getByTestId('chief-home-today');
+    await expect(today.getByRole('heading', { level: 2 })).toContainText('ian');
+    const date = new Intl.DateTimeFormat('zh-CN', {
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+    }).format(Date.now());
+    await expect(today).toContainText(date);
+    await expect(today).toContainText('往上滑查看昨天的对话');
+    const lines = today.getByTestId('chief-brief-project');
+    await expect(lines).toHaveCount(2);
+    await expect(lines.nth(0)).toContainText('cairn');
+    await expect(lines.nth(0)).toContainText('1 个运行中');
+    await expect(lines.nth(0)).toContainText('1 项待处理');
+    await expect(lines.nth(1)).toContainText('cairn-site');
+    await expect(lines.nth(1)).toContainText('完成 1 个');
+    await expect(today.getByTestId('needs-you-row')).toHaveCount(1);
+    await expect(today.getByTestId('needs-you-row')).toContainText('首页问候语对齐原型');
+    const earlier = home.getByTestId('chief-earlier');
+    await expect(earlier).toContainText('已经补给它了');
+    const opacity = await earlier.evaluate((node) => Number(getComputedStyle(node).opacity));
+    expect(opacity).toBeLessThan(1);
+    await expect(today.getByRole('heading', { level: 2 })).toBeInViewport();
+    await expect(earlier.getByText('看板拖完卡片计数不对，修一下')).not.toBeInViewport();
+    await expect(page.getByTestId('home-sections')).toHaveCount(0);
+    await expect(home.getByTestId('jump-to-latest')).toHaveAttribute('data-active', 'false');
+    await evidenceShot(page, 'day-home.png');
+    await earlier.getByText('看板拖完卡片计数不对，修一下').scrollIntoViewIfNeeded();
+    await evidenceShot(page, 'day-home-scrolled-up.png');
+    await page.evaluate(() => localStorage.setItem('cairn-theme', 'light'));
+    await page.reload();
+    await expect(today.getByRole('heading', { level: 2 })).toBeInViewport();
+    await expect(home.getByTestId('jump-to-latest')).toHaveAttribute('data-active', 'false');
+    await page.waitForTimeout(300);
+    await evidenceShot(page, 'day-home-light.png');
+  });
+
+  test('a need card in the brief opens the task panel in place', async ({ page }) => {
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: yesterdayHistory(),
+      todos: dayTasks(),
+      projects: [PROJECT, SITE],
+    });
+    await page.goto('/app');
+    await page
+      .getByTestId('chief-home-today')
+      .getByTestId('needs-you-row')
+      .getByRole('link')
+      .click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe('todo-2');
+    expect(new URL(page.url()).pathname).toBe('/app');
+    await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
+  });
+
+  test('the first send of the day continues the chat below the brief', async ({ page }) => {
+    const sent = await mockLive(page, {
+      threads: [THREAD],
+      messages: yesterdayHistory(),
+      todos: dayTasks(),
+      projects: [PROJECT, SITE],
+    });
+    await page.goto('/app');
+    const home = page.getByTestId('chief-home');
+    await expect(home).toHaveAttribute('data-layout', 'day');
+    const input = home.getByTestId('chief-composer-input');
+    await input.fill('先看 #12 的评审');
+    await input.press('Enter');
+    await expect.poll(() => sent).toEqual(['先看 #12 的评审']);
+    await expect(home).toHaveAttribute('data-layout', 'chat');
+    const today = home.getByTestId('chief-home-today');
+    await expect(today).toBeVisible();
+    await expect(today).not.toContainText('往上滑查看');
+    const message = home.getByTestId('chief-stream').getByText('先看 #12 的评审');
+    await expect(message).toBeInViewport();
+    await expect(home.getByTestId('chief-earlier')).not.toContainText('先看 #12 的评审');
+    const brief = await today.boundingBox();
+    const sentBox = await message.boundingBox();
+    expect(brief).not.toBeNull();
+    expect(sentBox).not.toBeNull();
+    if (brief && sentBox) expect(sentBox.y).toBeGreaterThan(brief.y + brief.height - 1);
+    await evidenceShot(page, 'day-home-after-send.png');
+  });
+
+  test('a send whose server time is still yesterday does not bring the clean layout back', async ({
+    page,
+  }) => {
+    const sent = await mockLive(page, {
+      threads: [THREAD],
+      messages: yesterdayHistory(),
+      todos: dayTasks(),
+      projects: [PROJECT, SITE],
+      sendAt: startOfToday() - 60_000,
+    });
+    await page.goto('/app');
+    const home = page.getByTestId('chief-home');
+    const input = home.getByTestId('chief-composer-input');
+    await input.fill('时钟偏差');
+    await input.press('Enter');
+    await expect.poll(() => sent).toEqual(['时钟偏差']);
+    await expect(home.getByTestId('chief-stream')).toContainText('时钟偏差');
+    await expect(home).toHaveAttribute('data-layout', 'chat');
+    await expect(home.getByTestId('chief-earlier')).not.toContainText('时钟偏差');
+  });
+
+  test('a thread that already has messages from today opens as normal chat', async ({ page }) => {
+    const base = startOfToday() + 60_000;
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: HISTORY.map((row, i) => ({ ...row, createdAt: base + i * 1000 })),
+    });
+    await page.goto('/app');
+    const home = page.getByTestId('chief-home');
+    await expect(home.getByTestId('chief-stream')).toContainText('已经补给它了');
+    await expect(home).toHaveAttribute('data-layout', 'chat');
+    await expect(home.getByTestId('chief-home-today')).toHaveCount(0);
+  });
+
+  test('a quiet night says so in one line and shows no need cards', async ({ page }) => {
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: yesterdayHistory(),
+      todos: [{ ...TASK, phase: 'todo' }],
+    });
+    await page.goto('/app');
+    const today = page.getByTestId('chief-home-today');
+    await expect(today).toContainText('过去 24 小时各项目没有新进展');
+    await expect(today.getByTestId('chief-brief-project')).toHaveCount(0);
+    await expect(today.getByTestId('needs-you-row')).toHaveCount(0);
+  });
+
+  test('phone width: the clean home fits the screen', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: yesterdayHistory(),
+      todos: dayTasks(),
+      projects: [PROJECT, SITE],
+    });
+    await page.goto('/app');
+    const today = page.getByTestId('chief-home-today');
+    await expect(today.getByRole('heading', { level: 2 })).toBeInViewport();
+    await expect(page.getByTestId('chief-home').locator('.chief-composer')).toBeInViewport();
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(390);
+    await expect(page.getByTestId('jump-to-latest')).toHaveAttribute('data-active', 'false');
+    await evidenceShot(page, 'day-home-phone.png');
   });
 });

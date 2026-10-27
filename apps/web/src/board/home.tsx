@@ -468,3 +468,58 @@ export function HomeSections({
     </div>
   );
 }
+
+const BRIEF_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export function DailyBrief({ todos, ...ctx }: RowContext & { todos: TodoRecord[] }) {
+  const { t } = useI18n();
+  const projectOf = useProjectName(ctx.projectNames);
+  const running = new Set(columnTodos('building', todos));
+  const waiting = splitStale(columnTodos('pending', todos), ctx.now).fresh;
+  const waitingSet = new Set(waiting);
+  const byProject = new Map<string, { done: number; running: number; waiting: number }>();
+  for (const todo of todos) {
+    const name = projectOf(todo) ?? t('其他');
+    const done = todo.phase === 'done' && ctx.now - todo.phaseAt <= BRIEF_WINDOW_MS;
+    if (!done && !running.has(todo) && !waitingSet.has(todo)) continue;
+    const line = byProject.get(name) ?? { done: 0, running: 0, waiting: 0 };
+    if (done) line.done += 1;
+    if (running.has(todo)) line.running += 1;
+    if (waitingSet.has(todo)) line.waiting += 1;
+    byProject.set(name, line);
+  }
+  const lines = [...byProject].sort(([a], [b]) => a.localeCompare(b));
+  return (
+    <div data-testid="chief-brief" className="flex flex-col gap-3 text-ui text-content-secondary">
+      {lines.length > 0 ? (
+        <>
+          <p className="m-0">{t('过去 24 小时各项目的情况：')}</p>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {lines.map(([name, line]) => (
+              <li key={name} data-testid="chief-brief-project" className="flex gap-3">
+                <span className="w-28 flex-none truncate font-medium text-foreground">{name}</span>
+                <span className="min-w-0">
+                  {[
+                    line.done > 0 ? t('完成 {n} 个', { n: line.done }) : null,
+                    line.running > 0 ? t('{n} 个运行中', { n: line.running }) : null,
+                    line.waiting > 0 ? t('{n} 项待处理', { n: line.waiting }) : null,
+                  ]
+                    .filter((part) => part != null)
+                    .join(t('，'))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="m-0">{t('过去 24 小时各项目没有新进展')}</p>
+      )}
+      {waiting.length > 0 && (
+        <>
+          <p className="m-0">{t('有 {n} 件事需要你处理：', { n: waiting.length })}</p>
+          <NeedsYouRows todos={waiting} {...ctx} />
+        </>
+      )}
+    </div>
+  );
+}
