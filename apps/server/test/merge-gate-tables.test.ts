@@ -793,10 +793,13 @@ test('a real machine completion cannot forge internal gate records', async () =>
         hasChanges: true,
         commit: H1,
         usage: [{ model: 'reported-model', input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }],
-        gateState: { ready: true, headSha: H1 },
-        gateDigest: { patchDigest: D1 },
-        gateRound: { round: 1 },
-        gateVerdict: { outcome: 'pass', kind: 'decision' },
+        gateState: { ...stateRow('report-build'), ready: true, blockers: [] },
+        gateDigest: digestRow('report-build', H1, D1),
+        gateRound: {
+          ...roundRow('forged-round', 'report-build', D1, 1),
+          perspectives: ['security'],
+        },
+        gateVerdict: verdictRow('report-step', 'report-build', { kind: 'decision' }),
       }),
     });
     expect(response.status).toBe(200);
