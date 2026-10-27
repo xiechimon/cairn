@@ -1,0 +1,46 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+ ❯ |@xiechimon/cairn| test/merge-gate-verdict.test.ts (16 tests | 2 failed) 14ms
+   × decision safety comes from the payload rather than caller pass flags (true) 8ms
+   × decision safety comes from the payload rather than caller pass flags (undefined) 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-verdict.test.ts > decision safety comes from the payload rather than caller pass flags (true)
+AssertionError: expected 'pass' to be 'block' // Object.is equality
+
+Expected: "block"
+Received: "pass"
+
+ ❯ test/merge-gate-verdict.test.ts:195:27
+    193| test.each([true, undefined])('decision safety comes from the payload r…
+    194|   const result = bindGateVerdict({ ...base, kind: 'decision', reviewVe…
+    195|   expect(result?.outcome).toBe(gateLoosening === true ? 'block' : 'ext…
+       |                           ^
+    196| });
+    197|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-verdict.test.ts > decision safety comes from the payload rather than caller pass flags (undefined)
+AssertionError: expected 'pass' to be 'extraction_failed' // Object.is equality
+
+Expected: "extraction_failed"
+Received: "pass"
+
+ ❯ test/merge-gate-verdict.test.ts:195:27
+    193| test.each([true, undefined])('decision safety comes from the payload r…
+    194|   const result = bindGateVerdict({ ...base, kind: 'decision', reviewVe…
+    195|   expect(result?.outcome).toBe(gateLoosening === true ? 'block' : 'ext…
+       |                           ^
+    196| });
+    197|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 14 passed (16)
+   Start at  11:03:12
+   Duration  295ms (transform 57%, import 34%, tests 7%, worker 2%)

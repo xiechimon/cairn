@@ -1375,7 +1375,13 @@ function persistGateVerdict(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   todoRow: typeof todo.$inferSelect | undefined,
-  facts: { stepFailed: boolean; extracted: boolean; blocked: boolean; report: VerdictReport },
+  facts: {
+    stepFailed: boolean;
+    extracted: boolean;
+    blocked: boolean;
+    report: VerdictReport;
+    reviewVerdict?: ReviewVerdict;
+  },
 ): void {
   if (stepRow.kind !== 'review' && stepRow.kind !== 'verify') return;
   const expectedHeadSha = expectedHeadOf(stepRow);
@@ -1391,6 +1397,7 @@ function persistGateVerdict(
     reportedHeadSha: facts.report.reportedHeadSha,
     stepFailed: facts.stepFailed,
     extracted: facts.extracted,
+    ...(facts.reviewVerdict !== undefined ? { reviewVerdict: facts.reviewVerdict } : {}),
     blocked: facts.blocked,
   });
   if (bound === null) return;
@@ -2247,17 +2254,9 @@ export function completeStep(
     });
     persistGateVerdict(deps, stepRow, todoRow, {
       stepFailed: false,
-      extracted:
-        outcome.findings !== undefined &&
-        (parseReviewPromptMeta(stepRow.prompt)?.purpose !== 'decision' ||
-          (typeof outcome.findings.gateLoosening === 'boolean' &&
-            typeof outcome.findings.evalRulerChange === 'boolean')),
-      blocked:
-        outcome.findings !== undefined &&
-        (hasBlockingFinding(outcome.findings) ||
-          (parseReviewPromptMeta(stepRow.prompt)?.purpose === 'decision' &&
-            (outcome.findings.gateLoosening === true ||
-              outcome.findings.evalRulerChange === true))),
+      extracted: outcome.findings !== undefined,
+      blocked: outcome.findings !== undefined && hasBlockingFinding(outcome.findings),
+      ...(outcome.findings !== undefined ? { reviewVerdict: outcome.findings } : {}),
       report:
         outcome.verdictReport ??
         reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),

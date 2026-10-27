@@ -84,12 +84,13 @@ describe('bindGateVerdict: extraction failure does not count as pass', () => {
     expect(bound?.outcome).toBe('pass');
   });
 
-  test('review reports no head: use expectedHeadSha, the digest comes from this delivery patch', () => {
+  test('review reports no head: expected is not substituted and no digest binds', () => {
     expect(deliveryDigest).toMatch(/^pd2:[0-9a-f]{64}$/);
     const bound = bindGateVerdict({ ...base, reportedHeadSha: null, compareFiles: delivery });
-    expect(bound?.headSha).toBe(HEAD);
+    expect(bound?.headSha).toBeNull();
     expect(bound?.expectedHeadSha).toBe(HEAD);
-    expect(bound?.patchDigest).toBe(deliveryDigest);
+    expect(bound?.patchDigest).toBeNull();
+    expect(bound?.outcome).toBe('unbound');
   });
 
   test('verify reports no head: expected is not substituted, no digest binding', () => {
@@ -189,3 +190,15 @@ describe('bindGateVerdict: extraction failure does not count as pass', () => {
     ).toBeNull();
   });
 });
+
+test.each([true, undefined])(
+  'decision safety comes from the payload rather than caller pass flags (%s)',
+  (gateLoosening) => {
+    const result = bindGateVerdict({
+      ...base,
+      kind: 'decision',
+      reviewVerdict: { conclusion: 'Go', findings: [], gateLoosening, evalRulerChange: false },
+    });
+    expect(result?.outcome).toBe(gateLoosening === true ? 'block' : 'extraction_failed');
+  },
+);

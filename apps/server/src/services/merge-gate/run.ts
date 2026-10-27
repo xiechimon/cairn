@@ -7,6 +7,7 @@ import { type GateReadCache, newGateReadCache, readGateGithubFacts } from './git
 import type { GateGithubPort } from './github-port.js';
 import { type GateVerdictView, isFullSha, mergeReadiness } from './readiness.js';
 import type { GateRuntimePort } from './runtime-port.js';
+import { decisionVerdictFacts } from './verdict.js';
 
 const REVIEW_VERDICT_KIND = 'review_verdict';
 const readCaches = new Map<string, GateReadCache>();
@@ -139,10 +140,20 @@ export async function evaluateMergeGate(
         ? (runtime.parseReviewMeta(reviewStep.prompt)?.agentId ?? null)
         : null;
     const answer = answers.get(row.stepId);
+    const decision = decisionVerdictFacts(answer);
+    const outcome =
+      row.kind === 'decision' &&
+      (row.outcome === 'pass' || row.outcome === 'block' || row.outcome === 'extraction_failed')
+        ? !decision.extracted
+          ? 'extraction_failed'
+          : decision.blocked
+            ? 'block'
+            : row.outcome
+        : row.outcome;
     return {
       kind: row.kind,
       perspective: row.perspective ?? (reviewStep ? perspectiveOf(reviewStep.prompt) : null),
-      outcome: row.outcome,
+      outcome,
       patchDigest: row.patchDigest,
       headSha: row.headSha,
       reviewerId,

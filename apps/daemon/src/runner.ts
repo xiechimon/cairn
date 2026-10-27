@@ -85,6 +85,7 @@ import { computeHarnessHash } from './harness-hash.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
+import { reviewedCheckoutHead } from './merge-decision.js';
 import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
@@ -1478,7 +1479,21 @@ async function runClaimedStep(
     }
   }
 
+  let reviewHeadSha: string | null = null;
   if (checkout) {
+    try {
+      const observed =
+        ws !== null && deps.workspace ? await deps.workspace.headCommit(ws.cwd) : null;
+      reviewHeadSha = reviewedCheckoutHead(
+        headAtStart,
+        observed,
+        parseReviewPromptMeta(claimed.instruction ?? null)?.expectedHeadSha ?? null,
+      );
+    } catch (err) {
+      logger.step(
+        `review head observation failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     const failed = await rewindToStepStart();
     if (failed !== null) {
       logger.step(`review rewind failed: ${failed}`);
@@ -1752,6 +1767,7 @@ async function runClaimedStep(
     ...(sessionIdForDone !== null ? { sessionId: sessionIdForDone } : {}),
     usage: [...usage],
     hasChanges,
+    ...(reviewHeadSha !== null ? { gateHeadSha: reviewHeadSha } : {}),
     ...(headCommit !== null ? { commit: headCommit } : {}),
     ...(preservedCommits.length > 0 ? { preservedCommits } : {}),
     ...(pushHookOutput !== null ? { pushHookOutput } : {}),

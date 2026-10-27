@@ -157,7 +157,10 @@ class FakeClient implements MachineApi {
 }
 
 const CHECKOUT_CWD = '/tmp/fake-workspace/worktrees/conv-1';
-function fakeWorkspace(calls: string[], opts: { rewindError?: string } = {}): WorktreeOps {
+function fakeWorkspace(
+  calls: string[],
+  opts: { rewindError?: string; heads?: (string | null)[] } = {},
+): WorktreeOps {
   return {
     async prepare(input) {
       calls.push(`prepare:${input.cloneUrl}`);
@@ -182,7 +185,7 @@ function fakeWorkspace(calls: string[], opts: { rewindError?: string } = {}): Wo
     },
     async headCommit() {
       calls.push('headCommit');
-      return 'abc123';
+      return opts.heads?.shift() ?? (opts.heads === undefined ? 'abc123' : null);
     },
     async countAhead() {
       return 1;
@@ -243,13 +246,16 @@ function scriptedBackend(captured: SessionOpts[], script: unknown[]): AgentBacke
   };
 }
 
-async function setup(claimed: ClaimedStep, opts: { rewindError?: string } = {}) {
+async function setup(
+  claimed: ClaimedStep,
+  opts: { rewindError?: string; heads?: (string | null)[] } = {},
+) {
   return setupWithBackend(claimed, opts, (captured) => capturingBackend(captured));
 }
 
 async function setupWithBackend(
   claimed: ClaimedStep,
-  opts: { rewindError?: string },
+  opts: { rewindError?: string; heads?: (string | null)[] },
   backendFor: (captured: SessionOpts[]) => AgentBackend,
 ) {
   const home = mkdtempSync(join(tmpdir(), 'cairn-runner-review-'));
@@ -409,3 +415,50 @@ test('product gate rejects an assistant pass example followed by unfinished revi
   expect(client.doneBodies[0]?.body.findings).toBeUndefined();
   expect(client.doneBodies[0]?.body.findingsError).toBeDefined();
 });
+
+test.each(
+  ['stable', 'missing', 'drift', 'wrong-checkout'].flatMap((scenario) => [
+    { scenario, decision: true },
+    { scenario, decision: false },
+  ]),
+)(
+  'gate completion reports only the stable expected checkout head ($scenario, decision=$decision)',
+  async ({ scenario, decision }) => {
+    const head = 'a'.repeat(40);
+    const claimed = claimedReview('review', HOSTED_REPO);
+    claimed.instruction = buildReviewStepPrompt({
+      agentId: 'a1',
+      gate: 'review',
+      ...(decision ? { purpose: 'decision' as const } : {}),
+      expectedHeadSha: head,
+      expectedPatchDigest: `pd2:${'b'.repeat(64)}`,
+      planText: '',
+      checkout: true,
+    });
+    const { client } = await setupWithBackend(
+      claimed,
+      {
+        heads:
+          scenario === 'stable'
+            ? [head, head]
+            : scenario === 'missing'
+              ? [null, null]
+              : scenario === 'wrong-checkout'
+                ? ['d'.repeat(40), 'd'.repeat(40)]
+                : [head, 'c'.repeat(40)],
+      },
+      (captured) =>
+        scriptedBackend(captured, [
+          {
+            type: 'message_end',
+            message: {
+              role: 'assistant',
+              content:
+                '{"conclusion":"Go","findings":[],"gateLoosening":false,"evalRulerChange":false}',
+            },
+          },
+        ]),
+    );
+    expect(client.doneBodies[0]?.body.gateHeadSha).toBe(scenario === 'stable' ? head : undefined);
+  },
+);

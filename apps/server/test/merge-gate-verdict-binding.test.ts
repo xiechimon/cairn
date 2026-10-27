@@ -338,7 +338,7 @@ describe('#1404 S5a verdict binding', () => {
     expect(row?.outcome).toBe('extraction_failed');
     expect(row?.outcome).not.toBe('pass');
     expect(row?.expectedHeadSha).toBe(HEAD);
-    expect(row?.headSha).toBe(HEAD);
+    expect(row?.headSha).toBeNull();
     expect(row?.kind).toBe('review');
     expect(row?.buildId).toBe(buildId);
   });
@@ -380,7 +380,7 @@ describe('#1404 S5a verdict binding', () => {
     expect(row?.kind).toBe('verify');
   });
 
-  test('an extracted passing verdict lands as pass, with expectedHeadSha', async () => {
+  test('a passing review without an observed head remains unbound', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -396,9 +396,9 @@ describe('#1404 S5a verdict binding', () => {
       findings: PASS_FINDINGS,
     });
     const row = w.verdictOf(claimed.stepId);
-    expect(row?.outcome).toBe('pass');
+    expect(row?.outcome).toBe('unbound');
     expect(row?.expectedHeadSha).toBe(HEAD);
-    expect(row?.headSha).toBe(HEAD);
+    expect(row?.headSha).toBeNull();
     expect(row?.patchDigest).toBeNull();
   });
 
@@ -468,7 +468,7 @@ describe('#1404 S5a verdict binding', () => {
     expect(meta?.expectedHeadSha).toBe(HEAD);
   });
 
-  test('a review blocking verdict lands as block; with no reported commit it still binds expectedHeadSha', async () => {
+  test('a review blocking verdict records its finding but never invents an observed head', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -485,11 +485,11 @@ describe('#1404 S5a verdict binding', () => {
     });
     const row = w.verdictOf(stepId);
     expect(row?.outcome).toBe('block');
-    expect(row?.headSha).toBe(HEAD);
+    expect(row?.headSha).toBeNull();
     expect(row?.expectedHeadSha).toBe(HEAD);
   });
 
-  test('a failed review step lands through the failure funnel as step_failed, head from expectedHeadSha', async () => {
+  test('a failed review step records step_failed without inventing an observed head', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -500,7 +500,7 @@ describe('#1404 S5a verdict binding', () => {
     await w.done(stepId, { status: 'failed', errorMessage: 'review process exited' });
     const row = w.verdictOf(stepId);
     expect(row?.outcome).toBe('step_failed');
-    expect(row?.headSha).toBe(HEAD);
+    expect(row?.headSha).toBeNull();
     expect(row?.expectedHeadSha).toBe(HEAD);
   });
 
@@ -542,7 +542,7 @@ describe('#1404 S5a verdict binding', () => {
     });
     attachGithubRepo(w, buildId);
     const stepId = await claimReview(w, buildId);
-    await w.done(stepId, { status: 'success', findings: PASS_FINDINGS });
+    await w.done(stepId, { status: 'success', gateHeadSha: HEAD, findings: PASS_FINDINGS });
     await flushVerdictDigests();
     const row = w.verdictOf(stepId);
     expect(row?.headSha).toBe(HEAD);
@@ -656,7 +656,7 @@ describe('#1404 S5a verdict binding', () => {
     expect(row?.patchDigest).toBeNull();
   });
 
-  test('a gateHeadSha the gate does not recognise is ignored; review still binds expectedHeadSha', async () => {
+  test('an invalid observed review head is ignored and expectedHeadSha is not substituted', async () => {
     world = await setup();
     const w = world;
     const buildId = await reachReviewGate(w, {
@@ -669,7 +669,7 @@ describe('#1404 S5a verdict binding', () => {
       gateHeadSha: 'HEAD',
       findings: PASS_FINDINGS,
     });
-    expect(w.verdictOf(stepId)?.headSha).toBe(HEAD);
+    expect(w.verdictOf(stepId)?.headSha).toBeNull();
   });
 
   test('when gateHeadSha equals expected but commit is a later code commit, no digest binding', async () => {
@@ -714,7 +714,7 @@ describe('#1404 S5a verdict binding', () => {
       stepIds.push(claimed.stepId);
     }
     for (const stepId of stepIds) {
-      await w.done(stepId, { status: 'success', findings: PASS_FINDINGS });
+      await w.done(stepId, { status: 'success', gateHeadSha: HEAD, findings: PASS_FINDINGS });
     }
     const perspectives = stepIds.map((id) => w.verdictOf(id)?.perspective).sort();
     expect(perspectives).toEqual([...REVIEW_FANOUT_ROLES].sort());
@@ -742,7 +742,7 @@ describe('#1404 S5a verdict binding', () => {
         createdAt: 1,
       })
       .run();
-    await w.done(stepId, { status: 'success', findings: PASS_FINDINGS });
+    await w.done(stepId, { status: 'success', gateHeadSha: HEAD, findings: PASS_FINDINGS });
     expect(w.verdictOf(stepId)?.outcome).toBe('block');
     expect(w.verdictOf(stepId)?.createdAt).toBe(1);
   });
@@ -770,7 +770,7 @@ describe('#1404 S5a verdict binding', () => {
     attachGithubRepo(w, buildId);
     const stepId = await claimReview(w, buildId);
     const started = Date.now();
-    await w.done(stepId, { status: 'success', findings: PASS_FINDINGS });
+    await w.done(stepId, { status: 'success', gateHeadSha: HEAD, findings: PASS_FINDINGS });
     expect(Date.now() - started).toBeLessThan(2_000);
     const row = w.verdictOf(stepId);
     expect(row?.outcome).toBe('pass');
@@ -790,7 +790,7 @@ describe('#1404 S5a verdict binding', () => {
     });
     attachGithubRepo(w, buildId);
     const stepId = await claimReview(w, buildId);
-    await w.done(stepId, { status: 'success', findings: PASS_FINDINGS });
+    await w.done(stepId, { status: 'success', gateHeadSha: HEAD, findings: PASS_FINDINGS });
     await flushVerdictDigests();
     const row = w.verdictOf(stepId);
     expect(row?.outcome).toBe('pass');

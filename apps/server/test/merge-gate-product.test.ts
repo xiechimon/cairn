@@ -260,7 +260,10 @@ function completeReview(
     })
     .where(eq(step.id, stepId))
     .run();
-  completeStep(s.svc, stepId, outcome);
+  completeStep(s.svc, stepId, {
+    verdictReport: { reportedHeadSha: HEAD, driftedHeads: [] },
+    ...outcome,
+  });
 }
 
 describe('in-product merge gate', () => {
@@ -544,7 +547,7 @@ describe('in-product merge gate', () => {
     expect(recorded?.modelId).toBe('gpt-5.4');
   });
 
-  test.each(['go', 'block', 'drift', 'missing', 'safety', 'missing-safety'])(
+  test.each(['go', 'block', 'drift', 'missing-head', 'missing', 'safety', 'missing-safety'])(
     'the chief decision is a separate patch-bound step (%s)',
     async (scenario) => {
       const blocked = scenario === 'block';
@@ -619,7 +622,7 @@ describe('in-product merge gate', () => {
         s.svc,
         decision?.id ?? '',
         scenario === 'missing'
-          ? {}
+          ? { verdictReport: { reportedHeadSha: HEAD, driftedHeads: [] } }
           : {
               findings: {
                 conclusion: blocked ? 'No-go' : 'Go',
@@ -640,7 +643,9 @@ describe('in-product merge gate', () => {
                       driftedHeads: ['d'.repeat(40)],
                     },
                   }
-                : {}),
+                : scenario === 'missing-head'
+                  ? {}
+                  : { verdictReport: { reportedHeadSha: HEAD, driftedHeads: [] } }),
             },
       );
       const verdict = s.db
@@ -649,22 +654,30 @@ describe('in-product merge gate', () => {
         .where(eq(gateVerdict.stepId, decision?.id ?? ''))
         .get();
       expect(verdict?.kind).toBe('decision');
+      if (scenario === 'safety' || scenario === 'missing-safety')
+        s.db
+          .update(gateVerdict)
+          .set({ outcome: 'pass' })
+          .where(eq(gateVerdict.stepId, decision?.id ?? ''))
+          .run();
       const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
       expect(result?.ready).toBe(scenario === 'go');
       if (blocked || scenario === 'safety')
         expect(result?.blockers.map((item) => item.code)).toContain('decision-no-go');
       if (scenario === 'missing' || scenario === 'missing-safety')
         expect(result?.blockers.map((item) => item.code)).toContain('decision-extraction-failed');
-      if (scenario === 'drift')
+      if (scenario === 'drift' || scenario === 'missing-head')
         expect(result?.blockers.map((item) => item.code)).toContain('decision-missing');
-      expect(verdict?.headSha).toBe(scenario === 'drift' ? 'd'.repeat(40) : HEAD);
+      expect(verdict?.headSha).toBe(
+        scenario === 'missing-head' ? null : scenario === 'drift' ? 'd'.repeat(40) : HEAD,
+      );
       expect(
         s.db
           .select()
           .from(gateVerdict)
           .where(eq(gateVerdict.stepId, decision?.id ?? ''))
           .get()?.patchDigest,
-      ).toBe(scenario === 'drift' ? null : result?.patchDigest);
+      ).toBe(scenario === 'drift' || scenario === 'missing-head' ? null : result?.patchDigest);
     },
   );
 

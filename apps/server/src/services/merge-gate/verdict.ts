@@ -1,3 +1,4 @@
+import type { ReviewVerdict } from '@cairn/shared';
 import { type CompareFile, EVIDENCE_PREFIX } from '@cairn/shared/merge-gate';
 import { computePatchDigest } from './digest.js';
 import { type GateVerdictView, isFullSha } from './readiness.js';
@@ -9,6 +10,7 @@ export interface BindGateVerdictInput {
   reportedHeadSha: string | null;
   stepFailed: boolean;
   extracted: boolean;
+  reviewVerdict?: ReviewVerdict;
   blocked: boolean;
   compareFiles?: readonly CompareFile[] | null;
   pathsAfterExpected?: readonly string[] | null;
@@ -30,7 +32,7 @@ export function bindGateVerdict(input: BindGateVerdictInput): BoundGateVerdict |
     input.reportedHeadSha !== null && isFullSha(input.reportedHeadSha)
       ? input.reportedHeadSha
       : null;
-  const reported = reportedFull ?? (input.kind !== 'verify' ? input.expectedHeadSha : null);
+  const reported = reportedFull;
   const rawDir = input.evidenceDir ?? null;
   const segment =
     rawDir?.startsWith(EVIDENCE_PREFIX) && rawDir.endsWith('/')
@@ -69,13 +71,18 @@ export function bindGateVerdict(input: BindGateVerdictInput): BoundGateVerdict |
   }
   const aligned = reported === input.expectedHeadSha || evidenceOnly;
   const files = input.compareFiles ?? null;
+  const decision = decisionVerdictFacts(input.reviewVerdict);
+  const extracted = input.kind === 'decision' ? decision.extracted : input.extracted;
+  const blocked = input.kind === 'decision' ? decision.blocked : input.blocked;
   const outcome: GateVerdictView['outcome'] = input.stepFailed
     ? 'step_failed'
-    : input.extracted
-      ? input.blocked
+    : !extracted
+      ? 'extraction_failed'
+      : blocked
         ? 'block'
-        : 'pass'
-      : 'extraction_failed';
+        : input.kind !== 'verify' && reported === null
+          ? 'unbound'
+          : 'pass';
   return {
     kind: input.kind,
     perspective: input.kind === 'verify' ? null : input.perspective,
@@ -83,5 +90,22 @@ export function bindGateVerdict(input: BindGateVerdictInput): BoundGateVerdict |
     expectedHeadSha: input.expectedHeadSha,
     headSha: reported,
     patchDigest: aligned && files !== null ? computePatchDigest(files).patchDigest : null,
+  };
+}
+
+export function decisionVerdictFacts(verdict: ReviewVerdict | undefined): {
+  extracted: boolean;
+  blocked: boolean;
+} {
+  return {
+    extracted:
+      verdict !== undefined &&
+      typeof verdict.gateLoosening === 'boolean' &&
+      typeof verdict.evalRulerChange === 'boolean',
+    blocked:
+      verdict !== undefined &&
+      (verdict.gateLoosening === true ||
+        verdict.evalRulerChange === true ||
+        verdict.findings.some((finding) => finding.severity === 'blocking')),
   };
 }

@@ -1,0 +1,62 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+ ❯ |@xiechimon/cairn| test/merge-gate-product.test.ts (25 tests | 1 failed) 3134ms
+   ❯ in-product merge gate (20)
+     × the chief decision is a separate patch-bound step (missing-head) 117ms
+ ❯ |@xiechimon/cairn-cli| test/runner-review.test.ts (12 tests | 1 failed) 194ms
+   × decision completion reports only a stable observed checkout head (stable) 30ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-review.test.ts > decision completion reports only a stable observed checkout head (stable)
+AssertionError: expected undefined to be 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…' // Object.is equality
+
+- Expected:
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
++ Received:
+undefined
+
+ ❯ test/runner-review.test.ts:455:52
+    453|         ]),
+    454|     );
+    455|     expect(client.doneBodies[0]?.body.gateHeadSha).toBe(scenario === '…
+       |                                                    ^
+    456|   },
+    457| );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-product.test.ts > in-product merge gate > the chief decision is a separate patch-bound step (missing-head)
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/merge-gate-product.test.ts:655:29
+    653|       expect(verdict?.kind).toBe('decision');
+    654|       const result = await evaluateMergeGate(s.svc, buildId, { port: s…
+    655|       expect(result?.ready).toBe(scenario === 'go');
+       |                             ^
+    656|       if (blocked || scenario === 'safety')
+    657|         expect(result?.blockers.map((item) => item.code)).toContain('d…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 35 passed (37)
+   Start at  11:01:56
+   Duration  17.62s (transform 53%, import 27%, tests 20%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 5.47s · 51% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+  Transform  |@xiechimon/cairn-cli| transforming modules took 3.50s · 56% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
