@@ -883,6 +883,30 @@ describe('4 PRs in the list', () => {
   });
 });
 
+describe('4b issues another dispatch lane owns', () => {
+  test('a by:<lane> label other than by:cairn is skipped without reading events; by:cairn and unlabeled issues are taken', async () => {
+    const w = await makeWorld({ list: [1394, 1401, 1402, 1403, 1404] });
+    const lane: Record<number, string> = {
+      1394: 'by:pi',
+      1401: 'by:codex',
+      1402: 'BY:Grok',
+      1403: 'by:cairn',
+    };
+    w.gh.state.open = w.gh.state.open.map((i) =>
+      lane[i.number] !== undefined
+        ? { ...i, labels: [...i.labels, { name: lane[i.number] as string, color: 'ededed' }] }
+        : i,
+    );
+    const tally = await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1403, 1404]);
+    for (const n of [1394, 1401, 1402]) {
+      expect(w.gh.eventReads(n)).toHaveLength(0);
+      expect(todoOf(w.s, n)).toBeUndefined();
+    }
+    expect(tally?.otherLane).toBe(3);
+  });
+});
+
 describe('5 already imported / self-created issues', () => {
   test('numbers that already have a github-issue card or a self-created issue card: recorded as claimed, no events read, no re-orchestration', async () => {
     const w = await makeWorld({ list: [1394, 1401, 1402] });
