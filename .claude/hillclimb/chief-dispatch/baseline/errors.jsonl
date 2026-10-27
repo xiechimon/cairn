@@ -1,16 +1,46 @@
-{"prompt_id":"c04","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=6125/1178 latency=51.4s","retries":0,"judge_retries":0,"latency_s":51.892}
-{"prompt_id":"o02","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=7285/856 latency=42.5s","retries":0,"judge_retries":0,"latency_s":42.949}
-{"prompt_id":"o05","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=10528/2021 latency=96.6s","retries":0,"judge_retries":0,"latency_s":112.074}
-{"prompt_id":"s01","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=34.2s","retries":0,"judge_retries":0,"latency_s":34.724}
-{"prompt_id":"s01","rep":1,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=34.2s","retries":0,"judge_retries":0,"latency_s":34.673}
-{"prompt_id":"m06","rep":2,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=337.8s","retries":0,"judge_retries":0,"latency_s":338.448}
-{"prompt_id":"m06","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=10495/2663 latency=375.9s","retries":0,"judge_retries":0,"latency_s":376.477}
-{"prompt_id":"s01","rep":2,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=12525/3881 latency=152.3s","retries":0,"judge_retries":0,"latency_s":168.231}
-{"prompt_id":"s02","rep":1,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=35.3s","retries":0,"judge_retries":0,"latency_s":36.56}
-{"prompt_id":"s03","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=34.2s","retries":0,"judge_retries":0,"latency_s":35.931}
-{"prompt_id":"s04","rep":1,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=34.2s","retries":0,"judge_retries":0,"latency_s":34.687}
-{"prompt_id":"s02","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=11694/2076 latency=159.4s","retries":0,"judge_retries":0,"latency_s":161.252}
-{"prompt_id":"s05","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=34.2s","retries":0,"judge_retries":0,"latency_s":34.729}
-{"prompt_id":"s05","rep":1,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=34.2s","retries":0,"judge_retries":0,"latency_s":34.728}
-{"prompt_id":"s06","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=34.4s","retries":0,"judge_retries":0,"latency_s":35.209}
-{"prompt_id":"s06","rep":2,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=51.6s","retries":0,"judge_retries":0,"latency_s":52.208}
+{"prompt_id":"d03","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":11.931}
+{"prompt_id":"c01","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":9.539}
+{"prompt_id":"c01","rep":0,"failure_class":"timeout","error":"c01 rep0: exceeded 1800s wall-clock ceiling","retries":0,"judge_retries":0,"latency_s":1835.878}
+{"prompt_id":"c04","rep":2,"failure_class":"error","error":"建 agent doc 失败: 408 null","retries":0,"judge_retries":0,"latency_s":431.148}
+{"prompt_id":"c05","rep":0,"failure_class":"error","error":"建 agent doc 失败: 408 null","retries":0,"judge_retries":0,"latency_s":430.539}
+{"prompt_id":"c03","rep":2,"failure_class":"timeout","error":"c03 rep2: exceeded 1800s wall-clock ceiling","retries":0,"judge_retries":0,"latency_s":1800.68}
+{"prompt_id":"c04","rep":1,"failure_class":"timeout","error":"c04 rep1: exceeded 1800s wall-clock ceiling","retries":0,"judge_retries":0,"latency_s":1818.178}
+{"prompt_id":"c06","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=done usage=0/0 latency=262.7s","retries":0,"judge_retries":0,"latency_s":268.153}
+{"prompt_id":"f01","rep":0,"failure_class":"error","error":"machine api 408: ","retries":0,"judge_retries":0,"latency_s":106.905}
+{"prompt_id":"c06","rep":2,"failure_class":"error","error":"machine api 408: ","retries":0,"judge_retries":0,"latency_s":107.134}
+{"prompt_id":"f01","rep":1,"failure_class":"error","error":"waitFor timeout","retries":0,"judge_retries":0,"latency_s":236.356}
+{"prompt_id":"f01","rep":2,"failure_class":"error","error":"waitFor timeout","retries":0,"judge_retries":0,"latency_s":236.364}
+{"prompt_id":"f02","rep":0,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":35.124}
+{"prompt_id":"c05","rep":2,"failure_class":"timeout","error":"c05 rep2: exceeded 1800s wall-clock ceiling","retries":0,"judge_retries":0,"latency_s":1845.491}
+{"prompt_id":"f03","rep":0,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":85.844}
+{"prompt_id":"f03","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":75.068}
+{"prompt_id":"f03","rep":2,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":99.379}
+{"prompt_id":"f04","rep":0,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":87.405}
+{"prompt_id":"f04","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":104.23}
+{"prompt_id":"f04","rep":2,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":71.825}
+{"prompt_id":"f02","rep":1,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=83425/3381 latency=1387.2s","retries":0,"judge_retries":0,"latency_s":1415.221}
+{"prompt_id":"f02","rep":2,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=67675/2263 latency=1375.3s","retries":0,"judge_retries":0,"latency_s":1380.199}
+{"prompt_id":"c06","rep":1,"failure_class":"timeout","error":"c06 rep1: exceeded 1800s wall-clock ceiling","retries":0,"judge_retries":0,"latency_s":1858.426}
+{"prompt_id":"f05","rep":0,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":118.555}
+{"prompt_id":"f05","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":303.883}
+{"prompt_id":"f06","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":320.404}
+{"prompt_id":"f06","rep":0,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":444.242}
+{"prompt_id":"f06","rep":2,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":294.898}
+{"prompt_id":"o01","rep":0,"failure_class":"error","error":"machine api 408: ","retries":0,"judge_retries":0,"latency_s":202.468}
+{"prompt_id":"o01","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":180.4}
+{"prompt_id":"o01","rep":2,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":412.786}
+{"prompt_id":"o03","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":8.169}
+{"prompt_id":"o02","rep":0,"failure_class":"timeout","error":"o02 rep0: exceeded 1800s wall-clock ceiling","retries":0,"judge_retries":0,"latency_s":1803.876}
+{"prompt_id":"o02","rep":1,"failure_class":"timeout","error":"o02 rep1: exceeded 1800s wall-clock ceiling","retries":0,"judge_retries":0,"latency_s":1846.495}
+{"prompt_id":"o02","rep":2,"failure_class":"timeout","error":"o02 rep2: exceeded 1800s wall-clock ceiling","retries":0,"judge_retries":0,"latency_s":1914.038}
+{"prompt_id":"o04","rep":0,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":522.947}
+{"prompt_id":"o04","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":503.328}
+{"prompt_id":"o04","rep":2,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":567.256}
+{"prompt_id":"o05","rep":2,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":385.035}
+{"prompt_id":"o06","rep":0,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":191.627}
+{"prompt_id":"o06","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":97.704}
+{"prompt_id":"o06","rep":2,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":244.385}
+{"prompt_id":"n01","rep":0,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":447.601}
+{"prompt_id":"n02","rep":1,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":25.881}
+{"prompt_id":"n02","rep":0,"failure_class":"harness_error","error":"回合未正常完成：step=failed usage=0/0 latency=25.7s","retries":0,"judge_retries":0,"latency_s":26.851}
+{"prompt_id":"n03","rep":0,"failure_class":"error","error":"fetch failed","retries":0,"judge_retries":0,"latency_s":34.39}
