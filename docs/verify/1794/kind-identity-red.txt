@@ -1,0 +1,40 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+ ❯ |@xiechimon/cairn| test/merge-gate-product.test.ts (39 tests | 3 failed | 36 skipped) 183ms
+   × a verdict cannot replace its queued kind or claim identity (kind) 96ms
+   × a verdict cannot replace its queued kind or claim identity (agent) 36ms
+   × a verdict cannot replace its queued kind or claim identity (model) 49ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-product.test.ts > a verdict cannot replace its queued kind or claim identity (kind)
+AssertionError: expected [ 'phase-not-review', …(3) ] to include 'decision-missing'
+ ❯ test/merge-gate-product.test.ts:1363:64
+    1361|       .run();
+    1362|     const readiness = await evaluateMergeGate(s.svc, buildId, { port: …
+    1363|     expect(readiness?.blockers.map((blocker) => blocker.code)).toConta…
+       |                                                                ^
+    1364|       attack === 'kind' ? 'decision-missing' : 'independent-review-mis…
+    1365|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-product.test.ts > a verdict cannot replace its queued kind or claim identity (agent)
+ FAIL  |@xiechimon/cairn| test/merge-gate-product.test.ts > a verdict cannot replace its queued kind or claim identity (model)
+AssertionError: expected [ 'phase-not-review', …(2) ] to include 'independent-review-missing'
+ ❯ test/merge-gate-product.test.ts:1363:64
+    1361|       .run();
+    1362|     const readiness = await evaluateMergeGate(s.svc, buildId, { port: …
+    1363|     expect(readiness?.blockers.map((blocker) => blocker.code)).toConta…
+       |                                                                ^
+    1364|       attack === 'kind' ? 'decision-missing' : 'independent-review-mis…
+    1365|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 36 skipped (39)
+   Start at  12:42:04
+   Duration  1.98s (transform 63%, import 27%, tests 10%)

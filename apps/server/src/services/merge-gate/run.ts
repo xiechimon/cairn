@@ -107,21 +107,42 @@ export async function evaluateMergeGate(
   );
   const views: GateVerdictView[] = stored.map((row) => {
     const reviewStep = steps.find((item) => item.id === row.stepId);
-    const completed = reviewStep?.status === 'done';
+    const meta = reviewStep?.kind === 'review' ? runtime.parseReviewMeta(reviewStep.prompt) : null;
+    const expectedKind =
+      reviewStep?.kind === 'verify'
+        ? 'verify'
+        : meta?.gate === 'review'
+          ? meta.purpose === 'decision'
+            ? 'decision'
+            : 'review'
+          : null;
+    const execution = reviewStep?.fallback?.execution;
+    const bindingKnown =
+      reviewStep?.status === 'done' &&
+      expectedKind === row.kind &&
+      typeof execution?.agentId === 'string' &&
+      execution.agentId !== '' &&
+      typeof execution.modelId === 'string' &&
+      execution.modelId !== '' &&
+      row.reviewerAgentId === execution.agentId &&
+      row.reviewerModelId === execution.modelId &&
+      (row.kind === 'verify' || meta?.agentId === execution.agentId);
     const answer =
-      completed && row.kind !== 'verify' ? runtime.parseReviewVerdict(row.payload) : null;
+      bindingKnown && row.kind !== 'verify' ? runtime.parseReviewVerdict(row.payload) : null;
     const verifyAnswer =
-      completed && row.kind === 'verify' ? runtime.parseVerifyVerdict(row.payload) : null;
+      bindingKnown && row.kind === 'verify' ? runtime.parseVerifyVerdict(row.payload) : null;
     const payload =
       row.kind === 'verify'
         ? verifyVerdictFacts(verifyAnswer ?? undefined, verificationItems)
         : reviewVerdictFacts(answer ?? undefined);
     const outcome = ['pass', 'block', 'extraction_failed'].includes(row.outcome)
-      ? !payload.extracted
-        ? 'extraction_failed'
-        : payload.blocked
-          ? 'block'
-          : row.outcome
+      ? !bindingKnown
+        ? 'unbound'
+        : !payload.extracted
+          ? 'extraction_failed'
+          : payload.blocked
+            ? 'block'
+            : row.outcome
       : row.outcome;
     return {
       kind: row.kind,

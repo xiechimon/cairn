@@ -313,7 +313,16 @@ describe('in-product merge gate', () => {
     expect(review).toBeDefined();
     s.db
       .update(step)
-      .set({ status: 'done', finishedAt: 2 })
+      .set({
+        status: 'done',
+        finishedAt: 2,
+        fallback: {
+          model: null,
+          tried: [],
+          zeroUsageRetried: false,
+          execution: { agentId: 'agent-reviewer', modelId: 'gpt-5.4' },
+        },
+      })
       .where(eq(step.id, review?.id ?? ''))
       .run();
     const statuses: { sha: string; state: string; description: string }[] = [];
@@ -453,7 +462,17 @@ describe('in-product merge gate', () => {
       const currentId = current?.id ?? '';
       s.db
         .update(step)
-        .set({ status: 'done', createdAt: 20, finishedAt: 30 })
+        .set({
+          status: 'done',
+          createdAt: 20,
+          finishedAt: 30,
+          fallback: {
+            model: null,
+            tried: [],
+            zeroUsageRetried: false,
+            execution: { agentId: reviewerId, modelId: 'gpt-5.4' },
+          },
+        })
         .where(eq(step.id, currentId))
         .run();
       s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
@@ -1343,3 +1362,38 @@ test('a default review records NoGo successfully while its build still waits for
   const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
   expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('review-blocking');
 });
+
+test.each(['kind', 'agent', 'model', 'prompt-agent'])(
+  'a verdict cannot replace its queued kind or claim identity (%s)',
+  async (attack) => {
+    const { s, buildId, reviewId } = await claimedMachineReview(attack === 'model');
+    if (attack === 'prompt-agent') {
+      const prompt = s.db.select().from(step).where(eq(step.id, reviewId)).get()?.prompt ?? '';
+      const newline = prompt.indexOf('\n');
+      const meta = JSON.parse(prompt.slice(0, newline));
+      s.db
+        .update(step)
+        .set({
+          prompt: JSON.stringify({ ...meta, agentId: 'forged-agent' }) + prompt.slice(newline),
+        })
+        .where(eq(step.id, reviewId))
+        .run();
+    } else {
+      s.db
+        .update(gateVerdict)
+        .set(
+          attack === 'kind'
+            ? { kind: 'decision' }
+            : attack === 'agent'
+              ? { reviewerAgentId: 'forged-agent' }
+              : { reviewerModelId: 'gpt-5.4' },
+        )
+        .where(eq(gateVerdict.stepId, reviewId))
+        .run();
+    }
+    const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    expect(readiness?.blockers.map((blocker) => blocker.code)).toContain(
+      attack === 'kind' ? 'decision-missing' : 'independent-review-missing',
+    );
+  },
+);
