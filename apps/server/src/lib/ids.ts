@@ -1,11 +1,13 @@
 import { randomBytes } from 'node:crypto';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const LEADING_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 export function newRecordId(size = 21): string {
   const bytes = randomBytes(size);
   let out = '';
-  for (let i = 0; i < size; i++) {
+  out += LEADING_ALPHABET[(bytes[0] as number) % LEADING_ALPHABET.length];
+  for (let i = 1; i < size; i++) {
     out += ALPHABET[(bytes[i] as number) & 63];
   }
   return out;

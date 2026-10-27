@@ -1,0 +1,11 @@
+n_concurrent_trials: 1
+agent_timeout_multiplier: 15
+agent_setup_timeout_multiplier: 10
+verifier_timeout_multiplier: 10
+environment:
+  extra_docker_compose:
+    - host-network.compose.yaml
+verifier:
+  env:
+    UV_HTTP_TIMEOUT: "300"
+    UV_HTTP_RETRIES: "8"
