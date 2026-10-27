@@ -76,8 +76,9 @@ export function backfillTokenUsageCost(db: Db): void {
       row.costCacheRead === 0 &&
       row.costCacheWrite === 0 &&
       row.costTotal === 0;
-    const cost = rates ? costFromRates(row, rates) : legacyZero ? null : undefined;
-    if (cost === undefined) continue;
+    if (!legacyZero) continue;
+    const cost = rates ? costFromRates(row, rates) : null;
+
     db.update(tokenUsage)
       .set(
         cost ?? {
