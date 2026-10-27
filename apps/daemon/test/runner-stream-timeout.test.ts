@@ -20,6 +20,8 @@ import {
   runStep,
   STREAM_DURATION_CAP_DEFAULT_MS,
   STREAM_DURATION_CAP_ENV,
+  STREAM_FIRST_EVENT_ENV,
+  STREAM_IDLE_ENV,
   type StreamTimeoutArm,
   streamTimeoutMessage,
 } from '../src/runner.js';
@@ -280,15 +282,16 @@ async function run(opts: {
   backend: AgentBackend;
   timeouts: { first: number; idle: number; body: number };
   durationCapMs?: number;
-  envCap?: string;
+  env?: Record<string, string>;
 }): Promise<MachineDoneBody> {
   const home = mkdtempSync(join(tmpdir(), 'cairn-runner-timeout-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger } = captureLogger();
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);
-  const prevEnv = process.env[STREAM_DURATION_CAP_ENV];
-  if (opts.envCap !== undefined) process.env[STREAM_DURATION_CAP_ENV] = opts.envCap;
+  const envEntries = Object.entries(opts.env ?? {});
+  const prevEnv = envEntries.map(([k]) => [k, process.env[k]] as const);
+  for (const [k, v] of envEntries) process.env[k] = v;
   try {
     await runStep(
       {
@@ -309,9 +312,9 @@ async function run(opts: {
       },
     );
   } finally {
-    if (opts.envCap !== undefined) {
-      if (prevEnv === undefined) delete process.env[STREAM_DURATION_CAP_ENV];
-      else process.env[STREAM_DURATION_CAP_ENV] = prevEnv;
+    for (const [k, v] of prevEnv) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
     }
   }
   expect(client.doneBodies).toHaveLength(1);
@@ -362,7 +365,7 @@ describe('runner stream-timeout guardrails (#699)', () => {
         finish: 'silent',
       }).backend,
       timeouts: { first: WIDE, idle: WIDE, body: WIDE },
-      envCap: '150',
+      env: { [STREAM_DURATION_CAP_ENV]: '150' },
     });
     expect(body.status).toBe('failed');
     expect(body.errorMessage).toBe('stream timeout (arm=duration, cap=150ms)');
@@ -377,10 +380,44 @@ describe('runner stream-timeout guardrails (#699)', () => {
         finish: 'silent',
       }).backend,
       timeouts: { first: WIDE, idle: WIDE, body: WIDE },
-      envCap: '250',
+      env: { [STREAM_DURATION_CAP_ENV]: '250' },
     });
     expect(body.status).toBe('failed');
     expect(body.errorMessage).toBe('stream timeout (arm=duration, cap=250ms)');
+  });
+
+  test('failure mode 3b (env knob): CAIRN_STREAM_IDLE_MS widens the idle arm for slow providers', async () => {
+    const body = await run({
+      backend: streamingBackend({ firstEventMs: 20, intervalMs: 150, events: 3, finish: 'done' })
+        .backend,
+      timeouts: { first: WIDE, idle: 80, body: 120 },
+      durationCapMs: WIDE,
+      env: { [STREAM_IDLE_ENV]: '600' },
+    });
+    expect(body.status).toBe('success');
+  });
+
+  test('failure mode 3c (env knob): CAIRN_STREAM_FIRST_EVENT_MS widens the first-event arm', async () => {
+    const body = await run({
+      backend: streamingBackend({ firstEventMs: 150, intervalMs: 20, events: 3, finish: 'done' })
+        .backend,
+      timeouts: { first: 60, idle: WIDE, body: 100 },
+      durationCapMs: WIDE,
+      env: { [STREAM_FIRST_EVENT_ENV]: '600' },
+    });
+    expect(body.status).toBe('success');
+  });
+
+  test('failure mode 3d (env knob): a garbage idle value falls back to the configured limit', async () => {
+    const body = await run({
+      backend: streamingBackend({ firstEventMs: 20, intervalMs: WIDE, events: 1, finish: 'silent' })
+        .backend,
+      timeouts: { first: WIDE, idle: 80, body: WIDE },
+      durationCapMs: WIDE,
+      env: { [STREAM_IDLE_ENV]: 'twenty minutes' },
+    });
+    expect(body.status).toBe('failed');
+    expect(body.errorMessage).toBe('stream timeout (arm=idle, idle=80ms)');
   });
 
   test('failure mode 4 (first): no events at all → wording names the first arm and value', async () => {
