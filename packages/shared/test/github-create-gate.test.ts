@@ -1,10 +1,14 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { expect, test } from 'vitest';
-import { acquireGithubCreateSlot, parseGithubCreateRateLimit } from '../src/github-create-gate.js';
+import {
+  acquireGithubCreateSlot,
+  GithubCreateGateNotWritableError,
+  parseGithubCreateRateLimit,
+} from '../src/github-create-gate.js';
 
 test('reservations respect spacing and a rolling hourly cap', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'github-create-'));
@@ -62,6 +66,47 @@ test('an abandoned lock fails closed instead of waiting forever', async () => {
     ).rejects.toThrow('GitHub create lock timed out');
   } finally {
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('an unwritable gate directory fails with a typed error naming the directory and the remedy', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'github-create-readonly-'));
+  const directory = join(home, 'github-create');
+  await mkdir(directory);
+  await chmod(directory, 0o500);
+  try {
+    const failure = await acquireGithubCreateSlot({ directory, lockTimeoutMs: 100 }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(GithubCreateGateNotWritableError);
+    const message = (failure as GithubCreateGateNotWritableError).message;
+    expect(message).toContain(directory);
+    expect(message).toMatch(/not writable/);
+    expect(message).toMatch(/chmod|remove/);
+  } finally {
+    await chmod(directory, 0o700);
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('a gate directory under an unwritable parent fails the same way', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'github-create-readonly-parent-'));
+  const directory = join(home, 'github-create');
+  await chmod(home, 0o500);
+  try {
+    const failure = await acquireGithubCreateSlot({ directory, lockTimeoutMs: 100 }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(GithubCreateGateNotWritableError);
+    const message = (failure as GithubCreateGateNotWritableError).message;
+    expect(message).toContain(directory);
+    expect(message).toMatch(/not writable/);
+    expect((failure as GithubCreateGateNotWritableError).code).toMatch(/EACCES|EPERM|EROFS/);
+  } finally {
+    await chmod(home, 0o700);
+    await rm(home, { recursive: true, force: true });
   }
 });
 

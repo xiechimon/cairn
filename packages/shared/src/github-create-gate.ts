@@ -40,6 +40,20 @@ export interface GithubCreateOptions {
   onDelay?: (reason: string, ms: number) => void;
 }
 
+export class GithubCreateGateNotWritableError extends Error {
+  readonly directory: string;
+  readonly code: string;
+
+  constructor(directory: string, code: string) {
+    super(
+      `github create gate directory not writable: ${directory}; grant the process write access (chmod u+w) or remove the directory so the gate recreates it`,
+    );
+    this.name = 'GithubCreateGateNotWritableError';
+    this.directory = directory;
+    this.code = code;
+  }
+}
+
 export async function acquireGithubCreateSlot(options: GithubCreateOptions = {}): Promise<number> {
   const directory =
     options.directory ?? join(process.env.CAIRN_HOME ?? join(homedir(), '.cairn'), 'github-create');
