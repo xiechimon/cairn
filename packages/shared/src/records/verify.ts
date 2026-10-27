@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import type { DocumentDiffFile } from './document-diff.js';
+import {
+  MOTION_TOKEN_PATHS,
+  RECORDING_EXTENSIONS,
+  RECORDING_MAX_BYTES,
+  recordingRequirements,
+} from './recording-trigger.js';
 
 export const verifyEvidenceSchema = z.object({
   path: z.string().min(1),
@@ -106,6 +112,22 @@ export function buildVerifyStepPrompt(args: {
     '',
     prSection,
     changesSection,
+    ...(args.changes === undefined
+      ? [
+          `Inspect the added lines of the delivery diff under apps/web/src/ for transition, animation, @keyframes, motion, a drag or hover handler (onDrag, onPointerMove, onMouseEnter, onMouseDown, draggable), hover:, scroll-behavior: smooth, and a scripted .style.transform / .style.scrollBehavior assignment; a change to ${MOTION_TOKEN_PATHS.join(', ')} also counts. If any trigger matches, include a real ${RECORDING_EXTENSIONS.join(', ')} recording (at most ${RECORDING_MAX_BYTES / (1024 * 1024)} MiB) under docs/verify/${args.ticketRef}/ in the verdict evidence list and link it in the PR body. Record navigation with node .claude/skills/verify-cairn/scripts/vp.mjs capture <route> --video --wait <ms>; record the affected interactions with Playwright recordVideo when navigation alone is insufficient.`,
+        ]
+      : []),
+    ...(recordingRequirements(
+      (args.changes ?? []).map((f) => ({
+        filename: f.path,
+        status: 'modified',
+        patch: f.hunks.flatMap((h) => h.lines).join('\n'),
+      })),
+    ).required
+      ? [
+          `Animated or interactive UI changed. Include a real ${RECORDING_EXTENSIONS.join(', ')} recording (at most ${RECORDING_MAX_BYTES / (1024 * 1024)} MiB) under docs/verify/${args.ticketRef}/ in the verdict evidence list and link it in the PR body. Use node .claude/skills/verify-cairn/scripts/vp.mjs capture <route> --video --wait <ms> to record the live route; drive the affected interactions in a recording-enabled Playwright context when navigation alone does not demonstrate them.`,
+        ]
+      : []),
   ];
   return sections.join('\n');
 }

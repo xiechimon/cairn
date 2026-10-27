@@ -56,6 +56,26 @@ test('changes to prepush scripts run the CI self-test files locally', () => {
   );
 });
 
+test('the recording gate runs in local prepush, in CI prepush and in the CI self-test step', () => {
+  const gate = 'node scripts/recording-gate.mjs';
+  for (const mode of ['local', 'ci'])
+    assert.ok(
+      prepushPlan(['apps/web/src/board/card.tsx'], mode)
+        .map((args) => args.join(' '))
+        .includes(gate),
+      mode,
+    );
+  assert.ok(selfTests.includes('scripts/recording-gate.test.mjs'));
+  assert.ok(
+    /scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|recording-gate|scrub-git-env|doc-reader-tests)/.test(
+      'scripts/recording-gate.mjs',
+    ),
+  );
+  assert.ok(
+    readFileSync('.github/workflows/ci.yml', 'utf8').includes('scripts/recording-gate.test.mjs'),
+  );
+});
+
 test('a ledger entry change runs the ledger gate even when only documents changed', () => {
   const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
   for (const mode of ['local', 'ci'])
