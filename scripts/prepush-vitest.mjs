@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
+import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -19,20 +20,30 @@ export function unexpectedFailures(report, knownRed, cwd = root) {
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const base = process.env.PREPUSH_BASE_SHA || 'origin/main';
   const outputFile = join(mkdtempSync(join(tmpdir(), 'prepush-vitest-')), 'report.json');
-  const run = spawnSync(
-    'pnpm',
-    [
-      'exec',
-      'vitest',
-      'run',
-      '--changed',
-      base,
-      '--reporter=default',
-      '--reporter=json',
-      `--outputFile.json=${outputFile}`,
-    ],
-    { cwd: root, stdio: 'inherit' },
-  );
+  const lease = await acquireSlot();
+  let run;
+  try {
+    run = spawnSync(
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        'run',
+        '--changed',
+        base,
+        '--reporter=default',
+        '--reporter=json',
+        `--outputFile.json=${outputFile}`,
+      ],
+      {
+        cwd: root,
+        stdio: 'inherit',
+        env: leaseEnv(lease),
+      },
+    );
+  } finally {
+    lease?.release();
+  }
   let report;
   try {
     report = JSON.parse(readFileSync(outputFile, 'utf8'));

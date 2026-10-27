@@ -74,6 +74,31 @@ async function until(watched, stream, pattern, timeoutMs = 15_000) {
   }
 }
 
+const prepushVitestFixture = (dir) => {
+  mkdirSync(join(dir, 'tmp'), { recursive: true });
+  const repo = join(dir, 'vitest-repo');
+  mkdirSync(join(repo, 'scripts'), { recursive: true });
+  for (const file of ['prepush-vitest.mjs', 'heavy-slots.mjs', 'prepush-known-red.json'])
+    copyFileSync(join('scripts', file), join(repo, 'scripts', file));
+  const bin = join(dir, 'bin');
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, 'pnpm'),
+    `#!/usr/bin/env node
+const { writeFileSync } = require('node:fs');
+const output = process.argv.find((arg) => arg.startsWith('--outputFile.json='));
+if (!output) process.exit(2);
+writeFileSync(output.slice('--outputFile.json='.length), JSON.stringify({ testResults: [] }));
+console.log('FAKE-VITEST-RAN');
+`,
+    { mode: 0o755 },
+  );
+  return {
+    repo,
+    withFakePnpm: (env) => ({ ...env, PATH: `${bin}:${process.env.PATH}` }),
+  };
+};
+
 const fakePnpmFixture = (dir) => {
   const bin = join(dir, 'bin');
   const log = join(dir, 'pnpm-calls.jsonl');
@@ -545,6 +570,51 @@ test('a squatted slot port fails e2e:affected before playwright and names the ho
     assert.equal(existsSync(fake.log), false);
     const next = startHolder(env);
     await until(next, 'out', /SLOT 2/, 5_000);
+  } finally {
+    cleanup();
+  }
+});
+
+test('prepush-vitest run directly queues for a slot and only starts vitest once the holder exits', async () => {
+  const { dir, env, cleanup } = sandbox(1);
+  const { repo, withFakePnpm } = prepushVitestFixture(dir);
+  try {
+    const holder = startHolder(env);
+    await until(holder, 'out', /SLOT 1/);
+    const run = watch(process.execPath, ['scripts/prepush-vitest.mjs'], {
+      cwd: repo,
+      env: withFakePnpm(env),
+    });
+    await until(run, 'err', /queued, position 1/);
+    assert.doesNotMatch(run.out + run.err, /FAKE-VITEST-RAN/);
+    holder.child.kill('SIGKILL');
+    await until(run, 'out', /FAKE-VITEST-RAN/, 5_000);
+    assert.equal(await run.exited, 0);
+    const next = startHolder(env);
+    await until(next, 'out', /SLOT 1/, 5_000);
+  } finally {
+    cleanup();
+  }
+});
+
+test('prepush-vitest reuses the lease inherited from pnpm prepush without queueing', async () => {
+  const { dir, env, cleanup } = sandbox(1);
+  const { repo, withFakePnpm } = prepushVitestFixture(dir);
+  try {
+    const holder = startHolder(env);
+    await until(holder, 'out', /SLOT 1/);
+    const inherited = withFakePnpm({
+      ...env,
+      CAIRN_HEAVY_SLOT: '1',
+      CAIRN_HEAVY_SLOT_OWNER: String(holder.child.pid),
+    });
+    const run = watch(process.execPath, ['scripts/prepush-vitest.mjs'], {
+      cwd: repo,
+      env: inherited,
+    });
+    await until(run, 'out', /FAKE-VITEST-RAN/, 10_000);
+    assert.doesNotMatch(run.err, /queued, position/);
+    assert.equal(await run.exited, 0);
   } finally {
     cleanup();
   }
