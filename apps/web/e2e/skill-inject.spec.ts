@@ -7,9 +7,11 @@ const ROUTE_NO_SKILLS = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 
 test('the injected-skills row names each skill with its hit reason', async ({ page }) => {
   await page.goto(ROUTE);
+  await expect(page.getByTestId('injected-skills')).toHaveCount(0);
+  await expect(page.getByTestId('injected-skills-chip')).toContainText('已加载');
+  await page.getByTestId('injected-skills-chip').click();
   const row = page.getByTestId('injected-skills');
   await expect(row).toBeVisible();
-  await expect(row).toContainText('注入技能：');
   await expect(row).toContainText('better-typography');
   await expect(row).toContainText('同域「前端界面」');
   await expect(row).toContainText('tdd');
@@ -18,6 +20,9 @@ test('the injected-skills row names each skill with its hit reason', async ({ pa
 
 test('a computed zero-hit run shows the no-skills placeholder, not absence', async ({ page }) => {
   await page.goto(ROUTE_ZERO);
+  await expect(page.getByTestId('injected-skills')).toHaveCount(0);
+  await expect(page.getByTestId('injected-skills-chip')).toContainText('已加载');
+  await page.getByTestId('injected-skills-chip').click();
   const row = page.getByTestId('injected-skills');
   await expect(row).toBeVisible();
   await expect(row).toContainText('未注入技能');

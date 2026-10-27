@@ -21,6 +21,21 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
+  '思考 {n} 次': 'Thinking: {n}',
+  '读了 {n} 个文件': 'Files read: {n}',
+  '搜索 {n} 次': 'Searches: {n}',
+  '跑了 {n} 条命令': 'Commands: {n}',
+  '改了 {n} 个文件': 'Files edited: {n}',
+  '调用 {n} 个工具': 'Tool calls: {n}',
+  '已加载 {n} 个技能': 'Skills loaded: {n}',
+  '还有 {n} 行': '{n} more lines',
+  无输出: 'No output',
+  未完成: 'Not finished',
+  读取: 'Read',
+  运行: 'Run',
+  修改: 'Edit',
+  调用: 'Call',
+
   // —— shared chrome / sidebar (r2 §1.1) ——
   搜索: 'Search',
   // #351 看板更名工作台：'Workbench'（不用 'Workspace'，避撞 daemon workspaces 概念）
@@ -231,7 +246,6 @@ export const EN: Record<string, string> = {
   由定时发起: 'Started by schedule',
   收起: 'Collapse',
   // #933: the collapsed tool group's identity label (transcript action row).
-  工具过程: 'Tool process',
   尚无描述: 'No description yet',
   '{y}年{mo}月{d}日 {hh}:{mm} 创建': 'Created {monthShort} {d}, {y} {hh}:{mm}',
 
@@ -731,7 +745,6 @@ export const EN: Record<string, string> = {
   '挡下：{n}': 'Blocked: {n}',
   // #1106 dispatch skill injection: detail-face lookup row (reasons ride as
   // server data, not t() keys — same law as note #634).
-  '注入技能：': 'Injected skills: ',
   '未注入技能（任务文本未命中任何技能）': 'No skills injected (task text matched none)',
   // #1288：模型活性标注——dead 模型置灰 +「已下架」（不隐藏）。
   已下架: 'Delisted',

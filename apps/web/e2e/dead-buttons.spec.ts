@@ -384,23 +384,17 @@ test('account drops the `更换` button, keeps the avatar head (#306 wontfix shi
   await expect(page.locator('.account-avatar img')).toBeVisible();
 });
 
-test('transcript tool group: `收起` collapses, the footer row re-expands (#306)', async ({ page }) => {
+test('transcript work summary collapses and re-expands call rows', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28');
-
-  await expect(page.locator('.chat-tool-pill')).toHaveCount(2);
-  const collapse = page.locator('.chat-collapse');
-  await expect(collapse).toBeVisible();
-  const footer = page.locator('button.chat-row-icons--toggle');
-  await expect(footer).toHaveAttribute('aria-expanded', 'true');
-
-  await collapse.click();
-  await expect(page.locator('.chat-tool-pill')).toHaveCount(0);
-  await expect(collapse).toHaveCount(0);
-  await expect(footer).toHaveAttribute('aria-expanded', 'false');
-
-  await footer.click();
-  await expect(page.locator('.chat-tool-pill')).toHaveCount(2);
-  await expect(collapse).toBeVisible();
+  const summary = page.getByTestId('work-summary');
+  await expect(page.getByTestId('work-call')).toHaveCount(2);
+  await expect(summary).toHaveAttribute('aria-expanded', 'true');
+  await summary.click();
+  await expect(page.getByTestId('work-call')).toHaveCount(0);
+  await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  await summary.click();
+  await expect(page.getByTestId('work-call')).toHaveCount(2);
+  await expect(summary).toHaveAttribute('aria-expanded', 'true');
 });
 
 const REVIEW_DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
