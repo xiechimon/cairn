@@ -1,0 +1,31 @@
+PR: https://github.com/xiechimon/cairn/pull/1821 (original draft; replacement PR is expected)
+Reviewed source: c731d45d5d8e934bf80be1f3f8318b07e118c1ac; base origin/main 02eaff6bcaa04f73c1219770df6ee7f5b17dd197; old lane origin/lane/1794 d7ac947353c7a945e74794f12589d4a7a3fcffcc.
+Verdict: PASS for the staged source and security boundaries reviewed; not acceptance of the complete #1794 feature. Recheck source changes or a different base.
+
+What it does:
+- Runs and displays the product gate, using protected I/O adapters and a pure policy core, and records and audits gate observations.
+
+Good:
+- Review and decision require a stable actually observed checkout head; unknown or drifting heads do not bind. The server claim snapshots author model and identity. Step-bound safety payloads and review, decision and verification outcomes are rechecked in the protected core; the verification checklist is derived there from server plan text.
+- Final product review output is parsed in protected daemon code; an unfinished final response cannot recover an earlier passing example. Audit uncertainty prevents merged-to-done reconciliation and retries.
+- Machine adapters remain in existing category ⑤; pure gate import restrictions and protected-path lists were not relaxed. F15 did change: one protected adapter is excluded from its old blanket machine-file prohibition, with a transitive report import boundary, authenticated forged-record negative control, and a documented negative control for the prior CI-loop dependency.
+
+Bad:
+- No further blocking defect found in the reviewed port, binding, outcome, audit, extraction, scheduling, storage and display changes. Original PR #1821 body currently claims full acceptance and contains a closing keyword; it is not the staged replacement PR and must not be used to close #1794.
+- Legacy daemons omitting observed review heads and old verification records lacking the original payload fail closed; rollout needs upgraded daemons and fresh review/verification.
+
+Ugly:
+- No additional high-impact issue found in the checked trust boundary. The mismatch audit requires readable merged facts, storage, and an issue port; unavailable prerequisites leave a task in review and retry.
+
+Tests:
+- Independent run: 4 files / 79 cases passed: merge-gate-product, merge-gate-tables, runner-review and merge-gate-imports; git diff --check passed. Author reports 684 cases across 26 files, one web mapping case, lint and typecheck green. The reviewer did not rerun the full suite or live host acceptance. code-review and security-review skills were unavailable; independent source/security review is a substitute and is not a claim those skills ran.
+- No live task PR has merged through this code. requestMerge is not wired to readiness; public review publication and autonomous merge execution are incomplete; the one-week timer comparison is pending. Keep #1794 open.
+
+Three questions:
+- Correctness: PASS for reviewed staged code, subject to stated integration and rollout limitations.
+- Gate loosening: the original F15 blanket test changed as stated; no protected path list or pure-core import allowlist loosening found. Runtime gate safety fields and blocking findings are checked in the protected core.
+- Eval ruler: no intentional measurement-threshold change found; the plan parser was moved to a protected module with legacy re-exports, and its source is documented as byte-identical.
+
+SHA-256: run.ts aae2c629c861f0b6b94beec01c74d74d070156200fab453baf715fab31623b67; verdict.ts c3210079a83a1fae1e6c3663a5ca0b4f9b0c6bfec6c064705683e5d615c81f09; audit.ts 0fd8a89d6dcbebdea39c460ef47e63ec41435a263d6f1ac2c1b6e35e66636f02; machine-gate-port.ts 3d191fbafac22fa468b121ff73fd621c9ef061914534336e14efd8197e905653; machine-gate-storage.ts 473a481c408f21883d288eb196ebb26b84298c535afe787809a70a18a8f2f066; daemon merge-decision.ts 62e43a50169a139e97c28065ce84dc2cf902a4a8619b8afc06937baf555657c7; shared merge-gate.ts 5db46011089c9b63b02194e8d047c405cd846e90afd21b85d36028c64128d5ca.
+
+Scope qualification: this was an independent review of the changed gate surfaces and relevant call paths, not a claim that the entire long runner.ts and builds.ts files or every linked historical issue were read in full. No GitHub labels, comments, pushes or merges were performed.

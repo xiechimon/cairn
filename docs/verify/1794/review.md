@@ -35,3 +35,22 @@ Reviewed source SHA-256 values:
 - `apps/server/src/services/ci-loop.ts`: `cadf011b76b15f0c2916553a1e34762b05bbf23878454ab8b38b208ce892860f`
 
 The review does not cover a live task PR merge, public review publication, autonomous merge execution, or one week of matching external-timer outcomes. Issue #1794 remains open for those acceptance items.
+
+## Final protected ports and verdict review
+
+The separate `ports_review_1794` agent reviewed source commit `c731d45d5d8e934bf80be1f3f8318b07e118c1ac` against main `02eaff6bcaa04f73c1219770df6ee7f5b17dd197`. Its scoped code and security-boundary conclusion was PASS with no remaining blocking finding in the reviewed gate, binding, extraction, audit, adapter, storage, scheduling and display changes. The exact report and source hashes are in `independent-review.txt`.
+
+The reviewer independently ran 79 cases across the product gate, F15 table boundary, daemon review runner and pure-import suites. All passed. The author separately ran 684 cases across 26 related files and the web plan mapper case, plus lint and typecheck.
+
+Additional findings fixed before that source review:
+
+- An unfinished final assistant response could recover an earlier passing example, and per-message runner state could omit a consecutive assistant response. Protected final-output extraction and message-state reset now reject that case.
+- Missing GitHub facts, storage or an audit port could silently allow merged-task completion. The terminal transition now requires a fresh auditable merged observation and records an already-merged, pending-audit hint on failure.
+- Review and decision heads could substitute the expected prompt head for an absent observed head. Stable observed start and finish heads must equal the expected head; missing or drifting observations cannot bind.
+- Review, verification and decision outcomes could trust caller booleans or stored passes. Protected core code derives outcomes from each step-bound payload and rechecks them for readiness. Verification criteria come from the server plan, using the unchanged parser relocated into the protected shared module.
+
+F15 deliberately distinguishes the new protected server database adapter from daemon report handlers. The report handlers cannot directly reference gate tables or reach the adapter through runtime imports and re-exports. A real authenticated completion with complete forged gate records leaves all four tables empty. The old indirect CI-loop import makes the new static boundary test fail. Pure-import restrictions and protected-path lists remain unchanged.
+
+This review covers the changed gate code and relevant call paths. It does not claim that every line of the long runner and builds files or every historical issue was read in full. The named repository review skills remain unavailable, and this record does not claim they ran. Full pre-push and live host acceptance were not independently rerun by the reviewer. Old daemons without observed review heads and old verification records without the original payload fail closed and require an upgraded daemon and fresh review or verification.
+
+No actual task PR merge, public review publication, autonomous merge executor or one-week timer retirement is accepted by this review. Issue #1794 stays open.
