@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path';
 
 const require = createRequire(new URL('../../../integration/package.json', import.meta.url));
 const loader = require.resolve('tsx/cli');
-const out = resolve(process.argv[2]);
+const out = resolve(process.argv[2] ?? process.env.VERIFY_EVIDENCE_DIR);
 const flow = mkdtempSync(join(tmpdir(), 'cairn-retry-proof-'));
 const dataset = JSON.parse(readFileSync('.claude/hillclimb/chief-dispatch/cases.json', 'utf8'));
 const hold = dataset.cases.find((entry) => entry.expect.kind === 'hold');

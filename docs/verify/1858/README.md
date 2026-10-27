@@ -12,11 +12,13 @@ The retry implementation, its imported budget, coverage, oracle checker, and rep
 
 ## Real runtime, local provider stub
 
-Run under an available heavy slot:
+The canonical registered entry runs under an available heavy slot:
 
 ```sh
-TMPDIR=/private/tmp node scripts/heavy-slots.mjs run -- node docs/verify/1858/drive-retry.mjs /tmp/chief-retry-proof
+TMPDIR=/private/tmp VERIFY_EVIDENCE_DIR=/tmp/chief-retry-proof node scripts/heavy-slots.mjs run -- node .claude/skills/verify-cairn/scripts/vp.mjs drive chief-dispatch-recovery
 ```
+
+`probe-registry-red.log` and `probe-entry-red.log` record the missing registration before its fix. `probe-registry-green.log` validates the indexed case; `probe-entry-green.log` and `registered-retry-proof.json` record a successful execution through the canonical entry. The existing reach check remains unchanged.
 
 `retry-runtime-proof.json` and `retry-runtime.log` record the real server, daemon, and eval CLI. A local provider returns HTTP 400 once and HTTP 200 next. The CLI finishes with one successful result, `infra_retries=1`, and `decision_ok=1`. The fixture performs no real-model call. It does not establish paid-provider reliability or a fresh model-quality baseline.
 
