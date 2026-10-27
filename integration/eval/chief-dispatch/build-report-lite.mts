@@ -254,19 +254,25 @@ function build(flowArg: string) {
   }
 
   const rows: Rows = Object.create(null);
-  for (const v of variants) rows[v] = loadRows(join(flow, v, 'results.jsonl'), warnings, v);
+  const errorsByVariant: Record<string, Record<string, unknown>[]> = Object.create(null);
+  for (const v of variants) {
+    rows[v] = loadRows(join(flow, v, 'results.jsonl'), warnings, v);
+    errorsByVariant[v] = loadJsonl(join(flow, v, 'errors.jsonl'));
+  }
 
   for (let i = variants.length - 1; i > 0; i--) {
     const v = variants[i] as string;
-    if (Object.keys(rows[v] ?? NO_ROWS).length) continue;
+    if (Object.keys(rows[v] ?? NO_ROWS).length || errorsByVariant[v]?.length) continue;
     warnings.push(
-      `${v}: zero result rows - dropping (run not started or results.jsonl missing/empty)`,
+      `${v}: zero result and error rows - dropping (run not started or records missing/empty)`,
     );
     variants.splice(i, 1);
   }
   const firstVariant = variants[0] as string;
-  if (!Object.keys(rows[firstVariant] ?? NO_ROWS).length)
-    throw new Error(`${firstVariant}/ has no result rows under ${flow} - nothing to report`);
+  if (!Object.keys(rows[firstVariant] ?? NO_ROWS).length && !errorsByVariant[firstVariant]?.length)
+    throw new Error(
+      `${firstVariant}/ has no result or error rows under ${flow} - nothing to report`,
+    );
 
   const header: Record<string, Header> = Object.create(null);
   for (const v of variants) {
@@ -302,12 +308,17 @@ function build(flowArg: string) {
 
   const ids: string[] = [];
   const seenId = new Set<string>();
-  for (const v of variants)
-    for (const pid of Object.keys(rows[v] ?? NO_ROWS))
-      if (!seenId.has(pid)) {
+  for (const v of variants) {
+    const errorIds = (errorsByVariant[v] ?? []).flatMap((row) => {
+      const id = row.prompt_id ?? row.id ?? row.case_id;
+      return typeof id === 'string' || typeof id === 'number' ? [String(id)] : [];
+    });
+    for (const pid of [...Object.keys(rows[v] ?? NO_ROWS), ...errorIds])
+      if (pid && !seenId.has(pid)) {
         seenId.add(pid);
         ids.push(pid);
       }
+  }
 
   const caseMean = (reps: ResultRow[], m: string): number | null => {
     const vals = reps.map((r) => scoredValue(r, m)).filter(isNum);
@@ -360,7 +371,7 @@ function build(flowArg: string) {
   );
   for (const v of variants) {
     const scored = Object.values(rows[v] ?? NO_ROWS).flat();
-    const errors = loadJsonl(join(flow, v, 'errors.jsonl'));
+    const errors = errorsByVariant[v] ?? [];
     coverage[v] = familyCoverage({ caseIds, results: scored, errors, metric: primary });
     suspects[v] =
       primary === 'decision_ok'

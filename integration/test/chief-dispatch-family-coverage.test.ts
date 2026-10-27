@@ -162,3 +162,35 @@ test('mixed known and unknown repetition identities cannot publish a headline', 
   expect(html).toContain('d 4/unknown');
   expect(headline(html)).toBe('withheld');
 });
+
+test('an error-only baseline renders failed coverage and suspect tasks', () => {
+  const errors = [0, 1, 2].map((rep) => failed('s01', rep));
+  const home = writeFlow('all-failed-baseline', ['s01'], [], errors);
+  writeFileSync(
+    join(home, '_state.json'),
+    JSON.stringify({ metrics: [{ id: 'decision_ok', kind: 'binary' }] }),
+  );
+  const html = report(home);
+  expect(html).toContain('s 0/3');
+  expect(html).toContain('s01 0/3');
+  expect(html).toContain('class="id">s01');
+  expect(headline(html)).toBe('withheld');
+});
+
+test('a completed error-only variant is retained beside a successful baseline', () => {
+  const home = writeFlow(
+    'all-failed-variant',
+    ['s01'],
+    [0, 1, 2].map((rep) => scored('s01', rep)),
+    [],
+  );
+  mkdirSync(join(home, 'v1'));
+  writeFileSync(
+    join(home, 'v1', 'errors.jsonl'),
+    `${[0, 1, 2].map((rep) => JSON.stringify(failed('s01', rep))).join('\n')}\n`,
+  );
+  const html = report(home);
+  expect(html).toContain('<h3>v1</h3><p>s 0/3</p>');
+  expect(html.match(/<tr><td>v1<\/td>.*?<\/tr>/)?.[0]).toContain('data-headline="withheld"');
+  expect(html).toContain('s01 0/3');
+});
