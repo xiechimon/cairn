@@ -13,11 +13,13 @@ import type {
 } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
+import { gitPrim } from '../src/git.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { WorkspaceManager } from '../src/workspace.js';
 
 const probeMock = vi.fn();
 vi.mock('../src/github-probe.js', async (importOriginal) => {
@@ -158,6 +160,8 @@ function fakeWorkspace(opts: {
   pushWithToken?: () => Promise<void>;
   pushWithMachine?: () => Promise<void>;
   credentialSource?: 'integration' | 'machine';
+  currentBranch?: string | null;
+  commitsAhead?: string[];
 }) {
   const calls: string[] = [];
   const pushes: { branch: string; cred: GitCredentials | null }[] = [];
@@ -192,6 +196,12 @@ function fakeWorkspace(opts: {
     },
     async countAhead() {
       return 1;
+    },
+    async currentBranch() {
+      return opts.currentBranch ?? null;
+    },
+    async commitsAhead() {
+      return opts.commitsAhead ?? [];
     },
     async restoreCheckpoint() {},
     async cleanupOrphans() {
@@ -287,6 +297,31 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     const allText = `${JSON.stringify(transcriptRows(paths))}\n${lines.join('\n')}`;
     expect(allText).not.toContain(GITHUB_TOKEN.password);
     expect(lines.some((l) => l.includes('machine credentials'))).toBe(true);
+  }, 20_000);
+
+  test('a push that fails twice with connection reset and then succeeds does not fail the build', async () => {
+    vi.useFakeTimers();
+    try {
+      let pushAttempts = 0;
+      vi.spyOn(gitPrim, 'push').mockImplementation(async () => {
+        pushAttempts += 1;
+        if (pushAttempts < 3) throw new Error('Recv failure: Connection reset by peer');
+      });
+      const workspace = fakeWorkspace({});
+      const manager = new WorkspaceManager({ logger: captureLogger().logger });
+      workspace.ws.push = manager.push.bind(manager);
+      const pending = setup(
+        claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+        { git: GITHUB_TOKEN, workspace },
+      );
+      await vi.runAllTimersAsync();
+      const { client } = await pending;
+      expect(pushAttempts).toBe(3);
+      expect(client.doneBodies[0]!.body.status).toBe('success');
+    } finally {
+      vi.restoreAllMocks();
+      vi.useRealTimers();
+    }
   }, 20_000);
 
   test('failure mode 2: github token valid → single push (cred = token), provenance line integration', async () => {

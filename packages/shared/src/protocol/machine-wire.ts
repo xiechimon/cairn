@@ -302,11 +302,13 @@ export type MachineSessionResponse = z.infer<typeof machineSessionResponseSchema
 
 export const FINDINGS_ERROR_CHAR_LIMIT = 2_000;
 
+export const QUOTA_BLOCK_REASON_MAX_CHARS = 500;
+
 export const quotaBlockSchema = z.object({
   kind: z.enum(['quota', 'capacity']),
   providerId: z.string(),
   label: z.string().optional(),
-  reason: z.string().max(500),
+  reason: z.string().max(QUOTA_BLOCK_REASON_MAX_CHARS),
   retryAfterMs: z.number().int().positive().optional(),
 });
 export type QuotaBlock = z.infer<typeof quotaBlockSchema>;
