@@ -1,0 +1,2 @@
+[heavy-slots] acquired slot 1/1
+{"providerMode":"local stub","runtime":"real server, daemon, and eval CLI","requestStatuses":[400,200],"resultRows":1,"infraRetries":1,"decisionOk":1}

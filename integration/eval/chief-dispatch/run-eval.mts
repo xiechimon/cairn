@@ -35,6 +35,7 @@ import {
   parseResultsJsonl,
   traceDigest,
 } from './harness-eval-result.mts';
+import { retryHarnessInfra } from './infra-retry.mts';
 import {
   bootStack,
   disposeLeftovers,
@@ -488,17 +489,22 @@ async function main() {
       const deadline = ARGS.timeoutS > 0 ? t0 + ARGS.timeoutS * 1000 : Infinity;
       const appRetry = { count: 0 };
       const judgeRetry = { count: 0 };
+      const infraRetry = { count: 0 };
       try {
         const { run, g, latency_s } = await withTimeout(
           (async () => {
             let tAttempt = t0;
-            const run = await withBackoff(
-              () => {
-                tAttempt = Date.now();
-                return runCase(c, ctx);
-              },
-              appRetry,
-              deadline,
+            const run = await retryHarnessInfra(
+              () =>
+                withBackoff(
+                  () => {
+                    tAttempt = Date.now();
+                    return runCase(c, ctx);
+                  },
+                  appRetry,
+                  deadline,
+                ),
+              infraRetry,
             );
             lastRun.run = run;
             const latency_s = (Date.now() - tAttempt) / 1000;
@@ -543,11 +549,16 @@ async function main() {
           prompt: isLearnCase(c) ? c.round2 : c.prompt,
           tags: c.tags,
           meta:
-            safeId !== String(c.id) || appRetry.count || judgeRetry.count || isLearnCase(c)
+            safeId !== String(c.id) ||
+            appRetry.count ||
+            judgeRetry.count ||
+            infraRetry.count ||
+            isLearnCase(c)
               ? {
                   ...(safeId !== String(c.id) ? { original_id: String(c.id) } : {}),
                   ...(appRetry.count ? { retries: appRetry.count } : {}),
                   ...(judgeRetry.count ? { judge_retries: judgeRetry.count } : {}),
+                  ...(infraRetry.count ? { infra_retries: infraRetry.count } : {}),
                   ...(isLearnCase(c) ? { arm: ARGS.arm } : {}),
                 }
               : undefined,
@@ -584,6 +595,7 @@ async function main() {
             failure_class: err?.failure_class ?? 'error',
             error: String(err?.message || e),
             retries: appRetry.count,
+            infra_retries: infraRetry.count,
             judge_retries: judgeRetry.count,
             model: lastRun.run?.model,
             usage: lastRun.run?.usage,
