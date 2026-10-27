@@ -1,0 +1,29 @@
+{
+  "status": 200,
+  "requests": [
+    {
+      "max_tokens": 8192,
+      "thinking": {
+        "type": "enabled",
+        "budget_tokens": 4096
+      },
+      "inputTokens": 7900
+    },
+    {
+      "max_tokens": 4097,
+      "thinking": {
+        "type": "enabled",
+        "budget_tokens": 4096
+      },
+      "inputTokens": 3974
+    },
+    {
+      "max_tokens": 4097,
+      "thinking": {
+        "type": "enabled",
+        "budget_tokens": 4096
+      },
+      "inputTokens": 2010
+    }
+  ]
+}

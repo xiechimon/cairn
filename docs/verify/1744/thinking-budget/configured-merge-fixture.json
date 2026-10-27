@@ -1,0 +1,7 @@
+{
+  "autoMergeRequest": {
+    "mergeMethod": "SQUASH",
+    "commitHeadline": "daemon(1744): preserve thinking budgets during summary recovery (#1933)",
+    "commitBody": "Retry message-shaped compaction summaries that exceed provider context limits.\nPreserve enabled thinking budgets and reserve at least one additional output\ntoken; shorten conversation input when output cannot fit that constraint.\nKeep ordinary requests and non-ceiling errors unchanged, and retain bounded\nretry logs and explicit terminal errors.\n\nVerified with 22 compaction cases, including test-first failures for both\nreported-input and generic ceiling errors, plus captured retry parameters.\nPort the original lessons to main's per-file ledger without restoring its\nobsolete table.\n\nPart of #1744. Live production step survival and Responses-shaped requests\nremain outside this delivery's verified scope.\n\nCo-authored-by: Cairnwright <348051526+cairnwright@users.noreply.github.com>\nCo-authored-by: XMON <xmon345@gmail.com>\n"
+  }
+}

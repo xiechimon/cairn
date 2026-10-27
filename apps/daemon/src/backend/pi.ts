@@ -34,6 +34,7 @@ import {
   SettingsManager,
 } from '@earendil-works/pi-coding-agent';
 import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
+import { compactionCeilingFetch } from './compaction-ceiling.js';
 import { SessionNotResumableError } from './errors.js';
 import { connectFailedLine } from './mcp-config.js';
 import { PiStepSpanSink } from './otel.js';
@@ -160,9 +161,10 @@ export async function summarizeCompactionTranscript(
   transcript: string,
   fetchImpl: typeof fetch,
   caps: { contextWindow: number; maxTokens: number },
+  log: (line: string) => void = () => {},
 ): Promise<string> {
   const previous = globalThis.fetch;
-  globalThis.fetch = fetchImpl;
+  globalThis.fetch = compactionCeilingFetch(fetchImpl, log);
   try {
     return await generateSummary(
       [{ role: 'user', content: transcript, timestamp: 1 }],
@@ -435,6 +437,7 @@ export interface AgentSessionEventLike {
   isError?: boolean;
   attempt?: number;
   willRetry?: boolean;
+  errorMessage?: string;
 }
 
 export interface MapState {
@@ -691,6 +694,7 @@ class PiSessionHandle implements AgentSessionHandle {
     private readonly model: { input: ('text' | 'image')[] } | null,
     diagnose?: (message: string) => string,
     private readonly spans?: PiStepSpanSink,
+    private readonly onCompactionLog?: (line: string) => void,
   ) {
     this.sessionId = session.sessionId;
     this.sessionFile = session.sessionFile;
@@ -698,6 +702,9 @@ class PiSessionHandle implements AgentSessionHandle {
     this.events = this.queue.iterable();
     session.subscribe((event) => {
       const raw = event as unknown as AgentSessionEventLike;
+      if (raw.type === 'compaction_end' && raw.errorMessage) {
+        this.onCompactionLog?.(`compaction failed: ${raw.errorMessage}`);
+      }
       if (this.spans !== undefined) recordPiSpanEvent(this.spans, raw);
       for (const mapped of mapPiSessionEvent(raw, this.state)) {
         if (this.stopping && mapped.type === 'done') continue;
@@ -761,6 +768,7 @@ export interface PiBackendOpts {
   onGateLog?: (msg: string) => void;
   onTrustLog?: (msg: string) => void;
   onOtelLog?: (msg: string) => void;
+  onCompactionLog?: (msg: string) => void;
   gateRules?: readonly PermissionRule[];
   machineName?: string;
 }
@@ -830,9 +838,12 @@ export class PiBackend implements AgentBackend {
     }
     const providerResponses: ProviderResponseSink = { current: null };
     const diagnosedFetch = wrapProviderFetch(globalThis.fetch, providerResponses);
+    const ceilingFetch = compactionCeilingFetch(diagnosedFetch, (line) => {
+      this.opts.onCompactionLog?.(line);
+    });
     const streamSimple = runtime.streamSimple.bind(runtime);
     runtime.streamSimple = (requestModel, context, options) =>
-      streamSimple(requestModel, context, { ...options, fetch: diagnosedFetch });
+      streamSimple(requestModel, context, { ...options, fetch: ceilingFetch });
     const diagnose = (message: string): string =>
       enrichProviderError(message, providerResponses.current, {
         ...(this.opts.machineName !== undefined
@@ -1023,6 +1034,7 @@ export class PiBackend implements AgentBackend {
             this.opts.onOtelLog,
           )
         : undefined,
+      (line) => this.opts.onCompactionLog?.(line),
     );
     if (opts.prompt !== undefined) {
       const promptImages =
