@@ -132,7 +132,7 @@ const MEMORIES = Array.from({ length: 40 }, (_, i) => ({
 }));
 
 async function openChiefSettings(page: Page) {
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await page.locator('button[aria-label="总管"]').click();
   const drawer = page.getByRole('dialog', { name: '总管' });
   await expect(drawer).toBeVisible();

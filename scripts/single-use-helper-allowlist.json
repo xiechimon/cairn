@@ -58,5 +58,30 @@
     "path": "apps/server/src/services/machine-step-token.ts",
     "name": "chiefStepToken",
     "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/web/src/chief/chief-conversation.tsx",
+    "name": "readStoredChiefDraft",
+    "reason": "Moved unchanged from chief-drawer.tsx when the drawer body became the shared ChiefConversation; the try/catch around localStorage would bloat the useState initializer"
+  },
+  {
+    "path": "apps/web/src/chief/chief-conversation.tsx",
+    "name": "copyText",
+    "reason": "Moved unchanged from chief-drawer.tsx; passed as the onCopy callback of every message row, not called inline"
+  },
+  {
+    "path": "apps/web/src/chief/chief-conversation.tsx",
+    "name": "toggleTools",
+    "reason": "Moved unchanged from chief-drawer.tsx; passed as the onToggleTools callback of every message row, not called inline"
+  },
+  {
+    "path": "apps/web/src/chief/chief-message-rows.tsx",
+    "name": "HandoffRow",
+    "reason": "React component that reads TodoGlanceContext with its own hook; inlining it would put useContext inside the row switch"
+  },
+  {
+    "path": "apps/web/src/api/mappers.ts",
+    "name": "handoffTodoOf",
+    "reason": "Named predicate for a successful message_todo call; inlining it puts four guards inside the stream collection loop"
   }
 ]

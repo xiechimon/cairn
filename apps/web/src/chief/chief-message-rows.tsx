@@ -1,5 +1,6 @@
 import type { AskUserAnswer } from '@cairn/shared';
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useContext } from 'react';
+import { Link } from 'react-router';
 import type { CurrentUser } from '../api/provider.js';
 import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
@@ -10,10 +11,12 @@ import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
+import { TodoGlanceContext, TodoStatus } from '../detail/segments.js';
 import type { ChiefContent, ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, ChevronDown, ChevronRight, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
+import { mentionChipClass } from '../overlay/mention-chip.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefSpiralFace } from './chief-spiral-face.js';
@@ -104,6 +107,28 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
   );
 }
 
+function HandoffRow({ todoId }: { todoId: string }) {
+  const { t } = useI18n();
+  const glance = useContext(TodoGlanceContext)?.get(todoId);
+  return (
+    <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
+      <Marker className={MARKER_NOTE_CLS} data-testid="chief-handoff">
+        <MarkerContent>
+          {t('已转给任务')}
+          <Link
+            to={`/app/todo/${todoId}`}
+            className={`${mentionChipClass('todo')} cursor-pointer`}
+            data-phase={glance?.phase}
+          >
+            {glance != null && <TodoStatus phase={glance.phase} />}
+            {glance?.seq != null ? `#${glance.seq}` : t('任务')}
+          </Link>
+        </MarkerContent>
+      </Marker>
+    </MessageScrollerItem>
+  );
+}
+
 export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string | number {
   switch (item.kind) {
     case 'user':
@@ -111,6 +136,7 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
     case 'thinking':
     case 'tool':
     case 'question':
+    case 'handoff':
       return item.id ?? index;
     default:
       return index;
@@ -158,6 +184,7 @@ export function ChiefStreamRow({
         </Marker>
       </MessageScrollerItem>
     );
+  if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'note')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>

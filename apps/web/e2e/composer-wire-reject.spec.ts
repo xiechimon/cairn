@@ -191,7 +191,7 @@ async function openChiefDrawer(page: Page) {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: [] });
   });
-  await page.goto('/app');
+  await page.goto('/app?view=board');
 
   await page.getByRole('button', { name: '总管', exact: true }).click();
   const input = page.getByTestId('chief-composer-input');
