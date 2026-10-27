@@ -3,7 +3,9 @@ import {
   assertSkillInjection,
   buildSecondPrWarningNote,
   CHANGES_DIFF_MAX_BYTES,
+  CHIEF_MODEL_FALLBACK_KIND,
   CHIEF_TURN_ERROR_KIND,
+  type ChiefModelFallbackContent,
   classifyStepFailure,
   conversationBranch,
   SKILL_INJECTION_CHECK_KIND,
@@ -14,8 +16,11 @@ import {
 import { and, eq } from 'drizzle-orm';
 import {
   type agent,
+  agent as agentTable,
   build,
+  chief,
   chiefMessage,
+  chiefThread,
   machine,
   message,
   type StepFallbackRow,
@@ -40,6 +45,7 @@ import {
 } from './builds.js';
 import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
 import { cancelPendingQuestions } from './chief-questions.js';
+import { recordChiefStop, releaseUnconsumedSteer } from './chief-turns.js';
 import {
   buildCiFixPrompt,
   CI_FIX_PROMPT_HEAD,
@@ -70,6 +76,7 @@ import {
 import {
   effectiveModel,
   isZeroUsageSilentSuccess,
+  modelKey,
   planModelFallback,
   recordProviderOutcome,
   ZERO_USAGE_FAILURE,
@@ -378,6 +385,28 @@ export async function finishStep(
   if (worker?.agentRow) {
     recordProviderOutcome(effectiveModel(worker.agentRow, stepRow).provider, outcome, zeroUsage);
   }
+  const chiefAgent = chiefStepAgent(deps, stepRow);
+  if (chiefAgent !== null) {
+    releaseUnconsumedSteer(db, stepRow);
+    recordProviderOutcome(effectiveModel(chiefAgent, stepRow).provider, outcome, false);
+    const plan = planModelFallback(db, stepRow, chiefAgent, outcome);
+    if (plan !== null) {
+      if (plan.trigger === 'model_unavailable') {
+        markModelDead(plan.from.provider, plan.from.modelId);
+      }
+      const content: ChiefModelFallbackContent = {
+        kind: CHIEF_MODEL_FALLBACK_KIND,
+        from: modelKey(plan.from),
+        to: modelKey(plan.to),
+        stepId: stepRow.id,
+      };
+      requeueStep(deps, stepRow, plan.row, {
+        id: `chief-fallback-${stepRow.id}-${plan.row.tried.length}`,
+        content: JSON.stringify(content),
+      });
+      return;
+    }
+  }
   if (worker !== null) {
     const plan = planModelFallback(db, stepRow, worker.agentRow, outcome);
     if (plan !== null) {
@@ -402,10 +431,10 @@ export async function finishStep(
   }
   if (
     outcome.status === 'failed' &&
-    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable' &&
-    worker?.agentRow
+    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable'
   ) {
-    const ran = effectiveModel(worker.agentRow, stepRow);
+    const ranAgent = worker?.agentRow ?? chiefAgent;
+    const ran = ranAgent ? effectiveModel(ranAgent, stepRow) : { provider: null, modelId: null };
     if (ran.provider && ran.modelId) markModelDead(ran.provider, ran.modelId);
   }
   if (outcome.skillInjectionFacts !== undefined) {
@@ -413,9 +442,18 @@ export async function finishStep(
   }
   if (stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId)) {
     db.update(step)
-      .set({ status: outcome.status === 'success' ? 'done' : 'failed' })
+      .set({
+        status:
+          outcome.status === 'success'
+            ? 'done'
+            : outcome.status === 'stopped'
+              ? 'stopped'
+              : 'failed',
+        ...(outcome.status === 'stopped' ? { finishedAt: nowMs() } : {}),
+      })
       .where(eq(step.id, stepId))
       .run();
+    if (outcome.status === 'stopped') recordChiefStop(deps, stepRow);
     publishStepStatus(deps, stepId);
     cancelPendingQuestions(
       {
@@ -566,12 +604,31 @@ function requeueStep(
     })
     .where(eq(step.id, stepRow.id))
     .run();
-  upsertMessage(deps, {
+  const noteRow = {
     id: note.id,
-    conversationId: stepRow.buildId,
-    role: 'system',
+    role: 'system' as const,
     content: note.content,
     createdAt: nowMs(),
-  });
+  };
+  if (isChiefConversation(stepRow.buildId)) {
+    upsertChiefRow(deps, { ...noteRow, threadId: stepRow.buildId });
+  } else {
+    upsertMessage(deps, { ...noteRow, conversationId: stepRow.buildId });
+  }
   publishStepStatus(deps, stepRow.id);
+}
+
+function chiefStepAgent(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+): typeof agent.$inferSelect | null {
+  if (stepRow.kind !== 'chief' || !isChiefConversation(stepRow.buildId)) return null;
+  const row = deps.db
+    .select({ agentRow: agentTable })
+    .from(chiefThread)
+    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
+    .innerJoin(agentTable, eq(chief.agentId, agentTable.id))
+    .where(eq(chiefThread.id, stepRow.buildId))
+    .get();
+  return row?.agentRow ?? null;
 }

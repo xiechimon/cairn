@@ -121,6 +121,7 @@ export interface MachineApi {
   ): Promise<void>;
   done(stepId: string, body: MachineDoneBody): Promise<void>;
   steer(stepId: string): Promise<string | null>;
+  steerAck?(stepId: string): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
   syncResult(syncId: string, body: MachineSyncResultBody): Promise<void>;
   stream(
@@ -496,6 +497,12 @@ export class MachineClient implements MachineApi {
       { parse: (raw) => machineSteerResponseSchema.parse(raw) },
     );
     return res.content;
+  }
+
+  async steerAck(stepId: string): Promise<void> {
+    await this.request('POST', `/api/machine/steer/ack?stepId=${encodeURIComponent(stepId)}`, {
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
   }
 
   async stop(stepId: string): Promise<boolean | null> {

@@ -616,6 +616,7 @@ export function BoardPage() {
                 below={home.sections}
                 brief={home.brief}
                 todoGlances={todoGlances}
+                onNewTask={openNewTask}
               />
             )}
             tagsById={tagIndex.tagById}

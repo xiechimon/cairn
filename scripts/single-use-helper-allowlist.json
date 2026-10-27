@@ -113,5 +113,20 @@
     "path": "apps/web/src/task-panel/task-panel.tsx",
     "name": "PanelComposer",
     "reason": "React component that owns the steps query, mutations and draft state for one task, rendered only when the task is known; inlining would call those hooks conditionally."
+  },
+  {
+    "path": "apps/server/src/services/chief-turns.ts",
+    "name": "createdTodoIdOf",
+    "reason": "Parses one tool row into a created todo id with four guards and a JSON try/catch; inlining it puts all of that inside the stop row's filter loop"
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "chiefStepAgent",
+    "reason": "Three-table join from a chief step to its agent; inlining it puts the query in the middle of finishStep's outcome branching"
+  },
+  {
+    "path": "apps/web/src/chief/chief-message-rows.tsx",
+    "name": "StoppedRow",
+    "reason": "React component with its own i18n hook; inlining it would call the hook from inside the row switch"
   }
 ]
