@@ -42,6 +42,28 @@ function requestedOutput(raw: string): number {
 }
 
 describe('#1744 compaction at the context ceiling', () => {
+  test.each([
+    'You are a context summarization assistant.',
+    [{ type: 'text', text: 'You are a context summarization assistant.' }],
+  ])('an Anthropic top-level summary system recovers output room', async (system) => {
+    let calls = 0;
+    const wrapped = compactionCeilingFetch(async (_input, init) => {
+      calls += 1;
+      const requested = requestedOutput(String(init?.body));
+      return requested + 7_900 > 8_000 ? ceilingError(8_000, requested, 7_900) : summaryOk();
+    });
+    const response = await wrapped('https://example.invalid/v1/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        system,
+        max_tokens: 1_024,
+        messages: [{ role: 'user', content: '<conversation>\nhello\n</conversation>' }],
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(calls).toBe(2);
+  });
+
   test.each(['null', '17', '"ordinary"', '{"messages":[null,17,"ordinary"]}'])(
     'a non-summary JSON body %s is forwarded unchanged',
     async (body) => {

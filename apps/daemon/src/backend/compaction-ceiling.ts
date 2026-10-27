@@ -10,6 +10,7 @@ interface ChatMessage {
 }
 
 interface ChatBody {
+  system?: unknown;
   messages?: ChatMessage[];
   max_tokens?: number;
   max_completion_tokens?: number;
@@ -165,21 +166,13 @@ export function compactionCeilingFetch(
     }
     let current = parsed as ChatBody;
     const messages = parsed.messages as ChatMessage[];
-    const summarySystemMessage = messages.some((message) => {
-      if (message.role !== 'system' && message.role !== 'developer') return false;
-      if (typeof message.content === 'string') return message.content.startsWith(SUMMARY_MARKER);
-      if (!Array.isArray(message.content)) return false;
-      return message.content.some(
-        (part: unknown) =>
-          part !== null &&
-          typeof part === 'object' &&
-          'type' in part &&
-          part.type === 'text' &&
-          'text' in part &&
-          typeof part.text === 'string' &&
-          part.text.startsWith(SUMMARY_MARKER),
+    const summarySystemMessage =
+      isSummaryPrompt(current.system) ||
+      messages.some(
+        (message) =>
+          (message.role === 'system' || message.role === 'developer') &&
+          isSummaryPrompt(message.content),
       );
-    });
     if (!summarySystemMessage) return inner(input, init);
     let lastResponse: Response | null = null;
     let lastText = '';
@@ -204,4 +197,19 @@ export function compactionCeilingFetch(
     if (lastResponse === null) return inner(input, init);
     return replayResponse(lastResponse, lastText);
   };
+}
+
+function isSummaryPrompt(content: unknown): boolean {
+  if (typeof content === 'string') return content.startsWith(SUMMARY_MARKER);
+  if (!Array.isArray(content)) return false;
+  return content.some(
+    (part: unknown) =>
+      part !== null &&
+      typeof part === 'object' &&
+      'type' in part &&
+      part.type === 'text' &&
+      'text' in part &&
+      typeof part.text === 'string' &&
+      part.text.startsWith(SUMMARY_MARKER),
+  );
 }

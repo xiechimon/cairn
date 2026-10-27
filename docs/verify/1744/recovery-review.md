@@ -1,6 +1,6 @@
 # Compaction recovery review fixes
 
-The summary fetch wrapper bounds recovery when the final conversation block exceeds the available budget. It identifies summaries from system or developer text, so ordinary user/tool messages quoting the summary marker are forwarded unchanged. JSON null, primitives and malformed message arrays also pass through unchanged.
+The summary fetch wrapper bounds recovery when the final conversation block exceeds the available budget. It identifies summaries from system or developer text, including Anthropic's top-level system string or text blocks, so ordinary user/tool messages quoting the summary marker are forwarded unchanged. JSON null, primitives and malformed message arrays also pass through unchanged.
 
 Failure cases, written before changing the implementation:
 
@@ -14,7 +14,8 @@ Command: `pnpm exec vitest run apps/daemon/test/pi-compaction-ceiling.test.ts`.
 
 - `recovery-red.log`: three failed, seven passed on the original PR code.
 - `structure-red.log`: two failed, fifteen passed on the first review revision.
-- `recovery-green.log`: seventeen passed after both fixes and validation guards.
+- `anthropic-red.log`: two failed, seventeen passed when summary detection ignored Anthropic's top-level system field.
+- `recovery-green.log`: nineteen passed after the fixes and validation guards.
 
 The tests run the actual wrapper and upstream pi summarizer against deterministic provider-style context errors. This verifies wire-body recovery; it does not claim a fresh real-provider deployment experiment or a production step lifecycle recording.
 
