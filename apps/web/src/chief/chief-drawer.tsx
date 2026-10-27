@@ -20,7 +20,7 @@ interface DrawerProps {
   chief: ChiefContent;
   onSettings?: () => void;
   onClose: () => void;
-  onSend?: (text: string) => void | Promise<void>;
+  onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onThread?: (title: string, index: number) => void;
   onNewThread?: () => void;
   onRewind?: (messageId: string) => void;

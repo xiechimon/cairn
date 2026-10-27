@@ -46,7 +46,7 @@ Now going through `as-bot.sh` (the dispatching side):
 - Committing (git author and committer).
 - Pushing.
 - Opening PRs (`gh pr create`).
-- Enabling auto-merge (`gh pr merge --auto`).
+- Merge preparation follows the identity checks below; merge authorization uses the human login.
 
 The agents (codex, pi, grok) themselves never commit and never push.
 
@@ -60,6 +60,20 @@ Not switched:
 - `GITHUB_TOKEN` in CI: belongs to none of these identities.
 
 Merging, approving, and label changes — operations that need a human identity — still use xiechimon's gh login and never go through the App token.
+
+## Merge identity
+
+The GitHub App identity opens PRs and authenticates pushes. The Git author on main is a separate identity. The `commit-author` workflow rejects `cairnwright[bot]` in the latest main commit's author name or email.
+
+Read the PR opener and all commit authors with `gh pr view <n> --json author,commits` before choosing the merge method.
+
+- Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Check that neither its author name nor email contains `cairnwright[bot]`. Use the dispatcher's `~/.cairn/tools/merge-pr.sh` after inspecting its source and usage on the dispatch host. If the helper is unavailable or authorship is wrong, return the PR to the dispatcher for preparation.
+- Human-opened PRs use `gh pr merge <n> --squash --auto` after checking that none of their commit authors contains `cairnwright[bot]`.
+- Both paths require fully checked Acceptance and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
+
+Squashing a bot-opened PR can attribute the main commit to the bot opener even when the branch commit has the required author. Rebase preserves the prepared commit's author. A later green run checks the new main tip; it does not repair historical authorship.
+
+This repository documents the external helper contract. Its implementation is outside this checkout and must be inspected separately before changing dispatcher behavior.
 
 ## Token constraints
 

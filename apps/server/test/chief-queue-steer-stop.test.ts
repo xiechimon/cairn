@@ -299,6 +299,20 @@ describe('steer (T5): `现在插话`', () => {
     expect(await w.claim()).toBeNull();
   });
 
+  test('a steered message keeps the composer project chip', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const res = await call(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
+      body: { content: '改一下按钮', projectId: w.projectId },
+    });
+    const queued = ((await res.json()) as { message: { id: string } }).message.id;
+    expect((await w.steer(queued)).status).toBe(200);
+    expect(await w.fetchSteer(running!.step.id)).toBe(
+      `【输入框选定项目：queue-proj（id: ${w.projectId}）】\n改一下按钮`,
+    );
+  });
+
   test('a steer the running turn never picks up runs as its own turn afterwards', async () => {
     const w = await setupWorld();
     await w.send('第一句');
@@ -491,6 +505,18 @@ describe('chief unavailable (T4)', () => {
     const resumed = await w.claim();
     expect(resumed?.instruction).toBe('第一句');
     expect((await w.envelope()).outage ?? null).toBeNull();
+  });
+
+  test('capacity without a backup parks the chief with the effective provider', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    expect(running).not.toBeNull();
+    await w.done(running!.step.id, { status: 'failed', errorMessage: '429: rate limit exceeded' });
+    const row = w.stepRow(running!.step.id);
+    expect(row?.status).toBe('waiting_quota');
+    expect(row?.quotaBlock?.providerId).toBe('relay-a');
+    expect(await w.claim()).toBeNull();
   });
 
   test('a held message can be withdrawn while the chief is down', async () => {

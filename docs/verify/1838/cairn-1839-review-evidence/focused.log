@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 <home>/.codex/worktrees/pr-1839-prior-art/cairn
+
+
+ Test Files  4 passed (4)
+      Tests  72 passed (72)
+   Start at  03:18:44
+   Duration  1.55s (transform 48%, import 31%, tests 20%)
+

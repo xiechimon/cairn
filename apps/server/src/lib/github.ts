@@ -1099,6 +1099,19 @@ export async function githubUpdateIssueTitle(
   await writeJson(fetchImpl, 'PATCH', url, token, { title });
 }
 
+export async function githubCloseIssue(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  comment: string,
+): Promise<void> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  await writeJson(fetchImpl, 'PATCH', url, token, { state: 'closed', state_reason: 'not_planned' });
+  await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
+}
+
 export type GithubMergeResult =
   | { kind: 'merged'; sha: string }
   | { kind: 'refused'; status: number; message: string }

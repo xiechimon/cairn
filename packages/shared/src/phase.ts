@@ -26,6 +26,23 @@ export const PHASE_SEMANTICS: Readonly<Record<Phase, string>> = {
 
 export const IN_PROGRESS_PHASES = ['queued', 'planning', 'building'] as const;
 
+export interface TodoStartState {
+  phase: string;
+  latestBuildId: string | null;
+  lastRunAt: number | null;
+  hasChanges: boolean;
+  hasPlan: boolean;
+}
+
+export function isStartedTodo(row: TodoStartState): boolean {
+  if ((IN_PROGRESS_PHASES as readonly string[]).includes(row.phase)) return true;
+  return row.latestBuildId != null || row.lastRunAt != null || row.hasChanges || row.hasPlan;
+}
+
+export function canMoveTodoProject(row: TodoStartState & { sourceKind?: string | null }): boolean {
+  return row.phase === 'todo' && !isStartedTodo(row) && row.sourceKind !== 'github-issue';
+}
+
 export const ORCHESTRATE_PHASES = ['todo', 'failed'] as const;
 
 export const canOrchestrate = (phase: Phase): boolean =>

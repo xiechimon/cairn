@@ -68,6 +68,7 @@ import type {
   TokenUsageContent,
   TranscriptItem,
   UsageCostContent,
+  WorkStep,
 } from '../fixtures/records.js';
 import { activityLabel } from './activity.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
@@ -495,8 +496,8 @@ export function mapPlanDiff(diff: {
 }
 
 interface ToolEntry {
-  kind: '__tool__';
-  call: ToolCallRecord;
+  kind: '__work__';
+  step: WorkStep;
 }
 
 interface TimelineEntry {
@@ -568,11 +569,22 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       toolNameByResult.set(pairedText, paired.name);
   }
 
+  const claimedSince = steps.find((s) => s.status === 'claimed')?.createdAt ?? null;
   const entries: TimelineEntry[] = [];
+  let previousAt: number | null = null;
   for (const m of messages) {
+    const seconds =
+      previousAt !== null && m.createdAt > previousAt ? (m.createdAt - previousAt) / 1000 : null;
+    previousAt = m.createdAt;
     const call = toolCallOfContent(m.content);
     if (call !== null) {
-      entries.push({ at: m.createdAt, item: toolItem(call) });
+      entries.push({
+        at: m.createdAt,
+        item: {
+          kind: '__work__',
+          step: workCall(call, seconds, claimedSince !== null && m.createdAt >= claimedSince),
+        },
+      });
       continue;
     }
     const text = textOfContent(m.content).trim();
@@ -630,7 +642,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
     const thinking = m.role === 'assistant' ? thinkingOfContent(m.content) : null;
     if (thinking !== null)
-      entries.push({ at: m.createdAt, item: { kind: 'thinking', text: thinking, id: m.id } });
+      entries.push({
+        at: m.createdAt,
+        item: { kind: '__work__', step: { kind: 'think', text: thinking, id: m.id, seconds } },
+      });
   }
 
   const planSteps = steps.filter((s) => s.kind === 'plan');
@@ -660,33 +675,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
 
   entries.sort((a, b) => a.at - b.at);
   const items: TranscriptItem[] = [...head];
-  let toolRun: { seconds: number; pills: string[]; outputs: (string | null)[] } | null = null;
-  const flushTools = () => {
-    if (toolRun !== null) {
-      items.push({
-        kind: 'tools',
-        seconds: toolRun.seconds,
-        expanded: false,
-        pills: toolRun.pills,
-        outputs: toolRun.outputs,
-      });
-      toolRun = null;
-    }
-  };
-  for (const e of entries) {
-    if (e.item.kind === '__tool__') {
-      const secs = durationSeconds(e.item.call);
-      toolRun = toolRun ?? { seconds: 0, pills: [], outputs: [] };
-      toolRun.seconds += secs;
-      toolRun.pills.push(pillOf(e.item.call));
-      const output = resultToText(e.item.call.result);
-      toolRun.outputs.push(output !== null && isJsonPlumbing(output) ? null : output);
-      continue;
-    }
-    flushTools();
-    items.push(e.item);
+  for (const entry of entries) {
+    if (entry.item.kind === '__work__') {
+      const previous = items.at(-1);
+      if (previous?.kind === 'work') previous.steps.push(entry.item.step);
+      else items.push({ kind: 'work', id: entry.item.step.id, steps: [entry.item.step] });
+    } else items.push(entry.item);
   }
-  flushTools();
 
   const skillReadNames: string[] = [];
   const skillDeniedNames: string[] = [];
@@ -700,7 +695,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   }
   const readSkills = skillReadNames.filter((n) => !skillDeniedNames.includes(n));
   if (readSkills.length > 0 || skillDeniedNames.length > 0) {
-    items.push({ kind: 'skills', read: readSkills, denied: skillDeniedNames });
+    items.splice(head.length, 0, { kind: 'skills', read: readSkills, denied: skillDeniedNames });
   }
 
   const running = steps.find(
@@ -708,7 +703,15 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   );
   if (running && build) {
     if (liveThinking.trim() !== '') {
-      items.push({ kind: 'thinking', text: liveThinking });
+      const step: WorkStep = {
+        kind: 'think',
+        id: 'live-thinking',
+        text: liveThinking,
+        seconds: null,
+      };
+      const previous = items.at(-1);
+      if (previous?.kind === 'work') previous.steps.push(step);
+      else items.push({ kind: 'work', id: step.id, steps: [step] });
     }
     if (liveText.trim() !== '') {
       items.push({
@@ -784,15 +787,85 @@ function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string 
   }
 }
 
-function toolItem(call: ToolCallRecord): ToolEntry {
-  return { kind: '__tool__', call };
-}
-
-function durationSeconds(call: ToolCallRecord): number {
-  if (call.startedAt !== undefined && call.endedAt !== undefined) {
-    return Math.max(0, Math.round((call.endedAt - call.startedAt) / 1000));
+function workCall(
+  call: ToolCallRecord,
+  fallbackSeconds: number | null,
+  stepRunning: boolean,
+): WorkStep {
+  const args = (call.arguments ?? {}) as Record<string, unknown>;
+  const name = call.name.toLowerCase();
+  const path = String(args.file_path ?? args.path ?? '').replace(
+    /^\/(?:home|Users)\/[^/]+\/\.(?:pacman-chief|cairn)\/(?:workspaces|plans)\/[^/]+\//,
+    '',
+  );
+  const output = resultToText(call.result);
+  const seconds =
+    call.startedAt !== undefined && call.endedAt !== undefined
+      ? Math.max(0, (call.endedAt - call.startedAt) / 1000)
+      : call.startedAt !== undefined
+        ? null
+        : fallbackSeconds;
+  const base = {
+    kind: 'call' as const,
+    id: call.id,
+    label: call.name,
+    output: output !== null && isJsonPlumbing(output) ? null : output,
+    error: call.isError === true,
+    running: call.result === undefined && stepRunning,
+    unfinished: call.result === undefined && !stepRunning,
+    seconds,
+  };
+  if (name === 'read') {
+    const offset = typeof args.offset === 'number' ? args.offset : null;
+    const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : null;
+    const range =
+      offset === null && limit === null
+        ? ''
+        : limit === null
+          ? ` L${offset}+`
+          : ` L${offset ?? 1}–${(offset ?? 1) + limit - 1}`;
+    return { ...base, action: 'read', target: path + range };
   }
-  return 0;
+  if (name === 'edit' || name === 'write' || name === 'multiedit') {
+    const edits = name === 'multiedit' && Array.isArray(args.edits) ? args.edits : [args];
+    const removed: string[] = [];
+    const added: string[] = [];
+    for (const edit of edits) {
+      if (edit === null || typeof edit !== 'object') continue;
+      const values = edit as Record<string, unknown>;
+      const oldText = values.old_string ?? values.oldText;
+      const newText = values.new_string ?? values.newText ?? values.content;
+      if (typeof oldText === 'string' && oldText !== '') removed.push(...oldText.split('\n'));
+      if (typeof newText === 'string' && newText !== '') added.push(...newText.split('\n'));
+    }
+    return {
+      ...base,
+      action: 'edit',
+      target: path,
+      diff: { added: added.length, removed: removed.length },
+      changes: { removed, added },
+    };
+  }
+  if (name === 'grep' || name === 'find' || name === 'ls' || name === 'glob') {
+    const pattern = typeof args.pattern === 'string' ? args.pattern : '';
+    return {
+      ...base,
+      action: 'search',
+      description: [call.name, pattern, path].filter((part) => part !== '').join(' '),
+    };
+  }
+  if (name === 'bash') {
+    const command = typeof args.command === 'string' ? args.command : '';
+    const description =
+      typeof args.description === 'string' ? args.description : (command.split('\n')[0] ?? '');
+    return {
+      ...base,
+      action: /^(grep|rg|find|git grep)\b/.test(command.trim()) ? 'search' : 'run',
+      description,
+      command,
+    };
+  }
+  return { ...base, action: 'tool', target: call.name.replace(/^mcp__/, '').replace(/__/g, ' · ') };
 }
 
 function resultToText(result: unknown): string | null {

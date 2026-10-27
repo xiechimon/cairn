@@ -1,0 +1,74 @@
+
+ RUN  v5.0.1 <home>/.codex/worktrees/pr-1839-prior-art/cairn
+
+ ❯ |@cairn/integration| test/plan-prior-art-grade.test.ts (13 tests | 8 failed) 8ms
+   ❯ prior-art decision scoring (12)
+     × does not award reuse credit to Decision: do not reuse croner because we will build a hand-written parser. 3ms
+     × does not award reuse credit to Decision: never reuse croner because we will build a hand-written parser. 1ms
+     × does not award reuse credit to Decision: we will not reuse croner because we will build a hand-written parser. 0ms
+     × does not award reuse credit to Decision: build a hand-written parser because the croner reuse example is unsuitable. 0ms
+     × does not award reuse credit to Decision: reuse another-library because it is maintained; croner is only a reference. 0ms
+     × does not award reuse credit to > Decision: reuse croner because it is maintained.
+Decision: build a parser because the example is unsuitable. 0ms
+     × does not award reuse credit to ```text
+Decision: reuse croner because it is maintained.
+```
+Decision: build a parser because the example is unsuitable. 0ms
+     × ignores reuse claims outside the prior-art decision 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > prior-art decision scoring > does not award reuse credit to Decision: do not reuse croner because we will build a hand-written parser.
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > prior-art decision scoring > does not award reuse credit to Decision: never reuse croner because we will build a hand-written parser.
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > prior-art decision scoring > does not award reuse credit to Decision: we will not reuse croner because we will build a hand-written parser.
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > prior-art decision scoring > does not award reuse credit to Decision: build a hand-written parser because the croner reuse example is unsuitable.
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > prior-art decision scoring > does not award reuse credit to Decision: reuse another-library because it is maintained; croner is only a reference.
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > prior-art decision scoring > does not award reuse credit to > Decision: reuse croner because it is maintained.
+Decision: build a parser because the example is unsuitable.
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > prior-art decision scoring > does not award reuse credit to ```text
+Decision: reuse croner because it is maintained.
+```
+Decision: build a parser because the example is unsuitable.
+AssertionError: expected 1 to be 0.5 // Object.is equality
+
+- Expected
++ Received
+
+- 0.5
++ 1
+
+ ❯ test/plan-prior-art-grade.test.ts:54:60
+     52|     '```text\nDecision: reuse croner because it is maintained.\n```\nD…
+     53|   ])('does not award reuse credit to %s', (decision) => {
+     54|     expect(gradePlanPriorArt(featurePlan(decision)).score).toBe(0.5);
+       |                                                            ^
+     55|   });
+     56|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > prior-art decision scoring > ignores reuse claims outside the prior-art decision
+AssertionError: expected 1 to be 0.5 // Object.is equality
+
+- Expected
++ Received
+
+- 0.5
++ 1
+
+ ❯ test/plan-prior-art-grade.test.ts:61:15
+     59|       'Decision: build a parser because the library is unsuitable.',
+     60|       'An earlier proposal said to reuse croner.',
+     61|     )).score).toBe(0.5);
+       |               ^
+     62|   });
+     63|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 5 passed (13)
+   Start at  03:14:03
+   Duration  360ms (transform 62%, import 34%, tests 3%, worker 1%)
+

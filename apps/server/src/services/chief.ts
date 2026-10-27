@@ -22,6 +22,7 @@ import {
   isBackendRuntimeId,
   isIssueSourcedTask,
   newChiefThreadId,
+  PLAN_PRIOR_ART_RULE,
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -377,16 +378,43 @@ export function chiefBinding(
   }
 }
 
+const PICKED_PROJECT_OPEN = '【输入框选定项目：';
+
+function pickedProjectOf(
+  db: ChiefDeps['db'],
+  teamId: string,
+  projectId: string | null | undefined,
+): { id: string; name: string } | null {
+  if (projectId == null) return null;
+  return (
+    db
+      .select({ id: project.id, name: project.name })
+      .from(project)
+      .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+      .get() ?? null
+  );
+}
+
+function promptWithPickedProject(picked: { id: string; name: string } | null, content: string) {
+  return picked === null
+    ? content
+    : `${PICKED_PROJECT_OPEN}${picked.name.replace(/[【】\r\n]+/g, ' ').trim()}（id: ${picked.id}）】\n${content}`;
+}
+
 export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
-  body: { threadId: string | null; content: string },
+  body: { threadId: string | null; content: string; projectId?: string | null | undefined },
 ): {
   thread: ChiefThread;
   message: { id: string; role: 'user'; content: string; createdAt: number };
 } {
   const chiefRow = ensureChief(deps, teamId);
   requireBoundAgent(deps, chiefRow);
+  const picked = pickedProjectOf(deps.db, teamId, body.projectId);
+  if (body.projectId != null && picked === null) {
+    throw new HttpError(400, `project ${body.projectId} not in team`);
+  }
 
   let threadRow: ThreadRow | undefined;
   if (body.threadId !== null) {
@@ -435,12 +463,17 @@ export function sendChiefMessage(
       threadId: threadRow.id,
       role: 'user',
       content: body.content,
+      projectId: picked?.id ?? null,
       createdAt: now,
     })
     .run();
   deps.db.update(chiefThread).set({ updatedAt: now }).where(eq(chiefThread.id, threadRow.id)).run();
 
-  enqueueChiefStep(deps, threadRow.id, { prompt: body.content, trigger: 'user', id: message.id });
+  enqueueChiefStep(deps, threadRow.id, {
+    prompt: promptWithPickedProject(picked, body.content),
+    trigger: 'user',
+    id: message.id,
+  });
   const projector = stepQueueProjector(deps.db, teamId);
   const pendingTurn = projector.pendingChiefOf(threadRow.id);
   return {
@@ -525,7 +558,10 @@ export function rewindChiefThread(
   deps.convHub?.clearConversationBuffer(threadId);
   const content =
     typeof anchor.content === 'string' ? anchor.content : (extractText(anchor.content) ?? '');
-  enqueueChiefStep(deps, threadId, { prompt: content, trigger: 'user' });
+  enqueueChiefStep(deps, threadId, {
+    prompt: promptWithPickedProject(pickedProjectOf(deps.db, teamId, anchor.projectId), content),
+    trigger: 'user',
+  });
   const fresh = getChiefThread(deps, threadId);
   if (!fresh) throw new Error('chief thread missing after rewind');
   const projector = stepQueueProjector(deps.db, teamId);
@@ -836,8 +872,10 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
     '- 拆分：拆分粒度 = 核销次数——按可独立验收的成果拆，不按执行步骤拆；同类小事项合并一张卡（多子事项以 ` + ` 并入标题），跨类型、可各自独立验收的交付物才拆成多张。子卡 spec 必须内嵌用户原文片段（`> …` blockquote）并给兄弟任务文字交叉引用。',
     '- 编排回合（开始任务入口，消息形「开始任务 #n」+ 编排请求行）：先规划再派发——单一工作单元：直接 run_builds 派该任务（assignment 按职责文本选）；确含多个可独立验收的交付物：create_todo 拆子卡 + run_builds 逐个派发 + close_todos 关掉原卡（看板不留父卡），回执列全部子卡实体引用。',
     '- 派发判定（逐次派发自行判断，无团队设置槽，ADR 0014）：先规划还是直接修，由你自己判。判断纪律：当信息会实质改变结果、执行方式、权限或安全时才问；否则自己决定，并说出你决定了什么。可判信号（非硬规则）：有可复现步骤或失败测试的缺陷 → 直接修（run_builds 传 withPlan=false）；引入新能力、或改动跨包 → 先问（问 = ask_user 结构化提问：本回合会挂起等用户在问答卡上作答，一次可带最多 4 问；判不准且不便当面问时也可传 withPlan=true 先规划，方案停在确认关口，用户批准或打回即表态）；判不准 → 先规划（withPlan 缺省即先规划）。直接修只跳过方案确认闸，审阅关口恒在——完成后仍停在审阅关口等用户审。',
+    `- ${PLAN_PRIOR_ART_RULE}`,
     '- 派发回执：每次派发把判定理由写进 run_builds 的 dispatchReason 参数（随调用落 transcript，判定可审计），并在给用户的回执里写明「我判为直接修 / 先规划，因为 X」。用户可就地一句话推翻该判定——推翻只影响这一次派发（已开跑的先 cancel_builds 取消，再按相反模式重派），不外推为常设偏好。',
-    '- 项目归属：create_todo 前先定 projectId。用户点名项目就用它；没点名时先查再定——对照 projects 的 name/description，必要时用 docs 读候选项目的文件、用 todos 看各项目已有任务，按证据选一个，并在回执里说「放在 X，因为 Y」。查完仍然分不出时才 ask_user，问题里只列仍然分不出的候选，不列已排除的项目，本回合不建任务。一句话涉及多个项目时，每个项目一张 todo，spec 里写明彼此关系与先后顺序。只是提问、没要求改动时只回答，不建任务。',
+    '- 项目归属：create_todo 前先定 projectId。用户消息以「【输入框选定项目：X（id: …）】」起头时，本回合新建的任务都放 X，不再调查也不问，回执里说「放在 X（你选的）」。用户点名项目就用它；没点名时先查再定——对照 projects 的 name/description，必要时用 docs 读候选项目的文件、用 todos 看各项目已有任务，按证据选一个，并在回执里说「放在 X，因为 Y」。查完仍然分不出时才 ask_user，问题里只列仍然分不出的候选，不列已排除的项目，选项最后加一个「都不是」，本回合不建任务。一句话涉及多个项目时，每个项目一张 todo，spec 里写明彼此关系与先后顺序。只是提问、没要求改动时只回答，不建任务。',
+    '- 换项目：用户说任务放错了项目时，还没开始的任务用 update_todo 传 projectId 挪过去（标签会清掉）；已经开始的任务不能挪，告诉用户可以关掉它，再在正确的项目里新建。',
     '- 分派：读 agents 的职责文本按权重选择；归属按交付物与改动范围区分——面向读者的文档产出（README/手册/教程/变更日志）归文档职责 Agent；后端功能、缺陷、重构与性能归后端职责 Agent；Web 界面布局、样式与交互归前端职责 Agent；CI 流水线、构建打包、依赖与部署配置归运维职责 Agent。归属拿不准时先 ask_user 澄清，不猜。run_builds 传 assignment.build.agentId。',
     '- 交付物优先于路径：归属看交付物，不看请求里出现的路径或技术词——要更新的是 README 就归文档职责，哪怕那个 README 躺在 apps/web 下。',
     '- 主任务定归属：一句请求含多个同类子项时按主任务定归属，不拆成多个 todo，次任务随主任务交给同一个 Agent。',

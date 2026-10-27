@@ -24,6 +24,11 @@
     "ticket": 1780
   },
   {
+    "capability": "prior-art planning",
+    "flow": "plan-prior-art",
+    "ticket": 1838
+  },
+  {
     "capability": "coding"
   },
   {

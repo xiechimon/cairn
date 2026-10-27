@@ -21,6 +21,21 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
+  '思考 {n} 次': 'Thinking: {n}',
+  '读了 {n} 个文件': 'Files read: {n}',
+  '搜索 {n} 次': 'Searches: {n}',
+  '跑了 {n} 条命令': 'Commands: {n}',
+  '改了 {n} 个文件': 'Files edited: {n}',
+  '调用 {n} 个工具': 'Tool calls: {n}',
+  '已加载 {n} 个技能': 'Skills loaded: {n}',
+  '还有 {n} 行': '{n} more lines',
+  无输出: 'No output',
+  未完成: 'Not finished',
+  读取: 'Read',
+  运行: 'Run',
+  修改: 'Edit',
+  调用: 'Call',
+
   // —— shared chrome / sidebar (r2 §1.1) ——
   搜索: 'Search',
   // #351 看板更名工作台：'Workbench'（不用 'Workspace'，避撞 daemon workspaces 概念）
@@ -39,6 +54,14 @@ export const EN: Record<string, string> = {
   '，': ', ',
   '{n} 项待你处理': '{n} waiting on you',
   '，没有需要你的事': ', nothing needs you',
+  发给哪个项目: 'Send to which project',
+  '发给哪个项目：{name}': 'Send to project: {name}',
+  '自动，由总管判断': 'Auto, the Chief decides',
+  '总管判断，拿不准会问你': 'The Chief decides and asks when unsure',
+  挪到哪个项目: 'Move to which project',
+  '还没开始，放错了可以': 'Not started yet. If it is in the wrong place, ',
+  换项目: 'Move project',
+  '换项目失败，请重试。': 'Could not move the task. Try again.',
   往上滑查看昨天的对话: "Scroll up for yesterday's conversation",
   往上滑查看之前的对话: 'Scroll up for earlier conversation',
   '过去 24 小时各项目的情况：': 'Projects in the last 24 hours:',
@@ -223,7 +246,6 @@ export const EN: Record<string, string> = {
   由定时发起: 'Started by schedule',
   收起: 'Collapse',
   // #933: the collapsed tool group's identity label (transcript action row).
-  工具过程: 'Tool process',
   尚无描述: 'No description yet',
   '{y}年{mo}月{d}日 {hh}:{mm} 创建': 'Created {monthShort} {d}, {y} {hh}:{mm}',
 
@@ -723,7 +745,6 @@ export const EN: Record<string, string> = {
   '挡下：{n}': 'Blocked: {n}',
   // #1106 dispatch skill injection: detail-face lookup row (reasons ride as
   // server data, not t() keys — same law as note #634).
-  '注入技能：': 'Injected skills: ',
   '未注入技能（任务文本未命中任何技能）': 'No skills injected (task text matched none)',
   // #1288：模型活性标注——dead 模型置灰 +「已下架」（不隐藏）。
   已下架: 'Delisted',
@@ -1232,8 +1253,8 @@ export const EN: Record<string, string> = {
   '提交回答失败，请重试。': 'Could not submit your answers. Try again.',
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',
-  '主模型额度用完、服务 5xx、账号耗尽、限流、模型 404 或认证失败时，按顺序换到下一个可用备选。只有规划和执行步会换；审核、验证、合并、总管不换。备选用尽后，限流和额度继续等待，其他服务故障则该步失败。':
-    'When the primary model runs out of quota, hits a provider 5xx or account exhaustion, is rate limited, returns 404, or fails authentication, the next usable fallback takes over in order. Only plan and build steps switch; review, verify, merge and chief never do. After the fallback list is exhausted, rate limits and quota keep waiting; other provider failures fail the step.',
+  '主模型额度用完、服务 5xx、账号耗尽、限流、模型 404 或认证失败时，按顺序换到下一个可用备选。规划和执行步会换，总管只换同一运行时的备选；审核、验证、合并不换。备选用尽后，限流和额度继续等待，其他服务故障则该步失败。':
+    'When the primary model runs out of quota, hits a provider 5xx or account exhaustion, is rate limited, returns 404, or fails authentication, the next usable fallback takes over in order. Plan and build steps switch; the chief uses backups within the same runtime. Review, verify and merge steps never switch. After the fallback list is exhausted, rate limits and quota keep waiting; other provider failures fail the step.',
   '备用 {n}': 'Fallback {n}',
   '备用 {n} 运行时': 'Fallback {n} runtime',
   '备用 {n} 模型': 'Fallback {n} model',

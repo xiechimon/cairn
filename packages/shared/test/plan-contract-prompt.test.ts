@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { personaByRole } from '../src/records/persona.js';
 import {
   appendPlanLocationNote,
   buildPlanContractRewritePrompt,
@@ -8,6 +9,7 @@ import {
   classifyUserText,
   composeTaskPromptWithInstruction,
   isPlanContractRewritePrompt,
+  PLAN_PRIOR_ART_RULE,
   PLAN_VERIFICATION_RULE,
 } from '../src/records/prompts.js';
 
@@ -44,6 +46,30 @@ describe('presentation-layer filtering (failure modes 3, 4)', () => {
     );
     expect(classifyUserText(composed, TASK)).toBe('synthetic');
     expect(classifyUserText(oldRewrite, TASK)).toBe('synthetic');
+  });
+});
+
+describe('prior art reaches planner prompts (#1838)', () => {
+  test('first-round, missing-file rewrite, and contract rewrite all carry the prior-art rule', () => {
+    expect(buildPlanFirstRoundInstruction()).toContain(PLAN_PRIOR_ART_RULE);
+    expect(buildPlanRewritePrompt()).toContain(PLAN_PRIOR_ART_RULE);
+    expect(buildPlanContractRewritePrompt('功能方案缺少 Prior art 小节')).toContain(
+      PLAN_PRIOR_ART_RULE,
+    );
+    expect(PLAN_PRIOR_ART_RULE).toContain('Prior art');
+    expect(PLAN_PRIOR_ART_RULE).toContain('Kind: fix');
+  });
+
+  test('the planner persona carries the same rule', () => {
+    expect(personaByRole('planner').description).toContain(PLAN_PRIOR_ART_RULE);
+  });
+
+  test('the previous contract-rewrite wording still classifies as synthetic', () => {
+    const legacy =
+      '方案的 Verification 小节没过结构检查：「缺节」。请更新 plan.md 交接位置指定的文件，补齐 Verification 小节再结束本步。' +
+      `${PLAN_VERIFICATION_RULE}其余小节不必改动。`;
+    expect(isPlanContractRewritePrompt(legacy)).toBe(true);
+    expect(classifyUserText(legacy, TASK)).toBe('synthetic');
   });
 });
 
