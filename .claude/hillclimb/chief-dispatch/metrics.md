@@ -295,3 +295,22 @@ them; a verdict on cost needs about 80 paired cases.
 `reasoning_effort=low` cut output to 1/4, while the point estimate in the real agentic loop is
 only −8%. A single shot has no tool round trips and no context accumulation; it does not represent
 real load. Evaluating fields like this must go through the real loop.
+
+## Fresh conventions ablation (#1945): blocked preflight, 2026-10-27
+
+No fresh current-versus-cut measurement is available. At revision
+`b80e55d85a4b320e05bfbf12084aa3fb8540d2ea`, prerequisite issues #1943 and #1944
+were OPEN: this checkout has neither prompt-set switching nor the comparison CLI.
+The process also lacks the required relay URL; relay network availability was not tested.
+
+The proposed `v19450` and `v19451` directories were both absent before any run;
+neither arm was started. Recheck emptiness before first use after the prerequisites
+merge. Historical `baseline` rows are not a fresh control and must not be used for
+this comparison. The earlier baseline command above describes the historical workflow,
+not the #1945 experiment.
+
+See [preflight evidence and continuation requirements](../../../docs/verify/1945/README.md).
+Live-run acceptance remains incomplete, and pass-rate, token and cost differences
+are unavailable. The intended intervention changes only the chief conventions section;
+it cannot establish effects for arbitrary AGENTS.md slimming or other agent workloads.
+Production prompts are unchanged.
