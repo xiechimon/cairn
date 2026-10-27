@@ -514,6 +514,7 @@ export const chiefMessage = sqliteTable('chief_message', {
     .references(() => chiefThread.id, { onDelete: 'cascade' }),
   role: text('role').$type<'system' | 'user' | 'assistant'>().notNull(),
   content: json<unknown>('content').notNull(),
+  projectId: text('projectId'),
   createdAt: epochMs('createdAt').notNull(),
 });
 

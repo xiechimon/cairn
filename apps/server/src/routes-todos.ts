@@ -2,6 +2,7 @@ import {
   createTodoBodySchema,
   githubIssueEchoSchema,
   IN_PROGRESS_PHASES,
+  isStartedTodo,
   needsYouQuerySchema,
   phaseSchema,
   type TodoRecord,
@@ -31,7 +32,6 @@ import {
   createTodo,
   deleteTodo,
   getTodo,
-  isStartedTodoRow,
   listTodos,
   resetTodo,
   retrySelfIssueCreate,
@@ -99,7 +99,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       prior != null &&
       prior.phase !== 'todo' &&
       prior.phase !== 'closed' &&
-      isStartedTodoRow(prior)
+      isStartedTodo(prior)
     ) {
       throw conflict(
         `这张卡已经开始过，挪回待开始要重置（清空构建历史）：POST /api/todos/${id}/reset`,

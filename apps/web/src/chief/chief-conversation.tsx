@@ -3,6 +3,7 @@ import {
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
 } from '@cairn/shared';
+import { CircleDashed } from 'lucide-react';
 import {
   type Dispatch,
   type ReactNode,
@@ -15,6 +16,7 @@ import {
 } from 'react';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { ProjectAvatar } from '../board/project-avatar.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -61,12 +63,16 @@ import { type MentionGroups, MentionInline, MentionPicker } from '../overlay/men
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
+import { ProjectMenu } from './project-menu.js';
 
 const HEAD_ICON_BTN_CLS =
   "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const TOOL_BTN_CLS =
   "size-6 cursor-pointer text-(--text-tertiary) hover:text-(--text-secondary) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+
+const PROJECT_CHIP_CLS =
+  "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const SEND_BTN_CLS =
   'ml-auto cursor-pointer rounded-md border-0 bg-transparent text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
@@ -89,6 +95,7 @@ const EXAMPLE_ICONS = {
 } as const;
 
 export const CHIEF_DRAFT_STORAGE_KEY = 'cairn.chief-draft';
+export const CHIEF_PROJECT_STORAGE_KEY = 'cairn.chief-project';
 
 function readStoredChiefDraft(): string {
   try {
@@ -114,7 +121,7 @@ export interface ChiefConversationProps {
   chief: ChiefContent;
   onSettings?: () => void;
   onClose?: () => void;
-  onSend?: (text: string) => void | Promise<void>;
+  onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onThread?: (title: string, index: number) => void;
   onNewThread?: () => void;
   onRewind?: (messageId: string) => void;
@@ -189,6 +196,29 @@ export function ChiefConversation({
     })),
     machine: (machinesQ.data ?? []).map((m) => ({ id: m.id, label: m.name })),
   };
+  const projectOptions = useMemo(
+    () =>
+      (projectsQ.data ?? []).map((p) => ({ id: p.id, name: p.name, description: p.description })),
+    [projectsQ.data],
+  );
+  const [storedProjectId, setStoredProjectId] = useState(() => {
+    if (!live) return null;
+    try {
+      return localStorage.getItem(CHIEF_PROJECT_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const pickedProject = projectOptions.find((p) => p.id === storedProjectId) ?? null;
+  const chipVisible = onSend != null && projectOptions.length > 1;
+  const pickProject = useCallback((projectId: string | null) => {
+    setStoredProjectId(projectId);
+    try {
+      if (projectId === null) localStorage.removeItem(CHIEF_PROJECT_STORAGE_KEY);
+      else localStorage.setItem(CHIEF_PROJECT_STORAGE_KEY, projectId);
+    } catch {}
+  }, []);
+  const chipProjectId = chipVisible ? (pickedProject?.id ?? null) : null;
   const onAttachment =
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
   const { scrollToEnd } = useMessageScroller();
@@ -238,10 +268,11 @@ export function ChiefConversation({
         ? undefined
         : (text: string) => {
             scrollToEnd();
-            return onSend(text);
+            return onSend(text, chipProjectId);
           },
     onAttachment,
     mentionGroups,
+    ...(chipVisible ? { onPickProject: (p: { id: string }) => pickProject(p.id) } : {}),
     slash: {
       reviewAvailable: false,
       stopAvailable: false,
@@ -270,9 +301,8 @@ export function ChiefConversation({
     setInlineHighlight,
     inlineListboxId,
     inlineListboxRef,
-    insertToken,
+    acceptInlineRow,
     insertTokens,
-    insertFile,
     groups,
     slashOpen,
     slashQuery,
@@ -551,7 +581,7 @@ export function ChiefConversation({
                   variant="ghost"
                   className="h-16 w-full cursor-pointer justify-start gap-3 rounded-(--radius-card) border-none bg-(--card) px-3 text-left whitespace-normal font-normal ring-1 ring-(--border) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
                   key={ex.text}
-                  onClick={onSend != null ? () => void onSend(ex.text) : undefined}
+                  onClick={onSend != null ? () => void onSend(ex.text, chipProjectId) : undefined}
                 >
                   <span className="flex size-6 flex-none items-center justify-center text-(--text-tertiary)">
                     <Icon width={16} height={16} />
@@ -653,18 +683,7 @@ export function ChiefConversation({
             query={inlineQuery}
             highlight={inlineHighlight}
             onHover={setInlineHighlight}
-            onPick={(row) => {
-              if (row.kind === 'file') {
-                insertFile(row.label);
-              } else {
-                insertToken({
-                  kind: row.kind,
-                  id: row.id,
-                  label: row.label,
-                  ...(row.seq !== undefined ? { seq: row.seq } : {}),
-                });
-              }
-            }}
+            onPick={acceptInlineRow}
             listboxRef={inlineListboxRef}
             listboxId={inlineListboxId}
           />
@@ -716,6 +735,38 @@ export function ChiefConversation({
           >
             <Grid2x2 width={16} height={16} />
           </IconTooltip>
+          {chipVisible && (
+            <ProjectMenu
+              title="发给哪个项目"
+              projects={projectOptions}
+              value={pickedProject?.id ?? null}
+              withAuto
+              side="top"
+              onPick={pickProject}
+              trigger={
+                <Button
+                  variant="ghost"
+                  data-testid="chief-project-chip"
+                  data-set={pickedProject != null ? '' : undefined}
+                  aria-label={t('发给哪个项目：{name}', {
+                    name: pickedProject?.name ?? t('自动，由总管判断'),
+                  })}
+                  className={`-ml-2 ${PROJECT_CHIP_CLS}`}
+                />
+              }
+            >
+              {pickedProject != null ? (
+                <ProjectAvatar
+                  name={pickedProject.name}
+                  tone={projectOptions.indexOf(pickedProject)}
+                />
+              ) : (
+                <CircleDashed className="size-4 flex-none" />
+              )}
+              <span className="truncate">{pickedProject?.name ?? t('自动')}</span>
+              <ChevronDown width={12} height={12} />
+            </ProjectMenu>
+          )}
           {stopMode ? (
             <Button
               variant="ghost"

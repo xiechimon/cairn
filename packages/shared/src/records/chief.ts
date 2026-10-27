@@ -153,6 +153,7 @@ export type PatchChiefBody = z.infer<typeof patchChiefBodySchema>;
 export const chiefSendMessageBodySchema = z.object({
   threadId: z.string().nullable(),
   content: z.string().min(1),
+  projectId: z.string().min(1).nullish(),
 });
 export type ChiefSendMessageBody = z.infer<typeof chiefSendMessageBodySchema>;
 

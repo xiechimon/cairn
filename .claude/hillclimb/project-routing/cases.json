@@ -1,6 +1,6 @@
 {
   "flow": "project-routing",
-  "note": "#1920: with several projects in the team, does the Chief put each todo in the right project, ask only when candidates stay tied after investigating, split a cross-project request into one todo per project, and answer questions without creating todos. Graded on the final todo rows (projectId), not the transcript.",
+  "note": "#1920: with several projects in the team, does the Chief put each todo in the right project, ask only when candidates stay tied after investigating, split a cross-project request into one todo per project, and answer questions without creating todos. Cases with a chip send the composer's picked project with the message (#2009): the todo must land there even when the text alone is tied or points elsewhere, and a question still creates nothing. Graded on the final todo rows (projectId), not the transcript.",
   "roster": [
     {
       "key": "exec-glm-5.3",
@@ -192,6 +192,45 @@
         "answer"
       ],
       "prompt": "官网和看板服务是同一个项目吗？",
+      "expect": {
+        "kind": "answer"
+      }
+    },
+    {
+      "id": "c01",
+      "tags": [
+        "chip"
+      ],
+      "chip": "digest-bot",
+      "prompt": "把 Python 最低版本从 3.11 升到 3.13。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "digest-bot"
+        ]
+      }
+    },
+    {
+      "id": "c02",
+      "tags": [
+        "chip"
+      ],
+      "chip": "bench",
+      "prompt": "有个 README 里的链接点开是 404，帮我修一下。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "bench"
+        ]
+      }
+    },
+    {
+      "id": "c03",
+      "tags": [
+        "chip"
+      ],
+      "chip": "digest-bot",
+      "prompt": "digest-bot 是用什么语言写的？",
       "expect": {
         "kind": "answer"
       }

@@ -299,6 +299,20 @@ describe('steer (T5): `现在插话`', () => {
     expect(await w.claim()).toBeNull();
   });
 
+  test('a steered message keeps the composer project chip', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const res = await call(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
+      body: { content: '改一下按钮', projectId: w.projectId },
+    });
+    const queued = ((await res.json()) as { message: { id: string } }).message.id;
+    expect((await w.steer(queued)).status).toBe(200);
+    expect(await w.fetchSteer(running!.step.id)).toBe(
+      `【输入框选定项目：queue-proj（id: ${w.projectId}）】\n改一下按钮`,
+    );
+  });
+
   test('a steer the running turn never picks up runs as its own turn afterwards', async () => {
     const w = await setupWorld();
     await w.send('第一句');

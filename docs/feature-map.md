@@ -1100,7 +1100,7 @@ before today.
 |---|---|---|---|---|---|---|
 | dispatch | `chief-dispatch` | 64 | 29/30 (96.7%) | 2026-10-26 | `glm-5.3` | scored |
 | memory use | `memory-regression` | 21 |  |  |  | built-not-run |
-| project routing | `project-routing` | 13 |  |  |  | built-not-run |
+| project routing | `project-routing` | 16 |  |  |  | built-not-run |
 | learn from correction | `learn` | 10 |  |  |  | built-not-run |
 | review |  |  |  |  |  | none ([#1779](https://github.com/xiechimon/cairn/issues/1779)) |
 | planning |  |  |  |  |  | none ([#1780](https://github.com/xiechimon/cairn/issues/1780)) |

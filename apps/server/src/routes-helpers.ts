@@ -53,6 +53,7 @@ export const patchTodoBodySchema = z.object({
   phase: phaseSchema.optional(),
   tagIds: z.array(z.string()).optional(),
   orderIndex: z.number().optional(),
+  projectId: z.string().min(1).optional(),
   assignment: z
     .object({
       plan: assignmentSlotSchema.optional(),

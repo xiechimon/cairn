@@ -356,13 +356,17 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'update_todo',
-    description: 'Update fields of a todo (title/spec/tags/order).',
+    description:
+      'Update fields of a todo (title/spec/tags/order), or move an unstarted todo to another project.',
     parameters: obj(
       {
         todoId: str('Todo id.'),
         title: str('Optional new title.'),
         spec: str('Optional new spec.'),
         tagIds: idArr('Optional replacement tag ids.'),
+        projectId: str(
+          'Optional target project id. Only for a todo that has not started; its tags are dropped.',
+        ),
       },
       ['todoId'],
     ),

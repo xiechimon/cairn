@@ -218,7 +218,7 @@ export function steerChiefMessage(
   const running = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
   if (running === undefined) return { steered: false };
   if (STEER_HOLDS.includes(waiting.holdReason ?? '')) return { steered: true };
-  const content = typeof message.content === 'string' ? message.content : (waiting.prompt ?? '');
+  const content = waiting.prompt ?? (typeof message.content === 'string' ? message.content : '');
   const now = nowMs();
   const prior = deps.db
     .select()

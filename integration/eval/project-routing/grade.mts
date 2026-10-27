@@ -9,6 +9,7 @@ export type RoutingExpect =
 export interface RoutingCase {
   id: string;
   tags: string[];
+  chip?: string;
   prompt: string;
   expect: RoutingExpect;
 }

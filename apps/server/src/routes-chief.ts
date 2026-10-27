@@ -46,9 +46,10 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/chief/threads', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
+    const raw = (await jsonBody(c)) as { content?: unknown; projectId?: unknown };
     const body = parseWith(
       chiefSendMessageBodySchema,
-      { threadId: null, content: ((await jsonBody(c)) as { content?: unknown })?.content },
+      { threadId: null, content: raw?.content, projectId: raw?.projectId },
       'body',
     );
     const result = sendChiefMessage(svc, teamId, body);
@@ -119,12 +120,12 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       ctx.convHub?.publishMessage(conversationId, { ...result.message });
       return c.json(result, 201);
     }
-    const raw = (await jsonBody(c)) as { content?: unknown };
+    const raw = (await jsonBody(c)) as { content?: unknown; projectId?: unknown };
     const thread = getChiefThread(svc, conversationId);
     if (!thread) throw notFound(`conversation ${conversationId}`);
     const body = parseWith(
       chiefSendMessageBodySchema,
-      { threadId: conversationId, content: raw?.content },
+      { threadId: conversationId, content: raw?.content, projectId: raw?.projectId },
       'body',
     );
     const result = sendChiefMessage(svc, thread.teamId, body);

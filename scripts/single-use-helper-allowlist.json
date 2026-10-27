@@ -115,6 +115,16 @@
     "reason": "React component that owns the steps query, mutations and draft state for one task, rendered only when the task is known; inlining would call those hooks conditionally."
   },
   {
+    "path": "apps/server/src/services/todos.ts",
+    "name": "planProjectMove",
+    "reason": "Validates a project move (target team, tags, started, imported issue, issue in flight) and computes its column slot and issue plan; inlining would put five early exits and the self-issue branching into the middle of updateTodo's patch flow."
+  },
+  {
+    "path": "apps/server/src/services/todos.ts",
+    "name": "scheduleMovedIssueClose",
+    "reason": "Fire-and-forget GitHub close of the old self-created issue after a move; inlining would put an async token lookup and its error logging inside the synchronous updateTodo."
+  },
+  {
     "path": "apps/server/src/services/chief-turns.ts",
     "name": "createdTodoIdOf",
     "reason": "Parses one tool row into a created todo id with four guards and a JSON try/catch; inlining it puts all of that inside the stop row's filter loop"
