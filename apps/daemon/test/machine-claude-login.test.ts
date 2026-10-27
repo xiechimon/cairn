@@ -43,6 +43,31 @@ describe('machine presence carries Claude Code login', () => {
     }
   });
 
+  test.each([
+    { method: 'api_key_helper', provider: 'firstParty' },
+    { method: 'third_party', provider: 'bedrock' },
+  ])(
+    'alternative authentication ignores stale OAuth credentials: $method',
+    async ({ method, provider }) => {
+      let reads = 0;
+      const { handle, api } = await boot({
+        claudeCodeAuthProbe: async () => ({ state: 'logged-in', method, provider }),
+        readClaudeOauthExpiresAt: () => {
+          reads += 1;
+          return Date.now() - 60_000;
+        },
+      });
+      try {
+        await waitFor(() => api.presenceBodies.length > 0);
+        expect(loginOf(api.presenceBodies[0])).toEqual({ state: 'ok' });
+        expect(reads).toBe(0);
+      } finally {
+        await handle.stop();
+        await handle.done;
+      }
+    },
+  );
+
   test('the presence beat re-probes and the next report follows a newly expired clock', async () => {
     let expiresAt = Date.now() + 2 * DAY;
     const { handle, api } = await boot({

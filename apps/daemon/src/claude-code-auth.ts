@@ -103,7 +103,13 @@ export function parseClaudeOauthExpiresAt(raw: string): number | null {
 export function readDefaultClaudeOauthExpiresAt(): number | null {
   try {
     return parseClaudeOauthExpiresAt(
-      readFileSync(join(homedir(), '.claude', '.credentials.json'), 'utf8'),
+      readFileSync(
+        join(
+          (process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')).normalize('NFC'),
+          '.credentials.json',
+        ),
+        'utf8',
+      ),
     );
   } catch {
     return null;

@@ -163,7 +163,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     const pending = (async () => {
       const probe = await (opts.claudeCodeAuthProbe ?? probeClaudeCodeAuth)();
       claudeAuth = probe;
-      const expiresAt = probe.state === 'unknown' ? null : readExpiresAt();
+      const expiresAt =
+        probe.state === 'logged-in' &&
+        probe.method === 'oauth_token' &&
+        probe.provider === 'firstParty'
+          ? readExpiresAt()
+          : null;
       claudeLogin = classifyClaudeCodeLogin(probe.state, expiresAt, Date.now());
       return probe;
     })();

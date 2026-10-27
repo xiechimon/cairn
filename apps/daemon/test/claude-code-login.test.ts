@@ -1,5 +1,11 @@
-import { describe, expect, test } from 'vitest';
-import { parseClaudeOauthExpiresAt } from '../src/claude-code-auth.js';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, test, vi } from 'vitest';
+import {
+  parseClaudeOauthExpiresAt,
+  readDefaultClaudeOauthExpiresAt,
+} from '../src/claude-code-auth.js';
 
 describe('parseClaudeOauthExpiresAt', () => {
   test('reads only claudeAiOauth.expiresAt and never returns token material', () => {
@@ -26,5 +32,32 @@ describe('parseClaudeOauthExpiresAt', () => {
       ),
     ).toBeNull();
     expect(parseClaudeOauthExpiresAt(JSON.stringify({ claudeAiOauth: {} }))).toBeNull();
+  });
+});
+
+describe('readDefaultClaudeOauthExpiresAt', () => {
+  test('uses the active config directory without falling back to the default account', () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-auth-home-'));
+    const custom = join(home, 'custom');
+    const defaultDir = join(home, '.claude');
+    mkdirSync(custom);
+    mkdirSync(defaultDir);
+    const credentials = (expiresAt: number) => JSON.stringify({ claudeAiOauth: { expiresAt } });
+    writeFileSync(join(defaultDir, '.credentials.json'), credentials(100));
+    writeFileSync(join(custom, '.credentials.json'), credentials(200));
+    vi.stubEnv('HOME', home);
+    try {
+      vi.stubEnv('CLAUDE_CONFIG_DIR', custom);
+      expect(readDefaultClaudeOauthExpiresAt()).toBe(200);
+      writeFileSync(join(custom, '.credentials.json'), 'invalid');
+      expect(readDefaultClaudeOauthExpiresAt()).toBeNull();
+      rmSync(join(custom, '.credentials.json'));
+      expect(readDefaultClaudeOauthExpiresAt()).toBeNull();
+      vi.stubEnv('CLAUDE_CONFIG_DIR', '');
+      expect(readDefaultClaudeOauthExpiresAt()).toBe(100);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 });

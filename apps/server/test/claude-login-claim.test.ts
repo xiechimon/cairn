@@ -56,7 +56,7 @@ function report(login?: {
 }
 
 async function world(): Promise<{ s: TestServer; projectId: string }> {
-  const s = bootServer();
+  const s = bootServer({ githubFetch: async () => new Response('[]') });
   disposables.push(() => s.dispose());
   const projectId = await postProject(s.app, 'claude-login');
   return { s, projectId };
