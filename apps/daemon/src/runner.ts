@@ -116,6 +116,7 @@ export interface RunStepDeps {
   workspace?: WorktreeOps;
   sessionHandles?: Map<string, AgentSessionHandle>;
   stepImageSupport?: Map<string, boolean | null>;
+  stepTranscripts?: Map<string, TranscriptBuffer>;
   stops?: StepStops;
   heartbeatIntervalMs?: number;
   skillsDir?: string;
@@ -342,6 +343,7 @@ export async function runStep(
     await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance);
   } finally {
     clearInterval(heartbeat);
+    deps.stepTranscripts?.delete(stepId);
     stop.settle();
   }
 }
@@ -790,6 +792,7 @@ async function runClaimedStep(
       : null;
 
   const transcript = new TranscriptBuffer(deps.paths.outboxDir, stepId);
+  deps.stepTranscripts?.set(stepId, transcript);
   if (skippedNoVisionCount > 0) {
     transcript.upsert({
       id: `image-skip-${stepId}`,
@@ -1254,6 +1257,17 @@ async function runClaimedStep(
       return;
     }
     logger.raw(continueId !== null ? `continue session ${convId}` : `new session ${convId}`);
+    if (!isChief && imageSupport === null) {
+      try {
+        imageSupport =
+          (await backend.modelSupportsImages?.(sessionOpts.provider, sessionOpts.modelId)) ?? null;
+        deps.stepImageSupport?.set(stepId, imageSupport);
+      } catch (err) {
+        logger.step(
+          `session image support probe failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     deps.sessionHandles?.set(stepId, handle);
     stop.attach(handle).catch((err: unknown) => {

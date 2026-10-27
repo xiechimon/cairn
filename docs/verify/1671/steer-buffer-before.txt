@@ -1,0 +1,118 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1671
+
+ ❯ |@xiechimon/cairn-cli| test/machine-steer.test.ts (8 tests | 2 failed) 520ms
+   ❯ steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer) (8)
+     × degraded step (#1671, initial image=true): steering annotates unread images without downloading them 80ms
+     × degraded step (#1671, initial image=false): steering annotates unread images without downloading them 83ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-steer.test.ts > steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer) > degraded step (#1671, initial image=true): steering annotates unread images without downloading them
+AssertionError: expected [ { id: 'image-skip-s1', …(3) }, …(2) ] to deep equally contain ObjectContaining{…}
+
+- Expected:
+ObjectContaining {
+  "content": StringContaining "追加消息中的",
+  "role": "system",
+}
+
++ Received:
+[
+  {
+    "content": "图片未被模型读取：模型 stub-gw/stub-model 不支持图片输入，1 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）",
+    "createdAt": 1793095337962,
+    "id": "image-skip-s1",
+    "role": "system",
+  },
+  {
+    "content": "探针任务
+
+写一行探针
+
+![shot.png](attachment:t1/id1.png)
+
+本步的交接物是 plan.md：结束本步前，将方案写入 plan.md 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）。Verification 每一项必须是可执行的检查：命令、测试文件路径或可断言的结果（如接口返回值），不写「确认没问题」这类空话，也不留待定、待补之类的占位。
+plan.md 交接位置：/tmp/cairn-loop-1CJFwP/plans/conv-1/plan.md。该位置在仓库检出之外——将方案写入此文件；不要在仓库工作区里创建 plan.md，也不要把它 git add 或提交。",
+    "createdAt": 1793095337962,
+    "id": "user-s1",
+    "role": "user",
+  },
+  {
+    "content": [
+      {
+        "text": "跑着",
+        "type": "text",
+      },
+    ],
+    "createdAt": 1793095338018,
+    "id": "msg-s1-1",
+    "role": "assistant",
+  },
+]
+
+ ❯ test/machine-steer.test.ts:296:64
+    294|       await handle.stop();
+    295|       await handle.done;
+    296|       expect(api.uploads.flatMap(({ body }) => body.messages)).toConta…
+       |                                                                ^
+    297|         expect.objectContaining({
+    298|           role: 'system',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-steer.test.ts > steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer) > degraded step (#1671, initial image=false): steering annotates unread images without downloading them
+AssertionError: expected [ { id: 'user-s1', …(3) }, …(1) ] to deep equally contain ObjectContaining{…}
+
+- Expected:
+ObjectContaining {
+  "content": StringContaining "追加消息中的",
+  "role": "system",
+}
+
++ Received:
+[
+  {
+    "content": "探针任务
+
+写一行探针
+
+本步的交接物是 plan.md：结束本步前，将方案写入 plan.md 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）。Verification 每一项必须是可执行的检查：命令、测试文件路径或可断言的结果（如接口返回值），不写「确认没问题」这类空话，也不留待定、待补之类的占位。
+plan.md 交接位置：/tmp/cairn-loop-GzlDWg/plans/conv-1/plan.md。该位置在仓库检出之外——将方案写入此文件；不要在仓库工作区里创建 plan.md，也不要把它 git add 或提交。",
+    "createdAt": 1793095338051,
+    "id": "user-s1",
+    "role": "user",
+  },
+  {
+    "content": [
+      {
+        "text": "跑着",
+        "type": "text",
+      },
+    ],
+    "createdAt": 1793095338114,
+    "id": "msg-s1-1",
+    "role": "assistant",
+  },
+]
+
+ ❯ test/machine-steer.test.ts:296:64
+    294|       await handle.stop();
+    295|       await handle.done;
+    296|       expect(api.uploads.flatMap(({ body }) => body.messages)).toConta…
+       |                                                                ^
+    297|         expect.objectContaining({
+    298|           role: 'system',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 6 passed (8)
+   Start at  10:02:11
+   Duration  6.73s (transform 52%, import 40%, tests 8%)
+
+  Transform  |@xiechimon/cairn-cli| transforming modules took 3.41s · 52% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

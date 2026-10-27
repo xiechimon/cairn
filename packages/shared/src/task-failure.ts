@@ -126,7 +126,11 @@ export function isProviderAuthFailure(rawError: string): boolean {
 }
 
 export function noVisionSignalOf(message: string): boolean {
-  return /not a multimodal model/i.test(message) || /does not support images?/i.test(message);
+  return (
+    /not a multimodal model/i.test(message) ||
+    /does not support images?/i.test(message) ||
+    /gemini ACP backend: image capability is not advertised/.test(message)
+  );
 }
 
 export const AGENT_FAILURE_KINDS = ['quota', 'capacity', 'provider_network', 'other'] as const;

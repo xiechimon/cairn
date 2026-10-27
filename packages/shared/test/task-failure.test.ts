@@ -158,6 +158,7 @@ describe('noVisionSignalOf (#1671 tight-capability signal)', () => {
     '400: {"error":{"message":"GLM-5.3-BF16-W4A8 is not a multimodal model","code":"1006"}}',
     'this model does not support image input',
     'the endpoint does not support images',
+    'ACP initialize failed: gemini ACP backend: image capability is not advertised',
   ])('matches: %s', (msg) => {
     expect(noVisionSignalOf(msg)).toBe(true);
   });

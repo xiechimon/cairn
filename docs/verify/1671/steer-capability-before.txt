@@ -1,0 +1,63 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1671
+
+ ❯ |@xiechimon/cairn-cli| test/machine-steer.test.ts (8 tests | 2 failed) 475ms
+   ❯ steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer) (8)
+     × degraded step (#1671, initial image=true): steering annotates unread images without downloading them 78ms
+     × degraded step (#1671, initial image=false): steering annotates unread images without downloading them 30ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-steer.test.ts > steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer) > degraded step (#1671, initial image=true): steering annotates unread images without downloading them
+AssertionError: expected [] to deep equally contain ObjectContaining{…}
+
+- Expected:
+ObjectContaining {
+  "content": StringContaining "图片未被模型读取",
+  "role": "system",
+}
+
++ Received:
+[]
+
+ ❯ test/machine-steer.test.ts:284:28
+    282|     expect(steered[0]!.images ?? []).toHaveLength(0);
+    283|     expect(api.attachmentCalls).toHaveLength(0);
+    284|     expect(transcriptRows).toContainEqual(expect.objectContaining({
+       |                            ^
+    285|       role: 'system',
+    286|       content: expect.stringContaining('图片未被模型读取'),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-steer.test.ts > steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer) > degraded step (#1671, initial image=false): steering annotates unread images without downloading them
+AssertionError: expected '再看一眼这张图\n\n[image attached: shot.png]' to contain '![shot.png](attachment:t1/id1.png)'
+
+- Expected
++ Received
+
+- ![shot.png](attachment:t1/id1.png)
++ 再看一眼这张图
++
++ [image attached: shot.png]
+
+ ❯ test/machine-steer.test.ts:279:30
+    277|     api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    278|     await waitFor(() => steered.length === 1);
+    279|     expect(steered[0]!.text).toContain(token);
+       |                              ^
+    280|     expect(steered[0]!.text).toContain('[图片附件 t1/id1.png 未被模型读取 — 该图片未…
+    281|     expect(steered[0]!.text).not.toContain('[image attached:');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 6 passed (8)
+   Start at  09:59:06
+   Duration  5.93s (transform 52%, import 39%, tests 9%)
+
+  Transform  |@xiechimon/cairn-cli| transforming modules took 2.90s · 52% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

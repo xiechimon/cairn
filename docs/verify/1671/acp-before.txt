@@ -1,0 +1,109 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1671
+
+ ❯ |@cairn/shared| test/task-failure.test.ts (46 tests | 1 failed) 21ms
+   ❯ noVisionSignalOf (#1671 tight-capability signal) (11)
+     × matches: ACP initialize failed: gemini ACP backend: image capability is not advertised 5ms
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+ ❯ |@xiechimon/cairn-cli| test/acp-stdio.test.ts (13 tests | 3 failed) 86ms
+   ❯ Gemini stdio execution (13)
+     × image support is unknown before initialize and follows negotiated capability afterwards 2ms
+     × image steering sends pixels to a session that advertised image support 2ms
+     × image steering to a text-only session is rejected explicitly 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > image support is unknown before initialize and follows negotiated capability afterwards
+AssertionError: expected false to be null
+
+- Expected:
+null
+
++ Received:
+false
+
+ ❯ test/acp-stdio.test.ts:188:76
+    186|   test('image support is unknown before initialize and follows negotia…
+    187|     const vision = backend({ ACP_IMAGE: 'yes' });
+    188|     await expect(vision.modelSupportsImages?.(opts.provider, opts.mode…
+       |                                                                            ^
+    189|     const imageSession = await vision.createSession({
+    190|       ...opts,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > image steering sends pixels to a session that advertised image support
+AssertionError: promise rejected "RequestError: Image prompt was dropped { …(2) }" instead of resolving
+ ❯ test/acp-stdio.test.ts:205:58
+    203|     const images = [{ data: 'aA==', mimeType: 'image/png' }];
+    204|     const handle = await backend({ ACP_IMAGE: 'yes' }).createSession({…
+    205|     await expect(handle.steer('follow-up image', images)).resolves.toB…
+       |                                                          ^
+    206|     expect(await collect(handle.events)).toContainEqual({ type: 'done'…
+    207|   });
+
+Caused by: RequestError: Image prompt was dropped
+ ❯ Connection.handleResponse ../../../../../node_modules/.pnpm/@agentclientprotocol+sdk@2.0.2_zod@4.6.5/node_modules/@agentclientprotocol/sdk/dist/core/jsonrpc.js:847:40
+ ❯ Connection.receiveMessage ../../../../../node_modules/.pnpm/@agentclientprotocol+sdk@2.0.2_zod@4.6.5/node_modules/@agentclientprotocol/sdk/dist/core/jsonrpc.js:743:18
+ ❯ Connection.receiveWireMessage ../../../../../node_modules/.pnpm/@agentclientprotocol+sdk@2.0.2_zod@4.6.5/node_modules/@agentclientprotocol/sdk/dist/core/jsonrpc.js:673:14
+ ❯ Connection.receive ../../../../../node_modules/.pnpm/@agentclientprotocol+sdk@2.0.2_zod@4.6.5/node_modules/@agentclientprotocol/sdk/dist/core/jsonrpc.js:641:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: -32602, data: undefined, toResult: 'Function<toResult>', toErrorResponse: 'Function<toErrorResponse>' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > image steering to a text-only session is rejected explicitly
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ test/acp-stdio.test.ts:211:93
+    209|   test('image steering to a text-only session is rejected explicitly',…
+    210|     const handle = await backend().createSession(opts);
+    211|     await expect(handle.steer('follow-up image', [{ data: 'aA==', mime…
+       |                                                                                             ^
+    212|     await collect(handle.events);
+    213|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > matches: ACP initialize failed: gemini ACP backend: image capability is not advertised
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/task-failure.test.ts:163:35
+    161|     'ACP initialize failed: gemini ACP backend: image capability is no…
+    162|   ])('matches: %s', (msg) => {
+    163|     expect(noVisionSignalOf(msg)).toBe(true);
+       |                                   ^
+    164|   });
+    165|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 55 passed (59)
+   Start at  09:58:09
+   Duration  1.11s (transform 63%, import 22%, tests 14%, worker 1%)
+
