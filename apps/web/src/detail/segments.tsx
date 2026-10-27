@@ -7,6 +7,7 @@ import { useI18n } from '../i18n/provider.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 import { AGENTS_HREF } from '../routes/agent-detail-page.js';
+import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 
 const CODE_SKIN: Record<string, string> = {
   'chat-code':
@@ -50,14 +51,21 @@ export function TodoStatus({ phase }: { phase: Phase }) {
 
 function MentionChip({ seg }: { seg: DocSegment }) {
   const glances = useContext(TodoGlanceContext);
+  const openInPlace = useOpenTaskInPlace();
   const href = mentionHref(seg);
   const className = mentionChipClass(seg.mentionKind);
-  const phase =
-    seg.mentionKind === 'todo' && seg.mentionId != null
-      ? glances?.get(seg.mentionId)?.phase
-      : undefined;
+  const todoId = seg.mentionKind === 'todo' ? seg.mentionId : undefined;
+  const glance = todoId != null ? glances?.get(todoId) : undefined;
+  const phase = glance?.phase;
   return href != null ? (
-    <Link className={`${className} cursor-pointer`} to={href} data-phase={phase}>
+    <Link
+      className={`${className} cursor-pointer`}
+      to={href}
+      data-phase={phase}
+      onClick={(event) => {
+        if (todoId != null) openInPlace(event, todoId, glance);
+      }}
+    >
       {phase != null && <TodoStatus phase={phase} />}
       {seg.text}
     </Link>

@@ -65,6 +65,7 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
 import { SECRETS_HREF } from '../resources/secrets-page.js';
+import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { FallbackModelsSection } from './agent-fallback-models.js';
 import { AgentModelSelect, AgentRuntimeSelect } from './agent-model-select.js';
 
@@ -122,6 +123,7 @@ export function AgentDetailPage() {
   const agentId = params.id;
   const { search, hash } = useLocation();
   const navigate = useNavigate();
+  const openInPlace = useOpenTaskInPlace();
   const fixture = resolveScenario(new URLSearchParams(search));
   const { live, teamId } = useLiveData();
 
@@ -276,7 +278,13 @@ export function AgentDetailPage() {
   const thinkingLevel = toThinkingLevelDisplay(agent.thinkingLevel, thinkingOptions);
 
   return (
-    <PageShell route={AGENTS_HREF} title={agent.displayName} back="/app/team" fixture={fixture}>
+    <PageShell
+      route={AGENTS_HREF}
+      title={agent.displayName}
+      back="/app/team"
+      fixture={fixture}
+      taskPanel
+    >
       <div className="agent-detail flex flex-col gap-4">
         <SegmentedTabs
           className="agent-tabs"
@@ -421,7 +429,16 @@ export function AgentDetailPage() {
                       key={row.buildId}
                       variant="ghost"
                       className={AGENT_TASK_ROW_CLS}
-                      onClick={() => navigate(`/app/todo/${row.todo.id}`)}
+                      onClick={(event) => {
+                        if (
+                          !openInPlace(event, row.todo.id, {
+                            title: row.todo.title,
+                            seq: row.todo.seqNum,
+                            phase: row.todo.phase,
+                          })
+                        )
+                          navigate(`/app/todo/${row.todo.id}`);
+                      }}
                     >
                       <span className="agent-task-seq flex-none text-xs text-muted-foreground">
                         #{row.todo.seqNum}

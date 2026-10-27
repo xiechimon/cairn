@@ -66,7 +66,8 @@ test('the needs-me inbox lists recent pending cards as rows and folds week-old o
   await expect(inbox).toContainText('16 天前');
 
   await rows.first().getByRole('link').click();
-  await expect(page).toHaveURL(/\/app\/todo\/[^/?]+/);
+  await expect(page).toHaveURL(/[?&]task=[^&]+/);
+  await expect(page.getByRole('complementary', { name: '任务面板' }).getByTestId('task-panel-title')).toBeVisible();
 });
 
 test('the needs-me inbox shares its edges with the new-task bar', async ({ page }) => {

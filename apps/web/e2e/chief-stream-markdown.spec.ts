@@ -217,7 +217,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await expect(fence).toContainText('curl -s localhost:8787/healthz');
   });
 
-  test('F-R13: todo mentions render as chips, anchors point at task detail with click navigation; literal #seq/pseudo schemes render no chip (#675)', async ({
+  test('F-R13: todo mentions render as chips, anchors point at task detail and a click opens the task panel; literal #seq/pseudo schemes render no chip (#675)', async ({
     page,
   }) => {
     const stream = page.getByTestId('chief-stream');
@@ -234,7 +234,8 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     );
 
     await chip.click();
-    await page.waitForURL((u) => u.pathname === '/app/todo/r3-legacy-1');
+    await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe('r3-legacy-1');
   });
 
   test('F-R4/R5: typing rows have no foot; final rows keep the foot (copy + done 44s)', async ({ page }) => {
@@ -610,7 +611,8 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await expect(bubble.locator('.mention-chip')).toHaveCount(1);
 
     await chip.click();
-    await page.waitForURL((u) => u.pathname === '/app/todo/t16');
+    await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe('t16');
   });
 
   test('F-R15: copy payload = markdown source (not rendered output); the two-button row (copy/restore) is unaffected', async ({

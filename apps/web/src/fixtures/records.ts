@@ -526,11 +526,13 @@ export interface ChiefContent {
   agent?: { id?: string; displayName: string; avatarUrl: string | null };
   modelProvider?: string | null;
   threadTitle: string;
+  threadId?: string;
   threadsOpen?: boolean;
   threads?: ChiefThreadRef[];
   examples?: ChiefExample[];
   draft?: string;
   stream?: ChiefStreamItem[];
+  streamAt?: number[];
   running?: boolean;
   runningTool?: string;
 }

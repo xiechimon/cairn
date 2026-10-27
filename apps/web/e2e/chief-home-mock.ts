@@ -99,6 +99,9 @@ export interface MockState {
   threads: (typeof THREAD)[];
   messages: Row[];
   rejectSend?: boolean;
+  todos?: unknown[];
+  projects?: unknown[];
+  sendAt?: number;
 }
 
 type Json = (body: unknown, status?: number) => Promise<void>;
@@ -170,10 +173,24 @@ export async function mockLive(
         watches: [],
         wakes: [],
       });
+    if (p === `/api/conversations/${THREAD.id}/messages` && request.method() === 'POST') {
+      const content = (request.postDataJSON() as { content: string }).content;
+      sent.push(content);
+      state.messages = [
+        ...state.messages,
+        {
+          id: `n${state.messages.length + 1}`,
+          role: 'user',
+          content,
+          createdAt: state.sendAt ?? Date.now(),
+        },
+      ];
+      return json({ thread: THREAD }, 201);
+    }
     if (p === `/api/conversations/${THREAD.id}/messages`) return json({ messages: state.messages });
     if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
-    if (p === '/api/todos') return json([TASK]);
-    if (p === '/api/projects') return json([PROJECT]);
+    if (p === '/api/todos') return json(state.todos ?? [TASK]);
+    if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
     if (p === '/api/teams/t1/members' || p === '/api/teams/t1/machines' || p === '/api/skills')
       return json([]);
     return json([]);
