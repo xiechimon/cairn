@@ -23,6 +23,7 @@ import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { PHASE_UI } from '../phase.js';
+import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { COLUMNS, cardFace, STALE_PENDING_MS, sortColumnTodos, splitStale } from './columns.js';
 import { relativeTime } from './rel-time.js';
 import { ATTENTION } from './todo-card.js';
@@ -95,6 +96,7 @@ function TaskRow({
   trailing?: ReactNode;
 }) {
   const { search } = useLocation();
+  const openInPlace = useOpenTaskInPlace();
   return (
     <div
       data-testid={testId}
@@ -110,6 +112,7 @@ function TaskRow({
             muted ? 'text-content-tertiary' : 'text-foreground',
           )}
           to={{ pathname: `/app/todo/${todo.id}`, search }}
+          onClick={(event) => openInPlace(event, todo.id)}
         >
           {todo.title}
         </Link>

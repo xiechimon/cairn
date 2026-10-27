@@ -252,7 +252,8 @@ test.describe('home is one continuous chief chat (T1)', () => {
       '已经补给它了',
     );
     await page.getByTestId('chief-home').locator('a.mention-chip--todo').first().click();
-    await expect(page).toHaveURL(/\/app\/todo\/todo-1/);
+    await expect(page).toHaveURL(/\/app\?(.*&)?task=todo-1/);
+    await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
   });
 
   test('cmd+J on home focuses the home composer instead of opening the drawer', async ({ page }) => {

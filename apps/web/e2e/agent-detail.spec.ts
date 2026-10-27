@@ -641,10 +641,11 @@ test('overview: with running tasks rows are listed, section header carries the c
   await expect(rows.nth(1).locator('.agent-task-go svg')).toHaveCount(1);
 });
 
-test('overview: clicking a row enters task detail', async ({ page }) => {
+test('overview: clicking a row opens the task in the panel on this page (#1937)', async ({ page }) => {
   await page.goto(`${DETAIL.replace('agent-detail', 'agent-detail-active')}`);
   await page.locator('.agent-task-row').first().click();
-  await expect(page).toHaveURL(/\/app\/todo\/r3-legacy-12$/);
+  await expect(page).toHaveURL(/[?&]task=r3-legacy-12(&|$)/);
+  await expect(page.getByRole('complementary', { name: '任务面板' }).getByTestId('task-panel-title')).toContainText('README');
 });
 
 const OVERVIEW_LABELS = ['职责', '默认 skill', '运行时', '模型', '思考强度'];

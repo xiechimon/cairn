@@ -7,6 +7,7 @@ import { Kbd } from '../components/ui/kbd.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { TaskPanelRoot } from '../task-panel/task-panel-root.js';
 import { ChiefDrawer } from './chief-drawer.js';
 import { ChiefFabIcon } from './chief-fab-icon.js';
 import { type ChiefSurface, useChiefSurface } from './use-chief-surface.js';
@@ -76,7 +77,9 @@ export function ChiefRoot() {
   const fabExpanded = surface.chiefUnread > 0 || surface.chiefBusy;
   return (
     <ChiefRootContext.Provider value={api}>
-      <Outlet />
+      <TaskPanelRoot>
+        <Outlet />
+      </TaskPanelRoot>
       {fabVisible && (
         <Tooltip>
           <TooltipTrigger
