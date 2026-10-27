@@ -1,4 +1,5 @@
 import {
+  hasBlockingFinding,
   type ReviewFinding,
   type ReviewVerdict,
   reviewFindingSchema,
@@ -51,6 +52,13 @@ export function extractCodeFence(text: string): string | null {
 export function extractReviewVerdict(
   messages: readonly TranscriptMessageLike[],
 ): ReviewVerdictExtraction {
+  const finalLineVerdict = messages
+    .filter((message) => message.role === 'assistant')
+    .flatMap((message) => [
+      ...contentToText(message.content).matchAll(/^VERDICT:\s*(pass|block)\s*$/gim),
+    ])
+    .at(-1)?.[1]
+    ?.toLowerCase();
   let schemaFailure: string | null = null;
   let degraded: ReviewVerdict | null = null;
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -77,7 +85,26 @@ export function extractReviewVerdict(
         try {
           const parsed = JSON.parse(slice);
           const verdict = reviewVerdictSchema.safeParse(parsed);
-          if (verdict.success) return { status: 'ok', verdict: verdict.data };
+          if (verdict.success) {
+            if (finalLineVerdict === 'block' && !hasBlockingFinding(verdict.data)) {
+              return {
+                status: 'failed',
+                reason: 'Final reviewer verdict is block; refusing an earlier passing JSON example',
+              };
+            }
+            return { status: 'ok', verdict: verdict.data };
+          }
+          if (
+            parsed !== null &&
+            typeof parsed === 'object' &&
+            ('gateLoosening' in parsed || 'evalRulerChange' in parsed)
+          ) {
+            return {
+              status: 'failed',
+              reason:
+                'Safety verdict failed schema validation; refusing degradation or an older verdict',
+            };
+          }
           if (schemaFailure === null) {
             const parts = verdict.error.issues.map(
               (issue) =>
@@ -90,7 +117,15 @@ export function extractReviewVerdict(
       }
     }
   }
-  if (degraded !== null) return { status: 'ok', verdict: degraded };
+  if (degraded !== null) {
+    if (finalLineVerdict === 'block' && !hasBlockingFinding(degraded)) {
+      return {
+        status: 'failed',
+        reason: 'Final reviewer verdict is block; refusing a degraded passing JSON example',
+      };
+    }
+    return { status: 'ok', verdict: degraded };
+  }
   return {
     status: 'failed',
     reason:

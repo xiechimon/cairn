@@ -33,6 +33,7 @@ import {
   todo,
   tokenUsage,
 } from './db/schema.js';
+import { readGateRuns } from './services/machine-gate-storage.js';
 import { derivePackOutcome } from './trajectory-outcome.js';
 
 export class TrajectoryExportError extends Error {}
@@ -194,6 +195,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
           }));
           const runtimeModel = sessions[0]?.runtimeModels[0];
           const signals = derivePackOutcome(db, b, now);
+          const gateRuns = readGateRuns(join(config.dataDir, 'attachments'), b.id);
           const pack = trajectoryPackSchema.parse({
             buildId: b.id,
             input: {
@@ -218,6 +220,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
               token_usage: usage,
             },
             judgments: {
+              ...(gateRuns.length > 0 ? { gate_runs: gateRuns } : {}),
               plan: judgments
                 .filter((j) => j.side === 'plan')
                 .map(({ action, reason }) => ({ action, reason })),

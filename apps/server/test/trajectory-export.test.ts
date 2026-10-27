@@ -691,3 +691,42 @@ test('the last slot of createScheduler in index.ts comes from trajectoryExportRu
   const args = call.split('\n').filter((l) => l.trim() !== '');
   expect(args.at(-1)?.trim()).toMatch(/^trajectoryExportRunOf\(config, /);
 });
+
+test('exports each gate run with raw reviewer output, parsed verdict, action and model', () => {
+  const { home } = fixture();
+  const dir = join(home, 'server/attachments/gate-runs');
+  mkdirSync(dir, { recursive: true });
+  const gateRun = {
+    id: 'gate-run-1',
+    buildId: 'build-1',
+    at: 1005,
+    headSha: 'a'.repeat(40),
+    patchDigest: 'sha256:patch',
+    ready: false,
+    blockerCodes: ['review-blocking'],
+    merged: false,
+    mismatchIssue: null,
+    action: { status: 'written', autoMerge: 'not-requested' },
+    reviewers: [
+      {
+        stepId: 'review-1',
+        kind: 'review',
+        modelId: 'actual-review-model',
+        rawOutput: 'VERDICT: block',
+        outcome: 'block',
+        verdict: {
+          conclusion: 'Block',
+          findings: [],
+          gateLoosening: true,
+          evalRulerChange: false,
+        },
+      },
+    ],
+  };
+  writeFileSync(join(dir, 'build-1.jsonl'), `${JSON.stringify(gateRun)}\n`);
+  const out = join(home, 'gate-trajectory.jsonl');
+  const result = run(home, ['--build', 'build-1', '--out', out]);
+  expect(result.status, result.stderr).toBe(0);
+  const pack = JSON.parse(readFileSync(out, 'utf8').trim());
+  expect(pack.judgments.gate_runs).toEqual([gateRun]);
+});

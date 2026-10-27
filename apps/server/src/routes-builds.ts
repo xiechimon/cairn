@@ -36,8 +36,8 @@ import {
   readBuildChangeFile,
   readBuildChanges,
 } from './services/git.js';
+import { readProductGateState } from './services/machine-gate-port.js';
 import { isChiefConversation } from './services/machines.js';
-import { readMergeGateState } from './services/merge-gate-run.js';
 import { PhaseTransitionError } from './services/phase.js';
 
 export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
@@ -53,7 +53,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/builds/:id/gate', (c) => {
     const id = c.req.param('id');
     if (!getBuild(svc, id)) throw notFound(`build ${id}`);
-    return c.json({ state: readMergeGateState(ctx.db, id) });
+    return c.json({ state: readProductGateState(svc, id) });
   });
 
   app.get('/api/builds/:id/steps', (c) => {

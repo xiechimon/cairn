@@ -1,0 +1,10 @@
+ ❯ |@xiechimon/cairn| test/merge-gate-imports.test.ts (8 tests | 3 failed) 39ms
+   ❯ merge-gate sources import only from the gate own sources (8)
+     ✓ the parser recognizes every form; comments and ; inside braces do not fool it 23ms
+     × runtime imports do not go through the shared barrel 8ms
+     ✓ the gate sources were actually read (not vacuously true over zero files) 0ms
+     × each module imports only from '@cairn/shared', node:crypto or relative paths inside merge-gate/, loading no other code 2ms
+     × runtime values taken from '@cairn/shared' are exactly the ones records/merge-gate.ts exports 1ms
+     ✓ no symlink inside merge-gate/ points elsewhere (any extension, directories included) 0ms
+     ✓ records/merge-gate.ts imports only from 'zod', loading no other code 1ms
+     ✓ arrays and objects exported by records/merge-gate.ts are frozen (other shared modules cannot alter the gate lists and caps) 0ms

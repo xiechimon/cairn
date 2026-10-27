@@ -38,7 +38,7 @@ import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import { githubText } from './github-text.js';
-import { evaluateMergeGate } from './merge-gate-run.js';
+import { evaluateProductGate as evaluateMergeGate } from './machine-gate-port.js';
 import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD, CI_FIX_PUSH_RULE } from './retry-lessons.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -1038,6 +1038,7 @@ export function createCiPoller(
     );
     for (const cand of reviewCandidates) {
       try {
+        await evaluateMergeGate({ ...deps, githubFetch: run.githubFetch }, cand.buildId);
         await reconcileOne(cand, now, tally);
       } catch (err) {
         tally.errors += 1;
@@ -1060,9 +1061,9 @@ export function createCiPoller(
     for (const k of listFailures.keys()) if (!liveKeys.has(k)) listFailures.delete(k);
     for (const [k, v] of requiredCache)
       if (now - v.at >= CI_REQUIRED_CHECKS_TTL_MS) requiredCache.delete(k);
-    for (const cand of [...candidates, ...reviewCandidates]) {
+    for (const cand of candidates) {
       try {
-        await evaluateMergeGate(deps, cand.buildId);
+        await evaluateMergeGate({ ...deps, githubFetch: run.githubFetch }, cand.buildId);
       } catch (err) {
         tally.errors += 1;
         run.logger?.info(

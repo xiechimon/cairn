@@ -1,4 +1,6 @@
-import { parseReviewPromptMeta, REVIEW_VERDICT_KIND } from '@cairn/shared';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { buildReviewStepPrompt, parseReviewPromptMeta, REVIEW_VERDICT_KIND } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
@@ -9,15 +11,18 @@ import {
   gateRound,
   gateState,
   gateVerdict,
+  machine,
   message,
   project,
   step,
   todo,
 } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
+import { claimStep } from '../src/services/machine-claim.js';
+import { evaluateProductGate as evaluateMergeGate } from '../src/services/machine-gate-port.js';
+import { readGateRuns } from '../src/services/machine-gate-storage.js';
 import { compareFilesFromResponse, computePatchDigest } from '../src/services/merge-gate/digest.js';
 import type { GateGithubPort, GateRaw } from '../src/services/merge-gate/github-port.js';
-import { evaluateMergeGate } from '../src/services/merge-gate-run.js';
 import { bootServer, postProject, type TestServer } from './helpers.js';
 
 const HEAD = 'a'.repeat(40);
@@ -219,10 +224,39 @@ async function world(): Promise<{
       kind: 'build',
       status: 'claimed',
       checkpointCommit: HEAD,
+      fallback: {
+        model: null,
+        tried: [],
+        zeroUsageRetried: false,
+        execution: { agentId: authorId, modelId: 'claude-opus-4-8' },
+      },
       createdAt: 1,
     })
     .run();
   return { s, buildId, stepId, reviewerId, authorId };
+}
+
+function completeReview(
+  s: TestServer,
+  stepId: string,
+  outcome: Parameters<typeof completeStep>[2],
+): void {
+  const current = s.db.select().from(step).where(eq(step.id, stepId)).get();
+  const agentId = parseReviewPromptMeta(current?.prompt ?? null)?.agentId ?? '';
+  const reviewer = s.db.select().from(agentTable).where(eq(agentTable.id, agentId)).get();
+  s.db
+    .update(step)
+    .set({
+      fallback: {
+        model: null,
+        tried: [],
+        zeroUsageRetried: false,
+        execution: { agentId, modelId: reviewer?.modelId ?? null },
+      },
+    })
+    .where(eq(step.id, stepId))
+    .run();
+  completeStep(s.svc, stepId, outcome);
 }
 
 describe('in-product merge gate', () => {
@@ -331,6 +365,8 @@ describe('in-product merge gate', () => {
         role: 'system',
         content: JSON.stringify({
           kind: REVIEW_VERDICT_KIND,
+          stepId: review?.id,
+          modelId: 'gpt-5.4',
           verdict: {
             conclusion: 'No blocking findings',
             gateLoosening: false,
@@ -353,6 +389,8 @@ describe('in-product merge gate', () => {
       .set({
         content: JSON.stringify({
           kind: REVIEW_VERDICT_KIND,
+          stepId: review?.id,
+          modelId: 'gpt-5.4',
           verdict: {
             conclusion: 'Loosens the gate',
             gateLoosening: true,
@@ -365,5 +403,489 @@ describe('in-product merge gate', () => {
       .run();
     const loosened = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
     expect(loosened?.blockers.map((b) => b.code)).toContain('review-blocking');
+  });
+
+  test.each(['reverse-completion', 'cancelled-predecessor', 'legacy-unbound'])(
+    'review safety answers fail closed with %s',
+    async (scenario) => {
+      const { s, buildId, stepId, reviewerId } = await world();
+      completeStep(s.svc, stepId, { hasChanges: true });
+      const current = s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .find((row) => row.kind === 'review');
+      expect(current).toBeDefined();
+      const currentId = current?.id ?? '';
+      s.db
+        .update(step)
+        .set({ status: 'done', createdAt: 20, finishedAt: 30 })
+        .where(eq(step.id, currentId))
+        .run();
+      s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
+      const oldHead = 'c'.repeat(40);
+      s.db
+        .insert(step)
+        .values({
+          id: 'old-review',
+          buildId,
+          kind: 'review',
+          status: scenario === 'cancelled-predecessor' ? 'stopped' : 'done',
+          createdAt: 10,
+          finishedAt: 40,
+          prompt: buildReviewStepPrompt({
+            agentId: reviewerId,
+            gate: 'review',
+            planText: '',
+            changes: [],
+            checkout: true,
+            expectedHeadSha: oldHead,
+          }),
+        })
+        .run();
+      s.db
+        .insert(gateVerdict)
+        .values({
+          stepId: currentId,
+          buildId,
+          kind: 'review',
+          perspective: 'code_reviewer',
+          outcome: 'pass',
+          headSha: HEAD,
+          expectedHeadSha: HEAD,
+          createdAt: 30,
+        })
+        .run();
+      s.db
+        .insert(message)
+        .values({
+          id: 'current-answer',
+          conversationId: buildId,
+          role: 'system',
+          createdAt: 30,
+          content: JSON.stringify({
+            kind: REVIEW_VERDICT_KIND,
+            ...(scenario === 'legacy-unbound' ? {} : { stepId: currentId }),
+            modelId: 'gpt-5.4',
+            verdict: {
+              conclusion: 'Current patch changes the gate',
+              gateLoosening: true,
+              evalRulerChange: false,
+              findings: [],
+            },
+          }),
+        })
+        .run();
+      if (scenario !== 'cancelled-predecessor') {
+        s.db
+          .insert(message)
+          .values({
+            id: 'old-answer',
+            conversationId: buildId,
+            role: 'system',
+            createdAt: 40,
+            content: JSON.stringify({
+              kind: REVIEW_VERDICT_KIND,
+              stepId: 'old-review',
+              modelId: 'gpt-5.4',
+              verdict: {
+                conclusion: 'Old patch is safe',
+                gateLoosening: false,
+                evalRulerChange: false,
+                findings: [],
+              },
+            }),
+          })
+          .run();
+      }
+      const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+      const codes = result?.blockers.map((item) => item.code);
+      if (scenario === 'legacy-unbound') expect(codes).toContain('independent-review-missing');
+      else expect(codes).toContain('review-blocking');
+    },
+  );
+
+  test('review completion records its step identity with the structured verdict', async () => {
+    const { s, buildId, stepId } = await world();
+    completeStep(s.svc, stepId, { hasChanges: true });
+    const current = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .find((row) => row.kind === 'review');
+    completeReview(s, current?.id ?? '', {
+      findings: {
+        conclusion: 'No blocking findings',
+        gateLoosening: false,
+        evalRulerChange: false,
+        findings: [],
+      },
+    });
+    const recorded = s.db
+      .select()
+      .from(message)
+      .where(eq(message.conversationId, buildId))
+      .all()
+      .map((row) => {
+        try {
+          return JSON.parse(String(row.content));
+        } catch {
+          return null;
+        }
+      })
+      .find((row) => row?.kind === REVIEW_VERDICT_KIND);
+    expect(recorded?.stepId).toBe(current?.id);
+    expect(recorded?.modelId).toBe('gpt-5.4');
+  });
+
+  test.each(['go', 'block', 'drift', 'missing', 'safety', 'missing-safety'])(
+    'the chief decision is a separate patch-bound step (%s)',
+    async (scenario) => {
+      const blocked = scenario === 'block';
+      const { s, buildId, stepId } = await world();
+      completeStep(s.svc, stepId, { hasChanges: true });
+      const review = s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .find((row) => row.kind === 'review');
+      completeReview(s, review?.id ?? '', {
+        findings: {
+          conclusion: 'Independent review passed',
+          gateLoosening: false,
+          evalRulerChange: false,
+          findings: [],
+        },
+      });
+      s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
+      const first = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+      expect(first?.blockers.map((item) => item.code)).toContain('verify-missing');
+      expect(
+        s.db
+          .select()
+          .from(step)
+          .where(eq(step.buildId, buildId))
+          .all()
+          .filter((row) => row.prompt?.includes('"purpose":"decision"')),
+      ).toHaveLength(0);
+      s.db
+        .insert(step)
+        .values({
+          id: 'verify-step',
+          buildId,
+          kind: 'verify',
+          status: 'claimed',
+          prompt: JSON.stringify({ kind: 'verify', expectedHeadSha: HEAD }),
+          createdAt: 100,
+        })
+        .run();
+      completeStep(s.svc, 'verify-step', {
+        verifyVerdict: {
+          passed: true,
+          conclusion: 'Verification passed',
+          evidence: [{ path: 'docs/verify/1794/shot.png' }],
+        },
+        verdictReport: { reportedHeadSha: HEAD, driftedHeads: [] },
+      });
+      await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+      const decisions = s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .filter((row) => row.prompt?.includes('"purpose":"decision"'));
+      expect(decisions).toHaveLength(1);
+      const decision = decisions[0];
+      expect(parseReviewPromptMeta(decision?.prompt ?? null)?.agentId).toBe('agent-chief');
+      expect(decision?.prompt).toContain(HEAD);
+      expect(decision?.prompt).toContain('Independent review passed');
+      await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+      expect(
+        s.db
+          .select()
+          .from(step)
+          .where(eq(step.buildId, buildId))
+          .all()
+          .filter((row) => row.prompt?.includes('"purpose":"decision"')),
+      ).toHaveLength(1);
+      completeStep(
+        s.svc,
+        decision?.id ?? '',
+        scenario === 'missing'
+          ? {}
+          : {
+              findings: {
+                conclusion: blocked ? 'No-go' : 'Go',
+                ...(scenario === 'missing-safety'
+                  ? {}
+                  : {
+                      gateLoosening: scenario === 'safety',
+                      evalRulerChange: false,
+                    }),
+                findings: blocked
+                  ? [{ id: 'chief-block', severity: 'blocking', summary: 'Needs more evidence' }]
+                  : [],
+              },
+              ...(scenario === 'drift'
+                ? {
+                    verdictReport: {
+                      reportedHeadSha: 'd'.repeat(40),
+                      driftedHeads: ['d'.repeat(40)],
+                    },
+                  }
+                : {}),
+            },
+      );
+      const verdict = s.db
+        .select()
+        .from(gateVerdict)
+        .where(eq(gateVerdict.stepId, decision?.id ?? ''))
+        .get();
+      expect(verdict?.kind).toBe('decision');
+      const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+      expect(result?.ready).toBe(scenario === 'go');
+      if (blocked || scenario === 'safety')
+        expect(result?.blockers.map((item) => item.code)).toContain('decision-no-go');
+      if (scenario === 'missing' || scenario === 'missing-safety')
+        expect(result?.blockers.map((item) => item.code)).toContain('decision-extraction-failed');
+      if (scenario === 'drift')
+        expect(result?.blockers.map((item) => item.code)).toContain('decision-missing');
+      expect(verdict?.headSha).toBe(scenario === 'drift' ? 'd'.repeat(40) : HEAD);
+      expect(
+        s.db
+          .select()
+          .from(gateVerdict)
+          .where(eq(gateVerdict.stepId, decision?.id ?? ''))
+          .get()?.patchDigest,
+      ).toBe(scenario === 'drift' ? null : result?.patchDigest);
+    },
+  );
+
+  test('production evaluation records its action and audits a blocked merged head', async () => {
+    const { s, buildId, stepId } = await world();
+    completeStep(s.svc, stepId, { hasChanges: true });
+    const review = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .find((row) => row.kind === 'review');
+    const reviewId = review?.id ?? '';
+    completeReview(s, reviewId, {
+      findings: {
+        conclusion: 'Gate loosening detected',
+        gateLoosening: true,
+        evalRulerChange: false,
+        findings: [],
+      },
+    });
+    const sessions = join(s.attachmentsDir, 'step-sessions');
+    mkdirSync(sessions, { recursive: true });
+    writeFileSync(
+      join(sessions, `${reviewId}.jsonl`),
+      JSON.stringify({
+        type: 'message',
+        message: {
+          role: 'assistant',
+          model: 'gpt-5.4',
+          content: 'VERDICT: block',
+        },
+      }),
+    );
+    const deps = { ...s.svc, attachmentsDir: s.attachmentsDir };
+    await evaluateMergeGate(deps, buildId, { port: scriptedPort([]) });
+    const recorded = readGateRuns(s.attachmentsDir, buildId);
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]?.action.status).toBe('written');
+    expect(recorded[0]?.reviewers[0]).toMatchObject({
+      stepId: reviewId,
+      modelId: 'gpt-5.4',
+      verdict: { gateLoosening: true },
+    });
+    expect(recorded[0]?.reviewers[0]?.rawOutput).toContain('VERDICT: block');
+    const port = scriptedPort([]);
+    const pull = port.pull;
+    port.pull = async (number, options) => {
+      const response = await pull(number, options);
+      if (response.kind !== 'ok') return response;
+      return { ...response, body: { ...(response.body as object), state: 'closed', merged: true } };
+    };
+    const issues: { number: number; body: string }[] = [];
+    const auditPort = {
+      readIssuePage: async () => ({ issues, hasMore: false }),
+      createIssue: async (input: { title: string; body: string }) => {
+        issues.push({ number: 91, body: input.body });
+        return 91;
+      },
+    };
+    await evaluateMergeGate(deps, buildId, { port, auditPort });
+    await evaluateMergeGate(deps, buildId, { port, auditPort });
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.body).toContain('review-blocking');
+    expect(readGateRuns(s.attachmentsDir, buildId).at(-1)?.mismatchIssue).toBe(91);
+  });
+
+  test('review independence uses the completed run model after agent settings change', async () => {
+    const { s, buildId, stepId, reviewerId } = await world();
+    completeStep(s.svc, stepId, { hasChanges: true });
+    const review = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .find((row) => row.kind === 'review');
+    completeReview(s, review?.id ?? '', {
+      findings: {
+        conclusion: 'Reviewed with GPT',
+        gateLoosening: false,
+        evalRulerChange: false,
+        findings: [],
+      },
+    });
+    s.db
+      .update(agentTable)
+      .set({ modelId: 'claude-opus-4-8' })
+      .where(eq(agentTable.id, reviewerId))
+      .run();
+    const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    expect(result?.blockers.map((item) => item.code)).not.toContain('independent-review-missing');
+  });
+
+  test.each(['snapshot', 'fallback', 'unknown'])(
+    'review independence cannot be changed by author settings (%s)',
+    async (source) => {
+      const { s, buildId, stepId, authorId, reviewerId } = await world();
+      if (source !== 'snapshot')
+        s.db
+          .update(step)
+          .set({
+            fallback:
+              source === 'fallback'
+                ? {
+                    model: { provider: 'anthropic', modelId: 'claude-opus-4-8' },
+                    tried: [],
+                    zeroUsageRetried: false,
+                  }
+                : null,
+          })
+          .where(eq(step.id, stepId))
+          .run();
+      completeStep(s.svc, stepId, { hasChanges: true });
+      s.db.update(agentTable).set({ modelId: 'gpt-5.4' }).where(eq(agentTable.id, authorId)).run();
+      s.db
+        .update(agentTable)
+        .set({ modelId: 'claude-opus-4-8' })
+        .where(eq(agentTable.id, reviewerId))
+        .run();
+      const review = s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .find((row) => row.kind === 'review');
+      completeReview(s, review?.id ?? '', {
+        findings: {
+          conclusion: 'Reviewed',
+          gateLoosening: false,
+          evalRulerChange: false,
+          findings: [],
+        },
+      });
+      const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+      expect(result?.blockers.map((item) => item.code)).toContain('independent-review-missing');
+    },
+  );
+
+  test('server claim snapshots the effective model without replacing fallback state', async () => {
+    const { s, stepId, authorId } = await world();
+    s.db
+      .insert(machine)
+      .values({
+        id: 'model-machine',
+        teamId: s.team.id,
+        name: 'worker',
+        online: true,
+        enabledRuntimes: ['pi'],
+      })
+      .run();
+    s.db
+      .update(agentTable)
+      .set({ machineId: 'model-machine', provider: 'anthropic' })
+      .where(eq(agentTable.id, authorId))
+      .run();
+    const fallback = {
+      model: { provider: 'openai', modelId: 'gpt-5.4' },
+      tried: ['anthropic/claude-opus-4-8'],
+      zeroUsageRetried: true,
+    };
+    s.db.update(step).set({ status: 'pending', fallback }).where(eq(step.id, stepId)).run();
+    const claimed = await claimStep(
+      { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
+      'model-machine',
+      s.team.id,
+      0,
+      'http://localhost',
+    );
+    expect(claimed?.step.id).toBe(stepId);
+    expect(claimed?.agent?.modelId).toBe('gpt-5.4');
+    expect(s.db.select().from(step).where(eq(step.id, stepId)).get()?.fallback).toEqual({
+      ...fallback,
+      execution: { agentId: authorId, modelId: 'gpt-5.4' },
+    });
+  });
+
+  test('legacy author assignment changes cannot make the actual author an independent reviewer', async () => {
+    const { s, buildId, stepId, authorId } = await world();
+    s.db
+      .update(step)
+      .set({
+        fallback: {
+          model: { provider: 'anthropic', modelId: 'claude-opus-4-8' },
+          tried: [],
+          zeroUsageRetried: false,
+        },
+      })
+      .where(eq(step.id, stepId))
+      .run();
+    completeStep(s.svc, stepId, { hasChanges: true });
+    s.db
+      .update(todo)
+      .set({ assignment: { plan: null, build: { agentId: 'agent-chief' } } })
+      .where(eq(todo.id, 'todo-1794'))
+      .run();
+    s.db.update(agentTable).set({ modelId: 'gpt-5.4' }).where(eq(agentTable.id, authorId)).run();
+    const review = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .find((row) => row.kind === 'review');
+    const reviewId = review?.id ?? '';
+    s.db
+      .update(step)
+      .set({
+        prompt: buildReviewStepPrompt({
+          agentId: authorId,
+          gate: 'review',
+          expectedHeadSha: HEAD,
+          planText: '',
+          checkout: true,
+        }),
+      })
+      .where(eq(step.id, reviewId))
+      .run();
+    completeReview(s, reviewId, {
+      findings: {
+        conclusion: 'Author reviewed own work',
+        gateLoosening: false,
+        evalRulerChange: false,
+        findings: [],
+      },
+    });
+    const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    expect(result?.blockers.map((item) => item.code)).toContain('independent-review-missing');
   });
 });

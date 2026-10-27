@@ -30,7 +30,7 @@ export function bindGateVerdict(input: BindGateVerdictInput): BoundGateVerdict |
     input.reportedHeadSha !== null && isFullSha(input.reportedHeadSha)
       ? input.reportedHeadSha
       : null;
-  const reported = reportedFull ?? (input.kind === 'review' ? input.expectedHeadSha : null);
+  const reported = reportedFull ?? (input.kind !== 'verify' ? input.expectedHeadSha : null);
   const rawDir = input.evidenceDir ?? null;
   const segment =
     rawDir?.startsWith(EVIDENCE_PREFIX) && rawDir.endsWith('/')

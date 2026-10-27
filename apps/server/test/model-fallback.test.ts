@@ -276,7 +276,7 @@ describe('model fallback chain (#1493)', () => {
       await done(w, c.stepId, quotaDone('relay-a'));
       const row = stepRow(w, c.stepId);
       expect(row.status).toBe('waiting_quota');
-      expect(row.fallback).toBeNull();
+      expect(row.fallback?.model).toBeNull();
       const notif = w.s.db
         .select()
         .from(notificationTable)
@@ -293,7 +293,7 @@ describe('model fallback chain (#1493)', () => {
     await done(w, c.stepId, quotaDone('relay-a'));
     const row = stepRow(w, c.stepId);
     expect(row.status).toBe('waiting_quota');
-    expect(row.fallback).toBeNull();
+    expect(row.fallback?.model).toBeNull();
   });
 
   test('X5: rate limit (capacity) does not switch models', async () => {
@@ -307,7 +307,7 @@ describe('model fallback chain (#1493)', () => {
     });
     const row = stepRow(w, c.stepId);
     expect(row.status).toBe('waiting_quota');
-    expect(row.fallback).toBeNull();
+    expect(row.fallback?.model).toBeNull();
   });
 
   test('X7: an open provider is not chosen as fallback', async () => {
@@ -400,7 +400,7 @@ describe('0 token silent failure (#1493)', () => {
     const a = await claim(w);
     await done(w, a.stepId, { status: 'success', usage: zeroUsage });
     expect(stepRow(w, a.stepId).status).not.toBe('pending');
-    expect(stepRow(w, a.stepId).fallback).toBeNull();
+    expect(stepRow(w, a.stepId).fallback?.model).toBeNull();
   });
 
   test('X11 negative control: no usage reported (legacy daemon) not judged', async () => {
@@ -409,7 +409,7 @@ describe('0 token silent failure (#1493)', () => {
     const a = await claim(w);
     await done(w, a.stepId, { status: 'success' });
     expect(stepRow(w, a.stepId).status).not.toBe('pending');
-    expect(stepRow(w, a.stepId).fallback).toBeNull();
+    expect(stepRow(w, a.stepId).fallback?.model).toBeNull();
   });
 });
 

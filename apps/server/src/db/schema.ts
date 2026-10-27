@@ -164,6 +164,7 @@ export interface QuotaWaitRow {
 }
 
 export interface StepFallbackRow {
+  execution?: { agentId: string; modelId: string | null };
   model: ModelRef | null;
   tried: string[];
   zeroUsageRetried: boolean;

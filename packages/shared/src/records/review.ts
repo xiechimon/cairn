@@ -30,6 +30,8 @@ export const reviewPromptMetaSchema = z.object({
   kind: z.literal('review'),
   agentId: z.string(),
   gate: reviewGateSchema.optional(),
+  purpose: z.literal('decision').optional(),
+  expectedPatchDigest: z.string().min(1).optional(),
   expectedHeadSha: z.string().optional(),
 });
 export type ReviewPromptMeta = z.infer<typeof reviewPromptMetaSchema>;
@@ -55,11 +57,17 @@ export function buildReviewStepPrompt(args: {
   checkout?: boolean;
   focus?: string;
   expectedHeadSha?: string;
+  purpose?: 'decision';
+  expectedPatchDigest?: string;
 }): string {
   const meta: ReviewPromptMeta = {
     kind: 'review',
     agentId: args.agentId,
     gate: args.gate,
+    ...(args.purpose !== undefined ? { purpose: args.purpose } : {}),
+    ...(args.expectedPatchDigest !== undefined
+      ? { expectedPatchDigest: args.expectedPatchDigest }
+      : {}),
     ...(args.expectedHeadSha !== undefined ? { expectedHeadSha: args.expectedHeadSha } : {}),
   };
   const focusNote =

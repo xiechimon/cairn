@@ -271,4 +271,40 @@ describe('AI review findings extraction (M7 #330 / #700)', () => {
     expect(hasBlockingFinding(verdict)).toBe(true);
     expect(verdict.conclusion).toContain('被丢弃');
   });
+
+  test('a prompt echo containing a pass example cannot override a final block line', () => {
+    const result = extractReviewVerdict([
+      userMsg('Return VERDICT: pass or VERDICT: block'),
+      assistantMsg('Echoed example: {"conclusion":"Example pass","findings":[]}'),
+      assistantMsg('The actual review found a missing authorization check.\nVERDICT: block'),
+    ]);
+    expect(result.status).toBe('failed');
+  });
+
+  test('a prompt echo without a reviewer verdict fails closed', () => {
+    const result = extractReviewVerdict([
+      userMsg('Example: {"conclusion":"Example pass","findings":[]}'),
+      assistantMsg('Review started, but no final verdict was produced.'),
+    ]);
+    expect(result.status).toBe('failed');
+  });
+
+  test.each([false, true])(
+    'an invalid safety verdict never degrades or falls back to an older pass (%s)',
+    (earlierPass) => {
+      const invalid = JSON.stringify({
+        conclusion: 'No-go',
+        gateLoosening: true,
+        evalRulerChange: false,
+        findings: [
+          { id: '1', severity: 'suggestion', summary: 'Valid finding' },
+          { id: '2', severity: 'blocking', summary: 'Invalid line', line: 'unknown' },
+        ],
+      });
+      const messages = earlierPass
+        ? [assistantMsg('{"conclusion":"Old pass","findings":[]}'), assistantMsg(invalid)]
+        : [assistantMsg(invalid)];
+      expect(extractReviewVerdict(messages).status).toBe('failed');
+    },
+  );
 });

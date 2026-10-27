@@ -310,6 +310,10 @@ async function tryClaim(
         lastHeartbeatAt: claimedAt,
         skillInjection,
         blockerHandoff,
+        fallback: {
+          ...(cand.stepRow.fallback ?? { model: null, tried: [], zeroUsageRetried: false }),
+          execution: { agentId: agentRow.id, modelId: model.modelId },
+        },
         holdReason: null,
         holdUntil: null,
       })

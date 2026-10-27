@@ -194,6 +194,7 @@ export const useBuildGate = (buildId: string | null | undefined, enabled: boolea
         `/api/builds/${buildId}/gate`,
       ),
     enabled: enabled && buildId != null,
+    refetchInterval: 3000,
   });
 
 export const useProjectBuilds = (projectId: string | undefined, enabled: boolean) =>

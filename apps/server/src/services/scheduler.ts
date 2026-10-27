@@ -117,7 +117,12 @@ export function createScheduler(
   let timer: NodeJS.Timeout | null = null;
   const ciPoller =
     ci !== undefined && ci !== null
-      ? createCiPoller(deps, { githubFetch: ci.githubFetch, logger: ci.logger })
+      ? createCiPoller(
+          deps.attachmentsDir === undefined && gc != null
+            ? { ...deps, attachmentsDir: gc.attachmentsDir }
+            : deps,
+          { githubFetch: ci.githubFetch, logger: ci.logger },
+        )
       : null;
   let ciTimer: NodeJS.Timeout | null = null;
   const issueIntake =

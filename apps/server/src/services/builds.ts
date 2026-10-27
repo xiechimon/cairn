@@ -1385,7 +1385,7 @@ function persistGateVerdict(
       ? (agentForStep(deps.db, todoRow, 'review', stepRow.prompt)?.persona ?? null)
       : null;
   const bound = bindGateVerdict({
-    kind: stepRow.kind,
+    kind: parseReviewPromptMeta(stepRow.prompt)?.purpose === 'decision' ? 'decision' : stepRow.kind,
     perspective,
     expectedHeadSha,
     reportedHeadSha: facts.report.reportedHeadSha,
@@ -1402,7 +1402,10 @@ function persistGateVerdict(
       kind: bound.kind,
       perspective: bound.perspective,
       outcome: bound.outcome,
-      patchDigest: null,
+      patchDigest:
+        bound.kind === 'decision' && bound.headSha === bound.expectedHeadSha
+          ? (parseReviewPromptMeta(stepRow.prompt)?.expectedPatchDigest ?? null)
+          : null,
       headSha: bound.headSha,
       expectedHeadSha: bound.expectedHeadSha,
       createdAt: nowMs(),
@@ -2232,6 +2235,11 @@ export function completeStep(
       role: 'system',
       content: JSON.stringify({
         kind: REVIEW_VERDICT_KIND,
+        stepId: stepRow.id,
+        modelId:
+          stepRow.fallback?.execution !== undefined
+            ? stepRow.fallback.execution.modelId
+            : (stepRow.fallback?.model?.modelId ?? null),
         verdict,
         ...(outcome.findingsError !== undefined ? { extractionError: outcome.findingsError } : {}),
       }),
@@ -2239,12 +2247,22 @@ export function completeStep(
     });
     persistGateVerdict(deps, stepRow, todoRow, {
       stepFailed: false,
-      extracted: outcome.findings !== undefined,
-      blocked: outcome.findings !== undefined && hasBlockingFinding(outcome.findings),
+      extracted:
+        outcome.findings !== undefined &&
+        (parseReviewPromptMeta(stepRow.prompt)?.purpose !== 'decision' ||
+          (typeof outcome.findings.gateLoosening === 'boolean' &&
+            typeof outcome.findings.evalRulerChange === 'boolean')),
+      blocked:
+        outcome.findings !== undefined &&
+        (hasBlockingFinding(outcome.findings) ||
+          (parseReviewPromptMeta(stepRow.prompt)?.purpose === 'decision' &&
+            (outcome.findings.gateLoosening === true ||
+              outcome.findings.evalRulerChange === true))),
       report:
         outcome.verdictReport ??
         reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),
     });
+    if (parseReviewPromptMeta(stepRow.prompt)?.purpose === 'decision') return;
     if (hasBlockingFinding(verdict)) {
       const revisionInFlight = deps.db
         .select({ id: step.id })
@@ -2303,6 +2321,7 @@ export function completeStep(
       role: 'system',
       content: JSON.stringify({
         kind: VERIFY_VERDICT_KIND,
+        stepId: stepRow.id,
         verdict,
         ...(outcome.verifyVerdictError !== undefined
           ? { extractionError: outcome.verifyVerdictError }
