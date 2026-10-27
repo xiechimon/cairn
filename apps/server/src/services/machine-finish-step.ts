@@ -45,7 +45,7 @@ import {
 } from './builds.js';
 import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
 import { cancelPendingQuestions } from './chief-questions.js';
-import { recordChiefStop } from './chief-turns.js';
+import { recordChiefStop, releaseUnconsumedSteer } from './chief-turns.js';
 import {
   buildCiFixPrompt,
   CI_FIX_PROMPT_HEAD,
@@ -387,6 +387,7 @@ export async function finishStep(
   }
   const chiefAgent = chiefStepAgent(deps, stepRow);
   if (chiefAgent !== null) {
+    releaseUnconsumedSteer(db, stepRow);
     recordProviderOutcome(effectiveModel(chiefAgent, stepRow).provider, outcome, false);
     const plan = planModelFallback(db, stepRow, chiefAgent, outcome);
     if (plan !== null) {
@@ -397,6 +398,7 @@ export async function finishStep(
         kind: CHIEF_MODEL_FALLBACK_KIND,
         from: modelKey(plan.from),
         to: modelKey(plan.to),
+        stepId: stepRow.id,
       };
       requeueStep(deps, stepRow, plan.row, {
         id: `chief-fallback-${stepRow.id}-${plan.row.tried.length}`,

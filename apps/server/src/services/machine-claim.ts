@@ -202,7 +202,7 @@ function buildChiefClaim(
       description: agentRow.description,
       provider: model.provider,
       modelId: model.modelId,
-      thinkingLevel: agentRow.thinkingLevel,
+      thinkingLevel: stepRow.fallback?.model ? null : agentRow.thinkingLevel,
       memories,
     },
     chief: {

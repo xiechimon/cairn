@@ -20,10 +20,15 @@ import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { publishStepRow } from './quota-wait.js';
 
 type StepRow = typeof step.$inferSelect;
 
 const LIVE_STATUSES = ['pending', 'claimed', 'waiting_quota'] as const;
+
+const STEERED_HOLD = 'steer';
+
+export const CHIEF_ABANDONED_STEP_MS = 120_000;
 
 export interface ChiefTurnDeps {
   db: Db;
@@ -73,7 +78,7 @@ export function chiefPendingMessages(db: Db, threadId: string): ChiefPendingMess
   const out: ChiefPendingMessage[] = [];
   let parked = false;
   live.forEach((row, index) => {
-    if (row.status === 'claimed') return;
+    if (row.status === 'claimed' || row.holdReason === STEERED_HOLD) return;
     parked = parked || isParked(row, now);
     const userRow = db
       .select({ id: chiefMessage.id })
@@ -100,14 +105,7 @@ function modelLabel(model: { provider: string | null; modelId: string | null }):
 }
 
 export function chiefThreadFallbackModel(db: Db, threadId: string): string | null {
-  const latest = db
-    .select()
-    .from(step)
-    .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief')))
-    .orderBy(sql`${step.createdAt} desc`, sql`rowid desc`)
-    .limit(1)
-    .get();
-  const model = latest?.fallback?.model;
+  const model = liveChiefSteps(db, threadId)[0]?.fallback?.model;
   return model == null ? null : modelLabel(model);
 }
 
@@ -193,9 +191,12 @@ export function withdrawChiefMessage(
   requireThread(deps.db, teamId, threadId);
   requireUserMessage(deps.db, threadId, messageId);
   const row = waitingStepOf(deps.db, threadId, messageId);
+  const message = requireUserMessage(deps.db, threadId, messageId);
   deps.db.delete(step).where(eq(step.id, row.id)).run();
   deps.db.delete(chiefMessage).where(eq(chiefMessage.id, messageId)).run();
   settleChiefActiveRun(deps.db, threadId);
+  publishStepRow(deps, row);
+  deps.convHub?.publishMessage(threadId, message);
   return { ok: true };
 }
 
@@ -226,10 +227,41 @@ export function steerChiefMessage(
       set: { stepId: running.id, content: merged, createdAt: now },
     })
     .run();
-  deps.db.delete(step).where(eq(step.id, waiting.id)).run();
-  deps.db.update(chiefMessage).set({ createdAt: now }).where(eq(chiefMessage.id, messageId)).run();
+  deps.db.update(step).set({ holdReason: STEERED_HOLD }).where(eq(step.id, waiting.id)).run();
   deps.machineHub?.steerSignal(thread.teamId, running.id);
+  publishStepRow(deps, waiting);
   return { steered: true };
+}
+
+export function consumeChiefSteer(deps: Pick<ChiefTurnDeps, 'db' | 'convHub'>, threadId: string) {
+  const steered = liveChiefSteps(deps.db, threadId).filter(
+    (row) => row.status === 'pending' && row.holdReason === STEERED_HOLD,
+  );
+  const now = nowMs();
+  for (const row of steered) {
+    deps.db.delete(step).where(eq(step.id, row.id)).run();
+    deps.db.update(chiefMessage).set({ createdAt: now }).where(eq(chiefMessage.id, row.id)).run();
+    const message = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, row.id)).get();
+    if (message) deps.convHub?.publishMessage(threadId, message);
+  }
+}
+
+export function releaseUnconsumedSteer(db: Db, finished: StepRow): void {
+  db.delete(steerPending)
+    .where(
+      and(eq(steerPending.conversationId, finished.buildId), eq(steerPending.stepId, finished.id)),
+    )
+    .run();
+  db.update(step)
+    .set({ holdReason: null })
+    .where(
+      and(
+        eq(step.buildId, finished.buildId),
+        eq(step.status, 'pending'),
+        eq(step.holdReason, STEERED_HOLD),
+      ),
+    )
+    .run();
 }
 
 export function stopChiefTurn(
@@ -238,12 +270,14 @@ export function stopChiefTurn(
   threadId: string,
 ): { delegated: boolean } {
   const thread = requireThread(deps.db, teamId, threadId);
-  const head = liveChiefSteps(deps.db, threadId)[0];
+  const head = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
   if (head === undefined) {
     throw new HttpError(409, 'no chief turn in flight (总管当前没有在回复)');
   }
-  if (head.status === 'claimed') {
-    const now = nowMs();
+  const now = nowMs();
+  const abandoned =
+    head.lastHeartbeatAt !== null && now - head.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS;
+  if (!abandoned) {
     deps.db
       .insert(stopPending)
       .values({ conversationId: threadId, stepId: head.id, discard: false, createdAt: now })
@@ -257,11 +291,14 @@ export function stopChiefTurn(
   }
   deps.db
     .update(step)
-    .set({ status: 'stopped', finishedAt: nowMs() })
+    .set({ status: 'stopped', finishedAt: now })
     .where(eq(step.id, head.id))
     .run();
+  releaseUnconsumedSteer(deps.db, head);
   recordChiefStop(deps, head);
   settleChiefActiveRun(deps.db, threadId);
+  const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();
+  if (stopped) publishStepRow(deps, stopped);
   return { delegated: false };
 }
 

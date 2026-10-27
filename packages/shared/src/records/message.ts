@@ -70,6 +70,7 @@ export const chiefModelFallbackContentSchema = z.object({
   kind: z.literal(CHIEF_MODEL_FALLBACK_KIND),
   from: z.string(),
   to: z.string(),
+  stepId: z.string(),
 });
 export type ChiefModelFallbackContent = z.infer<typeof chiefModelFallbackContentSchema>;
 

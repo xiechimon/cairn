@@ -23,7 +23,9 @@ import { newMachineToken } from '../lib/keys.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import { NotFoundError } from './builds.js';
+import { consumeChiefSteer } from './chief-turns.js';
 import { recommendMachineConcurrency } from './dispatch-eligibility.js';
+import type { ConversationStreamHub } from './events.js';
 import {
   agentForStep,
   isChiefConversation,
@@ -50,7 +52,7 @@ export { MERGE_NOT_LANDED_NOTE } from './machine-merge-landing.js';
 export { stepToken, toProviderConfig } from './machine-step-token.js';
 
 export function fetchSteer(
-  deps: { db: Db },
+  deps: { db: Db; convHub?: ConversationStreamHub },
   machine: { id: string },
   stepId: string,
 ): { content: string | null } {
@@ -69,6 +71,7 @@ export function fetchSteer(
   if (pending.stepId !== stepId) {
     return { content: null };
   }
+  if (isChiefConversation(stepRow.buildId)) consumeChiefSteer(deps, stepRow.buildId);
   return { content: pending.content };
 }
 

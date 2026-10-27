@@ -1,5 +1,6 @@
 import {
   classifyStepFailure,
+  isBackendRuntimeId,
   isProviderAuthFailure,
   type MachineDoneBody,
   type ModelRef,
@@ -96,9 +97,13 @@ export function planModelFallback(
   const from = stepRow.fallback?.model ?? primary;
   const tried = new Set(stepRow.fallback?.tried ?? [modelKey(primary)]);
   tried.add(modelKey(from));
+  const sameRuntime = (m: ModelRef) =>
+    stepRow.kind !== 'chief' ||
+    isBackendRuntimeId(m.provider) === isBackendRuntimeId(primary.provider);
   const to = chain.find(
     (m) =>
       !tried.has(modelKey(m)) &&
+      sameRuntime(m) &&
       runtimeGatePasses(machineRow, m.provider) &&
       getModelLiveness(m.provider, m.modelId) !== 'dead' &&
       providerHealth.tryAcquire(m.provider),

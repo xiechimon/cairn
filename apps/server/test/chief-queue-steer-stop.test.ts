@@ -189,6 +189,10 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
     stop() {
       return call(s.app, 'POST', `/api/teams/${teamId}/chief/threads/${threadId}/stop`);
     },
+    async fetchSteer(stepId: string) {
+      const res = await call(s.app, 'GET', `/api/machine/steer?stepId=${stepId}`, { cred: token });
+      return ((await res.json()) as { content: string | null }).content;
+    },
     stepRow(id: string) {
       return s.db.select().from(stepTable).where(eq(stepTable.id, id)).get();
     },
@@ -244,7 +248,7 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
   });
 });
 
-describe('steer (T5): 现在插话', () => {
+describe('steer (T5): `现在插话`', () => {
   test('steer moves a queued message into the running turn and after the earlier rows', async () => {
     const w = await setupWorld();
     await w.send('第一句');
@@ -258,9 +262,26 @@ describe('steer (T5): 现在插话', () => {
     expect(pending).toHaveLength(1);
     expect(pending[0]!.stepId).toBe(running!.step.id);
     expect(pending[0]!.content).toBe('改成只看 cairn 项目');
-    expect(w.stepRow(queued)).toBeUndefined();
     expect((await w.thread()).pending).toEqual([]);
+    expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
+    expect(w.stepRow(queued)).toBeUndefined();
     expect(w.messages().find((m) => m.id === queued)!.createdAt).toBeGreaterThanOrEqual(before);
+    await w.done(running!.step.id, { status: 'success' });
+    expect(await w.claim()).toBeNull();
+  });
+
+  test('a steer the running turn never picks up runs as its own turn afterwards', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const queued = await w.send('改成只看 cairn 项目');
+    expect((await w.steer(queued)).status).toBe(200);
+    await w.done(running!.step.id, { status: 'success' });
+    expect(w.s.db.select().from(steerPending).all()).toHaveLength(0);
+    expect((await w.thread()).pending).toEqual([]);
+    const next = await w.claim();
+    expect(next?.step.id).toBe(queued);
+    expect(next?.instruction).toBe('改成只看 cairn 项目');
   });
 
   test('a steer that arrives after the reply finished stays a normal message for the next turn', async () => {
@@ -327,6 +348,32 @@ describe('stop (T5)', () => {
     });
   });
 
+  test('stop with no running turn is refused, so a queued message is never cancelled by it', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const queued = await w.send('第二句');
+    await w.done(running!.step.id, { status: 'success' });
+    expect((await w.stop()).status).toBe(409);
+    expect(w.stepRow(queued)?.status).toBe('pending');
+  });
+
+  test('stop on a turn whose machine went silent ends it right away', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    w.s.db
+      .update(stepTable)
+      .set({ lastHeartbeatAt: Date.now() - 10 * 60_000 })
+      .where(eq(stepTable.id, running!.step.id))
+      .run();
+    const res = await w.stop();
+    expect(await res.json()).toEqual({ delegated: false });
+    expect(w.stepRow(running!.step.id)?.status).toBe('stopped');
+    expect(w.messages().some((m) => m.id === `chief-stop-${running!.step.id}`)).toBe(true);
+    expect((await w.thread()).activeRun).toBeNull();
+  });
+
   test('stop while queued turns wait: the next queued message still runs', async () => {
     const w = await setupWorld();
     await w.send('第一句');
@@ -387,7 +434,21 @@ describe('chief unavailable (T4)', () => {
       kind: 'chief_model_fallback',
       from: 'relay-a/model-a',
       to: 'relay-b/model-b',
+      stepId: running!.step.id,
     });
+  });
+
+  test('a backup model on another runtime is skipped, so the thread session stays usable', async () => {
+    const w = await setupWorld([{ provider: 'claude-code', modelId: 'sonnet' }]);
+    w.s.db
+      .update(machineTable)
+      .set({ enabledRuntimes: ['pi', 'claude-code'] })
+      .run();
+    await w.send('第一句');
+    const running = await w.claim();
+    await w.done(running!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
+    expect((await w.envelope()).outage?.reason).toBe('quota');
+    expect(w.stepRow(running!.step.id)?.fallback ?? null).toBeNull();
   });
 
   test('fallback chain exhausted: the turn parks on quota and the outage shows', async () => {

@@ -42,6 +42,7 @@ import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import {
+  CHIEF_ABANDONED_STEP_MS,
   chiefOutage,
   chiefPendingMessages,
   chiefThreadFallbackModel,
@@ -954,7 +955,7 @@ export function notifyChiefTurn(
   });
 }
 
-export const CHIEF_ABANDONED_STEP_MS = 120_000;
+export { CHIEF_ABANDONED_STEP_MS } from './chief-turns.js';
 
 export function sweepAbandonedChiefSteps(
   deps: { db: Db; convHub?: ConversationStreamHub; machineHub?: MachineWakeHub },

@@ -227,7 +227,7 @@ test.describe('chief unavailable (T4)', () => {
     await expect(home.getByTestId('chief-pending')).toHaveCount(1);
   });
 
-  test('phone width: the banner collapses to one line with 详情', async ({ page }) => {
+  test('phone width: the banner collapses to one line with `详情`', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockLive(page, outageState());
     await page.goto('/app');
@@ -265,10 +265,14 @@ test.describe('chief unavailable (T4)', () => {
             kind: 'chief_model_fallback',
             from: 'relay-a/claude-opus',
             to: 'relay-b/glm-4.6',
+            stepId: 'm1',
           }),
           createdAt: 11,
         },
+        { id: 'user-m1', role: 'user', content: FIRST.content, createdAt: 11 },
         { id: 'm2', role: 'assistant', content: '好，我先看一下看板的计数逻辑。', createdAt: 12 },
+        { id: 'user-w1', role: 'user', content: '[wake:settle] 任务 #9 已合并完成', createdAt: 30 },
+        { id: 'm5', role: 'assistant', content: '#9 已经合并了。', createdAt: 31 },
       ],
     });
     await page.goto('/app');
@@ -277,9 +281,9 @@ test.describe('chief unavailable (T4)', () => {
     await expect(row).toContainText('备用模型 relay-b/glm-4.6');
     await expect(row.getByTestId('chief-fallback-dot')).toBeVisible();
     await expect(row).toContainText('主模型暂时用不了');
-    await expect(home.getByTestId('chief-fallback-note')).toContainText(
-      '由备用模型 relay-b/glm-4.6 回答',
-    );
+    const notes = home.getByTestId('chief-fallback-note');
+    await expect(notes).toHaveCount(1);
+    await expect(notes).toContainText('由备用模型 relay-b/glm-4.6 回答');
     await expect(home.getByTestId('chief-fallback-banner')).toContainText('relay-b/glm-4.6');
     await expect(home.getByTestId('chief-outage')).toHaveCount(0);
     await evidenceShot(page, 'fallback.png');
@@ -310,7 +314,7 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     await expect(home.getByTestId('chief-pending').first()).toContainText('只看 cairn 项目就行');
   });
 
-  test('现在插话 steers the queued message into the running reply', async ({ page }) => {
+  test('`现在插话` steers the queued message into the running reply', async ({ page }) => {
     const calls = await mockLive(page, busyState());
     await page.goto('/app');
     await page

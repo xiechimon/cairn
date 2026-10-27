@@ -1161,7 +1161,7 @@ function collectChiefStream(
 } {
   const items: ChiefStreamItem[] = [];
   const pendingById = new Map<string, ChiefStreamItem>();
-  let fallbackModel: string | null = null;
+  let fallback: { model: string; stepId: string } | null = null;
   const postedTexts = new Set(
     messages
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
@@ -1169,6 +1169,12 @@ function collectChiefStream(
   );
   let pendingTools: ChiefToolRow[] = [];
   for (const m of messages) {
+    if (m.role === 'user' && fallback !== null) {
+      const stepOfRow = m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+        ? m.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)
+        : m.id;
+      if (stepOfRow !== fallback.stepId) fallback = null;
+    }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
     if (pendingState !== undefined) {
       const text = textOfContent(m.content).trim();
@@ -1195,9 +1201,9 @@ function collectChiefStream(
         items.push({ kind: 'stopped', todos: stopped.data.todos, id: m.id });
         continue;
       }
-      const fallback = chiefModelFallbackContentSchema.safeParse(parsed);
-      if (fallback.success) {
-        fallbackModel = fallback.data.to;
+      const switched = chiefModelFallbackContentSchema.safeParse(parsed);
+      if (switched.success) {
+        fallback = { model: switched.data.to, stepId: switched.data.stepId };
         continue;
       }
     }
@@ -1252,7 +1258,6 @@ function collectChiefStream(
       if (text === '') continue;
       if (m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) && postedTexts.has(text)) continue;
       pendingTools = [];
-      fallbackModel = null;
       items.push({ kind: 'user', text, id: m.id, markdown: text });
       continue;
     }
@@ -1263,7 +1268,7 @@ function collectChiefStream(
       seconds: '',
       id: m.id,
       ...(pendingTools.length > 0 ? { tools: pendingTools } : {}),
-      ...(fallbackModel !== null ? { fallbackModel } : {}),
+      ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
     });
     pendingTools = [];
   }
