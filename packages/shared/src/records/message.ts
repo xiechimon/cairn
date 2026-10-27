@@ -82,6 +82,7 @@ export const chiefDigestContentSchema = z.object({
   kind: z.literal(CHIEF_DIGEST_KIND),
   reason: z.enum(['daily', 'threshold']),
   coversUntil: z.number(),
+  coversThrough: z.string().optional(),
   madeAt: z.number(),
   items: z.array(chiefDigestItemSchema),
 });

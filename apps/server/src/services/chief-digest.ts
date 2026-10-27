@@ -6,13 +6,14 @@ import {
   CHIEF_DIGEST_THREAD_ID_PREFIX,
   CHIEF_REMOTE_TOOLS,
   CHIEF_TOOL_CATEGORIES,
+  chiefDigestContentSchema,
   chiefDigestGroupSchema,
   chiefDigestThreadId,
   ISSUE_FENCE_OPEN,
   isChiefDigestThreadId,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
-import { and, asc, desc, eq, gt, gte, inArray, like, lt, ne, not, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, like, lt, ne, not, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { agent, chief, chiefMessage, chiefThread, step } from '../db/schema.js';
@@ -85,10 +86,23 @@ function localDay(ms: number, tz: string): string {
 
 const notDigestRow = not(like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`));
 
-function uncoveredFilter(threadId: string, since: number | null, before: number) {
+function afterBoundary(at: number, rowid: number | null) {
+  return rowid === null
+    ? gt(chiefMessage.createdAt, at)
+    : or(
+        gt(chiefMessage.createdAt, at),
+        and(eq(chiefMessage.createdAt, at), gt(sql`rowid`, rowid)),
+      );
+}
+
+function uncoveredFilter(
+  threadId: string,
+  since: { at: number; rowid: number | null } | null,
+  before: number,
+) {
   return and(
     eq(chiefMessage.threadId, threadId),
-    since === null ? undefined : gt(chiefMessage.createdAt, since),
+    since === null ? undefined : afterBoundary(since.at, since.rowid),
     lt(chiefMessage.createdAt, before),
     notDigestRow,
     ne(chiefMessage.role, 'system'),
@@ -161,19 +175,43 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
       .orderBy(desc(chiefThread.updatedAt))
       .all();
     for (const thread of threads) {
+      const lastDigest = db
+        .select({ createdAt: chiefMessage.createdAt, content: chiefMessage.content })
+        .from(chiefMessage)
+        .where(
+          and(
+            eq(chiefMessage.threadId, thread.id),
+            like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`),
+          ),
+        )
+        .orderBy(desc(chiefMessage.createdAt))
+        .limit(1)
+        .get();
+      let coversThrough: string | undefined;
+      try {
+        coversThrough = chiefDigestContentSchema.safeParse(
+          JSON.parse(String(lastDigest?.content ?? 'null')),
+        ).data?.coversThrough;
+      } catch {}
       const since =
-        db
-          .select({ createdAt: chiefMessage.createdAt })
-          .from(chiefMessage)
-          .where(
-            and(
-              eq(chiefMessage.threadId, thread.id),
-              like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`),
-            ),
-          )
-          .orderBy(desc(chiefMessage.createdAt))
-          .limit(1)
-          .get()?.createdAt ?? null;
+        lastDigest === undefined
+          ? null
+          : {
+              at: lastDigest.createdAt,
+              rowid:
+                coversThrough === undefined
+                  ? null
+                  : (db
+                      .select({ rowid: sql<number>`rowid` })
+                      .from(chiefMessage)
+                      .where(
+                        and(
+                          eq(chiefMessage.threadId, thread.id),
+                          eq(chiefMessage.id, coversThrough),
+                        ),
+                      )
+                      .get()?.rowid ?? null),
+            };
       const stats = db
         .select({
           first: sql<number | null>`min(${chiefMessage.createdAt})`,
@@ -338,18 +376,21 @@ export function finishChiefDigest(
   const chiefRow = thread
     ? db.select().from(chief).where(eq(chief.id, thread.chiefId)).get()
     : undefined;
+  const lastCovered =
+    thread !== undefined && meta?.[3] !== undefined
+      ? db
+          .select({ id: chiefMessage.id, rowid: sql<number>`rowid` })
+          .from(chiefMessage)
+          .where(and(eq(chiefMessage.threadId, thread.id), eq(chiefMessage.id, meta[3])))
+          .get()
+      : undefined;
   const ok =
     items !== null &&
     thread !== undefined &&
     chiefRow !== undefined &&
     chiefDigestThreadId(chiefRow.id) === stepRow.buildId &&
     meta?.[2] !== undefined &&
-    meta[3] !== undefined &&
-    db
-      .select({ id: chiefMessage.id })
-      .from(chiefMessage)
-      .where(and(eq(chiefMessage.threadId, thread.id), eq(chiefMessage.id, meta[3])))
-      .get() !== undefined;
+    lastCovered !== undefined;
   db.update(step)
     .set({ status: ok ? 'done' : 'failed', finishedAt: now })
     .where(eq(step.id, stepRow.id))
@@ -361,6 +402,7 @@ export function finishChiefDigest(
     kind: CHIEF_DIGEST_KIND,
     reason: meta[4] === 'daily' ? 'daily' : 'threshold',
     coversUntil: until,
+    coversThrough: lastCovered.id,
     madeAt: now,
     items: items.map((item): ChiefDigestItem => {
       if (item.group !== 'remembered' || rememberAs === null) return item;
@@ -402,7 +444,11 @@ export function finishChiefDigest(
     .select({ id: chiefMessage.id })
     .from(chiefMessage)
     .where(
-      and(eq(chiefMessage.threadId, thread.id), gt(chiefMessage.createdAt, until), notDigestRow),
+      and(
+        eq(chiefMessage.threadId, thread.id),
+        afterBoundary(until, lastCovered.rowid),
+        notDigestRow,
+      ),
     )
     .limit(1)
     .get();

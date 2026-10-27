@@ -655,6 +655,30 @@ describe('chief long-chat digests (#1939)', () => {
     expect(w.digestRows()[0]?.createdAt).toBeLessThan(TODAY_0830);
   });
 
+  test('a message appended after the plan with the cutoff timestamp stays uncovered', async () => {
+    const w = await setup();
+    w.plan(TODAY_0830);
+    const claimed = await w.claim();
+    if (!claimed) throw new Error('no digest step');
+    w.s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'skewed',
+        threadId: w.threadId,
+        role: 'user',
+        content: '时钟偏慢的执行端写进来的消息',
+        createdAt: YESTERDAY_EVENING + 1000,
+      })
+      .run();
+    await w.done(claimed.step.id, VALID_OUTPUT);
+    const main = w.s.db.select().from(chiefThread).where(eq(chiefThread.id, w.threadId)).get();
+    expect(main?.sessionId).toBe('sess-main');
+    w.plan(TODAY_0830 + 24 * 60 * 60_000);
+    const next = w.digestSteps().find((r) => r.id !== claimed.step.id);
+    expect(next?.prompt).toContain('时钟偏慢的执行端写进来的消息');
+    expect(next?.prompt).not.toContain('已建任务 #9，正在跑。');
+  });
+
   test('threads idle for more than two days are left alone', async () => {
     const w = await setup();
     w.s.db
