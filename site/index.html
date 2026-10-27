@@ -89,13 +89,14 @@ pre{margin:0;background:var(--surface);border:1px solid var(--line);border-radiu
 .w:hover{transform:translateY(-4px);box-shadow:0 26px 60px var(--glow)}
 .w:hover::before{opacity:1}
 .stage{position:relative;border-radius:16px;background:var(--surface);border:1px solid var(--line);overflow:hidden;aspect-ratio:16/10}
-.w1 .stage{aspect-ratio:21/8}
+.w1 .stage{aspect-ratio:1586/992}
+.stage img{display:block;width:100%;height:100%;object-fit:contain}
 .stage{background-image:radial-gradient(var(--line) 1px,transparent 1.2px);background-size:14px 14px}
 .meta{padding:16px 10px 8px}
 .meta h3{margin:0 0 4px;font-size:19px;letter-spacing:-.01em}
 .meta p{margin:0 0 12px;color:var(--muted);font-size:14.5px}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
-.chips>span{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--muted)}
+.chips>span,.chips>a{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--muted)}
 .chips>.soon{display:inline-flex;align-items:center;gap:6px;background:var(--soft);border-color:transparent;color:var(--ink)}
 .kb{--g:10px;--p:8px;position:absolute;inset:18px;display:grid;grid-template-columns:repeat(4,1fr);gap:var(--g)}
 .col{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:30px 8px 8px;position:relative}
@@ -144,7 +145,7 @@ html[data-lang=zh] .prompt [data-l=zh],html[data-lang=en] .prompt [data-l=en]{di
 .note{margin-top:14px;text-align:center;color:var(--muted);font-size:13px}
 .rv{opacity:0;transform:translateY(24px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1)}
 .rv.in{opacity:1;transform:none}
-@media (max-width:820px){.bento{grid-template-columns:1fr}.w1 .stage{aspect-ratio:4/3}.kb{inset:12px;--g:6px;--p:5px}.col{padding:26px 5px 5px}.col b{font-size:10px;left:7px}.ghost{height:20px;margin-bottom:6px}.ghost:nth-child(n+4){display:none}.tk{--y:96px;padding:6px}.tk.t2{display:none}}
+@media (max-width:820px){.bento{grid-template-columns:1fr}.w1 .stage{aspect-ratio:1586/992}.kb{inset:12px;--g:6px;--p:5px}.col{padding:26px 5px 5px}.col b{font-size:10px;left:7px}.ghost{height:20px;margin-bottom:6px}.ghost:nth-child(n+4){display:none}.tk{--y:96px;padding:6px}.tk.t2{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.rv{opacity:1;transform:none}.blk,.bar2{opacity:1;transform:none}.prompt span{max-width:22ch}}
 footer{padding:40px 0 32px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 [data-l]{display:none}
@@ -253,24 +254,24 @@ html[data-lang=zh] [data-l=zh],html[data-lang=en] [data-l=en]{display:inline}
 <section id="showcase">
   <div class="sc-head rv">
     <span class="eyebrow"><i class="pulse"></i>Showcase</span>
-    <h2><span data-l="zh">agent 真实做出来的作品</span><span data-l="en">Work agents actually shipped</span></h2>
-    <p><span data-l="zh">每件作品都会配录屏、PR 链接和查得到出处的数字。项目还在成型，下面是占位。</span><span data-l="en">Each piece will come with a recording, the pull request and numbers you can trace. Cairn is still taking shape, so these are placeholders.</span></p>
+    <h2><span data-l="zh">Showcase concepts</span><span data-l="en">Showcase concepts</span></h2>
+    <p><span data-l="zh">AI-generated concept art previews the planned demonstrations. Recordings, pull requests and sourced metrics are still to come.</span><span data-l="en">AI-generated concept art previews the planned demonstrations. Recordings, pull requests and sourced metrics are still to come.</span></p>
   </div>
   <div class="bento">
     <article class="w w1 rv">
-      <div class="stage" aria-hidden="true"><div class="kb"><div class="col"><b><span data-l="zh">领票</span><span data-l="en">Claim</span></b><div class="ghost"></div><div class="ghost s"></div><div class="ghost"></div><div class="ghost s"></div></div><div class="col"><b><span data-l="zh">实现</span><span data-l="en">Build</span></b><div class="ghost"></div><div class="ghost s"></div><div class="ghost"></div><div class="ghost s"></div></div><div class="col"><b><span data-l="zh">审核</span><span data-l="en">Review</span></b><div class="ghost"></div><div class="ghost s"></div><div class="ghost"></div><div class="ghost s"></div></div><div class="col"><b><span data-l="zh">合并</span><span data-l="en">Merge</span></b><div class="ghost"></div><div class="ghost s"></div><div class="ghost"></div><div class="ghost s"></div></div><div class="tk"><i></i><i></i><div class="bar"></div><span class="av"></span><span class="ok">✓</span></div><div class="tk t2"><i></i><i></i><div class="bar"></div><span class="av"></span><span class="ok">✓</span></div></div></div>
-      <div class="meta"><h3><span data-l="zh">自举闭环</span><span data-l="en">Bootstrap loop</span></h3><p><span data-l="zh">Cairn 里的 agent 从领票、实现、审核到合并，自己完成一张 Cairn 的票。</span><span data-l="en">An agent inside Cairn takes one of Cairn's own tickets from claim through build and review to merge.</span></p><div class="chips"><span><span data-l="zh">录屏</span><span data-l="en">Video</span></span><span>PR</span><span><span data-l="zh">数据出处</span><span data-l="en">Sourced numbers</span></span><span class="soon"><i class="pulse"></i><span data-l="zh">筹备中</span><span data-l="en">Coming soon</span></span></div></div>
+      <div class="stage"><img src="media/showcase/bootstrap-loop.png" alt="Concept art: task, code, review and a human gate" width="1586" height="992" loading="lazy"></div>
+      <div class="meta"><h3><span data-l="zh">自举闭环</span><span data-l="en">Bootstrap loop</span></h3><p><span data-l="zh">Cairn 里的 agent 从领票、实现、审核到合并，自己完成一张 Cairn 的票。</span><span data-l="en">An agent inside Cairn takes one of Cairn's own tickets from claim through build and review to merge.</span></p><div class="chips"><span>AI-generated concept art</span><a href="https://github.com/xiechimon/cairn/issues/1667">Evidence plan</a></div></div>
     </article>
     <article class="w rv">
-      <div class="stage" aria-hidden="true"><div class="app"><div class="top"><u></u><u></u><u></u></div><div class="blk b1"></div><div class="blk p b2"></div><div class="blk b3"></div><div class="blk b4"></div><div class="blk b5"></div><div class="prompt"><span data-l="zh">做一个记账小应用……</span><span data-l="en">Build a budgeting app…</span></div></div></div>
-      <div class="meta"><h3><span data-l="zh">从零做一个应用</span><span data-l="en">An app from scratch</span></h3><p><span data-l="zh">给一句需求，agent 团队在你的机器上把一个完整应用做出来。</span><span data-l="en">One sentence in, and the agent team builds a complete app on your machine.</span></p><div class="chips"><span><span data-l="zh">录屏</span><span data-l="en">Video</span></span><span>PR</span><span><span data-l="zh">数据出处</span><span data-l="en">Sourced numbers</span></span><span class="soon"><i class="pulse"></i><span data-l="zh">筹备中</span><span data-l="en">Coming soon</span></span></div></div>
+      <div class="stage"><img src="media/showcase/app-from-scratch.png" alt="Concept art: an application assembled on a local workstation" width="1586" height="992" loading="lazy"></div>
+      <div class="meta"><h3><span data-l="zh">从零做一个应用</span><span data-l="en">An app from scratch</span></h3><p><span data-l="zh">给一句需求，agent 团队在你的机器上把一个完整应用做出来。</span><span data-l="en">One sentence in, and the agent team builds a complete app on your machine.</span></p><div class="chips"><span>AI-generated concept art</span><a href="https://github.com/xiechimon/cairn/issues/1667">Evidence plan</a></div></div>
     </article>
     <article class="w rv">
-      <div class="stage" aria-hidden="true"><div class="chart"><div class="grp"><div class="bar2" style="height:46%"></div><div class="bar2 n" style="height:64%"></div><em><span data-l="zh">任务 A</span><span data-l="en">Task A</span></em></div><div class="grp"><div class="bar2" style="height:58%"></div><div class="bar2 n" style="height:72%"></div><em><span data-l="zh">任务 B</span><span data-l="en">Task B</span></em></div><div class="grp"><div class="bar2" style="height:34%"></div><div class="bar2 n" style="height:55%"></div><em><span data-l="zh">任务 C</span><span data-l="en">Task C</span></em></div></div><div class="cap2"><span><i></i><span data-l="zh">优化前</span><span data-l="en">Before</span></span><span><i class="n"></i><span data-l="zh">优化后</span><span data-l="en">After</span></span></div></div>
-      <div class="meta"><h3><span data-l="zh">harness 优化前后</span><span data-l="en">Harness before and after</span></h3><p><span data-l="zh">同一组任务，改了提示词、技能和路由前后的评测对比。</span><span data-l="en">The same task set, scored before and after a prompt, skill and routing change.</span></p><div class="chips"><span><span data-l="zh">录屏</span><span data-l="en">Video</span></span><span>PR</span><span><span data-l="zh">数据出处</span><span data-l="en">Sourced numbers</span></span><span class="soon"><i class="pulse"></i><span data-l="zh">筹备中</span><span data-l="en">Coming soon</span></span></div></div>
+      <div class="stage"><img src="media/showcase/harness-comparison.png" alt="Concept art: tangled and structured harness routing" width="1586" height="992" loading="lazy"></div>
+      <div class="meta"><h3><span data-l="zh">harness 优化前后</span><span data-l="en">Harness before and after</span></h3><p><span data-l="zh">同一组任务，改了提示词、技能和路由前后的评测对比。</span><span data-l="en">The same task set, scored before and after a prompt, skill and routing change.</span></p><div class="chips"><span>AI-generated concept art</span><a href="https://github.com/xiechimon/cairn/issues/1667">Evidence plan</a></div></div>
     </article>
   </div>
-  <p class="note"><span data-l="zh">卡片里是示意动画，不是真实数据。</span><span data-l="en">The animations are illustrations, not real data.</span></p>
+  <p class="note"><span data-l="zh">AI-generated illustrations, not recordings or real data.</span><span data-l="en">AI-generated illustrations, not recordings or real data.</span></p>
 </section>
 
 <section id="start">

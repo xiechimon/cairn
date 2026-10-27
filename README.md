@@ -71,13 +71,19 @@
 
 ## Showcase
 
-Real work that agents shipped inside Cairn, each with a recording, the pull request and numbers you can check. Cairn is still taking shape, so these slots are placeholders for now.
+AI-generated concept art previews the planned demonstrations. These illustrations are not recordings or real data. PR links and sourced metrics remain tracked in [#1667](https://github.com/xiechimon/cairn/issues/1667).
 
-| | Work | What it will show |
-|---|---|---|
-| 1 | Bootstrap loop | An agent inside Cairn takes one of Cairn's own tickets from claim through build and review to merge. *Coming soon.* |
-| 2 | An app from scratch | One sentence in, and the agent team builds a complete app on your machine. *Coming soon.* |
-| 3 | Harness before and after | The same task set, scored before and after a prompt, skill and routing change. *Coming soon.* |
+### Bootstrap loop
+
+![Concept art: Task, code, review and a human gate](site/media/showcase/bootstrap-loop.png)
+
+### An app from scratch
+
+![Concept art: Application panels assembled on a local workstation](site/media/showcase/app-from-scratch.png)
+
+### Harness before and after
+
+![Concept art: Tangled and structured harness routing](site/media/showcase/harness-comparison.png)
 
 ## Features
 

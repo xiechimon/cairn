@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_shared_generated_assets (__main__.Showcase.test_shared_generated_assets)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1667/docs/verify/1667/check.py", line 16, in test_shared_generated_assets
+    self.assertIn(f'width="{width}"', tag)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'width="1586"' not found in '<img src="media/showcase/bootstrap-loop.png" alt="Concept art: task, code, review and a human gate" width="1584" height="992" loading="lazy">'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

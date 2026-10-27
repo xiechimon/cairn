@@ -71,13 +71,19 @@
 
 ## 作品
 
-这里只放 agent 在 Cairn 里真实做出来的东西，每个都配录屏、PR 链接和能查到出处的数字。项目还在成型，下面先占位。
+AI-generated concept art previews the planned demonstrations. These illustrations are not recordings or real data. PR links and sourced metrics remain tracked in [#1667](https://github.com/xiechimon/cairn/issues/1667).
 
-| | 作品 | 会展示什么 |
-|---|---|---|
-| 1 | 自举闭环 | Cairn 里的 agent 从领票、实现、审核到合并，自己完成一张 Cairn 的票。*筹备中。* |
-| 2 | 从零做一个应用 | 给一句需求，agent 团队在你的机器上把一个完整应用做出来。*筹备中。* |
-| 3 | harness 优化前后 | 同一组任务，改了提示词、技能和路由前后的评测对比。*筹备中。* |
+### Bootstrap loop
+
+![Concept art: Task, code, review and a human gate](site/media/showcase/bootstrap-loop.png)
+
+### An app from scratch
+
+![Concept art: Application panels assembled on a local workstation](site/media/showcase/app-from-scratch.png)
+
+### Harness before and after
+
+![Concept art: Tangled and structured harness routing](site/media/showcase/harness-comparison.png)
 
 ## 功能
 
