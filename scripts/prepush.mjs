@@ -70,6 +70,7 @@ export function prepushPlan(paths, mode = 'local') {
     ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
     ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
     ledgerGate,
+    ['python3', 'scripts/pr-evidence-gate.test.py'],
   ];
   return mode === 'ci'
     ? required
