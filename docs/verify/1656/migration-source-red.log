@@ -1,0 +1,30 @@
+✖ migration preserves every source row and sums counters when categories merge (6.408393ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 56.133057
+
+✖ failing tests:
+
+test at docs/verify/1656/migration.test.mjs:10:1
+✖ migration preserves every source row and sums counters when categories merge (6.408393ms)
+  AssertionError [ERR_ASSERTION]: migration manifest must contain every source ledger row
+  
+  164 !== 165
+  
+      at TestContext.<anonymous> (file:///tmp/1656-migration-control-ixoo9hqm/docs/verify/1656/migration.test.mjs:25:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 164,
+    expected: 165,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
