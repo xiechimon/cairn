@@ -61,6 +61,8 @@ test.describe('task panel list view', () => {
     await expect(panel(page)).toBeVisible();
     await page.getByRole('link', { name: '定时' }).first().click();
     await expect(page).toHaveURL(/\/app\/schedules/);
+    await expect(page.getByTestId('chief-home')).toHaveCount(0);
+    await expect(panel(page)).toHaveCount(0);
     await page.goBack();
     await expect(page.getByTestId('chief-home')).toBeVisible();
     await expect(panel(page)).toHaveCount(0);
