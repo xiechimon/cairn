@@ -1,0 +1,2 @@
+integration typecheck$ tsc --noEmit
+integration typecheck: Done

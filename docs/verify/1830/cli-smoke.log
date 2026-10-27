@@ -1,0 +1,7 @@
+[routing] 2 run(s) to go on 1 task(s)
+[routing] slugify single stub-model rep0: pass (oracle passed)
+[routing] slugify handoff stub-model rep0: pass (oracle passed)
+[routing] per-model summary:
+  handoff/stub-model: 1/1 pass, flagged 0, errors 0
+  single/stub-model: 1/1 pass, flagged 0, errors 0
+[routing] report: ../docs/verify/1830/cli-smoke/report.md

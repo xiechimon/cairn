@@ -1,0 +1,31 @@
+{
+  "providers": {
+    "cairn-bench": {
+      "baseUrl": "http://127.0.0.1:34129/v1",
+      "api": "openai-completions",
+      "apiKey": "per-step",
+      "authHeader": true,
+      "compat": {
+        "supportsDeveloperRole": false
+      },
+      "models": [
+        {
+          "id": "stub-model",
+          "name": "stub-model",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 128000,
+          "maxTokens": 16384
+        }
+      ]
+    }
+  }
+}

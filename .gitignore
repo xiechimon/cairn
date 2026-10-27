@@ -113,3 +113,6 @@ playwright-report/
 
 # gardener weekly sweep output (#1617): local run default; CI uploads it as an artifact
 .gardener/
+
+# routing eval live-run outputs (evidence lives in docs/verify)
+integration/eval/routing/results/

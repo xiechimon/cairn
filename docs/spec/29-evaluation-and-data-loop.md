@@ -106,6 +106,7 @@ Consequences already absorbed by other tickets: #1515's weekly summary is replac
 | E2-2 | #1518 | Isolated runner (Harbor since 2026-10-25) | open |
 | E2-3 | #1519 | Bench holdout slice as a CI regression gate | open |
 | E2-attached | #1532 | Same-model cross-harness page-generation comparison | open |
+| E2-attached | #1830 | Routing eval: a strong model plans and cheap models execute, on a 21-task cairn-bench slice with pass/cost/time per model and anti-cheat (out-of-workdir reads, wrapped implementations) | merged |
 | Observability | #1569–#1573 | Langfuse self-host, `traj:push`, score sync, OTel spans, bench-as-dataset | #1569 closed; #1570–#1573 open |
 | E3 | — | Self-optimization loop (#1579, #1614, #1576 as candidates) | not ticketed |
 | E4 | — | Standing loop with human sampling | not ticketed |

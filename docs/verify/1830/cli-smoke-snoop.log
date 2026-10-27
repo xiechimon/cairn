@@ -1,0 +1,5 @@
+[routing] 1 run(s) to go on 1 task(s)
+[routing] slugify single stub-model rep0: fail (out-of-workdir reads: /etc/hostname)
+[routing] per-model summary:
+  single/stub-model: 0/1 pass, flagged 1, errors 0
+[routing] report: ../docs/verify/1830/cli-smoke-snoop/report.md
