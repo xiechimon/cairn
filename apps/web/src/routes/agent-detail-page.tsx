@@ -65,6 +65,7 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
 import { SECRETS_HREF } from '../resources/secrets-page.js';
+import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { FallbackModelsSection } from './agent-fallback-models.js';
 import { AgentModelSelect, AgentRuntimeSelect } from './agent-model-select.js';
 
@@ -122,6 +123,7 @@ export function AgentDetailPage() {
   const agentId = params.id;
   const { search } = useLocation();
   const navigate = useNavigate();
+  const openInPlace = useOpenTaskInPlace();
   const fixture = resolveScenario(new URLSearchParams(search));
   const { live, teamId } = useLiveData();
 
@@ -267,7 +269,13 @@ export function AgentDetailPage() {
   const thinkingLevel = toThinkingLevelDisplay(agent.thinkingLevel, thinkingOptions);
 
   return (
-    <PageShell route={AGENTS_HREF} title={agent.displayName} back="/app/team" fixture={fixture}>
+    <PageShell
+      route={AGENTS_HREF}
+      title={agent.displayName}
+      back="/app/team"
+      fixture={fixture}
+      taskPanel
+    >
       <div className="agent-detail flex flex-col gap-4">
         <SegmentedTabs
           className="agent-tabs"
@@ -412,7 +420,16 @@ export function AgentDetailPage() {
                       key={row.buildId}
                       variant="ghost"
                       className={AGENT_TASK_ROW_CLS}
-                      onClick={() => navigate(`/app/todo/${row.todo.id}`)}
+                      onClick={(event) => {
+                        if (
+                          !openInPlace(event, row.todo.id, {
+                            title: row.todo.title,
+                            seq: row.todo.seqNum,
+                            phase: row.todo.phase,
+                          })
+                        )
+                          navigate(`/app/todo/${row.todo.id}`);
+                      }}
                     >
                       <span className="agent-task-seq flex-none text-xs text-muted-foreground">
                         #{row.todo.seqNum}
@@ -671,7 +688,7 @@ export function AgentDetailPage() {
               )}
             </section>
 
-            <section className="agent-perm-group agent-machine-fit flex flex-col gap-2">
+            <section className="agent-perm-group flex flex-col gap-2">
               <h3 className="m-0 text-card-title font-medium text-foreground">{t('机器匹配')}</h3>
               <p className={SETTINGS_HINT_CLS}>
                 {t(
@@ -691,13 +708,11 @@ export function AgentDetailPage() {
                   {mcpOptions.map((server) => (
                     <SettingsRow
                       key={server.id}
-                      className="agent-required-mcp-row"
                       label={server.name}
                       hint={t('要求执行机已安装该 MCP 服务器')}
                       hintClassName="agent-perm-hint"
                     >
                       <Switch
-                        className="agent-required-mcp-switch"
                         aria-label={t('要求安装 {name}', { name: server.name })}
                         checked={(agent.requiredCapabilities?.mcpServers ?? []).includes(server.id)}
                         onCheckedChange={(checked) => toggleRequiredMcp(server.id, checked)}
@@ -716,7 +731,6 @@ export function AgentDetailPage() {
                     machineFitQ.data.machines.map((m) => (
                       <SettingsRow
                         key={m.machineId}
-                        className="agent-fit-row"
                         label={m.name}
                         hint={machineFitHint(m, t)}
                         hintClassName="agent-perm-hint"

@@ -154,7 +154,6 @@ describe('record additive contract (old server / old daemon parse both ways)', (
     latestCliVersion: null,
     kind: 'local' as const,
     enabledRuntimes: ['pi'],
-    shellEnabled: false,
   };
 
   it('machineRecordSchema: capabilities three states -- absent (old server) / null (never reported) / list', () => {

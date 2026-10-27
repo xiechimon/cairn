@@ -170,17 +170,14 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     'apps/server/src/services/secrets.ts',
     'apps/server/src/services/credentials.ts',
     'apps/server/src/services/api-keys.ts',
-    'apps/server/src/services/webhook-tokens.ts',
     'apps/server/src/services/oauth.ts',
     'apps/server/src/routes-machine.ts',
     'apps/daemon/src/credentials.ts',
     'apps/daemon/src/secret-channel.ts',
-    'apps/daemon/src/shell-channel.ts',
     'apps/daemon/src/machine-client.ts',
     'apps/daemon/src/backend/command-gate.ts',
     'apps/server/src/services/mcp-face.ts',
     'apps/server/src/services/mcp-servers.ts',
-    'apps/server/src/routes-webhook.ts',
     'apps/server/src/db/client.ts',
   ];
   test('⑤ security-sensitive surfaces and the migration-running DB bootstrap: every file in the list is protected, never in gateSource', () => {

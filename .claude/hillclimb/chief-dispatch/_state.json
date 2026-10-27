@@ -78,5 +78,5 @@
     "integration/eval/chief-dispatch/repo-seed/packages/shared/package.json",
     "integration/eval/chief-dispatch/repo-seed/packages/shared/src/protocol.ts"
   ],
-  "harness_sha": "9df6bea0a9c66e37ff50cb69058426a61e07c955012c6502df5be800671f57cf"
+  "harness_sha": "17e76d90a6895e571f69ca01ddd2afd86c244d4c38da79eab0a78c7a34aed411"
 }

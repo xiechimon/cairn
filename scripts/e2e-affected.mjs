@@ -3,7 +3,12 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
-import { acquireSlot, leaseEnv, writeSlotPlaywrightConfig } from './heavy-slots.mjs';
+import {
+  acquireSlot,
+  leaseEnv,
+  slotPortReport,
+  writeSlotPlaywrightConfig,
+} from './heavy-slots.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const WEB_DIR = join(REPO_ROOT, 'apps/web');
@@ -38,6 +43,8 @@ const BOARD = [
   'storage-unavailable',
   'mobile-narrow',
   'focus-ring-clip',
+  'chief-home-',
+  'task-panel',
 ];
 const SIDEBAR = [
   'sidebar-',
@@ -72,6 +79,7 @@ const DETAIL = [
   'spec-brief-',
   'spinner-',
   'chief-fab',
+  'chief-home-',
   'chief-stream-markdown',
   'composer-wire-reject',
   'user-menu-',
@@ -102,6 +110,7 @@ const DETAIL = [
   'thinking-row-truncate',
   'hotkeys-ready',
   'mobile-narrow',
+  'task-panel',
 ];
 const CHIEF = [
   'composer-tool-tips',
@@ -115,8 +124,15 @@ const CHIEF = [
   'z-ladder',
   'hotkeys-ready',
   'mobile-narrow',
+  'task-panel',
 ];
-const AGENT = ['agent-', 'team-create-agent', 'registry-focus-ring', 'resource-back-spa'];
+const AGENT = [
+  'agent-',
+  'team-create-agent',
+  'registry-focus-ring',
+  'resource-back-spa',
+  'task-panel',
+];
 const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models'];
 const OVERLAY = [
   'newtask-',
@@ -167,6 +183,7 @@ const PAGES = [
   'registry-focus-ring',
   'resource-back-spa',
   'mobile-narrow',
+  'task-panel',
 ];
 const RESOURCES = [
   'machine-',
@@ -183,6 +200,7 @@ const RESOURCES = [
   'registry-focus-ring',
   'resource-back-spa',
   'skill-import',
+  'task-panel',
 ];
 const SHARED_SURFACE_ONLY = ['cds-motion', 'color-freeze', 'fixture-mode-chip'];
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
@@ -233,6 +251,10 @@ const FILE_RULES = new Map([
 
 const DIR_RULES = [
   { prefix: 'apps/web/src/board/', specs: BOARD },
+  {
+    prefix: 'apps/web/src/task-panel/',
+    specs: [...BOARD, ...CHIEF, ...PAGES, ...RESOURCES, ...AGENT],
+  },
   { prefix: 'apps/web/src/chief/', specs: CHIEF },
   { prefix: 'apps/web/src/detail/', specs: DETAIL },
   { prefix: 'apps/web/src/overlay/', specs: OVERLAY },
@@ -390,6 +412,11 @@ function runPlaywright(specs, full) {
   const args = ['exec', 'playwright', 'test'];
   const env = { ...leaseEnv(lease), E2E_PORT: PORT };
   if (lease !== null) {
+    const conflict = slotPortReport({ slot: lease.slot });
+    if (conflict !== null) {
+      console.error(conflict);
+      process.exit(1);
+    }
     const slotRun = writeSlotPlaywrightConfig({
       slot: lease.slot,
       env: process.env,

@@ -29,7 +29,6 @@ export const EN: Record<string, string> = {
   '调用 {n} 个工具': 'Tool calls: {n}',
   '已加载 {n} 个技能': 'Skills loaded: {n}',
   '还有 {n} 行': '{n} more lines',
-  '，': ', ',
   无输出: 'No output',
   未完成: 'Not finished',
   读取: 'Read',
@@ -44,6 +43,27 @@ export const EN: Record<string, string> = {
   // Paper 顶栏等你处理摘要：数字单独着色，后接本串（「3 项等你处理」→「3 waiting on you」）
   项等你处理: 'waiting on you',
   没有等你处理的事: 'Nothing is waiting on you',
+  '{greeting}，{name}': '{greeting}, {name}',
+  夜深了: 'Good night',
+  早上好: 'Good morning',
+  中午好: 'Good afternoon',
+  下午好: 'Good afternoon',
+  晚上好: 'Good evening',
+  与总管的对话: 'Conversation with the Chief',
+  '{running} 个任务运行中，今天合并了 {done} 个': '{running} tasks running, {done} merged today',
+  '，': ', ',
+  '{n} 项待你处理': '{n} waiting on you',
+  '，没有需要你的事': ', nothing needs you',
+  往上滑查看昨天的对话: "Scroll up for yesterday's conversation",
+  往上滑查看之前的对话: 'Scroll up for earlier conversation',
+  '过去 24 小时各项目的情况：': 'Projects in the last 24 hours:',
+  '过去 24 小时各项目没有新进展': 'No project activity in the last 24 hours',
+  '完成 {n} 个': '{n} done',
+  '{n} 个运行中': '{n} running',
+  '{n} 项待处理': '{n} waiting',
+  '有 {n} 件事需要你处理：': '{n} need you:',
+  今天的概况: "Today's overview",
+  已转给任务: 'Passed to task',
   定时: 'Schedules',
   '{n} 台机器在线': '{n} machines online',
   '执行中 {n}': '{n} running',
@@ -1053,10 +1073,6 @@ export const EN: Record<string, string> = {
   可跑: 'Runnable',
   不可跑: 'Not runnable',
   '暂无机器。': 'No machines yet.',
-  // XMON-113：机器行 shell 开关的副文案（机器侧半边；{tool} 插值 = 上面那条
-  // AGENT_TOOL_SHELL 的 en 值，两层开关共用同一词）。
-  '已授权「{tool}」的 Agent 可在该机器上执行命令。':
-    'Agents you have granted {tool} to can run commands on this machine.',
   // #895 机器页三态读标注（spec 21 A8；orchestration 块 join 行集）+ chief
   // 设置 Agent tab「机器」槽的描述（A6）。徽标/状态 = 机器与总管编排的
   // 关系面，非机器自身状态。
@@ -1073,7 +1089,6 @@ export const EN: Record<string, string> = {
     'Which team skills this Agent may read. Unrestricted reads everything; once restricted, only the checked skills are readable and every unchecked one is denied. Unrestricted and nothing-checked are two different states, switchable either way.',
   // shared canon（packages/shared/src/records/agent.ts、memory.ts），经 t()
   // 消费、不作字面量出现——i18n-coverage COMPUTED_KEYS 登记。
-  '远程 shell': 'Remote shell',
   合并分支: 'Merge branches',
   创建标签: 'Create tags',
   推送分支: 'Push branches',
@@ -1081,8 +1096,6 @@ export const EN: Record<string, string> = {
   更新技能: 'Update skills',
   运行时: 'Runtime',
   '内置 (pi)': 'Built-in (pi)',
-  '允许该 Agent 在团队中已开启 shell 访问的机器上执行命令。':
-    'Allow this Agent to run commands on machines where shell access is enabled for the team.',
   '允许该 Agent 通过合并分支进行发布（例如将 develop 合并进 main）。':
     'Let this Agent publish by merging branches (for example develop into main).',
   '允许该 Agent 创建 git tag，这可能触发发布流程。':
@@ -1120,6 +1133,38 @@ export const EN: Record<string, string> = {
   '换个关键词再试。': 'Try another search term.',
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
   总管本轮执行失败: 'The chief turn failed',
+  '撤回失败，总管可能已经开始处理这条了。':
+    'Could not withdraw: the chief may already be working on it.',
+  '插话失败，请重试。': 'Could not steer. Try again.',
+  '停止失败，请重试。': 'Could not stop. Try again.',
+  '已停止，没有建任务。': 'Stopped. No task was created.',
+  '已停止。停之前已经建了任务': 'Stopped. A task was already created before the stop:',
+  '已存下，总管恢复后会处理': 'Saved. The chief will handle it once it is back',
+  '排队中，总管回完上一条就看': 'Queued. The chief reads it after the current reply',
+  现在插话: 'Steer now',
+  撤回: 'Withdraw',
+  '由备用模型 {model} 回答': 'Answered by backup model {model}',
+  总管的模型: "the chief's model",
+  '总管用的模型 {model} 额度已用完': "The chief's model {model} is out of quota",
+  '总管用的模型 {model} 暂时过载': "The chief's model {model} is overloaded",
+  '{time} 会自动再试': 'it retries automatically at {time}',
+  恢复时间还不确定: 'no recovery time yet',
+  总管暂时不可用: 'The chief is unavailable',
+  '{why}，{when}。任务照常在跑；你说的话先存下，恢复后按顺序处理。':
+    '{why}; {when}. Tasks keep running; your messages are saved and handled in order once it is back.',
+  详情: 'Details',
+  直接建任务: 'Create a task directly',
+  给总管换模型: "Change the chief's model",
+  '总管的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。':
+    "The chief's main model is unavailable, so backup model {model} is replying. Its judgment may be less sharp.",
+  换模型: 'Change model',
+  停止总管这次回复: 'Stop this chief reply',
+  '备用模型 {model}': 'Backup model {model}',
+  '，主模型暂时用不了': ', main model unavailable',
+  '可以继续说，总管恢复后会按顺序处理…':
+    'Keep typing; the chief handles messages in order once it is back…',
+  '总管回完这条就看；想马上补充，发出后点「现在插话」':
+    'The chief reads this after the current reply; to add it now, send it and click Steer now',
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——
@@ -1215,4 +1260,27 @@ export const EN: Record<string, string> = {
   '已下架，运行时会跳过该备选': 'Delisted; this fallback is skipped at run time',
   '归属机 {machine} 未开启 {runtime} runtime，运行时会跳过该备选':
     'Home machine {machine} has the {runtime} runtime off; this fallback is skipped at run time',
+  执行: 'Build',
+  合并: 'Merge',
+  待你处理: 'Waiting on you',
+  '需要你回答、确认或检查的任务会出现在这里。':
+    'Tasks that need your answer, confirmation or check show up here.',
+  运行中: 'Running',
+  没有运行中的任务: 'No running tasks',
+  没有待开始的任务: 'No tasks waiting to start',
+  还没有已完成的任务: 'No finished tasks yet',
+  '运行失败。可以在下方说明后重跑，或展开查看过程。':
+    'The run failed. Explain below to rerun it, or expand to see what happened.',
+  '方案已写好，确认后开始执行。': 'The plan is ready. Confirm it to start the build.',
+  '改动已完成，审阅后合并。': 'The changes are done. Review them to merge.',
+  'Agent 在等你的回复。': 'The agent is waiting for your reply.',
+  任务面板: 'Task panel',
+  关闭面板: 'Close panel',
+  未开始: 'Not started',
+  展开为整页: 'Open as full page',
+  找不到这个任务: 'This task was not found',
+  '进度 · {done}/{total}': 'Progress · {done}/{total}',
+  引导这个任务: 'Steer this task',
+  '回复 agent…': 'Reply to the agent…',
+  '引导这个任务…': 'Steer this task…',
 };

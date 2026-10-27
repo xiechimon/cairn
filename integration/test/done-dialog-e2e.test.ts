@@ -183,6 +183,10 @@ async function driveToReview(spec: string, opts: { rework: boolean }) {
 async function openDetailViaBoard(title: string): Promise<void> {
   await page.goto(`${server.url}/app?view=board`);
   await page.getByRole('link', { name: title }).click();
+  await page
+    .getByRole('complementary', { name: '任务面板' })
+    .getByRole('link', { name: '展开为整页' })
+    .click();
   await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
     timeout: 15_000,
   });
@@ -232,6 +236,10 @@ beforeAll(async () => {
   });
   expect(project.status).toBe(201);
   projectId = (project.body as { id: string }).id;
+  const policy = await api(server.url, 'PATCH', `/api/projects/${projectId}/merge-policy`, {
+    mergePolicy: 'human',
+  });
+  expect(policy.status).toBe(200);
   const key = await api(server.url, 'POST', `/api/teams/${server.teamId}/api-keys`, {
     name: 'done-dialog-m1-key',
     gitAccess: false,

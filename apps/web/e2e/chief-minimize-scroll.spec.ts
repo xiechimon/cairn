@@ -36,7 +36,7 @@ async function settled(page: Page) {
 
 test.describe('chief minimize keeps the scroll position (#1067)', () => {
   test('scroll to the middle → minimize → reopen lands at the same spot', async ({ page }) => {
-    await page.goto('/app?scenario=chief-scroll-long');
+    await page.goto('/app?view=board&scenario=chief-scroll-long');
     await settled(page);
     // the mount-time defaultScrollPosition="end" marks the viewport
     // data-autoscrolling for a 180ms window; a programmatic scrollTop
@@ -100,7 +100,7 @@ test.describe('chief minimize keeps the scroll position (#1067)', () => {
   });
 
   test('the parked window is out of the a11y tree and does not eat focus', async ({ page }) => {
-    await page.goto('/app?scenario=chief-scroll-long');
+    await page.goto('/app?view=board&scenario=chief-scroll-long');
     await settled(page);
 
     await minimize(page).click();
@@ -123,7 +123,7 @@ test.describe('chief minimize keeps the scroll position (#1067)', () => {
   });
 
   test('reopen still focuses the composer (closed→open autofocus law)', async ({ page }) => {
-    await page.goto('/app?scenario=chief-scroll-long');
+    await page.goto('/app?view=board&scenario=chief-scroll-long');
     await settled(page);
     const composer = page.getByTestId('chief-composer-input');
 
@@ -139,7 +139,7 @@ test.describe('chief minimize keeps the scroll position (#1067)', () => {
   });
 
   test('FAB is visible while the window is parked and reopens it (D4)', async ({ page }) => {
-    await page.goto('/app?scenario=chief-scroll-long');
+    await page.goto('/app?view=board&scenario=chief-scroll-long');
     await settled(page);
 
     await minimize(page).click();

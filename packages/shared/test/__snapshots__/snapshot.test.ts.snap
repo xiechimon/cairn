@@ -1206,6 +1206,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
+    "pushHookOutput": {
+      "type": "string",
+    },
     "quotaBlock": {
       "additionalProperties": false,
       "properties": {
@@ -6068,6 +6071,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
   "ENV_VARS": {
     "apiKey": "CAIRN_API_KEY",
     "customModelReasoning": "CAIRN_CUSTOM_MODEL_REASONING",
+    "githubCreateHourlyCap": "CAIRN_GITHUB_CREATE_HOURLY_CAP",
+    "githubCreateMinIntervalMs": "CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS",
     "githubOauthClientId": "CAIRN_GITHUB_OAUTH_CLIENT_ID",
     "githubOauthClientSecret": "CAIRN_GITHUB_OAUTH_CLIENT_SECRET",
     "home": "CAIRN_HOME",
@@ -6078,6 +6083,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "requireToken": "CAIRN_REQUIRE_TOKEN",
     "server": "CAIRN_SERVER",
     "skillsDir": "CAIRN_SKILLS_DIR",
+    "tailscaleUsers": "CAIRN_TAILSCALE_USERS",
     "team": "CAIRN_TEAM",
     "token": "CAIRN_TOKEN",
     "trajectoryOutcomeBackfill": "CAIRN_TRAJ_OUTCOME_BACKFILL",
@@ -6395,7 +6401,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > pi stream events 
   ],
   "MACHINE_CUSTOM_TOOLS": [
     "web_fetch",
-    "remote_shell",
     "push_branch",
   ],
   "PI_STREAM_EVENTS": [
@@ -6526,13 +6531,10 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief",
   "chief_thread",
   "chief_message",
-  "whats_new",
   "attachment",
   "branch_sync",
   "github_connection",
   "skill_audit",
-  "shell_command",
-  "webhook_token",
   "gate_digest",
   "gate_round",
   "gate_verdict",
@@ -6732,11 +6734,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "[设计] 能力读面（XMON-16 / #499 B3 裁决 A）：引擎能力词表送 web——载荷 = 思考强度档位，单源 shared THINKING_LEVELS",
     "path": "/api/capabilities",
-  },
-  {
-    "method": "GET",
-    "note": "形状保留、内容自选（02 §6.1）",
-    "path": "/api/whats-new",
   },
   {
     "method": "GET",
@@ -7489,6 +7486,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "fallbackModel": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "id": {
       "type": "string",
     },
@@ -7509,6 +7512,29 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
         "string",
         "null",
       ],
+    },
+    "pending": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "messageId": {
+            "type": "string",
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "held",
+            ],
+            "type": "string",
+          },
+        },
+        "required": [
+          "messageId",
+          "state",
+        ],
+        "type": "object",
+      },
+      "type": "array",
     },
     "pendingSessionResumeAt": {
       "anyOf": [
@@ -7821,9 +7847,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "minimum": -9007199254740991,
       "type": "integer",
     },
-    "shellEnabled": {
-      "type": "boolean",
-    },
     "teamId": {
       "type": "string",
     },
@@ -7836,7 +7859,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
     "latestCliVersion",
     "kind",
     "enabledRuntimes",
-    "shellEnabled",
   ],
   "type": "object",
 }
@@ -9030,17 +9052,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > use
     "displayName",
     "avatarUrl",
   ],
-  "type": "object",
-}
-`;
-
-exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > whats_new > whats_new.json 1`] = `
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": {},
-  "propertyNames": {
-    "type": "string",
-  },
   "type": "object",
 }
 `;

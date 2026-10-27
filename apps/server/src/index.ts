@@ -12,6 +12,7 @@ import {
   missingRequiredTokenError,
   reposDirOf,
   warnInsecureBind,
+  warnTailscaleBind,
 } from './config.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
@@ -22,7 +23,12 @@ import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { backfillPersonas } from './services/personas.js';
-import { createScheduler, issueIntakeRunOf, trajectoryOutcomeRunOf } from './services/scheduler.js';
+import {
+  createScheduler,
+  issueIntakeRunOf,
+  trajectoryExportRunOf,
+  trajectoryOutcomeRunOf,
+} from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 
@@ -88,6 +94,7 @@ const app = createApp(
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,
     authToken: config.authToken,
+    tailscaleUsers: config.tailscaleUsers,
     mcpConfigPath: config.mcpConfigPath,
     logger,
   },
@@ -95,6 +102,7 @@ const app = createApp(
 );
 
 warnInsecureBind(logger, config);
+warnTailscaleBind(logger, config);
 logTokenAuthStartup(logger, config);
 
 const scheduler = createScheduler(
@@ -114,6 +122,7 @@ const scheduler = createScheduler(
   { githubFetch, logger },
   issueIntakeRunOf(config, { githubFetch, logger }),
   trajectoryOutcomeRunOf(config, { logger }),
+  trajectoryExportRunOf(config, { logger }),
 );
 scheduler.start();
 

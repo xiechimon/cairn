@@ -1,5 +1,5 @@
 import type { ModelCostRates } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, provider, todo, tokenUsage } from '../db/schema.js';
 
@@ -57,37 +57,26 @@ export function backfillTokenUsageCost(db: Db): void {
       output: tokenUsage.output,
       cacheRead: tokenUsage.cacheRead,
       cacheWrite: tokenUsage.cacheWrite,
-      costInput: tokenUsage.costInput,
-      costOutput: tokenUsage.costOutput,
-      costCacheRead: tokenUsage.costCacheRead,
-      costCacheWrite: tokenUsage.costCacheWrite,
-      costTotal: tokenUsage.costTotal,
       teamId: todo.teamId,
     })
     .from(tokenUsage)
     .innerJoin(build, eq(build.id, tokenUsage.buildId))
     .innerJoin(todo, eq(todo.id, build.todoId))
+    .where(
+      and(
+        isNull(tokenUsage.costInput),
+        isNull(tokenUsage.costOutput),
+        isNull(tokenUsage.costCacheRead),
+        isNull(tokenUsage.costCacheWrite),
+        isNull(tokenUsage.costTotal),
+      ),
+    )
     .all();
   for (const row of rows) {
     const rates = ratesForModel(db, row.teamId, row.model);
-    const legacyZero =
-      row.costInput === 0 &&
-      row.costOutput === 0 &&
-      row.costCacheRead === 0 &&
-      row.costCacheWrite === 0 &&
-      row.costTotal === 0;
-    const cost = rates ? costFromRates(row, rates) : legacyZero ? null : undefined;
-    if (cost === undefined) continue;
+    if (rates === undefined) continue;
     db.update(tokenUsage)
-      .set(
-        cost ?? {
-          costInput: null,
-          costOutput: null,
-          costCacheRead: null,
-          costCacheWrite: null,
-          costTotal: null,
-        },
-      )
+      .set(costFromRates(row, rates))
       .where(and(eq(tokenUsage.buildId, row.buildId), eq(tokenUsage.model, row.model)))
       .run();
   }

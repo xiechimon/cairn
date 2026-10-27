@@ -49,6 +49,9 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/chief/threads/{tid}/rewind',
   'POST /api/teams/{id}/chief/threads/{tid}/questions/{requestId}/answer',
   'POST /api/teams/{id}/chief/threads/{tid}/questions/{requestId}/cancel',
+  'DELETE /api/teams/{id}/chief/threads/{tid}/messages/{mid}',
+  'POST /api/teams/{id}/chief/threads/{tid}/messages/{mid}/steer',
+  'POST /api/teams/{id}/chief/threads/{tid}/stop',
   'POST /api/todos/{id}/orchestrate',
   'POST /api/todos/{id}/stop-and-done',
   'POST /api/todos/{id}/reset',
@@ -83,10 +86,6 @@ const INFERRED_ROUTES = [
   'GET /api/todos/{id}/github-issue',
   'POST /api/todos/{id}/github-issue/retry',
   'GET /api/projects/{id}/files',
-  'POST /api/webhook/github/{token}',
-  'GET /api/teams/{id}/webhook-tokens',
-  'POST /api/teams/{id}/webhook-tokens',
-  'DELETE /api/teams/{id}/webhook-tokens/{tid}',
 ];
 
 const CORE_ROUTES = [
@@ -138,7 +137,6 @@ const M5_ROUTES = [
   'GET /api/teams/{id}/skills/{sid}/file',
   'GET /api/teams/{id}/agents/{aid}/tasks',
   'GET /api/skills',
-  'GET /api/whats-new',
   'POST /api/analytics/first-touch',
   'GET /api/conversations/{id}/stream',
   'GET /api/builds/{id}/plans',

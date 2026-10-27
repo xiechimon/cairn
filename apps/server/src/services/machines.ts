@@ -23,7 +23,9 @@ import { newMachineToken } from '../lib/keys.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import { NotFoundError } from './builds.js';
+import { ackChiefSteer, takeChiefSteer } from './chief-turns.js';
 import { recommendMachineConcurrency } from './dispatch-eligibility.js';
+import type { ConversationStreamHub } from './events.js';
 import {
   agentForStep,
   isChiefConversation,
@@ -32,6 +34,7 @@ import {
   upsertChiefRow,
   upsertMessage,
 } from './machine-deps.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
 
@@ -65,11 +68,34 @@ export function fetchSteer(
     .where(eq(steerPending.conversationId, stepRow.buildId))
     .get();
   if (!pending) return { content: null };
+  if (
+    pending.stepId === stepId &&
+    isChiefConversation(stepRow.buildId) &&
+    !takeChiefSteer(db, stepRow.buildId)
+  ) {
+    return { content: null };
+  }
   db.delete(steerPending).where(eq(steerPending.conversationId, stepRow.buildId)).run();
   if (pending.stepId !== stepId) {
     return { content: null };
   }
   return { content: pending.content };
+}
+
+export function ackSteer(
+  deps: { db: Db; convHub?: ConversationStreamHub; machineHub?: MachineWakeHub },
+  machine: { id: string; teamId: string },
+  stepId: string,
+): { ok: true } {
+  const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  if (
+    stepRow?.machineId === machine.id &&
+    stepRow.status === 'claimed' &&
+    isChiefConversation(stepRow.buildId)
+  ) {
+    ackChiefSteer(deps, machine.teamId, stepRow);
+  }
+  return { ok: true };
 }
 
 export function fetchStop(
@@ -123,7 +149,6 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     latestCliVersion: row.latestCliVersion,
     kind: row.kind,
     enabledRuntimes: row.enabledRuntimes,
-    shellEnabled: row.shellEnabled,
     maxConcurrent: row.maxConcurrent,
     maxConcurrentOverridden: row.maxConcurrentOverridden,
     recommendedConcurrent: recommendation.value,

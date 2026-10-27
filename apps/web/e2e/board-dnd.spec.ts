@@ -656,15 +656,15 @@ test('cards from every column arm the drag gesture (#753)', async ({ page }) => 
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('2');
 });
 
-test('click navigation survives sensor arming on the newly draggable columns (#753/#629)', async ({
+test('click opening survives sensor arming on the newly draggable columns (#753/#629, #1937)', async ({
   page,
 }) => {
   await page.goto('/app?scenario=board-drag-matrix&view=board');
   for (const id of ['dm-confirm', 'dm-done-changes']) {
     const card = page.locator(`[data-todo-id="${id}"]`);
     await card.click();
-    await page.waitForURL((u) => u.pathname === `/app/todo/${id}`);
-    expect(new URL(page.url()).pathname).toBe(`/app/todo/${id}`);
+    await page.waitForURL((u) => u.searchParams.get('task') === id);
+    expect(new URL(page.url()).pathname).toBe('/app');
     await page.goto('/app?scenario=board-drag-matrix&view=board');
     await expect(page.locator(`[data-todo-id="${id}"]`)).toBeVisible();
   }

@@ -155,16 +155,11 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
   bindAllAgents(s);
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string; machineId: string };
-  let projectId: string;
-  if (opts.hosted) {
-    const hostedRes = await call(s.app, 'POST', '/api/projects', {
-      body: { name: 'review-hosted', repoKind: 'hosted' },
-    });
-    expect(hostedRes.status).toBe(201);
-    projectId = ((await hostedRes.json()) as { id: string }).id;
-  } else {
-    projectId = await postProject(s.app);
-  }
+  const projectId = await postProject(
+    s.app,
+    opts.hosted ? 'review-hosted' : 'demo',
+    opts.hosted ? { repoKind: 'hosted' } : {},
+  );
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '审核探针', spec: '实现一段示例代码供审核' },
   });

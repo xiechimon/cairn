@@ -170,7 +170,7 @@ async function stubWorld(page: Page, stepStatus: 'claimed' | 'stopped' = 'claime
   await expect(page.getByTestId('transcript-col')).toBeVisible();
 }
 
-test('work groups consecutive thinking and calls, with only the last block expanded', async ({ page }) => {
+test('work groups consecutive thinking and calls, with only the last block expanded', async ({ page }, testInfo) => {
   await stubWorld(page);
   const summaries = page.getByTestId('work-summary');
   await expect(summaries).toHaveCount(2);
@@ -194,6 +194,7 @@ test('work groups consecutive thinking and calls, with only the last block expan
   await block.getByTestId('work-think').click();
   await expect(block.getByTestId('thinking-body')).toHaveText(LONG_THINKING);
   await expect(page.getByTestId('work-block').last().getByTestId('work-spinner')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('work-trace-current.png') });
 });
 
 test('call details preserve commands, cap output and show edit lines', async ({ page }) => {

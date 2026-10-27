@@ -38,7 +38,7 @@ test('read state zero controls: zero button / zero menu semantics inside the ann
 
   await expect(page.locator(`${SHELL} [data-orchestration][role="button"]`)).toHaveCount(0);
 
-  await expect(page.locator(`${ROW} [role="switch"]`)).toHaveCount(3);
+  await expect(page.locator(`${ROW} [role="switch"]`)).toHaveCount(0);
 });
 
 test('legacy zero drift: no annotation data (06 canon face) grows no annotation nodes', async ({ page }) => {

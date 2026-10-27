@@ -129,7 +129,7 @@ const GATE_SCRIPTS = [
   'stub-x.mjs',
   'vp.mjs',
   'vp-selftest.mjs',
-  'drive-902-gate-actor.mjs',
+  'drive-1400-chip-word.mjs',
   'drive-hotkeys.mjs',
 ];
 const GATE_MAPS = { 't.md': '# t\n\n- `node .claude/skills/verify-cairn/scripts/vp.mjs drive t legacy`\n' };
@@ -145,7 +145,7 @@ function gateRegistry(cases = {}, support = {}) {
       t: {
         recipe: 'features/t.md',
         cases: {
-          legacy: { ...STUB, script: `${GATE_DIR}drive-902-gate-actor.mjs` },
+          legacy: { ...STUB, script: `${GATE_DIR}drive-1400-chip-word.mjs` },
           named: { ...STUB, script: `${GATE_DIR}drive-hotkeys.mjs` },
           ...cases,
         },
@@ -1216,6 +1216,23 @@ const cases = [
     },
   ],
   [
+    'stale ticket-named probes are archived under docs/verify, not in scripts/',
+    () => {
+      const stale = [];
+      for (const [feature, entry] of Object.entries(REGISTRY.features)) {
+        for (const [name, c] of Object.entries(entry.cases)) {
+          const base = c.script.split('/').pop();
+          if (c.status !== 'stale' || !/^drive-\d/.test(base)) continue;
+          const id = base.match(/^drive-(\d+(?:-\d+)?)/)[1];
+          const archived = `docs/verify/${id}/${base}`;
+          if (c.script !== archived || !existsSync(resolve(ROOT, archived))) stale.push(`${feature}/${name} ${c.script}`);
+        }
+      }
+      if (stale.length > 0) console.log(`      still active: ${stale.length} (${stale.slice(0, 3).join('; ')})`);
+      return stale.length === 0;
+    },
+  ],
+  [
     'the registry gate passes on this checkout',
     () => {
       const r = spawnSync(process.execPath, [GATE], { encoding: 'utf8' });
@@ -1343,7 +1360,7 @@ const cases = [
     },
   ],
   [
-    'the registry gate refuses a ticket-named drive script registered from outside scripts/',
+    'the registry gate allows an archived ticket script only at docs/verify/<ticket>/<script>',
     () => {
       const outside = 'docs/verify/1500/drive-1500-new.mjs';
       const featureNamed = 'docs/verify/1500/drive-hotkeys-copy.mjs';
@@ -1352,19 +1369,31 @@ const cases = [
         feature: { ...STUB, script: featureNamed },
       });
       const r = runGate(registry, GATE_SCRIPTS, GATE_MAPS, [outside, featureNamed]);
-      const grandfathered = runGate(
+      const archived = runGate(
         gateRegistry({ moved: { ...STUB, script: 'docs/verify/902/drive-902-gate-actor.mjs' } }),
         GATE_SCRIPTS,
         GATE_MAPS,
         ['docs/verify/902/drive-902-gate-actor.mjs'],
       );
-      return (
-        r.code === 1 &&
-        r.out.includes(`t/ticket: ${outside} is named after a ticket`) &&
-        !r.out.includes('t/feature:') &&
-        grandfathered.code === 1 &&
-        grandfathered.out.includes('t/moved: docs/verify/902/drive-902-gate-actor.mjs is named after a ticket')
+      const wrongDir = runGate(
+        gateRegistry({ moved: { ...STUB, script: 'docs/verify/900/drive-902-gate-actor.mjs' } }),
+        GATE_SCRIPTS,
+        GATE_MAPS,
+        ['docs/verify/900/drive-902-gate-actor.mjs'],
       );
+      const backInScripts = runGate(
+        gateRegistry({ legacy: { ...STUB, script: `${GATE_DIR}drive-902-gate-actor.mjs` } }),
+        [...GATE_SCRIPTS, 'drive-902-gate-actor.mjs'],
+        GATE_MAPS,
+      );
+      const bad = [
+        [r.code === 1 && r.out.includes(`t/ticket: ${outside} is named after a ticket`) && !r.out.includes('t/feature:'), 'new ticket script'],
+        [archived.code === 0, `archived exit ${archived.code}: ${archived.out.trim().split('\n')[0]}`],
+        [wrongDir.code === 1 && wrongDir.out.includes('docs/verify/900/drive-902-gate-actor.mjs is named after a ticket'), 'wrong dir'],
+        [backInScripts.code === 1 && backInScripts.out.includes('scripts/drive-902-gate-actor.mjs: named after a ticket'), 'back in scripts'],
+      ].filter(([ok]) => !ok);
+      for (const [, why] of bad) console.log(`      ${why}`);
+      return bad.length === 0;
     },
   ],
   [

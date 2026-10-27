@@ -46,6 +46,9 @@ export interface ChiefSurface {
   onRewind?: (messageId: string) => void;
   onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancelQuestion?: (requestId: string) => void;
+  onWithdraw?: (messageId: string) => Promise<void>;
+  onSteer?: (messageId: string) => void;
+  onStop?: () => void;
 }
 
 const NEW_THREAD = -1;
@@ -65,7 +68,11 @@ function readStoredChiefOpen(): boolean {
   }
 }
 
-export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): ChiefSurface {
+export function useChiefSurface(
+  fixture: FixtureSet,
+  deepLink?: ChiefDeepLink,
+  onHome = false,
+): ChiefSurface {
   const { live, teamId } = useLiveData();
   const { t } = useI18n();
   const chiefQ = useChief(teamId, live);
@@ -92,11 +99,11 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
   }, []);
   const chiefViewOpen = chiefView === 'drawer';
   useEffect(() => {
-    if (!live) return;
+    if (!live || onHome) return;
     try {
       localStorage.setItem(CHIEF_OPEN_STORAGE_KEY, chiefView === 'drawer' ? '1' : '0');
     } catch {}
-  }, [live, chiefView]);
+  }, [live, onHome, chiefView]);
 
   const [activeThreadIdx, setActiveThreadIdx] = useState<number | null>(null);
   const liveThreads = chiefThreadsQ.data ?? [];
@@ -116,10 +123,18 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
     const idx = liveThreads.findIndex((thread) => thread.id === deepLinkId);
     if (idx >= 0) {
       setActiveThreadIdx(idx);
-      setChiefView('drawer');
+      if (!onHome) setChiefView('drawer');
     }
     onDeepLinkConsumed?.();
-  }, [live, deepLinkId, chiefThreadsQ.isSuccess, liveThreads, onDeepLinkConsumed, setChiefView]);
+  }, [
+    live,
+    deepLinkId,
+    chiefThreadsQ.isSuccess,
+    liveThreads,
+    onDeepLinkConsumed,
+    setChiefView,
+    onHome,
+  ]);
   const chiefMessagesQ = useMessages(live ? (activeThread?.id ?? null) : null, live);
   const streamHandlers = useMemo(
     () => ({
@@ -133,7 +148,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
   );
   useConversationStream(
     live ? (activeThread?.id ?? undefined) : undefined,
-    live && chiefViewOpen,
+    live && (chiefViewOpen || onHome),
     streamHandlers,
   );
   const activeThreadId = live ? (activeThread?.id ?? null) : null;
@@ -215,6 +230,37 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
       }
     : undefined;
 
+  const onWithdraw = live
+    ? (messageId: string) => {
+        if (activeThread === null) return Promise.resolve();
+        return mutations.chiefWithdraw
+          .mutateAsync({ threadId: activeThread.id, messageId })
+          .then(() => undefined)
+          .catch((error: unknown) => {
+            toastError(t('撤回失败，总管可能已经开始处理这条了。'), error);
+            throw error;
+          });
+      }
+    : undefined;
+  const onSteer = live
+    ? (messageId: string) => {
+        if (activeThread === null) return;
+        mutations.chiefSteer.mutate(
+          { threadId: activeThread.id, messageId },
+          { onError: (e) => toastError(t('插话失败，请重试。'), e) },
+        );
+      }
+    : undefined;
+  const onStop = live
+    ? () => {
+        if (activeThread === null) return;
+        mutations.chiefStop.mutate(
+          { threadId: activeThread.id },
+          { onError: (e) => toastError(t('停止失败，请重试。'), e) },
+        );
+      }
+    : undefined;
+
   const onSend = live
     ? (text: string) => {
         return mutations.chiefSend
@@ -243,5 +289,8 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
     onRewind,
     onAnswerQuestion,
     onCancelQuestion,
+    onWithdraw,
+    onSteer,
+    onStop,
   };
 }

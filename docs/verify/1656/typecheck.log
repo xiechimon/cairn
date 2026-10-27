@@ -1,0 +1,12 @@
+$ pnpm -r typecheck
+Scope: 6 of 7 workspace projects
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck: Done
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+apps/web typecheck: Done
+integration typecheck: Done

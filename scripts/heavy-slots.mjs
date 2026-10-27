@@ -1,6 +1,14 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { constants as osConstants, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -70,6 +78,43 @@ export function leaseEnv(lease, env = process.env) {
     CAIRN_HEAVY_SLOT: String(lease.slot),
     CAIRN_HEAVY_SLOT_OWNER: String(lease.owner),
   };
+}
+
+export function slotPortHolder(port) {
+  const lsof = spawnSync('lsof', ['-t', `-iTCP:${port}`, '-sTCP:LISTEN'], { encoding: 'utf8' });
+  let pid = null;
+  if (!lsof.error) {
+    const parsed = Number((lsof.stdout || '').trim().split('\n')[0]);
+    if (Number.isInteger(parsed) && parsed > 0) pid = parsed;
+  } else {
+    const ss = spawnSync('ss', ['-ltnpH', `sport = :${port}`], { encoding: 'utf8' });
+    const match = ss.error ? null : /pid=(\d+)/.exec(ss.stdout || '');
+    if (match) pid = Number(match[1]);
+  }
+  if (pid === null) return null;
+  const ps = spawnSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' });
+  const command = ps.error || (ps.stdout || '').trim() === '' ? undefined : ps.stdout.trim();
+  let cwd;
+  try {
+    cwd = readlinkSync(`/proc/${pid}/cwd`);
+  } catch {
+    const lsofCwd = spawnSync('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'], {
+      encoding: 'utf8',
+    });
+    const match = lsofCwd.error ? null : /^n(.+)$/m.exec((lsofCwd.stdout || '').trim());
+    cwd = match ? match[1] : undefined;
+  }
+  return { pid, command, cwd };
+}
+
+export function slotPortReport({ slot, env = process.env }) {
+  const { port } = slotResources(slot, env);
+  const holder = slotPortHolder(port);
+  if (holder === null) return null;
+  const details = [`pid ${holder.pid}`];
+  if (holder.cwd !== undefined) details.push(`cwd ${holder.cwd}`);
+  if (holder.command !== undefined) details.push(`command ${holder.command}`);
+  return `[heavy-slots] slot ${slot}'s port ${port} is held by ${details.join(', ')}; anything on a leased slot's port is an orphan — kill the pid or free the port, then rerun`;
 }
 
 function isAlive(pid) {

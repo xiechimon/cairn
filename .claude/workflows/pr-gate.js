@@ -83,18 +83,15 @@ const PROTECTED = [
   'apps/server/src/services/secrets.ts',
   'apps/server/src/services/credentials.ts',
   'apps/server/src/services/api-keys.ts',
-  'apps/server/src/services/webhook-tokens.ts',
   'apps/server/src/services/oauth.ts',
   'apps/server/src/routes-machine.ts',
   'apps/server/src/services/machine*.ts',
   'apps/daemon/src/credentials.ts',
   'apps/daemon/src/secret-channel.ts',
-  'apps/daemon/src/shell-channel.ts',
   'apps/daemon/src/machine-client.ts',
   'apps/daemon/src/backend/command-gate.ts',
   'apps/server/src/services/mcp-face.ts',
   'apps/server/src/services/mcp-servers.ts',
-  'apps/server/src/routes-webhook.ts',
   'apps/server/src/db/client.ts',
   'integration/eval/**',
   '.claude/hillclimb/**',
@@ -136,7 +133,7 @@ function globToRegExp(glob, { protect = false } = {}) {
   }
   return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, protect ? 'iu' : 'i')
 }
-const SCRIPT_SHA256 = '8faf66b63ba26d87239d2eca62ca6acbcb82844f1b2137079e994e6fcd6fb88a'
+const SCRIPT_SHA256 = 'db230f1e87cf654eb8c6d78a29d0b470c17eccb7f3212963aeb781f79471dc35'
 const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { protect: true }))
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))

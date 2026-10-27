@@ -253,8 +253,8 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       };
     };
 
-    const drafted = await measureComposer('/app?scenario=111');
-    const empty = await measureComposer('/app?scenario=114');
+    const drafted = await measureComposer('/app?view=board&scenario=111');
+    const empty = await measureComposer('/app?view=board&scenario=114');
 
     expect(drafted.height).toBe(120);
     expect(empty.height).toBe(60);
@@ -276,7 +276,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       return composer.getAttribute('placeholder');
     };
 
-    expect(await placeholderAt('113')).toBe('向 Agent 补充说明，执行过程中即可送达');
+    expect(await placeholderAt('113')).toBe('总管回完这条就看；想马上补充，发出后点「现在插话」');
     expect(await placeholderAt('111')).toBe('有什么可以帮你的？');
     expect(await placeholderAt('114')).toBe('有什么可以帮你的？');
   });

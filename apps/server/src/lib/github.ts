@@ -1,3 +1,8 @@
+import { setTimeout as sleep } from 'node:timers/promises';
+import {
+  acquireGithubCreateSlot,
+  parseGithubCreateRateLimit,
+} from '@cairn/shared/github-create-gate';
 // Node fetch ignores http_proxy/https_proxy unless the server starts with NODE_USE_ENV_PROXY=1 (Node >= 24.5).
 import { HttpError } from './errors.js';
 
@@ -280,10 +285,10 @@ export async function githubBranchPulls(
   token: string | null,
   owner: string,
   repo: string,
-  opts: { head: string; base: string },
+  opts: { head: string; base?: string; state?: 'open' | 'all' },
 ): Promise<GithubBranchPull[] | null> {
   const url = listUrl(owner, repo, 'pulls', {
-    state: 'all',
+    state: opts.state ?? 'all',
     head: opts.head,
     base: opts.base,
     per_page: 10,
@@ -1040,7 +1045,12 @@ async function writeJson(
   } catch (err) {
     throw mapFetchThrow(url, err);
   }
-  if (!res.ok) throw mapUpstreamStatus(url, res);
+  if (!res.ok) {
+    const delay =
+      method === 'POST' ? parseGithubCreateRateLimit(res, await res.text().catch(() => '')) : null;
+    if (delay !== null) throw new GithubRateLimitedError(url, res.status, Date.now() + delay, null);
+    throw mapUpstreamStatus(url, res);
+  }
   try {
     return await res.json();
   } catch {
@@ -1056,7 +1066,21 @@ export async function githubCreateIssue(
   input: { title: string; body: string; labels?: string[] },
 ): Promise<{ number: number }> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues`;
-  const data = (await writeJson(fetchImpl, 'POST', url, token, input)) as Record<string, unknown>;
+  let data: Record<string, unknown>;
+  for (let attempt = 0; ; attempt++) {
+    await acquireGithubCreateSlot();
+    try {
+      data = (await writeJson(fetchImpl, 'POST', url, token, input)) as Record<string, unknown>;
+      break;
+    } catch (error) {
+      if (!(error instanceof GithubRateLimitedError) || attempt >= 3) throw error;
+      const delay =
+        Math.max(1000, (error.retryAt(Date.now()) ?? Date.now() + 60000) - Date.now()) *
+        2 ** attempt;
+      console.warn(`GitHub create rate limited; retrying in ${delay}ms`);
+      await sleep(delay);
+    }
+  }
   if (typeof data.number !== 'number') {
     throw new HttpError(502, `github create issue response missing number: ${url}`);
   }

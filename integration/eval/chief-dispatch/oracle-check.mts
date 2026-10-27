@@ -57,6 +57,7 @@ function oracle(c: Case): TurnEvidence {
         title: 'x',
         spec: '> 原文\n\n要求：\n- a',
         buildAgentId: pick(key),
+        projectId: 'p1',
         planAgentId: null,
         phase: 'queued',
       },

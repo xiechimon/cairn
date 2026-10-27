@@ -86,6 +86,8 @@ function sortedRecord(entries: readonly (readonly [string, string])[]): Record<s
 export function deriveModelRoster(catalogs: readonly RosterCatalog[]): ModelRoster {
   const assigned = new Map<string, string | null>();
   const assign = (id: string, vendor: string) => {
+    const makerId = id.replace(/^zai-/u, '').replaceAll('.', '-');
+    if (makerId.startsWith('glm-')) vendor = 'Z.ai';
     const prev = assigned.get(id);
     if (prev === undefined) assigned.set(id, vendor);
     else if (prev !== vendor) assigned.set(id, null);
@@ -106,6 +108,10 @@ export function deriveModelRoster(catalogs: readonly RosterCatalog[]): ModelRost
     [...assigned.entries()].flatMap(([id, vendor]) => (vendor === null ? [] : [[id, vendor]])),
   );
   const aliases = new Map<string, string>();
+  for (const id of Object.keys(vendors)) {
+    const canonical = id.replace(/^(?:zai-)?glm-(\d+)-(\d+)(.*)$/u, 'glm-$1.$2$3');
+    if (canonical !== id && vendors[canonical] === vendors[id]) aliases.set(id, canonical);
+  }
   if (radius !== undefined) {
     const groups = new Map<string, string[]>();
     for (const model of radius.models) {

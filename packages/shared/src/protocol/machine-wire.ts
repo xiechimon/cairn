@@ -140,7 +140,6 @@ export const claimedStepSchema = z.object({
 });
 export type ClaimedStep = z.infer<typeof claimedStepSchema>;
 
-export const LOCAL_TOOL_REMOTE_SHELL = 'remote_shell';
 export const LOCAL_TOOL_CREATE_TAG = 'create_tag';
 
 export const machineClaimResponseSchema = z.object({
@@ -318,6 +317,7 @@ export const machineDoneBodySchema = z.object({
   sessionId: z.string().optional(),
   usage: z.array(modelUsageSchema).optional(),
   hasChanges: z.boolean().optional(),
+  pushHookOutput: z.string().optional(),
   workBranchDrift: z.object({ expected: z.string().min(1), actual: z.string().min(1) }).optional(),
   commit: z.string().optional(),
   preservedCommits: z.array(z.string().regex(/^[0-9a-f]{40,64}$/)).optional(),
@@ -338,31 +338,6 @@ export type MachineDoneBody = z.infer<typeof machineDoneBodySchema>;
 export const machineDoneResponseSchema = machineOkResponseSchema;
 
 export const CHANGES_DIFF_MAX_BYTES = 512 * 1024;
-
-export const SHELL_COMMAND_CHAR_LIMIT = 10_000;
-
-export const SHELL_OUTPUT_CHAR_LIMIT = 100_000;
-
-export const machineShellPrecheckBodySchema = z.object({
-  command: z.string().min(1).max(SHELL_COMMAND_CHAR_LIMIT),
-});
-export type MachineShellPrecheckBody = z.infer<typeof machineShellPrecheckBodySchema>;
-
-export const machineShellPrecheckResponseSchema = z.object({
-  allowed: z.literal(true),
-  runId: recordId,
-});
-export type MachineShellPrecheckResponse = z.infer<typeof machineShellPrecheckResponseSchema>;
-
-export const machineShellResultBodySchema = z.object({
-  status: z.enum(['done', 'failed']),
-  exitCode: z.number().int().optional(),
-  output: z.string().max(SHELL_OUTPUT_CHAR_LIMIT).optional(),
-  errorMessage: z.string().max(2_000).optional(),
-});
-export type MachineShellResultBody = z.infer<typeof machineShellResultBodySchema>;
-
-export const machineShellResultResponseSchema = machineOkResponseSchema;
 
 export const machineSkillsManifestResponseSchema = z.object({
   selection: z.enum(['all', 'whitelist']),
@@ -402,6 +377,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'GET',
     path: '/api/machine/steer',
     reason: '[设计] W3 steer 拉取-确认（06 册 D9；claimed 步单槽 pending，?stepId=）',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/steer/ack',
+    reason:
+      '[design] #1938 steer delivery ack: the chief keeps a steered message queued until the daemon reports it reached the live session (?stepId=)',
   },
   {
     method: 'GET',
@@ -447,18 +428,6 @@ export const MACHINE_WIRE_EXTENSIONS = [
     path: '/api/machine/sync-result/{syncId}',
     reason:
       '[设计] M7 #319 分支对话框「同步到机器」daemon 回写结果（08 册附录 B；状态机 pending→running→synced/failed）',
-  },
-  {
-    method: 'POST',
-    path: '/api/machine/shell/{stepId}',
-    reason:
-      '[设计] XMON-108 R1 机器 shell 每调用预检（双开关复核 + 审计行先于放行 + runId 下发；拒绝 = 403）',
-  },
-  {
-    method: 'POST',
-    path: '/api/machine/shell/{runId}/result',
-    reason:
-      '[设计] XMON-108 R1 daemon 回写 shell 执行结果（exitCode/截断输出；终态 done/failed 只写一次）',
   },
 ] as const;
 
