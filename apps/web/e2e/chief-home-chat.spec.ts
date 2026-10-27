@@ -284,10 +284,10 @@ test.describe('home is one continuous chief chat (T1)', () => {
     const panel = page.getByRole('complementary', { name: '任务面板' });
     await expect(panel).toBeVisible();
     await expect(panel).toBeInViewport({ ratio: 1 });
+    await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe('todo-1');
     const url = new URL(page.url());
     expect(url.pathname).toBe('/app');
     expect(url.searchParams.get('view')).toBe('board');
-    expect(url.searchParams.get('task')).toBe('todo-1');
     await expect(drawer).toBeHidden();
   });
 
