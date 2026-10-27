@@ -440,6 +440,7 @@ export interface ChiefSegment {
 export type ChiefStreamItem =
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string }
+  | { kind: 'handoff'; todoId: string; id?: string }
   | {
       kind: 'question';
       id?: string;

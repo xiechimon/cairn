@@ -89,7 +89,7 @@ async function openDrawer(page: Page) {
   const membersLoaded = page.waitForResponse(
     (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
   );
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await membersLoaded;
 
   await page.getByRole('button', { name: '总管', exact: true }).click();
