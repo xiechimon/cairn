@@ -1,6 +1,6 @@
 import { conversationBranch, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   message as messageTable,
@@ -18,6 +18,17 @@ import {
 } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, type TestServer } from './helpers.js';
+
+vi.mock('../src/services/machine-gate-port.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  evaluateProductGate: vi.fn(async () => ({
+    ready: true,
+    headSha: 'f'.repeat(40),
+    patchDigest: 'legacy-reconcile-audited-patch',
+    policy: 'human',
+    blockers: [],
+  })),
+}));
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
