@@ -25,7 +25,7 @@ import { ChiefSpiralFace } from './chief-spiral-face.js';
 import { AVATAR_IMG_CLS, AVATAR_SLOT_CLS } from './recipes.js';
 
 const MSG_TOOL_BTN_CLS =
-  "size-5 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const TURN_TOOLS_CLS =
   'mt-1.5 flex flex-col gap-1 rounded-(--radius-popover) bg-(--secondary) px-2 py-1.5';
