@@ -15,7 +15,8 @@ judgment, not a gate judgment.
 Link checks (#750): image links in the PR body must be embedded
 (`![label](url)`) and must answer HTTP 200 (catches bad SHAs).
 
-A URL is an image link under two parallel rules (#940):
+Explicit Markdown and HTML image embeds are scanned even without extensions.
+Other URLs are image links under two parallel rules (#940):
 
 1. Extension: any https URL ending in png|gif|jpe?g|webp|svg, on any
    host.
@@ -49,7 +50,7 @@ the footer at the lane that opens the PR is out of bounds (#1335),
 so the gate has to recognize the form. Bare URLs that are not wrapped
 in any of the three forms still fail.
 
-raw.githubusercontent.com is judged by rule 1 alone: it serves every
+Outside explicit image embeds, raw.githubusercontent.com is judged by rule 1 alone: it serves every
 committed file type, so an extensionless raw path (LICENSE, a directory
 permalink) is a reference, and non-image evidence files (.json, .md,
 .txt) cannot be embedded as images -- they are read as references, not
@@ -61,13 +62,6 @@ Fenced code blocks do not exempt image links: agents list evidence in
 code fences, and an image link in a fence renders nowhere (#940 keeps
 this a non-goal).
 
-The link criteria are shared with the coordinator's reference
-implementation `scratch/pr-evidence-check.py` (outside this repo): same
-MD_LINK, IMG_EXT, IMG_URL, MEDIA_HOST_URL, TAIL_EXT,
-is_media_host_image, same curl probe, same verdicts. Change one, change
-the other. The section check lives only in this gate -- the reference
-scanner sweeps PRs that predate the template.
-
 Usage:
   PR_BODY='<pr body>' python3 scripts/pr-evidence-gate.py   # CI entry point
   python3 scripts/pr-evidence-gate.py path/to/body.md        # local testing
@@ -76,101 +70,29 @@ Exit 0 when the body passes, 1 otherwise. Findings name the section or
 the URL (with its line for bare URLs).
 """
 import os
+from html import unescape
+from urllib.parse import parse_qs, urlsplit
 import re
 import subprocess
 import sys
 import concurrent.futures as cf
 
-# Shared with scratch/pr-evidence-check.py -- keep byte-identical.
 MD_LINK = re.compile(r'(?P<bang>!?)\[(?P<label>[^\]]*)\]\((?P<url>[^)\s]+)\)')
-IMG_EXT = r'(?:png|gif|jpe?g|webp|svg)'
-IMG_URL = re.compile(r'https://[^\s)\]>"`]+\.' + IMG_EXT)
-MEDIA_HOST_URL = re.compile(
-    r'https://(?:user-images\.githubusercontent\.com'
-    r'|github\.com/user-attachments)/[^\s)\]>"`]*')
+IMG_EXT = re.compile(r'\.(?:png|gif|jpe?g|webp|svg)$', re.IGNORECASE)
+URL = re.compile(r"https://[^\s)\]>\"'`<]+")
 TAIL_EXT = re.compile(r'\.[A-Za-z0-9]+$')
-
-
-def is_media_host_image(url):
-    """True when a media-host URL is extensionless: an uploaded asset.
-
-    A media-host URL that does carry an extension is judged by rule 1
-    instead (an image extension) or ignored (anything else), so the two
-    rules never double-count one URL.
-    """
-    path = url.split('?', 1)[0].split('#', 1)[0]
-    last = path.rsplit('/', 1)[-1]
-    return bool(last) and not TAIL_EXT.search(last)
-
-
-# HTML embedding (#1335): `<img src="...">` and `<source srcset="...">`
-# render the URL as an image, the same as markdown `![label](url)`. The
-# Cursor badge footer the agent injects after `<!-- CURSOR_AGENT_PR_BODY_END -->`
-# is a `<picture>` with two `<source>` variants and an `<img>` fallback per
-# link. The opening `<picture>` and the closing `</picture>` are not
-# matched here -- only the attribute values that actually carry the URL.
-# Quotes must balance (single or double) so an attribute containing a stray
-# quote cannot leak into the next attribute.
 HTML_EMBED = re.compile(
-    r'<(?P<tag>img|source)\b[^>]*?\s(?P<attr>src|srcset)'
-    r'=(?P<quote>["\'])(?P<value>[^"\']*?)(?P=quote)',
+    r"<(?:img\b[^>]*?\ssrc|source\b[^>]*?\ssrcset)"
+    r"\s*=\s*(?P<quote>[\"'])(?P<value>.*?)(?P=quote)",
     re.IGNORECASE | re.DOTALL)
 
 
-def html_embed_spans(body):
-    """Byte spans of URLs embedded via `<img src>` or `<source srcset>`.
-
-    Returns a set of (start, end) offsets into `body`, one per URL
-    fragment inside an attribute value. `srcset` may carry
-    comma-separated URLs (whitespace around each comma is allowed;
-    a width/height descriptor like `2x` or `100w` after each URL is
-    stripped); each URL is its own span, registered at the offset
-    IMG_URL would find it so the lookup in `find_links` matches.
-    """
-    spans = set()
-    for m in HTML_EMBED.finditer(body):
-        value = m.group('value')
-        base = m.start('value')
-        pos = 0
-        for part in value.split(','):
-            # Skip leading whitespace inside the original fragment so
-            # the second URL's span lands where IMG_URL actually
-            # finds it (`srcset="a.svg, b.svg"` -- the cursor after
-            # the comma and the space is +2, not +1).
-            ws_lead = 0
-            while ws_lead < len(part) and part[ws_lead].isspace():
-                ws_lead += 1
-            url_part = part[ws_lead:]
-            # First whitespace-separated token is the URL; any
-            # trailing descriptor like `2x` or `100w` is not part of
-            # it. The token is also absent when the fragment is just
-            # whitespace (an empty srcset cell), in which case no
-            # span is registered.
-            url = url_part.split()[0] if url_part else ''
-            url_start = base + pos + ws_lead
-            url_end = url_start + len(url)
-            if url:
-                spans.add((url_start, url_end))
-            pos += len(part) + 1  # +1 for the comma separator
-    return spans
-
-
-def in_html_embed(ms, me, html_embed):
-    """True when the URL span [ms, me) is contained in any embed span.
-
-    IMG_URL terminates its match at the file extension, so a
-    `<source srcset="...svg?v=1#x">` and a bare equivalent stop at
-    different offsets. Equality misses the embedded case and the
-    gate red-flags a URL GitHub does render; containment keeps the
-    form recognised (#1335). Containment is one-directional: the
-    embedded span is always at least as wide as the IMAGE span
-    (image extension is a suffix of the embed value), so a simple
-    `[hs, he)` superset test is enough.
-    """
-    for hs, he in html_embed:
-        if hs <= ms and me <= he:
-            return True
-    return False
+def is_media_host_image(url):
+    parsed = urlsplit(url)
+    media_host = parsed.hostname == 'user-images.githubusercontent.com' or (
+        parsed.hostname == 'github.com' and parsed.path.startswith('/user-attachments/'))
+    last = parsed.path.rsplit('/', 1)[-1]
+    return media_host and bool(last) and not TAIL_EXT.search(last)
 
 
 REQUIRED_SECTIONS = ('Upstream', 'Verified')
@@ -263,48 +185,43 @@ def find_links(body):
     """
     clean = without_html_comments(body)
 
-    targets = {}
-    for m in MD_LINK.finditer(clean):
-        start, end = m.span('url')
-        targets[(start, end)] = m
-
-    def markdown_target(start, end):
-        for (s, e), m in targets.items():
-            if s <= start and end <= e:
-                return m
-        return None
-
-    html_embed = html_embed_spans(clean)
-
-    matches = list(IMG_URL.finditer(clean))
-    matches += [m for m in MEDIA_HOST_URL.finditer(clean)
-                if is_media_host_image(m.group(0))]
-    matches.sort(key=lambda m: m.start())
-
     links = []
-    seen = set()
-    for m in matches:
-        ms, me = m.start(), m.end()
-        if in_html_embed(ms, me, html_embed):
+    occupied = []
+    for m in HTML_EMBED.finditer(clean):
+        value = m.group('value')
+        parts = value.split(',') if m.group(0).lower().startswith('<source') else [value]
+        for part in parts:
+            tokens = part.split()
+            if not tokens or not tokens[0].startswith('https://'):
+                continue
             links.append({'form': 'html', 'embedded': True, 'label': None,
-                          'url': m.group(0),
-                          'line': clean.count('\n', 0, ms) + 1})
+                          'url': unescape(tokens[0]),
+                          'line': clean.count('\n', 0, m.start()) + 1})
+        occupied.append(m.span())
+
+    for m in MD_LINK.finditer(clean):
+        if any(start <= m.start() < end for start, end in occupied):
             continue
-        md = markdown_target(ms, me)
-        if md is None:
-            links.append({'form': 'bare', 'embedded': False, 'label': None,
-                          'url': m.group(0),
-                          'line': clean.count('\n', 0, ms) + 1})
+        url = unescape(m.group('url'))
+        embedded = m.group('bang') == '!'
+        if url.startswith('https://') and (
+                embedded or IMG_EXT.search(urlsplit(url).path) or is_media_host_image(url)):
+            links.append({'form': 'image' if embedded else 'link',
+                          'embedded': embedded, 'label': m.group('label'), 'url': url,
+                          'line': clean.count('\n', 0, m.start()) + 1})
+        occupied.append(m.span())
+
+    for m in URL.finditer(clean):
+        if any(start <= m.start() < end for start, end in occupied):
             continue
-        span = md.span('url')
-        if span in seen:
-            continue
-        seen.add(span)
-        links.append({'form': 'image' if md.group('bang') == '!' else 'link',
-                      'embedded': md.group('bang') == '!',
-                      'label': md.group('label'),
-                      'url': clean[span[0]:span[1]],
-                      'line': clean.count('\n', 0, md.start()) + 1})
+        url = unescape(m.group(0)).rstrip(',;.!:')
+        parsed = urlsplit(url)
+        path = re.sub(r'(\.(?:png|gif|jpe?g|webp|svg))[,;!:].*$',
+                      r'\1', parsed.path, flags=re.IGNORECASE)
+        url = parsed._replace(path=path).geturl()
+        if IMG_EXT.search(urlsplit(url).path) or is_media_host_image(url):
+            links.append({'form': 'bare', 'embedded': False, 'label': None, 'url': url,
+                          'line': clean.count('\n', 0, m.start()) + 1})
     return links
 
 
@@ -351,6 +268,9 @@ def main():
 
     print(f"pr-evidence: scanned {len(links)} image link(s)")
     for link in links:
+        if 'scenario' in parse_qs(urlsplit(link['url']).query, keep_blank_values=True):
+            failures.append(link)
+            print(f"FAIL fixture: {describe(link)}")
         if not link['embedded']:
             failures.append(link)
             print(f"FAIL not-embedded: {describe(link)}")

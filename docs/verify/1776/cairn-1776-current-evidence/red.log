@@ -1,0 +1,50 @@
+[heavy-slots] acquired slot 1/1
+$ playwright test chief-panel.spec.ts -g '24px targets'
+[WebServer] (node:55806) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:55808) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/xmon/.codex/worktrees/pr-1776-buttons/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:55838) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:55841) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:55853) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/chief-panel.spec.ts:56:3 › chief panel floating form (ADR 0013) › chief header and composer tools retain 24px targets after conversation extraction (834ms)
+
+
+  1) e2e/chief-panel.spec.ts:56:3 › chief panel floating form (ADR 0013) › chief header and composer tools retain 24px targets after conversation extraction 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 24
+    Received: 20
+
+      62 |       const box = await control.boundingBox();
+      63 |       expect(box).not.toBeNull();
+    > 64 |       expect(box?.width).toBe(24);
+         |                          ^
+      65 |       expect(box?.height).toBe(24);
+      66 |     }
+      67 |     await page.screenshot({ path: testInfo.outputPath('chief-button-tiers.png') });
+        at /Users/xmon/.codex/worktrees/pr-1776-buttons/cairn/apps/web/e2e/chief-panel.spec.ts:64:26
+
+    Error Context: test-results/chief-panel-chief-panel-fl-a3c98-ter-conversation-extraction/error-context.md
+
+  1 failed
+    e2e/chief-panel.spec.ts:56:3 › chief panel floating form (ADR 0013) › chief header and composer tools retain 24px targets after conversation extraction 
+[ELIFECYCLE] Command failed with exit code 1.
+Error: ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL
+
+  × "pnpm recursive run" failed in /Users/xmon/.codex/worktrees/pr-1776-
+  │ buttons/cairn/apps/web
+

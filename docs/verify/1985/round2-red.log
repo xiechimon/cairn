@@ -1,0 +1,39 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1985
+
+ ❯ |@cairn/integration| test/routing-boundary.test.ts (46 tests | 7 failed | 39 skipped) 1817ms
+   ❯ real process read boundary (26)
+     × records forbidden proc and sys reads despite a passing oracle (0) 261ms
+     × records forbidden proc and sys reads despite a passing oracle (1) 252ms
+     × records forbidden proc and sys reads despite a passing oracle (2) 260ms
+     × records forbidden proc and sys reads despite a passing oracle (3) 261ms
+     × records forbidden proc and sys reads despite a passing oracle (4) 255ms
+     × records forbidden proc and sys reads despite a passing oracle (5) 259ms
+     × records forbidden proc and sys reads despite a passing oracle (6) 267ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > records forbidden proc and sys reads despite a passing oracle (0)
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > records forbidden proc and sys reads despite a passing oracle (1)
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > records forbidden proc and sys reads despite a passing oracle (2)
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > records forbidden proc and sys reads despite a passing oracle (3)
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > records forbidden proc and sys reads despite a passing oracle (4)
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > records forbidden proc and sys reads despite a passing oracle (5)
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > records forbidden proc and sys reads despite a passing oracle (6)
+AssertionError: expected 0 to be greater than 0
+ ❯ test/routing-boundary.test.ts:208:38
+    206|     expect(result.exitCode).toBe(0);
+    207|     expect(result.stdout).not.toContain(secret);
+    208|     expect(result.violations.length).toBeGreaterThan(0);
+       |                                      ^
+    209|     const grade = graded([oracle, result], []);
+    210|     expect(grade.oraclePass).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 39 skipped (46)
+   Start at  11:37:00
+   Duration  1.94s (tests 98%, transform 2%, import 1%)
+

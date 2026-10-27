@@ -137,7 +137,14 @@ async function runCase(
   const { stack, world, projectIds } = await freshStack(input);
   try {
     const timeoutMs = ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000;
-    const ev = await driveTurn(stack, input.prompt, { timeoutMs });
+    const chip =
+      isRoutingCase(input) && input.chip !== undefined ? projectIds[input.chip] : undefined;
+    if (isRoutingCase(input) && input.chip !== undefined && chip === undefined)
+      throw new Error(`case ${input.id}: chip project ${input.chip} is not seeded`);
+    const ev = await driveTurn(stack, input.prompt, {
+      timeoutMs,
+      ...(chip !== undefined ? { projectId: chip } : {}),
+    });
     const dead = (ev.usage.input === 0 && ev.usage.output === 0) || ev.stepStatus !== 'done';
     if (dead) {
       const e = new Error(

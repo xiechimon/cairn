@@ -1,110 +1,58 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const COLLAPSED = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout';
-const EXPANDED = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28';
-
-const toggle = (page: Page) => page.getByRole('button', { name: /工具过程/ });
-const toolsRow = (page: Page) =>
-  page.getByTestId('msg-actions').filter({ has: page.locator('button[aria-expanded]') });
+const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout';
+const summary = (page: Page) => page.getByTestId('work-summary');
+const block = (page: Page) => page.getByTestId('work-block');
 
 async function readClipboard(page: Page): Promise<string> {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   return page.evaluate(() => navigator.clipboard.readText());
 }
 
-test('I1: the collapsed group names itself — terminal glyph + `工具过程` label', async ({
-  page,
-}) => {
-  await page.goto(COLLAPSED);
-  const expander = toggle(page);
-  await expect(expander).toBeVisible();
-  // the identity glyph rides inside the expander, ahead of the elapsed tail
-  await expect(expander.locator('svg').first()).toBeVisible();
-  const label = expander.getByText('工具过程');
-  await expect(label).toHaveText('工具过程');
-  await expect(label).toBeVisible();
-  // the label reads before the elapsed tail, so the row opens with identity
-  const order = await expander.evaluate((el) => {
-    const spans = [...el.querySelectorAll('span')];
-    const label = spans.find((s) => s.textContent?.includes('工具过程'));
-    const elapsed = spans.find((s) => /完成/.test(s.textContent ?? ''));
-    if (label == null || elapsed == null) return null;
-    return label.getBoundingClientRect().left < elapsed.getBoundingClientRect().left;
-  });
-  expect(order).toBe(true);
+test('I1: the summary names the work performed and its duration', async ({ page }) => {
+  await page.goto(ROUTE);
+  await expect(summary(page)).toContainText('跑了 2 条命令');
+  await expect(summary(page)).toContainText('19s');
+  await expect(summary(page).locator('svg').first()).toBeVisible();
 });
 
-test('I2: collapsed offers no copy — the affordance lives in the expanded state', async ({
-  page,
-}) => {
-  await page.goto(COLLAPSED);
-  // collapsed: nothing to copy that the screen shows, so no copy button
-  await expect(toolsRow(page).getByRole('button', { name: '复制' })).toHaveCount(0);
-  // expanding brings the copy back beside the group header
-  await toggle(page).click();
-  await expect(page.getByTestId('tool-pill')).toHaveCount(2);
-  await expect(toolsRow(page).getByRole('button', { name: '复制' })).toHaveCount(1);
-  // collapsing removes it again — the rule rides the state, not the mount
-  await page.getByRole('button', { name: '收起', exact: true }).click();
-  await expect(toolsRow(page).getByRole('button', { name: '复制' })).toHaveCount(0);
+test('I2: copy is available only while the work block is expanded', async ({ page }) => {
+  await page.goto(ROUTE);
+  await expect(summary(page)).toHaveAttribute('aria-expanded', 'true');
+  await expect(block(page).getByRole('button', { name: '复制', exact: true })).toHaveCount(1);
+  await summary(page).click();
+  await expect(page.getByTestId('work-call')).toHaveCount(0);
+  await expect(block(page).getByRole('button', { name: '复制', exact: true })).toHaveCount(0);
+  await summary(page).click();
+  await expect(page.getByTestId('work-call')).toHaveCount(2);
 });
 
-test('I3: expanded copy still puts pills and outputs on the clipboard', async ({ page }) => {
-  await page.goto(COLLAPSED);
+test('I3: copying work includes commands and outputs', async ({ page }) => {
+  await page.goto(ROUTE);
   await readClipboard(page);
-  await toggle(page).click();
-  await toolsRow(page).getByRole('button', { name: '复制' }).click();
+  await block(page).getByRole('button', { name: '复制', exact: true }).click();
   const clip = await readClipboard(page);
-  expect(clip).toContain('bash ls -la');
+  expect(clip).toContain('ls -la');
   expect(clip).toContain('total 16');
   expect(clip).toContain('hello from cairn');
 });
 
-test('I4: expand/collapse interaction and the #470 row geometry are untouched', async ({
-  page,
-}) => {
-  await page.goto(EXPANDED);
-  const expander = toggle(page);
-  await expect(expander).toHaveAttribute('aria-expanded', 'true');
-  // the identity label rides both states — the header is the group's name
-  await expect(expander.getByText('工具过程')).toHaveText('工具过程');
-  await expander.click();
-  await expect(page.getByTestId('tool-pill')).toHaveCount(0);
-  await expect(expander).toHaveAttribute('aria-expanded', 'false');
-  await expander.click();
-  await expect(page.getByTestId('tool-pill')).toHaveCount(2);
-  // #470 fence: the row keeps its 32px inset under the agent text column and
-  // the 16px pitch — the identity glyph must not grow the row
-  const geo = await page.evaluate(() => {
-    const el = document.querySelector(
-      '[data-testid="msg-actions"]:has(button[aria-expanded])',
-    )!;
-    const cs = getComputedStyle(el);
-    return { padLeft: cs.paddingLeft, height: Math.round(el.getBoundingClientRect().height) };
+test('I4: call rows keep the agent column inset and compact height', async ({ page }) => {
+  await page.goto(ROUTE);
+  const geometry = await block(page).evaluate((el) => {
+    const row = el.querySelector('[data-testid="work-call"]')!;
+    return { inset: getComputedStyle(el).paddingLeft, height: row.getBoundingClientRect().height };
   });
-  expect(geo.padLeft).toBe('32px');
-  expect(geo.height).toBeLessThanOrEqual(16);
+  expect(geometry.inset).toBe('32px');
+  expect(geometry.height).toBeGreaterThanOrEqual(26);
+  expect(geometry.height).toBeLessThanOrEqual(28);
 });
 
-test('I5: the identity row draws no rule — the transcript boundary stays air', async ({
-  page,
-}) => {
-  await page.goto(COLLAPSED);
-  // scoped to the action-row family: the md sample's code fence carries its
-  // own box border by design (#469), the turn boundary must not
-  const ruled = await page.evaluate(() =>
-    [
-      ...document.querySelectorAll(
-        '[data-testid="msg-actions"], [data-testid="msg-actions"] *',
-      ),
-    ]
-      .filter((el) => {
-        const cs = getComputedStyle(el);
-        const top = Number.parseFloat(cs.borderTopWidth) || 0;
-        const bot = Number.parseFloat(cs.borderBottomWidth) || 0;
-        return (top > 0 || bot > 0) && el.getBoundingClientRect().height > 0;
-      })
-      .map((el) => el.className),
-  );
-  expect(ruled).toEqual([]);
+test('I5: work summaries keep the transcript boundary free of horizontal rules', async ({ page }) => {
+  await page.goto(ROUTE);
+  const borders = await summary(page).evaluate((el) => {
+    const style = getComputedStyle(el);
+    return [style.borderTopWidth, style.borderBottomWidth];
+  });
+  expect(borders).toEqual(['0px', '0px']);
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
@@ -9,17 +9,10 @@ import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import {
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Copy,
-  ExternalLink,
-  FileTab,
-  Terminal,
-} from '../icons/index.js';
+import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
 import { ChatMarkdown, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
+import { InjectedSkills, WorkTrace } from './work-trace.js';
 
 export interface LiveStep {
   step: string;
@@ -74,45 +67,21 @@ function ActionRow({
   bare,
   copy,
   t,
-  toggle,
-  label,
   align = 'start',
 }: {
   seconds?: number;
   bare?: boolean;
   copy?: string;
   t: TFunc;
-  toggle?: { expanded: boolean; onToggle: () => void };
-  label?: string;
   align?: 'start' | 'end';
 }) {
   const tail = (
     <>
-      {label != null && (
-        <span className="inline-flex items-center gap-2 text-meta whitespace-nowrap text-(--text-secondary)">
-          <Terminal width={12} height={12} />
-          {label}
-        </span>
-      )}
       {(seconds != null || bare === true) && (
         <span className="border-l border-(--input) pl-2 text-meta whitespace-nowrap text-(--text-tertiary)">
           {seconds != null ? formatElapsed(seconds, t) : t('完成')}
         </span>
       )}
-      {toggle != null &&
-        (toggle.expanded ? (
-          <ChevronDown
-            width={10}
-            height={10}
-            className="chat-foot-chevron text-(--text-tertiary)"
-          />
-        ) : (
-          <ChevronRight
-            width={10}
-            height={10}
-            className="chat-foot-chevron text-(--text-tertiary)"
-          />
-        ))}
     </>
   );
   return (
@@ -132,18 +101,7 @@ function ActionRow({
           <Copy width={13} height={13} />
         </Button>
       )}
-      {toggle == null ? (
-        tail
-      ) : (
-        <Button
-          variant="ghost"
-          className="chat-row-icons--toggle h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-[length:inherit] leading-[inherit] font-normal hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit aria-expanded:bg-transparent aria-expanded:text-inherit active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-          aria-expanded={toggle.expanded}
-          onClick={toggle.onToggle}
-        >
-          {tail}
-        </Button>
-      )}
+      {tail}
     </div>
   );
 }
@@ -206,6 +164,8 @@ function Row({
   onOpenPlan,
   agent,
   liveStep,
+  defaultExpanded,
+  entering,
 }: {
   item: TranscriptItem;
   prev: TranscriptItem | undefined;
@@ -213,6 +173,8 @@ function Row({
   onOpenPlan?: () => void;
   agent: { displayName: string; avatarUrl: string | null } | null;
   liveStep: LiveStep | null;
+  defaultExpanded: boolean;
+  entering: Set<string>;
 }) {
   const margin = rowMargin(item, prev);
   switch (item.kind) {
@@ -260,26 +222,7 @@ function Row({
         </div>
       );
     case 'injected-skills':
-      return (
-        <div
-          className="chat-note mx-auto mt-3.5 flex max-w-[68ch] flex-wrap items-baseline justify-center gap-x-1.5 text-center text-meta text-(--text-tertiary)"
-          data-testid="injected-skills"
-        >
-          {item.skills.length > 0 ? (
-            <>
-              <span>{t('注入技能：')}</span>
-              {item.skills.map((s) => (
-                <span key={s.id} className="[overflow-wrap:anywhere]">
-                  {s.id}
-                  <span className="text-(--text-tertiary)">（{s.reason}）</span>
-                </span>
-              ))}
-            </>
-          ) : (
-            <span>{t('未注入技能（任务文本未命中任何技能）')}</span>
-          )}
-        </div>
-      );
+      return <InjectedSkills skills={item.skills} t={t} />;
     case 'chief':
       return (
         <div className={`${ROW_BASE} chat-row--chief ${margin}`}>
@@ -449,8 +392,8 @@ function Row({
           />
         </>
       );
-    case 'tools':
-      return <ToolsRow item={item} t={t} />;
+    case 'work':
+      return <WorkTrace item={item} defaultExpanded={defaultExpanded} entering={entering} t={t} />;
     case 'skills':
       return (
         <div
@@ -666,66 +609,6 @@ function verifyCopyText(item: Extract<TranscriptItem, { kind: 'verify' }>): stri
   ].join('\n');
 }
 
-function toolsCopyText(item: Extract<TranscriptItem, { kind: 'tools' }>): string {
-  return item.pills
-    .map((pill, i) => {
-      const output = item.outputs?.[i];
-      return output != null && output !== '' ? `${pill}\n${output}` : pill;
-    })
-    .join('\n');
-}
-
-function ToolsRow({ item, t }: { item: Extract<TranscriptItem, { kind: 'tools' }>; t: TFunc }) {
-  const [expanded, setExpanded] = useState(item.expanded);
-  return (
-    <>
-      <ActionRow
-        seconds={item.seconds}
-        copy={expanded ? toolsCopyText(item) : undefined}
-        label={t('工具过程')}
-        t={t}
-        toggle={{ expanded, onToggle: () => setExpanded((v) => !v) }}
-      />
-      {expanded && (
-        <>
-          <div className="mt-3 flex flex-col gap-2 pl-8 pr-1">
-            {item.pills.map((pill, i) => {
-              const output = item.outputs?.[i];
-              return (
-                <div key={`${i}-${pill}`} className="flex min-w-0 flex-col gap-1">
-                  <div
-                    className="chat-tool-pill flex h-5 items-center gap-2 overflow-hidden rounded-(--cds-radius-sm) border border-(--border) bg-(--secondary) pl-2.5 font-mono text-caption whitespace-nowrap text-(--text-secondary) [&_svg]:flex-none"
-                    data-testid="tool-pill"
-                  >
-                    <Terminal width={12} height={12} />
-                    <span className="truncate">{pill}</span>
-                  </div>
-                  {output != null && output !== '' && (
-                    <pre
-                      className="m-0 max-h-60 overflow-auto rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-caption break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
-                      data-testid="tool-output"
-                    >
-                      {output}
-                    </pre>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <Button
-            variant="ghost"
-            className="chat-collapse mt-3.5 ml-8 flex h-auto cursor-pointer items-center gap-0.5 justify-start rounded-none border-none bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-            onClick={() => setExpanded(false)}
-          >
-            {t('收起')}
-            <ChevronDown width={10} height={10} className="rotate-180" />
-          </Button>
-        </>
-      )}
-    </>
-  );
-}
-
 export function Transcript({
   transcript,
   agent = null,
@@ -733,6 +616,28 @@ export function Transcript({
   liveStep = null,
 }: TranscriptProps) {
   const { t } = useI18n();
+  const previous = useRef<{ live: boolean; ids: Set<string> }>({ live: false, ids: new Set() });
+  const live = transcript.some((item) => item.kind === 'streaming');
+  const workItems = transcript.filter((item) => item.kind === 'work');
+  const entering = new Set<string>();
+  const ids = new Set<string>();
+  for (const item of workItems) {
+    for (const step of item.steps) {
+      ids.add(step.id);
+      if (
+        live &&
+        previous.current.live &&
+        previous.current.ids.size > 0 &&
+        !previous.current.ids.has(step.id)
+      )
+        entering.add(step.id);
+    }
+  }
+  useEffect(() => {
+    previous.current = { live, ids };
+  });
+  const lastWork = workItems.at(-1);
+
   return (
     <>
       {transcript.map((item, i) => {
@@ -746,6 +651,8 @@ export function Transcript({
               onOpenPlan={onOpenPlan}
               agent={agent}
               liveStep={liveStep}
+              defaultExpanded={item === lastWork}
+              entering={entering}
             />
           </MessageScrollerItem>
         );

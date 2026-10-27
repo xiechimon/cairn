@@ -126,7 +126,10 @@ not carry the closing keyword for the parent ticket.
   `node scripts/english-only-gate.mjs --text <body>` and reds otherwise;
   run it locally on `/tmp/pr.md` before opening.
 - Asking the user anything about an open PR: first `gh pr merge <n> --disable-auto`, then `gh pr edit <n> --add-label needs-decision`, then ask. The gate is red while the label is on and disarms auto-merge on every run until a person removes the label (an agent may remove it only after the user decided in chat, with the `CAIRN_DECIDED=1` prefix). Editing the body green does not clear the label.
-- Arm auto-merge (`gh pr merge <n> --squash --auto`) only on a PR whose Acceptance is fully checked and that carries no `needs-decision` label; an unchecked item adds the label and disarms auto-merge on its own.
+- Before enabling any merge, require fully checked Acceptance and no `needs-decision` label; an unchecked item adds the label and disarms auto-merge on its own.
+- Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
+- Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.
+- Human-opened PRs use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author. After a merge, read the main commit author and the `commit-author` Actions result.
 
 ## Gate facts — what is actually enforced
 

@@ -35,7 +35,7 @@ const COMPOSER_PLACEHOLDER = 'px-4 pt-3 text-ui';
 const COMPOSER_INPUT =
   "field-sizing-fixed h-12 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-4 pt-3 pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-ui text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-secondary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
 const COMPOSER_TOOL =
-  'flex size-7.5 cursor-pointer items-center justify-center border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0';
+  'flex size-7 cursor-pointer items-center justify-center border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0';
 const COMPOSER_SQUARE =
   'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-(--cds-radius-lg) border-none p-0 active:not-aria-[haspopup]:translate-y-0';
 
@@ -95,9 +95,8 @@ export function Composer({
     setInlineHighlight,
     inlineListboxId,
     inlineListboxRef,
-    insertToken,
+    acceptInlineRow,
     insertTokens,
-    insertFile,
     groups,
     slashOpen,
     slashQuery,
@@ -194,18 +193,7 @@ export function Composer({
             query={inlineQuery}
             highlight={inlineHighlight}
             onHover={setInlineHighlight}
-            onPick={(row) => {
-              if (row.kind === 'file') {
-                insertFile(row.label);
-              } else {
-                insertToken({
-                  kind: row.kind,
-                  id: row.id,
-                  label: row.label,
-                  ...(row.seq !== undefined ? { seq: row.seq } : {}),
-                });
-              }
-            }}
+            onPick={acceptInlineRow}
             listboxRef={inlineListboxRef}
             listboxId={inlineListboxId}
           />
@@ -249,7 +237,7 @@ export function Composer({
         accept="text/*,image/*,application/json,application/pdf,application/xml"
       />
       <div
-        className="composer-toolbar absolute bottom-3 left-2.5 flex items-center"
+        className="composer-toolbar absolute bottom-3.5 left-2.5 flex items-center"
         data-testid="composer-toolbar"
       >
         <IconTooltip

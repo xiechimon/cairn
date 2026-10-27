@@ -471,7 +471,7 @@ async function settleChiefTurn(
 export async function driveTurn(
   stack: Stack,
   prompt: string,
-  opts: { timeoutMs: number },
+  opts: { timeoutMs: number; projectId?: string },
 ): Promise<TurnEvidence> {
   const db = stack.server.db;
   const before = new Set(
@@ -489,6 +489,7 @@ export async function driveTurn(
     `/api/teams/${stack.server.teamId}/chief/threads`,
     {
       content: prompt,
+      ...(opts.projectId !== undefined ? { projectId: opts.projectId } : {}),
     },
   );
   if (sent.status !== 201)
