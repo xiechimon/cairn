@@ -133,6 +133,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       onGateLog: (msg) => logger.gate(msg),
       onTrustLog: (msg) => logger.trust(msg),
       onOtelLog: (msg) => logger.prefixed('otel', msg),
+      onCompactionLog: (msg) => logger.step(msg),
       machineName: config.name,
     });
   if (opts.backend === undefined) {
