@@ -342,10 +342,61 @@ describe('chief long-chat digests (#1939)', () => {
         .all()
         .some((r) => String(r.content).includes('model exploded')),
     ).toBe(false);
+    w.s.db
+      .update(stepTable)
+      .set({ finishedAt: TODAY_0830 })
+      .where(eq(stepTable.id, claimed.step.id))
+      .run();
     w.plan(TODAY_0830 + 60_000);
     expect(w.digestSteps()).toHaveLength(1);
     w.plan(TODAY_0830 + CHIEF_DIGEST_RETRY_MS + 1000);
     expect(w.digestSteps()).toHaveLength(2);
+  });
+
+  test('the retry wait counts from when a run failed, not when it was queued', async () => {
+    const w = await setup();
+    w.plan(TODAY_0830);
+    const claimed = await w.claim();
+    if (!claimed) throw new Error('no digest step');
+    await w.done(claimed.step.id, 'oops', 'failed');
+    const failedAt = TODAY_0830 + 20 * 60_000;
+    w.s.db
+      .update(stepTable)
+      .set({ finishedAt: failedAt })
+      .where(eq(stepTable.id, claimed.step.id))
+      .run();
+    w.plan(failedAt + 60_000);
+    expect(w.digestSteps()).toHaveLength(1);
+    w.plan(failedAt + CHIEF_DIGEST_RETRY_MS + 1000);
+    expect(w.digestSteps()).toHaveLength(2);
+  });
+
+  test('a rewind while the digest runs discards its result', async () => {
+    const w = await setup();
+    w.plan(TODAY_0830);
+    const claimed = await w.claim();
+    if (!claimed) throw new Error('no digest step');
+    const anchor = w.s.db
+      .select()
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.threadId, w.threadId), eq(chiefMessage.role, 'user')))
+      .get();
+    const rewound = await call(
+      w.s.app,
+      'POST',
+      `/api/teams/${w.teamId}/chief/threads/${w.threadId}/rewind`,
+      { body: { messageId: anchor?.id } },
+    );
+    expect(rewound.status).toBe(200);
+    await w.done(claimed.step.id, VALID_OUTPUT);
+    expect(w.digestRows()).toHaveLength(0);
+    expect(
+      w.s.db
+        .select()
+        .from(agentMemory)
+        .all()
+        .some((m) => m.content === '发布卡住时先查 npm 源'),
+    ).toBe(false);
   });
 
   test('unparseable output counts as a failure', async () => {

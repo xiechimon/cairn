@@ -121,7 +121,8 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
     if (
       lastRun !== undefined &&
       (['pending', 'claimed', 'waiting_quota'].includes(lastRun.status) ||
-        (lastRun.status === 'failed' && now - lastRun.createdAt < CHIEF_DIGEST_RETRY_MS))
+        (lastRun.status === 'failed' &&
+          now - (lastRun.finishedAt ?? lastRun.createdAt) < CHIEF_DIGEST_RETRY_MS))
     )
       continue;
     const userTurnWaiting = db
@@ -337,9 +338,15 @@ export function finishChiefDigest(
     thread !== undefined &&
     chiefRow !== undefined &&
     chiefDigestThreadId(chiefRow.id) === stepRow.buildId &&
-    meta?.[2] !== undefined;
+    meta?.[2] !== undefined &&
+    db
+      .select({ id: chiefMessage.id })
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.threadId, thread.id), eq(chiefMessage.createdAt, Number(meta[2]))))
+      .limit(1)
+      .get() !== undefined;
   db.update(step)
-    .set({ status: ok ? 'done' : 'failed' })
+    .set({ status: ok ? 'done' : 'failed', finishedAt: now })
     .where(eq(step.id, stepRow.id))
     .run();
   if (!ok) return;
