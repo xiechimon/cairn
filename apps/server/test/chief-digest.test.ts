@@ -229,6 +229,7 @@ describe('chief long-chat digests (#1939)', () => {
     expect(tools).toContain('todos');
     expect(tools).not.toContain('create_todo');
     expect(tools).not.toContain('save_memory');
+    expect(tools).not.toContain('issues');
     expect(claimed?.chief?.systemPrompt).not.toContain('创建任务、分派');
   });
 
@@ -420,6 +421,16 @@ describe('chief long-chat digests (#1939)', () => {
     expect(write.status).toBe(403);
     const read = await w.relay(claimed.step.id, 'todos', {});
     expect(read.status).toBe(200);
+    expect((await w.relay(claimed.step.id, 'issues', {})).status).toBe(403);
+    const post = await call(
+      w.s.app,
+      'POST',
+      `/api/conversations/${claimed.step.buildId}/messages`,
+      {
+        body: { content: 'Digest thread=x until=1 reason=daily' },
+      },
+    );
+    expect(post.status).toBe(404);
   });
 
   test('an empty digest still marks the chat covered, so it is not retried', async () => {

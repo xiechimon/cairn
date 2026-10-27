@@ -39,7 +39,14 @@ export const CHIEF_DIGEST_SYSTEM_PROMPT = [
   '用与对话相同的语言写，白话短句。',
 ].join('\n');
 
-const READ_TOOLS: ReadonlySet<string> = new Set(CHIEF_TOOL_CATEGORIES.read);
+const GITHUB_READ_TOOLS: ReadonlySet<string> = new Set([
+  'issues',
+  'pull_requests',
+  'workflow_runs',
+]);
+const READ_TOOLS: ReadonlySet<string> = new Set(
+  CHIEF_TOOL_CATEGORIES.read.filter((name) => !GITHUB_READ_TOOLS.has(name)),
+);
 
 export const CHIEF_DIGEST_REMOTE_TOOLS = CHIEF_REMOTE_TOOLS.filter((t) => READ_TOOLS.has(t.name));
 
@@ -424,7 +431,7 @@ function writeDigest(deps: DigestDeps, stepRow: typeof step.$inferSelect, now: n
   const chiefRow = thread
     ? deps.db.select().from(chief).where(eq(chief.id, thread.chiefId)).get()
     : undefined;
-  if (!thread || !chiefRow) return false;
+  if (!thread || !chiefRow || chiefDigestThreadId(chiefRow.id) !== stepRow.buildId) return false;
   const until = Number(meta[2]);
   const rememberAs = prompt.includes(ISSUE_FENCE_OPEN) ? null : chiefRow.agentId;
   const content: ChiefDigestContent = {

@@ -24,6 +24,7 @@ import {
   fenceIssueText,
   ISSUE_FENCE_OPEN,
   isBackendRuntimeId,
+  isChiefDigestThreadId,
   isIssueSourcedTask,
   newChiefThreadId,
 } from '@cairn/shared';
@@ -383,7 +384,7 @@ export function sendChiefMessage(
   let threadRow: ThreadRow | undefined;
   if (body.threadId !== null) {
     threadRow = getChiefThread(deps, body.threadId);
-    if (!threadRow || threadRow.teamId !== teamId) {
+    if (!threadRow || threadRow.teamId !== teamId || isChiefDigestThreadId(threadRow.id)) {
       throw new HttpError(404, `chief thread ${body.threadId}`);
     }
   }
