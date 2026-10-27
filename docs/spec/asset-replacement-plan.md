@@ -36,7 +36,7 @@ Risk note (recorded, no guardrail): `pacman` shares its name with the Arch Linux
 | Slot | todos.dev current value | Replacement value |
 |---|---|---|
 | CLI command name | `tds` | `pacman` |
-| env prefix | `TDS_SERVER` etc. | `PACMAN_SERVER` / `PACMAN_API_KEY` / `PACMAN_TEAM` / `PACMAN_WORKSPACES_DIR` |
+| env prefix | `TDS_SERVER` etc. | `CAIRN_SERVER` / `CAIRN_API_KEY` / `CAIRN_TEAM` / `CAIRN_WORKSPACES_DIR` |
 | User home directory | `~/.tds` | `~/.pacman` |
 | Workspace directory | `~/.tds/workspaces/<conversationId>` | `~/.pacman/workspaces/<conversationId>` |
 | Branch prefix | `tds/conv-` | `pacman/conv-` |
