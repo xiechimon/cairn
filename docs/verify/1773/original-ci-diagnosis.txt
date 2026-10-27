@@ -1,0 +1,52 @@
+# PR #1879 CI diagnosis
+
+## Cause
+
+The failing check tested ae87b15652f0ea0751ddb2e423677a478d34b393.
+The failure is inherited from main, not introduced by the memory-regression changes.
+The roster implementation, snapshot, regression test, and lockfile are identical
+between that failed head and origin/main at 0117480ad956c1b0bc6b1f5cef149fdd11a9802f.
+The installed pi-ai package is 1.4.0, matching the lockfile.
+
+The worktree already contained commit 0f90f5df28b76ccba36f80befcade84d5813e992,
+which synchronizes the snapshot with those catalogs. No additional code change
+was made during this diagnosis. ADR 0027 requires this catalog equality check.
+
+## Local reproduction
+
+All test and verification commands ran through `flock /tmp/cairn-heavy.lock`.
+
+Command: `pnpm exec vitest run apps/server/test/merge-gate-model-roster.test.ts`.
+
+With the origin/main snapshot temporarily substituted, the existing test failed:
+
+```text
+FAIL test/merge-gate-model-roster.test.ts > merge-gate model roster > the checked-in snapshot matches the installed pi model catalogs
+AssertionError: expected { vendors: { …(162) }, …(1) } to deeply equal { vendors: { …(157) }, …(1) }
+Test Files  1 failed (1)
+Tests  1 failed | 1 passed (2)
+```
+
+After restoring the snapshot from local HEAD, the same test passed:
+
+```text
+Test Files  1 passed (1)
+Tests  2 passed (2)
+```
+
+The focused test also passed independently before the negative control.
+The original snapshot was restored before releasing the lock.
+
+## Verification
+
+- `pnpm lint`: passed, with two informational diagnostics in unrelated files.
+- `pnpm typecheck`: passed for all workspace packages.
+- `pnpm spec:parse`: passed; 1299 web tests in 184 files collected and 37 integration test files parsed.
+- `git diff --check`: passed.
+- GitHub `pr-evidence`: passed on the failed PR head; no PR body change is needed.
+- Remote main was verified through the GitHub API as 0117480ad956c1b0bc6b1f5cef149fdd11a9802f.
+- That main commit is already an ancestor of lane/1773; rebasing would be a no-op.
+- `docs/lessons.md` was left intact, preserving all rows.
+
+No Git metadata was written and nothing was pushed. The full commit message is
+provided in `COMMIT_MSG.txt` for the sandbox handoff.

@@ -149,6 +149,7 @@ export const CHIEF_DISPATCH_HARNESS_PATHS = [
   `${CHIEF_DISPATCH_DIR}/repo-seed/docs/api.md`,
   `${CHIEF_DISPATCH_DIR}/repo-seed/docs/deploy.md`,
   `${CHIEF_DISPATCH_DIR}/repo-seed/docs/index.md`,
+  `${CHIEF_DISPATCH_DIR}/repo-seed/docs/push.md`,
   `${CHIEF_DISPATCH_DIR}/repo-seed/docs/usage.md`,
   `${CHIEF_DISPATCH_DIR}/repo-seed/package.json`,
   `${CHIEF_DISPATCH_DIR}/repo-seed/packages/shared/README.md`,

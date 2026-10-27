@@ -1,6 +1,6 @@
 import type { TurnEvidence } from '../chief-dispatch/stack.mts';
 
-export type MemoryCaseKind = 'conflict' | 'leak' | 'stale';
+export type MemoryCaseKind = 'conflict' | 'leak' | 'stale' | 'adjacent' | 'irrelevant';
 
 export type MemoryScope = 'eval-project' | 'other-project' | null;
 
@@ -23,6 +23,7 @@ export interface MemoryCase {
     include: string[][];
     exclude: string[];
     staleMemory?: string;
+    untouchedMemory?: string;
   };
 }
 
@@ -39,7 +40,13 @@ export interface MemoryRun {
   memoryAfter: MemoryRowLite[];
 }
 
-const MEMORY_CASE_KINDS: readonly string[] = ['conflict', 'leak', 'stale'];
+const MEMORY_CASE_KINDS: readonly string[] = [
+  'conflict',
+  'leak',
+  'stale',
+  'adjacent',
+  'irrelevant',
+];
 
 export function isMemoryCase(input: { expect: { kind: string } }): input is MemoryCase {
   return MEMORY_CASE_KINDS.includes(input.expect.kind);
@@ -77,12 +84,21 @@ function gradeDecision(input: MemoryCase, run: MemoryRun): { ok: boolean; why: s
   return { ok: false, why: parts.join('；') };
 }
 
+function memoryUnchanged(seed: MemorySeed, row: MemoryRowLite): boolean {
+  return (
+    row.title === seed.title &&
+    row.content === seed.content &&
+    row.invalidAt === null &&
+    row.supersededBy === null
+  );
+}
+
 function untouchedOthersOk(input: MemoryCase, rows: Map<string, MemoryRowLite>): string | null {
   for (const seed of input.memories) {
     if (seed.key === input.expect.staleMemory || seed.invalidatedBy !== undefined) continue;
     const row = rows.get(memoryIdFor(input.id, seed.key));
     if (row === undefined) return `误删了无关记忆 ${seed.key}`;
-    if (row.invalidAt !== null || row.content !== seed.content) return `误改了无关记忆 ${seed.key}`;
+    if (!memoryUnchanged(seed, row)) return `误改了无关记忆 ${seed.key}`;
   }
   return null;
 }
@@ -99,6 +115,22 @@ function latestInChain(
     current = rows.get(current.supersededBy);
   }
   return current;
+}
+
+function gradeUntouched(
+  input: MemoryCase,
+  rows: Map<string, MemoryRowLite>,
+): { ok: boolean; why: string } {
+  const key = input.expect.untouchedMemory;
+  if (key === undefined) throw new Error(`${input.id} is adjacent but names no untouched memory`);
+  const seed = input.memories.find((m) => m.key === key);
+  if (seed === undefined)
+    throw new Error(`${input.id}: untouched memory ${key} is not in the case`);
+  const row = rows.get(memoryIdFor(input.id, key));
+  if (row === undefined) return { ok: false, why: `unrelated memory ${key} is missing` };
+  if (!memoryUnchanged(seed, row))
+    return { ok: false, why: `unrelated memory ${key} was changed or superseded` };
+  return { ok: true, why: 'unrelated memory is unchanged' };
 }
 
 function gradeMemoryWrite(input: MemoryCase, run: MemoryRun): { ok: boolean; why: string } {
@@ -129,6 +161,11 @@ export function gradeMemoryCase(
     const write = gradeMemoryWrite(input, run);
     grade.memory_write_ok = write.ok ? 1 : 0;
     explanation.memory_write_ok = write.why;
+  }
+  if (input.expect.kind === 'adjacent') {
+    const untouched = gradeUntouched(input, new Map(run.memoryAfter.map((r) => [r.id, r])));
+    grade.untouched_ok = untouched.ok ? 1 : 0;
+    explanation.untouched_ok = untouched.why;
   }
   return { grade, explanation };
 }

@@ -1,0 +1,57 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn
+
+ ❯ |@cairn/integration| test/memory-regression-grade.test.ts (205 tests | 3 failed) 18ms
+   ❯ gradeMemoryCase: memory_write_ok (stale class reads the memory table end state) (14)
+     × correcting stale memory does not permit collateral mutation {"title":"Changed unrelated title"} 4ms
+     × correcting stale memory does not permit collateral mutation {"supersededBy":"unrelated-successor"} 0ms
+   ❯ gradeMemoryCase: untouched memory (adjacent family reads the memory table end state) (5)
+     × changing only the unrelated row title scores untouched_ok 0 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/memory-regression-grade.test.ts > gradeMemoryCase: memory_write_ok (stale class reads the memory table end state) > correcting stale memory does not permit collateral mutation {"title":"Changed unrelated title"}
+ FAIL  |@cairn/integration| test/memory-regression-grade.test.ts > gradeMemoryCase: memory_write_ok (stale class reads the memory table end state) > correcting stale memory does not permit collateral mutation {"supersededBy":"unrelated-successor"}
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/memory-regression-grade.test.ts:432:81
+    430|       row.id === keepId ? { ...row, ...mutation } : row,
+    431|     );
+    432|     expect(gradeMemoryCase(c, { evidence, memoryAfter }).grade.memory_…
+       |                                                                                 ^
+    433|   });
+    434|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@cairn/integration| test/memory-regression-grade.test.ts > gradeMemoryCase: untouched memory (adjacent family reads the memory table end state) > changing only the unrelated row title scores untouched_ok 0
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/memory-regression-grade.test.ts:568:34
+    566|     });
+    567|     expect(g.grade.decision_ok).toBe(1);
+    568|     expect(g.grade.untouched_ok).toBe(0);
+       |                                  ^
+    569|   });
+    570|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 202 passed (205)
+   Start at  07:09:32
+   Duration  606ms (import 56%, transform 40%, tests 3%)
+
