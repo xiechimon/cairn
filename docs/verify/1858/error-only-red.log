@@ -1,0 +1,57 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1864-eval-recovery/cairn
+
+ ❯ |@cairn/integration| test/chief-dispatch-family-coverage.test.ts (10 tests | 2 failed) 613ms
+   × an error-only baseline renders failed coverage and suspect tasks 62ms
+   × a completed error-only variant is retained beside a successful baseline 70ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/chief-dispatch-family-coverage.test.ts > an error-only baseline renders failed coverage and suspect tasks
+AssertionError: build-report-lite: baseline/ has no result rows under /private/tmp/cairn-coverage-all-failed-baseline-7YnrcI - nothing to report
+: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ report test/chief-dispatch-family-coverage.test.ts:54:34
+     52| function report(home: string): string {
+     53|   const run = spawnSync(process.execPath, [SCRIPT, home], { encoding: …
+     54|   expect(run.status, run.stderr).toBe(0);
+       |                                  ^
+     55|   return readFileSync(join(home, 'report.html'), 'utf8');
+     56| }
+ ❯ test/chief-dispatch-family-coverage.test.ts:170:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@cairn/integration| test/chief-dispatch-family-coverage.test.ts > a completed error-only variant is retained beside a successful baseline
+AssertionError: expected '<!DOCTYPE html>\n<html lang="en"><hea…' to contain '<h3>v1</h3><p>s 0/3</p>'
+
+- Expected
++ Received
+
+- <h3>v1</h3><p>s 0/3</p>
++ <!DOCTYPE html>
++ <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>cairn-coverage-all-failed-variant-sE3bhm - eval report</title><style>:root{color-scheme:light dark;--fg:#1a1a1a;--bg:#fff;--muted:#666;--line:#ddd;--pill:#eee;--warn:#b45309;--best:#ecfdf5}@media(prefers-color-scheme:dark){:root{--fg:#e6e6e6;--bg:#121212;--muted:#9a9a9a;--line:#333;--pill:#2a2a2a;--warn:#f59e0b;--best:#0f2a1f}}body{font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);background:var(--bg);margin:0;padding:24px;max-width:1400px}h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 8px}.meta,.hint{color:var(--muted);margin:0 0 8px}table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}th{cursor:pointer;user-select:none;white-space:nowrap}th.asc:after{content:" \25B4"}th.desc:after{content:" \25BE"}td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}td.id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}.pill{display:inline-block;background:var(--pill);border-radius:10px;padding:0 8px;font-size:12px}.pill.warn{color:var(--warn)}tr.best td{background:var(--best)}.links{font-size:12px}.links a{margin-right:6px}td.prompt{max-width:520px}details summary{cursor:pointer;color:var(--muted)}pre{white-space:pre-wrap;font-size:12px;margin:6px 0 0}.warnings{color:var(--warn)}code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}</style></head><body><header><h1>cairn-coverage-all-failed-variant-sE3bhm</h1><p class="meta">1 variant &middot; 1 cases &middot; primary metric <code>decision_ok</code> &middot; generated 2026-10-27 22:39:35 UTC &middot; lite report (no transcripts inlined; click rep links)</p></header><section><h2>Variants</h2><table><thead><tr><th data-k="s">variant</th><th data-k="s">change</th><th data-k="s">model</th><th data-k="n">mean decision_ok</th><th data-k="n">cases</th><th data-k="n">truncated</th><th data-k="s">failed attempts</th></tr></thead><tbody><tr><td>baseline</td><td></td><td></td><td class="num" data-headline="1.000">1.000</td><td class="num">1</td><td class="num">0</td><td>0</td></tr></tbody></table></section><section><h2>Coverage</h2><h3>baseline</h3><p>s 3/3</p></section><section><h2>Cases</h2><p class="hint">Click a column header to sort. Per-case values are the mean of <code>decision_ok</code> over status-ok reps.</p><table id="cases"><thead><tr><th data-k="s">id</th><th data-k="s">tags</th><th data-k="n">baseline</th><th data-k="s">prompt</th></tr></thead><tbody><tr><td class="id">s01</td><td></td><td class="num" data-v="1.000">1.000</td><td class="prompt"><details><summary></summary><pre></pre></details></td></tr></tbody></table></section><section class="warnings"><h2>Warnings</h2><ul><li>v1: zero result rows - dropping (run not started or results.jsonl missing/empty)</li></ul></section><script>document.querySelectorAll("th[data-k]").forEach(function(th){th.addEventListener("click",function(){var t=th.closest("table"),tb=t.tBodies[0],i=Array.prototype.indexOf.call(th.parentNode.children,th);var asc=!th.classList.contains("asc");t.querySelectorAll("th").forEach(function(h){h.classList.remove("asc","desc")});th.classList.add(asc?"asc":"desc");var num=th.dataset.k==="n";var rows=Array.prototype.slice.call(tb.rows);rows.sort(function(a,b){var x=a.cells[i],y=b.cells[i];var u=num?parseFloat(x.dataset.v||x.textContent):x.textContent.trim().toLowerCase();var w=num?parseFloat(y.dataset.v||y.textContent):y.textContent.trim().toLowerCase();if(num){if(isNaN(u))u=-Infinity;if(isNaN(w))w=-Infinity}return (u<w?-1:u>w?1:0)*(asc?1:-1)});rows.forEach(function(r){tb.appendChild(r)})})});</script></body></html>
++
+
+ ❯ test/chief-dispatch-family-coverage.test.ts:182:16
+    180|   writeFileSync(join(home, 'v1', 'errors.jsonl'), [0, 1, 2].map((rep) …
+    181|   const html = report(home);
+    182|   expect(html).toContain('<h3>v1</h3><p>s 0/3</p>');
+       |                ^
+    183|   expect(html).toMatch(/<tr><td>v1<\/td>[^]*?data-headline="withheld"/…
+    184|   expect(html).toContain('s01 0/3');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 8 passed (10)
+   Start at  06:39:35
+   Duration  717ms (tests 96%, transform 2%, import 1%)
+

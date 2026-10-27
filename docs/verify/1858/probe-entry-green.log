@@ -1,0 +1,5 @@
+[heavy-slots] acquired slot 1/1
+vp: chief-dispatch-recovery/retry-failed-turn usage: Optional <output-directory>; defaults to VERIFY_EVIDENCE_DIR supplied by vp.mjs
+vp: evidence /tmp/cairn-1864-review/registered-retry-proof
+vp: chief-dispatch-recovery/retry-failed-turn -> node docs/verify/1858/drive-retry.mjs
+{"providerMode":"local stub","runtime":"real server, daemon, and eval CLI","requestStatuses":[400,200],"resultRows":1,"infraRetries":1,"decisionOk":1}

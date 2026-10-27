@@ -12,6 +12,16 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import {
+  type FamilyCoverage,
+  familyCoverage,
+  formatCoverage,
+  scoredValue,
+  suspectTasks,
+  withheldFamilies,
+} from './family-coverage.mts';
+import type { Case, RosterAgent } from './grade.mts';
+import { checkOracleCase } from './oracle-check.mts';
 
 type ResultRow = {
   prompt_id?: unknown;
@@ -118,6 +128,21 @@ function loadRows(p: string, warnings: string[], dir: string): RowsById {
 }
 
 type ErrorCounts = { total: number; byClass: Record<string, number> };
+function loadJsonl(p: string): Record<string, unknown>[] {
+  const rows: Record<string, unknown>[] = [];
+  for (const line of readText(p).split('\n')) {
+    if (!line.trim()) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      parsed = null;
+    }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+      rows.push(parsed as Record<string, unknown>);
+  }
+  return rows;
+}
 function countErrors(vdir: string): ErrorCounts {
   let total = 0;
   const byClass: Record<string, number> = Object.create(null);
@@ -184,6 +209,12 @@ type Agg = {
   truncated: number;
 };
 
+function declaredCaseIds(flow: string): string[] {
+  const parsed = readJSON<{ cases?: { id?: unknown }[] }>(join(flow, 'cases.json'), {});
+  const cases = Array.isArray(parsed.cases) ? parsed.cases : [];
+  return cases.map((entry) => (entry?.id == null ? '' : String(entry.id))).filter((id) => id);
+}
+
 function build(flowArg: string) {
   const flow = resolve(flowArg);
   if (!statSync(flow, { throwIfNoEntry: false })?.isDirectory())
@@ -223,19 +254,25 @@ function build(flowArg: string) {
   }
 
   const rows: Rows = Object.create(null);
-  for (const v of variants) rows[v] = loadRows(join(flow, v, 'results.jsonl'), warnings, v);
+  const errorsByVariant: Record<string, Record<string, unknown>[]> = Object.create(null);
+  for (const v of variants) {
+    rows[v] = loadRows(join(flow, v, 'results.jsonl'), warnings, v);
+    errorsByVariant[v] = loadJsonl(join(flow, v, 'errors.jsonl'));
+  }
 
   for (let i = variants.length - 1; i > 0; i--) {
     const v = variants[i] as string;
-    if (Object.keys(rows[v] ?? NO_ROWS).length) continue;
+    if (Object.keys(rows[v] ?? NO_ROWS).length || errorsByVariant[v]?.length) continue;
     warnings.push(
-      `${v}: zero result rows - dropping (run not started or results.jsonl missing/empty)`,
+      `${v}: zero result and error rows - dropping (run not started or records missing/empty)`,
     );
     variants.splice(i, 1);
   }
   const firstVariant = variants[0] as string;
-  if (!Object.keys(rows[firstVariant] ?? NO_ROWS).length)
-    throw new Error(`${firstVariant}/ has no result rows under ${flow} - nothing to report`);
+  if (!Object.keys(rows[firstVariant] ?? NO_ROWS).length && !errorsByVariant[firstVariant]?.length)
+    throw new Error(
+      `${firstVariant}/ has no result or error rows under ${flow} - nothing to report`,
+    );
 
   const header: Record<string, Header> = Object.create(null);
   for (const v of variants) {
@@ -271,18 +308,20 @@ function build(flowArg: string) {
 
   const ids: string[] = [];
   const seenId = new Set<string>();
-  for (const v of variants)
-    for (const pid of Object.keys(rows[v] ?? NO_ROWS))
-      if (!seenId.has(pid)) {
+  for (const v of variants) {
+    const errorIds = (errorsByVariant[v] ?? []).flatMap((row) => {
+      const id = row.prompt_id ?? row.id ?? row.case_id;
+      return typeof id === 'string' || typeof id === 'number' ? [String(id)] : [];
+    });
+    for (const pid of [...Object.keys(rows[v] ?? NO_ROWS), ...errorIds])
+      if (pid && !seenId.has(pid)) {
         seenId.add(pid);
         ids.push(pid);
       }
+  }
 
-  const okReps = (reps: ResultRow[]) => reps.filter((r) => r.status == null || r.status === 'ok');
   const caseMean = (reps: ResultRow[], m: string): number | null => {
-    const vals = okReps(reps)
-      .map((r) => coerceScores(r.grade)[m])
-      .filter(isNum);
+    const vals = reps.map((r) => scoredValue(r, m)).filter(isNum);
     return vals.length ? vals.reduce((s, x) => s + x, 0) / vals.length : null;
   };
   const cases: CaseRow[] = ids.map((pid) => {
@@ -322,6 +361,32 @@ function build(flowArg: string) {
     }
     return { id: pid, split: splitOf[pid] || '', tags, prompt: String(first.prompt ?? ''), per };
   });
+
+  const caseIds = declaredCaseIds(flow);
+  const coverage: Record<string, FamilyCoverage[]> = Object.create(null);
+  const suspects: Record<string, SuspectTask[]> = Object.create(null);
+  const oracleInput = readJSON<{ cases?: Case[]; roster?: RosterAgent[] }>(
+    join(flow, 'cases.json'),
+    {},
+  );
+  for (const v of variants) {
+    const scored = Object.values(rows[v] ?? NO_ROWS).flat();
+    const errors = errorsByVariant[v] ?? [];
+    coverage[v] = familyCoverage({ caseIds, results: scored, errors, metric: primary });
+    suspects[v] =
+      primary === 'decision_ok'
+        ? suspectTasks(scored, errors).map((suspect) => {
+            const input = Array.isArray(oracleInput.cases)
+              ? oracleInput.cases.find((entry) => entry?.id === suspect.id)
+              : undefined;
+            const verified =
+              input !== undefined &&
+              Array.isArray(oracleInput.roster) &&
+              checkOracleCase(input, oracleInput.roster);
+            return { ...suspect, verified };
+          })
+        : [];
+  }
 
   const agg: Record<string, Agg> = {};
   for (const v of variants) {
@@ -364,6 +429,8 @@ function build(flowArg: string) {
     variants,
     header,
     agg,
+    coverage,
+    suspects,
     cases,
     primary,
     metrics: metrics.map((m) => m.id),
@@ -374,11 +441,15 @@ function build(flowArg: string) {
   return { variants: variants.length, cases: cases.length, warnings };
 }
 
+type SuspectTask = { id: string; trials: number; verified: boolean };
+
 type RenderInput = {
   flow: string;
   variants: string[];
   header: Record<string, Header>;
   agg: Record<string, Agg>;
+  coverage: Record<string, FamilyCoverage[]>;
+  suspects: Record<string, SuspectTask[]>;
   cases: CaseRow[];
   primary: string;
   metrics: string[];
@@ -391,6 +462,8 @@ function render({
   variants,
   header,
   agg,
+  coverage,
+  suspects,
   cases,
   primary,
   metrics,
@@ -405,6 +478,12 @@ function render({
     .map((v) => {
       const h = header[v] as Header,
         a = agg[v] as Agg;
+      const covered = coverage[v] ?? [];
+      const withheld = withheldFamilies(covered);
+      const headline =
+        withheld.length > 0 || (suspects[v] ?? []).some((task) => !task.verified)
+          ? 'withheld'
+          : fmt(a.all);
       const err = h.errors.total
         ? h.errors.total +
           ' (' +
@@ -425,8 +504,10 @@ function render({
         '</td><td>' +
         esc(h.model) +
         '</td>' +
-        '<td class="num">' +
-        fmt(a.all) +
+        '<td class="num" data-headline="' +
+        esc(headline) +
+        '">' +
+        esc(headline) +
         '</td><td class="num">' +
         a.n +
         '</td>' +
@@ -439,6 +520,32 @@ function render({
       );
     })
     .join('\n');
+
+  const coverageSection = variants
+    .map((v) => {
+      const covered = coverage[v] ?? [];
+      const withheld = withheldFamilies(covered);
+      const note =
+        withheld.length > 0
+          ? `<p>headline withheld: ${withheld.map((family) => esc(family)).join(', ')}</p>`
+          : '';
+      return `<h3>${esc(v)}</h3><p>${esc(formatCoverage(covered))}</p>${note}`;
+    })
+    .join('');
+
+  const suspectSection = variants
+    .map((v) => {
+      const tasks = suspects[v] ?? [];
+      if (tasks.length === 0) return '';
+      const rows = tasks
+        .map(
+          (task) =>
+            `<li>${esc(task.id)} 0/${task.trials}: oracle ${task.verified ? 'verified' : 'unverified'}</li>`,
+        )
+        .join('');
+      return `<h3>${esc(v)}</h3><ul>${rows}</ul>`;
+    })
+    .join('');
 
   const caseRows = cases
     .map((c) => {
@@ -530,6 +637,10 @@ function render({
     '</tr></thead><tbody>' +
     variantRows +
     '</tbody></table></section>' +
+    '<section><h2>Coverage</h2>' +
+    coverageSection +
+    '</section>' +
+    (suspectSection ? `<section><h2>Suspect tasks</h2>${suspectSection}</section>` : '') +
     '<section><h2>Cases</h2><p class="hint">Click a column header to sort. Per-case values are the mean of <code>' +
     esc(primary) +
     '</code> over status-ok reps.</p>' +
