@@ -298,14 +298,16 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const row = me(c);
     const stepId = c.req.query('stepId');
     if (!stepId) throw new HttpError(400, 'stepId required');
-    return c.json(fetchSteer({ db: ctx.db, convHub: ctx.convHub }, row, stepId));
+    return c.json(fetchSteer({ db: ctx.db }, row, stepId));
   });
 
   app.post('/api/machine/steer/ack', (c) => {
     const row = me(c);
     const stepId = c.req.query('stepId');
     if (!stepId) throw new HttpError(400, 'stepId required');
-    return c.json(ackSteer({ db: ctx.db, convHub: ctx.convHub }, row, stepId));
+    return c.json(
+      ackSteer({ db: ctx.db, convHub: ctx.convHub, machineHub: ctx.machineHub }, row, stepId),
+    );
   });
 
   app.get('/api/machine/stop', (c) => {

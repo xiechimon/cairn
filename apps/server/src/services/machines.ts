@@ -23,7 +23,7 @@ import { newMachineToken } from '../lib/keys.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import { NotFoundError } from './builds.js';
-import { consumeChiefSteer, markChiefSteerSent } from './chief-turns.js';
+import { ackChiefSteer, takeChiefSteer } from './chief-turns.js';
 import { recommendMachineConcurrency } from './dispatch-eligibility.js';
 import type { ConversationStreamHub } from './events.js';
 import {
@@ -34,6 +34,7 @@ import {
   upsertChiefRow,
   upsertMessage,
 } from './machine-deps.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
 
@@ -52,7 +53,7 @@ export { MERGE_NOT_LANDED_NOTE } from './machine-merge-landing.js';
 export { stepToken, toProviderConfig } from './machine-step-token.js';
 
 export function fetchSteer(
-  deps: { db: Db; convHub?: ConversationStreamHub },
+  deps: { db: Db },
   machine: { id: string },
   stepId: string,
 ): { content: string | null } {
@@ -67,17 +68,23 @@ export function fetchSteer(
     .where(eq(steerPending.conversationId, stepRow.buildId))
     .get();
   if (!pending) return { content: null };
+  if (
+    pending.stepId === stepId &&
+    isChiefConversation(stepRow.buildId) &&
+    !takeChiefSteer(db, stepRow.buildId)
+  ) {
+    return { content: null };
+  }
   db.delete(steerPending).where(eq(steerPending.conversationId, stepRow.buildId)).run();
   if (pending.stepId !== stepId) {
     return { content: null };
   }
-  if (isChiefConversation(stepRow.buildId)) markChiefSteerSent(db, stepRow.buildId);
   return { content: pending.content };
 }
 
 export function ackSteer(
-  deps: { db: Db; convHub?: ConversationStreamHub },
-  machine: { id: string },
+  deps: { db: Db; convHub?: ConversationStreamHub; machineHub?: MachineWakeHub },
+  machine: { id: string; teamId: string },
   stepId: string,
 ): { ok: true } {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
@@ -86,7 +93,7 @@ export function ackSteer(
     stepRow.status === 'claimed' &&
     isChiefConversation(stepRow.buildId)
   ) {
-    consumeChiefSteer(deps, stepRow.buildId);
+    ackChiefSteer(deps, machine.teamId, stepRow);
   }
   return { ok: true };
 }

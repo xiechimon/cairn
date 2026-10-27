@@ -339,6 +339,25 @@ describe('steer (T5): `现在插话`', () => {
     expect(next?.instruction).toBe('改成只看 cairn 项目');
   });
 
+  test('an ack only settles the batch it acknowledges; a later steer waits for its own fetch and ack', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const a = await w.send('插话 A');
+    const b = await w.send('插话 B');
+    expect((await w.steer(a)).status).toBe(200);
+    expect(await w.fetchSteer(running!.step.id)).toBe('插话 A');
+    expect((await w.steer(b)).status).toBe(200);
+    expect(await w.fetchSteer(running!.step.id)).toBeNull();
+    await w.ackSteer(running!.step.id);
+    expect(w.stepRow(a)).toBeUndefined();
+    expect(w.stepRow(b)).toBeDefined();
+    expect(await w.fetchSteer(running!.step.id)).toBe('插话 B');
+    await w.done(running!.step.id, { status: 'success' });
+    const next = await w.claim();
+    expect(next?.step.id).toBe(b);
+  });
+
   test('steering the same message twice sends its text once', async () => {
     const w = await setupWorld();
     await w.send('第一句');

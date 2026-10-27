@@ -240,7 +240,9 @@ export function steerChiefMessage(
   return { steered: true };
 }
 
-export function markChiefSteerSent(db: Db, threadId: string): void {
+export function takeChiefSteer(db: Db, threadId: string): boolean {
+  const live = liveChiefSteps(db, threadId);
+  if (live.some((row) => row.holdReason === STEER_SENT_HOLD)) return false;
   db.update(step)
     .set({ holdReason: STEER_SENT_HOLD })
     .where(
@@ -251,19 +253,31 @@ export function markChiefSteerSent(db: Db, threadId: string): void {
       ),
     )
     .run();
+  return true;
 }
 
-export function consumeChiefSteer(deps: Pick<ChiefTurnDeps, 'db' | 'convHub'>, threadId: string) {
-  const steered = liveChiefSteps(deps.db, threadId).filter(
+export function ackChiefSteer(
+  deps: Pick<ChiefTurnDeps, 'db' | 'convHub' | 'machineHub'>,
+  teamId: string,
+  running: StepRow,
+): void {
+  const threadId = running.buildId;
+  const sent = liveChiefSteps(deps.db, threadId).filter(
     (row) => row.status === 'pending' && row.holdReason === STEER_SENT_HOLD,
   );
   const now = nowMs();
-  for (const row of steered) {
+  for (const row of sent) {
     deps.db.delete(step).where(eq(step.id, row.id)).run();
     deps.db.update(chiefMessage).set({ createdAt: now }).where(eq(chiefMessage.id, row.id)).run();
     const message = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, row.id)).get();
     if (message) deps.convHub?.publishMessage(threadId, message);
   }
+  const next = deps.db
+    .select()
+    .from(steerPending)
+    .where(eq(steerPending.conversationId, threadId))
+    .get();
+  if (next?.stepId === running.id) deps.machineHub?.steerSignal(teamId, running.id);
 }
 
 export function releaseUnconsumedSteer(db: Db, finished: StepRow): void {
