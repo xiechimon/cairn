@@ -1,4 +1,5 @@
-Existing parser source equals the protected parser source byte-for-byte after trimming outer whitespace: true
+Initial relocation at c731d45d5 copied the parser byte-for-byte after trimming outer whitespace.
+Current source subsequently inlines its private single-use helpers; see plan-parser-parity.txt for output equivalence.
 Parser SHA-256: c332cbb8e6310896117505835e52dd8e149acb8b81ce36a34920b12c223e06ab
 Consumers: builds.ts, retry-lessons.ts, web api/mappers.ts, shared plan-contract.test.ts, legacy records/plan.ts re-export.
 PLAN_SECTIONS has no mutating consumers and is now frozen under the existing gate-export contract.

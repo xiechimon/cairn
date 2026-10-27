@@ -1,0 +1,2 @@
+Original and current parser outputs match for 259 inputs across both public APIs (518 comparisons).
+Private single-use helpers are inlined; error text, checklist parsing and public export bindings retain their existing behavior.

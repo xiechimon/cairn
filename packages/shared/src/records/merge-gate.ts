@@ -358,8 +358,8 @@ function sectionMark(line: string): SectionMark | null {
   return { kind: 'label', name: cleanSectionName(l[1] ?? ''), rest: (l[2] ?? '').trim() };
 }
 
-function verificationSection(content: string): { head: string; lines: string[] } | undefined {
-  const lines = content.split('\n');
+export function checkPlanContract(content: string): PlanContractCheck {
+  const lines = content.replace(/\r\n?/g, '\n').split('\n');
   let start = -1;
   let level = 0;
   let head = '';
@@ -371,7 +371,7 @@ function verificationSection(content: string): { head: string; lines: string[] }
     else head = mark.rest;
     break;
   }
-  if (start < 0) return undefined;
+  if (start < 0) return { ok: false, problem: '方案缺少 Verification 小节' };
   const out: string[] = [];
   let inFence = false;
   for (let i = start; i < lines.length; i++) {
@@ -389,22 +389,15 @@ function verificationSection(content: string): { head: string; lines: string[] }
     if (fenceLine) inFence = !inFence;
     out.push(raw);
   }
-  return { head, lines: out };
-}
-
-function splitItems(section: { head: string; lines: string[] }): {
-  text: string;
-  fenced: boolean;
-}[] {
-  const isList = (raw: string) => LIST_ITEM.test(raw);
+  const section = { head, lines: out };
   let inFenceScan = false;
   const hasList = section.lines.some((raw) => {
     if (raw.trim().startsWith('```')) inFenceScan = !inFenceScan;
-    return !inFenceScan && isList(raw);
+    return !inFenceScan && LIST_ITEM.test(raw);
   });
-  const items: { text: string; fenced: boolean; indent: number | null }[] = [];
-  if (section.head !== '') items.push({ text: section.head, fenced: false, indent: null });
-  let fence: { lines: string[]; owner: (typeof items)[number] | null } | null = null;
+  const parsedItems: { text: string; fenced: boolean; indent: number | null }[] = [];
+  if (section.head !== '') parsedItems.push({ text: section.head, fenced: false, indent: null });
+  let fence: { lines: string[]; owner: (typeof parsedItems)[number] | null } | null = null;
   for (const raw of section.lines) {
     const line = raw.trim();
     if (fence !== null) {
@@ -413,14 +406,14 @@ function splitItems(section: { head: string; lines: string[] }): {
         if (fence.owner !== null) {
           fence.owner.text = `${fence.owner.text}\n${fence.lines.join('\n')}`;
         } else {
-          items.push({ text: fence.lines.join('\n'), fenced: true, indent: null });
+          parsedItems.push({ text: fence.lines.join('\n'), fenced: true, indent: null });
         }
         fence = null;
       }
       continue;
     }
     if (line.startsWith('```')) {
-      const prev = items[items.length - 1];
+      const prev = parsedItems[parsedItems.length - 1];
       const indent = raw.length - line.length;
       const owner =
         hasList && prev !== undefined && !prev.fenced && prev.indent != null && indent > prev.indent
@@ -430,29 +423,23 @@ function splitItems(section: { head: string; lines: string[] }): {
       continue;
     }
     if (line === '') continue;
-    const prev = items[items.length - 1];
+    const prev = parsedItems[parsedItems.length - 1];
     const li = LIST_ITEM.exec(raw);
     if (li !== null) {
       const indent = li[1]?.length ?? 0;
       const text = (li[2] ?? '').trim();
       if (prev?.indent != null && indent > prev.indent) prev.text = `${prev.text} ${text}`;
-      else items.push({ text, fenced: false, indent });
+      else parsedItems.push({ text, fenced: false, indent });
       continue;
     }
-    if (!hasList) items.push({ text: line, fenced: false, indent: null });
+    if (!hasList) parsedItems.push({ text: line, fenced: false, indent: null });
     else if (prev !== undefined && !prev.fenced) prev.text = `${prev.text} ${line}`;
   }
   if (fence !== null) {
     if (fence.owner !== null) fence.owner.text = `${fence.owner.text}\n${fence.lines.join('\n')}`;
-    else items.push({ text: fence.lines.join('\n'), fenced: true, indent: null });
+    else parsedItems.push({ text: fence.lines.join('\n'), fenced: true, indent: null });
   }
-  return items.map(({ text, fenced }) => ({ text, fenced }));
-}
-
-export function checkPlanContract(content: string): PlanContractCheck {
-  const section = verificationSection(content.replace(/\r\n?/g, '\n'));
-  if (section === undefined) return { ok: false, problem: '方案缺少 Verification 小节' };
-  const items = splitItems(section);
+  const items = parsedItems.map(({ text, fenced }) => ({ text, fenced }));
   if (items.length === 0) return { ok: false, problem: 'Verification 小节为空' };
   const vague: number[] = [];
   const unanchored: number[] = [];

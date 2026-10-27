@@ -1,0 +1,11 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+
+ Test Files  6 passed (6)
+      Tests  85 passed (85)
+   Start at  11:56:42
+   Duration  5.59s (transform 44%, import 29%, tests 27%)
+
+    Isolate  6 workers spawned · ~81ms startup each (spawn + environment, per file)
+             at least ~406ms faster with isolate: false — reuses workers across files instead of one per file

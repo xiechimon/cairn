@@ -1139,30 +1139,36 @@ async function claimedMachineReview(sameVendor = false, gateLoosening = false) {
     .all()
     .find((row) => String(row.content).includes(`"stepId":"${reviewId}"`));
   expect(record).toBeDefined();
-  const postRow = async (id: string, content: unknown, transport = 'tool') => {
-    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
-    const row = { id, role: 'system', content, createdAt: 100 };
-    if (transport === 'upload') {
-      const urls = await s.app.request(`/api/machine/upload-urls/${reviewId}`, {
+  return {
+    s,
+    buildId,
+    reviewId,
+    record,
+    postRow: async (id: string, content: unknown, transport = 'tool') => {
+      const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+      const row = { id, role: 'system', content, createdAt: 100 };
+      if (transport === 'upload') {
+        const urls = await s.app.request(`/api/machine/upload-urls/${reviewId}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ files: [{ name: 'transcript.json' }] }),
+        });
+        expect(urls.status).toBe(200);
+        const upload = (await urls.json()) as { uploads: { url: string }[] };
+        return s.app.request(upload.uploads[0]?.url ?? '', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ stepId: reviewId, messages: [row] }),
+        });
+      }
+      return s.app.request(`/api/machine/tool/${reviewId}`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ files: [{ name: 'transcript.json' }] }),
+        body: JSON.stringify({ kind: 'transcript_row', row }),
       });
-      expect(urls.status).toBe(200);
-      const upload = (await urls.json()) as { uploads: { url: string }[] };
-      return s.app.request(upload.uploads[0]?.url ?? '', {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ stepId: reviewId, messages: [row] }),
-      });
-    }
-    return s.app.request(`/api/machine/tool/${reviewId}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ kind: 'transcript_row', row }),
-    });
+    },
+    token,
   };
-  return { s, buildId, reviewId, record, postRow, token };
 }
 
 test.each(

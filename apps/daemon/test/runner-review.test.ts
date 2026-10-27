@@ -157,49 +157,6 @@ class FakeClient implements MachineApi {
 }
 
 const CHECKOUT_CWD = '/tmp/fake-workspace/worktrees/conv-1';
-function fakeWorkspace(
-  calls: string[],
-  opts: { rewindError?: string; heads?: (string | null)[] } = {},
-): WorktreeOps {
-  return {
-    async prepare(input) {
-      calls.push(`prepare:${input.cloneUrl}`);
-      return {
-        cwd: CHECKOUT_CWD,
-        baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
-        branch: `cairn/conv-${input.conversationId}`,
-        defaultBranch: 'main',
-        reused: true,
-      };
-    },
-    async commitAll() {
-      calls.push('commitAll');
-      return { committed: true, head: 'abc123' };
-    },
-    async push(_cwd, branch) {
-      calls.push(`push:${branch}`);
-    },
-    async mergeDefaultBranch() {
-      calls.push('mergeDefaultBranch');
-      return { output: 'Already up to date' };
-    },
-    async headCommit() {
-      calls.push('headCommit');
-      return opts.heads?.shift() ?? (opts.heads === undefined ? 'abc123' : null);
-    },
-    async countAhead() {
-      return 1;
-    },
-    async restoreCheckpoint(_cwd, commit) {
-      calls.push(`restoreCheckpoint:${commit}`);
-      if (opts.rewindError !== undefined) throw new Error(opts.rewindError);
-    },
-    async cleanupOrphans() {
-      return [];
-    },
-  };
-}
-
 function capturingBackend(captured: SessionOpts[]): AgentBackend {
   const session = (): AgentSessionHandle => ({
     sessionId: 'pi-sess-review',
@@ -264,13 +221,50 @@ async function setupWithBackend(
   const client = new FakeClient();
   client.calls = calls;
   const captured: SessionOpts[] = [];
+  const workspace: WorktreeOps = {
+    async prepare(input) {
+      calls.push(`prepare:${input.cloneUrl}`);
+      return {
+        cwd: CHECKOUT_CWD,
+        baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
+        branch: `cairn/conv-${input.conversationId}`,
+        defaultBranch: 'main',
+        reused: true,
+      };
+    },
+    async commitAll() {
+      calls.push('commitAll');
+      return { committed: true, head: 'abc123' };
+    },
+    async push(_cwd, branch) {
+      calls.push(`push:${branch}`);
+    },
+    async mergeDefaultBranch() {
+      calls.push('mergeDefaultBranch');
+      return { output: 'Already up to date' };
+    },
+    async headCommit() {
+      calls.push('headCommit');
+      return opts.heads?.shift() ?? (opts.heads === undefined ? 'abc123' : null);
+    },
+    async countAhead() {
+      return 1;
+    },
+    async restoreCheckpoint(_cwd, commit) {
+      calls.push(`restoreCheckpoint:${commit}`);
+      if (opts.rewindError !== undefined) throw new Error(opts.rewindError);
+    },
+    async cleanupOrphans() {
+      return [];
+    },
+  };
   const deps = {
     client,
     journal: new StepJournal(paths.outboxDir),
     backendFor: () => backendFor(captured),
     logger: captureLogger(),
     paths,
-    workspace: fakeWorkspace(calls, opts),
+    workspace,
     workspacesDir: join(home, 'workspaces'),
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
