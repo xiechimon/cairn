@@ -194,6 +194,173 @@ describe('planVerificationItems (checklist input for the verify step)', () => {
   });
 });
 
+const VERIFIED =
+  '## Verification\n- `pnpm exec vitest run packages/shared/test/plan-contract.test.ts` passes\n';
+
+const PRIOR_ART_OK = [
+  '## Prior art',
+  '- croner: https://github.com/Hexagon/croner',
+  '- Decision: reuse `croner` (maintained, 0 deps) instead of a hand-written parser.',
+].join('\n');
+
+describe('checkPlanContract prior art (#1838)', () => {
+  test('a feature plan without a Prior art section is rejected', () => {
+    const r = checkPlanContract(
+      [
+        '## Context',
+        'Kind: feature',
+        'Add cron-style scheduling, a new user-facing capability.',
+        '',
+        '## Changes',
+        '- new module apps/server/src/services/cron-schedule.ts',
+        '',
+        VERIFIED,
+      ].join('\n'),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.problem).toContain('Prior art');
+  });
+
+  test('a split plan and a new-module plan are feature plans', () => {
+    for (const body of [
+      '## Context\n拆解方案：把调度和通知拆卡。\n',
+      '## Changes\n- Add a new module `packages/shared/src/cron.ts`\n',
+      'Kind: feature\n',
+    ]) {
+      const r = checkPlanContract(`${body}\n${VERIFIED}`);
+      expect(r.ok, body).toBe(false);
+      if (!r.ok) expect(r.problem).toContain('Prior art');
+    }
+  });
+
+  test('a one-line bug fix is accepted without Prior art', () => {
+    const r = checkPlanContract(
+      [
+        '## Context',
+        'Kind: fix',
+        'One-line bug fix: the failure banner stays blank.',
+        '',
+        '## Changes',
+        '- apps/server/src/services/builds.ts returns the stored error string',
+        '',
+        '## Verification',
+        '- `pnpm exec vitest run apps/server/test/build-fallback-report.test.ts` passes',
+      ].join('\n'),
+    );
+    expect(r).toMatchObject({ ok: true });
+  });
+
+  test('Kind: fix does not exempt a plan that adds a new module', () => {
+    const r = checkPlanContract(
+      [
+        'Kind: fix',
+        '## Changes',
+        '- Add a new module `packages/shared/src/cron.ts`',
+        VERIFIED,
+      ].join('\n'),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.problem).toContain('Prior art');
+  });
+
+  test('a feature plan whose Prior art section has no link is rejected', () => {
+    const r = checkPlanContract(
+      [
+        'Kind: feature',
+        '## Prior art',
+        '- croner is a scheduling library',
+        '- Decision: reuse croner (maintained, 0 deps) instead of a hand-written parser.',
+        VERIFIED,
+      ].join('\n'),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.problem).toContain('链接');
+  });
+
+  test('a link inside a code fence does not count as a citation', () => {
+    const r = checkPlanContract(
+      [
+        'Kind: feature',
+        '## Prior art',
+        '```',
+        'https://github.com/Hexagon/croner',
+        '```',
+        '- Decision: reuse croner (maintained, 0 deps) instead of a hand-written parser.',
+        VERIFIED,
+      ].join('\n'),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.problem).toContain('链接');
+  });
+
+  test('a link without a reuse-or-build decision and a reason is rejected', () => {
+    const r = checkPlanContract(
+      [
+        'Kind: feature',
+        '## Prior art',
+        '- https://github.com/Hexagon/croner',
+        '- Decision: reuse croner',
+        VERIFIED,
+      ].join('\n'),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.problem).toContain('决策');
+  });
+
+  test('one cited link plus a reuse-or-build decision passes', () => {
+    const r = checkPlanContract(
+      ['Kind: feature', 'new user-facing capability', PRIOR_ART_OK, VERIFIED].join('\n'),
+    );
+    expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+  });
+
+  test('a decision to build, with a reason and a link, passes', () => {
+    const r = checkPlanContract(
+      [
+        'Kind: feature',
+        '## Prior art',
+        '- https://github.com/Hexagon/croner',
+        '- Decision: build our own parser because the library cannot express todo calendar fields.',
+        VERIFIED,
+      ].join('\n'),
+    );
+    expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+  });
+
+  test('Prior art placed after Verification is not judged as a verification item', () => {
+    const r = checkPlanContract(
+      ['## Verification', '- `pnpm lint`', '', PRIOR_ART_OK, '', 'Kind: feature'].join('\n'),
+    );
+    expect(r).toEqual({ ok: true, items: ['`pnpm lint`'] });
+  });
+
+  test('a label-form Prior art section and a numbered heading are accepted', () => {
+    const r = checkPlanContract(
+      [
+        'Kind: feature',
+        'Prior art: https://github.com/Hexagon/croner',
+        '- Decision: reuse croner because it is maintained instead of a hand-written parser.',
+        VERIFIED,
+      ].join('\n'),
+    );
+    expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+    const numbered = checkPlanContract(
+      [
+        'Kind: feature',
+        '## 5. Prior art',
+        '- https://github.com/Hexagon/croner',
+        '- Decision: reuse croner (maintained) instead of a hand-written parser.',
+        VERIFIED,
+      ].join('\n'),
+    );
+    expect(numbered.ok, !numbered.ok ? numbered.problem : '').toBe(true);
+  });
+
+  test('an invalid feature plan yields no verification checklist', () => {
+    expect(planVerificationItems(`Kind: feature\n${VERIFIED}`)).toEqual([]);
+  });
+});
+
 describe('vague words inside a nested code block', () => {
   test('does not flag a command that searches for TODO', () => {
     const plan = [

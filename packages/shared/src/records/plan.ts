@@ -3,7 +3,13 @@ import { epochMs, recordId } from './common.js';
 
 export const PLAN_FILE_NAME = 'plan.md';
 
-export const PLAN_SECTIONS = ['Context', 'Changes', 'Edge cases', 'Verification'] as const;
+export const PLAN_SECTIONS = [
+  'Context',
+  'Changes',
+  'Edge cases',
+  'Verification',
+  'Prior art',
+] as const;
 
 export const planRecordSchema = z.object({
   id: recordId,
@@ -31,6 +37,13 @@ const ANCHOR_PATTERNS: readonly RegExp[] = [
 ];
 
 const VAGUE_PATTERN = /\b(?:TODO|TBD|FIXME)\b|待定|待补|待确认/;
+const FEATURE_PLAN =
+  /\bkind\s*[:：]\s*feature\b|\bnew module\b|\buser-facing capability\b|\bnew user-facing\b|\bsplit plan\b|\bsplit_todo\b|新模块|用户可见能力|面向用户的新能力|拆卡|拆解方案/i;
+const SOURCE_LINK = /https?:\/\/\S+/;
+const DECISION_CHOICE =
+  /\b(?:reuse|re-use|hand-roll|hand-rolled|hand-written|handwritten|build)\b|复用|自建|手写/i;
+const DECISION_REASON =
+  /\b(?:because|instead|rather than|maintained|reason|deps?)\b|因为|而不是|理由|依赖|维护/i;
 
 const LIST_ITEM = /^(\s*)(?:[-*•]|\d+[.)])\s+(.*)$/;
 const HEADING = /^(#{1,6})\s+(.*)$/;
@@ -63,14 +76,24 @@ function sectionMark(line: string): SectionMark | null {
   return { kind: 'label', name: cleanSectionName(l[1] ?? ''), rest: (l[2] ?? '').trim() };
 }
 
-function verificationSection(content: string): { head: string; lines: string[] } | undefined {
+function namedSection(
+  content: string,
+  sectionName: string,
+): { head: string; lines: string[] } | undefined {
   const lines = content.split('\n');
   let start = -1;
   let level = 0;
   let head = '';
+  let scanningFence = false;
   for (let i = 0; i < lines.length; i++) {
-    const mark = sectionMark((lines[i] ?? '').trim());
-    if (mark?.name !== 'verification') continue;
+    const line = (lines[i] ?? '').trim();
+    if (line.startsWith('```')) {
+      scanningFence = !scanningFence;
+      continue;
+    }
+    if (scanningFence) continue;
+    const mark = sectionMark(line);
+    if (mark?.name !== sectionName) continue;
     start = i + 1;
     if (mark.kind === 'heading') level = mark.level;
     else head = mark.rest;
@@ -154,28 +177,77 @@ function splitItems(section: { head: string; lines: string[] }): {
   return items.map(({ text, fenced }) => ({ text, fenced }));
 }
 
+export function planNeedsPriorArt(content: string): boolean {
+  const prose: string[] = [];
+  let inFence = false;
+  for (const raw of content.replace(/\r\n?/g, '\n').split('\n')) {
+    if (raw.trim().startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (!inFence) prose.push(raw);
+  }
+  return FEATURE_PLAN.test(prose.join('\n'));
+}
+
+export function planPriorArtLines(content: string): string[] | undefined {
+  const prior = namedSection(content.replace(/\r\n?/g, '\n'), 'prior art');
+  if (prior === undefined) return undefined;
+  const prose: string[] = [];
+  if (prior.head !== '') prose.push(prior.head);
+  let inFence = false;
+  for (const raw of prior.lines) {
+    const line = raw.trim();
+    if (line.startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (!inFence && line !== '') prose.push(line);
+  }
+  return prose;
+}
+
 export function checkPlanContract(content: string): PlanContractCheck {
-  const section = verificationSection(content.replace(/\r\n?/g, '\n'));
-  if (section === undefined) return { ok: false, problem: '方案缺少 Verification 小节' };
-  const items = splitItems(section);
-  if (items.length === 0) return { ok: false, problem: 'Verification 小节为空' };
-  const vague: number[] = [];
-  const unanchored: number[] = [];
-  items.forEach((item, i) => {
-    if (item.fenced) return;
-    if (
-      VAGUE_PATTERN.test(item.text.replace(/^\s*```[\s\S]*?^\s*```/gm, '').replace(/`[^`]*`/g, ''))
-    )
-      vague.push(i + 1);
-    else if (!ANCHOR_PATTERNS.some((p) => p.test(item.text))) unanchored.push(i + 1);
-  });
-  const named = (ns: number[]) => ns.map((n) => `第 ${n} 项`).join('、');
+  const normalized = content.replace(/\r\n?/g, '\n');
+  const section = namedSection(normalized, 'verification');
   const problems: string[] = [];
-  if (unanchored.length > 0)
-    problems.push(
-      `Verification ${named(unanchored)}没有可执行的检查（要写命令、测试文件路径或可断言的结果）`,
-    );
-  if (vague.length > 0) problems.push(`Verification ${named(vague)}含待定之类的占位词`);
+  let items: { text: string; fenced: boolean }[] = [];
+  if (section === undefined) problems.push('方案缺少 Verification 小节');
+  else {
+    items = splitItems(section);
+    if (items.length === 0) problems.push('Verification 小节为空');
+    else {
+      const vague: number[] = [];
+      const unanchored: number[] = [];
+      items.forEach((item, i) => {
+        if (item.fenced) return;
+        if (
+          VAGUE_PATTERN.test(
+            item.text.replace(/^\s*```[\s\S]*?^\s*```/gm, '').replace(/`[^`]*`/g, ''),
+          )
+        )
+          vague.push(i + 1);
+        else if (!ANCHOR_PATTERNS.some((p) => p.test(item.text))) unanchored.push(i + 1);
+      });
+      const itemLabel = (n: number) => `第 ${n} 项`;
+      if (unanchored.length > 0)
+        problems.push(
+          `Verification ${unanchored.map(itemLabel).join('、')}没有可执行的检查（要写命令、测试文件路径或可断言的结果）`,
+        );
+      if (vague.length > 0)
+        problems.push(`Verification ${vague.map(itemLabel).join('、')}含待定之类的占位词`);
+    }
+  }
+  if (planNeedsPriorArt(normalized)) {
+    const prose = planPriorArtLines(normalized);
+    if (prose === undefined) problems.push('功能方案缺少 Prior art 小节');
+    else {
+      if (!prose.some((line) => SOURCE_LINK.test(line)))
+        problems.push('Prior art 小节至少要有一条来源链接');
+      if (!prose.some((line) => DECISION_CHOICE.test(line) && DECISION_REASON.test(line)))
+        problems.push('Prior art 小节缺少复用或自建的决策及理由');
+    }
+  }
   if (problems.length > 0) return { ok: false, problem: problems.join('；') };
   return { ok: true, items: items.map((i) => i.text) };
 }
