@@ -17,7 +17,19 @@ import { type BuildDeps, completeStep, requestMerge } from '../src/services/buil
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { evaluateProductGate } from '../src/services/machine-gate-port.js';
 import { bootServer, req, type TestServer } from './helpers.js';
+
+vi.mock('../src/services/machine-gate-port.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  evaluateProductGate: vi.fn(async () => ({
+    ready: true,
+    headSha: 'f'.repeat(40),
+    patchDigest: 'legacy-reconcile-audited-patch',
+    policy: 'human',
+    blockers: [],
+  })),
+}));
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -325,7 +337,8 @@ async function refusal(p: Promise<unknown>): Promise<HttpError> {
 
 const PLAIN_BODY = 'Merged by cairn.';
 
-const MERGED_ROW = `PR #201 已由 cairn 经 GitHub 合并（squash，合并提交 ${MERGE_SHA.slice(0, 7)}）`;
+const MERGED_ROW = `PR #201 已由 cairn 经 GitHub 合并（squash，合并提交 ${MERGE_SHA.slice(0, 7)}）；审计尚未确认，cairn 对账确认后收尾`;
+const RECONCILED_ROW = `PR #201 已在 GitHub 合并（合并提交 ${MERGE_SHA.slice(0, 7)}，由 octo 合并）`;
 
 function expectUntouched(w: World, phase: Phase = 'review'): void {
   expect(w.systemRows()).toEqual([]);
@@ -335,7 +348,7 @@ function expectUntouched(w: World, phase: Phase = 'review'): void {
 }
 
 describe('#1403 segment 2b: the server merges the PR through the GitHub API', () => {
-  test('[2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done', async () => {
+  test('[2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; audit sweep completes the card', async () => {
     const w = makeWorld({ pendingVerify: true });
     const result = await requestMerge(w.deps, w.buildId, 'Xmon');
     expect(result).toEqual({ delegated: true });
@@ -352,7 +365,15 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     });
     expect(put.headers['content-type']).toBe('application/json');
     expect(w.userRows()).toEqual([{ content: MERGE_ANNOUNCEMENT, actor: 'Xmon' }]);
-    expect(w.systemRows()).toEqual([MERGED_ROW, DONE_ROW]);
+    expect(w.phase()).toBe('review');
+    expect(w.systemRows()).toEqual([MERGED_ROW]);
+    await w.sweep();
+    expect(evaluateProductGate).toHaveBeenCalledWith(
+      expect.objectContaining({ db: w.s.db }),
+      w.buildId,
+      { requireAudit: true },
+    );
+    expect(w.systemRows()).toEqual([MERGED_ROW, RECONCILED_ROW, DONE_ROW]);
     expect(w.phase()).toBe('done');
     expect(w.steps().find((r) => r.kind === 'verify')?.status).toBe('stopped');
     expect(w.steps().filter((r) => r.kind === 'merge')).toEqual([]);
@@ -413,6 +434,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       >;
       expect(body.commit_title).toBe('Merge pull request #201');
       expect(body.commit_message).toBe('closes #77');
+      expect(w.phase()).toBe('review');
+      await w.sweep();
       expect(w.phase()).toBe('done');
     },
   );
@@ -785,6 +808,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
     expect(w.fake.gets()).toHaveLength(2);
     expect(w.fake.puts()).toHaveLength(1);
+    expect(w.phase()).toBe('review');
+    await w.sweep();
     expect(w.phase()).toBe('done');
   });
 
@@ -1002,6 +1027,9 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect((rejected.reason as HttpError).status).toBe(409);
     expect(w.fake.gets()).toHaveLength(1);
     expect(w.fake.puts()).toHaveLength(1);
+    expect(w.phase()).toBe('review');
+    expect(w.systemRows()).toEqual([MERGED_ROW]);
+    await w.sweep();
     expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
   });
 
@@ -1020,7 +1048,10 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     };
     await requestMerge(w.deps, w.buildId);
     expect(swept).toBe(0);
-    expect(w.systemRows()).toEqual([MERGED_ROW, DONE_ROW]);
+    expect(w.phase()).toBe('review');
+    expect(w.systemRows()).toEqual([MERGED_ROW]);
+    await w.sweep();
+    expect(w.systemRows()).toEqual([MERGED_ROW, RECONCILED_ROW, DONE_ROW]);
     expect(w.phase()).toBe('done');
   });
 
@@ -1061,11 +1092,14 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(w.phase()).toBe('closed');
   });
 
-  test('[2b-D18a] failed card that can be restored, GitHub merges → restored, then done', async () => {
+  test('[2b-D18a] failed card that can be restored, GitHub merges → restored to review, then an audit sweep completes the card', async () => {
     const w = makeWorld({ phase: 'failed' });
     expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    expect(w.phase()).toBe('review');
+    expect(w.systemRows()).toEqual([MERGED_ROW]);
+    await w.sweep();
+    expect(w.systemRows()).toEqual([MERGED_ROW, RECONCILED_ROW, DONE_ROW]);
     expect(w.phase()).toBe('done');
-    expect(w.systemRows()).toEqual([MERGED_ROW, DONE_ROW]);
   });
 
   test('[2b-D18b] failed card that can be restored, GitHub refuses → stays failed, no row', async () => {
@@ -1247,6 +1281,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
     const put = w.fake.puts()[0] as Recorded;
     expect((JSON.parse(put.body ?? 'null') as { sha: string }).sha).toBe(merged);
+    expect(w.phase()).toBe('review');
+    await w.sweep();
     expect(w.phase()).toBe('done');
   });
 
@@ -1344,6 +1380,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const res = await req(ok.s.app, 'POST', `/api/builds/${ok.buildId}/merge`);
     expect(res.status).toBe(202);
     expect(await res.json()).toEqual({ delegated: true });
+    expect(ok.phase()).toBe('review');
+    await ok.sweep();
     expect(ok.phase()).toBe('done');
     const no = makeWorld();
     no.fake.mergeAnswer = { status: 405, body: { message: 'Pull Request is not mergeable' } };
