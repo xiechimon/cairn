@@ -1313,6 +1313,7 @@ export function mapChief(
         }
       : {}),
     threadTitle: active?.title ?? '新主题',
+    ...(active !== null ? { threadId: active.id } : {}),
     ...(opts.threads.length > 0
       ? {
           threads: opts.threads.map((t) => ({

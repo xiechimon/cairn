@@ -172,7 +172,12 @@ async function mockLive(
       sent.push(content);
       state.messages = [
         ...state.messages,
-        { id: `n${state.messages.length + 1}`, role: 'user', content, createdAt: state.sendAt ?? Date.now() },
+        {
+          id: `n${state.messages.length + 1}`,
+          role: 'user',
+          content,
+          createdAt: state.sendAt ?? Date.now(),
+        },
       ];
       return json({ thread: THREAD }, 201);
     }

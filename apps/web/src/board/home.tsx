@@ -479,8 +479,7 @@ export function DailyBrief({ todos, ...ctx }: RowContext & { todos: TodoRecord[]
   const waitingSet = new Set(waiting);
   const byProject = new Map<string, { done: number; running: number; waiting: number }>();
   for (const todo of todos) {
-    const name = projectOf(todo);
-    if (name == null) continue;
+    const name = projectOf(todo) ?? t('其他');
     const done = todo.phase === 'done' && ctx.now - todo.phaseAt <= BRIEF_WINDOW_MS;
     if (!done && !running.has(todo) && !waitingSet.has(todo)) continue;
     const line = byProject.get(name) ?? { done: 0, running: 0, waiting: 0 };
