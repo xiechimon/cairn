@@ -607,3 +607,129 @@ describe('GET /api/todos/{id}/github-issue read-only echo (D family)', () => {
     s.dispose();
   });
 });
+
+describe('moving a task with a self-created issue to another project (#2009)', () => {
+  test('the old issue gets a comment and is closed as not planned, and a new issue opens in the new repo', async () => {
+    const BETA = 'octo/beta';
+    const mock = ghMock({
+      [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE },
+      [`POST ${issuePath(101)}/comments`]: { status: 201, body: { id: 1 } },
+      [`PATCH ${issuePath(101)}`]: { status: 200, body: { number: 101, state: 'closed' } },
+      [`POST /repos/${BETA}/issues`]: { status: 201, body: { ...CREATED_ISSUE, number: 7 } },
+    });
+    const s = bootServer({ githubFetch: mock.impl });
+    seedConnection(s);
+    const alpha = await postGithubProject(s.app);
+    const betaRes = await call(s.app, 'POST', '/api/projects', {
+      body: { name: 'beta', kind: 'github', githubRepo: BETA },
+    });
+    const beta = ((await betaRes.json()) as { id: string }).id;
+    const created = await createTask(s.app, alpha);
+    await flushSelfIssueWrites();
+    const moved = await call(s.app, 'PATCH', `/api/todos/${created.id}`, {
+      body: { projectId: beta },
+    });
+    expect(moved.status).toBe(200);
+    await flushSelfIssueWrites();
+    await vi.waitFor(() => expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1));
+    expect(JSON.parse(mock.callsTo('PATCH', issuePath(101))[0]!.body!)).toEqual({
+      state: 'closed',
+      state_reason: 'not_planned',
+    });
+    expect(mock.callsTo('POST', `${issuePath(101)}/comments`)[0]!.body).toContain(`${BETA}#7`);
+    const after = await getTodo(s.app, created.id);
+    expect(after.projectId).toBe(beta);
+    expect(after.sourceRef).toBe(`github:${BETA}#7`);
+    s.dispose();
+  });
+
+  test('when the new repo refuses the issue, the old one stays open and linked until a retry succeeds', async () => {
+    const BETA = 'octo/beta';
+    const mock = ghMock({
+      [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE },
+      [`POST ${issuePath(101)}/comments`]: { status: 201, body: { id: 1 } },
+      [`PATCH ${issuePath(101)}`]: { status: 200, body: { number: 101, state: 'closed' } },
+      [`POST /repos/${BETA}/issues`]: { status: 410, body: { message: 'Issues are disabled' } },
+    });
+    const s = bootServer({ githubFetch: mock.impl });
+    seedConnection(s);
+    const alpha = await postGithubProject(s.app);
+    const betaRes = await call(s.app, 'POST', '/api/projects', {
+      body: { name: 'beta', kind: 'github', githubRepo: BETA },
+    });
+    const beta = ((await betaRes.json()) as { id: string }).id;
+    const created = await createTask(s.app, alpha);
+    await flushSelfIssueWrites();
+    await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { projectId: beta } });
+    await flushSelfIssueWrites();
+    expect(mock.callsTo('POST', `/repos/${BETA}/issues`)).toHaveLength(1);
+    expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(0);
+    const stuck = await getTodo(s.app, created.id);
+    expect(stuck.projectId).toBe(beta);
+    expect(stuck.sourceRef).toBe(`github:${REPO}#101`);
+    mock.set(`POST /repos/${BETA}/issues`, { status: 201, body: { ...CREATED_ISSUE, number: 7 } });
+    const retry = await call(s.app, 'POST', `/api/todos/${created.id}/github-issue/retry`);
+    expect(retry.status).toBe(200);
+    await vi.waitFor(() => expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1));
+    expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${BETA}#7`);
+    s.dispose();
+  });
+
+  test('the old issue is closed with the token the connection holds after the replacement opens', async () => {
+    const BETA = 'octo/beta';
+    const ROTATED = 'ghp_rotated_token';
+    const mock = ghMock({
+      [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE },
+      [`POST ${issuePath(101)}/comments`]: { status: 201, body: { id: 1 } },
+      [`PATCH ${issuePath(101)}`]: { status: 200, body: { number: 101, state: 'closed' } },
+      [`POST /repos/${BETA}/issues`]: { status: 201, body: { ...CREATED_ISSUE, number: 7 } },
+    });
+    let rotate = (): void => undefined;
+    const s = bootServer({
+      githubFetch: async (input, init) => {
+        const res = await mock.impl(input, init);
+        if (new URL(String(input)).pathname === `/repos/${BETA}/issues`) rotate();
+        return res;
+      },
+    });
+    seedConnection(s);
+    rotate = () =>
+      upsertGithubConnection(
+        { db: s.db, box: s.secretBox },
+        { teamId: s.team.id, login: 'octo', accessToken: ROTATED, scope: 'repo' },
+      );
+    const alpha = await postGithubProject(s.app);
+    const betaRes = await call(s.app, 'POST', '/api/projects', {
+      body: { name: 'beta', kind: 'github', githubRepo: BETA },
+    });
+    const beta = ((await betaRes.json()) as { id: string }).id;
+    const created = await createTask(s.app, alpha);
+    await flushSelfIssueWrites();
+    await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { projectId: beta } });
+    await flushSelfIssueWrites();
+    const close = mock.callsTo('PATCH', issuePath(101));
+    expect(close).toHaveLength(1);
+    expect(close[0]!.headers.authorization).toBe(`Bearer ${ROTATED}`);
+    s.dispose();
+  });
+
+  test('moving to a project without GitHub closes the old issue and clears the link', async () => {
+    const mock = ghMock({
+      [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE },
+      [`POST ${issuePath(101)}/comments`]: { status: 201, body: { id: 1 } },
+      [`PATCH ${issuePath(101)}`]: { status: 200, body: { number: 101, state: 'closed' } },
+    });
+    const s = bootServer({ githubFetch: mock.impl });
+    seedConnection(s);
+    const alpha = await postGithubProject(s.app);
+    const local = await postProject(s.app, 'local');
+    const created = await createTask(s.app, alpha);
+    await flushSelfIssueWrites();
+    await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { projectId: local } });
+    await vi.waitFor(() => expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1));
+    const after = await getTodo(s.app, created.id);
+    expect(after.sourceKind).toBeNull();
+    expect(after.sourceRef).toBeNull();
+    s.dispose();
+  });
+});
