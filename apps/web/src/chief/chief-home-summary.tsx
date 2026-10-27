@@ -1,24 +1,8 @@
 import { Link, useLocation } from 'react-router';
-import type { HomeOverview, ProjectGlance } from '../board/board.js';
+import type { HomeOverview } from '../board/board.js';
 import { withColumnParam } from '../board/columns.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useI18n } from '../i18n/provider.js';
-
-function ProjectLine({ row }: { row: ProjectGlance }) {
-  const { t } = useI18n();
-  const parts = [
-    row.running > 0 ? t('{n} 个在跑', { n: row.running }) : null,
-    row.doneToday > 0 ? t('今天合并 {n} 个', { n: row.doneToday }) : null,
-    row.needsYou > 0 ? t('{n} 项待你处理', { n: row.needsYou }) : null,
-  ].filter((part) => part != null);
-  return (
-    <li data-testid="chief-home-project" className="flex min-w-0 items-center gap-2">
-      <ProjectAvatar name={row.name} tone={row.tone} />
-      <b className="min-w-24 truncate font-medium text-foreground">{row.name}</b>
-      <span className="truncate">{parts.join(t('，'))}</span>
-    </li>
-  );
-}
 
 export function HomeSummary({
   needsYou,
@@ -52,7 +36,23 @@ export function HomeSummary({
           className="m-0 mt-2 grid list-none gap-1.5 p-0"
         >
           {byProject.map((row) => (
-            <ProjectLine key={row.projectId} row={row} />
+            <li
+              key={row.projectId}
+              data-testid="chief-home-project"
+              className="flex min-w-0 items-center gap-2"
+            >
+              <ProjectAvatar name={row.name} tone={row.tone} />
+              <b className="min-w-24 truncate font-medium text-foreground">{row.name}</b>
+              <span className="truncate">
+                {[
+                  row.running > 0 ? t('{n} 个在跑', { n: row.running }) : null,
+                  row.doneToday > 0 ? t('今天合并 {n} 个', { n: row.doneToday }) : null,
+                  row.needsYou > 0 ? t('{n} 项待你处理', { n: row.needsYou }) : null,
+                ]
+                  .filter((part) => part != null)
+                  .join(t('，'))}
+              </span>
+            </li>
           ))}
         </ul>
       )}

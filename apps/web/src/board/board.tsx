@@ -102,33 +102,6 @@ export interface HomeOverview {
   byProject: ProjectGlance[];
 }
 
-function glanceByProject(
-  projectNames: Record<string, string> | undefined,
-  buckets: Record<'needsYou' | 'running' | 'doneToday', TodoRecord[]>,
-): ProjectGlance[] {
-  const names = projectNames ?? {};
-  const order = Object.keys(names);
-  if (order.length < 2) return [];
-  const rows = new Map<string, ProjectGlance>();
-  for (const [key, todos] of Object.entries(buckets) as [keyof typeof buckets, TodoRecord[]][]) {
-    for (const todo of todos) {
-      const name = names[todo.projectId];
-      if (name == null) continue;
-      const row = rows.get(todo.projectId) ?? {
-        projectId: todo.projectId,
-        name,
-        tone: order.indexOf(todo.projectId),
-        needsYou: 0,
-        running: 0,
-        doneToday: 0,
-      };
-      row[key] += 1;
-      rows.set(todo.projectId, row);
-    }
-  }
-  return [...rows.values()].sort((a, b) => a.tone - b.tone);
-}
-
 const COLUMN_ICON = {
   idle: { icon: CircleDashed, tone: 'text-icon' },
   running: { icon: Activity, tone: 'text-running' },
@@ -327,6 +300,29 @@ export function BoardSurface({
     running: viewTodos('building'),
     doneToday: visibleTodos.filter((todo) => todo.phase === 'done' && todo.phaseAt >= startOfToday),
   };
+  const projectOrder = Object.keys(fixture.projectNames ?? {});
+  const projectGlances = new Map<string, ProjectGlance>();
+  if (projectOrder.length > 1) {
+    for (const [key, todos] of Object.entries(homeBuckets) as [
+      keyof typeof homeBuckets,
+      TodoRecord[],
+    ][]) {
+      for (const todo of todos) {
+        const name = fixture.projectNames?.[todo.projectId];
+        if (name == null) continue;
+        const row = projectGlances.get(todo.projectId) ?? {
+          projectId: todo.projectId,
+          name,
+          tone: projectOrder.indexOf(todo.projectId),
+          needsYou: 0,
+          running: 0,
+          doneToday: 0,
+        };
+        row[key] += 1;
+        projectGlances.set(todo.projectId, row);
+      }
+    }
+  }
   const filterEmpty = (
     <>
       <span className="text-sm text-muted-foreground">{t('没有匹配筛选条件的任务')}</span>
@@ -409,7 +405,7 @@ export function BoardSurface({
           needsYou: homeBuckets.needsYou.length,
           running: homeBuckets.running.length,
           doneToday: homeBuckets.doneToday.length,
-          byProject: glanceByProject(fixture.projectNames, homeBuckets),
+          byProject: [...projectGlances.values()].sort((x, y) => x.tone - y.tone),
         })
       ) : home && !showFilterEmpty ? (
         <HomeSections

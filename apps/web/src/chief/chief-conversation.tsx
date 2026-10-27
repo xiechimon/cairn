@@ -94,14 +94,6 @@ const EXAMPLE_ICONS = {
 export const CHIEF_DRAFT_STORAGE_KEY = 'cairn.chief-draft';
 export const CHIEF_PROJECT_STORAGE_KEY = 'cairn.chief-project';
 
-function readStoredChiefProject(): string | null {
-  try {
-    return localStorage.getItem(CHIEF_PROJECT_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
 function readStoredChiefDraft(): string {
   try {
     return localStorage.getItem(CHIEF_DRAFT_STORAGE_KEY) ?? '';
@@ -196,9 +188,14 @@ export function ChiefConversation({
       (projectsQ.data ?? []).map((p) => ({ id: p.id, name: p.name, description: p.description })),
     [projectsQ.data],
   );
-  const [storedProjectId, setStoredProjectId] = useState(() =>
-    live ? readStoredChiefProject() : null,
-  );
+  const [storedProjectId, setStoredProjectId] = useState(() => {
+    if (!live) return null;
+    try {
+      return localStorage.getItem(CHIEF_PROJECT_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
   const pickedProject = projectOptions.find((p) => p.id === storedProjectId) ?? null;
   const chipVisible = onSend != null && projectOptions.length > 1;
   const pickProject = useCallback((projectId: string | null) => {

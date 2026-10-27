@@ -367,20 +367,6 @@ export function chiefBinding(
 
 const PICKED_PROJECT_OPEN = '【输入框选定项目：';
 
-function pickedProject(
-  deps: ChiefDeps,
-  teamId: string,
-  projectId: string,
-): { id: string; name: string } {
-  const row = deps.db
-    .select({ id: project.id, name: project.name })
-    .from(project)
-    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
-    .get();
-  if (row === undefined) throw new HttpError(400, `project ${projectId} not in team`);
-  return row;
-}
-
 export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
@@ -391,7 +377,17 @@ export function sendChiefMessage(
 } {
   const chiefRow = ensureChief(deps, teamId);
   requireBoundAgent(deps, chiefRow);
-  const picked = body.projectId == null ? null : pickedProject(deps, teamId, body.projectId);
+  const picked =
+    body.projectId == null
+      ? null
+      : (deps.db
+          .select({ id: project.id, name: project.name })
+          .from(project)
+          .where(and(eq(project.id, body.projectId), eq(project.teamId, teamId)))
+          .get() ?? null);
+  if (body.projectId != null && picked === null) {
+    throw new HttpError(400, `project ${body.projectId} not in team`);
+  }
 
   let threadRow: ThreadRow | undefined;
   if (body.threadId !== null) {
