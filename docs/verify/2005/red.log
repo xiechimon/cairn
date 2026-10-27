@@ -1,0 +1,47 @@
+node:internal/modules/esm/resolve:272
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/mnt/fast/lanes/cairn-2005/scripts/baseline-owner-gate.mjs' imported from /mnt/fast/lanes/cairn-2005/scripts/baseline-owner-gate.test.mjs
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:389:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///mnt/fast/lanes/cairn-2005/scripts/baseline-owner-gate.mjs'
+}
+
+Node.js v26.8.2
+✖ scripts/baseline-owner-gate.test.mjs (59.323472ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 73.541316
+
+✖ failing tests:
+
+test at scripts/baseline-owner-gate.test.mjs:1:1
+✖ scripts/baseline-owner-gate.test.mjs (59.323472ms)
+  'test failed'
+
+=== Fix: the blanket scripts/*-baseline.json pattern flagged the CI job structure pin,
+=== so the gate blocked every PR that registers a new CI job, including this one.
+=== Red: the two new bootstrap tests against the pre-fix gate.
+✖ the CI job structure pin is not a tunable baseline (0.803981ms)
+✖ registering a new CI job needs no main-red ownership (0.249923ms)
+ℹ tests 13
+ℹ pass 11
+ℹ fail 2
+✖ failing tests:
+✖ the CI job structure pin is not a tunable baseline (0.803981ms)
+✖ registering a new CI job needs no main-red ownership (0.249923ms)

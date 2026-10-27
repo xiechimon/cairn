@@ -1,0 +1,21 @@
+✔ rejects unowned changes to scripts/prepush-known-red.json (1.039246ms)
+✔ accepts main-red ownership of scripts/prepush-known-red.json (0.110269ms)
+✔ rejects unowned changes to scripts/lint-warning-baseline.json (0.076188ms)
+✔ accepts main-red ownership of scripts/lint-warning-baseline.json (0.063465ms)
+✔ rejects unowned changes to scripts/comment-discipline-allowlist.json (0.061586ms)
+✔ accepts main-red ownership of scripts/comment-discipline-allowlist.json (0.056633ms)
+✔ ordinary files need no issue ownership (0.097232ms)
+✔ the CI job structure pin is not a tunable baseline (0.104812ms)
+✔ registering a new CI job needs no main-red ownership (0.11699ms)
+✔ tunable baselines listed in the ledger stay protected (0.166313ms)
+✔ protected changes require at least one closing issue (0.0811ms)
+✔ every closing issue must have the exact main-red label (0.080517ms)
+✔ collects distinct closing issue lines including comma-separated declarations (0.298442ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53.182962

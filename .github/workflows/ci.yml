@@ -408,3 +408,20 @@ jobs:
           git fetch --depth=1 origin "$BASELINE_RATCHET_BASE_SHA"
           node --test scripts/baseline-ratchet-gate.test.mjs scripts/gardener-weekly.test.mjs scripts/evidence-prune.test.mjs
           node scripts/baseline-ratchet-gate.mjs
+
+  baseline-owner-gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+      - name: Baseline owner gate (#2005)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --test scripts/baseline-owner-gate.test.mjs
+          node scripts/baseline-owner-gate.mjs
