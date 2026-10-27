@@ -299,7 +299,7 @@ export async function boot(opts: {
     claudeCodeBackend: opts.claudeCodeBackend,
     claudeCodeAuthProbe:
       opts.claudeCodeAuthProbe ??
-      (async () => ({ state: 'logged-in', method: 'oauth_token', provider: 'firstParty' })),
+      (async () => ({ state: 'logged-in', method: 'claude.ai', provider: 'firstParty' })),
     readClaudeOauthExpiresAt: opts.readClaudeOauthExpiresAt ?? (() => null),
     ...(opts.capabilitiesProbe !== undefined ? { capabilitiesProbe: opts.capabilitiesProbe } : {}),
     idleSleepPrevention: false,

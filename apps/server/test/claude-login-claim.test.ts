@@ -10,7 +10,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { claimStep } from '../src/services/machines.js';
+import { claimStep, markPresence } from '../src/services/machines.js';
 import {
   bootServer,
   insertMachine,
@@ -263,6 +263,35 @@ describe('claimStep and Claude Code login expiry', () => {
 });
 
 describe('presence stores Claude Code login and the machine record exposes it', () => {
+  test('online login changes notify the team without repeating unchanged heartbeats', async () => {
+    const { s } = await world();
+    const machineId = insertMachine(s, {
+      name: 'online-login',
+      claudeCodeReport: report({ state: 'ok' }),
+    });
+    const events: object[] = [];
+    s.hub.subscribe(s.team.id, {
+      nextSeq: () => 1,
+      send: async (event: object) => {
+        events.push(event);
+      },
+    });
+    const deps = {
+      ...s.svc,
+      box: s.secretBox,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+    };
+    const expiresAt = Date.now() + 1000;
+    markPresence(deps, machineId, { claudeCode: report({ state: 'expiring', expiresAt }) });
+    expect(events).toEqual([{ type: 'machine_presence', machineId, online: true }]);
+    markPresence(deps, machineId, { claudeCode: report({ state: 'expiring', expiresAt }) });
+    markPresence(deps, machineId, {});
+    expect(events).toHaveLength(1);
+    markPresence(deps, machineId, { claudeCode: report({ state: 'ok' }) });
+    expect(events).toHaveLength(2);
+  });
+
   test('presence keeps login, and the team machine list returns claudeLogin', async () => {
     const { s } = await world();
     const apiKey = await issueApiKey(s);

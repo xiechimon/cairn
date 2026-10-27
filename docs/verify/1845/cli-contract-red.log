@@ -1,0 +1,77 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1845-auth
+
+ ❯ |@xiechimon/cairn-cli| test/machine-claude-login.test.ts (6 tests | 3 failed) 31ms
+   ❯ machine presence carries Claude Code login (6)
+     × startup presence reports expiring when the oauth clock is inside 3 days 23ms
+     × alternative authentication ignores stale OAuth credentials: oauth_token 1ms
+     × the presence beat re-probes and the next report follows a newly expired clock 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-claude-login.test.ts > machine presence carries Claude Code login > startup presence reports expiring when the oauth clock is inside 3 days
+AssertionError: expected { state: 'ok' } to deeply equal { state: 'expiring', …(1) }
+
+- Expected
++ Received
+
+  {
+-   "expiresAt": 1793269815148,
+-   "state": "expiring",
++   "state": "ok",
+  }
+
+ ❯ test/machine-claude-login.test.ts:19:44
+     17|     try {
+     18|       await waitFor(() => api.presenceBodies.length > 0);
+     19|       expect(loginOf(api.enrollBodies[0])).toEqual({ state: 'expiring'…
+       |                                            ^
+     20|       expect(loginOf(api.presenceBodies[0])).toEqual({ state: 'expirin…
+     21|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-claude-login.test.ts > machine presence carries Claude Code login > alternative authentication ignores stale OAuth credentials: oauth_token
+AssertionError: expected { state: 'expired', …(1) } to deeply equal { state: 'ok' }
+
+- Expected
++ Received
+
+  {
+-   "state": "ok",
++   "expiresAt": 1793096955174,
++   "state": "expired",
+  }
+
+ ❯ test/machine-claude-login.test.ts:63:48
+     61|       try {
+     62|         await waitFor(() => api.presenceBodies.length > 0);
+     63|         expect(loginOf(api.presenceBodies[0])).toEqual({ state: 'ok' }…
+       |                                                ^
+     64|         expect(reads).toBe(0);
+     65|       } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-claude-login.test.ts > machine presence carries Claude Code login > the presence beat re-probes and the next report follows a newly expired clock
+AssertionError: expected 'ok' to be 'expiring' // Object.is equality
+
+Expected: "expiring"
+Received: "ok"
+
+ ❯ test/machine-claude-login.test.ts:80:53
+     78|     try {
+     79|       await waitFor(() => api.presenceBodies.length > 0);
+     80|       expect(loginOf(api.presenceBodies[0])?.state).toBe('expiring');
+       |                                                     ^
+     81|       expiresAt = Date.now() - 60_000;
+     82|       await waitFor(() => api.presenceBodies.some((body) => loginOf(bo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+   Start at  10:30:12
+   Duration  2.37s (import 53%, transform 46%, tests 1%)
+

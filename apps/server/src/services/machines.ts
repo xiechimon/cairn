@@ -376,6 +376,12 @@ export function markPresence(
   const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!row) throw new NotFoundError(`machine ${machineId}`);
   const becameOnline = !row.online;
+  const previousLogin = row.claudeCodeReport?.login;
+  const reportedLogin = body.claudeCode?.login;
+  const loginChanged =
+    body.claudeCode !== undefined &&
+    (previousLogin?.state !== reportedLogin?.state ||
+      previousLogin?.expiresAt !== reportedLogin?.expiresAt);
   const capabilities = parseCapabilitiesField(body.capabilities);
   db.update(machine)
     .set({
@@ -387,7 +393,7 @@ export function markPresence(
     })
     .where(eq(machine.id, machineId))
     .run();
-  if (becameOnline) {
+  if (becameOnline || loginChanged) {
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online: true }));
   }
 }

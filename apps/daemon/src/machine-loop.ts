@@ -165,7 +165,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       claudeAuth = probe;
       const expiresAt =
         probe.state === 'logged-in' &&
-        probe.method === 'oauth_token' &&
+        probe.method === 'claude.ai' &&
         probe.provider === 'firstParty'
           ? readExpiresAt()
           : null;

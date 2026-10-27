@@ -45,6 +45,7 @@ describe('machine presence carries Claude Code login', () => {
 
   test.each([
     { method: 'api_key_helper', provider: 'firstParty' },
+    { method: 'oauth_token', provider: 'firstParty' },
     { method: 'third_party', provider: 'bedrock' },
   ])(
     'alternative authentication ignores stale OAuth credentials: $method',
