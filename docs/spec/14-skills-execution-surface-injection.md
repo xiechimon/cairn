@@ -14,9 +14,9 @@ The skills data source already migrated to the local directory (spec 13), but th
 
 ## Solution
 
-Before creating an agent session, the daemon **explicitly scans** the pacman-configured skills directory (env `PACMAN_SKILLS_DIR`, default `~/.agents/skills`), calling pi's top-level exports `loadSkills` and `formatSkillsForPrompt`:
+Before creating an agent session, the daemon **explicitly scans** the pacman-configured skills directory (env `CAIRN_SKILLS_DIR`, default `~/.agents/skills`), calling pi's top-level exports `loadSkills` and `formatSkillsForPrompt`:
 
-- **`loadSkills` mode**: does not read pi's default directory (`includeDefaults: false`, `agentDir` passed a non-pi-default value such as `PACMAN_HOME/agent` so pi skips its user-level default scan), only `skillPaths: [PACMAN_SKILLS_DIR]` as the single source of truth — aligned with spec 13's "single source of truth".
+- **`loadSkills` mode**: does not read pi's default directory (`includeDefaults: false`, `agentDir` passed a non-pi-default value such as `CAIRN_HOME/agent` so pi skips its user-level default scan), only `skillPaths: [CAIRN_SKILLS_DIR]` as the single source of truth — aligned with spec 13's "single source of truth".
 - **id model**: the skill identity = frontmatter `name` (the agentskills.io standard); no frontmatter / no `name` field = fall back to the directory name. The wire id and the runtime id come from the same source, no split.
 - **Injection shape**: catalog, not full text. `formatSkillsForPrompt(skills)` generates the `<available_skills><skill><name/><description/><location/></skill></available_skills>` XML block (the agentskills.io/integrate-skills standard), **appended to** `SessionOpts.systemPrompt` (not replacing). The agent's own `read` tool reads the SKILL.md full text on demand when the description matches — pi already wrote the system-prompt section "Use the read tool to load a skill's file when the task matches its description." + "references are relative to the skill directory (parent of SKILL.md)" for this.
 - **Conflict dedup**: pi already dedups by realpath + name-collision detection (winnerPath/loserPath), reused unchanged.
@@ -24,7 +24,7 @@ Before creating an agent session, the daemon **explicitly scans** the pacman-con
 ## User Stories
 
 1. As a user who keeps all skills in `~/.agents/skills`, once the pacman daemon starts these skills automatically appear in the agent's available set — zero extra configuration.
-2. As a self-hosted user, I start the daemon with `PACMAN_SKILLS_DIR=/path/to/other`, and skills load from there, not `~/.agents/skills`.
+2. As a self-hosted user, I start the daemon with `CAIRN_SKILLS_DIR=/path/to/other`, and skills load from there, not `~/.agents/skills`.
 3. As a skills author, I write `name: foo-deploy` in the SKILL.md frontmatter, and the pacman UI list, the agent.skills checkbox, and the agent-session available set all use the same `foo-deploy` — renaming the directory does not affect it.
 4. As a long-skills author, the full skill text is not stuffed into the system prompt; the agent sees the catalog (name + description + location) and `read`s the SKILL.md itself when the description matches — token budget linear, not exponential.
 5. As a conflict handler, I put same-named skills in two directories (different realpaths), pacman follows pi's "winner path" ruling, and the daemon log prints the collision diagnostic.
@@ -44,7 +44,7 @@ Before creating an agent session, the daemon **explicitly scans** the pacman-con
 - No change (spec 13's `GET /api/skills?teamId=` live-scan already suffices for the UI; this spec reuses its result for daemon-side comparison, but the daemon reads the local directory directly, not through the server — under the self-host single-machine model a server hop has no benefit).
 
 **daemon**
-- `apps/daemon/src/config.ts`: add `skillsDir: string` (schema), default = `env.PACMAN_SKILLS_DIR ?? join(homedir(), '.agents', 'skills')`. Env priority above the home default (continuing the existing settings seam discipline).
+- `apps/daemon/src/config.ts`: add `skillsDir: string` (schema), default = `env.CAIRN_SKILLS_DIR ?? join(homedir(), '.agents', 'skills')`. Env priority above the home default (continuing the existing settings seam discipline).
 - `apps/daemon/src/backend/pi.ts`: before `createAgentSession({...})`, add a new step:
   1. `loadSkills({ cwd: config.home, agentDir: '<a non-existent pi-default path>', skillPaths: [skillsDir], includeDefaults: false })` → `{ skills, diagnostics }` (**`cwd` uses the daemon home, not the task worktree** — avoiding worktree switches causing project-level skills resolution jumps)
   2. catalog byte budget (#1116, 2026-10-10 user ruling switched tracks; the old "50-count gate + 200-char description truncation" retired): the visible set is decided by the binding surface (#372 allowlist ∩ #1106 injection selection; chief = trusted-surface full set), the budget only backstops prompt bloat — after catalog rendering it counts by **UTF-8 bytes** (CJK honest, not `.length`), on exceeding `SKILLS_CATALOG_BUDGET_BYTES` (1 MiB, aligned with the Multica pack-archive single-file tier) it **drops from the tail by priority** (priority = injection-selection order > allowlist order > the scan order with team directory first — the binding array order is exactly the user's sort/pin operation surface), and it is **not silent**: `[skills] budget: total=<B> budget=<B'> dropped=<N>: <names>` logs the names + the catalog tail appends an `<omitted_skills reason="byte-budget">` section (the agent itself can see who is missing). description no longer truncated (routing evidence full; the budget gate already covers the cost semantics).
@@ -68,7 +68,7 @@ Before creating an agent session, the daemon **explicitly scans** the pacman-con
 
 ### Data contracts
 
-- env: `PACMAN_SKILLS_DIR` — single string, dir path (default `~/.agents/skills`). Missing / non-existent directory = empty skill set (same rule as spec 13).
+- env: `CAIRN_SKILLS_DIR` — single string, dir path (default `~/.agents/skills`). Missing / non-existent directory = empty skill set (same rule as spec 13).
 - daemon log: the `[skills] <type>: <msg>` family (`<type>` ∈ `loaded | collision | invalid-frontmatter | missing-skill-md | filtered | budget | catalog`), info level. #1116 ②: within collision, **content byte-for-byte identical mirrors** (the common single-machine shape where server skillsDir = daemon skillsDir) merge into one line `collision: <N> identical mirror(s) deduped (team view wins; budget counts the merged set once)` — per-entry lines are reserved for real content conflicts; the `catalog: entries=<N> chars=<C> bytes=<B>` observation line always lands (bytes = the budget caliber).
 - SessionOpts.systemPrompt: the existing user-side stitching `+ '\n\n' + formatSkillsForPrompt(skills, 'read')`. `fileReadTool` passes `'read'` — the pacman daemon carries the `read` tool by default.
 
@@ -97,7 +97,7 @@ On step start (before the runner builds the session) pull the skill pack by step
 
 ### Cache strategy (content-addressed)
 
-- Cache root = `<PACMAN_HOME>/team-skills/`; an entry = `<sha256(pack deterministic serialization)>/`, under it one `dirName/` subdirectory per skill (files written byte for byte, including nested relative paths).
+- Cache root = `<CAIRN_HOME>/team-skills/`; an entry = `<sha256(pack deterministic serialization)>/`, under it one `dirName/` subdirectory per skill (files written byte for byte, including nested relative paths).
 - Hit means reuse: the same pack across steps has zero rewrite, the directory mtime touched (LRU treats it as most-recently-used); content changes = a new hash directory. Why content-addressed rather than mtime-invalidated: the daemon cannot know the server-side directory mtime, while the pack-content hash naturally covers every "server changed any file" case, and concurrent steps hitting the same directory are naturally idempotent.
 - Write atomicity: `.tmp-*` directory + rename to land — a half-written directory never visible under its hash name; a concurrent race where rename fails and the target already landed = same content, just reuse.
 - Lifecycle: mtime LRU pruning, keep cap `TEAM_SKILLS_CACHE_MAX_ENTRIES = 16` (pack total ≤ 2MB, disk ceiling ≈ 32MB); crash-leftover `.tmp-*` reclaimed together. Pruning best-effort, failure only logs and does not affect this step.
@@ -133,7 +133,7 @@ S2's "one GET stuffs full text" distribution shape never succeeded against a rea
 
 ### daemon cache topology (two-layer content addressing)
 
-- The cache root `<PACMAN_HOME>/team-skills/` splits two layers: `blobs/<sha256>` single-file content store (write-once, tmp+rename atomic landing, mtime LRU cap `TEAM_SKILLS_BLOB_MAX_ENTRIES = 4096`) + `views/<sha256(manifest deterministic serialization)>` runtime read directory tree (one dirName/ subdirectory per skill, assembled from blobs via hardlink, cross-device falls back to copy; mtime LRU cap `TEAM_SKILLS_CACHE_MAX_ENTRIES = 16`).
+- The cache root `<CAIRN_HOME>/team-skills/` splits two layers: `blobs/<sha256>` single-file content store (write-once, tmp+rename atomic landing, mtime LRU cap `TEAM_SKILLS_BLOB_MAX_ENTRIES = 4096`) + `views/<sha256(manifest deterministic serialization)>` runtime read directory tree (one dirName/ subdirectory per skill, assembled from blobs via hardlink, cross-device falls back to copy; mtime LRU cap `TEAM_SKILLS_CACHE_MAX_ENTRIES = 16`).
 - Incremental surface (#920 acceptance): pull only files locally missing or hash-different — changing one file transfers one file; manifest unchanged = view hit, zero requests. hardlink decouples the view and blob lifecycles: a blob path reclaimed by LRU does not damage an assembled view, and a view rebuild re-pulls missing blobs.
 - Integrity: per-file sizeBytes + sha256 double-check before landing the blob, mismatch = explicit error (never materialize while sick).
 - Write atomicity continues: view `.tmp-*` + rename, the failure path has no half-written view; the pre-#920 old-shape remnants (top-level content-addressed directories) reclaimed by prune together.
@@ -148,7 +148,7 @@ S2's "one GET stuffs full text" distribution shape never succeeded against a rea
 
 ### Premortem (three causes of death + guardrails)
 
-- **`PACMAN_SKILLS_DIR` points to a no-permission/unreadable directory** → guardrail: the daemon degrades to an empty set + `[skills] invalid: <msg>` log on `loadSkills` error, without killing daemon startup.
+- **`CAIRN_SKILLS_DIR` points to a no-permission/unreadable directory** → guardrail: the daemon degrades to an empty set + `[skills] invalid: <msg>` log on `loadSkills` error, without killing daemon startup.
 - **frontmatter `name` inconsistent with the directory name** → guardrail: pi's `loadSkills` already uses the frontmatter name as the primary key, the directory name only as the no-frontmatter fallback; this spec makes the semantics explicit, and the UI double-labels `directory name（name）` when ambiguous.
 - **large skill content triggers prompt bloat** → guardrail: the catalog is an index, not full text (`formatSkillsForPrompt` does not expand by default); the agent reads full text on demand. The token budget only correlates linearly with catalog length, weakly with total skill length.
 
@@ -164,7 +164,7 @@ T1 (#367) does not block T3 but shares the wire shape; after T1 completes, open 
 
 ## Acceptance Criteria
 
-- [ ] `apps/daemon/src/config.ts` adds the `skillsDir` field, env `PACMAN_SKILLS_DIR` overrides the default `~/.agents/skills`; missing / non-existent = empty skill set without error
+- [ ] `apps/daemon/src/config.ts` adds the `skillsDir` field, env `CAIRN_SKILLS_DIR` overrides the default `~/.agents/skills`; missing / non-existent = empty skill set without error
 - [ ] before `createAgentSession` in `apps/daemon/src/backend/pi.ts` inject the catalog: `loadSkills` (`cwd: config.home`, `includeDefaults: false`, `skillPaths: [skillsDir]`) + `formatSkillsForPrompt(skills, 'read')` stitched to the end of systemPrompt
 - [ ] **the read-tool reachable-path set includes the skills root** — this is the hard acceptance of this spec's path connectivity; the end-to-end test asserts the agent's `read SKILL.md` is not rejected by the sandbox
 - [x] the catalog byte budget takes effect (#1116 track switch; the old "50-entry cap + 200-char description truncation" retired): the 99-skill store enters the catalog fully; over budget it drops from the tail by binding order + `budget:` log naming + the `<omitted_skills>` catalog tail section; CJK counted by UTF-8 bytes; description no longer truncated
@@ -198,7 +198,7 @@ After #958 / spec 24 moved the brief (incl. this spec's skills catalog) into the
      ② `Skill(<name>)` + ③ `Skill(skill:<name>)` — the Skill tool surface. **Two measured mechanism facts decide this layer must exist independently**: a Read deny does **not** also block the Skill tool's content load (a Skill call reading SKILL.md does not go through the Read permission check — `docs/verify/917/` B4: with only Read deny, unauthorized skill content still enters the model context); while `Skill(<name>)` deny rejects the call under bypassPermissions and lands `result.permission_denials` (B5 artifact). The `skill:` prefix shape matches that skill's any name (alias / display name) per the official docs, double insurance alongside the exact shape.
      **The SDK `skills` option is not used**: the d.ts claims "unlisted skills are hidden from the model's listing and rejected by the Skill tool", but measured (`docs/verify/917/` run1 B2) it is only translated by the SDK into a `Skill(<name>)` **allow** rule — allow rules have no effect under bypassPermissions, and the native listing count does not move at all (122 → 122). The claim mismatches the implementation, discarded.
      A chief step (allowlist default) emits no deny rule (CLI default behavior zero regression). An empty allowlist (`[]`) = all scanned skills enter the deny set (the mirror of the directory zero-injection discipline).
-     **Known residual**: the deny rules only cover pacman-scannable skills (under `PACMAN_SKILLS_DIR` + the team directory); entries on the machine's native directory (`~/.claude/skills`, plugins) that pacman does not know remain model-visible and callable — that is the shelved caliber 2's (turn off the whole native surface) territory, this section does not overreach. Artifact baseline: the local native listing 122 entries (B1).
+     **Known residual**: the deny rules only cover pacman-scannable skills (under `CAIRN_SKILLS_DIR` + the team directory); entries on the machine's native directory (`~/.claude/skills`, plugins) that pacman does not know remain model-visible and callable — that is the shelved caliber 2's (turn off the whole native surface) territory, this section does not overreach. Artifact baseline: the local native listing 122 entries (B1).
    - **pi**: the built-in `read` is overridden with a same-named customTool into a gated version (#866 T5 gated bash same-shape, the pi registry is last-write-wins by name). The gate lands on `ReadOperations.readFile/access`: a path hitting the unauthorized skill's `baseDir` prefix throws rejection — **both sides realpath-normalized before the comparison** (macOS `/tmp` → `/private/tmp` symlink drift must not pass), the rejection goes into the tool error result (the agent sees the rerouted copy) + a `[skills] denied-read:` line. pi's `operations` is a **whole replacement** (read.js `options.operations ?? defaultReadOperations`), so `readFile/access/detectImageMimeType` three pieces must be present — the last piece passes through pi's root export `detectSupportedImageMimeTypeFromFile`, zero disturbance to the image-read surface.
    - **The unauthorized set single source**: `collectDeniedSkillDirs` (exported from backend/pi.ts, consumed by claude-code.ts through the existing backend seam channel) — same-argument scan as `buildSkillsCatalog` (teamSkillsDir first, first-wins), allowlist default → empty set; an out-of-list entry's `baseDir` is the deny target. Scattered files in the directory not scanned as skills are not this section's authorization surface.
    - **Known boundary (registered truthfully)**: the bash bypass (`cat <unauthorized SKILL.md>`) is not blocked by either backend — this section's hard-block coverage = the file-tool surface, literally consistent with caliber 4's "permission deny path rules"; sandbox-level convergence is not this ticket.
