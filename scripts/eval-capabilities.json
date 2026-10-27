@@ -8,6 +8,10 @@
     "flow": "memory-regression"
   },
   {
+    "capability": "project routing",
+    "flow": "project-routing"
+  },
+  {
     "capability": "learn from correction",
     "flow": "learn"
   },

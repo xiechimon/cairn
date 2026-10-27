@@ -1128,6 +1128,13 @@ function stripWakeMarker(text: string): string {
   return text.replace(WAKE_MARKER_PREFIX_RE, '');
 }
 
+function handoffTodoOf(call: ToolCallRecord): string | null {
+  if (call.name !== 'message_todo' || call.result === undefined || call.isError === true)
+    return null;
+  const todoId = (call.arguments as { todoId?: unknown } | null)?.todoId;
+  return typeof todoId === 'string' && todoId !== '' ? todoId : null;
+}
+
 export function mapChiefStream(messages: MessageRow[], inlineTools = false): ChiefStreamItem[] {
   return collectChiefStream(messages, inlineTools).items;
 }
@@ -1175,6 +1182,9 @@ function collectChiefStream(
           ...(call.isError === true ? { error: true } : {}),
         });
       }
+      const handoffTodoId = handoffTodoOf(call);
+      if (handoffTodoId !== null)
+        items.push({ kind: 'handoff', todoId: handoffTodoId, id: `${m.id}:handoff` });
       continue;
     }
     const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;

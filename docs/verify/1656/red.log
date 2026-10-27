@@ -1,0 +1,115 @@
+✖ every migrated entry passes and the old table is gone (11.287047ms)
+✔ level 5 entry without a reason is rejected (0.293904ms)
+✔ level outside 1 to 5 is rejected (0.191849ms)
+✔ pending upgrade without a ticket is rejected, with a ticket passes (0.182385ms)
+✔ the real bad note that sat on main without a ticket is rejected (0.143567ms)
+✔ file name without a ticket number is rejected (0.141974ms)
+✔ missing, reordered or malformed fields are rejected (0.192601ms)
+✔ a resurrected docs/lessons.md table is rejected (0.546123ms)
+✔ two parallel branches each adding an entry merge without conflict (32.596871ms)
+✔ the old single table does conflict when two branches append a row (23.893957ms)
+✖ both upgrade-pending word orders and the original Chinese marker require a ticket (0.336758ms)
+✖ table generation rejects malformed entries with the ledger diagnostic (0.423249ms)
+✖ migration preserves every source row and sums counters when categories merge (0.155996ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 9
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 114.594876
+
+✖ failing tests:
+
+test at scripts/lessons-ledger-gate.test.mjs:27:1
+✖ every migrated entry passes and the old table is gone (11.287047ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   'docs/lessons.md was split into per-entry files under docs/lessons/; do not bring the summary table back'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///workspace/cairn/.claude/worktrees/ledger-1656/scripts/lessons-ledger-gate.test.mjs:29:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.start (node:internal/test_runner/test:1242:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'docs/lessons.md was split into per-entry files under docs/lessons/; do not bring the summary table back' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/lessons-ledger-gate.test.mjs:178:2
+✖ both upgrade-pending word orders and the original Chinese marker require a ticket (0.336758ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///workspace/cairn/.claude/worktrees/ledger-1656/scripts/lessons-ledger-gate.test.mjs:180:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/lessons-ledger-gate.test.mjs:184:1
+✖ table generation rejects malformed entries with the ledger diagnostic (0.423249ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /missing leading --- frontmatter/. Input:
+  
+  "TypeError: Cannot read properties of null (reading 'Category')"
+  
+      at TestContext.<anonymous> (file:///workspace/cairn/.claude/worktrees/ledger-1656/scripts/lessons-ledger-gate.test.mjs:185:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: TypeError: Cannot read properties of null (reading 'Category')
+        at file:///workspace/cairn/.claude/worktrees/ledger-1656/scripts/lessons-ledger-gate.mjs:86:74
+        at Array.map (<anonymous>)
+        at file:///workspace/cairn/.claude/worktrees/ledger-1656/scripts/lessons-ledger-gate.mjs:86:55
+        at Array.map (<anonymous>)
+        at renderTable (file:///workspace/cairn/.claude/worktrees/ledger-1656/scripts/lessons-ledger-gate.mjs:84:24)
+        at file:///workspace/cairn/.claude/worktrees/ledger-1656/scripts/lessons-ledger-gate.test.mjs:185:23
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file:///workspace/cairn/.claude/worktrees/ledger-1656/scripts/lessons-ledger-gate.test.mjs:185:10)
+        at Test.runInAsyncScope (node:async_hooks:227:14),
+    expected: /missing leading --- frontmatter/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at scripts/lessons-ledger-gate.test.mjs:188:1
+✖ migration preserves every source row and sums counters when categories merge (0.155996ms)
+  Error: ENOENT: no such file or directory, open '/workspace/cairn/.claude/worktrees/ledger-1656/docs/verify/1656/migration.json'
+      at readFileSync (node:fs:484:20)
+      at TestContext.<anonymous> (file:///workspace/cairn/.claude/worktrees/ledger-1656/scripts/lessons-ledger-gate.test.mjs:189:31)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/workspace/cairn/.claude/worktrees/ledger-1656/docs/verify/1656/migration.json'
+  }

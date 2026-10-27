@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { COLUMN_PARAM, parseColumnParam } from '../board/columns.js';
+import { BOARD_VIEW_PARAM } from '../board/home.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -27,6 +29,14 @@ function isDetailRoute(pathname: string): boolean {
   return pathname.startsWith('/app/todo/');
 }
 
+export function isChiefHome(pathname: string, searchParams: URLSearchParams): boolean {
+  return (
+    pathname === '/app' &&
+    searchParams.get(BOARD_VIEW_PARAM) !== 'board' &&
+    parseColumnParam(searchParams.get(COLUMN_PARAM)) === null
+  );
+}
+
 export function ChiefRoot() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
@@ -50,7 +60,8 @@ export function ChiefRoot() {
     }),
     [chiefParam, linkThreadId, consumeChiefParam],
   );
-  const surface = useChiefSurface(fixture, deepLink);
+  const onHome = isChiefHome(pathname, searchParams);
+  const surface = useChiefSurface(fixture, deepLink, onHome);
   const onSettings = useCallback(() => {
     if (pathname === '/app') surface.setChiefView('settings');
     else navigate('/app?chief=settings');
@@ -59,8 +70,9 @@ export function ChiefRoot() {
     () => ({ surface, openChiefThread: setLinkThreadId }),
     [surface],
   );
-  const windowOpen = surface.chiefView === 'drawer';
-  const fabVisible = !windowOpen && (!isDetailRoute(pathname) || surface.chiefUnread > 0);
+  const windowOpen = surface.chiefView === 'drawer' && !onHome;
+  const fabVisible =
+    !onHome && !windowOpen && (!isDetailRoute(pathname) || surface.chiefUnread > 0);
   const fabExpanded = surface.chiefUnread > 0 || surface.chiefBusy;
   return (
     <ChiefRootContext.Provider value={api}>
@@ -114,18 +126,20 @@ export function ChiefRoot() {
           </TooltipContent>
         </Tooltip>
       )}
-      <ChiefDrawer
-        open={windowOpen}
-        chief={surface.chiefData}
-        onSettings={onSettings}
-        onClose={() => surface.setChiefView('none')}
-        onSend={surface.onSend}
-        onThread={surface.onThread}
-        onNewThread={surface.onNewThread}
-        onRewind={surface.onRewind}
-        onAnswerQuestion={surface.onAnswerQuestion}
-        onCancelQuestion={surface.onCancelQuestion}
-      />
+      {!onHome && (
+        <ChiefDrawer
+          open={windowOpen}
+          chief={surface.chiefData}
+          onSettings={onSettings}
+          onClose={() => surface.setChiefView('none')}
+          onSend={surface.onSend}
+          onThread={surface.onThread}
+          onNewThread={surface.onNewThread}
+          onRewind={surface.onRewind}
+          onAnswerQuestion={surface.onAnswerQuestion}
+          onCancelQuestion={surface.onCancelQuestion}
+        />
+      )}
     </ChiefRootContext.Provider>
   );
 }

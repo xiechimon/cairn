@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16';
-const CHIEF = '/app?scenario=chief-question';
+const CHIEF = '/app?view=board&scenario=chief-question';
 
 async function expectTip(page: Page, button: Locator, label: string) {
   await button.hover();
