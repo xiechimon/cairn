@@ -47,7 +47,7 @@ A bench of ~30 tasks distilled from merged PRs (issue text + base SHA as the pro
 Completion criteria:
 
 - 30-task list with per-task oracle checks (original patch passes, empty patch fails) and ian spot-checking ~10 tasks for inter-rater agreement (#1517; tasks ship as Harbor task directories with a pinned Harbor version).
-- Isolated runner reports pass@1, pass^3, Wilson intervals, and cost; the score is not at ceiling (< 70%); a tampered-test-result negative control is caught by the grading container (#1518; Harbor owns container/network isolation, Cairn ships only the agent adapter and result conversion).
+- Isolated runner reports pass@1, pass^3, Wilson intervals, and cost; the score is not at ceiling (< 70%); a tampered-test-result negative control is caught by the grading container (#1518; Harbor owns container/network isolation, Cairn ships only the agent adapter and result conversion). Task images install uv, Python and the test runner before scoring, and the scoring container uses compose `network_mode: none` so scoring does not download and cannot reach the network (#1681).
 - Every harness-touching PR runs the bench holdout slice plus the chief-dispatch suite in CI; the gate blocks only on differences exceeding the confidence interval; a deliberately-broken-dispatch negative control is blocked, and non-harness PRs do not trigger it (#1519).
 - The page-generation comparison suite has its question bank and grading rubric in `integration/eval/`, a bare-pi-loop baseline round on the weak model tier, and per-batch human calibration (#1532).
 

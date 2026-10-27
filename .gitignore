@@ -30,6 +30,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 *.tsbuildinfo
 .wrangler
 .mintlify
+integration/eval/harbor/tasks/offline-oracle/environment/vendor/
 
 # IntelliJ based IDEs
 .idea
