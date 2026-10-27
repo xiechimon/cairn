@@ -26,7 +26,7 @@ The summary is generated only to stdout by `pnpm lessons:table`; no generated su
 
 ## Final targeted checks and review
 
-`green.log` records 15 passing tests, including the migration acceptance. `integration.log` records the final prepush-plan, document-reader, and CI-job integration tests. `migration-red.log` runs the same migration assertion against the prior PR head's extracted ledger and fails on a missing source entry.
+`green.log` records 16 passing tests, including the migration acceptance. `integration.log` records the final prepush-plan, document-reader, and CI-job integration tests. `migration-red.log` runs the same migration assertion against the prior PR head's extracted ledger and fails on a missing source entry.
 
 Review checked the complete gate, parser tests, prepush integration, and migration mapping against main. No blocking findings remain in this change. Simplification keeps documentation-only checks in one list and preserves the existing document-reader runner. No merge-gate source, protected-path list, dependency, or lockfile changes appear relative to main.
 
@@ -39,3 +39,9 @@ The existing `githubFetch` port now supplies empty branch lists in the delivery 
 ## Moving-main reconciliation
 
 Main advanced to the recorded source in `migration.json` while the push was queued. The queued push was stopped before remote updates. Both new source rows are preserved: shared scratch-path overwrites join the existing shared-output category, and leading-hyphen record IDs join the existing candidate-ID category. The source-row check now reconciles all 167 rows and retains 154 migrated categories.
+
+## Concurrent remote rewrite
+
+The remote lane was rebased externally to `e17c1a48` while this work was in progress. This branch merges that commit normally. `remote-reconciliation.json` maps all 157 remote entries to the canonical category files. Every remote text field is retained, safeguards keep the strongest level, and source events are not counted twice. Run `node --test docs/verify/1656/remote-reconciliation.test.mjs` to verify the remote tree and all mapped fields directly through Git.
+
+The shared environment requires a command-local Linux subreaper for orphaned process cleanup because PID 1 does not reap zombies. It wraps the original normal push command and preserves its exit status and hooks; product cleanup and test assertions are unchanged.
