@@ -1253,8 +1253,8 @@ export const EN: Record<string, string> = {
   '提交回答失败，请重试。': 'Could not submit your answers. Try again.',
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',
-  '主模型额度用完、服务 5xx、账号耗尽、限流、模型 404 或认证失败时，按顺序换到下一个可用备选。只有规划和执行步会换；审核、验证、合并、总管不换。备选用尽后，限流和额度继续等待，其他服务故障则该步失败。':
-    'When the primary model runs out of quota, hits a provider 5xx or account exhaustion, is rate limited, returns 404, or fails authentication, the next usable fallback takes over in order. Only plan and build steps switch; review, verify, merge and chief never do. After the fallback list is exhausted, rate limits and quota keep waiting; other provider failures fail the step.',
+  '主模型额度用完、服务 5xx、账号耗尽、限流、模型 404 或认证失败时，按顺序换到下一个可用备选。规划和执行步会换，总管只换同一运行时的备选；审核、验证、合并不换。备选用尽后，限流和额度继续等待，其他服务故障则该步失败。':
+    'When the primary model runs out of quota, hits a provider 5xx or account exhaustion, is rate limited, returns 404, or fails authentication, the next usable fallback takes over in order. Plan and build steps switch; the chief uses backups within the same runtime. Review, verify and merge steps never switch. After the fallback list is exhausted, rate limits and quota keep waiting; other provider failures fail the step.',
   '备用 {n}': 'Fallback {n}',
   '备用 {n} 运行时': 'Fallback {n} runtime',
   '备用 {n} 模型': 'Fallback {n} model',

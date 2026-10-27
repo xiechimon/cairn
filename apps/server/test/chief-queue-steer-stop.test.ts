@@ -507,6 +507,18 @@ describe('chief unavailable (T4)', () => {
     expect((await w.envelope()).outage ?? null).toBeNull();
   });
 
+  test('capacity without a backup parks the chief with the effective provider', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    expect(running).not.toBeNull();
+    await w.done(running!.step.id, { status: 'failed', errorMessage: '429: rate limit exceeded' });
+    const row = w.stepRow(running!.step.id);
+    expect(row?.status).toBe('waiting_quota');
+    expect(row?.quotaBlock?.providerId).toBe('relay-a');
+    expect(await w.claim()).toBeNull();
+  });
+
   test('a held message can be withdrawn while the chief is down', async () => {
     const w = await setupWorld();
     await w.send('第一句');
