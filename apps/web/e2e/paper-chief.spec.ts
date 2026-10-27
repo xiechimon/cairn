@@ -1,11 +1,11 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-const GATED = '/app?scenario=100';
-const READY = '/app?scenario=111';
-const THREAD = '/app?scenario=114';
-const SWITCHER = '/app?scenario=116';
-const QUESTION = '/app?scenario=chief-question';
-const SETTINGS = (tab: string) => `/app?scenario=${tab}`;
+const GATED = '/app?view=board&scenario=100';
+const READY = '/app?view=board&scenario=111';
+const THREAD = '/app?view=board&scenario=114';
+const SWITCHER = '/app?view=board&scenario=116';
+const QUESTION = '/app?view=board&scenario=chief-question';
+const SETTINGS = (tab: string) => `/app?view=board&scenario=${tab}`;
 
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
 

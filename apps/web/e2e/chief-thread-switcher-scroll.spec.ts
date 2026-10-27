@@ -25,7 +25,7 @@ test.describe('chief thread switcher long-list scroll (#1094)', () => {
   test('the 22-thread list caps inside the window and the tail row is clickable', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=chief-threads-long');
+    await page.goto('/app?view=board&scenario=chief-threads-long');
     await expect(menu(page)).toBeVisible();
     const items = menu(page).getByRole('menuitem');
     await expect(items).toHaveCount(22);
@@ -75,7 +75,7 @@ test.describe('chief thread switcher long-list scroll (#1094)', () => {
   });
 
   test('the short canon list (r5 116, 2 threads) keeps its natural height', async ({ page }) => {
-    await page.goto('/app?scenario=116');
+    await page.goto('/app?view=board&scenario=116');
     await expect(menu(page)).toBeVisible();
     const geom = await menu(page).evaluate((el) => ({
       clientHeight: el.clientHeight,
@@ -97,7 +97,7 @@ test.describe('chief thread switcher long-list scroll (#1094)', () => {
   });
 
   test('Tab walks the list to the tail row and scrolls it into view', async ({ page }) => {
-    await page.goto('/app?scenario=chief-threads-long');
+    await page.goto('/app?view=board&scenario=chief-threads-long');
     const items = menu(page).getByRole('menuitem');
     await expect(items).toHaveCount(22);
 

@@ -38,6 +38,8 @@ import {
 } from '../board/repo-filter.js';
 import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { buildTagOptions, matchesTagFilter, parseTagParam } from '../board/tag-filter.js';
+import { ChiefHome } from '../chief/chief-home.js';
+import { HomeSummary } from '../chief/chief-home-summary.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { cardOrchestration } from '../chief/orchestration-inflight.js';
@@ -550,6 +552,13 @@ export function BoardPage() {
     ? { ...fixture, todos, now: Date.now(), ...(projectNames ? { projectNames } : {}) }
     : { ...fixture, todos };
   const quotaInfos = quotaBannerInfo(todos);
+  const todoGlances = useMemo(
+    () =>
+      new Map(
+        todos.map((todo) => [todo.id, { phase: todo.phase, seq: todo.seqNum, title: todo.title }]),
+      ),
+    [todos],
+  );
   return (
     <div className="board-shell flex h-full overflow-hidden bg-(--surface-1)" data-route="board">
       <AppSidebar
@@ -598,6 +607,15 @@ export function BoardPage() {
             filters={filters}
             onlyColumn={onlyColumn}
             boardView={boardView}
+            renderHome={(home) => (
+              <ChiefHome
+                surface={chief}
+                now={fixtureWithTodos.now}
+                summary={<HomeSummary {...home} />}
+                below={home.sections}
+                todoGlances={todoGlances}
+              />
+            )}
             tagsById={tagIndex.tagById}
             onNewTask={openNewTask}
             loading={live && !todosQ.isSuccess}

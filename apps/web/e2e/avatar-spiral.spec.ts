@@ -206,7 +206,7 @@ test('a working agent spins its spiral; idle rows stay still', async ({ page }) 
 });
 
 test('the unbound chief wears the spiral face instead of the dashed one', async ({ page }) => {
-  await page.goto('/app?scenario=114');
+  await page.goto('/app?view=board&scenario=114');
   const face = page.getByTestId('chief-stream').getByTestId('chief-msg').locator('> svg');
   await expect(face).toHaveCount(1);
   await expect(face.locator('circle')).toHaveAttribute('fill', 'var(--fab-surface)');
@@ -216,7 +216,7 @@ test('the unbound chief wears the spiral face instead of the dashed one', async 
 test('the chief spiral spins on the reply it is still typing, rests on finished ones', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=chief-md');
+  await page.goto('/app?view=board&scenario=chief-md');
   const spirals = page
     .getByTestId('chief-stream')
     .getByTestId('chief-msg')

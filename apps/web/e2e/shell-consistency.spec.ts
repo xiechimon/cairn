@@ -65,7 +65,7 @@ const headContentX = (page: Page) =>
 
 test.describe('the root FAB wakes the window on every shell family', () => {
   const families = [
-    { name: 'board', route: '/app?scenario=01', gear: true },
+    { name: 'board', route: '/app?view=board&scenario=01', gear: true },
     { name: 'pages', route: '/app/schedules?scenario=11', gear: true },
     { name: 'resources', route: '/app/resources/skills?scenario=06', gear: true },
     { name: 'secondary', route: '/app/team?scenario=12', gear: true },
