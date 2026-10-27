@@ -79,3 +79,17 @@ describe('prior-art decision scoring', () => {
     expect(gradePlanPriorArt(featurePlan(decision)).score).toBe(1);
   });
 });
+
+test('a prior-art heading inside a fenced example cannot satisfy the feature contract', () => {
+  const example = [
+    'Kind: feature',
+    '```markdown',
+    '## Prior art',
+    '- Source: https://github.com/hexagon/croner',
+    '- Decision: reuse croner because it is maintained.',
+    '```',
+    '## Verification',
+    '- Run pnpm lint.',
+  ].join('\n');
+  expect(gradePlanPriorArt(example).score).toBe(0);
+});

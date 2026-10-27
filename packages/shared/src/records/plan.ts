@@ -84,8 +84,15 @@ function namedSection(
   let start = -1;
   let level = 0;
   let head = '';
+  let scanningFence = false;
   for (let i = 0; i < lines.length; i++) {
-    const mark = sectionMark((lines[i] ?? '').trim());
+    const line = (lines[i] ?? '').trim();
+    if (line.startsWith('```')) {
+      scanningFence = !scanningFence;
+      continue;
+    }
+    if (scanningFence) continue;
+    const mark = sectionMark(line);
     if (mark?.name !== sectionName) continue;
     start = i + 1;
     if (mark.kind === 'heading') level = mark.level;
