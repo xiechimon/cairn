@@ -1,0 +1,61 @@
+$ flock /tmp/cairn-heavy.lock node scripts/prepush-vitest.mjs
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1985
+
+ ✓ |@cairn/integration| test/routing-boundary.test.ts (49 tests) 7695ms
+   ✓ real process read boundary (26)
+     ✓ records forbidden proc and sys reads despite a passing oracle (6) 309ms
+     ✓ permits local checks: cd lib && cat ../lib/adder.mjs 409ms
+     ✓ permits a real node --test run inside the workspace 333ms
+
+ Test Files  1 passed (1)
+      Tests  49 passed (49)
+   Start at  12:03:58
+   Duration  7.79s (tests 100%)
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-kg46zsi8/prepush-vitest-CxyCsp/report.json
+
+$ flock /tmp/cairn-heavy.lock pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+
+$ pnpm lint
+$ biome ci .
+[0m[34mChecked 1050 files in 465[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1355 tests in 189 files collected, disk count matches (2.5s)
+[spec-parse-gate] integration/test: 41 test files parsed clean by tsc (2.0s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+$ flock /tmp/cairn-heavy.lock pnpm --filter @cairn/integration exec tsx eval/routing/boundary-check.mts
+ok   oracle passes under enforcement
+ok   external read blocked, recorded and graded fail (0)
+ok   external read blocked, recorded and graded fail (1)
+ok   external read blocked, recorded and graded fail (2)
+ok   external read blocked, recorded and graded fail (3)
+ok   external read blocked, recorded and graded fail (4)
+ok   external read blocked, recorded and graded fail (5)
+ok   external read blocked, recorded and graded fail (6)
+ok   external read blocked, recorded and graded fail (7)
+ok   external read blocked, recorded and graded fail (8)
+ok   external read blocked, recorded and graded fail (9)
+ok   seeded reuse rejected with a passing oracle (0)
+ok   seeded reuse rejected with a passing oracle (1)
+ok   seeded reuse rejected with a passing oracle (2)
+ok   independent implementation mentioning the decoy passes
+ok   task exit 125 keeps enforcement
+ok   real node --test run succeeds without violations
+ok   kernel Landlock absence fails closed
+
+boundary self-check PASS

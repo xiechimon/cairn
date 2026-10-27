@@ -1,0 +1,32 @@
+$ flock /tmp/cairn-heavy.lock pnpm exec vitest run integration/test/routing-boundary.test.ts
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1985
+
+
+ Test Files  1 passed (1)
+      Tests  39 passed (39)
+   Start at  10:29:16
+   Duration  6.09s (tests 99%)
+
+$ flock /tmp/cairn-heavy.lock pnpm --filter @cairn/integration exec tsx eval/routing/boundary-check.mts
+
+ok   oracle passes under enforcement
+ok   external read blocked, recorded and graded fail (0)
+ok   external read blocked, recorded and graded fail (1)
+ok   external read blocked, recorded and graded fail (2)
+ok   external read blocked, recorded and graded fail (3)
+ok   external read blocked, recorded and graded fail (4)
+ok   external read blocked, recorded and graded fail (5)
+ok   external read blocked, recorded and graded fail (6)
+ok   external read blocked, recorded and graded fail (7)
+ok   external read blocked, recorded and graded fail (8)
+ok   external read blocked, recorded and graded fail (9)
+ok   seeded reuse rejected with a passing oracle (0)
+ok   seeded reuse rejected with a passing oracle (1)
+ok   seeded reuse rejected with a passing oracle (2)
+ok   independent implementation mentioning the decoy passes
+ok   task exit 125 keeps enforcement
+ok   real node --test run succeeds without violations
+ok   kernel Landlock absence fails closed
+
+boundary self-check PASS
