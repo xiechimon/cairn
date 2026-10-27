@@ -35,7 +35,7 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
+import { githubCloseIssue, githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
 import {
@@ -344,6 +344,7 @@ export function updateTodo(
     phase?: Phase;
     tagIds?: string[];
     orderIndex?: number;
+    projectId?: string;
     assignment?: {
       plan?: NonNullable<Assignment['plan']>;
       build?: NonNullable<Assignment['build']>;
@@ -358,6 +359,11 @@ export function updateTodo(
   if (!row) return null;
 
   const sets: Partial<TodoRow> = {};
+  const move =
+    patch.projectId !== undefined && patch.projectId !== row.projectId
+      ? planProjectMove(deps, row, patch.projectId)
+      : null;
+  if (move !== null) Object.assign(sets, move.sets);
   if (patch.title !== undefined) sets.title = patch.title;
   if (patch.spec !== undefined) {
     sets.spec = patch.spec;
@@ -409,6 +415,9 @@ export function updateTodo(
     sets.v = row.v + 1;
     db.update(todo).set(sets).where(eq(todo.id, id)).run();
   }
+  if (move !== null && patch.tagIds === undefined) {
+    db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
+  }
   if (patch.tagIds !== undefined) {
     db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
     for (const tagId of patch.tagIds) {
@@ -433,11 +442,71 @@ export function updateTodo(
   const record = getTodo(deps, id);
   if (!record) return null;
   hub.publishTodoDoc(record.teamId, record);
+  if (move?.closeIssueRef != null) scheduleMovedIssueClose(deps, row.teamId, move);
+  if (move?.sets.sourceKind === 'github-issue-self') scheduleSelfIssueCreate(deps, id);
   if (patch.phase !== undefined && !manualPhaseApplied) {
     notifyPhaseEntry(deps, record, row.phase, patch.phase);
   }
   if (sets.phase === 'done') settleSplitOnDone(deps, id);
   return record;
+}
+
+interface ProjectMove {
+  sets: Pick<TodoRow, 'projectId' | 'orderIndex'> &
+    Partial<Pick<TodoRow, 'sourceKind' | 'sourceRef'>>;
+  closeIssueRef: string | null;
+  targetName: string;
+}
+
+function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): ProjectMove {
+  const target = projectOfTodo(deps.db, { projectId, teamId: row.teamId });
+  if (target === undefined) throw new HttpError(404, `project ${projectId}`);
+  if (row.phase !== 'todo' || isStartedTodoRow(row)) {
+    throw new HttpError(409, '这张卡已经开始了，不能换项目');
+  }
+  if (row.sourceKind === 'github-issue') {
+    throw new HttpError(409, '从 GitHub issue 导入的任务不能换项目');
+  }
+  if (selfIssueInFlight.has(row.id)) {
+    throw new HttpError(409, '正在给这张卡开 GitHub issue，稍后再换项目');
+  }
+  const orderRow = deps.db
+    .select({ n: max(todo.orderIndex) })
+    .from(todo)
+    .where(and(eq(todo.projectId, target.id), eq(todo.phase, 'todo')))
+    .get();
+  const sets: ProjectMove['sets'] = { projectId: target.id, orderIndex: (orderRow?.n ?? -1) + 1 };
+  if (row.sourceKind === 'github-issue-self') {
+    sets.sourceKind =
+      planSelfIssue(deps, row.teamId, target.id) !== null ? 'github-issue-self' : null;
+    sets.sourceRef = null;
+  } else if (row.sourceKind === null && planSelfIssue(deps, row.teamId, target.id) !== null) {
+    sets.sourceKind = 'github-issue-self';
+  }
+  return {
+    sets,
+    closeIssueRef: row.sourceKind === 'github-issue-self' ? row.sourceRef : null,
+    targetName: target.name,
+  };
+}
+
+function scheduleMovedIssueClose(deps: TodoDeps, teamId: string, move: ProjectMove): void {
+  const parsed = move.closeIssueRef === null ? null : parseGithubIssueSourceRef(move.closeIssueRef);
+  if (parsed === null || deps.box === undefined) return;
+  void teamGithubToken(deps, teamId)
+    .then((access) =>
+      'token' in access
+        ? githubCloseIssue(
+            deps.githubFetch ?? fetch,
+            access.token,
+            parsed.owner,
+            parsed.repo,
+            parsed.issueNumber,
+            `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
+          )
+        : undefined,
+    )
+    .catch(() => undefined);
 }
 
 export function setTodoPhase(

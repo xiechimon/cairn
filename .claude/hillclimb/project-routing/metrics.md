@@ -28,3 +28,7 @@ name boundaries for the ASCII names.
   READMEs carry the old contact address). Expected: ask, listing only those two.
 - Cross-project (`x01`–`x02`): one request touching two projects. Expected: one todo in each.
 - Question only (`q01`–`q02`): no change requested. Expected: answer, no todo.
+- Chip (`c01`–`c03`, #2009): the message carries the project picked on the composer chip. `c01`
+  reuses the tied `t01` text and `c02` the broken-link `i01` text, so the chip alone decides;
+  expected: one todo in the chip's project, no question. `c03` is a question; expected: answer,
+  no todo.

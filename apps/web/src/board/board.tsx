@@ -85,11 +85,48 @@ interface BoardProps {
   renderHome?: (home: HomeOverview) => ReactNode;
 }
 
+export interface ProjectGlance {
+  projectId: string;
+  name: string;
+  tone: number;
+  needsYou: number;
+  running: number;
+  doneToday: number;
+}
+
 export interface HomeOverview {
   sections: ReactNode;
   needsYou: number;
   running: number;
   doneToday: number;
+  byProject: ProjectGlance[];
+}
+
+function glanceByProject(
+  projectNames: Record<string, string> | undefined,
+  buckets: Record<'needsYou' | 'running' | 'doneToday', TodoRecord[]>,
+): ProjectGlance[] {
+  const names = projectNames ?? {};
+  const order = Object.keys(names);
+  if (order.length < 2) return [];
+  const rows = new Map<string, ProjectGlance>();
+  for (const [key, todos] of Object.entries(buckets) as [keyof typeof buckets, TodoRecord[]][]) {
+    for (const todo of todos) {
+      const name = names[todo.projectId];
+      if (name == null) continue;
+      const row = rows.get(todo.projectId) ?? {
+        projectId: todo.projectId,
+        name,
+        tone: order.indexOf(todo.projectId),
+        needsYou: 0,
+        running: 0,
+        doneToday: 0,
+      };
+      row[key] += 1;
+      rows.set(todo.projectId, row);
+    }
+  }
+  return [...rows.values()].sort((a, b) => a.tone - b.tone);
 }
 
 const COLUMN_ICON = {
@@ -285,6 +322,11 @@ export function BoardSurface({
   const staleCount = pendingSplit.stale.length;
   const chatHome = home && renderHome != null;
   const startOfToday = new Date(fixture.now).setHours(0, 0, 0, 0);
+  const homeBuckets = {
+    needsYou: pendingSplit.fresh,
+    running: viewTodos('building'),
+    doneToday: visibleTodos.filter((todo) => todo.phase === 'done' && todo.phaseAt >= startOfToday),
+  };
   const filterEmpty = (
     <>
       <span className="text-sm text-muted-foreground">{t('没有匹配筛选条件的任务')}</span>
@@ -364,11 +406,10 @@ export function BoardSurface({
               loading={loading}
             />
           ),
-          needsYou: pendingSplit.fresh.length,
-          running: viewTodos('building').length,
-          doneToday: visibleTodos.filter(
-            (todo) => todo.phase === 'done' && todo.phaseAt >= startOfToday,
-          ).length,
+          needsYou: homeBuckets.needsYou.length,
+          running: homeBuckets.running.length,
+          doneToday: homeBuckets.doneToday.length,
+          byProject: glanceByProject(fixture.projectNames, homeBuckets),
         })
       ) : home && !showFilterEmpty ? (
         <HomeSections

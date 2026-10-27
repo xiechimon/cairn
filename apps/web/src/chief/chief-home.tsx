@@ -49,7 +49,7 @@ export function ChiefHome({ surface, now, summary, below, todoGlances }: ChiefHo
   }, [empty]);
 
   const send = useCallback(
-    (text: string) => {
+    (text: string, projectId: string | null) => {
       if (onSend == null) return;
       if (
         empty &&
@@ -62,7 +62,7 @@ export function ChiefHome({ surface, now, summary, below, todoGlances }: ChiefHo
       } else if (empty) {
         setHeroCollapsed(true);
       }
-      const sent = Promise.resolve(onSend(text));
+      const sent = Promise.resolve(onSend(text, projectId));
       if (empty) sent.catch(() => setHeroCollapsed(false));
       return sent;
     },

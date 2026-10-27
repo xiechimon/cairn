@@ -471,6 +471,9 @@ export async function executeChiefTool(
         ...(optStr(params, 'title') !== undefined ? { title: optStr(params, 'title') } : {}),
         ...(optStr(params, 'spec') !== undefined ? { spec: optStr(params, 'spec') } : {}),
         ...(params.tagIds !== undefined ? { tagIds: strArr(params, 'tagIds') } : {}),
+        ...(optStr(params, 'projectId') !== undefined
+          ? { projectId: optStr(params, 'projectId') }
+          : {}),
       });
       if (!record) throw new HttpError(404, `todo ${todoId}`);
       return json(record);

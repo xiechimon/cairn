@@ -40,7 +40,7 @@ export interface ChiefSurface {
   chiefData: ChiefContent;
   chiefUnread: number;
   chiefBusy: boolean;
-  onSend?: (text: string) => void | Promise<void>;
+  onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onThread?: (title: string, index: number) => void;
   onNewThread?: () => void;
   onRewind?: (messageId: string) => void;
@@ -228,9 +228,9 @@ export function useChiefSurface(
     : undefined;
 
   const onSend = live
-    ? (text: string) => {
+    ? (text: string, projectId: string | null) => {
         return mutations.chiefSend
-          .mutateAsync({ threadId: activeThread?.id ?? null, content: text })
+          .mutateAsync({ threadId: activeThread?.id ?? null, content: text, projectId })
           .then(() => {
             if (activeThread === null) setActiveThreadIdx(0);
           })
