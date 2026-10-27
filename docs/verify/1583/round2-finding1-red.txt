@@ -1,0 +1,56 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1583/apps/server
+
+ ❯ test/scheduling-plan.test.ts (31 tests | 6 failed | 24 skipped) 42ms
+   ❯ review round two closure safety (7)
+     × unfinished acceptance cannot be bypassed by - [ ] pending
+Superseded by #1600 27ms
+     × unfinished acceptance cannot be bypassed by - [ ] pending 2ms
+     × unfinished acceptance cannot be bypassed by - [ ] pending
+被 spec 28 替代 2ms
+     × requires completed acceptance and merged pull body evidence: delivery (#1394) / - [x] 排期落地
+- [x] 报告可读 1ms
+     × requires completed acceptance and merged pull body evidence: delivery /  1ms
+     × requires completed acceptance and merged pull body evidence: delivery / - [x] 排期落地
+- [x] 报告可读 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/scheduling-plan.test.ts > review round two closure safety > unfinished acceptance cannot be bypassed by - [ ] pending
+Superseded by #1600
+ FAIL  test/scheduling-plan.test.ts > review round two closure safety > unfinished acceptance cannot be bypassed by - [ ] pending
+ FAIL  test/scheduling-plan.test.ts > review round two closure safety > unfinished acceptance cannot be bypassed by - [ ] pending
+被 spec 28 替代
+AssertionError: expected 'close' not to be 'close' // Object.is equality
+ ❯ test/scheduling-plan.test.ts:392:29
+    390|     }));
+    391|     const item = report.items.find((entry) => entry.issue === 1394);
+    392|     expect(item?.group).not.toBe('close');
+       |                             ^
+    393|     expect(item?.closeReason).toBeNull();
+    394|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  test/scheduling-plan.test.ts > review round two closure safety > requires completed acceptance and merged pull body evidence: delivery (#1394) / - [x] 排期落地
+- [x] 报告可读
+ FAIL  test/scheduling-plan.test.ts > review round two closure safety > requires completed acceptance and merged pull body evidence: delivery / 
+ FAIL  test/scheduling-plan.test.ts > review round two closure safety > requires completed acceptance and merged pull body evidence: delivery / - [x] 排期落地
+- [x] 报告可读
+AssertionError: expected 'close' not to be 'close' // Object.is equality
+ ❯ test/scheduling-plan.test.ts:406:40
+    404|       specLedger: ['done #1394'],
+    405|     }));
+    406|     expect(report.items[0]?.group).not.toBe('close');
+       |                                        ^
+    407|   });
+    408|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 1 passed | 24 skipped (31)
+   Start at  16:41:20
+   Duration  1.63s (transform 76%, import 21%, tests 3%)
+

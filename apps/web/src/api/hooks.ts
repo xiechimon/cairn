@@ -48,7 +48,9 @@ import type {
   ProjectTreeResponse,
   ProviderPreset,
   ProviderRecord,
+  ScheduleExecuteResult,
   ScheduleRecord,
+  ScheduleReport,
   SearchResponse,
   SecretRecord,
   SetSecretBody,
@@ -110,6 +112,14 @@ export const useProjectAutonomy = (projectId: string | undefined, enabled: boole
   useQuery({
     queryKey: ['project-autonomy', projectId],
     queryFn: () => api.get<AutonomyRecord>(`/api/projects/${projectId}/autonomy`),
+    enabled: enabled && projectId !== undefined,
+  });
+
+export const useProjectSchedule = (projectId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['project-schedule', projectId],
+    queryFn: () =>
+      api.get<{ report: ScheduleReport | null }>(`/api/projects/${projectId}/schedule`),
     enabled: enabled && projectId !== undefined,
   });
 
@@ -731,6 +741,17 @@ export function useApiMutations(teamId: string | undefined) {
         api.patch<AutonomyRecord>(`/api/projects/${input.id}/autonomy`, input.body),
       onSuccess: (record, input) => {
         qc.setQueryData(['project-autonomy', input.id], record);
+        invalidateAll();
+      },
+    }),
+    executeSchedule: useMutation({
+      mutationFn: (input: { id: string; reportId: string; issues: number[] }) =>
+        api.post<ScheduleExecuteResult>(`/api/projects/${input.id}/schedule/execute`, {
+          reportId: input.reportId,
+          issues: input.issues,
+        }),
+      onSuccess: (_result, input) => {
+        void qc.invalidateQueries({ queryKey: ['project-schedule', input.id] });
         invalidateAll();
       },
     }),

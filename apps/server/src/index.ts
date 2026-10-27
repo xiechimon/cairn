@@ -26,6 +26,7 @@ import { backfillPersonas } from './services/personas.js';
 import {
   createScheduler,
   issueIntakeRunOf,
+  schedulingRunOf,
   trajectoryExportRunOf,
   trajectoryOutcomeRunOf,
 } from './services/scheduler.js';
@@ -123,6 +124,7 @@ const scheduler = createScheduler(
   issueIntakeRunOf(config, { githubFetch, logger }),
   trajectoryOutcomeRunOf(config, { logger }),
   trajectoryExportRunOf(config, { logger }),
+  schedulingRunOf(config, { githubFetch, logger }),
 );
 scheduler.start();
 

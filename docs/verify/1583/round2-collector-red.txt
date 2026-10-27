@@ -1,0 +1,40 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1583/apps/server
+
+ ❯ test/scheduling-plan.test.ts (32 tests | 1 failed | 31 skipped) 23ms
+   × the scheduling collector retains merged pull body evidence 22ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/scheduling-plan.test.ts > the scheduling collector retains merged pull body evidence
+AssertionError: expected [ { number: 1500, …(3) } ] to deeply equal [ { number: 1500, …(4) } ]
+
+- Expected
++ Received
+
+@@ -1,8 +1,7 @@
+  [
+    {
+-     "body": "Closes #1394",
+      "mergedAt": 1792713600000,
+      "number": 1500,
+      "title": "delivery",
+      "url": "https://github.com/owner/repo/pull/1500",
+    },
+
+ ❯ test/scheduling-plan.test.ts:439:17
+    437|   ), { status: 200 });
+    438|   const pulls = await mergedPulls(fetchImpl, 'token', 'owner', 'repo');
+    439|   expect(pulls).toEqual([{
+       |                 ^
+    440|     number: 1500, title: 'delivery', body: 'Closes #1394',
+    441|     mergedAt: Date.parse('2026-10-23T00:00:00Z'), url: 'https://github…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 31 skipped (32)
+   Start at  16:42:40
+   Duration  459ms (transform 65%, import 28%, tests 6%, worker 1%)
+

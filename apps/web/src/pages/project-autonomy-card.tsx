@@ -21,6 +21,7 @@ const KIND_LABELS: Record<AutonomyKind, string> = {
   'issue-intake': 'issue 进料',
   gardener: '园丁',
   'auto-merge': '自治合并',
+  scheduling: '总管排期',
 };
 
 const REASON_LABELS: Record<AutonomyGateReason, string> = {

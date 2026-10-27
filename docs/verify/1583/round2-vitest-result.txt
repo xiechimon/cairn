@@ -1,0 +1,60 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/scheduling-replay.test.ts > replay of the 2026-10-23 manual sweep (#1583) > every ticket the human closed that morning is suggested for closure with a citation
+AssertionError: #1394 is not in the close group: expected 'next' to be 'close' // Object.is equality
+
+Expected: "close"
+Received: "next"
+
+ ❯ test/scheduling-replay.test.ts:49:67
+     47|       const item = report.items.find((i) => i.issue === number);
+     48|       expect(item, `#${number} is missing from the replay`).toBeDefine…
+     49|       expect(item?.group, `#${number} is not in the close group`).toBe…
+       |                                                                   ^
+     50|       expect(item?.evidence.length ?? 0).toBeGreaterThan(0);
+     51|       const cited = item?.evidence.every((e) => e.ref.length > 1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/scheduling-replay.test.ts > replay of the 2026-10-23 manual sweep (#1583) > a close suggestion always names the merged pull, ledger row or ticket it rests on
+AssertionError: expected 0 to be greater than or equal to 4
+ ❯ test/scheduling-replay.test.ts:59:40
+     57|   test('a close suggestion always names the merged pull, ledger row or…
+     58|     const report = replay();
+     59|     expect(report.groups.close.length).toBeGreaterThanOrEqual(EXPECTED…
+       |                                        ^
+     60|     for (const item of report.items.filter((i) => i.group === 'close')…
+     61|       expect(item.evidence.length).toBeGreaterThan(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/scheduling-sweep.test.ts > createScheduling sweep > persists a report with the four groups and closes only with evidence
+AssertionError: expected [ 1528, 2 ] to deeply equal [ 2 ]
+
+- Expected
++ Received
+
+  [
++   1528,
+    2,
+  ]
+
+ ❯ test/scheduling-sweep.test.ts:165:33
+    163|     expect(outcomes).toHaveLength(1);
+    164|     expect(outcomes[0]?.kind).toBe('generated');
+    165|     const report = latestScheduleReport(w.s.db, w.projectId);
+       |                                 ^
+    166|     expect(report).not.toBeNull();
+    167|     expect(report?.mainSha).toBe(MAIN_SHA);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed | 361 passed (363)
+      Tests  3 failed | 4833 passed (4836)
+   Start at  16:43:51
+   Duration  206.71s (tests 60%, import 38%, transform 1%)
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-lig80h8h/prepush-vitest-ZnXIeE/report.json
+[prepush] FAIL: apps/server/test/scheduling-replay.test.ts
+[prepush] FAIL: apps/server/test/scheduling-sweep.test.ts

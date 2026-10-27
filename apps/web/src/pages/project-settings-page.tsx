@@ -24,6 +24,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, SquarePen } from '../icons/index.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { ProjectAutonomyCard } from './project-autonomy-card.js';
+import { ProjectScheduleCard } from './project-schedule-card.js';
 import { PageShell, TabGroup } from './shell.js';
 
 const TABS = [
@@ -352,7 +353,10 @@ export function ProjectSettingsPage() {
           </SettingsCard>
         )}
         {live && wireProject?.repoKind === 'github' && id !== undefined && teamId !== undefined && (
-          <ProjectAutonomyCard projectId={id} teamId={teamId} />
+          <>
+            <ProjectAutonomyCard projectId={id} teamId={teamId} />
+            <ProjectScheduleCard projectId={id} teamId={teamId} />
+          </>
         )}
         <section className="flex flex-col gap-2">
           <h3 className="m-0 px-1 text-meta font-normal text-content-tertiary">{t('危险操作')}</h3>

@@ -8,12 +8,12 @@ import { MIGRATIONS_FOLDER, openMemoryDb } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 
-describe('the 37-table migration (the 01 §6 list)', () => {
+describe('the 39-table migration (the 01 §6 list)', () => {
   test('the drizzle schema table-name set = DB_TABLES', () => {
     const tables = Object.values(schema).filter((v) => is(v, SQLiteTable));
     const names = tables.map((t) => getTableConfig(t as SQLiteTable).name).sort();
     expect(names).toEqual([...DB_TABLES].sort());
-    expect(names).toHaveLength(38);
+    expect(names).toHaveLength(39);
     expect(names).toContain('chief');
     expect(names).toContain('attachment');
     expect(names).toContain('branch_sync');

@@ -1,6 +1,7 @@
 import {
   createProjectBodySchema,
   createTagBodySchema,
+  executeScheduleBodySchema,
   type FsListResult,
   type FsPickResult,
   githubIssuesResponseSchema,
@@ -8,6 +9,7 @@ import {
   patchAutonomyBodySchema,
   patchProjectBodySchema,
   patchProjectMergeConfigSchema,
+  scheduleExecuteResultSchema,
 } from '@cairn/shared';
 import { eq, inArray } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -51,6 +53,8 @@ import {
   updateProject,
   updateProjectMergeConfig,
 } from './services/projects.js';
+import { executeSchedule } from './services/scheduling/execute.js';
+import { latestScheduleReport } from './services/scheduling/store.js';
 import { seedFixedTags } from './services/tags.js';
 import { listTodos } from './services/todos.js';
 
@@ -264,6 +268,18 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const row = requireProject(ctx, c.req.param('id'));
     const body = parseWith(patchAutonomyBodySchema, await jsonBody(c), 'body');
     return c.json(patchAutonomy(ctx.db, row.id, body, nowMs()));
+  });
+
+  app.get('/api/projects/:id/schedule', (c) => {
+    const row = requireProject(ctx, c.req.param('id'));
+    return c.json({ report: latestScheduleReport(ctx.db, row.id) });
+  });
+
+  app.post('/api/projects/:id/schedule/execute', async (c) => {
+    const row = requireProject(ctx, c.req.param('id'));
+    const body = parseWith(executeScheduleBodySchema, await jsonBody(c), 'body');
+    const result = await executeSchedule({ deps: svcOf(ctx), user: ctx.user }, row.id, body);
+    return c.json(scheduleExecuteResultSchema.parse(result));
   });
 
   app.delete('/api/projects/:id', (c) => {

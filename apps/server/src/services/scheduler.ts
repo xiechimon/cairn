@@ -42,6 +42,7 @@ import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
 import { computeNextRunAt, dueSchedules, isRecurring, updateNextRunAt } from './schedules.js';
+import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
 
 export interface SchedulerOptions {
   tickMs: number;
@@ -68,6 +69,19 @@ export function issueIntakeRunOf(
       : `github issue intake off (set ${ENV_VARS.issueIntake}=1 to enable)`,
   );
   return config.issueIntake ? run : null;
+}
+
+export function schedulingRunOf(
+  config: { scheduling: boolean },
+  run: SchedulingRun,
+): SchedulingRun | null {
+  run.logger?.info(
+    { scheduling: config.scheduling },
+    config.scheduling
+      ? `weekly schedule report on (${ENV_VARS.scheduling})`
+      : `weekly schedule report off (set ${ENV_VARS.scheduling}=1 to enable)`,
+  );
+  return config.scheduling ? run : null;
 }
 
 export interface AttachmentGcRun {
@@ -114,6 +128,7 @@ export function createScheduler(
   intake?: IssueIntakeRun | null,
   outcome?: TrajectoryOutcomeRun | null,
   exportRun?: TrajectoryExportRun | null,
+  scheduling?: SchedulingRun | null,
 ): Scheduler {
   let timer: NodeJS.Timeout | null = null;
   const ciPoller =
@@ -126,6 +141,14 @@ export function createScheduler(
       ? createIssueIntake(deps, { githubFetch: intake.githubFetch, logger: intake.logger })
       : null;
   let intakeTimer: NodeJS.Timeout | null = null;
+  const schedulingSweep =
+    scheduling !== undefined && scheduling !== null
+      ? createScheduling(deps, {
+          githubFetch: scheduling.githubFetch,
+          logger: scheduling.logger,
+        })
+      : null;
+  let scheduleTimer: NodeJS.Timeout | null = null;
   let lastGcAt = 0;
   let gcImmediate: NodeJS.Immediate | null = null;
   let gcBatches: ReturnType<typeof sweepAttachmentBatches> | null = null;
@@ -255,6 +278,13 @@ export function createScheduler(
         }, ISSUE_INTAKE_INTERVAL_MS);
         intakeTimer.unref?.();
       }
+      if (schedulingSweep !== null) {
+        void schedulingSweep.sweep().catch(() => {});
+        scheduleTimer = setInterval(() => {
+          void schedulingSweep.sweep().catch(() => {});
+        }, SCHEDULE_INTERVAL_MS);
+        scheduleTimer.unref?.();
+      }
       if (outcome !== undefined && outcome !== null && deps.reposDir !== undefined) {
         const reposDir = deps.reposDir;
         const sweep = () => {
@@ -317,6 +347,10 @@ export function createScheduler(
       if (intakeTimer !== null) {
         clearInterval(intakeTimer);
         intakeTimer = null;
+      }
+      if (scheduleTimer !== null) {
+        clearInterval(scheduleTimer);
+        scheduleTimer = null;
       }
     },
   };

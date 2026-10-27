@@ -32,6 +32,7 @@ export const serverConfigSchema = z.object({
   host: z.string().nullable(),
   mcpConfigPath: z.string(),
   issueIntake: z.boolean(),
+  scheduling: z.boolean(),
   trajectoryOutcomeBackfill: z.boolean(),
 });
 export type ServerConfig = z.infer<typeof serverConfigSchema>;
@@ -127,6 +128,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
       process.env[ENV_VARS.mcpConfig] || join(homedir(), CLAUDE_CONFIG_FILE_NAME),
     ),
     issueIntake: envFlag(ENV_VARS.issueIntake),
+    scheduling: envFlag(ENV_VARS.scheduling),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
     ...overrides,
   });
