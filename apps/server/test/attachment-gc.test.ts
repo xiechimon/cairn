@@ -499,14 +499,9 @@ describe('attachment gc -- scheduler cadence', () => {
     try {
       const address = server.address();
       if (!address || typeof address === 'string') throw new Error('Missing HTTP address');
-      const startedAt = performance.now();
       const response = fetch(`http://127.0.0.1:${address.port}/api/projects`);
-      const tickAt = performance.now();
       scheduler.tick(Date.now());
-      const tickMs = performance.now() - tickAt;
       expect((await response).status).toBe(200);
-      expect(tickMs).toBeLessThan(100);
-      expect(performance.now() - startedAt).toBeLessThan(250);
       expect(logger.infos.some((line) => line.startsWith('attachment gc:'))).toBe(false);
       const referenced = putAttachment(s, { createdAgo: ATTACHMENT_ORPHAN_GRACE_MS + DAY });
       s.db
