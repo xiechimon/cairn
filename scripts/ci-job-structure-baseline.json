@@ -9,6 +9,7 @@
     "UI consumer shape gate (#1054)",
     "Install dependencies",
     "Prepush checks (#1533)",
+    "Upload safeguard interceptions",
     "PR evidence regression tests",
     "Prepush self-test",
     "verify-cairn CLI self-test (#1402)",
