@@ -134,7 +134,7 @@ async function openChief(page: Page) {
   const membersLoaded = page.waitForResponse(
     (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
   );
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await membersLoaded;
 
   await page.getByRole('button', { name: '总管' }).click();
@@ -390,7 +390,7 @@ test('a mid-line image paste lands the token whole-line at the caret (FM6)', asy
   await stubBoot(page);
   const uploads = await stubUploads(page);
   await stubMentionSources(page);
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await page.getByRole('button', { name: '总管' }).click();
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeEditable();
@@ -418,7 +418,7 @@ test('Enter during the upload does not send; after it lands Enter sends the toke
   await stubBoot(page);
   await stubMentionSources(page);
   const deferred = await deferUploads(page);
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await page.getByRole('button', { name: '总管' }).click();
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeEditable();
@@ -524,7 +524,7 @@ async function openChiefThread(page: Page) {
       },
     }),
   );
-  await page.goto('/app?chief=chief-bbb');
+  await page.goto('/app?view=board&chief=chief-bbb');
   const drawer = page.locator('.chief-drawer');
   await expect(drawer).toBeVisible();
   return drawer;
@@ -555,7 +555,7 @@ test.describe('fixture face stays inert (#732 FM3)', () => {
   test('the composer is read-only: no listbox, attach inert, picker at zero counts', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=111');
+    await page.goto('/app?view=board&scenario=111');
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
     const input = page.getByTestId('chief-composer-input');

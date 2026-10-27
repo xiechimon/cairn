@@ -90,4 +90,5 @@ run_flow() {
 
 run_flow chief-dispatch
 run_flow memory-regression
+run_flow project-routing
 echo "eval-weekly: table ${TABLE}"

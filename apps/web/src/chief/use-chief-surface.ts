@@ -65,7 +65,11 @@ function readStoredChiefOpen(): boolean {
   }
 }
 
-export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): ChiefSurface {
+export function useChiefSurface(
+  fixture: FixtureSet,
+  deepLink?: ChiefDeepLink,
+  onHome = false,
+): ChiefSurface {
   const { live, teamId } = useLiveData();
   const { t } = useI18n();
   const chiefQ = useChief(teamId, live);
@@ -92,11 +96,11 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
   }, []);
   const chiefViewOpen = chiefView === 'drawer';
   useEffect(() => {
-    if (!live) return;
+    if (!live || onHome) return;
     try {
       localStorage.setItem(CHIEF_OPEN_STORAGE_KEY, chiefView === 'drawer' ? '1' : '0');
     } catch {}
-  }, [live, chiefView]);
+  }, [live, onHome, chiefView]);
 
   const [activeThreadIdx, setActiveThreadIdx] = useState<number | null>(null);
   const liveThreads = chiefThreadsQ.data ?? [];
@@ -116,10 +120,18 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
     const idx = liveThreads.findIndex((thread) => thread.id === deepLinkId);
     if (idx >= 0) {
       setActiveThreadIdx(idx);
-      setChiefView('drawer');
+      if (!onHome) setChiefView('drawer');
     }
     onDeepLinkConsumed?.();
-  }, [live, deepLinkId, chiefThreadsQ.isSuccess, liveThreads, onDeepLinkConsumed, setChiefView]);
+  }, [
+    live,
+    deepLinkId,
+    chiefThreadsQ.isSuccess,
+    liveThreads,
+    onDeepLinkConsumed,
+    setChiefView,
+    onHome,
+  ]);
   const chiefMessagesQ = useMessages(live ? (activeThread?.id ?? null) : null, live);
   const streamHandlers = useMemo(
     () => ({
@@ -133,7 +145,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
   );
   useConversationStream(
     live ? (activeThread?.id ?? undefined) : undefined,
-    live && chiefViewOpen,
+    live && (chiefViewOpen || onHome),
     streamHandlers,
   );
   const activeThreadId = live ? (activeThread?.id ?? null) : null;

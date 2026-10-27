@@ -26,6 +26,8 @@ import {
   type MemoryRowLite,
 } from '../memory-regression/grade.mts';
 import { readMemoryRows, seedMemories } from '../memory-regression/seed.mts';
+import { gradeRoutingCase, isRoutingCase, type RoutingCase } from '../project-routing/grade.mts';
+import { seedRoutingProjects } from '../project-routing/seed.mts';
 import { type Case, gradeCase, type RosterAgent } from './grade.mts';
 import {
   buildHarnessEvalResult,
@@ -60,7 +62,7 @@ const PRICES: Record<string, { in: number; out: number; cacheRead: number }> = {
   'deepseek-v4-pro': { in: 0.955, out: 1.911, cacheRead: 0.08 },
 };
 
-type EvalCase = Case | MemoryCase | LearnCase;
+type EvalCase = Case | MemoryCase | RoutingCase | LearnCase;
 
 async function loadCases(): Promise<EvalCase[]> {
   const d = JSON.parse(readFileSync(join(ARGS.flow, 'cases.json'), 'utf8')) as {
@@ -72,7 +74,9 @@ async function loadCases(): Promise<EvalCase[]> {
   return d.cases;
 }
 
-async function freshStack(input: Case | MemoryCase): Promise<{ stack: Stack; world: SeededWorld }> {
+async function freshStack(
+  input: Case | MemoryCase | RoutingCase,
+): Promise<{ stack: Stack; world: SeededWorld; projectIds: Record<string, string> }> {
   const stack = await bootStack();
   try {
     const world = await seedWorld(stack, {
@@ -82,7 +86,10 @@ async function freshStack(input: Case | MemoryCase): Promise<{ stack: Stack; wor
       chiefModelId: CHIEF_MODEL,
     });
     if (isMemoryCase(input)) await seedMemories(stack.server, world, input);
-    return { stack, world };
+    const projectIds = isRoutingCase(input)
+      ? await seedRoutingProjects(stack, world)
+      : { 'eval-project': world.projectId };
+    return { stack, world, projectIds };
   } catch (e) {
     await stack.close();
     throw e;
@@ -101,6 +108,7 @@ async function runCase(
   evidence: TurnEvidence;
   truncated: boolean;
   agentIds: Record<string, string>;
+  projectIds: Record<string, string>;
   memoryAfter: MemoryRowLite[];
   grade?: { grade: Record<string, number>; explanation: Record<string, string> };
 }> {
@@ -121,11 +129,12 @@ async function runCase(
       evidence: learned.evidence,
       truncated,
       agentIds: learned.agentIds,
+      projectIds: {},
       memoryAfter: [],
       grade: learned.grade,
     };
   }
-  const { stack, world } = await freshStack(input);
+  const { stack, world, projectIds } = await freshStack(input);
   try {
     const timeoutMs = ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000;
     const ev = await driveTurn(stack, input.prompt, { timeoutMs });
@@ -148,6 +157,7 @@ async function runCase(
       evidence: ev,
       truncated,
       agentIds: world.agentIds,
+      projectIds,
       memoryAfter: readMemoryRows(stack.server, world.chiefAgentId),
       grade: undefined,
     };
@@ -266,7 +276,10 @@ function usage() {
 
 function checkHarness(statePath: string, st: Record<string, unknown>, approve: boolean) {
   const self = fileURLToPath(import.meta.url);
-  const listed = [...CHIEF_DISPATCH_HARNESS_PATHS];
+  const declared = Array.isArray(st.harness_paths)
+    ? st.harness_paths.filter((p): p is string => typeof p === 'string')
+    : [];
+  const listed = [...new Set([...CHIEF_DISPATCH_HARNESS_PATHS, ...declared])];
   const paths = [...new Set([self, ...listed.map((p) => resolveFromRoot(p))])].sort();
   const h = createHash('sha256');
   const hashed: string[] = [];
@@ -504,6 +517,7 @@ async function main() {
                     throw new Error(`learn case ${c.id} returned no grade`);
                   return run.grade;
                 }
+                if (isRoutingCase(c)) return gradeRoutingCase(c, run.evidence, run.projectIds);
                 return isMemoryCase(c)
                   ? gradeMemoryCase(c, { evidence: run.evidence, memoryAfter: run.memoryAfter })
                   : gradeCase(c, run, ROSTER);

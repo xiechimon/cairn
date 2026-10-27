@@ -374,7 +374,7 @@ test.describe('push notification click loop (XMON-106)', () => {
   test('T4: chief deep link → drawer opens on the target thread, params consumed once and stripped from the URL', async ({ page }) => {
     await stubEventSource(page);
     await mockLiveApi(page);
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -386,6 +386,18 @@ test.describe('push notification click loop (XMON-106)', () => {
     expect(page.url()).toContain('/app');
   });
 
+  test('T4 home: a chief deep link on home opens the target thread in the home chat and strips the param', async ({ page }) => {
+    await stubEventSource(page);
+    await mockLiveApi(page);
+    await page.goto('/app?chief=chief-bbb');
+
+    const home = page.getByTestId('chief-home');
+    const chip = home.getByRole('button', { name: '主题', exact: true });
+    await expect(chip.locator('span')).toHaveText('线程乙');
+    await expect.poll(() => page.url()).not.toContain('chief=');
+    await expect(page.locator('.chief-drawer')).toHaveCount(0);
+  });
+
   test('T4b: chief deep link pointing at a missing thread → drawer does not open, params still cleared', async ({ page }) => {
     await stubEventSource(page);
     await mockLiveApi(page);
@@ -393,9 +405,8 @@ test.describe('push notification click loop (XMON-106)', () => {
 
     await expect.poll(() => page.url()).not.toContain('chief=');
 
-    const drawer = page.locator('.chief-drawer');
-    await expect(drawer).toHaveCount(1);
-    await expect(drawer).toBeHidden();
+    await expect(page.locator('.chief-drawer')).toHaveCount(0);
+    await expect(page.getByTestId('chief-home')).toBeVisible();
 
     await expect(page.locator('[data-route="board"]')).toBeVisible();
   });

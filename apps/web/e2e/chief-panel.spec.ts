@@ -253,8 +253,8 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       };
     };
 
-    const drafted = await measureComposer('/app?scenario=111');
-    const empty = await measureComposer('/app?scenario=114');
+    const drafted = await measureComposer('/app?view=board&scenario=111');
+    const empty = await measureComposer('/app?view=board&scenario=114');
 
     expect(drafted.height).toBe(120);
     expect(empty.height).toBe(60);
