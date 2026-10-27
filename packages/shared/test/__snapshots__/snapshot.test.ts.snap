@@ -6071,6 +6071,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
   "ENV_VARS": {
     "apiKey": "CAIRN_API_KEY",
     "customModelReasoning": "CAIRN_CUSTOM_MODEL_REASONING",
+    "githubCreateHourlyCap": "CAIRN_GITHUB_CREATE_HOURLY_CAP",
+    "githubCreateMinIntervalMs": "CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS",
     "githubOauthClientId": "CAIRN_GITHUB_OAUTH_CLIENT_ID",
     "githubOauthClientSecret": "CAIRN_GITHUB_OAUTH_CLIENT_SECRET",
     "home": "CAIRN_HOME",

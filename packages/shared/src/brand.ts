@@ -43,6 +43,8 @@ export const BRAND = {
 } as const;
 
 export const ENV_VARS = {
+  githubCreateMinIntervalMs: 'CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS',
+  githubCreateHourlyCap: 'CAIRN_GITHUB_CREATE_HOURLY_CAP',
   server: 'CAIRN_SERVER',
   apiKey: 'CAIRN_API_KEY',
   team: 'CAIRN_TEAM',

@@ -433,6 +433,8 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 
   it('env vars are the CAIRN_ same-shape replacement (replacement plan §2; r3 §1.1 observed original names TDS_*)', () => {
     const {
+      githubCreateMinIntervalMs,
+      githubCreateHourlyCap,
       webDir,
       githubOauthClientId,
       githubOauthClientSecret,
@@ -455,6 +457,8 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       workspacesDir: 'CAIRN_WORKSPACES_DIR',
       home: 'CAIRN_HOME',
     });
+    expect(githubCreateMinIntervalMs).toBe('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS');
+    expect(githubCreateHourlyCap).toBe('CAIRN_GITHUB_CREATE_HOURLY_CAP');
     expect(webDir).toBe('CAIRN_WEB_DIR');
     expect(githubOauthClientId).toBe('CAIRN_GITHUB_OAUTH_CLIENT_ID');
     expect(githubOauthClientSecret).toBe('CAIRN_GITHUB_OAUTH_CLIENT_SECRET');
