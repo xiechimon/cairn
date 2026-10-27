@@ -43,7 +43,7 @@ const BOARD = [
   'storage-unavailable',
   'mobile-narrow',
   'focus-ring-clip',
-  'chief-home-chat',
+  'chief-home-',
   'chief-project-pick',
   'task-panel',
 ];
@@ -80,7 +80,7 @@ const DETAIL = [
   'spec-brief-',
   'spinner-',
   'chief-fab',
-  'chief-home-chat',
+  'chief-home-',
   'chief-project-pick',
   'chief-stream-markdown',
   'composer-wire-reject',

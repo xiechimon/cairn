@@ -1421,6 +1421,7 @@ async function runClaimedStep(
     }
     break;
   }
+  deps.sessionHandles?.delete(stepId);
   await sealSegment();
   flushDeltas();
   flushThinking();
@@ -1785,7 +1786,6 @@ async function runClaimedStep(
   } catch (err) {
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
-    deps.sessionHandles?.delete(stepId);
     return;
   }
 
@@ -1794,12 +1794,10 @@ async function runClaimedStep(
   } catch (err) {
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
-    deps.sessionHandles?.delete(stepId);
     return;
   }
   clearCredentials(creds);
   journal.remove(stepId);
-  deps.sessionHandles?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
 }
 

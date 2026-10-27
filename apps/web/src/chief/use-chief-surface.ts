@@ -46,6 +46,9 @@ export interface ChiefSurface {
   onRewind?: (messageId: string) => void;
   onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancelQuestion?: (requestId: string) => void;
+  onWithdraw?: (messageId: string) => Promise<void>;
+  onSteer?: (messageId: string) => void;
+  onStop?: () => void;
 }
 
 const NEW_THREAD = -1;
@@ -227,6 +230,37 @@ export function useChiefSurface(
       }
     : undefined;
 
+  const onWithdraw = live
+    ? (messageId: string) => {
+        if (activeThread === null) return Promise.resolve();
+        return mutations.chiefWithdraw
+          .mutateAsync({ threadId: activeThread.id, messageId })
+          .then(() => undefined)
+          .catch((error: unknown) => {
+            toastError(t('撤回失败，总管可能已经开始处理这条了。'), error);
+            throw error;
+          });
+      }
+    : undefined;
+  const onSteer = live
+    ? (messageId: string) => {
+        if (activeThread === null) return;
+        mutations.chiefSteer.mutate(
+          { threadId: activeThread.id, messageId },
+          { onError: (e) => toastError(t('插话失败，请重试。'), e) },
+        );
+      }
+    : undefined;
+  const onStop = live
+    ? () => {
+        if (activeThread === null) return;
+        mutations.chiefStop.mutate(
+          { threadId: activeThread.id },
+          { onError: (e) => toastError(t('停止失败，请重试。'), e) },
+        );
+      }
+    : undefined;
+
   const onSend = live
     ? (text: string, projectId: string | null) => {
         return mutations.chiefSend
@@ -255,5 +289,8 @@ export function useChiefSurface(
     onRewind,
     onAnswerQuestion,
     onCancelQuestion,
+    onWithdraw,
+    onSteer,
+    onStop,
   };
 }

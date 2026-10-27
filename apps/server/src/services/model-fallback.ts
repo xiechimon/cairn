@@ -1,5 +1,6 @@
 import {
   classifyStepFailure,
+  isBackendRuntimeId,
   isProviderAuthFailure,
   type MachineDoneBody,
   type ModelRef,
@@ -16,6 +17,8 @@ type AgentRow = typeof agent.$inferSelect;
 type StepRow = typeof step.$inferSelect;
 
 export const FALLBACK_STEP_KINDS: readonly StepKind[] = ['plan', 'build'];
+
+const MODEL_FALLBACK_STEP_KINDS: readonly StepKind[] = [...FALLBACK_STEP_KINDS, 'chief'];
 
 export type FallbackTrigger = 'quota' | 'model_unavailable' | 'auth';
 
@@ -82,7 +85,7 @@ export function planModelFallback(
   agentRow: AgentRow | null,
   outcome: MachineDoneBody,
 ): FallbackPlan | null {
-  if (!FALLBACK_STEP_KINDS.includes(stepRow.kind)) return null;
+  if (!MODEL_FALLBACK_STEP_KINDS.includes(stepRow.kind)) return null;
   const trigger = fallbackTriggerOf(outcome);
   if (trigger === null) return null;
   const chain = agentRow?.fallbackModels ?? [];
@@ -97,6 +100,10 @@ export function planModelFallback(
   const to = chain.find(
     (m) =>
       !tried.has(modelKey(m)) &&
+      (stepRow.kind !== 'chief' ||
+        (isBackendRuntimeId(m.provider) || isBackendRuntimeId(primary.provider)
+          ? m.provider === primary.provider
+          : true)) &&
       runtimeGatePasses(machineRow, m.provider) &&
       getModelLiveness(m.provider, m.modelId) !== 'dead' &&
       providerHealth.tryAcquire(m.provider),

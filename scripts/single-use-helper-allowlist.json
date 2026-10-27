@@ -123,5 +123,20 @@
     "path": "apps/server/src/services/todos.ts",
     "name": "scheduleMovedIssueClose",
     "reason": "Fire-and-forget GitHub close of the old self-created issue after a move; inlining would put an async token lookup and its error logging inside the synchronous updateTodo."
+  },
+  {
+    "path": "apps/server/src/services/chief-turns.ts",
+    "name": "createdTodoIdOf",
+    "reason": "Parses one tool row into a created todo id with four guards and a JSON try/catch; inlining it puts all of that inside the stop row's filter loop"
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "chiefStepAgent",
+    "reason": "Three-table join from a chief step to its agent; inlining it puts the query in the middle of finishStep's outcome branching"
+  },
+  {
+    "path": "apps/web/src/chief/chief-message-rows.tsx",
+    "name": "StoppedRow",
+    "reason": "React component with its own i18n hook; inlining it would call the hook from inside the row switch"
   }
 ]

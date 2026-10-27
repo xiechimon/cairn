@@ -201,6 +201,9 @@ export class FakeMachineApi implements MachineApi {
     this.calls.push(`steer:${stepId}`);
     return this.steerResponse;
   }
+  async steerAck(stepId: string) {
+    this.calls.push(`steer-ack:${stepId}`);
+  }
   async attachment(stepId: string, attachmentId: string): Promise<MachineAttachmentResponse> {
     this.attachmentCalls.push(`${stepId}:${attachmentId}`);
     const hit = this.attachments[attachmentId];

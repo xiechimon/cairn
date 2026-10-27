@@ -28,9 +28,18 @@ interface ChiefHomeProps {
   below: ReactNode;
   brief: ReactNode;
   todoGlances: ReadonlyMap<string, TodoGlance>;
+  onNewTask?: () => void;
 }
 
-export function ChiefHome({ surface, now, summary, below, brief, todoGlances }: ChiefHomeProps) {
+export function ChiefHome({
+  surface,
+  now,
+  summary,
+  below,
+  brief,
+  todoGlances,
+  onNewTask,
+}: ChiefHomeProps) {
   const { t, locale } = useI18n();
   const { user } = useLiveData();
   const { chiefData, chiefView, setChiefView, onSend } = surface;
@@ -162,6 +171,10 @@ export function ChiefHome({ surface, now, summary, below, brief, todoGlances }: 
           onRewind={surface.onRewind}
           onAnswerQuestion={surface.onAnswerQuestion}
           onCancelQuestion={surface.onCancelQuestion}
+          onWithdraw={surface.onWithdraw}
+          onSteer={surface.onSteer}
+          onStop={surface.onStop}
+          onNewTask={onNewTask}
           onSettings={() => setChiefView('settings')}
           threadsOpen={threadsOpen}
           setThreadsOpen={setThreadsOpen}

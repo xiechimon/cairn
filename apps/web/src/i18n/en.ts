@@ -1128,6 +1128,38 @@ export const EN: Record<string, string> = {
   '换个关键词再试。': 'Try another search term.',
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
   总管本轮执行失败: 'The chief turn failed',
+  '撤回失败，总管可能已经开始处理这条了。':
+    'Could not withdraw: the chief may already be working on it.',
+  '插话失败，请重试。': 'Could not steer. Try again.',
+  '停止失败，请重试。': 'Could not stop. Try again.',
+  '已停止，没有建任务。': 'Stopped. No task was created.',
+  '已停止。停之前已经建了任务': 'Stopped. A task was already created before the stop:',
+  '已存下，总管恢复后会处理': 'Saved. The chief will handle it once it is back',
+  '排队中，总管回完上一条就看': 'Queued. The chief reads it after the current reply',
+  现在插话: 'Steer now',
+  撤回: 'Withdraw',
+  '由备用模型 {model} 回答': 'Answered by backup model {model}',
+  总管的模型: "the chief's model",
+  '总管用的模型 {model} 额度已用完': "The chief's model {model} is out of quota",
+  '总管用的模型 {model} 暂时过载': "The chief's model {model} is overloaded",
+  '{time} 会自动再试': 'it retries automatically at {time}',
+  恢复时间还不确定: 'no recovery time yet',
+  总管暂时不可用: 'The chief is unavailable',
+  '{why}，{when}。任务照常在跑；你说的话先存下，恢复后按顺序处理。':
+    '{why}; {when}. Tasks keep running; your messages are saved and handled in order once it is back.',
+  详情: 'Details',
+  直接建任务: 'Create a task directly',
+  给总管换模型: "Change the chief's model",
+  '总管的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。':
+    "The chief's main model is unavailable, so backup model {model} is replying. Its judgment may be less sharp.",
+  换模型: 'Change model',
+  停止总管这次回复: 'Stop this chief reply',
+  '备用模型 {model}': 'Backup model {model}',
+  '，主模型暂时用不了': ', main model unavailable',
+  '可以继续说，总管恢复后会按顺序处理…':
+    'Keep typing; the chief handles messages in order once it is back…',
+  '总管回完这条就看；想马上补充，发出后点「现在插话」':
+    'The chief reads this after the current reply; to add it now, send it and click Steer now',
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——

@@ -18,6 +18,7 @@ import {
   sendChiefMessage,
 } from './services/chief.js';
 import { answerQuestion, cancelQuestion, parseAnswerBody } from './services/chief-questions.js';
+import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { isChiefConversation } from './services/machines.js';
 
 export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
@@ -61,6 +62,24 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const body = parseWith(chiefRewindBodySchema, await jsonBody(c), 'body');
     return c.json(rewindChiefThread(svc, teamId, c.req.param('tid'), body));
+  });
+
+  app.delete('/api/teams/:id/chief/threads/:tid/messages/:mid', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(withdrawChiefMessage(svc, teamId, c.req.param('tid'), c.req.param('mid')));
+  });
+
+  app.post('/api/teams/:id/chief/threads/:tid/messages/:mid/steer', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(steerChiefMessage(svc, teamId, c.req.param('tid'), c.req.param('mid')));
+  });
+
+  app.post('/api/teams/:id/chief/threads/:tid/stop', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(stopChiefTurn(svc, teamId, c.req.param('tid')));
   });
 
   app.post('/api/teams/:id/chief/threads/:tid/questions/:requestId/answer', async (c) => {

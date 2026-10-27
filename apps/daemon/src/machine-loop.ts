@@ -399,7 +399,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           }`,
         );
       }
+      if (sessionHandles.get(stepId) !== live) {
+        logger.step(`steer dropped (no live session) step=${stepId}`);
+        return;
+      }
       await live.steer(deliveryText, images);
+      await client.steerAck?.(stepId);
       logger.step(`steer delivered step=${stepId}`);
     } catch (err) {
       logger.step(`steer delivery failed: ${err instanceof Error ? err.message : String(err)}`);
