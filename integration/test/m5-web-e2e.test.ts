@@ -205,6 +205,10 @@ async function createAndStart(title: string): Promise<void> {
 
 async function openDetail(title: string): Promise<void> {
   await page.getByRole('link', { name: title }).click();
+  await page
+    .getByRole('complementary', { name: '任务面板' })
+    .getByRole('link', { name: '展开为整页' })
+    .click();
   await pexpect(page.locator('.detail-shell')).toBeVisible({ timeout: 15_000 });
 }
 

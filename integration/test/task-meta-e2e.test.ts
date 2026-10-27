@@ -90,6 +90,10 @@ describe('spec 15 #394 title-less surface + fixed tag vocabulary (live UI → wi
     expect(probe!.tagIds).toEqual([]);
 
     await page.getByRole('link', { name: '394 占位标题探针' }).click();
+    await page
+      .getByRole('complementary', { name: '任务面板' })
+      .getByRole('link', { name: '展开为整页' })
+      .click();
     await pexpect(page.locator('.detail-shell')).toBeVisible({ timeout: 15_000 });
     await pexpect(page.locator('.fresh-tags')).toHaveCount(0);
   }, 180_000);

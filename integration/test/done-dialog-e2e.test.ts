@@ -183,6 +183,10 @@ async function driveToReview(spec: string, opts: { rework: boolean }) {
 async function openDetailViaBoard(title: string): Promise<void> {
   await page.goto(`${server.url}/app?view=board`);
   await page.getByRole('link', { name: title }).click();
+  await page
+    .getByRole('complementary', { name: '任务面板' })
+    .getByRole('link', { name: '展开为整页' })
+    .click();
   await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
     timeout: 15_000,
   });
