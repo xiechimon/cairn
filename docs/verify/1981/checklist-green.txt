@@ -1,0 +1,18 @@
+PASS Codex incorporates shared checklist
+PASS Grok incorporates shared checklist
+PASS pi incorporates shared checklist
+PASS fixture scope in dispatch
+PASS fixture scope in skill
+PASS stub scope in dispatch
+PASS stub scope in skill
+PASS delivery scope in dispatch
+PASS delivery scope in skill
+PASS mechanism artifact in dispatch
+PASS mechanism artifact in skill
+PASS review boundary in dispatch
+PASS review boundary in skill
+PASS parent scope in dispatch
+PASS parent scope in skill
+PASS stub workflow preserved
+PASS fixture workflow preserved
+17/17 checks passed
