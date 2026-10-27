@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { agentTodoItemSchema } from './agent-todo.js';
 import type { BriefBackendId } from './brief-file.js';
+import type { StepOtelContext } from './otel.js';
 import { epochMs, recordId } from './records/common.js';
 import { messageRecordSchema } from './records/message.js';
 import {
@@ -142,6 +143,7 @@ export interface SessionOpts {
   teamSkillsDir?: string;
   readOnly?: boolean;
   env?: Record<string, string>;
+  telemetry?: StepOtelContext;
   cwd: string;
   prompt?: string;
   promptImages?: readonly DeliveredImage[];

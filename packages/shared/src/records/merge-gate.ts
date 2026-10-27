@@ -50,6 +50,7 @@ export const AUTO_MERGE_PATH_GLOBS = [
   'packages/*/test/**',
   'integration/test/**',
   'docs/verify/**',
+  'docs/**/*.md',
 ] as const;
 
 export const PROTECTED_PATH_GLOBS = [
@@ -63,7 +64,11 @@ export const PROTECTED_PATH_GLOBS = [
   '**/CLAUDE*.md',
   '**/AGENTS*.md',
   'docs/pr-review.md',
+  'docs/lessons.md',
+  'docs/lessons/**',
+  'docs/agent-dispatch-prompts.md',
   'docs/adr/**',
+  'docs/spec/**',
   '**/scripts/**',
   '**/*.config.*',
   '**/biome.json',
@@ -83,19 +88,22 @@ export const PROTECTED_PATH_GLOBS = [
   'apps/server/src/services/secrets.ts',
   'apps/server/src/services/credentials.ts',
   'apps/server/src/services/api-keys.ts',
-  'apps/server/src/services/webhook-tokens.ts',
   'apps/server/src/services/oauth.ts',
   'apps/server/src/routes-machine.ts',
   'apps/server/src/services/machine*.ts',
   'apps/daemon/src/credentials.ts',
   'apps/daemon/src/secret-channel.ts',
-  'apps/daemon/src/shell-channel.ts',
   'apps/daemon/src/machine-client.ts',
   'apps/daemon/src/backend/command-gate.ts',
   'apps/server/src/services/mcp-face.ts',
   'apps/server/src/services/mcp-servers.ts',
-  'apps/server/src/routes-webhook.ts',
   'apps/server/src/db/client.ts',
+  'integration/eval/**',
+  '.claude/hillclimb/**',
+  'apps/server/src/trajectory-export.ts',
+  'apps/server/src/trajectory-export-cli.ts',
+  'apps/server/src/trajectory-outcome.ts',
+  'packages/shared/src/trajectory-pack.ts',
 ] as const;
 
 export const MERGE_GATE_SOURCE_GLOBS = [
@@ -229,9 +237,12 @@ export const MERGE_BLOCKERS = [
     label: '补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）',
   },
   { code: 'size-cap', class: 'human', label: '补丁超过 800 行或 40 个文件' },
-  { code: 'protected-path', class: 'human', label: '改动命中 D4 保护路径' },
+  {
+    code: 'independent-review-missing',
+    class: 'transient',
+    label: 'Protected changes require a bound independent review',
+  },
   { code: 'outside-auto-merge', class: 'human', label: '改动在可自动合并集之外' },
-  { code: 'test-deleted', class: 'human', label: '删除了测试' },
   {
     code: 'opaque-file',
     class: 'human',

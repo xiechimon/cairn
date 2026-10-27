@@ -14,6 +14,7 @@ import { extractText } from './chief.js';
 import { githubRepoOfProject, projectOfTodo, readBuildChanges } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import { githubText } from './github-text.js';
+import type { OAuthClientConfig } from './oauth.js';
 
 const PR_TITLE_PROBE_TIMEOUT_MS = 5_000;
 
@@ -22,6 +23,7 @@ export interface BlockerHandoffDeps {
   box?: Parameters<typeof githubTokenOrNull>[0]['box'];
   reposDir: string;
   githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
   attachmentsDir: string;
 }
 
@@ -50,7 +52,7 @@ export async function blockerHandoffForClaim(
   );
   const projectRow = projectOfTodo(deps.db, todoRow);
   const repoRef = githubRepoOfProject(projectRow);
-  const token = githubTokenOrNull(deps, todoRow.teamId);
+  const token = await githubTokenOrNull(deps, todoRow.teamId);
   const blockers: BlockerHandoffEntry[] = [];
   for (const blockerId of blockerIds) {
     const blockerRow = blockerRows.get(blockerId);

@@ -40,6 +40,7 @@ export interface AppContext {
   oauthFetch?: FetchLike;
   oauthClient: OAuthClientConfig | null;
   authToken: string | null;
+  tailscaleUsers: string[];
   mcpConfigPath: string;
   logger?: Logger;
 }

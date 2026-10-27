@@ -356,3 +356,126 @@ export const boardDarkFresh: FixtureSet = {
   todos: [legacyReview, legacyDone, probeTodo('done', r7(13, 52)), darkFreshProbe],
   now: r7(13, 55),
 };
+
+const INBOX_NOW = r7(13, 55);
+const INBOX_DAY_MS = 24 * 60 * 60 * 1000;
+
+function inboxProbe(
+  id: string,
+  seqNum: number,
+  title: string,
+  phase: TodoRecord['phase'],
+  ageMs: number,
+  over?: Partial<TodoRecord>,
+): TodoRecord {
+  return {
+    ...probeTodo(phase, INBOX_NOW - ageMs),
+    id,
+    seqNum,
+    title,
+    spec: title,
+    tagIds: [],
+    ...over,
+  };
+}
+
+export const boardInbox: FixtureSet = {
+  ...boardDefault,
+  projectNames: { [PROJECT_ID]: 'pacman', 'inbox-probe': 'pacman-gh-probe' },
+  todos: [
+    inboxProbe(
+      'inbox-reply',
+      101,
+      'bug 票自动复现：要不要把复现脚本放进 e2e？',
+      'review',
+      40 * 60_000,
+      {
+        awaitingReply: true,
+      },
+    ),
+    inboxProbe(
+      'inbox-confirm',
+      102,
+      '段超时杀已交付 plan 的残留流：停闸后的 build 被覆写为 failed',
+      'confirm',
+      2 * 60 * 60_000,
+    ),
+    inboxProbe(
+      'inbox-review',
+      103,
+      '上下文顶格时压缩请求自身 400 且不可恢复：整步无恢复路径',
+      'review',
+      5 * 60 * 60_000,
+      {
+        hasChanges: true,
+      },
+    ),
+    inboxProbe(
+      'inbox-failed-fresh',
+      104,
+      '自治合并试点：纯文档与纯测试 PR 闸全绿即由 cairn 自己合并',
+      'failed',
+      26 * 60 * 60_000,
+    ),
+    inboxProbe(
+      'inbox-stale-1',
+      22,
+      '调慢 spinner 至 1.8s 同步呼吸律：补全 PR1119 证据段',
+      'failed',
+      16 * INBOX_DAY_MS,
+    ),
+    inboxProbe(
+      'inbox-stale-2',
+      77,
+      '规划 #1301 模型下拉宽度修复：消费端组合/零皮 adapter 方案',
+      'confirm',
+      13 * INBOX_DAY_MS,
+    ),
+    inboxProbe(
+      'inbox-stale-3',
+      26,
+      '实现 issue #1138：claim 闸加 agent 级 maxConcurrentTasks',
+      'failed',
+      14 * INBOX_DAY_MS,
+    ),
+    inboxProbe(
+      'inbox-stale-4',
+      48,
+      '实现 #1186 skills 注入面三前置条件的机器断言',
+      'failed',
+      14 * INBOX_DAY_MS,
+      {
+        projectId: 'inbox-probe',
+      },
+    ),
+    inboxProbe(
+      'inbox-stale-5',
+      50,
+      '#1242 冲突解除收尾轮：PR1283 已合并，落地态核验全绿',
+      'failed',
+      14 * INBOX_DAY_MS,
+      {
+        projectId: 'inbox-probe',
+      },
+    ),
+    inboxProbe(
+      'inbox-running',
+      105,
+      'bug 票自动复现：新 bug 票先由 agent 用 verify-cairn 跑一遍并贴证据',
+      'building',
+      60 * 60_000,
+    ),
+    inboxProbe('inbox-todo', 106, '给工作台加上按项目分组的开关', 'todo', 10 * 60 * 60_000),
+    inboxProbe(
+      'inbox-done',
+      107,
+      'chief: split_todo 拆解方案过检查器即自动开跑',
+      'done',
+      5 * 60 * 60_000,
+    ),
+    inboxProbe('inbox-done-2', 108, '修复看板拖拽列的直角与圆角不一致', 'done', 20 * 60 * 60_000),
+    inboxProbe('inbox-done-3', 109, '模型下拉在窄屏下被截断', 'closed', 2 * INBOX_DAY_MS),
+    inboxProbe('inbox-done-4', 110, '记忆候选流程接上评测', 'done', 3 * INBOX_DAY_MS),
+  ],
+  now: INBOX_NOW,
+};

@@ -3,7 +3,7 @@
     "sha": "5d9d91d6",
     "date": "2026-10-09"
   },
-  "scope": "apps/web/src consumer points minus components/ui/ (#1054/#1055, ADR 0012 D1). Two ledgers in one review face. squareBoxes: every line the shape gate flags (visible square box: bare rounded-none + unconditional paint, or enclosing border + fill with no radius declared) must match an entry {file, anchor, kind, basis?, reason} — anchor = literal substring of the flagged line. kind deviation = deliberate non-registry geometry with reason; kind rides-primitive = radius comes through from the underlying registry component (basis names it); kind state-surface = state tint painted over an already-ruled box (line-level scan cannot see the base class). brandInkText: every consumer text-role use of the brand ink (--card-button/--focus-ring as text-(...) or CSS color:) must match an entry {file, anchor, role, reason, contrast} — role in selection-mark | indicator | badge-glyph | action-link (#987: brand ink is spot emphasis only, never body/label/button-text ink; action-link = the board card accent text link, DESIGN.md 按钮). Solid-fill (bg-) uses are the slot's canonical role and are not policed. Full disposition inventory incl. wave-1 attribution: docs/spec/27-消费点形状与品牌墨台账.md.",
+  "scope": "apps/web/src consumer points minus components/ui/ (#1054/#1055, ADR 0012 D1). Two ledgers in one review face. squareBoxes: every line the shape gate flags (visible square box: bare rounded-none + unconditional paint, or enclosing border + fill with no radius declared) must match an entry {file, anchor, kind, basis?, reason} — anchor = literal substring of the flagged line. kind deviation = deliberate non-registry geometry with reason; kind rides-primitive = radius comes through from the underlying registry component (basis names it); kind state-surface = state tint painted over an already-ruled box (line-level scan cannot see the base class). brandInkText: every consumer text-role use of the brand ink (--card-button/--focus-ring as text-(...) or CSS color:) must match an entry {file, anchor, role, reason, contrast} — role in selection-mark | indicator | badge-glyph | action-link (#987: brand ink is spot emphasis only, never body/label/button-text ink; action-link = the board card accent text link, DESIGN.md 按钮). Solid-fill (bg-) uses are the slot's canonical role and are not policed. Full disposition inventory incl. wave-1 attribution: docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md.",
   "squareBoxes": [
     {
       "file": "apps/web/src/chief/chief-settings.tsx",
@@ -16,6 +16,12 @@
       "anchor": "rounded-none border-0 border-b border-border",
       "kind": "deviation",
       "reason": "ResourceRow button form (#1416): a full-width Button row inside the settings card. It draws the row divider itself because the Button's transparent border hides the card's divide-y rule (last:border-b-0 keeps the last row clean), and a divider on a rounded box would curl up at both ends, so the box stays square. The card's --radius-card corners stay the visible shape."
+    },
+    {
+      "file": "apps/web/src/board/app-sidebar.tsx",
+      "anchor": "top-0 left-0 flex h-full w-72",
+      "kind": "deviation",
+      "reason": "Phone sidebar drawer: a full-height Dialog panel pinned to the left screen edge, as on claude.ai mobile. Its top, left and bottom edges sit on the viewport edge, where rounded corners would leave slivers of the page showing, so the box stays square; the sidebar inside keeps its own surface."
     }
   ],
   "brandInkText": [
@@ -27,7 +33,7 @@
       "contrast": "docs/verify/988/ (sealed) re-attested in docs/verify/1055/colors/incremental.md"
     },
     {
-      "file": "apps/web/src/overlays/chip-popover.tsx",
+      "file": "apps/web/src/overlay/chip-popover.tsx",
       "anchor": "ml-auto flex text-(--card-button)",
       "role": "selection-mark",
       "reason": "Check mark on the assigned-agent row = selection indicator (#987: brand ink is for 选中标记/小徽标 only). Wave-1 0bfbdefa kept the spot-emphasis usages on a user-approved ruling.",
@@ -98,30 +104,23 @@
     },
     {
       "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "ring-1 ring-border [&>svg:first-child]:text-(--card-button)",
+      "anchor": "bg-(--hover-1) font-medium text-foreground [&>svg:first-child]:text-(--card-button)",
       "role": "indicator",
-      "reason": "Active sidebar row icon. DESIGN.md 侧栏: active row = sheet + hairline + accent icon.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
+      "reason": "Active sidebar row icon. DESIGN.md shell: active row = flat --hover-1 fill + accent icon.",
+      "contrast": "measured 2026-10-25 in the fixture build (light / dark): 9.14 / 6.90 on the composited --hover-1 row; non-text glyph, 3:1 gate"
     },
     {
       "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "const RAIL_ACTIVE = `bg-background text-(--card-button)",
+      "anchor": "const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button)",
       "role": "indicator",
       "reason": "Collapsed-rail twin of the active row icon (icon-only rows).",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
+      "contrast": "measured 2026-10-25 in the fixture build (light / dark): same fill as the expanded active row (9.14 / 6.90); non-text glyph, 3:1 gate"
     },
     {
       "file": "apps/web/src/board/sidebar.tsx",
       "anchor": "${RAIL_BTN} text-(--card-button)",
       "role": "indicator",
       "reason": "Rail 新任务 plus glyph. DESIGN.md 侧栏: 新任务 carries a terracotta plus.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
-    },
-    {
-      "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "size-4 flex-none text-(--card-button)",
-      "role": "indicator",
-      "reason": "Expanded 新任务 button plus glyph (DESIGN.md 侧栏 item 2).",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
     },
     {
@@ -158,6 +157,34 @@
       "role": "indicator",
       "reason": "Runtime head 未安装 / 未登录 state = needs you (DESIGN.md: accent only for needs-you); carried with a CircleAlert icon and the label, so the state does not rely on color.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 12px text)"
+    },
+    {
+      "file": "apps/web/src/board/home.tsx",
+      "anchor": "const ACTION_CLASS = 'flex-none gap-1 text-(--card-button)'",
+      "role": "action-link",
+      "reason": "Home and needs-me inbox row action (回复/确认计划/审阅/重试/开始): the same accent text action the task card shows.",
+      "contrast": "measured 2026-10-25 in the fixture build (light / dark): 12.26 / 6.11 on --card"
+    },
+    {
+      "file": "apps/web/src/board/home.tsx",
+      "anchor": "className=\"text-(--card-button)\"",
+      "role": "indicator",
+      "reason": "Needs-me inbox row status glyph (failed / plan / review / reply). DESIGN.md 图标: needs-you icons take the accent; non-text glyph, 3:1 gate.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, measured in PR #1369)"
+    },
+    {
+      "file": "apps/web/src/board/home.tsx",
+      "anchor": "tone=\"text-(--card-button)\"",
+      "role": "indicator",
+      "reason": "Home `需要你` section header alert-circle glyph. DESIGN.md 图标: needs-you icons take the accent; non-text glyph, 3:1 gate.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369)"
+    },
+    {
+      "file": "apps/web/src/board/board.tsx",
+      "anchor": "<BrandMark className=\"size-5 text-(--card-button)\" />",
+      "role": "indicator",
+      "reason": "Spiral brand mark at the start of the board new-task bar.",
+      "contrast": "measured 2026-10-25 in the fixture build (light / dark): 12.26 / 6.11 on --card; non-text glyph, 3:1 gate"
     }
   ]
 }

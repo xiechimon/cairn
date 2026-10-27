@@ -1,201 +1,201 @@
-# r15 · Multica 的 run 过程呈现（UI 渲染 + 事件流）源码级事实
+# r15 · How Multica renders a run in progress (UI rendering + event stream): source-level facts
 
-> 目的：把「一个 agent 正在跑的工作单元在 Multica UI 上怎么呈现」钉到源码级事实（前端渲染 + wire + 落库时机），供 pacman 总管抽屉的实时行改动做对照。
-> 素材 A（源码侧，唯一一手来源）：`multica-ai/multica` 浅克隆 `--depth 1`，HEAD = `b4ca5b4a23e68b26292a680dca7689a952bb1cd5`（2026-10-04 12:48:20 +0800，"refactor(skills): retire legacy issue skill redirect (#9046)"），落在 `/tmp/multica-src-runui.BHtJaX`（仓外，不污染 pacman）。克隆时间 2026-10-05 15:57 UTC。
-> 素材 B（文档口径）：同仓 `apps/docs/content/docs/*.mdx`（随源码版本走）。
-> 未使用素材：本机 Multica 桌面版（`~/Library/Application Support/Multica/`）与 CLI 未取；活界面未取——源码已能回答全部六问，不需要 B/C 一级来源里的后两类。
-> 阅读约定：出处两类，逐条标注——**C**（代码）= multica 源码 `路径:行号`（相对克隆根）；**D**（文档）= `apps/docs/content/docs/*.mdx:行号`；**[推断]** = 无直接出处、由代码行为推断的结论。全篇无 emoji。
-> 命名先说清：Multica 里一次 agent 执行叫 **task**（UI 层叫 **run**）。UI 有两条独立的呈现面共用同一份 task 数据——**chat 面**（`packages/views/chat/`，会话流里 agent 的回复）与 **issue 面**（`packages/views/issues/`，issue 详情里的 live 运行条 + 执行日志）。两边都读同一份 `task_message` 行，但切分与折叠逻辑不同，下文分开写。
-
----
-
-## 1. 结论先行
-
-1. **一次 run 在 UI 上是「一行」（one row），页面按 `task:<taskId>` 作行键**；实时流与终稿共用这一个键，落库时是**同一行的数据原地替换**，不是卸载重建（`packages/views/chat/components/chat-message-list.tsx:124-137,469-479`）。行**内部**再按时间线切成多条 step（叙述文本 / 工具调用 / thinking / error），这些 step 是**实时逐个出现**的，不是收尾批量补的。（§2、§3）
-2. **一条 `task_message` 的界不是「一次工具调用」，而是「一段连续同类型增量」**：daemon 把连续的 text（或 thinking）增量攒进同一个缓冲，直到**类型变化 / 500ms tick / 运行结束**才封成一行；工具调用与工具结果各是**独立行**，不进这个缓冲。（`server/internal/daemon/daemon.go:9439-9469,9573-9666`）（§2）
-3. **切分与折叠发生在读取端，不在写入端**：wire 是扁平的 `(seq, type, tool, content, input, output, call_id)` 行；前端把 `tool_use`/`tool_result` 按 `call_id` 配成一步、把连续同类 text 合并、把连续同工具调用（≥3 个且非 shell）折成一组。（`packages/views/common/task-transcript/build-steps.ts:95-198`、`build-timeline.ts:23-46,135-154`）（§2、§4）
-4. **工具调用在流式期就可见**，形态是**可展开的一行**（provider 原生工具名 + 最有信息量的一个参数），不是独立大卡片。工具行与前后叙述文本的**交错次序被保留**，靠 `seq` 排序。（`chat-message-list.tsx:1232-1280`、`trace-event-presenter.ts:124-147`）（§3）
-5. **中间叙述文本与最终结论在 chat 面被显式分层**：`splitTimeline` 把时间线切成 preface（首个非文本项之前的文本）/ middle（首个到最后一个非文本项，含夹在中间的文本）/ final（最后一个非文本项之后的文本）。流式期 final 在 fold 外当正文渲染；**settled 后 spine 的落库 `chat_message.content` 接管 final**，preface+middle 留作过程历史。（`packages/views/chat/lib/copy-text.ts:16-34`、`chat-message-list.tsx:1075-1150`）（§3、§4）
-6. **一次 run 的多条 assistant 消息不各占 UI 记录，而是合并**。两级合并：daemon 端连续增量封进一行（§2），前端 `buildTimeline` 再把相邻同类型行二次合并（`build-timeline.ts:135-154`）。一个 chat 会话里**每一轮**各占一行，轮内不再拆成多行。（§4）
-7. **折叠默认值与流态联动**：chat 面的过程 fold **流式期默认展开、settled 时自动折叠**（`chat-message-list.tsx:1171-1176`）；issue 面 live 运行条**默认折叠**（`inline-comment-run.tsx:42`）；完整 transcript 弹窗**默认时间正序、不跟随**，只有切到「Newest first」才启用 live 跟随（`agent-transcript-dialog.tsx:581-582`、`stores/transcript-view-store.ts:19-20`）。（§5）
-8. **wire 面：实时推送走 WebSocket，且「先落库再广播」**。daemon → server 是 HTTP POST 批量（500ms 一拍 + 首个可见事件立即）、server 先 `CreateTaskMessages` 落库、再按 seq 顺序 `publishTask` 广播；前端按 `task:message` 帧增量写 React Query 缓存，客户端在**打开某个 run 时**再从 REST 回填整条时间线。没有 SSE、没有轮询。（`server/internal/handler/daemon.go:5090-5233`、`use-realtime-sync.ts:1488-1512`、`chat/queries.ts:218-235,321`）（§6）
-9. **文本行与工具行在 wire 上是同一个通道**（同一个 `task:message` 事件、同一个 seq 空间、按 seq 全局排序），只是 `type` 字段不同；差异全在下游渲染（§3）与 daemon 的封口策略（§2）。（§6）
-10. 「打字行被落库行接管」这类交接是**显式写死的**：chat 面用 `pendingAlreadyPersisted` 门 + 稳定行键 + 同一个 `AssistantMessage` 组件承载两态（`chat-message-list.tsx:238-257,524-600`）；缓存写入用按 `seq` 的并集合并，避免回填覆盖已到的实时帧（`chat/queries.ts:249-298`）。（§6）
+> Purpose: pin down at source level "how a work unit being run by an agent is presented in the Multica UI" (frontend rendering + wire + persistence timing), as a comparison target for the real-time row changes in pacman's chief drawer.
+> Material A (source side, the only first-hand source): a shallow clone of `multica-ai/multica` with `--depth 1`, HEAD = `b4ca5b4a23e68b26292a680dca7689a952bb1cd5` (2026-10-04 12:48:20 +0800, "refactor(skills): retire legacy issue skill redirect (#9046)"), at `/tmp/multica-src-runui.BHtJaX` (outside the repo, not polluting pacman). Cloned 2026-10-05 15:57 UTC.
+> Material B (docs caliber): the same repo's `apps/docs/content/docs/*.mdx` (tracks the source version).
+> Unused material: the local Multica desktop app (`~/Library/Application Support/Multica/`) and CLI were not taken; no live UI was captured — the source alone can answer all six questions, so the latter two kinds of first-hand source in B/C were not needed.
+> Reading conventions: two kinds of sources, marked per item — **C** (code) = multica source `path:line` (relative to the clone root); **D** (docs) = `apps/docs/content/docs/*.mdx:line`; **[inference]** = a conclusion with no direct source, inferred from code behavior. No emoji anywhere in this document.
+> Naming first: in Multica, one agent execution is called a **task** (in the UI layer, a **run**). The UI has two independent presentation surfaces sharing the same task data — the **chat surface** (`packages/views/chat/`, the agent's replies in the conversation stream) and the **issue surface** (`packages/views/issues/`, the live run bar + execution log inside an issue's detail). Both read the same `task_message` rows, but with different splitting and folding logic, described separately below.
 
 ---
 
-## 2. 面 1：过程是「一个持续增长的块」还是「按步骤切分的多条记录」
+## 1. Conclusions first
 
-### 2.1 源码实测（C）
-
-**一条 run = UI 上一个实体，内部是多条按 seq 排序的 step。**
-
-- 实时行与终稿行**共用一个 Virtuoso 行键**：`messageRowKey` 对带 `task_id` 的 assistant 消息返回 `task:<taskId>`，与 live 行 `key: task:<taskId>` 相同（`packages/views/chat/components/chat-message-list.tsx:124-137`，live 行构造在 `:275`）。注释（`:117-123`）明说这是为了让「已经在渲染的 Mermaid 图 / HTML iframe 在任务完成时挂载不丢」。
-- 行内渲染 `TimelineView` → 时间线是一条条 step 顺序铺开（下文 §3）。
-
-**step 的界定义在两端，且都是「连续同类型增量」而非「一步一工具」：**
-
-- **daemon 写入端**（`server/internal/daemon/daemon.go`）：
-  - `appendPending(type, content)`：text / thinking 增量追加进 `pendingContent` 缓冲；类型切换时先 `sealPendingLocked()` 把上一段封成一行（`:9455-9469`）。
-  - `sealPendingLocked()`：把当前连续帧封成一个带 `seq` 的 `TaskMessageData`（`:9439-9453`）。
-  - `flush()`：封当前帧 + 把 `batch` 整批发出（`:9471-9487`），由 500ms ticker（`:9489`）与「首个可见事件」（`flushFirstVisible`，`:9508-9517`）触发。
-  - `tool_use` / `tool_result` / `error` **不走缓冲**，各自立即 `batch = append(...)` 成独立行（`:9573-9666`）；`tool_use` 到达时先 `sealPendingLocked()` 封住前面的文本帧（`:9578`），保证文本行与工具行不混在一个 seq 里。
-- **前端读取端**：`buildTimeline(msgs)` 按 `seq` 排序，把相邻的 `text`/`thinking` 行再合并（`:135-154`）；合并判据 `canMergeStreamingText` = 前一条与后一条同为 `text` 或同为 `thinking`（`build-timeline.ts:23-25`）。
-
-**「切分时机」是实时的：** daemon 每个 500ms tick 或类型切换就发布一次；客户端 `task:message` 帧**首个立即写缓存、其后按 100ms 固定窗口合并**（`use-realtime-sync.ts:137,1498-1505`）。收尾只有一次补 flush（`daemon.go:9678`），不是把整轮攒到最后一次性切。
-
-### 2.2 文档口径（D）
-
-- `apps/docs/content/docs/tasks.mdx:66`：「Click **View transcript** on a row to see the agent's messages, tool calls, and error output. For a run still in progress the transcript keeps streaming while the dialog stays open, and a **Newest first** toggle flips the event order.」——文档确认「messages / tool calls / error output」三类与「流式期间持续追加」。
-
-### 2.3 差异
-
-- 文档只说 transcript「keeps streaming」，没写切分粒度与时机。源码实测的粒度是**「连续同类型增量」为一行**，而**不是**「一次工具调用为一行」——后者是读取端再加工的产物（§4）。
-- 文档没提「同一行实时/终稿原地替换」，这是源码里靠稳定行键 + 单组件双态实现的（§6）。
+1. **A run is "one row" in the UI, and the page uses `task:<taskId>` as the row key**; the real-time stream and the final version share this one key, and persistence is an **in-place replacement of the same row's data**, not an unmount-and-rebuild (`packages/views/chat/components/chat-message-list.tsx:124-137,469-479`). **Inside** the row, the timeline is cut into multiple steps (narration text / tool calls / thinking / error), and these steps appear **one by one in real time**, not batch-appended at wrap-up. (§2, §3)
+2. **The boundary of one `task_message` is not "one tool call" but "a run of consecutive same-type deltas"**: the daemon accumulates consecutive text (or thinking) deltas into the same buffer, sealing them into one row only on **type change / 500ms tick / run end**; tool calls and tool results are each **independent rows**, never entering this buffer. (`server/internal/daemon/daemon.go:9439-9469,9573-9666`) (§2)
+3. **Splitting and folding happen on the read side, not the write side**: the wire is a flat `(seq, type, tool, content, input, output, call_id)` row; the frontend pairs `tool_use`/`tool_result` into one step by `call_id`, merges consecutive same-type text, and folds runs of consecutive same-tool calls (≥3 and non-shell) into a group. (`packages/views/common/task-transcript/build-steps.ts:95-198`, `build-timeline.ts:23-46,135-154`) (§2, §4)
+4. **Tool calls are visible during streaming, in the form of an expandable one-line row** (the provider's native tool name + the single most informative argument), not a standalone big card. The **interleaved order** between tool rows and surrounding narration text is preserved, ordered by `seq`. (`chat-message-list.tsx:1232-1280`, `trace-event-presenter.ts:124-147`) (§3)
+5. **Intermediate narration text and the final conclusion are explicitly layered in the chat surface**: `splitTimeline` cuts the timeline into preface (text before the first non-text item) / middle (from the first to the last non-text item, including text in between) / final (text after the last non-text item). During streaming, final renders as body text outside the fold; **after settled, the persisted `chat_message.content` of the spine takes over final**, while preface+middle remain as process history. (`packages/views/chat/lib/copy-text.ts:16-34`, `chat-message-list.tsx:1075-1150`) (§3, §4)
+6. **Multiple assistant messages of one run do not each occupy a UI record; they are merged.** Two-level merging: the daemon seals consecutive deltas into one row (§2), and the frontend `buildTimeline` merges adjacent same-type rows a second time (`build-timeline.ts:135-154`). In one chat conversation, **each turn** occupies one row and is not split further into multiple rows. (§4)
+7. **Fold defaults are coupled to the streaming state**: the chat surface's process fold **defaults to open during streaming and auto-folds at settled** (`chat-message-list.tsx:1171-1176`); the issue surface's live run bar **defaults to folded** (`inline-comment-run.tsx:42`); the full transcript dialog **defaults to chronological order and does not follow**, with live follow enabled only when switched to "Newest first" (`agent-transcript-dialog.tsx:581-582`, `stores/transcript-view-store.ts:19-20`). (§5)
+8. **Wire surface: real-time push goes over WebSocket, and it is "persist first, then broadcast"**. daemon → server is batched HTTP POST (one beat per 500ms + the first visible event immediately); the server first persists with `CreateTaskMessages`, then broadcasts with `publishTask` in seq order; the frontend writes `task:message` frames into the React Query cache incrementally, and the client backfills the whole timeline from REST **when opening a run**. There is no SSE and no polling. (`server/internal/handler/daemon.go:5090-5233`, `use-realtime-sync.ts:1488-1512`, `chat/queries.ts:218-235,321`) (§6)
+9. **Text rows and tool rows ride the same channel on the wire** (the same `task:message` event, the same seq space, globally ordered by seq), differing only in the `type` field; all differences live in downstream rendering (§3) and the daemon's sealing policy (§2). (§6)
+10. Hand-offs like "the typing row is taken over by the persisted row" are **explicitly hard-coded**: the chat surface uses a `pendingAlreadyPersisted` gate + a stable row key + the same `AssistantMessage` component carrying both states (`chat-message-list.tsx:238-257,524-600`); cache writes use a by-seq union merge, so backfill does not overwrite already-arrived real-time frames (`chat/queries.ts:249-298`). (§6)
 
 ---
 
-## 3. 面 2 / 面 3：工具调用的形态、交错次序、过程与结论的分层
+## 2. Surface 1: is the process "one continuously growing block" or "multiple records split by steps"
 
-### 3.1 chat 面（会话流内 agent 回复）
+### 2.1 Source measurement (C)
 
-**工具调用形态 = 可展开的一行。**
+**One run = one entity in the UI, internally multiple steps ordered by seq.**
 
-- `ToolCallRow`（`chat-message-list.tsx:1247-1280`）：折叠态是 `工具名 + 一行摘要`，点开是完整输入 JSON（`<pre>`）。`item.tool` 原样显示（provider 原生名，不重命名）。
-- 摘要由 `traceToolArgSummary` 从 input 里按优先级挑一个最有信息量的参数（`query` → 多文件 patch → `file_path`/`path` → `pattern` → `description` → `command`/`cmd` → `prompt` → `skill` → 第一个短字符串），命令还会剥掉 `zsh -lc '...'` 外壳并截到 120 字符（`trace-event-presenter.ts:124-147`）。
-- `ToolResultRow`（`:1282-1310`）：单独一行，摘要取输出前 120 字符，点开看前 4000 字符。
-- `ThinkingRow`（`:1312-1332`）：单独一行，斜体预览前 150 字符，点开看全文。
-- `ErrorRow`（`:1334-1341`）：不可折叠的一行，destructive 色。
+- The real-time row and the final row **share one Virtuoso row key**: `messageRowKey` returns `task:<taskId>` for assistant messages carrying a `task_id`, identical to the live row's `key: task:<taskId>` (`packages/views/chat/components/chat-message-list.tsx:124-137`; the live row is constructed at `:275`). The comment (`:117-123`) says this is so that "Mermaid charts / HTML iframes already rendering mount without loss when the task completes".
+- In-row rendering is `TimelineView` → the timeline is laid out step by step (§3 below).
 
-**交错次序保留。** `TimelineView` 把时间线按 seq 铺开为行序列，`ItemRow` 按 `item.type` 分派到上面四种行（`:1232-1245`）；fold 内部对 `text` 类型走 `MiddleTextRow`、其余走 `ItemRow`（`:1187-1198`）。即 **工具行与夹在它们之间的叙述文本按到达次序交错呈现**，不是把工具汇总到一处。
+**Step boundaries are defined on both ends, and both are "a run of consecutive same-type deltas", not "one tool call per step":**
 
-**过程与结论分开——边界由 `splitTimeline` 定义**（`packages/views/chat/lib/copy-text.ts:16-34`）：
+- **The daemon write end** (`server/internal/daemon/daemon.go`):
+  - `appendPending(type, content)`: text / thinking deltas are appended into the `pendingContent` buffer; on a type switch, `sealPendingLocked()` first seals the previous run into one row (`:9455-9469`).
+  - `sealPendingLocked()`: seals the current consecutive frames into one `TaskMessageData` carrying a `seq` (`:9439-9453`).
+  - `flush()`: seals the current frame + sends the whole `batch` (`:9471-9487`), driven by the 500ms ticker (`:9489`) and "the first visible event" (`flushFirstVisible`, `:9508-9517`).
+  - `tool_use` / `tool_result` / `error` **do not go through the buffer**; each is immediately appended to `batch` as an independent row (`:9573-9666`); when a `tool_use` arrives, `sealPendingLocked()` is called first to seal the preceding text frame (`:9578`), ensuring text rows and tool rows never share one seq.
+- **The frontend read end**: `buildTimeline(msgs)` sorts by `seq` and merges adjacent `text`/`thinking` rows again (`:135-154`); the merge predicate `canMergeStreamingText` = the previous and next are both `text` or both `thinking` (`build-timeline.ts:23-25`).
 
-- `preface` = 首个非 text 项（第一个 thinking/tool/error）之前的 text；
-- `middle` = 从首个非 text 项到最后一个非 text 项（含其间的 text）；
-- `final` = 最后一个非 text 项之后的 text。
-- 流式期渲染：preface 在 fold 上方当正文（`RichContent`），middle 进 `OuterProcessFold`，final 在 fold 下方当正文（`chat-message-list.tsx:1115-1149`）。
-- **settled 后**：`processItems = preface + middle` 仍留在 fold 里；`final` 被**落库的 `chat_message.content`（canonical answer）替换**（`:1088-1112`，`canonicalAnswerText` 在 `copy-text.ts:41-47`）。注释（`:1062-1073`）明说：「Once settled, the persisted chat_message content is authoritative for the answer. Preface + middle remain in the process fold so intermediate narration is still inspectable; only trailing transcript text is replaced.」
+**"When splitting happens" is real-time:** the daemon publishes once per 500ms tick or per type switch; the client writes the first `task:message` frame into the cache immediately and merges subsequent frames on a fixed 100ms window (`use-realtime-sync.ts:137,1498-1505`). Wrap-up has only one supplementary flush (`daemon.go:9678`) — the whole turn is not accumulated for a one-time split at the end.
 
-### 3.2 issue 面（issue 详情内的 live 运行条 + 完整 transcript 弹窗）
+### 2.2 Docs caliber (D)
 
-**live 运行条（`InlineCommentRun`）**（`packages/views/issues/components/inline-comment-run.tsx`）：
+- `apps/docs/content/docs/tasks.mdx:66`: "Click **View transcript** on a row to see the agent's messages, tool calls, and error output. For a run still in progress the transcript keeps streaming while the dialog stays open, and a **Newest first** toggle flips the event order." — the docs confirm the three kinds "messages / tool calls / error output" and "continuous appending during streaming".
 
-- 折叠态**只有一行活动摘要**：`RunActivitySummary` 显示当前活动——优先「最后一个尚无结果的工具调用」的参数字符串，否则最后一条有内容的 step（text 首行 / thinking 预览 / error 文案 / 「等待响应」）（`:127-136,376-382`）。状态前缀由 task.status 决定（queued/dispatched/waiting/running）（`:137-140`）。
-- 展开态是 step 列表（`:231-243`）：`buildSteps`→`groupSteps` 产出 `TraceRow`，每行 `InlineStep`（`:318-361`）是原生 `<details>` 折叠，折叠态一行 `图标 + 摘要 + 箭头`，展开显示该步的 input/result 体（`StepBody`）。工具配对靠 `call_id`，shell 调用不折叠、同工具连续 ≥3 个才折成组（见 §4）。
-- 默认**只渲染尾部 12 行**，更多走「显示更早的 N 条」按钮（`:98,236-237`）。
+### 2.3 Differences
 
-**完整 transcript 弹窗（`AgentTranscriptDialog`）**（`packages/views/common/task-transcript/agent-transcript-dialog.tsx`）：
-
-- 文件头注释（`:109-112`）总结四层读法：「what happened (header), what it produced (outcome), where the time went (timeline), and the evidence (steps)」。
-- step 行分派（`TranscriptRow`，`:1412-1417`）：group → `GroupRow`；text 且非 call → `ProseRow`；其余 → `StepRow`。
-- `ProseRow`（`:1491-1506`）：**agent 自己的话以正文尺寸常开**，注释（`:1472-1489`）明说这是「the layer inversion the redesign turns on: ... Prose is content and stays open; tool calls are evidence and fold.」——即**叙述文本默认全展开，工具调用默认折叠成一行**。
-- `StepRow`（`:1510-1587`）：一行 `偏移时间 + 竖线 + 图标 + 工具名/kind + 一行摘要 + 时长`，点选后右侧开 `StepInspector`（`:1700+`）看完整 input/result 体。
-- 展开体的差异化渲染见 `trace-event-presenter.ts:236-258`（`TraceEventDetail` 四种：diff / file / patch / text）——文件改写成 diff、整文件写入当纯内容、多文件 patch 一节一文件。
-
-### 3.3 文档口径与差异
-
-- `tasks.mdx:66` 只列「agent's messages, tool calls, and error output」三类；源码实测的 step 类型是 `text`/`thinking`/`tool_use`/`tool_result`/`error` 五类（`build-timeline.ts:7`、`trace-event-presenter.ts:28-34`）——文档漏了 thinking。
-- 文档没有描述「fold」这个结构；`splitTimeline` 的三段分层纯属源码实现（注释自称 "Conductor-style"）。[推断] 这是刻意的产品设计：过程可查但不喧宾夺主。
+- The docs only say the transcript "keeps streaming", without stating the splitting granularity or timing. The source-measured granularity is **"a run of consecutive same-type deltas" per row**, **not** "one tool call per row" — the latter is a read-side re-processing product (§4).
+- The docs do not mention "the same row is replaced in place between real-time and final"; in the source this is achieved via a stable row key + a single component carrying two states (§6).
 
 ---
 
-## 4. 面 4：多条 assistant 消息的合并 / 拆分判据
+## 3. Surfaces 2 / 3: the form of tool calls, interleaved order, and the layering of process vs conclusion
 
-### 4.1 合并（一次 run 内的多条消息）
+### 3.1 Chat surface (agent replies inside the conversation stream)
 
-两级：
+**Tool call form = an expandable one-line row.**
 
-1. **daemon 端**（写入前）：连续同类型 text 增量封成一行（`daemon.go:9455-9469`）。
-2. **前端**（读取时）：`buildTimeline`（`packages/views/common/task-transcript/build-timeline.ts:135-154`）把相邻的 `text`/`thinking` 行再合并，判据与 `coalesceTimelineItems`（`:28-46`）一致——`canMergeStreamingText(prev, next)` = 两者同为 `text` 或同为 `thinking`（`:23-25`）。合并时 content 直接拼接、`created_at` 取后者。
+- `ToolCallRow` (`chat-message-list.tsx:1247-1280`): the folded state is `tool name + one-line summary`; expanding shows the full input JSON (`<pre>`). `item.tool` is displayed as-is (the provider's native name, not renamed).
+- The summary is picked from the input by `traceToolArgSummary` by priority (the single most informative argument): `query` → multi-file patch → `file_path`/`path` → `pattern` → `description` → `command`/`cmd` → `prompt` → `skill` → the first short string; commands also get the `zsh -lc '...'` wrapper stripped and are truncated to 120 characters (`trace-event-presenter.ts:124-147`).
+- `ToolResultRow` (`:1282-1310`): a separate row, the summary takes the first 120 characters of the output, expanding shows the first 4000 characters.
+- `ThinkingRow` (`:1312-1332`): a separate row, italic preview of the first 150 characters, expanding shows the full text.
+- `ErrorRow` (`:1334-1341`): a non-collapsible row in destructive color.
 
-另有按 `call_id` 的**工具配对**（不发散成两行）：`buildSteps` 把 `tool_use` 与其 `tool_result` 合成一个 `TraceCallStep`，用**不透明的 `call_id`** 配对，没有 `call_id` 的老记录退回「按工具名 FIFO」；两套键分开存（`id:` vs `tool:` 前缀），互不串（`build-steps.ts:95-149`）。孤儿 result 保留为独立 step，绝不丢（`:128-137`）。
+**Interleaved order is preserved.** `TimelineView` lays the timeline out as a row sequence by seq, and `ItemRow` dispatches by `item.type` to the four row kinds above (`:1232-1245`); inside the fold, `text` items go through `MiddleTextRow` and everything else through `ItemRow` (`:1187-1198`). That is, **tool rows and the narration text between them are interleaved in arrival order**, not aggregated into one place.
 
-**折叠成组**的判据（`build-steps.ts:152-198`）：
+**Process and conclusion are separated — the boundary is defined by `splitTimeline`** (`packages/views/chat/lib/copy-text.ts:16-34`):
 
-- `MIN_GROUP_SIZE = 3`（`:64`）——连续同工具调用 ≥3 个才折成 `TraceGroupRow`；
-- **shell 调用永不折叠**（`isShellCall`，`:75-77`），判据是 input 带 `command` 字符串（不依赖工具名白名单，跨 backend 成立）。
+- `preface` = text before the first non-text item (the first thinking/tool/error);
+- `middle` = from the first non-text item to the last non-text item (text in between included);
+- `final` = text after the last non-text item.
+- Streaming-period rendering: preface is body text above the fold (`RichContent`), middle goes into `OuterProcessFold`, final is body text below the fold (`chat-message-list.tsx:1115-1149`).
+- **After settled**: `processItems = preface + middle` stays in the fold; `final` is **replaced by the persisted `chat_message.content` (the canonical answer)** (`:1088-1112`; `canonicalAnswerText` in `copy-text.ts:41-47`). The comment (`:1062-1073`) states it explicitly: "Once settled, the persisted chat_message content is authoritative for the answer. Preface + middle remain in the process fold so intermediate narration is still inspectable; only trailing transcript text is replaced."
 
-### 4.2 拆分（多个 run / 多轮）
+### 3.2 Issue surface (live run bar inside issue detail + full transcript dialog)
 
-- **chat 会话**：每一轮（一个 task）占一行（行键 `task:<taskId>`），轮内不拆多行（`chat-message-list.tsx:124-137,265-278`）。
-- **issue 执行日志**：每个 run 一行（`execution-log-section.tsx:47-72` 注释 + active/past 两桶）；完整过程在每行的 transcript 弹窗里。
-- **issue live 运行条**：每个 run 一个 section（`inline-comment-run.tsx:173-175`，`data-run-id={task.id}`）。
+**Live run bar (`InlineCommentRun`)** (`packages/views/issues/components/inline-comment-run.tsx`):
 
-**判据的代码位置汇总**：轮 = task 的边界（`task.id` / `task_id`）；轮内 step 边界 = daemon `sealPendingLocked`/`appendPending`（`daemon.go:9439-9469`）+ 前端 `buildTimeline`（`build-timeline.ts:135-154`）；工具对 = `buildSteps` 的 `call_id` 配对（`build-steps.ts:95-149`）。
+- The folded state is **just one line of activity summary**: `RunActivitySummary` shows the current activity — preferring the argument string of "the last tool call that has no result yet", otherwise the last content-bearing step (first line of text / thinking preview / error copy / "waiting for response") (`:127-136,376-382`). The status prefix is decided by task.status (queued/dispatched/waiting/running) (`:137-140`).
+- The expanded state is a step list (`:231-243`): `buildSteps` → `groupSteps` produce `TraceRow`s, each rendered as `InlineStep` (`:318-361`) — a native `<details>` fold whose folded state is one line of `icon + summary + arrow`, expanding to that step's input/result body (`StepBody`). Tool pairing relies on `call_id`; shell calls are never folded, and ≥3 consecutive same-tool calls are folded into a group (see §4).
+- By default **only the last 12 rows are rendered**, with a "show N earlier" button for more (`:98,236-237`).
+
+**Full transcript dialog (`AgentTranscriptDialog`)** (`packages/views/common/task-transcript/agent-transcript-dialog.tsx`):
+
+- The file-header comment (`:109-112`) summarizes the four-layer reading: "what happened (header), what it produced (outcome), where the time went (timeline), and the evidence (steps)".
+- Step row dispatch (`TranscriptRow`, `:1412-1417`): group → `GroupRow`; text and not a call → `ProseRow`; everything else → `StepRow`.
+- `ProseRow` (`:1491-1506`): **the agent's own words stay open at body size**, and the comment (`:1472-1489`) says this is "the layer inversion the redesign turns on: ... Prose is content and stays open; tool calls are evidence and fold." — that is, **narration text is fully expanded by default, while tool calls default to a folded one-line row**.
+- `StepRow` (`:1510-1587`): one line of `offset time + vertical bar + icon + tool name/kind + one-line summary + duration`; selecting it opens a `StepInspector` (`:1700+`) on the right showing the full input/result body.
+- Differentiated rendering of expanded bodies is in `trace-event-presenter.ts:236-258` (`TraceEventDetail`, four kinds: diff / file / patch / text) — file modifications render as diffs, whole-file writes as plain content, multi-file patches with one section per file.
+
+### 3.3 Docs caliber and differences
+
+- `tasks.mdx:66` lists only "agent's messages, tool calls, and error output" three kinds; the source-measured step types are `text`/`thinking`/`tool_use`/`tool_result`/`error`, five kinds (`build-timeline.ts:7`, `trace-event-presenter.ts:28-34`) — the docs miss thinking.
+- The docs do not describe the "fold" structure; the three-part layering of `splitTimeline` is purely a source implementation (the comment calls itself "Conductor-style"). [inference] This is deliberate product design: the process is inspectable but does not upstage the answer.
 
 ---
 
-## 5. 面 5：长过程的折叠 / 展开与默认值
+## 4. Surface 4: merge / split criteria for multiple assistant messages
 
-| 面 | 结构 | 默认 |
+### 4.1 Merging (multiple messages within one run)
+
+Two levels:
+
+1. **Daemon side** (before writing): consecutive same-type text deltas are sealed into one row (`daemon.go:9455-9469`).
+2. **Frontend** (at read time): `buildTimeline` (`packages/views/common/task-transcript/build-timeline.ts:135-154`) merges adjacent `text`/`thinking` rows again, with the predicate identical to `coalesceTimelineItems` (`:28-46`) — `canMergeStreamingText(prev, next)` = both are `text` or both are `thinking` (`:23-25`). On merge, contents are concatenated directly and `created_at` takes the later one.
+
+There is also **tool pairing** by `call_id` (not fanned out into two rows): `buildSteps` combines a `tool_use` with its `tool_result` into one `TraceCallStep`, paired by the **opaque `call_id`**; old records without a `call_id` fall back to "FIFO by tool name"; the two key sets are stored separately (the `id:` vs `tool:` prefixes) and do not cross (`build-steps.ts:95-149`). Orphan results stay as independent steps and are never dropped (`:128-137`).
+
+**The grouping fold criteria** (`build-steps.ts:152-198`):
+
+- `MIN_GROUP_SIZE = 3` (`:64`) — only runs of ≥3 consecutive same-tool calls fold into a `TraceGroupRow`;
+- **shell calls are never folded** (`isShellCall`, `:75-77`), the predicate being the input carrying a `command` string (no tool-name whitelist dependency, holding across backends).
+
+### 4.2 Splitting (multiple runs / multiple turns)
+
+- **Chat conversation**: each turn (one task) occupies one row (row key `task:<taskId>`), and a turn is not split into multiple rows (`chat-message-list.tsx:124-137,265-278`).
+- **Issue execution log**: one row per run (`execution-log-section.tsx:47-72` comment + active/past two buckets); the full process lives in each row's transcript dialog.
+- **Issue live run bar**: one section per run (`inline-comment-run.tsx:173-175`, `data-run-id={task.id}`).
+
+**Code-location summary of the criteria**: a turn = the boundary of a task (`task.id` / `task_id`); within a turn, step boundaries = the daemon's `sealPendingLocked`/`appendPending` (`daemon.go:9439-9469`) + the frontend's `buildTimeline` (`build-timeline.ts:135-154`); a tool pair = `buildSteps`'s `call_id` pairing (`build-steps.ts:95-149`).
+
+---
+
+## 5. Surface 5: folding / expanding of long processes and the defaults
+
+| Surface | Structure | Default |
 |---|---|---|
-| chat 过程 fold（`OuterProcessFold`） | `Collapsible`：preface/middle 收进「过程 N 步」折叠区 | **流式期默认展开，settled 自动折叠**（`chat-message-list.tsx:1171-1176`：`useState(!!isStreaming)`，`wasStreaming && !isStreaming → setOpen(false)`） |
-| chat 单条工具/结果/thinking 行 | 各自 `Collapsible`，点开看详情 | 默认**折叠**（`ToolCallRow`/`ToolResultRow`/`ThinkingRow` 均 `useState(false)`，`:1249,1284,1313`） |
-| chat 正文（final / preface） | `RichContent` | 常开 |
-| issue live 运行条 step 列表 | `<details>` 每步折叠；尾部 12 行 | 整体默认**折叠**（`inline-comment-run.tsx:42`），标签「查看活动 · N 步」 |
-| transcript 弹窗 step 列表 | 虚拟列表（`react-virtuoso`），`ProseRow` 常开、`StepRow`/`GroupRow` 折叠 | 时间**正序**、不跟随；`Newest first` 才启用 live 跟随（`agent-transcript-dialog.tsx:581-582`，默认值在 `packages/core/agents/stores/transcript-view-store.ts:19-20`） |
-| transcript 弹窗「更长」内容 | `ToolDetailSurface` 超 1600 字符 / 14 行 → 渐隐 + 「显示全部」（`detail-surfaces.tsx:248-282`）；diff 超 14 行同理（`:201-229`） | 折叠 |
-| 时间线（`RunTimeline`） | 双泳道（模型 / 工具）真实时间轴 + 1×/2×/4×/8× 缩放（`run-timeline.tsx:43,110-288`） | 常开（有 lanes 时） |
+| Chat process fold (`OuterProcessFold`) | `Collapsible`: preface/middle go into the "process · N steps" fold area | **Defaults to open during streaming, auto-folds at settled** (`chat-message-list.tsx:1171-1176`: `useState(!!isStreaming)`, `wasStreaming && !isStreaming → setOpen(false)`) |
+| Chat single tool/result/thinking rows | Each a `Collapsible`, click to expand | **Folded by default** (`ToolCallRow`/`ToolResultRow`/`ThinkingRow` all `useState(false)`, `:1249,1284,1313`) |
+| Chat body text (final / preface) | `RichContent` | Always open |
+| Issue live run bar step list | `<details>` folding per step; last 12 rows | Overall **folded by default** (`inline-comment-run.tsx:42`), label `查看活动 · N 步` |
+| Transcript dialog step list | Virtual list (`react-virtuoso`); `ProseRow` always open, `StepRow`/`GroupRow` folded | Chronological order, no follow; live follow only with `Newest first` (`agent-transcript-dialog.tsx:581-582`; default values in `packages/core/agents/stores/transcript-view-store.ts:19-20`) |
+| Transcript dialog "longer" content | `ToolDetailSurface`: beyond 1600 characters / 14 lines → fade + "show all" (`detail-surfaces.tsx:248-282`); same for diffs beyond 14 lines (`:201-229`) | Folded |
+| Timeline (`RunTimeline`) | Dual-lane (model / tools) real-time axis + 1×/2×/4×/8× zoom (`run-timeline.tsx:43,110-288`) | Always open (when lanes exist) |
 
-**live 跟随模型**（`transcript-follow.ts:1-70` + `chat 面` 的 `stick-to-bottom`）：共用同一个「live-end follow latch」纯状态机——读者主动滚动才解除跟随，系统位移不算；回到边缘区自动重新跟随。chat 面的 live 行滚动用 Virtuoso 的 `scrollToIndex({index:"LAST"})`（`chat-message-list.tsx:202-204`）。
+**The live-follow model** (`transcript-follow.ts:1-70` + the chat surface's `stick-to-bottom`): both share the same "live-end follow latch" pure state machine — only a user-initiated scroll breaks the follow; programmatic movement does not count; returning to the edge area re-engages follow. The chat surface's live-row scrolling uses Virtuoso's `scrollToIndex({index:"LAST"})` (`chat-message-list.tsx:202-204`).
 
-**状态标签**（`TaskStatusPill`，`packages/views/chat/components/task-status-pill.tsx`）：按**最后一条非 error / 非 tool_result 消息的类型**决定标签——`thinking`→「思考中」、`text`→「正在输入」、`tool_use`→按工具 slug 映射（bash/exec→「运行命令」、read/glob→「读取文件」、grep→「搜索代码」、write/edit→「编辑」、web_search→「联网搜索」，未知→「工作中」）（`pickStageKeys`，`:61-123`；映射表 `:44-56`）。秒数用 1s ticker，锚点锁死首次渲染（`:169-199`）。
-
----
-
-## 6. 面 6：wire 面（实时推送 vs 落库、增量与终稿收敛、工具/文本是否分通道）
-
-### 6.1 通道
-
-- **客户端收：WebSocket**。事件类型 `task:message`（`packages/core/types/events.ts:33`），payload 类型 `TaskMessagePayload`（`:291-316`）：`{task_id, issue_id, seq, type, tool?, call_id?, content?, input?, output?, output_truncated?, created_at?}`。WS 客户端在 `packages/core/api/ws-client.ts`（URL 由 `:85` 构造，`new WebSocket(url.toString())` 在 `:99`）。**无 SSE、无轮询**（grep `EventSource`/`text/event-stream` 在 core/web 全空；task messages 无 `refetchInterval`）。
-- **daemon 发：HTTP POST 批量**。`ReportTaskMessages`（`server/internal/handler/daemon.go:5090`），body `{messages: [...]}`（`:5085-5087`）；由 500ms ticker + 首个可见事件驱动（`server/internal/daemon/daemon.go:9489,9508-9517`）。
-
-### 6.2 落库时机：先落库再广播
-
-- `ReportTaskMessages` 先 `CreateTaskMessages`（批插，`:5209`），**成功后才** `h.publishTask(protocol.EventTaskMessage, ...)` 按 seq 顺序逐条广播（`:5216-5230`）。注释（`:5217-5221`）明说：「CreateTaskMessages orders its result by seq ... subscribers render these events as they arrive, so the ordering lives in the query rather than in the clients.」
-- 客户端注释直接确认这一契约（`packages/core/chat/queries.ts:321`）：「Dropping a frame for an unregistered task is safe — **the row is persisted before it is broadcast**, so whoever opens the task next fetches it from the server.」
-- 落库前服务端**二次脱敏**（`redact.Text/InputMap`）并做 PostgreSQL NUL 清洗（`daemon.go:5157-5180`）；daemon 侧发送前也脱敏一次（`daemon.go:9590-9598`）。
-
-### 6.3 增量的收敛（是否「打字行被落库行接管」）
-
-**是，且是显式逻辑。**
-
-- **缓存层收敛**：`task:message` 帧经 `mergeTaskMessagesBySeq`（`chat/queries.ts:249-258`，按 seq 去重、保留已有对象引用）写入 React Query 缓存 `["task-messages", taskId]`；REST 回填经 `structuralSharing: unionTaskMessagesBySeq`（`:209-213,280-298`，server 数据在冲突时胜出，但响应没提到的 seq **保留不删**）。注释（`:266-278`）说明原因：「a normal query response and the realtime stream race ... A plain replace would drop those seqs, and staleTime: Infinity means nothing would ever refetch them」。
-- **视图层接管**：chat 面 `pendingAlreadyPersisted`（`chat-message-list.tsx:238-244`）= 当 messages 里已出现 `task_id === pendingTaskId` 的 assistant 消息时，**抑制 live 时间线**，改由落库消息承载；`showLiveTimeline` / `hasLive` 与之互斥（`:250-278`）。两者用**同一个 `AssistantMessage` 组件**渲染（`:469-479` 与 `:508-522`），`message` prop 从 `undefined`（流式）变为落库对象（settled），`phase` 从 `"streaming"` 变 `"settled"`（`:585`）。
-- **回填时机**：`useTaskMessages(taskId, isLive, enabled)` 在挂载时 `refetchOnMount:"always"`、窗口聚焦 `refetchOnWindowFocus:"always"`，并在 `isLive` 由 true→false 时再 refetch（`chat/queries.ts:218-235`）——即「运行中靠 WS，打开/结束时靠 REST 补齐」。
-
-### 6.4 工具行与文本行是不是两条通道
-
-**同一个通道，同一个 seq 空间，只是 `type` 不同**（`events.ts:298` 的 `type` union 含 text/thinking/tool_use/tool_result/error）。差异只在下游：
-
-- daemon 端：text/thinking 走缓冲封口，tool_use/tool_result/error 各自立即成行（§2.1）。
-- 渲染端：chat 面按 type 分派到不同行组件（§3.1）；issue 面再用 `call_id` 把 tool_use/tool_result 配成一步（§4.1）。
-
-[推断] 之所以工具行不进文本缓冲，是为了让「调用了什么工具」在 500ms 内就能出来、不被长文本拖住；而文本攒成一段是为了避免每个 token 一行把 transcript 撑爆（`build-steps.ts:3-16` 注释记录过历史教训：「a 75-call run rendered 150 rows」）。
-
-### 6.5 各端的缓存键 / 摄取门
-
-- 广播是**全 workspace fanout**（`daemon.go:5114-5120` 注释；`use-realtime-sync.ts:1443-1446`），但客户端有两个门（`use-realtime-sync.ts:1443-1457`）：(1) 只保留**本客户端已持有时间线缓存条目**的 task 的帧（`isTaskMessageTimelineHeld`，`chat/queries.ts:323-328`）；(2) 存活帧按 100ms 固定窗口合并成一次缓存写。写入前**再查一次**门（GC 可能已回收，`:1461-1472`）。
+**Status label** (`TaskStatusPill`, `packages/views/chat/components/task-status-pill.tsx`): the label is decided by **the type of the last message that is neither error nor tool_result** — `thinking` → `思考中`, `text` → `正在输入`, `tool_use` → mapped by tool slug (bash/exec → `运行命令`, read/glob → `读取文件`, grep → `搜索代码`, write/edit → `编辑`, web_search → `联网搜索`, unknown → `工作中`) (`pickStageKeys`, `:61-123`; the mapping table `:44-56`). The seconds ticker runs at 1s, with the anchor locked to the first render (`:169-199`).
 
 ---
 
-## 7. 对 pacman 的直接含义
+## 6. Surface 6: the wire surface (real-time push vs persistence, incremental vs final convergence, whether tools/text ride separate channels)
 
-pacman 现状（本仓 `chief-live-split` 分支实测位置）：一轮 = 一个 step = 一个 `activeRun`；在飞期间把整轮所有 `text_delta` **无分隔拼成一行 typing 行**（`apps/web/src/api/mappers.ts:1166-1174`）；轮末 transcript 上传才按 assistant message 拆行；带工具披露的 `LiveRow`（`apps/web/src/components/chat/live-row.tsx`）**只在首 token 之前**渲染（`mappers.ts:1175-1206`）。照 Multica 的做法，总管抽屉的实时行要做这几件事：
+### 6.1 Channels
 
-1. **行键稳定，落库即原地接管**：Multica 实时行与终稿行共用一个键（`task:<id>`），靠同一个组件渲染两态、靠 `pendingAlreadyPersisted` 门切换，落库时是「同一行的数据替换」而非卸载重建（`chat-message-list.tsx:124-137,238-257,469-479`）。pacman 已有「typing 行 ↔ 落库 robot 行」的交接注释（`mappers.ts:1182-1187`），可对照收紧：确认交接是数据替换而非 remount，避免 Markdown/工具展开态在交接瞬间丢。
-2. **流式期就按边界切，别攒到轮末**：pacman 现在是「整轮 text_delta 一行、轮末才拆」。Multica 的切分在流式期实时发生——daemon 按「类型变化 / 500ms / 首个可见事件」封口（`daemon.go:9439-9517`），前端再按 seq 合并同类。对应到 pacman：typing 行内部应在**流式期**按事件边界（助手文本段落之间出现工具调用/thinking 时）就断开，而不是等 transcript 落库。
-3. **工具行与文本行共存并交错，而非二选一**：pacman 现在「工具披露只在首 token 前，typing 接管后工具行缺席」（`mappers.ts:1193-1195`）。Multica 里工具行是**独立 step 行**，与叙述文本按 seq 交错、随工具对折叠成一步（`build-steps.ts:95-149`、`chat-message-list.tsx:1232-1280`）。总管抽屉应让工具调用在整轮期间持续可见、按次序插入，而不是被文本行顶掉。
-4. **过程 / 结论分层，且边界可定义**：Multica 用 `splitTimeline` 三段划分，settled 后落库内容只接管 final，preface+middle 留作可查过程（`copy-text.ts:16-34`、`chat-message-list.tsx:1062-1112`）。pacman 若要做「过程 fold + 答案」，可直接复用这个边界定义（「首个非文本项之前 / 首个到最后一个非文本项 / 最后一个非文本项之后」），并让 fold **流式期默认展开、settled 自动折叠**（`:1171-1176`）。
-5. **活动标签取「最新事件类型」，不写死文案**：Multica 的 `TaskStatusPill` 用最后一条非 error/tool_result 消息的类型 + 工具 slug 映射出标签（`task-status-pill.tsx:61-123`），秒数只在有真实起点时才渲染、绝不摆冻结数。pacman 已有 `activityLabel`/最近信号（#905，`mappers.ts:1196-1204`），可对照把抽屉实时行标签也变成「最新事件类型驱动」，并守住「没有真实时刻就整行不渲染秒数」。
-6. **增量与终稿按 id/seq 去重合并，别让回填覆盖已到的实时帧**：Multica 用 `mergeTaskMessagesBySeq` + `unionTaskMessagesBySeq` + `structuralSharing`，server 数据在冲突时胜出但响应未提到的 seq 保留（`chat/queries.ts:209-298`）。pacman 的 SSE 已有 stream handoff（`apps/web/test/chief-stream-handoff.test.ts`），可对照检查「终稿重取是否可能丢掉流式期已经渲染、但落库行尚未包含的那一段」这类窗口。
+- **Client receives: WebSocket**. The event type is `task:message` (`packages/core/types/events.ts:33`), the payload type `TaskMessagePayload` (`:291-316`): `{task_id, issue_id, seq, type, tool?, call_id?, content?, input?, output?, output_truncated?, created_at?}`. The WS client is in `packages/core/api/ws-client.ts` (URL constructed at `:85`, `new WebSocket(url.toString())` at `:99`). **No SSE, no polling** (grep for `EventSource`/`text/event-stream` across core/web is empty; task messages have no `refetchInterval`).
+- **Daemon sends: batched HTTP POST**. `ReportTaskMessages` (`server/internal/handler/daemon.go:5090`), body `{messages: [...]}` (`:5085-5087`); driven by the 500ms ticker + the first visible event (`server/internal/daemon/daemon.go:9489,9508-9517`).
+
+### 6.2 Persistence timing: persist first, then broadcast
+
+- `ReportTaskMessages` first calls `CreateTaskMessages` (batch insert, `:5209`), and only **after success** does `h.publishTask(protocol.EventTaskMessage, ...)` broadcast row by row in seq order (`:5216-5230`). The comment (`:5217-5221`) states it explicitly: "CreateTaskMessages orders its result by seq ... subscribers render these events as they arrive, so the ordering lives in the query rather than in the clients."
+- A client-side comment confirms this contract directly (`packages/core/chat/queries.ts:321`): "Dropping a frame for an unregistered task is safe — **the row is persisted before it is broadcast**, so whoever opens the task next fetches it from the server."
+- Before persistence the server **redacts a second time** (`redact.Text/InputMap`) and does PostgreSQL NUL cleaning (`daemon.go:5157-5180`); the daemon also redacts once before sending (`daemon.go:9590-9598`).
+
+### 6.3 Convergence of incrementals (is it "the typing row is taken over by the persisted row"?)
+
+**Yes, and it is explicit logic.**
+
+- **Cache-layer convergence**: `task:message` frames are written into the React Query cache `["task-messages", taskId]` via `mergeTaskMessagesBySeq` (`chat/queries.ts:249-258`, dedup by seq, keeping existing object references); REST backfill goes through `structuralSharing: unionTaskMessagesBySeq` (`:209-213,280-298` — server data wins on conflict, but seqs not mentioned in the response are **kept, not deleted**). The comment (`:266-278`) explains why: "a normal query response and the realtime stream race ... A plain replace would drop those seqs, and staleTime: Infinity means nothing would ever refetch them".
+- **View-layer takeover**: the chat surface's `pendingAlreadyPersisted` (`chat-message-list.tsx:238-244`) = when an assistant message with `task_id === pendingTaskId` already appears in messages, **the live timeline is suppressed** and the persisted messages take over; `showLiveTimeline` / `hasLive` are mutually exclusive with it (`:250-278`). Both are rendered by **the same `AssistantMessage` component** (`:469-479` and `:508-522`), with the `message` prop going from `undefined` (streaming) to the persisted object (settled), and `phase` from `"streaming"` to `"settled"` (`:585`).
+- **Backfill timing**: `useTaskMessages(taskId, isLive, enabled)` refetches with `refetchOnMount:"always"` at mount, `refetchOnWindowFocus:"always"` on window focus, and refetches again when `isLive` goes from true→false (`chat/queries.ts:218-235`) — that is, "WS while running, REST to fill in when opening / finishing".
+
+### 6.4 Are tool rows and text rows two separate channels
+
+**The same channel, the same seq space, differing only in the `type` field** (the `type` union at `events.ts:298` includes text/thinking/tool_use/tool_result/error). The differences live only downstream:
+
+- Daemon side: text/thinking go through the buffer-and-seal path, while tool_use/tool_result/error each become rows immediately (§2.1).
+- Rendering side: the chat surface dispatches by type into different row components (§3.1); the issue surface then pairs tool_use/tool_result into one step by `call_id` (§4.1).
+
+[inference] The reason tool rows do not enter the text buffer is to let "which tool was called" surface within 500ms instead of being held back by long text; and the reason text is accumulated into runs is to avoid one row per token blowing up the transcript (the comment at `build-steps.ts:3-16` records the historical lesson: "a 75-call run rendered 150 rows").
+
+### 6.5 Per-side cache keys / ingestion gates
+
+- The broadcast is a **whole-workspace fanout** (`daemon.go:5114-5120` comment; `use-realtime-sync.ts:1443-1446`), but the client has two gates (`use-realtime-sync.ts:1443-1457`): (1) keep only frames for tasks whose timeline cache entry **this client already holds** (`isTaskMessageTimelineHeld`, `chat/queries.ts:323-328`); (2) surviving frames are merged into a single cache write on a fixed 100ms window. The gate is **re-checked before writing** (GC may have collected it, `:1461-1472`).
 
 ---
 
-## 8. 未拿到 / 边界
+## 7. Direct implications for pacman
 
-- 本机 Multica 桌面版（`~/Library/Application Support/Multica/`、app.asar）与 CLI 未取——源码已足以回答全部六问，且取实物只读成本高于收益。
-- 活界面未取。
-- `apps/docs/content/docs/tasks.mdx` 是唯一描述该 UI 的文档页（`chat.mdx` 讲 chat 用法，无过程呈现细节）；除 §2.2/§3.3 引的两句外无更多口径可对拍。
-- 未验证：chat 面 `OuterProcessFold` 在多轮快速连续任务下折叠态是否会被下一轮的 streaming 重新展开——本次只读源码未实测（[推断] 会，因为 `open` 初值取 `isStreaming`，但同一 `AssistantMessage` 组件实例跨轮不重挂时 `open` 状态如何迁移未逐行追）。
+pacman current state (measured positions on this repo's `chief-live-split` branch): one turn = one step = one `activeRun`; while in flight, all `text_delta`s of the turn are **concatenated without separators into a single typing row** (`apps/web/src/api/mappers.ts:1166-1174`); only at turn end is the transcript uploaded and split into rows by assistant message; the tool-disclosing `LiveRow` (`apps/web/src/components/chat/live-row.tsx`) **renders only before the first token** (`mappers.ts:1175-1206`). Following Multica's approach, the chief drawer's real-time row needs these changes:
+
+1. **Stable row key; persistence takes over in place**: Multica's real-time row and final row share one key (`task:<id>`), rendered in two states by the same component, switched by the `pendingAlreadyPersisted` gate, and persistence is "replacement of the same row's data" rather than unmount-and-rebuild (`chat-message-list.tsx:124-137,238-257,469-479`). pacman already has a hand-off comment for the "typing row ↔ persisted robot row" (`mappers.ts:1182-1187`); tighten it against this: confirm the hand-off is data replacement rather than a remount, so Markdown / tool-expanded state is not lost at the hand-off instant.
+2. **Split by boundaries during streaming; do not accumulate until turn end**: pacman currently keeps "one row for the whole turn's text_delta, split only at turn end". Multica's splitting happens in real time during streaming — the daemon seals on "type change / 500ms / first visible event" (`daemon.go:9439-9517`), and the frontend merges same-type frames by seq. Mapped to pacman: inside the typing row, breaks should happen **during streaming** at event boundaries (when a tool call / thinking appears between assistant-text paragraphs), not after the transcript persists.
+3. **Tool rows and text rows coexist and interleave; not either-or**: pacman currently has "tool disclosure only before the first token; once the typing row takes over, tool rows are absent" (`mappers.ts:1193-1195`). In Multica, tool rows are **independent step rows**, interleaved with narration text by seq and folded into one step as tool pairs (`build-steps.ts:95-149`, `chat-message-list.tsx:1232-1280`). The chief drawer should keep tool calls visible continuously throughout the turn, inserted in order, rather than being displaced by the text row.
+4. **Layer process and conclusion, with a definable boundary**: Multica uses the `splitTimeline` three-part division; after settled, the persisted content takes over only final, while preface+middle remain as an inspectable process (`copy-text.ts:16-34`, `chat-message-list.tsx:1062-1112`). If pacman wants "process fold + answer", this boundary definition can be reused directly ("before the first non-text item / from the first to the last non-text item / after the last non-text item"), and the fold made to **default to open during streaming and auto-fold at settled** (`:1171-1176`).
+5. **Activity label takes "the latest event type", no hard-coded copy**: Multica's `TaskStatusPill` derives the label from the type of the last non-error/tool_result message plus a tool-slug mapping (`task-status-pill.tsx:61-123`), and seconds render only with a real start point, never showing a frozen number. pacman already has `activityLabel` / the latest signal (#905, `mappers.ts:1196-1204`); map the drawer real-time row's label to the same "latest-event-type-driven" shape, and hold the line "no real timestamp → no seconds rendered for the whole row".
+6. **Deduplicate and merge incrementals and final by id/seq; do not let backfill overwrite already-arrived real-time frames**: Multica uses `mergeTaskMessagesBySeq` + `unionTaskMessagesBySeq` + `structuralSharing`, with server data winning on conflict while seqs unmentioned in the response are kept (`chat/queries.ts:209-298`). pacman's SSE already has a stream hand-off (`apps/web/test/chief-stream-handoff.test.ts`); check against this class of window: "can the final re-fetch drop a segment already rendered during streaming but not yet contained in the persisted row?"
+
+---
+
+## 8. Not obtained / boundaries
+
+- The local Multica desktop app (`~/Library/Application Support/Multica/`, app.asar) and CLI were not taken — the source alone suffices to answer all six questions, and the read-only cost of the artifacts outweighed the benefit.
+- No live UI was captured.
+- `apps/docs/content/docs/tasks.mdx` is the only docs page describing this UI (`chat.mdx` covers chat usage, with no process-presentation details); beyond the two sentences quoted in §2.2/§3.3 there is no further caliber to cross-check.
+- Unverified: whether the chat surface's `OuterProcessFold` fold state gets re-expanded by the next turn's streaming under rapid consecutive tasks — this pass read source only and did not measure it live ([inference] it will, because the `open` initial value takes `isStreaming`, but how the `open` state migrates when the same `AssistantMessage` component instance spans turns without remounting was not traced line by line).

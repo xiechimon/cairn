@@ -1,31 +1,31 @@
-# #1137 验证证据：GitHub webhook → 建 todo + orchestrate 事件入口 tracer
+# #1137 verification evidence: GitHub webhook → create-todo + orchestrate event-entry tracer
 
-三段 tracer 证据（live 栈 18/18，探针 `drive-1137-webhook-tracer`）+ 失败路径单测（18/18）+ 受影响面回归（89/89）。
+Three-segment tracer evidence (live stack 18/18, probe `drive-1137-webhook-tracer`) + failure-path unit tests (18/18) + affected-surface regression (89/89).
 
-## 栈坐标
+## Stack coordinates
 
-- server：`http://127.0.0.1:8791`（verify-pacman launch.mjs 隔离栈，scratch PACMAN_HOME 全新库）
-- 真出站一次：`importGithubIssue` 经 gh token 拉 `xiechimon/pacman#1137` 真实 issue 详情 + label 镜像（铺底连接行密文落库，token 不落任何证据文件）
-- 铺底：github connection / agent / chief 行经服务模块直达（REST 面无 connection 写入口——oauth 独占；agent 创建被 #1259 归属机闸收紧；铺底非被测面，与 `apps/server/test/webhook.test.ts` 同形 seed）；项目与 webhook token 走真 REST
+- server: `http://127.0.0.1:8791` (verify-pacman launch.mjs isolated stack, scratch PACMAN_HOME with a fresh library)
+- one real outbound call: `importGithubIssue` pulls the real issue details of `xiechimon/pacman#1137` through the gh token + label mirroring (the bedding connection row's secret lands encrypted in the DB; the token lands in no evidence file)
+- bedding: github connection / agent / chief go through the service modules directly (the REST face has no connection write entry — oauth exclusive; agent creation is tightened by the #1259 home-machine gate; bedding is not the tested face, seeded the same shape as `apps/server/test/webhook.test.ts`); the project and the webhook token go through real REST
 
-## 三段判据与对应文件
+## The three segments, criteria and files
 
-| 段 | 判据 | 文件 |
+| segment | criterion | files |
 |---|---|---|
-| 请求段 | 响应 JSON（result/todoId/threadId/deliveryId 回显）+ pino 日志行按 deliveryId 键落 server.log | `01-created.json`、`11-tracer-server-log.txt` |
-| 落库段 | todo 行 `sourceKind=github-issue`/`sourceRef=github:xiechimon/pacman#1137` + `webhook_token.lastUsedAt` 回写 + 只存哈希 | `02-todo-row.json`、`03-webhook-token-row.json` |
-| 派发段 | `chief_thread` 行（chiefId 绑定）+ 首条 user 消息（含 todo 锚点）+ `step` 行 kind=chief/pending（buildId=threadId） | `04-dispatch-rows.json` |
+| request segment | response JSON (result/todoId/threadId/deliveryId echoed) + pino log lines keyed by deliveryId in server.log | `01-created.json`, `11-tracer-server-log.txt` |
+| DB segment | todo row `sourceKind=github-issue`/`sourceRef=github:xiechimon/pacman#1137` + `webhook_token.lastUsedAt` write-back + hash-only storage | `02-todo-row.json`, `03-webhook-token-row.json` |
+| dispatch segment | `chief_thread` row (chiefId bound) + first user message (carrying the todo anchor) + `step` row kind=chief/pending (buildId=threadId) | `04-dispatch-rows.json` |
 
-失败路径（live + 单测双覆盖）：错 token 401（`07-wrong-token.json`）、同 delivery 60s 窗口 duplicate（`05-duplicate-window.json`）、同 issue 重放 sourceRef 持久闸 duplicate（`06-duplicate-sourceref.json`，零副作用：todo 恒 1 行/线程恒 1 条）、ping noop（`08-ping.json`）、非触发 label ignored（`09-ignored-label.json`）、repo 未映射 misconfigured（`10-misconfigured.json`）。
+Failure paths (live + unit double coverage): wrong token 401 (`07-wrong-token.json`), same-delivery 60s window duplicate (`05-duplicate-window.json`), same-issue replay sourceRef persistent-gate duplicate (`06-duplicate-sourceref.json`, zero side effects: todo always 1 row / thread always 1 entry), ping noop (`08-ping.json`), non-triggering label ignored (`09-ignored-label.json`), unmapped repo misconfigured (`10-misconfigured.json`).
 
-## 复跑配方
+## Rerun recipe
 
 ```sh
-node .claude/skills/verify-pacman/scripts/launch.mjs   # 隔离栈 8791/5273
+node .claude/skills/verify-pacman/scripts/launch.mjs   # isolated stack 8791/5273
 GH_WEBHOOK_VERIFY_TOKEN="$(gh auth token)" \
   pnpm -C apps/server exec tsx \
   ../../.claude/skills/verify-pacman/scripts/drive-1137-webhook-tracer.mjs
 node .claude/skills/verify-pacman/scripts/cleanup.mjs
 ```
 
-单测与回归：`webhook-test-output.txt`（18/18）、`regression-test-output.txt`（wire/token-auth/orchestration-source/github-issues/delivery-surface，89/89）。`result.json` 为探针逐条 check 账本。
+Unit tests and regression: `webhook-test-output.txt` (18/18), `regression-test-output.txt` (wire/token-auth/orchestration-source/github-issues/delivery-surface, 89/89). `result.json` is the probe's per-check ledger.

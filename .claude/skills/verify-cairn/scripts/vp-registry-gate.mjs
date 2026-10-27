@@ -14,48 +14,55 @@ const COMMITTED = resolve(ROOT, 'docs', 'verify');
 const TICKET_NAMED = new Set([
   'drive-1007-pages.mjs',
   'drive-1008-overlay-registry.mjs',
-  'drive-1009-a0-live.mjs',
   'drive-1010-select.mjs',
-  'drive-1025-plan-first-round.mjs',
   'drive-1030-local-files.mjs',
-  'drive-1031-account-controls.mjs',
-  'drive-1033-avatar.mjs',
-  'drive-1034-thinking-truncate.mjs',
   'drive-1035-zoom-fit.mjs',
   'drive-1050-claude-bin.mjs',
-  'drive-1065-zombie-claim.mjs',
-  'drive-1094-threads-scroll.mjs',
   'drive-1097-folder-drill.mjs',
   'drive-1102-commit-detail.mjs',
-  'drive-1104-unassigned-build.mjs',
-  'drive-1106-skill-inject.mjs',
-  'drive-1108-concurrency.mjs',
   'drive-1136-stale-sweep.mjs',
   'drive-1137-webhook-tracer.mjs',
-  'drive-1138-agent-concurrency.mjs',
-  'drive-1169-skills-split.mjs',
   'drive-1170-skill-import.mjs',
-  'drive-1171-native-plugin.mjs',
   'drive-1185-import-rollback.mjs',
-  'drive-1186-skill-injection.mjs',
-  'drive-1208-machine-pin.mjs',
-  'drive-1210-local-unreachable.mjs',
-  'drive-1213-dual-source.mjs',
   'drive-1241-recommended-concurrency.mjs',
   'drive-1242-project-identity.mjs',
-  'drive-1250-persona-verify.mjs',
-  'drive-1251-capability-gate.mjs',
-  'drive-1257-hang-retry.mjs',
   'drive-1258-fail-links.mjs',
   'drive-1259-1260-binding.mjs',
   'drive-1259-mea-live.mjs',
-  'drive-1261-quota-wait.mjs',
   'drive-1262-ansi-error.mjs',
   'drive-1279-restart-combo.mts',
   'drive-1303-chief-unread.mjs',
   'drive-1308-thinking-delta.mjs',
   'drive-1313-empty-review.mjs',
   'drive-1400-chip-word.mjs',
+  'drive-926-convergence.mts',
+  'drive-943-board-sidebar.mjs',
+  'drive-945-detail.mjs',
+  'drive-949-overlays.mjs',
+  'drive-953-sealed.mjs',
+]);
+const TICKET_ARCHIVED = new Set([
+  'drive-1009-a0-live.mjs',
+  'drive-1025-plan-first-round.mjs',
+  'drive-1031-account-controls.mjs',
+  'drive-1033-avatar.mjs',
+  'drive-1034-thinking-truncate.mjs',
+  'drive-1065-zombie-claim.mjs',
+  'drive-1094-threads-scroll.mjs',
+  'drive-1104-unassigned-build.mjs',
+  'drive-1106-skill-inject.mjs',
+  'drive-1108-concurrency.mjs',
+  'drive-1138-agent-concurrency.mjs',
+  'drive-1169-skills-split.mjs',
+  'drive-1171-native-plugin.mjs',
+  'drive-1186-skill-injection.mjs',
+  'drive-1208-machine-pin.mjs',
+  'drive-1210-local-unreachable.mjs',
+  'drive-1213-dual-source.mjs',
+  'drive-1250-persona-verify.mjs',
+  'drive-1251-capability-gate.mjs',
+  'drive-1257-hang-retry.mjs',
+  'drive-1261-quota-wait.mjs',
   'drive-902-gate-actor.mjs',
   'drive-903-dispatch-judgment.mjs',
   'drive-904-plan-chain.mjs',
@@ -63,16 +70,11 @@ const TICKET_NAMED = new Set([
   'drive-919-skills-routing.mjs',
   'drive-920-skills-manifest.mjs',
   'drive-925-pi-policy.mjs',
-  'drive-926-convergence.mts',
   'drive-929-930.mjs',
-  'drive-943-board-sidebar.mjs',
-  'drive-945-detail.mjs',
   'drive-947-secondary.mjs',
   'drive-948-overlay.mjs',
-  'drive-949-overlays.mjs',
   'drive-951-detail.mjs',
   'drive-952-finale.mjs',
-  'drive-953-sealed.mjs',
 ]);
 const STATUSES = new Set(['current', 'stale', 'host-bound']);
 const NEEDS = new Set([
@@ -90,6 +92,12 @@ const NEEDS = new Set([
 const DRIVE_LINE = /vp\.mjs drive ([a-z0-9][\w-]*)(?: ([a-z0-9][\w-]*|<[^>\s]+>))?/g;
 const COMMAND_SPAN = /vp\.mjs drive [^`\n]*/g;
 const TICKET_NAME = /^drive-\d/;
+
+function archivedTicketScript(script) {
+  const name = basename(script);
+  const id = /^drive-(\d+(?:-\d+)?)/.exec(name)?.[1];
+  return id !== undefined && TICKET_ARCHIVED.has(name) && resolve(script) === resolve(ROOT, 'docs', 'verify', id, name);
+}
 
 const problems = [];
 const problem = (subject, text) => problems.push(`${subject}: ${text}`);
@@ -129,7 +137,7 @@ for (const { id, c } of cases) {
   const script = resolve(ROOT, c.script ?? '');
   if (!c.script || !existsSync(script)) problem(id, `script ${c.script} does not exist`);
   if (script.startsWith(`${SCRIPTS_DIR}${sep}`)) caseScripts.add(script.slice(SCRIPTS_DIR.length + 1));
-  else if (TICKET_NAME.test(basename(script))) {
+  else if (TICKET_NAME.test(basename(script)) && !archivedTicketScript(script)) {
     problem(id, `${relative(ROOT, script)} is named after a ticket (drive-<number>); name the script after the feature`);
   }
   if (!STATUSES.has(c.status)) problem(id, `status ${c.status} is not current, stale or host-bound`);

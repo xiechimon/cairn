@@ -1,8 +1,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const TAGS = '/app?scenario=board-tags';
-const EMPTY = '/app?scenario=board-tags-empty';
-const REPOS = '/app?scenario=board-repos';
+const TAGS = '/app?scenario=board-tags&view=board';
+const EMPTY = '/app?scenario=board-tags-empty&view=board';
+const REPOS = '/app?scenario=board-repos&view=board';
 
 const PRJ_CANON = 'ZAQczKCu0MOAzC1ZqcFlX';
 
@@ -49,18 +49,13 @@ async function openTypePopover(page: Page) {
 test('legacy scenario (no projectNames) renders no repo section; top bar two buttons = bare filter button + new-task capsule', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
 
   await expect(chipsBar(page)).toHaveCount(0);
   const banner = page.getByRole('banner');
-  await expect(banner.getByRole('button')).toHaveCount(2);
+  await expect(banner.getByRole('button')).toHaveCount(1);
   await expect(typeBtn(page)).toBeVisible();
-
-  await expect(banner.getByRole('button', { name: /任务/ })).toHaveCount(1);
-  await expect(banner.getByRole('button', { name: '新任务' })).toHaveAttribute(
-    'data-variant',
-    'default',
-  );
+  await expect(page.getByTestId('board-new-task-bar')).toBeVisible();
 
   await expect(typeBtn(page)).toHaveAttribute('data-variant', 'ghost');
   const bg = await typeBtn(page).evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -452,4 +447,17 @@ test('task card tag = vocab-colored tag icon + name: no solid chip, no placehold
       .evaluate((el) => el.getBoundingClientRect().height);
   expect(await metaH('tagfilter-bug')).toBeCloseTo(20, 0);
   expect(await metaH('tagfilter-plain')).toBeCloseTo(20, 0);
+});
+
+test('two type picks in the same frame both land in the URL (no stale selection)', async ({
+  page,
+}) => {
+  await page.goto(TAGS);
+  await openTypePopover(page);
+  await expect(typeOption(page, 'bug')).toBeVisible();
+  await page.evaluate(() => {
+    for (const name of ['bug', 'docs'])
+      document.querySelector<HTMLElement>(`[data-tag="${name}"]`)?.click();
+  });
+  await expect(page).toHaveURL(/[?&]tags=bug,docs(&|$)/);
 });

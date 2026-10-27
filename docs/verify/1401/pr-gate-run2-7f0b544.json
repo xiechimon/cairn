@@ -110,7 +110,7 @@
       "dimension": "correctness",
       "title": "spec 28 §8 and §7.5 describe artifacts and output that do not exist at head",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 265,
       "failurePath": "Line 265 marks P0 [x] with evidence `docs/verify/1401/`（pr-gate 两轮判定）. Only pr-gate-run1-b67e340.json exists there at head, and the PR has no comments, although the body says a run 2 summary is in a comment. Line 246 gives pr-gate's output as `{headSha, go, blocking[], notes}`, but the script returns {pr, ticket, headSha, go, blocking, suggestions, protectedPaths, mergedBy, missing, shaMismatch, skepticsMissing, checked}; there is no `notes`. Line 246 also says the evidence dimension re-runs verify-pacman drives, while the script (line 113) re-runs at most three commands quoted in the Verified section."
     },
@@ -127,7 +127,7 @@
       "dimension": "rules",
       "title": "Spec 28 §7.5 pr-gate row still disagrees with the shipped pr-gate.js, although 7f0b544 says spec 28 now matches",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 246,
       "failurePath": "The 7f0b544 message says 'Spec 28 matches: ... the pr-gate description', but three parts of the §7.5 row still describe a different gate. (1) The output is given as `{headSha, go, blocking[], notes}`. pr-gate.js:231-244 returns {pr, ticket, headSha, go, blocking, suggestions, protectedPaths, mergedBy, missing, shaMismatch, skepticsMissing, checked} and has no `notes`. (2) The evidence dimension is described as re-running the matching verify-pacman driver at headSha. pr-gate.js:113 re-runs at most three of the narrowest commands quoted in the PR's Verified section and never invokes verify-pacman. (3) The rules dimension is said to cover `docs/pr-review.md`, the biome seams and the attribution trailers (尾标). pr-gate.js:100 mentions neither pr-review.md nor the trailers. The spec is the document that must move with this script. A later session that resumes from spec 28 (§8 calls it the only progress truth across compaction) will assume the gate checks things it does not.",
       "evidence": "spec 28 line 246 at 7f0b544; pr-gate.js lines 100, 113, 231-244; run-1 rules suggestion 'Spec 28 §7.5 and §8 disagree with the pr-gate.js this PR ships' (unchanged for these three points)."
@@ -136,7 +136,7 @@
       "dimension": "rules",
       "title": "Spec 28 §8 P0 row claims two pr-gate verdicts in docs/verify/1401/, but the head holds only run 1",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 265,
       "failurePath": "The P0 ledger row reads `docs/verify/1401/`（pr-gate 两轮判定）, meaning two pr-gate verdicts, and is ticked [x]. At 7f0b544, docs/verify/1401/ contains only pr-gate-run1-b67e340.json. The PR body's Acceptance item 4 points to 'run 2 summary in a comment below', but issues/1410/comments is empty. If the PR merges at this head, main's ledger (the cross-compaction progress truth, §8 heading and line 226) says evidence exists that is not in the repo. Fix: commit the run-2 verdict under docs/verify/1401/ before merge, or reword the row to match what is on disk.",
       "evidence": "`git ls-tree -r --name-only 7f0b544 docs/verify/1401/` lists 1 file. `gh api repos/xiechimon/pacman/issues/1410/comments` returns []."
@@ -154,7 +154,7 @@
       "dimension": "tests",
       "title": "Ticked acceptance item 4 cites evidence that is not at the head, and the ticket's 'callable by name' item is reworded while the PR's own Verified section shows it failing",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 265,
       "failurePath": "The PR body ticks 'pr-gate stored ... and run on this PR via scriptPath (run 1 JSON above; run 2 summary in a comment below)'. The PR has 0 issue comments. The §8 P0 row (spec 28:265) says `docs/verify/1401/`（pr-gate 两轮判定）, but docs/verify/1401/ at 7f0b544 holds only pr-gate-run1-b67e340.json.\n\nTicket #1401's acceptance item is '`pr-gate` workflow 存仓，可按名调用' (stored in the repo and callable by name). The PR rewrote it to 'named invocation works only in a session started after the merge', and its Verified section quotes `Workflow \"pr-gate\" not found`. The ticket's last item, '本票 PR 由用户合并（D7）', is not listed at all.\n\nMerging squashes e5414a2's `closes #1401` into main. That closes the ticket with the by-name item shown only as failing and the run-2 evidence absent.\n\nOptions: commit the run-2 result under docs/verify/1401/, or drop the run-2 claim from the ledger and the item. Then either leave the by-name item unticked with a follow-up, or record that the ticket's wording was amended.",
       "evidence": "`gh api repos/xiechimon/pacman/issues/1410/comments -q length` returned 0. `git ls-tree -r 7f0b544 docs/verify/1401/` lists only pr-gate-run1-b67e340.json. The ticket's acceptance list is in the #1401 body; the PR's Acceptance item 4 and its 'Named invocation ... returned Workflow \"pr-gate\" not found' line are in the PR body."
@@ -181,7 +181,7 @@
       "dimension": "tests",
       "title": "The Verified grep for 'ADR 0018 body unchanged' hides added or removed lines that start with + or -",
       "severity": "suggestion",
-      "file": "docs/adr/0018-多agent团队三层与机器能力闸.md",
+      "file": "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
       "line": 4,
       "failurePath": "The PR's evidence for acceptance item 2 is `git diff ... | grep -E '^[+-][^+-]'`. An added markdown bullet ('- x') appears in the diff as '+- x', and a removed one appears as '-- x'. Both are filtered out, so the check would also print only the header pointer when a bullet in the ADR 0018 body had been edited.\n\nThe claim holds at head: I read the raw diff and it adds exactly lines 4-5 and nothing else. The assertion itself is weak, though. `git diff --numstat` showing '2 0', or a filter that drops only the '+++'/'---' header lines, would be a check a body edit cannot pass.",
       "evidence": "`git diff base...7f0b544 -- docs/adr/0018-*.md` shows one hunk @@ -1,6 +1,8 @@ with the two added lines '+>' and '+> 修订：...'."
@@ -222,7 +222,7 @@
       "dimension": "evidence",
       "title": "Ticked Acceptance item cites a 'run 2 summary in a comment below' that does not exist, and spec 28 §8 marks P0 done with 'two rounds' of evidence while docs/verify/1401/ holds one",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 263,
       "failurePath": "The Acceptance item 'pr-gate stored ... and run on this PR via scriptPath (run 1 JSON above; run 2 summary in a comment below)' is ticked. GET issues/1410/comments returns []. The §8 ledger P0 row reads 证据 `docs/verify/1401/`（pr-gate 两轮判定） with 完成 [x]. At the head that directory contains only pr-gate-run1-b67e340.json. A session that resumes from the ledger (spec 28 calls it the only progress truth across compaction) reads P0 as complete with two-round evidence that is not there. Nothing shows the fixed script at 7f0b544 completing a run. Run 1 exercised b67e340, not the code being merged.",
       "evidence": "git show 7f0b544:docs/verify/1401/ lists one file. The PR issue comments are empty."
@@ -231,7 +231,7 @@
       "dimension": "evidence",
       "title": "Ticket acceptance 'pr-gate workflow 存仓，可按名调用' has no evidence; the PR rewords it and ticks it on an untested inference",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 253,
       "failurePath": "Ticket #1401's acceptance requires that pr-gate can be invoked by name. The only observation in the PR is the failure 'Workflow \"pr-gate\" not found. Available: deep-research'. The claim that a session started after the merge will find it rests only on that error message; no run demonstrates the session-start scan. Spec 28 §7.5 nonetheless records it as '#1410 实测'. Meanwhile 'Closes #1401' closes the ticket on merge with this item unproven.",
       "evidence": "PR body Verified: 'Named workflows are read at session start and this file landed after it ... A session started after the merge can use the name.' No artifact backs it."
@@ -248,8 +248,8 @@
   ],
   "protectedPaths": [
     ".claude/workflows/pr-gate.js",
-    "docs/adr/0018-多agent团队三层与机器能力闸.md",
-    "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md"
+    "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+    "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md"
   ],
   "mergedBy": "user",
   "missing": [],

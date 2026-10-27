@@ -150,10 +150,13 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
   const outcomes = new Map<string, Outcome>();
   let skippedNoVision = 0;
   for (const ref of refs) {
-    const outcome =
-      opts.imageSupport === false && isImageAttachmentExt(ref.ext)
-        ? noVision(ref.key, opts.log)
-        : await resolveOne(ref, opts);
+    let outcome: Outcome;
+    if (opts.imageSupport === false && isImageAttachmentExt(ref.ext)) {
+      opts.log(`attachment not delivered (model does not support images): ${ref.key}`);
+      outcome = { kind: 'noVision', note: `[图片附件 ${ref.key} 未被模型读取 — 该图片未下载]` };
+    } else {
+      outcome = await resolveOne(ref, opts);
+    }
     if (outcome.kind === 'noVision') skippedNoVision += 1;
     outcomes.set(ref.line, outcome);
     if (outcome.kind === 'inline') images.push(outcome.image);
@@ -190,11 +193,6 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
     }
   }
   return { text: outLines.join('\n'), images, skippedNoVision };
-}
-
-function noVision(key: string, log: (line: string) => void): Outcome {
-  log(`attachment not delivered (model does not support images): ${key}`);
-  return { kind: 'noVision', note: `[图片附件 ${key} 未被模型读取 — 该图片未下载]` };
 }
 
 function unavailable(

@@ -7,7 +7,7 @@ import { classifyPaths } from '../src/services/merge-gate/paths.js';
 const REPO_ROOT = join(import.meta.dirname, '../../..');
 const OWNER = '@xiechimon';
 const EVAL_ROOTS = ['integration/eval/', '.claude/hillclimb/'];
-const GITHUB_UNSUPPORTED_PATTERN = /[!\[\]\\]|^#/;
+const GITHUB_UNSUPPORTED_PATTERN = /[![\]\\]|^#/;
 const TOKEN_SHAPES = [/gh[pousr]_[A-Za-z0-9]{20,}/, /github_pat_[A-Za-z0-9_]{20,}/];
 
 const read = (path: string) => readFileSync(join(REPO_ROOT, path), 'utf8');
@@ -121,6 +121,6 @@ describe('docs/ops/agent-bot-identity.md', () => {
 
   test('states that Code Owners review turns on only after the bot pushes the PR', () => {
     expect(doc).toContain('Require review from Code Owners');
-    expect(doc).toMatch(/不能批准自己的 PR/);
+    expect(doc).toMatch(/cannot approve his own PR/);
   });
 });

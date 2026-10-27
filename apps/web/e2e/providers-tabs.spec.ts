@@ -201,7 +201,7 @@ test('geometry: tablist/header/model-row cards all hug the content column left e
   const cardBox = await card.boundingBox();
   expect(colBox).not.toBeNull();
 
-  expect(colBox?.x).toBe(455);
+  expect(colBox?.x).toBe(460);
   for (const box of [tabsBox, headBox, cardBox]) {
     expect(box?.x).toBe(colBox?.x);
   }

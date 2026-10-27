@@ -131,9 +131,29 @@ test('regression #486/#494: skills list reachable by wheel, scrollbar hugs the p
   expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(733);
 
   expect((await col.boundingBox())?.width).toBe(widthBefore);
-  // the sheet sits 10px below the viewport top; the Paper top bar is 56px
   const topbar = await page.getByTestId('page-topbar').boundingBox();
-  expect(topbar?.y).toBe(10);
+  expect(topbar?.y).toBe(0);
   expect(topbar?.height).toBe(56);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test('a clickable resource row answers hover with a fill that stays inside the card corners', async ({
+  page,
+}) => {
+  await page.goto(`${SKILLS}?scenario=06`);
+  const row = page.getByTestId('resource-row').first();
+  const before = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await row.hover();
+  await expect
+    .poll(() => row.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .not.toBe(before);
+  const corners = await row.evaluate((el) => {
+    const card = el.closest('.settings-card') as HTMLElement;
+    const cs = getComputedStyle(el);
+    return {
+      row: [cs.borderTopLeftRadius, cs.borderBottomRightRadius],
+      card: getComputedStyle(card).borderTopLeftRadius,
+    };
+  });
+  expect(corners.row).toEqual([corners.card, corners.card]);
 });

@@ -1,8 +1,0 @@
-2026-10-09 23:40:39 finished (0 running)
-
-
- Test Files  1 passed (1)
-      Tests  2 passed (2)
-   Start at  23:40:34
-   Duration  5.04s (tests 70%, import 21%, transform 10%)
-

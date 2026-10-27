@@ -19,6 +19,7 @@ import {
   WRITE_AUTHOR_ASSOCIATIONS,
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import {
   type BuildDeps,
   enqueueStep,
@@ -167,7 +168,7 @@ export function buildCiFixPrompt(args: {
   ].join('\n');
 }
 
-function countMarkedRounds(db: Db, buildId: string, head: string): number {
+export function countMarkedRounds(db: Db, buildId: string, head: string): number {
   return db
     .select({ id: step.id })
     .from(step)
@@ -175,7 +176,7 @@ function countMarkedRounds(db: Db, buildId: string, head: string): number {
     .all().length;
 }
 
-function deadLoopMessage(rounds: number): string {
+export function deadLoopMessage(rounds: number): string {
   return `CI 检查连续 ${rounds} 轮自动修复仍未通过（死循环闸：连续 ${CI_FIX_ROUNDS_MAX} 轮）——停止追加修复步，转人工处理。`;
 }
 
@@ -293,6 +294,7 @@ export function createCiPoller(
     const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
     if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
     setTodoPhase(deps, cand.todoId, 'failed');
+    emitRuntimeBuildSpan(deps.db, cand.buildId, 'failed');
   }
 
   function writeSystemRow(buildId: string, content: string): void {
@@ -485,7 +487,7 @@ export function createCiPoller(
       tally.reviewSkipped += 1;
       return;
     }
-    const token = githubTokenOrNull(deps, target.teamId);
+    const token = await githubTokenOrNull(deps, target.teamId);
     const entry = pullCache.get(key) ?? null;
     let pull: GithubPull | null;
     let readAt = now;
@@ -785,7 +787,7 @@ export function createCiPoller(
       tally.skipped += 1;
       return;
     }
-    const grindToken = githubTokenOrNull(deps, target.teamId);
+    const grindToken = await githubTokenOrNull(deps, target.teamId);
     if (grindToken === null) recordGrindAnonRead(now);
     const pullEntry = grindPullCache.get(key) ?? null;
     const pullPage = await githubPull(

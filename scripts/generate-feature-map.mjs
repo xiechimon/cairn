@@ -40,6 +40,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { loadRepoEvalCoverage, renderEvalCoverage } from './eval-coverage.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const DOC_NAME = 'feature-map.md';
@@ -61,17 +62,20 @@ const TEST_SKIP_DIRS = new Set([
 ]);
 const TEST_SUFFIXES = ['.test.ts', '.test.tsx', '.spec.ts'];
 
-// Tier vocabulary and semantics: docs/spec/18-定位与差异化.md (差异化面 = the
+// Tier vocabulary and semantics: docs/spec/18-positioning-and-differentiation.md (the `差异化面` tier = the
 // three semantic-axis cores — two hard gates, AI review with teeth, versioned
-// plan documents; 运行轴 = the runtime model — machine × CLI, daemon,
-// self-hosted orchestration; 通用面 = everything else). Classification is a
+// plan documents; the `运行轴` tier = the runtime model — machine × CLI, daemon,
+// self-hosted orchestration; the `通用面` tier = everything else). Classification is a
 // title keyword match, first rule wins, not a semantic judgment — §0.6 of the
 // doc states this limitation.
-const TIER_ORDER = ['差异化面', '运行轴', '通用面'];
+const TIER_ORDER = ['Differentiation surface', 'Runtime axis', 'General surface'];
 const TIER_RULES = [
-  ['差异化面', /闸|gate|confirm|review|审核|方案|plan|驳回|reject|revision|verdict|相位|phase/i],
   [
-    '运行轴',
+    'Differentiation surface',
+    /闸|gate|confirm|review|审核|方案|plan|驳回|reject|revision|verdict|相位|phase/i,
+  ],
+  [
+    'Runtime axis',
     /机器|machine|daemon|runtime|执行|executor|worktree|自托管|部署|deploy|enroll|claim|亲和|affinity|沙箱|sandbox|编排|orchestrat|会话|session|跨机|钉选|多机|cli|pin/i,
   ],
 ];
@@ -243,7 +247,7 @@ function classifyTier(title) {
   for (const [tier, re] of TIER_RULES) {
     if (re.test(title)) return tier;
   }
-  return '通用面';
+  return 'General surface';
 }
 
 function cell(text) {
@@ -270,6 +274,18 @@ if (mode !== undefined && mode !== '--check') {
   fail(`unknown argument "${mode}" (usage: generate-feature-map.mjs [--check])`);
 }
 const checkOnly = mode === '--check';
+
+let coverage;
+try {
+  coverage = loadRepoEvalCoverage(REPO_ROOT);
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
+}
+if (coverage.unlisted.length > 0) {
+  fail(
+    `hillclimb flow ${coverage.unlisted.map((name) => `"${name}"`).join(', ')} has no capability row`,
+  );
+}
 
 const specRefs = collectSpecRefs();
 const { numeric: verifyNumeric, other: verifyOther } = collectVerifyDirs();
@@ -302,7 +318,13 @@ for (const num of union.sort(byNum)) {
   anchors.push(...sources.tests);
   const anchored = anchors.length > 0;
   const status =
-    rec.state === 'closed' ? (anchored ? '已做' : '未验证') : anchored ? '在跑' : '待开';
+    rec.state === 'closed'
+      ? anchored
+        ? 'Done'
+        : 'Unverified'
+      : anchored
+        ? 'In progress'
+        : 'Not started';
   rows.push({
     num,
     title: rec.title,
@@ -321,101 +343,127 @@ rows.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier) || b
 // ---------------------------------------------------------------------------
 
 const out = [];
-out.push('# 功能地图（当前状态活册）');
+out.push('# Feature map (living register of current state)');
 out.push('');
 out.push(
-  '> 本册由 `scripts/generate-feature-map.mjs` 机械抽取生成，勿手改；改口径 = 改脚本后重跑（#894 立首版规则）。',
+  '> This register is mechanically extracted by `scripts/generate-feature-map.mjs` — do not hand-edit; changing the rules = changing the script and re-running (#894 established the first-version rules).',
 );
 out.push(
-  '> 重生成：`node scripts/generate-feature-map.mjs`；校验落盘版与源数据一致：加 `--check`。',
+  '> Regenerate: `node scripts/generate-feature-map.mjs`; verify the on-disk copy against its sources: add `--check`.',
 );
-out.push('> 前置：`gh` 已登录、api.github.com 可达。');
-out.push('> 与 03 册分工：03-ROADMAP = 构建顺序历史册；本册 = 当前状态活册。');
+out.push('> Prereq: `gh` authenticated, api.github.com reachable.');
 out.push(
-  '> 编号注：曾落 spec 序列 22 号，撞号重编至 25（#952）；#1527 起移出编号序列，改落 `docs/feature-map.md`（生成物不占手写册号）。',
+  '> Division of labor with volume 03: 03-ROADMAP = the historical register of build order; this register = the living register of current state.',
 );
-out.push('');
-out.push('## 0. 抽取口径');
-out.push('');
-out.push('全部规则机械可重跑，无逐行人工编辑。正本 = 脚本本身，本节由脚本渲染。');
-out.push('');
-out.push('### 0.1 行与列');
-out.push('');
-out.push('行 = 票号并集（三个来源，票号按数值归一、前导零去除）：');
-out.push('');
-out.push(`1. \`docs/spec/*.md\` 里的 \`${REF_SOURCE}\` 引用——负向前瞻排除十六进制色值；`);
-out.push('2. `docs/verify/` 的纯数字目录名（已落地验收产物）；');
 out.push(
-  `3. CI 测试面（${TEST_ROOTS.join('、')} 下的 ${TEST_SUFFIXES.join(' / ')}，跳过 ${[...TEST_SKIP_DIRS].sort().join('、')}）里的票号引用。`,
+  '> Numbering note: this once occupied spec sequence number 22 and was renumbered to 25 after a collision (#952); from #1527 it left the numbered sequence and moved to `docs/feature-map.md` (generated artifacts do not consume hand-written volume numbers).',
 );
+out.push('');
+out.push('## 0. Extraction rules');
 out.push('');
 out.push(
-  '标题与状态取 `gh api repos/<owner>/<repo>/issues?state=all`（含 PR）。行集按 `gh issue list` 口径只收 issue；被引用的 PR 号不生成行（列 §3.2），解析不到的票号列 §3.3。',
+  'All rules are mechanically re-runnable with no per-line manual editing. The canonical text = the script itself; this section is rendered by the script.',
 );
 out.push('');
-out.push('四列：功能 = `#票号` + issue 标题逐字；哪一档 = §0.2；状态 = §0.3；验证锚 = §0.4。');
+out.push('### 0.1 Rows and columns');
 out.push('');
-out.push('### 0.2 档位规则（18 册口径）');
+out.push(
+  'A row = the union of ticket numbers (three sources, numbers normalized numerically with leading zeros dropped):',
+);
 out.push('');
-out.push('档位词表来自 `docs/spec/18-定位与差异化.md`（差异化面 / 运行轴 / 通用面）。');
-out.push('判定 = 标题关键词匹配，按下表顺序首中即停，全不中 = 通用面：');
+out.push(
+  `1. \`${REF_SOURCE}\` references inside \`docs/spec/*.md\` — the negative lookahead excludes hexadecimal color literals;`,
+);
+out.push('2. purely numeric directory names under `docs/verify/` (landed acceptance evidence);');
+out.push(
+  `3. ticket references in the CI test surface (${TEST_SUFFIXES.join(' / ')} under ${TEST_ROOTS.join(' / ')}, skipping ${[...TEST_SKIP_DIRS].sort().join(' / ')}).`,
+);
 out.push('');
-out.push('| 档 | 标题正则（脚本内正本） |');
+out.push(
+  'Titles and states come from `gh api repos/<owner>/<repo>/issues?state=all` (PRs included). The row set follows the `gh issue list` notion and only includes issues; referenced PR numbers do not become rows (listed in §3.2), and numbers that resolve to nothing land in §3.3.',
+);
+out.push('');
+out.push(
+  'Four columns: Feature = `#ticket` + the issue title verbatim (backtick-quoted, since legacy titles are Chinese); Tier = §0.2; Status = §0.3; Verification anchors = §0.4.',
+);
+out.push('');
+out.push('### 0.2 Tier rules (per volume 18)');
+out.push('');
+out.push(
+  'The tier vocabulary comes from `docs/spec/18-positioning-and-differentiation.md` (`差异化面` / `运行轴` / `通用面`).',
+);
+out.push(
+  'Judgment = title keyword match, first rule in the table wins, and no match = General surface:',
+);
+out.push('');
+out.push('| Tier | Title regex (canonical in the script) |');
 out.push('|---|---|');
 for (const [tier, re] of TIER_RULES) {
   out.push(`| ${tier} | \`/${re.source}/${re.flags}\` |`);
 }
 out.push('');
-out.push('### 0.3 状态规则');
+out.push('### 0.3 Status rules');
 out.push('');
-out.push('| issue 状态 | 有验证锚 | 无验证锚 |');
+out.push('| issue state | has verification anchor | no verification anchor |');
 out.push('|---|---|---|');
-out.push('| closed | 已做 | 未验证 |');
-out.push('| open | 在跑 | 待开 |');
+out.push('| closed | Done | Unverified |');
+out.push('| open | In progress | Not started |');
 out.push('');
-out.push('### 0.4 验证锚规则');
+out.push('### 0.4 Verification anchor rules');
 out.push('');
 out.push(
-  '- `docs/verify/<票号>/` 目录存在 → 该路径入锚；已被每周清理移出工作区的目录（`docs/verify/pruned.json`）→ `<sha>:docs/verify/<票号>/` 入锚，`git show` 可读；',
+  '- the directory `docs/verify/<ticket>/` exists → that path becomes an anchor; directories already pruned from the working tree by the weekly cleanup (`docs/verify/pruned.json`) → `<sha>:docs/verify/<ticket>/` becomes an anchor, readable via `git show`;',
 );
-out.push('- CI 测试面里引用该票号的文件 → 逐个路径入锚（这些文件由 §0.5 的 CI job 执行）；');
-out.push('- 两者皆无 → 锚列标 `[未验证]`，行进 §3.1 补活清单。');
+out.push(
+  '- files referencing the ticket in the CI test surface → each path becomes an anchor (these files are executed by the CI jobs in §0.5);',
+);
+out.push(
+  '- neither → the anchor column is marked `[unverified]` and the row enters the §3.1 follow-up list.',
+);
 out.push('');
-out.push('### 0.5 CI 执行面（`.github/workflows/ci.yml` 抽取）');
+out.push('### 0.5 CI execution surface (extracted from `.github/workflows/ci.yml`)');
 out.push('');
 if (ciJobs.length > 0) {
-  out.push('| job | 命名步骤 |');
+  out.push('| job | named steps |');
   out.push('|---|---|');
   for (const job of ciJobs) {
-    out.push(`| \`${job.id}\` | ${job.steps.map((s) => cell(s)).join('、')} |`);
+    out.push(
+      `| \`${job.id}\` | ${job.steps.map((s) => `\`${cell(s).replace(/`/g, '')}\``).join(' / ')} |`,
+    );
   }
 } else {
-  out.push('（未找到 `.github/workflows/ci.yml`。）');
+  out.push('(`.github/workflows/ci.yml` not found.)');
 }
 out.push('');
-out.push('### 0.6 已知局限（首版如实登记）');
+out.push('### 0.6 Known limitations (recorded as-is in the first version)');
 out.push('');
-out.push('1. 引用识别是行级正则，不排代码围栏：spec 代码块里的 `#NNN` 也会被当引用收进。');
 out.push(
-  '2. 档位是标题关键词匹配，不做语义判断——多义词不区分（「闸」既是产品硬闸也是 CI 闸名，「review」既是 AI 审核也是一般代码审查）。错档行 = 规则噪音，细化 §0.2 两条正则是后续活。',
-);
-out.push('3. 状态不读 `state_reason`：wontfix / not_planned 关闭的票同样记「已做」。');
-out.push('4. 功能列 = issue 标题逐字。开票后行为再演化，标题不跟。');
-out.push(
-  '5. 行集 = 三源引用到的票。从未开票、或开了票但 spec / 测试 / 证据都没引用过的功能不在册。',
+  '1. Reference detection is a line-level regex that does not exclude code fences: a `#NNN` inside a spec code block is also collected as a reference.',
 );
 out.push(
-  '6. GitHub 数据是生成时点快照；源数据变了重跑即更新（活册的更新方式）。「跑两次一致」指源数据不变时字节一致。',
+  '2. Tiers are title keyword matches with no semantic judgment — homonyms are not distinguished (`闸` is both a product hard gate and a CI gate name, and `review` is both AI review and ordinary code review). A wrongly tiered row = rule noise; refining the two §0.2 regexes is follow-up work.',
+);
+out.push(
+  '3. Status does not read `state_reason`: tickets closed as wontfix / not_planned are likewise recorded as "Done".',
+);
+out.push(
+  '4. The Feature column = the issue title verbatim. After a ticket is opened, the behavior may still evolve and the title does not follow.',
+);
+out.push(
+  '5. The row set = tickets referenced by the three sources. Features never ticketed, or ticketed but referenced by neither spec / tests / evidence, are not in this register.',
+);
+out.push(
+  '6. The GitHub data is a snapshot at generation time; when a source changes, re-running updates it (that is how a living register updates). "Two consecutive runs agree" means byte-identical only while the sources are unchanged.',
 );
 out.push('');
 
 // §1 statistics
 const tierCount = new Map(TIER_ORDER.map((t) => [t, 0]));
 const statusCount = new Map([
-  ['已做', 0],
-  ['在跑', 0],
-  ['待开', 0],
-  ['未验证', 0],
+  ['Done', 0],
+  ['In progress', 0],
+  ['Not started', 0],
+  ['Unverified', 0],
 ]);
 let withVerify = 0;
 let withTests = 0;
@@ -436,114 +484,122 @@ for (const row of rows) {
 // the doc must only change when a source of the map changes.
 const specFileCount = new Set([...specRefs.values()].flatMap((s) => [...s])).size;
 
-out.push('## 1. 统计');
+out.push('## 1. Statistics');
 out.push('');
-out.push('| 项 | 数 |');
+out.push('| Item | Count |');
 out.push('|---|---|');
-out.push(`| 地图行（issue） | ${rows.length} |`);
+out.push(`| Map rows (issues) | ${rows.length} |`);
 for (const tier of TIER_ORDER) {
-  out.push(`| 其中 ${tier} | ${tierCount.get(tier)} |`);
+  out.push(`| of which ${tier} | ${tierCount.get(tier)} |`);
 }
-for (const status of ['已做', '在跑', '待开', '未验证']) {
-  out.push(`| 状态 ${status} | ${statusCount.get(status)} |`);
+for (const status of ['Done', 'In progress', 'Not started', 'Unverified']) {
+  out.push(`| status ${status} | ${statusCount.get(status)} |`);
 }
-out.push(`| 锚 = 证据目录 + 测试引用 | ${withBoth} |`);
-out.push(`| 锚 = 仅证据目录 | ${withVerify} |`);
-out.push(`| 锚 = 仅测试引用 | ${withTests} |`);
-out.push(`| 无锚（\`[未验证]\`） | ${withNone} |`);
-out.push(`| 被引用的 PR（不生成行，§3.2） | ${prRefs.length} |`);
-out.push(`| 解析不到的票号（§3.3） | ${unresolved.length} |`);
-out.push(`| 非 GitHub 票号的证据目录（§3.4） | ${verifyOther.size} |`);
-out.push(`| 扫描面：spec 册 / 测试文件 | ${specFileCount} / ${testFileCount} |`);
+out.push(`| anchors = evidence directory + test reference | ${withBoth} |`);
+out.push(`| anchors = evidence directory only | ${withVerify} |`);
+out.push(`| anchors = test reference only | ${withTests} |`);
+out.push(`| no anchor (\`[unverified]\`) | ${withNone} |`);
+out.push(`| referenced PRs (no rows, §3.2) | ${prRefs.length} |`);
+out.push(`| unresolvable ticket numbers (§3.3) | ${unresolved.length} |`);
+out.push(
+  `| evidence directories that are not GitHub ticket numbers (§3.4) | ${verifyOther.size} |`,
+);
+out.push(`| scan surface: spec volumes / test files | ${specFileCount} / ${testFileCount} |`);
 out.push('');
 
 // §2 the map
-out.push('## 2. 功能地图');
+out.push('## 2. Feature map');
 out.push('');
-out.push(`排序：档位（${TIER_ORDER.join(' → ')}）内按票号升序。`);
+out.push(`Ordering: by tier (${TIER_ORDER.join(' → ')}), tickets ascending within a tier.`);
 out.push('');
-out.push('| 功能 | 哪一档 | 状态 | 验证锚 |');
+out.push('| Feature | Tier | Status | Verification anchors |');
 out.push('|---|---|---|---|');
 for (const row of rows) {
-  const feature = `[#${row.num}](${issueUrl(repo, row.num)}) ${cell(row.title)}`;
-  const anchor = row.anchored ? row.anchors.map((a) => `\`${a}\``).join('<br>') : '[未验证]';
+  const feature = `[#${row.num}](${issueUrl(repo, row.num)}) \`${cell(row.title).replace(/`/g, '')}\``;
+  const anchor = row.anchored ? row.anchors.map((a) => `\`${a}\``).join('<br>') : '[unverified]';
   out.push(`| ${feature} | ${row.tier} | ${row.status} | ${anchor} |`);
 }
 out.push('');
 
 // §3 gaps
-out.push('## 3. 没锚与挂不上的行（后续要补的活）');
+out.push('## 3. Rows without anchors and rows that cannot be resolved (follow-up work)');
 out.push('');
-out.push('### 3.1 `[未验证]` 行');
+out.push('### 3.1 `[unverified]` rows');
 out.push('');
 out.push(
-  '这些行没有 `docs/verify/<票号>/` 目录，CI 测试面也没有文件引用该票号——功能声称来自 spec 册，但没有可指过去的验证锚。补锚 = 补 verify 证据或补测试引用。',
+  'These rows have neither a `docs/verify/<ticket>/` directory nor a CI-test-surface file referencing the ticket — the feature claim comes from the spec volumes, but there is no verification anchor to point at. Adding an anchor = adding verify evidence or a test reference.',
 );
 out.push('');
 const unverified = rows.filter((r) => !r.anchored);
 if (unverified.length === 0) {
-  out.push('（无。）');
+  out.push('(None.)');
 } else {
-  out.push('| 票 | 功能 | 引用它的 spec 册 |');
+  out.push('| Ticket | Feature | Spec volumes referencing it |');
   out.push('|---|---|---|');
   for (const row of unverified) {
     out.push(
-      `| [#${row.num}](${issueUrl(repo, row.num)}) | ${cell(row.title)} | ${row.sources.spec.map((s) => `\`${s}\``).join('<br>')} |`,
+      `| [#${row.num}](${issueUrl(repo, row.num)}) | \`${cell(row.title).replace(/`/g, '')}\` | ${row.sources.spec.map((s) => `\`${s}\``).join('<br>')} |`,
     );
   }
 }
 out.push('');
-out.push('### 3.2 被引用的 PR（不生成行）');
+out.push('### 3.2 Referenced PRs (no rows)');
 out.push('');
-out.push('行集口径 = issue（§0.1）。这些 PR 号被三源引用到，实现在对应 issue 行下。');
+out.push(
+  'The row-set criterion = issues (§0.1). These PR numbers are referenced by the three sources; their implementations sit under the corresponding issue rows.',
+);
 out.push('');
 if (prRefs.length === 0) {
-  out.push('（无。）');
+  out.push('(None.)');
 } else {
-  out.push('| PR | 标题 | 状态 | 引用来源 |');
+  out.push('| PR | Title | State | Referenced by |');
   out.push('|---|---|---|---|');
   for (const { num, rec, sources } of prRefs) {
     const src = [];
     if (sources.spec.length > 0) src.push(`spec ×${sources.spec.length}`);
-    if (sources.tests.length > 0) src.push(`测试 ×${sources.tests.length}`);
+    if (sources.tests.length > 0) src.push(`tests ×${sources.tests.length}`);
     out.push(
-      `| [#${num}](https://github.com/${repo}/pull/${num}) | ${cell(rec.title)} | ${rec.state === 'closed' ? 'closed' : 'open'} | ${src.join('、')} |`,
+      `| [#${num}](https://github.com/${repo}/pull/${num}) | \`${cell(rec.title).replace(/`/g, '')}\` | ${rec.state === 'closed' ? 'closed' : 'open'} | ${src.join(' + ')} |`,
     );
   }
 }
 out.push('');
-out.push('### 3.3 解析不到的票号');
+out.push('### 3.3 Unresolvable ticket numbers');
 out.push('');
-out.push('这些号被三源引用到，但仓内不存在该 issue/PR（跨仓引用、笔误，或引用了被删除的票）。');
+out.push(
+  'These numbers are referenced by the three sources, but the issue/PR does not exist in this repo (a cross-repo reference, a typo, or a reference to a deleted ticket).',
+);
 out.push('');
 if (unresolved.length === 0) {
-  out.push('（无。）');
+  out.push('(None.)');
 } else {
-  out.push('| 票号 | 引用来源 |');
+  out.push('| Ticket number | Referenced by |');
   out.push('|---|---|');
   for (const { num, sources } of unresolved) {
     const src = [...sources.spec.map((s) => `\`${s}\``)];
-    if (sources.tests.length > 0) src.push(`测试面 ×${sources.tests.length}`);
-    if (sources.verify) src.push('`docs/verify/` 目录名');
+    if (sources.tests.length > 0) src.push(`test surface ×${sources.tests.length}`);
+    if (sources.verify) src.push('`docs/verify/` directory name');
     out.push(`| #${num} | ${src.join('<br>')} |`);
   }
 }
 out.push('');
-out.push('### 3.4 非 GitHub 票号的证据目录');
+out.push('### 3.4 Evidence directories that are not GitHub ticket numbers');
 out.push('');
 out.push(
-  '`docs/verify/` 下这些目录名不是本仓 GitHub 票号（历史 tracker / 线程编号 / 变体目录），`gh issue list` 解析不到；证据本体在仓内可查。',
+  'These directory names under `docs/verify/` are not GitHub ticket numbers of this repo (a historical tracker / thread number / variant directory) and cannot be resolved by `gh issue list`; the evidence itself is in the repo and can be looked up.',
 );
 out.push('');
 if (verifyOther.size === 0) {
-  out.push('（无。）');
+  out.push('(None.)');
 } else {
-  out.push('| 目录 | 路径 |');
+  out.push('| Directory | Path |');
   out.push('|---|---|');
   for (const [name, anchor] of verifyOther) {
     out.push(`| ${cell(name)} | \`${anchor}\` |`);
   }
 }
+out.push('');
+out.push(renderEvalCoverage(coverage.rows, repo).trimEnd());
 out.push('');
 
 const content = out.join('\n');
@@ -564,6 +620,6 @@ if (checkOnly) {
 } else {
   writeFileSync(DOC_PATH, content);
   process.stdout.write(
-    `wrote ${DOC_REL}: ${rows.length} rows (${TIER_ORDER.map((t) => `${t} ${tierCount.get(t)}`).join(' / ')}), [未验证] ${withNone}\n`,
+    `wrote ${DOC_REL}: ${rows.length} rows (${TIER_ORDER.map((t) => `${t} ${tierCount.get(t)}`).join(' / ')}), [unverified] ${withNone}\n`,
   );
 }

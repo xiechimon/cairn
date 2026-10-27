@@ -473,17 +473,20 @@ test('needs evidence from two different builds, then a successful recurrence pro
 test('human confirmation promotes only with two builds of evidence', async () => {
   const h = home(['build-a', 'build-b']);
   await curate(h, ['--in', writeCandidates([candidateLine('build-a')])]);
+  const opened = openDbWithHandle(join(h.dir, 'server/server.db'));
+  opened.db.update(memoryCandidate).set({ id: '-confirmation' }).run();
+  opened.close();
   const id = readDb(h).candidates[0]?.id ?? '';
-  const early = await curate(h, ['--confirm', id]);
+  const early = await curate(h, [`--confirm=${id}`]);
   expect(early.status).toBe(1);
   expect(early.stderr).toContain('needs evidence from 2 different builds (has 1)');
   await curate(h, ['--in', writeCandidates([candidateLine('build-b', { buildSucceeded: false })])]);
-  const confirmed = await curate(h, ['--confirm', id]);
+  const confirmed = await curate(h, [`--confirm=${id}`]);
   expect(confirmed.status, confirmed.stderr).toBe(0);
   const { candidates, memories } = readDb(h);
   expect(confirmed.stdout.trim()).toBe(`promoted=${id} memory=${memories[0]?.id}`);
   expect(candidates[0]?.status).toBe('promoted');
-  const again = await curate(h, ['--confirm', id]);
+  const again = await curate(h, [`--confirm=${id}`]);
   expect(again.status).toBe(1);
   expect(again.stderr).toContain('already promoted');
 });
@@ -577,18 +580,22 @@ test('curate rejects fenced issue text and builds it cannot place', async () => 
 test('a dismissed candidate absorbs later recurrences and is never promoted', async () => {
   const h = home(['build-a', 'build-b']);
   await curate(h, ['--in', writeCandidates([candidateLine('build-a')])]);
+  const opened = openDbWithHandle(join(h.dir, 'server/server.db'));
+  opened.db.update(memoryCandidate).set({ id: '-candidate' }).run();
+  opened.close();
   const id = readDb(h).candidates[0]?.id ?? '';
-  const dismissed = await curate(h, ['--dismiss', id]);
+  const dismissed = await curate(h, [`--dismiss=${id}`]);
   expect(dismissed.status, dismissed.stderr).toBe(0);
   expect(dismissed.stdout.trim()).toBe(`dismissed=${id}`);
   const recurrence = await curate(h, ['--in', writeCandidates([candidateLine('build-b')])]);
+  expect(recurrence.status, recurrence.stderr).toBe(0);
   expect(recurrence.stdout).toContain(
     'memory_pending=0 memory_merged=1 memory_known=0 memory_promoted=0',
   );
   const { candidates, memories } = readDb(h);
   expect(memories).toEqual([]);
   expect(candidates).toMatchObject([{ status: 'dismissed', buildIds: ['build-a', 'build-b'] }]);
-  const confirm = await curate(h, ['--confirm', id]);
+  const confirm = await curate(h, [`--confirm=${id}`]);
   expect(confirm.status).toBe(1);
   expect(confirm.stderr).toContain('is dismissed');
 });

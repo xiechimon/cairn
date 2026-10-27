@@ -97,7 +97,7 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import type { MentionGroups } from '../overlay/mention-picker.js';
 import type { FileMentionEntry } from '../overlay/mention-token.js';
 import { MoreMenu } from '../overlay/more-menu.js';
-import { SearchPanel, useSearchState } from '../overlays/search-panel.js';
+import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
 import { safeLocalStorage } from '../safe-storage.js';
@@ -666,7 +666,7 @@ export function TodoDetailPage() {
 
   return (
     <div
-      className="detail-shell flex h-full overflow-hidden bg-(--surface-1) [--detail-pane-right:488px] max-[816px]:[--detail-pane-right:0px] [&>.board-sidebar]:max-[816px]:hidden"
+      className="detail-shell flex h-full overflow-hidden bg-(--surface-1) [--detail-pane-right:488px] max-[816px]:[--detail-pane-right:0px] [&>.app-menu-trigger]:hidden [&>.board-sidebar]:max-[816px]:hidden"
       data-route="todo-detail"
       data-todo-id={id}
     >

@@ -22,10 +22,10 @@ export interface SlashMenuProps {
 }
 
 const MENU_CLS =
-  'slash-menu absolute inset-x-0 bottom-[calc(100%+8px)] z-40 max-h-55 overflow-auto rounded-lg bg-popover p-1 shadow-(--shadow-popover)';
+  'slash-menu absolute inset-x-0 bottom-[calc(100%+8px)] z-40 max-h-55 overflow-auto rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';
 
 const ROW_CLS =
-  'slash-menu-row flex h-auto w-full cursor-pointer items-baseline justify-start gap-2 rounded-md border-0 px-2 py-2 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground active:not-aria-[haspopup]:translate-y-0';
+  'slash-menu-row flex h-auto w-full cursor-pointer items-baseline justify-start gap-2 rounded-(--radius-menu-item) border-0 px-2.5 py-2 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground active:not-aria-[haspopup]:translate-y-0';
 
 const NAME_CLS = 'flex-none font-mono text-meta';
 const DESC_CLS = 'truncate text-meta text-content-tertiary';

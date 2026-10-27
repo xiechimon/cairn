@@ -99,6 +99,10 @@ export const todo = sqliteTable(
     sourceKind: text('sourceKind').$type<TodoSourceKind | null>(),
     sourceRef: text('sourceRef'),
     output: text('output').$type<TodoOutputKind>().notNull().default('code'),
+    userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
+    userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
+      .notNull()
+      .default(sql`'[]'`),
   },
   (t) => [index('todo_phase_idx').on(t.phase)],
 );
@@ -429,22 +433,6 @@ export const apiKey = sqliteTable('api_key', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
-export const webhookToken = sqliteTable(
-  'webhook_token',
-  {
-    id: text('id').primaryKey(),
-    teamId: text('teamId')
-      .notNull()
-      .references(() => team.id),
-    name: text('name'),
-    tokenHash: text('tokenHash').notNull(),
-    masked: text('masked').notNull(),
-    createdAt: epochMs('createdAt').notNull(),
-    lastUsedAt: epochMs('lastUsedAt'),
-  },
-  (t) => [uniqueIndex('webhook_token_tokenHash_unique').on(t.tokenHash)],
-);
-
 export const machine = sqliteTable(
   'machine',
   {
@@ -459,7 +447,6 @@ export const machine = sqliteTable(
     latestCliVersion: text('latestCliVersion'),
     kind: text('kind').notNull().default('remote'),
     enabledRuntimes: json<string[]>('enabledRuntimes').notNull().default(sql`'[]'`),
-    shellEnabled: bool('shellEnabled').notNull().default(false),
     claudeCodeReport: json<ClaudeCodeReport | null>('claudeCodeReport'),
     maxConcurrent: integer('maxConcurrent').notNull().default(3),
     maxConcurrentOverridden: bool('maxConcurrentOverridden').notNull().default(false),
@@ -468,21 +455,6 @@ export const machine = sqliteTable(
   },
   (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
 );
-
-export const shellCommand = sqliteTable('shell_command', {
-  id: text('id').primaryKey(),
-  stepId: text('stepId').notNull(),
-  machineId: text('machineId').notNull(),
-  agentId: text('agentId').notNull(),
-  teamId: text('teamId').notNull(),
-  command: text('command').notNull(),
-  status: text('status').$type<'denied' | 'running' | 'done' | 'failed'>().notNull(),
-  exitCode: integer('exitCode'),
-  output: text('output'),
-  errorMessage: text('errorMessage'),
-  createdAt: epochMs('createdAt').notNull(),
-  finishedAt: epochMs('finishedAt'),
-});
 
 export const tokenUsage = sqliteTable(
   'token_usage',
@@ -493,11 +465,11 @@ export const tokenUsage = sqliteTable(
     output: integer('output').notNull().default(0),
     cacheRead: integer('cacheRead').notNull().default(0),
     cacheWrite: integer('cacheWrite').notNull().default(0),
-    costInput: real('costInput').notNull().default(0),
-    costOutput: real('costOutput').notNull().default(0),
-    costCacheRead: real('costCacheRead').notNull().default(0),
-    costCacheWrite: real('costCacheWrite').notNull().default(0),
-    costTotal: real('costTotal').notNull().default(0),
+    costInput: real('costInput'),
+    costOutput: real('costOutput'),
+    costCacheRead: real('costCacheRead'),
+    costCacheWrite: real('costCacheWrite'),
+    costTotal: real('costTotal'),
   },
   (t) => [primaryKey({ columns: [t.buildId, t.model] })],
 );
@@ -545,12 +517,6 @@ export const chiefMessage = sqliteTable('chief_message', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
-export const whatsNew = sqliteTable('whats_new', {
-  id: text('id').primaryKey(),
-  body: json<Record<string, unknown>>('body').notNull(),
-  createdAt: epochMs('createdAt').notNull(),
-});
-
 export const attachment = sqliteTable('attachment', {
   id: text('id').primaryKey(),
   teamId: text('teamId')
@@ -573,6 +539,9 @@ export const githubConnection = sqliteTable('github_connection', {
     .references(() => team.id, { onDelete: 'cascade' }),
   login: text('login').notNull(),
   accessTokenCipher: text('accessTokenCipher').notNull(),
+  refreshTokenCipher: text('refreshTokenCipher'),
+  accessTokenExpiresAt: epochMs('accessTokenExpiresAt'),
+  disconnectedReason: text('disconnectedReason'),
   scope: text('scope').notNull(),
   createdAt: epochMs('createdAt').notNull(),
 });
@@ -704,3 +673,13 @@ export const buildFeedback = sqliteTable(
   },
   (t) => [index('build_feedback_buildId_idx').on(t.buildId)],
 );
+
+export const buildOutcomeBackfill = sqliteTable('build_outcome_backfill', {
+  buildId: text('buildId')
+    .primaryKey()
+    .references(() => build.id, { onDelete: 'cascade' }),
+  revertedWithin7d: bool('revertedWithin7d').notNull(),
+  fixedByLaterPr: bool('fixedByLaterPr').notNull(),
+  mergeCommit: text('mergeCommit').notNull(),
+  checkedAt: epochMs('checkedAt').notNull(),
+});

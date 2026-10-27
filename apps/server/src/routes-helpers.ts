@@ -154,6 +154,7 @@ export function svcOf(ctx: AppContext) {
     reposDir: ctx.reposDir,
     attachmentsDir: ctx.attachmentsDir,
     box: ctx.secretBox,
+    oauthClient: ctx.oauthClient,
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
   };
 }
@@ -162,6 +163,7 @@ export function githubIssueDepsOf(ctx: AppContext): GithubIssueFaceDeps {
   return {
     db: ctx.db,
     box: ctx.secretBox,
+    oauthClient: ctx.oauthClient,
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
   };
 }

@@ -6,7 +6,7 @@ import { bootServer, insertMachine, req } from './helpers.js';
 const AGENT_ID = 'agent-tools-1';
 
 describe('Agent tools write-side filtering (XMON-77)', () => {
-  test('POST: out-of-vocabulary values (self-made entry) silently dropped, all six in-vocabulary tiers kept + order unchanged', async () => {
+  test('POST: out-of-vocabulary values (self-made entry and retired remote shell) silently dropped, remaining switches kept in order', async () => {
     const s = bootServer();
     const create = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
       displayName: '权限探针',
@@ -17,7 +17,6 @@ describe('Agent tools write-side filtering (XMON-77)', () => {
     const id = ((await create.json()) as { id: string }).id;
     expect(s.db.select().from(agentTable).where(eq(agentTable.id, id)).get()!.tools).toEqual([
       '推送分支',
-      '远程 shell',
       '创建标签',
       '更新技能',
     ]);

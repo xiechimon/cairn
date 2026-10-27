@@ -337,6 +337,10 @@ export class WorkspaceManager implements WorktreeOps {
     return gitPrim.countAhead(cwd, defaultBranch);
   }
 
+  async commitsAhead(cwd: string, defaultBranch: string): Promise<string[]> {
+    return gitPrim.commitsAhead(cwd, defaultBranch);
+  }
+
   async currentBranch(cwd: string): Promise<string | null> {
     return gitPrim.currentBranch(cwd);
   }

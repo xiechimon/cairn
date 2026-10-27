@@ -1,0 +1,85 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1671
+
+ ❯ |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts (16 tests | 3 failed) 193ms
+   ❯ runner 400-signal one-time degrade retry (#1671 slice 2) (10)
+     × a network retry can still degrade a later image rejection once 71ms
+     × a thrown image rejection from the event iterator retries without images 13ms
+     × continue-session image rejection starts a fresh text-only session with the task 34ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > a network retry can still degrade a later image rejection once
+AssertionError: expected [ 'create', 'continue', 'continue' ] to deeply equal [ 'create', 'continue', 'create' ]
+
+- Expected
++ Received
+
+  [
+    "create",
+    "continue",
+-   "create",
++   "continue",
+  ]
+
+ ❯ test/runner-image-degrade.test.ts:415:21
+    413|     const { client } = await runImageStep(claimed, backend);
+    414|     expect(created).toHaveLength(3);
+    415|     expect(actions).toEqual(['create', 'continue', 'create']);
+       |                     ^
+    416|     expect(created[2]?.opts.promptImages).toBeUndefined();
+    417|     expect(client.doneBodies[0]?.body.status).toBe('success');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > a thrown image rejection from the event iterator retries without images
+AssertionError: expected [ { opts: { …(8) } } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:429:21
+    427|     });
+    428|     const { client } = await runImageStep(claimed, backend);
+    429|     expect(created).toHaveLength(2);
+       |                     ^
+    430|     expect(created[1]?.opts.promptImages).toBeUndefined();
+    431|     expect(client.doneBodies[0]?.body.status).toBe('success');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > continue-session image rejection starts a fresh text-only session with the task
+AssertionError: expected [ 'continue', 'continue' ] to deeply equal [ 'continue', 'create' ]
+
+- Expected
++ Received
+
+  [
+    "continue",
+-   "create",
++   "continue",
+  ]
+
+ ❯ test/runner-image-degrade.test.ts:560:21
+    558|
+    559|     expect(created).toHaveLength(2);
+    560|     expect(actions).toEqual(['continue', 'create']);
+       |                     ^
+    561|     expect(created[1]?.opts.prompt).toContain(TASK.spec);
+    562|     expect(created[1]?.opts.promptImages).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 13 passed (16)
+   Start at  09:50:48
+   Duration  10.24s (transform 61%, import 37%, tests 2%)
+
+  Transform  |@xiechimon/cairn-cli| transforming modules took 5.79s · 61% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

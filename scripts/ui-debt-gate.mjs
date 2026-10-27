@@ -85,6 +85,10 @@ const arbitraryPattern = (names) =>
     'g',
   );
 const TEXT_PATTERN = arbitraryPattern(['text']);
+const RADIUS_PATTERN = new RegExp(
+  String.raw`(?<![\w-])rounded(?:-(?:t|r|b|l|s|e|tl|tr|br|bl|ss|se|es|ee))?-\[(?:${LENGTH}|${INTERPOLATED})\]`,
+  'g',
+);
 const SPACING_PATTERN = arbitraryPattern(SPACING_UTILITIES);
 
 function countArbitrary(source) {
@@ -107,8 +111,19 @@ const ARBITRARY_CANARY = [
   ['leading-[18px] tracking-[0.02em] stop-[3px] blend-[2px] font-size-[3px]', 0, 0],
 ];
 
+const RADIUS_CANARY = [
+  ['rounded-[4px] rounded-br-[6px] hover:rounded-[0.5rem]', 3],
+  ['rounded-(--cds-radius-sm) rounded-[min(var(--radius-md),10px)] rounded-lg', 0],
+];
+
 function selfCheckMatcher() {
   const problems = [];
+  for (const [sample, want] of RADIUS_CANARY) {
+    const got = sample.match(RADIUS_PATTERN)?.length ?? 0;
+    if (got !== want) {
+      problems.push(`radius canary ${JSON.stringify(sample)}: expected ${want}, got ${got}`);
+    }
+  }
   for (const [sample, text, spacing] of ARBITRARY_CANARY) {
     const got = countArbitrary(sample);
     if (got.text !== text || got.spacing !== spacing) {
@@ -202,12 +217,15 @@ function scanTree() {
   }
 
   const arbitrary = { textTotal: 0, spacingTotal: 0, files: {} };
+  const radii = [];
   let arbitraryScanned = 0;
   for (const f of arbitraryFiles) {
     const r = rel(f);
     if (ARBITRARY_EXCLUDED(r)) continue;
     arbitraryScanned++;
-    const { text, spacing } = countArbitrary(readFileSync(f, 'utf8'));
+    const source = readFileSync(f, 'utf8');
+    for (const m of source.match(RADIUS_PATTERN) ?? []) radii.push(`${r}: ${m}`);
+    const { text, spacing } = countArbitrary(source);
     if (text + spacing > 0) arbitrary.files[r] = { text, spacing };
     arbitrary.textTotal += text;
     arbitrary.spacingTotal += spacing;
@@ -218,6 +236,7 @@ function scanTree() {
     controlFiles,
     controlTotal,
     arbitrary,
+    radii,
     cssCount: cssFiles.length,
     tsxCount: tsxFiles.length,
     arbitraryScanned,
@@ -513,6 +532,12 @@ function check(baseSha) {
     } else if (now < allowed) {
       shrunk.push(`arbitrary ${key} total: ${allowed} -> ${now}`);
     }
+  }
+
+  for (const hit of scan.radii) {
+    failures.push(
+      `D6 ${hit}: arbitrary radius. Use a radius token (--cds-radius-xs..2xl, --radius-menu-item, --radius-popover, --radius-card) so nested corners stay concentric`,
+    );
   }
 
   if (baseSha && effective !== inTree) {

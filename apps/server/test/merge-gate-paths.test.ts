@@ -60,7 +60,11 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     ['CLAUDE 变体', 'CLAUDE.local.md', 'apps/web/src/claude-md.ts'],
     ['AGENTS 变体', 'AGENTS.override.md', 'apps/web/src/agents.ts'],
     ['评审口径', 'docs/pr-review.md', 'docs/pr-review-notes/x.md'],
+    ['error ledger', 'docs/lessons.md', 'docs/lessons-archive.md'],
+    ['error ledger entry', 'docs/lessons/1651-probe-reach.md', 'docs/lessonsx/1651.md'],
+    ['dispatch template', 'docs/agent-dispatch-prompts.md', 'docs/agent-dispatch.md'],
     ['ADR', 'docs/adr/0021-x.md', 'docs/adrs.md'],
+    ['design decisions', 'docs/spec/28-x.md', 'docs/specs.md'],
     ['闸脚本', 'apps/server/scripts/db-check.mjs', 'apps/server/src/scriptsx.ts'],
     ['配置', 'apps/web/vite.config.mts', 'apps/web/src/config.ts'],
     ['biome', 'apps/web/biome.jsonc', 'apps/web/src/biome.ts'],
@@ -166,17 +170,14 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     'apps/server/src/services/secrets.ts',
     'apps/server/src/services/credentials.ts',
     'apps/server/src/services/api-keys.ts',
-    'apps/server/src/services/webhook-tokens.ts',
     'apps/server/src/services/oauth.ts',
     'apps/server/src/routes-machine.ts',
     'apps/daemon/src/credentials.ts',
     'apps/daemon/src/secret-channel.ts',
-    'apps/daemon/src/shell-channel.ts',
     'apps/daemon/src/machine-client.ts',
     'apps/daemon/src/backend/command-gate.ts',
     'apps/server/src/services/mcp-face.ts',
     'apps/server/src/services/mcp-servers.ts',
-    'apps/server/src/routes-webhook.ts',
     'apps/server/src/db/client.ts',
   ];
   test('⑤ security-sensitive surfaces and the migration-running DB bootstrap: every file in the list is protected, never in gateSource', () => {
@@ -216,6 +217,54 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
       const r = classify([f(p)]);
       expect(r.protected, p).toEqual([]);
       expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
+  const EVAL_SURFACE_PATHS = [
+    'integration/eval/adoption/judge.mts',
+    'integration/eval/adoption/sealed-ledger.mts',
+    'integration/eval/chief-dispatch/grade.mts',
+    'integration/eval/memory-regression/grade.mts',
+    '.claude/hillclimb/chief-dispatch/cases.json',
+    '.claude/hillclimb/memory-regression/_state.json',
+    'apps/server/src/trajectory-export.ts',
+    'apps/server/src/trajectory-export-cli.ts',
+    'apps/server/src/trajectory-outcome.ts',
+    'packages/shared/src/trajectory-pack.ts',
+  ];
+  test('⑥ eval ruler surface: every path is protected and never in gateSource', () => {
+    for (const p of EVAL_SURFACE_PATHS) {
+      const r = classify([f(p)]);
+      expect(r.protected, p).toEqual([p]);
+      expect(r.gateSource, p).toEqual([]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
+  test('⑥ is case-insensitive like the other protect globs', () => {
+    for (const p of ['Integration/Eval/X.Mts', '.Claude/Hillclimb/X.json']) {
+      expect(classify([f(p)]).protected, p).toEqual([p]);
+    }
+  });
+
+  test('⑥ lookalikes outside the eval dirs stay in the auto-merge set', () => {
+    for (const p of [
+      'packages/hillclimb/src/cases.json',
+      'apps/server/src/trajectory.ts',
+      'apps/server/src/trajectory-attribution.ts',
+      'packages/shared/src/trajectory.ts',
+    ]) {
+      const r = classify([f(p)]);
+      expect(r.protected, p).toEqual([]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
+  test('⑥ same-named dirs outside the protected surface are not protected but still leave the auto-merge set', () => {
+    for (const p of ['integration/evalx/judge.mts', 'hillclimb/cases.json']) {
+      const r = classify([f(p)]);
+      expect(r.protected, p).toEqual([]);
+      expect(r.outsideAutoMerge, p).toEqual([p]);
     }
   });
 
@@ -276,13 +325,13 @@ describe('default deny: anything outside the auto-merge set is left to a human',
     expect(r.protected).toEqual([]);
   });
 
-  test('out-of-set paths (docs, root files, public, eval) are each listed', () => {
+  test('out-of-set paths (docs, root files, public) are each listed', () => {
     const files = [
-      'docs/spec/28-x.md',
+      'docs/research/assets/r1/sw.js',
+      'docs/research/assets/r1/asset-manifest.json',
       'README.md',
       'CONTEXT.md',
       'apps/web/public/x.svg',
-      'integration/eval/x.ts',
     ];
     expect(classify(files.map((p) => f(p))).outsideAutoMerge).toEqual(files);
   });
@@ -311,9 +360,51 @@ describe('default deny: anything outside the auto-merge set is left to a human',
 
   test('a rename from out of set into the set: recorded out of set by the original path', () => {
     const r = classify([
-      f('apps/web/src/x.ts', { status: 'renamed', previousFilename: 'docs/spec/x.md' }),
+      f('apps/web/src/x.ts', { status: 'renamed', previousFilename: 'README.md' }),
     ]);
-    expect(r.outsideAutoMerge).toEqual(['docs/spec/x.md']);
+    expect(r.outsideAutoMerge).toEqual(['README.md']);
+  });
+});
+
+describe('docs-only (#1621): Markdown under docs joins the auto-merge set; design decisions, ADRs and the review guide still stay with the user', () => {
+  test('Markdown at any depth under docs is in the set', () => {
+    const files = ['docs/ops/langfuse.md', 'docs/README.md', 'docs/a3/x.md', 'docs/research/r1.MD'];
+    const r = classify(files.map((p) => f(p)));
+    expect(r.protected).toEqual([]);
+    expect(r.outsideAutoMerge).toEqual([]);
+  });
+
+  test('protected doc paths still match under case or Unicode folds and never land in the set', () => {
+    for (const p of [
+      'docs/ADR/0021-x.md',
+      'Docs/Adr/0021-x.md',
+      'docs/SPEC/28-x.md',
+      'docs/\u{17F}pec/28-x.md',
+      'docs/PR-Review.md',
+      'doc\u{17F}/pr-review.md',
+      'doc\u{17F}/adr/0021-x.md',
+      'docs/spec',
+    ]) {
+      const asciiFold = p.normalize('NFKC').toLowerCase();
+      expect(classify([f(asciiFold)]).protected, `${p} folds to ${asciiFold}`).toEqual([asciiFold]);
+      const r = classify([f(p, { status: 'added' })]);
+      expect(r.protected, p).toEqual([p]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
+  test('a name that only looks like docs via Unicode folding lands outside the set', () => {
+    const p = 'doc\u{17F}/x.md';
+    const r = classify([f(p, { status: 'added' })]);
+    expect(r.protected).toEqual([]);
+    expect(r.outsideAutoMerge).toEqual([p]);
+  });
+
+  test('renaming an ADR into a plain doc counts as protected by its original name', () => {
+    const r = classify([
+      f('docs/notes/0021.md', { status: 'renamed', previousFilename: 'docs/adr/0021-x.md' }),
+    ]);
+    expect(r.protected).toEqual(['docs/adr/0021-x.md']);
   });
 });
 

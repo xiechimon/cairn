@@ -358,10 +358,9 @@ describe('agent record (r3 §4 measured verbatim)', () => {
   });
 });
 
-describe('agent permission-toggle vocabulary (XMON-84 user decision B: all six tiers kept)', () => {
-  it('toggle vocabulary = all six tiers kept (user decision B; two enforcement tiers + four pending-ontology tiers)', () => {
+describe('agent permission-toggle vocabulary', () => {
+  it('toggle vocabulary keeps the five remaining switches', () => {
     expect([...AGENT_TOOL_SWITCHES]).toEqual([
-      '远程 shell',
       '合并分支',
       '创建标签',
       '推送分支',
@@ -374,7 +373,7 @@ describe('agent permission-toggle vocabulary (XMON-84 user decision B: all six t
   it('filterAgentTools: in-vocabulary kept all + order preserved; out-of-vocabulary (custom tiers) silently dropped', () => {
     expect(
       filterAgentTools(['推送分支', '远程 shell', '合并分支', '创建标签', '自造档', '更新技能']),
-    ).toEqual(['推送分支', '远程 shell', '合并分支', '创建标签', '更新技能']);
+    ).toEqual(['推送分支', '合并分支', '创建标签', '更新技能']);
     expect(filterAgentTools([])).toEqual([]);
   });
 

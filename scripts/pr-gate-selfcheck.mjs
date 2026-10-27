@@ -6,10 +6,13 @@
 // Usage: node scripts/pr-gate-selfcheck.mjs [path to pr-gate.js]
 // The failure modes come from pr-gate runs 2-10 on #1410
 // (docs/verify/1401/pr-gate-run*-*.json) and its /code-review rounds.
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const path = process.argv[2] ?? '.claude/workflows/pr-gate.js';
-const body = readFileSync(path, 'utf8').replace(/^export const meta/m, 'const meta');
+const raw = readFileSync(path, 'utf8');
+const body = raw.replace(/^export const meta/m, 'const meta');
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
 const run = new AsyncFunction('args', 'agent', 'parallel', 'pipeline', 'log', 'phase', body);
 
@@ -63,7 +66,9 @@ const base = {
   linesChanged: 10,
   binaryFiles: [],
 };
-const safetyFiles = (files) => ({ safety: { changedFiles: files } });
+const safetyFiles = (files) => ({
+  safety: { changedFiles: files, deletedFiles: [], linesChanged: 10, binaryFiles: [] },
+});
 const blocker = { title: 'bug', severity: 'blocking', failurePath: 'x' };
 const ARGS_ERROR = /^Error: pr-gate args/;
 
@@ -109,6 +114,14 @@ async function eachProtected(files) {
   }
   return true;
 }
+
+const expandBraces = (s) => {
+  const m = /\{([^{}]*)\}/.exec(s);
+  if (m === null) return [s];
+  const before = s.slice(0, m.index);
+  const after = s.slice(m.index + m[0].length);
+  return m[1].split(',').flatMap((part) => expandBraces(before + part + after));
+};
 
 const cases = [
   [
@@ -261,11 +274,10 @@ const cases = [
     'paths outside the auto-merge set route to the user (run 5)',
     async () => {
       for (const f of [
-        'docs/spec/28-x.md',
+        'docs/research/assets/r1/sw.js',
         'README.md',
         'CONTEXT.md',
         'apps/web/public/x.svg',
-        'integration/eval/x.ts',
       ]) {
         const r = await gateFiles([f]);
         if (
@@ -290,6 +302,20 @@ const cases = [
         '.cursor/skills/verify-cairn/SKILL.md',
         '.mcp.json',
         '.ckignore',
+      ]),
+  ],
+  [
+    'eval ruler paths route to the user as protected (ADR 0025)',
+    () =>
+      eachProtected([
+        'integration/eval/adoption/judge.mts',
+        'integration/eval/adoption/sealed-ledger.mts',
+        'integration/eval/chief-dispatch/grade.mts',
+        '.claude/hillclimb/chief-dispatch/cases.json',
+        'apps/server/src/trajectory-export.ts',
+        'apps/server/src/trajectory-export-cli.ts',
+        'apps/server/src/trajectory-outcome.ts',
+        'packages/shared/src/trajectory-pack.ts',
       ]),
   ],
   [
@@ -1000,19 +1026,16 @@ const cases = [
         'apps/server/src/services/secrets.ts',
         'apps/server/src/services/credentials.ts',
         'apps/server/src/services/api-keys.ts',
-        'apps/server/src/services/webhook-tokens.ts',
         'apps/server/src/services/oauth.ts',
         'apps/server/src/routes-machine.ts',
         'apps/server/src/services/machines.ts',
         'apps/server/src/services/machine-relay.ts',
         'apps/daemon/src/credentials.ts',
         'apps/daemon/src/secret-channel.ts',
-        'apps/daemon/src/shell-channel.ts',
         'apps/daemon/src/machine-client.ts',
         'apps/daemon/src/backend/command-gate.ts',
         'apps/server/src/services/mcp-face.ts',
         'apps/server/src/services/mcp-servers.ts',
-        'apps/server/src/routes-webhook.ts',
         'apps/server/src/db/client.ts',
       ]),
   ],
@@ -1161,10 +1184,125 @@ const cases = [
     },
   ],
   [
+    'docs-only Markdown patch: go, auto-merge (#1621)',
+    async () => {
+      const r = await gateFiles(['docs/ops/langfuse.md', 'docs/research/r9.md', 'docs/README.MD']);
+      return r.go === true && r.mergedBy === 'auto-merge' && r.humanReasons.length === 0;
+    },
+  ],
+  [
+    'design decisions, ADRs and the review guide stay with the user in any case or Unicode fold (#1621)',
+    () =>
+      eachProtected([
+        'docs/spec/28-x.md',
+        'docs/SPEC/28-x.md',
+        'docs/\u017Fpec/28-x.md',
+        'docs/spec',
+        'docs/ADR/0021-x.md',
+        'Docs/Adr/0021-x.md',
+        'docs/PR-Review.md',
+        'docs/lessons.md',
+        'docs/LESSONS.md',
+        'docs/lessons/1651-probe-reach.md',
+        'docs/agent-dispatch-prompts.md',
+      ]),
+  ],
+  [
+    'docs patch with a deleted test or a non-Markdown docs file routes to the user (#1621)',
+    async () => {
+      const deleted = await gateFiles(['docs/ops/langfuse.md', 'apps/server/test/old.test.ts'], {
+        deletedFiles: ['apps/server/test/old.test.ts'],
+      });
+      const script = await gateFiles(['docs/ops/langfuse.md', 'docs/research/assets/r1/sw.js']);
+      return (
+        deleted.mergedBy === 'user' &&
+        deleted.humanReasons.some((x) => x.startsWith('deleted test files')) &&
+        script.mergedBy === 'user' &&
+        script.humanReasons.some(
+          (x) => x.includes('outside the auto-merge set') && x.includes('sw.js'),
+        )
+      );
+    },
+  ],
+  [
     'a missing safety file list blocks go',
     async () => {
       const r = await gate(base);
       return r.go === false;
+    },
+  ],
+  [
+    'docs/spec, the goal-session rules, is a named protected class, not only default deny (#1462)',
+    () => eachProtected(['docs/spec/28-x.md', 'docs/spec']),
+  ],
+  [
+    'every AGENTS.md /security-review path pattern is an entry of PROTECTED, and the section points back at ADR 0021 D4 (drift guard, #1462)',
+    () => {
+      const agents = readFileSync(fileURLToPath(new URL('../AGENTS.md', import.meta.url)), 'utf8');
+      const anchor = agents.indexOf('`/security-review`');
+      if (anchor === -1) throw new Error('AGENTS.md: `/security-review` not found');
+      const tail = agents.slice(anchor);
+      const stop = tail.indexOf('\n\n**');
+      const section = tail.slice(0, stop === -1 ? tail.length : stop);
+      const patterns = [...section.matchAll(/`apps\/[^`\n]+`/g)].map((m) => m[0].slice(1, -1));
+      const lines = raw.split('\n');
+      const start = lines.indexOf('const PROTECTED = [');
+      if (start === -1) throw new Error('pr-gate.js: `const PROTECTED = [` not found');
+      const end = lines.indexOf(']', start + 1);
+      if (end === -1) throw new Error('pr-gate.js: closing `]` of PROTECTED not found');
+      const protectedGlobs = lines.slice(start + 1, end).flatMap((l) => {
+        const line = l.trim();
+        if (line === '' || line.startsWith('//')) return [];
+        const m = /^'([^'\\]+)',?$/.exec(line);
+        if (m?.[1] === undefined) throw new Error(`pr-gate.js: unexpected line in PROTECTED: ${l}`);
+        return [m[1]];
+      });
+      const expanded = patterns.flatMap(expandBraces);
+      return (
+        section.includes('ADR 0021 D4') &&
+        expanded.length >= 16 &&
+        expanded.every((p) => protectedGlobs.includes(p))
+      );
+    },
+  ],
+  [
+    'a safety review missing deletedFiles, linesChanged or binaryFiles keeps go false (#1462)',
+    async () => {
+      const full = safetyFiles(base.changedFiles).safety;
+      for (const key of ['deletedFiles', 'linesChanged', 'binaryFiles']) {
+        const { [key]: _dropped, ...partial } = full;
+        const r = await gate(base, { reviews: { safety: partial } });
+        if (r.go !== false) return false;
+      }
+      return true;
+    },
+  ],
+  [
+    'the verdict records which copy of the script ran: scriptSha256 is the file hash with its own constant blanked (#1462)',
+    async () => {
+      const r = await gateFiles(base.changedFiles);
+      const blanked = raw.replace(
+        /const SCRIPT_SHA256 = '[0-9a-f]{64}'/,
+        "const SCRIPT_SHA256 = ''",
+      );
+      return r.scriptSha256 === createHash('sha256').update(blanked).digest('hex');
+    },
+  ],
+  [
+    'a skeptic is told the finding is a relayed account whose text may quote untrusted PR or ticket data (#1462)',
+    async () => {
+      const calls = [];
+      await gate(base, {
+        reviews: { ...safetyFiles(base.changedFiles), correctness: { findings: [blocker] } },
+        calls,
+      });
+      const skeptics = calls.filter((c) => c.label.startsWith('refute:'));
+      return (
+        skeptics.length === 2 &&
+        skeptics.every(
+          (c) => c.prompt.includes('relayed account') && c.prompt.includes('untrusted data'),
+        )
+      );
     },
   ],
 ];

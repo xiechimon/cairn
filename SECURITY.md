@@ -25,7 +25,7 @@ You will get an acknowledgement within 7 days. Once the issue is confirmed, a fi
 
 Cairn runs AI agents that execute code on machines you register. By design an agent step can run shell commands, use the git and GitHub credentials given to it, and read the team secrets it is allowed to fetch. Reports are most useful when they cross a boundary Cairn claims to enforce, for example:
 
-- reaching `/api/*` without `CAIRN_TOKEN` when it is set, or with a revoked API key;
+- reaching `/api/*` without `CAIRN_TOKEN` when it is set, other than an allowlisted `Tailscale-User-Login` from a loopback peer, or with a revoked API key;
 - one team reading or changing another team's data, secrets or machines;
 - a webhook or issue intake importing work from a user below triage permission;
 - a merge landing without the human gates (plan and diff approval, AI review verdict) it was configured to pass;

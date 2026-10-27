@@ -1,35 +1,31 @@
-# #1257 验证证据：无人认领挂起 / 等额度 / 流断续跑
+# #1257 verification evidence: unclaimed hangs / quota holds / stream-cut reruns
 
-双向证据：`before-*.txt` = 旧码上跑的实际失败输出（红）；`after-*.txt` /
-`a-*` / `b-*` / `c-*` = 本改动上的通过输出与活栈取证。
+Two-way evidence: `before-*.txt` = the actual failure outputs run on the old code (red); `after-*.txt` /
+`a-*` / `b-*` / `c-*` = the passing outputs and live-stack captures on this change.
 
-## 单测面（先红后绿）
+## Unit-test face (red first, then green)
 
-- `before-classifier.txt` — 分类器模块缺位（旧码无 task-failure.ts）。
-- `before-quota-hold.txt` — quota 挂起测试 9/12 失败（hold 列/落位/claim 闸
-  未实现）。
-- `before-network-retry.txt` — runner 流断重试测试 4/6 失败（重试闸未实现）。
-- `before-sweep-hang.txt` — sweep 挂起语义翻转后旧码 14 处失败（pending 步
-  仍按失败收尾）。
-- 全量绿态（跑点见 PR body Verified 节）：shared 355/355、server 999/999、
-  daemon 743/743、web 483/483、lint/typecheck/spec:parse 全过。
+- `before-classifier.txt` — the classifier module absent (the old code has no task-failure.ts).
+- `before-quota-hold.txt` — the quota-hold tests 9/12 failing (the hold column / placement / claim gate unimplemented).
+- `before-network-retry.txt` — the runner stream-cut retry tests 4/6 failing (the retry gate unimplemented).
+- `before-sweep-hang.txt` — 14 failures on the old code after the sweep-hang semantics flipped (pending steps were still closed as failed).
+- Full green state (run points in the PR body's Verified section): shared 355/355, server 999/999, daemon 743/743, web 483/483, lint/typecheck/spec:parse all pass.
 
-## 活栈面（verify-pacman 定制 probe）
+## Live-stack face (verify-pacman custom probe)
 
-复跑配方（详见 `.claude/skills/verify-pacman/changelog/2026-10-12-1257.md`）：
+Rerun recipe (see `.claude/skills/verify-pacman/changelog/2026-10-12-1257.md`):
 
 ```sh
 VERIFY_PORT=8802 VERIFY_WEB_PORT=5282 node .claude/skills/verify-pacman/scripts/launch.mjs
-node .claude/skills/verify-pacman/scripts/drive-1257-hang-retry.mjs   # env 同上
+node .claude/skills/verify-pacman/scripts/drive-1257-hang-retry.mjs   # same env prefix
 ```
 
-三腿（stub LLM 三实例：ok / quota-first / cut-twice）：
+Three legs (three stub LLM instances: ok / quota-first / cut-twice):
 
-- **A 等机器**：`a-board-waiting-machine.png`（板面「等机器」chip）+
-  `a-todo-record.json`（REST waitingOn）+ `a-final.json`（daemon 回来后
-  plan 步 done + plan.md 落库）。
-- **B 等额度**：`b-board-waiting-quota.png`（板面「等额度」chip）+
-  `b-hold.json`（step holdReason/holdUntil/holdCount + todo 不落 failed）+
-  `b-final.json`（退避到期自动重领、额度恢复自动跑完）。
-- **C 流断续跑**：`c-final.json`（两次中段断连 → 第三发成功、步 done）+
-  `c-retry-evidence.json`（daemon 重试行）。
+- **A waiting on a machine**: `a-board-waiting-machine.png` (the board's `等机器` chip) +
+  `a-todo-record.json` (REST waitingOn) + `a-final.json` (the plan step done after the daemon returns + plan.md persisted).
+- **B waiting on quota**: `b-board-waiting-quota.png` (the board's `等额度` chip) +
+  `b-hold.json` (the step's holdReason/holdUntil/holdCount + the todo not landing in failed) +
+  `b-final.json` (the backoff expires and the step is re-claimed automatically; the quota recovers and the run completes automatically).
+- **C stream-cut rerun**: `c-final.json` (two mid-stream disconnects → the third attempt succeeds, step done) +
+  `c-retry-evidence.json` (the daemon's retry lines).

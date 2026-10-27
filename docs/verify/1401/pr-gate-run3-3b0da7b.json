@@ -81,7 +81,7 @@
       "dimension": "rules",
       "title": "Spec 28 §7.5 says the pr-gate rules dimension covers docs/pr-review.md and attribution trailers; pr-gate.js checks neither",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 246,
       "failurePath": "Spec 28 line 246 lists the five dimensions and gives the rules dimension as '仓规与缝纪律（`docs/pr-review.md`、biome 缝、尾标）'. The rules prompt in .claude/workflows/pr-gate.js:116 names CLAUDE.md/AGENTS.md, seams, inline import, any, helpers, closing keywords, subject format, banned words, emoji, ADRs and docs. It names neither docs/pr-review.md nor commit or PR attribution trailers. Commit 4c27770 says spec 28 §7.5 now states the args and the output shape, and those two now match. This third mismatch from run 2 remains. §8 calls spec 28 the only progress truth across compaction. A later session that reads §7.5 will assume the gate checks the pr-review.md scorecard flow and the trailers, and that pr-gate's go covers them, when no reviewer is asked to. Fix: drop those two words from §7.5, or add them to the rules prompt.",
       "evidence": "spec 28:246 at 3b0da7b; pr-gate.js:116 at 3b0da7b; run 2's rules suggestion 'Spec 28 §7.5 pr-gate row still disagrees with the shipped pr-gate.js' (point 3)."
@@ -90,7 +90,7 @@
       "dimension": "rules",
       "title": "pr-gate-harness.mjs is a living test that spec 28 says to rerun after every script change, but it sits in docs/verify/1401/, which is add-only",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 254,
       "failurePath": "Spec 28:254 says the harness at docs/verify/1401/pr-gate-harness.mjs checks the script's deterministic part, and that whoever edits pr-gate.js should run it first ('改脚本后先跑它'). docs/README.md:20 and ADR 0015 declare docs/verify/<ticket>/ add-only: '只增不改、不外迁'. Take the next pr-gate.js change, which pr-gate.js:27-28 already announces (P3 #1404 adds the merge-readiness gate source to PROTECTED, which changes D4 routing). That PR must either edit a frozen evidence file, breaking ADR 0015, or leave the harness without a case for the new rule. In the second case the 'run it first' check keeps passing while it no longer covers what the script does. Fix: move the reusable harness next to the script (for example .claude/workflows/pr-gate.harness.mjs, which falls under the same D4 protection), and keep only its output in docs/verify/1401/ as evidence.",
       "evidence": "docs/README.md:20 at base; ADR 0015 line 23; spec 28:254 and pr-gate.js:25-28 at 3b0da7b."
@@ -152,7 +152,7 @@
       "dimension": "tests",
       "title": "PR Acceptance leaves out ticket item '本票 PR 由用户合并（D7）'",
       "severity": "suggestion",
-      "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+      "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
       "line": 1,
       "failurePath": "Ticket #1401 has five acceptance items. The PR body lists four, all ticked, and leaves out '本票 PR 由用户合并（D7）'. The Risk section does say the PR routes to a user merge, and the item cannot be ticked before the merge. Still, item-by-item reconciliation needs it listed unticked, because e5414a2 closes #1401 at merge and the checklist would otherwise never show it."
     },
@@ -160,7 +160,7 @@
       "dimension": "safety",
       "title": "Supply-chain and test-config files outside D4: pnpm-workspace.yaml (allowBuilds, catalog), vitest.config.ts",
       "severity": "suggestion",
-      "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+      "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
       "line": 37,
       "failurePath": "D4 protects package.json and pnpm-lock.yaml as the supply chain. It does not protect pnpm-workspace.yaml, whose allowBuilds map on main decides which dependency install scripts run (for example `protobufjs: false`, `'@google/genai': false`).\n\nScenario: a PR flips `protobufjs` to true, or adds a new allowBuilds entry. The stubbed gate returns mergedBy 'auto-merge' for changedFiles ['pnpm-workspace.yaml']. If the lockfile does not change, that third-party install script then runs in CI and on every dev machine with no user review.\n\nTest config has the same gap. The root vitest.config.ts drives the CI `pnpm test` step, and a PR can exclude tests there without deleting a test file. For ['vitest.config.ts'] the stub run also returns auto-merge. This is an ADR-level scope decision, so I kept it as a suggestion. Adding pnpm-workspace.yaml (and .npmrc if one appears) to D4 and to pr-gate.js PROTECTED lines 44-46 closes the supply-chain half."
     },
@@ -192,7 +192,7 @@
       "dimension": "safety",
       "title": "The gate's harness sits outside D4 and inside the patchDigest exclusion",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 254,
       "failurePath": "Spec 28 §7.5 makes docs/verify/1401/pr-gate-harness.mjs the check to run after any edit to the gate. That path matches no D4 glob, and ADR 0021 D3 excludes docs/verify/** from patchDigest.\n\nScenario: a later PR drops harness cases, such as the rename or deleted-test checks. It is not routed to the user, and as an evidence-only commit it would not invalidate a P3 verdict. A future gate edit, which is itself user-merged, could then be shown green against a weakened harness.\n\nMoving the harness to scripts/pr-gate-harness.mjs puts it under the existing `scripts/*gate*` D4 glob."
     },
@@ -226,12 +226,12 @@
   ],
   "protectedPaths": [
     ".claude/workflows/pr-gate.js",
-    "docs/adr/0018-多agent团队三层与机器能力闸.md",
-    "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md"
+    "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+    "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md"
   ],
   "mergedBy": "user",
   "humanReasons": [
-    "protected paths: .claude/workflows/pr-gate.js, docs/adr/0018-多agent团队三层与机器能力闸.md, docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+    "protected paths: .claude/workflows/pr-gate.js, docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md, docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
     "1425 lines changed (over 800)"
   ],
   "missing": [],

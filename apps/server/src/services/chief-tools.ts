@@ -1,24 +1,20 @@
 import type { SecretBox, UserRecord } from '@cairn/shared';
 import {
   AGENT_TOOL_DEFAULTS,
-  AGENT_TOOL_SHELL,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
-  filterAgentTools,
   IN_PROGRESS_PHASES,
-  isChiefConversationId,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
   todoOutputSchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
   build,
   chief,
-  chiefMessage,
   chiefThread,
   machine,
   message,
@@ -30,6 +26,7 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import {
   advanceSplitWaves,
   applyBuildStepAction,
@@ -39,6 +36,7 @@ import {
 } from './builds.js';
 import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from './chief.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
+import { readConversationPage } from './conversation-page.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
@@ -51,6 +49,7 @@ import {
   updateMemoryEntry,
 } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
+import type { OAuthClientConfig } from './oauth.js';
 import { getModelSources } from './providers.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
@@ -72,6 +71,7 @@ export interface ChiefToolDeps {
   skillsDir: string;
   mcpConfigPath?: string;
   githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
 }
 
 export interface ChiefToolCtx {
@@ -390,25 +390,7 @@ export async function executeChiefTool(
     }
     case 'conversation': {
       const conversationId = str(params, 'conversationId');
-      if (isChiefConversationId(conversationId)) {
-        const rows = db
-          .select()
-          .from(chiefMessage)
-          .where(eq(chiefMessage.threadId, conversationId))
-          .orderBy(asc(chiefMessage.createdAt))
-          .all();
-        return json(
-          rows.map((r) => ({ id: r.id, role: r.role, content: r.content, createdAt: r.createdAt })),
-        );
-      }
-      const rows = db
-        .select()
-        .from(message)
-        .where(eq(message.conversationId, conversationId))
-        .all();
-      return json(
-        rows.map((r) => ({ id: r.id, role: r.role, content: r.content, createdAt: r.createdAt })),
-      );
+      return json(readConversationPage(db, conversationId, optStr(params, 'before')));
     }
 
     case 'create_todo': {
@@ -667,17 +649,6 @@ export async function executeChiefTool(
         if (hit && deleteSecret(keysvc, ctx.teamId, hit.id)) deleted.push(n);
       }
       return json({ deleted });
-    }
-    case 'set_remote_shell': {
-      const agentId = str(params, 'agentId');
-      const row = requireTeamAgent(db, agentId, ctx.teamId);
-      const enabledParam = params.enabled;
-      if (typeof enabledParam !== 'boolean')
-        throw new HttpError(400, 'invalid params.enabled: expected boolean');
-      const tools = filterAgentTools(row.tools).filter((t) => t !== AGENT_TOOL_SHELL);
-      if (enabledParam) tools.push(AGENT_TOOL_SHELL);
-      db.update(agent).set({ tools }).where(eq(agent.id, agentId)).run();
-      return json({ agentId, remoteShell: enabledParam, tools });
     }
     case 'schedule_todo': {
       const todoId = str(params, 'todoId');
@@ -1012,6 +983,7 @@ function buildDeps(deps: ChiefToolDeps) {
     reposDir: deps.reposDir,
     box: deps.box,
     githubFetch: deps.githubFetch,
+    oauthClient: deps.oauthClient,
   };
 }
 export async function confirmBuild(
@@ -1022,7 +994,18 @@ export async function confirmBuild(
   if (!deps.db.select().from(build).where(eq(build.id, buildId)).get()) {
     throw new HttpError(404, `build ${buildId}`);
   }
-  await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
+  try {
+    await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
+  } catch (err) {
+    if (
+      err instanceof HttpError &&
+      err.status === 409 &&
+      err.message.endsWith('当前相位 building')
+    ) {
+      return;
+    }
+    throw err;
+  }
 }
 
 export interface WorkerMemoryCtx {
@@ -1090,6 +1073,9 @@ export async function executeWorkerMemoryTool(
     case 'attachment': {
       const { readAttachmentMeta } = await import('./attachments.js');
       const attachmentId = str(params, 'attachmentId');
+      if (!todoAuthorizesAttachment(db, ctx.todoId, attachmentId)) {
+        throw new HttpError(404, `attachment ${attachmentId}`);
+      }
       return json(
         readAttachmentMeta({ db, attachmentsDir: ctx.attachmentsDir }, ctx.teamId, attachmentId),
       );

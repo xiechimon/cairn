@@ -343,6 +343,16 @@ describe('runner stream-timeout guardrails (#699)', () => {
     expect(body.errorMessage).toBe('stream timeout (arm=idle, idle=80ms)');
   });
 
+  test('build progress resets the duration budget', async () => {
+    const body = await run({
+      backend: streamingBackend({ firstEventMs: 20, intervalMs: 40, events: 8, finish: 'done' })
+        .backend,
+      timeouts: { first: WIDE, idle: WIDE, body: WIDE },
+      durationCapMs: 150,
+    });
+    expect(body.status).toBe('success');
+  });
+
   test('failure mode 3: a continuously active but unbounded stream hits the step-level absolute cap (not reset by events)', async () => {
     const body = await run({
       backend: streamingBackend({
@@ -352,7 +362,7 @@ describe('runner stream-timeout guardrails (#699)', () => {
         finish: 'silent',
       }).backend,
       timeouts: { first: WIDE, idle: WIDE, body: WIDE },
-      durationCapMs: 150,
+      envCap: '150',
     });
     expect(body.status).toBe('failed');
     expect(body.errorMessage).toBe('stream timeout (arm=duration, cap=150ms)');

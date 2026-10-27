@@ -1,0 +1,9 @@
+[Unit]
+Description=Weekly Cairn real-model eval rerun
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c 'source "$HOME/.cairn/tools/eval-env.sh" && exec "$HOME/.cairn/tools/weekly/eval-weekly.sh"'
+TimeoutStartSec=12h
+StandardOutput=append:%h/.local/state/cairn-eval/weekly.log
+StandardError=append:%h/.local/state/cairn-eval/weekly.log

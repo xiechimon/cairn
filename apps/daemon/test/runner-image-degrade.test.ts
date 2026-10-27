@@ -13,7 +13,6 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import {
-  CONTINUE_PROMPTS,
   formatAttachmentToken,
   type MachineAttachmentResponse,
   type ProviderConfig,
@@ -171,11 +170,16 @@ interface HandleRecord {
   stopped: number;
 }
 
-function handleOf(events: StepEvent[], record: HandleRecord): AgentSessionHandle {
+function handleOf(
+  events: StepEvent[],
+  record: HandleRecord,
+  streamFailure?: string,
+): AgentSessionHandle {
   return {
     sessionId: 'sess-1',
     events: (async function* gen() {
       for (const ev of events) yield ev;
+      if (streamFailure !== undefined) throw new Error(streamFailure);
     })(),
     async steer() {},
     async stop() {
@@ -189,6 +193,8 @@ interface BackendScript {
   eventsByCall: StepEvent[][];
   modelSupportsImages?: (provider: ProviderConfig, modelId: string) => Promise<boolean | null>;
   rememberNoVisionCalls: { providerId: string; modelId: string }[];
+  failOpen?: string;
+  streamFailure?: string;
 }
 
 function scriptingBackend(script: BackendScript): {
@@ -196,26 +202,31 @@ function scriptingBackend(script: BackendScript): {
   created: { opts: SessionOpts }[];
   handles: AgentSessionHandle[];
   stopRecords: HandleRecord[];
+  actions: string[];
 } {
   const created: { opts: SessionOpts }[] = [];
   const handles: AgentSessionHandle[] = [];
   const stopRecords: HandleRecord[] = [];
+  const actions: string[] = [];
   let call = 0;
   const backend: AgentBackend = {
     capabilities: PI_CAPABILITIES,
     async createSession(opts) {
+      actions.push('create');
       created.push({ opts: { ...opts } });
+      if (script.failOpen !== undefined && call++ === 0) throw new Error(script.failOpen);
       const record: HandleRecord = { stopped: 0 };
       stopRecords.push(record);
       const events = script.eventsByCall[Math.min(call, script.eventsByCall.length - 1)] ?? [
         DONE_EVENT,
       ];
       call += 1;
-      const h = handleOf(events, record);
+      const h = handleOf(events, record, call === 1 ? script.streamFailure : undefined);
       handles.push(h);
       return h;
     },
     async continueSession(_id, opts) {
+      actions.push('continue');
       created.push({ opts: { ...opts } });
       const record: HandleRecord = { stopped: 0 };
       stopRecords.push(record);
@@ -223,7 +234,7 @@ function scriptingBackend(script: BackendScript): {
         DONE_EVENT,
       ];
       call += 1;
-      const h = handleOf(events, record);
+      const h = handleOf(events, record, call === 1 ? script.streamFailure : undefined);
       handles.push(h);
       return h;
     },
@@ -236,7 +247,7 @@ function scriptingBackend(script: BackendScript): {
         }
       : {}),
   };
-  return { backend, created, handles, stopRecords };
+  return { backend, created, handles, stopRecords, actions };
 }
 
 async function runImageStep(
@@ -340,7 +351,7 @@ describe('runner probe-driven degrade (#1671 slice 1)', () => {
     expect(lines.join('\n')).toContain('image support probe failed');
   });
 
-  test('text-only spec: probe never called, no images, zero attachment calls', async () => {
+  test('text-only spec probes capability for later image steering', async () => {
     const claimed = imageStep(TASK.spec);
     let probed = 0;
     const { backend } = scriptingBackend({
@@ -352,7 +363,7 @@ describe('runner probe-driven degrade (#1671 slice 1)', () => {
       rememberNoVisionCalls: [],
     });
     await runImageStep(claimed, backend);
-    expect(probed).toBe(0);
+    expect(probed).toBe(1);
   });
 
   test('no-model step fails before any attachment download', async () => {
@@ -376,6 +387,53 @@ describe('runner probe-driven degrade (#1671 slice 1)', () => {
 });
 
 describe('runner 400-signal one-time degrade retry (#1671 slice 2)', () => {
+  test('session creation rejects image input: retry without images instead of failing the step', async () => {
+    const claimed = imageStep(`${TASK.spec}\n\n${SPEC_TOKEN}`);
+    const { backend, created } = scriptingBackend({
+      eventsByCall: [[DONE_EVENT]],
+      modelSupportsImages: async () => null,
+      rememberNoVisionCalls: [],
+      failOpen: NO_VISION_400.error.message,
+    });
+    const { client } = await runImageStep(claimed, backend);
+    expect(created).toHaveLength(2);
+    expect(created[1]?.opts.promptImages).toBeUndefined();
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    expect(systemRows(client).join('\n')).toContain('图片未被模型读取');
+  });
+
+  test('a network retry can still degrade a later image rejection once', async () => {
+    const claimed = imageStep(`${TASK.spec}\n\n${SPEC_TOKEN}`);
+    const { backend, created, actions } = scriptingBackend({
+      eventsByCall: [
+        [{ type: 'error', error: { message: 'ECONNRESET', retryable: true } }],
+        [NO_VISION_400],
+        [DONE_EVENT],
+      ],
+      modelSupportsImages: async () => null,
+      rememberNoVisionCalls: [],
+    });
+    const { client } = await runImageStep(claimed, backend);
+    expect(created).toHaveLength(3);
+    expect(actions).toEqual(['create', 'continue', 'create']);
+    expect(created[2]?.opts.promptImages).toBeUndefined();
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+  });
+
+  test('a thrown image rejection from the event iterator retries without images', async () => {
+    const claimed = imageStep(`${TASK.spec}\n\n${SPEC_TOKEN}`);
+    const { backend, created } = scriptingBackend({
+      eventsByCall: [[], [DONE_EVENT]],
+      streamFailure: NO_VISION_400.error.message,
+      modelSupportsImages: async () => null,
+      rememberNoVisionCalls: [],
+    });
+    const { client } = await runImageStep(claimed, backend);
+    expect(created).toHaveLength(2);
+    expect(created[1]?.opts.promptImages).toBeUndefined();
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+  });
+
   test('undeclared model 400s on images → learn, retry without images, step succeeds', async () => {
     const claimed = imageStep(`${TASK.spec}\n\n${SPEC_TOKEN}`);
     const script: BackendScript = {
@@ -489,7 +547,7 @@ describe('runner 400-signal one-time degrade retry (#1671 slice 2)', () => {
     expect(script.rememberNoVisionCalls).toHaveLength(0);
   });
 
-  test('continue-session step: degrade retry re-prompts the same session with annotated text', async () => {
+  test('continue-session image rejection starts a fresh text-only session with the task', async () => {
     const claimed = imageStep(`${TASK.spec}\n\n${SPEC_TOKEN}`);
     claimed.session = { action: 'continue', sessionId: 'sess-old' };
     claimed.instruction = `继续执行\n\n${SPEC_TOKEN}`;
@@ -498,11 +556,12 @@ describe('runner 400-signal one-time degrade retry (#1671 slice 2)', () => {
       modelSupportsImages: async () => null,
       rememberNoVisionCalls: [],
     };
-    const { backend, created } = scriptingBackend(script);
+    const { backend, created, actions } = scriptingBackend(script);
     const { client } = await runImageStep(claimed, backend);
 
     expect(created).toHaveLength(2);
-    expect(created[0]?.opts.prompt).toContain(CONTINUE_PROMPTS.build.slice(0, 0));
+    expect(actions).toEqual(['continue', 'create']);
+    expect(created[1]?.opts.prompt).toContain(TASK.spec);
     expect(created[1]?.opts.promptImages).toBeUndefined();
     expect(created[1]?.opts.prompt).toContain('[图片附件 t1/img1.png 未被模型读取 — 该图片未下载]');
     expect(client.doneBodies[0]?.body.status).toBe('success');

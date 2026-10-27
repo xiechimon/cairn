@@ -108,10 +108,17 @@ not carry the closing keyword for the parent ticket.
   `unreachable`); then `python3 scripts/pr-tasks-gate.py /tmp/pr.md` —
   exit 1 names `no-tasks` (Acceptance carries no task-list item) or
   `unchecked-task` (a `- [ ]` still open, with its line number).
+  A section whose only content is a fenced block counts as empty: put at
+  least one prose line above the fence (#1785).
 - Editing an open PR: `gh pr edit` breaks on Projects-classic GraphQL
   errors; use `gh api -X PATCH repos/xiechimon/cairn/pulls/<n> -F
   body=@/tmp/pr.md`, then re-read with `gh pr view <n> --json body` and
   compare.
+- Pin raw links to a short SHA (8 characters). From a cloud session the egress proxy wraps URLs that carry a full 40-character SHA in backticks, which breaks the embed (#1771). Read the stored body back after creating or editing the PR.
+- After opening a PR and after each push, read `mergeable_state` once
+  (`gh api repos/xiechimon/cairn/pulls/<n> -q .mergeable_state`). A `dirty`
+  PR runs no `pull_request` workflows, so no CI event ever arrives to say
+  so; merge `origin/main` in and push (#1785 sat conflicted for 15 minutes).
 - Image links must be the embedded `![label](url)` form and must not sit
   inside fenced code blocks — a link in a fence renders nowhere.
 - Bodies are in English, with no Chinese mixed in. Quote a Chinese UI label

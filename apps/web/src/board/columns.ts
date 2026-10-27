@@ -119,8 +119,24 @@ export function cardFace(todo: TodoRecord): CardFace {
   }
 }
 
-export function attentionCount(todos: TodoRecord[]): number {
-  return countInColumn(todos, 'pending');
+export const STALE_PENDING_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function isStalePending(todo: TodoRecord, now: number): boolean {
+  return todo.awaitingReply !== true && now - todo.phaseAt > STALE_PENDING_MS;
+}
+
+export function splitStale(
+  todos: TodoRecord[],
+  now: number,
+): { fresh: TodoRecord[]; stale: TodoRecord[] } {
+  const fresh: TodoRecord[] = [];
+  const stale: TodoRecord[] = [];
+  for (const todo of todos) (isStalePending(todo, now) ? stale : fresh).push(todo);
+  return { fresh, stale };
+}
+
+export function attentionCount(todos: TodoRecord[], now: number): number {
+  return countInColumn(splitStale(todos, now).fresh, 'pending');
 }
 
 export function countInColumn(todos: TodoRecord[], columnId: string): number {

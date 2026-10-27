@@ -14,6 +14,7 @@ import type {
 } from '@cairn/shared';
 import { CHANGES_DIFF_MAX_BYTES } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
+import { GitPushHookError } from '../src/git.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
@@ -241,6 +242,7 @@ interface RunOpts {
   claimed: ClaimedStep;
   probe: { number: number; url: string } | null | Error;
   diff: string | null;
+  pushError?: Error;
 }
 
 async function runOnce(opts: RunOpts): Promise<MachineDoneBody> {
@@ -254,6 +256,10 @@ async function runOnce(opts: RunOpts): Promise<MachineDoneBody> {
   const journal = new StepJournal(paths.outboxDir);
   const backend = doneBackend();
   const { ws } = fakeWorkspace(join(home, 'ws', 'conv-1'), opts.diff);
+  if (opts.pushError)
+    ws.push = async () => {
+      throw opts.pushError;
+    };
   await runStep(
     {
       client,
@@ -345,5 +351,34 @@ describe('runner delivery surface reporting (#704)', () => {
     });
     expect(probeMock).not.toHaveBeenCalled();
     expect(body.changesDiff).toBeUndefined();
+  });
+});
+
+describe('#1829 closing push report', () => {
+  test('a local hook rejection reports recovery input and still discovers the agent-opened PR', async () => {
+    const body = await runOnce({
+      claimed: claimedGithubStep(),
+      probe: { number: 1829, url: 'https://github.com/octocat/Hello-World/pull/1829' },
+      diff: SAMPLE_DIFF,
+      pushError: new GitPushHookError('lint stdout\nlint stderr'),
+    });
+    expect(body).toMatchObject({
+      status: 'success',
+      pushHookOutput: 'lint stdout\nlint stderr',
+      prNumber: 1829,
+      hasChanges: true,
+    });
+    expect(body.errorMessage).toBeUndefined();
+  });
+
+  test('an ordinary push error still fails the step', async () => {
+    const body = await runOnce({
+      claimed: claimedGithubStep(),
+      probe: null,
+      diff: SAMPLE_DIFF,
+      pushError: new Error('Connection refused'),
+    });
+    expect(body).toMatchObject({ status: 'failed', errorMessage: 'Connection refused' });
+    expect(body.pushHookOutput).toBeUndefined();
   });
 });

@@ -1,6 +1,6 @@
 # 1255 board column scroll
 
-Live stack: vite `http://127.0.0.1:5273/app`, server `127.0.0.1:8791`, viewport 1440x732. Thirty cards in 待开始 (`[data-column-list="todo"]`). New todos land in that column. 待处理 uses the same `ColumnList`.
+Live stack: vite `http://127.0.0.1:5273/app`, server `127.0.0.1:8791`, viewport 1440x732. Thirty cards in `待开始` (`[data-column-list="todo"]`). New todos land in that column. `待处理` uses the same `ColumnList`.
 
 The scrolling node is the column list. `[data-testid=board-scroller]` is `overflow-y: hidden` and stayed at scrollTop 0 (`scrollHeight` 688 = `clientHeight` 688).
 

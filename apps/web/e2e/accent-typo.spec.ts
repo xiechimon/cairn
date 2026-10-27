@@ -5,7 +5,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const m = await page.evaluate(async () => {
       await document.fonts.ready;
@@ -33,7 +33,7 @@ for (const theme of ['light', 'dark'] as const) {
 
   test(`sidebar header carries the Cairn pixel mark + name (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const m = await page.evaluate(() => {
       const row = document.querySelector('.sidebar-team-row');
@@ -87,7 +87,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const read = () =>
       page.evaluate(() => {
@@ -118,7 +118,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const read = (sel: string) =>
       page.evaluate((s) => {
@@ -236,7 +236,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const destructive = await resolveToken(page, '--destructive');
     const card = await resolveToken(page, '--card');
@@ -248,7 +248,7 @@ for (const theme of ['light', 'dark'] as const) {
 
   test(`P5 main-button pair passes 4.5 in both themes (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
     const bg = await resolveToken(page, '--card-button');
     const fg = await resolveToken(page, '--text-on-accent');
     expect(bg).toBe(theme === 'dark' ? 'rgb(240, 146, 109)' : 'rgb(23, 58, 47)');

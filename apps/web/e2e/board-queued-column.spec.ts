@@ -78,7 +78,7 @@ test('queued cards sit in `执行中` with a waiting footer; todo and building s
   page,
 }) => {
   await stubWorld(page);
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   await expect(page.locator(`[data-todo-id="${FRESH.id}"]`)).toBeVisible();
   await evidencePanelShot(page, 'board-columns.png', page.getByTestId('board-scroller'), 0);
   await expect(card(page, 'building', QUEUED.id)).toBeVisible();
@@ -94,11 +94,12 @@ test('queued cards sit in `执行中` with a waiting footer; todo and building s
   const heldFooter = card(page, 'building', HELD.id).locator('[data-card-footer="waiting"]');
   await expect(heldFooter).toHaveText('r3-builder · 等机器');
   for (const footer of [queuedFooter, heldFooter]) {
-    await expect(footer.locator('.animate-breath')).toHaveCount(0);
+    for (const icon of await footer.locator('svg').all())
+      await expect(icon).not.toHaveCSS('animation-name', 'spin');
   }
   const runningFooter = card(page, 'building', RUNNING.id).locator('[data-card-footer="running"]');
   await expect(runningFooter).toHaveText('r3-builder · 执行中');
-  await expect(runningFooter.locator('.animate-breath')).toHaveCount(1);
+  await expect(runningFooter.locator('svg')).toHaveCSS('animation-name', 'spin');
 });
 
 for (const theme of ['light', 'dark'] as const) {
@@ -106,7 +107,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await stubWorld(page);
-    await page.goto('/app');
+    await page.goto('/app?view=board');
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await expect(card(page, 'building', HELD.id).locator('[data-card-footer="waiting"]')).toBeVisible();
     const { violations } = await new AxeBuilder({ page })
@@ -123,7 +124,7 @@ for (const theme of ['light', 'dark'] as const) {
 
 test('a queued card dropped on `待开始` opens the reset dialog', async ({ page }) => {
   await stubWorld(page);
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   const from = await page.locator(`[data-todo-id="${QUEUED.id}"]`).first().boundingBox();
   const list = await page.locator('[data-column-list="todo"]').boundingBox();
   if (from == null || list == null) throw new Error('board not rendered');

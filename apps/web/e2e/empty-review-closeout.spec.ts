@@ -42,7 +42,7 @@ const WIRE_CARD = {
   title: '空提交收口',
   spec: '',
   phase: 'review',
-  phaseAt: 0,
+  phaseAt: Date.now(),
   seqNum: 9,
   orderIndex: 0,
   tagIds: [],
@@ -136,7 +136,7 @@ async function stubSurface(
 }
 
 async function openBoard(page: Page) {
-  await page.goto('/app');
+  await page.goto('/app?view=board');
   const card = page.locator(`.todo-card[data-todo-id="${CARD_ID}"]`);
   await expect(card).toBeVisible();
   await card.locator('.todo-card-action').click();

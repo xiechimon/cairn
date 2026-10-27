@@ -3,5 +3,60 @@
     "path": "apps/daemon/src/machine-loop.ts",
     "name": "deliverSync",
     "reason": "改名前就存在的闭包：用循环内的状态，内联会把 SSE 回调撑长；改名 PR 触碰该文件才被闸扫到"
+  },
+  {
+    "path": "apps/web/src/board/home.tsx",
+    "name": "NeedsYouInbox",
+    "reason": "React component with its own fold state hook; inlining it would put useState and the fresh/stale split inside the 300-line BoardSurface render"
+  },
+  {
+    "path": "apps/web/src/board/board.tsx",
+    "name": "StalePendingLink",
+    "reason": "React component with its own i18n and location hooks, rendered inside the pending column's map; inlining would call hooks from the column loop"
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "workerSkillInjection",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "claimCandidates",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "claimChiefCandidates",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "claimLocalTools",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-claim.ts",
+    "name": "buildChiefClaim",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "holdStepForQuota",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "recordSkillInjectionCheck",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "workerStepContext",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/server/src/services/machine-step-token.ts",
+    "name": "chiefStepToken",
+    "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
   }
 ]

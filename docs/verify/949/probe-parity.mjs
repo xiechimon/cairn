@@ -1,14 +1,17 @@
 #!/usr/bin/env node
-// #949 overlays/ 域施工的等值迁移 parity 探针：在同一 fixture 栈形态上采集
-// 三个面（⌘K search panel / chip popover / plan dropdown）的 computed-style
-// 与几何真值，before（origin/main）与 after（迁移分支）各跑一次，diff 出
-// 等值面与预期漂移面（chip mini 14px → StatusChip sm 16px 是 spec/22 §5.2
-// 正典增长，非回归）。选择器口径：本脚本是机制探针（不是 e2e 钉扎），允许
-// 使用类名/data-slot 定位——迁移后旧类名消失时脚本同步换载体（after 版）。
+// #949 overlays/ equivalence-migration parity probe: collects computed-style
+// and geometry ground truth for three faces (⌘K search panel / chip popover /
+// plan dropdown) on the same fixture-stack shape, once before (origin/main) and
+// once after (migration branch), and diffs out the equivalent faces from the
+// expected-drift faces (chip mini 14px → StatusChip sm 16px is the spec/22 §5.2
+// canon growth, not a regression). Selector policy: this script is a mechanism
+// probe (not an e2e pin), so class/data-slot locating is allowed — when the old
+// class names disappear after the migration, the script switches carrier in the
+// after version.
 //
-// 用法（仓根跑，@playwright/test 走仓内解析）：
+// Usage (run from the repo root; @playwright/test resolves in-tree):
 //   node docs/verify/949/probe-parity.mjs --url http://localhost:8405 --out /tmp/probe-949-before.json
-// 退出码：0 = 采集完成（值本身不做断言，人审 diff）。
+// Exit code: 0 = collection done (the values themselves carry no assertions; a human reviews the diff).
 
 import { writeFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
@@ -17,25 +20,27 @@ const args = process.argv.slice(2);
 const argOf = (name) => args[args.indexOf(name) + 1];
 const BASE = argOf('--url') ?? 'http://localhost:8405';
 const OUT = argOf('--out') ?? '/tmp/probe-parity.json';
-// e2e 的钉扎条件是暗模（playwright.config colorScheme:'dark'）——parity 两模
-// 都采：--scheme dark|light（缺省 light，与首轮采集一致）。
+// The e2e pin condition is dark (playwright.config colorScheme:'dark') —
+// parity collects both themes: --scheme dark|light (default light, matching the
+// first collection round).
 const SCHEME = args.includes('--scheme') ? argOf('--scheme') : 'light';
-// after 栈上旧类名已退役：载体选择子经 --carrier after 切换（等值迁移的
-// 判定面是 computed 值，不是选择子本身）。
+// On the after stack the old class names are retired: the carrier selectors
+// switch via --carrier after (the equivalence judgment face is the computed
+// value, not the selector itself).
 const AFTER = args.includes('--carrier') && argOf('--carrier') === 'after';
 
 const BOARD = `${BASE}/app?scenario=01`;
 const DETAIL19 = `${BASE}/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=19`;
 const DETAIL27 = `${BASE}/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27`;
 
-/** 面板/行/弹层的选择子组——before 走类名，after 走语义/数据载体。 */
+/** Selector group for panel/rows/popover — before uses class names, after uses semantic/data carriers. */
 const SEL = AFTER
   ? {
       panel: '[role="dialog"][aria-label="搜索"]',
       inputRowInput: '[role="dialog"][aria-label="搜索"] input',
-      // 结构定位（探针专用，非 spec 载体）：面板子级 = 输入行 + 列表；结果行
-      // 子级 = icon/main/time/chip 四 span；popover 子级 = head/title/divider/
-      // section×2/divider/button。
+      // Structural locating (probe-only, not the spec carrier): panel children =
+      // input row + list; result-row children = four spans icon/main/time/chip;
+      // popover children = head/title/divider/section×2/divider/button.
       inputRow: '[role="dialog"][aria-label="搜索"] > div:nth-of-type(1)',
       navRow: '[role="dialog"][aria-label="搜索"] [data-row-kind="nav"]',
       todoRow: '[role="dialog"][aria-label="搜索"] [data-row-kind="todo"]',
@@ -61,7 +66,7 @@ const SEL = AFTER
       popCheck:
         '[role="dialog"][aria-label="任务分配"] [data-selected] > div:nth-of-type(2) > span:last-of-type',
       popEdit: '[role="dialog"][aria-label="任务分配"] > button',
-      chipWrap: '[data-testid="chip-chevron"]', // 特判：探针里取 parentElement²
+      chipWrap: '[data-testid="chip-chevron"]', // special case: the probe takes parentElement²
       chevron: '[data-testid="chip-chevron"]',
       menuContent: '[role="menu"][aria-label="面板视图"]',
       menuRow: '[role="menuitemradio"]',
@@ -153,16 +158,16 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 
-// —— Face S: ⌘K search panel（board scenario 01）—————————————————————————
+// —— Face S: ⌘K search panel (board scenario 01) —————————————————————————
 await page.goto(BOARD);
 await page.locator('.sidebar-row, .rail-row').first().waitFor({ state: 'visible', timeout: 15000 });
-// 侧栏常亮 pill（before: 类名载体；after: aria-current）——面板未开时的静息态
+// Sidebar always-lit pill (before: class carrier; after: aria-current) — the resting state with the panel closed
 out.pillRest = {
   before: await cs(page, SEL.pill, ['backgroundColor', 'color'], '::before'),
   row: await cs(page, SEL.pill, ['color']),
 };
 await openPanel(page);
-await page.waitForTimeout(400); // 进场落定
+await page.waitForTimeout(400); // let the entry settle
 out.panel = {
   box: await box(page, SEL.panel),
   style: await cs(page, SEL.panel, [
@@ -200,7 +205,7 @@ out.navRowRest = {
   ]),
 };
 out.navRowHover = await hoverBg(page, SEL.navRow);
-// 键盘光标接管：ArrowDown → row0 选中；kbd 态下悬停 row1 不得亮
+// Keyboard cursor takeover: ArrowDown → row0 selected; hovering row1 must not highlight it in kbd state
 await page.locator(SEL.inputRowInput).focus();
 await page.keyboard.press('ArrowDown');
 await page.waitForTimeout(120);
@@ -221,7 +226,7 @@ out.kbdSelected = {
       ),
 };
 out.kbdHoverSuppressed = await hoverBg(page, `${SEL.navRow}:nth-of-type(2)`);
-// 结果行（fixture 探针任务对）
+// Result rows (the fixture probe-task pair)
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 await openPanel(page);
@@ -251,7 +256,7 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 out.pillRestored = { before: await cs(page, SEL.pill, ['backgroundColor'], '::before') };
 
-// —— Face P: chip popover（detail scenario 19，冻结开态）———————————————————
+// —— Face P: chip popover (detail scenario 19, frozen open) ————————————————————
 await page.goto(DETAIL19);
 await page.locator(SEL.popover).waitFor({ state: 'visible', timeout: 15000 });
 await page.waitForTimeout(300);
@@ -322,7 +327,7 @@ out.catcher = await page.evaluate(() => {
   };
 });
 
-// —— Face D: plan dropdown（detail scenario 27）———————————————————————————
+// —— Face D: plan dropdown (detail scenario 27) ————————————————————————————
 await page.goto(DETAIL27);
 await page.locator(SEL.docSelect).first().waitFor({ state: 'visible', timeout: 15000 });
 await page.locator(SEL.docSelect).first().click();
@@ -349,11 +354,11 @@ out.menuRowChecked = {
   ]),
 };
 out.menuIndicator = await cs(page, SEL.menuIndicator, ['color']);
-// 键盘焦点行（Base UI roving focus：开面后 ArrowDown 移焦）
+// Keyboard focus row (Base UI roving focus: ArrowDown moves focus once the face is open)
 await page.keyboard.press('ArrowDown');
 await page.waitForTimeout(150);
 out.menuRowFocus = await cs(page, SEL.menuRow, ['outlineStyle', 'outlineWidth', 'outlineColor', 'outlineOffset', 'backgroundColor']);
-// hover 增亮面（未选中行 + 选中行）
+// Hover highlight faces (unselected row + selected row)
 const rows = page.locator(SEL.menuRow);
 const rowCount = await rows.count();
 out.menuRowHoverUnchecked = await hoverBg(page, `${SEL.menuRow}:nth-child(${rowCount})`);

@@ -1,7 +1,7 @@
 {
   "probe": "903-dispatch-judgment",
   "ticket": "#903",
-  "adr": "docs/adr/0014-chief派发判定-判定权归chief-判说可推翻.md",
+  "adr": "docs/adr/0014-chief-dispatch-verdict-authority-rests-with-chief-overridable.md",
   "stack": {
     "server": "http://127.0.0.1:8795",
     "web": "http://127.0.0.1:5277",

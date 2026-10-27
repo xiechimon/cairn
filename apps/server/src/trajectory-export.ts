@@ -21,6 +21,7 @@ import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { ZodError } from 'zod';
 import type { ServerConfig } from './config.js';
+import * as schema from './db/schema.js';
 import {
   agent,
   build,
@@ -71,7 +72,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
   if ([databaseTarget, `${databaseTarget}-wal`, `${databaseTarget}-shm`].includes(outputTarget))
     throw new TrajectoryExportError('Output must not overwrite the database');
   const sqlite = new Database(config.dbPath, { readonly: true, fileMustExist: true });
-  const db = drizzle(sqlite);
+  const db = drizzle(sqlite, { schema });
   try {
     const now = Date.now();
     let redacted = 0;
@@ -237,7 +238,9 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
               merged: signals.merged,
               revertedWithin7d: signals.revertedWithin7d,
               fixedByLaterPr: signals.fixedByLaterPr,
-              costTotal: usage.length ? usage.reduce((sum, u) => sum + u.costTotal, 0) : null,
+              costTotal: usage.some((u) => u.costTotal !== null)
+                ? usage.reduce((sum, u) => sum + (u.costTotal ?? 0), 0)
+                : null,
             },
           });
           const cleaned = redactSecrets(pack);

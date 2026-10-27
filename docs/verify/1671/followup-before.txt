@@ -1,0 +1,97 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1671
+
+ ❯ |@xiechimon/cairn-cli| test/image-support.test.ts (9 tests | 1 failed) 103ms
+   ❯ probeModelImageSupport decision order (#1671) (9)
+     × Claude Code reuses an observed image rejection for the next step 5ms
+ ❯ |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts (15 tests | 3 failed) 63ms
+   ❯ runner probe-driven degrade (#1671 slice 1) (6)
+     × text-only spec probes capability for later image steering 8ms
+   ❯ runner 400-signal one-time degrade retry (#1671 slice 2) (9)
+     × session creation rejects image input: retry without images instead of failing the step 3ms
+     × a network retry can still degrade a later image rejection once 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/image-support.test.ts > probeModelImageSupport decision order (#1671) > Claude Code reuses an observed image rejection for the next step
+AssertionError: expected null to be false // Object.is equality
+
+- Expected:
+false
+
++ Received:
+null
+
+ ❯ test/image-support.test.ts:29:70
+     27|     await expect(backend.modelSupportsImages(provider, 'text-relay')).…
+     28|     backend.rememberNoVision(provider, 'text-relay');
+     29|     await expect(backend.modelSupportsImages(provider, 'text-relay')).…
+       |                                                                      ^
+     30|   });
+     31|   test('custom model declares input [text,image] → true', async () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner probe-driven degrade (#1671 slice 1) > text-only spec probes capability for later image steering
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/runner-image-degrade.test.ts:357:20
+    355|     });
+    356|     await runImageStep(claimed, backend);
+    357|     expect(probed).toBe(1);
+       |                    ^
+    358|   });
+    359|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > session creation rejects image input: retry without images instead of failing the step
+AssertionError: expected [ { opts: { …(8) } } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:390:21
+    388|     });
+    389|     const { client } = await runImageStep(claimed, backend);
+    390|     expect(created).toHaveLength(2);
+       |                     ^
+    391|     expect(created[1]?.opts.promptImages).toBeUndefined();
+    392|     expect(client.doneBodies[0]?.body.status).toBe('success');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > a network retry can still degrade a later image rejection once
+AssertionError: expected [ { opts: { …(8) } }, …(1) ] to have a length of 3 but got 2
+
+- Expected
++ Received
+
+- 3
++ 2
+
+ ❯ test/runner-image-degrade.test.ts:408:21
+    406|     });
+    407|     const { client } = await runImageStep(claimed, backend);
+    408|     expect(created).toHaveLength(3);
+       |                     ^
+    409|     expect(created[2]?.opts.promptImages).toBeUndefined();
+    410|     expect(client.doneBodies[0]?.body.status).toBe('success');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 20 passed (24)
+   Start at  09:23:30
+   Duration  3.38s (import 54%, transform 40%, tests 5%)
+

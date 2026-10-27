@@ -7,6 +7,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -15,11 +16,12 @@ import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
-import { skipsQueue, slotCount, slotResources } from './heavy-slots.mjs';
+import { skipsQueue, slotCount, slotPortHolder, slotResources } from './heavy-slots.mjs';
 import { prepushModules } from './prepush.mjs';
 
 const moduleUrl = pathToFileURL(resolve('scripts/heavy-slots.mjs')).href;
 const cli = resolve('scripts/heavy-slots.mjs');
+const e2eAffectedCli = resolve('scripts/e2e-affected.mjs');
 const children = new Set();
 
 test.afterEach(() => {
@@ -27,15 +29,21 @@ test.afterEach(() => {
   children.clear();
 });
 
+const SANDBOX_PORT_BASE = 20000 + (process.pid % 1000) * 20;
+
 function sandbox(slots) {
   const dir = mkdtempSync(join(tmpdir(), 'heavy-slots-test-'));
   const env = {
     ...process.env,
     CAIRN_HEAVY_SLOTS: String(slots),
     CAIRN_HEAVY_SLOTS_DIR: join(dir, 'locks'),
+    TMPDIR: join(dir, 'tmp'),
+    E2E_AFFECTED_PORT: String(SANDBOX_PORT_BASE),
   };
   delete env.CI;
   delete env.CAIRN_HEAVY_SLOT;
+  delete env.CAIRN_HEAVY_SLOT_OWNER;
+  delete env.E2E_PORT;
   return { dir, env, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
@@ -65,6 +73,50 @@ async function until(watched, stream, pattern, timeoutMs = 15_000) {
     await sleep(20);
   }
 }
+
+const fakePnpmFixture = (dir) => {
+  const bin = join(dir, 'bin');
+  const log = join(dir, 'pnpm-calls.jsonl');
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, 'pnpm'),
+    `#!/usr/bin/env node
+const { appendFileSync } = require('node:fs');
+appendFileSync(
+  ${JSON.stringify(log)},
+  JSON.stringify({
+    argv: process.argv.slice(2),
+    E2E_PORT: process.env.E2E_PORT,
+    E2E_DIST_DIR: process.env.E2E_DIST_DIR,
+    CAIRN_HEAVY_SLOT: process.env.CAIRN_HEAVY_SLOT,
+  }) + '\\n',
+);
+console.log('FAKE-PLAYWRIGHT-RAN');
+`,
+    { mode: 0o755 },
+  );
+  return {
+    log,
+    withFakePnpm: (env) => ({ ...env, PATH: `${bin}:${process.env.PATH}` }),
+  };
+};
+
+const startSquatter = (env, port, cwd) =>
+  watch(
+    process.execPath,
+    [
+      '-e',
+      `require('node:net')
+        .createServer(() => {})
+        .listen(${port}, '127.0.0.1', () => console.log('SQUATTER-READY'))
+        .on('error', (error) => {
+          console.log('SQUATTER-ERROR ' + error.code);
+          process.exit(3);
+        });
+      setInterval(() => {}, 1000);`,
+    ],
+    { env, cwd },
+  );
 
 const startHolder = (env, { wait = true, lingerMs = 60_000 } = {}) =>
   watch(
@@ -114,6 +166,23 @@ test('each slot owns its own e2e port and build directory', () => {
   assert.equal(slotResources(2, { E2E_AFFECTED_PORT: '9000' }).port, 9000 + (two.port - one.port));
   assert.equal(slotResources(1, { E2E_PORT: '7777', E2E_AFFECTED_PORT: '9000' }).port, 7777);
   assert.equal(slotResources(2, { E2E_PORT: '7777' }).port, 7777 + (two.port - one.port));
+});
+
+test('slotPortHolder names the pid, cwd and command of whatever listens on the port', async () => {
+  const { dir, env, cleanup } = sandbox(1);
+  try {
+    mkdirSync(join(dir, 'squatter'));
+    const squatterCwd = realpathSync(join(dir, 'squatter'));
+    const squatter = startSquatter(env, Number(env.E2E_AFFECTED_PORT), squatterCwd);
+    await until(squatter, 'out', /SQUATTER-READY/);
+    const holder = slotPortHolder(Number(env.E2E_AFFECTED_PORT));
+    assert.equal(holder.pid, squatter.child.pid);
+    assert.equal(holder.cwd, squatterCwd);
+    assert.match(holder.command, /node/);
+    assert.equal(slotPortHolder(Number(env.E2E_AFFECTED_PORT) + 1), null);
+  } finally {
+    cleanup();
+  }
 });
 
 test('a bad slot count gets a warning and a single slot', async () => {
@@ -415,6 +484,72 @@ test('e2e:affected queues for a slot, but a dry run never waits', async () => {
   }
 });
 
+test('e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit', async () => {
+  const { dir, env, cleanup } = sandbox(2);
+  const fake = fakePnpmFixture(dir);
+  try {
+    const holder = startHolder(env);
+    await until(holder, 'out', /SLOT 1/);
+    const run = watch(process.execPath, [e2eAffectedCli, 'apps/web/e2e/branch-button.spec.ts'], {
+      env: fake.withFakePnpm(env),
+    });
+    assert.equal(await run.exited, 0, run.out + run.err);
+    assert.match(run.out, /FAKE-PLAYWRIGHT-RAN/);
+    const slotTwoPort = Number(env.E2E_AFFECTED_PORT) + 10;
+    assert.match(run.out, new RegExp(`slot 2: E2E_PORT=${slotTwoPort}`));
+    const calls = readFileSync(fake.log, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    assert.equal(calls.length, 1);
+    const [call] = calls;
+    assert.equal(call.E2E_PORT, String(slotTwoPort));
+    assert.equal(call.CAIRN_HEAVY_SLOT, '2');
+    assert.equal(call.E2E_DIST_DIR, join(env.TMPDIR, 'cairn-heavy-slot-2', 'web-dist'));
+    assert.notEqual(call.E2E_PORT, env.E2E_AFFECTED_PORT);
+    assert.ok(call.argv.includes('branch-button.spec.ts'));
+    const configPath = call.argv[call.argv.indexOf('--config') + 1];
+    const config = readFileSync(configPath, 'utf8');
+    assert.match(config, new RegExp(`http://127\\.0\\.0\\.1:${slotTwoPort}`));
+    assert.ok(!config.includes(`127.0.0.1:${env.E2E_AFFECTED_PORT}`));
+    assert.ok(!config.includes('8398'));
+    const next = startHolder(env);
+    await until(next, 'out', /SLOT 2/, 5_000);
+  } finally {
+    cleanup();
+  }
+});
+
+test('a squatted slot port fails e2e:affected before playwright and names the holding process', async () => {
+  const { dir, env, cleanup } = sandbox(2);
+  const fake = fakePnpmFixture(dir);
+  try {
+    const holder = startHolder(env);
+    await until(holder, 'out', /SLOT 1/);
+    mkdirSync(join(dir, 'squatter'));
+    const squatterCwd = realpathSync(join(dir, 'squatter'));
+    const squatter = startSquatter(env, Number(env.E2E_AFFECTED_PORT) + 10, squatterCwd);
+    await until(squatter, 'out', /SQUATTER-READY/);
+    const run = watch(process.execPath, [e2eAffectedCli, 'apps/web/e2e/branch-button.spec.ts'], {
+      env: fake.withFakePnpm(env),
+    });
+    assert.equal(await run.exited, 1);
+    assert.ok(
+      run.err.includes(
+        `slot 2's port ${Number(env.E2E_AFFECTED_PORT) + 10} is held by pid ${squatter.child.pid}`,
+      ),
+      run.out + run.err,
+    );
+    assert.ok(run.err.includes(squatterCwd), run.out + run.err);
+    assert.ok(!run.out.includes('FAKE-PLAYWRIGHT-RAN'));
+    assert.equal(existsSync(fake.log), false);
+    const next = startHolder(env);
+    await until(next, 'out', /SLOT 2/, 5_000);
+  } finally {
+    cleanup();
+  }
+});
+
 test('prepush queues for a slot in local mode and starts once the holder is killed', async () => {
   const { dir, env, cleanup } = sandbox(1);
   const repo = join(dir, 'repo');
@@ -456,6 +591,44 @@ test('prepush queues for a slot in local mode and starts once the holder is kill
     });
     assert.match(ci.stdout, /\[prepush\] node scripts\/ui-debt-gate\.mjs/);
     assert.equal(existsSync(join(repo, 'scripts/heavy-slots.mjs')), true);
+  } finally {
+    cleanup();
+  }
+});
+
+test('prepush reports a squatted slot port before running any check', async () => {
+  const { dir, env, cleanup } = sandbox(1);
+  const repo = join(dir, 'repo');
+  mkdirSync(join(repo, 'scripts'), { recursive: true });
+  const git = (...args) =>
+    execFileSync(
+      'git',
+      ['-c', 'user.name=heavy-slots-test', '-c', 'user.email=heavy@example.invalid', ...args],
+      { cwd: repo, stdio: 'pipe' },
+    );
+  try {
+    for (const file of prepushModules) copyFileSync(file, join(repo, file));
+    git('init');
+    writeFileSync(join(repo, 'README.md'), 'first\n');
+    git('add', 'README.md');
+    git('commit', '-m', 'initial');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    writeFileSync(join(repo, 'new.ts'), 'export const probe = 1;\n');
+    mkdirSync(join(dir, 'squatter'));
+    const squatterCwd = realpathSync(join(dir, 'squatter'));
+    const squatter = startSquatter(env, Number(env.E2E_AFFECTED_PORT), squatterCwd);
+    await until(squatter, 'out', /SQUATTER-READY/);
+    const prepush = watch(process.execPath, ['scripts/prepush.mjs'], {
+      cwd: repo,
+      env: { ...env, PREPUSH_BASE_SHA: 'origin/main' },
+    });
+    assert.equal(await prepush.exited, 1, prepush.out + prepush.err);
+    assert.ok(
+      prepush.err.includes(`is held by pid ${squatter.child.pid}`),
+      prepush.out + prepush.err,
+    );
+    assert.ok(prepush.err.includes(squatterCwd), prepush.out + prepush.err);
+    assert.doesNotMatch(prepush.out, /\[prepush\] node scripts/);
   } finally {
     cleanup();
   }

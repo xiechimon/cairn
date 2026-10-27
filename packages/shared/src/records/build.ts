@@ -37,6 +37,7 @@ export const BUILD_FALLBACK_REPORT_HEAD = '构建步兜底报告';
 
 export function buildFallbackReport(args: {
   reason: string;
+  commits?: readonly string[];
   files?: readonly string[];
   pr: { number: number; url: string | null } | null;
 }): string {
@@ -52,6 +53,7 @@ export function buildFallbackReport(args: {
     `${BUILD_FALLBACK_REPORT_HEAD}：本步异常结束，以下由系统根据已知记录生成。`,
     `- 失败原因：${args.reason}`,
     `- 已知改动：${files}`,
+    ...(args.commits?.map((commit) => `- Commit: ${commit}`) ?? []),
     `- PR：${pr}`,
     '- 下一步：看过失败原因后带反馈重跑。',
   ].join('\n');

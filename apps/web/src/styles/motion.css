@@ -44,11 +44,6 @@ body[data-board-dragging] .todo-card:hover {
   animation: card-enter var(--dur-fast) var(--ease-pop);
 }
 
-@keyframes card-breath {
-  50% {
-    opacity: 0.35;
-  }
-}
 @media (hover: hover) and (pointer: fine) {
   .todo-card-branch {
     transition: background-color var(--dur-fast) var(--ease-standard);

@@ -4,6 +4,7 @@ import {
   type ProjectMergeConfig,
   patchProjectMergeConfigSchema,
   projectConvertedNote,
+  projectGithubRepoRetargetedNote,
   projectMergeConfigSchema,
   projectRenamedNote,
   type SecretBox,
@@ -17,7 +18,8 @@ import { githubRepoReachable } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 import { isGithubRepoRef, removeHostedRepoDir, validateGithubLocalSlotPath } from './git.js';
-import { openGithubToken } from './github-connection.js';
+import { teamGithubToken } from './github-connection.js';
+import type { OAuthClientConfig } from './oauth.js';
 import { insertMessageRow } from './transcript.js';
 
 type ProjectRow = typeof project.$inferSelect;
@@ -52,7 +54,9 @@ export interface ProjectPatchDeps {
   db: Db;
   box: SecretBox;
   githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
   convHub?: ConversationStreamHub;
+  logger?: { info(obj: object, msg: string): void };
 }
 
 const IN_FLIGHT_STEP_STATUSES = ['pending', 'claimed', 'waiting_quota'] as const;
@@ -101,6 +105,10 @@ interface ConversionInput {
   localPath: string | null | undefined;
 }
 
+interface RetargetInput {
+  githubRepo: string;
+}
+
 export async function updateProject(
   deps: ProjectPatchDeps,
   id: string,
@@ -129,6 +137,7 @@ export async function updateProject(
   }
 
   let conversion: ConversionInput | undefined;
+  let retarget: RetargetInput | undefined;
   if (body.repoKind !== undefined) {
     if (body.repoKind !== 'github') {
       throw new HttpError(
@@ -153,10 +162,18 @@ export async function updateProject(
     }
     conversion = { githubRepo: body.githubRepo, localPath: body.localPath };
   } else if (body.githubRepo !== undefined) {
-    throw new HttpError(
-      400,
-      'invalid body at githubRepo: only changeable via local→github kind conversion (carry repoKind)',
-    );
+    if (row.repoKind !== 'github') {
+      throw new HttpError(
+        400,
+        'invalid body at githubRepo: only changeable via local→github kind conversion (carry repoKind)',
+      );
+    }
+    if (!isGithubRepoRef(body.githubRepo)) {
+      throw new HttpError(400, 'invalid body at githubRepo: expected "owner/repo"');
+    }
+    if (body.githubRepo !== row.githubRepo) {
+      retarget = { githubRepo: body.githubRepo };
+    }
   }
 
   let localPath: string | null | undefined;
@@ -177,16 +194,31 @@ export async function updateProject(
 
   if (conversion !== undefined) {
     await assertNoInFlightBuilds(db, id);
-    const slash = conversion.githubRepo.indexOf('/');
-    const owner = conversion.githubRepo.slice(0, slash);
-    const repo = conversion.githubRepo.slice(slash + 1);
-    const token = openGithubToken({ db, box: deps.box }, row.teamId);
+  }
+  if (conversion !== undefined || retarget !== undefined) {
+    const ref = conversion?.githubRepo ?? retarget?.githubRepo ?? '';
+    const slash = ref.indexOf('/');
+    const owner = ref.slice(0, slash);
+    const repo = ref.slice(slash + 1);
+    const access = await teamGithubToken(deps, row.teamId);
     const fetchImpl = deps.githubFetch ?? fetch;
-    const reachable = await githubRepoReachable(fetchImpl, token, owner, repo);
-    if (!reachable) {
-      throw new HttpError(
-        400,
-        `invalid body at githubRepo: repository not reachable: ${conversion.githubRepo}`,
+    const probe = await githubRepoReachable(
+      fetchImpl,
+      'token' in access ? access.token : null,
+      owner,
+      repo,
+    );
+    if (!probe.reachable) {
+      throw new HttpError(400, `invalid body at githubRepo: repository not reachable: ${ref}`);
+    }
+    if (
+      retarget !== undefined &&
+      probe.fullName !== null &&
+      probe.fullName.toLowerCase() !== ref.toLowerCase()
+    ) {
+      deps.logger?.info(
+        { projectId: id, from: ref, to: probe.fullName },
+        `github repo renamed: ${ref} now answers as ${probe.fullName}; consider updating the project`,
       );
     }
   }
@@ -200,7 +232,7 @@ export async function updateProject(
 
   const nextName = name ?? row.name;
   const nextRepoKind = conversion !== undefined ? 'github' : row.repoKind;
-  const nextGithubRepo = conversion !== undefined ? conversion.githubRepo : row.githubRepo;
+  const nextGithubRepo = conversion?.githubRepo ?? retarget?.githubRepo ?? row.githubRepo;
   const nextLocalPath = localPath !== undefined ? localPath : row.localPath;
   const nextDescription = description !== undefined ? description : row.description;
   db.update(project)
@@ -215,12 +247,26 @@ export async function updateProject(
     .run();
 
   const renamed = name !== undefined && name !== row.name;
-  if (renamed || conversion !== undefined) {
-    const note =
-      conversion !== undefined
-        ? projectConvertedNote({ githubRepo: conversion.githubRepo, localPath: nextLocalPath })
-        : projectRenamedNote({ from: row.name, to: nextName });
-    insertProjectNote(deps, id, note);
+  if (conversion !== undefined) {
+    insertProjectNote(
+      deps,
+      id,
+      projectConvertedNote({ githubRepo: conversion.githubRepo, localPath: nextLocalPath }),
+    );
+  } else {
+    if (retarget !== undefined) {
+      insertProjectNote(
+        deps,
+        id,
+        projectGithubRepoRetargetedNote({
+          from: row.githubRepo ?? '',
+          to: retarget.githubRepo,
+        }),
+      );
+    }
+    if (renamed) {
+      insertProjectNote(deps, id, projectRenamedNote({ from: row.name, to: nextName }));
+    }
   }
 
   const updated = db.select().from(project).where(eq(project.id, id)).get();

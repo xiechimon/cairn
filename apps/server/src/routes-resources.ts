@@ -17,7 +17,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { agent, machine, provider, todo, whatsNew } from './db/schema.js';
+import { agent, machine, provider, todo } from './db/schema.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
 import {
@@ -32,8 +32,8 @@ import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
 import {
   deleteGithubConnection,
-  openGithubToken,
   readGithubConnectionStatus,
+  teamGithubToken,
 } from './services/github-connection.js';
 import {
   machineConcurrencyPatch,
@@ -141,7 +141,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(patchMachineBodySchema, await jsonBody(c), 'body');
     const patch = {
       ...(body.enabledRuntimes !== undefined ? { enabledRuntimes: body.enabledRuntimes } : {}),
-      ...(body.shellEnabled !== undefined ? { shellEnabled: body.shellEnabled } : {}),
       ...(body.maxConcurrent !== undefined ? machineConcurrencyPatch(row, body.maxConcurrent) : {}),
     };
     if (Object.keys(patch).length > 0) {
@@ -311,11 +310,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.json(record);
   });
 
-  app.get('/api/whats-new', (c) => {
-    const rows = ctx.db.select().from(whatsNew).all();
-    return c.json(rows.map((r) => ({ id: r.id, createdAt: r.createdAt, ...r.body })));
-  });
-
   const keysvc = { db: ctx.db, box: ctx.secretBox };
 
   app.get('/api/teams/:id/providers', (c) => {
@@ -467,10 +461,18 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/github/repos', async (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
     requireTeam(ctx, teamId);
-    const token = openGithubToken({ db: ctx.db, box: ctx.secretBox }, teamId);
-    if (token === null) throw notFound('github connection');
+    const access = await teamGithubToken(
+      {
+        db: ctx.db,
+        box: ctx.secretBox,
+        githubFetch: ctx.githubFetch,
+        oauthClient: ctx.oauthClient,
+      },
+      teamId,
+    );
+    if (!('token' in access)) throw notFound('github connection');
     const fetchImpl = ctx.githubFetch ?? fetch;
-    const repos = await githubUserRepos(fetchImpl, token);
+    const repos = await githubUserRepos(fetchImpl, access.token);
     const q = c.req.query('q')?.trim().toLowerCase() ?? '';
     const hits = q === '' ? repos : repos.filter((r) => r.fullName.toLowerCase().includes(q));
     return c.json(

@@ -32,7 +32,7 @@
       "dimension": "correctness",
       "title": "Auto-merge is not pinned to the head pr-gate judged, so a later push merges without a new gate run",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 232,
       "failurePath": "The flow in §7.3/§7.4 and D7 is: run pr-gate, and on go with the gated headSha equal to the PR head, enable auto-merge. The §7.4 prompt also tells the session to run update-branch on BEHIND and to fix CI red. Neither `gh pr merge --squash --auto` nor auto-merge through the GitHub tool binds the head SHA. Auto-merge stays armed when a writer with push access adds commits. So a push after auto-merge is enabled (an update-branch merge commit, or a CI fix) is merged once checks go green, and pr-gate never sees that head. pr-gate.js:16 and §7.5 require that the merge happen only on the gated headSha. Passing `--match-head-commit <headSha>` when enabling auto-merge, or disabling auto-merge before any later push and re-gating, would close this gap.",
       "evidence": "spec 28 lines 208, 232 and 246; pr-gate.js:16 ('The caller merges only when go is true and headSha equals the PR head')."
@@ -59,7 +59,7 @@
       "dimension": "rules",
       "title": "AGENTS.md's squash procedure lands a commit on this PR with no closing line and no ticket in the subject",
       "severity": "suggestion",
-      "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+      "file": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
       "line": 35,
       "failurePath": "Three commits on the branch (ca088ce, 3944905, 662cbd9) have subjects `docs: spec 28 ...` with no `(<ticket>)`. The first of them carries no closing keyword. AGENTS.md (Git, squash rule) tells a CLI merger to take `gh api repos/xiechimon/pacman/pulls/<n>/commits -q '.[0].commit.message'` as the squash subject and body. ADR 0021 D2 (line 35) repeats that human CLI merges follow 'AGENTS.md 的 squash 取法'. For #1410, `.[0]` is ca088ce: `docs: spec 28 自举闭环计划（...）`, and `grep -ci 'closes #'` on that message gives 0. A merger who follows the documented procedure therefore puts a subject with no ticket on main and leaves #1401 OPEN, which is the closing failure AGENTS.md was written to prevent. Two things soften this. The repo's GitHub UI default (COMMIT_MESSAGES) includes e5414a2's `closes #1401`, and the PR body's Issues section warns the merger. That is why this is a suggestion. Two cheap fixes: have the last commit's message carry `closes #1401` as well, or reword the three early subjects (`docs(1401): ...`). Either way, D2 should not send multi-commit PRs to the `.[0]` procedure.",
       "evidence": "gh api repos/xiechimon/pacman/pulls/1410/commits --jq '.[0]' -> ca088ce 'docs: spec 28 自举闭环计划（pacman 自写 PR、自合 PR，goal 模式执行）'. `closes #1401` appears only in e5414a2 (4th commit). Repo squash_merge_commit_message=COMMIT_MESSAGES."
@@ -104,7 +104,7 @@
       "dimension": "tests",
       "title": "§8 ledger ticks P0 done before the user merge that P0's acceptance requires",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 265,
       "failurePath": "spec 28 line 86 sets P0 acceptance as 'ADR 0021 由用户合并（D7）', and ticket #1401's last item is '本票 PR 由用户合并（D7）'. The P0 row on this branch already reads '[x]'. Ticket failure mode 4 says the ledger is what a resumed session reads after compaction. A goal session resumed on this branch before the merge, or after a change request, would read P0 as complete while #1410 is open. Leave the box empty or write a pending marker, and tick it in the follow-up that records the merge.",
       "evidence": "Ledger row at line 265 ends with '| 用户 | [x] |'. PR #1410 state is open, and the PR body says the merge item is not a task box."
@@ -134,7 +134,7 @@
       "file": ".claude/workflows/pr-gate.js",
       "line": 30,
       "failurePath": "ADR 0021 D4 ① protects 'files that steer agents' by class. Three such files are not covered.\n- The repo tracks .cursor/skills/verify-pacman/SKILL.md and features/. Only its scripts/ match **/scripts/**.\n- .ckignore is the allowlist of the local scout-block hook that decides what agent tools may read.\n- spec 28 is the runbook the goal session obeys: §3 says '只按这里写定的裁决施工', and it holds the D7 merge routing and the §7.5 rule to run the origin/main copy through scriptPath.\nEach of these files on its own comes out go:true, mergedBy:auto-merge with the head script. So a later bootstrap PR that loosens D7, or changes §7.5 to named invocation, would be judged auto-mergeable. On this PR it changes nothing, because the PR already routes to the user. I added docs/spec/28 to protectedPaths. Naming these files in ADR 0021 D4 and in PROTECTED would close the gap for later PRs.",
-      "evidence": "git ls-tree at head: .cursor/skills/verify-pacman/{SKILL.md,features,scripts/glass.mjs} and .ckignore ('自定义放行——补 scout-block baseline 的过度拦'). Probe: .cursor/skills/verify-pacman/SKILL.md, .ckignore and docs/spec/28-自举闭环-自写自合.md each give true auto-merge []."
+      "evidence": "git ls-tree at head: .cursor/skills/verify-pacman/{SKILL.md,features,scripts/glass.mjs} and .ckignore ('自定义放行——补 scout-block baseline 的过度拦'). Probe: .cursor/skills/verify-pacman/SKILL.md, .ckignore and docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md each give true auto-merge []."
     },
     {
       "dimension": "safety",
@@ -168,14 +168,14 @@
     ".claude/workflows/pr-gate.js",
     ".github/workflows/ci.yml",
     ".gitignore",
-    "docs/adr/0018-多agent团队三层与机器能力闸.md",
-    "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+    "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+    "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
     "scripts/pr-gate-selfcheck.mjs",
-    "docs/spec/28-自举闭环-自写自合.md"
+    "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md"
   ],
   "mergedBy": "user",
   "humanReasons": [
-    "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-多agent团队三层与机器能力闸.md, docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-自举闭环-自写自合.md",
+    "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md, docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
     "2319 lines changed (over 800)"
   ],
   "missing": [],

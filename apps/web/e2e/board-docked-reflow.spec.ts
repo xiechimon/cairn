@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const STRESS = '/app?scenario=board-stress';
+const STRESS = '/app?scenario=board-stress&view=board';
 const FLOOR = 200;
 
 const drawer = (page: Page) => page.locator('.chief-drawer');
@@ -82,7 +82,7 @@ test.describe('board never reflows under the floating chief window (ADR 0013 D1)
 
     const box = await scroller(page).boundingBox();
     expect(box).not.toBeNull();
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + 40);
+    await page.mouse.move(box!.x + 120, box!.y + 40);
     await page.mouse.wheel(300, 0);
     await expect
       .poll(async () => (await measure(page)).scrollLeft, { timeout: 2000 })
@@ -176,7 +176,7 @@ test.describe('board never reflows under the floating chief window (ADR 0013 D1)
   });
 
   test('resting geometry at 1440 is untouched by the floor token', async ({ page }) => {
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
     await page.waitForSelector('[data-column]');
 
     const m = await measure(page);

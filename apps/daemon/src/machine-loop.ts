@@ -14,6 +14,7 @@ import {
 } from '@cairn/shared';
 import { createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
+import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import { type ClaudeCodeAuthProbe, probeClaudeCodeAuth } from './claude-code-auth.js';
 import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
@@ -60,6 +61,7 @@ export interface MachineLoopOpts {
   idleSleepPrevention?: boolean;
   orphanTtlMs?: number;
   hookTimeoutMs?: number;
+  otel?: DaemonOtel | null;
 }
 
 export interface MachineHandle {
@@ -103,6 +105,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   loadOrCreateDeviceJson(paths);
   setupProxy(logger, opts.proxyEnv ?? process.env, config.serverUrl);
 
+  let daemonOtel: DaemonOtel | null = opts.otel ?? null;
+  if (opts.otel === undefined) {
+    try {
+      daemonOtel = daemonOtelFromEnv(process.env);
+    } catch (error) {
+      logger.machine(
+        `otel config ignored: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      daemonOtel = null;
+    }
+  }
+
   logger.raw('Loading pi runtime…');
   const backend =
     opts.backend ??
@@ -118,6 +132,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       onSkillsLog: (msg) => logger.skills(msg),
       onGateLog: (msg) => logger.gate(msg),
       onTrustLog: (msg) => logger.trust(msg),
+      onOtelLog: (msg) => logger.prefixed('otel', msg),
       machineName: config.name,
     });
   if (opts.backend === undefined) {
@@ -472,6 +487,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       stops,
       machineName: config.name,
       claudeCodeAuthProbe: probeAuthAndRemember,
+      ...(daemonOtel !== null ? { otel: daemonOtel } : {}),
       ...(opts.heartbeatIntervalMs !== undefined
         ? { heartbeatIntervalMs: opts.heartbeatIntervalMs }
         : {}),

@@ -14,9 +14,8 @@ import {
   githubListPulls,
   githubListWorkflowRuns,
 } from '../lib/github.js';
-import { SecretBoxError } from '../lib/secret-box.js';
 import { githubRepoOfProject } from './git.js';
-import { openGithubToken } from './github-connection.js';
+import { teamGithubToken } from './github-connection.js';
 import type { GithubIssueFaceDeps } from './github-issues.js';
 
 export const GITHUB_READ_TIMEOUT_MS = 6_000;
@@ -49,7 +48,11 @@ interface GithubTarget {
   token: string;
 }
 
-function openTarget(deps: GithubReadDeps, teamId: string, projectId: string): GithubTarget {
+async function openTarget(
+  deps: GithubReadDeps,
+  teamId: string,
+  projectId: string,
+): Promise<GithubTarget> {
   const row = deps.db
     .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
     .from(project)
@@ -65,18 +68,15 @@ function openTarget(deps: GithubReadDeps, teamId: string, projectId: string): Gi
   }
   const { owner, repo } = ref;
   const slug = `${owner}/${repo}`;
-  let token: string | null;
-  try {
-    token = openGithubToken({ db: deps.db, box: deps.box }, teamId);
-  } catch (err) {
-    if (!(err instanceof SecretBoxError)) throw err;
+  const access = await teamGithubToken(deps, teamId);
+  if ('reason' in access && access.reason === 'token-unreadable') {
     throw new HttpError(
       409,
       'github connection cannot be read (the stored token does not decrypt); reconnect GitHub',
     );
   }
-  if (token === null) throw notFound('github connection');
-  return { owner, repo, slug, token };
+  if (!('token' in access)) throw notFound('github connection');
+  return { owner, repo, slug, token: access.token };
 }
 
 function readFailure(failure: GithubListFailure, slug: string): HttpError {
@@ -159,7 +159,7 @@ export async function executeGithubReadTool(
   switch (name) {
     case 'issues': {
       const p = parseWith(githubReadToolParamsSchemas.issues, params, 'params');
-      const t = openTarget(deps, teamId, p.projectId);
+      const t = await openTarget(deps, teamId, p.projectId);
       const state = p.state ?? 'open';
       const paging = pageOf(p, GITHUB_READ_PER_PAGE_MAX.issues);
       const { items, hasMore } = unwrap(
@@ -198,7 +198,7 @@ export async function executeGithubReadTool(
     }
     case 'pull_requests': {
       const p = parseWith(githubReadToolParamsSchemas.pull_requests, params, 'params');
-      const t = openTarget(deps, teamId, p.projectId);
+      const t = await openTarget(deps, teamId, p.projectId);
       const state = p.state ?? 'open';
       const paging = pageOf(p, GITHUB_READ_PER_PAGE_MAX.pull_requests);
       const { items, hasMore } = unwrap(
@@ -230,7 +230,7 @@ export async function executeGithubReadTool(
     }
     case 'workflow_runs': {
       const p = parseWith(githubReadToolParamsSchemas.workflow_runs, params, 'params');
-      const t = openTarget(deps, teamId, p.projectId);
+      const t = await openTarget(deps, teamId, p.projectId);
       const paging = pageOf(p, GITHUB_READ_PER_PAGE_MAX.workflow_runs);
       const { items, hasMore } = unwrap(
         await githubListWorkflowRuns(fetchImpl, t.token, t.owner, t.repo, {

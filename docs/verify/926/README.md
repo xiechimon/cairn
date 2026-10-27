@@ -1,17 +1,17 @@
-# #926 验证证据：daemon 重试与收敛时序显式化
+# #926 verification evidence: daemon retry and convergence timing made explicit
 
-票面两处从「假定」改成「声明 + 可观测」：
+Two ticket spots change from "assumed" to "declared + observable":
 
-1. **重试面**：pi 的 `retry.*` 在 daemon 里显式设置（不再吃上游默认），runner 的零进展护栏常量 `RETRY_STORM_MAX` 与 `retry.maxRetries` 同源派生。
-2. **收敛判定**：`done` 由 pi 的 `agent_settled`（「不会再自动继续」的权威信号）触发，取代旧的 `agent_end(!willRetry)` 猜测。
+1. **Retry face**: pi's `retry.*` is set explicitly in the daemon (no longer eating the upstream default), and the runner's no-progress guardrail constant `RETRY_STORM_MAX` is derived from the same source as `retry.maxRetries`.
+2. **Convergence judgment**: `done` is triggered by pi's `agent_settled` (the authoritative "will not continue automatically" signal), replacing the old `agent_end(!willRetry)` guess.
 
-## 机制生效验收：实物判据
+## Mechanism-effect acceptance: artifact criteria
 
-按仓内 `verify-pacman`「机制生效验收:实物判据」硬规则，声称的机制从**运行时真值**取证，不是读源码。探针 `drive-926-convergence.mts` 起真 pi 运行时打 stub LLM，产物 = `convergence-evidence.json`。
+Per the in-repo `verify-pacman` "mechanism-effect acceptance: artifact criteria" hard rule, every claimed mechanism is evidenced from **runtime ground truth**, not by reading source. The probe `drive-926-convergence.mts` starts a real pi runtime against a stub LLM; the artifact = `convergence-evidence.json`.
 
-### Phase A — retry 面被 pi 实际消费（不是摆设，也不是默认巧合）
+### Phase A — the retry face is actually consumed by pi (not a decoration, not a default coincidence)
 
-`buildPiSessionSettings()` 产出的设置对象喂进 **pi 真 `SettingsManager.inMemory`**，再 `getRetrySettings()` 读回：
+The settings object produced by `buildPiSessionSettings()` is fed into the **real pi `SettingsManager.inMemory`**, then read back via `getRetrySettings()`:
 
 ```
 piGetRetrySettings         = { enabled: true, maxRetries: 3, baseDelayMs: 2000, maxAgentDelayMs: 60000 }
@@ -19,42 +19,42 @@ piGetProviderRetrySettings = { maxRetries: 0, maxRetryDelayMs: 60000 }
 RETRY_STORM_MAX            = 3
 ```
 
-读回值 == daemon 显式声明值。**但这些显式值恰与 pi 1.0.4 内建默认逐字节相同**——单看读回分不清「读了我们的设置」还是「回落默认」。故探针再做一步对照（`drivenProbe`）：给同一 `inMemory` 喂一份 `maxRetries = 5`（≠ 默认 3）的 retry 设置，读回随即变 5，证明 `getRetrySettings` 读的是传入设置（**设置驱动读回**）。配合单测的引用同一性（`buildPiSessionSettings().retry === PI_RETRY_SETTINGS`）与 `pi.ts` 把该设置喂进 `SettingsManager.inMemory`，即得：真会话里 pi 读到的 `maxRetries=3` 来自我们的显式设置，且**改动设置值会改变 pi 重试逻辑读到的值**（不是摆设）。
+The read-back values == the daemon's explicit declared values. **But these explicit values happen to be byte-identical to pi 1.0.4's built-in defaults** — the read-back alone cannot distinguish "read our settings" from "fell back to defaults". So the probe does one more comparison (`drivenProbe`): feed the same `inMemory` a retry setting with `maxRetries = 5` (≠ the default 3), and the read-back immediately becomes 5, proving `getRetrySettings` reads the passed-in settings (**settings-driven read-back**). Combined with the unit test's reference identity (`buildPiSessionSettings().retry === PI_RETRY_SETTINGS`) and `pi.ts` feeding those settings into `SettingsManager.inMemory`, this yields: in a real session the `maxRetries=3` pi reads comes from our explicit settings, and **changing the setting value changes the value pi's retry logic reads** (not a decoration).
 
-`RETRY_STORM_MAX === getRetrySettings().maxRetries` —— 护栏常量与 pi 实际读到的重试预算同源，结构上不脱钩（单源 = `apps/daemon/src/backend/pi-retry.ts`）。
+`RETRY_STORM_MAX === getRetrySettings().maxRetries` — the guardrail constant and the retry budget pi actually reads are same-source, structurally not decoupled (single source = `apps/daemon/src/backend/pi-retry.ts`).
 
-### Phase B — 真 pi 会话的原始事件序 + done 时机
+### Phase B — the raw event sequence of a real pi session + the done timing
 
-真 `AgentSession`（daemon `materializeProvider` + `buildPiSessionSettings` + `ModelRuntime` + `createAgentSession`）打 stub LLM，订阅**原始 pi 事件**并同步过 daemon 的 `mapPiSessionEvent`：
+A real `AgentSession` (daemon `materializeProvider` + `buildPiSessionSettings` + `ModelRuntime` + `createAgentSession`) against a stub LLM, subscribing to the **raw pi events** and passing them through the daemon's `mapPiSessionEvent`:
 
 ```
 raw pi events : … → turn_end → agent_end(14) → agent_settled(15)
 mapped events : … → message_end → done
 ```
 
-- 真 pi 先发 `agent_end`（idx 14），**再**发 `agent_settled`（idx 15）——settled 是收敛权威信号。
-- 映射产出**恰好一个** `done`，且它对应的原始事件索引 == `agent_settled` 的索引（15）。
-- `agent_end`（idx 14）**未**触发 done —— 旧路径会在此提前发 done（并在排队工作/溢出恢复仍要继续时 dispose 会话，掐死后续 run）。
+- Real pi emits `agent_end` first (idx 14), **then** `agent_settled` (idx 15) — settled is the convergence authority signal.
+- The mapping produces **exactly one** `done`, and its corresponding raw event index == `agent_settled`'s index (15).
+- `agent_end` (idx 14) does **not** trigger done — the old path would have fired done here early (and disposed the session while queued work / overflow recovery still had to continue, strangling the subsequent runs).
 
-这就是票面要的收敛对照：真 pi 的 `agent_settled` 驱动 done，`agent_end(!willRetry)` 不再驱动。
+This is the convergence contrast the ticket asks for: real pi's `agent_settled` drives done, and `agent_end(!willRetry)` no longer drives it.
 
-### Phase C — 映射函数确定性对照
+### Phase C — the mapping function determinism contrast
 
-`mapPiSessionEvent` 直接喂两种事件：
+`mapPiSessionEvent` fed the two events directly:
 
 ```
-agent_end(willRetry=false) → []                      （不发 done）
-agent_settled              → [{ type: 'done', … }]   （发 done）
+agent_end(willRetry=false) → []                      (no done)
+agent_settled              → [{ type: 'done', … }]   (done)
 ```
 
-## 单元/集成面（CI 常驻）
+## Unit/integration faces (standing in CI)
 
-- `apps/daemon/test/map-pi-event.test.ts`：`agent_settled → done`、`agent_end` 恒不发 done、「模型还会继续」路径 done 不提前、usage 累积随 settled 更完整。
-- `apps/daemon/test/pi-retry-config.test.ts`：retry 面显式接入（引用同一性）、显式值对齐 docs、`RETRY_STORM_MAX` 与会话设置同源。
-- `apps/daemon/test/runner-error-lifecycle.test.ts`：护栏预算可注入且改变收尾行为（`retryStormMax=1 → 第 2 发即收`）。
-- `integration/`（22 文件 / 62 测试）：真 daemon + 真 PiBackend + stub LLM 端到端，步收敛到完成（`finished`）——agent_settled → done 在全链运行时成立。
+- `apps/daemon/test/map-pi-event.test.ts`: `agent_settled → done`, `agent_end` never fires done, the "model will continue" path does not fire done early, usage accumulation is more complete with settled.
+- `apps/daemon/test/pi-retry-config.test.ts`: the retry face is explicitly wired (reference identity), explicit values aligned with docs, `RETRY_STORM_MAX` same-source as the session settings.
+- `apps/daemon/test/runner-error-lifecycle.test.ts`: the guardrail budget is injectable and changes the close-out behavior (`retryStormMax=1 → closes on the 2nd attempt`).
+- `integration/` (22 files / 62 tests): real daemon + real PiBackend + stub LLM end to end, the step converges to completion (`finished`) — agent_settled → done holds at the full-chain runtime.
 
-## 复跑
+## Rerun
 
 ```sh
 cd apps/daemon
@@ -62,4 +62,4 @@ corepack pnpm exec tsx \
   "$(git rev-parse --show-toplevel)/.claude/skills/verify-pacman/scripts/drive-926-convergence.mts"
 ```
 
-探针自起 stub LLM 并自回收（scratch 目录用后即删），退出码 0 = 全部断言通过，产物刷新 `docs/verify/926/convergence-evidence.json`。回环 stub 走本机，跑前若设了代理需 `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*'`。
+The probe starts the stub LLM itself and self-recycles (the scratch directory is deleted after use); exit code 0 = all assertions pass, and the artifact refreshes `docs/verify/926/convergence-evidence.json`. The loopback stub stays on this machine — if a proxy is set before the run, use `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*'`.

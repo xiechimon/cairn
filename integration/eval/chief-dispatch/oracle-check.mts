@@ -1,14 +1,4 @@
 #!/usr/bin/env -S pnpm exec tsx
-// 判分链自检（build-eval 手册：首次全量付费跑之前必须过）。
-//
-// 把三种构造出来的回合喂过真判分函数，不看模型、不花钱：
-//   oracle — 期望的行为全做对 → 必须 ~100%
-//   null   — 空回合（无工具、无正文）→ 必须 ~0%（否则判分太宽）
-//   misroute — 派给了别的 Agent → 必须 ~0%（否则判分只看「派没派」不看「派给谁」）
-//
-// oracle 不过 = 判分或链路坏了；null 不挂 = 判分太松。两条都是几分钟的事，
-// 能挡掉大多数要花一整轮钱才暴露的 bug。
-
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type Case, gradeCase, type RosterAgent } from './grade.mts';
@@ -20,13 +10,11 @@ const d = JSON.parse(readFileSync(join(FLOW, 'cases.json'), 'utf8')) as {
   cases: Case[];
 };
 const roster = d.roster;
-// 评测里每条栈的 agentId 都是现建的随机串；自检里用等价替身。
 const agentIds: Record<string, string> = Object.fromEntries(
   roster.map((r) => [r.key, `agent-${r.key}`]),
 );
 const nameByKey = new Map(roster.map((r) => [r.key, r.displayName]));
 
-/** 自检用的替身 id：真评测里每条栈的 agentId 都是现建的随机串。 */
 function pick(key: string): string {
   const id = agentIds[key];
   if (id === undefined) throw new Error(`roster 里没有 ${key}`);
@@ -49,7 +37,6 @@ function base(): TurnEvidence {
   };
 }
 
-/** 期望行为全做对的回合。 */
 function oracle(c: Case): TurnEvidence {
   const ev = base();
   if (c.expect.kind === 'dispatch') {
@@ -83,12 +70,10 @@ function oracle(c: Case): TurnEvidence {
   return ev;
 }
 
-/** 空回合：既没派工也没正文。 */
 function nullRun(): TurnEvidence {
   return base();
 }
 
-/** 派了，但派给别的 Agent（该派 A 却派 B）。 */
 function misroute(c: Case): TurnEvidence {
   const ev = oracle(c);
   if (c.expect.kind !== 'dispatch') return ev;
@@ -133,8 +118,6 @@ const tally = (
 console.log(`flow=${FLOW}  用例 ${d.cases.length} 条\n`);
 const o = tally('oracle', oracle);
 const n = tally('null', () => nullRun());
-// misroute 只在派工用例上有意义：hold 用例本就不该派工，misroute 对它们原样
-// 返回是正确行为，算进去就是假阳性。
 const m = tally('misroute', misroute, (c) => c.expect.kind === 'dispatch');
 
 let exit = 0;

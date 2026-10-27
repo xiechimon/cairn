@@ -1,380 +1,272 @@
-# Base UI 主题：黑白骨架 + 手作动效 + Herdr 紫（V2 方向落仓）
+# Base UI theme: black-and-white skeleton + hand-made motion + Herdr purple (V2 direction landing in the repo)
 
-> 状态：spec 待施工。前身作废票 #782（只换色不动几何，范围写错，用户已关）。
-> 用户原话（2026-10-04，三遍一致）：V2 方向是黑白骨架加手作动效加主题色，不只是换个颜色。
-> 主题色用 Herdr 紫那对：亮底米色纸加深紫、暗底暖黑加浅紫。
-> 输入材料正本：`library/t-accent-prototype/`（README + `accent-compare-prototype.html`
-> + `HERDR-THEME-TOKENS.md`，2026-10-04 从 herdr.dev CSS 直接拉取）与
-> `library/t-0068-prototype/`（V2 骨架与动效来源，Base UI 文档正典 demo）。
-> 本 spec 只回答「落仓成什么样」；施工与验收拆票见 §6。
+> Status: spec awaiting construction. Predecessor voided ticket #782 (recolor-only, no geometry change, scope written wrong, closed by the user).
+> The user's words (2026-10-04, consistent three times): the V2 direction is a black-and-white skeleton plus hand-made motion plus a theme color, not just swapping a color.
+> The theme color uses that Herdr pair of purples: light on beige paper with deep purple, dark on warm black with light purple.
+> Canonical input material: `library/t-accent-prototype/` (README + `accent-compare-prototype.html` + `HERDR-THEME-TOKENS.md`, pulled directly from herdr.dev CSS on 2026-10-04) and `library/t-0068-prototype/` (source of the V2 skeleton and motion, the canonical Base UI docs demo).
+> This spec only answers "what it looks like when landed in the repo"; the construction/acceptance ticket split is in §6.
 
-## 0. 失败方式清单（先列再施工，仓内纪律）
+## 0. Failure-mode list (list first, then construct — repo discipline)
 
-动任何一块之前，执行票必须先把对应的失败方式写成该票的验收否决项：
+Before touching anything, the execution ticket must first write the corresponding failure modes into that ticket's acceptance-veto items:
 
-| # | 失败方式 | 护栏 |
+| # | Failure mode | Guardrail |
 |---|---|---|
-| F1 | token 值翻转但视觉 spec 基线没重拍：全站视觉 spec 变红，施工者逐条 `--update-snapshots` 蒙混过关，把真回归也洗成新基线 | 每个含视觉变更的 PR 先贴受影响 spec 清单，重拍前后各跑一次 `e2e:affected`，diff 逐条说明（见 §5.3） |
-| F2 | 暗色 destructive 配白字出货：`#ffffff` on `#e05a5a` 实测只有 3.63:1 | `--destructive-foreground` 暗侧必须是深字（§2.1），T-accept 对比度门逐对重测 |
-| F3 | 亮色 pick 选中行按原型 14% tint 配亮紫字出货：实测 3.50:1，大幅低于 4.5 | 亮侧选中对按 §2.5 的加深紫方案（4.59:1），不许直抄原型值 |
-| F4 | herdr `faint` 系被当正文色用：亮侧 `#86826f` 在纸面上只有 3.27:1 | faint/faint2 在本仓只许做装饰（边框、占位、非文本图标），正文 ramp 见 §2.4 的刻意偏离 |
-| F5 | 手作动效与 tw 默认打架：同一弹层同时跑 `animate-in` 和手写 keyframe，进出场叠成双份 | 手作只许以「覆写值」形态落在已迁移面（§1.2），单面单机制，grep 可复核 |
-| F6 | 圆角清零 silently 打断几何钉扎：checkbox 18px→16px、弹层 radius 10px→0，`checkbox-unified` / `visual-polish` 等断言静默失效 | 每个骨架 PR 列出触碰的几何断言并同步更新，禁止只改 CSS 不改 spec（§5.2） |
-| F7 | 状态色与新 spot 色相撞：chip-plan 之外的某处把紫色同时当品牌和状态用，用户分不清「可点」和「计划中」 | 15° 规则（§2.5）：与 spot 同 hue ±15° 的槽一律回 spot 族，其余状态色保留 |
-| F8 | 主题切换整页 smear：颜色/背景/边框/阴影上的 transition 在 `.light` 翻转时齐爆 | 凡动 token 值的 PR 必须带主题切换抑制（better-ui recipe，`transition:none` + reflow + 下帧恢复），`theme-toggle.spec` 覆盖 |
-| F9 | fixture 基线拍到别的车道的栈：`reuseExistingServer` + 端口相撞导致证据拍成别人的构建 | 选口在开跑前一刻 `lsof` 复查（实锤先例），撞口换口重跑，该轮结果作废 |
+| F1 | Token values flip but the visual-spec baseline is not reshot: the whole site's visual specs go red, the implementer blindly runs `--update-snapshots` line by line, laundering real regressions into the new baseline | Every PR with visual changes first posts the affected-spec list; run `e2e:affected` once before and once after reshooting; explain the diff line by line (see §5.3) |
+| F2 | Dark-mode destructive ships with white text: `#ffffff` on `#e05a5a` measures only 3.63:1 | `--destructive-foreground` on the dark side must be dark text (§2.1); the T-accept contrast gate retests every pair |
+| F3 | Light-mode pick selected row ships with light-purple text per the prototype's 14% tint: measures 3.50:1, far below 4.5 | The light-side selected pair uses §2.5's deepened-purple scheme (4.59:1); copying the prototype value verbatim is forbidden |
+| F4 | herdr `faint` family used as body-text color: the light side's `#86826f` is only 3.27:1 on paper | faint/faint2 may only be decorative in this repo (borders, placeholders, non-text icons); the body-text ramp keeps the deliberate deviation of §2.4 |
+| F5 | Hand-made motion fights the tw defaults: the same popover runs `animate-in` and a hand-written keyframe at once, entry/exit stacking doubled | Hand-made work may only land as "override values" on already-migrated surfaces (§1.2); one mechanism per surface, grep-verifiable |
+| F6 | Radius-zeroing silently breaks geometry pins: checkbox 18px→16px, popover radius 10px→0, and `checkbox-unified` / `visual-polish` assertions quietly die | Every skeleton PR lists the geometry assertions it touches and updates them in sync; changing CSS without changing spec is forbidden (§5.2) |
+| F7 | State colors collide with the new spot hue: somewhere outside chip-plan uses purple as both brand and state, and the user cannot tell "clickable" from "planned" | The 15° rule (§2.5): slots within ±15° of spot's hue all go back to the spot family; the other state colors stay |
+| F8 | Theme switch smears the whole page: transitions on color/background/border/shadow all fire at once when `.light` flips | Any PR touching token values must carry theme-switch suppression (better-ui recipe: `transition:none` + reflow + restore next frame), covered by `theme-toggle.spec` |
+| F9 | The fixture baseline photographs another lane's stack: `reuseExistingServer` + port collision makes the evidence shoot someone else's build | Re-check the port with `lsof` right before starting (a proven precedent); on collision switch ports and rerun; that round's results are void |
 
-## 1. 范围：三件各到什么深度
+## 1. Scope: three pieces, each to what depth
 
-### 1.1 骨架：从现行换到黑白骨架的面
+### 1.1 Skeleton: which surfaces switch from the current to the black-and-white skeleton
 
-骨架 = V2 原型 `html[data-v="v2"]` 那套几何与结构语言，原型行号指
-`accent-compare-prototype.html`。分两批，第一批是原型已钉死的面，第二批是同方向・值待面票实测：
+The skeleton = the V2 prototype's `html[data-v="v2"]` geometry and structural language; prototype line numbers refer to `accent-compare-prototype.html`. Two batches: the first is what the prototype has pinned down; the second is the same direction, with values to be measured by surface tickets:
 
-第一批（原型有 exact 值，直接落仓）：
+First batch (prototype has exact values; land directly):
 
-- 复选 tile：18px 方角 4px 圆角 → **16px、圆角 0、1px 墨线框**（原型 L321–329）。
-  关态透明底（面板色底）+ 墨线框；开态翻主题色实底 + 主题色字勾（原型 L337–341，
-  H 档即主题色填充，不是黑白反相）。hover 未勾选框描边提示可点（L342）。
-  现行 `checkbox.css` 的 `--card-button` 实底 + 白勾语义保留，只是换值与几何。
-- 按钮：高 32px、圆角 0、14px/400（L344–352）。主按钮主题色实底 + 主题色字，
-  hover `brightness(1.07)`（L365，不降透明度）；次按钮面板底 + 墨线框，
-  hover 走 hover-token、press 走 active-token（L353–359）。
-- 弹层壳：12px 内边距、1px 墨线框、圆角 0、顶部锚距 8px、最小宽 220px（现行
-  220px 弹层宽度不变，L373–380），带 12×6 描边 Arrow（原型 L371）。
-- 行 hover：一律跟主题色走——行与更多钮吃主题色淡 tint（`accent-soft` =
-  `color-mix(in srgb, spot 14%, transparent)`，原型 L103），主按钮保持实色；
-  删除行吃 danger 淡 tint（原型 README §操作）。
+- Checkbox tile: 18px square with 4px radius → **16px, radius 0, 1px ink border** (prototype L321–329). Off state: transparent fill (panel-color fill) + ink border; on state: solid theme-color fill + theme-color check glyph (prototype L337–341, the H tier being theme-color fill, not a black-white inversion). Hover on the unchecked box outlines it to hint clickability (L342). The current `checkbox.css` semantics of `--card-button` solid fill + white check are kept; only the values and geometry change.
+- Buttons: height 32px, radius 0, 14px/400 (L344–352). Primary: theme-color solid fill + theme-color text, hover `brightness(1.07)` (L365, no opacity drop); secondary: panel fill + ink border, hover goes through the hover token, press through the active token (L353–359).
+- Popover shell: 12px inner padding, 1px ink border, radius 0, 8px top anchor offset, min width 220px (the current 220px popover width unchanged, L373–380), with a 12×6 outlined Arrow (prototype L371).
+- Row hover: always follows the theme color — rows and more-buttons take a light theme-color tint (`accent-soft` = `color-mix(in srgb, spot 14%, transparent)`, prototype L103), the primary button stays solid; delete rows take a light danger tint (prototype README §operations).
 
-第二批（同方向，值由面票从原型方法复测，不许拍脑袋）：
+Second batch (same direction; values re-measured by surface tickets using the prototype's method, no guessing):
 
-- 看板卡片、侧栏行、chief 抽屉、detail 面、pages 面：骨架语言一致（墨线框、
-  方角、主题色 hover tint），但这些面的几何被 e2e 几何钉扎锁着
-  （18px tile、220px 弹层、12px 圆角等），逐面迁移 + 逐面重审钉扎。
-- 用户原话已接受与 todos.dev 脱钩（t-0068 README 代价列明：放弃复刻纪律与
-  像素纪律）。几何钉扎不是冻结不让改，是改了必须同步改断言（F6）。
+- Board cards, sidebar rows, the chief drawer, the detail surface, pages surfaces: the skeleton language is uniform (ink border, square corners, theme-color hover tint), but these surfaces' geometry is pinned by e2e geometry assertions (18px tile, 220px popover, 12px radius, etc.), so migrate surface by surface + re-review the pins surface by surface.
+- The user's words already accepted decoupling from todos.dev (the t-0068 README's cost list: abandoning replication and pixel discipline). Geometry pinning does not freeze changes; it means changing them must update the assertions in sync (F6).
 
-不碰的面：`--radius` 基与卡片圆角不在第一批动；board 列宽 token、z 阶梯、
-字体栈与本 spec 无关。
+Surfaces not touched: the `--radius` base and card radii do not move in the first batch; board column-width tokens, the z ladder, and the font stack are out of this spec's scope.
 
-### 1.2 动效：手作哪些，与 motion.css / ADR 0009 是什么关系
+### 1.2 Motion: what is hand-made, and the relationship with motion.css / ADR 0009
 
-先写清关系，再列手作清单。
+State the relationship first, then the hand-made list.
 
-**关系一句话：手作动效是 ADR 0009 默认档在已迁移面上的有界覆写，不是第二套系统。**
-ADR 0009（方向 B，全站进出场收敛 shadcn/tw-animate-css 默认）继续有效：
-未迁移的面一切照旧（dialog `zoom-in-95`、dropdown/popover `duration-100` +
-slide -8px、挂载淡入 tw 默认档，ADR D3 追认值不变）。已迁移的面把其中与
-V2 骨架冲突的**值**换成原型 exact 值，机制仍是单套（transition 语义、
-可中途打断，better-ui 律），落点与 motion.css D4 保留面（tab 指示条滑动、
-hover/press tint、`prefers-reduced-motion` 全站降级律）并存。
-验收形态：单面单机制——任一已迁移面 grep 到 `animate-in` 与手写 keyframe
-并存即红（F5）。
+**The relationship in one sentence: hand-made motion is a bounded override of ADR 0009's default tier on migrated surfaces, not a second system.**
+ADR 0009 (direction B, site-wide entry/exit converges on shadcn/tw-animate-css defaults) stays in force: unmigrated surfaces keep everything as is (dialog `zoom-in-95`, dropdown/popover `duration-100` + slide -8px, mount fade-in at the tw default tier, the ADR D3 retroactively-approved values unchanged). On migrated surfaces, the **values** that conflict with the V2 skeleton are swapped for the prototype's exact values; the mechanism stays single-set (transition semantics, interruptible mid-flight, the better-ui rule), coexisting with motion.css's D4 preserved surfaces (tab indicator slide, hover/press tint, the `prefers-reduced-motion` site-wide downgrade rule). Acceptance form: one mechanism per surface — any migrated surface where grep finds `animate-in` and a hand-written keyframe coexisting goes red (F5).
 
-手作清单（全部来自原型，有 exact 值；生产形态由面票定 transition 写法，
-better-ui 律：交互态变化用 transition，不用一次性 keyframe）：
+Hand-made list (all from the prototype, with exact values; the production form of the transition code is decided by surface tickets, per the better-ui rule: interaction-state changes use transition, not one-shot keyframes):
 
-- 勾选入场：底色 100ms ease-out 反相 + 勾 scale .5→1 微 overshoot 140ms，
-  曲线 `cubic-bezier(0.34, 1.4, 0.64, 1)`（原型 L796）；取消：勾缩退 90ms +
-  底色回翻 100ms（L802–806）。复选行 press：tile 缩 0.92，80ms ease-out（L330）。
-- 弹层进出场：scale .98 + fade，100ms ease-out，origin 随锚位（L371，Base UI
-  文档正典值）。已迁移的 overlay 面用它**替代** ADR D3 的 slide -8px。
-- 焦点环：2px 实线 + offset 2（复选 tile，L331–334；沿用仓内 #388 家族律，
-  颜色换 `--focus-ring` 新值）；弹层内按钮环 offset -1（L366–368）。
-- 主题切换抑制：换肤 PR 必带（better-ui recipe：`transition:none` 注入 +
-  reflow + 下帧恢复），F8。
+- Check entrance: background 100ms ease-out inversion + check scale .5→1 with a slight overshoot at 140ms, curve `cubic-bezier(0.34, 1.4, 0.64, 1)` (prototype L796); uncheck: check shrinks out at 90ms + background flips back at 100ms (L802–806). Checkbox-row press: tile scales to 0.92, 80ms ease-out (L330).
+- Popover enter/exit: scale .98 + fade, 100ms ease-out, origin follows the anchor (L371, the canonical Base UI docs value). On migrated overlay surfaces it **replaces** ADR D3's slide -8px.
+- Focus ring: 2px solid + offset 2 (checkbox tile, L331–334; following the repo's #388 family rule, color swapped to the new `--focus-ring` value); the in-popover button ring offset -1 (L366–368).
+- Theme-switch suppression: the skin-swap PR must carry it (better-ui recipe: inject `transition:none` + reflow + restore next frame), F8.
 
-「动效不是 Base UI 给的」仍成立（t-0068 README §事实）：库只给
-`data-open` / `data-starting-style` / `data-ending-style` 钩子，CSS 全手写。
-本仓 checkbox 已迁 Base UI 官方件（#690），钩子现成，手作值直接落上去。
+"Motion is not given by Base UI" still holds (t-0068 README §facts): the library only gives the `data-open` / `data-starting-style` / `data-ending-style` hooks; the CSS is all hand-written. This repo's checkbox is already on the Base UI official component (#690), the hooks exist, and the hand-made values drop straight on.
 
-动效证据按既有纪律走 GIF（用户 2026-10-03 定：动效类改动验收证据必须含
-GIF，before/after 各一条；做法照抄 t-0041：动画全 paused +
-`__motionScrub(t)` 手动 scrub → 逐帧截图 → ffmpeg 合成；PR body 走 raw
-永久链内嵌）。静态图只作补充。
+Motion evidence follows the existing GIF discipline (user decided 2026-10-03: motion-class changes' acceptance evidence must include a GIF, one before/after each; method copied from t-0041: animation fully paused + manual scrub with `__motionScrub(t)` → frame-by-frame screenshots → ffmpeg assembly; the PR body embeds via raw permanent links). Static images are supplementary only.
 
-### 1.3 主题色：Herdr 紫进哪些 token，用 H 档 exact 值
+### 1.3 Theme color: which tokens the Herdr purple enters, using the H-tier exact values
 
-只用 H 档（Herdr 真值），A–D 自定档是原型过程资产，不落仓：
+Only the H tier (Herdr true values); the A–D custom tiers are prototype process assets, not landed:
 
-- 亮：纸面 `#efece5` + 主钮紫 `#8839ef` + 白字（5.41:1，复测一致）。
-- 暗：暖黑底 `#17171a` + 主钮紫 `#cba6f7` + 深字 `#17171a`（8.81:1，复测一致；
-  原型标注 8.8，复测 8.81，采用复测值）。
+- Light: paper `#efece5` + primary-button purple `#8839ef` + white text (5.41:1, re-measurement consistent).
+- Dark: warm-black background `#17171a` + primary-button purple `#cba6f7` + dark text `#17171a` (8.81:1, re-measurement consistent; the prototype says 8.8, the re-measure 8.81, the re-measured value adopted).
 
-紫只进三类槽（原型 README §各档是什么：主行动按钮「完成」与勾选态复选框，
-边框/文字/投影保持黑白）：
+Purple enters only three slot classes (prototype README §what the tiers are: the primary action button "Done" and the checked checkbox; borders/text/shadows stay black-and-white):
 
-1. 主行动实底：`--card-button`（亮 `#8839ef` / 暗 `#cba6f7`）。
-2. 焦点环：`--focus-ring`（同上两值；现行与 `--card-button` 同值关系保持）。
-3. 勾选态 tile 填充 + 选中行文字：经 `--brand` / `--brand-fg` 语义（§2.5 派生规则）。
+1. Primary-action solid fill: `--card-button` (light `#8839ef` / dark `#cba6f7`).
+2. Focus ring: `--focus-ring` (the same two values; the current same-value relationship with `--card-button` is kept).
+3. Checked-tile fill + selected-row text: through the `--brand` / `--brand-fg` semantics (derivation rules in §2.5).
 
-danger 另起红系（原型已修掉旧 V2「danger 吃白色」缺陷）：亮 `#c73e3e`、
-暗 `#e05a5a`，均为 herdr 真值。注意暗侧红底**不许配白字**（3.63:1，F2），
-`--destructive-foreground` 暗侧翻深字，见 §2.1。
+danger starts a separate red family (the prototype already fixed the old V2 "danger takes white" defect): light `#c73e3e`, dark `#e05a5a`, both herdr true values. Note the dark-side red fill **must not take white text** (3.63:1, F2); `--destructive-foreground` flips to dark text on the dark side, see §2.1.
 
-`--spot-ink` 语义（herdr 站房：亮白字 / 暗底字）由 `--text-on-accent`
-承接：亮 `#ffffff`、暗 `#17171a`。
+The `--spot-ink` semantics (the herdr site proper: light takes white text / dark takes background-colored text) are carried by `--text-on-accent`: light `#ffffff`, dark `#17171a`.
 
-## 2. Token 映射表：原型值 → 仓内槽位
+## 2. Token mapping table: prototype values → repo slots
 
-记法：每行一槽，来源标记三档——[真值]（herdr.dev 站点 mode 层或原型 exact 值，
-逐字采用）、[派生]（按本节规则算出，附实测对比度）、[保留]（现行值不动，
-附不动的理由）。凡标[派生]/[保留]的槽，面票仍须按 §5.1 重测一遍才算落地。
+Notation: one slot per row, sources tagged in three tiers — [true value] (the herdr.dev site's mode layer or the prototype's exact value, adopted verbatim), [derived] (computed per this section's rules, with the measured contrast attached), [kept] (current value unchanged, with the reason). Every slot tagged [derived]/[kept] must still be re-measured by the surface ticket per §5.1 before it counts as landed.
 
-主题机制不变：`:root` = 暗默认，根元素 `.light` = 浅色镜像（`theme.ts`，
-localStorage `pacman-theme` + `data-theme` 镜像）；记法沿用 hex/rgb
-（shadcn.css 头注：e2e 值探针按 rgb 解析）。
+The theme mechanism is unchanged: `:root` = dark default, root element `.light` = light mirror (`theme.ts`, localStorage `pacman-theme` + `data-theme` mirror); notation stays hex/rgb (shadcn.css header note: the e2e value probes parse rgb).
 
-### 2.1 官方语义槽（`--background` 系 + `--primary` 系 + `--destructive` 系）
+### 2.1 Official semantic slots (the `--background` family + `--primary` family + `--destructive` family)
 
-暗侧（`:root`）：
+Dark side (`:root`):
 
-| 槽 | 新值 | 来源 |
+| Slot | New value | Source |
 |---|---|---|
-| `--background` | `#17171a` | [真值] ink bg |
-| `--foreground` | `#eae8ee` | [真值] ink |
-| `--card` / `--popover` | `#1e1e22` | [真值] panel/pop |
-| `--card-foreground` / `--popover-foreground` | `#eae8ee` | [真值] |
-| `--primary` / `--primary-foreground` | `#e5e5e5` / `#171717` | [保留] 中性实底角色，V2 无对应，非品牌槽 |
-| `--secondary` / `--secondary-foreground` | `#26262b` / `#eae8ee` | [真值] line 色兼 sedentary 填充 |
-| `--muted` | `#26262b` | [真值] mass |
-| `--muted-foreground` | `#b0afb6` | [真值] faint，8.22:1，正文通过 |
-| `--accent` / `--accent-foreground` | `#26262b` / `#eae8ee` | [真值] 原型 hover |
-| `--destructive` | `#e05a5a` | [真值] H 暗红 |
-| `--destructive-foreground` | `#17171a` | [派生] 4.92:1；白字只有 3.63:1，**暗侧必须翻深**（F2）。现行两主题同白字的惯例就此断裂 |
-| `--border` | `#26262b` | [真值] line，alpha 写法实色化 |
-| `--input` | `#35353d` | [真值] line2 |
-| `--ring` | `#908f96` | [派生] faint2，5.58:1，环按 3:1 验收通过 |
+| `--background` | `#17171a` | [true value] ink bg |
+| `--foreground` | `#eae8ee` | [true value] ink |
+| `--card` / `--popover` | `#1e1e22` | [true value] panel/pop |
+| `--card-foreground` / `--popover-foreground` | `#eae8ee` | [true value] |
+| `--primary` / `--primary-foreground` | `#e5e5e5` / `#171717` | [kept] neutral solid-fill role; V2 has no counterpart; not a brand slot |
+| `--secondary` / `--secondary-foreground` | `#26262b` / `#eae8ee` | [true value] line color doubling as sedentary fill |
+| `--muted` | `#26262b` | [true value] mass |
+| `--muted-foreground` | `#b0afb6` | [true value] faint, 8.22:1, body text passes |
+| `--accent` / `--accent-foreground` | `#26262b` / `#eae8ee` | [true value] prototype hover |
+| `--destructive` | `#e05a5a` | [true value] H dark red |
+| `--destructive-foreground` | `#17171a` | [derived] 4.92:1; white text is only 3.63:1, **the dark side must flip to dark** (F2). The current convention of white text in both themes breaks here |
+| `--border` | `#26262b` | [true value] line, alpha notation made solid |
+| `--input` | `#35353d` | [true value] line2 |
+| `--ring` | `#908f96` | [derived] faint2, 5.58:1, the ring passes at the 3:1 acceptance bar |
 
-亮侧（`.light`）：
+Light side (`.light`):
 
-| 槽 | 新值 | 来源 |
+| Slot | New value | Source |
 |---|---|---|
-| `--background` | `#efece5` | [真值] paper |
-| `--foreground` | `#15140f` | [真值] ink |
-| `--card` / `--popover` | `#e7e3da` | [真值] panel/pop（卡片与纸面只差一档，跟 herdr 站房同取舍） |
-| `--card-foreground` / `--popover-foreground` | `#15140f` | [真值] |
-| `--primary` / `--primary-foreground` | `#171717` / `#fafafa` | [保留] 同暗侧理由 |
-| `--secondary` / `--secondary-foreground` | `#e7e3da` / `#15140f` | [真值] panel |
-| `--muted` | `#ddd8cc` | [真值] mass |
-| `--muted-foreground` | `#55534a` | [真值] dim，6.54:1 |
-| `--accent` / `--accent-foreground` | `#e2ded4` / `#15140f` | [真值] 原型 hover |
-| `--destructive` | `#c73e3e` | [真值] H 亮红 |
-| `--destructive-foreground` | `#ffffff` | [派生] 5.02:1 |
-| `--border` | `#e2ded4` | [真值] line |
-| `--input` | `#cbc5b6` | [真值] line2 |
-| `--ring` | `#86826f` | [派生] faint，3.27:1——环按 3:1 验收刚过，面票重测，不通过则退 dim（F4 相关） |
+| `--background` | `#efece5` | [true value] paper |
+| `--foreground` | `#15140f` | [true value] ink |
+| `--card` / `--popover` | `#e7e3da` | [true value] panel/pop (card and paper differ by one tier, same trade as the herdr site proper) |
+| `--card-foreground` / `--popover-foreground` | `#15140f` | [true value] |
+| `--primary` / `--primary-foreground` | `#171717` / `#fafafa` | [kept] same reason as the dark side |
+| `--secondary` / `--secondary-foreground` | `#e7e3da` / `#15140f` | [true value] panel |
+| `--muted` | `#ddd8cc` | [true value] mass |
+| `--muted-foreground` | `#55534a` | [true value] dim, 6.54:1 |
+| `--accent` / `--accent-foreground` | `#e2ded4` / `#15140f` | [true value] prototype hover |
+| `--destructive` | `#c73e3e` | [true value] H light red |
+| `--destructive-foreground` | `#ffffff` | [derived] 5.02:1 |
+| `--border` | `#e2ded4` | [true value] line |
+| `--input` | `#cbc5b6` | [true value] line2 |
+| `--ring` | `#86826f` | [derived] faint, 3.27:1 — the ring barely passes the 3:1 acceptance; the surface ticket re-measures, and if it fails, falls back to dim (F4-related) |
 
-### 2.2 surface / text / 缝线族（补位族，同源压缩）
+### 2.2 surface / text / seam-line families (the gap-filling family, compressed same-source)
 
-herdr 中性阶只有三档（底/面板/团块）加两档线，現行五档 surface ramp 按此压缩，
-多余阶做别名，不许自创第四档灰：
+herdr's neutral ladder has only three tiers (background/panel/mass) plus two line tiers; the current five-tier surface ramp compresses accordingly, with the surplus tiers becoming aliases — inventing a fourth gray tier is forbidden:
 
-| 槽 | 暗 | 亮 | 来源 |
+| Slot | Dark | Light | Source |
 |---|---|---|---|
-| `--surface` | `#1e1e22` | `#e7e3da` | [真值] panel |
-| `--surface-secondary` | `#26262b` | `#ddd8cc` | [真值] 暗=line 兼填充 / 亮=mass |
-| `--surface-tertiary` | `#35353d` | `#ddd8cc`（别名，与 secondary 同值） | [真值] 暗=原型 active / 亮=herdr 无第四阶，并阶 |
-| `--surface-elevated` | `#1e1e22`（别名，与 surface 同值） | `#e7e3da`（别名） | 并阶，理由同上 |
-| `--surface-hover` | `#26262b` | `#e2ded4` | [真值] 原型 hover 两值 |
-| `--surface-press` | `#35353d` | `#ddd8cc` | [真值] 原型 active 两值 |
-| `--column` / `--col-bg` | `#17171a`（== background，保持现行关系） | `#efece5`（== background） | [真值] 关系保持 |
-| `--border-default` | `#26262b` | `#e2ded4` | [真值] 两档 line |
-| `--border-strong` | `#35353d` | `#cbc5b6` | [真值] 两档 line2 |
-| `--sidebar-hover` / `--sidebar-active` / `--seg-hover` | 不动（ink alpha 梯 5%/10%，自适应） | 同左（warm-ink alpha 梯） | [保留] 机制自适应底色 |
-| `--text-on-accent` / `--toggle-knob` / `--overlay-scrim` | `#17171a` / `#ffffff` / `rgb(0 0 0/0.6)` | `#ffffff` / `#ffffff` / `rgb(0 0 0/0.6)` | [真值] spot-ink 语义；knob/scrim 主题不变 |
+| `--surface` | `#1e1e22` | `#e7e3da` | [true value] panel |
+| `--surface-secondary` | `#26262b` | `#ddd8cc` | [true value] dark=line doubling as fill / light=mass |
+| `--surface-tertiary` | `#35353d` | `#ddd8cc` (alias, same value as secondary) | [true value] dark=prototype active / light=herdr has no fourth tier, tiers merged |
+| `--surface-elevated` | `#1e1e22` (alias, same value as surface) | `#e7e3da` (alias) | tiers merged, same reason as above |
+| `--surface-hover` | `#26262b` | `#e2ded4` | [true value] the prototype's two hover values |
+| `--surface-press` | `#35353d` | `#ddd8cc` | [true value] the prototype's two active values |
+| `--column` / `--col-bg` | `#17171a` (== background, current relationship kept) | `#efece5` (== background) | [true value] relationship kept |
+| `--border-default` | `#26262b` | `#e2ded4` | [true value] the two line tiers |
+| `--border-strong` | `#35353d` | `#cbc5b6` | [true value] the two line2 tiers |
+| `--sidebar-hover` / `--sidebar-active` / `--seg-hover` | unchanged (ink alpha ladder 5%/10%, self-adapting) | same as dark (warm-ink alpha ladder) | [kept] the mechanism adapts to the fill color |
+| `--text-on-accent` / `--toggle-knob` / `--overlay-scrim` | `#17171a` / `#ffffff` / `rgb(0 0 0/0.6)` | `#ffffff` / `#ffffff` / `rgb(0 0 0/0.6)` | [true value] spot-ink semantics; knob/scrim theme-invariant |
 
-### 2.3 品牌与焦点（§1.3 的三类槽）
+### 2.3 Brand and focus (the three slot classes of §1.3)
 
-| 槽 | 暗 | 亮 | 来源 |
+| Slot | Dark | Light | Source |
 |---|---|---|---|
-| `--card-button` | `#cba6f7` | `#8839ef` | [真值] 两档 spot |
-| `--focus-ring` | `#cba6f7` | `#8839ef` | [真值] 与卡按钮同值关系保持 |
-| `--text-on-accent` | `#17171a`（8.81:1） | `#ffffff`（5.41:1） | [真值] 复测值 |
-| `--drop-tint-border` / `-base` / `-hover` | `#cba6f7` 实色边 + `color-mix(spot 5%/10%)` | `#8839ef` 实色边 + `color-mix(spot 5%/10%)` | [派生] 只换色相，5%/10% 两档比例沿现行 |
+| `--card-button` | `#cba6f7` | `#8839ef` | [true value] the two spot tiers |
+| `--focus-ring` | `#cba6f7` | `#8839ef` | [true value] the same-value relationship with the card button kept |
+| `--text-on-accent` | `#17171a` (8.81:1) | `#ffffff` (5.41:1) | [true value] re-measured values |
+| `--drop-tint-border` / `-base` / `-hover` | `#cba6f7` solid border + `color-mix(spot 5%/10%)` | `#8839ef` solid border + `color-mix(spot 5%/10%)` | [derived] hue swapped only; the 5%/10% tier ratios carried over from the current values |
 
-### 2.4 正文 ramp：一次刻意的偏离（better-colors 实测结论）
+### 2.4 Body-text ramp: one deliberate deviation (better-colors measured conclusion)
 
-herdr 自家的 `faint` 在亮纸面上只有 3.27:1（faint2 约 3.15:1），在 herdr 站房里
-它们只做装饰。照抄进正文 ramp 会批量制造 F4。裁定：
+herdr's own `faint` is only 3.27:1 on light paper (faint2 about 3.15:1); on the herdr site proper they are decorative only. Copying them into the body-text ramp would mass-produce F4. Ruling:
 
-- 暗侧采用 herdr 全套：`--text-secondary` → dim `#cdccd2`（11.21:1），
-  `--text-tertiary` → faint `#b0afb6`（8.22:1），`--text-dim` → faint2
-  `#908f96`（5.58:1，仅装饰：时间戳/占位/非活动图标，沿 XMON-55 口径）。
-- 亮侧**保留现行 warm ramp**：`--text-secondary` `#44403c`（纸面约 8.8:1）、
-  `--text-tertiary` `#57534e`（复测 6.47:1）、`--text-dim` `#a8a29e`（仅装饰）。
-  理由：现行值全部通过且与纸面暖调同源，换 herdr dim（6.54:1）是降级，
-  换 faint 是违规。herdr faint 系在亮侧只许进装饰位（`--ring` 看 §2.1 末行）。
-- `--col-head-text`：暗 → dim `#cdccd2`；亮保留 `#57534e`（6.47:1）。
-- `--menu-icon`：亮保留 `#1c1917`；暗保留 `#71717a`——新面板上 3.44:1，
-  按**非文本 3:1**验收（图标不是正文），面票注明口径。
+- Dark side adopts herdr's full set: `--text-secondary` → dim `#cdccd2` (11.21:1), `--text-tertiary` → faint `#b0afb6` (8.22:1), `--text-dim` → faint2 `#908f96` (5.58:1, decorative only: timestamps/placeholders/inactive icons, per the XMON-55 convention).
+- Light side **keeps the current warm ramp**: `--text-secondary` `#44403c` (about 8.8:1 on paper), `--text-tertiary` `#57534e` (re-measured 6.47:1), `--text-dim` `#a8a29e` (decorative only). Reason: the current values all pass and are same-source with the paper's warm tone; switching to herdr dim (6.54:1) is a downgrade, and to faint a violation. The herdr faint family may enter the light side only at decorative slots (for `--ring` see the last row of §2.1).
+- `--col-head-text`: dark → dim `#cdccd2`; light keeps `#57534e` (6.47:1).
+- `--menu-icon`: light keeps `#1c1917`; dark keeps `#71717a` — 3.44:1 on the new panel, accepted at the **non-text 3:1** bar (icons are not body text); the surface ticket notes the convention.
 
-### 2.5 选中/计划/徽标族：15° 规则（better-colors one color one meaning）
+### 2.5 Selected/planned/badge family: the 15° rule (better-colors "one color one meaning")
 
-spot 紫 hue 约 270°。凡与 spot 差 ±15° 以内的槽（现行 indigo 族）一律回
-spot 族；蓝绿橙红状态槽（色相差 >15°）全部保留——紫只许表示「品牌/可点」，
-状态另有其色（F7）：
+Spot purple's hue is about 270°. Every slot within ±15° of spot (the current indigo family) goes back to the spot family; the blue/green/orange/red state slots (hue difference >15°) all stay — purple may only mean "brand / clickable", and states have their own colors (F7):
 
-回 spot 族（`--brand`/`--brand-fg` 语义承载）：`--chip-plan-bg/fg`、
-`--tile-indigo-bg/fg`、`--overlay-select-indigo`、`--pick-selected-bg/fg`、
-`--indigo-500`/`--indigo-600`（品牌字形用途）、`--notify-icon-bg` + 其上字形、
-`--primary-disabled` / `--indigo-disabled` / `--indigo-disabled-fg`
-（spot 按底色 mix 降级，精确比由面票实测钉死，失能态不按 4.5 验收但须可辨）。
+Back to the spot family (carried by the `--brand`/`--brand-fg` semantics): `--chip-plan-bg/fg`, `--tile-indigo-bg/fg`, `--overlay-select-indigo`, `--pick-selected-bg/fg`, `--indigo-500`/`--indigo-600` (brand-glyph uses), `--notify-icon-bg` + the glyph on it, `--primary-disabled` / `--indigo-disabled` / `--indigo-disabled-fg` (spot mixed down against the fill; the exact ratios pinned by the surface ticket's measurements; the disabled state is not accepted at 4.5 but must be distinguishable).
 
-选中对 exact 值（已实测，面票复测）：
+Selected-pair exact values (already measured; the surface ticket re-measures):
 
-- 暗：底 = spot 14% mix 于 panel（≈`#363140`），字 `#cba6f7`，6.19:1。
-- 亮：底 = spot 14% mix 于 panel，字取加深紫 `#6d28d9`，4.59:1。
-  注意：亮侧若用 spot 原色做字只有 3.50:1（F3），**加深一档是强制项**，
-  不是可选打磨。该槽是「tint 底上的字」专用阶，命名须含角色
-  （如 `--spot-text-on-tint`），不许复用 `--card-button` 顶替。
+- Dark: fill = spot 14% mixed onto panel (≈`#363140`), text `#cba6f7`, 6.19:1.
+- Light: fill = spot 14% mixed onto panel, text takes the deepened purple `#6d28d9`, 4.59:1. Note: on the light side, spot's raw color as text is only 3.50:1 (F3); **deepening one tier is mandatory**, not optional polish. This slot is a dedicated tier for "text on a tint fill"; the name must carry the role (e.g. `--spot-text-on-tint`); reusing `--card-button` as a stand-in is forbidden.
 
-保留（状态语义）：`--col-dot-*` 四槽、`--badge-*` 三槽、`--chip-confirm/done/failed`
-及 `--tile-orange/hero`、`--diff-*`、`--fail-fg`、`--project-avatar-*`
-（`#e97b35` 头像身份色）、palette 原语 `--blue/amber/green/rose/gray-500`、
-`--stop`（与 destructive 同色相不同明度是现行双红并存，延续并在票据注明）。
+Kept (state semantics): the four `--col-dot-*` slots, the three `--badge-*` slots, `--chip-confirm/done/failed` plus `--tile-orange/hero`, `--diff-*`, `--fail-fg`, `--project-avatar-*` (`#e97b35` avatar identity color), the palette primitives `--blue/amber/green/rose/gray-500`, `--stop` (same hue as destructive but different lightness is the current dual-red coexistence; carried over, noted in the ticket).
 
-### 2.6 浮层/对话框/行级槽：对齐到线与团块
+### 2.6 Overlay/dialog/row-level slots: aligned to line and mass
 
-| 槽 | 暗 | 亮 | 来源 |
+| Slot | Dark | Light | Source |
 |---|---|---|---|
-| `--dialog-bg` / `--dialog-box-bg` | `#1e1e22`（box 沿 panel + 边框，保持现行关系） | `#e7e3da`（同左） | [真值] |
-| `--dialog-ring` | `#35353d` | `#cbc5b6` | [真值] line2 |
-| `--dialog-row-bg` | `#26262b`（mass，落在 panel dialog 上可见） | `#ddd8cc`（同左） | [派生] 关系保持 |
-| `--row-selected` | `#26262b` | `#e2ded4`（== hover，选中即 hover 上限） | [真值] |
-| `--row-icon-bg` | `#35353d` | `#ddd8cc` | [真值] mass 系 |
-| `--overlay-divider` | `#26262b` | `#e2ded4` | [真值] line |
-| `--range-chip-bg` / `-border` | `#26262b` / `#35353d` | `#e7e3da` / `#cbc5b6` | [对齐] |
-| `--pill-idle-bg` | `#26262b` | `#ddd8cc` | [对齐] mass |
-| `--dash-border` | `#35353d` | `#cbc5b6` | [真值] line2（虚线 add-machine 边框） |
-| `--toggle-track` | `#35353d`（panel 上可见） | `#cbc5b6`（同左） | [派生] |
-| `--chief-tab-bg` / `-active` | `#26262b` / `#35353d` | `#ddd8cc`（strip） / `#e7e3da`（active pill，方向沿现行：pill 浅于 strip） | [真值+关系] |
-| `--seg-active` | `#35353d` | `#ddd8cc` | [真值] 原型 active |
-| `--tab-chip-bg` | `#1e1e22` | `#e7e3da` | [真值] panel（落在 mass 组底上） |
-| `--agent-avatar-bg` | `#26262b`（== chip-idle-bg，关系保持） | `#e7e3da`（同左） | [对齐] |
-| `--chip-idle-bg` / `-fg` | `#26262b` / `#9ea3ae`（保留，面票按 4.5 复测） | `#e7e3da` / `#4d5562`（保留，面票复测） | [对齐+保留] |
-| `--notify-icon-bg` | `#35353d`，字形走 spot `#cba6f7` | spot 14% tint，字形 `#8839ef` | [派生] 面票复测非文本 3:1 |
+| `--dialog-bg` / `--dialog-box-bg` | `#1e1e22` (box follows panel + border, current relationship kept) | `#e7e3da` (same as dark) | [true value] |
+| `--dialog-ring` | `#35353d` | `#cbc5b6` | [true value] line2 |
+| `--dialog-row-bg` | `#26262b` (mass, visible on the panel dialog) | `#ddd8cc` (same as dark) | [derived] relationship kept |
+| `--row-selected` | `#26262b` | `#e2ded4` (== hover; selected is the hover ceiling) | [true value] |
+| `--row-icon-bg` | `#35353d` | `#ddd8cc` | [true value] the mass family |
+| `--overlay-divider` | `#26262b` | `#e2ded4` | [true value] line |
+| `--range-chip-bg` / `-border` | `#26262b` / `#35353d` | `#e7e3da` / `#cbc5b6` | [aligned] |
+| `--pill-idle-bg` | `#26262b` | `#ddd8cc` | [aligned] mass |
+| `--dash-border` | `#35353d` | `#cbc5b6` | [true value] line2 (the dashed add-machine border) |
+| `--toggle-track` | `#35353d` (visible on panel) | `#cbc5b6` (same as dark) | [derived] |
+| `--chief-tab-bg` / `-active` | `#26262b` / `#35353d` | `#ddd8cc` (strip) / `#e7e3da` (active pill, direction carried from current: pill lighter than strip) | [true value + relationship] |
+| `--seg-active` | `#35353d` | `#ddd8cc` | [true value] prototype active |
+| `--tab-chip-bg` | `#1e1e22` | `#e7e3da` | [true value] panel (sits on the mass group fill) |
+| `--agent-avatar-bg` | `#26262b` (== chip-idle-bg, relationship kept) | `#e7e3da` (same as dark) | [aligned] |
+| `--chip-idle-bg` / `-fg` | `#26262b` / `#9ea3ae` (kept; the surface ticket re-measures at 4.5) | `#e7e3da` / `#4d5562` (kept; the surface ticket re-measures) | [aligned + kept] |
+| `--notify-icon-bg` | `#35353d`, the glyph takes spot `#cba6f7` | spot 14% tint, the glyph `#8839ef` | [derived] the surface ticket re-measures at non-text 3:1 |
 
-### 2.7 阴影/圆角/动效 token（better-ui 落仓口径）
+### 2.7 Shadow/radius/motion tokens (the better-ui landing convention)
 
-用户选的是 Herdr 那对，不是 V2 通用档——阴影采用 H 档的柔和投影，
-**不用** V2 通用 `4px 4px 0` 硬投影：
+The user picked Herdr's pair, not the V2 generic tier — shadows use the H tier's soft shadows, **not** the V2-generic `4px 4px 0` hard shadow:
 
-- 亮：卡片 `0 1px 2px rgb(26 26 24/0.08)`，弹层 `0 8px 24px rgb(26 26 24/0.16)`
- （H 亮真值）。暗：无投影，线框承重（H 暗真值）。
-- `--edge-ring` 机制保留（inset spread ring，颜色跟 `--border-default` 走，
-  自动适配；小数 zoom 下不断线，已是既有结论）。
-- `--drag-shadow` 形状保留（`0 8px 24px`，参考站配方），颜色亮侧换
-  `rgb(26 26 24/0.18)`，暗侧保留黑 tons（panel 上黑影弱，面票实物确认）。
-  `--chief-shadow` 并入弹层 tier。`--fab-shadow` 仍是 `--edge-shadow` 别名。
-- 圆角：第一批迁移面（复选 tile、弹层壳、面内主/次按钮）圆角清零；
-  `--radius` 基与卡片圆角不动，等第二批面票逐面决定（默认跟 V2 归零，
-  每面须经视觉 spec 重审）。同心圆角律（better-ui：外 = 内 + padding）
-  在嵌套弹层上逐面核对。
-- 动效 token：`--dur-fast` 150ms 与 tw 默认同值，保留；`--dur-overlay` 200ms
-  → 收敛 150ms（ADR D3 挂载淡入归默认档）；easing 三档保留。
-  手作值（140ms overshoot 曲线、100ms ease-out、brightness(1.07)）以面作用域
-  token/类形态与 D4 保留面共处 `motion.css`，不另起文件（单系统可 grep）。
+- Light: card `0 1px 2px rgb(26 26 24/0.08)`, popover `0 8px 24px rgb(26 26 24/0.16)` (H light true values). Dark: no shadows, the line border carries the weight (H dark true values).
+- The `--edge-ring` mechanism is kept (an inset spread ring; its color follows `--border-default` and adapts automatically; it does not break at fractional zoom, an existing conclusion).
+- The `--drag-shadow` shape is kept (`0 8px 24px`, the reference-site recipe); its color switches to `rgb(26 26 24/0.18)` on the light side, and keeps the black tint on the dark side (black shadows are weak on panel; the surface ticket confirms on the artifact). `--chief-shadow` merges into the popover tier. `--fab-shadow` remains an alias of `--edge-shadow`.
+- Radii: the first-batch migrated surfaces (checkbox tile, popover shell, in-surface primary/secondary buttons) go to radius zero; the `--radius` base and card radii do not move, awaiting the second-batch surface tickets one surface at a time (default follows V2 to zero; each surface must pass visual-spec re-review). The concentric-radius rule (better-ui: outer = inner + padding) is checked per surface on nested popovers.
+- Motion tokens: `--dur-fast` 150ms equals the tw default, kept; `--dur-overlay` 200ms → converges to 150ms (ADR D3's mount fade-in goes to the default tier); the three easing tiers are kept. The hand-made values (140ms overshoot curve, 100ms ease-out, brightness(1.07)) coexist with the D4 preserved surfaces in `motion.css` as surface-scoped tokens/classes — no separate file (a single system, greppable).
 
-`taste` skill 结论：HERDR-THEME-TOKENS.md 即 2026-10-04 从 herdr.dev
-`style.css` + `site.css` 直接拉取的 mode 层真值（一手 token 反推已完成），
-无超出该表的面需要再跑浏览器反推。本 spec 不再为 taste 留票。
+The `taste` skill conclusion: HERDR-THEME-TOKENS.md is exactly the mode-layer true values pulled directly from herdr.dev's `style.css` + `site.css` on 2026-10-04 (first-hand token reverse-derivation already done); no surface beyond that table needs another browser reverse-derivation. This spec leaves no ticket for taste.
 
-## 3. 迁移顺序：token 层先行，按面随后，每步可独立合
+## 3. Migration order: token layer first, surfaces after, each step independently mergeable
 
-token 是全局单源（`shadcn.css` 唯一持值，`tokens.css` 只做别名），按面拆
-token 会分叉系统——所以顺序是「一次 token 翻转 + N 个面骨架」，不是逐面
-自带 token。每步独立合的含义：每步自带 `e2e:affected` + 视觉基线重拍，
-合后 main 随时可发。
+Tokens are a global single source (`shadcn.css` is the only value holder; `tokens.css` only aliases); splitting tokens per surface would fork the system — hence the order is "one token flip + N surface skeletons", not each surface carrying its own tokens. Independently mergeable means: each step carries its own `e2e:affected` + visual-baseline reshoot, and main stays releasable after every merge.
 
-| 步 | 内容 | 为何在这 | 独立合形态 |
+| Step | Content | Why here | Independent-merge form |
 |---|---|---|---|
-| P0 | 基建：新增 `--spot-text-on-tint`（亮 `#6d28d9`）、`accent-soft`（spot 14% mix）语义槽、失能 mix 规则、主题切换抑制工具 | 无视觉变化，后续步的前置名 | token 加法 PR，零视觉 diff |
-| P1 | token 值翻转：§2 全表落 `shadcn.css`（`.light` 镜像同步），别名层零改动 | 单源翻转，一次把颜色账算清；骨架几何本步不动，漂移面最小 | 全站变色 PR + 全量视觉基线重拍（§5.3），`e2e:affected` 回落全量（共享面） |
-| P2 | 复选骨架：16px/圆角0/墨线框 + 开态主题色填充 + 勾选 140ms/取消 90ms 手作 + press 缩放 | 原型钉死最牢的面；checkbox 已是 Base UI 官方件（#690），钩子现成 | `checkbox-unified` + 视觉 spec 同步更新 |
-| P3 | 弹层骨架：12px 内边距/墨线/圆角0/Arrow + 进场 scale.98+fade 100ms（替代 slide） | B1 弹层壳是 spec 16 既定先行面，同批人马顺手收 | overlay 系 spec + dialog-viewport 钉扎复审 |
-| P4 | 行 hover/按钮：accent-soft tint、主钮 brightness(1.07)、次钮 hover/active token | 纯 token 消费，无几何变更，最易回滚 | hover 系 spec（card-press 等） |
-| P5 | danger/焦点/环：红系两值 + 暗侧深字翻转 + `--ring` 两值 + 切换抑制 | 语义最重（可点性/危险操作），单独一票便于 revert | overlay-focus + brand-typo（改名见 §5.2） |
-| P6 | 第二批面收口：board 卡片、侧栏、chief、detail、pages 骨架 + 圆角归零 | 体量与钉扎密度最大（spec 16 B4 同理最多两条车道），放最后 | 按面拆 2–3 票，可并行（错域），禁同文件配对（preferences §收口顺序） |
-| P7 | 总验收：§5 全项 + fixture 基线封版 | 收尾票，不接受「下次再测」 | 绿了才算完 |
+| P0 | Infrastructure: add the `--spot-text-on-tint` (light `#6d28d9`), `accent-soft` (spot 14% mix) semantic slots, the disabled-mix rule, the theme-switch suppression utility | No visual change; the precondition names for later steps | A token-addition PR, zero visual diff |
+| P1 | Token-value flip: §2's full table lands in `shadcn.css` (the `.light` mirror in sync), alias layer unchanged | A single-source flip settles the color account once; skeleton geometry does not move in this step, so the drift surface is minimal | A whole-site recolor PR + full visual-baseline reshoot (§5.3); `e2e:affected` falls back to the full suite (shared surfaces) |
+| P2 | Checkbox skeleton: 16px/radius-0/ink border + on-state theme-color fill + the 140ms check / 90ms uncheck hand-made motion + press scale | The surface the prototype pins hardest; the checkbox is already the Base UI official component (#690), hooks ready | `checkbox-unified` + visual spec updated in sync |
+| P3 | Popover skeleton: 12px inner padding/ink line/radius 0/Arrow + enter scale .98+fade 100ms (replacing slide) | The B1 popover shell is spec 16's designated first surface; the same crew closes it in passing | overlay-family specs + dialog-viewport pin re-review |
+| P4 | Row hover/buttons: accent-soft tint, primary brighten brightness(1.07), secondary hover/active tokens | Pure token consumption, no geometry change, easiest to roll back | hover-family specs (card-press etc.) |
+| P5 | danger/focus/rings: the two red values + the dark-side dark-text flip + the two `--ring` values + switch suppression | Heaviest semantics (clickability / dangerous actions); its own ticket makes revert easy | overlay-focus + brand-typo (renamed, see §5.2) |
+| P6 | Second-batch surfaces closed out: board cards, sidebar, chief, detail, pages skeletons + radius zeroing | The largest volume and pin density (spec 16 B4 likewise capped at two lanes), goes last | Split into 2–3 surface tickets, parallelizable (different domains), same-file pairing forbidden (preferences §closing order) |
+| P7 | Final acceptance: everything in §5 + fixture baseline sealed | The closing ticket; "test it next time" not accepted | Done only when green |
 
-P1 与 spec 16 的关系：spec 16 未合的批次若与 P1 同期在飞，以「P1 先合、
-结构票 rebase 跟进」为准（颜色正本单源，跟随方适配；反向会制造双正本）。
+P1 and spec 16's relationship: if spec 16's unmerged batches are in flight at the same time as P1, "P1 merges first, the structure tickets rebase and follow" rules (the color canonical copy is single-source; the follower adapts; the reverse would create two canonical copies).
 
-## 4. 与现行 Indigo 品牌的关系：直接切，不双轨
+## 4. Relationship with the current Indigo brand: switch directly, no dual track
 
-- 断。`--card-button`/`--focus-ring` 从 `#4e47dd` 直接换两档 spot 紫，
-  无过渡期、无双轨、无 compat shim。理由：主题机制是单 `.light` 开关，
-  双品牌等于把 §2 全表再 fork 一份，e2e 矩阵翻倍；原型 H 档本身已 drop
-  indigo；现行 `#4e47dd` 恰是原型 A 档亮值，用户叙事是「紫从 indigo 搬到
-  Herdr 紫」，连续性成立。
-- 断裂点只有两处，写进 P5 票面：① `--destructive-foreground` 暗侧由白字翻
-  深字（F2）；② `--pick-selected-fg` 亮侧由品牌实色改加深紫（F3）。
-  其余 indigo 痕迹（chip-plan/tile-indigo 等）按 §2.5 回 spot 族，
-  不留 `--indigo-*` 活引用（槽可留空值占位一版后删，或随 P1 直接删，
-  面票定；消费方约 40 个文件由 P1 同 PR 切完，不许悬空）。
-- `brand-typo.spec.ts` 更名（`accent-typo.spec.ts`）并更新断言，随 P5。
+- Cut. `--card-button`/`--focus-ring` switch from `#4e47dd` directly to the two spot purples; no transition period, no dual track, no compat shim. Reason: the theme mechanism is a single `.light` switch; a dual brand would fork §2's full table again and double the e2e matrix; the prototype's H tier itself already dropped indigo; the current `#4e47dd` happens to be the prototype's A-tier light value, and the user's narrative is "the purple moves from indigo to Herdr purple" — continuity holds.
+- Only two break points, written into P5's ticket: ① `--destructive-foreground` on the dark side flips from white to dark text (F2); ② `--pick-selected-fg` on the light side changes from the brand solid color to the deepened purple (F3). The remaining indigo traces (chip-plan/tile-indigo etc.) go back to the spot family per §2.5, leaving no live `--indigo-*` references (the slots may sit as empty placeholders for one release then be deleted, or be deleted outright with P1 — decided by the surface ticket; the ~40 consumer files are all switched in P1's own PR, none left dangling).
+- `brand-typo.spec.ts` is renamed (`accent-typo.spec.ts`) with its assertions updated, with P5.
 
-## 5. 验收
+## 5. Acceptance
 
-### 5.1 双主题对比度实测（better-colors 方法：测渲染对，不估算）
+### 5.1 Dual-theme contrast measurement (the better-colors method: measure rendered pairs, no estimating)
 
- bright用作物以 P1 落仓后的编译产物为准，下表是本 spec 已复测的门槛值，
- 面票须逐对复测（容差 ±0.02，工具：本节同款相对亮度公式，双主题 × 明暗）：
+The bright crops are based on the compiled output after P1 lands; the table below holds this spec's re-measured gate values, and the surface ticket must re-measure pair by pair (tolerance ±0.02; tool: this section's same relative-luminance formula, dual theme × light/dark):
 
-文本对（≥4.5:1）：主钮字两档 5.41 / 8.81、正文两档 15.63 / 14.72、
-次级字 8.71 / 11.21、 muted 两档 6.54 / 8.22、danger 字 5.02 / 4.92、
-选中对 4.59（亮，加深紫方案） / 6.19（暗）、pick 现行对 5.45/5.21 作废。
-非文本对（≥3:1）：`--ring` 亮 3.27（面票不通过则退 dim）、menu-icon 暗
-3.44（按图标口径通过）。
-装饰免测：faint 系亮侧值（3.27/3.15）只许出现在边框/占位/装饰图标，
-出现在正文即红。
+Text pairs (≥4.5:1): primary-button text both tiers 5.41 / 8.81, body text both tiers 15.63 / 14.72, secondary text 8.71 / 11.21, muted both tiers 6.54 / 8.22, danger text 5.02 / 4.92, selected pairs 4.59 (light, deepened-purple scheme) / 6.19 (dark), the current pick pairs 5.45/5.21 voided.
+Non-text pairs (≥3:1): `--ring` light 3.27 (the surface ticket falls back to dim if it fails), menu-icon dark 3.44 (passes at the icon bar).
+Decorative exempt: the faint family's light-side values (3.27/3.15) may appear only in borders/placeholders/decorative icons; appearing in body text goes red.
 
-### 5.2 视觉 spec 更新清单
+### 5.2 Visual-spec update list
 
-必碰：`sidebar-visual`、`visual-polish`、`theme-toggle`（加切换抑制断言）、
-`brand-typo`（更名 + 换断言）、`checkbox-unified`（16px/圆角0/开态填充）、
-`card-press`（press token 值）、`overlay-focus`（环色 + offset）。
-可能碰（P6 按面列）：chief 系、detail 系、board 系视觉断言。
-规则：改 CSS 必同 PR 改断言（F6）；`--update-snapshots` 前后各跑一次，
-diff 逐条说明用途（F1）。
+Must touch: `sidebar-visual`, `visual-polish`, `theme-toggle` (add switch-suppression assertions), `brand-typo` (renamed + assertions swapped), `checkbox-unified` (16px/radius-0/on-state fill), `card-press` (press token values), `overlay-focus` (ring color + offset).
+May touch (P6 lists per surface): chief-family, detail-family, board-family visual assertions.
+Rules: change CSS, change assertions in the same PR (F6); run once before and once after `--update-snapshots`, and explain the diff line by line (F1).
 
-### 5.3 fixture 截图基线重拍计划
+### 5.3 Fixture screenshot baseline reshoot plan
 
-- 基建：fixture 构建只 1.5s（既有基线），贵的是拍摄不是构建。
-- P1 合后：双主题 ×（看板 / 弹层 / 复选 / 按钮 / danger 确认 / pick 选中行）
-  六组 before/after（before 取自 P1 前 main 的一次性 worktree 栈，
-  不许拿旧图頂替；verify 栈 vite 热吃改动，server 不吃——before 必须在
-  `origin/main` 一次性栈上跑，沿用既有纪律）。
-- 动效面（P2/P3）：GIF before/after 各一条（§1.2 做法），静态图只作补充。
-- 归档：`docs/verify/<票号>/` + PR body raw 永久链（SHA 从命令输出取，
-  curl 到 200；Multica 通道已停，不走评论）。
-- 跑法：开发期 `e2e:affected`（P1 触共享面自动回落全量），收尾全量归 CI
-  四分片；本地全量 154s/617 条但多 lane 并行是内存压力源，不当日常。
+- Infrastructure: the fixture build is only 1.5s (existing baseline); the expensive part is shooting, not building.
+- After P1 merges: dual theme × (board / popovers / checkboxes / buttons / danger confirm / pick selected rows), six groups before/after (the "before" shot from a one-off worktree stack of main before P1; old images may not stand in; the verify stack's vite hot-reloads changes but the server does not — the "before" must run on a one-off `origin/main` stack, following the existing discipline).
+- Motion surfaces (P2/P3): one GIF before/after each (§1.2 method); static images supplementary only.
+- Archiving: `docs/verify/<ticket>/` + PR body raw permanent links (SHA taken from command output, curl to 200; the Multica channel is retired, no comment route).
+- How to run: during development `e2e:affected` (P1 touches shared surfaces and auto-falls back to the full suite); at closing, the full suite goes to CI's four shards; the local full run is 154s/617 cases but parallel lanes are the memory-pressure source — not a daily driver.
 
-## 6. 拆票清单（agent-ready，每票标题 + 一句话范围 + blocked 边）
+## 6. Ticket split list (agent-ready: each ticket's title + one-line scope + blocked edges)
 
-1. `web(theme): land Herdr token values in shadcn.css (P1)` —— §2 全表翻转 + 别名零改 + 全量视觉基线重拍。blocked: P0。
-2. `web(theme): add spot-soft, spot-text-on-tint, disabled-mix and theme-switch suppression (P0)` —— 新增语义槽与切换抑制工具，零视觉 diff。blocked: 无。
-3. `web(theme): V2 checkbox bone 16px square plus hand-made check motion (P2)` —— tile 几何 + 开态填充 + 140/90ms 动效 + GIF 证据。blocked: #1。
-4. `web(theme): V2 overlay bone plus scale-fade enter replacing slide (P3)` —— 弹层壳几何 + Arrow + 进场覆写 + 单机制 grep 验收。blocked: #1。
-5. `web(theme): accent-soft row hovers, button brighten, danger reds and focus rings (P4+P5)` —— hover tint、主钮 hover、红系两值、暗侧深字翻转、环色、brand spec 更名。blocked: #1。
-6. `web(theme): board/sidebar/chief/detail/pages bone convergence (P6)` —— 第二批面骨架 + 圆角归零，可再拆 2–3 面票（错域并行，禁同文件配对）。blocked: #1。
-7. `web(theme): dual-theme contrast re-measure and fixture baseline seal (P7)` —— §5 全项复测 + 基线封版。blocked: #3, #4, #5, #6。
+1. `web(theme): land Herdr token values in shadcn.css (P1)` — the full §2 table flip + alias layer untouched + full visual-baseline reshoot. blocked: P0.
+2. `web(theme): add spot-soft, spot-text-on-tint, disabled-mix and theme-switch suppression (P0)` — new semantic slots and the switch-suppression utility, zero visual diff. blocked: none.
+3. `web(theme): V2 checkbox bone 16px square plus hand-made check motion (P2)` — tile geometry + on-state fill + 140/90ms motion + GIF evidence. blocked: #1.
+4. `web(theme): V2 overlay bone plus scale-fade enter replacing slide (P3)` — popover shell geometry + Arrow + enter override + single-mechanism grep acceptance. blocked: #1.
+5. `web(theme): accent-soft row hovers, button brighten, danger reds and focus rings (P4+P5)` — hover tint, primary-button hover, the two red values, the dark-side dark-text flip, ring colors, the brand spec rename. blocked: #1.
+6. `web(theme): board/sidebar/chief/detail/pages bone convergence (P6)` — second-batch surface skeletons + radius zeroing; splittable further into 2–3 surface tickets (parallel across domains, same-file pairing forbidden). blocked: #1.
+7. `web(theme): dual-theme contrast re-measure and fixture baseline seal (P7)` — everything in §5 re-measured + baseline sealed. blocked: #3, #4, #5, #6.
 
-合并归协调者：spec 进 `docs/spec/` 随 PR 走，或直接落仓，票里写明。
-本 spec 文件本身随首个 P 票 PR 进仓（`docs/spec/base-ui-theme.md`），
-不单独开 PR。
+Merging belongs to the coordinator: the spec goes into `docs/spec/` with a PR, or lands directly; the ticket says which. This spec file itself enters the repo with the first P-ticket PR (`docs/spec/base-ui-theme.md`), no separate PR.
 
-## 附：事实源索引（取数位置，不重复抄值）
+## Appendix: fact-source index (where the data was taken; values not copied again)
 
-- V2 骨架 exact 值：`library/t-accent-prototype/accent-compare-prototype.html`
-  L36–83（黑白骨架）、L92–103（主题色层）、L108–159（H 两档）、L316–380
-  （复选/按钮/弹层几何与动效）、L772–806（WAAPI 动效引擎值）。
-- Herdr 真值：同目录 `HERDR-THEME-TOKENS.md`（站点 mode 层 paper/ink +
-  23 套 palette；备查，不进仓）。
-- 现行正本：`apps/web/src/styles/shadcn.css`（颜色唯一持值）、
-  `tokens.css`（别名 + 非颜色层）、`motion.css`（D4 保留面 + 待退役复刻值）、
-  `docs/adr/0009-全站动效收敛-shadcn-默认.md`（动效关系正本）。
-- 对比度：本 spec §5.1 数值由相对亮度公式复算（原型括号值 5.41/8.8/
-  6.42/5.34/8.72/5.43/5.02/9.18/5.48/8.46 逐项核对一致，H 暗取复测 8.81）。
+- V2 skeleton exact values: `library/t-accent-prototype/accent-compare-prototype.html` L36–83 (black-and-white skeleton), L92–103 (theme-color layer), L108–159 (H's two tiers), L316–380 (checkbox/button/popover geometry and motion), L772–806 (the WAAPI motion-engine values).
+- Herdr true values: `HERDR-THEME-TOKENS.md` in the same directory (the site's mode layer paper/ink + 23 palettes; for reference, not landed).
+- Current canonical copies: `apps/web/src/styles/shadcn.css` (the only color value holder), `tokens.css` (aliases + non-color layers), `motion.css` (D4 preserved surfaces + replication values pending retirement), `docs/adr/0009-site-wide-motion-converges-on-shadcn-defaults.md` (the canonical copy of the motion relationship).
+- Contrast: §5.1's values were recomputed with the relative-luminance formula (the prototype's parenthesized values 5.41/8.8/6.42/5.34/8.72/5.43/5.02/9.18/5.48/8.46 all checked item by item and consistent; H-dark takes the re-measured 8.81).

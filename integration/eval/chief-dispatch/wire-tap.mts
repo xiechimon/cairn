@@ -1,14 +1,4 @@
 #!/usr/bin/env -S pnpm exec tsx
-// 记录代理：把 CAIRN_EVAL_RELAY_URL 指到它，就能看到 daemon 真正发出去的请求体。
-//
-// 为什么需要它：模型条目写对了（reasoning/map/compat 都在）不等于 pi 真的把它翻译
-// 成了 wire 字段——中间还隔着 pi 的 compat 探测、档位夹取、以及我们看不到的组装。
-// 实测遇到过一次「探针单发能砍 4 倍输出、真实回路毫无改善」，不把请求体截下来就没法
-// 判断是没发、发错字段、还是发了但上游不理。
-//
-//   node <repo>/node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs \
-//     integration/eval/chief-dispatch/wire-tap.mts [监听端口] [上游 baseUrl] [记录文件]
-
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { createServer, request as httpRequest, type IncomingMessage } from 'node:http';
 

@@ -1,6 +1,9 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { orchestrationSourceRef, parseOrchestrationSourceRef } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { beforeEach, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   agent as agentTable,
   build as buildTable,
@@ -28,6 +31,18 @@ let chiefId: string;
 let threadId: string;
 let projectId: string;
 let ghFetch: FetchLike;
+let throttleHome: string;
+
+beforeAll(async () => {
+  throttleHome = await mkdtemp(join(tmpdir(), 'orchestration-source-'));
+  vi.stubEnv('CAIRN_HOME', throttleHome);
+  vi.stubEnv('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS', '0');
+});
+
+afterAll(async () => {
+  vi.unstubAllEnvs();
+  await rm(throttleHome, { recursive: true, force: true });
+});
 
 function seedAgent(): void {
   s.db

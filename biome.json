@@ -92,6 +92,10 @@
                   "@agentclientprotocol/sdk/*/*"
                 ],
                 "message": "缝纪律（ACP）：@agentclientprotocol/sdk 只许经 AgentBackend 缝消费——实现唯一落点 apps/daemon/src/backend/acp.ts。"
+              },
+              {
+                "group": ["@opentelemetry/*", "@opentelemetry/*/*"],
+                "message": "Seam discipline (observability-4): OpenTelemetry packages may only be consumed through the thin bridge module apps/daemon/src/backend/otel.ts, and only when CAIRN_OTEL_ENDPOINT is configured."
               }
             ],
             "paths": {

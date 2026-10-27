@@ -1121,6 +1121,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "conclusion": {
           "type": "string",
         },
+        "evalRulerChange": {
+          "type": "boolean",
+        },
         "findings": {
           "default": [],
           "items": {
@@ -1164,6 +1167,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           },
           "type": "array",
         },
+        "gateLoosening": {
+          "type": "boolean",
+        },
       },
       "required": [
         "conclusion",
@@ -1191,6 +1197,16 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "type": "integer",
     },
     "prUrl": {
+      "type": "string",
+    },
+    "preservedCommits": {
+      "items": {
+        "pattern": "^[0-9a-f]{40,64}$",
+        "type": "string",
+      },
+      "type": "array",
+    },
+    "pushHookOutput": {
       "type": "string",
     },
     "quotaBlock": {
@@ -4020,6 +4036,9 @@ exports[`body/envelope schema snapshots > githubConnectionStatus > githubConnect
     "connected": {
       "type": "boolean",
     },
+    "disconnectReason": {
+      "type": "string",
+    },
     "login": {
       "type": "string",
     },
@@ -5388,6 +5407,9 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "output": {
                   "type": "number",
                 },
+                "priced": {
+                  "type": "boolean",
+                },
                 "total": {
                   "type": "number",
                 },
@@ -6060,6 +6082,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
   "ENV_VARS": {
     "apiKey": "CAIRN_API_KEY",
     "customModelReasoning": "CAIRN_CUSTOM_MODEL_REASONING",
+    "githubCreateHourlyCap": "CAIRN_GITHUB_CREATE_HOURLY_CAP",
+    "githubCreateMinIntervalMs": "CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS",
     "githubOauthClientId": "CAIRN_GITHUB_OAUTH_CLIENT_ID",
     "githubOauthClientSecret": "CAIRN_GITHUB_OAUTH_CLIENT_SECRET",
     "home": "CAIRN_HOME",
@@ -6070,8 +6094,10 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "requireToken": "CAIRN_REQUIRE_TOKEN",
     "server": "CAIRN_SERVER",
     "skillsDir": "CAIRN_SKILLS_DIR",
+    "tailscaleUsers": "CAIRN_TAILSCALE_USERS",
     "team": "CAIRN_TEAM",
     "token": "CAIRN_TOKEN",
+    "trajectoryOutcomeBackfill": "CAIRN_TRAJ_OUTCOME_BACKFILL",
     "webDir": "CAIRN_WEB_DIR",
     "workspacesDir": "CAIRN_WORKSPACES_DIR",
   },
@@ -6092,6 +6118,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > local state layou
     "skills",
     "gate",
     "trust",
+    "otel",
   ],
   "LOCAL_STATE_DIRS": [
     "outbox",
@@ -6311,9 +6338,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
   "compare-truncated: human, compare 文件列表被截断",
   "patch-unbindable: human, 补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）",
   "size-cap: human, 补丁超过 800 行或 40 个文件",
-  "protected-path: human, 改动命中 D4 保护路径",
+  "independent-review-missing: transient, Protected changes require a bound independent review",
   "outside-auto-merge: human, 改动在可自动合并集之外",
-  "test-deleted: human, 删除了测试",
   "opaque-file: human, 证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）",
   "evidence-outside-ticket: human, 改动了别的票的证据目录",
   "evidence-executable: human, 证据目录里新增或改动了可执行文件",
@@ -6386,7 +6412,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > pi stream events 
   ],
   "MACHINE_CUSTOM_TOOLS": [
     "web_fetch",
-    "remote_shell",
     "push_branch",
   ],
   "PI_STREAM_EVENTS": [
@@ -6517,13 +6542,10 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief",
   "chief_thread",
   "chief_message",
-  "whats_new",
   "attachment",
   "branch_sync",
   "github_connection",
   "skill_audit",
-  "shell_command",
-  "webhook_token",
   "gate_digest",
   "gate_round",
   "gate_verdict",
@@ -6531,6 +6553,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "autonomy_state",
   "member_activity",
   "build_feedback",
+  "build_outcome_backfill",
   "memory_save_conflict",
   "memory_candidate",
 ]
@@ -6722,11 +6745,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "[设计] 能力读面（XMON-16 / #499 B3 裁决 A）：引擎能力词表送 web——载荷 = 思考强度档位，单源 shared THINKING_LEVELS",
     "path": "/api/capabilities",
-  },
-  {
-    "method": "GET",
-    "note": "形状保留、内容自选（02 §6.1）",
-    "path": "/api/whats-new",
   },
   {
     "method": "GET",
@@ -7811,9 +7829,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "minimum": -9007199254740991,
       "type": "integer",
     },
-    "shellEnabled": {
-      "type": "boolean",
-    },
     "teamId": {
       "type": "string",
     },
@@ -7826,7 +7841,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
     "latestCliVersion",
     "kind",
     "enabledRuntimes",
-    "shellEnabled",
   ],
   "type": "object",
 }
@@ -8843,6 +8857,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         "output": {
           "type": "number",
         },
+        "priced": {
+          "type": "boolean",
+        },
         "total": {
           "type": "number",
         },
@@ -8941,19 +8958,34 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tok
       "type": "integer",
     },
     "costCacheRead": {
-      "type": "number",
+      "type": [
+        "number",
+        "null",
+      ],
     },
     "costCacheWrite": {
-      "type": "number",
+      "type": [
+        "number",
+        "null",
+      ],
     },
     "costInput": {
-      "type": "number",
+      "type": [
+        "number",
+        "null",
+      ],
     },
     "costOutput": {
-      "type": "number",
+      "type": [
+        "number",
+        "null",
+      ],
     },
     "costTotal": {
-      "type": "number",
+      "type": [
+        "number",
+        "null",
+      ],
     },
     "input": {
       "maximum": 9007199254740991,
@@ -9013,17 +9045,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > use
     "displayName",
     "avatarUrl",
   ],
-  "type": "object",
-}
-`;
-
-exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > whats_new > whats_new.json 1`] = `
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": {},
-  "propertyNames": {
-    "type": "string",
-  },
   "type": "object",
 }
 `;

@@ -173,13 +173,20 @@ export function formatUsd(n: number): string {
   return n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`;
 }
 
+export function usageCostKnown(cost: UsageCost): boolean {
+  if (cost.priced === false) return false;
+  if (cost.priced === true) return true;
+  return cost.total > 0;
+}
+
 export function mapUsageCost(cost: UsageCost | undefined): UsageCostContent | null {
-  if (cost === undefined || cost.total <= 0) return null;
+  if (cost === undefined || !usageCostKnown(cost)) return null;
+  const split = cost.input + cost.output + cost.cacheRead + cost.cacheWrite > 0 || cost.total === 0;
   return {
     total: formatUsd(cost.total),
-    cacheRead: formatUsd(cost.cacheRead),
-    input: formatUsd(cost.input + cost.cacheWrite),
-    output: formatUsd(cost.output),
+    cacheRead: split ? formatUsd(cost.cacheRead) : '—',
+    input: split ? formatUsd(cost.input + cost.cacheWrite) : '—',
+    output: split ? formatUsd(cost.output) : '—',
   };
 }
 
@@ -974,7 +981,6 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
     name: m.name,
     online: m.online,
     enabledRuntimes: m.enabledRuntimes,
-    shellEnabled: m.shellEnabled,
     ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),
     ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),

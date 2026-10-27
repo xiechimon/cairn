@@ -164,6 +164,10 @@ export function projectRenamedNote(input: { from: string; to: string }): string 
   return `项目已从「${input.from}」改名为「${input.to}」。`;
 }
 
+export function projectGithubRepoRetargetedNote(input: { from: string; to: string }): string {
+  return `项目的 GitHub 仓库已从「${input.from}」更换为「${input.to}」。`;
+}
+
 export function projectConvertedNote(input: {
   githubRepo: string;
   localPath: string | null;

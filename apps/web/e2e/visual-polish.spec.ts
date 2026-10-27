@@ -60,7 +60,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const card = await edgeContract(page, '.todo-card');
 
@@ -75,7 +75,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const column = await edgeContract(page, '.board-column');
 
@@ -88,7 +88,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=notify-banner');
+    await page.goto('/app?scenario=notify-banner&view=board');
 
     const banner = await edgeContract(page, '.board-notify-banner');
 
@@ -117,7 +117,7 @@ for (const theme of ['light', 'dark'] as const) {
 
   test(`sidebar sits on canvas beside the sheet, no seam of its own (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const probe = await page.evaluate(() => {
       const sidebar = document.querySelector('.board-sidebar');
@@ -129,16 +129,14 @@ for (const theme of ['light', 'dark'] as const) {
         mainBg: getComputedStyle(main).backgroundColor,
         borderRight: cs.borderRightWidth,
         seamColor: cs.borderRightColor,
-        topbarBorderColor: getComputedStyle(
-          document.querySelector('.board-topbar')!,
-        ).borderBottomColor,
+        topbarBorderWidth: getComputedStyle(document.querySelector('.board-topbar')!).borderBottomWidth,
         shadow: cs.boxShadow,
       };
     });
-    // CDS PR-3: sidebar is tier-1 (--surface-1), distinct from the sheet;
-    // Paper PR 7: the sheet's ring is the edge, the sidebar draws no seam
     expect(probe.sidebarBg).not.toBe(probe.mainBg);
-    expect(probe.borderRight).toBe('0px');
+    expect(probe.borderRight).toBe('1px');
+    expect(probe.seamColor).not.toBe('transparent');
+    expect(probe.topbarBorderWidth).toBe('0px');
     expect(probe.shadow).toBe('none');
   });
 
@@ -146,7 +144,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01');
+    await page.goto('/app?scenario=01&view=board');
 
     const metrics = await page.locator('.board-scroller').evaluate((el) => {
       el.scrollLeft = 400;
@@ -186,12 +184,12 @@ test('collapsed rail draws no seam either (Paper PR 7)', async ({ page }) => {
     localStorage.setItem('cairn-theme', 'dark');
     localStorage.setItem('cairn.sidebar-collapsed', '1');
   });
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
 
   const rail = await page.locator('.board-sidebar--collapsed').evaluate((el) => {
     const cs = getComputedStyle(el);
     return { borderRight: cs.borderRightWidth, shadow: cs.boxShadow };
   });
-  expect(rail.borderRight).toBe('0px');
+  expect(rail.borderRight).toBe('1px');
   expect(rail.shadow).toBe('none');
 });

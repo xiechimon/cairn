@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ProviderConfig } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { ClaudeCodeBackend } from '../src/backend/claude-code.js';
 import { probeModelImageSupport, rememberNoVision } from '../src/backend/image-support.js';
 
 function customProvider(providerId: string, models: ProviderConfig['models']): ProviderConfig {
@@ -20,6 +21,13 @@ function builtinProvider(providerId: string): ProviderConfig {
 }
 
 describe('probeModelImageSupport decision order (#1671)', () => {
+  test('Claude Code reuses an observed image rejection for the next step', async () => {
+    const backend = new ClaudeCodeBackend({});
+    const provider = builtinProvider('claude-code');
+    await expect(backend.modelSupportsImages(provider, 'text-relay')).resolves.toBeNull();
+    backend.rememberNoVision(provider, 'text-relay');
+    await expect(backend.modelSupportsImages(provider, 'text-relay')).resolves.toBe(false);
+  });
   test('custom model declares input [text,image] → true', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-imgprobe-'));
     const provider = customProvider('vision-gw', [

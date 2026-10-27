@@ -23,7 +23,7 @@
       "dimension": "correctness",
       "title": "Spec 28 §7.5 and the pr-gate.js header describe the gate as it was before 28b1377",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 255,
       "failurePath": "Spec 28 line 255 says the safety dimension takes 三样 (three items) from git. The safety prompt at pr-gate.js:169 asks for four: changedFiles, deletedFiles, linesChanged and binaryFiles.\n\nThe §7.5 table at line 247 describes D4 as matching protected paths plus deleted tests and the 800-line / 40-file caps. It leaves out the default-deny rule (paths outside the auto-merge set, pr-gate.js:344-349) and binary files outside docs/verify (pr-gate.js:339-351). A reader taking the spec as the description of the gate would expect a docs-only or binary-only PR to auto-merge, but the gate routes it to the user.\n\nThe pr-gate.js header comment at line 14 and meta.description say every blocking finding gets two skeptics. Under MAX_SKEPTICS (line 249) the third blocking finding gets none.",
       "evidence": "pr-gate.js:169 asks for four values from git; spec 28:255 says 三样. spec 28:247 does not mention `outside the auto-merge set` or binary routing, both present in humanReasons at pr-gate.js:347-354. pr-gate.js:14 says 'every blocking finding gets two skeptics', against lines 249-252."
@@ -34,7 +34,7 @@
       "severity": "suggestion",
       "file": "AGENTS.md",
       "line": 70,
-      "failurePath": "Commits ca088ce, 3944905 and 662cbd9 have subjects of the form `docs: spec 28 …` with no `(<ticket>)`. A merger who follows AGENTS.md:70 literally runs `gh api repos/xiechimon/pacman/pulls/1410/commits -q '.[0].commit.message'`. That returns ca088ce: the subject is `docs: spec 28 自举闭环计划（…）` and the body has 0 matches for `closes #1401`. Main then gets a squash commit whose subject has no ticket, and #1401 stays OPEN. ADR 0021 D2 (docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md:35) also sends people who merge through the GitHub UI or the command line to this recipe. The PR body's Issues section warns about this. The GitHub UI default for this repo (COMMIT_OR_PR_TITLE plus COMMIT_MESSAGES) gives the PR title `docs(1401): …` and a body that includes e5414a2's `closes #1401`. Since force-push is forbidden, the history cannot be reworded. The merge has to use the PR title and the default body, not the AGENTS.md `.[0]` recipe.",
+      "failurePath": "Commits ca088ce, 3944905 and 662cbd9 have subjects of the form `docs: spec 28 …` with no `(<ticket>)`. A merger who follows AGENTS.md:70 literally runs `gh api repos/xiechimon/pacman/pulls/1410/commits -q '.[0].commit.message'`. That returns ca088ce: the subject is `docs: spec 28 自举闭环计划（…）` and the body has 0 matches for `closes #1401`. Main then gets a squash commit whose subject has no ticket, and #1401 stays OPEN. ADR 0021 D2 (docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md:35) also sends people who merge through the GitHub UI or the command line to this recipe. The PR body's Issues section warns about this. The GitHub UI default for this repo (COMMIT_OR_PR_TITLE plus COMMIT_MESSAGES) gives the PR title `docs(1401): …` and a body that includes e5414a2's `closes #1401`. Since force-push is forbidden, the history cannot be reworded. The merge has to use the PR title and the default body, not the AGENTS.md `.[0]` recipe.",
       "evidence": "`gh api repos/xiechimon/pacman/pulls/1410/commits -q '.[0].sha'` prints ca088cedbded3d23924f275af54f5444b7692d67, and grep -c 'closes #1401' on its message prints 0. `gh api repos/xiechimon/pacman` reports squash_merge_commit_title=COMMIT_OR_PR_TITLE and squash_merge_commit_message=COMMIT_MESSAGES."
     },
     {
@@ -50,7 +50,7 @@
       "dimension": "rules",
       "title": "Spec 28 §7.5 pr-gate row describes D4 routing as protected-path matching only",
       "severity": "suggestion",
-      "file": "docs/spec/28-自举闭环-自写自合.md",
+      "file": "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
       "line": 247,
       "failurePath": "The §7.5 table row says 'D4 由脚本机械判：保护路径按调用方传入的 changedFiles 匹配，再并上审查者报的；删测试文件、补丁超 800 行或 40 个文件也转 user'. The script also sends to the user (a) every path outside AUTO_MERGE (pr-gate.js:344-349) and (b) binary files outside docs/verify (pr-gate.js:339-351). A reader who takes the §7.5 row as the description of pr-gate would expect a docs-only change outside the protected classes, such as docs/spec/**, to come back as mergedBy 'auto-merge'. It comes back as 'user'. §3 D4 (line 71) and the §7.5 rules bullet (line 255) say default deny and binary, but the row that defines pr-gate's routing was not updated with the behavior.",
       "evidence": "pr-gate.js:344-351: `const outside = … !AUTO_MERGE_RE.some(…)` and `binary files outside docs/verify` both feed humanReasons."
@@ -123,15 +123,15 @@
     ".claude/workflows/pr-gate.js",
     ".github/workflows/ci.yml",
     ".gitignore",
-    "docs/adr/0018-多agent团队三层与机器能力闸.md",
-    "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+    "docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md",
+    "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
     "docs/pr-review.md",
     "scripts/pr-gate-selfcheck.mjs",
-    "docs/spec/28-自举闭环-自写自合.md"
+    "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md"
   ],
   "mergedBy": "user",
   "humanReasons": [
-    "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-多agent团队三层与机器能力闸.md, docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-自举闭环-自写自合.md",
+    "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, docs/adr/0018-multi-agent-team-three-layers-machine-capability-gate.md, docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md",
     "3520 lines changed (over 800)"
   ],
   "missing": [],

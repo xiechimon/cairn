@@ -1,6 +1,6 @@
-# r13 · Multica 双运行时机制核验（fresh clone，2026-10-02）
+# r13 · Multica dual-runtime mechanism verification (fresh clone, 2026-10-02)
 
-> 目的：为 spec 17（双运行时执行面）提供 r10（docs/research/r10-multica-runtime.md）结论的 fresh-clone 复核——两层模型、claude/pi 家族后端、分派路径逐项带路径：行号证据；两处 r10 旧结论已修正（BuiltinRuntime 12 字段非 9；不消费 opts.McpConfig 的家族 6 个非 4 个）。核验方法：shallow clone 全文读源，不转述二手材料。
+> Purpose: provide spec 17 (dual-runtime execution surface) with a fresh-clone re-review of r10's conclusions (docs/research/r10-multica-runtime.md) — the two-layer model, the claude/pi family backends, and the dispatch path, item by item with path:line evidence; two of r10's older conclusions were corrected (BuiltinRuntime has 12 fields, not 9; the families that do not consume opts.McpConfig are 6, not 4). Verification method: shallow clone, read the source in full, no secondhand paraphrasing.
 
 Cloned HEAD: `2ea01ae4ef55de4310b99af192d2dbd367832883` (2026-10-01 18:18:24 +0800, "docs(changelog): add v0.6.1 release entry"), shallow clone of github.com/multica-ai/multica at /tmp/multica-src-t0028.
 Drift vs prior verification (43b0571f992567a919c7f1f699ff160922594b94, 2026-09-29): two days of commits; the structures verified below (BuiltinRuntime, BuiltinRuntimes registry, Backend interface, claude/pi backends, dispatch path) are all still present and the registry still holds exactly one entry. File/line references below are to the 2ea01ae clone.

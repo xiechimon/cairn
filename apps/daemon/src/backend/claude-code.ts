@@ -38,7 +38,8 @@ import { z } from 'zod';
 import { claudeCodeAuthFailureMessage } from '../claude-code-auth.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { SessionNotResumableError } from './errors.js';
-import { rememberNoVision } from './image-support.js';
+import { isLearnedNoVision, rememberNoVision } from './image-support.js';
+import { claudeTelemetryEnv } from './otel.js';
 import {
   appendSkillsCatalog,
   collectDeniedSkillDirs,
@@ -116,6 +117,8 @@ function toUsageRows(
         outputTokens: number;
         cacheReadInputTokens: number;
         cacheCreationInputTokens: number;
+        costUSD?: number;
+        costBasis?: string;
       }
     >;
     usage?: {
@@ -123,28 +126,56 @@ function toUsageRows(
       output_tokens?: number;
       cache_read_input_tokens?: number;
       cache_creation_input_tokens?: number;
+      cache_creation?: {
+        ephemeral_5m_input_tokens?: number;
+        ephemeral_1h_input_tokens?: number;
+      };
     };
   },
   modelId: string | undefined,
 ): ModelUsage[] {
   const entries = Object.entries(msg.modelUsage ?? {});
   if (entries.length > 0) {
-    return entries.map(([key, mu]) => ({
-      model: `${USAGE_MODEL_PREFIX}/${key}`,
-      input: mu.inputTokens,
-      output: mu.outputTokens,
-      cacheRead: mu.cacheReadInputTokens,
-      cacheWrite: mu.cacheCreationInputTokens,
-    }));
+    return entries.map(([key, mu]) => {
+      const flat = msg.usage?.cache_creation_input_tokens ?? 0;
+      const nested = msg.usage?.cache_creation;
+      const nestedWrite =
+        (nested?.ephemeral_5m_input_tokens ?? 0) + (nested?.ephemeral_1h_input_tokens ?? 0);
+      const cacheWrite =
+        mu.cacheCreationInputTokens > 0
+          ? mu.cacheCreationInputTokens
+          : entries.length === 1 && flat > 0
+            ? flat
+            : entries.length === 1
+              ? nestedWrite
+              : 0;
+      const cost =
+        mu.costBasis === 'unknown' || typeof mu.costUSD !== 'number' || mu.costUSD === 0
+          ? undefined
+          : { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: mu.costUSD };
+      return {
+        model: `${USAGE_MODEL_PREFIX}/${key}`,
+        input: mu.inputTokens,
+        output: mu.outputTokens,
+        cacheRead: mu.cacheReadInputTokens,
+        cacheWrite,
+        ...(cost !== undefined ? { cost } : {}),
+      };
+    });
   }
   if (msg.usage && modelId !== undefined) {
+    const flat = msg.usage.cache_creation_input_tokens ?? 0;
+    const nested = msg.usage.cache_creation;
     return [
       {
         model: `${USAGE_MODEL_PREFIX}/${modelId}`,
         input: msg.usage.input_tokens ?? 0,
         output: msg.usage.output_tokens ?? 0,
         cacheRead: msg.usage.cache_read_input_tokens ?? 0,
-        cacheWrite: msg.usage.cache_creation_input_tokens ?? 0,
+        cacheWrite:
+          flat > 0
+            ? flat
+            : (nested?.ephemeral_5m_input_tokens ?? 0) + (nested?.ephemeral_1h_input_tokens ?? 0),
       },
     ];
   }
@@ -793,6 +824,12 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   };
 }
 
+export function claudeSessionEnv(opts: SessionOpts): Record<string, string> | undefined {
+  const telemetryEnv = opts.telemetry !== undefined ? claudeTelemetryEnv(opts.telemetry) : null;
+  if (opts.env === undefined && telemetryEnv === null) return undefined;
+  return { ...opts.env, ...telemetryEnv };
+}
+
 export interface ClaudeCodeBackendOpts {
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
@@ -827,8 +864,8 @@ export class ClaudeCodeBackend implements AgentBackend {
     return this.open(opts, id);
   }
 
-  async modelSupportsImages(_provider: ProviderConfig, _modelId: string): Promise<boolean | null> {
-    return null;
+  async modelSupportsImages(provider: ProviderConfig, modelId: string): Promise<boolean | null> {
+    return isLearnedNoVision(provider.providerId, modelId) ? false : null;
   }
 
   rememberNoVision(provider: ProviderConfig, modelId: string): void {
@@ -875,6 +912,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       session: opts,
       ...(this.opts.onSkillsLog !== undefined ? { log: this.opts.onSkillsLog } : {}),
     });
+    const sessionEnv = claudeSessionEnv(opts);
     const sdkOptions: Options = buildClaudeSdkOptions({
       cwd: opts.cwd,
       modelId: opts.modelId,
@@ -889,7 +927,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       ...(this.opts.executablePath !== undefined
         ? { executablePath: this.opts.executablePath }
         : {}),
-      ...(opts.env !== undefined ? { env: opts.env } : {}),
+      ...(sessionEnv !== undefined ? { env: sessionEnv } : {}),
       ...(nativePluginDir !== null
         ? { plugins: [{ type: 'local' as const, path: nativePluginDir }] }
         : {}),

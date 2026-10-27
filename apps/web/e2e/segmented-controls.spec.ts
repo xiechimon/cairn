@@ -171,7 +171,7 @@ test('branch-dialog seg: hover steps the Git ink, click swaps the tab body', asy
   // #366: the detail route no longer opens the branch dialog (the surface
   // is a static right-pane section there) — the board card icon remains
   // the dialog's live trigger.
-  await page.goto('/app?scenario=01');
+  await page.goto('/app?scenario=01&view=board');
   await page.locator('.todo-card-branch').first().click();
   await expect(page.getByRole('dialog')).toBeVisible();
   const git = page.getByRole('tab', { name: 'Git' });

@@ -1,4 +1,4 @@
-import { AGENT_TOOL_SHELL, MACHINE_RUNTIMES, type MachineRuntime } from '@cairn/shared';
+import { MACHINE_RUNTIMES, type MachineRuntime } from '@cairn/shared';
 import { cn } from 'cn';
 import { Monitor, Plus as PlusIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -12,8 +12,6 @@ import { EmptyState } from '../components/empty-state.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
-import { Switch } from '../components/ui/switch.js';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { TEAM_NAME } from '../fixtures/fixtures.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -36,8 +34,6 @@ const RUNTIME_MARKS: Record<MachineRuntime, typeof PiMark> = {
   'claude-code': ClaudeMark,
   gemini: GeminiMark,
 };
-
-const MACHINE_SHELL_HINT = '已授权「{tool}」的 Agent 可在该机器上执行命令。';
 
 const FALLBACK_RANGE = { min: 1, max: 8 };
 
@@ -155,7 +151,7 @@ function MachineConcurrencySelect({
         side="bottom"
         sideOffset={8}
         aria-label={t('并发上限')}
-        className="w-52 rounded-lg bg-popover p-1.5 shadow-(--shadow-popover)"
+        className="w-52 p-(--menu-pad)"
       >
         <div className="flex items-baseline justify-between px-1">
           <span className="text-meta text-content-tertiary">{t('并发上限')}</span>
@@ -253,18 +249,14 @@ function MachineConcurrencySelect({
                 {t('未收到能力指纹，按保守默认 {n} 估算', { n: recommended ?? value })}
               </span>
             ) : null}
-            {estimate ? null : (
+            {estimate || hardware === undefined || hardware.memoryTotalMb === undefined ? null : (
               <>
-                {hardware !== undefined && hardware.memoryTotalMb !== undefined && (
-                  <>
-                    <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
-                    <BasisRow
-                      label={t('总内存')}
-                      value={`${(hardware.memoryTotalMb / 1024).toFixed(1)} GiB`}
-                    />
-                    <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
-                  </>
-                )}
+                <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
+                <BasisRow
+                  label={t('总内存')}
+                  value={`${(hardware.memoryTotalMb / 1024).toFixed(1)} GiB`}
+                />
+                <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
               </>
             )}
           </div>
@@ -332,16 +324,6 @@ export function MachinesPage() {
 
   const rowKey = (machine: MachineRow): string => machine.id ?? machine.name;
 
-  const [shellDraft, setShellDraft] = useState<Record<string, boolean>>({});
-  const shellOn = (machine: MachineRow): boolean =>
-    shellDraft[rowKey(machine)] ?? machine.shellEnabled ?? false;
-  const toggleShell = (machine: MachineRow, on: boolean): void => {
-    if (!live || machine.id == null) {
-      setShellDraft((prev) => ({ ...prev, [rowKey(machine)]: on }));
-      return;
-    }
-    mutations.patchMachine.mutate({ id: machine.id, body: { shellEnabled: on } });
-  };
   const [capDraft, setCapDraft] = useState<Record<string, number>>({});
   const capOn = (machine: MachineRow): number =>
     capDraft[rowKey(machine)] ?? machine.maxConcurrent ?? 1;
@@ -371,9 +353,6 @@ export function MachinesPage() {
     }
     return patchCap(machine.id, null);
   };
-  const shellSaveFailed =
-    mutations.patchMachine.isError &&
-    mutations.patchMachine.variables?.body.shellEnabled !== undefined;
   const capSaveFailed =
     mutations.patchMachine.isError &&
     mutations.patchMachine.variables?.body.maxConcurrent !== undefined;
@@ -393,7 +372,7 @@ export function MachinesPage() {
       }
       fixture={fixture}
     >
-      {(shellSaveFailed || capSaveFailed) && (
+      {capSaveFailed && (
         <p className="mt-0 mb-2 text-meta text-destructive" role="alert">
           {t('保存失败，请重试。')}
         </p>
@@ -414,6 +393,7 @@ export function MachinesPage() {
             return (
               <ResourceRow
                 key={rowKey(machine)}
+                className="flex-wrap gap-y-2"
                 data-machine-id={machine.id}
                 data-kind={machine.kind ?? 'remote'}
               >
@@ -425,7 +405,7 @@ export function MachinesPage() {
                   </RowTitle>
                   {machine.online !== undefined && <OnlineStatus on={machine.online !== false} />}
                 </RowText>
-                <span className="flex flex-none items-center gap-5">
+                <span className="ml-auto flex flex-wrap items-center justify-end gap-x-5 gap-y-2">
                   {machine.kind === 'local' ? (
                     <span className="flex items-center gap-4">
                       {MACHINE_RUNTIMES.map((runtime) => {
@@ -479,29 +459,6 @@ export function MachinesPage() {
                       )}
                     </span>
                   )}
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <span
-                          data-machine-col="shell"
-                          className="flex flex-none items-center gap-2"
-                        />
-                      }
-                    >
-                      <span className="text-meta whitespace-nowrap text-content-tertiary">
-                        {t(AGENT_TOOL_SHELL)}
-                      </span>
-                      <Switch
-                        data-machine-id={machine.id}
-                        aria-label={t(AGENT_TOOL_SHELL)}
-                        checked={shellOn(machine)}
-                        onCheckedChange={(on) => toggleShell(machine, on)}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={8}>
-                      {t(MACHINE_SHELL_HINT, { tool: t(AGENT_TOOL_SHELL) })}
-                    </TooltipContent>
-                  </Tooltip>
                   {machine.maxConcurrent !== undefined && (
                     <span
                       className="flex flex-none items-center gap-2.5"

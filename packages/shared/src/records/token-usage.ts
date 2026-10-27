@@ -10,10 +10,10 @@ export const tokenUsageSchema = z.object({
   output: z.number().int(),
   cacheRead: z.number().int(),
   cacheWrite: z.number().int(),
-  costInput: z.number(),
-  costOutput: z.number(),
-  costCacheRead: z.number(),
-  costCacheWrite: z.number(),
-  costTotal: z.number(),
+  costInput: z.number().nullable(),
+  costOutput: z.number().nullable(),
+  costCacheRead: z.number().nullable(),
+  costCacheWrite: z.number().nullable(),
+  costTotal: z.number().nullable(),
 });
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;

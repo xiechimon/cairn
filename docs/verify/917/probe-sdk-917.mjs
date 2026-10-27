@@ -1,16 +1,19 @@
 #!/usr/bin/env node
-// #917 实物取证探针（claude-code 侧机制，真 SDK/CLI + 真模型，非源码推断）。
-// 三组 before/after：
-//   A. deny 路径规则在 bypassPermissions 下挡 Read
-//      （A1 before = 无规则读成功；A2 after = Read(//dir/**) 规则在位被拒）
-//   B. 原生 Skill 工具面的白名单执行（B1 = 原生清单实数基线；B3 before =
-//      无规则时未授权技能可被 Skill 工具加载；B4 = 仅 Read deny 是否连带挡
-//      Skill 内容加载；B5 after = Read deny + Skill(name) deny 必须拒）
-//   C. 新选项组（settingSources 显式含 'project'）不伤 CLAUDE.md 简报通道
-//      （C1 = worktree CLAUDE.md 里的 codeword 被模型回出）
-// 运行：仓库根 `node docs/verify/917/probe-sdk-917.mjs`
-// 前提：本机 claude 登录态（或 ANTHROPIC_API_KEY）；模型缺省 glm-5.3，
-//       PROBE_MODEL 可覆写。产物 = 同目录 probe-results.json。
+// #917 real-artifact evidence probe (claude-code-side mechanism, real SDK/CLI +
+// real model, no source inference). Three before/after groups:
+//   A. deny path rules block Read under bypassPermissions
+//      (A1 before = read succeeds with no rule; A2 after = blocked with the
+//      Read(//dir/**) rule in place)
+//   B. whitelist enforcement on the native Skill tool face (B1 = native listing
+//      measured baseline; B3 before = an unauthorized skill can be loaded by
+//      the Skill tool with no rule; B4 = does a Read deny alone block Skill
+//      content loading; B5 after = Read deny + Skill(name) deny must refuse)
+//   C. the new option set (settingSources explicitly including 'project') does
+//      not break the CLAUDE.md brief channel (C1 = the codeword from the
+//      worktree CLAUDE.md is echoed back by the model)
+// Run: from the repo root `node docs/verify/917/probe-sdk-917.mjs`
+// Prereq: a local claude login (or ANTHROPIC_API_KEY); model defaults to
+//         glm-5.3, PROBE_MODEL overrides. Output = probe-results.json here.
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,11 +29,11 @@ const sdk = await import(
 const SECRET_MARKER = 'SECRET-MARKER-917';
 const BRIEF_MARKER = 'BRIEF-MARKER-917';
 const SKILL_CONTENT_MARKER = 'SKILL-CONTENT-MARKER-917';
-// 与 daemon 的 CLAUDE_SETTING_SOURCES 同值（spec 14 §裁决后的范围 1）。
+// Same value as the daemon's CLAUDE_SETTING_SOURCES (spec 14, scope 1 after the ruling).
 const SETTING_SOURCES = ['user', 'project', 'local'];
 const MODEL = process.env.PROBE_MODEL || 'glm-5.3';
 
-/** 与 claude-code.ts buildSkillDenyRules 同形：`Read(/<绝对路径>/**)`。 */
+/** Same shape as claude-code.ts buildSkillDenyRules: `Read(/<absolute path>/**)`. */
 function denyRule(baseDir) {
   const escaped = baseDir.replaceAll(/([\\*?[\]])/g, '\\$1');
   return `Read(/${escaped}/**)`;
@@ -72,7 +75,7 @@ async function runOnce(label, options, prompt, timeoutMs = 150_000) {
   return out;
 }
 
-/** relay 通道有间歇故障史：每组最多 3 次尝试，全部留档。 */
+/** The relay channel has a history of intermittent failures: up to 3 attempts per group, all archived. */
 async function runProbe(label, options, prompt) {
   const attempts = [];
   for (let i = 0; i < 3; i++) {
@@ -87,7 +90,7 @@ const root = mkdtempSync(join(tmpdir(), 'pac-917-probe-'));
 const evidence = { generated_at: new Date().toISOString(), sdk_model_requested: MODEL, probes: {} };
 
 try {
-  // —— 场地：work 目录（cwd）+ 未授权「技能」目录（deny 目标）———————————
+  // —— Ground: work directory (cwd) + the unauthorized "skill" directory (deny target) ——
   const work = join(root, 'work');
   mkdirSync(work, { recursive: true });
   const secretDir = join(root, 'secret-skill');
@@ -107,24 +110,26 @@ try {
     'If the tool call is denied or errors, reply with exactly: DENIED',
   ].join('\n');
 
-  // A1 before：无 deny 规则（bypass 下 work 外文件可读 = 现状漏洞面）。
+  // A1 before: no deny rule (under bypass, files outside work are readable = the current vulnerability face).
   evidence.probes.A1_before_no_deny = await runProbe('A1-before-no-deny', base, readPrompt);
-  // A2 after：同场地 + settings.permissions.deny（daemon 的 worker 步形态）。
+  // A2 after: same ground + settings.permissions.deny (the daemon's worker-step shape).
   evidence.probes.A2_after_deny = await runProbe('A2-after-deny', {
     ...base,
     settings: { permissions: { deny: [denyRule(secretDir)] } },
   }, readPrompt);
 
-  // B1：原生清单实数（issue 背景「产品不拥有、也不知情」的实物基线）。
+  // B1: native listing measured (the artifact baseline for the issue background "the product neither owns nor knows about it").
   const okPrompt = 'Reply with exactly: ok';
   evidence.probes.B1_native_default = await runProbe('B1-native-default', base, okPrompt);
 
-  // B3/B4/B5：原生 Skill 工具面调用三态（project 档技能种进 scratch cwd 的
-  // .claude/skills——不动 ~/.claude；SKILL.md 内容含独立 marker，prompt 不
-  // 泄露该 marker——回出 marker = 技能内容真的进了模型上下文）。
-  //   B3 before：无规则 → 调用成功（= 白名单在原生面上的洞）
-  //   B4：仅 Read deny 规则 → Skill 工具的内容加载是否连带被挡（机制问题）
-  //   B5：Read deny + Skill(name) deny → 调用必须被拒（口径 4 的完整形态）
+  // B3/B4/B5: three states of invoking the native Skill tool face (the project-
+  // level skill is planted into the scratch cwd's .claude/skills — ~/.claude is
+  // untouched; the SKILL.md content carries an independent marker and the prompt
+  // does not leak it — echoing the marker = the skill content really entered the
+  // model context).
+  //   B3 before: no rule → invocation succeeds (= the whitelist hole on the native face)
+  //   B4: Read deny rule only → does Skill tool content loading get blocked along the way (mechanism question)
+  //   B5: Read deny + Skill(name) deny → the invocation must be refused (the complete form of policy 4)
   const skillWork = join(root, 'skill-work');
   const skillDir = join(skillWork, '.claude', 'skills', 'probe-skill');
   mkdirSync(skillDir, { recursive: true });
@@ -166,7 +171,7 @@ try {
     skillPrompt
   );
 
-  // C1：CLAUDE.md 简报通道在显式 settingSources 下存活（spec 24 承重位重验）。
+  // C1: the CLAUDE.md brief channel stays alive under explicit settingSources (re-verify of the spec 24 load-bearing position).
   const briefWork = join(root, 'brief-work');
   mkdirSync(briefWork, { recursive: true });
   writeFileSync(
@@ -181,7 +186,7 @@ try {
     'What is the project codeword? Reply with exactly the codeword.'
   );
 
-  // —— 判定（三组都取「成功尝试」的实物字段）————————————————————
+  // —— Verdicts (each group takes the artifact fields of the "successful attempt") ————
   const last = (p) => (p.attempts.find((a) => a.error === null && a.result !== null) ?? null);
   const a1 = last(evidence.probes.A1_before_no_deny);
   const a2 = last(evidence.probes.A2_after_deny);

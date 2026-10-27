@@ -229,6 +229,8 @@ describe('watch/wake active loop three triggers (r5 section 3.5)', () => {
     expect(steps.at(-1)!.kind).toBe('chief');
     expect(prompt).toContain('[wake:gate]');
     expect(prompt).not.toContain('自动确认规则');
-    expect(prompt).toContain('「完成」');
+    expect(prompt).toContain('autonomous');
+    expect(prompt).toContain('human');
+    expect(prompt).toContain('ADR 0026');
   });
 });

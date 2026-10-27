@@ -182,7 +182,7 @@ describe('machine protocol (02 §5, r3 §1.6)', () => {
 
   it('config kinds and machine custom tools (02 §5.6)', () => {
     expect(CONFIG_KINDS).toEqual(['api_key', 'oauth', 'http', 'stdio']);
-    expect(MACHINE_CUSTOM_TOOLS).toEqual(['web_fetch', 'remote_shell', 'push_branch']);
+    expect(MACHINE_CUSTOM_TOOLS).toEqual(['web_fetch', 'push_branch']);
   });
 
   it('CLI command face copied verbatim (02 §5.1)', () => {
@@ -244,7 +244,6 @@ describe('web REST vocabulary (02 §6.1 canonical)', () => {
       ['GET', '/api/documents/{id}/diff'],
       ['GET', '/api/schedules'],
       ['GET', '/api/skills'],
-      ['GET', '/api/whats-new'],
       ['GET', '/api/search'],
     ] as const) {
       expect(has(method, path), `${method} ${path}`).toBe(true);
@@ -434,17 +433,21 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 
   it('env vars are the CAIRN_ same-shape replacement (replacement plan §2; r3 §1.1 observed original names TDS_*)', () => {
     const {
+      githubCreateMinIntervalMs,
+      githubCreateHourlyCap,
       webDir,
       githubOauthClientId,
       githubOauthClientSecret,
       token,
       requireToken,
+      tailscaleUsers,
       mcpConfig,
       skillsDir,
       customModelReasoning,
       piCacheRetention,
       hookTimeoutMs,
       issueIntake,
+      trajectoryOutcomeBackfill,
       ...observed
     } = ENV_VARS;
     expect(observed).toEqual({
@@ -454,17 +457,21 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       workspacesDir: 'CAIRN_WORKSPACES_DIR',
       home: 'CAIRN_HOME',
     });
+    expect(githubCreateMinIntervalMs).toBe('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS');
+    expect(githubCreateHourlyCap).toBe('CAIRN_GITHUB_CREATE_HOURLY_CAP');
     expect(webDir).toBe('CAIRN_WEB_DIR');
     expect(githubOauthClientId).toBe('CAIRN_GITHUB_OAUTH_CLIENT_ID');
     expect(githubOauthClientSecret).toBe('CAIRN_GITHUB_OAUTH_CLIENT_SECRET');
     expect(token).toBe('CAIRN_TOKEN');
     expect(requireToken).toBe('CAIRN_REQUIRE_TOKEN');
+    expect(tailscaleUsers).toBe('CAIRN_TAILSCALE_USERS');
     expect(mcpConfig).toBe('CAIRN_MCP_CONFIG');
     expect(skillsDir).toBe('CAIRN_SKILLS_DIR');
     expect(customModelReasoning).toBe('CAIRN_CUSTOM_MODEL_REASONING');
     expect(piCacheRetention).toBe('CAIRN_PI_CACHE_RETENTION');
     expect(hookTimeoutMs).toBe('CAIRN_HOOK_TIMEOUT_MS');
     expect(issueIntake).toBe('CAIRN_ISSUE_INTAKE');
+    expect(trajectoryOutcomeBackfill).toBe('CAIRN_TRAJ_OUTCOME_BACKFILL');
   });
 
   it('credential formats match the observed shapes (key prefix follows the BRAND slot)', () => {
@@ -491,29 +498,32 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 });
 
 describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity)', () => {
-  it('DB table registry is the 01 §6 list + chief + steer/stop_pending + attachment + branch_sync + github_connection − skill − mcp_server − document_diff + skill_audit + shell_command + webhook_token + the four gate tables + autonomy_state + member_activity (37 incl. the todo_tag join)', () => {
-    expect(DB_TABLES).toHaveLength(40);
+  it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
+    expect(DB_TABLES).toHaveLength(38);
     expect(DB_TABLES).toContain('autonomy_state');
     expect(DB_TABLES).toContain('member_activity');
     expect(DB_TABLES).toContain('build_feedback');
+    expect(DB_TABLES).toContain('build_outcome_backfill');
     expect(DB_TABLES).toContain('todo_tag');
     expect(DB_TABLES).toContain('chief');
     expect(DB_TABLES).toContain('attachment');
     expect(DB_TABLES).toContain('branch_sync');
     expect(DB_TABLES).toContain('stop_pending');
     expect(DB_TABLES).toContain('github_connection');
-    expect(DB_TABLES).toContain('shell_command');
+    expect(DB_TABLES).toContain('schedule');
+    expect(DB_TABLES).not.toContain('shell_command');
+    expect(DB_TABLES).not.toContain('whats_new');
     expect(DB_TABLES).not.toContain('skill');
     expect(DB_TABLES).toContain('skill_audit');
-    expect(DB_TABLES).toContain('webhook_token');
+    expect(DB_TABLES).not.toContain('webhook_token');
     for (const t of ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state']) {
       expect(DB_TABLES).toContain(t);
       expect(INTERNAL_ONLY_TABLES).toContain(t);
     }
   });
 
-  it('record shapes cover exactly the 22 wire tables (todo_tag join + steer/stop_pending internal + attachment binary + github_connection credential + webhook_token credential have none; skill = disk projection with no table slot #367, mcp_server = config projection with no table slot #368, document_diff = dead schema retired #1029 but wire shape still lives in document-diff.js)', () => {
-    expect(Object.keys(RECORD_SCHEMAS)).toHaveLength(22);
+  it('record shapes cover exactly the 21 wire tables (todo_tag join + internal tables have none; skill and mcp_server are projections with no table slot)', () => {
+    expect(Object.keys(RECORD_SCHEMAS)).toHaveLength(21);
     expect(Object.keys(RECORD_SCHEMAS)).toEqual(
       DB_TABLES.filter(
         (t) =>

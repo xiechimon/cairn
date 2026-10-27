@@ -143,3 +143,38 @@ test('does not flag an existing large function when a parameter or body changes'
     rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test('a moved file is judged by its changed lines, not as a new file', () => {
+  const cwd = mkdtempSync(resolve(tmpdir(), 'single-use-gate-move-'));
+  const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+  const source = [
+    'function helper(value: number) {',
+    '  return value + 1;',
+    '}',
+    'export const answer = helper(41);',
+    '',
+  ].join('\n');
+  try {
+    git('init');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+    mkdirSync(resolve(cwd, 'apps/web/src/overlays'), { recursive: true });
+    mkdirSync(resolve(cwd, 'scripts'));
+    writeFileSync(resolve(cwd, 'apps/web/src/overlays/panel.ts'), source);
+    writeFileSync(resolve(cwd, 'scripts/single-use-helper-allowlist.json'), '[]');
+    git('add', '.');
+    git('commit', '-m', 'baseline');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    mkdirSync(resolve(cwd, 'apps/web/src/overlay'));
+    git('mv', 'apps/web/src/overlays/panel.ts', 'apps/web/src/overlay/panel.ts');
+    git('commit', '-m', 'move');
+    const result = spawnSync(process.execPath, [script], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, SINGLE_USE_HELPER_BASE_SHA: '' },
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});

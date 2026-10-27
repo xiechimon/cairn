@@ -10,6 +10,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./github-create-gate": "./src/github-create-gate.ts",
     "./merge-gate": "./src/records/merge-gate.ts"
   },
   "scripts": {
@@ -20,6 +21,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "26.6.2",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

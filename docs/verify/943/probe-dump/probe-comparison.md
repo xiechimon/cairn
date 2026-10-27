@@ -1,3 +1,4 @@
+```
 # Probe dump — old baseline → new measured (#921)
 
 Run 2026-10-05T19:48:23.130Z · commit `ec0d1fb8` · port 8397 · playwright 1.63.0 · workers 4
@@ -248,3 +249,5 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | user-menu-trigger.spec.ts | 99 | toBeGreaterThan | > 0 | 11 | — | rail chip opens the same popover, unclipped by the 40px rail |
 | user-menu-trigger.spec.ts | 99 | toBeGreaterThan | > 0 | 14.5 | — | #163 anchoring: bottom distance is viewport-invariant, the chip is never covered — both shapes |
 | user-menu-trigger.spec.ts | 177 | toBeLessThanOrEqual | ≤ 1 | 0 | — | #163 anchoring: bottom distance is viewport-invariant, the chip is never covered — both shapes |
+
+```

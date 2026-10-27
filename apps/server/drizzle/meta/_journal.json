@@ -386,6 +386,41 @@
       "when": 1792923570660,
       "tag": "0054_scheduler_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "6",
+      "when": 1792945729621,
+      "tag": "0055_build_outcome_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "6",
+      "when": 1792961081633,
+      "tag": "0056_user_attachment_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "6",
+      "when": 1792988595997,
+      "tag": "0057_github_connection_refresh",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1793005785278,
+      "tag": "0058_token_usage_cost_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1793033753026,
+      "tag": "0059_retire_zero_use",
+      "breakpoints": true
     }
   ]
 }

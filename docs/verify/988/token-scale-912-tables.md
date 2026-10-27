@@ -1,3 +1,4 @@
+```
 <!-- 本文件由 apps/web/e2e/measure-912.mjs 生成（#953 自 library/t-0909 随迁），勿手改。
      取数源 = apps/web/e2e/palette-c.css（#909 定版色板冻结副本）+ apps/web/src/styles/{shadcn,tokens}.css；
      对比度 = WCAG 2.1 亮度比，逐对实测。 -->
@@ -264,3 +265,5 @@ light 88 对全过，最低 3.08:1（ring）。report-only = 软发丝线 / 装�
 | `--danger` | 不变 | `#9e2c49` | `#9e2c49` | `--danger on --background` | 6.43:1 | 3 | PASS |
 | `--card-border` | 不变 | `#eae4e0` | `#eae4e0` | `--card-border on --card` | 1.06:1 | — | report-only |
 
+
+```

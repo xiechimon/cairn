@@ -1,29 +1,35 @@
+import {
+  BRIEF_CREATE_NAME,
+  briefBackendForProvider,
+  isBackendRuntimeId,
+  MACHINE_RUNTIMES,
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { acpErrorMessage, mapAcpUpdate, validateGeminiSession } from '../src/backend/acp.js';
 
 describe('Gemini ACP bridge', () => {
   test('failure mode 1: missing spawn binary yields an install hint', () => {
-    expect(acpErrorMessage(new Error('spawn gemini ENOENT'))).toContain('未找到 gemini');
+    expect(acpErrorMessage(new Error('spawn gemini ENOENT'))).toContain('install Gemini CLI');
   });
 
   test('failure mode 2: auth failure points to Gemini login', () => {
-    expect(acpErrorMessage(new Error('authenticate required'))).toContain('Gemini 登录');
+    expect(acpErrorMessage(new Error('authenticate required'))).toContain('Gemini login');
+    expect(acpErrorMessage(new Error('Gemini API key is missing or not configured.'))).toContain(
+      'Gemini login',
+    );
   });
 
   test('failure mode 3: gemini is a standalone runtime; unknown provider stays pi', async () => {
-    const shared = await import('@cairn/shared');
-    expect(shared.isBackendRuntimeId('gemini')).toBe(true);
-    expect(shared.isBackendRuntimeId('unknown-provider')).toBe(false);
+    expect(isBackendRuntimeId('gemini')).toBe(true);
+    expect(isBackendRuntimeId('unknown-provider')).toBe(false);
   });
 
   test('failure mode 4: absent runtime switch does not pass', async () => {
-    const { MACHINE_RUNTIMES } = await import('@cairn/shared');
     expect(MACHINE_RUNTIMES).toContain('gemini');
     expect(['pi'].includes('gemini')).toBe(false);
   });
 
   test('failure mode 5: brief backend uses GEMINI.md', async () => {
-    const { briefBackendForProvider, BRIEF_CREATE_NAME } = await import('@cairn/shared');
     expect(BRIEF_CREATE_NAME[briefBackendForProvider('gemini')]).toBe('GEMINI.md');
   });
 
@@ -57,7 +63,10 @@ describe('Gemini ACP bridge', () => {
   });
 
   test('failure mode 9: cancellation error maps to message_stop', () => {
-    expect(mapAcpUpdate({ kind: 'cancelled' })).toEqual({ type: 'message_stop' });
+    expect(mapAcpUpdate({ kind: 'cancelled' })).toEqual({
+      type: 'message_stop',
+      message: { role: 'assistant', content: '' },
+    });
   });
 
   test('failure mode 10: protocol version mismatch keeps both versions', () => {

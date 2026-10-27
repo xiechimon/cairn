@@ -1,0 +1,13 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1671
+
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  09:51:38
+   Duration  10.38s (transform 59%, import 38%, tests 2%)
+
+  Transform  |@xiechimon/cairn-cli| transforming modules took 5.73s · 59% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

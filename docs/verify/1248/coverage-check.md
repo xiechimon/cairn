@@ -1,67 +1,67 @@
-# #1248 ADR 0018 结构自检记录（2026-10-12）
+# #1248 ADR 0018 structure self-check record (2026-10-12)
 
-## 四段齐核验
+## Four-section completeness check
 
-| 段 | 在位 |
+| section | present |
 |---|---|
-| Problem Statement | 是（三正交子题：票内/票间/跨机） |
-| 侦察事实 | 是（F1–F11，全部带出处） |
-| Decision | 是（决策 0 名册 + 层 1/2/3 + 协调模型） |
-| Premortem | 是（三死因 + 护栏） |
-| 末节：与 ADR 0017 关系 | 是（正交不冲突，选源判定先于能力闸） |
-| 末节：施工票拆分 | 是（#1250/#1251 + 落位注记 F11） |
+| Problem Statement | yes (three orthogonal sub-problems: intra-ticket / inter-ticket / cross-machine) |
+| reconnaissance facts | yes (F1-F11, all with sources) |
+| Decision | yes (decision 0 roster + layers 1/2/3 + the coordination model) |
+| Premortem | yes (three death causes + guardrails) |
+| final section: the relationship with ADR 0017 | yes (orthogonal, no conflict; the source-selection judgment precedes the capability gate) |
+| final section: the construction-ticket split | yes (#1250/#1251 + the placement note F11) |
 
-## 覆盖对照表
+## Coverage reconciliation tables
 
-### #1248 票面交付三箱
+### #1248's three ticket deliverable boxes
 
-| 票面交付 | ADR 位置 |
+| ticket deliverable | ADR location |
 |---|---|
-| docs/adr/0018-*.md 入账（三层 + 协调模型 + 与 0017 关系） | 全文 + 「与 ADR 0017 的关系」节 |
-| 02 册 agent/机器节补能力闸语义 | 02 册 §4.2 末条 + §5.4 末条（指针式注记，不复制正文——正本纪律） |
-| 施工票拆分建议写 ADR 末节 | 「施工票拆分」节（#1250/#1251 + #1249 占用注记） |
+| docs/adr/0018-*.md entered (three layers + the coordination model + the relationship with 0017) | the full text + the `与 ADR 0017 的关系` section |
+| spec 02's agent/machine sections gain the capability-gate semantics | spec 02 §4.2 last item + §5.4 last item (pointer-style notes, not copying the body — the canon discipline) |
+| the construction-ticket split suggestion written into the ADR's final section | the `施工票拆分` section (#1250/#1251 + the #1249 occupancy note) |
 
-### #1248 票面定案三层
+### #1248's three ruled layers
 
-| 定案 | ADR 位置 |
+| ruling | ADR location |
 |---|---|
-| 层 1 票内流水线（四角色/四步种/assignment 扩展/confirm+merge 留人） | Decision 1 |
-| 层 2 split_todo 拆票 + 依赖边 + 子全 done 父自动收 + confirm 人审 | Decision 2 |
-| 层 3 角色并发 + #1241 机器推荐并发跨机并行 | Decision 3 |
-| 协调模型（能力清单上报/requiredCapabilities/能力闸/可见 reason/skills 单源/MCP 对账） | Decision 4 |
+| layer 1 intra-ticket pipeline (four roles / four step kinds / the assignment extension / confirm+merge keep-a-human) | Decision 1 |
+| layer 2 split_todo ticket-splitting + dependency edges + all-children-done auto-close + a human confirm | Decision 2 |
+| layer 3 role concurrency + the #1241 machine-recommended concurrency across machines in parallel | Decision 3 |
+| the coordination model (capability inventory reporting / requiredCapabilities / the capability gate / visible reason / skills single source / MCP reconciliation) | Decision 4 |
 
-### 七点设计输入（#1248 评论）
+### The seven design inputs (the #1248 comment)
 
-| 输入 | ADR 位置 |
+| input | ADR location |
 |---|---|
-| ① Skill=how/Persona=who/Command=when 三层分离 + persona 契约 | Decision 0 |
-| ② personas do not invoke other personas、编排单层 | Decision 0 硬律条 |
-| ③ meta-orchestrator 反模式 + chief 值回 criteria | Decision 0 Chief 行 |
-| ④ fan-out 三视角 + 小合并 go/no-go | Decision 1 review fan-out 条 |
-| ⑤ 决策矩阵拆解判据 | Decision 2 |
-| ⑥ /build auto 先例佐证 confirm 留人 | Decision 1 confirm 条 |
-| ⑦ mcpServers frontmatter 被静默忽略 → MCP 协调归机器/daemon 层 | Decision 4 第 6 条 |
+| ① Skill=how / Persona=who / Command=when three-layer separation + the persona contract | Decision 0 |
+| ② personas do not invoke other personas, single-layer orchestration | Decision 0's hard-law entry |
+| ③ the meta-orchestrator anti-pattern + the chief criteria for value return | Decision 0's Chief row |
+| ④ the fan-out three perspectives + the small-merge go/no-go | Decision 1's review fan-out entry |
+| ⑤ the decision-matrix split criteria | Decision 2 |
+| ⑥ the /build auto precedent supporting confirm keep-a-human | Decision 1's confirm entry |
+| ⑦ mcpServers frontmatter silently ignored → MCP coordination belongs to the machine/daemon layer | Decision 4 item 6 |
 
-### 名册定案（会话补正 2026-10-12）
+### The roster ruling (session correction 2026-10-12)
 
-| 名册项 | ADR 位置 |
+| roster item | ADR location |
 |---|---|
-| 7 员（Chief + Planner + Implementer + CodeReviewer/SecurityAuditor/TestEngineer + Verifier）逐条职责 + artifact | Decision 0 表 |
-| WebPerf 不设 agent，作 Verifier 条件 skill hop | Decision 0 |
-| 合并动作留人不在名册 | Decision 0 |
-| Composition 块要求 | Decision 0 首段 |
-| 模型档位按角色注记（具体值留 #1250 seeding） | Decision 0 末条 |
-| TestEngineer 与 Verifier 分工（读 diff 批评 vs 跑真系统取证） | Decision 0 表 Verifier 行 |
+| the seven members (Chief + Planner + Implementer + CodeReviewer/SecurityAuditor/TestEngineer + Verifier), per-item duties + artifact | Decision 0's table |
+| no WebPerf agent; it is a Verifier conditional skill hop | Decision 0 |
+| the merge action keeps a human, not in the roster | Decision 0 |
+| the Composition block requirement | Decision 0's opening paragraph |
+| model tiers annotated per role (concrete values left to the #1250 seeding) | Decision 0's last entry |
+| the TestEngineer / Verifier division of labor (reading the diff to criticize vs running the real system for evidence) | Decision 0's table, the Verifier row |
 
-## Edge case 核对
+## Edge-case reconciliation
 
-- 与 ADR 0017 无矛盾：0017 localPath 加速位语义不动，关系节明写「选源判定先于能力闸，两条判定不互相改写」——交叉读通过。
-- #1241 只引用不重定义（Decision 3 明写「以其 plan 交接物为准」）。
-- 依赖边两说并存如实入账（F8 + Decision 2），承载留 #1250。
-- review meta header 语义不动（Decision 1 承载钉法：槽位管默认、meta header 管实际）。
-- 纯文档票：零 .ts 改动；02 册只加两条指针注记。
+- No contradiction with ADR 0017: 0017's localPath accelerator-slot semantics do not move, and the relationship section states "the source-selection judgment precedes the capability gate; the two judgments do not rewrite each other" — a cross-read passes.
+- #1241 is referenced, not redefined (Decision 3 states "its plan handoff artifact is the canon").
+- The dependency-edge two-readings coexistence is entered faithfully (F8 + Decision 2); the carrier is left to #1250.
+- The review meta header semantics do not move (Decision 1's carrier pin: the slot governs the default, the meta header governs the actual).
+- A pure-docs ticket: zero .ts changes; spec 02 gains only two pointer notes.
 
-## 验证
+## Verification
 
-- `pnpm spec:parse` PASS（输出存同目录 spec-parse-gate.txt，exit=0）。
-- 本文件 + spec-parse-gate.txt = docs/verify/1248/ 证据包。
+- `pnpm spec:parse` PASS (output stored in this directory as spec-parse-gate.txt, exit=0).
+- This file + spec-parse-gate.txt = the docs/verify/1248/ evidence package.

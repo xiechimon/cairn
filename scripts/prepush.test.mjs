@@ -24,7 +24,17 @@ import {
 test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
     ['node', 'scripts/english-only-gate.mjs'],
+    ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons.md', 'AGENTS.md'],
   ]);
+  assert.deepEqual(prepushPlan(['docs/lessons.md'], 'ci'), [
+    ['node', 'scripts/english-only-gate.mjs'],
+  ]);
+  assert.deepEqual(
+    prepushPlan(['apps/server/src/app.ts', 'docs/ops/langfuse.md']).filter(
+      (args) => args[1] === 'scripts/doc-reader-tests.mjs',
+    ),
+    [['node', 'scripts/doc-reader-tests.mjs', 'docs/ops/langfuse.md']],
+  );
   assert.deepEqual(prepushPlan(['docs/lessons.md'], 'advisory'), [
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],
   ]);
@@ -48,6 +58,7 @@ test('local code checks include both UI gates and affected e2e', () => {
   const commands = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   for (const command of [
     'node scripts/ci-job-structure-gate.mjs',
+    'node scripts/feature-map-staleness-gate.mjs',
     'node scripts/english-only-gate.mjs',
     'node scripts/ui-debt-gate.mjs',
     'node scripts/ui-drift-gate.mjs',
@@ -66,12 +77,10 @@ test('local code checks include both UI gates and affected e2e', () => {
     assert.ok(commands.includes(command), command);
 });
 
-test('every single-script CI step also runs in local prepush or is listed as CI-only', () => {
+test('every CI node scripts step also runs in local prepush or is listed as CI-only', () => {
   const local = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   const ciScripts = [
-    ...readFileSync('.github/workflows/ci.yml', 'utf8').matchAll(
-      /run: node (scripts\/[\w-]+\.mjs)\n/g,
-    ),
+    ...readFileSync('.github/workflows/ci.yml', 'utf8').matchAll(/node (scripts\/[\w-]+\.mjs)\n/g),
   ].map((match) => match[1]);
   assert.ok(ciScripts.includes('scripts/ui-registry-gate.mjs'));
   for (const script of ciScripts)

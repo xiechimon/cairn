@@ -1,34 +1,34 @@
-# PR 评审评分卡（#1080）
+# PR review scorecard (#1080)
 
-> 形态借自 pi 的 `.pi/prompts/pr.md`（受版本管理的固定六节评分卡 + 五步流程）。作者侧标准已在 `.github/PULL_REQUEST_TEMPLATE.md`（模板五节）与 `scripts/pr-evidence-gate.py`（形态闸）——本文件补的是**给 reviewer 的成文标准**：审这个仓的 PR 按什么顺序看什么、输出什么形态。它是判断依据，不是可机械判的闸；机械检查归 CI，见下文「机械检查不归评审者」。
+> The form is borrowed from pi's `.pi/prompts/pr.md` (a version-controlled fixed six-section scorecard + five-step process). The author-side standard already lives in `.github/PULL_REQUEST_TEMPLATE.md` (the template's five sections) and `scripts/pr-evidence-gate.py` (the form gate) — what this file adds is **the written standard for reviewers**: what to read in what order when reviewing a PR in this repo, and what shape the output takes. It is a basis for judgment, not a mechanically decidable gate; mechanical checks belong to CI, see "Mechanical checks are not the reviewer's job" below.
 
-## 五步流程（按序执行，跳步即盲评）
+## Five-step process (execute in order; skipping a step means reviewing blind)
 
-1. **打 `inprogress` 标签**：开工即标记（`gh pr edit <PR> --add-label inprogress`），防两个评审者重复劳动；打不上（权限、标签缺失）就明说并继续，不因此停评。评完把标签移除（`--remove-label`）——标签只表示「评审进行中」。
-2. **全文读完**：PR 描述、全部评论、全部 commit、全部变更文件——一个不漏再动手评。
-3. **读关联 issue**：body / 评论 / commit message / 交叉链接里引用的每张 issue 全文（含评论）。先理解「要什么」，再评「给的是不是那个」。
-4. **不切分支看 diff**：只用 `gh pr view` / `gh pr diff` / `gh api` / `git show <ref>:<path>`（fetch 后）；需要 PR 文件内容就落一次性文件读。**绝不 `gh pr checkout`、绝不 `git switch`**——本仓多车道长期并行、各占独立 worktree 施工，评审者一 checkout 就把 worktree 挪到别人的分支上，撞碎正在施工的现场；评审是只读动作，不改变任何工作区状态。
-   - 被 diff 触及的代码文件**整读**（不截断）再对照 diff；diff 没碰但验证行为必须读到的代码路径（调用方、接口另一端、共享面）也一并读。
-5. **检查 docs 是否需要同步**：改了已有行为或加了新机制时，`docs/spec/`（分层职责、验收口径）、`docs/feature-map.md`（功能地图活册）、`apps/web/COMPONENTS.md`、`.claude/skills/verify-pacman/SKILL.md` 这类文档面是否该跟着变。发现缺口记进 `Bad` 或 `Tests`，不当场替作者改。
+1. **Label `inprogress`**: mark it the moment you start (`gh pr edit <PR> --add-label inprogress`) so two reviewers do not duplicate work; if labeling fails (permissions, missing label), say so explicitly and continue — do not stop the review because of it. Remove the label when done (`--remove-label`) — the label only means "review in progress".
+2. **Read everything**: the PR body, all comments, all commits, all changed files — not one missing before you start writing the review.
+3. **Read the linked issues**: the full text (including comments) of every issue referenced in the body / comments / commit messages / cross-links. Understand "what is being asked for" before judging "is what is given that thing".
+4. **Read the diff without switching branches**: use only `gh pr view` / `gh pr diff` / `gh api` / `git show <ref>:<path>` (after fetch); if you need a PR file's contents, write it to a one-off file and read that. **Never `gh pr checkout`, never `git switch`** — this repo runs many lanes in parallel for the long term, each building in its own worktree; the moment a reviewer checks out, the worktree jumps onto someone else's branch and smashes the construction site; reviewing is a read-only action and changes no working-tree state.
+   - Code files touched by the diff are read **in full** (no truncation) before being compared against the diff; code paths the diff does not touch but that verifying the behavior requires (callers, the other end of an interface, shared surfaces) are read as well.
+5. **Check whether docs need to stay in sync**: when existing behavior changed or a new mechanism was added, check whether document surfaces like `docs/spec/` (layering responsibilities, acceptance criteria), `docs/feature-map.md` (the feature-map living register), `apps/web/COMPONENTS.md`, and `.claude/skills/verify-pacman/SKILL.md` should change with it. Record gaps under `Bad` or `Tests`; do not fix them for the author on the spot.
 
-## 例外：`pr-gate` workflow（ADR 0021、spec 28 §7.5）
+## Exception: the `pr-gate` workflow (ADR 0021, spec 28 §7.5)
 
-`.claude/workflows/pr-gate.js` 是合并前闸，不是人审评分卡，四处与上面不同：子代理对 GitHub 只读，不打 `inprogress` 标签、不发评论，结论是一份带 headSha 的 JSON 判定，由主会话转述；证据维度及其反驳者跑在各自的独立 worktree 里，可以 `git -c core.hooksPath=/dev/null checkout --detach <headSha>`（第 4 步禁的是在共享工作区里切换，独立 worktree 不撞别的车道）；凡 checkout、fetch、删 ref 都关掉钩子，因为共享 clone 的 `core.hooksPath` 可能是 husky 写的相对路径 `.husky/_`，会解析到 checkout 出来的树里，PR 自带的钩子就会带着会话凭证运行；`head.repo.full_name` 不是本仓（fork）时不 checkout、不装依赖、不跑命令，只用 `git show` / `git diff` / `git ls-tree` 读；读 PR 改用 fetch 进私有 ref（路径里带 head，读完删掉）；PR 评论只读 `author_association` 为 OWNER / MEMBER / COLLABORATOR 的，读评论的命令用 `--jq` 先滤掉其余（仓库公开，谁都能评论，证据维度有 shell）。其余步骤（全文读完、读关联 issue、文档同步）照常。改这里或改 `pr-gate.js` 的评审口径时两处一起改。
+`.claude/workflows/pr-gate.js` is a pre-merge gate, not a human-review scorecard, and differs from the above in four places: the sub-agent has read-only access to GitHub — it applies no `inprogress` label and posts no comments — and its verdict is a JSON judgment carrying a headSha, relayed by the main session; the evidence dimension and its refuter run in their own separate worktrees and may `git -c core.hooksPath=/dev/null checkout --detach <headSha>` (what step 4 forbids is switching branches in a shared workspace; a separate worktree does not collide with other lanes); hooks are disabled for any checkout, fetch, or ref deletion, because the shared clone's `core.hooksPath` may be the relative path `.husky/_` written by husky, which resolves into the checked-out tree, and the PR-bundled hooks would then run with the session's credentials; when `head.repo.full_name` is not this repo (a fork), never check out, install dependencies, or run commands — read only with `git show` / `git diff` / `git ls-tree`; to read a PR, fetch it into a private ref (the path carries head, deleted after reading); read only PR comments whose `author_association` is OWNER / MEMBER / COLLABORATOR, filtering out the rest with `--jq` first (the repo is public, anyone can comment, and the evidence dimension has a shell). The remaining steps (read everything, read linked issues, doc sync) proceed as usual. When changing this file or the review criteria in `pr-gate.js`, change both together.
 
-## 六节评分卡（固定输出形态）
+## Six-section scorecard (fixed output form)
 
-对每张被审 PR 输出六节，节名固定：
+For each reviewed PR, output six sections with fixed names:
 
-| 节 | 内容 |
+| Section | Content |
 |---|---|
-| **What it does** | 一段短话：这个改动做了什么、意图是什么 |
-| **Good** | 站得住的选择或改进 |
-| **Bad** | 具体问题：回归、缺测试、风险 |
-| **Ugly** | 隐蔽的、或高影响的问题 |
-| **Tests** | 覆盖了什么、缺什么、现有测试够不够 |
-| **Open questions** | 只有**卡住合并决策、需要用户拍板**的事 |
+| **What it does** | One short paragraph: what this change does and what its intent is |
+| **Good** | Choices or improvements that hold up |
+| **Bad** | Concrete problems: regressions, missing tests, risks |
+| **Ugly** | Hidden or high-impact problems |
+| **Tests** | What is covered, what is missing, whether existing tests are enough |
+| **Open questions** | Only things that **block the merge decision and need the user to decide** |
 
-输出格式（每 PR 一段）：
+Output format (one block per PR):
 
 ```
 PR: <url>
@@ -46,20 +46,20 @@ Open questions:
 - ...
 ```
 
-三条硬规矩：
+Three hard rules:
 
-- **Bad / Ugly 查完没发现问题，就在该节下明说**「未发现问题（查过 X / Y 面）」——这是结论，不是凑数；禁止的形态是只剩标题、一句敷衍的「无」。
-- **Open questions 没有就整节省略**，连标题都不留——它只收「卡住合并决策、需要用户拍板」的事，审出的一般问题归 Bad / Ugly。写了 Open questions 就同时 `gh pr edit <PR> --add-label needs-decision`（#1440）：`pr-evidence` 见标签即红、解除 auto-merge，用户拍板后由人摘标签；问题只留在评审文字里等于没问。
-- 六节全部写实条目；写不出真实条目的节不写。
+- **If Bad / Ugly find nothing after checking, say so explicitly in that section** — "no issues found (checked X / Y surfaces)" — that is a conclusion, not filler; the forbidden form is a bare heading with a perfunctory "none".
+- **If there are no Open questions, omit the whole section**, heading included — it only takes "things that block the merge decision and need the user to decide"; general problems found in review belong in Bad / Ugly. When you do write Open questions, also run `gh pr edit <PR> --add-label needs-decision` (#1440): `pr-evidence` goes red on the label and disarms auto-merge; after the user decides, a human removes the label; a question left only in the review text is a question never asked.
+- All six sections carry real entries; a section you cannot fill with a real entry is not written.
 
-评审结论落 **PR 评论**（`gh pr comment`，长内容写一次性文件走 `--body-file`），不动 PR body——body 是作者的证据面，评审不改它。
+The review verdict lands as a **PR comment** (`gh pr comment`; write long content to a one-off file and use `--body-file`), not by editing the PR body — the body is the author's evidence surface, and the review does not change it.
 
-## 机械检查不归评审者（别做 CI 的复读机）
+## Mechanical checks are not the reviewer's job (do not be a CI parrot)
 
-lint / typecheck / spec:parse / vitest / e2e 由 CI `check` job 与 `pack-smoke` / `e2e-gate` 必需检查覆盖；Upstream / Failure-path 两节「有答案」由 `pr-evidence-gate.py` 钉住；Acceptance 段 tasks 存在且全勾由 `pr-tasks-gate.py`（pr-evidence job 的 pr-tasks 步）钉住。评审者把判断力花在机器看不见的地方：
+lint / typecheck / spec:parse / vitest / e2e are covered by the CI `check` job and the `pack-smoke` / `e2e-gate` required checks; the "has answers" property of the Upstream / Failure-path sections is pinned by `pr-evidence-gate.py`; the Acceptance-section tasks existing and being fully checked is pinned by `pr-tasks-gate.py` (the pr-tasks step of the pr-evidence job). The reviewer spends judgment where machines cannot see:
 
-- **语义冲突**：两条并行 PR 各自改同一件事、各自能跑绿（git 合并干净、typecheck 才露馅或根本不露）——对照在飞的 open PR 看 `gh pr diff --name-only` 有没有撞件。
-- **缝纪律**：`biome.json` 的 `noRestrictedImports` 锁死的依赖是否绕开了薄桥模块（`apps/daemon/src/backend/` 是 GitOps / MCP / LLM provider 缝）。
-- **快照面**：动 `packages/shared` 的 wire schema，`snapshot.test.ts` 是否同步更新（JSON 投影变了没更快照 = CI 必红）。
-- **尾标纪律**：`closes #N` 是否在 commit message 里（squash 只带 commit message，PR body 不进 main）；分段 PR 是否**误带**了整票的尾标。
-- **豁免真实性**（pr-tasks 闸管不了的）：PR 写了 `- [x] no task surface: <理由>` 但明明有任务面 → 机器只验「已勾」，真假归评审者，记 Bad。
+- **Semantic conflicts**: two parallel PRs each change the same thing and each runs green (git merges cleanly, typecheck exposes it late or not at all) — compare against open PRs in flight and check `gh pr diff --name-only` for file collisions.
+- **Seam discipline**: whether dependencies locked by `biome.json`'s `noRestrictedImports` are being reached around the thin bridge modules (`apps/daemon/src/backend/` is the GitOps / MCP / LLM provider seam).
+- **Snapshot surfaces**: when the wire schema in `packages/shared` changes, whether `snapshot.test.ts` was updated in sync (a changed JSON projection with no snapshot update = guaranteed CI red).
+- **Closing-tag discipline**: whether `closes #N` is in the commit message (a squash merge carries only the commit message; the PR body never enters main); whether a staged PR **mistakenly carries** the whole ticket's closing tag.
+- **Exemption authenticity** (what the pr-tasks gate cannot police): the PR writes `- [x] no task surface: <reason>` while clearly having a task surface → the machine only verifies the checkbox is ticked; the truth is the reviewer's job, record it as Bad.

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { dropEscLayer, ensureGestureKeys, pushEscLayer } from '../overlays/gesture-machine.js';
+import { dropEscLayer, ensureGestureKeys, pushEscLayer } from '../overlay/gesture-machine.js';
 
 export function useEscClose(onClose: () => void, enabled = true): void {
   const onCloseRef = useRef(onClose);

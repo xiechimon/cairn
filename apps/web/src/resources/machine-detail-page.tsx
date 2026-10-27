@@ -10,16 +10,11 @@ import {
   SettingsCard,
   SettingsDangerZone,
   SettingsRow,
+  SettingsSelectTrigger,
 } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select.js';
+import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -166,14 +161,14 @@ export function MachineDetailPage() {
             hint={t('把归属这台机器的 agent 一起迁到另一台机器。')}
           >
             <Select value={evacuateTarget} onValueChange={(v) => setEvacuateTarget(v as string)}>
-              <SelectTrigger
+              <SettingsSelectTrigger
                 aria-label={t('迁移到')}
                 className={`machine-evacuate-select ${SETTINGS_SELECT_TRIGGER_CLS}`}
               >
                 <SelectValue>
                   {others.find((m) => m.id === evacuateTarget)?.name ?? t('迁移到…')}
                 </SelectValue>
-              </SelectTrigger>
+              </SettingsSelectTrigger>
               <SelectContent aria-label={t('迁移到')}>
                 {others.map((m) => (
                   <SelectItem key={m.id} className="machine-evacuate-row" value={m.id ?? ''}>

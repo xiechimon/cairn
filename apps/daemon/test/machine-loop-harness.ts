@@ -108,7 +108,6 @@ export class FakeMachineApi implements MachineApi {
       latestCliVersion: null,
       kind: 'remote' as const,
       enabledRuntimes: [],
-      shellEnabled: false,
       ...this.mePatch,
     };
   }
@@ -260,6 +259,7 @@ export async function boot(opts: {
   preEnrolled?: { serverUrl: string };
   seedJournal?: (paths: StatePaths) => void;
   capEnv?: NodeJS.ProcessEnv;
+  otel?: import('../src/backend/otel.js').DaemonOtel | null;
 }) {
   const home = tmpHome();
   const { logger, lines } = captureLogger();
@@ -301,6 +301,7 @@ export async function boot(opts: {
     claimBackoffBaseMs: 10,
     proxyEnv: {},
     ...(opts.capEnv !== undefined ? { capEnv: opts.capEnv } : {}),
+    ...(opts.otel !== undefined ? { otel: opts.otel } : {}),
   });
   return { handle, api, lines, paths, home };
 }
