@@ -106,8 +106,9 @@ export function parseClaudeOauthExpiresAt(raw: string): number | null {
   };
   const refreshable = typeof refreshToken === 'string' && refreshToken.length > 0;
   const expiresAt = refreshable ? refreshTokenExpiresAt : accessExpiresAt;
-  if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) return null;
-  if (refreshable && typeof accessExpiresAt === 'number' && Number.isFinite(accessExpiresAt)) {
+  if (typeof expiresAt !== 'number' || !Number.isSafeInteger(Math.trunc(expiresAt))) return null;
+  if (refreshable && typeof accessExpiresAt === 'number') {
+    if (!Number.isSafeInteger(Math.trunc(accessExpiresAt))) return null;
     return Math.trunc(Math.max(expiresAt, accessExpiresAt));
   }
   return Math.trunc(expiresAt);

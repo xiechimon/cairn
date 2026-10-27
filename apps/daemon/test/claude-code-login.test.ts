@@ -61,6 +61,9 @@ describe('parseClaudeOauthExpiresAt', () => {
       ),
     ).toBeNull();
     expect(parseClaudeOauthExpiresAt(JSON.stringify({ claudeAiOauth: {} }))).toBeNull();
+    expect(
+      parseClaudeOauthExpiresAt(JSON.stringify({ claudeAiOauth: { expiresAt: 1e30 } })),
+    ).toBeNull();
   });
 });
 
