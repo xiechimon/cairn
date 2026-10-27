@@ -1393,6 +1393,9 @@ function persistGateVerdict(
     stepRow.kind === 'review' && todoRow !== undefined
       ? (agentForStep(deps.db, todoRow, 'review', stepRow.prompt)?.persona ?? null)
       : null;
+  const execution = stepRow.fallback?.execution;
+  const reviewPayload = execution?.modelId != null ? facts.reviewVerdict : undefined;
+  const verifyPayload = execution?.modelId != null ? facts.verifyVerdict : undefined;
   const bound = bindGateVerdict({
     kind: parseReviewPromptMeta(stepRow.prompt)?.purpose === 'decision' ? 'decision' : stepRow.kind,
     perspective,
@@ -1400,8 +1403,8 @@ function persistGateVerdict(
     reportedHeadSha: facts.report.reportedHeadSha,
     stepFailed: facts.stepFailed,
     extracted: facts.extracted,
-    ...(facts.reviewVerdict !== undefined ? { reviewVerdict: facts.reviewVerdict } : {}),
-    ...(facts.verifyVerdict !== undefined ? { verifyVerdict: facts.verifyVerdict } : {}),
+    ...(reviewPayload !== undefined ? { reviewVerdict: reviewPayload } : {}),
+    ...(verifyPayload !== undefined ? { verifyVerdict: verifyPayload } : {}),
     ...(facts.planContent !== undefined ? { planContent: facts.planContent } : {}),
     ...(facts.planRequired !== undefined ? { planRequired: facts.planRequired } : {}),
     blocked: facts.blocked,
@@ -1415,6 +1418,9 @@ function persistGateVerdict(
       kind: bound.kind,
       perspective: bound.perspective,
       outcome: bound.outcome,
+      payload: reviewPayload ?? verifyPayload ?? null,
+      reviewerAgentId: execution?.agentId ?? null,
+      reviewerModelId: execution?.modelId ?? null,
       patchDigest:
         bound.kind === 'decision' && bound.headSha === bound.expectedHeadSha
           ? (parseReviewPromptMeta(stepRow.prompt)?.expectedPatchDigest ?? null)
@@ -1709,11 +1715,11 @@ async function mergeThroughGithub(
       role: 'system',
       content:
         result.kind === 'merged'
-          ? `PR #${prNumber} 已由 cairn 经 GitHub 合并（squash，合并提交 ${githubText(result.sha).slice(0, 7)}）`
+          ? `PR #${prNumber} 已由 cairn 经 GitHub 合并（squash，合并提交 ${githubText(result.sha).slice(0, 7)}）；审计尚未确认，cairn 对账确认后收尾`
           : `已请 GitHub 合并 PR #${prNumber}，GitHub 没有明确答复（${unclearReason(result)}）。cairn 对账会读这张 PR：已合并就收尾；还开着就留在审核关口，可以再点合并。`,
       createdAt: nowMs(),
     });
-    if (result.kind === 'merged' && atGate) finishTodoDone(deps, row.todoId, row.id);
+    if (result.kind === 'merged' && atGate) stopUnclaimedGateSteps(deps, row.id);
     return { delegated: true };
   } finally {
     mergingBuilds.delete(row.id);

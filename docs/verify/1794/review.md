@@ -36,7 +36,7 @@ Reviewed source SHA-256 values:
 
 The review does not cover a live task PR merge, public review publication, autonomous merge execution, or one week of matching external-timer outcomes. Issue #1794 remains open for those acceptance items.
 
-## Final protected ports and verdict review
+## Earlier protected ports and verdict review
 
 The separate `ports_review_1794` agent reviewed source commit `c731d45d5d8e934bf80be1f3f8318b07e118c1ac` against main `02eaff6bcaa04f73c1219770df6ee7f5b17dd197`. Its scoped code and security-boundary conclusion was PASS with no remaining blocking finding in the reviewed gate, binding, extraction, audit, adapter, storage, scheduling and display changes. The exact report and source hashes are in `independent-review.txt`.
 
@@ -54,3 +54,7 @@ F15 deliberately distinguishes the new protected server database adapter from da
 This review covers the changed gate code and relevant call paths. It does not claim that every line of the long runner and builds files or every historical issue was read in full. The named repository review skills remain unavailable, and this record does not claim they ran. Full pre-push and live host acceptance were not independently rerun by the reviewer. Old daemons without observed review heads and old verification records without the original payload fail closed and require an upgraded daemon and fresh review or verification.
 
 No actual task PR merge, public review publication, autonomous merge executor or one-week timer retirement is accepted by this review. Issue #1794 stays open.
+
+## Follow-up full-file review
+
+A follow-up full-file review found two additional blockers after the earlier scoped snapshot: human GitHub merge success finished tasks before the poller's required audit, and machine transcript writes could replace the messages the gate trusted for reviewer identity and safety payloads. Those findings required further source changes. The earlier scoped PASS does not cover this later source. The current implementation leaves human merges in review for audit, stores immutable server-owned verdict facts, derives reviewer identity from server claim execution, and rejects cross-conversation transcript ID conflicts while retaining same-conversation recovery. Final source-bound review is recorded separately when complete.

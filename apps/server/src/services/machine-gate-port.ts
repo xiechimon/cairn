@@ -14,7 +14,6 @@ import {
   gateRound,
   gateState,
   gateVerdict,
-  message,
   plan,
   step,
   todo,
@@ -49,12 +48,6 @@ export function machineGatePort(deps: BuildDeps): GateRuntimePort {
     readSteps: (id) => db.select().from(step).where(eq(step.buildId, id)).all(),
     readAgents: (id) => db.select().from(agent).where(eq(agent.teamId, id)).all(),
     readVerdicts: (id) => db.select().from(gateVerdict).where(eq(gateVerdict.buildId, id)).all(),
-    readMessages: (id) =>
-      db
-        .select()
-        .from(message)
-        .where(and(eq(message.conversationId, id), eq(message.role, 'system')))
-        .all(),
     readChief: (id) => db.select().from(chief).where(eq(chief.teamId, id)).get(),
     readState: (id) => db.select().from(gateState).where(eq(gateState.buildId, id)).get(),
     bindVerdictDigest: (id, digest) => {

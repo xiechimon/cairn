@@ -15,7 +15,6 @@ import type {
   gateRound,
   gateState,
   gateVerdict,
-  message,
   project,
   step,
   todo,
@@ -39,7 +38,6 @@ export interface GateRuntimePort {
   readSteps(buildId: string): (typeof step.$inferSelect)[];
   readAgents(teamId: string): (typeof agent.$inferSelect)[];
   readVerdicts(buildId: string): (typeof gateVerdict.$inferSelect)[];
-  readMessages(buildId: string): (typeof message.$inferSelect)[];
   readChief(teamId: string): typeof chief.$inferSelect | undefined;
   readState(buildId: string): StateRow | undefined;
   bindVerdictDigest(stepId: string, digest: string): void;

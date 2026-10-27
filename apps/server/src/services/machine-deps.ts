@@ -2,10 +2,11 @@ import type { SecretBox, StepRecord, UserRecord } from '@cairn/shared';
 import { isChiefConversationId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, chiefThread, message, step, todo } from '../db/schema.js';
+import { build, chiefMessage, chiefThread, message, step, todo } from '../db/schema.js';
+import { conflict } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
+import { nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
-import { upsertChiefMessage } from './chief.js';
 import { agentForStep as agentForStepEligibility } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -93,14 +94,17 @@ export function upsertMessage(
   deps: { db: Db; convHub?: ConversationStreamHub },
   row: MessageRowInput & { conversationId: string },
 ): void {
-  deps.db
+  const written = deps.db
     .insert(message)
     .values(row)
     .onConflictDoUpdate({
       target: message.id,
+      setWhere: eq(message.conversationId, row.conversationId),
       set: { role: row.role, content: row.content, createdAt: row.createdAt },
     })
     .run();
+  if (written.changes === 0)
+    throw conflict('Transcript message ID belongs to another conversation');
   deps.convHub?.publishMessage(row.conversationId, row);
 }
 
@@ -108,6 +112,21 @@ export function upsertChiefRow(
   deps: { db: Db; convHub?: ConversationStreamHub },
   row: MessageRowInput & { threadId: string },
 ): void {
-  upsertChiefMessage(deps.db, row);
+  const written = deps.db
+    .insert(chiefMessage)
+    .values(row)
+    .onConflictDoUpdate({
+      target: chiefMessage.id,
+      setWhere: eq(chiefMessage.threadId, row.threadId),
+      set: { role: row.role, content: row.content, createdAt: row.createdAt },
+    })
+    .run();
+  if (written.changes === 0)
+    throw conflict('Transcript message ID belongs to another chief thread');
+  deps.db
+    .update(chiefThread)
+    .set({ updatedAt: nowMs() })
+    .where(eq(chiefThread.id, row.threadId))
+    .run();
   deps.convHub?.publishMessage(row.threadId, row);
 }

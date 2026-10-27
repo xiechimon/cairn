@@ -20,11 +20,13 @@ import type {
   ProviderCompat,
   ProviderModel,
   RequiredCapabilities,
+  ReviewVerdict,
   SkillInjectionRecord,
   StepKind,
   TodoOutputKind,
   TodoSourceKind,
   TriggerSource,
+  VerifyVerdict,
 } from '@cairn/shared';
 import { sql } from 'drizzle-orm';
 import {
@@ -618,6 +620,9 @@ export const gateVerdict = sqliteTable(
     kind: text('kind').$type<GateVerdictKind>().notNull(),
     perspective: text('perspective'),
     outcome: text('outcome').$type<GateVerdictOutcome>().notNull(),
+    payload: json<ReviewVerdict | VerifyVerdict>('payload'),
+    reviewerAgentId: text('reviewerAgentId'),
+    reviewerModelId: text('reviewerModelId'),
     patchDigest: text('patchDigest'),
     headSha: text('headSha'),
     expectedHeadSha: text('expectedHeadSha').notNull(),

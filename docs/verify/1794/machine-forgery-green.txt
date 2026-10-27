@@ -1,0 +1,8 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+
+ Test Files  1 passed (1)
+      Tests  6 passed | 29 skipped (35)
+   Start at  11:45:27
+   Duration  1.56s (transform 55%, import 27%, tests 18%)

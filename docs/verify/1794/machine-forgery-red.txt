@@ -1,0 +1,58 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+ ❯ |@xiechimon/cairn| test/merge-gate-product.test.ts (31 tests | 3 failed | 28 skipped) 147ms
+   × a completed machine cannot forge gate model by overwriting a server message 80ms
+   × a completed machine cannot forge gate safety by overwriting a server message 34ms
+   × a completed machine can retransmit its conversation but cannot overwrite another conversation 32ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-product.test.ts > a completed machine cannot forge gate model by overwriting a server message
+AssertionError: expected [ 'phase-not-review', …(2) ] to include 'independent-review-missing'
+ ❯ test/merge-gate-product.test.ts:1147:64
+    1145|     expect(response.status).toBe(200);
+    1146|     const readiness = await evaluateMergeGate(s.svc, buildId, { port: …
+    1147|     expect(readiness?.blockers.map((blocker) => blocker.code)).toConta…
+       |                                                                ^
+    1148|       attack === 'model' ? 'independent-review-missing' : 'review-bloc…
+    1149|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-product.test.ts > a completed machine cannot forge gate safety by overwriting a server message
+AssertionError: expected [ 'phase-not-review', …(2) ] to include 'review-blocking'
+ ❯ test/merge-gate-product.test.ts:1147:64
+    1145|     expect(response.status).toBe(200);
+    1146|     const readiness = await evaluateMergeGate(s.svc, buildId, { port: …
+    1147|     expect(readiness?.blockers.map((blocker) => blocker.code)).toConta…
+       |                                                                ^
+    1148|       attack === 'model' ? 'independent-review-missing' : 'review-bloc…
+    1149|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-product.test.ts > a completed machine can retransmit its conversation but cannot overwrite another conversation
+AssertionError: expected 200 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 200
+
+ ❯ test/merge-gate-product.test.ts:1166:25
+    1164|     .run();
+    1165|   const forged = await postRow('other-server-message', 'Overwritten');
+    1166|   expect(forged.status).toBe(409);
+       |                         ^
+    1167|   expect(
+    1168|     s.db.select().from(message).where(eq(message.id, 'other-server-mes…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 28 skipped (31)
+   Start at  11:34:44
+   Duration  1.45s (transform 57%, import 32%, tests 11%)

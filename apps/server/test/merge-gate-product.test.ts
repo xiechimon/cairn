@@ -7,6 +7,8 @@ import {
   agent as agentTable,
   build,
   chief,
+  chiefMessage,
+  chiefThread,
   gateDigest,
   gateRound,
   gateState,
@@ -28,7 +30,7 @@ import { readGateRuns } from '../src/services/machine-gate-storage.js';
 import { compareFilesFromResponse, computePatchDigest } from '../src/services/merge-gate/digest.js';
 import type { GateGithubPort, GateRaw } from '../src/services/merge-gate/github-port.js';
 import { evaluateMergeGate as evaluateCoreGate } from '../src/services/merge-gate/run.js';
-import { bootServer, postProject, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
 
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
@@ -247,7 +249,10 @@ function completeReview(
   outcome: Parameters<typeof completeStep>[2],
 ): void {
   const current = s.db.select().from(step).where(eq(step.id, stepId)).get();
-  const agentId = parseReviewPromptMeta(current?.prompt ?? null)?.agentId ?? '';
+  const agentId =
+    current?.kind === 'verify'
+      ? 'agent-verifier'
+      : (parseReviewPromptMeta(current?.prompt ?? null)?.agentId ?? '');
   const reviewer = s.db.select().from(agentTable).where(eq(agentTable.id, agentId)).get();
   s.db
     .update(step)
@@ -359,6 +364,14 @@ describe('in-product merge gate', () => {
         kind: 'review',
         perspective: 'code_reviewer',
         outcome: 'pass',
+        payload: {
+          conclusion: 'Stored pass',
+          gateLoosening: false,
+          evalRulerChange: false,
+          findings: [],
+        },
+        reviewerAgentId: 'agent-reviewer',
+        reviewerModelId: 'gpt-5.4',
         patchDigest: digest,
         headSha: HEAD,
         expectedHeadSha: HEAD,
@@ -408,6 +421,18 @@ describe('in-product merge gate', () => {
         }),
       })
       .where(eq(message.id, 'msg-verdict'))
+      .run();
+    s.db
+      .update(gateVerdict)
+      .set({
+        payload: {
+          conclusion: 'Stored gate loosening',
+          gateLoosening: true,
+          evalRulerChange: false,
+          findings: [],
+        },
+      })
+      .where(eq(gateVerdict.stepId, review?.id ?? ''))
       .run();
     const loosened = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
     expect(loosened?.blockers.map((b) => b.code)).toContain('review-blocking');
@@ -460,6 +485,17 @@ describe('in-product merge gate', () => {
           kind: 'review',
           perspective: 'code_reviewer',
           outcome: 'pass',
+          payload:
+            scenario === 'legacy-unbound'
+              ? null
+              : {
+                  conclusion: 'Current stored gate change',
+                  gateLoosening: true,
+                  evalRulerChange: false,
+                  findings: [],
+                },
+          reviewerAgentId: reviewerId,
+          reviewerModelId: 'gpt-5.4',
           headSha: HEAD,
           expectedHeadSha: HEAD,
           createdAt: 30,
@@ -590,7 +626,7 @@ describe('in-product merge gate', () => {
           createdAt: 100,
         })
         .run();
-      completeStep(s.svc, 'verify-step', {
+      completeReview(s, 'verify-step', {
         verifyVerdict: {
           passed: true,
           conclusion: 'Verification passed',
@@ -619,8 +655,8 @@ describe('in-product merge gate', () => {
           .all()
           .filter((row) => row.prompt?.includes('"purpose":"decision"')),
       ).toHaveLength(1);
-      completeStep(
-        s.svc,
+      completeReview(
+        s,
         decision?.id ?? '',
         scenario === 'missing'
           ? { verdictReport: { reportedHeadSha: HEAD, driftedHeads: [] } }
@@ -645,7 +681,7 @@ describe('in-product merge gate', () => {
                     },
                   }
                 : scenario === 'missing-head'
-                  ? {}
+                  ? { verdictReport: { reportedHeadSha: null, driftedHeads: [] } }
                   : { verdictReport: { reportedHeadSha: HEAD, driftedHeads: [] } }),
             },
       );
@@ -984,7 +1020,7 @@ test('a stored passing verification cannot hide a failing verdict in its bound m
       createdAt: 100,
     })
     .run();
-  completeStep(s.svc, 'failing-verify', {
+  completeReview(s, 'failing-verify', {
     verifyVerdict: { passed: false, conclusion: 'Verification failed', evidence: [] },
     verdictReport: { reportedHeadSha: HEAD, driftedHeads: [] },
   });
@@ -1021,7 +1057,7 @@ test('empty caller criteria cannot hide evidence missing from the server plan', 
       createdAt: 100,
     })
     .run();
-  completeStep(s.svc, 'partial-verify', {
+  completeReview(s, 'partial-verify', {
     verifyVerdict: {
       passed: true,
       conclusion: 'Claimed pass',
@@ -1048,4 +1084,231 @@ test('empty caller criteria cannot hide evidence missing from the server plan', 
     .run();
   const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
   expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('verify-failed');
+});
+
+async function claimedMachineReview(sameVendor = false, gateLoosening = false) {
+  const { s, buildId, stepId, reviewerId } = await world();
+  const key = await issueApiKey(s);
+  const enrollment = await s.app.request('/api/machine/enroll', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ teamId: s.team.id, name: 'gate-payload-worker', cliVersion: '0.1.0' }),
+  });
+  expect(enrollment.status).toBe(200);
+  const { token, machineId } = (await enrollment.json()) as { token: string; machineId: string };
+  s.db
+    .update(agentTable)
+    .set({
+      machineId,
+      provider: sameVendor ? 'anthropic' : 'openai',
+      modelId: sameVendor ? 'claude-opus-4-8' : 'gpt-5.4',
+    })
+    .where(eq(agentTable.id, reviewerId))
+    .run();
+  completeStep(s.svc, stepId, { hasChanges: true });
+  const review = s.db
+    .select()
+    .from(step)
+    .where(eq(step.buildId, buildId))
+    .all()
+    .find((row) => row.kind === 'review');
+  const reviewId = review?.id ?? '';
+  const claimed = await claimStep(
+    { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
+    machineId,
+    s.team.id,
+    0,
+    'http://localhost',
+  );
+  expect(claimed?.step.id).toBe(reviewId);
+  const done = await s.app.request(`/api/machine/done/${reviewId}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      status: 'success',
+      gateHeadSha: HEAD,
+      findings: { conclusion: 'Reviewed', gateLoosening, evalRulerChange: false, findings: [] },
+    }),
+  });
+  expect(done.status).toBe(200);
+  expect(s.db.select().from(step).where(eq(step.id, reviewId)).get()?.status).toBe('done');
+  const record = s.db
+    .select()
+    .from(message)
+    .where(eq(message.conversationId, buildId))
+    .all()
+    .find((row) => String(row.content).includes(`"stepId":"${reviewId}"`));
+  expect(record).toBeDefined();
+  const postRow = async (id: string, content: unknown, transport = 'tool') => {
+    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const row = { id, role: 'system', content, createdAt: 100 };
+    if (transport === 'upload') {
+      const urls = await s.app.request(`/api/machine/upload-urls/${reviewId}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ files: [{ name: 'transcript.json' }] }),
+      });
+      expect(urls.status).toBe(200);
+      const upload = (await urls.json()) as { uploads: { url: string }[] };
+      return s.app.request(upload.uploads[0]?.url ?? '', {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ stepId: reviewId, messages: [row] }),
+      });
+    }
+    return s.app.request(`/api/machine/tool/${reviewId}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ kind: 'transcript_row', row }),
+    });
+  };
+  return { s, buildId, reviewId, record, postRow, token };
+}
+
+test.each(
+  ['model', 'safety'].flatMap((attack) =>
+    ['tool', 'upload'].map((transport) => ({ attack, transport })),
+  ),
+)(
+  'a completed machine cannot forge gate $attack through $transport',
+  async ({ attack, transport }) => {
+    const { s, buildId, reviewId, record, postRow, token } = await claimedMachineReview(
+      attack === 'model',
+      attack === 'safety',
+    );
+    if (attack === 'safety')
+      s.db
+        .update(gateVerdict)
+        .set({ outcome: 'pass' })
+        .where(eq(gateVerdict.stepId, reviewId))
+        .run();
+    const original = JSON.parse(String(record?.content));
+    const response = await postRow(
+      record?.id ?? '',
+      JSON.stringify({
+        ...original,
+        modelId: 'gpt-5.4',
+        verdict: {
+          conclusion: 'Forged pass',
+          gateLoosening: false,
+          evalRulerChange: false,
+          findings: [],
+        },
+      }),
+      transport,
+    );
+    expect(response.status).toBe(200);
+    const snapshot = s.db.select().from(gateVerdict).where(eq(gateVerdict.stepId, reviewId)).get();
+    expect(snapshot?.reviewerModelId).toBe(attack === 'model' ? 'claude-opus-4-8' : 'gpt-5.4');
+    const duplicate = await s.app.request(`/api/machine/done/${reviewId}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        status: 'success',
+        gateHeadSha: 'f'.repeat(40),
+        findings: {
+          conclusion: 'Late forged pass',
+          gateLoosening: false,
+          evalRulerChange: false,
+          findings: [],
+        },
+      }),
+    });
+    expect(duplicate.status).toBe(200);
+    expect(s.db.select().from(gateVerdict).where(eq(gateVerdict.stepId, reviewId)).get()).toEqual(
+      snapshot,
+    );
+    const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    expect(readiness?.blockers.map((blocker) => blocker.code)).toContain(
+      attack === 'model' ? 'independent-review-missing' : 'review-blocking',
+    );
+  },
+);
+
+test.each(['tool', 'upload'])(
+  'a completed machine can recover via %s but cannot overwrite another conversation',
+  async (transport) => {
+    const { s, buildId, postRow } = await claimedMachineReview();
+    s.db
+      .insert(message)
+      .values({
+        id: 'other-server-message',
+        conversationId: 'other-conversation',
+        role: 'system',
+        content: 'Server-owned content',
+        createdAt: 1,
+      })
+      .run();
+    const forged = await postRow('other-server-message', 'Overwritten', transport);
+    expect(forged.status).toBe(409);
+    expect(
+      s.db.select().from(message).where(eq(message.id, 'other-server-message')).get()?.content,
+    ).toBe('Server-owned content');
+    expect((await postRow('recovery-row', 'First delivery', transport)).status).toBe(200);
+    expect((await postRow('recovery-row', 'Recovered delivery', transport)).status).toBe(200);
+    expect(s.db.select().from(message).where(eq(message.id, 'recovery-row')).get()).toMatchObject({
+      conversationId: buildId,
+      content: 'Recovered delivery',
+    });
+  },
+);
+
+test('a completed chief machine cannot overwrite another chief thread', async () => {
+  const { s, reviewId, token } = await claimedMachineReview();
+  const machineId = s.db.select().from(step).where(eq(step.id, reviewId)).get()?.machineId;
+  for (const id of ['chief-own-transcript', 'chief-other-transcript'])
+    s.db
+      .insert(chiefThread)
+      .values({
+        id,
+        chiefId: 'chief-1794',
+        userId: s.user.id,
+        teamId: s.team.id,
+        title: 'Chief transcript',
+        createdAt: 1,
+        updatedAt: 1,
+        sessionId: 'test-session',
+        sessionOpenedAt: 1,
+      })
+      .run();
+  s.db
+    .insert(step)
+    .values({
+      id: 'chief-recovery-step',
+      buildId: 'chief-own-transcript',
+      kind: 'chief',
+      status: 'done',
+      machineId,
+      createdAt: 1,
+    })
+    .run();
+  s.db
+    .insert(chiefMessage)
+    .values({
+      id: 'other-chief-message',
+      threadId: 'chief-other-transcript',
+      role: 'system',
+      content: 'Other chief content',
+      createdAt: 1,
+    })
+    .run();
+  const send = (id: string, content: string) =>
+    s.app.request('/api/machine/tool/chief-recovery-step', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        kind: 'transcript_row',
+        row: { id, role: 'assistant', content, createdAt: 100 },
+      }),
+    });
+  expect((await send('other-chief-message', 'Forged chief content')).status).toBe(409);
+  expect(
+    s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'other-chief-message')).get()
+      ?.content,
+  ).toBe('Other chief content');
+  expect((await send('own-chief-message', 'Initial chief content')).status).toBe(200);
+  expect((await send('own-chief-message', 'Recovered chief content')).status).toBe(200);
+  expect(
+    s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'own-chief-message')).get()?.content,
+  ).toBe('Recovered chief content');
 });

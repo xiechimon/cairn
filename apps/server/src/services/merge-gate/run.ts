@@ -1,4 +1,4 @@
-import type { MergeGateRun, MergeReadiness, ReviewVerdict, VerifyVerdict } from '@cairn/shared';
+import type { MergeGateRun, MergeReadiness } from '@cairn/shared';
 import { mergeReadinessSchema } from '@cairn/shared/merge-gate';
 import { auditMergedGate, type GateAuditIssuePort } from './audit.js';
 import { computePatchDigest } from './digest.js';
@@ -9,8 +9,6 @@ import { type GateVerdictView, isFullSha, mergeReadiness } from './readiness.js'
 import type { GateRuntimePort } from './runtime-port.js';
 import { reviewVerdictFacts, verificationItemsForPlan, verifyVerdictFacts } from './verdict.js';
 
-const REVIEW_VERDICT_KIND = 'review_verdict';
-const VERIFY_VERDICT_KIND = 'verify_verdict';
 const readCaches = new Map<string, GateReadCache>();
 const IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
 
@@ -99,51 +97,6 @@ export async function evaluateMergeGate(
       row.patchDigest = digest.patchDigest;
     }
   }
-  const answers = new Map<string, ReviewVerdict>();
-  const verifyAnswers = new Map<string, VerifyVerdict>();
-  const reviewerModels = new Map<string, string | null>();
-  const spoken = runtime.readMessages(buildId);
-  const ambiguous = new Set<string>();
-  for (const row of spoken) {
-    let raw = row.content;
-    if (typeof raw === 'string') {
-      try {
-        raw = JSON.parse(raw) as unknown;
-      } catch {
-        continue;
-      }
-    }
-    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue;
-    const record = raw as {
-      kind?: unknown;
-      stepId?: unknown;
-      verdict?: unknown;
-      modelId?: unknown;
-      gatePayload?: unknown;
-    };
-    if (record.kind === VERIFY_VERDICT_KIND && typeof record.stepId === 'string') {
-      const verifyStep = steps.find((item) => item.id === record.stepId && item.kind === 'verify');
-      if (verifyStep?.status !== 'done') continue;
-      if (verifyAnswers.has(record.stepId)) ambiguous.add(record.stepId);
-      const verdict = runtime.parseVerifyVerdict(record.gatePayload);
-      if (verdict !== null) verifyAnswers.set(record.stepId, verdict);
-      else ambiguous.add(record.stepId);
-      continue;
-    }
-    if (record.kind !== REVIEW_VERDICT_KIND || typeof record.stepId !== 'string') continue;
-    const reviewStep = steps.find((item) => item.id === record.stepId && item.kind === 'review');
-    if (reviewStep?.status !== 'done') continue;
-    if (answers.has(record.stepId)) ambiguous.add(record.stepId);
-    const parsed = runtime.parseReviewVerdict(record.verdict);
-    if (parsed !== null) {
-      answers.set(record.stepId, parsed);
-      reviewerModels.set(record.stepId, typeof record.modelId === 'string' ? record.modelId : null);
-    } else ambiguous.add(record.stepId);
-  }
-  for (const id of ambiguous) {
-    answers.delete(id);
-    verifyAnswers.delete(id);
-  }
   const perspectiveOf = (prompt: string | null): string => {
     const id = runtime.parseReviewMeta(prompt)?.agentId;
     return (id !== undefined ? agents.get(id)?.persona : null) ?? 'review';
@@ -154,16 +107,15 @@ export async function evaluateMergeGate(
   );
   const views: GateVerdictView[] = stored.map((row) => {
     const reviewStep = steps.find((item) => item.id === row.stepId);
-    const reviewerId =
-      reviewStep?.kind === 'review'
-        ? (runtime.parseReviewMeta(reviewStep.prompt)?.agentId ?? null)
-        : null;
-    const answer = answers.get(row.stepId);
-    const verifyAnswer = verifyAnswers.get(row.stepId);
+    const completed = reviewStep?.status === 'done';
+    const answer =
+      completed && row.kind !== 'verify' ? runtime.parseReviewVerdict(row.payload) : null;
+    const verifyAnswer =
+      completed && row.kind === 'verify' ? runtime.parseVerifyVerdict(row.payload) : null;
     const payload =
       row.kind === 'verify'
-        ? verifyVerdictFacts(verifyAnswer, verificationItems)
-        : reviewVerdictFacts(answer);
+        ? verifyVerdictFacts(verifyAnswer ?? undefined, verificationItems)
+        : reviewVerdictFacts(answer ?? undefined);
     const outcome = ['pass', 'block', 'extraction_failed'].includes(row.outcome)
       ? !payload.extracted
         ? 'extraction_failed'
@@ -177,8 +129,8 @@ export async function evaluateMergeGate(
       outcome,
       patchDigest: row.patchDigest,
       headSha: row.headSha,
-      reviewerId,
-      reviewerModel: answer !== undefined ? (reviewerModels.get(row.stepId) ?? null) : null,
+      reviewerId: row.reviewerAgentId,
+      reviewerModel: row.reviewerModelId,
       gateLoosening: answer?.gateLoosening ?? null,
       evalRulerChange: answer?.evalRulerChange ?? null,
     };
@@ -260,22 +212,16 @@ export async function evaluateMergeGate(
         runtime.parseReviewMeta(item.prompt)?.expectedPatchDigest === readiness.patchDigest,
     )
   ) {
-    const report = spoken
-      .filter((row) => {
-        try {
-          const value = JSON.parse(String(row.content)) as { stepId?: unknown };
-          return (
-            typeof value.stepId === 'string' &&
-            stored.some(
-              (verdict) =>
-                verdict.stepId === value.stepId && verdict.patchDigest === readiness.patchDigest,
-            )
-          );
-        } catch {
-          return false;
-        }
-      })
-      .map((row) => row.content);
+    const report = stored
+      .filter((verdict) => verdict.patchDigest === readiness.patchDigest)
+      .map((verdict) =>
+        JSON.stringify({
+          stepId: verdict.stepId,
+          kind: verdict.kind,
+          modelId: verdict.reviewerModelId,
+          verdict: verdict.payload,
+        }),
+      );
     runtime.enqueueReview(
       buildId,
       todoRow.teamId,
@@ -381,47 +327,17 @@ export async function evaluateMergeGate(
         auditPort,
       );
     }
-    const reviewers: MergeGateRun['reviewers'] = stored.map((verdict) => {
-      const output = spoken
-        .map((row) => {
-          try {
-            const record = JSON.parse(String(row.content)) as {
-              stepId?: unknown;
-              verdict?: unknown;
-              modelId?: unknown;
-            };
-            return record.stepId === verdict.stepId ? record : null;
-          } catch {
-            return null;
-          }
-        })
-        .find((record) => record !== null);
-      const parsed =
+    const reviewers: MergeGateRun['reviewers'] = stored.map((verdict, index) => ({
+      stepId: verdict.stepId,
+      kind: verdict.kind,
+      modelId: verdict.reviewerModelId,
+      rawOutput: runtime.readSession(verdict.stepId),
+      verdict:
         verdict.kind === 'verify'
-          ? runtime.parseVerifyVerdict(output?.verdict)
-          : runtime.parseReviewVerdict(output?.verdict);
-      const rawOutput = runtime.readSession(verdict.stepId);
-      const actualModels = (rawOutput ?? '').split('\n').flatMap((line) => {
-        try {
-          const entry = JSON.parse(line) as {
-            message?: { role?: unknown; model?: unknown; responseModel?: unknown };
-          };
-          const model = entry.message?.model ?? entry.message?.responseModel;
-          return entry.message?.role === 'assistant' && typeof model === 'string' ? [model] : [];
-        } catch {
-          return [];
-        }
-      });
-      return {
-        stepId: verdict.stepId,
-        kind: verdict.kind,
-        modelId:
-          actualModels.at(-1) ?? (typeof output?.modelId === 'string' ? output.modelId : null),
-        rawOutput,
-        verdict: parsed,
-        outcome: verdict.outcome,
-      };
-    });
+          ? runtime.parseVerifyVerdict(verdict.payload)
+          : runtime.parseReviewVerdict(verdict.payload),
+      outcome: views[index]?.outcome ?? verdict.outcome,
+    }));
     runtime.appendRun({
       id: runtime.newId(),
       buildId,

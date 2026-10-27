@@ -330,6 +330,9 @@ describe('gate_verdict: one row per step, attached only to real builds', () => {
         kind: 'verify',
         perspective: null,
         outcome: 'extraction_failed',
+        payload: null,
+        reviewerAgentId: null,
+        reviewerModelId: null,
         patchDigest: null,
         headSha: null,
         expectedHeadSha: H1,
@@ -814,5 +817,32 @@ test('a real machine completion cannot forge internal gate records', async () =>
     });
   } finally {
     s.dispose();
+  }
+});
+
+test('legacy gate rows survive the payload migration with unknown server snapshots', () => {
+  const { journal } = findGateEntry();
+  const sqlite = new Database(':memory:');
+  sqlite.pragma('foreign_keys = ON');
+  try {
+    const db = drizzle(sqlite);
+    const payloadIndex = journal.entries.findIndex((entry) =>
+      /ADD `payload`/.test(readFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), 'utf8')),
+    );
+    expect(payloadIndex).toBeGreaterThan(0);
+    migrate(db, { migrationsFolder: migrationsUpTo(journal, payloadIndex) });
+    const row = seedBuild(sqlite, seedTeam(sqlite), 'legacy-payload');
+    seedGateRows(sqlite, row.build, row.step);
+    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    expect(
+      sqlite
+        .prepare(
+          'SELECT outcome, payload, reviewerAgentId, reviewerModelId FROM gate_verdict WHERE stepId = ?',
+        )
+        .get(row.step),
+    ).toEqual({ outcome: 'pass', payload: null, reviewerAgentId: null, reviewerModelId: null });
+    for (const table of GATE_TABLES) expect(count(sqlite, table, row.build)).toBe(1);
+  } finally {
+    sqlite.close();
   }
 });

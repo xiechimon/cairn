@@ -1,0 +1,29 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+ ❯ |@xiechimon/cairn| test/merge-gate-reconciliation.test.ts (4 tests | 1 failed | 3 skipped) 63ms
+   × a real human GitHub merge waits for retryable audit before completing 62ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-reconciliation.test.ts > a real human GitHub merge waits for retryable audit before completing
+AssertionError: expected 'done' to be 'review' // Object.is equality
+
+Expected: "review"
+Received: "done"
+
+ ❯ test/merge-gate-reconciliation.test.ts:193:84
+    191|     await requestMerge(deps, 'human-build');
+    192|     expect(merged).toBe(true);
+    193|     expect(s.db.select().from(todo).where(eq(todo.id, 'human-todo')).g…
+       |                                                                                    ^
+    194|     let recovered = false;
+    195|     let audits = 0;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  11:26:26
+   Duration  1.33s (transform 61%, import 33%, tests 5%)
