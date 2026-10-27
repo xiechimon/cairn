@@ -42,6 +42,114 @@ function requestedOutput(raw: string): number {
 }
 
 describe('#1744 compaction at the context ceiling', () => {
+  test.each(['null', '17', '"ordinary"', '{"messages":[null,17,"ordinary"]}'])(
+    'a non-summary JSON body %s is forwarded unchanged',
+    async (body) => {
+      const bodies: unknown[] = [];
+      const wrapped = compactionCeilingFetch(async (_input, init) => {
+        bodies.push(init?.body);
+        return new Response('unchanged', { status: 400 });
+      });
+      const response = await wrapped('https://example.invalid', { method: 'POST', body });
+      expect(response.status).toBe(400);
+      expect(bodies).toEqual([body]);
+    },
+  );
+
+  test.each([
+    { role: 'system', content: 'You are a context summarization assistant.' },
+    { role: 'developer', content: 'You are a context summarization assistant.' },
+    {
+      role: 'system',
+      content: [{ type: 'text', text: 'You are a context summarization assistant.' }],
+    },
+  ])('a summary system message in $role form recovers output room', async (systemMessage) => {
+    let calls = 0;
+    const wrapped = compactionCeilingFetch(async (_input, init) => {
+      calls += 1;
+      const requested = requestedOutput(String(init?.body));
+      return requested + 7_900 > 8_000 ? ceilingError(8_000, requested, 7_900) : summaryOk();
+    });
+    const response = await wrapped('https://example.invalid/v1/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({
+        max_tokens: 1_024,
+        messages: [
+          systemMessage,
+          { role: 'user', content: '<conversation>\nhello\n</conversation>' },
+        ],
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(calls).toBe(2);
+  });
+
+  test('an oversized final conversation block is bounded and the summary retry fits', async () => {
+    const logs: string[] = [];
+    const bodies: string[] = [];
+    const wrapped = compactionCeilingFetch(
+      async (_input, init) => {
+        const raw = String(init?.body);
+        bodies.push(raw);
+        const input = Math.ceil(raw.length / 2);
+        const requested = requestedOutput(raw);
+        return input + requested > 8_000 ? ceilingError(8_000, requested, input) : summaryOk();
+      },
+      (line) => logs.push(line),
+    );
+    const response = await wrapped('https://example.invalid/v1/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({
+        max_tokens: 1_024,
+        messages: [
+          { role: 'system', content: 'You are a context summarization assistant.' },
+          {
+            role: 'user',
+            content: `<conversation>\n[User]: earlier\n\n[Assistant]: ${'x'.repeat(40_000)}\n</conversation>`,
+          },
+        ],
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(bodies.length).toBeGreaterThan(1);
+    expect(bodies.at(-1)!.length).toBeLessThan(16_000);
+    expect(logs.join('\n')).toContain('dropped older conversation text');
+  });
+
+  test.each(['user', 'tool'])(
+    'a normal %s message quoting the summary marker is returned unchanged on overflow',
+    async (role) => {
+      const bodies: string[] = [];
+      const logs: string[] = [];
+      const body = JSON.stringify({
+        max_tokens: 1_024,
+        messages: [
+          { role: 'system', content: 'You are a helpful coding assistant.' },
+          {
+            role,
+            content: `Explain You are a context summarization assistant. ${'x'.repeat(40_000)}`,
+          },
+        ],
+      });
+      const wrapped = compactionCeilingFetch(
+        async (_input, init) => {
+          const raw = String(init?.body);
+          bodies.push(raw);
+          return ceilingError(8_000, requestedOutput(raw), Math.ceil(raw.length / 2));
+        },
+        (line) => logs.push(line),
+      );
+      const response = await wrapped('https://example.invalid/v1/chat/completions', {
+        method: 'POST',
+        body,
+      });
+      expect(response.status).toBe(400);
+      expect(bodies).toHaveLength(1);
+      expect(bodies[0]).toBe(body);
+      expect(logs).toEqual([]);
+    },
+  );
+
   test('a summary whose provider counts 319873 input tokens on a 320000 window succeeds', async () => {
     const text = await summarizeCompactionTranscript(
       CEILING_TRANSCRIPT,

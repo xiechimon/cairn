@@ -45,7 +45,7 @@ function shrinkConversation(text: string, ratio: number): string {
   const blocks = conversation.split('\n\n');
   const target = Math.max(1, Math.floor(conversation.length * ratio));
   let shrunk = shrinkTail(conversation, ratio);
-  if (blocks.length > 1) {
+  if (blocks.length > 1 && (blocks.at(-1)?.length ?? 0) <= target) {
     const kept: string[] = [];
     let size = 0;
     for (let i = blocks.length - 1; i >= 0; i--) {
@@ -147,14 +147,40 @@ export function compactionCeilingFetch(
 ): typeof fetch {
   return async (input, init) => {
     const original = typeof init?.body === 'string' ? init.body : null;
-    if (original === null || !original.includes(SUMMARY_MARKER)) return inner(input, init);
-    let current: ChatBody;
+    if (original === null) return inner(input, init);
+    let parsed: unknown;
     try {
-      current = JSON.parse(original) as ChatBody;
+      parsed = JSON.parse(original);
     } catch {
       return inner(input, init);
     }
-    if (!Array.isArray(current.messages)) return inner(input, init);
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      !('messages' in parsed) ||
+      !Array.isArray(parsed.messages) ||
+      parsed.messages.some((message: unknown) => message === null || typeof message !== 'object')
+    ) {
+      return inner(input, init);
+    }
+    let current = parsed as ChatBody;
+    const messages = parsed.messages as ChatMessage[];
+    const summarySystemMessage = messages.some((message) => {
+      if (message.role !== 'system' && message.role !== 'developer') return false;
+      if (typeof message.content === 'string') return message.content.startsWith(SUMMARY_MARKER);
+      if (!Array.isArray(message.content)) return false;
+      return message.content.some(
+        (part: unknown) =>
+          part !== null &&
+          typeof part === 'object' &&
+          'type' in part &&
+          part.type === 'text' &&
+          'text' in part &&
+          typeof part.text === 'string' &&
+          part.text.startsWith(SUMMARY_MARKER),
+      );
+    });
+    if (!summarySystemMessage) return inner(input, init);
     let lastResponse: Response | null = null;
     let lastText = '';
     let attempts = 0;
