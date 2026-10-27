@@ -139,9 +139,6 @@ test("composer controls share one bottom row: stop is the send button's sibling"
   // a real hit target, not a 14px smudge
   expect(geo.stop.w).toBe(32);
   expect(geo.stop.h).toBe(32);
-  // one row, one axis — stop and send share the centre line the toolbar sits
-  // on. The 30px tool box against the 32px buttons leaves 1px of parity, so
-  // the tolerance is 1; the drift this pins was 9px (bottom 4 vs bottom 12).
   expect(geo.stop.cy).toBeCloseTo(geo.send.cy, 0);
   expect(Math.abs(geo.toolCy - geo.send.cy)).toBeLessThanOrEqual(1);
   // an 8px sibling gap, not an orphaned 27px float
