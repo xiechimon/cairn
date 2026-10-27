@@ -1,6 +1,9 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { conversationBranch, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   machine as machineTable,
@@ -25,7 +28,15 @@ import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
-afterAll(() => {
+let throttleHome: string;
+beforeAll(async () => {
+  throttleHome = await mkdtemp(join(tmpdir(), 'ci-loop-'));
+  vi.stubEnv('CAIRN_HOME', throttleHome);
+  vi.stubEnv('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS', '0');
+});
+afterAll(async () => {
+  vi.unstubAllEnvs();
+  await rm(throttleHome, { recursive: true, force: true });
   for (const d of disposables) d();
 });
 
