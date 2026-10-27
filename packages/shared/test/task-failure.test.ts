@@ -4,6 +4,7 @@ import {
   classifyAgentFailure,
   classifyStepFailure,
   isProviderAuthFailure,
+  isProviderOutage,
   parseRetryAfterMs,
   STEP_FAILURE_KINDS,
 } from '../src/task-failure.js';
@@ -97,6 +98,40 @@ describe('classifyStepFailure (#1257 three-bucket classification)', () => {
       'network',
       'other',
     ]);
+  });
+});
+
+describe('isProviderOutage (#1786 provider 5xx and account exhaustion)', () => {
+  test('provider 5xx and account-exhaustion phrasing trigger fallback', () => {
+    expect(isProviderOutage('503 All available accounts exhausted')).toBe(true);
+    expect(isProviderOutage('upstream error: HTTP 502 Bad Gateway')).toBe(true);
+    expect(isProviderOutage('provider error: HTTP 5xx')).toBe(true);
+    expect(isProviderOutage('upstream responded with status 500')).toBe(true);
+    expect(isProviderOutage('POST /v1/messages -> 503 application/json')).toBe(true);
+    expect(isProviderOutage('502 Internal Server Error')).toBe(true);
+    expect(isProviderOutage('quota exhausted on all accounts')).toBe(true);
+    expect(isProviderOutage('credits exhausted')).toBe(true);
+    expect(isProviderOutage('insufficient balance')).toBe(true);
+  });
+
+  test('errors outside the provider channel do not trigger fallback', () => {
+    expect(isProviderOutage('')).toBe(false);
+    expect(isProviderOutage('429 rate limited')).toBe(false);
+    expect(isProviderOutage('Context length exceeded: 200000 tokens')).toBe(false);
+    expect(
+      isProviderOutage(
+        'git push failed (1): remote: error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500',
+      ),
+    ).toBe(false);
+    expect(
+      isProviderOutage(
+        'git push failed (signal SIGTERM): Writing objects: 55% (512/930), 12.3 MiB',
+      ),
+    ).toBe(false);
+    expect(isProviderOutage('checked out 512 files')).toBe(false);
+    expect(isProviderOutage('context window exhausted mid-run')).toBe(false);
+    expect(isProviderOutage('retry budget exhausted')).toBe(false);
+    expect(isProviderOutage('the agent exhausted its tool-call budget')).toBe(false);
   });
 });
 
