@@ -1,0 +1,11 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1985
+
+ ✓ |@cairn/integration| test/routing-boundary.test.ts (21 tests) 4076ms
+
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  07:54:56
+   Duration  4.20s (tests 99%)
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-n0lwf7vr/prepush-vitest-PCJcQd/report.json

@@ -1,0 +1,129 @@
+$ pnpm --filter @cairn/integration exec vitest run test/routing-boundary.test.ts
+$ (pre-fix implementation on lane/1985: lexical decoy mention detection, task exit code read as
+   enforcement signal, no kernel Landlock unavailability control)
+
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1985/integration
+
+ ❯ test/routing-boundary.test.ts (34 tests | 7 failed) 30449ms
+   ❯ seeded implementation reuse detection (11)
+     × flags a module reference to the decoy (5) 29ms
+     × does not flag decoy mentions outside module specifiers (0) 3ms
+     × does not flag decoy mentions outside module specifiers (1) 8ms
+     × does not flag decoy mentions outside module specifiers (2) 3ms
+     × does not flag decoy mentions outside module specifiers (3) 7ms
+   ❯ real process read boundary (17)
+     × keeps enforcement when the task itself exits 125 780ms
+     × fails closed when kernel Landlock is unavailable 2028ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/routing-boundary.test.ts > seeded implementation reuse detection > flags a module reference to the decoy (5)
+AssertionError: expected [] to deeply equal [ 'vendor/copy.mjs' ]
+
+- Expected
++ Received
+
+- [
+-   "vendor/copy.mjs",
+- ]
++ []
+
+ ❯ test/routing-boundary.test.ts:100:63
+     98| describe('seeded implementation reuse detection', () => {
+     99|   test.each(referenceCases)('flags a module reference to the decoy (%#…
+    100|     expect(wrappedImplementations([{ path, content }], task)).toEqual(…
+       |                                                               ^
+    101|   });
+    102|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  test/routing-boundary.test.ts > seeded implementation reuse detection > does not flag decoy mentions outside module specifiers (0)
+ FAIL  test/routing-boundary.test.ts > seeded implementation reuse detection > does not flag decoy mentions outside module specifiers (1)
+ FAIL  test/routing-boundary.test.ts > seeded implementation reuse detection > does not flag decoy mentions outside module specifiers (2)
+AssertionError: expected [ 'adder.mjs' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "adder.mjs",
++ ]
+
+ ❯ test/routing-boundary.test.ts:106:65
+    104|     'does not flag decoy mentions outside module specifiers (%#)',
+    105|     (path, content) => {
+    106|       expect(wrappedImplementations([{ path, content }], task)).toEqua…
+       |                                                                 ^
+    107|     },
+    108|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  test/routing-boundary.test.ts > seeded implementation reuse detection > does not flag decoy mentions outside module specifiers (3)
+AssertionError: expected [ 'NOTES.md' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "NOTES.md",
++ ]
+
+ ❯ test/routing-boundary.test.ts:106:65
+    104|     'does not flag decoy mentions outside module specifiers (%#)',
+    105|     (path, content) => {
+    106|       expect(wrappedImplementations([{ path, content }], task)).toEqua…
+       |                                                                 ^
+    107|     },
+    108|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  test/routing-boundary.test.ts > real process read boundary > keeps enforcement when the task itself exits 125
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-boundary.test.ts:201:44
+    199|   test('keeps enforcement when the task itself exits 125', () => {
+    200|     const result = executeBounded({ workspace, command: 'exit 125' });
+    201|     expect(result.enforced, result.stderr).toBe(true);
+       |                                            ^
+    202|     expect(result.exitCode).toBe(125);
+    203|     expect(result.violations).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  test/routing-boundary.test.ts > real process read boundary > fails closed when kernel Landlock is unavailable
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/routing-boundary.test.ts:214:29
+    212|       landlockAbiOverride: 2,
+    213|     });
+    214|     expect(result.enforced).toBe(false);
+       |                             ^
+    215|     expect(result.stderr).toContain('Landlock');
+    216|     const grade = graded([oracle, result], []);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 27 passed (34)
+   Start at  08:52:17
+   Duration  31.08s (tests 99%, transform 1%)
+
