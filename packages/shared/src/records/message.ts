@@ -87,6 +87,22 @@ export const chiefDigestContentSchema = z.object({
 });
 export type ChiefDigestContent = z.infer<typeof chiefDigestContentSchema>;
 
+export const CHIEF_TURN_STOPPED_KIND = 'chief_turn_stopped';
+export const chiefTurnStoppedContentSchema = z.object({
+  kind: z.literal(CHIEF_TURN_STOPPED_KIND),
+  todos: z.array(z.object({ id: z.string(), seq: z.number().int(), title: z.string() })),
+});
+export type ChiefTurnStoppedContent = z.infer<typeof chiefTurnStoppedContentSchema>;
+
+export const CHIEF_MODEL_FALLBACK_KIND = 'chief_model_fallback';
+export const chiefModelFallbackContentSchema = z.object({
+  kind: z.literal(CHIEF_MODEL_FALLBACK_KIND),
+  from: z.string(),
+  to: z.string(),
+  stepId: z.string(),
+});
+export type ChiefModelFallbackContent = z.infer<typeof chiefModelFallbackContentSchema>;
+
 export const ASK_USER_QUESTION_KIND = 'ask_user_question';
 
 export const askUserQuestionSchema = z.object({

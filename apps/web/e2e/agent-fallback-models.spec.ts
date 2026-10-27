@@ -96,7 +96,7 @@ test('empty chain: rule copy is clear, only an add entry, no candidate rows', as
   const section = page.locator('.agent-fallback');
   await expect(section).toContainText('只有规划和执行步会换');
   await expect(section).toContainText('审核、验证、合并、总管不换');
-  await expect(section).toContainText('限流不换');
+  await expect(section).toContainText('备选用尽后，限流和额度继续等待');
   await expect(page.getByRole('combobox', { name: '备用 1 模型' })).toHaveCount(0);
   await expect(addButton(page)).toBeEnabled();
 });

@@ -71,6 +71,19 @@ export const chiefOrchestrationActivitySchema = z.object({
 });
 export type ChiefOrchestrationActivity = z.infer<typeof chiefOrchestrationActivitySchema>;
 
+export const chiefOutageSchema = z.object({
+  reason: z.enum(['quota', 'capacity']),
+  model: z.string().nullable(),
+  retryAt: epochMs.nullable(),
+});
+export type ChiefOutage = z.infer<typeof chiefOutageSchema>;
+
+export const chiefPendingMessageSchema = z.object({
+  messageId: z.string(),
+  state: z.enum(['queued', 'held']),
+});
+export type ChiefPendingMessage = z.infer<typeof chiefPendingMessageSchema>;
+
 export const chiefGetResponseSchema = z.object({
   chief: chiefRecordSchema,
   agentActor: agentRecordSchema.nullable(),
@@ -88,6 +101,7 @@ export const chiefGetResponseSchema = z.object({
       activity: z.array(chiefOrchestrationActivitySchema),
     })
     .optional(),
+  outage: chiefOutageSchema.nullable().optional(),
 });
 export type ChiefGetResponse = z.infer<typeof chiefGetResponseSchema>;
 
@@ -110,6 +124,8 @@ export const chiefThreadSchema = z.object({
   toolResultHashes: z.record(z.string(), z.string()),
   activeRun: activeRunSchema,
   lastTurnError: z.string().nullable().optional(),
+  pending: z.array(chiefPendingMessageSchema).optional(),
+  fallbackModel: z.string().nullable().optional(),
   turnQueue: z
     .object({
       position: z.number().int().min(1),
@@ -184,4 +200,5 @@ export const CHIEF_WATCHES_EMPTY_COPY =
   '暂无跟进事项。总管关注某个任务，或约定到点回头核实时，会按主题列在这里。';
 
 export const CHIEF_INPUT_PLACEHOLDER = '有什么可以帮你的？';
-export const CHIEF_INPUT_PLACEHOLDER_STEERING = '向 Agent 补充说明，执行过程中即可送达';
+export const CHIEF_INPUT_PLACEHOLDER_STEERING =
+  '总管回完这条就看；想马上补充，发出后点「现在插话」';

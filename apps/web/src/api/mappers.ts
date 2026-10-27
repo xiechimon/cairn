@@ -22,10 +22,11 @@ import {
   ASK_USER_QUESTION_KIND,
   askUserQuestionContentSchema,
   BRAND,
-  CHIEF_DIGEST_KIND,
   CHIEF_TURN_ERROR_KIND,
   chiefDigestContentSchema,
+  chiefModelFallbackContentSchema,
   chiefTurnErrorContentSchema,
+  chiefTurnStoppedContentSchema,
   classifySkillFact,
   classifyStepFailure,
   classifyUserText,
@@ -1082,18 +1083,6 @@ export function chiefTurnErrorOfContent(content: unknown): string | null {
   return row.success ? row.data.message : null;
 }
 
-export function chiefDigestOfContent(content: unknown) {
-  if (typeof content !== 'string' || !content.includes(CHIEF_DIGEST_KIND)) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    return null;
-  }
-  const row = chiefDigestContentSchema.safeParse(parsed);
-  return row.success ? row.data : null;
-}
-
 export function askQuestionOfContent(content: unknown): {
   requestId: string;
   status: 'pending' | 'answered' | 'cancelled';
@@ -1156,14 +1145,18 @@ export function mapChiefStream(messages: MessageRow[], inlineTools = false): Chi
 function collectChiefStream(
   messages: MessageRow[],
   inlineTools = false,
+  pendingIds: ReadonlyMap<string, 'queued' | 'held'> = new Map(),
 ): {
   items: ChiefStreamItem[];
   itemsAt: number[];
   trailingTools: ChiefToolRow[];
+  pending: ChiefStreamItem[];
 } {
   const items: ChiefStreamItem[] = [];
   const itemsAt: number[] = [];
   let lastAt = 0;
+  const pendingById = new Map<string, ChiefStreamItem>();
+  let fallback: { model: string; stepId: string } | null = null;
   const postedTexts = new Set(
     messages
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
@@ -1173,24 +1166,61 @@ function collectChiefStream(
   for (const m of messages) {
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
     lastAt = m.createdAt;
+    if (m.role === 'user' && fallback !== null) {
+      const stepOfRow = m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+        ? m.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)
+        : m.id;
+      if (stepOfRow !== fallback.stepId) fallback = null;
+    }
+    const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
+    if (pendingState !== undefined) {
+      const text = textOfContent(m.content).trim();
+      pendingById.set(m.id, {
+        kind: 'user',
+        text,
+        id: m.id,
+        markdown: text,
+        pending: pendingState,
+      });
+      continue;
+    }
     const turnError = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (turnError !== null) {
       pendingTools = [];
       items.push({ kind: 'error', text: turnError });
       continue;
     }
-    const digest = m.role === 'system' ? chiefDigestOfContent(m.content) : null;
-    if (digest !== null) {
-      if (digest.items.length === 0) continue;
-      pendingTools = [];
-      items.push({
-        kind: 'digest',
-        id: m.id,
-        reason: digest.reason,
-        madeAt: digest.madeAt,
-        items: digest.items,
-      });
-      continue;
+    if (m.role === 'system') {
+      let parsed: unknown = null;
+      try {
+        parsed = typeof m.content === 'string' ? JSON.parse(m.content) : null;
+      } catch {
+        parsed = null;
+      }
+      const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
+      if (stopped.success) {
+        pendingTools = [];
+        items.push({ kind: 'stopped', todos: stopped.data.todos, id: m.id });
+        continue;
+      }
+      const switched = chiefModelFallbackContentSchema.safeParse(parsed);
+      if (switched.success) {
+        fallback = { model: switched.data.to, stepId: switched.data.stepId };
+        continue;
+      }
+      const digest = chiefDigestContentSchema.safeParse(parsed);
+      if (digest.success) {
+        if (digest.data.items.length === 0) continue;
+        pendingTools = [];
+        items.push({
+          kind: 'digest',
+          id: m.id,
+          reason: digest.data.reason,
+          madeAt: digest.data.madeAt,
+          items: digest.data.items,
+        });
+        continue;
+      }
     }
     const call = toolCallOfContent(m.content);
     if (call !== null) {
@@ -1253,11 +1283,16 @@ function collectChiefStream(
       seconds: '',
       id: m.id,
       ...(pendingTools.length > 0 ? { tools: pendingTools } : {}),
+      ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
     });
     pendingTools = [];
   }
   while (itemsAt.length < items.length) itemsAt.push(lastAt);
-  return { items, itemsAt, trailingTools: pendingTools };
+  const pending = [...pendingIds.keys()].flatMap((id) => {
+    const item = pendingById.get(id);
+    return item === undefined ? [] : [item];
+  });
+  return { items, itemsAt, trailingTools: pendingTools, pending };
 }
 
 function autoCloseStrong(text: string): string {
@@ -1288,8 +1323,10 @@ export function mapChief(
     opts.activeThreadId !== null
       ? (opts.threads.find((t) => t.id === opts.activeThreadId) ?? null)
       : null;
-  const running = active?.activeRun != null;
-  const collected = active === null ? null : collectChiefStream(opts.messages, running);
+  const pendingIds = new Map((active?.pending ?? []).map((p) => [p.messageId, p.state] as const));
+  const parked = [...pendingIds.values()].includes('held');
+  const running = active?.activeRun != null && !parked;
+  const collected = active === null ? null : collectChiefStream(opts.messages, running, pendingIds);
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
   if (running) {
     if ((opts.liveThinking ?? '').trim() !== '') {
@@ -1325,6 +1362,7 @@ export function mapChief(
       }
     }
   }
+  chiefStream.push(...(collected?.pending ?? []));
   return {
     view: 'drawer',
     bound,
@@ -1359,6 +1397,8 @@ export function mapChief(
         ? { runningTool: active.activeRun.tool.toolName }
         : {}),
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
+    ...(env.outage != null ? { outage: env.outage } : {}),
+    ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),
   };
 }
 

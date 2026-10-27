@@ -302,11 +302,13 @@ export type MachineSessionResponse = z.infer<typeof machineSessionResponseSchema
 
 export const FINDINGS_ERROR_CHAR_LIMIT = 2_000;
 
+export const QUOTA_BLOCK_REASON_MAX_CHARS = 500;
+
 export const quotaBlockSchema = z.object({
   kind: z.enum(['quota', 'capacity']),
   providerId: z.string(),
   label: z.string().optional(),
-  reason: z.string().max(500),
+  reason: z.string().max(QUOTA_BLOCK_REASON_MAX_CHARS),
   retryAfterMs: z.number().int().positive().optional(),
 });
 export type QuotaBlock = z.infer<typeof quotaBlockSchema>;
@@ -377,6 +379,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'GET',
     path: '/api/machine/steer',
     reason: '[设计] W3 steer 拉取-确认（06 册 D9；claimed 步单槽 pending，?stepId=）',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/steer/ack',
+    reason:
+      '[design] #1938 steer delivery ack: the chief keeps a steered message queued until the daemon reports it reached the live session (?stepId=)',
   },
   {
     method: 'GET',
