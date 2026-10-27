@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { PATTERNS, rankBaselines } from './gardener-weekly.mjs';
+import { lessonSection, PATTERNS, rankBaselines } from './gardener-weekly.mjs';
 
 const script = resolve(import.meta.dirname, 'gardener-weekly.mjs');
 const NOW = '2026-10-24T12:00:00Z';
@@ -206,5 +206,23 @@ test('the watchlist patterns compile and each has a suggested rule when ungated'
   for (const pattern of PATTERNS) {
     assert.ok(new RegExp(pattern.regex).source);
     assert.ok(pattern.gate || pattern.suggestedRule, pattern.id);
+  }
+});
+
+test('the weekly report carries the lessons ledger summary and tolerates a missing ledger', () => {
+  const root = mkdtempSync(join(tmpdir(), 'gardener-lessons-'));
+  try {
+    mkdirSync(join(root, 'docs/lessons'), { recursive: true });
+    writeFileSync(
+      join(root, 'docs/lessons/2001-new-gate.md'),
+      '---\nCategory: a symptom\nSource: #1\nLevel: 2\nSafeguard: `scripts/some-gate.mjs`; since 2026-10-22\nIntercepts: 1\nRecurrences: 0\nNotes: kept\n---\n',
+    );
+    const section = lessonSection(root, new Date('2026-10-24T12:00:00Z'));
+    assert.match(section, /## Lessons ledger weekly summary/);
+    assert.match(section, /New categories:\n- new-gate/);
+    assert.match(section, /Intercepts: 0/);
+    assert.match(lessonSection(join(root, 'nope'), new Date()), /docs\/lessons\/ is missing/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
