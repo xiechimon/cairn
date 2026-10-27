@@ -1,0 +1,24 @@
+✔ migration preserves every source row and sums counters when categories merge (70.615011ms)
+✔ remote rebase reconciliation preserves every remote record and text field (2336.380724ms)
+✔ every migrated entry passes and the old table is gone (56.921852ms)
+✔ level 5 entry without a reason is rejected (44.498613ms)
+✔ level outside 1 to 5 is rejected (0.301963ms)
+✔ pending upgrade without a ticket is rejected, with a ticket passes (0.158258ms)
+✔ the real bad note that sat on main without a ticket is rejected (0.219339ms)
+✔ file name without a ticket number is rejected (0.125678ms)
+✔ missing, reordered or malformed fields are rejected (6.985626ms)
+✔ a resurrected docs/lessons.md table is rejected (0.898149ms)
+✔ two parallel branches each adding an entry merge without conflict (226.190391ms)
+✔ the old single table does conflict when two branches append a row (212.233731ms)
+✔ both upgrade-pending word orders and the original Chinese marker require a ticket (0.380551ms)
+✔ table generation rejects malformed entries with the ledger diagnostic (0.288012ms)
+✔ generated table keeps existing escaped pipes inside their cell (0.261693ms)
+✔ the CLI can validate and render entries from a checkout path containing spaces (300.337308ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4079.883677
