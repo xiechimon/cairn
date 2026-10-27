@@ -675,6 +675,44 @@ describe('moving a task with a self-created issue to another project (#2009)', (
     s.dispose();
   });
 
+  test('the old issue is closed with the token the connection holds after the replacement opens', async () => {
+    const BETA = 'octo/beta';
+    const ROTATED = 'ghp_rotated_token';
+    const mock = ghMock({
+      [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE },
+      [`POST ${issuePath(101)}/comments`]: { status: 201, body: { id: 1 } },
+      [`PATCH ${issuePath(101)}`]: { status: 200, body: { number: 101, state: 'closed' } },
+      [`POST /repos/${BETA}/issues`]: { status: 201, body: { ...CREATED_ISSUE, number: 7 } },
+    });
+    let rotate = (): void => undefined;
+    const s = bootServer({
+      githubFetch: async (input, init) => {
+        const res = await mock.impl(input, init);
+        if (new URL(String(input)).pathname === `/repos/${BETA}/issues`) rotate();
+        return res;
+      },
+    });
+    seedConnection(s);
+    rotate = () =>
+      upsertGithubConnection(
+        { db: s.db, box: s.secretBox },
+        { teamId: s.team.id, login: 'octo', accessToken: ROTATED, scope: 'repo' },
+      );
+    const alpha = await postGithubProject(s.app);
+    const betaRes = await call(s.app, 'POST', '/api/projects', {
+      body: { name: 'beta', kind: 'github', githubRepo: BETA },
+    });
+    const beta = ((await betaRes.json()) as { id: string }).id;
+    const created = await createTask(s.app, alpha);
+    await flushSelfIssueWrites();
+    await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { projectId: beta } });
+    await flushSelfIssueWrites();
+    const close = mock.callsTo('PATCH', issuePath(101));
+    expect(close).toHaveLength(1);
+    expect(close[0]!.headers.authorization).toBe(`Bearer ${ROTATED}`);
+    s.dispose();
+  });
+
   test('moving to a project without GitHub closes the old issue and clears the link', async () => {
     const mock = ghMock({
       [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE },

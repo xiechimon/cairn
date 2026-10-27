@@ -747,14 +747,21 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
   const record = getTodo(deps, todoId);
   if (record) hub.publishTodoDoc(record.teamId, record);
   if (replaced !== null) {
-    await githubCloseIssue(
-      deps.githubFetch ?? fetch,
-      access.token,
-      replaced.owner,
-      replaced.repo,
-      replaced.issueNumber,
-      `Cairn：这个任务挪到了 ${owner}/${repo}#${number}，这里的 issue 关闭。`,
-    ).catch((error: unknown) => console.warn(`moved todo: closing ${row.sourceRef} failed`, error));
+    const closeAccess = await teamGithubToken(deps, row.teamId);
+    if ('token' in closeAccess) {
+      await githubCloseIssue(
+        deps.githubFetch ?? fetch,
+        closeAccess.token,
+        replaced.owner,
+        replaced.repo,
+        replaced.issueNumber,
+        `Cairn：这个任务挪到了 ${owner}/${repo}#${number}，这里的 issue 关闭。`,
+      ).catch((error: unknown) =>
+        console.warn(`moved todo: closing ${row.sourceRef} failed`, error),
+      );
+    } else {
+      console.warn(`moved todo: no GitHub token to close ${row.sourceRef}`);
+    }
   }
   return record;
 }
