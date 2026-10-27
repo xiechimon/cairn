@@ -1,0 +1,35 @@
+✔ committed ci.yml matches the pinned job structure (106.634458ms)
+✔ PR #1540 misplaced freshness step goes red (71.535094ms)
+✔ a pinned step relocated to another job names both jobs (111.743137ms)
+✔ a pinned step deleted from ci.yml goes red (88.194984ms)
+✔ a step copied into another job while its pinned job keeps it goes red (94.345575ms)
+✔ a step pasted twice into one job goes red (109.774857ms)
+✔ a job absent from the baseline goes red (80.43213ms)
+✔ a baseline job gone from ci.yml goes red (32.090003ms)
+✔ a doc change selects the tests that name it, split by runner (0.946968ms)
+✔ root-level doc names, integration suites and known-red files are not selected (0.110646ms)
+[prepush] git init -q
+✔ documentation skips code checks, unknown paths fail closed (1.446362ms)
+✔ changes to prepush scripts run the CI self-test files locally (0.255465ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.147632ms)
+✔ local code checks include both UI gates and affected e2e (0.096045ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.216357ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.084788ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (7.997588ms)
+✔ affected e2e gets only code paths, so a bulk evidence prune fits on the command line (5.026335ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (278.865896ms)
+✔ a board card source change selects the spec that reads its title (87.855377ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.584646ms)
+✔ CLI skips real document changes and rejects a missing base (889.696154ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (505.935619ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (245.618637ms)
+✔ prepush vitest only forgives files listed as known local red (1.126338ms)
+✔ plan children do not inherit the git hook repository binding (33.227565ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3085.199285

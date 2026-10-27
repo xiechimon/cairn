@@ -14,7 +14,7 @@ Let cairn iterate on itself: close the spec 28 bootstrap loop (ADR 0021), where 
 - Leave no manual steps for the human (such as removing a label on GitHub). Do not put `needs-decision` on a PR: ask in chat when a decision is needed, then merge yourself.
 - Ask the human before design trade-offs (changing intended behavior, touching an ADR or a protected path).
 - After opening a PR, enable GitHub auto-merge and stop; do not sit watching CI.
-- Run a retro before closing every thread (see `.claude/skills/retro-cairn/SKILL.md`) without being reminded. The lessons ledger is `docs/lessons.md`.
+- Run a retro before closing every thread (see `.claude/skills/retro-cairn/SKILL.md`) without being reminded. The lessons ledger is `docs/lessons/` (one file per entry).
 - One local thread per topic: a new topic gets a new thread instead of piling onto the existing "dispatch local agents" thread; finish existing items in their own thread.
 - Threads default to a Sonnet-class model to save tokens; splitting tickets, reviewing changes, writing PRs and making trade-offs is Claude's work.
 - Do not stop to wait for the human to set priorities when dispatching; pick the order and go. Attach images directly in the reply, not only in the file library.
@@ -46,13 +46,13 @@ Start background `ai-route` runs with `scripts/dispatch-agent.mjs start <id> -- 
 - Main line: the spec 28 bootstrap loop (ADR 0021), tickets #1401 to #1409; P4 to P8 not started. The ledger in spec 28 section 8 lags slightly.
 - Eval loop: #1510 to #1519.
 - Harness A/B eval #1532: weak model glm-5.3-flash against strong model glm-5.3; first the rubric and baseline, then the full comparison after #1511 to #1514 merge.
-- Process-error retros: ledger `docs/lessons.md`; follow-ups L1 `pnpm prepush` (#1533), L2 fail→fix detector (#1535, depends on E0), L3 interception counts and recurrence escalation (#1534). Tickets that touch AGENTS.md are merged by the human.
+- Process-error retros: ledger `docs/lessons/`; follow-ups L1 `pnpm prepush` (#1533), L2 fail→fix detector (#1535, depends on E0), L3 interception counts and recurrence escalation (#1534). Tickets that touch AGENTS.md are merged by the human.
 - Comment discipline #1520. Legacy comments are being deleted (not translated) and legacy Chinese docs translated to English in batches.
 - Known: 150+ stale remote branches to clean up; cloud builds of better-sqlite3 need `npm i -g node-gyp` first.
 - cairn cannot merge its own PRs: chief's merge_builds is hard-refused (`chief.ts`); the human clicks "Done" (`完成`) in the web UI.
 
 ## 6. Takeover checklist
 
-1. Read `AGENTS.md`, this file and `docs/lessons.md`.
+1. Read `AGENTS.md`, this file and `docs/lessons/README.md`.
 2. Look at `.claude/skills/`: `pr-cairn` (PR bodies), `retro-cairn` (wrap-up retro), `verify-cairn`, `verify-step-claim`.
 3. Run `gh issue list` for tickets in flight and pick the next one from the spec 28 main line or the eval loop without waiting for someone to prioritize.
