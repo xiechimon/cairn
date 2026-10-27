@@ -12,7 +12,7 @@ for (const width of [360, 390]) {
     test('M1 board: sidebar folds into a menu drawer, top bar actions stay on screen, no page scroll', async ({
       page,
     }) => {
-      await page.goto('/app');
+      await page.goto('/app?view=board');
       await expect(page.locator('.board-sidebar')).toHaveCount(0);
       await expect(page.locator('.board-topbar-title')).toBeVisible();
       const menu = page.getByRole('button', { name: '展开侧边栏' });
@@ -28,7 +28,7 @@ for (const width of [360, 390]) {
       await drawer.getByRole('link', { name: '定时' }).click();
       await expect(page).toHaveURL(/\/app\/schedules/);
       await expect(drawer).toBeHidden();
-      await page.goto('/app');
+      await page.goto('/app?view=board');
       for (const name of ['筛选', '新任务']) {
         const box = (await page
           .getByRole('button', { name: new RegExp(name) })
@@ -77,7 +77,7 @@ for (const width of [360, 390]) {
     });
 
     test('M4 总管：FAB ≥44px，开窗可最小化收回', async ({ page }) => {
-      await page.goto('/app');
+      await page.goto('/app?view=board');
       const fab = page.locator('.chief-fab');
       await expect(fab).toBeVisible();
       const fabBox = (await fab.boundingBox()) as { width: number; height: number };

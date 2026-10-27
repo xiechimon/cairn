@@ -34,9 +34,10 @@ test('board topbar drops the `看板指南` button — right actions = `筛选` 
 
   const actions = page.locator('.board-topbar-actions');
   await expect(actions).toBeVisible();
-  await expect(actions.getByRole('button')).toHaveCount(1);
+  await expect(actions.getByRole('button')).toHaveCount(2);
   await expect(actions.getByRole('link')).toHaveCount(1);
   await expect(actions.getByRole('button', { name: '筛选', exact: true })).toBeVisible();
+  await expect(actions.getByRole('button', { name: '任务面板' })).toBeVisible();
   await expect(actions.getByRole('link', { name: '定时' })).toBeVisible();
   await expect(actions.getByRole('button', { name: '新任务' })).toHaveCount(0);
 
@@ -383,23 +384,17 @@ test('account drops the `更换` button, keeps the avatar head (#306 wontfix shi
   await expect(page.locator('.account-avatar img')).toBeVisible();
 });
 
-test('transcript tool group: `收起` collapses, the footer row re-expands (#306)', async ({ page }) => {
+test('transcript work summary collapses and re-expands call rows', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28');
-
-  await expect(page.locator('.chat-tool-pill')).toHaveCount(2);
-  const collapse = page.locator('.chat-collapse');
-  await expect(collapse).toBeVisible();
-  const footer = page.locator('button.chat-row-icons--toggle');
-  await expect(footer).toHaveAttribute('aria-expanded', 'true');
-
-  await collapse.click();
-  await expect(page.locator('.chat-tool-pill')).toHaveCount(0);
-  await expect(collapse).toHaveCount(0);
-  await expect(footer).toHaveAttribute('aria-expanded', 'false');
-
-  await footer.click();
-  await expect(page.locator('.chat-tool-pill')).toHaveCount(2);
-  await expect(collapse).toBeVisible();
+  const summary = page.getByTestId('work-summary');
+  await expect(page.getByTestId('work-call')).toHaveCount(2);
+  await expect(summary).toHaveAttribute('aria-expanded', 'true');
+  await summary.click();
+  await expect(page.getByTestId('work-call')).toHaveCount(0);
+  await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  await summary.click();
+  await expect(page.getByTestId('work-call')).toHaveCount(2);
+  await expect(summary).toHaveAttribute('aria-expanded', 'true');
 });
 
 const REVIEW_DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
@@ -468,14 +463,19 @@ test('reuse panel `查看方案` flips the doc pane to the plan face (#318)', as
   await expect(page.locator('.doc-empty')).toContainText('暂无方案');
 });
 
-test('project task rows and cards are real links to the todo detail (#318)', async ({ page }) => {
+test('project task rows and cards are real links to the todo detail that open in the panel (#318, #1937)', async ({ page }) => {
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks');
   const row = page.locator('.prj-task-row').first();
   await expect(row).toBeVisible();
 
   await expect(row.locator('a.prj-task-link')).toHaveCount(1);
+  await expect(row.locator('a.prj-task-link')).toHaveAttribute(
+    'href',
+    /\/app\/todo\/[^?]+\?scenario=prj-tasks&tab=tasks/,
+  );
   await row.click();
-  await expect(page).toHaveURL(/\/app\/todo\/[^?]+\?scenario=prj-tasks&tab=tasks/);
+  await expect(page).toHaveURL(/[?&]task=[^&]+/);
+  await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
 
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks');
   await page.locator('.prj-tasks-view-btn').nth(1).click();
@@ -483,7 +483,7 @@ test('project task rows and cards are real links to the todo detail (#318)', asy
   await expect(card).toBeVisible();
   await expect(card.locator('a.prj-task-link')).toHaveCount(1);
   await card.click();
-  await expect(page).toHaveURL(/\/app\/todo\//);
+  await expect(page).toHaveURL(/[?&]task=[^&]+/);
 });
 
 test('new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)', async ({

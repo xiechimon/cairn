@@ -240,7 +240,35 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
   test('failure mode 6: usage row set — modelUsage projection + claude-code/ key prefix', () => {
     const { events, state } = feed([RESULT_SUCCESS]);
     const done = events.find((e) => e.type === 'done');
-    expect(done).toEqual({
+    const row = {
+      model: 'claude-code/claude-sonnet-4-5',
+      input: 10,
+      output: 20,
+      cacheRead: 5,
+      cacheWrite: 7,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.01 },
+    };
+    expect(done).toEqual({ type: 'done', usage: [row] });
+    expect(state.usage).toEqual([row]);
+  });
+
+  test('failure mode 6c: costBasis unknown drops costUSD; a list price is kept on total only', () => {
+    const unknownBasis = {
+      ...RESULT_SUCCESS,
+      modelUsage: {
+        'claude-sonnet-4-5': {
+          inputTokens: 10,
+          outputTokens: 20,
+          cacheReadInputTokens: 5,
+          cacheCreationInputTokens: 7,
+          costUSD: 0.01,
+          costBasis: 'unknown',
+        },
+      },
+    } as unknown as SDKMessage;
+    const { events: unknownEvents } = feed([unknownBasis]);
+    const unknownDone = unknownEvents.find((e) => e.type === 'done');
+    expect(unknownDone).toEqual({
       type: 'done',
       usage: [
         {
@@ -252,15 +280,42 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
         },
       ],
     });
-    expect(state.usage).toEqual([
-      {
-        model: 'claude-code/claude-sonnet-4-5',
-        input: 10,
-        output: 20,
-        cacheRead: 5,
-        cacheWrite: 7,
+
+    const listed = {
+      ...RESULT_SUCCESS,
+      modelUsage: {
+        'claude-sonnet-4-5': {
+          inputTokens: 10,
+          outputTokens: 20,
+          cacheReadInputTokens: 5,
+          cacheCreationInputTokens: 0,
+          costUSD: 0.01,
+          costBasis: 'list',
+        },
       },
-    ]);
+      usage: {
+        input_tokens: 10,
+        output_tokens: 20,
+        cache_read_input_tokens: 5,
+        cache_creation_input_tokens: 0,
+        cache_creation: { ephemeral_5m_input_tokens: 3, ephemeral_1h_input_tokens: 4 },
+      },
+    } as unknown as SDKMessage;
+    const { events } = feed([listed]);
+    const done = events.find((e) => e.type === 'done');
+    expect(done).toEqual({
+      type: 'done',
+      usage: [
+        {
+          model: 'claude-code/claude-sonnet-4-5',
+          input: 10,
+          output: 20,
+          cacheRead: 5,
+          cacheWrite: 7,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.01 },
+        },
+      ],
+    });
   });
 
   test('failure mode 6b: modelUsage absent → single usage row synthesized (opts.modelId fallback)', () => {

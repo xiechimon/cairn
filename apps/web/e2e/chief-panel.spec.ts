@@ -53,6 +53,20 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     await expect(drawer(page)).toBeVisible();
   });
 
+  test('chief header and composer tools retain 24px targets after conversation extraction', async ({ page }, testInfo) => {
+    await page.goto('/app?scenario=111&view=board');
+    await settled(page);
+    for (const name of ['新主题', '总管设置', '最小化', '添加附件', '提及']) {
+      const control = drawer(page).getByRole('button', { name, exact: true });
+      await expect(control).toBeVisible();
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box?.width).toBe(24);
+      expect(box?.height).toBe(24);
+    }
+    await page.screenshot({ path: testInfo.outputPath('chief-button-tiers.png') });
+  });
+
   test('composer bar carries the attach + mention tools and the send button', async ({ page }) => {
     await page.goto('/app?scenario=111&view=board');
 
@@ -253,8 +267,8 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       };
     };
 
-    const drafted = await measureComposer('/app?scenario=111');
-    const empty = await measureComposer('/app?scenario=114');
+    const drafted = await measureComposer('/app?view=board&scenario=111');
+    const empty = await measureComposer('/app?view=board&scenario=114');
 
     expect(drafted.height).toBe(120);
     expect(empty.height).toBe(60);
@@ -276,7 +290,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       return composer.getAttribute('placeholder');
     };
 
-    expect(await placeholderAt('113')).toBe('向 Agent 补充说明，执行过程中即可送达');
+    expect(await placeholderAt('113')).toBe('总管回完这条就看；想马上补充，发出后点「现在插话」');
     expect(await placeholderAt('111')).toBe('有什么可以帮你的？');
     expect(await placeholderAt('114')).toBe('有什么可以帮你的？');
   });

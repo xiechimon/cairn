@@ -1,0 +1,40 @@
+[heavy-slots] queued, position 2 (all 1 slots are busy)
+[heavy-slots] queued, position 1 (all 1 slots are busy)
+[heavy-slots] acquired slot 1/1
+[WebServer] (node:89542) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:89544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/xmon/.codex/worktrees/pr-1842-network-retry/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:89551) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:89557) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 12 tests using 1 worker
+
+(node:89569) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:89583) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:89583) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/agent-fallback-models.spec.ts:93:1 › empty chain: rule copy is clear, only an add entry, no candidate rows (310ms)
+  ✓   2 e2e/agent-fallback-models.spec.ts:105:1 › add: lands in the store only after model selection, reload reads back the same row (623ms)
+  ✓   3 e2e/agent-fallback-models.spec.ts:124:1 › change: swapping the model of one row keeps the remaining rows in original order (500ms)
+  ✓   4 e2e/agent-fallback-models.spec.ts:134:1 › reorder: move up/down changes the stored order, first row cannot move up further, last row cannot move down further (595ms)
+  ✓   5 e2e/agent-fallback-models.spec.ts:154:1 › delete: deleting a middle row shifts the rest up, deleting down to empty sends null instead of an empty array (613ms)
+  ✓   6 e2e/agent-fallback-models.spec.ts:173:1 › cap: at 5 entries add is disabled, server returns 400 for the 6th and the chain stays unchanged (1.4s)
+  ✓   7 e2e/agent-fallback-models.spec.ts:195:1 › half-selected rows are not stored: with only a runtime picked and no model, the store keeps the original chain (566ms)
+  ✓   8 e2e/agent-fallback-models.spec.ts:209:1 › deleted model: the row greys out with an explanation and is not silently dropped (253ms)
+  ✓   9 e2e/agent-fallback-models.spec.ts:221:1 › dead model: the row greys out and is marked delisted (260ms)
+  ✓  10 e2e/agent-fallback-models.spec.ts:240:1 › owner machine missing the runtime a fallback needs: editing shows a hint, already-configured fallbacks are kept (261ms)
+  ✓  11 e2e/agent-fallback-models.spec.ts:261:3 › typography 1280px: runtime label does not wrap, description text does not overlap the right-side controls (285ms)
+  ✓  12 e2e/agent-fallback-models.spec.ts:261:3 › typography 560px: runtime label does not wrap, description text does not overlap the right-side controls (285ms)
+
+  12 passed (9.6s)

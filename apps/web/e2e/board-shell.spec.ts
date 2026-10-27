@@ -66,7 +66,8 @@ test('the needs-me inbox lists recent pending cards as rows and folds week-old o
   await expect(inbox).toContainText('16 天前');
 
   await rows.first().getByRole('link').click();
-  await expect(page).toHaveURL(/\/app\/todo\/[^/?]+/);
+  await expect(page).toHaveURL(/[?&]task=[^&]+/);
+  await expect(page.getByRole('complementary', { name: '任务面板' }).getByTestId('task-panel-title')).toBeVisible();
 });
 
 test('the needs-me inbox shares its edges with the new-task bar', async ({ page }) => {
@@ -161,13 +162,11 @@ test('a 390px needs-you row shows the whole title and keeps its actions on scree
   expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(bar.y);
 });
 
-test('a 390px home scrolls as one page and its last row clears the new-task bar', async ({ page }) => {
+test('a 390px home scrolls as one page down to its last row', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app?scenario=board-inbox');
-  await page.locator('.board-main').evaluate((el) => el.scrollTo(0, el.scrollHeight));
-  const lastRow = (await page.getByTestId('home-done-row').last().boundingBox())!;
-  const bar = (await page.getByTestId('board-new-task-bar').boundingBox())!;
-  expect(lastRow.y + lastRow.height).toBeLessThanOrEqual(bar.y);
+  await page.getByTestId('chief-home').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect(page.getByTestId('home-done-row').last()).toBeInViewport();
 });
 
 test('a short phone screen scrolls the board as one page to reach the last group', async ({

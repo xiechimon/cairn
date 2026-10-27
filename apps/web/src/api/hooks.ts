@@ -606,6 +606,7 @@ export function useApiMutations(teamId: string | undefined) {
           phase?: string;
           orderIndex?: number;
           tagIds?: string[];
+          projectId?: string;
           assignment?: {
             plan?: NonNullable<Assignment['plan']>;
             build?: NonNullable<Assignment['build']>;
@@ -733,14 +734,22 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     chiefSend: useMutation({
-      mutationFn: (input: { threadId: string | null; content: string }) =>
-        input.threadId === null
-          ? api.post<{ thread: ChiefThread }>(`/api/teams/${teamId}/chief/threads`, {
-              content: input.content,
-            })
-          : api.post<{ thread: ChiefThread }>(`/api/conversations/${input.threadId}/messages`, {
-              content: input.content,
-            }),
+      mutationFn: (input: {
+        threadId: string | null;
+        content: string;
+        projectId?: string | null;
+      }) => {
+        const body = {
+          content: input.content,
+          ...(input.projectId != null ? { projectId: input.projectId } : {}),
+        };
+        return input.threadId === null
+          ? api.post<{ thread: ChiefThread }>(`/api/teams/${teamId}/chief/threads`, body)
+          : api.post<{ thread: ChiefThread }>(
+              `/api/conversations/${input.threadId}/messages`,
+              body,
+            );
+      },
       onSuccess: invalidateAll,
     }),
     chiefRewind: useMutation({
@@ -748,6 +757,29 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<{ deletedCount: number; thread: ChiefThread }>(
           `/api/teams/${teamId}/chief/threads/${input.threadId}/rewind`,
           { messageId: input.messageId },
+        ),
+      onSuccess: invalidateAll,
+    }),
+    chiefWithdraw: useMutation({
+      mutationFn: (input: { threadId: string; messageId: string }) =>
+        api.del<{ ok: boolean }>(
+          `/api/teams/${teamId}/chief/threads/${input.threadId}/messages/${input.messageId}`,
+        ),
+      onSuccess: invalidateAll,
+    }),
+    chiefSteer: useMutation({
+      mutationFn: (input: { threadId: string; messageId: string }) =>
+        api.post<{ steered: boolean }>(
+          `/api/teams/${teamId}/chief/threads/${input.threadId}/messages/${input.messageId}/steer`,
+          {},
+        ),
+      onSuccess: invalidateAll,
+    }),
+    chiefStop: useMutation({
+      mutationFn: (input: { threadId: string }) =>
+        api.post<{ delegated: boolean }>(
+          `/api/teams/${teamId}/chief/threads/${input.threadId}/stop`,
+          {},
         ),
       onSuccess: invalidateAll,
     }),

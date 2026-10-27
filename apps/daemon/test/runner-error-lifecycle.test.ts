@@ -13,7 +13,7 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
 } from '@cairn/shared';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { adaptProviderCompat, PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -174,8 +174,8 @@ function scriptedStormBackend(scripts: StepEvent[][]): {
         usage: () => [],
       };
     },
-    async continueSession() {
-      throw new Error('unused');
+    async continueSession(_sessionId, opts) {
+      return backend.createSession(opts);
     },
     adaptProviderCompat: (provider: ProviderConfig, errorMessage: string) =>
       adaptProviderCompat(provider, errorMessage),
@@ -234,9 +234,16 @@ async function runLifecycleCase(
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
   };
-  await runStep(deps, claimedBuildStep(), {
-    ...(opts?.retryStormMax !== undefined ? { retryStormMax: opts.retryStormMax } : {}),
-  });
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    const pending = runStep(deps, claimedBuildStep(), {
+      ...(opts?.retryStormMax !== undefined ? { retryStormMax: opts.retryStormMax } : {}),
+    });
+    await vi.runAllTimersAsync();
+    await pending;
+  } finally {
+    vi.useRealTimers();
+  }
   return { client, lines, providers, autoRetries: counts.autoRetries };
 }
 
@@ -284,20 +291,21 @@ describe('runner auto_retry lifecycle (#708)', () => {
     expect(client.doneBodies[0]?.body.errorMessage).toBe(RELAY_400);
   });
 
-  test("storm boundary: pi's own budget exits after 3 tries (run8 connection-error shape) → storm not triggered, failed with root cause", async () => {
+  test("storm boundary: pi's own budget exits after 3 tries (run8 connection-error shape) → storm not triggered, daemon resumes successfully", async () => {
     const script: StepEvent[] = [
       ...errorCycles(3, 'connection error', { attempts: [1, 2, 3] }),
       { type: 'message_end', message: { role: 'assistant', content: '', stopReason: 'error' } },
       { type: 'error', error: { message: 'connection error', retryable: true } },
       { type: 'done', usage: [] },
     ];
-    const { client, lines, autoRetries } = await runLifecycleCase([script], {
+    const { client, lines, providers, autoRetries } = await runLifecycleCase([script], {
       providerId: 'gw-lc-budget',
     });
     expect(autoRetries).toBe(3);
     expect(lines.some((l) => l.includes('retry storm'))).toBe(false);
-    expect(client.doneBodies[0]?.body.status).toBe('failed');
-    expect(client.doneBodies[0]?.body.errorMessage).toBe('connection error');
+    expect(providers).toHaveLength(2);
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    expect(client.doneBodies[0]?.body.errorMessage).toBeUndefined();
   });
 
   test('progress resets the count: errors alternating with progress → storm not triggered, step success', async () => {

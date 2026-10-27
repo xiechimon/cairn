@@ -1,0 +1,59 @@
+[heavy-slots] queued, position 2 (all 1 slots are busy)
+[heavy-slots] queued, position 1 (all 1 slots are busy)
+[heavy-slots] acquired slot 1/1
+[WebServer] (node:6208) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:6212) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/xmon/.codex/worktrees/pr-1906-evidence/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:6235) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:6245) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:6259) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/detail-work-trace-review-negative.spec.ts:173:1 › work groups consecutive thinking and calls, with only the last block expanded (5.3s)
+
+
+  1) e2e/detail-work-trace-review-negative.spec.ts:173:1 › work groups consecutive thinking and calls, with only the last block expanded 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('work-summary')
+    Expected: 2
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" getByTestId('work-summary') with timeout 5000ms
+      - waiting for getByTestId('work-summary')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      174 |   await stubWorld(page);
+      175 |   const summaries = page.getByTestId('work-summary');
+    > 176 |   await expect(summaries).toHaveCount(2);
+          |                           ^
+      177 |   await expect(summaries.first()).toContainText('思考 1 次');
+      178 |   await expect(summaries.first()).toContainText('读了 1 个文件');
+      179 |   await expect(summaries.first()).toContainText('搜索 1 次');
+        at /Users/xmon/.codex/worktrees/pr-1906-evidence/cairn/apps/web/e2e/detail-work-trace-review-negative.spec.ts:176:27
+
+    Error Context: test-results/detail-work-trace-review-n-39505-nly-the-last-block-expanded/error-context.md
+
+  1 failed
+    e2e/detail-work-trace-review-negative.spec.ts:173:1 › work groups consecutive thinking and calls, with only the last block expanded 
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/xmon/.codex/worktrees/pr-1906-
+  │ evidence/cairn/apps/web
+

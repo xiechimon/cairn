@@ -12,8 +12,10 @@ import {
   insecureBindWarning,
   loadConfig,
   logTokenAuthStartup,
+  tailscaleBindWarning,
   tokenAuthStartupLines,
   warnInsecureBind,
+  warnTailscaleBind,
 } from '../src/config.js';
 import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
 
@@ -74,6 +76,91 @@ describe('token auth: the protected surface (failure modes 1/2/6)', () => {
       { name: 'query-token-probe' },
     );
     expect(post.status).toBe(401);
+  });
+});
+
+describe('#1762 Tailscale Serve identity authentication', () => {
+  function identityRequest(s: TestServer, login: string, remoteAddress: string): Promise<Response> {
+    return Promise.resolve(
+      s.app.request(
+        '/api/user/me',
+        {
+          headers: {
+            'Tailscale-User-Login': login,
+            'x-forwarded-for': '127.0.0.1',
+          },
+        },
+        { incoming: { socket: { remoteAddress } } },
+      ),
+    );
+  }
+
+  test.each(['127.0.0.1', '::1', '::ffff:127.0.0.1'])(
+    'loopback peer %s + allowed login -> /api/user/me 200 without token',
+    async (remoteAddress) => {
+      const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
+      const res = await identityRequest(s, 'xiechimon@github', remoteAddress);
+      expect(res.status).toBe(200);
+      expect((await res.json()) as { id?: string }).toEqual(s.user);
+    },
+  );
+
+  test('loopback + unknown login -> 401', async () => {
+    const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
+    const res = await identityRequest(s, 'stranger@github', '127.0.0.1');
+    expect(res.status).toBe(401);
+  });
+
+  test('non-loopback peer + forged identity and forwarding headers -> 401, and a valid token still passes', async () => {
+    const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
+    const res = await identityRequest(s, 'xiechimon@github', '100.64.0.2');
+    expect(res.status).toBe(401);
+    const withToken = await Promise.resolve(
+      s.app.request(
+        '/api/user/me',
+        {
+          headers: {
+            'Tailscale-User-Login': 'xiechimon@github',
+            'x-forwarded-for': '127.0.0.1',
+            authorization: `Bearer ${TOKEN}`,
+          },
+        },
+        { incoming: { socket: { remoteAddress: '100.64.0.2' } } },
+      ),
+    );
+    expect(withToken.status).toBe(200);
+  });
+
+  test('loopback + allowed login stays 200 when a stale bearer is also sent', async () => {
+    const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
+    const res = await Promise.resolve(
+      s.app.request(
+        '/api/user/me',
+        {
+          headers: {
+            'Tailscale-User-Login': 'xiechimon@github',
+            authorization: 'Bearer stale-bad-token',
+          },
+        },
+        { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
+      ),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  test('missing peer information rejects identity and preserves token fallback', async () => {
+    const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
+    const headers = { 'Tailscale-User-Login': 'xiechimon@github' };
+    expect((await reqWith(s, 'GET', '/api/user/me', headers)).status).toBe(401);
+    expect((await reqWith(s, 'GET', '/api/user/me', { ...headers, ...authHeaders })).status).toBe(
+      200,
+    );
+  });
+
+  test('no identity header -> token behavior unchanged', async () => {
+    const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
+    expect((await req(s.app, 'GET', '/api/user/me')).status).toBe(401);
+    expect((await reqWith(s, 'GET', '/api/user/me', authHeaders)).status).toBe(200);
   });
 });
 
@@ -433,6 +520,54 @@ describe('#1708 startup lines (token location + one-time login link)', () => {
     calls.length = 0;
     logTokenAuthStartup(stubLogger, loadConfig({ authToken: null }));
     expect(calls).toEqual([]);
+  });
+});
+
+describe('#1762 Tailscale identity bind warning', () => {
+  test('allowlist + non-loopback or default bind -> WARN; loopback or no allowlist -> no WARN', () => {
+    expect(
+      tailscaleBindWarning(loadConfig({ host: '0.0.0.0', tailscaleUsers: ['xiechimon@github'] })),
+    ).toMatch(/CAIRN_TAILSCALE_USERS/);
+    expect(
+      tailscaleBindWarning(loadConfig({ host: null, tailscaleUsers: ['xiechimon@github'] })),
+    ).toMatch(/127\.0\.0\.1/);
+    expect(
+      tailscaleBindWarning(loadConfig({ host: '127.0.0.1', tailscaleUsers: ['xiechimon@github'] })),
+    ).toBeNull();
+    expect(
+      tailscaleBindWarning(loadConfig({ host: '::1', tailscaleUsers: ['xiechimon@github'] })),
+    ).toBeNull();
+    expect(
+      tailscaleBindWarning(loadConfig({ host: 'localhost', tailscaleUsers: ['xiechimon@github'] })),
+    ).toBeNull();
+    expect(
+      tailscaleBindWarning(
+        loadConfig({ host: '192.168.1.10', tailscaleUsers: ['xiechimon@github'] }),
+      ),
+    ).toMatch(/Identity headers from non-loopback peers are ignored/);
+    expect(tailscaleBindWarning(loadConfig({ host: '0.0.0.0', tailscaleUsers: [] }))).toBeNull();
+  });
+
+  test('entry wiring emits one warning for an unsafe identity bind', () => {
+    const calls: string[] = [];
+    warnTailscaleBind(
+      { warn: (msg: string) => calls.push(msg) },
+      loadConfig({ host: null, tailscaleUsers: ['xiechimon@github'] }),
+    );
+    warnTailscaleBind(
+      { warn: (msg: string) => calls.push(msg) },
+      loadConfig({ host: '127.0.0.1', tailscaleUsers: ['xiechimon@github'] }),
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatch(/CAIRN_TAILSCALE_USERS/);
+  });
+
+  test('CAIRN_TAILSCALE_USERS maps to a trimmed allowlist without empty entries', () => {
+    vi.stubEnv('CAIRN_TAILSCALE_USERS', ' xiechimon@github, ,other@github,');
+    expect(loadConfig().tailscaleUsers).toEqual(['xiechimon@github', 'other@github']);
+    vi.stubEnv('CAIRN_TAILSCALE_USERS', '');
+    expect(loadConfig().tailscaleUsers).toEqual([]);
+    vi.unstubAllEnvs();
   });
 });
 

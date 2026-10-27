@@ -15,6 +15,7 @@ import {
 } from '@cairn/shared/merge-gate';
 import { computePatchDigest } from './digest.js';
 import { parseRawEvidenceLinks, qualifyingEvidenceLinks } from './evidence-link.js';
+import { independenceVendorDetail, modelsAreIndependent } from './model-identity.js';
 import { classifyPaths, touchesHarness } from './paths.js';
 
 export interface GateVerdictView {
@@ -325,25 +326,38 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     const paths = classifyPaths(compare.files, i.ticketRef);
     const reviewRequired = [...paths.protected, ...paths.deletedTests];
     if (reviewRequired.length > 0) {
-      const independent = i.verdicts.filter(
+      const author = i.author;
+      const bound = i.verdicts.filter(
         (v) =>
           v.kind === 'review' &&
           head !== null &&
           v.headSha === head &&
           D !== null &&
           v.patchDigest === D &&
-          i.author?.id.trim() &&
-          i.author.model.trim() &&
+          author?.id.trim() &&
+          author.model.trim() &&
           v.reviewerId?.trim() &&
-          v.reviewerId !== i.author.id &&
+          v.reviewerId !== author.id &&
           v.reviewerModel?.trim() &&
-          v.reviewerModel !== i.author.model &&
           typeof v.gateLoosening === 'boolean' &&
           typeof v.evalRulerChange === 'boolean' &&
           (v.outcome === 'pass' || v.outcome === 'block'),
       );
+      const independent = bound.filter(
+        (v) =>
+          v.reviewerModel != null && modelsAreIndependent(author?.model ?? '', v.reviewerModel),
+      );
       if (!independent.some((v) => v.outcome === 'pass')) {
-        block('independent-review-missing', ...names(reviewRequired));
+        const vendorDetail = [
+          ...new Set(
+            bound.flatMap((v) =>
+              v.reviewerModel == null
+                ? []
+                : independenceVendorDetail(author?.model ?? '', v.reviewerModel),
+            ),
+          ),
+        ];
+        block('independent-review-missing', ...names(reviewRequired), ...vendorDetail);
       }
       if (independent.some((v) => v.gateLoosening || v.evalRulerChange)) {
         block('review-blocking', 'Independent review reports gate loosening or eval ruler change');

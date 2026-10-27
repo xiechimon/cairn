@@ -1,25 +1,12 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout';
 
-const toggle = (page: import('@playwright/test').Page) =>
-  page.getByRole('button', { name: /工具过程/ });
+const toggle = (page: Page) =>
+  page.getByRole('button', { name: /跑了 2 条命令/ });
 
-/** Computed color of a `color: var(--foreground)` probe — the "normal
- *  contrast" reference the tool output must match (and the note's dim
- *  ink must not). */
-async function primaryInk(page: import('@playwright/test').Page): Promise<string> {
-  return page.evaluate(() => {
-    const probe = document.createElement('span');
-    probe.style.color = 'var(--foreground)';
-    document.body.appendChild(probe);
-    const c = getComputedStyle(probe).color;
-    probe.remove();
-    return c;
-  });
-}
 
-test('A1: tool output is collapsed behind the group toggle by default', async ({ page }) => {
+test('A1: tool output is collapsed behind individual calls by default', async ({ page }) => {
   await page.goto(ROUTE);
   // the group renders collapsed — no output block on screen yet
   await expect(page.getByTestId('tool-output')).toHaveCount(0);
@@ -32,9 +19,10 @@ test('A1: tool output is collapsed behind the group toggle by default', async ({
   await expect(toggle(page)).toBeVisible();
 });
 
-test('A2: expanding the group reveals one standalone block per tool output', async ({ page }) => {
+test('A2: expanding calls reveals one standalone block per tool output', async ({ page }) => {
   await page.goto(ROUTE);
-  await toggle(page).click();
+  if ((await toggle(page).getAttribute('aria-expanded')) !== 'true') await toggle(page).click();
+  for (const call of await page.getByTestId('work-call').all()) await call.click();
   const outputs = page.getByTestId('tool-output');
   await expect(outputs).toHaveCount(2);
   // verbatim stdout, whitespace preserved
@@ -47,8 +35,16 @@ test('A3: the output block is left aligned, mono, normal contrast — not a chat
   page,
 }) => {
   await page.goto(ROUTE);
-  await toggle(page).click();
-  const ink = await primaryInk(page);
+  if ((await toggle(page).getAttribute('aria-expanded')) !== 'true') await toggle(page).click();
+  for (const call of await page.getByTestId('work-call').all()) await call.click();
+  const ink = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--foreground)';
+    document.body.appendChild(probe);
+    const c = getComputedStyle(probe).color;
+    probe.remove();
+    return c;
+  });
   const box = await page.getByTestId('tool-output').first().evaluate((el) => {
     const cs = getComputedStyle(el);
     return {

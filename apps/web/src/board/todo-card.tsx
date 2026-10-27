@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
-import { formatUsd, NO_PRICE_REASON } from '../api/mappers.js';
+import { formatUsd, NO_PRICE_REASON, usageCostKnown } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
@@ -33,6 +33,7 @@ import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { PHASE_UI } from '../phase.js';
+import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { type CardFace, cardFace } from './columns.js';
 import { orchestrationErrorSummary } from './orchestration-error.js';
 import { relativeTime } from './rel-time.js';
@@ -96,6 +97,7 @@ export function TodoCard({
   const { t } = useI18n();
   const { search } = useLocation();
   const { live } = useLiveData();
+  const openInPlace = useOpenTaskInPlace();
   const face = cardFace(todo);
   const project = live ? projectName : (projectName ?? PROJECT_NAME);
   const suspended = suspension(todo);
@@ -155,6 +157,7 @@ export function TodoCard({
           className="todo-card-link rounded-sm text-inherit no-underline after:absolute after:inset-0 after:content-[''] [-webkit-user-drag:none]"
           to={{ pathname: `/app/todo/${todo.id}`, search }}
           draggable={false}
+          onClick={(event) => openInPlace(event, todo.id)}
         >
           {todo.title}
         </Link>
@@ -193,10 +196,10 @@ export function TodoCard({
             {todo.usageCost !== undefined && (
               <span
                 data-testid="card-cost"
-                title={todo.usageCost.total > 0 ? undefined : t(NO_PRICE_REASON)}
+                title={usageCostKnown(todo.usageCost) ? undefined : t(NO_PRICE_REASON)}
                 className={`${META_ITEM} tabular-nums`}
               >
-                {todo.usageCost.total > 0 ? formatUsd(todo.usageCost.total) : '—'}
+                {usageCostKnown(todo.usageCost) ? formatUsd(todo.usageCost.total) : '—'}
               </span>
             )}
             {face.kind === 'done' && face.canceled && (

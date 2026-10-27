@@ -7,6 +7,7 @@ import {
   chief as chiefTable,
   chiefThread,
   machine as machineTable,
+  project as projectTable,
   step as stepTable,
 } from '../src/db/schema.js';
 import {
@@ -235,6 +236,30 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).toContain('ADR 0026');
     expect(prompt).not.toContain('合并（merge）动作只由人触发');
     expect(prompt).toContain('措辞→spec');
+  });
+
+  test('systemPrompt lists each project with its description and carries the project-attribution rule (#1920)', () => {
+    H.s.db
+      .update(projectTable)
+      .set({ description: '官网 cairn.xmon.me 的静态站点' })
+      .where(eq(projectTable.id, H.projectId))
+      .run();
+    const prompt = composeChiefSystemPrompt(
+      {
+        db: H.s.db,
+        hub: H.s.hub,
+        machineHub: H.s.machineHub,
+        user: H.s.user,
+        skillsDir: H.s.skillsDir,
+      },
+      H.teamId,
+    );
+    expect(prompt).toContain('"description":"官网 cairn.xmon.me 的静态站点"');
+    expect(prompt).toContain('项目归属');
+    expect(prompt).toContain('先查再定');
+    expect(prompt).toContain('只列仍然分不出的候选');
+    expect(prompt).toContain('每个项目一张');
+    expect(prompt).toContain('只回答，不建任务');
   });
 
   test('systemPrompt dispatch-decision section: judgment discipline + three signals + review gate always present + receipt can override, static and independent of settings (#903)', () => {

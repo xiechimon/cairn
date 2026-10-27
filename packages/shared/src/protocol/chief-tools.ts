@@ -20,7 +20,7 @@ export const machineToolRelayResponseSchema = z.object({
 });
 export type MachineToolRelayResponse = z.infer<typeof machineToolRelayResponseSchema>;
 
-export const CHIEF_TOOLS_REMOVED = ['delete_skills'] as const;
+export const CHIEF_TOOLS_REMOVED = ['delete_skills', 'set_remote_shell'] as const;
 
 export const CHIEF_TOOLS_ADDED = [
   'create_skill',
@@ -68,7 +68,6 @@ export const CHIEF_TOOL_CATEGORIES = {
     'update_skill',
     'set_secret',
     'delete_secrets',
-    'set_remote_shell',
     'schedule_todo',
     'unschedule_todo',
   ],
@@ -357,13 +356,17 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'update_todo',
-    description: 'Update fields of a todo (title/spec/tags/order).',
+    description:
+      'Update fields of a todo (title/spec/tags/order), or move an unstarted todo to another project.',
     parameters: obj(
       {
         todoId: str('Todo id.'),
         title: str('Optional new title.'),
         spec: str('Optional new spec.'),
         tagIds: idArr('Optional replacement tag ids.'),
+        projectId: str(
+          'Optional target project id. Only for a todo that has not started; its tags are dropped.',
+        ),
       },
       ['todoId'],
     ),
@@ -507,14 +510,6 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     name: 'delete_secrets',
     description: 'Delete team secrets by name or id.',
     parameters: obj({ names: idArr('Secret names or ids to delete.') }, ['names']),
-  },
-  {
-    name: 'set_remote_shell',
-    description: 'Grant or revoke the remote shell permission switch of an agent.',
-    parameters: obj(
-      { agentId: str('Agent id.'), enabled: { type: 'boolean', description: 'Grant or revoke.' } },
-      ['agentId', 'enabled'],
-    ),
   },
   {
     name: 'schedule_todo',
@@ -717,7 +712,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-export const CHIEF_TOOL_COUNT = 53;
+export const CHIEF_TOOL_COUNT = 52;
 
 export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {

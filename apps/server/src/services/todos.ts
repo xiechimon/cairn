@@ -9,10 +9,12 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
+  canMoveTodoProject,
   DONE_ANNOUNCEMENT,
   derivePlaceholderTitle,
   githubIssueSourceRef,
   IN_PROGRESS_PHASES,
+  isStartedTodo,
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
@@ -25,6 +27,7 @@ import {
   machine,
   message,
   plan as planTable,
+  schedule,
   steerPending,
   step,
   stopPending,
@@ -35,7 +38,7 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
+import { githubCloseIssue, githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
 import {
@@ -117,6 +120,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
       cacheRead: sql<number>`coalesce(sum(${tokenUsage.costCacheRead}), 0)`,
       cacheWrite: sql<number>`coalesce(sum(${tokenUsage.costCacheWrite}), 0)`,
       total: sql<number>`coalesce(sum(${tokenUsage.costTotal}), 0)`,
+      priced: sql<number>`count(${tokenUsage.costTotal})`,
     })
     .from(tokenUsage)
     .innerJoin(build, eq(build.id, tokenUsage.buildId))
@@ -159,6 +163,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
             cacheRead: usage.cacheRead,
             cacheWrite: usage.cacheWrite,
             total: usage.total,
+            ...(usage.priced > 0 ? (usage.total === 0 ? { priced: true } : {}) : { priced: false }),
           },
         }
       : {}),
@@ -235,6 +240,21 @@ export function getTodo(deps: TodoDeps, id: string): TodoRecord | null {
   return row ? toTodoRecord(deps, row) : null;
 }
 
+function assertTagsInProject(db: Db, projectId: string, tagIds: readonly string[]): void {
+  if (tagIds.length === 0) return;
+  const owned = new Set(
+    db
+      .select({ id: tag.id })
+      .from(tag)
+      .where(and(eq(tag.projectId, projectId), inArray(tag.id, [...tagIds])))
+      .all()
+      .map((r) => r.id),
+  );
+  for (const tagId of tagIds) {
+    if (!owned.has(tagId)) throw new HttpError(400, `tag ${tagId} not in project`);
+  }
+}
+
 export function createTodo(
   deps: TodoDeps,
   input: {
@@ -254,19 +274,7 @@ export function createTodo(
 ): TodoRecord {
   const { db, hub } = deps;
   const tagIds = [...new Set(input.tagIds ?? [])];
-  if (tagIds.length > 0) {
-    const owned = new Set(
-      db
-        .select({ id: tag.id })
-        .from(tag)
-        .where(and(eq(tag.projectId, input.projectId), inArray(tag.id, tagIds)))
-        .all()
-        .map((r) => r.id),
-    );
-    for (const tagId of tagIds) {
-      if (!owned.has(tagId)) throw new HttpError(400, `tag ${tagId} not in project`);
-    }
-  }
+  assertTagsInProject(db, input.projectId, tagIds);
   const seqRow = db
     .select({ n: max(todo.seqNum) })
     .from(todo)
@@ -342,6 +350,7 @@ export function updateTodo(
     phase?: Phase;
     tagIds?: string[];
     orderIndex?: number;
+    projectId?: string;
     assignment?: {
       plan?: NonNullable<Assignment['plan']>;
       build?: NonNullable<Assignment['build']>;
@@ -356,6 +365,11 @@ export function updateTodo(
   if (!row) return null;
 
   const sets: Partial<TodoRow> = {};
+  const move =
+    patch.projectId !== undefined && patch.projectId !== row.projectId
+      ? planProjectMove(deps, row, patch.projectId, patch.tagIds ?? [])
+      : null;
+  if (move !== null) Object.assign(sets, move.sets);
   if (patch.title !== undefined) sets.title = patch.title;
   if (patch.spec !== undefined) {
     sets.spec = patch.spec;
@@ -407,6 +421,13 @@ export function updateTodo(
     sets.v = row.v + 1;
     db.update(todo).set(sets).where(eq(todo.id, id)).run();
   }
+  if (move !== null) {
+    db.update(schedule)
+      .set({ projectId: move.sets.projectId })
+      .where(eq(schedule.todoId, id))
+      .run();
+    if (patch.tagIds === undefined) db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
+  }
   if (patch.tagIds !== undefined) {
     db.delete(todoTag).where(eq(todoTag.todoId, id)).run();
     for (const tagId of patch.tagIds) {
@@ -431,11 +452,84 @@ export function updateTodo(
   const record = getTodo(deps, id);
   if (!record) return null;
   hub.publishTodoDoc(record.teamId, record);
+  if (move?.closeIssueRef != null) scheduleMovedIssueClose(deps, row.teamId, move);
+  if (move !== null && record.sourceKind === 'github-issue-self') {
+    scheduleSelfIssueCreate(deps, id);
+  }
   if (patch.phase !== undefined && !manualPhaseApplied) {
     notifyPhaseEntry(deps, record, row.phase, patch.phase);
   }
   if (sets.phase === 'done') settleSplitOnDone(deps, id);
   return record;
+}
+
+interface ProjectMove {
+  sets: Pick<TodoRow, 'projectId' | 'orderIndex'> &
+    Partial<Pick<TodoRow, 'sourceKind' | 'sourceRef'>>;
+  closeIssueRef: string | null;
+  targetName: string;
+}
+
+function planProjectMove(
+  deps: TodoDeps,
+  row: TodoRow,
+  projectId: string,
+  tagIds: readonly string[],
+): ProjectMove {
+  const target = projectOfTodo(deps.db, { projectId, teamId: row.teamId });
+  if (target === undefined) throw new HttpError(404, `project ${projectId}`);
+  assertTagsInProject(deps.db, target.id, tagIds);
+  if (!canMoveTodoProject(row)) {
+    throw new HttpError(
+      409,
+      row.sourceKind === 'github-issue'
+        ? '从 GitHub issue 导入的任务不能换项目'
+        : '这张卡已经开始了，不能换项目',
+    );
+  }
+  if (selfIssueInFlight.has(row.id)) {
+    throw new HttpError(409, '正在给这张卡开 GitHub issue，稍后再换项目');
+  }
+  const orderRow = deps.db
+    .select({ n: max(todo.orderIndex) })
+    .from(todo)
+    .where(and(eq(todo.projectId, target.id), eq(todo.phase, 'todo')))
+    .get();
+  const sets: ProjectMove['sets'] = { projectId: target.id, orderIndex: (orderRow?.n ?? -1) + 1 };
+  const targetOpensIssues = planSelfIssue(deps, row.teamId, target.id) !== null;
+  const dropsIssue = row.sourceKind === 'github-issue-self' && !targetOpensIssues;
+  if (dropsIssue) {
+    sets.sourceKind = null;
+    sets.sourceRef = null;
+  } else if (row.sourceKind === null && targetOpensIssues) {
+    sets.sourceKind = 'github-issue-self';
+  }
+  return {
+    sets,
+    closeIssueRef: dropsIssue ? row.sourceRef : null,
+    targetName: target.name,
+  };
+}
+
+function scheduleMovedIssueClose(deps: TodoDeps, teamId: string, move: ProjectMove): void {
+  const parsed = move.closeIssueRef === null ? null : parseGithubIssueSourceRef(move.closeIssueRef);
+  if (parsed === null || deps.box === undefined) return;
+  void teamGithubToken(deps, teamId)
+    .then((access) =>
+      'token' in access
+        ? githubCloseIssue(
+            deps.githubFetch ?? fetch,
+            access.token,
+            parsed.owner,
+            parsed.repo,
+            parsed.issueNumber,
+            `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
+          )
+        : console.warn(`moved todo: no GitHub token to close ${move.closeIssueRef}`),
+    )
+    .catch((error: unknown) =>
+      console.warn(`moved todo: closing ${move.closeIssueRef} failed`, error),
+    );
 }
 
 export function setTodoPhase(
@@ -514,17 +608,6 @@ export function settleSplitOnDone(deps: TodoDeps, childId: string): void {
   }
 }
 
-export function isStartedTodoRow(row: {
-  phase: Phase;
-  latestBuildId: string | null;
-  lastRunAt: number | null;
-  hasChanges: boolean;
-  hasPlan: boolean;
-}): boolean {
-  if ((IN_PROGRESS_PHASES as readonly string[]).includes(row.phase)) return true;
-  return row.latestBuildId != null || row.lastRunAt != null || row.hasChanges || row.hasPlan;
-}
-
 export function resetTodo(
   deps: TodoDeps & { convHub?: ConversationStreamHub },
   id: string,
@@ -541,7 +624,7 @@ export function resetTodo(
   if (expected?.buildId !== undefined && expected.buildId !== row.latestBuildId) {
     return { stale: true, record: current };
   }
-  if (!isStartedTodoRow(row)) return { stale: false, record: current };
+  if (!isStartedTodo(row)) return { stale: false, record: current };
 
   const buildRows = db.select().from(build).where(eq(build.todoId, id)).all();
   const buildIds = buildRows.map((b) => b.id);
@@ -636,9 +719,16 @@ function scheduleSelfIssueCreate(deps: TodoDeps, todoId: string): void {
 async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoRecord | null> {
   const { db, hub, box } = deps;
   const row = getRow(deps, todoId);
-  if (row?.sourceKind !== 'github-issue-self' || row.sourceRef !== null) return null;
-  if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
+  if (row?.sourceKind !== 'github-issue-self') return null;
   const repoRef = githubRepoOfProject(projectOfTodo(db, row));
+  const replaced = row.sourceRef === null ? null : parseGithubIssueSourceRef(row.sourceRef);
+  const replacesOtherRepo =
+    replaced !== null &&
+    repoRef !== null &&
+    `${replaced.owner}/${replaced.repo}`.toLowerCase() !==
+      `${repoRef.owner}/${repoRef.repo}`.toLowerCase();
+  if (row.sourceRef !== null && !replacesOtherRepo) return null;
+  if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
   if (repoRef === null) throw new HttpError(404, 'project is not github-backed');
   const access = await teamGithubToken(deps, row.teamId);
   if (!('token' in access)) throw new HttpError(404, 'github connection not found');
@@ -648,7 +738,7 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
     body: row.spec,
   });
   const fresh = getRow(deps, todoId);
-  if (!fresh || fresh.sourceRef !== null) return null;
+  if (!fresh || fresh.sourceRef !== row.sourceRef) return null;
   const ref = githubIssueSourceRef(owner, repo, number);
   db.update(todo)
     .set({ sourceRef: ref, v: fresh.v + 1 })
@@ -656,6 +746,23 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
     .run();
   const record = getTodo(deps, todoId);
   if (record) hub.publishTodoDoc(record.teamId, record);
+  if (replaced !== null) {
+    const closeAccess = await teamGithubToken(deps, row.teamId);
+    if ('token' in closeAccess) {
+      await githubCloseIssue(
+        deps.githubFetch ?? fetch,
+        closeAccess.token,
+        replaced.owner,
+        replaced.repo,
+        replaced.issueNumber,
+        `Cairn：这个任务挪到了 ${owner}/${repo}#${number}，这里的 issue 关闭。`,
+      ).catch((error: unknown) =>
+        console.warn(`moved todo: closing ${row.sourceRef} failed`, error),
+      );
+    } else {
+      console.warn(`moved todo: no GitHub token to close ${row.sourceRef}`);
+    }
+  }
   return record;
 }
 
@@ -665,7 +772,6 @@ export async function retrySelfIssueCreate(deps: TodoDeps, todoId: string): Prom
   if (row.sourceKind !== 'github-issue-self') {
     throw new HttpError(404, 'todo has no self-created github issue');
   }
-  if (row.sourceRef !== null) throw new HttpError(409, 'github issue already created');
   if (selfIssueInFlight.has(todoId)) {
     throw new HttpError(409, 'github issue creation already in flight');
   }

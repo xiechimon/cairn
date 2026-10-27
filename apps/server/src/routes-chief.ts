@@ -18,6 +18,7 @@ import {
   sendChiefMessage,
 } from './services/chief.js';
 import { answerQuestion, cancelQuestion, parseAnswerBody } from './services/chief-questions.js';
+import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { isChiefConversation } from './services/machines.js';
 
 export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
@@ -45,9 +46,10 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/chief/threads', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
+    const raw = (await jsonBody(c)) as { content?: unknown; projectId?: unknown };
     const body = parseWith(
       chiefSendMessageBodySchema,
-      { threadId: null, content: ((await jsonBody(c)) as { content?: unknown })?.content },
+      { threadId: null, content: raw?.content, projectId: raw?.projectId },
       'body',
     );
     const result = sendChiefMessage(svc, teamId, body);
@@ -60,6 +62,24 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const body = parseWith(chiefRewindBodySchema, await jsonBody(c), 'body');
     return c.json(rewindChiefThread(svc, teamId, c.req.param('tid'), body));
+  });
+
+  app.delete('/api/teams/:id/chief/threads/:tid/messages/:mid', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(withdrawChiefMessage(svc, teamId, c.req.param('tid'), c.req.param('mid')));
+  });
+
+  app.post('/api/teams/:id/chief/threads/:tid/messages/:mid/steer', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(steerChiefMessage(svc, teamId, c.req.param('tid'), c.req.param('mid')));
+  });
+
+  app.post('/api/teams/:id/chief/threads/:tid/stop', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(stopChiefTurn(svc, teamId, c.req.param('tid')));
   });
 
   app.post('/api/teams/:id/chief/threads/:tid/questions/:requestId/answer', async (c) => {
@@ -100,12 +120,12 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       ctx.convHub?.publishMessage(conversationId, { ...result.message });
       return c.json(result, 201);
     }
-    const raw = (await jsonBody(c)) as { content?: unknown };
+    const raw = (await jsonBody(c)) as { content?: unknown; projectId?: unknown };
     const thread = getChiefThread(svc, conversationId);
     if (!thread) throw notFound(`conversation ${conversationId}`);
     const body = parseWith(
       chiefSendMessageBodySchema,
-      { threadId: conversationId, content: raw?.content },
+      { threadId: conversationId, content: raw?.content, projectId: raw?.projectId },
       'body',
     );
     const result = sendChiefMessage(svc, thread.teamId, body);

@@ -39,6 +39,10 @@ test('detail round trip keeps the column scroll position', async ({ page }) => {
     return listEl instanceof HTMLElement ? listEl.scrollTop : 0;
   });
   expect(leftAt).toBeGreaterThan(200);
+  await page
+    .getByRole('complementary', { name: '任务面板' })
+    .getByRole('link', { name: '展开为整页' })
+    .evaluate((el: HTMLAnchorElement) => el.click());
   await page.waitForSelector('[data-route="todo-detail"]');
 
   await page.keyboard.press('Escape');

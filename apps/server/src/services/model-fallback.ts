@@ -1,6 +1,8 @@
 import {
   classifyStepFailure,
+  isBackendRuntimeId,
   isProviderAuthFailure,
+  isProviderOutage,
   type MachineDoneBody,
   type ModelRef,
   type StepKind,
@@ -17,16 +19,33 @@ type StepRow = typeof step.$inferSelect;
 
 export const FALLBACK_STEP_KINDS: readonly StepKind[] = ['plan', 'build'];
 
-export type FallbackTrigger = 'quota' | 'model_unavailable' | 'auth';
+const MODEL_FALLBACK_STEP_KINDS: readonly StepKind[] = [...FALLBACK_STEP_KINDS, 'chief'];
+
+export type FallbackTrigger =
+  | 'quota'
+  | 'model_unavailable'
+  | 'auth'
+  | 'capacity'
+  | 'provider_outage'
+  | 'network';
 
 const TRIGGER_TEXT: Record<FallbackTrigger, string> = {
   quota: '额度用完',
   model_unavailable: '模型不可用',
   auth: '认证失败',
+  capacity: '限流',
+  provider_outage: '服务暂时不可用',
+  network: 'network connection failed',
 };
 
 export function modelKey(m: ModelRef): string {
   return `${m.provider}/${m.modelId}`;
+}
+
+const GIT_FAILURE_PREFIX_RE = /^git [a-z-]+ failed \(/;
+
+export function isGitFailure(message: string): boolean {
+  return GIT_FAILURE_PREFIX_RE.test(message.trim());
 }
 
 export function effectiveModel(
@@ -38,12 +57,18 @@ export function effectiveModel(
 
 export function fallbackTriggerOf(outcome: MachineDoneBody): FallbackTrigger | null {
   if (outcome.status !== 'failed') return null;
-  if (outcome.quotaBlock !== undefined) return outcome.quotaBlock.kind === 'quota' ? 'quota' : null;
+  if (outcome.quotaBlock !== undefined) {
+    return outcome.quotaBlock.kind === 'quota' ? 'quota' : 'capacity';
+  }
   const msg = outcome.errorMessage ?? '';
+  if (isGitFailure(msg)) return null;
   const kind = classifyStepFailure(msg);
   if (kind === 'quota') return 'quota';
   if (kind === 'model_unavailable') return 'model_unavailable';
+  if (kind === 'capacity') return 'capacity';
+  if (kind === 'network') return 'network';
   if (kind === 'other' && isProviderAuthFailure(msg)) return 'auth';
+  if (isProviderOutage(msg)) return 'provider_outage';
   return null;
 }
 
@@ -51,9 +76,13 @@ export function isProviderFailure(outcome: MachineDoneBody): boolean {
   if (outcome.status !== 'failed') return false;
   if (outcome.quotaBlock !== undefined) return true;
   const msg = outcome.errorMessage ?? '';
+  if (isGitFailure(msg)) return false;
   const kind = classifyStepFailure(msg);
   return (
-    kind === 'quota' || kind === 'capacity' || (kind === 'other' && isProviderAuthFailure(msg))
+    kind === 'quota' ||
+    kind === 'capacity' ||
+    kind === 'network' ||
+    (kind === 'other' && (isProviderAuthFailure(msg) || isProviderOutage(msg)))
   );
 }
 
@@ -82,7 +111,7 @@ export function planModelFallback(
   agentRow: AgentRow | null,
   outcome: MachineDoneBody,
 ): FallbackPlan | null {
-  if (!FALLBACK_STEP_KINDS.includes(stepRow.kind)) return null;
+  if (!MODEL_FALLBACK_STEP_KINDS.includes(stepRow.kind)) return null;
   const trigger = fallbackTriggerOf(outcome);
   if (trigger === null) return null;
   const chain = agentRow?.fallbackModels ?? [];
@@ -97,6 +126,10 @@ export function planModelFallback(
   const to = chain.find(
     (m) =>
       !tried.has(modelKey(m)) &&
+      (stepRow.kind !== 'chief' ||
+        (isBackendRuntimeId(m.provider) || isBackendRuntimeId(primary.provider)
+          ? m.provider === primary.provider
+          : true)) &&
       runtimeGatePasses(machineRow, m.provider) &&
       getModelLiveness(m.provider, m.modelId) !== 'dead' &&
       providerHealth.tryAcquire(m.provider),

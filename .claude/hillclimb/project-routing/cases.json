@@ -1,0 +1,239 @@
+{
+  "flow": "project-routing",
+  "note": "#1920: with several projects in the team, does the Chief put each todo in the right project, ask only when candidates stay tied after investigating, split a cross-project request into one todo per project, and answer questions without creating todos. Cases with a chip send the composer's picked project with the message (#2009): the todo must land there even when the text alone is tied or points elsewhere, and a question still creates nothing. Graded on the final todo rows (projectId), not the transcript.",
+  "roster": [
+    {
+      "key": "exec-glm-5.3",
+      "displayName": "执行位1",
+      "modelId": "glm-5.3",
+      "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
+    },
+    {
+      "key": "exec-kimi-k3",
+      "displayName": "执行位2",
+      "modelId": "kimi-k3",
+      "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
+    },
+    {
+      "key": "exec-qwen3.8-max",
+      "displayName": "执行位3",
+      "modelId": "qwen3.8-max",
+      "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
+    },
+    {
+      "key": "exec-deepseek-v4-pro",
+      "displayName": "执行位4",
+      "modelId": "deepseek-v4-pro",
+      "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
+    }
+  ],
+  "cases": [
+    {
+      "id": "n01",
+      "tags": [
+        "named"
+      ],
+      "prompt": "在 docs-site 的定价页下面加一段常见问题，回答「自托管要不要钱」。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "docs-site"
+        ]
+      }
+    },
+    {
+      "id": "n02",
+      "tags": [
+        "named"
+      ],
+      "prompt": "给 bench 的跑题脚本加一个 --limit 参数，只跑前 N 道题。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "bench"
+        ]
+      }
+    },
+    {
+      "id": "i01",
+      "tags": [
+        "inferable",
+        "broken-links"
+      ],
+      "prompt": "有个 README 里的链接点开是 404，帮我修一下。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "docs-site"
+        ]
+      }
+    },
+    {
+      "id": "i02",
+      "tags": [
+        "inferable"
+      ],
+      "prompt": "早上推到飞书群的那条摘要今天没收到，查一下推送那步。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "digest-bot"
+        ]
+      }
+    },
+    {
+      "id": "i03",
+      "tags": [
+        "inferable"
+      ],
+      "prompt": "跑分报告的通过率算得不对，跳过的题也被算进分母了。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "bench"
+        ]
+      }
+    },
+    {
+      "id": "i04",
+      "tags": [
+        "inferable"
+      ],
+      "prompt": "看板上拖动卡片换列，刷新一下又回到原来的列了。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "eval-project"
+        ]
+      }
+    },
+    {
+      "id": "i05",
+      "tags": [
+        "inferable"
+      ],
+      "prompt": "官网首页的标题改成「一个总管，带一群 Agent 干活」。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "docs-site"
+        ]
+      }
+    },
+    {
+      "id": "t01",
+      "tags": [
+        "tied"
+      ],
+      "prompt": "把 Python 最低版本从 3.11 升到 3.13。",
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "digest-bot",
+          "bench"
+        ]
+      }
+    },
+    {
+      "id": "t02",
+      "tags": [
+        "tied"
+      ],
+      "prompt": "README 里的联系邮箱 team@example.com 换成 hi@cairn.dev。",
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "docs-site",
+          "digest-bot"
+        ]
+      }
+    },
+    {
+      "id": "x01",
+      "tags": [
+        "cross"
+      ],
+      "prompt": "导出接口要支持 CSV 格式，官网的文档也要把这个新格式写上。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "eval-project",
+          "docs-site"
+        ]
+      }
+    },
+    {
+      "id": "x02",
+      "tags": [
+        "cross"
+      ],
+      "prompt": "每天的信息雷达摘要末尾加一行当天的跑分通过率，跑分那边要先把通过率写成一个能读的文件。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "digest-bot",
+          "bench"
+        ]
+      }
+    },
+    {
+      "id": "q01",
+      "tags": [
+        "answer"
+      ],
+      "prompt": "digest-bot 是用什么语言写的？",
+      "expect": {
+        "kind": "answer"
+      }
+    },
+    {
+      "id": "q02",
+      "tags": [
+        "answer"
+      ],
+      "prompt": "官网和看板服务是同一个项目吗？",
+      "expect": {
+        "kind": "answer"
+      }
+    },
+    {
+      "id": "c01",
+      "tags": [
+        "chip"
+      ],
+      "chip": "digest-bot",
+      "prompt": "把 Python 最低版本从 3.11 升到 3.13。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "digest-bot"
+        ]
+      }
+    },
+    {
+      "id": "c02",
+      "tags": [
+        "chip"
+      ],
+      "chip": "bench",
+      "prompt": "有个 README 里的链接点开是 404，帮我修一下。",
+      "expect": {
+        "kind": "route",
+        "projects": [
+          "bench"
+        ]
+      }
+    },
+    {
+      "id": "c03",
+      "tags": [
+        "chip"
+      ],
+      "chip": "digest-bot",
+      "prompt": "digest-bot 是用什么语言写的？",
+      "expect": {
+        "kind": "answer"
+      }
+    }
+  ]
+}

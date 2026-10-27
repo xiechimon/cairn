@@ -108,12 +108,13 @@ test('card face is selection- and native-drag-locked (no `小链接` anywhere)',
   await expect(page.getByTestId('drag-overlay')).toHaveCount(0);
 });
 
-test('plain click on a done card still navigates to the detail route', async ({ page }) => {
+test('plain click on a done card opens it in the task panel and the card stays a link (#1937)', async ({ page }) => {
   await page.goto('/app?scenario=01&view=board');
   const card = page.locator('[data-column="done"] [data-todo-id]').first();
   const id = await card.getAttribute('data-todo-id');
+  await expect(card.locator('a.todo-card-link')).toHaveAttribute('href', new RegExp(`/app/todo/${id}`));
   await card.click();
-  // SPA pushState keeps the scenario query — match the path, not the full URL
-  await page.waitForURL((u) => u.pathname === `/app/todo/${id}`);
-  expect(new URL(page.url()).pathname).toBe(`/app/todo/${id}`);
+  await page.waitForURL((u) => u.searchParams.get('task') === id);
+  expect(new URL(page.url()).pathname).toBe('/app');
+  await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
 });

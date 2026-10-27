@@ -58,5 +58,95 @@
     "path": "apps/server/src/services/machine-step-token.ts",
     "name": "chiefStepToken",
     "reason": "Moved verbatim from services/machines.ts (#1522); the split is move-only, so inlining is deferred."
+  },
+  {
+    "path": "apps/web/src/chief/chief-conversation.tsx",
+    "name": "readStoredChiefDraft",
+    "reason": "Moved unchanged from chief-drawer.tsx when the drawer body became the shared ChiefConversation; the try/catch around localStorage would bloat the useState initializer"
+  },
+  {
+    "path": "apps/web/src/chief/chief-conversation.tsx",
+    "name": "copyText",
+    "reason": "Moved unchanged from chief-drawer.tsx; passed as the onCopy callback of every message row, not called inline"
+  },
+  {
+    "path": "apps/web/src/chief/chief-conversation.tsx",
+    "name": "toggleTools",
+    "reason": "Moved unchanged from chief-drawer.tsx; passed as the onToggleTools callback of every message row, not called inline"
+  },
+  {
+    "path": "apps/web/src/chief/chief-message-rows.tsx",
+    "name": "HandoffRow",
+    "reason": "React component that reads TodoGlanceContext with its own hook; inlining it would put useContext inside the row switch"
+  },
+  {
+    "path": "apps/web/src/api/mappers.ts",
+    "name": "handoffTodoOf",
+    "reason": "Named predicate for a successful message_todo call; inlining it puts four guards inside the stream collection loop"
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "OpenPanel",
+    "reason": "React component mounted only while the panel is open; it owns the Escape listener and the focus effect, so inlining would run them behind the early return in TaskPanel."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "ListView",
+    "reason": "React component with its own fold state hooks, rendered only in the list branch; inlining would call useState conditionally."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "TaskRow",
+    "reason": "React component rendered inside the group map with its own i18n hook; inlining would call hooks from the loop."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "TaskDetail",
+    "reason": "React component keyed by task id so its composer ref and children reset per task; inlining loses the key boundary and calls hooks conditionally."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "LastSummary",
+    "reason": "React component that owns the messages query for one task, rendered only when the task is known; inlining would call the query hook conditionally."
+  },
+  {
+    "path": "apps/web/src/task-panel/task-panel.tsx",
+    "name": "PanelComposer",
+    "reason": "React component that owns the steps query, mutations and draft state for one task, rendered only when the task is known; inlining would call those hooks conditionally."
+  },
+  {
+    "path": "apps/server/src/services/todos.ts",
+    "name": "planProjectMove",
+    "reason": "Validates a project move (target team, tags, started, imported issue, issue in flight) and computes its column slot and issue plan; inlining would put five early exits and the self-issue branching into the middle of updateTodo's patch flow."
+  },
+  {
+    "path": "apps/server/src/services/todos.ts",
+    "name": "scheduleMovedIssueClose",
+    "reason": "Fire-and-forget GitHub close of the old self-created issue after a move; inlining would put an async token lookup and its error logging inside the synchronous updateTodo."
+  },
+  {
+    "path": "apps/server/src/services/chief-turns.ts",
+    "name": "createdTodoIdOf",
+    "reason": "Parses one tool row into a created todo id with four guards and a JSON try/catch; inlining it puts all of that inside the stop row's filter loop"
+  },
+  {
+    "path": "apps/server/src/services/machine-finish-step.ts",
+    "name": "chiefStepAgent",
+    "reason": "Three-table join from a chief step to its agent; inlining it puts the query in the middle of finishStep's outcome branching"
+  },
+  {
+    "path": "apps/web/src/chief/chief-message-rows.tsx",
+    "name": "StoppedRow",
+    "reason": "React component with its own i18n hook; inlining it would call the hook from inside the row switch"
+  },
+  {
+    "path": "apps/web/src/api/mappers.ts",
+    "name": "workCall",
+    "reason": "Classifies one tool call into a work step across six tool families; inlining puts 70 lines of branching inside the mapTranscript message loop"
+  },
+  {
+    "path": "apps/web/src/detail/work-trace.tsx",
+    "name": "WorkStepRow",
+    "reason": "React component with its own open-state hook, rendered inside the steps map; inlining would call hooks from the loop"
   }
 ]

@@ -3,18 +3,25 @@ import {
   assertSkillInjection,
   buildSecondPrWarningNote,
   CHANGES_DIFF_MAX_BYTES,
+  CHIEF_MODEL_FALLBACK_KIND,
   CHIEF_TURN_ERROR_KIND,
+  type ChiefModelFallbackContent,
   classifyStepFailure,
+  conversationBranch,
+  QUOTA_BLOCK_REASON_MAX_CHARS,
   SKILL_INJECTION_CHECK_KIND,
   type SkillInjectionFacts,
   secondPrWarningNoteRowId,
   skillFactsFromContents,
 } from '@cairn/shared';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   type agent,
+  agent as agentTable,
   build,
+  chief,
   chiefMessage,
+  chiefThread,
   machine,
   message,
   type StepFallbackRow,
@@ -24,21 +31,33 @@ import {
   tokenUsage,
 } from '../db/schema.js';
 import { conflict } from '../lib/errors.js';
+import { githubBranchPulls } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
 import {
   applyStepFailure,
   applyStoppedStep,
   completeStep,
+  enqueueStep,
   mergedPrElsewhere,
+  noteDeliveredPlanResidual,
   reportedVerdictHeads,
   toBuildRecord,
 } from './builds.js';
 import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
 import { cancelPendingQuestions } from './chief-questions.js';
+import { recordChiefStop, releaseUnconsumedSteer } from './chief-turns.js';
+import {
+  buildCiFixPrompt,
+  CI_FIX_PROMPT_HEAD,
+  CI_FIX_ROUNDS_MAX,
+  countMarkedRounds,
+  deadLoopMessage,
+} from './ci-loop.js';
 import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
-import { diffTextNamesAFile, parseUnifiedDiff } from './git.js';
+import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
+import { githubTokenOrNull } from './github-connection.js';
 import {
   agentForStep,
   isChiefConversation,
@@ -58,6 +77,7 @@ import {
 import {
   effectiveModel,
   isZeroUsageSilentSuccess,
+  modelKey,
   planModelFallback,
   recordProviderOutcome,
   ZERO_USAGE_FAILURE,
@@ -66,6 +86,7 @@ import {
 import { markModelDead } from './model-liveness.js';
 import { notifyModelFallback } from './notifications.js';
 import { applyQuotaWaitStep } from './quota-wait.js';
+import { costFromRates, ratesForModel } from './token-usage-cost.js';
 
 function holdStepForQuota(
   deps: MachineDeps,
@@ -184,11 +205,52 @@ export async function finishStep(
           ?.teamId;
     if (found.machineId === machineId || released) {
       revokeStepGitCredential(deps, stepId);
+      if (body.status === 'failed') {
+        noteDeliveredPlanResidual(
+          deps,
+          found,
+          body.errorMessage?.trim() ? body.errorMessage : 'no reason reported',
+        );
+      }
       return;
     }
   }
   const stepRow = ownedStep(deps, machineId, stepId);
   revokeStepGitCredential(deps, stepId);
+  if (stepRow.kind === 'build') {
+    const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+    const todoRow = buildRow
+      ? db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
+      : undefined;
+    const project = todoRow ? projectOfTodo(db, todoRow) : null;
+    const repo = project ? githubRepoOfProject(project) : null;
+    if (repo !== null && todoRow) {
+      const token = await githubTokenOrNull(deps, todoRow.teamId);
+      const branch = conversationBranch(stepRow.buildId);
+      const pulls = await githubBranchPulls(
+        deps.githubFetch ?? fetch,
+        token,
+        repo.owner,
+        repo.repo,
+        { head: `${repo.owner}:${branch}`, state: 'open' },
+      );
+      const own = pulls
+        ?.filter(
+          (pull) =>
+            pull.state === 'open' &&
+            pull.headRef === branch &&
+            pull.headRepoId !== null &&
+            pull.headRepoId === pull.baseRepoId,
+        )
+        .sort((a, b) => b.number - a.number)[0];
+      if (own)
+        body = {
+          ...body,
+          prNumber: own.number,
+          prUrl: `https://github.com/${repo.owner}/${repo.repo}/pull/${own.number}`,
+        };
+    }
+  }
   let priorMerged: { prNumber: number; prUrl: string | null } | null = null;
   if (body.prUrl !== undefined && body.prNumber !== undefined) {
     const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
@@ -270,35 +332,51 @@ export async function finishStep(
   }
   const outcome: MachineDoneBody =
     landingError !== null ? { ...body, status: 'failed', errorMessage: landingError } : body;
+  const usageTeamId = stepTeamId(deps, stepRow);
   for (const u of outcome.usage ?? []) {
-    const cost = u.cost;
+    const prior = db
+      .select()
+      .from(tokenUsage)
+      .where(and(eq(tokenUsage.buildId, stepRow.buildId), eq(tokenUsage.model, u.model)))
+      .get();
+    const tokens = {
+      input: (prior?.input ?? 0) + u.input,
+      output: (prior?.output ?? 0) + u.output,
+      cacheRead: (prior?.cacheRead ?? 0) + u.cacheRead,
+      cacheWrite: (prior?.cacheWrite ?? 0) + u.cacheWrite,
+    };
+    const rates = ratesForModel(db, usageTeamId, u.model);
+    const reported = u.cost;
+    const cost = rates
+      ? costFromRates(tokens, rates)
+      : reported !== undefined &&
+          (reported.input !== 0 ||
+            reported.output !== 0 ||
+            reported.cacheRead !== 0 ||
+            reported.cacheWrite !== 0 ||
+            reported.total !== 0)
+        ? {
+            costInput: (prior?.costInput ?? 0) + reported.input,
+            costOutput: (prior?.costOutput ?? 0) + reported.output,
+            costCacheRead: (prior?.costCacheRead ?? 0) + reported.cacheRead,
+            costCacheWrite: (prior?.costCacheWrite ?? 0) + reported.cacheWrite,
+            costTotal: (prior?.costTotal ?? 0) + reported.total,
+          }
+        : null;
     db.insert(tokenUsage)
       .values({
         buildId: stepRow.buildId,
         model: u.model,
-        input: u.input,
-        output: u.output,
-        cacheRead: u.cacheRead,
-        cacheWrite: u.cacheWrite,
-        costInput: cost?.input ?? 0,
-        costOutput: cost?.output ?? 0,
-        costCacheRead: cost?.cacheRead ?? 0,
-        costCacheWrite: cost?.cacheWrite ?? 0,
-        costTotal: cost?.total ?? 0,
+        ...tokens,
+        costInput: cost?.costInput ?? null,
+        costOutput: cost?.costOutput ?? null,
+        costCacheRead: cost?.costCacheRead ?? null,
+        costCacheWrite: cost?.costCacheWrite ?? null,
+        costTotal: cost?.costTotal ?? null,
       })
       .onConflictDoUpdate({
         target: [tokenUsage.buildId, tokenUsage.model],
-        set: {
-          input: sql`${tokenUsage.input} + ${u.input}`,
-          output: sql`${tokenUsage.output} + ${u.output}`,
-          cacheRead: sql`${tokenUsage.cacheRead} + ${u.cacheRead}`,
-          cacheWrite: sql`${tokenUsage.cacheWrite} + ${u.cacheWrite}`,
-          costInput: sql`${tokenUsage.costInput} + ${cost?.input ?? 0}`,
-          costOutput: sql`${tokenUsage.costOutput} + ${cost?.output ?? 0}`,
-          costCacheRead: sql`${tokenUsage.costCacheRead} + ${cost?.cacheRead ?? 0}`,
-          costCacheWrite: sql`${tokenUsage.costCacheWrite} + ${cost?.cacheWrite ?? 0}`,
-          costTotal: sql`${tokenUsage.costTotal} + ${cost?.total ?? 0}`,
-        },
+        set: cost === null ? tokens : { ...tokens, ...cost },
       })
       .run();
   }
@@ -307,6 +385,28 @@ export async function finishStep(
   const zeroUsage = worker !== null && isZeroUsageSilentSuccess(stepRow.kind, outcome);
   if (worker?.agentRow) {
     recordProviderOutcome(effectiveModel(worker.agentRow, stepRow).provider, outcome, zeroUsage);
+  }
+  const chiefAgent = chiefStepAgent(deps, stepRow);
+  if (chiefAgent !== null) {
+    releaseUnconsumedSteer(db, stepRow);
+    recordProviderOutcome(effectiveModel(chiefAgent, stepRow).provider, outcome, false);
+    const plan = planModelFallback(db, stepRow, chiefAgent, outcome);
+    if (plan !== null) {
+      if (plan.trigger === 'model_unavailable') {
+        markModelDead(plan.from.provider, plan.from.modelId);
+      }
+      const content: ChiefModelFallbackContent = {
+        kind: CHIEF_MODEL_FALLBACK_KIND,
+        from: modelKey(plan.from),
+        to: modelKey(plan.to),
+        stepId: stepRow.id,
+      };
+      requeueStep(deps, stepRow, plan.row, {
+        id: `chief-fallback-${stepRow.id}-${plan.row.tried.length}`,
+        content: JSON.stringify(content),
+      });
+      return;
+    }
   }
   if (worker !== null) {
     const plan = planModelFallback(db, stepRow, worker.agentRow, outcome);
@@ -332,10 +432,23 @@ export async function finishStep(
   }
   if (
     outcome.status === 'failed' &&
-    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable' &&
-    worker?.agentRow
+    classifyStepFailure(outcome.errorMessage ?? '') === 'capacity'
   ) {
-    const ran = effectiveModel(worker.agentRow, stepRow);
+    const ranAgent = worker?.agentRow ?? chiefAgent;
+    const ran = ranAgent ? effectiveModel(ranAgent, stepRow) : null;
+    applyQuotaWaitStep(deps, stepRow, {
+      kind: 'capacity',
+      providerId: ran?.provider ?? '',
+      reason: (outcome.errorMessage ?? '').slice(0, QUOTA_BLOCK_REASON_MAX_CHARS),
+    });
+    return;
+  }
+  if (
+    outcome.status === 'failed' &&
+    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable'
+  ) {
+    const ranAgent = worker?.agentRow ?? chiefAgent;
+    const ran = ranAgent ? effectiveModel(ranAgent, stepRow) : { provider: null, modelId: null };
     if (ran.provider && ran.modelId) markModelDead(ran.provider, ran.modelId);
   }
   if (outcome.skillInjectionFacts !== undefined) {
@@ -343,9 +456,18 @@ export async function finishStep(
   }
   if (stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId)) {
     db.update(step)
-      .set({ status: outcome.status === 'success' ? 'done' : 'failed' })
+      .set({
+        status:
+          outcome.status === 'success'
+            ? 'done'
+            : outcome.status === 'stopped'
+              ? 'stopped'
+              : 'failed',
+        ...(outcome.status === 'stopped' ? { finishedAt: nowMs() } : {}),
+      })
       .where(eq(step.id, stepId))
       .run();
+    if (outcome.status === 'stopped') recordChiefStop(deps, stepRow);
     publishStepStatus(deps, stepId);
     cancelPendingQuestions(
       {
@@ -391,6 +513,41 @@ export async function finishStep(
       return;
     }
     applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictReport);
+    publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
+    return;
+  }
+  if (
+    stepRow.kind === 'build' &&
+    outcome.status === 'success' &&
+    outcome.pushHookOutput !== undefined &&
+    worker !== null &&
+    worker.todoRow.phase === 'building' &&
+    worker.todoRow.latestBuildId === stepRow.buildId
+  ) {
+    const rounds = countMarkedRounds(db, stepRow.buildId, CI_FIX_PROMPT_HEAD);
+    if (rounds >= CI_FIX_ROUNDS_MAX) {
+      applyStepFailure(deps, stepRow, deadLoopMessage(rounds), verdictReport);
+    } else {
+      db.update(step).set({ status: 'done', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
+      const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+      const prompt =
+        buildRow?.prNumber != null
+          ? buildCiFixPrompt({
+              prNumber: buildRow.prNumber,
+              prUrl: buildRow.prUrl,
+              round: rounds + 1,
+              failures: [{ name: 'local pre-push hook', conclusion: 'failure', summary: null }],
+            })
+          : `${CI_FIX_PROMPT_HEAD} Local pre-push hook rejected the closing push (round ${rounds + 1}/${CI_FIX_ROUNDS_MAX}).`;
+      enqueueStep(
+        deps,
+        stepRow.buildId,
+        'build',
+        worker.todoRow.teamId,
+        `${prompt}\n\n${outcome.pushHookOutput}\n\nFix the hook failures and push the same branch ${conversationBranch(stepRow.buildId)}. Do not create another branch or PR, bypass hooks, or merge the PR.`,
+      );
+    }
     publishStepStatus(deps, stepId);
     emitRuntimeStepSpan(deps.db, stepId);
     return;
@@ -461,12 +618,31 @@ function requeueStep(
     })
     .where(eq(step.id, stepRow.id))
     .run();
-  upsertMessage(deps, {
+  const noteRow = {
     id: note.id,
-    conversationId: stepRow.buildId,
-    role: 'system',
+    role: 'system' as const,
     content: note.content,
     createdAt: nowMs(),
-  });
+  };
+  if (isChiefConversation(stepRow.buildId)) {
+    upsertChiefRow(deps, { ...noteRow, threadId: stepRow.buildId });
+  } else {
+    upsertMessage(deps, { ...noteRow, conversationId: stepRow.buildId });
+  }
   publishStepStatus(deps, stepRow.id);
+}
+
+function chiefStepAgent(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+): typeof agent.$inferSelect | null {
+  if (stepRow.kind !== 'chief' || !isChiefConversation(stepRow.buildId)) return null;
+  const row = deps.db
+    .select({ agentRow: agentTable })
+    .from(chiefThread)
+    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
+    .innerJoin(agentTable, eq(chief.agentId, agentTable.id))
+    .where(eq(chiefThread.id, stepRow.buildId))
+    .get();
+  return row?.agentRow ?? null;
 }

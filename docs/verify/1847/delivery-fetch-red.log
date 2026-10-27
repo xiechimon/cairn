@@ -1,0 +1,69 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1847
+
+ ❯ |@xiechimon/cairn| test/delivery-surface.test.ts (8 tests | 4 failed) 20753ms
+   ❯ done channel delivery-surface backfill (#704 / B-C16) (7)
+     × failure mode 1: done carries prUrl/prNumber -> build row backfilled 5005ms
+     × failure mode 2: done without PR fields -> row stays null (no fabricated empty data) 5012ms
+     × failure mode 3: done carries changesDiff -> changes endpoint returns the real diff file set 5005ms
+     × failure mode 7: changesDiff empty string -> files empty and reported (empty commit) 5001ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/delivery-surface.test.ts > done channel delivery-surface backfill (#704 / B-C16) > failure mode 1: done carries prUrl/prNumber -> build row backfilled
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/delivery-surface.test.ts:122:3
+    120|
+    121| describe('done channel delivery-surface backfill (#704 / B-C16)', () =…
+    122|   test('failure mode 1: done carries prUrl/prNumber -> build row backf…
+       |   ^
+    123|     const w = await setupWorld();
+    124|     const buildId = await w.startBuild(w.githubProjectId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/delivery-surface.test.ts > done channel delivery-surface backfill (#704 / B-C16) > failure mode 2: done without PR fields -> row stays null (no fabricated empty data)
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/delivery-surface.test.ts:137:3
+    135|   });
+    136|
+    137|   test('failure mode 2: done without PR fields -> row stays null (no f…
+       |   ^
+    138|     const w = await setupWorld();
+    139|     const buildId = await w.startBuild(w.githubProjectId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/delivery-surface.test.ts > done channel delivery-surface backfill (#704 / B-C16) > failure mode 3: done carries changesDiff -> changes endpoint returns the real diff file set
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/delivery-surface.test.ts:147:3
+    145|   });
+    146|
+    147|   test('failure mode 3: done carries changesDiff -> changes endpoint r…
+       |   ^
+    148|     const w = await setupWorld();
+    149|     const buildId = await w.startBuild(w.githubProjectId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/delivery-surface.test.ts > done channel delivery-surface backfill (#704 / B-C16) > failure mode 7: changesDiff empty string -> files empty and reported (empty commit)
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/delivery-surface.test.ts:165:3
+    163|   });
+    164|
+    165|   test('failure mode 7: changesDiff empty string -> files empty and re…
+       |   ^
+    166|     const w = await setupWorld();
+    167|     const buildId = await w.startBuild(w.githubProjectId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 4 passed (8)
+   Start at  09:49:31
+   Duration  22.33s (tests 93%, transform 4%, import 3%)

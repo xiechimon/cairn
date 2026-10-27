@@ -1,0 +1,21 @@
+# Deterministic reproduction of the attachments grant-signature flake
+# Worktree: lane/1782 at e6aa4705, rebased on origin/main 4713294f
+# Command: apps/server/node_modules/.bin/tsx /tmp/cairn-1782-flake-repro.mts /mnt/fast/lanes/cairn-1782
+
+repro root: /mnt/fast/lanes/cairn-1782
+weak-tail grant found after 13 signed payloads
+sig        : LGDahL623nEmtnORA-HiW2sKnWC54iJqx4Xfi2MxiAA
+tampered   : eyJ0ZWFtSWQiOiIwYVVib1RCc0J0ZGJya2xpMnhGN1UiLCJrZXkiOiJhdHRhY2htZW50cy9yZXByby9zcGVjLm1kIiwic2l6ZUJ5dGVzIjo4LCJtaW1lVHlwZSI6InRleHQvbWFya2Rvd24iLCJzY29wZSI6Im1lc3NhZ2UiLCJhdHRhY2htZW50SWQiOiJzdHBVSkNyRTJINmczSEVvak1CQTAiLCJleHAiOjE3OTMwNTcwMTIyNzl9.LGDahL623nEmtnORA-HiW2sKnWC54iJqx4Xfi2MxiAA
+sig tail   : ...2MxiAA (second-to-last char = A, last char = A)
+tampered decodes to identical MAC bytes: true
+verifyAttachmentGrant(tampered) accepted (no throw)
+upload with tampered grant -> HTTP 409
+body: {"error":"uploaded size 1 ≠ grant 8"}
+second upload with the same tampered grant -> HTTP 409
+body: {"error":"uploaded size 1 ≠ grant 8"}
+
+# Single-file runs after the rebase (direct, no heavy lock per lane/1801 lesson):
+      Tests  27 passed (27)
+   Start at  16:18:33
+   Duration  1.69s (tests 43%, transform 33%, import 24%)
+

@@ -240,7 +240,6 @@ export interface MachineRow {
   online?: boolean;
   pill?: string;
   enabledRuntimes?: string[];
-  shellEnabled?: boolean;
   chiefHost?: boolean;
   chiefRunning?: boolean;
   chiefWaiting?: boolean;
@@ -275,6 +274,25 @@ export interface DocBlock {
   segments: DocSegment[];
 }
 
+export type WorkStep =
+  | { kind: 'think'; id: string; text: string; seconds: number | null }
+  | {
+      kind: 'call';
+      id: string;
+      action: 'read' | 'search' | 'run' | 'edit' | 'tool';
+      label: string;
+      target?: string;
+      description?: string;
+      command?: string;
+      diff?: { added: number; removed: number };
+      changes?: { removed: string[]; added: string[] };
+      output: string | null;
+      error: boolean;
+      running: boolean;
+      unfinished: boolean;
+      seconds: number | null;
+    };
+
 export type TranscriptItem =
   | { kind: 'run'; at?: string; machine?: string; cancelled?: boolean }
   | {
@@ -304,13 +322,7 @@ export type TranscriptItem =
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'injected-skills'; skills: { id: string; reason: string }[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number }
-  | {
-      kind: 'tools';
-      seconds: number;
-      expanded: boolean;
-      pills: string[];
-      outputs?: (string | null)[];
-    }
+  | { kind: 'work'; id: string; steps: WorkStep[]; expanded?: boolean }
   | { kind: 'elapsed'; seconds: number }
   | {
       kind: 'note';
@@ -441,6 +453,7 @@ export interface ChiefSegment {
 export type ChiefStreamItem =
   | { kind: 'note'; text: string; machineName?: string }
   | { kind: 'error'; text: string }
+  | { kind: 'handoff'; todoId: string; id?: string }
   | {
       kind: 'question';
       id?: string;
@@ -454,7 +467,8 @@ export type ChiefStreamItem =
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;
     }
-  | { kind: 'user'; text: string; id?: string; markdown?: string }
+  | { kind: 'user'; text: string; id?: string; markdown?: string; pending?: 'queued' | 'held' }
+  | { kind: 'stopped'; todos: { id: string; seq: number; title: string }[]; id?: string }
   | {
       kind: 'robot';
       paragraphs?: ChiefSegment[][];
@@ -464,6 +478,7 @@ export type ChiefStreamItem =
       seconds: string;
       tools?: ChiefToolRow[];
       id?: string;
+      fallbackModel?: string;
     }
   | {
       kind: 'thinking';
@@ -518,11 +533,15 @@ export interface ChiefContent {
   agent?: { id?: string; displayName: string; avatarUrl: string | null };
   modelProvider?: string | null;
   threadTitle: string;
+  threadId?: string;
   threadsOpen?: boolean;
   threads?: ChiefThreadRef[];
   examples?: ChiefExample[];
   draft?: string;
   stream?: ChiefStreamItem[];
+  streamAt?: number[];
   running?: boolean;
   runningTool?: string;
+  outage?: { reason: 'quota' | 'capacity'; model: string | null; retryAt: number | null };
+  fallbackModel?: string;
 }

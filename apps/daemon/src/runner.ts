@@ -46,7 +46,6 @@ import {
   isBackendRuntimeId,
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
-  LOCAL_TOOL_REMOTE_SHELL,
   LocalRepoUnreachableError,
   PLAN_FILE_NAME,
   parseRetryAfterMs,
@@ -80,7 +79,7 @@ import {
   probeClaudeCodeAuth,
 } from './claude-code-auth.js';
 import { clearCredentials, pushCredential } from './credentials.js';
-import { withGitCredentialFallback } from './git.js';
+import { GitPushHookError, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { computeHarnessHash } from './harness-hash.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
@@ -90,7 +89,6 @@ import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
-import { buildRemoteShellTool } from './shell-channel.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { resolveStepImages } from './step-attachments.js';
@@ -133,12 +131,9 @@ export interface RunStepOptions {
   retryStormMax?: number;
   streamTimeouts?: { first: number; idle: number; body: number };
   streamDurationCapMs?: number;
-  providerNetworkFinalWaitMs?: number;
 }
 
-export const PROVIDER_NETWORK_MAX_ATTEMPTS = 3;
-
-export const PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS = 5_000;
+export const PROVIDER_NETWORK_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
 
 export { RETRY_STORM_MAX };
 
@@ -149,9 +144,11 @@ export function combineTimeoutWithRootCause(timeoutText: string, rootCause: stri
 export const STREAM_DURATION_CAP_DEFAULT_MS = 3_600_000;
 
 export const STREAM_DURATION_CAP_ENV = 'CAIRN_STREAM_DURATION_CAP_MS';
+export const STREAM_IDLE_ENV = 'CAIRN_STREAM_IDLE_MS';
+export const STREAM_FIRST_EVENT_ENV = 'CAIRN_STREAM_FIRST_EVENT_MS';
 
-function envDurationCapMs(env: NodeJS.ProcessEnv): number | null {
-  const raw = env[STREAM_DURATION_CAP_ENV];
+function envPositiveMs(name: string): number | null {
+  const raw = process.env[name];
   if (raw === undefined) return null;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -636,14 +633,6 @@ async function runClaimedStep(
         onAudit: (line) => logger.step(line),
       })
     : null;
-  const remoteShellTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_REMOTE_SHELL)
-    ? buildRemoteShellTool({
-        wire: client,
-        stepId,
-        cwd,
-        onAudit: (line) => logger.step(line),
-      })
-    : null;
   const stepIdentity: CommitIdentity = {
     name: claimed.agent?.displayName ?? 'cairn-agent',
     email: `${claimed.step.machineId ?? 'machine'}@cairn.local`,
@@ -651,9 +640,7 @@ async function runClaimedStep(
   const createTagTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_CREATE_TAG)
     ? buildCreateTagTool({ repoDir: ws?.cwd ?? null, cred: creds.git, identity: stepIdentity })
     : null;
-  const localToolDefs = [secretTool, remoteShellTool, createTagTool].filter(
-    (t): t is LocalToolDef => t !== null,
-  );
+  const localToolDefs = [secretTool, createTagTool].filter((t): t is LocalToolDef => t !== null);
   const injectedForSession =
     agent.injectedSkills === undefined || agent.defaultSkill == null
       ? agent.injectedSkills
@@ -916,6 +903,7 @@ async function runClaimedStep(
 
   let usage: AgentTokenUsage = [];
   let lastError: string | null = null;
+  let closingPushHookError: GitPushHookError | null = null;
   let lastModelError: string | null = null;
   let messageSeq = 0;
   let sawChangeTool = false;
@@ -930,20 +918,29 @@ async function runClaimedStep(
     retryAfterMs: number | null;
   } | null = null;
   let networkRetries = 0;
-  const providerNetworkFinalWaitMs =
-    opts.providerNetworkFinalWaitMs ?? PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS;
+  const networkRetryDelays =
+    claimed.step.kind === 'plan' || claimed.step.kind === 'build'
+      ? PROVIDER_NETWORK_RETRY_DELAYS_MS
+      : [0, 5_000];
+  const envFirstMs = envPositiveMs(STREAM_FIRST_EVENT_ENV);
+  const envIdleMs = envPositiveMs(STREAM_IDLE_ENV);
   const streamTimeouts = {
-    first: opts.streamTimeouts?.first ?? STREAM_TIMEOUTS_MS.streamFirstEvent,
-    idle: opts.streamTimeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
-    body: opts.streamTimeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
+    first: envFirstMs ?? opts.streamTimeouts?.first ?? STREAM_TIMEOUTS_MS.streamFirstEvent,
+    idle: envIdleMs ?? opts.streamTimeouts?.idle ?? STREAM_TIMEOUTS_MS.streamIdle,
+    body: Math.max(
+      opts.streamTimeouts?.body ?? STREAM_TIMEOUTS_MS.streamBodyTimeout,
+      envFirstMs ?? 0,
+      envIdleMs ?? 0,
+    ),
   };
-  const absoluteDurationCapMs = envDurationCapMs(process.env);
+  const absoluteDurationCapMs = envPositiveMs(STREAM_DURATION_CAP_ENV);
   const streamDurationCapMs =
     absoluteDurationCapMs ?? opts.streamDurationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS;
   const progressResetsDuration = claimed.step.kind === 'build' && absoluteDurationCapMs === null;
   let timedOut = false;
   let timeoutArm: StreamTimeoutArm | null = null;
   const runningToolCalls = new Set<string>();
+  const toolStartedAt = new Map<string, number>();
   let watchdog: NodeJS.Timeout | null = null;
   let bodyTimeout: NodeJS.Timeout | null = null;
   let durationCap: NodeJS.Timeout | null = null;
@@ -1228,6 +1225,20 @@ async function runClaimedStep(
             break;
           }
           case 'toolcall_end': {
+            const eventTime = now();
+            if (ev.call.result === undefined) {
+              const startedAt = ev.call.startedAt ?? toolStartedAt.get(ev.call.id) ?? eventTime;
+              toolStartedAt.set(ev.call.id, startedAt);
+              ev.call = { ...ev.call, startedAt };
+            } else {
+              const startedAt = ev.call.startedAt ?? toolStartedAt.get(ev.call.id);
+              ev.call = {
+                ...ev.call,
+                ...(startedAt !== undefined ? { startedAt } : {}),
+                endedAt: ev.call.endedAt ?? eventTime,
+              };
+              toolStartedAt.delete(ev.call.id);
+            }
             if (progressResetsDuration) armDurationCap();
             sawProgress = true;
             zeroProgressRetries = 0;
@@ -1372,7 +1383,6 @@ async function runClaimedStep(
       }
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
-      break;
     }
     stop.detach();
     {
@@ -1383,17 +1393,14 @@ async function runClaimedStep(
         lastError !== null &&
         !stopPending &&
         classifyStepFailure(failureText) === 'network' &&
-        networkRetries < PROVIDER_NETWORK_MAX_ATTEMPTS - 1
+        networkRetries < networkRetryDelays.length
       ) {
+        const delay = networkRetryDelays[networkRetries] ?? 0;
         networkRetries += 1;
-        if (networkRetries === PROVIDER_NETWORK_MAX_ATTEMPTS - 1) {
-          logger.step(
-            `provider network retry ${networkRetries}: waiting ${providerNetworkFinalWaitMs}ms before final attempt`,
-          );
-          await new Promise((r) => setTimeout(r, providerNetworkFinalWaitMs));
-        } else {
-          logger.step(`provider network retry ${networkRetries}: resuming session immediately`);
-        }
+        logger.step(
+          `provider network retry ${networkRetries}: waiting ${delay}ms before ${networkRetries === networkRetryDelays.length ? 'final' : 'next'} attempt`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
         continueId = handle.sessionId;
         deps.sessionHandles?.delete(stepId);
         continue;
@@ -1424,6 +1431,7 @@ async function runClaimedStep(
     }
     break;
   }
+  deps.sessionHandles?.delete(stepId);
   await sealSegment();
   flushDeltas();
   flushThinking();
@@ -1610,7 +1618,18 @@ async function runClaimedStep(
       }
       hasChanges = headAhead > 0 || artifactBranches.length > 0;
     } catch (err) {
+      if (err instanceof GitPushHookError) closingPushHookError = err;
       lastError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  let pushHookOutput: string | null = null;
+  if (claimed.step.kind === 'build' && closingPushHookError !== null) {
+    pushHookOutput = stripAnsiEscapes(closingPushHookError.message);
+    lastError = null;
+    if (ws !== null && deps.workspace) {
+      headCommit = await deps.workspace.headCommit(ws.cwd);
+      hasChanges = true;
     }
   }
 
@@ -1749,6 +1768,7 @@ async function runClaimedStep(
     hasChanges,
     ...(headCommit !== null ? { commit: headCommit } : {}),
     ...(preservedCommits.length > 0 ? { preservedCommits } : {}),
+    ...(pushHookOutput !== null ? { pushHookOutput } : {}),
     ...(reviewExtraction?.status === 'ok' ? { findings: reviewExtraction.verdict } : {}),
     ...(reviewExtraction?.status === 'failed' ? { findingsError: reviewExtraction.reason } : {}),
     ...(verifyExtraction?.status === 'ok' ? { verifyVerdict: verifyExtraction.verdict } : {}),
@@ -1776,7 +1796,6 @@ async function runClaimedStep(
   } catch (err) {
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
-    deps.sessionHandles?.delete(stepId);
     return;
   }
 
@@ -1785,12 +1804,10 @@ async function runClaimedStep(
   } catch (err) {
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
-    deps.sessionHandles?.delete(stepId);
     return;
   }
   clearCredentials(creds);
   journal.remove(stepId);
-  deps.sessionHandles?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
 }
 

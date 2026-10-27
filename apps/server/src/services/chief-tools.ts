@@ -1,10 +1,8 @@
 import type { SecretBox, UserRecord } from '@cairn/shared';
 import {
   AGENT_TOOL_DEFAULTS,
-  AGENT_TOOL_SHELL,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
-  filterAgentTools,
   IN_PROGRESS_PHASES,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
@@ -473,6 +471,9 @@ export async function executeChiefTool(
         ...(optStr(params, 'title') !== undefined ? { title: optStr(params, 'title') } : {}),
         ...(optStr(params, 'spec') !== undefined ? { spec: optStr(params, 'spec') } : {}),
         ...(params.tagIds !== undefined ? { tagIds: strArr(params, 'tagIds') } : {}),
+        ...(optStr(params, 'projectId') !== undefined
+          ? { projectId: optStr(params, 'projectId') }
+          : {}),
       });
       if (!record) throw new HttpError(404, `todo ${todoId}`);
       return json(record);
@@ -651,17 +652,6 @@ export async function executeChiefTool(
         if (hit && deleteSecret(keysvc, ctx.teamId, hit.id)) deleted.push(n);
       }
       return json({ deleted });
-    }
-    case 'set_remote_shell': {
-      const agentId = str(params, 'agentId');
-      const row = requireTeamAgent(db, agentId, ctx.teamId);
-      const enabledParam = params.enabled;
-      if (typeof enabledParam !== 'boolean')
-        throw new HttpError(400, 'invalid params.enabled: expected boolean');
-      const tools = filterAgentTools(row.tools).filter((t) => t !== AGENT_TOOL_SHELL);
-      if (enabledParam) tools.push(AGENT_TOOL_SHELL);
-      db.update(agent).set({ tools }).where(eq(agent.id, agentId)).run();
-      return json({ agentId, remoteShell: enabledParam, tools });
     }
     case 'schedule_todo': {
       const todoId = str(params, 'todoId');
@@ -1007,7 +997,18 @@ export async function confirmBuild(
   if (!deps.db.select().from(build).where(eq(build.id, buildId)).get()) {
     throw new HttpError(404, `build ${buildId}`);
   }
-  await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
+  try {
+    await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
+  } catch (err) {
+    if (
+      err instanceof HttpError &&
+      err.status === 409 &&
+      err.message.endsWith('当前相位 building')
+    ) {
+      return;
+    }
+    throw err;
+  }
 }
 
 export interface WorkerMemoryCtx {

@@ -12,7 +12,7 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
 } from '@cairn/shared';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -148,7 +148,7 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: never) => void) {}
 }
 
-type Script = StepEvent[];
+type Script = (StepEvent | Error)[];
 
 function scriptedNetworkBackend(
   scripts: Script[],
@@ -168,6 +168,7 @@ function scriptedNetworkBackend(
       events: (async function* () {
         for (const ev of script) {
           if (stopped) return;
+          if (ev instanceof Error) throw ev;
           yield ev as never;
         }
       })(),
@@ -200,7 +201,7 @@ interface RunCaseOpts {
   stopRequested?: boolean;
   stopBeforeRetry?: boolean;
   stopDuringFinalWait?: boolean;
-  finalWaitMs?: number;
+  kind?: 'plan' | 'build';
 }
 
 async function runNetworkCase(
@@ -210,6 +211,7 @@ async function runNetworkCase(
   client: FakeClient;
   lines: string[];
   opened: { kind: 'new' | 'continue'; sessionId: string | null }[];
+  retryDelays: number[];
 }> {
   const home = mkdtempSync(join(tmpdir(), 'cairn-runner-net-'));
   const paths = statePaths(home, join(home, 'workspaces'));
@@ -241,14 +243,84 @@ async function runNetworkCase(
     heartbeatIntervalMs: 60_000,
     stops,
   };
-  await runStep(deps, claimedStep(), {
-    ...(opts.finalWaitMs !== undefined ? { providerNetworkFinalWaitMs: opts.finalWaitMs } : {}),
-  });
-  return { client, lines, opened };
+  const claimed = claimedStep();
+  claimed.step.kind = opts.kind ?? 'build';
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const timers = vi.spyOn(globalThis, 'setTimeout');
+  let retryDelays: number[] = [];
+  try {
+    const pending = runStep(deps, claimed);
+    await vi.runAllTimersAsync();
+    await pending;
+    retryDelays = timers.mock.calls.flatMap(([, delay]) =>
+      delay !== undefined && [2000, 4000, 8000, 16000].includes(delay) ? [delay] : [],
+    );
+  } finally {
+    timers.mockRestore();
+    vi.useRealTimers();
+  }
+  return { client, lines, opened, retryDelays };
 }
 
 describe('#1257 runner provider_network stream-drop retry (session continuation)', () => {
-  test('failure mode 1: first-round stream drop → immediate continueSession on the same session, second round succeeds → step success (two opens)', async () => {
+  test.each(['Connection error.', 'ECONNRESET', 'socket hang up', 'fetch failed'])(
+    'provider error %s retries four times with exponential backoff before reporting failure',
+    async (message) => {
+      const result = await runNetworkCase(
+        Array.from({ length: 5 }, () => [{ type: 'error', error: { message, retryable: false } }]),
+      );
+      const { client, opened, lines, retryDelays } = result;
+      expect(retryDelays).toEqual([2000, 4000, 8000, 16000]);
+      expect(opened).toHaveLength(5);
+      expect(opened.slice(1).every((entry) => entry.sessionId === opened[0]?.sessionId)).toBe(true);
+      expect(lines.filter((line) => line.includes('provider network retry'))).toEqual([
+        '[step] provider network retry 1: waiting 2000ms before next attempt',
+        '[step] provider network retry 2: waiting 4000ms before next attempt',
+        '[step] provider network retry 3: waiting 8000ms before next attempt',
+        '[step] provider network retry 4: waiting 16000ms before final attempt',
+      ]);
+      expect(client.doneBodies[0]?.body.status).toBe('failed');
+      expect(client.doneBodies[0]?.body.errorMessage).toContain(message);
+    },
+  );
+
+  test.each(['plan', 'build'] as const)(
+    '%s succeeds on the last same-model attempt after Connection error.',
+    async (kind) => {
+      const failure: Script = [
+        { type: 'error', error: { message: 'Connection error.', retryable: false } },
+      ];
+      const { client, opened } = await runNetworkCase(
+        [
+          failure,
+          failure,
+          failure,
+          failure,
+          [
+            { type: 'text_delta', text: 'ok' },
+            { type: 'done', usage: [] },
+          ],
+        ],
+        { kind },
+      );
+      expect(opened).toHaveLength(5);
+      expect(client.doneBodies[0]?.body.status).toBe('success');
+    },
+  );
+
+  test('a thrown provider fetch failure retries the same session', async () => {
+    const { client, opened } = await runNetworkCase([
+      [new Error('fetch failed')],
+      [
+        { type: 'text_delta', text: 'ok' },
+        { type: 'done', usage: [] },
+      ],
+    ]);
+    expect(opened).toHaveLength(2);
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+  });
+
+  test('failure mode 1: first-round stream drop → backed-off continueSession on the same session, second round succeeds → step success (two opens)', async () => {
     const { client, opened, lines } = await runNetworkCase([
       [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
       [
@@ -275,7 +347,7 @@ describe('#1257 runner provider_network stream-drop retry (session continuation)
           { type: 'done', usage: [] },
         ],
       ],
-      { finalWaitMs: 1 },
+      { kind: 'build' },
     );
 
     expect(opened).toHaveLength(3);
@@ -285,17 +357,19 @@ describe('#1257 runner provider_network stream-drop retry (session continuation)
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('failure mode 3: three stream drops → failed close (done(failed) carries the original error, no fourth round)', async () => {
+  test('five stream drops exhaust the same-model retry budget', async () => {
     const { client, opened } = await runNetworkCase(
       [
         [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
         [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
         [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
+        [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
+        [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
       ],
-      { finalWaitMs: 1 },
+      { kind: 'build' },
     );
 
-    expect(opened).toHaveLength(3);
+    expect(opened).toHaveLength(5);
     expect(client.doneBodies[0]?.body.status).toBe('failed');
     expect(client.doneBodies[0]?.body.errorMessage).toContain(NETWORK_ERROR);
   });
@@ -344,12 +418,15 @@ describe('#1257 runner provider_network stream-drop retry (session continuation)
       { type: 'error', error: { message: NETWORK_ERROR, retryable: false } },
       { type: 'done', usage: [] },
     ];
-    const { client, opened } = await runNetworkCase([failedRound, failedRound], {
-      stopDuringFinalWait: true,
-      finalWaitMs: 1,
-    });
+    const { client, opened } = await runNetworkCase(
+      [failedRound, failedRound, failedRound, failedRound],
+      {
+        stopDuringFinalWait: true,
+        kind: 'build',
+      },
+    );
 
-    expect(opened).toHaveLength(2);
+    expect(opened).toHaveLength(4);
     expect(client.doneBodies[0]?.body.status).toBe('stopped');
     expect(client.doneBodies[0]?.body.errorMessage).toBeUndefined();
   });

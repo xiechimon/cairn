@@ -1,6 +1,5 @@
 import type { ClaimedStep } from '@cairn/shared';
 import {
-  AGENT_TOOL_SHELL,
   AGENT_TOOL_TAG,
   appendMergedPrGuard,
   buildMergedPrGuardInstruction,
@@ -9,7 +8,6 @@ import {
   CHIEF_REMOTE_TOOLS,
   formatSkillRouteSection,
   LOCAL_TOOL_CREATE_TAG,
-  LOCAL_TOOL_REMOTE_SHELL,
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
   type SkillInjectionRecord,
@@ -24,6 +22,7 @@ import { nowMs } from '../lib/ids.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { chiefClaimContext, parseChiefTrigger } from './chief.js';
+import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import {
   agentRunningCount,
   capabilityGatePasses,
@@ -127,14 +126,8 @@ function claimMcpSlugs(
   return [...agentSlugs];
 }
 
-function claimLocalTools(
-  machineRow: { shellEnabled: boolean },
-  agentTools: readonly string[],
-): string[] {
+function claimLocalTools(agentTools: readonly string[]): string[] {
   const tools: string[] = [];
-  if (agentTools.includes(AGENT_TOOL_SHELL) && machineRow.shellEnabled) {
-    tools.push(LOCAL_TOOL_REMOTE_SHELL);
-  }
   if (agentTools.includes(AGENT_TOOL_TAG)) {
     tools.push(LOCAL_TOOL_CREATE_TAG);
   }
@@ -150,7 +143,8 @@ function buildChiefClaim(
   machineRow?: typeof machine.$inferSelect,
 ): ClaimedStep | null {
   if (!agentRow.modelId) return null;
-  if (!machineRow || !runtimeGatePasses(machineRow, agentRow.provider)) return null;
+  const model = effectiveModel(agentRow, stepRow);
+  if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
   const claimedAt = nowMs();
   const res = deps.db
@@ -206,9 +200,9 @@ function buildChiefClaim(
       id: agentRow.id,
       displayName: agentRow.displayName,
       description: agentRow.description,
-      provider: agentRow.provider,
-      modelId: agentRow.modelId,
-      thinkingLevel: agentRow.thinkingLevel,
+      provider: model.provider,
+      modelId: model.modelId,
+      thinkingLevel: stepRow.fallback?.model ? null : agentRow.thinkingLevel,
       memories,
     },
     chief: {
@@ -242,6 +236,7 @@ async function tryClaim(
   const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
   for (const cand of chiefCands) {
     if (cand.stepRow.createdAt > earliestWorker) break;
+    if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
     if (
       cand.agentRow.maxConcurrentTasks !== null &&
       agentRunningCount(db, cand.agentRow.id) >= cand.agentRow.maxConcurrentTasks
@@ -411,7 +406,7 @@ async function tryClaim(
         tools: [...agentRow.tools],
       },
       remoteTools: [...(isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS)],
-      localTools: claimLocalTools(machineRow, agentRow.tools),
+      localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }

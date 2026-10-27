@@ -23,7 +23,9 @@ import {
   askUserQuestionContentSchema,
   BRAND,
   CHIEF_TURN_ERROR_KIND,
+  chiefModelFallbackContentSchema,
   chiefTurnErrorContentSchema,
+  chiefTurnStoppedContentSchema,
   classifySkillFact,
   classifyStepFailure,
   classifyUserText,
@@ -66,6 +68,7 @@ import type {
   TokenUsageContent,
   TranscriptItem,
   UsageCostContent,
+  WorkStep,
 } from '../fixtures/records.js';
 import { activityLabel } from './activity.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
@@ -173,13 +176,20 @@ export function formatUsd(n: number): string {
   return n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`;
 }
 
+export function usageCostKnown(cost: UsageCost): boolean {
+  if (cost.priced === false) return false;
+  if (cost.priced === true) return true;
+  return cost.total > 0;
+}
+
 export function mapUsageCost(cost: UsageCost | undefined): UsageCostContent | null {
-  if (cost === undefined || cost.total <= 0) return null;
+  if (cost === undefined || !usageCostKnown(cost)) return null;
+  const split = cost.input + cost.output + cost.cacheRead + cost.cacheWrite > 0 || cost.total === 0;
   return {
     total: formatUsd(cost.total),
-    cacheRead: formatUsd(cost.cacheRead),
-    input: formatUsd(cost.input + cost.cacheWrite),
-    output: formatUsd(cost.output),
+    cacheRead: split ? formatUsd(cost.cacheRead) : '—',
+    input: split ? formatUsd(cost.input + cost.cacheWrite) : '—',
+    output: split ? formatUsd(cost.output) : '—',
   };
 }
 
@@ -486,8 +496,8 @@ export function mapPlanDiff(diff: {
 }
 
 interface ToolEntry {
-  kind: '__tool__';
-  call: ToolCallRecord;
+  kind: '__work__';
+  step: WorkStep;
 }
 
 interface TimelineEntry {
@@ -559,11 +569,22 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       toolNameByResult.set(pairedText, paired.name);
   }
 
+  const claimedSince = steps.find((s) => s.status === 'claimed')?.createdAt ?? null;
   const entries: TimelineEntry[] = [];
+  let previousAt: number | null = null;
   for (const m of messages) {
+    const seconds =
+      previousAt !== null && m.createdAt > previousAt ? (m.createdAt - previousAt) / 1000 : null;
+    previousAt = m.createdAt;
     const call = toolCallOfContent(m.content);
     if (call !== null) {
-      entries.push({ at: m.createdAt, item: toolItem(call) });
+      entries.push({
+        at: m.createdAt,
+        item: {
+          kind: '__work__',
+          step: workCall(call, seconds, claimedSince !== null && m.createdAt >= claimedSince),
+        },
+      });
       continue;
     }
     const text = textOfContent(m.content).trim();
@@ -621,7 +642,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
     const thinking = m.role === 'assistant' ? thinkingOfContent(m.content) : null;
     if (thinking !== null)
-      entries.push({ at: m.createdAt, item: { kind: 'thinking', text: thinking, id: m.id } });
+      entries.push({
+        at: m.createdAt,
+        item: { kind: '__work__', step: { kind: 'think', text: thinking, id: m.id, seconds } },
+      });
   }
 
   const planSteps = steps.filter((s) => s.kind === 'plan');
@@ -651,33 +675,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
 
   entries.sort((a, b) => a.at - b.at);
   const items: TranscriptItem[] = [...head];
-  let toolRun: { seconds: number; pills: string[]; outputs: (string | null)[] } | null = null;
-  const flushTools = () => {
-    if (toolRun !== null) {
-      items.push({
-        kind: 'tools',
-        seconds: toolRun.seconds,
-        expanded: false,
-        pills: toolRun.pills,
-        outputs: toolRun.outputs,
-      });
-      toolRun = null;
-    }
-  };
-  for (const e of entries) {
-    if (e.item.kind === '__tool__') {
-      const secs = durationSeconds(e.item.call);
-      toolRun = toolRun ?? { seconds: 0, pills: [], outputs: [] };
-      toolRun.seconds += secs;
-      toolRun.pills.push(pillOf(e.item.call));
-      const output = resultToText(e.item.call.result);
-      toolRun.outputs.push(output !== null && isJsonPlumbing(output) ? null : output);
-      continue;
-    }
-    flushTools();
-    items.push(e.item);
+  for (const entry of entries) {
+    if (entry.item.kind === '__work__') {
+      const previous = items.at(-1);
+      if (previous?.kind === 'work') previous.steps.push(entry.item.step);
+      else items.push({ kind: 'work', id: entry.item.step.id, steps: [entry.item.step] });
+    } else items.push(entry.item);
   }
-  flushTools();
 
   const skillReadNames: string[] = [];
   const skillDeniedNames: string[] = [];
@@ -691,7 +695,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   }
   const readSkills = skillReadNames.filter((n) => !skillDeniedNames.includes(n));
   if (readSkills.length > 0 || skillDeniedNames.length > 0) {
-    items.push({ kind: 'skills', read: readSkills, denied: skillDeniedNames });
+    items.splice(head.length, 0, { kind: 'skills', read: readSkills, denied: skillDeniedNames });
   }
 
   const running = steps.find(
@@ -699,7 +703,15 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   );
   if (running && build) {
     if (liveThinking.trim() !== '') {
-      items.push({ kind: 'thinking', text: liveThinking });
+      const step: WorkStep = {
+        kind: 'think',
+        id: 'live-thinking',
+        text: liveThinking,
+        seconds: null,
+      };
+      const previous = items.at(-1);
+      if (previous?.kind === 'work') previous.steps.push(step);
+      else items.push({ kind: 'work', id: step.id, steps: [step] });
     }
     if (liveText.trim() !== '') {
       items.push({
@@ -775,15 +787,85 @@ function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string 
   }
 }
 
-function toolItem(call: ToolCallRecord): ToolEntry {
-  return { kind: '__tool__', call };
-}
-
-function durationSeconds(call: ToolCallRecord): number {
-  if (call.startedAt !== undefined && call.endedAt !== undefined) {
-    return Math.max(0, Math.round((call.endedAt - call.startedAt) / 1000));
+function workCall(
+  call: ToolCallRecord,
+  fallbackSeconds: number | null,
+  stepRunning: boolean,
+): WorkStep {
+  const args = (call.arguments ?? {}) as Record<string, unknown>;
+  const name = call.name.toLowerCase();
+  const path = String(args.file_path ?? args.path ?? '').replace(
+    /^\/(?:home|Users)\/[^/]+\/\.(?:pacman-chief|cairn)\/(?:workspaces|plans)\/[^/]+\//,
+    '',
+  );
+  const output = resultToText(call.result);
+  const seconds =
+    call.startedAt !== undefined && call.endedAt !== undefined
+      ? Math.max(0, (call.endedAt - call.startedAt) / 1000)
+      : call.startedAt !== undefined
+        ? null
+        : fallbackSeconds;
+  const base = {
+    kind: 'call' as const,
+    id: call.id,
+    label: call.name,
+    output: output !== null && isJsonPlumbing(output) ? null : output,
+    error: call.isError === true,
+    running: call.result === undefined && stepRunning,
+    unfinished: call.result === undefined && !stepRunning,
+    seconds,
+  };
+  if (name === 'read') {
+    const offset = typeof args.offset === 'number' ? args.offset : null;
+    const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : null;
+    const range =
+      offset === null && limit === null
+        ? ''
+        : limit === null
+          ? ` L${offset}+`
+          : ` L${offset ?? 1}–${(offset ?? 1) + limit - 1}`;
+    return { ...base, action: 'read', target: path + range };
   }
-  return 0;
+  if (name === 'edit' || name === 'write' || name === 'multiedit') {
+    const edits = name === 'multiedit' && Array.isArray(args.edits) ? args.edits : [args];
+    const removed: string[] = [];
+    const added: string[] = [];
+    for (const edit of edits) {
+      if (edit === null || typeof edit !== 'object') continue;
+      const values = edit as Record<string, unknown>;
+      const oldText = values.old_string ?? values.oldText;
+      const newText = values.new_string ?? values.newText ?? values.content;
+      if (typeof oldText === 'string' && oldText !== '') removed.push(...oldText.split('\n'));
+      if (typeof newText === 'string' && newText !== '') added.push(...newText.split('\n'));
+    }
+    return {
+      ...base,
+      action: 'edit',
+      target: path,
+      diff: { added: added.length, removed: removed.length },
+      changes: { removed, added },
+    };
+  }
+  if (name === 'grep' || name === 'find' || name === 'ls' || name === 'glob') {
+    const pattern = typeof args.pattern === 'string' ? args.pattern : '';
+    return {
+      ...base,
+      action: 'search',
+      description: [call.name, pattern, path].filter((part) => part !== '').join(' '),
+    };
+  }
+  if (name === 'bash') {
+    const command = typeof args.command === 'string' ? args.command : '';
+    const description =
+      typeof args.description === 'string' ? args.description : (command.split('\n')[0] ?? '');
+    return {
+      ...base,
+      action: /^(grep|rg|find|git grep)\b/.test(command.trim()) ? 'search' : 'run',
+      description,
+      command,
+    };
+  }
+  return { ...base, action: 'tool', target: call.name.replace(/^mcp__/, '').replace(/__/g, ' · ') };
 }
 
 function resultToText(result: unknown): string | null {
@@ -974,7 +1056,6 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
     name: m.name,
     online: m.online,
     enabledRuntimes: m.enabledRuntimes,
-    shellEnabled: m.shellEnabled,
     ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),
     ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
@@ -1122,6 +1203,13 @@ function stripWakeMarker(text: string): string {
   return text.replace(WAKE_MARKER_PREFIX_RE, '');
 }
 
+function handoffTodoOf(call: ToolCallRecord): string | null {
+  if (call.name !== 'message_todo' || call.result === undefined || call.isError === true)
+    return null;
+  const todoId = (call.arguments as { todoId?: unknown } | null)?.todoId;
+  return typeof todoId === 'string' && todoId !== '' ? todoId : null;
+}
+
 export function mapChiefStream(messages: MessageRow[], inlineTools = false): ChiefStreamItem[] {
   return collectChiefStream(messages, inlineTools).items;
 }
@@ -1129,11 +1217,18 @@ export function mapChiefStream(messages: MessageRow[], inlineTools = false): Chi
 function collectChiefStream(
   messages: MessageRow[],
   inlineTools = false,
+  pendingIds: ReadonlyMap<string, 'queued' | 'held'> = new Map(),
 ): {
   items: ChiefStreamItem[];
+  itemsAt: number[];
   trailingTools: ChiefToolRow[];
+  pending: ChiefStreamItem[];
 } {
   const items: ChiefStreamItem[] = [];
+  const itemsAt: number[] = [];
+  let lastAt = 0;
+  const pendingById = new Map<string, ChiefStreamItem>();
+  let fallback: { model: string; stepId: string } | null = null;
   const postedTexts = new Set(
     messages
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
@@ -1141,11 +1236,50 @@ function collectChiefStream(
   );
   let pendingTools: ChiefToolRow[] = [];
   for (const m of messages) {
+    while (itemsAt.length < items.length) itemsAt.push(lastAt);
+    lastAt = m.createdAt;
+    if (m.role === 'user' && fallback !== null) {
+      const stepOfRow = m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+        ? m.id.slice(TRANSCRIPT_PROMPT_ROW_ID_PREFIX.length)
+        : m.id;
+      if (stepOfRow !== fallback.stepId) fallback = null;
+    }
+    const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
+    if (pendingState !== undefined) {
+      const text = textOfContent(m.content).trim();
+      pendingById.set(m.id, {
+        kind: 'user',
+        text,
+        id: m.id,
+        markdown: text,
+        pending: pendingState,
+      });
+      continue;
+    }
     const turnError = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (turnError !== null) {
       pendingTools = [];
       items.push({ kind: 'error', text: turnError });
       continue;
+    }
+    if (m.role === 'system') {
+      let parsed: unknown = null;
+      try {
+        parsed = typeof m.content === 'string' ? JSON.parse(m.content) : null;
+      } catch {
+        parsed = null;
+      }
+      const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
+      if (stopped.success) {
+        pendingTools = [];
+        items.push({ kind: 'stopped', todos: stopped.data.todos, id: m.id });
+        continue;
+      }
+      const switched = chiefModelFallbackContentSchema.safeParse(parsed);
+      if (switched.success) {
+        fallback = { model: switched.data.to, stepId: switched.data.stepId };
+        continue;
+      }
     }
     const call = toolCallOfContent(m.content);
     if (call !== null) {
@@ -1169,6 +1303,9 @@ function collectChiefStream(
           ...(call.isError === true ? { error: true } : {}),
         });
       }
+      const handoffTodoId = handoffTodoOf(call);
+      if (handoffTodoId !== null)
+        items.push({ kind: 'handoff', todoId: handoffTodoId, id: `${m.id}:handoff` });
       continue;
     }
     const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;
@@ -1205,10 +1342,16 @@ function collectChiefStream(
       seconds: '',
       id: m.id,
       ...(pendingTools.length > 0 ? { tools: pendingTools } : {}),
+      ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
     });
     pendingTools = [];
   }
-  return { items, trailingTools: pendingTools };
+  while (itemsAt.length < items.length) itemsAt.push(lastAt);
+  const pending = [...pendingIds.keys()].flatMap((id) => {
+    const item = pendingById.get(id);
+    return item === undefined ? [] : [item];
+  });
+  return { items, itemsAt, trailingTools: pendingTools, pending };
 }
 
 function autoCloseStrong(text: string): string {
@@ -1239,8 +1382,10 @@ export function mapChief(
     opts.activeThreadId !== null
       ? (opts.threads.find((t) => t.id === opts.activeThreadId) ?? null)
       : null;
-  const running = active?.activeRun != null;
-  const collected = active === null ? null : collectChiefStream(opts.messages, running);
+  const pendingIds = new Map((active?.pending ?? []).map((p) => [p.messageId, p.state] as const));
+  const parked = [...pendingIds.values()].includes('held');
+  const running = active?.activeRun != null && !parked;
+  const collected = active === null ? null : collectChiefStream(opts.messages, running, pendingIds);
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
   if (running) {
     if ((opts.liveThinking ?? '').trim() !== '') {
@@ -1276,6 +1421,7 @@ export function mapChief(
       }
     }
   }
+  chiefStream.push(...(collected?.pending ?? []));
   return {
     view: 'drawer',
     bound,
@@ -1291,6 +1437,7 @@ export function mapChief(
         }
       : {}),
     threadTitle: active?.title ?? '新主题',
+    ...(active !== null ? { threadId: active.id } : {}),
     ...(opts.threads.length > 0
       ? {
           threads: opts.threads.map((t) => ({
@@ -1299,7 +1446,9 @@ export function mapChief(
           })),
         }
       : {}),
-    ...(active === null ? { examples: CHIEF_HERO_EXAMPLES } : { stream: chiefStream }),
+    ...(active === null
+      ? { examples: CHIEF_HERO_EXAMPLES }
+      : { stream: chiefStream, streamAt: collected?.itemsAt ?? [] }),
     ...(running ? { running: true } : {}),
     ...(opts.activity?.phase === 'tool' && opts.activity.tool != null
       ? { runningTool: opts.activity.tool }
@@ -1307,6 +1456,8 @@ export function mapChief(
         ? { runningTool: active.activeRun.tool.toolName }
         : {}),
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
+    ...(env.outage != null ? { outage: env.outage } : {}),
+    ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),
   };
 }
 

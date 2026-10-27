@@ -61,6 +61,7 @@ export interface ComposerWireOptions {
     onStop?: () => void;
   };
   growCap?: number;
+  onPickProject?: (project: { id: string; label: string }) => void;
 }
 
 export interface ComposerWire {
@@ -91,7 +92,7 @@ export interface ComposerWire {
   inlineListboxId: string;
   inlineListboxRef: RefObject<HTMLDivElement | null>;
   closeInline: () => void;
-  insertToken: (token: MentionToken) => void;
+  acceptInlineRow: (row: InlineCompletionRow) => void;
   slashOpen: boolean;
   slashQuery: string;
   slashCaret: number | null;
@@ -108,7 +109,6 @@ export interface ComposerWire {
   helpRows: SlashRow[];
   helpSkillCount: number;
   insertTokens: (tokens: MentionToken[]) => void;
-  insertFile: (path: string) => void;
   groups: MentionGroups;
 }
 
@@ -135,6 +135,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     mentionFiles,
     slash: slashOptions,
     growCap,
+    onPickProject,
   } = options;
   const { t } = useI18n();
 
@@ -440,7 +441,31 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     insertTokensAt(tokens, inlineOpen ? inlineRangeRef.current : null);
   };
 
-  const insertToken = (token: MentionToken) => insertTokens([token]);
+  const acceptInlineRow = (row: InlineCompletionRow) => {
+    if (row.kind === 'file') {
+      insertFile(row.label);
+      return;
+    }
+    if (row.kind === 'project' && onPickProject !== undefined) {
+      applyTextInsert(
+        (current, at, end) => ({
+          value: current.slice(0, at) + current.slice(end ?? at),
+          caret: at,
+        }),
+        inlineOpen ? inlineRangeRef.current : null,
+      );
+      onPickProject({ id: row.id, label: row.label });
+      return;
+    }
+    insertTokens([
+      {
+        kind: row.kind,
+        id: row.id,
+        label: row.label,
+        ...(row.seq !== undefined ? { seq: row.seq } : {}),
+      },
+    ]);
+  };
 
   const insertFileAt = (path: string, range: CompletionRange | null) => {
     applyTextInsert((current, at, end) => insertFileText(current, path, at, end), range);
@@ -559,18 +584,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     }
     if (intent.kind === 'accept') {
       const picked = inlineRows[intent.index];
-      if (picked?.kind === 'file') {
-        insertFile(picked.label);
-      } else if (picked !== undefined) {
-        insertTokens([
-          {
-            kind: picked.kind,
-            id: picked.id,
-            label: picked.label,
-            ...(picked.seq !== undefined ? { seq: picked.seq } : {}),
-          },
-        ]);
-      }
+      if (picked !== undefined) acceptInlineRow(picked);
       return;
     }
     if (event.key === 'Enter' && !isComposing) {
@@ -650,9 +664,8 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     inlineListboxId,
     inlineListboxRef,
     closeInline,
-    insertToken,
+    acceptInlineRow,
     insertTokens,
-    insertFile,
     groups,
     slashOpen,
     slashQuery,

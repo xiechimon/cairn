@@ -17,7 +17,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { agent, machine, provider, todo, whatsNew } from './db/schema.js';
+import { agent, machine, provider, todo } from './db/schema.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
 import {
@@ -141,7 +141,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(patchMachineBodySchema, await jsonBody(c), 'body');
     const patch = {
       ...(body.enabledRuntimes !== undefined ? { enabledRuntimes: body.enabledRuntimes } : {}),
-      ...(body.shellEnabled !== undefined ? { shellEnabled: body.shellEnabled } : {}),
       ...(body.maxConcurrent !== undefined ? machineConcurrencyPatch(row, body.maxConcurrent) : {}),
     };
     if (Object.keys(patch).length > 0) {
@@ -309,11 +308,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const record = await refreshSkill(importOpts(teamId), c.req.param('sid'));
     return c.json(record);
-  });
-
-  app.get('/api/whats-new', (c) => {
-    const rows = ctx.db.select().from(whatsNew).all();
-    return c.json(rows.map((r) => ({ id: r.id, createdAt: r.createdAt, ...r.body })));
   });
 
   const keysvc = { db: ctx.db, box: ctx.secretBox };

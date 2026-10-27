@@ -175,7 +175,7 @@ async function settledDrawer(drawer: Locator) {
 
 test.describe('chief drawer markdown face (fixture, #650)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/app?scenario=chief-md');
+    await page.goto('/app?view=board&scenario=chief-md');
     await expect(page.locator('.chief-drawer')).toBeVisible();
   });
 
@@ -217,7 +217,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await expect(fence).toContainText('curl -s localhost:8787/healthz');
   });
 
-  test('F-R13: todo mentions render as chips, anchors point at task detail with click navigation; literal #seq/pseudo schemes render no chip (#675)', async ({
+  test('F-R13: todo mentions render as chips, anchors point at task detail and a click opens the task panel; literal #seq/pseudo schemes render no chip (#675)', async ({
     page,
   }) => {
     const stream = page.getByTestId('chief-stream');
@@ -234,7 +234,8 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     );
 
     await chip.click();
-    await page.waitForURL((u) => u.pathname === '/app/todo/r3-legacy-1');
+    await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe('r3-legacy-1');
   });
 
   test('F-R4/R5: typing rows have no foot; final rows keep the foot (copy + done 44s)', async ({ page }) => {
@@ -271,7 +272,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
   test('F-R9: frozen capture face r5 114 does not drift — segment arrays walk the original .chief-para/.chief-bullet paths', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=114');
+    await page.goto('/app?view=board&scenario=114');
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 
@@ -288,7 +289,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     page,
   }) => {
 
-    await page.goto('/app?scenario=113');
+    await page.goto('/app?view=board&scenario=113');
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 
@@ -305,7 +306,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await stubCdnAvatar(page);
     const state = { final: false };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -362,7 +363,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
       ],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -385,7 +386,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
 
     const state = { final: false };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -425,7 +426,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await stubCdnAvatar(page);
     const state: Parameters<typeof mockChiefLiveApi>[1] = { final: false };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -488,7 +489,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
       ],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -543,7 +544,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await stubEventSource(page);
     await stubCdnAvatar(page);
     await mockChiefLiveApi(page, { final: true });
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -581,7 +582,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
         { id: 'm9', role: 'assistant', content: '三件都办完。', createdAt: 9 },
       ],
     });
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
     await settledDrawer(drawer);
@@ -610,7 +611,8 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await expect(bubble.locator('.mention-chip')).toHaveCount(1);
 
     await chip.click();
-    await page.waitForURL((u) => u.pathname === '/app/todo/t16');
+    await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('task')).toBe('t16');
   });
 
   test('F-R15: copy payload = markdown source (not rendered output); the two-button row (copy/restore) is unaffected', async ({
@@ -668,7 +670,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
   test('F-R17: fixture capture face user bubbles zero drift — bare paths stay literal (no --md class, no chat-md blocks)', async ({
     page,
   }) => {
-    await page.goto('/app?scenario=chief-md');
+    await page.goto('/app?view=board&scenario=chief-md');
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const bubble = page.getByTestId('chief-stream').getByTestId('chief-bubble');
     await expect(bubble).toHaveCount(1);
@@ -711,7 +713,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       ],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -787,7 +789,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       ],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     const bashRow = drawer.locator('.chief-msg', { hasText: '正在调用 Bash' });
@@ -844,7 +846,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
       messages: [USER_ROW, ...segRows],
     };
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -868,7 +870,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     }
 
     state.activeRun = null;
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
     const settled = drawer.locator('.chief-msg, [data-testid="chief-msg"]');
     await expect(settled).toHaveCount(5);
     await expect(settled.nth(2)).toContainText('先看现状');
@@ -911,7 +913,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     await stubEventSource(page);
     await stubCdnAvatar(page);
     await mockChiefLiveApi(page, state);
-    await page.goto('/app?chief=chief-bbb');
+    await page.goto('/app?view=board&chief=chief-bbb');
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();

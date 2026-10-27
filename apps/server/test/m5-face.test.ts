@@ -339,7 +339,7 @@ describe('M5 vocabulary completion surface (02 section 6.1 canonical)', () => {
     }
   });
 
-  test('models/progress/agents tasks/whats-new/telemetry surface', async () => {
+  test('models/progress/agents tasks/telemetry surface', async () => {
     const { s, projectId, todoId } = await setupWorld();
     try {
       const models = (await (await req(s.app, 'GET', `/api/teams/${s.team.id}/models`)).json()) as {
@@ -377,8 +377,6 @@ describe('M5 vocabulary completion surface (02 section 6.1 canonical)', () => {
         await req(s.app, 'GET', `/api/teams/${s.team.id}/agents/other/tasks`)
       ).json()) as unknown[];
       expect(noTasks).toEqual([]);
-
-      expect(await (await req(s.app, 'GET', '/api/whats-new')).json()).toEqual([]);
 
       expect((await req(s.app, 'POST', '/api/analytics/first-touch', {})).status).toBe(204);
       expect((await req(s.app, 'POST', '/_mp/api/track', {})).status).toBe(204);

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { MergePolicy, ProjectRepoKind } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { createApp } from '../src/app.js';
@@ -31,6 +32,7 @@ export function bootServer(
     oauthClient?: AppContext['oauthClient'];
     oauthFetch?: AppContext['oauthFetch'];
     authToken?: string | null;
+    tailscaleUsers?: string[];
     mcpConfigPath?: string;
   } = {},
 ) {
@@ -78,6 +80,7 @@ export function bootServer(
     skillSourcesPath,
     ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
     authToken: opts.authToken ?? null,
+    tailscaleUsers: opts.tailscaleUsers ?? [],
     mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
   });
   return {
@@ -133,10 +136,20 @@ export function req(app: Hono, method: string, path: string, body?: unknown): Pr
   );
 }
 
-export async function postProject(app: Hono, name = 'demo'): Promise<string> {
-  const res = await req(app, 'POST', '/api/projects', { name });
+export async function postProject(
+  app: Hono,
+  name = 'demo',
+  opts: { mergePolicy?: MergePolicy; repoKind?: ProjectRepoKind } = {},
+): Promise<string> {
+  const res = await req(app, 'POST', '/api/projects', {
+    name,
+    ...(opts.repoKind !== undefined ? { repoKind: opts.repoKind } : {}),
+  });
   if (res.status !== 201) throw new Error(`postProject: ${res.status}`);
   const body = (await res.json()) as { id: string };
+  const mergePolicy = opts.mergePolicy ?? 'human';
+  const patched = await req(app, 'PATCH', `/api/projects/${body.id}/merge-policy`, { mergePolicy });
+  if (patched.status !== 200) throw new Error(`postProject merge-policy: ${patched.status}`);
   return body.id;
 }
 

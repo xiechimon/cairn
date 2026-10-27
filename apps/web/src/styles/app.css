@@ -314,7 +314,8 @@
 @media (max-width: 640px) {
   .board-topbar,
   [data-testid="page-topbar"],
-  [data-testid="chief-settings-topbar"] {
+  [data-testid="chief-settings-topbar"],
+  .task-panel [data-panel-head] {
     padding-left: 52px;
   }
 

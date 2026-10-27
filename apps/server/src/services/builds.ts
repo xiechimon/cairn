@@ -41,6 +41,7 @@ import {
   parseVerifyPromptMeta,
   personaByRole,
   planVerificationItems,
+  projectMergeConfigSchema,
   REVIEW_ANNOUNCEMENT,
   REVIEW_FANOUT_ROLES,
   REVIEW_VERDICT_KIND,
@@ -70,6 +71,9 @@ import type { Db } from '../db/client.js';
 import {
   agent,
   build,
+  buildFeedback,
+  chief,
+  chiefMessage,
   gateVerdict,
   machine,
   message,
@@ -96,6 +100,7 @@ import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { recordBuildFeedback } from './build-provenance.js';
+import { askQuestionContentOf } from './chief-questions.js';
 import { DONE_ROW } from './delivery-rows.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
@@ -823,6 +828,24 @@ async function assertNoMergedPrElsewhere(
   }
 }
 
+function applyBuildConfirm(deps: BuildDeps, buildId: string, actorName: string): void {
+  const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  if (!row) throw new NotFoundError(`build ${buildId}`);
+  const todoRecord = getTodo(deps, row.todoId);
+  if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
+  if (todoRecord.phase !== 'confirm') {
+    throw new HttpError(409, `确认仅适用于待确认（confirm）关口，当前相位 ${todoRecord.phase}`);
+  }
+  insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);
+  if (childrenOfTodo(deps.db, todoRecord.id).length > 0) {
+    dispatchSplitChildren(deps, todoRecord.id);
+    setTodoPhase(deps, todoRecord.id, 'building');
+    return;
+  }
+  setTodoPhase(deps, todoRecord.id, 'building');
+  enqueueStep(deps, buildId, 'build', todoRecord.teamId);
+}
+
 export async function applyBuildStepAction(
   deps: BuildDeps,
   buildId: string,
@@ -973,17 +996,7 @@ export async function applyBuildStepAction(
   }
 
   if (body.action === 'confirm') {
-    if (todoRecord.phase !== 'confirm') {
-      throw new HttpError(409, `确认仅适用于待确认（confirm）关口，当前相位 ${todoRecord.phase}`);
-    }
-    insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);
-    if (childrenOfTodo(deps.db, todoRecord.id).length > 0) {
-      dispatchSplitChildren(deps, todoRecord.id);
-      setTodoPhase(deps, todoRecord.id, 'building');
-      return;
-    }
-    setTodoPhase(deps, todoRecord.id, 'building');
-    enqueueStep(deps, buildId, 'build', todoRecord.teamId);
+    applyBuildConfirm(deps, buildId, actorName);
     return;
   }
   if (body.action === 'review') {
@@ -1668,6 +1681,49 @@ function enqueueReviewRevision(
   enqueueStep(deps, args.buildId, 'plan', args.teamId, args.revisePrompt);
 }
 
+export function noteDeliveredPlanResidual(
+  deps: BuildDeps,
+  stepRow: typeof step.$inferSelect,
+  reason: string,
+): boolean {
+  if (stepRow.kind !== 'plan') return false;
+  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  if (!buildRow) return false;
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (todoRow?.phase !== 'confirm') return false;
+  const planRow = deps.db
+    .select({ id: planTable.id })
+    .from(planTable)
+    .where(eq(planTable.buildId, stepRow.buildId))
+    .get();
+  if (planRow === undefined) return false;
+  const id = `plan-residual-${stepRow.id}`;
+  const content = `Plan step ${stepRow.id} reported a failure after the plan was delivered and the confirm gate was parked: ${reason}. The delivered plan and the confirm gate are unchanged.`;
+  const createdAt = nowMs();
+  const inserted = deps.db
+    .insert(message)
+    .values({
+      id,
+      conversationId: stepRow.buildId,
+      role: 'system',
+      content,
+      createdAt,
+      actor: null,
+    })
+    .onConflictDoNothing()
+    .run();
+  if (inserted.changes > 0) {
+    deps.convHub?.publishMessage(stepRow.buildId, {
+      id,
+      role: 'system',
+      content,
+      createdAt,
+      actor: null,
+    });
+  }
+  return true;
+}
+
 export function applyStepFailure(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
@@ -1684,6 +1740,15 @@ export function applyStepFailure(
     .run();
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
+  if (
+    noteDeliveredPlanResidual(
+      deps,
+      stepRow,
+      rawErrorMessage.trim() === '' ? 'no reason reported' : rawErrorMessage,
+    )
+  ) {
+    return;
+  }
   db.update(build).set({ errorMessage }).where(eq(build.id, buildRow.id)).run();
   if (stepRow.kind === 'build') {
     const changes = buildRow.changes;
@@ -1882,6 +1947,95 @@ function planContractOfStep(
   if (latest === undefined) return null;
   if (!rewrite && latest.stepId !== stepRow.id) return null;
   return checkPlanContract(latest.content);
+}
+
+const OPEN_DECISION_HEADING = /^(open questions|decisions needed|decision points)$/i;
+
+export const PLAN_AUTO_CONFIRM_GRACE_MS = 10 * 60_000;
+
+export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): void {
+  const waiting = deps.db.select().from(todo).where(eq(todo.phase, 'confirm')).all();
+  for (const todoRow of waiting) {
+    if (todoRow.latestBuildId === null || now - todoRow.phaseAt < PLAN_AUTO_CONFIRM_GRACE_MS) {
+      continue;
+    }
+    const buildId = todoRow.latestBuildId;
+    const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+    if (buildRow === undefined || buildRow.errorMessage !== null) continue;
+    const liveStep = deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, buildId),
+          inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+        ),
+      )
+      .get();
+    if (liveStep !== undefined) continue;
+    const latestPlan = latestPlanRow(deps, buildId);
+    if (latestPlan === undefined || !checkPlanContract(latestPlan.content).ok) continue;
+    const planLines = latestPlan.content
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map((l) => l.trim());
+    let openDecisions = false;
+    for (let i = 0; i < planLines.length && !openDecisions; i++) {
+      const name = (planLines[i] ?? '')
+        .replace(/^#{1,6}\s+/, '')
+        .replace(/\s+#+$/, '')
+        .replace(/\*\*|__/g, '')
+        .replace(/\s*[:：]$/, '')
+        .trim();
+      if (!OPEN_DECISION_HEADING.test(name)) continue;
+      const own = /^(#{1,6})\s/.exec(planLines[i] ?? '')?.[1]?.length;
+      const sectionLevel = own ?? (/^=+$/.test(planLines[i + 1] ?? '') ? 1 : 2);
+      for (const next of planLines.slice(i + 1)) {
+        if (next === '' || /^(=+|-+)$/.test(next)) continue;
+        const nextLevel = /^(#{1,6})\s/.exec(next)?.[1]?.length;
+        if (nextLevel !== undefined && nextLevel <= sectionLevel) break;
+        if (/^([-*]\s*)?(none|n\/a|nothing)\.?$/i.test(next)) break;
+        openDecisions = true;
+        break;
+      }
+    }
+    if (openDecisions) continue;
+    const mergePolicy = projectMergeConfigSchema.parse({
+      mergePolicy: projectOfTodo(deps.db, todoRow)?.autonomy?.mergePolicy,
+    }).mergePolicy;
+    if (mergePolicy === 'human' || childrenOfTodo(deps.db, todoRow.id).length > 0) continue;
+    const latestFeedback = deps.db
+      .select({ kind: buildFeedback.kind, side: buildFeedback.side })
+      .from(buildFeedback)
+      .where(eq(buildFeedback.buildId, buildId))
+      .orderBy(desc(buildFeedback.createdAt), desc(buildFeedback.id))
+      .get();
+    if (latestFeedback?.kind === 'revision' && latestFeedback.side === 'plan') continue;
+    const threadIds = [
+      ...new Set(
+        deps.db
+          .select({ watches: chief.watches })
+          .from(chief)
+          .where(eq(chief.teamId, todoRow.teamId))
+          .all()
+          .flatMap((row) =>
+            row.watches
+              .filter((watch) => watch.todoId === todoRow.id)
+              .map((watch) => watch.threadId),
+          ),
+      ),
+    ];
+    const pendingQuestion =
+      threadIds.length > 0 &&
+      deps.db
+        .select({ content: chiefMessage.content })
+        .from(chiefMessage)
+        .where(inArray(chiefMessage.threadId, threadIds))
+        .all()
+        .some((row) => askQuestionContentOf(row.content)?.status === 'pending');
+    if (pendingQuestion) continue;
+    applyBuildConfirm(deps, buildId, 'server');
+  }
 }
 
 export function completeStep(
