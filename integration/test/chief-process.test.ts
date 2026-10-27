@@ -47,6 +47,7 @@ const row = (todoId: string, buildAgentId: string | null) => ({
   title: 'x',
   spec: 's',
   buildAgentId,
+  projectId: 'p1',
   planAgentId: null,
   phase: 'queued',
 });

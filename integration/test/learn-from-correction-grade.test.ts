@@ -59,7 +59,15 @@ function withSpec(spec: string): TurnEvidence {
   return turn({
     createdTodoIds: ['t1'],
     createdTodoRows: [
-      { id: 't1', title: 'Task', spec, buildAgentId: null, planAgentId: null, phase: 'todo' },
+      {
+        id: 't1',
+        title: 'Task',
+        spec,
+        projectId: 'p1',
+        buildAgentId: null,
+        planAgentId: null,
+        phase: 'todo',
+      },
     ],
   });
 }
