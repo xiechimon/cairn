@@ -56,16 +56,38 @@ test.describe('task panel list view', () => {
     await expect.poll(() => panel(page).evaluate((el) => el.contains(document.activeElement))).toBe(false);
   });
 
-  test('leaving for a page without the panel closes it', async ({ page }) => {
+  test('leaving for a page without the panel closes it and Back brings it back', async ({ page }) => {
     await page.goto(`${HOME}&task=inbox-running`);
     await expect(panel(page)).toBeVisible();
     await page.getByRole('link', { name: '定时' }).first().click();
     await expect(page).toHaveURL(/\/app\/schedules/);
     await expect(page.getByTestId('chief-home')).toHaveCount(0);
     await expect(panel(page)).toHaveCount(0);
+    expect(params(page).get('task')).toBeNull();
     await page.goBack();
     await expect(page.getByTestId('chief-home')).toBeVisible();
-    await expect(panel(page)).toHaveCount(0);
+    await expect(panel(page).getByTestId('task-panel-title')).toContainText('verify-cairn');
+    expect(params(page).get('task')).toBe('inbox-running');
+  });
+
+  test('Back and Forward between hosts restore each page\'s open task', async ({ page }) => {
+    await page.goto(HOME);
+    await page.getByTestId('needs-you-row').filter({ hasText: '#102' }).getByRole('link').click();
+    await expect.poll(() => params(page).get('task')).toBe('inbox-confirm');
+    await page.getByRole('link', { name: '看板' }).first().click();
+    await expect(page.locator('[data-column]')).toHaveCount(4);
+    await page.locator('[data-todo-id="inbox-running"] .todo-card-link').click();
+    await expect(panel(page).getByTestId('task-panel-title')).toContainText('verify-cairn');
+    await page.goBack();
+    await expect(page.getByTestId('chief-home')).toBeVisible();
+    await expect(panel(page).getByTestId('task-panel-title')).toHaveText(
+      '段超时杀已交付 plan 的残留流：停闸后的 build 被覆写为 failed',
+    );
+    await expect.poll(() => params(page).get('task')).toBe('inbox-confirm');
+    await page.goForward();
+    await expect(page.locator('[data-column]')).toHaveCount(4);
+    await expect(panel(page).getByTestId('task-panel-title')).toContainText('verify-cairn');
+    await expect.poll(() => params(page).get('task')).toBe('inbox-running');
   });
 
   test('Esc closes the panel, clears the URL and returns focus to the toggle', async ({ page }) => {
@@ -158,6 +180,14 @@ test.describe('task panel hosts', () => {
     await expect(page.locator('[data-column]')).toHaveCount(4);
     expect(new URL(page.url()).searchParams.get('view')).toBe('board');
     await expect(card.locator('.todo-card-link')).toHaveAttribute('href', /\/app\/todo\/inbox-running/);
+    const opened = page.context().waitForEvent('page');
+    await card.locator('.todo-card-link').click({ modifiers: ['ControlOrMeta'] });
+    const tab = await opened;
+    await tab.waitForLoadState();
+    expect(new URL(tab.url()).pathname).toBe('/app/todo/inbox-running');
+    await tab.close();
+    expect(new URL(page.url()).pathname).toBe('/app');
+    await expect(panel(page).getByTestId('task-panel-title')).toContainText('verify-cairn');
     await shot(page, 'board-task.png');
   });
 

@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useLocation, useNavigate, useNavigationType } from 'react-router';
 import type { Phase } from '../fixtures/records.js';
 
 export const PANEL_PARAM = 'panel';
@@ -42,6 +42,8 @@ export interface TaskPanelApi {
   focusTaken: () => void;
 }
 
+const CLOSED = { open: false, taskId: null };
+
 const TaskPanelContext = createContext<TaskPanelApi | null>(null);
 
 export function useTaskPanel(): TaskPanelApi | null {
@@ -57,6 +59,7 @@ export function TaskPanelRoot({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const navigationType = useNavigationType();
   const [state, setState] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const taskId = params.get(TASK_PARAM);
@@ -74,7 +77,10 @@ export function TaskPanelRoot({
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (!params.has(PANEL_PARAM) && !params.has(TASK_PARAM)) return;
+    const inUrl = params.has(PANEL_PARAM) || params.has(TASK_PARAM);
+    if (navigationType === 'POP')
+      setState(inUrl ? { open: true, taskId: params.get(TASK_PARAM) } : CLOSED);
+    if (!inUrl) return;
     params.delete(PANEL_PARAM);
     params.delete(TASK_PARAM);
     const rest = params.toString();
@@ -82,13 +88,12 @@ export function TaskPanelRoot({
       { pathname: location.pathname, search: rest === '' ? '' : `?${rest}`, hash: location.hash },
       { replace: true, state: location.state },
     );
-  }, [location, navigate]);
+  }, [location, navigationType, navigate]);
 
   useEffect(() => {
-    if (!hosted) return;
     const url = new URL(window.location.href);
-    const panel = state.open ? '1' : null;
-    const task = state.open ? state.taskId : null;
+    const panel = hosted && state.open ? '1' : null;
+    const task = hosted && state.open ? state.taskId : null;
     if (url.searchParams.get(PANEL_PARAM) === panel && url.searchParams.get(TASK_PARAM) === task)
       return;
     if (panel == null) url.searchParams.delete(PANEL_PARAM);
@@ -100,7 +105,7 @@ export function TaskPanelRoot({
 
   useEffect(() => {
     if (wasHosted.current && !hosted) {
-      setState({ open: false, taskId: null });
+      setState(CLOSED);
       opener.current = null;
     }
     wasHosted.current = hosted;
@@ -121,7 +126,7 @@ export function TaskPanelRoot({
   }, []);
 
   const close = useCallback(() => {
-    setState({ open: false, taskId: null });
+    setState(CLOSED);
     const target = opener.current;
     opener.current = null;
     if (target != null) requestAnimationFrame(() => target.isConnected && target.focus());
