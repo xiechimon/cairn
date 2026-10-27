@@ -21,6 +21,7 @@ import {
   todo as todoTable,
   tokenUsage,
 } from '../../../apps/server/src/db/schema.js';
+import { cancelPendingQuestions } from '../../../apps/server/src/services/chief-questions.js';
 import { repoDirFor } from '../../../apps/server/src/services/git.js';
 import {
   api,
@@ -458,6 +459,7 @@ async function settleChiefTurn(
   );
   stack.park();
   await waitFor(() => {
+    cancelPendingQuestions({ db }, threadId, 'eval harness: no user is present to answer');
     const thread = db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
     const settled = fresh().some(
       (row) => row.status === 'done' || row.status === 'failed' || row.status === 'stopped',

@@ -10,8 +10,10 @@ transcript.
 
 | id | type | definition |
 |---|---|---|
-| `decision_ok` | binary (primary) | The step is `done` and: for `route`, the new todos sit in exactly the expected projects, one per project; for `ask`, no todo is created, the reply or `ask_user` names every candidate and no project outside the candidates; for `answer`, no todo is created and the reply is not empty. |
+| `decision_ok` | binary (primary) | The step is `done` and: for `route`, the new todos sit in exactly the expected projects, one per project; for `ask`, no todo is created, the `ask_user` question (or, without one, the reply) names every candidate, and the `ask_user` question names no project outside the candidates (the reply may explain why one was ruled out); for `answer`, no todo is created and the reply is not empty. |
 | `receipt_ok` | binary (`route` only) | The reply names every project a todo was placed in. |
+
+Todos the Chief closed in the same turn (a split parent, a misplaced card it replaced) are not counted. The harness cancels any pending `ask_user` card so the turn can finish without a user.
 
 A project counts as named when its name or one of its aliases (`projects.mts`) appears, with
 name boundaries for the ASCII names.

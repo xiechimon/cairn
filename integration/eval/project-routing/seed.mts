@@ -1,5 +1,3 @@
-import { eq } from 'drizzle-orm';
-import { project as projectTable } from '../../../apps/server/src/db/schema.js';
 import { api } from '../../test/helpers.js';
 import { type SeededWorld, type Stack, seedRepoContent } from '../chief-dispatch/stack.mts';
 import { DEFAULT_PROJECT_NAME, ROUTING_PROJECTS } from './projects.mts';
@@ -18,15 +16,15 @@ export async function seedRoutingProjects(
         teamId: server.teamId,
         repoKind: 'hosted',
       });
-      if (res.status !== 201) throw new Error(`建 ${p.name} 失败: ${res.status}`);
+      if (res.status !== 201) throw new Error(`creating project ${p.name} failed: ${res.status}`);
       id = (res.body as { id: string }).id;
       seedRepoContent(stack, id, p.name, p.seedDir);
     }
-    server.db
-      .update(projectTable)
-      .set({ description: p.description })
-      .where(eq(projectTable.id, id))
-      .run();
+    const described = await api(server.url, 'PATCH', `/api/projects/${id}`, {
+      description: p.description,
+    });
+    if (described.status !== 200)
+      throw new Error(`setting the description of ${p.name} failed: ${described.status}`);
     idsByName[p.name] = id;
   }
   return idsByName;

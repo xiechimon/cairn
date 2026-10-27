@@ -29,20 +29,40 @@ function mentionsProject(text: string, name: string): boolean {
   );
 }
 
-function questionText(ev: TurnEvidence): string {
+function askedText(ev: TurnEvidence): string | null {
   const asked = ev.toolCalls
     .filter((c) => c.name === 'ask_user')
     .map((c) => JSON.stringify(c.arguments));
-  return [ev.assistantText, ...asked].join('\n');
+  return asked.length > 0 ? asked.join('\n') : null;
 }
 
-function projectNamesOf(ev: TurnEvidence, idsByName: Record<string, string>): string[] {
+function placedProjects(ev: TurnEvidence, idsByName: Record<string, string>): string[] {
   const nameById = new Map(Object.entries(idsByName).map(([name, id]) => [id, name]));
-  return ev.createdTodoRows.map((t) => nameById.get(t.projectId) ?? `?${t.projectId}`);
+  return ev.createdTodoRows
+    .filter((t) => t.phase !== 'closed')
+    .map((t) => nameById.get(t.projectId) ?? `?${t.projectId}`);
 }
 
 function sameMultiset(a: string[], b: string[]): boolean {
   return a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
+}
+
+function gradeAsk(candidates: string[], ev: TurnEvidence): { ok: boolean; why: string } {
+  const question = askedText(ev);
+  const text = question ?? ev.assistantText;
+  const missing = candidates.filter((n) => !mentionsProject(text, n));
+  const extra =
+    question === null
+      ? []
+      : ROUTING_PROJECTS.map((p) => p.name).filter(
+          (n) => !candidates.includes(n) && mentionsProject(question, n),
+        );
+  if (missing.length === 0 && extra.length === 0)
+    return { ok: true, why: `asked about the tied candidates only: ${candidates.join(', ')}` };
+  const parts: string[] = [];
+  if (missing.length > 0) parts.push(`question leaves out ${missing.join(', ')}`);
+  if (extra.length > 0) parts.push(`question lists ruled-out ${extra.join(', ')}`);
+  return { ok: false, why: parts.join('; ') };
 }
 
 function gradeDecision(
@@ -50,34 +70,25 @@ function gradeDecision(
   ev: TurnEvidence,
   idsByName: Record<string, string>,
 ): { ok: boolean; why: string } {
-  if (ev.stepStatus !== 'done') return { ok: false, why: `步未完成：${ev.stepStatus}` };
-  const placed = projectNamesOf(ev, idsByName);
+  if (ev.stepStatus !== 'done') return { ok: false, why: `step not done: ${ev.stepStatus}` };
+  const placed = placedProjects(ev, idsByName);
   const expect = input.expect;
   if (expect.kind === 'route') {
     const ok = sameMultiset(placed, expect.projects);
     return {
       ok,
       why: ok
-        ? `每个项目各一张：${placed.join('、')}`
-        : `期望 [${expect.projects.join('、')}]，实际 [${placed.join('、') || '无'}]`,
+        ? `one todo per project: ${placed.join(', ')}`
+        : `expected [${expect.projects.join(', ')}], got [${placed.join(', ') || 'none'}]`,
     };
   }
-  if (placed.length > 0) return { ok: false, why: `不该建任务，却建在 ${placed.join('、')}` };
+  if (placed.length > 0)
+    return { ok: false, why: `should not create a todo, created in ${placed.join(', ')}` };
   if (expect.kind === 'answer') {
     const ok = ev.assistantText !== '';
-    return { ok, why: ok ? '只回答，没建任务' : '没建任务但也没回答' };
+    return { ok, why: ok ? 'answered without a todo' : 'no todo, but no answer either' };
   }
-  const text = questionText(ev);
-  const missing = expect.candidates.filter((n) => !mentionsProject(text, n));
-  const extra = ROUTING_PROJECTS.map((p) => p.name).filter(
-    (n) => !expect.candidates.includes(n) && mentionsProject(text, n),
-  );
-  if (missing.length === 0 && extra.length === 0)
-    return { ok: true, why: `只问了仍分不出的候选：${expect.candidates.join('、')}` };
-  const parts: string[] = [];
-  if (missing.length > 0) parts.push(`没问到 ${missing.join('、')}`);
-  if (extra.length > 0) parts.push(`列了已能排除的 ${extra.join('、')}`);
-  return { ok: false, why: parts.join('；') };
+  return gradeAsk(expect.candidates, ev);
 }
 
 export function gradeRoutingCase(
@@ -92,7 +103,9 @@ export function gradeRoutingCase(
     const unnamed = input.expect.projects.filter((n) => !mentionsProject(ev.assistantText, n));
     grade.receipt_ok = unnamed.length === 0 ? 1 : 0;
     explanation.receipt_ok =
-      unnamed.length === 0 ? '回执点名了项目' : `回执没提到 ${unnamed.join('、')}`;
+      unnamed.length === 0
+        ? 'reply names the project'
+        : `reply does not name ${unnamed.join(', ')}`;
   }
   return { grade, explanation };
 }

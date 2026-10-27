@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import type { TurnEvidence } from '../eval/chief-dispatch/stack.mts';
 import {
@@ -42,7 +42,7 @@ function todoIn(project: string, n = 1) {
     projectId: ids[project] ?? 'unknown',
     buildAgentId: null,
     planAgentId: null,
-    phase: 'backlog',
+    phase: 'todo',
   };
 }
 
@@ -57,6 +57,10 @@ const ask = (candidates: string[]): RoutingCase => ({
   tags: ['ask'],
   prompt: 'p',
   expect: { kind: 'ask', candidates },
+});
+const asked = (question: string) => ({
+  name: 'ask_user',
+  arguments: { questions: [{ header: '项目', question, options: [] }] },
 });
 const answer: RoutingCase = { id: 'q', tags: ['answer'], prompt: 'p', expect: { kind: 'answer' } };
 
@@ -95,16 +99,17 @@ describe('project-routing case ledger', () => {
   });
 
   test('the inferable broken-link case is decidable from the seeds alone', () => {
-    const readme = (name: string) => {
-      const p = ROUTING_PROJECTS.find((x) => x.name === name);
-      if (p === undefined) throw new Error(name);
-      return readFileSync(join(p.seedDir, 'README.md'), 'utf8');
-    };
-    const linkTargets = (text: string) =>
-      [...text.matchAll(/\]\((?!https?:)([^)#]+)\)/g)].map((m) => m[1] ?? '');
-    const broken = ROUTING_PROJECTS.filter((p) =>
-      linkTargets(readme(p.name)).some((t) => !existsSync(join(p.seedDir, t))),
-    ).map((p) => p.name);
+    const markdownFiles = (dir: string): string[] =>
+      readdirSync(dir, { recursive: true, encoding: 'utf8' })
+        .filter((f) => f.endsWith('.md'))
+        .map((f) => join(dir, f));
+    const hasBrokenLink = (file: string) =>
+      [...readFileSync(file, 'utf8').matchAll(/\]\((?!https?:)([^)#]+)\)/g)].some(
+        (m) => !existsSync(join(dirname(file), m[1] ?? '')),
+      );
+    const broken = ROUTING_PROJECTS.filter((p) => markdownFiles(p.seedDir).some(hasBrokenLink)).map(
+      (p) => p.name,
+    );
     const linkCase = cases.find((c) => c.tags.includes('broken-links'));
     expect(linkCase?.expect.kind === 'route' && linkCase.expect.projects).toEqual(broken);
   });
@@ -148,6 +153,18 @@ describe('gradeRoutingCase', () => {
     ).toBe(0);
   });
 
+  test('route: a todo the chief closed in the same turn does not count', () => {
+    const c = route(['eval-project', 'docs-site']);
+    const parent = { ...todoIn('eval-project', 0), phase: 'closed' };
+    expect(
+      gradeRoutingCase(
+        c,
+        turn({ createdTodoRows: [parent, todoIn('eval-project'), todoIn('docs-site')] }),
+        ids,
+      ).grade.decision_ok,
+    ).toBe(1);
+  });
+
   test('route receipt: the reply names the chosen project', () => {
     const c = route(['digest-bot']);
     const rows = [todoIn('digest-bot')];
@@ -161,13 +178,11 @@ describe('gradeRoutingCase', () => {
     ).toBe(0);
   });
 
-  test('ask: no todo, every candidate named, no project outside the candidates named', () => {
+  test('ask: no todo and every candidate named, in ask_user or in the reply', () => {
     const c = ask(['eval-project', 'docs-site']);
     const text = 'eval-project 和 docs-site 都有网页，放哪个？';
     expect(gradeRoutingCase(c, turn({ assistantText: text }), ids).grade.decision_ok).toBe(1);
-    expect(
-      gradeRoutingCase(c, turn({ assistantText: `${text} 还是 bench？` }), ids).grade.decision_ok,
-    ).toBe(0);
+    expect(gradeRoutingCase(c, turn({ toolCalls: [asked(text)] }), ids).grade.decision_ok).toBe(1);
     expect(
       gradeRoutingCase(c, turn({ assistantText: '放 eval-project 吗？' }), ids).grade.decision_ok,
     ).toBe(0);
@@ -180,11 +195,30 @@ describe('gradeRoutingCase', () => {
     ).toBe(0);
   });
 
-  test('ask: a todo-shaped project name inside a longer name does not count as naming it', () => {
+  test('ask: the ask_user question must not list a ruled-out project; the reply may explain it', () => {
+    const c = ask(['eval-project', 'docs-site']);
+    const question = 'eval-project 还是 docs-site？';
+    expect(
+      gradeRoutingCase(c, turn({ toolCalls: [asked(`${question}还是 bench？`)] }), ids).grade
+        .decision_ok,
+    ).toBe(0);
+    expect(
+      gradeRoutingCase(
+        c,
+        turn({ toolCalls: [asked(question)], assistantText: 'bench 没有网页，已排除。' }),
+        ids,
+      ).grade.decision_ok,
+    ).toBe(1);
+  });
+
+  test('ask: a project name inside a longer word does not count as naming that project', () => {
     const c = ask(['eval-project', 'docs-site']);
     expect(
-      gradeRoutingCase(c, turn({ assistantText: 'eval-project 还是 docs-site？' }), ids).grade
-        .decision_ok,
+      gradeRoutingCase(
+        c,
+        turn({ toolCalls: [asked('参考 SWE-bench 的做法，放 eval-project 还是 docs-site？')] }),
+        ids,
+      ).grade.decision_ok,
     ).toBe(1);
   });
 

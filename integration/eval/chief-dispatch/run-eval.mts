@@ -276,7 +276,10 @@ function usage() {
 
 function checkHarness(statePath: string, st: Record<string, unknown>, approve: boolean) {
   const self = fileURLToPath(import.meta.url);
-  const listed = [...CHIEF_DISPATCH_HARNESS_PATHS];
+  const declared = Array.isArray(st.harness_paths)
+    ? st.harness_paths.filter((p): p is string => typeof p === 'string')
+    : [];
+  const listed = [...new Set([...CHIEF_DISPATCH_HARNESS_PATHS, ...declared])];
   const paths = [...new Set([self, ...listed.map((p) => resolveFromRoot(p))])].sort();
   const h = createHash('sha256');
   const hashed: string[] = [];

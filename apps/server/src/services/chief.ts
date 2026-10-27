@@ -800,8 +800,8 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
         id: p.id,
         name: p.name,
         repoKind: p.repoKind,
-        description: p.description,
-        githubRepo: p.githubRepo,
+        ...(p.description !== null ? { description: p.description } : {}),
+        ...(p.githubRepo !== null ? { githubRepo: p.githubRepo } : {}),
       })),
     )}`,
     agents.length > 0
