@@ -90,7 +90,7 @@ async function pickModel(page: Page, slot: number, modelName: string) {
 
 const addButton = (page: Page) => page.getByRole('button', { name: '添加备用模型' });
 
-test('empty chain: rule copy is clear, only an add entry, no candidate rows', async ({ page }) => {
+test('empty chain: rule copy is clear, only an add entry, no candidate rows', async ({ page }, testInfo) => {
   const agentId = await createAgent('fb-empty');
   await openDetail(page, agentId);
   const section = page.locator('.agent-fallback');
@@ -99,6 +99,7 @@ test('empty chain: rule copy is clear, only an add entry, no candidate rows', as
   await expect(section).toContainText('备选用尽后，限流和额度继续等待');
   await expect(page.getByRole('combobox', { name: '备用 1 模型' })).toHaveCount(0);
   await expect(addButton(page)).toBeEnabled();
+  await page.screenshot({ path: testInfo.outputPath('fallback-copy-current.png') });
 });
 
 test('add: lands in the store only after model selection, reload reads back the same row', async ({ page }) => {
