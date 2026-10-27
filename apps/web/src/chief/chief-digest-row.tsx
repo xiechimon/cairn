@@ -24,58 +24,6 @@ const ITEM_TEXT_CLS =
   'min-w-0 flex-1 text-foreground [&>:first-child]:mt-0! [&>:last-child]:mb-0! [[data-gone]_&]:line-through';
 const ICON_BTN_CLS = 'size-7 shrink-0 text-content-tertiary';
 
-function clock(ms: number): string {
-  const d = new Date(ms);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function DigestItem({
-  item,
-  gone,
-  onForget,
-}: {
-  item: ChiefDigestItem;
-  gone: boolean;
-  onForget: (memory: { id: string; agentId: string }) => void;
-}) {
-  const { t } = useI18n();
-  const memory = item.memory;
-  return (
-    <li data-testid="chief-digest-item" data-gone={gone ? '' : undefined} className={ITEM_CLS}>
-      <div className="min-w-0 flex-1">
-        <div className={ITEM_TEXT_CLS}>
-          <ChatMarkdown text={item.text} />
-        </div>
-        {(item.reason !== '' || gone) && (
-          <div className="text-meta text-content-tertiary">{gone ? t('已忘掉') : item.reason}</div>
-        )}
-      </div>
-      {memory !== undefined && !gone && (
-        <>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={ICON_BTN_CLS}
-            aria-label={t('查看这条记忆')}
-            render={<Link to={`${AGENTS_HREF}/${memory.agentId}?tab=memory#memory-${memory.id}`} />}
-          >
-            <ExternalLink width={14} height={14} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={ICON_BTN_CLS}
-            aria-label={t('让总管忘掉这条')}
-            onClick={() => onForget(memory)}
-          >
-            <Trash2 width={14} height={14} />
-          </Button>
-        </>
-      )}
-    </li>
-  );
-}
-
 export function ChiefDigestRow({
   reason,
   madeAt,
@@ -94,22 +42,6 @@ export function ChiefDigestRow({
   const memoriesQ = useMemories(teamId, memoryAgentId, live && open && memoryAgentId !== undefined);
   const mutations = useApiMutations(teamId);
   const known = memoriesQ.data === undefined ? null : new Set(memoriesQ.data.map((m) => m.id));
-  const isGone = (item: ChiefDigestItem) =>
-    item.memory !== undefined &&
-    (forgotten.has(item.memory.id) || (known !== null && !known.has(item.memory.id)));
-  const forget = (memory: { id: string; agentId: string }) => {
-    if (!live) {
-      setForgotten((prev) => new Set(prev).add(memory.id));
-      return;
-    }
-    mutations.deleteMemory.mutate(
-      { agentId: memory.agentId, memoryId: memory.id },
-      {
-        onSuccess: () => setForgotten((prev) => new Set(prev).add(memory.id)),
-        onError: (error) => toastError(t('删除记忆失败，请重试。'), error),
-      },
-    );
-  };
   const label =
     reason === 'daily'
       ? t('总管把昨天的对话整理成了 {n} 条摘要', { n: items.length })
@@ -137,7 +69,7 @@ export function ChiefDigestRow({
       >
         <h3 className="m-0 text-ui font-medium text-foreground">
           {t(reason === 'daily' ? '昨天的摘要 · {time} 整理' : '上面内容的摘要 · {time} 整理', {
-            time: clock(madeAt),
+            time: new Date(madeAt).toTimeString().slice(0, 5),
           })}
         </h3>
         {CHIEF_DIGEST_GROUPS.map((group) => {
@@ -149,9 +81,70 @@ export function ChiefDigestRow({
                 {t(CHIEF_DIGEST_GROUP_LABELS[group])}
               </span>
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-                {groupItems.map((item, index) => (
-                  <DigestItem key={index} item={item} gone={isGone(item)} onForget={forget} />
-                ))}
+                {groupItems.map((item, index) => {
+                  const memory = item.memory;
+                  const gone =
+                    memory !== undefined &&
+                    (forgotten.has(memory.id) || (known !== null && !known.has(memory.id)));
+                  return (
+                    <li
+                      key={index}
+                      data-testid="chief-digest-item"
+                      data-gone={gone ? '' : undefined}
+                      className={ITEM_CLS}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className={ITEM_TEXT_CLS}>
+                          <ChatMarkdown text={item.text} />
+                        </div>
+                        {(item.reason !== '' || gone) && (
+                          <div className="text-meta text-content-tertiary">
+                            {gone ? t('已忘掉') : item.reason}
+                          </div>
+                        )}
+                      </div>
+                      {memory !== undefined && !gone && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={ICON_BTN_CLS}
+                            aria-label={t('查看这条记忆')}
+                            render={
+                              <Link
+                                to={`${AGENTS_HREF}/${memory.agentId}?tab=memory#memory-${memory.id}`}
+                              />
+                            }
+                          >
+                            <ExternalLink width={14} height={14} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={ICON_BTN_CLS}
+                            aria-label={t('让总管忘掉这条')}
+                            onClick={() => {
+                              const markGone = () =>
+                                setForgotten((prev) => new Set(prev).add(memory.id));
+                              if (!live) markGone();
+                              else
+                                mutations.deleteMemory.mutate(
+                                  { agentId: memory.agentId, memoryId: memory.id },
+                                  {
+                                    onSuccess: markGone,
+                                    onError: (error) =>
+                                      toastError(t('删除记忆失败，请重试。'), error),
+                                  },
+                                );
+                            }}
+                          >
+                            <Trash2 width={14} height={14} />
+                          </Button>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           );

@@ -135,12 +135,6 @@ async function setup(): Promise<World> {
     })
     .run();
   const deps = { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, convHub: s.convHub };
-  const digestThreadSteps = () =>
-    s.db
-      .select()
-      .from(stepTable)
-      .all()
-      .filter((r) => isChiefDigestThreadId(r.buildId));
   return {
     s,
     teamId,
@@ -178,7 +172,12 @@ async function setup(): Promise<World> {
       });
       expect(doneRes.status).toBe(200);
     },
-    digestSteps: digestThreadSteps,
+    digestSteps: () =>
+      s.db
+        .select()
+        .from(stepTable)
+        .all()
+        .filter((r) => isChiefDigestThreadId(r.buildId)),
     relay: (stepId, name, params) =>
       call(s.app, 'POST', `/api/machine/tool/${stepId}`, { cred: token, body: { name, params } }),
     digestRows: () =>

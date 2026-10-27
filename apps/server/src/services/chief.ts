@@ -778,6 +778,8 @@ export function fireDueChiefWakes(deps: ChiefDeps, now: number): void {
   }
 }
 
+const CHIEF_DIGEST_PROMPT_DIGESTS = 3;
+
 export function composeChiefSystemPrompt(
   deps: ChiefResourceDeps,
   teamId: string,
@@ -792,6 +794,30 @@ export function composeChiefSystemPrompt(
   const skills = scanLocalSkills(deps.skillsDir);
   const memories = agentRow ? injectMemories(deps.db, { agentId: agentRow.id }) : [];
 
+  const digestRows = deps.db
+    .select({ content: chiefMessage.content })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, threadId ?? ''),
+        like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`),
+      ),
+    )
+    .orderBy(desc(chiefMessage.createdAt))
+    .limit(CHIEF_DIGEST_PROMPT_DIGESTS)
+    .all();
+  const digestLines: string[] = [];
+  for (const row of digestRows.reverse()) {
+    const parsed = chiefDigestContentSchema.safeParse(
+      typeof row.content === 'string' ? JSON.parse(row.content) : row.content,
+    );
+    if (!parsed.success) continue;
+    for (const item of parsed.data.items) {
+      digestLines.push(
+        `- [${CHIEF_DIGEST_GROUP_LABELS[item.group]}] ${item.text}${item.reason !== '' ? `（${item.reason}）` : ''}`,
+      );
+    }
+  }
   const lines: string[] = [
     '你是「总管」（Chief）——每「用户×团队」一个的调度与对话代理：理解用户请求、创建任务、分派给合适的 Agent 执行，并在关口/落地/失败时跟进汇报。',
     '',
@@ -828,7 +854,7 @@ export function composeChiefSystemPrompt(
       ? memories.map((m) => `- ${m.title}：${m.content}`).join('\n')
       : '（尚无记忆）',
     '',
-    ...(threadId !== undefined ? chiefDigestSection(deps.db, threadId) : []),
+    ...(digestLines.length > 0 ? ['## 之前对话的摘要（原文仍在对话里）', ...digestLines, ''] : []),
     '## 工作约定',
     '- 措辞→spec：把用户口语请求变换为 todo——title = 动词短语提炼；spec = 三段式：① 用户原文 blockquote（`> …`）② `要求：` bullet 展开（文件位置/内容要点/读者对象）③ 需要时 `补充信息（探测得出，非用户确认）：` bullet（先探测仓库/资源再写事实，显式标注非用户确认）。',
     '- 拆分：拆分粒度 = 核销次数——按可独立验收的成果拆，不按执行步骤拆；同类小事项合并一张卡（多子事项以 ` + ` 并入标题），跨类型、可各自独立验收的交付物才拆成多张。子卡 spec 必须内嵌用户原文片段（`> …` blockquote）并给兄弟任务文字交叉引用。',
@@ -856,37 +882,6 @@ export function composeChiefSystemPrompt(
     '- 用与用户相同的语言回复。',
   ];
   return lines.join('\n');
-}
-
-const CHIEF_DIGEST_PROMPT_DIGESTS = 3;
-
-function chiefDigestSection(db: Db, threadId: string): string[] {
-  const rows = db
-    .select({ content: chiefMessage.content })
-    .from(chiefMessage)
-    .where(
-      and(
-        eq(chiefMessage.threadId, threadId),
-        like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`),
-      ),
-    )
-    .orderBy(desc(chiefMessage.createdAt))
-    .limit(CHIEF_DIGEST_PROMPT_DIGESTS)
-    .all();
-  const lines: string[] = [];
-  for (const row of rows.reverse()) {
-    const parsed = chiefDigestContentSchema.safeParse(
-      typeof row.content === 'string' ? JSON.parse(row.content) : row.content,
-    );
-    if (!parsed.success) continue;
-    for (const item of parsed.data.items) {
-      lines.push(
-        `- [${CHIEF_DIGEST_GROUP_LABELS[item.group]}] ${item.text}${item.reason !== '' ? `（${item.reason}）` : ''}`,
-      );
-    }
-  }
-  if (lines.length === 0) return [];
-  return ['## 之前对话的摘要（原文仍在对话里）', ...lines, ''];
 }
 
 export function chiefClaimContext(
