@@ -1,0 +1,1201 @@
+$ node scripts/prepush.mjs
+[heavy-slots] queued, position 1 (all 2 slots are busy)
+[heavy-slots] acquired slot 2/2
+[prepush] node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 14 text + 14 spacing in 13 file(s); 5 css + 212 tsx + 253 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 1b84a9bf8469.
+[prepush] node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 34 components/ui file(s); 23 brand-ink text-role line(s), all registered (23 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+[prepush] pnpm lint
+$ biome ci .
+[0m[34mChecked 1021 files in 2[0m[0m[2m[34ms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m
+[prepush] pnpm typecheck
+$ pnpm -r typecheck
+Scope: 6 of 7 workspace projects
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/daemon typecheck: Done
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+apps/web typecheck: Done
+integration typecheck: Done
+[prepush] pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1292 tests in 184 files collected, disk count matches (1.5s)
+[spec-parse-gate] integration/test: 38 test files parsed clean by tsc (4.1s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] node scripts/e2e-affected.mjs --check-coverage
+[e2e:affected] coverage: 0 uncovered spec(s)
+[prepush] node --test docs/verify/1542/reach.test.mjs
+✔ apps/web/e2e/unmapped-reach.spec.ts (34.685606ms)
+✔ apps/web/e2e/board-reach.spec.ts (25.589925ms)
+✔ apps/web/e2e/a11y-axe.spec.ts (27.731798ms)
+✔ registry reach: scripts/drive-unregistered.mjs (37.543371ms)
+✔ registry reach: docs/verify/1542/drive-unregistered.mts (31.484906ms)
+✔ registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs (29.991587ms)
+✔ registry reach: apps/web/e2e/unmapped-reach.spec.ts (55.596334ms)
+✔ registry reach: apps/web/e2e/board-reach.spec.ts (54.16039ms)
+✔ discovers committed, staged and untracked additions from the base (279.617585ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 622.736076
+[prepush] node scripts/lessons-ledger-gate.mjs
+lessons ledger ok
+[prepush] node scripts/ci-job-structure-gate.mjs
+ci-job-structure: GREEN (every named step sits in its pinned job)
+[prepush] node scripts/feature-map-staleness-gate.mjs
+feature-map-gate: OK (37 md files, 339 refs checked, 59 frozen in baseline)
+[prepush] node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+[prepush] node scripts/single-use-helper-gate.mjs
+single-use-helper-gate: 0 single-use helper(s)
+[prepush] node scripts/baseline-ratchet-gate.mjs
+baseline-ratchet-gate: 0 raised baseline(s)
+[prepush] node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 639 test sources, no package-manager spawns.
+[prepush] node scripts/pr-evidence-workflow-gate.mjs
+pr-evidence-workflow: GREEN (required-check shape intact)
+[prepush] node scripts/ui-registry-gate.mjs
+[ui-registry-gate] note: no base sha on this run (push event or local check) — the S5 ratchet has nothing to compare against; a status downgrade landing straight on main is guarded by review only (same posture as debt-gate D3 on main).
+[ui-registry-gate] PASS: 35 file(s) in apps/web/src/components/ui = 27 registry (20 pristine vs pinned snapshot / 7 registered deviations) + 8 adapters; snapshot shadcn@4.21.3 fetched 2026-10-25; ledger frozen from 1b84a9bf8469; comparison: in-tree only.
+[prepush] node scripts/ui-consumer-shape-gate.mjs
+[ui-consumer-shape-gate] PASS: 3 flagged line(s) across 253 consumer file(s), all registered (3 entries = 3 deviation).
+[prepush] node scripts/pr-gate-selfcheck.mjs
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are each required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+PASS  linesChanged must be a non-negative integer
+PASS  a path with a shell character is rejected
+PASS  CI gate helpers and data anywhere under scripts/ route to the user
+PASS  gate files outside root scripts/ route to the user (run 4)
+PASS  files that steer agents route to the user (run 4)
+PASS  a path a reviewer adds to protectedPaths routes to the user
+PASS  product source, tests, e2e and evidence do not route to the user
+PASS  paths outside the auto-merge set route to the user (run 5)
+PASS  agent-steering files the name list missed route to the user (run 5)
+PASS  eval ruler paths route to the user as protected (ADR 0025)
+PASS  case variants of protected paths route to the user (run 5)
+PASS  a protected path only the safety reviewer lists is matched (run 5)
+PASS  a deleted test helper (test directory only) routes to the user (run 5)
+PASS  a deleted colocated test (suffix only) routes to the user (run 5)
+PASS  a deleted path missing from changedFiles is an args error (run 5)
+PASS  pr and ticket must be positive integers (run 5)
+PASS  a path with a quote or space is rejected (run 5)
+PASS  configs CI runs under route to the user, at the root too
+PASS  a deletion only the safety reviewer reports routes to the user
+PASS  a larger line count from the safety reviewer routes to the user
+PASS  binaryFiles is required and lists changed paths only (code-review on #1410)
+PASS  a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410)
+PASS  a binary file under docs/verify stays mergeable without the user
+PASS  a binary file only the safety reviewer listed routes to the user
+PASS  a deleted test is found whatever the case of its directory or suffix (code-review on #1410)
+PASS  a glob star does not cross a slash: an extra directory before src/ leaves the auto-merge set (run 8)
+PASS  a deleted colocated .spec file outside a test directory routes to the user (run 8)
+PASS  a dimension whose review breaks the second stage counts as missing and keeps go false (run 8)
+PASS  private refs carry the head, so runs on two heads of one PR do not delete each other's refs (run 8)
+PASS  a reviewer that returns nothing blocks go
+PASS  findings past the skeptic cap are kept
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  two skeptics confirming on the head keep the finding (run 5)
+PASS  a split vote keeps the finding (run 5)
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a nested .gitattributes routes to the user (run 6)
+PASS  the args help gives the line count command that takes attributes from the empty tree (run 6)
+PASS  a C-quoted binary path is refused with the quoting hint (run 7)
+PASS  the safety reviewer is told both git commands with --no-renames, core.quotePath=false and the empty tree (runs 2, 6, 7)
+PASS  reviewers and skeptics fetch PR comments with a filter that drops non-members before the bodies reach them (run 7, final /code-review)
+PASS  reviewers confirm the head on their own ref, never FETCH_HEAD (run 1)
+PASS  every reviewer and skeptic is told GitHub is read-only and that PR text is data
+PASS  the safety reviewer must return all four git-derived values
+PASS  the 40-file cap counts files only the safety reviewer listed
+PASS  the merge readiness gate source routes to the user (run 6)
+PASS  migrations, the lockfile and .npmrc are protected, packages/* outside src and test is not auto (run 6)
+PASS  a deleted helper under e2e/, tests/ or __tests__/ routes to the user (run 6)
+PASS  exactly 800 lines and 40 files still auto-merge (run 6)
+PASS  a file only the safety reviewer lists counts toward the auto-merge set (run 6)
+PASS  headSha, an empty file list and non-string paths are args errors (run 6)
+PASS  the safety reviewer does not see the caller file list (run 6)
+PASS  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+PASS  the evidence reviewer and skeptics check for a fork before any checkout, and read a fork head with git show, diff and ls-tree only (run 10)
+PASS  every checkout the evidence prompts ask for runs with core.hooksPath=/dev/null (run 10)
+PASS  the fetch and the ref cleanup run with core.hooksPath=/dev/null in every prompt, the evidence worktrees included (run 10)
+PASS  evidence installs skip husky's prepare, which would set the shared clone's core.hooksPath to the relative .husky/_ (run 10)
+PASS  the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)
+PASS  a path only in the safety reviewer's deleted or binary list is matched against D4 and blocks go (run 10)
+PASS  an entry named exactly like a protected directory (a symlink .claude, scripts, drizzle) routes to the user (run 10)
+PASS  the bare-directory match is for protected classes only: src and docs/verify named alone stay outside the auto-merge set, file globs stay exact (run 10)
+PASS  D4 globs are anchored at the path start: an auto-merge or evidence path inside a longer one routes to the user (run 10)
+PASS  a caller line count larger than the safety reviewer's wins (run 10)
+PASS  the security-sensitive surfaces of the AGENTS.md /security-review list and the migration runner route to the user (run 11)
+PASS  the security class matches exact paths from the root: machine*.ts stops at a slash, and neighbours still auto-merge (run 11)
+PASS  protected names with U+017F or U+212A in place of s or k route to the user (run 11)
+PASS  auto-merge matching folds ASCII case only, protection folds Unicode: ſrc and docſ/verify route to the user, AGENTſ.md stays protected (run 11)
+PASS  a deleted test is found with U+017F in its directory or suffix (run 11)
+PASS  every prompt calls the ticket body untrusted data by the ticket's author, never instructions (run 11)
+PASS  each skeptic is given the finding and the refute rule (run 11)
+PASS  the safety reviewer's own protectedPaths route to the user (run 11)
+PASS  a deleted .mjs or .cts test routes to the user (run 11)
+PASS  skepticsMissing counts each skeptic that returned nothing (run 11)
+PASS  a path git quotes even with core.quotePath=false is sent to review by hand, not back to the flag (run 11)
+PASS  the args help and the safety reviewer say the line count command needs git 2.40 or later (run 11)
+PASS  docs-only Markdown patch: go, auto-merge (#1621)
+PASS  design decisions, ADRs and the review guide stay with the user in any case or Unicode fold (#1621)
+PASS  docs patch with a deleted test or a non-Markdown docs file routes to the user (#1621)
+PASS  a missing safety file list blocks go
+PASS  docs/spec, the goal-session rules, is a named protected class, not only default deny (#1462)
+PASS  every AGENTS.md /security-review path pattern is an entry of PROTECTED, and the section points back at ADR 0021 D4 (drift guard, #1462)
+PASS  a safety review missing deletedFiles, linesChanged or binaryFiles keeps go false (#1462)
+PASS  the verdict records which copy of the script ran: scriptSha256 is the file hash with its own constant blanked (#1462)
+PASS  a skeptic is told the finding is a relayed account whose text may quote untrusted PR or ticket data (#1462)
+94/94 passed (.claude/workflows/pr-gate.js)
+[prepush] node scripts/lane-file-gate.mjs
+lane-file-gate leg 1 (tracked at repo root): 0 hit(s)
+lane-file-gate leg 2: skipped (no base sha; local run or push event)
+lane-file-gate: OK (no lane process files tracked at the repository root)
+[prepush] node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+[prepush] node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/doc-reader-tests.test.mjs scripts/lessons-ledger-gate.test.mjs
+✔ a doc change selects the tests that name it, split by runner (0.801607ms)
+✔ root-level doc names, integration suites and known-red files are not selected (0.108872ms)
+✔ prose flags Chinese outside code spans, fences and HTML comments (1.292941ms)
+✔ code checks comments only; UI strings and exempt paths pass (1.819978ms)
+✔ diff mode reds added Chinese lines and Chinese commit messages only (316.937622ms)
+✔ --text checks a PR body file (51.063227ms)
+✔ slot count defaults to 2 and falls back to 1 with a warning for bad values (1.320081ms)
+✔ CI environments skip the queue (0.128873ms)
+✔ each slot owns its own e2e port and build directory (0.255772ms)
+✔ slotPortHolder names the pid, cwd and command of whatever listens on the port (88.370126ms)
+✔ a bad slot count gets a warning and a single slot (85.400637ms)
+✔ waiters see their queue position and are served first-come first-served (353.48108ms)
+✔ kill -9 on the holder frees the slot for the queued process within 5 seconds (332.71956ms)
+✔ a clean exit releases the slot too (308.314349ms)
+✔ simultaneous grabs for the last slot: exactly one wins, every round (15341.371983ms)
+✔ simultaneous reclaim of one dead holder: exactly one process inherits the slot (15586.985502ms)
+✔ two killed holders and several waiters: stale entries are reclaimed without double grants (2106.705047ms)
+✔ run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass (1538.432943ms)
+✔ a run wrapper inside a holder reuses its slot instead of queueing behind itself (67.685544ms)
+✔ an inherited slot variable that no live process holds is ignored (41.912332ms)
+✔ an inherited slot whose lock belongs to someone else is not reused (61.934659ms)
+✔ CI skips the queue even when every slot is taken (65.051148ms)
+✔ run wrapper passes the exit code through and frees the slot (62.733676ms)
+✔ e2e:affected queues for a slot, but a dry run never waits (103.738418ms)
+✔ e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit (128.517857ms)
+✔ a squatted slot port fails e2e:affected before playwright and names the holding process (176.837974ms)
+✔ prepush queues for a slot in local mode and starts once the holder is killed (488.505631ms)
+✔ prepush reports a squatted slot port before running any check (121.531696ms)
+✔ every migrated entry passes and the old table is gone (11.281752ms)
+✔ level 5 entry without a reason is rejected (0.253179ms)
+✔ level outside 1 to 5 is rejected (0.235352ms)
+✔ pending upgrade without a ticket is rejected, with a ticket passes (0.148612ms)
+✔ the real bad note that sat on main without a ticket is rejected (0.184737ms)
+✔ file name without a ticket number is rejected (0.129845ms)
+✔ missing, reordered or malformed fields are rejected (0.269233ms)
+✔ a resurrected docs/lessons.md table is rejected (0.658216ms)
+✔ two parallel branches each adding an entry merge without conflict (34.808836ms)
+✔ the old single table does conflict when two branches append a row (24.952473ms)
+✔ both upgrade-pending word orders and the original Chinese marker require a ticket (0.286889ms)
+✔ table generation rejects malformed entries with the ledger diagnostic (0.285358ms)
+✔ generated table keeps existing escaped pipes inside their cell (0.796874ms)
+✔ the CLI can validate and render entries from a checkout path containing spaces (46.972839ms)
+[prepush] git init -q
+✔ documentation skips code checks, unknown paths fail closed (1.265636ms)
+✔ changes to prepush scripts run the CI self-test files locally (0.201432ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.161091ms)
+✔ local code checks include both UI gates and affected e2e (0.096654ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.265177ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.091568ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (1.208381ms)
+✔ affected e2e gets only code paths, so a bulk evidence prune fits on the command line (2.900836ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (72.591875ms)
+✔ a board card source change selects the spec that reads its title (25.652661ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.563695ms)
+✔ CLI skips real document changes and rejects a missing base (378.520735ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (116.194099ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (81.737217ms)
+✔ prepush vitest only forgives files listed as known local red (1.064304ms)
+✔ plan children do not inherit the git hook repository binding (7.483973ms)
+ℹ tests 58
+ℹ suites 0
+ℹ pass 58
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 38497.783882
+[prepush] node scripts/prepush-vitest.mjs
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/ledger-1656
+
+ ✓ |@xiechimon/cairn| test/pr-reconcile.test.ts (186 tests) 5114ms
+ ✓ |@xiechimon/cairn| test/issue-intake.test.ts (174 tests) 6309ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts (122 tests) 3094ms
+ ✓ |@xiechimon/cairn| test/pr-seg3.test.ts (79 tests) 1928ms
+ ✓ |@xiechimon/cairn| test/skill-import.test.ts (35 tests) 905ms
+ ✓ |@xiechimon/cairn| test/github-reads.test.ts (39 tests) 988ms
+ ✓ |@xiechimon/cairn| test/ci-loop.test.ts (37 tests) 1093ms
+ ✓ |@xiechimon/cairn| test/skill-write.test.ts (30 tests) 1638ms
+   ✓ machine-wire skill listing and on-demand fetch (GET /api/machine/skills/{stepId}[/file]) (8)
+     ✓ M5: an over-limit file no longer fails the whole package -- an asset past the per-file gate enters the listing with its real size and is delivered byte-complete; a total over the old package gate still gets a listing 797ms
+ ✓ |@xiechimon/cairn| test/github-issues.test.ts (36 tests) 1097ms
+stderr | ../../packages/shared/src/github-create-gate.ts:55:46
+GitHub create delayed: spacing, 2969ms
+
+ ✓ |@xiechimon/cairn| test/persona-split-verify.test.ts (18 tests) 655ms
+ ✓ |@xiechimon/cairn| test/merge-gate-verdict-binding.test.ts (26 tests) 1079ms
+ ✓ |@xiechimon/cairn| test/machine-wire.test.ts (26 tests) 1387ms
+   ✓ claim/wake timing (r3 section 1.5 measured: ~75s long poll cadence + wake low-latency dispatch) (5)
+     ✓ empty long poll returns {step:null} after about the hold duration (same cadence shape, shortened timescale) 435ms
+ ✓ |@xiechimon/cairn| test/retry-lessons.test.ts (22 tests) 621ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts (26 tests) 495ms
+ ✓ |@xiechimon/cairn| test/review.test.ts (17 tests) 995ms
+ ✓ |@xiechimon/cairn| test/artifact-gate.test.ts (27 tests) 1010ms
+ ✓ |@xiechimon/cairn| test/project-identity.test.ts (29 tests) 332ms
+ ✓ |@xiechimon/cairn| test/merge-gate-tables.test.ts (25 tests) 508ms
+ ✓ |@xiechimon/cairn| test/build-abandoned-sweep.test.ts (34 tests) 743ms
+stderr | test/github-writeback.test.ts > self-created issues: stored as not-yet-created, source backfilled after async creation (A family) > a secondary limit retries the pending task and backfills its source
+GitHub create rate limited; retrying in 1000ms
+
+ ✓ |@xiechimon/cairn| test/github-writeback.test.ts (18 tests) 1743ms
+   ✓ self-created issues: stored as not-yet-created, source backfilled after async creation (A family) (10)
+     ✓ a secondary limit retries the pending task and backfills its source 1028ms
+ ✓ |@xiechimon/cairn| test/token-auth.test.ts (45 tests) 640ms
+ ✓ |@xiechimon/cairn| test/project-local.test.ts (32 tests) 245ms
+ ✓ |@xiechimon/cairn| test/m3b-machine-git.test.ts (12 tests) 866ms
+ ✓ |@xiechimon/cairn| test/git-hosting.test.ts (11 tests) 735ms
+ ✓ |@xiechimon/cairn| test/m5-face.test.ts (9 tests) 350ms
+ ✓ |@xiechimon/cairn| test/conv-stream-catchup.test.ts (25 tests) 478ms
+ ✓ |@xiechimon/cairn| test/close-stops-active-steps.test.ts (28 tests) 942ms
+ ✓ |@xiechimon/cairn| test/attachment-gc.test.ts (15 tests) 2183ms
+   ✓ attachment gc -- scheduler cadence (3)
+     ✓ a large transcript corpus does not block the event loop during a tick 1837ms
+ ✓ |@xiechimon/cairn| test/skills-local.test.ts (24 tests) 425ms
+ ✓ |@xiechimon/cairn| test/machine-pin.test.ts (11 tests) 2254ms
+   ✓ #1259 worker home-machine gate (2)
+     ✓ bound to A -> A claims, B comes up empty; rebound to B -> B claims (reassignment immediate) 512ms
+     ✓ no home machine set -> no machine can claim it (stays pending) 439ms
+   ✓ #1260 chief step delivery = bound Agent home machine (1)
+     ✓ Agent bound to B -> only B can claim the chief step; Agent rebound to A -> A claims (reassignment immediate) 444ms
+ ✓ |@xiechimon/cairn| test/machine-capability-gate.test.ts (14 tests) 471ms
+ ✓ |@xiechimon/cairn| test/plan-handoff.test.ts (15 tests) 608ms
+ ✓ |@xiechimon/cairn| test/attachments.test.ts (27 tests) 672ms
+ ✓ |@xiechimon/cairn| test/issue-fence.test.ts (10 tests) 335ms
+ ✓ |@xiechimon/cairn| test/model-fallback.test.ts (15 tests) 669ms
+ ✓ |@xiechimon/cairn| test/failed-review-restore.test.ts (7 tests) 519ms
+ ✓ |@xiechimon/cairn| test/queued-cancel-release.test.ts (10 tests) 456ms
+ ✓ |@xiechimon/cairn| test/plan-server-auto-confirm.test.ts (17 tests) 769ms
+ ✓ |@xiechimon/cairn| test/schedules.test.ts (14 tests) 473ms
+ ✓ |@xiechimon/cairn| test/second-pr-guard.test.ts (10 tests) 249ms
+ ✓ |@xiechimon/cairn| test/blocker-handoff-claim.test.ts (11 tests) 402ms
+ ✓ |@xiechimon/cairn| test/github-repo-dot-segments.test.ts (21 tests) 485ms
+ ✓ |@xiechimon/cairn| test/m4b-memory.test.ts (12 tests) 507ms
+ ✓ |@xiechimon/cairn| test/rework-branch-reuse.test.ts (9 tests) 280ms
+ ✓ |@xiechimon/cairn| test/capability-pending-reason.test.ts (11 tests) 496ms
+ ✓ |@xiechimon/cairn| test/gate-actor.test.ts (16 tests) 1054ms
+ ✓ |@xiechimon/cairn| test/stop.test.ts (11 tests) 916ms
+ ✓ |@xiechimon/cairn| test/mcp-servers.test.ts (21 tests) 679ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency.test.ts (9 tests) 499ms
+ ✓ |@xiechimon/cairn| test/memory-dedupe.test.ts (28 tests) 801ms
+ ✓ |@xiechimon/cairn| test/machine-attachment.test.ts (8 tests) 430ms
+ ✓ |@xiechimon/cairn| test/quota-hold.test.ts (12 tests) 603ms
+ ✓ |@xiechimon/cairn| test/keys.test.ts (12 tests) 325ms
+ ✓ |@xiechimon/cairn| test/chief-abandoned-sweep.test.ts (13 tests) 409ms
+ ✓ |@xiechimon/cairn| test/github-token-refresh.test.ts (9 tests) 275ms
+ ✓ |@xiechimon/cairn| test/orchestration-source.test.ts (11 tests) 332ms
+ ✓ |@xiechimon/cairn| test/agent-concurrency.test.ts (8 tests) 325ms
+ ✓ |@xiechimon/cairn| test/token-usage-cost.test.ts (4 tests) 191ms
+ ✓ |@xiechimon/cairn| test/m4a-chief-loop.test.ts (4 tests) 210ms
+ ✓ |@xiechimon/cairn| test/skill-inject-claim.test.ts (7 tests) 268ms
+ ✓ |@xiechimon/cairn| test/team-ownership-1470.test.ts (21 tests) 573ms
+ ✓ |@xiechimon/cairn| test/chief-demotion.test.ts (12 tests) 378ms
+ ✓ |@xiechimon/cairn| test/chief-questions.test.ts (8 tests) 1093ms
+   ✓ #1049 question line lifecycle (createOrGet / answer / cancel / wrap-up) (8)
+     ✓ hold semantics: expires back to pending (D3 does not auto-decide); answering after hold returns answered (<= poll granularity) 834ms
+ ✓ |@xiechimon/cairn| test/github-oauth.test.ts (14 tests) 327ms
+ ✓ |@xiechimon/cairn| test/mcp-face.test.ts (10 tests) 289ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency-chief.test.ts (9 tests) 350ms
+ ✓ |@xiechimon/cairn| test/chief-settings.test.ts (10 tests) 307ms
+ ✓ |@xiechimon/cairn| test/oauth.test.ts (15 tests) 387ms
+ ❯ |@xiechimon/cairn| test/delivery-surface.test.ts (8 tests | 4 failed) 20238ms
+   ❯ done channel delivery-surface backfill (#704 / B-C16) (7)
+     × failure mode 1: done carries prUrl/prNumber -> build row backfilled 5003ms
+     × failure mode 2: done without PR fields -> row stays null (no fabricated empty data) 5002ms
+     × failure mode 3: done carries changesDiff -> changes endpoint returns the real diff file set 5002ms
+     × failure mode 7: changesDiff empty string -> files empty and reported (empty commit) 5002ms
+     ✓ failure mode 8: 100% rename with no hunk -> files empty and changed 52ms
+     ✓ failure mode 4: changesDiff over the cap -> dropped (done still 200, row not half-written) 46ms
+     ✓ failure mode 6: build not reported / repo-less project -> {files:[]} (null != empty array) 63ms
+   ✓ hosted form source-of-truth does not drift (#704: the bare repo is still the only truth) (1)
+     ✓ failure mode 5: a hosted build reporting changesDiff does not change the projection source (bare repo read surface) 67ms
+ ✓ |@xiechimon/cairn| test/trajectory-outcome-backfill.test.ts (8 tests) 526ms
+ ✓ |@xiechimon/cairn| test/team-ownership-1497.test.ts (11 tests) 344ms
+ ✓ |@xiechimon/cairn| test/chief-unread-badge.test.ts (7 tests) 260ms
+ ✓ |@xiechimon/cairn| test/project-dual-source.test.ts (14 tests) 126ms
+ ✓ |@xiechimon/cairn| test/notifications.test.ts (6 tests) 952ms
+   ✓ three-event matrix (r5 section 7.2 field by field) (6)
+     ✓ entering done / entering failed has no in-app notification event (copied verbatim from the r5 section 7.2 observation window) 726ms
+ ✓ |@xiechimon/cairn| test/quota-wait.test.ts (5 tests) 235ms
+ ✓ |@xiechimon/cairn| test/machine-zombie-claim.test.ts (6 tests) 301ms
+ ✓ |@xiechimon/cairn| test/model-sources.test.ts (12 tests) 314ms
+ ✓ |@xiechimon/cairn| test/chief-watch.test.ts (7 tests) 223ms
+ ✓ |@xiechimon/cairn| test/chief-dispatch.test.ts (9 tests) 261ms
+ ✓ |@xiechimon/cairn| test/review-reject.test.ts (6 tests) 276ms
+ ✓ |@xiechimon/cairn| test/unassigned-build.test.ts (5 tests) 336ms
+ ✓ |@xiechimon/cairn| test/steer.test.ts (7 tests) 322ms
+ ✓ |@xiechimon/cairn| test/project-team-guard.test.ts (13 tests) 355ms
+ ✓ |@xiechimon/cairn| test/build-provenance.test.ts (7 tests) 231ms
+ ✓ |@xiechimon/cairn| test/machine-stale-sweep.test.ts (11 tests) 240ms
+ ❯ |@xiechimon/cairn| test/step-claim-report.test.ts (4 tests | 1 failed) 5091ms
+   ❯ #1473 a report counts only for the current claim (4)
+     × released and re-claimed by the same machine: the in-flight claim report is booked, later reports change nothing 5003ms
+     ✓ the card closed and the step stopped by the sweep: a late report changes nothing, the git credential is reclaimed 27ms
+     ✓ a step released back to pending: the original runner report gets ok without writing, the credential reclaimed; another team machine still 404 26ms
+     ✓ the step was released and re-claimed during the GitHub probe: the report 409s, the new claim stays claimed 34ms
+ ✓ |@xiechimon/cairn| test/needs-you.test.ts (8 tests) 291ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency-recommendation.test.ts (11 tests) 167ms
+ ✓ |@xiechimon/cairn| test/memory-invalidation.test.ts (12 tests) 364ms
+ ✓ |@xiechimon/cairn| test/github-connection.test.ts (11 tests) 292ms
+ ✓ |@xiechimon/cairn| test/chief-gate-budget.test.ts (5 tests) 188ms
+ ✓ |@xiechimon/cairn| test/fs-list.test.ts (18 tests) 45ms
+ ✓ |@xiechimon/cairn| test/thinking-delta.test.ts (4 tests) 190ms
+ ✓ |@xiechimon/cairn| test/runtime-otel.test.ts (8 tests) 191ms
+ ✓ |@xiechimon/cairn| test/rework-plan-fallback.test.ts (4 tests) 313ms
+ ✓ |@xiechimon/cairn| test/g2t2-executor-wire.test.ts (5 tests) 202ms
+ ✓ |@xiechimon/cairn| test/project-delete.test.ts (5 tests) 256ms
+ ✓ |@xiechimon/cairn| test/machine-local.test.ts (9 tests) 248ms
+ ✓ |@xiechimon/cairn| test/build-diff-fulltext.test.ts (4 tests) 431ms
+ ✓ |@xiechimon/cairn| test/task-meta.test.ts (8 tests) 258ms
+ ✓ |@xiechimon/cairn| test/skill-injection-check.test.ts (3 tests) 94ms
+ ✓ |@xiechimon/cairn| test/chief-skill-route.test.ts (5 tests) 228ms
+ ✓ |@xiechimon/cairn| test/manual-drop-matrix.test.ts (15 tests) 595ms
+ ✓ |@xiechimon/cairn| test/agent-delete.test.ts (7 tests) 220ms
+ ✓ |@xiechimon/cairn| test/step-session-upload.test.ts (4 tests) 179ms
+ ✓ |@xiechimon/cairn| test/credentials.test.ts (5 tests) 187ms
+ ✓ |@xiechimon/cairn| test/reset-todo.test.ts (6 tests) 199ms
+ ✓ |@xiechimon/cairn| test/agent-home-machine.test.ts (8 tests) 215ms
+ ✓ |@xiechimon/cairn| test/machine-shell.test.ts (4 tests) 193ms
+ ✓ |@xiechimon/cairn| test/todo-usage-cost.test.ts (3 tests) 116ms
+ ✓ |@xiechimon/cairn| test/machine-exit.test.ts (6 tests) 176ms
+ ✓ |@xiechimon/cairn| test/autonomy-api.test.ts (21 tests) 233ms
+ ✓ |@xiechimon/cairn| test/agent-tools.test.ts (6 tests) 191ms
+ ✓ |@xiechimon/cairn| test/stop-and-done-1247.test.ts (4 tests) 167ms
+ ✓ |@xiechimon/cairn| test/phase-funnel.test.ts (4 tests) 552ms
+   ✓ phase funnel same-phase idempotency (the XMON-59 main break) (4)
+     ✓ a same-phase replay does not throw and returns the current record; zero side effects (v/phaseAt unchanged, no new todo doc frame) 463ms
+ ✓ |@xiechimon/cairn| test/search.test.ts (6 tests) 203ms
+ ✓ |@xiechimon/cairn| test/chief-reject-diff.test.ts (2 tests) 97ms
+ ✓ |@xiechimon/cairn| test/chief-auto-confirm.test.ts (8 tests) 10ms
+ ✓ |@xiechimon/cairn| test/chief-tools.test.ts (5 tests) 169ms
+ ✓ |@xiechimon/cairn| test/sse.test.ts (3 tests) 207ms
+ ✓ |@xiechimon/cairn| test/patch-todo-reset-gate.test.ts (13 tests) 341ms
+ ✓ |@xiechimon/cairn| test/user-patch.test.ts (3 tests) 98ms
+ ✓ |@xiechimon/cairn| test/machines-module-split.test.ts (3 tests) 3ms
+ ✓ |@xiechimon/cairn| test/chief-thread.test.ts (3 tests) 114ms
+ ✓ |@xiechimon/cairn| test/agent-desc-limit.test.ts (4 tests) 119ms
+ ✓ |@xiechimon/cairn| test/enroll-browser.test.ts (1 test) 64ms
+ ✓ |@xiechimon/cairn| test/chief-context-failure.test.ts (1 test) 74ms
+ ✓ |@xiechimon/cairn| test/chief-memory.test.ts (3 tests) 113ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency-startup-backfill.test.ts (1 test) 5ms
+ ✓ |@xiechimon/cairn| test/info-fastlane.test.ts (1 test) 55ms
+ ✓ |@xiechimon/cairn| test/chief-todos-cap.test.ts (1 test) 879ms
+   ✓ chief todos output budget (1)
+     ✓ large todo lists stay within 32 KiB and can be paged without losing ids 878ms
+ ✓ |@xiechimon/cairn| test/provider-config.test.ts (5 tests) 3ms
+ ✓ |@xiechimon/cairn| test/persona-repo-rules.test.ts (1 test) 36ms
+ ✓ |@xiechimon/cairn| test/fs-pick.test.ts (1 test) 18ms
+ ✓ |@xiechimon/cairn| test/capabilities.test.ts (2 tests) 114ms
+ ❯ |@cairn/integration| test/m5-web-e2e.test.ts (3 tests | 3 skipped) 1865ms
+   ↓ M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload) (3)
+     ↓ create → plan → confirm → build → review → merge → done (main-sequence spine)
+     ↓ reject branch: request changes at the confirm gate → replanning → plan v2 → confirm → review (r5 §4)
+     ↓ scheduled run parks at review: create once schedule in UI → tick trigger → direct build → parks at review + started-by-schedule marker (r3 §9)
+ ❯ |@cairn/integration| test/board-trio-e2e.test.ts (3 tests | 3 skipped) 1404ms
+   ↓ #1216 board UI reliability triple defect (real web dist + real server + fake machine wire) (3)
+     ↓ ① save-and-start: one click enters the dispatch flow; in-flight state rejects duplicate orchestration
+     ↓ ② failed rerun: thread must land + visible in-flight + buildHistory grows after chief dispatch
+     ↓ ③ failed card detail deletable; missing/failed detail shows an explained state, not an empty shell
+ ❯ |@cairn/integration| test/done-dialog-e2e.test.ts (5 tests | 5 skipped) 1373ms
+   ↓ #1236 task-done confirmation dialog (real web dist + real server + fake machine wire) (5)
+     ↓ ① single-card query not ready: confirm does not close silently — dialog stays, alert visible, zero requests, phase unchanged
+     ↓ ② rework card merge done: success feedback visible at 202, phase reaches done after the machine finishes the merge step
+     ↓ ③ merge unchecked = done without merging: PATCH done lands immediately, zero merge steps, branch untouched
+     ↓ ④ server rejects (409): dialog stays open + server message visible verbatim
+     ↓ ⑤ failed card (build leg delivered): merge checkbox locked — done can only land via merge
+ ✓ |@cairn/integration| test/plan-upload-recovery.test.ts (2 tests) 7592ms
+   ✓ #1026/#1028 final-report failure recovery (real process restarts) (2)
+     ✓ PUT succeeded / done failed → daemon restart fast-path replays: no rerun, no duplicate version 2749ms
+     ✓ server shutdown in the final window → same-port reopen → old URL 404 (explainable) → reissued URL persists → daemon restart fast-path replays 4840ms
+
+[diag] stub requests consumed: 11
+[diag] daemon.log tail:
+
+ ✓ |@cairn/integration| test/rework-branch-reuse-e2e.test.ts (1 test) 1484ms
+   ✓ #931 both rework paths return to the original branch (E2E) (1)
+     ✓ failed restart and review reject: same conv / same branch / new commits land on the original branch / correct session shapes 1294ms
+
+[diag] stub requests consumed: 8
+[diag] daemon.log tail:
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a17cb3-4b00-701c-8917-acf1d3307676
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m3b-home-OZSbJp/workspaces/01a17cb3-4b00-701c-8917-acf1d3307676/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m3b-home-OZSbJp/workspaces/01a17cb3-4b00-701c-8917-acf1d3307676/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a17cb3-4b00-701c-8917-acf1d3307676
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed cairn/conv-01a17cb3-4b00-701c-8917-acf1d3307676
+finished (0 running)
+claim step=p8Bg1sAWV0ZjD979QfYpz
+step p8Bg1sAWV0ZjD979QfYpz for conv 01a17cb3-4e4a-75b1-bb5e-9a37fbf42d8a (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Cloning ZRqWnYdsyLl01cF9nRDSm/m3b-failure (branch: main)
+[workspace] Worktree added (cairn/conv-01a17cb3-4e4a-75b1-bb5e-9a37fbf42d8a from origin/main)
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: cairn-m3b-home-
+[skills] unknown-dispatch: plans
+[skills] unknown-dispatch: plan
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m3b-home-OZSbJp/workspaces/01a17cb3-4e4a-75b1-bb5e-9a37fbf42d8a/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m3b-home-OZSbJp/workspaces/01a17cb3-4e4a-75b1-bb5e-9a37fbf42d8a/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17cb3-4e4a-75b1-bb5e-9a37fbf42d8a
+[step] message usage: stub-gw/stub-model input=0 output=0 cacheRead=0 cacheWrite=0 cost=0
+[step] error: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:35825/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:35825/v1"; machine "m3b-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}" (retryable=false)
+[step] brief removed (AGENTS.md)
+[step] step failed: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:35825/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:35825/v1"; machine "m3b-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}"
+finished (0 running)
+claim step=rrSIe9-0IYHn-bXf652jz
+step rrSIe9-0IYHn-bXf652jz for conv 01a17cb3-58e4-7d80-9427-f801808597be (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Worktree added (cairn/conv-01a17cb3-58e4-7d80-9427-f801808597be from origin/main)
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: cairn-m3b-home-
+[skills] unknown-dispatch: plans
+[skills] unknown-dispatch: plan
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m3b-home-OZSbJp/workspaces/01a17cb3-58e4-7d80-9427-f801808597be/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m3b-home-OZSbJp/workspaces/01a17cb3-58e4-7d80-9427-f801808597be/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17cb3-58e4-7d80-9427-f801808597be
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed cairn/conv-01a17cb3-58e4-7d80-9427-f801808597be
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m3b-demo.test.ts (4 tests) 3993ms
+   ✓ M3b demo: single-machine full lifecycle todo→done (02 §4.2 main sequence) (4)
+     ✓ create → plan: worktree contract lands + plan.md v1 persisted + push (r3 §1.4/§3.3) 403ms
+     ✓ failure requires manual rerun (02/A6): provider 400 → failed → no auto rerun → POST builds rerun = new conv/new branch 2960ms
+
+[diag] stub requests consumed: 13
+[diag] daemon.log tail:
+[step] brief written: AGENTS.md (create)
+continue session chief-01a17cb3-5e42-7bff-8d96-6410460ec694
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+claim step=7eVbUN9epIEbzuCuXsue1
+step 7eVbUN9epIEbzuCuXsue1 for conv 01a17cb3-614f-7e3e-8c29-2dc45fcc2c60 (2 running)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[workspace] Worktree added (cairn/conv-01a17cb3-614f-7e3e-8c29-2dc45fcc2c60 from origin/main)
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a17cb3-614f-7e3e-8c29-2dc45fcc2c60
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-wake-home-6VXNF3/workspaces/01a17cb3-614f-7e3e-8c29-2dc45fcc2c60/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-wake-home-6VXNF3/workspaces/01a17cb3-614f-7e3e-8c29-2dc45fcc2c60/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17cb3-614f-7e3e-8c29-2dc45fcc2c60
+[step] message usage: stub-gw/stub-model input=0 output=0 cacheRead=0 cacheWrite=0 cost=0
+[step] error: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:39541/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:39541/v1"; machine "m4b-wake-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}" (retryable=false)
+[step] brief removed (AGENTS.md)
+[step] step failed: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:39541/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:39541/v1"; machine "m4b-wake-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}"
+finished (1 running)
+claim step=hXIQqpICf-p9DI0uGVJSI
+step hXIQqpICf-p9DI0uGVJSI for conv chief-01a17cb3-5e42-7bff-8d96-6410460ec694 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: v1
+[skills] unknown-dispatch: chat
+[skills] unknown-dispatch: completions
+[skills] unknown-dispatch: json
+[skills] unknown-dispatch: v1
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-wake-home-6VXNF3/workspaces/chief-01a17cb3-5e42-7bff-8d96-6410460ec694/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-wake-home-6VXNF3/workspaces/chief-01a17cb3-5e42-7bff-8d96-6410460ec694/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session chief-01a17cb3-5e42-7bff-8d96-6410460ec694
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+[machine] Shutting down…
+finished (0 running)
+
+ ✓ |@cairn/integration| test/m4b-watch-wake-e2e.test.ts (3 tests) 1193ms
+   ✓ M4b watch/wake three-trigger E2E (r5 §3.5 reference run) (3)
+     ✓ dispatch auto-watch (reason canon) + gate wake parks at review and reports 428ms
+     ✓ settle wake: two-phase merge report (delegation accepted → result confirmed) + watch auto-release 315ms
+
+[diag] stub requests consumed: 7
+[diag] daemon.log tail:
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team: 3 skill(s), 4 file(s) materialized → /tmp/cairn-it-routing-home-VzWwUh/team-skills/views/b794776452a99bdd1381b190217c6f63472f99db0ecc73fc89998bd941090150 (fetched 4 file(s) / 396 byte(s), reused 0)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-VzWwUh/workspaces/01a17cb3-668d-7fdb-b520-fc562a5d20c8/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-VzWwUh/workspaces/01a17cb3-668d-7fdb-b520-fc562a5d20c8/.pi/skills)
+[skills] filtered: local-blocked not in agent allowlist
+[skills] filtered: beta-skill not in injected selection
+[skills] filtered: gamma-skill not in injected selection
+[skills] loaded: 2 skills from /tmp/cairn-it-routing-home-VzWwUh/team-skills/views/b794776452a99bdd1381b190217c6f63472f99db0ecc73fc89998bd941090150 + /tmp/cairn-it-routing-local-fpHku5
+[skills] catalog: entries=2 chars=801 bytes=859
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a17cb3-668d-7fdb-b520-fc562a5d20c8
+[skills] denied-read: /tmp/cairn-it-routing-local-fpHku5/local-blocked/SKILL.md (skill local-blocked not in allowlist)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+claim step=0Nn7evdIO5ENivpShEEhf
+step 0Nn7evdIO5ENivpShEEhf for conv 01a17cb3-6776-7227-81c0-7048cfe5e46f (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-VzWwUh/workspaces/01a17cb3-6776-7227-81c0-7048cfe5e46f/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-VzWwUh/workspaces/01a17cb3-6776-7227-81c0-7048cfe5e46f/.pi/skills)
+[skills] filtered: local-blocked not in agent allowlist
+[skills] filtered: local-one not in agent allowlist
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+[skills] deny: 2 skill dir(s) hard-blocked
+new session 01a17cb3-6776-7227-81c0-7048cfe5e46f
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/skills-routing-e2e.test.ts (2 tests) 534ms
+
+[diag] stub requests consumed: 10
+[diag] daemon.log tail:
+finished (0 running)
+claim step=FAMG2T9yVJ0ghv6rw6b95
+step FAMG2T9yVJ0ghv6rw6b95 for conv 01a17cb3-6f01-7cdb-92eb-154b01bba4ba (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Worktree reused
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a17cb3-6f01-7cdb-92eb-154b01bba4ba
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-g2t2-home-tEbo0S/workspaces/01a17cb3-6f01-7cdb-92eb-154b01bba4ba/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-g2t2-home-tEbo0S/workspaces/01a17cb3-6f01-7cdb-92eb-154b01bba4ba/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a17cb3-6f01-7cdb-92eb-154b01bba4ba
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed cairn/conv-01a17cb3-6f01-7cdb-92eb-154b01bba4ba
+finished (0 running)
+claim step=n4dmsQ4nO5hXshwhsys0x
+step n4dmsQ4nO5hXshwhsys0x for conv 01a17cb3-6f01-7cdb-92eb-154b01bba4ba (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Worktree reused
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a17cb3-6f01-7cdb-92eb-154b01bba4ba
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-g2t2-home-tEbo0S/workspaces/01a17cb3-6f01-7cdb-92eb-154b01bba4ba/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-g2t2-home-tEbo0S/workspaces/01a17cb3-6f01-7cdb-92eb-154b01bba4ba/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a17cb3-6f01-7cdb-92eb-154b01bba4ba
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed cairn/conv-01a17cb3-6f01-7cdb-92eb-154b01bba4ba
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/g2t2-local-lifecycle.test.ts (2 tests) 1450ms
+   ✓ G2-T2 local form full lifecycle (spec 12: mirror clone + push back to the user repo = delivery, main checkout untouched) (2)
+     ✓ failure modes 1-3: plan/build → conv branch pushed back to the user repo → merge → conv branch update lands delivery, user main checkout unchanged (#1211) 712ms
+     ✓ failure mode 4: dirty workspace → merge step still done (#1211: delivery does not read the user workspace); user HEAD/dirty files unchanged 552ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+2026-10-27 09:31:38 Loading pi runtime…
+2026-10-27 09:31:38 [machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+2026-10-27 09:31:38 [machine] claude binary: not found on PATH or well-known dirs
+2026-10-27 09:31:38 Enrolled in team 6iPCEA8wZ_3f4owG34INx (machine xhh_meDEEdAb2uu8JfM1K)
+2026-10-27 09:31:38 Online (machineId=xhh_meDEEdAb2uu8JfM1K); polling http://127.0.0.1:38187
+2026-10-27 09:31:38 [recover] no pending steps found
+2026-10-27 09:31:38 [wake] push channel connected
+2026-10-27 09:31:38 claim step=OCke7Y6TwD6vluuP4dRTi
+2026-10-27 09:31:38 step OCke7Y6TwD6vluuP4dRTi for conv chief-01a17cb3-7527-7449-9956-151a9c9cda08 (1 running)
+2026-10-27 09:31:38 using model stub-gw/stub-model
+2026-10-27 09:31:38 [workspace] 准备工作区...
+2026-10-27 09:31:38 [mcp] managed-empty: strict MCP set (runtime config not inherited)
+2026-10-27 09:31:38 [skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+2026-10-27 09:31:38 [skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+2026-10-27 09:31:38 [skills] missing-skill-md: skill path does not exist (/tmp/cairn-ask-home-5AWFG6/workspaces/chief-01a17cb3-7527-7449-9956-151a9c9cda08/.claude/skills)
+2026-10-27 09:31:38 [skills] missing-skill-md: skill path does not exist (/tmp/cairn-ask-home-5AWFG6/workspaces/chief-01a17cb3-7527-7449-9956-151a9c9cda08/.pi/skills)
+2026-10-27 09:31:38 [skills] catalog: entries=0 chars=0 bytes=0
+2026-10-27 09:31:38 [step] brief written: AGENTS.md (create)
+2026-10-27 09:31:38 new session chief-01a17cb3-7527-7449-9956-151a9c9cda08
+2026-10-27 09:31:38 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-27 09:31:40 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-27 09:31:40 [step] brief removed (AGENTS.md)
+2026-10-27 09:31:40 finished (0 running)
+2026-10-27 09:31:40 claim step=CV5p4duPw9NueVFYlVmJu
+2026-10-27 09:31:40 step CV5p4duPw9NueVFYlVmJu for conv chief-01a17cb3-7f67-76e2-b306-f2b99b75f197 (1 running)
+2026-10-27 09:31:40 using model stub-gw/stub-model
+2026-10-27 09:31:40 [workspace] 准备工作区...
+2026-10-27 09:31:40 [mcp] managed-empty: strict MCP set (runtime config not inherited)
+2026-10-27 09:31:40 [skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+2026-10-27 09:31:40 [skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+2026-10-27 09:31:40 [skills] missing-skill-md: skill path does not exist (/tmp/cairn-ask-home-5AWFG6/workspaces/chief-01a17cb3-7f67-76e2-b306-f2b99b75f197/.claude/skills)
+2026-10-27 09:31:40 [skills] missing-skill-md: skill path does not exist (/tmp/cairn-ask-home-5AWFG6/workspaces/chief-01a17cb3-7f67-76e2-b306-f2b99b75f197/.pi/skills)
+2026-10-27 09:31:40 [skills] catalog: entries=0 chars=0 bytes=0
+2026-10-27 09:31:40 [step] brief written: AGENTS.md (create)
+2026-10-27 09:31:40 new session chief-01a17cb3-7f67-76e2-b306-f2b99b75f197
+2026-10-27 09:31:40 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-27 09:31:41 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-27 09:31:41 [step] brief removed (AGENTS.md)
+2026-10-27 09:31:41 finished (0 running)
+
+ ✓ |@cairn/integration| test/chief-ask-user.test.ts (2 tests) 3239ms
+   ✓ #1049 chief ask_user blocking Q&A full chain (pi backend) (2)
+     ✓ question → card (row + notification) → answer card → same turn continues (D2/D3/D4) 2639ms
+     ✓ user cancels → cancelled tool result → model converges in the same turn (D4 user-side exit) 512ms
+ ✓ |@cairn/integration| test/port-base-e2e.test.ts (3 tests) 15228ms
+   ✓ #1148 E2E: port base segmentation (two concurrent worker steps in different segments) (1)
+     ✓ two concurrent worker steps see CAIRN_PORT_BASE = 20000 / 20100 in their bash env 572ms
+   ✓ #1260 E2E: chief occupies the machine concurrency slot (cap 1) (1)
+     ✓ while a worker runs (cap 1) the chief queues for a free slot; a later worker is FIFO behind it 8352ms
+   ✓ #1148 E2E: env fallback precedence (env > DB > default) (1)
+     ✓ DB 2 / env 1 → only 1 worker runs at a time (env beats DB; server gate narrows to self-report) 6297ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: not found on PATH or well-known dirs
+Enrolled in team I_ebWUagBfRaAPqxHLzj2 (machine D5ehLt_998v4NNdKZamHZ)
+Online (machineId=D5ehLt_998v4NNdKZamHZ); polling http://127.0.0.1:38243
+[recover] no pending steps found
+[wake] push channel connected
+claim step=wsEGNGGrpznj9r67-dP2J
+step wsEGNGGrpznj9r67-dP2J for conv 01a17cb3-c504-72ea-a72d-404d4025ab20 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] ghost: not in local config — its tools are unavailable this turn
+[mcp] loaded from /tmp/cairn-m4b-mcp-home-9tYTzx/claude.json: demo, dead
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-mcp-home-9tYTzx/workspaces/01a17cb3-c504-72ea-a72d-404d4025ab20/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-mcp-home-9tYTzx/workspaces/01a17cb3-c504-72ea-a72d-404d4025ab20/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17cb3-c504-72ea-a72d-404d4025ab20
+[mcp] dead: connect failed — its tools are unavailable this turn: failed: fetch failed
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-mcp-e2e.test.ts (3 tests) 1711ms
+   ✓ MCP client face E2E: local config registration + per-Agent slug authorization + daemon local resolution bridge (spec 13) (1)
+     ✓ server projection = config mirror (secret values never leave the API); authorized build step calls external tools for real; dead endpoint/unknown slug degrade without blocking 1497ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: not found on PATH or well-known dirs
+Enrolled in team sDcLjDq87uF0w1yFO2gFZ (machine oPYGKbr0NzP0ITnH1egzV)
+Online (machineId=oPYGKbr0NzP0ITnH1egzV); polling http://127.0.0.1:46633
+[recover] no pending steps found
+[wake] push channel connected
+claim step=T__03Y86PdFAympS7XvYp
+step T__03Y86PdFAympS7XvYp for conv 01a17cb3-cf43-7346-bdc1-db1b1547b606 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-skills-home-8yWb44/workspaces/01a17cb3-cf43-7346-bdc1-db1b1547b606/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-skills-home-8yWb44/workspaces/01a17cb3-cf43-7346-bdc1-db1b1547b606/.pi/skills)
+[skills] filtered: extra-skill not in agent allowlist
+[skills] loaded: 1 skills from /tmp/cairn-it-skills-gA3cyt
+[skills] catalog: entries=1 chars=573 bytes=611
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a17cb3-cf43-7346-bdc1-db1b1547b606
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[skills] denied-read: /tmp/cairn-it-skills-gA3cyt/extra-skill/SKILL.md (skill extra-skill not in allowlist)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/skills-inject-e2e.test.ts (1 test) 428ms
+ ✓ |@cairn/integration| test/build-failure-preservation.test.ts (4 tests) 1875ms
+   ✓ duration failure pushes existing commits and exposes them in the fallback report and changes API 686ms
+   ✓ idle failure pushes existing commits and exposes them in the fallback report and changes API 357ms
+   ✓ restart of a failed build without a PR reuses its branch and restores earlier commits on a fresh workspace 693ms
+ ✓ |@cairn/integration| test/m7-failed-send-e2e.test.ts (1 test) 532ms
+   ✓ M7 failed-phase send E2E: failed send → restart → feedback joins the new round session → runs to confirm (1)
+     ✓ full-chain persistence + new round actually runs + phase gate rejects 348ms
+ ✓ |@cairn/integration| test/info-fastlane-e2e.test.ts (1 test) 658ms
+   ✓ #1626 info-class fast lane: info card report handed to the downstream code card (1)
+     ✓ info card only produces a report attachment, no branch push or merge; downstream code card brief carries the report and delivers as usual 475ms
+ ✓ |@cairn/integration| test/pi-session-policy.test.ts (1 test) 462ms
+
+[timing] wake→confirm (incl. real pi execution) = 209ms; idle claim cadence (hold=1s) = 3/3.2s
+ ✓ |@cairn/integration| test/m3a-demo.test.ts (4 tests) 3753ms
+   ✓ M3a demo: server dispatches step → daemon executes for real → transcript persists (4)
+     ✓ claim cadence is isomorphic to server hold (r3 §1.5 ~75–76s at compressed test timescale; production default 75s pinned on the wire test) 3201ms
+
+[diag] stub requests consumed: 5
+[diag] daemon.log tail:
+[machine] claude binary: not found on PATH or well-known dirs
+Enrolled in team yzDetpHm8uW7_1jZmTlJF (machine o3nm6ofQ9vzFAbawINV-X)
+Online (machineId=o3nm6ofQ9vzFAbawINV-X); polling http://127.0.0.1:46361
+[recover] no pending steps found
+[wake] push channel connected
+claim step=Sc8BslL6P2CAQoU9f-XT1
+step Sc8BslL6P2CAQoU9f-XT1 for conv 01a17cb4-02b2-7f54-8895-b6fdba6ab054 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-mem-home-2wGb9D/workspaces/01a17cb4-02b2-7f54-8895-b6fdba6ab054/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-mem-home-2wGb9D/workspaces/01a17cb4-02b2-7f54-8895-b6fdba6ab054/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17cb4-02b2-7f54-8895-b6fdba6ab054
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+claim step=SdUWLDkXvpYmYJUsrYT15
+step SdUWLDkXvpYmYJUsrYT15 for conv 01a17cb4-0975-7c60-923d-d953281d663f (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-mem-home-2wGb9D/workspaces/01a17cb4-0975-7c60-923d-d953281d663f/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-mem-home-2wGb9D/workspaces/01a17cb4-0975-7c60-923d-d953281d663f/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17cb4-0975-7c60-923d-d953281d663f
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-memory-e2e.test.ts (2 tests) 2056ms
+   ✓ M4b memory E2E: instruction-triggered + mid-step write + provenance + zero auto-write (r5 §6) (2)
+     ✓ spec instruction turn: save_memory persists mid-build-step, three-level provenance = live context 1743ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+Loading pi runtime…
+[machine] claude binary: not found on PATH or well-known dirs
+Enrolled in team gJ_4XdQuECFmEu_uTWTcy (machine Dld1Wpkx3x9rmrhaJXt3k)
+Online (machineId=Dld1Wpkx3x9rmrhaJXt3k); polling http://127.0.0.1:42895
+[recover] no pending steps found
+[wake] push channel connected
+claim step=Mmk2-Gp5eha1OguG5tnkj
+step Mmk2-Gp5eha1OguG5tnkj for conv 01a17cb4-0e4b-7929-9760-a14062a61810 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] loaded from /tmp/cairn-gate-home-DKBCUE/claude.json: demo
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-gate-home-DKBCUE/workspaces/01a17cb4-0e4b-7929-9760-a14062a61810/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-gate-home-DKBCUE/workspaces/01a17cb4-0e4b-7929-9760-a14062a61810/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17cb4-0e4b-7929-9760-a14062a61810
+[gate] ask: rule=ask-rm-rf-root command=rm -rf /
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[gate] reject: rule=deny-echo tool=mcp__demo__echo
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/gate-e2e.test.ts (1 test) 417ms
+ ❯ |@cairn/integration| test/web-plans-convergence.test.ts (1 test | 1 skipped) 1436ms
+   ↓ plan card converges via the team-stream phase event when the conv stream is dead (#666)
+ ✓ |@cairn/integration| test/crash-recover.test.ts (1 test) 2850ms
+   ✓ crash recovery (T2: AgentSession seam × host durable orchestration) (1)
+     ✓ SIGKILL mid-step → restart → recover reconciliation → continue session resumes → confirm 2848ms
+ ✓ |@cairn/integration| test/restart-blank-feedback-e2e.test.ts (1 test) 421ms
+   ✓ blank-feedback restart round (#720 negative case): no empty instruction injected (1)
+     ✓ blank feedback → plain restart round: no instruction, no blank user row, session prompt = task text 338ms
+
+[diag] todo phase: failed
+[diag] daemon.log tail:
+2026-10-27 09:32:25 [workspace] Cloning Zv9cjuqkXlBiaE1iUv-ya/ansi-lint-hook (branch: main)
+2026-10-27 09:32:26 [workspace] Worktree added (cairn/conv-01a17cb4-2ff6-7d92-9170-b82538749405 from origin/main)
+2026-10-27 09:32:26 [mcp] managed-empty: strict MCP set (runtime config not inherited)
+2026-10-27 09:32:26 [skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+2026-10-27 09:32:26 [skills] unknown-dispatch: conv-01a17cb4-2ff6-7d92-9170-b82538749405
+2026-10-27 09:32:26 [skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+2026-10-27 09:32:26 [skills] missing-skill-md: skill path does not exist (/tmp/cairn-1262-home-5jVims/workspaces/01a17cb4-2ff6-7d92-9170-b82538749405/.claude/skills)
+2026-10-27 09:32:26 [skills] missing-skill-md: skill path does not exist (/tmp/cairn-1262-home-5jVims/workspaces/01a17cb4-2ff6-7d92-9170-b82538749405/.pi/skills)
+2026-10-27 09:32:26 [skills] catalog: entries=0 chars=0 bytes=0
+2026-10-27 09:32:26 [step] brief written: AGENTS.md (create)
+2026-10-27 09:32:26 new session 01a17cb4-2ff6-7d92-9170-b82538749405
+2026-10-27 09:32:26 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-27 09:32:26 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-27 09:32:26 [step] brief removed (AGENTS.md)
+2026-10-27 09:32:26 [step] step failed: git commit failed (1): [0mapps/daemon/test/1262-ansi-probe.ts[0m[0m:[0m[0m1[0m[0m:[0m[0m7[0m[0m [0m[0m]8;;https://biomejs.dev/linter/rules/no-unused-variables\lint/correctness/noUnusedVariables]8;;\[0m[0m [0m[0m[30m[47m FIXABLE [0m[0m [0m[0m━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[33m⚠[0m[0m [0m[0m[33mThis variable [0m[0m[1m[33mgreeting[0m[0m[33m is unused.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m1 │ [0m[0mc[0m[0mo[0m[0mn[0m[0ms[0m[0mt[0m[0m [0m[0mg[0m[0mr[0m[0me[0m[0me[0m[0mt[0m[0mi[0m[0mn[0m[0mg[0m[0m [0m[0m=[0m[0m [0m[0m"[0m[0mh[0m[0me[0m[0ml[0m[0ml[0m[0mo[0m[0m"[0m[0m [0m[0m+[0m[0m [0m[0m"[0m[0m [0m[0mw[0m[0mo[0m[0mr[0m[0ml[0m[0md[0m[0m"[0m[0m;[0m[0m
+[0m[0m  [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2 │ [0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUnused variables are often the result of typos, incomplete refactors, or other sources of bugs.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUnsafe fix: If this is intentional, prepend [0m[0m[1m[34mgreeting[0m[0m[34m with an underscore.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m1[0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[31mc[0m[0m[31mo[0m[0m[31mn[0m[0m[31ms[0m[0m[31mt[0m[0m[2m[31m·[0m[0m[1m[31mg[0m[0m[1m[31mr[0m[0m[1m[31me[0m[0m[1m[31me[0m[0m[1m[31mt[0m[0m[1m[31mi[0m[0m[1m[31mn[0m[0m[1m[31mg[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[2m[31m·[0m[0m[31m"[0m[0m[31mh[0m[0m[31me[0m[0m[31ml[0m[0m[31ml[0m[0m[31mo[0m[0m[31m"[0m[0m[2m[31m·[0m[0m[31m+[0m[0m[2m[31m·[0m[0m[31m"[0m[0m[2m[31m·[0m[0m[31mw[0m[0m[31mo[0m[0m[31mr[0m[0m[31ml[0m[0m[31md[0m[0m[31m"[0m[0m[31m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m[1m1[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[32mc[0m[0m[32mo[0m[0m[32mn[0m[0m[32ms[0m[0m[32mt[0m[0m[2m[32m·[0m[0m[1m[32m_[0m[0m[1m[32mg[0m[0m[1m[32mr[0m[0m[1m[32me[0m[0m[1m[32me[0m[0m[1m[32mt[0m[0m[1m[32mi[0m[0m[1m[32mn[0m[0m[1m[32mg[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[2m[32m·[0m[0m[32m"[0m[0m[32mh[0m[0m[32me[0m[0m[32ml[0m[0m[32ml[0m[0m[32mo[0m[0m[32m"[0m[0m[2m[32m·[0m[0m[32m+[0m[0m[2m[32m·[0m[0m[32m"[0m[0m[2m[32m·[0m[0m[32mw[0m[0m[32mo[0m[0m[32mr[0m[0m[32ml[0m[0m[32md[0m[0m[32m"[0m[0m[32m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2[0m[0m [0m[0m[1m2[0m[0m[1m │ [0m[0m [0m[0m [0m[0m
+[0m[0m  [0m[0m
+[0m
+[0mapps/daemon/test/1262-ansi-probe.ts[0m[0m [0m[0mformat[0m[0m [0m[0m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[31m✖[0m[0m [0m[0m[31mFormatter would have printed the following content:[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m1[0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[31mc[0m[0m[31mo[0m[0m[31mn[0m[0m[31ms[0m[0m[31mt[0m[0m[2m[31m·[0m[0m[31mg[0m[0m[31mr[0m[0m[31me[0m[0m[31me[0m[0m[31mt[0m[0m[31mi[0m[0m[31mn[0m[0m[31mg[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[2m[31m·[0m[0m[1m[31m"[0m[0m[31mh[0m[0m[31me[0m[0m[31ml[0m[0m[31ml[0m[0m[31mo[0m[0m[1m[31m"[0m[0m[2m[31m·[0m[0m[31m+[0m[0m[2m[31m·[0m[0m[1m[31m"[0m[0m[2m[31m·[0m[0m[31mw[0m[0m[31mo[0m[0m[31mr[0m[0m[31ml[0m[0m[31md[0m[0m[1m[31m"[0m[0m[31m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m[1m1[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[32mc[0m[0m[32mo[0m[0m[32mn[0m[0m[32ms[0m[0m[32mt[0m[0m[2m[32m·[0m[0m[32mg[0m[0m[32mr[0m[0m[32me[0m[0m[32me[0m[0m[32mt[0m[0m[32mi[0m[0m[32mn[0m[0m[32mg[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[2m[32m·[0m[0m[1m[32m'[0m[0m[32mh[0m[0m[32me[0m[0m[32ml[0m[0m[32ml[0m[0m[32mo[0m[0m[1m[32m'[0m[0m[2m[32m·[0m[0m[32m+[0m[0m[2m[32m·[0m[0m[1m[32m'[0m[0m[2m[32m·[0m[0m[32mw[0m[0m[32mo[0m[0m[32mr[0m[0m[32ml[0m[0m[32md[0m[0m[1m[32m'[0m[0m[32m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2[0m[0m [0m[0m[1m2[0m[0m[1m │ [0m[0m [0m[0m [0m[0m
+[0m[0m  [0m[0m
+[0m
+[0m[34mChecked 1 file in 64[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m[0m
+[0m[0m[31mFound [0m[0m[31m1[0m[0m[31m error.[0m[0m
+[0m[0m[33mFound [0m[0m[33m1[0m[0m[33m warning.[0m
+[0mcheck[0m[0m [0m[0m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[31m✖[0m[0m [0m[0m[31mSome [0m[0m[1m[31merrors[0m[0m[31m were emitted while [0m[0m[1m[31mrunning checks[0m[0m[31m.[0m[0m
+[0m[0m  [0m[0m
+[0m
+2026-10-27 09:32:26 finished (0 running)
+
+ ✓ |@cairn/integration| test/ansi-errormessage-e2e.test.ts (1 test) 500ms
+   ✓ #1262 E2E: lint-failed commit → errorMessage persisted as plain text (1)
+     ✓ pre-commit colored biome output → failed → build.errorMessage unescaped, first line readable 494ms
+
+[diag] stub requests consumed: 2
+[diag] daemon.log tail:
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: not found on PATH or well-known dirs
+Enrolled in team L6xc8CUCR_nUAf4FEK-LS (machine LMnmyiVL5WxLd4iSoboO7)
+Online (machineId=LMnmyiVL5WxLd4iSoboO7); polling http://127.0.0.1:35867
+[recover] no pending steps found
+[wake] push channel connected
+claim step=8M5UggGlng9q3eqG38cQt
+step 8M5UggGlng9q3eqG38cQt for conv chief-01a17cb4-3574-73e7-b942-91cac5e74566 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/home/agent/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4a-home-hRsHcr/workspaces/chief-01a17cb4-3574-73e7-b942-91cac5e74566/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4a-home-hRsHcr/workspaces/chief-01a17cb4-3574-73e7-b942-91cac5e74566/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session chief-01a17cb4-3574-73e7-b942-91cac5e74566
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4a-chief-e2e.test.ts (1 test) 407ms
+ ✓ |@cairn/integration| test/m7-stop-e2e.test.ts (1 test) 434ms
+ ❯ |@cairn/integration| test/task-meta-e2e.test.ts (2 tests | 2 skipped) 1346ms
+   ↓ spec 15 #394 title-less surface + fixed tag vocabulary (live UI → wire → SQLite) (2)
+     ↓ project creation seeds the fixed 6-tag vocabulary (REST shape + SQLite rows)
+     ↓ dialog has no title input / no tag UI; first body line becomes the placeholder title; detail page has no tag add surface
+ ✓ |@cairn/integration| test/memory-regression-seed.test.ts (4 tests) 341ms
+ ✓ |@cairn/integration| test/w3-steer-e2e.test.ts (1 test) 8376ms
+   ✓ W3 steer E2E: message while building → pending → signal → pull-confirm → session.steer (1)
+     ✓ full-chain delivery + rendering + undisturbed step finish + gate reject 8188ms
+ ❯ |@cairn/integration| test/m7-branch-dialog-e2e.test.ts (1 test | 1 skipped) 1423ms
+   ↓ branch-sync buildId wiring (#346 regression pin) (1)
+     ↓ detail right pane switches to the Branch & PR section → renders the live face (machine picker + editable dir), not the fixture placeholder
+ ✓ |@cairn/integration| test/chief-eval-reap.test.ts (4 tests) 1888ms
+   ✓ reapEscapees (4)
+     ✓ cleans up dev servers that escaped their workspace 1426ms
+     ✓ pgrep -f substring matching bridges the /var vs /private/var symlink difference 425ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/board-trio-e2e.test.ts [ integration/test/board-trio-e2e.test.ts ]
+Error: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     pnpm exec playwright install                           ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+ ❯ test/board-trio-e2e.test.ts:238:28
+    236|   const [e1, e2, e3] = [await enroll('trio-m1'), await enroll('trio-m2…
+    237|   tokens = { m1: e1.token, m2: e2.token, m3: e3.token };
+    238|   browser = await chromium.launch();
+       |                            ^
+    239|   page = await browser.newPage({ viewport: { width: 1440, height: 732 …
+    240| }, 300_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+
+ FAIL  |@cairn/integration| test/done-dialog-e2e.test.ts [ integration/test/done-dialog-e2e.test.ts ]
+Error: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     pnpm exec playwright install                           ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+ ❯ test/done-dialog-e2e.test.ts:257:28
+    255|     throw new Error(`enroll → ${res.status} ${JSON.stringify(body)}`);
+    256|   machineToken = body.token;
+    257|   browser = await chromium.launch();
+       |                            ^
+    258|   page = await browser.newPage({ viewport: { width: 1440, height: 732 …
+    259| }, 300_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+
+ FAIL  |@cairn/integration| test/m5-web-e2e.test.ts [ integration/test/m5-web-e2e.test.ts ]
+Error: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     pnpm exec playwright install                           ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+ ❯ test/m5-web-e2e.test.ts:125:28
+    123|     }
+    124|   }, 30_000);
+    125|   browser = await chromium.launch();
+       |                            ^
+    126|   page = await browser.newPage({ viewport: { width: 1440, height: 732 …
+    127| }, 300_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+
+ FAIL  |@cairn/integration| test/m7-branch-dialog-e2e.test.ts [ integration/test/m7-branch-dialog-e2e.test.ts ]
+Error: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     pnpm exec playwright install                           ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+ ❯ test/m7-branch-dialog-e2e.test.ts:49:28
+     47|   expect(built.status).toBe(201);
+     48|
+     49|   browser = await chromium.launch();
+       |                            ^
+     50|   page = await browser.newPage({ viewport: { width: 1440, height: 732 …
+     51| }, 180_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯
+
+ FAIL  |@cairn/integration| test/task-meta-e2e.test.ts [ integration/test/task-meta-e2e.test.ts ]
+Error: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     pnpm exec playwright install                           ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+ ❯ test/task-meta-e2e.test.ts:40:28
+     38|   });
+     39|   projectId = (project.body as { id: string }).id;
+     40|   browser = await chromium.launch();
+       |                            ^
+     41|   page = await browser.newPage({ viewport: { width: 1440, height: 732 …
+     42| }, 180_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯
+
+ FAIL  |@cairn/integration| test/web-plans-convergence.test.ts [ integration/test/web-plans-convergence.test.ts ]
+Error: browserType.launch: Executable doesn't exist at /home/agent/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     pnpm exec playwright install                           ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+ ❯ test/web-plans-convergence.test.ts:84:28
+     82|     }
+     83|   }, 30_000);
+     84|   browser = await chromium.launch();
+       |                            ^
+     85|   page = await browser.newPage({ viewport: { width: 1440, height: 732 …
+     86| }, 300_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/delivery-surface.test.ts > done channel delivery-surface backfill (#704 / B-C16) > failure mode 1: done carries prUrl/prNumber -> build row backfilled
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/delivery-surface.test.ts:122:3
+    120|
+    121| describe('done channel delivery-surface backfill (#704 / B-C16)', () =…
+    122|   test('failure mode 1: done carries prUrl/prNumber -> build row backf…
+       |   ^
+    123|     const w = await setupWorld();
+    124|     const buildId = await w.startBuild(w.githubProjectId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/11]⎯
+
+ FAIL  |@xiechimon/cairn| test/delivery-surface.test.ts > done channel delivery-surface backfill (#704 / B-C16) > failure mode 2: done without PR fields -> row stays null (no fabricated empty data)
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/delivery-surface.test.ts:137:3
+    135|   });
+    136|
+    137|   test('failure mode 2: done without PR fields -> row stays null (no f…
+       |   ^
+    138|     const w = await setupWorld();
+    139|     const buildId = await w.startBuild(w.githubProjectId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/11]⎯
+
+ FAIL  |@xiechimon/cairn| test/delivery-surface.test.ts > done channel delivery-surface backfill (#704 / B-C16) > failure mode 3: done carries changesDiff -> changes endpoint returns the real diff file set
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/delivery-surface.test.ts:147:3
+    145|   });
+    146|
+    147|   test('failure mode 3: done carries changesDiff -> changes endpoint r…
+       |   ^
+    148|     const w = await setupWorld();
+    149|     const buildId = await w.startBuild(w.githubProjectId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/11]⎯
+
+ FAIL  |@xiechimon/cairn| test/delivery-surface.test.ts > done channel delivery-surface backfill (#704 / B-C16) > failure mode 7: changesDiff empty string -> files empty and reported (empty commit)
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/delivery-surface.test.ts:165:3
+    163|   });
+    164|
+    165|   test('failure mode 7: changesDiff empty string -> files empty and re…
+       |   ^
+    166|     const w = await setupWorld();
+    167|     const buildId = await w.startBuild(w.githubProjectId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/11]⎯
+
+ FAIL  |@xiechimon/cairn| test/step-claim-report.test.ts > #1473 a report counts only for the current claim > released and re-claimed by the same machine: the in-flight claim report is booked, later reports change nothing
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/step-claim-report.test.ts:140:3
+    138|
+    139| describe('#1473 a report counts only for the current claim', () => {
+    140|   test('released and re-claimed by the same machine: the in-flight cla…
+       |   ^
+    141|     const w = makeWorld();
+    142|     expect((await w.claim())?.step.id).toBe(STEP);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/11]⎯
+
+
+ Test Files  8 failed | 158 passed (166)
+      Tests  5 failed | 2165 passed | 15 skipped (2185)
+   Start at  09:28:15
+   Duration  270.75s (tests 66%, import 33%)
+
+    Isolate  166 workers spawned · ~66ms startup each (spawn + environment, per file)
+             at least ~10.86s faster with isolate: false — reuses workers across files instead of one per file
+
+JSON report written to /tmp/prepush-vitest-WAfpvP/report.json
+[prepush] FAIL: apps/server/test/delivery-surface.test.ts
+[prepush] FAIL: apps/server/test/step-claim-report.test.ts
+[prepush] FAIL: integration/test/board-trio-e2e.test.ts
+[prepush] FAIL: integration/test/done-dialog-e2e.test.ts
+[prepush] FAIL: integration/test/m5-web-e2e.test.ts
+[prepush] FAIL: integration/test/m7-branch-dialog-e2e.test.ts
+[prepush] FAIL: integration/test/task-meta-e2e.test.ts
+[prepush] FAIL: integration/test/web-plans-convergence.test.ts
+[ELIFECYCLE] Command failed with exit code 1.

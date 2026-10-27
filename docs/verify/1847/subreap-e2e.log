@@ -1,0 +1,78 @@
+[e2e:affected] changed paths (explicit):
+  apps/server/src/services/token-usage-cost.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+[e2e:affected] 3/184 specs on the standard fixture-build config, E2E_PORT=8398
+  agent-fallback-models.spec.ts live-server-reap.spec.ts token-gate.spec.ts
+[heavy-slots] acquired slot 1/2
+[e2e:affected] slot 1: E2E_PORT=8398, build output /tmp/cairn-heavy-slot-1/web-dist
+[WebServer] (node:141341) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:141355) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/workspace/cairn/.claude/worktrees/codex-1847/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:141400) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:141414) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 23 tests using 2 workers
+
+(node:141581) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:141580) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:141600) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:141611) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:141600) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:141611) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/live-server-reap.spec.ts:39:1 › after dispose not a single process of the server tree remains (1.7s)
+(node:141667) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:141703) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 e2e/agent-fallback-models.spec.ts:93:1 › empty chain: rule copy is clear, only an add entry, no candidate rows (703ms)
+(node:141703) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   3 e2e/live-server-reap.spec.ts:49:1 › caller SIGKILLed, teardown never runs → the server tree exits on its own (2.1s)
+(node:141744) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   4 e2e/agent-fallback-models.spec.ts:104:1 › add: lands in the store only after model selection, reload reads back the same row (1.7s)
+(node:141744) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:141882) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   6 e2e/agent-fallback-models.spec.ts:123:1 › change: swapping the model of one row keeps the remaining rows in original order (2.0s)
+(node:141882) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:141925) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   7 e2e/agent-fallback-models.spec.ts:133:1 › reorder: move up/down changes the stored order, first row cannot move up further, last row cannot move down further (2.3s)
+(node:141925) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   8 e2e/agent-fallback-models.spec.ts:153:1 › delete: deleting a middle row shifts the rest up, deleting down to empty sends null instead of an empty array (2.6s)
+  ✓   5 e2e/token-gate.spec.ts:46:1 › auth on: first visit lands the gate page; wrong token stays without persisting; right token enters the UI and SSE carries ?token= (2.3s)
+  ✓  10 e2e/token-gate.spec.ts:83:1 › auth on: a stale bad token lands the gate page on first visit and the bad value is cleared (1.1s)
+  ✓  11 e2e/token-gate.spec.ts:95:1 › auth on: a good token already in localStorage → first visit reaches the UI directly, zero gate page (1.2s)
+  ✓  12 e2e/token-gate.spec.ts:114:1 › auth off: zero gate page, zero token attached, behavior unchanged (849ms)
+  ✓  13 e2e/token-gate.spec.ts:132:1 › #1048 gate page guide: the zh face tells where the token comes from (cairn token command / server log / variable name) (1.3s)
+  ✓   9 e2e/agent-fallback-models.spec.ts:172:1 › cap: at 5 entries add is disabled, server returns 400 for the 6th and the chain stays unchanged (6.0s)
+  ✓  14 e2e/token-gate.spec.ts:145:1 › #1048 gate page guide: the en face keeps the same facts undistorted (command name / log / variable name interpolated through the dictionary template) (890ms)
+  ✓  15 e2e/agent-fallback-models.spec.ts:194:1 › half-selected rows are not stored: with only a runtime picked and no model, the store keeps the original chain (2.7s)
+  ✓  16 e2e/token-gate.spec.ts:160:1 › #1762 Tailscale Serve identity: the app opens without the token prompt or a stored token (1.8s)
+  ✓  18 e2e/token-gate.spec.ts:175:1 › #1708 login link: /app#token=<valid> signs in and strips the fragment (1.6s)
+  ✓  17 e2e/agent-fallback-models.spec.ts:208:1 › deleted model: the row greys out with an explanation and is not silently dropped (2.0s)
+  ✓  19 e2e/token-gate.spec.ts:185:1 › #1708 login link: an invalid fragment token lands the gate error copy and still strips the fragment (2.0s)
+  ✓  20 e2e/agent-fallback-models.spec.ts:220:1 › dead model: the row greys out and is marked delisted (2.1s)
+  ✓  21 e2e/agent-fallback-models.spec.ts:239:1 › owner machine missing the runtime a fallback needs: editing shows a hint, already-configured fallbacks are kept (1.4s)
+  ✓  22 e2e/agent-fallback-models.spec.ts:260:3 › typography 1280px: runtime label does not wrap, description text does not overlap the right-side controls (1.7s)
+  ✓  23 e2e/agent-fallback-models.spec.ts:260:3 › typography 560px: runtime label does not wrap, description text does not overlap the right-side controls (1.6s)
+
+  23 passed (35.0s)
