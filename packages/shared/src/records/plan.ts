@@ -40,8 +40,21 @@ const VAGUE_PATTERN = /\b(?:TODO|TBD|FIXME)\b|待定|待补|待确认/;
 const FEATURE_PLAN =
   /\bkind\s*[:：]\s*feature\b|\bnew module\b|\buser-facing capability\b|\bnew user-facing\b|\bsplit plan\b|\bsplit_todo\b|新模块|用户可见能力|面向用户的新能力|拆卡|拆解方案/i;
 const SOURCE_LINK = /https?:\/\/\S+/;
-const DECISION_CHOICE =
-  /\b(?:reuse|re-use|hand-roll|hand-rolled|hand-written|handwritten|build)\b|复用|自建|手写/i;
+const PLAN_CLASSIFICATION = /^Kind\s*[:：]\s*(feature|fix)\s*$/i;
+const DECISION_LABEL = /^(?:decision|决策|决定)\s*[:：]\s*/i;
+const ENGLISH_CHOICE =
+  /^(?:we\s+)?(?:(?:will|choose\s+to|plan\s+to)\s+)?(?:(not|do\s+not|never|don['’]t|won['’]t)\s+)?(re-?use|build|hand-roll(?:ed)?|hand-written|handwritten)\b\s*(.*)$/i;
+const CHINESE_CHOICE = /^(不)?(复用|自建|手写)\s*(.*)$/;
+
+export interface PlanPriorArtChoice {
+  kind: 'reuse' | 'build' | 'reject-reuse' | 'reject-build';
+  subject: string;
+}
+
+export interface PlanPriorArtDecision {
+  text: string;
+  choices: PlanPriorArtChoice[];
+}
 const DECISION_REASON =
   /\b(?:because|instead|rather than|maintained|reason|deps?)\b|因为|而不是|理由|依赖|维护/i;
 
@@ -177,26 +190,10 @@ function splitItems(section: { head: string; lines: string[] }): {
   return items.map(({ text, fenced }) => ({ text, fenced }));
 }
 
-export function planNeedsPriorArt(content: string): boolean {
+function proseLines(content: string): string[] {
   const prose: string[] = [];
   let inFence = false;
   for (const raw of content.replace(/\r\n?/g, '\n').split('\n')) {
-    if (raw.trim().startsWith('```')) {
-      inFence = !inFence;
-      continue;
-    }
-    if (!inFence) prose.push(raw);
-  }
-  return FEATURE_PLAN.test(prose.join('\n'));
-}
-
-export function planPriorArtLines(content: string): string[] | undefined {
-  const prior = namedSection(content.replace(/\r\n?/g, '\n'), 'prior art');
-  if (prior === undefined) return undefined;
-  const prose: string[] = [];
-  if (prior.head !== '') prose.push(prior.head);
-  let inFence = false;
-  for (const raw of prior.lines) {
     const line = raw.trim();
     if (line.startsWith('```')) {
       inFence = !inFence;
@@ -207,7 +204,48 @@ export function planPriorArtLines(content: string): string[] | undefined {
   return prose;
 }
 
-export function checkPlanContract(content: string): PlanContractCheck {
+function declaredPlanKind(content: string): 'feature' | 'fix' | undefined {
+  let kind: 'fix' | undefined;
+  for (const line of proseLines(content)) {
+    const match = PLAN_CLASSIFICATION.exec(line);
+    if (match?.[1]?.toLowerCase() === 'feature') return 'feature';
+    if (match?.[1]?.toLowerCase() === 'fix') kind = 'fix';
+  }
+  return kind;
+}
+
+export function planNeedsPriorArt(content: string): boolean {
+  return declaredPlanKind(content) !== 'fix' || FEATURE_PLAN.test(proseLines(content).join('\n'));
+}
+
+export function planPriorArtLines(content: string): string[] | undefined {
+  const prior = namedSection(content.replace(/\r\n?/g, '\n'), 'prior art');
+  return prior === undefined ? undefined : proseLines([prior.head, ...prior.lines].join('\n'));
+}
+
+function decisionChoice(text: string): PlanPriorArtChoice | null {
+  const match = ENGLISH_CHOICE.exec(text) ?? CHINESE_CHOICE.exec(text);
+  if (match === null) return null;
+  const reuse = /^(?:re-?use|复用)$/i.test(match[2] ?? '');
+  const rejected = match[1] !== undefined;
+  const kind = reuse ? (rejected ? 'reject-reuse' : 'reuse') : rejected ? 'reject-build' : 'build';
+  return { kind, subject: match[3] ?? '' };
+}
+
+export function planPriorArtDecisions(content: string): PlanPriorArtDecision[] | undefined {
+  return planPriorArtLines(content)?.flatMap((line) => {
+    const text = line.replace(/[`*_]/g, '').replace(/^(?:[-•]\s+|\d+[.)]\s+)/, '');
+    if (text.startsWith('>')) return [];
+    const labeled = DECISION_LABEL.test(text);
+    const body = text.replace(DECISION_LABEL, '');
+    const parsed = body.split(/[;；。]/).map((clause) => decisionChoice(clause.trim()));
+    if (!labeled && parsed[0] === null) return [];
+    const choices = parsed.filter((choice): choice is PlanPriorArtChoice => choice !== null);
+    return choices.length === 0 ? [] : [{ text: body, choices }];
+  });
+}
+
+function checkVerificationContract(content: string): PlanContractCheck {
   const normalized = content.replace(/\r\n?/g, '\n');
   const section = namedSection(normalized, 'verification');
   const problems: string[] = [];
@@ -238,21 +276,36 @@ export function checkPlanContract(content: string): PlanContractCheck {
         problems.push(`Verification ${vague.map(itemLabel).join('、')}含待定之类的占位词`);
     }
   }
+  if (problems.length > 0) return { ok: false, problem: problems.join('；') };
+  return { ok: true, items: items.map((i) => i.text) };
+}
+
+export function checkPlanContract(content: string): PlanContractCheck {
+  const normalized = content.replace(/\r\n?/g, '\n');
+  const verification = checkVerificationContract(normalized);
+  const problems: string[] = verification.ok ? [] : [verification.problem];
   if (planNeedsPriorArt(normalized)) {
     const prose = planPriorArtLines(normalized);
     if (prose === undefined) problems.push('功能方案缺少 Prior art 小节');
     else {
       if (!prose.some((line) => SOURCE_LINK.test(line)))
         problems.push('Prior art 小节至少要有一条来源链接');
-      if (!prose.some((line) => DECISION_CHOICE.test(line) && DECISION_REASON.test(line)))
+      if (
+        !planPriorArtDecisions(normalized)?.some((decision) =>
+          DECISION_REASON.test(decision.text.replace(/https?:\/\/\S+/g, '')),
+        )
+      )
         problems.push('Prior art 小节缺少复用或自建的决策及理由');
     }
   }
   if (problems.length > 0) return { ok: false, problem: problems.join('；') };
-  return { ok: true, items: items.map((i) => i.text) };
+  return verification;
 }
 
 export function planVerificationItems(content: string): string[] {
-  const r = checkPlanContract(content);
+  const r =
+    declaredPlanKind(content) === undefined
+      ? checkVerificationContract(content)
+      : checkPlanContract(content);
   return r.ok ? r.items : [];
 }

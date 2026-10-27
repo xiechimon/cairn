@@ -30,7 +30,7 @@ afterEach(() => vi.useRealTimers());
 
 const AGENT_ID = 'agent-psac-1';
 const GOOD_PLAN =
-  '# Plan\nContext: x\n\n## Verification\n- `pnpm exec vitest run README.test.ts` passes\n';
+  '# Plan\nKind: fix\nContext: x\n\n## Verification\n- `pnpm exec vitest run README.test.ts` passes\n';
 
 async function call(
   app: Hono,

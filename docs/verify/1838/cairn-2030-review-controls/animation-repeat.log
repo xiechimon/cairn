@@ -1,0 +1,101 @@
+[heavy-slots] acquired slot 1/1
+$ playwright test --grep 'history does not animate on first render' --repeat-each=20
+[WebServer] (node:9589) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9592) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/xmon/.codex/worktrees/pr-1839-reviewed-delivery/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:9606) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9610) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 40 tests using 4 workers
+
+(node:9641) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9642) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9639) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9640) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   4 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (828ms)
+  ✓   1 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (831ms)
+  ✓   3 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (842ms)
+  ✓   2 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (842ms)
+  ✓   6 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (462ms)
+  ✓   7 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (463ms)
+  ✓   5 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (482ms)
+  ✓   8 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (487ms)
+(node:9669) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9670) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9671) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  10 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (585ms)
+  ✓  11 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (582ms)
+  ✓  12 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (590ms)
+  ✓   9 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (530ms)
+  ✓  13 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (519ms)
+  ✓  14 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (539ms)
+  ✓  16 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (538ms)
+  ✓  15 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (544ms)
+(node:9711) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9710) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9713) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9714) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  19 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (530ms)
+  ✓  17 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (547ms)
+  ✓  20 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (539ms)
+  ✓  18 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (546ms)
+  ✓  21 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (477ms)
+  ✓  23 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (476ms)
+  ✓  22 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (481ms)
+  ✓  24 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (507ms)
+(node:9743) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9745) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9744) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9750) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  26 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (542ms)
+  ✓  27 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (485ms)
+  ✓  28 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (566ms)
+  ✓  25 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (592ms)
+  ✓  29 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (499ms)
+  ✓  32 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (477ms)
+  ✓  31 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (477ms)
+  ✓  30 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (528ms)
+(node:9776) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9775) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9778) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9777) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  35 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (536ms)
+  ✓  36 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (535ms)
+  ✓  34 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (534ms)
+  ✓  33 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (543ms)
+  ✓  38 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (467ms)
+  ✓  39 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (467ms)
+  ✓  37 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (482ms)
+  ✓  40 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (481ms)
+
+  40 passed (10.8s)

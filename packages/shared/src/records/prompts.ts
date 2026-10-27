@@ -186,7 +186,7 @@ export const PLAN_VERIFICATION_RULE =
   'Verification 每一项必须是可执行的检查：命令、测试文件路径或可断言的结果（如接口返回值），不写「确认没问题」这类空话，也不留待定、待补之类的占位。';
 
 export const PLAN_PRIOR_ART_RULE =
-  '功能方案（拆卡、新模块、新的用户可见能力，或标了 Kind: feature）动笔前先用网上搜索和 GitHub 搜索查同类实现与现成库，并查 issue、论坛或 X 上的用户反馈。plan.md 写 Prior art 小节：至少三条带链接的来源，再加一行复用或自建的决策和理由（例如复用 croner，因为仍在维护且零依赖，而不是手写解析器）。一行缺陷修复标 Kind: fix，跳过这一步。';
+  '方案先标 Kind: feature 或 Kind: fix；未标类型按功能方案校验，只有明确的一行小修可标 Kind: fix。功能方案（拆卡、新模块、新的用户可见能力，或标了 Kind: feature）动笔前先用网上搜索和 GitHub 搜索查同类实现与现成库，并查 issue、论坛或 X 上的用户反馈。plan.md 写 Prior art 小节：至少三条带链接的来源，再加一行复用或自建的决策和理由（例如复用 croner，因为仍在维护且零依赖，而不是手写解析器）。一行缺陷修复标 Kind: fix，跳过这一步。';
 
 const LEGACY_PLAN_PROMPTS = [
   `规划步未产出 ${PLAN_FILE_NAME} 交接文件。请将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，${PLAN_FILE_NAME} 如实记录改动内容与验证方式即可。`,

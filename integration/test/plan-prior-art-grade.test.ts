@@ -93,3 +93,12 @@ test('a prior-art heading inside a fenced example cannot satisfy the feature con
   ].join('\n');
   expect(gradePlanPriorArt(example).score).toBe(0);
 });
+
+test.each([
+  'Decision: reuse croner is rejected because we will build our own parser.',
+  'Decision: reuse croner because it is maintained.\nDecision: build our own parser instead because croner cannot support our calendar.',
+  'Decision: reuse croner because it is maintained; build our own parser instead because croner cannot support our calendar.',
+  '决策：复用 croner 被否决，因为需要手写解析器。',
+])('rejected or conflicting choices cannot receive full credit: %s', (decision) => {
+  expect(gradePlanPriorArt(featurePlan(decision)).score).toBe(0.5);
+});
