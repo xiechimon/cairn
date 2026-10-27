@@ -14,7 +14,7 @@ Issue #1656, continuing PR #1658.
 
 ## Results
 
-The current main ledger has 165 rows. They map to 154 entry files, with every text field preserved and counters summed for merged categories. The orchestration recurrence adds one to the existing context-check entry. One additional entry records the absent remote-tracking reference encountered when creating this worktree.
+The current main ledger has 165 rows. They map to 154 entry files, with every text field preserved and counters summed for merged categories. The orchestration recurrence adds one to the existing context-check entry. The #1671 lane adds one recurrence to the existing dependency-directory reuse entry. One additional entry records the absent remote-tracking reference encountered when creating this worktree.
 
 Run `node --test docs/verify/1656/migration.test.mjs` to check every migrated field and counter against `migration.json`. This is a migration acceptance artifact, separate from the lasting gate tests so later ledger edits and evidence pruning remain possible.
 
@@ -23,3 +23,11 @@ Run `node --test docs/verify/1656/migration.test.mjs` to check every migrated fi
 `selftests.log` records 57 passing tests from the CI prepush self-test group. `lint.log`, `typecheck.log`, and `spec.log` record the required checks. Spec parsing collects 1292 web tests and parses 38 integration files.
 
 The summary is generated only to stdout by `pnpm lessons:table`; no generated summary file is tracked. The merge-gate source and protected-path lists match main.
+
+## Final targeted checks and review
+
+`green.log` records 15 passing tests, including the migration acceptance. `integration.log` records the final prepush-plan, document-reader, and CI-job integration tests. `migration-red.log` runs the same migration assertion against the prior PR head's extracted ledger and fails on a missing source entry.
+
+Review checked the complete gate, parser tests, prepush integration, and migration mapping against main. No blocking findings remain in this change. Simplification keeps documentation-only checks in one list and preserves the existing document-reader runner. No merge-gate source, protected-path list, dependency, or lockfile changes appear relative to main.
+
+`prepush-blocked.log` records the actual complete prepush attempt. It passed the static gates and Node self-tests, then failed on eight Vitest files: six integration browser suites lacked the installed Playwright browser revision, and delivery-surface / step-claim-report hit public-network timeouts. The local code is committed; normal push remains blocked pending the shared environment and fixture repairs. No hook was bypassed.
