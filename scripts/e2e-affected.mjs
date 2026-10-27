@@ -203,6 +203,7 @@ const RESOURCES = [
   'resource-back-spa',
   'skill-import',
   'task-panel',
+  'first-pr-report',
 ];
 const SHARED_SURFACE_ONLY = ['cds-motion', 'color-freeze', 'fixture-mode-chip'];
 const SECONDARY = ['title-', 'shell-', 'segmented-'];

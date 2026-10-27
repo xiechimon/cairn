@@ -1,0 +1,20 @@
+Error: Cannot find module '../src/board/first-pr-card.js' imported from /mnt/fast/lanes/cairn-2001/apps/web/test/first-pr-card.test.ts
+ ❯ test/first-pr-card.test.ts:2:1
+      1| import { describe, expect, it } from 'vitest';
+      2| import { firstPrCardInfo } from '../src/board/first-pr-card.js';
+       | ^
+      3|
+      4| const PROMPT = {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  13:41:08
+   Duration  138ms (worker 96%, environment 4%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-2001/apps/web
+

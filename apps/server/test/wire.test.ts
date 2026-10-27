@@ -29,6 +29,7 @@ const INFERRED_ROUTES = [
   'POST /api/projects',
   'PATCH /api/projects/{id}',
   'PATCH /api/user/me',
+  'PATCH /api/teams/{id}',
   'PATCH /api/todos/{id}',
   'DELETE /api/todos/{id}',
   'GET /api/projects/{id}/autonomy',

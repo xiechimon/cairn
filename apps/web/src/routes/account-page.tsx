@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useApiMutations, useSession } from '../api/hooks.js';
+import { useApiMutations, useSession, useTeams } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNotificationPermission } from '../board/notify-banner.js';
 import { type NotifyPref, persistNotifyPref, readNotifyPref } from '../board/notify-pref.js';
@@ -41,6 +41,8 @@ export function AccountPage() {
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
   const sessionQ = useSession(live);
+  const teamsQ = useTeams(live);
+  const team = teamsQ.data?.find((candidate) => candidate.id === teamId);
   const mutations = useApiMutations(teamId);
   const [fixtureName, setFixtureName] = useState<string | null>(null);
   const userName = live ? (sessionQ.data?.displayName ?? USER_NAME) : (fixtureName ?? USER_NAME);
@@ -155,6 +157,28 @@ export function AccountPage() {
             />
           </SettingsRow>
         </SettingsCard>
+        {live && team !== undefined && (
+          <SettingsCard>
+            <SettingsRow
+              label={t('首个 PR 社区提示')}
+              hint={t(
+                '团队设置，默认关闭。首个 PR 完成后显示分享链接，由你决定是否在 GitHub 发布。',
+              )}
+            >
+              <Switch
+                aria-label={t('首个 PR 社区提示')}
+                checked={team.firstPrReportPrompt?.enabled ?? false}
+                disabled={mutations.patchTeam.isPending}
+                onCheckedChange={(enabled) =>
+                  mutations.patchTeam.mutate(
+                    { firstPrReportPrompt: { enabled } },
+                    { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+                  )
+                }
+              />
+            </SettingsRow>
+          </SettingsCard>
+        )}
       </div>
     </PageShell>
   );

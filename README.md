@@ -209,6 +209,12 @@ pnpm test         # vitest
 | `docs/research/` | r1–r15 site inventories and later product research (historical archive) |
 | `scripts/` | Build-time tools (incl. `generate-icons.mjs`) |
 
+## Community
+
+Questions, setup help and "how do I do X with cairn" go to [GitHub Discussions](https://github.com/xiechimon/cairn/discussions): the **Q&A** category for questions and **Show and tell** for what you built. Bugs and feature work go to the [issue tracker](https://github.com/xiechimon/cairn/issues), where a maintainer labels them before an agent picks them up. Security reports go to neither place; see [SECURITY.md](./SECURITY.md).
+
+After your team's first pull request merges, Cairn can show a dismissible card linking to a prefilled discussion post. The card is off by default, Cairn opens nothing on its own, and nothing is sent anywhere: you choose whether to submit the post. [docs/privacy.md](./docs/privacy.md) lists the exact fields the prefilled text carries.
+
 ## Third-party credits
 
 - Avatar font [Lorelei](https://www.figma.com/community/file/1198749693280469639) — © Lisa Wischofsky, CC0 1.0

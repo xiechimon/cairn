@@ -16,7 +16,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterAll, describe, expect, test } from 'vitest';
 import { MIGRATIONS_FOLDER, openDbWithHandle, openMemoryDb } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
-import { seed } from '../src/db/seed.js';
+import { insertLegacyUserAndTeam } from './helpers.js';
 
 const temps: string[] = [];
 function temp(prefix: string): string {
@@ -77,14 +77,17 @@ function buildLegacyDb(opts: { skillRows?: number; mcpRows?: number } = {}): Leg
   const sqlite = new Database(dbPath);
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: trimmedMigrations() });
-  const { team } = seed(db);
+  const { teamId } = insertLegacyUserAndTeam(sqlite, {
+    userId: 'user-legacy',
+    teamId: 'team-legacy',
+  });
   const insertSkill = sqlite.prepare(
     'INSERT INTO skill (id, teamId, name, description, files) VALUES (?, ?, ?, ?, ?)',
   );
   for (let i = 1; i <= skillRows; i++) {
     insertSkill.run(
       `sk-${i}`,
-      team.id,
+      teamId,
       `技能${i}`,
       i === 1 ? '旧库描述' : null,
       JSON.stringify({ 'SKILL.md': `# 技能${i}\n内容`, 'helper.sh': 'echo hi' }),
@@ -97,7 +100,7 @@ function buildLegacyDb(opts: { skillRows?: number; mcpRows?: number } = {}): Leg
   for (let i = 1; i <= mcpRows; i++) {
     insertMcp.run(
       `m-${i}`,
-      team.id,
+      teamId,
       `服务${i}`,
       `demo-${i}`,
       'http',
@@ -118,7 +121,7 @@ function buildLegacyDb(opts: { skillRows?: number; mcpRows?: number } = {}): Leg
     )
     .run(
       'ag-1',
-      team.id,
+      teamId,
       '旧 Agent',
       JSON.stringify(['sk-1', 'sk-gone']),
       JSON.stringify(['demo-1']),

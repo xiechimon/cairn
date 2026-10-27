@@ -16,6 +16,24 @@ import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 
+export interface LegacyWorldIds {
+  userId: string;
+  teamId: string;
+}
+
+export function insertLegacyUserAndTeam(
+  sqlite: { prepare(sql: string): { run(...args: unknown[]): unknown } },
+  ids: LegacyWorldIds,
+): LegacyWorldIds {
+  sqlite
+    .prepare('INSERT INTO user (id, displayName, avatarUrl) VALUES (?, ?, ?)')
+    .run(ids.userId, 'Owner', null);
+  sqlite
+    .prepare('INSERT INTO team (id, name, createdAt, plan, avatarStyle) VALUES (?, ?, ?, ?, ?)')
+    .run(ids.teamId, 'Legacy team', 1, 'free', 'notionist');
+  return ids;
+}
+
 export function bootServer(
   opts: {
     pingIntervalMs?: number;

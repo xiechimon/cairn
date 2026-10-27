@@ -1,0 +1,4 @@
+$ node scripts/ui-debt-gate.mjs   # at 9ef30291 (the pushed round-3 head)
+[ui-debt-gate] D2 bare controls: 4 total > baseline 3 (grew at: board/first-pr-card.tsx 0->1, chief/chief-conversation.tsx 0->1)
+[ui-debt-gate] FAIL: 1 violation(s). Build with components/ui/* + Tailwind theme keys; per-face css, bare controls and arbitrary values may only shrink. After removing debt, re-freeze: node scripts/ui-debt-gate.mjs --write
+exit code: 1

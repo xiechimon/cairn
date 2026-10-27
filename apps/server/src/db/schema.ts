@@ -53,6 +53,10 @@ export const team = sqliteTable('team', {
   createdAt: epochMs('createdAt').notNull(),
   plan: text('plan').notNull().default('free'),
   avatarStyle: text('avatarStyle'),
+  firstPrReportPromptEnabled: bool('firstPrReportPromptEnabled').notNull().default(false),
+  firstPrReportPromptDismissedAt: epochMs('firstPrReportPromptDismissedAt'),
+  firstPrReportPromptFirstPrAt: epochMs('firstPrReportPromptFirstPrAt'),
+  firstPrReportPromptFirstPrNumber: integer('firstPrReportPromptFirstPrNumber'),
 });
 
 export const project = sqliteTable('project', {

@@ -28,6 +28,7 @@ export * from './capabilities.js';
 export * from './chief.js';
 export * from './common.js';
 export * from './document-diff.js';
+export * from './first-pr-report.js';
 export * from './github.js';
 export * from './machine.js';
 export * from './machine-capabilities.js';

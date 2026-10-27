@@ -12,6 +12,7 @@ import {
   useProjectTags,
   useSearchResults,
   useSteps,
+  useTeams,
   useTodos,
 } from '../api/hooks.js';
 import { mapBranchInfo, toDisplayTodo } from '../api/mappers.js';
@@ -28,6 +29,7 @@ import {
 import { moveTodo, resetTodoLocal } from '../board/dnd.js';
 import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import type { FilterChip, FilterDimension } from '../board/filter-panel.js';
+import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
 import { BOARD_VIEW_PARAM } from '../board/home.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
@@ -81,6 +83,12 @@ export function BoardPage() {
   const projectsQ = useProjects(teamId, live);
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const mutations = useApiMutations(teamId);
+  const teamsQ = useTeams(live);
+  const team = live ? teamsQ.data?.[0] : undefined;
+  const firstPrCard =
+    team?.firstPrReportPrompt === undefined
+      ? null
+      : firstPrCardInfo(team.firstPrReportPrompt, team.createdAt);
   const orchestrateStart = useOrchestrateStart();
 
   const rawTags = searchParams.get('tags');
@@ -581,7 +589,14 @@ export function BoardPage() {
           <BoardSurface
             fixture={fixtureWithTodos}
             banner={
-              quotaInfos != null ? (
+              firstPrCard != null ? (
+                <FirstPrCard
+                  info={firstPrCard}
+                  onDismiss={() =>
+                    mutations.patchTeam.mutate({ firstPrReportPrompt: { dismissed: true } })
+                  }
+                />
+              ) : quotaInfos != null ? (
                 <QuotaBanner infos={quotaInfos} />
               ) : notifyBanner.visible ? (
                 <NotificationBanner onEnable={notifyBanner.enable} />
