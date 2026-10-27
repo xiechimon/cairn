@@ -54,6 +54,12 @@ export class GithubCreateGateNotWritableError extends Error {
   }
 }
 
+function asGateNotWritable(directory: string, error: unknown): unknown {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  if (code !== 'EACCES' && code !== 'EPERM' && code !== 'EROFS') return error;
+  return new GithubCreateGateNotWritableError(directory, code);
+}
+
 export async function acquireGithubCreateSlot(options: GithubCreateOptions = {}): Promise<number> {
   const directory =
     options.directory ?? join(process.env.CAIRN_HOME ?? join(homedir(), '.cairn'), 'github-create');
@@ -67,7 +73,11 @@ export async function acquireGithubCreateSlot(options: GithubCreateOptions = {})
   const log =
     options.onDelay ??
     ((reason: string, ms: number) => console.warn(`GitHub create delayed: ${reason}, ${ms}ms`));
-  await mkdir(directory, { recursive: true, mode: 0o700 });
+  try {
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+  } catch (error) {
+    throw asGateNotWritable(directory, error);
+  }
   const lock = join(directory, 'lock');
   const state = join(directory, 'state.json');
   let lockWaitStarted = now();
@@ -75,7 +85,8 @@ export async function acquireGithubCreateSlot(options: GithubCreateOptions = {})
     try {
       await mkdir(lock);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST')
+        throw asGateNotWritable(directory, error);
       if (now() - lockWaitStarted >= (options.lockTimeoutMs ?? 30000))
         throw new Error('GitHub create lock timed out; inspect the lock directory before retrying');
       await sleep(50);
