@@ -32,7 +32,7 @@ beforeAll(async () => {
       toolCall: {
         name: 'bash',
         arguments: {
-          command: `cat > plan.md <<'EOF'\n# 方案\n\nContext: 探针任务，README 当前无探针行。\nChanges: 在 README.md 追加一行 m3a probe。\nEdge cases: 无。\nVerification: 查 README.md 末行。\nEOF`,
+          command: `cat > plan.md <<'EOF'\n# 方案\nKind: fix\n\nContext: 探针任务，README 当前无探针行。\nChanges: 在 README.md 追加一行 m3a probe。\nEdge cases: 无。\nVerification: 查 README.md 末行。\nEOF`,
         },
       },
     },
