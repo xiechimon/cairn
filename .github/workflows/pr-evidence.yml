@@ -74,6 +74,8 @@ jobs:
       - name: Read the PR as it is now
         run: |
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits" > "$RUNNER_TEMP/pr-commits.json"
+          jq -n --arg repository "$(jq -r '.base.repo.full_name' "$RUNNER_TEMP/pr.json")" --slurpfile pages "$RUNNER_TEMP/pr-commits.json" '{repository: $repository, commits: ($pages[0] | add)}' > "$RUNNER_TEMP/pr-evidence-context.json"
           jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-body.md"
           echo "labels=$(jq -r '[.labels[].name] | join(",")' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
           echo "draft=$(jq -r '.draft' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
@@ -96,7 +98,7 @@ jobs:
       # have to push again to discover a tasks problem.
       - name: Check PR body evidence (sections + links embedded + reachable)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
-        run: python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md"
+        run: python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/pr-evidence-context.json"
 
       - name: Check PR body tasks (Acceptance checklist exists and is fully checked)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}

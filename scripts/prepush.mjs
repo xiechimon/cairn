@@ -65,6 +65,7 @@ export function prepushPlan(paths, mode = 'local') {
     language,
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
+    ['python3', 'scripts/pr-evidence-archive.test.py'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
