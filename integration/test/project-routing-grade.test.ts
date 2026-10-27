@@ -91,6 +91,15 @@ describe('project-routing case ledger', () => {
       expect(c.expect.kind === 'ask' && c.expect.candidates.length, c.id).toBeGreaterThanOrEqual(2);
   });
 
+  test('chip cases name a seeded project and cover a tie, a misleading request and a question (#2009)', () => {
+    const chipped = cases.filter((c) => c.chip !== undefined);
+    expect(chipped.length).toBeGreaterThanOrEqual(3);
+    for (const c of chipped) expect(names, `${c.id} chip ${c.chip}`).toContain(c.chip);
+    expect(chipped.map((c) => c.expect.kind).sort()).toEqual(['answer', 'route', 'route']);
+    for (const c of chipped.filter((x) => x.expect.kind === 'route'))
+      expect(c.expect.kind === 'route' && c.expect.projects, c.id).toEqual([c.chip]);
+  });
+
   test('every seeded project has a description and a repo seed directory', () => {
     for (const p of ROUTING_PROJECTS) {
       expect(p.description.length, p.name).toBeGreaterThan(0);

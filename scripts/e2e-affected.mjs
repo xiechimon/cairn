@@ -44,6 +44,7 @@ const BOARD = [
   'mobile-narrow',
   'focus-ring-clip',
   'chief-home-',
+  'chief-project-pick',
   'task-panel',
 ];
 const SIDEBAR = [
@@ -80,6 +81,7 @@ const DETAIL = [
   'spinner-',
   'chief-fab',
   'chief-home-',
+  'chief-project-pick',
   'chief-stream-markdown',
   'composer-wire-reject',
   'user-menu-',

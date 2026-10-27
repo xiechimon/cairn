@@ -43,6 +43,7 @@ import { PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { FixtureSet, Phase, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { PHASE_UI } from '../phase.js';
+import { MoveProjectLine } from './move-project.js';
 import { STAGES, type StageState, stagesFor } from './stages.js';
 import { type TaskPanelApi, useTaskPanel } from './task-panel-root.js';
 
@@ -519,6 +520,7 @@ function TaskDetail({
                 .filter((part) => part != null)
                 .join(' · ')}
             </div>
+            {todo != null && <MoveProjectLine todo={todo} />}
           </div>
         )}
         {need != null && (
