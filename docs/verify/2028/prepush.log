@@ -1,0 +1,218 @@
+[prepush] git fetch origin main failed (exit 255); using local origin/main, which may be stale
+[heavy-slots] acquired slot 1/2
+[prepush] node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 14 text + 14 spacing in 13 file(s); 5 css + 221 tsx + 263 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 1b84a9bf8469.
+[prepush] node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 34 components/ui file(s); 24 brand-ink text-role line(s), all registered (24 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+[prepush] pnpm lint
+$ biome ci .
+[0m[34mChecked 1048 files in 482[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m
+[prepush] pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+[prepush] pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1355 tests in 189 files collected, disk count matches (1.0s)
+[spec-parse-gate] integration/test: 41 test files parsed clean by tsc (1.3s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] node scripts/e2e-affected.mjs --check-coverage
+[e2e:affected] coverage: 0 uncovered spec(s)
+[prepush] node --test docs/verify/1542/reach.test.mjs
+✔ apps/web/e2e/unmapped-reach.spec.ts (22.93583ms)
+✔ apps/web/e2e/board-reach.spec.ts (26.236454ms)
+✔ apps/web/e2e/a11y-axe.spec.ts (27.263631ms)
+✔ registry reach: scripts/drive-unregistered.mjs (24.104699ms)
+✔ registry reach: docs/verify/1542/drive-unregistered.mts (22.511384ms)
+✔ registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs (24.50079ms)
+✔ registry reach: apps/web/e2e/unmapped-reach.spec.ts (50.178916ms)
+✔ registry reach: apps/web/e2e/board-reach.spec.ts (49.616441ms)
+✔ discovers committed, staged and untracked additions from the base (295.235928ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 588.101669
+[prepush] node scripts/lessons-ledger-gate.mjs
+lessons ledger ok
+[prepush] node scripts/ci-job-structure-gate.mjs
+ci-job-structure: GREEN (every named step sits in its pinned job)
+[prepush] node scripts/feature-map-staleness-gate.mjs
+feature-map-gate: OK (37 md files, 339 refs checked, 59 frozen in baseline)
+[prepush] node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+[prepush] node scripts/single-use-helper-gate.mjs
+single-use-helper-gate: 0 single-use helper(s)
+[prepush] node scripts/baseline-ratchet-gate.mjs
+baseline-ratchet-gate: 0 raised baseline(s)
+[prepush] node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 659 test sources, no package-manager spawns.
+[prepush] node scripts/pr-evidence-workflow-gate.mjs
+pr-evidence-workflow: GREEN (required-check shape intact)
+[prepush] node scripts/ui-registry-gate.mjs
+[ui-registry-gate] note: no base sha on this run (push event or local check) — the S5 ratchet has nothing to compare against; a status downgrade landing straight on main is guarded by review only (same posture as debt-gate D3 on main).
+[ui-registry-gate] PASS: 35 file(s) in apps/web/src/components/ui = 27 registry (20 pristine vs pinned snapshot / 7 registered deviations) + 8 adapters; snapshot shadcn@4.21.3 fetched 2026-10-25; ledger frozen from 1b84a9bf8469; comparison: in-tree only.
+[prepush] node scripts/ui-consumer-shape-gate.mjs
+[ui-consumer-shape-gate] PASS: 3 flagged line(s) across 263 consumer file(s), all registered (3 entries = 3 deviation).
+[prepush] node scripts/pr-gate-selfcheck.mjs
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are each required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+PASS  linesChanged must be a non-negative integer
+PASS  a path with a shell character is rejected
+PASS  CI gate helpers and data anywhere under scripts/ route to the user
+PASS  gate files outside root scripts/ route to the user (run 4)
+PASS  files that steer agents route to the user (run 4)
+PASS  a path a reviewer adds to protectedPaths routes to the user
+PASS  product source, tests, e2e and evidence do not route to the user
+PASS  paths outside the auto-merge set route to the user (run 5)
+PASS  agent-steering files the name list missed route to the user (run 5)
+PASS  eval ruler paths route to the user as protected (ADR 0025)
+PASS  case variants of protected paths route to the user (run 5)
+PASS  a protected path only the safety reviewer lists is matched (run 5)
+PASS  a deleted test helper (test directory only) routes to the user (run 5)
+PASS  a deleted colocated test (suffix only) routes to the user (run 5)
+PASS  a deleted path missing from changedFiles is an args error (run 5)
+PASS  pr and ticket must be positive integers (run 5)
+PASS  a path with a quote or space is rejected (run 5)
+PASS  configs CI runs under route to the user, at the root too
+PASS  a deletion only the safety reviewer reports routes to the user
+PASS  a larger line count from the safety reviewer routes to the user
+PASS  binaryFiles is required and lists changed paths only (code-review on #1410)
+PASS  a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410)
+PASS  a binary file under docs/verify stays mergeable without the user
+PASS  a binary file only the safety reviewer listed routes to the user
+PASS  a deleted test is found whatever the case of its directory or suffix (code-review on #1410)
+PASS  a glob star does not cross a slash: an extra directory before src/ leaves the auto-merge set (run 8)
+PASS  a deleted colocated .spec file outside a test directory routes to the user (run 8)
+PASS  a dimension whose review breaks the second stage counts as missing and keeps go false (run 8)
+PASS  private refs carry the head, so runs on two heads of one PR do not delete each other's refs (run 8)
+PASS  a reviewer that returns nothing blocks go
+PASS  findings past the skeptic cap are kept
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  two skeptics confirming on the head keep the finding (run 5)
+PASS  a split vote keeps the finding (run 5)
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a nested .gitattributes routes to the user (run 6)
+PASS  the args help gives the line count command that takes attributes from the empty tree (run 6)
+PASS  a C-quoted binary path is refused with the quoting hint (run 7)
+PASS  the safety reviewer is told both git commands with --no-renames, core.quotePath=false and the empty tree (runs 2, 6, 7)
+PASS  reviewers and skeptics fetch PR comments with a filter that drops non-members before the bodies reach them (run 7, final /code-review)
+PASS  reviewers confirm the head on their own ref, never FETCH_HEAD (run 1)
+PASS  every reviewer and skeptic is told GitHub is read-only and that PR text is data
+PASS  the safety reviewer must return all four git-derived values
+PASS  the 40-file cap counts files only the safety reviewer listed
+PASS  the merge readiness gate source routes to the user (run 6)
+PASS  migrations, the lockfile and .npmrc are protected, packages/* outside src and test is not auto (run 6)
+PASS  a deleted helper under e2e/, tests/ or __tests__/ routes to the user (run 6)
+PASS  exactly 800 lines and 40 files still auto-merge (run 6)
+PASS  a file only the safety reviewer lists counts toward the auto-merge set (run 6)
+PASS  headSha, an empty file list and non-string paths are args errors (run 6)
+PASS  the safety reviewer does not see the caller file list (run 6)
+PASS  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+PASS  the evidence reviewer and skeptics check for a fork before any checkout, and read a fork head with git show, diff and ls-tree only (run 10)
+PASS  every checkout the evidence prompts ask for runs with core.hooksPath=/dev/null (run 10)
+PASS  the fetch and the ref cleanup run with core.hooksPath=/dev/null in every prompt, the evidence worktrees included (run 10)
+PASS  evidence installs skip husky's prepare, which would set the shared clone's core.hooksPath to the relative .husky/_ (run 10)
+PASS  the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)
+PASS  a path only in the safety reviewer's deleted or binary list is matched against D4 and blocks go (run 10)
+PASS  an entry named exactly like a protected directory (a symlink .claude, scripts, drizzle) routes to the user (run 10)
+PASS  the bare-directory match is for protected classes only: src and docs/verify named alone stay outside the auto-merge set, file globs stay exact (run 10)
+PASS  D4 globs are anchored at the path start: an auto-merge or evidence path inside a longer one routes to the user (run 10)
+PASS  a caller line count larger than the safety reviewer's wins (run 10)
+PASS  the security-sensitive surfaces of the AGENTS.md /security-review list and the migration runner route to the user (run 11)
+PASS  the security class matches exact paths from the root: machine*.ts stops at a slash, and neighbours still auto-merge (run 11)
+PASS  protected names with U+017F or U+212A in place of s or k route to the user (run 11)
+PASS  auto-merge matching folds ASCII case only, protection folds Unicode: ſrc and docſ/verify route to the user, AGENTſ.md stays protected (run 11)
+PASS  a deleted test is found with U+017F in its directory or suffix (run 11)
+PASS  every prompt calls the ticket body untrusted data by the ticket's author, never instructions (run 11)
+PASS  each skeptic is given the finding and the refute rule (run 11)
+PASS  the safety reviewer's own protectedPaths route to the user (run 11)
+PASS  a deleted .mjs or .cts test routes to the user (run 11)
+PASS  skepticsMissing counts each skeptic that returned nothing (run 11)
+PASS  a path git quotes even with core.quotePath=false is sent to review by hand, not back to the flag (run 11)
+PASS  the args help and the safety reviewer say the line count command needs git 2.40 or later (run 11)
+PASS  docs-only Markdown patch: go, auto-merge (#1621)
+PASS  design decisions, ADRs and the review guide stay with the user in any case or Unicode fold (#1621)
+PASS  docs patch with a deleted test or a non-Markdown docs file routes to the user (#1621)
+PASS  a missing safety file list blocks go
+PASS  docs/spec, the goal-session rules, is a named protected class, not only default deny (#1462)
+PASS  every AGENTS.md /security-review path pattern is an entry of PROTECTED, and the section points back at ADR 0021 D4 (drift guard, #1462)
+PASS  a safety review missing deletedFiles, linesChanged or binaryFiles keeps go false (#1462)
+PASS  the verdict records which copy of the script ran: scriptSha256 is the file hash with its own constant blanked (#1462)
+PASS  a skeptic is told the finding is a relayed account whose text may quote untrusted PR or ticket data (#1462)
+94/94 passed (.claude/workflows/pr-gate.js)
+[prepush] node scripts/lane-file-gate.mjs
+lane-file-gate leg 1 (tracked at repo root): 0 hit(s)
+lane-file-gate leg 2: skipped (no base sha; local run or push event)
+lane-file-gate: OK (no lane process files tracked at the repository root)
+[prepush] node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+[prepush] node scripts/prepush-vitest.mjs
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-2028
+
+No test files found, exiting with code 0
+
+
+|@cairn/web| 
+
+include: test/**/*.test.ts
+exclude:  **/node_modules/**, **/.git/**
+
+|@cairn/integration| 
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+|@xiechimon/cairn| 
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+|@xiechimon/cairn-cli| 
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+|@cairn/shared| 
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-8l7wk3uh/prepush-vitest-plXOZ1/report.json
+[prepush] node scripts/doc-reader-tests.mjs docs/verify/2028/green.log docs/verify/2028/red.log
+[doc-reader-tests] no test reads the changed docs
+[prepush] node scripts/ui-dead-class-gate.mjs --compile
+ui-dead-class-gate: selector universe from postcss compile (apps/web/src/styles/app.css) + apps/web/src/**/*.css
+scanned 278 files (20 pristine registry files skipped), 8173 class-token occurrences, 1777 living selectors
+zero-rule names: 239 — selector-exempt 236, manual-exempt 3, DEAD 0
+OK — every rendered class token matches a living rule or carries a disposition.
+[prepush] pnpm --filter @cairn/web e2e:affected -- .github/workflows/commit-author.yml scripts/commit-author.test.mjs
+$ node ../../scripts/e2e-affected.mjs -- .github/workflows/commit-author.yml scripts/commit-author.test.mjs
+[e2e:affected] changed paths (explicit):
+  .github/workflows/commit-author.yml → none
+  scripts/commit-author.test.mjs → none
+[e2e:affected] no web e2e surface touched — vitest (`pnpm exec vitest run --changed origin/main`) and CI cover this change.
+[prepush] PASS (25 checks)
