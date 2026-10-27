@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { todoRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import type { FetchLike } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
 import { bootServer, type TestServer } from './helpers.js';
@@ -77,18 +76,19 @@ async function getTodo(app: Hono, id: string) {
 test('retry on an unwritable gate directory answers 503 naming the directory, with zero outbound calls', async () => {
   const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   const calls: string[] = [];
-  const recording: FetchLike = async (input, init) => {
-    calls.push(`${init?.method ?? 'GET'} ${String(input)}`);
-    return {
-      ok: false,
-      status: 404,
-      headers: { get: () => null },
-      json: async () => ({}),
-      text: async () => '',
-    };
-  };
   try {
-    const s = bootServer({ githubFetch: recording });
+    const s = bootServer({
+      githubFetch: async (input, init) => {
+        calls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+        return {
+          ok: false,
+          status: 404,
+          headers: { get: () => null },
+          json: async () => ({}),
+          text: async () => '',
+        };
+      },
+    });
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const todoId = await createTask(s.app, projectId);
@@ -108,11 +108,12 @@ test('retry on an unwritable gate directory answers 503 naming the directory, wi
 
 test('a creation-time mirror failure on an unwritable gate directory logs the todo and the cause', async () => {
   const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-  const recording: FetchLike = async (input, init) => {
-    throw new Error(`unexpected outbound call: ${init?.method ?? 'GET'} ${String(input)}`);
-  };
   try {
-    const s = bootServer({ githubFetch: recording });
+    const s = bootServer({
+      githubFetch: async (input, init) => {
+        throw new Error(`unexpected outbound call: ${init?.method ?? 'GET'} ${String(input)}`);
+      },
+    });
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const todoId = await createTask(s.app, projectId);
