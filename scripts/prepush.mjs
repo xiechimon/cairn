@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
+import { acquireSlot, leaseEnv, slotPortReport } from './heavy-slots.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -138,6 +138,13 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
       ? [['pnpm', '--filter', '@cairn/web', 'e2e', `--shard=${args[1]}`]]
       : prepushPlan(changedPaths(), args[0]?.slice(2) ?? 'local');
   const lease = plan.length > 0 ? await acquireSlot() : null;
+  if (lease !== null && plan.some((step) => step.includes('e2e:affected'))) {
+    const conflict = slotPortReport({ slot: lease.slot });
+    if (conflict !== null) {
+      console.error(conflict);
+      process.exit(1);
+    }
+  }
   runPlan(plan, { cwd: root, env: leaseEnv(lease) });
   console.log(`[prepush] PASS (${plan.length} checks)`);
 }

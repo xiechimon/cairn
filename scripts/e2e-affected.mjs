@@ -3,7 +3,12 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
-import { acquireSlot, leaseEnv, writeSlotPlaywrightConfig } from './heavy-slots.mjs';
+import {
+  acquireSlot,
+  leaseEnv,
+  slotPortReport,
+  writeSlotPlaywrightConfig,
+} from './heavy-slots.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const WEB_DIR = join(REPO_ROOT, 'apps/web');
@@ -390,6 +395,11 @@ function runPlaywright(specs, full) {
   const args = ['exec', 'playwright', 'test'];
   const env = { ...leaseEnv(lease), E2E_PORT: PORT };
   if (lease !== null) {
+    const conflict = slotPortReport({ slot: lease.slot });
+    if (conflict !== null) {
+      console.error(conflict);
+      process.exit(1);
+    }
     const slotRun = writeSlotPlaywrightConfig({
       slot: lease.slot,
       env: process.env,
