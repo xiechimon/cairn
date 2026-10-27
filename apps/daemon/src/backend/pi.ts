@@ -210,10 +210,12 @@ export function builtinToolNames(readOnly: boolean): readonly string[] {
 
 export function sessionToolNames(opts: {
   readOnly: boolean;
+  remoteToolsOnly?: boolean;
   remoteTools: readonly string[];
   mcpTools: readonly string[];
   localTools?: readonly string[];
 }): string[] {
+  if (opts.remoteToolsOnly === true) return [...opts.remoteTools];
   return [
     ...builtinToolNames(opts.readOnly),
     ...opts.remoteTools,
@@ -991,11 +993,14 @@ export class PiBackend implements AgentBackend {
       tools: [
         ...sessionToolNames({
           readOnly: opts.readOnly === true,
+          remoteToolsOnly: opts.remoteToolsOnly === true,
           remoteTools: remoteTools.map((t) => t.name),
           mcpTools: [],
           localTools: localTools.map((t) => t.name),
         }),
-        ...(mcpEndpoints.length > 0 ? [...MCP_TOOL_ALLOWLIST] : []),
+        ...(mcpEndpoints.length > 0 && opts.remoteToolsOnly !== true
+          ? [...MCP_TOOL_ALLOWLIST]
+          : []),
       ],
       ...(gatedRead || envBash !== null || customTools.length > 0 || localTools.length > 0
         ? {

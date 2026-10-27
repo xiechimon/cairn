@@ -395,3 +395,50 @@ describe('review step execution surface (#511)', () => {
     expect(body.findingsError).toContain('未找到');
   });
 });
+
+describe('chief digest execution surface (#1939)', () => {
+  const claimedDigest: ClaimedStep = {
+    step: {
+      id: 's-digest',
+      buildId: 'chief-digest-c1',
+      kind: 'chief',
+      machineId: 'm1',
+      createdAt: 1,
+    },
+    conversationId: 'chief-digest-c1',
+    session: { action: 'new', sessionId: null },
+    instruction: '整理这段对话',
+    agent: {
+      id: 'a1',
+      displayName: 'stub-chief',
+      description: null,
+      provider: null,
+      modelId: 'stub-model',
+      thinkingLevel: null,
+    },
+    chief: { threadId: 'chief-digest-c1', systemPrompt: '只读整理', trigger: 'user' },
+    remoteTools: [{ name: 'todos', description: 'list tasks' }],
+    mcpServers: [],
+    remoteToolsOnly: true,
+  };
+
+  test('a digest session gets only its remote tools and a managed-empty MCP set', async () => {
+    const { captured } = await setup(claimedDigest);
+    expect(captured[0]!.remoteToolsOnly).toBe(true);
+    expect(captured[0]!.mcpServers).toEqual([]);
+    expect(captured[0]!.remoteTools?.map((t) => t.name)).toEqual(['todos']);
+    expect(captured[0]!.localTools).toBeUndefined();
+  });
+
+  test('pi: a remote-only session drops read, bash, edit, write, local and MCP tools', () => {
+    expect(
+      sessionToolNames({
+        readOnly: false,
+        remoteToolsOnly: true,
+        remoteTools: ['todos'],
+        mcpTools: ['mcp__x__y'],
+        localTools: ['create_tag'],
+      }),
+    ).toEqual(['todos']);
+  });
+});

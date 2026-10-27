@@ -753,6 +753,7 @@ async function runClaimedStep(
     },
     ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
     ...(isReview ? { readOnly: true } : {}),
+    ...(claimed.remoteToolsOnly === true ? { remoteToolsOnly: true } : {}),
     ...(telemetry !== undefined ? { telemetry } : {}),
     ...(opts.env !== undefined || readonlyWorkspace
       ? { env: { ...opts.env, ...(readonlyWorkspace ? READONLY_GIT_ENV : {}) } }

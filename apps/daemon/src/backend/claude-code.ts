@@ -773,6 +773,7 @@ export interface ClaudeSdkOptionParts {
   resumeId: string | null;
   sessionId: string;
   disallowedTools: string[];
+  builtinTools?: string[];
   mcpServers: Record<string, McpServerConfig>;
   strictMcpConfig?: boolean;
   effort?: EffortLevel;
@@ -796,6 +797,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     model: parts.modelId,
     permissionMode: 'bypassPermissions',
     disallowedTools: parts.disallowedTools,
+    ...(parts.builtinTools !== undefined ? { tools: parts.builtinTools } : {}),
     includePartialMessages: true,
     settingSources: [...CLAUDE_SETTING_SOURCES],
     ...mcpSection,
@@ -909,6 +911,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       resumeId,
       sessionId,
       disallowedTools,
+      ...(opts.remoteToolsOnly === true ? { builtinTools: [] } : {}),
       mcpServers,
       ...(managedMcp ? { strictMcpConfig: true } : {}),
       ...(effort !== undefined ? { effort } : {}),
@@ -918,7 +921,7 @@ export class ClaudeCodeBackend implements AgentBackend {
         ? { executablePath: this.opts.executablePath }
         : {}),
       ...(sessionEnv !== undefined ? { env: sessionEnv } : {}),
-      ...(nativePluginDir !== null
+      ...(nativePluginDir !== null && opts.remoteToolsOnly !== true
         ? { plugins: [{ type: 'local' as const, path: nativePluginDir }] }
         : {}),
       abortController: abort,

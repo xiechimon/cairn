@@ -23,6 +23,7 @@ import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { chiefClaimContext, parseChiefTrigger } from './chief.js';
 import {
+  CHIEF_DIGEST_MIN_CLI_VERSION,
   CHIEF_DIGEST_REMOTE_TOOLS,
   CHIEF_DIGEST_SYSTEM_PROMPT,
   isChiefDigestStep,
@@ -113,9 +114,13 @@ function claimChiefCandidates(deps: MachineDeps, machineId: string, teamId: stri
 }
 
 export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
+  return cliVersionAtLeast(latestCliVersion, MCP_MIN_CLI_VERSION);
+}
+
+function cliVersionAtLeast(latestCliVersion: string | null, min: string): boolean {
   if (!latestCliVersion) return false;
   const parse = (v: string): number[] => v.split('.').map((n) => Number.parseInt(n, 10) || 0);
-  const [a, b] = [parse(latestCliVersion), parse(MCP_MIN_CLI_VERSION)];
+  const [a, b] = [parse(latestCliVersion), parse(min)];
   for (let i = 0; i < 3; i++) {
     const d = (a[i] ?? 0) - (b[i] ?? 0);
     if (d !== 0) return d > 0;
@@ -183,7 +188,7 @@ function buildChiefClaim(
   }
   const memories = injectMemories(deps.db, { agentId: agentRow.id });
   const chiefMcp = digest
-    ? undefined
+    ? []
     : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
   return {
     step: {
@@ -220,6 +225,7 @@ function buildChiefClaim(
     },
     remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : CHIEF_REMOTE_TOOLS)],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
+    ...(digest ? { remoteToolsOnly: true as const } : {}),
   };
 }
 
@@ -249,6 +255,12 @@ async function tryClaim(
   for (const cand of chiefCands) {
     if (cand.stepRow.createdAt > earliestWorker) break;
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
+    if (
+      isChiefDigestStep(cand.stepRow) &&
+      !cliVersionAtLeast(machineRow.latestCliVersion, CHIEF_DIGEST_MIN_CLI_VERSION)
+    ) {
+      continue;
+    }
     if (
       cand.agentRow.maxConcurrentTasks !== null &&
       agentRunningCount(db, cand.agentRow.id) >= cand.agentRow.maxConcurrentTasks

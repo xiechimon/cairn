@@ -29,6 +29,7 @@ export const CHIEF_DIGEST_THRESHOLD_CHARS = 40_000;
 export const CHIEF_DIGEST_RETRY_MS = 15 * 60_000;
 export const CHIEF_DIGEST_INPUT_MAX_CHARS = 60_000;
 export const CHIEF_DIGEST_LOOKBACK_MS = 2 * 24 * 60 * 60_000;
+export const CHIEF_DIGEST_MIN_CLI_VERSION = '0.2.2';
 const CHIEF_DIGEST_ITEMS_MAX = 12;
 const CHIEF_DIGEST_TEXT_MAX = 400;
 const DIGEST_META_RE = /\nDigest thread=(\S+) until=(\d+) last=(\S+) reason=(daily|threshold)$/;

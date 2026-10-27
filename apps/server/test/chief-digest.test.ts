@@ -20,6 +20,7 @@ import {
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import {
   CHIEF_DIGEST_LOOKBACK_MS,
+  CHIEF_DIGEST_MIN_CLI_VERSION,
   CHIEF_DIGEST_RETRY_MS,
   CHIEF_DIGEST_THRESHOLD_CHARS,
   planChiefDigests,
@@ -82,14 +83,14 @@ const VALID_OUTPUT = [
   '```',
 ].join('\n');
 
-async function setup(): Promise<World> {
+async function setup(cliVersion = CHIEF_DIGEST_MIN_CLI_VERSION): Promise<World> {
   const s = bootServer({ claimHoldMs: 200 });
   disposables.push(() => s.dispose());
   const teamId = s.team.id;
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: { teamId, name: 'digest-mbp', cliVersion: '0.1.0' },
+    body: { teamId, name: 'digest-mbp', cliVersion },
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = machineIdByName(s, 'digest-mbp');
@@ -230,6 +231,16 @@ describe('chief long-chat digests (#1939)', () => {
     expect(tools).not.toContain('save_memory');
     expect(tools).not.toContain('issues');
     expect(claimed?.chief?.systemPrompt).not.toContain('创建任务、分派');
+    expect(claimed?.remoteToolsOnly).toBe(true);
+    expect(claimed?.mcpServers).toEqual([]);
+  });
+
+  test('a machine on a daemon that cannot drop its local tools never claims a digest', async () => {
+    const w = await setup('0.2.1');
+    w.plan(TODAY_0830);
+    expect(w.digestSteps()).toHaveLength(1);
+    expect(await w.claim()).toBeNull();
+    expect(w.digestSteps()[0]?.status).toBe('pending');
   });
 
   test('a pending digest is not queued twice', async () => {
