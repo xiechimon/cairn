@@ -557,3 +557,33 @@ test('CLI reads a ledger file for outcomes and usage', () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Change failure rate \| 50\.0%/);
 });
+
+for (const [name, signals, expected] of [
+  [
+    'one negative signal with the other unknown',
+    { revertedWithin7d: false, fixedByLaterPr: null },
+    { known: 0, missing: 1, failed: 0, rate: null },
+  ],
+  [
+    'one positive signal with the other unknown',
+    { revertedWithin7d: true, fixedByLaterPr: null },
+    { known: 1, missing: 0, failed: 1, rate: 1 },
+  ],
+  [
+    'both signals explicitly negative',
+    { revertedWithin7d: false, fixedByLaterPr: false },
+    { known: 1, missing: 0, failed: 0, rate: 0 },
+  ],
+]) {
+  test(`change-failure coverage preserves ${name}`, () => {
+    const metrics = computeMetrics({
+      prs: [pr(90, { createdAt: '2026-10-14T00:00:00Z', mergedAt: '2026-10-14T01:00:00Z' })],
+      runs: [],
+      ledger: { 90: signals },
+      now: NOW,
+    });
+    for (const [key, value] of Object.entries(expected)) {
+      assert.equal(metrics.changeFailure[key], value, key);
+    }
+  });
+}

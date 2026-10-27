@@ -1,0 +1,36 @@
+✔ overlapping main runs recover at the first qualifying successful completion (0.520166ms)
+✔ a successful completion after the reporting instant cannot recover main yet (0.078583ms)
+✔ colored gh JSON still parses (0.79625ms)
+✔ isBot uses one allowlist for logins, app prefixes and bot suffixes (0.105833ms)
+✔ isoWeek labels the week of a date (0.082417ms)
+✔ fixture metrics match the hand-computed table (1.42575ms)
+✔ missing token data is counted separately instead of becoming zero (0.282792ms)
+✔ an empty week yields an empty table without errors or division by zero (0.1455ms)
+✔ duplicate pull requests from overlapping pages count once (0.094875ms)
+✔ report states the week, the table and the incomplete reason (0.149208ms)
+✔ a bot-authored pull request merged by a person without auto-merge counts as human (0.531625ms)
+✔ null backfill and null usage stay missing instead of counting as zero (0.299708ms)
+✔ a recorded zero token count stays zero (0.080708ms)
+✔ fetchPrs pages through results and normalizes nodes (0.341375ms)
+✔ fetchPrs keeps earlier pages and reports a rate limit as incomplete (0.14125ms)
+✔ fetchPrs rethrows errors that are not rate limits (0.199042ms)
+✔ fetchPrs marks the week incomplete when more pages remain after the cap (0.266792ms)
+✔ fetchMainRuns pages until a short page and normalizes runs (0.790417ms)
+✔ fetchMainRuns counts a main run as red only when a required check fails (0.108416ms)
+✔ fetchMainRuns keeps earlier runs and reports a rate limit while reading jobs (0.098916ms)
+✔ CLI writes the weekly JSON and the markdown report from a fixture (29.495417ms)
+✔ CLI runs on an empty fixture (27.766375ms)
+✔ the weekly workflow runs delivery metrics and posts the report (0.104792ms)
+✔ ci runs the delivery metrics self-test beside the gardener sweep (0.099833ms)
+✔ CLI reads a ledger file for outcomes and usage (27.754708ms)
+✔ change-failure coverage preserves one negative signal with the other unknown (0.101541ms)
+✔ change-failure coverage preserves one positive signal with the other unknown (0.0365ms)
+✔ change-failure coverage preserves both signals explicitly negative (0.03175ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 136.929333

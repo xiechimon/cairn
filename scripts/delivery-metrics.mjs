@@ -223,12 +223,13 @@ export function computeMetrics({ prs, runs, ledger = {}, now, incompleteReasons 
     const entry = ledger[String(pr.number)] ?? ledger[pr.number];
     const reverted = entry?.revertedWithin7d;
     const fixed = entry?.fixedByLaterPr;
-    if (typeof reverted !== 'boolean' && typeof fixed !== 'boolean') {
+    const failure = reverted === true || fixed === true;
+    if (!failure && (reverted !== false || fixed !== false)) {
       missing += 1;
       continue;
     }
     known.push(pr);
-    if (reverted === true || fixed === true) failed += 1;
+    if (failure) failed += 1;
   }
 
   return {
