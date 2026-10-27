@@ -42,7 +42,7 @@ afterAll(() => {
 });
 
 async function setupWorld(): Promise<World> {
-  const s = bootServer({ claimHoldMs: 200 });
+  const s = bootServer({ claimHoldMs: 200, githubFetch: async () => new Response('[]') });
   disposables.push(() => s.dispose());
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
