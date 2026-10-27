@@ -23,6 +23,7 @@
     "traj:reflect": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-reflect-cli.ts",
     "traj:backfill": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-backfill-cli.ts",
     "traj:curate": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-curate-cli.ts",
+    "rel:report": "pnpm --filter @xiechimon/cairn exec node --import tsx src/reliability-report-cli.ts",
     "lint": "biome ci .",
     "changeset": "changeset",
     "release:version": "changeset version",
