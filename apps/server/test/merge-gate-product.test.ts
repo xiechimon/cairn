@@ -1086,7 +1086,7 @@ test('empty caller criteria cannot hide evidence missing from the server plan', 
   expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('verify-failed');
 });
 
-async function claimedMachineReview(sameVendor = false, gateLoosening = false) {
+async function claimedMachineReview(sameVendor = false, gateLoosening = false, blocking = false) {
   const { s, buildId, stepId, reviewerId } = await world();
   const key = await issueApiKey(s);
   const enrollment = await s.app.request('/api/machine/enroll', {
@@ -1127,7 +1127,14 @@ async function claimedMachineReview(sameVendor = false, gateLoosening = false) {
     body: JSON.stringify({
       status: 'success',
       gateHeadSha: HEAD,
-      findings: { conclusion: 'Reviewed', gateLoosening, evalRulerChange: false, findings: [] },
+      findings: {
+        conclusion: 'Reviewed',
+        gateLoosening,
+        evalRulerChange: false,
+        findings: blocking
+          ? [{ id: 'default-block', severity: 'blocking', summary: 'Missing authorization' }]
+          : [],
+      },
     }),
   });
   expect(done.status).toBe(200);
@@ -1317,4 +1324,22 @@ test('a completed chief machine cannot overwrite another chief thread', async ()
   expect(
     s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'own-chief-message')).get()?.content,
   ).toBe('Recovered chief content');
+});
+
+test('a default review records NoGo successfully while its build still waits for CI', async () => {
+  const { s, buildId, reviewId } = await claimedMachineReview(false, false, true);
+  expect(s.db.select().from(todo).where(eq(todo.id, 'todo-1794')).get()?.phase).toBe('building');
+  expect(
+    s.db.select().from(gateVerdict).where(eq(gateVerdict.stepId, reviewId)).get()?.outcome,
+  ).toBe('block');
+  expect(
+    s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .filter((row) => row.kind === 'plan'),
+  ).toHaveLength(0);
+  const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+  expect(readiness?.blockers.map((blocker) => blocker.code)).toContain('review-blocking');
 });

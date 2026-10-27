@@ -1,0 +1,33 @@
+
+ RUN  v5.0.1 /workspace/cairn-1794
+
+ ❯ |@xiechimon/cairn| test/merge-gate-product.test.ts (36 tests | 1 failed | 35 skipped) 78ms
+   × a default review records NoGo successfully while its build still waits for CI 77ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-product.test.ts > a default review records NoGo successfully while its build still waits for CI
+AssertionError: expected 409 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 409
+
+ ❯ claimedMachineReview test/merge-gate-product.test.ts:1140:23
+    1138|     }),
+    1139|   });
+    1140|   expect(done.status).toBe(200);
+       |                       ^
+    1141|   expect(s.db.select().from(step).where(eq(step.id, reviewId)).get()?.…
+    1142|   const record = s.db
+ ❯ test/merge-gate-product.test.ts:1330:36
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 35 skipped (36)
+   Start at  12:27:55
+   Duration  1.38s (transform 62%, import 32%, tests 6%)

@@ -2273,7 +2273,11 @@ export function completeStep(
         outcome.verdictReport ??
         reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),
     });
-    if (parseReviewPromptMeta(stepRow.prompt)?.purpose === 'decision') return;
+    if (
+      todoRow.phase === 'building' ||
+      parseReviewPromptMeta(stepRow.prompt)?.purpose === 'decision'
+    )
+      return;
     if (hasBlockingFinding(verdict)) {
       const revisionInFlight = deps.db
         .select({ id: step.id })
