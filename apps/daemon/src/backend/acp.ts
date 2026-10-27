@@ -29,6 +29,7 @@ import type {
   ToolCallRecord,
 } from '@cairn/shared';
 import { DAEMON_VERSION } from '../version.js';
+import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 
 export const GEMINI_CAPABILITIES: AgentBackendCapabilities = {
   name: 'gemini',
@@ -252,7 +253,12 @@ export class GeminiBackend implements AgentBackend {
   constructor(private readonly options: GeminiBackendOptions = {}) {}
 
   async modelSupportsImages(provider: ProviderConfig, modelId: string): Promise<boolean | null> {
+    if (isLearnedNoVision(provider.providerId, modelId)) return false;
     return this.imageSupport.get(`${provider.providerId}/${modelId}`) ?? null;
+  }
+
+  rememberNoVision(provider: ProviderConfig, modelId: string): void {
+    rememberNoVision(provider.providerId, modelId);
   }
 
   async createSession(opts: SessionOpts): Promise<AgentSessionHandle> {

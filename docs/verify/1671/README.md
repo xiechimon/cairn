@@ -20,6 +20,8 @@ Independent review exposed session history retention and a thrown event-iterator
 
 [steer-buffer-before.txt](steer-buffer-before.txt) records two final-upload failures caused by separate cached transcript writers. The machine loop now writes through the runner's existing buffer. The final-upload assertion is included in the passing [acp-after.txt](acp-after.txt) run.
 
+[acp-cache-before.txt](acp-cache-before.txt) records a negotiated vision-capable session ignoring a later model rejection. The existing learned-capability cache now takes precedence over the handshake, and the same case passes in [acp-after.txt](acp-after.txt).
+
 Two existing server test fixtures now use an injected empty GitHub response unless their case supplies its own fetch function. This keeps their claim and report checks independent of public GitHub traffic. [network-fixture-after.txt](network-fixture-after.txt) records both fixture suites passing.
 
 Run the complete affected set:

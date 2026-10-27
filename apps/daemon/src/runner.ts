@@ -343,6 +343,7 @@ export async function runStep(
     await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance);
   } finally {
     clearInterval(heartbeat);
+    deps.stepImageSupport?.delete(stepId);
     deps.stepTranscripts?.delete(stepId);
     stop.settle();
   }
@@ -1892,7 +1893,6 @@ async function runClaimedStep(
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
     deps.sessionHandles?.delete(stepId);
-    deps.stepImageSupport?.delete(stepId);
     return;
   }
 
@@ -1902,13 +1902,11 @@ async function runClaimedStep(
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
     deps.sessionHandles?.delete(stepId);
-    deps.stepImageSupport?.delete(stepId);
     return;
   }
   clearCredentials(creds);
   journal.remove(stepId);
   deps.sessionHandles?.delete(stepId);
-  deps.stepImageSupport?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
 }
 
@@ -2024,7 +2022,6 @@ async function failStep(
 ): Promise<void> {
   clearInterval(heartbeat);
   deps.sessionHandles?.delete(stepId);
-  deps.stepImageSupport?.delete(stepId);
   deps.logger.step(`failed: ${message}`);
   try {
     await deps.client.done(stepId, { status: 'failed', errorMessage: message });

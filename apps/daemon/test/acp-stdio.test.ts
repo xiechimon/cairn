@@ -197,6 +197,8 @@ describe('Gemini stdio execution', () => {
     const textSession = await textOnly.createSession(opts);
     await expect(textOnly.modelSupportsImages?.(opts.provider, opts.modelId)).resolves.toBe(false);
     await collect(textSession.events);
+    vision.rememberNoVision?.(opts.provider, opts.modelId);
+    await expect(vision.modelSupportsImages?.(opts.provider, opts.modelId)).resolves.toBe(false);
   });
 
   test('image steering sends pixels to a session that advertised image support', async () => {

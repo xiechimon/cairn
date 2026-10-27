@@ -1,0 +1,46 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1671
+
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+ ❯ |@xiechimon/cairn-cli| test/acp-stdio.test.ts (13 tests | 1 failed) 103ms
+   ❯ Gemini stdio execution (13)
+     × image support is unknown before initialize and follows negotiated capability afterwards 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > image support is unknown before initialize and follows negotiated capability afterwards
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/acp-stdio.test.ts:201:76
+    199|     await collect(textSession.events);
+    200|     vision.rememberNoVision?.(opts.provider, opts.modelId);
+    201|     await expect(vision.modelSupportsImages?.(opts.provider, opts.mode…
+       |                                                                            ^
+    202|   });
+    203|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 12 passed (13)
+   Start at  10:06:16
+   Duration  2.64s (transform 72%, import 23%, tests 4%)
+
