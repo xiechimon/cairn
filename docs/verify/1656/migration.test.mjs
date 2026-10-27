@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -10,6 +11,19 @@ test('migration preserves every source row and sums counters when categories mer
   const manifest = JSON.parse(
     readFileSync(join(repoRoot, 'docs/verify/1656/migration.json'), 'utf8'),
   );
+  const source = execFileSync('git', ['show', `${manifest.source}:docs/lessons.md`], {
+    cwd: process.env.CAIRN_MIGRATION_SOURCE_REPO ?? repoRoot,
+    encoding: 'utf8',
+  });
+  const sourceRows = source.split('\n')
+    .filter((line) => line.startsWith('| ') && !line.startsWith('| Category |'))
+    .map((line) => {
+      const cells = line.split(/(?<!\\)\|/).slice(1).map((cell) => cell.trim());
+      if (cells.at(-1) === '') cells.pop();
+      return cells;
+    });
+  assert.equal(manifest.rows.length, sourceRows.length, 'migration manifest must contain every source ledger row');
+  assert.deepEqual(manifest.rows.map(({ cells }) => cells), sourceRows);
   const counts = new Map();
   for (const { entry, cells } of manifest.rows) {
     const text = entryText(entry);
