@@ -27,6 +27,8 @@ type StepRow = typeof step.$inferSelect;
 const LIVE_STATUSES = ['pending', 'claimed', 'waiting_quota'] as const;
 
 const STEERED_HOLD = 'steer';
+const STEER_SENT_HOLD = 'steer_sent';
+const STEER_HOLDS = [STEERED_HOLD, STEER_SENT_HOLD];
 
 export const CHIEF_ABANDONED_STEP_MS = 120_000;
 
@@ -76,7 +78,7 @@ export function chiefPendingMessages(db: Db, threadId: string): ChiefPendingMess
   const out: ChiefPendingMessage[] = [];
   let parked = false;
   live.forEach((row, index) => {
-    if (row.status === 'claimed' || row.holdReason === STEERED_HOLD) return;
+    if (row.status === 'claimed' || STEER_HOLDS.includes(row.holdReason ?? '')) return;
     parked = parked || isParked(row, now);
     const userRow = db
       .select({ id: chiefMessage.id })
@@ -189,7 +191,7 @@ export function withdrawChiefMessage(
   requireThread(deps.db, teamId, threadId);
   requireUserMessage(deps.db, threadId, messageId);
   const row = waitingStepOf(deps.db, threadId, messageId);
-  if (row.holdReason === STEERED_HOLD) {
+  if (STEER_HOLDS.includes(row.holdReason ?? '')) {
     throw new HttpError(
       409,
       'message already steered into the running turn (已经插话送进本回合了)',
@@ -215,6 +217,7 @@ export function steerChiefMessage(
   const waiting = waitingStepOf(deps.db, threadId, messageId);
   const running = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
   if (running === undefined) return { steered: false };
+  if (STEER_HOLDS.includes(waiting.holdReason ?? '')) return { steered: true };
   const content = typeof message.content === 'string' ? message.content : (waiting.prompt ?? '');
   const now = nowMs();
   const prior = deps.db
@@ -237,9 +240,22 @@ export function steerChiefMessage(
   return { steered: true };
 }
 
+export function markChiefSteerSent(db: Db, threadId: string): void {
+  db.update(step)
+    .set({ holdReason: STEER_SENT_HOLD })
+    .where(
+      and(
+        eq(step.buildId, threadId),
+        eq(step.status, 'pending'),
+        eq(step.holdReason, STEERED_HOLD),
+      ),
+    )
+    .run();
+}
+
 export function consumeChiefSteer(deps: Pick<ChiefTurnDeps, 'db' | 'convHub'>, threadId: string) {
   const steered = liveChiefSteps(deps.db, threadId).filter(
-    (row) => row.status === 'pending' && row.holdReason === STEERED_HOLD,
+    (row) => row.status === 'pending' && row.holdReason === STEER_SENT_HOLD,
   );
   const now = nowMs();
   for (const row of steered) {
@@ -262,7 +278,7 @@ export function releaseUnconsumedSteer(db: Db, finished: StepRow): void {
       and(
         eq(step.buildId, finished.buildId),
         eq(step.status, 'pending'),
-        eq(step.holdReason, STEERED_HOLD),
+        inArray(step.holdReason, STEER_HOLDS),
       ),
     )
     .run();

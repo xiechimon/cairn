@@ -3,7 +3,7 @@ Category: The chief queue shipped three edge cases that the self review missed a
 Source: #1938 (2026-10-27)
 Level: 2
 Safeguard: `apps/server/test/chief-queue-steer-stop.test.ts` cases "turns created in the same millisecond run in arrival order", "a steered message can no longer be withdrawn" and "a backup model on a different backend runtime is skipped too"
-Intercepts: 1
+Intercepts: 2
 Recurrences: 0
-Notes: Negative control: all three cases were written first and went red on the head the gate blocked (claimed `turn-a` instead of `turn-z`; withdraw returned 200; fallback row set), green after the fix. Pattern to check next time: any ordering key must match the one the UI shows, any state that has left the server must not be undoable, and identity checks must compare the identity, not a category flag
+Notes: Negative control: all three cases were written first and went red on the head the gate blocked (claimed `turn-a` instead of `turn-z`; withdraw returned 200; fallback row set), green after the fix. Pattern to check next time: any ordering key must match the one the UI shows, any state that has left the server must not be undoable, and identity checks must compare the identity, not a category flag. Second gate round: `fetchSteer` consumed the queued turn before the daemon delivered the text, so a turn that ended in between lost the message; now the turn stays held until `POST /api/machine/steer/ack`, with the case "a turn that finishes after the daemon fetched a steer but before it delivered it keeps the message queued" red first. Any hand-off to another process needs an ack before the sender drops its copy
 ---

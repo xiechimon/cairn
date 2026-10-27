@@ -189,6 +189,12 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
     stop() {
       return call(s.app, 'POST', `/api/teams/${teamId}/chief/threads/${threadId}/stop`);
     },
+    async ackSteer(stepId: string) {
+      const res = await call(s.app, 'POST', `/api/machine/steer/ack?stepId=${stepId}`, {
+        cred: token,
+      });
+      expect(res.status).toBe(200);
+    },
     async fetchSteer(stepId: string) {
       const res = await call(s.app, 'GET', `/api/machine/steer?stepId=${stepId}`, { cred: token });
       return ((await res.json()) as { content: string | null }).content;
@@ -285,6 +291,8 @@ describe('steer (T5): `现在插话`', () => {
     expect(pending[0]!.content).toBe('改成只看 cairn 项目');
     expect((await w.thread()).pending).toEqual([]);
     expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
+    expect(w.stepRow(queued)).toBeDefined();
+    await w.ackSteer(running!.step.id);
     expect(w.stepRow(queued)).toBeUndefined();
     expect(w.messages().find((m) => m.id === queued)!.createdAt).toBeGreaterThanOrEqual(before);
     await w.done(running!.step.id, { status: 'success' });
@@ -314,6 +322,32 @@ describe('steer (T5): `现在插话`', () => {
     expect((await w.withdraw(queued)).status).toBe(409);
     expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
     expect(w.messages().some((m) => m.id === queued)).toBe(true);
+  });
+
+  test('a turn that finishes after the daemon fetched a steer but before it delivered it keeps the message queued', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const queued = await w.send('改成只看 cairn 项目');
+    expect((await w.steer(queued)).status).toBe(200);
+    expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
+    expect((await w.thread()).pending).toEqual([]);
+    expect((await w.withdraw(queued)).status).toBe(409);
+    await w.done(running!.step.id, { status: 'success' });
+    const next = await w.claim();
+    expect(next?.step.id).toBe(queued);
+    expect(next?.instruction).toBe('改成只看 cairn 项目');
+  });
+
+  test('steering the same message twice sends its text once', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const queued = await w.send('改成只看 cairn 项目');
+    expect((await w.steer(queued)).status).toBe(200);
+    expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
+    expect(await (await w.steer(queued)).json()).toEqual({ steered: true });
+    expect(await w.fetchSteer(running!.step.id)).toBeNull();
   });
 
   test('a steer that arrives after the reply finished stays a normal message for the next turn', async () => {

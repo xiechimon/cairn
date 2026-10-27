@@ -23,7 +23,7 @@ import { newMachineToken } from '../lib/keys.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import { NotFoundError } from './builds.js';
-import { consumeChiefSteer } from './chief-turns.js';
+import { consumeChiefSteer, markChiefSteerSent } from './chief-turns.js';
 import { recommendMachineConcurrency } from './dispatch-eligibility.js';
 import type { ConversationStreamHub } from './events.js';
 import {
@@ -71,8 +71,24 @@ export function fetchSteer(
   if (pending.stepId !== stepId) {
     return { content: null };
   }
-  if (isChiefConversation(stepRow.buildId)) consumeChiefSteer(deps, stepRow.buildId);
+  if (isChiefConversation(stepRow.buildId)) markChiefSteerSent(db, stepRow.buildId);
   return { content: pending.content };
+}
+
+export function ackSteer(
+  deps: { db: Db; convHub?: ConversationStreamHub },
+  machine: { id: string },
+  stepId: string,
+): { ok: true } {
+  const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  if (
+    stepRow?.machineId === machine.id &&
+    stepRow.status === 'claimed' &&
+    isChiefConversation(stepRow.buildId)
+  ) {
+    consumeChiefSteer(deps, stepRow.buildId);
+  }
+  return { ok: true };
 }
 
 export function fetchStop(

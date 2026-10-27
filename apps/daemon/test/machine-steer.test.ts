@@ -47,6 +47,7 @@ describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.st
     await waitFor(() => steered.length === 1);
     expect(steered).toEqual(['顺便把测试也补上']);
     expect(api.calls).toContain('steer:s1');
+    await waitFor(() => api.calls.includes('steer-ack:s1'));
     release();
     await handle.stop();
     await handle.done;
@@ -168,6 +169,7 @@ describe('steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.st
     await waitFor(() => lines.some((l) => l.includes('steer dropped (no live session)')));
     expect(api.attachmentCalls).toHaveLength(0);
     expect(steered).toHaveLength(0);
+    expect(api.calls).not.toContain('steer-ack:s1');
     await handle.stop();
     await handle.done;
   });

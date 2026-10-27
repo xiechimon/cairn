@@ -39,6 +39,7 @@ import {
   receiveUpload,
 } from './services/machine-uploads.js';
 import {
+  ackSteer,
   authorizeEnrollmentMachine,
   claimStep,
   enrollMachine,
@@ -298,6 +299,13 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const stepId = c.req.query('stepId');
     if (!stepId) throw new HttpError(400, 'stepId required');
     return c.json(fetchSteer({ db: ctx.db, convHub: ctx.convHub }, row, stepId));
+  });
+
+  app.post('/api/machine/steer/ack', (c) => {
+    const row = me(c);
+    const stepId = c.req.query('stepId');
+    if (!stepId) throw new HttpError(400, 'stepId required');
+    return c.json(ackSteer({ db: ctx.db, convHub: ctx.convHub }, row, stepId));
   });
 
   app.get('/api/machine/stop', (c) => {

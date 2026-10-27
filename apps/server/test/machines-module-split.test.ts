@@ -22,6 +22,7 @@ describe('machines.ts facade', () => {
     expect(Object.keys(machines).sort()).toEqual([
       'MACHINE_STALE_OFFLINE_MS',
       'MERGE_NOT_LANDED_NOTE',
+      'ackSteer',
       'agentForStep',
       'authorizeEnrollmentMachine',
       'backfillMachineConcurrency',

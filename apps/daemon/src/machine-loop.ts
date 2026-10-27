@@ -400,6 +400,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         );
       }
       await live.steer(deliveryText, images);
+      await client.steerAck?.(stepId);
       logger.step(`steer delivered step=${stepId}`);
     } catch (err) {
       logger.step(`steer delivery failed: ${err instanceof Error ? err.message : String(err)}`);
