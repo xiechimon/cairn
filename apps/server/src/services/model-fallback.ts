@@ -101,7 +101,9 @@ export function planModelFallback(
     (m) =>
       !tried.has(modelKey(m)) &&
       (stepRow.kind !== 'chief' ||
-        isBackendRuntimeId(m.provider) === isBackendRuntimeId(primary.provider)) &&
+        (isBackendRuntimeId(m.provider) || isBackendRuntimeId(primary.provider)
+          ? m.provider === primary.provider
+          : true)) &&
       runtimeGatePasses(machineRow, m.provider) &&
       getModelLiveness(m.provider, m.modelId) !== 'dead' &&
       providerHealth.tryAcquire(m.provider),

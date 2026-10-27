@@ -62,12 +62,10 @@ function isParked(row: StepRow, now: number): boolean {
 }
 
 export function hasEarlierLiveChiefStep(db: Db, candidate: StepRow): boolean {
-  return liveChiefSteps(db, candidate.buildId).some(
-    (row) =>
-      row.id !== candidate.id &&
-      (row.status === 'claimed' ||
-        row.createdAt < candidate.createdAt ||
-        (row.createdAt === candidate.createdAt && row.id < candidate.id)),
+  const live = liveChiefSteps(db, candidate.buildId);
+  const at = live.findIndex((row) => row.id === candidate.id);
+  return live.some(
+    (row, index) => row.id !== candidate.id && (row.status === 'claimed' || index < at),
   );
 }
 
@@ -191,6 +189,12 @@ export function withdrawChiefMessage(
   requireThread(deps.db, teamId, threadId);
   requireUserMessage(deps.db, threadId, messageId);
   const row = waitingStepOf(deps.db, threadId, messageId);
+  if (row.holdReason === STEERED_HOLD) {
+    throw new HttpError(
+      409,
+      'message already steered into the running turn (已经插话送进本回合了)',
+    );
+  }
   const message = requireUserMessage(deps.db, threadId, messageId);
   deps.db.delete(step).where(eq(step.id, row.id)).run();
   deps.db.delete(chiefMessage).where(eq(chiefMessage.id, messageId)).run();

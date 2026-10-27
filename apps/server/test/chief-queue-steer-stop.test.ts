@@ -237,6 +237,27 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     expect((await w.thread()).pending).toEqual([]);
   });
 
+  test('turns created in the same millisecond run in arrival order, matching the queue', async () => {
+    const w = await setupWorld();
+    const firstSent = await w.send('第一句');
+    const secondSent = await w.send('第二句');
+    for (const [from, to] of [
+      [firstSent, 'turn-z'],
+      [secondSent, 'turn-a'],
+    ] as const) {
+      w.s.db.update(stepTable).set({ id: to, createdAt: 1 }).where(eq(stepTable.id, from)).run();
+      w.s.db
+        .update(chiefMessage)
+        .set({ id: to, createdAt: 1 })
+        .where(eq(chiefMessage.id, from))
+        .run();
+    }
+    expect((await w.thread()).pending?.map((p) => p.messageId)).toEqual(['turn-a']);
+    const first = await w.claim();
+    expect(first?.step.id).toBe('turn-z');
+    expect(await w.claim()).toBeNull();
+  });
+
   test('queue order survives a reload: pending entries come back oldest first', async () => {
     const w = await setupWorld();
     await w.send('第一句');
@@ -282,6 +303,17 @@ describe('steer (T5): `现在插话`', () => {
     const next = await w.claim();
     expect(next?.step.id).toBe(queued);
     expect(next?.instruction).toBe('改成只看 cairn 项目');
+  });
+
+  test('a steered message can no longer be withdrawn, so the daemon never gets withdrawn text', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const queued = await w.send('改成只看 cairn 项目');
+    expect((await w.steer(queued)).status).toBe(200);
+    expect((await w.withdraw(queued)).status).toBe(409);
+    expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
+    expect(w.messages().some((m) => m.id === queued)).toBe(true);
   });
 
   test('a steer that arrives after the reply finished stays a normal message for the next turn', async () => {
@@ -448,6 +480,24 @@ describe('chief unavailable (T4)', () => {
     const running = await w.claim();
     await w.done(running!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
     expect((await w.envelope()).outage?.reason).toBe('quota');
+    expect(w.stepRow(running!.step.id)?.fallback ?? null).toBeNull();
+  });
+
+  test('a backup model on a different backend runtime is skipped too', async () => {
+    const w = await setupWorld([{ provider: 'gemini', modelId: 'gemini-pro' }]);
+    w.s.db
+      .update(agentTable)
+      .set({ provider: 'claude-code', modelId: 'sonnet' })
+      .where(eq(agentTable.id, AGENT_ID))
+      .run();
+    w.s.db
+      .update(machineTable)
+      .set({ enabledRuntimes: ['pi', 'claude-code', 'gemini'] })
+      .run();
+    await w.send('第一句');
+    const running = await w.claim();
+    expect(running?.agent?.provider).toBe('claude-code');
+    await w.done(running!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
     expect(w.stepRow(running!.step.id)?.fallback ?? null).toBeNull();
   });
 
