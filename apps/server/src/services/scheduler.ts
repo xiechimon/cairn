@@ -27,6 +27,7 @@ import {
   toBuildRecord,
 } from './builds.js';
 import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
+import { planChiefDigests } from './chief-digest.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
@@ -199,6 +200,7 @@ export function createScheduler(
     }
     sweepIdleChiefUnread(deps, now);
     fireDueChiefWakes(deps, now);
+    planChiefDigests(deps, now);
     sweepStaleMachines(deps);
     sweepAbandonedChiefSteps(deps, now);
     sweepAbandonedBuildSteps(deps, now);

@@ -22,7 +22,9 @@ import {
   ASK_USER_QUESTION_KIND,
   askUserQuestionContentSchema,
   BRAND,
+  CHIEF_DIGEST_KIND,
   CHIEF_TURN_ERROR_KIND,
+  chiefDigestContentSchema,
   chiefTurnErrorContentSchema,
   classifySkillFact,
   classifyStepFailure,
@@ -1080,6 +1082,18 @@ export function chiefTurnErrorOfContent(content: unknown): string | null {
   return row.success ? row.data.message : null;
 }
 
+export function chiefDigestOfContent(content: unknown) {
+  if (typeof content !== 'string' || !content.includes(CHIEF_DIGEST_KIND)) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return null;
+  }
+  const row = chiefDigestContentSchema.safeParse(parsed);
+  return row.success ? row.data : null;
+}
+
 export function askQuestionOfContent(content: unknown): {
   requestId: string;
   status: 'pending' | 'answered' | 'cancelled';
@@ -1158,6 +1172,18 @@ function collectChiefStream(
     if (turnError !== null) {
       pendingTools = [];
       items.push({ kind: 'error', text: turnError });
+      continue;
+    }
+    const digest = m.role === 'system' ? chiefDigestOfContent(m.content) : null;
+    if (digest !== null) {
+      pendingTools = [];
+      items.push({
+        kind: 'digest',
+        id: m.id,
+        reason: digest.reason,
+        madeAt: digest.madeAt,
+        items: digest.items,
+      });
       continue;
     }
     const call = toolCallOfContent(m.content);

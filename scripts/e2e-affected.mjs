@@ -43,7 +43,7 @@ const BOARD = [
   'storage-unavailable',
   'mobile-narrow',
   'focus-ring-clip',
-  'chief-home-chat',
+  'chief-home-',
 ];
 const SIDEBAR = [
   'sidebar-',
@@ -78,7 +78,7 @@ const DETAIL = [
   'spec-brief-',
   'spinner-',
   'chief-fab',
-  'chief-home-chat',
+  'chief-home-',
   'chief-stream-markdown',
   'composer-wire-reject',
   'user-menu-',
@@ -123,7 +123,13 @@ const CHIEF = [
   'hotkeys-ready',
   'mobile-narrow',
 ];
-const AGENT = ['agent-', 'team-create-agent', 'registry-focus-ring', 'resource-back-spa'];
+const AGENT = [
+  'agent-',
+  'team-create-agent',
+  'registry-focus-ring',
+  'resource-back-spa',
+  'chief-home-digest',
+];
 const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models'];
 const OVERLAY = [
   'newtask-',
@@ -233,6 +239,7 @@ const FILE_RULES = new Map([
   ['apps/web/src/components/form-layout.tsx', ['paper-', 'account-', ...AGENT, ...PAGES]],
   ['apps/web/src/components/brand-marks.tsx', ['machines-', 'title-', 'brand-']],
   ['apps/web/vitest.config.ts', []],
+  ['apps/web/e2e/chief-home-mock.ts', ['chief-home-']],
   ['apps/web/e2e/live-server.ts', LIVE_SERVER],
   ['apps/web/e2e/live-server-tether.mjs', LIVE_SERVER],
   ['apps/web/e2e/live-server-spawner.ts', LIVE_SERVER],

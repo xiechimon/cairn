@@ -11,7 +11,7 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Brain, SearchX } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import {
   useAgent,
@@ -120,7 +120,7 @@ export function AgentDetailPage() {
   const { t } = useI18n();
   const params = useParams<{ id: string }>();
   const agentId = params.id;
-  const { search } = useLocation();
+  const { search, hash } = useLocation();
   const navigate = useNavigate();
   const fixture = resolveScenario(new URLSearchParams(search));
   const { live, teamId } = useLiveData();
@@ -137,7 +137,10 @@ export function AgentDetailPage() {
   const mcpQ = useMcpServers(teamId, live);
   const mutations = useApiMutations(teamId);
 
-  const [tab, setTab] = useState<AgentTab>('overview');
+  const [tab, setTab] = useState<AgentTab>(
+    () =>
+      TAB_LABELS.find(({ id }) => id === new URLSearchParams(search).get('tab'))?.id ?? 'overview',
+  );
   const [localPatch, setLocalPatch] = useState<Partial<AgentRecord>>({});
   const [removedMemories, setRemovedMemories] = useState<string[]>([]);
   const [memoryQuery, setMemoryQuery] = useState('');
@@ -203,6 +206,12 @@ export function AgentDetailPage() {
     memorySort === '添加时间'
       ? [...matchedMemories].sort((a, b) => b.createdAt - a.createdAt)
       : matchedMemories;
+  const linkedMemoryVisible =
+    tab === 'memory' && visibleMemories.some((row) => `#memory-${row.id}` === hash);
+  useEffect(() => {
+    if (linkedMemoryVisible)
+      document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'center' });
+  }, [linkedMemoryVisible, hash]);
   const secretIds = live
     ? (secretsQ.data ?? []).map((row) => row.id)
     : (fixture.resources?.secrets ?? []).map((row) => row.id);
@@ -517,7 +526,12 @@ export function AgentDetailPage() {
                     {visibleMemories.map((memory) => (
                       <div
                         key={memory.id}
-                        className={cn(SETTINGS_ROW_CLS, 'agent-memory-row items-start gap-3')}
+                        id={`memory-${memory.id}`}
+                        data-linked={`#memory-${memory.id}` === hash ? '' : undefined}
+                        className={cn(
+                          SETTINGS_ROW_CLS,
+                          'agent-memory-row items-start gap-3 data-linked:bg-(--menu-hover)',
+                        )}
                       >
                         <span className="flex flex-1 flex-col">
                           <span className="agent-memory-title text-ui text-foreground">

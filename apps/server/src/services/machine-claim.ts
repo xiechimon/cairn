@@ -23,6 +23,11 @@ import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { chiefClaimContext, parseChiefTrigger } from './chief.js';
 import {
+  CHIEF_DIGEST_REMOTE_TOOLS,
+  CHIEF_DIGEST_SYSTEM_PROMPT,
+  isChiefDigestStep,
+} from './chief-digest.js';
+import {
   agentRunningCount,
   capabilityGatePasses,
   machineRunningCount,
@@ -158,9 +163,10 @@ function buildChiefClaim(
     .where(and(eq(step.id, stepRow.id), eq(step.status, 'pending')))
     .run();
   if (res.changes === 0) return null;
-  const ctx = chiefClaimContext(deps, threadRow.id);
+  const digest = isChiefDigestStep(stepRow);
+  const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
   const trigger = parseChiefTrigger(stepRow.prompt);
-  const systemPrompt = ctx?.systemPrompt ?? '';
+  const systemPrompt = digest ? CHIEF_DIGEST_SYSTEM_PROMPT : (ctx?.systemPrompt ?? '');
   let routeSection = '';
   if (ctx && trigger === 'user') {
     const hint = suggestSkillsForMessage(
@@ -174,7 +180,9 @@ function buildChiefClaim(
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
   const memories = injectMemories(deps.db, { agentId: agentRow.id });
-  const chiefMcp = claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
+  const chiefMcp = digest
+    ? undefined
+    : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
   return {
     step: {
       id: stepRow.id,
@@ -208,7 +216,7 @@ function buildChiefClaim(
       systemPrompt,
       trigger,
     },
-    remoteTools: [...CHIEF_REMOTE_TOOLS],
+    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : CHIEF_REMOTE_TOOLS)],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
   };
 }

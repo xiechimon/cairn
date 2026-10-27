@@ -39,6 +39,7 @@ import {
   toBuildRecord,
 } from './builds.js';
 import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
+import { finishChiefDigest, isChiefDigestStep } from './chief-digest.js';
 import { cancelPendingQuestions } from './chief-questions.js';
 import {
   buildCiFixPrompt,
@@ -410,6 +411,12 @@ export async function finishStep(
   }
   if (outcome.skillInjectionFacts !== undefined) {
     recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
+  }
+  if (stepRow.kind === 'chief' && isChiefDigestStep(stepRow)) {
+    finishChiefDigest(deps, stepRow, outcome, nowMs());
+    publishStepStatus(deps, stepId);
+    emitRuntimeStepSpan(deps.db, stepId);
+    return;
   }
   if (stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId)) {
     db.update(step)

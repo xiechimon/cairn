@@ -12,6 +12,16 @@ export function isChiefConversationId(id: string): boolean {
   return id.startsWith(CHIEF_THREAD_ID_PREFIX);
 }
 
+export const CHIEF_DIGEST_THREAD_ID_PREFIX = `${CHIEF_THREAD_ID_PREFIX}digest-`;
+
+export function isChiefDigestThreadId(id: string): boolean {
+  return id.startsWith(CHIEF_DIGEST_THREAD_ID_PREFIX);
+}
+
+export function chiefDigestThreadId(chiefId: string): string {
+  return `${CHIEF_DIGEST_THREAD_ID_PREFIX}${chiefId}`;
+}
+
 export function newChiefThreadId(uuidv7: string): string {
   return `${CHIEF_THREAD_ID_PREFIX}${uuidv7}`;
 }

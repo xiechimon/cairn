@@ -2,6 +2,7 @@ import {
   type AgentRecord,
   type AgentTask,
   type AgentTodoItem,
+  type ChiefDigestItem,
   type DocumentDiffFile,
   type GithubRepoSummary,
   type MachineHardware,
@@ -478,6 +479,13 @@ export type ChiefStreamItem =
       running?: boolean;
       error?: boolean;
       id?: string;
+    }
+  | {
+      kind: 'digest';
+      id: string;
+      reason: 'daily' | 'threshold';
+      madeAt: number;
+      items: ChiefDigestItem[];
     }
   | {
       kind: 'streaming';
