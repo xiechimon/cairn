@@ -1,0 +1,87 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1839-reviewed-delivery/cairn
+
+ ❯ |@cairn/shared| test/plan-prior-art-review.test.ts (6 tests | 4 failed) 6ms
+   ❯ prior-art review controls (6)
+     × an unclassified capability cannot bypass prior art by omitting trigger words 4ms
+     × a description is not a decision: - https://github.com/Hexagon/croner: a maintained library that supports reuse. 1ms
+     × a description is not a decision: - Source: https://github.com/Hexagon/croner because it is maintained and supports reuse. 0ms
+     × a description is not a decision: - Decision: the maintained croner library supports reuse. 0ms
+ ❯ |@cairn/integration| test/plan-prior-art-grade.test.ts (23 tests | 4 failed) 9ms
+   × rejected or conflicting choices cannot receive full credit: Decision: reuse croner is rejected because we will build our own parser. 3ms
+   × rejected or conflicting choices cannot receive full credit: Decision: reuse croner because it is maintained.
+Decision: build our own parser instead because croner cannot support our calendar. 0ms
+   × rejected or conflicting choices cannot receive full credit: Decision: reuse croner because it is maintained; build our own parser instead because croner cannot support our calendar. 0ms
+   × rejected or conflicting choices cannot receive full credit: 决策：复用 croner 被否决，因为需要手写解析器。 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/shared| test/plan-prior-art-review.test.ts > prior-art review controls > an unclassified capability cannot bypass prior art by omitting trigger words
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/plan-prior-art-review.test.ts:20:23
+     18|   test('an unclassified capability cannot bypass prior art by omitting…
+     19|     const result = checkPlanContract(feature);
+     20|     expect(result.ok).toBe(false);
+       |                       ^
+     21|     if (!result.ok) expect(result.problem).toContain('Prior art');
+     22|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  |@cairn/shared| test/plan-prior-art-review.test.ts > prior-art review controls > a description is not a decision: - https://github.com/Hexagon/croner: a maintained library that supports reuse.
+ FAIL  |@cairn/shared| test/plan-prior-art-review.test.ts > prior-art review controls > a description is not a decision: - Source: https://github.com/Hexagon/croner because it is maintained and supports reuse.
+ FAIL  |@cairn/shared| test/plan-prior-art-review.test.ts > prior-art review controls > a description is not a decision: - Decision: the maintained croner library supports reuse.
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/plan-prior-art-review.test.ts:38:23
+     36|   ])('a description is not a decision: %s', (description) => {
+     37|     const result = checkPlanContract(priorArt(description));
+     38|     expect(result.ok).toBe(false);
+       |                       ^
+     39|     if (!result.ok) expect(result.problem).toContain('决策');
+     40|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > rejected or conflicting choices cannot receive full credit: Decision: reuse croner is rejected because we will build our own parser.
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > rejected or conflicting choices cannot receive full credit: Decision: reuse croner because it is maintained.
+Decision: build our own parser instead because croner cannot support our calendar.
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > rejected or conflicting choices cannot receive full credit: Decision: reuse croner because it is maintained; build our own parser instead because croner cannot support our calendar.
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > rejected or conflicting choices cannot receive full credit: 决策：复用 croner 被否决，因为需要手写解析器。
+AssertionError: expected 1 to be 0.5 // Object.is equality
+
+- Expected
++ Received
+
+- 0.5
++ 1
+
+ ❯ test/plan-prior-art-grade.test.ts:104:58
+    102|   '决策：复用 croner 被否决，因为需要手写解析器。',
+    103| ])('rejected or conflicting choices cannot receive full credit: %s', (…
+    104|   expect(gradePlanPriorArt(featurePlan(decision)).score).toBe(0.5);
+       |                                                          ^
+    105| });
+    106|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 21 passed (29)
+   Start at  04:40:23
+   Duration  476ms (transform 58%, import 36%, tests 5%, worker 1%)
+

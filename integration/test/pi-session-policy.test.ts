@@ -57,7 +57,7 @@ beforeAll(async () => {
       toolCall: {
         name: 'bash',
         arguments: {
-          command: `cat > plan.md <<'EOF'\n# 方案\n\nContext: 探针任务。\nChanges: 在 README.md 追加一行 policy probe。\nEdge cases: 无。\nVerification: 读回 README.md。\nEOF`,
+          command: `cat > plan.md <<'EOF'\n# 方案\nKind: fix\n\nContext: 探针任务。\nChanges: 在 README.md 追加一行 policy probe。\nEdge cases: 无。\nVerification: 读回 README.md。\nEOF`,
         },
       },
     },

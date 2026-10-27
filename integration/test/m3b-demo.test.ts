@@ -29,6 +29,7 @@ import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const PLAN_MD = [
   '# 方案',
+  'Kind: fix',
   '',
   'Context: 探针任务，README 当前无探针行。',
   'Changes: 在 README.md 追加一行 m3b probe。',

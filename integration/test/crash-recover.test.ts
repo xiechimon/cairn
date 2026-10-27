@@ -80,7 +80,7 @@ describe('crash recovery (T2: AgentSession seam × host durable orchestration)',
         toolCall: {
           name: 'bash',
           arguments: {
-            command: `cat > plan.md <<'EOF'\n# 方案\n\nContext: 崩溃恢复探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\nEOF`,
+            command: `cat > plan.md <<'EOF'\n# 方案\nKind: fix\n\nContext: 崩溃恢复探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\nEOF`,
           },
         },
       },

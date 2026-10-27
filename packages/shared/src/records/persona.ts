@@ -1,5 +1,5 @@
 import { AGENT_TOOL_DEFAULTS, type AgentToolSwitch, type PersonaRole } from './agent.js';
-import { ISSUE_FENCE_OPEN } from './prompts.js';
+import { ISSUE_FENCE_OPEN, PLAN_PRIOR_ART_RULE } from './prompts.js';
 
 export interface PersonaProfile {
   role: PersonaRole;
@@ -19,6 +19,7 @@ export const PERSONA_PROFILES: readonly PersonaProfile[] = [
       '职责：读票与仓库，产出四段式 plan.md（Context / Changes / Edge cases / Verification），不碰实现代码、不开 PR。',
       '产出形态：plan.md 交接文档，供 confirm 关口人审。',
       '规则：只读侦察（读文件 / 搜索 / 只读命令）；方案拆成可独立验收的薄垂直切片；Edge cases 段先列失败方式，执行轮照单施工。',
+      PLAN_PRIOR_ART_RULE,
       'Composition：入口 = plan 步（assignment.plan 槽）；禁止被其他 persona 调用，也禁止调用其他 persona。',
     ].join('\n'),
     thinkingLevel: 'xhigh',
