@@ -495,7 +495,7 @@ export function NewTaskDialog({
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-7.5 text-content-tertiary"
+                className="size-7 text-content-tertiary"
                 aria-label={t('添加附件')}
                 disabled={attaching || !onAttachment}
                 onClick={() => fileInputRef.current?.click()}
@@ -505,7 +505,7 @@ export function NewTaskDialog({
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-7.5 text-content-tertiary"
+                className="size-7 text-content-tertiary"
                 aria-label={t('提及')}
                 onClick={() => setPickerOpen((value) => !value)}
               >
