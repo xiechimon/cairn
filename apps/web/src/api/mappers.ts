@@ -1141,15 +1141,6 @@ export function mapChiefStream(messages: MessageRow[], inlineTools = false): Chi
   return collectChiefStream(messages, inlineTools).items;
 }
 
-function systemJsonOf(content: unknown): unknown {
-  if (typeof content !== 'string') return null;
-  try {
-    return JSON.parse(content) as unknown;
-  } catch {
-    return null;
-  }
-}
-
 function collectChiefStream(
   messages: MessageRow[],
   inlineTools = false,
@@ -1194,7 +1185,12 @@ function collectChiefStream(
       continue;
     }
     if (m.role === 'system') {
-      const parsed = systemJsonOf(m.content);
+      let parsed: unknown = null;
+      try {
+        parsed = typeof m.content === 'string' ? JSON.parse(m.content) : null;
+      } catch {
+        parsed = null;
+      }
       const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
       if (stopped.success) {
         pendingTools = [];

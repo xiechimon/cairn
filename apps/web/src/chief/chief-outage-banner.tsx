@@ -8,17 +8,6 @@ const BANNER_CLS =
 const LINK_BTN_CLS =
   'h-auto cursor-pointer border-none bg-transparent p-0 text-meta font-normal text-(--text-secondary) underline-offset-2 hover:bg-transparent hover:text-(--foreground) hover:underline dark:hover:bg-transparent';
 
-function retryText(retryAt: number, locale: string): string {
-  const at = new Date(retryAt);
-  const sameDay = at.toDateString() === new Date().toDateString();
-  return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'zh-CN', {
-    ...(sameDay ? {} : { month: 'short', day: 'numeric' }),
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(at);
-}
-
 export function ChiefOutageBanner({
   outage,
   onSettings,
@@ -35,9 +24,19 @@ export function ChiefOutageBanner({
     outage.reason === 'quota'
       ? t('总管用的模型 {model} 额度已用完', { model })
       : t('总管用的模型 {model} 暂时过载', { model });
+  const retryAt = outage.retryAt != null ? new Date(outage.retryAt) : null;
   const when =
-    outage.retryAt != null
-      ? t('{time} 会自动再试', { time: retryText(outage.retryAt, locale) })
+    retryAt !== null
+      ? t('{time} 会自动再试', {
+          time: new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'zh-CN', {
+            ...(retryAt.toDateString() === new Date().toDateString()
+              ? {}
+              : { month: 'short', day: 'numeric' }),
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          }).format(retryAt),
+        })
       : t('恢复时间还不确定');
   return (
     <div
