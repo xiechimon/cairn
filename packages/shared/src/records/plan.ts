@@ -223,22 +223,26 @@ export function planPriorArtLines(content: string): string[] | undefined {
   return prior === undefined ? undefined : proseLines([prior.head, ...prior.lines].join('\n'));
 }
 
-function decisionChoice(text: string): PlanPriorArtChoice | null {
-  const match = ENGLISH_CHOICE.exec(text) ?? CHINESE_CHOICE.exec(text);
-  if (match === null) return null;
-  const reuse = /^(?:re-?use|复用)$/i.test(match[2] ?? '');
-  const rejected = match[1] !== undefined;
-  const kind = reuse ? (rejected ? 'reject-reuse' : 'reuse') : rejected ? 'reject-build' : 'build';
-  return { kind, subject: match[3] ?? '' };
-}
-
 export function planPriorArtDecisions(content: string): PlanPriorArtDecision[] | undefined {
   return planPriorArtLines(content)?.flatMap((line) => {
     const text = line.replace(/[`*_]/g, '').replace(/^(?:[-•]\s+|\d+[.)]\s+)/, '');
     if (text.startsWith('>')) return [];
     const labeled = DECISION_LABEL.test(text);
     const body = text.replace(DECISION_LABEL, '');
-    const parsed = body.split(/[;；。]/).map((clause) => decisionChoice(clause.trim()));
+    const parsed = body.split(/[;；。]/).map((clause): PlanPriorArtChoice | null => {
+      const match = ENGLISH_CHOICE.exec(clause.trim()) ?? CHINESE_CHOICE.exec(clause.trim());
+      if (match === null) return null;
+      const reuse = /^(?:re-?use|复用)$/i.test(match[2] ?? '');
+      const rejected = match[1] !== undefined;
+      const kind = reuse
+        ? rejected
+          ? 'reject-reuse'
+          : 'reuse'
+        : rejected
+          ? 'reject-build'
+          : 'build';
+      return { kind, subject: match[3] ?? '' };
+    });
     if (!labeled && parsed[0] === null) return [];
     const choices = parsed.filter((choice): choice is PlanPriorArtChoice => choice !== null);
     return choices.length === 0 ? [] : [{ text: body, choices }];

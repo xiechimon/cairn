@@ -8,12 +8,6 @@ Add cron-style scheduling for todos.
 - Create apps/server/src/services/cron-schedule.ts and expose scheduling in the UI.
 ${verification}`;
 
-const priorArt = (decision: string) => `Kind: feature
-## Prior art
-- https://github.com/Hexagon/croner
-${decision}
-${verification}`;
-
 describe('prior-art review controls', () => {
   test('an unclassified capability cannot bypass prior art by omitting trigger words', () => {
     const result = checkPlanContract(feature);
@@ -38,7 +32,11 @@ describe('prior-art review controls', () => {
     '- Source: https://github.com/Hexagon/croner because it is maintained and supports reuse.',
     '- Decision: the maintained croner library supports reuse.',
   ])('a description is not a decision: %s', (description) => {
-    const result = checkPlanContract(priorArt(description));
+    const result = checkPlanContract(`Kind: feature
+## Prior art
+- https://github.com/Hexagon/croner
+${description}
+${verification}`);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.problem).toContain('决策');
   });
