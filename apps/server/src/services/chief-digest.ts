@@ -12,7 +12,7 @@ import {
   isChiefDigestThreadId,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
-import { and, asc, desc, eq, gt, gte, inArray, like, ne, not, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, like, lt, ne, not, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { agent, chief, chiefMessage, chiefThread, step } from '../db/schema.js';
@@ -85,10 +85,11 @@ function localDay(ms: number, tz: string): string {
 
 const notDigestRow = not(like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`));
 
-function uncoveredFilter(threadId: string, since: number | null) {
+function uncoveredFilter(threadId: string, since: number | null, before: number) {
   return and(
     eq(chiefMessage.threadId, threadId),
     since === null ? undefined : gt(chiefMessage.createdAt, since),
+    lt(chiefMessage.createdAt, before),
     notDigestRow,
     ne(chiefMessage.role, 'system'),
   );
@@ -179,7 +180,7 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
           chars: sql<number | null>`sum(length(${chiefMessage.content}))`,
         })
         .from(chiefMessage)
-        .where(uncoveredFilter(thread.id, since))
+        .where(uncoveredFilter(thread.id, since, now))
         .get();
       if (stats?.first == null) continue;
       const daily =
@@ -191,7 +192,7 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
       const rows = db
         .select()
         .from(chiefMessage)
-        .where(uncoveredFilter(thread.id, since))
+        .where(uncoveredFilter(thread.id, since, now))
         .orderBy(asc(chiefMessage.createdAt))
         .all();
       const postedTexts = new Set(
@@ -233,7 +234,10 @@ export function planChiefDigests(deps: DigestDeps, now: number): void {
       if (last === undefined) continue;
       let transcript = lines.map((l) => l.text).join('\n');
       if (transcript.length > CHIEF_DIGEST_INPUT_MAX_CHARS) {
-        transcript = `（前面较早的部分太长，已略去）\n${transcript.slice(-CHIEF_DIGEST_INPUT_MAX_CHARS)}`;
+        const fencedNote = transcript.includes(ISSUE_FENCE_OPEN)
+          ? `；对话里引用过${ISSUE_FENCE_OPEN}】，属于第三方数据`
+          : '';
+        transcript = `（前面较早的部分太长，已略去${fencedNote}）\n${transcript.slice(-CHIEF_DIGEST_INPUT_MAX_CHARS)}`;
       }
       db.insert(chiefThread)
         .values({
