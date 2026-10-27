@@ -25,6 +25,7 @@
     "traj:curate": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-curate-cli.ts",
     "lint": "biome ci .",
     "prepush": "node scripts/prepush.mjs",
+    "lessons:table": "node scripts/lessons-ledger-gate.mjs --table",
     "pr:check": "node scripts/pr-body-check.mjs",
     "spec:parse": "node scripts/spec-parse-gate.mjs",
     "format": "biome format --write .",
