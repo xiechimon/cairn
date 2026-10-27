@@ -55,6 +55,10 @@ Commit messages follow `area(issue): summary`, for example `server(1570): skip a
 
 A maintainer reviews every pull request, and an AI reviewer may also comment. A pull request merges once CI is green and the review approves it.
 
+## Releases
+
+Releases are automated with [changesets](https://changesets.dev). Add a changeset for any pull request that changes a publishable package (`pnpm changeset`), and the `release` workflow opens a `Version Packages` pull request when it merges to main. Merging that pull request publishes `@xiechimon/cairn` and `@xiechimon/cairn-cli` to npm and tags each release. Publishing runs under the repository's `NPM_TOKEN` secret, which only the owner can set.
+
 ## License
 
 By contributing you agree that your contributions are licensed under the [Apache License 2.0](./LICENSE).

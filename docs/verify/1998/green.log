@@ -1,0 +1,18 @@
+✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.058799ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 50.341182
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1998
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  11:49:00
+   Duration  395ms (transform 66%, import 31%, tests 2%, worker 1%)
+

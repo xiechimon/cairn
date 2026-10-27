@@ -1,6 +1,5 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { BRAND } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import pino from 'pino';
 import { createApp } from './app.js';
@@ -31,6 +30,7 @@ import {
 } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
+import { startupMessage } from './startup-log.js';
 
 const config = loadConfig();
 const logger = pino({
@@ -135,7 +135,7 @@ const server = serve(
   (info) => {
     logger.info(
       { port: info.port, dataDir: config.dataDir, teamId: seeded.team.id },
-      `cairn-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 ${BRAND.cliCommandName} start --api-key <key> --team <teamId>`,
+      startupMessage(),
     );
   },
 );

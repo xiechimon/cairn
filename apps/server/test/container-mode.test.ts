@@ -10,6 +10,7 @@ vi.setConfig({ testTimeout: 60_000 });
 const serverDir = resolve(import.meta.dirname, '..');
 const repoRoot = resolve(serverDir, '../..');
 const TOKEN = 'container-test-token-0123456789abcdef';
+const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
 
 const children: ChildProcess[] = [];
 const dirs: string[] = [];
@@ -88,6 +89,7 @@ describe('container mode: CAIRN_REQUIRE_TOKEN', () => {
     expect(code).toBe(1);
     expect(booted.output()).toMatch(/CAIRN_TOKEN/);
     expect(booted.output()).not.toContain('cairn-server online');
+    expect(booted.output()).not.toMatch(CJK);
     expect(existsSync(join(booted.home, 'server'))).toBe(false);
   });
 
@@ -118,6 +120,7 @@ describe('container mode: CAIRN_REQUIRE_TOKEN', () => {
     await untilOnline(booted);
     const base = `http://127.0.0.1:${booted.port}`;
     expect((await fetch(`${base}/api/user/me`)).status).toBe(200);
+    expect(booted.output()).not.toMatch(CJK);
   });
 });
 

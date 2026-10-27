@@ -84,7 +84,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
   const oauthSecret = process.env[ENV_VARS.githubOauthClientSecret] || undefined;
   if ((oauthId === undefined) !== (oauthSecret === undefined)) {
     throw new Error(
-      `oauth client half-configured: ${ENV_VARS.githubOauthClientId} 与 ${ENV_VARS.githubOauthClientSecret} 必须同设`,
+      `oauth client half-configured: set both ${ENV_VARS.githubOauthClientId} and ${ENV_VARS.githubOauthClientSecret}, or neither`,
     );
   }
   const envToken = envStr(ENV_VARS.token);
@@ -135,7 +135,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
 export function insecureBindWarning(config: ServerConfig): string | null {
   if (config.authToken !== null) return null;
   if (config.host === null || !ANY_INTERFACE_HOSTS.has(config.host)) return null;
-  return `绑定 ${config.host}（全网卡可达）且 ${ENV_VARS.token} 未设——API 面裸奔于所有网络接口；设 ${ENV_VARS.token}=<token> 开启 Bearer 鉴权，或 HOST=127.0.0.1 收回本机`;
+  return `bound to ${config.host} (reachable on every interface) with ${ENV_VARS.token} unset — the API is open to all interfaces; set ${ENV_VARS.token}=<token> to require Bearer auth, or HOST=127.0.0.1 to keep it local`;
 }
 
 const LOOPBACK_BIND_HOSTS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
@@ -148,7 +148,7 @@ export function tailscaleBindWarning(config: ServerConfig): string | null {
 
 export function missingRequiredTokenError(config: ServerConfig): string | null {
   if (!config.requireToken || config.authToken !== null) return null;
-  return `${ENV_VARS.requireToken} 已开但 ${ENV_VARS.token} 未设或为空——拒绝启动；设 ${ENV_VARS.token}=<随机长串>（例如 openssl rand -hex 32）后重启`;
+  return `${ENV_VARS.requireToken} is on but ${ENV_VARS.token} is unset or empty — refusing to start; set ${ENV_VARS.token}=<long random string> (for example openssl rand -hex 32) and restart`;
 }
 
 export function tokenAuthStartupLines(config: ServerConfig): string[] {
