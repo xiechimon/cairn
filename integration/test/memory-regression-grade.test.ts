@@ -57,6 +57,7 @@ function todoRow(spec: string, title = '任务') {
     title,
     spec,
     buildAgentId: null,
+    projectId: 'p1',
     planAgentId: null,
     phase: 'todo',
   };

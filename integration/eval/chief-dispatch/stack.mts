@@ -222,7 +222,12 @@ export async function bootStack(): Promise<Stack> {
   };
 }
 
-export function seedRepoContent(stack: Stack, projectId: string, projectName: string): void {
+export function seedRepoContent(
+  stack: Stack,
+  projectId: string,
+  projectName: string,
+  seedDir: string = REPO_SEED_DIR,
+): void {
   const db = stack.server.db;
   const row = db.select().from(projectTable).where(eq(projectTable.id, projectId)).get();
   const repoName = (row as { repoName?: string | null } | undefined)?.repoName;
@@ -236,7 +241,7 @@ export function seedRepoContent(stack: Stack, projectId: string, projectName: st
   };
   try {
     git('clone', bare, '.');
-    cpSync(REPO_SEED_DIR, work, { recursive: true });
+    cpSync(seedDir, work, { recursive: true });
     git('add', '-A');
     git(
       '-c',
@@ -355,6 +360,7 @@ export interface TurnEvidence {
     id: string;
     title: string;
     spec: string;
+    projectId: string;
     buildAgentId: string | null;
     planAgentId: string | null;
     phase: string;
@@ -545,6 +551,7 @@ function driveTurnEvidence(
       id: t.id,
       title: t.title,
       spec: t.spec ?? '',
+      projectId: t.projectId,
       buildAgentId: assignmentOf(t).build,
       planAgentId: assignmentOf(t).plan,
       phase: t.phase,
