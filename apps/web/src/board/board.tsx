@@ -51,7 +51,7 @@ import {
   FilterPanel,
   TOPBAR_TEXT_BUTTON,
 } from './filter-panel.js';
-import { HomeSections, NeedsYouInbox, withoutBoardView } from './home.js';
+import { DailyBrief, HomeSections, NeedsYouInbox, withoutBoardView } from './home.js';
 import { BrandMark } from './sidebar.js';
 import { cardTag } from './tag-filter.js';
 
@@ -87,6 +87,7 @@ interface BoardProps {
 
 export interface HomeOverview {
   sections: ReactNode;
+  brief: ReactNode;
   needsYou: number;
   running: number;
   doneToday: number;
@@ -362,6 +363,15 @@ export function BoardSurface({
               onAction={onAction}
               orchestrationOf={orchestrationOf}
               loading={loading}
+            />
+          ),
+          brief: (
+            <DailyBrief
+              todos={visibleTodos}
+              now={fixture.now}
+              projectNames={fixture.projectNames}
+              onAction={onAction}
+              orchestrationOf={orchestrationOf}
             />
           ),
           needsYou: pendingSplit.fresh.length,

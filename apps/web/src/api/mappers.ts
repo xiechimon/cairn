@@ -1144,9 +1144,12 @@ function collectChiefStream(
   inlineTools = false,
 ): {
   items: ChiefStreamItem[];
+  itemsAt: number[];
   trailingTools: ChiefToolRow[];
 } {
   const items: ChiefStreamItem[] = [];
+  const itemsAt: number[] = [];
+  let lastAt = 0;
   const postedTexts = new Set(
     messages
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
@@ -1154,6 +1157,8 @@ function collectChiefStream(
   );
   let pendingTools: ChiefToolRow[] = [];
   for (const m of messages) {
+    while (itemsAt.length < items.length) itemsAt.push(lastAt);
+    lastAt = m.createdAt;
     const turnError = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (turnError !== null) {
       pendingTools = [];
@@ -1224,7 +1229,8 @@ function collectChiefStream(
     });
     pendingTools = [];
   }
-  return { items, trailingTools: pendingTools };
+  while (itemsAt.length < items.length) itemsAt.push(lastAt);
+  return { items, itemsAt, trailingTools: pendingTools };
 }
 
 function autoCloseStrong(text: string): string {
@@ -1315,7 +1321,9 @@ export function mapChief(
           })),
         }
       : {}),
-    ...(active === null ? { examples: CHIEF_HERO_EXAMPLES } : { stream: chiefStream }),
+    ...(active === null
+      ? { examples: CHIEF_HERO_EXAMPLES }
+      : { stream: chiefStream, streamAt: collected?.itemsAt ?? [] }),
     ...(running ? { running: true } : {}),
     ...(opts.activity?.phase === 'tool' && opts.activity.tool != null
       ? { runningTool: opts.activity.tool }

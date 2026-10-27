@@ -523,6 +523,7 @@ export interface ChiefContent {
   examples?: ChiefExample[];
   draft?: string;
   stream?: ChiefStreamItem[];
+  streamAt?: number[];
   running?: boolean;
   runningTool?: string;
 }

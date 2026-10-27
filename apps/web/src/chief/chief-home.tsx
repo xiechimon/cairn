@@ -1,3 +1,4 @@
+import { ChevronUp } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useLiveData } from '../api/provider.js';
@@ -7,6 +8,8 @@ import type { TodoGlance } from '../detail/segments.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChiefConversation, ChiefFollowArmed } from './chief-conversation.js';
 import type { ChiefSurface } from './use-chief-surface.js';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const GREETINGS: [number, string][] = [
   [5, '夜深了'],
@@ -25,11 +28,12 @@ interface ChiefHomeProps {
   now: number;
   summary: ReactNode;
   below: ReactNode;
+  brief: ReactNode;
   todoGlances: ReadonlyMap<string, TodoGlance>;
 }
 
-export function ChiefHome({ surface, now, summary, below, todoGlances }: ChiefHomeProps) {
-  const { t } = useI18n();
+export function ChiefHome({ surface, now, summary, below, brief, todoGlances }: ChiefHomeProps) {
+  const { t, locale } = useI18n();
   const { user } = useLiveData();
   const { chiefData, chiefView, setChiefView, onSend } = surface;
   const [threadsOpen, setThreadsOpen] = useState(chiefData.threadsOpen ?? false);
@@ -37,6 +41,21 @@ export function ChiefHome({ surface, now, summary, below, todoGlances }: ChiefHo
   const [heroCollapsed, setHeroCollapsed] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const empty = (chiefData.stream?.length ?? 0) === 0;
+  const [sentHere, setSentHere] = useState(false);
+  const [dayLatch, setDayLatch] = useState<{ thread: string; earlier: number } | null>(null);
+  const startOfToday = new Date(now).setHours(0, 0, 0, 0);
+  const streamAt = chiefData.streamAt ?? [];
+  const todayFrom = streamAt.findIndex((at) => at >= startOfToday);
+  const earlier = todayFrom === -1 ? streamAt.length : todayFrom;
+  const fresh =
+    !sentHere && !heroCollapsed && earlier > 0 && earlier === (chiefData.stream?.length ?? 0);
+  const thread = chiefData.threadTitle;
+  const dayEarlier = fresh ? earlier : dayLatch?.thread === thread ? dayLatch.earlier : null;
+
+  useEffect(() => {
+    if (fresh) setDayLatch({ thread, earlier });
+    else setDayLatch((cur) => (cur != null && cur.thread !== thread ? null : cur));
+  }, [fresh, thread, earlier]);
 
   useEffect(() => {
     if (chiefView !== 'drawer') return;
@@ -51,6 +70,7 @@ export function ChiefHome({ surface, now, summary, below, todoGlances }: ChiefHo
   const send = useCallback(
     (text: string) => {
       if (onSend == null) return;
+      setSentHere(true);
       if (
         empty &&
         typeof document.startViewTransition === 'function' &&
@@ -69,16 +89,18 @@ export function ChiefHome({ surface, now, summary, below, todoGlances }: ChiefHo
     [onSend, empty],
   );
 
+  const greeting = t('{greeting}，{name}', {
+    greeting: t(greetingFor(new Date(now).getHours())),
+    name: user.displayName,
+  });
+
   const hero = (
     <header
       data-testid="chief-home-hero"
       className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-[6vh]"
     >
       <h2 className="m-0 font-serif text-page font-normal text-foreground text-balance">
-        {t('{greeting}，{name}', {
-          greeting: t(greetingFor(new Date(now).getHours())),
-          name: user.displayName,
-        })}
+        {greeting}
       </h2>
       <div data-testid="chief-home-summary" className="mt-2 text-ui text-content-secondary">
         {summary}
@@ -86,11 +108,44 @@ export function ChiefHome({ surface, now, summary, below, todoGlances }: ChiefHo
     </header>
   );
 
+  const lastEarlierAt = streamAt[earlier - 1] ?? 0;
+  const today = dayEarlier != null && (
+    <section
+      data-testid="chief-home-today"
+      aria-label={t('今天的概况')}
+      className={`flex flex-col gap-5 pt-8 pb-6 ${fresh ? 'min-h-[calc(100dvh-18rem)]' : ''}`}
+    >
+      {fresh && (
+        <p className="m-0 mb-auto flex items-center justify-center gap-1 text-meta text-content-tertiary">
+          <ChevronUp aria-hidden strokeWidth={1.75} className="size-3.5" />
+          {t(
+            lastEarlierAt >= startOfToday - DAY_MS
+              ? '往上滑查看昨天的对话'
+              : '往上滑查看之前的对话',
+          )}
+        </p>
+      )}
+      <header>
+        <h2 className="m-0 font-serif text-page font-normal text-foreground text-balance">
+          {greeting}
+        </h2>
+        <p className="mt-2 mb-0 text-ui text-content-tertiary">
+          {new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'zh-CN', {
+            month: 'long',
+            day: 'numeric',
+            weekday: 'short',
+          }).format(now)}
+        </p>
+      </header>
+      <div className={fresh ? 'mb-auto' : undefined}>{brief}</div>
+    </section>
+  );
+
   return (
     <section
       data-testid="chief-home"
       aria-label={t('与总管的对话')}
-      data-layout={empty && !heroCollapsed ? 'hero' : 'chat'}
+      data-layout={empty && !heroCollapsed ? 'hero' : fresh ? 'day' : 'chat'}
       className={`flex min-h-0 flex-1 flex-col ${empty && !heroCollapsed ? 'overflow-y-auto pb-10' : ''}`}
     >
       <MessageScrollerProvider
@@ -115,6 +170,7 @@ export function ChiefHome({ surface, now, summary, below, todoGlances }: ChiefHo
           below={below}
           heroCollapsed={heroCollapsed}
           todoGlances={todoGlances}
+          day={dayEarlier != null ? { earlier: dayEarlier, today } : undefined}
           composerRef={(node) => {
             composerRef.current = node;
           }}
