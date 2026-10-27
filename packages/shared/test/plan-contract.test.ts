@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { checkPlanContract, planVerificationItems } from '../src/records/plan.js';
 import plan1606Verification from './fixtures/plan1606-verification.md?raw';
+import plan2006Verification from './fixtures/plan2006-verification.md?raw';
 
 const GOOD = [
   'Kind: fix',
@@ -199,6 +200,52 @@ describe('checkPlanContract indented fence inside a list item (#1728)', () => {
       ok: true,
       items: ['```sh\npnpm lint\n```', '新测试 `apps/x.test.ts` 通过'],
     });
+  });
+});
+
+describe('checkPlanContract bold-labeled checks without a list (#2006)', () => {
+  test('the real plan from #2006 passes with one item per bold label', () => {
+    const r = checkPlanContract(`Kind: fix\n${plan2006Verification}`);
+    expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+    if (r.ok) {
+      expect(r.items).toHaveLength(9);
+      expect(r.items[0]).toMatch(/^\*\*V0/);
+      expect(r.items[0]).toContain('Expected at planning time');
+    }
+  });
+
+  test('a label owns its fence and the prose after it; intro prose before the first label is not an item', () => {
+    const r = checkPlanContract(
+      [
+        'Kind: fix',
+        '## Verification',
+        'All commands run at the repo root.',
+        '',
+        '**V0 — lint:**',
+        '',
+        '```sh',
+        'pnpm lint',
+        '```',
+        '',
+        'Expected: exit 0.',
+        '',
+        '**V1 — tests:** `pnpm exec vitest run packages/shared/test/plan-contract.test.ts` passes',
+      ].join('\n'),
+    );
+    expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+    if (r.ok) {
+      expect(r.items).toHaveLength(2);
+      expect(r.items[0]).toContain('pnpm lint');
+      expect(r.items[0]).toContain('Expected: exit 0.');
+    }
+  });
+
+  test('a label with only prose and no check is still rejected', () => {
+    const r = checkPlanContract(
+      'Kind: fix\n## Verification\n**V0 — sanity:**\n\nLooks right after the change.\n\n**V1:** `pnpm lint` passes\n',
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.problem).toContain('第 1 项');
   });
 });
 
