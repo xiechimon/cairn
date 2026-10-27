@@ -907,6 +907,30 @@ describe('4b issues another dispatch lane owns', () => {
   });
 });
 
+describe('4c issues held for a person', () => {
+  test('waits-ian, needs-triage, ready-for-human and needs-decision issues are skipped without reading events', async () => {
+    const w = await makeWorld({ list: [1394, 1401, 1402, 1403, 1404] });
+    const hold: Record<number, string> = {
+      1394: 'waits-ian',
+      1401: 'Needs-Triage',
+      1402: 'ready-for-human',
+      1403: 'needs-decision',
+    };
+    w.gh.state.open = w.gh.state.open.map((i) =>
+      hold[i.number] !== undefined
+        ? { ...i, labels: [...i.labels, { name: hold[i.number] as string, color: 'ededed' }] }
+        : i,
+    );
+    const tally = await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1404]);
+    for (const n of [1394, 1401, 1402, 1403]) {
+      expect(w.gh.eventReads(n)).toHaveLength(0);
+      expect(todoOf(w.s, n)).toBeUndefined();
+    }
+    expect(tally?.held).toBe(4);
+  });
+});
+
 describe('5 already imported / self-created issues', () => {
   test('numbers that already have a github-issue card or a self-created issue card: recorded as claimed, no events read, no re-orchestration', async () => {
     const w = await makeWorld({ list: [1394, 1401, 1402] });
