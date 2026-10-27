@@ -77,72 +77,72 @@ export function ChiefRoot() {
   const fabExpanded = surface.chiefUnread > 0 || surface.chiefBusy;
   return (
     <ChiefRootContext.Provider value={api}>
-      <TaskPanelRoot>
+      <TaskPanelRoot onTaskOpen={windowOpen ? () => surface.setChiefView('none') : undefined}>
         <Outlet />
-      </TaskPanelRoot>
-      {fabVisible && (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t('总管')}
-                onClick={() => surface.setChiefView('drawer')}
-                data-busy={surface.chiefBusy || undefined}
-                data-expanded={fabExpanded || undefined}
-                className="chief-fab fixed right-2 bottom-2 z-(--z-floating) size-10 cursor-pointer gap-1 rounded-full border-none bg-card font-normal text-foreground shadow-(--fab-shadow) transition-shadow duration-(--dur-fast) ease-(--ease-standard) hover:bg-card hover:text-foreground hover:shadow-(--e3) dark:hover:bg-card active:not-aria-[haspopup]:translate-y-0 data-expanded:w-auto data-expanded:pr-3.5 data-expanded:pl-1"
-              >
-                {surface.chiefUnread > 0 && (
-                  <span
-                    aria-hidden="true"
-                    className="ml-1.5 size-1.5 flex-none rounded-full bg-(--card-button)"
+        {fabVisible && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('总管')}
+                  onClick={() => surface.setChiefView('drawer')}
+                  data-busy={surface.chiefBusy || undefined}
+                  data-expanded={fabExpanded || undefined}
+                  className="chief-fab fixed right-2 bottom-2 z-(--z-floating) size-10 cursor-pointer gap-1 rounded-full border-none bg-card font-normal text-foreground shadow-(--fab-shadow) transition-shadow duration-(--dur-fast) ease-(--ease-standard) hover:bg-card hover:text-foreground hover:shadow-(--e3) dark:hover:bg-card active:not-aria-[haspopup]:translate-y-0 data-expanded:w-auto data-expanded:pr-3.5 data-expanded:pl-1"
+                >
+                  {surface.chiefUnread > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="ml-1.5 size-1.5 flex-none rounded-full bg-(--card-button)"
+                    />
+                  )}
+                  <ChiefFabIcon
+                    chief={surface.chiefData}
+                    busy={surface.chiefBusy}
+                    expanded={fabExpanded}
                   />
-                )}
-                <ChiefFabIcon
-                  chief={surface.chiefData}
-                  busy={surface.chiefBusy}
-                  expanded={fabExpanded}
-                />
-                {surface.chiefUnread > 0 ? (
-                  <span className="text-ui whitespace-nowrap text-content-secondary">
-                    <span className="fab-badge">
-                      {surface.chiefUnread > 99 ? '99+' : surface.chiefUnread}
-                    </span>{' '}
-                    {t('条新消息')}
-                  </span>
-                ) : (
-                  surface.chiefBusy && (
+                  {surface.chiefUnread > 0 ? (
                     <span className="text-ui whitespace-nowrap text-content-secondary">
-                      {t('思考中…')}
+                      <span className="fab-badge">
+                        {surface.chiefUnread > 99 ? '99+' : surface.chiefUnread}
+                      </span>{' '}
+                      {t('条新消息')}
                     </span>
-                  )
-                )}
-              </Button>
-            }
+                  ) : (
+                    surface.chiefBusy && (
+                      <span className="text-ui whitespace-nowrap text-content-secondary">
+                        {t('思考中…')}
+                      </span>
+                    )
+                  )}
+                </Button>
+              }
+            />
+            <TooltipContent side="top" sideOffset={8}>
+              {surface.chiefUnread > 0 && (
+                <span>{t('{n} 个总管会话有未读', { n: surface.chiefUnread })}</span>
+              )}
+              <Kbd>⌘J</Kbd>
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {!onHome && (
+          <ChiefDrawer
+            open={windowOpen}
+            chief={surface.chiefData}
+            onSettings={onSettings}
+            onClose={() => surface.setChiefView('none')}
+            onSend={surface.onSend}
+            onThread={surface.onThread}
+            onNewThread={surface.onNewThread}
+            onRewind={surface.onRewind}
+            onAnswerQuestion={surface.onAnswerQuestion}
+            onCancelQuestion={surface.onCancelQuestion}
           />
-          <TooltipContent side="top" sideOffset={8}>
-            {surface.chiefUnread > 0 && (
-              <span>{t('{n} 个总管会话有未读', { n: surface.chiefUnread })}</span>
-            )}
-            <Kbd>⌘J</Kbd>
-          </TooltipContent>
-        </Tooltip>
-      )}
-      {!onHome && (
-        <ChiefDrawer
-          open={windowOpen}
-          chief={surface.chiefData}
-          onSettings={onSettings}
-          onClose={() => surface.setChiefView('none')}
-          onSend={surface.onSend}
-          onThread={surface.onThread}
-          onNewThread={surface.onNewThread}
-          onRewind={surface.onRewind}
-          onAnswerQuestion={surface.onAnswerQuestion}
-          onCancelQuestion={surface.onCancelQuestion}
-        />
-      )}
+        )}
+      </TaskPanelRoot>
     </ChiefRootContext.Provider>
   );
 }

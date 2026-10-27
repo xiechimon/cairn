@@ -48,7 +48,13 @@ export function useTaskPanel(): TaskPanelApi | null {
   return useContext(TaskPanelContext);
 }
 
-export function TaskPanelRoot({ children }: { children: ReactNode }) {
+export function TaskPanelRoot({
+  children,
+  onTaskOpen,
+}: {
+  children: ReactNode;
+  onTaskOpen?: () => void;
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const [state, setState] = useState(() => {
@@ -62,6 +68,8 @@ export function TaskPanelRoot({ children }: { children: ReactNode }) {
   const [wantsFocus, setWantsFocus] = useState(false);
   const opener = useRef<HTMLElement | null>(null);
   const wasHosted = useRef(false);
+  const onTaskOpenRef = useRef(onTaskOpen);
+  onTaskOpenRef.current = onTaskOpen;
   const hosted = hosts > 0;
 
   useEffect(() => {
@@ -103,6 +111,7 @@ export function TaskPanelRoot({ children }: { children: ReactNode }) {
     setSeed(options.seed ?? null);
     setState({ open: true, taskId: id });
     setWantsFocus(options.focus === true);
+    onTaskOpenRef.current?.();
   }, []);
 
   const showList = useCallback((options: OpenOptions = {}) => {

@@ -273,6 +273,24 @@ test.describe('home is one continuous chief chat (T1)', () => {
     await expect(page.locator('.chief-drawer')).toBeVisible();
   });
 
+  test('a task chip in the drawer opens the task panel on the board instead of leaving it', async ({
+    page,
+  }) => {
+    await mockLive(page, { threads: [THREAD], messages: HISTORY });
+    await page.goto('/app?view=board');
+    await page.getByRole('button', { name: '总管', exact: true }).click();
+    const drawer = page.locator('.chief-drawer');
+    await drawer.locator('a.mention-chip--todo').first().click();
+    const panel = page.getByRole('complementary', { name: '任务面板' });
+    await expect(panel).toBeVisible();
+    await expect(panel).toBeInViewport({ ratio: 1 });
+    const url = new URL(page.url());
+    expect(url.pathname).toBe('/app');
+    expect(url.searchParams.get('view')).toBe('board');
+    expect(url.searchParams.get('task')).toBe('todo-1');
+    await expect(drawer).toBeHidden();
+  });
+
   test('phone width: the chat fills the screen and the composer stays on screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
