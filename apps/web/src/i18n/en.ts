@@ -1238,4 +1238,27 @@ export const EN: Record<string, string> = {
   '已下架，运行时会跳过该备选': 'Delisted; this fallback is skipped at run time',
   '归属机 {machine} 未开启 {runtime} runtime，运行时会跳过该备选':
     'Home machine {machine} has the {runtime} runtime off; this fallback is skipped at run time',
+  执行: 'Build',
+  合并: 'Merge',
+  待你处理: 'Waiting on you',
+  '需要你回答、确认或检查的任务会出现在这里。':
+    'Tasks that need your answer, confirmation or check show up here.',
+  运行中: 'Running',
+  没有运行中的任务: 'No running tasks',
+  没有待开始的任务: 'No tasks waiting to start',
+  还没有已完成的任务: 'No finished tasks yet',
+  '运行失败。可以在下方说明后重跑，或展开查看过程。':
+    'The run failed. Explain below to rerun it, or expand to see what happened.',
+  '方案已写好，确认后开始执行。': 'The plan is ready. Confirm it to start the build.',
+  '改动已完成，审阅后合并。': 'The changes are done. Review them to merge.',
+  'Agent 在等你的回复。': 'The agent is waiting for your reply.',
+  任务面板: 'Task panel',
+  关闭面板: 'Close panel',
+  未开始: 'Not started',
+  展开为整页: 'Open as full page',
+  找不到这个任务: 'This task was not found',
+  '进度 · {done}/{total}': 'Progress · {done}/{total}',
+  引导这个任务: 'Steer this task',
+  '回复 agent…': 'Reply to the agent…',
+  '引导这个任务…': 'Steer this task…',
 };

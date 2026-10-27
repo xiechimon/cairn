@@ -57,6 +57,7 @@ import { useI18n } from '../i18n/provider.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
+import { TaskPanel } from '../task-panel/task-panel.js';
 
 interface ReorderPatch {
   phase?: TodoRecord['phase'];
@@ -622,6 +623,7 @@ export function BoardPage() {
             loading={live && !todosQ.isSuccess}
           />
         )}
+        <TaskPanel fixture={fixtureWithTodos} />
       </div>
       <SearchPanel
         open={search.open}

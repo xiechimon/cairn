@@ -17,6 +17,7 @@ import { useI18n } from '../i18n/provider.js';
 import { Check, ChevronDown, ChevronRight, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
+import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefSpiralFace } from './chief-spiral-face.js';
@@ -113,6 +114,7 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
 function HandoffRow({ todoId }: { todoId: string }) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
+  const openInPlace = useOpenTaskInPlace();
   return (
     <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
       <Marker className={MARKER_NOTE_CLS} data-testid="chief-handoff">
@@ -122,6 +124,7 @@ function HandoffRow({ todoId }: { todoId: string }) {
             to={`/app/todo/${todoId}`}
             className={`${mentionChipClass('todo')} cursor-pointer`}
             data-phase={glance?.phase}
+            onClick={(event) => openInPlace(event, todoId, glance)}
           >
             {glance != null && <TodoStatus phase={glance.phase} />}
             {glance?.seq != null ? `#${glance.seq}` : t('任务')}
