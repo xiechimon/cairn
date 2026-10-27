@@ -7,8 +7,8 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { expect, test } from 'vitest';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
-import { seed } from '../src/db/seed.js';
 import { backfillTokenUsageCost } from '../src/services/token-usage-cost.js';
+import { insertLegacyUserAndTeam } from './helpers.js';
 
 test('upgrading from 0057 preserves ambiguous legacy zeros instead of guessing their provenance', () => {
   const journal = JSON.parse(
@@ -36,14 +36,15 @@ test('upgrading from 0057 preserves ambiguous legacy zeros instead of guessing t
         expect.objectContaining({ name: 'costTotal', notnull: 1, dflt_value: '0' }),
       ]),
     );
-    const { team, user } = seed(db);
-    db.insert(schema.project)
-      .values({ id: 'project-old-cost', teamId: team.id, name: 'Legacy' })
-      .run();
+    const { teamId, userId } = insertLegacyUserAndTeam(sqlite, {
+      userId: 'user-legacy',
+      teamId: 'team-legacy',
+    });
+    db.insert(schema.project).values({ id: 'project-old-cost', teamId, name: 'Legacy' }).run();
     db.insert(schema.todo)
       .values({
         id: 'todo-old-cost',
-        teamId: team.id,
+        teamId,
         projectId: 'project-old-cost',
         title: 'Legacy',
         phaseAt: 1,
@@ -62,7 +63,7 @@ test('upgrading from 0057 preserves ambiguous legacy zeros instead of guessing t
     db.insert(schema.provider)
       .values({
         id: 'provider-old-cost',
-        teamId: team.id,
+        teamId,
         kind: 'custom',
         providerId: 'old-gw',
         label: 'Old',
@@ -77,7 +78,7 @@ test('upgrading from 0057 preserves ambiguous legacy zeros instead of guessing t
             cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
           },
         ],
-        createdBy: user.id,
+        createdBy: userId,
         createdAt: 1,
         updatedAt: 1,
       })

@@ -1,0 +1,60 @@
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/13]⎯
+
+ FAIL  test/first-pr-report.test.ts > the discussions repository files exist > .github/DISCUSSION_TEMPLATE/first-pr.yml
+Error: ENOENT: no such file or directory, open '/mnt/fast/lanes/cairn-2001/.github/DISCUSSION_TEMPLATE/first-pr.yml'
+ ❯ test/first-pr-report.test.ts:194:18
+    192|     'docs/community/welcome.md',
+    193|   ])('%s', (path) => {
+    194|     const text = readFileSync(join(root, path), 'utf8');
+       |                  ^
+    195|     expect(text.trim().length).toBeGreaterThan(0);
+    196|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/13]⎯
+
+ FAIL  test/first-pr-report.test.ts > the discussions repository files exist > .github/DISCUSSION_TEMPLATE/q-a.yml
+Error: ENOENT: no such file or directory, open '/mnt/fast/lanes/cairn-2001/.github/DISCUSSION_TEMPLATE/q-a.yml'
+ ❯ test/first-pr-report.test.ts:194:18
+    192|     'docs/community/welcome.md',
+    193|   ])('%s', (path) => {
+    194|     const text = readFileSync(join(root, path), 'utf8');
+       |                  ^
+    195|     expect(text.trim().length).toBeGreaterThan(0);
+    196|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/13]⎯
+
+ FAIL  test/first-pr-report.test.ts > the discussions repository files exist > docs/community/welcome.md
+Error: ENOENT: no such file or directory, open '/mnt/fast/lanes/cairn-2001/docs/community/welcome.md'
+ ❯ test/first-pr-report.test.ts:194:18
+    192|     'docs/community/welcome.md',
+    193|   ])('%s', (path) => {
+    194|     const text = readFileSync(join(root, path), 'utf8');
+       |                  ^
+    195|     expect(text.trim().length).toBeGreaterThan(0);
+    196|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/13]⎯
+
+ FAIL  test/first-pr-report.test.ts > the discussions repository files exist > the first-PR discussion template labels its category
+Error: ENOENT: no such file or directory, open '/mnt/fast/lanes/cairn-2001/.github/DISCUSSION_TEMPLATE/first-pr.yml'
+ ❯ test/first-pr-report.test.ts:199:18
+    197|
+    198|   test('the first-PR discussion template labels its category', () => {
+    199|     const text = readFileSync(
+       |                  ^
+    200|       join(root, '.github/DISCUSSION_TEMPLATE/first-pr.yml'),
+    201|       'utf8',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/13]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  13 failed | 1 passed (14)
+   Start at  13:38:25
+   Duration  1.39s (transform 46%, import 34%, tests 20%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-2001/apps/server
+

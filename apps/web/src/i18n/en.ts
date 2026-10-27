@@ -311,6 +311,17 @@ export const EN: Record<string, string> = {
   名称: 'Name',
   语言: 'Language',
   推送通知: 'Push notifications',
+  '首个 PR': 'First PR',
+  '首个 PR 社区提示': 'First-PR community prompt',
+  '团队设置，默认关闭。首个 PR 完成后显示分享链接，由你决定是否在 GitHub 发布。':
+    'Team setting, off by default. Show a sharing link after the first PR succeeds; you decide whether to post on GitHub.',
+  '首个 PR 已合并': 'Your first PR merged',
+  '可以在 GitHub Discussions 发一条帖子，说明第一支 PR 用了多久':
+    'You can post in GitHub Discussions to say how long the first PR took',
+  '第一支 PR 用了 {days} 天。可以在 GitHub Discussions 发一条帖子':
+    'Your first PR took {days} days. You can post about it in GitHub Discussions',
+  '分享到 Discussions': 'Share on Discussions',
+  不再显示: 'Do not show again',
   // #1031: the switch is a preference; when it's on but the browser permission
   // is denied, the row explains why nothing will actually fire.
   '浏览器已拒绝通知权限，需到站点设置重新允许':

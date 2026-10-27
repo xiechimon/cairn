@@ -7,7 +7,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterAll, expect, test } from 'vitest';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
-import { seed } from '../src/db/seed.js';
+import { insertLegacyUserAndTeam } from './helpers.js';
 
 const temps: string[] = [];
 afterAll(() => {
@@ -39,12 +39,15 @@ test('legacy db upgrade keeps all stored memories valid: three columns added but
   const sqlite = new Database(dbPath);
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: oldMigrations });
-  const { team } = seed(db);
+  const { teamId } = insertLegacyUserAndTeam(sqlite, {
+    userId: 'user-legacy',
+    teamId: 'team-legacy',
+  });
   sqlite
     .prepare(
       'INSERT INTO agent_memory (id, agentId, teamId, title, content, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
     )
-    .run('legacy-1', 'agent-1', team.id, '旧记忆', '升级前写入', 1, 1);
+    .run('legacy-1', 'agent-1', teamId, '旧记忆', '升级前写入', 1, 1);
 
   migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
 
