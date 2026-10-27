@@ -45,6 +45,10 @@ describe('prior-art decision scoring', () => {
   test.each([
     'Decision: do not reuse croner because we will build a hand-written parser.',
     'Decision: never reuse croner because we will build a hand-written parser.',
+    '决策：不复用 croner，因为要手写解析器。',
+    'Decision: reuse croner because it is maintained; do not reuse croner in the final implementation.',
+    "Decision: reuse croner because it is maintained; don't reuse croner in the final implementation.",
+    'Source: a rejected example; reuse croner because it is maintained.\nDecision: build a parser because the example is unsuitable.',
     'Decision: we will not reuse croner because we will build a hand-written parser.',
     'Decision: build a hand-written parser because the croner reuse example is unsuitable.',
     'Decision: reuse another-library because it is maintained; croner is only a reference.',
@@ -67,6 +71,7 @@ describe('prior-art decision scoring', () => {
 
   test.each([
     'Decision: reuse `croner` because it is maintained.',
+    '决策：复用 croner，因为仍在维护。',
     'Decision: we will reuse croner rather than build a parser.',
     'Reuse croner because it is maintained.',
     'Decision: do not hand-roll; reuse croner because it is maintained.',
