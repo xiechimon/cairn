@@ -1,7 +1,7 @@
-import type { MachineCapabilities, RequiredCapabilities } from '@cairn/shared';
+import type { ClaudeCodeReport, MachineCapabilities, RequiredCapabilities } from '@cairn/shared';
 import {
+  homeMachineRejectReason,
   missingCapabilities as missingMachineCapabilities,
-  runtimeGatePasses,
 } from './dispatch-eligibility.js';
 import { pathHitsProtectedCategory } from './merge-gate/paths.js';
 
@@ -13,10 +13,11 @@ export interface SplitCheckerSubtodo {
 }
 
 export interface SplitCheckerMachine {
+  name: string;
   online: boolean;
   enabledRuntimes: readonly string[];
   capabilities: MachineCapabilities | null;
-  claudeCodeReport: { models: { id: string }[] } | null;
+  claudeCodeReport: ClaudeCodeReport | null;
 }
 
 export interface SplitCheckerAgent {
@@ -33,6 +34,7 @@ export interface SplitCheckerInput {
   agents: SplitCheckerAgent[];
   maxChildren?: number;
   autonomyPaused?: boolean;
+  modelCatalog?: ReadonlyArray<{ id: string; liveness?: 'alive' | 'dead' | 'unknown' }>;
 }
 
 export interface SplitCheckerResult {
@@ -85,22 +87,35 @@ export function checkSplitPlan(input: SplitCheckerInput): SplitCheckerResult {
       reasons.push(`agent ${subtodo.agentId} has no machine`);
     } else {
       if (!agent.machine.online) reasons.push(`agent ${subtodo.agentId} machine is offline`);
-      if (!runtimeGatePasses(agent.machine, agent.provider)) {
-        reasons.push(`agent ${subtodo.agentId} machine lacks the required runtime`);
-      }
+      const homeRejection = homeMachineRejectReason(
+        { ...agent.machine, enabledRuntimes: [...agent.machine.enabledRuntimes] },
+        agent,
+        input.modelCatalog,
+      );
+      if (homeRejection !== null) reasons.push(`agent ${subtodo.agentId}: ${homeRejection}`);
       const missing = missingMachineCapabilities(agent.machine, agent);
       if (missing.length > 0)
         reasons.push(`agent ${subtodo.agentId} missing capabilities: ${missing.join(', ')}`);
     }
-    const specPaths = [
+    const tokens = [
       ...subtodo.spec.matchAll(/`([^`]+)`|"([^"]+)"|'([^']+)'|([^\s`"'()[\]{},;!?]+)/gu),
-    ]
+    ];
+    const specPaths = tokens
       .map((match) =>
         (match[1] ?? match[2] ?? match[3] ?? match[4] ?? '')
           .replace(/[.:]+$/u, '')
           .replace(/^(?:\.\/)+/u, ''),
       )
       .filter((path) => path.includes('/') || path.includes('\\') || path.includes('.'));
+    for (let tokenIndex = 0; tokenIndex + 1 < tokens.length; tokenIndex += 1) {
+      const current = tokens[tokenIndex];
+      const next = tokens[tokenIndex + 1];
+      if (current?.[4] === undefined || next?.[4] === undefined) continue;
+      const gap = subtodo.spec.slice(current.index + current[0].length, next.index);
+      if (/[\\/]/u.test(current[4]) && /[.\\/]/u.test(next[4]) && /^\s+$/u.test(gap)) {
+        specPaths.push(`${current[4]}${gap}${next[4]}`);
+      }
+    }
     const protectedPath =
       specPaths.find(
         (path) =>

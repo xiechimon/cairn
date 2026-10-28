@@ -7,6 +7,7 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { mergedCatalogModels } from './model-liveness.js';
 import { checkSplitPlan, type SplitCheckerAgent } from './todo-split-checker.js';
 import { createTodo, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
@@ -71,6 +72,7 @@ export function createSplitTodo(
         modelId: agent.modelId,
         requiredCapabilities: agent.requiredCapabilities,
         machine: {
+          name: machine.name,
           online: machine.online,
           enabledRuntimes: machine.enabledRuntimes,
           capabilities: machine.capabilities,
@@ -85,6 +87,7 @@ export function createSplitTodo(
     const checked = checkSplitPlan({
       subtodos: items,
       agents: checkerAgents,
+      modelCatalog: mergedCatalogModels(),
       autonomyPaused:
         db
           .select({ paused: team.autonomyPaused })

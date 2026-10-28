@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { checkSplitPlan, type SplitCheckerInput } from '../src/services/todo-split-checker.js';
 
 const machine = {
+  name: 'test',
   online: true,
   enabledRuntimes: ['pi'],
   capabilities: null,
