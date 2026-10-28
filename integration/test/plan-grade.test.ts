@@ -186,14 +186,13 @@ describe('gradePlanCase', () => {
   });
 
   test('assistant prose naming the required items does not substitute for an artifact', () => {
+    const row = todoRow('look around the export path only', 'investigate export', 't1');
     const g = gradePlanCase(sample, {
       evidence: turn({
         stepStatus: 'done',
         assistantText: 'I will fix the download attribute on the blob url and add a test.',
-        createdTodoIds: ['t1'],
-        createdTodoRows: [
-          { id: 't1', title: 'investigate export', spec: 'look around the export path only' },
-        ],
+        createdTodoIds: [row.id],
+        createdTodoRows: [row],
       }),
     });
     expect(g.grade.plan_ok).toBe(0);
