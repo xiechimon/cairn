@@ -1,0 +1,30 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1848-overlap-repair/cairn
+
+ ❯ |@cairn/shared| test/github-overlap-prompt.test.ts (2 tests | 1 failed) 5ms
+   × worker branch instructions require complete overlap lookup before creating work 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/shared| test/github-overlap-prompt.test.ts > worker branch instructions require complete overlap lookup before creating work
+AssertionError: expected '工作分支注记：本步的工作分支是 cairn/work。工作区已检出该分支—…' to contain 'open issues'
+
+Expected: "open issues"
+Received: "工作分支注记：本步的工作分支是 cairn/work。工作区已检出该分支——本步的全部提交与推送都必须落在它上面：不要创建或切换到自己的分支，不要另开 worktree 或 clone 到别处干活；开 Pull Request 时 head 分支也必须是它。"
+
+ ❯ test/github-overlap-prompt.test.ts:11:16
+      9| test('worker branch instructions require complete overlap lookup befor…
+     10|   const note = buildWorkBranchNote('cairn/work');
+     11|   expect(note).toContain('open issues');
+       |                ^
+     12|   expect(note).toContain('open PRs');
+     13|   expect(note).toContain('last 7 days');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  15:06:48
+   Duration  226ms (transform 52%, import 43%, tests 3%, worker 1%)
+

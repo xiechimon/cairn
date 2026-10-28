@@ -9,4 +9,6 @@
 7. An overlap lookup failure must not be reported as an empty overlap list.
 8. Planner, issue creation, PR opening and the duplicate-ask behavior need verification beyond routing a preselected same-ask identifier.
 
-The first seven scenarios have local Git or stubbed GitHub controls. The eighth remains incomplete. The original PR's workflow, prompt, documentation and AGENTS changes have not yet been incorporated into this delivery branch. No replacement PR is ready for acceptance.
+9. Adding the overlap rule to branch notes must preserve current task classification and stripping of historical notes.
+
+The first seven scenarios have local Git or stubbed GitHub controls. The eighth remains incomplete. Worker branch instructions now carry the overlap rule, with 79 helper/protocol checks and a source-hashed runtime observation. Chief injection, the workflow, documentation and AGENTS changes remain to be incorporated. No replacement PR is ready for acceptance.

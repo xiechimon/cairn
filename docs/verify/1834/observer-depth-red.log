@@ -1,0 +1,25 @@
+node:fs:2775
+      const stats = binding.lstat(base, true, undefined, true /* throwIfNoEntry */);
+                            ^
+
+Error: ENOENT: no such file or directory, lstat '/Users/xmon/.codex/worktrees/pr-1848-overlap-repair/packages'
+    at realpathSync (node:fs:2775:29)
+    at [eval]:2:33
+    at runScriptInThisContext (node:internal/vm:219:10)
+    at node:internal/process/execution:451:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:449:60)
+    at evalFunction (node:internal/process/execution:283:30)
+    at asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:11) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'lstat',
+  path: '/Users/xmon/.codex/worktrees/pr-1848-overlap-repair/packages'
+}
+
+Node.js v24.14.0
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/xmon/.codex/worktrees/pr-1848-
+  │ overlap-repair/cairn/integration
+
