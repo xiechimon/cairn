@@ -1,0 +1,54 @@
+node:internal/assert/utils:146
+  throw error;
+  ^
+
+AssertionError [ERR_ASSERTION]: Missing expected exception.
+    at Object.<anonymous> (/mnt/fast/tmp/ai-route-tmp/run-d82_cqup/cairn-boundary-vHGjFm/checkout/probe.cjs:5:12)
+    at Module._compile (node:internal/modules/cjs/loader:1934:14)
+    at Object..js (node:internal/modules/cjs/loader:2074:10)
+    at Module.load (node:internal/modules/cjs/loader:1656:32)
+    at Module._load (node:internal/modules/cjs/loader:1448:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: undefined,
+  operator: 'throws',
+  diff: 'simple'
+}
+
+Node.js v26.8.2
+✖ filesystem boundary denies absolute publication credentials and parent processes (25.840447ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 168.332817
+
+✖ failing tests:
+
+test at scripts/harness-eval-worker.test.mjs:573:1
+✖ filesystem boundary denies absolute publication credentials and parent processes (25.840447ms)
+  Error: Command failed: bwrap --die-with-parent --new-session --unshare-user --unshare-pid --unshare-ipc --unshare-uts --cap-drop ALL --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind /lib64 /lib64 --ro-bind /etc/ssl /etc/ssl --ro-bind /etc/resolv.conf /etc/resolv.conf --ro-bind /etc/hosts /etc/hosts --proc /proc --dev /dev --tmpfs /tmp --ro-bind /home/ian/.local/share/mise/installs/node/26.8.2/bin/node /runtime/node --bind /mnt/fast/tmp/ai-route-tmp/run-d82_cqup/cairn-boundary-vHGjFm/checkout /mnt/fast/tmp/ai-route-tmp/run-d82_cqup/cairn-boundary-vHGjFm/checkout --bind /mnt/fast/tmp/ai-route-tmp/run-d82_cqup/cairn-boundary-vHGjFm/scratch /mnt/fast/tmp/ai-route-tmp/run-d82_cqup/cairn-boundary-vHGjFm/scratch --chdir /mnt/fast/tmp/ai-route-tmp/run-d82_cqup/cairn-boundary-vHGjFm/checkout -- /runtime/node /mnt/fast/tmp/ai-route-tmp/run-d82_cqup/cairn-boundary-vHGjFm/checkout/probe.cjs
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at checkExecSyncError (node:child_process:942:11)
+      at execFileSync (node:child_process:978:15)
+      at runIsolatedEvaluation (file:///mnt/fast/lanes/cairn-1975/scripts/harness-eval-worker.mjs:176:3)
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1975/scripts/harness-eval-worker.test.mjs:591:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    status: 1,
+    signal: null,
+    output: [ null, null, null ],
+    pid: 18,
+    stdout: null,
+    stderr: null
+  }
