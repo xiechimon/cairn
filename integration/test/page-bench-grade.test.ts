@@ -376,4 +376,54 @@ describe('page-bench fail-closed grading (#1961)', () => {
     expect(summary.invalidReasons.length).toBe(2);
     expect(summary.invalidReasons.every((row) => row.length > 0)).toBe(true);
   });
+
+  test('a record missing required fields with buildOk as a string is invalid and stays out of aggregates', () => {
+    const home = artifactHome();
+    const desktop = writeShot(home, 'desktop.png', 'desktop-bytes');
+    const mobile = writeShot(home, 'mobile.png', 'mobile-bytes');
+    const malformed = {
+      questionBankVersion: '1',
+      questionId: 'q-sample',
+      requirements: { hero: true, grid: true, pricing: true, footer: true },
+      buildOk: 'false',
+      consoleErrors: [],
+      screenshots: [
+        { viewport: 'desktop', path: desktop.path, sha256: desktop.sha256 },
+        { viewport: 'mobile', path: mobile.path, sha256: mobile.sha256 },
+      ],
+    };
+    const graded = gradeRun(malformed, BANK, { artifactRoot: home });
+    expect(graded.status).toBe('invalid');
+    if (graded.status === 'invalid') {
+      expect(graded.reasons.length).toBeGreaterThan(0);
+      expect(graded.reasons.join(' ')).toMatch(
+        /model|harnessVersion|budgets|elapsedMs|tokenUsage|retries|buildOk|schema|malformed/i,
+      );
+    }
+    const ok = gradeRun(completeRecord(home), BANK, { artifactRoot: home });
+    const summary = aggregateGrades([ok, graded]);
+    expect(summary.validCount).toBe(1);
+    expect(summary.invalidCount).toBe(1);
+    expect(summary.meanScore).toBe(1);
+  });
+
+  test('null requirements yield invalid reasons and do not throw', () => {
+    const home = artifactHome();
+    const record = {
+      ...completeRecord(home),
+      requirements: null,
+    };
+    let thrown: unknown;
+    let graded: ReturnType<typeof gradeRun> | undefined;
+    try {
+      graded = gradeRun(record, BANK, { artifactRoot: home });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeUndefined();
+    expect(graded?.status).toBe('invalid');
+    if (graded?.status === 'invalid') {
+      expect(graded.reasons.length).toBeGreaterThan(0);
+    }
+  });
 });

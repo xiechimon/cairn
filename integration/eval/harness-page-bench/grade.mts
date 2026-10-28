@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { accessSync, constants, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
+import { z } from 'zod';
 
 export type PageBenchRequirement = { id: string };
 
@@ -66,6 +67,38 @@ export type AggregateSummary = {
   invalidReasons: string[][];
 };
 
+const screenshotSchema = z.object({
+  viewport: z.enum(['desktop', 'mobile']),
+  path: z.string().min(1),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+});
+
+const runRecordSchema = z
+  .object({
+    questionBankVersion: z.string().min(1),
+    questionId: z.string().min(1),
+    requirements: z.record(z.string(), z.boolean()),
+    buildOk: z.boolean(),
+    consoleErrors: z.array(z.string()),
+    screenshots: z.array(screenshotSchema).min(1),
+    model: z.string().min(1),
+    harnessVersion: z.string().min(1),
+    budgets: z.object({
+      wallMs: z.number().nonnegative(),
+      inputTokens: z.number().int().nonnegative(),
+      outputTokens: z.number().int().nonnegative(),
+    }),
+    elapsedMs: z.number().nonnegative(),
+    tokenUsage: z.object({
+      input: z.number().int().nonnegative(),
+      output: z.number().int().nonnegative(),
+      cacheRead: z.number().int().nonnegative(),
+      cacheWrite: z.number().int().nonnegative(),
+    }),
+    retries: z.number().int().nonnegative(),
+  })
+  .strict();
+
 function resolvePath(path: string, artifactRoot: string | undefined): string {
   if (isAbsolute(path)) return path;
   return artifactRoot === undefined ? path : join(artifactRoot, path);
@@ -84,11 +117,24 @@ function sha256Hex(body: Buffer): string {
   return createHash('sha256').update(body).digest('hex');
 }
 
+function schemaReasons(error: z.ZodError): string[] {
+  const reasons = error.issues.map((issue) => {
+    const path = issue.path.length > 0 ? issue.path.join('.') : '(root)';
+    return `malformed run record: ${path}: ${issue.message}`;
+  });
+  return reasons.length > 0 ? reasons : ['malformed run record'];
+}
+
 export function gradeRun(
-  record: PageBenchRunRecord,
+  raw: unknown,
   bank: PageBenchBank,
   options: GradeOptions = {},
 ): GradeResult {
+  const parsed = runRecordSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { status: 'invalid', reasons: schemaReasons(parsed.error) };
+  }
+  const record = parsed.data;
   const reasons: string[] = [];
 
   if (record.questionBankVersion !== bank.version) {
