@@ -1,0 +1,147 @@
+......F....................F.........F.......F....F...............F..... [ 94%]
+..FF                                                                     [100%]
+=================================== FAILURES ===================================
+______________ test_worker_guidance_does_not_disclose_scan_rules _______________
+
+    def test_worker_guidance_does_not_disclose_scan_rules() -> None:
+        skill = PROMPT_FILE.parent.parent / "skills/cairn-worker/SKILL.md"
+        for text in (read_worker_system_prompt(), skill.read_text()):
+            for rule in ("conftest.py", "test_*.py", "leaderboard", "Do not fetch"):
+>               assert rule not in text
+E               AssertionError: assert 'conftest.py' not in 'You are a C... in English.'
+E                 
+E                 'conftest.py' is contained here:
+E                   _test.py, conftest.py, test.sh, and grading config. Running tests is allowed; changing them is not.
+E                 ?           +++++++++++
+E                   - Do not fetch the benchmark task's source repository, its leaderboard, or its website. Solve from the files present in this container.
+E                   - Do not open a pull request. There is no remote to push to; the final answer is the summary in your last message.
+E                   - Do not leave background processes running when you finish.
+E                   - Keep all messages in English.
+
+tests/test_cairn_executor.py:93: AssertionError
+___________ test_auxiliary_reward_cannot_turn_a_failure_into_a_pass ____________
+
+tmp_path = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-ukjauht4/pytest-of-ian/pytest-0/test_auxiliary_reward_cannot_t0')
+
+    def test_auxiliary_reward_cannot_turn_a_failure_into_a_pass(tmp_path: Path) -> None:
+        _write_trial(tmp_path, result={
+            "verifier_result": {"rewards": {"reward": 0.0, "auxiliary": 1.0}}
+        })
+>       assert not summarize_trial(tmp_path, name="task", voided=False).passed
+E       AssertionError: assert not True
+E        +  where True = TrialCost(name='task', dataset='', passed=True, voided=False, infra=False, wall_sec=0, tokens=0, findings=()).passed
+E        +    where TrialCost(name='task', dataset='', passed=True, voided=False, infra=False, wall_sec=0, tokens=0, findings=()) = summarize_trial(PosixPath('/mnt/fast/tmp/ai-route-tmp/run-ukjauht4/pytest-of-ian/pytest-0/test_auxiliary_reward_cannot_t0'), name='task', voided=False)
+
+tests/test_costs.py:184: AssertionError
+_______ test_partial_report_separates_planned_tasks_and_collected_trials _______
+
+    def test_partial_report_separates_planned_tasks_and_collected_trials() -> None:
+        report = build_report(
+            arms={"A": arm_summary([_trial("t1", True)], "A")},
+            task_names=["t1", "t2"], seed=1792, model="free",
+        )
+>       assert "Planned tasks: 2" in report
+E       AssertionError: assert 'Planned tasks: 2' in '# Cairn public benchmark baseline\n\n- Model: `free` (same channel for every arm)\n- Task list seed: `1792`\n- Tasks:...| Wall | Tokens | Scan |\n|---|---|---|---|---|---|\n\n### Arm A\n| terminal-bench-2-1 | t1 | pass | 100s | 10 | - |\n'
+
+tests/test_report.py:156: AssertionError
+___________________ test_read_subset_seed_requires_metadata ____________________
+
+tmp_path = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-ukjauht4/pytest-of-ian/pytest-0/test_read_subset_seed_requires0')
+
+    def test_read_subset_seed_requires_metadata(tmp_path: Path) -> None:
+        import pytest
+        from cairn_harbor.run_baseline import read_subset_seed
+    
+>       with pytest.raises(ValueError, match="seed"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+tests/test_run_baseline.py:88: Failed
+____________ test_collect_outcomes_scans_declared_harness_sessions _____________
+
+tmp_path = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-ukjauht4/pytest-of-ian/pytest-0/test_collect_outcomes_scans_de0')
+
+    def test_collect_outcomes_scans_declared_harness_sessions(tmp_path: Path) -> None:
+        from cairn_harbor.scan import ScanFinding
+    
+        trial = tmp_path / "job" / "solver__attempt1"
+        trial.mkdir(parents=True)
+        (trial / "result.json").write_text(json.dumps({
+            "verifier_result": {"rewards": {"reward": 1.0}}
+        }))
+        session = trial / "cloned.jsonl"
+        session.write_text(json.dumps({"message": {"role": "assistant", "content": [{
+            "type": "toolCall", "name": "edit", "arguments": {"path": "/app/solver.py"}
+        }]}}))
+>       outcomes = collect_outcomes(tmp_path, "job", "A",
+            harness_sessions={trial.name: [session]})
+E       TypeError: collect_outcomes() got an unexpected keyword argument 'harness_sessions'
+
+tests/test_run_baseline.py:149: TypeError
+________________________ test_benchmark_url_boundaries _________________________
+
+    def test_benchmark_url_boundaries() -> None:
+        from cairn_harbor.scan import is_benchmark_site_target
+    
+        for url in (
+            "https://bench.tbench.ai.evil.com/x",
+            "https://example.com/tbench.ai",
+            "https://github.com/swe-benchmarks/project",
+            "https://example.com/?next=https://tbench.ai",
+        ):
+>           assert not is_benchmark_site_target(url), url
+E           AssertionError: https://bench.tbench.ai.evil.com/x
+E           assert not True
+E            +  where True = <function is_benchmark_site_target at 0x7f7b625394e0>('https://bench.tbench.ai.evil.com/x')
+
+tests/test_scan.py:275: AssertionError
+_________________ test_missing_dataset_has_a_clear_diagnostic __________________
+
+tmp_path = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-ukjauht4/pytest-of-ian/pytest-0/test_missing_dataset_has_a_cle0')
+
+    def test_missing_dataset_has_a_clear_diagnostic(tmp_path: Path) -> None:
+        with pytest.raises(ValueError, match="dataset directory"):
+>           sample_task_names(tmp_path / "missing", 1, 0)
+
+tests/test_subset.py:75: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+cairn_harbor/subset.py:6: in sample_task_names
+    names = sorted(
+cairn_harbor/subset.py:7: in <genexpr>
+    entry.name for entry in dataset_dir.iterdir() if entry.is_dir()
+                            ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-ukjauht4/pytest-of-ian/pytest-0/test_missing_dataset_has_a_cle0/missing')
+
+    def iterdir(self):
+        """Yield path objects of the directory contents.
+    
+        The children are yielded in arbitrary order, and the
+        special entries '.' and '..' are not included.
+        """
+>       for name in os.listdir(self):
+                    ^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/mnt/fast/tmp/ai-route-tmp/run-ukjauht4/pytest-of-ian/pytest-0/test_missing_dataset_has_a_cle0/missing'
+
+/home/ian/.local/share/uv/python/cpython-3.12.15-linux-x86_64-gnu/lib/python3.12/pathlib.py:1056: FileNotFoundError
+______________ test_empty_dataset_is_rejected_even_for_zero_count ______________
+
+tmp_path = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-ukjauht4/pytest-of-ian/pytest-0/test_empty_dataset_is_rejected0')
+
+    def test_empty_dataset_is_rejected_even_for_zero_count(tmp_path: Path) -> None:
+>       with pytest.raises(ValueError, match="no tasks"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+tests/test_subset.py:79: Failed
+=========================== short test summary info ============================
+FAILED tests/test_cairn_executor.py::test_worker_guidance_does_not_disclose_scan_rules
+FAILED tests/test_costs.py::test_auxiliary_reward_cannot_turn_a_failure_into_a_pass
+FAILED tests/test_report.py::test_partial_report_separates_planned_tasks_and_collected_trials
+FAILED tests/test_run_baseline.py::test_read_subset_seed_requires_metadata - ...
+FAILED tests/test_run_baseline.py::test_collect_outcomes_scans_declared_harness_sessions
+FAILED tests/test_scan.py::test_benchmark_url_boundaries - AssertionError: ht...
+FAILED tests/test_subset.py::test_missing_dataset_has_a_clear_diagnostic - Fi...
+FAILED tests/test_subset.py::test_empty_dataset_is_rejected_even_for_zero_count
+8 failed, 68 passed in 2.32s

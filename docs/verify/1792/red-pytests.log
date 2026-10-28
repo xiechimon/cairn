@@ -1,0 +1,19 @@
+== uv run pytest -q (before implementation)
+tests/test_subset.py:6: in <module>
+    from cairn_harbor.subset import sample_task_names
+E   ModuleNotFoundError: No module named 'cairn_harbor.subset'
+=========================== short test summary info ============================
+ERROR tests/test_cairn_executor.py
+ERROR tests/test_subset.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
+2 errors in 0.19s
+
+== uv run pytest tests/test_scan.py tests/test_report.py -q
+>       assert ScanFinding.BENCHMARK_SITE_ACCESS in findings
+E       AssertionError: assert <ScanFinding.BENCHMARK_SITE_ACCESS: 'benchmark-site-access'> in []
+E        +  where <ScanFinding.BENCHMARK_SITE_ACCESS: 'benchmark-site-access'> = ScanFinding.BENCHMARK_SITE_ACCESS
+
+tests/test_scan.py:168: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_scan.py::test_curl_to_tbench_ai_is_flagged - AssertionError...
+1 failed, 21 passed in 0.04s
