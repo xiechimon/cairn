@@ -136,7 +136,7 @@ const AGENT = [
   'task-panel',
   'chief-home-digest',
 ];
-const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models'];
+const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models', 'split-autostart'];
 const OVERLAY = [
   'newtask-',
   'mention-',

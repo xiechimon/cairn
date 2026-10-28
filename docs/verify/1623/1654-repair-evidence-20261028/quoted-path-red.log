@@ -1,0 +1,36 @@
+
+ RUN  v5.0.1 <checkout>
+
+ ❯ |@xiechimon/cairn| test/todo-split-checker.test.ts (18 tests | 2 failed) 12ms
+   ❯ split_todo checker (18)
+     × falls back for protected or unclear path apps/server/src/merge gate/file.ts 3ms
+     × falls back for protected or unclear path apps/server/src/unsafe file.ts 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > split_todo checker > falls back for protected or unclear path apps/server/src/merge gate/file.ts
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > split_todo checker > falls back for protected or unclear path apps/server/src/unsafe file.ts
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/todo-split-checker.test.ts:127:23
+    125|       }),
+    126|     );
+    127|     expect(result.ok).toBe(false);
+       |                       ^
+    128|     expect(result.reasons).toEqual(
+    129|       expect.arrayContaining([expect.stringContaining('protected path'…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 16 passed (18)
+   Start at  18:57:42
+   Duration  703ms (import 55%, transform 43%, tests 2%)
+

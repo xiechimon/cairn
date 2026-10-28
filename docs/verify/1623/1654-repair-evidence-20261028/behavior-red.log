@@ -1,0 +1,70 @@
+
+ RUN  v5.0.1 <checkout>
+
+ ❯ |@xiechimon/cairn| test/persona-split-verify.test.ts (22 tests | 2 failed) 806ms
+   ❯ #1250 split_todo (layer 2) (12)
+     × failure mode 10: happy path -- child cards / dependency edges / the parent plan doc / the parent stopped at confirm / an announcement row 35ms
+     × chief split honors persisted team pause true and records its dispatch decision 40ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/persona-split-verify.test.ts > #1250 split_todo (layer 2) > failure mode 10: happy path -- child cards / dependency edges / the parent plan doc / the parent stopped at confirm / an announcement row
+AssertionError: expected '# 拆解方案：流水线探针\n\n由 Chief 拆为 2 张子卡（bloc…' to contain '产出：信息类（报告附件交付，不进合并）'
+
+- Expected
++ Received
+
+- 产出：信息类（报告附件交付，不进合并）
++ # 拆解方案：流水线探针
++
++ 由 Chief 拆为 2 张子卡（blocking 依赖边）。确认后：无阻塞子卡自动派发直执行；后续波次随阻塞子卡 done 自动推进；子卡全 done 时父卡自动收口。各子卡独立走 build→review→merge 流水线（合并闸逐卡留人）。
++
++ ## 子卡清单
++ ### 子卡 1：子卡 A
++ - 执行 agent：Implementer
++ - 依赖：无（确认后即派发）
++
++ 独立执行 A
++
++ ### 子卡 2：子卡 B
++ - 执行 agent：Implementer
++ - 依赖：子卡 1
++
++ 依赖 A
++
+
+ ❯ test/persona-split-verify.test.ts:549:18
+    547|     expect(plan).toContain('依赖：子卡 1');
+    548|     expect(plan).toContain('Implementer');
+    549|     expect(plan).toContain('产出：信息类（报告附件交付，不进合并）');
+       |                  ^
+    550|     expect(childA.output).toBe('info');
+    551|     expect(w.messagesOf(result.parentBuildId).some((m) => m.content ==…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn| test/persona-split-verify.test.ts > #1250 split_todo (layer 2) > chief split honors persisted team pause true and records its dispatch decision
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/persona-split-verify.test.ts:574:30
+    572|     });
+    573|     const result = JSON.parse(text) as { autoStart: boolean; parentBui…
+    574|     expect(result.autoStart).toBe(!paused);
+       |                              ^
+    575|     expect(w.todoRow().phase).toBe(paused ? 'confirm' : 'building');
+    576|     const rows = result.children.map(({ id }) => loadTodoRow(w.s, id));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 24 passed (26)
+   Start at  18:54:35
+   Duration  1.95s (import 38%, transform 33%, tests 29%)
+

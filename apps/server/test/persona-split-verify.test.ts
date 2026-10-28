@@ -15,13 +15,20 @@ import { describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   build as buildTable,
+  machine as machineTable,
   message as messageTable,
   plan as planTable,
+  project as projectTable,
   provider as providerTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { advanceSplitWaves, maybeEnqueueVerifyStep } from '../src/services/builds.js';
+import {
+  advanceSplitWaves,
+  dispatchSplitChildren,
+  maybeEnqueueVerifyStep,
+} from '../src/services/builds.js';
+import { executeChiefTool } from '../src/services/chief-tools.js';
 import { agentIdForStep, unassignedStepReason } from '../src/services/dispatch-eligibility.js';
 import { ensurePersonasSeeded } from '../src/services/personas.js';
 import { createSplitTodo } from '../src/services/todo-split.js';
@@ -505,7 +512,7 @@ describe('#1250 split_todo (layer 2)', () => {
     const result = createSplitTodo(deps, {
       parentId: w.todoId,
       subtodos: [
-        { title: '子卡 A', spec: '独立执行 A', agentId: implementerId },
+        { title: '子卡 A', spec: '独立执行 A', agentId: implementerId, output: 'info' },
         { title: '子卡 B', spec: '依赖 A', agentId: implementerId, blockedBy: [1] },
       ],
       chiefAgentId: null,
@@ -539,9 +546,141 @@ describe('#1250 split_todo (layer 2)', () => {
     expect(plan).toContain('子卡 A');
     expect(plan).toContain('依赖：子卡 1');
     expect(plan).toContain('Implementer');
+    expect(plan).toContain('产出：信息类（报告附件交付，不进合并）');
+    expect(childA.output).toBe('info');
     expect(w.messagesOf(result.parentBuildId).some((m) => m.content === SPLIT_ANNOUNCEMENT)).toBe(
       true,
     );
+  });
+
+  test.each([true, false])(
+    'chief split honors persisted team pause %s and records its dispatch decision',
+    async (paused) => {
+      const w = await setupWorld();
+      const implementerId = personaAgentId(w.s, 'implementer');
+      const updated = await call(w.s.app, 'PATCH', `/api/projects/${w.projectId}`, {
+        body: { splitPolicy: 'auto' },
+      });
+      expect(updated.status).toBe(200);
+      const pauseResponse = await call(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}`, {
+        body: { autonomyPaused: paused },
+      });
+      expect(pauseResponse.status).toBe(200);
+      w.s.db.update(machineTable).set({ online: true }).run();
+      const text = await executeChiefTool(
+        {
+          ...w.s.svc,
+          box: w.s.secretBox,
+          reposDir: w.s.reposDir,
+          attachmentsDir: w.s.attachmentsDir,
+        },
+        {
+          teamId: w.s.team.id,
+          userId: w.s.user.id,
+          chiefId: 'chief-test',
+          threadId: 'chief-thread-1',
+          chiefAgentId: null,
+          conversationId: 'chief-test',
+        },
+        'split_todo',
+        {
+          todoId: w.todoId,
+          subtodos: [
+            { title: 'A', spec: 'ordinary first task', agentId: implementerId },
+            { title: 'B', spec: 'ordinary second task', agentId: implementerId, blockedBy: [1] },
+          ],
+        },
+      );
+      const result = JSON.parse(text) as {
+        autoStart: boolean;
+        parentBuildId: string;
+        children: { id: string }[];
+      };
+      expect(result.autoStart).toBe(!paused);
+      expect(w.todoRow().phase).toBe(paused ? 'confirm' : 'building');
+      const rows = result.children.map(({ id }) => loadTodoRow(w.s, id));
+      expect(rows.map((row) => row.phase)).toEqual(paused ? ['todo', 'todo'] : ['queued', 'todo']);
+      expect(
+        w
+          .messagesOf(result.parentBuildId)
+          .some(
+            (message) =>
+              message.content ===
+              (paused
+                ? 'checker verdict: falls back to human review + team autonomy is paused'
+                : 'checker verdict: started automatically'),
+          ),
+      ).toBe(true);
+    },
+  );
+
+  test('auto policy dispatches unblocked children directly once the checker passes and records the verdict', async () => {
+    const w = await setupWorld();
+    const implementerId = personaAgentId(w.s, 'implementer');
+    w.s.db
+      .update(projectTable)
+      .set({ splitPolicy: 'auto' })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    w.s.db.update(machineTable).set({ online: true }).run();
+    const result = createSplitTodo(
+      { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
+      {
+        parentId: w.todoId,
+        subtodos: [
+          { title: 'A', spec: 'a', agentId: implementerId },
+          { title: 'B', spec: 'b', agentId: implementerId, blockedBy: [1] },
+        ],
+        chiefAgentId: null,
+        chiefId: 'chief-test',
+        threadId: 'chief-thread-1',
+        actorName: 'Chief',
+      },
+    );
+    dispatchSplitChildren(
+      { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
+      w.todoId,
+    );
+    expect(w.todoRow().phase).toBe('building');
+    expect(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, result.children[0]!.id)).get()!.phase,
+    ).toBe('queued');
+    expect(
+      w
+        .messagesOf(result.parentBuildId)
+        .some((m) => m.content === 'checker verdict: started automatically'),
+    ).toBe(true);
+  });
+
+  test('shadow policy only records the checker verdict and keeps the confirm gate', async () => {
+    const w = await setupWorld();
+    const implementerId = personaAgentId(w.s, 'implementer');
+    w.s.db
+      .update(projectTable)
+      .set({ splitPolicy: 'shadow' })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    w.s.db.update(machineTable).set({ online: true }).run();
+    const result = createSplitTodo(
+      { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
+      {
+        parentId: w.todoId,
+        subtodos: [
+          { title: 'A', spec: 'a', agentId: implementerId },
+          { title: 'B', spec: 'b', agentId: implementerId, blockedBy: [1] },
+        ],
+        chiefAgentId: null,
+        chiefId: 'chief-test',
+        threadId: 'chief-thread-1',
+        actorName: 'Chief',
+      },
+    );
+    expect(w.todoRow().phase).toBe('confirm');
+    expect(
+      w
+        .messagesOf(result.parentBuildId)
+        .some((m) => m.content === 'checker verdict: would start automatically (shadow)'),
+    ).toBe(true);
   });
 
   test('failure mode 11: the parent confirms -> unblocked children dispatched (direct execution) + the parent enters building; blocked children untouched', async () => {

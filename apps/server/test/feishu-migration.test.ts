@@ -21,7 +21,7 @@ test('Feishu migration follows all main migrations with unique indexes and a com
   expect(new Set(journal.entries.map((entry) => entry.idx)).size).toBe(journal.entries.length);
   expect(new Set(journal.entries.map((entry) => entry.tag)).size).toBe(journal.entries.length);
   const latest = journal.entries.at(-1);
-  expect(latest?.tag).toContain('feishu');
+  expect(journal.entries.some((entry) => entry.tag.endsWith('_feishu_binding'))).toBe(true);
   const snapshot = JSON.parse(
     readFileSync(
       join(MIGRATIONS_FOLDER, 'meta', `${String(latest?.idx).padStart(4, '0')}_snapshot.json`),
@@ -51,7 +51,9 @@ test.each(['fresh', 'upgrade'])(
       if (mode === 'upgrade') {
         const main = join(directory, 'main');
         mkdirSync(join(main, 'meta'), { recursive: true });
-        const entries = journal.entries.filter((entry) => !entry.tag.includes('feishu'));
+        const cut = journal.entries.findIndex((entry) => entry.tag.endsWith('_feishu_binding'));
+        expect(cut).toBeGreaterThan(0);
+        const entries = journal.entries.slice(0, cut);
         writeFileSync(join(main, 'meta/_journal.json'), JSON.stringify({ ...journal, entries }));
         for (const entry of entries)
           copyFileSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(main, `${entry.tag}.sql`));

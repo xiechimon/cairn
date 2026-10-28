@@ -12,6 +12,7 @@ export const teamRecordSchema = z.object({
   createdAt: epochMs,
   plan: teamPlanSchema,
   avatarStyle: z.string().nullable(),
+  autonomyPaused: z.boolean().optional(),
   firstPrReportPrompt: firstPrReportPromptSchema.optional(),
 });
 export type TeamRecord = z.infer<typeof teamRecordSchema>;

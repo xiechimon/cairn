@@ -21,6 +21,7 @@ import type {
   ProviderModel,
   RequiredCapabilities,
   SkillInjectionRecord,
+  SplitPolicy,
   StepKind,
   TodoOutputKind,
   TodoSourceKind,
@@ -53,6 +54,7 @@ export const team = sqliteTable('team', {
   createdAt: epochMs('createdAt').notNull(),
   plan: text('plan').notNull().default('free'),
   avatarStyle: text('avatarStyle'),
+  autonomyPaused: bool('autonomyPaused').notNull().default(false),
   firstPrReportPromptEnabled: bool('firstPrReportPromptEnabled').notNull().default(false),
   firstPrReportPromptDismissedAt: epochMs('firstPrReportPromptDismissedAt'),
   firstPrReportPromptFirstPrAt: epochMs('firstPrReportPromptFirstPrAt'),
@@ -65,6 +67,7 @@ export const project = sqliteTable('project', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
+  splitPolicy: text('splitPolicy').$type<SplitPolicy>().notNull().default('human'),
   description: text('description'),
   repoKind: text('repoKind').$type<ProjectRepoKind>(),
   repoName: text('repoName'),

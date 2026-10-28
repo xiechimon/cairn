@@ -8394,6 +8394,15 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "repoName": {
       "type": "string",
     },
+    "splitPolicy": {
+      "default": "human",
+      "enum": [
+        "human",
+        "shadow",
+        "auto",
+      ],
+      "type": "string",
+    },
     "teamId": {
       "type": "string",
     },
@@ -8402,6 +8411,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "id",
     "name",
     "teamId",
+    "splitPolicy",
   ],
   "type": "object",
 }
@@ -8782,6 +8792,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "autonomyPaused": {
+      "type": "boolean",
+    },
     "avatarStyle": {
       "type": [
         "string",

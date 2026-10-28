@@ -4,6 +4,9 @@ import { diffFileSchema } from './document-diff.js';
 import { mergePolicySchema } from './merge-gate.js';
 
 export const PROJECT_REPO_KINDS = ['hosted', 'github', 'local'] as const;
+export const SPLIT_POLICIES = ['human', 'shadow', 'auto'] as const;
+export const splitPolicySchema = z.enum(SPLIT_POLICIES);
+export type SplitPolicy = z.infer<typeof splitPolicySchema>;
 export const projectRepoKindSchema = z.enum(PROJECT_REPO_KINDS);
 export type ProjectRepoKind = z.infer<typeof projectRepoKindSchema>;
 
@@ -11,6 +14,7 @@ export const projectRecordSchema = z.object({
   id: recordId,
   name: z.string(),
   teamId: recordId,
+  splitPolicy: splitPolicySchema.default('human'),
   description: z.string().optional(),
   repoKind: projectRepoKindSchema.optional(),
   repoName: z.string().optional(),
@@ -61,6 +65,7 @@ export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
 export const patchProjectBodySchema = z
   .object({
     name: z.string().optional(),
+    splitPolicy: splitPolicySchema.optional(),
     description: z.string().nullish(),
     repoKind: projectRepoKindSchema.optional(),
     githubRepo: z.string().optional(),

@@ -4,7 +4,8 @@ import type { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
-import { agent, notification, user } from './db/schema.js';
+import { agent, notification, team, user } from './db/schema.js';
+import { toTeamRecord } from './db/seed.js';
 import { parseWith } from './lib/errors.js';
 import { agentRecordOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { createSerialConnection } from './services/events.js';
@@ -34,16 +35,29 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     return c.json(ctx.user);
   });
 
-  app.get('/api/teams', (c) =>
-    c.json([{ ...ctx.team, firstPrReportPrompt: readFirstPrReportPrompt(ctx.db, ctx.team.id) }]),
-  );
+  app.get('/api/teams', (c) => {
+    const row = ctx.db.select().from(team).where(eq(team.id, ctx.team.id)).get();
+    return c.json(
+      row === undefined
+        ? []
+        : [{ ...toTeamRecord(row), firstPrReportPrompt: readFirstPrReportPrompt(ctx.db, row.id) }],
+    );
+  });
 
   app.patch('/api/teams/:id', async (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     const body = parseWith(patchTeamBodySchema, await jsonBody(c), 'body');
-    const prompt = setFirstPrReportPrompt(ctx.db, id, body.firstPrReportPrompt);
-    return c.json({ ...ctx.team, firstPrReportPrompt: prompt });
+    if (body.autonomyPaused !== undefined) {
+      ctx.db.update(team).set({ autonomyPaused: body.autonomyPaused }).where(eq(team.id, id)).run();
+    }
+    const prompt = setFirstPrReportPrompt(ctx.db, id, body.firstPrReportPrompt ?? {});
+    const row = ctx.db.select().from(team).where(eq(team.id, id)).get();
+    return c.json({
+      ...ctx.team,
+      ...(row === undefined ? {} : toTeamRecord(row)),
+      firstPrReportPrompt: prompt,
+    });
   });
 
   app.get('/api/teams/:id/members', (c) => {
