@@ -11,6 +11,8 @@ Deterministic grader tests, labeled-slice negatives, tightened revision expectat
 
 `docs/verify/1968/baseline/` holds stub-relay smoke artifacts for runner wiring only. Those stub scores are **not** acceptance evidence and must not be copied into `.claude/hillclimb/plan/baseline/` as scored coverage. Real-model both-arm acceptance is unfinished; no cost approval was invented for a paid run in this lane.
 
+Ticket #1968 stays open until a real-model family run produces both arms after an approved cost estimate. This PR must not carry a closing keyword for that ticket.
+
 ## Reproduction
 
 ```sh
