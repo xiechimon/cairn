@@ -48,5 +48,6 @@ export function toTeamRecord(row: typeof team.$inferSelect): TeamRecord {
     createdAt: row.createdAt,
     plan: row.plan,
     avatarStyle: row.avatarStyle,
+    autonomyPaused: row.autonomyPaused,
   };
 }

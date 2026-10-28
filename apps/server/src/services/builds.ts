@@ -121,6 +121,7 @@ import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { projectMergeConfigOf } from './projects.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
+import { assertSplitProposalExecutable } from './split-proposal.js';
 import { stepQueueProjector } from './step-queue.js';
 import {
   childrenOfTodo,
@@ -610,6 +611,15 @@ export function startBuilds(
     if (projectRow?.teamId !== todoRecord.teamId) {
       throw new NotFoundError(`project ${input.projectId}`);
     }
+    const previous =
+      todoRecord.latestBuildId === null
+        ? undefined
+        : deps.db
+            .select({ errorMessage: build.errorMessage })
+            .from(build)
+            .where(eq(build.id, todoRecord.latestBuildId))
+            .get();
+    assertSplitProposalExecutable(previous?.errorMessage ?? null);
   }
   const created: BuildRecord[] = [];
   for (const todoId of input.todoIds) {
@@ -836,6 +846,7 @@ async function assertNoMergedPrElsewhere(
 function applyBuildConfirm(deps: BuildDeps, buildId: string, actorName: string): void {
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
+  assertSplitProposalExecutable(row.errorMessage);
   const todoRecord = getTodo(deps, row.todoId);
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRecord.phase !== 'confirm') {
@@ -863,6 +874,7 @@ export async function applyBuildStepAction(
 ): Promise<void> {
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
+  assertSplitProposalExecutable(row.errorMessage);
   let todoRecord = getTodo(deps, row.todoId);
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
   const actorName = actor ?? deps.user.displayName;

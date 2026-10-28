@@ -22,9 +22,14 @@ export const patchFirstPrReportPromptSchema = z.object({
   dismissed: z.boolean().optional(),
 });
 
-export const patchTeamBodySchema = z.object({
-  firstPrReportPrompt: patchFirstPrReportPromptSchema,
-});
+export const patchTeamBodySchema = z
+  .object({
+    firstPrReportPrompt: patchFirstPrReportPromptSchema.optional(),
+    autonomyPaused: z.boolean().optional(),
+  })
+  .refine((body) => body.firstPrReportPrompt !== undefined || body.autonomyPaused !== undefined, {
+    message: 'At least one team setting is required',
+  });
 export type PatchTeamBody = z.infer<typeof patchTeamBodySchema>;
 
 export const FIRST_PR_DISCUSSION_CATEGORY = 'Q&A';

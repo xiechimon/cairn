@@ -31,6 +31,7 @@ import {
   advanceSplitWaves,
   applyBuildStepAction,
   cancelBuild,
+  dispatchSplitChildren,
   startBuilds,
   stopActiveStepsAfterExit,
 } from './builds.js';
@@ -412,7 +413,8 @@ export async function executeChiefTool(
     }
     case 'split_todo': {
       const todoId = str(params, 'todoId');
-      requireTeamTodo(db, todoId, ctx.teamId);
+      const parent = requireTeamTodo(db, todoId, ctx.teamId);
+      const splitPolicy = requireProjectRow(db, parent.projectId, ctx.teamId).splitPolicy;
       const rawSubtodos = params.subtodos;
       if (!Array.isArray(rawSubtodos) || rawSubtodos.length === 0) {
         throw new HttpError(400, 'invalid params.subtodos: expected non-empty array');
@@ -428,7 +430,11 @@ export async function executeChiefTool(
             ? undefined
             : Array.isArray(blockedByRaw)
               ? blockedByRaw.map((n) => {
-                  if (typeof n !== 'number' || !Number.isInteger(n)) {
+                  if (
+                    typeof n !== 'number' ||
+                    !Number.isFinite(n) ||
+                    (splitPolicy === 'human' && !Number.isInteger(n))
+                  ) {
                     throw new HttpError(
                       400,
                       `invalid params.subtodos[${i}].blockedBy: expected integer[]`,
@@ -452,7 +458,7 @@ export async function executeChiefTool(
         };
       });
       const result = createSplitTodo(
-        { db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+        { db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user, convHub: deps.convHub },
         {
           parentId: todoId,
           subtodos,
@@ -462,6 +468,18 @@ export async function executeChiefTool(
           actorName: chiefActor.name,
         },
       );
+      if (result.autoStart) {
+        dispatchSplitChildren(
+          {
+            db,
+            hub: deps.hub,
+            machineHub: deps.machineHub,
+            user: deps.user,
+            convHub: deps.convHub,
+          },
+          todoId,
+        );
+      }
       return json(result);
     }
     case 'update_todo': {

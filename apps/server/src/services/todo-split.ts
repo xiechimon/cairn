@@ -2,13 +2,24 @@ import type { TodoOutputKind } from '@cairn/shared';
 import { SPLIT_ANNOUNCEMENT, type UserRecord } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, build, plan as planTable, todo } from '../db/schema.js';
+import { agent, build, machine, plan as planTable, project, team, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { mergedCatalogModels } from './model-liveness.js';
+import {
+  canResubmitRejectedSplit,
+  REJECTED_SPLIT_PROPOSAL_PREFIX,
+  SPLIT_PROPOSAL_CORRECTION,
+} from './split-proposal.js';
+import {
+  checkSplitPlan,
+  hasSplitDependencyCycle,
+  type SplitCheckerAgent,
+} from './todo-split-checker.js';
 import { createTodo, setTodoPhase } from './todos.js';
-import { insertGateAnnouncement } from './transcript.js';
+import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
 export interface SplitSubtodoInput {
   title: string;
@@ -36,11 +47,21 @@ export function createSplitTodo(
     threadId: string;
     actorName: string;
   },
-): { parentId: string; parentBuildId: string; children: { id: string; title: string }[] } {
+): {
+  parentId: string;
+  parentBuildId: string;
+  children: { id: string; title: string }[];
+  autoStart: boolean;
+} {
   const { db } = deps;
   const parent = db.select().from(todo).where(eq(todo.id, input.parentId)).get();
   if (parent === undefined) throw new HttpError(404, `todo ${input.parentId}`);
-  if (parent.phase !== 'todo') {
+  const projectRow = db.select().from(project).where(eq(project.id, parent.projectId)).get();
+  const splitPolicy = projectRow?.splitPolicy ?? 'human';
+  if (
+    parent.phase !== 'todo' &&
+    !(splitPolicy !== 'human' && canResubmitRejectedSplit(db, parent))
+  ) {
     throw new HttpError(409, `split 仅适用于未开工任务（当前相位 ${parent.phase}）`);
   }
   const existing = db
@@ -52,6 +73,43 @@ export function createSplitTodo(
     throw new HttpError(409, `todo ${input.parentId} 已拆解（${existing.length} 张子卡在位）`);
   }
   const items = input.subtodos;
+  let checkerPassed = false;
+  let checkerReasons: string[] = [];
+  if (splitPolicy !== 'human') {
+    const checkerAgents: SplitCheckerAgent[] = db
+      .select({
+        id: agent.id,
+        status: agent.status,
+        provider: agent.provider,
+        modelId: agent.modelId,
+        requiredCapabilities: agent.requiredCapabilities,
+        machine: {
+          name: machine.name,
+          online: machine.online,
+          enabledRuntimes: machine.enabledRuntimes,
+          capabilities: machine.capabilities,
+          claudeCodeReport: machine.claudeCodeReport,
+        },
+      })
+      .from(agent)
+      .leftJoin(machine, eq(agent.machineId, machine.id))
+      .where(eq(agent.teamId, parent.teamId))
+      .all()
+      .map((row) => ({ ...row, machine: row.machine?.online === undefined ? null : row.machine }));
+    const checked = checkSplitPlan({
+      subtodos: items,
+      agents: checkerAgents,
+      modelCatalog: mergedCatalogModels(),
+      autonomyPaused:
+        db
+          .select({ paused: team.autonomyPaused })
+          .from(team)
+          .where(eq(team.id, parent.teamId))
+          .get()?.paused !== false,
+    });
+    checkerPassed = checked.ok;
+    checkerReasons = checked.reasons;
+  }
   if (items.length < 2) {
     throw new HttpError(400, 'subtodos 至少两张：单卡诉求不是拆解，直接派发或改写 spec');
   }
@@ -59,39 +117,47 @@ export function createSplitTodo(
     if (item.title.trim() === '' || item.spec.trim() === '') {
       throw new HttpError(400, 'subtodos 每项 title/spec 必填非空');
     }
-    const row = db
-      .select({ id: agent.id, displayName: agent.displayName })
-      .from(agent)
-      .where(and(eq(agent.id, item.agentId), eq(agent.teamId, parent.teamId)))
-      .get();
-    if (row === undefined) {
-      throw new HttpError(404, `agent ${item.agentId}（不在本团队，或 id 抄错了）`);
-    }
   }
-  const edges: { from: number; to: number }[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (item === undefined) continue;
-    for (const idx of item.blockedBy ?? []) {
-      if (!Number.isInteger(idx) || idx < 1 || idx > items.length) {
-        throw new HttpError(400, `blockedBy 索引越界：${idx}（1..${items.length}）`);
+  let rejectedProposal = false;
+  try {
+    for (const item of items) {
+      const row = db
+        .select({ id: agent.id, displayName: agent.displayName })
+        .from(agent)
+        .where(and(eq(agent.id, item.agentId), eq(agent.teamId, parent.teamId)))
+        .get();
+      if (row === undefined) {
+        throw new HttpError(404, `agent ${item.agentId}（不在本团队，或 id 抄错了）`);
       }
-      if (idx === i + 1) throw new HttpError(400, 'blockedBy 不能自指');
-      edges.push({ from: idx - 1, to: i });
     }
-  }
-  {
-    const adj = new Map<number, number[]>();
-    for (const e of edges) adj.set(e.from, [...(adj.get(e.from) ?? []), e.to]);
-    const state = new Uint8Array(items.length);
-    const visit = (n: number): void => {
-      if (state[n] === 1) throw new HttpError(400, 'blockedBy 依赖成环（DFS 检测命中）');
-      if (state[n] === 2) return;
-      state[n] = 1;
-      for (const next of adj.get(n) ?? []) visit(next);
-      state[n] = 2;
-    };
-    for (let i = 0; i < items.length; i++) visit(i);
+    const edges: { from: number; to: number }[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item === undefined) continue;
+      for (const idx of item.blockedBy ?? []) {
+        if (!Number.isInteger(idx) || idx < 1 || idx > items.length) {
+          throw new HttpError(400, `blockedBy 索引越界：${idx}（1..${items.length}）`);
+        }
+        if (idx === i + 1) throw new HttpError(400, 'blockedBy 不能自指');
+        edges.push({ from: idx - 1, to: i });
+      }
+    }
+    {
+      const adj = new Map<number, number[]>();
+      for (const e of edges) adj.set(e.from, [...(adj.get(e.from) ?? []), e.to]);
+      if (hasSplitDependencyCycle(adj, items.length))
+        throw new HttpError(400, 'blockedBy 依赖成环（DFS 检测命中）');
+    }
+  } catch (error) {
+    if (
+      splitPolicy === 'human' ||
+      !(error instanceof HttpError) ||
+      (error.status !== 400 && error.status !== 404)
+    )
+      throw error;
+    rejectedProposal = true;
+    checkerPassed = false;
+    if (checkerReasons.length === 0) checkerReasons.push(error.message);
   }
 
   const children: {
@@ -102,41 +168,48 @@ export function createSplitTodo(
     blockedBy: string[];
     output?: TodoOutputKind;
   }[] = [];
-  for (const item of items) {
-    const record = createTodo(
-      { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
-      {
-        teamId: parent.teamId,
-        projectId: parent.projectId,
+  if (!rejectedProposal) {
+    for (const item of items) {
+      const record = createTodo(
+        { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+        {
+          teamId: parent.teamId,
+          projectId: parent.projectId,
+          title: item.title,
+          spec: item.spec,
+          createdBy: input.chiefAgentId,
+          ownerId: parent.ownerId,
+          orchestration: { threadId: input.threadId },
+          ...(item.output !== undefined ? { output: item.output } : {}),
+        },
+      );
+      children.push({
+        id: record.id,
         title: item.title,
         spec: item.spec,
-        createdBy: input.chiefAgentId,
-        ownerId: parent.ownerId,
-        orchestration: { threadId: input.threadId },
+        agentId: item.agentId,
+        blockedBy: [],
         ...(item.output !== undefined ? { output: item.output } : {}),
-      },
-    );
-    const blockerIds = (item.blockedBy ?? []).map((idx) => {
-      const blocker = children[idx - 1];
-      if (blocker === undefined) throw new Error(`split blockedBy index ${idx} not resolvable`);
-      return blocker.id;
-    });
-    db.update(todo)
-      .set({
-        sourceTodo: parent.id,
-        blockedBy: blockerIds.length > 0 ? blockerIds : null,
-        assignment: { plan: null, build: { agentId: item.agentId } },
-        sourceBuildId: input.chiefId,
-      })
-      .where(eq(todo.id, record.id))
-      .run();
-    children.push({
-      id: record.id,
-      title: item.title,
-      spec: item.spec,
-      agentId: item.agentId,
-      blockedBy: blockerIds,
-      ...(item.output !== undefined ? { output: item.output } : {}),
+      });
+    }
+    items.forEach((item, index) => {
+      const child = children[index];
+      if (child === undefined) throw new Error(`split child ${index + 1} missing`);
+      const blockerIds = (item.blockedBy ?? []).map((idx) => {
+        const blocker = children[idx - 1];
+        if (blocker === undefined) throw new Error(`split blockedBy index ${idx} not resolvable`);
+        return blocker.id;
+      });
+      child.blockedBy = blockerIds;
+      db.update(todo)
+        .set({
+          sourceTodo: parent.id,
+          blockedBy: blockerIds.length > 0 ? blockerIds : null,
+          assignment: { plan: null, build: { agentId: item.agentId } },
+          sourceBuildId: input.chiefId,
+        })
+        .where(eq(todo.id, child.id))
+        .run();
     });
   }
 
@@ -149,7 +222,9 @@ export function createSplitTodo(
       prevPhase: parent.phase,
       triggerSource: 'chief',
       planDocId: null,
-      errorMessage: null,
+      errorMessage: rejectedProposal
+        ? `${REJECTED_SPLIT_PROPOSAL_PREFIX}${checkerReasons.join('; ')}`
+        : null,
       prUrl: null,
       prNumber: null,
       changes: null,
@@ -163,7 +238,21 @@ export function createSplitTodo(
       id: planId,
       buildId: parentBuildId,
       version: 1,
-      content: renderSplitPlan(db, parent.title, children),
+      content: rejectedProposal
+        ? [
+            `# Rejected split proposal: ${parent.title}`,
+            '',
+            SPLIT_PROPOSAL_CORRECTION,
+            '',
+            '## Checker reasons',
+            ...checkerReasons.map((reason) => `- ${reason}`),
+            '',
+            '## Original proposal',
+            '```json',
+            JSON.stringify(items, null, 2),
+            '```',
+          ].join('\n')
+        : renderSplitPlan(db, parent.title, children),
       stepId: null,
       createdAt: nowMs(),
     })
@@ -174,6 +263,7 @@ export function createSplitTodo(
     .from(agent)
     .where(and(eq(agent.teamId, parent.teamId), eq(agent.persona, 'planner')))
     .get();
+  const autoStart = splitPolicy === 'auto' && checkerPassed;
   setTodoPhase(
     { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
     parent.id,
@@ -182,16 +272,40 @@ export function createSplitTodo(
       hasPlan: true,
       latestBuildId: parentBuildId,
       lastRunAt: nowMs(),
-      ...(planner !== undefined
+      ...(!autoStart && planner !== undefined
         ? { assignment: { plan: { agentId: planner.id }, build: null } }
         : {}),
     },
   );
+  if (autoStart) {
+    setTodoPhase(
+      { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+      parent.id,
+      'building',
+      { lastRunAt: nowMs() },
+    );
+  }
   insertGateAnnouncement(deps, parentBuildId, SPLIT_ANNOUNCEMENT, input.actorName);
+  const checkerText =
+    splitPolicy === 'human'
+      ? 'checker verdict: falls back to human review + project policy is human'
+      : checkerPassed
+        ? splitPolicy === 'auto'
+          ? 'checker verdict: started automatically'
+          : 'checker verdict: would start automatically (shadow)'
+        : `checker verdict: falls back to human review + ${checkerReasons.join('; ')}`;
+  insertMessageRow(deps, parentBuildId, {
+    id: newRecordId(),
+    role: 'user',
+    content: checkerText,
+    createdAt: nowMs(),
+    actor: input.actorName,
+  });
   return {
     parentId: parent.id,
     parentBuildId,
     children: children.map((c) => ({ id: c.id, title: c.title })),
+    autoStart,
   };
 }
 
