@@ -71,6 +71,14 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "archive-fixture-layout": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "archive-path-normalization": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "assumed-verification-entry-point": {
     "Intercepts": 3,
     "Recurrences": 2
@@ -136,6 +144,10 @@
     "Recurrences": 0
   },
   "changing-what-a-shared-route-shows-by-default-app-from": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "check-phase-attribution": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -251,6 +263,30 @@
     "Intercepts": 2,
     "Recurrences": 1
   },
+  "demo-deploy-scope": {
+    "Intercepts": 4,
+    "Recurrences": 0
+  },
+  "demo-field-selector": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "demo-folder-pending": {
+    "Intercepts": 2,
+    "Recurrences": 0
+  },
+  "demo-mobile-banner": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "demo-native-writes": {
+    "Intercepts": 2,
+    "Recurrences": 0
+  },
+  "demo-silent-dialogs": {
+    "Intercepts": 4,
+    "Recurrences": 1
+  },
   "detached-new-branch-ref": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -279,6 +315,10 @@
     "Intercepts": 3,
     "Recurrences": 1
   },
+  "error-only-variants": {
+    "Intercepts": 2,
+    "Recurrences": 0
+  },
   "escape-retry-hid-overlay": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -292,12 +332,16 @@
     "Recurrences": 0
   },
   "evidence-shot-mid-animation": {
-    "Intercepts": 1,
-    "Recurrences": 0
+    "Intercepts": 5,
+    "Recurrences": 1
   },
   "export-verdicts-did-not-map-one-to-one-to-persisted": {
     "Intercepts": 2,
     "Recurrences": 1
+  },
+  "extracted-source-imports": {
+    "Intercepts": 1,
+    "Recurrences": 0
   },
   "failed-build-delivery-skipped-already-committed-work-and-restart-selected": {
     "Intercepts": 2,
@@ -343,6 +387,10 @@
     "Intercepts": 0,
     "Recurrences": 1
   },
+  "gate-constant-freeze": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "gate-retry-metadata-changed-the-established-wake-prefix": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -363,6 +411,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "github-create-gate-eacces": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "github-secondary-rate-limit": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -375,13 +427,25 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "harness-policy-dependencies": {
+    "Intercepts": 6,
+    "Recurrences": 0
+  },
   "head-closed-pipe": {
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "historical-replay-input-contract": {
+    "Intercepts": 1,
+    "Recurrences": 1
+  },
   "hook-git-dir-reach-test": {
     "Intercepts": 0,
     "Recurrences": 0
+  },
+  "husky-root": {
+    "Intercepts": 1,
+    "Recurrences": 1
   },
   "identity-authentication-read-connection-metadata-before-checking-that-a-socket": {
     "Intercepts": 1,
@@ -403,8 +467,16 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "inline-diagnostic-syntax": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "intake-branch-skipped-server-chain": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "json-import-attribute": {
+    "Intercepts": 2,
     "Recurrences": 0
   },
   "lessons-section-broke-integration-tests": {
@@ -425,6 +497,10 @@
   },
   "mac-session-idle-13h": {
     "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "main-fixture-shape": {
+    "Intercepts": 1,
     "Recurrences": 0
   },
   "memory-retry-fingerprint": {
@@ -448,6 +524,10 @@
     "Recurrences": 1
   },
   "merged-translation-key-collision": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "missing-opt-in-control": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -567,6 +647,14 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "probe-registration": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "process-inventory-boundary": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "prompt-prefix-changed-dispatch-criterion": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -576,6 +664,10 @@
     "Recurrences": 0
   },
   "providers-tabs-vocabulary": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "push-author-range": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -595,12 +687,24 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "rebase-union": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "recurring-review-findings": {
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "red-gates-on-push": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "regression-setup-import": {
     "Intercepts": 2,
+    "Recurrences": 0
+  },
+  "report-score-eligibility": {
+    "Intercepts": 3,
     "Recurrences": 0
   },
   "reproduce-first-label-instructions": {
@@ -819,12 +923,24 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "verify-dispatch-diff": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "vp-fixture-dependency": {
+    "Intercepts": 41,
+    "Recurrences": 0
+  },
   "waiting-on-ci-after-pr": {
     "Intercepts": 0,
     "Recurrences": 0
   },
   "wall-clock-bound-in-shared-host-test": {
     "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "zero-pass-oracle-acceptance": {
+    "Intercepts": 1,
     "Recurrences": 0
   },
   "zsh-nomatch-search": {
