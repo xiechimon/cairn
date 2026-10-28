@@ -1100,3 +1100,64 @@ test('#2047 branch-gated pre-push checks still receive the named branch ref', as
 
   await expect(gitPrim.push(dir, 'work', null)).rejects.toMatchObject({ name: 'GitPushHookError' });
 }, 30_000);
+
+test('#2047 a chained URL rewrite cannot redirect the containment proof to a decoy repository', async () => {
+  const { remote, dir } = pushFixture();
+  const local = commitFile(dir, 'work.txt', 'work\n');
+  gitOk(dir, ['push', 'origin', 'work']);
+  const decoy = join(mkdtempSync(join(tmpdir(), 'cairn-push-url-decoy-')), 'repo.git');
+  gitOk(tmpdir(), ['clone', '--bare', remote, decoy]);
+  const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+  gitOk(remote, ['update-ref', 'refs/heads/work', foreign, local]);
+  gitOk(dir, ['config', `url.${remote}.insteadOf`, 'cairn-proof-alias:']);
+  gitOk(dir, ['config', `url.${decoy}.insteadOf`, remote]);
+  gitOk(dir, ['remote', 'set-url', 'origin', 'cairn-proof-alias:']);
+  expect(gitOk(dir, ['remote', 'get-url', 'origin'])).toBe(remote);
+  const notices: string[] = [];
+
+  await expect(
+    gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+  ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+  expect(notices).toEqual([]);
+  expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
+}, 30_000);
+
+test('#2047 an ordinary URL alias still certifies the actual containing tip', async () => {
+  const { upstream, remote, dir } = pushFixture();
+  const local = commitFile(dir, 'work.txt', 'work\n');
+  gitOk(dir, ['push', 'origin', 'work']);
+  gitOk(upstream, ['fetch', 'origin', 'refs/heads/work']);
+  gitOk(upstream, ['checkout', '--detach', local]);
+  gitOk(upstream, ['merge', '--no-ff', '-m', 'merge main into work', 'origin/main']);
+  gitOk(upstream, ['push', 'origin', 'HEAD:refs/heads/work']);
+  const actualTip = gitOk(upstream, ['rev-parse', 'HEAD']);
+  gitOk(dir, ['config', `url.${remote}.insteadOf`, 'cairn-proof-alias:']);
+  gitOk(dir, ['remote', 'set-url', 'origin', 'cairn-proof-alias:']);
+  const notices: string[] = [];
+
+  await expect(
+    gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+  ).resolves.toBeUndefined();
+
+  expect(notices).toEqual([`${local} ${actualTip}`]);
+}, 30_000);
+
+test('#2047 multiple fetch URLs cannot select an unrelated last-configured proof destination', async () => {
+  const { remote, dir } = pushFixture();
+  const local = commitFile(dir, 'work.txt', 'work\n');
+  gitOk(dir, ['push', 'origin', 'work']);
+  const decoy = join(mkdtempSync(join(tmpdir(), 'cairn-fetch-url-decoy-')), 'repo.git');
+  gitOk(tmpdir(), ['clone', '--bare', remote, decoy]);
+  const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+  gitOk(remote, ['update-ref', 'refs/heads/work', foreign, local]);
+  gitOk(dir, ['config', '--add', 'remote.origin.url', decoy]);
+  gitOk(dir, ['config', 'remote.origin.pushurl', remote]);
+  const notices: string[] = [];
+
+  await expect(
+    gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+  ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+  expect(notices).toEqual([]);
+}, 30_000);

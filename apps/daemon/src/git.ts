@@ -469,7 +469,21 @@ export const gitPrim = {
       return selected.code === 0 && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(oid) ? oid : null;
     };
     const local = await branchHead();
-    const fetchUrl = await gitPrim.remoteUrl(dir);
+    const remoteAddress = async (): Promise<string | null> => {
+      const address = await runGit(['remote', 'get-url', 'origin'], {
+        cwd: dir,
+        timeoutMs: META_TIMEOUT_MS,
+      });
+      return address.code === 0 ? address.stdout : null;
+    };
+    const fetchUrl = await remoteAddress();
+    const configuredUrls = await runGit(['config', '--null', '--get-all', 'remote.origin.url'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    const rawFetchUrls = configuredUrls.stdout.split('\0').filter((url) => url !== '');
+    const rawFetchUrl =
+      configuredUrls.code === 0 && rawFetchUrls.length === 1 ? rawFetchUrls[0] : null;
     const pushUrls = await runGit(['remote', 'get-url', '--push', '--all', 'origin'], {
       cwd: dir,
       timeoutMs: META_TIMEOUT_MS,
@@ -525,8 +539,12 @@ export const gitPrim = {
         local === null ||
         (await branchHead()) !== local ||
         fetchUrl === null ||
+        !/^[^\r\n]+\n$/.test(fetchUrl) ||
+        rawFetchUrl == null ||
+        /[\r\n]/.test(rawFetchUrl) ||
         pushUrls.code !== 0 ||
-        pushUrls.stdout.trim() !== fetchUrl
+        pushUrls.stdout !== fetchUrl ||
+        (await remoteAddress()) !== fetchUrl
       )
         throw rejection;
       const proofId = randomUUID();
@@ -551,7 +569,7 @@ export const gitPrim = {
               ...env,
               GIT_CONFIG_COUNT: String(configIndex + 1),
               [`GIT_CONFIG_KEY_${configIndex}`]: `remote.${proofRemote}.url`,
-              [`GIT_CONFIG_VALUE_${configIndex}`]: fetchUrl,
+              [`GIT_CONFIG_VALUE_${configIndex}`]: rawFetchUrl,
             },
             timeoutMs: NET_TIMEOUT_MS,
           },
@@ -575,7 +593,7 @@ export const gitPrim = {
       } finally {
         await runGitOk(['update-ref', '-d', proofRef], { cwd: dir, timeoutMs: META_TIMEOUT_MS });
       }
-      if ((await branchHead()) !== local) throw rejection;
+      if ((await branchHead()) !== local || (await remoteAddress()) !== fetchUrl) throw rejection;
       onAlreadyContained?.(local, remote);
     } finally {
       rmSync(traceDir, { recursive: true, force: true });

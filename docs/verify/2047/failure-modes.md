@@ -10,6 +10,7 @@
 8. The verification fetch fails, its ref is missing, or the ancestry command fails; none may count as successful delivery.
 9. Pre-push hook and authentication failures retain their existing error types and credential fallback behavior.
 10. Temporary proof refs survive in shared repository state or interfere with concurrent fetches.
-11. Existing successful branch pushes, tag pushes, network retries and credential scoping change behavior.
+11. Reusing an expanded URL applies rewrite rules twice, or an ambiguous raw URL list selects a different repository.
+12. Existing successful branch pushes, tag pushes, network retries and credential scoping change behavior.
 
 The original PR tests and additional real-Git controls are installed before changing the source. Test repositories use local temporary bare repositories and synthetic identities.
