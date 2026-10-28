@@ -1,0 +1,106 @@
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'rename'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'preserve'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'independent'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+✔ names the merged PR and its removed line, and accepts an explicit reference only (321.435542ms)
+✔ unchanged added lines and commits outside the base interval do not fail (232.635792ms)
+✔ tracks a renamed file and distinguishes identical lines by position (345.049417ms)
+✔ renaming protected lines without removing them passes (283.995708ms)
+✖ independent edits in a stale branch preserve the upstream addition through Git merge (333.251084ms)
+✖ an unresolved merge conflict cannot certify the absence of silent reverts (179.395458ms)
+✖ the CLI detects an upstream deletion introduced by resolving a merge into the lane (1603.455ms)
+✔ setup-node without pnpm installed is rejected (0.479083ms)
+✔ an earlier pnpm setup or package-manager-cache false is accepted (0.106542ms)
+✔ committed workflows install pnpm before setup-node caches it (2.883666ms)
+✔ a removed line beginning with two dashes is content, not a patch header (241.553167ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 8
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3586.199375
+
+✖ failing tests:
+
+test at scripts/silent-revert-gate.test.mjs:105:1
+✖ independent edits in a stale branch preserve the upstream addition through Git merge (333.251084ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     line: 22,
+  +     number: 12,
+  +     path: 'git.ts',
+  +     text: 'newFeature();'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-1848-overlap-repair/cairn/scripts/silent-revert-gate.test.mjs:122:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { number: 12, path: 'git.ts', line: 22, text: 'newFeature();' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/silent-revert-gate.test.mjs:135:1
+✖ an unresolved merge conflict cannot certify the absence of silent reverts (179.395458ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-1848-overlap-repair/cairn/scripts/silent-revert-gate.test.mjs:137:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /merge conflict/i,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at scripts/silent-revert-gate.test.mjs:149:1
+✖ the CLI detects an upstream deletion introduced by resolving a merge into the lane (1603.455ms)
+  AssertionError [ERR_ASSERTION]: silent-revert-gate: 0 unexplained removals
+  
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-1848-overlap-repair/cairn/scripts/silent-revert-gate.test.mjs:175:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,88 @@
+✔ searches titles and bodies with alternative terms and includes same-file PRs (2.878375ms)
+✔ lookup errors stop creation rather than reporting no overlaps (0.290125ms)
+✔ duplicate ask eval: a rephrased request extends the existing item without creating an issue (0.146792ms)
+✔ an existing same-ask PR also extends its discussion, and unknown references fail closed (0.109875ms)
+✔ empty planned paths fail before querying GitHub instead of hiding file overlaps (0.166625ms)
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'rename'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'preserve'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'independent'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to branch 'lane'
+✔ names the merged PR and its removed line, and accepts an explicit reference only (371.267041ms)
+✔ unchanged added lines and commits outside the base interval do not fail (244.291375ms)
+✔ tracks a renamed file and distinguishes identical lines by position (369.747666ms)
+✔ renaming protected lines without removing them passes (284.8905ms)
+✔ independent edits in a stale branch preserve the upstream addition through Git merge (344.868583ms)
+✔ an unresolved merge conflict cannot certify the absence of silent reverts (145.055292ms)
+✔ the CLI detects an upstream deletion introduced by resolving a merge into the lane (909.330625ms)
+✔ setup-node without pnpm installed is rejected (0.496166ms)
+✔ an earlier pnpm setup or package-manager-cache false is accepted (0.118667ms)
+✔ committed workflows install pnpm before setup-node caches it (2.865292ms)
+✔ a removed line beginning with two dashes is content, not a patch header (305.970833ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3026.029792
+$ biome ci .
+[0mapps/server/test/feishu-config.test.ts[0m[0m:[0m[0m144[0m[0m:[0m[0m7[0m[0m [0m[0m]8;;https://biomejs.dev/linter/rules/use-flat-map\lint/complexity/useFlatMap]8;;\[0m[0m [0m[0m[30m[47m FIXABLE [0m[0m [0m[0m━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mThe call chain [0m[0m[1m[34m.map().flat()[0m[0m[34m can be replaced with a single [0m[0m[1m[34m.flatMap()[0m[0m[34m call.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m142 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m{[0m[0m [0m[0md[0m[0mb[0m[0m:[0m[0m [0m[0ms[0m[0m.[0m[0md[0m[0mb[0m[0m,[0m[0m [0m[0mb[0m[0mo[0m[0mx[0m[0m:[0m[0m [0m[0ms[0m[0m.[0m[0ms[0m[0me[0m[0mc[0m[0mr[0m[0me[0m[0mt[0m[0mB[0m[0mo[0m[0mx[0m[0m [0m[0m}[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m143 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0ms[0m[0m.[0m[0mt[0m[0me[0m[0ma[0m[0mm[0m[0m.[0m[0mi[0m[0md[0m[0m,[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m144 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0ms[0m[0m.[0m[0md[0m[0mb[0m[0m
+[0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m145 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ms[0m[0me[0m[0ml[0m[0me[0m[0mc[0m[0mt[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m146 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0mr[0m[0mo[0m[0mm[0m[0m([0m[0mf[0m[0me[0m[0mi[0m[0ms[0m[0mh[0m[0mu[0m[0mB[0m[0mi[0m[0mn[0m[0md[0m[0mi[0m[0mn[0m[0mg[0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m147 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ma[0m[0ml[0m[0ml[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m148 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mm[0m[0ma[0m[0mp[0m[0m([0m[0m([0m[0mr[0m[0mo[0m[0mw[0m[0m)[0m[0m [0m[0m=[0m[0m>[0m[0m [0m[0m[[0m[0mr[0m[0mo[0m[0mw[0m[0m.[0m[0ma[0m[0mp[0m[0mp[0m[0mI[0m[0md[0m[0mC[0m[0mi[0m[0mp[0m[0mh[0m[0me[0m[0mr[0m[0m,[0m[0m [0m[0mr[0m[0mo[0m[0mw[0m[0m.[0m[0ma[0m[0mp[0m[0mp[0m[0mS[0m[0me[0m[0mc[0m[0mr[0m[0me[0m[0mt[0m[0mC[0m[0mi[0m[0mp[0m[0mh[0m[0me[0m[0mr[0m[0m][0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m149 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0ml[0m[0ma[0m[0mt[0m[0m([0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m150 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m151 │ [0m[0m [0m[0m [0m[0m)[0m[0m.[0m[0mt[0m[0mo[0m[0mE[0m[0mq[0m[0mu[0m[0ma[0m[0ml[0m[0m([0m[0m{[0m[0m}[0m[0m)[0m[0m;[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUsing [0m[0m[1m[34m.flatMap()[0m[0m[34m avoids the creation of an intermediate array.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mSafe fix: Replace the chain with [0m[0m[1m[34m.flatMap()[0m[0m[34m.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m146[0m[0m [0m[0m[1m146[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0mr[0m[0mo[0m[0mm[0m[0m([0m[0mf[0m[0me[0m[0mi[0m[0ms[0m[0mh[0m[0mu[0m[0mB[0m[0mi[0m[0mn[0m[0md[0m[0mi[0m[0mn[0m[0mg[0m[0m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m147[0m[0m [0m[0m[1m147[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ma[0m[0ml[0m[0ml[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m148[0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[31m.[0m[0m[1m[31mm[0m[0m[1m[31ma[0m[0m[1m[31mp[0m[0m[31m([0m[0m[31m([0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m)[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[31m>[0m[0m[2m[31m·[0m[0m[31m[[0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m.[0m[0m[31ma[0m[0m[31mp[0m[0m[31mp[0m[0m[31mI[0m[0m[31md[0m[0m[31mC[0m[0m[31mi[0m[0m[31mp[0m[0m[31mh[0m[0m[31me[0m[0m[31mr[0m[0m[31m,[0m[0m[2m[31m·[0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m.[0m[0m[31ma[0m[0m[31mp[0m[0m[31mp[0m[0m[31mS[0m[0m[31me[0m[0m[31mc[0m[0m[31mr[0m[0m[31me[0m[0m[31mt[0m[0m[31mC[0m[0m[31mi[0m[0m[31mp[0m[0m[31mh[0m[0m[31me[0m[0m[31mr[0m[0m[31m][0m[0m[1m[31m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m149[0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[31m.[0m[0m[1m[31mf[0m[0m[1m[31ml[0m[0m[1m[31ma[0m[0m[1m[31mt[0m[0m[1m[31m([0m[0m[31m)[0m[0m[31m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m148[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[32m.[0m[0m[1m[32mf[0m[0m[1m[32ml[0m[0m[1m[32ma[0m[0m[1m[32mt[0m[0m[1m[32mM[0m[0m[1m[32ma[0m[0m[1m[32mp[0m[0m[32m([0m[0m[32m([0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m)[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[32m>[0m[0m[2m[32m·[0m[0m[32m[[0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m.[0m[0m[32ma[0m[0m[32mp[0m[0m[32mp[0m[0m[32mI[0m[0m[32md[0m[0m[32mC[0m[0m[32mi[0m[0m[32mp[0m[0m[32mh[0m[0m[32me[0m[0m[32mr[0m[0m[32m,[0m[0m[2m[32m·[0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m.[0m[0m[32ma[0m[0m[32mp[0m[0m[32mp[0m[0m[32mS[0m[0m[32me[0m[0m[32mc[0m[0m[32mr[0m[0m[32me[0m[0m[32mt[0m[0m[32mC[0m[0m[32mi[0m[0m[32mp[0m[0m[32mh[0m[0m[32me[0m[0m[32mr[0m[0m[32m][0m[0m[32m)[0m[0m[32m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m150[0m[0m [0m[0m[1m149[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m151[0m[0m [0m[0m[1m150[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m.[0m[0mt[0m[0mo[0m[0mE[0m[0mq[0m[0mu[0m[0ma[0m[0ml[0m[0m([0m[0m{[0m[0m}[0m[0m)[0m[0m;[0m[0m
+[0m[0m  [0m[0m
+[0m
+[0m[34mChecked 1098 files in 906[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m[0m
+[0m[0m[34mFound [0m[0m[34m1[0m[0m[34m info.[0m
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1368 tests in 192 files collected, disk count matches (2.8s)
+[spec-parse-gate] integration/test: 50 test files parsed clean by tsc (1.3s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.

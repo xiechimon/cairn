@@ -1,0 +1,40 @@
+✔ searches titles and bodies with alternative terms and includes same-file PRs (2.294834ms)
+✔ lookup errors stop creation rather than reporting no overlaps (0.306959ms)
+✔ duplicate ask eval: a rephrased request extends the existing item without creating an issue (0.146208ms)
+✔ an existing same-ask PR also extends its discussion, and unknown references fail closed (0.107541ms)
+✔ empty planned paths fail before querying GitHub instead of hiding file overlaps (0.111542ms)
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'rename'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'preserve'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'independent'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to branch 'lane'
+✔ names the merged PR and its removed line, and accepts an explicit reference only (398.388958ms)
+✔ unchanged added lines and commits outside the base interval do not fail (249.671958ms)
+✔ tracks a renamed file and distinguishes identical lines by position (371.477333ms)
+✔ renaming protected lines without removing them passes (288.724167ms)
+✔ independent edits in a stale branch preserve the upstream addition through Git merge (345.027583ms)
+✔ an unresolved merge conflict cannot certify the absence of silent reverts (150.152125ms)
+✔ the CLI detects an upstream deletion introduced by resolving a merge into the lane (340.670208ms)
+✔ setup-node without pnpm installed is rejected (0.541916ms)
+✔ an earlier pnpm setup or package-manager-cache false is accepted (0.150583ms)
+✔ committed workflows install pnpm before setup-node caches it (2.43475ms)
+✔ a removed line beginning with two dashes is content, not a patch header (326.168791ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2523.055958
