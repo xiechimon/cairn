@@ -21,6 +21,7 @@
   },
   {
     "capability": "planning",
+    "flow": "plan",
     "ticket": 1780
   },
   {
