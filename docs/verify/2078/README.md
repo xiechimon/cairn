@@ -4,30 +4,34 @@ Issue: `run-eval.mts --write-verify` published schema-shaped evidence even when
 cases failed, mixed cached `results.jsonl` rows into `decision_ok`, wrote the
 destination file in place (interruptible), and accepted partial `--case` /
 non-all `--arm` selections. The #1975 worker also gates on
-`integration/test/write-verify.test.ts`, which was missing.
+`integration/test/write-verify.test.ts`, which was missing. #1973 also requires
+automated runs to use a new per-run directory so operator variant artifacts
+stay byte-identical.
 
 ## What changed
 
-- `integration/test/write-verify.test.ts`: vitest coverage for reject /
-  fail / interrupt / stale-cache / success paths, plus the worker preflight
-  existence check.
+- `integration/test/write-verify.test.ts`: recording relay; matching cached
+  seed rows; full request-count assertion; interrupt after confirmed activity
+  with `SIGTERM`; successful publish leaves no temp; existing variant bytes
+  stay identical.
 - `integration/eval/chief-dispatch/run-eval.mts`: reject partial selections;
-  skip done-cache seeding under `--write-verify`; publish only when
-  `fail === 0` and fresh rows cover the full suite; compute digests over
-  fresh rows/traces only; write via hashed `.tmp` then `renameSync`.
+  skip done-cache under `--write-verify`; write artifacts into a new
+  `<variant>.wv-<pid>-<stamp>` per-run directory; publish only when the suite
+  completes; digests over fresh rows/traces; hashed `.tmp` then `renameSync`.
 
-## Evidence
+## Evidence (review-gate BLOCK fix)
 
-- `red.log` / `red-summary.log` — new tests against `origin/main` run-eval:
-  4 failed / 2 passed (failed and interrupted runs still overwrite the prior
-  result; stale cached rows dilute `decision_ok` to ~0.33).
-- `green.log` — same suite after the change: 6/6 passed (24s).
-- `typecheck.log` — `pnpm --filter @cairn/integration typecheck` clean.
-- `lint.log` — `pnpm lint` clean (one unrelated info elsewhere).
-- `spec-parse.log` — `pnpm spec:parse` PASS.
-- `overlap.txt` — overlap lookup at 2026-10-28T17:10:06Z; no open PR on the
-  changed paths.
+- `block-red.log` — strengthened tests against the pre-isolation runner:
+  3 failed / 3 passed (matching seeds append into the operator variant;
+  success digests still read `baseline/`).
+- `block-green.log` — same suite after per-run isolation: 6/6 passed (~18s).
+- `block-typecheck.log` — `pnpm --filter @cairn/integration typecheck` clean.
+- `block-lint.log` — `pnpm lint` clean (one unrelated info elsewhere).
+- `block-spec-parse.log` — `pnpm spec:parse` PASS.
+- `block-harness-eval-result.log` / `block-harness-eval.log` — related schema
+  suites still green.
 
-## Base
+## Earlier round
 
-Rebased onto `origin/main` at `b9c5c55a`.
+- `red.log` / `red-summary.log` / `green.log` — first atomic publish round.
+- `typecheck.log` / `lint.log` / `spec-parse.log` / `overlap.txt` — first round.

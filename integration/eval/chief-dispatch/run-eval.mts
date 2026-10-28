@@ -405,8 +405,6 @@ process.on('uncaughtException', (err: NodeJS.ErrnoException) => {
 async function main() {
   ARGS = parseArgs(process.argv.slice(2));
   ARGS.flow = resolveFromRoot(ARGS.flow);
-  const vdir = join(ARGS.flow, ARGS.variant);
-  mkdirSync(join(vdir, 'traces'), { recursive: true });
   const statePath = join(ARGS.flow, '_state.json');
   let st: Record<string, unknown> = {};
   if (existsSync(statePath)) {
@@ -428,6 +426,10 @@ async function main() {
     console.error('--write-verify rejects --case and non-all --arm selections');
     process.exit(2);
   }
+  const vdir = ARGS.writeVerify
+    ? join(ARGS.flow, `${ARGS.variant}.wv-${process.pid}-${Date.now().toString(36)}`)
+    : join(ARGS.flow, ARGS.variant);
+  mkdirSync(join(vdir, 'traces'), { recursive: true });
   const ctx = { ...ARGS, state: st };
 
   const resultsPath = join(vdir, 'results.jsonl');

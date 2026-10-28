@@ -1,0 +1,12 @@
+4: ❯ test/write-verify.test.ts (6 tests | 3 failed) 18579ms
+6:     × a failed --write-verify run exits nonzero and leaves an existing result untouched 3760ms
+12: FAIL  test/write-verify.test.ts > write-verify evidence (#2078) > a failed --write-verify run exits nonzero and leaves an existing result untouched
+13:AssertionError: expected 3 to be 1 // Object.is equality
+31: FAIL  test/write-verify.test.ts > write-verify evidence (#2078) > --write-verify ignores matching cached rows and runs every case fresh into a new per-run directory
+32:AssertionError: expected false to be true // Object.is equality
+51: FAIL  test/write-verify.test.ts > write-verify evidence (#2078) > a successful complete run publishes schema-valid evidence with digests and no temp file
+52:AssertionError: expected false to be true // Object.is equality
+72: Test Files  1 failed (1)
+73:      Tests  3 failed | 3 passed (6)
+77:Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+79:  × "pnpm recursive exec" failed in /workspace/integration

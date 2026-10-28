@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -7,12 +7,13 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { harnessRegressionResultSchema } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import type { Case, RosterAgent } from '../eval/chief-dispatch/grade.mts';
@@ -40,6 +41,12 @@ const PRIOR = JSON.stringify({
 
 type StubMode = 'ok' | 'fail' | 'hang';
 
+type RecordingRelay = {
+  url: string;
+  requests: () => number;
+  waitForRequests: (n: number, ms?: number) => Promise<void>;
+};
+
 const scratch: string[] = [];
 const servers: Server[] = [];
 
@@ -53,10 +60,21 @@ afterEach(async () => {
   }
 });
 
-async function listenStub(mode: StubMode): Promise<string> {
+async function listenRecording(mode: StubMode): Promise<RecordingRelay> {
+  let requests = 0;
+  const waiters: { n: number; resolve: () => void }[] = [];
+  const bump = () => {
+    requests += 1;
+    const pending = waiters.splice(0);
+    for (const w of pending) {
+      if (requests >= w.n) w.resolve();
+      else waiters.push(w);
+    }
+  };
   const server = createServer(async (request, response) => {
     for await (const _chunk of request) {
     }
+    bump();
     if (mode === 'hang') {
       response.writeHead(200, { 'content-type': 'text/event-stream' });
       response.write(': keep-open\n\n');
@@ -86,17 +104,106 @@ async function listenStub(mode: StubMode): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (address === null || typeof address === 'string') throw new Error('No local provider port');
-  return `http://127.0.0.1:${address.port}/v1`;
+  return {
+    url: `http://127.0.0.1:${address.port}/v1`,
+    requests: () => requests,
+    waitForRequests: (n, ms = 60_000) =>
+      new Promise<void>((resolve, reject) => {
+        if (requests >= n) {
+          resolve();
+          return;
+        }
+        const timer = setTimeout(
+          () => reject(new Error(`relay saw ${requests} requests, wanted ${n}`)),
+          ms,
+        );
+        waiters.push({
+          n,
+          resolve: () => {
+            clearTimeout(timer);
+            resolve();
+          },
+        });
+      }),
+  };
 }
 
-function flowHome(cases: Case[]): { home: string; out: string } {
+function flowHome(cases: Case[]): { home: string; out: string; variant: string } {
   const home = mkdtempSync(join(tmpdir(), 'cairn-write-verify-'));
   scratch.push(home);
   writeFileSync(
     join(home, 'cases.json'),
     JSON.stringify({ roster: dataset.roster, cases }, null, 2),
   );
-  return { home, out: join(home, 'harness-regression.json') };
+  return { home, out: join(home, 'harness-regression.json'), variant: join(home, 'baseline') };
+}
+
+function seedPassingVariant(
+  variant: string,
+  caseIds: string[],
+): {
+  results: Buffer;
+  traces: Map<string, Buffer>;
+} {
+  mkdirSync(join(variant, 'traces'), { recursive: true });
+  const rows = caseIds.map((id) =>
+    JSON.stringify({
+      prompt_id: id,
+      rep: 0,
+      grade: { decision_ok: 1, receipt_ok: 1 },
+    }),
+  );
+  const resultsBody = Buffer.from(`${rows.join('\n')}\n`);
+  writeFileSync(join(variant, 'results.jsonl'), resultsBody);
+  const traces = new Map<string, Buffer>();
+  for (const id of caseIds) {
+    const name = `${id}_rep0.json`;
+    const body = Buffer.from(JSON.stringify({ seeded: true, prompt_id: id }, null, 2));
+    writeFileSync(join(variant, 'traces', name), body);
+    traces.set(name, body);
+  }
+  return { results: resultsBody, traces };
+}
+
+function snapshotVariant(variant: string): { results: Buffer; traces: Map<string, Buffer> } {
+  const results = existsSync(join(variant, 'results.jsonl'))
+    ? readFileSync(join(variant, 'results.jsonl'))
+    : Buffer.alloc(0);
+  const traces = new Map<string, Buffer>();
+  const tracesDir = join(variant, 'traces');
+  if (existsSync(tracesDir)) {
+    for (const name of readdirSync(tracesDir)
+      .filter((n) => n.endsWith('.json'))
+      .sort()) {
+      traces.set(name, readFileSync(join(tracesDir, name)));
+    }
+  }
+  return { results, traces };
+}
+
+function expectVariantByteIdentical(
+  variant: string,
+  prior: { results: Buffer; traces: Map<string, Buffer> },
+) {
+  const now = snapshotVariant(variant);
+  expect(now.results.equals(prior.results)).toBe(true);
+  expect([...now.traces.keys()]).toEqual([...prior.traces.keys()]);
+  for (const [name, body] of prior.traces) {
+    expect(now.traces.get(name)?.equals(body)).toBe(true);
+  }
+}
+
+function writeVerifyRunDirs(home: string): string[] {
+  return readdirSync(home)
+    .filter((n) => n.startsWith('baseline.wv-') && statSync(join(home, n)).isDirectory())
+    .sort();
+}
+
+function noTmpBeside(dest: string): void {
+  const base = basename(dest);
+  expect(
+    readdirSync(dirname(dest)).filter((n) => n.includes('.tmp') || n.startsWith(`.${base}.`)),
+  ).toEqual([]);
 }
 
 async function runEval(
@@ -147,8 +254,19 @@ async function runEval(
   return { status, output };
 }
 
+async function closeChild(child: ChildProcess, ms = 10_000): Promise<number | null> {
+  return Promise.race([
+    new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', resolve);
+    }),
+    new Promise<number | null>((resolve) => setTimeout(() => resolve(-1), ms)),
+  ]);
+}
+
 describe('write-verify evidence (#2078)', () => {
-  test('rejects --write-verify with --case or non-all --arm before publishing', () => {
+  test('rejects --write-verify with --case or non-all --arm before publishing', async () => {
+    const relay = await listenRecording('ok');
     const { home, out } = flowHome([{ ...hold, id: 'wv-partial' }]);
     writeFileSync(out, `${PRIOR}\n`);
     const before = readFileSync(out);
@@ -169,11 +287,20 @@ describe('write-verify evidence (#2078)', () => {
         '--case',
         'wv-partial',
       ],
-      { encoding: 'utf8' },
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          TMPDIR: home,
+          CAIRN_EVAL_RELAY_URL: relay.url,
+          CAIRN_EVAL_RELAY_KEY: 'nonsecret-write-verify',
+        },
+      },
     );
     expect(withCase.status).toBe(2);
     expect(`${withCase.stdout}${withCase.stderr}`).toMatch(/write-verify/i);
     expect(readFileSync(out)).toEqual(before);
+    expect(relay.requests()).toBe(0);
 
     const withArm = spawnSync(
       process.execPath,
@@ -192,30 +319,43 @@ describe('write-verify evidence (#2078)', () => {
         '--arm',
         'correction',
       ],
-      { encoding: 'utf8' },
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          TMPDIR: home,
+          CAIRN_EVAL_RELAY_URL: relay.url,
+          CAIRN_EVAL_RELAY_KEY: 'nonsecret-write-verify',
+        },
+      },
     );
     expect(withArm.status).toBe(2);
     expect(`${withArm.stdout}${withArm.stderr}`).toMatch(/write-verify/i);
     expect(readFileSync(out)).toEqual(before);
+    expect(relay.requests()).toBe(0);
   });
 
   test('a failed --write-verify run exits nonzero and leaves an existing result untouched', async () => {
-    const url = await listenStub('fail');
-    const { home, out } = flowHome([{ ...hold, id: 'wv-fail' }]);
+    const relay = await listenRecording('fail');
+    const { home, out, variant } = flowHome([{ ...hold, id: 'wv-fail' }]);
+    const priorVariant = seedPassingVariant(variant, ['wv-fail']);
     writeFileSync(out, `${PRIOR}\n`);
     const before = readFileSync(out);
     const got = await runEval(home, ['--write-verify', out, '--patch-digest', PATCH], {
-      CAIRN_EVAL_RELAY_URL: url,
+      CAIRN_EVAL_RELAY_URL: relay.url,
       CAIRN_EVAL_RELAY_KEY: 'nonsecret-write-verify',
     });
     expect(got.status, got.output).not.toBe(0);
     expect(readFileSync(out)).toEqual(before);
-    expect(readdirSync(home).some((n) => n.includes('.tmp'))).toBe(false);
+    expectVariantByteIdentical(variant, priorVariant);
+    expect(relay.requests()).toBeGreaterThanOrEqual(1);
+    noTmpBeside(out);
   }, 90_000);
 
   test('an interrupted --write-verify run never publishes and never damages an existing result', async () => {
-    const url = await listenStub('hang');
-    const { home, out } = flowHome([{ ...hold, id: 'wv-hang' }]);
+    const relay = await listenRecording('hang');
+    const { home, out, variant } = flowHome([{ ...hold, id: 'wv-hang' }]);
+    const priorVariant = seedPassingVariant(variant, ['wv-hang']);
     writeFileSync(out, `${PRIOR}\n`);
     const before = readFileSync(out);
     const child = spawn(
@@ -234,7 +374,7 @@ describe('write-verify evidence (#2078)', () => {
         '--concurrency',
         '1',
         '--timeout-s',
-        '8',
+        '30',
         '--approve-harness',
         '--write-verify',
         out,
@@ -245,70 +385,80 @@ describe('write-verify evidence (#2078)', () => {
         env: {
           ...process.env,
           TMPDIR: home,
-          CAIRN_EVAL_RELAY_URL: url,
+          CAIRN_EVAL_RELAY_URL: relay.url,
           CAIRN_EVAL_RELAY_KEY: 'nonsecret-write-verify',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     );
-    const closed = new Promise<number | null>((resolve, reject) => {
-      child.once('error', reject);
-      child.once('close', resolve);
-    });
-    await new Promise((r) => setTimeout(r, 1_500));
-    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
-    await Promise.race([
-      closed,
-      new Promise<number | null>((resolve) => setTimeout(() => resolve(-1), 10_000)),
-    ]);
+    await relay.waitForRequests(1, 60_000);
+    expect(child.exitCode).toBeNull();
+    expect(child.signalCode).toBeNull();
+    child.kill('SIGTERM');
+    const status = await closeChild(child, 15_000);
+    expect(status, 'child should exit after SIGTERM').not.toBe(-1);
     expect(readFileSync(out)).toEqual(before);
-    expect(readdirSync(home).some((n) => n.includes('.tmp'))).toBe(false);
-  }, 30_000);
-
-  test('stale cached results.jsonl rows do not leak into published decision_ok', async () => {
-    const url = await listenStub('ok');
-    const { home, out } = flowHome([{ ...hold, id: 'wv-fresh' }]);
-    mkdirSync(join(home, 'baseline'), { recursive: true });
-    writeFileSync(
-      join(home, 'baseline/results.jsonl'),
-      `${JSON.stringify({
-        prompt_id: 'stale-fail',
-        rep: 0,
-        grade: { decision_ok: 0, receipt_ok: 0 },
-      })}\n${JSON.stringify({
-        prompt_id: 'stale-fail-2',
-        rep: 0,
-        grade: { decision_ok: 0, receipt_ok: 0 },
-      })}\n`,
-    );
-    const got = await runEval(home, ['--write-verify', out, '--patch-digest', PATCH], {
-      CAIRN_EVAL_RELAY_URL: url,
-      CAIRN_EVAL_RELAY_KEY: 'nonsecret-write-verify',
-    });
-    expect(got.status, got.output).toBe(0);
-    const published = harnessRegressionResultSchema.parse(JSON.parse(readFileSync(out, 'utf8')));
-    expect(published.patchDigest).toBe(PATCH);
-    expect(published.harness_sha).toMatch(/^[0-9a-f]{64}$/);
-    expect(published.trace_digest).toMatch(/^[0-9a-f]{64}$/);
-    expect(published.decision_ok).toBe(1);
+    expectVariantByteIdentical(variant, priorVariant);
+    noTmpBeside(out);
   }, 90_000);
 
-  test('a successful complete run publishes schema-valid evidence with digests', async () => {
-    const url = await listenStub('ok');
-    const { home, out } = flowHome([
-      { ...hold, id: 'wv-a' },
-      { ...hold, id: 'wv-b' },
-    ]);
+  test('--write-verify ignores matching cached rows and runs every case fresh into a new per-run directory', async () => {
+    const relay = await listenRecording('ok');
+    const cases = [
+      { ...hold, id: 'wv-fresh-a' },
+      { ...hold, id: 'wv-fresh-b' },
+    ];
+    const { home, out, variant } = flowHome(cases);
+    const priorVariant = seedPassingVariant(
+      variant,
+      cases.map((c) => c.id),
+    );
+    writeFileSync(out, `${PRIOR}\n`);
     const got = await runEval(
       home,
       ['--write-verify', out, '--patch-digest', PATCH],
       {
-        CAIRN_EVAL_RELAY_URL: url,
+        CAIRN_EVAL_RELAY_URL: relay.url,
         CAIRN_EVAL_RELAY_KEY: 'nonsecret-write-verify',
       },
       120_000,
     );
     expect(got.status, got.output).toBe(0);
+    expect(relay.requests()).toBe(cases.length);
+    expectVariantByteIdentical(variant, priorVariant);
+    const runDirs = writeVerifyRunDirs(home);
+    expect(runDirs.length).toBe(1);
+    const runResults = readFileSync(join(home, runDirs[0]!, 'results.jsonl'), 'utf8')
+      .trim()
+      .split('\n');
+    expect(runResults).toHaveLength(cases.length);
+    const published = harnessRegressionResultSchema.parse(JSON.parse(readFileSync(out, 'utf8')));
+    expect(published.patchDigest).toBe(PATCH);
+    expect(published.decision_ok).toBe(1);
+    noTmpBeside(out);
+  }, 120_000);
+
+  test('a successful complete run publishes schema-valid evidence with digests and no temp file', async () => {
+    const relay = await listenRecording('ok');
+    const cases = [
+      { ...hold, id: 'wv-a' },
+      { ...hold, id: 'wv-b' },
+    ];
+    const { home, out, variant } = flowHome(cases);
+    const priorVariant = seedPassingVariant(variant, ['wv-a', 'wv-b']);
+    const got = await runEval(
+      home,
+      ['--write-verify', out, '--patch-digest', PATCH],
+      {
+        CAIRN_EVAL_RELAY_URL: relay.url,
+        CAIRN_EVAL_RELAY_KEY: 'nonsecret-write-verify',
+      },
+      120_000,
+    );
+    expect(got.status, got.output).toBe(0);
+    expect(relay.requests()).toBe(cases.length);
+    expectVariantByteIdentical(variant, priorVariant);
+    noTmpBeside(out);
     const published = harnessRegressionResultSchema.parse(JSON.parse(readFileSync(out, 'utf8')));
     expect(published.patchDigest).toBe(PATCH);
     expect(published.harness_sha).toMatch(/^[0-9a-f]{64}$/);
@@ -318,12 +468,14 @@ describe('write-verify evidence (#2078)', () => {
       harness_sha?: string;
     };
     expect(published.harness_sha).toBe(state.harness_sha);
-    const traces = readdirSync(join(home, 'baseline/traces'))
+    const runDirs = writeVerifyRunDirs(home);
+    expect(runDirs).toHaveLength(1);
+    const traces = readdirSync(join(home, runDirs[0]!, 'traces'))
       .filter((n) => n.endsWith('.json'))
       .sort()
       .map((n) => ({
         name: n,
-        body: new Uint8Array(readFileSync(join(home, 'baseline/traces', n))),
+        body: new Uint8Array(readFileSync(join(home, runDirs[0]!, 'traces', n))),
       }));
     const h = createHash('sha256');
     for (const f of traces) {
