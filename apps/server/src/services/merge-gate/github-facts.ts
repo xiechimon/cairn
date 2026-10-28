@@ -2,6 +2,8 @@ import {
   EVIDENCE_PREFIX,
   HARNESS_REGRESSION_RESULT_NAME,
   MERGE_GATE_STATUS_CONTEXT,
+  RECORDING_EXTENSION,
+  RECORDING_MAX_BYTES,
 } from '@cairn/shared/merge-gate';
 import { compareFilesFromResponse } from './digest.js';
 import { qualifyingEvidenceLinks } from './evidence-link.js';
@@ -417,7 +419,17 @@ function presentIn(listing: Listing, name: string, path: string): boolean | null
   const found = listing.entries.some(
     (e) => isObj(e) && e.type === 'file' && e.name === name && e.path === path,
   );
-  if (found) return true;
+  if (found) {
+    if (RECORDING_EXTENSION.test(path)) {
+      const entry = listing.entries.find(
+        (e) => isObj(e) && e.type === 'file' && e.name === name && e.path === path,
+      );
+      return (
+        isObj(entry) && isCount(entry.size) && entry.size > 0 && entry.size <= RECORDING_MAX_BYTES
+      );
+    }
+    return true;
+  }
   return listing.entries.length >= DIRECTORY_CAP ? null : false;
 }
 
@@ -435,11 +447,13 @@ async function probeEvidence(
   const out: GateEvidencePresence[] = [];
   const listings = new Map<string, Listing>();
   const repoKey = `${req.owner}/${req.repo}`.toLowerCase();
+  const recordingRequired = compare.files.some((f) => f.recordingRequired);
   for (const { sha, path } of links) {
     const memo = `${repoKey}@${sha}:${path}`;
-    if (r.cache.present.has(memo)) {
+    if (!RECORDING_EXTENSION.test(path) && r.cache.present.has(memo)) {
       out.push({ sha, path, present: true });
-      break;
+      if (!recordingRequired) break;
+      continue;
     }
     const slash = path.lastIndexOf('/');
     const dir = path.slice(0, slash);
@@ -456,8 +470,8 @@ async function probeEvidence(
     const present = presentIn(listing, path.slice(slash + 1), path);
     out.push({ sha, path, present });
     if (present === true) {
-      r.cache.present.add(memo);
-      break;
+      if (!RECORDING_EXTENSION.test(path)) r.cache.present.add(memo);
+      if (!recordingRequired || RECORDING_EXTENSION.test(path)) break;
     }
   }
   return out;

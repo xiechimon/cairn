@@ -1,0 +1,57 @@
+.........FFFF...
+======================================================================
+FAIL: test_ref_must_be_a_full_commit_sha (__main__.ArchiveTests.test_ref_must_be_a_full_commit_sha) (ref='main')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1983/scripts/pr-evidence-archive.test.py", line 123, in test_ref_must_be_a_full_commit_sha
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+PASS archive: archived: [proof](https://raw.githubusercontent.com/xiechimon/cairn/main/docs/verify/1983/proof.png)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_ref_must_be_a_full_commit_sha (__main__.ArchiveTests.test_ref_must_be_a_full_commit_sha) (ref='dev')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1983/scripts/pr-evidence-archive.test.py", line 123, in test_ref_must_be_a_full_commit_sha
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+PASS archive: archived: [proof](https://raw.githubusercontent.com/xiechimon/cairn/dev/docs/verify/1983/proof.png)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_ref_must_be_a_full_commit_sha (__main__.ArchiveTests.test_ref_must_be_a_full_commit_sha) (ref='v1.0.0')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1983/scripts/pr-evidence-archive.test.py", line 123, in test_ref_must_be_a_full_commit_sha
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+PASS archive: archived: [proof](https://raw.githubusercontent.com/xiechimon/cairn/v1.0.0/docs/verify/1983/proof.png)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_ref_must_be_a_full_commit_sha (__main__.ArchiveTests.test_ref_must_be_a_full_commit_sha) (ref='abc1234')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1983/scripts/pr-evidence-archive.test.py", line 123, in test_ref_must_be_a_full_commit_sha
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+PASS archive: archived: [proof](https://raw.githubusercontent.com/xiechimon/cairn/abc1234/docs/verify/1983/proof.png)
+pr-evidence: GREEN
+
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.120s
+
+FAILED (failures=4)

@@ -22,6 +22,12 @@ import { nowMs } from '../lib/ids.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { chiefClaimContext, parseChiefTrigger } from './chief.js';
+import {
+  CHIEF_DIGEST_MIN_CLI_VERSION,
+  CHIEF_DIGEST_REMOTE_TOOLS,
+  CHIEF_DIGEST_SYSTEM_PROMPT,
+  isChiefDigestStep,
+} from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import {
   agentRunningCount,
@@ -108,9 +114,13 @@ function claimChiefCandidates(deps: MachineDeps, machineId: string, teamId: stri
 }
 
 export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
+  return cliVersionAtLeast(latestCliVersion, MCP_MIN_CLI_VERSION);
+}
+
+function cliVersionAtLeast(latestCliVersion: string | null, min: string): boolean {
   if (!latestCliVersion) return false;
   const parse = (v: string): number[] => v.split('.').map((n) => Number.parseInt(n, 10) || 0);
-  const [a, b] = [parse(latestCliVersion), parse(MCP_MIN_CLI_VERSION)];
+  const [a, b] = [parse(latestCliVersion), parse(min)];
   for (let i = 0; i < 3; i++) {
     const d = (a[i] ?? 0) - (b[i] ?? 0);
     if (d !== 0) return d > 0;
@@ -160,9 +170,10 @@ function buildChiefClaim(
     .where(and(eq(step.id, stepRow.id), eq(step.status, 'pending')))
     .run();
   if (res.changes === 0) return null;
-  const ctx = chiefClaimContext(deps, threadRow.id);
+  const digest = isChiefDigestStep(stepRow);
+  const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
   const trigger = parseChiefTrigger(stepRow.prompt);
-  const systemPrompt = ctx?.systemPrompt ?? '';
+  const systemPrompt = digest ? CHIEF_DIGEST_SYSTEM_PROMPT : (ctx?.systemPrompt ?? '');
   let routeSection = '';
   if (ctx && trigger === 'user') {
     const hint = suggestSkillsForMessage(
@@ -176,7 +187,9 @@ function buildChiefClaim(
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
   const memories = injectMemories(deps.db, { agentId: agentRow.id });
-  const chiefMcp = claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
+  const chiefMcp = digest
+    ? []
+    : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
   return {
     step: {
       id: stepRow.id,
@@ -210,8 +223,9 @@ function buildChiefClaim(
       systemPrompt,
       trigger,
     },
-    remoteTools: [...CHIEF_REMOTE_TOOLS],
+    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : CHIEF_REMOTE_TOOLS)],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
+    ...(digest ? { remoteToolsOnly: true as const } : {}),
   };
 }
 
@@ -232,11 +246,21 @@ async function tryClaim(
   );
   const full = running >= workerCap;
   const workerCands = full ? [] : claimCandidates(deps, machineId, teamId);
-  const chiefCands = full ? [] : claimChiefCandidates(deps, machineId, teamId);
+  const chiefCands = full
+    ? []
+    : claimChiefCandidates(deps, machineId, teamId).sort(
+        (a, b) => Number(isChiefDigestStep(a.stepRow)) - Number(isChiefDigestStep(b.stepRow)),
+      );
   const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
   for (const cand of chiefCands) {
     if (cand.stepRow.createdAt > earliestWorker) break;
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
+    if (
+      isChiefDigestStep(cand.stepRow) &&
+      !cliVersionAtLeast(machineRow.latestCliVersion, CHIEF_DIGEST_MIN_CLI_VERSION)
+    ) {
+      continue;
+    }
     if (
       cand.agentRow.maxConcurrentTasks !== null &&
       agentRunningCount(db, cand.agentRow.id) >= cand.agentRow.maxConcurrentTasks

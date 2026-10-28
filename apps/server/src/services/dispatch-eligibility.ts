@@ -1,5 +1,6 @@
 import {
   type Assignment,
+  CHIEF_DIGEST_THREAD_ID_PREFIX,
   type ClaudeCodeReport,
   capabilityMissingLabels,
   isBackendRuntimeId,
@@ -10,7 +11,7 @@ import {
   type RequiredCapabilities,
   type StepKind,
 } from '@cairn/shared';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, like, ne, not } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
 
@@ -173,7 +174,14 @@ export function agentRunningCount(db: Db, agentId: string): number {
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
-    .where(and(eq(step.status, 'claimed'), eq(step.kind, 'chief'), eq(chief.agentId, agentId)))
+    .where(
+      and(
+        eq(step.status, 'claimed'),
+        eq(step.kind, 'chief'),
+        eq(chief.agentId, agentId),
+        not(like(step.buildId, `${CHIEF_DIGEST_THREAD_ID_PREFIX}%`)),
+      ),
+    )
     .all().length;
   return workerCount + chiefCount;
 }

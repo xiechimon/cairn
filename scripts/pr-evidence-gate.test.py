@@ -31,7 +31,7 @@ class EvidenceGateTests(unittest.TestCase):
                         self.assertNotIn('FAIL unreachable', output)
 
     def test_extensionless_embeds_keep_their_form_and_full_url(self):
-        url = 'https://example.org/view?theme=dark&size=2#proof'
+        url = 'https://raw.githubusercontent.com/xiechimon/cairn/3cca15fbe0e427154b134db0b433fc5e965119b2/docs/verify/1983/view?theme=dark&size=2#proof'
         for body, form in [(f'![proof]({url})', 'image'), (f'<img src="{url.replace("&", "&amp;")}">', 'html'), (f'<source srcset="{url} 2x">', 'html')]:
             with self.subTest(body=body):
                 links = gate.find_links(body)
@@ -40,7 +40,9 @@ class EvidenceGateTests(unittest.TestCase):
                 self.assertEqual(links[0]['form'], form)
                 self.assertTrue(links[0]['embedded'])
                 result, output, probe = self.verdict(body)
-                self.assertEqual(result, 0, output)
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL archive: missing repository context', output)
+                self.assertNotIn('FAIL not-embedded:', output)
                 probe.assert_called_once_with(url)
 
     def test_bare_images_with_punctuation_or_adjacent_markup_fail(self):
@@ -56,7 +58,7 @@ class EvidenceGateTests(unittest.TestCase):
                 probe.assert_called_once_with(expected)
 
     def test_references_are_not_images(self):
-        for url in ['https://github.com/xiechimon/cairn/issues/1810', 'https://raw.githubusercontent.com/xiechimon/cairn/abc/docs/verify/1810/proof', 'https://example.org/file.png.txt']:
+        for url in ['https://github.com/xiechimon/cairn/issues/1810', 'https://raw.githubusercontent.com/xiechimon/cairn/3cca15fbe0e427154b134db0b433fc5e965119b2/docs/verify/1810/proof', 'https://example.org/file.png.txt']:
             result, output, probe = self.verdict(f'[issue]({url})')
             self.assertEqual(result, 0, output)
             self.assertEqual(gate.find_links(f'[issue]({url})'), [])

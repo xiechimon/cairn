@@ -134,6 +134,7 @@ const AGENT = [
   'registry-focus-ring',
   'resource-back-spa',
   'task-panel',
+  'chief-home-digest',
 ];
 const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models'];
 const OVERLAY = [
@@ -248,6 +249,7 @@ const FILE_RULES = new Map([
   ['apps/web/src/components/brand-marks.tsx', ['machines-', 'title-', 'brand-']],
   ['apps/web/vitest.config.ts', []],
   ['apps/web/e2e/demo-server.ts', ['demo-mode']],
+  ['apps/web/e2e/chief-home-mock.ts', ['chief-home-']],
   ['apps/web/e2e/live-server.ts', LIVE_SERVER],
   ['apps/web/e2e/live-server-tether.mjs', LIVE_SERVER],
   ['apps/web/e2e/live-server-spawner.ts', LIVE_SERVER],

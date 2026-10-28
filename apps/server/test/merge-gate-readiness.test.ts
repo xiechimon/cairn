@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   type BlockerClass,
   CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
@@ -5,9 +7,10 @@ import {
   MERGE_BLOCKER_CODES,
   MERGE_BLOCKERS,
   type MergeBlockerCode,
+  recordingRequirements,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { computePatchDigest } from '../src/services/merge-gate/digest.js';
+import { compareFilesFromResponse, computePatchDigest } from '../src/services/merge-gate/digest.js';
 import {
   type GateCheckRun,
   type GateCompareCommit,
@@ -15,6 +18,7 @@ import {
   type GateVerdictView,
   mergeReadiness,
 } from '../src/services/merge-gate/readiness.js';
+import pastMotion from './fixtures/1783-motion-pr.json' with { type: 'json' };
 
 const HEAD = 'a'.repeat(40);
 const OLD = 'b'.repeat(40);
@@ -193,6 +197,7 @@ const CLASS: Record<MergeBlockerCode, BlockerClass> = {
   'harness-regression-below-threshold': 'human',
   'issue-ref-missing': 'human',
   'evidence-link-missing': 'transient',
+  'recording-missing': 'transient',
   'verify-missing': 'transient',
   'verify-failed': 'transient',
   'verify-extraction-failed': 'transient',
@@ -214,6 +219,12 @@ const CLASS: Record<MergeBlockerCode, BlockerClass> = {
 };
 
 const ROWS: Row[] = [
+  [
+    'recording-missing',
+    (i) => {
+      setFiles(i, [file('apps/web/src/card.tsx', { recordingRequired: true })]);
+    },
+  ],
   [
     'daily-cap',
     (i) => {
@@ -1912,5 +1923,97 @@ describe('ADR 0026 independent protected-path review', () => {
     ).toBe(true);
     expect(mergeReadiness(reviewedBy('google/gemini-2.5-pro[1m]', 'gpt-5.5')).ready).toBe(true);
     expect(mergeReadiness(reviewedBy('radius/balanced', 'openai/gpt-5.5')).ready).toBe(true);
+  });
+});
+
+describe('recording evidence (#1783)', () => {
+  test('historical PR #1356 PNG-only motion goes red and adding WebM goes green', () => {
+    const i = green();
+    const historical = compareFilesFromResponse({ files: [pastMotion.file] });
+    expect(historical).not.toBeNull();
+    setFiles(i, historical ?? []);
+    expect(mergeReadiness(i).blockers.map((b) => b.code)).toContain('recording-missing');
+    const video = opaque('docs/verify/1404/past-motion.webm');
+    setFiles(i, [...(historical ?? []), video]);
+    pr(i).body += ` ${link(HEAD, video.filename)}`;
+    i.evidence.push({ sha: HEAD, path: video.filename, present: true });
+    expect(mergeReadiness(i).ready).toBe(true);
+    setFiles(i, [file('apps/web/src/board/card.tsx')]);
+    pr(i).body = BODY;
+    expect(mergeReadiness(i).ready).toBe(true);
+  });
+
+  test('a web file whose patch GitHub omits is not treated as animated (#1783 negative control)', () => {
+    const parsed = compareFilesFromResponse({
+      files: [
+        {
+          filename: 'apps/web/src/board/card.tsx',
+          status: 'modified',
+          sha: HEAD,
+          additions: 3,
+          deletions: 1,
+        },
+      ],
+    });
+    expect(parsed?.[0]?.recordingRequired).toBeUndefined();
+    expect(recordingRequirements([parsed?.[0] ?? file('apps/web/src/board/card.tsx')])).toEqual({
+      required: false,
+      reasons: [],
+    });
+  });
+
+  test('the real compare sample keeps 21 web files green (#1783 negative control)', () => {
+    const sample = JSON.parse(
+      readFileSync(join(import.meta.dirname, 'fixtures/merge-gate-compare-sample.json'), 'utf8'),
+    ) as unknown;
+    const files = compareFilesFromResponse(sample);
+    expect(files).not.toBeNull();
+    expect(files?.filter((f) => f.filename.startsWith('apps/web/src/')).length).toBe(21);
+    expect(files?.some((f) => f.recordingRequired)).toBe(false);
+  });
+
+  test('unrelated identifiers do not fire while a real handler does (#1783)', () => {
+    const triggered = (patch: string) => {
+      const i = green();
+      const parsed = compareFilesFromResponse({
+        files: [
+          {
+            filename: 'apps/web/src/board/card.tsx',
+            status: 'modified',
+            sha: HEAD,
+            additions: 1,
+            deletions: 0,
+            patch,
+          },
+        ],
+      });
+      setFiles(i, parsed ?? []);
+      return !mergeReadiness(i).ready;
+    };
+    for (const line of [
+      '+  const promotion = rank(cards);',
+      '+  const motionDiv = <div />;',
+      '+  setMotionEnabled(true);',
+    ])
+      expect(triggered(line), line).toBe(false);
+    for (const line of [
+      '+  onMouseDown={begin}',
+      '+  onTouchStart={begin}',
+      '+  scroll-behavior: smooth;',
+    ])
+      expect(triggered(line), line).toBe(true);
+  });
+
+  test('motion with only a screenshot is blocked, a present recording clears the blocker', () => {
+    const i = green();
+    setFiles(i, [file('apps/web/src/board/card.tsx', { recordingRequired: true })]);
+    expect(mergeReadiness(i).blockers.map((b) => b.code)).toContain('recording-missing');
+    const video = opaque('docs/verify/1404/interaction.webm');
+    setFiles(i, [file('apps/web/src/board/card.tsx', { recordingRequired: true }), video]);
+    pr(i).body += ` ${link(HEAD, video.filename)}`;
+    i.evidence.push({ sha: HEAD, path: video.filename, present: true });
+    expect(mergeReadiness(i).ready).toBe(true);
+    i.evidence[1]!.present = null;
+    expect(mergeReadiness(i).blockers.map((b) => b.code)).toContain('recording-missing');
   });
 });

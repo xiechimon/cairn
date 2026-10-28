@@ -228,6 +228,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
+    "remoteToolsOnly": {
+      "const": true,
+      "type": "boolean",
+    },
     "session": {
       "additionalProperties": false,
       "properties": {
@@ -791,6 +795,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "type": "object",
               },
               "type": "array",
+            },
+            "remoteToolsOnly": {
+              "const": true,
+              "type": "boolean",
             },
             "session": {
               "additionalProperties": false,
@@ -6337,6 +6345,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
   "harness-regression-below-threshold: human, 回归评测 decision_ok 低于基线置信区间下限",
   "issue-ref-missing: human, 任务来源解不出 issue 号",
   "evidence-link-missing: transient, PR body 缺钉在本 PR 提交上、指向本 PR 证据的 raw 永久链",
+  "recording-missing: transient, Interactive or animated UI requires a recording of at most 5 MiB",
   "verify-missing: transient, 当前补丁没有验证判定",
   "verify-failed: transient, 验证未通过",
   "verify-extraction-failed: transient, 验证判定提取失败",

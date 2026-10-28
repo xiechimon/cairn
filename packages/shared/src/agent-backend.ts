@@ -142,6 +142,7 @@ export interface SessionOpts {
   }) => void;
   teamSkillsDir?: string;
   readOnly?: boolean;
+  remoteToolsOnly?: boolean;
   env?: Record<string, string>;
   telemetry?: StepOtelContext;
   cwd: string;

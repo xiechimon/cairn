@@ -50,7 +50,12 @@ const fixture = () => {
 test('prunes evidence folders older than the window and records their last commit', () => {
   const repo = fixture();
   try {
-    const oldSha = repo.commit(daysAgo(30), { 'docs/verify/100/shot.png': 'a' });
+    const oldSha = repo.commit(daysAgo(30), {
+      'docs/verify/100/shot.png': 'a',
+      'docs/verify/100/demo.webm': 'video',
+      'docs/verify/100/demo.mp4': 'video',
+      'docs/verify/100/demo.gif': 'video',
+    });
     repo.commit(daysAgo(3), { 'docs/verify/200/shot.png': 'b' });
     const result = repo.run();
     assert.equal(result.status, 0, result.stderr);
