@@ -1,0 +1,53 @@
+
+Running 2 tests using 1 worker
+
+(node:65525) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 apps/web/e2e/demo-mode.spec.ts:244:1 › write: completing a review task from the menu shows the demo notice (5.8s)
+(node:65544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  2 apps/web/e2e/demo-mode.spec.ts:257:1 › a board card opens the panel and expands into its versioned detail (828ms)
+
+
+  1) apps/web/e2e/demo-mode.spec.ts:244:1 › write: completing a review task from the menu shows the demo notice
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('[data-sonner-toast]').filter({ hasText: '这是演示数据，改动不会保存' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('[data-sonner-toast]').filter({ hasText: '这是演示数据，改动不会保存' }) with timeout 5000ms
+      - waiting for locator('[data-sonner-toast]').filter({ hasText: '这是演示数据，改动不会保存' })
+
+
+      249 |   const dialog = page.getByRole('dialog', { name: '完成任务', exact: true });
+      250 |   await dialog.getByRole('button', { name: '完成', exact: true }).click();
+    > 251 |   await expect(toast(page)).toBeVisible();
+          |                             ^
+      252 |   await expect(dialog).toBeHidden();
+      253 |   await expect(page.getByTestId('phase-chip')).toHaveText(/审核/);
+      254 |   expectQuiet(traffic);
+        at /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/apps/web/e2e/demo-mode.spec.ts:251:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-completing-6aad8--menu-shows-the-demo-notice/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-completing-6aad8--menu-shows-the-demo-notice/error-context.md
+
+    Error Context: ../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-completing-6aad8--menu-shows-the-demo-notice/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-completing-6aad8--menu-shows-the-demo-notice/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-completing-6aad8--menu-shows-the-demo-notice/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    apps/web/e2e/demo-mode.spec.ts:244:1 › write: completing a review task from the menu shows the demo notice
+  1 passed (10.7s)

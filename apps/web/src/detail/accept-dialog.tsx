@@ -6,6 +6,7 @@ import {
   DIALOG_TEXT_BUTTON,
   DialogShell,
 } from '../components/ui/dialog-shell.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 
 interface AcceptDialogProps {
@@ -56,7 +57,10 @@ export function AcceptDialog({
             disabled={blocked || confirming === true}
             onClick={() => {
               if (onConfirm) onConfirm(skipMerge ? false : mergeChecked);
-              else onClose();
+              else {
+                blockDemoWrite();
+                onClose();
+              }
             }}
           >
             {t('完成')}

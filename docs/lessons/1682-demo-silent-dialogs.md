@@ -1,9 +1,9 @@
 ---
-Category: Demo resource forms and OAuth selection closed without explaining that changes were not saved
+Category: Demo mutation dialogs closed without explaining that changes were not saved
 Source: PR #1769 review and browser reproduction (2026-10-28)
-Level: 2
-Safeguard: Browser cases submit the secret and provider forms and select OAuth in the compiled demo, asserting the notice and zero backend traffic
-Intercepts: 3
-Recurrences: 0
-Notes: The two form cases failed before their notice calls, and the OAuth case independently failed before its notice call. The existing production and ordinary-fixture callbacks keep their behavior. These checks use only explicit nonsecret demo values and do not contact a provider.
+Level: 1
+Safeguard: The shared AcceptDialog handles the demo completion fallback for every caller; resource forms provide the same notice, and browser cases cover both seams
+Intercepts: 4
+Recurrences: 1
+Notes: The two form cases and the OAuth case failed before their notice calls. Later review found the same missing feedback in task completion; its browser case also failed before the fix. Handling the completion fallback in the shared dialog prevents omission at individual task-menu or board callers. Production callbacks and ordinary-fixture close behavior are preserved. Test values are nonsecret and no provider is contacted.
 ---

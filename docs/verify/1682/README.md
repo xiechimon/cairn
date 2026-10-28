@@ -70,6 +70,17 @@ Public hosting and domain acceptance remain unverified.
 The source is a delivery checkpoint. Full code review and fresh independent
 review remain pending; green tests do not establish merge authorization.
 
+## Completion fallback follow-up
+
+Further local review found that the task menu could open the shared completion
+dialog and then close it without the demo notice. `accept-dialog-red.log`
+records that actual failure and a passing card-to-panel-to-detail navigation
+control. The fallback now sends the notice in the shared `AcceptDialog`.
+`accept-dialog-green.log` records all 20 demo cases passing after this change;
+`accept-required-green.log` records lint, typecheck and spec parsing passing.
+The earlier 1378-case run and capture manifest apply to source `f106a29e5`,
+before this follow-up. They are not evidence of a later full-suite run.
+
 ## Rebuilding the demo locally
 
 ```sh

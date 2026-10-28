@@ -241,6 +241,33 @@ test('write: the primary action and the delete confirm are blocked', async ({ pa
   expectQuiet(traffic);
 });
 
+test('write: completing a review task from the menu shows the demo notice', async ({ page }) => {
+  const traffic = watchTraffic(page);
+  await page.goto(`${demo.base}/app/todo/${DEMO.rateLimit}`);
+  await page.getByRole('button', { name: '更多', exact: true }).click();
+  await page.getByRole('menuitem', { name: '完成', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '完成任务', exact: true });
+  await dialog.getByRole('button', { name: '完成', exact: true }).click();
+  await expect(toast(page)).toBeVisible();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId('phase-chip')).toHaveText(/审核/);
+  expectQuiet(traffic);
+});
+
+test('a board card opens the panel and expands into its versioned detail', async ({ page }) => {
+  const traffic = watchTraffic(page);
+  await page.goto(`${demo.base}/app?view=board`);
+  await page.getByRole('link', { name: '登录后合并游客购物车', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: '任务面板', exact: true });
+  await expect(panel.getByTestId('task-panel-title')).toHaveText('登录后合并游客购物车');
+  await panel.getByRole('link', { name: '展开为整页', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/todo/${DEMO.cartMerge}`));
+  await expect(page.getByTestId('phase-chip')).toHaveText(/确认/);
+  await expect(page.getByText('blocking').first()).toBeVisible();
+  await expect(page.locator('.doc-pane-select').nth(1)).toHaveText(/v3/);
+  expectQuiet(traffic);
+});
+
 test('write: sending to the chief is blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app?view=board`);
