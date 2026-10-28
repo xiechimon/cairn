@@ -23,6 +23,7 @@ import {
   askUserQuestionContentSchema,
   BRAND,
   CHIEF_TURN_ERROR_KIND,
+  chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
   chiefTurnErrorContentSchema,
   chiefTurnStoppedContentSchema,
@@ -1278,6 +1279,19 @@ function collectChiefStream(
       const switched = chiefModelFallbackContentSchema.safeParse(parsed);
       if (switched.success) {
         fallback = { model: switched.data.to, stepId: switched.data.stepId };
+        continue;
+      }
+      const digest = chiefDigestContentSchema.safeParse(parsed);
+      if (digest.success) {
+        if (digest.data.items.length === 0) continue;
+        pendingTools = [];
+        items.push({
+          kind: 'digest',
+          id: m.id,
+          reason: digest.data.reason,
+          madeAt: digest.data.madeAt,
+          items: digest.data.items,
+        });
         continue;
       }
     }

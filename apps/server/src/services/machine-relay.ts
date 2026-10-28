@@ -11,6 +11,7 @@ import { eq } from 'drizzle-orm';
 import { agent, build, chief, chiefThread, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { NotFoundError } from './builds.js';
+import { assertChiefDigestTool } from './chief-digest.js';
 import {
   ASK_HOLD_MS,
   type ChiefQuestionDeps,
@@ -79,6 +80,7 @@ export async function executeRelayToolCall(
     throw new HttpError(400, `step ${stepId} is not a chief step`);
   }
   const threadId = row.buildId;
+  assertChiefDigestTool(threadId, name);
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   if (!threadRow) throw new NotFoundError(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();

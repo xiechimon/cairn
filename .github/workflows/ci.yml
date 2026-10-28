@@ -111,15 +111,26 @@ jobs:
 
       - name: Prepush checks (#1533)
         env:
+          CAIRN_GATE_LOG: ${{ runner.temp }}/gate-reds/gate-log.jsonl
+          CAIRN_BRANCH: ${{ github.head_ref || github.ref_name }}
           PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           UI_DEBT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: pnpm prepush --ci
+
+      - name: Upload safeguard interceptions
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: gate-reds-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/gate-reds/
+          if-no-files-found: ignore
+          retention-days: 90
 
       - name: PR evidence regression tests
         run: python3 scripts/pr-evidence-gate.test.py
 
       - name: Prepush self-test
-        run: node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/doc-reader-tests.test.mjs scripts/lessons-ledger-gate.test.mjs scripts/recording-gate.test.mjs
+        run: node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/doc-reader-tests.test.mjs scripts/lessons-ledger-gate.test.mjs scripts/recording-gate.test.mjs scripts/lessons-weekly.test.mjs
 
       # verify-cairn CLI self-test (#1402): vp.mjs dispatch, evidence, capture, links, archive rules.
       # Most drives use --dry-run; live ones use stub probes in a copied skill tree; archive/links
