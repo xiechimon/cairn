@@ -23,3 +23,7 @@ Resolution order is revert body, then validated explicit references, then blame 
 `red-utf8-space.log` is the suite before decoding: `"\303\251.txt"` became `Ã©.txt`, and unquoted `a/space name.txt` split into `space`. `green-utf8-space.log` is the passing parseDiffGitPaths / blame cases after UTF-8 byte assembly of octal escapes and splitting unquoted headers on ` b/` / ` /dev/null`.
 
 Open #2120 (reviewer-bank export) also edits `scripts/escape-trace.mjs` additively for export/validate; this change only fixes header path decoding shared by blame.
+
+## Mixed quoted/unquoted rename headers (tip-bound BLOCK on 8276b10d)
+
+`red-mixed-quote.log` is the suite on tip `8276b10d` before restore: `diff --git "a/tab\tname.txt" b/plain.txt` and the reverse both returned `null` because the revised parser required the second token to be quoted or `/dev/null` after a quoted first, and never looked for a quoted second after an unquoted first. `green-mixed-quote.log` is the passing parseDiffGitPaths case after each side is read independently (quoted with UTF-8 octal decode, or unquoted via ` b/` / ` /dev/null` / ` "` split). Prior UTF-8 octal and unquoted space coverage is unchanged.

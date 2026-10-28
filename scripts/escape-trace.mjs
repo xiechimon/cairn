@@ -175,85 +175,72 @@ function stripDiffGitPrefix(value) {
   return value;
 }
 
-function readQuotedDiffGitToken(line, index) {
-  if (line[index] !== '"') return null;
-  let i = index + 1;
-  let out = '';
-  const bytes = [];
-  const flushBytes = () => {
-    if (bytes.length === 0) return;
-    out += new TextDecoder('utf-8').decode(Uint8Array.from(bytes));
-    bytes.length = 0;
-  };
-  while (i < line.length) {
-    if (line[i] === '\\' && i + 1 < line.length) {
-      const next = line[++i];
-      if (next >= '0' && next <= '7') {
-        let oct = next;
-        for (
-          let k = 0;
-          k < 2 && i + 1 < line.length && line[i + 1] >= '0' && line[i + 1] <= '7';
-          k++
-        )
-          oct += line[++i];
-        bytes.push(Number.parseInt(oct, 8));
+function readDiffGitToken(line, index, role) {
+  if (index >= line.length) return null;
+  if (line[index] === '"') {
+    let i = index + 1;
+    let out = '';
+    const bytes = [];
+    const flushBytes = () => {
+      if (bytes.length === 0) return;
+      out += new TextDecoder('utf-8').decode(Uint8Array.from(bytes));
+      bytes.length = 0;
+    };
+    while (i < line.length) {
+      if (line[i] === '\\' && i + 1 < line.length) {
+        const next = line[++i];
+        if (next >= '0' && next <= '7') {
+          let oct = next;
+          for (
+            let k = 0;
+            k < 2 && i + 1 < line.length && line[i + 1] >= '0' && line[i + 1] <= '7';
+            k++
+          )
+            oct += line[++i];
+          bytes.push(Number.parseInt(oct, 8));
+          i++;
+          continue;
+        }
+        flushBytes();
+        if (next === 'a') out += '\x07';
+        else if (next === 'b') out += '\b';
+        else if (next === 't') out += '\t';
+        else if (next === 'n') out += '\n';
+        else if (next === 'v') out += '\v';
+        else if (next === 'f') out += '\f';
+        else if (next === 'r') out += '\r';
+        else if (next === '\\' || next === '"') out += next;
+        else out += next;
         i++;
         continue;
       }
+      if (line[i] === '"') {
+        flushBytes();
+        return { value: out, next: i + 1 };
+      }
       flushBytes();
-      if (next === 'a') out += '\x07';
-      else if (next === 'b') out += '\b';
-      else if (next === 't') out += '\t';
-      else if (next === 'n') out += '\n';
-      else if (next === 'v') out += '\v';
-      else if (next === 'f') out += '\f';
-      else if (next === 'r') out += '\r';
-      else if (next === '\\' || next === '"') out += next;
-      else out += next;
-      i++;
-      continue;
+      out += line[i++];
     }
-    if (line[i] === '"') {
-      flushBytes();
-      return { value: out, next: i + 1 };
-    }
-    flushBytes();
-    out += line[i++];
+    return null;
   }
-  return null;
+  if (role === 'second') return { value: line.slice(index), next: line.length };
+  let splitAt = -1;
+  for (const marker of [' b/', ' /dev/null', ' "']) {
+    const at = line.indexOf(marker, index);
+    if (at < 0) continue;
+    if (splitAt < 0 || at < splitAt) splitAt = at;
+  }
+  if (splitAt < 0) return null;
+  return { value: line.slice(index, splitAt), next: splitAt };
 }
 
 export function parseDiffGitPaths(line) {
   if (!line.startsWith('diff --git ')) return null;
-  const start = 'diff --git '.length;
-  if (line[start] === '"') {
-    const first = readQuotedDiffGitToken(line, start);
-    if (!first || line[first.next] !== ' ') return null;
-    const second =
-      line[first.next + 1] === '"'
-        ? readQuotedDiffGitToken(line, first.next + 1)
-        : line.startsWith(' /dev/null', first.next)
-          ? { value: '/dev/null', next: first.next + ' /dev/null'.length }
-          : null;
-    if (!second) return null;
-    return { a: stripDiffGitPrefix(first.value), b: stripDiffGitPrefix(second.value) };
-  }
-  const rest = line.slice(start);
-  let splitAt = -1;
-  let secondRaw = null;
-  for (const marker of [' b/', ' /dev/null']) {
-    const at = rest.indexOf(marker);
-    if (at < 0) continue;
-    if (splitAt < 0 || at < splitAt) {
-      splitAt = at;
-      secondRaw = rest.slice(at + 1);
-    }
-  }
-  if (splitAt < 0 || secondRaw === null) return null;
-  return {
-    a: stripDiffGitPrefix(rest.slice(0, splitAt)),
-    b: stripDiffGitPrefix(secondRaw),
-  };
+  const first = readDiffGitToken(line, 'diff --git '.length, 'first');
+  if (!first || line[first.next] !== ' ') return null;
+  const second = readDiffGitToken(line, first.next + 1, 'second');
+  if (!second) return null;
+  return { a: stripDiffGitPrefix(first.value), b: stripDiffGitPrefix(second.value) };
 }
 
 function blameChangedLines(cwd, followUpSha, paths) {

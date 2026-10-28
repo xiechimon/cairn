@@ -754,6 +754,25 @@ test('parseDiffGitPaths keeps unquoted paths that contain spaces', () => {
   assert.notEqual(parseDiffGitPaths('diff --git a/space name.txt b/space name.txt').a, 'space');
 });
 
+test('parseDiffGitPaths accepts rename headers with one quoted path and one unquoted path', () => {
+  assert.deepEqual(parseDiffGitPaths('diff --git "a/tab\\tname.txt" b/plain.txt'), {
+    a: 'tab\tname.txt',
+    b: 'plain.txt',
+  });
+  assert.deepEqual(parseDiffGitPaths('diff --git a/plain.txt "b/tab\\tname.txt"'), {
+    a: 'plain.txt',
+    b: 'tab\tname.txt',
+  });
+  assert.deepEqual(parseDiffGitPaths('diff --git "a/tab\\tname.txt" b/space name.txt'), {
+    a: 'tab\tname.txt',
+    b: 'space name.txt',
+  });
+  assert.deepEqual(parseDiffGitPaths('diff --git a/space name.txt "b/tab\\tname.txt"'), {
+    a: 'space name.txt',
+    b: 'tab\tname.txt',
+  });
+});
+
 test('blame resolves a UTF-8 path emitted as Git octal escapes', (t) => {
   const { cwd, git, commit } = fixture(t, 'escape-utf8-octal-');
   const utfPath = 'é.txt';
