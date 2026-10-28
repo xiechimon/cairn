@@ -17,3 +17,9 @@ Resolution order is revert body, then validated explicit references, then blame 
 `red-quotepath.log` is the suite on tip `f1d073d4` before header decoding: the #1884 explicit-reference case lacked file/line ranges, and quotePath-quoted `diff --git` headers left blame unresolved or collapsed mixed quoted/ordinary paths to a single origin.
 
 `green-quotepath.log` is 17 passing cases after `parseDiffGitPaths` accepts C-quoted headers (`\t`, `\n`, `\\`, `\"`, octal) and revert/explicit-reference resolutions attach parent blame ranges as evidence. Also covers `unavailable-pr-metadata` when commit-to-PR lookup finds nothing.
+
+## UTF-8 octal and unquoted space paths (tip-bound BLOCK on 93dce549)
+
+`red-utf8-space.log` is the suite before decoding: `"\303\251.txt"` became `Ã©.txt`, and unquoted `a/space name.txt` split into `space`. `green-utf8-space.log` is the passing parseDiffGitPaths / blame cases after UTF-8 byte assembly of octal escapes and splitting unquoted headers on ` b/` / ` /dev/null`.
+
+Open #2120 (reviewer-bank export) also edits `scripts/escape-trace.mjs` additively for export/validate; this change only fixes header path decoding shared by blame.

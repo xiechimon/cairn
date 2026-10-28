@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { collectCandidates, resolveTraces } from './escape-trace.mjs';
+import { collectCandidates, parseDiffGitPaths, resolveTraces } from './escape-trace.mjs';
 import { prepushPlan } from './prepush.mjs';
 
 const cli = resolve('scripts/escape-trace.mjs');
@@ -733,4 +733,107 @@ test('missing PR metadata stays unresolved with unavailable-pr-metadata', (t) =>
   assert.equal(trace.introducingSha, introducingSha);
   assert.equal(trace.originalPr, null);
   assert.equal(trace.unresolvedReason, 'unavailable-pr-metadata');
+});
+
+test('parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes', () => {
+  assert.deepEqual(parseDiffGitPaths('diff --git "a/\\303\\251.txt" "b/\\303\\251.txt"'), {
+    a: 'é.txt',
+    b: 'é.txt',
+  });
+  assert.notEqual(
+    parseDiffGitPaths('diff --git "a/\\303\\251.txt" "b/\\303\\251.txt"').a,
+    'Ã©.txt',
+  );
+});
+
+test('parseDiffGitPaths keeps unquoted paths that contain spaces', () => {
+  assert.deepEqual(parseDiffGitPaths('diff --git a/space name.txt b/space name.txt'), {
+    a: 'space name.txt',
+    b: 'space name.txt',
+  });
+  assert.notEqual(parseDiffGitPaths('diff --git a/space name.txt b/space name.txt').a, 'space');
+});
+
+test('blame resolves a UTF-8 path emitted as Git octal escapes', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-utf8-octal-');
+  const utfPath = 'é.txt';
+  const introduceAt = '2025-11-01T00:00:00Z';
+  const fixAt = '2025-11-03T00:00:00Z';
+  const introducingSha = commit('feat: utf8 path defect (#321)', introduceAt, {
+    [utfPath]: 'broken\n',
+  });
+  const fixingSha = commit('fix: repair utf8 path (#322)', fixAt, { [utfPath]: 'fixed\n' });
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const header = execFileSync(
+    'git',
+    ['-c', 'core.quotepath=true', 'diff', '--unified=0', introducingSha, fixingSha, '--', utfPath],
+    { cwd, encoding: 'buffer', env: { ...process.env, LC_ALL: 'C', LANG: 'C' } },
+  )
+    .toString('latin1')
+    .split('\n', 1)[0];
+  assert.match(header, /\\303\\251/);
+  assert.deepEqual(parseDiffGitPaths(header), { a: utfPath, b: utfPath });
+  const candidates = collectCandidates({
+    since: '2025-11-02T00:00:00Z',
+    until: '2025-11-04T00:00:00Z',
+    cwd,
+  });
+  const responder = {
+    pullsByCommit: {
+      [introducingSha]: [{ number: 321, merged_at: introduceAt }],
+      [fixingSha]: [{ number: 322, merged_at: fixAt }],
+    },
+    refs: {},
+  };
+  const [trace] = resolveTraces(candidates, { cwd, responder });
+  assert.equal(trace.status, 'resolved');
+  assert.equal(trace.method, 'blame');
+  assert.equal(trace.introducingSha, introducingSha);
+  assert.ok(trace.evidence.files.some((file) => file.path === utfPath));
+});
+
+test('blame resolves an unquoted path that contains spaces', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-space-path-');
+  git(['config', 'core.quotePath', 'false']);
+  const spacePath = 'space name.txt';
+  const introduceAt = '2025-10-01T00:00:00Z';
+  const fixAt = '2025-10-03T00:00:00Z';
+  const introducingSha = commit('feat: space path defect (#331)', introduceAt, {
+    [spacePath]: 'broken\n',
+  });
+  const fixingSha = commit('fix: repair space path (#332)', fixAt, { [spacePath]: 'fixed\n' });
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const header = execFileSync(
+    'git',
+    [
+      '-c',
+      'core.quotepath=false',
+      'diff',
+      '--unified=0',
+      introducingSha,
+      fixingSha,
+      '--',
+      spacePath,
+    ],
+    { cwd, encoding: 'utf8' },
+  ).split('\n', 1)[0];
+  assert.equal(header, 'diff --git a/space name.txt b/space name.txt');
+  assert.deepEqual(parseDiffGitPaths(header), { a: spacePath, b: spacePath });
+  const candidates = collectCandidates({
+    since: '2025-10-02T00:00:00Z',
+    until: '2025-10-04T00:00:00Z',
+    cwd,
+  });
+  const responder = {
+    pullsByCommit: {
+      [introducingSha]: [{ number: 331, merged_at: introduceAt }],
+      [fixingSha]: [{ number: 332, merged_at: fixAt }],
+    },
+    refs: {},
+  };
+  const [trace] = resolveTraces(candidates, { cwd, responder });
+  assert.equal(trace.status, 'resolved');
+  assert.equal(trace.method, 'blame');
+  assert.equal(trace.introducingSha, introducingSha);
+  assert.ok(trace.evidence.files.some((file) => file.path === spacePath));
 });
