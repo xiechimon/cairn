@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import type {
   GitCgiRequest,
   GitCgiResponse,
@@ -7,6 +8,7 @@ import type {
   GitRefInfo,
   GitTreeEntry,
 } from '@cairn/shared';
+import type { CompareFile } from '@cairn/shared/merge-gate';
 
 export interface GitRunResult {
   code: number;
@@ -242,6 +244,70 @@ export const systemGitOps: GitOps = {
     });
     if (r.code !== 0) return null;
     return { size: r.stdout.byteLength, content: new Uint8Array(r.stdout) };
+  },
+
+  async localCompareFiles(dir: string, base: string, head: string): Promise<CompareFile[]> {
+    for (const sha of [base, head]) {
+      if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`unsafe local compare commit: ${sha}`);
+    }
+    const args = [
+      '--literal-pathspecs',
+      '-c',
+      'core.quotePath=false',
+      'diff',
+      '--no-ext-diff',
+      '--no-textconv',
+    ];
+    const nameResult = await runGit(
+      [...args, '--name-status', '-z', '--find-renames', `${base}...${head}`, '--'],
+      { cwd: dir, timeoutMs: 30_000 },
+    );
+    if (nameResult.code !== 0) throw new Error(`git diff failed: ${nameResult.stderr}`);
+    const parts = nameResult.stdout.toString('utf8').split('\0');
+    const files: CompareFile[] = [];
+    for (let i = 0; i < parts.length && parts[i] !== ''; ) {
+      const status = parts[i++] ?? '';
+      const first = parts[i++];
+      const renamed = status.startsWith('R');
+      const filename = renamed ? parts[i++] : first;
+      if (!filename || !first) throw new Error('Unreadable local diff');
+      const paths = renamed ? [first, filename] : [filename];
+      const numstat = await runGit([...args, '--numstat', `${base}...${head}`, '--', ...paths], {
+        cwd: dir,
+        timeoutMs: 30_000,
+      });
+      if (numstat.code !== 0) throw new Error(`git diff failed: ${numstat.stderr}`);
+      const [added, removed] = numstat.stdout.toString('utf8').trim().split('\t');
+      const diffResult = await runGit(
+        [...args, '--unified=3', `${base}...${head}`, '--', ...paths],
+        { cwd: dir, timeoutMs: 30_000 },
+      );
+      if (diffResult.code !== 0) throw new Error(`git diff failed: ${diffResult.stderr}`);
+      const diff = diffResult.stdout.toString('utf8').replace(/\n$/, '');
+      const hunk = diff.indexOf('\n@@');
+      const patch = hunk === -1 ? null : diff.slice(hunk + 1);
+      const shaResult = await runGit(
+        ['rev-parse', '--verify', `${status === 'D' ? base : head}:${filename}`],
+        { cwd: dir, timeoutMs: META_TIMEOUT_MS },
+      );
+      if (shaResult.code !== 0) throw new Error(`git rev-parse failed: ${shaResult.stderr}`);
+      files.push({
+        status: renamed
+          ? 'renamed'
+          : status === 'A'
+            ? 'added'
+            : status === 'D'
+              ? 'removed'
+              : 'modified',
+        filename,
+        previousFilename: renamed ? first : null,
+        sha: shaResult.stdout.toString('utf8').trim(),
+        additions: added === '-' ? 0 : Number(added),
+        deletions: removed === '-' ? 0 : Number(removed),
+        patchSha: patch === null ? null : createHash('sha256').update(patch, 'utf8').digest('hex'),
+      });
+    }
+    return files;
   },
 
   async listBranches(dir) {

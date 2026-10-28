@@ -1,0 +1,14 @@
+{
+  "reviewSnapshot": "4155ffa10740a9858fd1860dd9e88a9e83093437",
+  "reviewBase": "c6b533e543da50914f408f2232791d41ab3e6d5a",
+  "currentBase": "928fd93c9ceb896bf83e536166224ef3414a08ec",
+  "comparedFiles": [
+    "apps/daemon/src/git.ts",
+    "apps/daemon/src/workspace.ts",
+    "apps/daemon/test/git.test.ts",
+    "apps/daemon/test/workspace-cred-fallback.test.ts",
+    "integration/eval/git-push-proof/observe.mts"
+  ],
+  "sourceDiffSha256": "d581c793808c52166e47316cd7687de06fe1b322c2c90ecce6021547b6035b25",
+  "sameSourceDiffAfterMainSync": true
+}

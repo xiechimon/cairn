@@ -1,4 +1,5 @@
 import type { WorkspaceHookNoteData } from './protocol/executor.js';
+import type { CompareFile } from './records/merge-gate.js';
 import type { LocalErrorReason, ProjectRepoKind } from './records/project.js';
 
 export interface GitTreeEntry {
@@ -41,6 +42,7 @@ export interface GitOps {
   isGitRepo(dir: string): Promise<boolean>;
   lsTree(dir: string, commit: string, subPath?: string): Promise<GitTreeEntry[]>;
   readFileAt(dir: string, commit: string, path: string): Promise<GitFileAtRef | null>;
+  localCompareFiles(dir: string, base: string, head: string): Promise<CompareFile[]>;
   listBranches(dir: string): Promise<{ defaultBranch: string | null; branches: GitRefInfo[] }>;
   isAncestor(dir: string, ancestor: string, commit: string): Promise<boolean>;
   updateBranchRef(dir: string, branch: string, commit: string): Promise<void>;

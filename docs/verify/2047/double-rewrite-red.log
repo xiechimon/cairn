@@ -1,0 +1,35 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-2047-contained-push/cairn
+
+ ❯ |@xiechimon/cairn-cli| test/git.test.ts (91 tests | 1 failed | 90 skipped) 611ms
+   × #2047 a chained URL rewrite cannot redirect the containment proof to a decoy repository 610ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 a chained URL rewrite cannot redirect the containment proof to a decoy repository
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ test/git.test.ts:1118:85
+    1116|   const notices: string[] = [];
+    1117|
+    1118|   await expect(gitPrim.push(dir, 'work', null, (a, b) => notices.push(…
+       |                                                                                     ^
+    1119|
+    1120|   expect(notices).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 90 skipped (91)
+   Start at  13:27:14
+   Duration  1.07s (tests 62%, transform 22%, import 16%)
+

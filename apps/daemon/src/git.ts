@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -139,6 +140,11 @@ const GIT_PERMANENT_FAILURE_PATTERNS: readonly RegExp[] = [
   /not a git repository/,
 ];
 
+function isPushRejectedNoFastForward(message: string): boolean {
+  if (isGitAuthFailure(message)) return false;
+  return /(?:non-fast-forward|fetch first)/.test(message);
+}
+
 export function isGitTransientNetFailure(message: string): boolean {
   const lower = message.toLowerCase();
   if (isGitAuthFailure(message)) return false;
@@ -205,6 +211,63 @@ export class GitPushHookError extends Error {
     super(output);
     this.name = 'GitPushHookError';
   }
+}
+
+export async function landGitSquash(input: {
+  dir: string;
+  branch: string;
+  currentBranch: string;
+  base: string;
+  commit: string;
+  receipt: string;
+}): Promise<'landed' | 'stale' | 'dirty'> {
+  const { dir, branch, currentBranch, base, commit, receipt } = input;
+  return new Promise((resolve, reject) => {
+    const child = spawn('git', ['update-ref', '--no-deref', '--stdin'], { cwd: dir });
+    let output = '';
+    let preparing = false;
+    let dirty = false;
+    const timer = setTimeout(() => child.kill('SIGKILL'), META_TIMEOUT_MS);
+    child.stdin.on('error', () => {});
+    child.stderr.resume();
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve(dirty ? 'dirty' : code === 0 ? 'landed' : 'stale');
+    });
+    child.stdout.on('data', (chunk: Buffer) => {
+      output += chunk.toString('utf8');
+      if (preparing || !output.includes('prepare: ok\n')) return;
+      preparing = true;
+      void (async () => {
+        try {
+          if ((await gitPrim.currentBranch(dir)) !== currentBranch)
+            throw new Error('Checkout changed');
+          const status = await runGitOk(['status', '--porcelain', '--untracked-files=all'], {
+            cwd: dir,
+            env: { GIT_OPTIONAL_LOCKS: '0' },
+            timeoutMs: META_TIMEOUT_MS,
+          });
+          if (status !== '') throw new Error('Worktree changed');
+          if (currentBranch === branch)
+            await runGitOk(['read-tree', '-m', '-u', base, commit], {
+              cwd: dir,
+              timeoutMs: META_TIMEOUT_MS,
+            });
+          child.stdin.end('commit\n');
+        } catch {
+          dirty = true;
+          child.stdin.end('abort\n');
+        }
+      })();
+    });
+    child.stdin.write(
+      `start\n${currentBranch === branch ? '' : `symref-verify HEAD refs/heads/${currentBranch}\n`}update refs/heads/${branch} ${commit} ${base}\nupdate ${receipt} ${commit}\nprepare\n`,
+    );
+  });
 }
 
 export const gitPrim = {
@@ -446,20 +509,59 @@ export const gitPrim = {
     return /^[0-9a-f]{40,64}$/.test(sha) ? sha : null;
   },
 
-  async push(dir: string, branch: string, cred: BoundGitCredentials | null): Promise<void> {
+  async push(
+    dir: string,
+    branch: string,
+    cred: BoundGitCredentials | null,
+    onAlreadyContained?: (local: string, remote: string) => void,
+  ): Promise<void> {
+    const env = cred ? gitCredentialEnv(cred) : machineGitEnv();
+    const branchRef = `refs/heads/${branch}`;
+    const branchHead = async (): Promise<string | null> => {
+      const selected = await runGit(['rev-parse', '--verify', '--end-of-options', branchRef], {
+        cwd: dir,
+        timeoutMs: META_TIMEOUT_MS,
+      });
+      const oid = selected.stdout.trim();
+      return selected.code === 0 && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(oid) ? oid : null;
+    };
+    const local = await branchHead();
+    const remoteAddress = async (): Promise<string | null> => {
+      const address = await runGit(['remote', 'get-url', 'origin'], {
+        cwd: dir,
+        timeoutMs: META_TIMEOUT_MS,
+      });
+      return address.code === 0 ? address.stdout : null;
+    };
+    const fetchUrl = await remoteAddress();
+    const configuredUrls = await runGit(['config', '--null', '--get-all', 'remote.origin.url'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    const rawFetchUrls = configuredUrls.stdout.split('\0').filter((url) => url !== '');
+    const rawFetchUrl =
+      configuredUrls.code === 0 && rawFetchUrls.length === 1 ? rawFetchUrls[0] : null;
+    const pushUrls = await runGit(['remote', 'get-url', '--push', '--all', 'origin'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
     const traceDir = mkdtempSync(join(tmpdir(), 'cairn-push-'));
     const traceFile = join(traceDir, 'trace.jsonl');
     try {
-      const result = await runGit(['push', '--end-of-options', 'origin', `refs/heads/${branch}`], {
-        cwd: dir,
-        env: {
-          ...(cred ? gitCredentialEnv(cred) : machineGitEnv()),
-          GIT_TRACE2_EVENT: traceFile,
+      const result = await runGit(
+        ['push', '--end-of-options', 'origin', `${branchRef}:${branchRef}`],
+        {
+          cwd: dir,
+          env: { ...env, GIT_TRACE2_EVENT: traceFile },
+          timeoutMs: NET_TIMEOUT_MS,
         },
-        timeoutMs: NET_TIMEOUT_MS,
-      });
+      );
       if (result.code === 0) return;
       const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n');
+      const pushFailure = new Error(
+        `git push failed (${result.code ?? `signal ${result.signal ?? 'unknown'}`}): ${output}`,
+      );
+      let hookRejected = false;
       const hooks = new Set<number>();
       for (const line of readFileSync(traceFile, 'utf8').split('\n')) {
         if (line === '') continue;
@@ -477,20 +579,82 @@ export const gitPrim = {
           event.child_class === 'hook' &&
           event.hook_name === 'pre-push' &&
           event.child_id !== undefined
-        )
+        ) {
           hooks.add(event.child_id);
+        }
         if (
           event.event === 'child_exit' &&
           event.child_id !== undefined &&
           hooks.has(event.child_id) &&
           event.code !== undefined &&
           event.code !== 0
-        )
-          throw new GitPushHookError(output);
+        ) {
+          hookRejected = true;
+          break;
+        }
       }
-      throw new Error(
-        `git push failed (${result.code ?? `signal ${result.signal ?? 'unknown'}`}): ${output}`,
-      );
+      const rejection = hookRejected ? new GitPushHookError(output) : pushFailure;
+      if (hookRejected || !isPushRejectedNoFastForward(output)) throw rejection;
+      if (
+        local === null ||
+        (await branchHead()) !== local ||
+        fetchUrl === null ||
+        !/^[^\r\n]+\n$/.test(fetchUrl) ||
+        rawFetchUrl == null ||
+        /[\r\n]/.test(rawFetchUrl) ||
+        pushUrls.code !== 0 ||
+        pushUrls.stdout !== fetchUrl ||
+        (await remoteAddress()) !== fetchUrl
+      )
+        throw rejection;
+      const proofId = randomUUID();
+      const proofRef = `refs/cairn/push-check/${proofId}`;
+      const proofRemote = `cairn-proof-${proofId}`;
+      const configIndex = inheritedGitConfigCount({ ...process.env, ...env });
+      let remote = '';
+      try {
+        const fetched = await runGit(
+          [
+            'fetch',
+            '--quiet',
+            '--no-write-fetch-head',
+            '--refmap=',
+            '--end-of-options',
+            proofRemote,
+            `${branchRef}:${proofRef}`,
+          ],
+          {
+            cwd: dir,
+            env: {
+              ...env,
+              GIT_CONFIG_COUNT: String(configIndex + 1),
+              [`GIT_CONFIG_KEY_${configIndex}`]: `remote.${proofRemote}.url`,
+              [`GIT_CONFIG_VALUE_${configIndex}`]: rawFetchUrl,
+            },
+            timeoutMs: NET_TIMEOUT_MS,
+          },
+        );
+        if (fetched.code !== 0) throw rejection;
+        const tip = await runGit(['rev-parse', '--verify', '--end-of-options', proofRef], {
+          cwd: dir,
+          timeoutMs: META_TIMEOUT_MS,
+        });
+        remote = tip.code === 0 ? tip.stdout.trim() : '';
+        if (
+          !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(remote) ||
+          (
+            await runGit(['merge-base', '--is-ancestor', '--end-of-options', local, remote], {
+              cwd: dir,
+              timeoutMs: META_TIMEOUT_MS,
+            })
+          ).code !== 0
+        )
+          throw rejection;
+      } finally {
+        await runGitOk(['update-ref', '-d', proofRef], { cwd: dir, timeoutMs: META_TIMEOUT_MS });
+      }
+      if ((await branchHead()) !== local || (await remoteAddress()) !== fetchUrl) throw rejection;
+      onAlreadyContained?.(local, remote);
     } finally {
       rmSync(traceDir, { recursive: true, force: true });
     }
@@ -623,7 +787,7 @@ export async function withGitNetRetries<T>(fn: () => Promise<T>): Promise<T> {
       lastErr = err;
       const msg = err instanceof Error ? err.message : String(err);
       if (err instanceof GitPushHookError || isGitAuthFailure(msg)) break;
-      if (!isGitTransientNetFailure(msg)) break;
+      if (isPushRejectedNoFastForward(msg) || !isGitTransientNetFailure(msg)) break;
       const delay = GIT_NET_RETRY_DELAYS_MS[i];
       if (delay === undefined) break;
       await new Promise((r) => setTimeout(r, delay));

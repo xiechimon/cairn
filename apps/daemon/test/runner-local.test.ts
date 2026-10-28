@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
@@ -17,6 +17,7 @@ import { LocalRepoUnreachableError, PLAN_FILE_NAME } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
+import { inspectLocalPatch } from '../src/local-merge.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
@@ -668,4 +669,41 @@ describe('runner local shape execution surface fail-loud (#1210 C fallback)', ()
     expect(client.doneBodies[0]!.body.status).toBe('failed');
     expect(client.doneBodies[0]!.body.errorMessage).toBe('boom raw git noise');
   });
+});
+
+test('a structured local merge lands without starting an agent or the branch delivery path', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-local-command-'));
+  try {
+    seedUserRepo(dir);
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim();
+    const base = git('rev-parse', 'HEAD');
+    git('checkout', '-b', 'work');
+    writeFileSync(join(dir, 'added.txt'), 'landed\n');
+    git('add', 'added.txt');
+    git('-c', 'user.name=test', '-c', 'user.email=test@localhost', 'commit', '-m', 'candidate');
+    const head = git('rev-parse', 'HEAD');
+    git('checkout', 'main');
+    const claimed = claimedStep('merge', { kind: 'local', cloneUrl: dir });
+    claimed.localMerge = {
+      projectId: 'p1',
+      buildId: 'conv-1',
+      defaultBranch: 'main',
+      workBranch: 'work',
+      judgedBase: base,
+      judgedHead: head,
+      judgedPatchDigest: (await inspectLocalPatch(dir, base, head)).patchDigest,
+      localChecks: ['test -f added.txt'],
+      message: 'Land candidate',
+      identity: { name: 'test', email: 'test@localhost' },
+    };
+    const { client, calls } = await setup(claimed);
+    expect(calls).toEqual([]);
+    expect(client.calls).toEqual(['done:s1:success']);
+    expect(client.doneBodies[0]?.body.localMerge?.result.outcome).toBe('merged');
+    expect(git('rev-list', '--count', `${base}..main`)).toBe('1');
+    expect(readFileSync(join(dir, 'added.txt'), 'utf8')).toBe('landed\n');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

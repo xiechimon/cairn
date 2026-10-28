@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -8,6 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { conversationBranch } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -15,8 +18,18 @@ import { commitEnv, runGit } from '../../apps/daemon/src/git.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
-import { build as buildTable, step as stepTable } from '../../apps/server/src/db/schema.js';
+import {
+  build as buildTable,
+  gateState as gateStateTable,
+  gateVerdict as gateVerdictTable,
+  step as stepTable,
+  todo as todoTable,
+} from '../../apps/server/src/db/schema.js';
+import { seed } from '../../apps/server/src/db/seed.js';
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
+import { TeamStreamHub } from '../../apps/server/src/services/events.js';
+import { enqueueLocalMerge } from '../../apps/server/src/services/local-merge.js';
+import { localGateFacts } from '../../apps/server/src/services/local-merge-facts.js';
 import {
   AGENT_ID,
   api,
@@ -146,7 +159,12 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
       server.url,
       server.teamId,
       { title: 'G2-T2 local 探针', spec: '在 README.md 追加一行 g2t2 probe line。' },
-      { repoKind: 'local', localPath: userRepo, projectName: 'g2t2-local' },
+      {
+        repoKind: 'local',
+        localPath: userRepo,
+        projectName: 'g2t2-local',
+        mergePolicy: 'human',
+      },
     );
     projectId = world.projectId;
     todoId = world.todoId;
@@ -185,7 +203,7 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
     expect(readFileSync(join(userRepo, 'README.md'), 'utf8')).not.toContain('g2t2 probe line');
 
     const mergeRes = await api(server.url, 'POST', `/api/builds/${buildId}/merge`, {});
-    expect(mergeRes.status).toBe(202);
+    expect(mergeRes.status, JSON.stringify(mergeRes.body)).toBe(202);
     expect(mergeRes.body).toEqual({ delegated: true });
     await waitFor(() => server.todoPhase(todoId) === 'done', 120_000);
 
@@ -207,7 +225,12 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
       server.url,
       server.teamId,
       { title: 'G2-T2 脏区探针', spec: '在 README.md 追加一行 g2t2 dirty probe。' },
-      { repoKind: 'local', localPath: dirtyRepo, projectName: 'g2t2-dirty' },
+      {
+        repoKind: 'local',
+        localPath: dirtyRepo,
+        projectName: 'g2t2-dirty',
+        mergePolicy: 'human',
+      },
     );
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
@@ -225,7 +248,7 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
     const headBefore = await headOf(dirtyRepo);
 
     const mergeRes = await api(server.url, 'POST', `/api/builds/${dirtyBuildId}/merge`, {});
-    expect(mergeRes.status).toBe(202);
+    expect(mergeRes.status, JSON.stringify(mergeRes.body)).toBe(202);
     await waitFor(() => server.todoPhase(world.todoId) === 'done', 120_000);
 
     const buildRow = server.db
@@ -249,3 +272,152 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
     expect(readFileSync(join(dirtyRepo, 'README.md'), 'utf8')).toContain('USER UNCOMMITTED WORK');
   }, 200_000);
 });
+
+for (const checkout of ['default', 'other', 'dirty'] as const) {
+  test(`autonomous local landing through claim and report with a ${checkout} checkout`, async () => {
+    const repo = await seedUserRepo();
+    const git = async (args: string[]) => {
+      const result = await runGit(args, { cwd: repo, env: commitEnv(IDENTITY) });
+      expect(result.code, result.stderr).toBe(0);
+      return result.stdout.trim();
+    };
+    const base = await headOf(repo);
+    const world = await seedWorld(
+      server.url,
+      server.teamId,
+      {
+        title: 'Land autonomous local candidate',
+        spec: 'Seeded ready verdict for local executor acceptance.',
+      },
+      { repoKind: 'local', localPath: repo, mergePolicy: 'autonomous' },
+    );
+    const checks = ['test -f apps/web/src/local.ts'];
+    expect(
+      (
+        await api(server.url, 'PATCH', `/api/projects/${world.projectId}/merge-policy`, {
+          localChecks: checks,
+        })
+      ).status,
+    ).toBe(200);
+    const buildId = randomUUID();
+    await git(['checkout', '-b', conversationBranch(buildId)]);
+    mkdirSync(join(repo, 'apps/web/src'), { recursive: true });
+    writeFileSync(join(repo, 'apps/web/src/local.ts'), 'export const value = 1;\n');
+    await git(['add', 'apps/web/src/local.ts']);
+    await git(['commit', '-m', 'candidate']);
+    const head = await headOf(repo);
+    await git(['checkout', 'main']);
+    if (checkout === 'other') await git(['checkout', '-b', 'user']);
+    if (checkout === 'dirty') writeFileSync(join(repo, 'README.md'), 'uncommitted user work\n');
+    server.db
+      .insert(buildTable)
+      .values({
+        id: buildId,
+        todoId: world.todoId,
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: Date.now(),
+      })
+      .run();
+    server.db
+      .update(todoTable)
+      .set({
+        phase: 'review',
+        latestBuildId: buildId,
+        assignment: { plan: null, build: { agentId: AGENT_ID } },
+        sourceRef: 'github:xiechimon/cairn#1625',
+      })
+      .where(eq(todoTable.id, world.todoId))
+      .run();
+    server.db
+      .insert(stepTable)
+      .values([
+        {
+          id: randomUUID(),
+          buildId,
+          kind: 'plan',
+          machineId: null,
+          status: 'done',
+          prompt: null,
+          createdAt: Date.now(),
+          checkpointCommit: base,
+        },
+        {
+          id: randomUUID(),
+          buildId,
+          kind: 'build',
+          machineId: null,
+          status: 'done',
+          prompt: null,
+          createdAt: Date.now() + 1,
+          checkpointCommit: head,
+        },
+      ])
+      .run();
+    const deps = { db: server.db, hub: new TeamStreamHub(), user: seed(server.db).user };
+    const judgedDigest = (await localGateFacts(deps, buildId, 'main'))?.readiness.patchDigest ?? '';
+    expect(judgedDigest).toMatch(/^pd2:/);
+    server.db
+      .insert(gateVerdictTable)
+      .values(
+        (
+          [
+            { kind: 'verify' as const, perspective: null },
+            { kind: 'review' as const, perspective: 'correctness' },
+            { kind: 'decision' as const, perspective: null },
+          ] as const
+        ).map((v, index) => ({
+          stepId: randomUUID(),
+          buildId,
+          kind: v.kind,
+          perspective: v.perspective,
+          outcome: 'pass' as const,
+          patchDigest: judgedDigest,
+          headSha: head,
+          expectedHeadSha: head,
+          createdAt: Date.now() + index,
+        })),
+      )
+      .run();
+    server.db
+      .insert(gateStateTable)
+      .values({
+        buildId,
+        ready: true,
+        headSha: head,
+        patchDigest: judgedDigest,
+        policy: 'autonomous',
+        blockers: [],
+        evaluatedAt: Date.now(),
+      })
+      .run();
+    const queued = await enqueueLocalMerge(deps, buildId, 'main');
+    expect(queued.readiness?.blockers).toEqual([]);
+    expect(queued.enqueued).toBe(true);
+    await waitFor(
+      () =>
+        server.db
+          .select()
+          .from(stepTable)
+          .where(eq(stepTable.buildId, buildId))
+          .all()
+          .find((row) => row.kind === 'merge')?.status === 'done',
+      30_000,
+    );
+    const defaultHead = await git(['rev-parse', 'main']);
+    if (checkout === 'dirty') {
+      expect(defaultHead).toBe(base);
+      expect(server.todoPhase(world.todoId)).toBe('review');
+      expect(readFileSync(join(repo, 'README.md'), 'utf8')).toBe('uncommitted user work\n');
+    } else {
+      expect(server.todoPhase(world.todoId)).toBe('done');
+      expect(await git(['rev-list', '--count', `${base}..main`])).toBe('1');
+      expect(await git(['rev-parse', 'main^'])).toBe(base);
+      expect(await git(['rev-parse', 'main^{tree}'])).toBe(
+        await git(['rev-parse', `${head}^{tree}`]),
+      );
+      expect(await headOf(repo)).toBe(checkout === 'default' ? defaultHead : base);
+      expect(existsSync(join(repo, 'apps/web/src/local.ts'))).toBe(checkout === 'default');
+    }
+  }, 60_000);
+}

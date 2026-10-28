@@ -10,6 +10,7 @@ import {
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
+  parseLocalMergeInstruction,
   type SkillInjectionRecord,
   selectSkillsForTask,
   suggestSkillsForMessage,
@@ -45,6 +46,7 @@ import {
 } from './machine-deps.js';
 import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
+import { projectMergeConfigOf } from './projects.js';
 import { scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
 import { setTodoPhase } from './todos.js';
@@ -282,6 +284,26 @@ async function tryClaim(
   }
 
   for (const cand of workerCands) {
+    const localMerge = parseLocalMergeInstruction(cand.stepRow.prompt);
+    if (localMerge !== null) {
+      const project = projectOfTodo(db, cand.todoRow);
+      const config = project ? projectMergeConfigOf(project) : null;
+      if (
+        project?.repoKind !== 'local' ||
+        project.id !== localMerge.projectId ||
+        config?.mergePolicy !== 'autonomous' ||
+        JSON.stringify(config.localChecks) !== JSON.stringify(localMerge.localChecks) ||
+        cand.todoRow.phase !== 'review' ||
+        cand.todoRow.latestBuildId !== localMerge.buildId
+      ) {
+        failStepWithEvents(
+          deps,
+          cand.stepRow,
+          'Local merge authorization changed; a new judgment is required',
+        );
+        continue;
+      }
+    }
     const agentRow = agentForStep(deps, cand.todoRow, cand.stepRow.kind, cand.stepRow.prompt);
     if (agentRow === null) {
       failStepWithEvents(
@@ -399,6 +421,7 @@ async function tryClaim(
         createdAt: cand.stepRow.createdAt,
       },
       conversationId: cand.stepRow.buildId,
+      ...(localMerge !== null ? { localMerge } : {}),
       session,
       ...(instruction !== null ? { instruction } : {}),
       todo: {

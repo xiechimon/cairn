@@ -1,0 +1,35 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-2047-contained-push/cairn
+
+ ❯ |@xiechimon/cairn-cli| test/git.test.ts (90 tests | 1 failed | 89 skipped) 512ms
+   × #2047 branch-gated pre-push checks still receive the named branch ref 511ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 branch-gated pre-push checks still receive the named branch ref
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ test/git.test.ts:1098:48
+    1096|   chmodSync(hook, 0o755);
+    1097|
+    1098|   await expect(gitPrim.push(dir, 'work', null)).rejects.toMatchObject(…
+       |                                                ^
+    1099| }, 30_000);
+    1100|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 89 skipped (90)
+   Start at  13:09:46
+   Duration  961ms (tests 58%, transform 25%, import 17%)
+

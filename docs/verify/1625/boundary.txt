@@ -1,0 +1,56 @@
+
+=== default: BEFORE ===
+$ git log -1 --format=%h %s
+eda2f0c base
+$ git status --short --branch
+## main
+$ daemon landLocalMerge (checks: true)
+{"outcome":"merged","commit":"533bf2b0ea436e3e8322ea35ebc32bfabd438a89"}
+=== default: AFTER ===
+$ git log -1 --format=%h %s
+533bf2b Deliver local candidate
+$ git log -1 main --format=%h %s
+533bf2b Deliver local candidate
+$ git status --short --branch
+## main
+$ git rev-list --count eda2f0c8a0fbb435d5d20dd6ab04c56c71855484..main
+1
+file.txt: "candidate\n"
+
+=== other: BEFORE ===
+$ git log -1 --format=%h %s
+eda2f0c base
+$ git status --short --branch
+## user
+$ daemon landLocalMerge (checks: true)
+{"outcome":"merged","commit":"533bf2b0ea436e3e8322ea35ebc32bfabd438a89"}
+=== other: AFTER ===
+$ git log -1 --format=%h %s
+eda2f0c base
+$ git log -1 main --format=%h %s
+533bf2b Deliver local candidate
+$ git status --short --branch
+## user
+$ git rev-list --count eda2f0c8a0fbb435d5d20dd6ab04c56c71855484..main
+1
+file.txt: "base\n"
+
+=== dirty: BEFORE ===
+$ git log -1 --format=%h %s
+eda2f0c base
+$ git status --short --branch
+## main
+ M file.txt
+$ daemon landLocalMerge (checks: true)
+{"outcome":"held","reason":"worktree-dirty"}
+=== dirty: AFTER ===
+$ git log -1 --format=%h %s
+eda2f0c base
+$ git log -1 main --format=%h %s
+eda2f0c base
+$ git status --short --branch
+## main
+ M file.txt
+$ git rev-list --count eda2f0c8a0fbb435d5d20dd6ab04c56c71855484..main
+0
+file.txt: "USER UNCOMMITTED WORK\n"

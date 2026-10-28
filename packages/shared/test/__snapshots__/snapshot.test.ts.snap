@@ -142,6 +142,80 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "null",
       ],
     },
+    "localMerge": {
+      "additionalProperties": false,
+      "properties": {
+        "buildId": {
+          "type": "string",
+        },
+        "defaultBranch": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "identity": {
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "email",
+          ],
+          "type": "object",
+        },
+        "judgedBase": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string",
+        },
+        "judgedHead": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string",
+        },
+        "judgedPatchDigest": {
+          "pattern": "^pd2:[0-9a-f]{64}$",
+          "type": "string",
+        },
+        "localChecks": {
+          "items": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "message": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "projectId": {
+          "type": "string",
+        },
+        "workBranch": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "projectId",
+        "buildId",
+        "defaultBranch",
+        "workBranch",
+        "judgedBase",
+        "judgedHead",
+        "judgedPatchDigest",
+        "localChecks",
+        "message",
+        "identity",
+      ],
+      "type": "object",
+    },
     "localTools": {
       "items": {
         "type": "string",
@@ -710,6 +784,80 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "null",
               ],
             },
+            "localMerge": {
+              "additionalProperties": false,
+              "properties": {
+                "buildId": {
+                  "type": "string",
+                },
+                "defaultBranch": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "identity": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "email": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "name": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "name",
+                    "email",
+                  ],
+                  "type": "object",
+                },
+                "judgedBase": {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string",
+                },
+                "judgedHead": {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string",
+                },
+                "judgedPatchDigest": {
+                  "pattern": "^pd2:[0-9a-f]{64}$",
+                  "type": "string",
+                },
+                "localChecks": {
+                  "items": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "message": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "projectId": {
+                  "type": "string",
+                },
+                "workBranch": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "projectId",
+                "buildId",
+                "defaultBranch",
+                "workBranch",
+                "judgedBase",
+                "judgedHead",
+                "judgedPatchDigest",
+                "localChecks",
+                "message",
+                "identity",
+              ],
+              "type": "object",
+            },
             "localTools": {
               "items": {
                 "type": "string",
@@ -1194,6 +1342,134 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     },
     "hasChanges": {
       "type": "boolean",
+    },
+    "localMerge": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "additionalProperties": false,
+          "properties": {
+            "buildId": {
+              "type": "string",
+            },
+            "defaultBranch": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "identity": {
+              "additionalProperties": false,
+              "properties": {
+                "email": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "name": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "name",
+                "email",
+              ],
+              "type": "object",
+            },
+            "judgedBase": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string",
+            },
+            "judgedHead": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string",
+            },
+            "judgedPatchDigest": {
+              "pattern": "^pd2:[0-9a-f]{64}$",
+              "type": "string",
+            },
+            "localChecks": {
+              "items": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "minItems": 1,
+              "type": "array",
+            },
+            "message": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "projectId": {
+              "type": "string",
+            },
+            "workBranch": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "projectId",
+            "buildId",
+            "defaultBranch",
+            "workBranch",
+            "judgedBase",
+            "judgedHead",
+            "judgedPatchDigest",
+            "localChecks",
+            "message",
+            "identity",
+          ],
+          "type": "object",
+        },
+        "result": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "commit": {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string",
+                },
+                "outcome": {
+                  "const": "merged",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "outcome",
+                "commit",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "outcome": {
+                  "enum": [
+                    "held",
+                    "recheck",
+                    "checks-failed",
+                  ],
+                  "type": "string",
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "outcome",
+                "reason",
+              ],
+              "type": "object",
+            },
+          ],
+        },
+      },
+      "required": [
+        "command",
+        "result",
+      ],
+      "type": "object",
     },
     "noOutput": {
       "const": true,

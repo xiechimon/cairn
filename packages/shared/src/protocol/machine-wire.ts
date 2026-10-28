@@ -72,7 +72,57 @@ export const machineClaimBodySchema = z.object({
 });
 export type MachineClaimBody = z.infer<typeof machineClaimBodySchema>;
 
+export const localMergeCommandSchema = z.object({
+  projectId: recordId,
+  buildId: recordId,
+  defaultBranch: z.string().min(1),
+  workBranch: z.string().min(1),
+  judgedBase: z.string().regex(/^[0-9a-f]{40}$/),
+  judgedHead: z.string().regex(/^[0-9a-f]{40}$/),
+  judgedPatchDigest: z.string().regex(/^pd2:[0-9a-f]{64}$/),
+  localChecks: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .refine((command) => command.trim().length > 0),
+    )
+    .min(1),
+  message: z.string().min(1),
+  identity: z.object({ name: z.string().min(1), email: z.string().min(1) }),
+});
+export type LocalMergeCommand = z.infer<typeof localMergeCommandSchema>;
+
+export const localMergeInstructionSchema = z.object({
+  kind: z.literal('local-merge'),
+  command: localMergeCommandSchema,
+});
+
+export function parseLocalMergeInstruction(
+  prompt: string | null | undefined,
+): LocalMergeCommand | null {
+  if (prompt == null || !prompt.startsWith('{')) return null;
+  try {
+    const parsed = localMergeInstructionSchema.safeParse(JSON.parse(prompt));
+    return parsed.success ? parsed.data.command : null;
+  } catch {
+    return null;
+  }
+}
+
+export const localMergeResultSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('merged'), commit: z.string().regex(/^[0-9a-f]{40}$/) }),
+  z.object({ outcome: z.enum(['held', 'recheck', 'checks-failed']), reason: z.string().min(1) }),
+]);
+export type LocalMergeResult = z.infer<typeof localMergeResultSchema>;
+export const localMergeReportSchema = z.object({
+  command: localMergeCommandSchema,
+  result: localMergeResultSchema,
+});
+export type LocalMergeReport = z.infer<typeof localMergeReportSchema>;
+
 export const claimedStepSchema = z.object({
+  localMerge: localMergeCommandSchema.optional(),
   step: stepRecordSchema,
   conversationId: recordId,
   session: z.object({
@@ -315,6 +365,7 @@ export const quotaBlockSchema = z.object({
 export type QuotaBlock = z.infer<typeof quotaBlockSchema>;
 
 export const machineDoneBodySchema = z.object({
+  localMerge: localMergeReportSchema.optional(),
   status: z.enum(['success', 'failed', 'stopped']),
   errorMessage: z.string().optional(),
   sessionId: z.string().optional(),
