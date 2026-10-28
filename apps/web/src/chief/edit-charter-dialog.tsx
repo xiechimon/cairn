@@ -6,6 +6,7 @@ import {
   DialogShell,
 } from '../components/ui/dialog-shell.js';
 import { Textarea } from '../components/ui/textarea.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 
 interface EditCharterDialogProps {
@@ -23,7 +24,10 @@ export function EditCharterDialog({ open, onClose, charter, onSave }: EditCharte
   }, [open, charter]);
   const save = () => {
     if (onSave != null) onSave(text);
-    else onClose();
+    else {
+      blockDemoWrite();
+      onClose();
+    }
   };
   return (
     <DialogShell

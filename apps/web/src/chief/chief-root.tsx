@@ -5,6 +5,7 @@ import { BOARD_VIEW_PARAM } from '../board/home.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
+import { DEMO_MODE } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { TaskPanelRoot } from '../task-panel/task-panel-root.js';
@@ -31,11 +32,10 @@ function isDetailRoute(pathname: string): boolean {
 }
 
 export function isChiefHome(pathname: string, searchParams: URLSearchParams): boolean {
-  return (
-    pathname === '/app' &&
-    searchParams.get(BOARD_VIEW_PARAM) !== 'board' &&
-    parseColumnParam(searchParams.get(COLUMN_PARAM)) === null
-  );
+  if (pathname !== '/app') return false;
+  if (parseColumnParam(searchParams.get(COLUMN_PARAM)) !== null) return false;
+  const view = searchParams.get(BOARD_VIEW_PARAM);
+  return DEMO_MODE ? view === 'home' : view !== 'board';
 }
 
 export function ChiefRoot() {

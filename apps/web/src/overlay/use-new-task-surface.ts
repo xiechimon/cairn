@@ -13,6 +13,7 @@ import {
 import { useLiveData } from '../api/provider.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { attachmentFailureTitle } from './attachment-paste.js';
@@ -91,6 +92,7 @@ export function useNewTaskSurface(fixture: FixtureSet, opts: NewTaskSurfaceOpts 
         );
         return;
       }
+      if (blockDemoWrite()) return;
       onFixtureSave?.(spec);
     },
     [

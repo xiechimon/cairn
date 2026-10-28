@@ -12,6 +12,7 @@ import { EmptyState } from '../components/empty-state.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { TEAM_NAME } from '../fixtures/fixtures.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -338,6 +339,7 @@ export function MachinesPage() {
   };
   const pickCap = (machine: MachineRow, n: number): Promise<unknown> | undefined => {
     if (!live || machine.id == null) {
+      if (blockDemoWrite()) return;
       setCapDraft((prev) => ({ ...prev, [rowKey(machine)]: n }));
       return;
     }
@@ -345,6 +347,7 @@ export function MachinesPage() {
   };
   const resetCap = (machine: MachineRow): Promise<unknown> | undefined => {
     if (!live || machine.id == null) {
+      if (blockDemoWrite()) return;
       setCapDraft((prev) => ({
         ...prev,
         [rowKey(machine)]: machine.recommendedConcurrent ?? machine.maxConcurrent ?? 1,

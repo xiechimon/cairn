@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow, ModelOption } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { MACHINES_HREF } from '../resources/machines-page.js';
@@ -68,6 +69,10 @@ export function CreateAgentDialog({
   const submit = () => {
     const displayName = name.trim();
     if (displayName === '' || machineId === null) return;
+    if (blockDemoWrite()) {
+      onClose();
+      return;
+    }
     if (onCreate != null) {
       onCreate({ displayName, provider, modelId, machineId });
     } else {
