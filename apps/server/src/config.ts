@@ -57,6 +57,8 @@ export const serverConfigSchema = z.object({
   mcpConfigPath: z.string(),
   issueIntake: z.boolean(),
   trajectoryOutcomeBackfill: z.boolean(),
+  trajectoryReflectCurate: z.boolean(),
+  trajectoryReflectOpenGuardIssues: z.boolean(),
   pushDigestTimes: z
     .array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/))
     .length(2)
@@ -159,6 +161,8 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     ),
     issueIntake: envFlag(ENV_VARS.issueIntake),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
+    trajectoryReflectCurate: envFlag(ENV_VARS.trajectoryReflectCurate),
+    trajectoryReflectOpenGuardIssues: envFlag(ENV_VARS.trajectoryReflectOpenGuardIssues),
     pushDigestTimes: (() => {
       const raw = envStr('CAIRN_PUSH_DIGEST_TIMES');
       if (raw === null) return ['09:00', '18:00'];

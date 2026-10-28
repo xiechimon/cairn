@@ -2,7 +2,18 @@
 
 Following ACE (Agentic Context Engineering, https://arxiv.org/abs/2510.04618) and its three-role split: the producer is the agent running builds normally; the reflector reads trajectory packs (the output of `pnpm traj:export` from #1511 / #1514) to find reusable experience; the curator deterministically merges and dedupes experience entries and then decides where each lands.
 
-Both commands are developer-side offline tools and do not enter the server runtime path. Path parameters resolve under the `apps/server` directory (the working directory of `pnpm --filter`); passing absolute paths is the most reliable.
+Both commands remain available as offline CLIs. Path parameters resolve under the `apps/server` directory (the working directory of `pnpm --filter`); passing absolute paths is the most reliable.
+
+## Scheduled reflect → curate (server)
+
+When `CAIRN_TRAJ_REFLECT_CURATE=1` and the reflector env is set (`CAIRN_REFLECTOR_BASE_URL`, `CAIRN_REFLECTOR_API_KEY`, `CAIRN_REFLECTOR_MODEL`), the server scheduler runs the same path once per UTC day after the daily trajectory export:
+
+1. Read (or create) `trajectory-exports/<YYYY-MM-DD>.jsonl`
+2. `reflectPacks` → `experience-candidates/reflect/<date>.jsonl`
+3. `curateCandidates` into `experience-candidates/`
+4. Write `experience-candidates/reflect/<date>.done` so the day is not repeated
+
+Optional: `CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES=1` opens a GitHub issue for each **new** `kind=guard` row when the project has a GitHub repo and the team has a token. Leave this off until a human wants auto-filed guard tickets.
 
 ## 1. Reflect: `pnpm traj:reflect`
 

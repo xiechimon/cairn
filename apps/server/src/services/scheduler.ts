@@ -12,6 +12,13 @@ import {
   type OutcomeBackfillLogger,
   sweepOutcomeBackfill,
 } from '../trajectory-outcome-backfill.js';
+import type { ReflectorEndpoint } from '../trajectory-reflect.js';
+import {
+  openGuardCandidateIssues,
+  REFLECT_CURATE_INTERVAL_MS,
+  type ReflectCurateLogger,
+  sweepReflectCurate,
+} from '../trajectory-reflect-curate.js';
 import {
   ATTACHMENT_GC_INTERVAL_MS,
   type GcLogger,
@@ -31,6 +38,7 @@ import { planChiefDigests } from './chief-digest.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
+import { githubTokenOrNull } from './github-connection.js';
 import {
   createIssueIntake,
   ISSUE_INTAKE_INTERVAL_MS,
@@ -106,6 +114,56 @@ export function trajectoryOutcomeRunOf(
   return config.trajectoryOutcomeBackfill ? run : null;
 }
 
+export interface TrajectoryReflectCurateRun {
+  logger: ReflectCurateLogger;
+  config: ServerConfig;
+  model: string;
+  endpoint: ReflectorEndpoint;
+  openGuardIssues: boolean;
+}
+
+export function trajectoryReflectCurateRunOf(
+  config: {
+    trajectoryReflectCurate: boolean;
+    trajectoryReflectOpenGuardIssues: boolean;
+  },
+  run: {
+    logger: ReflectCurateLogger;
+    config: ServerConfig;
+    model: string;
+    endpoint: ReflectorEndpoint;
+  },
+): TrajectoryReflectCurateRun | null {
+  if (!config.trajectoryReflectCurate) {
+    run.logger.info(
+      { trajectoryReflectCurate: false },
+      `trajectory reflect-curate off (set ${ENV_VARS.trajectoryReflectCurate}=1 to enable)`,
+    );
+    return null;
+  }
+  if (run.model === '' || run.endpoint.baseUrl === '' || run.endpoint.apiKey === '') {
+    run.logger.info(
+      { trajectoryReflectCurate: true },
+      'trajectory reflect-curate off (missing reflector model, CAIRN_REFLECTOR_BASE_URL, or CAIRN_REFLECTOR_API_KEY)',
+    );
+    return null;
+  }
+  run.logger.info(
+    {
+      trajectoryReflectCurate: true,
+      openGuardIssues: config.trajectoryReflectOpenGuardIssues,
+    },
+    `trajectory reflect-curate on (${ENV_VARS.trajectoryReflectCurate})`,
+  );
+  return {
+    logger: run.logger,
+    config: run.config,
+    model: run.model,
+    endpoint: run.endpoint,
+    openGuardIssues: config.trajectoryReflectOpenGuardIssues,
+  };
+}
+
 const CANCEL_GATE_PHASES = new Set(['confirm', 'review']);
 
 export function createScheduler(
@@ -116,6 +174,7 @@ export function createScheduler(
   intake?: IssueIntakeRun | null,
   outcome?: TrajectoryOutcomeRun | null,
   exportRun?: TrajectoryExportRun | null,
+  reflectCurate?: TrajectoryReflectCurateRun | null,
 ): Scheduler {
   let timer: NodeJS.Timeout | null = null;
   const lastDigestRun = new Map<string, number>();
@@ -137,6 +196,8 @@ export function createScheduler(
   let outcomeSweeping = false;
   let exportTimer: NodeJS.Timeout | null = null;
   let exportSweeping = false;
+  let reflectCurateTimer: NodeJS.Timeout | null = null;
+  let reflectCurateSweeping = false;
 
   function advanceGc(): void {
     if (!gc || !gcBatches) return;
@@ -313,8 +374,55 @@ export function createScheduler(
         exportTimer = setInterval(sweep, OUTCOME_BACKFILL_INTERVAL_MS);
         exportTimer.unref?.();
       }
+      if (reflectCurate !== undefined && reflectCurate !== null) {
+        const run = reflectCurate;
+        const openNewGuards =
+          run.openGuardIssues && deps.githubFetch !== undefined
+            ? (guards: Parameters<typeof openGuardCandidateIssues>[1]) =>
+                openGuardCandidateIssues(
+                  {
+                    db: deps.db,
+                    githubFetch: deps.githubFetch as FetchLike,
+                    tokenForTeam: (teamId) => githubTokenOrNull(deps, teamId),
+                    logger: run.logger,
+                  },
+                  guards,
+                )
+            : undefined;
+        const sweep = () => {
+          if (reflectCurateSweeping) return;
+          reflectCurateSweeping = true;
+          void sweepReflectCurate({
+            config: run.config,
+            db: deps.db,
+            logger: run.logger,
+            model: run.model,
+            endpoint: run.endpoint,
+            openNewGuards,
+          })
+            .then((summary) => {
+              run.logger.info(summary, 'trajectory reflect-curate');
+            })
+            .catch((err) => {
+              run.logger.info(
+                { err: err instanceof Error ? err.message : String(err) },
+                'trajectory reflect-curate failed (scheduler continues)',
+              );
+            })
+            .finally(() => {
+              reflectCurateSweeping = false;
+            });
+        };
+        sweep();
+        reflectCurateTimer = setInterval(sweep, REFLECT_CURATE_INTERVAL_MS);
+        reflectCurateTimer.unref?.();
+      }
     },
     stop() {
+      if (reflectCurateTimer !== null) {
+        clearInterval(reflectCurateTimer);
+        reflectCurateTimer = null;
+      }
       if (exportTimer !== null) {
         clearInterval(exportTimer);
         exportTimer = null;

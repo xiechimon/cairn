@@ -28,6 +28,7 @@ import {
   issueIntakeRunOf,
   trajectoryExportRunOf,
   trajectoryOutcomeRunOf,
+  trajectoryReflectCurateRunOf,
 } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
@@ -131,6 +132,15 @@ const scheduler = createScheduler(
   issueIntakeRunOf(config, { githubFetch, logger }),
   trajectoryOutcomeRunOf(config, { logger }),
   trajectoryExportRunOf(config, { logger }),
+  trajectoryReflectCurateRunOf(config, {
+    logger,
+    config,
+    model: process.env.CAIRN_REFLECTOR_MODEL ?? '',
+    endpoint: {
+      baseUrl: process.env.CAIRN_REFLECTOR_BASE_URL ?? '',
+      apiKey: process.env.CAIRN_REFLECTOR_API_KEY ?? '',
+    },
+  }),
 );
 scheduler.start();
 
