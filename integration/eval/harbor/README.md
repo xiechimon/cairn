@@ -39,3 +39,55 @@ isolation claim concerns what Harbor exposes inside the agent container. The
 oracle intentionally has the answer. This control does not defend against an
 agent with access to the host, Docker socket, or public repository over a separate
 channel.
+
+# Harbor submission boundary
+
+`submission.mts` exports `HarborSubmission`. It submits an instruction through real
+Cairn routes and polls the todo, build and conversation messages. It does not
+execute workspaces, install an executor or produce benchmark scores. The executor
+tracked by #1792 is not present in this checkout; this boundary can be reused by
+that adapter without introducing another executor.
+
+Supply configuration through the calling process environment:
+
+- `CAIRN_SERVER_URL`: HTTP or HTTPS origin, without credentials, a path or query.
+- `CAIRN_SERVER_TOKEN`: the server's web authentication token. Used only on protected
+  project, todo, build and conversation routes.
+- `CAIRN_MACHINE_TOKEN`: the enrolled machine credential. Used only on
+  `/api/machine/me`; it cannot replace the server token.
+- `CAIRN_TEAM_ID` and `CAIRN_MACHINE_ID`: expected authenticated machine identity.
+- `CAIRN_PROJECT_ID`: required explicit project belonging to that team.
+- `CAIRN_AGENT_ID`: agent assigned to the build.
+
+Load credentials from the environment using your existing secret provisioning.
+Do not interpolate them into shell commands, benchmark instructions, command-line
+arguments, checked-in configuration or artifacts. If a container adapter calls
+this boundary, forward the complete configuration through its environment API,
+including `CAIRN_PROJECT_ID`, rather than constructing a shell command.
+
+Construct `new HarborSubmission(process.env)`, call `submit(instruction)`, retain
+the returned `{ todoId, buildId }`, and pass it to `poll(task)`. Polling defaults
+to 25 minutes with a five-second interval; `timedOut` distinguishes a nonterminal
+todo from a completed one. Failed HTTP requests throw a status-only error;
+transport and JSON errors do not include request headers or response bodies.
+No project fallback exists. Configuration and machine/project membership are
+validated before either creation request. Creation is not transactional: retain
+`created` and `outcomes` if build creation fails after the todo was created, and inspect the
+server before retrying to avoid duplicate submissions.
+
+`outcomes` contains only method, route and HTTP status. Credential fields use
+JavaScript private storage, and polled results redact literal credentials before
+being returned. Treat other task content as sensitive independently. Do not
+collect environment dumps or arbitrary transport diagnostics.
+
+Run the authenticated integration coverage with:
+
+```sh
+pnpm exec vitest run integration/test/harbor-submission.test.ts
+```
+
+Set `HARBOR_EVIDENCE_PATH` to an output file to retain the successful scenario's
+record IDs and request outcomes. The tests use random ephemeral credentials,
+real server authentication middleware, real routes and an in-memory database;
+no daemon or listening server is started. Workspace execution and benchmark
+reporting remain separate tickets.

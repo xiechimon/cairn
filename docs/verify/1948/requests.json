@@ -1,0 +1,43 @@
+{
+  "task": {
+    "todoId": "5aZ8PNCXBSZDDXiRbqIjE",
+    "buildId": "01a18002-6fcf-7600-831f-fc07e4ccfbc1"
+  },
+  "outcomes": [
+    {
+      "method": "GET",
+      "route": "/api/machine/me",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "route": "/api/projects?teamId=d0eJOOsC94ZbBDl2j_A2U",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/api/projects/second/todos",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "route": "/api/projects/second/builds",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "route": "/api/todos/5aZ8PNCXBSZDDXiRbqIjE",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "route": "/api/builds/01a18002-6fcf-7600-831f-fc07e4ccfbc1",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "route": "/api/conversations/01a18002-6fcf-7600-831f-fc07e4ccfbc1/messages",
+      "status": 200
+    }
+  ]
+}
