@@ -1,0 +1,63 @@
+{
+  "flow": "plan",
+  "note": "Single-turn plan coverage through the chief-dispatch runner. Cases ask chief to write a plan as persisted todos; grading reads todo title+spec only (assistant prose does not count). expect.kind must be plan. include is alias groups (any alias in a group hits; every group must hit). exclude is forbidden. minSplits/maxSplits are inclusive bounds on the number of persisted plan cards (ADR 0024: split when work is independent; keep a single card for single-view single-artifact work).",
+  "roster": [
+    {
+      "key": "doc",
+      "displayName": "Doc",
+      "modelId": "qwen3.8-max",
+      "description": "Owns reader-facing docs: README, tutorials, changelogs. Does not change product code."
+    },
+    {
+      "key": "code",
+      "displayName": "Code",
+      "modelId": "glm-5.3",
+      "description": "Owns server, daemon, and shared package implementation and fixes. Does not own UI layout."
+    },
+    {
+      "key": "frontend",
+      "displayName": "Frontend",
+      "modelId": "kimi-k3",
+      "description": "Owns apps/web layout, components, and client behavior. Does not own backend APIs."
+    },
+    {
+      "key": "ops",
+      "displayName": "Ops",
+      "modelId": "glm-5.3",
+      "description": "Owns CI, packaging, deploy config, and local tooling. Does not implement product features."
+    }
+  ],
+  "cases": [
+    {
+      "id": "plan-001-no-split",
+      "tags": ["plan", "no-split"],
+      "prompt": "Export button does nothing on Safari. Write a plan that finds the cause in the client download path and covers verification. Keep it as one card: this is a single-view single-artifact fix.",
+      "expect": {
+        "kind": "plan",
+        "include": [
+          ["download attribute", "blob url", "safari"],
+          ["test", "regression", "verify"]
+        ],
+        "exclude": ["more logging", "only logging"],
+        "minSplits": 1,
+        "maxSplits": 1
+      }
+    },
+    {
+      "id": "plan-002-required-split",
+      "tags": ["plan", "required-split"],
+      "prompt": "Ship an export feature end to end: add a server export endpoint, wire the web export button, and document the user steps. These are independent deliverables across server, web, and docs, so split the plan into separate cards.",
+      "expect": {
+        "kind": "plan",
+        "include": [
+          ["export endpoint", "server export", "/export"],
+          ["export button", "web button", "apps/web"],
+          ["document", "docs", "readme"]
+        ],
+        "exclude": ["skip docs", "no documentation"],
+        "minSplits": 3,
+        "maxSplits": 6
+      }
+    }
+  ]
+}

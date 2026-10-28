@@ -130,6 +130,7 @@ export const CHIEF_DISPATCH_HARNESS_PATHS = [
   'apps/server/src/services/chief-tools.ts',
   'packages/shared/src/protocol/chief-tools.ts',
   `${CHIEF_DISPATCH_DIR}/grade.mts`,
+  'integration/eval/plan/grade.mts',
   `${CHIEF_DISPATCH_DIR}/infra-retry.mts`,
   'integration/eval/adoption/judge.mts',
   `${CHIEF_DISPATCH_DIR}/family-coverage.mts`,
