@@ -311,6 +311,9 @@ export const EN: Record<string, string> = {
   名称: 'Name',
   语言: 'Language',
   推送通知: 'Push notifications',
+  在这台设备上接收推送: 'Push on this device',
+  '需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到':
+    'Push immediately when a decision is needed; everything else lands in the twice-daily digest — even on the lock screen',
   '首个 PR': 'First PR',
   '首个 PR 社区提示': 'First-PR community prompt',
   '团队设置，默认关闭。首个 PR 完成后显示分享链接，由你决定是否在 GitHub 发布。':

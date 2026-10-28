@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DB_TABLES } from '@cairn/shared';
-import { is } from 'drizzle-orm';
+import { is, sql } from 'drizzle-orm';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { getTableConfig, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { describe, expect, test } from 'vitest';
 import { MIGRATIONS_FOLDER, openMemoryDb } from '../src/db/client.js';
@@ -13,7 +14,7 @@ describe('the 37-table migration (the 01 §6 list)', () => {
     const tables = Object.values(schema).filter((v) => is(v, SQLiteTable));
     const names = tables.map((t) => getTableConfig(t as SQLiteTable).name).sort();
     expect(names).toEqual([...DB_TABLES].sort());
-    expect(names).toHaveLength(39);
+    expect(names).toHaveLength(41);
     expect(names).toContain('chief');
     expect(names).toContain('attachment');
     expect(names).toContain('branch_sync');
@@ -34,6 +35,21 @@ describe('the 37-table migration (the 01 §6 list)', () => {
     for (const table of DB_TABLES) {
       expect(allSql, `missing CREATE TABLE \`${table}\``).toContain(`CREATE TABLE \`${table}\``);
     }
+  });
+
+  test('upgrades a database already migrated through the previous main migration', () => {
+    const db = openMemoryDb();
+    const journal = JSON.parse(
+      readFileSync(resolve(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
+    ) as { entries: { tag: string; when: number }[] };
+    const pushMigration = journal.entries.find((entry) => entry.tag === '0065_push_subscription');
+    if (pushMigration === undefined) throw new Error('push migration missing');
+    db.run(sql`DROP TABLE push_subscription`);
+    db.run(sql`DROP TABLE push_digest_item`);
+    db.run(sql`DELETE FROM __drizzle_migrations WHERE created_at = ${pushMigration.when}`);
+    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    expect(db.select().from(schema.pushSubscription).all()).toEqual([]);
+    expect(db.select().from(schema.pushDigestItem).all()).toEqual([]);
   });
 
   test('the migrations apply cleanly to an in-memory db', () => {

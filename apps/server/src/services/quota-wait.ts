@@ -6,6 +6,7 @@ import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyQuotaWait } from './notifications.js';
+import type { VapidKeys } from './push.js';
 import { getTodo } from './todos.js';
 
 export interface QuotaWaitDeps {
@@ -14,6 +15,7 @@ export interface QuotaWaitDeps {
   convHub?: ConversationStreamHub;
   machineHub?: MachineWakeHub;
   user: UserRecord;
+  vapidKeys?: VapidKeys | null;
 }
 
 export const QUOTA_PROBE_BASE_MS = 60_000;

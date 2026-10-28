@@ -1,0 +1,31 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1686
+
+ ❯ |@xiechimon/cairn| test/push.test.ts (40 tests | 1 failed | 39 skipped) 10ms
+   ❯ VAPID configuration (3)
+     × accepts only an HTTPS origin for push links and normalizes its trailing slash 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push.test.ts > VAPID configuration > accepts only an HTTPS origin for push links and normalizes its trailing slash
+AssertionError: expected 'https://cairn.example/' to be 'https://cairn.example' // Object.is equality
+
+Expected: "https://cairn.example"
+Received: "https://cairn.example/"
+
+ ❯ test/push.test.ts:560:75
+    558|
+    559|   test('accepts only an HTTPS origin for push links and normalizes its…
+    560|     expect(loadConfig({ webOrigin: 'https://cairn.example/' }).webOrig…
+       |                                                                           ^
+    561|     for (const webOrigin of ['http://cairn.example', 'https://user:sec…
+    562|       expect(() => loadConfig({ webOrigin })).toThrow();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 39 skipped (40)
+   Start at  12:59:29
+   Duration  1.67s (transform 68%, import 32%, tests 1%)
+

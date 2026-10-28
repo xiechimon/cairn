@@ -498,9 +498,9 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
   });
 });
 
-describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity)', () => {
+describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
-    expect(DB_TABLES).toHaveLength(39);
+    expect(DB_TABLES).toHaveLength(41);
     expect(DB_TABLES).toContain('autonomy_state');
     expect(DB_TABLES).toContain('member_activity');
     expect(DB_TABLES).toContain('build_feedback');
@@ -512,6 +512,9 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(DB_TABLES).toContain('stop_pending');
     expect(DB_TABLES).toContain('github_connection');
     expect(DB_TABLES).toContain('schedule');
+    expect(DB_TABLES).toContain('feishu_binding');
+    expect(DB_TABLES).toContain('push_subscription');
+    expect(DB_TABLES).toContain('push_digest_item');
     expect(DB_TABLES).not.toContain('shell_command');
     expect(DB_TABLES).not.toContain('whats_new');
     expect(DB_TABLES).not.toContain('skill');

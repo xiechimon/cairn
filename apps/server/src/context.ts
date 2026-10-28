@@ -6,6 +6,7 @@ import type { ConversationStreamHub, TeamStreamHub } from './services/events.js'
 import type { PendingUpload } from './services/machine-uploads.js';
 import type { MachineWakeHub } from './services/machine-wake-hub.js';
 import type { OAuthClientConfig, OAuthStateEntry } from './services/oauth.js';
+import type { VapidKeys } from './services/push.js';
 import type { SkillImportFetch } from './services/skill-import.js';
 
 export interface AppContext {
@@ -14,6 +15,8 @@ export interface AppContext {
   machineHub: MachineWakeHub;
   convHub?: ConversationStreamHub;
   secretBox: SecretBox;
+  vapidKeys?: VapidKeys | null;
+  pushEndpointHosts?: ReadonlySet<string>;
   user: UserRecord;
   team: TeamRecord;
   pingIntervalMs: number;

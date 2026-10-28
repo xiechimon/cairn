@@ -40,6 +40,7 @@ export async function machineAsk(
     db: deps.db,
     hub: deps.hub,
     user: deps.user,
+    vapidKeys: deps.vapidKeys,
     ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
   };
   const { content } = createOrGetQuestion(qDeps, {
@@ -92,6 +93,7 @@ export async function executeRelayToolCall(
       machineHub: deps.machineHub,
       box: deps.box,
       user: deps.user,
+      vapidKeys: deps.vapidKeys,
       reposDir: deps.reposDir,
       attachmentsDir: deps.attachmentsDir,
       skillsDir: deps.skillsDir,
@@ -198,7 +200,13 @@ async function setTaskMeta(
     tagIds = [tagId];
   }
   const record = updateTodo(
-    { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+    {
+      db: deps.db,
+      hub: deps.hub,
+      machineHub: deps.machineHub,
+      user: deps.user,
+      vapidKeys: deps.vapidKeys,
+    },
     todoRow.id,
     { title, ...(tagIds !== undefined ? { tagIds } : {}) },
   );
@@ -249,6 +257,7 @@ async function setTaskMetaGithubForm(
     hub: deps.hub,
     machineHub: deps.machineHub,
     user: deps.user,
+    vapidKeys: deps.vapidKeys,
     box: deps.box,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };

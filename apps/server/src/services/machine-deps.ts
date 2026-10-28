@@ -10,6 +10,7 @@ import { agentForStep as agentForStepEligibility } from './dispatch-eligibility.
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { OAuthClientConfig } from './oauth.js';
+import type { VapidKeys } from './push.js';
 
 export function isChiefConversation(id: string): boolean {
   return isChiefConversationId(id);
@@ -21,6 +22,7 @@ export interface MachineDeps {
   machineHub: MachineWakeHub;
   box: SecretBox;
   user: UserRecord;
+  vapidKeys?: VapidKeys | null;
   reposDir: string;
   attachmentsDir: string;
   skillsDir: string;

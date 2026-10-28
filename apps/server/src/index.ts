@@ -22,6 +22,7 @@ import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { backfillPersonas } from './services/personas.js';
+import { loadOrCreateVapidKeys } from './services/push.js';
 import {
   createScheduler,
   issueIntakeRunOf,
@@ -49,6 +50,11 @@ if (refusal !== null) {
 
 const { db, close } = openDbWithHandle(config.dbPath, { legacyExportDir: config.homeDir });
 const secretBox = createKeyfileSecretBox(config.keyfilePath);
+const vapidKeys = loadOrCreateVapidKeys(
+  config.vapidKeysPath,
+  config.vapidSubject,
+  config.webOrigin,
+);
 const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
@@ -79,6 +85,7 @@ const app = createApp(
     machineHub,
     convHub,
     secretBox,
+    vapidKeys,
     user: seeded.user,
     team: seeded.team,
     pingIntervalMs: config.pingIntervalMs,
@@ -111,13 +118,14 @@ const scheduler = createScheduler(
     hub,
     machineHub,
     user: seeded.user,
+    vapidKeys,
     convHub,
     box: secretBox,
     reposDir,
     githubFetch,
     oauthClient: config.githubOauth,
   },
-  { tickMs: config.schedulerTickMs },
+  { tickMs: config.schedulerTickMs, pushDigestTimes: config.pushDigestTimes },
   { attachmentsDir, logger },
   { githubFetch, logger },
   issueIntakeRunOf(config, { githubFetch, logger }),

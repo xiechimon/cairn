@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import type { MergePolicy, ProjectRepoKind } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
+import webpush from 'web-push';
 import { createApp } from '../src/app.js';
 import type { AppContext } from '../src/context.js';
 import { openMemoryDb } from '../src/db/client.js';
@@ -15,6 +16,7 @@ import { newRecordId } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
+import type { VapidKeys } from '../src/services/push.js';
 
 export interface LegacyWorldIds {
   userId: string;
@@ -51,6 +53,9 @@ export function bootServer(
     oauthFetch?: AppContext['oauthFetch'];
     authToken?: string | null;
     tailscaleUsers?: string[];
+    vapidKeys?: VapidKeys | null;
+    webOrigin?: string;
+    pushEndpointHosts?: ReadonlySet<string>;
     mcpConfigPath?: string;
   } = {},
 ) {
@@ -60,6 +65,15 @@ export function bootServer(
   const machineHub = new MachineWakeHub();
   const convHub = new ConversationStreamHub();
   const secretBox = createEphemeralSecretBox();
+  const generatedVapidKeys = webpush.generateVAPIDKeys();
+  const vapidKeys =
+    opts.vapidKeys === undefined
+      ? {
+          ...generatedVapidKeys,
+          subject: 'mailto:push@cairn.dev',
+          webOrigin: opts.webOrigin ?? 'https://cairn.local',
+        }
+      : opts.vapidKeys;
   const ownReposDir = opts.reposDir === undefined;
   const reposDir = opts.reposDir ?? mkdtempSync(join(tmpdir(), 'cairn-server-repos-'));
   const ownAttDir = opts.attachmentsDir === undefined;
@@ -77,6 +91,8 @@ export function bootServer(
     machineHub,
     convHub,
     secretBox,
+    vapidKeys,
+    ...(opts.pushEndpointHosts !== undefined ? { pushEndpointHosts: opts.pushEndpointHosts } : {}),
     user,
     team,
     pingIntervalMs: opts.pingIntervalMs ?? 3_600_000,
@@ -108,13 +124,14 @@ export function bootServer(
     machineHub,
     convHub,
     secretBox,
+    vapidKeys,
     user,
     team,
     reposDir,
     attachmentsDir,
     skillsDir,
     oauthStates,
-    svc: { db, hub, machineHub, convHub, user, skillsDir },
+    svc: { db, hub, machineHub, convHub, user, skillsDir, vapidKeys },
     dispose(): void {
       if (ownReposDir) rmSync(reposDir, { recursive: true, force: true });
       if (ownAttDir) rmSync(attachmentsDir, { recursive: true, force: true });

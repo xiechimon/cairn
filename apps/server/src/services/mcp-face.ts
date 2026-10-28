@@ -159,6 +159,7 @@ export async function executeMcpTool(
     hub: deps.hub,
     machineHub: deps.machineHub,
     user: deps.user,
+    vapidKeys: deps.vapidKeys,
     box: deps.box,
     oauthClient: deps.oauthClient,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),

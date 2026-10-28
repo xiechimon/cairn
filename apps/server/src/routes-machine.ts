@@ -146,6 +146,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     machineHub: ctx.machineHub,
     box: ctx.secretBox,
     user: ctx.user,
+    vapidKeys: ctx.vapidKeys,
     reposDir: ctx.reposDir,
     attachmentsDir: ctx.attachmentsDir,
     mcpConfigPath: ctx.mcpConfigPath,

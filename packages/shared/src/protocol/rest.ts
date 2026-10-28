@@ -99,6 +99,20 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'POST', path: '/api/teams/{id}/mcp-servers' },
   { method: 'POST', path: '/api/teams/{id}/agents', note: '→ 201 {id}（r5 §1/§8 补录）' },
   {
+    method: 'GET',
+    path: '/api/teams/{id}/push/key',
+    note: '#1686: VAPID public-key endpoint for pushManager.subscribe applicationServerKey',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/push/subscriptions',
+    note: '#1686: Web Push subscription upload with shared validation and endpoint upsert',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/teams/{id}/push/subscriptions',
+  },
+  {
     method: 'POST',
     path: '/api/skills',
     query: ['teamId'],
