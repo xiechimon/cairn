@@ -1,0 +1,750 @@
+$ node scripts/prepush.mjs
+[heavy-slots] queued, position 1 (all 1 slots are busy)
+[heavy-slots] acquired slot 1/1
+[prepush] node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 14 text + 14 spacing in 13 file(s); 5 css + 223 tsx + 267 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 1b84a9bf8469.
+[prepush] node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 34 components/ui file(s); 24 brand-ink text-role line(s), all registered (24 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+[prepush] pnpm lint
+$ biome ci .
+Checked 1071 files in 824ms. No fixes applied.
+[prepush] pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+[prepush] pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1380 tests in 191 files collected, disk count matches (1.5s)
+[spec-parse-gate] integration/test: 46 test files parsed clean by tsc (1.4s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] node scripts/e2e-affected.mjs --check-coverage
+[e2e:affected] coverage: 0 uncovered spec(s)
+[prepush] node --test docs/verify/1542/reach.test.mjs
+✔ apps/web/e2e/unmapped-reach.spec.ts (28.113667ms)
+✔ apps/web/e2e/board-reach.spec.ts (27.042459ms)
+✔ apps/web/e2e/a11y-axe.spec.ts (26.977125ms)
+✔ registry reach: scripts/drive-unregistered.mjs (30.388333ms)
+✔ registry reach: docs/verify/1542/drive-unregistered.mts (29.564875ms)
+✔ registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs (26.890416ms)
+✔ registry reach: apps/web/e2e/unmapped-reach.spec.ts (56.425833ms)
+✔ registry reach: apps/web/e2e/board-reach.spec.ts (58.183041ms)
+✔ discovers committed, staged and untracked additions from the base (407.500875ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 733.083083
+[prepush] node scripts/lessons-ledger-gate.mjs
+lessons ledger ok
+[prepush] python3 scripts/pr-evidence-gate.test.py
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.020s
+
+OK
+[prepush] node scripts/ci-job-structure-gate.mjs
+ci-job-structure: GREEN (every named step sits in its pinned job)
+[prepush] node scripts/feature-map-staleness-gate.mjs
+feature-map-gate: OK (37 md files, 339 refs checked, 59 frozen in baseline)
+[prepush] node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+[prepush] node scripts/single-use-helper-gate.mjs
+single-use-helper-gate: 0 single-use helper(s)
+[prepush] node scripts/baseline-ratchet-gate.mjs
+baseline-ratchet-gate: 0 raised baseline(s)
+[prepush] node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 680 test sources, no package-manager spawns.
+[prepush] node scripts/pr-evidence-workflow-gate.mjs
+pr-evidence-workflow: GREEN (required-check shape intact)
+[prepush] node scripts/ui-registry-gate.mjs
+[ui-registry-gate] note: no base sha on this run (push event or local check) — the S5 ratchet has nothing to compare against; a status downgrade landing straight on main is guarded by review only (same posture as debt-gate D3 on main).
+[ui-registry-gate] PASS: 35 file(s) in apps/web/src/components/ui = 27 registry (20 pristine vs pinned snapshot / 7 registered deviations) + 8 adapters; snapshot shadcn@4.21.3 fetched 2026-10-25; ledger frozen from 1b84a9bf8469; comparison: in-tree only.
+[prepush] node scripts/ui-consumer-shape-gate.mjs
+[ui-consumer-shape-gate] PASS: 3 flagged line(s) across 267 consumer file(s), all registered (3 entries = 3 deviation).
+[prepush] node scripts/pr-gate-selfcheck.mjs
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are each required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+PASS  linesChanged must be a non-negative integer
+PASS  a path with a shell character is rejected
+PASS  CI gate helpers and data anywhere under scripts/ route to the user
+PASS  gate files outside root scripts/ route to the user (run 4)
+PASS  files that steer agents route to the user (run 4)
+PASS  a path a reviewer adds to protectedPaths routes to the user
+PASS  product source, tests, e2e and evidence do not route to the user
+PASS  paths outside the auto-merge set route to the user (run 5)
+PASS  agent-steering files the name list missed route to the user (run 5)
+PASS  eval ruler paths route to the user as protected (ADR 0025)
+PASS  case variants of protected paths route to the user (run 5)
+PASS  a protected path only the safety reviewer lists is matched (run 5)
+PASS  a deleted test helper (test directory only) routes to the user (run 5)
+PASS  a deleted colocated test (suffix only) routes to the user (run 5)
+PASS  a deleted path missing from changedFiles is an args error (run 5)
+PASS  pr and ticket must be positive integers (run 5)
+PASS  a path with a quote or space is rejected (run 5)
+PASS  configs CI runs under route to the user, at the root too
+PASS  a deletion only the safety reviewer reports routes to the user
+PASS  a larger line count from the safety reviewer routes to the user
+PASS  binaryFiles is required and lists changed paths only (code-review on #1410)
+PASS  a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410)
+PASS  a binary file under docs/verify stays mergeable without the user
+PASS  a binary file only the safety reviewer listed routes to the user
+PASS  a deleted test is found whatever the case of its directory or suffix (code-review on #1410)
+PASS  a glob star does not cross a slash: an extra directory before src/ leaves the auto-merge set (run 8)
+PASS  a deleted colocated .spec file outside a test directory routes to the user (run 8)
+PASS  a dimension whose review breaks the second stage counts as missing and keeps go false (run 8)
+PASS  private refs carry the head, so runs on two heads of one PR do not delete each other's refs (run 8)
+PASS  a reviewer that returns nothing blocks go
+PASS  findings past the skeptic cap are kept
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  two skeptics confirming on the head keep the finding (run 5)
+PASS  a split vote keeps the finding (run 5)
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a nested .gitattributes routes to the user (run 6)
+PASS  the args help gives the line count command that takes attributes from the empty tree (run 6)
+PASS  a C-quoted binary path is refused with the quoting hint (run 7)
+PASS  the safety reviewer is told both git commands with --no-renames, core.quotePath=false and the empty tree (runs 2, 6, 7)
+PASS  reviewers and skeptics fetch PR comments with a filter that drops non-members before the bodies reach them (run 7, final /code-review)
+PASS  reviewers confirm the head on their own ref, never FETCH_HEAD (run 1)
+PASS  every reviewer and skeptic is told GitHub is read-only and that PR text is data
+PASS  the safety reviewer must return all four git-derived values
+PASS  the 40-file cap counts files only the safety reviewer listed
+PASS  the merge readiness gate source routes to the user (run 6)
+PASS  migrations, the lockfile and .npmrc are protected, packages/* outside src and test is not auto (run 6)
+PASS  a deleted helper under e2e/, tests/ or __tests__/ routes to the user (run 6)
+PASS  exactly 800 lines and 40 files still auto-merge (run 6)
+PASS  a file only the safety reviewer lists counts toward the auto-merge set (run 6)
+PASS  headSha, an empty file list and non-string paths are args errors (run 6)
+PASS  the safety reviewer does not see the caller file list (run 6)
+PASS  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+PASS  the evidence reviewer and skeptics check for a fork before any checkout, and read a fork head with git show, diff and ls-tree only (run 10)
+PASS  every checkout the evidence prompts ask for runs with core.hooksPath=/dev/null (run 10)
+PASS  the fetch and the ref cleanup run with core.hooksPath=/dev/null in every prompt, the evidence worktrees included (run 10)
+PASS  evidence installs skip husky's prepare, which would set the shared clone's core.hooksPath to the relative .husky/_ (run 10)
+PASS  the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)
+PASS  a path only in the safety reviewer's deleted or binary list is matched against D4 and blocks go (run 10)
+PASS  an entry named exactly like a protected directory (a symlink .claude, scripts, drizzle) routes to the user (run 10)
+PASS  the bare-directory match is for protected classes only: src and docs/verify named alone stay outside the auto-merge set, file globs stay exact (run 10)
+PASS  D4 globs are anchored at the path start: an auto-merge or evidence path inside a longer one routes to the user (run 10)
+PASS  a caller line count larger than the safety reviewer's wins (run 10)
+PASS  the security-sensitive surfaces of the AGENTS.md /security-review list and the migration runner route to the user (run 11)
+PASS  the security class matches exact paths from the root: machine*.ts stops at a slash, and neighbours still auto-merge (run 11)
+PASS  protected names with U+017F or U+212A in place of s or k route to the user (run 11)
+PASS  auto-merge matching folds ASCII case only, protection folds Unicode: ſrc and docſ/verify route to the user, AGENTſ.md stays protected (run 11)
+PASS  a deleted test is found with U+017F in its directory or suffix (run 11)
+PASS  every prompt calls the ticket body untrusted data by the ticket's author, never instructions (run 11)
+PASS  each skeptic is given the finding and the refute rule (run 11)
+PASS  the safety reviewer's own protectedPaths route to the user (run 11)
+PASS  a deleted .mjs or .cts test routes to the user (run 11)
+PASS  skepticsMissing counts each skeptic that returned nothing (run 11)
+PASS  a path git quotes even with core.quotePath=false is sent to review by hand, not back to the flag (run 11)
+PASS  the args help and the safety reviewer say the line count command needs git 2.40 or later (run 11)
+PASS  docs-only Markdown patch: go, auto-merge (#1621)
+PASS  design decisions, ADRs and the review guide stay with the user in any case or Unicode fold (#1621)
+PASS  docs patch with a deleted test or a non-Markdown docs file routes to the user (#1621)
+PASS  a missing safety file list blocks go
+PASS  docs/spec, the goal-session rules, is a named protected class, not only default deny (#1462)
+PASS  every AGENTS.md /security-review path pattern is an entry of PROTECTED, and the section points back at ADR 0021 D4 (drift guard, #1462)
+PASS  a safety review missing deletedFiles, linesChanged or binaryFiles keeps go false (#1462)
+PASS  the verdict records which copy of the script ran: scriptSha256 is the file hash with its own constant blanked (#1462)
+PASS  a skeptic is told the finding is a relayed account whose text may quote untrusted PR or ticket data (#1462)
+94/94 passed (.claude/workflows/pr-gate.js)
+[prepush] node scripts/lane-file-gate.mjs
+lane-file-gate leg 1 (tracked at repo root): 0 hit(s)
+lane-file-gate leg 2: skipped (no base sha; local run or push event)
+lane-file-gate: OK (no lane process files tracked at the repository root)
+[prepush] node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+[prepush] node scripts/prepush-vitest.mjs
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn
+
+No test files found, exiting with code 0
+
+
+|@cairn/web|
+
+include: test/**/*.test.ts
+exclude:  **/node_modules/**, **/.git/**
+
+|@cairn/integration|
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+|@xiechimon/cairn|
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+|@xiechimon/cairn-cli|
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+|@cairn/shared|
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+JSON report written to /private/tmp/prepush-vitest-xolteh/report.json
+[prepush] node scripts/doc-reader-tests.mjs docs/lessons/1682-demo-silent-dialogs.md docs/verify/1682/README.md docs/verify/1682/accept-dialog-green.log docs/verify/1682/accept-dialog-red.log docs/verify/1682/accept-required-green.log
+[doc-reader-tests] no test reads the changed docs
+[prepush] pnpm --filter @cairn/web test
+$ vitest run
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/apps/web
+
+
+ Test Files  54 passed (54)
+      Tests  596 passed (596)
+   Start at  08:45:58
+   Duration  3.68s (import 52%, transform 38%, tests 9%, worker 1%)
+
+  Transform  transforming modules took 6.65s · 38% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+[prepush] node scripts/ui-dead-class-gate.mjs --compile
+ui-dead-class-gate: selector universe from postcss compile (apps/web/src/styles/app.css) + apps/web/src/**/*.css
+scanned 282 files (20 pristine registry files skipped), 8237 class-token occurrences, 1779 living selectors
+zero-rule names: 239 — selector-exempt 236, manual-exempt 3, DEAD 0
+OK — every rendered class token matches a living rule or carries a disposition.
+[prepush] pnpm --filter @cairn/web e2e:affected -- apps/web/e2e/demo-mode.spec.ts apps/web/src/detail/accept-dialog.tsx
+$ node ../../scripts/e2e-affected.mjs -- apps/web/e2e/demo-mode.spec.ts apps/web/src/detail/accept-dialog.tsx
+[e2e:affected] changed paths (explicit):
+  apps/web/e2e/demo-mode.spec.ts → the spec itself
+  apps/web/src/detail/accept-dialog.tsx → area apps/web/src/detail/ + a11y-axe
+[e2e:affected] 58/191 specs on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts accent-typo.spec.ts attachment-strip.spec.ts branch-button.spec.ts cds-composer.spec.ts cds-dialogs.spec.ts cds-transcript.spec.ts chat-md-toolout.spec.ts chat-tools-identity.spec.ts chat-type-measure.spec.ts checkbox-unified.spec.ts chief-fab.spec.ts chief-home-busy.spec.ts chief-home-chat.spec.ts chief-project-pick.spec.ts chief-stream-markdown.spec.ts composer-inline-mention.spec.ts composer-paste.spec.ts composer-slash.spec.ts composer-tool-tips.spec.ts composer-wire-reject.spec.ts demo-mode.spec.ts detail-3pane.spec.ts detail-agent-todo.spec.ts detail-esc.spec.ts detail-narrow.spec.ts detail-queued-exit.spec.ts detail-work-trace.spec.ts diff-full-file.spec.ts diff-word-highlight.spec.ts elevation-ladder.spec.ts empty-review-closeout.spec.ts escape-wiring.spec.ts hotkeys-ready.spec.ts info-card-report.spec.ts live-agent-model-line.spec.ts live-project-name.spec.ts merge-reject.spec.ts mobile-narrow.spec.ts persona-verify.spec.ts phase-chip-words.spec.ts plan-diff-full-file.spec.ts queued-action.spec.ts registry-focus-ring.spec.ts reject-chain.spec.ts rerun-close-family.spec.ts review-reject.spec.ts skill-inject.spec.ts spec-brief-card.spec.ts spec-flow.spec.ts spinner-live.spec.ts task-panel.spec.ts thinking-row-truncate.spec.ts ticket-cost.spec.ts transcript-user-words.spec.ts user-menu-geometry.spec.ts user-menu-nav.spec.ts user-menu-trigger.spec.ts
+[e2e:affected] slot 1: E2E_PORT=8398, build output /private/tmp/cairn-heavy-slot-1/web-dist
+[WebServer] (node:72272) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:72275) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:72296) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:72298) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 483 tests using 2 workers
+
+(node:72319) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72318) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓    1 e2e/a11y-axe.spec.ts:115:5 › axe: board (light) (1.1s)
+  ✓    2 e2e/a11y-axe.spec.ts:115:5 › axe: board search (light) (1.2s)
+  ✓    3 e2e/a11y-axe.spec.ts:115:5 › axe: new task dialog (light) (833ms)
+  ✓    4 e2e/a11y-axe.spec.ts:115:5 › axe: new task dialog filled (light) (959ms)
+  ✓    5 e2e/a11y-axe.spec.ts:115:5 › axe: detail fresh (light) (626ms)
+  ✓    6 e2e/a11y-axe.spec.ts:115:5 › axe: detail confirm (light) (679ms)
+  ✓    7 e2e/a11y-axe.spec.ts:115:5 › axe: detail review (light) (727ms)
+  ✓    8 e2e/a11y-axe.spec.ts:115:5 › axe: detail tool calls (light) (760ms)
+  ✓    9 e2e/a11y-axe.spec.ts:115:5 › axe: chief window (light) (742ms)
+  ✓   10 e2e/a11y-axe.spec.ts:115:5 › axe: schedules list (light) (582ms)
+  ✓   11 e2e/a11y-axe.spec.ts:115:5 › axe: schedules form (light) (603ms)
+  ✓   12 e2e/a11y-axe.spec.ts:115:5 › axe: project tasks (light) (640ms)
+  ✓   13 e2e/a11y-axe.spec.ts:115:5 › axe: project settings (light) (632ms)
+  ✓   14 e2e/a11y-axe.spec.ts:115:5 › axe: team (light) (623ms)
+  ✓   15 e2e/a11y-axe.spec.ts:115:5 › axe: agent detail (light) (641ms)
+  ✓   16 e2e/a11y-axe.spec.ts:115:5 › axe: machines (light) (580ms)
+  ✓   17 e2e/a11y-axe.spec.ts:115:5 › axe: machine detail (light) (565ms)
+  ✓   18 e2e/a11y-axe.spec.ts:115:5 › axe: skills (light) (565ms)
+  ✓   19 e2e/a11y-axe.spec.ts:115:5 › axe: providers (light) (596ms)
+  ✓   20 e2e/a11y-axe.spec.ts:115:5 › axe: secrets (light) (595ms)
+  ✓   21 e2e/a11y-axe.spec.ts:115:5 › axe: mcp servers (light) (544ms)
+  ✓   22 e2e/a11y-axe.spec.ts:115:5 › axe: api keys (light) (544ms)
+  ✓   23 e2e/a11y-axe.spec.ts:115:5 › axe: account (light) (621ms)
+  ✓   24 e2e/a11y-axe.spec.ts:115:5 › axe: board (dark) (767ms)
+  ✓   25 e2e/a11y-axe.spec.ts:115:5 › axe: board search (dark) (823ms)
+  ✓   26 e2e/a11y-axe.spec.ts:115:5 › axe: new task dialog (dark) (795ms)
+  ✓   28 e2e/a11y-axe.spec.ts:115:5 › axe: detail fresh (dark) (581ms)
+  ✓   27 e2e/a11y-axe.spec.ts:115:5 › axe: new task dialog filled (dark) (838ms)
+  ✓   29 e2e/a11y-axe.spec.ts:115:5 › axe: detail confirm (dark) (681ms)
+  ✓   30 e2e/a11y-axe.spec.ts:115:5 › axe: detail review (dark) (703ms)
+  ✓   31 e2e/a11y-axe.spec.ts:115:5 › axe: detail tool calls (dark) (732ms)
+  ✓   32 e2e/a11y-axe.spec.ts:115:5 › axe: chief window (dark) (711ms)
+  ✓   33 e2e/a11y-axe.spec.ts:115:5 › axe: schedules list (dark) (615ms)
+  ✓   34 e2e/a11y-axe.spec.ts:115:5 › axe: schedules form (dark) (623ms)
+  ✓   36 e2e/a11y-axe.spec.ts:115:5 › axe: project settings (dark) (573ms)
+  ✓   35 e2e/a11y-axe.spec.ts:115:5 › axe: project tasks (dark) (626ms)
+  ✓   37 e2e/a11y-axe.spec.ts:115:5 › axe: team (dark) (623ms)
+  ✓   38 e2e/a11y-axe.spec.ts:115:5 › axe: agent detail (dark) (675ms)
+  ✓   39 e2e/a11y-axe.spec.ts:115:5 › axe: machines (dark) (592ms)
+  ✓   40 e2e/a11y-axe.spec.ts:115:5 › axe: machine detail (dark) (601ms)
+  ✓   41 e2e/a11y-axe.spec.ts:115:5 › axe: skills (dark) (565ms)
+  ✓   42 e2e/a11y-axe.spec.ts:115:5 › axe: providers (dark) (565ms)
+  ✓   43 e2e/a11y-axe.spec.ts:115:5 › axe: secrets (dark) (541ms)
+  ✓   44 e2e/a11y-axe.spec.ts:115:5 › axe: mcp servers (dark) (559ms)
+  ✓   45 e2e/a11y-axe.spec.ts:115:5 › axe: api keys (dark) (542ms)
+  ✓   46 e2e/a11y-axe.spec.ts:115:5 › axe: account (dark) (601ms)
+  ✓   47 e2e/accent-typo.spec.ts:4:3 › font baseline: body 400, card title 500, var font really loaded (light) (261ms)
+  ✓   49 e2e/accent-typo.spec.ts:23:3 › empty-state headline rides the Paper EmptyState title tier (light) (225ms)
+  ✓   48 e2e/attachment-strip.spec.ts:233:1 › detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move (475ms)
+  ✓   50 e2e/accent-typo.spec.ts:34:3 › sidebar header carries the Cairn pixel mark + name (light) (224ms)
+  ✓   51 e2e/attachment-strip.spec.ts:277:1 › detail face: clicking the settled chip opens the image preview; Esc closes it (502ms)
+  ✓   52 e2e/accent-typo.spec.ts:70:3 › page shell back chevron hover shows no background change (light) (567ms)
+  ✓   53 e2e/attachment-strip.spec.ts:312:1 › detail face: clicking the in-flight placeholder previews the local bytes (573ms)
+  ✓   54 e2e/accent-typo.spec.ts:86:3 › the sidebar collapse toggle rests bare and shows the row hover on hover (light) (722ms)
+  ✓   55 e2e/attachment-strip.spec.ts:346:1 › detail face: a failed upload clears the placeholder, toasts, keeps the draft (348ms)
+  ✓   57 e2e/attachment-strip.spec.ts:398:1 › new-task face: placeholder → settled chip → preview (620ms)
+  ✓   56 e2e/accent-typo.spec.ts:117:3 › the sidebar toggles hold face and geometry while pressed (light) (1.0s)
+  ✓   59 e2e/accent-typo.spec.ts:4:3 › font baseline: body 400, card title 500, var font really loaded (dark) (257ms)
+  ✓   58 e2e/attachment-strip.spec.ts:475:1 › chief face: placeholder → settled chip → preview (753ms)
+  ✓   60 e2e/accent-typo.spec.ts:23:3 › empty-state headline rides the Paper EmptyState title tier (dark) (232ms)
+  ✓   62 e2e/accent-typo.spec.ts:34:3 › sidebar header carries the Cairn pixel mark + name (dark) (228ms)
+  ✓   61 e2e/branch-button.spec.ts:3:1 › with-branch card: branch button visible and is the branch glyph, opens the branch and PR sheet (536ms)
+  ✓   64 e2e/branch-button.spec.ts:14:1 › no-branch card: branch button not rendered (219ms)
+  ✓   63 e2e/accent-typo.spec.ts:70:3 › page shell back chevron hover shows no background change (dark) (566ms)
+  ✓   65 e2e/cds-composer.spec.ts:4:1 › CDS composer: 20px radius, shadow-composer ladder, 8px send, 384 max-h (248ms)
+  ✓   67 e2e/cds-composer.spec.ts:138:1 › CDS composer: multi-line draft grows the card and text clears the toolbar (315ms)
+  ✓   66 e2e/accent-typo.spec.ts:86:3 › the sidebar collapse toggle rests bare and shows the row hover on hover (dark) (666ms)
+  ✓   68 e2e/cds-composer.spec.ts:171:1 › CDS composer: a wrapped single paragraph also clears the toolbar (336ms)
+  ✓   70 e2e/cds-composer.spec.ts:196:1 › CDS composer: a width change that wraps the draft re-reserves toolbar clearance (385ms)
+  ✓   71 e2e/cds-dialogs.spec.ts:11:1 › CDS search panel: 16px edge-radius + de-boxed input (327ms)
+  ✓   69 e2e/accent-typo.spec.ts:117:3 › the sidebar toggles hold face and geometry while pressed (dark) (967ms)
+  ✓   72 e2e/cds-dialogs.spec.ts:39:1 › Paper user-menu: 18px + shadow-popover, no solid border (253ms)
+  ✓   73 e2e/accent-typo.spec.ts:168:3 › page shell back chevron keeps a keyboard focus ring (light) (285ms)
+  ✓   74 e2e/cds-transcript.spec.ts:3:1 › CDS transcript: tokens, fade, follow 40 / jump 120, header 56 (Paper top bar) (276ms)
+  ✓   75 e2e/accent-typo.spec.ts:168:3 › page shell back chevron keeps a keyboard focus ring (dark) (315ms)
+  ✓   77 e2e/accent-typo.spec.ts:235:3 › P5 danger: destructive resolves and reads on card, passes 4.5 (light) (253ms)
+  ✓   78 e2e/accent-typo.spec.ts:249:3 › P5 main-button pair passes 4.5 in both themes (light) (220ms)
+  ✓   76 e2e/cds-transcript.spec.ts:41:1 › CDS transcript: jump-to-latest appears past 120px and restores end (925ms)
+  ✓   80 e2e/cds-transcript.spec.ts:89:1 › CDS transcript: thinking trigger 12/16 medium; code 12px / 11.5 (245ms)
+  ✓   81 e2e/chat-md-toolout.spec.ts:9:1 › A1: tool output is collapsed behind individual calls by default (241ms)
+  ✓   82 e2e/chat-md-toolout.spec.ts:22:1 › A2: expanding calls reveals one standalone block per tool output (303ms)
+  ✓   79 e2e/accent-typo.spec.ts:259:3 › Paper menu row hover rides menu-hover, delete row rides danger-soft (light) (1.1s)
+  ✓   84 e2e/accent-typo.spec.ts:235:3 › P5 danger: destructive resolves and reads on card, passes 4.5 (dark) (261ms)
+  ✓   83 e2e/chat-md-toolout.spec.ts:34:1 › A3: the output block is left aligned, mono, normal contrast — not a chat-note (372ms)
+  ✓   85 e2e/accent-typo.spec.ts:249:3 › P5 main-button pair passes 4.5 in both themes (dark) (260ms)
+  ✓   86 e2e/chat-md-toolout.spec.ts:63:1 › B1: a markdown heading renders as a heading element, not literal ## (296ms)
+  ✓   88 e2e/chat-md-toolout.spec.ts:76:1 › B2: ordered list renders ordinals and unordered list renders bullets (353ms)
+  ✓   89 e2e/chat-md-toolout.spec.ts:91:1 › B3: nested list items indent past their parent (255ms)
+  ✓   90 e2e/chat-md-toolout.spec.ts:106:1 › B3b: task list lines render as one todo card with per-state rows (243ms)
+  ✓   87 e2e/accent-typo.spec.ts:259:3 › Paper menu row hover rides menu-hover, delete row rides danger-soft (dark) (1.2s)
+  ✓   91 e2e/chat-md-toolout.spec.ts:117:1 › B4: a code fence renders as a mono block with no literal ``` leak (260ms)
+  ✓   93 e2e/chat-tools-identity.spec.ts:12:1 › I1: the summary names the work performed and its duration (266ms)
+  ✓   92 e2e/chat-md-toolout.spec.ts:129:1 › B5: inline code keeps the existing mono chip (275ms)
+  ✓   95 e2e/chat-md-toolout.spec.ts:137:1 › B6: no raw markdown syntax survives as literal prose (289ms)
+  ✓   94 e2e/chat-tools-identity.spec.ts:19:1 › I2: copy is available only while the work block is expanded (401ms)
+  ✓   96 e2e/chat-type-measure.spec.ts:6:1 › chat body reads at 14px (text-card-title) on a unitless 1.6 (319ms)
+  ✓   97 e2e/chat-tools-identity.spec.ts:30:1 › I3: copying work includes commands and outputs (408ms)
+  ✓   98 e2e/chat-type-measure.spec.ts:52:1 › 68ch measure cap binds the body text and the centered note (355ms)
+  ✓   99 e2e/chat-tools-identity.spec.ts:40:1 › I4: call rows keep the agent column inset and compact height (296ms)
+  ✓  100 e2e/chat-type-measure.spec.ts:102:1 › composer placeholder sits at 13.5px (text-ui) — one notch under the 14px body (233ms)
+  ✓  101 e2e/chat-tools-identity.spec.ts:51:1 › I5: work summaries keep the transcript boundary free of horizontal rules (267ms)
+  ✓  102 e2e/chat-type-measure.spec.ts:116:1 › bubble / avatar / footer keep their own geometry (#470 scope fence) (262ms)
+  ✓  103 e2e/checkbox-unified.spec.ts:29:1 › accept: native input renders with the official mask (no Mac checkbox painted) (303ms)
+  ✓  104 e2e/chat-type-measure.spec.ts:143:1 › turn boundary is air, not a rule: no divider between a user turn and the agent row (290ms)
+  ✓  105 e2e/checkbox-unified.spec.ts:43:1 › accept: unchecked state shows no check (374ms)
+  ✓  106 e2e/chief-fab.spec.ts:7:3 › detail FAB renders only with unread (#443) › unread 0: the detail route renders no FAB (307ms)
+  ✓  108 e2e/chief-fab.spec.ts:14:3 › detail FAB renders only with unread (#443) › unread > 0: the FAB renders with the badge value (254ms)
+  ✓  107 e2e/checkbox-unified.spec.ts:53:1 › accept: whole row clickable (text is also a click target) (376ms)
+  ✓  109 e2e/chief-fab.spec.ts:21:3 › detail FAB renders only with unread (#443) › the FAB keeps the corner anchor and grows into a 40px-tall pill when unread (255ms)
+  ✓  110 e2e/checkbox-unified.spec.ts:63:1 › accept: box geometry = 16×16 / radius 4px / gap to text 8 / text 13.5px (281ms)
+  ✓  111 e2e/chief-fab.spec.ts:40:3 › FAB icon follows the bound agent (#444) › bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay (275ms)
+  ✓  113 e2e/chief-fab.spec.ts:58:3 › FAB icon follows the bound agent (#444) › bound: a non-board route swaps at the same single consumption point (272ms)
+  ✓  112 e2e/checkbox-unified.spec.ts:86:1 › provider: unchecked state shows no white check (#dlg-provider-authheader id survives) (571ms)
+  ✓  114 e2e/chief-fab.spec.ts:67:3 › FAB icon follows the bound agent (#444) › avatarUrl override wins over the generated face (261ms)
+  ✓  115 e2e/checkbox-unified.spec.ts:100:1 › accept: Space toggles with focus on the Root itself (301ms)
+  ✓  116 e2e/chief-fab.spec.ts:75:3 › FAB icon follows the bound agent (#444) › unbound: the static glyph stays, no avatar face (276ms)
+  ✓  117 e2e/chief-home-busy.spec.ts:184:3 › chief unavailable (T4) › the banner explains the outage, held messages say they are saved, and there is no stop square (454ms)
+  ✓  118 e2e/chief-fab.spec.ts:85:3 › chief unread badge cap (#1303) › unread 100 renders 99+ and the tooltip names the thread count (385ms)
+  ✓  120 e2e/chief-fab.spec.ts:93:3 › chief unread badge cap (#1303) › unread 99 stays 99 (286ms)
+  ✓  119 e2e/chief-home-busy.spec.ts:211:3 › chief unavailable (T4) › direct task creation opens the new task dialog (418ms)
+  ✓  121 e2e/chief-fab.spec.ts:100:3 › chief FAB brand states › idle: a 40px disc on the card surface with body ink, the spiral holds still, no label (323ms)
+  ✓  122 e2e/chief-home-busy.spec.ts:218:3 › chief unavailable (T4) › withdrawing a held message deletes it and puts the text back in the composer (494ms)
+  ✓  123 e2e/chief-fab.spec.ts:125:3 › chief FAB brand states › busy: the pill says `思考中…` and the spiral spins (307ms)
+  ✓  125 e2e/chief-fab.spec.ts:137:3 › chief FAB brand states › unread: the pill names the count (294ms)
+  ✓  124 e2e/chief-home-busy.spec.ts:230:3 › chief unavailable (T4) › phone width: the banner collapses to one line with `详情` (382ms)
+  ✓  126 e2e/chief-fab.spec.ts:142:3 › chief FAB brand states › reduced motion: busy keeps the label but stops the spin (369ms)
+  ✓  127 e2e/chief-home-busy.spec.ts:251:3 › chief unavailable (T4) › with a backup model the model row gets a dot, and the reply says which model answered (370ms)
+  ✓  128 e2e/chief-home-chat.spec.ts:196:3 › home is one continuous chief chat (T1) › a fresh home shows the greeting, the composer and the sections, and no chief drawer (277ms)
+  ✓  129 e2e/chief-home-busy.spec.ts:294:3 › queue, steer and stop while the chief is replying (T5) › messages sent while busy are queued after the live reply, in server order (484ms)
+  ✓  130 e2e/chief-home-chat.spec.ts:212:3 › home is one continuous chief chat (T1) › the first send moves the composer to the bottom and the message joins the chat (372ms)
+  ✓  131 e2e/chief-home-busy.spec.ts:317:3 › queue, steer and stop while the chief is replying (T5) › `现在插话` steers the queued message into the running reply (334ms)
+  ✓  132 e2e/chief-home-chat.spec.ts:232:3 › home is one continuous chief chat (T1) › a first send that fails brings the greeting and the sections back (305ms)
+  ✓  133 e2e/chief-home-busy.spec.ts:328:3 › queue, steer and stop while the chief is replying (T5) › the send button is a stop square only while busy with an empty input (400ms)
+  ✓  134 e2e/chief-home-chat.spec.ts:244:3 › home is one continuous chief chat (T1) › Escape closes the thread menu on home (333ms)
+  ✓  135 e2e/chief-home-busy.spec.ts:343:3 › queue, steer and stop while the chief is replying (T5) › a stopped turn says no task was created (332ms)
+  ✓  136 e2e/chief-home-chat.spec.ts:255:3 › home is one continuous chief chat (T1) › a reply carries a live task chip, a hand-off row and an expandable trace; reload keeps it (608ms)
+  ✓  137 e2e/chief-home-busy.spec.ts:366:3 › queue, steer and stop while the chief is replying (T5) › a stop after a task was created names and links the task (366ms)
+  ✓  138 e2e/chief-home-chat.spec.ts:280:3 › home is one continuous chief chat (T1) › cmd+J on home focuses the home composer instead of opening the drawer (317ms)
+  ✓  140 e2e/chief-home-chat.spec.ts:289:3 › home is one continuous chief chat (T1) › the board view keeps the chief button and drawer (372ms)
+  ✓  139 e2e/chief-project-pick.spec.ts:195:3 › the home composer picks a project (T6 #2009) › the chip starts on 自动, lists every project with its description, and the pick rides on the send (1.1s)
+  ✓  141 e2e/chief-home-chat.spec.ts:297:3 › home is one continuous chief chat (T1) › a task chip in the drawer opens the task panel on the board instead of leaving it (1.0s)
+  ✓  142 e2e/chief-project-pick.spec.ts:223:3 › the home composer picks a project (T6 #2009) › the pick survives a reload, and 自动 sends no projectId (837ms)
+  ✓  143 e2e/chief-home-chat.spec.ts:315:3 › home is one continuous chief chat (T1) › phone width: the chat fills the screen and the composer stays on screen (289ms)
+  ✓  144 e2e/chief-project-pick.spec.ts:238:3 › the home composer picks a project (T6 #2009) › typing @ and picking a project sets the chip and leaves no @ text behind (333ms)
+  ✓  146 e2e/chief-project-pick.spec.ts:258:3 › the home composer picks a project (T6 #2009) › a team with one project shows no chip (269ms)
+  ✓  145 e2e/chief-home-chat.spec.ts:365:3 › the first open of each day starts on a clean home (T3) › yesterday stays above, dimmed, and today opens on the greeting, the date and a per-project brief (921ms)
+  ✓  147 e2e/chief-project-pick.spec.ts:267:3 › moving a task to another project (T6 #2009) › an unstarted task offers 换项目 and the pick patches its project (737ms)
+  ✓  148 e2e/chief-home-chat.spec.ts:414:3 › the first open of each day starts on a clean home (T3) › a need card in the brief opens the task panel in place (404ms)
+  ✓  149 e2e/chief-project-pick.spec.ts:287:3 › moving a task to another project (T6 #2009) › a running task has no 换项目 (315ms)
+  ✓  150 e2e/chief-home-chat.spec.ts:432:3 › the first open of each day starts on a clean home (T3) › the first send of the day continues the chat below the brief (413ms)
+  ✓  151 e2e/chief-project-pick.spec.ts:295:3 › moving a task to another project (T6 #2009) › phone width keeps the chip and the composer on screen (273ms)
+  ✓  152 e2e/chief-home-chat.spec.ts:461:3 › the first open of each day starts on a clean home (T3) › a send whose server time is still yesterday does not bring the clean layout back (354ms)
+  ✓  153 e2e/chief-stream-markdown.spec.ts:182:3 › chief drawer markdown face (fixture, #650) › F-R24: unbound chief reply rows wear the spiral face; the page has zero dashed-face glyphs (297ms)
+  ✓  154 e2e/chief-home-chat.spec.ts:482:3 › the first open of each day starts on a clean home (T3) › a thread that already has messages from today opens as normal chat (317ms)
+  ✓  155 e2e/chief-stream-markdown.spec.ts:190:3 › chief drawer markdown face (fixture, #650) › F-R1/R2/R3: robot markdown rows share the block parser — bold/heading/list/fence/chip all render, zero star leakage (276ms)
+  ✓  156 e2e/chief-home-chat.spec.ts:495:3 › the first open of each day starts on a clean home (T3) › a quiet night says so in one line and shows no need cards (312ms)
+  ✓  158 e2e/chief-home-chat.spec.ts:508:3 › the first open of each day starts on a clean home (T3) › phone width: the clean home fits the screen (320ms)
+  ✓  157 e2e/chief-stream-markdown.spec.ts:220:3 › chief drawer markdown face (fixture, #650) › F-R13: todo mentions render as chips, anchors point at task detail and a click opens the task panel; literal #seq/pseudo schemes render no chip (#675) (685ms)
+  ✓  159 e2e/composer-inline-mention.spec.ts:183:1 › trigger: line start / after whitespace / after CJK punctuation — never mid-word or in an email (F2) (323ms)
+  ✓  160 e2e/chief-stream-markdown.spec.ts:241:3 › chief drawer markdown face (fixture, #650) › F-R4/R5: typing rows have no foot; final rows keep the foot (copy + done 44s) (254ms)
+  ✓  162 e2e/chief-stream-markdown.spec.ts:257:3 › chief drawer markdown face (fixture, #650) › F-R6/R8: user row avatar = real identity img (XMON-105 single source), drawer body scrollable (264ms)
+  ✓  161 e2e/composer-inline-mention.spec.ts:205:1 › filter: fuzzy subsequence, smart case, empty-state row (328ms)
+  ✓  164 e2e/composer-inline-mention.spec.ts:232:1 › filter: candidate list caps at 15 (CN=15) (291ms)
+  ✓  163 e2e/chief-stream-markdown.spec.ts:272:3 › chief drawer markdown face (fixture, #650) › F-R9: frozen capture face r5 114 does not drift — segment arrays walk the original .chief-para/.chief-bullet paths (354ms)
+  ✓  165 e2e/composer-inline-mention.spec.ts:242:1 › keyboard: arrows cycle the highlight, the top row is NOT preselected (342ms)
+  ✓  166 e2e/chief-stream-markdown.spec.ts:288:3 › chief drawer markdown face (fixture, #650) › F-R15: fixture face (r5 113 running capture) grows no persistent rows — ChiefStreamItem new kind stays zero-pollution (364ms)
+  ✓  167 e2e/composer-inline-mention.spec.ts:264:1 › Enter with a highlight inserts WITHOUT sending; the second Enter sends (r9 §5 fix) (441ms)
+  ✓  168 e2e/chief-stream-markdown.spec.ts:304:3 › chief drawer streaming face (live mock, #651) › F-R7/R10/R11: text_delta lands incrementally, message final converges with no duplicates and no residue (421ms)
+  ✓  169 e2e/composer-inline-mention.spec.ts:291:1 › Enter without a highlight sends as typed (F1: composer-wire-reject law survives) (425ms)
+  ✓  170 e2e/chief-stream-markdown.spec.ts:349:3 › chief drawer streaming face (live mock, #651) › F-R12: two-row dedup (#667) — same-text POST + user-<stepId> echo render exactly one user bubble; two different texts in a row render two (414ms)
+  ✓  171 e2e/composer-inline-mention.spec.ts:302:1 › Tab inserts the top match without sending and keeps focus (rule 22/56) (415ms)
+  ✓  172 e2e/chief-stream-markdown.spec.ts:381:3 › chief drawer streaming face (live mock, #651) › F-R14: in-flight presence row (#739) — silent window hangs a streaming row, first delta converges into typing, final retires both rows (411ms)
+  ✓  174 e2e/chief-stream-markdown.spec.ts:422:3 › chief drawer streaming face (live mock, #651) › F-R16: mid-turn events do not flash-clear (#857) — tool/text rows re-fetch in-flight while the typing face stays, converged stored rows take over (347ms)
+  ✓  173 e2e/composer-inline-mention.spec.ts:314:1 › mouse: hover highlights, click inserts, the textarea never loses focus (F4 combobox) (549ms)
+  ✓  176 e2e/composer-inline-mention.spec.ts:345:1 › insert lands a trailing space and the caret after it — typing continues outside the token (F6) (340ms)
+  ✓  175 e2e/chief-stream-markdown.spec.ts:469:3 › chief drawer streaming face (live mock, #651) › F-R18: in-flight presence row expands (#822) — arrow click reveals live steps, typing takeover leaks nothing (834ms)
+  ✓  177 e2e/composer-inline-mention.spec.ts:363:1 › close set: Esc closes the listbox and stays on the detail (#634 layering) (312ms)
+  ✓  179 e2e/composer-inline-mention.spec.ts:382:1 › close set: backspace shortens the query, backspacing past @ closes (F7) (354ms)
+  ✓  180 e2e/composer-inline-mention.spec.ts:407:1 › close set: typing a space ends the token (rule 34) (290ms)
+  ✓  178 e2e/chief-stream-markdown.spec.ts:541:3 › chief drawer streaming face (live mock, #651) › F-R15: robot row identity chip (live face, #741) — avatar+name anchor, click navigates the whole chain into the Agent settings page (809ms)
+  ✓  181 e2e/composer-inline-mention.spec.ts:415:1 › close set: caret-only moves out of the token close the list (F3) (402ms)
+  ✓  183 e2e/composer-inline-mention.spec.ts:442:1 › close set: clicking outside the composer closes the list (347ms)
+  ✓  182 e2e/chief-stream-markdown.spec.ts:592:3 › chief drawer user-bubble markdown face (live mock, #742) › F-R14: user bubbles share the parser — todo chips become clickable anchors, bold becomes strong, negatives stay literal (671ms)
+  ✓  184 e2e/composer-inline-mention.spec.ts:451:1 › multiple mentions: a second @ after an insert opens fresh and lands in order (F10) (398ms)
+  ✓  185 e2e/chief-stream-markdown.spec.ts:618:3 › chief drawer user-bubble markdown face (live mock, #742) › F-R15: copy payload = markdown source (not rendered output); the two-button row (copy/restore) is unaffected (730ms)
+  ✓  186 e2e/composer-inline-mention.spec.ts:472:1 › popover multi-select inserts every token with trailing spaces (F11) (569ms)
+  ✓  188 e2e/composer-inline-mention.spec.ts:488:1 › IME: a composing Enter neither inserts nor sends (F8) (334ms)
+  ✓  187 e2e/chief-stream-markdown.spec.ts:633:3 › chief drawer user-bubble markdown face (live mock, #742) › F-R23: row ids thread through — live row Items carry the source chief_message id (messageId), order = storage order (663ms)
+  ✓  189 e2e/composer-inline-mention.spec.ts:518:1 › geometry: the listbox stays anchored above the composer (#688 ladder untouched) (612ms)
+  ✓  190 e2e/chief-stream-markdown.spec.ts:646:3 › chief drawer user-bubble markdown face (live mock, #742) › F-R16: single-paragraph plain-text bubble geometry does not drift (44px pill); multi-block bubble first/last block margin trimming works (590ms)
+  ✓  192 e2e/chief-stream-markdown.spec.ts:670:3 › chief drawer user-bubble markdown face (live mock, #742) › F-R17: fixture capture face user bubbles zero drift — bare paths stay literal (no --md class, no chat-md blocks) (284ms)
+  ✓  191 e2e/composer-inline-mention.spec.ts:566:1 › files: empty query lists entities then files in roster order (476ms)
+  ✓  194 e2e/composer-inline-mention.spec.ts:580:1 › files: fuzzy filters both faces, agents keep ties (505ms)
+  ✓  193 e2e/chief-stream-markdown.spec.ts:683:3 › chief drawer user-bubble markdown face (live mock, #742) › F-R19: segment-row projection (#955) — thinking rows in a single column, in-flight tool rows flat with real seconds (791ms)
+  ✓  195 e2e/composer-inline-mention.spec.ts:592:1 › files: Enter inserts the bare path with a trailing space and sends on second Enter (586ms)
+  ✓  196 e2e/chief-stream-markdown.spec.ts:769:3 › chief drawer user-bubble markdown face (live mock, #742) › F-R20: in-flight tool rows carry the concrete command (not a bare tool name) (409ms)
+  ✓  197 e2e/composer-inline-mention.spec.ts:611:1 › files: directory row inserts with a trailing slash (561ms)
+  ✓  198 e2e/chief-stream-markdown.spec.ts:801:3 › chief drawer user-bubble markdown face (live mock, #742) › F-R21: segment-order contract (#1003 / ADR 0011 premortem) — text segments first, their tool rows after, each exactly once; after settle tools fold into the trailing row (973ms)
+  ✓  199 e2e/composer-inline-mention.spec.ts:623:1 › chips: Enter-select renders the file chip with a fresh pop (524ms)
+  ✓  200 e2e/chief-stream-markdown.spec.ts:887:3 › chief drawer user-bubble markdown face (live mock, #742) › F-R22: long preview truncated by CSS — button width ≤ column width, ellipsis works, zero horizontal overflow (#1034) (361ms)
+  ✓  201 e2e/composer-inline-mention.spec.ts:643:1 › chips: agent select renders the agent chip (510ms)
+  ✓  202 e2e/composer-paste.spec.ts:280:1 › detail face: a mid-line image paste lands the token whole-line at the caret (369ms)
+  ✓  204 e2e/composer-paste.spec.ts:308:1 › detail face: one multi-image paste puts every token on its own line (405ms)
+  ✓  203 e2e/composer-inline-mention.spec.ts:654:1 › chips: Tab and click render the identical chip (identical accept path) (843ms)
+  ✓  205 e2e/composer-paste.spec.ts:326:1 › detail face: a text-only paste is never preventDefaulted (FM7 zero change) (339ms)
+  ✓  207 e2e/composer-paste.spec.ts:341:1 › detail face: a non-whitelisted paste is rejected with a toast, grant never fires (336ms)
+  ✓  206 e2e/composer-inline-mention.spec.ts:673:1 › chips: editing the path retires the chip; the pop plays only once (C8) (592ms)
+  ✓  208 e2e/composer-paste.spec.ts:360:1 › detail face: an over-cap paste is rejected with a toast, grant never fires (351ms)
+  ✓  210 e2e/composer-paste.spec.ts:376:1 › detail face: a non-image whitelist file (text/plain) is accepted under its real name (415ms)
+  ✓  209 e2e/composer-inline-mention.spec.ts:692:1 › chips: the strip yields while the listbox is open (C6) (629ms)
+  ✓  211 e2e/composer-paste.spec.ts:394:1 › detail face: a mixed file+text clipboard takes the files and drops the text (344ms)
+  ✓  212 e2e/composer-inline-mention.spec.ts:715:1 › five-kind: bare @ lists all five kinds in roster order (352ms)
+  ✓  213 e2e/composer-paste.spec.ts:422:1 › detail face: a failed upload toasts and the draft survives untouched (341ms)
+  ✓  214 e2e/composer-inline-mention.spec.ts:728:1 › five-kind: skill Tab-inserts the scheme token and the chip confirms (345ms)
+  ✓  216 e2e/composer-inline-mention.spec.ts:743:1 › five-kind: todo Enter-inserts the plain #seq token without sending (357ms)
+  ✓  215 e2e/composer-paste.spec.ts:444:1 › detail face: Enter during the upload does not send; after it lands, Enter sends the token (492ms)
+  ✓  217 e2e/composer-inline-mention.spec.ts:759:1 › five-kind: project click inserts the scheme token and the chip confirms (575ms)
+  ✓  218 e2e/composer-paste.spec.ts:505:1 › new-task face: paste inserts the token line-atomic into the spec and save carries it (629ms)
+  ✓  219 e2e/composer-inline-mention.spec.ts:771:1 › five-kind: machine Enter-inserts without sending; second Enter sends (322ms)
+  ✓  221 e2e/composer-slash.spec.ts:150:1 › trigger: `/` opens builtins then skills, paths and mid-word stay literal (F2/F6) (347ms)
+  ✓  220 e2e/composer-paste.spec.ts:535:1 › new-task face: save is blocked while the paste upload is in flight (769ms)
+  ✓  222 e2e/composer-slash.spec.ts:176:1 › filter: word-prefix only, alias, empty state (F3/F7) (312ms)
+  ✓  223 e2e/composer-paste.spec.ts:564:1 › detail face probe: a real Cmd/Ctrl+V clipboard image paste rides the same chain (343ms)
+  ✓  224 e2e/composer-slash.spec.ts:196:1 › no dual-open with the @ face (F4) (321ms)
+  ✓  226 e2e/composer-slash.spec.ts:211:1 › Enter on a highlighted execute row runs it without sending (F1) (317ms)
+  ✓  227 e2e/composer-slash.spec.ts:224:1 › Tab completes without running; Enter without highlight sends (F1) (299ms)
+  ✓  225 e2e/composer-tool-tips.spec.ts:13:1 › detail composer tools name themselves on hover (782ms)
+  ✓  228 e2e/composer-slash.spec.ts:239:1 › mid-prompt accept inserts literal text, never runs (F5) (301ms)
+  ✓  230 e2e/composer-slash.spec.ts:251:1 › close set: Esc, space, backspace-past-slash, outside click (440ms)
+  ✓  229 e2e/composer-tool-tips.spec.ts:21:1 › chief composer tools name themselves on hover (862ms)
+  ✓  231 e2e/composer-slash.spec.ts:284:1 › skill row inserts the wire token with trailing space (287ms)
+  ✓  232 e2e/composer-tool-tips.spec.ts:28:1 › light: chief composer is the same white field as the workbench new-task bar (263ms)
+  ✓  233 e2e/composer-slash.spec.ts:297:1 › mixed: slash skill token plus @ mention coexist (339ms)
+  ✓  234 e2e/composer-wire-reject.spec.ts:139:1 › detail face: a rejected steer (409) keeps the draft word for word (305ms)
+  ✓  235 e2e/composer-slash.spec.ts:314:1 › /help opens the command panel (348ms)
+  ✓  236 e2e/composer-wire-reject.spec.ts:163:1 › detail face: an accepted steer clears the draft (324ms)
+  ✓  238 e2e/composer-wire-reject.spec.ts:203:1 › chief face: a rejected send (500) keeps the draft and toasts (421ms)
+  ✓  239 e2e/composer-wire-reject.spec.ts:226:1 › chief face: an accepted send clears the draft (471ms)
+  ✓  240 e2e/detail-3pane.spec.ts:6:1 › three abutting panes: 248 sidebar | fluid center | 488 right (248ms)
+  ✓  241 e2e/detail-3pane.spec.ts:34:1 › no `文档|聊天` tab group survives on any phase surface (811ms)
+  ✓  242 e2e/detail-3pane.spec.ts:43:1 › detail head keeps the `更多` icon only — branch/token/history icons are gone (259ms)
+  ✓  243 e2e/detail-3pane.spec.ts:54:1 › composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it (238ms)
+  ✓  237 e2e/demo-mode.spec.ts:65:1 › plain /app opens demo home and links to the board; ?scenario= is ignored (533ms)
+  ✓  244 e2e/detail-3pane.spec.ts:105:1 › composer controls share one bottom row: stop is the send button's sibling (274ms)
+  ✓  245 e2e/demo-mode.spec.ts:86:1 › banner: 演示数据 + site and showcase links, bilingual, survives navigation and a phone (399ms)
+  ✓  247 e2e/demo-mode.spec.ts:117:1 › banner follows the locale (253ms)
+  ✓  246 e2e/detail-3pane.spec.ts:156:1 › composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1) (705ms)
+  ✓  249 e2e/detail-3pane.spec.ts:179:1 › right pane type select switches between the doc surface and the three sections (675ms)
+  ✓  250 e2e/detail-3pane.spec.ts:209:1 › scenarios 30/31/32 freeze the pane view instead of popping dialogs (519ms)
+  ✓  248 e2e/demo-mode.spec.ts:132:1 › the selling points browse end to end with no backend traffic (1.4s)
+  ✓  251 e2e/detail-3pane.spec.ts:224:1 › plan card activation in the thread opens the plan doc in the right pane (330ms)
+  ✓  253 e2e/detail-3pane.spec.ts:237:1 › fresh phase: the brief owns the whole center column, right pane collapses (310ms)
+  ✓  252 e2e/demo-mode.spec.ts:182:1 › write: a new task is blocked with the toast, the board is unchanged (609ms)
+  ✓  254 e2e/detail-agent-todo.spec.ts:5:1 › A1: the live todo card renders with all four items as card rows (295ms)
+  ✓  256 e2e/detail-agent-todo.spec.ts:16:1 › A2: rows carry the wire state verbatim (288ms)
+  ✓  255 e2e/demo-mode.spec.ts:197:1 › write: dragging a card to another column is blocked (643ms)
+  ✓  257 e2e/detail-agent-todo.spec.ts:25:1 › A3: state glyphs differ per row (dashed circle / spinning ring / check) (280ms)
+  ✓  258 e2e/demo-mode.spec.ts:217:1 › write: sending in the detail composer is blocked (317ms)
+  ✓  259 e2e/detail-agent-todo.spec.ts:48:1 › A4: the live card sits above the streaming row in the live tail (288ms)
+  ✓  261 e2e/detail-agent-todo.spec.ts:62:1 › A5: the inline markdown card surface is unchanged without an agent-todo item (272ms)
+  ✓  262 e2e/detail-esc.spec.ts:14:1 › E1: clean ESC leaves the detail, carrying the search home (278ms)
+  ✓  260 e2e/demo-mode.spec.ts:228:1 › write: the primary action and the delete confirm are blocked (1.1s)
+  ✓  263 e2e/detail-esc.spec.ts:20:1 › E2: ESC with the chip popover open closes the popover first (739ms)
+  ✓  264 e2e/demo-mode.spec.ts:244:1 › write: completing a review task from the menu shows the demo notice (781ms)
+  ✓  265 e2e/detail-esc.spec.ts:31:1 › E3: ESC with a modal overlay open closes the overlay first (781ms)
+  ✓  267 e2e/detail-narrow.spec.ts:28:1 › N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll (246ms)
+  ✓  266 e2e/demo-mode.spec.ts:257:1 › a board card opens the panel and expands into its versioned detail (963ms)
+  ✓  268 e2e/detail-narrow.spec.ts:46:1 › N2: 360 and 390 keep the same law (334ms)
+  ✓  270 e2e/detail-narrow.spec.ts:60:1 › N3: the degradation stops at 816px — the 3-pane shell survives above it (275ms)
+  ✓  269 e2e/demo-mode.spec.ts:271:1 › write: sending to the chief is blocked (376ms)
+  ✓  272 e2e/demo-mode.spec.ts:283:1 › write: sending to the chief from home is blocked (250ms)
+  ✓  271 e2e/detail-narrow.spec.ts:85:1 › N4: the docked chief panel cannot re-overflow the 320px shell (636ms)
+  ✓  273 e2e/demo-mode.spec.ts:295:1 › write: the create dialog on the team page is blocked (505ms)
+  ✓  274 e2e/detail-narrow.spec.ts:106:1 › N5: head actions and the composer stay inside the 320px viewport (238ms)
+  ✓  275 e2e/demo-mode.spec.ts:309:1 › write: machine evacuation is blocked before backend traffic (402ms)
+  ✓  276 e2e/detail-queued-exit.spec.ts:90:1 › queued: `更多` offers `停止`, and confirming it stops the build (610ms)
+  ✓  277 e2e/demo-mode.spec.ts:322:1 › write: deleting the spare machine is blocked before backend traffic (882ms)
+  ✓  278 e2e/detail-queued-exit.spec.ts:107:1 › queued: a synchronous stop leaves no `正在停止…` behind (631ms)
+  ✓  280 e2e/detail-queued-exit.spec.ts:165:1 › queued: `更多` > `关闭` is enabled and closes the task (445ms)
+  ✓  279 e2e/demo-mode.spec.ts:336:1 › write: secret creation explains that demo changes are not saved (619ms)
+  ✓  281 e2e/detail-queued-exit.spec.ts:175:1 › planning: no menu `停止`, `关闭` stays disabled (345ms)
+  ✓  282 e2e/demo-mode.spec.ts:350:1 › write: provider creation explains that demo changes are not saved (675ms)
+  ✓  283 e2e/detail-work-trace.spec.ts:173:1 › work groups consecutive thinking and calls, with only the last block expanded (495ms)
+  ✓  285 e2e/detail-work-trace.spec.ts:200:1 › call details preserve commands, cap output and show edit lines (519ms)
+  ✓  284 e2e/demo-mode.spec.ts:366:1 › write: provider OAuth explains that demo changes are not saved (648ms)
+  ✓  286 e2e/detail-work-trace.spec.ts:226:1 › a call cut off by a stopped run shows as unfinished, not done (707ms)
+  ✓  287 e2e/demo-mode.spec.ts:377:1 › the blocked toast is English under the en locale (878ms)
+  ✓  288 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (322ms)
+  ✓  289 e2e/demo-mode.spec.ts:390:1 › the production build carries no demo content and ignores demo behaviour (339ms)
+  ✓  290 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (324ms)
+  ✓  292 e2e/diff-full-file.spec.ts:5:1 › initial render shows the hunk face and the `显示完整文件` button, no full text (initial render unpolluted) (278ms)
+  ✓  291 e2e/detail-work-trace.spec.ts:247:1 › a long summary stays on one line in a narrow column and keeps the full text in its title (315ms)
+  ✓  294 e2e/diff-word-highlight.spec.ts:16:1 › long lines create horizontal scroll, and every line box/hunk header/file row fills the scroll width (hunk face) (266ms)
+  ✓  293 e2e/diff-full-file.spec.ts:12:1 › click expands the full text inline: hunks hidden, full text with continuous line numbers, button flips to `显示差异` (334ms)
+  ✓  295 e2e/diff-word-highlight.spec.ts:34:1 › rows in the `显示完整文件` face also fill the scroll width (352ms)
+  ✓  296 e2e/diff-full-file.spec.ts:30:1 › click again returns to the hunk face, button copy flips back to `显示完整文件` (361ms)
+  ✓  297 e2e/diff-word-highlight.spec.ts:48:1 › word pairs mark only the changed words deep: exactly one word-level span per side, text = changed word (281ms)
+  ✓  298 e2e/elevation-ladder.spec.ts:85:5 › elevation ladder (light) › each rung is its pool plus one ring, ring last (276ms)
+  ✓  299 e2e/diff-word-highlight.spec.ts:58:1 › unequal-length runs pair by min(m,n), leftover del keeps whole-line highlight with zero word-level spans (265ms)
+  ✓  300 e2e/elevation-ladder.spec.ts:102:5 › elevation ladder (light) › pools hold the pre-ladder darkness; --top only in dark e2/e3 (262ms)
+  ✓  301 e2e/diff-word-highlight.spec.ts:68:1 › marker rows do not break pairing (r8 72 shape): long-line comparisons often yield word-level spans (332ms)
+  ✓  302 e2e/elevation-ladder.spec.ts:129:5 › elevation ladder (light) › old slot names alias the ladder (323ms)
+  ✓  303 e2e/diff-word-highlight.spec.ts:78:1 › over-limit pairs fall back to whole-line highlight without silence: data-word=capped + non-empty title, zero word-level spans (261ms)
+  ✓  305 e2e/diff-word-highlight.spec.ts:89:1 › word-level spans swallow no whitespace: line text matches the fixture byte for byte (327ms)
+  ✓  306 e2e/diff-word-highlight.spec.ts:98:1 › add-only hunks get zero word-level spans (27b regression face, pairing does not misfire) (283ms)
+  ✓  304 e2e/elevation-ladder.spec.ts:161:5 › elevation ladder (light) › one ring per edge on the rendered surfaces (1.0s)
+  ✓  307 e2e/diff-word-highlight.spec.ts:104:1 › plan-diff face takes word-level spans through the same path (scenario 72 real del/add pairs) (263ms)
+  ✓  308 e2e/elevation-ladder.spec.ts:85:5 › elevation ladder (dark) › each rung is its pool plus one ring, ring last (283ms)
+  ✓  309 e2e/diff-word-highlight.spec.ts:111:3 › word-level background rides a token darker than the whole-line background, opaque and distinguishable (light) (278ms)
+  ✓  310 e2e/elevation-ladder.spec.ts:102:5 › elevation ladder (dark) › pools hold the pre-ladder darkness; --top only in dark e2/e3 (248ms)
+  ✓  311 e2e/diff-word-highlight.spec.ts:111:3 › word-level background rides a token darker than the whole-line background, opaque and distinguishable (dark) (270ms)
+  ✓  312 e2e/elevation-ladder.spec.ts:129:5 › elevation ladder (dark) › old slot names alias the ladder (260ms)
+  ✓  313 e2e/empty-review-closeout.spec.ts:158:1 › board: a review card with a reported empty diff completes without merging and without blocking authorization (863ms)
+  ✓  314 e2e/elevation-ladder.spec.ts:161:5 › elevation ladder (dark) › one ring per edge on the rendered surfaces (968ms)
+  ✓  315 e2e/empty-review-closeout.spec.ts:184:1 › detail: a review card with a reported empty diff likewise shows no merge row and completion is clickable (367ms)
+  ✓  316 e2e/escape-wiring.spec.ts:50:1 › an open layer is not re-wired by re-render: a single Escape still closes the layer after URL write-back (661ms)
+  ✓  317 e2e/empty-review-closeout.spec.ts:193:1 › cards with real file changes still show the merge row; completion disabled when authorization is missing (572ms)
+  ✓  319 e2e/empty-review-closeout.spec.ts:204:1 › git still has file headers but the parsed file set is empty: merge is not skipped (560ms)
+  ✓  318 e2e/escape-wiring.spec.ts:75:1 › the confirm sheet is not re-wired by root re-render: a single Escape still closes it after a ⌘K round trip (988ms)
+  ✓  320 e2e/empty-review-closeout.spec.ts:213:1 › changes not reported (no reported key) is not treated as an empty commit; merge row and authorization gate stay (586ms)
+  ✓  321 e2e/hotkeys-ready.spec.ts:16:1 › R1: ⌘K at load opens search (232ms)
+  ✓  323 e2e/hotkeys-ready.spec.ts:22:1 › R2: C at load opens the new-task dialog (262ms)
+  ✓  322 e2e/info-card-report.spec.ts:190:3 › info card transcript shows the report text and its attachment reference (light) (343ms)
+  ✓  324 e2e/hotkeys-ready.spec.ts:28:1 › R3: ⌘J at load opens the chief drawer (258ms)
+  ✓  326 e2e/hotkeys-ready.spec.ts:34:1 › R4: Escape at load on the detail page leaves it (287ms)
+  ✓  325 e2e/info-card-report.spec.ts:222:3 › info card completion dialog offers no merge and completes without one (light) (494ms)
+  ✓  327 e2e/hotkeys-ready.spec.ts:40:1 › R5: the app is mounted when load fires (232ms)
+  ✓  328 e2e/info-card-report.spec.ts:190:3 › info card transcript shows the report text and its attachment reference (dark) (313ms)
+  ✓  329 e2e/live-agent-model-line.spec.ts:106:1 › unassigned todo: `未指派` alone, no model segment (361ms)
+  ✓  330 e2e/info-card-report.spec.ts:222:3 › info card completion dialog offers no merge and completes without one (dark) (493ms)
+  ✓  331 e2e/live-agent-model-line.spec.ts:115:1 › assigned agent: its own model and thinking level, not another member’s (532ms)
+  ✓  332 e2e/info-card-report.spec.ts:253:1 › code card completion dialog keeps its merge row (396ms)
+  ✓  333 e2e/live-agent-model-line.spec.ts:131:1 › agent without a model configured: the name alone (348ms)
+  ✓  334 e2e/live-project-name.spec.ts:139:3 › board card › projects pending: no project item, then each card’s own project (307ms)
+  ✓  335 e2e/live-agent-model-line.spec.ts:141:1 › members pending: the name alone, then the model fills in (346ms)
+  ✓  336 e2e/live-project-name.spec.ts:162:3 › board card › projects read failed: no project item (2.2s)
+  ✓  337 e2e/live-agent-model-line.spec.ts:154:1 › members read failed: the name alone (2.1s)
+  ✓  339 e2e/live-agent-model-line.spec.ts:171:1 › en locale: the null thinking level reads Default (320ms)
+  ✓  338 e2e/live-project-name.spec.ts:190:1 › drag overlay: no project while pending, the card’s own project once loaded (744ms)
+  ✓  341 e2e/live-project-name.spec.ts:222:3 › detail chip popover › projects loaded: the head names the todo’s own project (333ms)
+  ✓  340 e2e/merge-reject.spec.ts:152:1 › board entry: completion button disabled and names the missing item when the executing Agent lacks `推送分支` (559ms)
+  ✓  342 e2e/live-project-name.spec.ts:237:3 › detail chip popover › projects pending: the head has no project, then fills in (405ms)
+  ✓  343 e2e/merge-reject.spec.ts:160:1 › detail entry: the same Agent disabled and naming the missing item on the same sheet (334ms)
+  ✓  345 e2e/merge-reject.spec.ts:168:1 › when both items are missing in a non-empty authorization set, both entries are named (562ms)
+  ✓  344 e2e/live-project-name.spec.ts:262:3 › new-task dialog › projects pending: no project chip, and saving sends nothing to a fixture project (1.1s)
+  ✓  346 e2e/merge-reject.spec.ts:175:1 › empty authorization set still blocks (#994): explicit all-off = zero authorizations, both entries disabled and name both items (742ms)
+  ✓  348 e2e/merge-reject.spec.ts:192:1 › with both items on: no blocking, completion button clickable, no missing-item hint (623ms)
+  ✓  349 e2e/merge-reject.spec.ts:198:1 › board entry: server really rejects (403) → the sheet stays open, server copy shown verbatim (703ms)
+  ✓  347 e2e/live-project-name.spec.ts:295:3 › new-task dialog › projects read failed: no project chip (2.3s)
+  ✓  350 e2e/merge-reject.spec.ts:216:1 › merge success (202) → the sheet closes as usual, no error row left (869ms)
+  ✓  351 e2e/live-project-name.spec.ts:308:3 › new-task dialog › projects loaded and empty: no project chip, saving creates the default project (654ms)
+  ✓  353 e2e/persona-verify.spec.ts:10:1 › verify verdict rows render all three chip states with their conclusions (250ms)
+  ✓  354 e2e/persona-verify.spec.ts:19:1 › evidence entries render as path blocks, notes included (245ms)
+  ✓  352 e2e/mobile-narrow.spec.ts:12:5 › 窄屏 360px › M1 board: sidebar folds into a menu drawer, top bar actions stay on screen, no page scroll (1.1s)
+  ✓  355 e2e/persona-verify.spec.ts:32:1 › the review dialog grows no fan-out row on the fixture face (283ms)
+  ✓  356 e2e/mobile-narrow.spec.ts:46:5 › 窄屏 360px › M2 纸页：阅读列不裁切，栏内控件留在视口内 (256ms)
+  ✓  357 e2e/phase-chip-words.spec.ts:13:1 › board: the fresh task sits in `待开始`, `待处理` holds the review card (272ms)
+  ✓  358 e2e/mobile-narrow.spec.ts:58:5 › 窄屏 360px › M3 详情：头按钮与 composer 控件触控区 ≥44px (298ms)
+  ✓  359 e2e/phase-chip-words.spec.ts:23:1 › detail header: the fresh task chip reads the column word `待开始` (267ms)
+  ✓  361 e2e/phase-chip-words.spec.ts:28:1 › search rows: fresh reads `待开始`, review `审核`, done `已完成` (329ms)
+  ✓  362 e2e/phase-chip-words.spec.ts:41:1 › project task rows: fresh reads `待开始`, review `审核` (238ms)
+  ✓  363 e2e/phase-chip-words.spec.ts:77:1 › schedule cards: todo reads `待开始`, queued `排队中`, confirm `确认` (233ms)
+  ✓  360 e2e/mobile-narrow.spec.ts:79:5 › 窄屏 360px › M4 总管：FAB ≥44px，开窗可最小化收回 (1.0s)
+  ✓  364 e2e/plan-diff-full-file.spec.ts:5:1 › initial render shows the hunk face and the `显示完整文件` button, no full text (initial render unpolluted) (262ms)
+  ✓  365 e2e/mobile-narrow.spec.ts:97:5 › 窄屏 360px › M5 搜索面板：整面板留在视口内，Esc 可关 (425ms)
+  ✓  366 e2e/plan-diff-full-file.spec.ts:12:1 › click expands inline to the full version text: hunks hidden, line numbers continuous, button flips to `显示差异` (317ms)
+  ✓  368 e2e/plan-diff-full-file.spec.ts:31:1 › click again returns to the hunk face, button copy flips back to `显示完整文件` (357ms)
+  ✓  367 e2e/mobile-narrow.spec.ts:109:5 › 窄屏 360px › M6 弹层：AI 审核对话框在视口内可关 (613ms)
+  ✓  369 e2e/queued-action.spec.ts:107:1 › detail: a queued task has no `开始`, keeps `排队中` and the wait row (384ms)
+  ✓  371 e2e/queued-action.spec.ts:118:1 › detail: a todo task keeps its `开始` (346ms)
+  ✓  370 e2e/mobile-narrow.spec.ts:120:5 › 窄屏 360px › M8 paper pages keep a side gutter and visible names (861ms)
+  ✓  373 e2e/mobile-narrow.spec.ts:154:5 › 窄屏 360px › M7 审批弹层：合并对话框在视口内可关 (502ms)
+  ✓  372 e2e/queued-action.spec.ts:125:1 › board: the queued card renders no `开始`, the todo card shows it on hover (1.0s)
+  ✓  374 e2e/mobile-narrow.spec.ts:12:5 › 窄屏 390px › M1 board: sidebar folds into a menu drawer, top bar actions stay on screen, no page scroll (1.0s)
+  ✓  376 e2e/mobile-narrow.spec.ts:46:5 › 窄屏 390px › M2 纸页：阅读列不裁切，栏内控件留在视口内 (226ms)
+  ✓  375 e2e/registry-focus-ring.spec.ts:102:3 › #1244 registry focus outline › input, select, and button use the global outline (1.1s)
+  ✓  377 e2e/mobile-narrow.spec.ts:58:5 › 窄屏 390px › M3 详情：头按钮与 composer 控件触控区 ≥44px (256ms)
+  ✓  379 e2e/mobile-narrow.spec.ts:79:5 › 窄屏 390px › M4 总管：FAB ≥44px，开窗可最小化收回 (1.0s)
+  ✓  378 e2e/registry-focus-ring.spec.ts:122:3 › #1244 registry focus outline › the same three controls use the global outline in light (1.2s)
+  ✓  380 e2e/mobile-narrow.spec.ts:97:5 › 窄屏 390px › M5 搜索面板：整面板留在视口内，Esc 可关 (468ms)
+  ✓  381 e2e/registry-focus-ring.spec.ts:136:3 › #1244 registry focus outline › a default textarea uses the global outline in both themes (898ms)
+  ✓  382 e2e/mobile-narrow.spec.ts:109:5 › 窄屏 390px › M6 弹层：AI 审核对话框在视口内可关 (589ms)
+  ✓  383 e2e/registry-focus-ring.spec.ts:148:3 › #1244 registry focus outline › clicking the name input shows the global outline, not the gray ring (507ms)
+  ✓  384 e2e/mobile-narrow.spec.ts:120:5 › 窄屏 390px › M8 paper pages keep a side gutter and visible names (725ms)
+  ✓  385 e2e/registry-focus-ring.spec.ts:157:3 › #1244 registry focus outline › aria-invalid keeps a 3px destructive shadow and the global outline (720ms)
+  ✓  386 e2e/mobile-narrow.spec.ts:154:5 › 窄屏 390px › M7 审批弹层：合并对话框在视口内可关 (497ms)
+  ✓  387 e2e/registry-focus-ring.spec.ts:171:3 › #1244 registry focus outline › checkbox, switch, and badge use the global outline (1.2s)
+  ✓  389 e2e/registry-focus-ring.spec.ts:203:3 › #1244 registry focus outline › input-group draws the outline on the shell, not the control (457ms)
+  ✓  390 e2e/registry-focus-ring.spec.ts:223:3 › #1244 registry focus outline › a segmented option draws the focus ring inset (433ms)
+  ✓  388 e2e/reject-chain.spec.ts:3:1 › reject loop: request changes → v2 → diff → confirm (2.1s)
+  ✓  391 e2e/registry-focus-ring.spec.ts:237:3 › #1244 registry focus outline › the sidebar user button uses the global outline (470ms)
+  ✓  392 e2e/rerun-close-family.spec.ts:10:3 › X button closes the rerun dialog (scenario 56) (432ms)
+  ✓  394 e2e/rerun-close-family.spec.ts:18:3 › Escape closes the rerun dialog (scenario 56) (294ms)
+  ✓  393 e2e/review-reject.spec.ts:112:1 › FM1/FM2: idle review send = steps revision action face, draft cleared, chip flips to planning instantly (373ms)
+  ✓  395 e2e/rerun-close-family.spec.ts:26:3 › backdrop click closes the rerun dialog (scenario 56); panel clicks do not (456ms)
+  ✓  397 e2e/rerun-close-family.spec.ts:10:3 › X button closes the reuse panel (scenario 75) (361ms)
+  ✓  396 e2e/review-reject.spec.ts:152:1 › FM3: the more menu shows the `请求修改` entry, after sheet feedback it walks the same action face (841ms)
+  ✓  398 e2e/rerun-close-family.spec.ts:18:3 › Escape closes the reuse panel (scenario 75) (290ms)
+  ✓  399 e2e/review-reject.spec.ts:186:1 › FM3 boundary: non-review phase (live building) more menu renders no reject row (368ms)
+  ✓  400 e2e/rerun-close-family.spec.ts:26:3 › backdrop click closes the reuse panel (scenario 75); panel clicks do not (441ms)
+  ✓  401 e2e/review-reject.spec.ts:196:1 › FM4: sending mid-run review (claimed step present) keeps steer semantics, does not steal the action face (361ms)
+  ✓  403 e2e/review-reject.spec.ts:239:1 › FM2: reject denied (409 race) keeps the draft verbatim + hint row explicit, nothing swallowed silently (378ms)
+  ✓  402 e2e/rerun-close-family.spec.ts:39:1 › reuse panel back button returns to the rerun dialog (490ms)
+  ✓  405 e2e/skill-inject.spec.ts:8:1 › the injected-skills row names each skill with its hit reason (305ms)
+  ✓  406 e2e/skill-inject.spec.ts:21:1 › a computed zero-hit run shows the no-skills placeholder, not absence (287ms)
+  ✓  407 e2e/skill-inject.spec.ts:31:1 › a run without an injection record grows no row (control zero-noise) (254ms)
+  ✓  408 e2e/spec-brief-card.spec.ts:83:1 › 1. spec block-level markdown rendering: headings/lists/fences become elements, literal markers do not leak (265ms)
+  ✓  409 e2e/spec-brief-card.spec.ts:95:1 › 2. attachment token rows render as chips: images with thumbnail constraints, files with name and endpoint link (273ms)
+  ✓  410 e2e/spec-brief-card.spec.ts:107:1 › 3. image attachments constrained by thumbnails — no longer naked original-size images breaking the page (273ms)
+  ✓  404 e2e/search-live-project-name.spec.ts:102:1 › live, projects loaded: pre-response rows carry each todo’s own project (1.8s)
+  ✓  411 e2e/spec-brief-card.spec.ts:117:1 › 4. brief-card recipe = framed content box (1px border / rounded-lg / surface-secondary background) (305ms)
+  ✓  413 e2e/spec-brief-card.spec.ts:142:1 › 4b. wide screens line length takes the 68ch cap (same law as the 60–75 character band in #470) (287ms)
+  ✓  412 e2e/search-live-project-name.spec.ts:142:1 › live, projects read failed: pre-response rows show no project line (908ms)
+  ✓  414 e2e/spec-brief-card.spec.ts:160:1 › 5. live tasks with a spec no longer show `尚无描述`; empty spec keeps the placeholder (400ms)
+  ✓  415 e2e/spec-flow.spec.ts:93:1 › 1. brief card lives in the scrolling column: visible inside .chat-col, no longer a direct child of .detail-center (346ms)
+  ✓  416 e2e/spec-brief-card.spec.ts:170:1 › 6. ordered-list numerals distinguished from body text, aligned with the first-line baseline, two-digit numbers do not jog the content column (#814 rework) (335ms)
+  ✓  417 e2e/spec-flow.spec.ts:103:1 › 2. brief card scrolls away with the flow: out of the viewport at the bottom, back to the column top at the top (349ms)
+  ✓  418 e2e/spinner-live.spec.ts:13:3 › streaming row loading indicator (scenario 26) › Atom mounts: stylesheet injected, shell + 3 tilted orbits, staggered 1800ms spin (298ms)
+  ✓  420 e2e/spinner-live.spec.ts:62:3 › streaming row loading indicator (scenario 26) › root is a 16px square, shell a 16px circle, row keeps 20px (413ms)
+  ✓  419 e2e/spec-flow.spec.ts:121:1 › 3. extra-long unbreakable lines wrap into the middle column: chat horizontal scrollWidth equals clientWidth (443ms)
+  ✓  421 e2e/spinner-live.spec.ts:94:3 › streaming row loading indicator (scenario 26) › root is aria-hidden and shell/ring strokes ride currentColor; label stays the cue (364ms)
+  ✓  423 e2e/spinner-live.spec.ts:112:3 › streaming row loading indicator (scenario 26) › elapsed seconds ride tabular figures (331ms)
+  ✓  422 e2e/task-panel.spec.ts:24:3 › task panel list view › the toggle opens the list in four groups and writes ?panel=1 without a history entry (887ms)
+  ✓  424 e2e/spinner-live.spec.ts:119:3 › streaming row loading indicator (scenario 26) › prefers-reduced-motion freezes the spins with the static settle transform (420ms)
+  ✓  425 e2e/task-panel.spec.ts:47:3 › task panel list view › a mouse open after a keyboard open does not move focus into the panel (398ms)
+  ✓  426 e2e/spinner-live.spec.ts:144:3 › quiescent building gap (scenario spinner-quiescent) › one live row: spinning indicator + static `执行中...` label, no seconds (342ms)
+  ✓  427 e2e/task-panel.spec.ts:59:3 › task panel list view › leaving for a page without the panel closes it and Back brings it back (491ms)
+  ✓  428 e2e/thinking-row-truncate.spec.ts:152:1 › T1: thinking shares a work block with a compact row and no avatar overlap (457ms)
+  ✓  430 e2e/thinking-row-truncate.spec.ts:162:1 › T2: the work block stays inside the transcript width (422ms)
+  ✓  429 e2e/task-panel.spec.ts:73:3 › task panel list view › Back and Forward between hosts restore each page's open task (672ms)
+  ✓  432 e2e/task-panel.spec.ts:93:3 › task panel list view › Esc closes the panel, clears the URL and returns focus to the toggle (415ms)
+  ✓  431 e2e/thinking-row-truncate.spec.ts:171:1 › T3: the long preview stays on one line and hides while full thinking is open (563ms)
+  ✓  433 e2e/task-panel.spec.ts:103:3 › task panel list view › a reload with ?panel=1 opens the list again (321ms)
+  ✓  434 e2e/thinking-row-truncate.spec.ts:184:1 › T4: full thinking preserves whitespace without horizontal page overflow (452ms)
+  ✓  436 e2e/ticket-cost.spec.ts:150:5 › light › board cards show the summed amount, `—` with a reason, or nothing (383ms)
+  ✓  435 e2e/task-panel.spec.ts:110:3 › task panel task view › a home row opens the task in place with the ask box, the stage list and the expand link (635ms)
+  ✓  438 e2e/task-panel.spec.ts:139:3 › task panel task view › a deep link with ?task opens that task (292ms)
+  ✓  437 e2e/ticket-cost.spec.ts:179:5 › light › detail: total plus `缓存读取` / `输入` / `输出` from the cost columns (569ms)
+  ✓  439 e2e/task-panel.spec.ts:147:3 › task panel task view › a keyboard open moves focus into the panel and Esc returns it to the row (344ms)
+  ✓  440 e2e/ticket-cost.spec.ts:208:5 › light › detail: no price source reads `—` and says why, never $0.00 (598ms)
+  ✓  441 e2e/task-panel.spec.ts:162:3 › task panel task view › the expand link leaves for the full task page and closes the panel (571ms)
+  ✓  442 e2e/ticket-cost.spec.ts:150:5 › dark › board cards show the summed amount, `—` with a reason, or nothing (343ms)
+  ✓  444 e2e/ticket-cost.spec.ts:179:5 › dark › detail: total plus `缓存读取` / `输入` / `输出` from the cost columns (595ms)
+  ✓  443 e2e/task-panel.spec.ts:173:3 › task panel hosts › kanban: a card opens the panel and the board stays; a modified click keeps the link (891ms)
+  ✓  445 e2e/ticket-cost.spec.ts:208:5 › dark › detail: no price source reads `—` and says why, never $0.00 (547ms)
+  ✓  446 e2e/task-panel.spec.ts:200:3 › task panel hosts › project page: a task row opens the panel (596ms)
+  ✓  448 e2e/task-panel.spec.ts:210:3 › task panel hosts › agent page: an in-progress row opens the panel (360ms)
+  ✓  447 e2e/ticket-cost.spec.ts:226:1 › detail: a known free price reads $0.00 (563ms)
+  ✓  449 e2e/task-panel.spec.ts:217:3 › task panel hosts › machine page: the toggle opens the task list (325ms)
+  ✓  450 e2e/ticket-cost.spec.ts:234:1 › detail: a sub-cent total is not rounded to $0.00 (557ms)
+  ✓  451 e2e/task-panel.spec.ts:225:3 › task panel layout › desktop: the panel docks at 420px beside the page (310ms)
+  ✓  453 e2e/transcript-user-words.spec.ts:164:1 › 1. task text appears exactly once: the description area carries it, the bubble does not repeat it (nesting fix) (358ms)
+  ✓  452 e2e/task-panel.spec.ts:233:3 › task panel layout › 1100px and below: the panel overlays the page and the scrim closes it (650ms)
+  ✓  454 e2e/transcript-user-words.spec.ts:182:1 › 2. CONTINUE continuation prompts do not pose as user bubbles (335ms)
+  ✓  455 e2e/task-panel.spec.ts:248:3 › task panel layout › phone: the panel fills the screen (514ms)
+  ✓  456 e2e/transcript-user-words.spec.ts:189:1 › 3. review announcement row = note family (same shape as `发起了合并`), not a bubble (337ms)
+  ✓  458 e2e/transcript-user-words.spec.ts:199:1 › 4. real steer utterances go through markdown: fences become code blocks, literal ``` does not leak (359ms)
+  ✓  459 e2e/transcript-user-words.spec.ts:209:1 › 5. a one-line message keeps the 32px bubble height (no geometry drift) (379ms)
+  ✓  460 e2e/transcript-user-words.spec.ts:221:1 › 6. taskline does not mis-attach: after the task text row retires no #seq row residue remains (335ms)
+  ✓  461 e2e/user-menu-geometry.spec.ts:76:5 › user menu: every control stays inside the panel, nested radii are concentric (light, zh) (432ms)
+  ✓  462 e2e/user-menu-geometry.spec.ts:105:5 › language select: padded list, pill rows concentric with the popup (light, zh) (436ms)
+  ✓  463 e2e/user-menu-geometry.spec.ts:76:5 › user menu: every control stays inside the panel, nested radii are concentric (light, en) (418ms)
+  ✓  457 e2e/task-panel.spec.ts:259:1 › a task created while the list is open flashes once (2.5s)
+  ✓  464 e2e/user-menu-geometry.spec.ts:105:5 › language select: padded list, pill rows concentric with the popup (light, en) (463ms)
+  ✓  466 e2e/user-menu-geometry.spec.ts:76:5 › user menu: every control stays inside the panel, nested radii are concentric (dark, zh) (593ms)
+  ✓  465 e2e/task-panel.spec.ts:278:5 › axe with the panel open › list (1.1s)
+  ✓  467 e2e/user-menu-geometry.spec.ts:105:5 › language select: padded list, pill rows concentric with the popup (dark, zh) (634ms)
+  ✓  468 e2e/task-panel.spec.ts:278:5 › axe with the panel open › task (859ms)
+  ✓  469 e2e/user-menu-geometry.spec.ts:76:5 › user menu: every control stays inside the panel, nested radii are concentric (dark, en) (505ms)
+  ✓  471 e2e/user-menu-geometry.spec.ts:105:5 › language select: padded list, pill rows concentric with the popup (dark, en) (505ms)
+  ✓  470 e2e/task-panel.spec.ts:278:5 › axe with the panel open › board task (869ms)
+  ✓  472 e2e/user-menu-geometry.spec.ts:127:1 › menu tokens: --radius-menu-item resolves to --radius-popover minus --menu-pad (246ms)
+  ✓  473 e2e/task-panel.spec.ts:322:1 › live: the panel shows the last agent summary and the composer steers the running task (502ms)
+  ✓  474 e2e/user-menu-nav.spec.ts:27:3 › `账号` row SPA-navigates to /app/account?scenario=01 (524ms)
+  ✓  476 e2e/user-menu-nav.spec.ts:27:3 › `API 密钥` row SPA-navigates to /app/api-keys?scenario=01 (488ms)
+  ✓  475 e2e/user-menu-trigger.spec.ts:65:1 › expanded chip: click opens anchored above the chip, re-click closes (653ms)
+  ✓  477 e2e/user-menu-nav.spec.ts:27:3 › `MCP` row SPA-navigates to /app/resources/mcp-servers?scenario=01 (493ms)
+  ✓  478 e2e/user-menu-trigger.spec.ts:84:1 › outside click and Esc close the open menu (776ms)
+  ✓  479 e2e/user-menu-trigger.spec.ts:99:1 › rail chip opens the same popover, unclipped by the 40px rail (626ms)
+  ✓  480 e2e/user-menu-trigger.spec.ts:114:1 › #163 anchoring: bottom distance is viewport-invariant, the chip is never covered — both shapes (1.5s)
+  ✓  481 e2e/user-menu-trigger.spec.ts:148:1 › appearance row works from the click-opened menu and the choice survives reopen (596ms)
+  ✓  482 e2e/user-menu-trigger.spec.ts:170:1 › detail route: the trigger opens the menu over the confirm surface (486ms)
+  ✓  483 e2e/user-menu-trigger.spec.ts:182:1 › #1245 floating menu is a single skin and stays inside the viewport (483ms)
+
+  483 passed (2.2m)
+[prepush] PASS (27 checks)
+To https://github.com/xiechimon/cairn.git
+   178ee0f21..12c1a8d4c  HEAD -> codex/1682-reviewed-delivery

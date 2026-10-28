@@ -81,6 +81,8 @@ control. The fallback now sends the notice in the shared `AcceptDialog`.
 The earlier 1378-case run and capture manifest apply to source `f106a29e5`,
 before this follow-up. They are not evidence of a later full-suite run.
 
+Follow-up source `12c1a8d4c34de1e9b4efba8e2b5fcea167c4975c` passed all 483 affected browser cases and all 27 prepush checks (`followup-prepush-green.log`). The first attempt had one task-panel list color-contrast failure and 482 passes (`followup-prepush-first-failure.log`). Without a source change, all three panel accessibility cases then passed (`panel-contrast-recheck.log`), followed by the complete 483-case pass. The intermittent failure remains unexplained; no assertion, retry setting, or accessibility threshold was weakened.
+
 ## Rebuilding the demo locally
 
 ```sh
