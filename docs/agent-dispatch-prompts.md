@@ -9,16 +9,22 @@ Do not start long background tasks directly with `( ... & )` or `nohup ... &`: t
 ```sh
 node scripts/dispatch-agent.mjs start <id> [--cwd <dir>] [--ticket <ticket> [--force]] -- <full command>
 node scripts/dispatch-agent.mjs check <id>
+node scripts/dispatch-agent.mjs wait <id> [--timeout-s <n>]
 ```
 
-start runs the command in its own session (avoiding the process-group cleanup), checks the process immediately and writes the state to a status file (default `$TMPDIR/cairn-dispatch/<id>.json`, overridable with `CAIRN_DISPATCH_STATUS_DIR`; command output goes to `<id>.log`). Before reporting a task's state, run `check` to read the status file; never say "running" from memory. A task started directly has no status record, and `check` reports that the process does not exist.
+start runs the command in its own session (avoiding the process-group cleanup), checks the process immediately and writes the state to a status file (default `$TMPDIR/cairn-dispatch/<id>.json`, overridable with `CAIRN_DISPATCH_STATUS_DIR`; command output goes to `<id>.log`). Before reporting a task's state, run `check` to read the status file; never say "running" from memory. A task started directly has no status record, and `check` reports that the process does not exist. After the job should have finished, run `wait`: it polls until the process exits, then runs `scripts/lane-worker-exit-gate.mjs` so a banned-model route (for example `deepseek-v4-flash`) or a short rc-0 no-op wrap-up fails the wait even when the child returned 0 (#2021).
 
 Dispatch work for a ticket always with `--ticket <ticket>` (ledger: no duplicate check before dispatch, #1569/#1578): start first checks whether someone is already on the same ticket: git working directories whose name contains the ticket number under the system tmp directories (`os.tmpdir()` and `/tmp`, excluding `--cwd` itself), branches on `origin` containing the ticket number, open PRs in `xiechimon/cairn` that mention the ticket number, and codex / pi / grok processes whose command line contains the ticket number. Any hit is listed and start refuses with exit code 1; a source that cannot be checked (for example gh unavailable) is reported as "unchecked", not as no hit. Add `--force` only after confirming the hits are unrelated.
 
 ```sh
 node scripts/dispatch-agent.mjs start 1556-impl --cwd <worktree> --ticket 1556 -- ai-route run implement -C <worktree> "<task>"
 node scripts/dispatch-agent.mjs check 1556-impl
+node scripts/dispatch-agent.mjs wait 1556-impl
 ```
+
+## Lane completion (#2021)
+
+Do not continue on a banned model from `.claude/workflow.md` (including `deepseek-v4-flash`; `deepseek-v4.1-flash` remains allowed). If `ai-route` selects a banned model, stop and exit non-zero so the dispatcher can retry. If you abort without opening a PR (overlapping work, human decision required, or any other stop), exit the process with a non-zero status; a zero exit after a short no-op wrap-up is classified as a lane failure by `scripts/lane-worker-exit-gate.mjs`.
 
 ## Accessing GitHub
 
