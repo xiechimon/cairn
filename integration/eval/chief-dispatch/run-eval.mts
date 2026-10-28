@@ -27,7 +27,7 @@ import {
 } from '../memory-regression/grade.mts';
 import { readMemoryRows, seedMemories } from '../memory-regression/seed.mts';
 import { gradePlanCase, isPlanCase, isPlanRevisionCase, type PlanCase } from '../plan/grade.mts';
-import { runPlanRevisionCase } from '../plan/run.mts';
+import { buildPlanRevisionTranscript, runPlanRevisionCase } from '../plan/run.mts';
 import { gradeRoutingCase, isRoutingCase, type RoutingCase } from '../project-routing/grade.mts';
 import { seedRoutingProjects } from '../project-routing/seed.mts';
 import { type Case, gradeCase, type RosterAgent } from './grade.mts';
@@ -158,7 +158,7 @@ async function runCase(
     });
     return {
       output: revised.output,
-      transcript: buildTranscript(revised.evidence),
+      transcript: buildPlanRevisionTranscript(revised, input),
       model: revised.model,
       usage: revised.usage,
       stop_reason: revised.stop_reason,

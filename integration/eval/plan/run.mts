@@ -56,6 +56,83 @@ export function planRevisionHarnessError(message: string): Error & { failure_cla
   return error;
 }
 
+export type PlanRevisionTranscriptRow = {
+  role: string;
+  content: string;
+  name?: string;
+};
+
+function stageTurnRows(evidence: TurnEvidence): PlanRevisionTranscriptRow[] {
+  const rows: PlanRevisionTranscriptRow[] = [];
+  for (const call of evidence.toolCalls) {
+    rows.push({
+      role: 'tool_call',
+      name: call.name,
+      content: JSON.stringify(call.arguments, null, 2),
+    });
+    rows.push({
+      role: 'tool_result',
+      name: call.name,
+      content: call.isError ? '(isError)' : '(ok)',
+    });
+  }
+  if (evidence.assistantText !== '')
+    rows.push({ role: 'assistant', content: evidence.assistantText });
+  rows.push({
+    role: 'assistant',
+    content:
+      `[end state] step=${evidence.stepStatus} · todos=${evidence.createdTodoIds.length} · builds=${evidence.buildRows.length} · ` +
+      `model=${evidence.model ?? 'n/a'} · ${evidence.usage.input}in/${evidence.usage.output}out · ${(evidence.wallMs / 1000).toFixed(1)}s`,
+  });
+  return rows;
+}
+
+export function buildPlanRevisionTranscript(
+  run: PlanRevisionRun,
+  input: PlanCase,
+): PlanRevisionTranscriptRow[] {
+  const out: PlanRevisionTranscriptRow[] = [];
+  const appendArm = (
+    armName: 'feedback' | 'control',
+    arm: PlanRevisionArmResult | undefined,
+  ): void => {
+    if (arm === undefined) return;
+    out.push({
+      role: 'arm',
+      name: armName,
+      content: JSON.stringify({
+        threadId: arm.threadId,
+        home: arm.home,
+        feedbackPresentInDb: arm.feedbackPresentInDb,
+        seededTodos: arm.seededTodos,
+      }),
+    });
+    if (
+      armName === 'feedback' &&
+      typeof input.feedback === 'string' &&
+      input.feedback.trim() !== ''
+    ) {
+      out.push({ role: 'user', name: 'feedback', content: input.feedback });
+    }
+    for (const stage of arm.stages) {
+      out.push({
+        role: 'stage',
+        name: `${armName}:${stage.name}`,
+        content: stage.name,
+      });
+      out.push(...stageTurnRows(stage.evidence));
+    }
+    out.push({
+      role: 'artifacts',
+      name: `${armName}-finalTodos`,
+      content: JSON.stringify(arm.finalTodos),
+    });
+  };
+  appendArm('feedback', run.feedback);
+  appendArm('control', run.control);
+  return out;
+}
+
 function deadTurn(evidence: TurnEvidence): void {
   if (
     (evidence.usage.input === 0 && evidence.usage.output === 0) ||

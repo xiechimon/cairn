@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import type { RosterAgent } from '../eval/chief-dispatch/grade.mts';
+import type { TurnEvidence } from '../eval/chief-dispatch/stack.mts';
 import {
   gradePlanCase,
   gradePlanRevisionCase,
@@ -14,7 +15,12 @@ import {
   type PlanCase,
   type PlanTodoRow,
 } from '../eval/plan/grade.mts';
-import { planRevisionHarnessError, runPlanRevisionCase } from '../eval/plan/run.mts';
+import {
+  buildPlanRevisionTranscript,
+  type PlanRevisionRun,
+  planRevisionHarnessError,
+  runPlanRevisionCase,
+} from '../eval/plan/run.mts';
 import { seedPriorPlan } from '../eval/plan/seed.mts';
 
 const require = createRequire(new URL('../package.json', import.meta.url));
@@ -627,4 +633,214 @@ describe('seedPriorPlan', () => {
   test('exports a seeder used by the revision path', () => {
     expect(typeof seedPriorPlan).toBe('function');
   });
+});
+
+function emptyEvidence(over: Partial<TurnEvidence> = {}): TurnEvidence {
+  return {
+    threadId: 't',
+    stepStatus: 'done',
+    toolCalls: [],
+    runBuildsArgs: [],
+    assistantText: '',
+    createdTodoIds: [],
+    createdTodoRows: [],
+    buildRows: [],
+    model: 'glm-5.3',
+    usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+    wallMs: 1,
+    ...over,
+  };
+}
+
+describe('buildPlanRevisionTranscript', () => {
+  const fixtureRun: PlanRevisionRun = {
+    feedback: {
+      threadId: 'fb-thread',
+      home: '/tmp/fb',
+      seededTodos: [
+        { id: 's1', title: 'Add logging', spec: 'Add logging to the export handler.' },
+        {
+          id: 's2',
+          title: 'Regression test',
+          spec: 'Keep the existing regression test card for the Safari export path.',
+        },
+      ],
+      finalTodos: [
+        {
+          id: 's1',
+          title: 'Fix Safari export',
+          spec: 'Fix the download attribute on a blob url; keep the existing regression test card.',
+        },
+        {
+          id: 's2',
+          title: 'Regression test',
+          spec: 'Keep the existing regression test card for the Safari export path.',
+        },
+      ],
+      stages: [
+        {
+          name: 'initial',
+          evidence: emptyEvidence({ threadId: 'fb-thread', assistantText: 'seeded' }),
+        },
+        {
+          name: 'rejection',
+          evidence: emptyEvidence({ threadId: 'fb-thread', assistantText: 'got feedback' }),
+        },
+        {
+          name: 'revision',
+          evidence: emptyEvidence({
+            threadId: 'fb-thread',
+            assistantText: 'revised',
+            toolCalls: [{ name: 'update_todo', arguments: { todoId: 's1' } }],
+          }),
+        },
+      ],
+      feedbackPresentInDb: true,
+      evidence: emptyEvidence({ threadId: 'fb-thread', assistantText: 'revised' }),
+      grade: {
+        grade: { revision_ok: 1 },
+        explanation: { revision_ok: 'ok' },
+      },
+    },
+    control: {
+      threadId: 'ctl-thread',
+      home: '/tmp/ctl',
+      seededTodos: [{ id: 'c1', title: 'Add logging', spec: 'Add logging to the export handler.' }],
+      finalTodos: [{ id: 'c1', title: 'Add logging', spec: 'Add logging to the export handler.' }],
+      stages: [
+        { name: 'initial', evidence: emptyEvidence({ threadId: 'ctl-thread' }) },
+        { name: 'revision', evidence: emptyEvidence({ threadId: 'ctl-thread' }) },
+      ],
+      feedbackPresentInDb: false,
+      evidence: emptyEvidence({ threadId: 'ctl-thread' }),
+      grade: {
+        grade: { revision_ok: 0 },
+        explanation: { revision_ok: 'mustFix missing' },
+      },
+    },
+    grade: {
+      grade: { revision_ok: 1, nofeedback_ok: 0, plan_ok: 1 },
+      explanation: {
+        revision_ok: 'ok',
+        nofeedback_ok: 'mustFix missing',
+        plan_ok: 'paired',
+      },
+    },
+    evidence: emptyEvidence({ threadId: 'fb-thread', assistantText: 'revised' }),
+    output: 'revised',
+    model: 'glm-5.3',
+    usage: { input_tokens: 2, output_tokens: 2 },
+    stop_reason: 'tool_use',
+    truncated: false,
+    agentIds: {},
+  };
+
+  test('persists both arms with stage boundaries, feedback message, and final edited todos', () => {
+    const transcript = buildPlanRevisionTranscript(fixtureRun, revisionCase);
+    const arms = transcript.filter((row) => row.role === 'arm').map((row) => row.name);
+    expect(arms).toEqual(expect.arrayContaining(['feedback', 'control']));
+    const stages = transcript
+      .filter((row) => row.role === 'stage')
+      .map((row) => `${row.name}:${row.content}`);
+    expect(stages.some((s) => s.startsWith('feedback:initial'))).toBe(true);
+    expect(stages.some((s) => s.startsWith('feedback:rejection'))).toBe(true);
+    expect(stages.some((s) => s.startsWith('feedback:revision'))).toBe(true);
+    expect(stages.some((s) => s.startsWith('control:initial'))).toBe(true);
+    expect(stages.some((s) => s.startsWith('control:revision'))).toBe(true);
+    const feedbackMsg = transcript.find((row) => row.role === 'user' && row.name === 'feedback');
+    expect(feedbackMsg?.content).toContain('download attribute on a blob url');
+    expect(transcript.some((row) => row.role === 'user' && row.name === 'control-feedback')).toBe(
+      false,
+    );
+    const finalFeedback = transcript.find(
+      (row) => row.role === 'artifacts' && row.name === 'feedback-finalTodos',
+    );
+    expect(finalFeedback).toBeDefined();
+    const rows = JSON.parse(finalFeedback!.content) as PlanTodoRow[];
+    expect(rows.some((r) => /download attribute|blob url/i.test(r.spec))).toBe(true);
+    const finalControl = transcript.find(
+      (row) => row.role === 'artifacts' && row.name === 'control-finalTodos',
+    );
+    expect(finalControl).toBeDefined();
+  });
+
+  test('a final-turn-only transcript fails the attributable evidence shape', () => {
+    const finalOnly = [
+      { role: 'assistant', content: 'revised' },
+      {
+        role: 'assistant',
+        content: '[end state] step=done · todos=0 · builds=0 · 模型=glm-5.3 · 1in/1out · 0.0s',
+      },
+    ];
+    expect(finalOnly.some((row) => row.role === 'arm')).toBe(false);
+    expect(finalOnly.some((row) => row.role === 'stage')).toBe(false);
+    expect(finalOnly.some((row) => row.role === 'artifacts')).toBe(false);
+  });
+});
+
+describe('plan revision runner traces', () => {
+  test('the runner persists control, stages, feedback, and final todos into traces', async () => {
+    const dataset = JSON.parse(readFileSync(join(planFlow, 'cases.json'), 'utf8')) as {
+      roster: RosterAgent[];
+    };
+    const home = mkdtempSync(join(tmpdir(), 'cairn-plan-rev-traces-'));
+    homes.push(home);
+    writeFileSync(
+      join(home, 'cases.json'),
+      `${JSON.stringify(
+        {
+          flow: 'plan',
+          roster: dataset.roster,
+          cases: [{ ...revisionCase, id: 'plan-rev-trace-persist' }],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    writeFileSync(join(home, '_state.json'), readFileSync(join(planFlow, '_state.json'), 'utf8'));
+    const stub = await startRevisionStub({
+      mode: 'adaptive',
+      seen: { feedback: false, priorPlan: false, prompts: [] },
+    });
+    try {
+      const { code, output } = await runRunner(
+        home,
+        {
+          TMPDIR: home,
+          CAIRN_EVAL_RELAY_URL: stub.url,
+          CAIRN_EVAL_RELAY_KEY: 'nonsecret-plan-revision-traces',
+        },
+        ['--case', 'plan-rev-trace-persist'],
+      );
+      expect(code, output).toBe(0);
+      const tracePath = join(home, 'baseline/traces/plan-rev-trace-persist_rep0.json');
+      expect(existsSync(tracePath)).toBe(true);
+      const transcript = JSON.parse(readFileSync(tracePath, 'utf8')) as {
+        role: string;
+        name?: string;
+        content: string;
+      }[];
+      expect(transcript.some((row) => row.role === 'arm' && row.name === 'feedback')).toBe(true);
+      expect(transcript.some((row) => row.role === 'arm' && row.name === 'control')).toBe(true);
+      expect(
+        transcript.some((row) => row.role === 'stage' && row.name === 'feedback:rejection'),
+      ).toBe(true);
+      expect(
+        transcript.some(
+          (row) =>
+            row.role === 'user' &&
+            row.name === 'feedback' &&
+            row.content.includes('download attribute on a blob url'),
+        ),
+      ).toBe(true);
+      expect(
+        transcript.some((row) => row.role === 'artifacts' && row.name === 'feedback-finalTodos'),
+      ).toBe(true);
+      expect(
+        transcript.some((row) => row.role === 'artifacts' && row.name === 'control-finalTodos'),
+      ).toBe(true);
+    } finally {
+      await stub.close();
+    }
+  }, 240_000);
 });
