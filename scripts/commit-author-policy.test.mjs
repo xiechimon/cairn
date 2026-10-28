@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -22,6 +22,87 @@ for (const file of [
       assert.match(guidance, /helper is unavailable[^\n]*dispatcher/);
       assert.match(guidance, /neither its author name nor email contains `cairnwright\[bot\]`/);
     }
+  });
+}
+
+test('documented preparation overrides inherited bot author and committer identities', () => {
+  const guidance = readFileSync('docs/ops/agent-bot-identity.md', 'utf8');
+  const preparation = guidance.split('## Commit preparation\n')[1].split('## Recovery')[0];
+  const recipe = preparation.match(/```sh\n([\s\S]*?)```/)[1];
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-preparation-'));
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) if (key.startsWith('GIT_')) delete env[key];
+  try {
+    assert.equal(spawnSync('git', ['init', directory], { env }).status, 0);
+    assert.equal(
+      spawnSync(
+        'git',
+        [
+          '-c',
+          'user.name=Baseline',
+          '-c',
+          'user.email=baseline@example.invalid',
+          '-c',
+          'core.hooksPath=/dev/null',
+          'commit',
+          '--allow-empty',
+          '-m',
+          'baseline',
+        ],
+        { cwd: directory, env },
+      ).status,
+      0,
+    );
+    assert.equal(
+      spawnSync('git', ['update-ref', 'refs/remotes/origin/main', 'HEAD'], { cwd: directory, env })
+        .status,
+      0,
+    );
+    writeFileSync(join(directory, 'COMMIT_MSG.txt'), 'Preparation fixture\n');
+    for (const inherited of ['AUTHOR', 'COMMITTER', 'BOTH']) {
+      const botEnv = { ...env };
+      for (const role of ['AUTHOR', 'COMMITTER']) {
+        if (inherited === role || inherited === 'BOTH') {
+          botEnv[`GIT_${role}_NAME`] = 'cairnwright[bot]';
+          botEnv[`GIT_${role}_EMAIL`] = '347615582+cairnwright[bot]@users.noreply.github.com';
+        }
+      }
+      writeFileSync(join(directory, 'COMMIT_MSG.txt'), `Preparation fixture ${inherited}\n`);
+      const restaged = spawnSync('git', ['add', 'COMMIT_MSG.txt'], { cwd: directory, env });
+      assert.equal(restaged.status, 0);
+      const result = spawnSync('bash', ['-e', '-c', recipe], {
+        cwd: directory,
+        env: botEnv,
+        encoding: 'utf8',
+      });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      const identity = spawnSync('git', ['log', '-1', '--format=%an <%ae>|%cn <%ce>'], {
+        cwd: directory,
+        env,
+        encoding: 'utf8',
+      });
+      const expected = 'Cairnwright <348051526+cairnwright@users.noreply.github.com>';
+      assert.equal(identity.stdout.trim(), `${expected}|${expected}`, inherited);
+      assert.ok(result.stdout.includes(`author: ${expected}`), result.stdout);
+      assert.ok(result.stdout.includes(`committer: ${expected}`), result.stdout);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('identity wrappers are explicitly excluded from commit preparation', () => {
+  const guidance = readFileSync('docs/ops/agent-bot-identity.md', 'utf8');
+  assert.match(guidance, /Do not prepare commits with `as-bot\.sh` or `as-bot-author\.sh`/);
+  assert.doesNotMatch(guidance, /as-bot(?:-author)?\.sh\s+git\s+commit\b/);
+});
+
+for (const file of ['.claude/skills/pr-cairn/SKILL.md', 'docs/ops/agent-bot-identity.md']) {
+  test(`${file} recovers through a compliant push without rewriting main`, () => {
+    const guidance = readFileSync(file, 'utf8');
+    assert.match(guidance, /subsequent compliant push[^\n]*BEFORE_SHA\.\.HEAD/);
+    assert.match(guidance, /Preserve main history/);
+    assert.match(guidance, /neither[^\n]*author name nor email[^\n]*cairnwright\[bot\]/);
   });
 }
 
