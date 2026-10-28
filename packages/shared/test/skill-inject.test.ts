@@ -204,3 +204,108 @@ describe('20+ skill noise gate (negative-case list from ticket acceptance 1)', (
     }
   });
 });
+
+describe('explicit mention: bounded and every occurrence (#1969)', () => {
+  const wikiNull: SkillInjectCandidate = { id: 'wiki', name: 'wiki', description: null };
+  const prNull: SkillInjectCandidate = { id: 'pr', name: 'pr', description: null };
+  const variantNull: SkillInjectCandidate = { id: 'variant', name: 'variant', description: null };
+  const mentionCues = ['use', 'with', 'skill', '/', '调用', '用'] as const;
+  const grantedWithNullWiki = [
+    ...granted.filter((s) => s.id !== 'wiki'),
+    wikiNull,
+    prNull,
+    variantNull,
+  ];
+
+  it('"Use wiki" selects wiki once with rule explicit-mention', () => {
+    const hits = selectSkillsForTask('Use wiki', grantedWithNullWiki);
+    const wikiHits = hits.filter((h) => h.id === 'wiki');
+    expect(wikiHits).toHaveLength(1);
+    expect(wikiHits[0]?.rule).toBe('explicit-mention');
+  });
+
+  it('"The wiki needs updating. Use wiki" selects wiki once with rule explicit-mention', () => {
+    const hits = selectSkillsForTask('The wiki needs updating. Use wiki', grantedWithNullWiki);
+    const wikiHits = hits.filter((h) => h.id === 'wiki');
+    expect(wikiHits).toHaveLength(1);
+    expect(wikiHits[0]?.rule).toBe('explicit-mention');
+  });
+
+  it('"the wiki page is stale" alone produces no explicit-mention hit for a single-token name', () => {
+    const hits = selectSkillsForTask('the wiki page is stale', [wikiNull]);
+    expect(hits.filter((h) => h.rule === 'explicit-mention')).toEqual([]);
+    expect(hits.map((h) => h.id)).not.toContain('wiki');
+  });
+
+  it('"reproduce the crash" does not select pr; "fix buttonVariants spacing" does not select variant', () => {
+    expect(selectSkillsForTask('reproduce the crash', [prNull])).toEqual([]);
+    expect(selectSkillsForTask('fix buttonVariants spacing', [variantNull])).toEqual([]);
+  });
+
+  it('"use the pr skill" and "/pr" select pr (cues: use, with, skill, /, 调用, 用)', () => {
+    expect(mentionCues).toEqual(['use', 'with', 'skill', '/', '调用', '用']);
+    const withSkill = selectSkillsForTask('use the pr skill', [prNull]);
+    expect(withSkill).toEqual([expect.objectContaining({ id: 'pr', rule: 'explicit-mention' })]);
+    const slash = selectSkillsForTask('/pr', [prNull]);
+    expect(slash).toEqual([expect.objectContaining({ id: 'pr', rule: 'explicit-mention' })]);
+  });
+
+  it('multi-token names (better-typography, "better typography") still select on mention without a cue', () => {
+    const multi = [
+      {
+        id: 'better-typography',
+        name: 'better-typography',
+        description: null,
+      },
+    ];
+    const hyphen = selectSkillsForTask('apply better-typography here', multi);
+    expect(hyphen).toEqual([
+      expect.objectContaining({ id: 'better-typography', rule: 'explicit-mention' }),
+    ]);
+    const spaced = selectSkillsForTask('apply better typography here', multi);
+    expect(spaced).toEqual([
+      expect.objectContaining({ id: 'better-typography', rule: 'explicit-mention' }),
+    ]);
+  });
+
+  it('Chinese name mention keeps current behavior', () => {
+    const zh = [{ id: 's1', name: '周报助手', description: '帮你写周报' }];
+    const hits = selectSkillsForTask('喊周报助手出来写一下本周周报', zh);
+    expect(hits.map((h) => h.id)).toEqual(['s1']);
+    expect(hits[0]?.rule).toBe('explicit-mention');
+  });
+
+  it('a task that both names a skill and hits its domain yields one explicit-mention hit, not domain', () => {
+    const hits = selectSkillsForTask('用 tdd 技能给购物车模块补单元测试', granted);
+    const tdd = hits.filter((h) => h.id === 'tdd');
+    expect(tdd).toHaveLength(1);
+    expect(tdd[0]?.rule).toBe('explicit-mention');
+  });
+
+  it('matching on name works when id differs', () => {
+    const renamed = [{ id: 'x-1', name: 'wiki', description: null }];
+    const hits = selectSkillsForTask('Use wiki', renamed);
+    expect(hits).toEqual([
+      expect.objectContaining({
+        id: 'x-1',
+        rule: 'explicit-mention',
+        reason: expect.stringContaining('wiki'),
+      }),
+    ]);
+  });
+
+  it('output order stays sorted by id for the new cases', () => {
+    const mixed: SkillInjectCandidate[] = [
+      variantNull,
+      wikiNull,
+      prNull,
+      { id: 'aaa-skill', name: 'wiki', description: null },
+    ];
+    const hits = selectSkillsForTask('Use wiki with the pr skill', mixed);
+    const ids = hits.map((h) => h.id);
+    expect(ids).toEqual([...ids].sort((a, b) => a.localeCompare(b)));
+    expect(ids).toContain('wiki');
+    expect(ids).toContain('pr');
+    expect(ids).toContain('aaa-skill');
+  });
+});
