@@ -26,3 +26,10 @@ pnpm spec:parse
 ## Rubric rule stated in tests
 
 Any non-empty `consoleErrors` makes the run `invalid` (never ignored; never scored as success).
+
+## Schema fail-closed (review fix)
+
+`gradeRun` validates the run-record shape (zod, matching `run-record.schema.json`) before scoring. Missing required fields, non-boolean `buildOk`, and null `requirements` are `invalid` and stay out of aggregates.
+
+- `schema-red.log` — two new cases fail on the prior tip (malformed accepted as valid; null requirements throw)
+- `schema-green.log` — 15/15 after schema validation
