@@ -8,15 +8,19 @@ const BOARD = '/app?scenario=board-inbox&view=board';
 const panel = (page: Page) => page.getByRole('complementary', { name: '任务面板' });
 const toggle = (page: Page) => page.getByRole('button', { name: '任务面板' });
 const params = (page: Page) => new URL(page.url()).searchParams;
-async function shot(page: Page, name: string) {
-  await page.evaluate(() =>
-    Promise.all(
-      document
-        .getAnimations()
-        .filter((a) => a.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY)
-        .map((a) => a.finished),
-    ),
+async function settleAnimations(page: Page) {
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          animation.effect?.getTiming().iterations === Number.POSITIVE_INFINITY ||
+          (!animation.pending && animation.playState !== 'running'),
+      ),
   );
+}
+async function shot(page: Page, name: string) {
+  await settleAnimations(page);
   await evidenceShot(page, name);
 }
 
@@ -278,6 +282,7 @@ test.describe('axe with the panel open', () => {
     test(name, async ({ page }) => {
       await page.goto(url);
       await expect(panel(page)).toBeVisible();
+      await settleAnimations(page);
       const result = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
         .analyze();

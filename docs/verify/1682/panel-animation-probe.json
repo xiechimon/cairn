@@ -1,0 +1,3997 @@
+{
+  "sourceCommit": "9aa08fd462b1fc62e24a8c6c00933ad9f339197c",
+  "appSurface": "compiled fixture",
+  "providerMode": "not exercised",
+  "observations": [
+    {
+      "round": 0,
+      "route": "&panel=1",
+      "animations": [
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 2400,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": null
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "linear",
+              "composite": "replace",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "linear",
+              "composite": "auto",
+              "transform": "rotate(360deg)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 220,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "translate": "12px",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "replace",
+              "opacity": "1",
+              "translate": "none",
+              "computedOffset": 1
+            }
+          ]
+        }
+      ],
+      "initial": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".ml-1"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.6pt (12.8px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".ml-1 > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.6pt (12.8px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .flex-none:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .flex-none:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5df2\u5b8c\u6210\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5df2\u5b8c\u6210\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settled": []
+    },
+    {
+      "round": 0,
+      "route": "&task=inbox-reply",
+      "animations": [
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 2400,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": null
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "linear",
+              "composite": "replace",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "linear",
+              "composite": "auto",
+              "transform": "rotate(360deg)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 220,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "translate": "12px",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "replace",
+              "opacity": "1",
+              "translate": "none",
+              "computedOffset": 1
+            }
+          ]
+        }
+      ],
+      "initial": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": [
+                ".-ml-2.rounded-\\[min\\(var\\(--radius-md\\)\\,10px\\)\\].\\[\\&_svg\\:not\\(\\[class\\*\\=\\'size-\\'\\]\\)\\]\\:size-3"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".flex-wrap"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "b"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".mb-1"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "div[data-state=\"done\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settled": []
+    },
+    {
+      "round": 0,
+      "route": "&view=board&task=inbox-review",
+      "animations": [
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 2400,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": null
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "linear",
+              "composite": "replace",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "linear",
+              "composite": "auto",
+              "transform": "rotate(360deg)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 220,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "translate": "12px",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "replace",
+              "opacity": "1",
+              "translate": "none",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 200,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "forwards",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.32, 0.72, 0, 1)",
+              "composite": "replace",
+              "filter": "none",
+              "opacity": "0",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.32, 0.72, 0, 1)",
+              "composite": "auto",
+              "filter": "blur(0px)",
+              "opacity": "0",
+              "transform": "translate3d(0px, 0px, 0px) scale3d(0.4, 0.4, 0.4) rotate(0deg)",
+              "computedOffset": 1
+            }
+          ]
+        }
+      ],
+      "initial": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": [
+                ".-ml-2"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".flex-wrap"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "b"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".mb-1.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".min-h-6\\.5[data-state=\"done\"][data-testid=\"task-panel-stage\"]:nth-child(2)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".min-h-6\\.5[data-state=\"done\"][data-testid=\"task-panel-stage\"]:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settled": []
+    },
+    {
+      "round": 1,
+      "route": "&panel=1",
+      "animations": [
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 2400,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": null
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "linear",
+              "composite": "replace",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "linear",
+              "composite": "auto",
+              "transform": "rotate(360deg)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 220,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "translate": "12px",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "replace",
+              "opacity": "1",
+              "translate": "none",
+              "computedOffset": 1
+            }
+          ]
+        }
+      ],
+      "initial": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".ml-1"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.6pt (12.8px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".ml-1 > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.6pt (12.8px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .flex-none:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .flex-none:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5df2\u5b8c\u6210\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5df2\u5b8c\u6210\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settled": []
+    },
+    {
+      "round": 1,
+      "route": "&task=inbox-reply",
+      "animations": [
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 2400,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": null
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "linear",
+              "composite": "replace",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "linear",
+              "composite": "auto",
+              "transform": "rotate(360deg)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 220,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "translate": "12px",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "replace",
+              "opacity": "1",
+              "translate": "none",
+              "computedOffset": 1
+            }
+          ]
+        }
+      ],
+      "initial": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": [
+                ".-ml-2.rounded-\\[min\\(var\\(--radius-md\\)\\,10px\\)\\].\\[\\&_svg\\:not\\(\\[class\\*\\=\\'size-\\'\\]\\)\\]\\:size-3"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".flex-wrap"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "b"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".mb-1"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "div[data-state=\"done\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settled": []
+    },
+    {
+      "round": 1,
+      "route": "&view=board&task=inbox-review",
+      "animations": [
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 2400,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": null
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "linear",
+              "composite": "replace",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "linear",
+              "composite": "auto",
+              "transform": "rotate(360deg)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 220,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "translate": "12px",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "replace",
+              "opacity": "1",
+              "translate": "none",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 200,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "forwards",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.32, 0.72, 0, 1)",
+              "composite": "replace",
+              "filter": "none",
+              "opacity": "0",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.32, 0.72, 0, 1)",
+              "composite": "auto",
+              "filter": "blur(0px)",
+              "opacity": "0",
+              "transform": "translate3d(0px, 0px, 0px) scale3d(0.4, 0.4, 0.4) rotate(0deg)",
+              "computedOffset": 1
+            }
+          ]
+        }
+      ],
+      "initial": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": [
+                ".-ml-2"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".flex-wrap"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "b"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".mb-1.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".min-h-6\\.5[data-state=\"done\"][data-testid=\"task-panel-stage\"]:nth-child(2)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".min-h-6\\.5[data-state=\"done\"][data-testid=\"task-panel-stage\"]:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settled": []
+    },
+    {
+      "round": 2,
+      "route": "&panel=1",
+      "animations": [
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 2400,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": null
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "linear",
+              "composite": "replace",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "linear",
+              "composite": "auto",
+              "transform": "rotate(360deg)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 220,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "translate": "12px",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "replace",
+              "opacity": "1",
+              "translate": "none",
+              "computedOffset": 1
+            }
+          ]
+        }
+      ],
+      "initial": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u4f60\u5904\u7406\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(2) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(3) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(4) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch:nth-child(5) > .col-start-2.col-end-4.gap-2\\.5 > .text-\\(--card-button\\).flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".ml-1"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.6pt (12.8px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".ml-1 > span"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.6pt (12.8px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u8fd0\u884c\u4e2d\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .flex-none:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .tabular-nums.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .truncate"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .tabular-nums.flex-none"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5f85\u5f00\u59cb\"] > .task-panel-row.grid-cols-\\[16px_minmax\\(0\\,1fr\\)_auto\\].justify-stretch > .col-start-2.col-end-4.gap-2\\.5 > .flex-none:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5df2\u5b8c\u6210\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "section[aria-label=\"\u5df2\u5b8c\u6210\"] > .px-1\\.5.aria-expanded\\:text-content-tertiary[data-testid=\"task-panel-group\"] > .tabular-nums"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settled": []
+    },
+    {
+      "round": 2,
+      "route": "&task=inbox-reply",
+      "animations": [
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 2400,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": null
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "linear",
+              "composite": "replace",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "linear",
+              "composite": "auto",
+              "transform": "rotate(360deg)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 220,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "translate": "12px",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "replace",
+              "opacity": "1",
+              "translate": "none",
+              "computedOffset": 1
+            }
+          ]
+        }
+      ],
+      "initial": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": [
+                ".-ml-2.rounded-\\[min\\(var\\(--radius-md\\)\\,10px\\)\\].\\[\\&_svg\\:not\\(\\[class\\*\\=\\'size-\\'\\]\\)\\]\\:size-3"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".flex-wrap"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "b"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".mb-1"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "div[data-state=\"done\"]"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settled": []
+    },
+    {
+      "round": 2,
+      "route": "&view=board&task=inbox-review",
+      "animations": [
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 2400,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": null
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "linear",
+              "composite": "replace",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "linear",
+              "composite": "auto",
+              "transform": "rotate(360deg)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 150,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "transform": "translateY(4px)",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.22, 1, 0.36, 1)",
+              "composite": "auto",
+              "opacity": "1",
+              "transform": "translateY(0px)",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 220,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "none",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "auto",
+              "opacity": "0",
+              "translate": "12px",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+              "composite": "replace",
+              "opacity": "1",
+              "translate": "none",
+              "computedOffset": 1
+            }
+          ]
+        },
+        {
+          "state": "running",
+          "timing": {
+            "delay": 0,
+            "direction": "normal",
+            "duration": 200,
+            "easing": "linear",
+            "endDelay": 0,
+            "fill": "forwards",
+            "iterationStart": 0,
+            "iterations": 1
+          },
+          "keys": [
+            {
+              "offset": 0,
+              "easing": "cubic-bezier(0.32, 0.72, 0, 1)",
+              "composite": "replace",
+              "filter": "none",
+              "opacity": "0",
+              "transform": "none",
+              "computedOffset": 0
+            },
+            {
+              "offset": 1,
+              "easing": "cubic-bezier(0.32, 0.72, 0, 1)",
+              "composite": "auto",
+              "filter": "blur(0px)",
+              "opacity": "0",
+              "transform": "translate3d(0px, 0px, 0px) scale3d(0.4, 0.4, 0.4) rotate(0deg)",
+              "computedOffset": 1
+            }
+          ]
+        }
+      ],
+      "initial": [
+        {
+          "id": "color-contrast",
+          "nodes": [
+            {
+              "target": [
+                ".-ml-2"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".flex-wrap"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.13 (foreground color: #85807a, background color: #24201b, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#85807a",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.13,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                "b"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.2 (foreground color: #b57155, background color: #24201b, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#b57155",
+                  "bgColor": "#24201b",
+                  "contrastRatio": 4.2,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".mb-1.text-meta.text-content-tertiary"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".min-h-6\\.5[data-state=\"done\"][data-testid=\"task-panel-stage\"]:nth-child(2)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            },
+            {
+              "target": [
+                ".min-h-6\\.5[data-state=\"done\"][data-testid=\"task-panel-stage\"]:nth-child(3)"
+              ],
+              "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.87 (foreground color: #87827c, background color: #2c2723, font size: 10.1pt (13.5px), font weight: normal). Expected contrast ratio of 4.5:1",
+              "checks": [
+                {
+                  "fgColor": "#87827c",
+                  "bgColor": "#2c2723",
+                  "contrastRatio": 3.87,
+                  "fontSize": "10.1pt (13.5px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settled": []
+    }
+  ]
+}

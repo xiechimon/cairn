@@ -1,0 +1,43 @@
+[WebServer] (node:82323) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:82326) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:82343) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:82351) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 22 tests using 1 worker
+
+(node:82360) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 apps/web/e2e/task-panel.spec.ts:28:3 › task panel list view › the toggle opens the list in four groups and writes ?panel=1 without a history entry (966ms)
+  ✓   2 apps/web/e2e/task-panel.spec.ts:51:3 › task panel list view › a mouse open after a keyboard open does not move focus into the panel (359ms)
+  ✓   3 apps/web/e2e/task-panel.spec.ts:63:3 › task panel list view › leaving for a page without the panel closes it and Back brings it back (386ms)
+  ✓   4 apps/web/e2e/task-panel.spec.ts:77:3 › task panel list view › Back and Forward between hosts restore each page's open task (685ms)
+  ✓   5 apps/web/e2e/task-panel.spec.ts:97:3 › task panel list view › Esc closes the panel, clears the URL and returns focus to the toggle (324ms)
+  ✓   6 apps/web/e2e/task-panel.spec.ts:107:3 › task panel list view › a reload with ?panel=1 opens the list again (264ms)
+  ✓   7 apps/web/e2e/task-panel.spec.ts:114:3 › task panel task view › a home row opens the task in place with the ask box, the stage list and the expand link (597ms)
+  ✓   8 apps/web/e2e/task-panel.spec.ts:143:3 › task panel task view › a deep link with ?task opens that task (273ms)
+  ✓   9 apps/web/e2e/task-panel.spec.ts:151:3 › task panel task view › a keyboard open moves focus into the panel and Esc returns it to the row (311ms)
+  ✓  10 apps/web/e2e/task-panel.spec.ts:166:3 › task panel task view › the expand link leaves for the full task page and closes the panel (606ms)
+  ✓  11 apps/web/e2e/task-panel.spec.ts:177:3 › task panel hosts › kanban: a card opens the panel and the board stays; a modified click keeps the link (714ms)
+  ✓  12 apps/web/e2e/task-panel.spec.ts:204:3 › task panel hosts › project page: a task row opens the panel (576ms)
+  ✓  13 apps/web/e2e/task-panel.spec.ts:214:3 › task panel hosts › agent page: an in-progress row opens the panel (336ms)
+  ✓  14 apps/web/e2e/task-panel.spec.ts:221:3 › task panel hosts › machine page: the toggle opens the task list (289ms)
+  ✓  15 apps/web/e2e/task-panel.spec.ts:229:3 › task panel layout › desktop: the panel docks at 420px beside the page (275ms)
+  ✓  16 apps/web/e2e/task-panel.spec.ts:237:3 › task panel layout › 1100px and below: the panel overlays the page and the scrim closes it (642ms)
+  ✓  17 apps/web/e2e/task-panel.spec.ts:252:3 › task panel layout › phone: the panel fills the screen (415ms)
+  ✓  18 apps/web/e2e/task-panel.spec.ts:263:1 › a task created while the list is open flashes once (2.5s)
+  ✓  19 apps/web/e2e/task-panel.spec.ts:282:5 › axe with the panel open › list (926ms)
+  ✓  20 apps/web/e2e/task-panel.spec.ts:282:5 › axe with the panel open › task (801ms)
+  ✓  21 apps/web/e2e/task-panel.spec.ts:282:5 › axe with the panel open › board task (901ms)
+  ✓  22 apps/web/e2e/task-panel.spec.ts:327:1 › live: the panel shows the last agent summary and the composer steers the running task (485ms)
+
+  22 passed (16.2s)

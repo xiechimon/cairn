@@ -81,7 +81,7 @@ control. The fallback now sends the notice in the shared `AcceptDialog`.
 The earlier 1378-case run and capture manifest apply to source `f106a29e5`,
 before this follow-up. They are not evidence of a later full-suite run.
 
-Follow-up source `12c1a8d4c34de1e9b4efba8e2b5fcea167c4975c` passed all 483 affected browser cases and all 27 prepush checks (`followup-prepush-green.log`). The first attempt had one task-panel list color-contrast failure and 482 passes (`followup-prepush-first-failure.log`). Without a source change, all three panel accessibility cases then passed (`panel-contrast-recheck.log`), followed by the complete 483-case pass. The intermittent failure remains unexplained; no assertion, retry setting, or accessibility threshold was weakened.
+Follow-up source `12c1a8d4c34de1e9b4efba8e2b5fcea167c4975c` passed all 483 affected browser cases and all 27 prepush checks (`followup-prepush-green.log`). The first attempt had one task-panel list color-contrast failure and 482 passes (`followup-prepush-first-failure.log`). Without a source change, all three panel accessibility cases then passed (`panel-contrast-recheck.log`), followed by the complete 483-case pass. The initial intermittent failure was later traced to entry-animation measurement, as documented below; no assertion, retry setting, or accessibility threshold was weakened.
 
 ## Rebuilding the demo locally
 
@@ -122,3 +122,7 @@ production-only artifact.
 ## Local folder-picker follow-up
 
 The valid folder-picker control reproduced a disabled browse button after the demo notice (`folder-pending-red.log`). Guarding before pending state then exposed a separate hidden fallback GET (`folder-hidden-query-red.log`). The fallback now mounts only while open. `folder-green.log` records all 21 demo browser cases passing; `folder-required-green.log` records lint, typecheck and spec parsing. Existing source and capture checkpoints above retain their original commit scope.
+
+## Panel measurement correction
+
+The first folder-change prepush failed four panel checks, including a cancelled-animation screenshot and three axe contrast checks (`folder-prepush-red.log`). Nine fresh compiled-fixture probes recorded the actual 220ms entry opacity animation, transient contrast violations, and zero violations after finite animations settled (`panel-animation-probe.json`). Screenshots and axe now share the same native animation-state polling boundary. No color, opacity, animation, assertion, or WCAG threshold was changed. The complete 22-case task-panel suite passed (`panel-settled-green.log`). This corrects measurement timing; it does not establish public hosting.
