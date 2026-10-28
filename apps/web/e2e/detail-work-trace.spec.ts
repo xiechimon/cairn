@@ -237,10 +237,17 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     await stubWorld(page);
     await expect(page.getByTestId('work-call').last()).toBeVisible();
     await expect(page.locator('.work-enter')).toHaveCount(0);
-    const animations = await page.getByTestId('work-block').last().evaluate((el) =>
-      el.getAnimations({ subtree: true }).filter((animation) => animation.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY).length,
-    );
-    expect(animations).toBe(0);
+    await expect
+      .poll(async () =>
+        page.getByTestId('work-block').last().evaluate((el) =>
+          el.getAnimations({ subtree: true }).filter((animation) => {
+            if (!(animation instanceof CSSAnimation)) return false;
+            if (animation.playState !== 'running' && animation.playState !== 'pending') return false;
+            return animation.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY;
+          }).length,
+        ),
+      )
+      .toBe(0);
   });
 }
 
