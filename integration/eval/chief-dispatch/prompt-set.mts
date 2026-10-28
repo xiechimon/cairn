@@ -140,10 +140,9 @@ function provenanceComplete(p: Partial<EvalProvenance> | null | undefined): p is
   );
 }
 
-function sameProvenance(left: EvalProvenance, right: EvalProvenance): boolean {
+function sameRunConfig(left: EvalProvenance, right: EvalProvenance): boolean {
   return (
     left.prompt_set === right.prompt_set &&
-    left.prompt_set_identity === right.prompt_set_identity &&
     left.harness_sha === right.harness_sha &&
     left.model === right.model &&
     (left.thinking ?? null) === (right.thinking ?? null) &&
@@ -155,7 +154,7 @@ function sameProvenance(left: EvalProvenance, right: EvalProvenance): boolean {
 }
 
 export function resumeCompatibilityError(
-  rows: { provenance?: Partial<EvalProvenance> | null }[],
+  rows: { prompt_id?: unknown; provenance?: Partial<EvalProvenance> | null }[],
   expected: EvalProvenance,
 ): string | null {
   if (rows.length === 0) return null;
@@ -176,27 +175,50 @@ export function resumeCompatibilityError(
   }
   for (const row of rows) {
     const p = row.provenance;
-    if (!provenanceComplete(p) || !sameProvenance(p, first)) {
+    if (!provenanceComplete(p) || !sameRunConfig(p, first)) {
       return (
         'incompatible results.jsonl provenance (mixed or incomplete rows); ' +
         'use a fresh --variant directory'
       );
     }
   }
-  const comparable: EvalProvenance = {
-    ...expected,
-    prompt_set_identity:
-      expected.prompt_set_identity !== ''
-        ? expected.prompt_set_identity
-        : first.prompt_set_identity,
-  };
-  if (!sameProvenance(first, comparable)) {
+  const identityByPromptId = new Map<string, string>();
+  for (const row of rows) {
+    const p = row.provenance;
+    if (!provenanceComplete(p)) continue;
+    const key = String(row.prompt_id ?? '');
+    const seen = identityByPromptId.get(key);
+    if (seen === undefined) {
+      identityByPromptId.set(key, p.prompt_set_identity);
+    } else if (seen !== p.prompt_set_identity) {
+      return (
+        'incompatible results.jsonl provenance (mixed or incomplete rows); ' +
+        'use a fresh --variant directory'
+      );
+    }
+  }
+  if (expected.prompt_set_identity !== '') {
+    for (const row of rows) {
+      const p = row.provenance;
+      if (!provenanceComplete(p) || p.prompt_set_identity !== expected.prompt_set_identity) {
+        return (
+          `incompatible results.jsonl provenance (have prompt_set=${first.prompt_set} arm=${first.arm} ` +
+          `window=${String(first.context_window)} flow=${first.flow_digest.slice(0, 12)} ` +
+          `harness=${first.harness_sha.slice(0, 12)} model=${first.model}; want prompt_set=${expected.prompt_set} ` +
+          `arm=${expected.arm} window=${String(expected.context_window)} flow=${expected.flow_digest.slice(0, 12)} ` +
+          `harness=${expected.harness_sha.slice(0, 12)} model=${expected.model}); ` +
+          'use a fresh --variant directory'
+        );
+      }
+    }
+  }
+  if (!sameRunConfig(first, expected)) {
     return (
       `incompatible results.jsonl provenance (have prompt_set=${first.prompt_set} arm=${first.arm} ` +
       `window=${String(first.context_window)} flow=${first.flow_digest.slice(0, 12)} ` +
-      `harness=${first.harness_sha.slice(0, 12)} model=${first.model}; want prompt_set=${comparable.prompt_set} ` +
-      `arm=${comparable.arm} window=${String(comparable.context_window)} flow=${comparable.flow_digest.slice(0, 12)} ` +
-      `harness=${comparable.harness_sha.slice(0, 12)} model=${comparable.model}); ` +
+      `harness=${first.harness_sha.slice(0, 12)} model=${first.model}; want prompt_set=${expected.prompt_set} ` +
+      `arm=${expected.arm} window=${String(expected.context_window)} flow=${expected.flow_digest.slice(0, 12)} ` +
+      `harness=${expected.harness_sha.slice(0, 12)} model=${expected.model}); ` +
       'use a fresh --variant directory'
     );
   }

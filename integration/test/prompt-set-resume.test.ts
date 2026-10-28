@@ -23,6 +23,7 @@ import {
   cairnRuntimePromptFromRelay,
   type PromptSet,
   promptSetIdentity,
+  resumeCompatibilityError,
 } from '../eval/chief-dispatch/prompt-set.mts';
 
 const require = createRequire(new URL('../package.json', import.meta.url));
@@ -231,6 +232,78 @@ function productionPrompt(): string {
 
 afterAll(() => {
   if (skillsDir) rmSync(skillsDir, { recursive: true, force: true });
+});
+
+describe('resumeCompatibilityError unit', () => {
+  const base = {
+    prompt_set: 'current' as const,
+    harness_sha: 'abc',
+    model: 'glm-5.3',
+    thinking: null as string | null,
+    timeout_s: 30,
+    arm: 'all',
+    context_window: null as number | null,
+    flow_digest: 'flow',
+  };
+
+  test('two memory cases with distinct identities resume under empty expected identity', () => {
+    const rows = [
+      {
+        prompt_id: 'mem-a',
+        provenance: { ...base, prompt_set_identity: 'id-a' },
+      },
+      {
+        prompt_id: 'mem-b',
+        provenance: { ...base, prompt_set_identity: 'id-b' },
+      },
+    ];
+    expect(resumeCompatibilityError(rows, { ...base, prompt_set_identity: '' })).toBeNull();
+  });
+
+  test('same prompt_id with mixed identities rejects', () => {
+    const rows = [
+      {
+        prompt_id: 'mem-a',
+        provenance: { ...base, prompt_set_identity: 'id-a' },
+      },
+      {
+        prompt_id: 'mem-a',
+        provenance: { ...base, prompt_set_identity: 'id-b' },
+      },
+    ];
+    expect(resumeCompatibilityError(rows, { ...base, prompt_set_identity: '' })).toMatch(
+      /mixed or incomplete/,
+    );
+  });
+
+  test('non-empty expected identity still binds every row', () => {
+    const rows = [
+      {
+        prompt_id: 'hold',
+        provenance: { ...base, prompt_set_identity: 'id-a' },
+      },
+    ];
+    expect(resumeCompatibilityError(rows, { ...base, prompt_set_identity: 'id-a' })).toBeNull();
+    expect(resumeCompatibilityError(rows, { ...base, prompt_set_identity: 'id-other' })).toMatch(
+      /incompatible results\.jsonl provenance/,
+    );
+  });
+
+  test('mixed arm still rejects across rows', () => {
+    const rows = [
+      {
+        prompt_id: 'a',
+        provenance: { ...base, prompt_set_identity: 'id-a', arm: 'all' },
+      },
+      {
+        prompt_id: 'b',
+        provenance: { ...base, prompt_set_identity: 'id-b', arm: 'oracle' },
+      },
+    ];
+    expect(resumeCompatibilityError(rows, { ...base, prompt_set_identity: '' })).toMatch(
+      /mixed or incomplete/,
+    );
+  });
 });
 
 describe('prompt-set resume provenance', () => {
