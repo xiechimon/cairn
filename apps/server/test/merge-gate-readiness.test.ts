@@ -194,6 +194,7 @@ const CLASS: Record<MergeBlockerCode, BlockerClass> = {
   'evidence-executable': 'human',
   'harness-regression-missing': 'human',
   'harness-regression-stale': 'human',
+  'harness-regression-evaluating': 'transient',
   'harness-regression-below-threshold': 'human',
   'issue-ref-missing': 'human',
   'evidence-link-missing': 'transient',
@@ -401,6 +402,13 @@ const ROWS: Row[] = [
     (i) => {
       setFiles(i, [...FILES, file('apps/server/src/services/chief.ts')]);
       i.harnessEvalText = harnessEvalJson({ patchDigest: `pd2:${'0'.repeat(64)}` });
+    },
+  ],
+  [
+    'harness-regression-evaluating',
+    (i) => {
+      setFiles(i, [...FILES, file('apps/server/src/services/chief.ts')]);
+      i.harnessEval = { attempt: { state: 'dispatched' } };
     },
   ],
   [
