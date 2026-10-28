@@ -1,0 +1,11 @@
+{
+  "checkoutHead": "607cd485e7afcb340d36d2dcea9c9b1eae07c029",
+  "sourceHasUncommittedChanges": true,
+  "deliveryComplete": false,
+  "files": {
+    "packages/shared/src/github-overlap.ts": "3d743fecc618c9bb6b3bbd7e08567a3ad4dfdbf1ab20de3929634f68da87cc7f",
+    "scripts/github-overlap.test.mjs": "92f9e0375fbda211102bb6dd47a3b04be2c617296774b34092c295fa3c3a7a34",
+    "apps/server/src/lib/github-overlap.ts": "f2651605c9a3c5738e977ab5ffbdc0338ca5ae3f7a5ba4a3843fa1a97a150232",
+    "apps/server/src/services/github-reads.ts": "a316a1289a3338a3ecd7b2c47abb977abce642c1a9cc6a86dbc1eae2c381f927"
+  }
+}

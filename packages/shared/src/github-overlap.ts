@@ -80,30 +80,50 @@ export async function lookupOverlaps({
   const filePulls: GithubOverlapReport['filePulls'] = [];
   if (paths.length) {
     const planned = new Set(paths.map((path) => path.replace(/^\.\//, '')));
-    for (const pull of items(
-      await request(`repos/${repo}/pulls?state=open&per_page=100`),
-      'pull',
-    )) {
+    const pulls = items(await request(`repos/${repo}/pulls?state=open&per_page=100`), 'pull');
+    for (const pull of pulls)
       if (typeof pull.head?.ref !== 'string') throw new Error('Missing GitHub PR head branch');
-      const files = await request(`repos/${repo}/pulls/${pull.number}/files?per_page=100`);
-      const overlappingFiles: string[] = [];
-      for (const file of files) {
-        if (
-          typeof file !== 'object' ||
-          file === null ||
-          !('filename' in file) ||
-          typeof file.filename !== 'string'
-        )
-          throw new Error('Malformed GitHub PR file');
-        if (
-          planned.has(file.filename) ||
-          ('previous_filename' in file &&
-            typeof file.previous_filename === 'string' &&
-            planned.has(file.previous_filename))
-        )
-          overlappingFiles.push(file.filename);
-      }
-      if (overlappingFiles.length) filePulls.push({ ...pull, overlappingFiles });
+    const matches = new Map<number, GithubOverlapReport['filePulls'][number]>();
+    let next = 0;
+    let stopped = false;
+    const outcomes = await Promise.allSettled(
+      Array.from({ length: Math.min(3, pulls.length) }, async () => {
+        while (!stopped) {
+          const index = next++;
+          const pull = pulls[index];
+          if (pull === undefined) return;
+          try {
+            const files = await request(`repos/${repo}/pulls/${pull.number}/files?per_page=100`);
+            const overlappingFiles: string[] = [];
+            for (const file of files) {
+              if (
+                typeof file !== 'object' ||
+                file === null ||
+                !('filename' in file) ||
+                typeof file.filename !== 'string'
+              )
+                throw new Error('Malformed GitHub PR file');
+              if (
+                planned.has(file.filename) ||
+                ('previous_filename' in file &&
+                  typeof file.previous_filename === 'string' &&
+                  planned.has(file.previous_filename))
+              )
+                overlappingFiles.push(file.filename);
+            }
+            if (overlappingFiles.length) matches.set(index, { ...pull, overlappingFiles });
+          } catch (error) {
+            stopped = true;
+            throw error;
+          }
+        }
+      }),
+    );
+    const rejected = outcomes.find((outcome) => outcome.status === 'rejected');
+    if (rejected?.status === 'rejected') throw rejected.reason;
+    for (let index = 0; index < pulls.length; index++) {
+      const match = matches.get(index);
+      if (match !== undefined) filePulls.push(match);
     }
   }
   return {

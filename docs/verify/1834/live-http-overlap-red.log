@@ -1,0 +1,6 @@
+{"complete":false,"requests":18,"wallMs":8362,"error":{"name":"TimeoutError","message":"The operation was aborted due to timeout"}}
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/xmon/.codex/worktrees/pr-1848-
+  │ overlap-repair/cairn/integration
+

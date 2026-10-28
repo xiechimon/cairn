@@ -1,0 +1,42 @@
+✔ searches titles and bodies with alternative terms and includes same-file PRs (1.95725ms)
+✔ lookup errors stop creation rather than reporting no overlaps (0.289ms)
+✔ an explicit same-ask target extends the existing item without creating an issue (0.146041ms)
+✔ an existing same-ask PR also extends its discussion, and unknown references fail closed (0.102625ms)
+✔ empty planned paths fail before querying GitHub instead of hiding file overlaps (0.537375ms)
+✔ file overlap lookup overlaps network waits within a three-request bound and retains PR order (2.488167ms)
+✔ a failed file read rejects the whole lookup and stops queued requests (0.653917ms)
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'rename'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'preserve'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'independent'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to branch 'lane'
+✔ names the merged PR and its removed line, and accepts an explicit reference only (356.64375ms)
+✔ unchanged added lines and commits outside the base interval do not fail (243.153625ms)
+✔ tracks a renamed file and distinguishes identical lines by position (441.416166ms)
+✔ renaming protected lines without removing them passes (292.623459ms)
+✔ independent edits in a stale branch preserve the upstream addition through Git merge (360.332583ms)
+✔ an unresolved merge conflict cannot certify the absence of silent reverts (142.308916ms)
+✔ the CLI detects an upstream deletion introduced by resolving a merge into the lane (1401.272625ms)
+✔ setup-node without pnpm installed is rejected (0.4955ms)
+✔ an earlier pnpm setup or package-manager-cache false is accepted (0.113083ms)
+✔ committed workflows install pnpm before setup-node caches it (2.601417ms)
+✔ a removed line beginning with two dashes is content, not a patch header (305.072333ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3593.935083

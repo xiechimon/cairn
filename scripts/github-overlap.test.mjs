@@ -116,3 +116,63 @@ test('empty planned paths fail before querying GitHub instead of hiding file ove
   );
   assert.equal(requests, 0);
 });
+
+test('file overlap lookup overlaps network waits within a three-request bound and retains PR order', async () => {
+  let active = 0;
+  let peak = 0;
+  const pulls = Array.from({ length: 9 }, (_, index) => ({
+    number: index + 1,
+    title: `Work ${index + 1}`,
+    body: '',
+    state: 'open',
+    head: { ref: `lane/${index + 1}` },
+  }));
+  const report = await lookupOverlaps({
+    repo: 'octo/repo',
+    terms: ['retry'],
+    paths: ['git.ts'],
+    request: async (path) => {
+      if (path.includes('/pulls?')) return pulls;
+      if (!path.includes('/files')) return [];
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setImmediate(resolve));
+      active--;
+      return [{ filename: 'git.ts' }];
+    },
+  });
+  assert.ok(peak > 1 && peak <= 3, `Observed concurrent file reads: ${peak}`);
+  assert.equal(active, 0);
+  assert.deepEqual(
+    report.filePulls.map((pull) => pull.number),
+    pulls.map((pull) => pull.number),
+  );
+});
+
+test('a failed file read rejects the whole lookup and stops queued requests', async () => {
+  const started = [];
+  await assert.rejects(
+    lookupOverlaps({
+      repo: 'octo/repo',
+      terms: ['retry'],
+      paths: ['git.ts'],
+      request: async (path) => {
+        if (path.includes('/pulls?'))
+          return Array.from({ length: 9 }, (_, index) => ({
+            number: index + 1,
+            title: 'Work',
+            body: '',
+            state: 'open',
+            head: { ref: 'lane/work' },
+          }));
+        if (!path.includes('/files')) return [];
+        started.push(path);
+        if (path.includes('/2/files')) throw new Error('file page unavailable');
+        await new Promise((resolve) => setImmediate(resolve));
+        return [{ filename: 'git.ts' }];
+      },
+    }),
+    /file page unavailable/,
+  );
+  assert.ok(started.length <= 3);
+});

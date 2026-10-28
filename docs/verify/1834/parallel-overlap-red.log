@@ -1,0 +1,31 @@
+✔ searches titles and bodies with alternative terms and includes same-file PRs (2.583417ms)
+✔ lookup errors stop creation rather than reporting no overlaps (0.291292ms)
+✔ an explicit same-ask target extends the existing item without creating an issue (0.13925ms)
+✔ an existing same-ask PR also extends its discussion, and unknown references fail closed (0.098875ms)
+✔ empty planned paths fail before querying GitHub instead of hiding file overlaps (0.100208ms)
+✖ file overlap lookup overlaps network waits within a three-request bound and retains PR order (3.583166ms)
+✔ a failed file read rejects the whole lookup and stops queued requests (0.668166ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 82.684042
+
+✖ failing tests:
+
+test at scripts/github-overlap.test.mjs:120:1
+✖ file overlap lookup overlaps network waits within a three-request bound and retains PR order (3.583166ms)
+  AssertionError [ERR_ASSERTION]: Observed concurrent file reads: 1
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-1848-overlap-repair/cairn/scripts/github-overlap.test.mjs:144:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
