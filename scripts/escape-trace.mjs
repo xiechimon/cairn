@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const REVIEWER_INPUT_FORBIDDEN = new Set([
@@ -150,8 +150,7 @@ function mapFixingParentLocation(cwd, fixingSha, introducingSha, location) {
     const header = /^([0-9a-f]{40}) (\d+) (\d+)(?: (\d+))?$/.exec(line);
     if (header) {
       currentSha = header[1];
-      if (currentSha !== introducingSha)
-        return { ok: false, reason: 'blame-not-introducing' };
+      if (currentSha !== introducingSha) return { ok: false, reason: 'blame-not-introducing' };
       origLines.push(Number(header[2]));
       continue;
     }
@@ -163,7 +162,8 @@ function mapFixingParentLocation(cwd, fixingSha, introducingSha, location) {
   const startLine = origLines[0];
   const endLine = origLines[origLines.length - 1];
   for (let expected = startLine, index = 0; index < origLines.length; index++, expected++) {
-    if (origLines[index] !== expected) return { ok: false, reason: 'noncontiguous-introducing-lines' };
+    if (origLines[index] !== expected)
+      return { ok: false, reason: 'noncontiguous-introducing-lines' };
   }
   const path = mappedPath || location.path;
   const introBlob = tryGitAt(cwd, ['show', `${introducingSha}:${path}`]);
@@ -175,8 +175,7 @@ function mapFixingParentLocation(cwd, fixingSha, introducingSha, location) {
 
 function ineligibleReason(trace) {
   if (!trace || typeof trace !== 'object') return 'invalid-trace';
-  if (trace.status === 'unresolved')
-    return `unresolved:${trace.unresolvedReason ?? 'unspecified'}`;
+  if (trace.status === 'unresolved') return `unresolved:${trace.unresolvedReason ?? 'unspecified'}`;
   if (trace.status === 'multiple-origin') return 'multiple-origin';
   if (trace.status === 'outside-window') return 'outside-window';
   if (trace.status !== 'resolved') return `status:${trace.status ?? 'missing'}`;
@@ -190,7 +189,10 @@ function ineligibleReason(trace) {
 
 function loadSchema() {
   return JSON.parse(
-    readFileSync(resolve(import.meta.dirname, '../integration/eval/review/case.schema.json'), 'utf8'),
+    readFileSync(
+      resolve(import.meta.dirname, '../integration/eval/review/case.schema.json'),
+      'utf8',
+    ),
   );
 }
 
@@ -209,8 +211,7 @@ function validateAgainstSchema(value, schema, path = '$') {
     errors.push(`${path}: expected one of ${schema.enum.join(', ')}`);
   if (schema.type) {
     const actual = typeOf(value);
-    const typeOk =
-      schema.type === actual || (schema.type === 'number' && actual === 'integer');
+    const typeOk = schema.type === actual || (schema.type === 'number' && actual === 'integer');
     if (!typeOk) errors.push(`${path}: expected ${schema.type}, got ${actual}`);
   }
   if (schema.type === 'string') {
@@ -225,9 +226,8 @@ function validateAgainstSchema(value, schema, path = '$') {
       errors.push(`${path}: expected >= ${schema.minimum}`);
   }
   if (schema.type === 'array' && Array.isArray(value) && schema.items) {
-    value.forEach((item, index) =>
-      errors.push(...validateAgainstSchema(item, schema.items, `${path}[${index}]`)),
-    );
+    for (let index = 0; index < value.length; index++)
+      errors.push(...validateAgainstSchema(value[index], schema.items, `${path}[${index}]`));
   }
   if (schema.type === 'object' && value && typeof value === 'object' && !Array.isArray(value)) {
     for (const key of schema.required ?? []) {
@@ -260,13 +260,7 @@ function buildCase(trace, location, { cwd }) {
   const diff = gitAt(cwd, ['show', '--format=', '--unified=3', introducingSha]);
   if (!diff.trim()) return { ok: false, reason: 'introducing-diff-empty' };
   const fixingSubject = gitAt(cwd, ['show', '-s', '--format=%s', fixingSha]).trim();
-  const fixingPatch = gitAt(cwd, [
-    'diff',
-    `${fixingSha}^`,
-    fixingSha,
-    '--',
-    location.path,
-  ]);
+  const fixingPatch = gitAt(cwd, ['diff', `${fixingSha}^`, fixingSha, '--', location.path]);
   const id = caseId({
     originalPr: trace.originalPr,
     fixingPr: trace.fixingPr,
@@ -278,10 +272,7 @@ function buildCase(trace, location, { cwd }) {
   const limitations = [];
   if (!fixingPatch.trim()) limitations.push('fixing-patch-empty-for-path');
   if (defect.path !== location.path) limitations.push('path-renamed-since-introducing');
-  if (
-    defect.startLine !== location.startLine ||
-    defect.endLine !== location.endLine
-  )
+  if (defect.startLine !== location.startLine || defect.endLine !== location.endLine)
     limitations.push('lines-shifted-since-introducing');
   return {
     ok: true,
@@ -307,9 +298,7 @@ function buildCase(trace, location, { cwd }) {
           endLine: defect.endLine,
         },
         labels: ['production-escape', trace.method ?? 'unknown-method'],
-        correction: fixingPatch.trim()
-          ? `${fixingSubject}\n\n${fixingPatch}`
-          : fixingSubject,
+        correction: fixingPatch.trim() ? `${fixingSubject}\n\n${fixingPatch}` : fixingSubject,
       },
       tracing: {
         method: String(trace.method ?? 'unknown'),
@@ -368,9 +357,7 @@ export function exportCases({ traces, outDir, cwd = process.cwd() }) {
       exported.push({ id: built.case.id, path: `cases/${built.case.id}.json` });
     }
   }
-  candidates.sort((a, b) =>
-    JSON.stringify(a).localeCompare(JSON.stringify(b)),
-  );
+  candidates.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   exported.sort((a, b) => a.id.localeCompare(b.id));
   writeFileSync(join(outDir, 'candidates.json'), stableStringify(candidates));
   return { exported, candidates };
@@ -379,8 +366,7 @@ export function exportCases({ traces, outDir, cwd = process.cwd() }) {
 function validateBankCase(bankCase, { cwd, schema }) {
   const errors = validateAgainstSchema(bankCase, schema);
   for (const key of Object.keys(bankCase.reviewerInput ?? {})) {
-    if (REVIEWER_INPUT_FORBIDDEN.has(key))
-      errors.push(`reviewerInput must not contain ${key}`);
+    if (REVIEWER_INPUT_FORBIDDEN.has(key)) errors.push(`reviewerInput must not contain ${key}`);
   }
   if (errors.length) return errors;
   if (bankCase.answer.defect.endLine < bankCase.answer.defect.startLine)
@@ -397,10 +383,7 @@ function validateBankCase(bankCase, { cwd, schema }) {
       errors.push('replay base must be the introducing parent');
   }
   if (introducingSha) {
-    const blob = tryGitAt(cwd, [
-      'show',
-      `${introducingSha}:${bankCase.answer.defect.path}`,
-    ]);
+    const blob = tryGitAt(cwd, ['show', `${introducingSha}:${bankCase.answer.defect.path}`]);
     if (!blob.ok) errors.push('defect path missing at introducing commit');
     else {
       const lineCount = blobLineCount(blob.stdout);
@@ -482,14 +465,10 @@ function parseValidateArgs(args) {
       casesDir = args[i];
       continue;
     }
-    throw new Error(
-      'Usage: node scripts/escape-trace.mjs validate-cases <cases-dir> [--cwd path]',
-    );
+    throw new Error('Usage: node scripts/escape-trace.mjs validate-cases <cases-dir> [--cwd path]');
   }
   if (!casesDir)
-    throw new Error(
-      'Usage: node scripts/escape-trace.mjs validate-cases <cases-dir> [--cwd path]',
-    );
+    throw new Error('Usage: node scripts/escape-trace.mjs validate-cases <cases-dir> [--cwd path]');
   return { casesDir, cwd };
 }
 

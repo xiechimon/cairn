@@ -1,13 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -456,11 +449,9 @@ test('the reviewer-input object contains no defect label, location or correction
 });
 
 test('validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case', (t) => {
-  const empty = spawnSync(
-    process.execPath,
-    [cli, 'validate-cases', join(bankRoot, 'cases')],
-    { encoding: 'utf8' },
-  );
+  const empty = spawnSync(process.execPath, [cli, 'validate-cases', join(bankRoot, 'cases')], {
+    encoding: 'utf8',
+  });
   assert.equal(empty.status, 0, empty.stderr);
   const { cwd, git, commit } = fixture(t, 'escape-validate-cli-');
   const introduceAt = '2026-05-01T00:00:00Z';
@@ -609,9 +600,7 @@ test('newline-terminated blobs do not admit an extra phantom line in export or v
     cwd,
   });
   assert.equal(phantom.exported.length, 0);
-  assert.ok(
-    phantom.candidates.some((entry) => /line|range|map/i.test(entry.ineligibleReason)),
-  );
+  assert.ok(phantom.candidates.some((entry) => /line|range|map/i.test(entry.ineligibleReason)));
   const good = exportCases({
     traces: [
       resolvedTrace({
@@ -725,7 +714,9 @@ test('successive exports preserve existing cases and only upsert matching identi
     cwd,
   });
   assert.equal(third.exported.length, 1);
-  const names = readdirSync(join(out, 'cases')).filter((name) => name.endsWith('.json')).sort();
+  const names = readdirSync(join(out, 'cases'))
+    .filter((name) => name.endsWith('.json'))
+    .sort();
   assert.equal(names.length, 2);
   assert.ok(names.includes(`${firstId}.json`));
   assert.ok(names.includes(`${third.exported[0].id}.json`));
