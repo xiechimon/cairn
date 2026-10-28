@@ -30,6 +30,13 @@ describe('local merge decision', () => {
     });
   });
 
+  test('a dirty tree on another branch holds with worktree-dirty', () => {
+    expect(decideLocalMerge(base({ currentBranch: 'feature', worktreeClean: false }))).toEqual({
+      action: 'hold',
+      reason: 'worktree-dirty',
+    });
+  });
+
   test('unknown checkout is held without touching the workspace', () => {
     expect(decideLocalMerge(base({ currentBranch: null }))).toEqual({
       action: 'hold',

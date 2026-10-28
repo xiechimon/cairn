@@ -1,0 +1,53 @@
+Daemon targeted tests: 36 passed
+ Test Files  3 passed (3)
+      Tests  36 passed (36)
+   Duration  2.09s (tests 58%, transform 22%, import 20%)
+
+Server targeted tests: 42 passed
+ Test Files  3 passed (3)
+      Tests  42 passed (42)
+   Duration  1.48s (transform 44%, import 34%, tests 22%)
+
+Real daemon/server lifecycle: 5 passed in exactly one test file
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Duration  7.27s (tests 71%, transform 15%, import 14%)
+
+flock /tmp/cairn-heavy.lock node scripts/prepush-vitest.mjs
+ Test Files  346 passed (346)
+      Tests  4598 passed (4598)
+   Duration  223.97s (tests 59%, import 39%, transform 1%)
+
+flock /tmp/cairn-heavy.lock pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+
+pnpm lint
+PASS: biome ci . checked 1074 files; no fixes applied.
+
+pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1360 tests in 190 files collected, disk count matches (2.5s)
+[spec-parse-gate] integration/test: 46 test files parsed clean by tsc (1.6s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+
+node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+
+node scripts/single-use-helper-gate.mjs
+single-use-helper-gate: 0 single-use helper(s)
+
+node scripts/lessons-ledger-gate.mjs
+lessons ledger ok

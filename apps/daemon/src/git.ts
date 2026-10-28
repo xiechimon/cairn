@@ -213,6 +213,63 @@ export class GitPushHookError extends Error {
   }
 }
 
+export async function landGitSquash(input: {
+  dir: string;
+  branch: string;
+  currentBranch: string;
+  base: string;
+  commit: string;
+  receipt: string;
+}): Promise<'landed' | 'stale' | 'dirty'> {
+  const { dir, branch, currentBranch, base, commit, receipt } = input;
+  return new Promise((resolve, reject) => {
+    const child = spawn('git', ['update-ref', '--no-deref', '--stdin'], { cwd: dir });
+    let output = '';
+    let preparing = false;
+    let dirty = false;
+    const timer = setTimeout(() => child.kill('SIGKILL'), META_TIMEOUT_MS);
+    child.stdin.on('error', () => {});
+    child.stderr.resume();
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve(dirty ? 'dirty' : code === 0 ? 'landed' : 'stale');
+    });
+    child.stdout.on('data', (chunk: Buffer) => {
+      output += chunk.toString('utf8');
+      if (preparing || !output.includes('prepare: ok\n')) return;
+      preparing = true;
+      void (async () => {
+        try {
+          if ((await gitPrim.currentBranch(dir)) !== currentBranch)
+            throw new Error('Checkout changed');
+          const status = await runGitOk(['status', '--porcelain', '--untracked-files=all'], {
+            cwd: dir,
+            env: { GIT_OPTIONAL_LOCKS: '0' },
+            timeoutMs: META_TIMEOUT_MS,
+          });
+          if (status !== '') throw new Error('Worktree changed');
+          if (currentBranch === branch)
+            await runGitOk(['read-tree', '-m', '-u', base, commit], {
+              cwd: dir,
+              timeoutMs: META_TIMEOUT_MS,
+            });
+          child.stdin.end('commit\n');
+        } catch {
+          dirty = true;
+          child.stdin.end('abort\n');
+        }
+      })();
+    });
+    child.stdin.write(
+      `start\n${currentBranch === branch ? '' : `symref-verify HEAD refs/heads/${currentBranch}\n`}update refs/heads/${branch} ${commit} ${base}\nupdate ${receipt} ${commit}\nprepare\n`,
+    );
+  });
+}
+
 export const gitPrim = {
   async clone(url: string, dir: string, cred: BoundGitCredentials | null): Promise<void> {
     await runGitOk(['clone', '--end-of-options', url, dir], {

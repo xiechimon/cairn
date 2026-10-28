@@ -8,6 +8,7 @@ import {
   type ChiefModelFallbackContent,
   classifyStepFailure,
   conversationBranch,
+  parseLocalMergeInstruction,
   QUOTA_BLOCK_REASON_MAX_CHARS,
   SKILL_INJECTION_CHECK_KIND,
   type SkillInjectionFacts,
@@ -59,6 +60,7 @@ import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
+import { applyLocalMergeReport } from './local-merge.js';
 import {
   agentForStep,
   isChiefConversation,
@@ -257,6 +259,14 @@ export async function finishStep(
     const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
     if (buildRow) priorMerged = await mergedPrElsewhere(deps, buildRow.todoId, stepRow.buildId);
   }
+  if (body.localMerge !== undefined) {
+    if (body.status !== 'success')
+      throw conflict('Local merge results require a successful command report');
+    applyLocalMergeReport(deps, stepRow, body.localMerge);
+    return;
+  }
+  if (body.status === 'success' && parseLocalMergeInstruction(stepRow.prompt) !== null)
+    throw conflict('Local merge command reported no landing result');
   const mergeSuccess = stepRow.kind === 'merge' && body.status === 'success';
   let landingSkipped = mergeSuccess && mergeCardLeftReview(deps, stepRow);
   let landingError: string | null = null;

@@ -4,7 +4,7 @@
 
 ## Decision
 
-Local projects support `mergePolicy = human | shadow | autonomous`, just like GitHub projects, and default to `human`. Existing behavior for `human` is unchanged.
+Local projects support `mergePolicy = human | shadow | autonomous`, just like GitHub projects. The default is whatever ADR 0026 R1 sets for every project kind; this ADR does not fork it. Existing behavior for `human` is unchanged.
 
 Autonomous merging still goes through ADR 0021's merge-readiness gate and D4 criteria first. For local projects, the patch summary is produced by the machine hosting the repository running `git diff <base>...<head>`; the summary tuple, evidence-directory exclusion rules, and recomputation requirements are identical to the GitHub version. Before merging, re-read the default-branch head; if it differs from the base used at decision time, or the recomputed summary differs, re-evaluate.
 
@@ -19,4 +19,4 @@ The autonomous executor is the daemon on the machine hosting the repository. The
 
 ## Relationship to ADR 0021
 
-The D4 protection categories and the auto-mergeable set are reused as-is. Local only swaps D2's execution site from the server's GitHub REST surface to the daemon on the machine hosting the repository; the criteria do not fork into a separate system. ADR 0021's `human` default and #1211's main-checkout safety boundary continue to apply.
+The D4 protection categories and the auto-mergeable set are reused as-is. Local only swaps D2's execution site from the server's GitHub REST surface to the daemon on the machine hosting the repository; the criteria do not fork into a separate system. ADR 0021's `human` default as amended by ADR 0026 R1, and #1211's main-checkout safety boundary, continue to apply.

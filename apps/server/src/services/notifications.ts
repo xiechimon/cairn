@@ -83,6 +83,7 @@ export function notifyTodoPhase(
   deps: NotificationDeps,
   todo: TodoRecord,
   to: 'confirm' | 'review',
+  snippet: string | null = null,
 ): NotificationRecord {
   const agentId =
     to === 'confirm'
@@ -99,7 +100,7 @@ export function notifyTodoPhase(
     agent: agentRow
       ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
       : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
-    snippet: null,
+    snippet,
   });
 }
 
