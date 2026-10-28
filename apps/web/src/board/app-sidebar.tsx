@@ -1,15 +1,4 @@
-// Shared app sidebar (issue #129): the single BoardSidebar call site every
-// route family renders, so the rail keeps identical geometry and behavior
-// across /app ↔ /app/team ↔ resources ↔ detail hops — the collapse state
-// online dot, the attention badge and the ⌘K search row all derive the
-// same way everywhere. Routes that mount their own SearchPanel (board and
-// detail: their fixture ui.searchOpen open states drive the fixture rows)
-// pass searchPanel={false} + their own onSearch opener; every other shell
-// rides the internal panel, which renders nothing while closed.
-// with their own dialog (board / project) pass onNewTask and keep their
-// page-anchored save semantics; every other route rides the internal
-// global dialog (useNewTaskSurface, live save path shared with the board).
-
+import { cn } from 'cn';
 import { PanelLeft } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
@@ -17,6 +6,7 @@ import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
+import { DEMO_MODE } from '../demo/demo-gate.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useNewTaskHotkey } from '../overlay/hotkeys.js';
@@ -120,7 +110,10 @@ export function AppSidebar({
           <Button
             variant="ghost"
             size="icon"
-            className="app-menu-trigger fixed top-1.5 left-1 z-(--z-floating) size-11 text-content-secondary"
+            className={cn(
+              'app-menu-trigger fixed left-1 z-(--z-floating) size-11 text-content-secondary',
+              DEMO_MODE ? 'top-10.5' : 'top-1.5',
+            )}
             aria-label={t('展开侧边栏')}
             aria-expanded={drawerOpen}
             onClick={() => setDrawerOpen(true)}

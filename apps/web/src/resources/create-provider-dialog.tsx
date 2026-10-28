@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, PlusSmall, Search } from '../icons/index.js';
 
@@ -232,6 +233,7 @@ export function CreateProviderDialog({
         ...(apiKey !== '' ? { apiKey } : {}),
       });
     } else {
+      blockDemoWrite();
       onClose();
     }
   };
@@ -285,13 +287,17 @@ export function CreateProviderDialog({
                       data-preset-id={row.id}
                       className={PICKER_ROW_CLS}
                       disabled={row.oauth && (!row.wired || connectPending === true)}
-                      onClick={() =>
-                        row.oauth
-                          ? onConnect != null
-                            ? onConnect(row.id)
-                            : onClose()
-                          : enterForm({ id: row.id, label: row.label })
-                      }
+                      onClick={() => {
+                        if (!row.oauth) {
+                          enterForm({ id: row.id, label: row.label });
+                          return;
+                        }
+                        if (onConnect != null) onConnect(row.id);
+                        else {
+                          blockDemoWrite();
+                          onClose();
+                        }
+                      }}
                     >
                       <span aria-hidden className={PICKER_TILE_CLS}>
                         {row.label.charAt(0)}

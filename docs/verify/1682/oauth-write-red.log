@@ -1,0 +1,49 @@
+
+Running 1 test using 1 worker
+
+(node:56896) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/demo-mode.spec.ts:315:1 › write: provider OAuth explains that demo changes are not saved (5.7s)
+
+
+  1) e2e/demo-mode.spec.ts:315:1 › write: provider OAuth explains that demo changes are not saved ──
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('[data-sonner-toast]').filter({ hasText: '这是演示数据，改动不会保存' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('[data-sonner-toast]').filter({ hasText: '这是演示数据，改动不会保存' }) with timeout 5000ms
+      - waiting for locator('[data-sonner-toast]').filter({ hasText: '这是演示数据，改动不会保存' })
+
+
+      319 |   const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+      320 |   await dialog.locator('[data-preset-id="github-copilot"]').click();
+    > 321 |   await expect(toast(page)).toBeVisible();
+          |                             ^
+      322 |   await expect(dialog).toBeHidden();
+      323 |   expectQuiet(traffic);
+      324 | });
+        at /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/apps/web/e2e/demo-mode.spec.ts:321:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-provider-O-0ff03--demo-changes-are-not-saved/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-provider-O-0ff03--demo-changes-are-not-saved/error-context.md
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-provider-O-0ff03--demo-changes-are-not-saved/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-provider-O-0ff03--demo-changes-are-not-saved/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-provider-O-0ff03--demo-changes-are-not-saved/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    e2e/demo-mode.spec.ts:315:1 › write: provider OAuth explains that demo changes are not saved ───

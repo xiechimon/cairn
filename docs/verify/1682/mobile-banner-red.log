@@ -1,0 +1,42 @@
+
+Running 1 test using 1 worker
+
+(node:59484) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/demo-mode.spec.ts:86:1 › banner: 演示数据 + site and showcase links, bilingual, survives navigation and a phone (557ms)
+
+
+  1) e2e/demo-mode.spec.ts:86:1 › banner: 演示数据 + site and showcase links, bilingual, survives navigation and a phone
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 36
+    Received:    6
+
+      110 |   const menuBox = await menu.boundingBox();
+      111 |   if (box == null || menuBox == null) throw new Error('mobile banner geometry missing');
+    > 112 |   expect(menuBox.y).toBeGreaterThanOrEqual(box.y + box.height);
+          |                     ^
+      113 |   expect(menuBox.width).toBeGreaterThanOrEqual(44);
+      114 |   expect(menuBox.height).toBeGreaterThanOrEqual(44);
+      115 | });
+        at /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/apps/web/e2e/demo-mode.spec.ts:112:21
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-banner-演示数据-site-d07dd-ives-navigation-and-a-phone/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-banner-演示数据-site-d07dd-ives-navigation-and-a-phone/error-context.md
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-banner-演示数据-site-d07dd-ives-navigation-and-a-phone/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-banner-演示数据-site-d07dd-ives-navigation-and-a-phone/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-banner-演示数据-site-d07dd-ives-navigation-and-a-phone/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    e2e/demo-mode.spec.ts:86:1 › banner: 演示数据 + site and showcase links, bilingual, survives navigation and a phone

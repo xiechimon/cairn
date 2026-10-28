@@ -300,6 +300,11 @@ export const EN: Record<string, string> = {
   '按你的本地时区运行（Asia/Shanghai）': 'Runs in your local time zone (Asia/Shanghai)',
   // #1037 fixture 模式自我声明 chip（api/provider.tsx）
   '示例数据（scenario {id}）': 'Sample data (scenario {id})',
+  演示数据: 'Demo data',
+  '只读演示，改动不会被保存。': 'Read-only demo — changes are not saved.',
+  官网: 'Website',
+  闭环录像: 'Closed-loop video',
+  '这是演示数据，改动不会保存': 'Demo data: changes are not saved',
   还没有定时任务: 'No schedules yet',
   '按周期或在指定时间自动重新运行任务。每一轮都会依据任务描述从头开始一次全新运行，到达确认或审核关口时暂停，交由负责人接手。':
     'Automatically rerun a task on a cycle or at a chosen time. Every round starts a fresh run from the task description, pausing at the confirm or review gate for the owner to pick up.',

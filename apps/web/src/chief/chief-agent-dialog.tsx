@@ -9,6 +9,7 @@ import {
 } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, Search } from '../icons/index.js';
 
@@ -96,6 +97,7 @@ export function ChiefAgentDialog({
       return;
     }
     if (onBind == null) {
+      blockDemoWrite();
       onClose();
       return;
     }

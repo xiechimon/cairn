@@ -16,6 +16,7 @@ import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
@@ -56,6 +57,7 @@ export function MachineDetailPage() {
 
   const evacuate = async () => {
     if (evacuateTarget === null) return;
+    if (blockDemoWrite()) return;
     setEvacuating(true);
     try {
       const res = await fetch(`/api/machines/${machineId}/evacuate`, {
@@ -85,6 +87,7 @@ export function MachineDetailPage() {
 
   const remove = async () => {
     setConfirmOpen(false);
+    if (blockDemoWrite()) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/machines/${machineId}`, { method: 'DELETE' });

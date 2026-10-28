@@ -3,6 +3,7 @@ import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../componen
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 import { FORM_TEXTAREA_CLS } from './parts.js';
 
@@ -23,6 +24,7 @@ export function CreateSecretDialog({ open, onClose, onCreate }: CreateSecretDial
     if (onCreate != null) {
       onCreate({ name: trimmed, description: description.trim() || undefined, value });
     } else {
+      blockDemoWrite();
       onClose();
     }
     setName('');

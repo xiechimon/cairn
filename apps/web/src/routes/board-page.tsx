@@ -47,6 +47,7 @@ import { ChiefSettings } from '../chief/chief-settings.js';
 import { cardOrchestration } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { BranchDialog } from '../detail/branch-dialog.js';
 import { substantiveChangesOf } from '../detail/empty-commit.js';
@@ -340,6 +341,10 @@ export function BoardPage() {
   const confirmReset = useCallback(async () => {
     if (resetTarget == null || resetSnapshot == null) return;
     if (!live) {
+      if (blockDemoWrite()) {
+        closeResetGate();
+        return;
+      }
       setFixtureTodos((prev) => resetTodoLocal(prev, resetTarget.id, fixture.now));
       closeResetGate();
       return;
@@ -398,7 +403,10 @@ export function BoardPage() {
 
   const startTask = useCallback(
     (todo: TodoRecord) => {
-      if (!live) return;
+      if (!live) {
+        blockDemoWrite();
+        return;
+      }
       orchestrateStart.orchestrate({ id: todo.id, seqNum: todo.seqNum });
     },
     [live, orchestrateStart.orchestrate],
@@ -413,6 +421,7 @@ export function BoardPage() {
       const next = moveTodo(todos, todo.id, columnId, live ? Date.now() : fixture.now);
       if (next === todos) return;
       if (!live) {
+        if (blockDemoWrite()) return;
         setFixtureTodos(next);
         return;
       }
@@ -465,6 +474,7 @@ export function BoardPage() {
       const next = moveTodo(todos, todo.id, 'done', live ? Date.now() : fixture.now, phase);
       if (next === todos) return;
       if (!live) {
+        if (blockDemoWrite()) return;
         setFixtureTodos(next);
         return;
       }

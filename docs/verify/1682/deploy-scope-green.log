@@ -1,0 +1,8 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn
+
+
+ Test Files  2 passed (2)
+      Tests  11 passed (11)
+   Start at  08:23:41
+   Duration  646ms (tests 61%, transform 22%, import 17%)

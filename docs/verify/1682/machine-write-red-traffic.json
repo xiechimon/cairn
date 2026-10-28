@@ -1,0 +1,14 @@
+[
+  {
+    "test": "demo-mode-write-machine-ev-c0e40-cked-before-backend-traffic",
+    "method": "POST",
+    "url": "http://127.0.0.1:49929/api/machines/demo-machine-dev-mac/evacuate",
+    "status": 404
+  },
+  {
+    "test": "demo-mode-write-deleting-t-e7ee2-cked-before-backend-traffic",
+    "method": "DELETE",
+    "url": "http://127.0.0.1:49953/api/machines/demo-machine-spare",
+    "status": 404
+  }
+]

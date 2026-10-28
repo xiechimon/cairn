@@ -56,6 +56,7 @@ import { StatusChip } from '../components/ui/status-chip.js';
 import { Switch } from '../components/ui/switch.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { isDeleted, markDeleted } from '../fixtures/deletions.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -172,7 +173,7 @@ export function AgentDetailPage() {
             },
           },
         );
-      } else {
+      } else if (!blockDemoWrite()) {
         setLocalPatch((prev) => ({ ...prev, ...body }));
       }
     },
@@ -555,7 +556,8 @@ export function AgentDetailPage() {
                                     toastError(t('删除记忆失败，请重试。'), error),
                                 },
                               );
-                            else setRemovedMemories((prev) => [...prev, memory.id]);
+                            else if (!blockDemoWrite())
+                              setRemovedMemories((prev) => [...prev, memory.id]);
                           }}
                         >
                           {t('删除')}
@@ -770,6 +772,7 @@ export function AgentDetailPage() {
             });
             return;
           }
+          if (blockDemoWrite()) return;
           markDeleted(agentId);
           navigate({ pathname: '/app/team', search });
         }}

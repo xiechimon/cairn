@@ -27,6 +27,7 @@ import {
 } from '../components/ui/select.js';
 import { StatusChip } from '../components/ui/status-chip.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import {
   markDeleted,
   markScheduleCreated,
@@ -359,6 +360,10 @@ export function SchedulesPage() {
     setFormOpen(false);
   };
   const saveScheduleFixture = () => {
+    if (blockDemoWrite()) {
+      setFixtureFormOpen(false);
+      return;
+    }
     const todo = fixture.todos[0];
     if (todo == null) {
       setFixtureFormOpen(false);
@@ -506,7 +511,7 @@ export function SchedulesPage() {
             mutations.deleteSchedule.mutate(deleteTarget.id, {
               onError: (error) => toastError(t('删除定时失败，请重试。'), error),
             });
-          else markDeleted(deleteTarget.id);
+          else if (!blockDemoWrite()) markDeleted(deleteTarget.id);
           setConfirmOpen(false);
         }}
       />

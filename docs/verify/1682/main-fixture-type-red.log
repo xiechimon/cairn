@@ -1,0 +1,24 @@
+$ biome ci .
+[0m[34mChecked 1071 files in 733[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: src/fixtures/demo.ts(313,9): error TS2322: Type '"tools"' is not assignable to type '"agent-todo" | "chief" | "elapsed" | "fail" | "injected-skills" | "note" | "plan" | "report" | "review" | "robot" | "run" | "scheduled" | "skills" | "streaming" | "thinking" | "user" | "verify" | "work"'.
+apps/web typecheck: src/fixtures/demo.ts(365,9): error TS2322: Type '"tools"' is not assignable to type '"agent-todo" | "chief" | "elapsed" | "fail" | "injected-skills" | "note" | "plan" | "report" | "review" | "robot" | "run" | "scheduled" | "skills" | "streaming" | "thinking" | "user" | "verify" | "work"'.
+apps/web typecheck: src/fixtures/demo.ts(449,7): error TS2353: Object literal may only specify known properties, and 'shellEnabled' does not exist in type 'MachineRow'.
+apps/web typecheck: src/fixtures/demo.ts(460,7): error TS2353: Object literal may only specify known properties, and 'shellEnabled' does not exist in type 'MachineRow'.
+apps/web typecheck: Failed
+[ELIFECYCLE] Command failed with exit code 1.
+apps/daemon typecheck: Failed
+[ELIFECYCLE] Command failed.
+apps/server typecheck: Failed
+[ELIFECYCLE] Command failed.
+Error: ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL
+
+  × "pnpm recursive run" failed in /Users/xmon/.codex/worktrees/pr-1769-demo-
+  │ delivery/cairn/apps/web
+
+[ELIFECYCLE] Command failed with exit code 1.

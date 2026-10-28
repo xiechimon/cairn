@@ -60,6 +60,7 @@ import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { Button } from '../components/ui/button.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { Composer } from '../detail/composer.js';
 import { DetailHead } from '../detail/dhead.js';
@@ -148,6 +149,7 @@ export function TodoDetailPage() {
   const { live, teamId, userName } = useLiveData();
   const { t } = useI18n();
   const fixture = resolveScenario(searchParams);
+  const fixtureDetail = id != null ? (fixture.details?.[id] ?? fixture.detail) : fixture.detail;
   const { openChiefThread } = useChiefRoot();
   const orchestrateStart = useOrchestrateStart();
   const chiefThreadsQ = useChiefThreads(teamId, live);
@@ -207,8 +209,8 @@ export function TodoDetailPage() {
     setRejectError(null);
   }, []);
   const mergeMissing = useMergeGate(live ? (wireTodo?.assignment?.build?.agentId ?? null) : null);
-  const [menu, setMenu] = useState<'versions' | 'compare' | undefined>(fixture.detail?.versionMenu);
-  const [diff, setDiff] = useState(fixture.detail?.planDiff);
+  const [menu, setMenu] = useState<'versions' | 'compare' | undefined>(fixtureDetail?.versionMenu);
+  const [diff, setDiff] = useState(fixtureDetail?.planDiff);
   const [chain, setChain] = useState<ChainState>('idle');
   const [changesExpanded, setChangesExpanded] = useState(true);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -420,7 +422,7 @@ export function TodoDetailPage() {
         })
       : undefined;
 
-  const fixtureView = chainView(fixture.detail, chain, diff);
+  const fixtureView = chainView(fixtureDetail, chain, diff);
   const view = live
     ? {
         phaseOverride: null as Phase | null,
@@ -486,7 +488,7 @@ export function TodoDetailPage() {
     clearDraft: () => setLiveDraft(''),
     chain,
     setChain,
-    revisionAvailable: fixture.detail?.revision != null,
+    revisionAvailable: fixtureDetail?.revision != null,
   });
 
   const actionInFlight =
@@ -623,7 +625,7 @@ export function TodoDetailPage() {
     ? (filesQ.data?.files ?? []).map((f) => ({ path: f.path, type: f.type }))
     : undefined;
   const ui = PHASE_UI[phase];
-  const detail = live ? liveDetail : fixture.detail;
+  const detail = live ? liveDetail : fixtureDetail;
   const streaming = live ? running : view.transcript.some((item) => item.kind === 'streaming');
   const docMode =
     view.planDiff != null
@@ -654,6 +656,10 @@ export function TodoDetailPage() {
       else if (phase === 'review') setOverlay({ kind: 'accept' });
       else if (phase === 'failed') setOverlay({ kind: 'rerun' });
       else if (phase === 'done') startBuild(true);
+      return;
+    }
+    if (DEMO_MODE) {
+      blockDemoWrite();
       return;
     }
     if (chain === 'landed' && detail?.revision != null) {
@@ -746,7 +752,7 @@ export function TodoDetailPage() {
                 placeholder={reviewActive ? t('AI 审核进行中…') : ui.placeholder}
                 aiReview={(phase === 'confirm' || phase === 'review') && !todo.awaitingReply}
                 streaming={streaming}
-                editable={live}
+                editable={live || DEMO_MODE}
                 draft={live ? liveDraft : undefined}
                 onDraftChange={live ? setLiveDraft : undefined}
                 onAttachment={onAttachment}
@@ -881,6 +887,7 @@ export function TodoDetailPage() {
             });
             return;
           }
+          if (blockDemoWrite()) return;
           markDeleted(todo.id);
           navigate('/app');
         }}

@@ -1,0 +1,38 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn
+
+ ❯ |@cairn/web| test/demo-deploy.test.ts (6 tests | 4 failed) 498ms
+   × demo deployment decision for packages/shared/src/records.ts is exit 1 84ms
+   × demo deployment decision for pnpm-lock.yaml is exit 1 79ms
+   × demo deployment decision for pnpm-workspace.yaml is exit 1 81ms
+   × demo deployment decision for package.json is exit 1 82ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/web| test/demo-deploy.test.ts > demo deployment decision for packages/shared/src/records.ts is exit 1
+ FAIL  |@cairn/web| test/demo-deploy.test.ts > demo deployment decision for pnpm-lock.yaml is exit 1
+ FAIL  |@cairn/web| test/demo-deploy.test.ts > demo deployment decision for pnpm-workspace.yaml is exit 1
+ FAIL  |@cairn/web| test/demo-deploy.test.ts > demo deployment decision for package.json is exit 1
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/demo-deploy.test.ts:45:42
+     43|       env,
+     44|     });
+     45|     expect(result.status, result.stderr).toBe(expected);
+       |                                          ^
+     46|   } finally {
+     47|     rmSync(root, { recursive: true, force: true });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 2 passed (6)
+   Start at  08:23:08
+   Duration  591ms (tests 96%, transform 2%, import 1%)

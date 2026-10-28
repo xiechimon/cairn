@@ -1,0 +1,230 @@
+
+Running 17 tests using 1 worker
+
+(node:57380) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   1 e2e/demo-mode.spec.ts:65:1 › plain /app opens the demo board; ?scenario= is ignored (5.4s)
+(node:57501) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 e2e/demo-mode.spec.ts:81:1 › banner: 演示数据 + site and showcase links, bilingual, survives navigation and a phone (622ms)
+  ✓   3 e2e/demo-mode.spec.ts:106:1 › banner follows the locale (328ms)
+  ✘   4 e2e/demo-mode.spec.ts:121:1 › the selling points browse end to end with no backend traffic (5.3s)
+(node:57644) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   5 e2e/demo-mode.spec.ts:170:1 › write: a new task is blocked with the toast, the board is unchanged (643ms)
+  ✘   6 e2e/demo-mode.spec.ts:185:1 › write: dragging a card to another column is blocked (30.1s)
+(node:57803) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   7 e2e/demo-mode.spec.ts:205:1 › write: sending in the detail composer is blocked (438ms)
+  ✘   8 e2e/demo-mode.spec.ts:216:1 › write: the primary action and the delete confirm are blocked (6.0s)
+(node:57823) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   9 e2e/demo-mode.spec.ts:232:1 › write: sending to the chief is blocked (30.1s)
+(node:57949) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  10 e2e/demo-mode.spec.ts:244:1 › write: the create dialog on the team page is blocked (649ms)
+  ✓  11 e2e/demo-mode.spec.ts:258:1 › write: machine evacuation is blocked before backend traffic (481ms)
+  ✓  12 e2e/demo-mode.spec.ts:271:1 › write: deleting the spare machine is blocked before backend traffic (1.0s)
+  ✓  13 e2e/demo-mode.spec.ts:285:1 › write: secret creation explains that demo changes are not saved (682ms)
+  ✓  14 e2e/demo-mode.spec.ts:299:1 › write: provider creation explains that demo changes are not saved (745ms)
+  ✓  15 e2e/demo-mode.spec.ts:315:1 › write: provider OAuth explains that demo changes are not saved (646ms)
+  ✓  16 e2e/demo-mode.spec.ts:326:1 › the blocked toast is English under the en locale (661ms)
+  ✓  17 e2e/demo-mode.spec.ts:339:1 › the production build carries no demo content and ignores demo behaviour (400ms)
+
+
+  1) e2e/demo-mode.spec.ts:65:1 › plain /app opens the demo board; ?scenario= is ignored ───────────
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('section[data-column]')
+    Expected: 4
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('section[data-column]') with timeout 5000ms
+      - waiting for locator('section[data-column]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      66 |   const traffic = watchTraffic(page);
+      67 |   await page.goto(`${demo.base}/app`);
+    > 68 |   await expect(page.locator('section[data-column]')).toHaveCount(4);
+         |                                                      ^
+      69 |   for (const column of ['todo', 'building', 'pending', 'done']) {
+      70 |     await expect(page.locator(`section[data-column="${column}"] [data-todo-id]`).first()).toBeVisible();
+      71 |   }
+        at /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/apps/web/e2e/demo-mode.spec.ts:68:54
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-plain-app-opens-the-demo-board-scenario-is-ignored/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-plain-app-opens-the-demo-board-scenario-is-ignored/error-context.md
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-plain-app-opens-the-demo-board-scenario-is-ignored/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-plain-app-opens-the-demo-board-scenario-is-ignored/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-plain-app-opens-the-demo-board-scenario-is-ignored/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) e2e/demo-mode.spec.ts:121:1 › the selling points browse end to end with no backend traffic ────
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('section[data-column="pending"] [data-todo-id]')
+    Expected: 3
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('section[data-column="pending"] [data-todo-id]') with timeout 5000ms
+      - waiting for locator('section[data-column="pending"] [data-todo-id]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      123 |
+      124 |   await page.goto(`${demo.base}/app`);
+    > 125 |   await expect(page.locator('section[data-column="pending"] [data-todo-id]')).toHaveCount(3);
+          |                                                                               ^
+      126 |
+      127 |   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
+      128 |   await expect(page.getByTestId('phase-chip')).toHaveText(/确认/);
+        at /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/apps/web/e2e/demo-mode.spec.ts:125:79
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-the-selling-poin-b6f52-end-with-no-backend-traffic/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-the-selling-poin-b6f52-end-with-no-backend-traffic/error-context.md
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-the-selling-poin-b6f52-end-with-no-backend-traffic/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-the-selling-poin-b6f52-end-with-no-backend-traffic/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-the-selling-poin-b6f52-end-with-no-backend-traffic/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) e2e/demo-mode.spec.ts:185:1 › write: dragging a card to another column is blocked ─────────────
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.boundingBox: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for locator('section[data-column="done"] [data-todo-id="demo-coupon-page"]')
+
+
+      188 |   const card = page.locator(`section[data-column="done"] [data-todo-id="${DEMO.coupon}"]`);
+      189 |   const target = page.locator('section[data-column="pending"] [data-column-list]');
+    > 190 |   const from = await card.boundingBox();
+          |                           ^
+      191 |   const to = await target.boundingBox();
+      192 |   if (from == null || to == null) throw new Error('drag geometry missing');
+      193 |   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+        at /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/apps/web/e2e/demo-mode.spec.ts:190:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-dragging-a-card-to-another-column-is-blocked/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-dragging-a-card-to-another-column-is-blocked/error-context.md
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-dragging-a-card-to-another-column-is-blocked/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-dragging-a-card-to-another-column-is-blocked/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-dragging-a-card-to-another-column-is-blocked/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) e2e/demo-mode.spec.ts:216:1 › write: the primary action and the delete confirm are blocked ────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('[data-todo-id="demo-cart-merge"]')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('[data-todo-id="demo-cart-merge"]') with timeout 5000ms
+      - waiting for locator('[data-todo-id="demo-cart-merge"]')
+
+
+      226 |   await expect(page).toHaveURL(new RegExp(`/app/todo/${DEMO.cartMerge}$`));
+      227 |   await page.goto(`${demo.base}/app`);
+    > 228 |   await expect(page.locator(`[data-todo-id="${DEMO.cartMerge}"]`)).toBeVisible();
+          |                                                                    ^
+      229 |   expectQuiet(traffic);
+      230 | });
+      231 |
+        at /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/apps/web/e2e/demo-mode.spec.ts:228:68
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-the-primar-8566c--delete-confirm-are-blocked/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-the-primar-8566c--delete-confirm-are-blocked/error-context.md
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-the-primar-8566c--delete-confirm-are-blocked/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-the-primar-8566c--delete-confirm-are-blocked/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-the-primar-8566c--delete-confirm-are-blocked/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) e2e/demo-mode.spec.ts:232:1 › write: sending to the chief is blocked ──────────────────────────
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.fill: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByRole('dialog', { name: /总管/ }).getByRole('textbox')
+
+
+      236 |   const chief = page.getByRole('dialog', { name: /总管/ });
+      237 |   const input = chief.getByRole('textbox');
+    > 238 |   await input.fill('把购物车那张票提到最前面');
+          |               ^
+      239 |   await input.press('Enter');
+      240 |   await expect(toast(page)).toBeVisible();
+      241 |   expectQuiet(traffic);
+        at /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/apps/web/e2e/demo-mode.spec.ts:238:15
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-sending-to-the-chief-is-blocked/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-sending-to-the-chief-is-blocked/error-context.md
+
+    Error Context: ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-sending-to-the-chief-is-blocked/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-sending-to-the-chief-is-blocked/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-sending-to-the-chief-is-blocked/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5 failed
+    e2e/demo-mode.spec.ts:65:1 › plain /app opens the demo board; ?scenario= is ignored ────────────
+    e2e/demo-mode.spec.ts:121:1 › the selling points browse end to end with no backend traffic ─────
+    e2e/demo-mode.spec.ts:185:1 › write: dragging a card to another column is blocked ──────────────
+    e2e/demo-mode.spec.ts:216:1 › write: the primary action and the delete confirm are blocked ─────
+    e2e/demo-mode.spec.ts:232:1 › write: sending to the chief is blocked ───────────────────────────
+  12 passed (1.6m)

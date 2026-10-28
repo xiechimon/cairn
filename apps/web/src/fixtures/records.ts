@@ -194,6 +194,7 @@ export interface FixtureSet {
   todos: TodoRecord[];
   now: number;
   detail?: DetailContent;
+  details?: Record<string, DetailContent>;
   overlay?: OverlayState;
   chiefUnread?: number;
   chiefBusy?: boolean;

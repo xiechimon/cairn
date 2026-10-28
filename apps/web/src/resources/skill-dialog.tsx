@@ -16,6 +16,7 @@ import { DialogShell } from '../components/ui/dialog-shell.js';
 import { FieldDescription, FieldError } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 import { FORM_TEXTAREA_CLS } from './parts.js';
 
@@ -140,6 +141,7 @@ export function SkillDialog({
       files: [{ path: SKILL_ENTRY_FILE, content: entry }],
     };
     if (!live) {
+      blockDemoWrite();
       onClose();
       return;
     }

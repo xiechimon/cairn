@@ -1,0 +1,25 @@
+
+Running 18 tests using 1 worker
+
+(node:59613) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 apps/web/e2e/demo-mode.spec.ts:65:1 › plain /app opens demo home and links to the board; ?scenario= is ignored (672ms)
+  ✓   2 apps/web/e2e/demo-mode.spec.ts:86:1 › banner: 演示数据 + site and showcase links, bilingual, survives navigation and a phone (386ms)
+  ✓   3 apps/web/e2e/demo-mode.spec.ts:117:1 › banner follows the locale (283ms)
+  ✓   4 apps/web/e2e/demo-mode.spec.ts:132:1 › the selling points browse end to end with no backend traffic (1.8s)
+  ✓   5 apps/web/e2e/demo-mode.spec.ts:182:1 › write: a new task is blocked with the toast, the board is unchanged (679ms)
+  ✓   6 apps/web/e2e/demo-mode.spec.ts:197:1 › write: dragging a card to another column is blocked (692ms)
+  ✓   7 apps/web/e2e/demo-mode.spec.ts:217:1 › write: sending in the detail composer is blocked (442ms)
+  ✓   8 apps/web/e2e/demo-mode.spec.ts:228:1 › write: the primary action and the delete confirm are blocked (944ms)
+  ✓   9 apps/web/e2e/demo-mode.spec.ts:244:1 › write: sending to the chief is blocked (405ms)
+  ✓  10 apps/web/e2e/demo-mode.spec.ts:256:1 › write: sending to the chief from home is blocked (318ms)
+  ✓  11 apps/web/e2e/demo-mode.spec.ts:268:1 › write: the create dialog on the team page is blocked (570ms)
+  ✓  12 apps/web/e2e/demo-mode.spec.ts:282:1 › write: machine evacuation is blocked before backend traffic (465ms)
+  ✓  13 apps/web/e2e/demo-mode.spec.ts:295:1 › write: deleting the spare machine is blocked before backend traffic (1.0s)
+  ✓  14 apps/web/e2e/demo-mode.spec.ts:309:1 › write: secret creation explains that demo changes are not saved (798ms)
+  ✓  15 apps/web/e2e/demo-mode.spec.ts:323:1 › write: provider creation explains that demo changes are not saved (907ms)
+  ✓  16 apps/web/e2e/demo-mode.spec.ts:339:1 › write: provider OAuth explains that demo changes are not saved (768ms)
+  ✓  17 apps/web/e2e/demo-mode.spec.ts:350:1 › the blocked toast is English under the en locale (719ms)
+  ✓  18 apps/web/e2e/demo-mode.spec.ts:363:1 › the production build carries no demo content and ignores demo behaviour (522ms)
+
+  18 passed (14.2s)

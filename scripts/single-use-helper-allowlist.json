@@ -148,5 +148,10 @@
     "path": "apps/web/src/detail/work-trace.tsx",
     "name": "WorkStepRow",
     "reason": "React component with its own open-state hook, rendered inside the steps map; inlining would call hooks from the loop"
+  },
+  {
+    "path": "apps/web/src/fixtures/demo.ts",
+    "name": "demoFixtureOf",
+    "reason": "Single call site by design: wraps the whole demo fixture construction so the PURE-annotated call lets the production build tree-shake the module away; inlining the body would restore top-level helper calls that defeat shaking"
   }
 ]

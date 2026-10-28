@@ -24,6 +24,7 @@ import {
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
@@ -194,7 +195,7 @@ export function ProjectNewPage() {
         onSuccess: (data) => window.location.assign(data.authorizationUrl),
         onError: (err) => setOauthError(err.message),
       });
-    } else {
+    } else if (!blockDemoWrite()) {
       setFixtureAuth(true);
     }
   };
@@ -205,7 +206,7 @@ export function ProjectNewPage() {
       mutations.disconnectGithub.mutate(undefined, {
         onError: (error) => toastError(t('断开连接失败，请重试。'), error),
       });
-    } else {
+    } else if (!blockDemoWrite()) {
       setFixtureAuth(false);
     }
   };
@@ -332,6 +333,7 @@ export function ProjectNewPage() {
       : null;
 
   const submit = () => {
+    if (blockDemoWrite()) return;
     const body: CreateProjectBody =
       repoSel === 'github'
         ? { name: name.trim(), kind: 'github', githubRepo: githubRepo.trim() }
