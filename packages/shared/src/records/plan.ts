@@ -59,6 +59,8 @@ const DECISION_REASON =
   /\b(?:because|instead|rather than|maintained|reason|deps?)\b|因为|而不是|理由|依赖|维护/i;
 
 const LIST_ITEM = /^(\s*)(?:[-*•]|\d+[.)])\s+(.*)$/;
+
+const CHECK_LABEL = /^\s*(?:\*\*\S|#{3,6}\s)/;
 const HEADING = /^(#{1,6})\s+(.*)$/;
 const LABEL = /^(?:\d+[.)、]\s*)?([A-Za-z][A-Za-z ]{0,24}?)\s*[:：]\s*(.*)$/;
 
@@ -123,7 +125,7 @@ function namedSection(
       const mark = sectionMark(line);
       if (mark?.kind === 'heading') {
         if (level === 0 || mark.level <= level || isPlanSectionName(mark.name)) break;
-        continue;
+        if (sectionName !== 'verification' || mark.level < 3) continue;
       }
       if (mark?.kind === 'label' && isPlanSectionName(mark.name)) break;
     }
@@ -143,8 +145,31 @@ function splitItems(section: { head: string; lines: string[] }): {
     if (raw.trim().startsWith('```')) inFenceScan = !inFenceScan;
     return !inFenceScan && isList(raw);
   });
+  let inLabelScan = false;
+  const labeled =
+    !hasList &&
+    section.lines.some((raw) => {
+      if (raw.trim().startsWith('```')) inLabelScan = !inLabelScan;
+      return !inLabelScan && CHECK_LABEL.test(raw);
+    });
   const items: { text: string; fenced: boolean; indent: number | null }[] = [];
   if (section.head !== '') items.push({ text: section.head, fenced: false, indent: null });
+  if (labeled) {
+    let current: (typeof items)[number] | null = null;
+    let inFence = false;
+    for (const raw of section.lines) {
+      const line = raw.trim();
+      if (line.startsWith('```')) inFence = !inFence;
+      else if (!inFence && CHECK_LABEL.test(raw)) {
+        current = { text: line, fenced: false, indent: null };
+        items.push(current);
+        continue;
+      }
+      if (current === null || (line === '' && !inFence)) continue;
+      current.text = `${current.text}\n${raw}`;
+    }
+    return items.map(({ text, fenced }) => ({ text, fenced }));
+  }
   let fence: { lines: string[]; owner: (typeof items)[number] | null } | null = null;
   for (const raw of section.lines) {
     const line = raw.trim();
@@ -170,7 +195,7 @@ function splitItems(section: { head: string; lines: string[] }): {
       fence = { lines: [raw], owner };
       continue;
     }
-    if (line === '') continue;
+    if (line === '' || (hasList && HEADING.test(line))) continue;
     const prev = items[items.length - 1];
     const li = LIST_ITEM.exec(raw);
     if (li !== null) {

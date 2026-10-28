@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986/integration
+
+
+ Test Files  4 passed (4)
+      Tests  84 passed (84)
+   Start at  16:08:29
+   Duration  22.35s (tests 92%, transform 4%, import 4%)
+

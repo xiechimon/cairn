@@ -1,0 +1,22 @@
+$ biome ci .
+[0m[34mChecked 1066 files in 469[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1355 tests in 189 files collected, disk count matches (1.0s)
+[spec-parse-gate] integration/test: 48 test files parsed clean by tsc (1.2s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+english-only-gate: 0 line(s) with Chinese text
+single-use-helper-gate: 0 single-use helper(s)
+comment-discipline-gate: 0 new comment line(s)
+lessons ledger ok

@@ -1,0 +1,36 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986
+
+ ✓ |@cairn/integration| test/routing-driver.test.ts (14 tests) 6068ms
+   ✓ #1986 programmatic routing runner failures that need no sandbox (5)
+     ✓ a planner timeout cannot pass and stays attributable 1516ms
+     ✓ an executor timeout cannot pass 1523ms
+   ✓ #1986 programmatic routing runner through the real backend and oracle (9)
+     ✓ the single arm passes through the real backend and oracle 311ms
+     ✓ the handoff arm transfers only plan text into a freshly seeded executor 337ms
+     ✓ a planner write tool attempt fails the run even when the executor passes 332ms
+     ✓ a planner shell write attempt is denied and recorded 317ms
+     ✓ a planner external read is recorded from the sandbox and fails the run 330ms
+     ✓ an executor external read is recorded despite a passing oracle 443ms
+     ✓ a planner read-tool external read is recorded and fails the run 313ms
+     ✓ a planner attempt to touch executor data is blocked and recorded 317ms
+ ✓ |@cairn/integration| test/routing-sessions.test.ts (19 tests) 5489ms
+   ✓ planner programmatic shell writes are denied before execution 420ms
+   ✓ single arm: a stub-relay session edits the workspace and the real oracle passes 311ms
+   ✓ handoff arm: a fresh executor receives the original task, only plan text, and seeded files 608ms
+   ✓ planner forbidden reads never reach the relay and fail despite a passing oracle 319ms
+   ✓ executor forbidden reads never reach the relay and fail despite a passing oracle 314ms
+   ✓ planner executor-directory reads are denied before returning task data 329ms
+   ✓ planner timeouts cannot become successful runs 512ms
+   ✓ executor timeouts cannot become successful runs 529ms
+   ✓ executor symlinks cannot bypass the live read boundary 618ms
+   ✓ explicit file reads cannot use runtime resource allowances as task data 309ms
+   ✓ planner explicit runtime-resource read /etc/passwd is blocked and graded 321ms
+   ✓ planner explicit runtime-resource read /dev/null is blocked and graded 310ms
+
+ Test Files  2 passed (2)
+      Tests  33 passed (33)
+   Start at  16:26:37
+   Duration  12.61s (tests 93%, import 7%)
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-8b52eoh_/prepush-vitest-0q8AGM/report.json
