@@ -80,6 +80,7 @@ credentials.enc
 !.claude/skills/verify-cairn/
 !.claude/skills/pr-cairn/
 !.claude/skills/verify-step-claim/
+!.claude/skills/verify-merge-gate/
 !.claude/skills/retro-cairn/
 !.claude/workflow.md
 !.claude/hillclimb/

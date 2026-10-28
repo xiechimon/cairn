@@ -71,6 +71,14 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "archive-fixture-layout": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "archive-path-normalization": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "assumed-verification-entry-point": {
     "Intercepts": 3,
     "Recurrences": 2
@@ -255,6 +263,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "direct-vitest-skipped-slot": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "directory-wide-absence-assertion": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -279,9 +291,17 @@
     "Intercepts": 3,
     "Recurrences": 1
   },
+  "error-only-variants": {
+    "Intercepts": 2,
+    "Recurrences": 0
+  },
   "escape-retry-hid-overlay": {
     "Intercepts": 1,
     "Recurrences": 0
+  },
+  "eval-context-declaration": {
+    "Intercepts": 4,
+    "Recurrences": 1
   },
   "evidence-branch-audit-option": {
     "Intercepts": 0,
@@ -289,6 +309,10 @@
   },
   "evidence-docs-committed-on-a-lane-spelled-out-the-lane": {
     "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "evidence-log-whitespace": {
+    "Intercepts": 1,
     "Recurrences": 0
   },
   "evidence-shot-mid-animation": {
@@ -343,6 +367,10 @@
     "Intercepts": 0,
     "Recurrences": 1
   },
+  "gate-constant-freeze": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "gate-retry-metadata-changed-the-established-wake-prefix": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -363,6 +391,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "github-create-gate-eacces": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "github-secondary-rate-limit": {
     "Intercepts": 0,
     "Recurrences": 0
@@ -375,9 +407,21 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "harbor-artifact-paths": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "harness-policy-dependencies": {
+    "Intercepts": 6,
+    "Recurrences": 0
+  },
   "head-closed-pipe": {
     "Intercepts": 0,
     "Recurrences": 0
+  },
+  "historical-replay-input-contract": {
+    "Intercepts": 1,
+    "Recurrences": 1
   },
   "hook-git-dir-reach-test": {
     "Intercepts": 0,
@@ -389,6 +433,10 @@
   },
   "idle-watchdog-kills-silent-tools": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "ignored-skill-restaging": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "image-not-attached-to-reply": {
@@ -403,8 +451,16 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "inline-diagnostic-syntax": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "intake-branch-skipped-server-chain": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "json-import-attribute": {
+    "Intercepts": 2,
     "Recurrences": 0
   },
   "lessons-section-broke-integration-tests": {
@@ -451,6 +507,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "missing-opt-in-control": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "model-roster-assigned-a-hosted-glm-model-to-mistral-allowing": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -468,6 +528,10 @@
     "Recurrences": 0
   },
   "native-diagnostic-loader": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "nested-node-test-context": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -493,6 +557,10 @@
   },
   "online-probe-exit-zero": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "overwritten-verdict-history": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "overwrote-existing-skill": {
@@ -567,6 +635,14 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "probe-registration": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "process-inventory-boundary": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "prompt-prefix-changed-dispatch-criterion": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -576,6 +652,10 @@
     "Recurrences": 0
   },
   "providers-tabs-vocabulary": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "push-author-range": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -599,8 +679,16 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "red-gates-on-push": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "regression-setup-import": {
     "Intercepts": 2,
+    "Recurrences": 0
+  },
+  "report-score-eligibility": {
+    "Intercepts": 3,
     "Recurrences": 0
   },
   "reproduce-first-label-instructions": {
@@ -707,11 +795,19 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "tampering-control": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "target-read-audit": {
     "Intercepts": 2,
     "Recurrences": 0
   },
   "task-exit-read-as-helper-failure": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "test-fixture-types": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -803,6 +899,10 @@
     "Intercepts": 2,
     "Recurrences": 0
   },
+  "unobserved-review-head": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "unreachable-grading-module": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -819,12 +919,28 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "verifier-container-evidence": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "verify-dispatch-diff": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "vp-fixture-dependency": {
+    "Intercepts": 41,
+    "Recurrences": 0
+  },
   "waiting-on-ci-after-pr": {
     "Intercepts": 0,
     "Recurrences": 0
   },
   "wall-clock-bound-in-shared-host-test": {
     "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "zero-pass-oracle-acceptance": {
+    "Intercepts": 1,
     "Recurrences": 0
   },
   "zsh-nomatch-search": {
