@@ -1,0 +1,30 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1517/integration
+
+ ❯ test/bench-v0-manifest.test.ts (1 test | 1 failed) 4ms
+   × bench-v0 records only independently agreed tasks with paired control evidence 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/bench-v0-manifest.test.ts > bench-v0 records only independently agreed tasks with paired control evidence
+Error: ENOENT: no such file or directory, open '/mnt/fast/lanes/cairn-1517/integration/eval/harbor/bench-v0.json'
+ ❯ test/bench-v0-manifest.test.ts:8:31
+      6|
+      7| test('bench-v0 records only independently agreed tasks with paired con…
+      8|   const manifest = JSON.parse(readFileSync(join(root, 'bench-v0.json')…
+       |                               ^
+      9|   expect(manifest.harborVersion).toBe('0.25.0');
+     10|   expect(manifest.target).toBe(30);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  16:42:41
+   Duration  99ms (transform 52%, import 23%, tests 15%, worker 10%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-1517/integration
+

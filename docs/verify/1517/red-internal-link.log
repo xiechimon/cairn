@@ -1,0 +1,75 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/fast/lanes/cairn-1517
+collected 7 items
+
+integration/eval/harbor/test_pr_to_task.py ......F                       [100%]
+
+=================================== FAILURES ===================================
+______________ test_internal_parent_link_does_not_escape_archive _______________
+
+repository = (PosixPath('/mnt/fast/tmp/ai-route-tmp/run-0wbzfvgn/pytest-of-ian/pytest-3/test_internal_parent_link_does0/repo'), 'aac245a5c6b835f336dcab3b198ee7a41361ff16', 'd701042172ac126d1028ce7e9d088d0335af7cab')
+tmp_path = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-0wbzfvgn/pytest-of-ian/pytest-3/test_internal_parent_link_does0')
+
+    def test_internal_parent_link_does_not_escape_archive(repository, tmp_path):
+        repo, _, _ = repository
+        (repo / "nested").mkdir()
+        (repo / "nested/source").symlink_to("../add.py")
+        subprocess.run(["git", "add", "nested/source"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-m", "internal link"], cwd=repo, check=True)
+        base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+        (repo / "add.py").write_text("def add(a, b):\n    return a * b\n")
+        (repo / "test_add.py").write_text("def test_add():\n    assert True\n")
+        subprocess.run(["git", "add", "add.py", "test_add.py"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-m", "change"], cwd=repo, check=True)
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+>       converter.convert(repo, base, head, "Fixture", tmp_path / "task", ["true"], 42)
+
+integration/eval/harbor/test_pr_to_task.py:90: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+repo = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-0wbzfvgn/pytest-of-ian/pytest-3/test_internal_parent_link_does0/repo')
+base = '84c26b72922d4ad337c6ecadc220a8319ff8ab8b'
+head = '12a99db5b88f0e7605d47240edc4018784aac780', issue_body = 'Fixture'
+destination = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-0wbzfvgn/pytest-of-ian/pytest-3/test_internal_parent_link_does0/task')
+command = ['true'], issue = 42
+
+    def convert(repo, base, head, issue_body, destination, command, issue):
+        for sha in (base, head):
+            if not re.fullmatch(r"[a-f0-9]{40}", sha):
+                raise ValueError("Expected full commit SHA")
+        paths = patch_paths(repo, base, head)
+        tests = [path for path in paths if is_test(path)]
+        product = [path for path in paths if not is_test(path)]
+        if not tests or not product:
+            raise ValueError("Both product changes and regression tests are required")
+        if not command or not all(isinstance(arg, str) and arg for arg in command):
+            raise ValueError("Expected a nonempty test command argument array")
+        destination = Path(destination)
+        destination.mkdir(parents=True, exist_ok=False)
+        for directory in ("environment", "tests", "solution"):
+            (destination / directory).mkdir()
+        for directory, filename, files in (("tests", "tests.patch", tests), ("solution", "solution.patch", product)):
+            patch = run("git", "diff", "--binary", "--no-renames", base, head, "--", *files, cwd=repo)
+            (destination / directory / filename).write_text(patch)
+        archive = destination / "environment/base.tar"
+        subprocess.run(["git", "archive", "--format=tar", f"--output={archive.resolve()}", base], cwd=repo, check=True)
+        with tarfile.open(archive) as contents:
+            for member in contents:
+                validate_path(member.name.rstrip("/"))
+                if member.issym() or member.islnk():
+                    target = PurePosixPath(member.linkname)
+                    if target.is_absolute() or ".." in target.parts:
+>                       raise ValueError("Base archive contains a link escaping the source tree")
+E                       ValueError: Base archive contains a link escaping the source tree
+
+integration/eval/harbor/pr-to-task.py:86: ValueError
+----------------------------- Captured stdout call -----------------------------
+[master 84c26b7] internal link
+ 1 file changed, 1 insertion(+)
+ create mode 120000 nested/source
+[master 12a99db] change
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+=========================== short test summary info ============================
+FAILED integration/eval/harbor/test_pr_to_task.py::test_internal_parent_link_does_not_escape_archive
+========================= 1 failed, 6 passed in 0.80s ==========================

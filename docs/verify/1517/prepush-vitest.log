@@ -1,0 +1,11 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1517
+
+ ✓ |@cairn/integration| test/bench-v0-manifest.test.ts (1 test) 3ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  16:49:03
+   Duration  82ms (import 43%, tests 21%, worker 20%, transform 16%, environment 1%)
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-0wbzfvgn/prepush-vitest-IYuKlQ/report.json

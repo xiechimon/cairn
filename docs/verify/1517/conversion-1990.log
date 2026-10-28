@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1517/integration/eval/harbor/pr-to-task.py", line 208, in <module>
+    main()
+    ~~~~^^
+  File "/mnt/fast/lanes/cairn-1517/integration/eval/harbor/pr-to-task.py", line 201, in main
+    metadata = convert(ROOT, row["baseSha"], row["headSha"], body, args.output, json.loads(args.test_command_json), issue)
+  File "/mnt/fast/lanes/cairn-1517/integration/eval/harbor/pr-to-task.py", line 86, in convert
+    raise ValueError("Base archive contains a link escaping the source tree")
+ValueError: Base archive contains a link escaping the source tree
