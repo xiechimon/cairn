@@ -1,0 +1,79 @@
+RUN  v5.0.1 <checkout>
+
+ ❯ |@xiechimon/cairn| test/split-review-regressions.test.ts (8 tests | 5 failed) 1019ms
+   × unquoted path containing whitespace falls back as unclear 31ms
+   × checker rejects unavailable selected Claude model with report null 2ms
+   × checker rejects unavailable selected Claude model with report {"installed":false,"hostname":"test","models":[{"id":"selected","name":"Selected"}]} 1ms
+   × checker rejects unavailable selected Claude model with report {"installed":true,"hostname":"test","models":[]} 1ms
+   × checker matches the existing home-machine selected-model liveness decision 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/split-review-regressions.test.ts > unquoted path containing whitespace falls back as unclear
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/split-review-regressions.test.ts:23:36
+     21|   const input = checkerInput();
+     22|   input.subtodos[0]!.spec = 'edit apps/server/src/merge gate/x.ts';
+     23|   expect(checkSplitPlan(input).ok).toBe(false);
+       |                                    ^
+     24| });
+     25|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-review-regressions.test.ts > checker rejects unavailable selected Claude model with report null
+ FAIL  |@xiechimon/cairn| test/split-review-regressions.test.ts > checker rejects unavailable selected Claude model with report {"installed":false,"hostname":"test","models":[{"id":"selected","name":"Selected"}]}
+ FAIL  |@xiechimon/cairn| test/split-review-regressions.test.ts > checker rejects unavailable selected Claude model with report {"installed":true,"hostname":"test","models":[]}
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/split-review-regressions.test.ts:51:36
+     49|   input.agents[0] = { ...input.agents[0]!, provider: 'claude-code', mo…
+     50|   expect(homeMachineRejectReason(home, input.agents[0]!)).not.toBeNull…
+     51|   expect(checkSplitPlan(input).ok).toBe(false);
+       |                                    ^
+     52| });
+     53|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-review-regressions.test.ts > checker matches the existing home-machine selected-model liveness decision
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/split-review-regressions.test.ts:73:36
+     71|   input.agents[0] = { ...input.agents[0]!, provider: 'claude-code', mo…
+     72|   expect(homeMachineRejectReason(home, input.agents[0]!, catalog)).not…
+     73|   expect(checkSplitPlan(input).ok).toBe(false);
+       |                                    ^
+     74| });
+     75|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 3 passed (8)
+   Start at  19:05:36
+   Duration  11.14s (transform 57%, import 31%, tests 10%, worker 1%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 5.93s · 57% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns

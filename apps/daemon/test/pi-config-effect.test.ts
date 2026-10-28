@@ -178,3 +178,42 @@ describe('materializeProvider context/output cap declaration slots (#1526)', () 
     expect(models[1]).toMatchObject({ id: 'small', contextWindow: 128_000, maxTokens: 16_384 });
   });
 });
+
+describe('materializeProvider model input capability declaration (#1671)', () => {
+  function providerWith(providerId: string, models: ProviderConfig['models']): ProviderConfig {
+    return { ...gateway(providerId), models };
+  }
+  function loadModels(path: string, providerId: string): Record<string, unknown>[] {
+    const raw = JSON.parse(readFileSync(path, 'utf8')) as {
+      providers: Record<string, { models?: Record<string, unknown>[] }>;
+    };
+    return raw.providers[providerId]?.models ?? [];
+  }
+
+  test('model declares input [text,image] → models.json entry keeps image (vision models stop being forced to text-only)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-vision-'));
+    const path = join(dir, 'models.json');
+    materializeProvider(
+      path,
+      providerWith('vision-gw', [{ id: 'glm-5v', name: 'glm-5v', input: ['text', 'image'] }]),
+    );
+    expect(loadModels(path, 'vision-gw')[0]).toMatchObject({
+      id: 'glm-5v',
+      input: ['text', 'image'],
+    });
+  });
+
+  test('declares input [text] → text-only entry (degradation declared up front instead of learned from a 400)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-vision-'));
+    const path = join(dir, 'models.json');
+    materializeProvider(path, providerWith('text-gw', [{ id: 'm1', name: 'M1', input: ['text'] }]));
+    expect(loadModels(path, 'text-gw')[0]).toMatchObject({ id: 'm1', input: ['text'] });
+  });
+
+  test('input undeclared → [text] fallback unchanged (unknown stays unknown, not downgraded)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-vision-'));
+    const path = join(dir, 'models.json');
+    materializeProvider(path, providerWith('input-none', [{ id: 'm2', name: 'M2' }]));
+    expect(loadModels(path, 'input-none')[0]).toMatchObject({ id: 'm2', input: ['text'] });
+  });
+});

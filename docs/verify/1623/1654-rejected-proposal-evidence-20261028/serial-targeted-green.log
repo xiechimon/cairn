@@ -1,0 +1,13 @@
+[heavy-slots] acquired slot 1/1
+
+ RUN  v5.0.1 <checkout>
+
+
+ Test Files  27 passed (27)
+      Tests  345 passed (345)
+   Start at  19:47:38
+   Duration  22.49s (tests 49%, import 46%, transform 5%)
+
+    Isolate  27 workers spawned · ~61ms startup each (spawn + environment, per file)
+             at least ~1.58s faster with isolate: false — reuses workers across files instead of one per file
+

@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 <checkout>
+
+
+ Test Files  1 passed (1)
+      Tests  41 passed (41)
+   Start at  19:43:01
+   Duration  2.80s (tests 49%, transform 30%, import 21%)
+
