@@ -497,3 +497,237 @@ test('validate-cases CLI accepts the empty bank and refuses a leaking reviewer-i
   assert.notEqual(leaking.status, 0);
   assert.match(`${leaking.stderr}\n${leaking.stdout}`, /reviewerInput|correction|leak/i);
 });
+
+test('export maps fixing-parent line ranges back through intervening inserts to the introducing tree', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-map-intervening-');
+  commit('chore: seed', '2026-04-01T00:00:00Z', { 'drift.txt': 'alpha\n' });
+  const introducingSha = commit('feat: land bug (#40)', '2026-04-02T00:00:00Z', {
+    'drift.txt': 'alpha\nBUG\nomega\n',
+  });
+  commit('chore: insert above bug', '2026-04-03T00:00:00Z', {
+    'drift.txt': 'alpha\nINSERT\nBUG\nomega\n',
+  });
+  const fixingSha = commit('fix: repair drifted bug (#41)', '2026-04-04T00:00:00Z', {
+    'drift.txt': 'alpha\nINSERT\nGOOD\nomega\n',
+  });
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const out = join(cwd, 'review');
+  const result = exportCases({
+    traces: [
+      resolvedTrace({
+        introducingSha,
+        fixingSha,
+        originalPr: 40,
+        fixingPr: 41,
+        path: 'drift.txt',
+        start: 3,
+        end: 3,
+      }),
+    ],
+    outDir: out,
+    cwd,
+  });
+  assert.equal(result.exported.length, 1, JSON.stringify(result.candidates));
+  const bankCase = JSON.parse(
+    readFileSync(join(out, 'cases', `${result.exported[0].id}.json`), 'utf8'),
+  );
+  assert.equal(bankCase.answer.defect.path, 'drift.txt');
+  assert.equal(bankCase.answer.defect.startLine, 2);
+  assert.equal(bankCase.answer.defect.endLine, 2);
+  assert.ok(result.exported[0].id.includes('L2-2'));
+});
+
+test('export maps a renamed path at the fixing parent back to the introducing path and lines', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-map-rename-');
+  commit('chore: seed', '2026-03-01T00:00:00Z', { 'old/name.txt': 'keep\n' });
+  const introducingSha = commit('feat: bug in old path (#50)', '2026-03-02T00:00:00Z', {
+    'old/name.txt': 'keep\nbad\n',
+  });
+  mkdirSync(join(cwd, 'new'), { recursive: true });
+  git(['mv', 'old/name.txt', 'new/name.txt']);
+  git(['commit', '-q', '-m', 'refactor: rename path'], {
+    GIT_AUTHOR_DATE: '2026-03-03T00:00:00Z',
+    GIT_COMMITTER_DATE: '2026-03-03T00:00:00Z',
+  });
+  writeFileSync(join(cwd, 'new/name.txt'), 'keep\ngood\n');
+  git(['add', '--', 'new/name.txt']);
+  git(['commit', '-q', '-m', 'fix: repair after rename (#51)'], {
+    GIT_AUTHOR_DATE: '2026-03-04T00:00:00Z',
+    GIT_COMMITTER_DATE: '2026-03-04T00:00:00Z',
+  });
+  const fixingSha = git(['rev-parse', 'HEAD']);
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const out = join(cwd, 'review');
+  const result = exportCases({
+    traces: [
+      resolvedTrace({
+        introducingSha,
+        fixingSha,
+        originalPr: 50,
+        fixingPr: 51,
+        path: 'new/name.txt',
+        start: 2,
+        end: 2,
+      }),
+    ],
+    outDir: out,
+    cwd,
+  });
+  assert.equal(result.exported.length, 1, JSON.stringify(result.candidates));
+  const bankCase = JSON.parse(
+    readFileSync(join(out, 'cases', `${result.exported[0].id}.json`), 'utf8'),
+  );
+  assert.equal(bankCase.answer.defect.path, 'old/name.txt');
+  assert.equal(bankCase.answer.defect.startLine, 2);
+  assert.equal(bankCase.answer.defect.endLine, 2);
+});
+
+test('newline-terminated blobs do not admit an extra phantom line in export or validate', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-linecount-');
+  commit('chore: seed', '2026-02-01T00:00:00Z', { 'count.txt': 'one\n' });
+  const introducingSha = commit('feat: two lines (#60)', '2026-02-02T00:00:00Z', {
+    'count.txt': 'one\ntwo\n',
+  });
+  const fixingSha = commit('fix: touch two (#61)', '2026-02-03T00:00:00Z', {
+    'count.txt': 'one\ntwo-fixed\n',
+  });
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const out = join(cwd, 'review');
+  const phantom = exportCases({
+    traces: [
+      resolvedTrace({
+        introducingSha,
+        fixingSha,
+        originalPr: 60,
+        fixingPr: 61,
+        path: 'count.txt',
+        start: 3,
+        end: 3,
+      }),
+    ],
+    outDir: out,
+    cwd,
+  });
+  assert.equal(phantom.exported.length, 0);
+  assert.ok(
+    phantom.candidates.some((entry) => /line|range|map/i.test(entry.ineligibleReason)),
+  );
+  const good = exportCases({
+    traces: [
+      resolvedTrace({
+        introducingSha,
+        fixingSha,
+        originalPr: 60,
+        fixingPr: 61,
+        path: 'count.txt',
+        start: 2,
+        end: 2,
+      }),
+    ],
+    outDir: out,
+    cwd,
+  });
+  assert.equal(good.exported.length, 1);
+  const casePath = join(out, 'cases', `${good.exported[0].id}.json`);
+  const bankCase = JSON.parse(readFileSync(casePath, 'utf8'));
+  bankCase.answer.defect.startLine = 3;
+  bankCase.answer.defect.endLine = 3;
+  writeFileSync(casePath, `${JSON.stringify(bankCase, null, 2)}\n`);
+  const validation = validateCases(join(out, 'cases'), { cwd });
+  assert.equal(validation.ok, false);
+  assert.ok(validation.errors.some((error) => /line|range|blob/i.test(error)));
+});
+
+test('successive exports preserve existing cases and only upsert matching identities', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-preserve-');
+  commit('chore: seed', '2026-01-01T00:00:00Z', {
+    'a.txt': 'a\n',
+    'b.txt': 'b\n',
+  });
+  const introA = commit('feat: defect a (#70)', '2026-01-02T00:00:00Z', {
+    'a.txt': 'a\nbad-a\n',
+    'b.txt': 'b\n',
+  });
+  const introB = commit('feat: defect b (#71)', '2026-01-03T00:00:00Z', {
+    'a.txt': 'a\nbad-a\n',
+    'b.txt': 'b\nbad-b\n',
+  });
+  const fixA = commit('fix: repair a (#72)', '2026-01-04T00:00:00Z', {
+    'a.txt': 'a\ngood-a\n',
+    'b.txt': 'b\nbad-b\n',
+  });
+  const fixB = commit('fix: repair b (#73)', '2026-01-05T00:00:00Z', {
+    'a.txt': 'a\ngood-a\n',
+    'b.txt': 'b\ngood-b\n',
+  });
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const out = join(cwd, 'review');
+  const first = exportCases({
+    traces: [
+      resolvedTrace({
+        introducingSha: introA,
+        fixingSha: fixA,
+        originalPr: 70,
+        fixingPr: 72,
+        path: 'a.txt',
+        start: 2,
+        end: 2,
+      }),
+    ],
+    outDir: out,
+    cwd,
+  });
+  assert.equal(first.exported.length, 1);
+  const firstId = first.exported[0].id;
+  const firstBytes = readFileSync(join(out, 'cases', `${firstId}.json`));
+  const second = exportCases({
+    traces: [
+      {
+        followUpSha: fixB,
+        fixingSha: fixB,
+        followUpTimestamp: '2026-01-05T00:00:00.000Z',
+        fixingPr: 73,
+        introducingSha: null,
+        introducingMergedAt: null,
+        originalPr: null,
+        method: null,
+        status: 'unresolved',
+        unresolvedReason: 'unavailable-pr-metadata',
+        withinEscapeWindow: null,
+        evidence: {
+          paths: ['b.txt'],
+          files: [],
+          references: [],
+          unvalidatedReferences: [],
+          introducingCandidates: [],
+        },
+      },
+    ],
+    outDir: out,
+    cwd,
+  });
+  assert.equal(second.exported.length, 0);
+  assert.ok(second.candidates.length >= 1);
+  assert.deepEqual(readFileSync(join(out, 'cases', `${firstId}.json`)), firstBytes);
+  const third = exportCases({
+    traces: [
+      resolvedTrace({
+        introducingSha: introB,
+        fixingSha: fixB,
+        originalPr: 71,
+        fixingPr: 73,
+        path: 'b.txt',
+        start: 2,
+        end: 2,
+      }),
+    ],
+    outDir: out,
+    cwd,
+  });
+  assert.equal(third.exported.length, 1);
+  const names = readdirSync(join(out, 'cases')).filter((name) => name.endsWith('.json')).sort();
+  assert.equal(names.length, 2);
+  assert.ok(names.includes(`${firstId}.json`));
+  assert.ok(names.includes(`${third.exported[0].id}.json`));
+  assert.deepEqual(readFileSync(join(out, 'cases', `${firstId}.json`)), firstBytes);
+});

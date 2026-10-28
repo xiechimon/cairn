@@ -1,12 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const REVIEWER_INPUT_FORBIDDEN = new Set([
@@ -125,6 +118,61 @@ function defectLocations(trace) {
   return locations;
 }
 
+function blobLineCount(text) {
+  if (text.length === 0) return 0;
+  return text.endsWith('\n') ? text.slice(0, -1).split('\n').length : text.split('\n').length;
+}
+
+function mapFixingParentLocation(cwd, fixingSha, introducingSha, location) {
+  const parentResult = tryGitAt(cwd, ['rev-parse', '--verify', `${fixingSha}^`]);
+  if (!parentResult.ok) return { ok: false, reason: 'fixing-parent-missing' };
+  const fixingParent = parentResult.stdout.trim();
+  const parentBlob = tryGitAt(cwd, ['show', `${fixingParent}:${location.path}`]);
+  if (!parentBlob.ok) return { ok: false, reason: 'defect-path-missing-at-fixing-parent' };
+  if (location.endLine > blobLineCount(parentBlob.stdout))
+    return { ok: false, reason: 'defect-line-out-of-range-at-fixing-parent' };
+  const blame = tryGitAt(cwd, [
+    'blame',
+    '--porcelain',
+    '-C',
+    '-M',
+    '-L',
+    `${location.startLine},${location.endLine}`,
+    fixingParent,
+    '--',
+    location.path,
+  ]);
+  if (!blame.ok) return { ok: false, reason: 'blame-unmapable' };
+  const origLines = [];
+  let mappedPath = null;
+  let currentSha = null;
+  for (const line of blame.stdout.split('\n')) {
+    const header = /^([0-9a-f]{40}) (\d+) (\d+)(?: (\d+))?$/.exec(line);
+    if (header) {
+      currentSha = header[1];
+      if (currentSha !== introducingSha)
+        return { ok: false, reason: 'blame-not-introducing' };
+      origLines.push(Number(header[2]));
+      continue;
+    }
+    if (line.startsWith('filename ') && currentSha === introducingSha)
+      mappedPath = line.slice('filename '.length);
+  }
+  if (origLines.length === 0) return { ok: false, reason: 'unmapped-to-introducing' };
+  origLines.sort((a, b) => a - b);
+  const startLine = origLines[0];
+  const endLine = origLines[origLines.length - 1];
+  for (let expected = startLine, index = 0; index < origLines.length; index++, expected++) {
+    if (origLines[index] !== expected) return { ok: false, reason: 'noncontiguous-introducing-lines' };
+  }
+  const path = mappedPath || location.path;
+  const introBlob = tryGitAt(cwd, ['show', `${introducingSha}:${path}`]);
+  if (!introBlob.ok) return { ok: false, reason: 'defect-path-missing-at-introducing' };
+  if (endLine > blobLineCount(introBlob.stdout))
+    return { ok: false, reason: 'defect-line-out-of-range' };
+  return { ok: true, location: { path, startLine, endLine } };
+}
+
 function ineligibleReason(trace) {
   if (!trace || typeof trace !== 'object') return 'invalid-trace';
   if (trace.status === 'unresolved')
@@ -205,11 +253,9 @@ function buildCase(trace, location, { cwd }) {
   const parent = tryGitAt(cwd, ['rev-parse', '--verify', `${introducingSha}^`]);
   if (!parent.ok) return { ok: false, reason: 'replay-base-missing' };
   const replayBase = parent.stdout.trim();
-  const blob = tryGitAt(cwd, ['show', `${introducingSha}:${location.path}`]);
-  if (!blob.ok) return { ok: false, reason: 'defect-path-missing-at-introducing' };
-  const lines = blob.stdout.split('\n');
-  if (location.endLine > lines.length)
-    return { ok: false, reason: 'defect-line-out-of-range' };
+  const mapped = mapFixingParentLocation(cwd, fixingSha, introducingSha, location);
+  if (!mapped.ok) return mapped;
+  const defect = mapped.location;
   const subject = gitAt(cwd, ['show', '-s', '--format=%s', introducingSha]).trim();
   const diff = gitAt(cwd, ['show', '--format=', '--unified=3', introducingSha]);
   if (!diff.trim()) return { ok: false, reason: 'introducing-diff-empty' };
@@ -225,12 +271,18 @@ function buildCase(trace, location, { cwd }) {
     originalPr: trace.originalPr,
     fixingPr: trace.fixingPr,
     fixingSha,
-    path: location.path,
-    startLine: location.startLine,
-    endLine: location.endLine,
+    path: defect.path,
+    startLine: defect.startLine,
+    endLine: defect.endLine,
   });
   const limitations = [];
   if (!fixingPatch.trim()) limitations.push('fixing-patch-empty-for-path');
+  if (defect.path !== location.path) limitations.push('path-renamed-since-introducing');
+  if (
+    defect.startLine !== location.startLine ||
+    defect.endLine !== location.endLine
+  )
+    limitations.push('lines-shifted-since-introducing');
   return {
     ok: true,
     case: {
@@ -250,9 +302,9 @@ function buildCase(trace, location, { cwd }) {
       },
       answer: {
         defect: {
-          path: location.path,
-          startLine: location.startLine,
-          endLine: location.endLine,
+          path: defect.path,
+          startLine: defect.startLine,
+          endLine: defect.endLine,
         },
         labels: ['production-escape', trace.method ?? 'unknown-method'],
         correction: fixingPatch.trim()
@@ -273,9 +325,6 @@ export function exportCases({ traces, outDir, cwd = process.cwd() }) {
   if (!Array.isArray(traces)) throw new Error('export-cases expects a traces array');
   const casesDir = join(outDir, 'cases');
   mkdirSync(casesDir, { recursive: true });
-  for (const name of readdirSync(casesDir)) {
-    if (name.endsWith('.json')) rmSync(join(casesDir, name), { force: true });
-  }
   const exported = [];
   const candidates = [];
   const seen = new Set();
@@ -354,7 +403,7 @@ function validateBankCase(bankCase, { cwd, schema }) {
     ]);
     if (!blob.ok) errors.push('defect path missing at introducing commit');
     else {
-      const lineCount = blob.stdout.split('\n').length;
+      const lineCount = blobLineCount(blob.stdout);
       if (bankCase.answer.defect.endLine > lineCount)
         errors.push('defect line range exceeds introducing blob');
     }
