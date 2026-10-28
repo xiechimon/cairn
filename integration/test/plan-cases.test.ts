@@ -66,4 +66,27 @@ describe('plan cases ledger', () => {
       }
     }
   });
+
+  test('rev-004 requires exponential backoff and jitter as separate mustFix groups', () => {
+    const c = flow.cases.find((row) => row.id === 'rev-004-missing-requirement');
+    expect(c && isPlanRevisionCase(c)).toBe(true);
+    if (!c || !isPlanRevisionCase(c)) return;
+    const groups = c.expect.mustFix.map((group) => group.map((m) => m.toLowerCase()));
+    expect(groups.some((group) => group.some((m) => m.includes('backoff')))).toBe(true);
+    expect(groups.some((group) => group.some((m) => m.includes('jitter')))).toBe(true);
+    expect(groups.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('rev-008 requires composite index columns and pagination as separate checks', () => {
+    const c = flow.cases.find((row) => row.id === 'rev-008-db-index');
+    expect(c && isPlanRevisionCase(c)).toBe(true);
+    if (!c || !isPlanRevisionCase(c)) return;
+    const fix = c.expect.mustFix.map((group) => group.map((m) => m.toLowerCase()));
+    const preserve = c.expect.mustPreserve.map((group) => group.map((m) => m.toLowerCase()));
+    expect(fix.some((group) => group.some((m) => m.includes('composite index')))).toBe(true);
+    expect(fix.some((group) => group.some((m) => m.includes('team_id')))).toBe(true);
+    expect(fix.some((group) => group.some((m) => m.includes('updated_at')))).toBe(true);
+    expect(preserve.some((group) => group.some((m) => m.includes('paginat')))).toBe(true);
+    expect(fix.length).toBeGreaterThanOrEqual(3);
+  });
 });

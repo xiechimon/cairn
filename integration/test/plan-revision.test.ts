@@ -89,6 +89,34 @@ describe('labeled slice', () => {
     expect(g.grade.plan_ok).toBe(0);
     expect(g.explanation.plan_ok).toMatch(/dropped preserved|missing/i);
   });
+
+  test('exponential backoff without jitter fails rev-004', () => {
+    const example = labeled.examples.find((e) => e.id === 'rev-004-backoff-without-jitter-fails')!;
+    const c = byId.get(example.caseId)!;
+    const g = gradePlanRevisionCase(c, { evidence: turn(), todos: example.todos });
+    expect(g.grade.plan_ok).toBe(0);
+    expect(g.explanation.plan_ok).toMatch(/missing fix/i);
+  });
+
+  test('composite index without column pair fails rev-008', () => {
+    const example = labeled.examples.find(
+      (e) => e.id === 'rev-008-index-without-columns-fails',
+    )!;
+    const c = byId.get(example.caseId)!;
+    const g = gradePlanRevisionCase(c, { evidence: turn(), todos: example.todos });
+    expect(g.grade.plan_ok).toBe(0);
+    expect(g.explanation.plan_ok).toMatch(/missing fix/i);
+  });
+
+  test('composite index without pagination fails rev-008', () => {
+    const example = labeled.examples.find(
+      (e) => e.id === 'rev-008-index-without-pagination-fails',
+    )!;
+    const c = byId.get(example.caseId)!;
+    const g = gradePlanRevisionCase(c, { evidence: turn(), todos: example.todos });
+    expect(g.grade.plan_ok).toBe(0);
+    expect(g.explanation.plan_ok).toMatch(/dropped preserved|missing/i);
+  });
 });
 
 describe('revision grader negative controls', () => {

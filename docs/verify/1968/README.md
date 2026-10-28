@@ -5,22 +5,32 @@
 - `plan_ok` (binary): single-turn cases use include/exclude/split bounds; revision cases require `mustFix` + `mustPreserve` and forbid `exclude` on the final persisted todo title+spec (assistant prose does not count).
 - Revision arms: `feedback` seeds `priorPlan`, delivers rejection feedback, then grades the final board; `no-feedback` starts from an equivalent fresh stack without feedback. A harness failure is recorded in `errors.jsonl`, never as a control score.
 
+## Acceptance status
+
+Deterministic grader tests, labeled-slice negatives, tightened revision expectations, and the plan flow under `.claude/hillclimb/plan/` are in this PR. Planning is registered as flow `plan` and remains **built-not-run** until a real-model family run lands both arms.
+
+`docs/verify/1968/baseline/` holds stub-relay smoke artifacts for runner wiring only. Those stub scores are **not** acceptance evidence and must not be copied into `.claude/hillclimb/plan/baseline/` as scored coverage. Real-model both-arm acceptance is unfinished; no cost approval was invented for a paid run in this lane.
+
 ## Reproduction
 
 ```sh
-pnpm --filter @cairn/integration exec vitest run test/plan-cases.test.ts test/plan-grade.test.ts test/plan-revision.test.ts
+pnpm --filter @cairn/integration exec vitest run \
+  test/plan-cases.test.ts test/plan-grade.test.ts test/plan-revision.test.ts test/run-eval-resume.test.ts
 node --test scripts/eval-coverage.test.mjs
 node scripts/generate-feature-map.mjs && git diff --exit-code docs/feature-map.md
+```
+
+Real-model family (when credentials and an approved cost estimate exist):
+
+```sh
 pnpm exec tsx integration/eval/chief-dispatch/run-eval.mts \
   --flow .claude/hillclimb/plan --variant baseline --model glm-5.3 \
   --arm all --reps 1 --concurrency 1 --timeout-s 1800 --approve-harness
 ```
 
-Family scores in this tree used a stub relay for CI-reproducible both-arm artifacts (`baseline/`). Paid real-model runs need an orchestrator cost estimate first.
-
 ## Labeled slice
 
-`labeled-slice/` copies `integration/eval/plan/labeled-slice.json`: alias variation passes; Safari prompt-echo, missing fix, and dropped preserve fail.
+`labeled-slice/` copies `integration/eval/plan/labeled-slice.json`: alias variation passes; Safari prompt-echo, missing fix, dropped preserve, backoff-without-jitter, and incomplete composite-index plans fail.
 
 ## #1516 candidates later
 

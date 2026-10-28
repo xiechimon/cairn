@@ -78,22 +78,22 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 
 | Item | Count |
 |---|---|
-| Map rows (issues) | 690 |
+| Map rows (issues) | 693 |
 | of which Differentiation surface | 109 |
-| of which Runtime axis | 147 |
-| of which General surface | 434 |
-| status Done | 549 |
+| of which Runtime axis | 148 |
+| of which General surface | 436 |
+| status Done | 552 |
 | status In progress | 15 |
 | status Not started | 13 |
 | status Unverified | 113 |
-| anchors = evidence directory + test reference | 238 |
-| anchors = evidence directory only | 213 |
+| anchors = evidence directory + test reference | 240 |
+| anchors = evidence directory only | 214 |
 | anchors = test reference only | 113 |
 | no anchor (`[unverified]`) | 126 |
-| referenced PRs (no rows, §3.2) | 106 |
+| referenced PRs (no rows, §3.2) | 107 |
 | unresolvable ticket numbers (§3.3) | 0 |
 | evidence directories that are not GitHub ticket numbers (§3.4) | 97 |
-| scan surface: spec volumes / test files | 31 / 661 |
+| scan surface: spec volumes / test files | 31 / 663 |
 
 ## 2. Feature map
 
@@ -357,6 +357,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1845](https://github.com/xiechimon/cairn/issues/1845) `reliability: warn before a machine's Claude Code login expires and stop claiming claude-code steps after it has` | Runtime axis | In progress | `docs/verify/1845/` |
 | [#1852](https://github.com/xiechimon/cairn/issues/1852) `daemon+server: forward Claude rate-limit events and park steps until the limit resets` | Runtime axis | Done | `docs/verify/1852/`<br>`apps/daemon/test/runner-claude-rate-limit.test.ts`<br>`apps/server/test/claude-rate-limit.test.ts` |
 | [#1937](https://github.com/xiechimon/cairn/issues/1937) `web: in-place task panel shared by home, board, project, agent and machine pages (chat parity T2)` | Runtime axis | Done | `docs/verify/1937/`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/board-dnd.spec.ts`<br>`apps/web/e2e/card-press.spec.ts`<br>`apps/web/e2e/dead-buttons.spec.ts` |
+| [#1971](https://github.com/xiechimon/cairn/issues/1971) `server: audit skill injections when a worker claim succeeds` | Runtime axis | Done | `docs/verify/1971/`<br>`apps/server/test/skill-inject-claim.test.ts` |
 | [#10](https://github.com/xiechimon/cairn/issues/10) `Kernel: MCP agent channel` | General surface | Done | `apps/web/e2e/overlay-focus.spec.ts` |
 | [#11](https://github.com/xiechimon/cairn/issues/11) `Kernel: HTTP API surface` | General surface | Done | `packages/shared/test/records.test.ts` |
 | [#12](https://github.com/xiechimon/cairn/issues/12) `Kernel: SPA three screens` | General surface | Done | `apps/daemon/test/local-merge.test.ts`<br>`apps/daemon/test/runner-issue-fence.test.ts`<br>`apps/server/test/chief-digest.test.ts`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/board-queued-drop.spec.ts`<br>`apps/web/e2e/chief-home-chat.spec.ts`<br>`apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts`<br>`apps/web/test/mention-token.test.ts`<br>`packages/shared/test/issue-fence.test.ts` |
@@ -773,7 +774,9 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1945](https://github.com/xiechimon/cairn/issues/1945) `eval(1831): run and publish a fresh two-arm prompt ablation` | General surface | Done | `docs/verify/1945/` |
 | [#1946](https://github.com/xiechimon/cairn/issues/1946) `eval(1518): Establish exact, isolated Harbor grading controls` | General surface | Done | `docs/verify/1946/` |
 | [#1948](https://github.com/xiechimon/cairn/issues/1948) `eval(1518): Authenticate Harbor submissions and honor explicit project selection` | General surface | Done | `docs/verify/1948/` |
+| [#1960](https://github.com/xiechimon/cairn/issues/1960) `Define the page benchmark question bank and evidence contract` | General surface | Done | `docs/verify/1960/` |
 | [#1969](https://github.com/xiechimon/cairn/issues/1969) `skills: require bounded explicit mentions and scan every occurrence` | General surface | Done | `packages/shared/test/skill-inject.test.ts` |
+| [#1970](https://github.com/xiechimon/cairn/issues/1970) `skills: suppress weak domain signals and path-derived matches` | General surface | Done | `docs/verify/1970/`<br>`packages/shared/test/skill-inject.test.ts` |
 | [#1974](https://github.com/xiechimon/cairn/issues/1974) `server+web: Configure and unbind encrypted Feishu bot credentials (#1687, 1/3)` | General surface | Done | `docs/verify/1974/` |
 | [#1975](https://github.com/xiechimon/cairn/issues/1975) `Add a protected eval worker that publishes only the requested regression result` | General surface | Done | `docs/verify/1975/` |
 | [#1981](https://github.com/xiechimon/cairn/issues/1981) `verify: define evidence limits in implementer prompts and verify-cairn` | General surface | Done | `docs/verify/1981/` |
@@ -1036,6 +1039,7 @@ The row-set criterion = issues (§0.1). These PR numbers are referenced by the t
 | [#1703](https://github.com/xiechimon/cairn/pull/1703) | `fix(prepush): take a heavy slot when prepush-vitest runs directly` | closed |  |
 | [#1776](https://github.com/xiechimon/cairn/pull/1776) | `web: snap icon buttons to the 24/28/32 tiers` | closed |  |
 | [#1828](https://github.com/xiechimon/cairn/pull/1828) | `web,daemon: show agent work step by step on the task detail page` | closed |  |
+| [#1872](https://github.com/xiechimon/cairn/pull/1872) | `docs+eval(1532): add harness page benchmark question bank and scoring skeleton` | closed | tests ×1 |
 | [#2038](https://github.com/xiechimon/cairn/pull/2038) | `shared(plan): bold-labeled Verification checks own their fence and prose` | closed | tests ×1 |
 | [#2047](https://github.com/xiechimon/cairn/pull/2047) | `daemon(git): a rejected push the remote branch already contains counts as pushed` | closed | tests ×1 |
 | [#2081](https://github.com/xiechimon/cairn/pull/2081) | `scripts(1617): report historical paths in the weekly drift scan` | closed |  |
@@ -1171,7 +1175,7 @@ before today.
 | project routing | `project-routing` | 16 |  |  |  | built-not-run |
 | learn from correction | `learn` | 10 |  |  |  | built-not-run |
 | review |  |  |  |  |  | none ([#1779](https://github.com/xiechimon/cairn/issues/1779)) |
-| planning | `plan` | 13 | 2/23 (8.7%) |  | `glm-5.3` | scored |
+| planning | `plan` | 13 |  |  |  | built-not-run |
 | prior-art planning | `plan-prior-art` | 2 |  |  |  | built-not-run |
 | coding |  |  |  |  |  | none |
 | machine claim |  |  |  |  |  | tests only, no eval needed |

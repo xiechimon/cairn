@@ -48,6 +48,42 @@
           "spec": "Fix the download attribute on the blob url path. Skip writing any test."
         }
       ]
+    },
+    {
+      "id": "rev-004-backoff-without-jitter-fails",
+      "caseId": "rev-004-missing-requirement",
+      "expect": "fail",
+      "todos": [
+        {
+          "id": "t1",
+          "title": "Backoff retries",
+          "spec": "Use exponential backoff between retries and keep the partner timeout fixture."
+        }
+      ]
+    },
+    {
+      "id": "rev-008-index-without-columns-fails",
+      "caseId": "rev-008-db-index",
+      "expect": "fail",
+      "todos": [
+        {
+          "id": "t1",
+          "title": "Speed up list",
+          "spec": "Add a composite index and keep pagination plus the list latency benchmark."
+        }
+      ]
+    },
+    {
+      "id": "rev-008-index-without-pagination-fails",
+      "caseId": "rev-008-db-index",
+      "expect": "fail",
+      "todos": [
+        {
+          "id": "t1",
+          "title": "Index projects",
+          "spec": "Add a composite index on team_id and updated_at. Keep the list latency benchmark."
+        }
+      ]
     }
   ]
 }

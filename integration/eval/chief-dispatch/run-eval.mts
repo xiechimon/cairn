@@ -46,6 +46,7 @@ import {
   traceDigest,
 } from './harness-eval-result.mts';
 import { retryHarnessInfra } from './infra-retry.mts';
+import { evalResumeArmKey, evalResumeDoneKey } from './resume-key.mts';
 import {
   bootStack,
   disposeLeftovers,
@@ -490,7 +491,7 @@ async function main() {
           rep?: number;
           meta?: { arm?: string };
         };
-        done.add(`${r.prompt_id}\0${r.rep}\0${r.meta?.arm ?? ''}`);
+        done.add(evalResumeDoneKey(String(r.prompt_id ?? ''), Number(r.rep ?? 0), r.meta?.arm ?? ''));
       } catch {}
     }
 
@@ -558,7 +559,12 @@ async function main() {
       : [undefined];
     for (const planArm of arms)
       for (let rep = 0; rep < ARGS.reps; rep++) {
-        const doneKey = `${pathSafeId(c.id)}\0${rep}\0${planArm ?? ''}`;
+        const armKey = evalResumeArmKey({
+          planArm,
+          isLearn: isLearnCase(c),
+          learnArm: ARGS.arm,
+        });
+        const doneKey = evalResumeDoneKey(pathSafeId(c.id), rep, armKey);
         if (done.has(doneKey)) continue;
         tasks.push({ c, rep, planArm });
       }

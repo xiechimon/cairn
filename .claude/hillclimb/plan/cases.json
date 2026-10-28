@@ -1,6 +1,6 @@
 {
   "flow": "plan",
-  "note": "Plan coverage through the chief-dispatch runner. Single-turn cases use expect.kind=plan (alias groups, forbidden, split bounds). Revision cases use expect.kind=plan-revision with priorPlan/feedback and mustFix/mustPreserve/exclude. Grading reads todo title+spec only (assistant prose does not count).",
+  "note": "Plan coverage through the chief-dispatch runner. Single-turn cases use expect.kind=plan (alias groups, forbidden, split bounds). Revision cases use expect.kind=plan-revision with priorPlan+feedback; mustFix is feedback-dependent and mustPreserve must survive revision. Aliases name the fix, never the ticket topic word. Grading reads persisted todo title+spec only.",
   "roster": [
     {
       "key": "doc",
@@ -242,7 +242,10 @@
         "mustFix": [
           [
             "exponential backoff",
-            "backoff with jitter"
+            "expo backoff"
+          ],
+          [
+            "jitter"
           ]
         ],
         "mustPreserve": [
@@ -401,12 +404,20 @@
         "kind": "plan-revision",
         "mustFix": [
           [
-            "composite index",
-            "team_id, updated_at",
-            "(team_id, updated_at)"
+            "composite index"
+          ],
+          [
+            "team_id"
+          ],
+          [
+            "updated_at"
           ]
         ],
         "mustPreserve": [
+          [
+            "pagination",
+            "paginate"
+          ],
           [
             "list latency benchmark",
             "latency benchmark"
