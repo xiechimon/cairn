@@ -52,6 +52,7 @@ interface PullFake {
   mergeCommitSha?: string | null;
   mergedBy?: string | null;
   authorAssociation?: string;
+  opener?: unknown;
 }
 
 interface Recorded {
@@ -140,6 +141,7 @@ class GithubFake {
         merged: p.merged,
         ...(p.title === null ? {} : { title: p.title ?? PR_TITLE }),
         author_association: p.authorAssociation ?? 'OWNER',
+        user: p.opener === undefined ? { login: 'octo', type: 'User' } : p.opener,
         merge_commit_sha: p.merged ? (p.mergeCommitSha ?? MERGE_SHA) : 'e'.repeat(40),
         merged_by: p.merged && p.mergedBy != null ? { login: p.mergedBy } : null,
         merged_at: p.merged ? new Date().toISOString() : null,
@@ -344,6 +346,53 @@ function expectUntouched(w: World, phase: Phase = 'review'): void {
 }
 
 describe('#1403 segment 2b: the server merges the PR through the GitHub API', () => {
+  test.each([
+    { login: 'cairnwright[bot]', type: 'Bot' },
+    { login: 'cairnwright[bot]', type: 'User' },
+    { login: 'another[bot]', type: 'Bot' },
+    null,
+    {},
+    { login: 'octo' },
+    { login: '', type: 'User' },
+    { login: 123, type: 'User' },
+    { login: 'octo', type: 'Unknown' },
+  ])('#2127 refuses unsafe or unknown Cairn PR opener %j without mutations', async (opener) => {
+    const w = makeWorld({ githubRepo: 'Xiechimon/CAIRN', pull: { opener }, pendingVerify: true });
+    const beforeSteps = w.steps();
+    const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: expect.stringContaining('merge-pr.sh') });
+    expect(w.fake.puts()).toEqual([]);
+    expect(w.steps()).toEqual(beforeSteps);
+    expectUntouched(w);
+  });
+
+  test.each([
+    ['xiechimon/cairn', { login: 'octo', type: 'User' }],
+    ['octo/demo', { login: 'cairnwright[bot]', type: 'Bot' }],
+    ['octo/demo', null],
+  ])('#2127 preserves SHA-bound squash for eligible opener in %s', async (githubRepo, opener) => {
+    const w = makeWorld({ githubRepo, pull: { opener } });
+    await requestMerge(w.deps, w.buildId);
+    expect(w.fake.puts()).toHaveLength(1);
+    expect(JSON.parse(w.fake.puts()[0]?.body ?? 'null')).toMatchObject({
+      sha: CP,
+      merge_method: 'squash',
+    });
+    expect(w.phase()).toBe('done');
+  });
+
+  test('#2127 already merged bot PR can restore a failed card without another merge', async () => {
+    const w = makeWorld({
+      githubRepo: 'xiechimon/cairn',
+      phase: 'failed',
+      pull: { state: 'closed', merged: true, opener: { login: 'cairnwright[bot]', type: 'Bot' } },
+    });
+    await requestMerge(w.deps, w.buildId);
+    expect(w.fake.puts()).toEqual([]);
+    expect(w.phase()).toBe('review');
+  });
+
   test('[2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done', async () => {
     const w = makeWorld({ pendingVerify: true });
     const result = await requestMerge(w.deps, w.buildId, 'Xmon');

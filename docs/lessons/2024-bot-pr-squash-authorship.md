@@ -9,3 +9,5 @@ Notes: Issue #2088 repeated the bot squash authorship failure on dedf30ea. The n
 ---
 
 Issue #2101 adds a recovery fixture to the trusted main push test step. It executes the operational commit recipe with inherited bot identity, asserts local fixture identity without global configuration, preserves trailers and historical commit bytes, and checks the actual workflow shell. This is repository coverage, not evidence that the external merge helper enforced the route or that main recovered. Those claims require the resulting main metadata and a subsequent green Actions run.
+
+Issue #2127 adds a product API safeguard before squash: bot or unknown opener identity in `xiechimon/cairn` returns HTTP 409 without a merge PUT or task mutations. Nine unsafe cases returned HTTP 202 before the fix. External merges remain outside this boundary; the existing commit-author workflow remains unchanged.

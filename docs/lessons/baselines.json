@@ -827,6 +827,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "pull-shape-expectations": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "push-author-range": {
     "Intercepts": 1,
     "Recurrences": 0
