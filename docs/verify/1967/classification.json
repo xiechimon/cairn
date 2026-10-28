@@ -1,0 +1,58 @@
+[
+  {
+    "stepId": "step-ci-aihot",
+    "skillId": "aihot",
+    "rule": "domain",
+    "label": "unrelated",
+    "rationale": "Task asks to fix a failing CI job. aihot is a publish/release helper; the stored hit rides only the shared deploy keyword ci."
+  },
+  {
+    "stepId": "step-wiki-explicit",
+    "skillId": "wiki",
+    "rule": "explicit-mention",
+    "label": "relevant",
+    "rationale": "Task explicitly cues Use wiki for writing the decision log into the wiki."
+  },
+  {
+    "stepId": "step-layout-mixed",
+    "skillId": "design-review",
+    "rule": "domain",
+    "label": "relevant",
+    "rationale": "Task is a layout polish request; design-review covers layout and spacing review."
+  },
+  {
+    "stepId": "step-layout-mixed",
+    "skillId": "e2e-debugging",
+    "rule": "domain",
+    "label": "uncertain",
+    "rationale": "Stored reason cites a testing-domain bridge that the task text does not clearly support; keep uncertain rather than force a call."
+  },
+  {
+    "stepId": "step-path-docs",
+    "skillId": "docs-writer",
+    "rule": "domain",
+    "label": "unrelated",
+    "rationale": "Task only points at a docs/verify path token; writing a README skill is not required to follow that path."
+  },
+  {
+    "stepId": "step-debug-relevant",
+    "skillId": "e2e-debugging",
+    "rule": "domain",
+    "label": "relevant",
+    "rationale": "Task asks to debug a playwright timeout on CI; e2e-debugging matches that intent."
+  },
+  {
+    "stepId": "step-merge-uncertain",
+    "skillId": "contributor",
+    "rule": "domain",
+    "label": "uncertain",
+    "rationale": "Merge/PR vocabulary overlaps contributor guidance, but the checklist may not need that skill; leave uncertain."
+  },
+  {
+    "stepId": "step-home-secret",
+    "skillId": "diagnosing-bugs",
+    "rule": "domain",
+    "label": "unrelated",
+    "rationale": "Task is a path/token sanitization fixture, not a crash or failure diagnosis request."
+  }
+]

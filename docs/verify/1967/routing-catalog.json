@@ -1,0 +1,12 @@
+[
+  {
+    "id": "e2e-debugging",
+    "name": "e2e-debugging",
+    "description": "Debug flaky playwright e2e tests and CI timeouts"
+  },
+  {
+    "id": "design-review",
+    "name": "design-review",
+    "description": "Review UI layout typography spacing and visual polish"
+  }
+]
