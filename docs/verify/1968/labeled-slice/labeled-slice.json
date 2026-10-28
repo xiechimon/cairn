@@ -1,0 +1,53 @@
+{
+  "note": "Hand-labeled final todo artifacts for the deterministic plan revision grader. Pass rows must satisfy mustFix+mustPreserve; fail rows cover prompt-echo, missing fix, and dropped preserve.",
+  "examples": [
+    {
+      "id": "alias-variation-passes",
+      "caseId": "rev-001-safari-download",
+      "expect": "pass",
+      "todos": [
+        {
+          "id": "t1",
+          "title": "Fix blob URL download",
+          "spec": "Remove the download attribute on the blob url export path and keep the regression test for the download path."
+        }
+      ]
+    },
+    {
+      "id": "prompt-echo-safari-fails",
+      "caseId": "rev-001-safari-download",
+      "expect": "fail",
+      "todos": [
+        {
+          "id": "t1",
+          "title": "Investigate Safari export",
+          "spec": "Look at Safari export behavior and keep the regression test for the download path."
+        }
+      ]
+    },
+    {
+      "id": "missing-fix-fails",
+      "caseId": "rev-001-safari-download",
+      "expect": "fail",
+      "todos": [
+        {
+          "id": "t1",
+          "title": "Keep logging",
+          "spec": "Add more logging around export and keep the regression test for the download path."
+        }
+      ]
+    },
+    {
+      "id": "dropped-preserved-step-fails",
+      "caseId": "rev-001-safari-download",
+      "expect": "fail",
+      "todos": [
+        {
+          "id": "t1",
+          "title": "Fix download attribute",
+          "spec": "Fix the download attribute on the blob url path. Skip writing any test."
+        }
+      ]
+    }
+  ]
+}

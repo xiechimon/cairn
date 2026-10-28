@@ -26,7 +26,16 @@ import {
   type MemoryRowLite,
 } from '../memory-regression/grade.mts';
 import { readMemoryRows, seedMemories } from '../memory-regression/seed.mts';
-import { gradePlanCase, isPlanCase, type PlanCase } from '../plan/grade.mts';
+import {
+  gradePlanCase,
+  isPlanCase,
+  isPlanRevisionCase,
+  PLAN_REVISION_ARMS,
+  type PlanCase,
+  type PlanRevisionArm,
+  type PlanRevisionCase,
+} from '../plan/grade.mts';
+import { runPlanRevisionCase } from '../plan/run.mts';
 import { gradeRoutingCase, isRoutingCase, type RoutingCase } from '../project-routing/grade.mts';
 import { seedRoutingProjects } from '../project-routing/seed.mts';
 import { type Case, gradeCase, type RosterAgent } from './grade.mts';
@@ -64,7 +73,9 @@ const PRICES: Record<string, { in: number; out: number; cacheRead: number }> = {
   'deepseek-v4-pro': { in: 0.955, out: 1.911, cacheRead: 0.08 },
 };
 
-type EvalCase = Case | MemoryCase | RoutingCase | LearnCase | PlanCase;
+type EvalCase = Case | MemoryCase | RoutingCase | LearnCase | PlanCase | PlanRevisionCase;
+type RunnerArm = LearnArm | PlanRevisionArm;
+const RUNNER_ARMS: readonly string[] = [...LEARN_ARMS, ...PLAN_REVISION_ARMS];
 
 async function loadCases(): Promise<EvalCase[]> {
   const d = JSON.parse(readFileSync(join(ARGS.flow, 'cases.json'), 'utf8')) as {
@@ -77,7 +88,7 @@ async function loadCases(): Promise<EvalCase[]> {
 }
 
 async function freshStack(
-  input: Case | MemoryCase | RoutingCase | PlanCase,
+  input: Case | MemoryCase | RoutingCase | PlanCase | PlanRevisionCase,
 ): Promise<{ stack: Stack; world: SeededWorld; projectIds: Record<string, string> }> {
   const stack = await bootStack();
   try {
@@ -101,7 +112,7 @@ async function freshStack(
 
 async function runCase(
   input: EvalCase,
-  ctx: { timeoutS: number },
+  ctx: { timeoutS: number; planArm?: PlanRevisionArm },
 ): Promise<{
   output: string;
   transcript: { role: string; content: string; name?: string }[];
@@ -114,10 +125,14 @@ async function runCase(
   projectIds: Record<string, string>;
   memoryAfter: MemoryRowLite[];
   grade?: { grade: Record<string, number>; explanation: Record<string, string> };
+  planArm?: PlanRevisionArm;
 }> {
   if (isLearnCase(input)) {
+    if (!(LEARN_ARMS as readonly string[]).includes(ARGS.arm)) {
+      throw new Error(`learn cases do not accept --arm ${ARGS.arm}`);
+    }
     const learned = await runLearnCase(input, {
-      arm: ARGS.arm,
+      arm: ARGS.arm as LearnArm,
       roster: ROSTER,
       model: CHIEF_MODEL,
       timeoutMs: ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000,
@@ -135,6 +150,37 @@ async function runCase(
       projectIds: {},
       memoryAfter: [],
       grade: learned.grade,
+    };
+  }
+  if (isPlanRevisionCase(input)) {
+    const arm = ctx.planArm;
+    if (arm === undefined) throw new Error(`plan revision case ${input.id} missing arm`);
+    const revised = await runPlanRevisionCase(input, {
+      arm,
+      roster: ROSTER,
+      model: CHIEF_MODEL,
+      timeoutMs: ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000,
+    });
+    if (arm === 'feedback' && !revised.feedbackSeen) {
+      const error = new Error(
+        `plan revision case ${input.id}: feedback did not reach the agent`,
+      ) as Error & { failure_class?: string };
+      error.failure_class = 'harness_error';
+      throw error;
+    }
+    return {
+      output: revised.output,
+      transcript: buildTranscript(revised.evidence),
+      model: revised.model,
+      usage: revised.usage,
+      stop_reason: revised.stop_reason,
+      evidence: revised.evidence,
+      truncated: revised.truncated,
+      agentIds: revised.agentIds,
+      projectIds: revised.projectIds,
+      memoryAfter: [],
+      grade: revised.grade,
+      planArm: arm,
     };
   }
   const { stack, world, projectIds } = await freshStack(input);
@@ -221,7 +267,7 @@ function parseArgs(argv: string[]) {
     approveHarness: false,
     writeVerify: undefined as string | undefined,
     patchDigest: undefined as string | undefined,
-    arm: 'all' as LearnArm,
+    arm: 'all' as RunnerArm,
     caseIds: [] as string[],
   };
   const val = (i: number): string => {
@@ -245,7 +291,7 @@ function parseArgs(argv: string[]) {
     else if (k === '--approve-harness') a.approveHarness = true;
     else if (k === '--write-verify') a.writeVerify = val(++i);
     else if (k === '--patch-digest') a.patchDigest = val(++i);
-    else if (k === '--arm') a.arm = val(++i) as LearnArm;
+    else if (k === '--arm') a.arm = val(++i) as RunnerArm;
     else if (k === '--case') a.caseIds.push(val(++i));
     else if (k === '-h' || k === '--help') {
       usage();
@@ -256,8 +302,8 @@ function parseArgs(argv: string[]) {
       process.exit(2);
     }
   }
-  if (!(LEARN_ARMS as readonly string[]).includes(a.arm)) {
-    console.error(`--arm must be one of ${LEARN_ARMS.join(', ')}, got '${a.arm}'`);
+  if (!RUNNER_ARMS.includes(a.arm)) {
+    console.error(`--arm must be one of ${RUNNER_ARMS.join(', ')}, got '${a.arm}'`);
     usage();
     process.exit(2);
   }
@@ -284,7 +330,7 @@ function parseArgs(argv: string[]) {
 }
 function usage() {
   console.error(
-    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--context-window N] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
+    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--context-window N] [--arm all|no-memory|correction|oracle|reflect|feedback|no-feedback] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
   );
 }
 
@@ -439,8 +485,12 @@ async function main() {
     for (const ln of readFileSync(resultsPath, 'utf8').split('\n')) {
       if (!ln.trim()) continue;
       try {
-        const r = JSON.parse(ln);
-        done.add(`${r.prompt_id}\0${r.rep}`);
+        const r = JSON.parse(ln) as {
+          prompt_id?: string;
+          rep?: number;
+          meta?: { arm?: string };
+        };
+        done.add(`${r.prompt_id}\0${r.rep}\0${r.meta?.arm ?? ''}`);
       } catch {}
     }
 
@@ -464,7 +514,19 @@ async function main() {
     console.error('--context-window requires the chief model to be in the roster');
     process.exit(2);
   }
-  if (ARGS.arm !== 'all' && !cases.some((c) => isLearnCase(c))) {
+  if (
+    ARGS.arm !== 'all' &&
+    (PLAN_REVISION_ARMS as readonly string[]).includes(ARGS.arm) &&
+    !cases.some((c) => isPlanRevisionCase(c))
+  ) {
+    console.error(`--arm ${ARGS.arm} applies to plan revision cases only`);
+    process.exit(2);
+  }
+  if (
+    ARGS.arm !== 'all' &&
+    (LEARN_ARMS as readonly string[]).includes(ARGS.arm) &&
+    !cases.some((c) => isLearnCase(c))
+  ) {
     console.error(`--arm ${ARGS.arm} applies to learn cases only`);
     process.exit(2);
   }
@@ -480,13 +542,30 @@ async function main() {
     seen.set(k, c.id);
   }
 
-  const tasks: { c: EvalCase; rep: number }[] = [];
-  for (const c of cases)
-    for (let rep = 0; rep < ARGS.reps; rep++) {
-      if (done.has(`${pathSafeId(c.id)}\0${rep}`)) continue;
-      tasks.push({ c, rep });
-    }
-  console.error(`[${ARGS.variant}] ${tasks.length} of ${cases.length * ARGS.reps} (id,rep) to run`);
+  const tasks: { c: EvalCase; rep: number; planArm?: PlanRevisionArm }[] = [];
+  for (const c of cases) {
+    const arms: (PlanRevisionArm | undefined)[] = isPlanRevisionCase(c)
+      ? ARGS.arm === 'all'
+        ? [...PLAN_REVISION_ARMS]
+        : (PLAN_REVISION_ARMS as readonly string[]).includes(ARGS.arm)
+          ? [ARGS.arm as PlanRevisionArm]
+          : (() => {
+              console.error(
+                `plan revision case ${c.id} requires --arm all|feedback|no-feedback, got ${ARGS.arm}`,
+              );
+              process.exit(2);
+            })()
+      : [undefined];
+    for (const planArm of arms)
+      for (let rep = 0; rep < ARGS.reps; rep++) {
+        const doneKey = `${pathSafeId(c.id)}\0${rep}\0${planArm ?? ''}`;
+        if (done.has(doneKey)) continue;
+        tasks.push({ c, rep, planArm });
+      }
+  }
+  console.error(
+    `[${ARGS.variant}] ${tasks.length} of ${cases.length * ARGS.reps} (id,rep[,arm]) to run`,
+  );
 
   let i = 0;
   let ok = 0;
@@ -503,7 +582,7 @@ async function main() {
     while (i < tasks.length) {
       const task = tasks[i++];
       if (task === undefined) break;
-      const { c, rep } = task;
+      const { c, rep, planArm } = task;
       const safeId = pathSafeId(c.id);
       const t0 = Date.now();
       const lastRun: { run: Awaited<ReturnType<typeof runCase>> | null } = { run: null };
@@ -521,7 +600,7 @@ async function main() {
                 withBackoff(
                   () => {
                     tAttempt = Date.now();
-                    return runCase(c, ctx);
+                    return runCase(c, { ...ctx, planArm });
                   },
                   appRetry,
                   deadline,
@@ -552,6 +631,11 @@ async function main() {
                     throw new Error(`learn case ${c.id} returned no grade`);
                   return run.grade;
                 }
+                if (isPlanRevisionCase(c)) {
+                  if (run.grade === undefined)
+                    throw new Error(`plan revision case ${c.id} returned no grade`);
+                  return run.grade;
+                }
                 if (isPlanCase(c)) return gradePlanCase(c, { evidence: run.evidence });
                 if (isRoutingCase(c)) return gradeRoutingCase(c, run.evidence, run.projectIds);
                 if (isMemoryCase(c))
@@ -571,8 +655,9 @@ async function main() {
             return { run, g, latency_s };
           })(),
           ARGS.timeoutS,
-          `${c.id} rep${rep}`,
+          `${c.id}${planArm ? `:${planArm}` : ''} rep${rep}`,
         );
+        const armMeta = planArm ?? (isLearnCase(c) ? ARGS.arm : undefined);
         const row = {
           prompt_id: safeId,
           rep,
@@ -584,7 +669,7 @@ async function main() {
             appRetry.count ||
             judgeRetry.count ||
             infraRetry.count ||
-            isLearnCase(c)
+            armMeta !== undefined
               ? {
                   ...(ARGS.contextWindow !== undefined
                     ? { context_window: ARGS.contextWindow }
@@ -593,7 +678,7 @@ async function main() {
                   ...(appRetry.count ? { retries: appRetry.count } : {}),
                   ...(judgeRetry.count ? { judge_retries: judgeRetry.count } : {}),
                   ...(infraRetry.count ? { infra_retries: infraRetry.count } : {}),
-                  ...(isLearnCase(c) ? { arm: ARGS.arm } : {}),
+                  ...(armMeta !== undefined ? { arm: armMeta } : {}),
                 }
               : undefined,
           model: run.model,
@@ -608,7 +693,7 @@ async function main() {
         rowWritten = true;
         freshRows.push(row);
         if (run.transcript) {
-          const traceName = `${safeId}_rep${rep}.json`;
+          const traceName = `${safeId}${planArm ? `_${planArm}` : ''}_rep${rep}.json`;
           const traceBody = Buffer.from(JSON.stringify(run.transcript, null, 2));
           writeFileSync(join(vdir, 'traces', traceName), traceBody);
           freshTraces.push({ name: traceName, body: new Uint8Array(traceBody) });

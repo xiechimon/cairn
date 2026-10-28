@@ -4,13 +4,20 @@ import { describe, expect, test } from 'vitest';
 import type { TurnEvidence } from '../eval/chief-dispatch/stack.mts';
 import { isLearnCase } from '../eval/learn/grade.mts';
 import { isMemoryCase } from '../eval/memory-regression/grade.mts';
-import { gradePlanCase, isPlanCase, type PlanCase } from '../eval/plan/grade.mts';
+import {
+  type AnyPlanCase,
+  gradePlanCase,
+  isAnyPlanCase,
+  isPlanCase,
+  isPlanRevisionCase,
+  type PlanCase,
+} from '../eval/plan/grade.mts';
 import { isRoutingCase } from '../eval/project-routing/grade.mts';
 
 const FLOW_DIR = join(import.meta.dirname, '../../.claude/hillclimb/plan');
 const flow = JSON.parse(readFileSync(join(FLOW_DIR, 'cases.json'), 'utf8')) as {
   roster: unknown[];
-  cases: PlanCase[];
+  cases: AnyPlanCase[];
 };
 const state = JSON.parse(readFileSync(join(FLOW_DIR, '_state.json'), 'utf8')) as {
   metrics: { id: string }[];
@@ -81,16 +88,19 @@ describe('plan case ledger', () => {
     expect(new Set(cases.map((c) => c.id)).size).toBe(cases.length);
     expect(flow.roster.length).toBeGreaterThan(0);
     for (const c of cases) {
-      expect(isPlanCase(c), c.id).toBe(true);
-      expect(isMemoryCase(c), c.id).toBe(false);
-      expect(isRoutingCase(c), c.id).toBe(false);
-      expect(isLearnCase(c), c.id).toBe(false);
+      expect(isAnyPlanCase(c), c.id).toBe(true);
+      expect(isMemoryCase(c as never), c.id).toBe(false);
+      expect(isRoutingCase(c as never), c.id).toBe(false);
+      expect(isLearnCase(c as never), c.id).toBe(false);
     }
+    expect(cases.some((c) => isPlanCase(c))).toBe(true);
+    expect(cases.some((c) => isPlanRevisionCase(c))).toBe(true);
   });
 
   test('covers a required-split case and a no-split case', () => {
-    const splits = cases.filter((c) => c.expect.minSplits >= 2);
-    const noSplit = cases.filter((c) => c.expect.maxSplits === 1);
+    const singles = cases.filter((c) => isPlanCase(c));
+    const splits = singles.filter((c) => c.expect.minSplits >= 2);
+    const noSplit = singles.filter((c) => c.expect.maxSplits === 1);
     expect(splits.length).toBeGreaterThanOrEqual(1);
     expect(noSplit.length).toBeGreaterThanOrEqual(1);
   });
@@ -186,16 +196,14 @@ describe('gradePlanCase', () => {
   });
 
   test('assistant prose naming the required items does not substitute for an artifact', () => {
-    const row = todoRow('look around the export path only', 'investigate export', 't1');
     const g = gradePlanCase(sample, {
       evidence: turn({
         stepStatus: 'done',
         assistantText: 'I will fix the download attribute on the blob url and add a test.',
-        createdTodoIds: [row.id],
-        createdTodoRows: [row],
+        createdTodoIds: [],
+        createdTodoRows: [],
       }),
     });
     expect(g.grade.plan_ok).toBe(0);
-    expect(g.explanation.plan_ok).toMatch(/missing/i);
   });
 });

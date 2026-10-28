@@ -1,0 +1,10 @@
+[
+  {
+    "role": "assistant",
+    "content": "Plan written."
+  },
+  {
+    "role": "assistant",
+    "content": "[end state] step=done · todos=0 · builds=0 · 模型=glm-5.3 · 20in/30out · 0.1s"
+  }
+]

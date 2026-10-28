@@ -1,6 +1,6 @@
 {
   "flow": "plan",
-  "note": "Single-turn plan coverage through the chief-dispatch runner. Cases ask chief to write a plan as persisted todos; grading reads todo title+spec only (assistant prose does not count). expect.kind must be plan. include is alias groups (any alias in a group hits; every group must hit). exclude is forbidden. minSplits/maxSplits are inclusive bounds on the number of persisted plan cards (ADR 0024: split when work is independent; keep a single card for single-view single-artifact work).",
+  "note": "Plan coverage through the chief-dispatch runner. Single-turn cases use expect.kind=plan (alias groups, forbidden, split bounds). Revision cases use expect.kind=plan-revision with priorPlan/feedback and mustFix/mustPreserve/exclude. Grading reads todo title+spec only (assistant prose does not count).",
   "roster": [
     {
       "key": "doc",
@@ -30,33 +30,457 @@
   "cases": [
     {
       "id": "plan-001-no-split",
-      "tags": ["plan", "no-split"],
+      "tags": [
+        "plan",
+        "no-split"
+      ],
       "prompt": "Export button does nothing on Safari. Write a plan that finds the cause in the client download path and covers verification. Keep it as one card: this is a single-view single-artifact fix.",
       "expect": {
         "kind": "plan",
         "include": [
-          ["download attribute", "blob url", "safari"],
-          ["test", "regression", "verify"]
+          [
+            "download attribute",
+            "blob url",
+            "safari"
+          ],
+          [
+            "test",
+            "regression",
+            "verify"
+          ]
         ],
-        "exclude": ["more logging", "only logging"],
+        "exclude": [
+          "more logging",
+          "only logging"
+        ],
         "minSplits": 1,
         "maxSplits": 1
       }
     },
     {
       "id": "plan-002-required-split",
-      "tags": ["plan", "required-split"],
+      "tags": [
+        "plan",
+        "required-split"
+      ],
       "prompt": "Ship an export feature end to end: add a server export endpoint, wire the web export button, and document the user steps. These are independent deliverables across server, web, and docs, so split the plan into separate cards.",
       "expect": {
         "kind": "plan",
         "include": [
-          ["export endpoint", "server export", "/export"],
-          ["export button", "web button", "apps/web"],
-          ["document", "docs", "readme"]
+          [
+            "export endpoint",
+            "server export",
+            "/export"
+          ],
+          [
+            "export button",
+            "web button",
+            "apps/web"
+          ],
+          [
+            "document",
+            "docs",
+            "readme"
+          ]
         ],
-        "exclude": ["skip docs", "no documentation"],
+        "exclude": [
+          "skip docs",
+          "no documentation"
+        ],
         "minSplits": 3,
         "maxSplits": 6
+      }
+    },
+    {
+      "id": "plan-003-under-split",
+      "tags": [
+        "plan",
+        "under-split"
+      ],
+      "prompt": "Migrate auth cookies, rewrite the login form, and update the deploy checklist. These are independent workstreams; the plan must split them.",
+      "expect": {
+        "kind": "plan",
+        "include": [
+          [
+            "auth cookie",
+            "session cookie"
+          ],
+          [
+            "login form",
+            "sign-in form"
+          ],
+          [
+            "deploy checklist",
+            "deploy docs"
+          ]
+        ],
+        "exclude": [
+          "single card only"
+        ],
+        "minSplits": 3,
+        "maxSplits": 6
+      }
+    },
+    {
+      "id": "rev-001-safari-download",
+      "tags": [
+        "revision",
+        "ignored-feedback"
+      ],
+      "prompt": "Export button does nothing on Safari.",
+      "priorPlan": [
+        {
+          "title": "Add logging around export",
+          "spec": "Add more logging to the export handler and keep a regression test for the download path."
+        }
+      ],
+      "feedback": "Find the cause: it is the download attribute on a blob URL. Keep the existing regression test step.",
+      "expect": {
+        "kind": "plan-revision",
+        "mustFix": [
+          [
+            "download attribute",
+            "blob url"
+          ]
+        ],
+        "mustPreserve": [
+          [
+            "regression test",
+            "test for the download"
+          ]
+        ],
+        "exclude": [
+          "more logging",
+          "only logging"
+        ]
+      }
+    },
+    {
+      "id": "rev-002-drop-preserved-test",
+      "tags": [
+        "revision",
+        "dropped-step"
+      ],
+      "prompt": "Search results omit archived projects.",
+      "priorPlan": [
+        {
+          "title": "Filter archived projects",
+          "spec": "Exclude archived projects from search hits and keep the existing integration test for empty-query ranking."
+        }
+      ],
+      "feedback": "The filter must use archivedAt IS NOT NULL, not a status string. Keep the empty-query ranking test.",
+      "expect": {
+        "kind": "plan-revision",
+        "mustFix": [
+          [
+            "archivedAt",
+            "is not null"
+          ]
+        ],
+        "mustPreserve": [
+          [
+            "empty-query ranking",
+            "empty query ranking"
+          ]
+        ],
+        "exclude": [
+          "status string"
+        ]
+      }
+    },
+    {
+      "id": "rev-003-forbidden-rewrite",
+      "tags": [
+        "revision",
+        "forbidden"
+      ],
+      "prompt": "Token refresh fails after midnight.",
+      "priorPlan": [
+        {
+          "title": "Inspect refresh clock skew",
+          "spec": "Check clock skew on the refresh token path and keep the existing expiry unit test."
+        }
+      ],
+      "feedback": "Fix the TTL math in the refresh handler. Do not rewrite the entire auth stack. Keep the expiry unit test.",
+      "expect": {
+        "kind": "plan-revision",
+        "mustFix": [
+          [
+            "TTL math",
+            "ttl calculation",
+            "expiry math"
+          ]
+        ],
+        "mustPreserve": [
+          [
+            "expiry unit test",
+            "expiry test"
+          ]
+        ],
+        "exclude": [
+          "rewrite the entire auth",
+          "replace auth stack"
+        ]
+      }
+    },
+    {
+      "id": "rev-004-missing-requirement",
+      "tags": [
+        "revision",
+        "missing-requirement"
+      ],
+      "prompt": "Webhook retries storm the partner API.",
+      "priorPlan": [
+        {
+          "title": "Slow down webhook retries",
+          "spec": "Add a sleep between retries and keep the existing partner timeout fixture."
+        }
+      ],
+      "feedback": "Use exponential backoff with jitter, not a fixed sleep. Keep the partner timeout fixture.",
+      "expect": {
+        "kind": "plan-revision",
+        "mustFix": [
+          [
+            "exponential backoff",
+            "backoff with jitter"
+          ]
+        ],
+        "mustPreserve": [
+          [
+            "partner timeout fixture",
+            "timeout fixture"
+          ]
+        ],
+        "exclude": [
+          "fixed sleep"
+        ]
+      }
+    },
+    {
+      "id": "rev-005-under-split-revision",
+      "tags": [
+        "revision",
+        "under-splitting"
+      ],
+      "prompt": "Ship billing invoices across three independent workstreams.",
+      "priorPlan": [
+        {
+          "title": "Do all billing invoice work",
+          "spec": "Handle PDF render, email delivery, and ledger write in one card, and keep the invoice golden snapshot test."
+        }
+      ],
+      "feedback": "Split into three cards: one for the invoice PDF renderer, one for the SMTP send path, and one for the double-entry ledger. Keep the invoice golden snapshot test on the PDF card.",
+      "expect": {
+        "kind": "plan-revision",
+        "mustFix": [
+          [
+            "invoice pdf renderer",
+            "pdf renderer"
+          ],
+          [
+            "smtp send path",
+            "smtp delivery"
+          ],
+          [
+            "double-entry ledger",
+            "ledger entry"
+          ]
+        ],
+        "mustPreserve": [
+          [
+            "golden snapshot",
+            "invoice golden"
+          ]
+        ],
+        "exclude": [
+          "one card"
+        ],
+        "minSplits": 3,
+        "maxSplits": 6
+      }
+    },
+    {
+      "id": "rev-006-over-split-revision",
+      "tags": [
+        "revision",
+        "over-splitting"
+      ],
+      "prompt": "Rename a private helper in the search module.",
+      "priorPlan": [
+        {
+          "title": "Rename helper across five cards",
+          "spec": "Card 1 rename symbol. Card 2 update imports. Card 3 update tests. Card 4 update docs. Card 5 update changelog. Keep the search smoke test."
+        },
+        {
+          "title": "Update imports",
+          "spec": "Update imports for the renamed helper."
+        },
+        {
+          "title": "Update tests",
+          "spec": "Update unit tests for the renamed helper."
+        },
+        {
+          "title": "Update docs",
+          "spec": "Update docs for the renamed helper."
+        },
+        {
+          "title": "Update changelog",
+          "spec": "Update changelog for the renamed helper and keep the search smoke test."
+        }
+      ],
+      "feedback": "This is single-view single-artifact work. Collapse to one card. Keep the search smoke test.",
+      "expect": {
+        "kind": "plan-revision",
+        "mustFix": [
+          [
+            "rename helper",
+            "rename the helper",
+            "rename symbol"
+          ]
+        ],
+        "mustPreserve": [
+          [
+            "search smoke test",
+            "smoke test"
+          ]
+        ],
+        "exclude": [],
+        "minSplits": 1,
+        "maxSplits": 1
+      }
+    },
+    {
+      "id": "rev-007-cache-header",
+      "tags": [
+        "revision",
+        "ignored-feedback"
+      ],
+      "prompt": "CDN keeps serving stale CSS after deploy.",
+      "priorPlan": [
+        {
+          "title": "Bump asset query string",
+          "spec": "Append a random query string to CSS URLs and keep the existing cache-busting e2e."
+        }
+      ],
+      "feedback": "Set Cache-Control: no-cache on the CSS responses instead of query-string busting. Keep the cache-busting e2e.",
+      "expect": {
+        "kind": "plan-revision",
+        "mustFix": [
+          [
+            "cache-control",
+            "no-cache"
+          ]
+        ],
+        "mustPreserve": [
+          [
+            "cache-busting e2e",
+            "cache busting e2e"
+          ]
+        ],
+        "exclude": [
+          "random query string",
+          "query-string busting"
+        ]
+      }
+    },
+    {
+      "id": "rev-008-db-index",
+      "tags": [
+        "revision",
+        "missing-requirement"
+      ],
+      "prompt": "Project list endpoint times out on large teams.",
+      "priorPlan": [
+        {
+          "title": "Add pagination",
+          "spec": "Paginate the project list and keep the existing list latency benchmark."
+        }
+      ],
+      "feedback": "Add a composite index on (team_id, updated_at) as well as pagination. Keep the list latency benchmark.",
+      "expect": {
+        "kind": "plan-revision",
+        "mustFix": [
+          [
+            "composite index",
+            "team_id, updated_at",
+            "(team_id, updated_at)"
+          ]
+        ],
+        "mustPreserve": [
+          [
+            "list latency benchmark",
+            "latency benchmark"
+          ]
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "id": "rev-009-preserve-docs-step",
+      "tags": [
+        "revision",
+        "dropped-step"
+      ],
+      "prompt": "CLI flag --json prints YAML.",
+      "priorPlan": [
+        {
+          "title": "Fix --json serializer",
+          "spec": "Emit JSON for --json and keep the docs example that shows the flag."
+        }
+      ],
+      "feedback": "The serializer must call JSON.stringify, not the YAML dumper. Keep the docs example for --json.",
+      "expect": {
+        "kind": "plan-revision",
+        "mustFix": [
+          [
+            "json.stringify",
+            "JSON.stringify"
+          ]
+        ],
+        "mustPreserve": [
+          [
+            "docs example",
+            "documentation example"
+          ]
+        ],
+        "exclude": [
+          "yaml dumper",
+          "YAML dumper"
+        ]
+      }
+    },
+    {
+      "id": "rev-010-machine-online",
+      "tags": [
+        "revision",
+        "forbidden"
+      ],
+      "prompt": "Dispatch skips machines that just reconnected.",
+      "priorPlan": [
+        {
+          "title": "Widen heartbeat window",
+          "spec": "Treat machines as online for 30 minutes after last heartbeat and keep the reconnect integration test."
+        }
+      ],
+      "feedback": "Use the reconnect event to mark online immediately. Do not widen the heartbeat window. Keep the reconnect integration test.",
+      "expect": {
+        "kind": "plan-revision",
+        "mustFix": [
+          [
+            "reconnect event",
+            "on reconnect"
+          ]
+        ],
+        "mustPreserve": [
+          [
+            "reconnect integration test",
+            "reconnect test"
+          ]
+        ],
+        "exclude": [
+          "30 minutes",
+          "widen the heartbeat"
+        ]
       }
     }
   ]

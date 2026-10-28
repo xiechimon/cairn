@@ -1,0 +1,7 @@
+harness approved: sha256 4a23d7353284 over 45 file(s) recorded in /tmp/cairn-plan-family-zEdyF7/_state.json
+[baseline] 23 of 13 (id,rep[,arm]) to run
+[baseline] 16/23 done (16 ok, 0 failed), 30s elapsed, ~13s left
+  [baseline] rev-007-cache-header rep0 FAILED: fetch failed
+[baseline] 23/23 done (22 ok, 1 failed), 33s elapsed, ~0s left
+[baseline] done - 22 ok, 1 failed -> /tmp/cairn-plan-family-zEdyF7/baseline/results.jsonl
+[baseline] cleaned 46 leftover scratch directories
