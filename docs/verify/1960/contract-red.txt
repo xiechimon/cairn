@@ -1,0 +1,165 @@
+
+ RUN  v5.0.1 /workspace/integration
+
+ ❯ test/page-bench-contract.test.ts (7 tests | 7 failed) 10ms
+   ❯ page-bench contract (7)
+     × questions.json has 8-10 questions with unique ids 5ms
+     × every question has a nonempty requirement list, and requirement ids are unique 1ms
+     × every requirement has an observable check description 0ms
+     × every question declares desktop and mobile viewports and a network policy 0ms
+     × a complete sample run record validates 1ms
+     × screenshotPaths as plain strings (the #1872 shape) fails 0ms
+     × a record missing a requirement verdict fails 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/page-bench-contract.test.ts > page-bench contract > questions.json has 8-10 questions with unique ids
+AssertionError: missing /workspace/integration/eval/harness-page-bench/questions.json: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ loadQuestionBank test/page-bench-contract.test.ts:76:65
+     74|
+     75| function loadQuestionBank() {
+     76|   expect(existsSync(questionsPath), `missing ${questionsPath}`).toBe(t…
+       |                                                                 ^
+     77|   return questionBankSchema.parse(JSON.parse(readFileSync(questionsPat…
+     78| }
+ ❯ test/page-bench-contract.test.ts:126:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  test/page-bench-contract.test.ts > page-bench contract > every question has a nonempty requirement list, and requirement ids are unique
+AssertionError: missing /workspace/integration/eval/harness-page-bench/questions.json: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ loadQuestionBank test/page-bench-contract.test.ts:76:65
+     74|
+     75| function loadQuestionBank() {
+     76|   expect(existsSync(questionsPath), `missing ${questionsPath}`).toBe(t…
+       |                                                                 ^
+     77|   return questionBankSchema.parse(JSON.parse(readFileSync(questionsPat…
+     78| }
+ ❯ test/page-bench-contract.test.ts:134:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  test/page-bench-contract.test.ts > page-bench contract > every requirement has an observable check description
+AssertionError: missing /workspace/integration/eval/harness-page-bench/questions.json: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ loadQuestionBank test/page-bench-contract.test.ts:76:65
+     74|
+     75| function loadQuestionBank() {
+     76|   expect(existsSync(questionsPath), `missing ${questionsPath}`).toBe(t…
+       |                                                                 ^
+     77|   return questionBankSchema.parse(JSON.parse(readFileSync(questionsPat…
+     78| }
+ ❯ test/page-bench-contract.test.ts:143:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  test/page-bench-contract.test.ts > page-bench contract > every question declares desktop and mobile viewports and a network policy
+AssertionError: missing /workspace/integration/eval/harness-page-bench/questions.json: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ loadQuestionBank test/page-bench-contract.test.ts:76:65
+     74|
+     75| function loadQuestionBank() {
+     76|   expect(existsSync(questionsPath), `missing ${questionsPath}`).toBe(t…
+       |                                                                 ^
+     77|   return questionBankSchema.parse(JSON.parse(readFileSync(questionsPat…
+     78| }
+ ❯ test/page-bench-contract.test.ts:156:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  test/page-bench-contract.test.ts > page-bench contract > a complete sample run record validates
+AssertionError: missing /workspace/integration/eval/harness-page-bench/questions.json: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ loadQuestionBank test/page-bench-contract.test.ts:76:65
+     74|
+     75| function loadQuestionBank() {
+     76|   expect(existsSync(questionsPath), `missing ${questionsPath}`).toBe(t…
+       |                                                                 ^
+     77|   return questionBankSchema.parse(JSON.parse(readFileSync(questionsPat…
+     78| }
+ ❯ test/page-bench-contract.test.ts:166:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  test/page-bench-contract.test.ts > page-bench contract > screenshotPaths as plain strings (the #1872 shape) fails
+AssertionError: missing /workspace/integration/eval/harness-page-bench/questions.json: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ loadQuestionBank test/page-bench-contract.test.ts:76:65
+     74|
+     75| function loadQuestionBank() {
+     76|   expect(existsSync(questionsPath), `missing ${questionsPath}`).toBe(t…
+       |                                                                 ^
+     77|   return questionBankSchema.parse(JSON.parse(readFileSync(questionsPat…
+     78| }
+ ❯ test/page-bench-contract.test.ts:206:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  test/page-bench-contract.test.ts > page-bench contract > a record missing a requirement verdict fails
+AssertionError: missing /workspace/integration/eval/harness-page-bench/questions.json: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ loadQuestionBank test/page-bench-contract.test.ts:76:65
+     74|
+     75| function loadQuestionBank() {
+     76|   expect(existsSync(questionsPath), `missing ${questionsPath}`).toBe(t…
+       |                                                                 ^
+     77|   return questionBankSchema.parse(JSON.parse(readFileSync(questionsPat…
+     78| }
+ ❯ test/page-bench-contract.test.ts:221:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed (7)
+   Start at  17:17:42
+   Duration  180ms (import 50%, transform 35%, tests 12%, worker 3%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/integration
+

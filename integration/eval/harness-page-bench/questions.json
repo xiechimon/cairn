@@ -1,0 +1,382 @@
+{
+  "version": "1",
+  "questions": [
+    {
+      "id": "q1-landing",
+      "prompt": "Build a single runnable page (HTML + CSS + JS, or a small app) for a fictional productivity tool marketing landing. Include a hero, a three-feature grid, a three-tier pricing table, and a footer. The layout must remain usable at 360px width. Do not make external network requests at runtime.",
+      "requirements": [
+        {
+          "id": "hero",
+          "check": "A hero region with a product name and primary call-to-action is visible in the first viewport.",
+          "how": "Open the page at the desktop viewport and assert a heading and a clickable primary CTA exist above the fold."
+        },
+        {
+          "id": "feature-grid",
+          "check": "Exactly three feature items are rendered in a grid or equivalent multi-column layout.",
+          "how": "Count feature cards or list items under a features section; expect three."
+        },
+        {
+          "id": "pricing-tiers",
+          "check": "A pricing section exposes three distinct tiers with names and prices.",
+          "how": "Locate the pricing section and assert three tier containers each containing a name and a price string."
+        },
+        {
+          "id": "footer",
+          "check": "A footer landmark or footer element is present with at least one link or copyright line.",
+          "how": "Query footer or [role=contentinfo] and assert nonempty text or links."
+        },
+        {
+          "id": "responsive-360",
+          "check": "At 360px width, the hero CTA remains visible without horizontal page scroll.",
+          "how": "Resize to the mobile viewport, assert the CTA is in view, and assert document scrollWidth does not exceed clientWidth."
+        }
+      ],
+      "interactions": [
+        "Load the page",
+        "Scroll through hero, features, pricing, and footer",
+        "Resize to the mobile viewport and re-check the hero CTA"
+      ],
+      "viewports": {
+        "desktop": { "width": 1280, "height": 720 },
+        "mobile": { "width": 360, "height": 640 }
+      },
+      "network": { "allowExternal": false }
+    },
+    {
+      "id": "q2-dashboard",
+      "prompt": "Build a single runnable analytics dashboard page with a sidebar, four top metric cards, one line chart, one bar chart, a recent-activity table, and a dark/light theme toggle. Do not make external network requests at runtime.",
+      "requirements": [
+        {
+          "id": "sidebar",
+          "check": "A persistent sidebar or navigation landmark lists at least two destinations.",
+          "how": "Query nav or aside and assert at least two navigable items."
+        },
+        {
+          "id": "metric-cards",
+          "check": "Four metric cards each show a label and a numeric value.",
+          "how": "Count metric cards; assert four, each with a label and a number."
+        },
+        {
+          "id": "line-chart",
+          "check": "A line chart is rendered as SVG, canvas, or an accessible chart container.",
+          "how": "Locate the line-chart region and assert an svg, canvas, or role=img chart is present."
+        },
+        {
+          "id": "bar-chart",
+          "check": "A bar chart is rendered as SVG, canvas, or an accessible chart container.",
+          "how": "Locate the bar-chart region and assert an svg, canvas, or role=img chart is present."
+        },
+        {
+          "id": "activity-table",
+          "check": "A recent-activity table has a header row and at least one data row.",
+          "how": "Query table thead and tbody rows; expect header cells and >=1 body row."
+        },
+        {
+          "id": "theme-toggle",
+          "check": "Activating the theme toggle flips a dark/light marker on the document or root container.",
+          "how": "Read a theme class or data attribute, click the toggle, and assert the marker changed."
+        }
+      ],
+      "interactions": [
+        "Load the page",
+        "Click the theme toggle once and observe the root theme marker",
+        "Scroll the activity table into view"
+      ],
+      "viewports": {
+        "desktop": { "width": 1280, "height": 720 },
+        "mobile": { "width": 360, "height": 640 }
+      },
+      "network": { "allowExternal": false }
+    },
+    {
+      "id": "q3-form",
+      "prompt": "Build a single runnable multi-step registration form with three steps, client-side validation, a progress indicator, and a review/submit step that shows error states. Do not make external network requests at runtime.",
+      "requirements": [
+        {
+          "id": "three-steps",
+          "check": "The form exposes three sequential steps before final submit.",
+          "how": "Advance through the wizard and assert three distinct step panels or step labels appear."
+        },
+        {
+          "id": "progress",
+          "check": "A progress indicator shows the current step index or fraction.",
+          "how": "Assert progress text or aria-valuenow updates when moving between steps."
+        },
+        {
+          "id": "client-validation",
+          "check": "Submitting an empty required field on step one surfaces a visible validation message without leaving the step.",
+          "how": "Clear required inputs, attempt Next/Submit, and assert an error message is visible and the step does not advance."
+        },
+        {
+          "id": "review-step",
+          "check": "The final step summarizes entered values before submit.",
+          "how": "Complete valid inputs, reach the review step, and assert summarized field values match what was entered."
+        }
+      ],
+      "interactions": [
+        "Load the page",
+        "Attempt to advance with empty required fields",
+        "Fill valid values and advance through all steps to review"
+      ],
+      "viewports": {
+        "desktop": { "width": 1280, "height": 720 },
+        "mobile": { "width": 360, "height": 640 }
+      },
+      "network": { "allowExternal": false }
+    },
+    {
+      "id": "q4-interactive-tool",
+      "prompt": "Build a single runnable interactive calculator page (mortgage payment or unit converter) with live results, input validation, and a reset control. Do not make external network requests at runtime.",
+      "requirements": [
+        {
+          "id": "live-result",
+          "check": "Changing a numeric input updates the displayed result without a full page reload.",
+          "how": "Enter a known input set, read the result, change one input, and assert the result text changed."
+        },
+        {
+          "id": "input-validation",
+          "check": "Invalid input (empty or non-numeric where a number is required) shows a visible error and does not present a fabricated result as valid.",
+          "how": "Clear or poison a required numeric field and assert an error is shown and the result is blank or marked invalid."
+        },
+        {
+          "id": "reset",
+          "check": "A reset control restores default inputs and clears the computed result or errors.",
+          "how": "Enter values, click Reset, and assert inputs and result return to the initial empty or default state."
+        }
+      ],
+      "interactions": [
+        "Load the page",
+        "Enter valid inputs and observe the live result",
+        "Enter invalid input and observe the error",
+        "Click Reset"
+      ],
+      "viewports": {
+        "desktop": { "width": 1280, "height": 720 },
+        "mobile": { "width": 360, "height": 640 }
+      },
+      "network": { "allowExternal": false }
+    },
+    {
+      "id": "q5-data-table",
+      "prompt": "Build a single runnable page with a sortable, filterable data table of 50 rows, pagination, row selection, and an empty state when filters match nothing. Do not make external network requests at runtime.",
+      "requirements": [
+        {
+          "id": "fifty-rows-source",
+          "check": "The table data source contains 50 rows before filtering.",
+          "how": "With no filter applied and page size large enough, count rendered rows across pages or read a total-count indicator of 50."
+        },
+        {
+          "id": "sort",
+          "check": "Clicking a column header reorders rows by that column.",
+          "how": "Capture the first cell value, click a sortable header, and assert the first-row value changed according to sort order."
+        },
+        {
+          "id": "filter",
+          "check": "A filter input narrows visible rows to matching records.",
+          "how": "Type a unique token from one row and assert only matching rows remain visible."
+        },
+        {
+          "id": "pagination",
+          "check": "Pagination controls move between pages when the page size is smaller than the row count.",
+          "how": "Set or keep a page size under 50, click next, and assert the first-row identity changed."
+        },
+        {
+          "id": "row-selection",
+          "check": "Selecting a row marks it as selected in the UI.",
+          "how": "Click a row checkbox or row, then assert aria-selected, checked, or a selected class on that row."
+        },
+        {
+          "id": "empty-state",
+          "check": "A filter with no matches shows an empty-state message instead of stale rows.",
+          "how": "Enter a filter that matches nothing and assert an empty-state element is visible and no data rows remain."
+        }
+      ],
+      "interactions": [
+        "Load the page",
+        "Sort by a column header",
+        "Filter to a single row token",
+        "Clear filter and paginate",
+        "Select a row",
+        "Filter to an impossible token to open the empty state"
+      ],
+      "viewports": {
+        "desktop": { "width": 1280, "height": 720 },
+        "mobile": { "width": 360, "height": 640 }
+      },
+      "network": { "allowExternal": false }
+    },
+    {
+      "id": "q6-modal-flow",
+      "prompt": "Build a single runnable page that opens a modal dialog containing a form. The modal must trap focus, close on Escape, and close on backdrop click. Do not make external network requests at runtime.",
+      "requirements": [
+        {
+          "id": "open-modal",
+          "check": "A control opens a dialog that contains at least one form field.",
+          "how": "Click the open control and assert a dialog or [role=dialog] is visible with an input."
+        },
+        {
+          "id": "focus-trap",
+          "check": "Tabbing from the last focusable element inside the dialog cycles focus back inside the dialog.",
+          "how": "With the dialog open, Tab from the last focusable control and assert focus remains within the dialog."
+        },
+        {
+          "id": "escape-close",
+          "check": "Pressing Escape closes the dialog.",
+          "how": "Press Escape and assert the dialog is no longer visible."
+        },
+        {
+          "id": "backdrop-close",
+          "check": "Clicking the backdrop outside the dialog content closes the dialog.",
+          "how": "Re-open the dialog, click the backdrop, and assert the dialog is hidden."
+        }
+      ],
+      "interactions": [
+        "Load the page",
+        "Open the modal",
+        "Tab through focusable elements inside the modal",
+        "Press Escape to close",
+        "Re-open and click the backdrop to close"
+      ],
+      "viewports": {
+        "desktop": { "width": 1280, "height": 720 },
+        "mobile": { "width": 360, "height": 640 }
+      },
+      "network": { "allowExternal": false }
+    },
+    {
+      "id": "q7-responsive-gallery",
+      "prompt": "Build a single runnable image gallery page with a grid layout, a lightbox on click, and keyboard navigation for the lightbox. Bundle or inline placeholder images so the page needs no external network requests at runtime.",
+      "requirements": [
+        {
+          "id": "grid",
+          "check": "At least four gallery items render in a multi-column grid at the desktop viewport.",
+          "how": "Count gallery items and assert their computed layout places items in more than one column at desktop width."
+        },
+        {
+          "id": "lightbox-open",
+          "check": "Clicking a gallery item opens a lightbox or enlarged view of that item.",
+          "how": "Click the first item and assert a lightbox dialog or overlay shows the corresponding image."
+        },
+        {
+          "id": "keyboard-nav",
+          "check": "Arrow keys move between items while the lightbox is open.",
+          "how": "With the lightbox open, press ArrowRight and assert the displayed image identity changed."
+        }
+      ],
+      "interactions": [
+        "Load the page",
+        "Click the first gallery item",
+        "Press ArrowRight and ArrowLeft in the lightbox",
+        "Close the lightbox"
+      ],
+      "viewports": {
+        "desktop": { "width": 1280, "height": 720 },
+        "mobile": { "width": 360, "height": 640 }
+      },
+      "network": { "allowExternal": false }
+    },
+    {
+      "id": "q8-empty-error-states",
+      "prompt": "Build a single runnable list view that can demonstrate loading, empty, and error states, including a retry control on the error state. Drive the states from in-page controls or stubs so no external network is required at runtime.",
+      "requirements": [
+        {
+          "id": "loading-state",
+          "check": "A loading state is visible and announces busy or loading status.",
+          "how": "Trigger loading and assert a progressbar, aria-busy, or loading text is present."
+        },
+        {
+          "id": "empty-state",
+          "check": "An empty state shows a message when the list has zero items.",
+          "how": "Trigger the empty path and assert empty-state copy is visible with no list items."
+        },
+        {
+          "id": "error-state",
+          "check": "An error state shows an error message.",
+          "how": "Trigger the error path and assert an alert or error message is visible."
+        },
+        {
+          "id": "retry",
+          "check": "A retry control from the error state re-enters loading or a successful list path.",
+          "how": "From the error state, click Retry and assert loading or list content appears."
+        }
+      ],
+      "interactions": [
+        "Load the page",
+        "Trigger loading, empty, and error states via the page controls",
+        "Click Retry from the error state"
+      ],
+      "viewports": {
+        "desktop": { "width": 1280, "height": 720 },
+        "mobile": { "width": 360, "height": 640 }
+      },
+      "network": { "allowExternal": false }
+    },
+    {
+      "id": "q9-accessibility",
+      "prompt": "Build a single runnable page that must pass an axe-core scan with no violations. Use semantic landmarks, labeled controls, and full keyboard operability for interactive elements. Do not make external network requests at runtime.",
+      "requirements": [
+        {
+          "id": "landmarks",
+          "check": "The page exposes main and navigation landmarks.",
+          "how": "Query main/[role=main] and nav/[role=navigation] and assert both exist."
+        },
+        {
+          "id": "labels",
+          "check": "Every input has an associated accessible name.",
+          "how": "For each input, select, and textarea, assert a non-empty accessible name via label, aria-label, or aria-labelledby."
+        },
+        {
+          "id": "keyboard",
+          "check": "Every button and link is reachable and activatable with the keyboard.",
+          "how": "Tab to each interactive control and activate with Enter or Space; assert the expected UI change."
+        },
+        {
+          "id": "axe-clean",
+          "check": "An axe-core scan reports zero violations.",
+          "how": "Run axe against the loaded page and assert violations.length === 0."
+        }
+      ],
+      "interactions": [
+        "Load the page",
+        "Tab through interactive controls and activate each with the keyboard",
+        "Run axe-core"
+      ],
+      "viewports": {
+        "desktop": { "width": 1280, "height": 720 },
+        "mobile": { "width": 360, "height": 640 }
+      },
+      "network": { "allowExternal": false }
+    },
+    {
+      "id": "q10-performance-budget",
+      "prompt": "Build a single runnable landing page whose HTML+CSS+JS total under 100KB, with no external requests at runtime, targeting Lighthouse performance >= 90 when measured locally.",
+      "requirements": [
+        {
+          "id": "size-budget",
+          "check": "The sum of served HTML, CSS, and JS bytes is under 100KB.",
+          "how": "Sum Content-Length or on-disk bytes for the page and its local assets; assert total < 102400."
+        },
+        {
+          "id": "no-external",
+          "check": "During load and scripted interaction, no request leaves the local origin.",
+          "how": "Record network requests and assert every request URL is same-origin or data/blob."
+        },
+        {
+          "id": "lighthouse-perf",
+          "check": "A local Lighthouse performance score is at least 90.",
+          "how": "Run Lighthouse against the local page and assert categories.performance.score >= 0.9."
+        }
+      ],
+      "interactions": [
+        "Load the page with network recording enabled",
+        "Scroll the landing content",
+        "Run the size and Lighthouse checks"
+      ],
+      "viewports": {
+        "desktop": { "width": 1280, "height": 720 },
+        "mobile": { "width": 360, "height": 640 }
+      },
+      "network": { "allowExternal": false }
+    }
+  ]
+}
