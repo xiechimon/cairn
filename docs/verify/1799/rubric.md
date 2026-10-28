@@ -1,4 +1,4 @@
-# Relevance rubric (#1967)
+# Relevance rubric (#1799)
 
 Judge each stored injection against its task text. Do not reuse the #1874
 "loose keyword" proxy as a relevance label.

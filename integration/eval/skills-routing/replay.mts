@@ -125,7 +125,7 @@ export function main(argv: string[]): number {
   const snapshot = loadSnapshot(resolve(args.snapshot));
   const historical = replaySnapshot(snapshot);
   const routingCatalogPath =
-    args.routingCatalog ?? join(here, '../../../docs/verify/1967/routing-catalog.json');
+    args.routingCatalog ?? join(here, '../../../docs/verify/1799/routing-catalog.json');
   const routingCatalog = loadCatalog(routingCatalogPath);
   const routingScores = scoreRoutingCases(loadCases(), routingCatalog);
   const totals = aggregate(routingScores.map((row) => row.score));

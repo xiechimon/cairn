@@ -1,0 +1,94 @@
+
+ RUN  v5.0.1 /workspace/integration
+
+(node:4046) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ test/skills-routing-replay.test.ts (8 tests | 4 failed | 4 skipped) 44ms
+   ❯ skills-routing snapshot and replay (#1967 / #1799) (7)
+     × replay on a small frozen fixture is deterministic and reproduces the stored hits for the recorded matcher revision 10ms
+     × snapshot opens the database read-only 31ms
+     × the snapshot contains no secrets or absolute home paths 1ms
+     × classification totals reconcile with the snapshot population 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/skills-routing-replay.test.ts > skills-routing snapshot and replay (#1967 / #1799) > replay on a small frozen fixture is deterministic and reproduces the stored hits for the recorded matcher revision
+AssertionError: expected 'wrong-matcher-revision' to be 'fixture-matcher-revision' // Object.is equality
+
+Expected: "fixture-matcher-revision"
+Received: "wrong-matcher-revision"
+
+ ❯ test/skills-routing-replay.test.ts:254:35
+    252|     const second = replaySnapshot(snapshot);
+    253|     expect(second).toEqual(first);
+    254|     expect(first.matcherRevision).toBe(snapshot.matcherRevision);
+       |                                   ^
+    255|     expect(first.stored.hitCount).toBe(4);
+    256|     expect(first.stored.stepCount).toBe(3);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/skills-routing-replay.test.ts > skills-routing snapshot and replay (#1967 / #1799) > snapshot opens the database read-only
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/skills-routing-replay.test.ts:276:7
+    274|     expect(() =>
+    275|       sqlite.exec("INSERT INTO step (id, buildId, skillInjection) VALU…
+    276|     ).toThrow(/readonly|read-only|attempt to write/i);
+       |       ^
+    277|     const population = readInjectionPopulation(sqlite);
+    278|     expect(population).toHaveLength(3);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/skills-routing-replay.test.ts > skills-routing snapshot and replay (#1967 / #1799) > the snapshot contains no secrets or absolute home paths
+AssertionError: expected '{"path":"/home/omarchy-user/.cairn/se…' not to contain '/home/omarchy-user'
+
+Expected: "/home/omarchy-user"
+Received: "{"path":"/home/omarchy-user/.cairn/server/server.db","token":"Bearer abc.def-ghi_jkl","nested":{"note":"see /home/omarchy-user/secrets/token","github":"ghp_abcdefghijklmnopqrstuvwxyz0123456789"}}"
+
+ ❯ test/skills-routing-replay.test.ts:298:41
+    296|     };
+    297|     const cleaned = sanitizeSnapshotValue(dirty, { home }) as typeof d…
+    298|     expect(JSON.stringify(cleaned)).not.toContain(home);
+       |                                         ^
+    299|     expect(JSON.stringify(cleaned)).not.toContain('/home/omarchy-user'…
+    300|     expect(cleaned.path).toBe('~/.cairn/server/server.db');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/skills-routing-replay.test.ts > skills-routing snapshot and replay (#1967 / #1799) > classification totals reconcile with the snapshot population
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/skills-routing-replay.test.ts:342:23
+    340|     ];
+    341|     const totals = reconcileClassificationTotals(snapshot, classificat…
+    342|     expect(totals.ok).toBe(true);
+       |                       ^
+    343|     expect(totals.populationHits).toBe(4);
+    344|     expect(totals.classifiedHits).toBe(4);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 4 skipped (8)
+   Start at  18:46:21
+   Duration  599ms (transform 69%, import 22%, tests 9%, worker 1%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/integration
+

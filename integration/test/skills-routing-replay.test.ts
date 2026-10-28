@@ -1,4 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -12,9 +20,14 @@ import { aggregate, gradeRouting, loadCases } from '../eval/skills-routing/grade
 import { replaySnapshot, scoreRoutingCases } from '../eval/skills-routing/replay.mts';
 import { sanitizeSnapshotValue } from '../eval/skills-routing/sanitize.mts';
 import {
+  assertLiveSourceDb,
+  buildSnapshot,
+  flattenPopulationHits,
+  loadCandidatesFromSkillsDir,
   openSnapshotDatabase,
   readInjectionPopulation,
   type SkillsRoutingSnapshot,
+  stratifyHits,
 } from '../eval/skills-routing/snapshot.mts';
 
 const temps: string[] = [];
@@ -27,7 +40,7 @@ afterEach(() => {
 });
 
 function tempDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'skills-routing-1967-'));
+  const dir = mkdtempSync(join(tmpdir(), 'skills-routing-1799-'));
   temps.push(dir);
   return dir;
 }
@@ -136,13 +149,60 @@ function seedFixtureDb(path: string): void {
   db.close();
 }
 
+function seedLargePopulationDb(path: string, stepCount: number, hitsPerStep: number): void {
+  const db = new DatabaseSync(path);
+  db.exec(`
+    CREATE TABLE todo (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      spec TEXT NOT NULL
+    );
+    CREATE TABLE build (
+      id TEXT PRIMARY KEY,
+      todoId TEXT NOT NULL
+    );
+    CREATE TABLE step (
+      id TEXT PRIMARY KEY,
+      buildId TEXT NOT NULL,
+      skillInjection TEXT
+    );
+  `);
+  const insertTodo = db.prepare('INSERT INTO todo (id, title, spec) VALUES (?, ?, ?)');
+  const insertBuild = db.prepare('INSERT INTO build (id, todoId) VALUES (?, ?)');
+  const insertStep = db.prepare('INSERT INTO step (id, buildId, skillInjection) VALUES (?, ?, ?)');
+  const skills = ['aihot', 'wiki', 'e2e-debugging', 'design-review', 'contributor', 'docs-writer'];
+  const rules = ['domain', 'explicit-mention'] as const;
+  for (let i = 0; i < stepCount; i++) {
+    const todoId = `todo-${i}`;
+    const buildId = `build-${i}`;
+    const stepId = `step-${i}`;
+    insertTodo.run(todoId, `Task title ${i}`, `Task spec body ${i} for skill routing.`);
+    insertBuild.run(buildId, todoId);
+    const hits = Array.from({ length: hitsPerStep }, (_, j) => ({
+      id: skills[(i + j) % skills.length] as string,
+      rule: rules[j % rules.length],
+      reason: `synthetic hit ${i}/${j}`,
+    }));
+    insertStep.run(stepId, buildId, JSON.stringify({ hits }));
+  }
+  db.close();
+}
+
 function fixtureSnapshot(): SkillsRoutingSnapshot {
   return {
     snapshotAt: '2026-10-28T00:00:00.000Z',
-    sourceDb: '~/cairn/server/server.db',
+    sourceDb: '~/.cairn/server/server.db',
     matcherRevision: 'fixture-matcher-revision',
     headRevision: 'fixture-head-revision',
+    livePopulation: { stepCount: 3, hitCount: 4 },
     population: { stepCount: 3, hitCount: 4 },
+    sampling: {
+      method: 'full',
+      targetHitCount: null,
+      seed: 'fixture',
+      sampledHitCount: 4,
+      sampledStepCount: 3,
+    },
     candidates: [...FIXTURE_CANDIDATES],
     steps: [
       {
@@ -193,7 +253,7 @@ function fixtureSnapshot(): SkillsRoutingSnapshot {
   };
 }
 
-describe('skills-routing snapshot and replay (#1967)', () => {
+describe('skills-routing snapshot and replay (#1967 / #1799)', () => {
   test('replay on a small frozen fixture is deterministic and reproduces the stored hits for the recorded matcher revision', () => {
     const snapshot = fixtureSnapshot();
     const first = replaySnapshot(snapshot);
@@ -317,23 +377,113 @@ describe('skills-routing snapshot and replay (#1967)', () => {
       gradeRouting(['e2e-debugging'], ['e2e-debugging'], ['design-review']).forbiddenHits,
     ).toBe(0);
   });
+
+  test('skills-dir loader matches claim-time id and symlink directory rules', () => {
+    const dir = tempDir();
+    const skillsRoot = join(dir, 'skills');
+    mkdirSync(join(skillsRoot, 'dir-aihot'), { recursive: true });
+    writeFileSync(
+      join(skillsRoot, 'dir-aihot', 'SKILL.md'),
+      `---\nname: aihot\ndescription: Automate CI publish and release notes after a deploy\n---\n`,
+    );
+    mkdirSync(join(skillsRoot, 'wiki'), { recursive: true });
+    writeFileSync(
+      join(skillsRoot, 'wiki', 'SKILL.md'),
+      `---\nname: wiki\ndescription: Capture decisions into the team wiki\n---\n`,
+    );
+    mkdirSync(join(dir, 'real-dup'), { recursive: true });
+    writeFileSync(
+      join(dir, 'real-dup', 'SKILL.md'),
+      `---\nname: shared-skill\ndescription: Shared via two directory names\n---\n`,
+    );
+    symlinkSync(join(dir, 'real-dup'), join(skillsRoot, 'alias-a'));
+    symlinkSync(join(dir, 'real-dup'), join(skillsRoot, 'alias-b'));
+    const candidates = loadCandidatesFromSkillsDir(skillsRoot);
+    expect(candidates.map((row) => row.id).sort()).toEqual(['aihot', 'shared-skill', 'wiki']);
+    expect(candidates.find((row) => row.id === 'aihot')?.description).toContain('CI publish');
+  });
+
+  test('stratified sampling records live population separately from the captured sample', () => {
+    const dir = tempDir();
+    const dbPath = join(dir, 'server.db');
+    seedLargePopulationDb(dbPath, 20, 6);
+    const sqlite = openSnapshotDatabase(dbPath);
+    const flat = flattenPopulationHits(readInjectionPopulation(sqlite));
+    sqlite.close();
+    expect(flat).toHaveLength(120);
+    const sample = stratifyHits(flat, 30, 'unit-seed');
+    expect(sample).toHaveLength(30);
+    const again = stratifyHits(flat, 30, 'unit-seed');
+    expect(again).toEqual(sample);
+    const snapshot = buildSnapshot({
+      dbPath,
+      candidates: [...FIXTURE_CANDIDATES],
+      repoRoot: join(import.meta.dirname, '../..'),
+      stratifyHitCount: 30,
+      sampleSeed: 'unit-seed',
+      snapshotAt: '2026-10-28T18:00:00.000Z',
+      home: dir,
+    });
+    expect(snapshot.livePopulation).toEqual({ stepCount: 20, hitCount: 120 });
+    expect(snapshot.population.hitCount).toBe(30);
+    expect(snapshot.sampling.method).toBe('stratified-by-rule-skill');
+    expect(snapshot.sourceDb.endsWith('server.db')).toBe(true);
+    expect(snapshot.sourceDb.startsWith('fixture://')).toBe(false);
+  });
 });
 
-describe('skills-routing committed baseline artifacts (#1967)', () => {
-  test('docs/verify/1967 snapshot and classification stay reconciled', () => {
-    const root = join(import.meta.dirname, '../../docs/verify/1967');
-    const snapshot = JSON.parse(
-      readFileSync(join(root, 'snapshot.json'), 'utf8'),
-    ) as SkillsRoutingSnapshot;
-    const classifications = JSON.parse(
-      readFileSync(join(root, 'classification.json'), 'utf8'),
-    ) as InjectionClassification[];
-    const totals = reconcileClassificationTotals(snapshot, classifications);
-    expect(totals.ok).toBe(true);
-    expect(totals.populationHits).toBe(snapshot.population.hitCount);
-    expect(totals.classifiedHits).toBe(snapshot.population.hitCount);
-    const replay = replaySnapshot(snapshot);
-    expect(replay.stored.hitCount).toBe(snapshot.population.hitCount);
-    expect(replay.rows).toHaveLength(snapshot.population.stepCount);
+describe('skills-routing committed baseline artifacts (#1967 / #1799)', () => {
+  const root = join(import.meta.dirname, '../../docs/verify/1799');
+  const snapshotPath = join(root, 'snapshot.json');
+  const classificationPath = join(root, 'classification.json');
+  const hasLiveCapture = existsSync(snapshotPath) && existsSync(classificationPath);
+
+  test.skipIf(!hasLiveCapture)(
+    'docs/verify/1799 snapshot and classification stay reconciled against a live server.db capture',
+    () => {
+      const snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8')) as SkillsRoutingSnapshot;
+      assertLiveSourceDb(snapshot.sourceDb);
+      expect(snapshot.livePopulation.stepCount).toBeGreaterThan(0);
+      expect(snapshot.livePopulation.hitCount).toBeGreaterThanOrEqual(snapshot.population.hitCount);
+      expect(snapshot.population.hitCount).toBeGreaterThan(0);
+      const classifications = JSON.parse(
+        readFileSync(classificationPath, 'utf8'),
+      ) as InjectionClassification[];
+      const totals = reconcileClassificationTotals(snapshot, classifications);
+      expect(totals.ok).toBe(true);
+      expect(totals.populationHits).toBe(snapshot.population.hitCount);
+      expect(totals.classifiedHits).toBe(snapshot.population.hitCount);
+      const replay = replaySnapshot(snapshot);
+      expect(replay.stored.hitCount).toBe(snapshot.population.hitCount);
+      expect(replay.rows).toHaveLength(snapshot.population.stepCount);
+    },
+  );
+
+  test('docs/verify/1799 documents the live capture command and rejects fixture sourceDb markers', () => {
+    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    expect(readme).toContain('docs/verify/1799/snapshot.json');
+    expect(readme).toContain('~/.cairn/server/server.db');
+    expect(readme).toContain('--stratify-hits');
+    expect(() => assertLiveSourceDb('fixture://docs/verify/1799')).toThrow(/live DB path/);
+    expect(() => assertLiveSourceDb('~/.cairn/server/server.db')).not.toThrow();
+  });
+
+  test('when ~/.cairn/server/server.db is present the committed capture must measure that live population', () => {
+    const liveDb = join(process.env.HOME ?? '', '.cairn/server/server.db');
+    if (!existsSync(liveDb)) return;
+    expect(hasLiveCapture).toBe(true);
+    const snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8')) as SkillsRoutingSnapshot;
+    assertLiveSourceDb(snapshot.sourceDb);
+    const sqlite = openSnapshotDatabase(liveDb);
+    try {
+      const liveHits = flattenPopulationHits(readInjectionPopulation(sqlite));
+      const liveSteps = new Set(liveHits.map((row) => row.stepId));
+      expect(snapshot.livePopulation).toEqual({
+        stepCount: liveSteps.size,
+        hitCount: liveHits.length,
+      });
+    } finally {
+      sqlite.close();
+    }
   });
 });
