@@ -4,6 +4,8 @@ Append the task, scope and acceptance commands after the matching template; all 
 
 ## Starting tasks and reporting (#1556)
 
+Read `ai-route --help` before assembling a dispatch command. The parser expects the role immediately after `run`; `ai-route run --help` treats `--help` as a role and fails with `KeyError` after probing route availability.
+
 Do not start long background tasks directly with `( ... & )` or `nohup ... &`: the process-group cleanup when a tool call returns kills them (ledger #1556). Always use `scripts/dispatch-agent.mjs`:
 
 ```sh

@@ -191,6 +191,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "cli-help-treated-as-role": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "cli-tests-that-spawn-subprocesses-hand-wrote-timeouts-case-by": {
     "Intercepts": 1,
     "Recurrences": 0
