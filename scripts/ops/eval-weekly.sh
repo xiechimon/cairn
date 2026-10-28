@@ -84,6 +84,9 @@ run_flow() {
   else
     : > "${STATE}/${STAMP}/${flow}/baseline/errors.jsonl"
   fi
+  if [[ -d "${flow_dir}/baseline/traces" ]]; then
+    cp -R "${flow_dir}/baseline/traces" "${STATE}/${STAMP}/${flow}/baseline/"
+  fi
   record_dir "${flow}" "${STATE}/${STAMP}/${flow}" "${DAY}"
   echo "eval-weekly: ${flow} recorded"
 }
@@ -92,3 +95,10 @@ run_flow chief-dispatch
 run_flow memory-regression
 run_flow project-routing
 echo "eval-weekly: table ${TABLE}"
+
+review_args=(--week "${DAY}" --flows "${STATE}/${STAMP}" --out "${STATE}/reviews/${DAY}")
+if [[ -n "${CAIRN_EVAL_REVIEW_PACKS:-}" ]]; then
+  review_args+=(--packs "${CAIRN_EVAL_REVIEW_PACKS}")
+fi
+node "${WT}/scripts/eval-sample-failures.mjs" "${review_args[@]}"
+echo "eval-weekly: review ${STATE}/reviews/${DAY}/review.json"

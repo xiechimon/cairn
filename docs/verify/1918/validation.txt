@@ -1,0 +1,13 @@
+node --test scripts/eval-sample-failures.test.mjs: 1 passed; failed before implementation (red.log)
+pnpm lint: passed
+flock /tmp/cairn-heavy.lock pnpm typecheck: passed
+pnpm spec:parse: passed; 1355 web cases collected, 46 integration files parsed
+flock /tmp/cairn-heavy.lock node scripts/prepush-vitest.mjs: passed; 418 files, 5678 tests, 193.03 seconds
+bash -n scripts/ops/eval-weekly.sh: passed
+node scripts/english-only-gate.mjs: 0
+node scripts/single-use-helper-gate.mjs: 0
+node scripts/comment-discipline-gate.mjs: 0
+node scripts/lessons-ledger-gate.mjs: passed
+git diff --check: passed
+No staging or commit: sandbox handoff uses COMMIT_MSG.txt.
+No push or development server was started.
