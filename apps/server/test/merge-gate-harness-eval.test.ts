@@ -1,7 +1,11 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER, type CompareFile } from '@cairn/shared';
+import {
+  CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
+  type CompareFile,
+  type MergeReadiness,
+} from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { openDbWithHandle } from '../src/db/client.js';
 import {
@@ -11,15 +15,24 @@ import {
 } from '../src/services/harness-eval-coordinator.js';
 import { computePatchDigest } from '../src/services/merge-gate/digest.js';
 import { gateStatusFor } from '../src/services/merge-gate/gate-status.js';
-import {
-  prepareHarnessEvalRouting,
-  reclassify1865MissingStaleAsTransient,
-} from '../src/services/merge-gate/harness-eval-route.js';
+import { judgeMergeReadinessWithHarnessEval } from '../src/services/merge-gate/harness-eval-judge.js';
+import { prepareHarnessEvalRouting } from '../src/services/merge-gate/harness-eval-route.js';
 import {
   type GateInputs,
   type GateVerdictView,
   mergeReadiness,
 } from '../src/services/merge-gate/readiness.js';
+
+function reclassify1865MissingStaleAsTransient(r: MergeReadiness): MergeReadiness {
+  return {
+    ...r,
+    blockers: r.blockers.map((b) =>
+      b.code === 'harness-regression-missing' || b.code === 'harness-regression-stale'
+        ? { ...b, class: 'transient' }
+        : b,
+    ),
+  };
+}
 
 const HEAD = 'a'.repeat(40);
 const MAIN = 'f'.repeat(40);
@@ -410,5 +423,24 @@ describe('merge-gate harness eval routing (#1979)', () => {
       ['harness-regression-evaluating', 'transient'],
     ]);
     expect(fake.blockers[0]?.code).not.toBe('harness-regression-evaluating');
+  });
+
+  test('production judgeMergeReadinessWithHarnessEval dispatches for missing evidence and attaches a live attempt', async () => {
+    const { coordinator, dispatches } = openWorld();
+    const judged = await judgeMergeReadinessWithHarnessEval({
+      inputs: harnessInputs(),
+      coordinator,
+      repo: REPO,
+      pr: PR_NUMBER,
+      dispatchAuthorized: true,
+      now: 1_000_000,
+    });
+    expect(judged.need).toBe('missing');
+    expect(judged.routed.dispatched).toBe(true);
+    expect(dispatches).toHaveLength(1);
+    expect(judged.readiness.blockers.map((b) => [b.code, b.class])).toEqual([
+      ['harness-regression-evaluating', 'transient'],
+    ]);
+    expect(judged.inputs.harnessEval?.attempt?.state).toBe('dispatched');
   });
 });

@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte } from 'drizzle-orm';
+import { and, eq, gt, inArray, lte } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { harnessEvalAttempt } from '../db/schema.js';
 import { newRecordId } from '../lib/ids.js';
@@ -207,10 +207,21 @@ export function createHarnessEvalCoordinator(deps: HarnessEvalCoordinatorDeps) {
     workerId: string,
     outcome: HarnessEvalTerminalOutcome,
   ): CompleteResult {
+    const now = deps.now();
     const current = loadAttempt(deps.db, attemptId);
     if (current === null) return { ok: false, reason: 'missing' };
     if (current.state === 'terminal') return { ok: false, reason: 'terminal' };
     if (current.workerId !== workerId) return { ok: false, reason: 'unauthorized' };
+    if (current.deadlineAt <= now) {
+      deps.db
+        .update(harnessEvalAttempt)
+        .set({ state: 'terminal', outcome: 'timeout' })
+        .where(
+          and(eq(harnessEvalAttempt.id, attemptId), inArray(harnessEvalAttempt.state, LIVE_STATES)),
+        )
+        .run();
+      return { ok: false, reason: 'terminal' };
+    }
     const updated = deps.db
       .update(harnessEvalAttempt)
       .set({ state: 'terminal', outcome })
@@ -219,6 +230,7 @@ export function createHarnessEvalCoordinator(deps: HarnessEvalCoordinatorDeps) {
           eq(harnessEvalAttempt.id, attemptId),
           eq(harnessEvalAttempt.workerId, workerId),
           inArray(harnessEvalAttempt.state, LIVE_STATES),
+          gt(harnessEvalAttempt.deadlineAt, now),
         ),
       )
       .run();

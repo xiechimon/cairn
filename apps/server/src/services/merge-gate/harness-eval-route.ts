@@ -1,4 +1,3 @@
-import type { MergeReadiness } from '@cairn/shared/merge-gate';
 import type {
   ClaimAttemptInput,
   ClaimAttemptResult,
@@ -28,10 +27,34 @@ export type PrepareHarnessEvalResult = {
   dispatched: boolean;
 };
 
+export type LiveHarnessAttemptView = {
+  state: string;
+  deadlineAt?: number;
+  patchDigest?: string;
+};
+
 const LIVE = new Set(['claimed', 'dispatched', 'dispatch_uncertain']);
 
-export function isLiveHarnessAttempt(attempt: { state: string } | null | undefined): boolean {
-  return attempt != null && LIVE.has(attempt.state);
+export function isLiveHarnessAttempt(
+  attempt: LiveHarnessAttemptView | null | undefined,
+  opts: { now?: number; patchDigest?: string } = {},
+): boolean {
+  if (attempt == null || !LIVE.has(attempt.state)) return false;
+  if (
+    typeof attempt.deadlineAt === 'number' &&
+    opts.now !== undefined &&
+    attempt.deadlineAt <= opts.now
+  ) {
+    return false;
+  }
+  if (
+    opts.patchDigest !== undefined &&
+    attempt.patchDigest !== undefined &&
+    attempt.patchDigest !== opts.patchDigest
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export async function prepareHarnessEvalRouting(
@@ -62,16 +85,5 @@ export async function prepareHarnessEvalRouting(
     attempt: claimed.attempt,
     created: claimed.created,
     dispatched: claimed.dispatched,
-  };
-}
-
-export function reclassify1865MissingStaleAsTransient(r: MergeReadiness): MergeReadiness {
-  return {
-    ...r,
-    blockers: r.blockers.map((b) =>
-      b.code === 'harness-regression-missing' || b.code === 'harness-regression-stale'
-        ? { ...b, class: 'transient' }
-        : b,
-    ),
   };
 }
