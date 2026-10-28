@@ -6,6 +6,7 @@ import {
   buildMergedPrGuardNote,
   buildTaskPromptText,
   CHIEF_REMOTE_TOOLS,
+  claudeRateBlock,
   formatSkillRouteSection,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
@@ -30,11 +31,13 @@ import {
   isChiefDigestStep,
 } from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
+import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import {
   agentRunningCount,
   capabilityGatePasses,
   machineRunningCount,
   runtimeGatePasses,
+  stepRuntimeFor,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
 import { projectOfTodo, projectRepoRef } from './git.js';
@@ -95,7 +98,7 @@ function claimCandidates(deps: MachineDeps, _machineId: string, teamId: string):
   return rows;
 }
 
-function claimChiefCandidates(deps: MachineDeps, machineId: string, teamId: string) {
+function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: string) {
   return deps.db
     .select({ stepRow: step, threadRow: chiefThread, chiefRow: chief, agentRow: agent })
     .from(step)
@@ -107,7 +110,6 @@ function claimChiefCandidates(deps: MachineDeps, machineId: string, teamId: stri
         eq(step.status, 'pending'),
         eq(step.kind, 'chief'),
         eq(chiefThread.teamId, teamId),
-        eq(agent.machineId, machineId),
         or(isNull(step.holdUntil), lte(step.holdUntil, sql`${nowMs()}`)),
       ),
     )
@@ -241,6 +243,18 @@ async function tryClaim(
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
+  refreshClaudeRateParks(deps, teamId);
+  const blockedCache = new Map<string, boolean>();
+  const claudeBlocked = (id: string | null): boolean => {
+    if (id === null) return false;
+    const cached = blockedCache.get(id);
+    if (cached !== undefined) return cached;
+    const row =
+      id === machineId ? machineRow : db.select().from(machine).where(eq(machine.id, id)).get();
+    const blocked = claudeRateBlock(row?.claudeRateLimits ?? [], nowMs()) !== null;
+    blockedCache.set(id, blocked);
+    return blocked;
+  };
   const running = machineRunningCount(db, machineId);
   const workerCap = Math.min(
     machineRow.maxConcurrent,
@@ -262,6 +276,11 @@ async function tryClaim(
       !cliVersionAtLeast(machineRow.latestCliVersion, CHIEF_DIGEST_MIN_CLI_VERSION)
     ) {
       continue;
+    }
+    const chiefRuntime = stepRuntimeFor(cand.agentRow.provider);
+    if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
+    if (cand.agentRow.machineId !== machineId) {
+      if (chiefRuntime !== 'claude-code' || !claudeBlocked(cand.agentRow.machineId)) continue;
     }
     if (
       cand.agentRow.maxConcurrentTasks !== null &&
@@ -314,8 +333,12 @@ async function tryClaim(
       continue;
     }
     if (!agentRow.modelId) continue;
-    if (agentRow.machineId !== machineId) continue;
     const model = effectiveModel(agentRow, cand.stepRow);
+    const runtime = stepRuntimeFor(model.provider);
+    if (runtime === 'claude-code' && claudeBlocked(machineId)) continue;
+    if (agentRow.machineId !== machineId) {
+      if (runtime !== 'claude-code' || !claudeBlocked(agentRow.machineId)) continue;
+    }
     if (!runtimeGatePasses(machineRow, model.provider)) continue;
     if (!capabilityGatePasses(machineRow, agentRow)) continue;
     if (

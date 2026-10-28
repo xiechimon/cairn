@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { agentTodoItemSchema } from './agent-todo.js';
 import type { BriefBackendId } from './brief-file.js';
 import type { StepOtelContext } from './otel.js';
+import type { ClaudeRateLimitNotice } from './records/claude-rate-limit.js';
 import { epochMs, recordId } from './records/common.js';
 import { messageRecordSchema } from './records/message.js';
 import {
@@ -148,6 +149,7 @@ export interface SessionOpts {
   cwd: string;
   prompt?: string;
   promptImages?: readonly DeliveredImage[];
+  onClaudeRateLimit?: (notice: ClaudeRateLimitNotice) => void;
 }
 
 export interface DeliveredImage {

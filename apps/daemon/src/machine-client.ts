@@ -2,6 +2,7 @@ import {
   type AgentTodoReport,
   type ClaimedStep,
   type ClaudeCodeReport,
+  type ClaudeRateLimitReport,
   type MachineAskBody,
   type MachineAskResponse,
   type MachineAttachmentResponse,
@@ -120,6 +121,7 @@ export interface MachineApi {
     contentType?: string,
   ): Promise<void>;
   done(stepId: string, body: MachineDoneBody): Promise<void>;
+  reportClaudeRateLimit?(body: ClaudeRateLimitReport): Promise<void>;
   steer(stepId: string): Promise<string | null>;
   steerAck?(stepId: string): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
@@ -485,6 +487,13 @@ export class MachineClient implements MachineApi {
 
   async done(stepId: string, body: MachineDoneBody): Promise<void> {
     await this.request('POST', `/api/machine/done/${stepId}`, {
+      body,
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
+  }
+
+  async reportClaudeRateLimit(body: ClaudeRateLimitReport): Promise<void> {
+    await this.request('POST', '/api/machine/rate-limit', {
       body,
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });

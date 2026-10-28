@@ -126,14 +126,15 @@ describe('phase nine values authoritative single source (02 §4.1, locked)', () 
 });
 
 describe('machine protocol (02 §5, r3 §1.6)', () => {
-  it('has the 13 machine-face endpoints', () => {
-    expect(MACHINE_ENDPOINTS).toHaveLength(13);
+  it('has the 14 machine-face endpoints', () => {
+    expect(MACHINE_ENDPOINTS).toHaveLength(14);
     expect(MACHINE_ENDPOINTS.map((e) => e.path)).toEqual([
       '/api/machine/enroll',
       '/api/machine/enroll/start',
       '/api/machine/enroll/poll',
       '/api/machine/me',
       '/api/machine/presence',
+      '/api/machine/rate-limit',
       '/api/machine/recover',
       '/api/machine/tasks/claim',
       '/api/machine/stream',
@@ -574,8 +575,8 @@ describe('thinking-level capability read surface (XMON-16 / #499 B3 ruling A)', 
 });
 
 describe('machine wire (02 §5 canonical, wire layer enters CI)', () => {
-  it('MACHINE_WIRE covers exactly the 13 endpoint paths (single source)', () => {
-    expect(MACHINE_WIRE).toHaveLength(13);
+  it('MACHINE_WIRE covers exactly the 14 endpoint paths (single source)', () => {
+    expect(MACHINE_WIRE).toHaveLength(14);
     expect(MACHINE_WIRE.map((w) => w.path)).toEqual(MACHINE_ENDPOINTS.map((e) => e.path));
   });
 

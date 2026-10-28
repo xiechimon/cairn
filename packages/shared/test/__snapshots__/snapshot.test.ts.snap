@@ -611,6 +611,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "POST /api/machine/enroll/poll",
   "GET /api/machine/me",
   "POST /api/machine/presence",
+  "POST /api/machine/rate-limit",
   "POST /api/machine/recover",
   "POST /api/machine/tasks/claim",
   "GET /api/machine/stream",
@@ -6558,6 +6559,10 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > machine surface 1
   {
     "note": "心跳（断网时并行失败，进程不退出，r3 §1.5）",
     "path": "/api/machine/presence",
+  },
+  {
+    "note": "Claude rate-limit report (per machine and subscription)",
+    "path": "/api/machine/rate-limit",
   },
   {
     "note": "步 journal 恢复（细节 [推断]，02 §5.4/§11）",

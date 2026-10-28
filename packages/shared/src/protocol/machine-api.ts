@@ -9,6 +9,10 @@ export const MACHINE_ENDPOINTS: readonly MachineEndpoint[] = [
   { path: '/api/machine/enroll/poll' },
   { path: '/api/machine/me', note: '机器自述' },
   { path: '/api/machine/presence', note: '心跳（断网时并行失败，进程不退出，r3 §1.5）' },
+  {
+    path: '/api/machine/rate-limit',
+    note: 'Claude rate-limit report (per machine and subscription)',
+  },
   { path: '/api/machine/recover', note: '步 journal 恢复（细节 [推断]，02 §5.4/§11）' },
   { path: '/api/machine/tasks/claim', note: '长轮询领取（~75–76s 节奏，r3 §1.5）' },
   { path: '/api/machine/stream', note: 'wake SSE 低延迟派发（02 §1.2/§5.4）' },

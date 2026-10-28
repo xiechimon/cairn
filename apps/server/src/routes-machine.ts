@@ -1,5 +1,6 @@
 import type { ToolCallRecord } from '@cairn/shared';
 import {
+  claudeRateLimitReportSchema,
   machineActivityBodySchema,
   machineAgentTodoBodySchema,
   machineAskBodySchema,
@@ -30,6 +31,7 @@ import { HttpError, parseWith } from './lib/errors.js';
 import { newRecordId } from './lib/ids.js';
 import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
+import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import {
   createUploadUrls,
@@ -247,6 +249,15 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const row = me(c);
     const body = parseWith(machinePresenceBodySchema, (await jsonBody(c)) ?? {}, 'body');
     markPresence(deps, row.id, body);
+    return c.json({ ok: true as const });
+  });
+
+  app.post('/api/machine/rate-limit', async (c) => {
+    const row = me(c);
+    const body = parseWith(claudeRateLimitReportSchema, (await jsonBody(c)) ?? {}, 'body');
+    if (body.machineId !== row.id)
+      throw new HttpError(403, 'rate limit event is for another machine');
+    recordClaudeRateLimit(deps, row, body);
     return c.json({ ok: true as const });
   });
 
