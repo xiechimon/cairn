@@ -1,0 +1,53 @@
+[heavy-slots] acquired slot 1/2
+harness approved: sha256 33179ccc6fca over 45 file(s) recorded in /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/glm-5.3/with-memory/_state.json
+[baseline] 10 of 10 (id,rep) to run
+[baseline] 0/10 done (0 ok, 0 failed), 30s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 60s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 90s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 120s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 150s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 180s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 210s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 240s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 270s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 300s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 330s elapsed
+[baseline] 0/10 done (0 ok, 0 failed), 360s elapsed
+  [baseline] a01 rep0 FAILED: a01 rep0: exceeded 360s wall-clock ceiling
+  [baseline] a02 rep0 FAILED: a02 rep0: exceeded 360s wall-clock ceiling
+[baseline] 2/10 done (0 ok, 2 failed), 390s elapsed, ~1560s left
+[baseline] 2/10 done (0 ok, 2 failed), 420s elapsed, ~1680s left
+[baseline] 2/10 done (0 ok, 2 failed), 450s elapsed, ~1800s left
+[baseline] 2/10 done (0 ok, 2 failed), 480s elapsed, ~1920s left
+[baseline] 2/10 done (0 ok, 2 failed), 510s elapsed, ~2040s left
+[baseline] 2/10 done (0 ok, 2 failed), 540s elapsed, ~2160s left
+[baseline] 2/10 done (0 ok, 2 failed), 570s elapsed, ~2280s left
+[baseline] 2/10 done (0 ok, 2 failed), 600s elapsed, ~2400s left
+[baseline] 3/10 done (1 ok, 2 failed), 630s elapsed, ~1470s left
+[baseline] 3/10 done (1 ok, 2 failed), 660s elapsed, ~1540s left
+[baseline] 3/10 done (1 ok, 2 failed), 690s elapsed, ~1610s left
+[baseline] 3/10 done (1 ok, 2 failed), 720s elapsed, ~1680s left
+  [baseline] a05 rep0 FAILED: a05 rep0: exceeded 360s wall-clock ceiling
+[baseline] 4/10 done (1 ok, 3 failed), 750s elapsed, ~1125s left
+[baseline] 4/10 done (1 ok, 3 failed), 780s elapsed, ~1170s left
+[baseline] 6/10 done (3 ok, 3 failed), 810s elapsed, ~540s left
+[baseline] 6/10 done (3 ok, 3 failed), 840s elapsed, ~560s left
+[baseline] 7/10 done (4 ok, 3 failed), 870s elapsed, ~373s left
+[baseline] 7/10 done (4 ok, 3 failed), 900s elapsed, ~386s left
+[baseline] 7/10 done (4 ok, 3 failed), 930s elapsed, ~399s left
+[baseline] 7/10 done (4 ok, 3 failed), 960s elapsed, ~411s left
+[baseline] 7/10 done (4 ok, 3 failed), 990s elapsed, ~424s left
+[baseline] 7/10 done (4 ok, 3 failed), 1020s elapsed, ~437s left
+[baseline] 7/10 done (4 ok, 3 failed), 1050s elapsed, ~450s left
+[baseline] 7/10 done (4 ok, 3 failed), 1080s elapsed, ~463s left
+[baseline] 8/10 done (5 ok, 3 failed), 1110s elapsed, ~278s left
+[baseline] 8/10 done (5 ok, 3 failed), 1140s elapsed, ~285s left
+[baseline] 8/10 done (5 ok, 3 failed), 1170s elapsed, ~293s left
+[baseline] 8/10 done (5 ok, 3 failed), 1200s elapsed, ~300s left
+  [baseline] i09 rep0 FAILED: i09 rep0: exceeded 360s wall-clock ceiling
+[baseline] 9/10 done (5 ok, 4 failed), 1230s elapsed, ~137s left
+[baseline] 9/10 done (5 ok, 4 failed), 1260s elapsed, ~140s left
+[baseline] 9/10 done (5 ok, 4 failed), 1290s elapsed, ~143s left
+[baseline] 10/10 done (6 ok, 4 failed), 1290s elapsed, ~0s left
+[baseline] done - 6 ok, 4 failed -> /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/glm-5.3/with-memory/baseline/results.jsonl
+[baseline] 收尾清掉 28 个残留 scratch 目录

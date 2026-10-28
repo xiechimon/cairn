@@ -1,0 +1,40 @@
+{
+  "sourceCommit": "87ecbc71a4401ac7eac067eadb538acef51c046e",
+  "requestedTurns": 48,
+  "processAliveAtCollection": false,
+  "sourceWorktreeCleanAtCollection": true,
+  "completionMarker": "BATCH_COMPLETE",
+  "counts": {
+    "deepseek-v4.1-flash": {
+      "with-memory": {
+        "results": 10,
+        "errors": 0
+      },
+      "no-memory": {
+        "results": 5,
+        "errors": 1
+      }
+    },
+    "glm-5.3": {
+      "with-memory": {
+        "results": 6,
+        "errors": 4
+      },
+      "no-memory": {
+        "results": 5,
+        "errors": 1
+      }
+    },
+    "glm-5.3-flash": {
+      "with-memory": {
+        "results": 0,
+        "errors": 10
+      },
+      "no-memory": {
+        "results": 0,
+        "errors": 6
+      }
+    }
+  },
+  "qualificationReady": false
+}

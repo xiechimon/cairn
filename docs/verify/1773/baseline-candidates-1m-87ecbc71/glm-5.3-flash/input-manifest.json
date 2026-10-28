@@ -1,0 +1,20 @@
+{
+  "sourceCommit": "87ecbc71a4401ac7eac067eadb538acef51c046e",
+  "requestedModel": "glm-5.3-flash",
+  "providerMode": "real",
+  "contextWindow": 1000000,
+  "files": {
+    "cases.json": "3569971199a0009695d5ae7b984c34abc7a4fb3666e8e8744e541ed9380b605c",
+    "_state.json": "973d84c6e81fb6bae0cc7c11ef324cfdae6fb5a62cadcc0f03681aee84bbd387"
+  },
+  "armInputs": {
+    "with-memory": {
+      "cases.json": "3569971199a0009695d5ae7b984c34abc7a4fb3666e8e8744e541ed9380b605c",
+      "_state.json": "973d84c6e81fb6bae0cc7c11ef324cfdae6fb5a62cadcc0f03681aee84bbd387"
+    },
+    "no-memory": {
+      "cases.json": "f3d8245b73fef1c2e9467005423927978c13bc5b7c3478b92a0ba05b56f7910d",
+      "_state.json": "973d84c6e81fb6bae0cc7c11ef324cfdae6fb5a62cadcc0f03681aee84bbd387"
+    }
+  }
+}

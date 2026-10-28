@@ -1,0 +1,10 @@
+{"prompt_id":"a02","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.5s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":44.915}
+{"prompt_id":"a01","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.5s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":45.049}
+{"prompt_id":"a03","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.5s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":44.905}
+{"prompt_id":"a05","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.5s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":44.968}
+{"prompt_id":"i01","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.6s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":44.937}
+{"prompt_id":"i06","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.7s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":44.942}
+{"prompt_id":"i07","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.5s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":44.732}
+{"prompt_id":"i08","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.5s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":44.729}
+{"prompt_id":"i09","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.5s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":44.721}
+{"prompt_id":"i10","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.5s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":44.689}

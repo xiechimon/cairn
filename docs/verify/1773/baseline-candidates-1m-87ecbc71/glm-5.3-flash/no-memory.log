@@ -1,0 +1,16 @@
+[heavy-slots] acquired slot 1/2
+harness approved: sha256 33179ccc6fca over 45 file(s) recorded in /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/glm-5.3-flash/no-memory/_state.json
+[baseline] 6 of 6 (id,rep) to run
+[baseline] 0/6 done (0 ok, 0 failed), 30s elapsed
+  [baseline] i01 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+  [baseline] i06 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.6s
+[baseline] 2/6 done (0 ok, 2 failed), 60s elapsed, ~120s left
+  [baseline] i07 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+  [baseline] i08 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+[baseline] 4/6 done (0 ok, 4 failed), 90s elapsed, ~45s left
+[baseline] 4/6 done (0 ok, 4 failed), 120s elapsed, ~60s left
+  [baseline] i09 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+  [baseline] i10 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+[baseline] 6/6 done (0 ok, 6 failed), 135s elapsed, ~0s left
+[baseline] done - 0 ok, 6 failed -> /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/glm-5.3-flash/no-memory/baseline/results.jsonl
+[baseline] 收尾清掉 36 个残留 scratch 目录

@@ -1,0 +1,20 @@
+[heavy-slots] acquired slot 1/2
+harness approved: sha256 33179ccc6fca over 45 file(s) recorded in /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/deepseek-v4.1-flash/no-memory/_state.json
+[baseline] 6 of 6 (id,rep) to run
+[baseline] 2/6 done (2 ok, 0 failed), 30s elapsed, ~60s left
+[baseline] 4/6 done (4 ok, 0 failed), 60s elapsed, ~30s left
+[baseline] 5/6 done (5 ok, 0 failed), 90s elapsed, ~18s left
+[baseline] 5/6 done (5 ok, 0 failed), 120s elapsed, ~24s left
+[baseline] 5/6 done (5 ok, 0 failed), 150s elapsed, ~30s left
+[baseline] 5/6 done (5 ok, 0 failed), 180s elapsed, ~36s left
+[baseline] 5/6 done (5 ok, 0 failed), 210s elapsed, ~42s left
+[baseline] 5/6 done (5 ok, 0 failed), 240s elapsed, ~48s left
+[baseline] 5/6 done (5 ok, 0 failed), 270s elapsed, ~54s left
+[baseline] 5/6 done (5 ok, 0 failed), 300s elapsed, ~60s left
+[baseline] 5/6 done (5 ok, 0 failed), 330s elapsed, ~66s left
+[baseline] 5/6 done (5 ok, 0 failed), 360s elapsed, ~72s left
+[baseline] 5/6 done (5 ok, 0 failed), 390s elapsed, ~78s left
+  [baseline] i09 rep0 FAILED: i09 rep0: exceeded 360s wall-clock ceiling
+[baseline] 6/6 done (5 ok, 1 failed), 391s elapsed, ~0s left
+[baseline] done - 5 ok, 1 failed -> /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/deepseek-v4.1-flash/no-memory/baseline/results.jsonl
+[baseline] 收尾清掉 10 个残留 scratch 目录

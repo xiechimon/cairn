@@ -1,0 +1,13 @@
+START model=deepseek-v4.1-flash arm=with-memory contextWindow=1000000 cases=10
+END model=deepseek-v4.1-flash arm=with-memory rc=0
+START model=deepseek-v4.1-flash arm=no-memory contextWindow=1000000 cases=6
+END model=deepseek-v4.1-flash arm=no-memory rc=1
+START model=glm-5.3 arm=with-memory contextWindow=1000000 cases=10
+END model=glm-5.3 arm=with-memory rc=1
+START model=glm-5.3 arm=no-memory contextWindow=1000000 cases=6
+END model=glm-5.3 arm=no-memory rc=1
+START model=glm-5.3-flash arm=with-memory contextWindow=1000000 cases=10
+END model=glm-5.3-flash arm=with-memory rc=1
+START model=glm-5.3-flash arm=no-memory contextWindow=1000000 cases=6
+END model=glm-5.3-flash arm=no-memory rc=1
+BATCH_COMPLETE

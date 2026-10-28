@@ -1,0 +1,212 @@
+{
+  "ready": false,
+  "familyCounts": {
+    "adjacent": 4,
+    "irrelevant": 6
+  },
+  "cases": [
+    {
+      "id": "a01",
+      "kind": "adjacent",
+      "fingerprint": "bfd6aeb989f34d0c46bf14e1674b2d83b4b8c1815d7ee4cf014bb8fc18151da7",
+      "qualified": true,
+      "paired": true,
+      "observations": [
+        {
+          "model": "deepseek-v4.1-flash",
+          "rep": 0,
+          "decision": 0,
+          "untouched": 1,
+          "noMemoryDecision": null
+        }
+      ]
+    },
+    {
+      "id": "a02",
+      "kind": "adjacent",
+      "fingerprint": "33d6805c6138cbcaa128058a3d046ed98f2ceeddeb90d85ddaa84166455dd8ca",
+      "qualified": true,
+      "paired": true,
+      "observations": [
+        {
+          "model": "deepseek-v4.1-flash",
+          "rep": 0,
+          "decision": 0,
+          "untouched": 1,
+          "noMemoryDecision": null
+        }
+      ]
+    },
+    {
+      "id": "a03",
+      "kind": "adjacent",
+      "fingerprint": "eda4aaa73daf3bd882c8dadd00247f3bf157b85694da07c40a42824c19f84580",
+      "qualified": true,
+      "paired": true,
+      "observations": [
+        {
+          "model": "deepseek-v4.1-flash",
+          "rep": 0,
+          "decision": 0,
+          "untouched": 1,
+          "noMemoryDecision": null
+        },
+        {
+          "model": "glm-5.3",
+          "rep": 0,
+          "decision": 1,
+          "untouched": 1,
+          "noMemoryDecision": null
+        }
+      ]
+    },
+    {
+      "id": "a05",
+      "kind": "adjacent",
+      "fingerprint": "605284be532d5de9dbab67212a0b186d7e7dd9e03a15d55d9faf4b693e1c1ff9",
+      "qualified": true,
+      "paired": true,
+      "observations": [
+        {
+          "model": "deepseek-v4.1-flash",
+          "rep": 0,
+          "decision": 0,
+          "untouched": 1,
+          "noMemoryDecision": null
+        }
+      ]
+    },
+    {
+      "id": "i01",
+      "kind": "irrelevant",
+      "fingerprint": "5ad842d00ae0d2337c7eaa16c63ae164a93921219553d7da8d64325e6acf9674",
+      "qualified": false,
+      "paired": true,
+      "observations": [
+        {
+          "model": "deepseek-v4.1-flash",
+          "rep": 0,
+          "decision": 1,
+          "untouched": null,
+          "noMemoryDecision": 1
+        },
+        {
+          "model": "glm-5.3",
+          "rep": 0,
+          "decision": 1,
+          "untouched": null,
+          "noMemoryDecision": 1
+        }
+      ]
+    },
+    {
+      "id": "i06",
+      "kind": "irrelevant",
+      "fingerprint": "3368710907c314a07a4fe52b35a2d767ad8e66a87d976a76217817737519089e",
+      "qualified": true,
+      "paired": true,
+      "observations": [
+        {
+          "model": "deepseek-v4.1-flash",
+          "rep": 0,
+          "decision": 0,
+          "untouched": null,
+          "noMemoryDecision": 0
+        },
+        {
+          "model": "glm-5.3",
+          "rep": 0,
+          "decision": 1,
+          "untouched": null,
+          "noMemoryDecision": 1
+        }
+      ]
+    },
+    {
+      "id": "i07",
+      "kind": "irrelevant",
+      "fingerprint": "f7a7aaa99b7fbcd9a748445f3bedad3aea3d6ed7345e272feb11ce23c2938694",
+      "qualified": false,
+      "paired": true,
+      "observations": [
+        {
+          "model": "deepseek-v4.1-flash",
+          "rep": 0,
+          "decision": 1,
+          "untouched": null,
+          "noMemoryDecision": 1
+        },
+        {
+          "model": "glm-5.3",
+          "rep": 0,
+          "decision": 1,
+          "untouched": null,
+          "noMemoryDecision": 1
+        }
+      ]
+    },
+    {
+      "id": "i08",
+      "kind": "irrelevant",
+      "fingerprint": "149b1e02410ce2c713e05ef409faac6b2697823101aa6033693fc3fa0bbbff2a",
+      "qualified": false,
+      "paired": true,
+      "observations": [
+        {
+          "model": "deepseek-v4.1-flash",
+          "rep": 0,
+          "decision": 1,
+          "untouched": null,
+          "noMemoryDecision": 1
+        },
+        {
+          "model": "glm-5.3",
+          "rep": 0,
+          "decision": 1,
+          "untouched": null,
+          "noMemoryDecision": 1
+        }
+      ]
+    },
+    {
+      "id": "i09",
+      "kind": "irrelevant",
+      "fingerprint": "6bfd9ed1931621db040e492bfce4b24915858b88c87f9cecc8e7a525dee95e42",
+      "qualified": false,
+      "paired": false,
+      "observations": [
+        {
+          "model": "deepseek-v4.1-flash",
+          "rep": 0,
+          "decision": 1,
+          "untouched": null,
+          "noMemoryDecision": null
+        }
+      ]
+    },
+    {
+      "id": "i10",
+      "kind": "irrelevant",
+      "fingerprint": "eac4e285d077510725ad50e9fadf11be3fe07060c261b850eaa9056762fbc3df",
+      "qualified": true,
+      "paired": true,
+      "observations": [
+        {
+          "model": "deepseek-v4.1-flash",
+          "rep": 0,
+          "decision": 0,
+          "untouched": null,
+          "noMemoryDecision": 0
+        },
+        {
+          "model": "glm-5.3",
+          "rep": 0,
+          "decision": 0,
+          "untouched": null,
+          "noMemoryDecision": 0
+        }
+      ]
+    }
+  ],
+  "executionErrors": 22
+}

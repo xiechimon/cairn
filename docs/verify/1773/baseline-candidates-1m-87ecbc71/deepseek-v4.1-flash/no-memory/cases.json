@@ -1,0 +1,1030 @@
+{
+  "flow": "memory-regression",
+  "note": "Memory-regression inputs. memories are seeded into the isolated store (scope eval-project, other-project, or null for global; ageDays is age at seed time; invalidatedBy points at another memory in the same case and sets invalidAt plus supersededBy). expect.include is grouped required phrases (one alias per group, every group must hit) and exclude is forbidden phrases. The judge reads the new todo title and spec. Stale cases also judge the memory table. Adjacent cases also require the named untouchedMemory row to keep its content and no supersededBy. Irrelevant cases judge decision_ok only.",
+  "roster": [
+    {
+      "key": "exec-glm-5.3",
+      "displayName": "执行位1",
+      "modelId": "glm-5.3",
+      "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
+    },
+    {
+      "key": "exec-glm-5.3-flash",
+      "displayName": "执行位2",
+      "modelId": "glm-5.3-flash",
+      "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
+    },
+    {
+      "key": "exec-deepseek-v4.1-flash",
+      "displayName": "执行位3",
+      "modelId": "deepseek-v4.1-flash",
+      "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
+    }
+  ],
+  "cases": [
+    {
+      "id": "c01",
+      "tags": [
+        "conflict",
+        "invalidated"
+      ],
+      "prompt": "给 eval-project 建一张任务：整理 0.6 版本的发布分支准备清单。spec 里把分支的具体命名格式写明，别让执行的人去猜。",
+      "memories": [
+        {
+          "key": "old",
+          "title": "发布分支命名",
+          "content": "发布分支统一叫 `release/x.y`，例如 release/0.5。",
+          "ageDays": 45,
+          "invalidatedBy": "new"
+        },
+        {
+          "key": "new",
+          "title": "发布分支命名",
+          "content": "发布分支改为 `rel-x.y`，例如 rel-0.5，不再使用 release/ 目录前缀。",
+          "ageDays": 6
+        }
+      ],
+      "expect": {
+        "kind": "conflict",
+        "include": [
+          [
+            "rel-"
+          ]
+        ],
+        "exclude": [
+          "release/"
+        ]
+      }
+    },
+    {
+      "id": "c02",
+      "tags": [
+        "conflict",
+        "invalidated"
+      ],
+      "prompt": "给 eval-project 建一张任务：为 POST /api/tasks/delete 补一节错误响应的文档。spec 里写明错误响应体有哪些字段。",
+      "memories": [
+        {
+          "key": "old",
+          "title": "错误响应格式",
+          "content": "接口出错时响应体为 `{code, msg}`。",
+          "ageDays": 45,
+          "invalidatedBy": "new"
+        },
+        {
+          "key": "new",
+          "title": "错误响应格式",
+          "content": "接口出错时响应体改为 `{error, detail}`，旧的 code/msg 已废弃。",
+          "ageDays": 6
+        }
+      ],
+      "expect": {
+        "kind": "conflict",
+        "include": [
+          [
+            "detail"
+          ]
+        ],
+        "exclude": [
+          "msg"
+        ]
+      }
+    },
+    {
+      "id": "c03",
+      "tags": [
+        "conflict",
+        "invalidated"
+      ],
+      "prompt": "给 eval-project 建一张任务：给任务搜索接口补一段字段说明，重点说清楚时间字段的取值格式，spec 里写具体格式。",
+      "memories": [
+        {
+          "key": "old",
+          "title": "时间字段格式",
+          "content": "接口里的时间字段一律用 ISO 8601 字符串。",
+          "ageDays": 45,
+          "invalidatedBy": "new"
+        },
+        {
+          "key": "new",
+          "title": "时间字段格式",
+          "content": "接口里的时间字段统一改为 epoch 毫秒整数。",
+          "ageDays": 6
+        }
+      ],
+      "expect": {
+        "kind": "conflict",
+        "include": [
+          [
+            "epoch",
+            "毫秒"
+          ]
+        ],
+        "exclude": [
+          "iso8601",
+          "iso 8601",
+          "iso-8601",
+          "iso 字符串"
+        ]
+      }
+    },
+    {
+      "id": "c04",
+      "tags": [
+        "conflict",
+        "invalidated"
+      ],
+      "prompt": "给 eval-project 建一张任务：把任务导出功能的评审安排写进 spec，要写明默认找谁评审。",
+      "memories": [
+        {
+          "key": "old",
+          "title": "默认评审人",
+          "content": "后端改动默认指派 @mao-ops 评审。",
+          "ageDays": 45,
+          "invalidatedBy": "new"
+        },
+        {
+          "key": "new",
+          "title": "默认评审人",
+          "content": "后端改动的默认评审人换成 @lin-ops，@mao-ops 已调岗。",
+          "ageDays": 6
+        }
+      ],
+      "expect": {
+        "kind": "conflict",
+        "include": [
+          [
+            "@lin-ops"
+          ]
+        ],
+        "exclude": [
+          "@mao-ops"
+        ]
+      }
+    },
+    {
+      "id": "c05",
+      "tags": [
+        "conflict",
+        "earlier-only"
+      ],
+      "prompt": "给 eval-project 建一张任务：给任务搜索模块补单元测试。spec 里写明测试覆盖率要达到多少才算过。",
+      "memories": [
+        {
+          "key": "old",
+          "title": "覆盖率门槛",
+          "content": "合并前测试覆盖率要达到 60%。",
+          "ageDays": 45
+        },
+        {
+          "key": "new",
+          "title": "覆盖率门槛",
+          "content": "合并前测试覆盖率要达到 80%。",
+          "ageDays": 6
+        }
+      ],
+      "expect": {
+        "kind": "conflict",
+        "include": [
+          [
+            "80%"
+          ]
+        ],
+        "exclude": [
+          "60%"
+        ]
+      }
+    },
+    {
+      "id": "c06",
+      "tags": [
+        "conflict",
+        "earlier-only"
+      ],
+      "prompt": "给 eval-project 建一张任务：写一份联调说明，spec 里写明联调用的环境域名。",
+      "memories": [
+        {
+          "key": "old",
+          "title": "联调环境域名",
+          "content": "联调一律连 staging.eval.example。",
+          "ageDays": 45
+        },
+        {
+          "key": "new",
+          "title": "联调环境域名",
+          "content": "联调环境换成 pre.eval.example。",
+          "ageDays": 6
+        }
+      ],
+      "expect": {
+        "kind": "conflict",
+        "include": [
+          [
+            "pre.eval.example"
+          ]
+        ],
+        "exclude": [
+          "staging.eval.example"
+        ]
+      }
+    },
+    {
+      "id": "c07",
+      "tags": [
+        "conflict",
+        "earlier-only"
+      ],
+      "prompt": "给 eval-project 建一张任务：给任务导出模块加运行日志。spec 里写明用什么方式打日志。",
+      "memories": [
+        {
+          "key": "old",
+          "title": "日志写法",
+          "content": "打日志直接用 console.log。",
+          "ageDays": 45
+        },
+        {
+          "key": "new",
+          "title": "日志写法",
+          "content": "日志统一走 logger.info / logger.warn，不再用 console.log。",
+          "ageDays": 6
+        }
+      ],
+      "expect": {
+        "kind": "conflict",
+        "include": [
+          [
+            "logger"
+          ]
+        ],
+        "exclude": [
+          "console.log"
+        ]
+      }
+    },
+    {
+      "id": "l01",
+      "tags": [
+        "leak",
+        "title-named"
+      ],
+      "prompt": "给 eval-project 建一张任务：把发布流程写进部署文档。spec 里写明从哪条分支发布。",
+      "memories": [
+        {
+          "key": "foreign",
+          "title": "other-project 发布分支",
+          "content": "other-project 的发布分支叫 trunk，直接往 trunk 合并后发布。",
+          "scope": "other-project",
+          "ageDays": 20
+        },
+        {
+          "key": "own",
+          "title": "发布分支",
+          "content": "eval-project 从 main 分支发布，不另开发布分支。",
+          "scope": "eval-project",
+          "ageDays": 10
+        }
+      ],
+      "expect": {
+        "kind": "leak",
+        "include": [
+          [
+            "从 main"
+          ]
+        ],
+        "exclude": [
+          "trunk"
+        ]
+      }
+    },
+    {
+      "id": "l02",
+      "tags": [
+        "leak",
+        "content-named"
+      ],
+      "prompt": "给 eval-project 建一张任务：补全任务删除接口的 API 文档。spec 里写明接口路径。",
+      "memories": [
+        {
+          "key": "foreign",
+          "title": "接口前缀",
+          "content": "other-project 的接口路径统一以 /v0/ 开头。",
+          "scope": "other-project",
+          "ageDays": 20
+        }
+      ],
+      "expect": {
+        "kind": "leak",
+        "include": [
+          [
+            "/api/"
+          ]
+        ],
+        "exclude": [
+          "/v0"
+        ]
+      }
+    },
+    {
+      "id": "l03",
+      "tags": [
+        "leak",
+        "content-named"
+      ],
+      "prompt": "给 eval-project 建一张任务：给任务导出加一行表头。spec 里写明提交信息和 PR 标题该怎么写。",
+      "memories": [
+        {
+          "key": "foreign",
+          "title": "PR 标题格式",
+          "content": "other-project 要求 PR 标题以 [BILL-数字] 开头。",
+          "scope": "other-project",
+          "ageDays": 20
+        },
+        {
+          "key": "own",
+          "title": "提交信息语言",
+          "content": "eval-project 的提交信息用中文。",
+          "scope": "eval-project",
+          "ageDays": 10
+        }
+      ],
+      "expect": {
+        "kind": "leak",
+        "include": [
+          [
+            "中文"
+          ]
+        ],
+        "exclude": [
+          "bill-"
+        ]
+      }
+    },
+    {
+      "id": "l04",
+      "tags": [
+        "leak",
+        "content-named"
+      ],
+      "prompt": "给 eval-project 建一张任务：给搜索模块补测试。spec 里写明用什么测试框架来跑。",
+      "memories": [
+        {
+          "key": "foreign",
+          "title": "测试框架",
+          "content": "other-project 的测试用 jest，配置在根目录 jest.config.js。",
+          "scope": "other-project",
+          "ageDays": 20
+        }
+      ],
+      "expect": {
+        "kind": "leak",
+        "include": [
+          [
+            "vitest"
+          ]
+        ],
+        "exclude": [
+          "jest"
+        ]
+      }
+    },
+    {
+      "id": "l05",
+      "tags": [
+        "leak",
+        "content-named"
+      ],
+      "prompt": "给 eval-project 建一张任务：补任务删除逻辑的测试。spec 里写明测试用哪个数据库。",
+      "memories": [
+        {
+          "key": "foreign",
+          "title": "测试数据库",
+          "content": "other-project 的测试一律连 atlas-test 实例，不要用本地 sqlite。",
+          "scope": "other-project",
+          "ageDays": 20
+        }
+      ],
+      "expect": {
+        "kind": "leak",
+        "include": [
+          [
+            "sqlite"
+          ]
+        ],
+        "exclude": [
+          "atlas-test"
+        ]
+      }
+    },
+    {
+      "id": "l06",
+      "tags": [
+        "leak",
+        "content-named"
+      ],
+      "prompt": "给 eval-project 建一张任务：补一份贡献说明。spec 里写明提交信息的写法。",
+      "memories": [
+        {
+          "key": "foreign",
+          "title": "提交信息格式",
+          "content": "other-project 的提交信息一律以 `bcn:` 开头。",
+          "scope": "other-project",
+          "ageDays": 20
+        },
+        {
+          "key": "own",
+          "title": "提交信息语言",
+          "content": "eval-project 的提交信息用中文。",
+          "scope": "eval-project",
+          "ageDays": 10
+        }
+      ],
+      "expect": {
+        "kind": "leak",
+        "include": [
+          [
+            "中文"
+          ]
+        ],
+        "exclude": [
+          "bcn:"
+        ]
+      }
+    },
+    {
+      "id": "l07",
+      "tags": [
+        "leak",
+        "content-named"
+      ],
+      "prompt": "给 eval-project 建一张任务：写一份部署前检查清单。spec 里写明本地生产形态用哪条命令启动。",
+      "memories": [
+        {
+          "key": "foreign",
+          "title": "上线前验证",
+          "content": "other-project 上线前必须先在 staging-9 环境验证，然后用 `make ship` 发布。",
+          "scope": "other-project",
+          "ageDays": 20
+        }
+      ],
+      "expect": {
+        "kind": "leak",
+        "include": [
+          [
+            "pnpm start"
+          ]
+        ],
+        "exclude": [
+          "staging-9",
+          "make ship"
+        ]
+      }
+    },
+    {
+      "id": "s01",
+      "tags": [
+        "stale",
+        "command"
+      ],
+      "prompt": "给 eval-project 建一张任务：给 README 补一节新手上手说明。spec 里写明在本地怎么把前后端一起启动。",
+      "memories": [
+        {
+          "key": "stale",
+          "title": "本地启动命令",
+          "content": "本地同时启动前后端用 `yarn dev:all`。",
+          "ageDays": 60
+        },
+        {
+          "key": "keep",
+          "title": "提交信息语言",
+          "content": "提交信息用中文，一句话说明改动。",
+          "ageDays": 30
+        }
+      ],
+      "expect": {
+        "kind": "stale",
+        "include": [
+          [
+            "pnpm dev"
+          ]
+        ],
+        "exclude": [
+          "yarn dev:all"
+        ],
+        "staleMemory": "stale"
+      }
+    },
+    {
+      "id": "s02",
+      "tags": [
+        "stale",
+        "port"
+      ],
+      "prompt": "给 eval-project 建一张任务：给服务端加一个健康检查接口。spec 里写明服务在本地监听哪个端口。",
+      "memories": [
+        {
+          "key": "stale",
+          "title": "服务端口",
+          "content": "服务端本地默认监听 3000 端口。",
+          "ageDays": 60
+        },
+        {
+          "key": "keep",
+          "title": "提交信息语言",
+          "content": "提交信息用中文，一句话说明改动。",
+          "ageDays": 30
+        }
+      ],
+      "expect": {
+        "kind": "stale",
+        "include": [
+          [
+            "8787"
+          ]
+        ],
+        "exclude": [
+          "3000"
+        ],
+        "staleMemory": "stale"
+      }
+    },
+    {
+      "id": "s03",
+      "tags": [
+        "stale",
+        "deploy"
+      ],
+      "prompt": "给 eval-project 建一张任务：把部署文档重写成能直接照着操作的版本。spec 里写明部署用哪条命令。",
+      "memories": [
+        {
+          "key": "stale",
+          "title": "部署命令",
+          "content": "部署统一用 `docker compose up -d`。",
+          "ageDays": 60
+        },
+        {
+          "key": "keep",
+          "title": "提交信息语言",
+          "content": "提交信息用中文，一句话说明改动。",
+          "ageDays": 30
+        }
+      ],
+      "expect": {
+        "kind": "stale",
+        "include": [
+          [
+            "pnpm start"
+          ]
+        ],
+        "exclude": [
+          "docker compose"
+        ],
+        "staleMemory": "stale"
+      }
+    },
+    {
+      "id": "s04",
+      "tags": [
+        "stale",
+        "ci"
+      ],
+      "prompt": "给 eval-project 建一张任务：在 CI 流水线里加一步 lint。spec 里写明 CI 里装依赖用的命令。",
+      "memories": [
+        {
+          "key": "stale",
+          "title": "CI 装依赖",
+          "content": "CI 里装依赖用 `yarn install --frozen-lockfile`。",
+          "ageDays": 60
+        },
+        {
+          "key": "keep",
+          "title": "提交信息语言",
+          "content": "提交信息用中文，一句话说明改动。",
+          "ageDays": 30
+        }
+      ],
+      "expect": {
+        "kind": "stale",
+        "include": [
+          [
+            "pnpm install --frozen-lockfile"
+          ]
+        ],
+        "exclude": [
+          "yarn install"
+        ],
+        "staleMemory": "stale"
+      }
+    },
+    {
+      "id": "s05",
+      "tags": [
+        "stale",
+        "version"
+      ],
+      "prompt": "给 eval-project 建一张任务：给 README 补一节环境要求。spec 里写明 Node 版本要求。",
+      "memories": [
+        {
+          "key": "stale",
+          "title": "Node 版本",
+          "content": "项目要求 Node >=18 即可。",
+          "ageDays": 60
+        },
+        {
+          "key": "keep",
+          "title": "提交信息语言",
+          "content": "提交信息用中文，一句话说明改动。",
+          "ageDays": 30
+        }
+      ],
+      "expect": {
+        "kind": "stale",
+        "include": [
+          [
+            ">=20",
+            "node 20",
+            "20.0.0",
+            "node:20"
+          ]
+        ],
+        "exclude": [
+          ">=18",
+          "node 18",
+          "node18"
+        ],
+        "staleMemory": "stale"
+      }
+    },
+    {
+      "id": "s06",
+      "tags": [
+        "stale",
+        "port"
+      ],
+      "prompt": "给 eval-project 建一张任务：给前端补一份本地调试说明。spec 里写明前端开发服务器的端口。",
+      "memories": [
+        {
+          "key": "stale",
+          "title": "前端端口",
+          "content": "前端开发服务器默认跑在 4000 端口。",
+          "ageDays": 60
+        },
+        {
+          "key": "keep",
+          "title": "提交信息语言",
+          "content": "提交信息用中文，一句话说明改动。",
+          "ageDays": 30
+        }
+      ],
+      "expect": {
+        "kind": "stale",
+        "include": [
+          [
+            "5173"
+          ]
+        ],
+        "exclude": [
+          "4000"
+        ],
+        "staleMemory": "stale"
+      }
+    },
+    {
+      "id": "s07",
+      "tags": [
+        "stale",
+        "command"
+      ],
+      "prompt": "给 eval-project 建一张任务：在 CI 里加一步单元测试。spec 里写明跑单测的命令。",
+      "memories": [
+        {
+          "key": "stale",
+          "title": "单测命令",
+          "content": "跑单测用 `pnpm test:unit`。",
+          "ageDays": 60
+        },
+        {
+          "key": "keep",
+          "title": "提交信息语言",
+          "content": "提交信息用中文，一句话说明改动。",
+          "ageDays": 30
+        }
+      ],
+      "expect": {
+        "kind": "stale",
+        "include": [
+          [
+            "pnpm test",
+            "vitest run"
+          ]
+        ],
+        "exclude": [
+          "test:unit"
+        ],
+        "staleMemory": "stale"
+      }
+    },
+    {
+      "id": "a01",
+      "tags": [
+        "adjacent",
+        "preference"
+      ],
+      "prompt": "给 eval-project 建一张任务：把设计评审怎么收集反馈写进贡献说明。spec 里写明具体方式。",
+      "memories": [
+        {
+          "key": "target",
+          "title": "eval-project 反馈方式",
+          "content": "eval-project 里，设计评审的反馈方式是异步书面意见。",
+          "scope": "eval-project",
+          "ageDays": 4
+        },
+        {
+          "key": "keep",
+          "title": "eval-project 反馈方式",
+          "content": "eval-project 里，事故响应的反馈方式是同步电话会议。",
+          "scope": "eval-project",
+          "ageDays": 40
+        }
+      ],
+      "expect": {
+        "kind": "adjacent",
+        "include": [
+          [
+            "异步书面"
+          ]
+        ],
+        "exclude": [
+          "同步电话"
+        ],
+        "untouchedMemory": "keep"
+      }
+    },
+    {
+      "id": "a02",
+      "tags": [
+        "adjacent",
+        "command"
+      ],
+      "prompt": "给 eval-project 建一张任务：把代码改动的推送前检查写进贡献说明。spec 写明现行命令。仓库里的现行做法如果和你记住的不同，改掉对应的那条记忆。",
+      "memories": [
+        {
+          "key": "target",
+          "title": "eval-project 推送前检查",
+          "content": "eval-project 里推送前检查，代码改动要跑 `pnpm e2e:full`。",
+          "scope": "eval-project",
+          "ageDays": 50
+        },
+        {
+          "key": "keep",
+          "title": "eval-project 推送前检查",
+          "content": "eval-project 里推送前检查，只改文档要跑 `skip-docs-e2e`。",
+          "scope": "eval-project",
+          "ageDays": 20
+        }
+      ],
+      "expect": {
+        "kind": "adjacent",
+        "include": [
+          [
+            "e2e:affected"
+          ]
+        ],
+        "exclude": [
+          "e2e:full",
+          "skip-docs-e2e"
+        ],
+        "untouchedMemory": "keep"
+      }
+    },
+    {
+      "id": "a03",
+      "tags": [
+        "adjacent",
+        "port"
+      ],
+      "prompt": "给 eval-project 建一张任务：健康检查说明写明服务端本地监听的端口。和仓库不符的记忆改成现行端口。",
+      "memories": [
+        {
+          "key": "target",
+          "title": "eval-project 本地监听端口",
+          "content": "eval-project 里本地监听端口，服务端那一个记成 9090。",
+          "scope": "eval-project",
+          "ageDays": 60
+        },
+        {
+          "key": "keep",
+          "title": "eval-project 本地监听端口",
+          "content": "eval-project 里本地监听端口，指标抓取那一个记成 9100。",
+          "scope": "eval-project",
+          "ageDays": 15
+        }
+      ],
+      "expect": {
+        "kind": "adjacent",
+        "include": [
+          [
+            "8787"
+          ]
+        ],
+        "exclude": [
+          "9090",
+          "9100"
+        ],
+        "untouchedMemory": "keep"
+      }
+    },
+    {
+      "id": "a05",
+      "tags": [
+        "adjacent",
+        "deploy"
+      ],
+      "prompt": "给 eval-project 建一张任务：把服务进程的生产启动说明改成能直接照着操作的版本。spec 写明启动服务用的现行命令。和仓库不符的记忆改成现行命令。",
+      "memories": [
+        {
+          "key": "target",
+          "title": "eval-project 上线命令",
+          "content": "eval-project 里上线步骤的服务进程启动命令是 `docker compose up -d`。",
+          "scope": "eval-project",
+          "ageDays": 55
+        },
+        {
+          "key": "keep",
+          "title": "eval-project 上线命令",
+          "content": "eval-project 里上线步骤的数据库迁移命令是 `make migrate-prod`。",
+          "scope": "eval-project",
+          "ageDays": 18
+        }
+      ],
+      "expect": {
+        "kind": "adjacent",
+        "include": [
+          [
+            "pnpm start"
+          ]
+        ],
+        "exclude": [
+          "docker compose",
+          "make migrate-prod"
+        ],
+        "untouchedMemory": "keep"
+      }
+    },
+    {
+      "id": "i01",
+      "tags": [
+        "irrelevant",
+        "startup"
+      ],
+      "prompt": "给 eval-project 建一张任务：给 README 补一节新手上手说明。spec 里写明在本地怎么把前后端一起启动。",
+      "memories": [],
+      "expect": {
+        "kind": "irrelevant",
+        "include": [
+          [
+            "pnpm dev"
+          ]
+        ],
+        "exclude": [
+          "spec-salt-441"
+        ]
+      }
+    },
+    {
+      "id": "i06",
+      "tags": [
+        "irrelevant",
+        "test"
+      ],
+      "prompt": "给 eval-project 建一张任务：在 CI 里加一步单元测试。spec 里写明跑单测的命令。",
+      "memories": [],
+      "expect": {
+        "kind": "irrelevant",
+        "include": [
+          [
+            "vitest run"
+          ]
+        ],
+        "exclude": [
+          "test-owl"
+        ]
+      }
+    },
+    {
+      "id": "i07",
+      "tags": [
+        "irrelevant",
+        "protocol"
+      ],
+      "prompt": "给 eval-project 建一张任务：把批量删除任务的响应对齐最近一次破坏性协议变更。spec 写明该变更的版本、HTTP 方法和路径、现行响应的全部字段，以及请求里不存在的 id 如何表达。以共享协议源码和变更日志为准。",
+      "memories": [],
+      "expect": {
+        "kind": "irrelevant",
+        "include": [
+          [
+            "/api/tasks/delete"
+          ],
+          [
+            "deleted"
+          ],
+          [
+            "skipped"
+          ],
+          [
+            "0.5.0"
+          ]
+        ],
+        "exclude": [
+          "fern-index-37"
+        ]
+      }
+    },
+    {
+      "id": "i08",
+      "tags": [
+        "irrelevant",
+        "sorting"
+      ],
+      "prompt": "给 eval-project 建一张任务：为搜索结果排序补回归测试。spec 根据源码写明当前真正使用的排序字段、排序方向，以及它和代码说明中的哪个字段不一致；这张任务只覆盖搜索排序。",
+      "memories": [],
+      "expect": {
+        "kind": "irrelevant",
+        "include": [
+          [
+            "updatedAt"
+          ],
+          [
+            "createdAt"
+          ],
+          [
+            "倒序",
+            "降序",
+            "descending",
+            "desc"
+          ]
+        ],
+        "exclude": [
+          "album-pine-82"
+        ]
+      }
+    },
+    {
+      "id": "i09",
+      "tags": [
+        "irrelevant",
+        "control-flow"
+      ],
+      "prompt": "给 eval-project 建一张任务：给按团队清空任务的操作补多条数据回归测试。spec 列出从按团队清空到批量删除的两个实际函数名，并写出哪个控制流语句造成只处理第一条；先读实际源码再写验收。",
+      "memories": [],
+      "expect": {
+        "kind": "irrelevant",
+        "include": [
+          [
+            "deleteAll"
+          ],
+          [
+            "deleteMany"
+          ],
+          [
+            "return"
+          ]
+        ],
+        "exclude": [
+          "cypress-lunch-73"
+        ]
+      }
+    },
+    {
+      "id": "i10",
+      "tags": [
+        "irrelevant",
+        "startup-matrix"
+      ],
+      "prompt": "给 eval-project 建一张任务：整理开发和生产环境的启动差异。spec 分别写明根目录开发启动命令、生产启动命令、Node 最低版本，以及前端开发服务器默认端口。",
+      "memories": [],
+      "expect": {
+        "kind": "irrelevant",
+        "include": [
+          [
+            "pnpm dev"
+          ],
+          [
+            "pnpm start"
+          ],
+          [
+            ">=20",
+            "node 20",
+            "20.0.0",
+            "node:20"
+          ],
+          [
+            "5173"
+          ]
+        ],
+        "exclude": [
+          "venue-copper-56"
+        ]
+      }
+    }
+  ]
+}

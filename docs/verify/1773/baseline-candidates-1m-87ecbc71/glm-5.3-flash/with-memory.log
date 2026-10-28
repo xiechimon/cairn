@@ -1,0 +1,23 @@
+[heavy-slots] acquired slot 1/2
+harness approved: sha256 33179ccc6fca over 45 file(s) recorded in /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/glm-5.3-flash/with-memory/_state.json
+[baseline] 10 of 10 (id,rep) to run
+[baseline] 0/10 done (0 ok, 0 failed), 30s elapsed
+  [baseline] a02 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+  [baseline] a01 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+[baseline] 2/10 done (0 ok, 2 failed), 60s elapsed, ~240s left
+  [baseline] a03 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+  [baseline] a05 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+[baseline] 4/10 done (0 ok, 4 failed), 90s elapsed, ~135s left
+[baseline] 4/10 done (0 ok, 4 failed), 120s elapsed, ~180s left
+  [baseline] i01 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.6s
+  [baseline] i06 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.7s
+[baseline] 6/10 done (0 ok, 6 failed), 150s elapsed, ~100s left
+  [baseline] i07 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+  [baseline] i08 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+[baseline] 8/10 done (0 ok, 8 failed), 180s elapsed, ~45s left
+[baseline] 8/10 done (0 ok, 8 failed), 210s elapsed, ~53s left
+  [baseline] i09 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+  [baseline] i10 rep0 FAILED: 回合未正常完成：step=failed usage=0/0 latency=14.5s
+[baseline] 10/10 done (0 ok, 10 failed), 224s elapsed, ~0s left
+[baseline] done - 0 ok, 10 failed -> /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/glm-5.3-flash/with-memory/baseline/results.jsonl
+[baseline] 收尾清掉 60 个残留 scratch 目录

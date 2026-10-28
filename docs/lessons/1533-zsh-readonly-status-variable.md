@@ -5,5 +5,5 @@ Level: 3
 Safeguard: Tool-command variables use a task-specific prefix, following the existing execution rules
 Intercepts: 0
 Recurrences: 0
-Notes: The negative-control file has been removed; interactive tool commands are not in-repo checked scripts, so in-repo lint cannot cover them
+Notes: The #1773 qualification report repeated this mistake on 2026-10-28. Its corrected command uses Python subprocess return codes and waits for artifact transfer completion. A command-entry safeguard is still needed; in-repo lint does not inspect interactive tool calls.
 ---

@@ -47,3 +47,27 @@ New irrelevant candidates `i07` to `i10` ask for repository protocol changes, ac
 `candidate-qualification-before-baseline.json` records `ready: false` with zero observations for all four new candidates. Old case results do not qualify new fingerprints. Each new retained case still needs real-model qualification, and the delivery is not ready to merge. Before the next real batch, the source will synchronize current main and re-verify dependencies so its source and approval manifests match the version intended for delivery.
 
 The evidence push at `098de9daa577a7ff7472498a95f8959971ffce2e` passed the canonical 26-check prepush entry point. Its broad related run had 4896 passes and two local environment failures, both already listed in `scripts/prepush-known-red.json`; this is not an all-unit-tests-green claim. The list and its behavior were not changed. A separate positive-control rerun reproduced the missing fake-password environment value, with no fake token observed in command arguments. Remote CI remains the merge check for those environment-dependent tests.
+
+## Completed current-main candidate baseline
+
+The source synchronized main at `87ecbc71a4401ac7eac067eadb538acef51c046e`.
+The source and the approval inputs stayed frozen while all six model/condition arms
+ran. `baseline-candidates-1m-87ecbc71/` preserves the arm inputs, manifests, results,
+errors, exit codes and completion log for 48 requested turns across the approved
+three-model roster. Collection confirmed the batch process was absent, the completion
+marker was present, and its source worktree was clean. The file-hash manifest and
+completion summary are stored beside the archive.
+
+`qualification-candidates-1m-87ecbc71.json` passed the provenance checks and reports
+`ready: false`: four adjacent cases and six irrelevant cases, with 22 execution
+errors. Cases `a01`, `a02`, `a03`, `a05`, `i06` and `i10` have qualifying scored
+failures. Cases `i01`, `i07`, `i08` and `i09` do not; `i09` also lacks a completed
+no-memory pair. Scored rows have explicit 1000000 context metadata and nonzero usage.
+Errors supply no qualifying failure. Old-source results are not reused to make the
+current candidates pass. Four-to-six qualified irrelevant cases are still required.
+
+After main synchronization the verifier runs with the integration package's installed
+`tsx`: `pnpm --filter @cairn/integration exec tsx ../docs/verify/1773/check-qualification.mts <run-directory>...`.
+The dependency is declared by that package. A root-level `pnpm exec tsx` could not
+resolve the binary; the corrected command successfully inspected all three current
+model archives without changing the verifier or its acceptance conditions.

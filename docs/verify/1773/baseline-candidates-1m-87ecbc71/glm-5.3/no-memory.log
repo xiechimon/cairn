@@ -1,0 +1,23 @@
+[heavy-slots] acquired slot 1/2
+harness approved: sha256 33179ccc6fca over 45 file(s) recorded in /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/glm-5.3/no-memory/_state.json
+[baseline] 6 of 6 (id,rep) to run
+[baseline] 0/6 done (0 ok, 0 failed), 30s elapsed
+[baseline] 0/6 done (0 ok, 0 failed), 60s elapsed
+[baseline] 2/6 done (2 ok, 0 failed), 90s elapsed, ~180s left
+[baseline] 2/6 done (2 ok, 0 failed), 120s elapsed, ~240s left
+[baseline] 4/6 done (4 ok, 0 failed), 150s elapsed, ~75s left
+[baseline] 4/6 done (4 ok, 0 failed), 180s elapsed, ~90s left
+[baseline] 4/6 done (4 ok, 0 failed), 210s elapsed, ~105s left
+[baseline] 4/6 done (4 ok, 0 failed), 240s elapsed, ~120s left
+[baseline] 4/6 done (4 ok, 0 failed), 270s elapsed, ~135s left
+[baseline] 4/6 done (4 ok, 0 failed), 300s elapsed, ~150s left
+[baseline] 4/6 done (4 ok, 0 failed), 330s elapsed, ~165s left
+[baseline] 4/6 done (4 ok, 0 failed), 360s elapsed, ~180s left
+[baseline] 4/6 done (4 ok, 0 failed), 390s elapsed, ~195s left
+[baseline] 4/6 done (4 ok, 0 failed), 420s elapsed, ~210s left
+[baseline] 4/6 done (4 ok, 0 failed), 450s elapsed, ~225s left
+[baseline] 4/6 done (4 ok, 0 failed), 480s elapsed, ~240s left
+  [baseline] i09 rep0 FAILED: i09 rep0: exceeded 360s wall-clock ceiling
+[baseline] 6/6 done (5 ok, 1 failed), 497s elapsed, ~0s left
+[baseline] done - 5 ok, 1 failed -> /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/glm-5.3/no-memory/baseline/results.jsonl
+[baseline] 收尾清掉 10 个残留 scratch 目录

@@ -1,0 +1,10 @@
+[heavy-slots] acquired slot 1/2
+harness approved: sha256 33179ccc6fca over 45 file(s) recorded in /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/deepseek-v4.1-flash/with-memory/_state.json
+[baseline] 10 of 10 (id,rep) to run
+[baseline] 2/10 done (2 ok, 0 failed), 30s elapsed, ~120s left
+[baseline] 4/10 done (4 ok, 0 failed), 60s elapsed, ~90s left
+[baseline] 7/10 done (7 ok, 0 failed), 90s elapsed, ~39s left
+[baseline] 8/10 done (8 ok, 0 failed), 120s elapsed, ~30s left
+[baseline] 10/10 done (10 ok, 0 failed), 139s elapsed, ~0s left
+[baseline] done - 10 ok, 0 failed -> /mnt/fast/tmp/codex-1773-candidates-1m-87ecbc71/deepseek-v4.1-flash/with-memory/baseline/results.jsonl
+[baseline] 收尾清掉 20 个残留 scratch 目录

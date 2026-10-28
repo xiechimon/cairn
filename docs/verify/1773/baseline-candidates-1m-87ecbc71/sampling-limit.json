@@ -1,0 +1,33 @@
+{
+  "sourceCommit": "87ecbc71a4401ac7eac067eadb538acef51c046e",
+  "purpose": "complete fresh qualification after synchronizing current main",
+  "modelOrder": [
+    "deepseek-v4.1-flash",
+    "glm-5.3",
+    "glm-5.3-flash"
+  ],
+  "withMemoryCases": [
+    "a01",
+    "a02",
+    "a03",
+    "a05",
+    "i01",
+    "i06",
+    "i07",
+    "i08",
+    "i09",
+    "i10"
+  ],
+  "noMemoryCases": [
+    "i01",
+    "i06",
+    "i07",
+    "i08",
+    "i09",
+    "i10"
+  ],
+  "maximumRequestedTurns": 48,
+  "contextWindow": 1000000,
+  "repetitions": 1,
+  "previousSourceResultsReusable": false
+}
