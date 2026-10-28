@@ -37,7 +37,7 @@ The author reviewed the source diff against the captured main revision for secur
 
 ## Remaining acceptance
 
-No real provider was called and no browser task-card demonstration was recorded for this checkpoint. The coordinating lane owns that evidence before delivery acceptance. Scripted provider responses and API transcript assertions do not prove the deployed card displays the notice or a real provider completes the text-only retry.
+The source checkpoint originally had only scripted provider and API transcript evidence. The subsequent live trial below establishes real provider execution and actual-card presentation for the declared text-only path. A real unknown-model capability rejection followed by a text-only retry remains unverified.
 
 Automatic routing to a different vision model remains outside this delivery. An unknown model first receiving an image through steering after useful progress may reject it asynchronously; this delivery preserves the progress guard and does not restart the whole step for that unresolved case. Parent #1671 and its original acceptance remain open.
 
@@ -48,7 +48,21 @@ The initial checkpoint body contained escaped newline characters from a shell-qu
 ```python
 from pathlib import Path
 import subprocess
-raw = subprocess.check_output(['git', 'log', '-1', '--format=%B'], text=True)
+raw = subprocess.check_output(['git', 'show', '-s', '--format=%B', '6091529dd1e38f5c7edaaeefb7e217718d05cef1'], text=True)
 assert chr(92) + 'n' not in raw
 assert raw.rstrip('\n') == Path('/tmp/1928-message.txt').read_text().rstrip('\n')
 ```
+
+## Real declared-text-only provider and actual-card acceptance
+
+The coordinator clicked Start in the actual production-mode web build, not a fixture page. The first click exposed a missing Chief binding in the disposable seed; the binding was repaired and the coordinator retried Start. The trial used a real server with an in-memory database, a real daemon with a disposable home, a hosted toy project and an existing 436-byte PNG. The assigned model was `domestic-proxy/deepseek-v4.1-flash`, declared `input: [text]` with a 1,000,000-token context window. The synthetic Agent had an empty skill allowlist and no default skill; the recorded build step has zero skill hits.
+
+[live-text-only-requests.json](live-text-only-requests.json) contains only safe forwarding metadata: 12 real calls, all HTTP 200, all zero image blocks, and 130,800 total tokens. These calls include Chief orchestration as well as the information task; they are not all attributed to the task. No capability rejection was injected. Real Authorization stayed in the fixed-upstream tap's memory, and neither credentials nor provider request payloads were exported.
+
+[live-text-only-terminal.json](live-text-only-terminal.json) records the information task in `review`, its build step `done`, no build error, its report attachment, and the unread-image system notice retained by the transcript API. Per-build usage was input 8,416, output 570, cacheRead 3,840 and cacheWrite 0. [The generated report](live-text-only-report.md) includes `IMAGE-FALLBACK-1671` and explicitly says the screenshot was not read, without describing its contents. The report is model-authored output; its acceptance prose does not independently establish anything beyond the measured evidence here.
+
+The coordinator observed the actual Review card, unread-image system notice and report, and supplied [the card screenshot](live-text-only-card.png) and [the notice screenshot](live-text-only-notice.png). The evidence-collection lane inspected those supplied images and the APIs but did not click Start. [live-setup.md](live-setup.md) describes the reusable harness and its Chief-binding preflight.
+
+Before cleanup, all Chief threads had no active run, pending input or turn queue; machine activity was empty and the build was terminal. [live-text-only-cleanup.json](live-text-only-cleanup.json) records normal owned-harness shutdown, the PID no longer running and the private runtime directory removed. All 19 checkpoint source and test hashes remained unchanged.
+
+This live trial proves only the declared-text-only path. It does not prove that a real GLM or other unknown model rejected an image, that rejection-triggered fresh text retry works with a real provider, automatic vision-model routing, or the unresolved unknown-model late-steer case. Parent #1671 remains open for its remaining scope.
