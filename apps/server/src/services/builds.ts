@@ -715,6 +715,48 @@ export function maybeEnqueueVerifyStep(
   enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
 }
 
+const REVIEW_IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
+
+export function maybeEnqueueIndependentReview(
+  deps: BuildDeps,
+  todoRow: TodoRow,
+  buildId: string,
+): void {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  if (buildRow === undefined || githubPrOf(deps, todoRow, buildRow.prNumber) === null) return;
+  const head = dispatchHeadSha(deps, buildId);
+  if (head === null) return;
+  const reviews = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, buildId), eq(step.kind, 'review')))
+    .all();
+  if (reviews.some((row) => (REVIEW_IN_FLIGHT as readonly string[]).includes(row.status))) return;
+  if (reviews.some((row) => parseReviewPromptMeta(row.prompt)?.expectedHeadSha === head)) return;
+  const slotted = todoRow.assignment?.review?.agentId ?? null;
+  const personaReviewer = deps.db
+    .select({ id: agent.id })
+    .from(agent)
+    .where(and(eq(agent.teamId, todoRow.teamId), eq(agent.persona, 'code_reviewer')))
+    .get();
+  const agentId = slotted ?? personaReviewer?.id ?? null;
+  if (agentId === null) return;
+  const reviewer = deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
+  const focus = reviewer?.persona != null ? personaByRole(reviewer.persona).reviewFocus : undefined;
+  const plan = latestPlanRow(deps, buildId);
+  const prompt = buildReviewStepPrompt({
+    agentId,
+    gate: 'review',
+    planText: plan?.content ?? '',
+    changes: [],
+    checkout: hasRepoBinding(projectOfTodo(deps.db, todoRow)),
+    expectedHeadSha: head,
+    ...(focus !== undefined && focus !== '' ? { focus } : {}),
+  });
+  insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, deps.user.displayName);
+  enqueueStep(deps, buildId, 'review', todoRow.teamId, prompt);
+}
+
 export function advanceSplitWaves(deps: BuildDeps, childTodoId: string): void {
   const row = deps.db.select().from(todo).where(eq(todo.id, childTodoId)).get();
   if (row === undefined || row.sourceTodo === null) return;
@@ -2214,6 +2256,8 @@ export function completeStep(
         hasChanges: outcome.hasChanges ?? true,
       });
     }
+    const freshTodo = deps.db.select().from(todo).where(eq(todo.id, todoRow.id)).get();
+    if (freshTodo) maybeEnqueueIndependentReview(deps, freshTodo, stepRow.buildId);
     return;
   }
   if (stepRow.kind === 'review') {

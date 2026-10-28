@@ -17,6 +17,7 @@ import {
   useApiMutations,
   useBuild,
   useBuildChanges,
+  useBuildGate,
   useBuildUsage,
   useChiefThreads,
   useDocumentDiff,
@@ -68,6 +69,7 @@ import { DocPane } from '../detail/docpane.js';
 import { substantiveChangesOf } from '../detail/empty-commit.js';
 import { FreshBlock } from '../detail/fresh-block.js';
 import { mergeRejectCopy, useMergeGate } from '../detail/merge-gate.js';
+import { MergeGateVerdict } from '../detail/merge-gate-verdict.js';
 import { RerunDialog, ReusePanel } from '../detail/overlays.js';
 import { RejectDialog } from '../detail/reject-dialog.js';
 import { ReviewDialog } from '../detail/review-dialog.js';
@@ -167,6 +169,7 @@ export function TodoDetailPage() {
   const wireTodo = todoQ.data ?? null;
   const buildId = wireTodo?.latestBuildId ?? null;
   const buildQ = useBuild(buildId, live);
+  const gateQ = useBuildGate(buildId, live);
   const stepsQ = useSteps(buildId, live);
   const messagesQ = useMessages(buildId, live);
   const plansQ = usePlans(buildId, live);
@@ -714,6 +717,7 @@ export function TodoDetailPage() {
                 onOpenThread={openChiefThread}
               />
             )}
+            {live && gateQ.data?.state != null && <MergeGateVerdict state={gateQ.data.state} />}
             {detail == null ? (
               <div className="detail-fresh min-h-0 flex-1 overflow-y-auto pb-4">
                 <FreshBlock
