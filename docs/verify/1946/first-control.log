@@ -1,0 +1,8 @@
+harbor run -p /mnt/fast/lanes/cairn-1946/integration/eval/harbor/tasks/hello-file -a oracle --job-name 1946-hello-file-oracle-20261028004422 --jobs-dir /mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs -n 1 --ek keep_containers=true
+1946-hello-file-oracle-20261028004422: reward=1.0
+508572653f3d
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1946/integration/eval/harbor/run_controls.py", line 68, in <module>
+    assert all(item['NetworkMode'] == 'none' for item in inspections)
+               ^^^^^^^^^^^^^^^^^^^^^
+AssertionError: [{'Id': '508572653f3ddf77e5de98e75027fe3c0f773199efc095d4be5211cbf2bf83c1', 'Name': '/hello-file__wemzacs__env-main-1', 'Hostname': '508572653f3d', 'NetworkMode': 'none', 'Mounts': [{'Type': 'bind', 'Source': '/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hello-file-oracle-20261028004422/hello-file__wemZAcs/agent', 'Destination': '/logs/agent', 'Mode': 'rw,z', 'RW': True, 'Propagation': 'rprivate'}, {'Type': 'bind', 'Source': '/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hello-file-oracle-20261028004422/hello-file__wemZAcs/artifacts/logs/artifacts', 'Destination': '/logs/artifacts', 'Mode': 'rw,z', 'RW': True, 'Propagation': 'rprivate'}, {'Type': 'bind', 'Source': '/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hello-file-oracle-20261028004422/hello-file__wemZAcs/verifier', 'Destination': '/logs/verifier', 'Mode': 'rw,z', 'RW': True, 'Propagation': 'rprivate'}], 'State': {'Status': 'exited', 'Running': False, 'Paused': False, 'Restarting': False, 'OOMKilled': False, 'Dead': False, 'Pid': 0, 'ExitCode': 137, 'Error': '', 'StartedAt': '2026-10-28T00:44:54.996406351Z', 'FinishedAt': '2026-10-28T00:45:14.613178941Z'}}]
