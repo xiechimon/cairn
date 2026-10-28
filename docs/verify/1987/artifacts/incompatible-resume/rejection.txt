@@ -1,0 +1,2 @@
+refusing incompatible resume before any model call:
+- prices changed (recorded "bf4099b9e9bc9ee410ba7145d4e35ccedcde169c5e79348c3b995cf0ec8f43f1", requested "63a3bcb716b09023e2eddd28dcba02fe8e64b2ce1fb04f632962ea0a964ce3e8")
