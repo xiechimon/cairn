@@ -7,8 +7,17 @@
 ## Green acceptance
 
 - `acceptance-integration.log`: plan-grade, plan-flow, harness-eval-result
-- `acceptance-shared.log`: harness-eval (includes plan grader harness path)
+- `acceptance-shared.log`: harness-eval
 - `acceptance-typecheck.log` / `acceptance-lint.log`
+
+## Review-gate fix
+
+Plan grader stays on `.claude/hillclimb/plan/_state.json` `harness_paths` only, not `CHIEF_DISPATCH_HARNESS_PATHS`.
+
+- `gatefix-shared.log`: harness-eval asserts plan grader is absent from `CHIEF_DISPATCH_HARNESS_PATHS`
+- `gatefix-integration.log`: plan-grade / plan-flow
+- `gatefix-merge-gate.log`: chief-dispatch `_state.json` matches the constant item-for-item
+- `gatefix-typecheck.log` / `gatefix-lint.log`
 
 ## Real runner artifacts
 
