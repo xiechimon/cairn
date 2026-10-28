@@ -31,6 +31,7 @@ import type {
   MachineRecord,
   McpServerRecord,
   MemoryRecord,
+  MergeReadiness,
   ModelSourcesEnvelope,
   OAuthAuthorizeResponse,
   PatchAgentBody,
@@ -184,6 +185,16 @@ export const useBuild = (id: string | null | undefined, enabled: boolean) =>
     queryKey: ['build', id],
     queryFn: () => api.get<BuildRecord>(`/api/builds/${id}`),
     enabled: enabled && id != null,
+  });
+
+export const useBuildGate = (buildId: string | null | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['buildGate', buildId],
+    queryFn: () =>
+      api.get<{ state: (MergeReadiness & { evaluatedAt: number }) | null }>(
+        `/api/builds/${buildId}/gate`,
+      ),
+    enabled: enabled && buildId != null,
   });
 
 export const useProjectBuilds = (projectId: string | undefined, enabled: boolean) =>

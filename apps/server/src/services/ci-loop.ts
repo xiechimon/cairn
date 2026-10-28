@@ -27,6 +27,7 @@ import {
   hasActiveStep,
   hasMessageRow,
   lastPushedCheckpoint,
+  maybeEnqueueIndependentReview,
   maybeEnqueueVerifyStep,
   roundStart,
   stopUnclaimedGateSteps,
@@ -37,6 +38,7 @@ import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import { githubText } from './github-text.js';
+import { evaluateMergeGate } from './merge-gate-run.js';
 import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD, CI_FIX_PUSH_RULE } from './retry-lessons.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -945,6 +947,7 @@ export function createCiPoller(
       hintOnce(cand.buildId, CI_FIX_GREEN_EVENT, 0);
     }
     setTodoPhase(deps, cand.todoId, 'review');
+    maybeEnqueueIndependentReview(deps, todoRow, cand.buildId);
     const lastVerifyAt = deps.db
       .select({ at: step.createdAt })
       .from(step)
@@ -1057,6 +1060,17 @@ export function createCiPoller(
     for (const k of listFailures.keys()) if (!liveKeys.has(k)) listFailures.delete(k);
     for (const [k, v] of requiredCache)
       if (now - v.at >= CI_REQUIRED_CHECKS_TTL_MS) requiredCache.delete(k);
+    for (const cand of [...candidates, ...reviewCandidates]) {
+      try {
+        await evaluateMergeGate(deps, cand.buildId);
+      } catch (err) {
+        tally.errors += 1;
+        run.logger?.info(
+          { err: err instanceof Error ? err.message : String(err) },
+          'merge gate evaluation failed (sweep continues)',
+        );
+      }
+    }
     const memoBuilds = new Set([...reviewBuilds, ...candidates.map((c) => c.buildId)]);
     for (const k of knownRows)
       if (!memoBuilds.has(k.slice(0, k.indexOf('\u0000')))) knownRows.delete(k);
