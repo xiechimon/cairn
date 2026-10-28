@@ -63,7 +63,7 @@ Merging, approving, and label changes — operations that need a human identity 
 
 ## Merge identity
 
-The GitHub App identity opens PRs and authenticates pushes. The Git author on main is a separate identity. The `commit-author` workflow rejects `cairnwright[bot]` in the latest main commit's author name or email.
+The GitHub App identity opens PRs and authenticates pushes. The Git author on main is a separate identity. The `commit-author` workflow rejects `cairnwright[bot]` in any checked commit's author name or email. PRs check `BASE_SHA..HEAD` from the PR base to its explicit head. Main pushes check `BEFORE_SHA..HEAD`; when the previous SHA is missing or all zeros, the check falls back to `HEAD^!` (the tip only).
 
 Read the PR opener and all commit authors with `gh pr view <n> --json author,commits` before choosing the merge method.
 
@@ -71,7 +71,7 @@ Read the PR opener and all commit authors with `gh pr view <n> --json author,com
 - Human-opened PRs use `gh pr merge <n> --squash --auto` after checking that none of their commit authors contains `cairnwright[bot]`.
 - Both paths require fully checked Acceptance and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.
 
-Squashing a bot-opened PR can attribute the main commit to the bot opener even when the branch commit has the required author. Rebase preserves the prepared commit's author. A later green run checks the new main tip; it does not repair historical authorship.
+Squashing a bot-opened PR can attribute the main commit to the bot opener even when the branch commit has the required author. Rebase preserves the prepared commit's author. A later green push checks its own pushed range; historical bot commits outside that range are excluded, and their authorship remains unchanged.
 
 This repository documents the external helper contract. Its implementation is outside this checkout and must be inspected separately before changing dispatcher behavior.
 
@@ -125,3 +125,21 @@ state transaction can leave the lock behind; acquisition fails closed after
 30 seconds rather than bypassing the cap. Inspect and remove an abandoned lock
 only after confirming no process is using it. Invalid state fails closed as well.
 Clock rollback retains future reservations and delays creation conservatively.
+
+## Incident recovery commit preparation
+
+For #2101, prepare the reviewed correction outside both identity wrappers. This recovery procedure supersedes the historical bot-wrapped commit example above. App authentication for pushes and PR creation remains separate from commit authorship. Repository configuration alone cannot override inherited author or committer environment variables.
+
+```sh
+GIT_AUTHOR_NAME=Cairnwright \
+GIT_AUTHOR_EMAIL=348051526+cairnwright@users.noreply.github.com \
+GIT_COMMITTER_NAME=Cairnwright \
+GIT_COMMITTER_EMAIL=348051526+cairnwright@users.noreply.github.com \
+git commit --file COMMIT_MSG.txt
+```
+
+Keep the reviewed message and its co-author trailers. Verify the resulting author and committer with `git log -1 --format='%an <%ae>|%cn <%ce>%n%B'`. Bot-opened PRs still require exactly one Cairnwright-authored commit and the verified external helper's rebase route. Do not squash a bot-opened PR to recover this incident.
+
+The dispatcher must use this preparation command for the correction, verify the helper on the dispatch host, and inspect the actual main commit after the authorized merge. Then read the subsequent main push's `commit-author` Actions result. A compliant new push range can pass while the historical rejected commit remains intact; rerunning the historical failed range still fails. Until both main metadata and the later green run are recorded, #2101 recovery remains pending. Local fixtures cannot establish external helper enforcement or main acceptance.
+
+The trusted main push step in `.github/workflows/commit-author.yml` runs `scripts/commit-author-recovery.test.mjs`. It executes this recipe with inherited bot identity in an isolated Git repository, preserves co-author trailers and historical commit bytes, and checks both the subsequent push range and the rejected historical range using the workflow shell.
