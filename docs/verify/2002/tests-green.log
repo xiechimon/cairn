@@ -1,0 +1,13 @@
+✔ #2002 the committed file is exactly a GitHub Sponsors account and passes the gate (30.376155ms)
+✔ #2002 a file without a GitHub Sponsors account is rejected (0.252747ms)
+✔ #2002 duplicate keys are rejected instead of silently overwriting (0.22932ms)
+✔ #2002 a non-GitHub key, an empty key and a non-https custom link are rejected (0.254702ms)
+✔ #2002 block lists and inline lists read the same entries (0.252944ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 76.448952

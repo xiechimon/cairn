@@ -387,6 +387,15 @@ jobs:
           node --test scripts/npm-command-gate.test.mjs
           node scripts/npm-command-gate.mjs
 
+  funding-yml-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Funding links gate (#2002)
+        run: |
+          node --test scripts/funding-yml-gate.test.mjs
+          node scripts/funding-yml-gate.mjs
+
   dispatch-agent-test:
     runs-on: ubuntu-latest
     steps:

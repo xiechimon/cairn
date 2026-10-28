@@ -1,0 +1,117 @@
+✖ #2002 the committed file is exactly a GitHub Sponsors account and passes the gate (5.515413ms)
+✖ #2002 a file without a GitHub Sponsors account is rejected (0.282779ms)
+✖ #2002 duplicate keys are rejected instead of silently overwriting (0.228123ms)
+✖ #2002 a non-GitHub key, an empty key and a non-https custom link are rejected (0.39583ms)
+✔ #2002 block lists and inline lists read the same entries (0.258309ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 1
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53.038676
+
+✖ failing tests:
+
+test at scripts/funding-yml-gate.test.mjs:13:1
+✖ #2002 the committed file is exactly a GitHub Sponsors account and passes the gate (5.515413ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   custom: [
+  +     'https://afdian.com/a/xiechimon'
+  +   ],
+      github: [
+        'xiechimon'
+      ]
+    }
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2002/scripts/funding-yml-gate.test.mjs:16:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { github: [ 'xiechimon' ], custom: [ 'https://afdian.com/a/xiechimon' ] },
+    expected: { github: [ 'xiechimon' ] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/funding-yml-gate.test.mjs:21:1
+✖ #2002 a file without a GitHub Sponsors account is rejected (0.282779ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'github: GitHub Sponsors account is required'
+  - ]
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2002/scripts/funding-yml-gate.test.mjs:22:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'github: GitHub Sponsors account is required' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/funding-yml-gate.test.mjs:28:1
+✖ #2002 duplicate keys are rejected instead of silently overwriting (0.228123ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'line 2: duplicate `github` key'
+  - ]
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2002/scripts/funding-yml-gate.test.mjs:29:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'line 2: duplicate `github` key' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/funding-yml-gate.test.mjs:35:1
+✖ #2002 a non-GitHub key, an empty key and a non-https custom link are rejected (0.39583ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  -   'github: GitHub Sponsors account is required',
+      'line 1: `github` has no value'
+    ]
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2002/scripts/funding-yml-gate.test.mjs:44:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'line 1: `github` has no value' ],
+    expected: [ 'github: GitHub Sponsors account is required', 'line 1: `github` has no value' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

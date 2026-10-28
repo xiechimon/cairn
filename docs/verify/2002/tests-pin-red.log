@@ -1,0 +1,42 @@
+✖ #2002 the committed file is exactly a GitHub Sponsors account and passes the gate (5.698415ms)
+✔ #2002 a file without a GitHub Sponsors account is rejected (0.257343ms)
+✔ #2002 duplicate keys are rejected instead of silently overwriting (0.17433ms)
+✔ #2002 a non-GitHub key, an empty key and a non-https custom link are rejected (0.185761ms)
+✔ #2002 block lists and inline lists read the same entries (0.182635ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 52.436968
+
+✖ failing tests:
+
+test at scripts/funding-yml-gate.test.mjs:13:1
+✖ #2002 the committed file is exactly a GitHub Sponsors account and passes the gate (5.698415ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   custom: [
+  +     'https://afdian.com/a/someoneelse'
+  +   ],
+      github: [
+        'xiechimon'
+      ]
+    }
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2002/scripts/funding-yml-gate.test.mjs:16:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { github: [ 'xiechimon' ], custom: [ 'https://afdian.com/a/someoneelse' ] },
+    expected: { github: [ 'xiechimon' ] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
