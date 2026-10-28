@@ -16,6 +16,7 @@ import {
 } from '@cairn/shared/merge-gate';
 import { computePatchDigest } from './digest.js';
 import { parseRawEvidenceLinks, qualifyingEvidenceLinks } from './evidence-link.js';
+import { isLiveHarnessAttempt } from './harness-eval-route.js';
 import { independenceVendorDetail, modelsAreIndependent } from './model-identity.js';
 import { classifyPaths, touchesHarness } from './paths.js';
 
@@ -104,6 +105,7 @@ export interface GateInputs {
   } | null;
   availability: { reviewerPerspectives: string[]; verifier: boolean; decider: boolean };
   harnessEvalText?: string | null;
+  harnessEval?: { attempt: { state: string } | null } | null;
 }
 
 const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
@@ -382,10 +384,16 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
           parsed = null;
         }
       }
-      if (parsed === null) block('harness-regression-missing');
-      else if (parsed.patchDigest !== D) block('harness-regression-stale');
-      else if (parsed.decision_ok < CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER) {
-        block('harness-regression-below-threshold', String(parsed.decision_ok));
+      if (parsed !== null && parsed.patchDigest === D) {
+        if (parsed.decision_ok < CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER) {
+          block('harness-regression-below-threshold', String(parsed.decision_ok));
+        }
+      } else if (isLiveHarnessAttempt(i.harnessEval?.attempt ?? null)) {
+        block('harness-regression-evaluating');
+      } else if (parsed === null) {
+        block('harness-regression-missing');
+      } else {
+        block('harness-regression-stale');
       }
     }
   }
