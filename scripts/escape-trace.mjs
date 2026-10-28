@@ -74,55 +74,9 @@ function tryGitAt(cwd, args) {
   }
 }
 
-function parseRevertSha(message) {
-  const match = /This reverts commit ([0-9a-f]{7,40})\.?/i.exec(message);
-  return match?.[1] ?? null;
-}
-
-function parseExplicitRefs(message) {
-  const refs = [];
-  for (const match of message.matchAll(/\bintroduced by #(\d+)\b/gi))
-    refs.push({ kind: 'introduced-by', number: Number(match[1]), needsValidation: true });
-  for (const match of message.matchAll(/\b(?:fixes|fixed)\s+#(\d+)\b/gi))
-    refs.push({ kind: 'fixes', number: Number(match[1]), needsValidation: true });
-  return refs;
-}
-
-function trailingSubjectPr(subject) {
-  return Number(subject.match(/\(#(\d+)\)\s*$/)?.[1]) || null;
-}
-
-function loadResponder(respondFile) {
-  if (!respondFile) return { pullsByCommit: {}, refs: {} };
-  return JSON.parse(readFileSync(respondFile, 'utf8'));
-}
-
 function lookupRef(responder, number) {
   const key = String(number);
   return responder.refs?.[key] ?? responder.refs?.[number] ?? null;
-}
-
-function lookupPullsForCommit(responder, sha, cwd) {
-  const direct =
-    responder.pullsByCommit?.[sha] ?? responder.pullsByCommit?.[sha.slice(0, 7)] ?? null;
-  if (direct) return direct;
-  if (responder.offline) return [];
-  if (!responder.allowNetwork) return [];
-  try {
-    const repo = gitAt(cwd, ['remote', 'get-url', 'origin']).trim();
-    const match = /github\.com[:/]([^/]+)\/([^/.]+)/.exec(repo);
-    if (!match) return [];
-    const body = execFileSync('gh', ['api', `repos/${match[1]}/${match[2]}/commits/${sha}/pulls`], {
-      encoding: 'utf8',
-      maxBuffer: 16 * 1024 * 1024,
-    });
-    return JSON.parse(body).map((pull) => ({
-      number: pull.number,
-      merged_at: pull.merged_at,
-    }));
-  } catch {
-    return [];
-  }
 }
 
 function expandSha(cwd, sha) {
@@ -136,8 +90,31 @@ function resolveCommitToPr(cwd, sha, responder) {
   const full = expandSha(cwd, sha);
   if (!full) return { pr: null, mergedAt: null, reason: 'missing-commit' };
   const subject = gitAt(cwd, ['show', '-s', '--format=%s', full]).trim();
-  const subjectPr = trailingSubjectPr(subject);
-  const pulls = lookupPullsForCommit(responder, full, cwd).filter((pull) => pull.merged_at);
+  const subjectPr = Number(subject.match(/\(#(\d+)\)\s*$/)?.[1]) || null;
+  const direct =
+    responder.pullsByCommit?.[full] ?? responder.pullsByCommit?.[full.slice(0, 7)] ?? null;
+  let pulls = [];
+  if (direct) pulls = direct;
+  else if (!responder.offline && responder.allowNetwork) {
+    try {
+      const repo = gitAt(cwd, ['remote', 'get-url', 'origin']).trim();
+      const match = /github\.com[:/]([^/]+)\/([^/.]+)/.exec(repo);
+      if (match) {
+        const body = execFileSync(
+          'gh',
+          ['api', `repos/${match[1]}/${match[2]}/commits/${full}/pulls`],
+          { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
+        );
+        pulls = JSON.parse(body).map((pull) => ({
+          number: pull.number,
+          merged_at: pull.merged_at,
+        }));
+      }
+    } catch {
+      pulls = [];
+    }
+  }
+  pulls = pulls.filter((pull) => pull.merged_at);
   const unique = [...new Map(pulls.map((pull) => [pull.number, pull])).values()];
   if (unique.length > 1) {
     if (subjectPr && unique.some((pull) => pull.number === subjectPr)) {
@@ -162,112 +139,6 @@ function resolveCommitToPr(cwd, sha, responder) {
   return { pr: null, mergedAt: null, reason: 'unavailable-pr-metadata' };
 }
 
-function parseBlameRanges(diffText) {
-  const rangesByPath = new Map();
-  let path = null;
-  for (const line of diffText.split('\n')) {
-    const pathMatch = /^diff --git a\/(.+) b\/(.+)$/.exec(line);
-    if (pathMatch) {
-      path = pathMatch[1] === '/dev/null' ? pathMatch[2] : pathMatch[1];
-      continue;
-    }
-    const hunk = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
-    if (!hunk || !path || path === '/dev/null') continue;
-    const start = Number(hunk[1]);
-    const count = hunk[2] === undefined ? 1 : Number(hunk[2]);
-    if (count === 0) continue;
-    const list = rangesByPath.get(path) ?? [];
-    list.push({ start, end: start + count - 1 });
-    rangesByPath.set(path, list);
-  }
-  return rangesByPath;
-}
-
-function blameIntroducing(cwd, followUpSha, paths) {
-  const parentResult = tryGitAt(cwd, ['rev-parse', '--verify', `${followUpSha}^`]);
-  if (!parentResult.ok)
-    return { status: 'unresolved', reason: 'missing-parent-history', files: [], shas: [] };
-  const parent = parentResult.stdout.trim();
-  const diffResult = tryGitAt(cwd, [
-    'diff',
-    '--unified=0',
-    '--find-renames',
-    `${parent}`,
-    followUpSha,
-    '--',
-    ...paths,
-  ]);
-  if (!diffResult.ok)
-    return { status: 'unresolved', reason: 'shallow-or-unavailable-diff', files: [], shas: [] };
-  const rangesByPath = parseBlameRanges(diffResult.stdout);
-  if (rangesByPath.size === 0)
-    return { status: 'unresolved', reason: 'no-blameable-lines', files: [], shas: [] };
-  const shas = new Set();
-  const files = [];
-  for (const [path, ranges] of rangesByPath) {
-    const fileRanges = [];
-    for (const range of ranges) {
-      const blame = tryGitAt(cwd, [
-        'blame',
-        '--porcelain',
-        '-L',
-        `${range.start},${range.end}`,
-        parent,
-        '--',
-        path,
-      ]);
-      if (!blame.ok)
-        return {
-          status: 'unresolved',
-          reason: 'shallow-or-unavailable-blame',
-          files,
-          shas: [...shas],
-        };
-      for (const line of blame.stdout.split('\n')) {
-        const header = /^([0-9a-f]{40}) \d+ \d+(?: \d+)?$/.exec(line);
-        if (header) shas.add(header[1]);
-      }
-      fileRanges.push({ start: range.start, end: range.end });
-    }
-    files.push({ path, lines: fileRanges });
-  }
-  const unique = [...shas];
-  if (unique.length === 0)
-    return { status: 'unresolved', reason: 'shallow-or-unavailable-blame', files, shas: unique };
-  if (unique.length > 1) return { status: 'multiple-origin', reason: null, files, shas: unique };
-  return { status: 'resolved', reason: null, files, shas: unique };
-}
-
-function withinWindow(introducingMergedAt, followUpTimestamp) {
-  if (!introducingMergedAt || !followUpTimestamp) return null;
-  const delta = new Date(followUpTimestamp).getTime() - new Date(introducingMergedAt).getTime();
-  if (!Number.isFinite(delta) || delta < 0) return false;
-  return delta <= ESCAPE_WINDOW_MS;
-}
-
-function baseTrace(candidate) {
-  return {
-    followUpSha: candidate.followUpSha,
-    fixingSha: candidate.followUpSha,
-    followUpTimestamp: candidate.timestamp,
-    fixingPr: candidate.fixingPr,
-    introducingSha: null,
-    introducingMergedAt: null,
-    originalPr: null,
-    method: null,
-    status: 'unresolved',
-    unresolvedReason: null,
-    withinEscapeWindow: null,
-    evidence: {
-      paths: candidate.paths,
-      files: [],
-      references: [],
-      unvalidatedReferences: [],
-      introducingCandidates: [],
-    },
-  };
-}
-
 function finishResolved(trace, { introducingSha, originalPr, introducingMergedAt, method, files }) {
   trace.introducingSha = introducingSha;
   trace.originalPr = originalPr;
@@ -276,7 +147,12 @@ function finishResolved(trace, { introducingSha, originalPr, introducingMergedAt
     : null;
   trace.method = method;
   if (files) trace.evidence.files = files;
-  const inside = withinWindow(trace.introducingMergedAt, trace.followUpTimestamp);
+  let inside = null;
+  if (trace.introducingMergedAt && trace.followUpTimestamp) {
+    const delta =
+      new Date(trace.followUpTimestamp).getTime() - new Date(trace.introducingMergedAt).getTime();
+    inside = Number.isFinite(delta) && delta >= 0 ? delta <= ESCAPE_WINDOW_MS : false;
+  }
   trace.withinEscapeWindow = inside;
   if (inside === false) {
     trace.status = 'outside-window';
@@ -301,10 +177,30 @@ export function resolveTraces(candidates, { cwd = process.cwd(), responder = {} 
     allowNetwork: responder.allowNetwork ?? false,
   };
   return candidates.map((candidate) => {
-    const trace = baseTrace(candidate);
+    const trace = {
+      followUpSha: candidate.followUpSha,
+      fixingSha: candidate.followUpSha,
+      followUpTimestamp: candidate.timestamp,
+      fixingPr: candidate.fixingPr,
+      introducingSha: null,
+      introducingMergedAt: null,
+      originalPr: null,
+      method: null,
+      status: 'unresolved',
+      unresolvedReason: null,
+      withinEscapeWindow: null,
+      evidence: {
+        paths: candidate.paths,
+        files: [],
+        references: [],
+        unvalidatedReferences: [],
+        introducingCandidates: [],
+      },
+    };
     const message = candidate.message ?? '';
 
-    const revertSha = parseRevertSha(message);
+    const revertMatch = /This reverts commit ([0-9a-f]{7,40})\.?/i.exec(message);
+    const revertSha = revertMatch?.[1] ?? null;
     if (revertSha) {
       const full = expandSha(cwd, revertSha);
       if (!full) {
@@ -338,7 +234,11 @@ export function resolveTraces(candidates, { cwd = process.cwd(), responder = {} 
       return trace;
     }
 
-    const refs = parseExplicitRefs(message);
+    const refs = [];
+    for (const match of message.matchAll(/\bintroduced by #(\d+)\b/gi))
+      refs.push({ kind: 'introduced-by', number: Number(match[1]), needsValidation: true });
+    for (const match of message.matchAll(/\b(?:fixes|fixed)\s+#(\d+)\b/gi))
+      refs.push({ kind: 'fixes', number: Number(match[1]), needsValidation: true });
     const validated = [];
     for (const ref of refs) {
       const meta = lookupRef(active, ref.number);
@@ -398,20 +298,91 @@ export function resolveTraces(candidates, { cwd = process.cwd(), responder = {} 
       });
     }
 
-    const blamed = blameIntroducing(cwd, candidate.followUpSha, candidate.paths);
-    trace.evidence.files = blamed.files;
-    if (blamed.status === 'unresolved') {
+    const parentResult = tryGitAt(cwd, ['rev-parse', '--verify', `${candidate.followUpSha}^`]);
+    if (!parentResult.ok) {
       trace.method = 'blame';
-      trace.unresolvedReason = blamed.reason;
+      trace.unresolvedReason = 'missing-parent-history';
       return trace;
     }
-    if (blamed.status === 'multiple-origin') {
+    const parent = parentResult.stdout.trim();
+    const diffResult = tryGitAt(cwd, [
+      'diff',
+      '--unified=0',
+      '--find-renames',
+      `${parent}`,
+      candidate.followUpSha,
+      '--',
+      ...candidate.paths,
+    ]);
+    if (!diffResult.ok) {
+      trace.method = 'blame';
+      trace.unresolvedReason = 'shallow-or-unavailable-diff';
+      return trace;
+    }
+    const rangesByPath = new Map();
+    let blamePath = null;
+    for (const line of diffResult.stdout.split('\n')) {
+      const pathMatch = /^diff --git a\/(.+) b\/(.+)$/.exec(line);
+      if (pathMatch) {
+        blamePath = pathMatch[1] === '/dev/null' ? pathMatch[2] : pathMatch[1];
+        continue;
+      }
+      const hunk = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
+      if (!hunk || !blamePath || blamePath === '/dev/null') continue;
+      const start = Number(hunk[1]);
+      const count = hunk[2] === undefined ? 1 : Number(hunk[2]);
+      if (count === 0) continue;
+      const list = rangesByPath.get(blamePath) ?? [];
+      list.push({ start, end: start + count - 1 });
+      rangesByPath.set(blamePath, list);
+    }
+    if (rangesByPath.size === 0) {
+      trace.method = 'blame';
+      trace.unresolvedReason = 'no-blameable-lines';
+      return trace;
+    }
+    const shas = new Set();
+    const files = [];
+    for (const [path, ranges] of rangesByPath) {
+      const fileRanges = [];
+      for (const range of ranges) {
+        const blame = tryGitAt(cwd, [
+          'blame',
+          '--porcelain',
+          '-L',
+          `${range.start},${range.end}`,
+          parent,
+          '--',
+          path,
+        ]);
+        if (!blame.ok) {
+          trace.method = 'blame';
+          trace.unresolvedReason = 'shallow-or-unavailable-blame';
+          trace.evidence.files = files;
+          return trace;
+        }
+        for (const line of blame.stdout.split('\n')) {
+          const header = /^([0-9a-f]{40}) \d+ \d+(?: \d+)?$/.exec(line);
+          if (header) shas.add(header[1]);
+        }
+        fileRanges.push({ start: range.start, end: range.end });
+      }
+      files.push({ path, lines: fileRanges });
+    }
+    trace.evidence.files = files;
+    const unique = [...shas];
+    if (unique.length === 0) {
+      trace.method = 'blame';
+      trace.unresolvedReason = 'shallow-or-unavailable-blame';
+      return trace;
+    }
+    if (unique.length > 1) {
       trace.status = 'multiple-origin';
       trace.method = 'blame';
-      trace.evidence.introducingCandidates = blamed.shas;
+      trace.evidence.introducingCandidates = unique;
       return trace;
     }
-    const introducingSha = blamed.shas[0];
+    const introducingSha = unique[0];
     const resolved = resolveCommitToPr(cwd, introducingSha, active);
     if (resolved.pr === null || !resolved.mergedAt) {
       trace.method = 'blame';
@@ -424,21 +395,9 @@ export function resolveTraces(candidates, { cwd = process.cwd(), responder = {} 
       originalPr: resolved.pr,
       introducingMergedAt: resolved.mergedAt,
       method: 'blame',
-      files: blamed.files,
+      files,
     });
   });
-}
-
-function printJson(value) {
-  console.log(JSON.stringify(value, null, 2));
-}
-
-function parseSinceUntil(args) {
-  if (args.length !== 4 || args[0] !== '--since' || args[2] !== '--until')
-    throw new Error(
-      'Usage: node scripts/escape-trace.mjs [candidates] --since UTC --until UTC (inclusive since, exclusive until; origin/main committer timestamps)',
-    );
-  return { since: args[1], until: args[3] };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
@@ -460,12 +419,27 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
       const candidates = JSON.parse(input);
       if (!Array.isArray(candidates))
         throw new Error('trace expects a JSON array of candidates on stdin');
-      const responder = loadResponder(respondFile);
-      printJson(resolveTraces(candidates, { responder }));
+      const responder = respondFile
+        ? JSON.parse(readFileSync(respondFile, 'utf8'))
+        : { pullsByCommit: {}, refs: {} };
+      console.log(JSON.stringify(resolveTraces(candidates, { responder }), null, 2));
     } else {
       const candidateArgs = args[0] === 'candidates' ? args.slice(1) : args;
-      const { since, until } = parseSinceUntil(candidateArgs);
-      printJson(collectCandidates({ since, until }));
+      if (
+        candidateArgs.length !== 4 ||
+        candidateArgs[0] !== '--since' ||
+        candidateArgs[2] !== '--until'
+      )
+        throw new Error(
+          'Usage: node scripts/escape-trace.mjs [candidates] --since UTC --until UTC (inclusive since, exclusive until; origin/main committer timestamps)',
+        );
+      console.log(
+        JSON.stringify(
+          collectCandidates({ since: candidateArgs[1], until: candidateArgs[3] }),
+          null,
+          2,
+        ),
+      );
     }
   } catch (error) {
     console.error(error.message);

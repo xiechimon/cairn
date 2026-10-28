@@ -25,25 +25,31 @@ function fixture(t, prefix = 'escape-candidates-') {
   git(['init', '-q']);
   git(['config', 'user.name', 'Candidate test']);
   git(['config', 'user.email', 'candidate@example.invalid']);
-  function commit(message, date = start, pathOrFiles = 'file.txt') {
-    const files = typeof pathOrFiles === 'string' ? { [pathOrFiles]: message } : { ...pathOrFiles };
-    for (const [path, content] of Object.entries(files)) {
-      const absolute = join(cwd, path);
-      mkdirSync(dirname(absolute), { recursive: true });
-      writeFileSync(absolute, content);
-      git(['add', '--', path]);
-    }
-    git(['commit', '-q', '-m', message], { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date });
-    return git(['rev-parse', 'HEAD']);
-  }
   const run = (...args) =>
     spawnSync(process.execPath, [cli, '--since', start, '--until', end, ...args], {
       cwd,
       encoding: 'utf8',
     });
-  const runArgs = (args, opts = {}) =>
-    spawnSync(process.execPath, [cli, ...args], { cwd, encoding: 'utf8', ...opts });
-  return { cwd, git, commit, run, runArgs };
+  return {
+    cwd,
+    git,
+    run,
+    commit(message, date = start, pathOrFiles = 'file.txt') {
+      const files =
+        typeof pathOrFiles === 'string' ? { [pathOrFiles]: message } : { ...pathOrFiles };
+      for (const [path, content] of Object.entries(files)) {
+        const absolute = join(cwd, path);
+        mkdirSync(dirname(absolute), { recursive: true });
+        writeFileSync(absolute, content);
+        git(['add', '--', path]);
+      }
+      git(['commit', '-q', '-m', message], { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date });
+      return git(['rev-parse', 'HEAD']);
+    },
+    runArgs(args, opts = {}) {
+      return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: 'utf8', ...opts });
+    },
+  };
 }
 
 function isoPlus(base, ms) {
