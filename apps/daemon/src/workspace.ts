@@ -321,7 +321,13 @@ export class WorkspaceManager implements WorktreeOps {
 
   async push(cwd: string, branch: string, credentials: BoundGitCredentials | null): Promise<void> {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
-    await withGitNetRetries(() => gitPrim.push(cwd, branch, credentials));
+    await withGitNetRetries(() =>
+      gitPrim.push(cwd, branch, credentials, (local, remote) =>
+        this.logger.workspace(
+          `push of ${branch} already contained in origin/${branch} (local ${local.slice(0, 7)}, remote ${remote.slice(0, 7)}); nothing to push`,
+        ),
+      ),
+    );
   }
 
   async mergeDefaultBranch(cwd: string, defaultBranch: string): Promise<{ output: string }> {

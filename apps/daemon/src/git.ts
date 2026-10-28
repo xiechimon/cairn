@@ -139,6 +139,11 @@ const GIT_PERMANENT_FAILURE_PATTERNS: readonly RegExp[] = [
   /not a git repository/,
 ];
 
+function isPushRejectedNoFastForward(message: string): boolean {
+  if (isGitAuthFailure(message)) return false;
+  return /(?:non-fast-forward|fetch first)/.test(message);
+}
+
 export function isGitTransientNetFailure(message: string): boolean {
   const lower = message.toLowerCase();
   if (isGitAuthFailure(message)) return false;
@@ -503,20 +508,27 @@ export const gitPrim = {
     return /^[0-9a-f]{40,64}$/.test(sha) ? sha : null;
   },
 
-  async push(dir: string, branch: string, cred: BoundGitCredentials | null): Promise<void> {
+  async push(
+    dir: string,
+    branch: string,
+    cred: BoundGitCredentials | null,
+    onAlreadyContained?: (local: string, remote: string) => void,
+  ): Promise<void> {
+    const env = cred ? gitCredentialEnv(cred) : machineGitEnv();
     const traceDir = mkdtempSync(join(tmpdir(), 'cairn-push-'));
     const traceFile = join(traceDir, 'trace.jsonl');
     try {
       const result = await runGit(['push', '--end-of-options', 'origin', `refs/heads/${branch}`], {
         cwd: dir,
-        env: {
-          ...(cred ? gitCredentialEnv(cred) : machineGitEnv()),
-          GIT_TRACE2_EVENT: traceFile,
-        },
+        env: { ...env, GIT_TRACE2_EVENT: traceFile },
         timeoutMs: NET_TIMEOUT_MS,
       });
       if (result.code === 0) return;
       const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n');
+      const pushFailure = new Error(
+        `git push failed (${result.code ?? `signal ${result.signal ?? 'unknown'}`}): ${output}`,
+      );
+      let hookRejected = false;
       const hooks = new Set<number>();
       for (const line of readFileSync(traceFile, 'utf8').split('\n')) {
         if (line === '') continue;
@@ -534,20 +546,43 @@ export const gitPrim = {
           event.child_class === 'hook' &&
           event.hook_name === 'pre-push' &&
           event.child_id !== undefined
-        )
+        ) {
           hooks.add(event.child_id);
+        }
         if (
           event.event === 'child_exit' &&
           event.child_id !== undefined &&
           hooks.has(event.child_id) &&
           event.code !== undefined &&
           event.code !== 0
-        )
-          throw new GitPushHookError(output);
+        ) {
+          hookRejected = true;
+          break;
+        }
       }
-      throw new Error(
-        `git push failed (${result.code ?? `signal ${result.signal ?? 'unknown'}`}): ${output}`,
-      );
+      const rejection = hookRejected ? new GitPushHookError(output) : pushFailure;
+      if (hookRejected || !isPushRejectedNoFastForward(output)) throw rejection;
+      const contained = await (async () => {
+        const local = await gitPrim.head(dir);
+        const fetched = await runGit(
+          ['fetch', '--quiet', '--end-of-options', 'origin', `refs/heads/${branch}`],
+          { cwd: dir, env, timeoutMs: NET_TIMEOUT_MS },
+        );
+        if (local === null || fetched.code !== 0) return null;
+        const tip = await runGit(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'], {
+          cwd: dir,
+          timeoutMs: META_TIMEOUT_MS,
+        });
+        const remote = tip.code === 0 ? tip.stdout.trim() : '';
+        if (!/^[0-9a-f]{40,64}$/.test(remote)) return null;
+        const ancestor = await runGit(
+          ['merge-base', '--is-ancestor', '--end-of-options', local, remote],
+          { cwd: dir, timeoutMs: META_TIMEOUT_MS },
+        );
+        return ancestor.code === 0 ? { local, remote } : null;
+      })().catch(() => null);
+      if (contained === null) throw rejection;
+      onAlreadyContained?.(contained.local, contained.remote);
     } finally {
       rmSync(traceDir, { recursive: true, force: true });
     }
@@ -680,7 +715,7 @@ export async function withGitNetRetries<T>(fn: () => Promise<T>): Promise<T> {
       lastErr = err;
       const msg = err instanceof Error ? err.message : String(err);
       if (err instanceof GitPushHookError || isGitAuthFailure(msg)) break;
-      if (!isGitTransientNetFailure(msg)) break;
+      if (isPushRejectedNoFastForward(msg) || !isGitTransientNetFailure(msg)) break;
       const delay = GIT_NET_RETRY_DELAYS_MS[i];
       if (delay === undefined) break;
       await new Promise((r) => setTimeout(r, delay));

@@ -861,3 +861,116 @@ test('#1829 a hook rejection on the machine credential fallback retains its reco
     ),
   ).rejects.toBe(hookError);
 });
+
+function commitFile(dir: string, name: string, body: string): string {
+  writeFileSync(join(dir, name), body);
+  gitOk(dir, ['add', name]);
+  gitOk(dir, ['commit', '-m', `add ${name}`]);
+  return gitOk(dir, ['rev-parse', 'HEAD']);
+}
+
+function pushFixture(): { remote: string; upstream: string; dir: string } {
+  const remote = join(mkdtempSync(join(tmpdir(), 'cairn-contained-remote-')), 'repo.git');
+  gitOk(tmpdir(), ['init', '--bare', remote]);
+  gitOk(remote, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+  const source = mkdtempSync(join(tmpdir(), 'cairn-contained-source-'));
+  gitOk(source, ['init', '-q', '-b', 'main']);
+  gitOk(source, ['config', 'user.email', 't@example.com']);
+  gitOk(source, ['config', 'user.name', 't']);
+  commitFile(source, 'seed.txt', 'seed\n');
+  gitOk(source, ['remote', 'add', 'origin', remote]);
+  gitOk(source, ['push', 'origin', 'main']);
+  commitFile(source, 'main-only.txt', 'main advances after the branch was cut\n');
+  gitOk(source, ['push', 'origin', 'main']);
+  const upstream = mkdtempSync(join(tmpdir(), 'cairn-contained-upstream-'));
+  gitOk(tmpdir(), ['clone', remote, upstream]);
+  gitOk(upstream, ['config', 'user.email', 't@example.com']);
+  gitOk(upstream, ['config', 'user.name', 't']);
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-contained-work-'));
+  gitOk(tmpdir(), ['clone', remote, dir]);
+  gitOk(dir, ['config', 'user.email', 't@example.com']);
+  gitOk(dir, ['config', 'user.name', 't']);
+  gitOk(dir, ['checkout', '-B', 'work', 'HEAD~1']);
+  return { remote, upstream, dir };
+}
+
+describe('#2006 a work-branch push already contained in the remote branch is not a failure', () => {
+  test('failure mode 1: remote branch is local HEAD plus a merge of main (Update branch) -> push succeeds, one log line names both short SHAs', async () => {
+    const { upstream, dir } = pushFixture();
+    const sha = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'HEAD:refs/heads/work']);
+    gitOk(upstream, ['fetch', 'origin', 'refs/heads/work']);
+    gitOk(upstream, ['checkout', '--detach', sha]);
+    gitOk(upstream, ['merge', '--no-ff', '-m', "Merge branch 'main' into work", 'origin/main']);
+    gitOk(upstream, ['push', 'origin', 'HEAD:refs/heads/work']);
+    const merged = gitOk(upstream, ['rev-parse', 'HEAD']);
+    expect(merged).not.toBe(sha);
+    const lines: string[] = [];
+
+    await expect(
+      gitPrim.push(dir, 'work', null, (a, b) => lines.push(`${a} ${b}`)),
+    ).resolves.toBeUndefined();
+
+    expect(gitOk(dir, ['rev-parse', 'HEAD'])).toBe(sha);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain(sha.slice(0, 7));
+    expect(lines[0]).toContain(merged.slice(0, 7));
+  }, 30_000);
+
+  test('failure mode 2: remote branch advanced by a commit that does not contain local HEAD -> non-fast-forward still throws', async () => {
+    const { upstream, dir } = pushFixture();
+    commitFile(dir, 'work.txt', 'work\n');
+    gitOk(upstream, ['checkout', '-B', 'work', 'origin/main']);
+    commitFile(upstream, 'foreign.txt', 'foreign\n');
+    gitOk(upstream, ['push', 'origin', 'work']);
+    commitFile(dir, 'later.txt', 'later\n');
+    const lines: string[] = [];
+
+    const err = await gitPrim
+      .push(dir, 'work', null, (a, b) => lines.push(`${a} ${b}`))
+      .catch((error: unknown) => error);
+
+    expect(err).toBeInstanceOf(Error);
+    expect(String(err)).toContain('git push failed');
+    expect(String(err)).toMatch(/non-fast-forward|fetch first/);
+    expect(lines).toEqual([]);
+  }, 30_000);
+
+  test('failure mode 2b: a stale remote-tracking ref that names local HEAD does not count as contained when fetch does not map the branch', async () => {
+    const { upstream, dir } = pushFixture();
+    gitOk(upstream, ['checkout', '-B', 'work', 'origin/main']);
+    commitFile(upstream, 'foreign.txt', 'foreign\n');
+    gitOk(upstream, ['push', 'origin', 'work']);
+    const sha = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['update-ref', 'refs/remotes/origin/work', sha]);
+    gitOk(dir, ['config', 'remote.origin.fetch', '+refs/heads/main:refs/remotes/origin/main']);
+    const lines: string[] = [];
+
+    const err = await gitPrim
+      .push(dir, 'work', null, (a, b) => lines.push(`${a} ${b}`))
+      .catch((error: unknown) => error);
+
+    expect(String(err)).toMatch(/non-fast-forward|fetch first/);
+    expect(lines).toEqual([]);
+  }, 30_000);
+
+  test('failure mode 3: a rejected pre-push hook never triggers the containment retry', async () => {
+    const { dir } = pushFixture();
+    commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['config', 'core.hooksPath', join(dir, '.git', 'hooks')]);
+    const hook = join(dir, '.git', 'hooks', 'pre-push');
+    const marker = join(dir, 'hook-calls');
+    writeFileSync(hook, `#!/bin/sh\necho called >> '${marker}'\necho 'lint failed' >&2\nexit 1\n`);
+    chmodSync(hook, 0o755);
+    const lines: string[] = [];
+
+    const err = await gitPrim
+      .push(dir, 'work', null, (a, b) => lines.push(`${a} ${b}`))
+      .catch((error: unknown) => error);
+
+    expect(err).toMatchObject({ name: 'GitPushHookError' });
+    expect(String(err)).toContain('lint failed');
+    expect(readFileSync(marker, 'utf8')).toBe('called\n');
+    expect(lines).toEqual([]);
+  }, 30_000);
+});
