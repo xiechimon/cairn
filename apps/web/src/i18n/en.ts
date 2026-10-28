@@ -1315,4 +1315,24 @@ export const EN: Record<string, string> = {
   引导这个任务: 'Steer this task',
   '回复 agent…': 'Reply to the agent…',
   '引导这个任务…': 'Steer this task…',
+  飞书机器人: 'Feishu bot',
+  飞书配置加载失败: 'Could not load Feishu configuration',
+  正在加载飞书配置: 'Loading Feishu configuration',
+  '仅保存配置，不会连接飞书或启用审批。':
+    'Saves configuration only. Does not connect to Feishu or enable approvals.',
+  已配置: 'Configured',
+  未配置: 'Not configured',
+  '接收者 Open ID': 'Recipient Open ID',
+  'Cairn 地址': 'Cairn origin',
+  '留空保留当前密钥；更换 App ID 时须填写新密钥。':
+    'Leave blank to keep the current secret. A new App ID requires a new secret.',
+  '请检查 App ID、密钥、接收者和 Cairn 地址。':
+    'Check the App ID, secret, recipient and Cairn origin.',
+  保存配置: 'Save configuration',
+  解除绑定: 'Unbind',
+  '解除飞书绑定？': 'Unbind Feishu?',
+  '将删除保存的 App ID 和 App Secret。': 'This deletes the saved App ID and App Secret.',
+  '解除后需要重新填写才能恢复连接。':
+    'Re-entering the fields is required to reconnect after unbinding.',
+  解除飞书绑定确认: 'Unbind Feishu confirmation',
 };

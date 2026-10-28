@@ -1,0 +1,97 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1974
+
+ ❯ |@xiechimon/cairn| test/feishu-config.test.ts (5 tests | 4 failed) 442ms
+   × configuration persists, replaces encrypted credentials, and completely unbinds without network calls 130ms
+   × invalid configuration never changes the binding or echoes credentials 59ms
+   × ordinary secret APIs and agent credential access cannot expose, shadow, overwrite or delete bot credentials 67ms
+   × failed credential replacement rolls back both credentials and binding 61ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/feishu-config.test.ts > configuration persists, replaces encrypted credentials, and completely unbinds without network calls
+AssertionError: expected { error: 'Not found' } to deeply equal { Object (configured, appId, ...) }
+
+- Expected
++ Received
+
+  {
+-   "appId": null,
+-   "cairnOrigin": null,
+-   "configured": false,
+-   "openId": null,
++   "error": "Not found",
+  }
+
+ ❯ test/feishu-config.test.ts:29:58
+     27|   const s = setup();
+     28|   const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new …
+     29|   expect(await (await req(s.app, 'GET', s.path)).json()).toEqual({
+       |                                                          ^
+     30|     configured: false, appId: null, openId: null, cairnOrigin: null,
+     31|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/feishu-config.test.ts > invalid configuration never changes the binding or echoes credentials
+AssertionError: expected 404 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 404
+
+ ❯ test/feishu-config.test.ts:61:29
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/feishu-config.test.ts > ordinary secret APIs and agent credential access cannot expose, shadow, overwrite or delete bot credentials
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ test/feishu-config.test.ts:87:60
+     85|   const s = setup();
+     86|   const secretsPath = `/api/teams/${s.team.id}/secrets`;
+     87|   expect((await req(s.app, 'PUT', s.path, config)).status).toBe(200);
+       |                                                            ^
+     88|   const rows = s.db.select().from(secret).all();
+     89|   expect(await (await req(s.app, 'GET', secretsPath)).json()).toEqual(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/feishu-config.test.ts > failed credential replacement rolls back both credentials and binding
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ test/feishu-config.test.ts:108:60
+    106| test('failed credential replacement rolls back both credentials and bi…
+    107|   const s = setup();
+    108|   expect((await req(s.app, 'PUT', s.path, config)).status).toBe(200);
+       |                                                            ^
+    109|   const before = s.db.select().from(secret).all();
+    110|   vi.spyOn(s.secretBox, 'seal').mockImplementationOnce(() => 'unused-c…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 1 passed (5)
+   Start at  16:28:06
+   Duration  6.74s (transform 72%, import 21%, tests 7%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 4.72s · 72% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

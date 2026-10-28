@@ -1,6 +1,7 @@
 export * from './chief-tools.js';
 export * from './client-state.js';
 export * from './executor.js';
+export * from './feishu.js';
 export * from './fs-list.js';
 export * from './fs-pick.js';
 export * from './machine-api.js';
