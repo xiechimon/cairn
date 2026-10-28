@@ -1,0 +1,8 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/eval-explicit-context/cairn
+
+
+ Test Files  3 passed (3)
+      Tests  110 passed (110)
+   Start at  08:48:36
+   Duration  24.98s (tests 95%, transform 2%, import 2%)

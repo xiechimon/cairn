@@ -1,4 +1,6 @@
-# Context-window code review
+# Historical implementing-session context-window review
+
+This historical pass was superseded by the independent block at head `bdc21db4`. It is not current merge approval. See `context-independent-first-review.md` and the test-first corrections in `context-window.md`.
 
 Reviewed source: `2ca1ade918b3311764874d730e717ca1053c9a91` against main `d3c8d5039`. Subsequent commits contain evidence and whitespace normalization only. This is the implementing session's review, not a fresh independent model review.
 
