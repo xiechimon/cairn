@@ -42,8 +42,7 @@ export function classifyLaneExit({ log, rc, durationSeconds }) {
   }
 
   const duration = Number(durationSeconds);
-  const short =
-    Number.isFinite(duration) && duration >= 0 && duration < SHORT_NOOP_SECONDS;
+  const short = Number.isFinite(duration) && duration >= 0 && duration < SHORT_NOOP_SECONDS;
   if (short && NOOP_PATTERNS.some((pattern) => pattern.test(text))) {
     return {
       ok: false,
@@ -68,26 +67,29 @@ export function classifyLaneExit({ log, rc, durationSeconds }) {
   return { ok: true, code: 'ok', reason: 'lane exit looks complete' };
 }
 
-function parseArgs(argv) {
-  const out = {};
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const args = {};
+  const argv = process.argv.slice(2);
+  let unknown;
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
     if (key === '--log' || key === '--rc' || key === '--duration-s') {
-      out[key.slice(2)] = argv[++i];
+      args[key.slice(2)] = argv[++i];
     } else if (key === '--help' || key === '-h') {
-      out.help = true;
+      args.help = true;
     } else {
-      out.unknown = key;
+      unknown = key;
     }
   }
-  return out;
-}
-
-function main(argv) {
-  const args = parseArgs(argv);
-  if (args.help || args.unknown || !args.log || args.rc === undefined || args['duration-s'] === undefined) {
+  if (
+    args.help ||
+    unknown ||
+    !args.log ||
+    args.rc === undefined ||
+    args['duration-s'] === undefined
+  ) {
     console.error(USAGE);
-    if (args.unknown) console.error(`unknown argument: ${args.unknown}`);
+    if (unknown) console.error(`unknown argument: ${unknown}`);
     process.exit(2);
   }
   let log;
@@ -109,8 +111,4 @@ function main(argv) {
   }
   console.error(line);
   process.exit(1);
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main(process.argv.slice(2));
 }

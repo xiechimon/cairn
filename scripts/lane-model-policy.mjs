@@ -1,11 +1,7 @@
 #!/usr/bin/env node
 import { pathToFileURL } from 'node:url';
 
-export const BANNED_MODEL_IDS = Object.freeze([
-  'deepseek-v4-flash',
-  'minimax-m3',
-  'gpt-6-astra',
-]);
+export const BANNED_MODEL_IDS = Object.freeze(['deepseek-v4-flash', 'minimax-m3', 'gpt-6-astra']);
 
 const AI_ROUTE_LINE = /^ai-route:\s+([A-Za-z0-9_-]+)\s+->\s+(\S+)\s*$/;
 

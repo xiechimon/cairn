@@ -88,7 +88,11 @@ if (subcommand === 'check') {
   let optionsValid = true;
   for (let i = 0; i < rest.length && optionsValid; i++) {
     const option = rest[i];
-    if (option === '--timeout-s' && timeoutSeconds === undefined && /^\d+$/.test(rest[i + 1] ?? '')) {
+    if (
+      option === '--timeout-s' &&
+      timeoutSeconds === undefined &&
+      /^\d+$/.test(rest[i + 1] ?? '')
+    ) {
       timeoutSeconds = Number(rest[++i]);
     } else {
       optionsValid = false;
@@ -106,10 +110,7 @@ if (subcommand === 'check') {
     process.exit(1);
   }
   while (isRunning(record.pid)) {
-    if (
-      timeoutSeconds !== undefined &&
-      (Date.now() - startedWait) / 1000 >= timeoutSeconds
-    ) {
+    if (timeoutSeconds !== undefined && (Date.now() - startedWait) / 1000 >= timeoutSeconds) {
       console.error(`dispatch ${id}: still running after ${timeoutSeconds}s (pid ${record.pid})`);
       process.exit(1);
     }

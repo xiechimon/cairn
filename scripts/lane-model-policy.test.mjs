@@ -29,9 +29,11 @@ test('parseAiRouteSelection reads the #2021 implement route line', () => {
 });
 
 test('bannedModelFromLog reds the real #1517/#1792 exit artifact', () => {
-  const log = ['other noise', 'ai-route: implement -> pi:domestic-proxy/deepseek-v4-flash', ''].join(
-    '\n',
-  );
+  const log = [
+    'other noise',
+    'ai-route: implement -> pi:domestic-proxy/deepseek-v4-flash',
+    '',
+  ].join('\n');
   const hit = bannedModelFromLog(log);
   assert.ok(hit);
   assert.equal(hit.modelId, 'deepseek-v4-flash');
