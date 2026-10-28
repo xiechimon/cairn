@@ -453,6 +453,10 @@ async function main() {
     console.error('--context-window is not supported for learn cases');
     process.exit(2);
   }
+  if (ARGS.contextWindow !== undefined && !ROSTER.some((a) => a.modelId === CHIEF_MODEL)) {
+    console.error('--context-window requires the chief model to be in the roster');
+    process.exit(2);
+  }
   if (ARGS.arm !== 'all' && !cases.some((c) => isLearnCase(c))) {
     console.error(`--arm ${ARGS.arm} applies to learn cases only`);
     process.exit(2);
@@ -606,7 +610,7 @@ async function main() {
             prompt_id: safeId,
             rep,
             failure_class: err?.failure_class ?? 'error',
-            context_window: ARGS.contextWindow,
+            requested_context_window: ARGS.contextWindow,
             error: String(err?.message || e),
             retries: appRetry.count,
             infra_retries: infraRetry.count,

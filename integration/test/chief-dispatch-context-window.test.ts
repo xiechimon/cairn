@@ -205,3 +205,103 @@ test('context-window requests for learn cases are rejected before model executio
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+test.each([undefined, 'missing-chief'])(
+  'an explicit window rejects a chief model outside the roster: %s',
+  (model) => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-context-missing-chief-'));
+    try {
+      const roster = dataset.roster.filter((entry) => entry.modelId !== 'glm-5.3');
+      writeFileSync(
+        join(home, 'cases.json'),
+        JSON.stringify({ ...dataset, roster, cases: dataset.cases.slice(0, 1) }),
+      );
+      const args = [
+        loader,
+        runner,
+        '--flow',
+        home,
+        '--context-window',
+        '1000000',
+        '--timeout-s',
+        '1',
+        '--approve-harness',
+      ];
+      if (model !== undefined) args.push('--model', model);
+      const result = spawnSync(process.execPath, args, {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          TMPDIR: home,
+          CAIRN_EVAL_RELAY_URL: '',
+          CAIRN_EVAL_RELAY_KEY: 'nonsecret-context-probe',
+        },
+      });
+      expect(result.status, result.stderr).toBe(2);
+      expect(result.stderr).toContain(
+        '--context-window requires the chief model to be in the roster',
+      );
+      expect(readdirSync(home).some((name) => name.startsWith('cairn-eval-chief-'))).toBe(false);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  },
+  30_000,
+);
+
+test('configuration failures record the requested window without claiming materialization', () => {
+  const home = mkdtempSync(join(tmpdir(), 'cairn-context-requested-'));
+  try {
+    writeFileSync(
+      join(home, 'cases.json'),
+      JSON.stringify({ ...dataset, cases: dataset.cases.slice(0, 1) }),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        loader,
+        runner,
+        '--flow',
+        home,
+        '--model',
+        'glm-5.3',
+        '--context-window',
+        '1000000',
+        '--reps',
+        '1',
+        '--concurrency',
+        '1',
+        '--timeout-s',
+        '30',
+        '--approve-harness',
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          TMPDIR: home,
+          CAIRN_EVAL_RELAY_URL: '',
+          CAIRN_EVAL_RELAY_KEY: 'nonsecret-context-probe',
+        },
+      },
+    );
+    expect(result.status, result.stderr).toBe(1);
+    const errors = readFileSync(join(home, 'baseline/errors.jsonl'), 'utf8')
+      .trim()
+      .split('\n')
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            error: string;
+            context_window?: number;
+            requested_context_window?: number;
+          },
+      );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.error).toContain('relay URL missing');
+    expect(errors[0]?.requested_context_window).toBe(1_000_000);
+    expect(errors[0]).not.toHaveProperty('context_window');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+}, 60_000);
