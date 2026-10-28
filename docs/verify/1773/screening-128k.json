@@ -1,0 +1,248 @@
+{
+  "sourceCommit": "aae8a0bcdfb2311c418c2f6229d22d332b338d02",
+  "providerMode": "real",
+  "configuredContextWindow": 128000,
+  "usableForAcceptance": false,
+  "reason": "The eval provider omitted contextWindow and the backend used its 128k default. The paired job was stopped after discovery.",
+  "arms": {
+    "with-memory": {
+      "results": [
+        {
+          "prompt_id": "i01",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 48278,
+            "output_tokens": 2951
+          },
+          "grade": {
+            "decision_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实"
+          }
+        },
+        {
+          "prompt_id": "a01",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 35152,
+            "output_tokens": 2169
+          },
+          "grade": {
+            "decision_ok": 1,
+            "untouched_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实",
+            "untouched_ok": "unrelated memory is unchanged"
+          }
+        },
+        {
+          "prompt_id": "a03",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 109985,
+            "output_tokens": 9398
+          },
+          "grade": {
+            "decision_ok": 0,
+            "untouched_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "出现不该采信的 9090",
+            "untouched_ok": "unrelated memory is unchanged"
+          }
+        },
+        {
+          "prompt_id": "a02",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 157715,
+            "output_tokens": 12049
+          },
+          "grade": {
+            "decision_ok": 0,
+            "untouched_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "缺少 e2e:affected；出现不该采信的 e2e:full、skip-docs-e2e",
+            "untouched_ok": "unrelated memory is unchanged"
+          }
+        },
+        {
+          "prompt_id": "a04",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 50171,
+            "output_tokens": 3137
+          },
+          "grade": {
+            "decision_ok": 1,
+            "untouched_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实",
+            "untouched_ok": "unrelated memory is unchanged"
+          }
+        },
+        {
+          "prompt_id": "i02",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 84779,
+            "output_tokens": 2244
+          },
+          "grade": {
+            "decision_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实"
+          }
+        },
+        {
+          "prompt_id": "i04",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 34171,
+            "output_tokens": 1526
+          },
+          "grade": {
+            "decision_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实"
+          }
+        },
+        {
+          "prompt_id": "i03",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 62770,
+            "output_tokens": 3658
+          },
+          "grade": {
+            "decision_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实"
+          }
+        },
+        {
+          "prompt_id": "i05",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 111510,
+            "output_tokens": 3946
+          },
+          "grade": {
+            "decision_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实"
+          }
+        },
+        {
+          "prompt_id": "i06",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 50765,
+            "output_tokens": 4432
+          },
+          "grade": {
+            "decision_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实"
+          }
+        }
+      ],
+      "errors": [
+        {
+          "prompt_id": "a05",
+          "rep": 0,
+          "failure_class": "timeout",
+          "latency_s": 360.029
+        },
+        {
+          "prompt_id": "a06",
+          "rep": 0,
+          "failure_class": "timeout",
+          "latency_s": 360.027
+        }
+      ]
+    },
+    "no-memory": {
+      "results": [
+        {
+          "prompt_id": "i02",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 84779,
+            "output_tokens": 2410
+          },
+          "grade": {
+            "decision_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实"
+          }
+        },
+        {
+          "prompt_id": "i01",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 48295,
+            "output_tokens": 2808
+          },
+          "grade": {
+            "decision_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实"
+          }
+        },
+        {
+          "prompt_id": "i04",
+          "rep": 0,
+          "status": "ok",
+          "model": "glm-5.3",
+          "usage": {
+            "input_tokens": 35165,
+            "output_tokens": 2452
+          },
+          "grade": {
+            "decision_ok": 1
+          },
+          "explanation": {
+            "decision_ok": "产出遵循应采信的那条事实"
+          }
+        }
+      ],
+      "errors": []
+    }
+  }
+}

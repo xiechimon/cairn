@@ -1,0 +1,23 @@
+✔ completed baseline failures and paired controls qualify both families (0.808542ms)
+✔ all-pass cases do not qualify (0.115625ms)
+✔ harness errors cannot supply qualifying failures (0.084333ms)
+✔ a preservation failure qualifies an adjacent case independently of decision (0.095334ms)
+✔ missing no-memory controls keep the delivery incomplete (0.086708ms)
+✔ a changed case cannot inherit old qualification (0.089709ms)
+✔ duplicate repetitions are rejected (0.188542ms)
+✔ an unlisted requested model is rejected (0.054208ms)
+✔ served-model substitution is rejected (0.083792ms)
+✔ truncated or zero-usage rows cannot qualify (0.147041ms)
+✔ missing repetitions or required grades are rejected (0.132375ms)
+✔ error-classified rows cannot be moved into scored results (0.068833ms)
+✔ fixture provenance is rejected before source artifacts are inspected (1.043ms)
+✔ a configured window below 1M cannot qualify (0.633417ms)
+✔ scored rows must record the same window as their run (0.099208ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 98.494542

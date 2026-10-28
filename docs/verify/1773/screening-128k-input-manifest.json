@@ -1,0 +1,19 @@
+{
+  "sourceCommit": "aae8a0bcdfb2311c418c2f6229d22d332b338d02",
+  "requestedModel": "glm-5.3",
+  "providerMode": "real",
+  "files": {
+    "cases.json": "4b232fae8a192be9328779eeab6c664f20ad46df90b19a224634bd0d0f7a293a",
+    "_state.json": "973d84c6e81fb6bae0cc7c11ef324cfdae6fb5a62cadcc0f03681aee84bbd387"
+  },
+  "armInputs": {
+    "with-memory": {
+      "cases.json": "4b232fae8a192be9328779eeab6c664f20ad46df90b19a224634bd0d0f7a293a",
+      "_state.json": "973d84c6e81fb6bae0cc7c11ef324cfdae6fb5a62cadcc0f03681aee84bbd387"
+    },
+    "no-memory": {
+      "cases.json": "69561160d72fb35cf8a29777fa2f2740a80a1fc14b2072b4d8ef75e3250fa4f8",
+      "_state.json": "973d84c6e81fb6bae0cc7c11ef324cfdae6fb5a62cadcc0f03681aee84bbd387"
+    }
+  }
+}

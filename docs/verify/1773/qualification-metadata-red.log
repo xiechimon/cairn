@@ -1,0 +1,76 @@
+fatal: path 'packages/shared/src/records/merge-gate.ts' exists on disk, but not in '0000000000000000000000000000000000000000'
+✔ completed baseline failures and paired controls qualify both families (0.790958ms)
+✔ all-pass cases do not qualify (0.117416ms)
+✔ harness errors cannot supply qualifying failures (0.090959ms)
+✔ a preservation failure qualifies an adjacent case independently of decision (0.096084ms)
+✔ missing no-memory controls keep the delivery incomplete (0.075333ms)
+✔ a changed case cannot inherit old qualification (0.093042ms)
+✔ duplicate repetitions are rejected (0.195292ms)
+✔ an unlisted requested model is rejected (0.057667ms)
+✔ served-model substitution is rejected (0.080291ms)
+✔ truncated or zero-usage rows cannot qualify (0.130042ms)
+✔ missing repetitions or required grades are rejected (0.146917ms)
+✖ error-classified rows cannot be moved into scored results (0.462208ms)
+✖ fixture provenance is rejected before source artifacts are inspected (25.637792ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 11
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 164.785333
+
+✖ failing tests:
+
+test at docs/verify/1773/check-qualification.test.mts:85:1
+✖ error-classified rows cannot be moved into scored results (0.462208ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn/docs/verify/1773/check-qualification.test.mts:87:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /Incomplete scored row/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at docs/verify/1773/check-qualification.test.mts:89:1
+✖ fixture provenance is rejected before source artifacts are inspected (25.637792ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Real-provider provenance is missing/. Input:
+  
+  'Error: Command failed: git show 0000000000000000000000000000000000000000:packages/shared/src/records/merge-gate.ts\n' +
+    "fatal: path 'packages/shared/src/records/merge-gate.ts' exists on disk, but not in '0000000000000000000000000000000000000000'\n"
+  
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn/docs/verify/1773/check-qualification.test.mts:93:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Command failed: git show 0000000000000000000000000000000000000000:packages/shared/src/records/merge-gate.ts
+    fatal: path 'packages/shared/src/records/merge-gate.ts' exists on disk, but not in '0000000000000000000000000000000000000000'
+    
+        at genericNodeError (node:internal/errors:985:15)
+        at wrappedFn (node:internal/errors:539:14)
+        at checkExecSyncError (node:child_process:925:11)
+        at execFileSync (node:child_process:961:15)
+        at source (file:///Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn/docs/verify/1773/check-qualification.mts:125:44)
+        at verifyRun (file:///Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn/docs/verify/1773/check-qualification.mts:127:10)
+        at file:///Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn/docs/verify/1773/check-qualification.test.mts:93:25
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn/docs/verify/1773/check-qualification.test.mts:93:12),
+    expected: /Real-provider provenance is missing/,
+    operator: 'throws',
+    diff: 'simple'
+  }

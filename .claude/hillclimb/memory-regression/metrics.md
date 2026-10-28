@@ -66,10 +66,12 @@ the key.
 ```sh
 source ~/.cairn/tools/eval-env.sh
 pnpm --filter @cairn/integration exec tsx eval/chief-dispatch/run-eval.mts \
-  --flow .claude/hillclimb/memory-regression --variant baseline --model glm-5.3 --reps 3 --approve-harness
+  --flow .claude/hillclimb/memory-regression --variant baseline --model glm-5.3 --context-window 1000000 --reps 3 --approve-harness
 ```
 
 `--variant` is `baseline` or `v<N>`. The roster model goes in `--model`.
+
+The explicit context window is materialized for the chief model and recorded in each scored row. A model name or directory declaration does not establish that runtime setting. Historical results without that metadata do not establish the current 1M configuration. The external weekly timer described below was not exercised or changed by this delivery.
 
 ## Weekly re-run
 

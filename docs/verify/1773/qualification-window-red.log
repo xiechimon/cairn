@@ -1,0 +1,61 @@
+✔ completed baseline failures and paired controls qualify both families (0.771666ms)
+✔ all-pass cases do not qualify (0.138625ms)
+✔ harness errors cannot supply qualifying failures (0.084625ms)
+✔ a preservation failure qualifies an adjacent case independently of decision (0.092542ms)
+✔ missing no-memory controls keep the delivery incomplete (0.083083ms)
+✔ a changed case cannot inherit old qualification (0.090875ms)
+✔ duplicate repetitions are rejected (0.182625ms)
+✔ an unlisted requested model is rejected (0.074792ms)
+✔ served-model substitution is rejected (0.082791ms)
+✔ truncated or zero-usage rows cannot qualify (0.143667ms)
+✔ missing repetitions or required grades are rejected (0.136959ms)
+✔ error-classified rows cannot be moved into scored results (0.068375ms)
+✔ fixture provenance is rejected before source artifacts are inspected (1.108208ms)
+✖ a configured window below 1M cannot qualify (0.326333ms)
+✖ scored rows must record the same window as their run (0.486917ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 13
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 98.133459
+
+✖ failing tests:
+
+test at docs/verify/1773/check-qualification.test.mts:124:1
+✖ a configured window below 1M cannot qualify (0.326333ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn/docs/verify/1773/check-qualification.test.mts:125:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /1M execution metadata is missing/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at docs/verify/1773/check-qualification.test.mts:127:1
+✖ scored rows must record the same window as their run (0.486917ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn/docs/verify/1773/check-qualification.test.mts:130:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /Incomplete scored row/,
+    operator: 'throws',
+    diff: 'simple'
+  }

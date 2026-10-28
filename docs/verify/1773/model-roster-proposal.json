@@ -1,0 +1,30 @@
+{
+  "status": "awaiting owner decision",
+  "issue": 1773,
+  "currentRoster": [
+    "glm-5.3",
+    "kimi-k3",
+    "qwen3.8-max",
+    "deepseek-v4-pro"
+  ],
+  "proposedRoster": [
+    "glm-5.3",
+    "glm-5.3-flash",
+    "deepseek-v4.1-flash"
+  ],
+  "proposedContextWindow": 1000000,
+  "reason": "The current allowed model set differs from the historical evaluation roster. Updating the evaluation roster changes its acceptance population.",
+  "observedScreening": {
+    "model": "glm-5.3",
+    "irrelevantPassed": 6,
+    "irrelevantCandidates": 6,
+    "qualifyingIrrelevantFailures": 0,
+    "adjacentScoredFailures": 2,
+    "executionTimeouts": 2,
+    "configuredWindow": 128000,
+    "usableForAcceptance": false
+  },
+  "requiredRerun": "Run all retained new cases and paired irrelevant no-memory controls with explicitly materialized 1M model metadata. Do not carry over the 128k results as acceptance evidence.",
+  "retentionRule": "Keep 4 to 6 cases per new family. Each retained case needs at least one completed scored failure on an approved roster model. Execution errors do not qualify.",
+  "alternative": "Keep the existing roster and redesign candidates for the allowed glm-5.3 model without changing grading or counting execution errors as failures."
+}

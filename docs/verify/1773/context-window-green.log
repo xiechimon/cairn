@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn
+
+
+ Test Files  5 passed (5)
+      Tests  318 passed (318)
+   Start at  07:52:27
+   Duration  20.31s (tests 86%, import 8%, transform 6%)
+

@@ -1,0 +1,57 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn
+
+ ❯ |@cairn/integration| test/chief-dispatch-context-window.test.ts (9 tests | 2 failed) 16005ms
+   × eval CLI materializes context 1000000 from declaration 1000000 1691ms
+   × context-window requests for learn cases are rejected before model execution 1539ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/chief-dispatch-context-window.test.ts > eval CLI materializes context 1000000 from declaration 1000000
+AssertionError: unknown argument: --context-window
+usage: run-eval.mts --flow DIR --variant ID [--model ID] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]
+: expected 2 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 2
+
+ ❯ test/chief-dispatch-context-window.test.ts:119:28
+    117|         clearTimeout(timer);
+    118|       }
+    119|       expect(code, output).toBe(0);
+       |                            ^
+    120|       expect(requests).toBe(1);
+    121|       expect(observed.find((model) => model.id === 'glm-5.3')?.context…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@cairn/integration| test/chief-dispatch-context-window.test.ts > context-window requests for learn cases are rejected before model execution
+AssertionError: expected 'unknown argument: --context-window\nu…' to contain '--context-window is not supported for…'
+
+- Expected
++ Received
+
+- --context-window is not supported for learn cases
++ unknown argument: --context-window
++ usage: run-eval.mts --flow DIR --variant ID [--model ID] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]
++
+
+ ❯ test/chief-dispatch-context-window.test.ts:184:27
+    182|     );
+    183|     expect(result.status).toBe(2);
+    184|     expect(result.stderr).toContain('--context-window is not supported…
+       |                           ^
+    185|   } finally {
+    186|     rmSync(home, { recursive: true, force: true });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 7 passed (9)
+   Start at  07:48:35
+   Duration  16.11s (tests 100%)
+

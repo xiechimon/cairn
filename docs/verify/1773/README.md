@@ -7,3 +7,17 @@ The original PR head is `6fd985108eb6ce6694ee0e5547c1895625bc217c`. `original-ne
 The saved chief-dispatch approval hash remains main's existing value after the added push fixture enters both path declarations. Runtime evaluation approval will apply only to an isolated copy of the flow state.
 
 Real-model qualification is pending. Grader controls and seeded database checks do not prove that a case fails on a roster model. A completed scored turn must fail the applicable metric before that new case can qualify under issue #1773. A harness error cannot supply that evidence. This checkpoint has not satisfied that requirement and is not ready to merge.
+
+## Context configuration correction
+
+The real screening from source `aae8a0bcdfb2311c418c2f6229d22d332b338d02` is preserved in `screening-128k.json`. All six irrelevant cases passed, two adjacent cases produced scored failures, and two adjacent turns timed out. Three no-memory controls completed before the task's own evaluation process group was stopped. The provider omitted its context window and the backend used 128000, so none of this batch establishes acceptance under the current 1M requirement.
+
+`context-window-red.log` records two failing CLI controls before the explicit option. `context-window-green.log` records 318 passing cases across five related suites. `context-window-1000000.json` and `context-window-default.json` preserve observations of the daemon's actual model file and the result-row metadata. The provider was a local stub; these artifacts establish configuration propagation without asserting paid-provider reliability.
+
+## Qualification verifier
+
+`check-qualification.mts` reads existing artifacts; it invokes no model and adds no evaluation runner. It checks the source commit, source and arm input hashes, unchanged grading dependencies, approved file fingerprint, model identity, complete scored repetitions, and explicit 1M row metadata. Error rows do not contribute qualifying failures. Every retained new case still needs a completed scored failure, and irrelevant cases need completed no-memory observations. The family counts remain four to six.
+
+`qualification-metadata-red.log` and `qualification-window-red.log` record the negative controls. `qualification-green.log` records 15 passing checks. `old-screening-rejection.log` records rejection of the actual old manifest for missing 1M execution metadata. Provenance declarations alone do not authenticate provider traffic; the observed real run and its limits remain part of the review evidence.
+
+The proposed model roster is recorded in `model-roster-proposal.json`. It has not been applied and awaits the owner's decision. The original PR remains blocked by `needs-decision`.
