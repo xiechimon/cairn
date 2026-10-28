@@ -709,7 +709,11 @@ function planSelfIssue(deps: TodoDeps, teamId: string, projectId: string): Githu
 
 function scheduleSelfIssueCreate(deps: TodoDeps, todoId: string): void {
   const pending = runSelfIssueCreate(deps, todoId)
-    .catch(() => undefined)
+    .catch((error: unknown) => {
+      console.error(
+        `self issue create failed for todo ${todoId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    })
     .finally(() => {
       if (selfIssueInFlight.get(todoId) === pending) selfIssueInFlight.delete(todoId);
     });

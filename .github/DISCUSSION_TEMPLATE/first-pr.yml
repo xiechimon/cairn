@@ -1,0 +1,41 @@
+labels: ["Q&A"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share your first gated pull request: what you asked Cairn for, what came back, and how long it took.
+        Do not paste secrets, API keys, tokens or private repository content.
+  - type: textarea
+    id: what-you-built
+    attributes:
+      label: What the pull request changed
+      description: A sentence or two about the task you gave Cairn.
+    validations:
+      required: true
+  - type: input
+    id: time-to-first-pr
+    attributes:
+      label: Time to first pull request
+      description: Roughly how long from installing Cairn to the first merged pull request.
+      placeholder: "3 days"
+    validations:
+      required: false
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent backend
+      options:
+        - claude-code
+        - pi
+        - codex
+        - grok
+        - other
+    validations:
+      required: false
+  - type: textarea
+    id: friction
+    attributes:
+      label: What slowed you down
+      description: Setup steps, configuration, or anything in the UI that cost you time.
+    validations:
+      required: false

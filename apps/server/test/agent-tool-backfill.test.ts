@@ -7,7 +7,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterAll, describe, expect, test } from 'vitest';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
-import { seed } from '../src/db/seed.js';
+import { insertLegacyUserAndTeam } from './helpers.js';
 
 const temps: string[] = [];
 function temp(prefix: string): string {
@@ -59,12 +59,15 @@ function buildPreBackfillDb(rows: LegacyAgent[]): { dbPath: string } {
   const sqlite = new Database(dbPath);
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: preBackfillMigrations() });
-  const { team } = seed(db);
+  const { teamId } = insertLegacyUserAndTeam(sqlite, {
+    userId: 'user-legacy',
+    teamId: 'team-legacy',
+  });
   const insert = sqlite.prepare(
     'INSERT INTO agent (id, teamId, displayName, tools, secrets, skills, mcpServers) VALUES (?, ?, ?, ?, ?, ?, ?)',
   );
   for (const row of rows) {
-    insert.run(row.id, team.id, `存量-${row.id}`, row.tools, '[]', '[]', '[]');
+    insert.run(row.id, teamId, `存量-${row.id}`, row.tools, '[]', '[]', '[]');
   }
   sqlite.close();
   return { dbPath };

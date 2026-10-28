@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -12,11 +13,14 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { readEvents, recordAll } from './lessons-ledger-gate.mjs';
 import {
   ciOnlyScripts,
+  gateOf,
   localOnly,
   prepushModules,
   prepushPlan,
+  recordInterception,
   runPlan,
   selfTests,
 } from './prepush.mjs';
@@ -53,6 +57,26 @@ test('changes to prepush scripts run the CI self-test files locally', () => {
   );
   assert.ok(
     readFileSync('.github/workflows/ci.yml', 'utf8').includes(`run: ${selfTest.join(' ')}\n`),
+  );
+});
+
+test('the recording gate runs in local prepush, in CI prepush and in the CI self-test step', () => {
+  const gate = 'node scripts/recording-gate.mjs';
+  for (const mode of ['local', 'ci'])
+    assert.ok(
+      prepushPlan(['apps/web/src/board/card.tsx'], mode)
+        .map((args) => args.join(' '))
+        .includes(gate),
+      mode,
+    );
+  assert.ok(selfTests.includes('scripts/recording-gate.test.mjs'));
+  assert.ok(
+    /scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|recording-gate|scrub-git-env|doc-reader-tests)/.test(
+      'scripts/recording-gate.mjs',
+    ),
+  );
+  assert.ok(
+    readFileSync('.github/workflows/ci.yml', 'utf8').includes('scripts/recording-gate.test.mjs'),
   );
 });
 
@@ -389,5 +413,187 @@ test('plan children do not inherit the git hook repository binding', () => {
     assert.equal(gitIn(scratch, ['rev-parse', '--is-inside-work-tree']).trim(), 'true');
   } finally {
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('only gate scripts are mapped to a ledger category when a step goes red', () => {
+  assert.equal(
+    gateOf(['node', 'scripts/comment-discipline-gate.mjs']),
+    'scripts/comment-discipline-gate.mjs',
+  );
+  assert.equal(gateOf(['node', '--test', 'scripts/prepush.test.mjs']), null);
+  assert.equal(gateOf(['pnpm', 'lint']), null);
+  assert.equal(gateOf(['node', 'scripts/e2e-affected.mjs', '--check-coverage']), null);
+});
+
+test('a gate that blocks a push records one intercept for every entry whose safeguard names it', () => {
+  const root = mkdtempSync(join(tmpdir(), 'cairn-prepush-intercept-'));
+  try {
+    mkdirSync(join(root, 'docs/lessons'), { recursive: true });
+    for (const [name, safeguard] of [
+      ['2001-comment-discipline.md', '`scripts/comment-discipline-gate.mjs` checks added lines'],
+      ['2002-unrelated-gate.md', '`scripts/single-use-helper-gate.mjs` checks helpers'],
+    ])
+      writeFileSync(
+        join(root, 'docs/lessons', name),
+        `---\nCategory: a symptom\nSource: #1\nLevel: 2\nSafeguard: ${safeguard}; since 2026-10-20\nIntercepts: 0\nRecurrences: 0\nNotes: kept\n---\n`,
+      );
+    const gate = 'scripts/comment-discipline-gate.mjs';
+    const log = join(root, 'gate-log.jsonl');
+    const env = { CAIRN_REPO: 'xiechimon/cairn', CAIRN_BRANCH: 'lane/2023', CAIRN_GATE_LOG: log };
+    assert.equal(recordInterception({ root, gate, env }), 1);
+    assert.equal(recordInterception({ root, gate, env }), 1);
+    recordAll(
+      root,
+      readFileSync(log, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line)),
+    );
+    assert.equal(readEvents(root).length, 1);
+    assert.equal(readEvents(root)[0].category, 'comment-discipline');
+    assert.match(
+      readFileSync(join(root, 'docs/lessons', '2001-comment-discipline.md'), 'utf8'),
+      /^Intercepts: 1$/m,
+    );
+    assert.equal(recordInterception({ root, gate: 'scripts/no-such-gate.mjs', env }), 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function interceptRepo(prefix) {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  mkdirSync(join(root, 'docs/lessons'), { recursive: true });
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  writeFileSync(
+    join(root, 'docs/lessons/2001-comment-discipline.md'),
+    '---\nCategory: a symptom\nSource: #1\nLevel: 2\nSafeguard: `scripts/comment-discipline-gate.mjs`; since 2026-10-20\nIntercepts: 0\nRecurrences: 0\nNotes: kept\n---\n',
+  );
+  writeFileSync(join(root, 'scripts/comment-discipline-gate.mjs'), 'process.exit(3);\n');
+  return root;
+}
+
+test('a red gate step leaves the repository untouched and still exits non-zero', () => {
+  const root = interceptRepo('cairn-prepush-red-');
+  try {
+    const exits = [];
+    runPlan([['node', 'scripts/comment-discipline-gate.mjs']], {
+      cwd: root,
+      env: { ...process.env, CAIRN_BRANCH: 'lane/2023' },
+      exit: (code) => exits.push(code),
+    });
+    assert.deepEqual(exits, [3]);
+    assert.equal(readEvents(root).length, 0);
+    assert.match(
+      readFileSync(join(root, 'docs/lessons/2001-comment-discipline.md'), 'utf8'),
+      /^Intercepts: 0$/m,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('retrying the same gate on the same branch after another commit records nothing new', () => {
+  const root = interceptRepo('cairn-prepush-retry-');
+  try {
+    const log = join(root, 'gate-log.jsonl');
+    const env = { ...process.env, CAIRN_BRANCH: 'lane/2023', CAIRN_GATE_LOG: log };
+    const exits = [];
+    for (const commit of ['first', 'second']) {
+      runPlan([['node', 'scripts/comment-discipline-gate.mjs']], {
+        cwd: root,
+        env: { ...env, CAIRN_HEAD: commit },
+        exit: (code) => exits.push(code),
+      });
+    }
+    assert.deepEqual(exits, [3, 3]);
+    recordAll(
+      root,
+      readFileSync(log, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line)),
+    );
+    assert.equal(readEvents(root).length, 1);
+    assert.match(
+      readFileSync(join(root, 'docs/lessons/2001-comment-discipline.md'), 'utf8'),
+      /^Intercepts: 1$/m,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('CAIRN_GATE_LOG appends the gate-red events for a CI job to collect', () => {
+  const root = interceptRepo('cairn-prepush-log-');
+  try {
+    const log = join(root, '.cairn', 'gate-log.jsonl');
+    const env = { ...process.env, CAIRN_BRANCH: 'lane/2023', CAIRN_GATE_LOG: log };
+    runPlan([['node', 'scripts/comment-discipline-gate.mjs']], { cwd: root, env, exit: () => {} });
+    runPlan([['node', 'scripts/comment-discipline-gate.mjs']], {
+      cwd: root,
+      env,
+      exit: () => {},
+    });
+    const logged = readFileSync(log, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    assert.equal(logged.length, 2);
+    assert.equal(logged[0].category, 'comment-discipline');
+    assert.equal(logged[0].branch, 'lane/2023');
+    assert.equal(readEvents(root).length, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched', () => {
+  const bare = mkdtempSync(join(tmpdir(), 'cairn-prepush-bare-'));
+  const off = interceptRepo('cairn-prepush-off-');
+  try {
+    const before = readdirSync(bare);
+    assert.equal(
+      recordInterception({ root: bare, gate: 'scripts/comment-discipline-gate.mjs', env: {} }),
+      0,
+    );
+    assert.deepEqual(readdirSync(bare), before);
+    assert.equal(
+      recordInterception({
+        root: off,
+        gate: 'scripts/comment-discipline-gate.mjs',
+        env: { CAIRN_LESSONS_LEDGER: '0', CAIRN_BRANCH: 'lane/2023' },
+      }),
+      0,
+    );
+    assert.equal(existsSync(join(off, 'docs/lessons/events.jsonl')), false);
+  } finally {
+    rmSync(bare, { recursive: true, force: true });
+    rmSync(off, { recursive: true, force: true });
+  }
+});
+
+test('logging is opt-in and never projects counters into the checkout', () => {
+  const root = interceptRepo('cairn-log-opt-in-');
+  try {
+    const path = join(root, 'docs/lessons/2001-comment-discipline.md');
+    const before = readFileSync(path, 'utf8');
+    assert.equal(
+      recordInterception({ root, gate: 'scripts/comment-discipline-gate.mjs', env: {} }),
+      0,
+    );
+    assert.equal(readEvents(root).length, 0);
+    const log = join(root, 'external.jsonl');
+    recordInterception({
+      root,
+      gate: 'scripts/comment-discipline-gate.mjs',
+      env: { CAIRN_GATE_LOG: log, CAIRN_BRANCH: 'lane/1' },
+    });
+    assert.equal(JSON.parse(readFileSync(log, 'utf8')).branch, 'lane/1');
+    assert.equal(readEvents(root).length, 0);
+    assert.equal(readFileSync(path, 'utf8'), before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

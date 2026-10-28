@@ -4,9 +4,14 @@ import * as shared from '@cairn/shared';
 import { transformSync } from 'esbuild';
 import { describe, expect, test } from 'vitest';
 import * as records from '../../../packages/shared/src/records/merge-gate.js';
+import * as recordingTrigger from '../../../packages/shared/src/records/recording-trigger.js';
 
 const GATE_DIR = resolve(import.meta.dirname, '../src/services/merge-gate');
 const RECORDS = resolve(import.meta.dirname, '../../../packages/shared/src/records/merge-gate.ts');
+const RECORDING_TRIGGER = resolve(
+  import.meta.dirname,
+  '../../../packages/shared/src/records/recording-trigger.ts',
+);
 const NODE_BUILTINS = new Set(['node:crypto']);
 const LOADERS =
   /\b(?:import|require)\s*\(|\bimport\.meta\b|\bcreateRequire\b|\beval\b|\bFunction\b|\bconstructor\b|\bprocess\b|\bglobalThis\b/g;
@@ -121,7 +126,7 @@ const entries = (readdirSync(GATE_DIR, { recursive: true }) as string[]).map((na
 const gateFiles = entries.filter((f) => CODE_FILE.test(f));
 const gateJs = gateFiles.map((file) => ({ file, js: toJs(readFileSync(file, 'utf8'), file) }));
 const sharedValues = shared as unknown as Record<string, unknown>;
-const recordValues = records as unknown as Record<string, unknown>;
+const recordValues = { ...records, ...recordingTrigger } as unknown as Record<string, unknown>;
 const foreignName = (name: string) =>
   !(name in recordValues) || sharedValues[name] !== recordValues[name];
 
@@ -269,8 +274,12 @@ describe('merge-gate sources import only from the gate own sources', () => {
     expect(escaping.map((f) => relative(GATE_DIR, f))).toEqual([]);
   });
 
-  test("records/merge-gate.ts imports only from 'zod', loading no other code", () => {
-    expect(specifiers(toJs(readFileSync(RECORDS, 'utf8')))).toEqual(['zod']);
+  test("records/merge-gate.ts imports only from 'zod' and its own recording trigger table", () => {
+    expect(specifiers(toJs(readFileSync(RECORDS, 'utf8')))).toEqual([
+      'zod',
+      './recording-trigger.js',
+    ]);
+    expect(specifiers(toJs(readFileSync(RECORDING_TRIGGER, 'utf8')))).toEqual([]);
   });
 
   test('arrays and objects exported by records/merge-gate.ts are frozen (other shared modules cannot alter the gate lists and caps)', () => {

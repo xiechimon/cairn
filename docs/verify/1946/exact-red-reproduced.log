@@ -1,0 +1,53 @@
+FFFF
+======================================================================
+FAIL: test_exact_bytes (test_exact_grading.ExactGradingTest.test_exact_bytes) (task='hello-file', case='missing newline')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1946/integration/eval/harbor/test_exact_grading.py", line 34, in test_exact_bytes
+    self.assertEqual((directory / 'verifier/reward.txt').read_text(), reward)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '1\n' != '0\n'
+- 1
++ 0
+
+
+======================================================================
+FAIL: test_exact_bytes (test_exact_grading.ExactGradingTest.test_exact_bytes) (task='hello-file', case='extra newlines')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1946/integration/eval/harbor/test_exact_grading.py", line 34, in test_exact_bytes
+    self.assertEqual((directory / 'verifier/reward.txt').read_text(), reward)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '1\n' != '0\n'
+- 1
++ 0
+
+
+======================================================================
+FAIL: test_exact_bytes (test_exact_grading.ExactGradingTest.test_exact_bytes) (task='hidden-answer', case='missing newline')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1946/integration/eval/harbor/test_exact_grading.py", line 34, in test_exact_bytes
+    self.assertEqual((directory / 'verifier/reward.txt').read_text(), reward)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '1\n' != '0\n'
+- 1
++ 0
+
+
+======================================================================
+FAIL: test_exact_bytes (test_exact_grading.ExactGradingTest.test_exact_bytes) (task='hidden-answer', case='extra newlines')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1946/integration/eval/harbor/test_exact_grading.py", line 34, in test_exact_bytes
+    self.assertEqual((directory / 'verifier/reward.txt').read_text(), reward)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '1\n' != '0\n'
+- 1
++ 0
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.216s
+
+FAILED (failures=4)

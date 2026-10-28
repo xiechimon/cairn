@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, recordId } from './common.js';
+import { firstPrReportPromptSchema } from './first-pr-report.js';
 import { userRecordSchema } from './user.js';
 
 export const teamPlanSchema = z.string();
@@ -11,6 +12,7 @@ export const teamRecordSchema = z.object({
   createdAt: epochMs,
   plan: teamPlanSchema,
   avatarStyle: z.string().nullable(),
+  firstPrReportPrompt: firstPrReportPromptSchema.optional(),
 });
 export type TeamRecord = z.infer<typeof teamRecordSchema>;
 

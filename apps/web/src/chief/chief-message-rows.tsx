@@ -18,6 +18,7 @@ import { Check, ChevronDown, ChevronRight, Copy, FileText, Restore } from '../ic
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
+import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefSpiralFace } from './chief-spiral-face.js';
@@ -143,6 +144,7 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
     case 'tool':
     case 'question':
     case 'handoff':
+    case 'digest':
     case 'stopped':
       return item.id ?? index;
     default:
@@ -225,6 +227,8 @@ export function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
+  if (item.kind === 'digest')
+    return <ChiefDigestRow reason={item.reason} madeAt={item.madeAt} items={item.items} />;
   if (item.kind === 'note')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>

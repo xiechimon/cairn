@@ -1,9 +1,22 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { countMetric, METRICS } from './baseline-ledger.mjs';
+import {
+  loadLedger,
+  readEvents,
+  renderWeeklySummary,
+  weeklySummary,
+} from './lessons-ledger-gate.mjs';
+
+export function lessonSection(root, now) {
+  if (!existsSync(join(root, 'docs/lessons')))
+    return '## Lessons ledger\n\nnone: docs/lessons/ is missing\n';
+  const summary = weeklySummary(loadLedger(root), readEvents(root), { now });
+  return `${renderWeeklySummary(summary)}\n`;
+}
 
 const WINDOW_DAYS = 7;
 const MIN_NEW_SITES = 3;
@@ -148,6 +161,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       `Next target: ${target ? `${target.id} (${target.count}, ${signed(target.delta)})` : 'none'}`,
       'Cleanup PR dispatch: not run; it waits on the autonomous merge loop (#1405 P4).',
       '',
+      lessonSection(process.cwd(), now),
       '## Candidate tickets',
       ...(candidates.length === 0
         ? [`none: no ungated pattern was added ${MIN_NEW_SITES}+ times in the window`]

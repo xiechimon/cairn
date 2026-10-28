@@ -58,6 +58,36 @@ export const chiefTurnErrorContentSchema = z.object({
 });
 export type ChiefTurnErrorContent = z.infer<typeof chiefTurnErrorContentSchema>;
 
+export const CHIEF_DIGEST_KIND = 'chief_digest';
+export const CHIEF_DIGEST_ROW_ID_PREFIX = 'chief-digest-';
+export const CHIEF_DIGEST_GROUPS = ['decided', 'done', 'open', 'remembered'] as const;
+export const chiefDigestGroupSchema = z.enum(CHIEF_DIGEST_GROUPS);
+export const CHIEF_DIGEST_GROUP_LABELS = {
+  decided: '决定',
+  done: '完成',
+  open: '还开着',
+  remembered: '记住了',
+} as const satisfies Record<(typeof CHIEF_DIGEST_GROUPS)[number], string>;
+export type ChiefDigestGroup = z.infer<typeof chiefDigestGroupSchema>;
+
+export const chiefDigestItemSchema = z.object({
+  group: chiefDigestGroupSchema,
+  text: z.string().min(1).max(400),
+  reason: z.string().max(400),
+  memory: z.object({ id: z.string(), agentId: z.string() }).optional(),
+});
+export type ChiefDigestItem = z.infer<typeof chiefDigestItemSchema>;
+
+export const chiefDigestContentSchema = z.object({
+  kind: z.literal(CHIEF_DIGEST_KIND),
+  reason: z.enum(['daily', 'threshold']),
+  coversUntil: z.number(),
+  coversThrough: z.string().optional(),
+  madeAt: z.number(),
+  items: z.array(chiefDigestItemSchema),
+});
+export type ChiefDigestContent = z.infer<typeof chiefDigestContentSchema>;
+
 export const CHIEF_TURN_STOPPED_KIND = 'chief_turn_stopped';
 export const chiefTurnStoppedContentSchema = z.object({
   kind: z.literal(CHIEF_TURN_STOPPED_KIND),

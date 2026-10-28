@@ -1,0 +1,4 @@
+harbor run -p /mnt/fast/lanes/cairn-1946/integration/eval/harbor/tasks/hidden-answer -a integration.eval.harbor.tamper_agent:TamperAgent --job-name 1946-hidden-answer-TamperAgent-20261028005043 --jobs-dir /mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs -n 1 --ek keep_containers=true
+1946-hidden-answer-TamperAgent-20261028005043: reward=0.0
+6c61eac14e2f
+bec082864faf

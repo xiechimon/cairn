@@ -311,6 +311,17 @@ export const EN: Record<string, string> = {
   名称: 'Name',
   语言: 'Language',
   推送通知: 'Push notifications',
+  '首个 PR': 'First PR',
+  '首个 PR 社区提示': 'First-PR community prompt',
+  '团队设置，默认关闭。首个 PR 完成后显示分享链接，由你决定是否在 GitHub 发布。':
+    'Team setting, off by default. Show a sharing link after the first PR succeeds; you decide whether to post on GitHub.',
+  '首个 PR 已合并': 'Your first PR merged',
+  '可以在 GitHub Discussions 发一条帖子，说明第一支 PR 用了多久':
+    'You can post in GitHub Discussions to say how long the first PR took',
+  '第一支 PR 用了 {days} 天。可以在 GitHub Discussions 发一条帖子':
+    'Your first PR took {days} days. You can post about it in GitHub Discussions',
+  '分享到 Discussions': 'Share on Discussions',
+  不再显示: 'Do not show again',
   // #1031: the switch is a preference; when it's on but the browser permission
   // is denied, the row explains why nothing will actually fire.
   '浏览器已拒绝通知权限，需到站点设置重新允许':
@@ -1268,6 +1279,19 @@ export const EN: Record<string, string> = {
   '已下架，运行时会跳过该备选': 'Delisted; this fallback is skipped at run time',
   '归属机 {machine} 未开启 {runtime} runtime，运行时会跳过该备选':
     'Home machine {machine} has the {runtime} runtime off; this fallback is skipped at run time',
+  已忘掉: 'Forgotten',
+  查看这条记忆: 'View this memory',
+  让总管忘掉这条: 'Make the chief forget this',
+  决定: 'Decided',
+  还开着: 'Still open',
+  记住了: 'Remembered',
+  '总管把昨天的对话整理成了 {n} 条摘要': "The chief summarized yesterday's chat into {n} items",
+  '对话太长了，总管把上面的内容整理成了 {n} 条摘要':
+    'The chat got long, so the chief summarized everything above into {n} items',
+  '昨天的摘要 · {time} 整理': "Yesterday's summary · made at {time}",
+  '上面内容的摘要 · {time} 整理': 'Summary of the chat above · made at {time}',
+  '原文都还在，往上滑就能看到。总管接着聊时用的是这份摘要；任务的进度它会直接去任务里查，不靠记对话。摘要漏了或写错了，直接在下面告诉总管。':
+    'The original messages are still here; scroll up to see them. The chief continues from this summary and checks task progress in the tasks themselves, not from memory of the chat. If something is missing or wrong, tell the chief below.',
   执行: 'Build',
   合并: 'Merge',
   待你处理: 'Waiting on you',

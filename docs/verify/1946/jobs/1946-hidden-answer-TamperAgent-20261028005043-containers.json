@@ -1,0 +1,76 @@
+[
+  {
+    "Id": "6c61eac14e2fd0b61223c789245d163480f6f224d692fac2d1eabb5e58b05fd7",
+    "Name": "/hidden-answer__fhwg4ld__env-main-1",
+    "Hostname": "6c61eac14e2f",
+    "NetworkMode": "none",
+    "Mounts": [
+      {
+        "Type": "bind",
+        "Source": "/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hidden-answer-TamperAgent-20261028005043/hidden-answer__FHWG4Ld/agent",
+        "Destination": "/logs/agent",
+        "Mode": "rw,z",
+        "RW": true,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hidden-answer-TamperAgent-20261028005043/hidden-answer__FHWG4Ld/artifacts/logs/artifacts",
+        "Destination": "/logs/artifacts",
+        "Mode": "rw,z",
+        "RW": true,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hidden-answer-TamperAgent-20261028005043/hidden-answer__FHWG4Ld/verifier",
+        "Destination": "/logs/verifier",
+        "Mode": "rw,z",
+        "RW": true,
+        "Propagation": "rprivate"
+      }
+    ],
+    "State": {
+      "Status": "exited",
+      "Running": false,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 0,
+      "ExitCode": 137,
+      "Error": "",
+      "StartedAt": "2026-10-28T00:51:33.119376075Z",
+      "FinishedAt": "2026-10-28T00:51:45.754263794Z"
+    }
+  },
+  {
+    "Id": "bec082864faff559e249123fb4cde249743ec1f5413f6980225489c2a4bfcded",
+    "Name": "/hidden-answer__fhwg4ld__verifier__trial-main-1",
+    "Hostname": "bec082864faf",
+    "NetworkMode": "none",
+    "Mounts": [
+      {
+        "Type": "bind",
+        "Source": "/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hidden-answer-TamperAgent-20261028005043/hidden-answer__FHWG4Ld/verifier",
+        "Destination": "/logs/verifier",
+        "Mode": "rw,z",
+        "RW": true,
+        "Propagation": "rprivate"
+      }
+    ],
+    "State": {
+      "Status": "exited",
+      "Running": false,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 0,
+      "ExitCode": 137,
+      "Error": "",
+      "StartedAt": "2026-10-28T00:52:02.388694265Z",
+      "FinishedAt": "2026-10-28T00:52:22.750558112Z"
+    }
+  }
+]

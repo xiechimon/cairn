@@ -21,9 +21,9 @@ import {
   machine as machineTable,
   step as stepTable,
 } from '../src/db/schema.js';
-import { seed } from '../src/db/seed.js';
 import {
   bootServer,
+  insertLegacyUserAndTeam,
   issueApiKey,
   postProject,
   req,
@@ -494,12 +494,15 @@ describe('#682 0022 backfill (legacy [] machine rows -> [pi])', () => {
     const sqlite = new Database(dbPath);
     const db = drizzle(sqlite, { schema });
     migrate(db, { migrationsFolder: prePinMigrations() });
-    const { team } = seed(db);
+    const { teamId } = insertLegacyUserAndTeam(sqlite, {
+      userId: 'user-legacy',
+      teamId: 'team-legacy',
+    });
     const insert = sqlite.prepare(
       'INSERT INTO machine (id, teamId, name, enabledRuntimes) VALUES (?, ?, ?, ?)',
     );
-    insert.run('m-legacy-off', team.id, 'legacy-off', '[]');
-    insert.run('m-legacy-cc', team.id, 'legacy-cc', '["claude-code"]');
+    insert.run('m-legacy-off', teamId, 'legacy-off', '[]');
+    insert.run('m-legacy-cc', teamId, 'legacy-cc', '["claude-code"]');
     sqlite.close();
     return dbPath;
   }

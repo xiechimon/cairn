@@ -1,0 +1,33 @@
+$ node scripts/ui-debt-gate.mjs   # after the fix, on lane/2001
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 14 text + 14 spacing in 13 file(s); 5 css + 222 tsx + 264 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 1b84a9bf8469.
+exit code: 0
+
+$ biome ci .   # after the fix, on lane/2001
+Checked 1062 files in 472ms. No fixes applied.
+exit code: 0
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit code: 0
+
+$ pnpm --filter @xiechimon/cairn exec vitest run test/first-pr-report.test.ts test/machine-pin.test.ts
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-2001/apps/server
+
+
+ Test Files  2 passed (2)
+      Tests  25 passed (25)
+   Start at  15:50:08
+   Duration  3.47s (tests 55%, transform 26%, import 19%)
+
+
+$ pnpm --filter @cairn/web exec playwright test e2e/first-pr-report.spec.ts
+
+Running 5 tests using 1 worker
+
+  ✓  1 e2e/first-pr-report.spec.ts:55:1 › setting on + a recorded first PR shows the card; its link opens the prefilled discussion (364ms)
+  ✓  2 e2e/first-pr-report.spec.ts:76:1 › dismissing hides it for good (355ms)
+  ✓  3 e2e/first-pr-report.spec.ts:88:1 › with the setting off nothing is shown (285ms)
+  ✓  4 e2e/first-pr-report.spec.ts:96:1 › users enable the team prompt, persist it, and permanently dismiss the card through the UI (829ms)
+  ✓  5 e2e/first-pr-report.spec.ts:120:1 › a failed team-setting save stays off and displays an error (334ms)
+
+  5 passed (4.4s)

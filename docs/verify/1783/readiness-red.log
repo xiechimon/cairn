@@ -1,0 +1,27 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1783
+
+ ❯ |@xiechimon/cairn| test/merge-gate-readiness.test.ts (192 tests | 1 failed) 62ms
+   ❯ recording evidence (#1783) (1)
+     × motion with only a screenshot is blocked, a present recording clears the blocker 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-readiness.test.ts > recording evidence (#1783) > motion with only a screenshot is blocked, a present recording clears the blocker
+AssertionError: expected [] to include 'recording-missing'
+ ❯ test/merge-gate-readiness.test.ts:1923:59
+    1921|     const i = green();
+    1922|     setFiles(i, [file('apps/web/src/board/card.tsx', { recordingRequir…
+    1923|     expect(mergeReadiness(i).blockers.map((b) => b.code)).toContain('r…
+       |                                                           ^
+    1924|     const video = opaque('docs/verify/1404/interaction.webm');
+    1925|     setFiles(i, [file('apps/web/src/board/card.tsx', { recordingRequir…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 191 passed (192)
+   Start at  12:10:46
+   Duration  731ms (transform 75%, import 15%, tests 9%)
+

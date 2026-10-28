@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  MOTION_TOKEN_PATHS,
+  RECORDING_EXTENSIONS,
+  RECORDING_MAX_BYTES,
+  recordingRequirements,
+} from './recording-trigger.js';
 
 export const MERGE_POLICIES = ['human', 'shadow', 'autonomous'] as const;
 export const mergePolicySchema = z.enum(MERGE_POLICIES);
@@ -19,6 +25,10 @@ export const GATE_LIMITS = {
 export const PATCH_DIGEST_VERSION = 'pd2';
 
 export const EVIDENCE_PREFIX = 'docs/verify/';
+
+export const RECORDING_EXTENSION = /(\.gif|\.webm|\.mp4)$/i;
+
+export { MOTION_TOKEN_PATHS, RECORDING_EXTENSIONS, RECORDING_MAX_BYTES, recordingRequirements };
 
 export const EVIDENCE_EXECUTABLE_EXTENSIONS = [
   '.mjs',
@@ -186,6 +196,7 @@ export const compareFileSchema = z.object({
   sha: z.string().nullable(),
   additions: z.number().int().nonnegative(),
   deletions: z.number().int().nonnegative(),
+  recordingRequired: z.boolean().optional(),
   patchSha: z
     .string()
     .regex(/^[0-9a-f]{64}$/)
@@ -277,6 +288,11 @@ export const MERGE_BLOCKERS = [
     class: 'transient',
     label: 'PR body 缺钉在本 PR 提交上、指向本 PR 证据的 raw 永久链',
   },
+  {
+    code: 'recording-missing',
+    class: 'transient',
+    label: 'Interactive or animated UI requires a recording of at most 5 MiB',
+  },
   { code: 'verify-missing', class: 'transient', label: '当前补丁没有验证判定' },
   { code: 'verify-failed', class: 'transient', label: '验证未通过' },
   { code: 'verify-extraction-failed', class: 'transient', label: '验证判定提取失败' },
@@ -319,6 +335,7 @@ export type MergeReadiness = z.infer<typeof mergeReadinessSchema>;
 
 for (const value of [
   MERGE_POLICIES,
+  MOTION_TOKEN_PATHS,
   GATE_LIMITS,
   EVIDENCE_EXECUTABLE_EXTENSIONS,
   AUTO_MERGE_PATH_GLOBS,

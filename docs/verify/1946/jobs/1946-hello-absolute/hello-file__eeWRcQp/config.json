@@ -1,0 +1,8 @@
+{
+    "task": {
+        "path": "integration/eval/harbor/tasks/hello-file"
+    },
+    "trial_name": "hello-file__eeWRcQp",
+    "trials_dir": "/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hello-absolute",
+    "job_id": "6f9e6e9f-dae4-4a8b-b734-f3405cc042cc"
+}

@@ -16,6 +16,7 @@ import {
 } from '../src/services/merge-gate/github-facts.js';
 import type { GateGithubPort, GateRaw } from '../src/services/merge-gate/github-port.js';
 import { mergeReadiness } from '../src/services/merge-gate/readiness.js';
+import pastMotion from './fixtures/1783-motion-pr.json' with { type: 'json' };
 
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
@@ -1147,5 +1148,63 @@ describe('readGateGithubFacts into mergeReadiness and gateStatusFor: an unusable
     expect(status.description.startsWith(`${labelOf('pr-behind-base')} (pr-behind-base)`)).toBe(
       true,
     );
+  });
+});
+
+describe('recording facts (#1783)', () => {
+  test('past PR #1356 requires recording while copy-only and removed motion do not', () => {
+    const project = (patch: string, filename = 'apps/web/src/board/card.tsx') =>
+      compareFilesFromResponse({ files: [ghFile(filename, { patch })] })?.[0];
+    expect(compareFilesFromResponse({ files: [pastMotion.file] })?.[0]?.recordingRequired).toBe(
+      true,
+    );
+    expect(project('+<p>New copy</p>')?.recordingRequired).not.toBe(true);
+    expect(project('-transition: opacity 200ms;\n+color: red;')?.recordingRequired).not.toBe(true);
+    for (const line of [
+      'transition: opacity 200ms',
+      '@keyframes appear {}',
+      'animation: appear',
+      'motion.div',
+      'onDragStart={drag}',
+      'onMouseEnter={show}',
+      'onPointerEnter={show}',
+    ]) {
+      expect(project(`+${line}`)?.recordingRequired).toBe(true);
+    }
+    expect(
+      project('+--spring-duration: 100ms;', 'apps/web/src/styles/motion.css')?.recordingRequired,
+    ).toBe(true);
+    expect(project('+transition: x', 'apps/server/src/x.ts')?.recordingRequired).not.toBe(true);
+  });
+
+  test('a screenshot first does not hide recording presence or its size, including cached reads', async () => {
+    const video = 'docs/verify/1404/demo.webm';
+    const cache = newGateReadCache();
+    const readMotion = (size: number) =>
+      read(
+        {
+          pull: () => ok(prBody({ body: `${link(HEAD)} ${link(HEAD, video)}`, changed_files: 3 })),
+          compare: comparePages(chain(EARLIER, HEAD), [
+            ghFile('apps/web/src/card.tsx', { patch: '+transition: opacity 200ms' }),
+            FILES[2],
+            ghFile(video),
+          ]),
+          contents: () =>
+            ok([
+              { name: 'shot.png', path: SHOT, type: 'file', size: 10 },
+              { name: 'demo.webm', path: video, type: 'file', size },
+            ]),
+        },
+        cache,
+      );
+    const first = await readMotion(100);
+    expect(first.evidence).toContainEqual({ sha: HEAD, path: video, present: true });
+    expect((await readMotion(100)).evidence).toContainEqual({
+      sha: HEAD,
+      path: video,
+      present: true,
+    });
+    const large = await readMotion(5 * 1024 * 1024 + 1);
+    expect(large.evidence).toContainEqual({ sha: HEAD, path: video, present: false });
   });
 });

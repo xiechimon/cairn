@@ -105,6 +105,7 @@ import { DONE_ROW } from './delivery-rows.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { markFirstPrPromptDue } from './first-pr-report.js';
 import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
@@ -2342,6 +2343,7 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
   });
   advanceSplitWaves(deps, todoId);
   emitRuntimeBuildSpan(deps.db, buildId, 'done');
+  markFirstPrPromptDue(deps.db, buildId);
 }
 
 export class NotFoundError extends Error {

@@ -1,6 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { acquireSlot, leaseEnv, slotPortReport } from './heavy-slots.mjs';
+import { interceptEventsForGate, loadLedger } from './lessons-ledger-gate.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -27,6 +30,8 @@ export const selfTests = [
   'scripts/english-only-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
   'scripts/lessons-ledger-gate.test.mjs',
+  'scripts/recording-gate.test.mjs',
+  'scripts/lessons-weekly.test.mjs',
 ];
 
 export const localOnly = [
@@ -64,11 +69,14 @@ export function prepushPlan(paths, mode = 'local') {
     language,
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
+    ['python3', 'scripts/pr-evidence-archive.test.py'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
+    ['node', 'scripts/recording-gate.mjs'],
     ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
     ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
+    ['node', '--test', 'scripts/escape-trace.test.mjs'],
     ledgerGate,
     ['python3', 'scripts/pr-evidence-gate.test.py'],
   ];
@@ -78,7 +86,7 @@ export function prepushPlan(paths, mode = 'local') {
         ...required,
         ...localOnly,
         ...(paths.some((path) =>
-          /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|scrub-git-env|doc-reader-tests)/.test(
+          /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|recording-gate|scrub-git-env|doc-reader-tests)/.test(
             path,
           ),
         )
@@ -94,15 +102,72 @@ export function prepushPlan(paths, mode = 'local') {
       ];
 }
 
-export function runPlan(plan, { cwd, env }) {
-  for (const [command, ...commandArgs] of plan) {
+const GATE_SCRIPTS = /^scripts\/[a-z0-9-]+-gate\.mjs$/;
+
+export function gateOf(step) {
+  const [, script] = step;
+  return typeof script === 'string' && GATE_SCRIPTS.test(script) ? script : null;
+}
+
+export function branchName(root, env) {
+  const result = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  return (
+    env.CAIRN_BRANCH ||
+    (result.status === 0 ? (result.stdout ?? '').trim() : '') ||
+    env.GITHUB_HEAD_REF ||
+    env.GITHUB_REF_NAME ||
+    'detached'
+  );
+}
+
+export function gateLogPath(env) {
+  const raw = env.CAIRN_GATE_LOG;
+  if (raw === undefined || raw === '' || raw === '0' || raw === 'false') return null;
+  return resolve(
+    raw === '1' || raw === 'true' ? join(tmpdir(), 'cairn-gate-reds/gate-log.jsonl') : raw,
+  );
+}
+
+export function ledgerDisabled(root, env) {
+  const flag = env.CAIRN_LESSONS_LEDGER;
+  if (flag === '0' || flag === 'false') return true;
+  return !existsSync(join(root, 'docs/lessons'));
+}
+
+export function recordInterception({ root, gate, env }) {
+  const log = gateLogPath(env);
+  if (log === null || ledgerDisabled(root, env)) return 0;
+  const events = interceptEventsForGate(loadLedger(root), gate, {
+    repo: env.CAIRN_REPO ?? 'xiechimon/cairn',
+    branch: branchName(root, env),
+  });
+  if (events.length === 0) return 0;
+  mkdirSync(dirname(log), { recursive: true });
+  appendFileSync(log, events.map((event) => `${JSON.stringify(event)}\n`).join(''));
+  return events.length;
+}
+
+export function runPlan(plan, { cwd, env, exit = (code) => process.exit(code) }) {
+  for (const step of plan) {
+    const [command, ...commandArgs] = step;
     console.log(`[prepush] ${command} ${commandArgs.join(' ')}`);
     const result = spawnSync(command, commandArgs, {
       cwd,
       stdio: 'inherit',
       env: scrubGitEnv({ ...env }),
     });
-    if (result.status !== 0) process.exit(result.status ?? 1);
+    if (result.status !== 0) {
+      const gate = gateOf(step);
+      if (gate !== null) {
+        const recorded = recordInterception({ root: cwd, gate, env });
+        console.log(`[prepush] ${gate} blocked the push; recorded ${recorded} intercepts`);
+      }
+      exit(result.status ?? 1);
+      return;
+    }
   }
 }
 
