@@ -2,7 +2,7 @@
 
 All notable changes to Cairn are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Cairn is pre-1.0, so a minor version may contain breaking changes.
 
-Releases are tagged on the repository as `vX.Y.Z` and published to npm as two packages: [`@xiechimon/cairn`](https://www.npmjs.com/package/@xiechimon/cairn) (server and web UI) and [`@xiechimon/cairn-cli`](https://www.npmjs.com/package/@xiechimon/cairn-cli) (the daemon that runs builds on your machines).
+Releases are automated with changesets: the `release` workflow publishes to npm and tags each released package (`@xiechimon/cairn@X.Y.Z`). The two packages are [`@xiechimon/cairn`](https://www.npmjs.com/package/@xiechimon/cairn) (server and web UI) and [`@xiechimon/cairn-cli`](https://www.npmjs.com/package/@xiechimon/cairn-cli) (the daemon that runs builds on your machines); each carries its own changelog generated from changesets.
 
 ## [Unreleased]
 

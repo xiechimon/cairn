@@ -1,0 +1,51 @@
+✖ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (0.535603ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 52.632794
+
+✖ failing tests:
+
+test at scripts/release-config.test.mjs:28:1
+✖ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (0.535603ms)
+  Error: ENOENT: no such file or directory, open '/mnt/fast/lanes/cairn-1998/.changeset/config.json'
+      at readFileSync (node:fs:621:20)
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1998/scripts/release-config.test.mjs:29:29)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/mnt/fast/lanes/cairn-1998/.changeset/config.json'
+  }
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1998
+
+ ❯ |@xiechimon/cairn| test/startup-log.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/startup-log.test.ts [ apps/server/test/startup-log.test.ts ]
+Error: Cannot find module '../src/startup-log.js' imported from /mnt/fast/lanes/cairn-1998/apps/server/test/startup-log.test.ts
+ ❯ test/startup-log.test.ts:10:1
+      8|   tokenAuthStartupLines,
+      9| } from '../src/config.js';
+     10| import { startupMessage } from '../src/startup-log.js';
+       | ^
+     11|
+     12| const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  11:37:57
+   Duration  372ms (worker 96%, environment 4%)
+
