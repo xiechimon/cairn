@@ -222,9 +222,9 @@ $ node ../../scripts/e2e-affected.mjs -- integration/eval/chief-dispatch/run-eva
   integration/test/chief-dispatch-context-window.test.ts → none
 [e2e:affected] no web e2e surface touched — vitest (`pnpm exec vitest run --changed origin/main`) and CI cover this change.
 [prepush] PASS (26 checks)
-remote: 
-remote: Create a pull request for 'codex/eval-explicit-context' on GitHub by visiting:        
-remote:      https://github.com/xiechimon/cairn/pull/new/codex/eval-explicit-context        
-remote: 
+remote:
+remote: Create a pull request for 'codex/eval-explicit-context' on GitHub by visiting:
+remote:      https://github.com/xiechimon/cairn/pull/new/codex/eval-explicit-context
+remote:
 To https://github.com/xiechimon/cairn.git
  * [new branch]          HEAD -> codex/eval-explicit-context
