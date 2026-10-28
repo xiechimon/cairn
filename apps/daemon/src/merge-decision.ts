@@ -22,7 +22,7 @@ export function decideLocalMerge(facts: LocalMergeFacts): LocalMergeDecision {
     return { action: 'recheck', reason: 'default-head-moved' };
   }
   if (facts.currentBranch === null) return { action: 'hold', reason: 'checkout-unknown' };
-  if (facts.currentBranch !== facts.defaultBranch) return { action: 'update-ref' };
   if (!facts.worktreeClean) return { action: 'hold', reason: 'worktree-dirty' };
+  if (facts.currentBranch !== facts.defaultBranch) return { action: 'update-ref' };
   return { action: 'fast-forward' };
 }
