@@ -2,8 +2,8 @@
 Category: Browser evidence and geometry checks observed transient or cancelled animations
 Source: #1937 (2026-10-27)
 Level: 1
-Safeguard: Panel screenshots, axe, and model-menu geometry poll native finite animation state without capturing rejectable finished promises; since 2026-10-28
-Intercepts: 6
-Recurrences: 2
-Notes: Four panel prepush failures included one cancelled-animation AbortError and three contrast checks. Nine compiled-fixture probes observed transient violations and zero after finite animations settled. The full 22-case panel suite passed after sharing the boundary. A later full run passed 1387 cases and failed model-menu geometry before its assertions with the same AbortError. Three controlled native-animation cancellations reproduced the old rejection and passed state polling with menu scrollWidth and clientWidth both 439. Infinite animations are ignored; product animations and geometry assertions remain unchanged.
+Safeguard: Panel evidence and model geometry poll native finite animation state; project-file shadow assertions use Playwright CSS polling for the final 1px ring; since 2026-10-28
+Intercepts: 7
+Recurrences: 3
+Notes: Four panel failures included one cancelled-animation AbortError and three contrast checks. Nine compiled-fixture probes observed transient violations and zero after finite animations settled; all 22 panel cases passed. Model-menu waiting reproduced AbortError in three controlled native-animation cancellations, then passed state polling with both widths 439. The next complete run passed 1387 cases and read project-file shadow spread 0.837381px during its transition toward 1px. Its CSS assertion now waits for the same required 1px substring; all 18 project-page repetitions passed. Product animations, final style values, geometry requirements, and accessibility thresholds remain unchanged.
 ---

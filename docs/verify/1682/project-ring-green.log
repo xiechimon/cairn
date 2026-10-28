@@ -1,0 +1,44 @@
+$ playwright test paper-project-page.spec.ts --repeat-each=3 --workers=1
+[WebServer] (node:79613) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:79616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:79650) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:79653) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 18 tests using 1 worker
+
+(node:79674) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/paper-project-page.spec.ts:47:3 › tasks: reading column, one card of 52px rows with status and meta (light) (1.7s)
+  ✓   2 e2e/paper-project-page.spec.ts:118:3 › tasks: empty state is the shared EmptyState (light) (923ms)
+  ✓   3 e2e/paper-project-page.spec.ts:133:3 › files: bleed body, picker face on the selected file, type scale (light) (1.4s)
+  ✓   4 e2e/paper-project-page.spec.ts:47:3 › tasks: reading column, one card of 52px rows with status and meta (dark) (1.3s)
+  ✓   5 e2e/paper-project-page.spec.ts:118:3 › tasks: empty state is the shared EmptyState (dark) (864ms)
+  ✓   6 e2e/paper-project-page.spec.ts:133:3 › files: bleed body, picker face on the selected file, type scale (dark) (1.2s)
+(node:79759) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   7 e2e/paper-project-page.spec.ts:47:3 › tasks: reading column, one card of 52px rows with status and meta (light) (1.2s)
+  ✓   8 e2e/paper-project-page.spec.ts:118:3 › tasks: empty state is the shared EmptyState (light) (799ms)
+  ✓   9 e2e/paper-project-page.spec.ts:133:3 › files: bleed body, picker face on the selected file, type scale (light) (1.4s)
+  ✓  10 e2e/paper-project-page.spec.ts:47:3 › tasks: reading column, one card of 52px rows with status and meta (dark) (1.2s)
+  ✓  11 e2e/paper-project-page.spec.ts:118:3 › tasks: empty state is the shared EmptyState (dark) (700ms)
+  ✓  12 e2e/paper-project-page.spec.ts:133:3 › files: bleed body, picker face on the selected file, type scale (dark) (1.3s)
+(node:81974) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  13 e2e/paper-project-page.spec.ts:47:3 › tasks: reading column, one card of 52px rows with status and meta (light) (3.5s)
+  ✓  14 e2e/paper-project-page.spec.ts:118:3 › tasks: empty state is the shared EmptyState (light) (1.6s)
+  ✓  15 e2e/paper-project-page.spec.ts:133:3 › files: bleed body, picker face on the selected file, type scale (light) (2.9s)
+  ✓  16 e2e/paper-project-page.spec.ts:47:3 › tasks: reading column, one card of 52px rows with status and meta (dark) (1.5s)
+  ✓  17 e2e/paper-project-page.spec.ts:118:3 › tasks: empty state is the shared EmptyState (dark) (793ms)
+  ✓  18 e2e/paper-project-page.spec.ts:133:3 › files: bleed body, picker face on the selected file, type scale (dark) (1.1s)
+
+  18 passed (48.8s)

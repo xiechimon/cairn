@@ -11,8 +11,6 @@ function setTheme(page: Page, theme: 'light' | 'dark') {
   return page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
 }
 
-/** Resolve a token (or any CSS color expression) to the rgb() string the
- *  computed style reports. */
 function resolveColor(page: Page, value: string) {
   return page.evaluate((v) => {
     const probe = document.createElement('span');
@@ -88,7 +86,6 @@ for (const theme of ['light', 'dark'] as const) {
       ['0px', '0px'],
     ]);
 
-    // Fixture rows: #1 review (needs you, accent), #2 done (ink-3).
     const accent = await resolveColor(page, 'var(--card-button)');
     const ink3 = await resolveColor(page, 'var(--text-tertiary)');
     const ink = await resolveColor(page, 'var(--foreground)');
@@ -150,7 +147,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(file).toHaveAttribute('aria-current', 'true');
     await page.mouse.move(0, 0);
     await expect(file, 'F1').toHaveCSS('background-color', await resolveBackground(page, 'var(--card)'));
-    expect(await css(file, 'box-shadow'), 'F1: 1px ring').toContain('0px 0px 0px 1px');
+    await expect(file, 'F1: 1px ring').toHaveCSS('box-shadow', /0px 0px 0px 1px/);
 
     await page.locator('.prj-files-seg-tab', { hasText: '历史' }).click();
     const commit = page.locator('[data-history-entry="commit"]').first();
