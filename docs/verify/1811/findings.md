@@ -208,3 +208,27 @@ allowlist entry as the original PR. Without that entry, the normal pre-commit ho
 cannot re-stage this tracked skill directory. Product files are unchanged. This supporting
 metadata change exceeds the issue comment's literal two-directory restriction and must
 be reconciled explicitly in acceptance.
+
+## F6: the production fast-forward check and update are separate operations
+
+At `05d0dd12`, `applyMergeLanding` reads the tip, awaits `isAncestor`
+(`machine-merge-landing.ts:39`), and later awaits `updateBranchRef` (`:45`).
+`apps/server/src/lib/git.ts:197` invokes `git update-ref <ref> <new>` without an
+expected old value. An intervening writer can advance the default branch after the
+ancestor check; the unconditional update can then overwrite that advance.
+
+`local-landing-race.mts` exercises the actual GitOps functions against a temporary
+bare repository. A candidate and a competing commit both descend from the checked
+base. The initial ancestor check succeeds. The competing commit advances `main`, and
+the candidate does not contain it. The following unconditional update nevertheless
+succeeds and replaces it. `local-landing-race.json` records this runtime result.
+The server endpoint and its scheduling were not exercised, so this establishes the
+GitOps interleaving rather than the frequency of the race in deployed traffic.
+
+The current `LocalLanding.tla` treats the fast-forward check and update as one
+`LandLocal` action. Its P3 result therefore does not establish safety for this
+production check/update gap. The action correspondence must be read with that
+atomicity boundary. A production repair needs an expected-old-value ref update or
+a synchronization mechanism that also covers other writers. This exploratory delivery
+does not change product behavior. Review the in-flight local-merge work in #2050
+before assigning a separate repair.
