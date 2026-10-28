@@ -335,6 +335,7 @@ describe('in-product merge gate', () => {
         role: 'system',
         content: JSON.stringify({
           kind: REVIEW_VERDICT_KIND,
+          stepId: review?.id ?? '',
           verdict: {
             conclusion: 'No blocking findings',
             gateLoosening: false,
@@ -407,6 +408,7 @@ describe('in-product merge gate', () => {
       .set({
         content: JSON.stringify({
           kind: REVIEW_VERDICT_KIND,
+          stepId: review?.id ?? '',
           verdict: {
             conclusion: 'Loosens the gate',
             gateLoosening: true,
@@ -419,6 +421,118 @@ describe('in-product merge gate', () => {
       .run();
     const loosened = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
     expect(loosened?.blockers.map((b) => b.code)).toContain('review-blocking');
+  });
+
+  test('spoken safety answers bind by step id when reviews finish out of creation order', async () => {
+    const { s, buildId, stepId, reviewerId } = await world();
+    completeStep(s.svc, stepId, { hasChanges: true });
+    s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
+    const firstReview = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .find((row) => row.kind === 'review');
+    expect(firstReview).toBeDefined();
+    const secondReviewId = 'step-review-second';
+    s.db
+      .insert(step)
+      .values({
+        id: secondReviewId,
+        buildId,
+        kind: 'review',
+        status: 'done',
+        prompt: firstReview?.prompt ?? `{"kind":"review","agentId":"${reviewerId}"}`,
+        createdAt: (firstReview?.createdAt ?? 2) + 1,
+        finishedAt: 10,
+      })
+      .run();
+    s.db
+      .update(step)
+      .set({ status: 'done', finishedAt: 20 })
+      .where(eq(step.id, firstReview?.id ?? ''))
+      .run();
+    const compareBody = {
+      files: [
+        {
+          filename: 'apps/server/src/services/merge-gate/readiness.ts',
+          status: 'modified',
+          sha: '1'.repeat(40),
+          additions: 4,
+          deletions: 1,
+          patch: '@@ protected\n+gate\n',
+        },
+        {
+          filename: 'docs/verify/1794/shot.png',
+          status: 'added',
+          sha: '2'.repeat(40),
+          additions: 0,
+          deletions: 0,
+        },
+      ],
+    };
+    const digest = computePatchDigest(compareFilesFromResponse(compareBody) ?? [], {
+      expectedFileCount: 2,
+    }).patchDigest;
+    expect(digest).not.toBeNull();
+    for (const [id, at] of [
+      [secondReviewId, 10],
+      [firstReview?.id ?? '', 20],
+    ] as const) {
+      s.db
+        .insert(gateVerdict)
+        .values({
+          stepId: id,
+          buildId,
+          kind: 'review',
+          perspective: 'code_reviewer',
+          outcome: 'pass',
+          patchDigest: digest,
+          headSha: HEAD,
+          expectedHeadSha: HEAD,
+          createdAt: at,
+        })
+        .run();
+    }
+    s.db
+      .insert(message)
+      .values([
+        {
+          id: 'msg-verdict-second-first',
+          conversationId: buildId,
+          role: 'system',
+          content: JSON.stringify({
+            kind: REVIEW_VERDICT_KIND,
+            stepId: secondReviewId,
+            verdict: {
+              conclusion: 'Second review safe',
+              gateLoosening: false,
+              evalRulerChange: false,
+              findings: [],
+            },
+          }),
+          createdAt: 10,
+        },
+        {
+          id: 'msg-verdict-first-later',
+          conversationId: buildId,
+          role: 'system',
+          content: JSON.stringify({
+            kind: REVIEW_VERDICT_KIND,
+            stepId: firstReview?.id ?? '',
+            verdict: {
+              conclusion: 'First review loosens the gate',
+              gateLoosening: true,
+              evalRulerChange: false,
+              findings: [],
+            },
+          }),
+          createdAt: 20,
+        },
+      ])
+      .run();
+    const readiness = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    expect(readiness?.blockers.map((b) => b.code)).toContain('review-blocking');
   });
 
   test('parsed VERDICT line disagreeing with structured outcome is a mismatch', () => {

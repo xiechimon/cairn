@@ -159,37 +159,32 @@ export async function evaluateMergeGate(
     }
   }
   const answers = new Map<string, ReviewVerdict>();
-  const spoken = deps.db
+  const reviewStepIds = new Set(
+    steps.filter((item) => item.kind === 'review').map((item) => item.id),
+  );
+  for (const row of deps.db
     .select()
     .from(message)
     .where(and(eq(message.conversationId, buildId), eq(message.role, 'system')))
     .orderBy(asc(message.createdAt))
-    .all()
-    .flatMap((row) => {
-      let raw = row.content;
-      if (typeof raw === 'string') {
-        try {
-          raw = JSON.parse(raw) as unknown;
-        } catch {
-          return [];
-        }
+    .all()) {
+    let raw = row.content;
+    if (typeof raw === 'string') {
+      try {
+        raw = JSON.parse(raw) as unknown;
+      } catch {
+        continue;
       }
-      if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return [];
-      const record = raw as { kind?: unknown; verdict?: unknown };
-      if (record.kind !== REVIEW_VERDICT_KIND) return [];
-      const parsed = reviewVerdictSchema.safeParse(record.verdict);
-      return parsed.success ? [parsed.data] : [];
-    });
-  let spokenAt = 0;
-  for (const row of steps
-    .filter((item) => item.kind === 'review')
-    .sort((a, b) => a.createdAt - b.createdAt)) {
-    const recorded = stored.find((item) => item.stepId === row.id);
+    }
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const record = raw as { kind?: unknown; verdict?: unknown; stepId?: unknown };
+    if (record.kind !== REVIEW_VERDICT_KIND) continue;
+    if (typeof record.stepId !== 'string' || !reviewStepIds.has(record.stepId)) continue;
+    const recorded = stored.find((item) => item.stepId === record.stepId);
     if (recorded?.outcome === 'step_failed') continue;
-    const verdict = spoken[spokenAt];
-    if (verdict === undefined) break;
-    spokenAt += 1;
-    answers.set(row.id, verdict);
+    const parsed = reviewVerdictSchema.safeParse(record.verdict);
+    if (!parsed.success) continue;
+    answers.set(record.stepId, parsed.data);
   }
   const perspectiveOf = (prompt: string | null): string => {
     const id = parseReviewPromptMeta(prompt)?.agentId;

@@ -2277,6 +2277,7 @@ export function completeStep(
       role: 'system',
       content: JSON.stringify({
         kind: REVIEW_VERDICT_KIND,
+        stepId: stepRow.id,
         verdict,
         ...(outcome.findingsError !== undefined ? { extractionError: outcome.findingsError } : {}),
       }),
