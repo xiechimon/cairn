@@ -21,11 +21,33 @@ export function decisionOkRate(
   return ok / rows.length;
 }
 
-export function parseResultsJsonl(text: string): { grade?: { decision_ok?: number } }[] {
-  const rows: { grade?: { decision_ok?: number } }[] = [];
+export type ParsedEvalResultRow = {
+  prompt_id?: string;
+  rep?: number;
+  status?: string;
+  in_tokens?: number;
+  out_tokens?: number;
+  cache_read_tokens?: number;
+  cost_usd?: number;
+  model?: string | null;
+  tags?: string[];
+  grade?: { decision_ok?: number; receipt_ok?: number; [key: string]: number | undefined };
+  provenance?: {
+    prompt_set?: string;
+    prompt_set_identity?: string;
+    harness_sha?: string;
+    model?: string;
+    thinking?: string | null;
+    timeout_s?: number;
+  } | null;
+  meta?: { prompt_set?: string } | null;
+};
+
+export function parseResultsJsonl(text: string): ParsedEvalResultRow[] {
+  const rows: ParsedEvalResultRow[] = [];
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
-    rows.push(JSON.parse(line) as { grade?: { decision_ok?: number } });
+    rows.push(JSON.parse(line) as ParsedEvalResultRow);
   }
   return rows;
 }
