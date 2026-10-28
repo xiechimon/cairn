@@ -1,0 +1,157 @@
+Negative control: partial-write
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986
+
+ ❯ |@cairn/integration| test/routing-sessions.test.ts (19 tests | 3 failed | 16 skipped) 644ms
+   × planner write attempts cannot implement for a no-op executor 283ms
+   × planner edit attempts cannot implement for a no-op executor 184ms
+   × planner bash attempts cannot implement for a no-op executor 176ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-sessions.test.ts > planner write attempts cannot implement for a no-op executor
+ FAIL  |@cairn/integration| test/routing-sessions.test.ts > planner edit attempts cannot implement for a no-op executor
+ FAIL  |@cairn/integration| test/routing-sessions.test.ts > planner bash attempts cannot implement for a no-op executor
+AssertionError: expected 'export function slugify(value) {\n  t…' to be 'export function slugify(value) {\n  t…' // Object.is equality
+
+- Expected
++ Received
+
+  export function slugify(value) {
+    throw new Error('not implemented');
+  }
+
++ planner changed this
++
+
+ ❯ test/routing-sessions.test.ts:179:76
+    177|     const task = CAIRN_BENCH_TASKS.find((entry) => entry.id === 'slugi…
+    178|     for (const role of ['planner', 'executor']) {
+    179|       expect(readFileSync(join(root, `run/${role}/lib/slug.mjs`), 'utf…
+       |                                                                            ^
+    180|         task.seedFiles['lib/slug.mjs'],
+    181|       );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 16 skipped (19)
+   Start at  16:22:18
+   Duration  1.70s (import 41%, tests 40%, transform 19%)
+
+
+Negative control: empty-read
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986
+
+ ❯ |@cairn/integration| test/routing-sessions.test.ts (19 tests | 1 failed | 18 skipped) 2731ms
+   × planner executor-directory reads are denied before returning task data 2728ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-sessions.test.ts > planner executor-directory reads are denied before returning task data
+AssertionError: expected 'pass' to be 'fail' // Object.is equality
+
+Expected: "fail"
+Received: "pass"
+
+ ❯ test/routing-sessions.test.ts:219:22
+    217|   });
+    218|   expect(row.oracle_pass).toBe(true);
+    219|   expect(row.status).toBe('fail');
+       |                      ^
+    220|   expect(row.planner_violations.join('\n')).toContain('executor/lib/sl…
+    221|   const feedback = JSON.stringify(stub?.requests[1]?.messages);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  16:23:04
+   Duration  5.99s (tests 47%, transform 32%, import 21%)
+
+
+Negative control: history-leak
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986
+
+ ❯ |@cairn/integration| test/routing-sessions.test.ts (19 tests | 1 failed | 18 skipped) 753ms
+   × handoff arm: a fresh executor receives the original task, only plan text, and seeded files 752ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-sessions.test.ts > handoff arm: a fresh executor receives the original task, only plan text, and seeded files
+AssertionError: expected [ { role: 'user', …(1) } ] to deeply equal [ { role: 'user', …(1) } ]
+
+- Expected
++ Received
+
+@@ -17,10 +17,14 @@
+  You may run `node <file>` to check your work. There are no tests in the repository.
+
+  ## Implementation plan (written by the planner model)
+
+  Implement slugify with lowercase, dash collapsing, and trimming.
++ export function slugify(value) {
++   throw new Error('not implemented');
++ }
++
+
+  Implement the plan above. The task statement and the plan together are the full requirement.",
+          "type": "text",
+        },
+      ],
+
+ ❯ test/routing-sessions.test.ts:133:82
+    131|   if (!task) throw new Error('Missing slugify task');
+    132|   const executorRequest = stub?.requests[2];
+    133|   expect(executorRequest?.messages.filter((message) => message.role ==…
+       |                                                                                  ^
+    134|     {
+    135|       role: 'user',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  16:23:26
+   Duration  1.57s (tests 50%, import 31%, transform 19%)
+
+
+Negative control: runtime-allowance
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986
+
+ ❯ |@cairn/integration| test/routing-sessions.test.ts (19 tests | 2 failed | 17 skipped) 1084ms
+   × planner explicit runtime-resource read /etc/passwd is blocked and graded 587ms
+   × planner explicit runtime-resource read /dev/null is blocked and graded 496ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-sessions.test.ts > planner explicit runtime-resource read /etc/passwd is blocked and graded
+ FAIL  |@cairn/integration| test/routing-sessions.test.ts > planner explicit runtime-resource read /dev/null is blocked and graded
+AssertionError: expected 'pass' to be 'fail' // Object.is equality
+
+Expected: "fail"
+Received: "pass"
+
+ ❯ test/routing-sessions.test.ts:335:24
+    333|     });
+    334|     expect(row.oracle_pass).toBe(true);
+    335|     expect(row.status).toBe('fail');
+       |                        ^
+    336|     expect(stub?.requests[1]?.messages.filter((message) => message.rol…
+    337|       expect.objectContaining({ content: `Denied: EACCES read tool: ou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 17 skipped (19)
+   Start at  16:25:03
+   Duration  1.88s (tests 60%, import 25%, transform 15%)
+
+
