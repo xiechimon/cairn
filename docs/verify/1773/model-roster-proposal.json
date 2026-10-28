@@ -1,5 +1,5 @@
 {
-  "status": "awaiting owner decision",
+  "status": "approved by owner",
   "issue": 1773,
   "currentRoster": [
     "glm-5.3",
@@ -26,5 +26,9 @@
   },
   "requiredRerun": "Run all retained new cases and paired irrelevant no-memory controls with explicitly materialized 1M model metadata. Do not carry over the 128k results as acceptance evidence.",
   "retentionRule": "Keep 4 to 6 cases per new family. Each retained case needs at least one completed scored failure on an approved roster model. Execution errors do not qualify.",
-  "alternative": "Keep the existing roster and redesign candidates for the allowed glm-5.3 model without changing grading or counting execution errors as failures."
+  "alternative": "Keep the existing roster and redesign candidates for the allowed glm-5.3 model without changing grading or counting execution errors as failures.",
+  "approval": {
+    "date": "2026-10-28",
+    "decision": "Use the three currently allowed models and rerun all retained candidates plus paired irrelevant no-memory controls with an explicit 1000000 context window."
+  }
 }

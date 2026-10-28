@@ -9,21 +9,15 @@
       "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
     },
     {
-      "key": "exec-kimi-k3",
+      "key": "exec-glm-5.3-flash",
       "displayName": "执行位2",
-      "modelId": "kimi-k3",
+      "modelId": "glm-5.3-flash",
       "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
     },
     {
-      "key": "exec-qwen3.8-max",
+      "key": "exec-deepseek-v4.1-flash",
       "displayName": "执行位3",
-      "modelId": "qwen3.8-max",
-      "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
-    },
-    {
-      "key": "exec-deepseek-v4-pro",
-      "displayName": "执行位4",
-      "modelId": "deepseek-v4-pro",
+      "modelId": "deepseek-v4.1-flash",
       "description": "通用执行 Agent，评测里只当编制标签，不会被调用。"
     }
   ],
