@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /workspace
+
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  17:27:49
+   Duration  2.08s (tests 56%, import 24%, transform 20%)
+

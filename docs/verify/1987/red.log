@@ -1,0 +1,25 @@
+
+ RUN  v5.0.1 /workspace
+
+ ❯ |@cairn/integration| test/routing-resume.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-resume.test.ts [ integration/test/routing-resume.test.ts ]
+Error: Cannot find module '../eval/routing/run.mts' imported from /workspace/integration/test/routing-resume.test.ts
+ ❯ test/routing-resume.test.ts:7:1
+      5| import { CAIRN_BENCH_TASKS } from '../eval/routing/bench.mts';
+      6| import type { RoutingRunRow } from '../eval/routing/driver.mts';
+      7| import {
+       | ^
+      8|   assertResumeAllowed,
+      9|   parseArgs,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  17:27:09
+   Duration  165ms (worker 96%, environment 4%)
+
