@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/xmon/.codex/worktrees/pr-2023-drift-repair/cairn/docs/verify/2081/review-preflight.test.py", line 10, in <module>
+    SPEC.loader.exec_module(MODULE)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 747, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 880, in get_code
+  File "<frozen importlib._bootstrap_external>", line 926, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/xmon/.codex/worktrees/pr-2023-drift-repair/cairn/docs/verify/2081/review-preflight.py'
