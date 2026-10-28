@@ -11,3 +11,9 @@ TMPDIR=/private/tmp pnpm exec vitest run integration/test/chief-dispatch-context
 ```
 
 The memory case difficulty requirements in issue #1773 remain separate. Adding this option does not complete those requirements or authorize a model-roster change.
+
+## Evidence
+
+`context-isolated-green.log` records 107 passing tests on source commit `2ca1ade918b3311764874d730e717ca1053c9a91`, based on main `d3c8d5039`. The command also includes `apps/server/test/merge-gate-paths.test.ts`. `context-isolated-default.json` and `context-isolated-1000000.json` preserve the observed daemon model configuration and scored-row metadata. The tested provider is a local HTTP stub; no real-provider capacity claim follows from these checks.
+
+`context-window-red.log` records the test-first control from the parent delivery branch before this option existed: two failures and seven passes. The failing controls were the unrecognized explicit option and the missing learn-case rejection. That run belongs to the parent branch, rather than the isolated source commit above.
