@@ -61,10 +61,6 @@ export function parseLangfuseAnnotationTarget(env: {
   return { host: url.origin, publicKey, secretKey, queueId };
 }
 
-function authHeader(target: LangfuseAnnotationTarget): string {
-  return `Basic ${Buffer.from(`${target.publicKey}:${target.secretKey}`).toString('base64')}`;
-}
-
 async function langfuseFetch(
   target: LangfuseAnnotationTarget,
   path: string,
@@ -73,7 +69,7 @@ async function langfuseFetch(
   const response = await fetch(`${target.host}${path}`, {
     ...init,
     headers: {
-      authorization: authHeader(target),
+      authorization: `Basic ${Buffer.from(`${target.publicKey}:${target.secretKey}`).toString('base64')}`,
       'content-type': 'application/json',
       ...(init?.headers ?? {}),
     },
