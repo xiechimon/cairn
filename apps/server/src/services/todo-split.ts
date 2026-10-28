@@ -173,7 +173,13 @@ export function createSplitTodo(
   if (!rejectedProposal) {
     for (const item of items) {
       const record = createTodo(
-        { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user, vapidKeys: deps.vapidKeys },
+        {
+          db: deps.db,
+          hub: deps.hub,
+          machineHub: deps.machineHub,
+          user: deps.user,
+          vapidKeys: deps.vapidKeys,
+        },
         {
           teamId: parent.teamId,
           projectId: parent.projectId,
@@ -267,7 +273,13 @@ export function createSplitTodo(
     .get();
   const autoStart = splitPolicy === 'auto' && checkerPassed;
   setTodoPhase(
-    { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user, vapidKeys: deps.vapidKeys },
+    {
+      db: deps.db,
+      hub: deps.hub,
+      machineHub: deps.machineHub,
+      user: deps.user,
+      vapidKeys: deps.vapidKeys,
+    },
     parent.id,
     'confirm',
     {
@@ -281,7 +293,13 @@ export function createSplitTodo(
   );
   if (autoStart) {
     setTodoPhase(
-      { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user, vapidKeys: deps.vapidKeys },
+      {
+        db: deps.db,
+        hub: deps.hub,
+        machineHub: deps.machineHub,
+        user: deps.user,
+        vapidKeys: deps.vapidKeys,
+      },
       parent.id,
       'building',
       { lastRunAt: nowMs() },
