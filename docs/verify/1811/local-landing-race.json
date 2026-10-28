@@ -1,0 +1,8 @@
+{
+  "sourceCommit": "05d0dd12e3e9eab720bfd7c4afeb097ed4c0615e",
+  "originalCheckPassed": true,
+  "competingAdvanceAfterCheck": true,
+  "candidateContainsCompetingCommit": false,
+  "unconditionalUpdateOverwroteCompetingAdvance": true,
+  "boundary": "Real GitOps calls in a temporary bare repository; no server endpoint exercised"
+}

@@ -1,0 +1,179 @@
+TLC2 Version 2.19 of 08 August 2024 (rev: 5a47802)
+Running breadth-first search Model-Checking with fp 107 and seed 5673516876959405915 with 1 worker on 16 cores with 477MB heap and 64MB offheap memory [pid: 2431581] (Linux 7.2.8-9-omarchy amd64, Azul Systems, Inc. 17.0.20 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /mnt/fast/tmp/codex-2069-model-review-20261028/.claude/skills/verify-merge-gate/model/RepeatedVerdict.tla
+Parsing file /mnt/fast/tmp/codex-2069-model-review-20261028/.claude/skills/verify-merge-gate/model/MergeGate.tla
+Parsing file /tmp/Naturals.tla
+Semantic processing of module Naturals
+Semantic processing of module MergeGate
+Semantic processing of module RepeatedVerdict
+Starting... (2026-10-27 20:38:31)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-10-27 20:38:31.
+Error: Invariant RepeatedVerdictRemainsBlocked is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ vOutcome = [ verify |-> [d1 |-> "none", d2 |-> "none"],
+  review |-> [d1 |-> "none", d2 |-> "none"],
+  decision |-> [d1 |-> "none", d2 |-> "none"] ]
+/\ landed = [ h |-> "none",
+  d |-> "none",
+  v |-> "pass",
+  rv |-> "pass",
+  dv |-> "pass",
+  indep |-> FALSE,
+  rh |-> "none" ]
+/\ lastEval = [ready |-> FALSE, h |-> "none", b |-> "none", d |-> "none"]
+/\ codePushes = 0
+/\ benignMoves = 0
+/\ vHead = [d1 |-> "none", d2 |-> "none"]
+/\ dgst = "d1"
+/\ satDecision = "none"
+/\ satVerify = "none"
+/\ interactingMoves = 0
+/\ vIndep = [d1 |-> FALSE, d2 |-> FALSE]
+/\ base = "b1"
+/\ satReview = "none"
+/\ evidencePushes = 0
+/\ satReviewHead = "none"
+/\ verdicts = 0
+/\ head = "h1"
+
+State 2: <RepeatedVerdictNext line 5, col 3 to line 9, col 24 of module RepeatedVerdict>
+/\ vOutcome = [ verify |-> [d1 |-> "block", d2 |-> "none"],
+  review |-> [d1 |-> "none", d2 |-> "none"],
+  decision |-> [d1 |-> "none", d2 |-> "none"] ]
+/\ landed = [ h |-> "none",
+  d |-> "none",
+  v |-> "pass",
+  rv |-> "pass",
+  dv |-> "pass",
+  indep |-> FALSE,
+  rh |-> "none" ]
+/\ lastEval = [ready |-> FALSE, h |-> "none", b |-> "none", d |-> "none"]
+/\ codePushes = 0
+/\ benignMoves = 0
+/\ vHead = [d1 |-> "none", d2 |-> "none"]
+/\ dgst = "d1"
+/\ satDecision = "none"
+/\ satVerify = "none"
+/\ interactingMoves = 0
+/\ vIndep = [d1 |-> FALSE, d2 |-> FALSE]
+/\ base = "b1"
+/\ satReview = "none"
+/\ evidencePushes = 0
+/\ satReviewHead = "none"
+/\ verdicts = 1
+/\ head = "h1"
+
+State 3: <RepeatedVerdictNext line 5, col 3 to line 9, col 24 of module RepeatedVerdict>
+/\ vOutcome = [ verify |-> [d1 |-> "pass", d2 |-> "none"],
+  review |-> [d1 |-> "none", d2 |-> "none"],
+  decision |-> [d1 |-> "none", d2 |-> "none"] ]
+/\ landed = [ h |-> "none",
+  d |-> "none",
+  v |-> "pass",
+  rv |-> "pass",
+  dv |-> "pass",
+  indep |-> FALSE,
+  rh |-> "none" ]
+/\ lastEval = [ready |-> FALSE, h |-> "none", b |-> "none", d |-> "none"]
+/\ codePushes = 0
+/\ benignMoves = 0
+/\ vHead = [d1 |-> "none", d2 |-> "none"]
+/\ dgst = "d1"
+/\ satDecision = "none"
+/\ satVerify = "none"
+/\ interactingMoves = 0
+/\ vIndep = [d1 |-> FALSE, d2 |-> FALSE]
+/\ base = "b1"
+/\ satReview = "none"
+/\ evidencePushes = 0
+/\ satReviewHead = "none"
+/\ verdicts = 2
+/\ head = "h1"
+
+State 4: <RepeatedVerdictNext line 5, col 3 to line 9, col 24 of module RepeatedVerdict>
+/\ vOutcome = [ verify |-> [d1 |-> "pass", d2 |-> "none"],
+  review |-> [d1 |-> "pass", d2 |-> "none"],
+  decision |-> [d1 |-> "none", d2 |-> "none"] ]
+/\ landed = [ h |-> "none",
+  d |-> "none",
+  v |-> "pass",
+  rv |-> "pass",
+  dv |-> "pass",
+  indep |-> FALSE,
+  rh |-> "none" ]
+/\ lastEval = [ready |-> FALSE, h |-> "none", b |-> "none", d |-> "none"]
+/\ codePushes = 0
+/\ benignMoves = 0
+/\ vHead = [d1 |-> "h1", d2 |-> "none"]
+/\ dgst = "d1"
+/\ satDecision = "none"
+/\ satVerify = "none"
+/\ interactingMoves = 0
+/\ vIndep = [d1 |-> FALSE, d2 |-> FALSE]
+/\ base = "b1"
+/\ satReview = "none"
+/\ evidencePushes = 0
+/\ satReviewHead = "none"
+/\ verdicts = 3
+/\ head = "h1"
+
+State 5: <RepeatedVerdictNext line 5, col 3 to line 9, col 24 of module RepeatedVerdict>
+/\ vOutcome = [ verify |-> [d1 |-> "pass", d2 |-> "none"],
+  review |-> [d1 |-> "pass", d2 |-> "none"],
+  decision |-> [d1 |-> "pass", d2 |-> "none"] ]
+/\ landed = [ h |-> "none",
+  d |-> "none",
+  v |-> "pass",
+  rv |-> "pass",
+  dv |-> "pass",
+  indep |-> FALSE,
+  rh |-> "none" ]
+/\ lastEval = [ready |-> FALSE, h |-> "none", b |-> "none", d |-> "none"]
+/\ codePushes = 0
+/\ benignMoves = 0
+/\ vHead = [d1 |-> "h1", d2 |-> "none"]
+/\ dgst = "d1"
+/\ satDecision = "none"
+/\ satVerify = "none"
+/\ interactingMoves = 0
+/\ vIndep = [d1 |-> FALSE, d2 |-> FALSE]
+/\ base = "b1"
+/\ satReview = "none"
+/\ evidencePushes = 0
+/\ satReviewHead = "none"
+/\ verdicts = 4
+/\ head = "h1"
+
+State 6: <RepeatedVerdictNext line 5, col 3 to line 9, col 24 of module RepeatedVerdict>
+/\ vOutcome = [ verify |-> [d1 |-> "pass", d2 |-> "none"],
+  review |-> [d1 |-> "pass", d2 |-> "none"],
+  decision |-> [d1 |-> "pass", d2 |-> "none"] ]
+/\ landed = [ h |-> "none",
+  d |-> "none",
+  v |-> "pass",
+  rv |-> "pass",
+  dv |-> "pass",
+  indep |-> FALSE,
+  rh |-> "none" ]
+/\ lastEval = [ready |-> TRUE, h |-> "h1", b |-> "b1", d |-> "d1"]
+/\ codePushes = 0
+/\ benignMoves = 0
+/\ vHead = [d1 |-> "h1", d2 |-> "none"]
+/\ dgst = "d1"
+/\ satDecision = "d1"
+/\ satVerify = "d1"
+/\ interactingMoves = 0
+/\ vIndep = [d1 |-> FALSE, d2 |-> FALSE]
+/\ base = "b1"
+/\ satReview = "d1"
+/\ evidencePushes = 0
+/\ satReviewHead = "none"
+/\ verdicts = 4
+/\ head = "h1"
+
+12 states generated, 12 distinct states found, 3 states left on queue.
+The depth of the complete state graph search is 6.
+The average outdegree of the complete state graph is 1 (minimum is 1, the maximum 4 and the 95th percentile is 4).
+Finished in 00s at (2026-10-27 20:38:31)

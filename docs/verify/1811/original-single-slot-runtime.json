@@ -1,0 +1,27 @@
+{
+  "sequence": [
+    {
+      "kind": "verify",
+      "outcome": "block"
+    },
+    {
+      "kind": "verify",
+      "outcome": "pass"
+    },
+    {
+      "kind": "review",
+      "outcome": "pass"
+    },
+    {
+      "kind": "decision",
+      "outcome": "pass"
+    }
+  ],
+  "realVerifyBlockRetained": true,
+  "modelSingleSlotProjection": {
+    "verify": "pass",
+    "review": "pass",
+    "decision": "pass"
+  },
+  "modelProjectionAllowsReadiness": true
+}
