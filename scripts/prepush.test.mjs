@@ -60,6 +60,24 @@ test('changes to prepush scripts run the CI self-test files locally', () => {
   );
 });
 
+test('escape-trace tests run only when escape-trace or reviewer-bank paths change', () => {
+  const step = 'node --test scripts/escape-trace.test.mjs';
+  for (const mode of ['local', 'ci']) {
+    assert.ok(
+      !prepushPlan(['apps/server/src/app.ts'], mode)
+        .map((args) => args.join(' '))
+        .includes(step),
+      mode,
+    );
+    assert.ok(
+      prepushPlan(['scripts/escape-trace.mjs'], mode)
+        .map((args) => args.join(' '))
+        .includes(step),
+      mode,
+    );
+  }
+});
+
 test('the recording gate runs in local prepush, in CI prepush and in the CI self-test step', () => {
   const gate = 'node scripts/recording-gate.mjs';
   for (const mode of ['local', 'ci'])
