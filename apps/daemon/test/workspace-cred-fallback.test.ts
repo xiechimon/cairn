@@ -51,7 +51,6 @@ async function seedOrigin(): Promise<void> {
   await runGit(['init', '--bare', originDir]);
   await runGit(['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd: originDir });
   await runGit(['clone', originDir, seedDir]);
-  const { writeFileSync } = await import('node:fs');
   writeFileSync(join(seedDir, 'README.md'), '# seed\n');
   await runGit(['checkout', '-B', 'main'], { cwd: seedDir });
   await runGit(['add', '-A'], { cwd: seedDir });

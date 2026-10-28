@@ -28,3 +28,5 @@ Tests:
 - These are real local Git repositories with synthetic identities and local HTTP credential controls. They do not establish hosted-provider delivery or a deployed daemon result.
 
 The simplification pass keeps the original Git retry and hook classification interfaces. A closure reads the requested branch consistently at three points. The temporary remote exists only in the fetch child's configuration, and the temporary ref is scoped to one call. There is no new global cache, hook wrapper, persistent remote or dependency.
+
+After merging main `c6b533e543da50914f408f2232791d41ab3e6d5a`, the four-file suite passes 109 tests again and lint, workspace typecheck and spec collection pass. The fixture setup uses its existing top-level `writeFileSync` import directly instead of importing the same function inline. The earlier 96-test same-file log precedes this import cleanup; `current-main-related-green.log` verifies the current hashed files.
