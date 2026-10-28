@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import type { MergePolicy, ProjectRepoKind } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
+import { onTestFinished } from 'vitest';
 import webpush from 'web-push';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createApp } from '../src/app.js';
 import type { AppContext } from '../src/context.js';
 import { openMemoryDb } from '../src/db/client.js';
@@ -75,80 +76,95 @@ export function bootServer(
           webOrigin: opts.webOrigin ?? 'https://cairn.local',
         }
       : opts.vapidKeys;
-  const ownReposDir = opts.reposDir === undefined;
-  const reposDir = opts.reposDir ?? mkdtempSync(join(tmpdir(), 'cairn-server-repos-'));
-  const ownAttDir = opts.attachmentsDir === undefined;
-  const attachmentsDir = opts.attachmentsDir ?? mkdtempSync(join(tmpdir(), 'cairn-att-'));
-  const ownSkillsDir = opts.skillsDir === undefined;
-  const skillsDir = opts.skillsDir ?? mkdtempSync(join(tmpdir(), 'cairn-skills-'));
-  const ownSkillSourcesDir = opts.skillSourcesPath === undefined;
+  const ownedDirs: string[] = [];
+  const takeDir = (prefix: string): string => {
+    const dir = makeTestTempDir(prefix);
+    ownedDirs.push(dir);
+    return dir;
+  };
+  const reposDir = opts.reposDir ?? takeDir('server-repos-');
+  const attachmentsDir = opts.attachmentsDir ?? takeDir('server-att-');
+  const skillsDir = opts.skillsDir ?? takeDir('server-skills-');
   const skillSourcesPath =
-    opts.skillSourcesPath ??
-    join(mkdtempSync(join(tmpdir(), 'cairn-skill-sources-')), 'skill-sources.json');
+    opts.skillSourcesPath ?? join(takeDir('skill-sources-'), 'skill-sources.json');
+  let disposed = false;
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
+    for (const dir of ownedDirs.splice(0)) releaseTestTempDir(dir);
+  };
   const oauthStates: AppContext['oauthStates'] = new Map();
-  const app = createApp({
-    db,
-    hub,
-    machineHub,
-    convHub,
-    secretBox,
-    vapidKeys,
-    ...(opts.pushEndpointHosts !== undefined ? { pushEndpointHosts: opts.pushEndpointHosts } : {}),
-    user,
-    team,
-    pingIntervalMs: opts.pingIntervalMs ?? 3_600_000,
-    claimHoldMs: opts.claimHoldMs ?? 250,
-    uploads: new Map(),
-    enrollments: new Map(),
-    oauthStates,
-    oauthClient: opts.oauthClient ?? null,
-    ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
-    ...(opts.githubFetch !== undefined ? { githubFetch: opts.githubFetch } : {}),
-    ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
-    ...(opts.skillImportFetch !== undefined ? { skillImportFetch: opts.skillImportFetch } : {}),
-    ...(opts.skillImportTimeoutMs !== undefined
-      ? { skillImportTimeoutMs: opts.skillImportTimeoutMs }
-      : {}),
-    reposDir,
-    attachmentsDir,
-    skillsDir,
-    skillSourcesPath,
-    ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
-    authToken: opts.authToken ?? null,
-    tailscaleUsers: opts.tailscaleUsers ?? [],
-    mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
-  });
-  return {
-    app,
-    db,
-    hub,
-    machineHub,
-    convHub,
-    secretBox,
-    vapidKeys,
-    user,
-    team,
-    reposDir,
-    attachmentsDir,
-    skillsDir,
-    oauthStates,
-    svc: {
+  try {
+    const app = createApp({
       db,
       hub,
       machineHub,
       convHub,
-      user,
-      skillsDir,
+      secretBox,
       vapidKeys,
-      harnessEval: productionHarnessEvalConfig(),
-    },
-    dispose(): void {
-      if (ownReposDir) rmSync(reposDir, { recursive: true, force: true });
-      if (ownAttDir) rmSync(attachmentsDir, { recursive: true, force: true });
-      if (ownSkillsDir) rmSync(skillsDir, { recursive: true, force: true });
-      if (ownSkillSourcesDir) rmSync(dirname(skillSourcesPath), { recursive: true, force: true });
-    },
-  };
+      ...(opts.pushEndpointHosts !== undefined
+        ? { pushEndpointHosts: opts.pushEndpointHosts }
+        : {}),
+      user,
+      team,
+      pingIntervalMs: opts.pingIntervalMs ?? 3_600_000,
+      claimHoldMs: opts.claimHoldMs ?? 250,
+      uploads: new Map(),
+      enrollments: new Map(),
+      oauthStates,
+      oauthClient: opts.oauthClient ?? null,
+      ...(opts.oauthFetch !== undefined ? { oauthFetch: opts.oauthFetch } : {}),
+      ...(opts.githubFetch !== undefined ? { githubFetch: opts.githubFetch } : {}),
+      ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
+      ...(opts.skillImportFetch !== undefined ? { skillImportFetch: opts.skillImportFetch } : {}),
+      ...(opts.skillImportTimeoutMs !== undefined
+        ? { skillImportTimeoutMs: opts.skillImportTimeoutMs }
+        : {}),
+      reposDir,
+      attachmentsDir,
+      skillsDir,
+      skillSourcesPath,
+      ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
+      authToken: opts.authToken ?? null,
+      tailscaleUsers: opts.tailscaleUsers ?? [],
+      mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
+    });
+    try {
+      onTestFinished(dispose);
+    } catch {
+      void 0;
+    }
+    return {
+      app,
+      db,
+      hub,
+      machineHub,
+      convHub,
+      secretBox,
+      vapidKeys,
+      user,
+      team,
+      reposDir,
+      attachmentsDir,
+      skillsDir,
+      skillSourcesPath,
+      oauthStates,
+      svc: {
+        db,
+        hub,
+        machineHub,
+        convHub,
+        user,
+        skillsDir,
+        vapidKeys,
+        harnessEval: productionHarnessEvalConfig(),
+      },
+      dispose,
+    };
+  } catch (error) {
+    dispose();
+    throw error;
+  }
 }
 
 export async function issueApiKey(s: ReturnType<typeof bootServer>): Promise<string> {

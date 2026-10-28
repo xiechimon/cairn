@@ -1,14 +1,13 @@
-import { randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { MergePolicy, ProjectRepoKind, Scheduler } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { and, eq, isNull } from 'drizzle-orm';
+import { onTestFinished } from 'vitest';
 import { z } from 'zod';
 import { createApp } from '../../apps/server/src/app.js';
 import { openDbWithHandle, openMemoryDb } from '../../apps/server/src/db/client.js';
@@ -23,6 +22,7 @@ import { createApiKey } from '../../apps/server/src/services/api-keys.js';
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
 import { createScheduler } from '../../apps/server/src/services/scheduler.js';
+import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 export const AGENT_ID = 'agent-it-1';
 
@@ -34,6 +34,8 @@ export interface RealServer {
   reposDir: string;
   attachmentsDir: string;
   skillsDir: string;
+  skillSourcesPath: string;
+  mcpConfigPath: string;
   claimCount: () => number;
   todoPhase(todoId: string): string;
   scheduler: Scheduler | null;
@@ -50,150 +52,178 @@ export async function bootRealServer(opts: {
   dbPath?: string;
   port?: number;
 }): Promise<RealServer> {
+  const ownedDirs: string[] = [];
+  const takeDir = (prefix: string): string => {
+    const dir = makeTestTempDir(prefix);
+    ownedDirs.push(dir);
+    return dir;
+  };
   const db = opts.dbPath !== undefined ? openDbWithHandle(opts.dbPath).db : openMemoryDb();
   const { user, team } = seed(db);
   const hub = new TeamStreamHub();
   const machineHub = new MachineWakeHub();
   const convHub = new ConversationStreamHub();
   const secretBox = createEphemeralSecretBox();
-  const reposDir = mkdtempSync(join(tmpdir(), 'cairn-it-repos-'));
-  const attachmentsDir = mkdtempSync(join(tmpdir(), 'cairn-it-att-'));
-  const skillsDir = mkdtempSync(join(tmpdir(), 'cairn-it-skills-'));
-  const app = createApp({
-    db,
-    hub,
-    machineHub,
-    convHub,
-    secretBox,
-    user,
-    team,
-    pingIntervalMs: 15_000,
-    claimHoldMs: opts.claimHoldMs ?? 1_000,
-    uploads: new Map(),
-    enrollments: new Map(),
-    oauthStates: new Map(),
-    oauthClient: null,
-    reposDir,
-    attachmentsDir,
-    skillsDir,
-    skillSourcesPath: join(
-      mkdtempSync(join(tmpdir(), 'cairn-it-skill-sources-')),
-      'skill-sources.json',
-    ),
-    webDir: opts.webDir ?? null,
-    authToken: null,
-    tailscaleUsers: [],
-    mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-it-mcp-${randomUUID()}.json`),
-  });
-  const scheduler = opts.scheduler
-    ? createScheduler({ db, hub, user, convHub }, { tickMs: 60_000 })
-    : null;
-  const issuedKey = createApiKey(
-    { db },
-    {
-      teamId: team.id,
-      name: 'machine-bootstrap',
-      gitAccess: false,
-      mcpAccess: false,
-      toolGrants: { read: [], write: [] },
-    },
-  );
+  const reposDir = takeDir('it-repos-');
+  const attachmentsDir = takeDir('it-att-');
+  const skillsDir = takeDir('it-skills-');
+  const skillSourcesPath = join(takeDir('it-skill-sources-'), 'skill-sources.json');
+  const ownMcpConfig = opts.mcpConfigPath === undefined;
+  const mcpConfigPath = opts.mcpConfigPath ?? join(takeDir('it-mcp-'), 'mcp.json');
+  if (ownMcpConfig) writeFileSync(mcpConfigPath, '{}\n');
+  let closed = false;
+  const releaseOwned = (): void => {
+    for (const dir of ownedDirs.splice(0)) releaseTestTempDir(dir);
+  };
+  try {
+    const app = createApp({
+      db,
+      hub,
+      machineHub,
+      convHub,
+      secretBox,
+      user,
+      team,
+      pingIntervalMs: 15_000,
+      claimHoldMs: opts.claimHoldMs ?? 1_000,
+      uploads: new Map(),
+      enrollments: new Map(),
+      oauthStates: new Map(),
+      oauthClient: null,
+      reposDir,
+      attachmentsDir,
+      skillsDir,
+      skillSourcesPath,
+      webDir: opts.webDir ?? null,
+      authToken: null,
+      tailscaleUsers: [],
+      mcpConfigPath,
+    });
+    const scheduler = opts.scheduler
+      ? createScheduler({ db, hub, user, convHub }, { tickMs: 60_000 })
+      : null;
+    const issuedKey = createApiKey(
+      { db },
+      {
+        teamId: team.id,
+        name: 'machine-bootstrap',
+        gitAccess: false,
+        mcpAccess: false,
+        toolGrants: { read: [], write: [] },
+      },
+    );
 
-  let claims = 0;
-  const fetchImpl: typeof app.fetch = async (input, init) => {
-    const url =
-      typeof input === 'string'
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : (input as Request).url;
-    if (url.includes('/api/machine/tasks/claim')) claims += 1;
-    if (
-      url.includes('/api/machine/enroll') &&
-      ((init as RequestInit | undefined)?.method ?? 'POST') === 'POST'
-    ) {
-      const res = await app.fetch(input as never, init);
-      if (res.status === 200) {
-        const body = (await res
-          .clone()
-          .json()
-          .catch(() => null)) as {
-          machineId?: string;
-        } | null;
-        if (typeof body?.machineId === 'string') {
-          db.update(agentTable)
-            .set({ machineId: body.machineId })
-            .where(and(eq(agentTable.teamId, team.id), isNull(agentTable.machineId)))
-            .run();
+    let claims = 0;
+    const fetchImpl: typeof app.fetch = async (input, init) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : (input as Request).url;
+      if (url.includes('/api/machine/tasks/claim')) claims += 1;
+      if (
+        url.includes('/api/machine/enroll') &&
+        ((init as RequestInit | undefined)?.method ?? 'POST') === 'POST'
+      ) {
+        const res = await app.fetch(input as never, init);
+        if (res.status === 200) {
+          const body = (await res
+            .clone()
+            .json()
+            .catch(() => null)) as {
+            machineId?: string;
+          } | null;
+          if (typeof body?.machineId === 'string') {
+            db.update(agentTable)
+              .set({ machineId: body.machineId })
+              .where(and(eq(agentTable.teamId, team.id), isNull(agentTable.machineId)))
+              .run();
+          }
         }
+        return res;
       }
-      return res;
+      return app.fetch(input as never, init);
+    };
+
+    const server = serve({ fetch: fetchImpl, port: opts.port ?? 0 });
+    await new Promise<void>((resolve) => server.once('listening', resolve));
+    const port = (server.address() as AddressInfo).port;
+    const url = `http://127.0.0.1:${port}`;
+
+    if (
+      db.select().from(providerTable).where(eq(providerTable.id, 'prov-it')).get() === undefined
+    ) {
+      db.insert(providerTable)
+        .values({
+          id: 'prov-it',
+          teamId: team.id,
+          kind: 'custom',
+          providerId: 'stub-gw',
+          label: 'Stub Gateway',
+          baseUrl: opts.providerBaseUrl,
+          api: 'openai-completions',
+          authHeader: true,
+          compat: { supportsDeveloperRole: false },
+          models: [{ id: 'stub-model', name: 'stub-model' }],
+          createdBy: user.id,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        })
+        .run();
     }
-    return app.fetch(input as never, init);
-  };
+    if (db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get() === undefined) {
+      db.insert(agentTable)
+        .values({
+          id: AGENT_ID,
+          teamId: team.id,
+          displayName: 'it-builder',
+          description:
+            opts.agentDescription ?? '你是集成测试执行 Agent：直接简短回答，不使用任何工具。',
+          provider: 'stub-gw',
+          modelId: 'stub-model',
+          tools: ['合并分支', '推送分支'],
+        })
+        .run();
+    }
 
-  const server = serve({ fetch: fetchImpl, port: opts.port ?? 0 });
-  await new Promise<void>((resolve) => server.once('listening', resolve));
-  const port = (server.address() as AddressInfo).port;
-  const url = `http://127.0.0.1:${port}`;
-
-  if (db.select().from(providerTable).where(eq(providerTable.id, 'prov-it')).get() === undefined) {
-    db.insert(providerTable)
-      .values({
-        id: 'prov-it',
-        teamId: team.id,
-        kind: 'custom',
-        providerId: 'stub-gw',
-        label: 'Stub Gateway',
-        baseUrl: opts.providerBaseUrl,
-        api: 'openai-completions',
-        authHeader: true,
-        compat: { supportsDeveloperRole: false },
-        models: [{ id: 'stub-model', name: 'stub-model' }],
-        createdBy: user.id,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      })
-      .run();
-  }
-  if (db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get() === undefined) {
-    db.insert(agentTable)
-      .values({
-        id: AGENT_ID,
-        teamId: team.id,
-        displayName: 'it-builder',
-        description:
-          opts.agentDescription ?? '你是集成测试执行 Agent：直接简短回答，不使用任何工具。',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        tools: ['合并分支', '推送分支'],
-      })
-      .run();
-  }
-
-  return {
-    url,
-    teamId: team.id,
-    apiKey: issuedKey.plaintext,
-    db,
-    reposDir,
-    attachmentsDir,
-    skillsDir,
-    claimCount: () => claims,
-    todoPhase(todoId: string) {
-      return db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.phase ?? '';
-    },
-    scheduler,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        scheduler?.stop();
-        // node:http long-polling/SSE connections keep close() pending; drop all live connections first.
-        (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
+    const close = async (): Promise<void> => {
+      if (closed) return;
+      closed = true;
+      scheduler?.stop();
+      (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
+      await new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
-        rmSync(reposDir, { recursive: true, force: true });
-        rmSync(skillsDir, { recursive: true, force: true });
-      }),
-  };
+      });
+      releaseOwned();
+    };
+    try {
+      onTestFinished(close);
+    } catch {
+      void 0;
+    }
+
+    return {
+      url,
+      teamId: team.id,
+      apiKey: issuedKey.plaintext,
+      db,
+      reposDir,
+      attachmentsDir,
+      skillsDir,
+      skillSourcesPath,
+      mcpConfigPath,
+      claimCount: () => claims,
+      todoPhase(todoId: string) {
+        return db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.phase ?? '';
+      },
+      scheduler,
+      close,
+    };
+  } catch (error) {
+    releaseOwned();
+    throw error;
+  }
 }
 
 export async function api(
