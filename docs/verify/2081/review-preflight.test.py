@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).parent
 SPEC = importlib.util.spec_from_file_location('review_preflight', ROOT / 'review-preflight.py')
@@ -65,6 +66,64 @@ class ReviewPreflightTests(unittest.TestCase):
         record['execution']['configuredContextWindow'] = 128000
         record['execution']['rc'] = 1
         self.assertIn('Review requires a successful process and at least 1000000 context tokens', MODULE.review_errors(record, HEAD, DIGEST, 'GPT'))
+
+
+class GitHubFactsTests(unittest.TestCase):
+    def setUp(self):
+        self.files = json.loads((ROOT / 'github-files-extract.json').read_text())
+        self.good = json.loads((ROOT / 'github-digest-review.json').read_text())
+        self.local = json.loads((ROOT / 'local-digest-review.json').read_text())
+        self.head = self.good['binding']['headSha']
+        self.base = self.good['binding']['baseSha']
+        self.pr = {'head': {'sha': self.head}, 'base': {'sha': self.base}, 'changed_files': len(self.files), 'state': 'open'}
+
+    def git_output(self, command, **kwargs):
+        if command[1] == 'diff':
+            return '\0'.join(f['filename'] for f in self.files).encode() + b'\0'
+        path = command[-1].split(':', 1)[1]
+        return (next(f['sha'] for f in self.files if f['filename'] == path) + '\n').encode()
+
+    def test_raw_github_fields_derive_digest_including_opaque_patch_and_evidence_exclusion(self):
+        derived = MODULE.github_patch_digest(self.files)
+        self.assertEqual(derived, 'pd2:5343fcf54bdaf7fb7286f04fc22c6dab5b38ca0c4a39f1efafe689c59e9c6454')
+        evidence_changed = copy.deepcopy(self.files)
+        evidence_changed[-1]['patch'] = 'different evidence bytes'
+        self.assertEqual(MODULE.github_patch_digest(evidence_changed), derived)
+        source_changed = copy.deepcopy(self.files)
+        source_changed[0]['patch'] += '\n'
+        self.assertNotEqual(MODULE.github_patch_digest(source_changed), derived)
+
+    def test_local_compare_file_schema_is_rejected(self):
+        local = [{'filename': f['filename'], 'status': f['status'], 'sha': f['sha'], 'additions': f['additions'], 'deletions': f['deletions'], 'previousFilename': None, 'patchSha': None} for f in self.files]
+        with self.assertRaisesRegex(ValueError, 'raw GitHub'):
+            MODULE.github_patch_digest(local)
+
+    def test_complete_current_capture_matches_local_blobs(self):
+        with patch.object(MODULE.subprocess, 'check_output', side_effect=self.git_output):
+            errors, digest = MODULE.github_facts_errors(self.pr, self.files, self.head, self.base, ROOT)
+        self.assertEqual(errors, [])
+        self.assertEqual(digest, MODULE.github_patch_digest(self.files))
+
+    def test_partial_and_duplicate_files_are_rejected(self):
+        for files in [self.files[:-1], [self.files[0]] * len(self.files)]:
+            with patch.object(MODULE.subprocess, 'check_output', side_effect=self.git_output):
+                errors, _ = MODULE.github_facts_errors(self.pr, files, self.head, self.base, ROOT)
+            self.assertTrue(errors)
+
+    def test_stale_head_base_and_blob_mismatch_are_rejected(self):
+        for field in ['head', 'base']:
+            pr = copy.deepcopy(self.pr)
+            pr[field]['sha'] = '0' * 40
+            with patch.object(MODULE.subprocess, 'check_output', side_effect=self.git_output):
+                self.assertTrue(MODULE.github_facts_errors(pr, self.files, self.head, self.base, ROOT)[0])
+        with patch.object(MODULE.subprocess, 'check_output', return_value=b'0' * 40 + b'\n'):
+            self.assertTrue(MODULE.github_facts_errors(self.pr, self.files, self.head, self.base, ROOT)[0])
+
+    def test_same_head_local_digest_review_is_not_github_bound(self):
+        self.assertEqual(self.local['review']['headSha'], self.good['review']['headSha'])
+        digest = self.good['review']['patchDigest']
+        self.assertIn('Review digest differs from the current patch', MODULE.review_errors(self.local, self.head, digest, 'GPT'))
+        self.assertEqual(MODULE.review_errors(self.good, self.head, digest, 'GPT'), [])
 
 
 if __name__ == '__main__':

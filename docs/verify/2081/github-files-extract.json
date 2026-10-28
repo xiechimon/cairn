@@ -1,0 +1,28 @@
+[
+  {
+    "filename": "apps/server/drizzle/0063_split_policy.sql",
+    "status": "added",
+    "sha": "affb8b5b5178631ca6b5bd507bfeb2b2aeb7fd4d",
+    "additions": 2,
+    "deletions": 0,
+    "changes": 2,
+    "patch": "@@ -0,0 +1,2 @@\n+ALTER TABLE `project` ADD `splitPolicy` text DEFAULT 'human' NOT NULL;--> statement-breakpoint\n+ALTER TABLE `team` ADD `autonomyPaused` integer DEFAULT false NOT NULL;\n\\ No newline at end of file"
+  },
+  {
+    "filename": "apps/server/drizzle/meta/0063_snapshot.json",
+    "status": "added",
+    "sha": "88f1beb9551b0476f8f970d1c1bd92a12417a4a4",
+    "additions": 3612,
+    "deletions": 0,
+    "changes": 3612
+  },
+  {
+    "filename": "docs/verify/1623/1654-deep-graph-evidence-20261028/single-use.log",
+    "status": "added",
+    "sha": "ca7af38d2edacebb9966f4fe056b7066f4ad7200",
+    "additions": 1,
+    "deletions": 0,
+    "changes": 1,
+    "patch": "@@ -0,0 +1 @@\n+single-use-helper-gate: 0 single-use helper(s)"
+  }
+]

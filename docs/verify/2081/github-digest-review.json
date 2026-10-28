@@ -1,0 +1,51 @@
+{
+  "timing": "pre_merge",
+  "completedAtUtc": "2026-10-28T12:37:00.622648+00:00",
+  "binding": {
+    "headSha": "60aaf07a741186378cf027d635462157ee9ad755",
+    "baseSha": "6237fcb562bd159e82105ce8b9da680106e020bc",
+    "patchDigest": "pd2:cf55062632e67915d21d1d9848543ce603966234994037855835a58b7ec88b41",
+    "binaryDiffSha256": "9f37a5d30caa27e9ec45506845f759fc89d43563a2d2caec5f5dd506e4587236",
+    "writerModelFamily": "GPT",
+    "timing": "pre_merge",
+    "bundleSha256": "cea8a986d06a9ca51f9f7bbab60364a2b2f85faf27eabe225ff3da1694cfcae6",
+    "digestSource": "GitHub PR files API"
+  },
+  "execution": {
+    "rc": 0,
+    "seconds": 19,
+    "timing": "pre_merge",
+    "configuredContextWindow": 1000000
+  },
+  "completion": {
+    "model": "deepseek-v4.1-flash",
+    "stopReason": "stop",
+    "usage": {
+      "input": 314651,
+      "output": 1434,
+      "cacheRead": 256,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 316341,
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+      }
+    }
+  },
+  "review": {
+    "headSha": "60aaf07a741186378cf027d635462157ee9ad755",
+    "patchDigest": "pd2:cf55062632e67915d21d1d9848543ce603966234994037855835a58b7ec88b41",
+    "reviewerModel": "deepseek-v4.1-flash",
+    "verdict": "pass",
+    "gateWeakening": {
+      "answer": "no"
+    },
+    "evalRulerChange": {
+      "answer": "no"
+    }
+  }
+}
