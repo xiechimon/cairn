@@ -413,6 +413,33 @@ export const pushDigestItem = sqliteTable('push_digest_item', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
+type HarnessEvalAttemptState = 'claimed' | 'dispatched' | 'dispatch_uncertain' | 'terminal';
+type HarnessEvalAttemptOutcome =
+  | 'completed'
+  | 'timeout'
+  | 'worker_failure'
+  | 'rejected_publication'
+  | 'unavailable_worker'
+  | 'budget_refusal';
+
+export const harnessEvalAttempt = sqliteTable(
+  'harness_eval_attempts',
+  {
+    id: text('id').primaryKey(),
+    repo: text('repo').notNull(),
+    pr: integer('pr').notNull(),
+    patchDigest: text('patchDigest').notNull(),
+    workerId: text('workerId').notNull(),
+    state: text('state').$type<HarnessEvalAttemptState>().notNull(),
+    deadlineAt: epochMs('deadlineAt').notNull(),
+    outcome: text('outcome').$type<HarnessEvalAttemptOutcome | null>(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('harness_eval_attempts_repo_pr_digest_unique').on(t.repo, t.pr, t.patchDigest),
+  ],
+);
+
 export const skillAudit = sqliteTable('skill_audit', {
   id: text('id').primaryKey(),
   skillId: text('skillId').notNull(),

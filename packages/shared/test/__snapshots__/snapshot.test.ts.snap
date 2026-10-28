@@ -6897,6 +6897,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "memory_candidate",
   "push_subscription",
   "push_digest_item",
+  "harness_eval_attempts",
 ]
 `;
 
