@@ -77,11 +77,12 @@
     "integration/eval/chief-dispatch/repo-seed/docs/api.md",
     "integration/eval/chief-dispatch/repo-seed/docs/deploy.md",
     "integration/eval/chief-dispatch/repo-seed/docs/index.md",
+    "integration/eval/chief-dispatch/repo-seed/docs/push.md",
     "integration/eval/chief-dispatch/repo-seed/docs/usage.md",
     "integration/eval/chief-dispatch/repo-seed/package.json",
     "integration/eval/chief-dispatch/repo-seed/packages/shared/README.md",
     "integration/eval/chief-dispatch/repo-seed/packages/shared/package.json",
     "integration/eval/chief-dispatch/repo-seed/packages/shared/src/protocol.ts"
   ],
-  "harness_sha": "17e76d90a6895e571f69ca01ddd2afd86c244d4c38da79eab0a78c7a34aed411"
+  "harness_sha": "bcff13cf2bab3c29d5c4b26b1b915ac504f343127aeb26fb28aea817f0655fe5"
 }

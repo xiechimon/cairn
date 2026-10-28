@@ -104,4 +104,34 @@ describe('memory seed library', () => {
       expect(rows.find((r) => r.id === memoryIdFor('s01', key))?.invalidAt).toBeNull();
     }
   });
+
+  test('adjacent class: both memories are stored on eval-project', async () => {
+    const c = flow.cases.find((item) => item.expect.kind === 'adjacent');
+    if (c === undefined) throw new Error('no adjacent case');
+    await seedMemories(stack.server, world, c);
+    const rows = listMemoryEntries(stack.server.db, {
+      agentId: world.chiefAgentId,
+      teamId: stack.server.teamId,
+    });
+    for (const memory of c.memories) {
+      expect(rows.find((r) => r.id === memoryIdFor(c.id, memory.key))?.projectId).toBe(
+        world.projectId,
+      );
+    }
+  });
+
+  test('irrelevant class: the memory is stored on eval-project', async () => {
+    const c = flow.cases.find((item) => item.expect.kind === 'irrelevant');
+    if (c === undefined) throw new Error('no irrelevant case');
+    await seedMemories(stack.server, world, c);
+    const rows = listMemoryEntries(stack.server.db, {
+      agentId: world.chiefAgentId,
+      teamId: stack.server.teamId,
+    });
+    const memory = c.memories[0];
+    if (memory === undefined) throw new Error(`${c.id} has no memory`);
+    expect(rows.find((r) => r.id === memoryIdFor(c.id, memory.key))?.projectId).toBe(
+      world.projectId,
+    );
+  });
 });

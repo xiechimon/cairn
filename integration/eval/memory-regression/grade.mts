@@ -1,6 +1,6 @@
 import type { TurnEvidence } from '../chief-dispatch/stack.mts';
 
-export type MemoryCaseKind = 'conflict' | 'leak' | 'stale';
+export type MemoryCaseKind = 'conflict' | 'leak' | 'stale' | 'adjacent' | 'irrelevant';
 
 export type MemoryScope = 'eval-project' | 'other-project' | null;
 
@@ -23,6 +23,7 @@ export interface MemoryCase {
     include: string[][];
     exclude: string[];
     staleMemory?: string;
+    untouchedMemory?: string;
   };
 }
 
@@ -39,7 +40,13 @@ export interface MemoryRun {
   memoryAfter: MemoryRowLite[];
 }
 
-const MEMORY_CASE_KINDS: readonly string[] = ['conflict', 'leak', 'stale'];
+const MEMORY_CASE_KINDS: readonly string[] = [
+  'conflict',
+  'leak',
+  'stale',
+  'adjacent',
+  'irrelevant',
+];
 
 export function isMemoryCase(input: { expect: { kind: string } }): input is MemoryCase {
   return MEMORY_CASE_KINDS.includes(input.expect.kind);
@@ -101,6 +108,22 @@ function latestInChain(
   return current;
 }
 
+function gradeUntouched(
+  input: MemoryCase,
+  rows: Map<string, MemoryRowLite>,
+): { ok: boolean; why: string } {
+  const key = input.expect.untouchedMemory;
+  if (key === undefined) throw new Error(`${input.id} is adjacent but names no untouched memory`);
+  const seed = input.memories.find((m) => m.key === key);
+  if (seed === undefined)
+    throw new Error(`${input.id}: untouched memory ${key} is not in the case`);
+  const row = rows.get(memoryIdFor(input.id, key));
+  if (row === undefined) return { ok: false, why: `unrelated memory ${key} is missing` };
+  if (row.content !== seed.content || row.supersededBy !== null || row.invalidAt !== null)
+    return { ok: false, why: `unrelated memory ${key} was changed or superseded` };
+  return { ok: true, why: 'unrelated memory is unchanged' };
+}
+
 function gradeMemoryWrite(input: MemoryCase, run: MemoryRun): { ok: boolean; why: string } {
   const staleKey = input.expect.staleMemory;
   if (staleKey === undefined) throw new Error(`${input.id} 是过期类却没给 staleMemory`);
@@ -129,6 +152,11 @@ export function gradeMemoryCase(
     const write = gradeMemoryWrite(input, run);
     grade.memory_write_ok = write.ok ? 1 : 0;
     explanation.memory_write_ok = write.why;
+  }
+  if (input.expect.kind === 'adjacent') {
+    const untouched = gradeUntouched(input, new Map(run.memoryAfter.map((r) => [r.id, r])));
+    grade.untouched_ok = untouched.ok ? 1 : 0;
+    explanation.untouched_ok = untouched.why;
   }
   return { grade, explanation };
 }

@@ -12,6 +12,12 @@
       "label": "记忆修正",
       "kind": "binary",
       "better": "higher"
+    },
+    {
+      "id": "untouched_ok",
+      "label": "Unrelated memory untouched",
+      "kind": "binary",
+      "better": "higher"
     }
   ],
   "perf_fields": [
@@ -45,6 +51,7 @@
   "harness_paths": [
     "integration/eval/chief-dispatch/stack.mts",
     "integration/eval/chief-dispatch/repo-seed/README.md",
+    "integration/eval/chief-dispatch/repo-seed/docs/push.md",
     "integration/eval/memory-regression/grade.mts",
     "integration/eval/memory-regression/seed.mts",
     ".claude/hillclimb/memory-regression/cases.json",

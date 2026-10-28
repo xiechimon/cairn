@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { overlaps } from '../../apps/server/src/services/memory.js';
 import type { TurnEvidence } from '../eval/chief-dispatch/stack.mts';
 import {
   gradeMemoryCase,
@@ -222,13 +223,83 @@ describe('case data', () => {
     }
   });
 
-  test('metrics declare decision_ok and memory_write_ok', () => {
-    expect(state.metrics.map((m) => m.id)).toEqual(['decision_ok', 'memory_write_ok']);
+  test('metrics declare decision_ok, memory_write_ok and untouched_ok', () => {
+    expect(state.metrics.map((m) => m.id)).toEqual([
+      'decision_ok',
+      'memory_write_ok',
+      'untouched_ok',
+    ]);
+  });
+
+  test('adjacent and irrelevant families each have 4 to 6 cases', () => {
+    for (const kind of ['adjacent', 'irrelevant'] as const) {
+      expect(byClass(kind).length, kind).toBeGreaterThanOrEqual(4);
+      expect(byClass(kind).length, kind).toBeLessThanOrEqual(6);
+    }
+  });
+
+  test('adjacent: the untouched memory shares a project with a lookalike and the pair overlaps', () => {
+    for (const c of byClass('adjacent')) {
+      const key = c.expect.untouchedMemory;
+      const keep = c.memories.find((m) => m.key === key);
+      const others = c.memories.filter((m) => m.key !== key);
+      expect(keep, c.id).toBeDefined();
+      expect(others.length, c.id).toBeGreaterThan(0);
+      for (const memory of c.memories) expect(memory.scope, c.id).toBe('eval-project');
+      const keepTitle = keep?.title ?? '';
+      const keepContent = keep?.content ?? '';
+      expect(
+        others.some(
+          (other) => overlaps(other.title, keepTitle) || overlaps(other.content, keepContent),
+        ),
+        c.id,
+      ).toBe(true);
+      const keepText = lower(`${keepTitle} ${keepContent}`);
+      expect(
+        c.expect.exclude.some((marker) => keepText.includes(lower(marker))),
+        c.id,
+      ).toBe(true);
+      const applicable = lower(others.map((m) => `${m.title}\n${m.content}`).join('\n'));
+      for (const group of c.expect.include) {
+        expect(
+          group.some((alt) => applicable.includes(lower(alt)) || repoText.includes(lower(alt))),
+          `${c.id}: ${group.join('|')}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  test('irrelevant: the in-scope memory does not contain the answer, and the answer is in the repo', () => {
+    for (const c of byClass('irrelevant')) {
+      expect(c.expect.include.length, c.id).toBeGreaterThan(0);
+      expect(c.expect.untouchedMemory, c.id).toBeUndefined();
+      const memoryText = lower(c.memories.map((m) => `${m.title}\n${m.content}`).join('\n'));
+      for (const memory of c.memories) expect(memory.scope, c.id).toBe('eval-project');
+      for (const group of c.expect.include) {
+        expect(
+          group.some((alt) => repoText.includes(lower(alt))),
+          `${c.id}: ${group.join('|')}`,
+        ).toBe(true);
+        expect(
+          group.every((alt) => !memoryText.includes(lower(alt))),
+          `${c.id}: ${group.join('|')}`,
+        ).toBe(true);
+      }
+      expect(
+        c.expect.exclude.some((marker) => memoryText.includes(lower(marker))),
+        c.id,
+      ).toBe(true);
+    }
   });
 
   test('isMemoryCase separates memory cases from dispatch cases', () => {
     expect(isMemoryCase(cases[0] as MemoryCase)).toBe(true);
     expect(isMemoryCase({ expect: { kind: 'dispatch' } })).toBe(false);
+  });
+
+  test('isMemoryCase accepts the adjacent and irrelevant families', () => {
+    expect(isMemoryCase({ expect: { kind: 'adjacent' } })).toBe(true);
+    expect(isMemoryCase({ expect: { kind: 'irrelevant' } })).toBe(true);
   });
 });
 
@@ -240,12 +311,15 @@ describe('gradeMemoryCase: fixture end state', () => {
         : seededRows(c);
     const g = gradeMemoryCase(c, { evidence: withSpec(oracleSpec(c)), memoryAfter });
     expect(g.grade.decision_ok, g.explanation.decision_ok).toBe(1);
+    if (c.expect.kind === 'adjacent') expect(g.grade.untouched_ok, c.id).toBe(1);
+    if (c.expect.kind === 'irrelevant') expect(g.grade, c.id).toEqual({ decision_ok: 1 });
   });
 
   test.each(cases.map((c) => [c.id, c] as const))('%s 空回合 → 全 0', (_id, c) => {
     const g = gradeMemoryCase(c, { evidence: turn(), memoryAfter: seededRows(c) });
     expect(g.grade.decision_ok).toBe(0);
     if (c.expect.kind === 'stale') expect(g.grade.memory_write_ok).toBe(0);
+    if (c.expect.kind === 'adjacent') expect(g.grade.untouched_ok).toBe(1);
   });
 
   test.each(cases.map((c) => [c.id, c] as const))(
@@ -312,13 +386,14 @@ describe('gradeMemoryCase: fixture end state', () => {
     expect(hitBoth.grade.decision_ok).toBe(1);
   });
 
-  test('conflict and cross-project classes produce no memory_write_ok', () => {
-    for (const c of [...byClass('conflict'), ...byClass('leak')]) {
+  test('conflict, cross-project and irrelevant classes produce no memory-table metric', () => {
+    for (const c of [...byClass('conflict'), ...byClass('leak'), ...byClass('irrelevant')]) {
       const g = gradeMemoryCase(c, {
         evidence: withSpec(oracleSpec(c)),
         memoryAfter: seededRows(c),
       });
       expect(g.grade, c.id).not.toHaveProperty('memory_write_ok');
+      expect(g.grade, c.id).not.toHaveProperty('untouched_ok');
     }
   });
 });
@@ -408,5 +483,126 @@ describe('gradeMemoryCase: memory_write_ok (stale class reads the memory table e
     const g = gradeMemoryCase(c, { evidence, memoryAfter: seededRows(c) });
     expect(g.grade.decision_ok).toBe(1);
     expect(g.grade.memory_write_ok).toBe(0);
+  });
+});
+
+function adjacentFixture(): MemoryCase {
+  return {
+    id: 'a-fixture',
+    tags: ['adjacent'],
+    prompt: 'Write the design-review task for eval-project.',
+    memories: [
+      {
+        key: 'target',
+        title: 'Design review feedback',
+        content: 'Design reviews use async written notes.',
+        scope: 'eval-project',
+        ageDays: 4,
+      },
+      {
+        key: 'keep',
+        title: 'Incident feedback',
+        content: 'Incidents use a sync call.',
+        scope: 'eval-project',
+        ageDays: 40,
+      },
+    ],
+    expect: {
+      kind: 'adjacent',
+      include: [['async written notes']],
+      exclude: ['sync call'],
+      untouchedMemory: 'keep',
+    },
+  };
+}
+
+describe('gradeMemoryCase: untouched memory (adjacent family reads the memory table end state)', () => {
+  test('superseding the unrelated row scores untouched_ok 0 while the todo can still be right', () => {
+    const c = adjacentFixture();
+    const memoryAfter = seededRows(c).map((row) =>
+      row.id === memoryIdFor(c.id, 'keep') ? { ...row, supersededBy: 'mem-other' } : row,
+    );
+    const g = gradeMemoryCase(c, {
+      evidence: withSpec('async written notes'),
+      memoryAfter,
+    });
+    expect(g.grade.decision_ok).toBe(1);
+    expect(g.grade.untouched_ok).toBe(0);
+  });
+
+  test('changing the unrelated row content scores untouched_ok 0', () => {
+    const c = adjacentFixture();
+    const memoryAfter = seededRows(c).map((row) =>
+      row.id === memoryIdFor(c.id, 'keep')
+        ? { ...row, content: 'Incidents use a written note.' }
+        : row,
+    );
+    const g = gradeMemoryCase(c, {
+      evidence: withSpec('async written notes'),
+      memoryAfter,
+    });
+    expect(g.grade.untouched_ok).toBe(0);
+  });
+
+  test('deleting the unrelated row scores untouched_ok 0', () => {
+    const c = adjacentFixture();
+    const memoryAfter = seededRows(c).filter((row) => row.id !== memoryIdFor(c.id, 'keep'));
+    const g = gradeMemoryCase(c, {
+      evidence: withSpec('async written notes'),
+      memoryAfter,
+    });
+    expect(g.grade.untouched_ok).toBe(0);
+  });
+
+  test('updating the matching memory leaves untouched_ok 1 when the unrelated row is unchanged', () => {
+    const c = adjacentFixture();
+    const targetId = memoryIdFor(c.id, 'target');
+    const memoryAfter = seededRows(c).map((row) =>
+      row.id === targetId
+        ? { ...row, content: 'Design reviews use a message board.', supersededBy: null }
+        : row,
+    );
+    const g = gradeMemoryCase(c, {
+      evidence: withSpec('async written notes'),
+      memoryAfter,
+    });
+    expect(g.grade.decision_ok).toBe(1);
+    expect(g.grade.untouched_ok).toBe(1);
+    expect(g.grade).not.toHaveProperty('memory_write_ok');
+  });
+});
+
+describe('gradeMemoryCase: irrelevant family', () => {
+  const c: MemoryCase = {
+    id: 'i-fixture',
+    tags: ['irrelevant'],
+    prompt: 'Write how to start eval-project locally.',
+    memories: [
+      {
+        key: 'aside',
+        title: 'Pantry note',
+        content: 'The snack cupboard code is pantry-19.',
+        scope: 'eval-project',
+        ageDays: 3,
+      },
+    ],
+    expect: {
+      kind: 'irrelevant',
+      include: [['pnpm dev']],
+      exclude: ['pantry-19'],
+    },
+  };
+
+  test('decision_ok follows the todo text and no memory-table metric is emitted', () => {
+    const pass = gradeMemoryCase(c, {
+      evidence: withSpec('pnpm dev'),
+      memoryAfter: [],
+    });
+    const fail = gradeMemoryCase(c, {
+      evidence: withSpec('pnpm dev and pantry-19'),
+      memoryAfter: seededRows(c),
+    });
+    expect(pass.grade).toEqual({ decision_ok: 1 });
+    expect(fail.grade).toEqual({ decision_ok: 0 });
   });
 });
