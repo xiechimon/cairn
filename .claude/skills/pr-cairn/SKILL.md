@@ -125,8 +125,8 @@ not carry the closing keyword for the parent ticket.
   or file path in backticks. The pr-evidence check runs
   `node scripts/english-only-gate.mjs --text <body>` and reds otherwise;
   run it locally on `/tmp/pr.md` before opening.
-- Asking the user anything about an open PR: first `gh pr merge <n> --disable-auto`, then `gh pr edit <n> --add-label needs-decision`, then ask. The gate is red while the label is on and disarms auto-merge on every run until a person removes the label (an agent may remove it only after the user decided in chat, with the `CAIRN_DECIDED=1` prefix). Editing the body green does not clear the label.
-- Before enabling any merge, require fully checked Acceptance and no `needs-decision` label; an unchecked item adds the label and disarms auto-merge on its own.
+- Never add the `needs-decision` label. When a PR needs a decision, decide by your own recommendation, say in the chat what you chose and why, and keep going; only payments or the owner's own credentials go to the owner. A label that is already on keeps pr-evidence red and disarms auto-merge until it is removed.
+- Before enabling any merge, require fully checked Acceptance and no `needs-decision` label; an unchecked item keeps pr-evidence red until it is checked.
 - Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.
 - Human-opened PRs use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author. After a merge, read the main commit author and the `commit-author` Actions result.
@@ -138,5 +138,5 @@ not carry the closing keyword for the parent ticket.
 | `## Verified`, `## Upstream` answered (non-empty after stripping comments) | pr-evidence (required check) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
 | Acceptance carries >=1 task-list item, all checked | pr-evidence (required check, pr-tasks step) |
-| no `needs-decision` label on the PR (a person's decision is pending) | pr-evidence (required check); while the label is on, each run also disarms auto-merge, and an unchecked Acceptance item adds the label |
+| no `needs-decision` label on the PR (a person's decision is pending) | pr-evidence (required check); while the label is on, each run also disarms auto-merge |
 | body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |
