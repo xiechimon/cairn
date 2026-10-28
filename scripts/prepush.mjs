@@ -66,12 +66,6 @@ export function prepushPlan(paths, mode = 'local') {
     if (mode !== 'ci') checks.push(['node', 'scripts/doc-reader-tests.mjs', ...docPaths]);
     return checks;
   }
-  const escapeTrace = paths.some(
-    (path) =>
-      path === 'scripts/escape-trace.mjs' ||
-      path === 'scripts/escape-trace.test.mjs' ||
-      path.startsWith('integration/eval/review/'),
-  );
   const required = [
     language,
     ['node', 'scripts/ui-debt-gate.mjs'],
@@ -83,7 +77,7 @@ export function prepushPlan(paths, mode = 'local') {
     ['node', 'scripts/recording-gate.mjs'],
     ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
     ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
-    ...(escapeTrace ? [['node', '--test', 'scripts/escape-trace.test.mjs']] : []),
+    ['node', '--test', 'scripts/escape-trace.test.mjs'],
     ledgerGate,
     ['python3', 'scripts/pr-evidence-gate.test.py'],
   ];
