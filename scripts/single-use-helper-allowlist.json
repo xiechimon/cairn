@@ -153,5 +153,55 @@
     "path": "apps/web/src/fixtures/demo.ts",
     "name": "demoFixtureOf",
     "reason": "Single call site by design: wraps the whole demo fixture construction so the PURE-annotated call lets the production build tree-shake the module away; inlining the body would restore top-level helper calls that defeat shaking"
+  },
+  {
+    "path": "scripts/escape-trace.mjs",
+    "name": "caseId",
+    "reason": "Stable bank identity from provenance fields; kept next to export so validate and export share one id shape without inlining into buildCase"
+  },
+  {
+    "path": "scripts/escape-trace.mjs",
+    "name": "mapFixingParentLocation",
+    "reason": "Blame-maps fixing-parent ranges onto the introducing tree including renames; inlining would bury 40 lines of porcelain parsing inside buildCase"
+  },
+  {
+    "path": "scripts/escape-trace.mjs",
+    "name": "ineligibleReason",
+    "reason": "Classifies unresolved traces before export; shared wording between candidates.json and tests stays in one place"
+  },
+  {
+    "path": "scripts/escape-trace.mjs",
+    "name": "loadSchema",
+    "reason": "Loads the versioned case schema once for validateCases; inlining duplicates the path resolve into validateBankCase"
+  },
+  {
+    "path": "scripts/escape-trace.mjs",
+    "name": "typeOf",
+    "reason": "JSON Schema type tag including integer-vs-number; used only from validateAgainstSchema but kept separate so the schema walker stays readable"
+  },
+  {
+    "path": "scripts/escape-trace.mjs",
+    "name": "buildCase",
+    "reason": "Builds one verified bank case from a mapped location; inlining would nest provenance, reviewerInput, and answer assembly inside the export loop"
+  },
+  {
+    "path": "scripts/escape-trace.mjs",
+    "name": "validateBankCase",
+    "reason": "Schema plus git replay checks for one case file; inlining would nest blob and replay-base checks inside validateCases"
+  },
+  {
+    "path": "scripts/escape-trace.mjs",
+    "name": "parseExportArgs",
+    "reason": "CLI argv parser for export-cases; kept out of the main CLI switch so usage errors stay local"
+  },
+  {
+    "path": "scripts/escape-trace.mjs",
+    "name": "parseValidateArgs",
+    "reason": "CLI argv parser for validate-cases; kept out of the main CLI switch so usage errors stay local"
+  },
+  {
+    "path": "scripts/escape-trace.test.mjs",
+    "name": "commit",
+    "reason": "Fixture helper returned from fixture(); the gate counts only the return binding as a reference even though tests call the destructured binding many times"
   }
 ]

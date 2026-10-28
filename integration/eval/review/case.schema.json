@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cairn.local/integration/eval/review/case.schema.json",
+  "title": "ReviewerBankCase",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "provenance", "reviewerInput", "answer", "tracing"],
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["originalPr", "fixingPr", "introducingSha", "fixingSha", "replayBase"],
+      "properties": {
+        "originalPr": { "type": "integer", "minimum": 1 },
+        "fixingPr": { "type": "integer", "minimum": 1 },
+        "introducingSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "fixingSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "replayBase": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "reviewerInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["originalPr", "subject", "diff"],
+      "properties": {
+        "originalPr": { "type": "integer", "minimum": 1 },
+        "subject": { "type": "string", "minLength": 1 },
+        "diff": { "type": "string", "minLength": 1 }
+      }
+    },
+    "answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defect", "labels", "correction"],
+      "properties": {
+        "defect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "startLine", "endLine"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "startLine": { "type": "integer", "minimum": 1 },
+            "endLine": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "labels": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "correction": { "type": "string", "minLength": 1 }
+      }
+    },
+    "tracing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "evidenceSufficiency", "replayLimitations", "evidence"],
+      "properties": {
+        "method": { "type": "string", "minLength": 1 },
+        "evidenceSufficiency": { "enum": ["verified"] },
+        "replayLimitations": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "evidence": { "type": "object" }
+      }
+    }
+  }
+}
