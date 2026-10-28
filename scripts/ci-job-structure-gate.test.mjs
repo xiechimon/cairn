@@ -138,3 +138,75 @@ test('a baseline job gone from ci.yml goes red', () => {
   assert.equal(result.status, 1);
   assert.match(result.stdout, /baseline job "closing-keyword-gate" is gone from the workflow/);
 });
+
+test('site deployment applies the project root directory exactly once', () => {
+  const root = resolve(import.meta.dirname, '..');
+  const deployment = readFileSync(join(root, '.github/workflows/site-deploy.yml'), 'utf8');
+  const command = deployment.match(/- run: (npx .+)/)?.[1];
+  assert.ok(command);
+  assert.doesNotMatch(deployment, /working-directory:/);
+  const directory = mkdtempSync(join(tmpdir(), 'site-deploy-'));
+  try {
+    writeFileSync(join(directory, 'npx'), 'printf "%s\\n" "$@" > "$DEPLOY_ARGUMENTS"\n', {
+      mode: 0o755,
+    });
+    const result = spawnSync(
+      'bash',
+      ['-e', '-c', command.replace(/\$\{\{ secrets.VERCEL_TOKEN \}\}/g, 'test-token')],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${directory}:${process.env.PATH}`,
+          DEPLOY_ARGUMENTS: join(directory, 'arguments'),
+        },
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const args = readFileSync(join(directory, 'arguments'), 'utf8').trim().split('\n');
+    const deploy = args.indexOf('deploy');
+    const positionalRoot = args[deploy + 1].startsWith('--') ? '.' : args[deploy + 1];
+    const effectiveRoot = resolve(root, positionalRoot, 'site');
+    assert.equal(effectiveRoot, join(root, 'site'));
+    assert.match(readFileSync(join(effectiveRoot, 'index.html'), 'utf8'), /<!doctype html>/i);
+    const config = JSON.parse(readFileSync(join(effectiveRoot, 'vercel.json'), 'utf8'));
+    assert.equal(config.cleanUrls, true);
+    assert.equal(config.git.deploymentEnabled, false);
+    assert.ok(
+      config.headers.some((entry) =>
+        entry.headers.some(
+          (header) => header.key === 'X-Content-Type-Options' && header.value === 'nosniff',
+        ),
+      ),
+    );
+    for (const flag of ['--prod', '--yes', '--archive=tgz', '--token'])
+      assert.ok(args.includes(flag));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('site deployment limits uploads and retains main-only guarded triggers', () => {
+  const root = resolve(import.meta.dirname, '..');
+  const deployment = readFileSync(join(root, '.github/workflows/site-deploy.yml'), 'utf8');
+  assert.match(deployment, /branches: \[main\]/);
+  assert.match(deployment, /paths: \['site\/\*\*'\]/);
+  assert.doesNotMatch(deployment, /pull_request/);
+  assert.match(deployment, /workflow_dispatch:/);
+  assert.match(deployment, /vars.VERCEL_DEPLOY == 'on'/);
+  assert.match(deployment, /cancel-in-progress: true/);
+  const uploadFilter = deployment.match(/- run: (printf .+ > \.vercelignore)/)?.[1];
+  assert.ok(uploadFilter);
+  const directory = mkdtempSync(join(tmpdir(), 'site-upload-filter-'));
+  try {
+    const result = spawnSync('bash', ['-e', '-c', uploadFilter], {
+      cwd: directory,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(join(directory, '.vercelignore'), 'utf8'), '*\n!site\n!site/**\n');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
