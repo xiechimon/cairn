@@ -186,3 +186,46 @@ test('default human project: split still stops at the parent confirm gate; child
   await page.goto(`${server.base}/app/todo/${split.parentId}`);
   await expect(page.getByText('checker verdict: falls back to human review + project policy is human')).toBeVisible();
 });
+
+test('rejected split proposal stays reviewable, refuses confirmation, and accepts a corrected chief resubmission without losing history', async ({ page }) => {
+  const { teamId, machineToken, implementerId } = await teamStage();
+  const project = await ok<{ id: string }>('POST', '/api/projects', { name: 'split-correction' });
+  await ok('PATCH', `/api/projects/${project.id}`, { splitPolicy: 'auto' });
+  const parent = await ok<{ id: string }>('POST', `/api/projects/${project.id}/todos`, { title: 'correct a rejected split', spec: 'ordinary implementation' });
+  await ok('POST', `/api/teams/${teamId}/chief/threads`, { content: `split ${parent.id}` });
+  const chiefStep = await claimStep(machineToken);
+  expect(chiefStep.kind).toBe('chief');
+  const malformed = await ok<{ text: string }>('POST', `/api/machine/tool/${chiefStep.id}`, {
+    name: 'split_todo', params: { todoId: parent.id, subtodos: [
+      { title: 'First', spec: 'ordinary first task', agentId: 'ghost' },
+      { title: 'Second', spec: 'ordinary second task', agentId: implementerId, blockedBy: [1] },
+    ] },
+  }, machineToken);
+  const rejected = JSON.parse(malformed.text) as { parentBuildId: string; children: { id: string }[]; autoStart: boolean };
+  expect(rejected.children).toEqual([]);
+  expect(rejected.autoStart).toBe(false);
+  expect((await todoOf(parent.id)).phase).toBe('confirm');
+  expect((await ok<TodoWire[]>('GET', '/api/todos')).filter((row) => row.sourceTodo === parent.id)).toEqual([]);
+  const oldPlans = await ok<{ content: string }[]>('GET', `/api/builds/${rejected.parentBuildId}/plans`);
+  expect(oldPlans[0]!.content).toContain('ghost');
+  expect(oldPlans[0]!.content).toContain('split_todo');
+  const confirmation = await fetch(`${server.base}/api/builds/${rejected.parentBuildId}/steps`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'confirm' }) });
+  expect(confirmation.status).toBe(409);
+  expect(await confirmation.text()).toContain('split_todo');
+  await page.goto(`${server.base}/app/todo/${parent.id}`);
+  await expect(page.getByText(/checker verdict: falls back to human review.*ghost/)).toBeVisible();
+  const corrected = await ok<{ text: string }>('POST', `/api/machine/tool/${chiefStep.id}`, {
+    name: 'split_todo', params: { todoId: parent.id, subtodos: [
+      { title: 'First', spec: 'ordinary first task', agentId: implementerId },
+      { title: 'Second', spec: 'ordinary second task', agentId: implementerId, blockedBy: [1] },
+    ] },
+  }, machineToken);
+  const accepted = JSON.parse(corrected.text) as { parentBuildId: string; children: { id: string }[]; autoStart: boolean };
+  expect(accepted.autoStart).toBe(true);
+  expect(accepted.parentBuildId).not.toBe(rejected.parentBuildId);
+  expect((await todoOf(parent.id)).phase).toBe('building');
+  expect((await todoOf(accepted.children[0]!.id)).phase).toBe('queued');
+  expect((await todoOf(accepted.children[1]!.id)).phase).toBe('todo');
+  expect(await ok('GET', `/api/builds/${rejected.parentBuildId}/plans`)).toEqual(oldPlans);
+  await ok('POST', `/api/machine/done/${chiefStep.id}`, { status: 'success' }, machineToken);
+});

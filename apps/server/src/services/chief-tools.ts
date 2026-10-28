@@ -413,7 +413,8 @@ export async function executeChiefTool(
     }
     case 'split_todo': {
       const todoId = str(params, 'todoId');
-      requireTeamTodo(db, todoId, ctx.teamId);
+      const parent = requireTeamTodo(db, todoId, ctx.teamId);
+      const splitPolicy = requireProjectRow(db, parent.projectId, ctx.teamId).splitPolicy;
       const rawSubtodos = params.subtodos;
       if (!Array.isArray(rawSubtodos) || rawSubtodos.length === 0) {
         throw new HttpError(400, 'invalid params.subtodos: expected non-empty array');
@@ -429,7 +430,11 @@ export async function executeChiefTool(
             ? undefined
             : Array.isArray(blockedByRaw)
               ? blockedByRaw.map((n) => {
-                  if (typeof n !== 'number' || !Number.isInteger(n)) {
+                  if (
+                    typeof n !== 'number' ||
+                    !Number.isFinite(n) ||
+                    (splitPolicy === 'human' && !Number.isInteger(n))
+                  ) {
                     throw new HttpError(
                       400,
                       `invalid params.subtodos[${i}].blockedBy: expected integer[]`,
