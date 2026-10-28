@@ -1,0 +1,12 @@
+{
+  "reviewSource": "92dba818de1c2162f4f434f610654ac477a66ba6",
+  "previousBase": "13e751c1b72b7012e6d4a940bc1cbe6a279b9d3c",
+  "currentBase": "928fd93c9ceb896bf83e536166224ef3414a08ec",
+  "mergedTree": "419c1a7466ebffc3881a326b2a6fd23d5e662884",
+  "paths": [
+    ".claude/skills/verify-merge-gate",
+    ".gitignore"
+  ],
+  "patchByteIdentical": true,
+  "patchSha256": "b8b98640e60106e5ecd5f0ed98d58c3bfab772a2f2c03531dcc7d42e1e714bb0"
+}
