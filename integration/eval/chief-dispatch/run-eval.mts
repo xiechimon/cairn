@@ -491,7 +491,9 @@ async function main() {
           rep?: number;
           meta?: { arm?: string };
         };
-        done.add(evalResumeDoneKey(String(r.prompt_id ?? ''), Number(r.rep ?? 0), r.meta?.arm ?? ''));
+        done.add(
+          evalResumeDoneKey(String(r.prompt_id ?? ''), Number(r.rep ?? 0), r.meta?.arm ?? ''),
+        );
       } catch {}
     }
 

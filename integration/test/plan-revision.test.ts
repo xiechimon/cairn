@@ -99,9 +99,7 @@ describe('labeled slice', () => {
   });
 
   test('composite index without column pair fails rev-008', () => {
-    const example = labeled.examples.find(
-      (e) => e.id === 'rev-008-index-without-columns-fails',
-    )!;
+    const example = labeled.examples.find((e) => e.id === 'rev-008-index-without-columns-fails')!;
     const c = byId.get(example.caseId)!;
     const g = gradePlanRevisionCase(c, { evidence: turn(), todos: example.todos });
     expect(g.grade.plan_ok).toBe(0);
