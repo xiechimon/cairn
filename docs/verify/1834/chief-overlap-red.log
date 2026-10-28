@@ -1,0 +1,48 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1848-overlap-repair/cairn
+
+ ❯ |@xiechimon/cairn| test/chief-github-overlaps.test.ts (7 tests | 2 failed) 243ms
+   × chief overlap tool reads complete title/body searches and independent file overlaps without writes 72ms
+   × chief overlap later-page errors cannot return partial success 28ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/chief-github-overlaps.test.ts > chief overlap tool reads complete title/body searches and independent file overlaps without writes
+HttpError: unknown chief tool: github_overlaps
+ ❯ executeChiefTool src/services/chief-tools.ts:907:13
+    905|
+    906|     default:
+    907|       throw new HttpError(400, `unknown chief tool: ${name}`);
+       |             ^
+    908|   }
+    909| }
+ ❯ Object.read test/chief-github-overlaps.test.ts:56:5
+ ❯ test/chief-github-overlaps.test.ts:121:41
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn| test/chief-github-overlaps.test.ts > chief overlap later-page errors cannot return partial success
+AssertionError: expected [] to have a length of 2 but got +0
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ test/chief-github-overlaps.test.ts:178:23
+    176|   );
+    177|   await expect(world.read()).rejects.toThrow();
+    178|   expect(world.calls).toHaveLength(2);
+       |                       ^
+    179| });
+    180|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 5 passed (7)
+   Start at  15:51:57
+   Duration  1.58s (transform 47%, import 37%, tests 16%)
+

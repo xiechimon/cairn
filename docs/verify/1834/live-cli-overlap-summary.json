@@ -1,0 +1,59 @@
+{
+  "scope": "real GitHub lookup through the shared CLI; not a live-model chief turn",
+  "checkedAt": "2026-10-28T08:15:59.128Z",
+  "repo": "xiechimon/cairn",
+  "terms": [
+    "contained push",
+    "non-fast-forward"
+  ],
+  "paths": [
+    "apps/daemon/src/git.ts"
+  ],
+  "reportSha256": "3e97c36904f38a9487e28840ec47e6cbdd345a6c6ccf2d6e2068461c3c630982",
+  "compactReportBytes": 29189,
+  "candidates": {
+    "openIssues": [],
+    "openPulls": [
+      {
+        "number": 2073,
+        "title": "daemon(2047): verify contained pushes against a fresh remote ref",
+        "bodyBytes": 10723,
+        "bodySha256": "da0e0e5df2cfc956bd6b3849d2dc5d27a556e5e0a54fe320c184cafc124a2a4b",
+        "htmlUrl": "https://github.com/xiechimon/cairn/pull/2073"
+      },
+      {
+        "number": 2047,
+        "title": "daemon(git): a rejected push the remote branch already contains counts as pushed",
+        "bodyBytes": 3189,
+        "bodySha256": "d5d56e1755029982697ca43be01a48c58761567934d167929cee653cfac53726",
+        "htmlUrl": "https://github.com/xiechimon/cairn/pull/2047"
+      }
+    ],
+    "recentPulls": [],
+    "filePulls": [
+      {
+        "number": 2073,
+        "title": "daemon(2047): verify contained pushes against a fresh remote ref",
+        "bodyBytes": 10723,
+        "bodySha256": "da0e0e5df2cfc956bd6b3849d2dc5d27a556e5e0a54fe320c184cafc124a2a4b",
+        "htmlUrl": "https://github.com/xiechimon/cairn/pull/2073",
+        "headRef": "codex/2047-reviewed-contained-push",
+        "overlappingFiles": [
+          "apps/daemon/src/git.ts"
+        ]
+      },
+      {
+        "number": 2047,
+        "title": "daemon(git): a rejected push the remote branch already contains counts as pushed",
+        "bodyBytes": 3189,
+        "bodySha256": "d5d56e1755029982697ca43be01a48c58761567934d167929cee653cfac53726",
+        "htmlUrl": "https://github.com/xiechimon/cairn/pull/2047",
+        "headRef": "lane/push-already-contained",
+        "overlappingFiles": [
+          "apps/daemon/src/git.ts"
+        ]
+      }
+    ]
+  },
+  "bodyCaptureMode": "Full runtime body fields are hashed and counted here; this summary does not embed them"
+}

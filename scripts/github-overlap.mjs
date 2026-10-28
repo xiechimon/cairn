@@ -3,44 +3,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
-export async function lookupOverlaps({ repo, terms, paths = [], request, now = new Date() }) {
-  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new Error('Expected --repo owner/name');
-  const words = [...new Set(terms.map((term) => term.trim()).filter(Boolean))];
-  if (!words.length) throw new Error('At least one --term is required');
-  if (paths.some((path) => typeof path !== 'string' || !path.trim()))
-    throw new Error('Each planned path must be non-empty');
-  const since = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10);
-  const query = words.map((term) => `"${term.replace(/["\\]/g, ' ')}"`).join(' OR ');
-  const search = async (scope) =>
-    request(
-      `search/issues?q=${encodeURIComponent(`repo:${repo} ${scope} in:title,body ${query}`)}&per_page=100`,
-    );
-  const openIssues = await search('is:issue is:open');
-  const openPulls = await search('is:pr is:open');
-  const recentPulls = await search(`is:pr is:merged merged:>=${since}`);
-  const filePulls = [];
-  if (paths.length) {
-    const planned = new Set(paths.map((path) => path.replace(/^\.\//, '')));
-    for (const pull of await request(`repos/${repo}/pulls?state=open&per_page=100`)) {
-      const files = await request(`repos/${repo}/pulls/${pull.number}/files?per_page=100`);
-      const overlappingFiles = files
-        .filter((file) => planned.has(file.filename) || planned.has(file.previous_filename))
-        .map((file) => file.filename);
-      if (overlappingFiles.length) filePulls.push({ ...pull, overlappingFiles });
-    }
-  }
-  return {
-    repo,
-    checkedAt: now.toISOString(),
-    since,
-    terms: words,
-    paths,
-    openIssues,
-    openPulls,
-    recentPulls,
-    filePulls,
-  };
-}
+import { lookupOverlaps } from '../packages/shared/src/github-overlap.ts';
+
+export { lookupOverlaps };
 
 export async function resolveOverlap({ report, sameAsk, kind, body, write }) {
   const candidates = [

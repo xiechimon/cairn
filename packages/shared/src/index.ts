@@ -11,6 +11,7 @@ export * from './experience-candidate.js';
 export * from './failure-attribution.js';
 export * from './genai-conventions.js';
 export * from './git-ops.js';
+export * from './github-overlap.js';
 export * from './otel.js';
 export * from './phase.js';
 export * from './protocol/index.js';

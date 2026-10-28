@@ -1,0 +1,26 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1848-overlap-repair/cairn
+
+ ❯ |@xiechimon/cairn| test/chief-github-overlaps.test.ts (8 tests | 1 failed | 7 skipped) 52ms
+   × chief overlap rejects oversized third-party bodies instead of returning a partial report 52ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/chief-github-overlaps.test.ts > chief overlap rejects oversized third-party bodies instead of returning a partial report
+AssertionError: expected null to be an instance of Error
+ ❯ test/chief-github-overlaps.test.ts:190:19
+    188|   }));
+    189|   const failure = await world.read({ paths: [] }).then(() => null, (er…
+    190|   expect(failure).toBeInstanceOf(Error);
+       |                   ^
+    191|   expect(String(failure)).toMatch(/64 KiB/);
+    192| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  16:05:18
+   Duration  1.45s (transform 54%, import 41%, tests 4%)
+

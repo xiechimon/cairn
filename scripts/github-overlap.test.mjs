@@ -55,7 +55,7 @@ test('lookup errors stop creation rather than reporting no overlaps', async () =
   );
 });
 
-test('duplicate ask eval: a rephrased request extends the existing item without creating an issue', async () => {
+test('an explicit same-ask target extends the existing item without creating an issue', async () => {
   const writes = [];
   const report = {
     openIssues: [{ number: 1786, title: 'Retry transient push failures' }],

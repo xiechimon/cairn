@@ -2,6 +2,7 @@ import {
   GITHUB_READ_PER_PAGE_MAX,
   githubIssueSourceRef,
   githubReadToolParamsSchemas,
+  lookupOverlaps,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -14,6 +15,7 @@ import {
   githubListPulls,
   githubListWorkflowRuns,
 } from '../lib/github.js';
+import { githubOverlapItems } from '../lib/github-overlap.js';
 import { githubRepoOfProject } from './git.js';
 import { teamGithubToken } from './github-connection.js';
 import type { GithubIssueFaceDeps } from './github-issues.js';
@@ -157,6 +159,20 @@ export async function executeGithubReadTool(
   const fetchImpl = deps.githubFetch ?? fetch;
   const timeoutMs = GITHUB_READ_TIMEOUT_MS;
   switch (name) {
+    case 'github_overlaps': {
+      const p = parseWith(githubReadToolParamsSchemas.github_overlaps, params, 'params');
+      const t = await openTarget(deps, teamId, p.projectId);
+      const signal = AbortSignal.timeout(8_000);
+      const report = await lookupOverlaps({
+        repo: t.slug,
+        terms: p.terms,
+        paths: p.paths,
+        request: (path) => githubOverlapItems(fetchImpl, t.token, path, signal),
+      });
+      if (Buffer.byteLength(JSON.stringify(report), 'utf8') > 64 * 1024)
+        throw new HttpError(413, 'GitHub overlap report exceeds 64 KiB; narrow the lookup');
+      return { ...report, projectId: p.projectId, untrusted: true };
+    }
     case 'issues': {
       const p = parseWith(githubReadToolParamsSchemas.issues, params, 'params');
       const t = await openTarget(deps, teamId, p.projectId);

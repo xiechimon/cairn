@@ -1,0 +1,84 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1848-overlap-repair/cairn
+
+ ❯ |@cairn/shared| test/chief-tools.test.ts (17 tests | 3 failed) 12ms
+   ❯ 52-item vocabulary (7)
+     × raw key set is exactly 49; live vocabulary = raw - removals + additions = 52 4ms
+     × vocabulary key set = raw key set - removal registry + addition registry (no other add/remove/rename) 1ms
+     × groups = 16 read + 20 organize + 5 execute + 11 private 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/shared| test/chief-tools.test.ts > 52-item vocabulary > raw key set is exactly 49; live vocabulary = raw - removals + additions = 52
+AssertionError: expected 53 to be 52 // Object.is equality
+
+- Expected
++ Received
+
+- 52
++ 53
+
+ ❯ test/chief-tools.test.ts:85:30
+     83|   it('raw key set is exactly 49; live vocabulary = raw - removals + ad…
+     84|     expect(rawKeys).toHaveLength(49);
+     85|     expect(CHIEF_TOOL_COUNT).toBe(52);
+       |                              ^
+     86|     expect(CHIEF_TOOL_COUNT).toBe(rawKeys.length - removed.length + ad…
+     87|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@cairn/shared| test/chief-tools.test.ts > 52-item vocabulary > vocabulary key set = raw key set - removal registry + addition registry (no other add/remove/rename)
+AssertionError: expected [ 'agents', 'ask_user', …(51) ] to deeply equal [ 'agents', 'ask_user', …(50) ]
+
+- Expected
++ Received
+
+@@ -16,10 +16,11 @@
+    "delete_agents",
+    "delete_memory",
+    "delete_secrets",
+    "delete_todos",
+    "docs",
++   "github_overlaps",
+    "issues",
+    "machines",
+    "mcp_servers",
+    "memories",
+    "merge_builds",
+
+ ❯ test/chief-tools.test.ts:90:30
+     88|
+     89|   it('vocabulary key set = raw key set - removal registry + addition r…
+     90|     expect(CHIEF_TOOL_NAMES).toEqual(expected);
+       |                              ^
+     91|     expect(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort()).toEqual(expec…
+     92|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@cairn/shared| test/chief-tools.test.ts > 52-item vocabulary > groups = 16 read + 20 organize + 5 execute + 11 private
+AssertionError: expected [ Array(17) ] to have a length of 16 but got 17
+
+- Expected
++ Received
+
+- 16
++ 17
+
+ ❯ test/chief-tools.test.ts:116:40
+    114|
+    115|   it('groups = 16 read + 20 organize + 5 execute + 11 private', () => {
+    116|     expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(16);
+       |                                        ^
+    117|     expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(20);
+    118|     expect(CHIEF_TOOL_CATEGORIES.execute).toHaveLength(5);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 14 passed (17)
+   Start at  16:00:30
+   Duration  386ms (transform 65%, import 31%, tests 4%, worker 1%)
+

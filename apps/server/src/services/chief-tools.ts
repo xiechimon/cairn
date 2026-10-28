@@ -382,6 +382,7 @@ export async function executeChiefTool(
     case 'issues':
     case 'pull_requests':
     case 'workflow_runs':
+    case 'github_overlaps':
       return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {
       const attachmentId = str(params, 'attachmentId');

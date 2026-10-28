@@ -1,0 +1,40 @@
+✔ searches titles and bodies with alternative terms and includes same-file PRs (2.142ms)
+✔ lookup errors stop creation rather than reporting no overlaps (0.303416ms)
+✔ an explicit same-ask target extends the existing item without creating an issue (0.149042ms)
+✔ an existing same-ask PR also extends its discussion, and unknown references fail closed (0.108916ms)
+✔ empty planned paths fail before querying GitHub instead of hiding file overlaps (0.093208ms)
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'rename'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'preserve'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'independent'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to branch 'lane'
+✔ names the merged PR and its removed line, and accepts an explicit reference only (357.896667ms)
+✔ unchanged added lines and commits outside the base interval do not fail (246.382791ms)
+✔ tracks a renamed file and distinguishes identical lines by position (362.472042ms)
+✔ renaming protected lines without removing them passes (307.508708ms)
+✔ independent edits in a stale branch preserve the upstream addition through Git merge (385.930958ms)
+✔ an unresolved merge conflict cannot certify the absence of silent reverts (142.651125ms)
+✔ the CLI detects an upstream deletion introduced by resolving a merge into the lane (1243.217167ms)
+✔ setup-node without pnpm installed is rejected (0.506167ms)
+✔ an earlier pnpm setup or package-manager-cache false is accepted (0.112083ms)
+✔ committed workflows install pnpm before setup-node caches it (3.604625ms)
+✔ a removed line beginning with two dashes is content, not a patch header (304.224167ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3407.997042

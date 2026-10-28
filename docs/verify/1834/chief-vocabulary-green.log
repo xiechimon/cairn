@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1848-overlap-repair/cairn
+
+
+ Test Files  2 passed (2)
+      Tests  21 passed (21)
+   Start at  16:01:09
+   Duration  1.55s (transform 56%, import 32%, tests 12%)
+

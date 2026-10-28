@@ -1,0 +1,20 @@
+{
+  "checkoutHead": "8253c5cf200c678045e2740b93ea0dc8e21d0f1e",
+  "sourceHasUncommittedChanges": true,
+  "deliveryComplete": false,
+  "files": {
+    "apps/server/src/lib/github-overlap.ts": "f2651605c9a3c5738e977ab5ffbdc0338ca5ae3f7a5ba4a3843fa1a97a150232",
+    "apps/server/src/services/chief.ts": "b8f7759953e62ea3ce17545b12c425233e49df4e9afa108345e0aaa59e005879",
+    "apps/server/src/services/chief-tools.ts": "193bc0759c984bbd4f5344956e5a0ac7b038f2c8dbc8cbfbc05272267003d017",
+    "apps/server/src/services/github-reads.ts": "a316a1289a3338a3ecd7b2c47abb977abce642c1a9cc6a86dbc1eae2c381f927",
+    "apps/server/test/chief-github-overlaps.test.ts": "a8edcfc3aa9f5849d8821a44b6eedd1d6bf161c328b2d2007abadc46ec8ae83c",
+    "apps/server/test/chief-overlap-claim.test.ts": "2b9517f3eff4392e5e7b74fd2c7d0c4edfed7774e64a39a2f5d362b6738d6a05",
+    "packages/shared/src/github-overlap.ts": "aa0c12b558cb7550377e60ccd7c0fa24edadbe09702d203636a4b918f8fe0c0d",
+    "packages/shared/src/records/prompts.ts": "67f973c0c5c2e771d5884db72bdf42ced42e18d7cc8eb296c209ab55b6856088",
+    "packages/shared/src/protocol/chief-tools.ts": "50350e13694cc268089da7f91136e65ba385386ae0aac02404cbf4c38cf77713",
+    "packages/shared/src/index.ts": "e53da956a31759c9e3d6b1deaed862996231e9b550df49c01e868b00614131be",
+    "packages/shared/test/chief-tools.test.ts": "7610f8cf3821e8f5f0d4599b5b370c85530a9419069418c9407f0377ed512e86",
+    "scripts/github-overlap.mjs": "e2478e9cd3bbb4c0f717f0b4ce53f309f80e2a8f24821b45114c1f58c3cffc3e",
+    "scripts/github-overlap.test.mjs": "ff62b367bdd691746ddf6050412f4f0061f7853642707b0941659d3f62d93bd1"
+  }
+}

@@ -71,7 +71,7 @@ const RAW_TOOL_DEF_HASH_KEYS = [
   'workflow_runs',
 ];
 
-describe('52-item vocabulary', () => {
+describe('53-item vocabulary', () => {
   const rawKeys: string[] = RAW_TOOL_DEF_HASH_KEYS;
   const removed: readonly string[] = CHIEF_TOOLS_REMOVED;
   const added: readonly string[] = CHIEF_TOOLS_ADDED;
@@ -80,9 +80,9 @@ describe('52-item vocabulary', () => {
     ...added,
   ].sort();
 
-  it('raw key set is exactly 49; live vocabulary = raw - removals + additions = 52', () => {
+  it('raw key set is exactly 49; live vocabulary = raw - removals + additions = 53', () => {
     expect(rawKeys).toHaveLength(49);
-    expect(CHIEF_TOOL_COUNT).toBe(52);
+    expect(CHIEF_TOOL_COUNT).toBe(53);
     expect(CHIEF_TOOL_COUNT).toBe(rawKeys.length - removed.length + added.length);
   });
 
@@ -91,7 +91,7 @@ describe('52-item vocabulary', () => {
     expect(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort()).toEqual(expected);
   });
 
-  it('removal registry = delete_skills + set_remote_shell; addition registry = create_skill + update_skill + models + split_todo + update_memory', () => {
+  it('removal registry = delete_skills + set_remote_shell; addition registry = create_skill + update_skill + models + split_todo + update_memory + github_overlaps', () => {
     expect(removed).toEqual(['delete_skills', 'set_remote_shell']);
     expect(added).toEqual([
       'create_skill',
@@ -99,6 +99,7 @@ describe('52-item vocabulary', () => {
       'models',
       'split_todo',
       'update_memory',
+      'github_overlaps',
     ]);
     expect(CHIEF_TOOL_CATEGORIES.organize).toContain('split_todo');
     expect(CHIEF_REMOTE_TOOLS.find((t) => t.name === 'split_todo')).toBeDefined();
@@ -112,8 +113,8 @@ describe('52-item vocabulary', () => {
     }
   });
 
-  it('groups = 16 read + 20 organize + 5 execute + 11 private', () => {
-    expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(16);
+  it('groups = 17 read + 20 organize + 5 execute + 11 private', () => {
+    expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(17);
     expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(20);
     expect(CHIEF_TOOL_CATEGORIES.execute).toHaveLength(5);
     expect(CHIEF_TOOL_CATEGORIES.private).toHaveLength(11);
