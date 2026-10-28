@@ -1,0 +1,14 @@
+{
+  "sourceCommit": "8e8db4859aac50f6977e6c11c7dd634c373074fb",
+  "files": {
+    "completion.txt": "b3a80ed001d4f680ea5bd3d18002890f992a7a8e21c4182bd019048e6b29b8dd",
+    "deepseek-v4.1-flash/input-manifest.json": "4a4f50a1589b33d8afe08bb68a82b40b4e8fa86b79fb49625e82c8db0c2d055b",
+    "deepseek-v4.1-flash/no-memory/_state.json": "c367cdda290169e8de3d1524084f6433214b3744a98bf6bc5b31d42533d422df",
+    "deepseek-v4.1-flash/no-memory/baseline/results.jsonl": "968da8c7ca2000a0a8573a22c4fd6fbf21375d02c35dd16ffe80afa0575c9cbe",
+    "deepseek-v4.1-flash/no-memory/cases.json": "c5da396e6d3e888358727a7ded50e96d89cb0fe9cb57e46d08fec9706fe33dd0",
+    "deepseek-v4.1-flash/with-memory/_state.json": "c367cdda290169e8de3d1524084f6433214b3744a98bf6bc5b31d42533d422df",
+    "deepseek-v4.1-flash/with-memory/baseline/results.jsonl": "943783d4cbc40448d18f3d97e828dfe3a1a9273aea77ea5526b606aa737c64dc",
+    "deepseek-v4.1-flash/with-memory/cases.json": "328a2b5459f53af0760a982abadd823bc67a3eea528990c7f75cf6c006336b39",
+    "sampling-limit.json": "6f641dcbdf02beecbe7bde45398d00816f59b6296a5bf2e75bc1790086d97a2a"
+  }
+}

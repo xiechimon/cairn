@@ -1,0 +1,20 @@
+{
+  "sourceCommit": "8e8db4859aac50f6977e6c11c7dd634c373074fb",
+  "requestedModel": "deepseek-v4.1-flash",
+  "providerMode": "real",
+  "contextWindow": 1000000,
+  "files": {
+    "cases.json": "328a2b5459f53af0760a982abadd823bc67a3eea528990c7f75cf6c006336b39",
+    "_state.json": "973d84c6e81fb6bae0cc7c11ef324cfdae6fb5a62cadcc0f03681aee84bbd387"
+  },
+  "armInputs": {
+    "with-memory": {
+      "cases.json": "328a2b5459f53af0760a982abadd823bc67a3eea528990c7f75cf6c006336b39",
+      "_state.json": "973d84c6e81fb6bae0cc7c11ef324cfdae6fb5a62cadcc0f03681aee84bbd387"
+    },
+    "no-memory": {
+      "cases.json": "c5da396e6d3e888358727a7ded50e96d89cb0fe9cb57e46d08fec9706fe33dd0",
+      "_state.json": "973d84c6e81fb6bae0cc7c11ef324cfdae6fb5a62cadcc0f03681aee84bbd387"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "purpose": "one additional unchanged irrelevant-case replication",
+  "selectedCases": [
+    "i01",
+    "i02",
+    "i03",
+    "i04",
+    "i05",
+    "i06"
+  ],
+  "arms": [
+    "with-memory",
+    "no-memory"
+  ],
+  "maximumRequestedTurns": 12,
+  "repetitions": 1,
+  "changesToCasesOrGrading": false
+}
