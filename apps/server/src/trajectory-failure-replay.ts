@@ -118,11 +118,13 @@ export function confirmCandidatesByTraceIds(
   completedTraceIds: ReadonlySet<string>,
   traceIdOfBuild: (buildId: string) => string,
 ): FailureReplayCandidate[] {
-  return candidates.map((candidate) =>
-    completedTraceIds.has(traceIdOfBuild(candidate.buildId))
-      ? failureReplayCandidateSchema.parse({ ...candidate, status: 'confirmed' })
-      : candidate,
-  );
+  return candidates.map((candidate) => {
+    if (candidate.status === 'dismissed') return candidate;
+    const confirmed = completedTraceIds.has(traceIdOfBuild(candidate.buildId));
+    const nextStatus = confirmed ? 'confirmed' : 'pending';
+    if (candidate.status === nextStatus) return candidate;
+    return failureReplayCandidateSchema.parse({ ...candidate, status: nextStatus });
+  });
 }
 
 export interface MaterializeOptions {

@@ -13,6 +13,7 @@ import {
 } from '@cairn/shared';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
+  confirmCandidatesByTraceIds,
   draftAssertionsFromFeedback,
   failureReplayCandidateId,
   generateFailureReplayCandidates,
@@ -243,6 +244,51 @@ test('enqueue posts TRACE items to the Langfuse annotation queue and never touch
   expect(readdirSync(bank)).toEqual([]);
 });
 
+test('confirmCandidatesByTraceIds treats missing confirmation as not confirmed', () => {
+  const pending = failureReplayCandidateSchema.parse({
+    id: failureReplayCandidateId('build-plan', 'plan-rejection'),
+    event: 'plan-rejection',
+    buildId: 'build-plan',
+    baseSha: 'sha-plan',
+    prompt: { spec: 'Task plan', baseSha: 'sha-plan' },
+    feedback: 'Missing step',
+    draftAssertions: ['must include the missing step'],
+    status: 'pending',
+    createdAt: 1,
+  });
+  const forgedConfirmed = failureReplayCandidateSchema.parse({
+    id: failureReplayCandidateId('build-forged', 'review-blocking'),
+    event: 'review-blocking',
+    buildId: 'build-forged',
+    baseSha: 'sha-forged',
+    prompt: { spec: 'Task forged', baseSha: 'sha-forged' },
+    feedback: 'Auth missing',
+    draftAssertions: ['new routes must enforce auth'],
+    status: 'confirmed',
+    createdAt: 1,
+  });
+  const dismissed = failureReplayCandidateSchema.parse({
+    id: failureReplayCandidateId('build-dismissed', 'plan-rejection'),
+    event: 'plan-rejection',
+    buildId: 'build-dismissed',
+    baseSha: 'sha-dismissed',
+    prompt: { spec: 'Task dismissed', baseSha: 'sha-dismissed' },
+    feedback: 'not actionable',
+    draftAssertions: ['must stay dismissed'],
+    status: 'dismissed',
+    createdAt: 1,
+  });
+  const completedOnly = new Set([otlpTraceIdOfBuild('build-dismissed')]);
+  const updated = confirmCandidatesByTraceIds(
+    [pending, forgedConfirmed, dismissed],
+    completedOnly,
+    otlpTraceIdOfBuild,
+  );
+  expect(updated.find((row) => row.id === pending.id)?.status).toBe('pending');
+  expect(updated.find((row) => row.id === forgedConfirmed.id)?.status).toBe('pending');
+  expect(updated.find((row) => row.id === dismissed.id)?.status).toBe('dismissed');
+});
+
 test('intake promotes only COMPLETED queue items into the bank', async () => {
   const bank = mkdtempSync(join(tmpdir(), 'cairn-fr-bank-'));
   dirs.push(bank);
@@ -268,7 +314,30 @@ test('intake promotes only COMPLETED queue items into the bank', async () => {
     status: 'pending',
     createdAt: 1,
   });
+  const forgedConfirmed = failureReplayCandidateSchema.parse({
+    id: failureReplayCandidateId('build-forged', 'review-blocking'),
+    event: 'review-blocking',
+    buildId: 'build-forged',
+    baseSha: 'sha-forged',
+    prompt: { spec: 'Task forged', baseSha: 'sha-forged' },
+    feedback: 'Auth missing',
+    draftAssertions: ['new routes must enforce auth'],
+    status: 'confirmed',
+    createdAt: 1,
+  });
+  const dismissedCompleted = failureReplayCandidateSchema.parse({
+    id: failureReplayCandidateId('build-dismissed', 'plan-rejection'),
+    event: 'plan-rejection',
+    buildId: 'build-dismissed',
+    baseSha: 'sha-dismissed',
+    prompt: { spec: 'Task dismissed', baseSha: 'sha-dismissed' },
+    feedback: 'not actionable',
+    draftAssertions: ['must stay dismissed'],
+    status: 'dismissed',
+    createdAt: 1,
+  });
   const completedTraceId = otlpTraceIdOfBuild('build-revert');
+  const dismissedTraceId = otlpTraceIdOfBuild('build-dismissed');
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     res.statusCode = 200;
     res.setHeader('content-type', 'application/json');
@@ -288,8 +357,17 @@ test('intake promotes only COMPLETED queue items into the bank', async () => {
               createdAt: '2026-10-28T00:00:00.000Z',
               updatedAt: '2026-10-28T00:00:00.000Z',
             },
+            {
+              id: 'item-dismissed-completed',
+              queueId: 'queue-fr',
+              objectId: dismissedTraceId,
+              objectType: 'TRACE',
+              status: 'COMPLETED',
+              createdAt: '2026-10-28T00:00:00.000Z',
+              updatedAt: '2026-10-28T00:00:00.000Z',
+            },
           ],
-          meta: { page: 1, limit: 50, totalItems: 1, totalPages: 1 },
+          meta: { page: 1, limit: 50, totalItems: 2, totalPages: 1 },
         }),
       );
       return;
@@ -307,19 +385,26 @@ test('intake promotes only COMPLETED queue items into the bank', async () => {
     CAIRN_LANGFUSE_ANNOTATION_QUEUE_ID: 'queue-fr',
   });
   const completed = await listCompletedFailureReplayItems(target);
-  expect(completed.map((item) => item.objectId)).toEqual([completedTraceId]);
-  const confirmed = [pendingPlan, pendingRevert].map((candidate) =>
-    completed.some((item) => item.objectId === otlpTraceIdOfBuild(candidate.buildId))
-      ? { ...candidate, status: 'confirmed' as const }
-      : candidate,
+  expect(completed.map((item) => item.objectId).sort()).toEqual(
+    [completedTraceId, dismissedTraceId].sort(),
   );
+  const confirmed = confirmCandidatesByTraceIds(
+    [pendingPlan, pendingRevert, forgedConfirmed, dismissedCompleted],
+    new Set(completed.map((item) => item.objectId)),
+    otlpTraceIdOfBuild,
+  );
+  expect(confirmed.find((row) => row.id === pendingPlan.id)?.status).toBe('pending');
+  expect(confirmed.find((row) => row.id === pendingRevert.id)?.status).toBe('confirmed');
+  expect(confirmed.find((row) => row.id === forgedConfirmed.id)?.status).toBe('pending');
+  expect(confirmed.find((row) => row.id === dismissedCompleted.id)?.status).toBe('dismissed');
   const written = materializeConfirmedBankCases(confirmed, bank, { now: () => 77 });
   expect(written).toHaveLength(1);
   expect(written[0]?.id).toBe(pendingRevert.id);
   expect(existsSync(join(bank, 'cases', `${pendingPlan.id}.json`))).toBe(false);
+  expect(existsSync(join(bank, 'cases', `${forgedConfirmed.id}.json`))).toBe(false);
+  expect(existsSync(join(bank, 'cases', `${dismissedCompleted.id}.json`))).toBe(false);
   expect(existsSync(join(bank, 'cases', `${pendingRevert.id}.json`))).toBe(true);
 });
-
 test('draftAssertionsFromFeedback turns human feedback into executable check stubs', () => {
   expect(draftAssertionsFromFeedback('Auth check is missing on the new route')).toEqual([
     'must satisfy reviewer feedback: Auth check is missing on the new route',

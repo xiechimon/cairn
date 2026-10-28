@@ -12,26 +12,6 @@
     "reason": "local environment race: default-head-moved vs worktree-dirty under parallel prepush"
   },
   {
-    "file": "apps/daemon/test/tag-tool.test.ts",
-    "reason": "Local environment red (git annotated-tag timeouts under load); same on main under vitest --changed"
-  },
-  {
-    "file": "apps/daemon/test/git.test.ts",
-    "reason": "Local environment red (git fixture timeouts under load); same on main under vitest --changed"
-  },
-  {
-    "file": "apps/daemon/test/sync.test.ts",
-    "reason": "Local environment red (git sync timeouts under load); same on main under vitest --changed"
-  },
-  {
-    "file": "apps/daemon/test/workspace.test.ts",
-    "reason": "Local environment red (git workspace timeouts under load); same on main under vitest --changed"
-  },
-  {
-    "file": "apps/daemon/test/runner-local.test.ts",
-    "reason": "Local environment flake under vitest --changed load (passes alone; timeouts under concurrent git fixtures); same on this VM against main"
-  },
-  {
     "file": "integration/test/g2t2-local-lifecycle.test.ts",
     "reason": "local environment: autonomous landing stays in review when an alternate checkout races"
   },
