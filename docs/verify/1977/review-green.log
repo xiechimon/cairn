@@ -1,0 +1,34 @@
+✔ concurrent claims, repeated requests and restarts dispatch one worker per digest (96.753643ms)
+✔ lost dispatch acknowledgment never retries and recovers completion after restart (70.748014ms)
+✔ worker-failed is durable and requires human attention (45.425878ms)
+✔ worker-unavailable is durable and requires human attention (43.786501ms)
+✔ budget-refused is durable and requires human attention (44.470284ms)
+✔ deadline expiry survives restart and rejects late completion (45.576433ms)
+✔ new digests supersede old authorization while evidence-only heads reuse attempts (48.573299ms)
+✔ publication rejection is terminal and cannot be retried (66.54829ms)
+✔ deadline and supersession are rechecked after an in-flight poll (43.542496ms)
+✔ poll failures and unknown dispatches eventually time out without another paid run (42.137752ms)
+✔ independent processes atomically claim one durable attempt (139.349607ms)
+✔ process death during claim-crash never repeats dispatch or publication (136.428361ms)
+✔ process death during publish-crash never repeats dispatch or publication (113.195053ms)
+✔ attempt storage must survive reopening and deadlines must be representable (43.239023ms)
+✔ repeated running polls retain the original deadline and dispatch identity (47.568055ms)
+✔ dispatch worker-failed is terminal before polling (41.573814ms)
+✔ dispatch worker-unavailable is terminal before polling (40.765506ms)
+✔ dispatch budget-refused is terminal before polling (49.565008ms)
+✔ deadline during dispatch revokes late acknowledgment and completion (41.065693ms)
+✔ supersession during dispatch revokes late acknowledgment and completion (45.793253ms)
+✔ a process killed after durable claim and before dispatch never launches on restart (104.866254ms)
+✔ ordinary Promise-returning publishers cannot enter the publication boundary (35.436522ms)
+✔ completion authenticates worker identity and fences late callbacks (69.640643ms)
+✔ direct completion rejects deadline after a restart (42.920173ms)
+✔ direct completion rejects supersession after a restart (47.65859ms)
+✔ publication waits for command completion and rejects commands that exceed their deadline (67.669352ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1962.260116
