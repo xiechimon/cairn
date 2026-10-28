@@ -33,6 +33,13 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
+import {
+  currentDeviceSubscription,
+  ensureNotificationPermission,
+  pushDeviceSupported,
+  subscribeDevicePush,
+  unsubscribeDevicePush,
+} from '../pwa/push-device.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { FeishuSettings } from './feishu-settings.js';
 
@@ -79,6 +86,19 @@ export function AccountPage() {
   );
   const notifyOn = notifyPref === null ? permission === 'granted' : notifyPref === 'on';
   const notifyBlocked = notifyOn && permission === 'denied';
+  const devicePushLive = live && teamId !== undefined && pushDeviceSupported();
+  const [deviceSubscribed, setDeviceSubscribed] = useState<boolean | null>(null);
+  const [devicePushFailed, setDevicePushFailed] = useState(false);
+  useEffect(() => {
+    if (!devicePushLive) return;
+    let cancelled = false;
+    void currentDeviceSubscription().then((sub) => {
+      if (!cancelled) setDeviceSubscribed(sub !== null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [devicePushLive]);
   return (
     <PageShell route="account" fixture={fixture} selected="none" title={t('账号')}>
       <div className="flex flex-col gap-6">
@@ -157,6 +177,45 @@ export function AccountPage() {
               }}
             />
           </SettingsRow>
+          {devicePushLive && (
+            <SettingsRow
+              label={t('在这台设备上接收推送')}
+              hint={
+                devicePushFailed
+                  ? t('浏览器已拒绝通知权限，需到站点设置重新允许')
+                  : t('需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到')
+              }
+              hintClassName={devicePushFailed ? 'account-notify-blocked' : undefined}
+            >
+              <Switch
+                aria-label={t('在这台设备上接收推送')}
+                checked={deviceSubscribed === true}
+                disabled={deviceSubscribed === null}
+                onCheckedChange={(checked) => {
+                  if (teamId === undefined) return;
+                  setDevicePushFailed(false);
+                  void (async () => {
+                    try {
+                      if (checked) {
+                        if ((await ensureNotificationPermission()) !== 'granted') {
+                          setDevicePushFailed(true);
+                          return;
+                        }
+                        await subscribeDevicePush(teamId);
+                        setDeviceSubscribed(true);
+                      } else {
+                        await unsubscribeDevicePush(teamId);
+                        setDeviceSubscribed(false);
+                      }
+                    } catch (error) {
+                      setDevicePushFailed(true);
+                      toastError(t('保存失败，请重试。'), error);
+                    }
+                  })();
+                }}
+              />
+            </SettingsRow>
+          )}
         </SettingsCard>
         {live && team !== undefined && (
           <SettingsCard>

@@ -1,0 +1,32 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1686
+
+ ❯ |@xiechimon/cairn| test/schema.test.ts (5 tests | 1 failed) 93ms
+   ❯ the 37-table migration (the 01 §6 list) (4)
+     × upgrades a database already migrated through the previous main migration 35ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/schema.test.ts > the 37-table migration (the 01 §6 list) > upgrades a database already migrated through the previous main migration
+SqliteError: no such table: push_subscription
+ ❯ Database.prepare ../../node_modules/.pnpm/better-sqlite3@13.0.3/node_modules/better-sqlite3/lib/methods/wrappers.js:5:21
+ ❯ BetterSQLiteSession.prepareQuery ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/src/better-sqlite3/session.ts:60:28
+ ❯ BetterSQLiteSession.prepareOneTimeQuery ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/src/sqlite-core/session.ts:250:15
+ ❯ SQLiteSelectBase._prepare ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/src/sqlite-core/query-builders/select.ts:916:85
+ ❯ SQLiteSelectBase.all ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+better-sqlite3@9.6.0_better-sqlite3@13.0.3/node_modules/src/sqlite-core/query-builders/select.ts:950:15
+ ❯ test/schema.test.ts:49:54
+     47|     db.run(sql`DELETE FROM __drizzle_migrations WHERE created_at = ${p…
+     48|     migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+     49|     expect(db.select().from(schema.pushSubscription).all()).toEqual([]…
+       |                                                      ^
+     50|     expect(db.select().from(schema.pushDigestItem).all()).toEqual([]);
+     51|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  12:55:50
+   Duration  711ms (import 50%, transform 35%, tests 15%)
+

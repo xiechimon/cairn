@@ -189,7 +189,7 @@
   },
   "cli-tests-that-spawn-subprocesses-hand-wrote-timeouts-case-by": {
     "Intercepts": 1,
-    "Recurrences": 0
+    "Recurrences": 1
   },
   "click-contract-misses-integration": {
     "Intercepts": 1,
@@ -259,7 +259,19 @@
     "Intercepts": 3,
     "Recurrences": 1
   },
+  "decision-text-truncated": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "detached-new-branch-ref": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "digest-deletes-unsent-events": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "digest-overlap": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -524,6 +536,10 @@
     "Recurrences": 1
   },
   "merged-translation-key-collision": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "migration-timestamp-skipped": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -952,6 +968,10 @@
     "Recurrences": 0
   },
   "use-optional-chain": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "verification-command-context": {
     "Intercepts": 1,
     "Recurrences": 0
   },

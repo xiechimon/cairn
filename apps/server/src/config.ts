@@ -21,6 +21,30 @@ export const serverConfigSchema = z.object({
   skillsDir: z.string(),
   dbPath: z.string(),
   keyfilePath: z.string(),
+  vapidKeysPath: z.string(),
+  vapidSubject: z.string().refine((value) => {
+    if (/^mailto:[^@\s]+@[^@\s]+$/.test(value)) return true;
+    try {
+      return new URL(value).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }),
+  webOrigin: z
+    .string()
+    .url()
+    .refine((value) => {
+      const url = new URL(value);
+      return (
+        url.protocol === 'https:' &&
+        url.username === '' &&
+        url.password === '' &&
+        url.pathname === '/' &&
+        url.search === '' &&
+        url.hash === ''
+      );
+    })
+    .transform((value) => new URL(value).origin),
   pingIntervalMs: z.number().int().positive(),
   claimHoldMs: z.number().int().positive(),
   schedulerTickMs: z.number().int().positive(),
@@ -33,6 +57,10 @@ export const serverConfigSchema = z.object({
   mcpConfigPath: z.string(),
   issueIntake: z.boolean(),
   trajectoryOutcomeBackfill: z.boolean(),
+  pushDigestTimes: z
+    .array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/))
+    .length(2)
+    .refine((times) => times[0] !== times[1]),
 });
 export type ServerConfig = z.infer<typeof serverConfigSchema>;
 
@@ -108,6 +136,9 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     skillsDir,
     dbPath: join(dataDir, 'server.db'),
     keyfilePath: join(dataDir, 'secretbox.key'),
+    vapidKeysPath: join(dataDir, 'vapid.json'),
+    vapidSubject: envStr('CAIRN_VAPID_SUBJECT') ?? 'mailto:push@cairn.dev',
+    webOrigin: envStr('CAIRN_WEB_ORIGIN') ?? 'https://cairn.local',
     pingIntervalMs: TEAM_STREAM_PING_INTERVAL_MS,
     claimHoldMs: CLAIM_POLL_INTERVAL_MS,
     schedulerTickMs: 15_000,
@@ -128,6 +159,11 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     ),
     issueIntake: envFlag(ENV_VARS.issueIntake),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
+    pushDigestTimes: (() => {
+      const raw = envStr('CAIRN_PUSH_DIGEST_TIMES');
+      if (raw === null) return ['09:00', '18:00'];
+      return raw.split(',').map((slot) => slot.trim());
+    })(),
     ...overrides,
   });
 }

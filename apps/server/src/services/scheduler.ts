@@ -40,11 +40,13 @@ import { sweepStaleMachines } from './machines.js';
 import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
+import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
 import { computeNextRunAt, dueSchedules, isRecurring, updateNextRunAt } from './schedules.js';
 
 export interface SchedulerOptions {
   tickMs: number;
+  pushDigestTimes?: readonly string[];
 }
 
 export interface CiPollRun {
@@ -116,6 +118,8 @@ export function createScheduler(
   exportRun?: TrajectoryExportRun | null,
 ): Scheduler {
   let timer: NodeJS.Timeout | null = null;
+  const lastDigestRun = new Map<string, number>();
+  let digestSweeping = false;
   const ciPoller =
     ci !== undefined && ci !== null
       ? createCiPoller(deps, { githubFetch: ci.githubFetch, logger: ci.logger })
@@ -208,6 +212,22 @@ export function createScheduler(
     sweepPlanAutoConfirm(deps, now);
     sweepQuotaWaitSteps(deps, now);
     void sweepFailedRetries(deps).catch(() => {});
+    const digestTimes = opts.pushDigestTimes ?? [];
+    if (digestTimes.length > 0 && !digestSweeping) {
+      const due = digestSlotsDue(now, digestTimes, lastDigestRun);
+      if (due.length > 0) {
+        for (const slot of due) {
+          const at = digestSlotDueAt(now, slot);
+          if (at !== null) lastDigestRun.set(slot, at);
+        }
+        digestSweeping = true;
+        void sweepPushDigest(deps.db, deps.vapidKeys ?? null)
+          .catch(() => {})
+          .finally(() => {
+            digestSweeping = false;
+          });
+      }
+    }
     if (
       gc !== undefined &&
       gc !== null &&

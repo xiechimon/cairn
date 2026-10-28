@@ -38,6 +38,8 @@ export const DB_TABLES = [
   'build_outcome_backfill',
   'memory_save_conflict',
   'memory_candidate',
+  'push_subscription',
+  'push_digest_item',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -62,4 +64,6 @@ export const INTERNAL_ONLY_TABLES = [
   'build_outcome_backfill',
   'memory_save_conflict',
   'memory_candidate',
+  'push_subscription',
+  'push_digest_item',
 ] as const;

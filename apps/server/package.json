@@ -28,13 +28,15 @@
     "db:check": "node scripts/db-check.mjs"
   },
   "dependencies": {
-    "better-sqlite3": "13.0.3"
+    "better-sqlite3": "13.0.3",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@cairn/shared": "workspace:*",
     "@hono/node-server": "2.1.1",
     "@modelcontextprotocol/sdk": "1.30.0",
-    "@cairn/shared": "workspace:*",
     "@types/better-sqlite3": "9.6.0",
+    "@types/web-push": "^3.6.4",
     "cron-parser": "5.10.1",
     "diff": "catalog:",
     "drizzle-kit": "0.31.10",

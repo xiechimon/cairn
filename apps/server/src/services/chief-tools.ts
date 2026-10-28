@@ -52,6 +52,7 @@ import {
 import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { getModelSources } from './providers.js';
+import type { VapidKeys } from './push.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
@@ -66,6 +67,7 @@ export interface ChiefToolDeps {
   machineHub?: MachineWakeHub;
   box: SecretBox;
   user: UserRecord;
+  vapidKeys?: VapidKeys | null;
   convHub?: ConversationStreamHub;
   reposDir: string;
   attachmentsDir: string;
@@ -195,6 +197,7 @@ export async function executeChiefTool(
     hub: deps.hub,
     machineHub: deps.machineHub,
     user: deps.user,
+    vapidKeys: deps.vapidKeys,
     box: deps.box,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
@@ -458,7 +461,14 @@ export async function executeChiefTool(
         };
       });
       const result = createSplitTodo(
-        { db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user, convHub: deps.convHub },
+        {
+          db,
+          hub: deps.hub,
+          machineHub: deps.machineHub,
+          user: deps.user,
+          vapidKeys: deps.vapidKeys,
+          convHub: deps.convHub,
+        },
         {
           parentId: todoId,
           subtodos,
@@ -738,7 +748,13 @@ export async function executeChiefTool(
       const started: unknown[] = [];
       for (const { todoId, row, projectName } of targets) {
         const builds = startBuilds(
-          { db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+          {
+            db,
+            hub: deps.hub,
+            machineHub: deps.machineHub,
+            user: deps.user,
+            vapidKeys: deps.vapidKeys,
+          },
           {
             projectId: row.projectId,
             todoIds: [todoId],
@@ -792,6 +808,7 @@ export async function executeChiefTool(
           db,
           hub: deps.hub,
           user: deps.user,
+          vapidKeys: deps.vapidKeys,
           ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
         },
         {
@@ -928,7 +945,10 @@ export async function executeChiefTool(
 
 export type TransitionActor = { kind: 'user' | 'agent'; name: string };
 
-export type TransitionDeps = Pick<ChiefToolDeps, 'db' | 'hub' | 'machineHub' | 'user' | 'convHub'>;
+export type TransitionDeps = Pick<
+  ChiefToolDeps,
+  'db' | 'hub' | 'machineHub' | 'user' | 'vapidKeys' | 'convHub'
+>;
 
 export function transitionTodos(
   deps: TransitionDeps,
@@ -942,6 +962,7 @@ export function transitionTodos(
     hub: deps.hub,
     machineHub: deps.machineHub,
     user: deps.user,
+    vapidKeys: deps.vapidKeys,
     convHub: deps.convHub,
   };
   const transitioned: string[] = [];
@@ -980,7 +1001,13 @@ export function transitionTodos(
         }
         if (to === 'done' && owned.phase !== 'done') {
           advanceSplitWaves(
-            { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+            {
+              db: deps.db,
+              hub: deps.hub,
+              machineHub: deps.machineHub,
+              user: deps.user,
+              vapidKeys: deps.vapidKeys,
+            },
             id,
           );
         }
@@ -1000,6 +1027,7 @@ function buildDeps(deps: ChiefToolDeps) {
     hub: deps.hub,
     machineHub: deps.machineHub,
     user: deps.user,
+    vapidKeys: deps.vapidKeys,
     convHub: deps.convHub,
     reposDir: deps.reposDir,
     box: deps.box,

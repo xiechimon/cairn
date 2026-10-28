@@ -7,6 +7,7 @@ import { registerCoreRoutes } from './routes-core.js';
 import { registerFeishuRoutes } from './routes-feishu.js';
 import { registerGitHostingRoutes } from './routes-git-hosting.js';
 import { registerProjectRoutes } from './routes-projects.js';
+import { registerPushRoutes } from './routes-push.js';
 import { registerResourceRoutes } from './routes-resources.js';
 import { registerTodoRoutes } from './routes-todos.js';
 import { registerUploadRoutes } from './routes-uploads.js';
@@ -23,6 +24,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerAgentRoutes(app, ctx);
   registerResourceRoutes(app, ctx);
   registerGitHostingRoutes(app, ctx);
+  registerPushRoutes(app, ctx);
 
   app.post('/api/analytics/first-touch', () => new Response(null, { status: 204 }));
   app.post('/_mp/api/track', () => new Response(null, { status: 204 }));
@@ -35,6 +37,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
         machineHub: ctx.machineHub,
         box: ctx.secretBox,
         user: ctx.user,
+        vapidKeys: ctx.vapidKeys,
         reposDir: ctx.reposDir,
         attachmentsDir: ctx.attachmentsDir,
         mcpConfigPath: ctx.mcpConfigPath,

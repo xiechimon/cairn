@@ -119,6 +119,7 @@ import { githubGatePort } from './merge-gate-github.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { projectMergeConfigOf } from './projects.js';
+import { queuePushDigest, type VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
@@ -137,6 +138,7 @@ export interface BuildDeps {
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
   user: UserRecord;
+  vapidKeys?: VapidKeys | null;
   convHub?: ConversationStreamHub;
   reposDir?: string;
   box?: SecretBox;
@@ -2384,6 +2386,19 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
   });
   advanceSplitWaves(deps, todoId);
   emitRuntimeBuildSpan(deps.db, buildId, 'done');
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
+  if (todoRow !== undefined) {
+    const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+    queuePushDigest(deps.db, deps.user.id, todoRow.teamId, {
+      title: 'PR 已合并',
+      body:
+        buildRow?.prNumber != null
+          ? `PR #${buildRow.prNumber} 已合并：#${todoRow.seqNum} ${todoRow.title}`
+          : `#${todoRow.seqNum} ${todoRow.title}`,
+      href: `/app/todo/${todoId}`,
+      tag: `${deps.user.id}:${todoId}`,
+    });
+  }
   markFirstPrPromptDue(deps.db, buildId);
 }
 

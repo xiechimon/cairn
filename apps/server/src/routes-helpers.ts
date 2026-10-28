@@ -151,6 +151,7 @@ export function svcOf(ctx: AppContext) {
     hub: ctx.hub,
     machineHub: ctx.machineHub,
     user: ctx.user,
+    vapidKeys: ctx.vapidKeys,
     convHub: ctx.convHub,
     reposDir: ctx.reposDir,
     attachmentsDir: ctx.attachmentsDir,

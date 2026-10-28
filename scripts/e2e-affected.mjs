@@ -219,7 +219,10 @@ const FILE_RULES = new Map([
   ['apps/web/src/board/app-sidebar.tsx', SIDEBAR],
   ['apps/web/src/routes/board-page.tsx', BOARD],
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
-  ['apps/web/src/routes/account-page.tsx', ['account-', 'user-menu-', 'cds-density']],
+  [
+    'apps/web/src/routes/account-page.tsx',
+    ['account-', 'user-menu-', 'cds-density', 'push-device-switch'],
+  ],
   ['apps/web/src/routes/feishu-settings.tsx', ['account-feishu']],
   ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
@@ -267,7 +270,7 @@ const DIR_RULES = [
   { prefix: 'apps/web/src/pages/', specs: PAGES },
   { prefix: 'apps/web/src/resources/', specs: RESOURCES },
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },
-  { prefix: 'apps/web/src/pwa/', specs: ['notify-'] },
+  { prefix: 'apps/web/src/pwa/', specs: ['notify-', 'push-device-switch'] },
   { prefix: 'apps/web/test/', specs: [] },
 ];
 

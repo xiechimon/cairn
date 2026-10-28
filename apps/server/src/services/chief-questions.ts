@@ -17,12 +17,14 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { notifyChiefMessage } from './notifications.js';
+import { pushToUserSafely, type VapidKeys } from './push.js';
 
 export interface ChiefQuestionDeps {
   db: Db;
   hub?: TeamStreamHub;
   convHub?: ConversationStreamHub;
   user?: UserRecord;
+  vapidKeys?: VapidKeys | null;
 }
 
 export const ASK_HOLD_MS = 70_000;
@@ -137,6 +139,18 @@ export function createOrGetQuestion(
           : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),
       },
     );
+  }
+  if (deps.user !== undefined && deps.vapidKeys != null) {
+    const questionLines = input.questions.map((q) => {
+      const options = q.options.map((o) => o.label).join(' / ');
+      return options.length > 0 ? `${q.question}（${options}）` : q.question;
+    });
+    pushToUserSafely(deps.db, deps.vapidKeys ?? null, deps.user.id, threadRow?.teamId ?? '', {
+      title: '需要你决定',
+      body: questionLines.join('\n'),
+      href: `/app?chief=${encodeURIComponent(input.threadId)}`,
+      tag: `${deps.user.id}:${input.requestId}`,
+    });
   }
   return { content, created: true };
 }

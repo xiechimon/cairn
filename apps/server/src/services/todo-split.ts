@@ -8,6 +8,7 @@ import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { mergedCatalogModels } from './model-liveness.js';
+import type { VapidKeys } from './push.js';
 import {
   canResubmitRejectedSplit,
   REJECTED_SPLIT_PROPOSAL_PREFIX,
@@ -34,6 +35,7 @@ export interface SplitDeps {
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
   user: UserRecord;
+  vapidKeys?: VapidKeys | null;
   convHub?: ConversationStreamHub;
 }
 
@@ -171,7 +173,13 @@ export function createSplitTodo(
   if (!rejectedProposal) {
     for (const item of items) {
       const record = createTodo(
-        { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+        {
+          db: deps.db,
+          hub: deps.hub,
+          machineHub: deps.machineHub,
+          user: deps.user,
+          vapidKeys: deps.vapidKeys,
+        },
         {
           teamId: parent.teamId,
           projectId: parent.projectId,
@@ -265,7 +273,13 @@ export function createSplitTodo(
     .get();
   const autoStart = splitPolicy === 'auto' && checkerPassed;
   setTodoPhase(
-    { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+    {
+      db: deps.db,
+      hub: deps.hub,
+      machineHub: deps.machineHub,
+      user: deps.user,
+      vapidKeys: deps.vapidKeys,
+    },
     parent.id,
     'confirm',
     {
@@ -279,7 +293,13 @@ export function createSplitTodo(
   );
   if (autoStart) {
     setTodoPhase(
-      { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+      {
+        db: deps.db,
+        hub: deps.hub,
+        machineHub: deps.machineHub,
+        user: deps.user,
+        vapidKeys: deps.vapidKeys,
+      },
       parent.id,
       'building',
       { lastRunAt: nowMs() },

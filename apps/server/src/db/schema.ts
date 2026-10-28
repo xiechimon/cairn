@@ -389,6 +389,30 @@ export const memoryCandidate = sqliteTable(
   (t) => [index('memory_candidate_scope_idx').on(t.agentId, t.teamId, t.projectId)],
 );
 
+export const pushSubscription = sqliteTable(
+  'push_subscription',
+  {
+    id: text('id').primaryKey(),
+    userId: text('userId').notNull(),
+    teamId: text('teamId').notNull(),
+    endpoint: text('endpoint').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [uniqueIndex('push_subscription_endpoint_unique').on(t.endpoint)],
+);
+
+export const pushDigestItem = sqliteTable('push_digest_item', {
+  id: text('id').primaryKey(),
+  userId: text('userId').notNull(),
+  teamId: text('teamId').notNull(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  href: text('href').notNull(),
+  createdAt: epochMs('createdAt').notNull(),
+});
+
 export const skillAudit = sqliteTable('skill_audit', {
   id: text('id').primaryKey(),
   skillId: text('skillId').notNull(),
