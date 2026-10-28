@@ -1,0 +1,27 @@
+✖ prepush-vitest run directly queues for a slot and only starts vitest once the holder exits (15055.014417ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15102.679167
+
+✖ failing tests:
+
+test at scripts/heavy-slots.test.mjs:578:1
+✖ prepush-vitest run directly queues for a slot and only starts vitest once the holder exits (15055.014417ms)
+  AssertionError [ERR_ASSERTION]: /queued, position 1/ never appeared on err: FAKE-VITEST-RAN
+  
+      at until (file:///private/tmp/cairn-1703-negative/scripts/heavy-slots.test.mjs:72:14)
+      at async TestContext.<anonymous> (file:///private/tmp/cairn-1703-negative/scripts/heavy-slots.test.mjs:588:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }

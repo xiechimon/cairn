@@ -1,0 +1,53 @@
+✔ prose flags Chinese outside code spans, fences and HTML comments (6.492667ms)
+✔ code checks comments only; UI strings and exempt paths pass (1.829959ms)
+✔ diff mode reds added Chinese lines and Chinese commit messages only (718.434ms)
+✔ --text checks a PR body file (61.5935ms)
+✔ slot count defaults to 2 and falls back to 1 with a warning for bad values (2.606459ms)
+✔ CI environments skip the queue (0.133916ms)
+✔ each slot owns its own e2e port and build directory (1.311625ms)
+✔ slotPortHolder names the pid, cwd and command of whatever listens on the port (200.547875ms)
+✔ a bad slot count gets a warning and a single slot (85.16325ms)
+✔ waiters see their queue position and are served first-come first-served (380.706084ms)
+✔ kill -9 on the holder frees the slot for the queued process within 5 seconds (335.441417ms)
+✔ a clean exit releases the slot too (337.57525ms)
+✔ simultaneous grabs for the last slot: exactly one wins, every round (15171.536291ms)
+✔ simultaneous reclaim of one dead holder: exactly one process inherits the slot (15543.400333ms)
+✔ two killed holders and several waiters: stale entries are reclaimed without double grants (1905.252709ms)
+✔ run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass (1885.269958ms)
+✔ a run wrapper inside a holder reuses its slot instead of queueing behind itself (440.525541ms)
+✔ an inherited slot variable that no live process holds is ignored (91.731167ms)
+✔ an inherited slot whose lock belongs to someone else is not reused (85.700084ms)
+✔ CI skips the queue even when every slot is taken (168.030417ms)
+✔ run wrapper passes the exit code through and frees the slot (131.43ms)
+✔ e2e:affected queues for a slot, but a dry run never waits (183.548458ms)
+✔ e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit (518.424583ms)
+✔ a squatted slot port fails e2e:affected before playwright and names the holding process (345.779958ms)
+✔ prepush-vitest run directly queues for a slot and only starts vitest once the holder exits (609.519334ms)
+✔ prepush-vitest reuses the lease inherited from pnpm prepush without queueing (276.591708ms)
+✔ prepush queues for a slot in local mode and starts once the holder is killed (743.359208ms)
+✔ prepush reports a squatted slot port before running any check (244.71ms)
+[prepush] git init -q
+✔ documentation skips code checks, unknown paths fail closed (3.253625ms)
+✔ changes to prepush scripts run the CI self-test files locally (1.341917ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.169ms)
+✔ local code checks include both UI gates and affected e2e (0.108125ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.392667ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.102125ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (11.43275ms)
+✔ affected e2e gets only code paths, so a bulk evidence prune fits on the command line (4.355584ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (136.675ms)
+✔ a board card source change selects the spec that reads its title (33.534334ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.42025ms)
+✔ CLI skips real document changes and rejects a missing base (955.332291ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (1010.243042ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (412.178292ms)
+✔ prepush vitest only forgives files listed as known local red (0.701916ms)
+✔ plan children do not inherit the git hook repository binding (50.75375ms)
+ℹ tests 44
+ℹ suites 0
+ℹ pass 44
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39760.053917
