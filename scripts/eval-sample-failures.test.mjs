@@ -49,8 +49,17 @@ test('weekly CLI stratifies failures, blinds packs, preserves reviews and report
       '35',
     );
     assert.equal(sampled.status, 0, sampled.stderr);
+    const sampledOut = JSON.parse(sampled.stdout);
+    assert.equal(sampledOut.available.packs, 35);
+    assert.equal(sampledOut.traces.hit, 2);
+    assert.equal(sampledOut.traces.miss, 2);
+    assert.ok(sampledOut.traces.hit > 0);
+    assert.ok(sampledOut.available.packs > 0);
     const path = join(root, '.claude/hillclimb/reviews/2026-11-16/review.json');
     const review = JSON.parse(readFileSync(path, 'utf8'));
+    assert.equal(review.available.packs, 35);
+    assert.equal(review.available.traces.hit, 2);
+    assert.equal(review.available.traces.miss, 2);
     assert.equal(review.items.filter((r) => r.kind === 'trial').length, 4);
     assert.equal(review.items.filter((r) => r.kind === 'pack').length, 35);
     assert.ok(!JSON.stringify(review).includes('secret-model'));

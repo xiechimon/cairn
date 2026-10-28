@@ -1,0 +1,11 @@
+node --test scripts/eval-sample-failures.test.mjs scripts/eval-weekly-ops.test.mjs: 5 passed (green.log)
+bash -n scripts/ops/eval-weekly.sh: passed (bash-n.log)
+same-day re-run simulation: exit 0 before flows (same-day-rerun.log)
+labeler unset: exit 1 named message (labeler-unset.log)
+fixture packs/traces: packs=35 traces hit=2 miss=2 (fixture-packs-traces.log)
+pnpm lint: passed
+pnpm typecheck: passed
+node scripts/english-only-gate.mjs: 0
+node scripts/comment-discipline-gate.mjs: 0
+node scripts/single-use-helper-gate.mjs: 0
+node scripts/lessons-ledger-gate.mjs: passed

@@ -1,0 +1,3 @@
+pnpm lint: passed (1 info, 0 warnings after template-curly fix)
+pnpm typecheck: passed
+english-only / comment-discipline / single-use-helper / lessons-ledger: passed

@@ -1,0 +1,85 @@
+TAP version 13
+# Subtest: same-day re-run exits before flows when the review directory already exists
+not ok 1 - same-day re-run exits before flows when the review directory already exists
+  ---
+  duration_ms: 9.576255
+  type: 'test'
+  location: '/workspace/scripts/eval-weekly-ops.test.mjs:37:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    fatal: not a git repository (or any of the parent directories): .git
+    
+    
+    128 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 128
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scripts/eval-weekly-ops.test.mjs:48:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: labeler environment unset fails before a zero-pack review
+not ok 2 - labeler environment unset fails before a zero-pack review
+  ---
+  duration_ms: 7.073892
+  type: 'test'
+  location: '/workspace/scripts/eval-weekly-ops.test.mjs:57:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /labeler environment is unset/. Input:
+    
+    'fatal: not a git repository (or any of the parent directories): .git\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    fatal: not a git repository (or any of the parent directories): .git
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scripts/eval-weekly-ops.test.mjs:62:12)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: weekly script exports packs by default and echoes sampler trace hit counts
+not ok 3 - weekly script exports packs by default and echoes sampler trace hit counts
+  ---
+  duration_ms: 0.257668
+  type: 'test'
+  location: '/workspace/scripts/eval-weekly-ops.test.mjs:72:1'
+  failureType: 'testCodeFailure'
+  error: 'same-day review message missing'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scripts/eval-weekly-ops.test.mjs:81:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 0
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 66.863003
