@@ -1,0 +1,9 @@
+{
+  "baseCommit": "13e751c1b72b7012e6d4a940bc1cbe6a279b9d3c",
+  "originalPullRequestHead": "77aa4c8618a51ca52f1a209c7fa9419bad3bceb1",
+  "files": {
+    "packages/shared/src/records/plan.ts": "3ccfed8f05e45d09b7642ef7eb648298b6e910919c05391bd36f1bd8b907cd74",
+    "packages/shared/test/plan-contract.test.ts": "af9891fa0ca7ee545dd73792040473be7eebed28504e90dbd97f258139dabbf3",
+    "packages/shared/test/fixtures/plan2006-verification.md": "be178fe0e759696f11d5d2365e698215c39526b48a0e8645ad872a394145e69e"
+  }
+}

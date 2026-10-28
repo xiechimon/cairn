@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { checkPlanContract, planVerificationItems } from '../src/records/plan.js';
 import plan1606Verification from './fixtures/plan1606-verification.md?raw';
+import plan2006Verification from './fixtures/plan2006-verification.md?raw';
 
 const GOOD = [
   'Kind: fix',
@@ -202,6 +203,52 @@ describe('checkPlanContract indented fence inside a list item (#1728)', () => {
   });
 });
 
+describe('checkPlanContract bold-labeled checks without a list (#2006)', () => {
+  test('the real plan from #2006 passes with one item per bold label', () => {
+    const r = checkPlanContract(`Kind: fix\n${plan2006Verification}`);
+    expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+    if (r.ok) {
+      expect(r.items).toHaveLength(9);
+      expect(r.items[0]).toMatch(/^\*\*V0/);
+      expect(r.items[0]).toContain('Expected at planning time');
+    }
+  });
+
+  test('a label owns its fence and the prose after it; intro prose before the first label is not an item', () => {
+    const r = checkPlanContract(
+      [
+        'Kind: fix',
+        '## Verification',
+        'All commands run at the repo root.',
+        '',
+        '**V0 — lint:**',
+        '',
+        '```sh',
+        'pnpm lint',
+        '```',
+        '',
+        'Expected: exit 0.',
+        '',
+        '**V1 — tests:** `pnpm exec vitest run packages/shared/test/plan-contract.test.ts` passes',
+      ].join('\n'),
+    );
+    expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+    if (r.ok) {
+      expect(r.items).toHaveLength(2);
+      expect(r.items[0]).toContain('pnpm lint');
+      expect(r.items[0]).toContain('Expected: exit 0.');
+    }
+  });
+
+  test('a label with only prose and no check is still rejected', () => {
+    const r = checkPlanContract(
+      'Kind: fix\n## Verification\n**V0 — sanity:**\n\nLooks right after the change.\n\n**V1:** `pnpm lint` passes\n',
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.problem).toContain('第 1 项');
+  });
+});
+
 describe('planVerificationItems (checklist input for the verify step)', () => {
   test('valid plan returns the checklist; invalid or no section returns empty array (old plans not backfilled)', () => {
     expect(planVerificationItems(GOOD)).toHaveLength(3);
@@ -392,5 +439,49 @@ describe('vague words inside a nested code block', () => {
       '   Assert: no output.',
     ].join('\n');
     expect(checkPlanContract(plan)).toMatchObject({ ok: true });
+  });
+});
+
+describe('heading-labeled Verification checks retain their content (#2038)', () => {
+  for (const level of [3, 4, 5, 6]) {
+    const heading = '#'.repeat(level);
+    test(`level ${level} retains an inline command`, () => {
+      const item = `${heading} Lint: \`pnpm lint\` passes`;
+      expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`)).toEqual({
+        ok: true,
+        items: [item],
+      });
+    });
+
+    test(`level ${level} owns its fenced command and expected result`, () => {
+      const item = `${heading} Lint\n\`\`\`sh\npnpm lint\n\`\`\`\nExpected: exit 0.`;
+      expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`)).toEqual({
+        ok: true,
+        items: [item],
+      });
+    });
+  }
+
+  test('a prose-only heading is still rejected before a valid heading', () => {
+    const result = checkPlanContract(
+      'Kind: fix\n## Verification\n### Visual check\nLooks right.\n### Lint: `pnpm lint` passes\n',
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.problem).toContain('第 1 项');
+  });
+
+  test('headings inside a fence remain command text', () => {
+    const item = '### Script\n```sh\npnpm lint\n### Command text\n```';
+    expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`)).toEqual({
+      ok: true,
+      items: [item],
+    });
+  });
+
+  test('a known plan section still ends heading-labeled Verification', () => {
+    const item = '### Lint: `pnpm lint` passes';
+    expect(
+      checkPlanContract(`Kind: fix\n## Verification\n${item}\n### Edge cases\nLooks right.\n`),
+    ).toEqual({ ok: true, items: [item] });
   });
 });

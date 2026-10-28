@@ -1,0 +1,334 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-2038-heading-repair/cairn
+
+ ❯ |@cairn/shared| test/plan-contract.test.ts (49 tests | 12 failed) 15ms
+   ❯ checkPlanContract bold-labeled checks without a list (#2006) (3)
+     × the real plan from #2006 passes with one item per bold label 3ms
+     × a label owns its fence and the prose after it; intro prose before the first label is not an item 0ms
+   ❯ heading-labeled Verification checks retain their content (#2038) (11)
+     × level 3 retains an inline command 1ms
+     × level 3 owns its fenced command and expected result 0ms
+     × level 4 retains an inline command 0ms
+     × level 4 owns its fenced command and expected result 0ms
+     × level 5 retains an inline command 0ms
+     × level 5 owns its fenced command and expected result 0ms
+     × level 6 retains an inline command 0ms
+     × level 6 owns its fenced command and expected result 0ms
+     × headings inside a fence remain command text 0ms
+     × a known plan section still ends heading-labeled Verification 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > checkPlanContract bold-labeled checks without a list (#2006) > the real plan from #2006 passes with one item per bold label
+AssertionError: Verification 第 1 项、第 2 项、第 3 项、第 8 项、第 9 项、第 12 项、第 13 项、第 15 项、第 18 项、第 19 项、第 23 项、第 26 项、第 27 项、第 30 项、第 38 项、第 40 项没有可执行的检查（要写命令、测试文件路径或可断言的结果）: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/plan-contract.test.ts:209:42
+    207|   test('the real plan from #2006 passes with one item per bold label',…
+    208|     const r = checkPlanContract(`Kind: fix\n${plan2006Verification}`);
+    209|     expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+       |                                          ^
+    210|     if (r.ok) {
+    211|       expect(r.items).toHaveLength(9);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > checkPlanContract bold-labeled checks without a list (#2006) > a label owns its fence and the prose after it; intro prose before the first label is not an item
+AssertionError: Verification 第 1 项、第 2 项、第 4 项没有可执行的检查（要写命令、测试文件路径或可断言的结果）: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/plan-contract.test.ts:235:42
+    233|       ].join('\n'),
+    234|     );
+    235|     expect(r.ok, !r.ok ? r.problem : '').toBe(true);
+       |                                          ^
+    236|     if (r.ok) {
+    237|       expect(r.items).toHaveLength(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > heading-labeled Verification checks retain their content (#2038) > level 3 retains an inline command
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: true, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "items": [
+-     "### Lint: `pnpm lint` passes",
+-   ],
+-   "ok": true,
++   "ok": false,
++   "problem": "Verification 小节为空",
+  }
+
+ ❯ test/plan-contract.test.ts:451:74
+    449|     test(`level ${level} retains an inline command`, () => {
+    450|       const item = `${heading} Lint: \`pnpm lint\` passes`;
+    451|       expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`…
+       |                                                                          ^
+    452|         ok: true,
+    453|         items: [item],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > heading-labeled Verification checks retain their content (#2038) > level 3 owns its fenced command and expected result
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: true, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "items": [
+-     "### Lint
+- ```sh
+- pnpm lint
+- ```
+- Expected: exit 0.",
+-   ],
+-   "ok": true,
++   "ok": false,
++   "problem": "Verification 第 2 项没有可执行的检查（要写命令、测试文件路径或可断言的结果）",
+  }
+
+ ❯ test/plan-contract.test.ts:459:74
+    457|     test(`level ${level} owns its fenced command and expected result`,…
+    458|       const item = `${heading} Lint\n\`\`\`sh\npnpm lint\n\`\`\`\nExpe…
+    459|       expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`…
+       |                                                                          ^
+    460|         ok: true,
+    461|         items: [item],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > heading-labeled Verification checks retain their content (#2038) > level 4 retains an inline command
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: true, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "items": [
+-     "#### Lint: `pnpm lint` passes",
+-   ],
+-   "ok": true,
++   "ok": false,
++   "problem": "Verification 小节为空",
+  }
+
+ ❯ test/plan-contract.test.ts:451:74
+    449|     test(`level ${level} retains an inline command`, () => {
+    450|       const item = `${heading} Lint: \`pnpm lint\` passes`;
+    451|       expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`…
+       |                                                                          ^
+    452|         ok: true,
+    453|         items: [item],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > heading-labeled Verification checks retain their content (#2038) > level 4 owns its fenced command and expected result
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: true, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "items": [
+-     "#### Lint
+- ```sh
+- pnpm lint
+- ```
+- Expected: exit 0.",
+-   ],
+-   "ok": true,
++   "ok": false,
++   "problem": "Verification 第 2 项没有可执行的检查（要写命令、测试文件路径或可断言的结果）",
+  }
+
+ ❯ test/plan-contract.test.ts:459:74
+    457|     test(`level ${level} owns its fenced command and expected result`,…
+    458|       const item = `${heading} Lint\n\`\`\`sh\npnpm lint\n\`\`\`\nExpe…
+    459|       expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`…
+       |                                                                          ^
+    460|         ok: true,
+    461|         items: [item],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > heading-labeled Verification checks retain their content (#2038) > level 5 retains an inline command
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: true, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "items": [
+-     "##### Lint: `pnpm lint` passes",
+-   ],
+-   "ok": true,
++   "ok": false,
++   "problem": "Verification 小节为空",
+  }
+
+ ❯ test/plan-contract.test.ts:451:74
+    449|     test(`level ${level} retains an inline command`, () => {
+    450|       const item = `${heading} Lint: \`pnpm lint\` passes`;
+    451|       expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`…
+       |                                                                          ^
+    452|         ok: true,
+    453|         items: [item],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > heading-labeled Verification checks retain their content (#2038) > level 5 owns its fenced command and expected result
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: true, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "items": [
+-     "##### Lint
+- ```sh
+- pnpm lint
+- ```
+- Expected: exit 0.",
+-   ],
+-   "ok": true,
++   "ok": false,
++   "problem": "Verification 第 2 项没有可执行的检查（要写命令、测试文件路径或可断言的结果）",
+  }
+
+ ❯ test/plan-contract.test.ts:459:74
+    457|     test(`level ${level} owns its fenced command and expected result`,…
+    458|       const item = `${heading} Lint\n\`\`\`sh\npnpm lint\n\`\`\`\nExpe…
+    459|       expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`…
+       |                                                                          ^
+    460|         ok: true,
+    461|         items: [item],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > heading-labeled Verification checks retain their content (#2038) > level 6 retains an inline command
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: true, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "items": [
+-     "###### Lint: `pnpm lint` passes",
+-   ],
+-   "ok": true,
++   "ok": false,
++   "problem": "Verification 小节为空",
+  }
+
+ ❯ test/plan-contract.test.ts:451:74
+    449|     test(`level ${level} retains an inline command`, () => {
+    450|       const item = `${heading} Lint: \`pnpm lint\` passes`;
+    451|       expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`…
+       |                                                                          ^
+    452|         ok: true,
+    453|         items: [item],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > heading-labeled Verification checks retain their content (#2038) > level 6 owns its fenced command and expected result
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: true, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "items": [
+-     "###### Lint
+- ```sh
+- pnpm lint
+- ```
+- Expected: exit 0.",
+-   ],
+-   "ok": true,
++   "ok": false,
++   "problem": "Verification 第 2 项没有可执行的检查（要写命令、测试文件路径或可断言的结果）",
+  }
+
+ ❯ test/plan-contract.test.ts:459:74
+    457|     test(`level ${level} owns its fenced command and expected result`,…
+    458|       const item = `${heading} Lint\n\`\`\`sh\npnpm lint\n\`\`\`\nExpe…
+    459|       expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`…
+       |                                                                          ^
+    460|         ok: true,
+    461|         items: [item],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > heading-labeled Verification checks retain their content (#2038) > headings inside a fence remain command text
+AssertionError: expected { ok: true, …(1) } to deeply equal { ok: true, …(1) }
+
+- Expected
++ Received
+
+@@ -1,9 +1,8 @@
+  {
+    "items": [
+-     "### Script
+- ```sh
++     "```sh
+  pnpm lint
+  ### Command text
+  ```",
+    ],
+    "ok": true,
+
+ ❯ test/plan-contract.test.ts:476:72
+    474|   test('headings inside a fence remain command text', () => {
+    475|     const item = '### Script\n```sh\npnpm lint\n### Command text\n```';
+    476|     expect(checkPlanContract(`Kind: fix\n## Verification\n${item}\n`))…
+       |                                                                        ^
+    477|       ok: true,
+    478|       items: [item],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯
+
+ FAIL  |@cairn/shared| test/plan-contract.test.ts > heading-labeled Verification checks retain their content (#2038) > a known plan section still ends heading-labeled Verification
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: true, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "items": [
+-     "### Lint: `pnpm lint` passes",
+-   ],
+-   "ok": true,
++   "ok": false,
++   "problem": "Verification 小节为空",
+  }
+
+ ❯ test/plan-contract.test.ts:486:7
+    484|     expect(
+    485|       checkPlanContract(`Kind: fix\n## Verification\n${item}\n### Edge…
+    486|     ).toEqual({ ok: true, items: [item] });
+       |       ^
+    487|   });
+    488| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  12 failed | 37 passed (49)
+   Start at  12:37:55
+   Duration  228ms (import 52%, transform 33%, tests 13%, worker 2%)
+
