@@ -12,7 +12,7 @@ Good:
 
 Bad:
 - The original PR advertises heading labels, but section extraction discards them before the label splitter can see them. Ten regression cases fail against its exact source. The corrected source passes all 49 contract tests.
-- The broad affected run is tracked separately. It must not be reported as green solely because the focused contract tests pass.
+- The broad affected run reports 4,738 passed, two failed and one skipped. Both failed files are already registered in `scripts/prepush-known-red.json`; the exact failure output is retained in `affected-run.log`. This is not a claim that every affected test passes locally.
 
 Ugly:
 - No new credential, authentication, dispatch, persistence or dependency behavior is introduced. Plan verification lists feed server build acceptance and retry lessons, so compatibility of existing list and plain-prose forms matters.
