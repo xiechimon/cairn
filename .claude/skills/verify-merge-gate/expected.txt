@@ -1,0 +1,25 @@
+# config-name expected-result [counterexample action sequence, comma separated]
+# PASS = TLC must find no error; FAIL = TLC must report the config's own last INVARIANT
+# on exactly these actions. See SKILL.md, "Properties" and "Prove the check can fail".
+
+# P1 / P2: the GitHub merge path (MergeGate.tla)
+P1_MergeBoundToJudgedPatch PASS
+P2_StaleVerdictNeverSatisfies PASS
+
+# P1 / P2 negative controls: the binding dropped, mirroring pre-ADR-0021-D3 code.
+# P1N and P2N drop the patch-digest binding (a verdict on any patch satisfies the gate).
+P1N_UnboundVerdicts FAIL RecordVerdict,PushCode,RecordVerdict,RecordVerdict,Evaluate,ExecuteMergeGithub
+P2N_UnboundVerdicts FAIL RecordVerdict,PushCode,RecordVerdict,RecordVerdict,Evaluate
+# P1H drops only the review-head binding (independent review on an older head counts).
+P1H_UnboundReviewHead FAIL RecordVerdict,RecordVerdict,RecordVerdict,Evaluate,ExecuteMergeGithub
+# P4 drops the digest re-check between evaluate and merge. Today's merge path
+# (builds.ts) has neither the re-check nor the evaluation: F1 and F3 in SKILL.md.
+P4_MergeRechecksDigest FAIL RecordVerdict,RecordVerdict,RecordVerdict,Evaluate,BaseMoveInteracting,ExecuteMergeGithub
+
+# P3: the local landing path (LocalLanding.tla)
+P3_LocalLandingBindsJudgedPatch PASS
+
+# P3 negative controls: each of the three re-checks dropped in turn.
+P3A_NoLandingRecheck FAIL JudgeLocalPatch,LocalPatchChange,CreateCommit,DecideLocalMerge,LandLocal
+P3B_NoFfCheck FAIL JudgeLocalPatch,CreateCommit,DecideLocalMerge,LocalBaseMove,LandLocal
+P3C_NoBaseRecheck FAIL JudgeLocalPatch,LocalBaseMove,CreateCommit,DecideLocalMerge,LandLocal
