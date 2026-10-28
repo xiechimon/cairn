@@ -1,0 +1,13 @@
+# Isolated live acceptance setup
+
+Run `pnpm --filter @cairn/web exec vite build`, then `pnpm --filter @cairn/integration exec tsx verify/image-fallback-live.mts` from the repository root. The harness validates the reviewed feature source hashes and requires existing local Pi metadata and credentials for `domestic-proxy/deepseek-v4.1-flash`. It reads the credential into process memory only. The provider in the disposable server receives a local placeholder; the forwarding tap applies the fixed real Authorization privately.
+
+The output reports the actual card URL, PID, safe status URL and stop URL. The task remains in the todo phase until the operator clicks Start in the real UI. The forwarding status must show zero requests before that click. Start invokes Chief orchestration, which then dispatches the existing assigned information task; the seed binds the disposable team's Chief to the same synthetic Agent and verifies that binding before readiness. No orchestrate or builds API is called by the harness.
+
+The server uses an in-memory database, a hosted toy project and an existing 436-byte PNG screenshot. The daemon uses a private disposable home and an empty skill directory. The synthetic Agent has an empty skill allowlist and no default skill. Both listeners bind only 127.0.0.1. The safe tap records only model id, image block count, response status and numeric usage.
+
+Stop through POST to the reported `/__acceptance/stop` URL or SIGTERM to the reported PID. Cleanup stops the daemon, closes both listeners and removes the private run directory. Collect only sanitized acceptance artifacts before cleanup; credentials and private runtime files must not be committed.
+
+The first actual UI attempt found a missing Chief binding in the initial seed. The live fixture was repaired through the configuration PATCH and a GET read-back, with zero forwarding requests afterward. The script now performs that configuration and preflight automatically. This was a harness setup defect; feature code and its checkpoint hashes were unchanged. No real-provider outcome is claimed by setup readiness.
+
+Validate the script explicitly with `pnpm --filter @cairn/integration exec tsc -p verify/tsconfig.json`; the default integration project does not include this verification directory. The final zero-model-request readiness replay is recorded in `live-harness-preflight.json`. It binds and reads back the Chief, confirms the task is still unstarted, then stops the owned stack. Creation responses are parsed only for the fields their routes return. Startup failure also removes the owned private directory.

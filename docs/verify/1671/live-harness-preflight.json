@@ -1,0 +1,13 @@
+{
+  "featureCheckpoint": "6091529dd1e38f5c7edaaeefb7e217718d05cef1",
+  "modelRequests": 0,
+  "taskPhase": "todo",
+  "latestBuildId": null,
+  "chiefBoundToAssignedAgent": true,
+  "emptySkillAllowlist": true,
+  "noDefaultSkill": true,
+  "standaloneStrictTypecheck": "pass",
+  "replayPurpose": "Readiness and Chief binding only; no task or model execution.",
+  "ownedProcessStopped": true,
+  "privateDirectoryRemoved": true
+}

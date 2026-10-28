@@ -1,0 +1,21 @@
+{
+  "issue": 2083,
+  "parent": 1671,
+  "deliveryPR": 2082,
+  "originalPR": 1928,
+  "featureCheckpoint": "6091529dd1e38f5c7edaaeefb7e217718d05cef1",
+  "proofCheckpoint": "500969a9d1afc6bf948108163ad1fa0cce36a3fb",
+  "sourceAndProofFiles": {
+    "docs/verify/1671/reviewed-source-hashes.json": "aa7aa5b2678aef7c5282df454b78cf5e6756a23dc642d77ded027d0cf7209f30",
+    "docs/verify/1671/live-artifact-hashes.json": "3de5fc54aec416329f017a8ddbc7b9409320d5986b0c95c1d4e6f78bc32030fd",
+    "docs/verify/1671/live-text-only-terminal.json": "b1b9d216013431c5de7c1c9eddacd62fdc9f5edb8c4a7b13283111ebf8da314f",
+    "docs/verify/1671/live-text-only-requests.json": "65643eb2bcee5dc6dcddd2926e0ed6ac004cc835c6508718fd70514daa59c988",
+    "docs/verify/1671/live-text-only-report.md": "3f338ac3217a18b6109222d18e04826c1a3fecaf9d0814aa2ef11e6deb5d5a69",
+    "docs/verify/1671/live-text-only-card.png": "1b92a4c140bfd2430c0d3f0181c306201a43612b80ca1b320bb211aee4806aad",
+    "docs/verify/1671/live-text-only-notice.png": "b317801d13e8c7f75ebf42c8ec130aba00e128281149262f1c2e8b7aaad7e80b"
+  },
+  "archivedScreenshots": {
+    "docs/verify/2083/live-text-only-card.png": "1b92a4c140bfd2430c0d3f0181c306201a43612b80ca1b320bb211aee4806aad",
+    "docs/verify/2083/live-text-only-notice.png": "b317801d13e8c7f75ebf42c8ec130aba00e128281149262f1c2e8b7aaad7e80b"
+  }
+}

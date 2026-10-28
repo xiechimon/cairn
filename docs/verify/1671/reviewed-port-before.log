@@ -1,0 +1,539 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1928-image-repair/cairn
+
+ ❯ |@cairn/shared| test/task-failure.test.ts (48 tests | 11 failed) 13ms
+   ❯ noVisionSignalOf (#1671 tight-capability signal) (11)
+     × matches: 400: {"error":{"message":"GLM-5.3-BF16-W4A8 is not a multimodal model","code":"1006"}} 2ms
+     × matches: this model does not support image input 0ms
+     × matches: the endpoint does not support images 0ms
+     × matches: ACP initialize failed: gemini ACP backend: image capability is not advertised 0ms
+     × does not match (per-image errors are not capability signals):  0ms
+     × does not match (per-image errors are not capability signals): 不支持的图片格式 0ms
+     × does not match (per-image errors are not capability signals): image too large 0ms
+     × does not match (per-image errors are not capability signals): unsupported image format 0ms
+     × does not match (per-image errors are not capability signals): unsupported file type: image/heic 0ms
+     × does not match (per-image errors are not capability signals): 402 insufficient credits 1ms
+     × does not match (per-image errors are not capability signals): model not found 0ms
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+ ❯ |@xiechimon/cairn-cli| test/acp-stdio.test.ts (13 tests | 3 failed) 47ms
+   ❯ Gemini stdio execution (13)
+     × image support is unknown before initialize and follows negotiated capability afterwards 1ms
+     × image steering sends pixels to a session that advertised image support 1ms
+     × image steering to a text-only session is rejected explicitly 3ms
+ ❯ |@xiechimon/cairn-cli| test/step-attachments.test.ts (34 tests | 6 failed) 70ms
+   ❯ imageSupport=false degrade mode (#1671) (6)
+     × png token → zero downloads, token kept verbatim, no-vision annotation, skippedNoVision=1 6ms
+     × svg token → neither downloaded nor materialized to disk 1ms
+     × md/pdf tokens stay byte for byte (text model can still read them) 1ms
+     × mixed png + md: only the png degrades, md untouched 1ms
+     × fence-quoted png token → annotation line carries the > prefix (no escape from the #1406 fence) 1ms
+     × imageSupport omitted and null keep today behavior (regression baseline: download still happens) 1ms
+ ❯ |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts (16 tests | 12 failed) 2055ms
+   ❯ runner probe-driven degrade (#1671 slice 1) (6)
+     × declared no-vision model: no images delivered, annotated prompt, step succeeds 10ms
+     × probe throws → treated as unknown, images delivered, step succeeds 3ms
+     × text-only spec probes capability for later image steering 1ms
+     × no-model step fails before any attachment download 1ms
+   ❯ runner 400-signal one-time degrade retry (#1671 slice 2) (10)
+     × session creation rejects image input: retry without images instead of failing the step 1ms
+     × a network retry can still degrade a later image rejection once 2007ms
+     × a thrown image rejection from the event iterator retries without images 7ms
+     × undeclared model 400s on images → learn, retry without images, step succeeds 5ms
+     × learned cache short-circuits the next step: single session, zero 400s 5ms
+     × one-shot guard: second no-vision 400 after degrade → no third session, step fails 2ms
+     × continue-session image rejection starts a fresh text-only session with the task 2ms
+     × gemini backend declares no vision: image step degrades instead of failing 2ms
+ ❯ |@xiechimon/cairn-cli| test/machine-steer.test.ts (10 tests | 2 failed) 3769ms
+   ❯ steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer) (10)
+     × degraded step (#1671, initial image=true): steering annotates unread images without downloading them 3043ms
+     × degraded step (#1671, initial image=false): steering annotates unread images without downloading them 67ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 34 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > image support is unknown before initialize and follows negotiated capability afterwards
+TypeError: You must provide a Promise to expect() when using .resolves, not 'undefined'.
+ ❯ test/acp-stdio.test.ts:188:76
+    186|   test('image support is unknown before initialize and follows negotia…
+    187|     const vision = backend({ ACP_IMAGE: 'yes' });
+    188|     await expect(vision.modelSupportsImages?.(opts.provider, opts.mode…
+       |                                                                            ^
+    189|     const imageSession = await vision.createSession({
+    190|       ...opts,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > image steering sends pixels to a session that advertised image support
+AssertionError: promise rejected "RequestError: Image prompt was dropped { …(2) }" instead of resolving
+ ❯ test/acp-stdio.test.ts:210:58
+    208|       promptImages: images,
+    209|     });
+    210|     await expect(handle.steer('follow-up image', images)).resolves.toB…
+       |                                                          ^
+    211|     expect(await collect(handle.events)).toContainEqual({ type: 'done'…
+    212|   });
+
+Caused by: RequestError: Image prompt was dropped
+ ❯ Connection.handleResponse ../../node_modules/.pnpm/@agentclientprotocol+sdk@2.0.2_zod@4.6.5/node_modules/@agentclientprotocol/sdk/dist/core/jsonrpc.js:847:40
+ ❯ Connection.receiveMessage ../../node_modules/.pnpm/@agentclientprotocol+sdk@2.0.2_zod@4.6.5/node_modules/@agentclientprotocol/sdk/dist/core/jsonrpc.js:743:18
+ ❯ Connection.receiveWireMessage ../../node_modules/.pnpm/@agentclientprotocol+sdk@2.0.2_zod@4.6.5/node_modules/@agentclientprotocol/sdk/dist/core/jsonrpc.js:673:14
+ ❯ Connection.receive ../../node_modules/.pnpm/@agentclientprotocol+sdk@2.0.2_zod@4.6.5/node_modules/@agentclientprotocol/sdk/dist/core/jsonrpc.js:641:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: -32602, data: undefined, toResult: 'Function<toResult>', toErrorResponse: 'Function<toErrorResponse>' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/acp-stdio.test.ts > Gemini stdio execution > image steering to a text-only session is rejected explicitly
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ test/acp-stdio.test.ts:218:6
+    216|     await expect(
+    217|       handle.steer('follow-up image', [{ data: 'aA==', mimeType: 'imag…
+    218|     ).rejects.toThrow('image capability');
+       |      ^
+    219|     await collect(handle.events);
+    220|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-steer.test.ts > steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer) > degraded step (#1671, initial image=true): steering annotates unread images without downloading them
+Error: waitFor timeout
+ ❯ waitFor test/machine-loop-harness.ts:326:9
+    324|     await new Promise((r) => setTimeout(r, 10));
+    325|   }
+    326|   throw new Error('waitFor timeout');
+       |         ^
+    327| }
+    328|
+ ❯ test/machine-steer.test.ts:351:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-steer.test.ts > steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer) > degraded step (#1671, initial image=false): steering annotates unread images without downloading them
+AssertionError: expected '再看一眼这张图\n\n[image attached: shot.png]' to contain '![shot.png](attachment:t1/id1.png)'
+
+- Expected
++ Received
+
+- ![shot.png](attachment:t1/id1.png)
++ 再看一眼这张图
++
++ [image attached: shot.png]
+
+ ❯ test/machine-steer.test.ts:355:32
+    353|       api.onStreamEvent?.({ type: 'steer', stepId: 's1' });
+    354|       await waitFor(() => steered.length === 1);
+    355|       expect(steered[0]!.text).toContain(token);
+       |                                ^
+    356|       expect(steered[0]!.text).toContain('[图片附件 t1/id1.png 未被模型读取 — 该图…
+    357|       expect(steered[0]!.text).not.toContain('[image attached:');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner probe-driven degrade (#1671 slice 1) > declared no-vision model: no images delivered, annotated prompt, step succeeds
+AssertionError: expected [ 'img1' ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:300:36
+    298|     const { client, lines } = await runImageStep(claimed, backend);
+    299|
+    300|     expect(client.attachmentCalls).toHaveLength(0);
+       |                                    ^
+    301|     expect(created[0]?.opts.promptImages).toBeUndefined();
+    302|     expect(created[0]?.opts.prompt).toContain(SPEC_TOKEN);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner probe-driven degrade (#1671 slice 1) > probe throws → treated as unknown, images delivered, step succeeds
+AssertionError: expected 'step s1 for conv conv-1 (1 running)\n…' to contain 'image support probe failed'
+
+- Expected
++ Received
+
+- image support probe failed
++ step s1 for conv conv-1 (1 running)
++ using model stub-gw/stub-model
++ [workspace] 准备工作区...
++ [skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
++ new session conv-1
++ finished (0 running)
+
+ ❯ test/runner-image-degrade.test.ts:351:30
+    349|     expect(created[0]?.opts.promptImages).toHaveLength(1);
+    350|     expect(client.doneBodies[0]?.body.status).toBe('success');
+    351|     expect(lines.join('\n')).toContain('image support probe failed');
+       |                              ^
+    352|   });
+    353|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner probe-driven degrade (#1671 slice 1) > text-only spec probes capability for later image steering
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/runner-image-degrade.test.ts:366:20
+    364|     });
+    365|     await runImageStep(claimed, backend);
+    366|     expect(probed).toBe(1);
+       |                    ^
+    367|   });
+    368|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner probe-driven degrade (#1671 slice 1) > no-model step fails before any attachment download
+AssertionError: expected [ 'img1' ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:384:36
+    382|     });
+    383|     const { client } = await runImageStep(claimed, backend);
+    384|     expect(client.attachmentCalls).toHaveLength(0);
+       |                                    ^
+    385|     expect(client.doneBodies[0]?.body.status).toBe('failed');
+    386|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > session creation rejects image input: retry without images instead of failing the step
+AssertionError: expected [ { opts: { …(8) } } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:399:21
+    397|     });
+    398|     const { client } = await runImageStep(claimed, backend);
+    399|     expect(created).toHaveLength(2);
+       |                     ^
+    400|     expect(created[1]?.opts.promptImages).toBeUndefined();
+    401|     expect(client.doneBodies[0]?.body.status).toBe('success');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > a network retry can still degrade a later image rejection once
+AssertionError: expected [ { opts: { …(8) } }, …(1) ] to have a length of 3 but got 2
+
+- Expected
++ Received
+
+- 3
++ 2
+
+ ❯ test/runner-image-degrade.test.ts:417:21
+    415|     });
+    416|     const { client } = await runImageStep(claimed, backend);
+    417|     expect(created).toHaveLength(3);
+       |                     ^
+    418|     expect(actions).toEqual(['create', 'continue', 'create']);
+    419|     expect(created[2]?.opts.promptImages).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > a thrown image rejection from the event iterator retries without images
+AssertionError: expected [ { opts: { …(8) } } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:432:21
+    430|     });
+    431|     const { client } = await runImageStep(claimed, backend);
+    432|     expect(created).toHaveLength(2);
+       |                     ^
+    433|     expect(created[1]?.opts.promptImages).toBeUndefined();
+    434|     expect(client.doneBodies[0]?.body.status).toBe('success');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > undeclared model 400s on images → learn, retry without images, step succeeds
+AssertionError: expected [ { opts: { …(8) } } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:447:21
+    445|     const { client, lines } = await runImageStep(claimed, backend);
+    446|
+    447|     expect(created).toHaveLength(2);
+       |                     ^
+    448|     expect(created[0]?.opts.promptImages).toHaveLength(1);
+    449|     expect(created[1]?.opts.promptImages).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > learned cache short-circuits the next step: single session, zero 400s
+AssertionError: expected [ 'img1' ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:495:42
+    493|       claimed2,
+    494|     );
+    495|     expect(secondClient.attachmentCalls).toHaveLength(0);
+       |                                          ^
+    496|     expect(script.rememberNoVisionCalls).toHaveLength(0);
+    497|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > one-shot guard: second no-vision 400 after degrade → no third session, step fails
+AssertionError: expected [ { opts: { …(8) } } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:512:21
+    510|     const { client } = await runImageStep(claimed, backend);
+    511|
+    512|     expect(created).toHaveLength(2);
+       |                     ^
+    513|     expect(client.doneBodies[0]?.body.status).toBe('failed');
+    514|     expect(client.doneBodies[0]?.body.errorMessage).toContain('not a m…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > continue-session image rejection starts a fresh text-only session with the task
+AssertionError: expected [ { opts: { …(8) } } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:562:21
+    560|     const { client } = await runImageStep(claimed, backend);
+    561|
+    562|     expect(created).toHaveLength(2);
+       |                     ^
+    563|     expect(actions).toEqual(['continue', 'create']);
+    564|     expect(created[1]?.opts.prompt).toContain(TASK.spec);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > runner 400-signal one-time degrade retry (#1671 slice 2) > gemini backend declares no vision: image step degrades instead of failing
+AssertionError: expected [ { data: 'iVBORw0KGgo=', …(1) } ] to be undefined
+
+- Expected:
+undefined
+
++ Received:
+[
+  {
+    "data": "iVBORw0KGgo=",
+    "mimeType": "image/png",
+  },
+]
+
+ ❯ test/runner-image-degrade.test.ts:578:43
+    576|     });
+    577|     const { client } = await runImageStep(claimed, backend);
+    578|     expect(created[0]?.opts.promptImages).toBeUndefined();
+       |                                           ^
+    579|     expect(client.doneBodies[0]?.body.status).toBe('success');
+    580|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/step-attachments.test.ts > imageSupport=false degrade mode (#1671) > png token → zero downloads, token kept verbatim, no-vision annotation, skippedNoVision=1
+AssertionError: expected [ 'id1' ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/step-attachments.test.ts:327:23
+    325|       id1: pngResponse(),
+    326|     });
+    327|     expect(requested).toHaveLength(0);
+       |                       ^
+    328|     expect(out.images).toHaveLength(0);
+    329|     expect(out.skippedNoVision).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/step-attachments.test.ts > imageSupport=false degrade mode (#1671) > svg token → neither downloaded nor materialized to disk
+AssertionError: expected [ 'id1' ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/step-attachments.test.ts:347:23
+    345|       imageSupport: false,
+    346|     });
+    347|     expect(requested).toHaveLength(0);
+       |                       ^
+    348|     expect(out.skippedNoVision).toBe(1);
+    349|     expect(existsSync(join(s.materializeDir, 's1'))).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/step-attachments.test.ts > imageSupport=false degrade mode (#1671) > md/pdf tokens stay byte for byte (text model can still read them)
+AssertionError: expected undefined to be +0 // Object.is equality
+
+- Expected:
+0
+
++ Received:
+undefined
+
+ ❯ test/step-attachments.test.ts:358:33
+    356|     const { out, requested } = await resolveDegrade(text, {});
+    357|     expect(out.text).toBe(text);
+    358|     expect(out.skippedNoVision).toBe(0);
+       |                                 ^
+    359|     expect(requested).toHaveLength(0);
+    360|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/step-attachments.test.ts > imageSupport=false degrade mode (#1671) > mixed png + md: only the png degrades, md untouched
+AssertionError: expected [ 'id1' ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/step-attachments.test.ts:368:23
+    366|       id1: pngResponse(),
+    367|     });
+    368|     expect(requested).toHaveLength(0);
+       |                       ^
+    369|     expect(out.skippedNoVision).toBe(1);
+    370|     expect(out.text).toContain(pngToken);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/step-attachments.test.ts > imageSupport=false degrade mode (#1671) > fence-quoted png token → annotation line carries the > prefix (no escape from the #1406 fence)
+AssertionError: expected [ 'id1' ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/step-attachments.test.ts:380:23
+    378|     const fencedText = buildTaskPromptText('改圆角', `见下图。\n\n${token}`, …
+    379|     const { out, requested } = await resolveDegrade(fencedText, { id1:…
+    380|     expect(requested).toHaveLength(0);
+       |                       ^
+    381|     expect(out.skippedNoVision).toBe(1);
+    382|     expect(out.text).toContain(`> ${token}`);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/34]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/step-attachments.test.ts > imageSupport=false degrade mode (#1671) > imageSupport omitted and null keep today behavior (regression baseline: download still happens)
+AssertionError: expected undefined to be +0 // Object.is equality
+
+- Expected:
+0
+
++ Received:
+undefined
+
+ ❯ test/step-attachments.test.ts:401:35
+    399|       expect(requested).toEqual(['id1']);
+    400|       expect(out.images).toHaveLength(1);
+    401|       expect(out.skippedNoVision).toBe(0);
+       |                                   ^
+    402|       expect(out.text).toContain('[image attached: shot.png]');
+    403|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/34]⎯
+
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > matches: 400: {"error":{"message":"GLM-5.3-BF16-W4A8 is not a multimodal model","code":"1006"}}
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > matches: this model does not support image input
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > matches: the endpoint does not support images
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > matches: ACP initialize failed: gemini ACP backend: image capability is not advertised
+TypeError: noVisionSignalOf is not a function
+ ❯ test/task-failure.test.ts:198:12
+    196|     'ACP initialize failed: gemini ACP backend: image capability is no…
+    197|   ])('matches: %s', (msg) => {
+    198|     expect(noVisionSignalOf(msg)).toBe(true);
+       |            ^
+    199|   });
+    200|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/34]⎯
+
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > does not match (per-image errors are not capability signals): 
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > does not match (per-image errors are not capability signals): 不支持的图片格式
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > does not match (per-image errors are not capability signals): image too large
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > does not match (per-image errors are not capability signals): unsupported image format
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > does not match (per-image errors are not capability signals): unsupported file type: image/heic
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > does not match (per-image errors are not capability signals): 402 insufficient credits
+ FAIL  |@cairn/shared| test/task-failure.test.ts > noVisionSignalOf (#1671 tight-capability signal) > does not match (per-image errors are not capability signals): model not found
+TypeError: noVisionSignalOf is not a function
+ ❯ test/task-failure.test.ts:210:12
+    208|     'model not found',
+    209|   ])('does not match (per-image errors are not capability signals): %s…
+    210|     expect(noVisionSignalOf(msg)).toBe(false);
+       |            ^
+    211|   });
+    212| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/34]⎯
+
+
+ Test Files  5 failed (5)
+      Tests  34 failed | 87 passed (121)
+   Start at  18:18:40
+   Duration  5.16s (tests 63%, import 22%, transform 15%)
+
