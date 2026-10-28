@@ -941,6 +941,7 @@ async function runClaimedStep(
   let timedOut = false;
   let timeoutArm: StreamTimeoutArm | null = null;
   const runningToolCalls = new Set<string>();
+  const toolStartedAt = new Map<string, number>();
   let watchdog: NodeJS.Timeout | null = null;
   let bodyTimeout: NodeJS.Timeout | null = null;
   let durationCap: NodeJS.Timeout | null = null;
@@ -1225,6 +1226,20 @@ async function runClaimedStep(
             break;
           }
           case 'toolcall_end': {
+            const eventTime = now();
+            if (ev.call.result === undefined) {
+              const startedAt = ev.call.startedAt ?? toolStartedAt.get(ev.call.id) ?? eventTime;
+              toolStartedAt.set(ev.call.id, startedAt);
+              ev.call = { ...ev.call, startedAt };
+            } else {
+              const startedAt = ev.call.startedAt ?? toolStartedAt.get(ev.call.id);
+              ev.call = {
+                ...ev.call,
+                ...(startedAt !== undefined ? { startedAt } : {}),
+                endedAt: ev.call.endedAt ?? eventTime,
+              };
+              toolStartedAt.delete(ev.call.id);
+            }
             if (progressResetsDuration) armDurationCap();
             sawProgress = true;
             zeroProgressRetries = 0;

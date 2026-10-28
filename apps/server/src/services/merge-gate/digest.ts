@@ -5,6 +5,7 @@ import {
   EVIDENCE_PREFIX,
   GATE_LIMITS,
   PATCH_DIGEST_VERSION,
+  recordingRequirements,
 } from '@cairn/shared/merge-gate';
 
 export type DigestUnavailable = 'truncated' | 'count-mismatch' | 'null-sha' | 'empty';
@@ -89,7 +90,7 @@ export function computeLocalPatchDigest(
         ? null
         : createHash('sha256').update(file.patch, 'utf8').digest('hex'),
   }));
-  return computePatchDigest(compareFiles, opts);
+  return computePatchDigest(withRecordingFlags(compareFiles, files), opts);
 }
 
 const STATUSES: readonly string[] = COMPARE_FILE_STATUSES;
@@ -100,6 +101,7 @@ export function compareFilesFromResponse(body: unknown): CompareFile[] | null {
   const raw = (body as { files?: unknown }).files;
   if (!Array.isArray(raw)) return null;
   const out: CompareFile[] = [];
+  const patches = new Map<string, string | null>();
   for (const item of raw) {
     if (item === null || typeof item !== 'object') return null;
     const f = item as Record<string, unknown>;
@@ -112,6 +114,7 @@ export function compareFilesFromResponse(body: unknown): CompareFile[] | null {
     if (!(prev === undefined || prev === null || (typeof prev === 'string' && prev !== '')))
       return null;
     if ((f.status === 'renamed' || f.status === 'copied') && typeof prev !== 'string') return null;
+    patches.set(f.filename, typeof f.patch === 'string' ? f.patch : null);
     out.push({
       status: f.status as CompareFile['status'],
       filename: f.filename,
@@ -125,5 +128,22 @@ export function compareFilesFromResponse(body: unknown): CompareFile[] | null {
           : null,
     });
   }
-  return out;
+  return withRecordingFlags(
+    out,
+    out.map((f) => ({
+      filename: f.filename,
+      status: f.status,
+      patch: patches.get(f.filename) ?? null,
+    })),
+  );
+}
+
+function withRecordingFlags(
+  files: readonly CompareFile[],
+  inputs: readonly { filename: string; status: string; patch: string | null }[],
+): CompareFile[] {
+  const { reasons } = recordingRequirements(inputs);
+  if (reasons.length === 0) return [...files];
+  const triggered = new Set(reasons.map((reason) => reason.slice(0, reason.indexOf(': '))));
+  return files.map((f) => (triggered.has(f.filename) ? { ...f, recordingRequired: true } : f));
 }

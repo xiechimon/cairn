@@ -12,6 +12,7 @@ import {
   type MergeBlockerCode,
   type MergePolicy,
   type MergeReadiness,
+  RECORDING_EXTENSION,
 } from '@cairn/shared/merge-gate';
 import { computePatchDigest } from './digest.js';
 import { parseRawEvidenceLinks, qualifyingEvidenceLinks } from './evidence-link.js';
@@ -397,6 +398,15 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       const e = i.evidence.find((x) => x.sha === l.sha && x.path === l.path);
       return e === undefined ? false : e.present;
     });
+    if (
+      compare.files.some((f) => f.recordingRequired) &&
+      !qualifying.some((l, index) => RECORDING_EXTENSION.test(l.path) && presence[index] === true)
+    ) {
+      block(
+        'recording-missing',
+        'Link a present .gif, .webm or .mp4 of at most 5 MiB under this ticket evidence directory',
+      );
+    }
     if (qualifying.length === 0) {
       const { links } = parseRawEvidenceLinks(pr.body, args);
       block(

@@ -1,4 +1,4 @@
-import { patchUserBodySchema, type TeamMember } from '@cairn/shared';
+import { patchTeamBodySchema, patchUserBodySchema, type TeamMember } from '@cairn/shared';
 import { eq, isNull } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
@@ -8,6 +8,7 @@ import { agent, notification, user } from './db/schema.js';
 import { parseWith } from './lib/errors.js';
 import { agentRecordOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { createSerialConnection } from './services/events.js';
+import { readFirstPrReportPrompt, setFirstPrReportPrompt } from './services/first-pr-report.js';
 
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.use('/api/*', async (c, next) => {
@@ -22,16 +23,28 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
 
   app.patch('/api/user/me', async (c) => {
     const body = parseWith(patchUserBodySchema, await jsonBody(c), 'body');
-    ctx.db
-      .update(user)
-      .set({ displayName: body.displayName })
-      .where(eq(user.id, ctx.user.id))
-      .run();
-    ctx.user.displayName = body.displayName;
+    if (body.displayName !== undefined) {
+      ctx.db
+        .update(user)
+        .set({ displayName: body.displayName })
+        .where(eq(user.id, ctx.user.id))
+        .run();
+      ctx.user.displayName = body.displayName;
+    }
     return c.json(ctx.user);
   });
 
-  app.get('/api/teams', (c) => c.json([ctx.team]));
+  app.get('/api/teams', (c) =>
+    c.json([{ ...ctx.team, firstPrReportPrompt: readFirstPrReportPrompt(ctx.db, ctx.team.id) }]),
+  );
+
+  app.patch('/api/teams/:id', async (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    const body = parseWith(patchTeamBodySchema, await jsonBody(c), 'body');
+    const prompt = setFirstPrReportPrompt(ctx.db, id, body.firstPrReportPrompt);
+    return c.json({ ...ctx.team, firstPrReportPrompt: prompt });
+  });
 
   app.get('/api/teams/:id/members', (c) => {
     const id = c.req.param('id');

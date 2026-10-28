@@ -27,7 +27,7 @@ import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const DAEMON_DIR = fileURLToPath(new URL('../../apps/daemon', import.meta.url));
 const PLAN_CONTENT =
-  '# 方案\n\nContext: 恢复探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\n';
+  '# 方案\nKind: fix\n\nContext: 恢复探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\n';
 
 async function startProxy(target: string): Promise<{
   url: string;

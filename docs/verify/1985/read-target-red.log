@@ -1,0 +1,128 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1985
+
+ ❯ |@cairn/integration| test/routing-boundary.test.ts (20 tests | 7 failed) 2778ms
+   ❯ real process read boundary (16)
+     × blocks and records an external read (5) 228ms
+     × blocks and records an external read (8) 184ms
+     × permits local checks: cd lib && cat ../lib/adder.mjs 113ms
+     × permits local checks: cat "lib/adder.mjs" 110ms
+     × permits local checks: node -e "const fs=require('fs'); if(!fs.readFileSync('lib/adder.mjs','utf8').includes('add'))process.exit(1)" 177ms
+     × permits local checks: node -e "require('child_process').execFileSync('cat',['lib/adder.mjs'],{stdio:'inherit'})" 134ms
+   ❯ implementation reuse grading (4)
+     × accepts an independent implementation and rejects a failed oracle 132ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > blocks and records an external read (5)
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > blocks and records an external read (8)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-boundary.test.ts:41:112
+     39|     expect(result.enforced, result.stderr).toBe(true);
+     40|     expect(result.stdout).not.toContain(secret);
+     41|     expect(result.violations.some((entry) => entry.includes('external …
+       |                                                                                                                ^
+     42|     expect(result.violations.length).toBeGreaterThan(0);
+     43|     expect(gradeBoundedRun(task, { oraclePass: true, executions: [resu…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > permits local checks: cd lib && cat ../lib/adder.mjs
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > permits local checks: cat "lib/adder.mjs"
+AssertionError: expected [ 'syscall 257: /dev/tty', …(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "syscall 257: /dev/tty",
++   "syscall 257: /etc/nsswitch.conf",
++   "syscall 257: /etc/passwd",
++ ]
+
+ ❯ test/routing-boundary.test.ts:55:31
+     53|     expect(result.enforced, result.stderr).toBe(true);
+     54|     expect(result.exitCode, result.stderr).toBe(0);
+     55|     expect(result.violations).toEqual([]);
+       |                               ^
+     56|     expect(gradeBoundedRun(task, { oraclePass: true, executions: [resu…
+     57|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > permits local checks: node -e "const fs=require('fs'); if(!fs.readFileSync('lib/adder.mjs','utf8').includes('add'))process.exit(1)"
+AssertionError: node: OpenSSL configuration error:
+40B4F8DD0B7F0000:error:8000000D:system library:BIO_new_file:Permission denied:../deps/openssl/openssl/crypto/bio/bss_file.c:67:calling fopen(/etc/ssl/openssl.cnf, rb)
+
+
+: expected 13 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 13
+
+ ❯ test/routing-boundary.test.ts:54:44
+     52|     const result = executeBounded({ workspace, command });
+     53|     expect(result.enforced, result.stderr).toBe(true);
+     54|     expect(result.exitCode, result.stderr).toBe(0);
+       |                                            ^
+     55|     expect(result.violations).toEqual([]);
+     56|     expect(gradeBoundedRun(task, { oraclePass: true, executions: [resu…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > permits local checks: node -e "require('child_process').execFileSync('cat',['lib/adder.mjs'],{stdio:'inherit'})"
+AssertionError: node: OpenSSL configuration error:
+40C4A8739B7F0000:error:8000000D:system library:BIO_new_file:Permission denied:../deps/openssl/openssl/crypto/bio/bss_file.c:67:calling fopen(/etc/ssl/openssl.cnf, rb)
+
+
+: expected 13 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 13
+
+ ❯ test/routing-boundary.test.ts:54:44
+     52|     const result = executeBounded({ workspace, command });
+     53|     expect(result.enforced, result.stderr).toBe(true);
+     54|     expect(result.exitCode, result.stderr).toBe(0);
+       |                                            ^
+     55|     expect(result.violations).toEqual([]);
+     56|     expect(gradeBoundedRun(task, { oraclePass: true, executions: [resu…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > implementation reuse grading > accepts an independent implementation and rejects a failed oracle
+AssertionError: expected 'fail' to be 'pass' // Object.is equality
+
+Expected: "pass"
+Received: "fail"
+
+ ❯ test/routing-boundary.test.ts:86:49
+     84|     const result = executeBounded({ workspace, command: 'true' });
+     85|     const input = { oraclePass: true, executions: [result], changed: […
+     86|     expect(gradeBoundedRun(task, input).status).toBe('pass');
+       |                                                 ^
+     87|     expect(gradeBoundedRun(task, { ...input, oraclePass: false }).stat…
+     88|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 13 passed (20)
+   Start at  07:47:44
+   Duration  2.95s (tests 97%, transform 2%, import 1%)
+

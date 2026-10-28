@@ -17,6 +17,7 @@ const WEB_DIST = join(ROOT, 'apps/web/dist');
 
 const PLAN_MD = [
   '# 方案',
+  'Kind: fix',
   '',
   'Context: #666 收敛探针任务。',
   'Changes: 在 plan.md 落一版方案（无其它改动）。',

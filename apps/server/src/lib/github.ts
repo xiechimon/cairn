@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import {
   acquireGithubCreateSlot,
+  GithubCreateGateNotWritableError,
   parseGithubCreateRateLimit,
 } from '@cairn/shared/github-create-gate';
 // Node fetch ignores http_proxy/https_proxy unless the server starts with NODE_USE_ENV_PROXY=1 (Node >= 24.5).
@@ -1068,7 +1069,13 @@ export async function githubCreateIssue(
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues`;
   let data: Record<string, unknown>;
   for (let attempt = 0; ; attempt++) {
-    await acquireGithubCreateSlot();
+    try {
+      await acquireGithubCreateSlot();
+    } catch (error) {
+      if (error instanceof GithubCreateGateNotWritableError)
+        throw new HttpError(503, error.message);
+      throw error;
+    }
     try {
       data = (await writeJson(fetchImpl, 'POST', url, token, input)) as Record<string, unknown>;
       break;
@@ -1097,6 +1104,19 @@ export async function githubUpdateIssueTitle(
 ): Promise<void> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
   await writeJson(fetchImpl, 'PATCH', url, token, { title });
+}
+
+export async function githubCloseIssue(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  comment: string,
+): Promise<void> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  await writeJson(fetchImpl, 'PATCH', url, token, { state: 'closed', state_reason: 'not_planned' });
+  await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
 }
 
 export type GithubMergeResult =

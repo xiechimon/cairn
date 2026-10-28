@@ -53,6 +53,10 @@ export const team = sqliteTable('team', {
   createdAt: epochMs('createdAt').notNull(),
   plan: text('plan').notNull().default('free'),
   avatarStyle: text('avatarStyle'),
+  firstPrReportPromptEnabled: bool('firstPrReportPromptEnabled').notNull().default(false),
+  firstPrReportPromptDismissedAt: epochMs('firstPrReportPromptDismissedAt'),
+  firstPrReportPromptFirstPrAt: epochMs('firstPrReportPromptFirstPrAt'),
+  firstPrReportPromptFirstPrNumber: integer('firstPrReportPromptFirstPrNumber'),
 });
 
 export const project = sqliteTable('project', {
@@ -514,6 +518,7 @@ export const chiefMessage = sqliteTable('chief_message', {
     .references(() => chiefThread.id, { onDelete: 'cascade' }),
   role: text('role').$type<'system' | 'user' | 'assistant'>().notNull(),
   content: json<unknown>('content').notNull(),
+  projectId: text('projectId'),
   createdAt: epochMs('createdAt').notNull(),
 });
 

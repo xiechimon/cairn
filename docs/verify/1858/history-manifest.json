@@ -1,0 +1,22 @@
+{
+  "sourceCommit": "3e29c5631885f6d8ba4d049b0e2333bed353c8a2",
+  "counts": {
+    "cases": 64,
+    "results": 176,
+    "errors": 16
+  },
+  "files": {
+    "cases.json": {
+      "sha256": "ec4819f5337692225017db2a93d2d8e0bcb38714dc3533823ce717c485d475a8"
+    },
+    "_state.json": {
+      "sha256": "c532fcd8e20fa4247904cbc36882e6b82fa8684867490df6bfffed4b752ff7f9"
+    },
+    "baseline/results.jsonl": {
+      "sha256": "b9df2405ebb38e46ae4a611dda63e81b17619aaa179021f8552c01fe78116470"
+    },
+    "baseline/errors.jsonl": {
+      "sha256": "b38413ae606cc3689dcfe2b06d7d934f454053fbed7f0d0decbe7a9677596bc6"
+    }
+  }
+}

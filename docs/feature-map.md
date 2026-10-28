@@ -49,7 +49,7 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 
 | job | named steps |
 |---|---|
-| `check` | `Conflict markers` / `Lane file gate (#1199)` / `Test spawn gate` / `PR evidence workflow shape gate` / `CI job structure gate (#1557)` / `UI registry gate (#989)` / `UI consumer shape gate (#1054)` / `Install dependencies` / `Prepush checks (#1533)` / `Prepush self-test` / `verify-cairn CLI self-test (#1402)` / `Install Playwright chromium` / `Drizzle snapshot chain guard` / `Drizzle migration drift check` / `Test (vitest, light project)` / `Test (vitest, integration stack)` / `pr-gate self-check (#1401)` / `Lint warning cap gate (#1192)` |
+| `check` | `Conflict markers` / `Lane file gate (#1199)` / `Test spawn gate` / `PR evidence workflow shape gate` / `CI job structure gate (#1557)` / `UI registry gate (#989)` / `UI consumer shape gate (#1054)` / `Install dependencies` / `Prepush checks (#1533)` / `PR evidence regression tests` / `Prepush self-test` / `verify-cairn CLI self-test (#1402)` / `Install Playwright chromium` / `Drizzle snapshot chain guard` / `Drizzle migration drift check` / `Test (vitest, light project)` / `Test (vitest, integration stack)` / `pr-gate self-check (#1401)` / `Lint warning cap gate (#1192)` |
 | `e2e` | `Install dependencies` / `Install Playwright chromium` / `E2E (shard ${{ matrix.shard }}/4, #693)` / `CSS mechanism gate (#747)` |
 | `e2e-gate` | `Aggregate e2e shards` |
 | `pack-smoke` | `Install dependencies` / `Pack smoke (main package tarball, bare node)` |
@@ -77,22 +77,22 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 
 | Item | Count |
 |---|---|
-| Map rows (issues) | 633 |
-| of which Differentiation surface | 94 |
-| of which Runtime axis | 142 |
-| of which General surface | 397 |
-| status Done | 499 |
+| Map rows (issues) | 654 |
+| of which Differentiation surface | 99 |
+| of which Runtime axis | 145 |
+| of which General surface | 410 |
+| status Done | 520 |
 | status In progress | 6 |
 | status Not started | 16 |
 | status Unverified | 112 |
-| anchors = evidence directory + test reference | 222 |
-| anchors = evidence directory only | 172 |
+| anchors = evidence directory + test reference | 229 |
+| anchors = evidence directory only | 186 |
 | anchors = test reference only | 111 |
 | no anchor (`[unverified]`) | 128 |
-| referenced PRs (no rows, §3.2) | 97 |
+| referenced PRs (no rows, §3.2) | 100 |
 | unresolvable ticket numbers (§3.3) | 0 |
-| evidence directories that are not GitHub ticket numbers (§3.4) | 94 |
-| scan surface: spec volumes / test files | 31 / 583 |
+| evidence directories that are not GitHub ticket numbers (§3.4) | 96 |
+| scan surface: spec volumes / test files | 31 / 603 |
 
 ## 2. Feature map
 
@@ -187,13 +187,18 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1543](https://github.com/xiechimon/cairn/issues/1543) `Review finding: single-use non-exported helper left in the file` | Differentiation surface | Done | `docs/verify/1543/` |
 | [#1561](https://github.com/xiechimon/cairn/issues/1561) `single-use-helper-gate：既有大函数被改动就标红，白名单要整段函数文本` | Differentiation surface | Done | `docs/verify/1561/` |
 | [#1605](https://github.com/xiechimon/cairn/issues/1605) `eval: harness 改动采纳闸——三道统计闸 + 封存测试集` | Differentiation surface | Done | `apps/server/test/adoption-protected-paths.test.ts` |
-| [#1621](https://github.com/xiechimon/cairn/issues/1621) `自治合并试点：纯文档与纯测试 PR 闸全绿即由 cairn 自己合并` | Differentiation surface | In progress | `apps/server/test/merge-gate-paths.test.ts`<br>`apps/server/test/merge-gate-readiness.test.ts` |
+| [#1621](https://github.com/xiechimon/cairn/issues/1621) `自治合并试点：纯文档与纯测试 PR 闸全绿即由 cairn 自己合并` | Differentiation surface | Done | `apps/server/test/merge-gate-paths.test.ts`<br>`apps/server/test/merge-gate-readiness.test.ts` |
 | [#1623](https://github.com/xiechimon/cairn/issues/1623) `chief: split_todo 拆解方案过检查器即自动开跑（含 ADR 0018 层 2 修订与影子模式）` | Differentiation surface | Not started | [unverified] |
 | [#1728](https://github.com/xiechimon/cairn/issues/1728) `shared: plan contract checker splits a code block nested in a Verification list item into its own item` | Differentiation surface | Done | `packages/shared/test/plan-contract.test.ts` |
 | [#1730](https://github.com/xiechimon/cairn/issues/1730) `server: a GitHub project cannot follow a repo rename; PATCH rejects githubRepo` | Differentiation surface | Done | `apps/server/test/project-identity.test.ts` |
 | [#1753](https://github.com/xiechimon/cairn/issues/1753) `Implement ADR 0026: autonomous by default, protected paths need an independent review instead of a human` | Differentiation surface | Done | `docs/verify/1753/` |
 | [#1791](https://github.com/xiechimon/cairn/issues/1791) `server: plans that pass the contract check wait at confirm forever unless the chief happens to be watching` | Differentiation surface | Done | `apps/server/test/plan-server-auto-confirm.test.ts` |
 | [#1802](https://github.com/xiechimon/cairn/issues/1802) `server(rework): retry lessons carry the verify verdict and a "verified, keep working" list` | Differentiation surface | Done | `apps/server/test/retry-lessons.test.ts` |
+| [#1838](https://github.com/xiechimon/cairn/issues/1838) `chief: research prior art before planning a feature (cited sources, reuse-vs-build decision)` | Differentiation surface | Done | `docs/verify/1838/`<br>`integration/test/plan-prior-art-grade.test.ts`<br>`packages/shared/test/plan-contract-prompt.test.ts`<br>`packages/shared/test/plan-contract.test.ts` |
+| [#1847](https://github.com/xiechimon/cairn/issues/1847) `gate mismatch: PR #1823` | Differentiation surface | In progress | `docs/verify/1847/` |
+| [#1908](https://github.com/xiechimon/cairn/issues/1908) `scripts: e2e-affected and preview servers must take a heavy slot instead of defaulting to slot 1's port` | Differentiation surface | Done | `docs/verify/1908/` |
+| [#1920](https://github.com/xiechimon/cairn/issues/1920) `chief: attribute requests to the right project (investigate first, ask when tied, split across projects) + eval family` | Differentiation surface | Done | `apps/server/test/chief-settings.test.ts` |
+| [#1982](https://github.com/xiechimon/cairn/issues/1982) `gate: preserve complete image URLs and reject fixture evidence without misclassifying references` | Differentiation surface | Done | `docs/verify/1982/` |
 | [#16](https://github.com/xiechimon/cairn/issues/16) `研究：上游核心近读 — agent loop / bus / session / memory` | Runtime axis | Done | `apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts` |
 | [#25](https://github.com/xiechimon/cairn/issues/25) `设计：agent core TS 化（loop / runner / bus / session / memory）` | Runtime axis | Unverified | [unverified] |
 | [#37](https://github.com/xiechimon/cairn/issues/37) `研究：协议面与 executor 行为观察（API/WS 词表、MCP、tds start、BYOK/OAuth 面）` | Runtime axis | Unverified | [unverified] |
@@ -334,11 +339,14 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1611](https://github.com/xiechimon/cairn/issues/1611) `daemon(acp): Gemini CLI 作为第三执行面——stdio ACP 桥、词表与零凭据` | Runtime axis | Done | `docs/verify/1611/` |
 | [#1635](https://github.com/xiechimon/cairn/issues/1635) `daemon: git 子进程访问本机 server 时绕过全局 http.proxy（本机 integration 假红的根因）` | Runtime axis | Done | `apps/daemon/test/git-loopback-proxy.test.ts` |
 | [#1683](https://github.com/xiechimon/cairn/issues/1683) `server: Dockerfile + Railway 一键部署模板` | Runtime axis | In progress | `docs/verify/1683/` |
+| [#1786](https://github.com/xiechimon/cairn/issues/1786) `server+daemon: transient failures (provider 503, network reset on git push) fail the build instead of retrying` | Runtime axis | Done | `docs/verify/1786/`<br>`apps/daemon/test/git.test.ts`<br>`packages/shared/test/task-failure.test.ts` |
 | [#1808](https://github.com/xiechimon/cairn/issues/1808) `daemon: upgrade pi from 1.0.4 to 1.4.0 (compaction summary output cap, truncated-output session corruption)` | Runtime axis | Done | `apps/daemon/test/pi-compaction-ceiling.test.ts` |
 | [#1829](https://github.com/xiechimon/cairn/issues/1829) `daemon+server: a build whose final push is blocked by the repo pre-push hook fails outright, and a PR the agent opened is never recorded, so ci-loop never sees it` | Runtime axis | Done | `apps/daemon/test/git.test.ts`<br>`apps/daemon/test/runner-delivery.test.ts`<br>`apps/server/test/ci-loop.test.ts` |
+| [#1833](https://github.com/xiechimon/cairn/issues/1833) `daemon: throttle bulk issue and PR creation by the bot` | Runtime axis | Done | `docs/verify/1833/` |
+| [#1937](https://github.com/xiechimon/cairn/issues/1937) `web: in-place task panel shared by home, board, project, agent and machine pages (chat parity T2)` | Runtime axis | Done | `docs/verify/1937/`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/board-dnd.spec.ts`<br>`apps/web/e2e/card-press.spec.ts`<br>`apps/web/e2e/dead-buttons.spec.ts` |
 | [#10](https://github.com/xiechimon/cairn/issues/10) `Kernel: MCP agent channel` | General surface | Done | `apps/web/e2e/overlay-focus.spec.ts` |
 | [#11](https://github.com/xiechimon/cairn/issues/11) `Kernel: HTTP API surface` | General surface | Done | `packages/shared/test/records.test.ts` |
-| [#12](https://github.com/xiechimon/cairn/issues/12) `Kernel: SPA three screens` | General surface | Done | `apps/daemon/test/runner-issue-fence.test.ts`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/board-queued-drop.spec.ts`<br>`apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts`<br>`apps/web/test/mention-token.test.ts`<br>`packages/shared/test/issue-fence.test.ts` |
+| [#12](https://github.com/xiechimon/cairn/issues/12) `Kernel: SPA three screens` | General surface | Done | `apps/daemon/test/runner-issue-fence.test.ts`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/board-queued-drop.spec.ts`<br>`apps/web/e2e/chief-home-chat.spec.ts`<br>`apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts`<br>`apps/web/test/mention-token.test.ts`<br>`packages/shared/test/issue-fence.test.ts` |
 | [#13](https://github.com/xiechimon/cairn/issues/13) `Kernel: logging + crash recovery` | General surface | Done | `apps/server/test/trajectory-outcome.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts` |
 | [#15](https://github.com/xiechimon/cairn/issues/15) `研究：作者构建顺序考古（上游 git 历史）` | General surface | Done | `apps/web/e2e/overlay-focus.spec.ts` |
 | [#24](https://github.com/xiechimon/cairn/issues/24) `设计：TS 技术栈锁死` | General surface | Done | `apps/web/test/chief-markdown.test.ts` |
@@ -469,8 +477,8 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#448](https://github.com/xiechimon/cairn/issues/448) `mention-picker 构建产物里面板不居中（.anim-pop transform 覆盖 translateX(-50%)）` | General surface | Done | `apps/web/e2e/mention-picker-center.spec.ts` |
 | [#452](https://github.com/xiechimon/cairn/issues/452) `自派任务建时于 GitHub 建 issue，回填标题写进 issue（依赖 #446）` | General surface | Done | `apps/server/test/github-repo-dot-segments.test.ts` |
 | [#462](https://github.com/xiechimon/cairn/issues/462) `CI push-run E2E flake 三 symptom 留档：m5 超时/拒连 + board-filter Escape 关层竞态（PR run 六连绿对照）` | General surface | Done | `apps/web/test/sse-connection.test.ts` |
-| [#469](https://github.com/xiechimon/cairn/issues/469) `对话区两件事：工具输出独立成块 + 对话文本块级 markdown 渲染` | General surface | Done | `apps/web/e2e/chat-tools-identity.spec.ts`<br>`apps/web/test/transcript-tool-echo.test.ts` |
-| [#470](https://github.com/xiechimon/cairn/issues/470) `对话正文字号提阶 + 行宽上限` | General surface | Done | `apps/web/e2e/chat-tools-identity.spec.ts`<br>`apps/web/e2e/chat-type-measure.spec.ts`<br>`apps/web/e2e/spec-brief-card.spec.ts` |
+| [#469](https://github.com/xiechimon/cairn/issues/469) `对话区两件事：工具输出独立成块 + 对话文本块级 markdown 渲染` | General surface | Done | `apps/web/test/transcript-tool-echo.test.ts` |
+| [#470](https://github.com/xiechimon/cairn/issues/470) `对话正文字号提阶 + 行宽上限` | General surface | Done | `apps/web/e2e/chat-type-measure.spec.ts`<br>`apps/web/e2e/spec-brief-card.spec.ts` |
 | [#472](https://github.com/xiechimon/cairn/issues/472) `composer 改 in-flow：文字永不被输入框压住` | General surface | Done | `apps/web/e2e/detail-3pane.spec.ts` |
 | [#485](https://github.com/xiechimon/cairn/issues/485) `web: /app/team 的 Agent 无法点击与编辑 + 创建 Agent 弹窗内联服务商/模型位` | General surface | Done | `048253b78:docs/verify/485/` |
 | [#486](https://github.com/xiechimon/cairn/issues/486) `web: 资源五页内容超出视口即被裁——.res-col overflow:hidden 使面板无滚动容器` | General surface | Done | `ae3e46c06:docs/verify/486/`<br>`apps/web/e2e/skills-page.spec.ts` |
@@ -719,20 +727,33 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1614](https://github.com/xiechimon/cairn/issues/1614) `RSI-2 缺回归评测结果时自动派 Agent 跑，不再等人` | General surface | Not started | [unverified] |
 | [#1615](https://github.com/xiechimon/cairn/issues/1615) `server: 失败后重新开工时把上一轮 CI 报错、打回理由和失败原因注入新提示词` | General surface | Done | `apps/server/test/retry-lessons.test.ts` |
 | [#1616](https://github.com/xiechimon/cairn/issues/1616) `web: 任务详情与看板卡片显示每张票的花费（缓存读取 / 输入 / 输出）` | General surface | Done | `docs/verify/1616/` |
+| [#1618](https://github.com/xiechimon/cairn/issues/1618) `bug 票自动复现：新 bug 票先由 agent 用 verify-cairn 跑一遍并贴证据` | General surface | In progress | `docs/verify/1618/`<br>`apps/server/test/issue-intake.test.ts` |
 | [#1624](https://github.com/xiechimon/cairn/issues/1624) `chief: 子卡启动时注入前置子卡的交付摘要` | General surface | Done | `docs/verify/1624/`<br>`apps/daemon/test/runner-blocker-handoff.test.ts`<br>`apps/server/test/blocker-handoff-claim.test.ts` |
 | [#1625](https://github.com/xiechimon/cairn/issues/1625) `local 形态自动合并：ADR 0021 合并策略扩到本地项目` | General surface | Not started | [unverified] |
 | [#1626](https://github.com/xiechimon/cairn/issues/1626) `信息类快车道：产出不是代码的卡不碰仓库、成果直接递给下游` | General surface | Done | `docs/verify/1626/`<br>`apps/server/test/info-fastlane.test.ts`<br>`integration/test/info-fastlane-e2e.test.ts` |
 | [#1628](https://github.com/xiechimon/cairn/issues/1628) `重检查排队拿名额：prepush / e2e 同机并发上限，agent 写代码不受限` | General surface | Done | `docs/verify/1628/` |
-| [#1684](https://github.com/xiechimon/cairn/issues/1684) `web: 手机布局走查与修复（任务列表 / 详情 / 审批 / 总管）` | General surface | In progress | `docs/verify/1684/` |
+| [#1656](https://github.com/xiechimon/cairn/issues/1656) `错误台账拆成一条一个文件，汇总表脚本生成，消除 docs/lessons.md 合并冲突` | General surface | Done | `docs/verify/1656/` |
+| [#1681](https://github.com/xiechimon/cairn/issues/1681) `pacman-bench 正式打分：依赖打进任务镜像，判分阶段断网` | General surface | Done | `docs/verify/1681/` |
+| [#1684](https://github.com/xiechimon/cairn/issues/1684) `web: 手机布局走查与修复（任务列表 / 详情 / 审批 / 总管）` | General surface | Done | `docs/verify/1684/` |
 | [#1708](https://github.com/xiechimon/cairn/issues/1708) `server+web: tell users where the access token is (print on start, cairn token, login-page hint, one-time login link)` | General surface | Done | `apps/server/test/token-auth.test.ts`<br>`apps/web/e2e/token-gate.spec.ts` |
 | [#1710](https://github.com/xiechimon/cairn/issues/1710) `site, readme: final artwork (banner, crew, share card)` | General surface | Done | `docs/verify/1710/` |
 | [#1731](https://github.com/xiechimon/cairn/issues/1731) `server: GitHub OAuth connection ignores refresh tokens, so expiring user tokens break the connection` | General surface | Done | `apps/server/test/github-token-refresh.test.ts` |
-| [#1744](https://github.com/xiechimon/cairn/issues/1744) `上下文顶格时压缩请求自身 400 且不可恢复：整步无恢复路径` | General surface | In progress | `apps/daemon/test/pi-compaction-ceiling.test.ts` |
-| [#1762](https://github.com/xiechimon/cairn/issues/1762) `server: Tailscale Serve identity header signs the owner in without the access token (loopback-only trust)` | General surface | In progress | `apps/server/test/token-auth.test.ts`<br>`apps/web/e2e/token-gate.spec.ts` |
-| [#1777](https://github.com/xiechimon/cairn/issues/1777) `eval: record real-model baselines for chief-dispatch and memory-regression, rerun weekly` | General surface | Done | `docs/verify/1777/` |
+| [#1744](https://github.com/xiechimon/cairn/issues/1744) `上下文顶格时压缩请求自身 400 且不可恢复：整步无恢复路径` | General surface | In progress | `docs/verify/1744/`<br>`apps/daemon/test/pi-compaction-ceiling.test.ts` |
+| [#1762](https://github.com/xiechimon/cairn/issues/1762) `server: Tailscale Serve identity header signs the owner in without the access token (loopback-only trust)` | General surface | Done | `apps/server/test/token-auth.test.ts`<br>`apps/web/e2e/token-gate.spec.ts` |
+| [#1777](https://github.com/xiechimon/cairn/issues/1777) `eval: record real-model baselines for chief-dispatch and memory-regression, rerun weekly` | General surface | In progress | `docs/verify/1777/` |
 | [#1782](https://github.com/xiechimon/cairn/issues/1782) `eval(skills): skill routing precision and paired outcome eval` | General surface | Done | `docs/verify/1782/` |
 | [#1796](https://github.com/xiechimon/cairn/issues/1796) `chore: remove zero-use features (what's new notice, GitHub webhook receiver and tokens, remote shell commands)` | General surface | Done | `apps/server/test/machine-shell.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/machines-local.spec.ts`<br>`packages/shared/test/retired-zero-use.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
 | [#1800](https://github.com/xiechimon/cairn/issues/1800) `server: retry a failed task once automatically and fold stale failures out of "needs you"` | General surface | Done | `apps/server/test/needs-you.test.ts` |
+| [#1931](https://github.com/xiechimon/cairn/issues/1931) `web: make the home page one continuous chief chat (chat parity T1)` | General surface | Done | `docs/verify/1931/` |
+| [#1938](https://github.com/xiechimon/cairn/issues/1938) `web+server: chief unavailable banner, backup model, queue/steer/stop while busy (chat parity T4+T5)` | General surface | Done | `docs/verify/1938/` |
+| [#1945](https://github.com/xiechimon/cairn/issues/1945) `eval(1831): run and publish a fresh two-arm prompt ablation` | General surface | Done | `docs/verify/1945/` |
+| [#1981](https://github.com/xiechimon/cairn/issues/1981) `verify: define evidence limits in implementer prompts and verify-cairn` | General surface | Done | `docs/verify/1981/` |
+| [#1984](https://github.com/xiechimon/cairn/issues/1984) `eval(routing): land the benchmark fixtures and validated oracles` | General surface | Done | `docs/verify/1984/`<br>`integration/test/routing-bench.test.ts` |
+| [#1985](https://github.com/xiechimon/cairn/issues/1985) `eval(routing): enforce the workspace read boundary and grade implementation reuse` | General surface | Done | `docs/verify/1985/` |
+| [#2008](https://github.com/xiechimon/cairn/issues/2008) `web: clean home on the first open of each day, with a per-project brief (chat-home T3)` | General surface | Done | `docs/verify/2008/` |
+| [#2009](https://github.com/xiechimon/cairn/issues/2009) `web+server: project chip, @project, move-project and per-project summary in the chief home (chat parity T6)` | General surface | Done | `docs/verify/2009/`<br>`apps/server/test/chief-project-pick.test.ts`<br>`apps/server/test/github-writeback.test.ts`<br>`apps/web/e2e/chief-project-pick.spec.ts`<br>`integration/test/project-routing-grade.test.ts` |
+| [#2017](https://github.com/xiechimon/cairn/issues/2017) `test(server): attachment-gc event-loop test asserts wall-clock ms and fails under load` | General surface | Done | `docs/verify/2017/` |
+| [#2024](https://github.com/xiechimon/cairn/issues/2024) `main red: commit-author on 51cab1f0` | General surface | Done | `docs/verify/2024/` |
 
 ## 3. Rows without anchors and rows that cannot be resolved (follow-up work)
 
@@ -879,6 +900,7 @@ The row-set criterion = issues (§0.1). These PR numbers are referenced by the t
 |---|---|---|---|
 | [#88](https://github.com/xiechimon/cairn/pull/88) | `web(71): 路由批 C — schedules + project 三页像素面 + parity 矩阵加行（#71）` | closed | tests ×1 |
 | [#101](https://github.com/xiechimon/cairn/pull/101) | `daemon(80): M3b daemon 深面 — worktree 契约 + step 三类 + merge 202（单机生命周期实跑）` | closed | tests ×2 |
+| [#102](https://github.com/xiechimon/cairn/pull/102) | `server(81): M4a Chief 编排 — remoteTools relay + 措辞→spec + 驳回 v2 + 双 Agent 分派（#81）` | closed | tests ×1 |
 | [#108](https://github.com/xiechimon/cairn/pull/108) | `web(83): M5 汇合 — fixture 切真 API + live streaming 真 SSE + E2E 主时序全链（含 M6 终验）` | closed | spec ×1 |
 | [#115](https://github.com/xiechimon/cairn/pull/115) | `deps(107): pi 0.85.1 → 0.86.0——首个 D6 升级窗口（Breaking 三条全缝外）` | closed | spec ×1 |
 | [#117](https://github.com/xiechimon/cairn/pull/117) | `chore(104): TypeScript 5.9.3→7.0.2 全线抬升 —— 工具链共存核实 + i18n 门 TS7 scanner 改写` | closed | spec ×1 |
@@ -974,6 +996,8 @@ The row-set criterion = issues (§0.1). These PR numbers are referenced by the t
 | [#1636](https://github.com/xiechimon/cairn/pull/1636) | `eval(1605): adoption judge with validity, trigger and paired-z gates and a read-once sealed set` | closed | spec ×1 |
 | [#1641](https://github.com/xiechimon/cairn/pull/1641) | `server(1514): pnpm traj:export writes redacted trajectory packs from a readonly sqlite snapshot` | closed | spec ×1 |
 | [#1660](https://github.com/xiechimon/cairn/pull/1660) | `eval(1606): trajectory packs carry a failure attribution, with traj:label and traj:attribution` | closed | spec ×1 |
+| [#1776](https://github.com/xiechimon/cairn/pull/1776) | `web: snap icon buttons to the 24/28/32 tiers` | closed |  |
+| [#1828](https://github.com/xiechimon/cairn/pull/1828) | `web,daemon: show agent work step by step on the task detail page` | closed |  |
 
 ### 3.3 Unresolvable ticket numbers
 
@@ -1009,6 +1033,7 @@ These directory names under `docs/verify/` are not GitHub ticket numbers of this
 | XMON-89 | `bdb5c61c9:docs/verify/XMON-89/` |
 | app-icon | `docs/verify/app-icon/` |
 | board-drop-radius | `docs/verify/board-drop-radius/` |
+| button-tiers | `docs/verify/button-tiers/` |
 | cairn-theme | `docs/verify/cairn-theme/` |
 | chief-fab | `docs/verify/chief-fab/` |
 | claude-shell | `docs/verify/claude-shell/` |
@@ -1076,6 +1101,7 @@ These directory names under `docs/verify/` are not GitHub ticket numbers of this
 | ui-remove-quick | `docs/verify/ui-remove-quick/` |
 | ui-skeleton | `docs/verify/ui-skeleton/` |
 | ui-state-audit | `docs/verify/ui-state-audit/` |
+| work-trace | `docs/verify/work-trace/` |
 | xmon-13 | `b8a7bf3a7:docs/verify/xmon-13/` |
 | xmon-14 | `d37937f9f:docs/verify/xmon-14/` |
 | xmon-16 | `90ab48936:docs/verify/xmon-16/` |
@@ -1100,10 +1126,11 @@ before today.
 |---|---|---|---|---|---|---|
 | dispatch | `chief-dispatch` | 64 | 29/30 (96.7%) | 2026-10-26 | `glm-5.3` | scored |
 | memory use | `memory-regression` | 21 |  |  |  | built-not-run |
-| project routing | `project-routing` | 13 |  |  |  | built-not-run |
+| project routing | `project-routing` | 16 |  |  |  | built-not-run |
 | learn from correction | `learn` | 10 |  |  |  | built-not-run |
 | review |  |  |  |  |  | none ([#1779](https://github.com/xiechimon/cairn/issues/1779)) |
 | planning |  |  |  |  |  | none ([#1780](https://github.com/xiechimon/cairn/issues/1780)) |
+| prior-art planning | `plan-prior-art` | 2 |  |  |  | built-not-run |
 | coding |  |  |  |  |  | none |
 | machine claim |  |  |  |  |  | tests only, no eval needed |
 | intake |  |  |  |  |  | tests only, no eval needed |

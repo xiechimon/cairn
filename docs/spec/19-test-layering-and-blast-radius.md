@@ -28,7 +28,7 @@ CI side (step breakdown of the green run 37098721348): check job 7.4min, among w
 | **unit** | vitest projects, each package colocated `test/`, pure functions / schema / mapper | **every change** (seconds; narrowable by affected surface) | `pnpm test`; affected surface `pnpm exec vitest run --changed` |
 | **stack integration** | vitest `integration` project: in-process real server + daemon + Chromium walking the full chain | **when changing the server / daemon / shared contract surface** (affected surface) | `VITEST_PROJECT_SET=integration pnpm test` |
 | **web e2e** | playwright fixture surface: 83 specs / 617 cases, UI behavior and geometry | **development runs the affected surface**; **the full set goes to CI (4 shards)**; local full only when a final review really needs it | affected surface `pnpm --filter @pacman/web e2e:affected`; full `pnpm --filter @pacman/web e2e` |
-| **verify-pacman** | isolated live stack (8791/5273 + independent PACMAN_HOME) walking real user paths | **ticket-level acceptance** (proof before delivery that "it really runs", not daily regression) | `.claude/skills/verify-pacman/SKILL.md` |
+| **verify-pacman** | isolated live stack (8791/5273 + independent CAIRN_HOME) walking real user paths | **ticket-level acceptance** (proof before delivery that "it really runs", not daily regression) | `.claude/skills/verify-pacman/SKILL.md` |
 
 One-sentence memory: **unit every change, stack integration by contract, e2e development only the affected surface (the full set is CI's job), live probes ticket-level acceptance.**
 
@@ -74,7 +74,7 @@ The aggregate job itself has a criterion (#762): must be `if: always()` and expl
 | ts-imports (relative import style unified) | biome organizeImports | covered, not a risk surface |
 | entry-graphs (the browser bundle must not pull node-only modules) | single browser app (apps/web), the vite build itself is this gate | **low value not proposed**: pi's risk exists only in its multi-package published browser/node dual shape |
 | shrinkwrap / install-lock (published artifact reproducible install) | CI's `pack-smoke` job (#264) smoke-tests the main-package tarball | **equivalent already exists** |
-| hermetic test environment (test.sh: empty env + temp HOME + zero credentials) | partially equivalent: stack-integration/token-gate each `mkdtemp` + independent `PACMAN_HOME`; but the full vitest still inherits the machine env | **the only one worth proposing**: local tests may read the real `~/.pacman` / credentials causing false green/false red. Propose a later single ticket: a local `test:hermetic` wrapper (empty env + temp HOME). CI is naturally hermetic, no change needed |
+| hermetic test environment (test.sh: empty env + temp HOME + zero credentials) | partially equivalent: stack-integration/token-gate each `mkdtemp` + independent `CAIRN_HOME`; but the full vitest still inherits the machine env | **the only one worth proposing**: local tests may read the real `~/.pacman` / credentials causing false green/false red. Propose a later single ticket: a local `test:hermetic` wrapper (empty env + temp HOME). CI is naturally hermetic, no change needed |
 
 Conclusion: five of the six already have a different-shaped pacman equivalent, copying verbatim is duplicate construction; the only worthwhile addition is the hermetic environment, and it should be a separate ticket (the change surface is every test's startup mode, not mixed into this ticket).
 

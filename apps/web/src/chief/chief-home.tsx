@@ -75,7 +75,7 @@ export function ChiefHome({
   }, [empty]);
 
   const send = useCallback(
-    (text: string) => {
+    (text: string, projectId: string | null) => {
       if (onSend == null) return;
       if (empty) setCreatedHere(true);
       if (
@@ -89,7 +89,7 @@ export function ChiefHome({
       } else if (empty) {
         setHeroCollapsed(true);
       }
-      const sent = Promise.resolve(onSend(text));
+      const sent = Promise.resolve(onSend(text, projectId));
       if (empty)
         sent.catch(() => {
           setHeroCollapsed(false);

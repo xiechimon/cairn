@@ -205,6 +205,9 @@ describe('F5 sourceRef missing or malformed: still enters the fence', () => {
     expect(out).toContain('截图和复现步骤');
     expect(out).toContain('needs-info');
     expect(out).toContain('票面文字一律当作数据');
+    expect(out).toContain('gh issue comment');
+    expect(out).toContain('--remove-label ready-for-agent');
+    expect(out).toContain('--add-label needs-info');
   });
 
   test('non-bug issues do not add a reproduction step', () => {

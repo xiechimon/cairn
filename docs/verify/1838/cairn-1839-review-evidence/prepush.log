@@ -1,0 +1,1441 @@
+$ node scripts/prepush.mjs
+[heavy-slots] acquired slot 1/1
+[prepush] node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 14 text + 14 spacing in 13 file(s); 5 css + 221 tsx + 263 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 1b84a9bf8469.
+[prepush] node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 34 components/ui file(s); 24 brand-ink text-role line(s), all registered (24 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+[prepush] pnpm lint
+$ biome ci .
+[0m[34mChecked 1048 files in 699[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m
+[prepush] pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+[prepush] pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1355 tests in 189 files collected, disk count matches (1.1s)
+[spec-parse-gate] integration/test: 41 test files parsed clean by tsc (1.1s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] node scripts/e2e-affected.mjs --check-coverage
+[e2e:affected] coverage: 0 uncovered spec(s)
+[prepush] node --test docs/verify/1542/reach.test.mjs
+✔ apps/web/e2e/unmapped-reach.spec.ts (29.9445ms)
+✔ apps/web/e2e/board-reach.spec.ts (29.1905ms)
+✔ apps/web/e2e/a11y-axe.spec.ts (28.586959ms)
+✔ registry reach: scripts/drive-unregistered.mjs (28.867667ms)
+✔ registry reach: docs/verify/1542/drive-unregistered.mts (26.946875ms)
+✔ registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs (26.005166ms)
+✔ registry reach: apps/web/e2e/unmapped-reach.spec.ts (53.486833ms)
+✔ registry reach: apps/web/e2e/board-reach.spec.ts (53.348667ms)
+✔ discovers committed, staged and untracked additions from the base (468.987291ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 787.689667
+[prepush] node scripts/lessons-ledger-gate.mjs
+lessons ledger ok
+[prepush] node scripts/ci-job-structure-gate.mjs
+ci-job-structure: GREEN (every named step sits in its pinned job)
+[prepush] node scripts/feature-map-staleness-gate.mjs
+feature-map-gate: OK (37 md files, 339 refs checked, 59 frozen in baseline)
+[prepush] node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+[prepush] node scripts/single-use-helper-gate.mjs
+single-use-helper-gate: 0 single-use helper(s)
+[prepush] node scripts/baseline-ratchet-gate.mjs
+baseline-ratchet-gate: 0 raised baseline(s)
+[prepush] node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 660 test sources, no package-manager spawns.
+[prepush] node scripts/pr-evidence-workflow-gate.mjs
+pr-evidence-workflow: GREEN (required-check shape intact)
+[prepush] node scripts/ui-registry-gate.mjs
+[ui-registry-gate] note: no base sha on this run (push event or local check) — the S5 ratchet has nothing to compare against; a status downgrade landing straight on main is guarded by review only (same posture as debt-gate D3 on main).
+[ui-registry-gate] PASS: 35 file(s) in apps/web/src/components/ui = 27 registry (20 pristine vs pinned snapshot / 7 registered deviations) + 8 adapters; snapshot shadcn@4.21.3 fetched 2026-10-25; ledger frozen from 1b84a9bf8469; comparison: in-tree only.
+[prepush] node scripts/ui-consumer-shape-gate.mjs
+[ui-consumer-shape-gate] PASS: 3 flagged line(s) across 263 consumer file(s), all registered (3 entries = 3 deviation).
+[prepush] node scripts/pr-gate-selfcheck.mjs
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are each required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+PASS  linesChanged must be a non-negative integer
+PASS  a path with a shell character is rejected
+PASS  CI gate helpers and data anywhere under scripts/ route to the user
+PASS  gate files outside root scripts/ route to the user (run 4)
+PASS  files that steer agents route to the user (run 4)
+PASS  a path a reviewer adds to protectedPaths routes to the user
+PASS  product source, tests, e2e and evidence do not route to the user
+PASS  paths outside the auto-merge set route to the user (run 5)
+PASS  agent-steering files the name list missed route to the user (run 5)
+PASS  eval ruler paths route to the user as protected (ADR 0025)
+PASS  case variants of protected paths route to the user (run 5)
+PASS  a protected path only the safety reviewer lists is matched (run 5)
+PASS  a deleted test helper (test directory only) routes to the user (run 5)
+PASS  a deleted colocated test (suffix only) routes to the user (run 5)
+PASS  a deleted path missing from changedFiles is an args error (run 5)
+PASS  pr and ticket must be positive integers (run 5)
+PASS  a path with a quote or space is rejected (run 5)
+PASS  configs CI runs under route to the user, at the root too
+PASS  a deletion only the safety reviewer reports routes to the user
+PASS  a larger line count from the safety reviewer routes to the user
+PASS  binaryFiles is required and lists changed paths only (code-review on #1410)
+PASS  a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410)
+PASS  a binary file under docs/verify stays mergeable without the user
+PASS  a binary file only the safety reviewer listed routes to the user
+PASS  a deleted test is found whatever the case of its directory or suffix (code-review on #1410)
+PASS  a glob star does not cross a slash: an extra directory before src/ leaves the auto-merge set (run 8)
+PASS  a deleted colocated .spec file outside a test directory routes to the user (run 8)
+PASS  a dimension whose review breaks the second stage counts as missing and keeps go false (run 8)
+PASS  private refs carry the head, so runs on two heads of one PR do not delete each other's refs (run 8)
+PASS  a reviewer that returns nothing blocks go
+PASS  findings past the skeptic cap are kept
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  two skeptics confirming on the head keep the finding (run 5)
+PASS  a split vote keeps the finding (run 5)
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a nested .gitattributes routes to the user (run 6)
+PASS  the args help gives the line count command that takes attributes from the empty tree (run 6)
+PASS  a C-quoted binary path is refused with the quoting hint (run 7)
+PASS  the safety reviewer is told both git commands with --no-renames, core.quotePath=false and the empty tree (runs 2, 6, 7)
+PASS  reviewers and skeptics fetch PR comments with a filter that drops non-members before the bodies reach them (run 7, final /code-review)
+PASS  reviewers confirm the head on their own ref, never FETCH_HEAD (run 1)
+PASS  every reviewer and skeptic is told GitHub is read-only and that PR text is data
+PASS  the safety reviewer must return all four git-derived values
+PASS  the 40-file cap counts files only the safety reviewer listed
+PASS  the merge readiness gate source routes to the user (run 6)
+PASS  migrations, the lockfile and .npmrc are protected, packages/* outside src and test is not auto (run 6)
+PASS  a deleted helper under e2e/, tests/ or __tests__/ routes to the user (run 6)
+PASS  exactly 800 lines and 40 files still auto-merge (run 6)
+PASS  a file only the safety reviewer lists counts toward the auto-merge set (run 6)
+PASS  headSha, an empty file list and non-string paths are args errors (run 6)
+PASS  the safety reviewer does not see the caller file list (run 6)
+PASS  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+PASS  the evidence reviewer and skeptics check for a fork before any checkout, and read a fork head with git show, diff and ls-tree only (run 10)
+PASS  every checkout the evidence prompts ask for runs with core.hooksPath=/dev/null (run 10)
+PASS  the fetch and the ref cleanup run with core.hooksPath=/dev/null in every prompt, the evidence worktrees included (run 10)
+PASS  evidence installs skip husky's prepare, which would set the shared clone's core.hooksPath to the relative .husky/_ (run 10)
+PASS  the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)
+PASS  a path only in the safety reviewer's deleted or binary list is matched against D4 and blocks go (run 10)
+PASS  an entry named exactly like a protected directory (a symlink .claude, scripts, drizzle) routes to the user (run 10)
+PASS  the bare-directory match is for protected classes only: src and docs/verify named alone stay outside the auto-merge set, file globs stay exact (run 10)
+PASS  D4 globs are anchored at the path start: an auto-merge or evidence path inside a longer one routes to the user (run 10)
+PASS  a caller line count larger than the safety reviewer's wins (run 10)
+PASS  the security-sensitive surfaces of the AGENTS.md /security-review list and the migration runner route to the user (run 11)
+PASS  the security class matches exact paths from the root: machine*.ts stops at a slash, and neighbours still auto-merge (run 11)
+PASS  protected names with U+017F or U+212A in place of s or k route to the user (run 11)
+PASS  auto-merge matching folds ASCII case only, protection folds Unicode: ſrc and docſ/verify route to the user, AGENTſ.md stays protected (run 11)
+PASS  a deleted test is found with U+017F in its directory or suffix (run 11)
+PASS  every prompt calls the ticket body untrusted data by the ticket's author, never instructions (run 11)
+PASS  each skeptic is given the finding and the refute rule (run 11)
+PASS  the safety reviewer's own protectedPaths route to the user (run 11)
+PASS  a deleted .mjs or .cts test routes to the user (run 11)
+PASS  skepticsMissing counts each skeptic that returned nothing (run 11)
+PASS  a path git quotes even with core.quotePath=false is sent to review by hand, not back to the flag (run 11)
+PASS  the args help and the safety reviewer say the line count command needs git 2.40 or later (run 11)
+PASS  docs-only Markdown patch: go, auto-merge (#1621)
+PASS  design decisions, ADRs and the review guide stay with the user in any case or Unicode fold (#1621)
+PASS  docs patch with a deleted test or a non-Markdown docs file routes to the user (#1621)
+PASS  a missing safety file list blocks go
+PASS  docs/spec, the goal-session rules, is a named protected class, not only default deny (#1462)
+PASS  every AGENTS.md /security-review path pattern is an entry of PROTECTED, and the section points back at ADR 0021 D4 (drift guard, #1462)
+PASS  a safety review missing deletedFiles, linesChanged or binaryFiles keeps go false (#1462)
+PASS  the verdict records which copy of the script ran: scriptSha256 is the file hash with its own constant blanked (#1462)
+PASS  a skeptic is told the finding is a relayed account whose text may quote untrusted PR or ticket data (#1462)
+94/94 passed (.claude/workflows/pr-gate.js)
+[prepush] node scripts/lane-file-gate.mjs
+lane-file-gate leg 1 (tracked at repo root): 0 hit(s)
+lane-file-gate leg 2: skipped (no base sha; local run or push event)
+lane-file-gate: OK (no lane process files tracked at the repository root)
+[prepush] node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+[prepush] node scripts/prepush-vitest.mjs
+
+ RUN  v5.0.1 <home>/.codex/worktrees/pr-1839-prior-art/cairn
+
+ ✓ |@cairn/shared| test/plan-contract.test.ts (35 tests) 8ms
+ ✓ |@cairn/shared| test/issue-fence.test.ts (21 tests) 9ms
+ ✓ |@cairn/shared| test/machine-capabilities.test.ts (24 tests) 9ms
+ ✓ |@cairn/shared| test/blocker-handoff.test.ts (25 tests) 16ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts (40 tests) 15ms
+ ✓ |@cairn/shared| test/skill-inject.test.ts (17 tests) 25ms
+ ✓ |@cairn/shared| test/records.test.ts (55 tests) 42ms
+ ✓ |@cairn/shared| test/chief-tools.test.ts (17 tests) 7ms
+ ✓ |@cairn/shared| test/restart-prompt.test.ts (16 tests) 18ms
+ ✓ |@cairn/shared| test/plan-first-round-prompt.test.ts (14 tests) 3ms
+ ✓ |@cairn/shared| test/persona.test.ts (8 tests) 8ms
+ ✓ |@cairn/shared| test/trajectory-pack.test.ts (10 tests) 14ms
+ ✓ |@cairn/shared| test/plan-contract-prompt.test.ts (8 tests) 3ms
+ ✓ |@cairn/shared| test/snapshot.test.ts (79 tests) 60ms
+ ✓ |@cairn/shared| test/skill-route.test.ts (15 tests) 4ms
+ ✓ |@cairn/shared| test/work-branch-note.test.ts (9 tests) 6ms
+ ✓ |@cairn/shared| test/permission-rules.test.ts (11 tests) 6ms
+ ✓ |@cairn/shared| test/skill-entry.test.ts (11 tests) 6ms
+ ✓ |@cairn/shared| test/confirmed-plan-note.test.ts (6 tests) 3ms
+ ✓ |@cairn/shared| test/harness-eval.test.ts (3 tests) 4ms
+ ✓ |@cairn/shared| test/retired-zero-use.test.ts (4 tests) 4ms
+ ✓ |@cairn/shared| test/agent-todo-stream.test.ts (5 tests) 24ms
+ ✓ |@cairn/shared| test/review-reject-prompt.test.ts (4 tests) 4ms
+ ✓ |@cairn/shared| test/secret-redaction.test.ts (7 tests) 16ms
+ ✓ |@cairn/shared| test/memory-tools.test.ts (1 test) 4ms
+ ✓ |@cairn/web| test/chief-markdown.test.ts (33 tests) 9ms
+ ✓ |@cairn/web| test/activity-live-row.test.ts (18 tests) 38ms
+ ✓ |@cairn/web| test/transcript-user-words.test.ts (21 tests) 22ms
+ ✓ |@cairn/web| test/tag-filter.test.ts (21 tests) 4ms
+ ✓ |@cairn/web| test/columns.test.ts (33 tests) 11ms
+ ✓ |@cairn/web| test/sse-conversation-stream.test.ts (21 tests) 9ms
+ ✓ |@cairn/web| test/chief-user-echo.test.ts (13 tests) 7ms
+ ✓ |@cairn/web| test/dnd.test.ts (17 tests) 6ms
+ ✓ |@cairn/web| test/transcript-tool-echo.test.ts (6 tests) 4ms
+ ✓ |@cairn/web| test/work-trace-mapper.test.ts (8 tests) 33ms
+ ✓ |@cairn/web| test/chief-flight-expand.test.ts (7 tests) 16ms
+ ✓ |@cairn/web| test/chief-stream-handoff.test.ts (6 tests) 8ms
+ ✓ |@cairn/web| test/thinking-live-row.test.ts (6 tests) 22ms
+ ✓ |@cairn/web| test/chief-segments.test.ts (7 tests) 9ms
+ ✓ |@cairn/web| test/transcript-quiescent.test.ts (8 tests) 32ms
+ ✓ |@cairn/web| test/model-options.test.ts (10 tests) 6ms
+ ✓ |@cairn/web| test/agent-todo-row.test.ts (5 tests) 27ms
+ ✓ |@cairn/web| test/repo-filter.test.ts (10 tests) 9ms
+ ✓ |@cairn/web| test/injected-skills-row.test.ts (5 tests) 32ms
+ ✓ |@cairn/web| test/transcript-issue-fence.test.ts (2 tests) 24ms
+ ✓ |@cairn/web| test/i18n-coverage.test.ts (5 tests) 165ms
+ ✓ |@cairn/web| test/sse-guards.test.ts (7 tests) 5ms
+ ✓ |@cairn/web| test/fail-row-ansi.test.ts (3 tests) 25ms
+ ✓ |@cairn/web| test/chief-todo-handoff.test.ts (4 tests) 5ms
+ ✓ |@cairn/web| test/attachment-paste.test.ts (35 tests) 20ms
+ ✓ |@cairn/web| test/sse-team-events.test.ts (5 tests) 3ms
+ ✓ |@cairn/web| test/chief-orchestration-failure.test.ts (2 tests) 34ms
+ ✓ |@cairn/web| test/rel-time.test.ts (6 tests) 6ms
+ ✓ |@cairn/web| test/merge-gate.test.ts (7 tests) 2ms
+ ✓ |@cairn/web| test/usage-cost.test.ts (2 tests) 4ms
+ ✓ |@cairn/web| test/thinking-level.test.ts (5 tests) 2ms
+ ✓ |@cairn/web| test/created-at.test.ts (2 tests) 17ms
+ ✓ |@cairn/web| test/chief-identity.test.ts (5 tests) 14ms
+ ✓ |@cairn/web| test/segments-mention-nav.test.ts (5 tests) 25ms
+ ✓ |@xiechimon/cairn| test/merge-gate-readiness.test.ts (191 tests) 56ms
+ ✓ |@xiechimon/cairn| test/merge-gate-github-facts.test.ts (35 tests) 1663ms
+ ✓ |@xiechimon/cairn| test/skill-import.test.ts (35 tests) 1614ms
+ ✓ |@xiechimon/cairn| test/github-reads.test.ts (39 tests) 1545ms
+ ✓ |@xiechimon/cairn| test/pr-seg3.test.ts (79 tests) 3081ms
+ ✓ |@xiechimon/cairn| test/ci-loop.test.ts (37 tests) 1732ms
+ ✓ |@xiechimon/cairn| test/github-issues.test.ts (36 tests) 1607ms
+ ✓ |@xiechimon/cairn| test/skill-write.test.ts (30 tests) 2256ms
+   ✓ machine-wire skill listing and on-demand fetch (GET /api/machine/skills/{stepId}[/file]) (8)
+     ✓ M5: an over-limit file no longer fails the whole package -- an asset past the per-file gate enters the listing with its real size and is delivered byte-complete; a total over the old package gate still gets a listing 918ms
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts (122 tests) 4680ms
+ ✓ |@xiechimon/cairn| test/persona-split-verify.test.ts (18 tests) 981ms
+ ✓ |@xiechimon/cairn| test/merge-gate-paths.test.ts (89 tests) 27ms
+stderr | test/github-writeback.test.ts > self-created issues: stored as not-yet-created, source backfilled after async creation (A family) > a secondary limit retries the pending task and backfills its source
+GitHub create rate limited; retrying in 1000ms
+
+ ✓ |@xiechimon/cairn| test/merge-gate-verdict-binding.test.ts (26 tests) 1622ms
+ ✓ |@xiechimon/cairn| test/retry-lessons.test.ts (22 tests) 829ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts (26 tests) 602ms
+ ✓ |@xiechimon/cairn| test/machine-wire.test.ts (26 tests) 1683ms
+   ✓ claim/wake timing (r3 section 1.5 measured: ~75s long poll cadence + wake low-latency dispatch) (5)
+     ✓ empty long poll returns {step:null} after about the hold duration (same cadence shape, shortened timescale) 447ms
+ ✓ |@xiechimon/cairn| test/github-writeback.test.ts (22 tests) 2238ms
+   ✓ self-created issues: stored as not-yet-created, source backfilled after async creation (A family) (10)
+     ✓ a secondary limit retries the pending task and backfills its source 1050ms
+ ✓ |@xiechimon/cairn| test/pr-reconcile.test.ts (186 tests) 7161ms
+ ✓ |@xiechimon/cairn| test/project-identity.test.ts (29 tests) 675ms
+ ✓ |@xiechimon/cairn| test/artifact-gate.test.ts (27 tests) 1485ms
+ ✓ |@xiechimon/cairn| test/merge-gate-tables.test.ts (25 tests) 870ms
+ ✓ |@xiechimon/cairn| test/issue-intake.test.ts (176 tests) 8882ms
+ ✓ |@xiechimon/cairn| test/build-abandoned-sweep.test.ts (34 tests) 1292ms
+ ✓ |@xiechimon/cairn| test/token-auth.test.ts (45 tests) 1328ms
+ ✓ |@xiechimon/cairn| test/review.test.ts (17 tests) 3254ms
+   ✓ review step material forks by gate (#511) (5)
+     ✓ failure mode 1: the confirm-gate material contains no changes -- even when the conversation branch already has them 461ms
+     ✓ failure mode 2: the review-gate material contains the plan + changes (file paths and line-by-line diffs all present) 593ms
+     ✓ failure mode 4: the changes in the material = the same computation path as the human change surface (the GET /changes file set matches) 815ms
+     ✓ failure mode 6: the review step claim payload session = new (the prompt goes to a new session, not continuing the main conv) 301ms
+ ✓ |@xiechimon/cairn| test/model-fallback.test.ts (41 tests) 2307ms
+ ✓ |@xiechimon/cairn| test/chief-queue-steer-stop.test.ts (26 tests) 1918ms
+ ✓ |@xiechimon/cairn| test/project-local.test.ts (32 tests) 2240ms
+   ✓ the local project read surface -- the Files tab gate opens (#1030) (5)
+     ✓ F1 a reachable repo: all five read surfaces return real values; readable even with HEAD on a non-main branch 364ms
+     ✓ F6 commit detail: the root commit = all files added against the empty tree; a vanished directory = the same gate reason 313ms
+ ✓ |@xiechimon/cairn| test/m5-face.test.ts (9 tests) 622ms
+ ✓ |@xiechimon/cairn| test/m3b-machine-git.test.ts (12 tests) 3360ms
+   ✓ merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section 3.6 server-side main verify) (2)
+     ✓ merge step done(commit) -> bare repo main fast-forward + timeline 🎉 408ms
+     ✓ not fast-forward (main advanced during the merge window) -> step failed + todo failed (failure only human rerun, 02/A6) 453ms
+   ✓ #1487 merge step in flight when the card leaves review: success report not landed; repeated merge request 409 (4)
+     ✓ failure mode 1: closed while the merge step is in flight -> success report does not fast-forward main, card still closed, timeline explanation 344ms
+     ✓ failure mode 1b: report arrives while card still in review, closed during the landing git check -> still not fast-forwarded 434ms
+     ✓ failure mode 2: closed then reopened to to-do -> also not landed, card still todo 333ms
+     ✓ failure mode 3: same build already has an in-flight merge step (pending or claimed) -> another merge request 409, no extra one queued 317ms
+ ✓ |@xiechimon/cairn| test/conv-stream-catchup.test.ts (25 tests) 628ms
+   ✓ chief wire surface: mid-way entry catch-up (#740 ticket symptom path) (2)
+     ✓ delta during zero-subscriber period -> one catch-up text_delta on stream open -> live as usual -> new stream after done has zero catch-up 412ms
+ ✓ |@xiechimon/cairn| test/close-stops-active-steps.test.ts (28 tests) 1589ms
+ ✓ |@xiechimon/cairn| test/skills-local.test.ts (24 tests) 776ms
+ ✓ |@xiechimon/cairn| test/machine-capability-gate.test.ts (14 tests) 761ms
+ ✓ |@xiechimon/cairn| test/git-hosting.test.ts (11 tests) 6529ms
+   ✓ hosted form: bare repo + git http-backend (02 section 3 locked) (9)
+     ✓ clone/commit/push run green through (http-backend CGI full chain) -> branches/tree/file read back 801ms
+     ✓ GET /api/projects/{id}/files -> full recursion + directory entries + upper bound + round-trip (#760) 867ms
+     ✓ GET /api/projects/{id}/commits -> commit history read back new to old 775ms
+     ✓ GET /api/projects/{id}/commits/{sha} -> metadata + first-parent diff; boundary 404/defined state 1328ms
+     ✓ conv branch push (02 section 5.5: conv-<conversationId>) + binary file base64 1222ms
+     ✓ same-name project repoName uniquified (-2 suffix [design]); unknown repo 404 359ms
+   ✓ GitHub integration form (02 section 3: record surface + executor contract run through) (2)
+     ✓ executor contract run through: clone the user own repo -> conv-* branch -> push (remote local bare stand-in) 480ms
+ ✓ |@xiechimon/cairn| test/merge-gate-digest.test.ts (36 tests) 12ms
+ ✓ |@xiechimon/cairn| test/machine-pin.test.ts (11 tests) 2433ms
+   ✓ #1259 worker home-machine gate (2)
+     ✓ bound to A -> A claims, B comes up empty; rebound to B -> B claims (reassignment immediate) 547ms
+     ✓ no home machine set -> no machine can claim it (stays pending) 443ms
+   ✓ #1260 chief step delivery = bound Agent home machine (1)
+     ✓ Agent bound to B -> only B can claim the chief step; Agent rebound to A -> A claims (reassignment immediate) 463ms
+ ✓ |@xiechimon/cairn| test/plan-handoff.test.ts (15 tests) 1007ms
+ ✓ |@xiechimon/cairn| test/trajectory-push.test.ts (20 tests) 9246ms
+   ✓ maps one build to one trace: invoke_agent root, a span per step, chat and execute_tool under each step 1262ms
+   ✓ pushing the same pack twice sends byte-identical trace and span ids 500ms
+   ✓ a pack without steps or timestamps still yields a deterministic root span 484ms
+   ✓ rejects bad input before sending anything 647ms
+   ✓ a second push of the same traces to the same endpoint sends nothing and reports the skip 625ms
+   ✓ only traces not yet pushed are sent when a later file adds a build 513ms
+   ✓ --force pushes every span again 721ms
+   ✓ a different endpoint is a different target and gets the full push 549ms
+   ✓ the record is keyed without credentials, so rotating the key does not repush 530ms
+   ✓ traces delivered before a failure stay recorded and are skipped on retry 784ms
+ ✓ |@xiechimon/cairn| test/attachments.test.ts (27 tests) 1375ms
+ ✓ |@xiechimon/cairn| test/attachment-gc.test.ts (15 tests) 5111ms
+   ✓ attachment gc -- scheduler cadence (3)
+     ✓ a large transcript corpus does not block the event loop during a tick 4502ms
+ ✓ |@xiechimon/cairn| test/issue-fence.test.ts (10 tests) 838ms
+ ✓ |@xiechimon/cairn| test/queued-cancel-release.test.ts (10 tests) 926ms
+ ✓ |@xiechimon/cairn| test/schedules.test.ts (14 tests) 810ms
+ ✓ |@xiechimon/cairn| test/second-pr-guard.test.ts (10 tests) 460ms
+ ✓ |@xiechimon/cairn| test/plan-server-auto-confirm.test.ts (17 tests) 1369ms
+ ✓ |@xiechimon/cairn| test/failed-review-restore.test.ts (7 tests) 2316ms
+   ✓ #702 failed->review restore (B-C17 deadlock shape) (7)
+     ✓ failure mode 1 positive: exit open (build delivered) (2)
+       ✓ #519 shape run through: build done + review failed -> in-product merge 202 -> merge step -> done (PR not orphaned) 1100ms
+       ✓ only rerun the review: failed (build leg done) starting an AI review -> 202 + review step enqueued + phase back to review 887ms
+ ✓ |@xiechimon/cairn| test/blocker-handoff-claim.test.ts (11 tests) 700ms
+ ✓ |@xiechimon/cairn| test/rework-branch-reuse.test.ts (9 tests) 554ms
+ ✓ |@xiechimon/cairn| test/token-usage-cost.test.ts (6 tests) 541ms
+ ✓ |@xiechimon/cairn| test/github-repo-dot-segments.test.ts (21 tests) 1028ms
+ ✓ |@xiechimon/cairn| test/m4b-memory.test.ts (12 tests) 850ms
+ ✓ |@xiechimon/cairn| test/capability-pending-reason.test.ts (11 tests) 567ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency.test.ts (9 tests) 549ms
+ ✓ |@xiechimon/cairn| test/mcp-servers.test.ts (21 tests) 665ms
+ ✓ |@xiechimon/cairn| test/gate-actor.test.ts (16 tests) 916ms
+ ✓ |@xiechimon/cairn| test/stop.test.ts (11 tests) 1003ms
+ ✓ |@xiechimon/cairn| test/memory-dedupe.test.ts (28 tests) 1452ms
+ ✓ |@xiechimon/cairn| test/machine-attachment.test.ts (8 tests) 589ms
+ ✓ |@xiechimon/cairn| test/keys.test.ts (12 tests) 531ms
+ ✓ |@xiechimon/cairn| test/quota-hold.test.ts (12 tests) 824ms
+ ✓ |@xiechimon/cairn| test/chief-abandoned-sweep.test.ts (13 tests) 695ms
+ ✓ |@xiechimon/cairn| test/github-token-refresh.test.ts (9 tests) 447ms
+ ✓ |@xiechimon/cairn| test/m4a-chief-loop.test.ts (4 tests) 303ms
+ ✓ |@xiechimon/cairn| test/orchestration-source.test.ts (11 tests) 626ms
+ ✓ |@xiechimon/cairn| test/agent-concurrency.test.ts (8 tests) 571ms
+ ✓ |@xiechimon/cairn| test/skill-inject-claim.test.ts (7 tests) 500ms
+ ✓ |@xiechimon/cairn| test/team-ownership-1470.test.ts (21 tests) 1056ms
+ ✓ |@xiechimon/cairn| test/chief-demotion.test.ts (12 tests) 646ms
+ ✓ |@xiechimon/cairn| test/chief-settings.test.ts (11 tests) 594ms
+ ✓ |@xiechimon/cairn| test/github-oauth.test.ts (14 tests) 606ms
+ ✓ |@xiechimon/cairn| test/merge-gate-imports.test.ts (8 tests) 25ms
+ ✓ |@xiechimon/cairn| test/trajectory-reflect.test.ts (12 tests) 17513ms
+   ✓ reflects only builds that turned green after failing or were sent back by a human 358ms
+   ✓ an invalid reflection fails the run without output 1795ms
+   ✓ reflect requires arguments, endpoint and a fresh output path 705ms
+   ✓ memory candidates land as pending, deduplicated, and never in agent memory 1031ms
+   ✓ a lesson already in memory is skipped, an overlapping one records the conflict 730ms
+   ✓ needs evidence from two different builds, then a successful recurrence promotes it 2688ms
+   ✓ human confirmation promotes only with two builds of evidence 3884ms
+   ✓ guard candidates go to a local JSONL pool, merged across runs 1600ms
+   ✓ skill candidates become patch drafts that apply to the current skill file 792ms
+   ✓ curate rejects fenced issue text and builds it cannot place 782ms
+   ✓ a dismissed candidate absorbs later recurrences and is never promoted 2887ms
+ ✓ |@xiechimon/cairn| test/chief-questions.test.ts (8 tests) 1293ms
+   ✓ #1049 question line lifecycle (createOrGet / answer / cancel / wrap-up) (8)
+     ✓ hold semantics: expires back to pending (D3 does not auto-decide); answering after hold returns answered (<= poll granularity) 889ms
+ ✓ |@xiechimon/cairn| test/mcp-face.test.ts (10 tests) 511ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency-chief.test.ts (9 tests) 517ms
+ ✓ |@xiechimon/cairn| test/oauth.test.ts (15 tests) 830ms
+ ✓ |@xiechimon/cairn| test/delivery-surface.test.ts (8 tests) 1009ms
+   ✓ hosted form source-of-truth does not drift (#704: the bare repo is still the only truth) (1)
+     ✓ failure mode 5: a hosted build reporting changesDiff does not change the projection source (bare repo read surface) 322ms
+ ✓ |@xiechimon/cairn| test/team-ownership-1497.test.ts (11 tests) 677ms
+ ✓ |@xiechimon/cairn| test/chief-unread-badge.test.ts (7 tests) 575ms
+ ✓ |@xiechimon/cairn| test/project-dual-source.test.ts (14 tests) 342ms
+ ✓ |@xiechimon/cairn| test/quota-wait.test.ts (5 tests) 459ms
+ ✓ |@xiechimon/cairn| test/chief-project-pick.test.ts (14 tests) 773ms
+ ✓ |@xiechimon/cairn| test/machine-zombie-claim.test.ts (6 tests) 307ms
+ ✓ |@xiechimon/cairn| test/notifications.test.ts (6 tests) 1130ms
+   ✓ three-event matrix (r5 section 7.2 field by field) (6)
+     ✓ entering done / entering failed has no in-app notification event (copied verbatim from the r5 section 7.2 observation window) 667ms
+ ✓ |@xiechimon/cairn| test/model-sources.test.ts (12 tests) 625ms
+ ✓ |@xiechimon/cairn| test/trajectory-outcome.test.ts (6 tests) 4693ms
+   ✓ merged, closed-unmerged and reverted builds export with matching outcomes 705ms
+   ✓ a revert after the 7 day window does not count, and a later PR on the same ticket marks the fix 774ms
+   ✓ a merge newer than 7 days leaves the revert window open and reports it 689ms
+   ✓ builds without a merge or close record keep every outcome field null 781ms
+   ✓ a close followed by a later merge counts as merged, and the latest record wins 627ms
+   ✓ traj:export feeds traj:label: failed packs get labeled, successful packs are skipped 1116ms
+ ✓ |@xiechimon/cairn| test/chief-watch.test.ts (7 tests) 389ms
+ ✓ |@xiechimon/cairn| test/chief-dispatch.test.ts (9 tests) 493ms
+ ✓ |@xiechimon/cairn| test/review-reject.test.ts (6 tests) 496ms
+ ✓ |@xiechimon/cairn| test/trajectory-outcome-backfill.test.ts (8 tests) 4693ms
+   ✓ a revert commit on main within 7 days backfills revertedWithin7d 804ms
+   ✓ a later PR touching the same lines backfills fixedByLaterPr 839ms
+   ✓ a clean merge backfills both labels false 649ms
+   ✓ a revert landing after the 7 day window does not set revertedWithin7d 631ms
+   ✓ builds still inside the 7 day window are not backfilled yet 604ms
+   ✓ empty data and unmatched PR numbers are skipped without failing 710ms
+   ✓ a project without a readable repo counts as skippedNoRepo 453ms
+ ✓ |@xiechimon/cairn| test/unassigned-build.test.ts (5 tests) 515ms
+ ✓ |@xiechimon/cairn| test/steer.test.ts (7 tests) 497ms
+ ✓ |@xiechimon/cairn| test/merge-gate-status.test.ts (13 tests) 10ms
+ ✓ |@xiechimon/cairn| test/build-provenance.test.ts (7 tests) 502ms
+ ✓ |@xiechimon/cairn| test/machine-stale-sweep.test.ts (11 tests) 480ms
+ ✓ |@xiechimon/cairn| test/project-team-guard.test.ts (13 tests) 715ms
+ ✓ |@xiechimon/cairn| test/step-claim-report.test.ts (4 tests) 326ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency-recommendation.test.ts (11 tests) 288ms
+ ✓ |@xiechimon/cairn| test/needs-you.test.ts (8 tests) 543ms
+ ✓ |@xiechimon/cairn| test/trajectory-export.test.ts (29 tests) 26983ms
+   ✓ exports a complete validated pack from a readonly sqlite snapshot 2333ms
+   ✓ selects builds by creation time and writes defaults under the instance 1282ms
+   ✓ rejects invalid selectors undefined without writing output 719ms
+   ✓ rejects invalid selectors "--build" without writing output 671ms
+   ✓ rejects invalid selectors "--build" without writing output 708ms
+   ✓ rejects invalid selectors "--since" without writing output 613ms
+   ✓ rejects invalid selectors "--since" without writing output 600ms
+   ✓ rejects invalid selectors "--build" without writing output 610ms
+   ✓ rejects invalid selectors "--unknown" without writing output 576ms
+   ✓ missing database fails without creating a database 569ms
+   ✓ invalid schema fails without replacing output or leaking invalid values 725ms
+   ✓ refuses to write over database file server.db before reading 1614ms
+   ✓ refuses to write over database file server.db-wal before reading 1560ms
+   ✓ refuses to write over database file server.db-shm before reading 1586ms
+   ✓ refuses an existing output file with a clear reason 763ms
+   ✓ reports output errors without successful summary 676ms
+   ✓ redacts a token throughout nested exported values and counts replacements 605ms
+   ✓ exports the blocker handoff snapshot and redacts secrets inside it 784ms
+   ✓ refuses database file server.db through a symlinked parent 1438ms
+   ✓ refuses database file server.db-wal through a symlinked parent 1388ms
+   ✓ exports structured rejections, recorded approvals and gate verdicts 680ms
+   ✓ exports pi tool results and Claude session envelopes without dropping messages 746ms
+   ✓ uses the first step runtime model when a build has multiple billed models 741ms
+   ✓ separates review gate revisions from failed restarts on the diff side 739ms
+   ✓ ignores gate announcements without an actor 672ms
+   ✓ derives the Claude Code provider for Claude sessions with multiple billed models 712ms
+   ✓ skips builds whose step session was not uploaded and counts them in the summary 1407ms
+   ✓ time window export skips each dirty build by reason and keeps the clean ones 1463ms
+ ✓ |@xiechimon/cairn| test/github-connection.test.ts (11 tests) 497ms
+ ✓ |@xiechimon/cairn| test/memory-invalidation.test.ts (12 tests) 635ms
+ ✓ |@xiechimon/cairn| test/autonomy-gates.test.ts (26 tests) 4ms
+ ✓ |@xiechimon/cairn| test/chief-gate-budget.test.ts (5 tests) 345ms
+ ✓ |@xiechimon/cairn| test/thinking-delta.test.ts (4 tests) 417ms
+ ✓ |@xiechimon/cairn| test/fs-list.test.ts (18 tests) 467ms
+ ✓ |@xiechimon/cairn| test/runtime-otel.test.ts (8 tests) 454ms
+ ✓ |@xiechimon/cairn| test/g2t2-executor-wire.test.ts (5 tests) 399ms
+ ✓ |@xiechimon/cairn| test/rework-plan-fallback.test.ts (4 tests) 444ms
+ ✓ |@xiechimon/cairn| test/project-delete.test.ts (5 tests) 757ms
+   ✓ DELETE /api/projects/{id} (#189) (5)
+     ✓ hosted shape: the bare repo directory is cleared with it; a new project reusing the same repoName is safe 401ms
+ ✓ |@xiechimon/cairn| test/machine-local.test.ts (9 tests) 380ms
+ ✓ |@xiechimon/cairn| test/skill-injection-check.test.ts (3 tests) 150ms
+ ✓ |@xiechimon/cairn| test/task-meta.test.ts (8 tests) 444ms
+ ✓ |@xiechimon/cairn| test/chief-skill-route.test.ts (5 tests) 381ms
+ ✓ |@xiechimon/cairn| test/trajectory-attribution.test.ts (9 tests) 4819ms
+   ✓ labels only failed packs and leaves merged or pending packs untouched 309ms
+   ✓ stable output: relabeling the same input yields the same structure 637ms
+   ✓ rejects a labeler that is the tested model, with or without provider prefix 800ms
+   ✓ does not call the labeler for packs that are already labeled 307ms
+   ✓ a verdict outside the vocabularies or pointing at a missing message fails the run without output 1424ms
+   ✓ refuses to overwrite an existing output file 309ms
+   ✓ summary merges several files and rejects an invalid pack 498ms
+ ✓ |@xiechimon/cairn| test/step-session-upload.test.ts (4 tests) 304ms
+ ✓ |@xiechimon/cairn| test/agent-delete.test.ts (7 tests) 336ms
+ ✓ |@xiechimon/cairn| test/credentials.test.ts (5 tests) 286ms
+ ✓ |@xiechimon/cairn| test/reset-todo.test.ts (6 tests) 356ms
+ ✓ |@xiechimon/cairn| test/manual-drop-matrix.test.ts (15 tests) 1075ms
+ ✓ |@xiechimon/cairn| test/agent-home-machine.test.ts (8 tests) 390ms
+ ✓ |@xiechimon/cairn| test/secret-box.test.ts (10 tests) 9ms
+ ✓ |@xiechimon/cairn| test/todo-usage-cost.test.ts (3 tests) 207ms
+ ✓ |@xiechimon/cairn| test/machine-shell.test.ts (4 tests) 285ms
+ ✓ |@xiechimon/cairn| test/machine-exit.test.ts (6 tests) 265ms
+ ✓ |@xiechimon/cairn| test/stop-and-done-1247.test.ts (4 tests) 225ms
+ ✓ |@xiechimon/cairn| test/agent-tools.test.ts (6 tests) 299ms
+ ✓ |@xiechimon/cairn| test/autonomy-api.test.ts (21 tests) 440ms
+ ✓ |@xiechimon/cairn| test/phase.test.ts (8 tests) 7ms
+ ✓ |@xiechimon/cairn| test/build-diff-fulltext.test.ts (4 tests) 3539ms
+   ✓ GET /api/builds/{id}/changes/file (#224 diff full-text read surface) (4)
+     ✓ text = conv branch history state full text (not main old version); envelope passes the shared schema; nested paths same surface 1070ms
+     ✓ binary -> 200 base64 decodes back to the original bytes; over the 1 MiB gate -> 413 840ms
+     ✓ 404 surface: unknown build / non-managed project / conv branch not pushed / file missing / directory path 838ms
+     ✓ 400 surface: missing path / empty path / `..` segment / absolute path / NUL 760ms
+ ✓ |@xiechimon/cairn| test/chief-reject-diff.test.ts (2 tests) 175ms
+ ✓ |@xiechimon/cairn| test/search.test.ts (6 tests) 285ms
+ ✓ |@xiechimon/cairn| test/phase-funnel.test.ts (4 tests) 547ms
+   ✓ phase funnel same-phase idempotency (the XMON-59 main break) (4)
+     ✓ a same-phase replay does not throw and returns the current record; zero side effects (v/phaseAt unchanged, no new todo doc frame) 399ms
+ ✓ |@xiechimon/cairn| test/chief-auto-confirm.test.ts (8 tests) 3ms
+ ✓ |@xiechimon/cairn| test/chief-tools.test.ts (5 tests) 286ms
+ ✓ |@xiechimon/cairn| test/machines-module-split.test.ts (3 tests) 12ms
+ ✓ |@xiechimon/cairn| test/sse.test.ts (3 tests) 262ms
+ ✓ |@xiechimon/cairn| test/user-patch.test.ts (3 tests) 207ms
+ ✓ |@xiechimon/cairn| test/chief-thread.test.ts (3 tests) 214ms
+ ✓ |@xiechimon/cairn| test/agent-desc-limit.test.ts (4 tests) 239ms
+ ✓ |@xiechimon/cairn| test/patch-todo-reset-gate.test.ts (13 tests) 661ms
+ ✓ |@xiechimon/cairn| test/schema.test.ts (4 tests) 115ms
+ ✓ |@xiechimon/cairn| test/enroll-browser.test.ts (1 test) 109ms
+ ✓ |@xiechimon/cairn| test/adoption-protected-paths.test.ts (4 tests) 11ms
+ ✓ |@xiechimon/cairn| test/chief-context-failure.test.ts (1 test) 123ms
+ ✓ |@xiechimon/cairn| test/chief-memory.test.ts (3 tests) 224ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency-startup-backfill.test.ts (1 test) 16ms
+ ✓ |@xiechimon/cairn| test/info-fastlane.test.ts (1 test) 112ms
+ ✓ |@xiechimon/cairn| test/provider-config.test.ts (5 tests) 2ms
+ ✓ |@xiechimon/cairn| test/persona-repo-rules.test.ts (1 test) 74ms
+ ↓ |@xiechimon/cairn| test/fs-pick.test.ts (1 test | 1 skipped)
+ ✓ |@xiechimon/cairn| test/gemini-runtime.test.ts (2 tests) 4ms
+ ✓ |@xiechimon/cairn| test/documents.test.ts (1 test) 3ms
+ ✓ |@xiechimon/cairn-cli| test/step-attachments.test.ts (28 tests) 54ms
+ ✓ |@xiechimon/cairn| test/capabilities.test.ts (2 tests) 161ms
+ ✓ |@xiechimon/cairn-cli| test/skills-catalog.test.ts (44 tests) 118ms
+ ✓ |@xiechimon/cairn-cli| test/runner-recover-degrade.test.ts (11 tests) 39ms
+ ✓ |@xiechimon/cairn-cli| test/skills-native-plugin.test.ts (34 tests) 90ms
+ ✓ |@xiechimon/cairn| test/chief-todos-cap.test.ts (1 test) 1812ms
+   ✓ chief todos output budget (1)
+     ✓ large todo lists stay within 32 KiB and can be paged without losing ids 1811ms
+ ✓ |@xiechimon/cairn-cli| test/runner-error-lifecycle.test.ts (14 tests) 46ms
+ ✓ |@xiechimon/cairn-cli| test/runner-local.test.ts (15 tests) 987ms
+   ✓ runner repo shape wiring (spec 12 G2-T2) (5)
+     ✓ failure mode 2 (#1211 truth surface): local merge step through the real git chain → user repo only gains the conv branch, HEAD/reflog/worktree unchanged 819ms
+ ✓ |@xiechimon/cairn-cli| test/runner-runtime.test.ts (13 tests) 32ms
+ ✓ |@xiechimon/cairn-cli| test/runner-network-retry.test.ts (15 tests) 69ms
+ ✓ |@xiechimon/cairn-cli| test/runner-cred-fallback.test.ts (7 tests) 28ms
+ ✓ |@xiechimon/cairn-cli| test/runner-branch-drift.test.ts (12 tests) 36ms
+ ✓ |@xiechimon/cairn-cli| test/runner-brief.test.ts (11 tests) 34ms
+ ✓ |@xiechimon/cairn-cli| test/pi-protocol-fallback.test.ts (15 tests) 21ms
+ ✓ |@xiechimon/cairn-cli| test/runner-review.test.ts (8 tests) 26ms
+ ✓ |@xiechimon/cairn-cli| test/skills-hard-block.test.ts (28 tests) 28ms
+ ✓ |@xiechimon/cairn-cli| test/runner-artifact.test.ts (10 tests) 24ms
+ ✓ |@xiechimon/cairn-cli| test/runner-stop.test.ts (8 tests) 271ms
+ ✓ |@xiechimon/cairn-cli| test/map-claude-event.test.ts (15 tests) 8ms
+ ✓ |@xiechimon/cairn-cli| test/map-pi-event.test.ts (15 tests) 5ms
+ ✓ |@xiechimon/cairn-cli| test/runner-team-skills.test.ts (8 tests) 21ms
+ ✓ |@xiechimon/cairn-cli| test/review-findings.test.ts (22 tests) 10ms
+ ✓ |@xiechimon/cairn-cli| test/machine-steer.test.ts (8 tests) 696ms
+ ✓ |@xiechimon/cairn-cli| test/runner-stream-timeout.test.ts (17 tests) 3532ms
+   ✓ runner stream-timeout guardrails (#699) (12)
+     ✓ failure mode 1: an active stream with event gaps < body budget but total duration > body budget completes naturally 449ms
+     ✓ build progress resets the duration budget 361ms
+     ✓ failure mode 3b (env knob): CAIRN_STREAM_IDLE_MS widens the idle arm for slow providers 481ms
+   ✓ runner tool-execution liveness (#1591) (5)
+     ✓ silence past the idle threshold after the tool ends still fails 324ms
+ ✓ |@xiechimon/cairn-cli| test/runner-delivery.test.ts (8 tests) 22ms
+ ✓ |@xiechimon/cairn-cli| test/runner-issue-fence.test.ts (14 tests) 34ms
+ ✓ |@xiechimon/cairn-cli| test/runner-restart-prompt.test.ts (7 tests) 32ms
+ ✓ |@xiechimon/cairn-cli| test/brief-file.test.ts (22 tests) 29ms
+ ✓ |@xiechimon/cairn-cli| test/runner-quota-breaker.test.ts (6 tests) 18ms
+ ✓ |@xiechimon/cairn-cli| test/machine-stop.test.ts (8 tests) 540ms
+ ✓ |@xiechimon/cairn-cli| test/workspace-hooks.test.ts (10 tests) 298ms
+ ✓ |@xiechimon/cairn-cli| test/tag-tool.test.ts (11 tests) 4556ms
+   ✓ create_tag — annotated tag creation surface (failure modes 1–8) (8)
+     ✓ failure mode 1: default HEAD — annotated tag with a message lands on HEAD 546ms
+     ✓ failure mode 2: specified commit — tag lands on an older commit 517ms
+     ✓ failure mode 3: message absent = tag name used as the annotation text 406ms
+     ✓ failure mode 4: tag already exists → git's original error text 410ms
+     ✓ failure mode 6: local shape — cred null, real push to the file remote succeeds 415ms
+     ✓ failure mode 7: empty tag argument → explicit reason text 307ms
+   ✓ create_tag — github shape real push (HTTP + x-access-token Basic auth stand-in) (3)
+     ✓ failure mode 9: per-step credentials injected, real HTTP push succeeds, refs/tags land on the remote 539ms
+     ✓ failure mode 10: credential expired mid-step (server rejects token) → readable auth-failure original text 437ms
+     ✓ failure mode 11: push refused — remote already has a same-named tag with a different value → git refusal original text 556ms
+ ✓ |@xiechimon/cairn-cli| test/runner-plan-contract.test.ts (5 tests) 13ms
+ ✓ |@xiechimon/cairn-cli| test/runner-thinking-delta.test.ts (5 tests) 2424ms
+   ✓ runner thinking_delta throttled forwarding (#1308) (3)
+     ✓ two segments across the throttle window are reported separately 404ms
+   ✓ a tool call that finishes after a provider network retry keeps its start time 2006ms
+ ✓ |@xiechimon/cairn-cli| test/runner-upload-recovery.test.ts (4 tests) 1016ms
+   ✓ #1028 expired presigned-URL resend (recovery does not depend on server process memory) (2)
+     ✓ PUT 404 (old URL expired after a server restart) → re-fetch the URL and resend: done lands, journal cleared 1009ms
+ ✓ |@xiechimon/cairn-cli| test/provider-response.test.ts (14 tests) 42ms
+ ✓ |@xiechimon/cairn-cli| test/runner-silent-noop.test.ts (5 tests) 52ms
+ ❯ |@xiechimon/cairn-cli| test/local-executor.test.ts (4 tests | 1 failed) 2005ms
+   ✓ local-shape mirror clone (spec 12 G2-T2: hardlinks make it near-zero cost) (1)
+     ✓ failure mode 1: base clone object files are hardlinked (nlink ≥ 2 for ≥ 50%); plain-copy control = 0 hardlinks 329ms
+   ✓ local-shape landing (#1211: pushing the conv branch is the delivery, user's main checkout untouched) (2)
+     ✓ failure mode 2: worktree commit pushed back to the user repo → refs/heads gains the conv branch; user's HEAD/reflog/worktree unchanged (not advanced even when ff is possible) 470ms
+     ✓ failure mode 3: dirty worktree → push still succeeds (push only writes the conv branch ref); user's HEAD and dirty files unchanged 451ms
+   ❯ per-step credential argv discipline (spec 12 G2-T2: capturing fork+exec command lines) (1)
+     × failure mode 5: token never enters argv throughout credential-bearing clone/fetch/push; carried by the env credential.helper (positive control) 753ms
+ ✓ |@xiechimon/cairn-cli| test/machine-recover.test.ts (7 tests) 254ms
+ ✓ |@xiechimon/cairn-cli| test/secret-channel.test.ts (6 tests) 20ms
+ ✓ |@xiechimon/cairn-cli| test/otel-bridge.test.ts (10 tests) 24ms
+ ✓ |@xiechimon/cairn-cli| test/command-gate.test.ts (49 tests) 10ms
+ ✓ |@xiechimon/cairn-cli| test/claude-t4-tools.test.ts (16 tests) 13ms
+ ✓ |@xiechimon/cairn-cli| test/runner-session-upload.test.ts (4 tests) 23ms
+ ✓ |@xiechimon/cairn-cli| test/machine-step-exec.test.ts (4 tests) 403ms
+ ✓ |@xiechimon/cairn-cli| test/runner-images.test.ts (4 tests) 15ms
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+ ✓ |@xiechimon/cairn-cli| test/runner-mcp-managed.test.ts (5 tests) 25ms
+ ✓ |@xiechimon/cairn-cli| test/acp-stdio.test.ts (10 tests) 35ms
+ ✓ |@xiechimon/cairn-cli| test/ask-channel.test.ts (11 tests) 2198ms
+   ✓ #1049 machine-client askUser loop (4)
+     ✓ transient 5xx does not end the wait (answer arrives after retry) 2008ms
+ ✓ |@xiechimon/cairn-cli| test/machine-capabilities.test.ts (12 tests) 21ms
+ ✓ |@xiechimon/cairn-cli| test/runner-agent-todo.test.ts (7 tests) 24ms
+ ✓ |@xiechimon/cairn-cli| test/config-state.test.ts (18 tests) 19ms
+ ✓ |@xiechimon/cairn-cli| test/runner-create-tag.test.ts (4 tests) 18ms
+ ✓ |@xiechimon/cairn-cli| test/activity.test.ts (14 tests) 7ms
+ ✓ |@xiechimon/cairn-cli| test/pi-config-effect.test.ts (9 tests) 7ms
+ ✓ |@xiechimon/cairn-cli| test/machine-parallel-chief.test.ts (7 tests) 563ms
+ ✓ |@xiechimon/cairn-cli| test/claude-mcp-strict.test.ts (9 tests) 18ms
+ ✓ |@xiechimon/cairn-cli| test/step-reclaim.test.ts (3 tests) 307ms
+ ✓ |@xiechimon/cairn-cli| test/workspace-cred-fallback.test.ts (4 tests) 1358ms
+   ✓ workspace prepare credential fallback (#1225 clone half) (4)
+     ✓ failure mode 1: token auth failure + fallback gate open → clone falls back to machine and succeeds, provenance surfaces + fallback log 351ms
+     ✓ failure mode 3: base already in place → fetch follows the same fallback order, provenance machine 422ms
+     ✓ failure mode 4: token valid → single clone, provenance integration (behavior unchanged while integration works) 377ms
+ ✓ |@xiechimon/cairn-cli| test/git-loopback-proxy.test.ts (8 tests) 2292ms
+   ✓ git subprocess reaches the loopback server bypassing the global http.proxy (#1635) (8)
+     ✓ fetch from the loopback server also connects directly 320ms
+     ✓ the user's existing NO_PROXY entries are kept, non-loopback hosts still go through the proxy 379ms
+ ✓ |@xiechimon/cairn-cli| test/github-probe.test.ts (9 tests) 84ms
+ ✓ |@xiechimon/cairn-cli| test/git.test.ts (78 tests) 13437ms
+   ✓ gitCredentialEnv — per-step credential env injection (02 §8, nothing on disk) (2)
+     ✓ the empty-value reset makes the inline credential beat global helpers (real git credential fill) 391ms
+   ✓ gitCredentialEnv — the helper answers only for the host the credential was issued to (#1484) (20)
+     ✓ failure mode 5: origin repointed to another host via set-url → push / tagPush / fetch send no credential; the bound host still authenticates 410ms
+   ✓ machineGitEnv — execution machine's local credential env (#1225 fallback path) (2)
+     ✓ on the machine path global helpers answer normally (real git credential fill, mirror image of the reset tests) 3125ms
+   ✓ withGitNetRetries — deterministic auth-failure short circuit (#1225: 401 retries never flip red) (10)
+     ✓ network failures still retry (existing semantics unchanged) 6007ms
+ ✓ |@xiechimon/cairn-cli| test/agent-todo.test.ts (13 tests) 7ms
+ ✓ |@xiechimon/cairn-cli| test/token-command.test.ts (8 tests) 9ms
+ ✓ |@xiechimon/cairn-cli| test/workspace-source.test.ts (8 tests) 3408ms
+   ✓ dual execution-source selection (github-shape localPath acceleration slot, #1213) (6)
+     ✓ D1 localPath missing → fall back to GitHub clone + one source-selection log line 336ms
+     ✓ D2 origin mismatch → fall back (against mistaken absorption) 456ms
+     ✓ D3 same repo → local source used: base origin repointed to the truth; HEAD = truth remote tip after fetch 644ms
+     ✓ D4 TOCTOU: the source dies at clone time after the verdict → fallback without crash, base lands as usual 413ms
+     ✓ D5 default branch takes the truth remote's HEAD: the local source parked on a topic branch does not drift 655ms
+     ✓ D6 localPath absent → straight truth clone, no source-selection log (zero drift) 414ms
+ ✓ |@xiechimon/cairn-cli| test/workspace-local-unreachable.test.ts (5 tests) 317ms
+ ✓ |@xiechimon/cairn-cli| test/pi-session-policy.test.ts (12 tests) 13ms
+ ✓ |@xiechimon/cairn-cli| test/runner-blocker-handoff.test.ts (4 tests) 20ms
+ ✓ |@xiechimon/cairn-cli| test/claude-transcript-path.test.ts (5 tests) 7ms
+ ✓ |@xiechimon/cairn-cli| test/machine-boot.test.ts (5 tests) 110ms
+ ✓ |@xiechimon/cairn-cli| test/sync.test.ts (8 tests) 4060ms
+   ✓ performSync — the checkout step does not swallow failures (#1329) (8)
+     ✓ ref missing: failed written back naming the ref, current branch stays put 418ms
+     ✓ remote branch exists: HEAD lands detached on the target commit, local main not moved (contract: do not advance a same-named local branch) 478ms
+     ✓ non-force: checkout refuses to overwrite conflicting uncommitted worktree changes, file contents preserved 404ms
+     ✓ force: conflicting worktree changes discarded by checkout, HEAD lands on origin/<ref> 433ms
+     ✓ remote-branch checkout argv is exactly the fully-qualified ref + `--`: no --force when non-force, and no --end-of-options 464ms
+     ✓ remote-branch checkout argv is exactly --force + fully-qualified ref + `--` (when forced) 557ms
+     ✓ tag: resolved to a commit when no same-named branch exists, checked out detached by oid 644ms
+     ✓ SHA: resolved to a commit when no same-named branch exists, checked out detached by oid 658ms
+ ✓ |@xiechimon/cairn-cli| test/pi-span-event.test.ts (3 tests) 8ms
+ ✓ |@xiechimon/cairn-cli| test/verify-verdict.test.ts (6 tests) 5ms
+ ✓ |@xiechimon/cairn-cli| test/skills-version-skew.test.ts (5 tests) 18ms
+ ✓ |@xiechimon/cairn-cli| test/machine-backends.test.ts (4 tests) 306ms
+ ✓ |@xiechimon/cairn-cli| test/mcp-config.test.ts (6 tests) 13ms
+ ✓ |@xiechimon/cairn-cli| test/acp.test.ts (10 tests) 13ms
+ ✓ |@xiechimon/cairn-cli| test/machine-parallel.test.ts (2 tests) 442ms
+   ✓ #1108 parallel execution loop (localCap concurrency + free-slot handoff + graceful stop) (2)
+     ✓ P1+P2+P3: cap=2 runs two steps concurrently, no claim while in-flight is full, slot freed on close and re-claimed 325ms
+ ✓ |@xiechimon/cairn-cli| test/relay-tool.test.ts (3 tests) 27ms
+ ✓ |@xiechimon/cairn-cli| test/session-jsonl.test.ts (6 tests) 7ms
+ ✓ |@xiechimon/cairn-cli| test/harness-hash.test.ts (6 tests) 41ms
+ ✓ |@xiechimon/cairn-cli| test/task-meta-prompt.test.ts (6 tests) 8ms
+ ✓ |@xiechimon/cairn-cli| test/step-attachments-gc.test.ts (3 tests) 4ms
+ ✓ |@xiechimon/cairn-cli| test/backend-image-delivery.test.ts (8 tests) 4ms
+ ✓ |@xiechimon/cairn-cli| test/pi-compaction-ceiling.test.ts (2 tests) 137ms
+ ✓ |@xiechimon/cairn-cli| test/claude-code-models.test.ts (3 tests) 4ms
+ ✓ |@xiechimon/cairn-cli| test/proxy.test.ts (8 tests) 5ms
+ ✓ |@xiechimon/cairn-cli| test/machine-claim.test.ts (3 tests) 190ms
+ ✓ |@xiechimon/cairn-cli| test/workspace.test.ts (27 tests) 16243ms
+   ✓ worktree contract (02 §5.5 / r3 §1.4) (14)
+     ✓ the info-card read-only export refuses commit and push 435ms
+     ✓ prepare: base clone lands at <root>/<projectId>/repo + worktree add -b lands at <root>/<convId>, branch cairn/conv-* 463ms
+     ✓ a second conv on the same project: base fetch reused (no re-clone); the same conv again = Worktree reused 862ms
+     ✓ #1484: on base reuse, origin has drifted from cloneUrl → repointed to cloneUrl first, then fetch 746ms
+     ✓ #1484: comparison uses origin's raw configured value, insteadOf rewrites do not trigger repointing 579ms
+     ✓ base choice: origin/<convBranch> preferred when already fetched (cross-machine continuation surface) 532ms
+     ✓ commitAll + push: the conversation's working branch is pushed automatically at the end of every step; a clean tree = committed false 599ms
+     ✓ #958 gate 5: files carrying the brief marker are excluded from the commit, same-named files without the marker are committed as usual 438ms
+     ✓ #958 gate 4: briefMarkerInRef names it when the branch history carries the marker, empty for a clean branch 442ms
+     ✓ checkpoint restore: reset --hard + clean -fd → Worktree restored (r3 §1.4/§3.5) 511ms
+     ✓ merge --no-edit two states: Already up to date / a real merge (when main advances) 671ms
+     ✓ anti-divergence guardrail: origin/<branch> is ahead and the worktree is not on that branch → remote branch diverged 652ms
+     ✓ orphan reclamation: three-step cleanup of conv worktrees older than the TTL (7×24h); live steps / new directories untouched 586ms
+     ✓ projectLock: concurrent prepares on the same project serialized (clone race guardrail) 487ms
+   ✓ #1195 branchesWithNewCommits (step-window branch scan primitive) (6)
+     ✓ accident shape: a self-created branch keeps new commits within the window, HEAD already switched back → the branch is scanned out 542ms
+     ✓ branches outside the window miss: tip commit earlier than sinceMs (user's existing branches not misattributed) 547ms
+     ✓ branches with no commits beyond base miss (same-tip empty branches) 522ms
+     ✓ neighboring conv branches reported as-is (exclusion is a runner-side policy, the primitive makes no attribution ruling) 690ms
+     ✓ base unparseable → empty set (fail-open, no throw, no blocked close-out) 455ms
+     ✓ WorkspaceManager passes through the same semantics (WorktreeOps seam consumer surface) 514ms
+   ✓ #1149 environment lifecycle hooks (two prepare mount points) (7)
+     ✓ fresh checkout → .agents/setup runs, hooks slot carries an ok note (including stdout) 500ms
+     ✓ repo without hooks: hooks default to [], zero hook log lines (behavior consistent with current) 360ms
+     ✓ reused → .agents/resume runs (setup not rerun); failure/timeout non-fatal, step continues 614ms
+     ✓ setup failure → prepare throws (step failure surface); worktree rolled back → retry goes through fresh→setup again 714ms
+     ✓ stale rebuild (worktree directory manually deleted) → still goes through fresh → setup rerun 934ms
+     ✓ hooks consume step-level credentials: credentials non-null → GIT_CONFIG_COUNT=2 enters the hook env 688ms
+     ✓ hook timeout → fatal on the setup surface (step failure), non-fatal on the resume surface 1159ms
+ ✓ |@xiechimon/cairn-cli| test/machine-step-otel.test.ts (2 tests) 132ms
+ ✓ |@xiechimon/cairn-cli| test/pi-mcp-attention.test.ts (5 tests) 2ms
+ ✓ |@xiechimon/cairn-cli| test/claude-session-env.test.ts (3 tests) 2ms
+ ✓ |@xiechimon/cairn-cli| test/pi-retry-config.test.ts (3 tests) 2ms
+ ✓ |@cairn/integration| test/m5-web-e2e.test.ts (3 tests) 12371ms
+   ✓ M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload) (3)
+     ✓ create → plan → confirm → build → review → merge → done (main-sequence spine) 3757ms
+     ✓ reject branch: request changes at the confirm gate → replanning → plan v2 → confirm → review (r5 §4) 3553ms
+     ✓ scheduled run parks at review: create once schedule in UI → tick trigger → direct build → parks at review + started-by-schedule marker (r3 §9) 3029ms
+ ✓ |@cairn/integration| test/board-trio-e2e.test.ts (3 tests) 8189ms
+   ✓ #1216 board UI reliability triple defect (real web dist + real server + fake machine wire) (3)
+     ✓ ① save-and-start: one click enters the dispatch flow; in-flight state rejects duplicate orchestration 829ms
+     ✓ ② failed rerun: thread must land + visible in-flight + buildHistory grows after chief dispatch 1432ms
+     ✓ ③ failed card detail deletable; missing/failed detail shows an explained state, not an empty shell 4742ms
+ ✓ |@cairn/integration| test/done-dialog-e2e.test.ts (5 tests) 9156ms
+   ✓ #1236 task-done confirmation dialog (real web dist + real server + fake machine wire) (5)
+     ✓ ① single-card query not ready: confirm does not close silently — dialog stays, alert visible, zero requests, phase unchanged 1346ms
+     ✓ ② rework card merge done: success feedback visible at 202, phase reaches done after the machine finishes the merge step 1932ms
+     ✓ ③ merge unchecked = done without merging: PATCH done lands immediately, zero merge steps, branch untouched 1505ms
+     ✓ ④ server rejects (409): dialog stays open + server message visible verbatim 2009ms
+     ✓ ⑤ failed card (build leg delivered): merge checkbox locked — done can only land via merge 1274ms
+ ✓ |@cairn/integration| test/plan-upload-recovery.test.ts (2 tests) 8972ms
+   ✓ #1026/#1028 final-report failure recovery (real process restarts) (2)
+     ✓ PUT succeeded / done failed → daemon restart fast-path replays: no rerun, no duplicate version 3860ms
+     ✓ server shutdown in the final window → same-port reopen → old URL 404 (explainable) → reissued URL persists → daemon restart fast-path replays 5110ms
+
+[diag] stub requests consumed: 11
+[diag] daemon.log tail:
+
+ ✓ |@cairn/integration| test/rework-branch-reuse-e2e.test.ts (1 test) 3103ms
+   ✓ #931 both rework paths return to the original branch (E2E) (1)
+     ✓ failed restart and review reject: same conv / same branch / new commits land on the original branch / correct session shapes 2730ms
+
+[diag] stub requests consumed: 8
+[diag] daemon.log tail:
+[skills] filtered: job-apply not in injected selection
+[skills] filtered: job-match not in injected selection
+[skills] filtered: kami not in injected selection
+[skills] filtered: leader not in injected selection
+[skills] filtered: make-resume not in injected selection
+[skills] filtered: offer not in injected selection
+[skills] filtered: pr not in injected selection
+[skills] filtered: project-guide not in injected selection
+[skills] filtered: prototype not in injected selection
+[skills] filtered: prototype-switcher not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: reverse-engineer-anything not in injected selection
+[skills] filtered: setup-matt-pocock-skills not in injected selection
+[skills] filtered: setup-pre-commit not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: sharpen not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: built-in-browser not in injected selection
+[skills] filtered: chrome-browser not in injected selection
+[skills] filtered: deep-research not in injected selection
+[skills] filtered: docs not in injected selection
+[skills] filtered: docx not in injected selection
+[skills] filtered: google-workspace not in injected selection
+[skills] filtered: import-memory not in injected selection
+[skills] filtered: morning not in injected selection
+[skills] filtered: pdf not in injected selection
+[skills] filtered: pptx not in injected selection
+[skills] filtered: setup-writing-style not in injected selection
+[skills] filtered: skill-creator not in injected selection
+[skills] filtered: xlsx not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: terminal-browser not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: visual-edit not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17ecf-fe80-7f4c-94d2-a2c10af4de84
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed cairn/conv-01a17ecf-fe80-7f4c-94d2-a2c10af4de84
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m3b-demo.test.ts (4 tests) 5352ms
+   ✓ M3b demo: single-machine full lifecycle todo→done (02 §4.2 main sequence) (4)
+     ✓ create → plan: worktree contract lands + plan.md v1 persisted + push (r3 §1.4/§3.3) 677ms
+     ✓ confirm → build: continue session + real bash change → commit/push → review + hasChanges (git ground truth) 430ms
+     ✓ review → merge 202 delegated → merge step → main fast-forward → done (02 §4.2/A6 + r3 §3.6) 438ms
+     ✓ failure requires manual rerun (02/A6): provider 400 → failed → no auto rerun → POST builds rerun = new conv/new branch 3446ms
+ ✓ |@cairn/integration| test/learn-from-correction-grade.test.ts (29 tests) 7ms
+
+[diag] stub requests consumed: 13
+[diag] daemon.log tail:
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: terminal-browser not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: visual-edit not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17ed0-0c4d-7b20-8c54-37445a1c7671
+[step] message usage: stub-gw/stub-model input=0 output=0 cacheRead=0 cacheWrite=0 cost=0
+[step] error: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:60288/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:60288/v1"; machine "m4b-wake-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}" (retryable=false)
+[step] brief removed (AGENTS.md)
+[step] step failed: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:60288/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:60288/v1"; machine "m4b-wake-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}"
+finished (1 running)
+claim step=tHbzxXRKwtzoYMeBfcGXm
+step tHbzxXRKwtzoYMeBfcGXm for conv chief-01a17ed0-069f-7ee8-b36d-5cf5b4bc37e7 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: v1
+[skills] unknown-dispatch: chat
+[skills] unknown-dispatch: completions
+[skills] unknown-dispatch: json
+[skills] unknown-dispatch: v1
+[skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-m4b-wake-home-hLVbbW/workspaces/chief-01a17ed0-069f-7ee8-b36d-5cf5b4bc37e7/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-m4b-wake-home-hLVbbW/workspaces/chief-01a17ed0-069f-7ee8-b36d-5cf5b4bc37e7/.pi/skills)
+[skills] collision: name "computer-use" collision (winner=<home>/.agents/skills/computer-use/SKILL.md loser=<home>/.agents/skills/synced/51b8e5e0-5e73-4701-aa47-02546e55d596_b7e5706c-f8fb-48c8-95c1-8fde2684cc7a/computer-use/SKILL.md)
+[skills] loaded: 88 skills from <home>/.agents/skills
+[skills] catalog: entries=64 chars=27071 bytes=32597
+[step] brief written: AGENTS.md (create)
+continue session chief-01a17ed0-069f-7ee8-b36d-5cf5b4bc37e7
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-watch-wake-e2e.test.ts (3 tests) 2263ms
+   ✓ M4b watch/wake three-trigger E2E (r5 §3.5 reference run) (3)
+     ✓ dispatch auto-watch (reason canon) + gate wake parks at review and reports 770ms
+     ✓ settle wake: two-phase merge report (delegation accepted → result confirmed) + watch auto-release 624ms
+     ✓ failed wake: step failed → chief calls machines first, then evidence-style report + watch release 411ms
+
+[diag] stub requests consumed: 7
+[diag] daemon.log tail:
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team: 3 skill(s), 4 file(s) materialized → /private/tmp/cairn-it-routing-home-1ooUq7/team-skills/views/b794776452a99bdd1381b190217c6f63472f99db0ecc73fc89998bd941090150 (fetched 4 file(s) / 396 byte(s), reused 0)
+[skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-it-routing-home-1ooUq7/workspaces/01a17ed0-125a-7b98-9b9c-aba69e0a3a74/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-it-routing-home-1ooUq7/workspaces/01a17ed0-125a-7b98-9b9c-aba69e0a3a74/.pi/skills)
+[skills] filtered: local-blocked not in agent allowlist
+[skills] filtered: beta-skill not in injected selection
+[skills] filtered: gamma-skill not in injected selection
+[skills] loaded: 2 skills from /private/tmp/cairn-it-routing-home-1ooUq7/team-skills/views/b794776452a99bdd1381b190217c6f63472f99db0ecc73fc89998bd941090150 + /private/tmp/cairn-it-routing-local-GTx6yQ
+[skills] catalog: entries=2 chars=817 bytes=875
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a17ed0-125a-7b98-9b9c-aba69e0a3a74
+[skills] denied-read: /private/tmp/cairn-it-routing-local-GTx6yQ/local-blocked/SKILL.md (skill local-blocked not in allowlist)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+claim step=42Z3ryZOAlrIwMtF5OrbC
+step 42Z3ryZOAlrIwMtF5OrbC for conv 01a17ed0-1350-7149-9751-fa74dfe44c36 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-it-routing-home-1ooUq7/workspaces/01a17ed0-1350-7149-9751-fa74dfe44c36/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-it-routing-home-1ooUq7/workspaces/01a17ed0-1350-7149-9751-fa74dfe44c36/.pi/skills)
+[skills] filtered: local-blocked not in agent allowlist
+[skills] filtered: local-one not in agent allowlist
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+[skills] deny: 2 skill dir(s) hard-blocked
+new session 01a17ed0-1350-7149-9751-fa74dfe44c36
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/skills-routing-e2e.test.ts (2 tests) 726ms
+
+[diag] stub requests consumed: 10
+[diag] daemon.log tail:
+[skills] filtered: built-in-browser not in injected selection
+[skills] filtered: chrome-browser not in injected selection
+[skills] filtered: deep-research not in injected selection
+[skills] filtered: docs not in injected selection
+[skills] filtered: docx not in injected selection
+[skills] filtered: google-workspace not in injected selection
+[skills] filtered: import-memory not in injected selection
+[skills] filtered: morning not in injected selection
+[skills] filtered: pdf not in injected selection
+[skills] filtered: pptx not in injected selection
+[skills] filtered: setup-writing-style not in injected selection
+[skills] filtered: skill-creator not in injected selection
+[skills] filtered: xlsx not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: terminal-browser not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: visual-edit not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a17ed0-1dfd-7bd8-95ce-c0d184c3c341
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed cairn/conv-01a17ed0-1dfd-7bd8-95ce-c0d184c3c341
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/g2t2-local-lifecycle.test.ts (2 tests) 2960ms
+   ✓ G2-T2 local form full lifecycle (spec 12: mirror clone + push back to the user repo = delivery, main checkout untouched) (2)
+     ✓ failure modes 1-3: plan/build → conv branch pushed back to the user repo → merge → conv branch update lands delivery, user main checkout unchanged (#1211) 1397ms
+     ✓ failure mode 4: dirty workspace → merge step still done (#1211: delivery does not read the user workspace); user HEAD/dirty files unchanged 1208ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+2026-10-28 03:22:12 Loading pi runtime…
+2026-10-28 03:22:12 [machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+2026-10-28 03:22:12 [machine] claude binary: /opt/homebrew/bin/claude (2.1.306)
+2026-10-28 03:22:13 Enrolled in team NzWUs4rB77YsZ_uYJMe2K (machine v3_QfLXnCuf7l-hO5vAXQ)
+2026-10-28 03:22:13 Online (machineId=v3_QfLXnCuf7l-hO5vAXQ); polling http://127.0.0.1:60345
+2026-10-28 03:22:13 [recover] no pending steps found
+2026-10-28 03:22:13 [wake] push channel connected
+2026-10-28 03:22:13 claim step=sLx8RxLZi6w6BUJWxExL3
+2026-10-28 03:22:13 step sLx8RxLZi6w6BUJWxExL3 for conv chief-01a17ed0-26bd-7f21-87a6-b458cb2c9ac2 (1 running)
+2026-10-28 03:22:13 using model stub-gw/stub-model
+2026-10-28 03:22:13 [workspace] 准备工作区...
+2026-10-28 03:22:13 [mcp] managed-empty: strict MCP set (runtime config not inherited)
+2026-10-28 03:22:13 [skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+2026-10-28 03:22:13 [skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-ask-home-P9l4IV/workspaces/chief-01a17ed0-26bd-7f21-87a6-b458cb2c9ac2/.claude/skills)
+2026-10-28 03:22:13 [skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-ask-home-P9l4IV/workspaces/chief-01a17ed0-26bd-7f21-87a6-b458cb2c9ac2/.pi/skills)
+2026-10-28 03:22:13 [skills] collision: name "computer-use" collision (winner=<home>/.agents/skills/computer-use/SKILL.md loser=<home>/.agents/skills/synced/51b8e5e0-5e73-4701-aa47-02546e55d596_b7e5706c-f8fb-48c8-95c1-8fde2684cc7a/computer-use/SKILL.md)
+2026-10-28 03:22:13 [skills] loaded: 88 skills from <home>/.agents/skills
+2026-10-28 03:22:13 [skills] catalog: entries=64 chars=27071 bytes=32597
+2026-10-28 03:22:13 [step] brief written: AGENTS.md (create)
+2026-10-28 03:22:13 new session chief-01a17ed0-26bd-7f21-87a6-b458cb2c9ac2
+2026-10-28 03:22:13 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 03:22:15 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 03:22:15 [step] brief removed (AGENTS.md)
+2026-10-28 03:22:15 finished (0 running)
+2026-10-28 03:22:15 claim step=j5sJff4sebAhCBnqXg9YK
+2026-10-28 03:22:15 step j5sJff4sebAhCBnqXg9YK for conv chief-01a17ed0-312f-7c32-b599-4cab8966c9a3 (1 running)
+2026-10-28 03:22:15 using model stub-gw/stub-model
+2026-10-28 03:22:15 [workspace] 准备工作区...
+2026-10-28 03:22:15 [mcp] managed-empty: strict MCP set (runtime config not inherited)
+2026-10-28 03:22:15 [skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+2026-10-28 03:22:15 [skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-ask-home-P9l4IV/workspaces/chief-01a17ed0-312f-7c32-b599-4cab8966c9a3/.claude/skills)
+2026-10-28 03:22:15 [skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-ask-home-P9l4IV/workspaces/chief-01a17ed0-312f-7c32-b599-4cab8966c9a3/.pi/skills)
+2026-10-28 03:22:15 [skills] collision: name "computer-use" collision (winner=<home>/.agents/skills/computer-use/SKILL.md loser=<home>/.agents/skills/synced/51b8e5e0-5e73-4701-aa47-02546e55d596_b7e5706c-f8fb-48c8-95c1-8fde2684cc7a/computer-use/SKILL.md)
+2026-10-28 03:22:15 [skills] loaded: 88 skills from <home>/.agents/skills
+2026-10-28 03:22:15 [skills] catalog: entries=64 chars=27071 bytes=32597
+2026-10-28 03:22:15 [step] brief written: AGENTS.md (create)
+2026-10-28 03:22:15 new session chief-01a17ed0-312f-7c32-b599-4cab8966c9a3
+2026-10-28 03:22:15 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 03:22:16 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 03:22:16 [step] brief removed (AGENTS.md)
+2026-10-28 03:22:16 finished (0 running)
+
+ ✓ |@cairn/integration| test/chief-ask-user.test.ts (2 tests) 3456ms
+   ✓ #1049 chief ask_user blocking Q&A full chain (pi backend) (2)
+     ✓ question → card (row + notification) → answer card → same turn continues (D2/D3/D4) 2686ms
+     ✓ user cancels → cancelled tool result → model converges in the same turn (D4 user-side exit) 518ms
+ ✓ |@cairn/integration| test/port-base-e2e.test.ts (3 tests) 16087ms
+   ✓ #1148 E2E: port base segmentation (two concurrent worker steps in different segments) (1)
+     ✓ two concurrent worker steps see CAIRN_PORT_BASE = 20000 / 20100 in their bash env 708ms
+   ✓ #1260 E2E: chief occupies the machine concurrency slot (cap 1) (1)
+     ✓ while a worker runs (cap 1) the chief queues for a free slot; a later worker is FIFO behind it 8732ms
+   ✓ #1148 E2E: env fallback precedence (env > DB > default) (1)
+     ✓ DB 2 / env 1 → only 1 worker runs at a time (env beats DB; server gate narrows to self-report) 6633ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+[skills] filtered: docs not in injected selection
+[skills] filtered: docx not in injected selection
+[skills] filtered: google-workspace not in injected selection
+[skills] filtered: import-memory not in injected selection
+[skills] filtered: morning not in injected selection
+[skills] filtered: pdf not in injected selection
+[skills] filtered: pptx not in injected selection
+[skills] filtered: setup-writing-style not in injected selection
+[skills] filtered: skill-creator not in injected selection
+[skills] filtered: xlsx not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: terminal-browser not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: visual-edit not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17ed0-7a81-7fad-9fc7-1a6344d1e6b5
+[mcp] dead: connect failed — its tools are unavailable this turn: failed: fetch failed
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-mcp-e2e.test.ts (3 tests) 1947ms
+   ✓ MCP client face E2E: local config registration + per-Agent slug authorization + daemon local resolution bridge (spec 13) (1)
+     ✓ server projection = config mirror (secret values never leave the API); authorized build step calls external tools for real; dead endpoint/unknown slug degrade without blocking 1575ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: /opt/homebrew/bin/claude (2.1.306)
+Enrolled in team 4MWxAt3TI2TG5Q1XtCme4 (machine 8KVzwIwcedC2fH_36w4a_)
+Online (machineId=8KVzwIwcedC2fH_36w4a_); polling http://127.0.0.1:60455
+[recover] no pending steps found
+[wake] push channel connected
+claim step=6w1mhny4P3QqNKJNje_08
+step 6w1mhny4P3QqNKJNje_08 for conv 01a17ed0-853f-7aeb-a1f0-d32b0b084b97 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-it-skills-home-Ih2HmD/workspaces/01a17ed0-853f-7aeb-a1f0-d32b0b084b97/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-it-skills-home-Ih2HmD/workspaces/01a17ed0-853f-7aeb-a1f0-d32b0b084b97/.pi/skills)
+[skills] filtered: extra-skill not in agent allowlist
+[skills] loaded: 1 skills from /private/tmp/cairn-it-skills-CmrR1q
+[skills] catalog: entries=1 chars=581 bytes=619
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a17ed0-853f-7aeb-a1f0-d32b0b084b97
+[skills] denied-read: /private/tmp/cairn-it-skills-CmrR1q/extra-skill/SKILL.md (skill extra-skill not in allowlist)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/skills-inject-e2e.test.ts (1 test) 589ms
+ ✓ |@cairn/integration| test/build-failure-preservation.test.ts (4 tests) 3503ms
+   ✓ duration failure pushes existing commits and exposes them in the fallback report and changes API 1085ms
+   ✓ idle failure pushes existing commits and exposes them in the fallback report and changes API 753ms
+   ✓ crash failure pushes existing commits and exposes them in the fallback report and changes API 543ms
+   ✓ restart of a failed build without a PR reuses its branch and restores earlier commits on a fresh workspace 1121ms
+ ✓ |@cairn/integration| test/m7-failed-send-e2e.test.ts (1 test) 746ms
+   ✓ M7 failed-phase send E2E: failed send → restart → feedback joins the new round session → runs to confirm (1)
+     ✓ full-chain persistence + new round actually runs + phase gate rejects 392ms
+ ✓ |@cairn/integration| test/info-fastlane-e2e.test.ts (1 test) 1510ms
+   ✓ #1626 info-class fast lane: info card report handed to the downstream code card (1)
+     ✓ info card only produces a report attachment, no branch push or merge; downstream code card brief carries the report and delivers as usual 1141ms
+ ✓ |@cairn/integration| test/pi-session-policy.test.ts (1 test) 932ms
+   ✓ pi session policy (#925 trust/telemetry/settings + #927 cost/cache) (1)
+     ✓ failure modes 1-6: deny observable, brief not regressed, policy line readable, retention sent, cost persisted, four dims unchanged 576ms
+
+[timing] wake→confirm (incl. real pi execution) = 246ms; idle claim cadence (hold=1s) = 3/3.2s
+ ✓ |@cairn/integration| test/m3a-demo.test.ts (4 tests) 3954ms
+   ✓ M3a demo: server dispatches step → daemon executes for real → transcript persists (4)
+     ✓ claim cadence is isomorphic to server hold (r3 §1.5 ~75–76s at compressed test timescale; production default 75s pinned on the wire test) 3203ms
+
+[diag] stub requests consumed: 5
+[diag] daemon.log tail:
+[skills] filtered: built-in-browser not in injected selection
+[skills] filtered: chrome-browser not in injected selection
+[skills] filtered: deep-research not in injected selection
+[skills] filtered: docs not in injected selection
+[skills] filtered: docx not in injected selection
+[skills] filtered: google-workspace not in injected selection
+[skills] filtered: import-memory not in injected selection
+[skills] filtered: morning not in injected selection
+[skills] filtered: pdf not in injected selection
+[skills] filtered: pptx not in injected selection
+[skills] filtered: setup-writing-style not in injected selection
+[skills] filtered: skill-creator not in injected selection
+[skills] filtered: xlsx not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: terminal-browser not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: visual-edit not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17ed0-cb46-77df-939f-33505cf82699
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-memory-e2e.test.ts (2 tests) 2254ms
+   ✓ M4b memory E2E: instruction-triggered + mid-step write + provenance + zero auto-write (r5 §6) (2)
+     ✓ spec instruction turn: save_memory persists mid-build-step, three-level provenance = live context 1774ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: terminal-browser not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: visual-edit not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a17ed0-d062-7ec9-903a-d0767e1a8700
+[gate] ask: rule=ask-rm-rf-root command=rm -rf /
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[gate] reject: rule=deny-echo tool=mcp__demo__echo
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/gate-e2e.test.ts (1 test) 590ms
+ ✓ |@cairn/integration| test/web-plans-convergence.test.ts (1 test) 2529ms
+   ✓ plan card converges via the team-stream phase event when the conv stream is dead (#666) 798ms
+ ✓ |@cairn/integration| test/crash-recover.test.ts (1 test) 3365ms
+   ✓ crash recovery (T2: AgentSession seam × host durable orchestration) (1)
+     ✓ SIGKILL mid-step → restart → recover reconciliation → continue session resumes → confirm 3363ms
+ ✓ |@cairn/integration| test/restart-blank-feedback-e2e.test.ts (1 test) 630ms
+   ✓ blank-feedback restart round (#720 negative case): no empty instruction injected (1)
+     ✓ blank feedback → plain restart round: no instruction, no blank user row, session prompt = task text 381ms
+
+[diag] todo phase: failed
+[diag] daemon.log tail:
+2026-10-28 03:23:06 [skills] filtered: visual-edit not in injected selection
+2026-10-28 03:23:06 [skills] filtered: wait-what not in injected selection
+2026-10-28 03:23:06 [skills] filtered: wayfinder not in injected selection
+2026-10-28 03:23:06 [skills] filtered: why not in injected selection
+2026-10-28 03:23:06 [skills] filtered: wiki not in injected selection
+2026-10-28 03:23:06 [skills] filtered: wizard not in injected selection
+2026-10-28 03:23:06 [skills] filtered: writing-dna-skill not in injected selection
+2026-10-28 03:23:06 [skills] filtered: writing-for-agents not in injected selection
+2026-10-28 03:23:06 [skills] filtered: zread not in injected selection
+2026-10-28 03:23:06 [skills] catalog: entries=0 chars=0 bytes=0
+2026-10-28 03:23:06 [step] brief written: AGENTS.md (create)
+2026-10-28 03:23:06 new session 01a17ed0-f856-7166-be39-93761ff81e54
+2026-10-28 03:23:07 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 03:23:07 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 03:23:07 [step] brief removed (AGENTS.md)
+2026-10-28 03:23:07 [step] step failed: git commit failed (1): [0mapps/daemon/test/1262-ansi-probe.ts[0m[0m:[0m[0m1[0m[0m:[0m[0m7[0m[0m [0m[0m]8;;https://biomejs.dev/linter/rules/no-unused-variables\lint/correctness/noUnusedVariables]8;;\[0m[0m [0m[0m[30m[47m FIXABLE [0m[0m [0m[0m━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[33m⚠[0m[0m [0m[0m[33mThis variable [0m[0m[1m[33mgreeting[0m[0m[33m is unused.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m1 │ [0m[0mc[0m[0mo[0m[0mn[0m[0ms[0m[0mt[0m[0m [0m[0mg[0m[0mr[0m[0me[0m[0me[0m[0mt[0m[0mi[0m[0mn[0m[0mg[0m[0m [0m[0m=[0m[0m [0m[0m"[0m[0mh[0m[0me[0m[0ml[0m[0ml[0m[0mo[0m[0m"[0m[0m [0m[0m+[0m[0m [0m[0m"[0m[0m [0m[0mw[0m[0mo[0m[0mr[0m[0ml[0m[0md[0m[0m"[0m[0m;[0m[0m
+[0m[0m  [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2 │ [0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUnused variables are often the result of typos, incomplete refactors, or other sources of bugs.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUnsafe fix: If this is intentional, prepend [0m[0m[1m[34mgreeting[0m[0m[34m with an underscore.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m1[0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[31mc[0m[0m[31mo[0m[0m[31mn[0m[0m[31ms[0m[0m[31mt[0m[0m[2m[31m·[0m[0m[1m[31mg[0m[0m[1m[31mr[0m[0m[1m[31me[0m[0m[1m[31me[0m[0m[1m[31mt[0m[0m[1m[31mi[0m[0m[1m[31mn[0m[0m[1m[31mg[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[2m[31m·[0m[0m[31m"[0m[0m[31mh[0m[0m[31me[0m[0m[31ml[0m[0m[31ml[0m[0m[31mo[0m[0m[31m"[0m[0m[2m[31m·[0m[0m[31m+[0m[0m[2m[31m·[0m[0m[31m"[0m[0m[2m[31m·[0m[0m[31mw[0m[0m[31mo[0m[0m[31mr[0m[0m[31ml[0m[0m[31md[0m[0m[31m"[0m[0m[31m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m[1m1[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[32mc[0m[0m[32mo[0m[0m[32mn[0m[0m[32ms[0m[0m[32mt[0m[0m[2m[32m·[0m[0m[1m[32m_[0m[0m[1m[32mg[0m[0m[1m[32mr[0m[0m[1m[32me[0m[0m[1m[32me[0m[0m[1m[32mt[0m[0m[1m[32mi[0m[0m[1m[32mn[0m[0m[1m[32mg[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[2m[32m·[0m[0m[32m"[0m[0m[32mh[0m[0m[32me[0m[0m[32ml[0m[0m[32ml[0m[0m[32mo[0m[0m[32m"[0m[0m[2m[32m·[0m[0m[32m+[0m[0m[2m[32m·[0m[0m[32m"[0m[0m[2m[32m·[0m[0m[32mw[0m[0m[32mo[0m[0m[32mr[0m[0m[32ml[0m[0m[32md[0m[0m[32m"[0m[0m[32m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2[0m[0m [0m[0m[1m2[0m[0m[1m │ [0m[0m [0m[0m [0m[0m
+[0m[0m  [0m[0m
+[0m
+[0mapps/daemon/test/1262-ansi-probe.ts[0m[0m [0m[0mformat[0m[0m [0m[0m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[31m✖[0m[0m [0m[0m[31mFormatter would have printed the following content:[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m1[0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[31mc[0m[0m[31mo[0m[0m[31mn[0m[0m[31ms[0m[0m[31mt[0m[0m[2m[31m·[0m[0m[31mg[0m[0m[31mr[0m[0m[31me[0m[0m[31me[0m[0m[31mt[0m[0m[31mi[0m[0m[31mn[0m[0m[31mg[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[2m[31m·[0m[0m[1m[31m"[0m[0m[31mh[0m[0m[31me[0m[0m[31ml[0m[0m[31ml[0m[0m[31mo[0m[0m[1m[31m"[0m[0m[2m[31m·[0m[0m[31m+[0m[0m[2m[31m·[0m[0m[1m[31m"[0m[0m[2m[31m·[0m[0m[31mw[0m[0m[31mo[0m[0m[31mr[0m[0m[31ml[0m[0m[31md[0m[0m[1m[31m"[0m[0m[31m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m[1m1[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[32mc[0m[0m[32mo[0m[0m[32mn[0m[0m[32ms[0m[0m[32mt[0m[0m[2m[32m·[0m[0m[32mg[0m[0m[32mr[0m[0m[32me[0m[0m[32me[0m[0m[32mt[0m[0m[32mi[0m[0m[32mn[0m[0m[32mg[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[2m[32m·[0m[0m[1m[32m'[0m[0m[32mh[0m[0m[32me[0m[0m[32ml[0m[0m[32ml[0m[0m[32mo[0m[0m[1m[32m'[0m[0m[2m[32m·[0m[0m[32m+[0m[0m[2m[32m·[0m[0m[1m[32m'[0m[0m[2m[32m·[0m[0m[32mw[0m[0m[32mo[0m[0m[32mr[0m[0m[32ml[0m[0m[32md[0m[0m[1m[32m'[0m[0m[32m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2[0m[0m [0m[0m[1m2[0m[0m[1m │ [0m[0m [0m[0m [0m[0m
+[0m[0m  [0m[0m
+[0m
+[0m[34mChecked 1 file in 64[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m[0m
+[0m[0m[31mFound [0m[0m[31m1[0m[0m[31m error.[0m[0m
+[0m[0m[33mFound [0m[0m[33m1[0m[0m[33m warning.[0m
+[0mcheck[0m[0m [0m[0m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[31m✖[0m[0m [0m[0m[31mSome [0m[0m[1m[31merrors[0m[0m[31m were emitted while [0m[0m[1m[31mrunning checks[0m[0m[31m.[0m[0m
+[0m[0m  [0m[0m
+[0m
+
+ ✓ |@cairn/integration| test/ansi-errormessage-e2e.test.ts (1 test) 1421ms
+   ✓ #1262 E2E: lint-failed commit → errorMessage persisted as plain text (1)
+     ✓ pre-commit colored biome output → failed → build.errorMessage unescaped, first line readable 1405ms
+
+[diag] stub requests consumed: 2
+[diag] daemon.log tail:
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: /opt/homebrew/bin/claude (2.1.306)
+Enrolled in team xEUfokhfToRByLse_-YMx (machine N4gm7BqYS0ACb8LJng5JO)
+Online (machineId=N4gm7BqYS0ACb8LJng5JO); polling http://127.0.0.1:60683
+[recover] no pending steps found
+[wake] push channel connected
+claim step=GZZXLuLR3fbDDC9pZ3xTQ
+step GZZXLuLR3fbDDC9pZ3xTQ for conv chief-01a17ed1-00da-7dac-8470-f660f1dd45ba (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-m4a-home-3APfbD/workspaces/chief-01a17ed1-00da-7dac-8470-f660f1dd45ba/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/private/tmp/cairn-m4a-home-3APfbD/workspaces/chief-01a17ed1-00da-7dac-8470-f660f1dd45ba/.pi/skills)
+[skills] collision: name "computer-use" collision (winner=<home>/.agents/skills/computer-use/SKILL.md loser=<home>/.agents/skills/synced/51b8e5e0-5e73-4701-aa47-02546e55d596_b7e5706c-f8fb-48c8-95c1-8fde2684cc7a/computer-use/SKILL.md)
+[skills] loaded: 88 skills from <home>/.agents/skills
+[skills] catalog: entries=64 chars=27071 bytes=32597
+[step] brief written: AGENTS.md (create)
+new session chief-01a17ed1-00da-7dac-8470-f660f1dd45ba
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4a-chief-e2e.test.ts (1 test) 625ms
+ ✓ |@cairn/integration| test/task-meta-e2e.test.ts (2 tests) 2654ms
+   ✓ spec 15 #394 title-less surface + fixed tag vocabulary (live UI → wire → SQLite) (2)
+     ✓ dialog has no title input / no tag UI; first body line becomes the placeholder title; detail page has no tag add surface 1488ms
+ ✓ |@cairn/integration| test/m7-stop-e2e.test.ts (1 test) 4544ms
+ ✓ |@cairn/integration| test/memory-regression-seed.test.ts (4 tests) 710ms
+ ✓ |@cairn/integration| test/w3-steer-e2e.test.ts (1 test) 8659ms
+   ✓ W3 steer E2E: message while building → pending → signal → pull-confirm → session.steer (1)
+     ✓ full-chain delivery + rendering + undisturbed step finish + gate reject 8300ms
+ ✓ |@cairn/integration| test/m7-branch-dialog-e2e.test.ts (1 test) 1853ms
+   ✓ branch-sync buildId wiring (#346 regression pin) (1)
+     ✓ detail right pane switches to the Branch & PR section → renders the live face (machine picker + editable dir), not the fixture placeholder 689ms
+ ✓ |@cairn/integration| test/plan-prior-art-grade.test.ts (18 tests) 6ms
+ ✓ |@cairn/integration| test/chief-eval-reap.test.ts (4 tests) 1931ms
+   ✓ reapEscapees (4)
+     ✓ cleans up dev servers that escaped their workspace 1448ms
+     ✓ pgrep -f substring matching bridges the /var vs /private/var symlink difference 445ms
+ ✓ |@cairn/integration| test/harness-eval-result.test.ts (3 tests) 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/local-executor.test.ts > per-step credential argv discipline (spec 12 G2-T2: capturing fork+exec command lines) > failure mode 5: token never enters argv throughout credential-bearing clone/fetch/push; carried by the env credential.helper (positive control)
+AssertionError: expected 'x-access-token\nx-access-token\nx-acc…' to contain 'ghp_PROBE0000000000000000000000000000'
+
+- Expected
++ Received
+
+- ghp_PROBE0000000000000000000000000000
++ x-access-token
++ x-access-token
++ x-access-token
++
+
+ ❯ test/local-executor.test.ts:229:21
+    227|     expect(argv).not.toContain('credential.helper');
+    228|     const envDump = readFileSync(envLog, 'utf8');
+    229|     expect(envDump).toContain(PROBE_TOKEN);
+       |                     ^
+    230|     expect(envDump).toContain('x-access-token');
+    231|   }, 30_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 337 passed | 1 skipped (339)
+      Tests  1 failed | 4587 passed | 1 skipped (4589)
+   Start at  03:20:06
+   Duration  208.12s (tests 69%, import 30%, transform 1%)
+
+JSON report written to /private/tmp/prepush-vitest-oScCxy/report.json
+[prepush] known environment red locally (scripts/prepush-known-red.json): apps/daemon/test/local-executor.test.ts
+[prepush] node scripts/doc-reader-tests.mjs docs/lessons/1838-prior-art-reuse-keyword-scoring.md
+[doc-reader-tests] no test reads the changed docs
+[prepush] node scripts/ui-dead-class-gate.mjs --compile
+ui-dead-class-gate: selector universe from postcss compile (apps/web/src/styles/app.css) + apps/web/src/**/*.css
+scanned 278 files (20 pristine registry files skipped), 8173 class-token occurrences, 1777 living selectors
+zero-rule names: 239 — selector-exempt 236, manual-exempt 3, DEAD 0
+OK — every rendered class token matches a living rule or carries a disposition.
+[prepush] pnpm --filter @cairn/web e2e:affected -- .claude/hillclimb/plan-prior-art/cases.json apps/server/src/services/builds.ts apps/server/src/services/chief.ts apps/server/test/chief-settings.test.ts integration/eval/plan-prior-art/grade.mts integration/test/plan-prior-art-grade.test.ts packages/shared/src/records/persona.ts packages/shared/src/records/plan.ts packages/shared/src/records/prompts.ts packages/shared/test/plan-contract-prompt.test.ts packages/shared/test/plan-contract.test.ts scripts/eval-capabilities.json
+$ node ../../scripts/e2e-affected.mjs -- .claude/hillclimb/plan-prior-art/cases.json apps/server/src/services/builds.ts apps/server/src/services/chief.ts apps/server/test/chief-settings.test.ts integration/eval/plan-prior-art/grade.mts integration/test/plan-prior-art-grade.test.ts packages/shared/src/records/persona.ts packages/shared/src/records/plan.ts packages/shared/src/records/prompts.ts packages/shared/test/plan-contract-prompt.test.ts packages/shared/test/plan-contract.test.ts scripts/eval-capabilities.json
+[e2e:affected] changed paths (explicit):
+  .claude/hillclimb/plan-prior-art/cases.json → none
+  apps/server/src/services/builds.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/chief.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/chief-settings.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  integration/eval/plan-prior-art/grade.mts → none
+  integration/test/plan-prior-art-grade.test.ts → none
+  packages/shared/src/records/persona.ts → none
+  packages/shared/src/records/plan.ts → none
+  packages/shared/src/records/prompts.ts → none
+  packages/shared/test/plan-contract-prompt.test.ts → none
+  packages/shared/test/plan-contract.test.ts → none
+  scripts/eval-capabilities.json → none
+[e2e:affected] 3/189 specs on the standard fixture-build config, E2E_PORT=8398
+  agent-fallback-models.spec.ts live-server-reap.spec.ts token-gate.spec.ts
+[e2e:affected] slot 1: E2E_PORT=8398, build output /private/tmp/cairn-heavy-slot-1/web-dist
+[WebServer] (node:18558) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:18560) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "<home>/.codex/worktrees/pr-1839-prior-art/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:18583) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:18585) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 23 tests using 2 workers
+
+(node:18608) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18607) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18610) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18611) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18610) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18611) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/live-server-reap.spec.ts:39:1 › after dispose not a single process of the server tree remains (1.2s)
+(node:18671) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 e2e/agent-fallback-models.spec.ts:93:1 › empty chain: rule copy is clear, only an add entry, no candidate rows (325ms)
+(node:18673) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   4 e2e/agent-fallback-models.spec.ts:105:1 › add: lands in the store only after model selection, reload reads back the same row (655ms)
+(node:18673) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   5 e2e/agent-fallback-models.spec.ts:124:1 › change: swapping the model of one row keeps the remaining rows in original order (484ms)
+  ✓   3 e2e/live-server-reap.spec.ts:49:1 › caller SIGKILLed, teardown never runs → the server tree exits on its own (1.4s)
+(node:18746) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   6 e2e/agent-fallback-models.spec.ts:134:1 › reorder: move up/down changes the stored order, first row cannot move up further, last row cannot move down further (570ms)
+(node:18746) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   8 e2e/agent-fallback-models.spec.ts:154:1 › delete: deleting a middle row shifts the rest up, deleting down to empty sends null instead of an empty array (452ms)
+(node:18749) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18749) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:18750) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   9 e2e/agent-fallback-models.spec.ts:173:1 › cap: at 5 entries add is disabled, server returns 400 for the 6th and the chain stays unchanged (1.4s)
+(node:18750) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  10 e2e/agent-fallback-models.spec.ts:195:1 › half-selected rows are not stored: with only a runtime picked and no model, the store keeps the original chain (564ms)
+  ✓  11 e2e/agent-fallback-models.spec.ts:209:1 › deleted model: the row greys out with an explanation and is not silently dropped (255ms)
+  ✓  12 e2e/agent-fallback-models.spec.ts:221:1 › dead model: the row greys out and is marked delisted (286ms)
+  ✓   7 e2e/token-gate.spec.ts:46:1 › auth on: first visit lands the gate page; wrong token stays without persisting; right token enters the UI and SSE carries ?token= (475ms)
+  ✓  13 e2e/agent-fallback-models.spec.ts:240:1 › owner machine missing the runtime a fallback needs: editing shows a hint, already-configured fallbacks are kept (267ms)
+  ✓  14 e2e/token-gate.spec.ts:83:1 › auth on: a stale bad token lands the gate page on first visit and the bad value is cleared (264ms)
+  ✓  15 e2e/agent-fallback-models.spec.ts:261:3 › typography 1280px: runtime label does not wrap, description text does not overlap the right-side controls (298ms)
+  ✓  16 e2e/token-gate.spec.ts:95:1 › auth on: a good token already in localStorage → first visit reaches the UI directly, zero gate page (250ms)
+  ✓  17 e2e/agent-fallback-models.spec.ts:261:3 › typography 560px: runtime label does not wrap, description text does not overlap the right-side controls (273ms)
+  ✓  18 e2e/token-gate.spec.ts:114:1 › auth off: zero gate page, zero token attached, behavior unchanged (236ms)
+  ✓  19 e2e/token-gate.spec.ts:132:1 › #1048 gate page guide: the zh face tells where the token comes from (cairn token command / server log / variable name) (225ms)
+  ✓  20 e2e/token-gate.spec.ts:145:1 › #1048 gate page guide: the en face keeps the same facts undistorted (command name / log / variable name interpolated through the dictionary template) (205ms)
+  ✓  21 e2e/token-gate.spec.ts:160:1 › #1762 Tailscale Serve identity: the app opens without the token prompt or a stored token (205ms)
+  ✓  22 e2e/token-gate.spec.ts:175:1 › #1708 login link: /app#token=<valid> signs in and strips the fragment (240ms)
+  ✓  23 e2e/token-gate.spec.ts:185:1 › #1708 login link: an invalid fragment token lands the gate error copy and still strips the fragment (233ms)
+
+  23 passed (10.6s)
+[prepush] PASS (25 checks)

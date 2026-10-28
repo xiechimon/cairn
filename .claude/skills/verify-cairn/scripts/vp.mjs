@@ -9,12 +9,15 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
+  unlinkSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { chromium } from '@playwright/test';
+import { isRecordingPath, RECORDING_MAX_BYTES } from '../../../../packages/shared/src/records/recording-trigger.ts';
 
 const SKILL_DIR = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPTS_DIR = join(SKILL_DIR, 'scripts');
@@ -68,8 +71,9 @@ const USAGE = `verify-cairn: node .claude/skills/verify-cairn/scripts/vp.mjs <co
                                  inside docs/verify (VERIFY_EVIDENCE_DIR, or the output option's
                                  directory) is refused before anything runs, also with --dry-run;
                                  --dry-run prints what would run
-  capture <path> [--name <label>] [--wait <ms>]
+  capture <path> [--name <label>] [--wait <ms>] [--video]
                                  screenshot a live route, record console errors and failed requests
+                                 --video records navigation and the wait interval as WebM (max 5 MiB)
                                  (exit 0 when the page loaded; errors are recorded, not judged;
                                  with VERIFY_EVIDENCE_DIR set it writes into a new capture-<label>/,
                                  refused when that directory is inside docs/verify)
@@ -378,6 +382,7 @@ function driveCommand(argv) {
 }
 
 async function captureCommand(argv) {
+  const videoRequested = takeFlag(argv, '--video');
   const label = takeOption(argv, '--name')[0] ?? 'page';
   const waitText = takeOption(argv, '--wait')[0] ?? '1500';
   if (!/^[0-9]+$/.test(waitText)) fail('--wait needs a whole number of milliseconds');
@@ -401,9 +406,15 @@ async function captureCommand(argv) {
   let title = '';
 
   let browser;
+  let context;
+  let recording = null;
   try {
     browser = await chromium.launch();
-    const page = await browser.newPage({ viewport: { width: 1440, height: 732 }, colorScheme: 'dark' });
+    context = await browser.newContext({
+      viewport: { width: 1440, height: 732 }, colorScheme: 'dark',
+      ...(videoRequested ? { recordVideo: { dir, size: { width: 1440, height: 732 } } } : {}),
+    });
+    const page = await context.newPage();
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
     });
@@ -419,15 +430,29 @@ async function captureCommand(argv) {
     }
     await page.screenshot({ path: join(dir, screenshot) });
     title = await page.title().catch(() => '');
+    const video = page.video();
+    await context.close();
+    if (videoRequested) {
+      if (video === null) throw new Error('recording was not created');
+      const videoPath = await video.path();
+      const size = statSync(videoPath).size;
+      if (size === 0 || size > RECORDING_MAX_BYTES) {
+        unlinkSync(videoPath);
+        throw new Error('recording must be nonempty and at most 5 MiB; reduce --wait');
+      }
+      recording = `${label}.webm`;
+      renameSync(videoPath, join(dir, recording));
+    }
   } catch (err) {
 
     if (navigation === 'ok') navigation = firstLine(err);
     screenshot = null;
   } finally {
+    await context?.close();
     await browser?.close();
   }
 
-  const result = { url, title, navigation, screenshot, consoleErrors, failedRequests };
+  const result = { url, title, navigation, screenshot, ...(videoRequested ? { recording } : {}), consoleErrors, failedRequests };
   writeFileSync(join(dir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
   console.log(`vp: captured ${url}`);
   console.log(`    navigation ${navigation}, ${consoleErrors.length} console error(s), ${failedRequests.length} failed request(s)`);
@@ -474,6 +499,17 @@ function archiveCommand(argv) {
   const target = join(ROOT, 'docs', 'verify', ticket);
   const plans = sources.map((src) => {
     if (!existsSync(src) || !statSync(src).isDirectory()) fail(`not an evidence directory: ${src}`, 1);
+    const pending = [src];
+    for (const directory of pending) {
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const path = join(directory, entry.name);
+        if (entry.isDirectory()) pending.push(path);
+        else if (isRecordingPath(entry.name)) {
+          const size = statSync(path).size;
+          if (size === 0 || size > RECORDING_MAX_BYTES) fail(`recording must be nonempty and at most 5 MiB: ${path}`, 1);
+        }
+      }
+    }
     const dest = join(target, basename(src));
     if (existsSync(dest)) fail(`refusing to overwrite ${dest}: docs/verify is add-only (ADR 0015)`, 1);
     return { src, dest };

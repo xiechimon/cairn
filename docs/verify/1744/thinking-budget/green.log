@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1933-thinking-budget/cairn
+
+
+ Test Files  2 passed (2)
+      Tests  22 passed (22)
+   Start at  05:25:29
+   Duration  1.21s (import 68%, transform 21%, tests 11%)
+

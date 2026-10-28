@@ -1,0 +1,27 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1985
+
+ ❯ |@cairn/integration| test/routing-boundary.test.ts (21 tests | 1 failed) 8096ms
+   ❯ real process read boundary (17)
+     × records attempts from children requesting untraced execution 1282ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > records attempts from children requesting untraced execution
+AssertionError: expected 0 to be greater than 0
+ ❯ test/routing-boundary.test.ts:54:38
+     52|     expect(result.enforced, result.stderr).toBe(true);
+     53|     expect(result.stdout).not.toContain(secret);
+     54|     expect(result.violations.length).toBeGreaterThan(0);
+       |                                      ^
+     55|   });
+     56|   test.each([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 passed (21)
+   Start at  07:49:26
+   Duration  8.68s (tests 98%, transform 2%)
+

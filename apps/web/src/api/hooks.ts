@@ -38,6 +38,7 @@ import type {
   PatchChiefBody,
   PatchMachineBody,
   PatchProjectBody,
+  PatchTeamBody,
   PatchUserBody,
   PlanRow,
   ProjectCommitDetailResponse,
@@ -576,6 +577,13 @@ export function useApiMutations(teamId: string | undefined) {
         void qc.invalidateQueries({ queryKey: ['session'] });
       },
     }),
+    patchTeam: useMutation({
+      mutationFn: (body: PatchTeamBody) =>
+        api.patch<TeamRecord>(`/api/teams/${encodeURIComponent(teamId ?? '')}`, body),
+      onSuccess: () => {
+        void qc.invalidateQueries({ queryKey: ['teams'] });
+      },
+    }),
     createTodo: useMutation({
       mutationFn: (input: { projectId: string; spec: string; machineId?: string | null }) =>
         api.post<TodoRecord>(`/api/projects/${input.projectId}/todos`, {
@@ -606,6 +614,7 @@ export function useApiMutations(teamId: string | undefined) {
           phase?: string;
           orderIndex?: number;
           tagIds?: string[];
+          projectId?: string;
           assignment?: {
             plan?: NonNullable<Assignment['plan']>;
             build?: NonNullable<Assignment['build']>;
@@ -733,14 +742,22 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     chiefSend: useMutation({
-      mutationFn: (input: { threadId: string | null; content: string }) =>
-        input.threadId === null
-          ? api.post<{ thread: ChiefThread }>(`/api/teams/${teamId}/chief/threads`, {
-              content: input.content,
-            })
-          : api.post<{ thread: ChiefThread }>(`/api/conversations/${input.threadId}/messages`, {
-              content: input.content,
-            }),
+      mutationFn: (input: {
+        threadId: string | null;
+        content: string;
+        projectId?: string | null;
+      }) => {
+        const body = {
+          content: input.content,
+          ...(input.projectId != null ? { projectId: input.projectId } : {}),
+        };
+        return input.threadId === null
+          ? api.post<{ thread: ChiefThread }>(`/api/teams/${teamId}/chief/threads`, body)
+          : api.post<{ thread: ChiefThread }>(
+              `/api/conversations/${input.threadId}/messages`,
+              body,
+            );
+      },
       onSuccess: invalidateAll,
     }),
     chiefRewind: useMutation({

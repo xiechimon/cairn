@@ -34,6 +34,7 @@ import {
   hasBlockingFinding,
   isPlanContractRewritePrompt,
   MERGE_ANNOUNCEMENT,
+  PLAN_PRIOR_ART_RULE,
   type PlanContractCheck,
   parseGithubIssueSourceRef,
   parseReviewPromptMeta,
@@ -104,6 +105,7 @@ import { DONE_ROW } from './delivery-rows.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { markFirstPrPromptDue } from './first-pr-report.js';
 import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
@@ -1664,7 +1666,7 @@ async function mergeThroughGithub(
 
 const PLAN_REWRITE_PROMPT = buildPlanRewritePrompt();
 
-const REVIEW_REVISE_PROMPT = `用户对方案提出审核反馈，结论含 blocking findings。审核结论：<{conclusion}>。\n\nBlocking findings（必须逐条修复）：\n{blockings}\n\n请忠实按反馈调整方案，输出更新后的 plan.md（覆盖 Context/Changes/Edge cases/Verification 四段），并在结尾一句话摘要本次调整了什么。`;
+const REVIEW_REVISE_PROMPT = `用户对方案提出审核反馈，结论含 blocking findings。审核结论：<{conclusion}>。\n\nBlocking findings（必须逐条修复）：\n{blockings}\n\n请忠实按反馈调整方案，输出更新后的 plan.md（覆盖 Context/Changes/Edge cases/Verification 四段），并在结尾一句话摘要本次调整了什么。${PLAN_PRIOR_ART_RULE}`;
 
 function enqueueReviewRevision(
   deps: BuildDeps,
@@ -2341,6 +2343,7 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
   });
   advanceSplitWaves(deps, todoId);
   emitRuntimeBuildSpan(deps.db, buildId, 'done');
+  markFirstPrPromptDue(deps.db, buildId);
 }
 
 export class NotFoundError extends Error {

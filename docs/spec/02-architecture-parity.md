@@ -222,7 +222,7 @@ click "start" → the start-task dialog (Agent optional / the "use different Age
 | Slot | todos.dev current value | Replication disposition |
 |---|---|---|
 | CLI command name | `tds` | `pacman` (set by #44, executed by #109) |
-| env prefix | `TDS_` | `PACMAN_` same shape (set by #44, executed by #109) |
+| env prefix | `TDS_` | `CAIRN_` same shape (set by #44, executed by #109) |
 | user home directory | `~/.tds` | `~/.pacman` (set by #44, executed by #109) |
 | workspaces directory | `~/.tds/workspaces/<conversationId>` | `~/.pacman/workspaces/<conversationId>` (same slot renamed, executed by #109) |
 | branch prefix | `tds/conv-` | `pacman/conv-` (set by #44, executed by #109) |
