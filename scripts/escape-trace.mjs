@@ -169,6 +169,137 @@ function finishResolved(trace, { introducingSha, originalPr, introducingMergedAt
   return trace;
 }
 
+function readDiffGitToken(line, index) {
+  if (index >= line.length) return null;
+  if (line[index] === '"') {
+    let i = index + 1;
+    let out = '';
+    while (i < line.length) {
+      if (line[i] === '\\' && i + 1 < line.length) {
+        const next = line[++i];
+        if (next === 'a') out += '\x07';
+        else if (next === 'b') out += '\b';
+        else if (next === 't') out += '\t';
+        else if (next === 'n') out += '\n';
+        else if (next === 'v') out += '\v';
+        else if (next === 'f') out += '\f';
+        else if (next === 'r') out += '\r';
+        else if (next === '\\' || next === '"') out += next;
+        else if (next >= '0' && next <= '7') {
+          let oct = next;
+          for (
+            let k = 0;
+            k < 2 && i + 1 < line.length && line[i + 1] >= '0' && line[i + 1] <= '7';
+            k++
+          )
+            oct += line[++i];
+          out += String.fromCharCode(Number.parseInt(oct, 8));
+        } else out += next;
+        i++;
+        continue;
+      }
+      if (line[i] === '"') return { value: out, next: i + 1 };
+      out += line[i++];
+    }
+    return null;
+  }
+  let i = index;
+  while (i < line.length && line[i] !== ' ') i++;
+  return { value: line.slice(index, i), next: i };
+}
+
+function stripDiffGitPrefix(value) {
+  if (value === '/dev/null') return '/dev/null';
+  if (value.startsWith('a/') || value.startsWith('b/')) return value.slice(2);
+  return value;
+}
+
+export function parseDiffGitPaths(line) {
+  if (!line.startsWith('diff --git ')) return null;
+  const first = readDiffGitToken(line, 'diff --git '.length);
+  if (!first || line[first.next] !== ' ') return null;
+  const second = readDiffGitToken(line, first.next + 1);
+  if (!second) return null;
+  return { a: stripDiffGitPrefix(first.value), b: stripDiffGitPrefix(second.value) };
+}
+
+function blameChangedLines(cwd, followUpSha, paths) {
+  const parentResult = tryGitAt(cwd, ['rev-parse', '--verify', `${followUpSha}^`]);
+  if (!parentResult.ok)
+    return { status: 'unresolved', reason: 'missing-parent-history', files: [], shas: [] };
+  const parent = parentResult.stdout.trim();
+  const diffResult = tryGitAt(cwd, [
+    'diff',
+    '--unified=0',
+    '--find-renames',
+    `${parent}`,
+    followUpSha,
+    '--',
+    ...paths,
+  ]);
+  if (!diffResult.ok)
+    return { status: 'unresolved', reason: 'shallow-or-unavailable-diff', files: [], shas: [] };
+  const rangesByPath = new Map();
+  let blamePath = null;
+  for (const line of diffResult.stdout.split('\n')) {
+    const pathsInHeader = parseDiffGitPaths(line);
+    if (pathsInHeader) {
+      blamePath = pathsInHeader.a === '/dev/null' ? pathsInHeader.b : pathsInHeader.a;
+      continue;
+    }
+    const hunk = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
+    if (!hunk || !blamePath || blamePath === '/dev/null') continue;
+    const start = Number(hunk[1]);
+    const count = hunk[2] === undefined ? 1 : Number(hunk[2]);
+    if (count === 0) continue;
+    const list = rangesByPath.get(blamePath) ?? [];
+    list.push({ start, end: start + count - 1 });
+    rangesByPath.set(blamePath, list);
+  }
+  if (rangesByPath.size === 0)
+    return { status: 'unresolved', reason: 'no-blameable-lines', files: [], shas: [] };
+  const shas = new Set();
+  const files = [];
+  for (const [path, ranges] of rangesByPath) {
+    const fileRanges = [];
+    for (const range of ranges) {
+      const blame = tryGitAt(cwd, [
+        'blame',
+        '--porcelain',
+        '-L',
+        `${range.start},${range.end}`,
+        parent,
+        '--',
+        path,
+      ]);
+      if (!blame.ok)
+        return {
+          status: 'unresolved',
+          reason: 'shallow-or-unavailable-blame',
+          files,
+          shas: [...shas],
+        };
+      for (const blameLine of blame.stdout.split('\n')) {
+        const header = /^([0-9a-f]{40}) \d+ \d+(?: \d+)?$/.exec(blameLine);
+        if (header) shas.add(header[1]);
+      }
+      fileRanges.push({ start: range.start, end: range.end });
+    }
+    files.push({ path, lines: fileRanges });
+  }
+  const unique = [...shas];
+  if (unique.length === 0)
+    return { status: 'unresolved', reason: 'shallow-or-unavailable-blame', files, shas: unique };
+  if (unique.length > 1) return { status: 'multiple-origin', reason: null, files, shas: unique };
+  return { status: 'resolved', reason: null, files, shas: unique };
+}
+
+function evidenceFiles(cwd, followUpSha, paths) {
+  const blamed = blameChangedLines(cwd, followUpSha, paths);
+  if (blamed.files.length > 0) return blamed.files;
+  return paths.map((path) => ({ path, lines: [] }));
+}
+
 export function resolveTraces(candidates, { cwd = process.cwd(), responder = {} } = {}) {
   const active = {
     pullsByCommit: responder.pullsByCommit ?? {},
@@ -226,7 +357,7 @@ export function resolveTraces(candidates, { cwd = process.cwd(), responder = {} 
           originalPr: resolved.pr,
           introducingMergedAt: resolved.mergedAt,
           method: 'revert-body',
-          files: candidate.paths.map((path) => ({ path, lines: [] })),
+          files: evidenceFiles(cwd, candidate.followUpSha, candidate.paths),
         });
       trace.method = 'revert-body';
       trace.introducingSha = full;
@@ -294,95 +425,24 @@ export function resolveTraces(candidates, { cwd = process.cwd(), responder = {} 
         originalPr: chosen.number,
         introducingMergedAt: chosen.merged_at,
         method: 'explicit-reference',
-        files: candidate.paths.map((path) => ({ path, lines: [] })),
+        files: evidenceFiles(cwd, candidate.followUpSha, candidate.paths),
       });
     }
 
-    const parentResult = tryGitAt(cwd, ['rev-parse', '--verify', `${candidate.followUpSha}^`]);
-    if (!parentResult.ok) {
+    const blamed = blameChangedLines(cwd, candidate.followUpSha, candidate.paths);
+    trace.evidence.files = blamed.files;
+    if (blamed.status === 'unresolved') {
       trace.method = 'blame';
-      trace.unresolvedReason = 'missing-parent-history';
+      trace.unresolvedReason = blamed.reason;
       return trace;
     }
-    const parent = parentResult.stdout.trim();
-    const diffResult = tryGitAt(cwd, [
-      'diff',
-      '--unified=0',
-      '--find-renames',
-      `${parent}`,
-      candidate.followUpSha,
-      '--',
-      ...candidate.paths,
-    ]);
-    if (!diffResult.ok) {
-      trace.method = 'blame';
-      trace.unresolvedReason = 'shallow-or-unavailable-diff';
-      return trace;
-    }
-    const rangesByPath = new Map();
-    let blamePath = null;
-    for (const line of diffResult.stdout.split('\n')) {
-      const pathMatch = /^diff --git a\/(.+) b\/(.+)$/.exec(line);
-      if (pathMatch) {
-        blamePath = pathMatch[1] === '/dev/null' ? pathMatch[2] : pathMatch[1];
-        continue;
-      }
-      const hunk = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
-      if (!hunk || !blamePath || blamePath === '/dev/null') continue;
-      const start = Number(hunk[1]);
-      const count = hunk[2] === undefined ? 1 : Number(hunk[2]);
-      if (count === 0) continue;
-      const list = rangesByPath.get(blamePath) ?? [];
-      list.push({ start, end: start + count - 1 });
-      rangesByPath.set(blamePath, list);
-    }
-    if (rangesByPath.size === 0) {
-      trace.method = 'blame';
-      trace.unresolvedReason = 'no-blameable-lines';
-      return trace;
-    }
-    const shas = new Set();
-    const files = [];
-    for (const [path, ranges] of rangesByPath) {
-      const fileRanges = [];
-      for (const range of ranges) {
-        const blame = tryGitAt(cwd, [
-          'blame',
-          '--porcelain',
-          '-L',
-          `${range.start},${range.end}`,
-          parent,
-          '--',
-          path,
-        ]);
-        if (!blame.ok) {
-          trace.method = 'blame';
-          trace.unresolvedReason = 'shallow-or-unavailable-blame';
-          trace.evidence.files = files;
-          return trace;
-        }
-        for (const line of blame.stdout.split('\n')) {
-          const header = /^([0-9a-f]{40}) \d+ \d+(?: \d+)?$/.exec(line);
-          if (header) shas.add(header[1]);
-        }
-        fileRanges.push({ start: range.start, end: range.end });
-      }
-      files.push({ path, lines: fileRanges });
-    }
-    trace.evidence.files = files;
-    const unique = [...shas];
-    if (unique.length === 0) {
-      trace.method = 'blame';
-      trace.unresolvedReason = 'shallow-or-unavailable-blame';
-      return trace;
-    }
-    if (unique.length > 1) {
+    if (blamed.status === 'multiple-origin') {
       trace.status = 'multiple-origin';
       trace.method = 'blame';
-      trace.evidence.introducingCandidates = unique;
+      trace.evidence.introducingCandidates = blamed.shas;
       return trace;
     }
-    const introducingSha = unique[0];
+    const introducingSha = blamed.shas[0];
     const resolved = resolveCommitToPr(cwd, introducingSha, active);
     if (resolved.pr === null || !resolved.mergedAt) {
       trace.method = 'blame';
@@ -395,7 +455,7 @@ export function resolveTraces(candidates, { cwd = process.cwd(), responder = {} 
       originalPr: resolved.pr,
       introducingMergedAt: resolved.mergedAt,
       method: 'blame',
-      files,
+      files: blamed.files,
     });
   });
 }

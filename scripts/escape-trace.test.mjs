@@ -221,6 +221,11 @@ test('fix: repair regression introduced by #100 (#201) resolves origin PR 100 an
   assert.equal(trace.introducingMergedAt, new Date(introduceAt).toISOString());
   assert.equal(trace.followUpTimestamp, new Date(fixAt).toISOString());
   assert.ok(trace.evidence.references.some((ref) => ref.number === 100));
+  assert.ok(
+    trace.evidence.files.some(
+      (file) => file.path === 'token.txt' && file.lines.some((range) => range.start >= 1),
+    ),
+  );
 });
 
 test('a revert body resolves to the reverted commit and its PR', (t) => {
@@ -261,6 +266,11 @@ test('a revert body resolves to the reverted commit and its PR', (t) => {
   assert.equal(trace.fixingSha, fixingSha);
   assert.equal(trace.originalPr, 50);
   assert.equal(trace.withinEscapeWindow, true);
+  assert.ok(
+    trace.evidence.files.some(
+      (file) => file.path === 'feature.txt' && file.lines.some((range) => range.start >= 1),
+    ),
+  );
 });
 
 test('Fixes #N where N is an issue keeps an unvalidated reference with reason issue-not-pr', (t) => {
@@ -619,4 +629,108 @@ test('candidates subcommand pipes into trace through the CLI with a recorded res
   assert.equal(trace.fixingPr, 21);
   assert.equal(trace.method, 'explicit-reference');
   assert.equal(trace.status, 'resolved');
+});
+
+test('blame resolves quotePath-quoted paths that contain a tab and newline', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-quoted-path-');
+  const oddPath = 'tab\tand\nline.txt';
+  const introduceAt = '2026-01-10T00:00:00Z';
+  const fixAt = '2026-01-12T00:00:00Z';
+  const introducingSha = commit('feat: odd path defect (#301)', introduceAt, {
+    [oddPath]: 'broken\n',
+  });
+  const fixingSha = commit('fix: repair odd path (#302)', fixAt, { [oddPath]: 'fixed\n' });
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const header = execFileSync(
+    'git',
+    ['diff', '--unified=0', `${introducingSha}`, fixingSha, '--', oddPath],
+    { cwd, encoding: 'utf8' },
+  ).split('\n', 1)[0];
+  assert.match(header, /^diff --git "/);
+  const candidates = collectCandidates({
+    since: '2026-01-11T00:00:00Z',
+    until: '2026-01-13T00:00:00Z',
+    cwd,
+  });
+  assert.deepEqual(candidates[0].paths, [oddPath]);
+  const responder = {
+    pullsByCommit: {
+      [introducingSha]: [{ number: 301, merged_at: introduceAt }],
+      [fixingSha]: [{ number: 302, merged_at: fixAt }],
+    },
+    refs: {},
+  };
+  const [trace] = resolveTraces(candidates, { cwd, responder });
+  assert.equal(trace.status, 'resolved');
+  assert.equal(trace.method, 'blame');
+  assert.equal(trace.introducingSha, introducingSha);
+  assert.equal(trace.originalPr, 301);
+  assert.ok(
+    trace.evidence.files.some(
+      (file) => file.path === oddPath && file.lines.some((range) => range.start === 1),
+    ),
+  );
+});
+
+test('blame keeps separate origins when only one changed path is quotePath-quoted', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-mixed-quote-');
+  const oddPath = 'tab\tand\nline.txt';
+  const firstAt = '2026-01-01T00:00:00Z';
+  const secondAt = '2026-01-02T00:00:00Z';
+  const fixAt = '2026-01-04T00:00:00Z';
+  const firstSha = commit('feat: ordinary defect (#311)', firstAt, {
+    'ordinary.txt': 'A\n',
+  });
+  const secondSha = commit('feat: quoted defect (#312)', secondAt, {
+    'ordinary.txt': 'A\n',
+    [oddPath]: 'B\n',
+  });
+  commit('fix: repair ordinary and quoted (#313)', fixAt, {
+    'ordinary.txt': 'X\n',
+    [oddPath]: 'Y\n',
+  });
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const candidates = collectCandidates({
+    since: '2026-01-03T00:00:00Z',
+    until: '2026-01-05T00:00:00Z',
+    cwd,
+  });
+  const responder = {
+    pullsByCommit: {
+      [firstSha]: [{ number: 311, merged_at: firstAt }],
+      [secondSha]: [{ number: 312, merged_at: secondAt }],
+    },
+    refs: {},
+  };
+  const [trace] = resolveTraces(candidates, { cwd, responder });
+  assert.equal(trace.status, 'multiple-origin');
+  assert.equal(trace.method, 'blame');
+  assert.deepEqual([...trace.evidence.introducingCandidates].sort(), [firstSha, secondSha].sort());
+  assert.ok(trace.evidence.files.some((file) => file.path === 'ordinary.txt'));
+  assert.ok(trace.evidence.files.some((file) => file.path === oddPath));
+});
+
+test('missing PR metadata stays unresolved with unavailable-pr-metadata', (t) => {
+  const { cwd, git, commit } = fixture(t, 'escape-no-pr-meta-');
+  const introduceAt = '2025-12-01T00:00:00Z';
+  const fixAt = '2025-12-03T00:00:00Z';
+  const introducingSha = commit('feat: orphan defect', introduceAt, {
+    'orphan.txt': 'bad\n',
+  });
+  commit('fix: repair orphan defect (#401)', fixAt, { 'orphan.txt': 'good\n' });
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  const candidates = collectCandidates({
+    since: '2025-12-02T00:00:00Z',
+    until: '2025-12-04T00:00:00Z',
+    cwd,
+  });
+  const [trace] = resolveTraces(candidates, {
+    cwd,
+    responder: { pullsByCommit: {}, refs: {} },
+  });
+  assert.equal(trace.status, 'unresolved');
+  assert.equal(trace.method, 'blame');
+  assert.equal(trace.introducingSha, introducingSha);
+  assert.equal(trace.originalPr, null);
+  assert.equal(trace.unresolvedReason, 'unavailable-pr-metadata');
 });
