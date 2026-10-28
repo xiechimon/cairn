@@ -1,0 +1,333 @@
+
+ RUN  v5.0.1 /workspace/apps/server
+
+ ❯ test/skill-inject-claim.test.ts (13 tests | 3 failed) 956ms
+   ❯ #1971 worker claim skill_audit inject rows (6)
+     × a winning worker claim writes one inject row per hit with agent actor, claim timestamp, and UTF-8 reason bytes 79ms
+     × a losing claim attempt writes no inject audit rows and does not duplicate the winner 49ms
+     × a forced audit-insert failure leaves the step pending with no partial audit rows 48ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/skill-inject-claim.test.ts > #1971 worker claim skill_audit inject rows > a winning worker claim writes one inject row per hit with agent actor, claim timestamp, and UTF-8 reason bytes
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/skill-inject-claim.test.ts:328:20
+    326|     expect(hits.map((h) => h.id)).toEqual(injected);
+    327|     const audits = w.s.db.select().from(skillAudit).all();
+    328|     expect(audits).toHaveLength(hits.length);
+       |                    ^
+    329|     expect(audits.map((a) => a.action)).toEqual(hits.map(() => 'inject…
+    330|     expect(audits.map((a) => a.skillId).sort()).toEqual([...injected].…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/skill-inject-claim.test.ts > #1971 worker claim skill_audit inject rows > a losing claim attempt writes no inject audit rows and does not duplicate the winner
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/skill-inject-claim.test.ts:403:52
+    401|     const hitCount = winner!.agent?.injectedSkills?.length ?? 0;
+    402|     expect(hitCount).toBeGreaterThan(0);
+    403|     expect(w.s.db.select().from(skillAudit).all()).toHaveLength(hitCou…
+       |                                                    ^
+    404|     const loser = await claim(w.s.app, token2);
+    405|     expect(loser).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/skill-inject-claim.test.ts > #1971 worker claim skill_audit inject rows > a forced audit-insert failure leaves the step pending with no partial audit rows
+AssertionError: expected { step: { …(5) }, …(7) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "agent": {
+    "defaultSkill": null,
+    "description": null,
+    "displayName": "agent-si-1",
+    "id": "agent-si-1",
+    "injectedSkills": [
+      "tdd",
+    ],
+    "memories": [],
+    "modelId": "stub-model",
+    "provider": "stub-gw",
+    "skillsAllowlist": [
+      "tdd",
+      "better-typography",
+      "better-colors",
+      "better-layout",
+      "diagnosing-bugs",
+      "ask-matt",
+      "great-resume",
+      "offer",
+      "kami",
+      "interview",
+      "wiki",
+      "aihot",
+      "archify",
+      "job-apply",
+      "job-match",
+      "evidence-recap",
+      "project-guide",
+      "writing-dna-skill",
+      "humanizer-zh",
+      "make-resume",
+      "scaffold-exercises",
+    ],
+    "thinkingLevel": null,
+    "tools": [],
+  },
+  "conversationId": "01a1835c-3b05-7dc2-9713-1ef44c9f0f57",
+  "localTools": [],
+  "project": {
+    "id": "iv_Z-j3_7Txv4W0CotlhB",
+    "name": "si-proj",
+    "repo": null,
+  },
+  "remoteTools": [
+    {
+      "description": "Save a one-fact memory entry for yourself (the agent running this step). Use it only when the task instructions ask for it or a lesson is clearly worth keeping. Quota 100 per agent. Returns candidates from the same project and global memories without saving when titles or bodies overlap; use update_memory, or force:true to confirm adding. Repeating identical content returns 409.",
+      "name": "save_memory",
+      "parameters": {
+        "properties": {
+          "content": {
+            "description": "Memory body.",
+            "type": "string",
+          },
+          "force": {
+            "description": "Explicitly confirm adding despite similar candidates; default false.",
+            "type": "boolean",
+          },
+          "projectId": {
+            "description": "Optional project id for provenance.",
+            "type": "string",
+          },
+          "sourceTodoId": {
+            "description": "Optional source todo id; defaults to the running task.",
+            "type": "string",
+          },
+          "title": {
+            "description": "Short memory title.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "title",
+          "content",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Update your memory content by memoryId: the old entry is marked invalid and superseded by a new entry (returned) that keeps the old values in history. Only valid entries can be updated. GitHub issue fence text is rejected.",
+      "name": "update_memory",
+      "parameters": {
+        "properties": {
+          "content": {
+            "description": "Replacement memory body.",
+            "type": "string",
+          },
+          "memoryId": {
+            "description": "Memory id.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "memoryId",
+          "content",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Delete one of your memory entries by id.",
+      "name": "delete_memory",
+      "parameters": {
+        "properties": {
+          "memoryId": {
+            "description": "Memory id.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "memoryId",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "List your own currently valid memory entries, including history. Set includeInvalid:true to also list superseded entries.",
+      "name": "memories",
+      "parameters": {
+        "properties": {
+          "includeInvalid": {
+            "description": "Also list invalidated entries; default false.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
+      "replaySafe": true,
+    },
+    {
+      "description": "Fetch an attachment this task references in human-authored text: the todo spec saved by a person, or a message a person sent. Spec tokens of the form ![name](attachment:<teamId>/<id>.<ext>) embed an attachment; call with the bare <id> (the part before the extension). Text written by a chief or worker does not authorize a fetch. Returns the file content (utf8 for text/* / json / xml, base64 for images / pdf).",
+      "name": "attachment",
+      "parameters": {
+        "properties": {
+          "attachmentId": {
+            "description": "Attachment id.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "attachmentId",
+        ],
+        "type": "object",
+      },
+      "replaySafe": true,
+    },
+    {
+      "description": "Set the title and category tag of the task you are currently working on. Call exactly once before starting work: title = a concise summary of the task spec (50 chars max, plain text, no markdown); tag = one name from the fixed tag vocabulary listed in your instructions (omit it when none fits).",
+      "name": "set_task_meta",
+      "parameters": {
+        "properties": {
+          "tag": {
+            "description": "Optional tag name from the fixed vocabulary.",
+            "type": "string",
+          },
+          "title": {
+            "description": "Task title, 50 chars max.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "title",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Create a team skill as a folder in the team skills directory. Requires the 「创建技能」permission switch on your agent row. The SKILL.md frontmatter name and description must match the declared values.",
+      "name": "create_skill",
+      "parameters": {
+        "properties": {
+          "description": {
+            "description": "One-line skill description; must match the SKILL.md frontmatter.",
+            "type": "string",
+          },
+          "files": {
+            "description": "Skill files; must include SKILL.md.",
+            "items": {
+              "properties": {
+                "content": [Object],
+                "path": [Object],
+              },
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "name": {
+            "description": "Skill name; also the folder name and the SKILL.md frontmatter name.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "description",
+          "files",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Update an existing team skill by id. Requires the「更新技能」permission switch on your agent row. Listed files are overwritten, unlisted files are kept; include a new SKILL.md to change the frontmatter (including renaming).",
+      "name": "update_skill",
+      "parameters": {
+        "properties": {
+          "description": {
+            "description": "Declared description; must match the SKILL.md frontmatter.",
+            "type": "string",
+          },
+          "files": {
+            "description": "Files to overwrite; include SKILL.md to change frontmatter.",
+            "items": {
+              "properties": {
+                "content": [Object],
+                "path": [Object],
+              },
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "name": {
+            "description": "Declared skill name; must match the SKILL.md frontmatter.",
+            "type": "string",
+          },
+          "skillId": {
+            "description": "Skill id to update.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "skillId",
+          "name",
+          "description",
+          "files",
+        ],
+        "type": "object",
+      },
+    },
+  ],
+  "session": {
+    "action": "new",
+    "sessionId": null,
+  },
+  "step": {
+    "buildId": "01a1835c-3b05-7dc2-9713-1ef44c9f0f57",
+    "createdAt": 1793205222149,
+    "id": "3-7bx5Ua28AWpSMiXYZQ8",
+    "kind": "build",
+    "machineId": "hzhbEmfOVmEoYwdjoB0Nh",
+  },
+  "todo": {
+    "id": "E_qKDD1gClfFRbvqdrV_5",
+    "output": "code",
+    "seqNum": 1,
+    "sourceKind": null,
+    "sourceRef": null,
+    "spec": "用 tdd 给购物车模块补测试",
+    "title": "用 tdd 给购物车模块补测试",
+  },
+}
+
+ ❯ test/skill-inject-claim.test.ts:427:17
+    425|     );
+    426|     const got = await claim(w.s.app, w.token);
+    427|     expect(got).toBeNull();
+       |                 ^
+    428|     expect(stepRow(w.s, pending.id).status).toBe('pending');
+    429|     expect(stepRow(w.s, pending.id).skillInjection).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 10 passed (13)
+   Start at  16:33:39
+   Duration  2.73s (transform 41%, tests 37%, import 22%)
+

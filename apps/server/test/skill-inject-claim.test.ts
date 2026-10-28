@@ -3,9 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import { agent as agentTable, chief as chiefTable, step as stepTable } from '../src/db/schema.js';
+import {
+  agent as agentTable,
+  chief as chiefTable,
+  skillAudit,
+  step as stepTable,
+} from '../src/db/schema.js';
 import {
   bindAllAgents,
   bootServer,
@@ -302,5 +307,131 @@ describe('#1106 the wire gains only an optional field (zero additions to the ver
         agent: { ...legacyAgent, injectedSkills: [] },
       }),
     ).not.toThrow();
+  });
+});
+
+describe('#1971 worker claim skill_audit inject rows', () => {
+  test('a winning worker claim writes one inject row per hit with agent actor, claim timestamp, and UTF-8 reason bytes', async () => {
+    const w = await setupWorld();
+    const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
+    await startBuild(w.s, w.projectId, todoId);
+    const got = await claim(w.s.app, w.token);
+    expect(got).not.toBeNull();
+    const injected = got!.agent?.injectedSkills ?? [];
+    expect(injected).toContain('tdd');
+    const row = stepRow(w.s, got!.step.id);
+    expect(row.status).toBe('claimed');
+    expect(row.claimedAt).not.toBeNull();
+    const hits = row.skillInjection?.hits ?? [];
+    expect(hits.map((h) => h.id)).toEqual(injected);
+    const audits = w.s.db.select().from(skillAudit).all();
+    expect(audits).toHaveLength(hits.length);
+    expect(audits.map((a) => a.action)).toEqual(hits.map(() => 'inject'));
+    expect(audits.map((a) => a.skillId).sort()).toEqual([...injected].sort());
+    for (const hit of hits) {
+      const audit = audits.find((a) => a.skillId === hit.id)!;
+      expect(audit.actorType).toBe('agent');
+      expect(audit.actorId).toBe(AGENT_ID);
+      expect(audit.createdAt).toBe(row.claimedAt);
+      expect(audit.bytes).toBe(Buffer.byteLength(hit.reason, 'utf8'));
+      expect(audit.bytes).toBeGreaterThan(hit.reason.length);
+    }
+  });
+
+  test('zero-hit worker claims write no inject audit rows', async () => {
+    const w = await setupWorld();
+    const todoId = await createTodo(w.s, w.projectId, '把首页轮播图换成静态图');
+    await startBuild(w.s, w.projectId, todoId);
+    const got = await claim(w.s.app, w.token);
+    expect(got?.agent?.injectedSkills).toEqual([]);
+    expect(w.s.db.select().from(skillAudit).all()).toEqual([]);
+  });
+
+  test('chief claims write no inject audit rows', async () => {
+    const w = await setupWorld();
+    const chiefId = `chief-${w.s.user.id}-${w.s.team.id}`;
+    w.s.db
+      .insert(chiefTable)
+      .values({
+        id: chiefId,
+        userId: w.s.user.id,
+        teamId: w.s.team.id,
+        agentId: CHIEF_AGENT_ID,
+        charter: '',
+        createdAt: Date.now(),
+      })
+      .run();
+    const todoId = await createTodo(w.s, w.projectId, '总管编排一轮');
+    const orch = await req(w.s.app, 'POST', `/api/todos/${todoId}/orchestrate`, {});
+    expect(orch.status).toBe(201);
+    const got = await claim(w.s.app, w.token);
+    expect(got?.step.kind).toBe('chief');
+    expect(w.s.db.select().from(skillAudit).all()).toEqual([]);
+  });
+
+  test('ungranted skill names produce no inject audit rows', async () => {
+    const w = await setupWorld();
+    w.s.db
+      .update(agentTable)
+      .set({ skillsAllowlist: GRANTED.filter((id) => id !== 'tdd') })
+      .where(eq(agentTable.id, AGENT_ID))
+      .run();
+    const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
+    await startBuild(w.s, w.projectId, todoId);
+    const got = await claim(w.s.app, w.token);
+    expect(got?.agent?.injectedSkills).toEqual([]);
+    expect(w.s.db.select().from(skillAudit).all()).toEqual([]);
+  });
+
+  test('a losing claim attempt writes no inject audit rows and does not duplicate the winner', async () => {
+    const w = await setupWorld();
+    const key2 = await issueApiKey(w.s);
+    const enroll2 = await w.s.app.request('/api/machine/enroll', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key2}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ teamId: w.s.team.id, name: 'si-mbp-2', cliVersion: '0.1.0' }),
+    });
+    expect(enroll2.status).toBe(200);
+    const token2 = ((await enroll2.json()) as { token: string }).token;
+    bindAllAgents(w.s);
+    const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
+    await startBuild(w.s, w.projectId, todoId);
+    const winner = await claim(w.s.app, w.token);
+    expect(winner).not.toBeNull();
+    const hitCount = winner!.agent?.injectedSkills?.length ?? 0;
+    expect(hitCount).toBeGreaterThan(0);
+    expect(w.s.db.select().from(skillAudit).all()).toHaveLength(hitCount);
+    const loser = await claim(w.s.app, token2);
+    expect(loser).toBeNull();
+    expect(w.s.db.select().from(skillAudit).all()).toHaveLength(hitCount);
+    const again = await claim(w.s.app, w.token);
+    expect(again).toBeNull();
+    expect(w.s.db.select().from(skillAudit).all()).toHaveLength(hitCount);
+  });
+
+  test('a forced audit-insert failure leaves the step pending with no partial audit rows', async () => {
+    const w = await setupWorld();
+    const todoId = await createTodo(w.s, w.projectId, '用 tdd 给购物车模块补测试');
+    const buildId = await startBuild(w.s, w.projectId, todoId);
+    const pending = w.s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, buildId))
+      .all()
+      .find((r) => r.kind === 'build')!;
+    expect(pending.status).toBe('pending');
+    w.s.db.run(
+      sql`CREATE TRIGGER skill_audit_inject_fail BEFORE INSERT ON skill_audit BEGIN SELECT RAISE(ABORT, 'forced audit failure'); END`,
+    );
+    const got = await claim(w.s.app, w.token);
+    expect(got).toBeNull();
+    expect(stepRow(w.s, pending.id).status).toBe('pending');
+    expect(stepRow(w.s, pending.id).skillInjection).toBeNull();
+    expect(w.s.db.select().from(skillAudit).all()).toEqual([]);
+    w.s.db.run(sql`DROP TRIGGER skill_audit_inject_fail`);
+    const recovered = await claim(w.s.app, w.token);
+    expect(recovered).not.toBeNull();
+    expect(stepRow(w.s, pending.id).status).toBe('claimed');
+    expect(w.s.db.select().from(skillAudit).all().length).toBeGreaterThan(0);
   });
 });
