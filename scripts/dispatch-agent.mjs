@@ -3,12 +3,14 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { collectTicketSources, findTicketConflicts } from './dispatch-dedupe.mjs';
 import { classifyLaneExit } from './lane-worker-exit-gate.mjs';
 
 const START_GRACE_MS = 500;
 const WAIT_POLL_MS = 500;
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const SCRIPT = fileURLToPath(import.meta.url);
 const USAGE = `Usage:
   node scripts/dispatch-agent.mjs start <id> [--cwd <dir>] [--ticket <N> [--force]] -- <command> [args...]
   node scripts/dispatch-agent.mjs check <id>
@@ -23,7 +25,9 @@ recorded pid and exits non-zero when the process is missing; run it before
 reporting the state of a dispatched job instead of trusting impressions.
 wait polls until the process exits (or --timeout-s elapses), then runs
 scripts/lane-worker-exit-gate.mjs on the log so banned-model and short no-op
-exits (#2021) fail the wait even when the child returned rc 0.
+exits (#2021) fail the wait even when the child returned rc 0. The detached
+supervisor records the real exit code into the status file after start
+returns, so a late non-zero exit cannot be reported as wait ok.
 
 --ticket <N> refuses to start when ticket N already has work in flight: a git
 workdir under the temp dirs named after it, an origin branch, an open PR in
@@ -55,16 +59,48 @@ function writeStatus(statusPath, record) {
 const [subcommand, id, ...rest] = process.argv.slice(2);
 const statusDir = process.env.CAIRN_DISPATCH_STATUS_DIR ?? join(tmpdir(), 'cairn-dispatch');
 
-if (
+if (subcommand === 'record-exit') {
+  const statusPath = id;
+  const separator = rest.indexOf('--');
+  const command = separator === -1 ? [] : rest.slice(separator + 1);
+  if (!statusPath || command.length === 0 || command[0] === '') {
+    console.error(USAGE);
+    process.exit(2);
+  }
+  const cwd = process.env.CAIRN_DISPATCH_RECORD_CWD || process.cwd();
+  const child = spawn(command[0], command.slice(1), {
+    cwd,
+    stdio: ['ignore', 'inherit', 'inherit'],
+  });
+  child.once('exit', (code, signal) => {
+    const exitCode = code === null ? (signal ? 1 : 0) : code;
+    const previous = readStatus(statusPath) ?? {};
+    writeStatus(statusPath, {
+      ...previous,
+      exitCode,
+      alive: false,
+      checkedAt: new Date().toISOString(),
+    });
+    process.exit(exitCode);
+  });
+  child.once('error', () => {
+    const previous = readStatus(statusPath) ?? {};
+    writeStatus(statusPath, {
+      ...previous,
+      exitCode: 1,
+      alive: false,
+      checkedAt: new Date().toISOString(),
+    });
+    process.exit(1);
+  });
+} else if (
   (subcommand !== 'start' && subcommand !== 'check' && subcommand !== 'wait') ||
   !id ||
   !ID_PATTERN.test(id)
 ) {
   console.error(USAGE);
   process.exit(2);
-}
-
-if (subcommand === 'check') {
+} else if (subcommand === 'check') {
   if (rest.length > 0) {
     console.error(USAGE);
     process.exit(2);
@@ -119,11 +155,16 @@ if (subcommand === 'check') {
     });
     record = readStatus(statusPath) ?? record;
   }
-  for (let attempt = 0; attempt < 10 && typeof record.exitCode !== 'number'; attempt++) {
+  for (let attempt = 0; attempt < 40 && typeof record.exitCode !== 'number'; attempt++) {
     await new Promise((resolve) => {
       setTimeout(resolve, 50);
     });
     record = readStatus(statusPath) ?? record;
+  }
+  if (typeof record.exitCode !== 'number') {
+    console.error(`dispatch ${id}: wait failed: child exited without a recorded exit code`);
+    console.error(`log: ${record.log}`);
+    process.exit(1);
   }
   const endedAt = new Date().toISOString();
   const startedMs = Date.parse(record.startedAt);
@@ -136,8 +177,7 @@ if (subcommand === 'check') {
   } catch {
     log = '';
   }
-  const childRc = typeof record.exitCode === 'number' ? record.exitCode : 0;
-  const verdict = classifyLaneExit({ log, rc: childRc, durationSeconds });
+  const verdict = classifyLaneExit({ log, rc: record.exitCode, durationSeconds });
   writeStatus(statusPath, {
     ...record,
     alive: false,
@@ -205,18 +245,30 @@ if (subcommand === 'check') {
   const startedAt = new Date().toISOString();
   mkdirSync(statusDir, { recursive: true });
   const logPath = join(statusDir, `${id}.log`);
+  const statusPath = join(statusDir, `${id}.json`);
   const logFd = openSync(logPath, 'w');
-  const child = spawn(command[0], command.slice(1), {
-    cwd: cwd ?? process.cwd(),
+  const workCwd = cwd ?? process.cwd();
+  writeStatus(statusPath, {
+    id,
+    pid: null,
+    command: command.join(' '),
+    cwd: workCwd,
+    log: logPath,
+    startedAt,
+    alive: false,
+    checkedAt: startedAt,
+  });
+  const child = spawn(process.execPath, [SCRIPT, 'record-exit', statusPath, '--', ...command], {
+    cwd: workCwd,
     detached: true,
     stdio: ['ignore', logFd, logFd],
+    env: { ...process.env, CAIRN_DISPATCH_RECORD_CWD: workCwd },
   });
   let exited = false;
   let exitCode = null;
   child.once('exit', (code, signal) => {
     exited = true;
     exitCode = code === null ? (signal ? 1 : 0) : code;
-    const statusPath = join(statusDir, `${id}.json`);
     const previous = readStatus(statusPath) ?? {};
     writeStatus(statusPath, {
       ...previous,
@@ -237,22 +289,23 @@ if (subcommand === 'check') {
   });
   const alive = !exited && isRunning(child.pid);
   const record = {
+    ...(readStatus(statusPath) ?? {}),
     id,
     pid: child.pid ?? null,
     command: command.join(' '),
-    cwd: cwd ?? process.cwd(),
+    cwd: workCwd,
     log: logPath,
     startedAt,
     alive,
     checkedAt: new Date().toISOString(),
     ...(exitCode === null ? {} : { exitCode }),
   };
-  writeFileSync(join(statusDir, `${id}.json`), `${JSON.stringify(record, null, 2)}\n`);
+  writeStatus(statusPath, record);
   if (!alive) {
     console.error(`dispatch ${id}: process missing (pid ${record.pid} exited at start)`);
     process.exit(1);
   }
   console.log(`dispatch ${id}: pid ${record.pid} alive`);
-  console.log(`status: ${join(statusDir, `${id}.json`)}`);
+  console.log(`status: ${statusPath}`);
   console.log(`log: ${logPath}`);
 }

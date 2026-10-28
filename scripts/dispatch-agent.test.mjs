@@ -197,3 +197,53 @@ test('wait fails when the child prints the #2021 banned ai-route line', async ()
     rmSync(statusDir, { recursive: true, force: true });
   }
 });
+
+test('wait fails when the child exits non-zero after start returns', async () => {
+  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
+  try {
+    const start = runCli(
+      [
+        'start',
+        'fail-late',
+        '--',
+        process.execPath,
+        '-e',
+        'setTimeout(() => { console.log("late failure"); process.exit(7); }, 800)',
+      ],
+      statusDir,
+    );
+    assert.equal(start.status, 0, `${start.stdout}${start.stderr}`);
+    const wait = runCli(['wait', 'fail-late', '--timeout-s', '10'], statusDir);
+    assert.equal(wait.status, 1, `${wait.stdout}${wait.stderr}`);
+    assert.match(`${wait.stdout}${wait.stderr}`, /nonzero-rc|exited 7/);
+    const record = JSON.parse(readFileSync(join(statusDir, 'fail-late.json'), 'utf8'));
+    assert.equal(record.exitCode, 7);
+  } finally {
+    rmSync(statusDir, { recursive: true, force: true });
+  }
+});
+
+test('wait ok when the child exits 0 after start returns without a banned or no-op log', async () => {
+  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
+  try {
+    const start = runCli(
+      [
+        'start',
+        'ok-late',
+        '--',
+        process.execPath,
+        '-e',
+        'setTimeout(() => { console.log("finished real work"); process.exit(0); }, 800)',
+      ],
+      statusDir,
+    );
+    assert.equal(start.status, 0, `${start.stdout}${start.stderr}`);
+    const wait = runCli(['wait', 'ok-late', '--timeout-s', '10'], statusDir);
+    assert.equal(wait.status, 0, `${wait.stdout}${wait.stderr}`);
+    assert.match(wait.stdout, /wait ok/);
+    const record = JSON.parse(readFileSync(join(statusDir, 'ok-late.json'), 'utf8'));
+    assert.equal(record.exitCode, 0);
+  } finally {
+    rmSync(statusDir, { recursive: true, force: true });
+  }
+});
