@@ -47,21 +47,7 @@ export interface ReflectCurateSummary {
   guardIssuesOpened: number;
 }
 
-function utcDate(now: number): string {
-  return new Date(now).toISOString().slice(0, 10);
-}
-
-function readGuardIds(path: string): Set<string> {
-  if (!existsSync(path)) return new Set();
-  return new Set(
-    readFileSync(path, 'utf8')
-      .split('\n')
-      .filter((line) => line.trim() !== '')
-      .map((line) => guardCandidateSchema.parse(JSON.parse(line)).id),
-  );
-}
-
-function readGuards(path: string): GuardCandidate[] {
+function parseGuardCandidates(path: string): GuardCandidate[] {
   if (!existsSync(path)) return [];
   return readFileSync(path, 'utf8')
     .split('\n')
@@ -121,7 +107,7 @@ export async function openGuardCandidateIssues(
 
 export async function sweepReflectCurate(deps: ReflectCurateDeps): Promise<ReflectCurateSummary> {
   const now = deps.now ?? Date.now;
-  const date = utcDate(now());
+  const date = new Date(now()).toISOString().slice(0, 10);
   const reflectDir = join(deps.config.dataDir, 'experience-candidates', 'reflect');
   const outDir = join(deps.config.dataDir, 'experience-candidates');
   const donePath = join(reflectDir, `${date}.done`);
@@ -192,7 +178,7 @@ export async function sweepReflectCurate(deps: ReflectCurateDeps): Promise<Refle
         .split('\n')
         .filter((line) => line.trim() !== '')
     : [];
-  const beforeGuards = readGuardIds(guardsPath);
+  const beforeGuards = new Set(parseGuardCandidates(guardsPath).map((guard) => guard.id));
   const curateSummary =
     candidateLines.length === 0
       ? {
@@ -214,7 +200,7 @@ export async function sweepReflectCurate(deps: ReflectCurateDeps): Promise<Refle
 
   let guardIssuesOpened = 0;
   if (deps.openNewGuards !== undefined) {
-    const fresh = readGuards(guardsPath).filter((guard) => !beforeGuards.has(guard.id));
+    const fresh = parseGuardCandidates(guardsPath).filter((guard) => !beforeGuards.has(guard.id));
     if (fresh.length > 0) guardIssuesOpened = await deps.openNewGuards(fresh);
   }
 
