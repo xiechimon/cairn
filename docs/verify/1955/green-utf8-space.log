@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: blame resolves quotePath-quoted paths that contain a tab and newline
+ok 1 - blame resolves quotePath-quoted paths that contain a tab and newline
+  ---
+  duration_ms: 88.834575
+  type: 'test'
+  ...
+# Subtest: parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes
+ok 2 - parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes
+  ---
+  duration_ms: 0.211104
+  type: 'test'
+  ...
+# Subtest: parseDiffGitPaths keeps unquoted paths that contain spaces
+ok 3 - parseDiffGitPaths keeps unquoted paths that contain spaces
+  ---
+  duration_ms: 0.105393
+  type: 'test'
+  ...
+# Subtest: blame resolves a UTF-8 path emitted as Git octal escapes
+ok 4 - blame resolves a UTF-8 path emitted as Git octal escapes
+  ---
+  duration_ms: 67.930724
+  type: 'test'
+  ...
+# Subtest: blame resolves an unquoted path that contains spaces
+ok 5 - blame resolves an unquoted path that contains spaces
+  ---
+  duration_ms: 67.251201
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 272.461145

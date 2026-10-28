@@ -191,6 +191,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "claude-auth-fixture-oauth-token": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "cli-tests-that-spawn-subprocesses-hand-wrote-timeouts-case-by": {
     "Intercepts": 1,
     "Recurrences": 1
@@ -236,6 +240,10 @@
     "Recurrences": 0
   },
   "conflictids-narrowing": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "conflicting-weekly-labels": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -297,6 +305,10 @@
   },
   "disabled-control-contrast": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "dispatch-wait-missing-exit-code": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "dispatch-without-duplicate-check": {
@@ -507,6 +519,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "husky-triggered-unauthorized-install": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "identity-authentication-read-connection-metadata-before-checking-that-a-socket": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -551,6 +567,10 @@
     "Intercepts": 2,
     "Recurrences": 0
   },
+  "lane-worker-banned-model-and-noop-exit": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "lessons-section-broke-integration-tests": {
     "Intercepts": 2,
     "Recurrences": 0
@@ -583,6 +603,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "login-heartbeat-without-presence-event": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "long-test-without-tee-log": {
     "Intercepts": 0,
     "Recurrences": 2
@@ -609,6 +633,10 @@
   },
   "merge-head-entered-by-hand": {
     "Intercepts": 2,
+    "Recurrences": 1
+  },
+  "merge-on-stale-green-check": {
+    "Intercepts": 0,
     "Recurrences": 1
   },
   "merged-translation-key-collision": {
@@ -671,8 +699,16 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "oauth-access-token-as-login-expiry": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "online-probe-exit-zero": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "ours-theirs-dropped-unique-lines": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "overlap-empty-planned-path": {
@@ -823,12 +859,20 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "refresh-expiry-blocked-valid-access": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "regression-setup-import": {
     "Intercepts": 2,
     "Recurrences": 0
   },
   "rejected-split-confirm-contract": {
     "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "relative-claude-config-directory": {
+    "Intercepts": 1,
     "Recurrences": 0
   },
   "relay-wire-assumptions": {
@@ -908,8 +952,8 @@
     "Recurrences": 0
   },
   "single-use-helper-gate": {
-    "Intercepts": 11,
-    "Recurrences": 5
+    "Intercepts": 12,
+    "Recurrences": 6
   },
   "single-use-helper-gate-diffed-a-moved-file-against-nothing": {
     "Intercepts": 0,
@@ -1103,6 +1147,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "unsafe-credential-timestamp": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "untraced-child-audit": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -1136,6 +1184,10 @@
     "Recurrences": 0
   },
   "wall-clock-bound-in-shared-host-test": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "weekly-transcript-archive": {
     "Intercepts": 0,
     "Recurrences": 0
   },
