@@ -1,0 +1,110 @@
+✖ anonymous enrollment confirmation with server authentication enabled (58.912671ms)
+✖ read-only MCP key can obtain a machine token (29.255322ms)
+✖ publicly derived attachment signature permits a write outside the attachment directory (26.536884ms)
+✖ team secret plaintext reaches the model-facing tool result (0.452422ms)
+✔ MCP rejects missing keys and calls outside the granted tool set (35.584123ms)
+✖ machine bearer token file inherits a world-readable umask (0.887265ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 1
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 160.552415
+
+✖ failing tests:
+
+test at ../../docs/verify/2000/security-probes.ts:1:941
+✖ anonymous enrollment confirmation with server authentication enabled (58.912671ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  200 !== 401
+  
+      at TestContext.<anonymous> (/mnt/fast/lanes/cairn-2000/docs/verify/2000/security-probes.ts:35:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 401,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../docs/verify/2000/security-probes.ts:1:1864
+✖ read-only MCP key can obtain a machine token (29.255322ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  200 !== 403
+  
+      at TestContext.<anonymous> (/mnt/fast/lanes/cairn-2000/docs/verify/2000/security-probes.ts:67:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 403,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../docs/verify/2000/security-probes.ts:1:2683
+✖ publicly derived attachment signature permits a write outside the attachment directory (26.536884ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (/mnt/fast/lanes/cairn-2000/docs/verify/2000/security-probes.ts:114:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at ../../docs/verify/2000/security-probes.ts:1:3796
+✖ team secret plaintext reaches the model-facing tool result (0.452422ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/mnt/fast/lanes/cairn-2000/docs/verify/2000/security-probes.ts:139:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../docs/verify/2000/security-probes.ts:1:5108
+✖ machine bearer token file inherits a world-readable umask (0.887265ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  36 !== 0
+  
+      at TestContext.<anonymous> (/mnt/fast/lanes/cairn-2000/docs/verify/2000/security-probes.ts:196:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 36,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-2000/apps/server
+
