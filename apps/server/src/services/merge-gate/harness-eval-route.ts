@@ -31,29 +31,24 @@ export type LiveHarnessAttemptView = {
   state: string;
   deadlineAt?: number;
   patchDigest?: string;
+  workerId?: string;
+  id?: string;
+};
+
+export type LiveHarnessBinding = {
+  now: number;
+  patchDigest: string;
 };
 
 const LIVE = new Set(['claimed', 'dispatched', 'dispatch_uncertain']);
 
 export function isLiveHarnessAttempt(
   attempt: LiveHarnessAttemptView | null | undefined,
-  opts: { now?: number; patchDigest?: string } = {},
+  binding: LiveHarnessBinding,
 ): boolean {
   if (attempt == null || !LIVE.has(attempt.state)) return false;
-  if (
-    typeof attempt.deadlineAt === 'number' &&
-    opts.now !== undefined &&
-    attempt.deadlineAt <= opts.now
-  ) {
-    return false;
-  }
-  if (
-    opts.patchDigest !== undefined &&
-    attempt.patchDigest !== undefined &&
-    attempt.patchDigest !== opts.patchDigest
-  ) {
-    return false;
-  }
+  if (typeof attempt.deadlineAt !== 'number' || attempt.deadlineAt <= binding.now) return false;
+  if (attempt.patchDigest !== binding.patchDigest) return false;
   return true;
 }
 

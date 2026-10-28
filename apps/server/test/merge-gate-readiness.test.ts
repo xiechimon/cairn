@@ -408,7 +408,11 @@ const ROWS: Row[] = [
     'harness-regression-evaluating',
     (i) => {
       setFiles(i, [...FILES, file('apps/server/src/services/chief.ts')]);
-      i.harnessEval = { attempt: { state: 'dispatched' } };
+      const digest = computePatchDigest(compare(i).files).patchDigest as string;
+      i.harnessEval = {
+        attempt: { state: 'dispatched', deadlineAt: 2_000_000, patchDigest: digest },
+        now: 1_000_000,
+      };
     },
   ],
   [

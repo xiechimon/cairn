@@ -10,6 +10,7 @@ import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { projectOfTodo } from './git.js';
 import { createHarnessEvalCoordinator } from './harness-eval-coordinator.js';
+import { productionHarnessEvalConfig } from './harness-eval-production.js';
 import { judgeMergeReadinessWithHarnessEval } from './merge-gate/harness-eval-judge.js';
 import { type GateInputs, mergeReadiness } from './merge-gate/readiness.js';
 import { projectMergeConfigOf } from './projects.js';
@@ -172,8 +173,8 @@ export async function localGateFacts(
   };
   const inputs = decorate === undefined ? built : decorate(built);
   const prNumber = buildRow.prNumber;
-  if (deps.harnessEval !== undefined && prNumber !== null) {
-    const harness = deps.harnessEval;
+  if (prNumber !== null) {
+    const harness = deps.harnessEval ?? productionHarnessEvalConfig();
     const coordinator = createHarnessEvalCoordinator({
       db: deps.db,
       dispatch: harness.dispatch,

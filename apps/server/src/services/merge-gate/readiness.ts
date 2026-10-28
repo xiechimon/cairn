@@ -106,8 +106,14 @@ export interface GateInputs {
   availability: { reviewerPerspectives: string[]; verifier: boolean; decider: boolean };
   harnessEvalText?: string | null;
   harnessEval?: {
-    attempt: { state: string; deadlineAt?: number; patchDigest?: string } | null;
-    now?: number;
+    attempt: {
+      state: string;
+      deadlineAt?: number;
+      patchDigest?: string;
+      workerId?: string;
+      id?: string;
+    } | null;
+    now: number;
   } | null;
 }
 
@@ -392,8 +398,9 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
           block('harness-regression-below-threshold', String(parsed.decision_ok));
         }
       } else if (
-        isLiveHarnessAttempt(i.harnessEval?.attempt ?? null, {
-          now: i.harnessEval?.now,
+        i.harnessEval != null &&
+        isLiveHarnessAttempt(i.harnessEval.attempt, {
+          now: i.harnessEval.now,
           patchDigest: D,
         })
       ) {

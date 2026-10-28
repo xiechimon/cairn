@@ -20,7 +20,7 @@ export type JudgeHarnessEvalInput = {
   repo: string;
   pr: number;
   dispatchAuthorized: boolean;
-  now?: number;
+  now: number;
 };
 
 export type JudgeHarnessEvalResult = {
@@ -41,7 +41,10 @@ function parseHarnessResult(text: string | null | undefined): HarnessRegressionR
   }
 }
 
-export function harnessNeedFromInputs(inputs: GateInputs): {
+export function harnessNeedFromInputs(inputs: {
+  compare: GateInputs['compare'];
+  harnessEvalText?: string | null;
+}): {
   need: HarnessEvalNeed | null;
   patchDigest: string | null;
 } {
@@ -84,12 +87,11 @@ export async function judgeMergeReadinessWithHarnessEval(
     need,
     dispatchAuthorized: input.dispatchAuthorized,
   });
-  const now = input.now;
   const judged: GateInputs = {
     ...input.inputs,
     harnessEval: {
       attempt: routed.attempt,
-      now,
+      now: input.now,
     },
   };
   return {
