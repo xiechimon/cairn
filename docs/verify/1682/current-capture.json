@@ -5,7 +5,7 @@
   "errors": [],
   "result": "pass",
   "sourceBase": "d3c8d5039b73ddfcbd1196af6a714268f7f3a20f",
-  "sourceState": "uncommitted delivery tree, file hashes below",
+  "sourceState": "captured before commit; all listed source bytes verified against sourceCommit",
   "sourceFiles": {
     "apps/web/e2e/demo-mode.spec.ts": "4ff92947997ba24a3944a1d15bd490fcdff1b7d5575ffec1a6242960aafbf6d8",
     "apps/web/e2e/demo-server.ts": "20e065769746dcf5b5ab78c3d7352c1702e28d7d98216e8d88ff7e64ecae1d6c",
@@ -40,5 +40,6 @@
     "apps/web/src/routes/create-agent-dialog.tsx": "a91a7faaf90d12261e1a7f97c3790cdcae61d0955e0b42c2a30f4bb41dc6daab",
     "apps/web/src/routes/todo-detail-page.tsx": "30598a40c9bcde52a052bb546cd46280051146b03ec7acd51e0e33aed4010d36",
     "apps/web/vercel.json": "f8fba6ea53c0395d8725220e2b2fc29499a55906227902847d60c9eff5085c19"
-  }
+  },
+  "sourceCommit": "f106a29e5b635331103ffb8a399fcff5cf24ace5"
 }

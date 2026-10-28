@@ -30,6 +30,10 @@ window. No product navigation was changed to satisfy the older tests.
 
 ## Current delivery checks
 
+Source commit: `f106a29e5b635331103ffb8a399fcff5cf24ace5`, based on main
+`d3c8d5039`. The capture manifest records the full base and per-file SHA-256
+hashes, all checked against that source commit after capture.
+
 - `demo-suite-green.log`: 18 browser cases passed against compiled demo and
   production builds using the repository's existing static-server helper.
 - `machine-write-red.log` and `machine-write-red-traffic.json`: two actual
@@ -48,6 +52,10 @@ window. No product navigation was changed to satisfy the older tests.
 - `current-capture.json`: screenshot and recording run observed no backend
   requests or console errors. The app surface is the compiled demo fixture;
   no real model provider was exercised.
+- `prepush-green.log`: 27 checks passed, including 108 selected related
+  tests, all 596 web unit tests, and all 1378 browser tests across 191 specs.
+- `i18n-union.json`: all 1305 baseline translation-file lines have unchanged
+  contents; the five demo translation lines are the only additions.
 
 The browser command used a temporary Playwright configuration with one worker,
 the repository's `apps/web/e2e` test directory and `demo-mode.spec.ts`. It had
@@ -58,6 +66,9 @@ production case. These checks do not establish a public deployment.
 The direct HTTPS probe of `https://demo.cairn.xmon.me/app` on 2026-10-28 failed
 locally with `SSL_ERROR_SYSCALL`; it did not establish live-site availability.
 Public hosting and domain acceptance remain unverified.
+
+The source is a delivery checkpoint. Full code review and fresh independent
+review remain pending; green tests do not establish merge authorization.
 
 ## Rebuilding the demo locally
 
