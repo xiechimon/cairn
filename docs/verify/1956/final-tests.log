@@ -1,0 +1,35 @@
+[prepush] git init -q
+✔ documentation skips code checks, unknown paths fail closed (2.394009ms)
+✔ changes to prepush scripts run the CI self-test files locally (0.477676ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.334196ms)
+✔ local code checks include both UI gates and affected e2e (0.247223ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.487879ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.225733ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (1.811898ms)
+✔ affected e2e gets only code paths, so a bulk evidence prune fits on the command line (4.245042ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (142.133577ms)
+✔ a board card source change selects the spec that reads its title (31.676257ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.77421ms)
+✔ CLI skips real document changes and rejects a missing base (492.439091ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (159.957221ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (105.899214ms)
+✔ prepush vitest only forgives files listed as known local red (1.99229ms)
+✔ plan children do not inherit the git hook repository binding (18.665762ms)
+✔ CLI fetches original PR reviews through every page and retains evidence (182.577472ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (357.44003ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (172.93156ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (531.618861ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (141.93497ms)
+✔ the CLI suite runs in local and CI prepush plans (0.422736ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (391.383452ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (195.258237ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (92.867787ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (89.999842ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2232.109065

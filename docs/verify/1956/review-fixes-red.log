@@ -1,0 +1,96 @@
+✔ CLI fetches original PR reviews through every page and retains evidence (112.918223ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (300.119301ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (163.178408ms)
+✖ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (244.019914ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (114.773396ms)
+✔ the CLI suite runs in local and CI prepush plans (0.396237ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (343.380734ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (185.940423ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (97.707488ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (96.070125ms)
+✔ malformed review and gate pages disclose unavailable data without crashing the CLI (179.482274ms)
+✖ non-approving formal AI reviews do not establish AI coverage (96.941981ms)
+✖ earlier PR commits retain human evidence with explicit head coverage (88.427469ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 10
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2077.044523
+
+✖ failing tests:
+
+test at scripts/review-escapes.test.mjs:196:1
+✖ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (244.019914ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /6 qualifying events/. Input:
+  
+  '# Review escape fixtures\n' +
+    '\n' +
+    '`gate.json` records the relevant REST fields from PR #2120 and its production gate comments, captured on 2026-10-28. Each comment retains its published identity, URL, timestamps, header, and patch marker. Direct review transcripts are omitted. Carried-over comments are complete. The source endpoints are recorded in the JSON file.\n' +
+    '\n' +
+    'The CLI tests also build controlled formal review responses using GitHub REST field names. Those identities and dates are synthetic. They cover human reviews, known AI bot reviews, mixed reviews, pending reviews, unknown bots, stale heads, and post-merge reviews. The temporary REST response files also supply empty pages and API errors. No synthetic identity is presented as a recorded production reviewer.\n' +
+    '\n' +
+    'The multiweek scenario has six qualifying events across three UTC weeks, one unresolved event, two events outside the 14-day window, and one duplicate record. Qualifying events include two with unknown review paths, one of which has unavailable API data.\n'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:267:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '# Review escape fixtures\n\n`gate.json` records the relevant REST fields from PR #2120 and its production gate comments, captured on 2026-10-28. Each comment retains its published identity, URL, timestamps, header, and patch marker. Direct review transcripts are omitted. Carried-over comments are complete. The source endpoints are recorded in the JSON file.\n\nThe CLI tests also build controlled formal review responses using GitHub REST field names. Those identities and dates are synthetic. They cover human reviews, known AI bot reviews, mixed reviews, pending reviews, unknown bots, stale heads, and post-merge reviews. The temporary REST response files also supply empty pages and API errors. No synthetic identity is presented as a recorded production reviewer.\n\nThe multiweek scenario has six qualifying events across three UTC weeks, one unresolved event, two events outside the 14-day window, and one duplicate record. Qualifying events include two with unknown review paths, one of which has unavailable API data.\n',
+    expected: /6 qualifying events/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/review-escapes.test.mjs:418:1
+✖ non-approving formal AI reviews do not establish AI coverage (96.941981ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'ai-only'
+  - 'unknown'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:424:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'ai-only',
+    expected: 'unknown',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/review-escapes.test.mjs:429:1
+✖ earlier PR commits retain human evidence with explicit head coverage (88.427469ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unknown'
+  - 'human-only'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:436:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unknown',
+    expected: 'human-only',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

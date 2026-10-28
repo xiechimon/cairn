@@ -79,6 +79,7 @@ export function prepushPlan(paths, mode = 'local') {
     ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
     ['node', '--test', 'scripts/escape-trace.test.mjs'],
     ['node', 'scripts/escape-trace.mjs', 'validate-cases', 'integration/eval/review/cases'],
+    ['node', '--test', 'scripts/review-escapes.test.mjs'],
     ledgerGate,
     ['python3', 'scripts/pr-evidence-gate.test.py'],
   ];
