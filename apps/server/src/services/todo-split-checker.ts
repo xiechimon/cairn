@@ -60,18 +60,8 @@ export function checkSplitPlan(input: SplitCheckerInput): SplitCheckerResult {
       edges.set(blockedBy - 1, [...(edges.get(blockedBy - 1) ?? []), index]);
     }
   }
-  const states = new Uint8Array(subtodos.length);
-  const visit = (index: number): void => {
-    if (states[index] === 1) {
-      reasons.push('blockedBy dependencies form a cycle');
-      return;
-    }
-    if (states[index] === 2) return;
-    states[index] = 1;
-    for (const next of edges.get(index) ?? []) visit(next);
-    states[index] = 2;
-  };
-  for (let index = 0; index < subtodos.length; index += 1) visit(index);
+  if (hasSplitDependencyCycle(edges, subtodos.length))
+    reasons.push('blockedBy dependencies form a cycle');
   const maxChildren = input.maxChildren ?? 6;
   if (subtodos.length > maxChildren)
     reasons.push(`child count exceeds the limit of ${maxChildren}`);
@@ -125,4 +115,33 @@ export function checkSplitPlan(input: SplitCheckerInput): SplitCheckerResult {
       reasons.push(`child ${index + 1} hits a protected path ${protectedPath}`);
   }
   return { ok: reasons.length === 0, reasons };
+}
+
+export function hasSplitDependencyCycle(
+  edges: ReadonlyMap<number, readonly number[]>,
+  nodeCount: number,
+): boolean {
+  const states = new Uint8Array(nodeCount);
+  for (let root = 0; root < nodeCount; root += 1) {
+    if (states[root] !== 0) continue;
+    states[root] = 1;
+    const stack = [{ node: root, edge: 0 }];
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1];
+      if (frame === undefined) break;
+      const next = edges.get(frame.node)?.[frame.edge];
+      if (next === undefined) {
+        states[frame.node] = 2;
+        stack.pop();
+        continue;
+      }
+      frame.edge += 1;
+      if (states[next] === 1) return true;
+      if (states[next] === 0) {
+        states[next] = 1;
+        stack.push({ node: next, edge: 0 });
+      }
+    }
+  }
+  return false;
 }

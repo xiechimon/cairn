@@ -13,7 +13,11 @@ import {
   REJECTED_SPLIT_PROPOSAL_PREFIX,
   SPLIT_PROPOSAL_CORRECTION,
 } from './split-proposal.js';
-import { checkSplitPlan, type SplitCheckerAgent } from './todo-split-checker.js';
+import {
+  checkSplitPlan,
+  hasSplitDependencyCycle,
+  type SplitCheckerAgent,
+} from './todo-split-checker.js';
 import { createTodo, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
@@ -141,15 +145,8 @@ export function createSplitTodo(
     {
       const adj = new Map<number, number[]>();
       for (const e of edges) adj.set(e.from, [...(adj.get(e.from) ?? []), e.to]);
-      const state = new Uint8Array(items.length);
-      const visit = (n: number): void => {
-        if (state[n] === 1) throw new HttpError(400, 'blockedBy 依赖成环（DFS 检测命中）');
-        if (state[n] === 2) return;
-        state[n] = 1;
-        for (const next of adj.get(n) ?? []) visit(next);
-        state[n] = 2;
-      };
-      for (let i = 0; i < items.length; i++) visit(i);
+      if (hasSplitDependencyCycle(adj, items.length))
+        throw new HttpError(400, 'blockedBy 依赖成环（DFS 检测命中）');
     }
   } catch (error) {
     if (

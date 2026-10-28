@@ -135,3 +135,19 @@ describe('split_todo checker', () => {
     expect(checkSplitPlan(base())).toEqual({ ok: true, reasons: [] });
   });
 });
+
+for (const cyclic of [false, true]) {
+  test(`checks a 12000-node ${cyclic ? 'cycle' : 'chain'} below the HTTP size limit without recursion failure`, () => {
+    const subtodos = Array.from({ length: 12000 }, (_, index) => ({
+      title: 'x',
+      spec: 'x',
+      agentId: 'agent-a',
+      blockedBy: index === 0 ? (cyclic ? [12000] : []) : [index],
+    }));
+    expect(Buffer.byteLength(JSON.stringify(subtodos))).toBeLessThan(1024 * 1024);
+    const result = checkSplitPlan(base({ subtodos, maxChildren: 6 }));
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain('child count exceeds the limit of 6');
+    expect(result.reasons.includes('blockedBy dependencies form a cycle')).toBe(cyclic);
+  });
+}

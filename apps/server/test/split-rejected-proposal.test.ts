@@ -40,21 +40,25 @@ async function world(policy: 'human' | 'shadow' | 'auto') {
     spec: 'ordinary implementation',
   });
   const { id: parentId } = (await created.json()) as { id: string };
-  const tool = (name: string, params: Record<string, unknown>) =>
-    executeChiefTool(
-      { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
-      {
-        teamId: s.team.id,
-        userId: s.user.id,
-        chiefId: 'chief-test',
-        threadId: 'chief-thread-test',
-        chiefAgentId: null,
-        conversationId: 'chief-test',
-      },
-      name,
-      params,
-    );
-  return { s, projectId, parentId, tool };
+  return {
+    s,
+    projectId,
+    parentId,
+    tool: (name: string, params: Record<string, unknown>) =>
+      executeChiefTool(
+        { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
+        {
+          teamId: s.team.id,
+          userId: s.user.id,
+          chiefId: 'chief-test',
+          threadId: 'chief-thread-test',
+          chiefAgentId: null,
+          conversationId: 'chief-test',
+        },
+        name,
+        params,
+      ),
+  };
 }
 
 function seedRejected(w: Awaited<ReturnType<typeof world>>) {
@@ -359,3 +363,55 @@ for (const policy of ['human', 'shadow', 'auto'] as const) {
     },
   );
 }
+
+test.each(['human', 'shadow', 'auto'] as const)(
+  '%s validates a 12000-node cycle without losing its rejection contract',
+  async (policy) => {
+    const w = await world(policy);
+    try {
+      const subtodos = Array.from({ length: 12000 }, (_, index) => ({
+        title: 'x',
+        spec: 'x',
+        agentId: 'worker',
+        blockedBy: [index === 0 ? 12000 : index],
+      }));
+      expect(Buffer.byteLength(JSON.stringify(subtodos))).toBeLessThan(1024 * 1024);
+      if (policy === 'human') {
+        await expect(w.tool('split_todo', { todoId: w.parentId, subtodos })).rejects.toMatchObject({
+          status: 400,
+          message: expect.stringContaining('DFS'),
+        });
+        expect(w.s.db.select().from(build).all()).toEqual([]);
+        expect(w.s.db.select().from(plan).all()).toEqual([]);
+      } else {
+        const result = JSON.parse(await w.tool('split_todo', { todoId: w.parentId, subtodos })) as {
+          autoStart: boolean;
+          children: unknown[];
+          parentBuildId: string;
+        };
+        expect(result.autoStart).toBe(false);
+        expect(result.children).toEqual([]);
+        const savedBuild = w.s.db
+          .select()
+          .from(build)
+          .where(eq(build.id, result.parentBuildId))
+          .get()!;
+        expect(savedBuild.errorMessage).toContain('blockedBy dependencies form a cycle');
+        expect(savedBuild.errorMessage).toContain('child count exceeds the limit of 6');
+        const savedPlan = w.s.db
+          .select()
+          .from(plan)
+          .where(eq(plan.buildId, result.parentBuildId))
+          .get()!;
+        expect(savedPlan.content).toContain(JSON.stringify(subtodos, null, 2));
+        expect(w.s.db.select().from(todo).where(eq(todo.id, w.parentId)).get()!.phase).toBe(
+          'confirm',
+        );
+      }
+      expect(w.s.db.select().from(todo).all()).toHaveLength(1);
+      expect(w.s.db.select().from(step).all()).toEqual([]);
+    } finally {
+      w.s.dispose();
+    }
+  },
+);
