@@ -1,4 +1,9 @@
+import { copyFileSync, mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+
+const root = dirname(fileURLToPath(import.meta.url));
 
 const bundleFormFlag = {
   name: 'cairn-bundle-form',
@@ -29,3 +34,9 @@ await build({
   sourcemap: true,
   logLevel: 'info',
 });
+
+mkdirSync(resolve(root, 'dist'), { recursive: true });
+copyFileSync(
+  resolve(root, '../../scripts/harness-eval-worker.mjs'),
+  resolve(root, 'dist/harness-eval-worker.mjs'),
+);

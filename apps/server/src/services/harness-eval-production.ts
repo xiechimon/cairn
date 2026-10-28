@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
@@ -8,10 +9,18 @@ import type {
 
 export const DEFAULT_HARNESS_EVAL_ATTEMPT_TIMEOUT_MS = 60 * 60 * 1000;
 
-const WORKER_SCRIPT = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../../../../scripts/harness-eval-worker.mjs',
-);
+export function resolveHarnessEvalWorkerScriptFrom(here: string): string {
+  const srcForm = resolve(here, '../../../../scripts/harness-eval-worker.mjs');
+  const packagedForm = resolve(here, 'harness-eval-worker.mjs');
+  const repoForm = resolve(here, '../../../scripts/harness-eval-worker.mjs');
+  if (existsSync(srcForm)) return srcForm;
+  if (existsSync(packagedForm)) return packagedForm;
+  return repoForm;
+}
+
+export function resolveHarnessEvalWorkerScript(): string {
+  return resolveHarnessEvalWorkerScriptFrom(dirname(fileURLToPath(import.meta.url)));
+}
 
 export type HarnessEvalWorkerLaunchInput = {
   repo: string;
@@ -25,31 +34,54 @@ export type HarnessEvalWorkerLaunchInput = {
 
 export type HarnessEvalWorkerLaunch = (input: HarnessEvalWorkerLaunchInput) => void | Promise<void>;
 
+export type HarnessEvalWorkerSpawnHandle = {
+  once(event: 'error', listener: (error: Error) => void): unknown;
+  once(event: 'spawn', listener: () => void): unknown;
+  unref(): unknown;
+};
+
+export type HarnessEvalWorkerSpawn = (
+  command: string,
+  args: readonly string[],
+  options: {
+    detached: boolean;
+    stdio: 'ignore';
+    env: typeof process.env;
+  },
+) => HarnessEvalWorkerSpawnHandle;
+
 export async function defaultHarnessEvalWorkerLaunch(
   input: HarnessEvalWorkerLaunchInput,
+  spawnImpl?: HarnessEvalWorkerSpawn,
 ): Promise<void> {
+  const workerScript = resolveHarnessEvalWorkerScript();
+  if (!existsSync(workerScript)) {
+    throw new Error(`harness eval worker script missing at ${workerScript}`);
+  }
+  const args = [
+    workerScript,
+    '--repo',
+    input.repo,
+    '--pr',
+    String(input.pr),
+    '--ticket',
+    input.ticket,
+    '--expected-head',
+    input.expectedHead,
+    '--patch-digest',
+    input.patchDigest,
+  ] as const;
+  const options = {
+    detached: true,
+    stdio: 'ignore' as const,
+    env: process.env,
+  };
+  const launchSpawn: HarnessEvalWorkerSpawn =
+    spawnImpl ??
+    ((command, spawnArgs, spawnOptions) =>
+      spawn(command, [...spawnArgs], spawnOptions) as HarnessEvalWorkerSpawnHandle);
   await new Promise<void>((resolveLaunch, reject) => {
-    const child = spawn(
-      process.execPath,
-      [
-        WORKER_SCRIPT,
-        '--repo',
-        input.repo,
-        '--pr',
-        String(input.pr),
-        '--ticket',
-        input.ticket,
-        '--expected-head',
-        input.expectedHead,
-        '--patch-digest',
-        input.patchDigest,
-      ],
-      {
-        detached: true,
-        stdio: 'ignore',
-        env: process.env,
-      },
-    );
+    const child = launchSpawn(process.execPath, args, options);
     child.once('error', reject);
     child.once('spawn', () => {
       child.unref();
