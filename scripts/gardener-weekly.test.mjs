@@ -226,3 +226,41 @@ test('the weekly report carries the lessons ledger summary and tolerates a missi
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('with --drift the report appends the spec/ADR drift section and writes the JSON', () => {
+  const { cwd, commit, run } = fixture();
+  try {
+    commit(daysAgo(20), baselineFiles(quiet));
+    commit(
+      daysAgo(2),
+      {
+        'docs/adr/0001-test.md': 'Line one\nSee `apps/server/src/services/gone.ts`.\n',
+        'apps/server/src/services/gone.ts': 'export const gone = true;\n',
+      },
+      'add doc',
+    );
+    execFileSync('git', ['rm', '-q', 'apps/server/src/services/gone.ts'], { cwd });
+    execFileSync('git', ['commit', '-m', 'delete gone'], {
+      cwd,
+      env: { ...process.env, GIT_AUTHOR_DATE: daysAgo(1), GIT_COMMITTER_DATE: daysAgo(1) },
+    });
+    const result = run('--drift', '--out', '.gardener');
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /## Spec\/ADR drift at HEAD/);
+    assert.match(
+      result.stdout,
+      /\| docs\/adr\/0001-test\.md \| `apps\/server\/src\/services\/gone\.ts` \| path \| 2 \|/,
+    );
+    const driftJson = readFileSync(join(cwd, '.gardener', 'drift-2026-10-24.json'), 'utf8');
+    assert.deepEqual(JSON.parse(driftJson), [
+      {
+        doc: 'docs/adr/0001-test.md',
+        name: 'apps/server/src/services/gone.ts',
+        kind: 'path',
+        line: 2,
+      },
+    ]);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});

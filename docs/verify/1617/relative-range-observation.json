@@ -1,0 +1,22 @@
+{
+  "observedHead": "fd2d21673015012fca106d8867d3428ff76b5edf",
+  "code": {
+    "scripts/doc-drift.mjs": "12423336feb9c6bdd8e6b5a40fd9362ea5c042ad6d43f51bca815bf89285fbd8",
+    "scripts/doc-drift.test.mjs": "869f73d889b9fb36d2daf49549a1a4ccbcb3b73837bf340dfcd454a5bea70077",
+    "scripts/gardener-weekly.mjs": "7abc617ce1c2cf68375ec0e46c08da76964db62bbc9bc92a83da224603507224",
+    "scripts/gardener-weekly.test.mjs": "e457c2b57cae080e7764ae76b7aedff4af799188be7678fa505ec56d7c9ec79e",
+    ".github/workflows/ci.yml": "feb7c16a7f11ed83fda2e0a1e74d9943149baf16824fc3267258a0a05d517abe",
+    ".github/workflows/gardener-weekly.yml": "bb696c665f0770e67cb3b338661e514bd6bc42f736197417b3c2163e9f4e5409"
+  },
+  "reportedDriftRows": 122,
+  "tests": 49,
+  "originalBlock": "https://github.com/xiechimon/cairn/pull/2081#issuecomment-6465841487",
+  "addedRows": [
+    {
+      "doc": "docs/adr/0013-chief-panel-floating-window.md",
+      "name": "resources/shell.tsx",
+      "kind": "path",
+      "line": 24
+    }
+  ]
+}

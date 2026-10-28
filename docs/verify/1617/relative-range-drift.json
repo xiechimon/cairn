@@ -1,0 +1,734 @@
+[
+  {
+    "doc": "docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md",
+    "name": "apps/web/src/board/sidebar.css",
+    "kind": "path",
+    "line": 18
+  },
+  {
+    "doc": "docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md",
+    "name": "apps/web/src/overlay/overlay.css",
+    "kind": "path",
+    "line": 18
+  },
+  {
+    "doc": "docs/adr/0004-chief-panel-docked-right-rail.md",
+    "name": "apps/web/src/chief/chief.css",
+    "kind": "path",
+    "line": 17
+  },
+  {
+    "doc": "docs/adr/0004-chief-panel-docked-right-rail.md",
+    "name": "apps/web/src/chief/chief.css",
+    "kind": "path",
+    "line": 18
+  },
+  {
+    "doc": "docs/adr/0009-site-wide-motion-converges-on-shadcn-defaults.md",
+    "name": "docs/research/assets/r1/f965382e067739e9.css",
+    "kind": "path",
+    "line": 12
+  },
+  {
+    "doc": "docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md",
+    "name": "library/t-0909/reports/contrast.md",
+    "kind": "path",
+    "line": 26
+  },
+  {
+    "doc": "docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md",
+    "name": "library/t-0909/scripts/gen-palettes.mjs",
+    "kind": "path",
+    "line": 34
+  },
+  {
+    "doc": "docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md",
+    "name": "library/t-0909/src/themes/c.css",
+    "kind": "path",
+    "line": 34
+  },
+  {
+    "doc": "docs/adr/0011-chief-process-segments-in-real-time-at-event-boundaries.md",
+    "name": "docs/verify/857/tail-samples.jsonl",
+    "kind": "path",
+    "line": 18
+  },
+  {
+    "doc": "docs/adr/0013-chief-panel-floating-window.md",
+    "name": "resources/shell.tsx",
+    "kind": "path",
+    "line": 24
+  },
+  {
+    "doc": "docs/adr/0013-chief-panel-floating-window.md",
+    "name": "secondary/shell.tsx",
+    "kind": "path",
+    "line": 24
+  },
+  {
+    "doc": "docs/adr/0013-chief-panel-floating-window.md",
+    "name": "docs/verify/953/probe-sealed/probe-dump.json",
+    "kind": "path",
+    "line": 26
+  },
+  {
+    "doc": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
+    "name": "apps/server/src/routes-webhook.ts",
+    "kind": "path",
+    "line": 41
+  },
+  {
+    "doc": "docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md",
+    "name": "docs/lessons.md",
+    "kind": "path",
+    "line": 41
+  },
+  {
+    "doc": "docs/spec/00-foundation-decisions.md",
+    "name": "docs/research/r9-pi-sdk.md",
+    "kind": "path",
+    "line": 4
+  },
+  {
+    "doc": "docs/spec/00-foundation-decisions.md",
+    "name": "auth/chatgpt-oauth.ts",
+    "kind": "path",
+    "line": 44
+  },
+  {
+    "doc": "docs/spec/00-foundation-decisions.md",
+    "name": "docs/research/r3-protocol-executor.md",
+    "kind": "path",
+    "line": 60
+  },
+  {
+    "doc": "docs/spec/01-stack-v2.md",
+    "name": "docs/research/r1-site-inventory.md",
+    "kind": "path",
+    "line": 5
+  },
+  {
+    "doc": "docs/spec/02-architecture-parity.md",
+    "name": "docs/research/r3-protocol-executor.md",
+    "kind": "path",
+    "line": 4
+  },
+  {
+    "doc": "docs/spec/02-architecture-parity.md",
+    "name": "raw/bundle-remoteTools-extract.js",
+    "kind": "path",
+    "line": 150
+  },
+  {
+    "doc": "docs/spec/02-architecture-parity.md",
+    "name": "backend/mcp-bridge.ts",
+    "kind": "path",
+    "line": 283
+  },
+  {
+    "doc": "docs/spec/03-ROADMAP.md",
+    "name": ".claude/skills/verify-pacman/SKILL.md",
+    "kind": "path",
+    "line": 77
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "parity/diff-regions.mjs",
+    "kind": "path",
+    "line": 36
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "parity/match-text.mjs",
+    "kind": "path",
+    "line": 36
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "parity/matrix.mjs",
+    "kind": "path",
+    "line": 38
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/54-失败态-详情-light.png",
+    "kind": "path",
+    "line": 121
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/73-失败态-探针详情-light.png",
+    "kind": "path",
+    "line": 121
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/55-失败态-看板卡片-light.png",
+    "kind": "path",
+    "line": 122
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/56-失败态-重跑dialog-light.png",
+    "kind": "path",
+    "line": 123
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/74-重跑dialog-复用方案钮-light.png",
+    "kind": "path",
+    "line": 123
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/57-运行历史-失败态单行-light.png",
+    "kind": "path",
+    "line": 124
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/77-运行历史-多行-light.png",
+    "kind": "path",
+    "line": 124
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/58-AI审核-弹层-light.png",
+    "kind": "path",
+    "line": 125
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/60-AI审核-审核结果-light.png",
+    "kind": "path",
+    "line": 126
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/61-AI审核后-状态-light.png",
+    "kind": "path",
+    "line": 126
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/63-版本下拉-v2v1-light.png",
+    "kind": "path",
+    "line": 127
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/70-版本下拉-v3v2v1-light.png",
+    "kind": "path",
+    "line": 127
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/65-diff视图-v1v2-light.png",
+    "kind": "path",
+    "line": 128
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/66-diff展开-unified-light.png",
+    "kind": "path",
+    "line": 128
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/71-diff视图-v2v3-light.png",
+    "kind": "path",
+    "line": 128
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/72-diff展开-v2v3-light.png",
+    "kind": "path",
+    "line": 128
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/67-驳回-重规划streaming-light.png",
+    "kind": "path",
+    "line": 129
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/68-驳回-planv3时间线-light.png",
+    "kind": "path",
+    "line": 129
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/75-复用方案-子面板-light.png",
+    "kind": "path",
+    "line": 130
+  },
+  {
+    "doc": "docs/spec/04-acceptance-criteria.md",
+    "name": "r8/76-直接执行-复用方案时间线-light.png",
+    "kind": "path",
+    "line": 130
+  },
+  {
+    "doc": "docs/spec/08-m7-feature-closed-loop.md",
+    "name": "docs/research/r9-attachments-mentions.md",
+    "kind": "path",
+    "line": 110
+  },
+  {
+    "doc": "docs/spec/08-m7-feature-closed-loop.md",
+    "name": "overlays/plan-dropdown.tsx",
+    "kind": "path",
+    "line": 142
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/ui/button.tsx",
+    "kind": "path",
+    "line": 42
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/ui/button.css",
+    "kind": "path",
+    "line": 45
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/detail/detail.css",
+    "kind": "path",
+    "line": 51
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/chief/chief.css",
+    "kind": "path",
+    "line": 56
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/overlays/overlays.css",
+    "kind": "path",
+    "line": 58
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/board/sidebar.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/chief/chief.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/detail/overlays.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/overlay/mention-picker.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/overlay/overlay.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/pages/pages.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/resources/resources.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "apps/web/src/secondary/secondary.css",
+    "kind": "path",
+    "line": 61
+  },
+  {
+    "doc": "docs/spec/09-frontend-style-unification-a6.md",
+    "name": "docs/a3/diff-audit.md",
+    "kind": "path",
+    "line": 112
+  },
+  {
+    "doc": "docs/spec/10-m7-acceptance-report.md",
+    "name": ".claude/skills/verify-pacman/SKILL.md",
+    "kind": "path",
+    "line": 4
+  },
+  {
+    "doc": "docs/spec/11-model-service-and-machine-localization.md",
+    "name": "apps/web/src/chief/chief-model-select.tsx",
+    "kind": "path",
+    "line": 104
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "library/t-0909/src/themes/c.css",
+    "kind": "path",
+    "line": 3
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "resources/shell.tsx",
+    "kind": "path",
+    "line": 8
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "secondary/shell.tsx",
+    "kind": "path",
+    "line": 8
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "routes/agent-detail.css",
+    "kind": "path",
+    "line": 18
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "board/board.css",
+    "kind": "path",
+    "line": 30
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "secondary/shell.tsx",
+    "kind": "path",
+    "line": 32
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "ui/dialog.css",
+    "kind": "path",
+    "line": 74
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "pages/pages.css",
+    "kind": "path",
+    "line": 88
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "detail/detail.css",
+    "kind": "path",
+    "line": 89
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "secondary/secondary.css",
+    "kind": "path",
+    "line": 90
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "chief/chief.css",
+    "kind": "path",
+    "line": 91
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "detail/overlays.css",
+    "kind": "path",
+    "line": 92
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "resources/resources.css",
+    "kind": "path",
+    "line": 93
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "overlays/overlays.css",
+    "kind": "path",
+    "line": 94
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "overlay/overlay.css",
+    "kind": "path",
+    "line": 95
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "overlay/mention-picker.css",
+    "kind": "path",
+    "line": 96
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "resources/shell.tsx",
+    "kind": "path",
+    "line": 97
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "routes/agent-detail.css",
+    "kind": "path",
+    "line": 97
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "board/board.css",
+    "kind": "path",
+    "line": 98
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "detail/detail.css",
+    "kind": "path",
+    "line": 101
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "detail/overlays.css",
+    "kind": "path",
+    "line": 101
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "routes/agent-detail.css",
+    "kind": "path",
+    "line": 101
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "ui/kbd-hint.css",
+    "kind": "path",
+    "line": 101
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "ui/tag-chip.css",
+    "kind": "path",
+    "line": 101
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "overlays/search-panel.tsx",
+    "kind": "path",
+    "line": 113
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "detail/overlays.css",
+    "kind": "path",
+    "line": 136
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "resources/shell.tsx",
+    "kind": "path",
+    "line": 156
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "secondary/shell.tsx",
+    "kind": "path",
+    "line": 156
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "board/board.css",
+    "kind": "path",
+    "line": 157
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "detail/detail.css",
+    "kind": "path",
+    "line": 157
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "routes/agent-detail.css",
+    "kind": "path",
+    "line": 157
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "board/board.css",
+    "kind": "path",
+    "line": 165
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "routes/agent-detail.css",
+    "kind": "path",
+    "line": 171
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "overlay/token-gate.css",
+    "kind": "path",
+    "line": 177
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "routes/machine-authorize.css",
+    "kind": "path",
+    "line": 177
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "apps/web/src/secondary/secondary.css",
+    "kind": "path",
+    "line": 204
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "overlays/search-panel.tsx",
+    "kind": "path",
+    "line": 242
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "chief/chief-model-select.tsx",
+    "kind": "path",
+    "line": 246
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "board/repo-filter.tsx",
+    "kind": "path",
+    "line": 251
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "overlays/plan-dropdown.tsx",
+    "kind": "path",
+    "line": 256
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "board/tag-filter.tsx",
+    "kind": "path",
+    "line": 260
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "chief/chief-wake.tsx",
+    "kind": "path",
+    "line": 261
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "overlays/chip-popover.tsx",
+    "kind": "path",
+    "line": 263
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "overlays/dismiss.tsx",
+    "kind": "path",
+    "line": 264
+  },
+  {
+    "doc": "docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md",
+    "name": "resources/shell.tsx",
+    "kind": "path",
+    "line": 267
+  },
+  {
+    "doc": "docs/spec/19-test-layering-and-blast-radius.md",
+    "name": ".claude/skills/verify-pacman/SKILL.md",
+    "kind": "path",
+    "line": 31
+  },
+  {
+    "doc": "docs/spec/21-single-machine-orchestration-defaults.md",
+    "name": "docs/research/r5-chief-behavior.md",
+    "kind": "path",
+    "line": 7
+  },
+  {
+    "doc": "docs/spec/22-color-and-geometry-token-scale-canonical-table.md",
+    "name": "reports/contrast.md",
+    "kind": "path",
+    "line": 7
+  },
+  {
+    "doc": "docs/spec/22-color-and-geometry-token-scale-canonical-table.md",
+    "name": "src/ui/input.css",
+    "kind": "path",
+    "line": 430
+  },
+  {
+    "doc": "docs/spec/22-color-and-geometry-token-scale-canonical-table.md",
+    "name": "detail/overlays.css",
+    "kind": "path",
+    "line": 461
+  },
+  {
+    "doc": "docs/spec/22-color-and-geometry-token-scale-canonical-table.md",
+    "name": "ui/dialog.css",
+    "kind": "path",
+    "line": 467
+  },
+  {
+    "doc": "docs/spec/22-color-and-geometry-token-scale-canonical-table.md",
+    "name": "ui/chip.tsx",
+    "kind": "path",
+    "line": 480
+  },
+  {
+    "doc": "docs/spec/22-color-and-geometry-token-scale-canonical-table.md",
+    "name": "overlays/search-panel.tsx",
+    "kind": "path",
+    "line": 485
+  },
+  {
+    "doc": "docs/spec/22-color-and-geometry-token-scale-canonical-table.md",
+    "name": "ui/dialog.css",
+    "kind": "path",
+    "line": 504
+  },
+  {
+    "doc": "docs/spec/22-color-and-geometry-token-scale-canonical-table.md",
+    "name": "ui/dialog.css",
+    "kind": "path",
+    "line": 540
+  },
+  {
+    "doc": "docs/spec/asset-replacement-plan.md",
+    "name": "docs/research/r1-site-inventory.md",
+    "kind": "path",
+    "line": 4
+  },
+  {
+    "doc": "docs/spec/asset-replacement-plan.md",
+    "name": "scripts/generate-icons.mjs",
+    "kind": "path",
+    "line": 83
+  },
+  {
+    "doc": "docs/spec/asset-replacement-plan.md",
+    "name": "assets/r1/71fd990866a15643.css",
+    "kind": "path",
+    "line": 107
+  },
+  {
+    "doc": "docs/spec/asset-replacement-plan.md",
+    "name": "assets/r1/71fd990866a15643.css",
+    "kind": "path",
+    "line": 161
+  }
+]
