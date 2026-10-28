@@ -60,21 +60,21 @@ test('changes to prepush scripts run the CI self-test files locally', () => {
   );
 });
 
-test('escape-trace tests run only when escape-trace or reviewer-bank paths change', () => {
+test('escape-trace tests stay mandatory for every code prepush plan', () => {
   const step = 'node --test scripts/escape-trace.test.mjs';
   for (const mode of ['local', 'ci']) {
-    assert.ok(
-      !prepushPlan(['apps/server/src/app.ts'], mode)
-        .map((args) => args.join(' '))
-        .includes(step),
-      mode,
-    );
-    assert.ok(
-      prepushPlan(['scripts/escape-trace.mjs'], mode)
-        .map((args) => args.join(' '))
-        .includes(step),
-      mode,
-    );
+    for (const paths of [
+      ['apps/server/src/app.ts'],
+      ['scripts/prepush.mjs'],
+      ['.github/workflows/ci.yml'],
+      ['scripts/escape-trace.mjs'],
+    ])
+      assert.ok(
+        prepushPlan(paths, mode)
+          .map((args) => args.join(' '))
+          .includes(step),
+        `${mode} ${paths.join(',')}`,
+      );
   }
 });
 
