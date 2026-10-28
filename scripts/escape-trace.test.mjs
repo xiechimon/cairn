@@ -32,31 +32,23 @@ function fixture(t, prefix = 'escape-candidates-') {
   git(['init', '-q']);
   git(['config', 'user.name', 'Candidate test']);
   git(['config', 'user.email', 'candidate@example.invalid']);
+  function commit(message, date = start, pathOrFiles = 'file.txt') {
+    const files = typeof pathOrFiles === 'string' ? { [pathOrFiles]: message } : { ...pathOrFiles };
+    for (const [path, content] of Object.entries(files)) {
+      const absolute = join(cwd, path);
+      mkdirSync(dirname(absolute), { recursive: true });
+      writeFileSync(absolute, content);
+      git(['add', '--', path]);
+    }
+    git(['commit', '-q', '-m', message], { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date });
+    return git(['rev-parse', 'HEAD']);
+  }
   const run = (...args) =>
     spawnSync(process.execPath, [cli, '--since', start, '--until', end, ...args], {
       cwd,
       encoding: 'utf8',
     });
-  return {
-    cwd,
-    git,
-    run,
-    commit(message, date = start, pathOrFiles = 'file.txt') {
-      const files =
-        typeof pathOrFiles === 'string' ? { [pathOrFiles]: message } : { ...pathOrFiles };
-      for (const [path, content] of Object.entries(files)) {
-        const absolute = join(cwd, path);
-        mkdirSync(dirname(absolute), { recursive: true });
-        writeFileSync(absolute, content);
-        git(['add', '--', path]);
-      }
-      git(['commit', '-q', '-m', message], { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date });
-      return git(['rev-parse', 'HEAD']);
-    },
-    runArgs(args, opts = {}) {
-      return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: 'utf8', ...opts });
-    },
-  };
+  return { cwd, git, commit, run };
 }
 
 function isoPlus(base, ms) {
@@ -601,7 +593,7 @@ test('each resolved trace has immutable shas, PRs, method, timestamps and file/l
 });
 
 test('candidates subcommand pipes into trace through the CLI with a recorded responder', (t) => {
-  const { cwd, git, commit, runArgs } = fixture(t, 'escape-cli-pipe-');
+  const { cwd, git, commit } = fixture(t, 'escape-cli-pipe-');
   const introduceAt = '2026-02-01T00:00:00Z';
   const fixAt = '2026-02-05T00:00:00Z';
   const introducingSha = commit('feat: pipe defect (#20)', introduceAt, {
@@ -627,15 +619,15 @@ test('candidates subcommand pipes into trace through the CLI with a recorded res
       },
     }),
   );
-  const candidates = runArgs([
-    'candidates',
-    '--since',
-    '2026-02-04T00:00:00Z',
-    '--until',
-    '2026-02-06T00:00:00Z',
-  ]);
+  const candidates = spawnSync(
+    process.execPath,
+    [cli, 'candidates', '--since', '2026-02-04T00:00:00Z', '--until', '2026-02-06T00:00:00Z'],
+    { cwd, encoding: 'utf8' },
+  );
   assert.equal(candidates.status, 0, candidates.stderr);
-  const traced = runArgs(['trace', '--respond-file', respondFile], {
+  const traced = spawnSync(process.execPath, [cli, 'trace', '--respond-file', respondFile], {
+    cwd,
+    encoding: 'utf8',
     input: candidates.stdout,
   });
   assert.equal(traced.status, 0, traced.stderr);
