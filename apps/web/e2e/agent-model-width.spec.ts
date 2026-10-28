@@ -15,7 +15,15 @@ test('long model id: overview tab model popover does not clip horizontally, long
   await trigger.click();
   const menu = page.locator('.agent-model-menu');
   await expect(menu).toBeVisible();
-  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          animation.effect?.getTiming().iterations === Number.POSITIVE_INFINITY ||
+          (!animation.pending && animation.playState !== 'running'),
+      ),
+  );
 
   const m = await menu.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }));
   expect(m.sw).toBeLessThanOrEqual(m.cw);

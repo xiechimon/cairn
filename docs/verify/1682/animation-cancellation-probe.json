@@ -1,0 +1,32 @@
+[
+  {
+    "round": 0,
+    "control": "native animation cancelled on next frame",
+    "oldWait": "AbortError",
+    "pollingWait": "passed",
+    "geometry": {
+      "scroll": 439,
+      "client": 439
+    }
+  },
+  {
+    "round": 1,
+    "control": "native animation cancelled on next frame",
+    "oldWait": "AbortError",
+    "pollingWait": "passed",
+    "geometry": {
+      "scroll": 439,
+      "client": 439
+    }
+  },
+  {
+    "round": 2,
+    "control": "native animation cancelled on next frame",
+    "oldWait": "AbortError",
+    "pollingWait": "passed",
+    "geometry": {
+      "scroll": 439,
+      "client": 439
+    }
+  }
+]
