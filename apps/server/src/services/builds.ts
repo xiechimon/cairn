@@ -110,6 +110,7 @@ import { markFirstPrPromptDue } from './first-pr-report.js';
 import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
+import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import { storeInfoReport } from './info-handoff.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -146,6 +147,12 @@ export interface BuildDeps {
   oauthClient?: OAuthClientConfig | null;
   attachmentsDir?: string;
   gitOps?: typeof systemGitOps;
+  harnessEval?: {
+    dispatch: HarnessEvalDispatchPort;
+    attemptTimeoutMs?: number;
+    now?: () => number;
+    dispatchAuthorized?: boolean;
+  };
 }
 
 type BuildRow = typeof build.$inferSelect;

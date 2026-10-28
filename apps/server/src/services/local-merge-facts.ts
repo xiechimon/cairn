@@ -6,8 +6,11 @@ import {
 import { and, asc, eq, inArray, isNotNull, notInArray } from 'drizzle-orm';
 import { build, gateState, gateVerdict, step, todo } from '../db/schema.js';
 import { systemGitOps } from '../lib/git.js';
+import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { projectOfTodo } from './git.js';
+import { createHarnessEvalCoordinator } from './harness-eval-coordinator.js';
+import { judgeMergeReadinessWithHarnessEval } from './merge-gate/harness-eval-judge.js';
 import { type GateInputs, mergeReadiness } from './merge-gate/readiness.js';
 import { projectMergeConfigOf } from './projects.js';
 
@@ -168,6 +171,38 @@ export async function localGateFacts(
     },
   };
   const inputs = decorate === undefined ? built : decorate(built);
+  const prNumber = buildRow.prNumber;
+  if (deps.harnessEval !== undefined && prNumber !== null) {
+    const harness = deps.harnessEval;
+    const coordinator = createHarnessEvalCoordinator({
+      db: deps.db,
+      dispatch: harness.dispatch,
+      now: harness.now ?? nowMs,
+      attemptTimeoutMs: harness.attemptTimeoutMs ?? 60 * 60 * 1000,
+    });
+    const judged = await judgeMergeReadinessWithHarnessEval({
+      inputs,
+      coordinator,
+      repo:
+        inputs.repo.owner !== '' && inputs.repo.name !== ''
+          ? `${inputs.repo.owner}/${inputs.repo.name}`
+          : projectRow.name,
+      pr: prNumber,
+      dispatchAuthorized: harness.dispatchAuthorized !== false,
+      now: (harness.now ?? nowMs)(),
+    });
+    return {
+      node: buildId,
+      inputs: judged.inputs,
+      readiness: judged.readiness,
+      ready: judged.readiness.ready,
+      judgedBase: baseSha,
+      judgedHead: judged.readiness.headSha,
+      judgedDigest,
+      verdicts,
+      requiredChecks: required,
+    };
+  }
   const readiness = mergeReadiness(inputs);
   return {
     node: buildId,

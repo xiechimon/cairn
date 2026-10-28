@@ -105,7 +105,10 @@ export interface GateInputs {
   } | null;
   availability: { reviewerPerspectives: string[]; verifier: boolean; decider: boolean };
   harnessEvalText?: string | null;
-  harnessEval?: { attempt: { state: string } | null } | null;
+  harnessEval?: {
+    attempt: { state: string; deadlineAt?: number; patchDigest?: string } | null;
+    now?: number;
+  } | null;
 }
 
 const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
@@ -388,7 +391,12 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
         if (parsed.decision_ok < CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER) {
           block('harness-regression-below-threshold', String(parsed.decision_ok));
         }
-      } else if (isLiveHarnessAttempt(i.harnessEval?.attempt ?? null)) {
+      } else if (
+        isLiveHarnessAttempt(i.harnessEval?.attempt ?? null, {
+          now: i.harnessEval?.now,
+          patchDigest: D,
+        })
+      ) {
         block('harness-regression-evaluating');
       } else if (parsed === null) {
         block('harness-regression-missing');

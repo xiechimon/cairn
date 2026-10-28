@@ -239,7 +239,7 @@ describe('harness eval coordinator', () => {
 
   test('a late completion from a timed-out or superseded worker id is refused', async () => {
     const now = { value: 1_000_000 };
-    const { coordinator } = openWorld({
+    const { coordinator, db } = openWorld({
       now,
       attemptTimeoutMs: 1_000,
       ids: ['attempt-1', 'worker-1'],
@@ -250,11 +250,18 @@ describe('harness eval coordinator', () => {
       patchDigest: DIGEST_A,
     });
     now.value = claimed.attempt.deadlineAt;
-    coordinator.reconcile(now.value);
-    const late = coordinator.complete(claimed.attempt.id, claimed.attempt.workerId, 'completed');
-    expect(late.ok).toBe(false);
-    const wrongWorker = coordinator.complete(claimed.attempt.id, 'other-worker', 'completed');
-    expect(wrongWorker.ok).toBe(false);
+    const lateWithoutReconcile = coordinator.complete(
+      claimed.attempt.id,
+      claimed.attempt.workerId,
+      'completed',
+    );
+    expect(lateWithoutReconcile.ok).toBe(false);
+    expect(lateWithoutReconcile.reason).toBe('terminal');
+    const row = db.select().from(harnessEvalAttempt).all()[0];
+    expect(row?.state).toBe('terminal');
+    expect(row?.outcome).toBe('timeout');
+    const again = coordinator.complete(claimed.attempt.id, claimed.attempt.workerId, 'completed');
+    expect(again.ok).toBe(false);
 
     const second = openWorld({
       ids: ['attempt-2', 'worker-2'],
