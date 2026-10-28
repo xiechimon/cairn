@@ -1,0 +1,6 @@
+{"prompt_id":"i01","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.6s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":45.152}
+{"prompt_id":"i02","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.7s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":45.278}
+{"prompt_id":"i03","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.7s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":45.353}
+{"prompt_id":"i04","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.6s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":45.289}
+{"prompt_id":"i06","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.5s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":44.805}
+{"prompt_id":"i05","rep":0,"failure_class":"harness_error","requested_context_window":1000000,"error":"回合未正常完成：step=failed usage=0/0 latency=14.5s","retries":0,"infra_retries":2,"judge_retries":0,"latency_s":45.038}

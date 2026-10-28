@@ -1,0 +1,6 @@
+{"prompt_id":"a02","rep":0,"failure_class":"timeout","requested_context_window":1000000,"error":"a02 rep0: exceeded 360s wall-clock ceiling","retries":0,"infra_retries":0,"judge_retries":0,"latency_s":360.025}
+{"prompt_id":"a03","rep":0,"failure_class":"timeout","requested_context_window":1000000,"error":"a03 rep0: exceeded 360s wall-clock ceiling","retries":0,"infra_retries":0,"judge_retries":0,"latency_s":360.029}
+{"prompt_id":"a04","rep":0,"failure_class":"timeout","requested_context_window":1000000,"error":"a04 rep0: exceeded 360s wall-clock ceiling","retries":0,"infra_retries":0,"judge_retries":0,"latency_s":360.034}
+{"prompt_id":"a05","rep":0,"failure_class":"timeout","requested_context_window":1000000,"error":"a05 rep0: exceeded 360s wall-clock ceiling","retries":0,"infra_retries":0,"judge_retries":0,"latency_s":360.031}
+{"prompt_id":"i03","rep":0,"failure_class":"timeout","requested_context_window":1000000,"error":"i03 rep0: exceeded 360s wall-clock ceiling","retries":0,"infra_retries":0,"judge_retries":0,"latency_s":360.03}
+{"prompt_id":"i06","rep":0,"failure_class":"timeout","requested_context_window":1000000,"error":"i06 rep0: exceeded 360s wall-clock ceiling","retries":0,"infra_retries":0,"judge_retries":0,"latency_s":360.03}

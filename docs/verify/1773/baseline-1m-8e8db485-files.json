@@ -1,0 +1,33 @@
+{
+  "sourceCommit": "8e8db4859aac50f6977e6c11c7dd634c373074fb",
+  "providerMode": "real",
+  "contextWindow": 1000000,
+  "completion": "BATCH_COMPLETE",
+  "files": {
+    "completion.txt": "b3a80ed001d4f680ea5bd3d18002890f992a7a8e21c4182bd019048e6b29b8dd",
+    "deepseek-v4.1-flash/input-manifest.json": "4a4f50a1589b33d8afe08bb68a82b40b4e8fa86b79fb49625e82c8db0c2d055b",
+    "deepseek-v4.1-flash/no-memory/_state.json": "c367cdda290169e8de3d1524084f6433214b3744a98bf6bc5b31d42533d422df",
+    "deepseek-v4.1-flash/no-memory/baseline/results.jsonl": "c2538bb764d1492839a68d2dcd288881686ee5cba42276e9c5d1764b368d9303",
+    "deepseek-v4.1-flash/no-memory/cases.json": "c5da396e6d3e888358727a7ded50e96d89cb0fe9cb57e46d08fec9706fe33dd0",
+    "deepseek-v4.1-flash/with-memory/_state.json": "c367cdda290169e8de3d1524084f6433214b3744a98bf6bc5b31d42533d422df",
+    "deepseek-v4.1-flash/with-memory/baseline/results.jsonl": "13e4f70134766e55d01b4b39c1f53056491f072cfeb12a59de0e9b456448989c",
+    "deepseek-v4.1-flash/with-memory/cases.json": "328a2b5459f53af0760a982abadd823bc67a3eea528990c7f75cf6c006336b39",
+    "glm-5.3/input-manifest.json": "c3eb1968ee95c2ab77c94eb335518b57f36afc9bd0c41dd8da1df3420eb55666",
+    "glm-5.3/no-memory/_state.json": "c367cdda290169e8de3d1524084f6433214b3744a98bf6bc5b31d42533d422df",
+    "glm-5.3/no-memory/baseline/errors.jsonl": "786f83f522985addedbf9d750b2180c4f74a4b273ced69a22bf23c145b07c285",
+    "glm-5.3/no-memory/baseline/results.jsonl": "23e6acde8c88fdfc8480f011611b0323df84a88cc3acda5f3751e1ca60a25f4f",
+    "glm-5.3/no-memory/cases.json": "c5da396e6d3e888358727a7ded50e96d89cb0fe9cb57e46d08fec9706fe33dd0",
+    "glm-5.3/with-memory/_state.json": "c367cdda290169e8de3d1524084f6433214b3744a98bf6bc5b31d42533d422df",
+    "glm-5.3/with-memory/baseline/errors.jsonl": "6442abd019cf1b85be7b7a9592d9d1510b5d83d68ca95399bbf199f658d3d1d5",
+    "glm-5.3/with-memory/baseline/results.jsonl": "f7be2b654d41896cb159d0dab1662196ae8bf708991bf0ce3d43723f0c563df2",
+    "glm-5.3/with-memory/cases.json": "328a2b5459f53af0760a982abadd823bc67a3eea528990c7f75cf6c006336b39",
+    "glm-5.3-flash/input-manifest.json": "1ed21620dd888b56b21592a007bc454a22660a05e35aa31fa19376d982df14ef",
+    "glm-5.3-flash/no-memory/_state.json": "c367cdda290169e8de3d1524084f6433214b3744a98bf6bc5b31d42533d422df",
+    "glm-5.3-flash/no-memory/baseline/errors.jsonl": "7aabf938bdd3e763036ea338eb7fe9218b76bb00e9e4eb34408f9c0492bb2cc2",
+    "glm-5.3-flash/no-memory/cases.json": "c5da396e6d3e888358727a7ded50e96d89cb0fe9cb57e46d08fec9706fe33dd0",
+    "glm-5.3-flash/with-memory/_state.json": "c367cdda290169e8de3d1524084f6433214b3744a98bf6bc5b31d42533d422df",
+    "glm-5.3-flash/with-memory/baseline/errors.jsonl": "9d73d5a54df2fe2c9b179e789e4f4da2daecedd37fede5814ef2cb56e9992f88",
+    "glm-5.3-flash/with-memory/cases.json": "328a2b5459f53af0760a982abadd823bc67a3eea528990c7f75cf6c006336b39",
+    "runtime-window-observation.json": "06871854e56f53a1c495cbd0e3e7568db57e1a66eedf557f3c8515beb950af21"
+  }
+}

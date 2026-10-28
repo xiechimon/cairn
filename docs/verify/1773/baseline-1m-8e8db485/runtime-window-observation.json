@@ -1,0 +1,40 @@
+{
+  "sourceCommit": "8e8db4859aac50f6977e6c11c7dd634c373074fb",
+  "providerMode": "real",
+  "observations": [
+    {
+      "path": "tmp/cairn-eval-chief-Lp1ai1/agent-runtime/models.json",
+      "models": [
+        {
+          "id": "glm-5.3",
+          "contextWindow": 1000000
+        },
+        {
+          "id": "glm-5.3-flash",
+          "contextWindow": 128000
+        },
+        {
+          "id": "deepseek-v4.1-flash",
+          "contextWindow": 128000
+        }
+      ]
+    },
+    {
+      "path": "tmp/cairn-eval-chief-EIw9I6/agent-runtime/models.json",
+      "models": [
+        {
+          "id": "glm-5.3",
+          "contextWindow": 1000000
+        },
+        {
+          "id": "glm-5.3-flash",
+          "contextWindow": 128000
+        },
+        {
+          "id": "deepseek-v4.1-flash",
+          "contextWindow": 128000
+        }
+      ]
+    }
+  ]
+}
