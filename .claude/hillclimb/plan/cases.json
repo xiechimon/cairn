@@ -1,6 +1,6 @@
 {
   "flow": "plan",
-  "note": "Single-turn plan coverage through the chief-dispatch runner. Cases ask chief to write a plan as persisted todos; grading reads todo title+spec only (assistant prose does not count). expect.kind must be plan. include is alias groups (any alias in a group hits; every group must hit). exclude is forbidden. minSplits/maxSplits are inclusive bounds on the number of persisted plan cards (ADR 0024: split when work is independent; keep a single card for single-view single-artifact work).",
+  "note": "Plan coverage through the chief-dispatch runner. Single-turn cases grade persisted todos (title+spec). Revision cases seed a priorPlan, deliver rejection feedback on one arm, and run an isolated no-feedback control; grading uses mustFix/mustPreserve over the final todo rows including edits.",
   "roster": [
     {
       "key": "doc",
@@ -57,6 +57,35 @@
         "exclude": ["skip docs", "no documentation"],
         "minSplits": 3,
         "maxSplits": 6
+      }
+    },
+    {
+      "id": "plan-003-revision-feedback",
+      "tags": ["plan", "revision"],
+      "prompt": "Export button does nothing on Safari. Write a plan.",
+      "priorPlan": [
+        {
+          "title": "Add logging",
+          "spec": "Add logging to the export handler."
+        },
+        {
+          "title": "Regression test",
+          "spec": "Keep the existing regression test card for the Safari export path."
+        }
+      ],
+      "feedback": "Reject this plan. Find the cause: it is the download attribute on a blob url. Keep the existing regression test card.",
+      "revisionPrompt": "Revise the plan based on the feedback.",
+      "expect": {
+        "kind": "plan",
+        "include": [
+          ["download attribute", "blob url"],
+          ["test", "regression"]
+        ],
+        "exclude": ["more logging", "only logging"],
+        "minSplits": 1,
+        "maxSplits": 4,
+        "mustFix": [["download attribute", "blob url"]],
+        "mustPreserve": [["regression test", "existing regression test"]]
       }
     }
   ]
