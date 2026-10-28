@@ -5,7 +5,7 @@
   },
   "historicalReplayPredictions": {
     "stepCount": 7,
-    "hitCount": 10,
+    "hitCount": 5,
     "note": "Replay predictions use selectSkillsForTask on frozen task text and frozen candidates; they are reported separately from stored hits."
   },
   "matcherRevision": "4ca34d8a64886d5417002c5b7c7d0ed1278d70d4",
