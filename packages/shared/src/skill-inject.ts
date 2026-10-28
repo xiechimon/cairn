@@ -175,6 +175,7 @@ const SKILL_INJECT_DOMAINS: readonly SkillInjectDomain[] = [
     keywords: [
       '文档',
       'docs',
+      'documentation',
       'readme',
       '注释',
       '写作',
@@ -274,6 +275,8 @@ const SKILL_INJECT_DOMAINS: readonly SkillInjectDomain[] = [
 
 const CJK_RE = /[㐀-䶿一-鿿豈-﫿]/;
 
+const WEAK_DOMAIN_KEYWORDS = new Set(['ci', 'cd', 'api', 'pr', 'ui', 'ux', '失败']);
+
 function fold(text: string): { spaced: string; compact: string } {
   const spaced = text
     .normalize('NFKC')
@@ -293,15 +296,20 @@ function keywordHits(keyword: string, folded: { spaced: string; compact: string 
 function domainsOfText(text: string): Map<SkillInjectDomain, string> {
   const out = new Map<SkillInjectDomain, string>();
   if (text.trim() === '') return out;
-  const folded = fold(text);
+  const withoutUrlsAndPaths = text
+    .replace(/https?:\/\/[^\s)>\]]+/gi, ' ')
+    .replace(/(?:[\w.@+-]+\/)+[\w.@+-]+/g, ' ');
+  const folded = fold(withoutUrlsAndPaths);
   if (folded.compact === '') return out;
   for (const domain of SKILL_INJECT_DOMAINS) {
+    let strongHit: string | undefined;
     for (const kw of domain.keywords) {
-      if (keywordHits(kw, folded)) {
-        out.set(domain, kw);
-        break;
-      }
+      if (!keywordHits(kw, folded)) continue;
+      if (WEAK_DOMAIN_KEYWORDS.has(kw)) continue;
+      strongHit = kw;
+      break;
     }
+    if (strongHit !== undefined) out.set(domain, strongHit);
   }
   return out;
 }

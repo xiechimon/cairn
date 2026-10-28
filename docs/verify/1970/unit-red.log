@@ -1,0 +1,96 @@
+
+ RUN  v5.0.1 /workspace/packages/shared
+
+ ❯ test/skill-inject.test.ts (34 tests | 4 failed | 27 skipped) 22ms
+   ❯ domain: weak signals and paths (#1970) (7)
+     × "fix the CI job" does not select aihot 6ms
+     × "see docs/verify/1178/README.md" does not open the docs domain; a URL alone opens no domain 3ms
+     × "please update the documentation for the setup step" still opens the docs domain 0ms
+     × weak keywords ci, cd, api, pr, ui, ux alone do not open a domain; with a strong keyword in the same domain they still do 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/skill-inject.test.ts > domain: weak signals and paths (#1970) > "fix the CI job" does not select aihot
+AssertionError: expected [ 'aihot' ] to not include 'aihot'
+ ❯ test/skill-inject.test.ts:332:85
+    330|
+    331|   it('"fix the CI job" does not select aihot', () => {
+    332|     expect(selectSkillsForTask('fix the CI job', [aihotNews]).map((h) …
+       |                                                                                     ^
+    333|       'aihot',
+    334|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/skill-inject.test.ts > domain: weak signals and paths (#1970) > "see docs/verify/1178/README.md" does not open the docs domain; a URL alone opens no domain
+AssertionError: expected [ { id: 'docs-writer', …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "id": "docs-writer",
++     "reason": "任务文本与技能同域「文档写作」（任务命中「docs」，技能描述命中「docs」）",
++     "rule": "domain",
++   },
++ ]
+
+ ❯ test/skill-inject.test.ts:338:80
+    336|
+    337|   it('"see docs/verify/1178/README.md" does not open the docs domain; …
+    338|     expect(selectSkillsForTask('see docs/verify/1178/README.md', [docs…
+       |                                                                                ^
+    339|     expect(
+    340|       selectSkillsForTask('https://example.com/api/ui', [
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/skill-inject.test.ts > domain: weak signals and paths (#1970) > "please update the documentation for the setup step" still opens the docs domain
+AssertionError: expected [] to include 'docs-writer'
+ ❯ test/skill-inject.test.ts:352:35
+    350|       [docsSkill],
+    351|     );
+    352|     expect(hits.map((h) => h.id)).toContain('docs-writer');
+       |                                   ^
+    353|     expect(hits.find((h) => h.id === 'docs-writer')?.rule).toBe('domai…
+    354|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/skill-inject.test.ts > domain: weak signals and paths (#1970) > weak keywords ci, cd, api, pr, ui, ux alone do not open a domain; with a strong keyword in the same domain they still do
+AssertionError: ci: expected [ { id: 'ops', rule: 'domain', …(1) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "id": "ops",
++     "reason": "任务文本与技能同域「部署运维」（任务命中「ci」，技能描述命中「deploy」）",
++     "rule": "domain",
++   },
++ ]
+
+ ❯ test/skill-inject.test.ts:420:78
+    418|     ];
+    419|     for (const row of cases) {
+    420|       expect(selectSkillsForTask(row.weakAlone, [row.skill]), row.weak…
+       |                                                                              ^
+    421|       expect(
+    422|         selectSkillsForTask(row.strongTogether, [row.skill]).map((h) =…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 3 passed | 27 skipped (34)
+   Start at  16:30:38
+   Duration  568ms (transform 71%, import 23%, tests 5%, worker 1%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/packages/shared
+
