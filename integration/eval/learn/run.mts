@@ -1,5 +1,6 @@
 import type { ExperienceCandidate } from '@cairn/shared';
 import { reflectPacks } from '../../../apps/server/src/trajectory-reflect.js';
+import type { PromptSet } from '../chief-dispatch/prompt-set.mts';
 import {
   bootStack,
   driveFollowUp,
@@ -83,9 +84,10 @@ export function reflectEndpointFromEnv(): { baseUrl: string; apiKey: string } {
 async function withWorld<T>(
   roster: RosterAgent[],
   model: string,
+  opts: { promptSet?: PromptSet },
   body: (ctx: { stack: Stack; world: SeededWorld }) => Promise<T>,
 ): Promise<T> {
-  const stack = await bootStack();
+  const stack = await bootStack({ promptSet: opts.promptSet });
   try {
     const world = await seedWorld(stack, {
       relayBaseUrl: relayBaseUrl(),
@@ -130,7 +132,13 @@ async function reflectRound(
 
 export async function runLearnCase(
   input: LearnCase,
-  opts: { arm: LearnArm; roster: RosterAgent[]; model: string; timeoutMs: number },
+  opts: {
+    arm: LearnArm;
+    roster: RosterAgent[];
+    model: string;
+    timeoutMs: number;
+    promptSet?: PromptSet;
+  },
 ): Promise<LearnRun> {
   if (opts.arm === 'all' || opts.arm === 'reflect') reflectEndpointFromEnv();
   const timeoutMs = opts.timeoutMs;
@@ -145,7 +153,7 @@ export async function runLearnCase(
 
   const noMemory =
     opts.arm === 'all' || opts.arm === 'no-memory'
-      ? await withWorld(opts.roster, opts.model, async ({ stack, world }) => {
+      ? await withWorld(opts.roster, opts.model, opts, async ({ stack, world }) => {
           agentIds = world.agentIds;
           const evidence = await driveTurn(stack, input.round2, { timeoutMs });
           deadTurn(evidence);
@@ -157,7 +165,7 @@ export async function runLearnCase(
 
   const oracle =
     opts.arm === 'all' || opts.arm === 'oracle'
-      ? await withWorld(opts.roster, opts.model, async ({ stack, world }) => {
+      ? await withWorld(opts.roster, opts.model, opts, async ({ stack, world }) => {
           agentIds = world.agentIds;
           seedOracleMemory(stack.server, world, input);
           const evidence = await driveTurn(stack, input.round2, { timeoutMs });
@@ -173,7 +181,7 @@ export async function runLearnCase(
   let round1: TurnEvidence | undefined;
   let reflectAgentId = '';
   if (opts.arm === 'all' || opts.arm === 'correction' || opts.arm === 'reflect') {
-    await withWorld(opts.roster, opts.model, async ({ stack, world }) => {
+    await withWorld(opts.roster, opts.model, opts, async ({ stack, world }) => {
       agentIds = world.agentIds;
       reflectAgentId = world.chiefAgentId;
       const first = await driveTurn(stack, input.round1, { timeoutMs });

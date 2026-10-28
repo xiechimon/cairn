@@ -31,6 +31,7 @@ import {
   type RealServer,
   waitFor,
 } from '../../../integration/test/helpers.js';
+import { type PromptSet, rewriteClaimResponseBody } from './prompt-set.mts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -124,7 +125,8 @@ export function relayBaseUrl(): string {
   return url;
 }
 
-export async function bootStack(): Promise<Stack> {
+export async function bootStack(opts: { promptSet?: PromptSet } = {}): Promise<Stack> {
+  const promptSet: PromptSet = opts.promptSet ?? 'current';
   const server = await bootRealServer({
     providerBaseUrl: 'http://127.0.0.1:9/v1',
     claimHoldMs: 1_000,
@@ -156,7 +158,20 @@ export async function bootStack(): Promise<Stack> {
         headers: { 'content-type': 'application/json' },
       });
     }
-    return fetch(input, init);
+    const res = await fetch(input, init);
+    if (
+      promptSet !== 'current' &&
+      init?.method === 'POST' &&
+      url.endsWith('/api/machine/tasks/claim') &&
+      res.status === 200
+    ) {
+      const body = await res.text();
+      return new Response(rewriteClaimResponseBody(body, promptSet), {
+        status: res.status,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return res;
   };
   const config = loadDaemonConfig(
     {

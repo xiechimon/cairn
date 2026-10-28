@@ -47,4 +47,10 @@ describe('CHIEF_DISPATCH_HARNESS_PATHS', () => {
     expect(CHIEF_DISPATCH_HARNESS_PATHS).not.toContain('integration/eval/plan/run.mts');
     expect(CHIEF_DISPATCH_HARNESS_PATHS).not.toContain('integration/eval/plan/seed.mts');
   });
+
+  test('contains the prompt-set switch module (#1943)', () => {
+    expect(CHIEF_DISPATCH_HARNESS_PATHS).toContain(
+      'integration/eval/chief-dispatch/prompt-set.mts',
+    );
+  });
 });
