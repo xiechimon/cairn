@@ -571,6 +571,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "noncanonical-temp-path": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "nonexistent-npm-package-name": {
     "Intercepts": 0,
     "Recurrences": 0
