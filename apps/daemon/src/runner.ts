@@ -83,6 +83,7 @@ import { GitPushHookError, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { computeHarnessHash } from './harness-hash.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
+import { landLocalMerge } from './local-merge.js';
 import type { DaemonLogger } from './log.js';
 import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
 import { extractReviewVerdict } from './review-findings.js';
@@ -440,7 +441,7 @@ async function runClaimedStep(
     if (!opts.resume) rmSync(reportFile, { force: true });
   }
 
-  journal.claim({
+  const claimedEntry = journal.claim({
     stepId,
     buildId: claimed.step.buildId,
     kind: claimed.step.kind,
@@ -451,6 +452,54 @@ async function runClaimedStep(
     claimed,
     stopRequest: stop.request,
   });
+
+  if (claimed.localMerge !== undefined) {
+    const command = claimed.localMerge;
+    const repo = claimed.project?.repo;
+    let doneBody: MachineDoneBody;
+    try {
+      if (
+        claimed.step.kind !== 'merge' ||
+        repo?.kind !== 'local' ||
+        claimed.project?.id !== command.projectId ||
+        claimed.step.buildId !== command.buildId
+      )
+        throw new Error('Local merge command does not match the claim');
+      if (
+        claimed.agent?.tools !== undefined &&
+        [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].some((tool) => !claimed.agent?.tools?.includes(tool))
+      )
+        throw new Error('Local merge requires merge and push permission');
+      const result =
+        stop.request !== null
+          ? { outcome: 'held' as const, reason: 'stopped' }
+          : await landLocalMerge(repo.cloneUrl, command, () => stop.request !== null);
+      doneBody = {
+        status: 'success',
+        localMerge: { command, result },
+        ...(result.outcome === 'merged' ? { commit: result.commit } : {}),
+      };
+    } catch (err) {
+      doneBody = {
+        status: 'failed',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      };
+    }
+    const transcript = new TranscriptBuffer(deps.paths.outboxDir, stepId);
+    transcript.upsert({
+      id: `local-merge-${stepId}`,
+      role: 'system',
+      content: JSON.stringify(doneBody),
+      createdAt: now(),
+    });
+    journal.update(stepId, { state: 'awaiting-upload', doneBody });
+    await resumePendingUpload(
+      deps,
+      journal.get(stepId) ?? { ...claimedEntry, state: 'awaiting-upload', doneBody },
+      { running },
+    );
+    return;
+  }
 
   let deliveryPrompt = prompt;
   let promptImages: DeliveredImage[] | undefined;

@@ -85,6 +85,7 @@ import {
   todo,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
+import { systemGitOps } from '../lib/git.js';
 import {
   type FetchLike,
   type GithubMergeResult,
@@ -110,12 +111,14 @@ import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } 
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import { storeInfoReport } from './info-handoff.js';
+import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGatePort } from './merge-gate-github.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
+import { projectMergeConfigOf } from './projects.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import { stepQueueProjector } from './step-queue.js';
@@ -139,6 +142,7 @@ export interface BuildDeps {
   githubFetch?: FetchLike;
   oauthClient?: OAuthClientConfig | null;
   attachmentsDir?: string;
+  gitOps?: typeof systemGitOps;
 }
 
 type BuildRow = typeof build.$inferSelect;
@@ -1172,6 +1176,31 @@ export async function requestMerge(
   assertPhaseTransition(todoRow.phase, 'done');
   assertMergeTools(deps, todoRow);
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  if (
+    projectRow?.repoKind === 'local' &&
+    projectMergeConfigOf(projectRow).mergePolicy === 'autonomous'
+  ) {
+    const git = deps.gitOps ?? systemGitOps;
+    const localPath = projectRow.localPath;
+    if (localPath === null) {
+      throw new HttpError(409, '本地项目没有仓库路径，拒绝走未受控合并');
+    }
+    const listing = await git.listBranches(localPath).catch(() => null);
+    if (listing === null || listing.defaultBranch === null) {
+      throw new HttpError(409, '无法读取本地仓库默认分支，拒绝走未受控合并');
+    }
+    const local = await enqueueLocalMerge(deps, buildId, listing.defaultBranch);
+    if (local.enqueued) return { delegated: true };
+    const blocking = local.readiness?.blockers ?? [];
+    if (blocking.length > 0) {
+      throw new HttpError(
+        409,
+        `本地合并未通过关口判定，无法落地：${blocking.map((b) => b.label).join('；')}`,
+      );
+    }
+    throw new HttpError(409, '本地合并未通过关口判定，无法落地');
+  }
   enqueueStep(deps, buildId, 'merge', todoRow.teamId);
   return { delegated: true };
 }

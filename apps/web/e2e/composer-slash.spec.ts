@@ -233,7 +233,7 @@ test('Tab completes without running; Enter without highlight sends (F1)', async 
   // Plain Enter with no highlight keeps the send semantics.
   await input.fill('hello');
   await input.press('Enter');
-  expect(sent).toHaveLength(1);
+  await expect.poll(() => sent.length).toBe(1);
 });
 
 test('mid-prompt accept inserts literal text, never runs (F5)', async ({ page }) => {

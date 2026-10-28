@@ -1,4 +1,9 @@
-import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@cairn/shared';
+import {
+  conversationBranch,
+  DEFAULT_AUTONOMY_SETTINGS,
+  MERGE_ANNOUNCEMENT,
+  type Phase,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
@@ -165,6 +170,7 @@ interface WorldOpts {
   tools?: string[];
   source?: { kind: 'github-issue' | 'github-issue-self' | 'orchestration'; ref: string } | null;
   pendingVerify?: boolean;
+  mergePolicy?: 'human' | 'shadow' | 'autonomous';
   pull?: Partial<PullFake>;
 }
 
@@ -208,6 +214,9 @@ function makeWorld(opts: WorldOpts = {}): World {
       teamId: s.team.id,
       repoKind,
       githubRepo: repoKind === 'github' ? (opts.githubRepo ?? 'octo/demo') : null,
+      ...(opts.mergePolicy === undefined
+        ? {}
+        : { autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: opts.mergePolicy } }),
     })
     .run();
   s.db
@@ -1128,8 +1137,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(w.fake.requests).toEqual([]);
   });
 
-  test('[2b-D23] local repository → the merge step as before; its done finishes the card', async () => {
-    const w = makeWorld({ repoKind: 'local', prNumber: null });
+  test('[2b-D23] local repository under human → the merge step as before; its done finishes the card', async () => {
+    const w = makeWorld({ repoKind: 'local', prNumber: null, mergePolicy: 'human' });
     expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
     expect(w.fake.requests).toEqual([]);
     const mergeStep = w.s.db
@@ -1142,6 +1151,14 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     completeStep(w.deps, mergeStep?.id as string);
     expect(w.phase()).toBe('done');
     expect(w.systemRows()).toEqual([DONE_ROW]);
+  });
+
+  test('[2b-D23b] local repository under autonomous without a stored path → refused, no ungated merge', async () => {
+    const w = makeWorld({ repoKind: 'local', prNumber: null });
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.status).toBe(409);
+    expect(w.fake.requests).toEqual([]);
+    expect(w.steps().filter((r) => r.kind === 'merge')).toEqual([]);
   });
 
   test('[2b-D24] GitHub form without a recorded PR → the merge step as before; its done finishes the card', async () => {

@@ -256,7 +256,7 @@
     "Recurrences": 0
   },
   "cross-package-tests-skipped": {
-    "Intercepts": 2,
+    "Intercepts": 3,
     "Recurrences": 1
   },
   "detached-new-branch-ref": {
@@ -283,6 +283,10 @@
     "Intercepts": 0,
     "Recurrences": 0
   },
+  "e2e-non-retrying-count-assertion": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "e2e-url-before-render": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -305,6 +309,10 @@
   },
   "evidence-branch-audit-option": {
     "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "evidence-command-failure": {
+    "Intercepts": 1,
     "Recurrences": 0
   },
   "evidence-docs-committed-on-a-lane-spelled-out-the-lane": {
@@ -471,6 +479,18 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "local-index-observation": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "local-patch-whitespace": {
+    "Intercepts": 1,
+    "Recurrences": 1
+  },
+  "local-ref-transaction": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "lockfile-regex-multiline": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -600,6 +620,10 @@
     "Recurrences": 0
   },
   "playwright-filter-full-title": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "pnpm-test-filter": {
     "Intercepts": 1,
     "Recurrences": 0
   },
