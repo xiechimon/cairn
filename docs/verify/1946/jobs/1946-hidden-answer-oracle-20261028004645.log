@@ -1,0 +1,25 @@
+  1/1 Mean: 1.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:00:57 0:00:00
+adhoc • oracle
+┏━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━┓
+┃ Trials ┃ Exceptions ┃  Mean ┃
+┡━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━┩
+│      1 │          0 │ 1.000 │
+└────────┴────────────┴───────┘
+
+┏━━━━━━━━┳━━━━━━━┓
+┃ Reward ┃ Count ┃
+┡━━━━━━━━╇━━━━━━━┩
+│ 1.0    │     1 │
+└────────┴───────┘
+
+Job Info
+Total runtime: 57s
+Results written to 
+/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hidden-answer-oracle-20261
+028004645/result.json
+Inspect results by running `harbor view 
+/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs`
+Share results by running `harbor upload 
+/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hidden-answer-oracle-20261
+028004645`
+

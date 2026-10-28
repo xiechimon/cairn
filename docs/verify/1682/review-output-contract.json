@@ -1,0 +1,10 @@
+{
+  "sourceCommit": "9ffc42703628c94b937bf80790cb401d7f1d8ef4",
+  "incompleteFirstAttempt": true,
+  "observedRouterFailure": "review finished without a VERDICT line; trying the next model",
+  "requiredPattern": "^[\\s*`>#_-]*VERDICT:\\s*(pass|block)",
+  "rejectedPrefix": "SOURCE_VERDICT: pass",
+  "acceptedParserControl": "VERDICT: pass",
+  "sourceAcceptanceEstablished": false,
+  "correctedReview": "running, no verdict yet"
+}

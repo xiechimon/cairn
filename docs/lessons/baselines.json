@@ -327,12 +327,20 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "eval-context-declaration": {
+    "Intercepts": 4,
+    "Recurrences": 1
+  },
   "evidence-branch-audit-option": {
     "Intercepts": 0,
     "Recurrences": 0
   },
   "evidence-docs-committed-on-a-lane-spelled-out-the-lane": {
     "Intercepts": 0,
+    "Recurrences": 0
+  },
+  "evidence-log-whitespace": {
+    "Intercepts": 1,
     "Recurrences": 0
   },
   "evidence-shot-mid-animation": {
@@ -428,6 +436,10 @@
     "Recurrences": 0
   },
   "guard-tests-were-masked-by-another-mechanism-the-export-write": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "harbor-artifact-paths": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -552,6 +564,10 @@
     "Recurrences": 0
   },
   "native-diagnostic-loader": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "nested-node-test-context": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -723,6 +739,10 @@
     "Intercepts": 2,
     "Recurrences": 0
   },
+  "review-verdict-prefix": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "runtime-prefix-hides-violations": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -815,11 +835,19 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "tampering-control": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "target-read-audit": {
     "Intercepts": 2,
     "Recurrences": 0
   },
   "task-exit-read-as-helper-failure": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "test-fixture-types": {
     "Intercepts": 1,
     "Recurrences": 0
   },
@@ -924,6 +952,10 @@
     "Recurrences": 0
   },
   "use-optional-chain": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "verifier-container-evidence": {
     "Intercepts": 1,
     "Recurrences": 0
   },

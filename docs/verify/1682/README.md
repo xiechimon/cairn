@@ -142,3 +142,9 @@ The `delivery-*` screenshots and recording capture this synchronized source in c
 ## Project-file final-style measurement
 
 The evidence push at `dad57ef57a831d1fab8760bfb2385e0d226191aa` passed 1387 browser cases and failed a project-file shadow check (`delivery-evidence-prepush-red.log`). It read spread radius `0.837381px` while expecting the final `1px` ring. The assertion now uses Playwright's polling `toHaveCSS` for the identical required substring. No product style or expected final value changed. Three repetitions of the complete light/dark project-page file passed all eighteen cases (`project-ring-green.log`); lint, typecheck, and spec parsing passed (`project-ring-required-green.log`). A complete prepush run for this test correction remains pending. The compiled-demo captures above retain their exact source scope.
+
+## Current-main alignment
+
+Source `43475a6f0c73f7c36dd85b491ca44d79c771ba0c` passed all 1388 browser cases and 29 prepush checks (`project-ring-prepush-green.log`). Main `7e845c899f521a1f8c4d8fae6eaae0d45c882cb7` then merged without conflicts. No incoming change touched web source, shared client dependencies, or the marketing site. `main-source-equivalence.json` records unchanged hashes for all 39 files bound by the compiled-demo capture manifest. The only test correction after reviewed source `9ffc4270` is the final-style polling above.
+
+The first independent attempt completed no accepted review. A completed route was rejected because its requested `SOURCE_VERDICT` prefix did not satisfy the installed router's standalone `VERDICT` contract. `review-output-contract.json` records that boundary and its parser checks. A corrected independent request reviews the same unchanged product source and preserves its report separately. Its verdict remains pending. No project or public domain has been deployed by this delivery yet.
