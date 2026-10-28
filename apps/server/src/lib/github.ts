@@ -826,11 +826,18 @@ async function intakeGet(
   url: string,
   token: string,
   etag: string | null | undefined,
+  init?: { method?: 'POST'; body?: string },
 ): Promise<{ status: number; etag: string | null; link: string | null; data: unknown } | null> {
   let res: Awaited<ReturnType<FetchLike>>;
   try {
     res = await fetchImpl(url, {
-      headers: { ...authHeaders(token), ...(etag != null ? { 'if-none-match': etag } : {}) },
+      ...(init?.method !== undefined ? { method: init.method } : {}),
+      headers: {
+        ...authHeaders(token),
+        ...(etag != null ? { 'if-none-match': etag } : {}),
+        ...(init?.body !== undefined ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(init?.body !== undefined ? { body: init.body } : {}),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch {
@@ -977,6 +984,148 @@ export async function githubIssueEvents(
       full: got.data.body.length >= INTAKE_PER_PAGE,
     },
   };
+}
+
+export interface GithubLinkedPull {
+  number: number;
+  repo: string;
+  state: 'open' | 'closed';
+  merged: boolean;
+}
+
+export interface GithubLinkedPullsRead {
+  pulls: GithubLinkedPull[];
+  complete: boolean;
+}
+
+export const GITHUB_ISSUE_TIMELINE_MAX_PAGES = 5;
+
+export async function githubIssueTimeline(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  opts: { maxPages?: number } = {},
+): Promise<GithubLinkedPullsRead | null> {
+  const maxPages = opts.maxPages ?? GITHUB_ISSUE_TIMELINE_MAX_PAGES;
+  let url =
+    `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}/timeline` +
+    `?per_page=${INTAKE_PER_PAGE}`;
+  const pulls: GithubLinkedPull[] = [];
+  for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
+    const got = await intakeGet(fetchImpl, url, token, null);
+    if (got === null || got.status < 200 || got.status >= 300) return null;
+    if (!Array.isArray(got.data)) return null;
+    for (const raw of got.data) {
+      if (typeof raw !== 'object' || raw === null) return null;
+      const entry = raw as Record<string, unknown>;
+      const event = entry.event;
+      if (event !== 'cross-referenced' && event !== 'connected') continue;
+      const source = entry.source;
+      if (typeof source !== 'object' || source === null || !('issue' in source)) {
+        if (event === 'cross-referenced') return null;
+        continue;
+      }
+      const issueRaw = (source as { issue?: unknown }).issue;
+      if (typeof issueRaw !== 'object' || issueRaw === null) return null;
+      const issue = issueRaw as Record<string, unknown>;
+      const pr = issue.pull_request;
+      if (pr === undefined || pr === null) continue;
+      if (typeof pr !== 'object') return null;
+      const number = issue.number;
+      const state = issue.state;
+      const fullName = (issue.repository as { full_name?: unknown } | undefined)?.full_name;
+      const mergedAt = (pr as { merged_at?: unknown }).merged_at;
+      if (typeof number !== 'number' || (state !== 'open' && state !== 'closed')) return null;
+      if (typeof fullName !== 'string' || fullName === '') return null;
+      pulls.push({
+        number,
+        repo: fullName,
+        state,
+        merged: typeof mergedAt === 'string' && mergedAt !== '',
+      });
+    }
+    const hasRelNext = (got.link ?? '').includes('rel="next"');
+    if (!hasRelNext) return { pulls, complete: true };
+    const next = nextPageUrl(got.link);
+    if (next === null) return { pulls, complete: false };
+    if (pageNo === maxPages) return { pulls, complete: false };
+    url = next;
+  }
+  return { pulls, complete: false };
+}
+
+const ISSUE_CLOSING_PULLS_QUERY =
+  'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){' +
+  'issue(number:$number){closedByPullRequestsReferences(first:100,includeClosedPrs:true){' +
+  'pageInfo{hasNextPage}nodes{number state merged repository{nameWithOwner}}}}}}';
+
+export async function githubIssueClosingPulls(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+): Promise<GithubLinkedPullsRead | null> {
+  const url = 'https://api.github.com/graphql';
+  const got = await intakeGet(fetchImpl, url, token, null, {
+    method: 'POST',
+    body: JSON.stringify({
+      query: ISSUE_CLOSING_PULLS_QUERY,
+      variables: { owner, name: repo, number: issueNumber },
+    }),
+  });
+  if (got === null || got.status < 200 || got.status >= 300) return null;
+  if (typeof got.data !== 'object' || got.data === null) return null;
+  const root = got.data as { data?: unknown; errors?: unknown };
+  if (
+    Array.isArray(root.errors) &&
+    root.errors.some(
+      (entry) =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        (entry as { type?: unknown }).type === 'RATE_LIMITED',
+    )
+  ) {
+    throw new GithubRateLimitedError(url, got.status, null, null);
+  }
+  if (root.errors !== undefined) return null;
+  const repository = (root.data as { repository?: unknown } | null | undefined)?.repository;
+  if (typeof repository !== 'object' || repository === null) return null;
+  const issue = (repository as { issue?: unknown }).issue;
+  if (typeof issue !== 'object' || issue === null) return null;
+  const conn = (issue as { closedByPullRequestsReferences?: unknown })
+    .closedByPullRequestsReferences;
+  if (typeof conn !== 'object' || conn === null) return null;
+  const pageInfo = (conn as { pageInfo?: unknown; nodes?: unknown }).pageInfo;
+  const nodes = (conn as { nodes?: unknown }).nodes;
+  if (typeof pageInfo !== 'object' || pageInfo === null || !Array.isArray(nodes)) return null;
+  const hasNext = (pageInfo as { hasNextPage?: unknown }).hasNextPage;
+  if (typeof hasNext !== 'boolean') return null;
+  const pulls: GithubLinkedPull[] = [];
+  for (const node of nodes) {
+    if (node === null) continue;
+    if (typeof node !== 'object') return null;
+    const row = node as Record<string, unknown>;
+    let normalized: { state: 'open' | 'closed'; merged: boolean } | null = null;
+    if (row.state === 'OPEN') normalized = { state: 'open', merged: false };
+    else if (row.state === 'MERGED') normalized = { state: 'closed', merged: true };
+    else if (row.state === 'CLOSED' && typeof row.merged === 'boolean') {
+      normalized = { state: 'closed', merged: row.merged };
+    }
+    const nameWithOwner = (row.repository as { nameWithOwner?: unknown } | undefined)
+      ?.nameWithOwner;
+    if (normalized === null || typeof row.number !== 'number') return null;
+    if (typeof nameWithOwner !== 'string' || nameWithOwner === '') return null;
+    pulls.push({
+      number: row.number,
+      repo: nameWithOwner,
+      state: normalized.state,
+      merged: normalized.merged,
+    });
+  }
+  return { pulls, complete: !hasNext };
 }
 
 export interface GithubRepoPermission {
