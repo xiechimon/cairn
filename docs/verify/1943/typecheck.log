@@ -2,8 +2,8 @@ $ pnpm -r typecheck
 packages/shared typecheck$ tsc --noEmit
 packages/shared typecheck: Done
 apps/web typecheck$ tsc --noEmit
-apps/daemon typecheck$ tsc --noEmit
 apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
 apps/web typecheck: Done
 apps/daemon typecheck: Done
 apps/server typecheck: Done

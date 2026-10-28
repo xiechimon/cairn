@@ -25,9 +25,33 @@ const CUT_RULES = [
 
 export const CUT_CONVENTIONS = [CHIEF_CONVENTIONS_HEADER, ...CUT_RULES].join('\n');
 
-export function promptSetIdentity(set: PromptSet): string {
-  const body = set === 'cut' ? CUT_CONVENTIONS : `prompt-set:${set}`;
-  return createHash('sha256').update(body).digest('hex');
+const UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
+
+export function canonicalizePromptForIdentity(effectivePrompt: string): string {
+  return effectivePrompt
+    .replace(UUID_RE, '<id>')
+    .replace(/cairn-eval-(?:chief|skills)-[A-Za-z0-9_-]+/g, 'cairn-eval-<scratch>')
+    .replace(/("id"\s*:\s*")[^"]+"/g, '$1<id>"')
+    .replace(/（id: [^）]+）/g, '（id: <id>）')
+    .replace(/\(id: [^)]+\)/g, '(id: <id>)')
+    .replace(/workspaces\/chief-[A-Za-z0-9_-]+/g, 'workspaces/chief-<id>')
+    .replace(/\/(?:private\/)?(?:tmp|var\/folders)\/[^\s"'<>]+/g, '<tmpdir>');
+}
+
+export function promptSetIdentity(effectivePrompt: string): string {
+  return createHash('sha256').update(canonicalizePromptForIdentity(effectivePrompt)).digest('hex');
+}
+
+export function cairnRuntimePromptFromRelay(systemText: string): string {
+  const start = systemText.indexOf('你是「总管」');
+  if (start === -1) return systemText;
+  const end = systemText.indexOf('<!-- END CAIRN-RUNTIME -->', start);
+  if (end === -1) return systemText.slice(start);
+  return systemText.slice(start, end).replace(/\s+$/u, '');
+}
+
+export function flowDigest(casesFileBytes: string): string {
+  return createHash('sha256').update(casesFileBytes).digest('hex');
 }
 
 export function applyPromptSet(systemPrompt: string, set: PromptSet): string {
@@ -52,6 +76,16 @@ export function rewriteClaimResponseBody(body: string, set: PromptSet): string {
   return JSON.stringify(parsed);
 }
 
+export function chiefSystemPromptFromClaimBody(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as { step?: { chief?: { systemPrompt?: string } } | null };
+    const prompt = parsed?.step?.chief?.systemPrompt;
+    return typeof prompt === 'string' ? prompt : null;
+  } catch {
+    return null;
+  }
+}
+
 export type EvalProvenance = {
   prompt_set: PromptSet;
   prompt_set_identity: string;
@@ -59,23 +93,65 @@ export type EvalProvenance = {
   model: string;
   thinking: string | null;
   timeout_s: number;
+  arm: string;
+  context_window: number | null;
+  flow_digest: string;
 };
 
 export function buildEvalProvenance(input: {
   promptSet: PromptSet;
+  promptSetIdentity: string;
   harnessSha: string;
   model: string;
   thinking: string | null;
   timeoutS: number;
+  arm: string;
+  contextWindow: number | null;
+  flowDigest: string;
 }): EvalProvenance {
   return {
     prompt_set: input.promptSet,
-    prompt_set_identity: promptSetIdentity(input.promptSet),
+    prompt_set_identity: input.promptSetIdentity,
     harness_sha: input.harnessSha,
     model: input.model,
     thinking: input.thinking,
     timeout_s: input.timeoutS,
+    arm: input.arm,
+    context_window: input.contextWindow,
+    flow_digest: input.flowDigest,
   };
+}
+
+function provenanceComplete(p: Partial<EvalProvenance> | null | undefined): p is EvalProvenance {
+  return (
+    p != null &&
+    typeof p.prompt_set === 'string' &&
+    typeof p.prompt_set_identity === 'string' &&
+    p.prompt_set_identity !== '' &&
+    typeof p.harness_sha === 'string' &&
+    typeof p.model === 'string' &&
+    'thinking' in p &&
+    typeof p.timeout_s === 'number' &&
+    typeof p.arm === 'string' &&
+    'context_window' in p &&
+    (p.context_window === null || typeof p.context_window === 'number') &&
+    typeof p.flow_digest === 'string' &&
+    p.flow_digest !== ''
+  );
+}
+
+function sameProvenance(left: EvalProvenance, right: EvalProvenance): boolean {
+  return (
+    left.prompt_set === right.prompt_set &&
+    left.prompt_set_identity === right.prompt_set_identity &&
+    left.harness_sha === right.harness_sha &&
+    left.model === right.model &&
+    (left.thinking ?? null) === (right.thinking ?? null) &&
+    left.timeout_s === right.timeout_s &&
+    left.arm === right.arm &&
+    left.context_window === right.context_window &&
+    left.flow_digest === right.flow_digest
+  );
 }
 
 export function resumeCompatibilityError(
@@ -84,36 +160,45 @@ export function resumeCompatibilityError(
 ): string | null {
   if (rows.length === 0) return null;
   for (const row of rows) {
-    const p = row.provenance;
-    if (
-      p == null ||
-      typeof p.prompt_set !== 'string' ||
-      typeof p.prompt_set_identity !== 'string' ||
-      typeof p.harness_sha !== 'string' ||
-      typeof p.model !== 'string' ||
-      !('thinking' in p) ||
-      typeof p.timeout_s !== 'number'
-    ) {
+    if (!provenanceComplete(row.provenance)) {
       return (
         'incompatible results.jsonl: rows lack provenance required for safe resume; ' +
         'use a fresh --variant directory'
       );
     }
-    if (
-      p.prompt_set !== expected.prompt_set ||
-      p.prompt_set_identity !== expected.prompt_set_identity ||
-      p.harness_sha !== expected.harness_sha ||
-      p.model !== expected.model ||
-      (p.thinking ?? null) !== expected.thinking ||
-      p.timeout_s !== expected.timeout_s
-    ) {
+  }
+  const first = rows[0]?.provenance;
+  if (!provenanceComplete(first)) {
+    return (
+      'incompatible results.jsonl: rows lack provenance required for safe resume; ' +
+      'use a fresh --variant directory'
+    );
+  }
+  for (const row of rows) {
+    const p = row.provenance;
+    if (!provenanceComplete(p) || !sameProvenance(p, first)) {
       return (
-        `incompatible results.jsonl provenance (have prompt_set=${p.prompt_set} ` +
-        `harness=${p.harness_sha.slice(0, 12)} model=${p.model}; want prompt_set=${expected.prompt_set} ` +
-        `harness=${expected.harness_sha.slice(0, 12)} model=${expected.model}); ` +
+        'incompatible results.jsonl provenance (mixed or incomplete rows); ' +
         'use a fresh --variant directory'
       );
     }
+  }
+  const comparable: EvalProvenance = {
+    ...expected,
+    prompt_set_identity:
+      expected.prompt_set_identity !== ''
+        ? expected.prompt_set_identity
+        : first.prompt_set_identity,
+  };
+  if (!sameProvenance(first, comparable)) {
+    return (
+      `incompatible results.jsonl provenance (have prompt_set=${first.prompt_set} arm=${first.arm} ` +
+      `window=${String(first.context_window)} flow=${first.flow_digest.slice(0, 12)} ` +
+      `harness=${first.harness_sha.slice(0, 12)} model=${first.model}; want prompt_set=${comparable.prompt_set} ` +
+      `arm=${comparable.arm} window=${String(comparable.context_window)} flow=${comparable.flow_digest.slice(0, 12)} ` +
+      `harness=${comparable.harness_sha.slice(0, 12)} model=${comparable.model}); ` +
+      'use a fresh --variant directory'
+    );
   }
   return null;
 }

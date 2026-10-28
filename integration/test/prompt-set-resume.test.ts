@@ -20,6 +20,7 @@ import { TeamStreamHub } from '../../apps/server/src/services/events.js';
 import {
   applyPromptSet,
   CHIEF_CONVENTIONS_HEADER,
+  cairnRuntimePromptFromRelay,
   type PromptSet,
   promptSetIdentity,
 } from '../eval/chief-dispatch/prompt-set.mts';
@@ -141,14 +142,20 @@ function provenance(partial: {
   model?: string;
   thinking?: string | null;
   timeout_s?: number;
+  arm?: string;
+  context_window?: number | null;
+  flow_digest?: string;
 }) {
   return {
     prompt_set: partial.prompt_set,
-    prompt_set_identity: partial.prompt_set_identity ?? promptSetIdentity(partial.prompt_set),
+    prompt_set_identity: partial.prompt_set_identity ?? `test-identity-${partial.prompt_set}`,
     harness_sha: partial.harness_sha,
     model: partial.model ?? 'glm-5.3',
     thinking: partial.thinking === undefined ? null : partial.thinking,
     timeout_s: partial.timeout_s ?? 30,
+    arm: partial.arm ?? 'all',
+    context_window: partial.context_window === undefined ? null : partial.context_window,
+    flow_digest: partial.flow_digest ?? 'test-flow-digest',
   };
 }
 
@@ -450,7 +457,25 @@ describe('prompt-set resume provenance', () => {
       expect(cutPrompt.length).toBeLessThan(currentPrompt.length);
       expect(cutPrompt).not.toContain('ADR 0026');
       expect(cutPrompt).toContain('交付物优先于路径');
-      expect(promptSetIdentity('cut')).not.toBe(promptSetIdentity('current'));
+      expect(promptSetIdentity(prod)).not.toBe(promptSetIdentity(applyPromptSet(prod, 'cut')));
+      expect(promptSetIdentity(prod)).not.toBe(promptSetIdentity('prompt-set:current'));
+      const currentRows = readFileSync(join(home, 'v1/results.jsonl'), 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as { provenance?: { prompt_set_identity?: string } });
+      expect(currentRows[0]?.provenance?.prompt_set_identity).toBe(
+        promptSetIdentity(cairnRuntimePromptFromRelay(currentPrompt)),
+      );
+      const cutRows = readFileSync(join(home, 'v2/results.jsonl'), 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as { provenance?: { prompt_set_identity?: string } });
+      expect(cutRows[0]?.provenance?.prompt_set_identity).toBe(
+        promptSetIdentity(cairnRuntimePromptFromRelay(cutPrompt)),
+      );
+      expect(cutRows[0]?.provenance?.prompt_set_identity).not.toBe(
+        currentRows[0]?.provenance?.prompt_set_identity,
+      );
     } finally {
       await relay.close();
       rmSync(home, { recursive: true, force: true });
@@ -478,11 +503,90 @@ describe('prompt-set resume provenance', () => {
         .map(
           (line) =>
             JSON.parse(line) as {
-              provenance?: { prompt_set?: string; prompt_set_identity?: string };
+              provenance?: {
+                prompt_set?: string;
+                prompt_set_identity?: string;
+                arm?: string;
+              };
             },
         );
       expect(rows[0]?.provenance?.prompt_set).toBe('cut');
-      expect(rows[0]?.provenance?.prompt_set_identity).toBe(promptSetIdentity('cut'));
+      expect(rows[0]?.provenance?.arm).toBe('no-memory');
+      const sent = texts.find((text) => text.includes('交付物优先于路径'));
+      expect(sent).toBeTruthy();
+      expect(rows[0]?.provenance?.prompt_set_identity).toBe(
+        promptSetIdentity(cairnRuntimePromptFromRelay(sent ?? '')),
+      );
+    } finally {
+      await relay.close();
+      rmSync(home, { recursive: true, force: true });
+    }
+  }, 240_000);
+
+  test('changing --arm rejects resume before relay requests', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-arm-'));
+    const relay = await startRecordingRelay();
+    try {
+      writeFlow(home, [LEARN_CASE]);
+      const seed = await runEval(
+        home,
+        ['--approve-harness', '--prompt-set', 'current', '--arm', 'no-memory'],
+        relay,
+      );
+      expect(seed.code, seed.output).toBe(0);
+      const afterSeed = relay.requests.length;
+      const result = await runEval(home, ['--prompt-set', 'current', '--arm', 'oracle'], relay);
+      expect(result.code, result.output).toBe(2);
+      expect(relay.requests.length).toBe(afterSeed);
+      expect(result.output).toMatch(/incompatible results\.jsonl provenance/);
+      expect(result.output).toMatch(/fresh --variant/);
+    } finally {
+      await relay.close();
+      rmSync(home, { recursive: true, force: true });
+    }
+  }, 240_000);
+
+  test('changing --context-window rejects resume before relay requests', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-window-'));
+    const relay = await startRecordingRelay();
+    try {
+      writeFlow(home, [HOLD_CASE]);
+      const seed = await runEval(
+        home,
+        ['--approve-harness', '--prompt-set', 'current', '--context-window', '128000'],
+        relay,
+      );
+      expect(seed.code, seed.output).toBe(0);
+      const afterSeed = relay.requests.length;
+      const result = await runEval(
+        home,
+        ['--prompt-set', 'current', '--context-window', '256000'],
+        relay,
+      );
+      expect(result.code, result.output).toBe(2);
+      expect(relay.requests.length).toBe(afterSeed);
+      expect(result.output).toMatch(/incompatible results\.jsonl provenance/);
+    } finally {
+      await relay.close();
+      rmSync(home, { recursive: true, force: true });
+    }
+  }, 240_000);
+
+  test('editing flow cases or roster rejects resume before relay requests', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-flow-'));
+    const relay = await startRecordingRelay();
+    try {
+      writeFlow(home, [HOLD_CASE]);
+      const seed = await runEval(home, ['--approve-harness', '--prompt-set', 'current'], relay);
+      expect(seed.code, seed.output).toBe(0);
+      const afterSeed = relay.requests.length;
+      writeFlow(home, [{ ...HOLD_CASE, prompt: '改过的请求，仍是 hold。' }], {
+        ...JSON.parse(readFileSync(join(home, '_state.json'), 'utf8')),
+      });
+      const result = await runEval(home, ['--prompt-set', 'current'], relay);
+      expect(result.code, result.output).toBe(2);
+      expect(relay.requests.length).toBe(afterSeed);
+      expect(result.output).toMatch(/incompatible results\.jsonl provenance/);
     } finally {
       await relay.close();
       rmSync(home, { recursive: true, force: true });

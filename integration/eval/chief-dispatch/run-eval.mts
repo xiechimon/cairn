@@ -39,8 +39,10 @@ import {
 import { retryHarnessInfra } from './infra-retry.mts';
 import {
   buildEvalProvenance,
+  flowDigest,
   PROMPT_SETS,
   type PromptSet,
+  promptSetIdentity,
   resumeCompatibilityError,
 } from './prompt-set.mts';
 import {
@@ -119,6 +121,7 @@ async function runCase(
   agentIds: Record<string, string>;
   projectIds: Record<string, string>;
   memoryAfter: MemoryRowLite[];
+  chiefSystemPrompt: string | null;
   grade?: { grade: Record<string, number>; explanation: Record<string, string> };
 }> {
   if (isLearnCase(input)) {
@@ -141,6 +144,7 @@ async function runCase(
       agentIds: learned.agentIds,
       projectIds: {},
       memoryAfter: [],
+      chiefSystemPrompt: learned.chiefSystemPrompt,
       grade: learned.grade,
     };
   }
@@ -176,6 +180,7 @@ async function runCase(
       agentIds: world.agentIds,
       projectIds,
       memoryAfter: readMemoryRows(stack.server, world.chiefAgentId),
+      chiefSystemPrompt: stack.lastChiefSystemPrompt(),
       grade: undefined,
     };
   } finally {
@@ -453,12 +458,17 @@ async function main() {
   const ctx = { ...ARGS, state: st };
 
   let cases = await loadCases();
+  const casesFile = readFileSync(join(ARGS.flow, 'cases.json'), 'utf8');
   const runProvenance = buildEvalProvenance({
     promptSet: ARGS.promptSet,
+    promptSetIdentity: '',
     harnessSha: typeof st.harness_sha === 'string' ? st.harness_sha : '',
     model: CHIEF_MODEL,
     thinking: thinkingSetting(),
     timeoutS: ARGS.timeoutS,
+    arm: ARGS.arm,
+    contextWindow: ARGS.contextWindow ?? null,
+    flowDigest: flowDigest(casesFile),
   });
 
   const resultsPath = join(vdir, 'results.jsonl');
@@ -636,7 +646,10 @@ async function main() {
                   ...(isLearnCase(c) ? { arm: ARGS.arm } : {}),
                 }
               : undefined,
-          provenance: runProvenance,
+          provenance: {
+            ...runProvenance,
+            prompt_set_identity: promptSetIdentity(run.chiefSystemPrompt ?? ''),
+          },
           model: run.model,
           usage: run.usage,
           stop_reason: run.stop_reason,

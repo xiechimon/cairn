@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /workspace/integration
+
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  17:52:58
+   Duration  50.56s (tests 98%, transform 1%, import 1%)
+

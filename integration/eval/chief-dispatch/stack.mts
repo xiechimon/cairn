@@ -31,7 +31,12 @@ import {
   type RealServer,
   waitFor,
 } from '../../../integration/test/helpers.js';
-import { type PromptSet, rewriteClaimResponseBody } from './prompt-set.mts';
+import {
+  cairnRuntimePromptFromRelay,
+  chiefSystemPromptFromClaimBody,
+  type PromptSet,
+  rewriteClaimResponseBody,
+} from './prompt-set.mts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -98,6 +103,7 @@ export interface Stack {
   logLines: () => string[];
   park: () => void;
   unpark: () => void;
+  lastChiefSystemPrompt: () => string | null;
   close: () => Promise<void>;
 }
 
@@ -135,7 +141,33 @@ export async function bootStack(opts: { promptSet?: PromptSet } = {}): Promise<S
   const skillsDir = mkdtempSync(join(tmpdir(), 'cairn-eval-skills-'));
   const mcpConfigPath = join(tmpdir(), `cairn-eval-mcp-${randomUUID()}.json`);
   let claimsParked = false;
+  let lastChiefSystemPrompt: string | null = null;
   const parkedClaimReleases: Array<() => void> = [];
+  const captureRelaySystemPrompt = (init?: RequestInit) => {
+    if (typeof init?.body !== 'string') return;
+    try {
+      const parsed = JSON.parse(init.body) as {
+        messages?: { role?: string; content?: unknown }[];
+      };
+      for (const message of parsed.messages ?? []) {
+        if (message.role !== 'system') continue;
+        let text = '';
+        if (typeof message.content === 'string') text = message.content;
+        else if (Array.isArray(message.content)) {
+          text = message.content
+            .map((part) =>
+              typeof part === 'object' && part && 'text' in part
+                ? String((part as { text: string }).text)
+                : '',
+            )
+            .join('');
+        }
+        if (text === '') continue;
+        lastChiefSystemPrompt = cairnRuntimePromptFromRelay(text);
+        return;
+      }
+    } catch {}
+  };
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     if (claimsParked && init?.method === 'POST' && url.endsWith('/api/machine/tasks/claim')) {
@@ -158,15 +190,16 @@ export async function bootStack(opts: { promptSet?: PromptSet } = {}): Promise<S
         headers: { 'content-type': 'application/json' },
       });
     }
+    if (init?.method === 'POST' && url.includes('/chat/completions')) {
+      captureRelaySystemPrompt(init);
+    }
     const res = await fetch(input, init);
-    if (
-      promptSet !== 'current' &&
-      init?.method === 'POST' &&
-      url.endsWith('/api/machine/tasks/claim') &&
-      res.status === 200
-    ) {
+    if (init?.method === 'POST' && url.endsWith('/api/machine/tasks/claim') && res.status === 200) {
       const body = await res.text();
-      return new Response(rewriteClaimResponseBody(body, promptSet), {
+      const rewritten = rewriteClaimResponseBody(body, promptSet);
+      const fromClaim = chiefSystemPromptFromClaimBody(rewritten);
+      if (fromClaim !== null) lastChiefSystemPrompt = fromClaim;
+      return new Response(rewritten, {
         status: res.status,
         headers: { 'content-type': 'application/json' },
       });
@@ -212,6 +245,7 @@ export async function bootStack(opts: { promptSet?: PromptSet } = {}): Promise<S
       const waiting = parkedClaimReleases.splice(0);
       for (const release of waiting) release();
     },
+    lastChiefSystemPrompt: () => lastChiefSystemPrompt,
     close: async () => {
       const raceWith = async (p: unknown, ms: number): Promise<boolean> => {
         let settled = false;

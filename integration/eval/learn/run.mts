@@ -39,6 +39,7 @@ export interface LearnRun {
   evidence: TurnEvidence;
   truncated: boolean;
   agentIds: Record<string, string>;
+  chiefSystemPrompt: string | null;
   grade: { grade: Record<string, number>; explanation: Record<string, string> };
 }
 
@@ -146,9 +147,13 @@ export async function runLearnCase(
   let wallMs = 0;
   let headline: TurnEvidence | null = null;
   let agentIds: Record<string, string> = {};
+  let chiefSystemPrompt: string | null = null;
   const absorb = (evidence: TurnEvidence) => {
     usage = plusUsage(usage, evidence.usage);
     wallMs += evidence.wallMs;
+  };
+  const notePrompt = (stack: Stack) => {
+    chiefSystemPrompt = stack.lastChiefSystemPrompt() ?? chiefSystemPrompt;
   };
 
   const noMemory =
@@ -159,6 +164,7 @@ export async function runLearnCase(
           deadTurn(evidence);
           absorb(evidence);
           headline = evidence;
+          notePrompt(stack);
           return gradeLearnDecision(input, evidence);
         })
       : undefined;
@@ -172,6 +178,7 @@ export async function runLearnCase(
           deadTurn(evidence);
           absorb(evidence);
           headline = evidence;
+          notePrompt(stack);
           return gradeLearnDecision(input, evidence);
         })
       : undefined;
@@ -189,6 +196,7 @@ export async function runLearnCase(
       absorb(first);
       round1 = first;
       headline = first;
+      notePrompt(stack);
       if (opts.arm === 'reflect') return;
       const follow = await driveFollowUp(stack, first.threadId, input.correction, { timeoutMs });
       deadTurn(follow);
@@ -202,6 +210,7 @@ export async function runLearnCase(
       deadTurn(second);
       absorb(second);
       headline = second;
+      notePrompt(stack);
       correctionDecision = gradeLearnDecision(input, second);
     });
   }
@@ -235,6 +244,7 @@ export async function runLearnCase(
     evidence: scored,
     truncated,
     agentIds,
+    chiefSystemPrompt,
     grade: graded,
   };
 }
