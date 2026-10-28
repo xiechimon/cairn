@@ -1,0 +1,25 @@
+{
+  "checkoutHead": "80d1e90f4c00f8fdae7e1d40a4120cbaaffcf349",
+  "sourceHasUncommittedChanges": false,
+  "runtimeSourceFiles": {
+    "apps/daemon/src/git.ts": "03868263319e1a9b1f65943c2af7ddedf2c44c8c9ccac69c720ce70c8b1b2d87",
+    "apps/daemon/src/workspace.ts": "8c31d3c632fbbee5ebfb2a8a4ce038e89121247a4f1d170fe00e01f84d067f0c"
+  },
+  "observationScriptSha256": "fdcc73955cc7d897b18c5125c630b92d8cbd4f4c018ff7eaa8a9f39bd42efaca",
+  "providerMode": "not exercised; real local Git repositories with synthetic identities",
+  "local": "f1f2991bff67f4731a9dde21173b2b0df1c2ba93",
+  "actualTip": "a93da0b81e965808741a1930b271771aa2a3df8a",
+  "notices": [
+    {
+      "local": "f1f2991bff67f4731a9dde21173b2b0df1c2ba93",
+      "remote": "a93da0b81e965808741a1930b271771aa2a3df8a"
+    }
+  ],
+  "fetchHeadBefore": "preexisting observation sentinel\n",
+  "fetchHeadAfter": "preexisting observation sentinel\n",
+  "trackingRefsBefore": "refs/remotes/origin/main 57a04b7372329823779abf8a22cb946c5589e2ab\nrefs/remotes/origin/work f1f2991bff67f4731a9dde21173b2b0df1c2ba93",
+  "trackingRefsAfter": "refs/remotes/origin/main 57a04b7372329823779abf8a22cb946c5589e2ab\nrefs/remotes/origin/work f1f2991bff67f4731a9dde21173b2b0df1c2ba93",
+  "persistentConfigUnchanged": true,
+  "proofRefsAfter": "",
+  "remoteTipAfter": "a93da0b81e965808741a1930b271771aa2a3df8a"
+}
