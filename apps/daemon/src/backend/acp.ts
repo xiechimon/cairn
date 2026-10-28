@@ -22,11 +22,14 @@ import type {
   AgentSessionHandle,
   AgentTokenUsage,
   BriefChannel,
+  DeliveredImage,
+  ProviderConfig,
   SessionOpts,
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
 import { DAEMON_VERSION } from '../version.js';
+import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 
 export const GEMINI_CAPABILITIES: AgentBackendCapabilities = {
   name: 'gemini',
@@ -112,6 +115,7 @@ class GeminiSession implements AgentSessionHandle {
     private readonly connection: ReturnType<ReturnType<typeof client>['connect']>,
     private readonly prompt: string | undefined,
     private readonly images: readonly ContentBlock[],
+    private readonly imageCapability: boolean,
     private readonly cleanup: () => void,
   ) {
     this.sessionId = sessionId;
@@ -204,10 +208,16 @@ class GeminiSession implements AgentSessionHandle {
     }
   }
 
-  async steer(text: string): Promise<void> {
+  async steer(text: string, images: readonly DeliveredImage[] = []): Promise<void> {
+    if (images.length > 0 && !this.imageCapability) {
+      throw new Error('gemini ACP backend: image capability is not advertised');
+    }
     await this.connection.agent.request(methods.agent.session.prompt, {
       sessionId: this.sessionId,
-      prompt: [{ type: 'text', text }],
+      prompt: [
+        { type: 'text', text },
+        ...images.map((image) => ({ type: 'image' as const, ...image })),
+      ],
     });
   }
 
@@ -233,6 +243,7 @@ export interface GeminiBackendOptions {
 }
 
 export class GeminiBackend implements AgentBackend {
+  private readonly imageSupport = new Map<string, boolean>();
   readonly capabilities = GEMINI_CAPABILITIES;
   readonly brief: BriefChannel = {
     backendId: 'gemini',
@@ -240,6 +251,15 @@ export class GeminiBackend implements AgentBackend {
   };
 
   constructor(private readonly options: GeminiBackendOptions = {}) {}
+
+  async modelSupportsImages(provider: ProviderConfig, modelId: string): Promise<boolean | null> {
+    if (isLearnedNoVision(provider.providerId, modelId)) return false;
+    return this.imageSupport.get(`${provider.providerId}/${modelId}`) ?? null;
+  }
+
+  rememberNoVision(provider: ProviderConfig, modelId: string): void {
+    rememberNoVision(provider.providerId, modelId);
+  }
 
   async createSession(opts: SessionOpts): Promise<AgentSessionHandle> {
     return this.open(opts, undefined);
@@ -301,6 +321,10 @@ export class GeminiBackend implements AgentBackend {
       agentVersion = initialized.protocolVersion;
       if (agentVersion !== PROTOCOL_VERSION) throw new Error('Protocol version mismatch');
       const caps = initialized.agentCapabilities;
+      this.imageSupport.set(
+        `${opts.provider.providerId}/${opts.modelId}`,
+        caps?.promptCapabilities?.image === true,
+      );
       validateGeminiSession({ ...opts, imageCapability: caps?.promptCapabilities?.image === true });
       const request = { cwd: opts.cwd, mcpServers: [] };
       const response = resumeId
@@ -338,6 +362,7 @@ export class GeminiBackend implements AgentBackend {
         connection,
         validated.prompt,
         (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),
+        caps?.promptCapabilities?.image === true,
         () => {
           connection.close();
           child.kill();

@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -20,7 +21,7 @@ import { type ClaudeCodeAuthProbe, probeClaudeCodeAuth } from './claude-code-aut
 import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
 import type { DaemonConfig } from './config.js';
-import { StepJournal } from './journal.js';
+import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineClient } from './machine-client.js';
@@ -277,6 +278,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(opts.hookTimeoutMs !== undefined ? { hookTimeoutMs: opts.hookTimeoutMs } : {}),
   });
   const sessionHandles = new Map<string, AgentSessionHandle>();
+  const stepImageSupport = new Map<string, boolean | null>();
+  const stepTranscripts = new Map<string, TranscriptBuffer>();
   const stops = new StepStops();
   const inFlightChief = new Set<string>();
   const workerSlots = new Map<string, number>();
@@ -390,9 +393,24 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           client,
           materializeDir: paths.stepAttachmentsDir,
           log: (line) => logger.step(line),
+          imageSupport: stepImageSupport.get(stepId) ?? null,
         });
         deliveryText = resolved.text;
         if (resolved.images.length > 0) images = [...resolved.images];
+        if (resolved.skippedNoVision > 0) {
+          const row = {
+            id: `image-skip-steer-${stepId}-${randomUUID()}`,
+            role: 'system' as const,
+            content: `图片未被模型读取：追加消息中的 ${resolved.skippedNoVision} 张图片未交付，当前模型不支持图片输入。步骤继续执行。`,
+            createdAt: Date.now(),
+          };
+          stepTranscripts.get(stepId)?.upsert(row);
+          await client.transcriptRow?.(stepId, row).catch((err: unknown) => {
+            logger.step(
+              `image notice relay failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
+        }
       } catch (err) {
         logger.step(
           `steer attachment resolve failed (delivering raw text): ${
@@ -487,6 +505,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
       sessionHandles,
+      stepImageSupport,
+      stepTranscripts,
       stops,
       machineName: config.name,
       claudeCodeAuthProbe: probeAuthAndRemember,
