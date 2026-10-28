@@ -98,7 +98,8 @@ ReadyAt(h, b, d) ==
 
 RecordVerdict(k) ==
   /\ verdicts < MaxVerdicts
-  /\ \E o \in {"pass", "block"}, indep \in BOOLEAN, rh \in Heads :
+  /\ \E o \in {"pass", "block"}, indep \in BOOLEAN,
+        rh \in (IF evidencePushes = 1 THEN Heads ELSE {head}) :
        /\ verdictRows' = verdictRows \cup
             {[kind |-> k, digest |-> dgst, outcome |-> o,
               independent |-> IF k = "review" THEN indep ELSE FALSE,

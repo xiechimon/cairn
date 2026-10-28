@@ -7,7 +7,7 @@ description: TLA+ model checking (TLC, one command ~15 seconds) of cairn's merge
 
 Two decisions can put code on a default branch: the gate merges a GitHub PR (`mergeThroughGithub`, REST merge pinned to a commit) and a machine lands a hosted local project (`applyMergeLanding`, a ref update). `mergeReadiness` and `decideLocalMerge` specify the verdict decisions; their production wiring boundaries are F1, F3 and F4 below. Between a decision and a landing the head can move or another verdict can arrive. Unit tests cover the orderings their author wrote; these models walk **all** orderings within a bounded range.
 
-Models: `model/MergeGate.tla` (the GitHub merge path), `model/LocalLanding.tla` (the local landing path) and `model/RepeatedVerdict.tla` (the repeated-verdict regression), comment-free; the action-to-code correspondence lives only in this file. One configuration per property: `model/P*.cfg`. Expected results: `expected.txt`.
+Models: `model/MergeGate.tla` (the GitHub merge path), `model/LocalLanding.tla` (the local landing path) and `model/RepeatedVerdict.tla` (the repeated-verdict regression) and `model/ReviewHeadCausality.tla` (review-head causality), comment-free; the action-to-code correspondence lives only in this file. One configuration per property: `model/P*.cfg`. Expected results: `expected.txt`.
 
 Sibling skill: `verify-step-claim` models who may run a step; this one models whether a result may be merged. The runner contract, the `expected.txt` format and the negative-control discipline are the same on purpose.
 
@@ -18,7 +18,7 @@ Run when a change touches any file in the coverage record below. Copy-only or lo
 ## How to run
 
 ```sh
-.claude/skills/verify-merge-gate/scripts/run.sh                  # all eleven configs, ~15 seconds
+.claude/skills/verify-merge-gate/scripts/run.sh                  # all twelve configs, ~15 seconds
 .claude/skills/verify-merge-gate/scripts/run.sh P1_MergeBoundToJudgedPatch   # one, ~2 seconds
 ```
 
@@ -40,6 +40,7 @@ At the end the script lists commits and uncommitted changes that touched covered
 The GitHub merge path, `MergeGate.tla`:
 
 - **P1 `MergeBoundToJudgedPatch`**: every GitHub merge landed on a patch that a verify, decision and review verdict all passed on, and, for a protected-path patch, an independent review recorded at the merged head. Broken = code lands with a green gate that never judged it.
+- **P6 `ReviewHeadWasObserved`**: review records cannot refer to a head that has not appeared. A previous head remains eligible only after an evidence-only push keeps the patch unchanged.
 - **P5 `RepeatedVerdictRemainsBlocked`**: a blocking verify verdict remains effective after a passing verify verdict on the same digest, followed by passing review and decision verdicts. This forced four-write sequence is checked against `mergeReadiness` retaining any blocking row.
 - **P2 `StaleVerdictNeverSatisfies`**: a verdict bound to a patch other than the one evaluated never counts toward readiness. Broken = a verdict on an old patch qualifies a new one.
 
@@ -49,7 +50,7 @@ The local landing path, `LocalLanding.tla`:
 
 ## Current results and known findings (at sync-commit)
 
-`P1 PASS`, `P2 PASS` (155,443 distinct states), `P3 PASS` (47 states), `P5 PASS` (15 states). The four model constants are the negative controls; P1N, P2N, P1H, P4, P3A, P3B and P3C are expected-FAIL.
+`P1 PASS`, `P2 PASS` (64,329 distinct states), `P3 PASS` (47 states), `P5 PASS` (9 states), `P6 PASS` (64,329 states). The control constants select the negative controls; P1N, P2N, P1H, P4, P3A, P3B and P3C are expected-FAIL.
 
 **F1 (P4, live gap) the REST merge path consults no verdict and no digest.**
 The merge that runs today is `mergeThroughGithub` (`builds.ts:1512`) through `apiMergeGate` (`builds.ts:1453`): the card's phase and latest build, no step in flight, then the PR's state, branch, author and base ref, then the checkpoint pin — `builds.ts:1603` reads the checkpoint, `builds.ts:1610` requires `pull.headSha === checkpoint`, `builds.ts:1618` merges with `sha: checkpoint`. Verdicts with digests do exist by then: `persistGateVerdict` (`builds.ts:1334`) binds every review/verify verdict to a head through `bindGateVerdict` (`verdict.ts:27`) and fills its `patchDigest` from a compare read (`builds.ts:1422`, stored at `:1439`), and `mergeReadiness` (`readiness.ts:156`) accepts only verdicts bound to the digest it just computed (`readiness.ts:434`). The merge path reads none of that: no `mergeReadiness` call and no verdict query anywhere in it. The model states the missing re-check as `MergeRechecksDigest = FALSE` (config `P4_MergeRechecksDigest`), and TLC's counterexample is three verdicts, `Evaluate`, `BaseMoveInteracting`, merge: the head SHA is unchanged while the diff against the default branch is not.
@@ -76,7 +77,7 @@ Take the action correspondence table below and ask step by step whether each cou
 - A step is impossible in the code (precondition looser than the code, one code-side synchronous block split into two, a code-side check missing from the model) → model mistake. Fix the model, note what was wrong, run again.
 - When unsure, write an uncommitted reproduction test and walk the real code.
 
-The model's own defects found while building this skill, kept as evidence that the negative controls are not vacuous: `LocalLanding.tla` first typed `judged`/`decided`/`landed` as records while `TypeOK` allowed the string `"none"`, so all four P3 configs died on `TypeOK` at state 2 and never reached the property; the sentinel is now the record `NoFact`. `MergeGate.tla` first recorded every review verdict at the current head (`vHead[!dgst] = head`), which made `P1H_UnboundReviewHead` pass vacuously; it now chooses the recorded head freely. `MergeBoundToJudgedPatch` first read the verdicts at the end of the run, so a legitimate merge followed by a later blocking verdict counted as a violation; the judging verdicts are now snapshotted into `landed` at merge time.
+The model's own defects found while building this skill, kept as evidence that the negative controls are not vacuous: `LocalLanding.tla` first typed `judged`/`decided`/`landed` as records while `TypeOK` allowed the string `"none"`, so all four P3 configs died on `TypeOK` at state 2 and never reached the property; the sentinel is now the record `NoFact`. `MergeGate.tla` first recorded every review verdict at the current head (`vHead[!dgst] = head`), which made `P1H_UnboundReviewHead` pass vacuously; the current model chooses the current head or, after an evidence-only push, the previous head carrying the same patch. P6 rejects the original unrestricted choice because it admitted a head before that head existed. `MergeBoundToJudgedPatch` first read the verdicts at the end of the run, so a legitimate merge followed by a later blocking verdict counted as a violation; the judging verdicts are now snapshotted into `landed` at merge time.
 
 ## Action ↔ code correspondence
 
@@ -131,6 +132,8 @@ Each control drops exactly the guard its property names, and the counterexample 
 If any expected-FAIL control starts passing, the property or the model has gone vacuous; fix that before trusting a PASS.
 
 The original single-slot model failed P5: verify block, verify pass, review pass, decision pass, evaluate. TLC reported readiness after the block was overwritten. The row-set model passes the same regression without changing `MaxVerdicts` or the original properties; the original seven controls still produce their recorded counterexamples. See `docs/verify/1811/repeated-verdict-original-red.log` and `repeated-verdict-models-green.log`.
+
+The original unrestricted review-head choice also failed P6 after one review write. Its original failure is `docs/verify/1811/future-review-head-red.log`. The causal-head correction leaves the existing bounds unchanged and makes P1H demonstrate an older, already observed head instead. The current twelve-config output is `docs/verify/1811/causal-models-green.log`.
 
 ## Coverage record
 

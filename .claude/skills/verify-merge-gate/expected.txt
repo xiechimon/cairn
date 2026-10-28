@@ -11,7 +11,7 @@ P2_StaleVerdictNeverSatisfies PASS
 P1N_UnboundVerdicts FAIL RecordVerdict,PushCode,RecordVerdict,RecordVerdict,Evaluate,ExecuteMergeGithub
 P2N_UnboundVerdicts FAIL RecordVerdict,PushCode,RecordVerdict,RecordVerdict,Evaluate
 # P1H drops only the review-head binding (independent review on an older head counts).
-P1H_UnboundReviewHead FAIL RecordVerdict,RecordVerdict,RecordVerdict,Evaluate,ExecuteMergeGithub
+P1H_UnboundReviewHead FAIL PushEvidence,RecordVerdict,RecordVerdict,RecordVerdict,Evaluate,ExecuteMergeGithub
 # P4 drops the digest re-check between evaluate and merge. Today's merge path
 # (builds.ts) has neither the re-check nor the evaluation: F1 and F3 in SKILL.md.
 P4_MergeRechecksDigest FAIL RecordVerdict,RecordVerdict,RecordVerdict,Evaluate,BaseMoveInteracting,ExecuteMergeGithub
@@ -25,3 +25,4 @@ P3B_NoFfCheck FAIL JudgeLocalPatch,CreateCommit,DecideLocalMerge,LocalBaseMove,L
 P3C_NoBaseRecheck FAIL JudgeLocalPatch,LocalBaseMove,CreateCommit,DecideLocalMerge,LandLocal
 
 P5_RepeatedVerdictRemainsBlocked PASS
+P6_ReviewHeadWasObserved PASS

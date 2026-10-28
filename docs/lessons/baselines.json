@@ -263,6 +263,10 @@
     "Intercepts": 1,
     "Recurrences": 0
   },
+  "direct-vitest-skipped-slot": {
+    "Intercepts": 1,
+    "Recurrences": 0
+  },
   "directory-wide-absence-assertion": {
     "Intercepts": 1,
     "Recurrences": 0
@@ -429,6 +433,10 @@
   },
   "idle-watchdog-kills-silent-tools": {
     "Intercepts": 1,
+    "Recurrences": 0
+  },
+  "ignored-skill-restaging": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "image-not-attached-to-reply": {
@@ -889,6 +897,10 @@
   },
   "unicode-fold-fixture": {
     "Intercepts": 2,
+    "Recurrences": 0
+  },
+  "unobserved-review-head": {
+    "Intercepts": 0,
     "Recurrences": 0
   },
   "unreachable-grading-module": {

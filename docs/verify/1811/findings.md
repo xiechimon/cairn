@@ -232,3 +232,21 @@ atomicity boundary. A production repair needs an expected-old-value ref update o
 a synchronization mechanism that also covers other writers. This exploratory delivery
 does not change product behavior. Review the in-flight local-merge work in #2050
 before assigning a separate repair.
+
+## F7: an unobserved review head was a model mistake
+
+The unrestricted review-head choice allowed a review to name `h2` while the PR
+was still at initial head `h1`. The original P1H trace therefore did not show a
+reachable older-head scenario. `P6_ReviewHeadWasObserved` rejects that choice after
+one review write (`future-review-head-red.log`). This is a model defect, not a
+production defect.
+
+A record now names the current head, or a previous head after an evidence-only
+push preserves the patch. The current P1H counterexample is PushEvidence, three
+verdicts, Evaluate, ExecuteMergeGithub: a late review names already observed `h1`
+while the PR is at `h2` with the same patch. Its expectation changed to that observed
+causal trace; the property and the original head, digest and four-write bounds did
+not change. The seven original negative controls still fail. P1, P2 and the new P6
+explore 64,329 states each, and P5 explores nine. `causal-models-green.log` records
+the current twelve-config run. Historical eleven-config outputs describe the
+earlier model and remain preserved.

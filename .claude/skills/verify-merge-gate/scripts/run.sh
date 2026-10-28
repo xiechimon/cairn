@@ -44,6 +44,7 @@ module_for() {
   case "$1" in
     P3*|P3A*|P3B*|P3C*) echo LocalLanding.tla ;;
     P5*) echo RepeatedVerdict.tla ;;
+    P6*) echo ReviewHeadCausality.tla ;;
     *) echo MergeGate.tla ;;
   esac
 }
