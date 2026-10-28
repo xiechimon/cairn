@@ -861,3 +861,343 @@ test('#1829 a hook rejection on the machine credential fallback retains its reco
     ),
   ).rejects.toBe(hookError);
 });
+
+function commitFile(dir: string, name: string, body: string): string {
+  writeFileSync(join(dir, name), body);
+  gitOk(dir, ['add', name]);
+  gitOk(dir, ['commit', '-m', `add ${name}`]);
+  return gitOk(dir, ['rev-parse', 'HEAD']);
+}
+
+function pushFixture(): { remote: string; upstream: string; dir: string } {
+  const remote = join(mkdtempSync(join(tmpdir(), 'cairn-contained-remote-')), 'repo.git');
+  gitOk(tmpdir(), ['init', '--bare', remote]);
+  gitOk(remote, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+  const source = mkdtempSync(join(tmpdir(), 'cairn-contained-source-'));
+  gitOk(source, ['init', '-q', '-b', 'main']);
+  gitOk(source, ['config', 'user.email', 't@example.com']);
+  gitOk(source, ['config', 'user.name', 't']);
+  commitFile(source, 'seed.txt', 'seed\n');
+  gitOk(source, ['remote', 'add', 'origin', remote]);
+  gitOk(source, ['push', 'origin', 'main']);
+  commitFile(source, 'main-only.txt', 'main advances after the branch was cut\n');
+  gitOk(source, ['push', 'origin', 'main']);
+  const upstream = mkdtempSync(join(tmpdir(), 'cairn-contained-upstream-'));
+  gitOk(tmpdir(), ['clone', remote, upstream]);
+  gitOk(upstream, ['config', 'user.email', 't@example.com']);
+  gitOk(upstream, ['config', 'user.name', 't']);
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-contained-work-'));
+  gitOk(tmpdir(), ['clone', remote, dir]);
+  gitOk(dir, ['config', 'user.email', 't@example.com']);
+  gitOk(dir, ['config', 'user.name', 't']);
+  gitOk(dir, ['checkout', '-B', 'work', 'HEAD~1']);
+  return { remote, upstream, dir };
+}
+
+describe('#2006 a work-branch push already contained in the remote branch is not a failure', () => {
+  test('failure mode 1: remote branch is local HEAD plus a merge of main (Update branch) -> push succeeds, one log line names both short SHAs', async () => {
+    const { upstream, dir } = pushFixture();
+    const sha = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'HEAD:refs/heads/work']);
+    gitOk(upstream, ['fetch', 'origin', 'refs/heads/work']);
+    gitOk(upstream, ['checkout', '--detach', sha]);
+    gitOk(upstream, ['merge', '--no-ff', '-m', "Merge branch 'main' into work", 'origin/main']);
+    gitOk(upstream, ['push', 'origin', 'HEAD:refs/heads/work']);
+    const merged = gitOk(upstream, ['rev-parse', 'HEAD']);
+    expect(merged).not.toBe(sha);
+    const lines: string[] = [];
+
+    await expect(
+      gitPrim.push(dir, 'work', null, (a, b) => lines.push(`${a} ${b}`)),
+    ).resolves.toBeUndefined();
+
+    expect(gitOk(dir, ['rev-parse', 'HEAD'])).toBe(sha);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain(sha.slice(0, 7));
+    expect(lines[0]).toContain(merged.slice(0, 7));
+  }, 30_000);
+
+  test('failure mode 2: remote branch advanced by a commit that does not contain local HEAD -> non-fast-forward still throws', async () => {
+    const { upstream, dir } = pushFixture();
+    commitFile(dir, 'work.txt', 'work\n');
+    gitOk(upstream, ['checkout', '-B', 'work', 'origin/main']);
+    commitFile(upstream, 'foreign.txt', 'foreign\n');
+    gitOk(upstream, ['push', 'origin', 'work']);
+    commitFile(dir, 'later.txt', 'later\n');
+    const lines: string[] = [];
+
+    const err = await gitPrim
+      .push(dir, 'work', null, (a, b) => lines.push(`${a} ${b}`))
+      .catch((error: unknown) => error);
+
+    expect(err).toBeInstanceOf(Error);
+    expect(String(err)).toContain('git push failed');
+    expect(String(err)).toMatch(/non-fast-forward|fetch first/);
+    expect(lines).toEqual([]);
+  }, 30_000);
+
+  test('failure mode 3: a rejected pre-push hook never triggers the containment retry', async () => {
+    const { dir } = pushFixture();
+    commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['config', 'core.hooksPath', join(dir, '.git', 'hooks')]);
+    const hook = join(dir, '.git', 'hooks', 'pre-push');
+    const marker = join(dir, 'hook-calls');
+    writeFileSync(hook, `#!/bin/sh\necho called >> '${marker}'\necho 'lint failed' >&2\nexit 1\n`);
+    chmodSync(hook, 0o755);
+    const lines: string[] = [];
+
+    const err = await gitPrim
+      .push(dir, 'work', null, (a, b) => lines.push(`${a} ${b}`))
+      .catch((error: unknown) => error);
+
+    expect(err).toMatchObject({ name: 'GitPushHookError' });
+    expect(String(err)).toContain('lint failed');
+    expect(readFileSync(marker, 'utf8')).toBe('called\n');
+    expect(lines).toEqual([]);
+  }, 30_000);
+});
+
+describe('#2047 containment binds to the attempted branch and fetched destination', () => {
+  for (const mapping of ['missing', 'main-only']) {
+    test(`a ${mapping} fetch mapping cannot certify a divergent tip through stale tracking state`, async () => {
+      const { remote, dir } = pushFixture();
+      const local = commitFile(dir, 'work.txt', 'work\n');
+      gitOk(dir, ['push', 'origin', 'work']);
+      const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+      gitOk(remote, ['update-ref', 'refs/heads/work', foreign, local]);
+      if (mapping === 'missing') gitOk(dir, ['config', '--unset-all', 'remote.origin.fetch']);
+      else
+        gitOk(dir, ['config', 'remote.origin.fetch', '+refs/heads/main:refs/remotes/origin/main']);
+      expect(gitOk(dir, ['rev-parse', 'refs/remotes/origin/work'])).toBe(local);
+      const notices: string[] = [];
+
+      await expect(
+        gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+      ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+      expect(notices).toEqual([]);
+      expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
+      expect(gitOk(dir, ['for-each-ref', '--format=%(refname)', 'refs/cairn/push-check/'])).toBe(
+        '',
+      );
+    }, 30_000);
+  }
+
+  test('the requested branch is checked even when the current HEAD is a contained ancestor', async () => {
+    const { remote, dir } = pushFixture();
+    const local = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'work']);
+    const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+    gitOk(remote, ['update-ref', 'refs/heads/work', foreign, local]);
+    gitOk(dir, ['checkout', '--detach', 'origin/main']);
+    const notices: string[] = [];
+
+    await expect(
+      gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+    ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+    expect(notices).toEqual([]);
+    expect(gitOk(dir, ['rev-parse', 'refs/heads/work'])).toBe(local);
+  }, 30_000);
+
+  test('a successful hook that rewinds the source ref cannot change the attempted commit being certified', async () => {
+    const { remote, dir } = pushFixture();
+    const seed = gitOk(dir, ['rev-parse', 'HEAD']);
+    const local = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'work']);
+    const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+    gitOk(remote, ['update-ref', 'refs/heads/work', foreign, local]);
+    gitOk(dir, ['config', 'core.hooksPath', join(dir, '.git', 'hooks')]);
+    const hook = join(dir, '.git', 'hooks', 'pre-push');
+    writeFileSync(hook, `#!/bin/sh\ngit update-ref refs/heads/work ${seed} ${local}\n`);
+    chmodSync(hook, 0o755);
+    const notices: string[] = [];
+
+    await expect(
+      gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+    ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+    expect(notices).toEqual([]);
+    expect(gitOk(dir, ['rev-parse', 'refs/heads/work'])).toBe(seed);
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
+  }, 30_000);
+
+  for (const destinations of [1, 2]) {
+    test(`${destinations} distinct push destination configuration cannot be certified from the fetch destination`, async () => {
+      const { remote, dir } = pushFixture();
+      const local = commitFile(dir, 'work.txt', 'work\n');
+      gitOk(dir, ['push', 'origin', 'work']);
+      const pushRemote = join(mkdtempSync(join(tmpdir(), 'cairn-push-destination-')), 'repo.git');
+      gitOk(tmpdir(), ['clone', '--bare', remote, pushRemote]);
+      const foreign = gitOk(pushRemote, ['rev-parse', 'refs/heads/main']);
+      gitOk(pushRemote, ['update-ref', 'refs/heads/work', foreign, local]);
+      gitOk(dir, ['config', 'remote.origin.pushurl', pushRemote]);
+      if (destinations === 2) gitOk(dir, ['config', '--add', 'remote.origin.pushurl', remote]);
+      const notices: string[] = [];
+
+      await expect(
+        gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+      ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+      expect(notices).toEqual([]);
+      expect(gitOk(pushRemote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
+    }, 30_000);
+  }
+
+  test('a missing fetch mapping still accepts a real containing merge and reports its actual tip', async () => {
+    const { upstream, dir } = pushFixture();
+    const local = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'work']);
+    gitOk(upstream, ['fetch', 'origin', 'refs/heads/work']);
+    gitOk(upstream, ['checkout', '--detach', local]);
+    gitOk(upstream, ['merge', '--no-ff', '-m', 'merge main into work', 'origin/main']);
+    gitOk(upstream, ['push', 'origin', 'HEAD:refs/heads/work']);
+    const actualTip = gitOk(upstream, ['rev-parse', 'HEAD']);
+    gitOk(dir, ['config', '--unset-all', 'remote.origin.fetch']);
+    const notices: string[] = [];
+
+    await expect(
+      gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+    ).resolves.toBeUndefined();
+
+    expect(notices).toEqual([`${local} ${actualTip}`]);
+    expect(gitOk(dir, ['for-each-ref', '--format=%(refname)', 'refs/cairn/push-check/'])).toBe('');
+  }, 30_000);
+});
+
+test('#2047 a hook that repoints origin cannot redirect the containment proof', async () => {
+  const { remote, dir } = pushFixture();
+  const local = commitFile(dir, 'work.txt', 'work\n');
+  gitOk(dir, ['push', 'origin', 'work']);
+  const decoy = join(mkdtempSync(join(tmpdir(), 'cairn-push-decoy-')), 'repo.git');
+  gitOk(tmpdir(), ['clone', '--bare', remote, decoy]);
+  const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+  gitOk(remote, ['update-ref', 'refs/heads/work', foreign, local]);
+  gitOk(dir, ['config', 'core.hooksPath', join(dir, '.git', 'hooks')]);
+  const hook = join(dir, '.git', 'hooks', 'pre-push');
+  writeFileSync(hook, `#!/bin/sh\ngit remote set-url origin '${decoy}'\n`);
+  chmodSync(hook, 0o755);
+  const notices: string[] = [];
+
+  await expect(
+    gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+  ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+  expect(notices).toEqual([]);
+  expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
+}, 30_000);
+
+test('#2047 branch-gated pre-push checks still receive the named branch ref', async () => {
+  const { dir } = pushFixture();
+  commitFile(dir, 'work.txt', 'work\n');
+  gitOk(dir, ['config', 'core.hooksPath', join(dir, '.git', 'hooks')]);
+  const hook = join(dir, '.git', 'hooks', 'pre-push');
+  writeFileSync(
+    hook,
+    '#!/bin/sh\nwhile read local_ref local_oid remote_ref remote_oid; do\n  case "$local_ref" in refs/heads/work) echo branch-check-rejected >&2; exit 1;; esac\ndone\n',
+  );
+  chmodSync(hook, 0o755);
+
+  await expect(gitPrim.push(dir, 'work', null)).rejects.toMatchObject({ name: 'GitPushHookError' });
+}, 30_000);
+
+test('#2047 a chained URL rewrite cannot redirect the containment proof to a decoy repository', async () => {
+  const { remote, dir } = pushFixture();
+  const local = commitFile(dir, 'work.txt', 'work\n');
+  gitOk(dir, ['push', 'origin', 'work']);
+  const decoy = join(mkdtempSync(join(tmpdir(), 'cairn-push-url-decoy-')), 'repo.git');
+  gitOk(tmpdir(), ['clone', '--bare', remote, decoy]);
+  const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+  gitOk(remote, ['update-ref', 'refs/heads/work', foreign, local]);
+  gitOk(dir, ['config', `url.${remote}.insteadOf`, 'cairn-proof-alias:']);
+  gitOk(dir, ['config', `url.${decoy}.insteadOf`, remote]);
+  gitOk(dir, ['remote', 'set-url', 'origin', 'cairn-proof-alias:']);
+  expect(gitOk(dir, ['remote', 'get-url', 'origin'])).toBe(remote);
+  const notices: string[] = [];
+
+  await expect(
+    gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+  ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+  expect(notices).toEqual([]);
+  expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
+}, 30_000);
+
+test('#2047 an ordinary URL alias still certifies the actual containing tip', async () => {
+  const { upstream, remote, dir } = pushFixture();
+  const local = commitFile(dir, 'work.txt', 'work\n');
+  gitOk(dir, ['push', 'origin', 'work']);
+  gitOk(upstream, ['fetch', 'origin', 'refs/heads/work']);
+  gitOk(upstream, ['checkout', '--detach', local]);
+  gitOk(upstream, ['merge', '--no-ff', '-m', 'merge main into work', 'origin/main']);
+  gitOk(upstream, ['push', 'origin', 'HEAD:refs/heads/work']);
+  const actualTip = gitOk(upstream, ['rev-parse', 'HEAD']);
+  gitOk(dir, ['config', `url.${remote}.insteadOf`, 'cairn-proof-alias:']);
+  gitOk(dir, ['remote', 'set-url', 'origin', 'cairn-proof-alias:']);
+  const notices: string[] = [];
+
+  await expect(
+    gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+  ).resolves.toBeUndefined();
+
+  expect(notices).toEqual([`${local} ${actualTip}`]);
+}, 30_000);
+
+test('#2047 multiple fetch URLs cannot select an unrelated last-configured proof destination', async () => {
+  const { remote, dir } = pushFixture();
+  const local = commitFile(dir, 'work.txt', 'work\n');
+  gitOk(dir, ['push', 'origin', 'work']);
+  const decoy = join(mkdtempSync(join(tmpdir(), 'cairn-fetch-url-decoy-')), 'repo.git');
+  gitOk(tmpdir(), ['clone', '--bare', remote, decoy]);
+  const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+  gitOk(remote, ['update-ref', 'refs/heads/work', foreign, local]);
+  gitOk(dir, ['config', '--add', 'remote.origin.url', decoy]);
+  gitOk(dir, ['config', 'remote.origin.pushurl', remote]);
+  const notices: string[] = [];
+
+  await expect(
+    gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+  ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+  expect(notices).toEqual([]);
+}, 30_000);
+
+describe('#2047 configured push mappings cannot change the requested destination branch', () => {
+  test('a divergent mapped branch cannot turn an unchanged requested branch into a containment notice', async () => {
+    const { remote, dir } = pushFixture();
+    const local = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'work']);
+    const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+    gitOk(remote, ['update-ref', 'refs/heads/release', foreign]);
+    gitOk(dir, ['config', 'remote.origin.push', 'refs/heads/work:refs/heads/release']);
+    const notices: string[] = [];
+
+    await expect(
+      gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+    ).resolves.toBeUndefined();
+
+    expect(notices).toEqual([]);
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(local);
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/release'])).toBe(foreign);
+  }, 30_000);
+
+  test('a writable mapped branch cannot hide rejection from the requested divergent branch', async () => {
+    const { remote, dir } = pushFixture();
+    const seed = gitOk(dir, ['rev-parse', 'HEAD']);
+    const local = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'work']);
+    const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+    gitOk(remote, ['update-ref', 'refs/heads/work', foreign, local]);
+    gitOk(remote, ['update-ref', 'refs/heads/release', seed]);
+    gitOk(dir, ['config', 'remote.origin.push', 'refs/heads/work:refs/heads/release']);
+    const notices: string[] = [];
+
+    await expect(
+      gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+    ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+    expect(notices).toEqual([]);
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/release'])).toBe(seed);
+  }, 30_000);
+});
