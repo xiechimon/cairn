@@ -1,0 +1,50 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-2127
+
+ ❯ |@xiechimon/cairn| test/pr-merge-api.test.ts (136 tests | 9 failed | 123 skipped) 488ms
+   ❯ #1403 segment 2b: the server merges the PR through the GitHub API (136)
+     × #2127 refuses unsafe or unknown Cairn PR opener {"login":"cairnwright[bot]","type":"Bot"} without mutations 82ms
+     × #2127 refuses unsafe or unknown Cairn PR opener {"login":"cairnwright[bot]","type":"User"} without mutations 36ms
+     × #2127 refuses unsafe or unknown Cairn PR opener {"login":"another[bot]","type":"Bot"} without mutations 33ms
+     × #2127 refuses unsafe or unknown Cairn PR opener null without mutations 33ms
+     × #2127 refuses unsafe or unknown Cairn PR opener {} without mutations 34ms
+     × #2127 refuses unsafe or unknown Cairn PR opener {"login":"octo"} without mutations 34ms
+     × #2127 refuses unsafe or unknown Cairn PR opener {"login":"","type":"User"} without mutations 34ms
+     × #2127 refuses unsafe or unknown Cairn PR opener {"login":123,"type":"User"} without mutations 32ms
+     × #2127 refuses unsafe or unknown Cairn PR opener {"login":"octo","type":"Unknown"} without mutations 33ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"cairnwright[bot]","type":"Bot"} without mutations
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"cairnwright[bot]","type":"User"} without mutations
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"another[bot]","type":"Bot"} without mutations
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener null without mutations
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {} without mutations
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"octo"} without mutations
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"","type":"User"} without mutations
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":123,"type":"User"} without mutations
+ FAIL  |@xiechimon/cairn| test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > #2127 refuses unsafe or unknown Cairn PR opener {"login":"octo","type":"Unknown"} without mutations
+AssertionError: expected 202 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 202
+
+ ❯ test/pr-merge-api.test.ts:363:29
+    361|     const beforeSteps = w.steps();
+    362|     const response = await req(w.s.app, 'POST', `/api/builds/${w.build…
+    363|     expect(response.status).toBe(409);
+       |                             ^
+    364|     expect(await response.json()).toEqual({ error: expect.stringContai…
+    365|     expect(w.fake.puts()).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  9 failed | 4 passed | 123 skipped (136)
+   Start at  12:57:18
+   Duration  1.94s (transform 47%, import 27%, tests 26%)
+

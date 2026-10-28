@@ -1692,6 +1692,18 @@ async function mergeThroughGithub(
       });
       return { delegated: true };
     }
+    if (
+      repoRef.owner.toLowerCase() === 'xiechimon' &&
+      repoRef.repo.toLowerCase() === 'cairn' &&
+      (pull.openerType !== 'User' ||
+        !pull.openerLogin?.trim() ||
+        pull.openerLogin.toLowerCase().endsWith('[bot]'))
+    ) {
+      throw new HttpError(
+        409,
+        `PR #${prNumber} cannot be squash merged by cairn: xiechimon/cairn requires a verified human opener. Return bot-opened PRs to the dispatcher for identity preparation and rebase via ~/.cairn/tools/merge-pr.sh; restore missing opener identity before retrying.`,
+      );
+    }
     const checkpoint = lastPushedCheckpoint(deps, row.id, { mergeSteps: true });
     if (checkpoint === null || !isFullSha(checkpoint)) {
       throw new HttpError(
