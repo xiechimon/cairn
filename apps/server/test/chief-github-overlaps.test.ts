@@ -52,36 +52,39 @@ function overlapWorld(respond: (url: URL) => { data: unknown; next?: boolean; st
       scope: 'repo',
     },
   );
-  const read = (params: Record<string, unknown> = {}) =>
-    executeChiefTool(
-      {
-        db: server.db,
-        hub: server.hub,
-        machineHub: server.machineHub,
-        box: server.secretBox,
-        user: server.user,
-        reposDir: server.reposDir,
-        attachmentsDir: server.attachmentsDir,
-        skillsDir: server.skillsDir,
-        githubFetch,
-      },
-      {
-        teamId: server.team.id,
-        userId: server.user.id,
-        chiefId: 'overlap-chief',
-        threadId: 'overlap-thread',
-        chiefAgentId: null,
-        conversationId: 'overlap-thread',
-      },
-      'github_overlaps',
-      {
-        projectId: 'overlap-project',
-        terms: ['retry', 'temporary push'],
-        paths: ['git.ts'],
-        ...params,
-      },
-    );
-  return { server, calls, read };
+  return {
+    server,
+    calls,
+    read: (params: Record<string, unknown> = {}) =>
+      executeChiefTool(
+        {
+          db: server.db,
+          hub: server.hub,
+          machineHub: server.machineHub,
+          box: server.secretBox,
+          user: server.user,
+          reposDir: server.reposDir,
+          attachmentsDir: server.attachmentsDir,
+          skillsDir: server.skillsDir,
+          githubFetch,
+        },
+        {
+          teamId: server.team.id,
+          userId: server.user.id,
+          chiefId: 'overlap-chief',
+          threadId: 'overlap-thread',
+          chiefAgentId: null,
+          conversationId: 'overlap-thread',
+        },
+        'github_overlaps',
+        {
+          projectId: 'overlap-project',
+          terms: ['retry', 'temporary push'],
+          paths: ['git.ts'],
+          ...params,
+        },
+      ),
+  };
 }
 
 const candidate = (number: number) => ({

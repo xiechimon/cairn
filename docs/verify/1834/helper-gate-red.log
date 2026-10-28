@@ -1,0 +1,2 @@
+apps/server/test/chief-github-overlaps.test.ts:55: single-use non-exported function read; inline it or add a named allowlist entry
+single-use-helper-gate: 1 single-use helper(s)
