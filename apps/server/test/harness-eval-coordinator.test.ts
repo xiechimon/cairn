@@ -76,6 +76,31 @@ describe('harness eval coordinator', () => {
     expect(db.select().from(harnessEvalAttempt).all()).toHaveLength(1);
   });
 
+  test('claimAttempt forwards ticket and expectedHead into dispatch', async () => {
+    const { coordinator, dispatches } = openWorld({
+      ids: ['attempt-1', 'worker-1'],
+    });
+    const expectedHead = 'b'.repeat(40);
+    await coordinator.claimAttempt({
+      repo: REPO,
+      pr: PR,
+      patchDigest: DIGEST_A,
+      ticket: '1979',
+      expectedHead,
+    });
+    expect(dispatches).toEqual([
+      expect.objectContaining({
+        repo: REPO,
+        pr: PR,
+        patchDigest: DIGEST_A,
+        ticket: '1979',
+        expectedHead,
+        attemptId: 'attempt-1',
+        workerId: 'worker-1',
+      }),
+    ]);
+  });
+
   test('repeated polling after a claim does not dispatch again', async () => {
     const { coordinator, dispatches } = openWorld({
       ids: ['attempt-1', 'worker-1', 'attempt-2', 'worker-2'],

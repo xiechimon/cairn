@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -9,6 +10,7 @@ import {
   type MergeReadiness,
 } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
+import { publishEvaluation } from '../../../scripts/harness-eval-worker.mjs';
 import type { AppContext } from '../src/context.js';
 import { openDbWithHandle } from '../src/db/client.js';
 import { svcOf } from '../src/routes-helpers.js';
@@ -17,6 +19,7 @@ import {
   type HarnessEvalDispatchRequest,
   type HarnessEvalTerminalOutcome,
 } from '../src/services/harness-eval-coordinator.js';
+import { createProductionHarnessEvalDispatch } from '../src/services/harness-eval-production.js';
 import { computePatchDigest } from '../src/services/merge-gate/digest.js';
 import { gateStatusFor } from '../src/services/merge-gate/gate-status.js';
 import { newGateReadCache, readGateGithubFacts } from '../src/services/merge-gate/github-facts.js';
@@ -511,10 +514,37 @@ describe('merge-gate harness eval routing (#1979)', () => {
   });
 
   test('GitHub facts lifecycle: missing evidence dispatches, validated result-only commit is reread and clears regression', async () => {
-    const { coordinator, dispatches } = openWorld();
-    const HARNESS_FILE = 'apps/server/src/services/chief.ts';
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-1979-lifecycle-'));
+    const opened = openDbWithHandle(join(dir, 'db.sqlite'));
+    worlds.push({
+      close: () => {
+        opened.close();
+        rmSync(dir, { recursive: true, force: true });
+      },
+      dir,
+    });
+    const remote = join(dir, 'remote.git');
+    const seed = join(dir, 'seed');
+    const branch = 'cursor/1979';
     const RESULT_PATH = `${EVIDENCE_PREFIX}1979/${HARNESS_REGRESSION_RESULT_NAME}`;
-    const RESULT_HEAD = 'b'.repeat(40);
+    const git = (cwd: string, ...args: string[]) =>
+      execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-C', cwd, ...args], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim();
+    mkdirSync(seed);
+    git(seed, 'init', `--initial-branch=${branch}`);
+    git(seed, 'config', 'user.email', 'worker@example.invalid');
+    git(seed, 'config', 'user.name', 'Eval Worker');
+    writeFileSync(join(seed, 'harness.txt'), 'original\n');
+    git(seed, 'add', 'harness.txt');
+    git(seed, 'commit', '-m', 'initial');
+    execFileSync('git', ['init', '--bare', remote], { stdio: 'ignore' });
+    git(seed, 'remote', 'add', 'origin', remote);
+    git(seed, 'push', 'origin', `HEAD:refs/heads/${branch}`);
+    const expectedHead = git(seed, 'rev-parse', 'HEAD');
+
+    const HARNESS_FILE = 'apps/server/src/services/chief.ts';
     const ghFile = (filename: string, over: Record<string, unknown> = {}) => ({
       sha: '1'.repeat(40),
       filename,
@@ -532,9 +562,61 @@ describe('merge-gate harness eval routing (#1979)', () => {
       changes: 0,
       patch: undefined,
     });
-    const harnessGh = ghFile(HARNESS_FILE);
-    const testGh = ghFile('apps/server/test/ci-loop.test.ts');
-    const compareFiles = [harnessGh, testGh, shot];
+    const compareFiles = [ghFile(HARNESS_FILE), ghFile('apps/server/test/ci-loop.test.ts'), shot];
+
+    const dispatches: HarnessEvalDispatchRequest[] = [];
+    let publishedCommit: string | null = null;
+    let publishedResult: string | null = null;
+    let idSeq = 0;
+    const dispatch = createProductionHarnessEvalDispatch(async (input) => {
+      const resultText = resultJson({ patchDigest: input.patchDigest });
+      const published = await publishEvaluation(
+        {
+          repo: input.repo,
+          pr: String(input.pr),
+          ticket: input.ticket,
+          expectedHead: input.expectedHead,
+          patchDigest: input.patchDigest,
+        },
+        {
+          remote,
+          tempRoot: dir,
+          branch,
+          author: { name: 'Eval Worker', email: 'worker@example.invalid' },
+          verifyRequest: () => ({
+            head: expectedHead,
+            branch,
+            patchDigest: input.patchDigest,
+          }),
+          evaluate: ({ checkout, output }: { checkout: string; output: string }) => {
+            mkdirSync(join(checkout, 'docs/verify/1979'), { recursive: true });
+            writeFileSync(output, resultText);
+          },
+        },
+      );
+      publishedCommit = published.commit;
+      publishedResult = resultText;
+      dispatches.push({
+        repo: input.repo,
+        pr: input.pr,
+        patchDigest: input.patchDigest,
+        workerId: input.workerId,
+        attemptId: input.attemptId,
+        ticket: input.ticket,
+        expectedHead: input.expectedHead,
+      });
+    });
+    const coordinator = createHarnessEvalCoordinator({
+      db: opened.db,
+      dispatch,
+      now: () => 1_000_000,
+      attemptTimeoutMs: 60_000,
+      newId: () => {
+        idSeq += 1;
+        return `id-${idSeq}`;
+      },
+    });
+
     const ok = (body: unknown): GateRaw => ({
       kind: 'ok',
       status: 200,
@@ -546,8 +628,7 @@ describe('merge-gate harness eval routing (#1979)', () => {
       kind: 'failed',
       failure: { kind: 'status', status: 404, message: 'Not Found' },
     };
-    let head = HEAD;
-    let resultText: string | null = null;
+    const headOf = () => publishedCommit ?? expectedHead;
     const port: GateGithubPort = {
       pull: async () =>
         ok({
@@ -557,8 +638,8 @@ describe('merge-gate harness eval routing (#1979)', () => {
           draft: false,
           mergeable_state: 'clean',
           changed_files: compareFiles.length,
-          body: `evidence: https://raw.githubusercontent.com/xiechimon/cairn/${head}/docs/verify/1979/shot.png`,
-          head: { sha: head, ref: 'cursor/1979', repo: { full_name: REPO } },
+          body: `evidence: https://raw.githubusercontent.com/xiechimon/cairn/${headOf()}/docs/verify/1979/shot.png`,
+          head: { sha: headOf(), ref: branch, repo: { full_name: REPO } },
           base: { ref: 'main', repo: { full_name: REPO, default_branch: 'main' } },
         }),
       branch: async () =>
@@ -584,7 +665,7 @@ describe('merge-gate harness eval routing (#1979)', () => {
           total_commits: 2,
           commits: [
             { sha: EARLIER, parents: [{ sha: MAIN }] },
-            { sha: head, parents: [{ sha: EARLIER }] },
+            { sha: headOf(), parents: [{ sha: EARLIER }] },
           ],
           files: compareFiles,
         }),
@@ -595,7 +676,7 @@ describe('merge-gate harness eval routing (#1979)', () => {
             {
               id: 1,
               name: 'check',
-              head_sha: head,
+              head_sha: headOf(),
               status: 'completed',
               conclusion: 'success',
               app: { id: 1, slug: 'github-actions' },
@@ -603,16 +684,21 @@ describe('merge-gate harness eval routing (#1979)', () => {
             {
               id: 2,
               name: 'pr-evidence',
-              head_sha: head,
+              head_sha: headOf(),
               status: 'completed',
               conclusion: 'success',
               app: { id: 1, slug: 'github-actions' },
             },
           ],
         }),
-      combinedStatus: async () => ok({ sha: head, state: 'success', total_count: 0, statuses: [] }),
+      combinedStatus: async () =>
+        ok({ sha: headOf(), state: 'success', total_count: 0, statuses: [] }),
       contents: async (path, ref) => {
-        if (path === RESULT_PATH && ref === head && resultText !== null) {
+        const resultText =
+          publishedCommit !== null && ref === publishedCommit
+            ? git(remote, 'show', `${publishedCommit}:${RESULT_PATH}`)
+            : null;
+        if (path === RESULT_PATH && resultText !== null) {
           return ok({
             type: 'file',
             encoding: 'base64',
@@ -621,7 +707,7 @@ describe('merge-gate harness eval routing (#1979)', () => {
             path: RESULT_PATH,
           });
         }
-        if (path === 'docs/verify/1979' && ref === head) {
+        if (path === 'docs/verify/1979') {
           return ok([
             {
               name: 'shot.png',
@@ -658,7 +744,20 @@ describe('merge-gate harness eval routing (#1979)', () => {
     const first = await readGateGithubFacts(port, req, newGateReadCache());
     expect(first.harnessEvalText).toBeNull();
     expect(dispatches).toHaveLength(1);
-    expect(dispatches[0]?.patchDigest).toMatch(/^pd2:/);
+    const patchDigest = dispatches[0]?.patchDigest;
+    expect(dispatches[0]).toEqual(
+      expect.objectContaining({
+        ticket: '1979',
+        expectedHead,
+        patchDigest: expect.stringMatching(/^pd2:/),
+      }),
+    );
+    expect(publishedCommit).toMatch(/^[0-9a-f]{40}$/);
+    expect(publishedResult).not.toBeNull();
+    expect(git(remote, 'rev-list', '--count', `${expectedHead}..${publishedCommit}`)).toBe('1');
+    expect(
+      git(remote, 'diff', '--name-status', '--no-renames', expectedHead, publishedCommit!),
+    ).toBe(`A\t${RESULT_PATH}`);
     expect(first.harnessEval?.attempt?.state).toBe('dispatched');
     expect(first.harnessEval?.now).toBe(req.now);
     const evaluating = mergeReadiness({
@@ -670,7 +769,7 @@ describe('merge-gate harness eval routing (#1979)', () => {
         evidence: first.evidence,
         verdicts: harnessInputs().verdicts.map((row) => ({
           ...row,
-          patchDigest: dispatches[0]!.patchDigest,
+          patchDigest: patchDigest!,
         })),
       }),
       harnessEval: first.harnessEval,
@@ -681,14 +780,9 @@ describe('merge-gate harness eval routing (#1979)', () => {
         .map((b) => [b.code, b.class]),
     ).toEqual([['harness-regression-evaluating', 'transient']]);
 
-    const attempt = first.harnessEval?.attempt;
-    expect(attempt).not.toBeNull();
-    coordinator.complete(attempt!.id, attempt!.workerId, 'completed');
-    resultText = resultJson({ patchDigest: dispatches[0]!.patchDigest });
-    head = RESULT_HEAD;
-
     const second = await readGateGithubFacts(port, req, newGateReadCache());
-    expect(second.harnessEvalText).toBe(resultText);
+    expect(second.harnessEvalText).toBe(publishedResult);
+    expect(second.pr?.headSha).toBe(publishedCommit);
     expect(dispatches).toHaveLength(1);
     const after = mergeReadiness({
       ...harnessInputs({
@@ -699,7 +793,7 @@ describe('merge-gate harness eval routing (#1979)', () => {
         evidence: second.evidence,
         verdicts: harnessInputs().verdicts.map((row) => ({
           ...row,
-          patchDigest: dispatches[0]!.patchDigest,
+          patchDigest: patchDigest!,
         })),
       }),
       harnessEval: second.harnessEval,

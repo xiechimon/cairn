@@ -12,7 +12,7 @@ import {
   prepareHarnessEvalRouting,
 } from './harness-eval-route.js';
 import { touchesHarness } from './paths.js';
-import { type GateInputs, mergeReadiness } from './readiness.js';
+import { type GateInputs, isFullSha, mergeReadiness } from './readiness.js';
 
 export type JudgeHarnessEvalInput = {
   inputs: GateInputs;
@@ -86,6 +86,10 @@ export async function judgeMergeReadinessWithHarnessEval(
     patchDigest,
     need,
     dispatchAuthorized: input.dispatchAuthorized,
+    ticket: input.inputs.ticketRef,
+    ...(input.inputs.pr !== null && isFullSha(input.inputs.pr.headSha)
+      ? { expectedHead: input.inputs.pr.headSha }
+      : {}),
   });
   const judged: GateInputs = {
     ...input.inputs,

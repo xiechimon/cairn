@@ -632,6 +632,8 @@ export async function readGateGithubFacts(
         patchDigest,
         need,
         dispatchAuthorized: req.harnessEval.dispatchAuthorized,
+        ticket: req.ticketRef,
+        expectedHead: head,
       });
       facts.harnessEval = { attempt: routed.attempt, now: req.now };
     }

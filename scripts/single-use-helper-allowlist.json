@@ -203,5 +203,35 @@
     "path": "scripts/escape-trace.test.mjs",
     "name": "commit",
     "reason": "Fixture helper returned from fixture(); the gate counts only the return binding as a reference even though tests call the destructured binding many times"
+  },
+  {
+    "path": "apps/server/src/services/harness-eval-coordinator.ts",
+    "name": "claimAttempt",
+    "reason": "Returned as the coordinator port method; the factory closes over db/dispatch/now and inlining would collapse the claim/dispatch/ack state machine into the return object literal"
+  },
+  {
+    "path": "apps/server/src/services/harness-eval-coordinator.ts",
+    "name": "reconcile",
+    "reason": "Returned as the coordinator port method; inlining would put the deadline scan and timeout updates inside the return object literal"
+  },
+  {
+    "path": "apps/server/src/services/harness-eval-coordinator.ts",
+    "name": "complete",
+    "reason": "Returned as the coordinator port method; inlining would put the deadline and worker authorization guards inside the return object literal"
+  },
+  {
+    "path": "apps/server/src/services/harness-eval-coordinator.ts",
+    "name": "getAttempt",
+    "reason": "Returned as the coordinator port method; inlining would put the keyed lookup inside the return object literal"
+  },
+  {
+    "path": "apps/server/src/services/merge-gate/harness-eval-judge.ts",
+    "name": "parseHarnessResult",
+    "reason": "Shared JSON/schema parse used by harnessNeedFromInputs; inlining duplicates try/catch and schema checks at every call"
+  },
+  {
+    "path": "apps/server/test/merge-gate-harness-eval.test.ts",
+    "name": "reclassify1865MissingStaleAsTransient",
+    "reason": "Test fixture that rewrites blocker class for #1865 cases; inlining would repeat the map across readiness assertions"
   }
 ]

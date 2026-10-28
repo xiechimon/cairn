@@ -19,6 +19,8 @@ export type PrepareHarnessEvalInput = {
   patchDigest: string;
   need: HarnessEvalNeed | null;
   dispatchAuthorized: boolean;
+  ticket?: string;
+  expectedHead?: string;
 };
 
 export type PrepareHarnessEvalResult = {
@@ -75,7 +77,11 @@ export async function prepareHarnessEvalRouting(
       dispatched: false,
     };
   }
-  const claimed = await input.coordinator.claimAttempt(key);
+  const claimed = await input.coordinator.claimAttempt({
+    ...key,
+    ...(input.ticket !== undefined ? { ticket: input.ticket } : {}),
+    ...(input.expectedHead !== undefined ? { expectedHead: input.expectedHead } : {}),
+  });
   return {
     attempt: claimed.attempt,
     created: claimed.created,

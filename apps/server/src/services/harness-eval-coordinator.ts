@@ -31,6 +31,8 @@ export type HarnessEvalDispatchRequest = {
   patchDigest: string;
   workerId: string;
   attemptId: string;
+  ticket?: string;
+  expectedHead?: string;
 };
 
 export type HarnessEvalDispatchPort = (request: HarnessEvalDispatchRequest) => Promise<void>;
@@ -47,6 +49,8 @@ export type ClaimAttemptInput = {
   repo: string;
   pr: number;
   patchDigest: string;
+  ticket?: string;
+  expectedHead?: string;
 };
 
 export type ClaimAttemptResult = {
@@ -155,6 +159,8 @@ export function createHarnessEvalCoordinator(deps: HarnessEvalCoordinatorDeps) {
         patchDigest: created.attempt.patchDigest,
         workerId: created.attempt.workerId,
         attemptId: created.attempt.id,
+        ...(input.ticket !== undefined ? { ticket: input.ticket } : {}),
+        ...(input.expectedHead !== undefined ? { expectedHead: input.expectedHead } : {}),
       });
       const acknowledged = recordDispatchAck(created.attempt.id) ?? created.attempt;
       return { attempt: acknowledged, created: true, dispatched: true };
