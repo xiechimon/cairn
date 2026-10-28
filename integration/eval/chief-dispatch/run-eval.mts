@@ -26,6 +26,7 @@ import {
   type MemoryRowLite,
 } from '../memory-regression/grade.mts';
 import { readMemoryRows, seedMemories } from '../memory-regression/seed.mts';
+import { gradePlanCase, isPlanCase, type PlanCase } from '../plan/grade.mts';
 import { gradeRoutingCase, isRoutingCase, type RoutingCase } from '../project-routing/grade.mts';
 import { seedRoutingProjects } from '../project-routing/seed.mts';
 import { type Case, gradeCase, type RosterAgent } from './grade.mts';
@@ -63,7 +64,7 @@ const PRICES: Record<string, { in: number; out: number; cacheRead: number }> = {
   'deepseek-v4-pro': { in: 0.955, out: 1.911, cacheRead: 0.08 },
 };
 
-type EvalCase = Case | MemoryCase | RoutingCase | LearnCase;
+type EvalCase = Case | MemoryCase | RoutingCase | LearnCase | PlanCase;
 
 async function loadCases(): Promise<EvalCase[]> {
   const d = JSON.parse(readFileSync(join(ARGS.flow, 'cases.json'), 'utf8')) as {
@@ -76,7 +77,7 @@ async function loadCases(): Promise<EvalCase[]> {
 }
 
 async function freshStack(
-  input: Case | MemoryCase | RoutingCase,
+  input: Case | MemoryCase | RoutingCase | PlanCase,
 ): Promise<{ stack: Stack; world: SeededWorld; projectIds: Record<string, string> }> {
   const stack = await bootStack();
   try {
@@ -551,10 +552,18 @@ async function main() {
                     throw new Error(`learn case ${c.id} returned no grade`);
                   return run.grade;
                 }
+                if (isPlanCase(c)) return gradePlanCase(c, { evidence: run.evidence });
                 if (isRoutingCase(c)) return gradeRoutingCase(c, run.evidence, run.projectIds);
-                return isMemoryCase(c)
-                  ? gradeMemoryCase(c, { evidence: run.evidence, memoryAfter: run.memoryAfter })
-                  : gradeCase(c, run, ROSTER);
+                if (isMemoryCase(c))
+                  return gradeMemoryCase(c, {
+                    evidence: run.evidence,
+                    memoryAfter: run.memoryAfter,
+                  });
+                if (c.expect.kind === 'dispatch' || c.expect.kind === 'hold')
+                  return gradeCase(c, run, ROSTER);
+                throw new Error(
+                  `unknown expect.kind: ${String((c as { expect?: { kind?: string } }).expect?.kind)}`,
+                );
               },
               judgeRetry,
               deadline,
