@@ -17,7 +17,7 @@ Bad:
 - A production GitOps race remains outside the atomic LandLocal action. A real temporary-repository reproduction establishes that boundary. Product repair is outside this exploratory issue; #2050 contains relevant in-flight ref-transaction work and has not been approved here.
 
 Ugly:
-- The issue acceptance comment restricts paths to the new skill and docs. The normal commit hook rejects the ignored skill without the original PR's supporting one-line gitignore entry. A real git-add negative control and its passing allowlisted counterpart are archived. This metadata exception needs an explicit owner decision before merge.
+- The issue acceptance comment restricts paths to the new skill and docs. The normal commit hook rejects the ignored skill without the original PR's supporting one-line gitignore entry. A real git-add negative control and its passing allowlisted counterpart are archived. The owner explicitly approved this single-line metadata exception in chat on 2026-10-28.
 - No authentication, dispatch protocol, persisted schema, production merge policy or dependency change is included. The lessons baseline writer froze missing legacy counters while recording regression interceptions; counters were not edited by hand.
 
 Tests:
@@ -27,5 +27,3 @@ Tests:
 - Lint, workspace typecheck and spec collection passed. The runtime evidence scripts passed standalone Node-type-aware typechecks. The first published delivery head passed the canonical 29-check prepush entry point.
 - The simplification pass keeps the public model operators and configuration structure. Retained rows replace parallel overwritten outcome and identity slots; no dependency or production abstraction is introduced.
 
-Open questions:
-- May the delivery include the one-line gitignore allowlist entry required for the normal commit hook, despite the issue comment's literal two-directory restriction?

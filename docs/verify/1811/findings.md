@@ -206,8 +206,8 @@ audited `204491eb`, so the original file-and-line reachability mapping remains a
 The replacement changes the new skill and `docs/`, plus the same one-line `.gitignore`
 allowlist entry as the original PR. Without that entry, the normal pre-commit hook
 cannot re-stage this tracked skill directory. Product files are unchanged. This supporting
-metadata change exceeds the issue comment's literal two-directory restriction and must
-be reconciled explicitly in acceptance.
+metadata change exceeds the issue comment's literal two-directory restriction. The owner
+explicitly approved that single-line exception in chat on 2026-10-28.
 
 ## F6: the production fast-forward check and update are separate operations
 

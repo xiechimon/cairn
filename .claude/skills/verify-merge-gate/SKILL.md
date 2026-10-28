@@ -151,6 +151,7 @@ The original unrestricted review-head choice also failed P6 after one review wri
   apps/server/src/services/merge-gate/model-roster-data.ts
   apps/server/src/services/merge-gate-github.ts
   apps/server/src/services/builds.ts
+  apps/server/src/lib/git.ts
   apps/server/src/services/machine-merge-landing.ts
   apps/server/src/services/machine-finish-step.ts
   apps/daemon/src/merge-decision.ts

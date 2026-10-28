@@ -1,8 +1,7 @@
 {
-  "sourceParent": "71281b1e8601851c9e134a6467f50a5cd5e88ac5",
-  "baseCommit": "05d0dd12e3e9eab720bfd7c4afeb097ed4c0615e",
+  "baseCommit": "13e751c1b72b7012e6d4a940bc1cbe6a279b9d3c",
   "files": {
-    ".claude/skills/verify-merge-gate/SKILL.md": "5e21b6bd3e995a91eb52b0bae8380f2d7a8ac5798dc643b9fda9bc01538d1a0a",
+    ".claude/skills/verify-merge-gate/SKILL.md": "dfe6ebf2f7dc75dc39a7e68a2bedcb5fcf39012be648ce3c08483fc62480b11e",
     ".claude/skills/verify-merge-gate/expected.txt": "a66f5c5c8445cde4a05c7d6df88cbecdfc4ff5e538d5db36c88a6205fc9ecd53",
     ".claude/skills/verify-merge-gate/model/LocalLanding.tla": "c16c7e9650ae4b8261f8e1cd38b4cb1fea0c09e1b853901de0dbf3756e3d4c76",
     ".claude/skills/verify-merge-gate/model/MergeGate.tla": "a5798d839017e0f738a3d3ce038dbd1981111ba440ca7206274e9af629ee6e29",
