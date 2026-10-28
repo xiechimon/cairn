@@ -145,6 +145,24 @@ describe('revision grader negative controls', () => {
     expect(g.grade.plan_ok).toBe(0);
     expect(g.explanation.plan_ok).toMatch(/dropped preserved/i);
   });
+
+  test('assistant prose naming the fix does not substitute for todo artifacts', () => {
+    const g = gradePlanRevisionCase(sample, {
+      evidence: turn({
+        assistantText:
+          'Remove the download attribute on the blob url export and keep the regression test.',
+      }),
+      todos: [
+        {
+          id: 't1',
+          title: 'investigate export',
+          spec: 'look around the export path only',
+        },
+      ],
+    });
+    expect(g.grade.plan_ok).toBe(0);
+    expect(g.explanation.plan_ok).toMatch(/missing fix/i);
+  });
 });
 
 function chunk(payload: object): string {

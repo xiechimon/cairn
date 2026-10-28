@@ -200,10 +200,13 @@ describe('gradePlanCase', () => {
       evidence: turn({
         stepStatus: 'done',
         assistantText: 'I will fix the download attribute on the blob url and add a test.',
-        createdTodoIds: [],
-        createdTodoRows: [],
+        createdTodoIds: ['t1'],
+        createdTodoRows: [
+          { id: 't1', title: 'investigate export', spec: 'look around the export path only' },
+        ],
       }),
     });
     expect(g.grade.plan_ok).toBe(0);
+    expect(g.explanation.plan_ok).toMatch(/missing/i);
   });
 });
