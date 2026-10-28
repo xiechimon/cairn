@@ -112,25 +112,15 @@ jobs:
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
         run: node scripts/english-only-gate.mjs --text "$RUNNER_TEMP/pr-body.md"
 
-      # A pending decision must not be racing an armed auto-merge. An
-      # unchecked Acceptance item is a pending decision (verify it or waive
-      # it), so it adds the label; then, whenever the label is on, auto-merge
-      # is disarmed. A draft is still being written, cannot be auto-merged,
-      # and its template boxes are not yet anyone's decision, so it is not
-      # labelled; the red check alone holds it. Both calls are idempotent (re-adding a present label and
-      # disabling an unarmed auto-merge are no-ops) and both use the workflow
-      # token, so neither triggers another workflow run; the first step
-      # re-reads the label from the API on the next user-triggered event.
+      # A pending decision must not be racing an armed auto-merge: whenever
+      # the needs-decision label is on, auto-merge is disarmed. An unchecked
+      # Acceptance item only turns the pr-tasks step red and never adds the
+      # label, so checking the item turns the PR green with no manual label
+      # removal. Disabling an unarmed auto-merge is a no-op and uses the
+      # workflow token, so it does not trigger another workflow run.
       - name: Mark the decision pending and disarm auto-merge
         if: ${{ failure() }}
-        env:
-          PR_DRAFT: ${{ steps.pr.outputs.draft }}
         run: |
-          if [ "$PR_DRAFT" != "true" ] && grep -q 'FAIL unchecked-task' pr-tasks.log 2>/dev/null; then
-            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" -f 'labels[]=needs-decision' --silent
-            touch needs-decision.flag
-            echo "pr-decision: needs-decision label added (unchecked Acceptance item)"
-          fi
           if [ ! -f needs-decision.flag ]; then
             echo "pr-decision: red without a pending decision; auto-merge left as it is"
             exit 0
