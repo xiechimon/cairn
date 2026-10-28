@@ -491,11 +491,14 @@ export const gitPrim = {
     const traceDir = mkdtempSync(join(tmpdir(), 'cairn-push-'));
     const traceFile = join(traceDir, 'trace.jsonl');
     try {
-      const result = await runGit(['push', '--end-of-options', 'origin', branchRef], {
-        cwd: dir,
-        env: { ...env, GIT_TRACE2_EVENT: traceFile },
-        timeoutMs: NET_TIMEOUT_MS,
-      });
+      const result = await runGit(
+        ['push', '--end-of-options', 'origin', `${branchRef}:${branchRef}`],
+        {
+          cwd: dir,
+          env: { ...env, GIT_TRACE2_EVENT: traceFile },
+          timeoutMs: NET_TIMEOUT_MS,
+        },
+      );
       if (result.code === 0) return;
       const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n');
       const pushFailure = new Error(

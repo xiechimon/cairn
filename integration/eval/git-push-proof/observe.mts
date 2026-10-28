@@ -1,12 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { gitPrim } from '../../../apps/daemon/src/git.js';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const sourcePaths = ['apps/daemon/src/git.ts', 'apps/daemon/src/workspace.ts'];
-const fixture = mkdtempSync('/private/tmp/cairn-2047-observation-');
+const fixture = mkdtempSync(join(tmpdir(), 'cairn-2047-observation-'));
 const remote = join(fixture, 'origin.git');
 const work = join(fixture, 'work');
 const publisher = join(fixture, 'publisher');

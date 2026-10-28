@@ -1161,3 +1161,43 @@ test('#2047 multiple fetch URLs cannot select an unrelated last-configured proof
 
   expect(notices).toEqual([]);
 }, 30_000);
+
+describe('#2047 configured push mappings cannot change the requested destination branch', () => {
+  test('a divergent mapped branch cannot turn an unchanged requested branch into a containment notice', async () => {
+    const { remote, dir } = pushFixture();
+    const local = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'work']);
+    const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+    gitOk(remote, ['update-ref', 'refs/heads/release', foreign]);
+    gitOk(dir, ['config', 'remote.origin.push', 'refs/heads/work:refs/heads/release']);
+    const notices: string[] = [];
+
+    await expect(
+      gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+    ).resolves.toBeUndefined();
+
+    expect(notices).toEqual([]);
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(local);
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/release'])).toBe(foreign);
+  }, 30_000);
+
+  test('a writable mapped branch cannot hide rejection from the requested divergent branch', async () => {
+    const { remote, dir } = pushFixture();
+    const seed = gitOk(dir, ['rev-parse', 'HEAD']);
+    const local = commitFile(dir, 'work.txt', 'work\n');
+    gitOk(dir, ['push', 'origin', 'work']);
+    const foreign = gitOk(remote, ['rev-parse', 'refs/heads/main']);
+    gitOk(remote, ['update-ref', 'refs/heads/work', foreign, local]);
+    gitOk(remote, ['update-ref', 'refs/heads/release', seed]);
+    gitOk(dir, ['config', 'remote.origin.push', 'refs/heads/work:refs/heads/release']);
+    const notices: string[] = [];
+
+    await expect(
+      gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b}`)),
+    ).rejects.toThrow(/non-fast-forward|fetch first/);
+
+    expect(notices).toEqual([]);
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(foreign);
+    expect(gitOk(remote, ['rev-parse', 'refs/heads/release'])).toBe(seed);
+  }, 30_000);
+});

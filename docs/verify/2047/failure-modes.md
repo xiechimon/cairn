@@ -14,3 +14,6 @@
 12. Existing successful branch pushes, tag pushes, network retries and credential scoping change behavior.
 
 The original PR tests and additional real-Git controls are installed before changing the source. Test repositories use local temporary bare repositories and synthetic identities.
+
+13. A source-only push refspec inherits a different destination from remote.origin.push. A containing requested branch can then certify a rejection from another branch, or a successful push can publish to the wrong branch. The API must bind both source and destination while preserving named-branch hook input. The new real-Git controls precede the source repair.
+14. The runtime observer must create its fixture under the platform temporary directory so the published replay works on Linux as well as macOS.

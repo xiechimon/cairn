@@ -40,3 +40,23 @@ Main advanced to `928fd93c9ceb896bf83e536166224ef3414a08ec` with routing-evaluat
 CI run `40640258633` passed all four browser shards but failed the positive workspace containment test. The fixture attempted its merge without an explicit commit identity and ignored Git exit codes. With global and system configuration disabled and `user.useConfigOnly=true`, the unmodified fixture reproduces the same missing-log failure. Passing the existing synthetic identity into the merge, requiring successful merge and push exits, and asserting both merge parents makes the same six-test run pass. Product source is unchanged. This test-only follow-up is outside independent snapshot `4155ffa1`; that snapshot and the earlier five-file equivalence artifact describe the preceding revision.
 
 The follow-up author review checks the test-only diff against `cfcc1228`: the merge still uses the same branches and message, the identity matches the other fixture commits, and the assertions require the intended local and main parents. No confirmed finding remains in this follow-up. The four-file Git, workspace, credential-fallback and loopback-proxy run passes 134 tests; lint, typecheck and spec collection pass in `fixture-final-checks.log`.
+
+## Explicit destination follow-up
+
+What it does:
+- Makes the branch push explicitly target the same named remote branch used by the containment proof. Uses the platform temporary directory in the replay observer.
+
+Good:
+- The local source remains refs/heads/work in Git's pre-push protocol; the existing rejecting branch-hook regression still passes. The explicit destination removes remote.origin.push inference without changing tags or proof-fetch addresses.
+
+Bad:
+- The earlier author and DeepSeek reviews missed configured destination mappings. A separate review demonstrated the risk; two real-Git controls fail on d19917ed before the repair. The earlier PASS does not establish acceptance of the repaired head.
+
+Ugly:
+- The new head must remain unmerged until a fresh independent review passes. The earlier byte-equivalence artifacts describe preceding snapshots only.
+
+Tests:
+- The new controls fail with a false containment notice and a resolved promise that should reject. The repaired four-file Git/workspace/credential-fallback/loopback suite passes all 136 tests. The runtime observer verifies the same actual-tip and shared-state invariants on the explicit destination source.
+
+Open questions:
+- No additional product blocker was found in this author review of the follow-up. Independent acceptance remains pending. The simplification review retains one direct refspec instead of introducing a destination parser or new persistent configuration.
