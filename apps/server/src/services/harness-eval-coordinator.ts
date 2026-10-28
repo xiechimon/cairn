@@ -230,8 +230,24 @@ export function createHarnessEvalCoordinator(deps: HarnessEvalCoordinatorDeps) {
     return { ok: true };
   }
 
+  function getAttempt(input: ClaimAttemptInput): HarnessEvalAttempt | null {
+    const row = deps.db
+      .select()
+      .from(harnessEvalAttempt)
+      .where(
+        and(
+          eq(harnessEvalAttempt.repo, input.repo),
+          eq(harnessEvalAttempt.pr, input.pr),
+          eq(harnessEvalAttempt.patchDigest, input.patchDigest),
+        ),
+      )
+      .get();
+    return row === undefined ? null : asAttempt(row);
+  }
+
   return {
     claimAttempt,
+    getAttempt,
     recordDispatchAck: (attemptId: string) => {
       recordDispatchAck(attemptId);
     },

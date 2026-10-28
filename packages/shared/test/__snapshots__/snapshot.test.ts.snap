@@ -6682,6 +6682,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
   "evidence-executable: human, 证据目录里新增或改动了可执行文件",
   "harness-regression-missing: human, 改了 harness 但缺少绑定当前补丁的回归评测结果",
   "harness-regression-stale: human, 回归评测结果绑定的补丁摘要不是当前补丁",
+  "harness-regression-evaluating: transient, Harness regression evaluation is in progress for the current patch",
   "harness-regression-below-threshold: human, 回归评测 decision_ok 低于基线置信区间下限",
   "issue-ref-missing: human, 任务来源解不出 issue 号",
   "evidence-link-missing: transient, PR body 缺钉在本 PR 提交上、指向本 PR 证据的 raw 永久链",
