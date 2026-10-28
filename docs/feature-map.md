@@ -78,22 +78,22 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 
 | Item | Count |
 |---|---|
-| Map rows (issues) | 693 |
-| of which Differentiation surface | 109 |
+| Map rows (issues) | 695 |
+| of which Differentiation surface | 110 |
 | of which Runtime axis | 148 |
-| of which General surface | 436 |
-| status Done | 552 |
+| of which General surface | 437 |
+| status Done | 555 |
 | status In progress | 15 |
-| status Not started | 13 |
+| status Not started | 12 |
 | status Unverified | 113 |
-| anchors = evidence directory + test reference | 240 |
-| anchors = evidence directory only | 214 |
+| anchors = evidence directory + test reference | 242 |
+| anchors = evidence directory only | 215 |
 | anchors = test reference only | 113 |
-| no anchor (`[unverified]`) | 126 |
+| no anchor (`[unverified]`) | 125 |
 | referenced PRs (no rows, §3.2) | 107 |
 | unresolvable ticket numbers (§3.3) | 0 |
 | evidence directories that are not GitHub ticket numbers (§3.4) | 97 |
-| scan surface: spec volumes / test files | 31 / 663 |
+| scan surface: spec volumes / test files | 31 / 668 |
 
 ## 2. Feature map
 
@@ -197,6 +197,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1775](https://github.com/xiechimon/cairn/issues/1775) `daemon: keep team secrets out of the model context (gateway injection), research` | Differentiation surface | Done | `docs/verify/1775/` |
 | [#1783](https://github.com/xiechimon/cairn/issues/1783) `gate(evidence): require a recording when a PR changes interactive or animated UI` | Differentiation surface | Done | `docs/verify/1783/`<br>`apps/server/test/merge-gate-github-facts.test.ts`<br>`apps/server/test/merge-gate-readiness.test.ts`<br>`packages/shared/test/records-recording-trigger.test.ts`<br>`packages/shared/test/verify-prompt.test.ts` |
 | [#1791](https://github.com/xiechimon/cairn/issues/1791) `server: plans that pass the contract check wait at confirm forever unless the chief happens to be watching` | Differentiation surface | Done | `apps/server/test/plan-server-auto-confirm.test.ts` |
+| [#1794](https://github.com/xiechimon/cairn/issues/1794) `gate: run the merge review gate inside Cairn and retire the out-of-product review timer` | Differentiation surface | Done | `docs/verify/1794/`<br>`apps/server/test/merge-gate-product.test.ts` |
 | [#1802](https://github.com/xiechimon/cairn/issues/1802) `server(rework): retry lessons carry the verify verdict and a "verified, keep working" list` | Differentiation surface | Done | `apps/server/test/retry-lessons.test.ts` |
 | [#1811](https://github.com/xiechimon/cairn/issues/1811) `explore: TLA+ checks for task claiming and the merge gate with pstack's create-formal-verification-skill` | Differentiation surface | Done | `docs/verify/1811/` |
 | [#1838](https://github.com/xiechimon/cairn/issues/1838) `chief: research prior art before planning a feature (cited sources, reuse-vs-build decision)` | Differentiation surface | Done | `docs/verify/1838/`<br>`integration/test/plan-prior-art-grade.test.ts`<br>`packages/shared/test/plan-contract-prompt.test.ts`<br>`packages/shared/test/plan-contract.test.ts` |
@@ -719,7 +720,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1513](https://github.com/xiechimon/cairn/issues/1513) `E0-3 build 记 baseSha / harnessHash，人审反馈结构化落库` | General surface | Done | `docs/verify/1513/`<br>`apps/daemon/test/harness-hash.test.ts`<br>`apps/server/test/build-provenance.test.ts` |
 | [#1514](https://github.com/xiechimon/cairn/issues/1514) `E0-4 pnpm traj:export 只读导出 + 脱敏` | General surface | Unverified | [unverified] |
 | [#1515](https://github.com/xiechimon/cairn/issues/1515) `E1-1 合并后第 7 天回填结果标签` | General surface | Unverified | [unverified] |
-| [#1516](https://github.com/xiechimon/cairn/issues/1516) `E1-2 打回与回滚自动生成「失败回放」候选评测题` | General surface | Done | `docs/verify/1516/`<br>`apps/server/test/trajectory-failure-replay.test.ts`<br>`integration/eval/failure-replay/` |
+| [#1516](https://github.com/xiechimon/cairn/issues/1516) `E1-2 打回与回滚自动生成「失败回放」候选评测题` | General surface | Done | `docs/verify/1516/` |
 | [#1517](https://github.com/xiechimon/cairn/issues/1517) `E2-1 pacman-bench v0：从已合并 PR 选 30 题` | General surface | Done | `docs/verify/1517/` |
 | [#1518](https://github.com/xiechimon/cairn/issues/1518) `E2-2 pacman-bench 隔离跑分器` | General surface | Not started | [unverified] |
 | [#1519](https://github.com/xiechimon/cairn/issues/1519) `E2-3 回归评测接入 CI` | General surface | Not started | [unverified] |
@@ -793,6 +794,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#2021](https://github.com/xiechimon/cairn/issues/2021) `infra: lane workers failing on omarchy` | General surface | In progress | `docs/verify/2021/` |
 | [#2024](https://github.com/xiechimon/cairn/issues/2024) `main red: commit-author on 51cab1f0` | General surface | Done | `docs/verify/2024/` |
 | [#2028](https://github.com/xiechimon/cairn/issues/2028) `main red: commit-author on 4bbfe50e` | General surface | Done | `docs/verify/2028/` |
+| [#2078](https://github.com/xiechimon/cairn/issues/2078) `integration(1973): make --write-verify evidence atomic and complete-run-only` | General surface | Done | `docs/verify/2078/`<br>`integration/test/write-verify.test.ts` |
 | [#2083](https://github.com/xiechimon/cairn/issues/2083) `Bounded image-to-text fallback with unread-image notices` | General surface | Done | `docs/verify/2083/` |
 
 ## 3. Rows without anchors and rows that cannot be resolved (follow-up work)
@@ -916,7 +918,6 @@ These rows have neither a `docs/verify/<ticket>/` directory nor a CI-test-surfac
 | [#1510](https://github.com/xiechimon/cairn/issues/1510) | `spec 29 评测与数据闭环 + ADR 0022 评测面入保护路径` | `docs/spec/29-evaluation-and-data-loop.md` |
 | [#1514](https://github.com/xiechimon/cairn/issues/1514) | `E0-4 pnpm traj:export 只读导出 + 脱敏` | `docs/spec/29-evaluation-and-data-loop.md` |
 | [#1515](https://github.com/xiechimon/cairn/issues/1515) | `E1-1 合并后第 7 天回填结果标签` | `docs/spec/29-evaluation-and-data-loop.md` |
-| [#1516](https://github.com/xiechimon/cairn/issues/1516) | `E1-2 打回与回滚自动生成「失败回放」候选评测题` | `docs/spec/29-evaluation-and-data-loop.md` |
 | [#1518](https://github.com/xiechimon/cairn/issues/1518) | `E2-2 pacman-bench 隔离跑分器` | `docs/spec/29-evaluation-and-data-loop.md` |
 | [#1519](https://github.com/xiechimon/cairn/issues/1519) | `E2-3 回归评测接入 CI` | `docs/spec/29-evaluation-and-data-loop.md` |
 | [#1532](https://github.com/xiechimon/cairn/issues/1532) | `E2 附：同模型不同 harness 的页面生成对比评测（题库、打分细则、基线）` | `docs/spec/29-evaluation-and-data-loop.md` |
