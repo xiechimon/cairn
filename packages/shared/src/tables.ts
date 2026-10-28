@@ -40,6 +40,7 @@ export const DB_TABLES = [
   'memory_candidate',
   'push_subscription',
   'push_digest_item',
+  'harness_eval_attempts',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -66,4 +67,5 @@ export const INTERNAL_ONLY_TABLES = [
   'memory_candidate',
   'push_subscription',
   'push_digest_item',
+  'harness_eval_attempts',
 ] as const;
