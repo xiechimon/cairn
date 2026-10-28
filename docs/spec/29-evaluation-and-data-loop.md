@@ -101,7 +101,7 @@ Consequences already absorbed by other tickets: #1515's weekly summary is replac
 | E1 | #1605 | Adoption judge: validity / trigger / paired-z gates + read-once sealed set | merged (PR #1636) |
 | E1 | #1606 | Pack failure-attribution fields | merged (PR #1660) |
 | E1-1 | #1515 | 7-day outcome backfill | closed; the weekly summary it carried is replaced by Langfuse score dashboards (§3), and the lessons ledger feeds its facts in from the repository side (§4a) |
-| E1-2 | #1516 | Failure-replay candidate generation from rejections/rollbacks | open, waits for E0 (merged) — 2026-10-23 adjustment: confirmation via Langfuse annotation queue |
+| E1-2 | #1516 | Failure-replay candidate generation from rejections/rollbacks | landed (`pnpm traj:failure-replay`); confirmation via Langfuse annotation queue; bank at `integration/eval/failure-replay/` |
 | E2-1 | #1517 | pacman-bench v0: 30 tasks from merged PRs (Harbor format since 2026-10-25) | open |
 | E2-2 | #1518 | Isolated runner (Harbor since 2026-10-25) | open |
 | E2-3 | #1519 | Bench holdout slice as a CI regression gate | open |

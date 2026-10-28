@@ -705,7 +705,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1513](https://github.com/xiechimon/cairn/issues/1513) `E0-3 build 记 baseSha / harnessHash，人审反馈结构化落库` | General surface | Done | `docs/verify/1513/`<br>`apps/daemon/test/harness-hash.test.ts`<br>`apps/server/test/build-provenance.test.ts` |
 | [#1514](https://github.com/xiechimon/cairn/issues/1514) `E0-4 pnpm traj:export 只读导出 + 脱敏` | General surface | Unverified | [unverified] |
 | [#1515](https://github.com/xiechimon/cairn/issues/1515) `E1-1 合并后第 7 天回填结果标签` | General surface | Unverified | [unverified] |
-| [#1516](https://github.com/xiechimon/cairn/issues/1516) `E1-2 打回与回滚自动生成「失败回放」候选评测题` | General surface | Not started | [unverified] |
+| [#1516](https://github.com/xiechimon/cairn/issues/1516) `E1-2 打回与回滚自动生成「失败回放」候选评测题` | General surface | Done | `docs/verify/1516/`<br>`apps/server/test/trajectory-failure-replay.test.ts`<br>`integration/eval/failure-replay/` |
 | [#1517](https://github.com/xiechimon/cairn/issues/1517) `E2-1 pacman-bench v0：从已合并 PR 选 30 题` | General surface | Not started | [unverified] |
 | [#1518](https://github.com/xiechimon/cairn/issues/1518) `E2-2 pacman-bench 隔离跑分器` | General surface | Not started | [unverified] |
 | [#1519](https://github.com/xiechimon/cairn/issues/1519) `E2-3 回归评测接入 CI` | General surface | Not started | [unverified] |

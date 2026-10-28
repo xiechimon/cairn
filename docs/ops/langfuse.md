@@ -126,6 +126,33 @@ OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:3000/api/public/otel"
 OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic $(printf '%s' "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" | base64 | tr -d '\n'),x-langfuse-ingestion-version=4"
 ```
 
+## Failure-replay annotation queue (#1516)
+
+Plan rejection, review blocking, and post-merge revert trajectories become
+candidate bench questions (`pnpm traj:failure-replay --generate`). Push the
+matching packs with `pnpm traj:push` first so the deterministic build trace ids
+exist in Langfuse, then enqueue:
+
+```sh
+export CAIRN_LANGFUSE_HOST="http://127.0.0.1:3000"
+export CAIRN_LANGFUSE_PUBLIC_KEY="pk-lf-…"
+export CAIRN_LANGFUSE_SECRET_KEY="sk-lf-…"
+export CAIRN_LANGFUSE_ANNOTATION_QUEUE_ID="<queue-id>"
+pnpm traj:failure-replay --enqueue --in /tmp/failure-replay-candidates.jsonl
+```
+
+Create the queue once in the Langfuse UI (Annotations → New queue) with a
+pass/fail score config. Humans mark items COMPLETED there. Intake then writes
+only confirmed cases into the protected bank:
+
+```sh
+pnpm traj:failure-replay --intake --in /tmp/failure-replay-candidates.jsonl \
+  --bank integration/eval/failure-replay --out /tmp/failure-replay-confirmed.jsonl
+```
+
+Pending candidates never enter `integration/eval/`. The intake PR still needs a
+human merge (ADR 0025).
+
 ## Pushing trajectory packs (#1570)
 
 The JSONL trajectory packs produced by `pnpm traj:export` are converted by `pnpm traj:push` into OTLP/HTTP JSON and pushed to the endpoint above. It uses only the public protocol, carries no Langfuse SDK, and exits with an error when `CAIRN_OTEL_ENDPOINT` is not configured; nothing else in Cairn is affected.

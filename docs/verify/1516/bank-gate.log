@@ -1,0 +1,4 @@
+pending_candidates=3
+events=plan-rejection,review-blocking,post-merge-revert
+pending_bank_files=0 bank_empty=true
+confirmed_bank_files=3 cases=fr-plan-rejection-212a32648cf8.json,fr-post-merge-revert-e3250a47ef66.json,fr-review-blocking-077ae856b53f.json

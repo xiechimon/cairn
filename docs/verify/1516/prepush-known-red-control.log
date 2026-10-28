@@ -1,0 +1,6 @@
+Control: same failures on origin/main (278b620c) in this cloud agent VM, unrelated to #1516 sources.
+
+- apps/daemon/test/local-merge.test.ts: 8 failed | 5 passed (timeouts under 5s)
+- integration/test/routing-boundary.test.ts: permits runtime capability probes → syscall 257 /etc/resolv.conf
+- integration/test/g2t2-local-lifecycle.test.ts: autonomous local landing → expected done, got review
+- playwright chromium missing initially for board-trio / done-dialog / m5 / m7 / task-meta / web-plans e2e; installed chromium_headless_shell-1243 before retry
