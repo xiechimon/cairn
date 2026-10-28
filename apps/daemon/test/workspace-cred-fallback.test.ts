@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { commitEnv, gitPrim, runGit } from '../src/git.js';
+import { commitEnv, gitPrim, runGit, runGitOk } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
 
@@ -189,11 +189,15 @@ describe('#2006 closing push of a work branch the remote already contains', () =
 
     await runGit(['fetch', 'origin', 'refs/heads/work'], { cwd: seedDir });
     await runGit(['checkout', '--detach', local], { cwd: seedDir });
-    await runGit(['merge', '--no-ff', '-m', "Merge branch 'main' into work", 'origin/main'], {
+    await runGitOk(['merge', '--no-ff', '-m', "Merge branch 'main' into work", 'origin/main'], {
       cwd: seedDir,
+      env: commitEnv(IDENTITY),
     });
-    await runGit(['push', 'origin', 'HEAD:refs/heads/work'], { cwd: seedDir });
-    const remote = (await runGit(['rev-parse', 'HEAD'], { cwd: seedDir })).stdout.trim();
+    await runGitOk(['push', 'origin', 'HEAD:refs/heads/work'], { cwd: seedDir });
+    const remote = await runGitOk(['rev-parse', 'HEAD'], { cwd: seedDir });
+    const main = await runGitOk(['rev-parse', 'origin/main'], { cwd: seedDir });
+    const parents = await runGitOk(['show', '-s', '--format=%P', remote], { cwd: seedDir });
+    expect(parents.split(' ')).toEqual([local, main]);
     return { cwd, local, remote };
   }
 

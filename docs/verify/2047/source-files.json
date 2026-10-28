@@ -5,7 +5,7 @@
     "apps/daemon/src/git.ts": "03868263319e1a9b1f65943c2af7ddedf2c44c8c9ccac69c720ce70c8b1b2d87",
     "apps/daemon/src/workspace.ts": "8c31d3c632fbbee5ebfb2a8a4ce038e89121247a4f1d170fe00e01f84d067f0c",
     "apps/daemon/test/git.test.ts": "353d0874a59c0752c9f7369fb0fcd27f87484ff319856869468c1cdefc34c239",
-    "apps/daemon/test/workspace-cred-fallback.test.ts": "504cc34570766638b1676575e4814d5068fce91d0d4f863191f1fcf9d5fbd0dc",
+    "apps/daemon/test/workspace-cred-fallback.test.ts": "371e9e39991a72cd63ca761fe443b1cd76349ba639a8d212791d4807a0a2e937",
     "integration/eval/git-push-proof/observe.mts": "fdcc73955cc7d897b18c5125c630b92d8cbd4f4c018ff7eaa8a9f39bd42efaca"
   }
 }
