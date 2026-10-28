@@ -68,3 +68,16 @@ jobs:
         with:
           name: gardener-weekly
           path: gardener-summary/
+
+      - name: Delivery metrics weekly (#1758)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/delivery-metrics.mjs --out docs/metrics --comment --ticket 1717
+          cat docs/metrics/*.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload delivery metrics (#1758)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: delivery-metrics
+          path: docs/metrics/
