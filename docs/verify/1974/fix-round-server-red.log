@@ -1,0 +1,78 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1974
+
+ ❯ |@xiechimon/cairn| test/feishu-migration.test.ts (3 tests | 2 failed) 94ms
+   × fresh database applies Feishu migration and preserves main data 43ms
+   × upgrade database applies Feishu migration and preserves main data 47ms
+ ❯ |@xiechimon/cairn| test/feishu-config.test.ts (5 tests | 2 failed) 228ms
+   × configuration persists, replaces encrypted credentials, and completely unbinds without network calls 65ms
+   × ordinary secret APIs keep feishu.bot names usable and never expose the binding ciphers 36ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/feishu-config.test.ts > configuration persists, replaces encrypted credentials, and completely unbinds without network calls
+TypeError: .toMatch() expects to receive a string, but got undefined
+ ❯ test/feishu-config.test.ts:43:32
+     41|   const binding = s.db.select().from(feishuBinding).get();
+     42|   expect(binding).toBeDefined();
+     43|   expect(binding?.appIdCipher).toMatch(/^v1:/);
+       |                                ^
+     44|   expect(binding?.appSecretCipher).toMatch(/^v1:/);
+     45|   expect(binding?.appIdCipher).not.toContain(config.appId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/feishu-config.test.ts > ordinary secret APIs keep feishu.bot names usable and never expose the binding ciphers
+AssertionError: expected 400 to be 201 // Object.is equality
+
+- Expected
++ Received
+
+- 201
++ 400
+
+ ❯ test/feishu-config.test.ts:125:28
+    123|   for (const name of ['feishu.bot.app-id', 'feishu.bot.app-secret', 'F…
+    124|     const created = await req(s.app, 'POST', secretsPath, { name, valu…
+    125|     expect(created.status).toBe(201);
+       |                            ^
+    126|     const id = ((await created.json()) as { id: string }).id;
+    127|     expect(await (await req(s.app, 'GET', secretsPath)).json()).toEqua…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/feishu-migration.test.ts > fresh database applies Feishu migration and preserves main data
+ FAIL  |@xiechimon/cairn| test/feishu-migration.test.ts > upgrade database applies Feishu migration and preserves main data
+AssertionError: expected [ 'teamId', 'userId', 'openId', …(1) ] to deeply equal ArrayContaining{…}
+
+- Expected
++ Received
+
+- ArrayContaining [
++ [
+    "teamId",
+    "userId",
+    "openId",
+    "cairnOrigin",
+-   "appIdCipher",
+-   "appSecretCipher",
+-   "createdAt",
+-   "updatedAt",
+  ]
+
+ ❯ test/feishu-migration.test.ts:73:30
+     71|         sqlite.prepare("PRAGMA table_info('feishu_binding')").all() as…
+     72|       ).map((column) => column.name);
+     73|       expect(bindingColumns).toEqual(
+       |                              ^
+     74|         expect.arrayContaining([
+     75|           'teamId',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 4 passed (8)
+   Start at  19:02:16
+   Duration  1.39s (import 41%, transform 40%, tests 19%)
+

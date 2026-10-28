@@ -6543,6 +6543,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "attachment",
   "branch_sync",
   "github_connection",
+  "feishu_binding",
   "skill_audit",
   "gate_digest",
   "gate_round",
@@ -6559,6 +6560,18 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
 
 exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint vocabulary (02 §6.1) 1`] = `
 [
+  {
+    "method": "GET",
+    "path": "/api/teams/{id}/feishu",
+  },
+  {
+    "method": "PUT",
+    "path": "/api/teams/{id}/feishu",
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/teams/{id}/feishu",
+  },
   {
     "method": "GET",
     "note": "保形返回 seed 用户（02 §2.1）",

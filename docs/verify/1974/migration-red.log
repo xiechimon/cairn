@@ -1,0 +1,50 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1974
+
+ ❯ |@xiechimon/cairn| test/feishu-migration.test.ts (3 tests | 3 failed) 182ms
+   × Feishu migration follows all main migrations with unique indexes and a complete current-schema snapshot 7ms
+   × fresh database applies Feishu migration and preserves main data 94ms
+   × upgrade database applies Feishu migration and preserves main data 78ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/feishu-migration.test.ts > Feishu migration follows all main migrations with unique indexes and a complete current-schema snapshot
+AssertionError: expected [ '0000_glamorous_mimic', …(59) ] to include '0060_chief_message_project'
+ ❯ test/feishu-migration.test.ts:17:51
+     15| test('Feishu migration follows all main migrations with unique indexes…
+     16|   expect(journal.entries.map(entry => entry.tag)).toContain('0059_reti…
+     17|   expect(journal.entries.map(entry => entry.tag)).toContain('0060_chie…
+       |                                                   ^
+     18|   expect(journal.entries.map(entry => entry.tag)).toContain('0061_firs…
+     19|   expect(new Set(journal.entries.map(entry => entry.idx)).size).toBe(j…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/feishu-migration.test.ts > fresh database applies Feishu migration and preserves main data
+ FAIL  |@xiechimon/cairn| test/feishu-migration.test.ts > upgrade database applies Feishu migration and preserves main data
+AssertionError: expected undefined to deeply equal { name: 'feishu_binding' }
+
+- Expected:
+{
+  "name": "feishu_binding",
+}
+
++ Received:
+undefined
+
+ ❯ test/feishu-migration.test.ts:48:98
+     46|     }
+     47|     migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+     48|     expect(sqlite.prepare("SELECT name FROM sqlite_master WHERE name =…
+       |                                                                                                  ^
+     49|     expect(sqlite.prepare("SELECT name FROM sqlite_master WHERE name =…
+     50|     if (mode === 'upgrade') {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  16:28:29
+   Duration  1.23s (transform 51%, import 32%, tests 17%)
+
