@@ -1755,11 +1755,10 @@ describe('opt-in wiring: index.ts takes the intake run slot via issueIntakeRunOf
     expect(lines[0]?.msg).toContain(' on ');
   });
 
-  test('the 5th slot of createScheduler in index.ts comes from issueIntakeRunOf(config, ...)', () => {
+  test('createScheduler in index.ts wires issueIntakeRunOf before trajectoryOutcomeRunOf', () => {
     const src = readFileSync(join(import.meta.dirname, '../src/index.ts'), 'utf8');
     const call = /createScheduler\(([\s\S]*?)\n\);/.exec(src)?.[1] ?? '';
-    const args = call.split('\n').filter((l) => l.trim() !== '');
-    expect(args.at(-3)?.trim()).toMatch(/^issueIntakeRunOf\(config, /);
+    expect(call).toMatch(/issueIntakeRunOf\(config,[\s\S]*trajectoryOutcomeRunOf\(config,/);
   });
 });
 

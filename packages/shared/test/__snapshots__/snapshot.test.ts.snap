@@ -6429,6 +6429,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "team": "CAIRN_TEAM",
     "token": "CAIRN_TOKEN",
     "trajectoryOutcomeBackfill": "CAIRN_TRAJ_OUTCOME_BACKFILL",
+    "trajectoryReflectCurate": "CAIRN_TRAJ_REFLECT_CURATE",
+    "trajectoryReflectOpenGuardIssues": "CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES",
     "webDir": "CAIRN_WEB_DIR",
     "workspacesDir": "CAIRN_WORKSPACES_DIR",
   },
