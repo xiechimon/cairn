@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { type BenchTask, CAIRN_BENCH_TASKS } from './bench.mts';
 import type { RoutingArm } from './driver.mts';
 
-export const EXPERIMENT_MANIFEST = 'experiment.json';
+export const EXPERIMENT_MANIFEST = 'manifest.json';
 export const RESULTS_JSONL = 'results.jsonl';
 
 export type PriceRates = {
@@ -23,6 +23,7 @@ export interface ExperimentIdentity {
   singleModels: string[];
   taskIds: string[];
   taskDigest: string;
+  promptsDigest: string;
   harnessDigest: string;
   reps: number;
   timeoutS: number;
@@ -51,18 +52,22 @@ const HARNESS_FILES = [
   'session-tools.mts',
 ] as const;
 
-function sha256(text: string): string {
-  return createHash('sha256').update(text).digest('hex');
-}
-
 export function taskDigest(tasks: readonly BenchTask[]): string {
   const h = createHash('sha256');
   for (const task of [...tasks].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
     h.update(task.id).update('\0');
-    h.update(task.prompt).update('\0');
     h.update(JSON.stringify(task.seedFiles)).update('\0');
     h.update(JSON.stringify(task.oracle)).update('\0');
     h.update(JSON.stringify(task.decoy ?? null)).update('\0');
+  }
+  return h.digest('hex');
+}
+
+export function promptsDigest(tasks: readonly BenchTask[]): string {
+  const h = createHash('sha256');
+  for (const task of [...tasks].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+    h.update(task.id).update('\0');
+    h.update(task.prompt).update('\0');
   }
   return h.digest('hex');
 }
@@ -80,7 +85,17 @@ export function harnessDigest(here = dirname(fileURLToPath(import.meta.url))): s
 
 export function pricesDigest(prices: Record<string, PriceRates> | null): string | null {
   if (prices === null) return null;
-  return sha256(JSON.stringify(prices, Object.keys(prices).sort()));
+  const h = createHash('sha256');
+  for (const model of Object.keys(prices).sort()) {
+    const rates = prices[model];
+    if (rates === undefined) continue;
+    h.update(model).update('\0');
+    h.update(String(rates.input)).update('\0');
+    h.update(String(rates.output)).update('\0');
+    h.update(String(rates.cacheRead)).update('\0');
+    h.update(String(rates.cacheWrite)).update('\0');
+  }
+  return h.digest('hex');
 }
 
 export function buildExperimentIdentity(input: {
@@ -102,6 +117,7 @@ export function buildExperimentIdentity(input: {
     singleModels: [...input.singleModels],
     taskIds: input.tasks.map((task) => task.id),
     taskDigest: taskDigest(input.tasks),
+    promptsDigest: promptsDigest(input.tasks),
     harnessDigest: harnessDigest(),
     reps: input.reps,
     timeoutS: input.timeoutS,
@@ -134,6 +150,7 @@ export function identityConflicts(
   check('singleModels', 'singleModels');
   check('taskIds', 'task set');
   check('taskDigest', 'task/oracle digest');
+  check('promptsDigest', 'prompts');
   check('harnessDigest', 'harness digest');
   check('reps', 'reps');
   check('timeoutS', 'timeout-s');

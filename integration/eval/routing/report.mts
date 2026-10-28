@@ -106,7 +106,8 @@ export function aggregateByModel(
   for (const [key, bucket] of groups) {
     const [arm, model] = key.split('\0') as [RoutingArm, string];
     const gradedRows = bucket.filter((row) => row.status !== 'error');
-    const passes = gradedRows.filter((row) => row.status === 'pass').length;
+    const rateRows = bucket.filter((row) => row.status !== 'error' || isFlagged(row));
+    const passes = rateRows.filter((row) => row.status === 'pass').length;
     const costs = bucket
       .map((row) => rowCost(row, prices))
       .filter((cost): cost is number => cost !== null);
@@ -119,10 +120,10 @@ export function aggregateByModel(
       runs: bucket.length,
       graded: gradedRows.length,
       passes,
-      errors: bucket.length - gradedRows.length,
+      errors: bucket.filter((row) => row.status === 'error').length,
       flagged: bucket.filter(isFlagged).length,
-      passRate: gradedRows.length > 0 ? passes / gradedRows.length : null,
-      passRateCI: wilsonInterval(passes, gradedRows.length),
+      passRate: rateRows.length > 0 ? passes / rateRows.length : null,
+      passRateCI: wilsonInterval(passes, rateRows.length),
       costMeanUsd: costs.length > 0 ? mean(costs) : null,
       costCI: bootstrapMeanCI(costs),
       wallMeanMs: walls.length > 0 ? mean(walls) : null,
@@ -167,7 +168,7 @@ export function renderReport(
     `- Planner model for the handoff arm: ${identity.planner ?? '-'}`,
     `- Generated: ${meta.generatedAt}`,
     '',
-    'Pass rate counts only graded runs (errors excluded); flagged runs count as failures.',
+    'Pass rate excludes plain errors; flagged errors count as failures in the denominator.',
     'Cost cells show `unknown` when the persisted prices map has no rate for that model.',
     '',
     '## Per model',

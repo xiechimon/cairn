@@ -66,7 +66,7 @@ options:
   --relay-key <key>      API key (or CAIRN_EVAL_RELAY_KEY)
   --timeout-s <n>        per-session timeout seconds (default 900)
   --thinking <level>     optional thinking level
-  --report-only          rebuild report.md from persisted experiment.json + results.jsonl
+  --report-only          rebuild report.md from persisted manifest.json + results.jsonl
 `);
 }
 
@@ -304,6 +304,14 @@ export async function runExperiment(args: RoutingCliArgs): Promise<{
     }
   }
   console.error(`[routing] ${planned.length} run(s) to go on ${tasks.length} task(s)`);
+
+  if (planned.length === 0) {
+    const existingReport = join(args.out, 'report.md');
+    if (existsSync(existingReport)) {
+      return { planned: 0, ran: 0, reportPath: existingReport };
+    }
+    return { planned: 0, ran: 0, reportPath: writeRoutingReport(args.out, identity) };
+  }
 
   const resultsPath = join(args.out, RESULTS_JSONL);
   let ran = 0;
