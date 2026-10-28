@@ -137,6 +137,7 @@ export const claimedStepSchema = z.object({
   remoteTools: z.array(remoteToolDefSchema).optional(),
   localTools: z.array(z.string()).optional(),
   mcpServers: z.array(z.string()).optional(),
+  remoteToolsOnly: z.literal(true).optional(),
 });
 export type ClaimedStep = z.infer<typeof claimedStepSchema>;
 

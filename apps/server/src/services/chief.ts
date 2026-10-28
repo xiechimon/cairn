@@ -12,19 +12,24 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
+  CHIEF_DIGEST_GROUP_LABELS,
+  CHIEF_DIGEST_ROW_ID_PREFIX,
   CHIEF_REMOTE_TOOLS,
   CHIEF_WATCH_REASON_DISPATCH,
+  chiefDigestContentSchema,
+  chiefDigestThreadId,
   chiefIdFormat,
   chiefThreadTitle,
   chiefTurnErrorContentSchema,
   fenceIssueText,
   ISSUE_FENCE_OPEN,
   isBackendRuntimeId,
+  isChiefDigestThreadId,
   isIssueSourcedTask,
   newChiefThreadId,
   PLAN_PRIOR_ART_RULE,
 } from '@cairn/shared';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -308,7 +313,7 @@ export function listChiefThreads(deps: ChiefDeps, teamId: string): ChiefThread[]
   return deps.db
     .select()
     .from(chiefThread)
-    .where(eq(chiefThread.chiefId, row.id))
+    .where(and(eq(chiefThread.chiefId, row.id), ne(chiefThread.id, chiefDigestThreadId(row.id))))
     .orderBy(desc(chiefThread.updatedAt))
     .all()
     .map((r) => {
@@ -419,7 +424,7 @@ export function sendChiefMessage(
   let threadRow: ThreadRow | undefined;
   if (body.threadId !== null) {
     threadRow = getChiefThread(deps, body.threadId);
-    if (!threadRow || threadRow.teamId !== teamId) {
+    if (!threadRow || threadRow.teamId !== teamId || isChiefDigestThreadId(threadRow.id)) {
       throw new HttpError(404, `chief thread ${body.threadId}`);
     }
   }
@@ -821,7 +826,13 @@ export function fireDueChiefWakes(deps: ChiefDeps, now: number): void {
   }
 }
 
-export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string): string {
+const CHIEF_DIGEST_PROMPT_DIGESTS = 3;
+
+export function composeChiefSystemPrompt(
+  deps: ChiefResourceDeps,
+  teamId: string,
+  threadId?: string,
+): string {
   const chiefRow = ensureChief(deps, teamId);
   const agentRow = chiefRow.agentId
     ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
@@ -831,6 +842,30 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
   const skills = scanLocalSkills(deps.skillsDir);
   const memories = agentRow ? injectMemories(deps.db, { agentId: agentRow.id }) : [];
 
+  const digestRows = deps.db
+    .select({ content: chiefMessage.content })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, threadId ?? ''),
+        like(chiefMessage.id, `${CHIEF_DIGEST_ROW_ID_PREFIX}%`),
+      ),
+    )
+    .orderBy(desc(chiefMessage.createdAt))
+    .limit(CHIEF_DIGEST_PROMPT_DIGESTS)
+    .all();
+  const digestLines: string[] = [];
+  for (const row of digestRows.reverse()) {
+    const parsed = chiefDigestContentSchema.safeParse(
+      typeof row.content === 'string' ? JSON.parse(row.content) : row.content,
+    );
+    if (!parsed.success) continue;
+    for (const item of parsed.data.items) {
+      digestLines.push(
+        `- [${CHIEF_DIGEST_GROUP_LABELS[item.group]}] ${item.text}${item.reason !== '' ? `（${item.reason}）` : ''}`,
+      );
+    }
+  }
   const lines: string[] = [
     '你是「总管」（Chief）——每「用户×团队」一个的调度与对话代理：理解用户请求、创建任务、分派给合适的 Agent 执行，并在关口/落地/失败时跟进汇报。',
     '',
@@ -867,6 +902,7 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
       ? memories.map((m) => `- ${m.title}：${m.content}`).join('\n')
       : '（尚无记忆）',
     '',
+    ...(digestLines.length > 0 ? ['## 之前对话的摘要（原文仍在对话里）', ...digestLines, ''] : []),
     '## 工作约定',
     '- 措辞→spec：把用户口语请求变换为 todo——title = 动词短语提炼；spec = 三段式：① 用户原文 blockquote（`> …`）② `要求：` bullet 展开（文件位置/内容要点/读者对象）③ 需要时 `补充信息（探测得出，非用户确认）：` bullet（先探测仓库/资源再写事实，显式标注非用户确认）。',
     '- 拆分：拆分粒度 = 核销次数——按可独立验收的成果拆，不按执行步骤拆；同类小事项合并一张卡（多子事项以 ` + ` 并入标题），跨类型、可各自独立验收的交付物才拆成多张。子卡 spec 必须内嵌用户原文片段（`> …` blockquote）并给兄弟任务文字交叉引用。',
@@ -888,6 +924,7 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
     '- 记忆写入：仅在用户明确要求或明显值得沉淀时 save_memory（配额 100 条）。',
     '- 对话续接：create_todo 前先查同类进行中的 todo；若存在，用 message_todo 追加到运行中的 todo，不重复 create_todo。',
     '- 状态问答：回答进度/合并/运行状态前必须先调 todos、pull_requests、workflow_runs 或 machines 取当前状态，不凭记忆回答。',
+    '- 对话摘要：摘要只记对话，任务状态以工具查到的为准，两者对不上时信任务状态。用户问起以前的决定时，先从摘要里找，再用 todos 查任务现状，只回答，不建任务。',
     '- 回复简短：用用户语言、白话短句回复；没有新信息时不要回复。',
     '- 插话：用户在你回复途中补充的话（插话）会直接送进本回合。必须采纳它，并在这次回复里用一句话说明因为插话改了什么；插话和原请求冲突时以插话为准。',
     '- 记忆写入（纠错）：用户纠正总管时，不必等明确要求，直接 save_memory。',
@@ -909,7 +946,7 @@ export function chiefClaimContext(
   const threadRow = getChiefThread(deps, threadId);
   if (!threadRow) return null;
   return {
-    systemPrompt: composeChiefSystemPrompt(deps, threadRow.teamId),
+    systemPrompt: composeChiefSystemPrompt(deps, threadRow.teamId, threadId),
     sessionId: threadRow.sessionId !== '' ? threadRow.sessionId : null,
     trigger: 'user',
   };

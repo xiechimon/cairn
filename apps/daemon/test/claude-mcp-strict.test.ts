@@ -189,3 +189,21 @@ describe('claude-code spawn MCP isolation (#1307, tri-state)', () => {
     );
   });
 });
+
+describe('claude-code remote-only sessions (#1939)', () => {
+  test('no built-in tools: options carry tools [] and argv passes an empty --tools', async () => {
+    const cairn = createSdkMcpServer({ name: 'cairn', alwaysLoad: true, tools: [] });
+    const { options, args } = await spawnArgs(
+      parts({ mcpServers: { cairn }, strictMcpConfig: true, builtinTools: [] }),
+    );
+    expect(options.tools).toEqual([]);
+    const index = args.indexOf('--tools');
+    expect(index).toBeGreaterThanOrEqual(0);
+    expect(args[index + 1]).toBe('');
+    expect(args).toContain('--strict-mcp-config');
+  });
+
+  test('default sessions keep the preset tool set', () => {
+    expect('tools' in buildClaudeSdkOptions(parts())).toBe(false);
+  });
+});
