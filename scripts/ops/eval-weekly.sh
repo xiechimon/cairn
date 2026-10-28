@@ -3,6 +3,27 @@ set -euo pipefail
 export PATH="${HOME}/.local/share/mise/shims:${HOME}/.local/bin:/usr/local/bin:/usr/bin:${PATH}"
 export GIT_TERMINAL_PROMPT=0
 
+utc_midnight_offset() {
+  node --input-type=module -e '
+    const day = process.argv[1];
+    const offset = Number(process.argv[2]);
+    const start = new Date(`${day}T00:00:00.000Z`);
+    if (Number.isNaN(start.valueOf()) || !Number.isSafeInteger(offset)) process.exit(2);
+    start.setUTCDate(start.getUTCDate() + offset);
+    process.stdout.write(start.toISOString());
+  ' "$1" "$2"
+}
+
+if [[ "${1:-}" == "--week-window" ]]; then
+  if [[ -z "${2:-}" ]]; then
+    echo "eval-weekly: usage: --week-window YYYY-MM-DD" >&2
+    exit 2
+  fi
+  echo "since=$(utc_midnight_offset "$2" -7)"
+  echo "until=$(utc_midnight_offset "$2" 1)"
+  exit 0
+fi
+
 if [[ -z "${CAIRN_EVAL_RELAY_KEY:-}" || -z "${CAIRN_EVAL_RELAY_URL:-}" ]]; then
   source "${HOME}/.cairn/tools/eval-env.sh"
 fi
@@ -32,8 +53,58 @@ record_dir() {
     --date "${day}"
 }
 
+export_and_label_packs() {
+  local packs_dir="$1"
+  local day="$2"
+  local model="$3"
+  local packs_export="${packs_dir}/export.jsonl"
+  local packs_labeled="${packs_dir}/labeled.jsonl"
+  local week_since week_until
+  mkdir -p "${packs_dir}"
+  rm -f "${packs_export}" "${packs_labeled}"
+  week_since="$(utc_midnight_offset "${day}" -7)"
+  week_until="$(utc_midnight_offset "${day}" 1)"
+  echo "eval-weekly: exporting packs ${week_since} .. ${week_until}" >&2
+  pnpm traj:export --since "${week_since}" --until "${week_until}" --out "${packs_export}"
+  echo "eval-weekly: labeling packs with ${model}" >&2
+  if ! pnpm traj:label --in "${packs_export}" --out "${packs_labeled}" --model "${model}"; then
+    rm -f "${packs_export}" "${packs_labeled}"
+    echo "eval-weekly: labeling failed; cleared pack intermediates in ${packs_dir}" >&2
+    return 1
+  fi
+  printf '%s\n' "${packs_labeled}"
+}
+
 if [[ "${1:-}" == "--record" ]]; then
   record_dir "$2" "$3" "${4:-$(date -u +%Y-%m-%d)}"
+  exit 0
+fi
+
+if [[ "${1:-}" == "--packs" ]]; then
+  if [[ -z "${CAIRN_LABELER_BASE_URL:-}" || -z "${CAIRN_LABELER_API_KEY:-}" || -z "${CAIRN_LABELER_MODEL:-}" ]]; then
+    echo "eval-weekly: labeler environment is unset" >&2
+    exit 1
+  fi
+  packs_dir="${2:-}"
+  packs_week=""
+  shift 2 || true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --week)
+        packs_week="${2:-}"
+        shift 2
+        ;;
+      *)
+        echo "eval-weekly: usage: --packs <dir> --week YYYY-MM-DD" >&2
+        exit 2
+        ;;
+    esac
+  done
+  if [[ -z "${packs_dir}" || -z "${packs_week}" ]]; then
+    echo "eval-weekly: usage: --packs <dir> --week YYYY-MM-DD" >&2
+    exit 2
+  fi
+  export_and_label_packs "${packs_dir}" "${packs_week}" "${CAIRN_LABELER_MODEL}"
   exit 0
 fi
 
@@ -111,14 +182,7 @@ PACKS_LABELED="${PACKS_DIR}/labeled.jsonl"
 if [[ -n "${CAIRN_EVAL_REVIEW_PACKS:-}" ]]; then
   PACKS_LABELED="${CAIRN_EVAL_REVIEW_PACKS}"
 else
-  mkdir -p "${PACKS_DIR}"
-  WEEK_SINCE="$(date -u -d "${DAY} -7 days" +%Y-%m-%dT00:00:00.000Z)"
-  WEEK_UNTIL="$(date -u -d "${DAY} +1 day" +%Y-%m-%dT00:00:00.000Z)"
-  PACKS_EXPORT="${PACKS_DIR}/export.jsonl"
-  echo "eval-weekly: exporting packs ${WEEK_SINCE} .. ${WEEK_UNTIL}"
-  pnpm traj:export --since "${WEEK_SINCE}" --until "${WEEK_UNTIL}" --out "${PACKS_EXPORT}"
-  echo "eval-weekly: labeling packs with ${CAIRN_LABELER_MODEL}"
-  pnpm traj:label --in "${PACKS_EXPORT}" --out "${PACKS_LABELED}" --model "${CAIRN_LABELER_MODEL}"
+  PACKS_LABELED="$(export_and_label_packs "${PACKS_DIR}" "${DAY}" "${CAIRN_LABELER_MODEL}")"
 fi
 
 review_json="$(
