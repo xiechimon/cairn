@@ -1,6 +1,6 @@
 # 2097 — weekly review packs by default
 
-Wires pack export/label into `scripts/ops/eval-weekly.sh`, with an up-front same-day review-directory check and sampler trace hit/miss logging. Pack window math is portable UTC via Node (no GNU `date -d`). Export/label intermediates are removed before write and cleared again if labeling fails so same-day retries are not stuck on `OutputExists`.
+Wires pack export/label into `scripts/ops/eval-weekly.sh`, with an up-front same-day review-directory check and sampler trace hit/miss logging. Pack window math is portable UTC via Node (no GNU `date -d`). Export/label intermediates are removed before write and cleared again if labeling fails so same-day retries are not stuck on `OutputExists`. Pack CLI summaries go to stderr; the weekly job assigns the labeled path without capturing helper stdout.
 
 ## Artifacts
 
@@ -16,6 +16,7 @@ Wires pack export/label into `scripts/ops/eval-weekly.sh`, with an up-front same
 | `fixture-packs-traces.log` | Fixture review with `packs=35` and `traces hit=2` |
 | `portable-date.log` | `--week-window` on real date and a macOS-like `date -d` stub |
 | `pack-retry.log` | Export-success / label-failure / retry clears stuck artifacts |
+| `pack-capture-red.log` / `pack-capture-green.log` | Production capture path: labeled path only, CLI summaries on stderr |
 | `eval-weekly.diff` | Script diff showing early review check and pack export/label |
 | `gates.log` | lint / typecheck / english-only / comment / helper gates |
 

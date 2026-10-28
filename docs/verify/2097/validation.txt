@@ -1,7 +1,4 @@
-node --test scripts/eval-weekly-ops.test.mjs scripts/eval-sample-failures.test.mjs: 7 passed (review-fix-green.log)
-bash -n scripts/ops/eval-weekly.sh: passed
-week-window portable (real + macOS date stub): since=2026-10-21 until=2026-10-29
-export-success/label-failure/retry: cleared intermediates; retry labels (review-fix-green.log)
-pnpm lint: passed
-pnpm typecheck: passed
-english-only / comment / helper / lessons: passed
+node --test scripts/eval-weekly-ops.test.mjs scripts/eval-sample-failures.test.mjs: 9 passed
+pack-capture-red → pack-capture-green: CLI stdout no longer pollutes labeled path
+bash -n / lint / typecheck / english / comment / lessons: passed
+squash auto-merge: NOT re-armed (await review-gate PASS)

@@ -65,9 +65,9 @@ export_and_label_packs() {
   week_since="$(utc_midnight_offset "${day}" -7)"
   week_until="$(utc_midnight_offset "${day}" 1)"
   echo "eval-weekly: exporting packs ${week_since} .. ${week_until}" >&2
-  pnpm traj:export --since "${week_since}" --until "${week_until}" --out "${packs_export}"
+  pnpm traj:export --since "${week_since}" --until "${week_until}" --out "${packs_export}" >&2
   echo "eval-weekly: labeling packs with ${model}" >&2
-  if ! pnpm traj:label --in "${packs_export}" --out "${packs_labeled}" --model "${model}"; then
+  if ! pnpm traj:label --in "${packs_export}" --out "${packs_labeled}" --model "${model}" >&2; then
     rm -f "${packs_export}" "${packs_labeled}"
     echo "eval-weekly: labeling failed; cleared pack intermediates in ${packs_dir}" >&2
     return 1
@@ -182,7 +182,8 @@ PACKS_LABELED="${PACKS_DIR}/labeled.jsonl"
 if [[ -n "${CAIRN_EVAL_REVIEW_PACKS:-}" ]]; then
   PACKS_LABELED="${CAIRN_EVAL_REVIEW_PACKS}"
 else
-  PACKS_LABELED="$(export_and_label_packs "${PACKS_DIR}" "${DAY}" "${CAIRN_LABELER_MODEL}")"
+  export_and_label_packs "${PACKS_DIR}" "${DAY}" "${CAIRN_LABELER_MODEL}" >/dev/null
+  PACKS_LABELED="${PACKS_DIR}/labeled.jsonl"
 fi
 
 review_json="$(

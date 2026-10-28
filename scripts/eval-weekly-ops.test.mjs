@@ -88,7 +88,7 @@ test('weekly script exports packs by default and echoes sampler trace hit counts
   const reviewExists = source.indexOf('review already exists');
   const labelerCheck = source.indexOf('labeler environment is unset');
   const packHelper = source.indexOf('export_and_label_packs()');
-  const packCall = source.indexOf('PACKS_LABELED="$(export_and_label_packs');
+  const packCall = source.search(/export_and_label_packs "\$\{PACKS_DIR\}"/);
   const sampleStep = source.indexOf('eval-sample-failures.mjs');
   const firstFlow = source.indexOf('run_flow chief-dispatch');
   assert.ok(reviewExists >= 0, 'same-day review message missing');
@@ -184,4 +184,87 @@ esac
   } finally {
     rmSync(env.root, { recursive: true, force: true });
   }
+});
+
+test('pack helper stdout is only the labeled path when CLI prints summaries', () => {
+  const env = fixture();
+  try {
+    const packsDir = join(env.state, 'packs');
+    const bin = join(env.root, 'bin');
+    mkdirSync(bin);
+    writeExecutable(
+      join(bin, 'pnpm'),
+      `#!/bin/sh
+set -e
+cmd="$1"; shift
+out=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--out" ]; then out="$2"; shift 2; continue; fi
+  shift
+done
+case "$cmd" in
+  traj:export)
+    printf '%s\\n' '{"buildId":"b1"}' > "$out"
+    echo "exported=1 out=$out"
+    ;;
+  traj:label)
+    printf '%s\\n' '{"buildId":"b1","attribution":{"where":"runtime","why":"wrong_tool"}}' > "$out"
+    echo "labeled=1 out=$out"
+    ;;
+  *)
+    echo "unexpected pnpm $cmd" >&2
+    exit 2
+    ;;
+esac
+`,
+    );
+    const result = runWeekly(env, ['--packs', packsDir, '--week', '2026-10-28'], {
+      PATH: `${bin}:${process.env.PATH}`,
+      CAIRN_LABELER_BASE_URL: 'https://labeler.example/v1',
+      CAIRN_LABELER_API_KEY: 'labeler-key',
+      CAIRN_LABELER_MODEL: 'gpt-5-mini',
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const lines = result.stdout.replace(/\n$/, '').split('\n');
+    assert.deepEqual(lines, [join(packsDir, 'labeled.jsonl')]);
+    assert.match(result.stderr, /exported=1/);
+    assert.match(result.stderr, /labeled=1/);
+    const captured = spawnSync(
+      'bash',
+      [
+        '-c',
+        'set -euo pipefail; PACKS_LABELED="$(bash "$1" --packs "$2" --week 2026-10-28)"; printf "%s" "$PACKS_LABELED"',
+        'capture',
+        script,
+        packsDir,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          PATH: `${bin}:${process.env.PATH}`,
+          HOME: env.home,
+          CAIRN_EVAL_STATE_DIR: env.state,
+          CAIRN_EVAL_RELAY_URL: 'https://relay.example/v1',
+          CAIRN_EVAL_RELAY_KEY: 'relay-key',
+          CAIRN_EVAL_REPO: env.repo,
+          CAIRN_LABELER_BASE_URL: 'https://labeler.example/v1',
+          CAIRN_LABELER_API_KEY: 'labeler-key',
+          CAIRN_LABELER_MODEL: 'gpt-5-mini',
+        },
+      },
+    );
+    assert.equal(captured.status, 0, captured.stdout + captured.stderr);
+    assert.equal(captured.stdout, join(packsDir, 'labeled.jsonl'));
+  } finally {
+    rmSync(env.root, { recursive: true, force: true });
+  }
+});
+
+test('weekly script does not capture pack helper stdout into PACKS_LABELED', () => {
+  const source = readFileSync(script, 'utf8');
+  assert.doesNotMatch(source, /PACKS_LABELED="\$\(export_and_label_packs/);
+  assert.match(source, /export_and_label_packs "\$\{PACKS_DIR\}"/);
+  assert.match(source, /PACKS_LABELED="\$\{PACKS_DIR\}\/labeled\.jsonl"/);
+  assert.match(source, /pnpm traj:export[^\n]*>&2/);
+  assert.match(source, /pnpm traj:label[^\n]*>&2/);
 });
