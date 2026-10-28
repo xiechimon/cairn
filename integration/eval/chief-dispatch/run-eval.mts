@@ -4,11 +4,11 @@ import {
   appendFileSync,
   existsSync,
   mkdirSync,
-  readdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHIEF_DISPATCH_HARNESS_PATHS } from '@cairn/shared';
 import {
@@ -405,8 +405,6 @@ process.on('uncaughtException', (err: NodeJS.ErrnoException) => {
 async function main() {
   ARGS = parseArgs(process.argv.slice(2));
   ARGS.flow = resolveFromRoot(ARGS.flow);
-  const vdir = join(ARGS.flow, ARGS.variant);
-  mkdirSync(join(vdir, 'traces'), { recursive: true });
   const statePath = join(ARGS.flow, '_state.json');
   let st: Record<string, unknown> = {};
   if (existsSync(statePath)) {
@@ -424,11 +422,19 @@ async function main() {
     console.error('--write-verify requires --patch-digest');
     process.exit(2);
   }
+  if (ARGS.writeVerify && (ARGS.caseIds.length > 0 || ARGS.arm !== 'all')) {
+    console.error('--write-verify rejects --case and non-all --arm selections');
+    process.exit(2);
+  }
+  const vdir = ARGS.writeVerify
+    ? join(ARGS.flow, `${ARGS.variant}.wv-${process.pid}-${Date.now().toString(36)}`)
+    : join(ARGS.flow, ARGS.variant);
+  mkdirSync(join(vdir, 'traces'), { recursive: true });
   const ctx = { ...ARGS, state: st };
 
   const resultsPath = join(vdir, 'results.jsonl');
   const done = new Set<string>();
-  if (existsSync(resultsPath))
+  if (!ARGS.writeVerify && existsSync(resultsPath))
     for (const ln of readFileSync(resultsPath, 'utf8').split('\n')) {
       if (!ln.trim()) continue;
       try {
@@ -484,6 +490,8 @@ async function main() {
   let i = 0;
   let ok = 0;
   let fail = 0;
+  const freshRows: { grade?: { decision_ok?: number } }[] = [];
+  const freshTraces: { name: string; body: Uint8Array }[] = [];
   const errorsPath = join(vdir, 'errors.jsonl');
   for (const p of [resultsPath, errorsPath]) {
     if (!existsSync(p)) continue;
@@ -589,11 +597,13 @@ async function main() {
         };
         appendFileSync(resultsPath, `${JSON.stringify(row)}\n`);
         rowWritten = true;
-        if (run.transcript)
-          writeFileSync(
-            join(vdir, 'traces', `${safeId}_rep${rep}.json`),
-            JSON.stringify(run.transcript, null, 2),
-          );
+        freshRows.push(row);
+        if (run.transcript) {
+          const traceName = `${safeId}_rep${rep}.json`;
+          const traceBody = Buffer.from(JSON.stringify(run.transcript, null, 2));
+          writeFileSync(join(vdir, 'traces', traceName), traceBody);
+          freshTraces.push({ name: traceName, body: new Uint8Array(traceBody) });
+        }
         ok++;
       } catch (e) {
         fail++;
@@ -646,24 +656,25 @@ async function main() {
   const cleaned = disposeLeftovers();
   if (cleaned > 0) console.error(`[${ARGS.variant}] 收尾清掉 ${cleaned} 个残留 scratch 目录`);
   if (ARGS.writeVerify && ARGS.patchDigest) {
-    const sha = typeof st.harness_sha === 'string' ? st.harness_sha : '';
-    const rows = existsSync(resultsPath)
-      ? parseResultsJsonl(readFileSync(resultsPath, 'utf8'))
-      : [];
-    const tracesDir = join(vdir, 'traces');
-    const traces = existsSync(tracesDir)
-      ? readdirSync(tracesDir)
-          .filter((n) => n.endsWith('.json'))
-          .map((n) => ({ name: n, body: new Uint8Array(readFileSync(join(tracesDir, n))) }))
-      : [];
-    const result = buildHarnessEvalResult({
-      patchDigest: ARGS.patchDigest,
-      harness_sha: sha,
-      decision_ok: decisionOkRate(rows) ?? 0,
-      trace_digest: traceDigest(traces),
-    });
-    mkdirSync(dirname(ARGS.writeVerify), { recursive: true });
-    writeFileSync(ARGS.writeVerify, `${JSON.stringify(result, null, 2)}\n`);
+    const expected = cases.length * ARGS.reps;
+    const complete = fail === 0 && ok === expected && freshRows.length === expected;
+    if (complete) {
+      const sha = typeof st.harness_sha === 'string' ? st.harness_sha : '';
+      const result = buildHarnessEvalResult({
+        patchDigest: ARGS.patchDigest,
+        harness_sha: sha,
+        decision_ok: decisionOkRate(freshRows) ?? 0,
+        trace_digest: traceDigest(freshTraces),
+      });
+      const dest = ARGS.writeVerify;
+      mkdirSync(dirname(dest), { recursive: true });
+      const tmp = join(
+        dirname(dest),
+        `.${basename(dest)}.${createHash('sha256').update(String(process.pid)).digest('hex').slice(0, 16)}.tmp`,
+      );
+      writeFileSync(tmp, `${JSON.stringify(result, null, 2)}\n`);
+      renameSync(tmp, dest);
+    }
   }
   if (cases.some((c) => isLearnCase(c)) && existsSync(resultsPath)) {
     const headline = learnHeadlineFromRows(

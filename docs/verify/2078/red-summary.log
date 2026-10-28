@@ -1,0 +1,213 @@
+
+ RUN  v5.0.1 /workspace
+
+ ❯ |@cairn/integration| test/write-verify.test.ts (6 tests | 4 failed) 22611ms
+   ❯ write-verify evidence (#2078) (5)
+     × rejects --write-verify with --case or non-all --arm before publishing 2337ms
+     × a failed --write-verify run exits nonzero and leaves an existing result untouched 3714ms
+     × an interrupted --write-verify run never publishes and never damages an existing result 10485ms
+     × stale cached results.jsonl rows do not leak into published decision_ok 2869ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/write-verify.test.ts > write-verify evidence (#2078) > rejects --write-verify with --case or non-all --arm before publishing
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+  ... buffer dump omitted ...
+
+ ❯ test/write-verify.test.ts:174:29
+    172|       { encoding: 'utf8' },
+    173|     );
+    174|     expect(withCase.status).toBe(2);
+       |                             ^
+    175|     expect(`${withCase.stdout}${withCase.stderr}`).toMatch(/write-veri…
+    176|     expect(readFileSync(out)).toEqual(before);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@cairn/integration| test/write-verify.test.ts > write-verify evidence (#2078) > a failed --write-verify run exits nonzero and leaves an existing result untouched
+AssertionError: expected Buffer[ 123, 10, 32, 32, 34, 112, …(187) ] to deeply equal Buffer[ 123, 34, 112, 97, 116, …(131) ]
+
+- Expected
++ Received
+
+@@ -1,8 +1,11 @@
+  {
+    "data": [
+      123,
+  ... buffer dump omitted ...
+      112,
+  ... buffer dump omitted ...
+      116,
+  ... buffer dump omitted ...
+@@ -13,42 +16,85 @@
+      101,
+      115,
+      116,
+  ... buffer dump omitted ...
+      58,
+  ... buffer dump omitted ...
+      112,
+  ... buffer dump omitted ...
+      100,
+  ... buffer dump omitted ...
+      44,
+  ... buffer dump omitted ...
+      104,
+  ... buffer dump omitted ...
+      114,
+      110,
+@@ -59,77 +105,81 @@
+      115,
+      104,
+  ... buffer dump omitted ...
+      58,
+  ... buffer dump omitted ...
+      44,
+  ... buffer dump omitted ...
+      100,
+      101,
+  ... buffer dump omitted ...
+      105,
+@@ -140,14 +190,16 @@
+      95,
+      111,
+      107,
+  ... buffer dump omitted ...
+      58,
+  ... buffer dump omitted ...
+      48,
+  ... buffer dump omitted ...
+      44,
+  ... buffer dump omitted ...
+      116,
+      114,
+  ... buffer dump omitted ...
+@@ -159,76 +211,78 @@
+      101,
+      115,
+      116,
+  ... buffer dump omitted ...
+      58,
+  ... buffer dump omitted ...
+    ],
+    "type": "Buffer",
+  }
+
+ ❯ test/write-verify.test.ts:212:31
+    210|     });
+    211|     expect(got.status, got.output).not.toBe(0);
+    212|     expect(readFileSync(out)).toEqual(before);
+       |                               ^
+    213|     expect(readdirSync(home).some((n) => n.includes('.tmp'))).toBe(fal…
+    214|   }, 90_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@cairn/integration| test/write-verify.test.ts > write-verify evidence (#2078) > an interrupted --write-verify run never publishes and never damages an existing result
+AssertionError: expected Buffer[ 123, 10, 32, 32, 34, 112, …(187) ] to deeply equal Buffer[ 123, 34, 112, 97, 116, …(131) ]
+
+- Expected
++ Received
+
+@@ -1,8 +1,11 @@
+  {
+    "data": [
+      123,
+  ... buffer dump omitted ...
+      112,
+  ... buffer dump omitted ...
+      116,
+  ... buffer dump omitted ...
+@@ -13,42 +16,85 @@
+      101,
+      115,
+      116,
+  ... buffer dump omitted ...
+      58,
+  ... buffer dump omitted ...
+      112,
+  ... buffer dump omitted ...
+      100,
+  ... buffer dump omitted ...
+      44,
+  ... buffer dump omitted ...
+      104,
+  ... buffer dump omitted ...
+      114,
+      110,
+@@ -59,77 +105,81 @@
+      115,
+      104,
+  ... buffer dump omitted ...
+      58,
+  ... buffer dump omitted ...
+      44,
+  ... buffer dump omitted ...
+      100,
+      101,
+  ... buffer dump omitted ...
+      105,
+@@ -140,14 +190,16 @@
+      95,
+      111,
+      107,
+  ... buffer dump omitted ...
+      58,
+  ... buffer dump omitted ...
+      48,
+  ... buffer dump omitted ...
+      44,
+  ... buffer dump omitted ...
+      116,
+      114,
+  ... buffer dump omitted ...
+@@ -159,76 +211,78 @@
+      101,
+      115,
+      116,
+  ... buffer dump omitted ...
+      58,
+  ... buffer dump omitted ...
+    ],
+    "type": "Buffer",
+  }
+
+ ❯ test/write-verify.test.ts:264:31
+    262|       new Promise<number | null>((resolve) => setTimeout(() => resolve…
+    263|     ]);
+    264|     expect(readFileSync(out)).toEqual(before);
+       |                               ^
+    265|     expect(readdirSync(home).some((n) => n.includes('.tmp'))).toBe(fal…
+    266|   }, 30_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |@cairn/integration| test/write-verify.test.ts > write-verify evidence (#2078) > stale cached results.jsonl rows do not leak into published decision_ok
+AssertionError: expected 0.3333333333333333 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+  ... buffer dump omitted ...
++ 0.3333333333333333
+
+ ❯ test/write-verify.test.ts:293:35
+    291|     expect(published.harness_sha).toMatch(/^[0-9a-f]{64}$/);
+    292|     expect(published.trace_digest).toMatch(/^[0-9a-f]{64}$/);
+    293|     expect(published.decision_ok).toBe(1);
+       |                                   ^
+    294|   }, 90_000);
+    295|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 2 passed (6)
+   Start at  17:09:01
+   Duration  23.12s (tests 98%, transform 1%)
+
