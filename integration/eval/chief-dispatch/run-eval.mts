@@ -85,6 +85,7 @@ async function freshStack(
       relayKey: relayKey(),
       roster: ROSTER,
       chiefModelId: CHIEF_MODEL,
+      ...(ARGS.contextWindow !== undefined ? { chiefContextWindow: ARGS.contextWindow } : {}),
     });
     if (isMemoryCase(input)) await seedMemories(stack.server, world, input);
     const projectIds = isRoutingCase(input)
@@ -212,6 +213,7 @@ function parseArgs(argv: string[]) {
     flow: '.claude/hillclimb/flow',
     variant: 'baseline',
     model: undefined as string | undefined,
+    contextWindow: undefined as number | undefined,
     reps: 1,
     concurrency: 4,
     timeoutS: 1800,
@@ -235,6 +237,7 @@ function parseArgs(argv: string[]) {
     if (k === '--flow') a.flow = val(++i);
     else if (k === '--variant') a.variant = val(++i);
     else if (k === '--model') a.model = val(++i);
+    else if (k === '--context-window') a.contextWindow = +val(++i);
     else if (k === '--reps') a.reps = +val(++i);
     else if (k === '--concurrency') a.concurrency = +val(++i);
     else if (k === '--timeout-s') a.timeoutS = +val(++i);
@@ -263,6 +266,8 @@ function parseArgs(argv: string[]) {
     process.exit(2);
   }
   if (
+    (a.contextWindow !== undefined &&
+      (!Number.isSafeInteger(a.contextWindow) || a.contextWindow < 1)) ||
     !Number.isFinite(a.timeoutS) ||
     a.timeoutS < 0 ||
     a.timeoutS * 1000 > 2147483647 ||
@@ -278,7 +283,7 @@ function parseArgs(argv: string[]) {
 }
 function usage() {
   console.error(
-    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
+    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--context-window N] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
   );
 }
 
@@ -444,6 +449,10 @@ async function main() {
     const want = new Set(ARGS.caseIds);
     cases = cases.filter((c) => want.has(c.id));
   }
+  if (ARGS.contextWindow !== undefined && cases.some((c) => isLearnCase(c))) {
+    console.error('--context-window is not supported for learn cases');
+    process.exit(2);
+  }
   if (ARGS.arm !== 'all' && !cases.some((c) => isLearnCase(c))) {
     console.error(`--arm ${ARGS.arm} applies to learn cases only`);
     process.exit(2);
@@ -549,12 +558,16 @@ async function main() {
           prompt: isLearnCase(c) ? c.round2 : c.prompt,
           tags: c.tags,
           meta:
+            ARGS.contextWindow !== undefined ||
             safeId !== String(c.id) ||
             appRetry.count ||
             judgeRetry.count ||
             infraRetry.count ||
             isLearnCase(c)
               ? {
+                  ...(ARGS.contextWindow !== undefined
+                    ? { context_window: ARGS.contextWindow }
+                    : {}),
                   ...(safeId !== String(c.id) ? { original_id: String(c.id) } : {}),
                   ...(appRetry.count ? { retries: appRetry.count } : {}),
                   ...(judgeRetry.count ? { judge_retries: judgeRetry.count } : {}),
@@ -593,6 +606,7 @@ async function main() {
             prompt_id: safeId,
             rep,
             failure_class: err?.failure_class ?? 'error',
+            context_window: ARGS.contextWindow,
             error: String(err?.message || e),
             retries: appRetry.count,
             infra_retries: infraRetry.count,

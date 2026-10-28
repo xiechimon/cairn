@@ -274,7 +274,13 @@ export interface SeededWorld {
 
 export async function seedWorld(
   stack: Stack,
-  opts: { relayBaseUrl: string; relayKey: string; roster: RosterAgent[]; chiefModelId: string },
+  opts: {
+    relayBaseUrl: string;
+    relayKey: string;
+    roster: RosterAgent[];
+    chiefModelId: string;
+    chiefContextWindow?: number;
+  },
 ): Promise<SeededWorld> {
   const { server } = stack;
   const modelIds = [...new Set([...opts.roster.map((a) => a.modelId), opts.chiefModelId])];
@@ -285,7 +291,13 @@ export async function seedWorld(
     api: 'openai-completions',
     authHeader: true,
     compat: { supportsDeveloperRole: false },
-    models: modelIds.map((id) => ({ id, name: id })),
+    models: modelIds.map((id) => ({
+      id,
+      name: id,
+      ...(id === opts.chiefModelId && opts.chiefContextWindow !== undefined
+        ? { contextWindow: opts.chiefContextWindow }
+        : {}),
+    })),
     apiKey: opts.relayKey,
   });
   if (prov.status !== 201)
