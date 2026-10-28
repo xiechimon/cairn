@@ -30,7 +30,6 @@ Lives outside the repo at `~/.cairn/tools/app-token/`; the repo gains no depende
 Usage:
 
 ```sh
-~/.cairn/tools/app-token/as-bot.sh git commit ...
 ~/.cairn/tools/app-token/as-bot.sh git push origin <branch>
 node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head <branch> ...
 ```
@@ -43,7 +42,6 @@ On 2026-10-25 the App pushed a test branch and opened PRs (#1670 under the old n
 
 Now going through `as-bot.sh` (the dispatching side):
 
-- Committing (git author and committer).
 - Pushing.
 - Opening PRs (`gh pr create`).
 - Merge preparation follows the identity checks below; merge authorization uses the human login.
@@ -74,6 +72,27 @@ Read the PR opener and all commit authors with `gh pr view <n> --json author,com
 Squashing a bot-opened PR can attribute the main commit to the bot opener even when the branch commit has the required author. Rebase preserves the prepared commit's author. A later green push checks its own pushed range; historical bot commits outside that range are excluded, and their authorship remains unchanged.
 
 This repository documents the external helper contract. Its implementation is outside this checkout and must be inspected separately before changing dispatcher behavior.
+
+## Commit preparation
+
+App authentication authorizes remote operations; Git authorship records who prepared the commit. Do not prepare commits with `as-bot.sh` or `as-bot-author.sh`. The latter helper sets bot author and committer identities. Prepare commits outside both wrappers. Explicit environment assignments below override inherited author and committer names and emails, including values exported by a parent dispatcher:
+
+```sh
+GIT_AUTHOR_NAME=Cairnwright \
+GIT_AUTHOR_EMAIL=348051526+cairnwright@users.noreply.github.com \
+GIT_COMMITTER_NAME=Cairnwright \
+GIT_COMMITTER_EMAIL=348051526+cairnwright@users.noreply.github.com \
+git commit --file COMMIT_MSG.txt
+git log --format='%H author: %an <%ae> committer: %cn <%ce>' origin/main..HEAD
+```
+
+Check every commit in that range before pushing: neither its author name nor email may contain `cairnwright[bot]`; its committer name and email must also be free of that identity. Bot-opened PRs still require the single prepared commit and rebase path above. The token wrapper remains the authentication path for pushes and PR creation.
+
+## Recovery after a rejected main push
+
+Preserve main history. Prepare and merge the correction through the identity checks above. A subsequent compliant push checks `BEFORE_SHA..HEAD`, excluding historical violations outside its own pushed range. When `BEFORE_SHA` is missing or all zeros, the workflow checks `HEAD^!`. PR validation checks every commit in `BASE_SHA..HEAD`, including a forbidden author beneath a compliant tip.
+
+Read the resulting main commit's author and its `commit-author` Actions result after the merge. A green result establishes compliance for the checked range; it does not repair `b667fc4d133208d7650b66906d4be97a01939615` or any other historical commit. Keep the author gate unchanged. Dispatcher enforcement belongs to the external helper; this checkout cannot establish its implementation or which bypass caused the merge.
 
 ## Token constraints
 
