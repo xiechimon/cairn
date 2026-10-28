@@ -174,3 +174,26 @@ test('start reports missing when the command cannot spawn', () => {
     rmSync(statusDir, { recursive: true, force: true });
   }
 });
+
+test('wait fails when the child prints the #2021 banned ai-route line', async () => {
+  const statusDir = mkdtempSync(join(tmpdir(), 'dispatch-agent-test-'));
+  try {
+    const start = runCli(
+      [
+        'start',
+        'banned',
+        '--',
+        process.execPath,
+        '-e',
+        'setTimeout(() => { console.log("ai-route: implement -> pi:domestic-proxy/deepseek-v4-flash"); process.exit(0); }, 800)',
+      ],
+      statusDir,
+    );
+    assert.equal(start.status, 0, `${start.stdout}${start.stderr}`);
+    const wait = runCli(['wait', 'banned', '--timeout-s', '10'], statusDir);
+    assert.equal(wait.status, 1, `${wait.stdout}${wait.stderr}`);
+    assert.match(`${wait.stdout}${wait.stderr}`, /banned-model|deepseek-v4-flash/);
+  } finally {
+    rmSync(statusDir, { recursive: true, force: true });
+  }
+});

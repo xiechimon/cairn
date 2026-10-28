@@ -1,0 +1,12 @@
+=== banned-model (expect red) ===
+lane-worker-exit-gate: banned-model: banned model deepseek-v4-flash via pi:domestic-proxy/deepseek-v4-flash (task implement)
+exit:1
+=== noop-overlap (expect red) ===
+lane-worker-exit-gate: noop-exit: rc 0 after 57s with a no-op wrap-up (threshold 180s)
+exit:1
+=== noop-uncommitted (expect red) ===
+lane-worker-exit-gate: noop-exit: rc 0 after 55s with a no-op wrap-up (threshold 180s)
+exit:1
+=== allowed-long (expect green) ===
+lane-worker-exit-gate: ok: lane exit looks complete
+exit:0
