@@ -41,4 +41,10 @@ describe('CHIEF_DISPATCH_HARNESS_PATHS', () => {
     expect(CHIEF_DISPATCH_HARNESS_PATHS).toContain('apps/daemon/src/backend/pi.ts');
     expect(HARNESS_REGRESSION_RESULT_NAME).toBe('harness-regression.json');
   });
+
+  test('keeps plan-family graders on the plan flow _state only', () => {
+    expect(CHIEF_DISPATCH_HARNESS_PATHS).not.toContain('integration/eval/plan/grade.mts');
+    expect(CHIEF_DISPATCH_HARNESS_PATHS).not.toContain('integration/eval/plan/run.mts');
+    expect(CHIEF_DISPATCH_HARNESS_PATHS).not.toContain('integration/eval/plan/seed.mts');
+  });
 });
