@@ -28,8 +28,12 @@ The narrow context dependency review found fallback-model and pre-materializatio
 
 ## Completed approved-roster baseline
 
-`baseline-1m-8e8db485/` preserves the completed batch from source `8e8db4859aac50f6977e6c11c7dd634c373074fb`. All three approved models used explicit 1000000 context windows. The batch completion marker is present and its recorded process no longer exists. The manifest and input hashes passed the unchanged qualification verifier. `baseline-1m-8e8db485-files.json` records the copied artifact hashes.
+`baseline-1m-8e8db485/` preserves the completed batch from source `8e8db4859aac50f6977e6c11c7dd634c373074fb`. All three approved-model commands requested an explicit 1000000 context window. Scored rows confirm that value for GLM and DeepSeek; GLM Flash has no scored runtime observation. The batch completion marker is present and its recorded process no longer exists. The manifest and input hashes passed the unchanged qualification verifier. `baseline-1m-8e8db485-files.json` records the copied artifact hashes.
 
 The batch attempted 54 turns. `glm-5.3` produced six with-memory and four no-memory scored turns, with eight timeouts. `glm-5.3-flash` produced eighteen execution errors and no scored turns. These errors establish no model-quality failure. `deepseek-v4.1-flash` completed all twelve with-memory and six no-memory turns without execution errors.
 
 `qualification-1m-8e8db485.json` records `ready: false`, six adjacent candidates, six irrelevant candidates, and 26 execution errors. Cases `a01`, `a02`, `a03`, and `a05` have completed scored failures. Cases `i01` and `i06` have completed with-memory failures and successful paired no-memory observations. Cases `a04`, `a06`, `i02`, `i03`, `i04`, and `i05` have no qualifying with-memory failure. No case, metric, threshold, error classification, or acceptance item was changed to obtain this result. The delivery remains incomplete.
+
+## Bounded unchanged-case replication
+
+A second batch started on 2026-10-28 against the same source `8e8db4859aac50f6977e6c11c7dd634c373074fb`. It requests only `deepseek-v4.1-flash`, the model that completed the full first batch, with explicit 1000000 context windows. It reruns the six unchanged irrelevant cases and their six no-memory controls once in fresh directories. The limit is twelve requested turns. Case contents, grading, and all first-batch observations remain unchanged. The second batch is not yet qualification evidence; completed results must pass the same verifier.

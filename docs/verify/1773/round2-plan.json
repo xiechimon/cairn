@@ -1,0 +1,22 @@
+{
+  "sourceCommit": "8e8db4859aac50f6977e6c11c7dd634c373074fb",
+  "requestedModel": "deepseek-v4.1-flash",
+  "contextWindow": 1000000,
+  "selectedCases": [
+    "i01",
+    "i02",
+    "i03",
+    "i04",
+    "i05",
+    "i06"
+  ],
+  "arms": [
+    "with-memory",
+    "no-memory"
+  ],
+  "repetitions": 1,
+  "maximumRequestedTurns": 12,
+  "inputAndGradingChanges": false,
+  "freshOutputDirectories": true,
+  "status": "started, not acceptance evidence"
+}
