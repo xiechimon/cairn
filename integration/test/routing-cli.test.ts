@@ -187,13 +187,41 @@ describe('#1987 experiment identity and resume keys', () => {
     expect(identityConflicts(base, next).join('\n')).toMatch(/prices/);
   });
 
-  test('promptsDigest changes when task prompts change', () => {
-    const a = promptsDigest(selectTasks(['slugify']));
-    const b = promptsDigest(selectTasks(['iso8601-duration']));
-    expect(a).not.toBe(b);
+  test('promptsDigest rejects a prompt-text change for the same task id', () => {
+    const [task] = selectTasks(['slugify']);
+    if (task === undefined) throw new Error('missing slugify');
+    const altered = { ...task, prompt: `${task.prompt}\nchanged prompt body` };
+    expect(promptsDigest([task])).not.toBe(promptsDigest([altered]));
+    const base = buildExperimentIdentity({
+      arms: ['handoff'],
+      planner: 'planner-a',
+      executors: ['exec'],
+      singleModels: [],
+      tasks: [task],
+      reps: 1,
+      timeoutS: 30,
+      thinking: null,
+      prices: null,
+    });
+    const next = buildExperimentIdentity({
+      arms: ['handoff'],
+      planner: 'planner-a',
+      executors: ['exec'],
+      singleModels: [],
+      tasks: [altered],
+      reps: 1,
+      timeoutS: 30,
+      thinking: null,
+      prices: null,
+    });
+    expect(next.taskIds).toEqual(base.taskIds);
+    expect(next.taskDigest).toBe(base.taskDigest);
+    const reasons = identityConflicts(base, next).join('\n');
+    expect(reasons).toMatch(/prompts/);
+    expect(reasons).not.toMatch(/task set/);
   });
 
-  test('rows without manifest identity are rejected with a message that names the fix', () => {
+  test('rows without planner_model identity are rejected with a message that names the fix', () => {
     const identity = buildExperimentIdentity({
       arms: ['handoff'],
       planner: 'planner-a',
@@ -213,6 +241,32 @@ describe('#1987 experiment identity and resume keys', () => {
     };
     const reasons = diagnoseIncompatibleRows([legacy as never], identity);
     expect(reasons.join('\n')).toMatch(/planner_model/);
+  });
+
+  test('results without a manifest are rejected with an actionable recovery diagnostic', () => {
+    const directory = outDir();
+    writeFileSync(join(directory, RESULTS_JSONL), `${JSON.stringify(sampleRow())}\n`);
+    const before = snapshotTree(directory);
+    const next = prepareExperiment(
+      parseArgs([
+        '--arms',
+        'handoff',
+        '--planner',
+        'planner-a',
+        '--executors',
+        'exec',
+        '--tasks',
+        'slugify',
+        '--out',
+        directory,
+        '--timeout-s',
+        '30',
+      ]),
+    ).identity;
+    expect(() => assertResumeAllowed(directory, next)).toThrow(
+      /results\.jsonl exists without manifest\.json; delete the output directory or restore a compatible manifest/,
+    );
+    expectByteIdentical(before, directory);
   });
 });
 
@@ -621,14 +675,6 @@ describe('#1987 deterministic CLI integration', () => {
       pattern: /timeout/,
     },
     {
-      label: 'prompts',
-      mutate: (args: string[], _directory: string, _scratch: string) => {
-        const i = args.indexOf('--tasks');
-        args[i + 1] = 'iso8601-duration';
-      },
-      pattern: /prompts|task/,
-    },
-    {
       label: 'pricing',
       mutate: (args: string[], _directory: string, scratch: string) => {
         const nextPrices = join(scratch, 'prices-b.json');
@@ -687,6 +733,90 @@ describe('#1987 deterministic CLI integration', () => {
     },
     180_000,
   );
+
+  test('changing prompts for the same task rejects resume before any relay request and leaves out/ byte-identical', async () => {
+    const directory = outDir();
+    const stub = await startStubLlm([plan(), writeSlug(), done()]);
+    try {
+      const baseArgs = [
+        '--arms',
+        'handoff',
+        '--planner',
+        'stub-planner',
+        '--executors',
+        'stub-exec-a',
+        '--tasks',
+        'slugify',
+        '--reps',
+        '1',
+        '--timeout-s',
+        '45',
+        '--out',
+        directory,
+        '--relay-url',
+        stub.url,
+        '--relay-key',
+        'bench-key',
+      ];
+      await runExperiment(parseArgs(baseArgs));
+      const before = snapshotTree(directory);
+      const requestsBefore = stub.requests.length;
+      const recorded = prepareExperiment(parseArgs(baseArgs)).identity;
+      expect(recorded.taskIds).toEqual(['slugify']);
+      const next = {
+        ...recorded,
+        promptsDigest: 'f'.repeat(64),
+      };
+      expect(next.taskIds).toEqual(recorded.taskIds);
+      expect(next.taskDigest).toBe(recorded.taskDigest);
+      expect(() => assertResumeAllowed(directory, next)).toThrow(/prompts/);
+      expect(stub.requests.length).toBe(requestsBefore);
+      expectByteIdentical(before, directory);
+      await expect(runExperiment(parseArgs(baseArgs))).resolves.toMatchObject({ ran: 0 });
+      expect(stub.requests.length).toBe(requestsBefore);
+    } finally {
+      await stub.close();
+    }
+  }, 180_000);
+
+  test('results without a manifest reject resume before any relay request with recovery guidance', async () => {
+    const directory = outDir();
+    const stub = await startStubLlm([plan(), writeSlug(), done()]);
+    try {
+      writeFileSync(
+        join(directory, RESULTS_JSONL),
+        `${JSON.stringify(sampleRow({ planner_model: 'stub-planner', model: 'stub-exec-a' }))}\n`,
+      );
+      const before = snapshotTree(directory);
+      const args = [
+        '--arms',
+        'handoff',
+        '--planner',
+        'stub-planner',
+        '--executors',
+        'stub-exec-a',
+        '--tasks',
+        'slugify',
+        '--reps',
+        '1',
+        '--timeout-s',
+        '45',
+        '--out',
+        directory,
+        '--relay-url',
+        stub.url,
+        '--relay-key',
+        'bench-key',
+      ];
+      await expect(runExperiment(parseArgs(args))).rejects.toThrow(
+        /results\.jsonl exists without manifest\.json; delete the output directory or restore a compatible manifest/,
+      );
+      expect(stub.requests.length).toBe(0);
+      expectByteIdentical(before, directory);
+    } finally {
+      await stub.close();
+    }
+  }, 180_000);
 });
 
 describe('#1987 evidence helpers', () => {

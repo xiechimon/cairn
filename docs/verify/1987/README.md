@@ -5,9 +5,11 @@ reuse old handoff rows while the report relabeled them. There was also no
 persisted experiment identity binding measurement-affecting configuration, and
 no CLI/report layer on top of the #1986 session runner.
 
-Review-gate BLOCK on the first head (`0e6b26b7`) named three defects fixed here:
-pricing digest collapsed nested rates, flagged errors vanished from the pass-rate
-denominator, and acceptance-checklist v1 coverage/evidence was incomplete.
+Review-gate BLOCK findings fixed across heads: pricing digest collapsed nested
+rates; flagged errors vanished from the pass-rate denominator; checklist gaps
+included `--tasks`-only "prompts" coverage and a missing results-without-manifest
+recovery case. Tip coverage rejects same-task prompt digest changes and refuses
+`results.jsonl` without `manifest.json` with an actionable recovery diagnostic.
 
 ## What changed
 
@@ -29,7 +31,7 @@ denominator, and acceptance-checklist v1 coverage/evidence was incomplete.
 
 - `red.log` — suite against a tree without `run.mts` / `experiment.mts` /
   `report.mts`: import failure.
-- `green.log` — 21/21 passed after the change.
+- `green.log` — 23/23 passed after the change.
 - `typecheck.log`, `lint.log`, `spec-parse.log` — clean.
 - `overlap.txt` — no open PR on the changed paths.
 - `artifacts/clean/` — graded pass with `manifest.json` + report metrics.
