@@ -140,10 +140,15 @@ describe('domain-grouping dual signal (task and skill hit the same domain)', () 
     expect(ids).not.toContain('ask-matt');
   });
   it('multi-domain hit = union (skills of each domain injected when the task spans domains)', () => {
-    const hits = selectSkillsForTask('给部署脚本补安全扫描的单元测试', granted);
+    const deployRunbook: SkillInjectCandidate = {
+      id: 'deploy-runbook',
+      name: 'deploy-runbook',
+      description: '部署与 docker 上线步骤',
+    };
+    const hits = selectSkillsForTask('给部署脚本补安全扫描的单元测试', [...granted, deployRunbook]);
     const ids = hits.map((h) => h.id);
     expect(ids).toContain('tdd');
-    expect(ids).toContain('contributor');
+    expect(ids).toContain('deploy-runbook');
   });
 });
 
@@ -307,5 +312,117 @@ describe('explicit mention: bounded and every occurrence (#1969)', () => {
     expect(ids).toContain('wiki');
     expect(ids).toContain('pr');
     expect(ids).toContain('aaa-skill');
+  });
+});
+
+describe('domain: weak signals and paths (#1970)', () => {
+  const aihotNews: SkillInjectCandidate = {
+    id: 'aihot',
+    name: 'aihot',
+    description:
+      '查 AIHOT 中文 AI 资讯/精选/热点/日报：今天或最近的 AI 新闻、大模型与产品发布、AI 论文。必须走 aihot.news 匿名只读 API',
+  };
+  const docsSkill: SkillInjectCandidate = {
+    id: 'docs-writer',
+    name: 'docs-writer',
+    description: 'documentation writing guide and docs tutorials',
+  };
+  const diagnosingBugs: SkillInjectCandidate = {
+    id: 'diagnosing-bugs',
+    name: 'diagnosing-bugs',
+    description: 'Diagnosis loop for hard bugs and regressions',
+  };
+
+  it('"fix the CI job" does not select aihot', () => {
+    expect(selectSkillsForTask('fix the CI job', [aihotNews]).map((h) => h.id)).not.toContain(
+      'aihot',
+    );
+  });
+
+  it('"see docs/verify/1178/README.md" does not open the docs domain; a URL alone opens no domain', () => {
+    expect(selectSkillsForTask('see docs/verify/1178/README.md', [docsSkill])).toEqual([]);
+    expect(
+      selectSkillsForTask('https://example.com/api/ui', [
+        { id: 'fe', name: 'fe', description: 'frontend ui ux layout typography' },
+        { id: 'be', name: 'be', description: 'backend api endpoint routes' },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('"please update the documentation for the setup step" still opens the docs domain', () => {
+    const hits = selectSkillsForTask('please update the documentation for the setup step', [
+      docsSkill,
+    ]);
+    expect(hits.map((h) => h.id)).toContain('docs-writer');
+    expect(hits.find((h) => h.id === 'docs-writer')?.rule).toBe('domain');
+  });
+
+  it('"tests failed, see log" alone does not select diagnosing-bugs; concrete debug requests still do', () => {
+    expect(selectSkillsForTask('tests failed, see log', [diagnosingBugs])).toEqual([]);
+    const hits = selectSkillsForTask('debug why the build crashes with a null pointer', [
+      diagnosingBugs,
+    ]);
+    expect(hits.map((h) => h.id)).toContain('diagnosing-bugs');
+  });
+
+  it('"vitest red in packages/shared" still selects tdd; typography still selects better-typography', () => {
+    expect(
+      selectSkillsForTask('vitest red in packages/shared', granted).map((h) => h.id),
+    ).toContain('tdd');
+    expect(
+      selectSkillsForTask('tighten the heading typography', granted).map((h) => h.id),
+    ).toContain('better-typography');
+  });
+
+  it('a task naming wiki explicitly still selects wiki even when its words sit inside a path', () => {
+    const wikiNull: SkillInjectCandidate = { id: 'wiki', name: 'wiki', description: null };
+    const hits = selectSkillsForTask('Use wiki from docs/wiki/readme.md', [wikiNull]);
+    expect(hits).toEqual([expect.objectContaining({ id: 'wiki', rule: 'explicit-mention' })]);
+  });
+
+  it('weak keywords ci, cd, api, pr, ui, ux alone do not open a domain; with a strong keyword in the same domain they still do', () => {
+    const cases: Array<{
+      weakAlone: string;
+      strongTogether: string;
+      skill: SkillInjectCandidate;
+    }> = [
+      {
+        weakAlone: 'ci',
+        strongTogether: 'ci deploy docker',
+        skill: { id: 'ops', name: 'ops', description: 'deploy docker kubernetes' },
+      },
+      {
+        weakAlone: 'cd',
+        strongTogether: 'cd kubernetes pipeline',
+        skill: { id: 'ops', name: 'ops', description: 'deploy docker kubernetes' },
+      },
+      {
+        weakAlone: 'api',
+        strongTogether: 'api endpoint middleware',
+        skill: { id: 'be', name: 'be', description: 'backend endpoint middleware' },
+      },
+      {
+        weakAlone: 'pr',
+        strongTogether: 'pr merge rebase',
+        skill: { id: 'vcs', name: 'vcs', description: 'git merge rebase commits' },
+      },
+      {
+        weakAlone: 'ui',
+        strongTogether: 'ui layout typography',
+        skill: { id: 'fe', name: 'fe', description: 'frontend layout typography' },
+      },
+      {
+        weakAlone: 'ux',
+        strongTogether: 'ux layout typography',
+        skill: { id: 'fe', name: 'fe', description: 'frontend layout typography' },
+      },
+    ];
+    for (const row of cases) {
+      expect(selectSkillsForTask(row.weakAlone, [row.skill]), row.weakAlone).toEqual([]);
+      expect(
+        selectSkillsForTask(row.strongTogether, [row.skill]).map((h) => h.id),
+        row.strongTogether,
+      ).toContain(row.skill.id);
+    }
   });
 });
