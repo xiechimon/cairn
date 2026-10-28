@@ -159,6 +159,7 @@ function installSkill(root, cases, scripts = {}) {
   mkdirSync(join(skill, 'scripts'), { recursive: true });
   cpSync(VP, join(skill, 'scripts', 'vp.mjs'));
   symlinkSync(join(ROOT, 'node_modules'), join(root, 'node_modules'));
+  symlinkSync(join(ROOT, 'packages'), join(root, 'packages'));
   writeFileSync(join(skill, 'vp-registry.json'), JSON.stringify({ features: { t: { recipe: null, cases } } }));
   for (const [name, body] of Object.entries(scripts)) writeFileSync(join(skill, 'scripts', name), body);
   writeFileSync(

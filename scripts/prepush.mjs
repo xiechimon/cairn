@@ -27,6 +27,7 @@ export const selfTests = [
   'scripts/english-only-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
   'scripts/lessons-ledger-gate.test.mjs',
+  'scripts/recording-gate.test.mjs',
 ];
 
 export const localOnly = [
@@ -64,9 +65,11 @@ export function prepushPlan(paths, mode = 'local') {
     language,
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
+    ['python3', 'scripts/pr-evidence-archive.test.py'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
+    ['node', 'scripts/recording-gate.mjs'],
     ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
     ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
     ledgerGate,
@@ -78,7 +81,7 @@ export function prepushPlan(paths, mode = 'local') {
         ...required,
         ...localOnly,
         ...(paths.some((path) =>
-          /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|scrub-git-env|doc-reader-tests)/.test(
+          /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|recording-gate|scrub-git-env|doc-reader-tests)/.test(
             path,
           ),
         )

@@ -1,0 +1,75 @@
+===== PR #2030 | shared(1838): require cited prior art with reviewed decision scoring | repository xiechimon/cairn | 9 commits =====
+issues associated by closing keywords: 1838
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+===== PR #2034 | server(2017): assert event-loop yield by ordering, not wall-clock ms, in the attachment-gc test | repository xiechimon/cairn | 2 commits =====
+issues associated by closing keywords: 2017
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+===== PR #2025 | docs(2024): distinguish bot and human merge identities (#2024) | repository xiechimon/cairn | 1 commits =====
+issues associated by closing keywords: 2024
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+===== PR #2018 | eval(1985): enforce routing workspace reads and grade seeded reuse | repository xiechimon/cairn | 1 commits =====
+issues associated by closing keywords: 1985
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+===== PR #1992 | scripts(1982): preserve image evidence URLs and reject fixture embeds | repository xiechimon/cairn | 1 commits =====
+issues associated by closing keywords: 1982
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+===== PR #2022 | web(1786): align fallback hints with chief behavior | repository xiechimon/cairn | 11 commits =====
+issues associated by closing keywords: 1786
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL archive: outside associated issue archive: [Fallback settings](https://raw.githubusercontent.com/xiechimon/cairn/3ca26c99/docs/verify/1786/cairn-1786-fallback-copy-evidence/fallback-copy-current.png)
+pr-evidence: RED (1 problem(s))
+exit=1
+
+===== PR #2016 | web+server(2009): pick the project on the chief composer and move unstarted tasks between projects | repository xiechimon/cairn | 11 commits =====
+issues associated by closing keywords: 2009
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 4 image link(s)
+FAIL archive: outside associated issue archive: [chip menu](https://raw.githubusercontent.com/xiechimon/cairn/c50e55a5/docs/verify/2009/chip-menu.png)
+FAIL archive: outside associated issue archive: [chip picked](https://raw.githubusercontent.com/xiechimon/cairn/c50e55a5/docs/verify/2009/chip-picked.png)
+FAIL archive: outside associated issue archive: [move menu](https://raw.githubusercontent.com/xiechimon/cairn/c50e55a5/docs/verify/2009/move-menu.png)
+FAIL archive: outside associated issue archive: [phone](https://raw.githubusercontent.com/xiechimon/cairn/c50e55a5/docs/verify/2009/chip-phone.png)
+pr-evidence: RED (4 problem(s))
+exit=1
+
+===== PR #2020 | docs(1681): preserve offline-oracle runtime evidence | repository xiechimon/cairn | 4 commits =====
+issues associated by closing keywords: none
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+===== PR #2014 | eval(1984): land routing fixtures and validated oracles | repository xiechimon/cairn | 1 commits =====
+issues associated by closing keywords: 1984
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+===== PR #2013 | server(intake): skip issues held for a person | repository xiechimon/cairn | 1 commits =====
+issues associated by closing keywords: none
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+

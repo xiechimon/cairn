@@ -1,0 +1,32 @@
+----------------------------------------------------------------------
+Ran 13 tests in 0.132s
+
+OK
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.062s
+
+OK
+
+[prepush] git init -q
+✔ documentation skips code checks, unknown paths fail closed (1.353293ms)
+✔ changes to prepush scripts run the CI self-test files locally (0.27574ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.181192ms)
+✔ local code checks include both UI gates and affected e2e (0.126628ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.301958ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.121275ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (1.23515ms)
+✔ affected e2e gets only code paths, so a bulk evidence prune fits on the command line (2.727962ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (75.939591ms)
+✔ a board card source change selects the spec that reads its title (25.021224ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.46931ms)
+✔ CLI skips real document changes and rejects a missing base (469.738768ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (175.557212ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (113.930964ms)
+✔ prepush vitest only forgives files listed as known local red (1.23567ms)
+✔ plan children do not inherit the git hook repository binding (13.684843ms)
+ℹ tests 16
+ℹ pass 16
+ℹ fail 0
+
+pr-evidence-workflow: GREEN (required-check shape intact)

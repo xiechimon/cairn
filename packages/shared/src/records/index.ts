@@ -45,6 +45,7 @@ export * from './plan.js';
 export * from './project.js';
 export * from './prompts.js';
 export * from './provider.js';
+export * from './recording-trigger.js';
 export * from './report.js';
 export * from './review.js';
 export * from './schedule.js';
