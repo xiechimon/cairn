@@ -1,5 +1,5 @@
 {
-  "baseCommit": "c6b533e543da50914f408f2232791d41ab3e6d5a",
+  "baseCommit": "928fd93c9ceb896bf83e536166224ef3414a08ec",
   "originalPullRequestHead": "9526438e9b17fd3ef5d121b03ab0cd489acb7ae1",
   "files": {
     "apps/daemon/src/git.ts": "03868263319e1a9b1f65943c2af7ddedf2c44c8c9ccac69c720ce70c8b1b2d87",

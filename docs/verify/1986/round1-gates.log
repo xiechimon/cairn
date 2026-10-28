@@ -1,0 +1,35 @@
+# Round 1 gates after the corrections
+
+$ node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+
+$ node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+
+$ node scripts/single-use-helper-gate.mjs
+single-use-helper-gate: 0 single-use helper(s)
+
+$ node scripts/lessons-ledger-gate.mjs
+lessons ledger ok
+
+$ pnpm lint
+$ biome ci .
+[0m[34mChecked 1072 files in 470[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m
+
+$ pnpm typecheck
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+
+$ node scripts/prepush-vitest.mjs
+   ✓ planner explicit runtime-resource read /dev/null is blocked and graded 331ms
+
+ Test Files  2 passed (2)
+      Tests  35 passed (35)
+   Start at  18:11:07
+   Duration  12.70s (tests 92%, import 7%)
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-hk1_lvh_/prepush-vitest-bw1Kb7/report.json
