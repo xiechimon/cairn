@@ -1,0 +1,14 @@
+{
+  "oracle": {
+    "status": "infrastructure",
+    "log": "/tmp/cairn-1517-controls-1990/oracle.log",
+    "exitCode": 0,
+    "wallSeconds": 15.987
+  },
+  "nop": {
+    "status": "infrastructure",
+    "log": "/tmp/cairn-1517-controls-1990/nop.log",
+    "exitCode": 0,
+    "wallSeconds": 4.421
+  }
+}

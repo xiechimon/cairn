@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/home/ian/.local/bin/ai-route", line 703, in <module>
+    main(sys.argv[1:])
+    ~~~~^^^^^^^^^^^^^^
+  File "/home/ian/.local/bin/ai-route", line 678, in main
+    st = status(host=host)
+  File "/home/ian/.local/bin/ai-route", line 325, in status
+    cq = cached("codex", 300, lambda: codex_quota(host), refresh)
+  File "/home/ian/.local/bin/ai-route", line 134, in cached
+    json.dump(v, open(p, "w"))
+                 ~~~~^^^^^^^^
+OSError: [Errno 30] Read-only file system: '/home/ian/.cache/ai-route/codex.json'

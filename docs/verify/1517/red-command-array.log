@@ -1,0 +1,40 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/fast/lanes/cairn-1517
+collected 11 items
+
+integration/eval/harbor/test_pr_to_task.py .......F..F                   [100%]
+
+=================================== FAILURES ===================================
+__________________ test_rejects_non_array_test_commands[true] __________________
+
+repository = (PosixPath('/mnt/fast/tmp/ai-route-tmp/run-0wbzfvgn/pytest-of-ian/pytest-6/test_rejects_non_array_test_co0/repo'), 'a5273f3d4467177e3bccd830a283435b14bda647', '22c4362f0a793df155bd7004f55d825a44f5bc01')
+tmp_path = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-0wbzfvgn/pytest-of-ian/pytest-6/test_rejects_non_array_test_co0')
+command = 'true'
+
+    @pytest.mark.parametrize("command", ["true", [], [""], {"cmd": "true"}])
+    def test_rejects_non_array_test_commands(repository, tmp_path, command):
+        repo, base, head = repository
+>       with pytest.raises(ValueError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+integration/eval/harbor/test_pr_to_task.py:96: Failed
+________________ test_rejects_non_array_test_commands[command3] ________________
+
+repository = (PosixPath('/mnt/fast/tmp/ai-route-tmp/run-0wbzfvgn/pytest-of-ian/pytest-6/test_rejects_non_array_test_co3/repo'), 'a5273f3d4467177e3bccd830a283435b14bda647', '22c4362f0a793df155bd7004f55d825a44f5bc01')
+tmp_path = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-0wbzfvgn/pytest-of-ian/pytest-6/test_rejects_non_array_test_co3')
+command = {'cmd': 'true'}
+
+    @pytest.mark.parametrize("command", ["true", [], [""], {"cmd": "true"}])
+    def test_rejects_non_array_test_commands(repository, tmp_path, command):
+        repo, base, head = repository
+>       with pytest.raises(ValueError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+integration/eval/harbor/test_pr_to_task.py:96: Failed
+=========================== short test summary info ============================
+FAILED integration/eval/harbor/test_pr_to_task.py::test_rejects_non_array_test_commands[true]
+FAILED integration/eval/harbor/test_pr_to_task.py::test_rejects_non_array_test_commands[command3]
+========================= 2 failed, 9 passed in 0.74s ==========================
