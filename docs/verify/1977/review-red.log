@@ -1,0 +1,80 @@
+✔ concurrent claims, repeated requests and restarts dispatch one worker per digest (134.378939ms)
+✔ lost dispatch acknowledgment never retries and recovers completion after restart (116.47805ms)
+✔ worker-failed is durable and requires human attention (190.215072ms)
+✔ worker-unavailable is durable and requires human attention (171.484902ms)
+✔ budget-refused is durable and requires human attention (11.302687ms)
+✔ deadline expiry survives restart and rejects late completion (11.241218ms)
+✔ new digests supersede old authorization while evidence-only heads reuse attempts (14.340831ms)
+✔ publication rejection is terminal and cannot be retried (15.245885ms)
+✔ deadline and supersession are rechecked after an in-flight poll (11.804125ms)
+✔ poll failures and unknown dispatches eventually time out without another paid run (11.014861ms)
+✔ independent processes atomically claim one durable attempt (103.04931ms)
+✔ process death during claim-crash never repeats dispatch or publication (65.080107ms)
+✔ process death during publish-crash never repeats dispatch or publication (65.878649ms)
+✔ attempt storage must survive reopening and deadlines must be representable (8.789994ms)
+✔ repeated running polls retain the original deadline and dispatch identity (11.629547ms)
+✔ dispatch worker-failed is terminal before polling (8.496295ms)
+✔ dispatch worker-unavailable is terminal before polling (8.959814ms)
+✔ dispatch budget-refused is terminal before polling (9.168001ms)
+✔ deadline during dispatch revokes late acknowledgment and completion (9.374326ms)
+✔ supersession during dispatch revokes late acknowledgment and completion (11.606824ms)
+✖ a process killed after durable claim and before dispatch never launches on restart (61.903101ms)
+✖ ordinary Promise-returning publishers cannot enter the publication boundary (2.99487ms)
+✖ completion authenticates worker identity and fences late callbacks (8.221725ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 20
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1454.920276
+
+✖ failing tests:
+
+test at scripts/harness-eval-coordinator.test.mjs:324:1
+✖ a process killed after durable claim and before dispatch never launches on restart (61.903101ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'claimed'
+  - 'uncertain'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1977/scripts/harness-eval-coordinator.test.mjs:341:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'claimed',
+    expected: 'uncertain',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/harness-eval-coordinator.test.mjs:350:1
+✖ ordinary Promise-returning publishers cannot enter the publication boundary (2.99487ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1977/scripts/harness-eval-coordinator.test.mjs:353:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /publication command/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at scripts/harness-eval-coordinator.test.mjs:356:1
+✖ completion authenticates worker identity and fences late callbacks (8.221725ms)
+  TypeError: coordinator.complete is not a function
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1977/scripts/harness-eval-coordinator.test.mjs:360:36)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)

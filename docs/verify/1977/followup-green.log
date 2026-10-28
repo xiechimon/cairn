@@ -1,0 +1,28 @@
+✔ concurrent claims, repeated requests and restarts dispatch one worker per digest (17.640341ms)
+✔ lost dispatch acknowledgment never retries and recovers completion after restart (15.600463ms)
+✔ worker-failed is durable and requires human attention (11.478227ms)
+✔ worker-unavailable is durable and requires human attention (10.955207ms)
+✔ budget-refused is durable and requires human attention (11.205936ms)
+✔ deadline expiry survives restart and rejects late completion (11.442874ms)
+✔ new digests supersede old authorization while evidence-only heads reuse attempts (13.898378ms)
+✔ publication rejection is terminal and cannot be retried (13.946916ms)
+✔ deadline and supersession are rechecked after an in-flight poll (11.128472ms)
+✔ poll failures and unknown dispatches eventually time out without another paid run (11.376255ms)
+✔ independent processes atomically claim one durable attempt (55.856859ms)
+✔ process death during claim-crash never repeats dispatch or publication (35.448311ms)
+✔ process death during publish-crash never repeats dispatch or publication (40.519142ms)
+✔ attempt storage must survive reopening and deadlines must be representable (9.132121ms)
+✔ repeated running polls retain the original deadline and dispatch identity (11.075173ms)
+✔ dispatch worker-failed is terminal before polling (8.165731ms)
+✔ dispatch worker-unavailable is terminal before polling (7.968569ms)
+✔ dispatch budget-refused is terminal before polling (8.052159ms)
+✔ deadline during dispatch revokes late acknowledgment and completion (8.334367ms)
+✔ supersession during dispatch revokes late acknowledgment and completion (11.719009ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 373.139899

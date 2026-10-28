@@ -1,0 +1,10 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1977/packages/shared
+
+
+  Snapshots  1 updated 
+ Test Files  2 passed (2)
+      Tests  119 passed (119)
+   Start at  10:37:48
+   Duration  458ms (transform 63%, import 29%, tests 7%, worker 1%)
+

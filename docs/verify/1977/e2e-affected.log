@@ -1,0 +1,6 @@
+  apps/server/drizzle/meta/0066_snapshot.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/db/schema.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/schema.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+[e2e:affected] 4/196 specs on the standard fixture-build config, E2E_PORT=8398
+[e2e:affected] slot 1: E2E_PORT=8398, build output /mnt/fast/tmp/ai-route-tmp/run-v8qfn8v5/cairn-heavy-slot-1/web-dist
+  26 passed (13.3s)

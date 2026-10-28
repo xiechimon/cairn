@@ -1,0 +1,4 @@
+branch journal tail vs origin/main tail (after rebase onto 2d9fb2e1):
+main tail:  idx 65 0065_push_subscription
+branch tail: idx 66 0066_harness_eval_attempts
+branch migration = main tail + 1: PASS

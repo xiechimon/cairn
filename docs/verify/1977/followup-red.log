@@ -1,0 +1,49 @@
+✔ concurrent claims, repeated requests and restarts dispatch one worker per digest (17.01566ms)
+✔ lost dispatch acknowledgment never retries and recovers completion after restart (13.342624ms)
+✔ worker-failed is durable and requires human attention (10.838338ms)
+✔ worker-unavailable is durable and requires human attention (10.745403ms)
+✔ budget-refused is durable and requires human attention (10.938733ms)
+✔ deadline expiry survives restart and rejects late completion (12.906572ms)
+✔ new digests supersede old authorization while evidence-only heads reuse attempts (14.209005ms)
+✔ publication rejection is terminal and cannot be retried (14.757657ms)
+✔ deadline and supersession are rechecked after an in-flight poll (11.037323ms)
+✔ poll failures and unknown dispatches eventually time out without another paid run (12.071039ms)
+✔ independent processes atomically claim one durable attempt (52.641367ms)
+✔ process death during claim-crash never repeats dispatch or publication (35.731404ms)
+✔ process death during publish-crash never repeats dispatch or publication (38.718347ms)
+✖ attempt storage must survive reopening and deadlines must be representable (0.942455ms)
+✔ repeated running polls retain the original deadline and dispatch identity (11.202528ms)
+✔ dispatch worker-failed is terminal before polling (8.371858ms)
+✔ dispatch worker-unavailable is terminal before polling (8.199849ms)
+✔ dispatch budget-refused is terminal before polling (8.390816ms)
+✔ deadline during dispatch revokes late acknowledgment and completion (8.259265ms)
+✔ supersession during dispatch revokes late acknowledgment and completion (10.956451ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 19
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 356.089915
+
+✖ failing tests:
+
+test at scripts/harness-eval-coordinator.test.mjs:251:1
+✖ attempt storage must survive reopening and deadlines must be representable (0.942455ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1977/scripts/harness-eval-coordinator.test.mjs:254:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /persistent absolute database path/,
+    operator: 'throws',
+    diff: 'simple'
+  }

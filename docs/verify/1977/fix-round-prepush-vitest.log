@@ -1,0 +1,5 @@
+suites: 1266 passed / 5 failed / 1271 total
+tests: 4986 passed / 3 failed / 4989 total
+Failing files (pre-existing 5000ms timeouts, reproduced identically on origin/main at d4adc564):
+  apps/server/test/pr-reconcile.test.ts
+  apps/server/test/pr-seg3.test.ts

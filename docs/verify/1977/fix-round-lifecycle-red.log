@@ -1,0 +1,10 @@
+The two new lifecycle tests failed before the coordinator fix (deadline was
+computed at claim time and authorized() marked a late-accepted superseding
+attempt timed-out before it ever polled):
+
+ℹ tests 27
+ℹ pass 25
+ℹ fail 2
+✖ failing tests:
+✖ deadline passing during dispatch grants a fresh window on late acceptance
+✖ a hanging dispatch port does not consume the superseding attempt budget

@@ -1,0 +1,1514 @@
+[heavy-slots] acquired slot 1/2
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1977
+
+ ✓ |@cairn/shared| test/skill-entry.test.ts (11 tests) 6ms
+ ✓ |@cairn/shared| test/permission-rules.test.ts (11 tests) 5ms
+ ✓ |@cairn/shared| test/retired-zero-use.test.ts (4 tests) 8ms
+ ✓ |@cairn/shared| test/claude-rate-limit.test.ts (6 tests) 6ms
+ ✓ |@cairn/shared| test/skill-route.test.ts (15 tests) 14ms
+ ✓ |@cairn/shared| test/chief-tools.test.ts (17 tests) 19ms
+ ✓ |@cairn/shared| test/first-pr-report.test.ts (8 tests) 11ms
+ ✓ |@cairn/shared| test/agent-todo-stream.test.ts (5 tests) 11ms
+ ✓ |@cairn/shared| test/trajectory-pack.test.ts (10 tests) 25ms
+ ✓ |@cairn/shared| test/machine-capabilities.test.ts (24 tests) 25ms
+ ✓ |@cairn/shared| test/blocker-handoff.test.ts (25 tests) 25ms
+ ❯ |@cairn/shared| test/vocabulary.test.ts (40 tests | 1 failed) 25ms
+   ✓ phase nine values authoritative single source (02 §4.1, locked) (6)
+     ✓ is exactly the nine docs-ordered values 3ms
+     ✓ board columns are the four #351 workbench columns 0ms
+     ✓ column mapping is the #351 single-key fold (no hasChanges param) 1ms
+     ✓ manual drop targets are the four writable columns (#753) 0ms
+     ✓ canBoardDrop → building only for phases orchestrate accepts (#1457) 0ms
+     ✓ canBoardDrop is the per-source manual matrix (#753) 1ms
+   ✓ machine protocol (02 §5, r3 §1.6) (6)
+     ✓ has the 14 machine-face endpoints 0ms
+     ✓ pins the observed cadence and retry budgets 0ms
+     ✓ pi stream event vocabulary is the 17-item bundle extraction (02 §5.6) 0ms
+     ✓ config kinds and machine custom tools (02 §5.6) 0ms
+     ✓ CLI command face copied verbatim (02 §5.1) 0ms
+     ✓ step lifecycle log line templates (02 §5.7) 0ms
+   ✓ web REST vocabulary (02 §6.1 canonical) (5)
+     ✓ covers the observed GET list 1ms
+     ✓ covers the observed POST/PATCH list 0ms
+     ✓ carries query vocabularies for the parameterized GETs 0ms
+     ✓ excludes /api/push -- Web Push stays out of spec (R1 final ruling, 02 §9.1/04 §5) 0ms
+     ✓ skills write surface rolled back (XMON-109 spec 13 rollback: POST /api/skills + PUT teams/{id}/skills/{sid}); scan surface still absent 0ms
+   ✓ SSE channels (02 §1.2, all SSE, no WS) (1)
+     ✓ has exactly the three channels 0ms
+   ✓ MCP vocabulary (02 §7.2, r3 §6 matrix 1:1) (4)
+     ✓ server-face whitelist = 11 read groups + 13 write tools = 24 0ms
+     ✓ capability groups are the six docs verbatim (02 §7.2) 0ms
+     ✓ tool registry = 24 grant<->name single source, whitelist labels 1:1 (02/A10 shape-preserving) 1ms
+     ✓ executor minimum-version gate shape (02 §7.1: value self-determined per replica version line [design]) 0ms
+   ✓ worker memory tools (02 §4.4/r5 §6: worker-step remoteTools memory trio) (1)
+     ✓ the trio = MEMORY_TOOLS family, shapes pass remoteToolDefSchema 2ms
+   ✓ brand slots (02 §5.8 consolidation + replacement plan §2 canonical replacement values) (7)
+     ✓ covers every 02 §5.8 slot row 0ms
+     ✓ live values are the replacement cairn family (D3 triggered 2026-09-23, #109) 0ms
+     ✓ BRAND live values = BRAND_SLOTS replacement column (single-source discipline, replacement plan §2) 0ms
+     ✓ env vars are the CAIRN_ same-shape replacement (replacement plan §2; r3 §1.1 observed original names TDS_*) 0ms
+     ✓ credential formats match the observed shapes (key prefix follows the BRAND slot) 0ms
+     ✓ API-key list-row mask follows the r3 §6 display rule 0ms
+     ✓ SecretBox envelope version word is v1 (01 §4.2) 0ms
+   ❯ record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription) (2)
+     × DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796) 6ms
+     ✓ record shapes cover exactly the 21 wire tables (todo_tag join + internal tables have none; skill and mcp_server are projections with no table slot) 0ms
+   ✓ AgentBackend seam (01 §5, 00/D1 seam) (3)
+     ✓ StepEvent types = 02 §5.6 pi vocabulary session-facing 15 items, 1:1 no rename 0ms
+     ✓ BACKEND_RUNTIME_IDS accepts claude-code and gemini; pi is still not a backend identity 0ms
+     ✓ isBackendRuntimeId: outside the vocabulary (custom provider id / pi / null / undefined) always false 0ms
+   ✓ thinking-level capability read surface (XMON-16 / #499 B3 ruling A) (2)
+     ✓ THINKING_LEVELS = pi ThinkingLevel seven tiers verbatim 0ms
+     ✓ capability read-surface envelope accepts only in-vocabulary tiers (out-of-vocabulary always rejected) 1ms
+   ✓ machine wire (02 §5 canonical, wire layer enters CI) (2)
+     ✓ MACHINE_WIRE covers exactly the 14 endpoint paths (single source) 0ms
+     ✓ claim/stream verbs match observed evidence (long-poll claim + SSE stream) 0ms
+   ✓ PUBLISHED_PACKAGES (1)
+     ✓ install command and start command come from the same published package (package name and command name paired) 0ms
+ ✓ |@cairn/shared| test/skill-inject.test.ts (27 tests) 42ms
+ ❯ |@cairn/shared| test/snapshot.test.ts (79 tests | 1 failed) 51ms
+   ✓ record shapes, 24-table projection -- zod -> JSON Schema snapshot (21)
+     ✓ user 5ms
+     ✓ team 2ms
+     ✓ project 1ms
+     ✓ todo 2ms
+     ✓ tag 1ms
+     ✓ build 1ms
+     ✓ step 0ms
+     ✓ message 0ms
+     ✓ plan 0ms
+     ✓ schedule 1ms
+     ✓ notification 1ms
+     ✓ agent 1ms
+     ✓ agent_memory 0ms
+     ✓ provider 1ms
+     ✓ secret 0ms
+     ✓ api_key 0ms
+     ✓ machine 1ms
+     ✓ token_usage 0ms
+     ✓ chief 0ms
+     ✓ chief_thread 1ms
+     ✓ chief_message 0ms
+   ✓ body/envelope schema snapshots (24)
+     ✓ createTodoBody 0ms
+     ✓ createScheduleBody 0ms
+     ✓ createProjectBody 0ms
+     ✓ githubReposResponse 0ms
+     ✓ githubConnectionStatus 0ms
+     ✓ projectTreeResponse 0ms
+     ✓ projectFileResponse 0ms
+     ✓ projectBranchesResponse 0ms
+     ✓ startBuildsBody 0ms
+     ✓ mergeAcceptedResponse 0ms
+     ✓ buildStepActionBody 0ms
+     ✓ patchChiefBody 0ms
+     ✓ conversationMessagesResponse 0ms
+     ✓ notificationsResponse 0ms
+     ✓ searchResponse 0ms
+     ✓ setSecretBody 0ms
+     ✓ teamStreamEvent 2ms
+     ✓ conversationStreamEvent 2ms
+     ✓ planRow 0ms
+     ✓ stepJournalRow 1ms
+     ✓ apiKeyRow 0ms
+     ✓ machineJson 0ms
+     ✓ deviceJson 0ms
+     ✓ daemonJson 0ms
+   ✓ AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) (18)
+     ✓ stepEvent = 02 §5.6 pi vocabulary, 15 session events 1:1 (locked by 01 §5) 1ms
+     ✓ machine surface 13 endpoint verbs + paths (MACHINE_WIRE, verb [inferred] registry surface) 0ms
+     ✓ claimedStep 1ms
+     ✓ machineClaimBody 0ms
+     ✓ machineClaimResponse 2ms
+     ✓ machineDoneBody 4ms
+     ✓ machineEnrollBody 1ms
+     ✓ machineEnrollResponse 0ms
+     ✓ machinePresenceBody 0ms
+     ✓ machineRecoverResponse 0ms
+     ✓ machineStreamEvent 0ms
+     ✓ machineToolBody 1ms
+     ✓ machineThinkingDeltaBody 0ms
+     ✓ machineTranscriptDeltaBody 0ms
+     ✓ machineTokenResponse 0ms
+     ✓ machineUploadUrlsBody 0ms
+     ✓ machineUploadUrlsResponse 0ms
+     ✓ transcriptUpload 0ms
+   ❯ protocol vocabulary snapshot (02 §5/§6 canonical) (16)
+     ✓ web REST endpoint vocabulary (02 §6.1) 0ms
+     ✓ DELETE surface rules ([inferred], 02 §6.1) and divergence registry 0ms
+     ✓ machine surface 13 endpoints (02 §5/r3 §1.6) 0ms
+     ✓ SSE's three channels (02 §1.2) 0ms
+     ✓ executor minimum-version gate shape (02 §7.1: value self-determined per replica version line [design]) 0ms
+     ✓ local state layout and log prefixes (02 §5.3) 0ms
+     ✓ worktree contract (02 §5.5) 0ms
+     ✓ pi stream events / config kinds / stream timeouts / machine tools / proxy probing (02 §5.6) 0ms
+     ✓ step lifecycle line order (02 §5.7) and bring-up sequence canon (02 §5.4) 0ms
+     ✓ MCP server surface: 24-tool whitelist + six capability groups (02 §7.2) 0ms
+     ✓ provider presets 38-item catalog (r3 §2/02 §6.2) 0ms
+     ✓ localStorage key contract (02 §6.4/r2 §1.5) 0ms
+     ✓ phase nine values + board columns + semantics (02 §4.1) 0ms
+     ✓ brand-string naming table (02 §5.8 + replacement plan §2) 0ms
+     × storage table list (01 §6) 4ms
+     ✓ merge-gate blocker vocabulary: codes, categories, and copy, in fixed order (#1404; S5-S9 routed by category, first blocker is the status description) 0ms
+ ✓ |@cairn/shared| test/records.test.ts (56 tests) 44ms
+ ✓ |@cairn/shared| test/harness-eval.test.ts (3 tests) 8ms
+ ✓ |@cairn/shared| test/secret-redaction.test.ts (7 tests) 11ms
+ ✓ |@cairn/shared| test/memory-tools.test.ts (1 test) 6ms
+ ✓ |@cairn/web| test/chief-user-echo.test.ts (13 tests) 12ms
+ ✓ |@cairn/web| test/chief-markdown.test.ts (33 tests) 20ms
+ ✓ |@cairn/web| test/transcript-tool-echo.test.ts (6 tests) 25ms
+ ✓ |@cairn/web| test/work-trace-mapper.test.ts (8 tests) 49ms
+ ✓ |@cairn/web| test/tag-filter.test.ts (21 tests) 46ms
+ ✓ |@cairn/web| test/activity-live-row.test.ts (18 tests) 95ms
+ ✓ |@cairn/web| test/transcript-user-words.test.ts (21 tests) 167ms
+ ✓ |@cairn/web| test/chief-flight-expand.test.ts (7 tests) 34ms
+ ✓ |@cairn/web| test/dnd.test.ts (17 tests) 34ms
+(node:288) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |@cairn/web| test/sse-conversation-stream.test.ts (21 tests) 76ms
+ ✓ |@cairn/web| test/columns.test.ts (33 tests) 42ms
+ ✓ |@cairn/web| test/transcript-quiescent.test.ts (8 tests) 77ms
+ ✓ |@cairn/web| test/thinking-live-row.test.ts (6 tests) 52ms
+(node:346) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ |@cairn/web| test/chief-segments.test.ts (7 tests) 16ms
+ ✓ |@cairn/web| test/chief-stream-handoff.test.ts (6 tests) 69ms
+ ✓ |@cairn/web| test/agent-todo-row.test.ts (5 tests) 115ms
+ ✓ |@cairn/web| test/repo-filter.test.ts (10 tests) 49ms
+ ✓ |@cairn/web| test/model-options.test.ts (10 tests) 34ms
+ ✓ |@cairn/web| test/transcript-issue-fence.test.ts (2 tests) 96ms
+ ✓ |@cairn/web| test/injected-skills-row.test.ts (5 tests) 101ms
+ ✓ |@cairn/web| test/first-pr-card.test.ts (8 tests) 46ms
+ ✓ |@cairn/web| test/chief-todo-handoff.test.ts (4 tests) 68ms
+ ✓ |@cairn/web| test/fail-row-ansi.test.ts (3 tests) 31ms
+ ✓ |@cairn/web| test/sse-guards.test.ts (7 tests) 115ms
+ ✓ |@cairn/web| test/claude-login-copy.test.ts (3 tests) 5ms
+ ✓ |@cairn/web| test/sse-team-events.test.ts (5 tests) 44ms
+ ✓ |@cairn/web| test/i18n-coverage.test.ts (5 tests) 726ms
+   ✓ EN dict liveness (1)
+     ✓ every key appears as a literal somewhere in src/ (no dead entries) 661ms
+ ✓ |@cairn/web| test/thinking-level.test.ts (5 tests) 20ms
+ ✓ |@cairn/web| test/chief-orchestration-failure.test.ts (2 tests) 173ms
+ ✓ |@cairn/web| test/usage-cost.test.ts (2 tests) 25ms
+ ✓ |@cairn/web| test/rel-time.test.ts (6 tests) 81ms
+ ✓ |@cairn/web| test/created-at.test.ts (2 tests) 28ms
+ ✓ |@cairn/web| test/merge-gate.test.ts (7 tests) 9ms
+ ✓ |@cairn/web| test/attachment-paste.test.ts (35 tests) 80ms
+ ✓ |@xiechimon/cairn| test/merge-gate-readiness.test.ts (197 tests) 270ms
+ ✓ |@cairn/web| test/segments-mention-nav.test.ts (5 tests) 92ms
+ ✓ |@cairn/web| test/chief-identity.test.ts (5 tests) 125ms
+ ✓ |@xiechimon/cairn| test/schema.test.ts (5 tests) 292ms
+ ✓ |@xiechimon/cairn| test/merge-gate-github-facts.test.ts (37 tests) 1744ms
+(node:628) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+web push delivery failed
+ ✓ |@xiechimon/cairn| test/model-fallback.test.ts (41 tests) 3831ms
+ ✓ |@xiechimon/cairn| test/git-hosting.test.ts (11 tests) 4063ms
+   ✓ hosted form: bare repo + git http-backend (02 section 3 locked) (9)
+     ✓ POST /api/projects repoKind:hosted -> bare repo landed + record carries repoName/cloneUrl 885ms
+     ✓ GET /api/projects/{id}/commits -> commit history read back new to old 864ms
+     ✓ GET /api/projects/{id}/commits/{sha} -> metadata + first-parent diff; boundary 404/defined state 379ms
+     ✓ conv branch push (02 section 5.5: conv-<conversationId>) + binary file base64 398ms
+   ✓ GitHub integration form (02 section 3: record surface + executor contract run through) (2)
+     ✓ executor contract run through: clone the user own repo -> conv-* branch -> push (remote local bare stand-in) 651ms
+ ✓ |@xiechimon/cairn| test/pr-seg3.test.ts (79 tests) 4207ms
+web push delivery failed
+ ✓ |@xiechimon/cairn| test/reliability-report.test.ts (13 tests) 5956ms
+   ✓ the CLI refuses a missing --project or an inverted window with exit code 2 2583ms
+   ✓ the CLI reports the checked-in sample when --replay is given, ignoring project builds 1336ms
+   ✓ the CLI prints a JSON report and a markdown table from the real db path 1024ms
+ ✓ |@xiechimon/cairn| test/push.test.ts (40 tests) 4901ms
+   ✓ subscription authorization boundaries (4)
+     ✓ delivers only to the requested owner and team 800ms
+   ✓ digest routing: merged, failed, plan-ready, review queue; 410 prunes (7)
+     ✓ PATCH todo phase to confirm queues for the digest and sends no immediate push 419ms
+     ✓ queues build review for the digest without an immediate push 697ms
+     ✓ queues merged PR reconciliation for the digest without an immediate push 486ms
+     ✓ queues failed work for the digest without an immediate push 455ms
+ ✓ |@xiechimon/cairn| test/split-rejected-proposal.test.ts (44 tests) 4966ms
+   ✓ human validates a 12000-node cycle without losing its rejection contract 631ms
+   ✓ shadow validates a 12000-node cycle without losing its rejection contract 1058ms
+   ✓ auto validates a 12000-node cycle without losing its rejection contract 877ms
+stderr | test/github-writeback.test.ts > self-created issues: stored as not-yet-created, source backfilled after async creation (A family) > W3/A2-A5 creation fails (permission 404 / permission 403 / network down / malformed response): the task is still created, stays not-yet-created, no unhandled rejection
+self issue create failed for todo o_ov0n3VfSxiMeXu_m7oR: github repo not found (or private without auth): https://api.github.com/repos/octo/alpha/issues
+
+stderr | test/github-writeback.test.ts > self-created issues: stored as not-yet-created, source backfilled after async creation (A family) > W3/A2-A5 creation fails (permission 404 / permission 403 / network down / malformed response): the task is still created, stays not-yet-created, no unhandled rejection
+self issue create failed for todo aX9u8MxNclZL7MseTA_tj: github api 403: https://api.github.com/repos/octo/alpha/issues
+
+stderr | test/github-writeback.test.ts > self-created issues: stored as not-yet-created, source backfilled after async creation (A family) > W3/A2-A5 creation fails (permission 404 / permission 403 / network down / malformed response): the task is still created, stays not-yet-created, no unhandled rejection
+self issue create failed for todo hWAo5FgoJapCOuNgRcaLj: github fetch network error: fetch failed (ECONNREFUSED): https://api.github.com/repos/octo/alpha/issues
+
+stderr | test/github-writeback.test.ts > self-created issues: stored as not-yet-created, source backfilled after async creation (A family) > W3/A2-A5 creation fails (permission 404 / permission 403 / network down / malformed response): the task is still created, stays not-yet-created, no unhandled rejection
+self issue create failed for todo GWVEhG-WFWaowJFwqhar6: github create issue response missing number: https://api.github.com/repos/octo/alpha/issues
+
+stderr | test/github-writeback.test.ts > self-created issues: stored as not-yet-created, source backfilled after async creation (A family) > a secondary limit retries the pending task and backfills its source
+GitHub create rate limited; retrying in 1000ms
+
+ ✓ |@xiechimon/cairn| test/machine-pin.test.ts (11 tests) 5311ms
+   ✓ #1259 worker home-machine gate (2)
+     ✓ bound to A -> A claims, B comes up empty; rebound to B -> B claims (reassignment immediate) 668ms
+     ✓ no home machine set -> no machine can claim it (stays pending) 519ms
+   ✓ #1312 other-machine mark on a resumed session (1)
+     ✓ same-machine resume carries no priorMachineId; claim after rebind carries the previous-round machine 427ms
+   ✓ #1260 chief step delivery = bound Agent home machine (1)
+     ✓ Agent bound to B -> only B can claim the chief step; Agent rebound to A -> A claims (reassignment immediate) 547ms
+   ✓ #895 GET /chief orchestration envelope (spec 21 A5; #1260 re-source) (3)
+     ✓ failure mode G: projection -- homeMachineId + running (claimed) / waiting (pending not executable by its home machine) counts 2272ms
+ ✓ |@xiechimon/cairn| test/skill-write.test.ts (30 tests) 5900ms
+   ✓ machine-wire skill listing and on-demand fetch (GET /api/machine/skills/{stepId}[/file]) (8)
+     ✓ M5: an over-limit file no longer fails the whole package -- an asset past the per-file gate enters the listing with its real size and is delivered byte-complete; a total over the old package gate still gets a listing 1479ms
+     ✓ M6: a chief step = the full directory (the trust surface is not bound by the whitelist) 2371ms
+stderr | test/github-writeback.test.ts > self-created issues: stored as not-yet-created, source backfilled after async creation (A family) > W6/A13 a successful retry uses the current title: retry after agent/user renamed it -> issue title = new title, source backfilled
+self issue create failed for todo Ysc9gjen3KxOPa1hgPDYD: github repo not found (or private without auth): https://api.github.com/repos/octo/alpha/issues
+
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts (123 tests) 7713ms
+stderr | test/github-writeback.test.ts > title write-back and claim meta (B family) > W11/B3 title backfill on a not-yet-created task: local only, zero PATCH outbound (the later-created issue naturally uses the current title)
+self issue create failed for todo az6nAGaiIkuAnLiQkiV7g: github api 502: https://api.github.com/repos/octo/alpha/issues
+
+ ✓ |@xiechimon/cairn| test/trajectory-outcome.test.ts (6 tests) 8591ms
+   ✓ merged, closed-unmerged and reverted builds export with matching outcomes 1513ms
+   ✓ a revert after the 7 day window does not count, and a later PR on the same ticket marks the fix 1403ms
+   ✓ a merge newer than 7 days leaves the revert window open and reports it 1692ms
+   ✓ builds without a merge or close record keep every outcome field null 977ms
+   ✓ a close followed by a later merge counts as merged, and the latest record wins 1178ms
+   ✓ traj:export feeds traj:label: failed packs get labeled, successful packs are skipped 1824ms
+stderr | test/github-writeback.test.ts > GET /api/todos/{id}/github-issue read-only echo (D family) > W16b family cannot be fetched -> non-200: not-yet-created 404 / local task 404 / issue deleted 404 / connection removed 404
+self issue create failed for todo YJ68B05JQWRpJ0BaC8SL0: github api 502: https://api.github.com/repos/octo/alpha/issues
+
+stderr | test/github-writeback.test.ts > moving a task with a self-created issue to another project (#2009) > when the new repo refuses the issue, the old one stays open and linked until a retry succeeds
+self issue create failed for todo 1aoqo4gkHkiyvEKYh8NgO: github api 410: https://api.github.com/repos/octo/beta/issues
+
+ ✓ |@xiechimon/cairn| test/github-writeback.test.ts (22 tests) 3358ms
+   ✓ self-created issues: stored as not-yet-created, source backfilled after async creation (A family) (10)
+     ✓ a secondary limit retries the pending task and backfills its source 1105ms
+ ✓ |@xiechimon/cairn| test/ci-loop.test.ts (37 tests) 2907ms
+ ✓ |@xiechimon/cairn| test/merge-gate-verdict-binding.test.ts (26 tests) 3182ms
+ ✓ |@xiechimon/cairn| test/machine-wire.test.ts (26 tests) 2769ms
+   ✓ claim/wake timing (r3 section 1.5 measured: ~75s long poll cadence + wake low-latency dispatch) (5)
+     ✓ empty long poll returns {step:null} after about the hold duration (same cadence shape, shortened timescale) 480ms
+ ✓ |@xiechimon/cairn| test/github-reads.test.ts (39 tests) 2704ms
+ ✓ |@xiechimon/cairn| test/merge-gate-paths.test.ts (89 tests) 59ms
+ ✓ |@xiechimon/cairn| test/harness-eval-coordinator.test.ts (1 test) 4648ms
+   ✓ durable coordinator lifecycle across independent processes 4647ms
+stderr | test/github-issues.test.ts > #1406 concurrent import placeholder > different issues imported concurrently do not block each other
+self issue create failed for todo wOBQURI0F9qmn81Bf5S2x: github create gate directory not writable: /home/ian/.cairn/github-create; grant the process write access (chmod u+w) or remove the directory so the gate recreates it
+
+stderr | test/github-issues.test.ts > #1406 concurrent import placeholder > different issues imported concurrently do not block each other
+self issue create failed for todo EaVCmP8HPlowIXOuxBFg3: github create gate directory not writable: /home/ian/.cairn/github-create; grant the process write access (chmod u+w) or remove the directory so the gate recreates it
+
+ ✓ |@xiechimon/cairn| test/m3b-machine-git.test.ts (12 tests) 2621ms
+   ✓ claim payload repo binding slot (M3b worktree contract wiring, 02 section 3/5.5) (1)
+     ✓ hosted project -> project.repo {kind:hosted, cloneUrl=/git/<teamId>/<repoName>} 458ms
+ ✓ |@xiechimon/cairn| test/github-issues.test.ts (36 tests) 2880ms
+ ✓ |@xiechimon/cairn| test/close-stops-active-steps.test.ts (28 tests) 2194ms
+ ✓ |@xiechimon/cairn| test/plan-handoff.test.ts (15 tests) 1603ms
+ ✓ |@xiechimon/cairn| test/plan-server-auto-confirm.test.ts (17 tests) 2235ms
+ ✓ |@xiechimon/cairn| test/pr-reconcile.test.ts (186 tests) 11553ms
+ ✓ |@xiechimon/cairn| test/persona-split-verify.test.ts (22 tests) 3009ms
+   ✓ #1250 split_todo (layer 2) (12)
+     ✓ manual done stops the pending step (#1247, #1451) 334ms
+   ✓ #1492 the verify step issues verdicts by checklist (1)
+     ✓ the plan carries Verification -> confirm -> the verify material lists the checklist; missing evidence -> passed=false naming it 307ms
+ ✓ |@xiechimon/cairn| test/token-auth.test.ts (45 tests) 2872ms
+   ✓ token auth: the four exempt surfaces (failure modes 3/4/5/8) (4)
+     ✓ on + /api/machine/* with a machine credential (enroll Bearer apiKey) -> works as usual, no CAIRN_TOKEN needed 438ms
+     ✓ on + the OAuth callback without a token -> reachable (bad state still goes through the existing 302 error surface) 312ms
+ ✓ |@xiechimon/cairn| test/review.test.ts (17 tests) 3779ms
+   ✓ review step material forks by gate (#511) (5)
+     ✓ failure mode 1: the confirm-gate material contains no changes -- even when the conversation branch already has them 449ms
+     ✓ failure mode 2: the review-gate material contains the plan + changes (file paths and line-by-line diffs all present) 701ms
+     ✓ failure mode 3: an empty change surface at the review gate -> initiation still works, the material honestly says no changes 351ms
+     ✓ failure mode 4: the changes in the material = the same computation path as the human change surface (the GET /changes file set matches) 340ms
+ ✓ |@xiechimon/cairn| test/chief-digest.test.ts (24 tests) 3362ms
+   ✓ chief long-chat digests (#1939) (24)
+     ✓ items with a bad group or an overlong text are dropped or cut, not fatal 378ms
+ ✓ |@xiechimon/cairn| test/gate-actor.test.ts (16 tests) 2173ms
+   ✓ #902 gate-passing action records the actor (announcement row) (4)
+     ✓ failure modes 1/2: steps confirm -> transcript lands the confirm row, actor = user displayName 801ms
+     ✓ failure mode 3: chief confirm_builds -> confirm row actor = chief Agent displayName (not recorded as the user name) 307ms
+ ✓ |@xiechimon/cairn| test/failed-review-restore.test.ts (7 tests) 2059ms
+   ✓ #702 failed->review restore (B-C17 deadlock shape) (7)
+     ✓ failure mode 1 positive: exit open (build delivered) (2)
+       ✓ #519 shape run through: build done + review failed -> in-product merge 202 -> merge step -> done (PR not orphaned) 1049ms
+       ✓ only rerun the review: failed (build leg done) starting an AI review -> 202 + review step enqueued + phase back to review 347ms
+ ✓ |@xiechimon/cairn| test/m4b-memory.test.ts (12 tests) 2079ms
+   ✓ worker step memory relay (r5 section 6 write path = agent tool -> server executes) (12)
+     ✓ claim payload = memory trio + attachment read remoteTools (02 section 4.4 + #310/r9 section 3.1 worker-side attachment tools = spec `attachment:` token parse path) 883ms
+ ✓ |@xiechimon/cairn| test/chief-queue-steer-stop.test.ts (26 tests) 4390ms
+   ✓ chief turn queue (T5): one turn per thread, oldest first (5)
+     ✓ a message sent while a turn runs waits as queued and is not claimed beside it 402ms
+   ✓ steer (T5): `现在插话` (9)
+     ✓ an ack only settles the batch it acknowledges; a later steer waits for its own fetch and ack 371ms
+     ✓ the chief prompt requires using a steer and saying what changed 510ms
+ ✓ |@xiechimon/cairn| test/artifact-gate.test.ts (27 tests) 3697ms
+   ✓ gate 2 drift naming (#1195): branch drift is no longer "build produced zero changes" (3)
+     ✓ failure mode 6: hasChanges=false + workBranchDrift -> failure reason names the branch drift 583ms
+ ✓ |@xiechimon/cairn| test/github-repo-dot-segments.test.ts (21 tests) 1460ms
+ ✓ |@xiechimon/cairn| test/trajectory-push.test.ts (20 tests) 17622ms
+   ✓ maps one build to one trace: invoke_agent root, a span per step, chat and execute_tool under each step 1299ms
+   ✓ carries GenAI convention fields and cairn.* fields 719ms
+   ✓ pushing the same pack twice sends byte-identical trace and span ids 1480ms
+   ✓ different builds get different trace ids and disjoint span ids 446ms
+   ✓ redacts secrets in every string that leaves the machine 444ms
+   ✓ maps Claude session shapes: tool_use blocks, tool_result in user rows, snake_case usage 440ms
+   ✓ a pack without steps or timestamps still yields a deterministic root span 1453ms
+   ✓ accepts an endpoint that already ends with /v1/traces 453ms
+   ✓ fails fast with a reason when endpoint unset 374ms
+   ✓ fails fast with a reason when malformed headers 407ms
+   ✓ fails fast with a reason when endpoint not a url 333ms
+   ✓ rejects bad input before sending anything 1205ms
+   ✓ a non-2xx reply fails the run, names the status and leaks neither headers nor body 498ms
+   ✓ an unreachable endpoint fails the run without printing credentials in the url 407ms
+   ✓ a second push of the same traces to the same endpoint sends nothing and reports the skip 1024ms
+   ✓ only traces not yet pushed are sent when a later file adds a build 1092ms
+   ✓ --force pushes every span again 1325ms
+   ✓ a different endpoint is a different target and gets the full push 968ms
+   ✓ the record is keyed without credentials, so rotating the key does not repush 1478ms
+   ✓ traces delivered before a failure stay recorded and are skipped on retry 1769ms
+ ✓ |@xiechimon/cairn| test/merge-gate-digest.test.ts (36 tests) 38ms
+ ✓ |@xiechimon/cairn| test/issue-intake.test.ts (179 tests) 15779ms
+   ✓ 24 rate limited: this team stops reading for the round (26)
+     ✓ 导入时的详情读 429（retry-after 60）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条 313ms
+ ✓ |@xiechimon/cairn| test/machine-capability-gate.test.ts (14 tests) 1661ms
+   ✓ #1251 machine-fit read surface (agent surface "which machines can run it") (1)
+     ✓ failure mode 10: canRun/missing/mcpGaps/runtimeOk four states 396ms
+ ✓ |@xiechimon/cairn| test/fs-list.test.ts (18 tests) 1907ms
+   ✓ services/fs-list listDir -- live-scan surface (S family) (15)
+     ✓ S1 dir default/empty string = server $HOME start 1635ms
+ ✓ |@xiechimon/cairn| test/github-oauth.test.ts (14 tests) 1891ms
+   ✓ POST /api/teams/:id/github/oauth/authorize (connection family issuance) (2)
+     ✓ 1. oauth not configured -> 400 (not-configured family carried over, env slot name in the message) 321ms
+ ✓ |@xiechimon/cairn| test/attachment-gc.test.ts (15 tests) 8228ms
+   ✓ attachment gc -- scheduler cadence (3)
+     ✓ a large transcript corpus does not block the event loop during a tick 7236ms
+ ✓ |@xiechimon/cairn| test/chief-questions.test.ts (8 tests) 1973ms
+   ✓ #1049 question line lifecycle (createOrGet / answer / cancel / wrap-up) (8)
+     ✓ hold semantics: expires back to pending (D3 does not auto-decide); answering after hold returns answered (<= poll granularity) 886ms
+     ✓ cancel (user) and wrap-up (step terminal) both flip to cancelled; idempotent without re-flipping 358ms
+ ✓ |@xiechimon/cairn| test/local-merge-facts.test.ts (13 tests) 3301ms
+   ✓ localGateFacts: persisted rows become the gate inputs a local project is judged on (13)
+     ✓ the build boundary and the project configuration fill the policy, repo, checks and compare fields 437ms
+     ✓ the required checks are the project commands read at the judged head, so a mismatch is caught 431ms
+     ✓ a declared boundary that disagrees with the build is unreadable, not green 589ms
+     ✓ verdicts persisted for the judged patch are read back with their digest and outcome 428ms
+ ✓ |@xiechimon/cairn| test/delivery-surface.test.ts (8 tests) 3043ms
+   ✓ done channel delivery-surface backfill (#704 / B-C16) (7)
+     ✓ failure mode 8: 100% rename with no hunk -> files empty and changed 590ms
+     ✓ failure mode 4: changesDiff over the cap -> dropped (done still 200, row not half-written) 470ms
+     ✓ failure mode 6: build not reported / repo-less project -> {files:[]} (null != empty array) 429ms
+   ✓ hosted form source-of-truth does not drift (#704: the bare repo is still the only truth) (1)
+     ✓ failure mode 5: a hosted build reporting changesDiff does not change the projection source (bare repo read surface) 702ms
+ ✓ |@xiechimon/cairn| test/trajectory-outcome-backfill.test.ts (8 tests) 3785ms
+   ✓ a revert commit on main within 7 days backfills revertedWithin7d 768ms
+   ✓ a later PR touching the same lines backfills fixedByLaterPr 612ms
+   ✓ a clean merge backfills both labels false 402ms
+   ✓ a revert landing after the 7 day window does not set revertedWithin7d 667ms
+   ✓ builds still inside the 7 day window are not backfilled yet 342ms
+   ✓ empty data and unmatched PR numbers are skipped without failing 516ms
+   ✓ a project without a readable repo counts as skippedNoRepo 461ms
+ ✓ |@xiechimon/cairn| test/memory-dedupe.test.ts (28 tests) 4616ms
+   ✓ chief memory dedupe (14)
+     ✓ 候选提示不落库：旧约定 475ms
+     ✓ different topics added directly, candidate only adds with force:true 691ms
+     ✓ candidate request same content retry returns 409, saved content retry also 409 362ms
+     ✓ same body saves normally and clears the fingerprint after all candidates deleted, stays 409 while a candidate survives 300ms
+     ✓ when the candidate is deleted and a new similar entry replaces it, the same body gets a candidate again 334ms
+ ✓ |@xiechimon/cairn| test/merge-gate-tables.test.ts (25 tests) 5064ms
+   ✓ gate_round: one round per (buildId, patchDigest) (4)
+     ✓ F21 a round without patchDigest rejected by NOT NULL (UNIQUE treats NULLs as distinct, an empty digest could open endless rounds) 304ms
+     ✓ defaults: fixRound 0, state open, timedOut [], dispatches {} (read back through drizzle) 376ms
+   ✓ gate_verdict: one row per step, attached only to real builds (7)
+     ✓ F4 a second verdict for the same step is rejected by the primary key 359ms
+     ✓ F20 a verdict without expectedHeadSha rejected by NOT NULL (verdicts bind only to the head the server pinned when queueing the step) 449ms
+     ✓ F9 a verdict of a chief mini-merge step (step.buildId = the chief thread, no build row) attaches to the reviewed build; deleting the build takes the verdict, the chief step stays 386ms
+     ✓ the verdict table has an index on buildId (readiness reads all verdicts of the build each round) 538ms
+   ✓ gate_state: one latest snapshot per build (2)
+     ✓ F11 blockers round-trip without loss (escaped names, bidi controls, CJK labels, the S2 list cap), stored as valid JSON 377ms
+ ✓ |@xiechimon/cairn| test/manual-drop-matrix.test.ts (15 tests) 4502ms
+   ✓ manual drop matrix (#753): done source (4)
+     ✓ done->todo: never started = 200; changed (already started) = 409 pointing at /reset (#1486) 309ms
+   ✓ manual drop matrix (#753): awaiting source (7)
+     ✓ confirm/review->todo = 200 (reference site: started cards drag back to to-do; reset semantics separate ticket) 628ms
+     ✓ ->in-progress: review->building = 409; confirm->building goes through the legal funnel edge and is still allowed 574ms
+     ✓ same-column migration (confirm->review) = 409 (drag produces no intra-column phase rewrite) 505ms
+   ✓ manual drop matrix (#753): to-do/in-progress sources and non-landing phases (4)
+     ✓ todo->review = 409 (to-do->awaiting observed always-plain surface) 399ms
+     ✓ building->done = 200; building->todo = 409 pointing at /reset (in-progress is already started, #1486) 598ms
+ ✓ |@xiechimon/cairn| test/quota-hold.test.ts (12 tests) 2833ms
+   ✓ #1257 quota hold (done-surface classification + the hold/resume loop) (7)
+     ✓ failure mode 1: a quota failure -> held (pending + machine slot cleared + the sessionId resume surface + holdUntil at the first tier; zero failure traces + a step pending event + a waiting-for-quota row) 404ms
+     ✓ failure mode 2: nothing claims while held (holdUntil not reached) 725ms
+     ✓ failure mode 5: backoff caps from the third tier on 483ms
+ ✓ |@xiechimon/cairn| test/skill-import.test.ts (35 tests) 7353ms
+   ✓ POST /api/teams/{id}/skills/import (localPath) (11)
+     ✓ LP5: one file exceeds MAX_SKILL_FILE_BYTES -> 400 naming the file and the cap 309ms
+     ✓ LP6: a non-utf8 binary file -> 400 naming it (the text-channel boundary, no silent drop) 416ms
+   ✓ POST /api/teams/{id}/skills/{sid}/refresh (8)
+     ✓ R4: the source identity drifted (frontmatter name changed) -> 409, the on-disk content untouched 453ms
+     ✓ R6: the overwrite semantics pinned -- the source dropped a file, the local copy keeps it (listed files overwrite, unlisted files stay) 487ms
+     ✓ R7: source records survive a restart (a second boot on the same skillSourcesPath can refresh) 888ms
+   ✓ refresh and the machine-wire listing (the #920 handoff) (1)
+     ✓ M1: after refresh the same id has a new sha256 (the listing is rescanned per request -- the root cause of the new view) 846ms
+ ✓ |@xiechimon/cairn| test/stop.test.ts (11 tests) 3707ms
+   ✓ the stop server write surface (M7 #308) (11)
+     ✓ failure mode 1: no active step 409; an unknown build 404; missing discard 400 605ms
+     ✓ failure mode 6c: stopping the merge step -> review unchanged 452ms
+     ✓ failure mode 8: a double stop overwrites the single slot (the later discard wins); after stopped 409 365ms
+     ✓ failure mode 9: after stop is booked, the steer fetch -> null (the step is not claimed) 693ms
+     ✓ chief conversations are outside the stop surface: a chief- prefixed id -> 404 (stop gates on the build table) 688ms
+ ✓ |@xiechimon/cairn| test/build-abandoned-sweep.test.ts (34 tests) 7655ms
+   ✓ #862 T1 release of lost-contact claimed steps (sweepAbandonedBuildSteps) (14)
+     ✓ after release the home machine can reclaim: another machine comes up empty (#1259 home-machine gate), the home machine claims the same step once online 631ms
+     ✓ counterexample: fresh-heartbeat claimed step untouched (online or offline) 802ms
+   ✓ #1257 unclaimed suspension when the home machine is offline (home-machine form of sweepAbandonedBuildSteps) (9)
+     ✓ re-wait after release: anchored on the step last activity (heartbeat), stays suspended after release (#1257: no death verdict, waits for the home machine to return) 474ms
+     ✓ home machine offline but step heartbeat fresh (claimed running): untouched (claimed-surface criteria unchanged) 551ms
+   ✓ #881 home machine online but blocked by the runtime gate (#1257 suspension semantics) (5)
+     ✓ home machine online + gate blocked (claude-code step x pi-only machine) + past age: suspended waiting for a machine (#1257: auto-resumes after runtime enabled, no failure wrap-up) 787ms
+   ✓ #1284 verify step sweep (sweepAbandonedBuildSteps adds the verify kind) (6)
+     ✓ counterexample: done verify step untouched (terminal -- sweep only scans pending/claimed) 428ms
+     ✓ counterexample: failed verify step untouched (terminal -- sweep only scans pending/claimed) 407ms
+     ✓ counterexample: pending verify step past age + team zero online: suspended waiting for a machine, untouched (#1257) 679ms
+ ✓ |@xiechimon/cairn| test/build-diff-fulltext.test.ts (4 tests) 3381ms
+   ✓ GET /api/builds/{id}/changes/file (#224 diff full-text read surface) (4)
+     ✓ text = conv branch history state full text (not main old version); envelope passes the shared schema; nested paths same surface 1179ms
+     ✓ binary -> 200 base64 decodes back to the original bytes; over the 1 MiB gate -> 413 678ms
+     ✓ 404 surface: unknown build / non-managed project / conv branch not pushed / file missing / directory path 721ms
+     ✓ 400 surface: missing path / empty path / `..` segment / absolute path / NUL 774ms
+ ✓ |@xiechimon/cairn| test/attachments.test.ts (27 tests) 5630ms
+   ✓ attachments -- grant side (11)
+     ✓ missing fileName/mimeType/size -> 400 438ms
+     ✓ size=0 -> 400 493ms
+     ✓ negative size -> 400 618ms
+     ✓ over 10MiB -> 400 471ms
+     ✓ empty fileName -> 400 489ms
+   ✓ attachments — chief-tools / mcp-face tool (3)
+     ✓ chief-tools attachment image/* → base64 568ms
+ ✓ |@xiechimon/cairn| test/team-ownership-1470.test.ts (21 tests) 4220ms
+   ✓ #1470 MCP run_builds / schedule_todo: the project a todo points at is team-checked too (5)
+     ✓ U1 run_builds: an own-team todo pointing at another team project -> 404 project, not one build created 310ms
+     ✓ U8 run_builds: assigning another team agent -> 404 agent, not one build created 419ms
+     ✓ U2 schedule_todo: an own-team todo pointing at another team project -> 404 project, no schedule created 376ms
+     ✓ U7 same-team paths unchanged: run_builds and schedule_todo work as usual 456ms
+   ✓ #1470 save_memory: projectId / sourceTodoId are team-checked (6)
+     ✓ U7 own-team projects store as usual (chief explicit projectId, worker default context) 390ms
+ ✓ |@xiechimon/cairn| test/schedules.test.ts (14 tests) 2076ms
+ ✓ |@xiechimon/cairn| test/retry-lessons.test.ts (22 tests) 3861ms
+   ✓ #1615 restarting injects the previous round lessons (17)
+     ✓ repeated reuse mixing old rounds: the 3rd restart carries only the previous round lessons, not round 1 413ms
+     ✓ plan-step reassignment: a restart with feedback still belongs to the rework family and falls back to the build slot when the plan slot is empty 357ms
+ ✓ |@xiechimon/cairn| test/chief-demotion.test.ts (12 tests) 1001ms
+ ✓ |@xiechimon/cairn| test/notifications.test.ts (6 tests) 1997ms
+   ✓ three-event matrix (r5 section 7.2 field by field) (6)
+     ✓ entering confirm -> plan_ready: event shape field by field + channels always in_app 807ms
+     ✓ entering done / entering failed has no in-app notification event (copied verbatim from the r5 section 7.2 observation window) 770ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts (26 tests) 1403ms
+ ✓ |@xiechimon/cairn| test/queued-cancel-release.test.ts (10 tests) 1337ms
+ ✓ |@xiechimon/cairn| test/orchestration-source.test.ts (11 tests) 901ms
+ ✓ |@xiechimon/cairn| test/chief-todos-cap.test.ts (1 test) 2749ms
+   ✓ chief todos output budget (1)
+     ✓ large todo lists stay within 32 KiB and can be paged without losing ids 2745ms
+ ✓ |@xiechimon/cairn| test/chief-project-pick.test.ts (14 tests) 1120ms
+ ✓ |@xiechimon/cairn| test/local-merge-landing.test.ts (17 tests) 1205ms
+ ✓ |@xiechimon/cairn| test/chief-abandoned-sweep.test.ts (13 tests) 1248ms
+ ✓ |@xiechimon/cairn| test/blocker-handoff-claim.test.ts (11 tests) 1190ms
+ ✓ |@xiechimon/cairn| test/memory-invalidation.test.ts (12 tests) 1003ms
+ ✓ |@xiechimon/cairn| test/patch-todo-reset-gate.test.ts (13 tests) 1175ms
+ ✓ |@xiechimon/cairn| test/claude-rate-limit.test.ts (8 tests) 1041ms
+ ✓ |@xiechimon/cairn| test/machine-attachment.test.ts (8 tests) 1050ms
+   ✓ GET /api/machine/attachment/{stepId}/{attachmentId} (#730) (8)
+     ✓ #1481 only human task text authorizes both attachment interfaces 326ms
+ ✓ |@xiechimon/cairn| test/team-ownership-1497.test.ts (11 tests) 1131ms
+ ✓ |@xiechimon/cairn| test/chief-settings.test.ts (11 tests) 920ms
+ ✓ |@xiechimon/cairn| test/project-team-guard.test.ts (13 tests) 929ms
+ ✓ |@xiechimon/cairn| test/github-connection.test.ts (11 tests) 760ms
+ ✓ |@xiechimon/cairn| test/skills-local.test.ts (24 tests) 1203ms
+ ✓ |@xiechimon/cairn| test/oauth.test.ts (15 tests) 982ms
+ ✓ |@xiechimon/cairn| test/project-identity.test.ts (29 tests) 974ms
+ ✓ |@xiechimon/cairn| test/model-sources.test.ts (12 tests) 838ms
+ ✓ |@xiechimon/cairn| test/agent-concurrency.test.ts (8 tests) 807ms
+ ✓ |@xiechimon/cairn| test/claude-login-claim.test.ts (9 tests) 1112ms
+ ✓ |@xiechimon/cairn| test/keys.test.ts (12 tests) 847ms
+ ✓ |@xiechimon/cairn| test/mcp-servers.test.ts (21 tests) 1005ms
+ ✓ |@xiechimon/cairn| test/merge-gate-imports.test.ts (8 tests) 78ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency-chief.test.ts (9 tests) 869ms
+ ✓ |@xiechimon/cairn| test/issue-fence.test.ts (10 tests) 1056ms
+ ✓ |@xiechimon/cairn| test/m5-face.test.ts (9 tests) 940ms
+ ✓ |@xiechimon/cairn| test/unassigned-build.test.ts (5 tests) 742ms
+ ✓ |@xiechimon/cairn| test/steer.test.ts (7 tests) 767ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency.test.ts (9 tests) 840ms
+ ✓ |@xiechimon/cairn| test/rework-branch-reuse.test.ts (9 tests) 759ms
+ ✓ |@xiechimon/cairn| test/github-token-refresh.test.ts (9 tests) 689ms
+ ✓ |@xiechimon/cairn| test/mcp-face.test.ts (10 tests) 955ms
+ ✓ |@xiechimon/cairn| test/skill-inject-claim.test.ts (7 tests) 750ms
+ ✓ |@xiechimon/cairn| test/chief-dispatch.test.ts (9 tests) 815ms
+ ✓ |@xiechimon/cairn| test/token-usage-cost.test.ts (6 tests) 785ms
+ ✓ |@xiechimon/cairn| test/merge-gate-status.test.ts (13 tests) 49ms
+ ✓ |@xiechimon/cairn| test/machine-stale-sweep.test.ts (11 tests) 781ms
+ ✓ |@xiechimon/cairn| test/review-reject.test.ts (6 tests) 857ms
+ ✓ |@xiechimon/cairn| test/secret-box.test.ts (10 tests) 19ms
+ ✓ |@xiechimon/cairn| test/credentials.test.ts (5 tests) 499ms
+ ✓ |@xiechimon/cairn| test/machine-local.test.ts (9 tests) 710ms
+ ✓ |@xiechimon/cairn| test/m4a-chief-loop.test.ts (4 tests) 600ms
+   ✓ M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections 3.1/3.2/3.5) (4)
+     ✓ claim → relay(create_todo/run_builds) → transcript → done → gate wake 306ms
+ ✓ |@xiechimon/cairn| test/legacy-export.test.ts (6 tests) 654ms
+ ✓ |@xiechimon/cairn| test/machine-zombie-claim.test.ts (6 tests) 606ms
+ ✓ |@xiechimon/cairn| test/conv-stream-catchup.test.ts (25 tests) 721ms
+   ✓ chief wire surface: mid-way entry catch-up (#740 ticket symptom path) (2)
+     ✓ delta during zero-subscriber period -> one catch-up text_delta on stream open -> live as usual -> new stream after done has zero catch-up 426ms
+ ✓ |@xiechimon/cairn| test/step-session-upload.test.ts (4 tests) 553ms
+ ✓ |@xiechimon/cairn| test/step-claim-report.test.ts (4 tests) 504ms
+ ✓ |@xiechimon/cairn| test/task-meta.test.ts (8 tests) 813ms
+ ✓ |@xiechimon/cairn| test/needs-you.test.ts (8 tests) 976ms
+ ✓ |@xiechimon/cairn| test/phase-funnel.test.ts (4 tests) 893ms
+   ✓ phase funnel same-phase idempotency (the XMON-59 main break) (4)
+     ✓ a same-phase replay does not throw and returns the current record; zero side effects (v/phaseAt unchanged, no new todo doc frame) 579ms
+ ✓ |@xiechimon/cairn| test/search.test.ts (6 tests) 566ms
+ ✓ |@xiechimon/cairn| test/capability-pending-reason.test.ts (11 tests) 741ms
+ ✓ |@xiechimon/cairn| test/chief-unread-badge.test.ts (7 tests) 808ms
+ ✓ |@xiechimon/cairn| test/second-pr-guard.test.ts (10 tests) 710ms
+ ✓ |@xiechimon/cairn| test/agent-home-machine.test.ts (8 tests) 641ms
+ ✓ |@xiechimon/cairn| test/project-local.test.ts (32 tests) 981ms
+ ✓ |@xiechimon/cairn| test/chief-watch.test.ts (7 tests) 616ms
+ ✓ |@xiechimon/cairn| test/quota-wait.test.ts (5 tests) 652ms
+ ✓ |@xiechimon/cairn| test/machine-shell.test.ts (4 tests) 560ms
+ ✓ |@xiechimon/cairn| test/autonomy-api.test.ts (21 tests) 696ms
+ ✓ |@xiechimon/cairn| test/rework-plan-fallback.test.ts (4 tests) 822ms
+ ✓ |@xiechimon/cairn| test/project-delete.test.ts (5 tests) 720ms
+ ✓ |@xiechimon/cairn| test/local-merge-local-digest.test.ts (2 tests) 629ms
+   ✓ a local project whose path holds a different patch yields a digest that does not match 332ms
+ ✓ |@xiechimon/cairn| test/chief-skill-route.test.ts (5 tests) 546ms
+ ✓ |@xiechimon/cairn| test/agent-delete.test.ts (7 tests) 732ms
+ ✓ |@xiechimon/cairn| test/reset-todo.test.ts (6 tests) 603ms
+ ✓ |@xiechimon/cairn| test/build-provenance.test.ts (7 tests) 755ms
+ ✓ |@xiechimon/cairn| test/g2t2-executor-wire.test.ts (5 tests) 610ms
+ ✓ |@xiechimon/cairn| test/chief-tools.test.ts (5 tests) 431ms
+ ✓ |@xiechimon/cairn| test/chief-gate-budget.test.ts (5 tests) 562ms
+ ✓ |@xiechimon/cairn| test/thinking-delta.test.ts (4 tests) 512ms
+ ✓ |@xiechimon/cairn| test/agent-tools.test.ts (6 tests) 554ms
+ ✓ |@xiechimon/cairn| test/first-pr-report.test.ts (14 tests) 666ms
+ ✓ |@xiechimon/cairn| test/machine-exit.test.ts (6 tests) 565ms
+ ✓ |@xiechimon/cairn| test/runtime-otel.test.ts (8 tests) 620ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency-recommendation.test.ts (11 tests) 478ms
+ ✓ |@xiechimon/cairn| test/agent-desc-limit.test.ts (4 tests) 357ms
+ ✓ |@xiechimon/cairn| test/feishu-config.test.ts (5 tests) 591ms
+ ✓ |@xiechimon/cairn| test/trajectory-reflect-curate.test.ts (9 tests) 326ms
+ ✓ |@xiechimon/cairn| test/project-dual-source.test.ts (14 tests) 420ms
+ ✓ |@xiechimon/cairn| test/todo-usage-cost.test.ts (3 tests) 398ms
+ ✓ |@xiechimon/cairn| test/trajectory-reflect.test.ts (12 tests) 41330ms
+   ✓ reflects only builds that turned green after failing or were sent back by a human 815ms
+   ✓ drops candidates that copy GitHub issue text 867ms
+   ✓ an invalid reflection fails the run without output 4056ms
+   ✓ reflect requires arguments, endpoint and a fresh output path 1055ms
+   ✓ memory candidates land as pending, deduplicated, and never in agent memory 1801ms
+   ✓ a lesson already in memory is skipped, an overlapping one records the conflict 1428ms
+   ✓ needs evidence from two different builds, then a successful recurrence promotes it 6047ms
+   ✓ human confirmation promotes only with two builds of evidence 13301ms
+   ✓ guard candidates go to a local JSONL pool, merged across runs 2864ms
+   ✓ skill candidates become patch drafts that apply to the current skill file 1343ms
+   ✓ curate rejects fenced issue text and builds it cannot place 1601ms
+   ✓ a dismissed candidate absorbs later recurrences and is never promoted 6150ms
+ ✓ |@xiechimon/cairn| test/stop-and-done-1247.test.ts (4 tests) 389ms
+ ✓ |@xiechimon/cairn| test/chief-thread.test.ts (3 tests) 264ms
+ ✓ |@xiechimon/cairn| test/chief-reject-diff.test.ts (2 tests) 254ms
+ ✓ |@xiechimon/cairn| test/sse.test.ts (3 tests) 336ms
+ ✓ |@xiechimon/cairn| test/phase.test.ts (8 tests) 12ms
+ ✓ |@xiechimon/cairn| test/split-policy-migration.test.ts (2 tests) 226ms
+ ✓ |@xiechimon/cairn| test/feishu-migration.test.ts (3 tests) 200ms
+ ✓ |@xiechimon/cairn| test/skill-injection-check.test.ts (3 tests) 291ms
+ ✓ |@xiechimon/cairn| test/agent-skills-split-backfill.test.ts (2 tests) 241ms
+ ✓ |@xiechimon/cairn| test/chief-memory.test.ts (3 tests) 299ms
+ ✓ |@xiechimon/cairn| test/split-review-regressions.test.ts (9 tests) 298ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency-backfill.test.ts (1 test) 176ms
+ ✓ |@xiechimon/cairn| test/github-create-gate-unwritable.test.ts (2 tests) 269ms
+ ✓ |@xiechimon/cairn| test/agent-tool-backfill.test.ts (2 tests) 220ms
+ ✓ |@xiechimon/cairn| test/team-autonomy-pause.test.ts (2 tests) 241ms
+ ✓ |@xiechimon/cairn| test/todo-split-checker.test.ts (20 tests) 119ms
+ ✓ |@xiechimon/cairn| test/chief-context-failure.test.ts (1 test) 178ms
+ ✓ |@xiechimon/cairn| test/user-patch.test.ts (3 tests) 314ms
+ ✓ |@xiechimon/cairn| test/adoption-protected-paths.test.ts (4 tests) 11ms
+ ✓ |@xiechimon/cairn| test/trajectory-attribution.test.ts (9 tests) 9107ms
+   ✓ labels only failed packs and leaves merged or pending packs untouched 685ms
+   ✓ stable output: relabeling the same input yields the same structure 1218ms
+   ✓ rejects a labeler that is the tested model, with or without provider prefix 1410ms
+   ✓ does not call the labeler for packs that are already labeled 500ms
+   ✓ a verdict outside the vocabularies or pointing at a missing message fails the run without output 2685ms
+   ✓ refuses to overwrite an existing output file 570ms
+   ✓ requires --in, --out and --model 448ms
+   ✓ summary prints a (where, why) count table sorted by count 609ms
+   ✓ summary merges several files and rejects an invalid pack 979ms
+ ✓ |@xiechimon/cairn| test/memory-invalidation-migration.test.ts (1 test) 182ms
+ ✓ |@xiechimon/cairn| test/autonomy-gates.test.ts (26 tests) 13ms
+ ✓ |@xiechimon/cairn| test/info-fastlane.test.ts (1 test) 192ms
+ ✓ |@xiechimon/cairn| test/local-merge-digest.test.ts (1 test) 325ms
+   ✓ real Git additions, deletions, renames, binaries and evidence crossings match GitHub tuples without trimming patch bytes 323ms
+ ✓ |@xiechimon/cairn| test/github-connection-migration.test.ts (2 tests) 100ms
+ ✓ |@xiechimon/cairn| test/enroll-browser.test.ts (1 test) 195ms
+ ✓ |@xiechimon/cairn| test/reliability-replay.test.ts (9 tests) 24ms
+ ✓ |@xiechimon/cairn| test/reliability-causes.test.ts (4 tests) 11ms
+ ✓ |@xiechimon/cairn| test/token-usage-cost-migration.test.ts (1 test) 100ms
+ ✓ |@xiechimon/cairn| test/startup-log.test.ts (3 tests) 16ms
+ ✓ |@xiechimon/cairn| test/chief-auto-confirm.test.ts (8 tests) 6ms
+ ✓ |@xiechimon/cairn| test/persona-repo-rules.test.ts (1 test) 93ms
+ ✓ |@xiechimon/cairn| test/capabilities.test.ts (2 tests) 234ms
+ ✓ |@xiechimon/cairn| test/fs-pick.test.ts (1 test) 37ms
+ ✓ |@xiechimon/cairn| test/reliability-window.test.ts (3 tests) 8ms
+ ✓ |@xiechimon/cairn| test/machine-concurrency-startup-backfill.test.ts (1 test) 13ms
+ ✓ |@xiechimon/cairn| test/machines-module-split.test.ts (3 tests) 6ms
+ ✓ |@xiechimon/cairn| test/documents.test.ts (1 test) 6ms
+ ✓ |@xiechimon/cairn| test/provider-config.test.ts (5 tests) 6ms
+ ✓ |@xiechimon/cairn-cli| test/step-attachments.test.ts (34 tests) 84ms
+ ✓ |@xiechimon/cairn| test/gemini-runtime.test.ts (2 tests) 8ms
+ ✓ |@xiechimon/cairn-cli| test/runner-recover-degrade.test.ts (11 tests) 48ms
+ ✓ |@xiechimon/cairn-cli| test/skills-catalog.test.ts (44 tests) 128ms
+ ✓ |@xiechimon/cairn-cli| test/runner-error-lifecycle.test.ts (14 tests) 71ms
+ ✓ |@xiechimon/cairn-cli| test/skills-native-plugin.test.ts (34 tests) 71ms
+ ✓ |@xiechimon/cairn-cli| test/runner-runtime.test.ts (13 tests) 44ms
+ ✓ |@xiechimon/cairn-cli| test/runner-review.test.ts (10 tests) 47ms
+Switched to a new branch 'work'
+Switched to branch 'main'
+ ✓ |@xiechimon/cairn-cli| test/runner-network-retry.test.ts (15 tests) 89ms
+ ✓ |@xiechimon/cairn-cli| test/runner-cred-fallback.test.ts (7 tests) 33ms
+ ✓ |@xiechimon/cairn-cli| test/runner-local.test.ts (16 tests) 508ms
+ ✓ |@xiechimon/cairn-cli| test/pi-protocol-fallback.test.ts (15 tests) 22ms
+ ✓ |@xiechimon/cairn-cli| test/runner-branch-drift.test.ts (12 tests) 34ms
+ ✓ |@xiechimon/cairn-cli| test/runner-brief.test.ts (11 tests) 31ms
+ ✓ |@xiechimon/cairn-cli| test/skills-hard-block.test.ts (28 tests) 36ms
+ ✓ |@xiechimon/cairn-cli| test/map-claude-event.test.ts (16 tests) 29ms
+ ✓ |@xiechimon/cairn-cli| test/review-findings.test.ts (22 tests) 16ms
+ ✓ |@xiechimon/cairn-cli| test/runner-artifact.test.ts (10 tests) 28ms
+ ✓ |@xiechimon/cairn-cli| test/pi-compaction-ceiling.test.ts (19 tests) 166ms
+ ✓ |@xiechimon/cairn-cli| test/tag-tool.test.ts (11 tests) 1139ms
+ ✓ |@xiechimon/cairn-cli| test/runner-stop.test.ts (8 tests) 248ms
+ ✓ |@xiechimon/cairn-cli| test/map-pi-event.test.ts (15 tests) 8ms
+ ✓ |@xiechimon/cairn-cli| test/runner-team-skills.test.ts (8 tests) 30ms
+ ✓ |@xiechimon/cairn-cli| test/runner-delivery.test.ts (8 tests) 34ms
+ ✓ |@xiechimon/cairn-cli| test/brief-file.test.ts (22 tests) 24ms
+ ✓ |@xiechimon/cairn-cli| test/runner-restart-prompt.test.ts (7 tests) 32ms
+ ✓ |@xiechimon/cairn-cli| test/runner-issue-fence.test.ts (14 tests) 48ms
+ ✓ |@xiechimon/cairn-cli| test/runner-quota-breaker.test.ts (6 tests) 23ms
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+ ✓ |@xiechimon/cairn-cli| test/acp-stdio.test.ts (13 tests) 55ms
+ ✓ |@xiechimon/cairn-cli| test/workspace-cred-fallback.test.ts (6 tests) 782ms
+ ✓ |@xiechimon/cairn-cli| test/workspace.test.ts (27 tests) 3962ms
+   ✓ #1149 environment lifecycle hooks (two prepare mount points) (7)
+     ✓ hook timeout → fatal on the setup surface (step failure), non-fatal on the resume surface 409ms
+ ✓ |@xiechimon/cairn-cli| test/pi-config-effect.test.ts (12 tests) 9ms
+ ✓ |@xiechimon/cairn-cli| test/workspace-hooks.test.ts (10 tests) 236ms
+ ✓ |@xiechimon/cairn-cli| test/runner-plan-contract.test.ts (5 tests) 17ms
+ ✓ |@xiechimon/cairn-cli| test/provider-response.test.ts (14 tests) 50ms
+ ✓ |@xiechimon/cairn-cli| test/runner-stream-timeout.test.ts (17 tests) 3494ms
+   ✓ runner stream-timeout guardrails (#699) (12)
+     ✓ failure mode 1: an active stream with event gaps < body budget but total duration > body budget completes naturally 440ms
+     ✓ build progress resets the duration budget 347ms
+     ✓ failure mode 3b (env knob): CAIRN_STREAM_IDLE_MS widens the idle arm for slow providers 475ms
+   ✓ runner tool-execution liveness (#1591) (5)
+     ✓ silence past the idle threshold after the tool ends still fails 322ms
+ ✓ |@xiechimon/cairn-cli| test/local-executor.test.ts (4 tests) 831ms
+   ✓ per-step credential argv discipline (spec 12 G2-T2: capturing fork+exec command lines) (1)
+     ✓ failure mode 5: token never enters argv throughout credential-bearing clone/fetch/push; carried by the env credential.helper (positive control) 494ms
+ ✓ |@xiechimon/cairn-cli| test/otel-bridge.test.ts (10 tests) 36ms
+ ✓ |@xiechimon/cairn-cli| test/runner-silent-noop.test.ts (5 tests) 80ms
+ ✓ |@xiechimon/cairn-cli| test/secret-channel.test.ts (6 tests) 30ms
+ ✓ |@xiechimon/cairn-cli| test/machine-stop.test.ts (8 tests) 1549ms
+   ✓ stop delivery (M7 #308: event → fetch-ack → AgentSessionHandle.stop → done(stopped)) (4)
+     ✓ stop event → fetch-ack → live.stop() → done(stopped) report + transcript upload kept 1088ms
+ ✓ |@xiechimon/cairn-cli| test/runner-upload-recovery.test.ts (4 tests) 1019ms
+   ✓ #1028 expired presigned-URL resend (recovery does not depend on server process memory) (2)
+     ✓ PUT 404 (old URL expired after a server restart) → re-fetch the URL and resend: done lands, journal cleared 1010ms
+ ✓ |@xiechimon/cairn-cli| test/machine-steer.test.ts (10 tests) 3710ms
+   ✓ steer delivery (W3 #279: event → fetch-ack → AgentSessionHandle.steer) (10)
+     ✓ steer event → fetch-ack → handle.steer(text) on the running session 3099ms
+ ✓ |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts (19 tests) 4079ms
+   ✓ runner 400-signal one-time degrade retry (#1671 slice 2) (10)
+     ✓ a network retry can still degrade a later image rejection once 2006ms
+   ✓ image fallback integration with current runner recovery (2)
+     ✓ network recovery does not erase the progress guard for image rejection 2005ms
+ ✓ |@xiechimon/cairn-cli| test/machine-recover.test.ts (7 tests) 313ms
+ ✓ |@xiechimon/cairn-cli| test/command-gate.test.ts (49 tests) 16ms
+ ✓ |@xiechimon/cairn-cli| test/machine-capabilities.test.ts (12 tests) 26ms
+ ✓ |@xiechimon/cairn-cli| test/claude-t4-tools.test.ts (16 tests) 19ms
+ ✓ |@xiechimon/cairn-cli| test/runner-thinking-delta.test.ts (5 tests) 2429ms
+   ✓ runner thinking_delta throttled forwarding (#1308) (3)
+     ✓ two segments across the throttle window are reported separately 402ms
+   ✓ a tool call that finishes after a provider network retry keeps its start time 2008ms
+ ✓ |@xiechimon/cairn-cli| test/config-state.test.ts (18 tests) 23ms
+ ✓ |@xiechimon/cairn-cli| test/runner-session-upload.test.ts (4 tests) 47ms
+ ✓ |@xiechimon/cairn-cli| test/machine-step-exec.test.ts (4 tests) 482ms
+ ✓ |@xiechimon/cairn-cli| test/activity.test.ts (14 tests) 11ms
+ ✓ |@xiechimon/cairn-cli| test/runner-agent-todo.test.ts (7 tests) 36ms
+ ✓ |@xiechimon/cairn-cli| test/runner-mcp-managed.test.ts (5 tests) 27ms
+ ✓ |@xiechimon/cairn-cli| test/runner-images.test.ts (4 tests) 25ms
+ ✓ |@xiechimon/cairn-cli| test/runner-create-tag.test.ts (4 tests) 25ms
+ ✓ |@xiechimon/cairn-cli| test/github-probe.test.ts (9 tests) 51ms
+ ✓ |@xiechimon/cairn-cli| test/claude-mcp-strict.test.ts (11 tests) 75ms
+ ✓ |@xiechimon/cairn| test/trajectory-export.test.ts (29 tests) 51699ms
+   ✓ exports a complete validated pack from a readonly sqlite snapshot 2908ms
+   ✓ selects builds by creation time and writes defaults under the instance 2699ms
+   ✓ rejects invalid selectors undefined without writing output 1003ms
+   ✓ rejects invalid selectors "--build" without writing output 1200ms
+   ✓ rejects invalid selectors "--build" without writing output 1138ms
+   ✓ rejects invalid selectors "--since" without writing output 1220ms
+   ✓ rejects invalid selectors "--since" without writing output 1414ms
+   ✓ rejects invalid selectors "--build" without writing output 1166ms
+   ✓ rejects invalid selectors "--unknown" without writing output 1305ms
+   ✓ missing database fails without creating a database 1546ms
+   ✓ invalid schema fails without replacing output or leaking invalid values 1371ms
+   ✓ refuses to write over database file server.db before reading 5116ms
+   ✓ refuses to write over database file server.db-wal before reading 5772ms
+   ✓ refuses to write over database file server.db-shm before reading 2912ms
+   ✓ refuses an existing output file with a clear reason 1290ms
+   ✓ reports output errors without successful summary 1388ms
+   ✓ redacts a token throughout nested exported values and counts replacements 1344ms
+   ✓ exports the blocker handoff snapshot and redacts secrets inside it 1349ms
+   ✓ refuses database file server.db through a symlinked parent 2664ms
+   ✓ refuses database file server.db-wal through a symlinked parent 2801ms
+   ✓ exports structured rejections, recorded approvals and gate verdicts 1537ms
+   ✓ exports pi tool results and Claude session envelopes without dropping messages 1312ms
+   ✓ uses the first step runtime model when a build has multiple billed models 1151ms
+   ✓ separates review gate revisions from failed restarts on the diff side 985ms
+   ✓ ignores gate announcements without an actor 867ms
+   ✓ derives the Claude Code provider for Claude sessions with multiple billed models 898ms
+   ✓ skips builds whose step session was not uploaded and counts them in the summary 1400ms
+   ✓ time window export skips each dirty build by reason and keeps the clean ones 1939ms
+ ✓ |@xiechimon/cairn-cli| test/workspace-source.test.ts (8 tests) 1174ms
+   ✓ dual execution-source selection (github-shape localPath acceleration slot, #1213) (6)
+     ✓ D3 same repo → local source used: base origin repointed to the truth; HEAD = truth remote tip after fetch 388ms
+ ✓ |@xiechimon/cairn-cli| test/workspace-local-unreachable.test.ts (5 tests) 113ms
+ ✓ |@xiechimon/cairn-cli| test/ask-channel.test.ts (11 tests) 2224ms
+   ✓ #1049 machine-client askUser loop (4)
+     ✓ transient 5xx does not end the wait (answer arrives after retry) 2012ms
+ ✓ |@xiechimon/cairn-cli| test/token-command.test.ts (8 tests) 18ms
+ ✓ |@xiechimon/cairn-cli| test/runner-claude-rate-limit.test.ts (2 tests) 15ms
+ ✓ |@xiechimon/cairn-cli| test/git-loopback-proxy.test.ts (8 tests) 829ms
+ ✓ |@xiechimon/cairn-cli| test/agent-todo.test.ts (13 tests) 12ms
+ ✓ |@xiechimon/cairn-cli| test/machine-parallel-chief.test.ts (7 tests) 738ms
+ ✓ |@xiechimon/cairn-cli| test/sync.test.ts (8 tests) 1065ms
+ ✓ |@xiechimon/cairn-cli| test/pi-session-policy.test.ts (12 tests) 16ms
+ ✓ |@xiechimon/cairn-cli| test/verify-verdict.test.ts (6 tests) 24ms
+ ✓ |@xiechimon/cairn-cli| test/runner-blocker-handoff.test.ts (4 tests) 17ms
+ ✓ |@xiechimon/cairn-cli| test/step-reclaim.test.ts (3 tests) 340ms
+ ✓ |@xiechimon/cairn-cli| test/mcp-config.test.ts (6 tests) 11ms
+ ✓ |@xiechimon/cairn-cli| test/skills-version-skew.test.ts (5 tests) 11ms
+ ✓ |@xiechimon/cairn-cli| test/relay-tool.test.ts (3 tests) 66ms
+ ✓ |@xiechimon/cairn-cli| test/session-jsonl.test.ts (6 tests) 31ms
+ ✓ |@xiechimon/cairn-cli| test/claude-transcript-path.test.ts (5 tests) 11ms
+ ✓ |@xiechimon/cairn-cli| test/image-support.test.ts (9 tests) 60ms
+ ✓ |@xiechimon/cairn-cli| test/pi-span-event.test.ts (3 tests) 15ms
+ ✓ |@xiechimon/cairn-cli| test/harness-hash.test.ts (6 tests) 47ms
+ ✓ |@xiechimon/cairn-cli| test/task-meta-prompt.test.ts (6 tests) 8ms
+ ✓ |@xiechimon/cairn-cli| test/step-attachments-gc.test.ts (3 tests) 5ms
+ ✓ |@xiechimon/cairn-cli| test/machine-backends.test.ts (4 tests) 319ms
+ ✓ |@xiechimon/cairn-cli| test/machine-boot.test.ts (5 tests) 185ms
+ ✓ |@xiechimon/cairn-cli| test/acp.test.ts (10 tests) 9ms
+ ✓ |@xiechimon/cairn-cli| test/claude-code-models.test.ts (3 tests) 7ms
+ ✓ |@xiechimon/cairn-cli| test/machine-parallel.test.ts (2 tests) 504ms
+   ✓ #1108 parallel execution loop (localCap concurrency + free-slot handoff + graceful stop) (2)
+     ✓ P1+P2+P3: cap=2 runs two steps concurrently, no claim while in-flight is full, slot freed on close and re-claimed 386ms
+ ✓ |@xiechimon/cairn-cli| test/proxy.test.ts (8 tests) 5ms
+ ✓ |@xiechimon/cairn-cli| test/backend-image-delivery.test.ts (8 tests) 6ms
+ ✓ |@xiechimon/cairn-cli| test/local-merge.test.ts (13 tests) 3413ms
+   ✓ clean default checkout advances by exactly one squash commit 373ms
+   ✓ another clean branch keeps its branch, index and files unchanged 324ms
+   ✓ interrupted result recording is recovered without a second squash commit 483ms
+   ✓ a default ref rewind between the last read and landing fails the compare-and-swap 325ms
+ ✓ |@xiechimon/cairn-cli| test/machine-claude-login.test.ts (6 tests) 141ms
+ ✓ |@xiechimon/cairn-cli| test/pi-mcp-attention.test.ts (5 tests) 3ms
+ ✓ |@xiechimon/cairn-cli| test/claude-session-env.test.ts (3 tests) 4ms
+ ✓ |@xiechimon/cairn-cli| test/machine-claim.test.ts (3 tests) 159ms
+ ✓ |@xiechimon/cairn-cli| test/machine-step-otel.test.ts (2 tests) 84ms
+ ✓ |@xiechimon/cairn-cli| test/pi-retry-config.test.ts (3 tests) 3ms
+ ✓ |@xiechimon/cairn-cli| test/git.test.ts (95 tests) 10307ms
+   ✓ withGitNetRetries — deterministic auth-failure short circuit (#1225: 401 retries never flip red) (10)
+     ✓ network failures still retry (existing semantics unchanged) 6003ms
+   ✓ #2006 a work-branch push already contained in the remote branch is not a failure (3)
+     ✓ failure mode 1: remote branch is local HEAD plus a merge of main (Update branch) -> push succeeds, one log line names both short SHAs 329ms
+     ✓ failure mode 2: remote branch advanced by a commit that does not contain local HEAD -> non-fast-forward still throws 322ms
+   ✓ #2047 containment binds to the attempted branch and fetched destination (7)
+     ✓ a missing fetch mapping cannot certify a divergent tip through stale tracking state 380ms
+ ✓ |@cairn/integration| test/m5-web-e2e.test.ts (3 tests) 16600ms
+   ✓ M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload) (3)
+     ✓ create → plan → confirm → build → review → merge → done (main-sequence spine) 2989ms
+     ✓ reject branch: request changes at the confirm gate → replanning → plan v2 → confirm → review (r5 §4) 2862ms
+     ✓ scheduled run parks at review: create once schedule in UI → tick trigger → direct build → parks at review + started-by-schedule marker (r3 §9) 2178ms
+ ✓ |@cairn/integration| test/port-base-e2e.test.ts (3 tests) 16269ms
+   ✓ #1148 E2E: port base segmentation (two concurrent worker steps in different segments) (1)
+     ✓ two concurrent worker steps see CAIRN_PORT_BASE = 20000 / 20100 in their bash env 1192ms
+   ✓ #1260 E2E: chief occupies the machine concurrency slot (cap 1) (1)
+     ✓ while a worker runs (cap 1) the chief queues for a free slot; a later worker is FIFO behind it 8533ms
+   ✓ #1148 E2E: env fallback precedence (env > DB > default) (1)
+     ✓ DB 2 / env 1 → only 1 worker runs at a time (env beats DB; server gate narrows to self-report) 6536ms
+ ✓ |@cairn/integration| test/done-dialog-e2e.test.ts (5 tests) 9947ms
+   ✓ #1236 task-done confirmation dialog (real web dist + real server + fake machine wire) (5)
+     ✓ ① single-card query not ready: confirm does not close silently — dialog stays, alert visible, zero requests, phase unchanged 1593ms
+     ✓ ② rework card merge done: success feedback visible at 202, phase reaches done after the machine finishes the merge step 2082ms
+     ✓ ③ merge unchecked = done without merging: PATCH done lands immediately, zero merge steps, branch untouched 1564ms
+     ✓ ④ server rejects (409): dialog stays open + server message visible verbatim 2118ms
+     ✓ ⑤ failed card (build leg delivered): merge checkbox locked — done can only land via merge 1343ms
+ ✓ |@cairn/integration| test/plan-upload-recovery.test.ts (2 tests) 7976ms
+   ✓ #1026/#1028 final-report failure recovery (real process restarts) (2)
+     ✓ PUT succeeded / done failed → daemon restart fast-path replays: no rerun, no duplicate version 3040ms
+     ✓ server shutdown in the final window → same-port reopen → old URL 404 (explainable) → reissued URL persists → daemon restart fast-path replays 4934ms
+ ✓ |@cairn/integration| test/board-trio-e2e.test.ts (3 tests) 9049ms
+   ✓ #1216 board UI reliability triple defect (real web dist + real server + fake machine wire) (3)
+     ✓ ① save-and-start: one click enters the dispatch flow; in-flight state rejects duplicate orchestration 1239ms
+     ✓ ② failed rerun: thread must land + visible in-flight + buildHistory grows after chief dispatch 1517ms
+     ✓ ③ failed card detail deletable; missing/failed detail shows an explained state, not an empty shell 5027ms
+ ✓ |@cairn/integration| test/w3-steer-e2e.test.ts (1 test) 8554ms
+   ✓ W3 steer E2E: message while building → pending → signal → pull-confirm → session.steer (1)
+     ✓ full-chain delivery + rendering + undisturbed step finish + gate reject 8232ms
+
+[diag] stub requests consumed: 10
+[diag] daemon.log tail:
+[skills] filtered: sharpen not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a18397-8498-7e76-b0e3-2c5817b869f3
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed cairn/conv-01a18397-8498-7e76-b0e3-2c5817b869f3
+finished (0 running)
+claim step=x9SfCf0m1G4JvQ4p1wvV-
+step x9SfCf0m1G4JvQ4p1wvV- for conv 9ade01e2-6bb1-4d12-864c-f1182930289a (1 running)
+[recover] step x9SfCf0m1G4JvQ4p1wvV- awaiting upload — replaying final report (no agent round)
+finished (0 running)
+claim step=1Bxh7u8HqLINiP6InAKCX
+step 1Bxh7u8HqLINiP6InAKCX for conv 94d58904-838c-4d28-b2f8-fcec2ca714c9 (1 running)
+[recover] step 1Bxh7u8HqLINiP6InAKCX awaiting upload — replaying final report (no agent round)
+finished (0 running)
+claim step=gjZMW6aA3VU_4CqoeRUvM
+step gjZMW6aA3VU_4CqoeRUvM for conv 2cd70486-dc17-4120-9152-11afdc11a172 (1 running)
+[recover] step gjZMW6aA3VU_4CqoeRUvM awaiting upload — replaying final report (no agent round)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/g2t2-local-lifecycle.test.ts (5 tests) 5023ms
+   ✓ G2-T2 local form full lifecycle (spec 12: mirror clone + push back to the user repo = delivery, main checkout untouched) (2)
+     ✓ failure modes 1-3: plan/build → conv branch pushed back to the user repo → merge → conv branch update lands delivery, user main checkout unchanged (#1211) 792ms
+     ✓ failure mode 4: dirty workspace → merge step still done (#1211: delivery does not read the user workspace); user HEAD/dirty files unchanged 647ms
+   ✓ autonomous local landing through claim and report with a default checkout 1090ms
+   ✓ autonomous local landing through claim and report with a other checkout 1097ms
+   ✓ autonomous local landing through claim and report with a dirty checkout 1071ms
+ ✓ |@cairn/integration| test/routing-sessions.test.ts (19 tests) 6785ms
+   ✓ planner programmatic shell writes are denied before execution 1751ms
+   ✓ single arm: a stub-relay session edits the workspace and the real oracle passes 354ms
+   ✓ handoff arm: a fresh executor receives the original task, only plan text, and seeded files 641ms
+   ✓ planner forbidden reads never reach the relay and fail despite a passing oracle 315ms
+   ✓ executor forbidden reads never reach the relay and fail despite a passing oracle 323ms
+   ✓ planner executor-directory reads are denied before returning task data 333ms
+   ✓ planner timeouts cannot become successful runs 514ms
+   ✓ executor timeouts cannot become successful runs 521ms
+   ✓ executor symlinks cannot bypass the live read boundary 451ms
+   ✓ explicit file reads cannot use runtime resource allowances as task data 304ms
+   ✓ planner explicit runtime-resource read /etc/passwd is blocked and graded 324ms
+   ✓ planner explicit runtime-resource read /dev/null is blocked and graded 310ms
+
+[diag] stub requests consumed: 8
+[diag] daemon.log tail:
+[skills] filtered: grilling not in injected selection
+[skills] filtered: handoff not in injected selection
+[skills] filtered: herdr not in injected selection
+[skills] filtered: how not in injected selection
+[skills] filtered: humanizer-zh not in injected selection
+[skills] filtered: implement not in injected selection
+[skills] filtered: implement-spec not in injected selection
+[skills] filtered: improve-codebase-architecture not in injected selection
+[skills] filtered: in-your-own-words not in injected selection
+[skills] filtered: interface-review not in injected selection
+[skills] filtered: interview not in injected selection
+[skills] filtered: iphone-use not in injected selection
+[skills] filtered: job-apply not in injected selection
+[skills] filtered: job-match not in injected selection
+[skills] filtered: kami not in injected selection
+[skills] filtered: ketchup not in injected selection
+[skills] filtered: leader not in injected selection
+[skills] filtered: make-resume not in injected selection
+[skills] filtered: migrate-to-shoehorn not in injected selection
+[skills] filtered: offer not in injected selection
+[skills] filtered: pr not in injected selection
+[skills] filtered: project-guide not in injected selection
+[skills] filtered: prototype not in injected selection
+[skills] filtered: prototype-switcher not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: reverse-engineer-anything not in injected selection
+[skills] filtered: scaffold-exercises not in injected selection
+[skills] filtered: setup-matt-pocock-skills not in injected selection
+[skills] filtered: setup-pre-commit not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: sharpen not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a18397-c38d-7fe0-b8be-291ca42176c5
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed cairn/conv-01a18397-c38d-7fe0-b8be-291ca42176c5
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m3b-demo.test.ts (4 tests) 4118ms
+   ✓ M3b demo: single-machine full lifecycle todo→done (02 §4.2 main sequence) (4)
+     ✓ create → plan: worktree contract lands + plan.md v1 persisted + push (r3 §1.4/§3.3) 385ms
+     ✓ failure requires manual rerun (02/A6): provider 400 → failed → no auto rerun → POST builds rerun = new conv/new branch 2961ms
+ ✓ |@cairn/integration| test/routing-driver.test.ts (16 tests) 6066ms
+   ✓ #1986 programmatic routing runner failures that need no sandbox (5)
+     ✓ a planner timeout cannot pass and stays attributable 1513ms
+     ✓ an executor timeout cannot pass 1526ms
+   ✓ #1986 programmatic routing runner through the real backend and oracle (9)
+     ✓ the single arm passes through the real backend and oracle 315ms
+     ✓ the handoff arm transfers only plan text into a freshly seeded executor 314ms
+     ✓ a planner write tool attempt fails the run even when the executor passes 323ms
+     ✓ a planner shell write attempt is denied and recorded 313ms
+     ✓ a planner external read is recorded from the sandbox and fails the run 318ms
+     ✓ an executor external read is recorded despite a passing oracle 471ms
+     ✓ a planner read-tool external read is recorded and fails the run 325ms
+     ✓ a planner attempt to touch executor data is blocked and recorded 314ms
+ ✓ |@cairn/integration| test/learn-from-correction-grade.test.ts (29 tests) 16ms
+ ✓ |@cairn/integration| test/task-meta-e2e.test.ts (2 tests) 3637ms
+   ✓ spec 15 #394 title-less surface + fixed tag vocabulary (live UI → wire → SQLite) (2)
+     ✓ dialog has no title input / no tag UI; first body line becomes the placeholder title; detail page has no tag add surface 2320ms
+
+[timing] wake→confirm (incl. real pi execution) = 250ms; idle claim cadence (hold=1s) = 3/3.2s
+ ✓ |@cairn/integration| test/m3a-demo.test.ts (4 tests) 3984ms
+   ✓ M3a demo: server dispatches step → daemon executes for real → transcript persists (4)
+     ✓ claim cadence is isomorphic to server hold (r3 §1.5 ~75–76s at compressed test timescale; production default 75s pinned on the wire test) 3201ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+2026-10-28 10:39:00 Loading pi runtime…
+2026-10-28 10:39:00 [machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+2026-10-28 10:39:00 [machine] claude binary: /home/ian/.local/share/mise/installs/claude/latest/claude (2.1.302)
+2026-10-28 10:39:01 Enrolled in team BuL2COyzseNgI7o5X2KlR (machine WHG8cdXkebHDxVfp6wXgx)
+2026-10-28 10:39:01 Online (machineId=WHG8cdXkebHDxVfp6wXgx); polling http://127.0.0.1:39261
+2026-10-28 10:39:01 [recover] no pending steps found
+2026-10-28 10:39:01 [wake] push channel connected
+2026-10-28 10:39:01 claim step=BNn4CtKcVAR25VMLieZHO
+2026-10-28 10:39:01 step BNn4CtKcVAR25VMLieZHO for conv chief-01a18398-07ae-7e50-afe9-8592b3895ebc (1 running)
+2026-10-28 10:39:01 using model stub-gw/stub-model
+2026-10-28 10:39:01 [workspace] 准备工作区...
+2026-10-28 10:39:01 [mcp] managed-empty: strict MCP set (runtime config not inherited)
+2026-10-28 10:39:01 [skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+2026-10-28 10:39:01 [skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-ask-home-9TBa2H/workspaces/chief-01a18398-07ae-7e50-afe9-8592b3895ebc/.claude/skills)
+2026-10-28 10:39:01 [skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-ask-home-9TBa2H/workspaces/chief-01a18398-07ae-7e50-afe9-8592b3895ebc/.pi/skills)
+2026-10-28 10:39:01 [skills] loaded: 78 skills from /home/ian/.agents/skills
+2026-10-28 10:39:01 [skills] catalog: entries=51 chars=14351 bytes=19729
+2026-10-28 10:39:01 [step] brief written: AGENTS.md (create)
+2026-10-28 10:39:01 new session chief-01a18398-07ae-7e50-afe9-8592b3895ebc
+2026-10-28 10:39:01 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 10:39:03 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 10:39:03 [step] brief removed (AGENTS.md)
+2026-10-28 10:39:03 finished (0 running)
+2026-10-28 10:39:03 claim step=JHbJXbBrk0fxW-IqtmqdC
+2026-10-28 10:39:03 step JHbJXbBrk0fxW-IqtmqdC for conv chief-01a18398-120d-7222-85d2-45f84dd40905 (1 running)
+2026-10-28 10:39:03 using model stub-gw/stub-model
+2026-10-28 10:39:03 [workspace] 准备工作区...
+2026-10-28 10:39:03 [mcp] managed-empty: strict MCP set (runtime config not inherited)
+2026-10-28 10:39:03 [skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+2026-10-28 10:39:03 [skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-ask-home-9TBa2H/workspaces/chief-01a18398-120d-7222-85d2-45f84dd40905/.claude/skills)
+2026-10-28 10:39:03 [skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-ask-home-9TBa2H/workspaces/chief-01a18398-120d-7222-85d2-45f84dd40905/.pi/skills)
+2026-10-28 10:39:03 [skills] loaded: 78 skills from /home/ian/.agents/skills
+2026-10-28 10:39:03 [skills] catalog: entries=51 chars=14351 bytes=19729
+2026-10-28 10:39:03 [step] brief written: AGENTS.md (create)
+2026-10-28 10:39:03 new session chief-01a18398-120d-7222-85d2-45f84dd40905
+2026-10-28 10:39:03 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 10:39:04 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 10:39:04 [step] brief removed (AGENTS.md)
+2026-10-28 10:39:04 finished (0 running)
+
+ ✓ |@cairn/integration| test/chief-ask-user.test.ts (2 tests) 3415ms
+   ✓ #1049 chief ask_user blocking Q&A full chain (pi backend) (2)
+     ✓ question → card (row + notification) → answer card → same turn continues (D2/D3/D4) 2672ms
+     ✓ user cancels → cancelled tool result → model converges in the same turn (D4 user-side exit) 513ms
+ ✓ |@cairn/integration| test/crash-recover.test.ts (1 test) 3450ms
+   ✓ crash recovery (T2: AgentSession seam × host durable orchestration) (1)
+     ✓ SIGKILL mid-step → restart → recover reconciliation → continue session resumes → confirm 3448ms
+ ✓ |@cairn/integration| test/web-plans-convergence.test.ts (1 test) 2722ms
+   ✓ plan card converges via the team-stream phase event when the conv stream is dead (#666) 726ms
+
+[diag] stub requests consumed: 5
+[diag] daemon.log tail:
+[skills] filtered: offer not in injected selection
+[skills] filtered: pr not in injected selection
+[skills] filtered: project-guide not in injected selection
+[skills] filtered: prototype not in injected selection
+[skills] filtered: prototype-switcher not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: reverse-engineer-anything not in injected selection
+[skills] filtered: scaffold-exercises not in injected selection
+[skills] filtered: setup-matt-pocock-skills not in injected selection
+[skills] filtered: setup-pre-commit not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: sharpen not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a18398-3e81-7445-820a-ebec4e7e91fe
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-memory-e2e.test.ts (2 tests) 2218ms
+   ✓ M4b memory E2E: instruction-triggered + mid-step write + provenance + zero auto-write (r5 §6) (2)
+     ✓ spec instruction turn: save_memory persists mid-build-step, three-level provenance = live context 1776ms
+ ✓ |@cairn/integration| test/m7-branch-dialog-e2e.test.ts (1 test) 3973ms
+   ✓ branch-sync buildId wiring (#346 regression pin) (1)
+     ✓ detail right pane switches to the Branch & PR section → renders the live face (machine picker + editable dir), not the fixture placeholder 1334ms
+ ✓ |@cairn/integration| test/build-failure-preservation.test.ts (4 tests) 2023ms
+   ✓ duration failure pushes existing commits and exposes them in the fallback report and changes API 723ms
+   ✓ idle failure pushes existing commits and exposes them in the fallback report and changes API 402ms
+   ✓ restart of a failed build without a PR reuses its branch and restores earlier commits on a fresh workspace 711ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+[skills] filtered: prototype not in injected selection
+[skills] filtered: prototype-switcher not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: reverse-engineer-anything not in injected selection
+[skills] filtered: scaffold-exercises not in injected selection
+[skills] filtered: setup-matt-pocock-skills not in injected selection
+[skills] filtered: setup-pre-commit not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: sharpen not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a18398-61cf-7977-923f-5a6886c1bf4b
+[mcp] dead: connect failed — its tools are unavailable this turn: failed: fetch failed
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-mcp-e2e.test.ts (3 tests) 1890ms
+   ✓ MCP client face E2E: local config registration + per-Agent slug authorization + daemon local resolution bridge (spec 13) (1)
+     ✓ server projection = config mirror (secret values never leave the API); authorized build step calls external tools for real; dead endpoint/unknown slug degrade without blocking 1550ms
+ ✓ |@cairn/integration| test/chief-eval-reap.test.ts (4 tests) 1824ms
+   ✓ reapEscapees (4)
+     ✓ cleans up dev servers that escaped their workspace 1410ms
+     ✓ pgrep -f substring matching bridges the /var vs /private/var symlink difference 407ms
+
+[diag] stub requests consumed: 11
+[diag] daemon.log tail:
+
+ ✓ |@cairn/integration| test/rework-branch-reuse-e2e.test.ts (1 test) 1792ms
+   ✓ #931 both rework paths return to the original branch (E2E) (1)
+     ✓ failed restart and review reject: same conv / same branch / new commits land on the original branch / correct session shapes 1467ms
+
+[diag] stub requests consumed: 13
+[diag] daemon.log tail:
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a18398-8668-7aff-b59a-4af284ba1caa
+[step] message usage: stub-gw/stub-model input=0 output=0 cacheRead=0 cacheWrite=0 cost=0
+[step] error: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:41931/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:41931/v1"; machine "m4b-wake-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}" (retryable=false)
+[step] brief removed (AGENTS.md)
+[step] step failed: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:41931/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:41931/v1"; machine "m4b-wake-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}"
+finished (1 running)
+claim step=7rcei7CrNkNxGjRVYSglH
+step 7rcei7CrNkNxGjRVYSglH for conv chief-01a18398-8268-7636-9cd2-44e8f4e89923 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: v1
+[skills] unknown-dispatch: chat
+[skills] unknown-dispatch: completions
+[skills] unknown-dispatch: json
+[skills] unknown-dispatch: v1
+[skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-m4b-wake-home-SGgcoV/workspaces/chief-01a18398-8268-7636-9cd2-44e8f4e89923/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-m4b-wake-home-SGgcoV/workspaces/chief-01a18398-8268-7636-9cd2-44e8f4e89923/.pi/skills)
+[skills] loaded: 78 skills from /home/ian/.agents/skills
+[skills] catalog: entries=51 chars=14351 bytes=19729
+[step] brief written: AGENTS.md (create)
+continue session chief-01a18398-8268-7636-9cd2-44e8f4e89923
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-watch-wake-e2e.test.ts (3 tests) 1665ms
+   ✓ M4b watch/wake three-trigger E2E (r5 §3.5 reference run) (3)
+     ✓ dispatch auto-watch (reason canon) + gate wake parks at review and reports 554ms
+     ✓ settle wake: two-phase merge report (delegation accepted → result confirmed) + watch auto-release 421ms
+     ✓ failed wake: step failed → chief calls machines first, then evidence-style report + watch release 324ms
+ ✓ |@cairn/integration| test/info-fastlane-e2e.test.ts (1 test) 1040ms
+   ✓ #1626 info-class fast lane: info card report handed to the downstream code card (1)
+     ✓ info card only produces a report attachment, no branch push or merge; downstream code card brief carries the report and delivers as usual 706ms
+ ✓ |@cairn/integration| test/restart-blank-feedback-e2e.test.ts (1 test) 626ms
+   ✓ blank-feedback restart round (#720 negative case): no empty instruction injected (1)
+     ✓ blank feedback → plain restart round: no instruction, no blank user row, session prompt = task text 394ms
+ ✓ |@cairn/integration| test/plan-prior-art-grade.test.ts (23 tests) 10ms
+ ✓ |@cairn/integration| test/m7-stop-e2e.test.ts (1 test) 598ms
+ ✓ |@cairn/integration| test/m7-failed-send-e2e.test.ts (1 test) 724ms
+   ✓ M7 failed-phase send E2E: failed send → restart → feedback joins the new round session → runs to confirm (1)
+     ✓ full-chain persistence + new round actually runs + phase gate rejects 395ms
+
+[diag] stub requests consumed: 7
+[diag] daemon.log tail:
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team: 3 skill(s), 4 file(s) materialized → /mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-routing-home-ydfxpE/team-skills/views/b794776452a99bdd1381b190217c6f63472f99db0ecc73fc89998bd941090150 (fetched 4 file(s) / 396 byte(s), reused 0)
+[skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-routing-home-ydfxpE/workspaces/01a18398-a78c-76a1-99bb-937c16afc9b2/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-routing-home-ydfxpE/workspaces/01a18398-a78c-76a1-99bb-937c16afc9b2/.pi/skills)
+[skills] filtered: local-blocked not in agent allowlist
+[skills] filtered: beta-skill not in injected selection
+[skills] filtered: gamma-skill not in injected selection
+[skills] loaded: 2 skills from /mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-routing-home-ydfxpE/team-skills/views/b794776452a99bdd1381b190217c6f63472f99db0ecc73fc89998bd941090150 + /mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-routing-local-JlSB3p
+[skills] catalog: entries=2 chars=871 bytes=929
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a18398-a78c-76a1-99bb-937c16afc9b2
+[skills] denied-read: /mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-routing-local-JlSB3p/local-blocked/SKILL.md (skill local-blocked not in allowlist)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+claim step=DZS2IChKG0HUlXJvrov4w
+step DZS2IChKG0HUlXJvrov4w for conv 01a18398-a892-776f-85cc-40095966d325 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-routing-home-ydfxpE/workspaces/01a18398-a892-776f-85cc-40095966d325/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-routing-home-ydfxpE/workspaces/01a18398-a892-776f-85cc-40095966d325/.pi/skills)
+[skills] filtered: local-blocked not in agent allowlist
+[skills] filtered: local-one not in agent allowlist
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+[skills] deny: 2 skill dir(s) hard-blocked
+new session 01a18398-a892-776f-85cc-40095966d325
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/skills-routing-e2e.test.ts (2 tests) 714ms
+
+[diag] todo phase: failed
+[diag] daemon.log tail:
+2026-10-28 10:39:43 [skills] filtered: wait-what not in injected selection
+2026-10-28 10:39:43 [skills] filtered: wayfinder not in injected selection
+2026-10-28 10:39:43 [skills] filtered: why not in injected selection
+2026-10-28 10:39:43 [skills] filtered: wiki not in injected selection
+2026-10-28 10:39:43 [skills] filtered: wizard not in injected selection
+2026-10-28 10:39:43 [skills] filtered: writing-dna-skill not in injected selection
+2026-10-28 10:39:43 [skills] filtered: writing-for-agents not in injected selection
+2026-10-28 10:39:43 [skills] filtered: zread not in injected selection
+2026-10-28 10:39:43 [skills] catalog: entries=0 chars=0 bytes=0
+2026-10-28 10:39:43 [step] brief written: AGENTS.md (create)
+2026-10-28 10:39:43 new session 01a18398-ae1c-793a-90e0-8c1d6df8eb7b
+2026-10-28 10:39:43 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 10:39:44 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-28 10:39:44 [step] brief removed (AGENTS.md)
+2026-10-28 10:39:44 [step] step failed: git commit failed (1): [0mapps/daemon/test/1262-ansi-probe.ts[0m[0m:[0m[0m1[0m[0m:[0m[0m7[0m[0m [0m[0m]8;;https://biomejs.dev/linter/rules/no-unused-variables\lint/correctness/noUnusedVariables]8;;\[0m[0m [0m[0m[30m[47m FIXABLE [0m[0m [0m[0m━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[33m⚠[0m[0m [0m[0m[33mThis variable [0m[0m[1m[33mgreeting[0m[0m[33m is unused.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m1 │ [0m[0mc[0m[0mo[0m[0mn[0m[0ms[0m[0mt[0m[0m [0m[0mg[0m[0mr[0m[0me[0m[0me[0m[0mt[0m[0mi[0m[0mn[0m[0mg[0m[0m [0m[0m=[0m[0m [0m[0m"[0m[0mh[0m[0me[0m[0ml[0m[0ml[0m[0mo[0m[0m"[0m[0m [0m[0m+[0m[0m [0m[0m"[0m[0m [0m[0mw[0m[0mo[0m[0mr[0m[0ml[0m[0md[0m[0m"[0m[0m;[0m[0m
+[0m[0m  [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2 │ [0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUnused variables are often the result of typos, incomplete refactors, or other sources of bugs.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUnsafe fix: If this is intentional, prepend [0m[0m[1m[34mgreeting[0m[0m[34m with an underscore.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m1[0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[31mc[0m[0m[31mo[0m[0m[31mn[0m[0m[31ms[0m[0m[31mt[0m[0m[2m[31m·[0m[0m[1m[31mg[0m[0m[1m[31mr[0m[0m[1m[31me[0m[0m[1m[31me[0m[0m[1m[31mt[0m[0m[1m[31mi[0m[0m[1m[31mn[0m[0m[1m[31mg[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[2m[31m·[0m[0m[31m"[0m[0m[31mh[0m[0m[31me[0m[0m[31ml[0m[0m[31ml[0m[0m[31mo[0m[0m[31m"[0m[0m[2m[31m·[0m[0m[31m+[0m[0m[2m[31m·[0m[0m[31m"[0m[0m[2m[31m·[0m[0m[31mw[0m[0m[31mo[0m[0m[31mr[0m[0m[31ml[0m[0m[31md[0m[0m[31m"[0m[0m[31m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m[1m1[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[32mc[0m[0m[32mo[0m[0m[32mn[0m[0m[32ms[0m[0m[32mt[0m[0m[2m[32m·[0m[0m[1m[32m_[0m[0m[1m[32mg[0m[0m[1m[32mr[0m[0m[1m[32me[0m[0m[1m[32me[0m[0m[1m[32mt[0m[0m[1m[32mi[0m[0m[1m[32mn[0m[0m[1m[32mg[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[2m[32m·[0m[0m[32m"[0m[0m[32mh[0m[0m[32me[0m[0m[32ml[0m[0m[32ml[0m[0m[32mo[0m[0m[32m"[0m[0m[2m[32m·[0m[0m[32m+[0m[0m[2m[32m·[0m[0m[32m"[0m[0m[2m[32m·[0m[0m[32mw[0m[0m[32mo[0m[0m[32mr[0m[0m[32ml[0m[0m[32md[0m[0m[32m"[0m[0m[32m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2[0m[0m [0m[0m[1m2[0m[0m[1m │ [0m[0m [0m[0m [0m[0m
+[0m[0m  [0m[0m
+[0m
+[0mapps/daemon/test/1262-ansi-probe.ts[0m[0m [0m[0mformat[0m[0m [0m[0m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[31m✖[0m[0m [0m[0m[31mFormatter would have printed the following content:[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m1[0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[31mc[0m[0m[31mo[0m[0m[31mn[0m[0m[31ms[0m[0m[31mt[0m[0m[2m[31m·[0m[0m[31mg[0m[0m[31mr[0m[0m[31me[0m[0m[31me[0m[0m[31mt[0m[0m[31mi[0m[0m[31mn[0m[0m[31mg[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[2m[31m·[0m[0m[1m[31m"[0m[0m[31mh[0m[0m[31me[0m[0m[31ml[0m[0m[31ml[0m[0m[31mo[0m[0m[1m[31m"[0m[0m[2m[31m·[0m[0m[31m+[0m[0m[2m[31m·[0m[0m[1m[31m"[0m[0m[2m[31m·[0m[0m[31mw[0m[0m[31mo[0m[0m[31mr[0m[0m[31ml[0m[0m[31md[0m[0m[1m[31m"[0m[0m[31m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m[1m1[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[32mc[0m[0m[32mo[0m[0m[32mn[0m[0m[32ms[0m[0m[32mt[0m[0m[2m[32m·[0m[0m[32mg[0m[0m[32mr[0m[0m[32me[0m[0m[32me[0m[0m[32mt[0m[0m[32mi[0m[0m[32mn[0m[0m[32mg[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[2m[32m·[0m[0m[1m[32m'[0m[0m[32mh[0m[0m[32me[0m[0m[32ml[0m[0m[32ml[0m[0m[32mo[0m[0m[1m[32m'[0m[0m[2m[32m·[0m[0m[32m+[0m[0m[2m[32m·[0m[0m[1m[32m'[0m[0m[2m[32m·[0m[0m[32mw[0m[0m[32mo[0m[0m[32mr[0m[0m[32ml[0m[0m[32md[0m[0m[1m[32m'[0m[0m[32m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2[0m[0m [0m[0m[1m2[0m[0m[1m │ [0m[0m [0m[0m [0m[0m
+[0m[0m  [0m[0m
+[0m
+[0m[34mChecked 1 file in 64[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m[0m
+[0m[0m[31mFound [0m[0m[31m1[0m[0m[31m error.[0m[0m
+[0m[0m[33mFound [0m[0m[33m1[0m[0m[33m warning.[0m
+[0mcheck[0m[0m [0m[0m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[31m✖[0m[0m [0m[0m[31mSome [0m[0m[1m[31merrors[0m[0m[31m were emitted while [0m[0m[1m[31mrunning checks[0m[0m[31m.[0m[0m
+[0m[0m  [0m[0m
+[0m
+2026-10-28 10:39:44 finished (0 running)
+
+ ✓ |@cairn/integration| test/ansi-errormessage-e2e.test.ts (1 test) 705ms
+   ✓ #1262 E2E: lint-failed commit → errorMessage persisted as plain text (1)
+     ✓ pre-commit colored biome output → failed → build.errorMessage unescaped, first line readable 698ms
+ ✓ |@cairn/integration| test/pi-session-policy.test.ts (1 test) 675ms
+   ✓ pi session policy (#925 trust/telemetry/settings + #927 cost/cache) (1)
+     ✓ failure modes 1-6: deny observable, brief not regressed, policy line readable, retention sent, cost persisted, four dims unchanged 349ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a18398-bad0-76ef-b878-7f03a001b49d
+[gate] ask: rule=ask-rm-rf-root command=rm -rf /
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[gate] reject: rule=deny-echo tool=mcp__demo__echo
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/gate-e2e.test.ts (1 test) 669ms
+   ✓ #929 command gate tool_call seam E2E: both directions + MCP coverage (1)
+     ✓ reject and allow each land where they should: irreversible bash form denied (reason into transcript), MCP call passes the same gate, legal bash change lands 337ms
+ ✓ |@cairn/integration| test/memory-regression-seed.test.ts (4 tests) 425ms
+
+[diag] stub requests consumed: 2
+[diag] daemon.log tail:
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: /home/ian/.local/share/mise/installs/claude/latest/claude (2.1.302)
+Enrolled in team FbxSbwwGQhwND2AZm_xn8 (machine yzcfFeHDDnYsSauvOM2rX)
+Online (machineId=yzcfFeHDDnYsSauvOM2rX); polling http://127.0.0.1:43861
+[recover] no pending steps found
+[wake] push channel connected
+claim step=Fxn1-yUBH2d7Hx3Khkp7q
+step Fxn1-yUBH2d7Hx3Khkp7q for conv chief-01a18398-c64a-71cb-b0a1-f87f0bf0ba7c (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-m4a-home-qpvlx1/workspaces/chief-01a18398-c64a-71cb-b0a1-f87f0bf0ba7c/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-m4a-home-qpvlx1/workspaces/chief-01a18398-c64a-71cb-b0a1-f87f0bf0ba7c/.pi/skills)
+[skills] loaded: 78 skills from /home/ian/.agents/skills
+[skills] catalog: entries=51 chars=14351 bytes=19729
+[step] brief written: AGENTS.md (create)
+new session chief-01a18398-c64a-71cb-b0a1-f87f0bf0ba7c
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4a-chief-e2e.test.ts (1 test) 584ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: /home/ian/.local/share/mise/installs/claude/latest/claude (2.1.302)
+Enrolled in team VHvjxJuaeeGzF1-KuHeuj (machine SL5w-TRmfkaEwlI-Xe3OW)
+Online (machineId=SL5w-TRmfkaEwlI-Xe3OW); polling http://127.0.0.1:33251
+[recover] no pending steps found
+[wake] push channel connected
+claim step=9W6Eyjagi8h53bGq5VBu4
+step 9W6Eyjagi8h53bGq5VBu4 for conv 01a18398-cc3e-7e8a-970c-8131dea3f30e (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-skills-home-5SxeFo/workspaces/01a18398-cc3e-7e8a-970c-8131dea3f30e/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-skills-home-5SxeFo/workspaces/01a18398-cc3e-7e8a-970c-8131dea3f30e/.pi/skills)
+[skills] filtered: extra-skill not in agent allowlist
+[skills] loaded: 1 skills from /mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-skills-4zaFAg
+[skills] catalog: entries=1 chars=608 bytes=646
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a18398-cc3e-7e8a-970c-8131dea3f30e
+[skills] denied-read: /mnt/fast/tmp/ai-route-tmp/run-xls9_boc/cairn-it-skills-4zaFAg/extra-skill/SKILL.md (skill extra-skill not in allowlist)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/skills-inject-e2e.test.ts (1 test) 565ms
+ ✓ |@cairn/integration| test/harbor-submission.test.ts (16 tests) 523ms
+ ✓ |@cairn/integration| test/harness-eval-result.test.ts (3 tests) 4ms
+ ✓ |@cairn/integration| test/chief-dispatch-policy-binding.test.ts (5 tests) 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > storage table list (01 §6)
+Error: Snapshot `protocol vocabulary snapshot (02 §5/§6 canonical) > storage table list (01 §6) 1` mismatched
+
+- Expected
++ Received
+
+@@ -38,6 +38,8 @@
+    "build_outcome_backfill",
+    "memory_save_conflict",
+    "memory_candidate",
+    "push_subscription",
+    "push_digest_item",
++   "harness_eval_attempts",
++   "harness_eval_current",
+  ]
+
+ ❯ test/snapshot.test.ts:235:23
+    233|
+    234|   it('storage table list (01 §6)', () => {
+    235|     expect(DB_TABLES).toMatchSnapshot();
+       |                       ^
+    236|   });
+    237|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@cairn/shared| test/vocabulary.test.ts > record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription) > DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)
+AssertionError: expected [ 'user', 'team', 'project', …(40) ] to have a length of 41 but got 43
+
+- Expected
++ Received
+
+- 41
++ 43
+
+ ❯ test/vocabulary.test.ts:507:23
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+  Snapshots  1 failed
+ Test Files  2 failed | 372 passed (374)
+      Tests  2 failed | 4960 passed (4962)
+   Start at  10:36:11
+   Duration  221.87s (tests 61%, import 37%, transform 2%)
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-xls9_boc/prepush-vitest-E4EwtA/report.json
+[prepush] FAIL: packages/shared/test/snapshot.test.ts
+[prepush] FAIL: packages/shared/test/vocabulary.test.ts

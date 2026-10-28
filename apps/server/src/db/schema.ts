@@ -737,3 +737,25 @@ export const feishuBinding = sqliteTable(
   },
   (t) => [uniqueIndex('feishu_binding_openId_unique').on(t.openId)],
 );
+
+export const harnessEvalAttempts = sqliteTable(
+  'harness_eval_attempts',
+  {
+    workerId: text('worker_id').primaryKey(),
+    repo: text('repo').notNull(),
+    pr: integer('pr').notNull(),
+    digest: text('digest').notNull(),
+    record: text('record').notNull(),
+  },
+  (t) => [uniqueIndex('harness_eval_attempt_digest_unique').on(t.repo, t.pr, t.digest)],
+);
+
+export const harnessEvalCurrent = sqliteTable(
+  'harness_eval_current',
+  {
+    repo: text('repo').notNull(),
+    pr: integer('pr').notNull(),
+    workerId: text('worker_id').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.repo, t.pr] })],
+);

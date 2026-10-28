@@ -14,7 +14,7 @@ describe('the 37-table migration (the 01 §6 list)', () => {
     const tables = Object.values(schema).filter((v) => is(v, SQLiteTable));
     const names = tables.map((t) => getTableConfig(t as SQLiteTable).name).sort();
     expect(names).toEqual([...DB_TABLES].sort());
-    expect(names).toHaveLength(41);
+    expect(names).toHaveLength(43);
     expect(names).toContain('chief');
     expect(names).toContain('attachment');
     expect(names).toContain('branch_sync');
@@ -44,6 +44,9 @@ describe('the 37-table migration (the 01 §6 list)', () => {
     ) as { entries: { tag: string; when: number }[] };
     const pushMigration = journal.entries.find((entry) => entry.tag === '0065_push_subscription');
     if (pushMigration === undefined) throw new Error('push migration missing');
+    db.run(sql`DROP TABLE harness_eval_current`);
+    db.run(sql`DROP TABLE harness_eval_attempts`);
+    db.run(sql`DELETE FROM __drizzle_migrations WHERE created_at > ${pushMigration.when}`);
     db.run(sql`DROP TABLE push_subscription`);
     db.run(sql`DROP TABLE push_digest_item`);
     db.run(sql`DELETE FROM __drizzle_migrations WHERE created_at = ${pushMigration.when}`);

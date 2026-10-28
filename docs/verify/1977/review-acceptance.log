@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1977/apps/server
+
+
+ Test Files  2 passed (2)
+      Tests  6 passed (6)
+   Start at  10:38:33
+   Duration  2.17s (tests 77%, import 12%, transform 10%)
+
