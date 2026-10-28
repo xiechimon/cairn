@@ -11,11 +11,14 @@ const UNAVAILABLE = 'unavailable';
 
 export type EvalRowProvenance = {
   prompt_set: string;
-  prompt_set_identity?: string;
+  prompt_set_identity: string;
   harness_sha: string;
   model: string;
-  thinking?: string | null;
-  timeout_s?: number;
+  thinking: string | null;
+  timeout_s: number;
+  arm: string;
+  context_window: number | null;
+  flow_digest: string;
 };
 
 export type PromptSetResultRow = {
@@ -102,24 +105,103 @@ function formatMean(
   return `${mean} ± ${half}`;
 }
 
+function provenanceComplete(
+  p: Partial<EvalRowProvenance> | null | undefined,
+): p is EvalRowProvenance {
+  return (
+    p != null &&
+    typeof p.prompt_set === 'string' &&
+    p.prompt_set.length > 0 &&
+    typeof p.prompt_set_identity === 'string' &&
+    p.prompt_set_identity.length > 0 &&
+    typeof p.harness_sha === 'string' &&
+    p.harness_sha.length > 0 &&
+    typeof p.model === 'string' &&
+    p.model.length > 0 &&
+    'thinking' in p &&
+    (p.thinking === null || typeof p.thinking === 'string') &&
+    typeof p.timeout_s === 'number' &&
+    Number.isFinite(p.timeout_s) &&
+    typeof p.arm === 'string' &&
+    p.arm.length > 0 &&
+    'context_window' in p &&
+    (p.context_window === null ||
+      (typeof p.context_window === 'number' && Number.isFinite(p.context_window))) &&
+    typeof p.flow_digest === 'string' &&
+    p.flow_digest.length > 0
+  );
+}
+
+function missingProvenanceField(p: Partial<EvalRowProvenance> | null | undefined): string {
+  if (p == null) return 'provenance';
+  if (typeof p.prompt_set !== 'string' || p.prompt_set.length === 0) return 'prompt_set';
+  if (typeof p.prompt_set_identity !== 'string' || p.prompt_set_identity.length === 0) {
+    return 'prompt_set_identity';
+  }
+  if (typeof p.harness_sha !== 'string' || p.harness_sha.length === 0) return 'harness_sha';
+  if (typeof p.model !== 'string' || p.model.length === 0) return 'model';
+  if (!('thinking' in p) || !(p.thinking === null || typeof p.thinking === 'string')) {
+    return 'thinking';
+  }
+  if (typeof p.timeout_s !== 'number' || !Number.isFinite(p.timeout_s)) return 'timeout_s';
+  if (typeof p.arm !== 'string' || p.arm.length === 0) return 'arm';
+  if (
+    !('context_window' in p) ||
+    !(
+      p.context_window === null ||
+      (typeof p.context_window === 'number' && Number.isFinite(p.context_window))
+    )
+  ) {
+    return 'context_window';
+  }
+  if (typeof p.flow_digest !== 'string' || p.flow_digest.length === 0) return 'flow_digest';
+  return 'provenance';
+}
+
+function sameRunnerConfig(left: EvalRowProvenance, right: EvalRowProvenance): boolean {
+  return (
+    left.harness_sha === right.harness_sha &&
+    left.model === right.model &&
+    (left.thinking ?? null) === (right.thinking ?? null) &&
+    left.timeout_s === right.timeout_s &&
+    left.arm === right.arm &&
+    left.context_window === right.context_window &&
+    left.flow_digest === right.flow_digest
+  );
+}
+
+function sameArmProvenance(left: EvalRowProvenance, right: EvalRowProvenance): boolean {
+  return (
+    sameRunnerConfig(left, right) &&
+    left.prompt_set === right.prompt_set &&
+    left.prompt_set_identity === right.prompt_set_identity
+  );
+}
+
+function rejectDuplicateReps(rows: PromptSetResultRow[], label: string): void {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const key = `${row.prompt_id}\0${row.rep}`;
+    if (seen.has(key)) {
+      throw new CompareValidationError(
+        `${label} arm has duplicate (prompt_id, rep)=(${row.prompt_id}, ${row.rep})`,
+      );
+    }
+    seen.add(key);
+  }
+}
+
 function armIdentity(rows: PromptSetResultRow[], label: string): EvalRowProvenance {
   if (rows.length === 0) {
     throw new CompareValidationError(`${label} arm has no result rows to validate`);
   }
+  rejectDuplicateReps(rows, label);
   const identities: EvalRowProvenance[] = [];
   for (const row of rows) {
     const p = row.provenance;
-    if (
-      p == null ||
-      typeof p.prompt_set !== 'string' ||
-      p.prompt_set.length === 0 ||
-      typeof p.harness_sha !== 'string' ||
-      p.harness_sha.length === 0 ||
-      typeof p.model !== 'string' ||
-      p.model.length === 0
-    ) {
+    if (!provenanceComplete(p)) {
       throw new CompareValidationError(
-        `${label} arm: row ${row.prompt_id} rep${row.rep} lacks provenance (prompt_set, harness_sha, model); cannot compare`,
+        `${label} arm: row ${row.prompt_id} rep${row.rep} lacks provenance field ${missingProvenanceField(p)}; cannot compare`,
       );
     }
     identities.push(p);
@@ -129,16 +211,10 @@ function armIdentity(rows: PromptSetResultRow[], label: string): EvalRowProvenan
     throw new CompareValidationError(`${label} arm has no result rows to validate`);
   }
   for (const p of identities) {
-    if (p.prompt_set !== first.prompt_set) {
+    if (!sameArmProvenance(first, p)) {
       throw new CompareValidationError(
-        `${label} arm has mixed prompt_set provenance (${first.prompt_set} vs ${p.prompt_set})`,
+        `${label} arm has mixed provenance (prompt_set/prompt_set_identity/harness_sha/model/thinking/timeout_s/arm/context_window/flow_digest)`,
       );
-    }
-    if (p.harness_sha !== first.harness_sha) {
-      throw new CompareValidationError(`${label} arm has mixed harness_sha provenance`);
-    }
-    if (p.model !== first.model) {
-      throw new CompareValidationError(`${label} arm has mixed model provenance`);
     }
   }
   return first;
@@ -151,17 +227,27 @@ export function validateArms(input: {
   const current = input.currentRows.length === 0 ? null : armIdentity(input.currentRows, 'current');
   const cut = input.cutRows.length === 0 ? null : armIdentity(input.cutRows, 'cut');
   if (current !== null && cut !== null) {
-    if (current.harness_sha !== cut.harness_sha) {
+    if (!sameRunnerConfig(current, cut)) {
+      const mismatches: string[] = [];
+      if (current.harness_sha !== cut.harness_sha) mismatches.push('harness_sha');
+      if (current.model !== cut.model) mismatches.push('model');
+      if ((current.thinking ?? null) !== (cut.thinking ?? null)) mismatches.push('thinking');
+      if (current.timeout_s !== cut.timeout_s) mismatches.push('timeout_s');
+      if (current.arm !== cut.arm) mismatches.push('arm');
+      if (current.context_window !== cut.context_window) mismatches.push('context_window');
+      if (current.flow_digest !== cut.flow_digest) mismatches.push('flow_digest');
       throw new CompareValidationError(
-        `arms disagree on harness_sha (${current.harness_sha.slice(0, 12)} vs ${cut.harness_sha.slice(0, 12)})`,
+        `arms disagree on runner contract (${mismatches.join(', ')})`,
       );
-    }
-    if (current.model !== cut.model) {
-      throw new CompareValidationError(`arms disagree on model (${current.model} vs ${cut.model})`);
     }
     if (current.prompt_set === cut.prompt_set) {
       throw new CompareValidationError(
         `arms share the same prompt_set=${current.prompt_set}; refuse to compare identical arms`,
+      );
+    }
+    if (current.prompt_set_identity === cut.prompt_set_identity) {
+      throw new CompareValidationError(
+        `arms share the same prompt_set_identity=${current.prompt_set_identity}; refuse to compare identical arms`,
       );
     }
   }
@@ -204,7 +290,22 @@ function tokenField(
   );
 }
 
-function coverageWarnings(
+function formatRepSet(rows: PromptSetResultRow[]): string {
+  const reps = [...new Set(rows.map((row) => row.rep))].sort((a, b) => a - b);
+  return `[${reps.join(', ')}]`;
+}
+
+function sameRepSet(left: PromptSetResultRow[], right: PromptSetResultRow[]): boolean {
+  const leftReps = new Set(left.map((row) => row.rep));
+  const rightReps = new Set(right.map((row) => row.rep));
+  if (leftReps.size !== rightReps.size) return false;
+  for (const rep of leftReps) {
+    if (!rightReps.has(rep)) return false;
+  }
+  return true;
+}
+
+export function coverageWarnings(
   currentRows: PromptSetResultRow[],
   cutRows: PromptSetResultRow[],
 ): string[] {
@@ -218,8 +319,10 @@ function coverageWarnings(
   for (const id of ids) {
     const c = currentBy.get(id) ?? [];
     const k = cutBy.get(id) ?? [];
-    if (c.length !== k.length) {
-      warnings.push(`unequal coverage for ${id}: current reps=${c.length}, cut reps=${k.length}`);
+    if (!sameRepSet(c, k)) {
+      warnings.push(
+        `unequal coverage for ${id}: current reps=${formatRepSet(c)}, cut reps=${formatRepSet(k)}`,
+      );
     }
   }
   return warnings;

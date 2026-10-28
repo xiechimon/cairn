@@ -9,6 +9,7 @@ import { wilsonInterval } from '../eval/chief-dispatch/baseline-record.mts';
 import {
   buildComparisonMarkdown,
   CompareValidationError,
+  coverageWarnings,
   formatCostDifference,
   meanWithInterval,
   type PromptSetResultRow,
@@ -44,6 +45,9 @@ function provenance(promptSet: 'current' | 'cut', extra: Record<string, unknown>
     model: MODEL,
     thinking: null,
     timeout_s: 30,
+    arm: 'all',
+    context_window: null,
+    flow_digest: 'f'.repeat(64),
     ...extra,
   };
 }
@@ -366,6 +370,118 @@ describe('compare-prompt-sets provenance validation', () => {
     expect(bad.stdout + bad.stderr).not.toMatch(/## Summary/);
   });
 
+  test('mismatched thinking or timeout_s between arms is rejected', () => {
+    const current = [row({ prompt_id: 'd01', prompt_set: 'current' })];
+    expect(() =>
+      validateArms({
+        currentRows: current,
+        cutRows: [
+          row({
+            prompt_id: 'd01',
+            prompt_set: 'cut',
+            provenance: provenance('cut', { thinking: 'high' }),
+          }),
+        ],
+      }),
+    ).toThrow(/thinking/i);
+    expect(() =>
+      validateArms({
+        currentRows: current,
+        cutRows: [
+          row({
+            prompt_id: 'd01',
+            prompt_set: 'cut',
+            provenance: provenance('cut', { timeout_s: 900 }),
+          }),
+        ],
+      }),
+    ).toThrow(/timeout_s/i);
+  });
+
+  test('missing prompt_set_identity or incomplete runner fields are rejected', () => {
+    const cut = [row({ prompt_id: 'd01', prompt_set: 'cut' })];
+    expect(() =>
+      validateArms({
+        currentRows: [
+          row({
+            prompt_id: 'd01',
+            prompt_set: 'current',
+            provenance: provenance('current', { prompt_set_identity: '' }),
+          }),
+        ],
+        cutRows: cut,
+      }),
+    ).toThrow(/prompt_set_identity/i);
+
+    for (const field of ['arm', 'context_window', 'flow_digest'] as const) {
+      const incomplete = provenance('current');
+      delete (incomplete as Record<string, unknown>)[field];
+      expect(() =>
+        validateArms({
+          currentRows: [
+            row({
+              prompt_id: 'd01',
+              prompt_set: 'current',
+              provenance: incomplete,
+            }),
+          ],
+          cutRows: cut,
+        }),
+      ).toThrow(new RegExp(field));
+    }
+
+    expect(() =>
+      validateArms({
+        currentRows: [row({ prompt_id: 'd01', prompt_set: 'current' })],
+        cutRows: [
+          row({
+            prompt_id: 'd01',
+            prompt_set: 'cut',
+            provenance: provenance('cut', { arm: 'oracle' }),
+          }),
+        ],
+      }),
+    ).toThrow(/arm/i);
+
+    expect(() =>
+      validateArms({
+        currentRows: [row({ prompt_id: 'd01', prompt_set: 'current' })],
+        cutRows: [
+          row({
+            prompt_id: 'd01',
+            prompt_set: 'cut',
+            provenance: provenance('cut', { context_window: 8192 }),
+          }),
+        ],
+      }),
+    ).toThrow(/context_window/i);
+
+    expect(() =>
+      validateArms({
+        currentRows: [row({ prompt_id: 'd01', prompt_set: 'current' })],
+        cutRows: [
+          row({
+            prompt_id: 'd01',
+            prompt_set: 'cut',
+            provenance: provenance('cut', { flow_digest: 'c'.repeat(64) }),
+          }),
+        ],
+      }),
+    ).toThrow(/flow_digest/i);
+  });
+
+  test('duplicate prompt_id and rep within an arm is rejected', () => {
+    expect(() =>
+      validateArms({
+        currentRows: [
+          row({ prompt_id: 'd01', prompt_set: 'current', rep: 0 }),
+          row({ prompt_id: 'd01', prompt_set: 'current', rep: 0 }),
+        ],
+        cutRows: [row({ prompt_id: 'd01', prompt_set: 'cut', rep: 0 })],
+      }),
+    ).toThrow(/duplicate/i);
+  });
+
   test('unequal case/rep coverage is reported per case', () => {
     const current = [
       row({ prompt_id: 'd01', prompt_set: 'current', rep: 0 }),
@@ -390,6 +506,33 @@ describe('compare-prompt-sets provenance validation', () => {
     expect(md).toMatch(/d02/);
     expect(md).toMatch(/d03/);
     expect(md).toMatch(/unequal|missing|coverage/i);
+  });
+
+  test('equal row counts with different rep identities warn; equal counts alone are not enough', () => {
+    const current = [
+      row({ prompt_id: 'd01', prompt_set: 'current', rep: 0 }),
+      row({ prompt_id: 'd01', prompt_set: 'current', rep: 1 }),
+    ];
+    const cut = [
+      row({ prompt_id: 'd01', prompt_set: 'cut', rep: 2 }),
+      row({ prompt_id: 'd01', prompt_set: 'cut', rep: 3 }),
+    ];
+    const warnings = coverageWarnings(current, cut);
+    expect(warnings.some((w) => /unequal coverage for d01/.test(w))).toBe(true);
+    expect(warnings.join(';')).toMatch(/\[0,\s*1\]/);
+    expect(warnings.join(';')).toMatch(/\[2,\s*3\]/);
+    const md = buildComparisonMarkdown({
+      flow: 'fixture',
+      currentLabel: 'current',
+      cutLabel: 'cut',
+      currentRows: current,
+      cutRows: cut,
+      currentInfraErrors: 0,
+      cutInfraErrors: 0,
+    });
+    expect(md).toMatch(/unequal coverage for d01/);
+    expect(md).toMatch(/\[0,\s*1\]/);
+    expect(md).toMatch(/\[2,\s*3\]/);
   });
 });
 

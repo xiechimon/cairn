@@ -14,14 +14,23 @@ Full capture: `red.log`.
 
 ```
 pnpm --filter @cairn/integration exec vitest run test/compare-prompt-sets.test.ts
-# 10 passed
+# 14 passed
 pnpm typecheck
 pnpm lint
 pnpm --filter @cairn/integration exec tsx eval/chief-dispatch/compare-prompt-sets.mts \
   integration/test/fixtures/compare-prompt-sets/smoke --current current --cut cut
 ```
 
-CLI Markdown: `cli-smoke.md`.
+CLI Markdown: `cli-smoke.md`. Capture: `brake-green.log`.
+
+## Review-gate brake (#2114 / tip fix)
+
+Findings on tip `d4b2d1b5` (comment tip `e190f560`):
+
+1. `validateArms` only compared model + harness_sha; mismatched thinking/timeout_s and missing prompt_set_identity / arm / context_window / flow_digest were accepted.
+2. `coverageWarnings` compared row counts, so reps `[0,1]` vs `[2,3]` produced no warning; duplicate `(prompt_id, rep)` could inflate counts.
+
+Fix (tests first): full runner-contract validation via `sameRunnerConfig` / `provenanceComplete`; duplicate `(prompt_id, rep)` rejection; per-case rep-set coverage warnings. Smoke fixtures carry the full provenance fields.
 
 ## Files
 

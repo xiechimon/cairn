@@ -1,6 +1,6 @@
 # Prompt-set comparison: current vs cut (smoke)
 
-- generated: 2026-10-28T17:44:35.646Z
+- generated: 2026-10-28T18:49:21.273Z
 - pass metric: decision_ok; truncated rows count as failures and keep their usage/cost
 - current arm: current — 2 result rows, 2 cases; infrastructure errors: 1
 - cut arm: cut — 2 result rows, 2 cases; infrastructure errors: 0
