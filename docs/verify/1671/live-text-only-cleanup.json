@@ -1,0 +1,9 @@
+{
+  "ownedPid": 50500,
+  "stopMethod": "POST /__acceptance/stop",
+  "stopHttpStatus": 200,
+  "pidAliveAfterStop": false,
+  "privateDirectoryExistsAfterStop": false,
+  "chiefIdleBeforeStop": true,
+  "buildInFlightBeforeStop": false
+}

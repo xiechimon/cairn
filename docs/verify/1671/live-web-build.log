@@ -1,0 +1,16 @@
+vite v8.3.0 building client environment for production...
+transforming...
+[plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/xmon/.codex/worktrees/pr-1928-image-repair/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+✓ 2937 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     2.10 kB │ gzip:   0.86 kB
+dist/assets/index-DP9ys4VP.css    189.15 kB │ gzip:  30.71 kB
+dist/assets/index-Cg694aqa.js   1,612.30 kB │ gzip: 497.34 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.17s

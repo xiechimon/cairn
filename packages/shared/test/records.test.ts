@@ -252,6 +252,26 @@ describe('provider record (r3 §2 measured verbatim, key masked)', () => {
     ).toBe(false);
   });
 
+  it('keeps optional per-model input capability (#1671) and rejects empty or unknown values', () => {
+    const declared = {
+      ...sample,
+      models: [{ id: 'glm-5v', name: 'glm-5v', input: ['text', 'image'] }],
+    };
+    expect(providerRecordSchema.parse(declared)).toEqual(declared);
+    expect(
+      providerRecordSchema.safeParse({
+        ...sample,
+        models: [{ id: 'm', name: 'm', input: [] }],
+      }).success,
+    ).toBe(false);
+    expect(
+      providerRecordSchema.safeParse({
+        ...sample,
+        models: [{ id: 'm', name: 'm', input: ['text', 'video'] }],
+      }).success,
+    ).toBe(false);
+  });
+
   it('never models apiKey -- write-only (02 §8/r3 §2)', () => {
     const shape = providerRecordSchema.shape;
     expect('apiKey' in shape).toBe(false);

@@ -103,17 +103,20 @@ export interface ResolveStepImagesOpts {
   client: AttachmentDownloader;
   materializeDir: string;
   log: (line: string) => void;
+  imageSupport?: boolean | null;
 }
 
 export interface ResolvedStepImages {
   text: string;
   images: DeliveredImage[];
+  skippedNoVision: number;
 }
 
 type Outcome =
   | { kind: 'inline'; anchor: string; image: DeliveredImage }
   | { kind: 'materialized'; note: string }
   | { kind: 'unavailable'; note: string }
+  | { kind: 'noVision'; note: string }
   | { kind: 'untouched' };
 
 interface TokenLine {
@@ -135,11 +138,19 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
   const tokens = tokenLinesOf(lines);
   const bodies = tokens.flatMap((t) => (t === null ? [] : [t.body]));
   const images: DeliveredImage[] = [];
-  if (bodies.length === 0) return { text: opts.text, images };
+  if (bodies.length === 0) return { text: opts.text, images, skippedNoVision: 0 };
   const refs = parseAttachmentTokenLines(bodies.join('\n'));
   const outcomes = new Map<string, Outcome>();
+  let skippedNoVision = 0;
   for (const ref of refs) {
-    const outcome = await resolveOne(ref, opts);
+    let outcome: Outcome;
+    if (opts.imageSupport === false && isImageAttachmentExt(ref.ext)) {
+      opts.log(`attachment not delivered (model does not support images): ${ref.key}`);
+      outcome = { kind: 'noVision', note: `[图片附件 ${ref.key} 未被模型读取 — 该图片未下载]` };
+    } else {
+      outcome = await resolveOne(ref, opts);
+    }
+    if (outcome.kind === 'noVision') skippedNoVision += 1;
     outcomes.set(ref.line, outcome);
     if (outcome.kind === 'inline') images.push(outcome.image);
   }
@@ -171,7 +182,7 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
       emit(outcome.note);
     }
   }
-  return { text: outLines.join('\n'), images };
+  return { text: outLines.join('\n'), images, skippedNoVision };
 }
 
 function unavailable(

@@ -175,6 +175,8 @@ export interface AgentBackend {
   createSession(opts: SessionOpts): Promise<AgentSessionHandle>;
   continueSession(id: string, opts: SessionOpts): Promise<AgentSessionHandle>;
   adaptProviderCompat?(provider: ProviderConfig, errorMessage: string): ProviderConfig | null;
+  modelSupportsImages?(provider: ProviderConfig, modelId: string): Promise<boolean | null>;
+  rememberNoVision?(provider: ProviderConfig, modelId: string): void;
 }
 
 export const BACKEND_RUNTIME_IDS = ['claude-code', 'gemini'] as const;

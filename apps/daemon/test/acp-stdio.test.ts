@@ -183,6 +183,42 @@ describe('Gemini stdio execution', () => {
     expect(await collect(handle.events)).toContainEqual({ type: 'done', usage: [] });
   });
 
+  test('image support is unknown before initialize and follows negotiated capability afterwards', async () => {
+    const vision = backend({ ACP_IMAGE: 'yes' });
+    await expect(vision.modelSupportsImages?.(opts.provider, opts.modelId)).resolves.toBeNull();
+    const imageSession = await vision.createSession({
+      ...opts,
+      promptImages: [{ data: 'aA==', mimeType: 'image/png' }],
+    });
+    await expect(vision.modelSupportsImages?.(opts.provider, opts.modelId)).resolves.toBe(true);
+    await collect(imageSession.events);
+
+    const textOnly = backend();
+    const textSession = await textOnly.createSession(opts);
+    await expect(textOnly.modelSupportsImages?.(opts.provider, opts.modelId)).resolves.toBe(false);
+    await collect(textSession.events);
+    vision.rememberNoVision?.(opts.provider, opts.modelId);
+    await expect(vision.modelSupportsImages?.(opts.provider, opts.modelId)).resolves.toBe(false);
+  });
+
+  test('image steering sends pixels to a session that advertised image support', async () => {
+    const images = [{ data: 'aA==', mimeType: 'image/png' }];
+    const handle = await backend({ ACP_IMAGE: 'yes' }).createSession({
+      ...opts,
+      promptImages: images,
+    });
+    await expect(handle.steer('follow-up image', images)).resolves.toBeUndefined();
+    expect(await collect(handle.events)).toContainEqual({ type: 'done', usage: [] });
+  });
+
+  test('image steering to a text-only session is rejected explicitly', async () => {
+    const handle = await backend().createSession(opts);
+    await expect(
+      handle.steer('follow-up image', [{ data: 'aA==', mimeType: 'image/png' }]),
+    ).rejects.toThrow('image capability');
+    await collect(handle.events);
+  });
+
   test('applies the advertised model configuration before prompting', async () => {
     const handle = await backend({ ACP_CONFIG: 'yes' }).createSession(opts);
     expect(await collect(handle.events)).toContainEqual({ type: 'done', usage: [] });

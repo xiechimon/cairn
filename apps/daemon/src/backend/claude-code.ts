@@ -27,6 +27,7 @@ import type {
   LocalToolDef,
   McpEndpoint,
   ModelUsage,
+  ProviderConfig,
   RemoteToolDef,
   SessionOpts,
   StepEvent,
@@ -37,6 +38,7 @@ import { z } from 'zod';
 import { claudeCodeAuthFailureMessage } from '../claude-code-auth.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { SessionNotResumableError } from './errors.js';
+import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { claudeTelemetryEnv } from './otel.js';
 import {
   appendSkillsCatalog,
@@ -862,6 +864,14 @@ export class ClaudeCodeBackend implements AgentBackend {
       throw new SessionNotResumableError(id);
     }
     return this.open(opts, id);
+  }
+
+  async modelSupportsImages(provider: ProviderConfig, modelId: string): Promise<boolean | null> {
+    return isLearnedNoVision(provider.providerId, modelId) ? false : null;
+  }
+
+  rememberNoVision(provider: ProviderConfig, modelId: string): void {
+    rememberNoVision(provider.providerId, modelId);
   }
 
   private async open(opts: SessionOpts, resumeId: string | null): Promise<AgentSessionHandle> {

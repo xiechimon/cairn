@@ -301,6 +301,109 @@ describe('daemon image attachment parse and download (#730)', () => {
   });
 });
 
+describe('imageSupport=false degrade mode (#1671)', () => {
+  async function resolveDegrade(
+    text: string,
+    attachments: Record<string, MachineAttachmentResponse | Error>,
+  ) {
+    const s = setup();
+    const { client, requested } = fakeClient(attachments);
+    const out = await resolveStepImages({
+      text,
+      stepId: 's1',
+      client,
+      materializeDir: s.materializeDir,
+      log: s.log,
+      imageSupport: false,
+    });
+    return { out, requested, s };
+  }
+
+  test('png token → zero downloads, token kept verbatim, no-vision annotation, skippedNoVision=1', async () => {
+    const token = formatAttachmentToken('shot.png', 't1/id1.png');
+    const { out, requested } = await resolveDegrade(`任务\n\n${token}\n\n后文`, {
+      id1: pngResponse(),
+    });
+    expect(requested).toHaveLength(0);
+    expect(out.images).toHaveLength(0);
+    expect(out.skippedNoVision).toBe(1);
+    expect(out.text).toContain(token);
+    expect(out.text).toContain('[图片附件 t1/id1.png 未被模型读取 — 该图片未下载]');
+    expect(out.text).toContain('后文');
+  });
+
+  test('svg token → neither downloaded nor materialized to disk', async () => {
+    const token = formatAttachmentToken('diagram.svg', 't1/id1.svg');
+    const s = setup();
+    const { client, requested } = fakeClient({ id1: new Error('must not be called') });
+    const out = await resolveStepImages({
+      text: token,
+      stepId: 's1',
+      client,
+      materializeDir: s.materializeDir,
+      log: s.log,
+      imageSupport: false,
+    });
+    expect(requested).toHaveLength(0);
+    expect(out.skippedNoVision).toBe(1);
+    expect(existsSync(join(s.materializeDir, 's1'))).toBe(false);
+    expect(out.text).toContain(token);
+    expect(out.text).toContain('[图片附件 t1/id1.svg 未被模型读取 — 该图片未下载]');
+  });
+
+  test('md/pdf tokens stay byte for byte (text model can still read them)', async () => {
+    const text = ['![notes](attachment:t1/id1.md)', '', '![doc](attachment:t1/id2.pdf)'].join('\n');
+    const { out, requested } = await resolveDegrade(text, {});
+    expect(out.text).toBe(text);
+    expect(out.skippedNoVision).toBe(0);
+    expect(requested).toHaveLength(0);
+  });
+
+  test('mixed png + md: only the png degrades, md untouched', async () => {
+    const pngToken = formatAttachmentToken('shot.png', 't1/id1.png');
+    const mdToken = '![notes](attachment:t1/id2.md)';
+    const { out, requested } = await resolveDegrade(`${pngToken}\n${mdToken}`, {
+      id1: pngResponse(),
+    });
+    expect(requested).toHaveLength(0);
+    expect(out.skippedNoVision).toBe(1);
+    expect(out.text).toContain(pngToken);
+    expect(out.text).toContain('[图片附件 t1/id1.png 未被模型读取 — 该图片未下载]');
+    expect(out.text).toContain(mdToken);
+  });
+
+  test('fence-quoted png token → annotation line carries the > prefix (no escape from the #1406 fence)', async () => {
+    const GH = { sourceKind: 'github-issue', sourceRef: 'github:octo/alpha#7' };
+    const token = formatAttachmentToken('shot.png', 't1/id1.png');
+    const fencedText = buildTaskPromptText('改圆角', `见下图。\n\n${token}`, GH);
+    const { out, requested } = await resolveDegrade(fencedText, { id1: pngResponse() });
+    expect(requested).toHaveLength(0);
+    expect(out.skippedNoVision).toBe(1);
+    expect(out.text).toContain(`> ${token}`);
+    expect(out.text).toContain('> [图片附件 t1/id1.png 未被模型读取 — 该图片未下载]');
+  });
+
+  test('imageSupport omitted and null keep today behavior (regression baseline: download still happens)', async () => {
+    const token = formatAttachmentToken('shot.png', 't1/id1.png');
+    for (const imageSupport of [undefined, null] as const) {
+      const s = setup();
+      const { client, requested } = fakeClient({ id1: pngResponse() });
+      const out = await resolveStepImages({
+        text: `任务\n\n${token}`,
+        stepId: 's1',
+        client,
+        materializeDir: s.materializeDir,
+        log: s.log,
+        ...(imageSupport === null ? { imageSupport } : {}),
+      });
+      expect(requested).toEqual(['id1']);
+      expect(out.images).toHaveLength(1);
+      expect(out.skippedNoVision).toBe(0);
+      expect(out.text).toContain('[image attached: shot.png]');
+    }
+  });
+});
+
 describe('materializeAttachmentFile', () => {
   test('duplicate materialization of the same name → overwritten without error', () => {
     const s = setup();

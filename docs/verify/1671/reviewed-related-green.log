@@ -1,0 +1,27 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1928-image-repair/cairn
+
+Switched to a new branch 'work'
+Switched to branch 'main'
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+
+ Test Files  21 passed (21)
+      Tests  409 passed (409)
+   Start at  18:22:50
+   Duration  5.90s (tests 41%, import 38%, transform 20%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 2.38s · 51% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

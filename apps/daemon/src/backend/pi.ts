@@ -36,6 +36,7 @@ import {
 import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
 import { compactionCeilingFetch } from './compaction-ceiling.js';
 import { SessionNotResumableError } from './errors.js';
+import { probeModelImageSupport, rememberNoVision } from './image-support.js';
 import { connectFailedLine } from './mcp-config.js';
 import { PiStepSpanSink } from './otel.js';
 import { PI_RETRY_SETTINGS } from './pi-retry.js';
@@ -826,6 +827,14 @@ export class PiBackend implements AgentBackend {
     return adaptProviderCompat(provider, errorMessage);
   }
 
+  async modelSupportsImages(provider: ProviderConfig, modelId: string): Promise<boolean | null> {
+    return probeModelImageSupport(this.opts.agentDir, provider, modelId);
+  }
+
+  rememberNoVision(provider: ProviderConfig, modelId: string): void {
+    rememberNoVision(provider.providerId, modelId);
+  }
+
   private async open(opts: SessionOpts, resumeFile: string | null): Promise<AgentSessionHandle> {
     const modelsPath = join(this.opts.agentDir, 'models.json');
     materializeProvider(modelsPath, opts.provider);
@@ -1104,6 +1113,7 @@ export function materializeProvider(modelsPath: string, provider: ProviderConfig
       ...(m.cost !== undefined ? { cost: m.cost } : {}),
       ...(m.contextWindow !== undefined ? { contextWindow: m.contextWindow } : {}),
       ...(m.maxTokens !== undefined ? { maxTokens: m.maxTokens } : {}),
+      ...(m.input !== undefined ? { input: m.input } : {}),
       ...customModelReasoning(),
     })),
   };
