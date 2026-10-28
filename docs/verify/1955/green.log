@@ -1,0 +1,95 @@
+TAP version 13
+# fatal: Needed a single revision
+# Subtest: CLI uses origin/main, preserves full records, and recognizes only candidate syntax
+ok 1 - CLI uses origin/main, preserves full records, and recognizes only candidate syntax
+  ---
+  duration_ms: 336.922844
+  type: 'test'
+  ...
+# Subtest: CLI does not truncate more than 200 qualifying commits
+ok 2 - CLI does not truncate more than 200 qualifying commits
+  ---
+  duration_ms: 1062.136071
+  type: 'test'
+  ...
+# Subtest: CLI rejects missing refs and invalid or ambiguous UTC intervals
+ok 3 - CLI rejects missing refs and invalid or ambiguous UTC intervals
+  ---
+  duration_ms: 195.356319
+  type: 'test'
+  ...
+# Subtest: local and CI plans execute behavior assertions and propagate deliberate failures
+ok 4 - local and CI plans execute behavior assertions and propagate deliberate failures
+  ---
+  duration_ms: 192.381138
+  type: 'test'
+  ...
+# Subtest: fix: repair regression introduced by \#100 (\#201) resolves origin PR 100 and fixing PR 201
+ok 5 - fix: repair regression introduced by \#100 (\#201) resolves origin PR 100 and fixing PR 201
+  ---
+  duration_ms: 13107.993153
+  type: 'test'
+  ...
+# Subtest: a revert body resolves to the reverted commit and its PR
+ok 6 - a revert body resolves to the reverted commit and its PR
+  ---
+  duration_ms: 69.80955
+  type: 'test'
+  ...
+# Subtest: Fixes \#N where N is an issue keeps an unvalidated reference with reason issue-not-pr
+ok 7 - Fixes \#N where N is an issue keeps an unvalidated reference with reason issue-not-pr
+  ---
+  duration_ms: 15094.726036
+  type: 'test'
+  ...
+# Subtest: blame on the parent: the changed line last commit is the introducing commit
+ok 8 - blame on the parent: the changed line last commit is the introducing commit
+  ---
+  duration_ms: 64.316601
+  type: 'test'
+  ...
+# Subtest: blame split across two commits yields multiple-origin, not a guess
+ok 9 - blame split across two commits yields multiple-origin, not a guess
+  ---
+  duration_ms: 78.162238
+  type: 'test'
+  ...
+# Subtest: shallow history yields unresolved with a reason
+ok 10 - shallow history yields unresolved with a reason
+  ---
+  duration_ms: 67.221148
+  type: 'test'
+  ...
+# Subtest: exactly 14 days qualifies; 14 days plus one second does not
+ok 11 - exactly 14 days qualifies; 14 days plus one second does not
+  ---
+  duration_ms: 1564.104958
+  type: 'test'
+  ...
+# Subtest: an introducing merge before --since is still resolvable
+ok 12 - an introducing merge before --since is still resolvable
+  ---
+  duration_ms: 13115.215646
+  type: 'test'
+  ...
+# Subtest: each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence
+ok 13 - each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence
+  ---
+  duration_ms: 62.163057
+  type: 'test'
+  ...
+# Subtest: candidates subcommand pipes into trace through the CLI with a recorded responder
+ok 14 - candidates subcommand pipes into trace through the CLI with a recorded responder
+  ---
+  duration_ms: 15156.037955
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 60219.972234
