@@ -1,0 +1,14 @@
+..E......
+======================================================================
+ERROR: test_actual_source_bytes_survive_model_selection (__main__.ReviewPreflightTests.test_actual_source_bytes_survive_model_selection)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/.codex/worktrees/pr-2023-drift-repair/cairn/docs/verify/2081/review-preflight.test.py", line 59, in test_actual_source_bytes_survive_model_selection
+    self.assertEqual(MODULE.bundle_errors(body, {'example.ts': source}), [])
+                     ^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'review_preflight' has no attribute 'bundle_errors'
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.001s
+
+FAILED (errors=1)

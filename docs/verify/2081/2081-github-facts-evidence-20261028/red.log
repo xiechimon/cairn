@@ -1,0 +1,51 @@
+[heavy-slots] acquired slot 1/1
+EEEE.E.........
+======================================================================
+ERROR: test_complete_current_capture_matches_local_blobs (__main__.GitHubFactsTests.test_complete_current_capture_matches_local_blobs)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<checkout>/docs/verify/2081/review-preflight.test.py", line 103, in test_complete_current_capture_matches_local_blobs
+    errors, digest = MODULE.github_facts_errors(self.pr, self.files, self.head, self.base, ROOT)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'review_preflight' has no attribute 'github_facts_errors'
+
+======================================================================
+ERROR: test_local_compare_file_schema_is_rejected (__main__.GitHubFactsTests.test_local_compare_file_schema_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<checkout>/docs/verify/2081/review-preflight.test.py", line 99, in test_local_compare_file_schema_is_rejected
+    MODULE.github_patch_digest(local)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'review_preflight' has no attribute 'github_patch_digest'
+
+======================================================================
+ERROR: test_partial_and_duplicate_files_are_rejected (__main__.GitHubFactsTests.test_partial_and_duplicate_files_are_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<checkout>/docs/verify/2081/review-preflight.test.py", line 110, in test_partial_and_duplicate_files_are_rejected
+    errors, _ = MODULE.github_facts_errors(self.pr, files, self.head, self.base, ROOT)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'review_preflight' has no attribute 'github_facts_errors'
+
+======================================================================
+ERROR: test_raw_github_fields_derive_digest_including_opaque_patch_and_evidence_exclusion (__main__.GitHubFactsTests.test_raw_github_fields_derive_digest_including_opaque_patch_and_evidence_exclusion)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<checkout>/docs/verify/2081/review-preflight.test.py", line 87, in test_raw_github_fields_derive_digest_including_opaque_patch_and_evidence_exclusion
+    derived = MODULE.github_patch_digest(self.files)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'review_preflight' has no attribute 'github_patch_digest'
+
+======================================================================
+ERROR: test_stale_head_base_and_blob_mismatch_are_rejected (__main__.GitHubFactsTests.test_stale_head_base_and_blob_mismatch_are_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<checkout>/docs/verify/2081/review-preflight.test.py", line 118, in test_stale_head_base_and_blob_mismatch_are_rejected
+    self.assertTrue(MODULE.github_facts_errors(pr, self.files, self.head, self.base, ROOT)[0])
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'review_preflight' has no attribute 'github_facts_errors'
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.003s
+
+FAILED (errors=5)
