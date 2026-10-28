@@ -257,6 +257,8 @@ export async function boot(opts: {
   backend?: AgentBackend;
   claudeCodeBackend?: AgentBackend;
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
+  readClaudeOauthExpiresAt?: () => number | null;
+  presenceIntervalMs?: number;
   capabilitiesProbe?: () => MachineCapabilities;
   withMachineJson?: boolean;
   preEnrolled?: { serverUrl: string };
@@ -297,10 +299,11 @@ export async function boot(opts: {
     claudeCodeBackend: opts.claudeCodeBackend,
     claudeCodeAuthProbe:
       opts.claudeCodeAuthProbe ??
-      (async () => ({ state: 'logged-in', method: 'oauth_token', provider: 'firstParty' })),
+      (async () => ({ state: 'logged-in', method: 'claude.ai', provider: 'firstParty' })),
+    readClaudeOauthExpiresAt: opts.readClaudeOauthExpiresAt ?? (() => null),
     ...(opts.capabilitiesProbe !== undefined ? { capabilitiesProbe: opts.capabilitiesProbe } : {}),
     idleSleepPrevention: false,
-    presenceIntervalMs: 60_000,
+    presenceIntervalMs: opts.presenceIntervalMs ?? 60_000,
     claimBackoffBaseMs: 10,
     proxyEnv: {},
     ...(opts.capEnv !== undefined ? { capEnv: opts.capEnv } : {}),

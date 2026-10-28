@@ -1,0 +1,82 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1845-auth
+
+ ❯ |@xiechimon/cairn-cli| test/machine-claude-login.test.ts (5 tests | 2 failed) 97ms
+   ❯ machine presence carries Claude Code login (5)
+     × alternative authentication ignores stale OAuth credentials: api_key_helper 7ms
+     × alternative authentication ignores stale OAuth credentials: third_party 2ms
+ ❯ |@xiechimon/cairn-cli| test/claude-code-login.test.ts (3 tests | 1 failed) 12ms
+   ❯ readDefaultClaudeOauthExpiresAt (1)
+     × uses the active config directory without falling back to the default account 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/claude-code-login.test.ts > readDefaultClaudeOauthExpiresAt > uses the active config directory without falling back to the default account
+AssertionError: expected 100 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 100
+
+ ❯ test/claude-code-login.test.ts:48:49
+     46|     try {
+     47|       vi.stubEnv('CLAUDE_CONFIG_DIR', custom);
+     48|       expect(readDefaultClaudeOauthExpiresAt()).toBe(200);
+       |                                                 ^
+     49|       writeFileSync(join(custom, '.credentials.json'), 'invalid');
+     50|       expect(readDefaultClaudeOauthExpiresAt()).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-claude-login.test.ts > machine presence carries Claude Code login > alternative authentication ignores stale OAuth credentials: api_key_helper
+AssertionError: expected { state: 'expired', …(1) } to deeply equal { state: 'ok' }
+
+- Expected
++ Received
+
+  {
+-   "state": "ok",
++   "expiresAt": 1793095883160,
++   "state": "expired",
+  }
+
+ ❯ test/machine-claude-login.test.ts:60:46
+     58|     try {
+     59|       await waitFor(() => api.presenceBodies.length > 0);
+     60|       expect(loginOf(api.presenceBodies[0])).toEqual({ state: 'ok' });
+       |                                              ^
+     61|       expect(reads).toBe(0);
+     62|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/machine-claude-login.test.ts > machine presence carries Claude Code login > alternative authentication ignores stale OAuth credentials: third_party
+AssertionError: expected { state: 'expired', …(1) } to deeply equal { state: 'ok' }
+
+- Expected
++ Received
+
+  {
+-   "state": "ok",
++   "expiresAt": 1793095883168,
++   "state": "expired",
+  }
+
+ ❯ test/machine-claude-login.test.ts:60:46
+     58|     try {
+     59|       await waitFor(() => api.presenceBodies.length > 0);
+     60|       expect(loginOf(api.presenceBodies[0])).toEqual({ state: 'ok' });
+       |                                              ^
+     61|       expect(reads).toBe(0);
+     62|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  3 failed | 5 passed (8)
+   Start at  10:12:21
+   Duration  2.28s (import 50%, transform 44%, tests 6%)
+

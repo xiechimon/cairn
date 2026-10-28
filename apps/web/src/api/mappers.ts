@@ -1068,6 +1068,7 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
       : {}),
     ...(m.concurrencySource !== undefined ? { concurrencySource: m.concurrencySource } : {}),
     ...(m.concurrencyRange !== undefined ? { concurrencyRange: m.concurrencyRange } : {}),
+    ...(m.claudeLogin !== undefined ? { claudeLogin: m.claudeLogin } : {}),
   }));
 }
 

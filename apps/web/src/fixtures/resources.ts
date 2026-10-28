@@ -148,6 +148,53 @@ export const resourcesCcLoggedOut: FixtureSet = {
   },
 };
 
+const LOGIN_DAY_MS = 24 * 60 * 60 * 1000;
+
+export const machinesClaudeLogin: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    machines: [
+      {
+        id: 'machine-omarchy',
+        kind: 'local',
+        name: 'omarchy',
+        online: true,
+        enabledRuntimes: ['pi', 'claude-code'],
+        claudeLogin: { state: 'expiring', expiresAt: Date.now() + 2 * LOGIN_DAY_MS },
+      },
+      {
+        id: 'machine-soon',
+        kind: 'remote',
+        name: 'soon-box',
+        online: true,
+        claudeLogin: { state: 'expiring', expiresAt: Date.now() + 12 * 60 * 60 * 1000 },
+      },
+      {
+        id: 'machine-ghost',
+        kind: 'remote',
+        name: 'ghost',
+        online: true,
+        claudeLogin: { state: 'expired', expiresAt: Date.now() - 60 * 60 * 1000 },
+      },
+      {
+        id: 'machine-steady',
+        kind: 'remote',
+        name: 'steady',
+        online: true,
+        claudeLogin: { state: 'ok', expiresAt: Date.now() + 30 * LOGIN_DAY_MS },
+      },
+      {
+        id: 'machine-mystery',
+        kind: 'remote',
+        name: 'mystery',
+        online: true,
+        claudeLogin: { state: 'unknown', expiresAt: Date.now() - 60 * 60 * 1000 },
+      },
+    ],
+  },
+};
+
 export const machinesChiefState: FixtureSet = {
   ...resourcesDefault,
   resources: {

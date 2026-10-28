@@ -1,0 +1,34 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1845-auth
+
+ ❯ |@xiechimon/cairn-cli| test/claude-code-login.test.ts (5 tests | 1 failed) 7ms
+   ❯ parseClaudeOauthExpiresAt (4)
+     × a usable access token outlives an expired refresh token 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/claude-code-login.test.ts > parseClaudeOauthExpiresAt > a usable access token outlives an expired refresh token
+AssertionError: expected 100 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 100
+
+ ❯ test/claude-code-login.test.ts:51:7
+     49|         }),
+     50|       ),
+     51|     ).toBe(200);
+       |       ^
+     52|   });
+     53|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  10:34:19
+   Duration  110ms (transform 55%, tests 20%, import 19%, worker 6%)
+

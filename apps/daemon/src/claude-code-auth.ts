@@ -1,4 +1,7 @@
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { isAbsolute, join } from 'node:path';
 
 export type ClaudeCodeAuthProbe =
   | { state: 'logged-in'; method: string; provider: string }
@@ -79,6 +82,50 @@ export async function probeClaudeCodeAuth(
         err instanceof Error ? err.message : String(err)
       }`,
     };
+  }
+}
+
+export function parseClaudeOauthExpiresAt(raw: string): number | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+  const oauth = (parsed as { claudeAiOauth?: unknown }).claudeAiOauth;
+  if (typeof oauth !== 'object' || oauth === null || Array.isArray(oauth)) return null;
+  const {
+    expiresAt: accessExpiresAt,
+    refreshToken,
+    refreshTokenExpiresAt,
+  } = oauth as {
+    expiresAt?: unknown;
+    refreshToken?: unknown;
+    refreshTokenExpiresAt?: unknown;
+  };
+  const refreshable = typeof refreshToken === 'string' && refreshToken.length > 0;
+  const expiresAt = refreshable ? refreshTokenExpiresAt : accessExpiresAt;
+  if (typeof expiresAt !== 'number' || !Number.isSafeInteger(Math.trunc(expiresAt))) return null;
+  if (refreshable && typeof accessExpiresAt === 'number') {
+    if (!Number.isSafeInteger(Math.trunc(accessExpiresAt))) return null;
+    return Math.trunc(Math.max(expiresAt, accessExpiresAt));
+  }
+  return Math.trunc(expiresAt);
+}
+
+export function readDefaultClaudeOauthExpiresAt(): number | null {
+  const configDir = process.env.CLAUDE_CONFIG_DIR;
+  if (configDir && !isAbsolute(configDir)) return null;
+  try {
+    return parseClaudeOauthExpiresAt(
+      readFileSync(
+        join((configDir || join(homedir(), '.claude')).normalize('NFC'), '.credentials.json'),
+        'utf8',
+      ),
+    );
+  } catch {
+    return null;
   }
 }
 
