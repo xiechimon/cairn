@@ -34,6 +34,7 @@ import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { safeLocalStorage } from '../safe-storage.js';
+import { FeishuSettings } from './feishu-settings.js';
 
 export function AccountPage() {
   const { locale, setLocale, t } = useI18n();
@@ -179,6 +180,7 @@ export function AccountPage() {
             </SettingsRow>
           </SettingsCard>
         )}
+        {live && teamId && <FeishuSettings key={teamId} teamId={teamId} />}
       </div>
     </PageShell>
   );

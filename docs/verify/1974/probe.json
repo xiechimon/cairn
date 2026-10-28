@@ -1,0 +1,38 @@
+{
+  "syntheticDataOnly": true,
+  "status": {
+    "configured": true,
+    "appId": "cli_verification123",
+    "openId": "ou_verification123",
+    "cairnOrigin": "https://cairn.example.com"
+  },
+  "encryptedColumns": {
+    "appIdCipher": {
+      "envelopeVersion": "v1",
+      "containsSyntheticSecret": false,
+      "decryptedValueMatchesInput": true
+    },
+    "appSecretCipher": {
+      "envelopeVersion": "v1",
+      "containsSyntheticSecret": false,
+      "decryptedValueMatchesInput": true
+    }
+  },
+  "ordinarySecrets": [],
+  "agentCredentialValues": {},
+  "chiefUserSecret": {
+    "set": {
+      "id": "NEWyBlA_3QcU7F9N6XWHV",
+      "teamId": "BxIfA0iN5N4m5bzUHI_JF",
+      "name": "feishu.bot.app-secret",
+      "description": null
+    },
+    "deleted": [
+      "NEWyBlA_3QcU7F9N6XWHV"
+    ]
+  },
+  "afterUnbind": {
+    "bindings": 0,
+    "secrets": 0
+  }
+}

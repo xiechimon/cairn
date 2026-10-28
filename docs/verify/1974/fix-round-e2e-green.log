@@ -1,0 +1,21 @@
+[heavy-slots] acquired slot 1/2
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/mnt/fast/lanes/cairn-1974/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 9 tests using 2 workers
+
+  ✓  1 e2e/account-controls.spec.ts:12:1 › rename: header `编辑名称` enters edit mode prefilled and focused; Enter and save both submit (R1–R4) (500ms)
+  ✓  3 e2e/account-controls.spec.ts:34:1 › rename: Esc and cancel both discard the draft; empty or whitespace-only names do not submit (R5/R6) (451ms)
+  ✓  4 e2e/account-controls.spec.ts:59:1 › rename live: submit sends PATCH /api/user/me, the new name survives reload, failure toast names the field (R7–R9) (580ms)
+  ✓  2 e2e/account-feishu.spec.ts:4:1 › Feishu settings configure, reload, update and unbind without disclosing the secret (1.9s)
+  ✓  5 e2e/account-controls.spec.ts:106:1 › switch: granted state can be turned off, the off state persists across reload, and it can be turned back on (S1/S2) (577ms)
+  ✓  6 e2e/account-controls.spec.ts:125:1 › switch: denied state opens the preference panel + interception explainer, can be turned off, both states persist across reload (S3/S4) (544ms)
+  ✓  7 e2e/account-controls.spec.ts:152:1 › switch: default state fires the driver requestPermission, granted resolution lands and the on state persists (S5) (416ms)
+  ✓  8 e2e/account-controls.spec.ts:167:1 › switch fixture face: scenario can freeze denied — starts off, clicking opens the interception explainer; 13 baselines stay on (S6) (403ms)
+  ✓  9 e2e/account-controls.spec.ts:187:1 › probe: every control on the account page has an observable effect on click (P1, not just rename and switch) (900ms)
+
+  9 passed (6.7s)

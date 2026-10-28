@@ -6,6 +6,9 @@ export interface RestEndpoint {
 }
 
 export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
+  { method: 'GET', path: '/api/teams/{id}/feishu' },
+  { method: 'PUT', path: '/api/teams/{id}/feishu' },
+  { method: 'DELETE', path: '/api/teams/{id}/feishu' },
   { method: 'GET', path: '/api/auth/session', note: '保形返回 seed 用户（02 §2.1）' },
   { method: 'GET', path: '/api/user/me' },
   { method: 'GET', path: '/api/teams', note: '恒 seed 一行（02 §2.2）' },
