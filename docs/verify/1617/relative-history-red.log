@@ -1,0 +1,83 @@
+✔ a spec naming an existing path and an existing exported function reports nothing (147.44275ms)
+✔ a spec naming a deleted path reports it once with its line number (156.726667ms)
+✔ a renamed function is reported as a missing identifier (161.748459ms)
+✔ names inside fenced code blocks and URLs are ignored (148.039625ms)
+✔ a table row marked superseded is ignored (147.831125ms)
+✔ short or common words in backticks are not treated as identifiers (108.501834ms)
+✔ a path that never existed in the repo is not reported (131.5295ms)
+✔ a relative path resolving under a tracked file is not reported (119.995917ms)
+✔ a path with a line-range suffix is checked without the range (135.391125ms)
+✔ a directory reference is not reported as a missing path (113.614791ms)
+✖ a deleted relative path is reported through its historical repository path (159.680375ms)
+✔ historical suffix matching respects directory boundaries (160.544208ms)
+✖ uncommitted file restoration does not hide drift at HEAD (161.674667ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 11
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1893.589833
+
+✖ failing tests:
+
+test at ../../../../../../private/tmp/cairn-2023-old-uma1gdeb/doc-drift.test.mjs:225:1
+✖ a deleted relative path is reported through its historical repository path (159.680375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     doc: 'docs/spec/01-test.md',
+  -     kind: 'path',
+  -     line: 2,
+  -     name: 'api/mode.ts'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (file:///private/tmp/cairn-2023-old-uma1gdeb/doc-drift.test.mjs:236:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { doc: 'docs/spec/01-test.md', name: 'api/mode.ts', kind: 'path', line: 2 } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at ../../../../../../private/tmp/cairn-2023-old-uma1gdeb/doc-drift.test.mjs:263:1
+✖ uncommitted file restoration does not hide drift at HEAD (161.674667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     doc: 'docs/spec/01-test.md',
+  -     kind: 'path',
+  -     line: 1,
+  -     name: 'api/mode.ts'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (file:///private/tmp/cairn-2023-old-uma1gdeb/doc-drift.test.mjs:275:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { doc: 'docs/spec/01-test.md', name: 'api/mode.ts', kind: 'path', line: 1 } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
