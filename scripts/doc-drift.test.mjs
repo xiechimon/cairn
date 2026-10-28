@@ -300,3 +300,22 @@ test('an identifier mentioned only in integration fixtures is still missing from
     rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test('a deleted relative path with a line-range suffix reports its normalized path', () => {
+  const { cwd, commit, run } = fixture();
+  try {
+    commit({
+      'docs/spec/01-test.md': 'See `api/mode.ts:17-20` for the client.\n',
+      'apps/web/src/api/mode.ts': 'export const mode = true;\n',
+    });
+    commit({ 'apps/web/src/api/mode.ts': null }, 'delete client');
+    const result = run('--out', '.gardener');
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(
+      JSON.parse(readFileSync(join(cwd, '.gardener', `drift-${date}.json`), 'utf8')),
+      [{ doc: 'docs/spec/01-test.md', name: 'api/mode.ts', kind: 'path', line: 1 }],
+    );
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});

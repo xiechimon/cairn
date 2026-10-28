@@ -25,3 +25,7 @@ The 48 passing cases cover the new regressions, existing drift cases, weekly out
 ## Simplification
 
 Applied the local code-simplifier guidance to the changed code: retain one scanner shared by the standalone CLI and weekly report, reuse existing Git and rendering helpers, and avoid adding a second history index or new package. The repair adds one historical suffix pathspec and narrows the existing identifier scope. No additional abstraction was needed.
+
+## Re-review of the line-suffix fix
+
+The independent Codex review at issuecomment-6465841487 identified a blocking normalization-order omission. The new regression reproduces it through an exact empty-list assertion. Token normalization now precedes classification and is reused by filename checks. The affected CLI cases and related checks pass, 49 in total. This note does not substitute for the independent review of the published fix.

@@ -41,3 +41,22 @@ assert 'fail 2' in text
 ```
 
 The CI run and its explicit drift-test log line must be checked on the published delivery before merging. Local execution and workflow text alone do not establish that GitHub ran the added self-test.
+
+## Line-suffix follow-up
+
+The independent review of `fd2d2167` found that a relative path with a line suffix was rejected before normalization. `relative-range-red.log` records 14 passing tests and the new deletion case failing through its expected assertion. The scanner now normalizes each token before either path classifier or filename lookup.
+
+`relative-range-green.log` records 49 passing related tests. The corresponding lint, typecheck and spec-parse logs pass. `relative-range-weekly.log` and `relative-range-drift.json` report 122 missing paths from the same 58-document corpus at the observed head. The extra report is `resources/shell.tsx`, previously written with a line suffix. `relative-range-first-ten.json` rechecks the current first ten against deletion history; `relative-range-observation.json` binds the new source files to their hashes. The earlier 121-row observation remains the evidence for the earlier source version.
+
+The added-row explanation is checked against the actual artifact difference:
+
+```python
+from pathlib import Path
+import json
+root = Path('docs/verify/1617')
+key = lambda row: (row['doc'], row['line'], row['kind'], row['name'])
+before = {key(row) for row in json.loads((root / 'drift-main.json').read_text())}
+added = [row for row in json.loads((root / 'relative-range-drift.json').read_text()) if key(row) not in before]
+assert added == json.loads((root / 'relative-range-observation.json').read_text())['addedRows']
+assert f"The extra report is `{added[0]['name']}`, previously written with a line suffix." in (root / 'README.md').read_text()
+```

@@ -1,0 +1,102 @@
+[
+  {
+    "doc": "docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md",
+    "name": "apps/web/src/board/sidebar.css",
+    "kind": "path",
+    "line": 18,
+    "deletionCommit": "84ff1108a9888d4b12ba28691ccbb3db23469466",
+    "historicalPath": "apps/web/src/board/sidebar.css",
+    "absentAtHead": true,
+    "presentBeforeDeletion": true
+  },
+  {
+    "doc": "docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md",
+    "name": "apps/web/src/overlay/overlay.css",
+    "kind": "path",
+    "line": 18,
+    "deletionCommit": "7f90b261a17736010590b1fe973f8e3e918983ba",
+    "historicalPath": "apps/web/src/overlay/overlay.css",
+    "absentAtHead": true,
+    "presentBeforeDeletion": true
+  },
+  {
+    "doc": "docs/adr/0004-chief-panel-docked-right-rail.md",
+    "name": "apps/web/src/chief/chief.css",
+    "kind": "path",
+    "line": 17,
+    "deletionCommit": "b0003125c168b20f0b7d8aac507ca1fff3d8a9af",
+    "historicalPath": "apps/web/src/chief/chief.css",
+    "absentAtHead": true,
+    "presentBeforeDeletion": true
+  },
+  {
+    "doc": "docs/adr/0004-chief-panel-docked-right-rail.md",
+    "name": "apps/web/src/chief/chief.css",
+    "kind": "path",
+    "line": 18,
+    "deletionCommit": "b0003125c168b20f0b7d8aac507ca1fff3d8a9af",
+    "historicalPath": "apps/web/src/chief/chief.css",
+    "absentAtHead": true,
+    "presentBeforeDeletion": true
+  },
+  {
+    "doc": "docs/adr/0009-site-wide-motion-converges-on-shadcn-defaults.md",
+    "name": "docs/research/assets/r1/f965382e067739e9.css",
+    "kind": "path",
+    "line": 12,
+    "deletionCommit": "c4a54b1f7cc47756cb7449f2d44c0ea884713f4f",
+    "historicalPath": "docs/research/assets/r1/f965382e067739e9.css",
+    "absentAtHead": true,
+    "presentBeforeDeletion": true
+  },
+  {
+    "doc": "docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md",
+    "name": "library/t-0909/reports/contrast.md",
+    "kind": "path",
+    "line": 26,
+    "deletionCommit": "a0475e0fe1dcd5b2bd0c1d4d4765c62e36b356fd",
+    "historicalPath": "library/t-0909/reports/contrast.md",
+    "absentAtHead": true,
+    "presentBeforeDeletion": true
+  },
+  {
+    "doc": "docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md",
+    "name": "library/t-0909/scripts/gen-palettes.mjs",
+    "kind": "path",
+    "line": 34,
+    "deletionCommit": "a0475e0fe1dcd5b2bd0c1d4d4765c62e36b356fd",
+    "historicalPath": "library/t-0909/scripts/gen-palettes.mjs",
+    "absentAtHead": true,
+    "presentBeforeDeletion": true
+  },
+  {
+    "doc": "docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md",
+    "name": "library/t-0909/src/themes/c.css",
+    "kind": "path",
+    "line": 34,
+    "deletionCommit": "a0475e0fe1dcd5b2bd0c1d4d4765c62e36b356fd",
+    "historicalPath": "library/t-0909/src/themes/c.css",
+    "absentAtHead": true,
+    "presentBeforeDeletion": true
+  },
+  {
+    "doc": "docs/adr/0011-chief-process-segments-in-real-time-at-event-boundaries.md",
+    "name": "docs/verify/857/tail-samples.jsonl",
+    "kind": "path",
+    "line": 18,
+    "deletionCommit": "c782de21aa4e0bbc76b3c2a030b766cdd66b65a3",
+    "historicalPath": "docs/verify/857/tail-samples.jsonl",
+    "absentAtHead": true,
+    "presentBeforeDeletion": true
+  },
+  {
+    "doc": "docs/adr/0013-chief-panel-floating-window.md",
+    "name": "resources/shell.tsx",
+    "kind": "path",
+    "line": 24,
+    "deletionCommit": "b4b1f96338aee1c2f69bf39d3a6736fbe31b6cd6",
+    "historicalPath": "apps/web/src/resources/shell.tsx",
+    "absentAtHead": true,
+    "presentBeforeDeletion": true
+  }
+]

@@ -42,10 +42,6 @@ function identifierInCode(cwd, name) {
   return gitOk(cwd, 'grep', '-w', '-l', name, 'HEAD', '--', ...SCOPE_DIRS).length > 0;
 }
 
-function stripRange(path) {
-  return path.replace(RANGE_SUFFIX, '');
-}
-
 export function collectDocDrift(cwd = process.cwd()) {
   const tracked = new Set(
     git(cwd, 'ls-tree', '-r', '--name-only', 'HEAD').split('\n').filter(Boolean),
@@ -69,12 +65,11 @@ export function collectDocDrift(cwd = process.cwd()) {
       for (const match of line.matchAll(SPAN_RE)) {
         const span = match[1].trim();
         if (!span || /:\/\//.test(span) || /^(https?:|www\.|mailto:|[~/])/.test(span)) continue;
-        const token = span.split(/\s+/)[0];
+        const token = span.split(/\s+/)[0].replace(RANGE_SUFFIX, '');
         let path = null;
         if (SCOPE_DIRS.some((dir) => token.startsWith(`${dir}/`))) path = token;
         else if (/^[^/]+\/\S+\.\w+$/.test(token)) path = token;
         if (path) {
-          path = stripRange(path);
           const plain = path.replace(/[{}*?[\]]/g, '');
           if (path !== plain) continue;
           if (!/\.\w+$/.test(path)) continue;
@@ -101,13 +96,8 @@ export function collectDocDrift(cwd = process.cwd()) {
             rows.push({ doc, name, kind: 'identifier', line: i + 1 });
           }
         }
-        const pathToken = stripRange(token);
-        if (
-          /\.tsx?$/.test(pathToken) &&
-          !/[{}*?[\]]/.test(pathToken) &&
-          existsAtHead(tracked, pathToken)
-        ) {
-          const base = pathToken
+        if (/\.tsx?$/.test(token) && !/[{}*?[\]]/.test(token) && existsAtHead(tracked, token)) {
+          const base = token
             .split('/')
             .pop()
             .replace(/\.tsx?$/, '');

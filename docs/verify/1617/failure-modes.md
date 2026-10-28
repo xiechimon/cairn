@@ -9,3 +9,5 @@
 7. The CI self-test and weekly workflow retain their current jobs and add the drift invocation without changing baselines, allowlists or candidate-pattern logic.
 
 8. A historical function name retained only under integration fixtures must not conceal its disappearance from the acceptance checklist code scope.
+
+9. A relative path carrying a line or range suffix must be normalized before classification, including when its historical file was deleted.
