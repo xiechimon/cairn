@@ -1,0 +1,38 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1879-memory-cases/cairn
+
+ ❯ |@cairn/integration| test/memory-regression-grade.test.ts (195 tests | 1 failed) 77ms
+   ❯ case data (16)
+     × criterion words absent from the prompt, otherwise quoting the user verbatim in the spec would score for free 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/memory-regression-grade.test.ts > case data > criterion words absent from the prompt, otherwise quoting the user verbatim in the spec would score for free
+AssertionError: i07: 0.5.0: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/memory-regression-grade.test.ts:132:70
+    130|       const prompt = lower(c.prompt);
+    131|       for (const marker of [...c.expect.include.flat(), ...c.expect.ex…
+    132|         expect(prompt.includes(lower(marker)), `${c.id}: ${marker}`).t…
+       |                                                                      ^
+    133|       }
+    134|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 200 passed (201)
+   Start at  10:20:12
+   Duration  25.75s (import 44%, transform 34%, tests 21%)
+
+  Transform  |@cairn/integration| transforming modules took 8.51s · 34% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

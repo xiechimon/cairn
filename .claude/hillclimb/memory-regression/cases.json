@@ -805,33 +805,6 @@
       }
     },
     {
-      "id": "a04",
-      "tags": ["adjacent", "version"],
-      "prompt": "给 eval-project 建一张任务：README 的环境要求写明服务端的 Node 版本。和仓库不符的记忆改成现行要求。",
-      "memories": [
-        {
-          "key": "target",
-          "title": "eval-project 运行环境要求",
-          "content": "eval-project 的运行环境要求：服务端是 Node >=18。",
-          "scope": "eval-project",
-          "ageDays": 70
-        },
-        {
-          "key": "keep",
-          "title": "eval-project 运行环境要求",
-          "content": "eval-project 的运行环境要求：文档脚本是 Python >=3.9。",
-          "scope": "eval-project",
-          "ageDays": 12
-        }
-      ],
-      "expect": {
-        "kind": "adjacent",
-        "include": [[">=20", "node 20", "20.0.0", "node:20"]],
-        "exclude": [">=18", "python >=3.9"],
-        "untouchedMemory": "keep"
-      }
-    },
-    {
       "id": "a05",
       "tags": ["adjacent", "deploy"],
       "prompt": "给 eval-project 建一张任务：把服务进程的生产启动说明改成能直接照着操作的版本。spec 写明启动服务用的现行命令。和仓库不符的记忆改成现行命令。",
@@ -859,33 +832,6 @@
       }
     },
     {
-      "id": "a06",
-      "tags": ["adjacent", "ci"],
-      "prompt": "给 eval-project 建一张任务：CI 说明写明装依赖用的命令。和仓库不符的记忆改成现行命令。",
-      "memories": [
-        {
-          "key": "target",
-          "title": "eval-project CI 依赖",
-          "content": "eval-project 的 CI 装依赖命令是 `yarn install --frozen-lockfile`。",
-          "scope": "eval-project",
-          "ageDays": 45
-        },
-        {
-          "key": "keep",
-          "title": "eval-project CI 依赖",
-          "content": "eval-project 的 CI 装依赖缓存命令是 `yarn cache dir`。",
-          "scope": "eval-project",
-          "ageDays": 9
-        }
-      ],
-      "expect": {
-        "kind": "adjacent",
-        "include": [["pnpm install --frozen-lockfile"]],
-        "exclude": ["yarn install", "yarn cache"],
-        "untouchedMemory": "keep"
-      }
-    },
-    {
       "id": "i01",
       "tags": ["irrelevant", "startup"],
       "prompt": "给 eval-project 建一张任务：给 README 补一节新手上手说明。spec 里写明在本地怎么把前后端一起启动。",
@@ -905,82 +851,6 @@
       }
     },
     {
-      "id": "i02",
-      "tags": ["irrelevant", "port"],
-      "prompt": "给 eval-project 建一张任务：给服务端加一个健康检查接口。spec 里写明服务在本地监听哪个端口。",
-      "memories": [
-        {
-          "key": "aside",
-          "title": "团队回顾地点",
-          "content": "eval-project 的季度团队回顾在 cedar-room 会议室举行。",
-          "scope": "eval-project",
-          "ageDays": 6
-        }
-      ],
-      "expect": {
-        "kind": "irrelevant",
-        "include": [["8787"]],
-        "exclude": ["cedar-room"]
-      }
-    },
-    {
-      "id": "i03",
-      "tags": ["irrelevant", "deploy"],
-      "prompt": "给 eval-project 建一张任务：把部署文档重写成能直接照着操作的版本。spec 里写明部署用哪条命令。",
-      "memories": [
-        {
-          "key": "aside",
-          "title": "团队读书会",
-          "content": "eval-project 团队读书会的内部昵称是 blue-heron。",
-          "scope": "eval-project",
-          "ageDays": 11
-        }
-      ],
-      "expect": {
-        "kind": "irrelevant",
-        "include": [["pnpm start"]],
-        "exclude": ["blue-heron"]
-      }
-    },
-    {
-      "id": "i04",
-      "tags": ["irrelevant", "version"],
-      "prompt": "给 eval-project 建一张任务：给 README 补一节环境要求。spec 里写明 Node 版本要求。",
-      "memories": [
-        {
-          "key": "aside",
-          "title": "年度聚餐",
-          "content": "eval-project 的年度聚餐吉祥物叫 mascot-kip。",
-          "scope": "eval-project",
-          "ageDays": 14
-        }
-      ],
-      "expect": {
-        "kind": "irrelevant",
-        "include": [[">=20", "node 20", "20.0.0", "node:20"]],
-        "exclude": ["mascot-kip"]
-      }
-    },
-    {
-      "id": "i05",
-      "tags": ["irrelevant", "web"],
-      "prompt": "给 eval-project 建一张任务：给前端补一份本地调试说明。spec 里写明前端开发服务器的端口。",
-      "memories": [
-        {
-          "key": "aside",
-          "title": "例会点心",
-          "content": "eval-project 每周四团队例会供应的点心叫 oat-square。",
-          "scope": "eval-project",
-          "ageDays": 5
-        }
-      ],
-      "expect": {
-        "kind": "irrelevant",
-        "include": [["5173"]],
-        "exclude": ["oat-square"]
-      }
-    },
-    {
       "id": "i06",
       "tags": ["irrelevant", "test"],
       "prompt": "给 eval-project 建一张任务：在 CI 里加一步单元测试。spec 里写明跑单测的命令。",
@@ -997,6 +867,154 @@
         "kind": "irrelevant",
         "include": [["vitest run"]],
         "exclude": ["test-owl"]
+      }
+    },
+    {
+      "id": "i07",
+      "tags": [
+        "irrelevant",
+        "protocol"
+      ],
+      "prompt": "给 eval-project 建一张任务：把批量删除任务的响应对齐最近一次破坏性协议变更。spec 写明该变更的版本、HTTP 方法和路径、现行响应的全部字段，以及请求里不存在的 id 如何表达。以共享协议源码和变更日志为准。",
+      "memories": [
+        {
+          "key": "aside",
+          "title": "办公室植物登记",
+          "content": "eval-project 办公室植物登记的档案编号为 fern-index-37。",
+          "scope": "eval-project",
+          "ageDays": 8
+        }
+      ],
+      "expect": {
+        "kind": "irrelevant",
+        "include": [
+          [
+            "/api/tasks/delete"
+          ],
+          [
+            "deleted"
+          ],
+          [
+            "skipped"
+          ],
+          [
+            "0.5.0"
+          ]
+        ],
+        "exclude": [
+          "fern-index-37"
+        ]
+      }
+    },
+    {
+      "id": "i08",
+      "tags": [
+        "irrelevant",
+        "sorting"
+      ],
+      "prompt": "给 eval-project 建一张任务：为搜索结果排序补回归测试。spec 根据源码写明当前真正使用的排序字段、排序方向，以及它和代码说明中的哪个字段不一致；这张任务只覆盖搜索排序。",
+      "memories": [
+        {
+          "key": "aside",
+          "title": "团建相册归档",
+          "content": "eval-project 团建相册归档的内部编号为 album-pine-82。",
+          "scope": "eval-project",
+          "ageDays": 8
+        }
+      ],
+      "expect": {
+        "kind": "irrelevant",
+        "include": [
+          [
+            "updatedAt"
+          ],
+          [
+            "createdAt"
+          ],
+          [
+            "倒序",
+            "降序",
+            "descending",
+            "desc"
+          ]
+        ],
+        "exclude": [
+          "album-pine-82"
+        ]
+      }
+    },
+    {
+      "id": "i09",
+      "tags": [
+        "irrelevant",
+        "control-flow"
+      ],
+      "prompt": "给 eval-project 建一张任务：给按团队清空任务的操作补多条数据回归测试。spec 列出从按团队清空到批量删除的两个实际函数名，并写出哪个控制流语句造成只处理第一条；先读实际源码再写验收。",
+      "memories": [
+        {
+          "key": "aside",
+          "title": "午餐小组登记",
+          "content": "eval-project 午餐小组登记的内部名字为 cypress-lunch-73。",
+          "scope": "eval-project",
+          "ageDays": 8
+        }
+      ],
+      "expect": {
+        "kind": "irrelevant",
+        "include": [
+          [
+            "deleteAll"
+          ],
+          [
+            "deleteMany"
+          ],
+          [
+            "return"
+          ]
+        ],
+        "exclude": [
+          "cypress-lunch-73"
+        ]
+      }
+    },
+    {
+      "id": "i10",
+      "tags": [
+        "irrelevant",
+        "startup-matrix"
+      ],
+      "prompt": "给 eval-project 建一张任务：整理开发和生产环境的启动差异。spec 分别写明根目录开发启动命令、生产启动命令、Node 最低版本，以及前端开发服务器默认端口。",
+      "memories": [
+        {
+          "key": "aside",
+          "title": "旧活动场地台账",
+          "content": "eval-project 旧活动场地台账的标签为 venue-copper-56。",
+          "scope": "eval-project",
+          "ageDays": 8
+        }
+      ],
+      "expect": {
+        "kind": "irrelevant",
+        "include": [
+          [
+            "pnpm dev"
+          ],
+          [
+            "pnpm start"
+          ],
+          [
+            ">=20",
+            "node 20",
+            "20.0.0",
+            "node:20"
+          ],
+          [
+            "5173"
+          ]
+        ],
+        "exclude": [
+          "venue-copper-56"
+        ]
       }
     }
   ]

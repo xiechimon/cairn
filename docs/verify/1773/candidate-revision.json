@@ -1,0 +1,33 @@
+{
+  "basis": "issue #1773 requires keeping only cases with completed scored baseline failures",
+  "previousSourceCommit": "8e8db4859aac50f6977e6c11c7dd634c373074fb",
+  "retainedQualifiedIds": [
+    "a01",
+    "a02",
+    "a03",
+    "a05",
+    "i01",
+    "i06"
+  ],
+  "archivedUnqualifiedIds": [
+    "a04",
+    "a06",
+    "i02",
+    "i03",
+    "i04",
+    "i05"
+  ],
+  "newCandidates": [
+    "i07",
+    "i08",
+    "i09",
+    "i10"
+  ],
+  "familyCounts": {
+    "adjacent": 4,
+    "irrelevant": 6
+  },
+  "modelRosterChanged": false,
+  "graderChanged": false,
+  "newCandidatesQualified": false
+}
