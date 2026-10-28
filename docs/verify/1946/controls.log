@@ -1,0 +1,12 @@
+harbor run -p /mnt/fast/lanes/cairn-1946/integration/eval/harbor/tasks/hello-file -a oracle --job-name 1946-hello-file-oracle-20261028004645 --jobs-dir /mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs -n 1 --ek keep_containers=true
+1946-hello-file-oracle-20261028004645: reward=1.0
+3880dbe6b0e0
+b3c4cf7c1bfd
+harbor run -p /mnt/fast/lanes/cairn-1946/integration/eval/harbor/tasks/hidden-answer -a oracle --job-name 1946-hidden-answer-oracle-20261028004645 --jobs-dir /mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs -n 1 --ek keep_containers=true
+1946-hidden-answer-oracle-20261028004645: reward=1.0
+aa5177507254
+31be85d336af
+harbor run -p /mnt/fast/lanes/cairn-1946/integration/eval/harbor/tasks/hidden-answer -a integration.eval.harbor.tamper_agent:TamperAgent --job-name 1946-hidden-answer-TamperAgent-20261028004645 --jobs-dir /mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs -n 1 --ek keep_containers=true
+1946-hidden-answer-TamperAgent-20261028004645: reward=0.0
+3a0499c145d3
+5654af391f5e

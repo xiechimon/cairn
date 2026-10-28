@@ -1,0 +1,39 @@
+{
+    "schema_version": 2,
+    "task": {
+        "name": "hidden-answer",
+        "version": "1.0.0",
+        "type": "local",
+        "digest": "sha256:1dad7fe46a19e81ec678c82941d7d951853944ab553cec2b951f71abb563643e",
+        "path": "/mnt/fast/lanes/cairn-1946/integration/eval/harbor/tasks/hidden-answer"
+    },
+    "install_only": false,
+    "timeout_multiplier": 1.0,
+    "agent": {
+        "name": "oracle",
+        "skills": [],
+        "resume_trajectory": false,
+        "extra_allowed_hosts": [],
+        "kwargs": {},
+        "mcp_servers": []
+    },
+    "bridge_inputs": {},
+    "skills": [],
+    "environment": {
+        "type": "docker",
+        "force_build": false,
+        "delete": true,
+        "stream": false,
+        "cpu_enforcement_policy": "auto",
+        "memory_enforcement_policy": "auto",
+        "extra_docker_compose": [],
+        "kwargs": {
+            "keep_containers": true
+        },
+        "extra_allowed_hosts": []
+    },
+    "verifier": {
+        "disable": false,
+        "environment_mode": "separate"
+    }
+}

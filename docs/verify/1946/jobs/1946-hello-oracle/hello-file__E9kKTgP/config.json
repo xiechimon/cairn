@@ -1,0 +1,8 @@
+{
+    "task": {
+        "path": "integration/eval/harbor/tasks/hello-file"
+    },
+    "trial_name": "hello-file__E9kKTgP",
+    "trials_dir": "docs/verify/1946/jobs/1946-hello-oracle",
+    "job_id": "3c3ffc0f-bde7-46e3-a942-d88de72d0e7b"
+}
