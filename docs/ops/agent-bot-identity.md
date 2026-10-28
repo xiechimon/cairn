@@ -125,3 +125,21 @@ state transaction can leave the lock behind; acquisition fails closed after
 30 seconds rather than bypassing the cap. Inspect and remove an abandoned lock
 only after confirming no process is using it. Invalid state fails closed as well.
 Clock rollback retains future reservations and delays creation conservatively.
+
+## Incident recovery commit preparation
+
+For #2101, prepare the reviewed correction outside both identity wrappers. This recovery procedure supersedes the historical bot-wrapped commit example above. App authentication for pushes and PR creation remains separate from commit authorship. Repository configuration alone cannot override inherited author or committer environment variables.
+
+```sh
+GIT_AUTHOR_NAME=Cairnwright \
+GIT_AUTHOR_EMAIL=348051526+cairnwright@users.noreply.github.com \
+GIT_COMMITTER_NAME=Cairnwright \
+GIT_COMMITTER_EMAIL=348051526+cairnwright@users.noreply.github.com \
+git commit --file COMMIT_MSG.txt
+```
+
+Keep the reviewed message and its co-author trailers. Verify the resulting author and committer with `git log -1 --format='%an <%ae>|%cn <%ce>%n%B'`. Bot-opened PRs still require exactly one Cairnwright-authored commit and the verified external helper's rebase route. Do not squash a bot-opened PR to recover this incident.
+
+The dispatcher must use this preparation command for the correction, verify the helper on the dispatch host, and inspect the actual main commit after the authorized merge. Then read the subsequent main push's `commit-author` Actions result. A compliant new push range can pass while the historical rejected commit remains intact; rerunning the historical failed range still fails. Until both main metadata and the later green run are recorded, #2101 recovery remains pending. Local fixtures cannot establish external helper enforcement or main acceptance.
+
+The trusted main push step in `.github/workflows/commit-author.yml` runs `scripts/commit-author-recovery.test.mjs`. It executes this recipe with inherited bot identity in an isolated Git repository, preserves co-author trailers and historical commit bytes, and checks both the subsequent push range and the rejected historical range using the workflow shell.

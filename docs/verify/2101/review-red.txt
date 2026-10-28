@@ -1,0 +1,92 @@
+✖ recovery regression is run by the trusted main workflow (1.211959ms)
+✖ incident recovery preserves trailers and history while passing the actual push check (9.80325ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 54.097698
+
+✖ failing tests:
+
+test at scripts/commit-author-recovery.test.mjs:8:1
+✖ recovery regression is run by the trusted main workflow (1.211959ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /if: github.event_name == 'push'\n        run: node --test[^\n]*scripts\/commit-author-recovery.test.mjs/. Input:
+  
+  'name: commit-author\n' +
+    '\n' +
+    'on:\n' +
+    '  pull_request:\n' +
+    '  push:\n' +
+    '    branches: [main]\n' +
+    '\n' +
+    'permissions:\n' +
+    '  contents: read\n' +
+    '\n' +
+    'jobs:\n' +
+    '  commit-author:\n' +
+    '    runs-on: ubuntu-latest\n' +
+    '    steps:\n' +
+    '      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0\n' +
+    '        with:\n' +
+    '          fetch-depth: 0\n' +
+    '          ref: ${{ github.event.pull_request.head.sha || github.sha }}\n' +
+    '          persist-credentials: false\n' +
+    '      - name: Test author policy on trusted main code\n' +
+    "        if: github.event_name == 'push'\n" +
+    '        run: node --test scripts/commit-author.test.mjs scripts/commit-author-policy.test.mjs\n' +
+    '      - name: Commit authors never use the bot account\n' +
+    '        env:\n' +
+    '          BEFORE_SHA: ${{ github.event.before }}\n' +
+    '          BASE_SHA: ${{ github.event.pull_request.base.sha }}\n' +
+    '        run: |\n' +
+    '          if [ -n "$BASE_SHA" ]; then\n' +
+    '            range="$BASE_SHA..HEAD"\n' +
+    '          elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then\n' +
+    '            range="$BEFORE_SHA..HEAD"\n' +
+    '          else\n' +
+    '            range="HEAD^!"\n' +
+    '          fi\n' +
+    `          offending=$(git log --format='%H %an <%ae>' "$range" | grep -F 'cairnwright[bot]' || true)\n` +
+    `          git log --format='author: %an <%ae>' "$range"\n` +
+    '          if [ -n "$offending" ]; then\n' +
+    '            echo "$offending"\n' +
+    '            echo "::error::every commit in $range must be authored without cairnwright[bot]. Bot-opened PRs must merge by rebase from one commit authored by Cairnwright (~/.cairn/tools/merge-pr.sh). This check reads commit authors, so it cannot see the author a squash merge will write; read the author of the main commit after merging."\n' +
+    '            exit 1\n' +
+    '          fi\n'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2101/scripts/commit-author-recovery.test.mjs:10:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'name: commit-author\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  commit-author:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0\n        with:\n          fetch-depth: 0\n          ref: ${{ github.event.pull_request.head.sha || github.sha }}\n          persist-credentials: false\n      - name: Test author policy on trusted main code\n        if: github.event_name == \'push\'\n        run: node --test scripts/commit-author.test.mjs scripts/commit-author-policy.test.mjs\n      - name: Commit authors never use the bot account\n        env:\n          BEFORE_SHA: ${{ github.event.before }}\n          BASE_SHA: ${{ github.event.pull_request.base.sha }}\n        run: |\n          if [ -n "$BASE_SHA" ]; then\n            range="$BASE_SHA..HEAD"\n          elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then\n            range="$BEFORE_SHA..HEAD"\n          else\n            range="HEAD^!"\n          fi\n          offending=$(git log --format=\'%H %an <%ae>\' "$range" | grep -F \'cairnwright[bot]\' || true)\n          git log --format=\'author: %an <%ae>\' "$range"\n          if [ -n "$offending" ]; then\n            echo "$offending"\n            echo "::error::every commit in $range must be authored without cairnwright[bot]. Bot-opened PRs must merge by rebase from one commit authored by Cairnwright (~/.cairn/tools/merge-pr.sh). This check reads commit authors, so it cannot see the author a squash merge will write; read the author of the main commit after merging."\n            exit 1\n          fi\n',
+    expected: /if: github.event_name == 'push'\n        run: node --test[^\n]*scripts\/commit-author-recovery.test.mjs/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/commit-author-recovery.test.mjs:13:1
+✖ incident recovery preserves trailers and history while passing the actual push check (9.80325ms)
+  AssertionError [ERR_ASSERTION]: Missing fixture identity: user.name
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2101/scripts/commit-author-recovery.test.mjs:38:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

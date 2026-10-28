@@ -19,7 +19,7 @@ jobs:
           persist-credentials: false
       - name: Test author policy on trusted main code
         if: github.event_name == 'push'
-        run: node --test scripts/commit-author.test.mjs scripts/commit-author-policy.test.mjs
+        run: node --test scripts/commit-author.test.mjs scripts/commit-author-policy.test.mjs scripts/commit-author-recovery.test.mjs
       - name: Commit authors never use the bot account
         env:
           BEFORE_SHA: ${{ github.event.before }}
