@@ -159,7 +159,7 @@ export function ProjectNewPage() {
   };
 
   const browseFolder = () => {
-    if (pickBusy) return;
+    if (pickBusy || blockDemoWrite()) return;
     setPickBusy(true);
     setPickHint(null);
     mutations.pickLocalFolder.mutate(undefined, {
@@ -481,12 +481,14 @@ export function ProjectNewPage() {
                       >
                         {t('浏览')}
                       </PopoverTrigger>
-                      <DirBrowser
-                        onPick={(path) => {
-                          setBrowseOpen(false);
-                          onLocalPathChange(path);
-                        }}
-                      />
+                      {browseOpen && (
+                        <DirBrowser
+                          onPick={(path) => {
+                            setBrowseOpen(false);
+                            onLocalPathChange(path);
+                          }}
+                        />
+                      )}
                     </Popover>
                     <RepoSwapButton label={t('选择仓库')} buttonRef={swapBtnRef} />
                   </>

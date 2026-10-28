@@ -1,0 +1,51 @@
+
+Running 1 test using 1 worker
+
+(node:78105) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 apps/web/e2e/demo-mode.spec.ts:322:1 › write: browsing for a local project folder stays available after the demo notice (5.7s)
+
+
+  1) apps/web/e2e/demo-mode.spec.ts:322:1 › write: browsing for a local project folder stays available after the demo notice
+
+    Error: expect(locator).toBeEnabled() failed
+
+    Locator:  getByRole('button', { name: '浏览', exact: true })
+    Expected: enabled
+    Received: disabled
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toBeEnabled" getByRole('button', { name: '浏览', exact: true }) with timeout 5000ms
+      - waiting for getByRole('button', { name: '浏览', exact: true })
+        14 × locator resolved to <button disabled tabindex="0" type="button" aria-label="浏览" data-disabled="" data-size="default" id="base-ui-_r_15_" aria-expanded="false" data-variant="outline" aria-haspopup="dialog" data-slot="popover-trigger" data-base-ui-click-trigger="" class="group/button inline-flex items-center justify-center border bg-clip-padding font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate…>浏览</button>
+           - unexpected value "disabled"
+
+
+      330 |   await browse.click();
+      331 |   await expect(toast(page)).toBeVisible();
+    > 332 |   await expect(browse).toBeEnabled();
+          |                        ^
+      333 |   await expect(page.getByLabel('本地文件夹', { exact: true })).toHaveValue('');
+      334 |   expectQuiet(traffic);
+      335 | });
+        at /Users/xmon/.codex/worktrees/pr-1769-demo-delivery/cairn/apps/web/e2e/demo-mode.spec.ts:332:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-browsing-f-3e337-lable-after-the-demo-notice/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-browsing-f-3e337-lable-after-the-demo-notice/error-context.md
+
+    Error Context: ../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-browsing-f-3e337-lable-after-the-demo-notice/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-browsing-f-3e337-lable-after-the-demo-notice/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace ../../../../../../tmp/cairn-1769-demo-test-results/demo-mode-write-browsing-f-3e337-lable-after-the-demo-notice/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    apps/web/e2e/demo-mode.spec.ts:322:1 › write: browsing for a local project folder stays available after the demo notice

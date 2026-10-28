@@ -319,6 +319,21 @@ test('write: machine evacuation is blocked before backend traffic', async ({ pag
   expectQuiet(traffic);
 });
 
+test('write: browsing for a local project folder stays available after the demo notice', async ({
+  page,
+}) => {
+  const traffic = watchTraffic(page);
+  await page.goto(`${demo.base}/app/project/new`);
+  await page.locator('#prj-new-repo').click();
+  await page.getByRole('menuitemradio', { name: '本地文件夹', exact: true }).click();
+  const browse = page.getByRole('button', { name: '浏览', exact: true });
+  await browse.click();
+  await expect(toast(page)).toBeVisible();
+  await expect(browse).toBeEnabled();
+  await expect(page.getByLabel('本地文件夹', { exact: true })).toHaveValue('');
+  expectQuiet(traffic);
+});
+
 test('write: deleting the spare machine is blocked before backend traffic', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app/resources/machines/demo-machine-spare`);

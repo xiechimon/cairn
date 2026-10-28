@@ -118,3 +118,7 @@ lockfile or workspace catalog (same pattern as the site
 project, #1674), keeping the project inside the Hobby plan's daily build
 quota. Do not enable auto-deploy for all branches; the demo is a
 production-only artifact.
+
+## Local folder-picker follow-up
+
+The valid folder-picker control reproduced a disabled browse button after the demo notice (`folder-pending-red.log`). Guarding before pending state then exposed a separate hidden fallback GET (`folder-hidden-query-red.log`). The fallback now mounts only while open. `folder-green.log` records all 21 demo browser cases passing; `folder-required-green.log` records lint, typecheck and spec parsing. Existing source and capture checkpoints above retain their original commit scope.

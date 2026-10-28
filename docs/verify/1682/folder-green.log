@@ -1,0 +1,28 @@
+
+Running 21 tests using 1 worker
+
+(node:78616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 apps/web/e2e/demo-mode.spec.ts:65:1 › plain /app opens demo home and links to the board; ?scenario= is ignored (763ms)
+  ✓   2 apps/web/e2e/demo-mode.spec.ts:86:1 › banner: 演示数据 + site and showcase links, bilingual, survives navigation and a phone (408ms)
+  ✓   3 apps/web/e2e/demo-mode.spec.ts:117:1 › banner follows the locale (319ms)
+  ✓   4 apps/web/e2e/demo-mode.spec.ts:132:1 › the selling points browse end to end with no backend traffic (2.0s)
+  ✓   5 apps/web/e2e/demo-mode.spec.ts:182:1 › write: a new task is blocked with the toast, the board is unchanged (707ms)
+  ✓   6 apps/web/e2e/demo-mode.spec.ts:197:1 › write: dragging a card to another column is blocked (706ms)
+  ✓   7 apps/web/e2e/demo-mode.spec.ts:217:1 › write: sending in the detail composer is blocked (442ms)
+  ✓   8 apps/web/e2e/demo-mode.spec.ts:228:1 › write: the primary action and the delete confirm are blocked (1.0s)
+  ✓   9 apps/web/e2e/demo-mode.spec.ts:244:1 › write: completing a review task from the menu shows the demo notice (877ms)
+  ✓  10 apps/web/e2e/demo-mode.spec.ts:257:1 › a board card opens the panel and expands into its versioned detail (808ms)
+  ✓  11 apps/web/e2e/demo-mode.spec.ts:271:1 › write: sending to the chief is blocked (441ms)
+  ✓  12 apps/web/e2e/demo-mode.spec.ts:283:1 › write: sending to the chief from home is blocked (310ms)
+  ✓  13 apps/web/e2e/demo-mode.spec.ts:295:1 › write: the create dialog on the team page is blocked (592ms)
+  ✓  14 apps/web/e2e/demo-mode.spec.ts:309:1 › write: machine evacuation is blocked before backend traffic (480ms)
+  ✓  15 apps/web/e2e/demo-mode.spec.ts:322:1 › write: browsing for a local project folder stays available after the demo notice (598ms)
+  ✓  16 apps/web/e2e/demo-mode.spec.ts:337:1 › write: deleting the spare machine is blocked before backend traffic (802ms)
+  ✓  17 apps/web/e2e/demo-mode.spec.ts:351:1 › write: secret creation explains that demo changes are not saved (699ms)
+  ✓  18 apps/web/e2e/demo-mode.spec.ts:365:1 › write: provider creation explains that demo changes are not saved (746ms)
+  ✓  19 apps/web/e2e/demo-mode.spec.ts:381:1 › write: provider OAuth explains that demo changes are not saved (661ms)
+  ✓  20 apps/web/e2e/demo-mode.spec.ts:392:1 › the blocked toast is English under the en locale (663ms)
+  ✓  21 apps/web/e2e/demo-mode.spec.ts:405:1 › the production build carries no demo content and ignores demo behaviour (410ms)
+
+  21 passed (16.7s)
