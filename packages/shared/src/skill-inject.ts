@@ -311,14 +311,41 @@ function domainsOfSkill(skill: SkillInjectCandidate): Map<SkillInjectDomain, str
   return domainsOfText(text);
 }
 
+const MENTION_CUES = new Set(['use', 'with', 'skill', '/', '调用', '用']);
+
 function mentionsSkill(
+  taskText: string,
   foldedTask: { spaced: string; compact: string },
   skill: SkillInjectCandidate,
 ): string | null {
+  const hay = foldedTask.spaced.split(' ').filter((token) => token !== '');
   for (const key of [skill.id, skill.name]) {
     const normalized = fold(key);
     if (normalized.compact.length < 2) continue;
-    if (foldedTask.compact.includes(normalized.compact)) return key;
+    if (CJK_RE.test(key)) {
+      if (foldedTask.compact.includes(normalized.compact)) return key;
+      continue;
+    }
+    const keyPattern = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`(^|[^A-Za-z0-9_-])/${keyPattern}(?![A-Za-z0-9_-])`, 'i').test(taskText)) {
+      return key;
+    }
+    const needle = normalized.spaced.split(' ').filter((token) => token !== '');
+    if (needle.length === 0) continue;
+    for (let i = 0; i + needle.length <= hay.length; i++) {
+      let matches = true;
+      for (let j = 0; j < needle.length; j++) {
+        if (hay[i + j] !== needle[j]) {
+          matches = false;
+          break;
+        }
+      }
+      if (!matches) continue;
+      if (needle.length >= 2) return key;
+      const left = hay[i - 1] ?? '';
+      const right = hay[i + needle.length] ?? '';
+      if (MENTION_CUES.has(left) || MENTION_CUES.has(right)) return key;
+    }
   }
   return null;
 }
@@ -331,7 +358,7 @@ export function selectSkillsForTask(
   const taskDomains = domainsOfText(taskText);
   const hits: SkillInjectHit[] = [];
   for (const skill of candidates) {
-    const mentioned = mentionsSkill(foldedTask, skill);
+    const mentioned = mentionsSkill(taskText, foldedTask, skill);
     if (mentioned !== null) {
       hits.push({
         id: skill.id,
