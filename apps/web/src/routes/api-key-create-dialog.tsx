@@ -13,6 +13,7 @@ export interface ApiKeyCreateBody {
   name: string | null;
   gitAccess: boolean;
   mcpAccess: boolean;
+  machineAccess: boolean;
   toolGrants: { read: string[]; write: string[] };
 }
 
@@ -27,6 +28,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
   const [name, setName] = useState('');
   const [gitAccess, setGitAccess] = useState(false);
   const [mcpAccess, setMcpAccess] = useState(false);
+  const [machineAccess, setMachineAccess] = useState(true);
   const [read, setRead] = useState<Set<string>>(new Set());
   const [write, setWrite] = useState<Set<string>>(new Set());
 
@@ -41,18 +43,21 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
     setWrite(new Set(TOOL_NAMES));
     setGitAccess(true);
     setMcpAccess(true);
+    setMachineAccess(true);
   };
   const clearAll = () => {
     setRead(new Set());
     setWrite(new Set());
     setGitAccess(false);
     setMcpAccess(false);
+    setMachineAccess(false);
   };
   const submit = () => {
     onCreate({
       name: name.trim() === '' ? null : name.trim(),
       gitAccess,
       mcpAccess,
+      machineAccess,
       toolGrants: { read: [...read], write: [...write] },
     });
     onClose();
@@ -100,6 +105,15 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
               aria-label={t('MCP 访问（MCP 客户端接入）')}
             />
             {t('MCP 访问（MCP 客户端接入）')}
+          </label>
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
+          <label className="inline-flex cursor-pointer items-center gap-2 text-ui text-content-secondary">
+            <Checkbox
+              checked={machineAccess}
+              onCheckedChange={setMachineAccess}
+              aria-label={t('机器注册（CLI 接入执行机）')}
+            />
+            {t('机器注册（CLI 接入执行机）')}
           </label>
         </div>
         <div className="flex items-baseline justify-between">

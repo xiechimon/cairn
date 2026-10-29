@@ -788,5 +788,10 @@
     "path": "integration/vitest.config.ts",
     "line": "    // vite build empties apps/web/dist first, so files that each run it must not run in parallel (#349).",
     "reason": "external quirk: vite build empties its outDir before writing, so parallel builds into one dist clobber each other"
+  },
+  {
+    "path": "apps/web/src/routes/api-key-create-dialog.tsx",
+    "line": "          {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}",
+    "reason": "external quirk: biome a11y false positive on Base UI Checkbox inside label; same ignore already used for gitAccess and mcpAccess rows in this file"
   }
 ]

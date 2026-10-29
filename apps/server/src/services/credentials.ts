@@ -28,6 +28,7 @@ export function issueStepGitCredential(
     name: stepGitKeyName(input.stepId),
     gitAccess: true,
     mcpAccess: false,
+    machineAccess: false,
     toolGrants: { read: [], write: [] },
   });
   return { username: 'git', password: issued.plaintext };

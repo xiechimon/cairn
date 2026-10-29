@@ -185,6 +185,7 @@ export interface ApiKeyRecord {
   masked: string;
   gitAccess: boolean;
   mcpAccess: boolean;
+  machineAccess: boolean;
   plaintext?: string;
 }
 

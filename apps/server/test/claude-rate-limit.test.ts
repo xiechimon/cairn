@@ -32,7 +32,13 @@ async function call(
 
 async function issueKey(s: ReturnType<typeof bootServer>, name: string): Promise<string> {
   const res = await call(s.app, 'POST', `/api/teams/${s.team.id}/api-keys`, {
-    body: { name, gitAccess: false, mcpAccess: false, toolGrants: { read: [], write: [] } },
+    body: {
+      name,
+      gitAccess: false,
+      mcpAccess: false,
+      machineAccess: true,
+      toolGrants: { read: [], write: [] },
+    },
   });
   expect(res.status === 200 || res.status === 201).toBe(true);
   const body = (await res.json()) as { plaintext?: string; apiKey?: string; key?: string };
