@@ -46,6 +46,7 @@ const stalenessStep = [
   '',
   '',
   '      - name: Feature map staleness gate (#1160)',
+  `        if: \${{ !cancelled() }}`,
   '        run: node scripts/feature-map-staleness-gate.mjs',
 ].join('\n');
 
@@ -53,6 +54,7 @@ const labelStep = [
   '',
   '',
   '      - name: Issue label gate',
+  `        if: \${{ !cancelled() }}`,
   '        env:',
   `          GH_TOKEN: \${{ github.token }}`,
   '        run: node scripts/issue-label-gate.mjs',
@@ -65,58 +67,51 @@ test('committed ci.yml matches the pinned job structure', () => {
 });
 
 test('PR #1540 misplaced freshness step goes red', () => {
-  const result = runGate(
-    mutateWorkflow('comment-discipline-gate', (chunk) => chunk + freshnessStep),
-  );
+  const result = runGate(mutateWorkflow('check', (chunk) => chunk + freshnessStep));
   assert.equal(result.status, 1);
   assert.match(
     result.stdout,
-    /step "Feature map doc freshness check \(#1527\)" in job "comment-discipline-gate" is not in the baseline/,
+    /step "Feature map doc freshness check \(#1527\)" in job "check" is not in the baseline/,
   );
 });
 
 test('a pinned step relocated to another job names both jobs', () => {
   const result = runGate(
     mutateWorkflow(
-      'issue-label-gate',
+      'check',
       (chunk) => chunk + stalenessStep,
-      mutateWorkflow('feature-map-gate', (chunk) => chunk.slice(0, -stalenessStep.length)),
+      mutateWorkflow('gates', (chunk) => chunk.replace(stalenessStep, '')),
     ),
   );
   assert.equal(result.status, 1);
   assert.match(
     result.stdout,
-    /step "Feature map staleness gate \(#1160\)" is in job "issue-label-gate" but the baseline pins it to job "feature-map-gate"/,
+    /step "Feature map staleness gate \(#1160\)" is in job "check" but the baseline pins it to job "gates"/,
   );
 });
 
 test('a pinned step deleted from ci.yml goes red', () => {
-  const result = runGate(
-    mutateWorkflow('feature-map-gate', (chunk) => chunk.slice(0, -stalenessStep.length)),
-  );
+  const result = runGate(mutateWorkflow('gates', (chunk) => chunk.replace(stalenessStep, '')));
   assert.equal(result.status, 1);
   assert.match(
     result.stdout,
-    /baseline expects step "Feature map staleness gate \(#1160\)" in job "feature-map-gate" but the job has no such step/,
+    /baseline expects step "Feature map staleness gate \(#1160\)" in job "gates" but the job has no such step/,
   );
 });
 
 test('a step copied into another job while its pinned job keeps it goes red', () => {
-  const result = runGate(mutateWorkflow('issue-label-gate', (chunk) => chunk + stalenessStep));
+  const result = runGate(mutateWorkflow('check', (chunk) => chunk + stalenessStep));
   assert.equal(result.status, 1);
   assert.match(
     result.stdout,
-    /step "Feature map staleness gate \(#1160\)" in job "issue-label-gate" duplicates the step pinned to job "feature-map-gate"/,
+    /step "Feature map staleness gate \(#1160\)" in job "check" duplicates the step pinned to job "gates"/,
   );
 });
 
 test('a step pasted twice into one job goes red', () => {
-  const result = runGate(mutateWorkflow('issue-label-gate', (chunk) => chunk + labelStep));
+  const result = runGate(mutateWorkflow('gates', (chunk) => chunk + labelStep));
   assert.equal(result.status, 1);
-  assert.match(
-    result.stdout,
-    /job "issue-label-gate" lists step "Issue label gate" more than once/,
-  );
+  assert.match(result.stdout, /job "gates" lists step "Issue label gate" more than once/);
 });
 
 test('a job absent from the baseline goes red', () => {
@@ -134,9 +129,9 @@ test('a job absent from the baseline goes red', () => {
 });
 
 test('a baseline job gone from ci.yml goes red', () => {
-  const result = runGate(mutateWorkflow('closing-keyword-gate', () => ''));
+  const result = runGate(mutateWorkflow('gates', () => ''));
   assert.equal(result.status, 1);
-  assert.match(result.stdout, /baseline job "closing-keyword-gate" is gone from the workflow/);
+  assert.match(result.stdout, /baseline job "gates" is gone from the workflow/);
 });
 
 test('site deployment applies the project root directory exactly once', () => {

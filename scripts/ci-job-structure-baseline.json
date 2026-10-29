@@ -1,5 +1,7 @@
 {
-  "check": [
+  "changes": ["Classify changes"],
+  "check": ["Aggregate check parts"],
+  "check-core": [
     "Conflict markers",
     "Lane file gate (#1199)",
     "Test spawn gate",
@@ -13,13 +15,16 @@
     "PR evidence regression tests",
     "Prepush self-test",
     "verify-cairn CLI self-test (#1402)",
-    "Install Playwright chromium",
     "Drizzle snapshot chain guard",
     "Drizzle migration drift check",
-    "Test (vitest, light project)",
-    "Test (vitest, integration stack)",
     "pr-gate self-check (#1401)",
     "Lint warning cap gate (#1192)"
+  ],
+  "vitest-light": ["Install dependencies", "Test (vitest, light project)"],
+  "vitest-integration": [
+    "Install dependencies",
+    "Install Playwright chromium",
+    "Test (vitest, integration stack)"
   ],
   "e2e": [
     "Install dependencies",
@@ -30,15 +35,17 @@
   "e2e-gate": ["Aggregate e2e shards"],
   "pack-smoke": ["Install dependencies", "Pack smoke (main package tarball, bare node)"],
   "dead-class-gate": ["Install dependencies", "Dead class gate (#1036)"],
-  "issue-label-gate": ["Issue label gate"],
-  "feature-map-gate": ["Feature map staleness gate (#1160)"],
-  "comment-discipline-gate": ["Comment discipline gate (advisory, #1520)"],
-  "probe-reach-gate": ["Probe reach gate (advisory, #1542)"],
-  "single-use-helper-gate": ["Single-use helper gate (advisory, #1543)"],
-  "npm-command-gate": ["Package names in install commands exist on npm"],
-  "dispatch-agent-test": ["Dispatch agent start/check round trip (#1556)"],
-  "closing-keyword-gate": ["Closing keyword gate (advisory, #1541)"],
-  "baseline-ratchet-gate": ["Baseline ratchet gate and gardener sweep self-test (#1617)"],
-  "funding-yml-gate": ["Funding links gate (#2002)"],
+  "gates": [
+    "Issue label gate",
+    "Feature map staleness gate (#1160)",
+    "Comment discipline gate (advisory, #1520)",
+    "Probe reach gate (advisory, #1542)",
+    "Single-use helper gate (advisory, #1543)",
+    "Package names in install commands exist on npm",
+    "Funding links gate (#2002)",
+    "Dispatch agent start/check round trip (#1556)",
+    "Closing keyword gate (advisory, #1541)",
+    "Baseline ratchet gate and gardener sweep self-test (#1617)"
+  ],
   "ops-backup-test": ["Server backup script against an rrsync receiver (#2163)"]
 }
