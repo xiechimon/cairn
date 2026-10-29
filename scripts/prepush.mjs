@@ -22,6 +22,8 @@ export const ciOnlyScripts = {
   'scripts/feature-map-staleness-gate.mjs': 'advisory job that never blocks a merge',
   'scripts/npm-command-gate.mjs': 'verifies package names against the npm registry (network)',
   'scripts/check-closing-keyword.mjs': 'reads the PR event payload (GITHUB_EVENT_PATH)',
+  'scripts/baseline-owner-gate.mjs':
+    'reads the PR event payload and issue labels through the GitHub token',
 };
 
 export const selfTests = [
