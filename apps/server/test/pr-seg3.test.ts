@@ -1,6 +1,6 @@
 import { conversationBranch, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   message as messageTable,
@@ -18,6 +18,16 @@ import {
 } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, type TestServer } from './helpers.js';
+
+const globalFetch = vi.fn(() => Promise.reject(new Error('Unexpected global fetch')));
+beforeEach(() => {
+  globalFetch.mockClear();
+  vi.stubGlobal('fetch', globalFetch);
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  expect(globalFetch).not.toHaveBeenCalled();
+});
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -50,6 +60,7 @@ function reply(status: number, body: unknown, etag = '"e"', extra: Record<string
 }
 
 class Fake {
+  readonly gateFetch = vi.fn<FetchLike>((input, init) => this.respond(input, init));
   requests: string[] = [];
   headSha = HEAD;
   mergeableState: string | null = 'clean';
@@ -70,9 +81,13 @@ class Fake {
 
   reads = (part: string) => this.requests.filter((u) => u.includes(part));
 
-  readonly fetch: FetchLike = async (input, init) => {
+  readonly fetch: FetchLike = (input, init) => {
+    this.requests.push(String(input));
+    return this.respond(input, init);
+  };
+
+  private readonly respond: FetchLike = async (input, init) => {
     const url = String(input);
-    this.requests.push(url);
     if (/\/pulls\/\d+$/.test(url)) {
       this.onPull?.();
       if (this.pullStatus === 'throw') throw new TypeError('fetch failed');
@@ -265,16 +280,13 @@ function makeWorld(
     );
   }
   fake.branch = conversationBranch(buildId);
-  const deps: BuildDeps = { ...s.svc, box: s.secretBox, githubFetch: fake.fetch };
-  const poller = createCiPoller(
-    { ...s.svc, box: s.secretBox },
-    {
-      githubFetch: fake.fetch,
-      ...(opts.anonIpReadsPerHour !== undefined
-        ? { anonIpReadsPerHour: opts.anonIpReadsPerHour }
-        : {}),
-    },
-  );
+  const deps: BuildDeps = { ...s.svc, box: s.secretBox, githubFetch: fake.gateFetch };
+  const poller = createCiPoller(deps, {
+    githubFetch: fake.fetch,
+    ...(opts.anonIpReadsPerHour !== undefined
+      ? { anonIpReadsPerHour: opts.anonIpReadsPerHour }
+      : {}),
+  });
   return {
     s,
     fake,
@@ -346,6 +358,10 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
       const hints = w.systemRows().filter((c) => c.includes('「check」'));
       expect(hints).toHaveLength(1);
       expect(hints[0]).toContain(conclusion);
+      expect(w.fake.gateFetch).toHaveBeenCalledWith(
+        'https://api.github.com/repos/octo/demo/pulls/201',
+        expect.anything(),
+      );
     },
   );
 

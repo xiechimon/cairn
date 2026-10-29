@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { conversationBranch, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   message as messageTable,
@@ -23,6 +23,16 @@ import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { updateTodo } from '../src/services/todos.js';
 import { bootServer, type TestServer } from './helpers.js';
+
+const globalFetch = vi.fn(() => Promise.reject(new Error('Unexpected global fetch')));
+beforeEach(() => {
+  globalFetch.mockClear();
+  vi.stubGlobal('fetch', globalFetch);
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  expect(globalFetch).not.toHaveBeenCalled();
+});
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -82,6 +92,9 @@ interface BranchPullSpec {
 }
 
 class PullsMock {
+  readonly gateFetch = vi.fn((input: string | URL, init?: { headers?: Record<string, string> }) =>
+    this.respond(input, init),
+  );
   requests: string[] = [];
   headers: Record<string, string>[] = [];
   throwNext = false;
@@ -102,14 +115,21 @@ class PullsMock {
     input: string | URL,
     init?: { headers?: Record<string, string> },
   ): Promise<ReturnType<typeof res>> => {
+    this.requests.push(String(input));
+    this.headers.push({ ...(init?.headers ?? {}) });
+    return this.respond(input, init);
+  };
+
+  private readonly respond = (
+    input: string | URL,
+    init?: { headers?: Record<string, string> },
+  ): Promise<ReturnType<typeof res>> => {
     if (this.delayMs > 0) {
       const wait = this.delayMs;
       this.delayMs = 0;
-      return new Promise<void>((r) => setTimeout(r, wait)).then(() => this.fetch(input, init));
+      return new Promise<void>((r) => setTimeout(r, wait)).then(() => this.respond(input, init));
     }
     const url = String(input);
-    this.requests.push(url);
-    this.headers.push({ ...(init?.headers ?? {}) });
     if (this.throwNext) {
       this.throwNext = false;
       return Promise.reject(new TypeError('fetch failed'));
@@ -396,7 +416,10 @@ function pollerFor(
   mock: PullsMock,
   opts: { anonReadsPerHour?: number; anonIpReadsPerHour?: number } = {},
 ) {
-  return createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch: mock.fetch, ...opts });
+  return createCiPoller(
+    { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
+    { githubFetch: mock.fetch, ...opts },
+  );
 }
 
 async function sweepTwice(poller: ReturnType<typeof pollerFor>, t0 = Date.now()): Promise<void> {
@@ -453,6 +476,18 @@ function addReviewCard(w: World, prNumber: number): void {
 }
 
 describe('#1403 PR reconcile for review-phase builds', () => {
+  test('authenticated sweeps keep merge-gate reads on the injected transport', async () => {
+    const w = makeWorld({ connected: true });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'open', merged: false } });
+    await pollerFor(w, mock).sweep();
+    expect(mock.gateFetch).toHaveBeenCalledWith(
+      `https://api.github.com/repos/octo/demo/pulls/${w.prNumber}`,
+      expect.anything(),
+    );
+    expect(mock.requests.filter((url) => url.endsWith(`/pulls/${w.prNumber}`))).toHaveLength(1);
+    expect(w.todoRow().phase).toBe('review');
+  });
+
   test('① merged on GitHub → todo done, merge sha in a system row, celebration row', async () => {
     const w = makeWorld();
     const mock = new PullsMock({
@@ -510,7 +545,10 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, w.todoId)).run();
       return mock.fetch(input);
     };
-    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch: racing }).sweep();
+    await createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox, githubFetch: racing },
+      { githubFetch: racing },
+    ).sweep();
     expect(w.todoRow().phase).toBe('closed');
     expect(w.systemRows()).toEqual([]);
   });
@@ -589,7 +627,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     });
     const info = vi.fn();
     const poller = createCiPoller(
-      { ...w.s.svc, box: w.s.secretBox },
+      { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
       { githubFetch: mock.fetch, logger: { info } },
     );
     await poller.sweep();
@@ -790,7 +828,10 @@ describe('#1403 PR reconcile for review-phase builds', () => {
         .run();
       return mock.fetch(input, init);
     };
-    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch: racing }).sweep();
+    await createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox, githubFetch: racing },
+      { githubFetch: racing },
+    ).sweep();
     expect(w.todoRow().phase).toBe('review');
     expect(w.systemRows()).toEqual([]);
   });
@@ -1119,7 +1160,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true, ...missing } });
       const info = vi.fn();
       await createCiPoller(
-        { ...w.s.svc, box: w.s.secretBox },
+        { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
         { githubFetch: mock.fetch, logger: { info } },
       ).sweep();
       expect(w.todoRow().phase).toBe('review');
@@ -1152,7 +1193,10 @@ describe('#1403 PR reconcile for review-phase builds', () => {
         return mock.fetch(input, init);
       };
       if (at === 'compare') mock.onCompare = startMerge;
-      await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch: racing }).sweep();
+      await createCiPoller(
+        { ...w.s.svc, box: w.s.secretBox, githubFetch: racing },
+        { githubFetch: racing },
+      ).sweep();
       expect(w.todoRow().phase).toBe('review');
       expect(w.systemRows()).toEqual([]);
     },
@@ -1576,7 +1620,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     const mock = new PullsMock({ [w.prNumber]: { state: 'open', merged: false } });
     const info = vi.fn();
     await createCiPoller(
-      { ...w.s.svc, box: w.s.secretBox },
+      { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
       { githubFetch: mock.fetch, logger: { info } },
     ).sweep();
     const tally = info.mock.calls.at(-1)?.[0] as Record<string, number>;
@@ -1611,7 +1655,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     const fetch = mock.fetch;
     let slow = true;
     const timed = createCiPoller(
-      { ...w.s.svc, box: w.s.secretBox },
+      { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
       {
         githubFetch: (input, init) => {
           if (slow) {
@@ -1737,7 +1781,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       });
       const info = vi.fn();
       const poller = createCiPoller(
-        { ...w.s.svc, box: w.s.secretBox },
+        { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
         { githubFetch: mock.fetch, logger: { info } },
       );
       await sweepTwice(poller);
@@ -1790,7 +1834,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged, headRepo: null } });
       const info = vi.fn();
       const poller = createCiPoller(
-        { ...w.s.svc, box: w.s.secretBox },
+        { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
         { githubFetch: mock.fetch, logger: { info } },
       );
       await poller.sweep();
@@ -1809,7 +1853,10 @@ describe('#1403 PR reconcile for review-phase builds', () => {
         expect(reads).toHaveLength(1);
       } else {
         expect(reads).toHaveLength(2);
-        expect(mock.headers.at(-1)?.['if-none-match']).toBe('"x"');
+        const pullHeaders = mock.headers.filter((_, index) =>
+          mock.requests[index]?.endsWith(`/pulls/${w.prNumber}`),
+        );
+        expect(pullHeaders[1]?.['if-none-match']).toBe('"x"');
       }
     },
   );
@@ -1955,7 +2002,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
           .run();
       let raceNext = false;
       const poller = createCiPoller(
-        { ...w.s.svc, box: w.s.secretBox },
+        { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
         {
           githubFetch: (input, init) => {
             if (raceNext) {
@@ -2064,7 +2111,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     });
     const info = vi.fn();
     const poller = createCiPoller(
-      { ...w.s.svc, box: w.s.secretBox },
+      { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
       { githubFetch: mock.fetch, logger: { info } },
     );
     const buckets = [
@@ -2105,7 +2152,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     });
     const info = vi.fn();
     const poller = createCiPoller(
-      { ...w.s.svc, box: w.s.secretBox },
+      { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
       { githubFetch: mock.fetch, logger: { info } },
     );
     const tallyOf = () => info.mock.calls.at(-1)?.[0] as Record<string, number>;
@@ -2153,7 +2200,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       const mock = new PullsMock({ [w.prNumber]: spec });
       const info = vi.fn();
       const poller = createCiPoller(
-        { ...w.s.svc, box: w.s.secretBox },
+        { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
         { githubFetch: mock.fetch, logger: { info } },
       );
       const t0 = Date.now();
@@ -2292,7 +2339,7 @@ describe('#1403 segment 2: the PR the build tracks', () => {
     const info = vi.fn();
     const published = vi.spyOn(w.s.hub, 'publishBuildDoc');
     const poller = createCiPoller(
-      { ...w.s.svc, box: w.s.secretBox },
+      { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
       { githubFetch: mock.fetch, logger: { info } },
     );
     const t0 = Date.now();
@@ -2503,7 +2550,7 @@ describe('#1403 segment 2: the PR the build tracks', () => {
     mock.branchPulls = [{ number: 305 }];
     const info = vi.fn();
     const poller = createCiPoller(
-      { ...w.s.svc, box: w.s.secretBox },
+      { ...w.s.svc, box: w.s.secretBox, githubFetch: mock.gateFetch },
       { githubFetch: mock.fetch, logger: { info } },
     );
     await poller.sweep();
