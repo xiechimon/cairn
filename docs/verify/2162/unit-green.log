@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/suspicious-mirzakhani-83ad00
+
+
+ Test Files  5 passed (5)
+      Tests  34 passed (34)
+   Start at  23:08:00
+   Duration  1.67s (transform 52%, import 33%, tests 14%, worker 1%)
+

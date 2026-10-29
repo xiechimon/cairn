@@ -1,0 +1,10 @@
+=== failing (systemd-run exit 255)
+{"host":"omarchy","lastRunAt":1793286776000,"lastRunResult":"exit-code","lastRunExitStatus":"255","lastSuccessAt":null}
+=== stale (systemd-run exit 0)
+{"host":"omarchy","lastRunAt":1793268716000,"lastRunResult":"success","lastRunExitStatus":"0","lastSuccessAt":1793268716000}
+=== fresh (systemd-run exit 0)
+{"host":"omarchy","lastRunAt":1793286776000,"lastRunResult":"success","lastRunExitStatus":"0","lastSuccessAt":1793286776000}
+=== failing-after-success: success run (exit 0)
+{"host":"omarchy","lastRunAt":1793286790000,"lastRunResult":"success","lastRunExitStatus":"0","lastSuccessAt":1793286790000}
+=== failing-after-success: failed run (exit 255)
+{"host":"omarchy","lastRunAt":1793286790000,"lastRunResult":"exit-code","lastRunExitStatus":"255","lastSuccessAt":1793286790000}
