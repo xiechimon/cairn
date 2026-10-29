@@ -18,7 +18,12 @@ export const SCHEDULE_PER_PAGE = 100;
 export const SCHEDULE_MERGED_PULL_LIMIT = 100;
 export const SCHEDULE_MERGED_PULL_PAGES = Math.ceil(SCHEDULE_MERGED_PULL_LIMIT / SCHEDULE_PER_PAGE);
 export const SCHEDULE_OPEN_ISSUE_PAGES = 20;
-export const SCHEDULE_LEDGER_PATHS = ['docs/spec/README.md', 'README.md'];
+export const SCHEDULE_LEDGER_PATHS = [
+  'docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md',
+  'docs/spec/28-自举闭环-自写自合.md',
+  'docs/spec/README.md',
+  'README.md',
+];
 
 export type CollectFailure = GithubListFailure | { kind: 'budget' };
 
