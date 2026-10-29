@@ -80,9 +80,15 @@ jobs:
         run: node scripts/pr-evidence-workflow-gate.mjs
 
       - name: CI job structure gate (#1557)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           node --test scripts/ci-job-structure-gate.test.mjs
           node scripts/ci-job-structure-gate.mjs
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node --test scripts/baseline-owner-gate.test.mjs
+            node scripts/baseline-owner-gate.mjs
+          fi
 
       # components/ui registry gate (#989, map #980): allowlist + content-hash ledger +
       # pristine files vs vendored upstream snapshot + state ratchet (S5 vs base manifest,
@@ -431,20 +437,3 @@ jobs:
           git fetch --depth=1 origin "$BASELINE_RATCHET_BASE_SHA"
           node --test scripts/baseline-ratchet-gate.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
           node scripts/baseline-ratchet-gate.mjs
-
-  baseline-owner-gate:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: read
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          fetch-depth: 0
-      - name: Baseline owner gate (#2005)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          node --test scripts/baseline-owner-gate.test.mjs
-          node scripts/baseline-owner-gate.mjs

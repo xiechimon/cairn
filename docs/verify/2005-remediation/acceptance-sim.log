@@ -1,0 +1,4 @@
+this-pr []
+watch false [ 'scripts/lint-warning-baseline.json' ]
+only false [ 'scripts/lint-warning-baseline.json' ]
+curated true []

@@ -1,0 +1,142 @@
+TAP version 13
+# Subtest: rejects unowned changes to scripts/prepush-known-red.json
+ok 1 - rejects unowned changes to scripts/prepush-known-red.json
+  ---
+  duration_ms: 1.215905
+  type: 'test'
+  ...
+# Subtest: accepts curated gardener main-red ownership of scripts/prepush-known-red.json
+ok 2 - accepts curated gardener main-red ownership of scripts/prepush-known-red.json
+  ---
+  duration_ms: 0.195109
+  type: 'test'
+  ...
+# Subtest: rejects unowned changes to scripts/lint-warning-baseline.json
+ok 3 - rejects unowned changes to scripts/lint-warning-baseline.json
+  ---
+  duration_ms: 0.10372
+  type: 'test'
+  ...
+# Subtest: accepts curated gardener main-red ownership of scripts/lint-warning-baseline.json
+ok 4 - accepts curated gardener main-red ownership of scripts/lint-warning-baseline.json
+  ---
+  duration_ms: 0.101359
+  type: 'test'
+  ...
+# Subtest: rejects unowned changes to scripts/comment-discipline-allowlist.json
+ok 5 - rejects unowned changes to scripts/comment-discipline-allowlist.json
+  ---
+  duration_ms: 0.070147
+  type: 'test'
+  ...
+# Subtest: accepts curated gardener main-red ownership of scripts/comment-discipline-allowlist.json
+ok 6 - accepts curated gardener main-red ownership of scripts/comment-discipline-allowlist.json
+  ---
+  duration_ms: 0.066006
+  type: 'test'
+  ...
+# Subtest: rejects unowned changes to scripts/single-use-helper-allowlist.json
+ok 7 - rejects unowned changes to scripts/single-use-helper-allowlist.json
+  ---
+  duration_ms: 0.059089
+  type: 'test'
+  ...
+# Subtest: accepts curated gardener main-red ownership of scripts/single-use-helper-allowlist.json
+ok 8 - accepts curated gardener main-red ownership of scripts/single-use-helper-allowlist.json
+  ---
+  duration_ms: 0.053432
+  type: 'test'
+  ...
+# Subtest: rejects unowned changes to scripts/ui-debt-baseline.json
+ok 9 - rejects unowned changes to scripts/ui-debt-baseline.json
+  ---
+  duration_ms: 0.219679
+  type: 'test'
+  ...
+# Subtest: accepts curated gardener main-red ownership of scripts/ui-debt-baseline.json
+ok 10 - accepts curated gardener main-red ownership of scripts/ui-debt-baseline.json
+  ---
+  duration_ms: 0.230489
+  type: 'test'
+  ...
+# Subtest: rejects unowned changes to scripts/feature-map-staleness-baseline.json
+ok 11 - rejects unowned changes to scripts/feature-map-staleness-baseline.json
+  ---
+  duration_ms: 0.096435
+  type: 'test'
+  ...
+# Subtest: accepts curated gardener main-red ownership of scripts/feature-map-staleness-baseline.json
+ok 12 - accepts curated gardener main-red ownership of scripts/feature-map-staleness-baseline.json
+  ---
+  duration_ms: 0.057903
+  type: 'test'
+  ...
+# Subtest: ordinary files need no issue ownership
+ok 13 - ordinary files need no issue ownership
+  ---
+  duration_ms: 0.066857
+  type: 'test'
+  ...
+# Subtest: filename patterns match new baseline and allowlist files without a ledger entry
+ok 14 - filename patterns match new baseline and allowlist files without a ledger entry
+  ---
+  duration_ms: 0.087261
+  type: 'test'
+  ...
+# Subtest: the CI job structure pin is not a debt baseline
+ok 15 - the CI job structure pin is not a debt baseline
+  ---
+  duration_ms: 0.059511
+  type: 'test'
+  ...
+# Subtest: registering a CI structure pin change needs no main-red ownership
+ok 16 - registering a CI structure pin change needs no main-red ownership
+  ---
+  duration_ms: 0.041309
+  type: 'test'
+  ...
+# Subtest: protected changes require at least one closing issue
+ok 17 - protected changes require at least one closing issue
+  ---
+  duration_ms: 0.819547
+  type: 'test'
+  ...
+# Subtest: every closing issue must carry curated gardener main-red ownership
+ok 18 - every closing issue must carry curated gardener main-red ownership
+  ---
+  duration_ms: 0.196342
+  type: 'test'
+  ...
+# Subtest: raw main-watch alerts do not authorize baseline edits
+ok 19 - raw main-watch alerts do not authorize baseline edits
+  ---
+  duration_ms: 0.083282
+  type: 'test'
+  ...
+# Subtest: main-red alone is not curated ownership
+ok 20 - main-red alone is not curated ownership
+  ---
+  duration_ms: 0.049171
+  type: 'test'
+  ...
+# Subtest: curated ownership needs gardener batch and by labels plus a non-alert title
+ok 21 - curated ownership needs gardener batch and by labels plus a non-alert title
+  ---
+  duration_ms: 0.043108
+  type: 'test'
+  ...
+# Subtest: collects distinct closing issue lines including comma-separated declarations
+ok 22 - collects distinct closing issue lines including comma-separated declarations
+  ---
+  duration_ms: 0.26977
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 57.700968
