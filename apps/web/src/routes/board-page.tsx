@@ -15,7 +15,7 @@ import {
   useTeams,
   useTodos,
 } from '../api/hooks.js';
-import { mapBranchInfo, toDisplayTodo } from '../api/mappers.js';
+import { mapBranchInfo, mapMachines, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import { type BoardFilters, BoardSurface } from '../board/board.js';
@@ -555,21 +555,39 @@ export function BoardPage() {
   const branchBuildId = overlayTodo?.latestBuildId ?? null;
   const branchQueryId = branchOpen ? branchBuildId : null;
   const branchStepsQ = useSteps(branchQueryId, live && branchQueryId != null);
-  const branchMachinesQ = useMachines(teamId, live && branchOpen);
+  const machinesQ = useMachines(teamId, live);
   const branchInfo =
     overlayTodo == null
       ? null
       : live
         ? branchBuildId != null
-          ? mapBranchInfo(branchBuildId, branchStepsQ.data ?? [], branchMachinesQ.data ?? [])
+          ? mapBranchInfo(branchBuildId, branchStepsQ.data ?? [], machinesQ.data ?? [])
           : null
         : (overlayContent(overlayTodo.id)?.branch ?? null);
   const projectNames = useMemo(() => {
     if (!live) return undefined;
     return Object.fromEntries((projectsQ.data ?? []).map((p) => [p.id, p.name]));
   }, [live, projectsQ.data]);
+  const liveMachines = useMemo(
+    () => (live ? mapMachines(machinesQ.data ?? []) : undefined),
+    [live, machinesQ.data],
+  );
   const fixtureWithTodos: FixtureSet = live
-    ? { ...fixture, todos, now: Date.now(), ...(projectNames ? { projectNames } : {}) }
+    ? {
+        ...fixture,
+        todos,
+        now: Date.now(),
+        ...(projectNames ? { projectNames } : {}),
+        resources: {
+          skills: fixture.resources?.skills ?? [],
+          mcpServers: fixture.resources?.mcpServers ?? [],
+          machines: liveMachines ?? [],
+          providerSources: fixture.resources?.providerSources ?? [],
+          ...(fixture.resources?.providers ? { providers: fixture.resources.providers } : {}),
+          ...(fixture.resources?.memories ? { memories: fixture.resources.memories } : {}),
+          ...(fixture.resources?.secrets ? { secrets: fixture.resources.secrets } : {}),
+        },
+      }
     : { ...fixture, todos };
   const quotaInfos = quotaBannerInfo(todos);
   const todoGlances = useMemo(
