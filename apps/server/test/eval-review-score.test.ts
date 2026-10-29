@@ -17,12 +17,6 @@ afterEach(() => {
   for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-function tempDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'eval-review-score-'));
-  temps.push(dir);
-  return dir;
-}
-
 function packRecord(
   itemId: string,
   buildId: string,
@@ -179,7 +173,8 @@ test('conflicting repeated labels for the same item identity across weeks are re
 });
 
 test('labeler-trust.json shape uses Wilson lower bound, not the raw point estimate', () => {
-  const dir = tempDir();
+  const dir = mkdtempSync(join(tmpdir(), 'eval-review-score-'));
+  temps.push(dir);
   const path = join(dir, 'labeler-trust.json');
   const reader = { model: 'gpt-5', vendor: 'openai' };
   const records = Array.from({ length: 30 }, (_, i) =>

@@ -109,59 +109,43 @@ export function cohenKappa(pairs: Array<[string, string]>): DimensionScore {
   };
 }
 
-function itemIdentity(record: ReviewLabelRecord): string {
-  if (record.source === 'pack') {
-    if (!record.buildId) throw new Error(`Pack record missing buildId: ${record.itemId}`);
-    return `pack:${record.buildId}`;
-  }
-  return `eval:${record.itemId}`;
-}
-
-function handFingerprint(record: ReviewLabelRecord): string {
-  return JSON.stringify({
-    verdictClass: record.verdictClass,
-    where: record.where ?? null,
-    why: record.why ?? null,
-  });
-}
-
-function parseLabelRecord(value: unknown, path: string): ReviewLabelRecord {
-  if (typeof value !== 'object' || value === null) {
-    throw new Error(`Invalid label record in ${path}`);
-  }
-  const record = value as ReviewLabelRecord;
-  if (typeof record.itemId !== 'string' || record.itemId.length === 0) {
-    throw new Error(`Label record missing itemId in ${path}`);
-  }
-  if (record.source !== 'eval' && record.source !== 'pack') {
-    throw new Error(`Label record ${record.itemId} has invalid source`);
-  }
-  if (
-    record.verdictClass !== 'agent-mistake' &&
-    record.verdictClass !== 'grader-bug' &&
-    record.verdictClass !== 'unfair-task'
-  ) {
-    throw new Error(`Label record ${record.itemId} has invalid verdictClass`);
-  }
-  if (
-    typeof record.reader !== 'object' ||
-    record.reader === null ||
-    typeof record.reader.model !== 'string' ||
-    typeof record.reader.vendor !== 'string'
-  ) {
-    throw new Error(`Label record ${record.itemId} missing reader`);
-  }
-  if (typeof record.note !== 'string') {
-    throw new Error(`Label record ${record.itemId} missing note`);
-  }
-  return record;
-}
-
 export function readLabelRecords(path: string): ReviewLabelRecord[] {
   return readFileSync(path, 'utf8')
     .split('\n')
     .filter((line) => line.trim() !== '')
-    .map((line, index) => parseLabelRecord(JSON.parse(line), `${path}:${index + 1}`));
+    .map((line, index) => {
+      const loc = `${path}:${index + 1}`;
+      const value: unknown = JSON.parse(line);
+      if (typeof value !== 'object' || value === null) {
+        throw new Error(`Invalid label record in ${loc}`);
+      }
+      const record = value as ReviewLabelRecord;
+      if (typeof record.itemId !== 'string' || record.itemId.length === 0) {
+        throw new Error(`Label record missing itemId in ${loc}`);
+      }
+      if (record.source !== 'eval' && record.source !== 'pack') {
+        throw new Error(`Label record ${record.itemId} has invalid source`);
+      }
+      if (
+        record.verdictClass !== 'agent-mistake' &&
+        record.verdictClass !== 'grader-bug' &&
+        record.verdictClass !== 'unfair-task'
+      ) {
+        throw new Error(`Label record ${record.itemId} has invalid verdictClass`);
+      }
+      if (
+        typeof record.reader !== 'object' ||
+        record.reader === null ||
+        typeof record.reader.model !== 'string' ||
+        typeof record.reader.vendor !== 'string'
+      ) {
+        throw new Error(`Label record ${record.itemId} missing reader`);
+      }
+      if (typeof record.note !== 'string') {
+        throw new Error(`Label record ${record.itemId} missing note`);
+      }
+      return record;
+    });
 }
 
 export function readAnswersFile(path: string): AnswersFile {
@@ -189,8 +173,16 @@ export function scoreReviewWeeks(weeks: WeekInput[]): ReviewScore {
           `reader vendor equals the labeler vendor (${labeler}) for ${record.itemId}`,
         );
       }
-      const identity = itemIdentity(record);
-      const fingerprint = handFingerprint(record);
+      if (record.source === 'pack' && !record.buildId) {
+        throw new Error(`Pack record missing buildId: ${record.itemId}`);
+      }
+      const identity =
+        record.source === 'pack' ? `pack:${record.buildId}` : `eval:${record.itemId}`;
+      const fingerprint = JSON.stringify({
+        verdictClass: record.verdictClass,
+        where: record.where ?? null,
+        why: record.why ?? null,
+      });
       const previous = seen.get(identity);
       if (previous !== undefined) {
         if (previous !== fingerprint) {
