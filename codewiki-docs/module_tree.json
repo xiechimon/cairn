@@ -1,0 +1,911 @@
+{
+  "Backend_application_services": {
+    "path": "apps",
+    "components": [
+      "apps/daemon/package.json::build",
+      "apps/daemon/package.json::dev",
+      "apps/daemon/package.json::package.json",
+      "apps/daemon/package.json::prepack",
+      "apps/daemon/package.json::smoke",
+      "apps/daemon/package.json::test",
+      "apps/daemon/package.json::typecheck",
+      "apps/daemon/tsconfig.json::tsconfig.json",
+      "apps/daemon/src/backend/acp.ts::GeminiBackend.continueSession",
+      "apps/daemon/src/backend/acp.ts::GeminiBackend.createSession",
+      "apps/daemon/src/backend/acp.ts::GeminiSession.next",
+      "apps/daemon/src/backend/acp.ts::GeminiSession.steer",
+      "apps/daemon/src/backend/acp.ts::GeminiSession.stop",
+      "apps/daemon/src/backend/acp.ts::GeminiSession.usage",
+      "apps/daemon/src/backend/claude-code.ts::AsyncQueue.end",
+      "apps/daemon/src/backend/claude-code.ts::AsyncQueue.next",
+      "apps/daemon/src/backend/claude-code.ts::ClaudeCodeBackend.continueSession",
+      "apps/daemon/src/backend/claude-code.ts::ClaudeCodeBackend.createSession",
+      "apps/daemon/src/backend/claude-code.ts::ClaudeSessionHandle.steer",
+      "apps/daemon/src/backend/claude-code.ts::ClaudeSessionHandle.stop",
+      "apps/daemon/src/backend/claude-code.ts::ClaudeSessionHandle.usage",
+      "apps/daemon/src/backend/claude-code.ts::toImageBlock",
+      "apps/daemon/src/backend/command-gate.ts::BashGatePattern",
+      "apps/daemon/src/backend/command-gate.ts::hasRecursiveFlag",
+      "apps/daemon/src/backend/command-gate.ts::rmOperands",
+      "apps/daemon/src/backend/otel.ts::PiStepSpanSink.flush",
+      "apps/daemon/src/backend/pi.ts::EventQueue.end",
+      "apps/daemon/src/backend/pi.ts::EventQueue.iterable",
+      "apps/daemon/src/backend/pi.ts::EventQueue.next",
+      "apps/daemon/src/backend/pi.ts::EventQueue.push",
+      "apps/daemon/src/backend/pi.ts::PiBackend.adaptProviderCompat",
+      "apps/daemon/src/backend/pi.ts::PiBackend.continueSession",
+      "apps/daemon/src/backend/pi.ts::PiBackend.createSession",
+      "apps/daemon/src/backend/pi.ts::PiSessionHandle.steer",
+      "apps/daemon/src/backend/pi.ts::PiSessionHandle.stop",
+      "apps/daemon/src/backend/pi.ts::PiSessionHandle.usage",
+      "apps/daemon/src/backend/pi.ts::summarizeCompactionTranscript",
+      "apps/daemon/src/backend/skills.ts::discoverNativeSkills",
+      "apps/daemon/src/claude-code-auth.ts::defaultRun",
+      "apps/daemon/src/claude-code-auth.ts::probeClaudeCodeAuth",
+      "apps/daemon/src/claude-code-bin.ts::defaultRun",
+      "apps/daemon/src/cli.ts::isMainModule",
+      "apps/daemon/src/cli.ts::main",
+      "apps/daemon/src/git.ts::branchesWithNewCommits",
+      "apps/daemon/src/git.ts::commitsAhead",
+      "apps/daemon/src/git.ts::countAhead",
+      "apps/daemon/src/git.ts::currentBranch",
+      "apps/daemon/src/git.ts::push",
+      "apps/daemon/src/journal.ts::StepJournal.claim",
+      "apps/daemon/src/machine-capabilities.ts::probeMachineCapabilities",
+      "apps/daemon/src/machine-client.ts::MachineClient.claim",
+      "apps/daemon/src/machine-client.ts::MachineClient.enrollPoll",
+      "apps/daemon/src/machine-client.ts::MachineClient.enrollStart",
+      "apps/daemon/src/machine-client.ts::MachineClient.steer",
+      "apps/daemon/src/machine-client.ts::MachineClient.stop",
+      "apps/daemon/src/segment.ts::SegmentBuffer.current",
+      "apps/daemon/src/skill-tool.ts::scanSkillFileMap",
+      "apps/daemon/src/step-stops.ts::RunStop.request",
+      "apps/daemon/src/workspace.ts::WorkspaceManager.branchesWithNewCommits",
+      "apps/daemon/src/workspace.ts::WorkspaceManager.commitsAhead",
+      "apps/daemon/src/workspace.ts::WorkspaceManager.countAhead",
+      "apps/daemon/src/workspace.ts::WorkspaceManager.currentBranch",
+      "apps/daemon/src/workspace.ts::WorkspaceManager.push",
+      "apps/server/package.json::build",
+      "apps/server/package.json::dev",
+      "apps/server/package.json::db:check",
+      "apps/server/package.json::db:generate",
+      "apps/server/package.json::package.json",
+      "apps/server/package.json::prepack",
+      "apps/server/package.json::start",
+      "apps/server/package.json::test",
+      "apps/server/package.json::typecheck",
+      "apps/server/tsconfig.json::tsconfig.json",
+      "apps/server/src/app.ts::createApp",
+      "apps/server/src/config.ts::attachmentsDirOf",
+      "apps/server/src/config.ts::loadConfig",
+      "apps/server/src/config.ts::logTokenAuthStartup",
+      "apps/server/src/config.ts::missingRequiredTokenError",
+      "apps/server/src/config.ts::reposDirOf",
+      "apps/server/src/config.ts::warnInsecureBind",
+      "apps/server/src/config.ts::warnTailscaleBind",
+      "apps/server/src/db/client.ts::openMemoryDb",
+      "apps/server/src/db/client.ts::resolveMigrationsFolder",
+      "apps/server/src/db/legacy-export.ts::LegacyTableSpec",
+      "apps/server/src/db/legacy-export.ts::listLegacyExports",
+      "apps/server/src/db/schema.ts::GateBlockerRow",
+      "apps/server/src/db/schema.ts::GateRoundDispatch",
+      "apps/server/src/db/schema.ts::bool",
+      "apps/server/src/db/schema.ts::epochMs",
+      "apps/server/src/db/schema.ts::json",
+      "apps/server/src/db/seed.ts::seed",
+      "apps/server/src/lib/keys.ts::newDeviceId",
+      "apps/server/src/lib/secret-box.ts::createEphemeralSecretBox",
+      "apps/server/src/lib/secret-box.ts::createKeyfileSecretBox",
+      "apps/server/src/routes-helpers.ts::toMemoryRecord",
+      "apps/server/src/services/attachment-gc.ts::sweepAttachments",
+      "apps/server/src/services/attachments.ts::grantUpload",
+      "apps/server/src/services/attachments.ts::uploadFile",
+      "apps/server/src/services/builds.ts::flushVerdictDigests",
+      "apps/server/src/services/events.ts::ConversationStreamHub.subscribe",
+      "apps/server/src/services/events.ts::ConversationStreamHub.subscriberCount",
+      "apps/server/src/services/events.ts::TeamStreamHub.publishBranchSync",
+      "apps/server/src/services/events.ts::TeamStreamHub.subscribe",
+      "apps/server/src/services/events.ts::TeamStreamHub.subscriberCount",
+      "apps/server/src/services/first-pr-report.ts::daysToFirstPr",
+      "apps/server/src/services/fs-pick.ts::killInFlightPick",
+      "apps/server/src/services/github-connection.ts::openGithubToken",
+      "apps/server/src/services/github-connection.ts::refreshingGithubFetch",
+      "apps/server/src/services/machine-deps.ts::agentForStep",
+      "apps/server/src/services/machine-wake-hub.ts::MachineWakeHub.releaseMachine",
+      "apps/server/src/services/machine-wake-hub.ts::MachineWakeHub.streamCount",
+      "apps/server/src/services/machines.ts::backfillMachineConcurrency",
+      "apps/server/src/services/machines.ts::seedLocalMachine",
+      "apps/server/src/services/machines.ts::toStepRecord",
+      "apps/server/src/services/mcp-face.ts::grantedToolNames",
+      "apps/server/src/services/merge-gate/digest.ts::computeLocalPatchDigest",
+      "apps/server/src/services/merge-gate/evidence-link.ts::withoutTrailingPunct",
+      "apps/server/src/services/merge-gate/gate-status.ts::planGateStatusWrite",
+      "apps/server/src/services/merge-gate/gate-status.ts::writeGateStatus",
+      "apps/server/src/services/merge-gate/github-facts.ts::always",
+      "apps/server/src/services/merge-gate/github-facts.ts::readGateGithubFacts",
+      "apps/server/src/services/merge-gate/github-facts.ts::runOf",
+      "apps/server/src/services/merge-gate/github-facts.ts::statusOf",
+      "apps/server/src/services/merge-gate/model-roster.ts::deriveModelRoster",
+      "apps/server/src/services/merge-gate/paths.ts::protectedRe",
+      "apps/server/src/services/merge-gate/readiness.ts::checkName",
+      "apps/server/src/services/model-liveness.ts::ProviderLivenessCache",
+      "apps/server/src/services/model-liveness.ts::getRelayCatalogModels",
+      "apps/server/src/services/model-liveness.ts::minProbeModel",
+      "apps/server/src/services/personas.ts::backfillPersonas",
+      "apps/server/src/services/personas.ts::personaAgent",
+      "apps/server/src/services/provider-health.ts::ProviderHealthTracker",
+      "apps/server/src/services/provider-health.ts::ProviderHealthTracker.reset",
+      "apps/server/src/services/providers.ts::claudeCodeModelSource",
+      "apps/server/src/services/scheduler.ts::createScheduler",
+      "apps/server/src/services/scheduler.ts::issueIntakeRunOf",
+      "apps/server/src/services/scheduler.ts::trajectoryExportRunOf",
+      "apps/server/src/services/scheduler.ts::trajectoryOutcomeRunOf",
+      "apps/server/src/services/skill-import.ts::fetchGithubJson",
+      "apps/server/src/services/tags.ts::backfillFixedTags",
+      "apps/server/src/services/todos.ts::flushSelfIssueWrites",
+      "apps/server/src/services/token-usage-cost.ts::backfillTokenUsageCost",
+      "apps/server/src/trajectory-attribution.ts::labelPacks",
+      "apps/server/src/trajectory-attribution.ts::summarizeAttribution",
+      "apps/server/src/trajectory-curate.ts::Placement",
+      "apps/server/src/trajectory-curate.ts::confirmCandidate",
+      "apps/server/src/trajectory-curate.ts::curateCandidates",
+      "apps/server/src/trajectory-curate.ts::dismissCandidate",
+      "apps/server/src/trajectory-guard-detector.ts::detectCandidates",
+      "apps/server/src/trajectory-push.ts::parsePacks",
+      "apps/server/src/trajectory-push.ts::pushPacks",
+      "apps/server/src/trajectory-push.ts::resolveTarget",
+      "apps/server/src/trajectory-reflect.ts::reflectPacks"
+    ],
+    "children": {
+      "daemon": {
+        "path": "apps/daemon",
+        "components": [
+          "apps/daemon/package.json::build",
+          "apps/daemon/package.json::dev",
+          "apps/daemon/package.json::package.json",
+          "apps/daemon/package.json::prepack",
+          "apps/daemon/package.json::smoke",
+          "apps/daemon/package.json::test",
+          "apps/daemon/package.json::typecheck",
+          "apps/daemon/tsconfig.json::tsconfig.json",
+          "apps/daemon/src/backend/acp.ts::GeminiBackend.continueSession",
+          "apps/daemon/src/backend/acp.ts::GeminiBackend.createSession",
+          "apps/daemon/src/backend/acp.ts::GeminiSession.next",
+          "apps/daemon/src/backend/acp.ts::GeminiSession.steer",
+          "apps/daemon/src/backend/acp.ts::GeminiSession.stop",
+          "apps/daemon/src/backend/acp.ts::GeminiSession.usage",
+          "apps/daemon/src/backend/claude-code.ts::AsyncQueue.end",
+          "apps/daemon/src/backend/claude-code.ts::AsyncQueue.next",
+          "apps/daemon/src/backend/claude-code.ts::ClaudeCodeBackend.continueSession",
+          "apps/daemon/src/backend/claude-code.ts::ClaudeCodeBackend.createSession",
+          "apps/daemon/src/backend/claude-code.ts::ClaudeSessionHandle.steer",
+          "apps/daemon/src/backend/claude-code.ts::ClaudeSessionHandle.stop",
+          "apps/daemon/src/backend/claude-code.ts::ClaudeSessionHandle.usage",
+          "apps/daemon/src/backend/claude-code.ts::toImageBlock",
+          "apps/daemon/src/backend/command-gate.ts::BashGatePattern",
+          "apps/daemon/src/backend/command-gate.ts::hasRecursiveFlag",
+          "apps/daemon/src/backend/command-gate.ts::rmOperands",
+          "apps/daemon/src/backend/otel.ts::PiStepSpanSink.flush",
+          "apps/daemon/src/backend/pi.ts::EventQueue.end",
+          "apps/daemon/src/backend/pi.ts::EventQueue.iterable",
+          "apps/daemon/src/backend/pi.ts::EventQueue.next",
+          "apps/daemon/src/backend/pi.ts::EventQueue.push",
+          "apps/daemon/src/backend/pi.ts::PiBackend.adaptProviderCompat",
+          "apps/daemon/src/backend/pi.ts::PiBackend.continueSession",
+          "apps/daemon/src/backend/pi.ts::PiBackend.createSession",
+          "apps/daemon/src/backend/pi.ts::PiSessionHandle.steer",
+          "apps/daemon/src/backend/pi.ts::PiSessionHandle.stop",
+          "apps/daemon/src/backend/pi.ts::PiSessionHandle.usage",
+          "apps/daemon/src/backend/pi.ts::summarizeCompactionTranscript",
+          "apps/daemon/src/backend/skills.ts::discoverNativeSkills",
+          "apps/daemon/src/claude-code-auth.ts::defaultRun",
+          "apps/daemon/src/claude-code-auth.ts::probeClaudeCodeAuth",
+          "apps/daemon/src/claude-code-bin.ts::defaultRun",
+          "apps/daemon/src/cli.ts::isMainModule",
+          "apps/daemon/src/cli.ts::main",
+          "apps/daemon/src/git.ts::branchesWithNewCommits",
+          "apps/daemon/src/git.ts::commitsAhead",
+          "apps/daemon/src/git.ts::countAhead",
+          "apps/daemon/src/git.ts::currentBranch",
+          "apps/daemon/src/git.ts::push",
+          "apps/daemon/src/journal.ts::StepJournal.claim",
+          "apps/daemon/src/machine-capabilities.ts::probeMachineCapabilities",
+          "apps/daemon/src/machine-client.ts::MachineClient.claim",
+          "apps/daemon/src/machine-client.ts::MachineClient.enrollPoll",
+          "apps/daemon/src/machine-client.ts::MachineClient.enrollStart",
+          "apps/daemon/src/machine-client.ts::MachineClient.steer",
+          "apps/daemon/src/machine-client.ts::MachineClient.stop",
+          "apps/daemon/src/segment.ts::SegmentBuffer.current",
+          "apps/daemon/src/skill-tool.ts::scanSkillFileMap",
+          "apps/daemon/src/step-stops.ts::RunStop.request",
+          "apps/daemon/src/workspace.ts::WorkspaceManager.branchesWithNewCommits",
+          "apps/daemon/src/workspace.ts::WorkspaceManager.commitsAhead",
+          "apps/daemon/src/workspace.ts::WorkspaceManager.countAhead",
+          "apps/daemon/src/workspace.ts::WorkspaceManager.currentBranch",
+          "apps/daemon/src/workspace.ts::WorkspaceManager.push"
+        ],
+        "children": {
+          "daemon_backends": {
+            "components": [
+              "apps/daemon/src/backend/acp.ts::GeminiBackend.continueSession",
+              "apps/daemon/src/backend/acp.ts::GeminiBackend.createSession",
+              "apps/daemon/src/backend/acp.ts::GeminiSession.next",
+              "apps/daemon/src/backend/acp.ts::GeminiSession.steer",
+              "apps/daemon/src/backend/acp.ts::GeminiSession.stop",
+              "apps/daemon/src/backend/acp.ts::GeminiSession.usage",
+              "apps/daemon/src/backend/claude-code.ts::AsyncQueue.end",
+              "apps/daemon/src/backend/claude-code.ts::AsyncQueue.next",
+              "apps/daemon/src/backend/claude-code.ts::ClaudeCodeBackend.continueSession",
+              "apps/daemon/src/backend/claude-code.ts::ClaudeCodeBackend.createSession",
+              "apps/daemon/src/backend/claude-code.ts::ClaudeSessionHandle.steer",
+              "apps/daemon/src/backend/claude-code.ts::ClaudeSessionHandle.stop",
+              "apps/daemon/src/backend/claude-code.ts::ClaudeSessionHandle.usage",
+              "apps/daemon/src/backend/claude-code.ts::toImageBlock",
+              "apps/daemon/src/backend/command-gate.ts::BashGatePattern",
+              "apps/daemon/src/backend/command-gate.ts::hasRecursiveFlag",
+              "apps/daemon/src/backend/command-gate.ts::rmOperands",
+              "apps/daemon/src/backend/otel.ts::PiStepSpanSink.flush",
+              "apps/daemon/src/backend/pi.ts::EventQueue.end",
+              "apps/daemon/src/backend/pi.ts::EventQueue.iterable",
+              "apps/daemon/src/backend/pi.ts::EventQueue.next",
+              "apps/daemon/src/backend/pi.ts::EventQueue.push",
+              "apps/daemon/src/backend/pi.ts::PiBackend.adaptProviderCompat",
+              "apps/daemon/src/backend/pi.ts::PiBackend.continueSession",
+              "apps/daemon/src/backend/pi.ts::PiBackend.createSession",
+              "apps/daemon/src/backend/pi.ts::PiSessionHandle.steer",
+              "apps/daemon/src/backend/pi.ts::PiSessionHandle.stop",
+              "apps/daemon/src/backend/pi.ts::PiSessionHandle.usage",
+              "apps/daemon/src/backend/pi.ts::summarizeCompactionTranscript",
+              "apps/daemon/src/backend/skills.ts::discoverNativeSkills"
+            ],
+            "children": {}
+          },
+          "daemon_machine_client": {
+            "components": [
+              "apps/daemon/src/machine-client.ts::MachineClient.claim",
+              "apps/daemon/src/machine-client.ts::MachineClient.enrollPoll",
+              "apps/daemon/src/machine-client.ts::MachineClient.enrollStart",
+              "apps/daemon/src/machine-client.ts::MachineClient.steer",
+              "apps/daemon/src/machine-client.ts::MachineClient.stop",
+              "apps/daemon/src/machine-capabilities.ts::probeMachineCapabilities",
+              "apps/daemon/src/claude-code-auth.ts::defaultRun",
+              "apps/daemon/src/claude-code-auth.ts::probeClaudeCodeAuth",
+              "apps/daemon/src/claude-code-bin.ts::defaultRun"
+            ],
+            "children": {}
+          },
+          "daemon_workspace_git": {
+            "components": [
+              "apps/daemon/src/git.ts::branchesWithNewCommits",
+              "apps/daemon/src/git.ts::commitsAhead",
+              "apps/daemon/src/git.ts::countAhead",
+              "apps/daemon/src/git.ts::currentBranch",
+              "apps/daemon/src/git.ts::push",
+              "apps/daemon/src/workspace.ts::WorkspaceManager.branchesWithNewCommits",
+              "apps/daemon/src/workspace.ts::WorkspaceManager.commitsAhead",
+              "apps/daemon/src/workspace.ts::WorkspaceManager.countAhead",
+              "apps/daemon/src/workspace.ts::WorkspaceManager.currentBranch",
+              "apps/daemon/src/workspace.ts::WorkspaceManager.push"
+            ],
+            "children": {}
+          },
+          "daemon_step_execution": {
+            "components": [
+              "apps/daemon/src/journal.ts::StepJournal.claim",
+              "apps/daemon/src/segment.ts::SegmentBuffer.current",
+              "apps/daemon/src/skill-tool.ts::scanSkillFileMap",
+              "apps/daemon/src/step-stops.ts::RunStop.request"
+            ],
+            "children": {}
+          },
+          "daemon_cli": {
+            "components": [
+              "apps/daemon/package.json::build",
+              "apps/daemon/package.json::dev",
+              "apps/daemon/package.json::package.json",
+              "apps/daemon/package.json::prepack",
+              "apps/daemon/package.json::smoke",
+              "apps/daemon/package.json::test",
+              "apps/daemon/package.json::typecheck",
+              "apps/daemon/tsconfig.json::tsconfig.json",
+              "apps/daemon/src/cli.ts::isMainModule",
+              "apps/daemon/src/cli.ts::main"
+            ],
+            "children": {}
+          }
+        }
+      },
+      "server": {
+        "path": "apps/server",
+        "components": [
+          "apps/server/package.json::build",
+          "apps/server/package.json::dev",
+          "apps/server/package.json::db:check",
+          "apps/server/package.json::db:generate",
+          "apps/server/package.json::package.json",
+          "apps/server/package.json::prepack",
+          "apps/server/package.json::start",
+          "apps/server/package.json::test",
+          "apps/server/package.json::typecheck",
+          "apps/server/tsconfig.json::tsconfig.json",
+          "apps/server/src/app.ts::createApp",
+          "apps/server/src/config.ts::attachmentsDirOf",
+          "apps/server/src/config.ts::loadConfig",
+          "apps/server/src/config.ts::logTokenAuthStartup",
+          "apps/server/src/config.ts::missingRequiredTokenError",
+          "apps/server/src/config.ts::reposDirOf",
+          "apps/server/src/config.ts::warnInsecureBind",
+          "apps/server/src/config.ts::warnTailscaleBind",
+          "apps/server/src/db/client.ts::openMemoryDb",
+          "apps/server/src/db/client.ts::resolveMigrationsFolder",
+          "apps/server/src/db/legacy-export.ts::LegacyTableSpec",
+          "apps/server/src/db/legacy-export.ts::listLegacyExports",
+          "apps/server/src/db/schema.ts::GateBlockerRow",
+          "apps/server/src/db/schema.ts::GateRoundDispatch",
+          "apps/server/src/db/schema.ts::bool",
+          "apps/server/src/db/schema.ts::epochMs",
+          "apps/server/src/db/schema.ts::json",
+          "apps/server/src/db/seed.ts::seed",
+          "apps/server/src/lib/keys.ts::newDeviceId",
+          "apps/server/src/lib/secret-box.ts::createEphemeralSecretBox",
+          "apps/server/src/lib/secret-box.ts::createKeyfileSecretBox",
+          "apps/server/src/routes-helpers.ts::toMemoryRecord",
+          "apps/server/src/services/attachment-gc.ts::sweepAttachments",
+          "apps/server/src/services/attachments.ts::grantUpload",
+          "apps/server/src/services/attachments.ts::uploadFile",
+          "apps/server/src/services/builds.ts::flushVerdictDigests",
+          "apps/server/src/services/events.ts::ConversationStreamHub.subscribe",
+          "apps/server/src/services/events.ts::ConversationStreamHub.subscriberCount",
+          "apps/server/src/services/events.ts::TeamStreamHub.publishBranchSync",
+          "apps/server/src/services/events.ts::TeamStreamHub.subscribe",
+          "apps/server/src/services/events.ts::TeamStreamHub.subscriberCount",
+          "apps/server/src/services/first-pr-report.ts::daysToFirstPr",
+          "apps/server/src/services/fs-pick.ts::killInFlightPick",
+          "apps/server/src/services/github-connection.ts::openGithubToken",
+          "apps/server/src/services/github-connection.ts::refreshingGithubFetch",
+          "apps/server/src/services/machine-deps.ts::agentForStep",
+          "apps/server/src/services/machine-wake-hub.ts::MachineWakeHub.releaseMachine",
+          "apps/server/src/services/machine-wake-hub.ts::MachineWakeHub.streamCount",
+          "apps/server/src/services/machines.ts::backfillMachineConcurrency",
+          "apps/server/src/services/machines.ts::seedLocalMachine",
+          "apps/server/src/services/machines.ts::toStepRecord",
+          "apps/server/src/services/mcp-face.ts::grantedToolNames",
+          "apps/server/src/services/merge-gate/digest.ts::computeLocalPatchDigest",
+          "apps/server/src/services/merge-gate/evidence-link.ts::withoutTrailingPunct",
+          "apps/server/src/services/merge-gate/gate-status.ts::planGateStatusWrite",
+          "apps/server/src/services/merge-gate/gate-status.ts::writeGateStatus",
+          "apps/server/src/services/merge-gate/github-facts.ts::always",
+          "apps/server/src/services/merge-gate/github-facts.ts::readGateGithubFacts",
+          "apps/server/src/services/merge-gate/github-facts.ts::runOf",
+          "apps/server/src/services/merge-gate/github-facts.ts::statusOf",
+          "apps/server/src/services/merge-gate/model-roster.ts::deriveModelRoster",
+          "apps/server/src/services/merge-gate/paths.ts::protectedRe",
+          "apps/server/src/services/merge-gate/readiness.ts::checkName",
+          "apps/server/src/services/model-liveness.ts::ProviderLivenessCache",
+          "apps/server/src/services/model-liveness.ts::getRelayCatalogModels",
+          "apps/server/src/services/model-liveness.ts::minProbeModel",
+          "apps/server/src/services/personas.ts::backfillPersonas",
+          "apps/server/src/services/personas.ts::personaAgent",
+          "apps/server/src/services/provider-health.ts::ProviderHealthTracker",
+          "apps/server/src/services/provider-health.ts::ProviderHealthTracker.reset",
+          "apps/server/src/services/providers.ts::claudeCodeModelSource",
+          "apps/server/src/services/scheduler.ts::createScheduler",
+          "apps/server/src/services/scheduler.ts::issueIntakeRunOf",
+          "apps/server/src/services/scheduler.ts::trajectoryExportRunOf",
+          "apps/server/src/services/scheduler.ts::trajectoryOutcomeRunOf",
+          "apps/server/src/services/skill-import.ts::fetchGithubJson",
+          "apps/server/src/services/tags.ts::backfillFixedTags",
+          "apps/server/src/services/todos.ts::flushSelfIssueWrites",
+          "apps/server/src/services/token-usage-cost.ts::backfillTokenUsageCost",
+          "apps/server/src/trajectory-attribution.ts::labelPacks",
+          "apps/server/src/trajectory-attribution.ts::summarizeAttribution",
+          "apps/server/src/trajectory-curate.ts::Placement",
+          "apps/server/src/trajectory-curate.ts::confirmCandidate",
+          "apps/server/src/trajectory-curate.ts::curateCandidates",
+          "apps/server/src/trajectory-curate.ts::dismissCandidate",
+          "apps/server/src/trajectory-guard-detector.ts::detectCandidates",
+          "apps/server/src/trajectory-push.ts::parsePacks",
+          "apps/server/src/trajectory-push.ts::pushPacks",
+          "apps/server/src/trajectory-push.ts::resolveTarget",
+          "apps/server/src/trajectory-reflect.ts::reflectPacks"
+        ],
+        "children": {
+          "server_app_bootstrap": {
+            "components": [
+              "apps/server/src/app.ts::createApp",
+              "apps/server/src/config.ts::attachmentsDirOf",
+              "apps/server/src/config.ts::loadConfig",
+              "apps/server/src/config.ts::logTokenAuthStartup",
+              "apps/server/src/config.ts::missingRequiredTokenError",
+              "apps/server/src/config.ts::reposDirOf",
+              "apps/server/src/config.ts::warnInsecureBind",
+              "apps/server/src/config.ts::warnTailscaleBind",
+              "apps/server/src/routes-helpers.ts::toMemoryRecord",
+              "apps/server/src/lib/keys.ts::newDeviceId",
+              "apps/server/src/lib/secret-box.ts::createEphemeralSecretBox",
+              "apps/server/src/lib/secret-box.ts::createKeyfileSecretBox"
+            ],
+            "children": {}
+          },
+          "server_database": {
+            "components": [
+              "apps/server/src/db/client.ts::openMemoryDb",
+              "apps/server/src/db/client.ts::resolveMigrationsFolder",
+              "apps/server/src/db/legacy-export.ts::LegacyTableSpec",
+              "apps/server/src/db/legacy-export.ts::listLegacyExports",
+              "apps/server/src/db/schema.ts::GateBlockerRow",
+              "apps/server/src/db/schema.ts::GateRoundDispatch",
+              "apps/server/src/db/schema.ts::bool",
+              "apps/server/src/db/schema.ts::epochMs",
+              "apps/server/src/db/schema.ts::json",
+              "apps/server/src/db/seed.ts::seed"
+            ],
+            "children": {}
+          },
+          "server_build_lifecycle": {
+            "components": [
+              "apps/server/src/services/builds.ts::flushVerdictDigests",
+              "apps/server/src/services/todos.ts::flushSelfIssueWrites",
+              "apps/server/src/services/events.ts::ConversationStreamHub.subscribe",
+              "apps/server/src/services/events.ts::ConversationStreamHub.subscriberCount",
+              "apps/server/src/services/events.ts::TeamStreamHub.publishBranchSync",
+              "apps/server/src/services/events.ts::TeamStreamHub.subscribe",
+              "apps/server/src/services/events.ts::TeamStreamHub.subscriberCount"
+            ],
+            "children": {}
+          },
+          "server_machine_fleet": {
+            "components": [
+              "apps/server/src/services/machines.ts::backfillMachineConcurrency",
+              "apps/server/src/services/machines.ts::seedLocalMachine",
+              "apps/server/src/services/machines.ts::toStepRecord",
+              "apps/server/src/services/machine-deps.ts::agentForStep",
+              "apps/server/src/services/machine-wake-hub.ts::MachineWakeHub.releaseMachine",
+              "apps/server/src/services/machine-wake-hub.ts::MachineWakeHub.streamCount"
+            ],
+            "children": {}
+          },
+          "server_merge_gate": {
+            "components": [
+              "apps/server/src/services/merge-gate/digest.ts::computeLocalPatchDigest",
+              "apps/server/src/services/merge-gate/evidence-link.ts::withoutTrailingPunct",
+              "apps/server/src/services/merge-gate/gate-status.ts::planGateStatusWrite",
+              "apps/server/src/services/merge-gate/gate-status.ts::writeGateStatus",
+              "apps/server/src/services/merge-gate/github-facts.ts::always",
+              "apps/server/src/services/merge-gate/github-facts.ts::readGateGithubFacts",
+              "apps/server/src/services/merge-gate/github-facts.ts::runOf",
+              "apps/server/src/services/merge-gate/github-facts.ts::statusOf",
+              "apps/server/src/services/merge-gate/model-roster.ts::deriveModelRoster",
+              "apps/server/src/services/merge-gate/paths.ts::protectedRe",
+              "apps/server/src/services/merge-gate/readiness.ts::checkName"
+            ],
+            "children": {}
+          },
+          "server_provider_runtime": {
+            "components": [
+              "apps/server/src/services/providers.ts::claudeCodeModelSource",
+              "apps/server/src/services/model-liveness.ts::ProviderLivenessCache",
+              "apps/server/src/services/model-liveness.ts::getRelayCatalogModels",
+              "apps/server/src/services/model-liveness.ts::minProbeModel",
+              "apps/server/src/services/personas.ts::backfillPersonas",
+              "apps/server/src/services/personas.ts::personaAgent",
+              "apps/server/src/services/provider-health.ts::ProviderHealthTracker",
+              "apps/server/src/services/provider-health.ts::ProviderHealthTracker.reset",
+              "apps/server/src/services/token-usage-cost.ts::backfillTokenUsageCost"
+            ],
+            "children": {}
+          },
+          "server_integrations": {
+            "components": [
+              "apps/server/src/services/github-connection.ts::openGithubToken",
+              "apps/server/src/services/github-connection.ts::refreshingGithubFetch",
+              "apps/server/src/services/first-pr-report.ts::daysToFirstPr",
+              "apps/server/src/services/skill-import.ts::fetchGithubJson",
+              "apps/server/src/services/tags.ts::backfillFixedTags",
+              "apps/server/src/services/mcp-face.ts::grantedToolNames"
+            ],
+            "children": {}
+          },
+          "server_attachments": {
+            "components": [
+              "apps/server/src/services/attachments.ts::grantUpload",
+              "apps/server/src/services/attachments.ts::uploadFile",
+              "apps/server/src/services/attachment-gc.ts::sweepAttachments",
+              "apps/server/src/services/fs-pick.ts::killInFlightPick"
+            ],
+            "children": {}
+          },
+          "server_scheduler": {
+            "components": [
+              "apps/server/src/services/scheduler.ts::createScheduler",
+              "apps/server/src/services/scheduler.ts::issueIntakeRunOf",
+              "apps/server/src/services/scheduler.ts::trajectoryExportRunOf",
+              "apps/server/src/services/scheduler.ts::trajectoryOutcomeRunOf"
+            ],
+            "children": {}
+          },
+          "server_trajectory_tools": {
+            "components": [
+              "apps/server/src/trajectory-attribution.ts::labelPacks",
+              "apps/server/src/trajectory-attribution.ts::summarizeAttribution",
+              "apps/server/src/trajectory-curate.ts::Placement",
+              "apps/server/src/trajectory-curate.ts::confirmCandidate",
+              "apps/server/src/trajectory-curate.ts::curateCandidates",
+              "apps/server/src/trajectory-curate.ts::dismissCandidate",
+              "apps/server/src/trajectory-guard-detector.ts::detectCandidates",
+              "apps/server/src/trajectory-push.ts::parsePacks",
+              "apps/server/src/trajectory-push.ts::pushPacks",
+              "apps/server/src/trajectory-push.ts::resolveTarget",
+              "apps/server/src/trajectory-reflect.ts::reflectPacks"
+            ],
+            "children": {}
+          }
+        }
+      }
+    }
+  },
+  "shared": {
+    "path": "packages/shared",
+    "components": [
+      "packages/shared/package.json::package.json",
+      "packages/shared/package.json::test",
+      "packages/shared/package.json::typecheck",
+      "packages/shared/tsconfig.json::tsconfig.json",
+      "packages/shared/src/attachment-token.ts::formatAttachmentToken",
+      "packages/shared/src/brief-file.ts::briefBackendForProvider",
+      "packages/shared/src/git-ops.ts::GitOps",
+      "packages/shared/src/protocol/chief-tools.ts::githubListParams",
+      "packages/shared/src/protocol/chief-tools.ts::idArr",
+      "packages/shared/src/protocol/client-state.ts::ClientStateKey",
+      "packages/shared/src/protocol/machine-api.ts::MachineEndpoint",
+      "packages/shared/src/protocol/rest.ts::RestEndpoint",
+      "packages/shared/src/protocol/search.ts::searchNoResultsCopy",
+      "packages/shared/src/records/first-pr-report.ts::firstPrDiscussionUrl",
+      "packages/shared/src/records/prompts.ts::buildPlanRewritePrompt",
+      "packages/shared/src/records/prompts.ts::classifyUserText",
+      "packages/shared/src/records/provider.ts::OAuthFamily",
+      "packages/shared/src/records/recording-trigger.ts::isRecordingPath",
+      "packages/shared/src/records/skill.ts::buildSkillEntry",
+      "packages/shared/src/records/skill.ts::splitSkillEntry",
+      "packages/shared/src/records/todo.ts::parseOrchestrationSourceRef",
+      "packages/shared/src/task-failure.ts::digitBounded",
+      "packages/shared/src/task-meta.ts::FixedTag"
+    ],
+    "children": {
+      "shared_protocol": {
+        "components": [
+          "packages/shared/src/protocol/chief-tools.ts::githubListParams",
+          "packages/shared/src/protocol/chief-tools.ts::idArr",
+          "packages/shared/src/protocol/client-state.ts::ClientStateKey",
+          "packages/shared/src/protocol/machine-api.ts::MachineEndpoint",
+          "packages/shared/src/protocol/rest.ts::RestEndpoint",
+          "packages/shared/src/protocol/search.ts::searchNoResultsCopy"
+        ],
+        "children": {}
+      },
+      "shared_records": {
+        "components": [
+          "packages/shared/src/records/first-pr-report.ts::firstPrDiscussionUrl",
+          "packages/shared/src/records/prompts.ts::buildPlanRewritePrompt",
+          "packages/shared/src/records/prompts.ts::classifyUserText",
+          "packages/shared/src/records/provider.ts::OAuthFamily",
+          "packages/shared/src/records/recording-trigger.ts::isRecordingPath",
+          "packages/shared/src/records/skill.ts::buildSkillEntry",
+          "packages/shared/src/records/skill.ts::splitSkillEntry",
+          "packages/shared/src/records/todo.ts::parseOrchestrationSourceRef"
+        ],
+        "children": {}
+      },
+      "shared_task_tools": {
+        "components": [
+          "packages/shared/src/attachment-token.ts::formatAttachmentToken",
+          "packages/shared/src/brief-file.ts::briefBackendForProvider",
+          "packages/shared/src/git-ops.ts::GitOps",
+          "packages/shared/src/task-failure.ts::digitBounded",
+          "packages/shared/src/task-meta.ts::FixedTag"
+        ],
+        "children": {
+          "shared_task_tools_attachment": {
+            "components": [
+              "packages/shared/src/attachment-token.ts::formatAttachmentToken"
+            ],
+            "children": {}
+          },
+          "shared_task_tools_brief": {
+            "components": [
+              "packages/shared/src/brief-file.ts::briefBackendForProvider"
+            ],
+            "children": {}
+          },
+          "shared_task_tools_gitops": {
+            "components": [
+              "packages/shared/src/git-ops.ts::GitOps"
+            ],
+            "children": {}
+          },
+          "shared_task_tools_meta": {
+            "components": [
+              "packages/shared/src/task-meta.ts::FixedTag"
+            ],
+            "children": {}
+          },
+          "shared_task_tools_failure_classification": {
+            "components": [
+              "packages/shared/src/task-failure.ts::digitBounded",
+              "packages/shared/src/task-failure.ts::classifyStepFailure",
+              "packages/shared/src/task-failure.ts::classifyAgentFailure",
+              "packages/shared/src/task-failure.ts::isProviderOutage",
+              "packages/shared/src/task-failure.ts::isProviderAuthFailure",
+              "packages/shared/src/task-failure.ts::parseRetryAfterMs"
+            ],
+            "children": {}
+          }
+        }
+      },
+      "shared_runtime_helpers": {
+        "components": [
+          "packages/shared/src/attachment-token.ts::formatAttachmentToken",
+          "packages/shared/src/brief-file.ts::briefBackendForProvider",
+          "packages/shared/src/task-failure.ts::digitBounded",
+          "packages/shared/src/task-meta.ts::FixedTag"
+        ],
+        "children": {}
+      },
+      "shared_git_operations": {
+        "components": [
+          "packages/shared/src/git-ops.ts::GitOps"
+        ],
+        "children": {}
+      }
+    }
+  },
+  "Repository_automation_and_delivery": {
+    "path": "",
+    "components": [
+      ".github/workflows/ci.yml::check",
+      ".github/workflows/ci.yml::ci.yml",
+      ".github/workflows/ci.yml::dead-class-gate",
+      ".github/workflows/ci.yml::e2e",
+      ".github/workflows/ci.yml::e2e-gate",
+      ".github/workflows/ci.yml::feature-map-gate",
+      ".github/workflows/ci.yml::issue-label-gate",
+      ".github/workflows/ci.yml::pack-smoke",
+      ".github/workflows/commit-author.yml::commit-author",
+      ".github/workflows/commit-author.yml::commit-author.yml",
+      ".github/workflows/diagram-text-fit.yml::diagram-text-fit",
+      ".github/workflows/diagram-text-fit.yml::diagram-text-fit.yml",
+      ".github/workflows/feature-map-daily-check.yml::feature-map-daily-check",
+      ".github/workflows/feature-map-daily-check.yml::feature-map-daily-check.yml",
+      ".github/workflows/gardener-weekly.yml::gardener-weekly",
+      ".github/workflows/gardener-weekly.yml::gardener-weekly.yml",
+      ".github/workflows/pr-evidence.yml::pr-evidence",
+      ".github/workflows/pr-evidence.yml::pr-evidence.yml",
+      ".github/workflows/site-deploy.yml::deploy",
+      ".github/workflows/site-deploy.yml::site-deploy.yml",
+      ".claude/hooks/session-start.sh::session-start.sh",
+      ".claude/workflows/pr-gate.js::globToRegExp",
+      ".claude/workflows/pr-gate.js::isId",
+      ".claude/workflows/pr-gate.js::isPathList",
+      ".claude/workflows/pr-gate.js::isProtected",
+      ".claude/workflows/pr-gate.js::readRules",
+      ".nvmrc::.nvmrc",
+      "Dockerfile::Dockerfile",
+      "Dockerfile::build",
+      "Dockerfile::native",
+      "Dockerfile::stage_2",
+      "package.json::build",
+      "package.json::dev",
+      "package.json::dev:daemon",
+      "package.json::dev:server",
+      "package.json::dev:web",
+      "package.json::lessons:table",
+      "package.json::lint",
+      "package.json::package.json",
+      "package.json::pr:check",
+      "package.json::prepare",
+      "package.json::prepush",
+      "package.json::spec:parse",
+      "package.json::start",
+      "package.json::test",
+      "package.json::traj:attribution",
+      "package.json::traj:backfill",
+      "package.json::traj:curate",
+      "package.json::traj:export",
+      "package.json::traj:label",
+      "package.json::traj:push",
+      "package.json::traj:reflect",
+      "package.json::typecheck",
+      "biome.json::biome.json",
+      "pnpm-workspace.yaml::pnpm-workspace.yaml",
+      "railway.json::railway.json",
+      "vitest.config.ts::vitest.config.ts"
+    ],
+    "children": {
+      "github_ci": {
+        "path": ".github/workflows",
+        "components": [
+          ".github/workflows/ci.yml::check",
+          ".github/workflows/ci.yml::ci.yml",
+          ".github/workflows/ci.yml::dead-class-gate",
+          ".github/workflows/ci.yml::e2e",
+          ".github/workflows/ci.yml::e2e-gate",
+          ".github/workflows/ci.yml::feature-map-gate",
+          ".github/workflows/ci.yml::issue-label-gate",
+          ".github/workflows/ci.yml::pack-smoke",
+          ".github/workflows/commit-author.yml::commit-author",
+          ".github/workflows/commit-author.yml::commit-author.yml",
+          ".github/workflows/diagram-text-fit.yml::diagram-text-fit",
+          ".github/workflows/diagram-text-fit.yml::diagram-text-fit.yml",
+          ".github/workflows/feature-map-daily-check.yml::feature-map-daily-check",
+          ".github/workflows/feature-map-daily-check.yml::feature-map-daily-check.yml",
+          ".github/workflows/gardener-weekly.yml::gardener-weekly",
+          ".github/workflows/gardener-weekly.yml::gardener-weekly.yml",
+          ".github/workflows/pr-evidence.yml::pr-evidence",
+          ".github/workflows/pr-evidence.yml::pr-evidence.yml",
+          ".github/workflows/site-deploy.yml::deploy",
+          ".github/workflows/site-deploy.yml::site-deploy.yml"
+        ],
+        "children": {
+          "github_ci_main_pipeline": {
+            "components": [
+              ".github/workflows/ci.yml::check",
+              ".github/workflows/ci.yml::ci.yml",
+              ".github/workflows/ci.yml::dead-class-gate",
+              ".github/workflows/ci.yml::e2e",
+              ".github/workflows/ci.yml::e2e-gate",
+              ".github/workflows/ci.yml::feature-map-gate",
+              ".github/workflows/ci.yml::issue-label-gate",
+              ".github/workflows/ci.yml::pack-smoke"
+            ],
+            "children": {}
+          },
+          "github_ci_pr_evidence": {
+            "components": [
+              ".github/workflows/pr-evidence.yml::pr-evidence",
+              ".github/workflows/pr-evidence.yml::pr-evidence.yml"
+            ],
+            "children": {}
+          },
+          "github_ci_pr_policy_gates": {
+            "components": [
+              ".github/workflows/commit-author.yml::commit-author",
+              ".github/workflows/commit-author.yml::commit-author.yml",
+              ".github/workflows/diagram-text-fit.yml::diagram-text-fit",
+              ".github/workflows/diagram-text-fit.yml::diagram-text-fit.yml"
+            ],
+            "children": {}
+          },
+          "github_ci_scheduled_jobs": {
+            "components": [
+              ".github/workflows/feature-map-daily-check.yml::feature-map-daily-check",
+              ".github/workflows/feature-map-daily-check.yml::feature-map-daily-check.yml",
+              ".github/workflows/gardener-weekly.yml::gardener-weekly",
+              ".github/workflows/gardener-weekly.yml::gardener-weekly.yml"
+            ],
+            "children": {}
+          },
+          "github_ci_site_deploy": {
+            "components": [
+              ".github/workflows/site-deploy.yml::deploy",
+              ".github/workflows/site-deploy.yml::site-deploy.yml"
+            ],
+            "children": {}
+          }
+        }
+      },
+      "claude_automation": {
+        "path": ".claude",
+        "components": [
+          ".claude/hooks/session-start.sh::session-start.sh",
+          ".claude/workflows/pr-gate.js::globToRegExp",
+          ".claude/workflows/pr-gate.js::isId",
+          ".claude/workflows/pr-gate.js::isPathList",
+          ".claude/workflows/pr-gate.js::isProtected",
+          ".claude/workflows/pr-gate.js::readRules"
+        ],
+        "children": {
+          "claude_automation_session_hook": {
+            "components": [
+              ".claude/hooks/session-start.sh::session-start.sh"
+            ],
+            "children": {}
+          },
+          "claude_automation_pr_gate": {
+            "components": [
+              ".claude/workflows/pr-gate.js::globToRegExp",
+              ".claude/workflows/pr-gate.js::isId",
+              ".claude/workflows/pr-gate.js::isPathList",
+              ".claude/workflows/pr-gate.js::isProtected",
+              ".claude/workflows/pr-gate.js::readRules"
+            ],
+            "children": {}
+          }
+        }
+      },
+      "root_build_deploy": {
+        "path": ".",
+        "components": [
+          ".nvmrc::.nvmrc",
+          "Dockerfile::Dockerfile",
+          "Dockerfile::build",
+          "Dockerfile::native",
+          "Dockerfile::stage_2",
+          "package.json::build",
+          "package.json::dev",
+          "package.json::dev:daemon",
+          "package.json::dev:server",
+          "package.json::dev:web",
+          "package.json::lessons:table",
+          "package.json::lint",
+          "package.json::package.json",
+          "package.json::pr:check",
+          "package.json::prepare",
+          "package.json::prepush",
+          "package.json::spec:parse",
+          "package.json::start",
+          "package.json::test",
+          "package.json::traj:attribution",
+          "package.json::traj:backfill",
+          "package.json::traj:curate",
+          "package.json::traj:export",
+          "package.json::traj:label",
+          "package.json::traj:push",
+          "package.json::traj:reflect",
+          "package.json::typecheck",
+          "biome.json::biome.json",
+          "pnpm-workspace.yaml::pnpm-workspace.yaml",
+          "railway.json::railway.json",
+          "vitest.config.ts::vitest.config.ts"
+        ],
+        "children": {
+          "root_build_deploy_workspace": {
+            "components": [
+              "package.json::package.json",
+              "package.json::build",
+              "package.json::dev",
+              "package.json::dev:daemon",
+              "package.json::dev:server",
+              "package.json::dev:web",
+              "package.json::lessons:table",
+              "package.json::lint",
+              "package.json::pr:check",
+              "package.json::prepare",
+              "package.json::prepush",
+              "package.json::spec:parse",
+              "package.json::start",
+              "package.json::test",
+              "package.json::traj:attribution",
+              "package.json::traj:backfill",
+              "package.json::traj:curate",
+              "package.json::traj:export",
+              "package.json::traj:label",
+              "package.json::traj:push",
+              "package.json::traj:reflect",
+              "package.json::typecheck",
+              "pnpm-workspace.yaml::pnpm-workspace.yaml"
+            ],
+            "children": {}
+          },
+          "root_build_deploy_container": {
+            "components": [
+              "Dockerfile::Dockerfile",
+              "Dockerfile::build",
+              "Dockerfile::native",
+              "Dockerfile::stage_2",
+              "railway.json::railway.json"
+            ],
+            "children": {}
+          },
+          "root_build_deploy_quality": {
+            "components": [
+              "biome.json::biome.json",
+              "vitest.config.ts::vitest.config.ts",
+              ".nvmrc::.nvmrc"
+            ],
+            "children": {}
+          }
+        }
+      }
+    }
+  }
+}

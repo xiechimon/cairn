@@ -1,0 +1,155 @@
+{
+  "generation_info": {
+    "timestamp": "2026-10-29T07:59:14.960249+00:00",
+    "provider": "openai-compatible",
+    "main_model": "deepseek-v4-flash",
+    "generator_version": "2.0.0",
+    "repo_path": "/home/ian/Code/AgentProjects/cairn-wiki",
+    "commit_id": "7de5afe3d2192aaf6836b338141f9d51acf4b896",
+    "language": "Chinese (Simplified)",
+    "layout": "hierarchical"
+  },
+  "statistics": {
+    "total_components": 2329,
+    "leaf_nodes": 233,
+    "max_depth": 2
+  },
+  "files_generated": [
+    "overview.md",
+    "module_tree.json",
+    "first_module_tree.json",
+    "Backend_application_services.md",
+    "Backend_application_services/daemon.md",
+    "Backend_application_services/daemon/daemon_backends.md",
+    "Backend_application_services/daemon/daemon_cli.md",
+    "Backend_application_services/daemon/daemon_machine_client.md",
+    "Backend_application_services/daemon/daemon_step_execution.md",
+    "Backend_application_services/daemon/daemon_workspace_git.md",
+    "Backend_application_services/server.md",
+    "Backend_application_services/server/server_app_bootstrap.md",
+    "Backend_application_services/server/server_attachments.md",
+    "Backend_application_services/server/server_build_lifecycle.md",
+    "Backend_application_services/server/server_database.md",
+    "Backend_application_services/server/server_integrations.md",
+    "Backend_application_services/server/server_machine_fleet.md",
+    "Backend_application_services/server/server_merge_gate.md",
+    "Backend_application_services/server/server_provider_runtime.md",
+    "Backend_application_services/server/server_scheduler.md",
+    "Backend_application_services/server/server_trajectory_tools.md",
+    "Repository_automation_and_delivery.md",
+    "Repository_automation_and_delivery/claude_automation.md",
+    "Repository_automation_and_delivery/claude_automation/claude_automation_pr_gate.md",
+    "Repository_automation_and_delivery/claude_automation/claude_automation_session_hook.md",
+    "Repository_automation_and_delivery/github_ci.md",
+    "Repository_automation_and_delivery/github_ci/github_ci_main_pipeline.md",
+    "Repository_automation_and_delivery/github_ci/github_ci_pr_evidence.md",
+    "Repository_automation_and_delivery/github_ci/github_ci_pr_policy_gates.md",
+    "Repository_automation_and_delivery/github_ci/github_ci_scheduled_jobs.md",
+    "Repository_automation_and_delivery/github_ci/github_ci_site_deploy.md",
+    "Repository_automation_and_delivery/root_build_deploy.md",
+    "Repository_automation_and_delivery/root_build_deploy/root_build_deploy_container.md",
+    "Repository_automation_and_delivery/root_build_deploy/root_build_deploy_quality.md",
+    "Repository_automation_and_delivery/root_build_deploy/root_build_deploy_workspace.md",
+    "shared.md",
+    "shared/shared_git_operations.md",
+    "shared/shared_protocol.md",
+    "shared/shared_records.md",
+    "shared/shared_runtime_helpers.md",
+    "shared/shared_task_tools.md",
+    "shared/shared_task_tools/shared_task_tools_attachment.md",
+    "shared/shared_task_tools/shared_task_tools_brief.md",
+    "shared/shared_task_tools/shared_task_tools_failure_classification.md",
+    "shared/shared_task_tools/shared_task_tools_gitops.md",
+    "shared/shared_task_tools/shared_task_tools_meta.md"
+  ],
+  "usage": {
+    "schema_version": 2,
+    "scope": "this run only (modules resumed from disk cost nothing)",
+    "currency": "USD",
+    "cost_status": "unknown",
+    "incomplete": false,
+    "unknown_usage_calls": 0,
+    "n_calls": 2,
+    "totals": {
+      "input_tokens": 41003,
+      "output_tokens": 16015,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "requests": 2,
+      "total_tokens": 57018
+    },
+    "by_phase": {
+      "parent_modules": {
+        "calls": 1,
+        "input_tokens": 18786,
+        "output_tokens": 7727,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "requests": 1,
+        "total_tokens": 26513,
+        "unpriced_calls": 1
+      },
+      "overview": {
+        "calls": 1,
+        "input_tokens": 22217,
+        "output_tokens": 8288,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "requests": 1,
+        "total_tokens": 30505,
+        "unpriced_calls": 1
+      }
+    },
+    "by_model": {
+      "deepseek-v4-flash": {
+        "calls": 2,
+        "input_tokens": 41003,
+        "output_tokens": 16015,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "requests": 2,
+        "total_tokens": 57018,
+        "unpriced_calls": 2
+      }
+    },
+    "unpriced_models": [
+      "deepseek-v4-flash"
+    ],
+    "calls": [
+      {
+        "phase": "parent_modules",
+        "kind": "complete",
+        "target": "Repository_automation_and_delivery",
+        "model": "deepseek-v4-flash",
+        "seconds": 69.65,
+        "input_tokens": 18786,
+        "output_tokens": 7727,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "requests": 1,
+        "total_tokens": 26513,
+        "usage_reported": true,
+        "provider": "openai-compatible",
+        "requested_model": "deepseek-v4-flash",
+        "cost_source": "unknown"
+      },
+      {
+        "phase": "overview",
+        "kind": "complete",
+        "target": "cairn-wiki",
+        "model": "deepseek-v4-flash",
+        "seconds": 71.02,
+        "input_tokens": 22217,
+        "output_tokens": 8288,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "requests": 1,
+        "total_tokens": 30505,
+        "usage_reported": true,
+        "provider": "openai-compatible",
+        "requested_model": "deepseek-v4-flash",
+        "cost_source": "unknown"
+      }
+    ]
+  }
+}
