@@ -596,6 +596,14 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
   }
 });
 
+const prepushEnv = (overrides = {}) => {
+  const env = { ...process.env };
+  delete env.ENGLISH_ONLY_BASE_SHA;
+  delete env.UI_DEBT_BASE_SHA;
+  delete env.PREPUSH_BASE_SHA;
+  return { ...env, ...overrides };
+};
+
 test('CLI skips real document changes and rejects a missing base', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-'));
   process.env.CAIRN_HEAVY_SLOTS_DIR = join(directory, 'heavy-slots');
@@ -620,14 +628,14 @@ test('CLI skips real document changes and rejects a missing base', () => {
     const result = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, PREPUSH_BASE_SHA: 'origin/main' },
+      env: prepushEnv({ PREPUSH_BASE_SHA: 'origin/main' }),
     });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /PASS \(2 checks\)/);
     const forced = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, PREPUSH_BASE_SHA: 'origin/main', PREPUSH_FORCE_FULL: 'true' },
+      env: prepushEnv({ PREPUSH_BASE_SHA: 'origin/main', PREPUSH_FORCE_FULL: 'true' }),
     });
     assert.notEqual(forced.status, 0);
     assert.match(forced.stdout, /english-only-gate: 0 line\(s\)/);
@@ -638,7 +646,7 @@ test('CLI skips real document changes and rejects a missing base', () => {
       const code = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
         cwd: directory,
         encoding: 'utf8',
-        env: { ...process.env, PREPUSH_BASE_SHA: 'origin/main' },
+        env: prepushEnv({ PREPUSH_BASE_SHA: 'origin/main' }),
       });
       assert.notEqual(code.status, 0);
       assert.match(code.stdout, /prepush.*node scripts\/ui-debt-gate.mjs/);
@@ -646,13 +654,13 @@ test('CLI skips real document changes and rejects a missing base', () => {
     const firstPush = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, PREPUSH_BASE_SHA: '0'.repeat(40) },
+      env: prepushEnv({ PREPUSH_BASE_SHA: '0'.repeat(40) }),
     });
     assert.match(firstPush.stdout, /prepush.*node scripts\/ui-debt-gate.mjs/);
     const missing = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, PREPUSH_BASE_SHA: 'missing-ref' },
+      env: prepushEnv({ PREPUSH_BASE_SHA: 'missing-ref' }),
     });
     assert.notEqual(missing.status, 0);
   } finally {
@@ -667,15 +675,12 @@ const gitIn = (cwd, args) =>
     { cwd, encoding: 'utf8', stdio: 'pipe' },
   );
 
-const runPrepushCi = (cwd) => {
-  const env = { ...process.env };
-  delete env.PREPUSH_BASE_SHA;
-  return spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
+const runPrepushCi = (cwd) =>
+  spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
     cwd,
     encoding: 'utf8',
-    env,
+    env: prepushEnv(),
   });
-};
 
 test('a stale local origin/main is refreshed by fetch before computing changes', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-stale-'));
