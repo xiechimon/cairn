@@ -1,0 +1,63 @@
+✔ incident handoff leaves recurrence accounting to the collector (0.601666ms)
+✔ dispatcher message exists and retains the closing trailer (0.200067ms)
+✔ recovery fixture executes the recipe without incident wording assertions (0.107945ms)
+✔ AGENTS.md separates bot rebase from human squash (5.031656ms)
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (0.187625ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.118118ms)
+✔ documented preparation overrides inherited bot author and committer identities (38.597545ms)
+✔ identity wrappers are explicitly excluded from commit preparation (0.343383ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.25406ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.091645ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (38.872674ms)
+✔ recovery regression is run by the trusted main workflow (0.702332ms)
+✖ incident recovery preserves trailers and history while passing the actual push check (25.556517ms)
+✔ PR validation reads the explicit head without executing PR code (0.847337ms)
+✔ a bot-authored commit beneath a human tip is rejected (20.434079ms)
+✔ a squash commit authored by the bot is rejected (17.618987ms)
+✔ main push checks bot squash (16.431442ms)
+✔ main push checks bot beneath human tip (17.195881ms)
+✔ main push checks historical bot (18.982625ms)
+✔ main push checks missing before (16.456997ms)
+✔ main push checks zero before (15.523323ms)
+✔ every commit in a clean human range passes (19.01095ms)
+✔ author cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (11.250368ms)
+✔ author Human <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (10.579598ms)
+✔ author cairnwright[bot] <other@example.com> exits 1 with a bot committer (10.932202ms)
+✔ author Human <human@example.com> exits 0 with a bot committer (10.961516ms)
+✔ author Cairnwright <cairnwright@example.com> exits 0 with a bot committer (9.991064ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 26
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 243.693789
+
+✖ failing tests:
+
+test at scripts/commit-author-recovery.test.mjs:19:1
+✖ incident recovery preserves trailers and history while passing the actual push check (25.556517ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'cairnwright[bot] <348051526+cairnwright@users.noreply.github.com>|Cairnwright <348051526+cairnwright@users.noreply.github.com>\n' +
+  - 'Cairnwright <348051526+cairnwright@users.noreply.github.com>|Cairnwright <348051526+cairnwright@users.noreply.github.com>\n' +
+      'Recovery fixture\n' +
+      '\n' +
+      'Co-authored-by: Contributor <contributor@example.invalid>'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2136/scripts/commit-author-recovery.test.mjs:88:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'cairnwright[bot] <348051526+cairnwright@users.noreply.github.com>|Cairnwright <348051526+cairnwright@users.noreply.github.com>\nRecovery fixture\n\nCo-authored-by: Contributor <contributor@example.invalid>',
+    expected: 'Cairnwright <348051526+cairnwright@users.noreply.github.com>|Cairnwright <348051526+cairnwright@users.noreply.github.com>\nRecovery fixture\n\nCo-authored-by: Contributor <contributor@example.invalid>',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

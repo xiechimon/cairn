@@ -1,0 +1,94 @@
+✖ incident handoff leaves recurrence accounting to the collector (1.082181ms)
+✖ dispatcher message exists and retains the closing trailer (0.113448ms)
+✖ recovery fixture executes the recipe without incident wording assertions (0.172203ms)
+✔ AGENTS.md separates bot rebase from human squash (1.751754ms)
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (0.244845ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.179761ms)
+✔ documented preparation overrides inherited bot author and committer identities (38.232061ms)
+✔ identity wrappers are explicitly excluded from commit preparation (0.440265ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.372548ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.163805ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (36.268386ms)
+✔ recovery regression is run by the trusted main workflow (0.733379ms)
+✔ incident recovery preserves trailers and history while passing the actual push check (36.56056ms)
+✔ PR validation reads the explicit head without executing PR code (0.86939ms)
+✔ a bot-authored commit beneath a human tip is rejected (22.219607ms)
+✔ a squash commit authored by the bot is rejected (17.465888ms)
+✔ main push checks bot squash (15.763134ms)
+✔ main push checks bot beneath human tip (19.022633ms)
+✔ main push checks historical bot (18.99309ms)
+✔ main push checks missing before (15.61419ms)
+✔ main push checks zero before (14.604598ms)
+✔ every commit in a clean human range passes (20.290323ms)
+✔ author cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (11.683246ms)
+✔ author Human <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (10.835023ms)
+✔ author cairnwright[bot] <other@example.com> exits 1 with a bot committer (11.135856ms)
+✔ author Human <human@example.com> exits 0 with a bot committer (10.757674ms)
+✔ author Cairnwright <cairnwright@example.com> exits 0 with a bot committer (10.602524ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 24
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 251.713685
+
+✖ failing tests:
+
+test at docs/verify/2136/review-check.test.mjs:5:1
+✖ incident handoff leaves recurrence accounting to the collector (1.082181ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2136/docs/verify/2136/review-check.test.mjs:7:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at docs/verify/2136/review-check.test.mjs:10:1
+✖ dispatcher message exists and retains the closing trailer (0.113448ms)
+  Error: ENOENT: no such file or directory, open 'COMMIT_MSG.txt'
+      at readFileSync (node:fs:621:20)
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2136/docs/verify/2136/review-check.test.mjs:11:16)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'COMMIT_MSG.txt'
+  }
+
+test at docs/verify/2136/review-check.test.mjs:14:1
+✖ recovery fixture executes the recipe without incident wording assertions (0.172203ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  true !== false
+
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2136/docs/verify/2136/review-check.test.mjs:16:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
