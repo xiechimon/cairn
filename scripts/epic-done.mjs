@@ -6,30 +6,18 @@ const exitCodes = { unknown: 2, complete: 0, paused: 20, failed: 30, incomplete:
 const humanLabels = new Set(['needs-decision', 'waits-ian', 'ready-for-human']);
 const shaPattern = /^[a-f0-9]{40}$/;
 const isoPattern = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/;
-const query = `query($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) { issue(number: $number) {
-    number state stateReason
-    labels(first: 100) { nodes { name } pageInfo { hasNextPage } }
-    timelineItems(last: 1, itemTypes: [CLOSED_EVENT]) {
-      nodes { ... on ClosedEvent { closer { __typename
-        ... on PullRequest { merged mergeCommit { oid } }
-        ... on Commit { oid }
-      } } } pageInfo { hasNextPage }
-    }
-    closedByPullRequestsReferences(first: 100, includeClosedPrs: true) {
-      nodes { number state labels(first: 100) { nodes { name } pageInfo { hasNextPage } } }
-      pageInfo { hasNextPage }
-    }
-  } }
-}`;
+const query = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issue(number: $number) {
+  number state stateReason labels(first: 100) { nodes { name } pageInfo { hasNextPage } }
+  timelineItems(last: 1, itemTypes: [CLOSED_EVENT]) { nodes { ... on ClosedEvent { closer {
+    __typename ... on PullRequest { merged mergeCommit { oid } } ... on Commit { oid }
+  } } } }
+  closedByPullRequestsReferences(first: 100, includeClosedPrs: true) { nodes { number state labels(first: 100) { nodes { name } pageInfo { hasNextPage } } } pageInfo { hasNextPage } }
+} } }`;
 function requireFact(condition, message) {
   if (!condition) throw new Error(message);
 }
 function nonempty(value) {
   return typeof value === 'string' && value.trim().length > 0 && !value.includes('\0');
-}
-function isIso(value) {
-  return typeof value === 'string' && isoPattern.test(value) && Number.isFinite(Date.parse(value));
 }
 function exactKeys(value, required, optional = []) {
   return (
@@ -57,6 +45,7 @@ export function validateManifest(manifest, epic) {
       unique(issues, positiveInteger) &&
       issues.length > 0 &&
       unique(requiredChecks, nonempty) &&
+      requiredChecks.length > 0 &&
       Array.isArray(checks) &&
       new Set(checks.map((check) => check?.name)).size === checks.length &&
       checks.every(
@@ -87,29 +76,32 @@ function labels(connection) {
   return nodes(connection, 'labels').map((label) => label.name);
 }
 function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
+  const stderr = error?.stderr?.toString().trim().slice(-2000);
+  return stderr ? `${message.split('\n')[0]}\n${stderr}` : message;
 }
 function parseShas(output) {
   const shas = output.trim() ? output.trim().split('\n') : [];
-  const valid = unique(shas, (sha) => shaPattern.test(sha));
-  requireFact(valid, 'Malformed git ancestry');
+  requireFact(
+    unique(shas, (sha) => shaPattern.test(sha)),
+    'Malformed git ancestry',
+  );
   return shas;
 }
 function issueBlocker({ number, state, stateReason, closingSha }, history) {
   if (state !== 'CLOSED') return `Issue #${number} is open.`;
   if (stateReason !== 'COMPLETED') return `Issue #${number} has closing reason ${stateReason}.`;
   if (!closingSha) return `Issue #${number} has no merged PR or closing commit.`;
-  if (!history.includes(closingSha))
-    return `Issue #${number} closing change ${closingSha} is not on main.`;
+  if (!history.has(closingSha)) return `Issue #${number}: ${closingSha} is not on main.`;
   return null;
 }
-function completionWindow({ issues, history, mainline, descendants }) {
-  if (issues.some((issue) => issueBlocker(issue, history)))
+function completionWindow({ issues, history, mainline, descendants }, historySet) {
+  if (issues.some((issue) => issueBlocker(issue, historySet)))
     return { lastClosingSha: null, eligible: [] };
-  const lastClosingSha = history.find((sha) => issues.some((issue) => issue.closingSha === sha));
-  const eligible = mainline
-    .filter((sha) => issues.every((issue) => descendants[issue.closingSha].includes(sha)))
-    .slice(0, 30);
+  const closingShas = new Set(issues.map((issue) => issue.closingSha));
+  const sets = [...closingShas].map((sha) => new Set(descendants[sha]));
+  const lastClosingSha = history.find((sha) => closingShas.has(sha));
+  const eligible = mainline.filter((sha) => sets.every((set) => set.has(sha))).slice(0, 30);
   requireFact(eligible[0] === history[0], 'Missing main ancestry after closure');
   return { lastClosingSha, eligible };
 }
@@ -135,9 +127,10 @@ export function decideEpic(facts) {
     );
     const reasons = [];
     const waiting = [];
+    const historySet = new Set(facts.history);
     if (!startedAt) reasons.push('No time cap: --started-at was not provided.');
     for (const issue of issues) {
-      const blocker = issueBlocker(issue, facts.history);
+      const blocker = issueBlocker(issue, historySet);
       if (blocker) reasons.push(blocker);
       for (const label of issue.labels)
         if (humanLabels.has(label)) waiting.push(`Issue #${issue.number} carries ${label}.`);
@@ -147,7 +140,7 @@ export function decideEpic(facts) {
             if (humanLabels.has(label))
               waiting.push(`PR #${pull.number} for #${issue.number} carries ${label}.`);
     }
-    const { lastClosingSha, eligible } = completionWindow(facts);
+    const { lastClosingSha, eligible } = completionWindow(facts, historySet);
     const greenSha =
       commits.find((commit) => requiredCheckFailures(commit, manifest.requiredChecks).length === 0)
         ?.sha ?? null;
@@ -192,14 +185,14 @@ export async function main(argv, deps = {}) {
   const run = deps.run ?? execFileSync;
   const write = deps.write ?? console.log;
   const clock = deps.now ?? (() => new Date());
-  let json = argv.includes('--json');
+  const json = argv.includes('--json');
   let result;
   try {
     const { values, positionals } = parseArgs({
       args: argv,
       allowPositionals: true,
       options: {
-        ref: { type: 'string', default: 'origin/main' },
+        ref: { type: 'string' },
         repo: { type: 'string', default: 'xiechimon/cairn' },
         'started-at': { type: 'string' },
         pause: { type: 'string' },
@@ -207,21 +200,26 @@ export async function main(argv, deps = {}) {
         json: { type: 'boolean', default: false },
       },
     });
-    json = values.json;
     const [epic] = positionals;
     requireFact(
       positionals.length === 1 && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(epic),
       'Expected one epic name',
     );
     requireFact(/^[\w.-]+\/[\w.-]+$/.test(values.repo), 'Expected --repo owner/name');
-    requireFact(nonempty(values.ref) && !values.ref.startsWith('-'), 'Invalid --ref');
     requireFact(
-      values['started-at'] === undefined || isIso(values['started-at']),
+      values.ref === undefined || (nonempty(values.ref) && !values.ref.startsWith('-')),
+      'Invalid --ref',
+    );
+    const startedAt = values['started-at'];
+    requireFact(
+      startedAt === undefined ||
+        (isoPattern.test(startedAt) && Number.isFinite(Date.parse(startedAt))),
       'Invalid --started-at ISO timestamp',
     );
     for (const name of ['pause', 'fail'])
       requireFact(values[name] === undefined || nonempty(values[name]), `Invalid --${name} reason`);
     const options = { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, shell: false };
+    options.stdio = ['pipe', 'pipe', 'pipe'];
     const execute = (file, args, extra = {}) => {
       const stdout = run(file, args, { ...options, ...extra });
       requireFact(typeof stdout === 'string', `Malformed runner output for ${file}`);
@@ -232,10 +230,6 @@ export async function main(argv, deps = {}) {
     const root = git(['rev-parse', '--show-toplevel']).trim();
     requireFact(nonempty(root), 'Missing git working tree root');
     options.cwd = root;
-    const manifest = validateManifest(
-      JSON.parse(git(['show', `${values.ref}:.claude/epics/${epic}.json`])),
-      epic,
-    );
     const ref = api([`repos/${values.repo}/git/ref/heads/main`]);
     requireFact(
       ref?.ref === 'refs/heads/main' &&
@@ -246,9 +240,22 @@ export async function main(argv, deps = {}) {
     const mainSha = ref.object.sha;
     try {
       git(['cat-file', '-e', `${mainSha}^{commit}`]);
-    } catch {
-      throw new Error(`Remote main ${mainSha} is unavailable locally; run git fetch origin main.`);
+    } catch (error) {
+      throw new Error(`git fetch origin main (${mainSha}): ${errorMessage(error)}`);
     }
+    let manifestRef = mainSha;
+    if (values.ref !== undefined)
+      try {
+        manifestRef = git(['rev-parse', '--verify', `${values.ref}^{commit}`]).trim();
+        requireFact(shaPattern.test(manifestRef), 'Malformed manifest commit');
+        git(['merge-base', '--is-ancestor', manifestRef, mainSha]);
+      } catch (error) {
+        throw new Error(`Untrusted ref "${values.ref}": ${errorMessage(error)}`);
+      }
+    const manifest = validateManifest(
+      JSON.parse(git(['show', `${manifestRef}:.claude/epics/${epic}.json`])),
+      epic,
+    );
     const [owner, name] = values.repo.split('/');
     const issues = manifest.issues.map((number) => {
       const payload = api(
@@ -258,18 +265,17 @@ export async function main(argv, deps = {}) {
       requireFact(!payload.errors, 'GitHub GraphQL errors or partial data');
       const issue = payload.data?.repository?.issue;
       requireFact(issue?.number === number, `Missing or malformed issue #${number}`);
-      const events = nodes(issue.timelineItems, 'closing events');
+      const events = issue.timelineItems?.nodes;
       requireFact(
-        events.length <= 1 && (issue.state !== 'CLOSED' || events.length === 1),
+        Array.isArray(events) &&
+          events.length <= 1 &&
+          (issue.state !== 'CLOSED' || events.length === 1),
         `Missing last closing event for #${number}`,
       );
       let closingSha = null;
       const closer = events.length ? events[0]?.closer : null;
       if (closer !== null) {
-        requireFact(
-          ['PullRequest', 'Commit'].includes(closer?.__typename),
-          'Malformed issue closer',
-        );
+        requireFact(['PullRequest', 'Commit'].includes(closer?.__typename), 'Malformed closer');
         if (closer.__typename === 'Commit' || closer.merged === true) {
           closingSha = closer.__typename === 'Commit' ? closer.oid : closer.mergeCommit?.oid;
           requireFact(shaPattern.test(closingSha), 'Missing closing commit');
@@ -292,17 +298,19 @@ export async function main(argv, deps = {}) {
       'Partial git history: shallow repository',
     );
     const history = parseShas(git(['rev-list', '--topo-order', mainSha]));
+    const historySet = new Set(history);
     requireFact(history[0] === mainSha, 'Partial main git history');
     const mainline = parseShas(git(['rev-list', '--first-parent', mainSha]));
     const descendants = {};
     for (const sha of new Set(issues.map((issue) => issue.closingSha))) {
-      if (!history.includes(sha)) continue;
+      if (!historySet.has(sha)) continue;
       descendants[sha] = [
         sha,
         ...parseShas(git(['rev-list', '--ancestry-path', `${sha}..${mainSha}`])),
       ];
     }
-    const { eligible } = completionWindow({ issues, history, mainline, descendants });
+    const ancestry = { issues, history, mainline, descendants };
+    const { eligible } = completionWindow(ancestry, historySet);
     const commits = [];
     for (const sha of eligible) {
       const pages = api([
@@ -334,18 +342,16 @@ export async function main(argv, deps = {}) {
     const snapshot = () => {
       const head = git(['rev-parse', '--verify', 'HEAD']).trim();
       requireFact(shaPattern.test(head), 'Malformed working tree HEAD');
-      return { head, dirty: git(['status', '--porcelain=v1', '--untracked-files=all']).length > 0 };
+      return { head, dirty: git(['status', '--porcelain=v1', '--untracked-files=no']).length > 0 };
     };
     let worktree = snapshot();
-    const checks = [];
-    for (const check of manifest.checks) {
+    const checks = manifest.checks.map((check) => {
       const result = {
         name: check.name,
         status: 'not-run',
         reason: 'Requires a clean working tree at remote main.',
       };
-      checks.push(result);
-      if (worktree.dirty || worktree.head !== mainSha) continue;
+      if (worktree.dirty || worktree.head !== mainSha) return result;
       try {
         result.stdout = execute(check.run[0], check.run.slice(1), { timeout: 900_000 });
         const passed = result.stdout.includes(check.expectStdoutIncludes ?? '');
@@ -360,10 +366,11 @@ export async function main(argv, deps = {}) {
         )
           throw error;
         result.status = 'failed';
-        result.reason = timedOut ? 'Command timed out after 900 seconds.' : errorMessage(error);
+        result.reason = `${timedOut ? 'Command timed out after 900 seconds. ' : ''}${errorMessage(error)}`;
       }
       worktree = snapshot();
-    }
+      return result;
+    });
     if (worktree.dirty || worktree.head !== mainSha)
       for (const check of checks) {
         check.status = 'not-run';
@@ -371,16 +378,13 @@ export async function main(argv, deps = {}) {
       }
     const facts = {
       manifest,
-      issues,
       mainSha,
-      history,
-      mainline,
-      descendants,
+      ...ancestry,
       commits,
       checks,
       worktree,
       now: clock().toISOString(),
-      startedAt: values['started-at'] ?? null,
+      startedAt: startedAt ?? null,
       pause: values.pause ?? null,
       fail: values.fail ?? null,
     };
@@ -388,13 +392,9 @@ export async function main(argv, deps = {}) {
   } catch (error) {
     result = { state: 'unknown', exitCode: 2, reasons: [errorMessage(error)], checks: [] };
   }
-  write(
-    json
-      ? JSON.stringify(result, null, 2)
-      : [`state: ${result.state}`, ...result.reasons].join('\n'),
-  );
+  const text = [`state: ${result.state}`, ...result.reasons].join('\n');
+  write(json ? JSON.stringify(result, null, 2) : text);
   return result;
 }
-if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
+if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename)
   process.exitCode = (await main(process.argv.slice(2))).exitCode;
-}

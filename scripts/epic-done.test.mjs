@@ -71,7 +71,11 @@ function harness() {
       if (file === 'git') {
         if (args[0] === 'cat-file') return '';
         if (args[0] === 'show') return JSON.stringify(state.manifest);
-        if (args[0] === 'status') return state.dirty;
+        if (args[0] === 'status')
+          return args.includes('--untracked-files=no')
+            ? state.dirty.replace(/^\?\? .*\n/gm, '')
+            : state.dirty;
+        if (args[0] === 'merge-base') return '';
         if (args.includes('--is-shallow-repository')) return state.shallow;
         if (args[0] === 'rev-list') {
           if (args.includes('--topo-order')) return state.history.join('\n');
@@ -81,6 +85,7 @@ function harness() {
         }
         if (args.includes('--show-toplevel')) return '/checkout\n';
         if (args.includes('HEAD')) return `${state.head}\n`;
+        if (args[0] === 'rev-parse' && args[2] === 'frozen-v1^{commit}') return `${closing}\n`;
       }
       if (file === 'gh') {
         assert.equal(args[0], 'api');
@@ -139,7 +144,7 @@ test('complete: closed issues, a clean remote-main tree and one green commit', a
     'includeClosedPrs: true',
   ])
     assert.ok(graphql.includes(field), field);
-  assert.ok(state.calls.some(({ args }) => args.includes('origin/main:.claude/epics/E1.0a.json')));
+  assert.ok(state.calls.some(({ args }) => args.includes(`${tip}:.claude/epics/E1.0a.json`)));
   const execution = state.calls.find(({ file }) => file === 'node');
   assert.deepEqual(execution.args, ['--test', 'policy.test.mjs']);
   assert.equal(execution.options.cwd, '/checkout');
@@ -289,7 +294,7 @@ test('missing, pending, skipped and neutral required checks do not count as succ
 test('failure mode 6: dirty and non-main trees never execute manifest commands', async () => {
   for (const change of [
     (s) => {
-      s.dirty = '?? local-file\n';
+      s.dirty = ' M tracked-file\n';
     },
     (s) => {
       s.head = outside;
@@ -328,7 +333,7 @@ test('failure mode 7: frozen manifest comes only from git show at the selected r
   assert.ok(
     state.calls.some(
       ({ file, args }) =>
-        file === 'git' && args[0] === 'show' && args[1] === 'frozen-v1:.claude/epics/E1.0a.json',
+        file === 'git' && args[0] === 'show' && args[1] === `${closing}:.claude/epics/E1.0a.json`,
     ),
   );
   assert.ok(
@@ -739,6 +744,164 @@ test('partial or reordered examined commits cannot establish completion', async 
     [...result.facts.commits].reverse(),
   ]) {
     expectState(decideEpic({ ...result.facts, commits }), 'unknown', 2);
+  }
+});
+
+test('empty required checks cannot establish completion without CI evidence', async () => {
+  const { state, invoke } = harness();
+  state.manifest.requiredChecks = [];
+  state.checks[tip] = [{ total_count: 0, check_runs: [] }];
+  assert.throws(() => validateManifest(state.manifest, 'E1.0a'), /manifest/i);
+  expectState(await invoke(), 'unknown', 2, /manifest/i);
+  assert.ok(!state.calls.some(({ file }) => file === 'node'));
+});
+
+test('untracked files before and during checks preserve every check result', async () => {
+  const { state, invoke } = harness();
+  state.dirty = '?? existing-cache\n';
+  state.manifest.checks.push({ name: 'report', run: ['node', '--version'] });
+  state.command = () => {
+    state.dirty += '?? generated-report\n';
+    return 'pass';
+  };
+  const result = await invoke();
+  expectState(result, 'complete', 0);
+  assert.deepEqual(
+    result.checks.map(({ status }) => status),
+    ['passed', 'passed'],
+  );
+  assert.ok(
+    state.calls
+      .filter(({ args }) => args[0] === 'status')
+      .every(({ args }) => args.includes('--untracked-files=no')),
+  );
+});
+
+test('default manifest is pinned to the GitHub main SHA before it is read', async () => {
+  const { state, invoke } = harness();
+  state.intercept = (file, args) => {
+    if (file === 'git' && args[0] === 'show' && args[1].startsWith('origin/main:'))
+      return JSON.stringify({ ...state.manifest, epic: 'stale-local-main' });
+  };
+  expectState(await invoke(), 'complete', 0);
+  const remoteIndex = state.calls.findIndex(({ args }) => args[1]?.endsWith('/git/ref/heads/main'));
+  const manifestIndex = state.calls.findIndex(({ args }) => args[0] === 'show');
+  assert.ok(remoteIndex >= 0 && remoteIndex < manifestIndex);
+  assert.equal(state.calls[manifestIndex].args[1], `${tip}:.claude/epics/E1.0a.json`);
+});
+
+test('explicit manifest refs must resolve to ancestors of remote main', async () => {
+  for (const failure of ['branch', 'missing', 'malformed', 'ancestry-error']) {
+    const { state, invoke } = harness();
+    state.intercept = (file, args) => {
+      if (file !== 'git') return;
+      if (args[0] === 'rev-parse' && args[2] === 'edited-manifest^{commit}') {
+        if (failure === 'missing') throw new Error('unknown revision');
+        return failure === 'malformed' ? 'not-a-sha' : `${outside}\n`;
+      }
+      if (args[0] === 'merge-base')
+        throw Object.assign(new Error('ancestry rejected'), {
+          status: failure === 'branch' ? 1 : 128,
+        });
+    };
+    expectState(await invoke(['--ref', 'edited-manifest']), 'unknown', 2, /edited-manifest/);
+    assert.ok(!state.calls.some(({ args }) => args[0] === 'show'));
+    assert.ok(!state.calls.some(({ file }) => file === 'node'));
+  }
+  const { state, invoke } = harness();
+  expectState(await invoke(['--ref', 'frozen-v1']), 'complete', 0);
+  assert.ok(
+    state.calls.some(({ args }) => args.join(' ') === `merge-base --is-ancestor ${closing} ${tip}`),
+  );
+});
+
+test('history and descendant membership do not perform repeated array scans', async () => {
+  const { invoke } = harness();
+  const { facts } = await invoke();
+  const rejectScan = () => {
+    throw new Error('Linear membership scan');
+  };
+  facts.history.includes = rejectScan;
+  facts.descendants[closing].includes = rejectScan;
+  expectState(decideEpic(facts), 'complete', 0);
+});
+
+test('finding the latest closure reads issue SHAs independently of history length', async () => {
+  const { invoke } = harness();
+  const { facts } = await invoke();
+  const middle = Array.from({ length: 1000 }, (_, index) =>
+    (index + 1).toString(16).padStart(40, '0'),
+  );
+  facts.history = [tip, ...middle, closing, older];
+  facts.mainline = [...facts.history];
+  facts.descendants[closing] = facts.history.slice(0, -1);
+  let reads = 0;
+  for (const item of facts.issues)
+    Object.defineProperty(item, 'closingSha', {
+      get() {
+        reads++;
+        return closing;
+      },
+    });
+  expectState(decideEpic(facts), 'complete', 0);
+  assert.ok(reads < 50, `Read closing SHAs ${reads} times`);
+});
+
+test('last closing events need nodes and bounded length without forward pageInfo', async () => {
+  const { state, invoke } = harness();
+  for (const item of state.issues) delete item.timelineItems.pageInfo;
+  expectState(await invoke(), 'complete', 0);
+  const graphql = JSON.parse(
+    state.calls.find(({ args }) => args[1] === 'graphql').options.input,
+  ).query;
+  const closingConnection = graphql
+    .split('timelineItems')[1]
+    .split('closedByPullRequestsReferences')[0];
+  assert.doesNotMatch(closingConnection, /pageInfo/);
+  for (const events of [undefined, [], [state.issues[0].timelineItems.nodes[0], {}]]) {
+    state.issues[0].timelineItems = { nodes: events };
+    expectState(await invoke(), 'unknown', 2, /closing event/i);
+  }
+});
+
+test('git and gh capture stderr and include it in unknown reasons', async () => {
+  for (const command of ['git', 'gh']) {
+    const { state, invoke } = harness();
+    state.intercept = (file) => {
+      if (file === command)
+        throw Object.assign(new Error('runner failed'), {
+          status: 128,
+          stderr: Buffer.from(`${command} diagnostic`),
+        });
+    };
+    expectState(await invoke(), 'unknown', 2, new RegExp(`${command} diagnostic`));
+    assert.deepEqual(state.calls.find(({ file }) => file === command).options.stdio, [
+      'pipe',
+      'pipe',
+      'pipe',
+    ]);
+    assert.match(state.output[0], /^state: unknown\n/);
+  }
+});
+
+test('manifest check failures capture stderr tails including timeouts', async () => {
+  for (const timedOut of [false, true]) {
+    const { state, invoke } = harness();
+    state.command = () => {
+      throw Object.assign(new Error('command failed'), {
+        status: timedOut ? null : 1,
+        code: timedOut ? 'ETIMEDOUT' : undefined,
+        stderr: `${'x'.repeat(4000)}\ncheck diagnostic tail`,
+      });
+    };
+    const result = await invoke();
+    expectState(result, 'incomplete', 10, /check diagnostic tail/);
+    assert.ok(result.checks[0].reason.length < 2200);
+    assert.deepEqual(state.calls.find(({ file }) => file === 'node').options.stdio, [
+      'pipe',
+      'pipe',
+      'pipe',
+    ]);
   }
 });
 

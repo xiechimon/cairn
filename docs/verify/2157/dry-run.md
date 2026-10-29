@@ -1,6 +1,6 @@
 # epic-done dry run against live GitHub (#2157)
 
-Read-only run on 2026-10-29. The checker ran from a clean detached worktree at origin/main `e6a95e74e13853dc183cc5c7508907dd227d5870`. The manifests lived in an unreferenced local commit `1c16b1c6b88173f2b5d2aaa0ea8111b770cfe3bb` (parent: that main SHA), passed with `--ref`, and were never pushed. GitHub data came from the authenticated `gh` CLI. No GitHub write happened.
+Read-only runs on 2026-10-29. The runs under Output used the first commit of this branch, `b0cadf399`; the runs under Final code used the reviewed version. The checker ran from a clean detached worktree at origin/main `e6a95e74e13853dc183cc5c7508907dd227d5870`. The manifests lived in an unreferenced local commit `1c16b1c6b88173f2b5d2aaa0ea8111b770cfe3bb` (parent: that main SHA), passed with `--ref`, and were never pushed. GitHub data came from the authenticated `gh` CLI. No GitHub write happened.
 
 ## Manifests
 
@@ -69,6 +69,23 @@ Time cap of 6 hours elapsed since 2026-10-29T00:00:00Z.
 exit=30
 ```
 
+## Final code
+
+Review fixes made `--ref` accept only commits that are ancestors of the remote main SHA, and made the default manifest ref that SHA. The unmerged manifest commit used above is therefore rejected, and git errors appear in the reason after the state line:
+
+```text
+$ node scripts/epic-done.mjs dryrun-complete --ref 1c16b1c6b88173f2b5d2aaa0ea8111b770cfe3bb
+state: unknown
+Untrusted ref "1c16b1c6b88173f2b5d2aaa0ea8111b770cfe3bb": Command failed: git merge-base --is-ancestor 1c16b1c6b88173f2b5d2aaa0ea8111b770cfe3bb e6a95e74e13853dc183cc5c7508907dd227d5870
+exit=2
+
+$ node scripts/epic-done.mjs dryrun-complete
+state: unknown
+Command failed: git show e6a95e74e13853dc183cc5c7508907dd227d5870:.claude/epics/dryrun-complete.json
+fatal: path '.claude/epics/dryrun-complete.json' does not exist in 'e6a95e74e13853dc183cc5c7508907dd227d5870'
+exit=2
+```
+
 ## Tests
 
 On origin/main, before this change:
@@ -78,12 +95,11 @@ $ node --test scripts/epic-done.test.mjs
 Could not find 'scripts/epic-done.test.mjs'
 ```
 
-On this branch:
+On this branch (final code):
 
 ```text
 $ node --test scripts/epic-done.test.mjs
-ℹ tests 38
-ℹ pass 38
+ℹ tests 47
+ℹ pass 47
 ℹ fail 0
-ℹ duration_ms 121.20125
 ```
