@@ -14,7 +14,7 @@ export function BackupBanner({ notice }: { notice: BackupNotice }) {
     >
       <span
         aria-hidden
-        className="flex size-7 flex-none items-center justify-center rounded-full bg-(--badge-attention) text-[10px] leading-none font-bold text-(--badge-attention-fg)"
+        className="flex size-7 flex-none items-center justify-center rounded-full bg-(--badge-attention) text-caption leading-none font-bold text-(--badge-attention-fg)"
       >
         !
       </span>
