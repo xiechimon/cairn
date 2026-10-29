@@ -1,0 +1,119 @@
+
+ RUN  v5.0.1 /workspace/integration
+
+ ❯ test/fixture-lifecycle.test.ts (3 tests | 3 failed) 740ms
+   ❯ bootRealServer fixture lifecycle (3)
+     × bootRealServer.close() removes repos, skills, attachments and skill-sources dirs 54ms
+     × close() removes dirs only after server.close resolves 34ms
+     × twenty sequential boot/close cycles leave zero owned entries 650ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/fixture-lifecycle.test.ts > bootRealServer fixture lifecycle > bootRealServer.close() removes repos, skills, attachments and skill-sources dirs
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/fixture-lifecycle.test.ts:29:53
+     27|     await server.close();
+     28|     servers.pop();
+     29|     for (const dir of dirs) expect(existsSync(dir)).toBe(false);
+       |                                                     ^
+     30|     expect(existsSync(server.mcpConfigPath)).toBe(false);
+     31|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/fixture-lifecycle.test.ts > bootRealServer fixture lifecycle > close() removes dirs only after server.close resolves
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/fixture-lifecycle.test.ts:51:38
+     49|       await server.close();
+     50|       servers.pop();
+     51|       expect(presentAtCloseCallback).toBe(true);
+       |                                      ^
+     52|       for (const dir of dirs) expect(existsSync(dir)).toBe(false);
+     53|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/fixture-lifecycle.test.ts > bootRealServer fixture lifecycle > twenty sequential boot/close cycles leave zero owned entries
+AssertionError: expected [ 'cairn-it-att-0BsjlL', …(39) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "cairn-it-att-0BsjlL",
++   "cairn-it-att-0xrO1I",
++   "cairn-it-att-2CNJJG",
++   "cairn-it-att-3Xd0HJ",
++   "cairn-it-att-648ru4",
++   "cairn-it-att-APTJNu",
++   "cairn-it-att-BtsaKV",
++   "cairn-it-att-LFqTxf",
++   "cairn-it-att-M0rpR6",
++   "cairn-it-att-MHS9RX",
++   "cairn-it-att-PQ392C",
++   "cairn-it-att-PxWbKN",
++   "cairn-it-att-Q03JgU",
++   "cairn-it-att-QTzIAl",
++   "cairn-it-att-ZU921e",
++   "cairn-it-att-h8tYAu",
++   "cairn-it-att-qbiT92",
++   "cairn-it-att-uKO6Cp",
++   "cairn-it-att-uhQqBo",
++   "cairn-it-att-zCVBuc",
++   "cairn-it-skill-sources-76hNuD",
++   "cairn-it-skill-sources-9AEhIq",
++   "cairn-it-skill-sources-A3Zd4G",
++   "cairn-it-skill-sources-EetBDq",
++   "cairn-it-skill-sources-Egv3cy",
++   "cairn-it-skill-sources-FJKaYL",
++   "cairn-it-skill-sources-Gj4Xvb",
++   "cairn-it-skill-sources-NJM5jQ",
++   "cairn-it-skill-sources-QJiQtE",
++   "cairn-it-skill-sources-QpFJZg",
++   "cairn-it-skill-sources-UGNZCC",
++   "cairn-it-skill-sources-WgUuWQ",
++   "cairn-it-skill-sources-cwJl5u",
++   "cairn-it-skill-sources-gqWLAp",
++   "cairn-it-skill-sources-pQLQvh",
++   "cairn-it-skill-sources-qAxag9",
++   "cairn-it-skill-sources-rv8dOS",
++   "cairn-it-skill-sources-skaPx5",
++   "cairn-it-skill-sources-ycIY9G",
++   "cairn-it-skill-sources-zLuLTJ",
++ ]
+
+ ❯ test/fixture-lifecycle.test.ts:67:20
+     65|       (name) => name.startsWith('cairn-') && !before.has(name),
+     66|     );
+     67|     expect(leaked).toEqual([]);
+       |                    ^
+     68|   });
+     69| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  16:41:15
+   Duration  2.36s (transform 44%, tests 33%, import 24%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/integration
+

@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeEach } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   agent as agentTable,
   chief as chiefTable,
@@ -69,7 +69,7 @@ export function seedMachineReport(
 
 const claudeHomes: string[] = [];
 export function claudeHome(settingsJson?: string): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-chief-models-'));
+  const dir = makeTestTempDir('chief-models-');
   claudeHomes.push(dir);
   if (settingsJson !== undefined) {
     mkdirSync(join(dir, '.claude'), { recursive: true });
@@ -78,7 +78,7 @@ export function claudeHome(settingsJson?: string): string {
   return dir;
 }
 afterAll(() => {
-  for (const dir of claudeHomes.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const dir of claudeHomes.splice(0)) releaseTestTempDir(dir);
 });
 
 export function seedAgent(id: string, description: string, modelId = 'stub-model') {
