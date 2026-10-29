@@ -1,62 +1,111 @@
 #!/usr/bin/env bash
-# backup-server-db.sh — hourly backup of the cairn server SQLite DB (#1151 / ADR 0016 ruling 7).
-#
-#   scripts/ops/backup-server-db.sh --db <path to server.db> --out <backup dir> [--remote <ssh target:dir>] [--keep N]
-#
-# Behavior: sqlite3 .backup (safe on a live DB, atomic) → integrity_check failure
-# aborts → gzip lands at <out>/server-db-<UTC timestamp>.db.gz → optional scp push
-# to a remote → both ends rotate away the oldest copies beyond --keep (default 48).
-# Any failed step exits non-zero and prints where it failed — backups are the kind
-# of thing nobody notices when broken; silent failure is worse than no backup.
 set -euo pipefail
+umask 077
+
+usage() {
+  cat >&2 <<'EOF'
+usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
+         [--attachments <dir> --attachments-out <dir>] [--remote <rsync destination>]
+
+  --db               live server DB, copied with sqlite3 .backup and checked with integrity_check
+  --out              local directory for server-db-<UTC timestamp>.db.gz, keeping the newest --keep (default 48)
+  --attachments      server attachments directory, copied into --attachments-out without deleting anything
+  --remote           rsync destination root (for example dmit-backup:); receives db/ and attachments/
+                     with no remote shell, no deletes and no overwrites; the receiver rotates its own copies
+
+secretbox.key and *.pem are never copied or pushed. A failed step exits non-zero and names the step.
+EOF
+  exit 2
+}
 
 DB=""
 OUT=""
+ATTACHMENTS=""
+ATTACHMENTS_OUT=""
 REMOTE=""
 KEEP=48
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --db) DB="$2"; shift 2 ;;
-    --out) OUT="$2"; shift 2 ;;
-    --remote) REMOTE="$2"; shift 2 ;;
-    --keep) KEEP="$2"; shift 2 ;;
-    *) echo "unknown arg: $1" >&2; exit 2 ;;
+    --db | --out | --attachments | --attachments-out | --remote | --keep)
+      [ $# -ge 2 ] || { echo "$1 requires a value" >&2; usage; }
+      case "$1" in
+        --db) DB="$2" ;;
+        --out) OUT="$2" ;;
+        --attachments) ATTACHMENTS="$2" ;;
+        --attachments-out) ATTACHMENTS_OUT="$2" ;;
+        --remote) REMOTE="$2" ;;
+        --keep) KEEP="$2" ;;
+      esac
+      shift 2
+      ;;
+    -h | --help) usage ;;
+    *) echo "unknown arg: $1" >&2; usage ;;
   esac
 done
 
-[ -n "$DB" ] && [ -n "$OUT" ] || { echo "usage: backup-server-db.sh --db <path> --out <dir> [--remote host:dir] [--keep N]" >&2; exit 2; }
-[ -f "$DB" ] || { echo "db not found: $DB" >&2; exit 1; }
-command -v sqlite3 >/dev/null || { echo "sqlite3 not on PATH" >&2; exit 1; }
-
-ts="$(date -u +%Y%m%dT%H%M%SZ)"
-name="server-db-${ts}.db.gz"
-mkdir -p "$OUT"
-
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-
-echo "[$ts] backup start: $DB"
-sqlite3 "$DB" ".backup '$tmp/server.db'"
-integrity="$(sqlite3 "$tmp/server.db" 'PRAGMA integrity_check;')"
-[ "$integrity" = "ok" ] || { echo "[$ts] FAIL integrity_check: $integrity" >&2; exit 1; }
-
-gzip -c "$tmp/server.db" > "$OUT/$name"
-echo "[$ts] wrote $OUT/$name ($(stat -f%z "$OUT/$name" 2>/dev/null || stat -c%s "$OUT/$name") bytes)"
-
-if [ -n "$REMOTE" ]; then
-  host="${REMOTE%%:*}"
-  rdir="${REMOTE#*:}"
-  ssh -o BatchMode=yes -o ConnectTimeout=10 "$host" "mkdir -p '$rdir'"
-  scp -q -o BatchMode=yes -o ConnectTimeout=10 "$OUT/$name" "$REMOTE/"
-  echo "[$ts] pushed to $REMOTE/"
-  # Remote rotation: the file name carries the UTC timestamp; sort by name desc,
-  # skip the newest KEEP entries, delete the rest. while-read instead of xargs -r:
-  # BSD xargs has no -r, and empty input would run `rm -f` with no operand.
-  ssh -o BatchMode=yes "$host" "cd '$rdir' && { ls -1 server-db-*.db.gz 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) | while IFS= read -r f; do rm -f -- \"\$f\"; done"
+[ -n "$DB" ] && [ -n "$OUT" ] || usage
+[[ "$KEEP" =~ ^[1-9][0-9]*$ ]] || { echo "--keep must be a positive integer: $KEEP" >&2; usage; }
+if [[ -n "$ATTACHMENTS" && -z "$ATTACHMENTS_OUT" || -z "$ATTACHMENTS" && -n "$ATTACHMENTS_OUT" ]]; then
+  echo "--attachments and --attachments-out go together" >&2
+  usage
 fi
 
-# Local rotation (same rule).
-cd "$OUT" && { ls -1 server-db-*.db.gz 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) | while IFS= read -r f; do rm -f -- "$f"; done
+ts="$(date -u +%Y%m%dT%H%M%SZ)"
+
+fail() {
+  echo "[$ts] FAIL $1" >&2
+  exit 1
+}
+
+[ -f "$DB" ] || fail "db not found: $DB"
+command -v sqlite3 >/dev/null || fail "sqlite3 not on PATH"
+command -v gzip >/dev/null || fail "gzip not on PATH"
+if [ -n "$ATTACHMENTS$REMOTE" ]; then
+  command -v rsync >/dev/null || fail "rsync not on PATH"
+fi
+[ -z "$ATTACHMENTS" ] || [ -d "$ATTACHMENTS" ] || fail "attachments not found: $ATTACHMENTS"
+
+SECRETS=(--exclude=secretbox.key --exclude='*.pem')
+name="server-db-${ts}.db.gz"
+
+echo "[$ts] backup start: $DB"
+mkdir -p "$OUT" || fail "create $OUT"
+tmp="$(mktemp -d "$OUT/.backup.XXXXXX")" || fail "create a scratch dir in $OUT"
+trap 'rm -rf "$tmp"' EXIT
+
+sqlite3 "$DB" ".backup '$tmp/server.db'" || fail "sqlite3 .backup"
+integrity="$(sqlite3 "$tmp/server.db" 'PRAGMA integrity_check;')" || fail "integrity_check"
+[ "$integrity" = "ok" ] || fail "integrity_check: $integrity"
+gzip -c "$tmp/server.db" > "$tmp/$name" || fail "gzip"
+mv "$tmp/$name" "$OUT/$name" || fail "write $OUT/$name"
+rm -rf "$tmp"
+echo "[$ts] wrote $OUT/$name ($(wc -c < "$OUT/$name" | tr -d ' ') bytes)"
+
+(
+  cd "$OUT" &&
+    { ls -1 server-db-*.db.gz 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) |
+    while IFS= read -r f; do rm -f -- "$f"; done
+) || fail "rotate $OUT"
+
+if [ -n "$ATTACHMENTS" ]; then
+  mkdir -p "$ATTACHMENTS_OUT" || fail "create $ATTACHMENTS_OUT"
+  rsync -a "${SECRETS[@]}" "$ATTACHMENTS/" "$ATTACHMENTS_OUT/" || fail "copy attachments"
+  echo "[$ts] attachments copied: $(find "$ATTACHMENTS_OUT" -type f | wc -l | tr -d ' ') files"
+fi
+
+if [ -n "$REMOTE" ]; then
+  export RSYNC_RSH="${RSYNC_RSH:-ssh -o BatchMode=yes -o ConnectTimeout=30}"
+  case "$REMOTE" in
+    *: | */) dest="$REMOTE" ;;
+    *) dest="$REMOTE/" ;;
+  esac
+  push=(rsync -a --timeout=300 --ignore-existing)
+  "${push[@]}" --include='server-db-*.db.gz' --exclude='*' "$OUT/" "${dest}db/" || fail "push db to ${dest}db/"
+  if [ -n "$ATTACHMENTS" ]; then
+    "${push[@]}" "${SECRETS[@]}" "$ATTACHMENTS_OUT/" "${dest}attachments/" || fail "push attachments to ${dest}attachments/"
+  fi
+  echo "[$ts] pushed to $dest"
+fi
 
 echo "[$ts] backup done"

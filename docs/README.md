@@ -11,7 +11,7 @@ This directory holds two kinds of things: **long-lived documents** (specs, decis
 | `privacy.md` | What Cairn sends (nothing) and what the optional first-PR discussion prompt does and does not carry |
 | `community/welcome.md` | Discussion categories, where bugs and security reports go, and how to post a first-PR write-up |
 | `pr-review.md` | The PR review process (five-step process + six-section scorecard) |
-| `ops-db-backup.md` | Server DB backup and recovery (script `scripts/ops/backup-server-db.sh`, schedule template, and drill discipline) |
+| `ops-db-backup.md` | Server DB and attachments backup and recovery (script `scripts/ops/backup-server-db.sh`, the omarchy units, the rrsync receiver on dmit, and drill discipline) |
 | `feature-map.md` | Feature map (living register of current state), mechanically extracted by `scripts/generate-feature-map.mjs` — do not hand-edit; re-run the script to regenerate, add `--check` to verify |
 | `lessons/` | Error ledger (one file per error category of things that went wrong and were later fixed); protections take the highest feasible level on the ladder, and anything that can be made a machine check must not stop at prose |
 | `agent-dispatch-prompts.md` | Agent dispatch prompt templates (task, scope, and acceptance commands are appended after the matching template), shared by Codex / Grok / pi, all following AGENTS.md |
