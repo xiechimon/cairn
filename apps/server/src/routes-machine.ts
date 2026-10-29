@@ -29,7 +29,7 @@ import type { AppContext } from './context.js';
 import type { machine as machineTable } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { newRecordId } from './lib/ids.js';
-import { matchesAuthToken } from './lib/token-auth.js';
+import { matchesAllowlistedTailscaleIdentity, matchesAuthToken } from './lib/token-auth.js';
 import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
@@ -229,7 +229,10 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/machine/enroll/confirm', async (c) => {
     if (ctx.authToken !== null) {
       const token = bearer(c);
-      if (token === null || !matchesAuthToken(ctx.authToken, token)) throw unauthorized();
+      const ownerBearer = token !== null && matchesAuthToken(ctx.authToken, token);
+      if (!ownerBearer && !matchesAllowlistedTailscaleIdentity(c, ctx.tailscaleUsers)) {
+        throw unauthorized();
+      }
     }
     const body = parseWith(machineEnrollConfirmBodySchema, await jsonBody(c), 'body');
     const entry = ctx.enrollments.get(body.enrollId);

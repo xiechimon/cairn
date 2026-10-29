@@ -25,7 +25,7 @@ Run credential-holding services outside the untrusted execution identity where t
 ## Protect server access and local state
 
 1. Bind a local server explicitly to `HOST=127.0.0.1`. Set a random `CAIRN_TOKEN` and `CAIRN_REQUIRE_TOKEN=1` before startup. Protect the token from shell history, logs, and shared environment files. Require-token mode also suppresses the token-bearing startup login link.
-2. For remote access, use authenticated TLS and a firewall or private network with an explicit client allowlist. With #2053, enrollment confirmation requires the server owner bearer when authentication is enabled; keep start/poll reachable for the CLI, and still prefer authenticated TLS plus network allowlisting for remote daemons.
+2. For remote access, use authenticated TLS and a firewall or private network with an explicit client allowlist. With #2053, enrollment confirmation requires the server owner bearer or an allowlisted loopback Tailscale identity when authentication is enabled; keep start/poll reachable for the CLI, and still prefer authenticated TLS plus network allowlisting for remote daemons.
 3. Restrict every API key to trusted holders while #2054 is unresolved. A read-only MCP key currently also permits machine enrollment. Do not treat MCP tool grants as a complete limit on that key's authority.
 4. Before starting the daemon under its dedicated user, set `umask 077`. Make its Cairn home private and keep `machine.json` readable only by its owner. Check existing files as well as newly created ones. #2056 tracks automatic permission enforcement.
 5. Keep the server database and `secretbox.key` private. Back them up together into restricted storage. Anyone with both can decrypt stored secrets. Never mount those backups into the executor.

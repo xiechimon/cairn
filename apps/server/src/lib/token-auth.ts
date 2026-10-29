@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getConnInfo } from '@hono/node-server/conninfo';
-import type { Hono } from 'hono';
+import type { Context, Hono } from 'hono';
 import { sha256Hex } from './crypto.js';
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -31,6 +31,22 @@ export function matchesAuthToken(expected: string, provided: string): boolean {
   return makeVerifier(expected)(provided);
 }
 
+export function matchesAllowlistedTailscaleIdentity(
+  c: Context,
+  tailscaleUsers: readonly string[],
+): boolean {
+  if (tailscaleUsers.length === 0) return false;
+  const tailscaleLogin = c.req.header('tailscale-user-login');
+  if (tailscaleLogin === undefined || !tailscaleUsers.includes(tailscaleLogin)) return false;
+  let peerAddress: string | undefined;
+  try {
+    peerAddress = getConnInfo(c).remote.address;
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+  }
+  return peerAddress !== undefined && LOOPBACK_PEER_ADDRESSES.has(peerAddress);
+}
+
 export function registerTokenAuth(
   app: Hono,
   token: string | null,
@@ -38,21 +54,11 @@ export function registerTokenAuth(
 ): void {
   if (token === null) return;
   const verify = makeVerifier(token);
-  const allowedTailscaleUsers = new Set(tailscaleUsers);
   app.use('*', async (c, next) => {
     const url = new URL(c.req.url);
     const pathname = url.pathname;
     if (isExempt(pathname)) return next();
-    const tailscaleLogin = c.req.header('tailscale-user-login');
-    if (tailscaleLogin !== undefined && allowedTailscaleUsers.has(tailscaleLogin)) {
-      let peerAddress: string | undefined;
-      try {
-        peerAddress = getConnInfo(c).remote.address;
-      } catch (error) {
-        if (!(error instanceof TypeError)) throw error;
-      }
-      if (peerAddress !== undefined && LOOPBACK_PEER_ADDRESSES.has(peerAddress)) return next();
-    }
+    if (matchesAllowlistedTailscaleIdentity(c, tailscaleUsers)) return next();
     const authorization = c.req.header('authorization');
     if (authorization !== undefined) {
       const match = /^Bearer\s+(.+)$/i.exec(authorization);

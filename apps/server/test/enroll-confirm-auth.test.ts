@@ -177,4 +177,75 @@ describe('enroll confirm owner auth (#2053)', () => {
     const confirmed = await reqWith(s, 'POST', '/api/machine/enroll/confirm', {}, { enrollId });
     expect(confirmed.status).toBe(200);
   });
+
+  test('allowlisted loopback Tailscale identity confirms without stored bearer', async () => {
+    const s = bootServer({
+      authToken: OWNER_TOKEN,
+      tailscaleUsers: ['xiechimon@github'],
+    });
+    const start = await reqWith(
+      s,
+      'POST',
+      '/api/machine/enroll/start',
+      {},
+      { name: 'tailscale-serve' },
+    );
+    expect(start.status).toBe(200);
+    const { enrollId } = (await start.json()) as { enrollId: string };
+
+    const forged = await Promise.resolve(
+      s.app.request(
+        '/api/machine/enroll/confirm',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'Tailscale-User-Login': 'xiechimon@github',
+          },
+          body: JSON.stringify({ enrollId }),
+        },
+        { incoming: { socket: { remoteAddress: '100.64.0.2' } } },
+      ),
+    );
+    expect(forged.status).toBe(401);
+
+    const stranger = await Promise.resolve(
+      s.app.request(
+        '/api/machine/enroll/confirm',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'Tailscale-User-Login': 'stranger@github',
+          },
+          body: JSON.stringify({ enrollId }),
+        },
+        { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
+      ),
+    );
+    expect(stranger.status).toBe(401);
+
+    const confirmed = await Promise.resolve(
+      s.app.request(
+        '/api/machine/enroll/confirm',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'Tailscale-User-Login': 'xiechimon@github',
+          },
+          body: JSON.stringify({ enrollId }),
+        },
+        { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
+      ),
+    );
+    expect(confirmed.status).toBe(200);
+    const { machine } = (await confirmed.json()) as {
+      machine: { machineId: string; token: string; teamId: string };
+    };
+    expect(machine.teamId).toBe(s.team.id);
+
+    const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
+    expect(await poll.json()).toEqual({ status: 'authorized', machine });
+  });
 });
