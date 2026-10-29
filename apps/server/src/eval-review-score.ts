@@ -1,6 +1,11 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { FailureWhere, FailureWhy } from '@cairn/shared';
+import {
+  type FailureWhere,
+  type FailureWhy,
+  failureWhereSchema,
+  failureWhySchema,
+} from '@cairn/shared';
 
 export type ReviewLabelRecord = {
   itemId: string;
@@ -67,6 +72,7 @@ export type WeekScoreArtifact = {
 
 export function labelerVendor(modelId: string): string {
   const id = modelId.trim().toLowerCase();
+  if (id === '') return 'unknown';
   if (id.includes('claude')) return 'anthropic';
   if (id.includes('glm')) return 'z.ai';
   if (id.includes('gpt') || id.includes('codex') || id.includes('o1') || id.includes('o3')) {
@@ -167,8 +173,17 @@ export function scoreReviewWeeks(weeks: WeekInput[]): ReviewScore {
 
   for (const week of weeks) {
     const labeler = labelerVendor(week.answers.labelerModel);
+    if (labeler === 'unknown') {
+      throw new Error(
+        `unresolved labeler vendor for model ${week.answers.labelerModel || '(empty)'}`,
+      );
+    }
     for (const record of week.records) {
-      if (record.reader.vendor === labeler) {
+      const readerVendor = labelerVendor(record.reader.model);
+      if (readerVendor === 'unknown') {
+        throw new Error(`unresolved reader vendor for model ${record.reader.model || '(empty)'}`);
+      }
+      if (readerVendor === labeler) {
         throw new Error(
           `reader vendor equals the labeler vendor (${labeler}) for ${record.itemId}`,
         );
@@ -192,10 +207,27 @@ export function scoreReviewWeeks(weeks: WeekInput[]): ReviewScore {
       }
       seen.set(identity, fingerprint);
       const answer = week.answers.items[record.itemId];
-      if (!answer || record.where === undefined || record.why === undefined) continue;
+      if (!answer) continue;
+      if (record.where === undefined && record.why === undefined) continue;
+      const handWhere = failureWhereSchema.safeParse(record.where);
+      if (!handWhere.success) {
+        throw new Error(`invalid where for ${record.itemId}`);
+      }
+      const handWhy = failureWhySchema.safeParse(record.why);
+      if (!handWhy.success) {
+        throw new Error(`invalid why for ${record.itemId}`);
+      }
+      const answerWhere = failureWhereSchema.safeParse(answer.where);
+      if (!answerWhere.success) {
+        throw new Error(`invalid where for ${record.itemId} answers`);
+      }
+      const answerWhy = failureWhySchema.safeParse(answer.why);
+      if (!answerWhy.success) {
+        throw new Error(`invalid why for ${record.itemId} answers`);
+      }
       labeled += 1;
-      wherePairs.push([answer.where, record.where]);
-      whyPairs.push([answer.why, record.why]);
+      wherePairs.push([answerWhere.data, handWhere.data]);
+      whyPairs.push([answerWhy.data, handWhy.data]);
     }
   }
 

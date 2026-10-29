@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /workspace/apps/server
+
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  03:41:33
+   Duration  553ms (transform 73%, import 24%, tests 2%, worker 1%)
+

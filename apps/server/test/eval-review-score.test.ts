@@ -154,6 +154,114 @@ test("a record whose reader vendor equals the labeler's vendor is rejected", () 
   );
 });
 
+test('null where or why labels are rejected and cannot establish agreement', () => {
+  const reader = { model: 'gpt-5', vendor: 'openai' };
+  const base = packRecord('item-1', 'build-1', { where: 'prompt', why: 'wrong_tool' }, reader);
+  const answers: AnswersFile = {
+    labelerModel: 'claude-sonnet-4',
+    items: { 'item-1': { where: 'prompt', why: 'wrong_tool' } },
+  };
+  expect(() =>
+    scoreReviewWeeks([
+      {
+        week: '2026-W44',
+        records: [{ ...base, where: null as unknown as ReviewLabelRecord['where'] }],
+        answers,
+      },
+    ]),
+  ).toThrow(/invalid where/i);
+  expect(() =>
+    scoreReviewWeeks([
+      {
+        week: '2026-W44',
+        records: [{ ...base, why: null as unknown as ReviewLabelRecord['why'] }],
+        answers,
+      },
+    ]),
+  ).toThrow(/invalid why/i);
+});
+
+test('invalid where or why enum labels are rejected', () => {
+  const reader = { model: 'gpt-5', vendor: 'openai' };
+  const base = packRecord('item-1', 'build-1', { where: 'prompt', why: 'wrong_tool' }, reader);
+  const answers: AnswersFile = {
+    labelerModel: 'claude-sonnet-4',
+    items: { 'item-1': { where: 'prompt', why: 'wrong_tool' } },
+  };
+  expect(() =>
+    scoreReviewWeeks([
+      {
+        week: '2026-W44',
+        records: [{ ...base, where: 'not-a-where' as ReviewLabelRecord['where'] }],
+        answers,
+      },
+    ]),
+  ).toThrow(/invalid where/i);
+  expect(() =>
+    scoreReviewWeeks([
+      {
+        week: '2026-W44',
+        records: [{ ...base, why: 'not-a-why' as ReviewLabelRecord['why'] }],
+        answers,
+      },
+    ]),
+  ).toThrow(/invalid why/i);
+});
+
+test('empty reader.vendor cannot bypass same-vendor rejection when model maps to the labeler', () => {
+  const records = [
+    packRecord(
+      'item-1',
+      'build-1',
+      { where: 'prompt', why: 'wrong_tool' },
+      { model: 'claude-opus-4', vendor: '' },
+    ),
+  ];
+  const answers: AnswersFile = {
+    labelerModel: 'claude-sonnet-4',
+    items: { 'item-1': { where: 'prompt', why: 'wrong_tool' } },
+  };
+  expect(() => scoreReviewWeeks([{ week: '2026-W44', records, answers }])).toThrow(
+    /reader vendor equals the labeler vendor/i,
+  );
+});
+
+test('wrong-cased reader.vendor Anthropic cannot bypass same-vendor rejection', () => {
+  const records = [
+    packRecord(
+      'item-1',
+      'build-1',
+      { where: 'prompt', why: 'wrong_tool' },
+      { model: 'claude-opus-4', vendor: 'Anthropic' },
+    ),
+  ];
+  const answers: AnswersFile = {
+    labelerModel: 'claude-sonnet-4',
+    items: { 'item-1': { where: 'prompt', why: 'wrong_tool' } },
+  };
+  expect(() => scoreReviewWeeks([{ week: '2026-W44', records, answers }])).toThrow(
+    /reader vendor equals the labeler vendor/i,
+  );
+});
+
+test('unresolved reader.model vendor is rejected', () => {
+  const records = [
+    packRecord(
+      'item-1',
+      'build-1',
+      { where: 'prompt', why: 'wrong_tool' },
+      { model: 'mystery-model', vendor: 'openai' },
+    ),
+  ];
+  const answers: AnswersFile = {
+    labelerModel: 'claude-sonnet-4',
+    items: { 'item-1': { where: 'prompt', why: 'wrong_tool' } },
+  };
+  expect(() => scoreReviewWeeks([{ week: '2026-W44', records, answers }])).toThrow(
+    /unresolved reader vendor/i,
+  );
+});
+
 test('conflicting repeated labels for the same item identity across weeks are rejected', () => {
   const reader = { model: 'gpt-5', vendor: 'openai' };
   const first = packRecord('item-a', 'build-1', { where: 'prompt', why: 'wrong_tool' }, reader);
