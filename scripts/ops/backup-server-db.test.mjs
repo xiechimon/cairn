@@ -9,7 +9,6 @@ import {
   readFileSync,
   renameSync,
   rmSync,
-  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -54,13 +53,9 @@ function files(dir) {
     .sort();
 }
 
-function write(path, body, ageMinutes = 0) {
+function write(path, body) {
   mkdirSync(join(path, '..'), { recursive: true });
   writeFileSync(path, body);
-  if (ageMinutes > 0) {
-    const then = new Date(Date.now() - ageMinutes * 60000);
-    utimesSync(path, then, then);
-  }
 }
 
 function sqlite(db, sql) {
@@ -78,12 +73,20 @@ function fixture() {
   const receiver = join(root, 'receiver');
   mkdirSync(receiver, { recursive: true });
   mkdirSync(server, { recursive: true });
-  sqlite(db, "create table todo(id text); insert into todo values ('a'), ('b');");
+  sqlite(
+    db,
+    [
+      'create table todo(id text);',
+      "insert into todo values ('a'), ('b');",
+      'create table attachment(id text primary key, storageKey text not null, sizeBytes integer not null, status text not null);',
+      "insert into attachment values ('1', 'team1/one.png', 3, 'ready'), ('2', 'team1/two.txt', 3, 'ready'), ('3', 'team2/cert.pem', 11, 'ready');",
+    ].join(' '),
+  );
   write(join(server, 'secretbox.key'), 'server key');
-  write(join(attachments, 'team1', 'one.png'), 'one', 60);
-  write(join(attachments, 'team1', 'two.txt'), 'two', 60);
-  write(join(attachments, 'team1', 'secretbox.key'), 'planted key', 60);
-  write(join(attachments, 'team2', 'cert.pem'), 'planted pem', 60);
+  write(join(attachments, 'team1', 'one.png'), 'one');
+  write(join(attachments, 'team1', 'two.txt'), 'two');
+  write(join(attachments, 'team1', 'secretbox.key'), 'planted key');
+  write(join(attachments, 'team2', 'cert.pem'), 'planted pem');
   const rrsync = join(root, 'rrsync');
   writeFileSync(rrsync, receiverSource);
   const ssh = join(root, 'fake-ssh');
@@ -189,7 +192,8 @@ test('later runs add files on both sides and never delete or overwrite', () => {
   write(join(f.receiver, 'db', 'server-db-20200101T000000Z.db.gz'), 'kept by the receiver');
   write(join(f.receiver, 'attachments', 'team1', 'one.png'), 'receiver copy');
   rmSync(join(f.attachments, 'team1', 'two.txt'));
-  write(join(f.attachments, 'team3', 'three.png'), 'three', 60);
+  write(join(f.attachments, 'team3', 'three.png'), 'three');
+  sqlite(f.db, "insert into attachment values ('4', 'team3/three.png', 5, 'ready');");
 
   const result = f.run(f.full);
   assert.equal(result.status, 0, result.stderr);
@@ -247,21 +251,36 @@ test('bad arguments exit 2 before anything is written', () => {
   assert.equal(existsSync(f.backups), false);
 });
 
-test('an attachment written in the last minute waits for a later run on both sides', () => {
+test('an attachment is copied only once its row is ready and its size matches', () => {
   const f = fixture();
-  write(join(f.attachments, 'team4', 'upload.png'), 'partial');
-  assert.equal(f.run(f.full).status, 0);
-  assert.equal(existsSync(join(f.backups, 'attachments', 'team4', 'upload.png')), false);
-  assert.equal(existsSync(join(f.receiver, 'attachments', 'team4', 'upload.png')), false);
+  const upload = join(f.attachments, 'team4', 'upload.png');
+  const sides = [join(f.backups, 'attachments'), join(f.receiver, 'attachments')];
+  let hour = 0;
+  const runLater = () => {
+    for (const copy of dbCopies(join(f.backups, 'db')))
+      renameSync(
+        join(f.backups, 'db', copy),
+        join(f.backups, 'db', `server-db-20200101T0${hour++}0000Z.db.gz`),
+      );
+    return f.run(f.full);
+  };
 
-  write(join(f.attachments, 'team4', 'upload.png'), 'complete upload', 60);
-  const result = f.run(f.full);
-  assert.equal(result.status, 0, result.stderr);
-  for (const side of [f.backups, f.receiver])
-    assert.equal(
-      readFileSync(join(side, 'attachments', 'team4', 'upload.png'), 'utf8'),
-      'complete upload',
-    );
+  write(upload, 'partial');
+  sqlite(f.db, "insert into attachment values ('5', 'team4/upload.png', 15, 'pending');");
+  assert.equal(runLater().status, 0);
+  for (const side of sides) assert.equal(existsSync(join(side, 'team4', 'upload.png')), false);
+
+  sqlite(f.db, "update attachment set status = 'ready' where id = '5';");
+  const interrupted = runLater();
+  assert.equal(interrupted.status, 0, interrupted.stderr);
+  assert.match(interrupted.stderr, /skipped team4\/upload\.png: 7 bytes on disk, 15 in the db/);
+  for (const side of sides) assert.equal(existsSync(join(side, 'team4', 'upload.png')), false);
+
+  write(upload, 'complete upload');
+  const complete = runLater();
+  assert.equal(complete.status, 0, complete.stderr);
+  for (const side of sides)
+    assert.equal(readFileSync(join(side, 'team4', 'upload.png'), 'utf8'), 'complete upload');
 });
 
 test('a run whose copy name already exists fails and keeps the existing copy', () => {
@@ -282,4 +301,32 @@ test('a run whose copy name already exists fails and keeps the existing copy', (
   assert.match(result.stderr, /FAIL .*already exists/);
   for (const path of taken) assert.equal(readFileSync(path, 'utf8'), 'earlier run');
   assert.deepEqual(files(f.receiver), []);
+});
+
+test('a rewritten step session lands as a new version on both sides', () => {
+  const f = fixture();
+  const session = join(f.attachments, 'step-sessions', 'step1.jsonl');
+  const sides = [join(f.backups, 'attachments'), join(f.receiver, 'attachments')];
+  const versions = (side) =>
+    files(join(side, 'step-sessions')).map((name) =>
+      readFileSync(join(side, 'step-sessions', name), 'utf8'),
+    );
+  write(session, '{"a":1}\n');
+  assert.equal(f.run(f.full).status, 0);
+  for (const side of sides) assert.deepEqual(versions(side), ['{"a":1}\n']);
+
+  const [first] = dbCopies(join(f.backups, 'db'));
+  renameSync(
+    join(f.backups, 'db', first),
+    join(f.backups, 'db', 'server-db-20200101T090000Z.db.gz'),
+  );
+  write(session, '{"a":1}\n{"b":2}\n');
+  const result = f.run(f.full);
+  assert.equal(result.status, 0, result.stderr);
+  for (const side of sides) {
+    assert.deepEqual(versions(side).sort(), ['{"a":1}\n', '{"a":1}\n{"b":2}\n']);
+    assert.ok(
+      files(join(side, 'step-sessions')).every((name) => /^step1\.\d+-\d+\.jsonl$/.test(name)),
+    );
+  }
 });

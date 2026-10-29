@@ -9,8 +9,10 @@ usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
 
   --db               live server DB, copied with sqlite3 .backup and checked with integrity_check
   --out              local directory for server-db-<UTC timestamp>.db.gz, keeping the newest --keep (default 48)
-  --attachments      server attachments directory; files unchanged for over a minute are copied into
-                     --attachments-out, and nothing is ever deleted there
+  --attachments      server attachments directory; files whose attachment row is ready in this run's
+                     DB copy, with the size it records, are copied into --attachments-out, and nothing
+                     is ever deleted there; step-sessions/<step>.jsonl is copied as
+                     step-sessions/<step>.<mtime>-<size>.jsonl, one file per version
   --remote           existing rsync destination root (for example dmit-backup:); receives db/ and attachments/
                      with no remote shell, no deletes and no overwrites; the receiver rotates its own copies
 
@@ -94,10 +96,38 @@ echo "[$ts] wrote $OUT/$name ($(wc -c < "$OUT/$name" | tr -d ' ') bytes)"
 
 if [ -n "$ATTACHMENTS" ]; then
   mkdir -p "$ATTACHMENTS_OUT" || fail "create $ATTACHMENTS_OUT"
-  (cd "$ATTACHMENTS" && find . -type f -mmin +1 ! -name secretbox.key ! -name '*.pem' -print0) > "$tmp/settled" ||
-    fail "list settled attachments"
+  sqlite3 -separator $'\t' "$tmp/server.db" "select storageKey, sizeBytes from attachment where status = 'ready';" > "$tmp/ready" ||
+    fail "list ready attachments in the db copy"
+  : > "$tmp/settled"
+  while IFS=$'\t' read -r key size; do
+    case "/$key/" in
+      */../* | //*) fail "unsafe attachment storageKey: $key" ;;
+    esac
+    actual="$( [ -f "$ATTACHMENTS/$key" ] && wc -c < "$ATTACHMENTS/$key" | tr -d ' ' || echo missing)"
+    if [ "$actual" = "$size" ]; then
+      printf '%s\0' "$key" >> "$tmp/settled"
+    else
+      echo "[$ts] skipped $key: $actual bytes on disk, $size in the db" >&2
+    fi
+  done < "$tmp/ready"
   rsync -a --from0 --files-from="$tmp/settled" "${SECRETS[@]}" "$ATTACHMENTS/" "$ATTACHMENTS_OUT/" ||
     fail "copy attachments"
+  if [ -d "$ATTACHMENTS/step-sessions" ]; then
+    mkdir -p "$ATTACHMENTS_OUT/step-sessions" || fail "create $ATTACHMENTS_OUT/step-sessions"
+    for src in "$ATTACHMENTS"/step-sessions/*.jsonl; do
+      [ -f "$src" ] || continue
+      version="$(stat -c '%Y-%s' "$src" 2>/dev/null || stat -f '%m-%z' "$src")" || fail "stat $src"
+      dest="$ATTACHMENTS_OUT/step-sessions/$(basename "$src" .jsonl).$version.jsonl"
+      [ ! -e "$dest" ] || continue
+      cp "$src" "$dest.partial" || fail "copy $src"
+      if [ "$(stat -c '%Y-%s' "$src" 2>/dev/null || stat -f '%m-%z' "$src")" = "$version" ]; then
+        mv "$dest.partial" "$dest" || fail "write $dest"
+      else
+        rm -f "$dest.partial"
+        echo "[$ts] skipped $src: it changed during the copy" >&2
+      fi
+    done
+  fi
   echo "[$ts] attachments copied: $(find "$ATTACHMENTS_OUT" -type f | wc -l | tr -d ' ') files"
 fi
 
@@ -110,7 +140,7 @@ if [ -n "$REMOTE" ]; then
   push=(rsync -a --timeout=300 --ignore-existing)
   "${push[@]}" --include='server-db-*.db.gz' --exclude='*' "$OUT/" "${dest}db/" || fail "push db to ${dest}db/"
   if [ -n "$ATTACHMENTS" ]; then
-    "${push[@]}" "${SECRETS[@]}" "$ATTACHMENTS_OUT/" "${dest}attachments/" || fail "push attachments to ${dest}attachments/"
+    "${push[@]}" "${SECRETS[@]}" --exclude='*.partial' "$ATTACHMENTS_OUT/" "${dest}attachments/" || fail "push attachments to ${dest}attachments/"
   fi
   echo "[$ts] pushed to $dest"
 fi
