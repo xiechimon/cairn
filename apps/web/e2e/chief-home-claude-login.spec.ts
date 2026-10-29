@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { HISTORY, mockLive, PROJECT, TASK, THREAD, type Row } from './chief-home-mock';
+import { HISTORY, mockLive, PROJECT, TASK, THREAD } from './chief-home-mock';
 
 const DAY = 24 * 60 * 60 * 1000;
-const startOfToday = () => new Date().setHours(0, 0, 0, 0);
-const yesterdayHistory = (): Row[] => {
-  const base = startOfToday() - 10 * 60 * 60 * 1000;
-  return HISTORY.map((row, i) => ({ ...row, createdAt: base + i * 60_000 }));
-};
+const YESTERDAY_BASE = new Date().setHours(0, 0, 0, 0) - 10 * 60 * 60 * 1000;
+const YESTERDAY_HISTORY = HISTORY.map((row, i) => ({
+  ...row,
+  createdAt: YESTERDAY_BASE + i * 60_000,
+}));
 const SITE = { ...PROJECT, id: 'proj-2', name: 'cairn-site', repoName: 'cairn-site' };
-const dayTasks = () => [
+const DAY_TASKS = [
   TASK,
   {
     ...TASK,
@@ -75,8 +75,8 @@ const MACHINES = [
 test('daily brief warns for expiring and expired Claude Code logins', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
-    messages: yesterdayHistory(),
-    todos: dayTasks(),
+    messages: YESTERDAY_HISTORY,
+    todos: DAY_TASKS,
     projects: [PROJECT, SITE],
     machines: MACHINES,
   });
