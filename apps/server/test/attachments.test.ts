@@ -1,9 +1,15 @@
-import { readFileSync } from 'node:fs';
+import { createHash, createHmac } from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { attachment } from '../src/db/schema.js';
 import { signAttachmentGrant } from '../src/lib/attachments-token.js';
 import { newRecordId } from '../src/lib/ids.js';
+import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
+import { TEAM_ATTACHMENTS_QUOTA_BYTES } from '../src/services/attachment-gc.js';
+import { uploadFile } from '../src/services/attachments.js';
 import { bootServer, postProject, req } from './helpers.js';
 
 type TestServer = ReturnType<typeof bootServer>;
@@ -218,6 +224,7 @@ describe('attachments -- upload side', () => {
       const payload = {
         attachmentId: newRecordId(),
         teamId: s.team.id,
+        grantId: newRecordId(),
         key: 'attachments/x/y.md',
         sizeBytes: 1,
         mimeType: 'text/markdown',
@@ -272,7 +279,7 @@ describe('attachments -- upload side', () => {
     }
   });
 
-  test('uploading twice with the same grant -> 201 idempotent (overwrite)', async () => {
+  test('uploading twice with the same grant -> 409 single-use', async () => {
     const s = bootServer();
     try {
       const g = await grant(s, { size: 7 });
@@ -284,7 +291,6 @@ describe('attachments -- upload side', () => {
         { name: 'file', filename: 'spec.md', mimeType: 'text/markdown', bytes: v1 },
       );
       expect(r1.status).toBe(201);
-      const id1 = ((await r1.json()) as { id: string }).id;
       const v2 = new TextEncoder().encode('second\n');
       const r2 = await callMultipart(
         s.app,
@@ -292,13 +298,258 @@ describe('attachments -- upload side', () => {
         { grant: g.grant },
         { name: 'file', filename: 'spec.md', mimeType: 'text/markdown', bytes: v2 },
       );
-      expect(r2.status).toBe(201);
-      const id2 = ((await r2.json()) as { id: string }).id;
-      expect(id2).toBe(id1);
+      expect(r2.status).toBe(409);
       const onDisk = readFileSync(`${s.attachmentsDir}/${g.key}`);
       expect(new TextDecoder().decode(onDisk)).toBe('second\n');
     } finally {
       s.dispose();
+    }
+  });
+});
+
+describe('attachments -- #2055 signing key and path containment', () => {
+  test('forged public-constant grant with traversal key -> 401; nothing written outside', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cairn-2055-forge-'));
+    const attachmentsDir = join(root, 'attachments');
+    mkdirSync(attachmentsDir);
+    const s = bootServer({ attachmentsDir });
+    try {
+      const payload = {
+        attachmentId: 'synthetic-missing-row',
+        teamId: s.team.id,
+        key: '../sentinel.txt',
+        sizeBytes: 5,
+        mimeType: 'text/plain',
+        scope: 'message',
+        exp: Date.now() + 60_000,
+      };
+      const head = Buffer.from(JSON.stringify(payload)).toString('base64url');
+      const key = createHash('sha256').update('attachment-grant-key-v1').digest();
+      const signature = createHmac('sha256', key).update(head).digest('base64url');
+      expect(() =>
+        uploadFile(
+          {
+            db: s.db,
+            secretBox: createEphemeralSecretBox(),
+            attachmentsDir,
+            teamId: s.team.id,
+            userId: s.user.id,
+          },
+          {
+            grant: `${head}.${signature}`,
+            fileBytes: new TextEncoder().encode('audit'),
+            fileMimeType: 'text/plain',
+            fileName: 'sentinel.txt',
+          },
+        ),
+      ).toThrow(/401|grant/);
+      expect(existsSync(join(root, 'sentinel.txt'))).toBe(false);
+    } finally {
+      s.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('grant signed on server A fails upload on server B (cross-installation)', async () => {
+    const a = bootServer();
+    try {
+      const grantRes = await req(a.app, 'POST', '/api/uploads/grant', {
+        kind: 'attachment',
+        fileName: 'spec.md',
+        mimeType: 'text/markdown',
+        size: 8,
+      });
+      expect(grantRes.status).toBe(200);
+      const g = (await grantRes.json()) as { grant: string; key: string };
+      const otherBox = createEphemeralSecretBox();
+      expect(() =>
+        uploadFile(
+          {
+            db: a.db,
+            secretBox: otherBox,
+            attachmentsDir: a.attachmentsDir,
+            teamId: a.team.id,
+            userId: a.user.id,
+          },
+          {
+            grant: g.grant,
+            fileBytes: new TextEncoder().encode('# hello\n'),
+            fileMimeType: 'text/markdown',
+            fileName: 'spec.md',
+          },
+        ),
+      ).toThrow(/401|grant|signature/);
+      expect(existsSync(join(a.attachmentsDir, g.key))).toBe(false);
+    } finally {
+      a.dispose();
+    }
+  });
+
+  test('server-signed grant with no pending row -> 409; no write', () => {
+    const s = bootServer();
+    try {
+      const attachmentId = newRecordId();
+      const key = `${s.team.id}/${attachmentId}.md`;
+      const token = signAttachmentGrant(s.secretBox, {
+        attachmentId,
+        teamId: s.team.id,
+        grantId: newRecordId(),
+        key,
+        sizeBytes: 5,
+        mimeType: 'text/markdown',
+        scope: 'message',
+        exp: Date.now() + 60_000,
+      });
+      expect(() =>
+        uploadFile(
+          {
+            db: s.db,
+            secretBox: s.secretBox,
+            attachmentsDir: s.attachmentsDir,
+            teamId: s.team.id,
+            userId: s.user.id,
+          },
+          {
+            grant: token,
+            fileBytes: new TextEncoder().encode('hello'),
+            fileMimeType: 'text/markdown',
+            fileName: 'spec.md',
+          },
+        ),
+      ).toThrow(/409|pending|missing|grant/);
+      expect(existsSync(join(s.attachmentsDir, key))).toBe(false);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('server-signed grant whose key differs from row.storageKey -> 409; no write', async () => {
+    const s = bootServer();
+    try {
+      const grantRes = await req(s.app, 'POST', '/api/uploads/grant', {
+        kind: 'attachment',
+        fileName: 'spec.md',
+        mimeType: 'text/markdown',
+        size: 5,
+      });
+      const g = (await grantRes.json()) as {
+        grant: string;
+        key: string;
+        attachmentId: string;
+      };
+      const row = s.db.select().from(attachment).where(eq(attachment.id, g.attachmentId)).get();
+      expect(row?.grantId).toBeTruthy();
+      const forgedKey = `${s.team.id}/${newRecordId()}.md`;
+      const token = signAttachmentGrant(s.secretBox, {
+        attachmentId: g.attachmentId,
+        teamId: s.team.id,
+        grantId: row?.grantId ?? '',
+        key: forgedKey,
+        sizeBytes: 5,
+        mimeType: 'text/markdown',
+        scope: 'message',
+        exp: Date.now() + 60_000,
+      });
+      expect(() =>
+        uploadFile(
+          {
+            db: s.db,
+            secretBox: s.secretBox,
+            attachmentsDir: s.attachmentsDir,
+            teamId: s.team.id,
+            userId: s.user.id,
+          },
+          {
+            grant: token,
+            fileBytes: new TextEncoder().encode('hello'),
+            fileMimeType: 'text/markdown',
+            fileName: 'spec.md',
+          },
+        ),
+      ).toThrow(/409|storageKey|key|mismatch|does not match/);
+      expect(existsSync(join(s.attachmentsDir, forgedKey))).toBe(false);
+      expect(existsSync(join(s.attachmentsDir, g.key))).toBe(false);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('consumption quota re-check rejects when team usage crosses limit', async () => {
+    const s = bootServer();
+    try {
+      const grantRes = await req(s.app, 'POST', '/api/uploads/grant', {
+        kind: 'attachment',
+        fileName: 'spec.md',
+        mimeType: 'text/markdown',
+        size: 8,
+      });
+      expect(grantRes.status).toBe(200);
+      const g = (await grantRes.json()) as { grant: string; key: string; attachmentId: string };
+      s.db
+        .insert(attachment)
+        .values({
+          id: newRecordId(),
+          teamId: s.team.id,
+          createdBy: s.user.id,
+          fileName: 'hog.bin',
+          mimeType: 'text/plain',
+          sizeBytes: TEAM_ATTACHMENTS_QUOTA_BYTES,
+          storageKey: `${s.team.id}/${newRecordId()}.txt`,
+          grantId: newRecordId(),
+          scope: 'message',
+          status: 'ready',
+          createdAt: Date.now(),
+        })
+        .run();
+      const bytes = new TextEncoder().encode('# hello\n');
+      const res = await callMultipart(
+        s.app,
+        '/api/uploads/upload',
+        { grant: g.grant },
+        { name: 'file', filename: 'spec.md', mimeType: 'text/markdown', bytes },
+      );
+      expect([400, 409]).toContain(res.status);
+      expect(await res.text()).toMatch(/quota/);
+      expect(existsSync(join(s.attachmentsDir, g.key))).toBe(false);
+      const row = s.db.select().from(attachment).where(eq(attachment.id, g.attachmentId)).get();
+      expect(row?.status).toBe('pending');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('teamId directory replaced with symlink outside attachmentsDir is rejected', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cairn-2055-symlink-'));
+    const attachmentsDir = join(root, 'attachments');
+    const outside = join(root, 'outside');
+    mkdirSync(attachmentsDir);
+    mkdirSync(outside);
+    const s = bootServer({ attachmentsDir });
+    try {
+      const grantRes = await req(s.app, 'POST', '/api/uploads/grant', {
+        kind: 'attachment',
+        fileName: 'spec.md',
+        mimeType: 'text/markdown',
+        size: 8,
+      });
+      expect(grantRes.status).toBe(200);
+      const g = (await grantRes.json()) as { grant: string; key: string };
+      const teamDir = join(attachmentsDir, s.team.id);
+      if (existsSync(teamDir)) rmSync(teamDir, { recursive: true, force: true });
+      symlinkSync(outside, teamDir);
+      const bytes = new TextEncoder().encode('# hello\n');
+      const res = await callMultipart(
+        s.app,
+        '/api/uploads/upload',
+        { grant: g.grant },
+        { name: 'file', filename: 'spec.md', mimeType: 'text/markdown', bytes },
+      );
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      const fileName = g.key.split('/').pop() ?? '';
+      expect(existsSync(join(outside, fileName))).toBe(false);
+    } finally {
+      s.dispose();
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

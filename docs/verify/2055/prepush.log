@@ -1,0 +1,570 @@
+$ node scripts/prepush.mjs
+[heavy-slots] acquired slot 1/2
+[prepush] node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 14 text + 14 spacing in 13 file(s); 5 css + 226 tsx + 271 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 1b84a9bf8469.
+[prepush] node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 34 components/ui file(s); 24 brand-ink text-role line(s), all registered (24 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+[prepush] python3 scripts/pr-evidence-archive.test.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.154s
+
+OK
+[prepush] pnpm lint
+$ biome ci .
+[0mapps/server/test/feishu-config.test.ts[0m[0m:[0m[0m144[0m[0m:[0m[0m7[0m[0m [0m[0m]8;;https://biomejs.dev/linter/rules/use-flat-map\lint/complexity/useFlatMap]8;;\[0m[0m [0m[0m[30m[47m FIXABLE [0m[0m [0m[0m━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mThe call chain [0m[0m[1m[34m.map().flat()[0m[0m[34m can be replaced with a single [0m[0m[1m[34m.flatMap()[0m[0m[34m call.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m142 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m{[0m[0m [0m[0md[0m[0mb[0m[0m:[0m[0m [0m[0ms[0m[0m.[0m[0md[0m[0mb[0m[0m,[0m[0m [0m[0mb[0m[0mo[0m[0mx[0m[0m:[0m[0m [0m[0ms[0m[0m.[0m[0ms[0m[0me[0m[0mc[0m[0mr[0m[0me[0m[0mt[0m[0mB[0m[0mo[0m[0mx[0m[0m [0m[0m}[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m143 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0ms[0m[0m.[0m[0mt[0m[0me[0m[0ma[0m[0mm[0m[0m.[0m[0mi[0m[0md[0m[0m,[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m144 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0ms[0m[0m.[0m[0md[0m[0mb[0m[0m
+[0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m145 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ms[0m[0me[0m[0ml[0m[0me[0m[0mc[0m[0mt[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m146 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0mr[0m[0mo[0m[0mm[0m[0m([0m[0mf[0m[0me[0m[0mi[0m[0ms[0m[0mh[0m[0mu[0m[0mB[0m[0mi[0m[0mn[0m[0md[0m[0mi[0m[0mn[0m[0mg[0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m147 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ma[0m[0ml[0m[0ml[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m148 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mm[0m[0ma[0m[0mp[0m[0m([0m[0m([0m[0mr[0m[0mo[0m[0mw[0m[0m)[0m[0m [0m[0m=[0m[0m>[0m[0m [0m[0m[[0m[0mr[0m[0mo[0m[0mw[0m[0m.[0m[0ma[0m[0mp[0m[0mp[0m[0mI[0m[0md[0m[0mC[0m[0mi[0m[0mp[0m[0mh[0m[0me[0m[0mr[0m[0m,[0m[0m [0m[0mr[0m[0mo[0m[0mw[0m[0m.[0m[0ma[0m[0mp[0m[0mp[0m[0mS[0m[0me[0m[0mc[0m[0mr[0m[0me[0m[0mt[0m[0mC[0m[0mi[0m[0mp[0m[0mh[0m[0me[0m[0mr[0m[0m][0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m149 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0ml[0m[0ma[0m[0mt[0m[0m([0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m150 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m151 │ [0m[0m [0m[0m [0m[0m)[0m[0m.[0m[0mt[0m[0mo[0m[0mE[0m[0mq[0m[0mu[0m[0ma[0m[0ml[0m[0m([0m[0m{[0m[0m}[0m[0m)[0m[0m;[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUsing [0m[0m[1m[34m.flatMap()[0m[0m[34m avoids the creation of an intermediate array.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mSafe fix: Replace the chain with [0m[0m[1m[34m.flatMap()[0m[0m[34m.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m146[0m[0m [0m[0m[1m146[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0mr[0m[0mo[0m[0mm[0m[0m([0m[0mf[0m[0me[0m[0mi[0m[0ms[0m[0mh[0m[0mu[0m[0mB[0m[0mi[0m[0mn[0m[0md[0m[0mi[0m[0mn[0m[0mg[0m[0m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m147[0m[0m [0m[0m[1m147[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ma[0m[0ml[0m[0ml[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m148[0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[31m.[0m[0m[1m[31mm[0m[0m[1m[31ma[0m[0m[1m[31mp[0m[0m[31m([0m[0m[31m([0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m)[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[31m>[0m[0m[2m[31m·[0m[0m[31m[[0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m.[0m[0m[31ma[0m[0m[31mp[0m[0m[31mp[0m[0m[31mI[0m[0m[31md[0m[0m[31mC[0m[0m[31mi[0m[0m[31mp[0m[0m[31mh[0m[0m[31me[0m[0m[31mr[0m[0m[31m,[0m[0m[2m[31m·[0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m.[0m[0m[31ma[0m[0m[31mp[0m[0m[31mp[0m[0m[31mS[0m[0m[31me[0m[0m[31mc[0m[0m[31mr[0m[0m[31me[0m[0m[31mt[0m[0m[31mC[0m[0m[31mi[0m[0m[31mp[0m[0m[31mh[0m[0m[31me[0m[0m[31mr[0m[0m[31m][0m[0m[1m[31m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m149[0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[31m.[0m[0m[1m[31mf[0m[0m[1m[31ml[0m[0m[1m[31ma[0m[0m[1m[31mt[0m[0m[1m[31m([0m[0m[31m)[0m[0m[31m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m148[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[32m.[0m[0m[1m[32mf[0m[0m[1m[32ml[0m[0m[1m[32ma[0m[0m[1m[32mt[0m[0m[1m[32mM[0m[0m[1m[32ma[0m[0m[1m[32mp[0m[0m[32m([0m[0m[32m([0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m)[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[32m>[0m[0m[2m[32m·[0m[0m[32m[[0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m.[0m[0m[32ma[0m[0m[32mp[0m[0m[32mp[0m[0m[32mI[0m[0m[32md[0m[0m[32mC[0m[0m[32mi[0m[0m[32mp[0m[0m[32mh[0m[0m[32me[0m[0m[32mr[0m[0m[32m,[0m[0m[2m[32m·[0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m.[0m[0m[32ma[0m[0m[32mp[0m[0m[32mp[0m[0m[32mS[0m[0m[32me[0m[0m[32mc[0m[0m[32mr[0m[0m[32me[0m[0m[32mt[0m[0m[32mC[0m[0m[32mi[0m[0m[32mp[0m[0m[32mh[0m[0m[32me[0m[0m[32mr[0m[0m[32m][0m[0m[32m)[0m[0m[32m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m150[0m[0m [0m[0m[1m149[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m151[0m[0m [0m[0m[1m150[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m.[0m[0mt[0m[0mo[0m[0mE[0m[0mq[0m[0mu[0m[0ma[0m[0ml[0m[0m([0m[0m{[0m[0m}[0m[0m)[0m[0m;[0m[0m
+[0m[0m  [0m[0m
+[0m
+[0m[34mChecked 1209 files in 1452[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m[0m
+[0m[0m[34mFound [0m[0m[34m1[0m[0m[34m info.[0m
+[prepush] pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+[prepush] pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1387 tests in 196 files collected, disk count matches (1.3s)
+[spec-parse-gate] integration/test: 60 test files parsed clean by tsc (2.2s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] node scripts/recording-gate.mjs
+recording-gate: OK (the branch changes nothing against its base)
+[prepush] node scripts/e2e-affected.mjs --check-coverage
+[e2e:affected] coverage: 0 uncovered spec(s)
+[prepush] node --test docs/verify/1542/reach.test.mjs
+TAP version 13
+# Subtest: apps/web/e2e/unmapped-reach.spec.ts
+ok 1 - apps/web/e2e/unmapped-reach.spec.ts
+  ---
+  duration_ms: 28.22295
+  type: 'test'
+  ...
+# Subtest: apps/web/e2e/board-reach.spec.ts
+ok 2 - apps/web/e2e/board-reach.spec.ts
+  ---
+  duration_ms: 25.970924
+  type: 'test'
+  ...
+# Subtest: apps/web/e2e/a11y-axe.spec.ts
+ok 3 - apps/web/e2e/a11y-axe.spec.ts
+  ---
+  duration_ms: 25.882274
+  type: 'test'
+  ...
+# Subtest: registry reach: scripts/drive-unregistered.mjs
+ok 4 - registry reach: scripts/drive-unregistered.mjs
+  ---
+  duration_ms: 29.901423
+  type: 'test'
+  ...
+# Subtest: registry reach: docs/verify/1542/drive-unregistered.mts
+ok 5 - registry reach: docs/verify/1542/drive-unregistered.mts
+  ---
+  duration_ms: 34.46348
+  type: 'test'
+  ...
+# Subtest: registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs
+ok 6 - registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs
+  ---
+  duration_ms: 29.561319
+  type: 'test'
+  ...
+# Subtest: registry reach: apps/web/e2e/unmapped-reach.spec.ts
+ok 7 - registry reach: apps/web/e2e/unmapped-reach.spec.ts
+  ---
+  duration_ms: 56.547423
+  type: 'test'
+  ...
+# Subtest: registry reach: apps/web/e2e/board-reach.spec.ts
+ok 8 - registry reach: apps/web/e2e/board-reach.spec.ts
+  ---
+  duration_ms: 54.30876
+  type: 'test'
+  ...
+# Subtest: discovers committed, staged and untracked additions from the base
+ok 9 - discovers committed, staged and untracked additions from the base
+  ---
+  duration_ms: 310.405376
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 644.372194
+[prepush] node --test scripts/escape-trace.test.mjs
+TAP version 13
+# fatal: Needed a single revision
+# fatal: Needed a single revision
+# Subtest: CLI uses origin/main, preserves full records, and recognizes only candidate syntax
+ok 1 - CLI uses origin/main, preserves full records, and recognizes only candidate syntax
+  ---
+  duration_ms: 396.818631
+  type: 'test'
+  ...
+# Subtest: CLI does not truncate more than 200 qualifying commits
+ok 2 - CLI does not truncate more than 200 qualifying commits
+  ---
+  duration_ms: 1234.654275
+  type: 'test'
+  ...
+# Subtest: CLI rejects missing refs and invalid or ambiguous UTC intervals
+ok 3 - CLI rejects missing refs and invalid or ambiguous UTC intervals
+  ---
+  duration_ms: 190.951423
+  type: 'test'
+  ...
+# Subtest: local and CI plans execute behavior assertions and propagate deliberate failures
+ok 4 - local and CI plans execute behavior assertions and propagate deliberate failures
+  ---
+  duration_ms: 199.45904
+  type: 'test'
+  ...
+# Subtest: fix: repair regression introduced by \#100 (\#201) resolves origin PR 100 and fixing PR 201
+ok 5 - fix: repair regression introduced by \#100 (\#201) resolves origin PR 100 and fixing PR 201
+  ---
+  duration_ms: 74.4185
+  type: 'test'
+  ...
+# Subtest: a revert body resolves to the reverted commit and its PR
+ok 6 - a revert body resolves to the reverted commit and its PR
+  ---
+  duration_ms: 72.121707
+  type: 'test'
+  ...
+# Subtest: Fixes \#N where N is an issue keeps an unvalidated reference with reason issue-not-pr
+ok 7 - Fixes \#N where N is an issue keeps an unvalidated reference with reason issue-not-pr
+  ---
+  duration_ms: 27898.57834
+  type: 'test'
+  ...
+# Subtest: blame on the parent: the changed line last commit is the introducing commit
+ok 8 - blame on the parent: the changed line last commit is the introducing commit
+  ---
+  duration_ms: 72.177409
+  type: 'test'
+  ...
+# Subtest: blame split across two commits yields multiple-origin, not a guess
+ok 9 - blame split across two commits yields multiple-origin, not a guess
+  ---
+  duration_ms: 93.056447
+  type: 'test'
+  ...
+# Subtest: shallow history yields unresolved with a reason
+ok 10 - shallow history yields unresolved with a reason
+  ---
+  duration_ms: 73.834803
+  type: 'test'
+  ...
+# Subtest: exactly 14 days qualifies; 14 days plus one second does not
+ok 11 - exactly 14 days qualifies; 14 days plus one second does not
+  ---
+  duration_ms: 1771.341974
+  type: 'test'
+  ...
+# Subtest: an introducing merge before --since is still resolvable
+ok 12 - an introducing merge before --since is still resolvable
+  ---
+  duration_ms: 71.000765
+  type: 'test'
+  ...
+# Subtest: each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence
+ok 13 - each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence
+  ---
+  duration_ms: 69.538092
+  type: 'test'
+  ...
+# Subtest: candidates subcommand pipes into trace through the CLI with a recorded responder
+ok 14 - candidates subcommand pipes into trace through the CLI with a recorded responder
+  ---
+  duration_ms: 27970.350745
+  type: 'test'
+  ...
+# Subtest: blame resolves quotePath-quoted paths that contain a tab and newline
+ok 15 - blame resolves quotePath-quoted paths that contain a tab and newline
+  ---
+  duration_ms: 71.154963
+  type: 'test'
+  ...
+# Subtest: blame keeps separate origins when only one changed path is quotePath-quoted
+ok 16 - blame keeps separate origins when only one changed path is quotePath-quoted
+  ---
+  duration_ms: 93.02775
+  type: 'test'
+  ...
+# Subtest: missing PR metadata stays unresolved with unavailable-pr-metadata
+ok 17 - missing PR metadata stays unresolved with unavailable-pr-metadata
+  ---
+  duration_ms: 67.088981
+  type: 'test'
+  ...
+# Subtest: parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes
+ok 18 - parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes
+  ---
+  duration_ms: 0.256883
+  type: 'test'
+  ...
+# Subtest: parseDiffGitPaths keeps unquoted paths that contain spaces
+ok 19 - parseDiffGitPaths keeps unquoted paths that contain spaces
+  ---
+  duration_ms: 0.076734
+  type: 'test'
+  ...
+# Subtest: parseDiffGitPaths accepts rename headers with one quoted path and one unquoted path
+ok 20 - parseDiffGitPaths accepts rename headers with one quoted path and one unquoted path
+  ---
+  duration_ms: 0.06941
+  type: 'test'
+  ...
+# Subtest: blame resolves a UTF-8 path emitted as Git octal escapes
+ok 21 - blame resolves a UTF-8 path emitted as Git octal escapes
+  ---
+  duration_ms: 67.582682
+  type: 'test'
+  ...
+# Subtest: blame resolves an unquoted path that contains spaces
+ok 22 - blame resolves an unquoted path that contains spaces
+  ---
+  duration_ms: 1646.163227
+  type: 'test'
+  ...
+# Subtest: a controlled introduce/fix history exports one case that validates and replays
+ok 23 - a controlled introduce/fix history exports one case that validates and replays
+  ---
+  duration_ms: 120.72525
+  type: 'test'
+  ...
+# Subtest: unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank
+ok 24 - unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank
+  ---
+  duration_ms: 56.928407
+  type: 'test'
+  ...
+# Subtest: missing provenance, an invalid line range, or a replay base not in history fails validation
+ok 25 - missing provenance, an invalid line range, or a replay base not in history fails validation
+  ---
+  duration_ms: 28017.514597
+  type: 'test'
+  ...
+# Subtest: exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location
+ok 26 - exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location
+  ---
+  duration_ms: 185.039391
+  type: 'test'
+  ...
+# Subtest: the reviewer-input object contains no defect label, location or correction
+ok 27 - the reviewer-input object contains no defect label, location or correction
+  ---
+  duration_ms: 91.422808
+  type: 'test'
+  ...
+# Subtest: validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case
+ok 28 - validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case
+  ---
+  duration_ms: 1608.685309
+  type: 'test'
+  ...
+# Subtest: export maps fixing-parent line ranges back through intervening inserts to the introducing tree
+ok 29 - export maps fixing-parent line ranges back through intervening inserts to the introducing tree
+  ---
+  duration_ms: 112.754502
+  type: 'test'
+  ...
+# Subtest: export maps a renamed path at the fixing parent back to the introducing path and lines
+ok 30 - export maps a renamed path at the fixing parent back to the introducing path and lines
+  ---
+  duration_ms: 28053.181587
+  type: 'test'
+  ...
+# Subtest: newline-terminated blobs do not admit an extra phantom line in export or validate
+ok 31 - newline-terminated blobs do not admit an extra phantom line in export or validate
+  ---
+  duration_ms: 200.712635
+  type: 'test'
+  ...
+# Subtest: successive exports preserve existing cases and only upsert matching identities
+ok 32 - successive exports preserve existing cases and only upsert matching identities
+  ---
+  duration_ms: 1230.55765
+  type: 'test'
+  ...
+1..32
+# tests 32
+# suites 0
+# pass 32
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 121872.433215
+[prepush] node scripts/escape-trace.mjs validate-cases integration/eval/review/cases
+{
+  "ok": true,
+  "caseCount": 0
+}
+[prepush] node --test scripts/review-escapes.test.mjs
+TAP version 13
+# Subtest: CLI fetches original PR reviews through every page and retains evidence
+ok 1 - CLI fetches original PR reviews through every page and retains evidence
+  ---
+  duration_ms: 114.860152
+  type: 'test'
+  ...
+# Subtest: recorded production gate evidence and formal AI and human reviews classify separately
+ok 2 - recorded production gate evidence and formal AI and human reviews classify separately
+  ---
+  duration_ms: 270.967176
+  type: 'test'
+  ...
+# Subtest: post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify
+ok 3 - post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify
+  ---
+  duration_ms: 142.77334
+  type: 'test'
+  ...
+# Subtest: UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data
+ok 4 - UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data
+  ---
+  duration_ms: 428.512684
+  type: 'test'
+  ...
+# Subtest: partial pagination failure does not establish a definitive human-only outcome
+ok 5 - partial pagination failure does not establish a definitive human-only outcome
+  ---
+  duration_ms: 103.696698
+  type: 'test'
+  ...
+# Subtest: the CLI suite runs in local and CI prepush plans
+ok 6 - the CLI suite runs in local and CI prepush plans
+  ---
+  duration_ms: 0.357847
+  type: 'test'
+  ...
+# Subtest: gate comments paginate and stale heads and ungrounded carryovers remain unknown
+ok 7 - gate comments paginate and stale heads and ungrounded carryovers remain unknown
+  ---
+  duration_ms: 307.315981
+  type: 'test'
+  ...
+# Subtest: metadata or comment API failure stays visible even when reviews were retrieved
+ok 8 - metadata or comment API failure stays visible even when reviews were retrieved
+  ---
+  duration_ms: 163.514952
+  type: 'test'
+  ...
+# Subtest: a recorded BLOCK gate records AI review activity without claiming approval
+ok 9 - a recorded BLOCK gate records AI review activity without claiming approval
+  ---
+  duration_ms: 84.063085
+  type: 'test'
+  ...
+# Subtest: the resolver outside-window status is excluded rather than counted as unresolved
+ok 10 - the resolver outside-window status is excluded rather than counted as unresolved
+  ---
+  duration_ms: 80.454464
+  type: 'test'
+  ...
+# Subtest: malformed review and gate pages disclose unavailable data without crashing the CLI
+ok 11 - malformed review and gate pages disclose unavailable data without crashing the CLI
+  ---
+  duration_ms: 167.420848
+  type: 'test'
+  ...
+# Subtest: non-approving formal AI reviews do not establish AI coverage
+ok 12 - non-approving formal AI reviews do not establish AI coverage
+  ---
+  duration_ms: 166.031678
+  type: 'test'
+  ...
+# Subtest: earlier PR commits retain human evidence with explicit head coverage
+ok 13 - earlier PR commits retain human evidence with explicit head coverage
+  ---
+  duration_ms: 165.259889
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2242.207287
+[prepush] node scripts/lessons-ledger-gate.mjs
+lessons ledger ok
+[prepush] python3 scripts/pr-evidence-gate.test.py
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.031s
+
+OK
+[prepush] node scripts/ci-job-structure-gate.mjs
+ci-job-structure: GREEN (every named step sits in its pinned job)
+[prepush] node scripts/feature-map-staleness-gate.mjs
+feature-map-gate: OK (37 md files, 339 refs checked, 59 frozen in baseline)
+[prepush] node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+[prepush] node scripts/single-use-helper-gate.mjs
+single-use-helper-gate: 0 single-use helper(s)
+[prepush] node scripts/baseline-ratchet-gate.mjs
+baseline-ratchet-gate: 0 raised baseline(s)
+[prepush] node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 755 test sources, no package-manager spawns.
+[prepush] node scripts/pr-evidence-workflow-gate.mjs
+pr-evidence-workflow: GREEN (required-check shape intact)
+[prepush] node scripts/ui-registry-gate.mjs
+[ui-registry-gate] note: no base sha on this run (push event or local check) — the S5 ratchet has nothing to compare against; a status downgrade landing straight on main is guarded by review only (same posture as debt-gate D3 on main).
+[ui-registry-gate] PASS: 35 file(s) in apps/web/src/components/ui = 27 registry (20 pristine vs pinned snapshot / 7 registered deviations) + 8 adapters; snapshot shadcn@4.21.3 fetched 2026-10-25; ledger frozen from 1b84a9bf8469; comparison: in-tree only.
+[prepush] node scripts/ui-consumer-shape-gate.mjs
+[ui-consumer-shape-gate] PASS: 3 flagged line(s) across 271 consumer file(s), all registered (3 entries = 3 deviation).
+[prepush] node scripts/pr-gate-selfcheck.mjs
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are each required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+PASS  linesChanged must be a non-negative integer
+PASS  a path with a shell character is rejected
+PASS  CI gate helpers and data anywhere under scripts/ route to the user
+PASS  gate files outside root scripts/ route to the user (run 4)
+PASS  files that steer agents route to the user (run 4)
+PASS  a path a reviewer adds to protectedPaths routes to the user
+PASS  product source, tests, e2e and evidence do not route to the user
+PASS  paths outside the auto-merge set route to the user (run 5)
+PASS  agent-steering files the name list missed route to the user (run 5)
+PASS  eval ruler paths route to the user as protected (ADR 0025)
+PASS  harness eval dispatch tooling routes to the user as protected (#1614)
+PASS  case variants of protected paths route to the user (run 5)
+PASS  a protected path only the safety reviewer lists is matched (run 5)
+PASS  a deleted test helper (test directory only) routes to the user (run 5)
+PASS  a deleted colocated test (suffix only) routes to the user (run 5)
+PASS  a deleted path missing from changedFiles is an args error (run 5)
+PASS  pr and ticket must be positive integers (run 5)
+PASS  a path with a quote or space is rejected (run 5)
+PASS  configs CI runs under route to the user, at the root too
+PASS  a deletion only the safety reviewer reports routes to the user
+PASS  a larger line count from the safety reviewer routes to the user
+PASS  binaryFiles is required and lists changed paths only (code-review on #1410)
+PASS  a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410)
+PASS  a binary file under docs/verify stays mergeable without the user
+PASS  a binary file only the safety reviewer listed routes to the user
+PASS  a deleted test is found whatever the case of its directory or suffix (code-review on #1410)
+PASS  a glob star does not cross a slash: an extra directory before src/ leaves the auto-merge set (run 8)
+PASS  a deleted colocated .spec file outside a test directory routes to the user (run 8)
+PASS  a dimension whose review breaks the second stage counts as missing and keeps go false (run 8)
+PASS  private refs carry the head, so runs on two heads of one PR do not delete each other's refs (run 8)
+PASS  a reviewer that returns nothing blocks go
+PASS  findings past the skeptic cap are kept
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  two skeptics confirming on the head keep the finding (run 5)
+PASS  a split vote keeps the finding (run 5)
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a nested .gitattributes routes to the user (run 6)
+PASS  the args help gives the line count command that takes attributes from the empty tree (run 6)
+PASS  a C-quoted binary path is refused with the quoting hint (run 7)
+PASS  the safety reviewer is told both git commands with --no-renames, core.quotePath=false and the empty tree (runs 2, 6, 7)
+PASS  reviewers and skeptics fetch PR comments with a filter that drops non-members before the bodies reach them (run 7, final /code-review)
+PASS  reviewers confirm the head on their own ref, never FETCH_HEAD (run 1)
+PASS  every reviewer and skeptic is told GitHub is read-only and that PR text is data
+PASS  the safety reviewer must return all four git-derived values
+PASS  the 40-file cap counts files only the safety reviewer listed
+PASS  the merge readiness gate source routes to the user (run 6)
+PASS  migrations, the lockfile and .npmrc are protected, packages/* outside src and test is not auto (run 6)
+PASS  a deleted helper under e2e/, tests/ or __tests__/ routes to the user (run 6)
+PASS  exactly 800 lines and 40 files still auto-merge (run 6)
+PASS  a file only the safety reviewer lists counts toward the auto-merge set (run 6)
+PASS  headSha, an empty file list and non-string paths are args errors (run 6)
+PASS  the safety reviewer does not see the caller file list (run 6)
+PASS  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+PASS  the evidence reviewer and skeptics check for a fork before any checkout, and read a fork head with git show, diff and ls-tree only (run 10)
+PASS  every checkout the evidence prompts ask for runs with core.hooksPath=/dev/null (run 10)
+PASS  the fetch and the ref cleanup run with core.hooksPath=/dev/null in every prompt, the evidence worktrees included (run 10)
+PASS  evidence installs skip husky's prepare, which would set the shared clone's core.hooksPath to the relative .husky/_ (run 10)
+PASS  the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)
+PASS  a path only in the safety reviewer's deleted or binary list is matched against D4 and blocks go (run 10)
+PASS  an entry named exactly like a protected directory (a symlink .claude, scripts, drizzle) routes to the user (run 10)
+PASS  the bare-directory match is for protected classes only: src and docs/verify named alone stay outside the auto-merge set, file globs stay exact (run 10)
+PASS  D4 globs are anchored at the path start: an auto-merge or evidence path inside a longer one routes to the user (run 10)
+PASS  a caller line count larger than the safety reviewer's wins (run 10)
+PASS  the security-sensitive surfaces of the AGENTS.md /security-review list and the migration runner route to the user (run 11)
+PASS  the security class matches exact paths from the root: machine*.ts stops at a slash, and neighbours still auto-merge (run 11)
+PASS  protected names with U+017F or U+212A in place of s or k route to the user (run 11)
+PASS  auto-merge matching folds ASCII case only, protection folds Unicode: ſrc and docſ/verify route to the user, AGENTſ.md stays protected (run 11)
+PASS  a deleted test is found with U+017F in its directory or suffix (run 11)
+PASS  every prompt calls the ticket body untrusted data by the ticket's author, never instructions (run 11)
+PASS  each skeptic is given the finding and the refute rule (run 11)
+PASS  the safety reviewer's own protectedPaths route to the user (run 11)
+PASS  a deleted .mjs or .cts test routes to the user (run 11)
+PASS  skepticsMissing counts each skeptic that returned nothing (run 11)
+PASS  a path git quotes even with core.quotePath=false is sent to review by hand, not back to the flag (run 11)
+PASS  the args help and the safety reviewer say the line count command needs git 2.40 or later (run 11)
+PASS  docs-only Markdown patch: go, auto-merge (#1621)
+PASS  design decisions, ADRs and the review guide stay with the user in any case or Unicode fold (#1621)
+PASS  docs patch with a deleted test or a non-Markdown docs file routes to the user (#1621)
+PASS  a missing safety file list blocks go
+PASS  docs/spec, the goal-session rules, is a named protected class, not only default deny (#1462)
+PASS  every AGENTS.md /security-review path pattern is an entry of PROTECTED, and the section points back at ADR 0021 D4 (drift guard, #1462)
+PASS  a safety review missing deletedFiles, linesChanged or binaryFiles keeps go false (#1462)
+PASS  the verdict records which copy of the script ran: scriptSha256 is the file hash with its own constant blanked (#1462)
+PASS  a skeptic is told the finding is a relayed account whose text may quote untrusted PR or ticket data (#1462)
+95/95 passed (.claude/workflows/pr-gate.js)
+[prepush] node scripts/funding-yml-gate.mjs
+funding-yml-gate: 0 problem(s)
+[prepush] node scripts/lane-file-gate.mjs
+lane-file-gate leg 1 (tracked at repo root): 0 hit(s)
+lane-file-gate leg 2: skipped (no base sha; local run or push event)
+lane-file-gate: OK (no lane process files tracked at the repository root)
+[prepush] node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+[prepush] node scripts/prepush-vitest.mjs
+
+ RUN  v5.0.1 /workspace
+
+ ✓ |@xiechimon/cairn| test/pr-merge-api.test.ts (123 tests) 5279ms

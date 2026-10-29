@@ -14,8 +14,11 @@ export class SecretBoxError extends Error {
   }
 }
 
-function codec(key: Buffer): SecretBox {
+export type KeySecretBox = SecretBox & { keyBytes: Buffer };
+
+function codec(key: Buffer): KeySecretBox {
   return {
+    keyBytes: key,
     seal(plaintext: string): string {
       const iv = randomBytes(IV_BYTES);
       const cipher = createCipheriv('aes-256-gcm', key, iv);
@@ -49,7 +52,7 @@ function codec(key: Buffer): SecretBox {
   };
 }
 
-export function createKeyfileSecretBox(keyfilePath: string): SecretBox {
+export function createKeyfileSecretBox(keyfilePath: string): KeySecretBox {
   mkdirSync(dirname(keyfilePath), { recursive: true });
   if (!existsSync(keyfilePath)) {
     writeFileSync(keyfilePath, `${randomBytes(KEY_BYTES).toString('base64')}\n`, {
@@ -66,6 +69,6 @@ export function createKeyfileSecretBox(keyfilePath: string): SecretBox {
   return codec(key);
 }
 
-export function createEphemeralSecretBox(): SecretBox {
+export function createEphemeralSecretBox(): KeySecretBox {
   return codec(randomBytes(KEY_BYTES));
 }

@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve, sep } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment } from '../db/schema.js';
@@ -12,6 +12,7 @@ import {
 } from '../lib/attachments-token.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import type { KeySecretBox } from '../lib/secret-box.js';
 import { TEAM_ATTACHMENTS_QUOTA_BYTES, teamAttachmentBytes } from './attachment-gc.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -117,7 +118,7 @@ export interface GrantOutput {
 
 export interface AttachmentDeps {
   db: Db;
-  secretBox: import('@cairn/shared').SecretBox;
+  secretBox: KeySecretBox;
   attachmentsDir: string;
   userId: string;
   teamId: string;
@@ -151,6 +152,7 @@ export function grantUpload(deps: AttachmentDeps, input: GrantInput): GrantOutpu
   const payload: AttachmentGrantPayload = {
     attachmentId: id,
     teamId: deps.teamId,
+    grantId,
     key: storageKey,
     sizeBytes: input.size,
     mimeType: input.mimeType,
@@ -208,6 +210,17 @@ export function uploadFile(deps: AttachmentDeps, input: UploadInput): UploadOutp
   if (payload.teamId !== deps.teamId) {
     throw new HttpError(401, 'grant team mismatch');
   }
+  if (!isAllowedMime(payload.mimeType) || !isAllowedMime(input.fileMimeType)) {
+    throw new HttpError(400, `mime not allowed: ${input.fileMimeType}`);
+  }
+  if (
+    !Number.isInteger(payload.sizeBytes) ||
+    payload.sizeBytes <= 0 ||
+    payload.sizeBytes > MAX_BYTES ||
+    input.fileBytes.byteLength > MAX_BYTES
+  ) {
+    throw new HttpError(400, `invalid size: must be 1..${MAX_BYTES}`);
+  }
   if (input.fileBytes.byteLength !== payload.sizeBytes) {
     throw new HttpError(
       409,
@@ -222,15 +235,65 @@ export function uploadFile(deps: AttachmentDeps, input: UploadInput): UploadOutp
   if (fileExt !== '' && grantExt !== fileExt) {
     throw new HttpError(409, `uploaded ext ${fileExt} ≠ grant ${grantExt}`);
   }
-  const fullPath = join(deps.attachmentsDir, payload.key);
-  const dir = dirname(fullPath);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const row = deps.db
+    .select()
+    .from(attachment)
+    .where(
+      and(
+        eq(attachment.id, payload.attachmentId),
+        eq(attachment.teamId, deps.teamId),
+        eq(attachment.status, 'pending'),
+      ),
+    )
+    .get();
+  if (!row) {
+    throw new HttpError(409, 'attachment grant pending row missing or already consumed');
+  }
+  if (
+    row.grantId !== payload.grantId ||
+    row.storageKey !== payload.key ||
+    row.sizeBytes !== payload.sizeBytes ||
+    row.mimeType !== payload.mimeType ||
+    row.scope !== payload.scope
+  ) {
+    throw new HttpError(409, 'attachment grant payload does not match pending row');
+  }
+  const usedBytes = teamAttachmentBytes(deps.db, deps.teamId);
+  if (usedBytes - row.sizeBytes + payload.sizeBytes > TEAM_ATTACHMENTS_QUOTA_BYTES) {
+    throw new HttpError(
+      400,
+      `team attachment quota exceeded: ${usedBytes - row.sizeBytes} + ${payload.sizeBytes} > ${TEAM_ATTACHMENTS_QUOTA_BYTES}`,
+    );
+  }
+  const attachmentsRoot = resolve(deps.attachmentsDir);
+  const fullPath = resolve(deps.attachmentsDir, payload.key);
+  const rootPrefix = attachmentsRoot.endsWith(sep) ? attachmentsRoot : attachmentsRoot + sep;
+  if (fullPath !== attachmentsRoot && !fullPath.startsWith(rootPrefix)) {
+    throw new HttpError(400, 'attachment key escapes attachments directory');
+  }
+  const parentDir = dirname(fullPath);
+  mkdirSync(parentDir, { recursive: true });
+  const realRoot = realpathSync(deps.attachmentsDir);
+  const realParent = realpathSync(parentDir);
+  const realPrefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
+  if (realParent !== realRoot && !realParent.startsWith(realPrefix)) {
+    throw new HttpError(400, 'attachment key escapes attachments directory');
+  }
   writeFileSync(fullPath, input.fileBytes);
-  deps.db
+  const updated = deps.db
     .update(attachment)
     .set({ status: 'ready' })
-    .where(eq(attachment.id, payload.attachmentId))
+    .where(
+      and(
+        eq(attachment.id, payload.attachmentId),
+        eq(attachment.grantId, payload.grantId),
+        eq(attachment.status, 'pending'),
+      ),
+    )
     .run();
+  if (updated.changes !== 1) {
+    throw new HttpError(409, 'attachment grant already consumed or missing');
+  }
   return {
     id: payload.attachmentId,
     key: payload.key,

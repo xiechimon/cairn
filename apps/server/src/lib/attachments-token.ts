@@ -1,11 +1,12 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import type { SecretBox } from '@cairn/shared';
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import type { KeySecretBox } from './secret-box.js';
 
 export const ATTACHMENT_GRANT_TTL_MS = 5 * 60 * 1000;
 
 export interface AttachmentGrantPayload {
   attachmentId: string;
   teamId: string;
+  grantId: string;
   key: string;
   sizeBytes: number;
   mimeType: string;
@@ -13,14 +14,12 @@ export interface AttachmentGrantPayload {
   exp: number;
 }
 
-const keyCache = new WeakMap<SecretBox, Buffer>();
+const keyCache = new WeakMap<KeySecretBox, Buffer>();
 
-function hmacKey(secretBox: SecretBox): Buffer {
+function hmacKey(secretBox: KeySecretBox): Buffer {
   const cached = keyCache.get(secretBox);
   if (cached) return cached;
-  const sealed = secretBox.seal('attachment-grant-key-v1');
-  const plain = secretBox.open(sealed);
-  const key = createHash('sha256').update(plain).digest();
+  const key = createHmac('sha256', secretBox.keyBytes).update('attachment-grant-key-v2').digest();
   keyCache.set(secretBox, key);
   return key;
 }
@@ -35,14 +34,20 @@ function b64urlDecode(s: string): Buffer {
   return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/') + pad, 'base64');
 }
 
-export function signAttachmentGrant(secretBox: SecretBox, payload: AttachmentGrantPayload): string {
+export function signAttachmentGrant(
+  secretBox: KeySecretBox,
+  payload: AttachmentGrantPayload,
+): string {
   const json = JSON.stringify(payload);
   const head = b64url(json);
   const mac = createHmac('sha256', hmacKey(secretBox)).update(head).digest();
   return `${head}.${b64url(mac)}`;
 }
 
-export function verifyAttachmentGrant(secretBox: SecretBox, token: string): AttachmentGrantPayload {
+export function verifyAttachmentGrant(
+  secretBox: KeySecretBox,
+  token: string,
+): AttachmentGrantPayload {
   if (typeof token !== 'string' || token === '') {
     throw new AttachmentGrantError('grant missing', 401);
   }
@@ -78,6 +83,7 @@ function isPayload(v: unknown): v is AttachmentGrantPayload {
   return (
     typeof p.attachmentId === 'string' &&
     typeof p.teamId === 'string' &&
+    typeof p.grantId === 'string' &&
     typeof p.key === 'string' &&
     typeof p.sizeBytes === 'number' &&
     typeof p.mimeType === 'string' &&
