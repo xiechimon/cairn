@@ -1,9 +1,9 @@
 ---
 Category: A prepush change was pushed after running only its own tests; `scripts/heavy-slots.test.mjs`, which copies `scripts/prepush.mjs` into a fixture repo and runs in the same CI step, went red because the fixture lacked the new gate script
 Source: #1689 (2026-10-25)
-Level: 2
-Safeguard: `prepushPlan` runs the CI self-test files (`selfTests` in `scripts/prepush.mjs`) whenever a prepush, heavy-slots or English-only gate script changes; `scripts/prepush.test.mjs` pins the list to the CI step
+Level: 1
+Safeguard: `selfTests` in `scripts/prepush.mjs` is the only list of prepush self-test files: local `pnpm prepush` runs it when `.github/workflows/ci.yml`, a listed self-test, its adjacent `.mjs` source or a prepush script changes, and the CI "Prepush self-test" step runs `pnpm prepush --self-test`, which runs `node --test` over the same list, so a file cannot be added to one side only; `scripts/prepush.test.mjs` reds when `.github/workflows/ci.yml` names a self-test file or the step runs anything else; since 2026-10-29
 Intercepts: 0
-Recurrences: 0
-Notes: Negative control: the #1689 fixture without `english-only-gate.mjs` fails `scripts/heavy-slots.test.mjs` (CI run 40171261648)
+Recurrences: 1
+Notes: Negative controls: the #1689 fixture without `english-only-gate.mjs` fails `scripts/heavy-slots.test.mjs` (CI run 40171261648). In #2158, CI run 40893286745 failed the CI-list pin after `epic-done.test.mjs` was added only to the CI step; that recurrence moved the safeguard from level 2 to level 1 in #2159. The #2159 tests run against main at 3c6d02a0c, where `ci.yml` still repeats the list, fail 2 of 4 (the step runs `node --test <files>` and `--self-test` is not a mode); on #2159 they pass 4 of 4.
 ---
