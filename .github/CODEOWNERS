@@ -2,4 +2,3 @@
 /.claude/hillclimb/** @xiechimon
 /.github/CODEOWNERS @xiechimon
 /scripts/epic-done.mjs @xiechimon
-/.claude/epics/ @xiechimon
