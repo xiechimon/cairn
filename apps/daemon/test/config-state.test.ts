@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdtempSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -25,6 +33,26 @@ import {
 
 function tmp(): string {
   return mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
+}
+
+function modeBits(path: string): number {
+  return statSync(path).mode & 0o777;
+}
+
+const sampleMachine = {
+  machineId: 'm1',
+  token: 'a'.repeat(64),
+  teamId: 'team-1',
+  serverUrl: 'http://x',
+};
+
+function withUmask<T>(mask: number, fn: () => T): T {
+  const previous = process.umask(mask);
+  try {
+    return fn();
+  } finally {
+    process.umask(previous);
+  }
 }
 
 describe('loadDaemonConfig (Settings seam precedence)', () => {
@@ -189,5 +217,83 @@ describe('local state layout (02 §5.3)', () => {
     recordSession(paths, 'sess-1', '/x/sessions/sess-1.jsonl');
     expect(resolveSessionFile(paths, 'sess-1')).toBe('/x/sessions/sess-1.jsonl');
     expect(resolveSessionFile(paths, 'nope')).toBeNull();
+  });
+
+  test.each([0o022, 0o000])(
+    'ensureStateDirs yields 0o700 under umask %o (create + repair)',
+    (mask) => {
+      withUmask(mask, () => {
+        const home = join(tmp(), 'cairn-home');
+        const paths = statePaths(home);
+        ensureStateDirs(paths);
+        for (const dir of [
+          paths.home,
+          paths.outboxDir,
+          paths.chatSessionsDir,
+          paths.agentRuntimeDir,
+          paths.workspacesDir,
+        ]) {
+          expect(modeBits(dir), dir).toBe(0o700);
+        }
+
+        chmodSync(paths.home, 0o755);
+        chmodSync(paths.outboxDir, 0o755);
+        ensureStateDirs(paths);
+        expect(modeBits(paths.home)).toBe(0o700);
+        expect(modeBits(paths.outboxDir)).toBe(0o700);
+      });
+    },
+  );
+
+  test.each([0o022, 0o000])(
+    'saveMachineJson yields 0o600 under umask %o (create + repair overwrite)',
+    (mask) => {
+      withUmask(mask, () => {
+        const paths = statePaths(tmp());
+        ensureStateDirs(paths);
+        saveMachineJson(paths, sampleMachine);
+        expect(modeBits(paths.machineJson)).toBe(0o600);
+
+        chmodSync(paths.machineJson, 0o644);
+        expect(modeBits(paths.machineJson)).toBe(0o644);
+        saveMachineJson(paths, { ...sampleMachine, serverUrl: 'http://y' });
+        expect(modeBits(paths.machineJson)).toBe(0o600);
+        expect(loadMachineJson(paths)?.serverUrl).toBe('http://y');
+      });
+    },
+  );
+
+  test('device.json / daemon.json / session index are 0o600 under umask 022', () => {
+    withUmask(0o022, () => {
+      const paths = statePaths(tmp());
+      ensureStateDirs(paths);
+      loadOrCreateDeviceJson(paths);
+      writeDaemonJson(paths, { pid: 1, startedAt: 1, runner: 'cli' });
+      recordSession(paths, 'sess-1', '/x/s.jsonl');
+      expect(modeBits(paths.deviceJson)).toBe(0o600);
+      expect(modeBits(paths.daemonJson)).toBe(0o600);
+      expect(modeBits(join(paths.chatSessionsDir, 'index.json'))).toBe(0o600);
+    });
+  });
+
+  test('saveMachineJson refuses a symlinked machine.json (does not follow or chmod)', () => {
+    const paths = statePaths(tmp());
+    ensureStateDirs(paths);
+    const target = join(paths.home, 'machine-target.json');
+    writeFileSync(target, '{}\n', { mode: 0o644 });
+    symlinkSync(target, paths.machineJson);
+    expect(() => saveMachineJson(paths, sampleMachine)).toThrow(/symlink/i);
+    expect(modeBits(target)).toBe(0o644);
+    expect(lstatSync(paths.machineJson).isSymbolicLink()).toBe(true);
+  });
+
+  test('loadMachineJson still reads a legacy 0644 machine.json', () => {
+    const paths = statePaths(tmp());
+    ensureStateDirs(paths);
+    writeFileSync(paths.machineJson, `${JSON.stringify(sampleMachine, null, 2)}\n`, {
+      mode: 0o644,
+    });
+    chmodSync(paths.machineJson, 0o644);
+    expect(loadMachineJson(paths)).toEqual(sampleMachine);
   });
 });

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type DaemonJson,
@@ -9,6 +9,7 @@ import {
   type MachineJson,
   machineJsonSchema,
 } from '@cairn/shared';
+import { ensurePrivateDir, writePrivateFile } from './private-fs.js';
 
 export interface StatePaths {
   home: string;
@@ -52,7 +53,7 @@ export function ensureStateDirs(paths: StatePaths): void {
     paths.agentRuntimeDir,
     paths.workspacesDir,
   ]) {
-    mkdirSync(dir, { recursive: true });
+    ensurePrivateDir(dir);
   }
 }
 
@@ -74,7 +75,7 @@ export function loadMachineJson(paths: StatePaths): MachineJson | null {
 
 export function saveMachineJson(paths: StatePaths, value: MachineJson): void {
   machineJsonSchema.parse(value);
-  writeFileSync(paths.machineJson, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  writePrivateFile(paths.machineJson, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 export function forgetMachine(paths: StatePaths): boolean {
@@ -88,13 +89,13 @@ export function loadOrCreateDeviceJson(paths: StatePaths): DeviceJson {
   const parsed = existing === null ? null : deviceJsonSchema.safeParse(existing);
   if (parsed?.success) return parsed.data;
   const fresh: DeviceJson = { deviceId: randomBytes(16).toString('hex') };
-  writeFileSync(paths.deviceJson, `${JSON.stringify(fresh, null, 2)}\n`, 'utf8');
+  writePrivateFile(paths.deviceJson, `${JSON.stringify(fresh, null, 2)}\n`);
   return fresh;
 }
 
 export function writeDaemonJson(paths: StatePaths, value: DaemonJson): void {
   daemonJsonSchema.parse(value);
-  writeFileSync(paths.daemonJson, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  writePrivateFile(paths.daemonJson, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 export function loadDaemonJson(paths: StatePaths): DaemonJson | null {
@@ -115,10 +116,9 @@ export function loadSessionIndex(paths: StatePaths): SessionIndex {
 }
 
 export function saveSessionIndex(paths: StatePaths, index: SessionIndex): void {
-  writeFileSync(
+  writePrivateFile(
     join(paths.chatSessionsDir, 'index.json'),
     `${JSON.stringify(index, null, 2)}\n`,
-    'utf8',
   );
 }
 

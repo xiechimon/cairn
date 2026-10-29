@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep, MachineDoneBody, StepKind, TranscriptUpload } from '@cairn/shared';
+import { ensurePrivateDir, writePrivateFile } from './private-fs.js';
 import type { StopRequest } from './step-stops.js';
 
 export type JournalState = 'claimed' | 'running' | 'awaiting-upload' | 'done' | 'failed';
@@ -27,7 +28,7 @@ export type TranscriptMessage = TranscriptUpload['messages'][number];
 
 export class StepJournal {
   constructor(private readonly dir: string) {
-    mkdirSync(dir, { recursive: true });
+    ensurePrivateDir(dir);
   }
 
   private file(stepId: string): string {
@@ -96,7 +97,7 @@ export class StepJournal {
   }
 
   private write(entry: StepJournalEntry): void {
-    writeFileSync(this.file(entry.stepId), `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
+    writePrivateFile(this.file(entry.stepId), `${JSON.stringify(entry, null, 2)}\n`);
   }
 }
 
@@ -105,7 +106,7 @@ export class TranscriptBuffer {
   private readonly rows = new Map<string, TranscriptMessage>();
 
   constructor(dir: string, stepId: string) {
-    mkdirSync(dir, { recursive: true });
+    ensurePrivateDir(dir);
     this.file = join(dir, `step-${stepId}.transcript.json`);
     if (existsSync(this.file)) {
       try {
@@ -125,6 +126,6 @@ export class TranscriptBuffer {
   }
 
   private flush(): void {
-    writeFileSync(this.file, `${JSON.stringify(this.messages(), null, 2)}\n`, 'utf8');
+    writePrivateFile(this.file, `${JSON.stringify(this.messages(), null, 2)}\n`);
   }
 }
