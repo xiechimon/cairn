@@ -268,6 +268,36 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     }
   });
 
+  const HARNESS_EVAL_DISPATCH_PATHS = [
+    'apps/server/src/services/harness-eval-coordinator.ts',
+    'apps/server/src/services/harness-eval-production.ts',
+    'scripts/harness-eval-worker.mjs',
+    'apps/server/src/services/merge-gate/harness-eval-route.ts',
+    'apps/server/src/services/merge-gate/harness-eval-judge.ts',
+  ];
+  test('⑦ harness eval dispatch tooling is protected and never auto-merge (#1614)', () => {
+    for (const p of HARNESS_EVAL_DISPATCH_PATHS) {
+      const r = classify([f(p)]);
+      expect(r.protected, p).toEqual([p]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
+  test('⑦ harness-eval-* is case-insensitive; neighbours stay in the auto-merge set', () => {
+    expect(classify([f('Apps/Server/Src/Services/Harness-Eval-Coordinator.ts')]).protected).toEqual(
+      ['Apps/Server/Src/Services/Harness-Eval-Coordinator.ts'],
+    );
+    for (const p of [
+      'apps/server/src/services/harness-evalx.ts',
+      'apps/server/src/services/harness-eval/coordinator.ts',
+      'apps/server/src/services/builds.ts',
+    ]) {
+      const r = classify([f(p)]);
+      expect(r.protected, p).toEqual([]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
   test('a copy entry original name is classified too: copied out of a protected file counts as a hit', () => {
     const r = classify([
       f('apps/web/src/ci.yml', { status: 'copied', previousFilename: '.github/workflows/ci.yml' }),

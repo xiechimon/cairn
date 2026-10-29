@@ -93,6 +93,7 @@ const PROTECTED = [
   'apps/server/src/services/mcp-face.ts',
   'apps/server/src/services/mcp-servers.ts',
   'apps/server/src/db/client.ts',
+  'apps/server/src/services/harness-eval-*.ts',
   'integration/eval/**',
   '.claude/hillclimb/**',
   'apps/server/src/trajectory-export.ts',
@@ -133,7 +134,7 @@ function globToRegExp(glob, { protect = false } = {}) {
   }
   return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, protect ? 'iu' : 'i')
 }
-const SCRIPT_SHA256 = 'db230f1e87cf654eb8c6d78a29d0b470c17eccb7f3212963aeb781f79471dc35'
+const SCRIPT_SHA256 = '5233082290c1477fcc3e391eb900514e73a305e37d99e9127c91eff73e416446'
 const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { protect: true }))
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))

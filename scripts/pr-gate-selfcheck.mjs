@@ -319,6 +319,17 @@ const cases = [
       ]),
   ],
   [
+    'harness eval dispatch tooling routes to the user as protected (#1614)',
+    () =>
+      eachProtected([
+        'apps/server/src/services/harness-eval-coordinator.ts',
+        'apps/server/src/services/harness-eval-production.ts',
+        'scripts/harness-eval-worker.mjs',
+        'apps/server/src/services/merge-gate/harness-eval-route.ts',
+        'apps/server/src/services/merge-gate/harness-eval-judge.ts',
+      ]),
+  ],
+  [
     'case variants of protected paths route to the user (run 5)',
     () =>
       eachProtected([
