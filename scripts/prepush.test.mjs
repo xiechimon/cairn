@@ -49,9 +49,17 @@ test('documentation skips code checks, unknown paths fail closed', () => {
 
 test('changes to prepush scripts run the CI self-test files locally', () => {
   const selfTest = ['node', '--test', ...selfTests];
-  assert.ok(
-    prepushPlan(['scripts/heavy-slots.mjs']).some((args) => args.join(' ') === selfTest.join(' ')),
-  );
+  for (const path of [
+    'scripts/heavy-slots.mjs',
+    '.github/workflows/ci.yml',
+    'scripts/epic-done.mjs',
+    ...selfTests,
+    ...selfTests.map((path) => path.replace(/\.test\.mjs$/, '.mjs')),
+  ])
+    assert.ok(
+      prepushPlan([path]).some((args) => args.join(' ') === selfTest.join(' ')),
+      path,
+    );
   assert.ok(
     !prepushPlan(['apps/web/src/main.tsx']).some((args) => args.join(' ') === selfTest.join(' ')),
   );
