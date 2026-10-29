@@ -1,0 +1,150 @@
+{
+  "exported": [
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L110-110",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L110-110.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L112-112",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L112-112.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L118-123",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L118-123.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L129-129",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L129-129.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L132-137",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L132-137.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L140-140",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L140-140.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L26-26",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L26-26.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L31-31",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L31-31.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L33-33",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.mjs__L33-33.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.test.mjs__L10-10",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.test.mjs__L10-10.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.test.mjs__L3-3",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.test.mjs__L3-3.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.test.mjs__L77-79",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.test.mjs__L77-79.json"
+    },
+    {
+      "id": "pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.test.mjs__L83-83",
+      "path": "cases/pr-1547__fix-1562__f0835bbc4d9b__scripts_single-use-helper-gate.test.mjs__L83-83.json"
+    },
+    {
+      "id": "pr-1565__fix-1597__d60df992c572__scripts_migrate-pacman-to-cairn.sh__L56-56",
+      "path": "cases/pr-1565__fix-1597__d60df992c572__scripts_migrate-pacman-to-cairn.sh__L56-56.json"
+    },
+    {
+      "id": "pr-1565__fix-1598__3aa782e10657__scripts_migrate-pacman-to-cairn.sh__L82-82",
+      "path": "cases/pr-1565__fix-1598__3aa782e10657__scripts_migrate-pacman-to-cairn.sh__L82-82.json"
+    },
+    {
+      "id": "pr-1568__fix-1582__e0c3961d7894__site_index.html__L148-148",
+      "path": "cases/pr-1568__fix-1582__e0c3961d7894__site_index.html__L148-148.json"
+    }
+  ],
+  "candidates": [
+    {
+      "followUpSha": "0048134ec35ac67d67e14431a1a021cc0f945bd7",
+      "fixingSha": "0048134ec35ac67d67e14431a1a021cc0f945bd7",
+      "introducingSha": null,
+      "originalPr": null,
+      "fixingPr": 1328,
+      "status": "multiple-origin",
+      "unresolvedReason": null,
+      "ineligibleReason": "multiple-origin"
+    },
+    {
+      "followUpSha": "05d0dd12e3e9eab720bfd7c4afeb097ed4c0615e",
+      "fixingSha": "05d0dd12e3e9eab720bfd7c4afeb097ed4c0615e",
+      "introducingSha": null,
+      "originalPr": null,
+      "fixingPr": 1703,
+      "status": "multiple-origin",
+      "unresolvedReason": null,
+      "ineligibleReason": "multiple-origin"
+    },
+    {
+      "followUpSha": "06a6bfc6216baec53dcdf44445a598e0962a1651",
+      "fixingSha": "06a6bfc6216baec53dcdf44445a598e0962a1651",
+      "introducingSha": null,
+      "originalPr": null,
+      "fixingPr": 1592,
+      "status": "unresolved",
+      "unresolvedReason": "no-blameable-lines",
+      "ineligibleReason": "unresolved:no-blameable-lines"
+    },
+    {
+      "followUpSha": "15d6f98f4c6b78f7e2b62cf99583641d4d4274b3",
+      "fixingSha": "15d6f98f4c6b78f7e2b62cf99583641d4d4274b3",
+      "introducingSha": null,
+      "originalPr": null,
+      "fixingPr": 1585,
+      "status": "multiple-origin",
+      "unresolvedReason": null,
+      "ineligibleReason": "multiple-origin"
+    },
+    {
+      "followUpSha": "32a9adc37f101ade4c0f55fbf690b2377c9ccddb",
+      "fixingSha": "32a9adc37f101ade4c0f55fbf690b2377c9ccddb",
+      "introducingSha": null,
+      "originalPr": null,
+      "fixingPr": 1581,
+      "status": "unresolved",
+      "unresolvedReason": "no-blameable-lines",
+      "ineligibleReason": "unresolved:no-blameable-lines"
+    },
+    {
+      "followUpSha": "8757f6e663cbedce5e761286c7a1e00e6f10c768",
+      "fixingSha": "8757f6e663cbedce5e761286c7a1e00e6f10c768",
+      "introducingSha": "6899f15e5f77d7432628e92d4309a10883174e64",
+      "originalPr": 101,
+      "fixingPr": 1593,
+      "status": "outside-window",
+      "unresolvedReason": null,
+      "ineligibleReason": "outside-window"
+    },
+    {
+      "followUpSha": "d1bd843080a5894421950f045df1d7b49feaced0",
+      "fixingSha": "d1bd843080a5894421950f045df1d7b49feaced0",
+      "introducingSha": null,
+      "originalPr": null,
+      "fixingPr": 1323,
+      "status": "multiple-origin",
+      "unresolvedReason": null,
+      "ineligibleReason": "multiple-origin"
+    },
+    {
+      "followUpSha": "d3d7814f0924757a592cbf1ca97848cde350c097",
+      "fixingSha": "d3d7814f0924757a592cbf1ca97848cde350c097",
+      "introducingSha": "6b63325e64245c9bfed0c395d70f267f268fa998",
+      "originalPr": 637,
+      "fixingPr": 1584,
+      "status": "outside-window",
+      "unresolvedReason": null,
+      "ineligibleReason": "outside-window"
+    }
+  ]
+}
