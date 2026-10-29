@@ -742,7 +742,7 @@ test('CI includes this test and ownership covers the checker and frozen manifest
   );
   const owners = readFileSync(new URL('../.github/CODEOWNERS', import.meta.url), 'utf8');
   assert.match(owners, /^\/scripts\/epic-done\.mjs @xiechimon$/m);
-  assert.match(owners, /^\/\.claude\/epics\/ @xiechimon$/m);
+  assert.match(owners, /^\/\.claude\/epics\/\*\* @xiechimon$/m);
 });
 
 test('green side-branch commits cannot establish a green main after closure', async () => {
