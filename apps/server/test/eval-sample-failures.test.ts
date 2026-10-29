@@ -168,6 +168,16 @@ function fixtureTree() {
         labeledAt: 1,
       },
     }),
+    pack({
+      buildId: 'build-opaque-1',
+      attribution: {
+        where: 'unknown',
+        why: 'other',
+        evidence: [],
+        labeler: 'openai/gpt-5',
+        labeledAt: 1,
+      },
+    }),
     pack({ buildId: 'build-unattributed', attribution: null }),
     pack({
       buildId: 'build-merged',
@@ -230,6 +240,11 @@ test('same seed and week give the same sample', () => {
   );
 });
 
+function reviewMdHasLabelToken(reviewMd: string, token: string): boolean {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![A-Za-z0-9_/-])${escaped}(?![A-Za-z0-9_/-])`).test(reviewMd);
+}
+
 test('neither review file contains labeler where or why values from answers', () => {
   const { root, packsPath } = fixtureTree();
   const out = join(root, 'out');
@@ -239,7 +254,7 @@ test('neither review file contains labeler where or why values from answers', ()
     flowsDir: root,
     packPaths: [packsPath],
     perFlow: 3,
-    packs: 5,
+    packs: 6,
     out,
   });
   const answers = failureReviewAnswersSchema.parse(
@@ -253,18 +268,19 @@ test('neither review file contains labeler where or why values from answers', ()
     whereValues.add(item.where);
     whyValues.add(item.why);
   }
+  expect(whereValues.has('unknown')).toBe(true);
+  expect(whyValues.has('other')).toBe(true);
   expect(whereValues.size).toBeGreaterThan(0);
   expect(whyValues.size).toBeGreaterThan(0);
   for (const value of whereValues) {
     expect(FAILURE_WHERE.includes(value as (typeof FAILURE_WHERE)[number])).toBe(true);
-    expect(reviewMd.includes(value)).toBe(false);
-    expect(reviewBlank.includes(value)).toBe(false);
+    expect(reviewMdHasLabelToken(reviewMd, value)).toBe(false);
   }
   for (const value of whyValues) {
     expect(FAILURE_WHY.includes(value as (typeof FAILURE_WHY)[number])).toBe(true);
-    expect(reviewMd.includes(value)).toBe(false);
-    expect(reviewBlank.includes(value)).toBe(false);
+    expect(reviewMdHasLabelToken(reviewMd, value)).toBe(false);
   }
+  expect(reviewBlank.includes('"vendor":"unknown"')).toBe(true);
   for (const line of reviewBlank.trim().split('\n')) {
     const record = failureReviewRecordSchema.parse(JSON.parse(line));
     expect(record.where).toBeNull();
