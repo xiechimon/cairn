@@ -6,6 +6,23 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 
+test('merge instructions require the pr-gate auto-merge verdict', () => {
+  for (const file of ['AGENTS.md', 'docs/ops/agent-bot-identity.md']) {
+    const guidance = readFileSync(join(ROOT, file), 'utf8');
+    assert.ok(
+      guidance
+        .split('\n')
+        .includes(
+          "- Both paths require a pr-gate go with `mergedBy: 'auto-merge'` (every other PR goes to ian), fully checked Acceptance and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.",
+        ),
+      file,
+    );
+  }
+  const retro = readFileSync(join(ROOT, '.claude/skills/retro-cairn/SKILL.md'), 'utf8');
+  assert.ok(!retro.includes('open auto-merge'), '.claude/skills/retro-cairn/SKILL.md');
+  assert.ok(retro.includes("mergedBy: 'auto-merge'"), '.claude/skills/retro-cairn/SKILL.md');
+});
+
 test('AGENTS.md and pr-cairn agree that agents never add needs-decision', () => {
   for (const file of ['AGENTS.md', '.claude/skills/pr-cairn/SKILL.md']) {
     const guidance = readFileSync(join(ROOT, file), 'utf8');
