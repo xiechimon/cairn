@@ -52,6 +52,13 @@ interface TrialCandidate {
   resultRow: unknown;
 }
 
+interface PackBlindedTranscript {
+  buildId: string;
+  input: unknown;
+  process: unknown;
+  outcome: unknown;
+}
+
 interface PackCandidate {
   itemId: string;
   buildId: string;
@@ -59,6 +66,7 @@ interface PackCandidate {
   where: string;
   why: string;
   labeler: string;
+  blindedTranscript: PackBlindedTranscript;
 }
 
 function readJsonl(path: string): unknown[] {
@@ -207,6 +215,12 @@ export function sampleFailures(options: SampleFailuresOptions): SampleFailuresRe
         where: pack.attribution.where,
         why: pack.attribution.why,
         labeler: pack.attribution.labeler,
+        blindedTranscript: {
+          buildId: pack.buildId,
+          input: pack.input,
+          process: pack.process,
+          outcome: pack.outcome,
+        },
       };
       if (previous) {
         if (previous.where !== candidate.where || previous.why !== candidate.why) {
@@ -226,6 +240,7 @@ export function sampleFailures(options: SampleFailuresOptions): SampleFailuresRe
 
   mkdirSync(options.out, { recursive: true });
   const missingDir = join(options.out, 'missing-transcripts');
+  const packTranscriptDir = join(options.out, 'transcripts');
   const items: SampledItem[] = [
     ...trials.map((trial) => {
       let transcriptPath = trial.transcriptPath;
@@ -244,14 +259,19 @@ export function sampleFailures(options: SampleFailuresOptions): SampleFailuresRe
         transcriptMissing: trial.transcriptMissing,
       };
     }),
-    ...orderedPacks.map((pack) => ({
-      itemId: pack.itemId,
-      source: 'pack' as const,
-      flow: null,
-      buildId: pack.buildId,
-      transcriptPath: null,
-      transcriptMissing: false,
-    })),
+    ...orderedPacks.map((pack) => {
+      mkdirSync(packTranscriptDir, { recursive: true });
+      const transcriptPath = join(packTranscriptDir, `${pack.itemId.replaceAll(':', '_')}.json`);
+      writeFileSync(transcriptPath, `${JSON.stringify(pack.blindedTranscript, null, 2)}\n`);
+      return {
+        itemId: pack.itemId,
+        source: 'pack' as const,
+        flow: null,
+        buildId: pack.buildId,
+        transcriptPath,
+        transcriptMissing: false,
+      };
+    }),
   ];
 
   const blankRecords: FailureReviewRecord[] = items.map((item) =>

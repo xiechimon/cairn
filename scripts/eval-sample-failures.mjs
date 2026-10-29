@@ -237,24 +237,29 @@ export function sampleFailures({ week, flows, packs, count, out }) {
   return { review: join(out, 'review.json'), items: items.length };
 }
 
+const repositoryRoot = resolve(import.meta.dirname, '..');
+const defaultFlowsDir = join(repositoryRoot, '.claude/hillclimb');
+
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   try {
     const { values } = parseArgs({
       options: {
         week: { type: 'string' },
-        flows: { type: 'string', default: '.claude/hillclimb' },
+        flows: { type: 'string' },
         packs: { type: 'string', multiple: true, default: [] },
         count: { type: 'string', default: '10' },
         out: { type: 'string' },
         report: { type: 'string', multiple: true },
       },
     });
+    const flows = values.flows ? resolve(values.flows) : defaultFlowsDir;
     const result = values.report
       ? reportReviews(values.report)
       : sampleFailures({
           ...values,
+          flows,
           count: Number(values.count),
-          out: values.out ?? `.claude/hillclimb/reviews/${values.week}`,
+          out: values.out ?? join(flows, 'reviews', values.week),
         });
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {

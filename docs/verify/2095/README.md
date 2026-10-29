@@ -17,7 +17,3 @@ pnpm typecheck
 pnpm lint
 pnpm eval:sample-failures --week 2026-W44 --out /tmp/cairn-2095-out --flows <fixture> <packs.jsonl>
 ```
-
-## Prepush vitest scope
-
-Changing `packages/shared` barrel exports makes `vitest --changed` select daemon and integration suites that are unrelated to this sampler. `scripts/prepush-vitest.mjs` sets `VITEST_PROJECT_SET=server-shared` when every non-doc code path is under `packages/shared/` or `apps/server/`, so local prepush runs the packages + server projects only for this class of change.

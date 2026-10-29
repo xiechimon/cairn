@@ -1,6 +1,7 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   FAILURE_WHERE,
   FAILURE_WHY,
@@ -10,6 +11,8 @@ import {
 } from '@cairn/shared';
 import { afterEach, expect, test } from 'vitest';
 import { sampleFailures } from '../src/eval-sample-failures.js';
+
+const repoRoot = resolve(import.meta.dirname, '../../..');
 
 const dirs: string[] = [];
 
@@ -51,6 +54,7 @@ function pack(input: {
   buildId: string;
   merged?: boolean | null;
   attribution?: TrajectoryPack['attribution'];
+  transcriptText?: string;
 }): TrajectoryPack {
   return {
     buildId: input.buildId,
@@ -70,7 +74,14 @@ function pack(input: {
         {
           stepId: `${input.buildId}-step-1`,
           kind: 'build',
-          transcript: [],
+          transcript: input.transcriptText
+            ? [
+                {
+                  role: 'assistant',
+                  content: [{ type: 'text', text: input.transcriptText }],
+                },
+              ]
+            : [],
           checkpointCommit: null,
         },
       ],
@@ -120,6 +131,7 @@ function fixtureTree() {
   const packs = [
     pack({
       buildId: 'build-alpha-1',
+      transcriptText: 'pack-trace-alpha-1',
       attribution: {
         where: 'prompt',
         why: 'ignored_instruction',
@@ -130,6 +142,7 @@ function fixtureTree() {
     }),
     pack({
       buildId: 'build-alpha-2',
+      transcriptText: 'pack-trace-alpha-2',
       attribution: {
         where: 'prompt',
         why: 'wrong_tool',
@@ -140,6 +153,7 @@ function fixtureTree() {
     }),
     pack({
       buildId: 'build-beta-1',
+      transcriptText: 'pack-trace-beta-1',
       attribution: {
         where: 'runtime',
         why: 'premature_finish',
@@ -150,6 +164,7 @@ function fixtureTree() {
     }),
     pack({
       buildId: 'build-beta-2',
+      transcriptText: 'pack-trace-beta-2',
       attribution: {
         where: 'runtime',
         why: 'thinking_runaway',
@@ -160,6 +175,7 @@ function fixtureTree() {
     }),
     pack({
       buildId: 'build-gamma-1',
+      transcriptText: 'pack-trace-gamma-1',
       attribution: {
         where: 'config',
         why: 'ci_misread',
@@ -170,6 +186,7 @@ function fixtureTree() {
     }),
     pack({
       buildId: 'build-opaque-1',
+      transcriptText: 'pack-trace-opaque-1',
       attribution: {
         where: 'unknown',
         why: 'other',
@@ -311,4 +328,66 @@ test('passing trials and unattributed packs are never sampled', () => {
   expect(existsSync(join(out, 'review-2026-W44.md'))).toBe(true);
   expect(existsSync(join(out, 'review-2026-W44.blank.jsonl'))).toBe(true);
   expect(existsSync(join(out, 'answers-2026-W44.json'))).toBe(true);
+});
+
+test('sampled packs keep a blinded nonempty transcript artifact', () => {
+  const { root, packsPath } = fixtureTree();
+  const out = join(root, 'out');
+  const result = sampleFailures({
+    week: '2026-W44',
+    seed: 'seed-pack-trace',
+    flowsDir: root,
+    packPaths: [packsPath],
+    perFlow: 1,
+    packs: 6,
+    out,
+  });
+  const packItems = result.items.filter((item) => item.source === 'pack');
+  expect(packItems.length).toBeGreaterThan(0);
+  const reviewMd = readFileSync(join(out, 'review-2026-W44.md'), 'utf8');
+  for (const item of packItems) {
+    expect(item.transcriptPath).toBeTruthy();
+    expect(item.transcriptMissing).toBe(false);
+    expect(existsSync(item.transcriptPath!)).toBe(true);
+    const body = readFileSync(item.transcriptPath!, 'utf8');
+    expect(body.includes('pack-trace-')).toBe(true);
+    expect(body.includes('attribution')).toBe(false);
+    expect(body.includes('"where"')).toBe(false);
+    expect(body.includes('"why"')).toBe(false);
+    expect(body.includes('openai/gpt-5')).toBe(false);
+    const section = reviewMd.split(`## ${item.itemId}`)[1]?.split('\n## ')[0] ?? '';
+    expect(section.includes('- transcript: none')).toBe(false);
+    expect(section.includes('- transcript: `')).toBe(true);
+  }
+});
+
+test('root command without --flows samples repository-root hillclimb', () => {
+  const flow = `_cn91-2143-${process.pid}`;
+  const hillclimb = join(repoRoot, '.claude/hillclimb');
+  writeFlow(hillclimb, flow, [{ prompt_id: 'root-fail', rep: 0, grade: { ok: 0 } }], ['root-fail']);
+  const outRoot = mkdtempSync(join(tmpdir(), 'cairn-sample-failures-root-'));
+  dirs.push(outRoot);
+  const out = join(outRoot, 'out');
+  try {
+    const run = spawnSync(
+      'pnpm',
+      [
+        'eval:sample-failures',
+        '--week',
+        '2026-W44',
+        '--out',
+        out,
+        '--per-flow',
+        '3',
+        '--packs',
+        '1',
+      ],
+      { cwd: repoRoot, encoding: 'utf8', env: process.env },
+    );
+    expect(run.status).toBe(0);
+    const payload = JSON.parse(run.stdout) as { items: string[] };
+    expect(payload.items).toContain(`eval:${flow}:root-fail:0`);
+  } finally {
+    rmSync(join(hillclimb, flow), { recursive: true, force: true });
+  }
 });

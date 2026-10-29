@@ -1,5 +1,9 @@
+import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { SampleFailuresError, sampleFailures } from './eval-sample-failures.js';
+
+const repositoryRoot = resolve(import.meta.dirname, '../../..');
+const defaultFlowsDir = join(repositoryRoot, '.claude/hillclimb');
 
 try {
   const { values, positionals } = parseArgs({
@@ -7,7 +11,7 @@ try {
     options: {
       week: { type: 'string' },
       seed: { type: 'string' },
-      flows: { type: 'string', default: '.claude/hillclimb' },
+      flows: { type: 'string' },
       'per-flow': { type: 'string', default: '3' },
       packs: { type: 'string', default: '10' },
       out: { type: 'string' },
@@ -32,7 +36,7 @@ try {
   const result = sampleFailures({
     week: values.week,
     seed: values.seed ?? values.week,
-    flowsDir: values.flows ?? '.claude/hillclimb',
+    flowsDir: values.flows ? resolve(values.flows) : defaultFlowsDir,
     packPaths: positionals,
     perFlow,
     packs,

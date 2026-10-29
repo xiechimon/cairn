@@ -35,9 +35,19 @@ test('weekly CLI stratifies failures, blinds packs, preserves reviews and report
       },
     }));
     writeFileSync(join(root, 'packs.jsonl'), packs.map((p) => JSON.stringify(p)).join('\n'));
+    const flows = join(root, '.claude/hillclimb');
     const run = (...args) =>
       spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: 'utf8' });
-    const sampled = run('--week', '2026-11-16', '--packs', 'packs.jsonl', '--count', '35');
+    const sampled = run(
+      '--week',
+      '2026-11-16',
+      '--flows',
+      flows,
+      '--packs',
+      'packs.jsonl',
+      '--count',
+      '35',
+    );
     assert.equal(sampled.status, 0, sampled.stderr);
     const path = join(root, '.claude/hillclimb/reviews/2026-11-16/review.json');
     const review = JSON.parse(readFileSync(path, 'utf8'));
@@ -56,7 +66,10 @@ test('weekly CLI stratifies failures, blinds packs, preserves reviews and report
         };
     }
     writeFileSync(path, JSON.stringify(review));
-    assert.notEqual(run('--week', '2026-11-16', '--packs', 'packs.jsonl').status, 0);
+    assert.notEqual(
+      run('--week', '2026-11-16', '--flows', flows, '--packs', 'packs.jsonl').status,
+      0,
+    );
     const report = run('--report', path);
     assert.equal(report.status, 0, report.stderr);
     const result = JSON.parse(report.stdout);
@@ -74,6 +87,38 @@ test('weekly CLI stratifies failures, blinds packs, preserves reviews and report
     assert.notEqual(run('--report', path).status, 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('default --flows without flag resolves against the repository root', () => {
+  const repoRoot = resolve(import.meta.dirname, '..');
+  const flow = `_cn91-mjs-${process.pid}`;
+  const baseline = join(repoRoot, '.claude/hillclimb', flow, 'baseline');
+  const scratch = mkdtempSync(join(tmpdir(), 'eval-sample-mjs-root-'));
+  const out = join(scratch, 'review-out');
+  try {
+    mkdirSync(join(baseline, 'traces'), { recursive: true });
+    writeFileSync(
+      join(baseline, 'results.jsonl'),
+      `${JSON.stringify({ prompt_id: 'root-fail', rep: 0, grade: { ok: 0 } })}\n`,
+    );
+    writeFileSync(join(baseline, 'traces/root-fail_rep0.json'), '[{"content":"root"}]');
+    const run = spawnSync(
+      process.execPath,
+      [cli, '--week', '2026-11-16', '--out', out, '--count', '5'],
+      { cwd: join(repoRoot, 'apps/server'), encoding: 'utf8' },
+    );
+    assert.equal(run.status, 0, run.stderr);
+    const review = JSON.parse(readFileSync(join(out, 'review.json'), 'utf8'));
+    assert.ok(
+      review.items.some(
+        (item) => item.kind === 'trial' && item.sourceId === 'root-fail:rep0' && item.flow === flow,
+      ),
+      JSON.stringify(review.items),
+    );
+  } finally {
+    rmSync(join(repoRoot, '.claude/hillclimb', flow), { recursive: true, force: true });
+    rmSync(scratch, { recursive: true, force: true });
   }
 });
 
