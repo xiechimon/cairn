@@ -1,8 +1,8 @@
 {
-  "labels": 30,
-  "whereAgreement": 1,
-  "whyAgreement": 1,
+  "labels": 0,
+  "whereAgreement": null,
+  "whyAgreement": null,
   "kappaWhere": null,
   "kappaWhy": null,
-  "trusted": true
+  "trusted": false
 }
