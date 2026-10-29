@@ -34,7 +34,10 @@ export const selfTests = [
   'scripts/lessons-ledger-gate.test.mjs',
   'scripts/recording-gate.test.mjs',
   'scripts/lessons-weekly.test.mjs',
+  'scripts/epic-done.test.mjs',
 ];
+
+const selfTest = ['node', '--test', ...selfTests];
 
 export const localOnly = [
   ['node', 'scripts/ci-job-structure-gate.mjs'],
@@ -91,12 +94,17 @@ export function prepushPlan(paths, mode = 'local') {
     : [
         ...required,
         ...localOnly,
-        ...(paths.some((path) =>
-          /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|recording-gate|scrub-git-env|doc-reader-tests)/.test(
-            path,
-          ),
+        ...(paths.some(
+          (path) =>
+            path === '.github/workflows/ci.yml' ||
+            selfTests.some(
+              (selfTest) => path === selfTest || path === selfTest.replace(/\.test\.mjs$/, '.mjs'),
+            ) ||
+            /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|recording-gate|scrub-git-env|doc-reader-tests)/.test(
+              path,
+            ),
         )
-          ? [['node', '--test', ...selfTests]]
+          ? [selfTest]
           : []),
         ['node', 'scripts/prepush-vitest.mjs'],
         ...(docPaths.length ? [['node', 'scripts/doc-reader-tests.mjs', ...docPaths]] : []),
@@ -203,19 +211,21 @@ export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const args = process.argv.slice(2);
-  const modes = ['--ci', '--advisory', '--e2e-shard'];
+  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test'];
   if (
     args.length > 0 &&
     (!modes.includes(args[0]) || args.length !== (args[0] === '--e2e-shard' ? 2 : 1))
   ) {
-    console.error('Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4]');
+    console.error('Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test]');
     process.exit(2);
   }
   if (args[0] === '--e2e-shard' && !/^[1-4]\/4$/.test(args[1] ?? '')) process.exit(2);
   const plan =
     args[0] === '--e2e-shard'
       ? [['pnpm', '--filter', '@cairn/web', 'e2e', `--shard=${args[1]}`]]
-      : prepushPlan(changedPaths(), args[0]?.slice(2) ?? 'local');
+      : args[0] === '--self-test'
+        ? [selfTest]
+        : prepushPlan(changedPaths(), args[0]?.slice(2) ?? 'local');
   const lease = plan.length > 0 ? await acquireSlot() : null;
   if (lease !== null && plan.some((step) => step.includes('e2e:affected'))) {
     const conflict = slotPortReport({ slot: lease.slot });

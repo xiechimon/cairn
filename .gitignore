@@ -87,6 +87,7 @@ credentials.enc
 !.claude/settings.json
 !.claude/hooks/
 !.claude/workflows/
+!.claude/epics/
 .claude/hillclimb/*/baseline/traces/
 .claude/hillclimb/*/report.html
 .claude/hillclimb/*/trajectory/
