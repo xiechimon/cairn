@@ -55,20 +55,28 @@ export const localOnly = [
   ['node', 'scripts/lint-warning-cap.mjs'],
 ];
 
-const DOCS = /^(docs\/|.*\.md$|LICENSE$)/;
+const DOCS = /(?:\.md$|^LICENSE$)/;
 
-export function prepushPlan(paths, mode = 'local') {
+export function hasCode(paths) {
+  return paths.some(
+    (path) =>
+      !path.startsWith('.claude/epics/') &&
+      (/^(apps|packages|integration)\//.test(path) || !DOCS.test(path)),
+  );
+}
+
+export function prepushPlan(paths, mode = 'local', forceFull = false) {
   const advisory = [['node', 'scripts/ui-dead-class-gate.mjs', '--compile']];
   if (mode === 'advisory') return advisory;
   const language = ['node', 'scripts/english-only-gate.mjs'];
   const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
-  const codePaths = paths.filter((path) => !DOCS.test(path));
+  const codePaths = paths.filter((path) => hasCode([path]));
   const docPaths = paths.filter((path) => DOCS.test(path));
-  if (codePaths.length === 0) {
+  if (codePaths.length === 0 && !forceFull) {
     const checks = [language];
     if (paths.some((path) => path === 'docs/lessons.md' || path.startsWith('docs/lessons/')))
       checks.push(ledgerGate);
-    if (mode !== 'ci') checks.push(['node', 'scripts/doc-reader-tests.mjs', ...docPaths]);
+    checks.push(['node', 'scripts/doc-reader-tests.mjs', ...docPaths]);
     return checks;
   }
   const required = [
@@ -88,6 +96,7 @@ export function prepushPlan(paths, mode = 'local') {
     ['node', '--test', 'scripts/escape-eval-loop.test.mjs'],
     ledgerGate,
     ['python3', 'scripts/pr-evidence-gate.test.py'],
+    ...(docPaths.length ? [['node', 'scripts/doc-reader-tests.mjs', ...docPaths]] : []),
   ];
   return mode === 'ci'
     ? required
@@ -107,7 +116,6 @@ export function prepushPlan(paths, mode = 'local') {
           ? [selfTest]
           : []),
         ['node', 'scripts/prepush-vitest.mjs'],
-        ...(docPaths.length ? [['node', 'scripts/doc-reader-tests.mjs', ...docPaths]] : []),
         ...(paths.some((path) => path.startsWith('apps/web/'))
           ? [['pnpm', '--filter', '@cairn/web', 'test']]
           : []),
@@ -200,9 +208,9 @@ export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main
       [
         ...(ancestor === null
           ? git(['ls-files', '-z'])
-          : git(['diff', '--name-only', '-z', ancestor, 'HEAD'])
+          : git(['diff', '--no-renames', '--name-only', '-z', ancestor, 'HEAD'])
         ).split('\0'),
-        ...git(['diff', '--name-only', '-z', 'HEAD']).split('\0'),
+        ...git(['diff', '--no-renames', '--name-only', '-z', 'HEAD']).split('\0'),
         ...git(['ls-files', '--others', '--exclude-standard', '-z']).split('\0'),
       ].filter(Boolean),
     ),
@@ -211,21 +219,35 @@ export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const args = process.argv.slice(2);
-  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test'];
+  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test', '--has-code'];
   if (
     args.length > 0 &&
     (!modes.includes(args[0]) || args.length !== (args[0] === '--e2e-shard' ? 2 : 1))
   ) {
-    console.error('Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test]');
+    console.error(
+      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test | --has-code]',
+    );
     process.exit(2);
   }
   if (args[0] === '--e2e-shard' && !/^[1-4]\/4$/.test(args[1] ?? '')) process.exit(2);
+  if (args[0] === '--has-code') {
+    try {
+      console.log(hasCode(changedPaths()));
+    } catch {
+      console.log(true);
+    }
+    process.exit(0);
+  }
   const plan =
     args[0] === '--e2e-shard'
       ? [['pnpm', '--filter', '@cairn/web', 'e2e', `--shard=${args[1]}`]]
       : args[0] === '--self-test'
         ? [selfTest]
-        : prepushPlan(changedPaths(), args[0]?.slice(2) ?? 'local');
+        : prepushPlan(
+            changedPaths(),
+            args[0]?.slice(2) ?? 'local',
+            process.env.PREPUSH_FORCE_FULL === 'true',
+          );
   const lease = plan.length > 0 ? await acquireSlot() : null;
   if (lease !== null && plan.some((step) => step.includes('e2e:affected'))) {
     const conflict = slotPortReport({ slot: lease.slot });
