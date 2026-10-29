@@ -16,6 +16,17 @@ test('recovery regression is run by the trusted main workflow', () => {
   );
 });
 
+test('incident recovery documents #2136 rejected SHAs and pending production acceptance', () => {
+  const guidance =
+    readFileSync(new URL('../docs/ops/agent-bot-identity.md', import.meta.url), 'utf8').split(
+      '## Incident recovery commit preparation',
+    )[1] ?? '';
+  assert.match(guidance, /#2136/);
+  assert.match(guidance, /c683123a69b8737ba7f2dac4cf404408e4cd4d5d/);
+  assert.match(guidance, /78b85594328fe2c26680060d1ad9dfa28e97d76b/);
+  assert.match(guidance, /#2136 recovery remains pending/i);
+});
+
 test('incident recovery preserves trailers and history while passing the actual push check', () => {
   const guidance =
     readFileSync(new URL('../docs/ops/agent-bot-identity.md', import.meta.url), 'utf8').split(

@@ -1,11 +1,13 @@
 ---
 Category: Squashing a bot-opened PR attributed the main commit to the bot opener despite valid branch authorship
-Source: Issues #2024, #2028 and #2088; PRs #1828, #1906 and #2027 (2026-10-28)
+Source: Issues #2024, #2028, #2088 and #2136; PRs #1828, #1906, #2027, #2134 and #2135 (2026-10-28..2026-10-29)
 Level: 2
-Safeguard: The unchanged commit-author workflow rejects bot authors; merge preparation reads the PR opener and every author and uses the existing identity-aware merge helper instead of an unconditional squash command; scripts/commit-author-policy.test.mjs enforces the same routing in AGENTS.md
+Safeguard: The unchanged commit-author workflow rejects bot authors; merge preparation reads the PR opener and every author and uses the existing identity-aware merge helper instead of an unconditional squash command; scripts/commit-author-policy.test.mjs enforces the same routing in AGENTS.md; since 2026-10-28
 Intercepts: 2
-Recurrences: 1
-Notes: Issue #2088 repeated the bot squash authorship failure on dedf30ea. The new AGENTS.md policy case fails against the unconditional re-arm instruction and passes after identity-aware routing; this does not establish which instruction caused the merge. The main author gate rejected both 51cab1f0 and 4bbfe50e. Branch commit authors alone did not predict GitHub squash authorship. The external helper refuses bot PRs without one Cairnwright-authored commit. The reviewed change is carried into a single-commit PR opened by the verified current user without rewriting existing branches or main history.
+Recurrences: 2
+Notes: Issue #2088 repeated the bot squash authorship failure on dedf30ea. Issue #2136 repeated it on c683123a and tip 78b85594 after squash auto-merge of #2134 and #2135. The new AGENTS.md policy case fails against the unconditional re-arm instruction and passes after identity-aware routing; this does not establish which instruction caused the merge. The main author gate rejected both 51cab1f0 and 4bbfe50e, then c683123a and 78b85594. Branch commit authors alone did not predict GitHub squash authorship. The external helper refuses bot PRs without one Cairnwright-authored commit. The reviewed change is carried into a single-commit PR opened by the verified current user without rewriting existing branches or main history.
 ---
 
 Issue #2101 adds a recovery fixture to the trusted main push test step. It executes the operational commit recipe with inherited bot identity, asserts local fixture identity without global configuration, preserves trailers and historical commit bytes, and checks the actual workflow shell. This is repository coverage, not evidence that the external merge helper enforced the route or that main recovered. Those claims require the resulting main metadata and a subsequent green Actions run.
+
+Issue #2136 records the same squash-authorship failure on main commits `c683123a69b8737ba7f2dac4cf404408e4cd4d5d` and `78b85594328fe2c26680060d1ad9dfa28e97d76b`. Recovery keeps the author gate unchanged, preserves those commits, and prepares a later compliant push with the operational recipe. Production acceptance still requires the resulting main author metadata and a subsequent green `commit-author` Actions run; this ledger entry does not claim that dispatcher cause or main recovery.
