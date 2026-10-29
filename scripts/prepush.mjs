@@ -35,6 +35,7 @@ export const selfTests = [
   'scripts/recording-gate.test.mjs',
   'scripts/lessons-weekly.test.mjs',
   'scripts/epic-done.test.mjs',
+  'scripts/agent-rules.test.mjs',
 ];
 
 const selfTest = ['node', '--test', ...selfTests];
