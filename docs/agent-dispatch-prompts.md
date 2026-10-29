@@ -24,7 +24,7 @@ node scripts/dispatch-agent.mjs wait 1556-impl
 
 ## Lane completion (#2021)
 
-Do not continue on a banned model from `.claude/workflow.md` (including `deepseek-v4-flash`; `deepseek-v4.1-flash` remains allowed). If `ai-route` selects a banned model, stop and exit non-zero so the dispatcher can retry. If you abort without opening a PR (overlapping work, human decision required, or any other stop), exit the process with a non-zero status; a zero exit after a short no-op wrap-up is classified as a lane failure by `scripts/lane-worker-exit-gate.mjs`.
+Do not continue on a banned model from the "Do not use" line of the "Model roles" section in `AGENTS.md` (including `deepseek-v4-flash`; `deepseek-v4.1-flash` remains allowed). If `ai-route` selects a banned model, stop and exit non-zero so the dispatcher can retry. If you abort without opening a PR (overlapping work, human decision required, or any other stop), exit the process with a non-zero status; a zero exit after a short no-op wrap-up is classified as a lane failure by `scripts/lane-worker-exit-gate.mjs`.
 
 ## Accessing GitHub
 

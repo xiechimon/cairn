@@ -21,6 +21,28 @@ export function isBannedModelId(raw) {
   return false;
 }
 
+export function parseModelRoles(markdown) {
+  const lines = markdown.split(/\r?\n/);
+  const heading = lines.indexOf('## Model roles');
+  if (heading === -1) return [];
+  const rows = [];
+  for (const line of lines.slice(heading + 1)) {
+    if (line.startsWith('## ')) break;
+    if (!line.trim().startsWith('|')) continue;
+    const [role, model] = line
+      .trim()
+      .split('|')
+      .slice(1, -1)
+      .map((cell) => cell.trim());
+    if (!role || model === undefined) continue;
+    if (role === 'Role' && model === 'Model') continue;
+    if (/^:?-+:?$/.test(role) && /^:?-+:?$/.test(model)) continue;
+    const modelIds = [...model.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+    rows.push({ role, model, modelIds });
+  }
+  return rows;
+}
+
 export function modelIdFromRoute(route) {
   const trimmed = String(route ?? '').trim();
   if (!trimmed) return '';

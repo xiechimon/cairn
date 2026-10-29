@@ -8,6 +8,7 @@ import {
   bannedModelFromLog,
   isBannedModelId,
   parseAiRouteSelection,
+  parseModelRoles,
 } from './lane-model-policy.mjs';
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
@@ -45,13 +46,13 @@ test('bannedModelFromLog stays quiet for the allowed deepseek-v4.1-flash route',
   assert.equal(bannedModelFromLog(log), null);
 });
 
-test('workflow.md Do-not-use models are covered by BANNED_MODEL_IDS', () => {
-  const workflow = readFileSync(join(ROOT, '.claude/workflow.md'), 'utf8');
-  const banLine = workflow
+test('AGENTS.md Do-not-use models are covered by BANNED_MODEL_IDS', () => {
+  const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
+  const banLine = agents
     .split('\n')
-    .find((line) => line.startsWith('- Do not use:'))
-    ?.slice('- Do not use:'.length);
-  assert.ok(banLine, 'workflow.md must keep a Do not use line');
+    .find((line) => line.startsWith('- **Do not use**:'))
+    ?.slice('- **Do not use**:'.length);
+  assert.ok(banLine, 'AGENTS.md must keep a Do not use line');
   assert.match(banLine, /DeepSeek V4 Flash/i);
   assert.match(banLine, /MiniMax M3/i);
   assert.match(banLine, /gpt-6-astra/i);
@@ -61,4 +62,56 @@ test('workflow.md Do-not-use models are covered by BANNED_MODEL_IDS', () => {
   }
   assert.equal(isBannedModelId('gpt-5.6-sol'), true);
   assert.equal(isBannedModelId('gpt-5.6-luna'), true);
+});
+
+test('AGENTS.md Model roles table pins the role models and names no banned id', () => {
+  const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
+  const rows = parseModelRoles(agents);
+  assert.deepEqual(rows.find((row) => row.role === 'Orchestration')?.modelIds, ['claude-opus-5-5']);
+  assert.deepEqual(rows.find((row) => row.role === 'Implementation')?.modelIds, [
+    'gpt-6.1-sol',
+    'claude-sonnet-5-5',
+  ]);
+  assert.deepEqual(rows.find((row) => row.role === 'Mechanical work')?.modelIds, [
+    'claude-haiku-5-5',
+  ]);
+  assert.ok(rows.some((row) => row.role === 'Review'));
+  for (const row of rows) {
+    for (const id of row.modelIds) {
+      assert.equal(isBannedModelId(id), false, `${row.role} names banned model ${id}`);
+    }
+  }
+});
+
+test('parseModelRoles retains banned ids and excludes tables under other headings', () => {
+  const markdown = [
+    '## Other models',
+    '| Role | Model |',
+    '|---|---|',
+    '| Orchestration | `outside-before` |',
+    '## Model roles',
+    '| Role | Model |',
+    '|---|---|',
+    '| Implementation | `deepseek-v4-flash` |',
+    '## More models',
+    '| Role | Model |',
+    '|---|---|',
+    '| Mechanical work | `outside-after` |',
+  ].join('\n');
+  const rows = parseModelRoles(markdown);
+  assert.deepEqual(rows, [
+    {
+      role: 'Implementation',
+      model: '`deepseek-v4-flash`',
+      modelIds: ['deepseek-v4-flash'],
+    },
+  ]);
+  assert.equal(isBannedModelId(rows[0].modelIds[0]), true);
+});
+
+test('parseModelRoles returns no rows when the heading is missing', () => {
+  assert.deepEqual(
+    parseModelRoles('## Other models\n| Role | Model |\n|---|---|\n| Review | `gpt-6.1-sol` |'),
+    [],
+  );
 });
