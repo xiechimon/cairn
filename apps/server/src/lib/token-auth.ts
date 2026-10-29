@@ -27,6 +27,10 @@ function makeVerifier(token: string): (provided: string) => boolean {
   };
 }
 
+export function matchesAuthToken(expected: string, provided: string): boolean {
+  return makeVerifier(expected)(provided);
+}
+
 export function registerTokenAuth(
   app: Hono,
   token: string | null,
