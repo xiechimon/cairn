@@ -53,6 +53,7 @@ export function githubFake(routes: Record<string, GhRoute>) {
   return {
     impl,
     calls,
+    routes,
     advance: (sha: string) => {
       mainSha = sha;
     },
@@ -221,5 +222,47 @@ describe('createScheduling sweep', () => {
     const outcomes = await scheduling.sweep(1_700_000_000_000);
     expect(outcomes[0]).toEqual({ kind: 'gated', reason: 'disabled' });
     expect(w.mock.calls).toEqual([]);
+  });
+
+  test('recovers after a failed run that advanced lastEvaluatedAt past an issue update', async () => {
+    const t0 = 1_700_000_000_000;
+    const updatedAt = new Date(t0 + 10 * 60 * 1000).toISOString();
+    const w = world([openIssue(1)]);
+    const scheduling = createScheduling(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: w.mock.impl, logger },
+    );
+    const first = await scheduling.sweep(t0);
+    expect(first[0]?.kind).toBe('generated');
+    const firstId = latestScheduleReport(w.s.db, w.projectId)?.id;
+    w.mock.routes[`/repos/${REPO}/issues`] = {
+      body: [openIssue(1, { updated_at: updatedAt })],
+    };
+    w.mock.routes[`/repos/${REPO}/pulls`] = { status: 500, body: { message: 'boom' } };
+    const failed = await scheduling.sweep(t0 + 20 * 60 * 1000);
+    expect(failed[0]?.kind).toBe('skipped');
+    w.mock.routes[`/repos/${REPO}/pulls`] = { body: [] };
+    const recovered = await scheduling.sweep(t0 + 40 * 60 * 1000);
+    expect(recovered[0]?.kind).toBe('generated');
+    const report = latestScheduleReport(w.s.db, w.projectId);
+    expect(report?.id).not.toBe(firstId);
+    expect(report?.items.find((item) => item.issue === 1)?.updatedAt).toBe(Date.parse(updatedAt));
+  });
+
+  test('closing every open issue is not dormant and writes a fresh report', async () => {
+    const w = world([openIssue(1), openIssue(2)]);
+    const scheduling = createScheduling(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: w.mock.impl, logger },
+    );
+    const first = await scheduling.sweep(1_700_000_000_000);
+    expect(first[0]?.kind).toBe('generated');
+    expect(latestScheduleReport(w.s.db, w.projectId)?.items).toHaveLength(2);
+    w.mock.routes[`/repos/${REPO}/issues`] = { body: [] };
+    const next = await scheduling.sweep(1_700_000_000_000 + 6_000_000);
+    expect(next[0]?.kind).toBe('generated');
+    const report = latestScheduleReport(w.s.db, w.projectId);
+    expect(report?.items).toEqual([]);
+    expect(report?.groups).toEqual({ now: [], next: [], later: [], close: [] });
   });
 });

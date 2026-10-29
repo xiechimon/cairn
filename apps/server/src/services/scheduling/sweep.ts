@@ -24,9 +24,23 @@ import { teamGithubToken } from '../github-connection.js';
 import { ISSUE_INTAKE_LABEL } from '../issue-intake.js';
 import { defaultBranchSha, ledgerLines, mergedPulls, openIssues } from './collect.js';
 import { planSchedule } from './plan.js';
-import { insertScheduleReport } from './store.js';
+import { insertScheduleReport, latestScheduleReport } from './store.js';
 
 export const SCHEDULE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function issuesMatchPersistedReport(
+  listed: readonly { number: number; updatedAt: number }[],
+  report: ScheduleReport | null,
+): boolean {
+  if (report === null) return false;
+  if (listed.length !== report.items.length) return false;
+  const prior = new Map(report.items.map((item) => [item.issue, item.updatedAt ?? 0]));
+  if (prior.size !== listed.length) return false;
+  for (const issue of listed) {
+    if (prior.get(issue.number) !== issue.updatedAt) return false;
+  }
+  return true;
+}
 
 export interface SchedulingLogger {
   info(obj: object, msg: string): void;
@@ -105,9 +119,7 @@ export async function scheduleProject(
   if (sha === null) return { kind: 'skipped', reason: 'main-unreadable' };
   const listed = await openIssues(run.githubFetch, got.token, repoRef.owner, repoRef.repo);
   if ('skipped' in listed) return { kind: 'skipped', reason: listed.skipped };
-  const issuesUnchanged =
-    previous?.lastEvaluatedAt != null &&
-    listed.every((issue) => issue.updatedAt <= (previous.lastEvaluatedAt ?? 0));
+  const issuesUnchanged = issuesMatchPersistedReport(listed, latestScheduleReport(deps.db, row.id));
   const dormancy = evaluateAutonomyGates({
     now,
     settings,
