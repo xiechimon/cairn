@@ -106,15 +106,14 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
             />
             {t('MCP 访问（MCP 客户端接入）')}
           </label>
-          {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-          <label className="inline-flex cursor-pointer items-center gap-2 text-ui text-content-secondary">
+          <div className="inline-flex items-center gap-2 text-ui text-content-secondary">
             <Checkbox
               checked={machineAccess}
               onCheckedChange={setMachineAccess}
               aria-label={t('机器注册（CLI 接入执行机）')}
             />
-            {t('机器注册（CLI 接入执行机）')}
-          </label>
+            <span>{t('机器注册（CLI 接入执行机）')}</span>
+          </div>
         </div>
         <div className="flex items-baseline justify-between">
           <span className="text-ui font-medium text-foreground">{t('工具权限位')}</span>
