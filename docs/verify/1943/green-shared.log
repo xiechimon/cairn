@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /workspace/packages/shared
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  17:54:47
+   Duration  458ms (transform 71%, import 27%, tests 1%, worker 1%)
+

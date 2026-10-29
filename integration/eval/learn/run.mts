@@ -1,5 +1,6 @@
 import type { ExperienceCandidate } from '@cairn/shared';
 import { reflectPacks } from '../../../apps/server/src/trajectory-reflect.js';
+import type { PromptSet } from '../chief-dispatch/prompt-set.mts';
 import {
   bootStack,
   driveFollowUp,
@@ -38,6 +39,7 @@ export interface LearnRun {
   evidence: TurnEvidence;
   truncated: boolean;
   agentIds: Record<string, string>;
+  chiefSystemPrompt: string | null;
   grade: { grade: Record<string, number>; explanation: Record<string, string> };
 }
 
@@ -83,9 +85,10 @@ export function reflectEndpointFromEnv(): { baseUrl: string; apiKey: string } {
 async function withWorld<T>(
   roster: RosterAgent[],
   model: string,
+  opts: { promptSet?: PromptSet },
   body: (ctx: { stack: Stack; world: SeededWorld }) => Promise<T>,
 ): Promise<T> {
-  const stack = await bootStack();
+  const stack = await bootStack({ promptSet: opts.promptSet });
   try {
     const world = await seedWorld(stack, {
       relayBaseUrl: relayBaseUrl(),
@@ -130,7 +133,13 @@ async function reflectRound(
 
 export async function runLearnCase(
   input: LearnCase,
-  opts: { arm: LearnArm; roster: RosterAgent[]; model: string; timeoutMs: number },
+  opts: {
+    arm: LearnArm;
+    roster: RosterAgent[];
+    model: string;
+    timeoutMs: number;
+    promptSet?: PromptSet;
+  },
 ): Promise<LearnRun> {
   if (opts.arm === 'all' || opts.arm === 'reflect') reflectEndpointFromEnv();
   const timeoutMs = opts.timeoutMs;
@@ -138,32 +147,38 @@ export async function runLearnCase(
   let wallMs = 0;
   let headline: TurnEvidence | null = null;
   let agentIds: Record<string, string> = {};
+  let chiefSystemPrompt: string | null = null;
   const absorb = (evidence: TurnEvidence) => {
     usage = plusUsage(usage, evidence.usage);
     wallMs += evidence.wallMs;
   };
+  const notePrompt = (stack: Stack) => {
+    chiefSystemPrompt = stack.lastChiefSystemPrompt() ?? chiefSystemPrompt;
+  };
 
   const noMemory =
     opts.arm === 'all' || opts.arm === 'no-memory'
-      ? await withWorld(opts.roster, opts.model, async ({ stack, world }) => {
+      ? await withWorld(opts.roster, opts.model, opts, async ({ stack, world }) => {
           agentIds = world.agentIds;
           const evidence = await driveTurn(stack, input.round2, { timeoutMs });
           deadTurn(evidence);
           absorb(evidence);
           headline = evidence;
+          notePrompt(stack);
           return gradeLearnDecision(input, evidence);
         })
       : undefined;
 
   const oracle =
     opts.arm === 'all' || opts.arm === 'oracle'
-      ? await withWorld(opts.roster, opts.model, async ({ stack, world }) => {
+      ? await withWorld(opts.roster, opts.model, opts, async ({ stack, world }) => {
           agentIds = world.agentIds;
           seedOracleMemory(stack.server, world, input);
           const evidence = await driveTurn(stack, input.round2, { timeoutMs });
           deadTurn(evidence);
           absorb(evidence);
           headline = evidence;
+          notePrompt(stack);
           return gradeLearnDecision(input, evidence);
         })
       : undefined;
@@ -173,7 +188,7 @@ export async function runLearnCase(
   let round1: TurnEvidence | undefined;
   let reflectAgentId = '';
   if (opts.arm === 'all' || opts.arm === 'correction' || opts.arm === 'reflect') {
-    await withWorld(opts.roster, opts.model, async ({ stack, world }) => {
+    await withWorld(opts.roster, opts.model, opts, async ({ stack, world }) => {
       agentIds = world.agentIds;
       reflectAgentId = world.chiefAgentId;
       const first = await driveTurn(stack, input.round1, { timeoutMs });
@@ -181,6 +196,7 @@ export async function runLearnCase(
       absorb(first);
       round1 = first;
       headline = first;
+      notePrompt(stack);
       if (opts.arm === 'reflect') return;
       const follow = await driveFollowUp(stack, first.threadId, input.correction, { timeoutMs });
       deadTurn(follow);
@@ -194,6 +210,7 @@ export async function runLearnCase(
       deadTurn(second);
       absorb(second);
       headline = second;
+      notePrompt(stack);
       correctionDecision = gradeLearnDecision(input, second);
     });
   }
@@ -227,6 +244,7 @@ export async function runLearnCase(
     evidence: scored,
     truncated,
     agentIds,
+    chiefSystemPrompt,
     grade: graded,
   };
 }

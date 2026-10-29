@@ -44,6 +44,7 @@
   ],
   "harness_paths": [
     "integration/eval/chief-dispatch/stack.mts",
+    "integration/eval/chief-dispatch/prompt-set.mts",
     "apps/daemon/src/backend/pi.ts",
     "apps/server/src/services/chief-tools.ts",
     "packages/shared/src/protocol/chief-tools.ts",

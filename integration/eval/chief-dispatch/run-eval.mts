@@ -38,6 +38,14 @@ import {
 } from './harness-eval-result.mts';
 import { retryHarnessInfra } from './infra-retry.mts';
 import {
+  buildEvalProvenance,
+  flowDigest,
+  PROMPT_SETS,
+  type PromptSet,
+  promptSetIdentity,
+  resumeCompatibilityError,
+} from './prompt-set.mts';
+import {
   bootStack,
   disposeLeftovers,
   driveTurn,
@@ -79,7 +87,7 @@ async function loadCases(): Promise<EvalCase[]> {
 async function freshStack(
   input: Case | MemoryCase | RoutingCase | PlanCase,
 ): Promise<{ stack: Stack; world: SeededWorld; projectIds: Record<string, string> }> {
-  const stack = await bootStack();
+  const stack = await bootStack({ promptSet: ARGS.promptSet });
   try {
     const world = await seedWorld(stack, {
       relayBaseUrl: relayBaseUrl(),
@@ -113,6 +121,7 @@ async function runCase(
   agentIds: Record<string, string>;
   projectIds: Record<string, string>;
   memoryAfter: MemoryRowLite[];
+  chiefSystemPrompt: string | null;
   grade?: { grade: Record<string, number>; explanation: Record<string, string> };
 }> {
   if (isLearnCase(input)) {
@@ -120,6 +129,7 @@ async function runCase(
       arm: ARGS.arm,
       roster: ROSTER,
       model: CHIEF_MODEL,
+      promptSet: ARGS.promptSet,
       timeoutMs: ctx.timeoutS > 0 ? ctx.timeoutS * 1000 : 300_000,
     });
     const truncated = learned.truncated;
@@ -134,6 +144,7 @@ async function runCase(
       agentIds: learned.agentIds,
       projectIds: {},
       memoryAfter: [],
+      chiefSystemPrompt: learned.chiefSystemPrompt,
       grade: learned.grade,
     };
   }
@@ -169,6 +180,7 @@ async function runCase(
       agentIds: world.agentIds,
       projectIds,
       memoryAfter: readMemoryRows(stack.server, world.chiefAgentId),
+      chiefSystemPrompt: stack.lastChiefSystemPrompt(),
       grade: undefined,
     };
   } finally {
@@ -223,6 +235,7 @@ function parseArgs(argv: string[]) {
     patchDigest: undefined as string | undefined,
     arm: 'all' as LearnArm,
     caseIds: [] as string[],
+    promptSet: 'current' as PromptSet,
   };
   const val = (i: number): string => {
     const v = argv[i];
@@ -247,6 +260,7 @@ function parseArgs(argv: string[]) {
     else if (k === '--patch-digest') a.patchDigest = val(++i);
     else if (k === '--arm') a.arm = val(++i) as LearnArm;
     else if (k === '--case') a.caseIds.push(val(++i));
+    else if (k === '--prompt-set') a.promptSet = val(++i) as PromptSet;
     else if (k === '-h' || k === '--help') {
       usage();
       process.exit(0);
@@ -258,6 +272,11 @@ function parseArgs(argv: string[]) {
   }
   if (!(LEARN_ARMS as readonly string[]).includes(a.arm)) {
     console.error(`--arm must be one of ${LEARN_ARMS.join(', ')}, got '${a.arm}'`);
+    usage();
+    process.exit(2);
+  }
+  if (!(PROMPT_SETS as readonly string[]).includes(a.promptSet)) {
+    console.error(`--prompt-set must be one of ${PROMPT_SETS.join(', ')}, got '${a.promptSet}'`);
     usage();
     process.exit(2);
   }
@@ -284,8 +303,13 @@ function parseArgs(argv: string[]) {
 }
 function usage() {
   console.error(
-    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--context-window N] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
+    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--context-window N] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--prompt-set current|cut] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
   );
+}
+
+function thinkingSetting(): string | null {
+  const v = process.env.CAIRN_EVAL_CHIEF_THINKING;
+  return v !== undefined && v !== '' ? v : null;
 }
 
 function checkHarness(statePath: string, st: Record<string, unknown>, approve: boolean) {
@@ -433,18 +457,44 @@ async function main() {
   mkdirSync(join(vdir, 'traces'), { recursive: true });
   const ctx = { ...ARGS, state: st };
 
+  let cases = await loadCases();
+  const casesFile = readFileSync(join(ARGS.flow, 'cases.json'), 'utf8');
+  const runProvenance = buildEvalProvenance({
+    promptSet: ARGS.promptSet,
+    promptSetIdentity: '',
+    harnessSha: typeof st.harness_sha === 'string' ? st.harness_sha : '',
+    model: CHIEF_MODEL,
+    thinking: thinkingSetting(),
+    timeoutS: ARGS.timeoutS,
+    arm: ARGS.arm,
+    contextWindow: ARGS.contextWindow ?? null,
+    flowDigest: flowDigest(casesFile),
+  });
+
   const resultsPath = join(vdir, 'results.jsonl');
-  const done = new Set<string>();
-  if (!ARGS.writeVerify && existsSync(resultsPath))
+  const existingRows: {
+    prompt_id?: unknown;
+    rep?: unknown;
+    provenance?: Parameters<typeof resumeCompatibilityError>[0][number]['provenance'];
+  }[] = [];
+  if (!ARGS.writeVerify && existsSync(resultsPath)) {
     for (const ln of readFileSync(resultsPath, 'utf8').split('\n')) {
       if (!ln.trim()) continue;
       try {
-        const r = JSON.parse(ln);
-        done.add(`${r.prompt_id}\0${r.rep}`);
+        existingRows.push(JSON.parse(ln));
       } catch {}
     }
+  }
+  const resumeError = resumeCompatibilityError(existingRows, runProvenance);
+  if (resumeError !== null) {
+    console.error(resumeError);
+    process.exit(2);
+  }
+  const done = new Set<string>();
+  for (const r of existingRows) {
+    done.add(`${r.prompt_id}\0${r.rep}`);
+  }
 
-  let cases = await loadCases();
   if (ARGS.caseIds.length > 0) {
     const known = new Set(cases.map((c) => c.id));
     for (const id of ARGS.caseIds) {
@@ -596,6 +646,10 @@ async function main() {
                   ...(isLearnCase(c) ? { arm: ARGS.arm } : {}),
                 }
               : undefined,
+          provenance: {
+            ...runProvenance,
+            prompt_set_identity: promptSetIdentity(run.chiefSystemPrompt ?? ''),
+          },
           model: run.model,
           usage: run.usage,
           stop_reason: run.stop_reason,
