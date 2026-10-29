@@ -108,6 +108,7 @@ export const PROTECTED_PATH_GLOBS = [
   'apps/server/src/services/mcp-face.ts',
   'apps/server/src/services/mcp-servers.ts',
   'apps/server/src/db/client.ts',
+  'apps/server/src/services/harness-eval-*.ts',
   'integration/eval/**',
   '.claude/hillclimb/**',
   'apps/server/src/trajectory-export.ts',
