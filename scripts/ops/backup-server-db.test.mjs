@@ -7,6 +7,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -168,7 +169,7 @@ test('later runs add files on both sides and never delete or overwrite', () => {
   assert.equal(f.run(f.full).status, 0);
   write(join(f.receiver, 'db', 'server-db-20200101T000000Z.db.gz'), 'kept by the receiver');
   write(join(f.receiver, 'attachments', 'team1', 'one.png'), 'receiver copy');
-  spawnSync('rm', [join(f.attachments, 'team1', 'two.txt')]);
+  rmSync(join(f.attachments, 'team1', 'two.txt'));
   write(join(f.attachments, 'team3', 'three.png'), 'three');
 
   const result = f.run(f.full);

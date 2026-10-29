@@ -10,7 +10,7 @@ usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
   --db               live server DB, copied with sqlite3 .backup and checked with integrity_check
   --out              local directory for server-db-<UTC timestamp>.db.gz, keeping the newest --keep (default 48)
   --attachments      server attachments directory, copied into --attachments-out without deleting anything
-  --remote           rsync destination root (for example dmit-backup:); receives db/ and attachments/
+  --remote           existing rsync destination root (for example dmit-backup:); receives db/ and attachments/
                      with no remote shell, no deletes and no overwrites; the receiver rotates its own copies
 
 secretbox.key and *.pem are never copied or pushed. A failed step exits non-zero and names the step.
@@ -28,7 +28,7 @@ KEEP=48
 while [ $# -gt 0 ]; do
   case "$1" in
     --db | --out | --attachments | --attachments-out | --remote | --keep)
-      [ $# -ge 2 ] || { echo "$1 requires a value" >&2; usage; }
+      [ $# -ge 2 ] && [[ "$2" != -* ]] || { echo "$1 requires a value" >&2; usage; }
       case "$1" in
         --db) DB="$2" ;;
         --out) OUT="$2" ;;
@@ -59,6 +59,7 @@ fail() {
 }
 
 [ -f "$DB" ] || fail "db not found: $DB"
+DB="$(cd "$(dirname "$DB")" && pwd)/$(basename "$DB")"
 command -v sqlite3 >/dev/null || fail "sqlite3 not on PATH"
 command -v gzip >/dev/null || fail "gzip not on PATH"
 if [ -n "$ATTACHMENTS$REMOTE" ]; then
@@ -71,10 +72,11 @@ name="server-db-${ts}.db.gz"
 
 echo "[$ts] backup start: $DB"
 mkdir -p "$OUT" || fail "create $OUT"
+find "$OUT" -maxdepth 1 -type d -name '.backup.*' -mmin +60 -exec rm -rf {} + || fail "remove stale scratch dirs in $OUT"
 tmp="$(mktemp -d "$OUT/.backup.XXXXXX")" || fail "create a scratch dir in $OUT"
 trap 'rm -rf "$tmp"' EXIT
 
-sqlite3 "$DB" ".backup '$tmp/server.db'" || fail "sqlite3 .backup"
+(cd "$tmp" && sqlite3 "$DB" ".backup server.db") || fail "sqlite3 .backup"
 integrity="$(sqlite3 "$tmp/server.db" 'PRAGMA integrity_check;')" || fail "integrity_check"
 [ "$integrity" = "ok" ] || fail "integrity_check: $integrity"
 gzip -c "$tmp/server.db" > "$tmp/$name" || fail "gzip"
@@ -85,7 +87,7 @@ echo "[$ts] wrote $OUT/$name ($(wc -c < "$OUT/$name" | tr -d ' ') bytes)"
 (
   cd "$OUT" &&
     { ls -1 server-db-*.db.gz 2>/dev/null || true; } | sort -r | tail -n +$((KEEP + 1)) |
-    while IFS= read -r f; do rm -f -- "$f"; done
+    while IFS= read -r f; do rm -f -- "$f" || exit 1; done
 ) || fail "rotate $OUT"
 
 if [ -n "$ATTACHMENTS" ]; then
