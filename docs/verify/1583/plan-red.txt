@@ -1,0 +1,414 @@
+
+ RUN  v5.0.1 /workspace/apps/server
+
+ ❯ test/scheduling-plan.test.ts (32 tests | 20 failed) 25ms
+   ❯ parseIssueDependencies (2)
+     × reads the 依赖 / Blocked-By / 等 #N shapes and keeps unresolvable text as-is 7ms
+     × a dependency line without a number is reported, never guessed 1ms
+   ❯ planSchedule groups (4)
+     × a ticket with an unmerged dependency never enters now 2ms
+     × a dependency already merged on main stops blocking 1ms
+     × ready-for-agent is the only way into now when the dependency chain is clear 2ms
+     × a ticket with an in-flight build is marked as being worked on and never unlabelled 1ms
+   ❯ planSchedule close suggestions (14)
+     × a merged pull that names the ticket is concrete evidence for done 1ms
+     × a merged pull naming the ticket is not enough when acceptance boxes are unchecked 1ms
+     × unchecked acceptance boxes block a close when the only evidence is a merged pull 1ms
+     × a superseding ticket stated on the ticket is evidence for superseded 1ms
+     × a ticket with an in-flight build is never offered a label change 0ms
+     × a close suggestion removes the ready label when the ticket carries it 1ms
+     × a blocked ticket that carries ready-for-agent is offered its removal 0ms
+     × a group-now ticket that already carries the label has no label change 0ms
+     × a later ticket that carries ready-for-agent is offered its removal 0ms
+   ❯ planSchedule dependency ordering (3)
+     × inside a group, a ticket that unlocks another comes first 0ms
+     × a ticket that unlocks more tickets wins the tie over one that unlocks fewer 0ms
+     × the same ordering holds inside now 0ms
+   ❯ review round two closure safety (7)
+     × completed acceptance and a merged pull body permit a close suggestion 0ms
+   × the scheduling collector retains merged pull body evidence 2ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 20 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/scheduling-plan.test.ts > parseIssueDependencies > reads the 依赖 / Blocked-By / 等 #N shapes and keeps unresolvable text as-is
+AssertionError: expected [] to deeply equal [ 12, 13, 14, 15 ]
+
+- Expected
++ Received
+
+- [
+-   12,
+-   13,
+-   14,
+-   15,
+- ]
++ []
+
+ ❯ test/scheduling-plan.test.ts:40:27
+     38|       ['依赖 #12、#13', 'Blocked-By: #14', '等 #15 合并', '等待上游设计确认'].join('…
+     39|     );
+     40|     expect(parsed.issues).toEqual([12, 13, 14, 15]);
+       |                           ^
+     41|     expect(parsed.unparsed).toEqual(['等待上游设计确认']);
+     42|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > parseIssueDependencies > a dependency line without a number is reported, never guessed
+AssertionError: expected [] to deeply equal [ '依赖: 调度器先落地' ]
+
+- Expected
++ Received
+
+- [
+-   "依赖: 调度器先落地",
+- ]
++ []
+
+ ❯ test/scheduling-plan.test.ts:47:29
+     45|     const parsed = parseIssueDependencies('依赖: 调度器先落地');
+     46|     expect(parsed.issues).toEqual([]);
+     47|     expect(parsed.unparsed).toEqual(['依赖: 调度器先落地']);
+       |                             ^
+     48|   });
+     49| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule groups > a ticket with an unmerged dependency never enters now
+AssertionError: expected [] to include 2
+ ❯ test/scheduling-plan.test.ts:63:17
+     61|     const now = report.groups.now;
+     62|     expect(now).not.toContain(1);
+     63|     expect(now).toContain(2);
+       |                 ^
+     64|     const item = report.items.find((i) => i.issue === 1);
+     65|     expect(item?.group).toBe('next');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule groups > a dependency already merged on main stops blocking
+AssertionError: expected 'later' to be 'now' // Object.is equality
+
+Expected: "now"
+Received: "later"
+
+ ❯ test/scheduling-plan.test.ts:76:60
+     74|       }),
+     75|     );
+     76|     expect(report.items.find((i) => i.issue === 1)?.group).toBe('now');
+       |                                                            ^
+     77|     expect(report.items.find((i) => i.issue === 1)?.deps).toEqual([]);
+     78|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule groups > ready-for-agent is the only way into now when the dependency chain is clear
+AssertionError: expected [] to deeply equal [ 2 ]
+
+- Expected
++ Received
+
+- [
+-   2,
+- ]
++ []
+
+ ❯ test/scheduling-plan.test.ts:86:31
+     84|       }),
+     85|     );
+     86|     expect(report.groups.now).toEqual([2]);
+       |                               ^
+     87|     expect(report.groups.next).toEqual([1]);
+     88|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule groups > a ticket with an in-flight build is marked as being worked on and never unlabelled
+AssertionError: expected null to be '已在做' // Object.is equality
+
+- Expected:
+"已在做"
+
++ Received:
+null
+
+ ❯ test/scheduling-plan.test.ts:98:28
+     96|     );
+     97|     const item = report.items.find((i) => i.issue === 1);
+     98|     expect(item?.executor).toBe('已在做');
+       |                            ^
+     99|     expect(item?.reason).toContain('已在做');
+    100|     expect(item?.labelChange).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule close suggestions > a merged pull that names the ticket is concrete evidence for done
+AssertionError: expected 'later' to be 'close' // Object.is equality
+
+Expected: "close"
+Received: "later"
+
+ ❯ test/scheduling-plan.test.ts:123:25
+    121|     );
+    122|     const item = report.items.find((i) => i.issue === 1394);
+    123|     expect(item?.group).toBe('close');
+       |                         ^
+    124|     expect(item?.closeReason).toBe('done');
+    125|     expect(item?.evidence).toEqual([{ kind: 'merged-pull', ref: '#1500…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule close suggestions > a merged pull naming the ticket is not enough when acceptance boxes are unchecked
+AssertionError: expected 'stub' to contain '#1500'
+
+Expected: "#1500"
+Received: "stub"
+
+ ❯ test/scheduling-plan.test.ts:148:26
+    146|     expect(item?.closeReason).toBeNull();
+    147|     expect(item?.labelChange).toBeNull();
+    148|     expect(item?.reason).toContain('#1500');
+       |                          ^
+    149|     expect(item?.reason).toContain('2');
+    150|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule close suggestions > unchecked acceptance boxes block a close when the only evidence is a merged pull
+AssertionError: expected 'stub' to contain '1'
+
+Expected: "1"
+Received: "stub"
+
+ ❯ test/scheduling-plan.test.ts:187:26
+    185|     const item = report.items.find((i) => i.issue === 1403);
+    186|     expect(item?.group).not.toBe('close');
+    187|     expect(item?.reason).toContain('1');
+       |                          ^
+    188|   });
+    189|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule close suggestions > a superseding ticket stated on the ticket is evidence for superseded
+AssertionError: expected 'later' to be 'close' // Object.is equality
+
+Expected: "close"
+Received: "later"
+
+ ❯ test/scheduling-plan.test.ts:263:25
+    261|     );
+    262|     const item = report.items.find((i) => i.issue === 1528);
+    263|     expect(item?.group).toBe('close');
+       |                         ^
+    264|     expect(item?.closeReason).toBe('superseded');
+    265|     expect(item?.evidence[0]).toEqual({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule close suggestions > a ticket with an in-flight build is never offered a label change
+AssertionError: expected 'later' to be 'next' // Object.is equality
+
+Expected: "next"
+Received: "later"
+
+ ❯ test/scheduling-plan.test.ts:288:25
+    286|     );
+    287|     const item = report.items.find((i) => i.issue === 1);
+    288|     expect(item?.group).toBe('next');
+       |                         ^
+    289|     expect(item?.labelChange).toBeNull();
+    290|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule close suggestions > a close suggestion removes the ready label when the ticket carries it
+AssertionError: expected null to deeply equal { add: [], …(1) }
+
+- Expected:
+{
+  "add": [],
+  "remove": [
+    "ready-for-agent",
+  ],
+}
+
++ Received:
+null
+
+ ❯ test/scheduling-plan.test.ts:299:66
+    297|       }),
+    298|     );
+    299|     expect(report.items.find((i) => i.issue === 1)?.labelChange).toEqu…
+       |                                                                  ^
+    300|       add: [],
+    301|       remove: ['ready-for-agent'],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule close suggestions > a blocked ticket that carries ready-for-agent is offered its removal
+AssertionError: expected 'later' to be 'next' // Object.is equality
+
+Expected: "next"
+Received: "later"
+
+ ❯ test/scheduling-plan.test.ts:315:28
+    313|     );
+    314|     const blocked = report.items.find((i) => i.issue === 1);
+    315|     expect(blocked?.group).toBe('next');
+       |                            ^
+    316|     expect(blocked?.labelChange).toEqual({ add: [], remove: ['ready-fo…
+    317|     expect(blocked?.reason).toContain('轮询');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule close suggestions > a group-now ticket that already carries the label has no label change
+AssertionError: expected 'later' to be 'now' // Object.is equality
+
+Expected: "now"
+Received: "later"
+
+ ❯ test/scheduling-plan.test.ts:324:60
+    322|       baseInput({ issues: [issue({ number: 1, labels: ['ready-for-agen…
+    323|     );
+    324|     expect(report.items.find((i) => i.issue === 1)?.group).toBe('now');
+       |                                                            ^
+    325|     expect(report.items.find((i) => i.issue === 1)?.labelChange).toBeN…
+    326|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule close suggestions > a later ticket that carries ready-for-agent is offered its removal
+AssertionError: expected 'later' to be 'next' // Object.is equality
+
+Expected: "next"
+Received: "later"
+
+ ❯ test/scheduling-plan.test.ts:339:25
+    337|     );
+    338|     const item = report.items.find((i) => i.issue === 1);
+    339|     expect(item?.group).toBe('next');
+       |                         ^
+    340|     expect(item?.labelChange).toEqual({ add: [], remove: ['ready-for-a…
+    341|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule dependency ordering > inside a group, a ticket that unlocks another comes first
+AssertionError: expected [] to deeply equal [ 4, 3 ]
+
+- Expected
++ Received
+
+- [
+-   4,
+-   3,
+- ]
++ []
+
+ ❯ test/scheduling-plan.test.ts:351:32
+    349|       }),
+    350|     );
+    351|     expect(report.groups.next).toEqual([4, 3]);
+       |                                ^
+    352|   });
+    353|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule dependency ordering > a ticket that unlocks more tickets wins the tie over one that unlocks fewer
+AssertionError: expected [] to deeply equal [ 11, 21, 12, 13, 22 ]
+
+- Expected
++ Received
+
+- [
+-   11,
+-   21,
+-   12,
+-   13,
+-   22,
+- ]
++ []
+
+ ❯ test/scheduling-plan.test.ts:366:32
+    364|       }),
+    365|     );
+    366|     expect(report.groups.next).toEqual([11, 21, 12, 13, 22]);
+       |                                ^
+    367|     const unlockFirst = planSchedule(
+    368|       baseInput({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > planSchedule dependency ordering > the same ordering holds inside now
+AssertionError: expected [] to deeply equal [ 11 ]
+
+- Expected
++ Received
+
+- [
+-   11,
+- ]
++ []
+
+ ❯ test/scheduling-plan.test.ts:390:31
+    388|       }),
+    389|     );
+    390|     expect(report.groups.now).toEqual([11]);
+       |                               ^
+    391|     expect(report.groups.next).toEqual([10, 12]);
+    392|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > review round two closure safety > completed acceptance and a merged pull body permit a close suggestion
+AssertionError: expected 'later' to be 'close' // Object.is equality
+
+Expected: "close"
+Received: "later"
+
+ ❯ test/scheduling-plan.test.ts:450:36
+    448|       }),
+    449|     );
+    450|     expect(report.items[0]?.group).toBe('close');
+       |                                    ^
+    451|   });
+    452| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/20]⎯
+
+ FAIL  test/scheduling-plan.test.ts > the scheduling collector retains merged pull body evidence
+AssertionError: expected [] to deeply equal [ { number: 1500, …(4) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "body": "Closes #1394",
+-     "mergedAt": 1792713600000,
+-     "number": 1500,
+-     "title": "delivery",
+-     "url": "https://github.com/owner/repo/pull/1500",
+-   },
+- ]
++ []
+
+ ❯ test/scheduling-plan.test.ts:476:17
+    474|     'repo',
+    475|   );
+    476|   expect(pulls).toEqual([
+       |                 ^
+    477|     {
+    478|       number: 1500,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/20]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  20 failed | 12 passed (32)
+   Start at  03:35:56
+   Duration  298ms (transform 58%, tests 25%, import 13%, worker 4%)
+
