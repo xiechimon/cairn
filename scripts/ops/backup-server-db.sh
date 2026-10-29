@@ -9,11 +9,13 @@ usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
 
   --db               live server DB, copied with sqlite3 .backup and checked with integrity_check
   --out              local directory for server-db-<UTC timestamp>.db.gz, keeping the newest --keep (default 48)
-  --attachments      server attachments directory, copied into --attachments-out without deleting anything
+  --attachments      server attachments directory; files unchanged for over a minute are copied into
+                     --attachments-out, and nothing is ever deleted there
   --remote           existing rsync destination root (for example dmit-backup:); receives db/ and attachments/
                      with no remote shell, no deletes and no overwrites; the receiver rotates its own copies
 
-secretbox.key and *.pem are never copied or pushed. A failed step exits non-zero and names the step.
+secretbox.key and *.pem are never copied or pushed. A copy name that already exists fails the run.
+A failed step exits non-zero and names the step.
 EOF
   exit 2
 }
@@ -71,6 +73,7 @@ SECRETS=(--exclude=secretbox.key --exclude='*.pem')
 name="server-db-${ts}.db.gz"
 
 echo "[$ts] backup start: $DB"
+[ ! -e "$OUT/$name" ] || fail "$OUT/$name already exists"
 mkdir -p "$OUT" || fail "create $OUT"
 find "$OUT" -maxdepth 1 -type d -name '.backup.*' -mmin +60 -exec rm -rf {} + || fail "remove stale scratch dirs in $OUT"
 tmp="$(mktemp -d "$OUT/.backup.XXXXXX")" || fail "create a scratch dir in $OUT"
@@ -80,8 +83,7 @@ trap 'rm -rf "$tmp"' EXIT
 integrity="$(sqlite3 "$tmp/server.db" 'PRAGMA integrity_check;')" || fail "integrity_check"
 [ "$integrity" = "ok" ] || fail "integrity_check: $integrity"
 gzip -c "$tmp/server.db" > "$tmp/$name" || fail "gzip"
-mv "$tmp/$name" "$OUT/$name" || fail "write $OUT/$name"
-rm -rf "$tmp"
+ln "$tmp/$name" "$OUT/$name" || fail "write $OUT/$name: it already exists or the link failed"
 echo "[$ts] wrote $OUT/$name ($(wc -c < "$OUT/$name" | tr -d ' ') bytes)"
 
 (
@@ -92,7 +94,10 @@ echo "[$ts] wrote $OUT/$name ($(wc -c < "$OUT/$name" | tr -d ' ') bytes)"
 
 if [ -n "$ATTACHMENTS" ]; then
   mkdir -p "$ATTACHMENTS_OUT" || fail "create $ATTACHMENTS_OUT"
-  rsync -a "${SECRETS[@]}" "$ATTACHMENTS/" "$ATTACHMENTS_OUT/" || fail "copy attachments"
+  (cd "$ATTACHMENTS" && find . -type f -mmin +1 ! -name secretbox.key ! -name '*.pem' -print0) > "$tmp/settled" ||
+    fail "list settled attachments"
+  rsync -a --from0 --files-from="$tmp/settled" "${SECRETS[@]}" "$ATTACHMENTS/" "$ATTACHMENTS_OUT/" ||
+    fail "copy attachments"
   echo "[$ts] attachments copied: $(find "$ATTACHMENTS_OUT" -type f | wc -l | tr -d ' ') files"
 fi
 

@@ -18,9 +18,9 @@ scripts/ops/backup-server-db.sh --db <server.db> --out <dir> [--keep N] \
 Each run does these steps in order:
 
 1. `sqlite3 .backup` into a scratch dir inside `--out` (safe on a live DB), then `PRAGMA integrity_check`, which must print `ok`.
-2. gzip, then a rename to `<out>/server-db-<UTC timestamp>.db.gz`. The rename is atomic, so a crashed run never leaves a half-written copy under that name.
+2. gzip, then a hard link to `<out>/server-db-<UTC timestamp>.db.gz`. The link is atomic and never replaces a file, so a crashed run never leaves a half-written copy under that name. If a copy with that name already exists (two runs in the same second), the run fails and the existing copy stays as it is. The receiver would keep the first copy under that name anyway.
 3. Local rotation: keep the newest `--keep` copies (default 48, two days of hourly runs).
-4. With `--attachments`: `rsync -a` from the attachments dir into `--attachments-out`. Nothing is deleted, so the copy is cumulative and keeps files the server has since garbage-collected.
+4. With `--attachments`: `rsync -a` from the attachments dir into `--attachments-out`, limited to files unchanged for more than a minute. The server writes an upload in place, so a file still being written waits for the next run, and a half-written file never reaches the receiver, which could not replace it later. Nothing is deleted, so the copy is cumulative and keeps files the server has since garbage-collected.
 5. With `--remote`: two rsync pushes into the destination root, `<out>/` into `db/` (only `server-db-*.db.gz` files) and `<attachments-out>/` into `attachments/`. The pushes run plain `rsync --server` on the receiver: no remote shell, no `--delete`, and `--ignore-existing`, so a file already on the receiver is never overwritten. The receiver rotates its own copies.
 
 ssh runs with `BatchMode=yes` and `ConnectTimeout=30` unless `RSYNC_RSH` is set, so a missing key fails the run instead of waiting for a password. The push uses `--timeout=300`.

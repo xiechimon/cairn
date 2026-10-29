@@ -7,7 +7,9 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -52,9 +54,13 @@ function files(dir) {
     .sort();
 }
 
-function write(path, body) {
+function write(path, body, ageMinutes = 0) {
   mkdirSync(join(path, '..'), { recursive: true });
   writeFileSync(path, body);
+  if (ageMinutes > 0) {
+    const then = new Date(Date.now() - ageMinutes * 60000);
+    utimesSync(path, then, then);
+  }
 }
 
 function sqlite(db, sql) {
@@ -74,10 +80,10 @@ function fixture() {
   mkdirSync(server, { recursive: true });
   sqlite(db, "create table todo(id text); insert into todo values ('a'), ('b');");
   write(join(server, 'secretbox.key'), 'server key');
-  write(join(attachments, 'team1', 'one.png'), 'one');
-  write(join(attachments, 'team1', 'two.txt'), 'two');
-  write(join(attachments, 'team1', 'secretbox.key'), 'planted key');
-  write(join(attachments, 'team2', 'cert.pem'), 'planted pem');
+  write(join(attachments, 'team1', 'one.png'), 'one', 60);
+  write(join(attachments, 'team1', 'two.txt'), 'two', 60);
+  write(join(attachments, 'team1', 'secretbox.key'), 'planted key', 60);
+  write(join(attachments, 'team2', 'cert.pem'), 'planted pem', 60);
   const rrsync = join(root, 'rrsync');
   writeFileSync(rrsync, receiverSource);
   const ssh = join(root, 'fake-ssh');
@@ -175,10 +181,15 @@ test('a full run copies db and attachments locally and to an rrsync receiver, wi
 test('later runs add files on both sides and never delete or overwrite', () => {
   const f = fixture();
   assert.equal(f.run(f.full).status, 0);
+  const [first] = dbCopies(join(f.backups, 'db'));
+  renameSync(
+    join(f.backups, 'db', first),
+    join(f.backups, 'db', 'server-db-20200101T010000Z.db.gz'),
+  );
   write(join(f.receiver, 'db', 'server-db-20200101T000000Z.db.gz'), 'kept by the receiver');
   write(join(f.receiver, 'attachments', 'team1', 'one.png'), 'receiver copy');
   rmSync(join(f.attachments, 'team1', 'two.txt'));
-  write(join(f.attachments, 'team3', 'three.png'), 'three');
+  write(join(f.attachments, 'team3', 'three.png'), 'three', 60);
 
   const result = f.run(f.full);
   assert.equal(result.status, 0, result.stderr);
@@ -234,4 +245,41 @@ test('bad arguments exit 2 before anything is written', () => {
     assert.match(result.stderr, /usage|unknown|requires|--keep/);
   }
   assert.equal(existsSync(f.backups), false);
+});
+
+test('an attachment written in the last minute waits for a later run on both sides', () => {
+  const f = fixture();
+  write(join(f.attachments, 'team4', 'upload.png'), 'partial');
+  assert.equal(f.run(f.full).status, 0);
+  assert.equal(existsSync(join(f.backups, 'attachments', 'team4', 'upload.png')), false);
+  assert.equal(existsSync(join(f.receiver, 'attachments', 'team4', 'upload.png')), false);
+
+  write(join(f.attachments, 'team4', 'upload.png'), 'complete upload', 60);
+  const result = f.run(f.full);
+  assert.equal(result.status, 0, result.stderr);
+  for (const side of [f.backups, f.receiver])
+    assert.equal(
+      readFileSync(join(side, 'attachments', 'team4', 'upload.png'), 'utf8'),
+      'complete upload',
+    );
+});
+
+test('a run whose copy name already exists fails and keeps the existing copy', () => {
+  const f = fixture();
+  const out = join(f.backups, 'db');
+  const start = Date.now();
+  const taken = Array.from({ length: 15 }, (_, i) => {
+    const stamp = new Date(start + i * 1000)
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d+Z$/, 'Z');
+    const path = join(out, `server-db-${stamp}.db.gz`);
+    write(path, 'earlier run');
+    return path;
+  });
+  const result = f.run(f.full);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /FAIL .*already exists/);
+  for (const path of taken) assert.equal(readFileSync(path, 'utf8'), 'earlier run');
+  assert.deepEqual(files(f.receiver), []);
 });
