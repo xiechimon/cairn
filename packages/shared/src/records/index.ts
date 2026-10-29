@@ -23,6 +23,7 @@ export * from '../failure-review.js';
 export * from './agent.js';
 export * from './api-key.js';
 export * from './autonomy.js';
+export * from './backup-status.js';
 export * from './branch-sync.js';
 export * from './build.js';
 export * from './capabilities.js';

@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { ApiError, api } from '../api/client.js';
 import {
   useApiMutations,
+  useBackupNotice,
   useBuildChanges,
   useChiefThreads,
   useMachines,
@@ -18,6 +19,7 @@ import {
 import { mapBranchInfo, mapMachines, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { AppSidebar } from '../board/app-sidebar.js';
+import { BackupBanner } from '../board/backup-banner.js';
 import { type BoardFilters, BoardSurface } from '../board/board.js';
 import {
   COLUMN_PARAM,
@@ -556,6 +558,7 @@ export function BoardPage() {
   const branchQueryId = branchOpen ? branchBuildId : null;
   const branchStepsQ = useSteps(branchQueryId, live && branchQueryId != null);
   const machinesQ = useMachines(teamId, live);
+  const backupQ = useBackupNotice(live);
   const branchInfo =
     overlayTodo == null
       ? null
@@ -590,6 +593,7 @@ export function BoardPage() {
       }
     : { ...fixture, todos };
   const quotaInfos = quotaBannerInfo(todos);
+  const backupWarning = backupQ.data ?? null;
   const todoGlances = useMemo(
     () =>
       new Map(
@@ -618,7 +622,9 @@ export function BoardPage() {
           <BoardSurface
             fixture={fixtureWithTodos}
             banner={
-              firstPrCard != null ? (
+              backupWarning != null ? (
+                <BackupBanner notice={backupWarning} />
+              ) : firstPrCard != null ? (
                 <FirstPrCard
                   info={firstPrCard}
                   onDismiss={() =>
