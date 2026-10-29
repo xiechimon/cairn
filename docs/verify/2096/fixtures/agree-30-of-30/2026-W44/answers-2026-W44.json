@@ -1,0 +1,125 @@
+{
+  "labelerModel": "claude-sonnet-4",
+  "items": {
+    "item-0": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-1": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-2": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-3": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-4": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-5": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-6": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-7": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-8": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-9": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-10": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-11": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-12": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-13": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-14": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-15": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-16": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-17": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-18": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-19": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-20": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-21": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-22": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-23": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-24": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-25": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-26": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-27": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-28": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    },
+    "item-29": {
+      "where": "prompt",
+      "why": "wrong_tool"
+    }
+  }
+}

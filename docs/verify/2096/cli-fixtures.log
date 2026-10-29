@@ -1,0 +1,41 @@
+=== labels-29 ===
+$ pnpm --filter @xiechimon/cairn exec node --import tsx src/eval-review-score-cli.ts --reviews docs/verify/2096/fixtures/labels-29 --week 2026-W44 --trust /tmp/cairn-2096-trust/trust-29.json --out /tmp/cairn-2096-trust/out-29
+where: agreement=100.0% (n=29) kappa=null (n=29) wilson95=[0.883, 1.000] (n=29)
+why: agreement=100.0% (n=29) kappa=null (n=29) wilson95=[0.883, 1.000] (n=29)
+{
+  "labels": 29,
+  "whereAgreement": 1,
+  "whyAgreement": 1,
+  "kappaWhere": null,
+  "kappaWhy": null,
+  "trusted": false
+}
+wrote /tmp/cairn-2096-trust/trust-29.json
+
+=== agree-24-of-30 ===
+$ pnpm --filter @xiechimon/cairn exec node --import tsx src/eval-review-score-cli.ts --reviews docs/verify/2096/fixtures/agree-24-of-30 --week 2026-W44 --trust /tmp/cairn-2096-trust/trust-24.json --out /tmp/cairn-2096-trust/out-24
+where: agreement=80.0% (n=30) kappa=0.000 (n=30) wilson95=[0.627, 0.905] (n=30)
+why: agreement=100.0% (n=30) kappa=null (n=30) wilson95=[0.886, 1.000] (n=30)
+{
+  "labels": 30,
+  "whereAgreement": 0.8,
+  "whyAgreement": 1,
+  "kappaWhere": 0,
+  "kappaWhy": null,
+  "trusted": false
+}
+wrote /tmp/cairn-2096-trust/trust-24.json
+
+=== agree-30-of-30 ===
+$ pnpm --filter @xiechimon/cairn exec node --import tsx src/eval-review-score-cli.ts --reviews docs/verify/2096/fixtures/agree-30-of-30 --week 2026-W44 --trust /tmp/cairn-2096-trust/trust-30.json --out /tmp/cairn-2096-trust/out-30
+where: agreement=100.0% (n=30) kappa=null (n=30) wilson95=[0.886, 1.000] (n=30)
+why: agreement=100.0% (n=30) kappa=null (n=30) wilson95=[0.886, 1.000] (n=30)
+{
+  "labels": 30,
+  "whereAgreement": 1,
+  "whyAgreement": 1,
+  "kappaWhere": null,
+  "kappaWhy": null,
+  "trusted": true
+}
+wrote /tmp/cairn-2096-trust/trust-30.json
