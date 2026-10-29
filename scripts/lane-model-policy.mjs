@@ -31,14 +31,14 @@ export function parseModelRoles(markdown) {
     if (!line.trim().startsWith('|')) continue;
     const [role, model] = line
       .trim()
-      .split('|')
+      .split(/(?<!\\)\|/)
       .slice(1, -1)
       .map((cell) => cell.trim());
     if (!role || model === undefined) continue;
     if (role === 'Role' && model === 'Model') continue;
     if (/^:?-+:?$/.test(role) && /^:?-+:?$/.test(model)) continue;
-    const modelIds = [...model.matchAll(/[a-z][a-z0-9.]*(?:-[a-z0-9.]+)+/gi)].map(
-      (match) => match[0],
+    const modelIds = [...model.matchAll(/[a-z][a-z0-9.]*(?:-[a-z0-9.]+)+/gi)].map((match) =>
+      match[0].replace(/\.+$/, ''),
     );
     rows.push({ role, model, modelIds });
   }

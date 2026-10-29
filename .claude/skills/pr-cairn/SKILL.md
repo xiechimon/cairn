@@ -127,7 +127,7 @@ not carry the closing keyword for the parent ticket.
   or file path in backticks. The pr-evidence check runs
   `node scripts/english-only-gate.mjs --text <body>` and reds otherwise;
   run it locally on `/tmp/pr.md` before opening.
-- Never add the `needs-decision` label. When a PR needs a decision, decide by your own recommendation, say in the chat what you chose and why, and keep going; only payments or the owner's own credentials go to the owner. A label that is already on keeps pr-evidence red and disarms auto-merge until it is removed.
+- Never add the `needs-decision` label. When a PR needs a decision, decide by your own recommendation, say in the chat what you chose and why, and keep going; only payments, the owner's own credentials and the steps `AGENTS.md` routes to a person go to the owner. Before asking a person about a PR whose auto-merge is armed, disarm it with `gh pr merge <n> --disable-auto`. A label that is already on keeps pr-evidence red and disarms auto-merge until it is removed.
 - Before enabling any merge, require fully checked Acceptance and no `needs-decision` label; an unchecked item keeps pr-evidence red until it is checked.
 - Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.

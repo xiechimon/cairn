@@ -99,6 +99,22 @@ test('parseModelRoles finds a banned id written without backticks', () => {
   ]);
 });
 
+test('parseModelRoles keeps a model id after an escaped pipe', () => {
+  const markdown =
+    '## Model roles\n| Role | Model |\n|---|---|\n| Implementation | `gpt-6.1-sol` \\| deepseek-v4-flash |';
+  assert.deepEqual(
+    parseModelRoles(markdown).find((row) => row.role === 'Implementation')?.modelIds,
+    ['gpt-6.1-sol', 'deepseek-v4-flash'],
+  );
+});
+
+test('parseModelRoles drops sentence punctuation after a model id', () => {
+  const markdown = '## Model roles\n| Role | Model |\n|---|---|\n| Review | deepseek-v4-flash. |';
+  assert.deepEqual(parseModelRoles(markdown).find((row) => row.role === 'Review')?.modelIds, [
+    'deepseek-v4-flash',
+  ]);
+});
+
 test('parseModelRoles retains banned ids and excludes tables under other headings', () => {
   const markdown = [
     '## Other models',

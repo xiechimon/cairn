@@ -31,6 +31,12 @@ test('AGENTS.md and pr-cairn agree that agents never add needs-decision', () => 
     assert.ok(!guidance.includes('--add-label needs-decision'), file);
     assert.match(guidance, /[Nn]ever add the `needs-decision` label/, file);
     assert.match(guidance, /already on[^\n]*keeps pr-evidence red and disarms auto-merge/, file);
+    assert.match(
+      guidance,
+      /only payments, the owner's own credentials and the steps [^\n]*routes to a person go to the owner/,
+      file,
+    );
+    assert.ok(guidance.includes('gh pr merge <n> --disable-auto'), file);
     if (file === 'AGENTS.md') {
       assert.ok(guidance.includes('CAIRN_DECIDED=1'), file);
     }
