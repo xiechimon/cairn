@@ -1,0 +1,14 @@
+{
+  "week": "2026-W44",
+  "items": [
+    "eval:flow-b:case-b:0",
+    "eval:flow-a:case-a:0",
+    "pack:build-beta",
+    "pack:build-alpha"
+  ],
+  "traceHits": 1,
+  "traceMisses": 1,
+  "reviewMd": "/tmp/cairn-2095-out-1793240840/review-2026-W44.md",
+  "reviewBlank": "/tmp/cairn-2095-out-1793240840/review-2026-W44.blank.jsonl",
+  "answers": "/tmp/cairn-2095-out-1793240840/answers-2026-W44.json"
+}
