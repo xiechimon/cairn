@@ -1,0 +1,21 @@
+$ # scratch server: DB with 3 todo rows and 3 attachment rows (2 ready, 1 still pending), one step session, secretbox.key beside them, a planted x.pem
+$ scripts/ops/backup-server-db.sh --db $S/server/server.db --out $S/backups/db --attachments $S/server/attachments --attachments-out $S/backups/attachments --remote $S/target --keep 48
+[20261029T161945Z] backup start: $S/server/server.db
+[20261029T161945Z] wrote $S/backups/db/server-db-20261029T161945Z.db.gz (437 bytes)
+[20261029T161945Z] attachments copied: 3 files
+[20261029T161945Z] pushed to $S/target/
+[20261029T161945Z] backup done
+exit=0
+$ (cd $S/backups && find . -type f | LC_ALL=C sort | xargs shasum -a 256)
+158b175fbfdd184299daf609fb8d45efe75489226b61736a41b3cb181f6fe5e3  ./attachments/step-sessions/step1.1793290785-158b175fbfdd1842.jsonl
+7692c3ad3540bb803c020b3aee66cd8887123234ea0c6e7143c0add73ff431ed  ./attachments/team1/a.png
+3fc4ccfe745870e2c0d99f71f30ff0656c8dedd41cc1d7d3d376b0dbe685e2f3  ./attachments/team1/b.txt
+491ea1016eea81bfccede934204dd4617bd9adc3724985eb2e73a33d5d97f48f  ./db/server-db-20261029T161945Z.db.gz
+$ (cd $S/target && find . -type f | LC_ALL=C sort | xargs shasum -a 256)
+158b175fbfdd184299daf609fb8d45efe75489226b61736a41b3cb181f6fe5e3  ./attachments/step-sessions/step1.1793290785-158b175fbfdd1842.jsonl
+7692c3ad3540bb803c020b3aee66cd8887123234ea0c6e7143c0add73ff431ed  ./attachments/team1/a.png
+3fc4ccfe745870e2c0d99f71f30ff0656c8dedd41cc1d7d3d376b0dbe685e2f3  ./attachments/team1/b.txt
+491ea1016eea81bfccede934204dd4617bd9adc3724985eb2e73a33d5d97f48f  ./db/server-db-20261029T161945Z.db.gz
+$ gunzip -c $S/target/db/server-db-*.db.gz > restored.db && sqlite3 restored.db 'PRAGMA integrity_check; select count(*) from todo;'
+ok
+3

@@ -39,5 +39,6 @@
   "dispatch-agent-test": ["Dispatch agent start/check round trip (#1556)"],
   "closing-keyword-gate": ["Closing keyword gate (advisory, #1541)"],
   "baseline-ratchet-gate": ["Baseline ratchet gate and gardener sweep self-test (#1617)"],
-  "funding-yml-gate": ["Funding links gate (#2002)"]
+  "funding-yml-gate": ["Funding links gate (#2002)"],
+  "ops-backup-test": ["Server backup script against an rrsync receiver (#2163)"]
 }
