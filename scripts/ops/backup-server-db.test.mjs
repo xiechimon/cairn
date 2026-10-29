@@ -9,6 +9,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -326,7 +327,34 @@ test('a rewritten step session lands as a new version on both sides', () => {
   for (const side of sides) {
     assert.deepEqual(versions(side).sort(), ['{"a":1}\n', '{"a":1}\n{"b":2}\n']);
     assert.ok(
-      files(join(side, 'step-sessions')).every((name) => /^step1\.\d+-\d+\.jsonl$/.test(name)),
+      files(join(side, 'step-sessions')).every((name) =>
+        /^step1\.\d+-[0-9a-f]{16}\.jsonl$/.test(name),
+      ),
     );
+  }
+});
+
+test('an equal-size step session rewrite with the same mtime still lands as a new version', () => {
+  const f = fixture();
+  const session = join(f.attachments, 'step-sessions', 'step2.jsonl');
+  const stamp = new Date('2026-10-29T12:00:00Z');
+  write(session, '{"v":1}\n');
+  utimesSync(session, stamp, stamp);
+  assert.equal(f.run(f.full).status, 0);
+
+  const [first] = dbCopies(join(f.backups, 'db'));
+  renameSync(
+    join(f.backups, 'db', first),
+    join(f.backups, 'db', 'server-db-20200101T080000Z.db.gz'),
+  );
+  write(session, '{"v":2}\n');
+  utimesSync(session, stamp, stamp);
+  const result = f.run(f.full);
+  assert.equal(result.status, 0, result.stderr);
+  for (const side of [join(f.backups, 'attachments'), join(f.receiver, 'attachments')]) {
+    const contents = files(join(side, 'step-sessions')).map((name) =>
+      readFileSync(join(side, 'step-sessions', name), 'utf8'),
+    );
+    assert.deepEqual(contents.sort(), ['{"v":1}\n', '{"v":2}\n']);
   }
 });

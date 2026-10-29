@@ -12,7 +12,7 @@ usage: backup-server-db.sh --db <server.db> --out <dir> [--keep N]
   --attachments      server attachments directory; files whose attachment row is ready in this run's
                      DB copy, with the size it records, are copied into --attachments-out, and nothing
                      is ever deleted there; step-sessions/<step>.jsonl is copied as
-                     step-sessions/<step>.<mtime>-<size>.jsonl, one file per version
+                     step-sessions/<step>.<mtime>-<sha256 prefix>.jsonl, one file per content
   --remote           existing rsync destination root (for example dmit-backup:); receives db/ and attachments/
                      with no remote shell, no deletes and no overwrites; the receiver rotates its own copies
 
@@ -72,6 +72,7 @@ fi
 [ -z "$ATTACHMENTS" ] || [ -d "$ATTACHMENTS" ] || fail "attachments not found: $ATTACHMENTS"
 
 SECRETS=(--exclude=secretbox.key --exclude='*.pem')
+if command -v sha256sum >/dev/null; then SHA256=(sha256sum); else SHA256=(shasum -a 256); fi
 name="server-db-${ts}.db.gz"
 
 echo "[$ts] backup start: $DB"
@@ -116,15 +117,20 @@ if [ -n "$ATTACHMENTS" ]; then
     mkdir -p "$ATTACHMENTS_OUT/step-sessions" || fail "create $ATTACHMENTS_OUT/step-sessions"
     for src in "$ATTACHMENTS"/step-sessions/*.jsonl; do
       [ -f "$src" ] || continue
-      version="$(stat -c '%Y-%s' "$src" 2>/dev/null || stat -f '%m-%z' "$src")" || fail "stat $src"
-      dest="$ATTACHMENTS_OUT/step-sessions/$(basename "$src" .jsonl).$version.jsonl"
-      [ ! -e "$dest" ] || continue
-      cp "$src" "$dest.partial" || fail "copy $src"
-      if [ "$(stat -c '%Y-%s' "$src" 2>/dev/null || stat -f '%m-%z' "$src")" = "$version" ]; then
-        mv "$dest.partial" "$dest" || fail "write $dest"
-      else
-        rm -f "$dest.partial"
+      partial="$ATTACHMENTS_OUT/step-sessions/.$(basename "$src").partial"
+      cp "$src" "$partial" || fail "copy $src"
+      digest="$("${SHA256[@]}" < "$partial" | cut -c1-16)" || fail "hash $partial"
+      if [ "$("${SHA256[@]}" < "$src" | cut -c1-16)" != "$digest" ]; then
+        rm -f "$partial"
         echo "[$ts] skipped $src: it changed during the copy" >&2
+        continue
+      fi
+      mtime="$(stat -c '%Y' "$src" 2>/dev/null || stat -f '%m' "$src")" || fail "stat $src"
+      dest="$ATTACHMENTS_OUT/step-sessions/$(basename "$src" .jsonl).$mtime-$digest.jsonl"
+      if compgen -G "$ATTACHMENTS_OUT/step-sessions/$(basename "$src" .jsonl).*-$digest.jsonl" >/dev/null; then
+        rm -f "$partial"
+      else
+        mv "$partial" "$dest" || fail "write $dest"
       fi
     done
   fi
