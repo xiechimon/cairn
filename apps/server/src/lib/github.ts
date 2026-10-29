@@ -1314,11 +1314,16 @@ export async function githubCloseIssue(
   owner: string,
   repo: string,
   issueNumber: number,
-  comment: string,
+  opts: string | { stateReason: 'completed' },
 ): Promise<void> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
-  await writeJson(fetchImpl, 'PATCH', url, token, { state: 'closed', state_reason: 'not_planned' });
-  await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
+  await writeJson(fetchImpl, 'PATCH', url, token, {
+    state: 'closed',
+    state_reason: typeof opts === 'string' ? 'not_planned' : opts.stateReason,
+  });
+  if (typeof opts === 'string') {
+    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts });
+  }
 }
 
 export type GithubMergeResult =
