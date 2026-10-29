@@ -14,12 +14,13 @@ describe('the 37-table migration (the 01 §6 list)', () => {
     const tables = Object.values(schema).filter((v) => is(v, SQLiteTable));
     const names = tables.map((t) => getTableConfig(t as SQLiteTable).name).sort();
     expect(names).toEqual([...DB_TABLES].sort());
-    expect(names).toHaveLength(42);
+    expect(names).toHaveLength(43);
     expect(names).toContain('chief');
     expect(names).toContain('attachment');
     expect(names).toContain('branch_sync');
     expect(names).toContain('github_connection');
     expect(names).toContain('schedule');
+    expect(names).toContain('schedule_report');
     expect(names).not.toContain('shell_command');
     expect(names).toContain('gate_verdict');
   });
@@ -42,14 +43,12 @@ describe('the 37-table migration (the 01 §6 list)', () => {
     const journal = JSON.parse(
       readFileSync(resolve(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
     ) as { entries: { tag: string; when: number }[] };
-    const attemptMigration = journal.entries.find(
-      (entry) => entry.tag === '0066_harness_eval_attempts',
-    );
-    if (attemptMigration === undefined) throw new Error('harness eval attempts migration missing');
-    db.run(sql`DROP TABLE harness_eval_attempts`);
-    db.run(sql`DELETE FROM __drizzle_migrations WHERE created_at = ${attemptMigration.when}`);
+    const scheduleMigration = journal.entries.find((entry) => entry.tag === '0067_schedule_report');
+    if (scheduleMigration === undefined) throw new Error('schedule_report migration missing');
+    db.run(sql`DROP TABLE schedule_report`);
+    db.run(sql`DELETE FROM __drizzle_migrations WHERE created_at = ${scheduleMigration.when}`);
     migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-    expect(db.select().from(schema.harnessEvalAttempt).all()).toEqual([]);
+    expect(db.select().from(schema.scheduleReport).all()).toEqual([]);
   });
 
   test('the migrations apply cleanly to an in-memory db', () => {

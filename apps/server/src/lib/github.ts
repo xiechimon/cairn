@@ -916,6 +916,59 @@ export async function githubOpenIssuesWithLabel(
   };
 }
 
+export interface GithubOpenIssueDetail extends GithubIssueSummary {
+  body: string;
+  createdAt: number;
+  updatedAt: number;
+  url: string;
+}
+
+export interface GithubOpenIssuesDetailPage {
+  issues: GithubOpenIssueDetail[];
+  next: string | null;
+}
+
+function epochOf(value: unknown): number {
+  if (typeof value !== 'string') return 0;
+  const at = Date.parse(value);
+  return Number.isFinite(at) ? at : 0;
+}
+
+export async function githubOpenIssuesDetail(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  opts: { url?: string | null; etag?: string | null } = {},
+): Promise<GithubConditionalRead<GithubOpenIssuesDetailPage> | null> {
+  const url =
+    opts.url ??
+    `https://api.github.com/${repoPath(owner, repo)}/issues?state=open` +
+      `&sort=created&direction=asc&per_page=${INTAKE_PER_PAGE}`;
+  const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
+  if (got === null || got.notModified) return got;
+  if (!Array.isArray(got.data.body)) return null;
+  const issues: GithubOpenIssueDetail[] = [];
+  for (const raw of got.data.body as unknown[]) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const row = raw as Record<string, unknown>;
+    const projected = projectIssue(row);
+    if (projected === null) continue;
+    issues.push({
+      ...projected,
+      body: typeof row.body === 'string' ? row.body : '',
+      createdAt: epochOf(row.created_at),
+      updatedAt: epochOf(row.updated_at),
+      url: typeof row.html_url === 'string' ? row.html_url : '',
+    });
+  }
+  return {
+    notModified: false,
+    etag: got.etag,
+    data: { issues, next: nextPageUrl(got.data.link) },
+  };
+}
+
 export interface GithubIssueEvent {
   id: number;
   event: 'labeled' | 'unlabeled' | 'closed';

@@ -53,6 +53,7 @@ export * from './recording-trigger.js';
 export * from './report.js';
 export * from './review.js';
 export * from './schedule.js';
+export * from './scheduling.js';
 export * from './secret.js';
 export * from './skill.js';
 export * from './step.js';

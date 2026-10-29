@@ -448,6 +448,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       piCacheRetention,
       hookTimeoutMs,
       issueIntake,
+      scheduling,
       trajectoryOutcomeBackfill,
       trajectoryReflectCurate,
       trajectoryReflectOpenGuardIssues,
@@ -474,6 +475,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(piCacheRetention).toBe('CAIRN_PI_CACHE_RETENTION');
     expect(hookTimeoutMs).toBe('CAIRN_HOOK_TIMEOUT_MS');
     expect(issueIntake).toBe('CAIRN_ISSUE_INTAKE');
+    expect(scheduling).toBe('CAIRN_SCHEDULING');
     expect(trajectoryOutcomeBackfill).toBe('CAIRN_TRAJ_OUTCOME_BACKFILL');
     expect(trajectoryReflectCurate).toBe('CAIRN_TRAJ_REFLECT_CURATE');
     expect(trajectoryReflectOpenGuardIssues).toBe('CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES');
@@ -504,7 +506,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 
 describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
-    expect(DB_TABLES).toHaveLength(42);
+    expect(DB_TABLES).toHaveLength(43);
     expect(DB_TABLES).toContain('autonomy_state');
     expect(DB_TABLES).toContain('member_activity');
     expect(DB_TABLES).toContain('build_feedback');
@@ -516,6 +518,8 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(DB_TABLES).toContain('stop_pending');
     expect(DB_TABLES).toContain('github_connection');
     expect(DB_TABLES).toContain('schedule');
+    expect(DB_TABLES).toContain('schedule_report');
+    expect(INTERNAL_ONLY_TABLES).toContain('schedule_report');
     expect(DB_TABLES).toContain('feishu_binding');
     expect(DB_TABLES).toContain('push_subscription');
     expect(DB_TABLES).toContain('push_digest_item');

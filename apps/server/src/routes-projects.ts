@@ -51,6 +51,7 @@ import {
   updateProject,
   updateProjectMergeConfig,
 } from './services/projects.js';
+import { latestScheduleReport } from './services/scheduling/store.js';
 import { seedFixedTags } from './services/tags.js';
 import { listTodos } from './services/todos.js';
 
@@ -264,6 +265,11 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const row = requireProject(ctx, c.req.param('id'));
     const body = parseWith(patchAutonomyBodySchema, await jsonBody(c), 'body');
     return c.json(patchAutonomy(ctx.db, row.id, body, nowMs()));
+  });
+
+  app.get('/api/projects/:id/schedule', (c) => {
+    const row = requireProject(ctx, c.req.param('id'));
+    return c.json({ report: latestScheduleReport(ctx.db, row.id) });
   });
 
   app.delete('/api/projects/:id', (c) => {
