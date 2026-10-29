@@ -1,0 +1,24 @@
+commit-author	Commit authors never use the bot account	﻿2026-10-29T01:59:17.1261786Z ##[group]Run if [ -n "$BASE_SHA" ]; then
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1262187Z ^[[36;1mif [ -n "$BASE_SHA" ]; then^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1262456Z ^[[36;1m  range="$BASE_SHA..HEAD"^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1262870Z ^[[36;1melif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1263744Z ^[[36;1m  range="$BEFORE_SHA..HEAD"^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1264031Z ^[[36;1melse^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1264235Z ^[[36;1m  range="HEAD^!"^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1264456Z ^[[36;1mfi^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1264814Z ^[[36;1moffending=$(git log --format='%H %an <%ae>' "$range" | grep -F 'cairnwright[bot]' || true)^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1265297Z ^[[36;1mgit log --format='author: %an <%ae>' "$range"^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1265607Z ^[[36;1mif [ -n "$offending" ]; then^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1265869Z ^[[36;1m  echo "$offending"^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1267044Z ^[[36;1m  echo "::error::every commit in $range must be authored without cairnwright[bot]. Bot-opened PRs must merge by rebase from one commit authored by Cairnwright (~/.cairn/tools/merge-pr.sh). This check reads commit authors, so it cannot see the author a squash merge will write; read the author of the main commit after merging."^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1268312Z ^[[36;1m  exit 1^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1268506Z ^[[36;1mfi^[[0m
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1299189Z shell: /usr/bin/bash -e {0}
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1299443Z env:
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1299684Z   BEFORE_SHA: c683123a69b8737ba7f2dac4cf404408e4cd4d5d
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1299991Z   BASE_SHA: 
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1300183Z ##[endgroup]
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1399864Z author: cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com>
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1403584Z 78b85594328fe2c26680060d1ad9dfa28e97d76b cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com>
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1424955Z ##[error]every commit in c683123a69b8737ba7f2dac4cf404408e4cd4d5d..HEAD must be authored without cairnwright[bot]. Bot-opened PRs must merge by rebase from one commit authored by Cairnwright (~/.cairn/tools/merge-pr.sh). This check reads commit authors, so it cannot see the author a squash merge will write; read the author of the main commit after merging.
+commit-author	Commit authors never use the bot account	2026-10-29T01:59:17.1435492Z ##[error]Process completed with exit code 1.
