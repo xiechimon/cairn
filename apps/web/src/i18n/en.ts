@@ -580,6 +580,7 @@ export const EN: Record<string, string> = {
   'issue 进料': 'Issue intake',
   园丁: 'Gardener',
   自治合并: 'Auto-merge',
+  每周排期: 'Weekly schedule',
   合并闸: 'Merge gate',
   可以合并: 'Ready to merge',
   还不能合并: 'Not ready to merge',

@@ -21,6 +21,7 @@ import type {
   ProviderCompat,
   ProviderModel,
   RequiredCapabilities,
+  ScheduleReport,
   SkillInjectionRecord,
   SplitPolicy,
   StepKind,
@@ -763,4 +764,23 @@ export const feishuBinding = sqliteTable(
     updatedAt: epochMs('updatedAt').notNull(),
   },
   (t) => [uniqueIndex('feishu_binding_openId_unique').on(t.openId)],
+);
+
+export const scheduleReport = sqliteTable(
+  'schedule_report',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('projectId')
+      .notNull()
+      .references(() => project.id, { onDelete: 'cascade' }),
+    generatedAt: epochMs('generatedAt').notNull(),
+    mainSha: text('mainSha').notNull(),
+    groups: json<ScheduleReport['groups']>('groups').notNull(),
+    items: json<ScheduleReport['items']>('items').notNull(),
+    unparsedDeps: json<ScheduleReport['unparsedDeps']>('unparsedDeps').notNull(),
+    decidedAt: epochMs('decidedAt'),
+    decidedBy: text('decidedBy'),
+    appliedAt: epochMs('appliedAt'),
+  },
+  (t) => [index('schedule_report_project_idx').on(t.projectId, t.generatedAt)],
 );

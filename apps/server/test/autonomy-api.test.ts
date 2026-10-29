@@ -33,6 +33,7 @@ describe('GET / PATCH /api/projects/{id}/autonomy', () => {
         },
         { kind: 'gardener', lastStartedAt: null, lastBlockedReason: null, lastEvaluatedAt: null },
         { kind: 'auto-merge', lastStartedAt: null, lastBlockedReason: null, lastEvaluatedAt: null },
+        { kind: 'scheduling', lastStartedAt: null, lastBlockedReason: null, lastEvaluatedAt: null },
       ],
     });
   });

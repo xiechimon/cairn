@@ -470,6 +470,13 @@
       "when": 1793208746037,
       "tag": "0066_harness_eval_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "6",
+      "when": 1793243586719,
+      "tag": "0067_schedule_report",
+      "breakpoints": true
     }
   ]
 }

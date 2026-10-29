@@ -26,6 +26,7 @@ import { loadOrCreateVapidKeys } from './services/push.js';
 import {
   createScheduler,
   issueIntakeRunOf,
+  schedulingRunOf,
   trajectoryExportRunOf,
   trajectoryOutcomeRunOf,
   trajectoryReflectCurateRunOf,
@@ -141,6 +142,7 @@ const scheduler = createScheduler(
       apiKey: process.env.CAIRN_REFLECTOR_API_KEY ?? '',
     },
   }),
+  schedulingRunOf(config, { githubFetch, logger }),
 );
 scheduler.start();
 
