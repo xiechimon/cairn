@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
+import { runHeldOut } from '../eval/chief-dispatch-real/run-heldout.mts';
 import {
-  formatHeldOutRunStdout,
   openHeldOutCases,
   sealHeldOutCases,
   splitLabeledCases,
@@ -74,7 +74,7 @@ describe('chief-dispatch-real split', () => {
     expect(opened.map((c) => c.id).sort()).toEqual(heldOut.map((c) => c.id).sort());
   });
 
-  test("the runner's stdout for a held-out run contains no case prompt text", () => {
+  test('the runner invokes the evaluator and stdout contains no case prompt text', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-dispatch-real-heldout-'));
     dirs.push(dir);
     const box = createEphemeralSecretBox();
@@ -82,22 +82,41 @@ describe('chief-dispatch-real split', () => {
     writeVisibleFlow(visible, join(dir, 'visible'));
     const sealedPath = join(dir, 'heldout.sealed');
     sealHeldOutCases(heldOut, box, sealedPath);
-    const opened = openHeldOutCases(sealedPath, box);
-    const stdout = formatHeldOutRunStdout({
-      half: 'held-out',
-      caseCount: opened.length,
-      decisionOk: 0.5,
-      decisionOkInterval: [0.2, 0.8],
-      scored: opened.length,
+    let evaluatedFlow: string | null = null;
+    const result = await runHeldOut({
+      sealedPath,
+      box,
+      evaluate: async (flowDir) => {
+        evaluatedFlow = flowDir;
+        const flow = JSON.parse(readFileSync(join(flowDir, 'cases.json'), 'utf8')) as {
+          cases: Array<{ id: string; prompt: string }>;
+        };
+        expect(flow.cases.length).toBe(heldOut.length);
+        const lines = flow.cases.map((c, i) =>
+          JSON.stringify({
+            prompt_id: c.id,
+            rep: 1,
+            grade: { decision_ok: i < Math.ceil(flow.cases.length / 2) ? 1 : 0 },
+          }),
+        );
+        const { mkdirSync } = await import('node:fs');
+        mkdirSync(join(flowDir, 'baseline'), { recursive: true });
+        const resultsPath = join(flowDir, 'baseline', 'results.jsonl');
+        writeFileSync(resultsPath, `${lines.join('\n')}\n`);
+        return { resultsJsonlPath: resultsPath };
+      },
     });
-    writeFileSync(join(dir, 'stdout.txt'), stdout);
-    expect(stdout).toContain('held-out');
-    expect(stdout).toContain('decision_ok');
-    for (const c of opened) {
-      expect(stdout.includes(c.prompt)).toBe(false);
+    expect(evaluatedFlow).not.toBeNull();
+    expect(result.scored).toBe(heldOut.length);
+    const expectedOk = Math.ceil(heldOut.length / 2) / heldOut.length;
+    expect(result.decisionOk).toBeCloseTo(expectedOk, 5);
+    expect(result.stdout).toContain('held-out');
+    expect(result.stdout).toContain('decision_ok');
+    for (const c of heldOut) {
+      expect(result.stdout.includes(c.prompt)).toBe(false);
     }
     for (const c of visible) {
-      expect(stdout.includes(c.prompt)).toBe(false);
+      expect(result.stdout.includes(c.prompt)).toBe(false);
     }
   });
 });

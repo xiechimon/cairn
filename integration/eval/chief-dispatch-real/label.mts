@@ -1,8 +1,16 @@
 import type { ExportedDispatchCase, LabeledDispatchCase } from './types.mts';
 
+export interface LabelOption {
+  key: string;
+  displayName: string;
+  description: string;
+  projectName: string;
+  projectDescription: string;
+}
+
 export interface Labeler {
   vendor: string;
-  label: (input: { prompt: string; options: string[] }) => Promise<string>;
+  label: (input: { prompt: string; options: LabelOption[] }) => Promise<string>;
 }
 
 function rosterFromCase(input: ExportedDispatchCase): LabeledDispatchCase['roster'] {
@@ -21,8 +29,23 @@ function rosterFromCase(input: ExportedDispatchCase): LabeledDispatchCase['roste
   return [...seen.values()];
 }
 
-function optionsOf(input: ExportedDispatchCase): string[] {
-  return rosterFromCase(input).map((a) => a.key);
+function optionsOf(input: ExportedDispatchCase): LabelOption[] {
+  const options: LabelOption[] = [];
+  const seen = new Set<string>();
+  for (const project of input.projectsSnapshot) {
+    for (const agent of project.agents) {
+      if (seen.has(agent.key)) continue;
+      seen.add(agent.key);
+      options.push({
+        key: agent.key,
+        displayName: agent.displayName,
+        description: agent.description,
+        projectName: project.name,
+        projectDescription: project.description,
+      });
+    }
+  }
+  return options;
 }
 
 export async function labelDispatchCases(
@@ -43,7 +66,7 @@ export async function labelDispatchCases(
     const [left, right] = await Promise.all([a.label(payload), b.label(payload)]);
     if (left === 'unclear' || right === 'unclear') continue;
     if (left !== right) continue;
-    if (!options.includes(left)) continue;
+    if (!options.some((o) => o.key === left)) continue;
     kept.push({
       id: input.caseId,
       tags: ['dispatch', 'real', input.outcome, left],

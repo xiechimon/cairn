@@ -28,7 +28,7 @@ async function openAiLabeler(args: {
             role: 'user',
             content: JSON.stringify({
               prompt: input.prompt,
-              options: [...input.options, 'unclear'],
+              options: [...input.options, { key: 'unclear' }],
             }),
           },
         ],

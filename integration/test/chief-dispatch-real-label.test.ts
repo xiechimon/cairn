@@ -33,10 +33,15 @@ function baseCase(overrides: Partial<ExportedDispatchCase> = {}): ExportedDispat
   };
 }
 
-function labeler(vendor: string, answer: string): Labeler {
+function labeler(
+  vendor: string,
+  answer: string,
+  capture?: { last?: Parameters<Labeler['label']>[0] },
+): Labeler {
   return {
     vendor,
-    async label() {
+    async label(input) {
+      if (capture) capture.last = input;
       return answer;
     },
   };
@@ -77,5 +82,34 @@ describe('chief-dispatch-real label', () => {
     await expect(
       labelDispatchCases([baseCase()], [labeler('glm', 'frontend'), labeler('glm', 'frontend')]),
     ).rejects.toThrow(/different vendors|same vendor/i);
+  });
+
+  test('labelers receive agent and project descriptions and never the original dispatch', async () => {
+    const capture: { last?: Parameters<Labeler['label']>[0] } = {};
+    await labelDispatchCases(
+      [baseCase()],
+      [labeler('glm', 'frontend', capture), labeler('deepseek', 'frontend')],
+    );
+    expect(capture.last).toBeDefined();
+    expect(capture.last?.prompt).toContain('dark mode');
+    expect(capture.last?.options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: 'frontend',
+          description: 'Web UI',
+          projectName: 'cairn',
+          projectDescription: 'xiechimon/cairn',
+        }),
+        expect.objectContaining({
+          key: 'code',
+          description: 'Server code',
+          projectName: 'cairn',
+        }),
+      ]),
+    );
+    const blob = JSON.stringify(capture.last);
+    expect(blob).not.toContain('dispatchedTo');
+    expect(blob).not.toContain('a-code');
+    expect(blob).not.toMatch(/"key"\s*:\s*"code".*"dispatched/s);
   });
 });

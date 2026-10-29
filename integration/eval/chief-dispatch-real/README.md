@@ -51,15 +51,12 @@ pnpm exec tsx integration/eval/chief-dispatch/run-eval.mts \
   --variant baseline
 ```
 
-Held-out half (scores only; case text never on stdout):
+Held-out half (opens sealed cases, runs `run-eval.mts`, prints scores only):
 
 ```sh
-# 1) open sealed cases into a temp flow, run eval yourself, write scores.json
-# 2) or use run-heldout after you have aggregate scores:
 pnpm exec tsx integration/eval/chief-dispatch-real/run-heldout.mts \
   --sealed "$ROOT/heldout.sealed" \
-  --keyfile ~/.cairn/eval-heldout.key \
-  --scores "$ROOT/heldout-scores.json"
+  --keyfile ~/.cairn/eval-heldout.key
 ```
 
 Record aggregate counts, agreement rate, and pass rates per half (with intervals)

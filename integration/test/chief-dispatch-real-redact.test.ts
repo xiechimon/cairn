@@ -122,4 +122,50 @@ describe('chief-dispatch-real redact', () => {
       }
     }
   });
+
+  test('private paths, single-label hostnames, standalone private repos and Chinese names are replaced', () => {
+    const expanded = {
+      srvPath: '/srv/private/service/config.yaml',
+      singleHost: 'omarchy',
+      bareRepo: 'secret-radar',
+      chineseName: '张伟',
+    };
+    const result = redactDispatchCase(
+      fixture({
+        caseId: 'syn-expand',
+        prompt: `Ask ${expanded.chineseName} to restart ${expanded.singleHost} using ${expanded.srvPath} in repo ${expanded.bareRepo}`,
+        projectsSnapshot: [
+          {
+            id: 'proj-x',
+            name: expanded.bareRepo,
+            description: `hosted on ${expanded.singleHost}`,
+            agents: [
+              {
+                id: 'ag-x',
+                key: 'ops',
+                displayName: expanded.chineseName,
+                description: `path ${expanded.srvPath}`,
+              },
+            ],
+          },
+        ],
+        dispatchedTo: {
+          agentId: 'ag-x',
+          displayName: expanded.chineseName,
+          key: 'ops',
+        },
+      }),
+    );
+    expect(result.kept).toBe(true);
+    if (!result.kept) throw new Error('expected kept');
+    const text = JSON.stringify(result.case);
+    expect(text).not.toContain(expanded.srvPath);
+    expect(text).not.toContain(expanded.singleHost);
+    expect(text).not.toContain(expanded.bareRepo);
+    expect(text).not.toContain(expanded.chineseName);
+    expect(text).toMatch(/<PATH_\d+>/);
+    expect(text).toMatch(/<HOST_\d+>/);
+    expect(text).toMatch(/<REPO_\d+>/);
+    expect(text).toMatch(/<PERSON_\d+>/);
+  });
 });

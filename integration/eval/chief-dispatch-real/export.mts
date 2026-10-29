@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { parseOrchestrationSourceRef, redactSecrets } from '@cairn/shared';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../apps/server/src/db/schema.js';
 import {
@@ -42,21 +42,34 @@ function agentKey(displayName: string, id: string): string {
   return slug.length > 0 ? slug : id.slice(0, 8);
 }
 
-function promptFromThread(
+export function selectTriggeringUserPrompt(
+  messages: Array<{ role: string; content: unknown; createdAt: number }>,
+  dispatchAt: number,
+): string | null {
+  let best: { createdAt: number; text: string } | null = null;
+  for (const row of messages) {
+    if (row.role !== 'user' || row.createdAt > dispatchAt) continue;
+    const text = extractText(row.content);
+    if (text === null || text.trim() === '') continue;
+    if (best === null || row.createdAt >= best.createdAt) {
+      best = { createdAt: row.createdAt, text: text.trim() };
+    }
+  }
+  return best?.text ?? null;
+}
+
+function promptForDispatch(
   db: ReturnType<typeof drizzle<typeof schema>>,
   threadId: string,
+  dispatchAt: number,
 ): string | null {
   const rows = db
     .select()
     .from(chiefMessage)
-    .where(and(eq(chiefMessage.threadId, threadId), eq(chiefMessage.role, 'user')))
+    .where(eq(chiefMessage.threadId, threadId))
     .orderBy(asc(chiefMessage.createdAt))
     .all();
-  for (const row of rows) {
-    const text = extractText(row.content);
-    if (text !== null && text.trim() !== '') return text.trim();
-  }
-  return null;
+  return selectTriggeringUserPrompt(rows, dispatchAt);
 }
 
 function classifyOutcome(args: {
@@ -159,11 +172,12 @@ export function exportDispatchFailures(dbPath: string): ExportedDispatchCase[] {
       let prompt: string | null = null;
       if (task.sourceKind === 'orchestration' && task.sourceRef !== null) {
         const parsed = parseOrchestrationSourceRef(task.sourceRef);
-        if (parsed !== null) prompt = promptFromThread(db, parsed.threadId);
+        if (parsed !== null) {
+          const dispatchAt = Math.min(...chiefForTask.map((b) => b.createdAt));
+          prompt = promptForDispatch(db, parsed.threadId, dispatchAt);
+        }
       }
-      if (prompt === null || prompt === '') {
-        prompt = task.spec.trim() !== '' ? task.spec : task.title;
-      }
+      if (prompt === null || prompt === '') continue;
 
       const assignedId = task.assignment?.build?.agentId ?? task.assignment?.plan?.agentId ?? null;
       const assigned = assignedId === null ? null : agents.find((a) => a.id === assignedId);
