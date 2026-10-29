@@ -1,0 +1,13 @@
+
+ RUN  v5.0.1 /workspace/.claude/worktrees/cn-2149-tailscale-confirm-f5e1/apps/server
+
+
+ Test Files  3 passed (3)
+      Tests  52 passed (52)
+   Start at  05:10:42
+   Duration  2.61s (transform 46%, import 30%, tests 23%)
+
+  Transform  transforming modules took 2.74s · 46% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
