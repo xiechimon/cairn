@@ -1,0 +1,37 @@
+CASE: fixture markdown ?scenario=
+EXIT: 1 (expect 1)
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL archive: outside associated issue archive: [shot](https://example.org/view.png?scenario=board)
+FAIL fixture: [shot](https://example.org/view.png?scenario=board)
+pr-evidence: RED (2 problem(s))
+
+CASE: fixture html ?scenario=
+EXIT: 1 (expect 1)
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL archive: outside associated issue archive: https://example.org/view.png?scenario=board (HTML <img>/<source>, line 4)
+FAIL fixture: https://example.org/view.png?scenario=board (HTML <img>/<source>, line 4)
+pr-evidence: RED (2 problem(s))
+
+CASE: unarchived user-images upload
+EXIT: 1 (expect 1)
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL archive: outside associated issue archive: [shot](https://user-images.githubusercontent.com/123/proof.png)
+pr-evidence: RED (1 problem(s))
+
+CASE: wrong issue archive
+EXIT: 1 (expect 1)
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL archive: outside associated issue archive: [shot](https://raw.githubusercontent.com/xiechimon/cairn/3cca15fbe0e427154b134db0b433fc5e965119b2/docs/verify/999/proof.png)
+pr-evidence: RED (1 problem(s))
+
+CASE: archived control
+EXIT: 0 (expect 0)
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+PASS archive: archived: [shot](https://raw.githubusercontent.com/xiechimon/cairn/3cca15fbe0e427154b134db0b433fc5e965119b2/docs/verify/1810/proof.png)
+pr-evidence: GREEN
+
