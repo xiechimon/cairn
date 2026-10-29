@@ -23,30 +23,37 @@ const head = 'a'.repeat(40);
 const prefix = 'repos/xiechimon/cairn';
 
 function fixture(t) {
-  const cwd = mkdtempSync(join(tmpdir(), 'escape-eval-loop-'));
-  t.after(() => rmSync(cwd, { recursive: true, force: true }));
-  const git = (args, env = {}) =>
-    execFileSync('git', args, {
-      cwd,
-      encoding: 'utf8',
-      env: { ...process.env, ...env },
-      stdio: 'pipe',
-    }).trim();
-  git(['init', '-q']);
-  git(['config', 'user.name', 'Escape loop test']);
-  git(['config', 'user.email', 'escape-loop@example.invalid']);
-  function commit(message, date, pathOrFiles) {
-    const files = typeof pathOrFiles === 'string' ? { [pathOrFiles]: message } : { ...pathOrFiles };
-    for (const [path, content] of Object.entries(files)) {
-      const absolute = join(cwd, path);
-      mkdirSync(dirname(absolute), { recursive: true });
-      writeFileSync(absolute, content);
-      git(['add', '--', path]);
-    }
-    git(['commit', '-q', '-m', message], { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date });
-    return git(['rev-parse', 'HEAD']);
-  }
-  return { cwd, git, commit };
+  const fx = {
+    cwd: mkdtempSync(join(tmpdir(), 'escape-eval-loop-')),
+    git(args, env = {}) {
+      return execFileSync('git', args, {
+        cwd: this.cwd,
+        encoding: 'utf8',
+        env: { ...process.env, ...env },
+        stdio: 'pipe',
+      }).trim();
+    },
+    commit(message, date, pathOrFiles) {
+      const files =
+        typeof pathOrFiles === 'string' ? { [pathOrFiles]: message } : { ...pathOrFiles };
+      for (const [path, content] of Object.entries(files)) {
+        const absolute = join(this.cwd, path);
+        mkdirSync(dirname(absolute), { recursive: true });
+        writeFileSync(absolute, content);
+        this.git(['add', '--', path]);
+      }
+      this.git(['commit', '-q', '-m', message], {
+        GIT_AUTHOR_DATE: date,
+        GIT_COMMITTER_DATE: date,
+      });
+      return this.git(['rev-parse', 'HEAD']);
+    },
+  };
+  t.after(() => rmSync(fx.cwd, { recursive: true, force: true }));
+  fx.git(['init', '-q']);
+  fx.git(['config', 'user.name', 'Escape loop test']);
+  fx.git(['config', 'user.email', 'escape-loop@example.invalid']);
+  return fx;
 }
 
 function installFakeGh(dir, github) {
@@ -92,19 +99,19 @@ function githubFor(originalPr) {
 }
 
 test('escape-eval-loop traces the introducing PR, labels review path, reports weekly, and exports a bank case', (t) => {
-  const { cwd, git, commit } = fixture(t);
-  commit('chore: seed', '2026-09-19T00:00:00Z', { 'src/token.txt': 'safe\n' });
-  const introducingSha = commit('feat: land broken token path (#100)', introduceAt, {
+  const fx = fixture(t);
+  fx.commit('chore: seed', '2026-09-19T00:00:00Z', { 'src/token.txt': 'safe\n' });
+  const introducingSha = fx.commit('feat: land broken token path (#100)', introduceAt, {
     'src/token.txt': 'safe\nbroken\n',
   });
-  const fixingSha = commit('fix: repair regression introduced by #100 (#201)', fixAt, {
+  const fixingSha = fx.commit('fix: repair regression introduced by #100 (#201)', fixAt, {
     'src/token.txt': 'safe\nfixed\n',
   });
-  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  fx.git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
 
-  const out = join(cwd, 'out');
-  const bankOut = join(cwd, 'bank');
-  const respondPath = join(cwd, 'respond.json');
+  const out = join(fx.cwd, 'out');
+  const bankOut = join(fx.cwd, 'bank');
+  const respondPath = join(fx.cwd, 'respond.json');
   writeFileSync(
     respondPath,
     JSON.stringify({
@@ -128,7 +135,7 @@ test('escape-eval-loop traces the introducing PR, labels review path, reports we
       },
     }),
   );
-  installFakeGh(cwd, githubFor(100));
+  installFakeGh(fx.cwd, githubFor(100));
 
   const result = spawnSync(
     process.execPath,
@@ -145,15 +152,15 @@ test('escape-eval-loop traces the introducing PR, labels review path, reports we
       '--respond-file',
       respondPath,
       '--cwd',
-      cwd,
+      fx.cwd,
     ],
     {
       encoding: 'utf8',
       env: {
         ...process.env,
-        PATH: `${cwd}:${process.env.PATH}`,
-        RESPONSES: join(cwd, 'responses.json'),
-        REQUEST_LOG: join(cwd, 'requests'),
+        PATH: `${fx.cwd}:${process.env.PATH}`,
+        RESPONSES: join(fx.cwd, 'responses.json'),
+        REQUEST_LOG: join(fx.cwd, 'requests'),
       },
     },
   );
@@ -195,23 +202,26 @@ test('escape-eval-loop traces the introducing PR, labels review path, reports we
   assert.equal(bankCase.provenance.fixingSha, fixingSha);
   assert.ok(!('defect' in bankCase.reviewerInput));
 
-  const requests = readFileSync(join(cwd, 'requests'), 'utf8').trim().split('\n').map(JSON.parse);
+  const requests = readFileSync(join(fx.cwd, 'requests'), 'utf8')
+    .trim()
+    .split('\n')
+    .map(JSON.parse);
   assert.ok(requests.some((args) => args[1] === `${prefix}/pulls/100`));
   assert.ok(requests.some((args) => args[1] === `${prefix}/pulls/100/reviews?per_page=100&page=1`));
 });
 
 test('scoped Cairn fix subjects enter the loop; incidental revert wording does not', (t) => {
-  const { cwd, git, commit } = fixture(t);
-  commit('chore: seed', '2026-09-19T00:00:00Z', { 'a.txt': 'a\n' });
-  const introducingSha = commit('feat: ship (#50)', introduceAt, { 'a.txt': 'a\nbad\n' });
-  const fixingSha = commit('web(1832): fix crash (#1803)\n\nIntroduced by #50.\n', fixAt, {
+  const fx = fixture(t);
+  fx.commit('chore: seed', '2026-09-19T00:00:00Z', { 'a.txt': 'a\n' });
+  const introducingSha = fx.commit('feat: ship (#50)', introduceAt, { 'a.txt': 'a\nbad\n' });
+  const fixingSha = fx.commit('web(1832): fix crash (#1803)\n\nIntroduced by #50.\n', fixAt, {
     'a.txt': 'a\ngood\n',
   });
-  commit('docs: explain how to revert (#204)', fixAt, { 'docs.txt': 'revert guidance\n' });
-  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  fx.commit('docs: explain how to revert (#204)', fixAt, { 'docs.txt': 'revert guidance\n' });
+  fx.git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
 
-  const out = join(cwd, 'out');
-  const respondPath = join(cwd, 'respond.json');
+  const out = join(fx.cwd, 'out');
+  const respondPath = join(fx.cwd, 'respond.json');
   writeFileSync(
     respondPath,
     JSON.stringify({
@@ -229,7 +239,7 @@ test('scoped Cairn fix subjects enter the loop; incidental revert wording does n
       },
     }),
   );
-  installFakeGh(cwd, githubFor(50));
+  installFakeGh(fx.cwd, githubFor(50));
 
   const result = spawnSync(
     process.execPath,
@@ -242,19 +252,19 @@ test('scoped Cairn fix subjects enter the loop; incidental revert wording does n
       '--out',
       out,
       '--bank-out',
-      join(cwd, 'bank'),
+      join(fx.cwd, 'bank'),
       '--respond-file',
       respondPath,
       '--cwd',
-      cwd,
+      fx.cwd,
     ],
     {
       encoding: 'utf8',
       env: {
         ...process.env,
-        PATH: `${cwd}:${process.env.PATH}`,
-        RESPONSES: join(cwd, 'responses.json'),
-        REQUEST_LOG: join(cwd, 'requests'),
+        PATH: `${fx.cwd}:${process.env.PATH}`,
+        RESPONSES: join(fx.cwd, 'responses.json'),
+        REQUEST_LOG: join(fx.cwd, 'requests'),
       },
     },
   );
