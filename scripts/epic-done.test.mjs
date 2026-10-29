@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, isAbsolute, join } from 'node:path';
 import { test } from 'node:test';
 import { decideEpic, main, validateManifest } from './epic-done.mjs';
 
@@ -69,9 +71,10 @@ function harness() {
     write: (text) => state.output.push(text),
     run: (file, args, options) => {
       state.calls.push({ file, args, options });
-      const intercepted = state.intercept?.(file, args);
+      const intercepted = state.intercept?.(file, args, options);
       if (intercepted !== undefined) return intercepted;
       if (file === 'git') {
+        if (args.includes('worktree')) return '';
         if (args[0] === 'cat-file') return '';
         if (args[0] === 'show') return JSON.stringify(state.manifest);
         if (args[0] === 'status')
@@ -87,7 +90,7 @@ function harness() {
           return state.descendants[base].filter((sha) => sha !== base).join('\n');
         }
         if (args.includes('--show-toplevel')) return '/checkout\n';
-        if (args.includes('HEAD')) return `${state.head}\n`;
+        if (args.includes('HEAD')) return `${options.cwd === '/checkout' ? state.head : tip}\n`;
         if (args[0] === 'rev-parse' && args[2] === 'frozen-v1^{commit}') return `${closing}\n`;
       }
       if (file === 'gh') {
@@ -127,7 +130,177 @@ function expectState(result, state, exitCode, pattern) {
   if (pattern) assert.match(result.reasons.join('\n'), pattern);
 }
 
-test('complete: closed issues, a clean remote-main tree and one green commit', async () => {
+function realHarness(t) {
+  const fixture = harness();
+  const { state, deps } = fixture;
+  const root = mkdtempSync(join(tmpdir(), 'epic-done-repo-'));
+  const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  t.after(() => {
+    for (const { args } of state.calls.filter(({ args }) => args.includes('--detach'))) {
+      const path = args[args.indexOf('--detach') + 1];
+      spawnSync('git', ['worktree', 'remove', '--force', path], { cwd: root });
+      rmSync(dirname(path), { recursive: true, force: true });
+    }
+    rmSync(root, { recursive: true, force: true });
+  });
+  git(['init', '-q', '-b', 'main']);
+  state.manifest.checks = [{ name: 'tracked', run: ['test', '-f', 'tracked.txt'] }];
+  mkdirSync(join(root, '.claude/epics'), { recursive: true });
+  writeFileSync(join(root, '.claude/epics/E1.0a.json'), JSON.stringify(state.manifest));
+  writeFileSync(join(root, '.gitignore'), 'ignored-artifact.json\n');
+  writeFileSync(join(root, 'tracked.txt'), 'main');
+  git(['add', '.claude/epics/E1.0a.json', '.gitignore', 'tracked.txt']);
+  const commitArgs = [
+    '-c',
+    'core.hooksPath=/dev/null',
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.com',
+    '-c',
+    'commit.gpgsign=false',
+    'commit',
+    '-qm',
+    'Main fixture',
+  ];
+  git(commitArgs);
+  const mainSha = git(['rev-parse', 'HEAD']).trim();
+  state.remote = mainSha;
+  state.checks = { [mainSha]: [checkPage(mainSha)] };
+  for (const item of state.issues) item.timelineItems.nodes[0].closer.mergeCommit.oid = mainSha;
+  git(['switch', '-qc', 'feature']);
+  git([...commitArgs, '--allow-empty']);
+  const stub = deps.run;
+  deps.run = (file, args, options) => {
+    if (file === 'gh') return stub(file, args, options);
+    state.calls.push({ file, args, options });
+    const intercepted = state.intercept?.(file, args, options);
+    if (intercepted !== undefined) return intercepted;
+    if (file !== 'git' && state.command) return state.command(file, args, options);
+    return execFileSync(file, args, { ...options, cwd: options.cwd ?? root });
+  };
+  return { ...fixture, root, git, mainSha };
+}
+
+for (const artifact of ['required-artifact.json', 'ignored-artifact.json']) {
+  test(`caller-only ${artifact} cannot satisfy frozen checks`, async (t) => {
+    const { state, invoke, root, git } = realHarness(t);
+    git(['switch', '-q', 'main']);
+    writeFileSync(join(root, artifact), '{}');
+    state.manifest.checks = [{ name: 'artifact', run: ['test', '-f', artifact] }];
+    state.intercept = (file, args) => {
+      if (file === 'git' && args[0] === 'show') return JSON.stringify(state.manifest);
+    };
+    const result = await invoke();
+    expectState(result, 'incomplete', 10);
+    assert.equal(result.checks[0].status, 'failed');
+  });
+}
+
+test('tracked caller edits do not affect checks in the detached main tree', async (t) => {
+  const { state, invoke, root, mainSha } = realHarness(t);
+  writeFileSync(join(root, 'tracked.txt'), 'caller edit');
+  state.intercept = (file, args) => {
+    if (file === 'git' && args[0] === 'show')
+      return JSON.stringify({
+        ...state.manifest,
+        checks: [{ name: 'content', run: ['cat', 'tracked.txt'], expectStdoutIncludes: 'main' }],
+      });
+  };
+  const result = await invoke();
+  expectState(result, 'complete', 0);
+  assert.equal(result.facts.mainSha, mainSha);
+  assert.equal(result.checks[0].stdout, 'main');
+  assert.equal(readFileSync(join(root, 'tracked.txt'), 'utf8'), 'caller edit');
+});
+
+for (const outcome of [
+  'success',
+  'failure',
+  'timeout',
+  'midway error',
+  'wrong HEAD',
+  'add error',
+]) {
+  test(`temporary main worktree is removed after ${outcome}`, async (t) => {
+    const { state, invoke, git, mainSha, root } = realHarness(t);
+    const before = git(['worktree', 'list', '--porcelain']);
+    let commands = 0;
+    state.intercept = (file, args, options) => {
+      if (file === 'git' && args[0] === 'show')
+        return JSON.stringify({
+          ...state.manifest,
+          checks: [
+            { name: 'head', run: ['git', 'rev-parse', 'HEAD'], expectStdoutIncludes: mainSha },
+            { name: 'second', run: ['node', '--version'] },
+          ],
+        });
+      if (args.includes('--detach')) {
+        assert.deepEqual(args.slice(0, 5), [
+          '-c',
+          'core.hooksPath=/dev/null',
+          'worktree',
+          'add',
+          '--detach',
+        ]);
+        assert.ok(isAbsolute(args[5]));
+        assert.equal(args[6], mainSha);
+        if (outcome === 'add error') {
+          execFileSync(file, args, options);
+          throw new Error('worktree setup interrupted');
+        }
+      }
+      if (file === 'git' && args.join(' ') === 'rev-parse --verify HEAD' && options.cwd !== root) {
+        if (outcome === 'wrong HEAD') return `${outside}\n`;
+      }
+      if (options.timeout === 900_000) {
+        commands++;
+        assert.notEqual(options.cwd, root);
+        assert.equal(
+          execFileSync('git', ['rev-parse', 'HEAD'], {
+            cwd: options.cwd,
+            encoding: 'utf8',
+          }).trim(),
+          mainSha,
+        );
+        if (file === 'node') {
+          if (outcome === 'midway error') throw new Error('runner interrupted midway');
+          if (outcome === 'timeout')
+            throw Object.assign(new Error('check ETIMEDOUT'), { code: 'ETIMEDOUT' });
+          if (outcome === 'failure') throw Object.assign(new Error('check failed'), { status: 1 });
+        }
+      }
+    };
+    const result = await invoke();
+    const creation = state.calls.find(({ args }) => args.includes('--detach'));
+    assert.ok(creation, 'checker must create a detached worktree');
+    const path = creation.args[5];
+    assert.equal(git(['worktree', 'list', '--porcelain']), before);
+    assert.equal(existsSync(path), false);
+    assert.equal(existsSync(dirname(path)), false);
+    const setupFailed = outcome === 'wrong HEAD' || outcome === 'add error';
+    assert.equal(commands, setupFailed ? 0 : 2);
+    const unknown = setupFailed || outcome === 'midway error';
+    expectState(
+      result,
+      unknown ? 'unknown' : outcome === 'success' ? 'complete' : 'incomplete',
+      unknown ? 2 : outcome === 'success' ? 0 : 10,
+    );
+    if (!unknown) {
+      assert.deepEqual(
+        result.checks.map(({ name }) => name),
+        ['head', 'second'],
+      );
+      assert.equal(result.checks[0].stdout.trim(), mainSha);
+    }
+    const calls = state.calls;
+    const verifyIndex = calls.findIndex(({ args }) => args.join(' ') === 'rev-parse --verify HEAD');
+    const firstCheckIndex = calls.findIndex(({ options }) => options.timeout === 900_000);
+    if (!setupFailed) assert.ok(verifyIndex >= 0 && verifyIndex < firstCheckIndex);
+  });
+}
+
+test('complete: closed issues, isolated remote-main checks and one green commit', async () => {
   const { state, invoke } = harness();
   const result = await invoke();
   expectState(result, 'complete', 0, /No time cap/);
@@ -150,7 +323,8 @@ test('complete: closed issues, a clean remote-main tree and one green commit', a
   assert.ok(state.calls.some(({ args }) => args.includes(`${tip}:.claude/epics/E1.0a.json`)));
   const execution = state.calls.find(({ file }) => file === 'node');
   assert.deepEqual(execution.args, ['--test', 'policy.test.mjs']);
-  assert.equal(execution.options.cwd, '/checkout');
+  assert.notEqual(execution.options.cwd, '/checkout');
+  assert.ok(isAbsolute(execution.options.cwd));
   assert.equal(execution.options.shell, false);
 });
 
@@ -294,40 +468,19 @@ test('missing, pending, skipped and neutral required checks do not count as succ
   expectState(await invoke(), 'incomplete', 10);
 });
 
-test('failure mode 6: dirty and non-main trees never execute manifest commands', async () => {
-  for (const change of [
-    (s) => {
-      s.dirty = ' M tracked-file\n';
-    },
-    (s) => {
-      s.head = outside;
-    },
-  ]) {
-    const { state, invoke } = harness();
-    change(state);
-    const result = await invoke();
-    expectState(result, 'incomplete', 10, /not run/i);
-    assert.equal(result.checks[0].status, 'not-run');
-    assert.ok(!state.calls.some(({ file }) => file === 'node'));
-  }
-});
-
-test('working-tree changes during checks invalidate their result', async () => {
-  for (const change of [
-    (s) => {
-      s.dirty = ' M file\n';
-    },
-    (s) => {
-      s.head = outside;
-    },
-  ]) {
-    const { state, invoke } = harness();
-    state.command = () => {
-      change(state);
-      return 'pass';
-    };
-    expectState(await invoke(), 'incomplete', 10, /not run/i);
-  }
+test('caller edits and feature HEAD do not prevent checks at remote main', async () => {
+  const { state, invoke } = harness();
+  state.dirty = ' M tracked-file\n';
+  state.head = outside;
+  state.command = () => {
+    state.head = older;
+    return 'pass';
+  };
+  const result = await invoke();
+  expectState(result, 'complete', 0);
+  assert.equal(result.checks[0].status, 'passed');
+  assert.ok(!Object.hasOwn(result.facts, 'worktree'));
+  assert.ok(!state.calls.some(({ args }) => args[0] === 'status'));
 });
 
 test('failure mode 7: frozen manifest comes only from git show at the selected ref', async () => {
@@ -418,7 +571,7 @@ test('missing or malformed manifests and git runner failures are unknown', async
   }
   const { state, invoke } = harness();
   state.intercept = (file, args) => {
-    if (file === 'git' && args[0] === 'status') throw new Error('git failed');
+    if (file === 'git' && args[0] === 'rev-list') throw new Error('git failed');
   };
   expectState(await invoke(), 'unknown', 2, /git failed/);
 });
@@ -651,7 +804,7 @@ test('at most 30 eligible commits are examined, including a green thirtieth comm
       ]),
     );
     const result = await invoke();
-    expectState(result, greenIndex === 29 ? 'complete' : 'incomplete', greenIndex === 29 ? 0 : 10);
+    expectState(result, greenIndex === 29 ? 'complete' : 'unknown', greenIndex === 29 ? 0 : 2);
     const calls = state.calls.filter(({ args }) => args.some((arg) => arg.includes('/check-runs')));
     assert.equal(calls.length, 30);
     assert.deepEqual(
@@ -660,6 +813,37 @@ test('at most 30 eligible commits are examined, including a green thirtieth comm
     );
   }
 });
+
+for (const [count, greenIndex, expected] of [
+  [31, 30, 'unknown'],
+  [30, -1, 'incomplete'],
+  [40, 0, 'complete'],
+]) {
+  test(`${count} eligible commits with green index ${greenIndex} yield ${expected}`, async () => {
+    const { state, invoke } = harness();
+    const middle = Array.from({ length: count - 2 }, (_, index) =>
+      (index + 1).toString(16).padStart(40, '0'),
+    );
+    const eligible = [tip, ...middle, closing];
+    state.history = [...eligible, older];
+    state.mainline = [...state.history];
+    state.descendants[closing] = eligible;
+    state.checks = Object.fromEntries(
+      eligible.map((sha, index) => [
+        sha,
+        [checkPage(sha, index === greenIndex ? 'success' : 'failure')],
+      ]),
+    );
+    const result = await invoke();
+    expectState(result, expected, expected === 'unknown' ? 2 : expected === 'complete' ? 0 : 10);
+    const calls = state.calls.filter(({ args }) => args.some((arg) => arg.includes('/check-runs')));
+    assert.equal(calls.length, expected === 'complete' ? 1 : 30);
+    if (expected === 'unknown') {
+      assert.match(result.reasons.join('\n'), /1 eligible commit.*not examined/);
+      assert.match(result.reasons.join('\n'), new RegExp(closing));
+    }
+  });
+}
 
 test('no green commit reports missing and unsuccessful required checks on the newest commit', async () => {
   const { state, invoke } = harness();
@@ -773,11 +957,7 @@ test('untracked files before and during checks preserve every check result', asy
     result.checks.map(({ status }) => status),
     ['passed', 'passed'],
   );
-  assert.ok(
-    state.calls
-      .filter(({ args }) => args[0] === 'status')
-      .every(({ args }) => args.includes('--untracked-files=no')),
-  );
+  assert.ok(!state.calls.some(({ args }) => args[0] === 'status'));
 });
 
 test('default manifest is pinned to the GitHub main SHA before it is read', async () => {

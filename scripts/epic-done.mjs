@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 const exitCodes = { unknown: 2, complete: 0, paused: 20, failed: 30, incomplete: 10 };
@@ -97,13 +99,14 @@ function issueBlocker({ number, state, stateReason, closingSha }, history) {
 }
 function completionWindow({ issues, history, mainline, descendants }, historySet) {
   if (issues.some((issue) => issueBlocker(issue, historySet)))
-    return { lastClosingSha: null, eligible: [] };
+    return { lastClosingSha: null, eligible: [], unexamined: 0 };
   const closingShas = new Set(issues.map((issue) => issue.closingSha));
   const sets = [...closingShas].map((sha) => new Set(descendants[sha]));
   const lastClosingSha = history.find((sha) => closingShas.has(sha));
-  const eligible = mainline.filter((sha) => sets.every((set) => set.has(sha))).slice(0, 30);
+  const eligible = mainline.filter((sha) => sets.every((set) => set.has(sha)));
   requireFact(eligible[0] === history[0], 'Missing main ancestry after closure');
-  return { lastClosingSha, eligible };
+  const unexamined = Math.max(0, eligible.length - 30);
+  return { lastClosingSha, eligible: eligible.slice(0, 30), unexamined };
 }
 function requiredCheckFailures({ sha, runs }, requiredChecks) {
   return requiredChecks.flatMap((name) => {
@@ -116,8 +119,7 @@ function requiredCheckFailures({ sha, runs }, requiredChecks) {
 }
 export function decideEpic(facts) {
   try {
-    const { manifest, issues, mainSha, commits, checks, worktree } = facts;
-    const { now, startedAt, pause, fail } = facts;
+    const { manifest, issues, commits, checks, now, startedAt, pause, fail } = facts;
     validateManifest(manifest, manifest?.epic);
     requireFact(
       issues.length === manifest.issues.length &&
@@ -140,7 +142,7 @@ export function decideEpic(facts) {
             if (humanLabels.has(label))
               waiting.push(`PR #${pull.number} for #${issue.number} carries ${label}.`);
     }
-    const { lastClosingSha, eligible } = completionWindow(facts, historySet);
+    const { lastClosingSha, eligible, unexamined } = completionWindow(facts, historySet);
     const greenSha =
       commits.find((commit) => requiredCheckFailures(commit, manifest.requiredChecks).length === 0)
         ?.sha ?? null;
@@ -150,6 +152,10 @@ export function decideEpic(facts) {
         (greenSha || commits.length === eligible.length),
       'Missing or reordered examined main commits',
     );
+    requireFact(
+      greenSha || unexamined === 0,
+      `${unexamined} eligible commit(s) not examined since last closing SHA ${lastClosingSha}; no examined commit is green.`,
+    );
     if (lastClosingSha && !greenSha) {
       reasons.push(`No green main commit examined since ${lastClosingSha}.`);
       reasons.push(...requiredCheckFailures(commits[0], manifest.requiredChecks));
@@ -157,13 +163,10 @@ export function decideEpic(facts) {
     for (const check of checks)
       if (check.status !== 'passed')
         reasons.push(`Check "${check.name}" ${check.status.replace('-', ' ')}: ${check.reason}`);
-    const clean = worktree.dirty === false && worktree.head === mainSha;
-    if (!clean)
-      reasons.push(`Working tree is dirty or not at inspected main ${mainSha}; checks not run.`);
     const elapsed =
       startedAt && Date.parse(now) - Date.parse(startedAt) >= manifest.maxHours * 3600000;
     let state = 'incomplete';
-    if (lastClosingSha && greenSha && clean && checks.every((check) => check.status === 'passed')) {
+    if (lastClosingSha && greenSha && checks.every((check) => check.status === 'passed')) {
       state = 'complete';
       reasons.push(`Every issue is completed on main; required checks passed at ${greenSha}.`);
     } else if (waiting.length || pause) {
@@ -339,50 +342,47 @@ export async function main(argv, deps = {}) {
       commits.push(commit);
       if (requiredCheckFailures(commit, manifest.requiredChecks).length === 0) break;
     }
-    const snapshot = () => {
-      const head = git(['rev-parse', '--verify', 'HEAD']).trim();
-      requireFact(shaPattern.test(head), 'Malformed working tree HEAD');
-      return { head, dirty: git(['status', '--porcelain=v1', '--untracked-files=no']).length > 0 };
-    };
-    let worktree = snapshot();
-    const checks = manifest.checks.map((check) => {
-      const result = {
-        name: check.name,
-        status: 'not-run',
-        reason: 'Requires a clean working tree at remote main.',
-      };
-      if (worktree.dirty || worktree.head !== mainSha) return result;
+    const temporary = mkdtempSync(join(tmpdir(), 'epic-done-'));
+    const worktreePath = join(temporary, 'main');
+    let checks;
+    try {
+      git(['-c', 'core.hooksPath=/dev/null', 'worktree', 'add', '--detach', worktreePath, mainSha]);
+      const head = execute('git', ['rev-parse', '--verify', 'HEAD'], { cwd: worktreePath }).trim();
+      requireFact(head === mainSha, `Temporary worktree HEAD does not match main ${mainSha}`);
+      const checkOptions = { cwd: worktreePath, timeout: 900_000 };
+      checks = manifest.checks.map((check) => {
+        const result = { name: check.name };
+        try {
+          result.stdout = execute(check.run[0], check.run.slice(1), checkOptions);
+          const passed = result.stdout.includes(check.expectStdoutIncludes ?? '');
+          result.status = passed ? 'passed' : 'failed';
+          result.reason = passed ? null : 'Expected stdout substring is missing.';
+        } catch (error) {
+          const timedOut = error?.code === 'ETIMEDOUT';
+          if (
+            !timedOut &&
+            error?.code !== 'ENOENT' &&
+            !(Number.isInteger(error?.status) && error.status !== 0)
+          )
+            throw error;
+          result.status = 'failed';
+          result.reason = `${timedOut ? 'Command timed out after 900 seconds. ' : ''}${errorMessage(error)}`;
+        }
+        return result;
+      });
+    } finally {
       try {
-        result.stdout = execute(check.run[0], check.run.slice(1), { timeout: 900_000 });
-        const passed = result.stdout.includes(check.expectStdoutIncludes ?? '');
-        result.status = passed ? 'passed' : 'failed';
-        result.reason = passed ? null : 'Expected stdout substring is missing.';
-      } catch (error) {
-        const timedOut = error?.code === 'ETIMEDOUT';
-        if (
-          !timedOut &&
-          error?.code !== 'ENOENT' &&
-          !(Number.isInteger(error?.status) && error.status !== 0)
-        )
-          throw error;
-        result.status = 'failed';
-        result.reason = `${timedOut ? 'Command timed out after 900 seconds. ' : ''}${errorMessage(error)}`;
+        git(['worktree', 'remove', '--force', worktreePath]);
+      } finally {
+        rmSync(temporary, { recursive: true, force: true });
       }
-      worktree = snapshot();
-      return result;
-    });
-    if (worktree.dirty || worktree.head !== mainSha)
-      for (const check of checks) {
-        check.status = 'not-run';
-        check.reason = 'Results invalidated: local tree is dirty or HEAD moved.';
-      }
+    }
     const facts = {
       manifest,
       mainSha,
       ...ancestry,
       commits,
       checks,
-      worktree,
       now: clock().toISOString(),
       startedAt: startedAt ?? null,
       pause: values.pause ?? null,

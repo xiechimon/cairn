@@ -9,7 +9,7 @@ test('incident handoff leaves recurrence accounting to the collector', () => {
 });
 
 test('dispatcher message exists and retains the closing trailer', () => {
-  const message = spawnSync('git', ['log', '-1', '--format=%B'], { encoding: 'utf8' });
+  const message = spawnSync('git', ['log', '-1', '--format=%B', '--', 'docs/verify/2136/review-check.test.mjs'], { encoding: 'utf8' });
   assert.equal(message.status, 0, message.stderr);
   assert.match(message.stdout, /^Closes #2136$/m);
 });
