@@ -23,22 +23,22 @@ function which(tool) {
   return found.status === 0 ? found.stdout.trim() : '';
 }
 
-function receiverTools() {
-  const rsync = which('rsync');
-  const version = rsync ? spawnSync(rsync, ['--version'], { encoding: 'utf8' }).stdout : '';
-  assert.match(
-    version,
-    /^rsync\s+version 3\./,
-    `GNU rsync 3.x must come first on PATH (found ${rsync || 'none'}: ${version.split('\n')[0]})`,
-  );
-  const rrsync = process.env.RRSYNC || which('rrsync');
-  assert.ok(rrsync && existsSync(rrsync), 'rrsync not found: put it on PATH or set RRSYNC');
-  const source = readFileSync(rrsync, 'utf8');
-  assert.match(source, /-no-overwrite/, `${rrsync} has no -no-overwrite (needs rsync 3.4+)`);
-  return { rsync, rrsyncSource: source.replace(/^RSYNC = .*$/m, `RSYNC = '${rsync}'`) };
-}
-
-const tools = receiverTools();
+const rsync = which('rsync');
+const rsyncVersion = rsync ? spawnSync(rsync, ['--version'], { encoding: 'utf8' }).stdout : '';
+assert.match(
+  rsyncVersion,
+  /^rsync\s+version 3\./,
+  `GNU rsync 3.x must come first on PATH (found ${rsync || 'none'}: ${rsyncVersion.split('\n')[0]})`,
+);
+const rrsyncPath = process.env.RRSYNC || which('rrsync');
+assert.ok(rrsyncPath && existsSync(rrsyncPath), 'rrsync not found: put it on PATH or set RRSYNC');
+const rrsyncSource = readFileSync(rrsyncPath, 'utf8');
+assert.match(
+  rrsyncSource,
+  /-no-overwrite/,
+  `${rrsyncPath} has no -no-overwrite (needs rsync 3.4+)`,
+);
+const receiverSource = rrsyncSource.replace(/^RSYNC = .*$/m, `RSYNC = '${rsync}'`);
 
 function sha(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -79,7 +79,7 @@ function fixture() {
   write(join(attachments, 'team1', 'secretbox.key'), 'planted key');
   write(join(attachments, 'team2', 'cert.pem'), 'planted pem');
   const rrsync = join(root, 'rrsync');
-  writeFileSync(rrsync, tools.rrsyncSource);
+  writeFileSync(rrsync, receiverSource);
   const ssh = join(root, 'fake-ssh');
   writeFileSync(
     ssh,
@@ -91,11 +91,6 @@ function fixture() {
     ].join('\n'),
   );
   chmodSync(ssh, 0o755);
-  const run = (args, { receiverDir = receiver } = {}) =>
-    spawnSync('bash', [SCRIPT, ...args], {
-      encoding: 'utf8',
-      env: { ...process.env, RSYNC_RSH: ssh, FAKE_RECEIVER: receiverDir },
-    });
   const full = [
     '--db',
     db,
@@ -110,7 +105,20 @@ function fixture() {
     '--keep',
     '48',
   ];
-  return { root, server, db, attachments, backups, receiver, run, full };
+  return {
+    root,
+    server,
+    db,
+    attachments,
+    backups,
+    receiver,
+    full,
+    run: (args, { receiverDir = receiver } = {}) =>
+      spawnSync('bash', [SCRIPT, ...args], {
+        encoding: 'utf8',
+        env: { ...process.env, RSYNC_RSH: ssh, FAKE_RECEIVER: receiverDir },
+      }),
+  };
 }
 
 function dbCopies(dir) {
