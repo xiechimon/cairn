@@ -1,0 +1,42 @@
+✔ CLI fetches original PR reviews through every page and retains evidence (114.09648ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (287.448914ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (155.389476ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (438.101066ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (115.697806ms)
+✔ the CLI suite runs in local and CI prepush plans (0.40385ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (336.033202ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (168.065091ms)
+✖ a recorded BLOCK gate records AI review activity without claiming approval (88.843899ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1751.032577
+
+✖ failing tests:
+
+test at scripts/review-escapes.test.mjs:334:1
+✖ a recorded BLOCK gate records AI review activity without claiming approval (88.843899ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unknown'
+  - 'ai-only'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:339:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unknown',
+    expected: 'ai-only',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,19 @@
+✔ CLI fetches original PR reviews through every page and retains evidence (118.973455ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (281.868344ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (154.731444ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (439.089692ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (106.96585ms)
+✔ the CLI suite runs in local and CI prepush plans (0.432592ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (325.133943ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (171.818781ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (93.315784ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (96.931816ms)
+✔ malformed review and gate pages disclose unavailable data without crashing the CLI (175.346239ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2009.083421
