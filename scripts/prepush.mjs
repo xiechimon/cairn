@@ -34,6 +34,7 @@ export const selfTests = [
   'scripts/lessons-ledger-gate.test.mjs',
   'scripts/recording-gate.test.mjs',
   'scripts/lessons-weekly.test.mjs',
+  'scripts/epic-done.test.mjs',
 ];
 
 export const localOnly = [
@@ -91,10 +92,15 @@ export function prepushPlan(paths, mode = 'local') {
     : [
         ...required,
         ...localOnly,
-        ...(paths.some((path) =>
-          /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|recording-gate|scrub-git-env|doc-reader-tests)/.test(
-            path,
-          ),
+        ...(paths.some(
+          (path) =>
+            path === '.github/workflows/ci.yml' ||
+            selfTests.some(
+              (selfTest) => path === selfTest || path === selfTest.replace(/\.test\.mjs$/, '.mjs'),
+            ) ||
+            /^scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|recording-gate|scrub-git-env|doc-reader-tests)/.test(
+              path,
+            ),
         )
           ? [['node', '--test', ...selfTests]]
           : []),
