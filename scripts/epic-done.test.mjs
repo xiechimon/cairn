@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import { test } from 'node:test';
 import { decideEpic, main, validateManifest } from './epic-done.mjs';
+import { selfTests } from './prepush.mjs';
 
 const tip = 'a'.repeat(40);
 const closing = 'b'.repeat(40);
@@ -735,11 +736,7 @@ test('import has no CLI effects and the actual CLI guard emits unknown without n
 });
 
 test('CI includes this test and ownership covers the checker and frozen manifests', () => {
-  const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
-  assert.match(
-    workflow,
-    /node --test scripts\/prepush\.test\.mjs scripts\/heavy-slots\.test\.mjs[^\n]*scripts\/epic-done\.test\.mjs/,
-  );
+  assert.ok(selfTests.includes('scripts/epic-done.test.mjs'));
   const owners = readFileSync(new URL('../.github/CODEOWNERS', import.meta.url), 'utf8');
   assert.match(owners, /^\/scripts\/epic-done\.mjs @xiechimon$/m);
   assert.match(owners, /^\/\.claude\/epics\/\*\* @xiechimon$/m);

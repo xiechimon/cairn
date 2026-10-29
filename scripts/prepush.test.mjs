@@ -63,9 +63,63 @@ test('changes to prepush scripts run the CI self-test files locally', () => {
   assert.ok(
     !prepushPlan(['apps/web/src/main.tsx']).some((args) => args.join(' ') === selfTest.join(' ')),
   );
-  assert.ok(
-    readFileSync('.github/workflows/ci.yml', 'utf8').includes(`run: ${selfTest.join(' ')}\n`),
-  );
+});
+
+test('the CI self-test step runs selfTests through prepush and names no self-test file itself', () => {
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const checkJob = workflow
+    .split(/\n(?= {2}[a-z][\w-]*:)/)
+    .find((job) => job.startsWith('  check:'));
+  const step = /^ {6}- name: Prepush self-test\n((?: {8}.*\n)*)/m.exec(checkJob ?? '');
+  assert.equal(step?.[1], '        run: pnpm prepush --self-test\n');
+  for (const file of selfTests)
+    assert.ok(
+      !workflow.includes(file),
+      `${file} is named in .github/workflows/ci.yml; list self-test files only in selfTests in scripts/prepush.mjs`,
+    );
+});
+
+test('--self-test runs exactly the selfTests files, skips change detection and fails with them', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-self-test-'));
+  const env = { ...process.env, CAIRN_HEAVY_SLOTS_DIR: join(directory, 'heavy-slots') };
+  delete env.NODE_TEST_CONTEXT;
+  const run = () =>
+    spawnSync(process.execPath, ['scripts/prepush.mjs', '--self-test'], {
+      cwd: directory,
+      encoding: 'utf8',
+      env,
+    });
+  try {
+    mkdirSync(join(directory, 'scripts'));
+    for (const file of prepushModules) copyFileSync(file, join(directory, file));
+    for (const file of selfTests)
+      writeFileSync(
+        join(directory, file),
+        `import test from 'node:test';\ntest('ran ${file}', () => {});\n`,
+      );
+    const passing = run();
+    assert.equal(passing.status, 0, passing.stdout + passing.stderr);
+    assert.ok(
+      passing.stdout.includes(`[prepush] node --test ${selfTests.join(' ')}\n`),
+      passing.stdout,
+    );
+    for (const file of selfTests) assert.ok(passing.stdout.includes(`ran ${file}`), file);
+    assert.match(passing.stdout, /\[prepush\] PASS \(1 checks\)/);
+    writeFileSync(
+      join(directory, selfTests.at(-1)),
+      `import test from 'node:test';\ntest('red', () => { throw new Error('red'); });\n`,
+    );
+    const failing = run();
+    assert.notEqual(failing.status, 0, failing.stdout);
+    assert.doesNotMatch(failing.stdout, /PASS/);
+    const extra = spawnSync(process.execPath, ['scripts/prepush.mjs', '--self-test', 'x'], {
+      cwd: directory,
+      encoding: 'utf8',
+    });
+    assert.equal(extra.status, 2);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('escape-trace tests stay mandatory for every code prepush plan', () => {
@@ -100,9 +154,6 @@ test('the recording gate runs in local prepush, in CI prepush and in the CI self
     /scripts\/(prepush|heavy-slots|english-only-gate|lessons-ledger-gate|recording-gate|scrub-git-env|doc-reader-tests)/.test(
       'scripts/recording-gate.mjs',
     ),
-  );
-  assert.ok(
-    readFileSync('.github/workflows/ci.yml', 'utf8').includes('scripts/recording-gate.test.mjs'),
   );
 });
 
