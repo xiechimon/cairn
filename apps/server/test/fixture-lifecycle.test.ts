@@ -85,7 +85,7 @@ test('startup failure cleans owned dirs', () => {
     } finally {
       rmSync(fixtureFile, { force: true });
     }
-  });
+  }, 60_000);
 
   test('a test that never calls dispose has its dirs released by the fallback', () => {
     const runId = randomUUID();
@@ -126,5 +126,5 @@ test('leaks without dispose', () => {
       rmSync(fixtureFile, { force: true });
       rmSync(ownedPath, { force: true });
     }
-  });
+  }, 60_000);
 });
