@@ -5,9 +5,15 @@ import {
   RECORDING_EXTENSION,
   RECORDING_MAX_BYTES,
 } from '@cairn/shared/merge-gate';
+import type { HarnessEvalAttempt } from '../harness-eval-coordinator.js';
 import { compareFilesFromResponse } from './digest.js';
 import { qualifyingEvidenceLinks } from './evidence-link.js';
 import type { GateGithubPort, GateRaw, GateRawFailure } from './github-port.js';
+import { harnessNeedFromInputs } from './harness-eval-judge.js';
+import {
+  type HarnessEvalCoordinatorPort,
+  prepareHarnessEvalRouting,
+} from './harness-eval-route.js';
 import { touchesHarness } from './paths.js';
 import {
   type GateCheckRun,
@@ -30,6 +36,10 @@ export interface GateReadRequest {
   prNumber: number;
   ticketRef: string;
   now: number;
+  harnessEval?: {
+    coordinator: HarnessEvalCoordinatorPort;
+    dispatchAuthorized: boolean;
+  };
 }
 
 export interface GateReadCache {
@@ -52,6 +62,7 @@ export interface GateGithubFacts {
   compare: GateInputs['compare'];
   evidence: GateEvidencePresence[];
   harnessEvalText: string | null;
+  harnessEval: { attempt: HarnessEvalAttempt | null; now: number } | null;
   baseBehindBy: number | null;
   ownStatus: { state: string; description: string | null } | null | 'unreadable';
   rateLimited: { retryAt: number | null } | null;
@@ -490,6 +501,7 @@ export async function readGateGithubFacts(
     compare: 'unreadable',
     evidence: [],
     harnessEvalText: null,
+    harnessEval: null,
     baseBehindBy: null,
     ownStatus: 'unreadable',
     rateLimited: null,
@@ -605,6 +617,25 @@ export async function readGateGithubFacts(
           facts.harnessEvalText = null;
         }
       }
+    }
+  }
+  if (req.harnessEval !== undefined && typeof facts.compare !== 'string') {
+    const { need, patchDigest } = harnessNeedFromInputs({
+      compare: facts.compare,
+      harnessEvalText: facts.harnessEvalText,
+    });
+    if (patchDigest !== null) {
+      const routed = await prepareHarnessEvalRouting({
+        coordinator: req.harnessEval.coordinator,
+        repo: `${req.owner}/${req.repo}`,
+        pr: req.prNumber,
+        patchDigest,
+        need,
+        dispatchAuthorized: req.harnessEval.dispatchAuthorized,
+        ticket: req.ticketRef,
+        expectedHead: head,
+      });
+      facts.harnessEval = { attempt: routed.attempt, now: req.now };
     }
   }
   return done();

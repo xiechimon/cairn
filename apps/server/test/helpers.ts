@@ -15,6 +15,7 @@ import { sha256Hex } from '../src/lib/crypto.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
+import { productionHarnessEvalConfig } from '../src/services/harness-eval-production.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { VapidKeys } from '../src/services/push.js';
 
@@ -131,7 +132,16 @@ export function bootServer(
     attachmentsDir,
     skillsDir,
     oauthStates,
-    svc: { db, hub, machineHub, convHub, user, skillsDir, vapidKeys },
+    svc: {
+      db,
+      hub,
+      machineHub,
+      convHub,
+      user,
+      skillsDir,
+      vapidKeys,
+      harnessEval: productionHarnessEvalConfig(),
+    },
     dispose(): void {
       if (ownReposDir) rmSync(reposDir, { recursive: true, force: true });
       if (ownAttDir) rmSync(attachmentsDir, { recursive: true, force: true });

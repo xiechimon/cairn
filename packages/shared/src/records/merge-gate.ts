@@ -278,6 +278,11 @@ export const MERGE_BLOCKERS = [
     label: '回归评测结果绑定的补丁摘要不是当前补丁',
   },
   {
+    code: 'harness-regression-evaluating',
+    class: 'transient',
+    label: 'Harness regression evaluation is in progress for the current patch',
+  },
+  {
     code: 'harness-regression-below-threshold',
     class: 'human',
     label: '回归评测 decision_ok 低于基线置信区间下限',

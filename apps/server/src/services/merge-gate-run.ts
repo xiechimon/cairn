@@ -29,6 +29,11 @@ import type { BuildDeps } from './builds.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { teamGithubToken } from './github-connection.js';
+import { createHarnessEvalCoordinator } from './harness-eval-coordinator.js';
+import {
+  DEFAULT_HARNESS_EVAL_ATTEMPT_TIMEOUT_MS,
+  productionHarnessEvalConfig,
+} from './harness-eval-production.js';
 import { computePatchDigest } from './merge-gate/digest.js';
 import { planGateStatusWrite, writeGateStatus } from './merge-gate/gate-status.js';
 import {
@@ -112,6 +117,7 @@ export async function evaluateMergeGate(
     cache = newGateReadCache();
     readCaches.set(todoRow.teamId, cache);
   }
+  const harness = deps.harnessEval ?? productionHarnessEvalConfig();
   const facts = await readGateGithubFacts(
     port,
     {
@@ -120,6 +126,15 @@ export async function evaluateMergeGate(
       prNumber: buildRow.prNumber,
       ticketRef,
       now: opts.now ?? nowMs(),
+      harnessEval: {
+        coordinator: createHarnessEvalCoordinator({
+          db: deps.db,
+          dispatch: harness.dispatch,
+          now: harness.now ?? nowMs,
+          attemptTimeoutMs: harness.attemptTimeoutMs ?? DEFAULT_HARNESS_EVAL_ATTEMPT_TIMEOUT_MS,
+        }),
+        dispatchAuthorized: harness.dispatchAuthorized !== false,
+      },
     },
     cache,
   );
@@ -260,6 +275,7 @@ export async function evaluateMergeGate(
       decider: chiefRow?.agentId != null,
     },
     harnessEvalText: facts.harnessEvalText,
+    ...(facts.harnessEval !== null ? { harnessEval: facts.harnessEval } : {}),
   });
   const evaluatedAt = opts.now ?? nowMs();
   if (digest?.patchDigest != null && head !== null) {

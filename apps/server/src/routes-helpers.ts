@@ -16,6 +16,7 @@ import { agent, type agentMemory, apiKey, project, type tag } from './db/schema.
 import { sha256Hex } from './lib/crypto.js';
 import { notFound } from './lib/errors.js';
 import type { GithubIssueFaceDeps } from './services/github-issues.js';
+import { productionHarnessEvalConfig } from './services/harness-eval-production.js';
 
 export const SESSION_COOKIE = BRAND.sessionCookieName;
 
@@ -157,6 +158,7 @@ export function svcOf(ctx: AppContext) {
     attachmentsDir: ctx.attachmentsDir,
     box: ctx.secretBox,
     oauthClient: ctx.oauthClient,
+    harnessEval: productionHarnessEvalConfig(),
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
   };
 }
