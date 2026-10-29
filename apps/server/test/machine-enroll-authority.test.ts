@@ -5,9 +5,10 @@ import { describe, expect, test } from 'vitest';
 import { machine as machineTable } from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
 import { seedLocalMachine } from '../src/services/machines.js';
-import { bootServer, issueApiKey } from './helpers.js';
+import { bootServer, issueApiKey, type TestServer } from './helpers.js';
 
 const HOST = hostname();
+const OWNER_TOKEN = 'cairn-owner-enroll-2054';
 
 function call(
   app: Hono,
@@ -25,6 +26,23 @@ function call(
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     }),
   );
+}
+
+async function ownerClaimLocal(s: TestServer): Promise<{ machineId: string; token: string }> {
+  const start = await call(s.app, 'POST', '/api/machine/enroll/start', {
+    body: { name: HOST, teamId: s.team.id },
+  });
+  expect(start.status).toBe(200);
+  const { enrollId } = (await start.json()) as { enrollId: string };
+  const confirmed = await call(s.app, 'POST', '/api/machine/enroll/confirm', {
+    cred: OWNER_TOKEN,
+    body: { enrollId },
+  });
+  expect(confirmed.status).toBe(200);
+  const { machine } = (await confirmed.json()) as {
+    machine: { machineId: string; token: string };
+  };
+  return machine;
 }
 
 describe('machine enrollment authority (#2054)', () => {
@@ -57,18 +75,53 @@ describe('machine enrollment authority (#2054)', () => {
     }
   });
 
-  test('machineAccess bootstrap key enrolls and can claim the seeded local row', async () => {
+  test('remote machineAccess key cannot claim the unclaimed local row by hostname', async () => {
     const s = bootServer();
     try {
       seedLocalMachine(s.db, s.team.id);
-      const key = await issueApiKey(s);
+      const before = s.db
+        .select()
+        .from(machineTable)
+        .where(eq(machineTable.teamId, s.team.id))
+        .all()
+        .find((row) => row.kind === 'local');
+      expect(before?.tokenHash).toBeNull();
+      expect(before?.apiKeyId).toBeNull();
+      const seededId = before?.id;
+
+      const key = createApiKey(s, {
+        teamId: s.team.id,
+        name: 'remote-enroll',
+        gitAccess: false,
+        mcpAccess: false,
+        machineAccess: true,
+        toolGrants: { read: [], write: [] },
+      });
       const response = await call(s.app, 'POST', '/api/machine/enroll', {
-        cred: key,
+        cred: key.plaintext,
         body: { teamId: s.team.id, name: HOST, cliVersion: '0.1.0' },
       });
-      expect(response.status).toBe(200);
-      const body = (await response.json()) as { token: string; machineId: string };
-      const me = await call(s.app, 'GET', '/api/machine/me', { cred: body.token });
+      expect(response.status).toBe(403);
+
+      const after = s.db
+        .select()
+        .from(machineTable)
+        .where(eq(machineTable.id, seededId ?? ''))
+        .get();
+      expect(after?.tokenHash).toBeNull();
+      expect(after?.apiKeyId).toBeNull();
+      expect(after?.kind).toBe('local');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('owner-approved confirm claims the seeded local row; API-key hostname enroll still cannot', async () => {
+    const s = bootServer({ authToken: OWNER_TOKEN });
+    try {
+      seedLocalMachine(s.db, s.team.id);
+      const claimed = await ownerClaimLocal(s);
+      const me = await call(s.app, 'GET', '/api/machine/me', { cred: claimed.token });
       expect(me.status).toBe(200);
       expect(((await me.json()) as { kind: string }).kind).toBe('local');
       const locals = s.db
@@ -78,28 +131,45 @@ describe('machine enrollment authority (#2054)', () => {
         .all()
         .filter((row) => row.kind === 'local');
       expect(locals).toHaveLength(1);
-      expect(locals[0]?.id).toBe(body.machineId);
+      expect(locals[0]?.id).toBe(claimed.machineId);
       expect(locals[0]?.tokenHash).not.toBeNull();
+
+      const key = createApiKey(s, {
+        teamId: s.team.id,
+        name: 'post-claim-enroll',
+        gitAccess: false,
+        mcpAccess: false,
+        machineAccess: true,
+        toolGrants: { read: [], write: [] },
+      });
+      const takeover = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: HOST, cliVersion: '0.1.0' },
+      });
+      expect(takeover.status).toBe(403);
+      const after = s.db
+        .select()
+        .from(machineTable)
+        .where(eq(machineTable.id, claimed.machineId))
+        .get();
+      expect(after?.tokenHash).not.toBeNull();
+      expect((await call(s.app, 'GET', '/api/machine/me', { cred: claimed.token })).status).toBe(
+        200,
+      );
     } finally {
       s.dispose();
     }
   });
 
   test('another machineAccess key cannot rotate a claimed local token by matching hostname', async () => {
-    const s = bootServer();
+    const s = bootServer({ authToken: OWNER_TOKEN });
     try {
       seedLocalMachine(s.db, s.team.id);
-      const firstKey = await issueApiKey(s);
-      const first = await call(s.app, 'POST', '/api/machine/enroll', {
-        cred: firstKey,
-        body: { teamId: s.team.id, name: HOST, cliVersion: '0.1.0' },
-      });
-      expect(first.status).toBe(200);
-      const firstBody = (await first.json()) as { token: string; machineId: string };
+      const first = await ownerClaimLocal(s);
       const before = s.db
         .select()
         .from(machineTable)
-        .where(eq(machineTable.id, firstBody.machineId))
+        .where(eq(machineTable.id, first.machineId))
         .get();
       expect(before?.tokenHash).toBeTruthy();
 
@@ -120,14 +190,14 @@ describe('machine enrollment authority (#2054)', () => {
       const after = s.db
         .select()
         .from(machineTable)
-        .where(eq(machineTable.id, firstBody.machineId))
+        .where(eq(machineTable.id, first.machineId))
         .get();
       expect(after?.tokenHash).toBe(before?.tokenHash);
       expect(after?.apiKeyId).toBe(before?.apiKeyId);
 
-      const me = await call(s.app, 'GET', '/api/machine/me', { cred: firstBody.token });
+      const me = await call(s.app, 'GET', '/api/machine/me', { cred: first.token });
       expect(me.status).toBe(200);
-      expect(((await me.json()) as { id: string }).id).toBe(firstBody.machineId);
+      expect(((await me.json()) as { id: string }).id).toBe(first.machineId);
     } finally {
       s.dispose();
     }

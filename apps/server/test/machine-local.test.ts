@@ -85,7 +85,7 @@ describe('local-machine row seed (spec 11 A8: server boot seed, idempotent)', ()
     }
   });
 
-  test('an enrolled hostname row: seed adds kind=local, no separate row', async () => {
+  test('an enrolled hostname row without a seed: seed adds kind=local, no separate row', async () => {
     const s = bootServer();
     try {
       const key = await issueApiKey(s);
@@ -107,18 +107,27 @@ describe('local-machine row seed (spec 11 A8: server boot seed, idempotent)', ()
 });
 
 describe('enroll hostname same law (spec 11 A9: loopback enroll lands kind=local)', () => {
-  test('enroll name=hostname -> kind=local; seed row reused (no duplicate)', async () => {
-    const s = bootServer();
+  test('owner-approved confirm name=hostname -> kind=local; seed row reused (no duplicate)', async () => {
+    const ownerToken = 'cairn-owner-local-a9';
+    const s = bootServer({ authToken: ownerToken });
     try {
       seedLocalMachine(s.db, s.team.id);
-      const key = await issueApiKey(s);
-      const res = await call(s.app, 'POST', '/api/machine/enroll', {
-        cred: key,
-        body: { teamId: s.team.id, name: HOST, cliVersion: '0.1.0' },
+      const seededId = localRows(s.db, s.team.id)[0]?.id;
+      const start = await call(s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: HOST, teamId: s.team.id },
       });
-      expect(res.status).toBe(200);
+      expect(start.status).toBe(200);
+      const { enrollId } = (await start.json()) as { enrollId: string };
+      const confirmed = await call(s.app, 'POST', '/api/machine/enroll/confirm', {
+        cred: ownerToken,
+        body: { enrollId },
+      });
+      expect(confirmed.status).toBe(200);
+      const { machine } = (await confirmed.json()) as { machine: { machineId: string } };
       const rows = localRows(s.db, s.team.id);
       expect(rows).toHaveLength(1);
+      expect(rows[0]?.id).toBe(seededId);
+      expect(rows[0]?.id).toBe(machine.machineId);
       expect(rows[0]?.kind).toBe('local');
       expect(rows[0]?.tokenHash).not.toBeNull();
     } finally {

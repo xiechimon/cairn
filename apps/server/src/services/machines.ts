@@ -306,28 +306,13 @@ export function enrollMachine(
   }
   if (isLocalName) {
     const seeded = localMachineRow(db, input.teamId, input.name);
-    if (seeded && (seeded.apiKeyId !== null || seeded.tokenHash !== null)) {
-      throw new HttpError(403, 'local machine already enrolled');
-    }
     if (seeded) {
-      db.update(machine)
-        .set({
-          tokenHash: token.hash,
-          name: input.name,
-          apiKeyId: input.keyId,
-          kind: 'local',
-          ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
-          ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-          ...(capabilities !== undefined ? reportedConcurrencyPatch(seeded, capabilities) : {}),
-        })
-        .where(eq(machine.id, seeded.id))
-        .run();
-      return {
-        machineId: seeded.id,
-        token: token.plain,
-        teamId: input.teamId,
-        serverUrl: input.serverUrl,
-      };
+      throw new HttpError(
+        403,
+        seeded.apiKeyId !== null || seeded.tokenHash !== null
+          ? 'local machine already enrolled'
+          : 'local machine requires owner approval',
+      );
     }
   }
   const machineId = newRecordId();

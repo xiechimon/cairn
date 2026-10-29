@@ -2,7 +2,7 @@
 
 ## Claim
 
-`POST /api/machine/enroll` requires `machineAccess` on the API key. A key with MCP grants and `machineAccess=false` is refused with 403. A second `machineAccess` key cannot rotate an already-claimed local machine token by sending the server hostname as `name`. Bootstrap keys created with `machineAccess=true` still enroll and may claim an unclaimed seeded local row.
+`POST /api/machine/enroll` requires `machineAccess` on the API key. A key with MCP grants and `machineAccess=false` is refused with 403. A `machineAccess` key cannot claim or rotate the seeded local row by sending the server hostname as `name` (unclaimed or claimed); owner-approved `enroll/confirm` claims that identity. Remote keys still enroll under a non-hostname name.
 
 ## Commands
 
