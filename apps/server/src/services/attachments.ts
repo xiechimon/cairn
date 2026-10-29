@@ -1,4 +1,12 @@
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  constants,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  writeSync,
+} from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -279,7 +287,22 @@ export function uploadFile(deps: AttachmentDeps, input: UploadInput): UploadOutp
   if (realParent !== realRoot && !realParent.startsWith(realPrefix)) {
     throw new HttpError(400, 'attachment key escapes attachments directory');
   }
-  writeFileSync(fullPath, input.fileBytes);
+  const openFlags =
+    constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW;
+  let fd: number;
+  try {
+    fd = openSync(fullPath, openFlags, 0o600);
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err && err.code === 'ELOOP') {
+      throw new HttpError(400, 'attachment key escapes attachments directory');
+    }
+    throw err;
+  }
+  try {
+    writeSync(fd, Buffer.from(input.fileBytes));
+  } finally {
+    closeSync(fd);
+  }
   const updated = deps.db
     .update(attachment)
     .set({ status: 'ready' })

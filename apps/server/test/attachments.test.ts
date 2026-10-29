@@ -1,7 +1,15 @@
 import { createHash, createHmac } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { attachment } from '../src/db/schema.js';
@@ -547,6 +555,48 @@ describe('attachments -- #2055 signing key and path containment', () => {
       expect(res.status).toBeGreaterThanOrEqual(400);
       const fileName = g.key.split('/').pop() ?? '';
       expect(existsSync(join(outside, fileName))).toBe(false);
+    } finally {
+      s.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('destination file symlink outside attachmentsDir is rejected; outside unchanged', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cairn-2055-leaf-symlink-'));
+    const attachmentsDir = join(root, 'attachments');
+    const outside = join(root, 'outside');
+    const outsideTarget = join(outside, 'leaked.md');
+    mkdirSync(attachmentsDir);
+    mkdirSync(outside);
+    writeFileSync(outsideTarget, 'sentinel-before');
+    const s = bootServer({ attachmentsDir });
+    try {
+      const grantRes = await req(s.app, 'POST', '/api/uploads/grant', {
+        kind: 'attachment',
+        fileName: 'spec.md',
+        mimeType: 'text/markdown',
+        size: 8,
+      });
+      expect(grantRes.status).toBe(200);
+      const g = (await grantRes.json()) as {
+        grant: string;
+        key: string;
+        attachmentId: string;
+      };
+      const dest = join(attachmentsDir, g.key);
+      mkdirSync(dirname(dest), { recursive: true });
+      symlinkSync(outsideTarget, dest);
+      const bytes = new TextEncoder().encode('# hello\n');
+      const res = await callMultipart(
+        s.app,
+        '/api/uploads/upload',
+        { grant: g.grant },
+        { name: 'file', filename: 'spec.md', mimeType: 'text/markdown', bytes },
+      );
+      expect(res.status).toBe(400);
+      expect(readFileSync(outsideTarget, 'utf8')).toBe('sentinel-before');
+      const row = s.db.select().from(attachment).where(eq(attachment.id, g.attachmentId)).get();
+      expect(row?.status).toBe('pending');
     } finally {
       s.dispose();
       rmSync(root, { recursive: true, force: true });
