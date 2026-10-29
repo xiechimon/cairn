@@ -12,15 +12,6 @@ const date = '2026-10-29T12:00:00Z';
 const now = new Date('2026-10-29T14:00:00Z');
 const connection = (nodes) => ({ nodes, pageInfo: { hasNextPage: false } });
 const commit = (oid) => ({ oid, committedDate: date });
-const manifest = () => ({
-  epic: 'E1.0a',
-  issues: [1234, 1235],
-  requiredChecks: ['check', 'e2e-gate'],
-  checks: [
-    { name: 'policy', run: ['node', '--test', 'policy.test.mjs'], expectStdoutIncludes: 'pass' },
-  ],
-  maxHours: 6,
-});
 const issue = (number) => ({
   number,
   state: 'CLOSED',
@@ -45,7 +36,19 @@ const checkPage = (sha, conclusion = 'success') => ({
 
 function harness() {
   const state = {
-    manifest: manifest(),
+    manifest: {
+      epic: 'E1.0a',
+      issues: [1234, 1235],
+      requiredChecks: ['check', 'e2e-gate'],
+      checks: [
+        {
+          name: 'policy',
+          run: ['node', '--test', 'policy.test.mjs'],
+          expectStdoutIncludes: 'pass',
+        },
+      ],
+      maxHours: 6,
+    },
     issues: [issue(1234), issue(1235)],
     head: tip,
     dirty: '',
