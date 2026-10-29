@@ -1,15 +1,25 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { baselineOwnerFailures, closingIssues, isProtectedPath } from './baseline-owner-gate.mjs';
+import {
+  baselineOwnerFailures,
+  closingIssues,
+  isCuratedMainRed,
+  isProtectedPath,
+} from './baseline-owner-gate.mjs';
 
 const curated = {
-  labels: ['main-red', 'ready-for-agent'],
-  title: 'ci: restore lint warning baseline',
+  labels: ['main-red', 'batch:now', 'by:pi'],
+  title: 'ci: restore lint warning baseline after main red',
 };
-const gardener = {
+const curatedCairn = {
+  labels: ['main-red', 'batch:now', 'by:cairn'],
+  title: 'ci: lower ui-debt baseline after main red',
+};
+const mainWatch = {
   labels: ['main-red', 'batch:now', 'by:pi'],
   title: 'main red: commit-author on abcdef12',
 };
+const mainRedOnly = { labels: ['main-red'], title: 'ci: restore lint warning baseline' };
 const plain = { labels: ['ready-for-agent'], title: 'ci: tighten a gate' };
 
 for (const file of [
@@ -23,7 +33,7 @@ for (const file of [
   test(`rejects unowned changes to ${file}`, () => {
     assert.deepEqual(baselineOwnerFailures([file], [2005], { 2005: plain }), [file]);
   });
-  test(`accepts curated main-red ownership of ${file}`, () => {
+  test(`accepts curated gardener main-red ownership of ${file}`, () => {
     assert.deepEqual(baselineOwnerFailures([file], [2005], { 2005: curated }), []);
   });
 }
@@ -63,7 +73,7 @@ test('the CI job structure pin is not a debt baseline', () => {
   assert.deepEqual(baselineOwnerFailures(['scripts/ci-job-structure-baseline.json'], [], {}), []);
 });
 
-test('registering a new CI job needs no main-red ownership', () => {
+test('registering a CI structure pin change needs no main-red ownership', () => {
   assert.deepEqual(
     baselineOwnerFailures(
       ['.github/workflows/ci.yml', 'scripts/ci-job-structure-baseline.json'],
@@ -80,31 +90,62 @@ test('protected changes require at least one closing issue', () => {
   ]);
 });
 
-test('every closing issue must carry curated main-red ownership', () => {
+test('every closing issue must carry curated gardener main-red ownership', () => {
   const files = ['scripts/lint-warning-baseline.json'];
-  assert.deepEqual(baselineOwnerFailures(files, [1, 2], { 1: curated, 2: curated }), []);
+  assert.deepEqual(baselineOwnerFailures(files, [1, 2], { 1: curated, 2: curatedCairn }), []);
   assert.deepEqual(
     baselineOwnerFailures(files, [1, 2], {
       1: curated,
-      2: { labels: ['main-red-extra'], title: curated.title },
+      2: { labels: ['main-red-extra', 'batch:now', 'by:pi'], title: curated.title },
     }),
     files,
   );
   assert.deepEqual(baselineOwnerFailures(files, [1, 2], { 1: curated }), files);
 });
 
-test('gardener main-watch alerts do not count as curated main-red ownership', () => {
+test('raw main-watch alerts do not authorize baseline edits', () => {
   const files = ['scripts/lint-warning-baseline.json'];
-  assert.deepEqual(baselineOwnerFailures(files, [2136], { 2136: gardener }), files);
+  assert.equal(isCuratedMainRed(mainWatch), false);
+  assert.deepEqual(baselineOwnerFailures(files, [2136], { 2136: mainWatch }), files);
   assert.deepEqual(
-    baselineOwnerFailures(files, [2136, 2005], { 2136: gardener, 2005: curated }),
+    baselineOwnerFailures(files, [2136, 2005], { 2136: mainWatch, 2005: curated }),
     files,
   );
   assert.deepEqual(
     baselineOwnerFailures(files, [2005], {
-      2005: { labels: ['main-red'], title: 'Main red: release on deadbeef' },
+      2005: {
+        labels: ['main-red', 'batch:now', 'by:cairn'],
+        title: 'Main red: release on deadbeef',
+      },
     }),
     files,
+  );
+});
+
+test('main-red alone is not curated ownership', () => {
+  assert.equal(isCuratedMainRed(mainRedOnly), false);
+  assert.deepEqual(
+    baselineOwnerFailures(['scripts/lint-warning-baseline.json'], [99], { 99: mainRedOnly }),
+    ['scripts/lint-warning-baseline.json'],
+  );
+});
+
+test('curated ownership needs gardener batch and by labels plus a non-alert title', () => {
+  assert.equal(isCuratedMainRed(curated), true);
+  assert.equal(isCuratedMainRed(curatedCairn), true);
+  assert.equal(
+    isCuratedMainRed({
+      labels: ['main-red', 'ready-for-agent'],
+      title: 'ci: restore lint warning baseline',
+    }),
+    false,
+  );
+  assert.equal(
+    isCuratedMainRed({
+      labels: ['main-red', 'batch:now'],
+      title: 'ci: restore lint warning baseline',
+    }),
+    false,
   );
 });
 

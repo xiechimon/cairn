@@ -1,0 +1,171 @@
+TAP version 13
+# [prepush] git init -q
+# [prepush] node scripts/comment-discipline-gate.mjs
+# [prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 0 intercepts
+# [prepush] node scripts/comment-discipline-gate.mjs
+# [prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+# [prepush] node scripts/comment-discipline-gate.mjs
+# [prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+# [prepush] node scripts/comment-discipline-gate.mjs
+# [prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+# [prepush] node scripts/comment-discipline-gate.mjs
+# [prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+# Subtest: documentation skips code checks, unknown paths fail closed
+ok 1 - documentation skips code checks, unknown paths fail closed
+  ---
+  duration_ms: 1.524006
+  type: 'test'
+  ...
+# Subtest: changes to prepush scripts run the CI self-test files locally
+ok 2 - changes to prepush scripts run the CI self-test files locally
+  ---
+  duration_ms: 0.977816
+  type: 'test'
+  ...
+# Subtest: escape-trace tests stay mandatory for every code prepush plan
+ok 3 - escape-trace tests stay mandatory for every code prepush plan
+  ---
+  duration_ms: 0.253883
+  type: 'test'
+  ...
+# Subtest: the recording gate runs in local prepush, in CI prepush and in the CI self-test step
+ok 4 - the recording gate runs in local prepush, in CI prepush and in the CI self-test step
+  ---
+  duration_ms: 0.250255
+  type: 'test'
+  ...
+# Subtest: a ledger entry change runs the ledger gate even when only documents changed
+ok 5 - a ledger entry change runs the ledger gate even when only documents changed
+  ---
+  duration_ms: 0.204309
+  type: 'test'
+  ...
+# Subtest: local code checks include both UI gates and affected e2e
+ok 6 - local code checks include both UI gates and affected e2e
+  ---
+  duration_ms: 0.101231
+  type: 'test'
+  ...
+# Subtest: every CI node scripts step also runs in local prepush or is listed as CI-only
+ok 7 - every CI node scripts step also runs in local prepush or is listed as CI-only
+  ---
+  duration_ms: 0.296651
+  type: 'test'
+  ...
+# Subtest: a web change runs the whole web unit suite, which catches tests that read sources instead of importing them
+ok 8 - a web change runs the whole web unit suite, which catches tests that read sources instead of importing them
+  ---
+  duration_ms: 0.098738
+  type: 'test'
+  ...
+# Subtest: local gates default their base to the merge-base, not the moving origin/main tip
+ok 9 - local gates default their base to the merge-base, not the moving origin/main tip
+  ---
+  duration_ms: 1.465178
+  type: 'test'
+  ...
+# Subtest: affected e2e gets only code paths, so a bulk evidence prune fits on the command line
+ok 10 - affected e2e gets only code paths, so a bulk evidence prune fits on the command line
+  ---
+  duration_ms: 4.532658
+  type: 'test'
+  ...
+# Subtest: e2e coverage check passes on the real suite and names an unmapped spec
+ok 11 - e2e coverage check passes on the real suite and names an unmapped spec
+  ---
+  duration_ms: 80.935684
+  type: 'test'
+  ...
+# Subtest: a board card source change selects the spec that reads its title
+ok 12 - a board card source change selects the spec that reads its title
+  ---
+  duration_ms: 25.260158
+  type: 'test'
+  ...
+# Subtest: CI shares the plan but keeps advisory and full e2e in separate jobs
+ok 13 - CI shares the plan but keeps advisory and full e2e in separate jobs
+  ---
+  duration_ms: 0.655666
+  type: 'test'
+  ...
+# Subtest: CLI skips real document changes and rejects a missing base
+ok 14 - CLI skips real document changes and rejects a missing base
+  ---
+  duration_ms: 461.866148
+  type: 'test'
+  ...
+# Subtest: a stale local origin/main is refreshed by fetch before computing changes
+ok 15 - a stale local origin/main is refreshed by fetch before computing changes
+  ---
+  duration_ms: 204.918337
+  type: 'test'
+  ...
+# Subtest: fetch failure falls back to the local origin/main and prints a stale notice
+ok 16 - fetch failure falls back to the local origin/main and prints a stale notice
+  ---
+  duration_ms: 126.197024
+  type: 'test'
+  ...
+# Subtest: prepush vitest only forgives files listed as known local red
+ok 17 - prepush vitest only forgives files listed as known local red
+  ---
+  duration_ms: 1.08846
+  type: 'test'
+  ...
+# Subtest: plan children do not inherit the git hook repository binding
+ok 18 - plan children do not inherit the git hook repository binding
+  ---
+  duration_ms: 11.453356
+  type: 'test'
+  ...
+# Subtest: only gate scripts are mapped to a ledger category when a step goes red
+ok 19 - only gate scripts are mapped to a ledger category when a step goes red
+  ---
+  duration_ms: 0.198997
+  type: 'test'
+  ...
+# Subtest: a gate that blocks a push records one intercept for every entry whose safeguard names it
+ok 20 - a gate that blocks a push records one intercept for every entry whose safeguard names it
+  ---
+  duration_ms: 15.244815
+  type: 'test'
+  ...
+# Subtest: a red gate step leaves the repository untouched and still exits non-zero
+ok 21 - a red gate step leaves the repository untouched and still exits non-zero
+  ---
+  duration_ms: 18.473775
+  type: 'test'
+  ...
+# Subtest: retrying the same gate on the same branch after another commit records nothing new
+ok 22 - retrying the same gate on the same branch after another commit records nothing new
+  ---
+  duration_ms: 42.529917
+  type: 'test'
+  ...
+# Subtest: CAIRN_GATE_LOG appends the gate-red events for a CI job to collect
+ok 23 - CAIRN_GATE_LOG appends the gate-red events for a CI job to collect
+  ---
+  duration_ms: 42.937271
+  type: 'test'
+  ...
+# Subtest: a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched
+ok 24 - a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched
+  ---
+  duration_ms: 0.802483
+  type: 'test'
+  ...
+# Subtest: logging is opt-in and never projects counters into the checkout
+ok 25 - logging is opt-in and never projects counters into the checkout
+  ---
+  duration_ms: 2.456872
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1099.106133

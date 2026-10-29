@@ -22,10 +22,12 @@ export function closingIssues(body) {
 
 export function isCuratedMainRed(meta) {
   const labels = meta?.labels ?? [];
-  const title = meta?.title ?? '';
+  const title = (meta?.title ?? '').trim();
   if (!labels.includes('main-red')) return false;
-  if (/^main\s+red:/i.test(title.trim())) return false;
-  return true;
+  if (/^main\s+red:/i.test(title)) return false;
+  const hasBatch = labels.includes('batch:now');
+  const hasGardenerBy = labels.includes('by:pi') || labels.includes('by:cairn');
+  return hasBatch && hasGardenerBy;
 }
 
 export function baselineOwnerFailures(files, issues, metaByIssue) {
@@ -70,7 +72,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     if (failures.length > 0) {
       console.error(`baseline-owner-gate: protected files:\n${failures.join('\n')}`);
       console.error(
-        'Only main-health fix PRs may change these files. Declare Closes #N lines in the PR body; every declared issue must carry the main-red label and must not be a main-watch alert titled "main red: …".',
+        'Only main-health fix PRs may change these files. Declare Closes #N lines in the PR body; every declared issue must carry main-red plus gardener curation labels (batch:now and by:pi or by:cairn), and must not be a main-watch alert titled "main red: …".',
       );
       process.exitCode = 1;
     } else {
