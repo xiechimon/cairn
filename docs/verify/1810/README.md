@@ -22,9 +22,11 @@ python3 scripts/pr-evidence-archive.test.py -v
 ```
 
 `fixture-gate.txt` and `archive-gate.txt` are the verbose runs from this branch.
-`negative-controls.txt` replays the parent ticket's three machine-checkable
-shapes plus the green archived control, with HTTP fixed at 200 so reachability
-never decides the result.
+`negative-controls.txt` replays the parent ticket's machine-checkable shapes
+(fixture `scenario` query in markdown and HTML, unarchived upload, wrong-issue
+archive) plus the green archived control, with HTTP fixed at 200 so
+reachability never decides the result. Stub-only is not in that probe; see
+Review-only above.
 
 ## Review-only
 
