@@ -6,6 +6,7 @@ import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
 import {
   attachmentsDirOf,
+  backupStatusPathOf,
   loadConfig,
   logTokenAuthStartup,
   missingRequiredTokenError,
@@ -99,6 +100,7 @@ const app = createApp(
     githubFetch,
     reposDir,
     attachmentsDir,
+    backupStatusPath: backupStatusPathOf(config),
     skillsDir: config.skillsDir,
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,

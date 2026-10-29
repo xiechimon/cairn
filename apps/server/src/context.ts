@@ -34,6 +34,7 @@ export interface AppContext {
   >;
   reposDir: string;
   attachmentsDir: string;
+  backupStatusPath?: string;
   skillsDir: string;
   skillSourcesPath: string;
   skillImportFetch?: SkillImportFetch;

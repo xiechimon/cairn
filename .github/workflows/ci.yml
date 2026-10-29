@@ -385,3 +385,16 @@ jobs:
           git fetch origin "$BASELINE_RATCHET_BASE_SHA"
           node --test scripts/baseline-ratchet-gate.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
           node scripts/baseline-ratchet-gate.mjs
+
+  ops-backup-test:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Server backup script against an rrsync receiver (#2163)
+        run: |
+          command -v sqlite3 >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q sqlite3; }
+          curl -fsSL -o "$RUNNER_TEMP/rrsync" https://raw.githubusercontent.com/RsyncProject/rsync/v3.4.1/support/rrsync
+          echo "0bb743f8155907ed2a337c12a4672c67269e372803939ec98dac497edc714c9b  $RUNNER_TEMP/rrsync" | sha256sum -c -
+          RRSYNC="$RUNNER_TEMP/rrsync" node --test scripts/ops/backup-server-db.test.mjs

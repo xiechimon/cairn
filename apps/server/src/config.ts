@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ACCESS_TOKEN_FILE_NAME,
@@ -237,6 +237,10 @@ export function warnTailscaleBind(logger: { warn(msg: string): void }, config: S
 
 export function reposDirOf(config: ServerConfig): string {
   return join(config.dataDir, 'repos');
+}
+
+export function backupStatusPathOf(config: Pick<ServerConfig, 'dbPath'>): string {
+  return join(dirname(config.dbPath), 'backup-status.json');
 }
 
 export function attachmentsDirOf(config: ServerConfig): string {

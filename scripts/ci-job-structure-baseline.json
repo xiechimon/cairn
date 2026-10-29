@@ -46,5 +46,6 @@
     "Dispatch agent start/check round trip (#1556)",
     "Closing keyword gate (advisory, #1541)",
     "Baseline ratchet gate and gardener sweep self-test (#1617)"
-  ]
+  ],
+  "ops-backup-test": ["Server backup script against an rrsync receiver (#2163)"]
 }

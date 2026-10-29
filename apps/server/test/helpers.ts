@@ -59,6 +59,7 @@ export function bootServer(
     webOrigin?: string;
     pushEndpointHosts?: ReadonlySet<string>;
     mcpConfigPath?: string;
+    backupStatusPath?: string;
   } = {},
 ) {
   const db = openMemoryDb();
@@ -122,6 +123,7 @@ export function bootServer(
         : {}),
       reposDir,
       attachmentsDir,
+      ...(opts.backupStatusPath !== undefined ? { backupStatusPath: opts.backupStatusPath } : {}),
       skillsDir,
       skillSourcesPath,
       ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),

@@ -1,0 +1,15 @@
+{
+  "api": {
+    "state": "recorded",
+    "status": {
+      "host": "omarchy",
+      "lastRunAt": 1793268716000,
+      "lastRunResult": "success",
+      "lastRunExitStatus": "0",
+      "lastSuccessAt": 1793268716000
+    }
+  },
+  "bannerCount": 1,
+  "kind": "stale",
+  "text": "!\n\nThe server database backup on omarchy has not succeeded for 5 hours and may have stopped. On that machine run `systemctl --user list-timers cairn-db-backup.timer` to check the timer."
+}

@@ -1113,6 +1113,17 @@ export const EN: Record<string, string> = {
     'Claude Code login on {name} expires in less than a day. On that machine run `claude auth login`.',
   '{name} 上的 Claude Code 登录已过期。在该机器上运行 `claude auth login` 重新登录。':
     'Claude Code login on {name} has expired. On that machine run `claude auth login`.',
+  服务器数据库备份: 'Server database backup',
+  '服务器数据库备份状态文件无法读取，无法确认备份是否在运行。':
+    'The server database backup status file cannot be read, so the backup cannot be confirmed as running.',
+  '{host} 上的服务器数据库备份已有 {hours} 小时没有成功，备份可能已停止。在该机器上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。':
+    'The server database backup on {host} has not succeeded for {hours} hours and may have stopped. On that machine run `systemctl --user list-timers cairn-db-backup.timer` to check the timer.',
+  '{host} 上的服务器数据库备份最近一次运行失败（{detail}），还没有成功过的备份。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
+    'The latest server database backup run on {host} failed ({detail}), and no backup has succeeded yet. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
+  '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在不到 1 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
+    'The latest server database backup run on {host} failed ({detail}); the last successful backup was less than an hour ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
+  '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
+    'The latest server database backup run on {host} failed ({detail}); the last successful backup was {hours} hours ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why.',
   // #895 机器页三态读标注（spec 21 A8；orchestration 块 join 行集）+ chief
   // 设置 Agent tab「机器」槽的描述（A6）。徽标/状态 = 机器与总管编排的
   // 关系面，非机器自身状态。
