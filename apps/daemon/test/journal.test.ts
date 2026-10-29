@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
@@ -7,6 +7,19 @@ import { StepJournal, TranscriptBuffer } from '../src/journal.js';
 
 function tmp(): string {
   return mkdtempSync(join(tmpdir(), 'cairn-journal-'));
+}
+
+function modeBits(path: string): number {
+  return statSync(path).mode & 0o777;
+}
+
+function withUmask<T>(mask: number, fn: () => T): T {
+  const previous = process.umask(mask);
+  try {
+    return fn();
+  } finally {
+    process.umask(previous);
+  }
 }
 
 const claimed: ClaimedStep = {
@@ -82,5 +95,35 @@ describe('TranscriptBuffer', () => {
     expect(t2.messages()).toHaveLength(2);
     t2.upsert({ id: 'call-1', role: 'assistant', content: { kind: 'toolcall' }, createdAt: 150 });
     expect(t2.messages().map((m) => m.id)).toEqual(['user-s1', 'call-1', 'msg-2']);
+  });
+});
+
+describe('outbox journal/transcript file modes (#2056)', () => {
+  test('StepJournal writes step files as 0o600 under umask 022', () => {
+    withUmask(0o022, () => {
+      const dir = join(tmp(), 'steps');
+      const j = new StepJournal(dir);
+      expect(modeBits(dir)).toBe(0o700);
+      j.claim({
+        stepId: 's1',
+        buildId: 'b1',
+        kind: 'plan',
+        conversationId: 'b1',
+        sessionAction: 'new',
+        prompt: 'probe',
+        claimed,
+      });
+      expect(modeBits(join(dir, 'step-s1.json'))).toBe(0o600);
+    });
+  });
+
+  test('TranscriptBuffer writes transcript files as 0o600 under umask 022', () => {
+    withUmask(0o022, () => {
+      const dir = join(tmp(), 'transcripts');
+      const t = new TranscriptBuffer(dir, 's1');
+      expect(modeBits(dir)).toBe(0o700);
+      t.upsert({ id: 'm1', role: 'user', content: 'hi', createdAt: 1 });
+      expect(modeBits(join(dir, 'step-s1.transcript.json'))).toBe(0o600);
+    });
   });
 });

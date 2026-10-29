@@ -1,0 +1,190 @@
+
+ RUN  v5.0.1 /workspace
+
+ ❯ |@xiechimon/cairn-cli| test/journal.test.ts (5 tests | 2 failed) 13ms
+   ❯ outbox journal/transcript file modes (#2056) (2)
+     × StepJournal writes step files as 0o600 under umask 022 5ms
+     × TranscriptBuffer writes transcript files as 0o600 under umask 022 1ms
+ ❯ |@xiechimon/cairn-cli| test/config-state.test.ts (25 tests | 6 failed) 22ms
+   ❯ local state layout (02 §5.3) (12)
+     × ensureStateDirs yields 0o700 under umask 18 (create + repair) 4ms
+     × ensureStateDirs yields 0o700 under umask 0 (create + repair) 1ms
+     × saveMachineJson yields 0o600 under umask 18 (create + repair overwrite) 1ms
+     × saveMachineJson yields 0o600 under umask 0 (create + repair overwrite) 1ms
+     × device.json / daemon.json / session index are 0o600 under umask 022 1ms
+     × saveMachineJson refuses a symlinked machine.json (does not follow or chmod) 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/config-state.test.ts > local state layout (02 §5.3) > ensureStateDirs yields 0o700 under umask 18 (create + repair)
+AssertionError: /tmp/cairn-cfg-FUVxck/cairn-home: expected 493 to be 448 // Object.is equality
+
+- Expected
++ Received
+
+- 448
++ 493
+
+ ❯ test/config-state.test.ts:236:38
+    234|           paths.workspacesDir,
+    235|         ]) {
+    236|           expect(modeBits(dir), dir).toBe(0o700);
+       |                                      ^
+    237|         }
+    238|
+ ❯ withUmask test/config-state.test.ts:52:12
+ ❯ test/config-state.test.ts:225:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/config-state.test.ts > local state layout (02 §5.3) > ensureStateDirs yields 0o700 under umask 0 (create + repair)
+AssertionError: /tmp/cairn-cfg-OMkGJi/cairn-home: expected 511 to be 448 // Object.is equality
+
+- Expected
++ Received
+
+- 448
++ 511
+
+ ❯ test/config-state.test.ts:236:38
+    234|           paths.workspacesDir,
+    235|         ]) {
+    236|           expect(modeBits(dir), dir).toBe(0o700);
+       |                                      ^
+    237|         }
+    238|
+ ❯ withUmask test/config-state.test.ts:52:12
+ ❯ test/config-state.test.ts:225:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/config-state.test.ts > local state layout (02 §5.3) > saveMachineJson yields 0o600 under umask 18 (create + repair overwrite)
+AssertionError: expected 420 to be 384 // Object.is equality
+
+- Expected
++ Received
+
+- 384
++ 420
+
+ ❯ test/config-state.test.ts:255:45
+    253|         ensureStateDirs(paths);
+    254|         saveMachineJson(paths, sampleMachine);
+    255|         expect(modeBits(paths.machineJson)).toBe(0o600);
+       |                                             ^
+    256|
+    257|         chmodSync(paths.machineJson, 0o644);
+ ❯ withUmask test/config-state.test.ts:52:12
+ ❯ test/config-state.test.ts:251:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/config-state.test.ts > local state layout (02 §5.3) > saveMachineJson yields 0o600 under umask 0 (create + repair overwrite)
+AssertionError: expected 438 to be 384 // Object.is equality
+
+- Expected
++ Received
+
+- 384
++ 438
+
+ ❯ test/config-state.test.ts:255:45
+    253|         ensureStateDirs(paths);
+    254|         saveMachineJson(paths, sampleMachine);
+    255|         expect(modeBits(paths.machineJson)).toBe(0o600);
+       |                                             ^
+    256|
+    257|         chmodSync(paths.machineJson, 0o644);
+ ❯ withUmask test/config-state.test.ts:52:12
+ ❯ test/config-state.test.ts:251:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/config-state.test.ts > local state layout (02 §5.3) > device.json / daemon.json / session index are 0o600 under umask 022
+AssertionError: expected 420 to be 384 // Object.is equality
+
+- Expected
++ Received
+
+- 384
++ 420
+
+ ❯ test/config-state.test.ts:273:42
+    271|       writeDaemonJson(paths, { pid: 1, startedAt: 1, runner: 'cli' });
+    272|       recordSession(paths, 'sess-1', '/x/s.jsonl');
+    273|       expect(modeBits(paths.deviceJson)).toBe(0o600);
+       |                                          ^
+    274|       expect(modeBits(paths.daemonJson)).toBe(0o600);
+    275|       expect(modeBits(join(paths.chatSessionsDir, 'index.json'))).toBe…
+ ❯ withUmask test/config-state.test.ts:52:12
+ ❯ test/config-state.test.ts:267:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/config-state.test.ts > local state layout (02 §5.3) > saveMachineJson refuses a symlinked machine.json (does not follow or chmod)
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/config-state.test.ts:285:57
+    283|     writeFileSync(target, '{}\n', { mode: 0o644 });
+    284|     symlinkSync(target, paths.machineJson);
+    285|     expect(() => saveMachineJson(paths, sampleMachine)).toThrow(/symli…
+       |                                                         ^
+    286|     expect(modeBits(target)).toBe(0o644);
+    287|     expect(lstatSync(paths.machineJson).isSymbolicLink()).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/journal.test.ts > outbox journal/transcript file modes (#2056) > StepJournal writes step files as 0o600 under umask 022
+AssertionError: expected 493 to be 448 // Object.is equality
+
+- Expected
++ Received
+
+- 448
++ 493
+
+ ❯ test/journal.test.ts:106:29
+    104|       const dir = join(tmp(), 'steps');
+    105|       const j = new StepJournal(dir);
+    106|       expect(modeBits(dir)).toBe(0o700);
+       |                             ^
+    107|       j.claim({
+    108|         stepId: 's1',
+ ❯ withUmask test/journal.test.ts:19:12
+ ❯ test/journal.test.ts:103:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/journal.test.ts > outbox journal/transcript file modes (#2056) > TranscriptBuffer writes transcript files as 0o600 under umask 022
+AssertionError: expected 493 to be 448 // Object.is equality
+
+- Expected
++ Received
+
+- 448
++ 493
+
+ ❯ test/journal.test.ts:124:29
+    122|       const dir = join(tmp(), 'transcripts');
+    123|       const t = new TranscriptBuffer(dir, 's1');
+    124|       expect(modeBits(dir)).toBe(0o700);
+       |                             ^
+    125|       t.upsert({ id: 'm1', role: 'user', content: 'hi', createdAt: 1 }…
+    126|       expect(modeBits(join(dir, 'step-s1.transcript.json'))).toBe(0o60…
+ ❯ withUmask test/journal.test.ts:19:12
+ ❯ test/journal.test.ts:121:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 22 passed (30)
+   Start at  03:43:45
+   Duration  557ms (transform 70%, import 23%, tests 7%, worker 1%)
+
