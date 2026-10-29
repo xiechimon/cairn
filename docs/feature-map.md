@@ -747,6 +747,7 @@ Ordering: by tier (Differentiation surface → Runtime axis → General surface)
 | [#1931](https://github.com/xiechimon/cairn/issues/1931) `web: make the home page one continuous chief chat (chat parity T1)` | General surface | Done | `docs/verify/1931/` |
 | [#1938](https://github.com/xiechimon/cairn/issues/1938) `web+server: chief unavailable banner, backup model, queue/steer/stop while busy (chat parity T4+T5)` | General surface | Done | `docs/verify/1938/` |
 | [#1945](https://github.com/xiechimon/cairn/issues/1945) `eval(1831): run and publish a fresh two-arm prompt ablation` | General surface | Done | `docs/verify/1945/` |
+| [#1810](https://github.com/xiechimon/cairn/issues/1810) `verify: what does not count as evidence (prompt checklist plus machine checks in the merge gate)` | General surface | Done | `docs/verify/1810/` |
 | [#1981](https://github.com/xiechimon/cairn/issues/1981) `verify: define evidence limits in implementer prompts and verify-cairn` | General surface | Done | `docs/verify/1981/` |
 | [#1984](https://github.com/xiechimon/cairn/issues/1984) `eval(routing): land the benchmark fixtures and validated oracles` | General surface | Done | `docs/verify/1984/`<br>`integration/test/routing-bench.test.ts` |
 | [#1985](https://github.com/xiechimon/cairn/issues/1985) `eval(routing): enforce the workspace read boundary and grade implementation reuse` | General surface | Done | `docs/verify/1985/` |

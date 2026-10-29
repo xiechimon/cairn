@@ -1,0 +1,23 @@
+22/22 checks passing
+PASS prompt has Evidence limits checklist 
+PASS prompt names fixture scenario limit 
+PASS prompt names stub-only limit 
+PASS prompt names archive requirement 
+PASS prompt names landed fixture gate 
+PASS prompt names landed archive gate 
+PASS prompt does not claim 1810 incomplete 
+PASS prompt does not claim 1982/1983 planned 
+PASS prompt keeps stub as review 
+PASS skill has Evidence limits checklist 
+PASS skill names fixture scenario limit 
+PASS skill names stub-only limit 
+PASS skill names archive requirement 
+PASS skill names landed fixture gate 
+PASS skill names landed archive gate 
+PASS skill does not claim 1810 incomplete 
+PASS skill does not claim 1982/1983 planned 
+PASS skill keeps stub as review 
+PASS negative controls red fixture 
+PASS negative controls red archive 
+PASS negative controls green archived 
+PASS readme documents stub review-only 
