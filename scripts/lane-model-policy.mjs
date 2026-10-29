@@ -37,7 +37,9 @@ export function parseModelRoles(markdown) {
     if (!role || model === undefined) continue;
     if (role === 'Role' && model === 'Model') continue;
     if (/^:?-+:?$/.test(role) && /^:?-+:?$/.test(model)) continue;
-    const modelIds = [...model.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+    const modelIds = [...model.matchAll(/[a-z][a-z0-9.]*(?:-[a-z0-9.]+)+/gi)].map(
+      (match) => match[0],
+    );
     rows.push({ role, model, modelIds });
   }
   return rows;

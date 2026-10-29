@@ -57,6 +57,10 @@ test('AGENTS.md Do-not-use models are covered by BANNED_MODEL_IDS', () => {
   assert.match(banLine, /MiniMax M3/i);
   assert.match(banLine, /gpt-6-astra/i);
   assert.match(banLine, /GPT 5\.6/i);
+  assert.deepEqual(
+    [...banLine.matchAll(/`([a-z][a-z0-9.]*(?:-[a-z0-9.*]+)+)`/gi)].map((match) => match[1]),
+    [...BANNED_MODEL_IDS, 'gpt-5.6*'],
+  );
   for (const id of ['deepseek-v4-flash', 'minimax-m3', 'gpt-6-astra']) {
     assert.ok(BANNED_MODEL_IDS.includes(id), `missing ${id}`);
   }
@@ -75,12 +79,24 @@ test('AGENTS.md Model roles table pins the role models and names no banned id', 
   assert.deepEqual(rows.find((row) => row.role === 'Mechanical work')?.modelIds, [
     'claude-haiku-5-5',
   ]);
-  assert.ok(rows.some((row) => row.role === 'Review'));
+  assert.deepEqual(rows.find((row) => row.role === 'Review')?.modelIds, []);
+  assert.deepEqual(
+    rows.map((row) => row.role),
+    ['Orchestration', 'Implementation', 'Mechanical work', 'Review'],
+  );
   for (const row of rows) {
     for (const id of row.modelIds) {
       assert.equal(isBannedModelId(id), false, `${row.role} names banned model ${id}`);
     }
   }
+});
+
+test('parseModelRoles finds a banned id written without backticks', () => {
+  const markdown =
+    '## Model roles\n| Role | Model |\n|---|---|\n| Review | deepseek-v4-flash from a fresh context |';
+  assert.deepEqual(parseModelRoles(markdown).find((row) => row.role === 'Review')?.modelIds, [
+    'deepseek-v4-flash',
+  ]);
 });
 
 test('parseModelRoles retains banned ids and excludes tables under other headings', () => {

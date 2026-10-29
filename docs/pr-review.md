@@ -49,7 +49,7 @@ Open questions:
 Three hard rules:
 
 - **If Bad / Ugly find nothing after checking, say so explicitly in that section** — "no issues found (checked X / Y surfaces)" — that is a conclusion, not filler; the forbidden form is a bare heading with a perfunctory "none".
-- **If there are no Open questions, omit the whole section**, heading included — it only takes "things that block the merge decision and need the user to decide"; general problems found in review belong in Bad / Ugly. When you do write Open questions, also run `gh pr edit <PR> --add-label needs-decision` (#1440): `pr-evidence` goes red on the label and disarms auto-merge; after the user decides, a human removes the label; a question left only in the review text is a question never asked.
+- **If there are no Open questions, omit the whole section**, heading included — it only takes "things that block the merge decision and need the user to decide"; general problems found in review belong in Bad / Ugly. When you do write Open questions, also ask them in the chat; never add the `needs-decision` label (AGENTS.md, #2051). A question left only in the review text is a question never asked.
 - All six sections carry real entries; a section you cannot fill with a real entry is not written.
 
 The review verdict lands as a **PR comment** (`gh pr comment`; write long content to a one-off file and use `--body-file`), not by editing the PR body — the body is the author's evidence surface, and the review does not change it.

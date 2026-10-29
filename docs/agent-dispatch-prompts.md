@@ -32,7 +32,7 @@ Look up GitHub names, PRs and CI status only with the authenticated `gh api` (`g
 
 ## Image assets
 
-Images for the site, README, demo site, phone UI, icons and avatars, and doc illustrations are generated with codex first, not hand-drawn as SVG or canvas code. Image generation is exempt from the "codex for hard jobs only" quota rule. Show each generated image to ian first; it goes into the repo and gets pushed only after he approves.
+Images for the site, README, demo site, phone UI, icons and avatars, and doc illustrations are generated with codex first, not hand-drawn as SVG or canvas code. Image generation goes to codex whatever the task's implementer is. Show each generated image to ian first; it goes into the repo and gets pushed only after he approves.
 
 ## Evidence limits checklist
 
