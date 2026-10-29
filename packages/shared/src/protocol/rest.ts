@@ -14,6 +14,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams', note: '恒 seed 一行（02 §2.2）' },
   { method: 'GET', path: '/api/teams/{id}/members', note: 'Agent 列表实际走此端点（r5 §1）' },
   { method: 'GET', path: '/api/teams/{id}/machines' },
+  {
+    method: 'GET',
+    path: '/api/server/backup',
+    note: 'backup-status.json next to server.db (#2162)',
+  },
   { method: 'GET', path: '/api/teams/{id}/providers', note: 'presets[] 38 项原样（r3 §2）' },
   { method: 'GET', path: '/api/teams/{id}/mcp-servers' },
   { method: 'GET', path: '/api/teams/{id}/models' },

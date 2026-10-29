@@ -115,6 +115,22 @@ The receiver must keep at least as many DB copies as `--keep`. A copy it deletes
 
 Room, measured on 2026-10-29: a DB copy is about 34 MB, so 48 copies are about 1.7 GB on each side, plus attachments (159 MB off-site in total that day). dmit has 7.8 GB free on a 20 GB disk; omarchy's HDD has 1.7 TB free. The hourly push sends about 34 MB through the proxy, about 25 GB a month.
 
+## Monitoring (#2162)
+
+A stopped or failing backup shows up as a warning banner above the home page and the board. It sits in the banner slot rather than the daily brief because the brief only renders once the home chat has messages from an earlier day. Every run records its result, and the server reads that record:
+
+- The backup unit runs `scripts/ops/record-backup-status.sh --status <server data dir>/backup-status.json` as `ExecStopPost=`. systemd runs it after every run, including failures and timeout kills, and passes the run's result in `SERVICE_RESULT` / `EXIT_STATUS`. The script atomically writes the host, the run time, the result and the last successful run time; a failed run keeps the previous success time.
+- The status file sits next to `server.db`, in the data dir of the server it describes. A server that moves with its data dir brings a status that then goes stale, and a backup of a leftover DB copy writes its status next to that copy, not next to the live one.
+- The server serves the record at `GET /api/server/backup`. The banner appears when the latest run failed (at once, naming the systemd result), when the last success is older than 2 hours (the timer stopped or the machine is down), or when the status file cannot be read. A data dir without a status file has never recorded a backup, and no banner appears there. The web reads the record on load and every 5 minutes.
+
+Add the line to the backup service from the "Scheduling" section:
+
+```ini
+ExecStopPost=%h/cairn/scripts/ops/record-backup-status.sh --status %h/.cairn/server/backup-status.json
+```
+
+Check: after the next run, `cat ~/.cairn/server/backup-status.json` shows `"lastRunResult":"success"`. On omarchy the script is installed as `~/.cairn/tools/backup/record-backup-status.sh`, next to the backup wrapper.
+
 ## Recovery
 
 The omarchy push key is write-only, so a restore never uses it. Take the newest copy from the omarchy HDD if it survived, otherwise from dmit as root (from the Mac: `scp dmit:/home/cairnbak/cairn-backups/db/<newest>.db.gz .`).
