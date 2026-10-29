@@ -17,6 +17,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "eval:sample-failures": "node scripts/eval-sample-failures.mjs",
+    "eval:review-score": "pnpm --filter @xiechimon/cairn exec node --import tsx src/eval-review-score-cli.ts",
     "traj:export": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-export-cli.ts",
     "traj:push": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-push-cli.ts",
     "traj:label": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-label-cli.ts",
