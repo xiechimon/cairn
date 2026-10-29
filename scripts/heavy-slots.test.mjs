@@ -44,6 +44,9 @@ function sandbox(slots) {
   delete env.CAIRN_HEAVY_SLOT;
   delete env.CAIRN_HEAVY_SLOT_OWNER;
   delete env.E2E_PORT;
+  delete env.ENGLISH_ONLY_BASE_SHA;
+  delete env.UI_DEBT_BASE_SHA;
+  delete env.PREPUSH_BASE_SHA;
   return { dir, env, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
