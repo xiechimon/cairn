@@ -1,0 +1,21 @@
+{
+  "candidates": 12,
+  "resolved": 4,
+  "exported": 16,
+  "ineligible": 8,
+  "validation": {
+    "ok": true,
+    "errors": [],
+    "caseCount": 16
+  },
+  "weeklyTotals": {
+    "qualifyingEvents": 4,
+    "unknownReviewEvents": 4,
+    "unresolvedEvents": 6,
+    "unavailableReviewEvents": 0,
+    "outsideWindowEvents": 2,
+    "duplicateEvents": 0
+  },
+  "outDir": "/tmp/escape-loop-1832-Vip1",
+  "bankOut": "/tmp/escape-bank-1832-O5fl"
+}

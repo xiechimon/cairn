@@ -1,0 +1,2226 @@
+{
+  "version": 1,
+  "windowDays": 14,
+  "limitations": [
+    "Counts are candidate escapes from resolved attribution, not proof of a reviewer mistake.",
+    "No escape rate is computed: the reviewed-PR denominator is not available.",
+    "Review paths describe pre-merge evidence: formal human reviews may cover earlier PR commits; formal AI reviews require approval; production gates record PASS or BLOCK activity on the merged head.",
+    "Unknown bots and unrecognized gate formats do not establish AI or human review; unavailable or partial API data yields unknown.",
+    "Counts use distinct originating PRs per UTC Monday week/path; follow-up events are distinct PR/commit pairs."
+  ],
+  "totals": {
+    "qualifyingEvents": 4,
+    "unknownReviewEvents": 4,
+    "unresolvedEvents": 6,
+    "unavailableReviewEvents": 0,
+    "outsideWindowEvents": 2,
+    "duplicateEvents": 0
+  },
+  "weeks": [
+    {
+      "week": "2026-10-12",
+      "paths": {
+        "ai-only": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        },
+        "human-only": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        },
+        "mixed": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        },
+        "unknown": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        }
+      },
+      "unresolvedEvents": 2,
+      "unavailableReviewEvents": 0
+    },
+    {
+      "week": "2026-10-19",
+      "paths": {
+        "ai-only": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        },
+        "human-only": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        },
+        "mixed": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        },
+        "unknown": {
+          "distinctPrs": 3,
+          "followUpEvents": 4
+        }
+      },
+      "unresolvedEvents": 3,
+      "unavailableReviewEvents": 0
+    },
+    {
+      "week": "2026-10-26",
+      "paths": {
+        "ai-only": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        },
+        "human-only": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        },
+        "mixed": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        },
+        "unknown": {
+          "distinctPrs": 0,
+          "followUpEvents": 0
+        }
+      },
+      "unresolvedEvents": 1,
+      "unavailableReviewEvents": 0
+    }
+  ],
+  "events": [
+    {
+      "followUpSha": "d1bd843080a5894421950f045df1d7b49feaced0",
+      "fixingSha": "d1bd843080a5894421950f045df1d7b49feaced0",
+      "followUpTimestamp": "2026-10-15T07:03:50.000Z",
+      "fixingPr": 1323,
+      "introducingSha": null,
+      "introducingMergedAt": null,
+      "originalPr": null,
+      "method": "blame",
+      "status": "multiple-origin",
+      "unresolvedReason": null,
+      "withinEscapeWindow": null,
+      "evidence": {
+        "paths": [
+          "apps/server/src/routes-todos.ts",
+          "apps/server/src/services/builds.ts",
+          "apps/server/src/services/phase.ts",
+          "apps/server/src/services/todos.ts",
+          "apps/server/test/manual-drop-matrix.test.ts",
+          "apps/server/test/persona-split-verify.test.ts",
+          "apps/server/test/phase.test.ts",
+          "apps/server/test/stop-and-done-1247.test.ts",
+          "apps/server/test/wire.test.ts",
+          "apps/web/e2e/board-dnd-live.spec.ts",
+          "apps/web/e2e/board-dnd.spec.ts",
+          "apps/web/src/board/board.tsx",
+          "apps/web/src/board/columns.ts",
+          "apps/web/src/board/dnd.ts",
+          "apps/web/src/board/done-confirm-dialog.tsx",
+          "apps/web/src/board/todo-card.tsx",
+          "apps/web/src/fixtures/board.ts",
+          "apps/web/src/i18n/en.ts",
+          "apps/web/src/phase.ts",
+          "apps/web/src/routes/board-page.tsx",
+          "apps/web/test/columns.test.ts",
+          "apps/web/test/dnd.test.ts",
+          "docs/verify/1247/1247-after-canceled-in-done.png",
+          "docs/verify/1247/1247-after-confirm-dialog.png",
+          "docs/verify/1247/1247-after-done-column-mixed.png",
+          "docs/verify/1247/1247-after-done-order.png",
+          "docs/verify/1247/1247-after-drag-failed-dialog.png",
+          "docs/verify/1247/1247-after-failed-landed.png",
+          "docs/verify/1247/1247-after-inflight-dialog.png",
+          "docs/verify/1247/1247-after-inflight-still-running.png",
+          "docs/verify/1247/1247-after-inflight-stop-dialog.png",
+          "docs/verify/1247/1247-after-outcome-dialog-confirm.png",
+          "docs/verify/1247/1247-after-outcome-dialog.png",
+          "docs/verify/1247/1247-after-sibling-stays-waiting.png",
+          "docs/verify/1247/1247-before-confirm-drop.png",
+          "docs/verify/1247/1247-before-done-order.png",
+          "docs/verify/1247/1247-before-drag-failed-into-done.png",
+          "docs/verify/1247/1247-before-inflight-dialog.png",
+          "docs/verify/1247/1247-before-inflight-still-running.png",
+          "docs/verify/1247/1247-before-sibling-waiting.png",
+          "docs/verify/1247/1247-before-sibling-wave-started.png",
+          "docs/verify/1247/1247-before-stop-yanks-done.png",
+          "docs/verify/1247/1247-mon-decisions.txt",
+          "docs/verify/1247/README.md",
+          "docs/verify/1247/sse.txt",
+          "packages/shared/src/phase.ts",
+          "packages/shared/test/vocabulary.test.ts"
+        ],
+        "files": [
+          {
+            "path": "apps/server/src/routes-todos.ts",
+            "lines": [
+              {
+                "start": 13,
+                "end": 13
+              },
+              {
+                "start": 25,
+                "end": 25
+              },
+              {
+                "start": 109,
+                "end": 109
+              }
+            ]
+          },
+          {
+            "path": "apps/server/src/services/builds.ts",
+            "lines": [
+              {
+                "start": 75,
+                "end": 75
+              }
+            ]
+          },
+          {
+            "path": "apps/server/src/services/phase.ts",
+            "lines": [
+              {
+                "start": 23,
+                "end": 24
+              },
+              {
+                "start": 26,
+                "end": 26
+              },
+              {
+                "start": 30,
+                "end": 30
+              },
+              {
+                "start": 36,
+                "end": 36
+              },
+              {
+                "start": 46,
+                "end": 48
+              },
+              {
+                "start": 60,
+                "end": 61
+              }
+            ]
+          },
+          {
+            "path": "apps/server/src/services/todos.ts",
+            "lines": [
+              {
+                "start": 592,
+                "end": 592
+              }
+            ]
+          },
+          {
+            "path": "apps/server/test/manual-drop-matrix.test.ts",
+            "lines": [
+              {
+                "start": 6,
+                "end": 7
+              },
+              {
+                "start": 102,
+                "end": 103
+              },
+              {
+                "start": 105,
+                "end": 106
+              }
+            ]
+          },
+          {
+            "path": "apps/server/test/phase.test.ts",
+            "lines": [
+              {
+                "start": 87,
+                "end": 87
+              }
+            ]
+          },
+          {
+            "path": "apps/web/e2e/board-dnd-live.spec.ts",
+            "lines": [
+              {
+                "start": 217,
+                "end": 217
+              }
+            ]
+          },
+          {
+            "path": "apps/web/e2e/board-dnd.spec.ts",
+            "lines": [
+              {
+                "start": 1,
+                "end": 1
+              },
+              {
+                "start": 23,
+                "end": 23
+              },
+              {
+                "start": 162,
+                "end": 162
+              },
+              {
+                "start": 169,
+                "end": 169
+              },
+              {
+                "start": 214,
+                "end": 214
+              },
+              {
+                "start": 273,
+                "end": 273
+              },
+              {
+                "start": 368,
+                "end": 368
+              },
+              {
+                "start": 370,
+                "end": 371
+              },
+              {
+                "start": 383,
+                "end": 385
+              },
+              {
+                "start": 389,
+                "end": 389
+              },
+              {
+                "start": 554,
+                "end": 554
+              },
+              {
+                "start": 559,
+                "end": 559
+              },
+              {
+                "start": 592,
+                "end": 592
+              },
+              {
+                "start": 599,
+                "end": 600
+              },
+              {
+                "start": 607,
+                "end": 607
+              },
+              {
+                "start": 609,
+                "end": 609
+              },
+              {
+                "start": 616,
+                "end": 616
+              },
+              {
+                "start": 618,
+                "end": 618
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/board/board.tsx",
+            "lines": [
+              {
+                "start": 215,
+                "end": 216
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/board/columns.ts",
+            "lines": [
+              {
+                "start": 45,
+                "end": 47
+              },
+              {
+                "start": 91,
+                "end": 91
+              },
+              {
+                "start": 102,
+                "end": 103
+              },
+              {
+                "start": 117,
+                "end": 117
+              },
+              {
+                "start": 135,
+                "end": 140
+              },
+              {
+                "start": 142,
+                "end": 142
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/board/dnd.ts",
+            "lines": [
+              {
+                "start": 17,
+                "end": 17
+              },
+              {
+                "start": 30,
+                "end": 37
+              },
+              {
+                "start": 51,
+                "end": 51
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/board/done-confirm-dialog.tsx",
+            "lines": [
+              {
+                "start": 1,
+                "end": 7
+              },
+              {
+                "start": 17,
+                "end": 19
+              },
+              {
+                "start": 22,
+                "end": 22
+              },
+              {
+                "start": 26,
+                "end": 26
+              },
+              {
+                "start": 28,
+                "end": 31
+              },
+              {
+                "start": 34,
+                "end": 35
+              },
+              {
+                "start": 37,
+                "end": 37
+              },
+              {
+                "start": 41,
+                "end": 43
+              },
+              {
+                "start": 45,
+                "end": 51
+              },
+              {
+                "start": 53,
+                "end": 53
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/fixtures/board.ts",
+            "lines": [
+              {
+                "start": 148,
+                "end": 148
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/i18n/en.ts",
+            "lines": [
+              {
+                "start": 143,
+                "end": 150
+              },
+              {
+                "start": 569,
+                "end": 569
+              },
+              {
+                "start": 607,
+                "end": 607
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/phase.ts",
+            "lines": [
+              {
+                "start": 63,
+                "end": 63
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/routes/board-page.tsx",
+            "lines": [
+              {
+                "start": 548,
+                "end": 553
+              },
+              {
+                "start": 556,
+                "end": 556
+              },
+              {
+                "start": 559,
+                "end": 559
+              },
+              {
+                "start": 561,
+                "end": 561
+              },
+              {
+                "start": 750,
+                "end": 750
+              }
+            ]
+          },
+          {
+            "path": "apps/web/test/columns.test.ts",
+            "lines": [
+              {
+                "start": 55,
+                "end": 59
+              },
+              {
+                "start": 82,
+                "end": 82
+              },
+              {
+                "start": 84,
+                "end": 86
+              },
+              {
+                "start": 111,
+                "end": 111
+              },
+              {
+                "start": 218,
+                "end": 223
+              },
+              {
+                "start": 227,
+                "end": 229
+              },
+              {
+                "start": 233,
+                "end": 234
+              }
+            ]
+          },
+          {
+            "path": "apps/web/test/dnd.test.ts",
+            "lines": [
+              {
+                "start": 103,
+                "end": 105
+              }
+            ]
+          },
+          {
+            "path": "packages/shared/src/phase.ts",
+            "lines": [
+              {
+                "start": 69,
+                "end": 69
+              },
+              {
+                "start": 71,
+                "end": 71
+              },
+              {
+                "start": 77,
+                "end": 77
+              },
+              {
+                "start": 81,
+                "end": 81
+              },
+              {
+                "start": 94,
+                "end": 95
+              },
+              {
+                "start": 100,
+                "end": 100
+              },
+              {
+                "start": 104,
+                "end": 104
+              },
+              {
+                "start": 115,
+                "end": 115
+              }
+            ]
+          },
+          {
+            "path": "packages/shared/test/vocabulary.test.ts",
+            "lines": [
+              {
+                "start": 86,
+                "end": 86
+              },
+              {
+                "start": 107,
+                "end": 107
+              },
+              {
+                "start": 109,
+                "end": 109
+              },
+              {
+                "start": 123,
+                "end": 123
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": [
+          "5da6e72be4dcd8eab0257b348a2be1371f4883aa",
+          "8dcba82c9f56a4d1095c0c78f94851292b9a0283",
+          "aea01fd162b02d585ee9187f2d237450c992dbe3",
+          "a02601d2cc71ab7f4bc6570c37be616e15c46b01",
+          "09a3caa89df502b02c643f1c221c6c980479038a",
+          "46d89775ced675271e20bcf8e9c13f09a1fd84ef",
+          "b069262ff231625a69f8f36416eb5419f3878146",
+          "060088f32b07ce7eaaa8c32080f880044e67b4ee",
+          "20af9b3a3dcb67b7e09ffc8600bf5f5bb910619e",
+          "ee636a5f0227f5385b934a78475df37c82753443",
+          "7ccdcf20f41f87589d915538e6a7971901322238",
+          "4adc9fb3280c0cfd37333774ae80d71fd78fa51f",
+          "b5732b886487779e69aa694c7888d251713d8a90",
+          "9cbf21fbffae0e229340ca4a3c213e63a7b21335",
+          "97febed4c63f16d76204e19e54f5e340e78364bf",
+          "c8bd90926dfddfb36a8128145bd7ec262f419de7",
+          "a7e318911de1fac1ceebfeefa9664b9a7d0e6964",
+          "c682a66fa4f9e3210168cd84c7fc6100ba61e8fd"
+        ]
+      },
+      "originalPrUrl": null,
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/d1bd843080a5894421950f045df1d7b49feaced0",
+      "introducingUrl": null,
+      "attributionEvidence": {
+        "paths": [
+          "apps/server/src/routes-todos.ts",
+          "apps/server/src/services/builds.ts",
+          "apps/server/src/services/phase.ts",
+          "apps/server/src/services/todos.ts",
+          "apps/server/test/manual-drop-matrix.test.ts",
+          "apps/server/test/persona-split-verify.test.ts",
+          "apps/server/test/phase.test.ts",
+          "apps/server/test/stop-and-done-1247.test.ts",
+          "apps/server/test/wire.test.ts",
+          "apps/web/e2e/board-dnd-live.spec.ts",
+          "apps/web/e2e/board-dnd.spec.ts",
+          "apps/web/src/board/board.tsx",
+          "apps/web/src/board/columns.ts",
+          "apps/web/src/board/dnd.ts",
+          "apps/web/src/board/done-confirm-dialog.tsx",
+          "apps/web/src/board/todo-card.tsx",
+          "apps/web/src/fixtures/board.ts",
+          "apps/web/src/i18n/en.ts",
+          "apps/web/src/phase.ts",
+          "apps/web/src/routes/board-page.tsx",
+          "apps/web/test/columns.test.ts",
+          "apps/web/test/dnd.test.ts",
+          "docs/verify/1247/1247-after-canceled-in-done.png",
+          "docs/verify/1247/1247-after-confirm-dialog.png",
+          "docs/verify/1247/1247-after-done-column-mixed.png",
+          "docs/verify/1247/1247-after-done-order.png",
+          "docs/verify/1247/1247-after-drag-failed-dialog.png",
+          "docs/verify/1247/1247-after-failed-landed.png",
+          "docs/verify/1247/1247-after-inflight-dialog.png",
+          "docs/verify/1247/1247-after-inflight-still-running.png",
+          "docs/verify/1247/1247-after-inflight-stop-dialog.png",
+          "docs/verify/1247/1247-after-outcome-dialog-confirm.png",
+          "docs/verify/1247/1247-after-outcome-dialog.png",
+          "docs/verify/1247/1247-after-sibling-stays-waiting.png",
+          "docs/verify/1247/1247-before-confirm-drop.png",
+          "docs/verify/1247/1247-before-done-order.png",
+          "docs/verify/1247/1247-before-drag-failed-into-done.png",
+          "docs/verify/1247/1247-before-inflight-dialog.png",
+          "docs/verify/1247/1247-before-inflight-still-running.png",
+          "docs/verify/1247/1247-before-sibling-waiting.png",
+          "docs/verify/1247/1247-before-sibling-wave-started.png",
+          "docs/verify/1247/1247-before-stop-yanks-done.png",
+          "docs/verify/1247/1247-mon-decisions.txt",
+          "docs/verify/1247/README.md",
+          "docs/verify/1247/sse.txt",
+          "packages/shared/src/phase.ts",
+          "packages/shared/test/vocabulary.test.ts"
+        ],
+        "files": [
+          {
+            "path": "apps/server/src/routes-todos.ts",
+            "lines": [
+              {
+                "start": 13,
+                "end": 13
+              },
+              {
+                "start": 25,
+                "end": 25
+              },
+              {
+                "start": 109,
+                "end": 109
+              }
+            ]
+          },
+          {
+            "path": "apps/server/src/services/builds.ts",
+            "lines": [
+              {
+                "start": 75,
+                "end": 75
+              }
+            ]
+          },
+          {
+            "path": "apps/server/src/services/phase.ts",
+            "lines": [
+              {
+                "start": 23,
+                "end": 24
+              },
+              {
+                "start": 26,
+                "end": 26
+              },
+              {
+                "start": 30,
+                "end": 30
+              },
+              {
+                "start": 36,
+                "end": 36
+              },
+              {
+                "start": 46,
+                "end": 48
+              },
+              {
+                "start": 60,
+                "end": 61
+              }
+            ]
+          },
+          {
+            "path": "apps/server/src/services/todos.ts",
+            "lines": [
+              {
+                "start": 592,
+                "end": 592
+              }
+            ]
+          },
+          {
+            "path": "apps/server/test/manual-drop-matrix.test.ts",
+            "lines": [
+              {
+                "start": 6,
+                "end": 7
+              },
+              {
+                "start": 102,
+                "end": 103
+              },
+              {
+                "start": 105,
+                "end": 106
+              }
+            ]
+          },
+          {
+            "path": "apps/server/test/phase.test.ts",
+            "lines": [
+              {
+                "start": 87,
+                "end": 87
+              }
+            ]
+          },
+          {
+            "path": "apps/web/e2e/board-dnd-live.spec.ts",
+            "lines": [
+              {
+                "start": 217,
+                "end": 217
+              }
+            ]
+          },
+          {
+            "path": "apps/web/e2e/board-dnd.spec.ts",
+            "lines": [
+              {
+                "start": 1,
+                "end": 1
+              },
+              {
+                "start": 23,
+                "end": 23
+              },
+              {
+                "start": 162,
+                "end": 162
+              },
+              {
+                "start": 169,
+                "end": 169
+              },
+              {
+                "start": 214,
+                "end": 214
+              },
+              {
+                "start": 273,
+                "end": 273
+              },
+              {
+                "start": 368,
+                "end": 368
+              },
+              {
+                "start": 370,
+                "end": 371
+              },
+              {
+                "start": 383,
+                "end": 385
+              },
+              {
+                "start": 389,
+                "end": 389
+              },
+              {
+                "start": 554,
+                "end": 554
+              },
+              {
+                "start": 559,
+                "end": 559
+              },
+              {
+                "start": 592,
+                "end": 592
+              },
+              {
+                "start": 599,
+                "end": 600
+              },
+              {
+                "start": 607,
+                "end": 607
+              },
+              {
+                "start": 609,
+                "end": 609
+              },
+              {
+                "start": 616,
+                "end": 616
+              },
+              {
+                "start": 618,
+                "end": 618
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/board/board.tsx",
+            "lines": [
+              {
+                "start": 215,
+                "end": 216
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/board/columns.ts",
+            "lines": [
+              {
+                "start": 45,
+                "end": 47
+              },
+              {
+                "start": 91,
+                "end": 91
+              },
+              {
+                "start": 102,
+                "end": 103
+              },
+              {
+                "start": 117,
+                "end": 117
+              },
+              {
+                "start": 135,
+                "end": 140
+              },
+              {
+                "start": 142,
+                "end": 142
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/board/dnd.ts",
+            "lines": [
+              {
+                "start": 17,
+                "end": 17
+              },
+              {
+                "start": 30,
+                "end": 37
+              },
+              {
+                "start": 51,
+                "end": 51
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/board/done-confirm-dialog.tsx",
+            "lines": [
+              {
+                "start": 1,
+                "end": 7
+              },
+              {
+                "start": 17,
+                "end": 19
+              },
+              {
+                "start": 22,
+                "end": 22
+              },
+              {
+                "start": 26,
+                "end": 26
+              },
+              {
+                "start": 28,
+                "end": 31
+              },
+              {
+                "start": 34,
+                "end": 35
+              },
+              {
+                "start": 37,
+                "end": 37
+              },
+              {
+                "start": 41,
+                "end": 43
+              },
+              {
+                "start": 45,
+                "end": 51
+              },
+              {
+                "start": 53,
+                "end": 53
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/fixtures/board.ts",
+            "lines": [
+              {
+                "start": 148,
+                "end": 148
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/i18n/en.ts",
+            "lines": [
+              {
+                "start": 143,
+                "end": 150
+              },
+              {
+                "start": 569,
+                "end": 569
+              },
+              {
+                "start": 607,
+                "end": 607
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/phase.ts",
+            "lines": [
+              {
+                "start": 63,
+                "end": 63
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/routes/board-page.tsx",
+            "lines": [
+              {
+                "start": 548,
+                "end": 553
+              },
+              {
+                "start": 556,
+                "end": 556
+              },
+              {
+                "start": 559,
+                "end": 559
+              },
+              {
+                "start": 561,
+                "end": 561
+              },
+              {
+                "start": 750,
+                "end": 750
+              }
+            ]
+          },
+          {
+            "path": "apps/web/test/columns.test.ts",
+            "lines": [
+              {
+                "start": 55,
+                "end": 59
+              },
+              {
+                "start": 82,
+                "end": 82
+              },
+              {
+                "start": 84,
+                "end": 86
+              },
+              {
+                "start": 111,
+                "end": 111
+              },
+              {
+                "start": 218,
+                "end": 223
+              },
+              {
+                "start": 227,
+                "end": 229
+              },
+              {
+                "start": 233,
+                "end": 234
+              }
+            ]
+          },
+          {
+            "path": "apps/web/test/dnd.test.ts",
+            "lines": [
+              {
+                "start": 103,
+                "end": 105
+              }
+            ]
+          },
+          {
+            "path": "packages/shared/src/phase.ts",
+            "lines": [
+              {
+                "start": 69,
+                "end": 69
+              },
+              {
+                "start": 71,
+                "end": 71
+              },
+              {
+                "start": 77,
+                "end": 77
+              },
+              {
+                "start": 81,
+                "end": 81
+              },
+              {
+                "start": 94,
+                "end": 95
+              },
+              {
+                "start": 100,
+                "end": 100
+              },
+              {
+                "start": 104,
+                "end": 104
+              },
+              {
+                "start": 115,
+                "end": 115
+              }
+            ]
+          },
+          {
+            "path": "packages/shared/test/vocabulary.test.ts",
+            "lines": [
+              {
+                "start": 86,
+                "end": 86
+              },
+              {
+                "start": 107,
+                "end": 107
+              },
+              {
+                "start": 109,
+                "end": 109
+              },
+              {
+                "start": 123,
+                "end": 123
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": [
+          "5da6e72be4dcd8eab0257b348a2be1371f4883aa",
+          "8dcba82c9f56a4d1095c0c78f94851292b9a0283",
+          "aea01fd162b02d585ee9187f2d237450c992dbe3",
+          "a02601d2cc71ab7f4bc6570c37be616e15c46b01",
+          "09a3caa89df502b02c643f1c221c6c980479038a",
+          "46d89775ced675271e20bcf8e9c13f09a1fd84ef",
+          "b069262ff231625a69f8f36416eb5419f3878146",
+          "060088f32b07ce7eaaa8c32080f880044e67b4ee",
+          "20af9b3a3dcb67b7e09ffc8600bf5f5bb910619e",
+          "ee636a5f0227f5385b934a78475df37c82753443",
+          "7ccdcf20f41f87589d915538e6a7971901322238",
+          "4adc9fb3280c0cfd37333774ae80d71fd78fa51f",
+          "b5732b886487779e69aa694c7888d251713d8a90",
+          "9cbf21fbffae0e229340ca4a3c213e63a7b21335",
+          "97febed4c63f16d76204e19e54f5e340e78364bf",
+          "c8bd90926dfddfb36a8128145bd7ec262f419de7",
+          "a7e318911de1fac1ceebfeefa9664b9a7d0e6964",
+          "c682a66fa4f9e3210168cd84c7fc6100ba61e8fd"
+        ]
+      },
+      "review": null,
+      "week": "2026-10-12",
+      "reportStatus": "unresolved"
+    },
+    {
+      "followUpSha": "0048134ec35ac67d67e14431a1a021cc0f945bd7",
+      "fixingSha": "0048134ec35ac67d67e14431a1a021cc0f945bd7",
+      "followUpTimestamp": "2026-10-15T13:38:09.000Z",
+      "fixingPr": 1328,
+      "introducingSha": null,
+      "introducingMergedAt": null,
+      "originalPr": null,
+      "method": "blame",
+      "status": "multiple-origin",
+      "unresolvedReason": null,
+      "withinEscapeWindow": null,
+      "evidence": {
+        "paths": [
+          ".claude/skills/verify-pacman/SKILL.md",
+          ".claude/skills/verify-pacman/changelog/2026-10-14-1308.md",
+          ".claude/skills/verify-pacman/scripts/drive-1308-thinking-delta.mjs",
+          "apps/daemon/src/activity.ts",
+          "apps/daemon/src/machine-client.ts",
+          "apps/daemon/src/runner.ts",
+          "apps/daemon/test/runner-thinking-delta.test.ts",
+          "apps/server/src/routes-machine.ts",
+          "apps/server/src/services/events.ts",
+          "apps/server/src/services/machines.ts",
+          "apps/server/test/conv-stream-catchup.test.ts",
+          "apps/server/test/thinking-delta.test.ts",
+          "apps/web/src/api/live-thinking.ts",
+          "apps/web/src/api/mappers.ts",
+          "apps/web/src/api/sse.ts",
+          "apps/web/src/chief/use-chief-surface.ts",
+          "apps/web/src/routes/todo-detail-page.tsx",
+          "apps/web/test/sse-conversation-stream.test.ts",
+          "apps/web/test/thinking-live-row.test.ts",
+          "docs/verify/1308/README.md",
+          "docs/verify/1308/after-detail.png",
+          "docs/verify/1308/after-page-settled.txt",
+          "docs/verify/1308/after-page.txt",
+          "docs/verify/1308/after-post.json",
+          "docs/verify/1308/after-result.json",
+          "docs/verify/1308/after-settled.png",
+          "docs/verify/1308/after-sqlite.json",
+          "docs/verify/1308/after-sse-frames.json",
+          "docs/verify/1308/after-sse-summary.json",
+          "docs/verify/1308/before-detail.png",
+          "docs/verify/1308/before-page.txt",
+          "docs/verify/1308/before-post.json",
+          "docs/verify/1308/before-result.json",
+          "docs/verify/1308/before-sse-summary.json",
+          "packages/shared/src/protocol/machine-wire.ts",
+          "packages/shared/src/protocol/sse.ts",
+          "packages/shared/src/records/step.ts",
+          "packages/shared/test/__snapshots__/snapshot.test.ts.snap",
+          "packages/shared/test/snapshot.test.ts",
+          "packages/shared/test/thinking-delta-stream.test.ts"
+        ],
+        "files": [
+          {
+            "path": "apps/daemon/src/activity.ts",
+            "lines": [
+              {
+                "start": 30,
+                "end": 30
+              }
+            ]
+          },
+          {
+            "path": "apps/daemon/src/runner.ts",
+            "lines": [
+              {
+                "start": 1389,
+                "end": 1390
+              },
+              {
+                "start": 1401,
+                "end": 1401
+              },
+              {
+                "start": 1444,
+                "end": 1445
+              }
+            ]
+          },
+          {
+            "path": "apps/server/src/services/events.ts",
+            "lines": [
+              {
+                "start": 164,
+                "end": 164
+              },
+              {
+                "start": 189,
+                "end": 189
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/api/sse.ts",
+            "lines": [
+              {
+                "start": 31,
+                "end": 31
+              },
+              {
+                "start": 217,
+                "end": 217
+              },
+              {
+                "start": 219,
+                "end": 219
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/chief/use-chief-surface.ts",
+            "lines": [
+              {
+                "start": 210,
+                "end": 210
+              },
+              {
+                "start": 226,
+                "end": 226
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/routes/todo-detail-page.tsx",
+            "lines": [
+              {
+                "start": 319,
+                "end": 319
+              }
+            ]
+          },
+          {
+            "path": "packages/shared/src/records/step.ts",
+            "lines": [
+              {
+                "start": 186,
+                "end": 187
+              },
+              {
+                "start": 192,
+                "end": 192
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": [
+          "43de4f05b29f6dc22854252ea81589f36495177f",
+          "2615af4c2815be0eb7c9c8084d0745a5b916b4e8",
+          "8bf91c9b71a5fc575c3365af7ccd3e28d25f8135",
+          "cb8d2c759c2faffabde709b1db2b41ae923d9a83",
+          "84174dc4f30c4423e45a405497a635916ed72d14"
+        ]
+      },
+      "originalPrUrl": null,
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/0048134ec35ac67d67e14431a1a021cc0f945bd7",
+      "introducingUrl": null,
+      "attributionEvidence": {
+        "paths": [
+          ".claude/skills/verify-pacman/SKILL.md",
+          ".claude/skills/verify-pacman/changelog/2026-10-14-1308.md",
+          ".claude/skills/verify-pacman/scripts/drive-1308-thinking-delta.mjs",
+          "apps/daemon/src/activity.ts",
+          "apps/daemon/src/machine-client.ts",
+          "apps/daemon/src/runner.ts",
+          "apps/daemon/test/runner-thinking-delta.test.ts",
+          "apps/server/src/routes-machine.ts",
+          "apps/server/src/services/events.ts",
+          "apps/server/src/services/machines.ts",
+          "apps/server/test/conv-stream-catchup.test.ts",
+          "apps/server/test/thinking-delta.test.ts",
+          "apps/web/src/api/live-thinking.ts",
+          "apps/web/src/api/mappers.ts",
+          "apps/web/src/api/sse.ts",
+          "apps/web/src/chief/use-chief-surface.ts",
+          "apps/web/src/routes/todo-detail-page.tsx",
+          "apps/web/test/sse-conversation-stream.test.ts",
+          "apps/web/test/thinking-live-row.test.ts",
+          "docs/verify/1308/README.md",
+          "docs/verify/1308/after-detail.png",
+          "docs/verify/1308/after-page-settled.txt",
+          "docs/verify/1308/after-page.txt",
+          "docs/verify/1308/after-post.json",
+          "docs/verify/1308/after-result.json",
+          "docs/verify/1308/after-settled.png",
+          "docs/verify/1308/after-sqlite.json",
+          "docs/verify/1308/after-sse-frames.json",
+          "docs/verify/1308/after-sse-summary.json",
+          "docs/verify/1308/before-detail.png",
+          "docs/verify/1308/before-page.txt",
+          "docs/verify/1308/before-post.json",
+          "docs/verify/1308/before-result.json",
+          "docs/verify/1308/before-sse-summary.json",
+          "packages/shared/src/protocol/machine-wire.ts",
+          "packages/shared/src/protocol/sse.ts",
+          "packages/shared/src/records/step.ts",
+          "packages/shared/test/__snapshots__/snapshot.test.ts.snap",
+          "packages/shared/test/snapshot.test.ts",
+          "packages/shared/test/thinking-delta-stream.test.ts"
+        ],
+        "files": [
+          {
+            "path": "apps/daemon/src/activity.ts",
+            "lines": [
+              {
+                "start": 30,
+                "end": 30
+              }
+            ]
+          },
+          {
+            "path": "apps/daemon/src/runner.ts",
+            "lines": [
+              {
+                "start": 1389,
+                "end": 1390
+              },
+              {
+                "start": 1401,
+                "end": 1401
+              },
+              {
+                "start": 1444,
+                "end": 1445
+              }
+            ]
+          },
+          {
+            "path": "apps/server/src/services/events.ts",
+            "lines": [
+              {
+                "start": 164,
+                "end": 164
+              },
+              {
+                "start": 189,
+                "end": 189
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/api/sse.ts",
+            "lines": [
+              {
+                "start": 31,
+                "end": 31
+              },
+              {
+                "start": 217,
+                "end": 217
+              },
+              {
+                "start": 219,
+                "end": 219
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/chief/use-chief-surface.ts",
+            "lines": [
+              {
+                "start": 210,
+                "end": 210
+              },
+              {
+                "start": 226,
+                "end": 226
+              }
+            ]
+          },
+          {
+            "path": "apps/web/src/routes/todo-detail-page.tsx",
+            "lines": [
+              {
+                "start": 319,
+                "end": 319
+              }
+            ]
+          },
+          {
+            "path": "packages/shared/src/records/step.ts",
+            "lines": [
+              {
+                "start": 186,
+                "end": 187
+              },
+              {
+                "start": 192,
+                "end": 192
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": [
+          "43de4f05b29f6dc22854252ea81589f36495177f",
+          "2615af4c2815be0eb7c9c8084d0745a5b916b4e8",
+          "8bf91c9b71a5fc575c3365af7ccd3e28d25f8135",
+          "cb8d2c759c2faffabde709b1db2b41ae923d9a83",
+          "84174dc4f30c4423e45a405497a635916ed72d14"
+        ]
+      },
+      "review": null,
+      "week": "2026-10-12",
+      "reportStatus": "unresolved"
+    },
+    {
+      "followUpSha": "f0835bbc4d9b2033a348f8c6ac90268e119e8a23",
+      "fixingSha": "f0835bbc4d9b2033a348f8c6ac90268e119e8a23",
+      "followUpTimestamp": "2026-10-23T03:19:30.000Z",
+      "fixingPr": 1562,
+      "introducingSha": "e1224fcd4b4ef624e3f8863692cd1241e4ddc664",
+      "introducingMergedAt": "2026-10-23T01:44:05.000Z",
+      "originalPr": 1547,
+      "method": "blame",
+      "status": "resolved",
+      "unresolvedReason": null,
+      "withinEscapeWindow": true,
+      "evidence": {
+        "paths": [
+          "docs/verify/1561/gate-before-after.txt",
+          "scripts/single-use-helper-gate.mjs",
+          "scripts/single-use-helper-gate.test.mjs"
+        ],
+        "files": [
+          {
+            "path": "scripts/single-use-helper-gate.mjs",
+            "lines": [
+              {
+                "start": 26,
+                "end": 26
+              },
+              {
+                "start": 31,
+                "end": 31
+              },
+              {
+                "start": 33,
+                "end": 33
+              },
+              {
+                "start": 110,
+                "end": 110
+              },
+              {
+                "start": 112,
+                "end": 112
+              },
+              {
+                "start": 118,
+                "end": 123
+              },
+              {
+                "start": 129,
+                "end": 129
+              },
+              {
+                "start": 132,
+                "end": 137
+              },
+              {
+                "start": 140,
+                "end": 140
+              }
+            ]
+          },
+          {
+            "path": "scripts/single-use-helper-gate.test.mjs",
+            "lines": [
+              {
+                "start": 3,
+                "end": 3
+              },
+              {
+                "start": 10,
+                "end": 10
+              },
+              {
+                "start": 77,
+                "end": 79
+              },
+              {
+                "start": 83,
+                "end": 83
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "originalPrUrl": "https://github.com/xiechimon/cairn/pull/1547",
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/f0835bbc4d9b2033a348f8c6ac90268e119e8a23",
+      "introducingUrl": "https://github.com/xiechimon/cairn/commit/e1224fcd4b4ef624e3f8863692cd1241e4ddc664",
+      "attributionEvidence": {
+        "paths": [
+          "docs/verify/1561/gate-before-after.txt",
+          "scripts/single-use-helper-gate.mjs",
+          "scripts/single-use-helper-gate.test.mjs"
+        ],
+        "files": [
+          {
+            "path": "scripts/single-use-helper-gate.mjs",
+            "lines": [
+              {
+                "start": 26,
+                "end": 26
+              },
+              {
+                "start": 31,
+                "end": 31
+              },
+              {
+                "start": 33,
+                "end": 33
+              },
+              {
+                "start": 110,
+                "end": 110
+              },
+              {
+                "start": 112,
+                "end": 112
+              },
+              {
+                "start": 118,
+                "end": 123
+              },
+              {
+                "start": 129,
+                "end": 129
+              },
+              {
+                "start": 132,
+                "end": 137
+              },
+              {
+                "start": 140,
+                "end": 140
+              }
+            ]
+          },
+          {
+            "path": "scripts/single-use-helper-gate.test.mjs",
+            "lines": [
+              {
+                "start": 3,
+                "end": 3
+              },
+              {
+                "start": 10,
+                "end": 10
+              },
+              {
+                "start": 77,
+                "end": 79
+              },
+              {
+                "start": 83,
+                "end": 83
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "review": {
+        "path": "unknown",
+        "evidence": [],
+        "data": "available",
+        "errors": [],
+        "sources": [
+          "https://api.github.com/repos/xiechimon/cairn/pulls/1547/reviews",
+          "https://api.github.com/repos/xiechimon/cairn/issues/1547/comments"
+        ],
+        "mergedAt": "2026-10-23T01:44:05Z",
+        "mergedHeadSha": "4fc924ac33619c059a545b2b94d8132db6c64abd"
+      },
+      "week": "2026-10-19",
+      "reportStatus": "qualifying"
+    },
+    {
+      "followUpSha": "32a9adc37f101ade4c0f55fbf690b2377c9ccddb",
+      "fixingSha": "32a9adc37f101ade4c0f55fbf690b2377c9ccddb",
+      "followUpTimestamp": "2026-10-23T10:59:57.000Z",
+      "fixingPr": 1581,
+      "introducingSha": null,
+      "introducingMergedAt": null,
+      "originalPr": null,
+      "method": "blame",
+      "status": "unresolved",
+      "unresolvedReason": "no-blameable-lines",
+      "withinEscapeWindow": null,
+      "evidence": {
+        "paths": [
+          "scripts/scrub-git-env.mjs",
+          "scripts/scrub-git-env.test.mjs",
+          "vitest.config.ts"
+        ],
+        "files": [],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "originalPrUrl": null,
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/32a9adc37f101ade4c0f55fbf690b2377c9ccddb",
+      "introducingUrl": null,
+      "attributionEvidence": {
+        "paths": [
+          "scripts/scrub-git-env.mjs",
+          "scripts/scrub-git-env.test.mjs",
+          "vitest.config.ts"
+        ],
+        "files": [],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "review": null,
+      "week": "2026-10-19",
+      "reportStatus": "unresolved"
+    },
+    {
+      "followUpSha": "e0c3961d78941fbe61d78a71a5a2475625b6e6fd",
+      "fixingSha": "e0c3961d78941fbe61d78a71a5a2475625b6e6fd",
+      "followUpTimestamp": "2026-10-23T11:00:23.000Z",
+      "fixingPr": 1582,
+      "introducingSha": "886051936a4628ad178531082fe5595351e36e71",
+      "introducingMergedAt": "2026-10-23T10:14:44.000Z",
+      "originalPr": 1568,
+      "method": "blame",
+      "status": "resolved",
+      "unresolvedReason": null,
+      "withinEscapeWindow": true,
+      "evidence": {
+        "paths": [
+          ".github/workflows/ci.yml",
+          "docs/lessons.md",
+          "scripts/npm-command-gate.mjs",
+          "scripts/npm-command-gate.test.mjs",
+          "site/index.html"
+        ],
+        "files": [
+          {
+            "path": "site/index.html",
+            "lines": [
+              {
+                "start": 148,
+                "end": 148
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "originalPrUrl": "https://github.com/xiechimon/cairn/pull/1568",
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/e0c3961d78941fbe61d78a71a5a2475625b6e6fd",
+      "introducingUrl": "https://github.com/xiechimon/cairn/commit/886051936a4628ad178531082fe5595351e36e71",
+      "attributionEvidence": {
+        "paths": [
+          ".github/workflows/ci.yml",
+          "docs/lessons.md",
+          "scripts/npm-command-gate.mjs",
+          "scripts/npm-command-gate.test.mjs",
+          "site/index.html"
+        ],
+        "files": [
+          {
+            "path": "site/index.html",
+            "lines": [
+              {
+                "start": 148,
+                "end": 148
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "review": {
+        "path": "unknown",
+        "evidence": [],
+        "data": "available",
+        "errors": [],
+        "sources": [
+          "https://api.github.com/repos/xiechimon/cairn/pulls/1568/reviews",
+          "https://api.github.com/repos/xiechimon/cairn/issues/1568/comments"
+        ],
+        "mergedAt": "2026-10-23T10:14:44Z",
+        "mergedHeadSha": "997cbd00aa85ca01f570381e547295ec79fb01e0"
+      },
+      "week": "2026-10-19",
+      "reportStatus": "qualifying"
+    },
+    {
+      "followUpSha": "15d6f98f4c6b78f7e2b62cf99583641d4d4274b3",
+      "fixingSha": "15d6f98f4c6b78f7e2b62cf99583641d4d4274b3",
+      "followUpTimestamp": "2026-10-23T14:51:54.000Z",
+      "fixingPr": 1585,
+      "introducingSha": null,
+      "introducingMergedAt": null,
+      "originalPr": null,
+      "method": "blame",
+      "status": "multiple-origin",
+      "unresolvedReason": null,
+      "withinEscapeWindow": null,
+      "evidence": {
+        "paths": [
+          "apps/web/src/resources/create-machine-dialog.tsx",
+          "scripts/npm-command-gate.mjs",
+          "scripts/npm-command-gate.test.mjs"
+        ],
+        "files": [
+          {
+            "path": "apps/web/src/resources/create-machine-dialog.tsx",
+            "lines": [
+              {
+                "start": 1,
+                "end": 18
+              }
+            ]
+          },
+          {
+            "path": "scripts/npm-command-gate.mjs",
+            "lines": [
+              {
+                "start": 6,
+                "end": 6
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": [
+          "d5a7b91ce524f8ece4440d001c2d10b195d34183",
+          "0b64899554bca245e9fc32b96188a8318a2a094b",
+          "cafa9e1197984120319f5417d639e2522d7a0d12",
+          "da5972ced256207db7430d371bd2c0455ff792eb",
+          "e0c3961d78941fbe61d78a71a5a2475625b6e6fd"
+        ]
+      },
+      "originalPrUrl": null,
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/15d6f98f4c6b78f7e2b62cf99583641d4d4274b3",
+      "introducingUrl": null,
+      "attributionEvidence": {
+        "paths": [
+          "apps/web/src/resources/create-machine-dialog.tsx",
+          "scripts/npm-command-gate.mjs",
+          "scripts/npm-command-gate.test.mjs"
+        ],
+        "files": [
+          {
+            "path": "apps/web/src/resources/create-machine-dialog.tsx",
+            "lines": [
+              {
+                "start": 1,
+                "end": 18
+              }
+            ]
+          },
+          {
+            "path": "scripts/npm-command-gate.mjs",
+            "lines": [
+              {
+                "start": 6,
+                "end": 6
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": [
+          "d5a7b91ce524f8ece4440d001c2d10b195d34183",
+          "0b64899554bca245e9fc32b96188a8318a2a094b",
+          "cafa9e1197984120319f5417d639e2522d7a0d12",
+          "da5972ced256207db7430d371bd2c0455ff792eb",
+          "e0c3961d78941fbe61d78a71a5a2475625b6e6fd"
+        ]
+      },
+      "review": null,
+      "week": "2026-10-19",
+      "reportStatus": "unresolved"
+    },
+    {
+      "followUpSha": "06a6bfc6216baec53dcdf44445a598e0962a1651",
+      "fixingSha": "06a6bfc6216baec53dcdf44445a598e0962a1651",
+      "followUpTimestamp": "2026-10-23T15:31:39.000Z",
+      "fixingPr": 1592,
+      "introducingSha": null,
+      "introducingMergedAt": null,
+      "originalPr": null,
+      "method": "blame",
+      "status": "unresolved",
+      "unresolvedReason": "no-blameable-lines",
+      "withinEscapeWindow": null,
+      "evidence": {
+        "paths": [
+          "scripts/migrate-pacman-to-cairn.sh"
+        ],
+        "files": [],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "originalPrUrl": null,
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/06a6bfc6216baec53dcdf44445a598e0962a1651",
+      "introducingUrl": null,
+      "attributionEvidence": {
+        "paths": [
+          "scripts/migrate-pacman-to-cairn.sh"
+        ],
+        "files": [],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "review": null,
+      "week": "2026-10-19",
+      "reportStatus": "unresolved"
+    },
+    {
+      "followUpSha": "d60df992c5726b3f75a7248febe805c56eae59c2",
+      "fixingSha": "d60df992c5726b3f75a7248febe805c56eae59c2",
+      "followUpTimestamp": "2026-10-24T05:43:49.000Z",
+      "fixingPr": 1597,
+      "introducingSha": "0b64899554bca245e9fc32b96188a8318a2a094b",
+      "introducingMergedAt": "2026-10-23T11:18:34.000Z",
+      "originalPr": 1565,
+      "method": "blame",
+      "status": "resolved",
+      "unresolvedReason": null,
+      "withinEscapeWindow": true,
+      "evidence": {
+        "paths": [
+          "scripts/migrate-pacman-to-cairn.sh"
+        ],
+        "files": [
+          {
+            "path": "scripts/migrate-pacman-to-cairn.sh",
+            "lines": [
+              {
+                "start": 56,
+                "end": 56
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "originalPrUrl": "https://github.com/xiechimon/cairn/pull/1565",
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/d60df992c5726b3f75a7248febe805c56eae59c2",
+      "introducingUrl": "https://github.com/xiechimon/cairn/commit/0b64899554bca245e9fc32b96188a8318a2a094b",
+      "attributionEvidence": {
+        "paths": [
+          "scripts/migrate-pacman-to-cairn.sh"
+        ],
+        "files": [
+          {
+            "path": "scripts/migrate-pacman-to-cairn.sh",
+            "lines": [
+              {
+                "start": 56,
+                "end": 56
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "review": {
+        "path": "unknown",
+        "evidence": [],
+        "data": "available",
+        "errors": [],
+        "sources": [
+          "https://api.github.com/repos/xiechimon/cairn/pulls/1565/reviews",
+          "https://api.github.com/repos/xiechimon/cairn/issues/1565/comments"
+        ],
+        "mergedAt": "2026-10-23T11:18:34Z",
+        "mergedHeadSha": "fe8523eeb4f8ad22cf1830a92bc0d2c6826a127f"
+      },
+      "week": "2026-10-19",
+      "reportStatus": "qualifying"
+    },
+    {
+      "followUpSha": "3aa782e106579d97404dc376a2d607b76a1826e1",
+      "fixingSha": "3aa782e106579d97404dc376a2d607b76a1826e1",
+      "followUpTimestamp": "2026-10-24T05:49:36.000Z",
+      "fixingPr": 1598,
+      "introducingSha": "0b64899554bca245e9fc32b96188a8318a2a094b",
+      "introducingMergedAt": "2026-10-23T11:18:34.000Z",
+      "originalPr": 1565,
+      "method": "blame",
+      "status": "resolved",
+      "unresolvedReason": null,
+      "withinEscapeWindow": true,
+      "evidence": {
+        "paths": [
+          "scripts/migrate-pacman-to-cairn.sh"
+        ],
+        "files": [
+          {
+            "path": "scripts/migrate-pacman-to-cairn.sh",
+            "lines": [
+              {
+                "start": 91,
+                "end": 91
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "originalPrUrl": "https://github.com/xiechimon/cairn/pull/1565",
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/3aa782e106579d97404dc376a2d607b76a1826e1",
+      "introducingUrl": "https://github.com/xiechimon/cairn/commit/0b64899554bca245e9fc32b96188a8318a2a094b",
+      "attributionEvidence": {
+        "paths": [
+          "scripts/migrate-pacman-to-cairn.sh"
+        ],
+        "files": [
+          {
+            "path": "scripts/migrate-pacman-to-cairn.sh",
+            "lines": [
+              {
+                "start": 91,
+                "end": 91
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "review": {
+        "path": "unknown",
+        "evidence": [],
+        "data": "available",
+        "errors": [],
+        "sources": [
+          "https://api.github.com/repos/xiechimon/cairn/pulls/1565/reviews",
+          "https://api.github.com/repos/xiechimon/cairn/issues/1565/comments"
+        ],
+        "mergedAt": "2026-10-23T11:18:34Z",
+        "mergedHeadSha": "fe8523eeb4f8ad22cf1830a92bc0d2c6826a127f"
+      },
+      "week": "2026-10-19",
+      "reportStatus": "qualifying"
+    },
+    {
+      "followUpSha": "05d0dd12e3e9eab720bfd7c4afeb097ed4c0615e",
+      "fixingSha": "05d0dd12e3e9eab720bfd7c4afeb097ed4c0615e",
+      "followUpTimestamp": "2026-10-28T03:48:55.000Z",
+      "fixingPr": 1703,
+      "introducingSha": null,
+      "introducingMergedAt": null,
+      "originalPr": null,
+      "method": "blame",
+      "status": "multiple-origin",
+      "unresolvedReason": null,
+      "withinEscapeWindow": null,
+      "evidence": {
+        "paths": [
+          "docs/lessons/1703-direct-vitest-skipped-slot.md",
+          "docs/spec/19-test-layering-and-blast-radius.md",
+          "docs/verify/1703/cairn-1703-reconcile-evidence/README.md",
+          "docs/verify/1703/cairn-1703-reconcile-evidence/green.log",
+          "docs/verify/1703/cairn-1703-reconcile-evidence/prepush.log",
+          "docs/verify/1703/cairn-1703-reconcile-evidence/red.log",
+          "docs/verify/1703/cairn-1703-reconcile-evidence/regression.log",
+          "scripts/heavy-slots.test.mjs",
+          "scripts/prepush-vitest.mjs"
+        ],
+        "files": [
+          {
+            "path": "docs/spec/19-test-layering-and-blast-radius.md",
+            "lines": [
+              {
+                "start": 47,
+                "end": 47
+              }
+            ]
+          },
+          {
+            "path": "scripts/prepush-vitest.mjs",
+            "lines": [
+              {
+                "start": 22,
+                "end": 35
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": [
+          "c42ce40df30846aa88fcfbf1e5ae13c311308e8e",
+          "1442c6af5701640f07f71fa506342ff193c3dab1"
+        ]
+      },
+      "originalPrUrl": null,
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/05d0dd12e3e9eab720bfd7c4afeb097ed4c0615e",
+      "introducingUrl": null,
+      "attributionEvidence": {
+        "paths": [
+          "docs/lessons/1703-direct-vitest-skipped-slot.md",
+          "docs/spec/19-test-layering-and-blast-radius.md",
+          "docs/verify/1703/cairn-1703-reconcile-evidence/README.md",
+          "docs/verify/1703/cairn-1703-reconcile-evidence/green.log",
+          "docs/verify/1703/cairn-1703-reconcile-evidence/prepush.log",
+          "docs/verify/1703/cairn-1703-reconcile-evidence/red.log",
+          "docs/verify/1703/cairn-1703-reconcile-evidence/regression.log",
+          "scripts/heavy-slots.test.mjs",
+          "scripts/prepush-vitest.mjs"
+        ],
+        "files": [
+          {
+            "path": "docs/spec/19-test-layering-and-blast-radius.md",
+            "lines": [
+              {
+                "start": 47,
+                "end": 47
+              }
+            ]
+          },
+          {
+            "path": "scripts/prepush-vitest.mjs",
+            "lines": [
+              {
+                "start": 22,
+                "end": 35
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": [
+          "c42ce40df30846aa88fcfbf1e5ae13c311308e8e",
+          "1442c6af5701640f07f71fa506342ff193c3dab1"
+        ]
+      },
+      "review": null,
+      "week": "2026-10-26",
+      "reportStatus": "unresolved"
+    }
+  ],
+  "excluded": [
+    {
+      "followUpSha": "d3d7814f0924757a592cbf1ca97848cde350c097",
+      "fixingSha": "d3d7814f0924757a592cbf1ca97848cde350c097",
+      "followUpTimestamp": "2026-10-23T14:00:50.000Z",
+      "fixingPr": 1584,
+      "introducingSha": "6b63325e64245c9bfed0c395d70f267f268fa998",
+      "introducingMergedAt": "2026-10-02T14:13:21.000Z",
+      "originalPr": 637,
+      "method": "blame",
+      "status": "outside-window",
+      "unresolvedReason": null,
+      "withinEscapeWindow": false,
+      "evidence": {
+        "paths": [
+          "apps/web/src/api/mappers.ts",
+          "apps/web/test/transcript-tool-echo.test.ts",
+          "docs/verify/transcript-echo-trim/before-live-82.png"
+        ],
+        "files": [
+          {
+            "path": "apps/web/src/api/mappers.ts",
+            "lines": [
+              {
+                "start": 662,
+                "end": 663
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "originalPrUrl": "https://github.com/xiechimon/cairn/pull/637",
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/d3d7814f0924757a592cbf1ca97848cde350c097",
+      "introducingUrl": "https://github.com/xiechimon/cairn/commit/6b63325e64245c9bfed0c395d70f267f268fa998",
+      "attributionEvidence": {
+        "paths": [
+          "apps/web/src/api/mappers.ts",
+          "apps/web/test/transcript-tool-echo.test.ts",
+          "docs/verify/transcript-echo-trim/before-live-82.png"
+        ],
+        "files": [
+          {
+            "path": "apps/web/src/api/mappers.ts",
+            "lines": [
+              {
+                "start": 662,
+                "end": 663
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "review": null,
+      "exclusion": "outside-14-day-window"
+    },
+    {
+      "followUpSha": "8757f6e663cbedce5e761286c7a1e00e6f10c768",
+      "fixingSha": "8757f6e663cbedce5e761286c7a1e00e6f10c768",
+      "followUpTimestamp": "2026-10-23T15:59:20.000Z",
+      "fixingPr": 1593,
+      "introducingSha": "6899f15e5f77d7432628e92d4309a10883174e64",
+      "introducingMergedAt": "2026-09-22T21:59:42.000Z",
+      "originalPr": 101,
+      "method": "blame",
+      "status": "outside-window",
+      "unresolvedReason": null,
+      "withinEscapeWindow": false,
+      "evidence": {
+        "paths": [
+          "apps/daemon/src/git.ts"
+        ],
+        "files": [
+          {
+            "path": "apps/daemon/src/git.ts",
+            "lines": [
+              {
+                "start": 377,
+                "end": 377
+              },
+              {
+                "start": 383,
+                "end": 383
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "originalPrUrl": "https://github.com/xiechimon/cairn/pull/101",
+      "followUpUrl": "https://github.com/xiechimon/cairn/commit/8757f6e663cbedce5e761286c7a1e00e6f10c768",
+      "introducingUrl": "https://github.com/xiechimon/cairn/commit/6899f15e5f77d7432628e92d4309a10883174e64",
+      "attributionEvidence": {
+        "paths": [
+          "apps/daemon/src/git.ts"
+        ],
+        "files": [
+          {
+            "path": "apps/daemon/src/git.ts",
+            "lines": [
+              {
+                "start": 377,
+                "end": 377
+              },
+              {
+                "start": 383,
+                "end": 383
+              }
+            ]
+          }
+        ],
+        "references": [],
+        "unvalidatedReferences": [],
+        "introducingCandidates": []
+      },
+      "review": null,
+      "exclusion": "outside-14-day-window"
+    }
+  ]
+}
