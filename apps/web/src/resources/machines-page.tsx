@@ -7,6 +7,7 @@ import { useApiMutations, useChief, useMachines, useTeams } from '../api/hooks.j
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
+import { formatClaudeLoginWarning } from '../claude-login-warning.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Button } from '../components/ui/button.js';
@@ -395,27 +396,7 @@ export function MachinesPage() {
             const chief = chiefState(machine);
             const notice = claudeLoginNotice(machine.claudeLogin, Date.now());
             const loginWarning =
-              notice === null
-                ? null
-                : notice.kind === 'expired'
-                  ? t(
-                      '{name} 上的 Claude Code 登录已过期。在该机器上运行 `claude auth login` 重新登录。',
-                      { name: machine.name },
-                    )
-                  : notice.days === null
-                    ? t(
-                        '{name} 上的 Claude Code 登录将在不到 1 天内过期。在该机器上运行 `claude auth login` 重新登录。',
-                        { name: machine.name },
-                      )
-                    : notice.days === 1
-                      ? t(
-                          '{name} 上的 Claude Code 登录将在 1 天后过期。在该机器上运行 `claude auth login` 重新登录。',
-                          { name: machine.name },
-                        )
-                      : t(
-                          '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该机器上运行 `claude auth login` 重新登录。',
-                          { name: machine.name, days: notice.days },
-                        );
+              notice === null ? null : formatClaudeLoginWarning(notice, machine.name, t);
             return (
               <ResourceRow
                 key={rowKey(machine)}

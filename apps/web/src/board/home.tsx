@@ -1,4 +1,4 @@
-import { canOrchestrate } from '@cairn/shared';
+import { canOrchestrate, claudeLoginNotice } from '@cairn/shared';
 import { cn } from 'cn';
 import {
   Activity,
@@ -17,10 +17,11 @@ import { Link, useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
+import { formatClaudeLoginWarning } from '../claude-login-warning.js';
 import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { PROJECT_NAME } from '../fixtures/fixtures.js';
-import type { TodoRecord } from '../fixtures/records.js';
+import type { MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { PHASE_UI } from '../phase.js';
 import { useOpenTaskInPlace } from '../task-panel/task-panel-root.js';
@@ -471,7 +472,11 @@ export function HomeSections({
 
 const BRIEF_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export function DailyBrief({ todos, ...ctx }: RowContext & { todos: TodoRecord[] }) {
+export function DailyBrief({
+  todos,
+  machines = [],
+  ...ctx
+}: RowContext & { todos: TodoRecord[]; machines?: readonly MachineRow[] }) {
   const { t } = useI18n();
   const projectOf = useProjectName(ctx.projectNames);
   const running = new Set(columnTodos('building', todos));
@@ -489,6 +494,17 @@ export function DailyBrief({ todos, ...ctx }: RowContext & { todos: TodoRecord[]
     byProject.set(name, line);
   }
   const lines = [...byProject].sort(([a], [b]) => a.localeCompare(b));
+  const loginWarnings = machines.flatMap((machine) => {
+    const notice = claudeLoginNotice(machine.claudeLogin, ctx.now);
+    if (notice === null) return [];
+    return [
+      {
+        key: machine.id ?? machine.name,
+        kind: notice.kind,
+        text: formatClaudeLoginWarning(notice, machine.name, t),
+      },
+    ];
+  });
   return (
     <div data-testid="chief-brief" className="flex flex-col gap-3 text-ui text-content-secondary">
       {lines.length > 0 ? (
@@ -513,6 +529,20 @@ export function DailyBrief({ todos, ...ctx }: RowContext & { todos: TodoRecord[]
         </>
       ) : (
         <p className="m-0">{t('过去 24 小时各项目没有新进展')}</p>
+      )}
+      {loginWarnings.length > 0 && (
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {loginWarnings.map((warning) => (
+            <li
+              key={warning.key}
+              data-testid="claude-login-warning"
+              data-login={warning.kind}
+              role="status"
+            >
+              {warning.text}
+            </li>
+          ))}
+        </ul>
       )}
       {waiting.length > 0 && (
         <>

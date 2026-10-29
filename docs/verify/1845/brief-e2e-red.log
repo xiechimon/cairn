@@ -1,0 +1,50 @@
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/workspace/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+
+Running 1 test using 1 worker
+
+(node:5385) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] e2e/chief-home-claude-login.spec.ts:75:1 › daily brief warns for expiring and expired Claude Code logins
+  1) e2e/chief-home-claude-login.spec.ts:75:1 › daily brief warns for expiring and expired Claude Code logins 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('chief-home-today').getByTestId('claude-login-warning')
+    Expected: 2
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" getByTestId('chief-home-today').getByTestId('claude-login-warning') with timeout 5000ms
+      - waiting for getByTestId('chief-home-today').getByTestId('claude-login-warning')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      85 |   await expect(today.getByTestId('chief-brief')).toBeVisible();
+      86 |   const warnings = today.getByTestId('claude-login-warning');
+    > 87 |   await expect(warnings).toHaveCount(2);
+         |                          ^
+      88 |   await expect(warnings.nth(0)).toHaveAttribute('data-login', 'expiring');
+      89 |   await expect(warnings.nth(0)).toHaveText(
+      90 |     'omarchy 上的 Claude Code 登录将在 2 天后过期。在该机器上运行 `claude auth login` 重新登录。',
+        at /workspace/apps/web/e2e/chief-home-claude-login.spec.ts:87:26
+
+    Error Context: test-results/chief-home-claude-login-da-b11c9--expired-Claude-Code-logins/error-context.md
+
+
+  1 failed
+    e2e/chief-home-claude-login.spec.ts:75:1 › daily brief warns for expiring and expired Claude Code logins 
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/apps/web
+
