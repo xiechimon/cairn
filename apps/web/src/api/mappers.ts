@@ -1045,6 +1045,7 @@ export function mapApiKeys(rows: ApiKeyRow[]): DisplayApiKey[] {
     masked: r.masked,
     gitAccess: r.gitAccess,
     mcpAccess: r.mcpAccess,
+    machineAccess: r.machineAccess,
   }));
 }
 

@@ -861,6 +861,7 @@ export function useApiMutations(teamId: string | undefined) {
         name: string | null;
         gitAccess: boolean;
         mcpAccess: boolean;
+        machineAccess: boolean;
         toolGrants: { read: string[]; write: string[] };
       }) => api.post<ApiKeyRow & { plaintext?: string }>(`/api/teams/${teamId}/api-keys`, body),
       onSuccess: invalidateAll,

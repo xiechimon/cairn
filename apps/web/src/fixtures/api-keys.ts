@@ -9,6 +9,7 @@ const API_KEY_CREATED: ApiKeyRecord = {
   masked: maskApiKey(API_KEY_PLAINTEXT),
   gitAccess: true,
   mcpAccess: true,
+  machineAccess: true,
   plaintext: API_KEY_PLAINTEXT,
 };
 

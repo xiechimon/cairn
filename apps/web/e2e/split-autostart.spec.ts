@@ -48,6 +48,7 @@ async function teamStage(): Promise<Stage> {
     name: 'split-autostart',
     gitAccess: false,
     mcpAccess: false,
+    machineAccess: true,
     toolGrants: { read: [], write: [] },
   });
   const enrolled = await ok<{ machineId: string; token: string }>(

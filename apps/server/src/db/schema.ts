@@ -488,6 +488,7 @@ export const apiKey = sqliteTable('api_key', {
   name: text('name'),
   gitAccess: bool('gitAccess').notNull().default(false),
   mcpAccess: bool('mcpAccess').notNull().default(false),
+  machineAccess: bool('machineAccess').notNull().default(false),
   toolGrants: json<{ read: string[]; write: string[] }>('toolGrants').notNull(),
   keyHash: text('keyHash').notNull(),
   masked: text('masked').notNull(),

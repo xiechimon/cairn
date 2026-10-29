@@ -255,6 +255,7 @@ describe('apiKey surface (r3 section 6 observed display rules + 02 section 8 has
     name: '笔记本',
     gitAccess: true,
     mcpAccess: true,
+    machineAccess: true,
     toolGrants: { read: ['Todos', 'Projects'], write: ['Create Todo'] },
   };
 

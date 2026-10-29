@@ -43,12 +43,14 @@ describe('the 37-table migration (the 01 §6 list)', () => {
     const journal = JSON.parse(
       readFileSync(resolve(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
     ) as { entries: { tag: string; when: number }[] };
-    const scheduleMigration = journal.entries.find((entry) => entry.tag === '0067_schedule_report');
-    if (scheduleMigration === undefined) throw new Error('schedule_report migration missing');
-    db.run(sql`DROP TABLE schedule_report`);
-    db.run(sql`DELETE FROM __drizzle_migrations WHERE created_at = ${scheduleMigration.when}`);
+    const tipMigration = journal.entries.find((entry) => entry.tag === '0068_odd_cloak');
+    if (tipMigration === undefined) throw new Error('machineAccess migration missing');
+    db.run(sql`ALTER TABLE api_key DROP COLUMN machineAccess`);
+    db.run(sql`DELETE FROM __drizzle_migrations WHERE created_at = ${tipMigration.when}`);
     migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-    expect(db.select().from(schema.scheduleReport).all()).toEqual([]);
+    const columns = db.all(sql`PRAGMA table_info(api_key)`) as { name: string }[];
+    expect(columns.some((column) => column.name === 'machineAccess')).toBe(true);
+    expect(db.select().from(schema.harnessEvalAttempt).all()).toEqual([]);
   });
 
   test('the migrations apply cleanly to an in-memory db', () => {

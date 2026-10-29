@@ -222,6 +222,7 @@ beforeAll(async () => {
       name: `${name}-key`,
       gitAccess: false,
       mcpAccess: false,
+      machineAccess: true,
       toolGrants: { read: [], write: [] },
     });
     const keyBody = key.body as { plaintext?: string; record?: { plaintext?: string } };

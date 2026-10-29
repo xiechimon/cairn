@@ -3292,6 +3292,10 @@ exports[`body/envelope schema snapshots > apiKeyRow > apiKeyRow.json 1`] = `
     "id": {
       "type": "string",
     },
+    "machineAccess": {
+      "default": false,
+      "type": "boolean",
+    },
     "masked": {
       "type": "string",
     },
@@ -3331,6 +3335,7 @@ exports[`body/envelope schema snapshots > apiKeyRow > apiKeyRow.json 1`] = `
     "name",
     "gitAccess",
     "mcpAccess",
+    "machineAccess",
     "toolGrants",
     "id",
     "masked",
@@ -7575,6 +7580,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > api
     "gitAccess": {
       "type": "boolean",
     },
+    "machineAccess": {
+      "default": false,
+      "type": "boolean",
+    },
     "mcpAccess": {
       "type": "boolean",
     },
@@ -7611,6 +7620,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > api
     "name",
     "gitAccess",
     "mcpAccess",
+    "machineAccess",
     "toolGrants",
   ],
   "type": "object",

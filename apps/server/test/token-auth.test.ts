@@ -171,6 +171,7 @@ describe('token auth: the four exempt surfaces (failure modes 3/4/5/8)', () => {
       name: 'machine-bootstrap',
       gitAccess: false,
       mcpAccess: false,
+      machineAccess: true,
       toolGrants: { read: [], write: [] },
     });
     expect(issued.status).toBe(201);

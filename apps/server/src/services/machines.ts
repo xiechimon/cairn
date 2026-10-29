@@ -278,33 +278,42 @@ export function enrollMachine(
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
   const token = newMachineToken();
-  const isLocal = input.name === hostname();
+  const isLocalName = input.name === hostname();
   const capabilities = parseCapabilitiesField(input.capabilities);
-  const existing =
-    db
-      .select()
-      .from(machine)
-      .where(and(eq(machine.apiKeyId, input.keyId), eq(machine.teamId, input.teamId)))
-      .get() ?? (isLocal ? localMachineRow(db, input.teamId, input.name) : undefined);
-  if (existing) {
+  const byKey = db
+    .select()
+    .from(machine)
+    .where(and(eq(machine.apiKeyId, input.keyId), eq(machine.teamId, input.teamId)))
+    .get();
+  if (byKey) {
     db.update(machine)
       .set({
         tokenHash: token.hash,
         name: input.name,
         apiKeyId: input.keyId,
         ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
-        ...(isLocal ? { kind: 'local' as const } : {}),
         ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-        ...(capabilities !== undefined ? reportedConcurrencyPatch(existing, capabilities) : {}),
+        ...(capabilities !== undefined ? reportedConcurrencyPatch(byKey, capabilities) : {}),
       })
-      .where(eq(machine.id, existing.id))
+      .where(eq(machine.id, byKey.id))
       .run();
     return {
-      machineId: existing.id,
+      machineId: byKey.id,
       token: token.plain,
       teamId: input.teamId,
       serverUrl: input.serverUrl,
     };
+  }
+  if (isLocalName) {
+    const seeded = localMachineRow(db, input.teamId, input.name);
+    if (seeded) {
+      throw new HttpError(
+        403,
+        seeded.apiKeyId !== null || seeded.tokenHash !== null
+          ? 'local machine already enrolled'
+          : 'local machine requires owner approval',
+      );
+    }
   }
   const machineId = newRecordId();
   db.insert(machine)
@@ -316,7 +325,7 @@ export function enrollMachine(
       tokenHash: token.hash,
       apiKeyId: input.keyId,
       latestCliVersion: input.cliVersion ?? null,
-      kind: isLocal ? 'local' : 'remote',
+      kind: isLocalName ? 'local' : 'remote',
       enabledRuntimes: ['pi'],
       ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
       ...(capabilities !== undefined
