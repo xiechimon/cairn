@@ -71,7 +71,8 @@ test('compiled worker runs an agent command with CAIRN_ORB through the real stdi
   api.claimQueue.push(claimed);
   const provider = new NspawnOrbProvider({
     runner: async (argv, options) => {
-      if (argv[0] !== 'systemd-run') return { code: 0, stdout: '', stderr: '' };
+      if (argv[0] !== 'systemd-run' || !argv.includes('--uid=agent'))
+        return { code: 0, stdout: '', stderr: '' };
       const home = join(scratch, 'user');
       mkdirSync(home, { recursive: true });
       return runOrbCommand(

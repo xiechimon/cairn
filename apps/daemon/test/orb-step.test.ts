@@ -1,8 +1,10 @@
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import type { AgentBackend, MachineDoneBody, SessionOpts } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
-import { StepJournal } from '../src/journal.js';
-import { encodeOrbFrame } from '../src/orb/protocol.js';
+import { StepJournal, TranscriptBuffer } from '../src/journal.js';
+import { decodeOrbFrame, encodeOrbFrame } from '../src/orb/protocol.js';
 import {
   NspawnOrbProvider,
   type OrbCommandRunner,
@@ -23,7 +25,8 @@ function workerRunner(
   observe?: (options: OrbExecOptions) => void,
 ): OrbCommandRunner {
   return async (argv, options) => {
-    if (argv[0] !== 'systemd-run') return { code: 0, stdout: '', stderr: '' };
+    if (argv[0] !== 'systemd-run' || !argv.includes('--uid=agent'))
+      return { code: 0, stdout: '', stderr: '' };
     if (options) observe?.(options);
     const input = new PassThrough();
     const output = new PassThrough();
@@ -192,15 +195,15 @@ test.each(['clone', 'start', 'worker', 'worker-exit', 'worker-frame', 'eviction'
     const runner = workerRunner(fakeBackend([{ type: 'done', usage: [] }]).backend);
     const provider = new NspawnOrbProvider({
       runner: async (argv, options) => {
-        if (argv[0] === 'systemd-run' && source === 'worker-exit')
+        if (argv.includes('--uid=agent') && source === 'worker-exit')
           return { code: 137, stdout: '', stderr: `${source} unavailable` };
-        if (argv[0] === 'systemd-run' && source === 'worker-frame') {
+        if (argv.includes('--uid=agent') && source === 'worker-frame') {
           options?.onStdout?.(encodeOrbFrame({ type: 'failed', error: `${source} unavailable` }));
           return { code: 0, stdout: '', stderr: '' };
         }
         if (
           argv[1] === source ||
-          (source === 'worker' && argv[0] === 'systemd-run') ||
+          (source === 'worker' && argv.includes('--uid=agent')) ||
           (source === 'eviction' && argv[1] === 'poweroff')
         )
           throw new Error(`${source} unavailable`);
@@ -359,7 +362,8 @@ test('orb mounts conversation workspaces and artifacts without sharing host runt
       paths.teamSkillsCacheDir,
     ])
       expect(sources).not.toContain(root);
-    expect(sources).toContain(paths.outboxDir);
+    expect(sources).not.toContain(paths.outboxDir);
+    expect(sources).toContain(join(paths.home, 'orb-outbox', CLAIMED.step.id));
   } finally {
     await handle.stop();
     await handle.done;
@@ -442,6 +446,227 @@ test('worker exit waits for an in-flight finish report without replacing or dupl
     expect(new StepJournal(paths.outboxDir).pending()).toEqual([]);
   } finally {
     release.resolve();
+    await handle.stop();
+    await handle.done;
+  }
+});
+
+test('an orb cannot mount another step outbox or forge its host recovery journal', async () => {
+  const executions: OrbExecOptions[] = [];
+  const api = new FakeMachineApi();
+  api.mePatch = { maxConcurrent: 2 };
+  for (const id of ['s1', 's2'])
+    api.claimQueue.push({
+      ...CLAIMED,
+      conversationId: id,
+      step: { ...CLAIMED.step, id, buildId: id },
+    });
+  const provider = new NspawnOrbProvider({
+    runner: async (argv, options) => {
+      if (argv[0] !== 'systemd-run' || !options) return { code: 0, stdout: '', stderr: '' };
+      executions.push(options);
+      const init = decodeOrbFrame(options.input?.trim() ?? '');
+      if (init?.type !== 'init') throw new Error('Missing init frame');
+      const outbox = init.input.paths.outboxDir;
+      const forged = new StepJournal(outbox);
+      forged.claim({
+        stepId: 'victim',
+        buildId: 'victim-build',
+        kind: 'plan',
+        conversationId: 'victim-build',
+        sessionAction: 'new',
+        prompt: 'forged',
+      });
+      forged.update('victim', {
+        state: 'awaiting-upload',
+        doneBody: { status: 'success' },
+        stopRequest: { discard: true },
+      });
+      options.onStdout?.(encodeOrbFrame({ type: 'finished' }));
+      return { code: 0, stdout: '', stderr: '' };
+    },
+  });
+  const { handle, paths } = await boot({
+    api,
+    orbProvider: provider,
+    capEnv: { CAIRN_EXECUTOR: 'orb' },
+  });
+  try {
+    await waitFor(() => executions.length === 2);
+    const outboxes = ['s1', 's2'].map((id) => join(paths.home, 'orb-outbox', id));
+    for (const [index, execution] of executions.entries()) {
+      const sources = execution.binds?.map((bind) => bind.source) ?? [];
+      expect(sources).toContain(outboxes[index]);
+      expect(sources).not.toContain(outboxes[1 - index]);
+      expect(sources).not.toContain(paths.outboxDir);
+      expect(sources).not.toContain(dirname(outboxes[index]!));
+    }
+    const journal = new StepJournal(paths.outboxDir);
+    expect(journal.get('victim')).toBeNull();
+    expect(
+      journal
+        .pending()
+        .map((entry) => entry.stepId)
+        .sort(),
+    ).toEqual(['s1', 's2']);
+  } finally {
+    await handle.stop();
+    await handle.done;
+  }
+});
+
+test('worker checkpoints preserve only the bound step recovery state in the private host journal', async () => {
+  const release = defer();
+  const api = new FakeMachineApi();
+  api.claimQueue.push(CLAIMED);
+  let workerOutbox = '';
+  const backend: AgentBackend = {
+    ...fakeBackend([]).backend,
+    async createSession(opts) {
+      return {
+        ...(await fakeBackend([]).backend.createSession(opts)),
+        events: (async function* () {
+          await release.promise;
+          yield { type: 'done' as const, usage: [] };
+        })(),
+      };
+    },
+  };
+  const provider = new NspawnOrbProvider({
+    runner: workerRunner(backend, (options) => {
+      const init = decodeOrbFrame(options.input?.trim() ?? '');
+      if (init?.type === 'init') workerOutbox = init.input.paths.outboxDir;
+    }),
+  });
+  const { handle, paths } = await boot({
+    api,
+    orbProvider: provider,
+    capEnv: { CAIRN_EXECUTOR: 'orb' },
+  });
+  try {
+    const journal = new StepJournal(paths.outboxDir);
+    await waitFor(() => journal.get('s1')?.sessionId === 'pi-sess-1');
+    mkdirSync(workerOutbox, { recursive: true });
+    writeFileSync(
+      join(workerOutbox, 'step-s1.json'),
+      JSON.stringify({
+        stepId: 'victim',
+        claimed: CLAIMED,
+        state: 'awaiting-upload',
+        doneBody: { status: 'success' },
+        stopRequest: { discard: true },
+      }),
+    );
+    expect(journal.get('s1')).toMatchObject({ stepId: 's1', sessionId: 'pi-sess-1' });
+    expect(journal.get('s1')?.stopRequest).toBeUndefined();
+    expect(journal.get('victim')).toBeNull();
+  } finally {
+    release.resolve();
+    await handle.stop();
+    await handle.done;
+  }
+});
+
+test('orb recovery uploads its step artifacts and ignores forged worker journals for other steps', async () => {
+  const api = new FakeMachineApi();
+  api.recoverSteps = [
+    { ...CLAIMED.step, kind: 'plan', machineId: 'm1' },
+    { ...CLAIMED.step, kind: 'plan', id: 'victim', machineId: 'm1' },
+  ];
+  const provider = new NspawnOrbProvider({
+    runner: async () => {
+      throw new Error('Recovery must not start an orb');
+    },
+  });
+  const { handle, paths } = await boot({
+    api,
+    orbProvider: provider,
+    capEnv: { CAIRN_EXECUTOR: 'orb' },
+    seedJournal: (paths) => {
+      const host = new StepJournal(paths.outboxDir);
+      host.claim({
+        stepId: 's1',
+        buildId: CLAIMED.step.buildId,
+        kind: 'plan',
+        conversationId: CLAIMED.conversationId,
+        sessionAction: 'new',
+        prompt: null,
+        claimed: CLAIMED,
+      });
+      host.update('s1', { state: 'awaiting-upload', doneBody: { status: 'success' } });
+      const workerOutbox = join(paths.home, 'orb-outbox', 's1');
+      new TranscriptBuffer(paths.outboxDir, 's1').upsert({
+        id: 'row',
+        role: 'assistant',
+        content: 'Recovered own transcript',
+        createdAt: 1,
+      });
+      const forged = new StepJournal(workerOutbox);
+      forged.claim({
+        stepId: 'victim',
+        buildId: 'victim-build',
+        kind: 'plan',
+        conversationId: 'victim-build',
+        sessionAction: 'new',
+        prompt: 'forged',
+        claimed: { ...CLAIMED, step: { ...CLAIMED.step, id: 'victim' } },
+      });
+      forged.update('victim', {
+        state: 'awaiting-upload',
+        doneBody: { status: 'success' },
+        stopRequest: { discard: true },
+      });
+    },
+  });
+  try {
+    expect(api.doneBodies).toEqual([
+      { stepId: 's1', body: { status: 'success' } },
+      {
+        stepId: 'victim',
+        body: { status: 'failed', errorMessage: 'daemon journal lost across restart' },
+      },
+    ]);
+    expect(JSON.stringify(api.uploads)).toContain('Recovered own transcript');
+    expect(new StepJournal(paths.outboxDir).pending()).toEqual([]);
+  } finally {
+    await handle.stop();
+    await handle.done;
+  }
+});
+
+test('host failure recovery never follows a symlink planted in an orb outbox', async () => {
+  const api = new FakeMachineApi();
+  api.claimQueue.push(CLAIMED);
+  const provider = new NspawnOrbProvider({
+    runner: async (argv, options) => {
+      if (!argv.includes('--uid=agent')) return { code: 0, stdout: '', stderr: '' };
+      const init = decodeOrbFrame(options?.input?.trim() ?? '');
+      if (init?.type !== 'init') throw new Error('Missing init frame');
+      symlinkSync(
+        join(init.input.paths.home, 'outbox', 'step-victim.transcript.json'),
+        join(init.input.paths.outboxDir, 'step-s1.transcript.json'),
+      );
+      return { code: 1, stdout: '', stderr: 'worker exited' };
+    },
+  });
+  const { handle } = await boot({
+    api,
+    orbProvider: provider,
+    capEnv: { CAIRN_EXECUTOR: 'orb' },
+    seedJournal: (paths) => {
+      new TranscriptBuffer(paths.outboxDir, 'victim').upsert({
+        id: 'private',
+        role: 'assistant',
+        content: 'Other conversation private transcript',
+        createdAt: 1,
+      });
+    },
+  });
+  try {
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]?.body.status).toBe('failed');
+    expect(JSON.stringify(api.uploads)).not.toContain('Other conversation private transcript');
+  } finally {
     await handle.stop();
     await handle.done;
   }

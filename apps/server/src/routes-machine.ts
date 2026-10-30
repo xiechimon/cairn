@@ -5,6 +5,7 @@ import {
   machineAgentTodoBodySchema,
   machineAskBodySchema,
   machineClaimBodySchema,
+  machineClosedOrbsBodySchema,
   machineDoneBodySchema,
   machineEnrollBodySchema,
   machineEnrollConfirmBodySchema,
@@ -259,8 +260,10 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     return c.json(toMachineRecord(row, machineRunningCount(deps.db, row.id)));
   });
 
-  app.get('/api/machine/orbs/closed', (c) => {
+  app.post('/api/machine/orbs/closed', async (c) => {
     const row = me(c);
+    const body = parseWith(machineClosedOrbsBodySchema, await jsonBody(c), 'body');
+    if (body.conversationIds.length === 0) return c.json([]);
     const closed = ctx.db
       .selectDistinct({ id: build.id })
       .from(build)
@@ -268,6 +271,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       .innerJoin(step, eq(step.buildId, build.id))
       .where(
         and(
+          inArray(build.id, body.conversationIds),
           eq(step.machineId, row.id),
           eq(todo.teamId, row.teamId),
           or(inArray(todo.phase, ['closed', 'done']), isNotNull(todo.archivedAt)),

@@ -1,4 +1,5 @@
-import type { ClaimedStep } from '@cairn/shared';
+import { type ClaimedStep, machineDoneBodySchema, transcriptUploadSchema } from '@cairn/shared';
+import { z } from 'zod';
 import type { MachineApi } from '../machine-client.js';
 import type { RunStepOptions } from '../runner.js';
 import type { StatePaths } from '../state.js';
@@ -37,6 +38,19 @@ export interface OrbStepInput {
   methods: OrbStepMethod[];
 }
 
+export const orbCheckpointSchema = z
+  .object({
+    state: z.enum(['claimed', 'running', 'awaiting-upload', 'done', 'failed']),
+    sessionId: z.string().nullable(),
+    sessionAction: z.enum(['new', 'continue']),
+    prompt: z.string().nullable(),
+    doneBody: machineDoneBodySchema.nullable().optional(),
+    planContent: z.string().nullable().optional(),
+    transcript: transcriptUploadSchema.shape.messages.optional(),
+    sessionContent: z.string().nullable().optional(),
+  })
+  .strict();
+
 export type OrbFrame =
   | { type: 'init'; input: OrbStepInput }
   | { type: 'call'; id: number; method: OrbStepMethod; args: unknown[] }
@@ -44,6 +58,7 @@ export type OrbFrame =
   | { type: 'reply'; id: number; value?: unknown; error?: string; status?: number; body?: string }
   | { type: 'stop'; discard: boolean }
   | { type: 'session'; live: boolean }
+  | { type: 'checkpoint'; checkpoint: z.infer<typeof orbCheckpointSchema> }
   | { type: 'steered'; id: number; error?: string }
   | {
       type: 'steer';

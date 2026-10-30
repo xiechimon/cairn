@@ -17,7 +17,12 @@ export interface OrbHandle {
 
 export interface OrbExecOptions {
   env?: NodeJS.ProcessEnv;
-  binds?: readonly { source: string; target: string; readonly?: boolean }[];
+  binds?: readonly {
+    source: string;
+    target: string;
+    readonly?: boolean;
+    releaseAfterExec?: boolean;
+  }[];
   cwd?: string;
   signal?: AbortSignal;
   input?: string;
@@ -183,6 +188,7 @@ export class NspawnOrbProvider implements OrbProvider {
     if (!handle.running) {
       await this.command(['machinectl', 'start', handle.id]);
       handle.running = true;
+      this.bound.set(handle.id, new Set());
       handle.notes.push(orbNote('orb: setup'));
       handle.notes.push(
         orbNote(`orb: started in ${Date.now() - startedAt}ms`, Date.now() - startedAt),
@@ -197,45 +203,75 @@ export class NspawnOrbProvider implements OrbProvider {
     argv: readonly string[],
     options: OrbExecOptions,
   ): Promise<OrbExecResult> {
+    if (handle.running && !this.bound.has(handle.id)) {
+      await this.stop(handle);
+      await this.ensure(handle);
+    }
     let bound = this.bound.get(handle.id);
     if (!bound) {
       bound = new Set();
       this.bound.set(handle.id, bound);
     }
-    for (const bind of options.binds ?? []) {
-      const key = JSON.stringify(bind);
-      if (bound.has(key)) continue;
-      await this.command([
-        'machinectl',
-        'bind',
-        '--mkdir',
-        ...(bind.readonly ? ['--read-only'] : []),
-        handle.id,
-        bind.source,
-        bind.target,
-      ]);
-      bound.add(key);
-    }
-    const env = { ...options.env, CAIRN_ORB: '1' };
-    const flags = Object.entries(env).flatMap(([key, value]) =>
-      value === undefined ? [] : [`--setenv=${key}=${value}`],
-    );
-    return this.runner(
-      [
-        'systemd-run',
-        '-M',
-        handle.id,
-        '--uid=agent',
-        '--wait',
-        '--pipe',
-        '--quiet',
-        ...(options.cwd ? [`--working-directory=${options.cwd}`] : []),
-        ...flags,
-        '--',
-        ...argv,
-      ],
-      { ...options, env: undefined },
-    );
+    const execute = async () => {
+      for (const bind of options.binds ?? []) {
+        const key = JSON.stringify(bind);
+        if (bound.has(key)) continue;
+        await this.command([
+          'machinectl',
+          'bind',
+          '--mkdir',
+          ...(bind.readonly ? ['--read-only'] : []),
+          handle.id,
+          bind.source,
+          bind.target,
+        ]);
+        bound.add(key);
+      }
+      const env = { ...options.env, CAIRN_ORB: '1' };
+      const flags = Object.entries(env).flatMap(([key, value]) =>
+        value === undefined ? [] : [`--setenv=${key}=${value}`],
+      );
+      return this.runner(
+        [
+          'systemd-run',
+          '-M',
+          handle.id,
+          '--uid=agent',
+          '--wait',
+          '--pipe',
+          '--quiet',
+          ...(options.cwd ? [`--working-directory=${options.cwd}`] : []),
+          ...flags,
+          '--',
+          ...argv,
+        ],
+        { ...options, env: undefined },
+      );
+    };
+    return execute().finally(async () => {
+      const released = (options.binds ?? []).filter(
+        (bind) => bind.releaseAfterExec && bound.has(JSON.stringify(bind)),
+      );
+      if (released.length > 0) {
+        try {
+          await this.command([
+            'systemd-run',
+            '-M',
+            handle.id,
+            '--wait',
+            '--quiet',
+            '--',
+            'umount',
+            '--',
+            ...released.map((bind) => bind.target),
+          ]);
+          for (const bind of released) bound.delete(JSON.stringify(bind));
+        } catch (error) {
+          await this.stop(handle);
+          throw error;
+        }
+      }
+    });
   }
 
   async stop(handle: OrbHandle): Promise<void> {

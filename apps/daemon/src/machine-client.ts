@@ -8,6 +8,7 @@ import {
   type MachineAttachmentResponse,
   type MachineCapabilities,
   type MachineClaimBody,
+  type MachineClosedOrbsBody,
   type MachineDoneBody,
   type MachineEnrollResponse,
   type MachineHeartbeatBody,
@@ -22,6 +23,7 @@ import {
   machineAskResponseSchema,
   machineAttachmentResponseSchema,
   machineClaimResponseSchema,
+  machineClosedOrbsResponseSchema,
   machineEnrollPollResponseSchema,
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
@@ -43,8 +45,6 @@ import {
   type TranscriptRow,
   type TranscriptUpload,
 } from '@cairn/shared';
-
-import { z } from 'zod';
 
 export class MachineApiError extends Error {
   constructor(
@@ -83,7 +83,9 @@ export interface MachineApi {
     capabilities?: MachineCapabilities;
   }): Promise<void>;
   recover(): Promise<MachineRecoverResponse>;
-  closedOrbConversations?(): Promise<string[]>;
+  closedOrbConversations?(
+    conversationIds: MachineClosedOrbsBody['conversationIds'],
+  ): Promise<string[]>;
   claim(signal?: AbortSignal, body?: MachineClaimBody): Promise<ClaimedStep | null>;
   heartbeat(stepId: string, body?: MachineHeartbeatBody): Promise<void>;
   tool(stepId: string, call: ToolCallRecord): Promise<void>;
@@ -239,9 +241,13 @@ export class MachineClient implements MachineApi {
     });
   }
 
-  async closedOrbConversations(): Promise<string[]> {
-    return this.request('GET', '/api/machine/orbs/closed', {
-      parse: (raw) => z.array(z.string()).parse(raw),
+  async closedOrbConversations(
+    conversationIds: MachineClosedOrbsBody['conversationIds'],
+  ): Promise<string[]> {
+    return this.request('POST', '/api/machine/orbs/closed', {
+      body: { conversationIds },
+      signal: AbortSignal.timeout(10_000),
+      parse: (raw) => machineClosedOrbsResponseSchema.parse(raw),
     });
   }
 

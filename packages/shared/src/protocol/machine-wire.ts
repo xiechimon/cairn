@@ -56,6 +56,23 @@ export const machineEnrollConfirmResponseSchema = z.object({ machine: machineJso
 
 export const machineMeResponseSchema = machineRecordSchema;
 
+export const MACHINE_ORB_CONVERSATIONS_LIMIT = 250;
+export const machineClosedOrbsBodySchema = z.object({
+  conversationIds: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .max(128)
+        .regex(/^[a-zA-Z0-9_-]+$/),
+    )
+    .max(MACHINE_ORB_CONVERSATIONS_LIMIT),
+});
+export type MachineClosedOrbsBody = z.infer<typeof machineClosedOrbsBodySchema>;
+export const machineClosedOrbsResponseSchema = z
+  .array(recordId)
+  .max(MACHINE_ORB_CONVERSATIONS_LIMIT);
+
 export const machinePresenceBodySchema = z.object({
   cliVersion: z.string().optional(),
   claudeCode: claudeCodeReportSchema.optional(),
@@ -431,10 +448,10 @@ export const MACHINE_WIRE_EXTENSIONS = [
     reason: '[设计] W4 #285 浏览器授权流完成面（授权页用户确认；capability=enrollId）',
   },
   {
-    method: 'GET',
+    method: 'POST',
     path: '/api/machine/orbs/closed',
     reason:
-      '[design] #2274 closed and archived build ids for orb cleanup, scoped to the authenticated machine and team',
+      '[design] #2274 bounded held build ids checked for closed or archived orb cleanup, scoped to the authenticated machine and team',
   },
   {
     method: 'GET',

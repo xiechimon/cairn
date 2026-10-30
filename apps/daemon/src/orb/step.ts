@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentSessionHandle, ClaimedStep, MachineDoneBody } from '@cairn/shared';
 import { TranscriptBuffer } from '../journal.js';
 import { MachineApiError } from '../machine-client.js';
+import { writePrivateFile } from '../private-fs.js';
 import { type RunStepDeps, type RunStepOptions, resumePendingUpload, runStep } from '../runner.js';
 import { StepStops } from '../step-stops.js';
 import type { OrbLifecycle } from './lifecycle.js';
@@ -12,6 +13,7 @@ import {
   ORB_STEP_METHODS,
   type OrbFrame,
   type OrbStepInput,
+  orbCheckpointSchema,
 } from './protocol.js';
 import { type OrbHandle, orbNote } from './provider.js';
 
@@ -28,6 +30,7 @@ export async function runOrbStep(
     return;
   }
   const stepId = claimed.step.id;
+  const stepPaths = { ...deps.paths, outboxDir: join(deps.paths.home, 'orb-outbox', stepId) };
   deps.journal.claim({
     stepId,
     buildId: claimed.step.buildId,
@@ -90,7 +93,7 @@ export async function runOrbStep(
         lifecycle.provider.touch(handle, Date.now());
         const methods = ORB_STEP_METHODS.filter((method) => deps.client[method] !== undefined);
         const paths = {
-          ...deps.paths,
+          ...stepPaths,
           chatSessionsDir: join(deps.paths.chatSessionsDir, handle.id),
           agentRuntimeDir: join(deps.paths.agentRuntimeDir, handle.id),
           teamSkillsCacheDir: join(deps.paths.teamSkillsCacheDir, handle.id),
@@ -107,7 +110,7 @@ export async function runOrbStep(
           methods,
         };
         const directories = [
-          deps.paths.outboxDir,
+          paths.outboxDir,
           paths.chatSessionsDir,
           paths.agentRuntimeDir,
           paths.teamSkillsCacheDir,
@@ -117,9 +120,16 @@ export async function runOrbStep(
           paths.workspacesDir,
         ];
         for (const dir of directories) mkdirSync(dir, { recursive: true });
-        const binds: { source: string; target: string; readonly?: boolean }[] = directories.map(
-          (source) => ({ source, target: source }),
-        );
+        const binds: {
+          source: string;
+          target: string;
+          readonly?: boolean;
+          releaseAfterExec?: boolean;
+        }[] = directories.map((source) => ({
+          source,
+          target: source,
+          ...(source === paths.outboxDir ? { releaseAfterExec: true } : {}),
+        }));
         for (const source of [deps.skillsDir, deps.mcpConfigPath]) {
           if (source && existsSync(source)) binds.push({ source, target: source, readonly: true });
         }
@@ -133,6 +143,27 @@ export async function runOrbStep(
         const requests = new Map<number, AbortController>();
         const uploads = new Set<string>();
         const receive = async (frame: OrbFrame): Promise<void> => {
+          if (frame.type === 'checkpoint') {
+            const parsed = orbCheckpointSchema.safeParse(frame.checkpoint);
+            if (parsed.success && !completion.reported) {
+              const { transcript, sessionContent, ...checkpoint } = parsed.data;
+              if (transcript) {
+                writePrivateFile(
+                  join(deps.paths.outboxDir, `step-${stepId}.transcript.json`),
+                  JSON.stringify(transcript),
+                );
+              }
+              const sessionFile = join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`);
+              if (sessionContent != null) writePrivateFile(sessionFile, sessionContent);
+              deps.journal.update(stepId, {
+                ...checkpoint,
+                ...(sessionContent !== undefined
+                  ? { sessionFile: sessionContent === null ? null : sessionFile }
+                  : {}),
+              });
+            }
+            return;
+          }
           if (frame.type === 'session') {
             ready = frame.live;
             if (ready) {
@@ -197,6 +228,7 @@ export async function runOrbStep(
             if (frame.method === 'done') {
               completion.reported = true;
               deps.journal.remove(stepId);
+              rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
             }
             if (frame.method === 'uploadUrls') {
               for (const upload of (value as { uploads: { url: string }[] }).uploads)
@@ -251,7 +283,7 @@ export async function runOrbStep(
     if (completion.reporting) await completion.reporting.catch(() => {});
     if (!completion.reported) {
       const pending = deps.journal.get(stepId);
-      if (completion.reporting && pending?.doneBody) {
+      if (pending?.state === 'awaiting-upload' && pending.doneBody) {
         await resumePendingUpload(deps, pending, { running: options.running });
         return;
       }

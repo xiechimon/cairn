@@ -334,3 +334,95 @@ test('provider restart preserves a machine that is actually running', async () =
   expect(commands.filter((c) => c.argv[1] === 'start')).toHaveLength(1);
   expect((await restarted.list())[0]?.running).toBe(true);
 });
+
+test('step outbox binds are released after both successful and failed execution', async () => {
+  for (const fail of [false, true]) {
+    const { commands, runner, stateFile } = fixture();
+    const scoped = new NspawnOrbProvider({
+      stateFile,
+      runner: async (argv, options) => {
+        if (fail && argv[0] === 'systemd-run' && argv.includes('--uid=agent'))
+          throw new Error('worker failed');
+        return runner(argv, options);
+      },
+    });
+    const handle = await scoped.ensure({ conversationId: 'A', projectId: 'P' });
+    const execution = scoped.exec(handle, ['cairn', 'orb-step'], {
+      binds: [{ source: '/outbox/s1', target: '/outbox/s1', releaseAfterExec: true }],
+    });
+    if (fail) await expect(execution).rejects.toThrow('worker failed');
+    else await execution;
+    expect(commands.at(-1)?.argv).toEqual([
+      'systemd-run',
+      '-M',
+      handle.id,
+      '--wait',
+      '--quiet',
+      '--',
+      'umount',
+      '--',
+      '/outbox/s1',
+    ]);
+  }
+});
+
+test('a recovered running container drops stale mounts before executing another step', async () => {
+  const { provider, commands, runner, stateFile } = fixture();
+  const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
+  const recovered = new NspawnOrbProvider({
+    stateFile,
+    runner: async (argv, options) => {
+      const result = await runner(argv, options);
+      return argv[1] === 'list' ? { ...result, stdout: `${handle.id} container linux` } : result;
+    },
+  });
+  const recoveredHandle = await recovered.ensure({ conversationId: 'A', projectId: 'P' });
+  const before = commands.length;
+  await recovered.exec(recoveredHandle, ['true'], {});
+  expect(commands.slice(before).map((command) => command.argv[1])).toEqual([
+    'poweroff',
+    'stop',
+    'start',
+    '-M',
+  ]);
+});
+
+test('partial bind failure releases the already mounted step outbox', async () => {
+  const { runner, stateFile, commands } = fixture();
+  const provider = new NspawnOrbProvider({
+    stateFile,
+    runner: async (argv, options) => {
+      if (argv[1] === 'bind' && argv.includes('/work')) throw new Error('bind failed');
+      return runner(argv, options);
+    },
+  });
+  const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
+  await expect(
+    provider.exec(handle, ['true'], {
+      binds: [
+        { source: '/outbox/s1', target: '/outbox/s1', releaseAfterExec: true },
+        { source: '/work', target: '/work' },
+      ],
+    }),
+  ).rejects.toThrow('bind failed');
+  expect(commands.at(-1)?.argv).toContain('umount');
+});
+
+test('failed outbox unmount stops the container before it can be reused', async () => {
+  const { runner, stateFile, commands } = fixture();
+  const provider = new NspawnOrbProvider({
+    stateFile,
+    runner: async (argv, options) => {
+      if (argv.includes('umount')) throw new Error('unmount failed');
+      return runner(argv, options);
+    },
+  });
+  const handle = await provider.ensure({ conversationId: 'A', projectId: 'P' });
+  await expect(
+    provider.exec(handle, ['true'], {
+      binds: [{ source: '/outbox/s1', target: '/outbox/s1', releaseAfterExec: true }],
+    }),
+  ).rejects.toThrow('unmount failed');
+  expect(handle.running).toBe(false);
+  expect(commands.slice(-2).map((command) => command.argv[1])).toEqual(['poweroff', 'stop']);
+});

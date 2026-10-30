@@ -4,10 +4,11 @@ import type { AgentBackend, AgentSessionHandle } from '@cairn/shared';
 import { createGeminiBackend } from '../backend/acp.js';
 import { createClaudeCodeBackend } from '../backend/claude-code.js';
 import { createPiBackend } from '../backend/pi.js';
-import { StepJournal } from '../journal.js';
+import { StepJournal, TranscriptBuffer } from '../journal.js';
 import { createDaemonLogger } from '../log.js';
 import { type MachineApi, MachineApiError } from '../machine-client.js';
 import { runStep } from '../runner.js';
+import { readSessionJsonlForUpload } from '../session-jsonl.js';
 import { recordSession, resolveSessionFile } from '../state.js';
 import { StepStops, type StopRequest } from '../step-stops.js';
 import { WorkspaceManager } from '../workspace.js';
@@ -116,7 +117,36 @@ export async function runOrbWorker(io: {
         logger,
         paths,
         backendFor,
-        journal: new StepJournal(paths.outboxDir),
+        journal: new (class extends StepJournal {
+          override update(...args: Parameters<StepJournal['update']>) {
+            const entry = super.update(...args);
+            if (entry)
+              send({
+                type: 'checkpoint',
+                checkpoint: {
+                  state: entry.state,
+                  sessionId: entry.sessionId,
+                  sessionAction: entry.sessionAction,
+                  prompt: entry.prompt,
+                  doneBody: entry.doneBody,
+                  planContent: entry.planContent,
+                  ...(entry.state === 'awaiting-upload' && entry.doneBody != null
+                    ? {
+                        transcript: new TranscriptBuffer(
+                          paths.outboxDir,
+                          input.claimed.step.id,
+                        ).messages(),
+                        sessionContent: readSessionJsonlForUpload(
+                          entry.sessionFile ?? undefined,
+                          (message) => logger.step(message),
+                        ),
+                      }
+                    : {}),
+                },
+              });
+            return entry;
+          }
+        })(paths.outboxDir),
         workspacesDir: input.workspacesDir,
         mcpConfigPath: input.mcpConfigPath,
         skillsDir: input.skillsDir,

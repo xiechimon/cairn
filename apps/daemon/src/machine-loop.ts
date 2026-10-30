@@ -14,6 +14,7 @@ import {
   type ClaudeLogin,
   classifyClaudeCodeLogin,
   isBackendRuntimeId,
+  MACHINE_ORB_CONVERSATIONS_LIMIT,
   ORPHAN_WORKTREE_TTL_MS,
 } from '@cairn/shared';
 import { createGeminiBackend } from './backend/acp.js';
@@ -380,22 +381,51 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   stepScratchTimer.unref?.();
 
   let sweepingOrbs = false;
+  let pollingClosedOrbs = false;
+  let orbCleanupStopped = false;
+  let closedConversationIds: string[] = [];
   const sweepOrbs = () => {
-    if (sweepingOrbs || orbProvider.kind !== 'orb') return;
+    if (sweepingOrbs || orbCleanupStopped || orbProvider.kind !== 'orb') return;
     sweepingOrbs = true;
-    void (async () => {
-      const closedConversationIds = await client.closedOrbConversations?.();
-      await orbs.sweep({
+    const closed = closedConversationIds;
+    closedConversationIds = [];
+    void orbs
+      .sweep({
         activeConversationIds: journal.pending().map((entry) => entry.conversationId),
-        closedConversationIds,
-      });
-    })()
+        closedConversationIds: closed,
+      })
       .catch((error: unknown) => logger.workspace(`orb cleanup failed: ${String(error)}`))
       .finally(() => {
         sweepingOrbs = false;
       });
   };
+  const pollClosedOrbs = () => {
+    if (
+      pollingClosedOrbs ||
+      orbCleanupStopped ||
+      orbProvider.kind !== 'orb' ||
+      !client.closedOrbConversations
+    )
+      return;
+    pollingClosedOrbs = true;
+    const request = client.closedOrbConversations.bind(client);
+    void (async () => {
+      const ids = (await orbProvider.list()).map((orb) => orb.conversationId);
+      for (let offset = 0; offset < ids.length; offset += MACHINE_ORB_CONVERSATIONS_LIMIT) {
+        const closed = await request(ids.slice(offset, offset + MACHINE_ORB_CONVERSATIONS_LIMIT));
+        closedConversationIds.push(...closed);
+      }
+    })()
+      .catch((error: unknown) => logger.workspace(`closed orb poll failed: ${String(error)}`))
+      .finally(() => {
+        pollingClosedOrbs = false;
+        sweepOrbs();
+      });
+  };
+  pollClosedOrbs();
   sweepOrbs();
+  const closedOrbTimer = setInterval(pollClosedOrbs, 60_000);
+  closedOrbTimer.unref?.();
   const orbTimer = setInterval(sweepOrbs, 1_000);
   orbTimer.unref?.();
 
@@ -650,6 +680,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     logger.machine(`Shutting down…${cause ? ` (${cause})` : ''}`);
     clearInterval(presenceTimer);
     clearInterval(orphanTimer);
+    orbCleanupStopped = true;
+    clearInterval(closedOrbTimer);
     clearInterval(orbTimer);
     clearInterval(stepScratchTimer);
     streamCtrl.abort();
