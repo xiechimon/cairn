@@ -75,7 +75,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(await css(banner, 'box-shadow'), 'W2: 1px ring').toContain('0px 0px 0px 1px');
     const gateButton = banner.getByRole('button', { name: '设置' });
     expect((await gateButton.boundingBox())?.height, 'W2').toBe(32);
-    await expect(gateButton, 'W2').toHaveCSS('border-top-left-radius', '8px');
+    await expect(gateButton, 'W2').toHaveCSS('border-top-left-radius', '6px');
 
     const hero = win.getByRole('heading', { name: '选择一个主题开始' });
     await expect(hero, 'W3').toHaveCSS('font-family', serif);

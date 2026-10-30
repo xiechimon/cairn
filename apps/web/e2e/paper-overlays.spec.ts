@@ -92,11 +92,11 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
   await evidenceShot(page, 'delete-confirm-s.png');
 });
 
-test('dialog face: sheet surface, 16px corners, 16px sans title, 28px close', async ({ page }) => {
+test('dialog face: sheet surface, 12px corners, 16px sans title, 28px close', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, SECRETS, '添加密钥');
   await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f9f8f4'));
-  await expect(dialog).toHaveCSS('border-top-left-radius', '16px');
+  await expect(dialog).toHaveCSS('border-top-left-radius', '12px');
   const title = dialog.getByTestId('dialog-head').getByText('添加密钥');
   await expect(title).toHaveCSS('font-size', '16px');
   const close = dialog.getByRole('button', { name: '关闭' });
@@ -155,7 +155,7 @@ test('footer stays on screen on a short viewport; only the body scrolls', async 
   expect(overflow).toBe(true);
 });
 
-test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px padding', async ({
+test('Paper menu: 32px rows, 13.5px text, 15px icons, 12px panel corners, 4px padding', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
@@ -164,7 +164,7 @@ test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px pa
   const menu = page.locator('.more-menu');
   await expect(menu).toBeVisible();
   await settle(menu);
-  await expect(menu).toHaveCSS('border-top-left-radius', '18px');
+  await expect(menu).toHaveCSS('border-top-left-radius', '12px');
   await expect(menu).toHaveCSS('padding-top', '6px');
   await expect(menu).toHaveCSS('background-color', 'rgb(254, 254, 251)');
 
@@ -192,7 +192,7 @@ test('user menu rides the same Paper menu face', async ({ page }) => {
   const menu = page.locator('.user-menu');
   await expect(menu).toBeVisible();
   await settle(menu.locator('..'));
-  await expect(menu).toHaveCSS('border-top-left-radius', '18px');
+  await expect(menu).toHaveCSS('border-top-left-radius', '12px');
   await expect(menu).toHaveCSS('padding-top', '6px');
   for (const label of ['账号', 'API 密钥', 'MCP']) {
     const row = menu.locator('a.user-menu-row', { hasText: label });

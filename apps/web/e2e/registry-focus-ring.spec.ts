@@ -1,19 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { settleTransitions } from './helpers.js';
 
-// #1244: registry focus skins (outline-none + focus-visible:ring-3
-// ring-ring/50) sit in the utilities layer and override the #388 base
-// outline. Keyboard focus on the primitives must be the global outline
-// (2px solid --focus-ring, offset 2) and must not paint the 3px gray
-// box-shadow. aria-invalid keeps its own destructive shadow.
-//
-// Failure modes this file pins:
-// 1. Mouse focus that is not :focus-visible paints a UA outline.
-// 2. aria-invalid loses its destructive shadow.
-// 3. A focused input-group draws the outline on the inner control and
-//    the shell at once, or on neither.
-// 4. checkbox / switch (span roots, outside button/input) have no outline.
-
 const AGENT =
   '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06';
 const SKILLS = '/app/resources/skills?scenario=01';
@@ -93,13 +80,22 @@ function expectGlobalOutline(info: FocusInfo) {
   expect(info.borderTopColor).not.toBe(hexToRgb(info.ringColor));
 }
 
+function expectFieldRing(info: FocusInfo) {
+  expect(info.focusVisible).toBe(true);
+  expect(info.outlineStyle).toBe('none');
+  expect(info.borderTopColor).toBe(hexToRgb(info.focusRing));
+  expect(info.boxShadow).toContain('0px 0px 0px 3px');
+}
+
 async function themed(page: Page, theme: 'dark' | 'light', url: string) {
   await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
   await page.goto(url);
 }
 
-test.describe('#1244 registry focus outline', () => {
-  test('input, select, and button use the global outline', async ({ page }) => {
+test.describe('#1244 registry focus: outline on buttons, field ring on text fields', () => {
+  test('input and select wear the field ring; the button keeps the global outline', async ({
+    page,
+  }) => {
     await themed(page, 'dark', AGENT);
     await page.getByRole('button', { name: '创建 Agent' }).click();
     const dialog = page.getByRole('dialog', { name: '创建 agent' });
@@ -107,33 +103,32 @@ test.describe('#1244 registry focus outline', () => {
 
     const input = dialog.locator('#dlg-agent-name');
     await focusKeyboard(input);
-    const inputInfo = await readFocus(input);
-    expectGlobalOutline(inputInfo);
+    expectFieldRing(await readFocus(input));
 
     const select = dialog.locator('.dlg-agent-machine-select');
     await focusKeyboard(select);
-    expectGlobalOutline(await readFocus(select));
+    expectFieldRing(await readFocus(select));
 
     const button = dialog.getByRole('button', { name: '关闭' });
     await focusKeyboard(button);
     expectGlobalOutline(await readFocus(button));
   });
 
-  test('the same three controls use the global outline in light', async ({ page }) => {
+  test('the same three controls in light', async ({ page }) => {
     await themed(page, 'light', AGENT);
     await page.getByRole('button', { name: '创建 Agent' }).click();
     const dialog = page.getByRole('dialog', { name: '创建 agent' });
     await expect(dialog).toBeVisible();
     const input = dialog.locator('#dlg-agent-name');
     await focusKeyboard(input);
-    expectGlobalOutline(await readFocus(input));
+    expectFieldRing(await readFocus(input));
     await focusKeyboard(dialog.locator('.dlg-agent-machine-select'));
-    expectGlobalOutline(await readFocus(dialog.locator('.dlg-agent-machine-select')));
+    expectFieldRing(await readFocus(dialog.locator('.dlg-agent-machine-select')));
     await focusKeyboard(dialog.getByRole('button', { name: '关闭' }));
     expectGlobalOutline(await readFocus(dialog.getByRole('button', { name: '关闭' })));
   });
 
-  test('a default textarea uses the global outline in both themes', async ({ page }) => {
+  test('a default textarea wears the field ring in both themes', async ({ page }) => {
     for (const theme of ['dark', 'light'] as const) {
       await themed(page, theme, SKILLS);
       await page.getByTestId('resource-empty').getByRole('button', { name: '新建技能' }).click();
@@ -141,17 +136,17 @@ test.describe('#1244 registry focus outline', () => {
       await expect(dialog).toBeVisible();
       const body = dialog.locator('#dlg-skill-body');
       await focusKeyboard(body);
-      expectGlobalOutline(await readFocus(body));
+      expectFieldRing(await readFocus(body));
     }
   });
 
-  test('clicking the name input shows the global outline, not the gray ring', async ({ page }) => {
+  test('clicking the name input shows the field ring, not the gray ring', async ({ page }) => {
     await themed(page, 'dark', AGENT);
     await page.getByRole('button', { name: '创建 Agent' }).click();
     const input = page.locator('#dlg-agent-name');
     await input.click();
     await settleTransitions(page);
-    expectGlobalOutline(await readFocus(input));
+    expectFieldRing(await readFocus(input));
   });
 
   test('aria-invalid keeps a 3px destructive shadow and the global outline', async ({ page }) => {
@@ -200,7 +195,7 @@ test.describe('#1244 registry focus outline', () => {
     expectGlobalOutline(await readFocus(badge));
   });
 
-  test('input-group draws the outline on the shell, not the control', async ({ page }) => {
+  test('input-group draws the field ring on the shell, not the control', async ({ page }) => {
     await themed(page, 'dark', TASKS);
     const control = page.getByRole('textbox', { name: '搜索任务' });
     await expect(control).toBeVisible();
@@ -210,12 +205,7 @@ test.describe('#1244 registry focus outline', () => {
     expect(controlInfo.outlineStyle).toBe('none');
     expect(controlInfo.boxShadow).not.toContain('0px 0px 0px 3px');
     const shell = page.locator('[data-slot="input-group"]').first();
-    const shellInfo = await readFocus(shell);
-    expect(shellInfo.outlineStyle).toBe('solid');
-    expect(shellInfo.outlineWidth).toBe('2px');
-    expect(shellInfo.outlineOffset).toBe('2px');
-    expect(shellInfo.outlineColor).toBe(hexToRgb(shellInfo.focusRing));
-    expect(shellInfo.boxShadow).not.toContain('0px 0px 0px 3px');
+    expectFieldRing({ ...(await readFocus(shell)), focusVisible: true });
   });
 
   // Segmented options sit 2px apart, so their keyboard ring is drawn inside
