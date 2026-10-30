@@ -168,7 +168,7 @@ test('a full run copies db and attachments locally and to an rrsync receiver, wi
   const [copy] = dbCopies(join(f.backups, 'db'));
   assert.ok(copy, 'no local db copy');
   assert.equal(restoredRows(join(f.backups, 'db', copy), f.root), 'a\nb');
-  assert.deepEqual(files(join(f.receiver, 'db')), [copy]);
+  assert.deepEqual(files(join(f.receiver, 'db')), [copy, `${copy}.attachments.sha256`]);
   assert.equal(sha(join(f.receiver, 'db', copy)), sha(join(f.backups, 'db', copy)));
 
   const attachments = ['team1/one.png', 'team1/two.txt'];
@@ -179,6 +179,7 @@ test('a full run copies db and attachments locally and to an rrsync receiver, wi
   assert.deepEqual(files(f.receiver), [
     ...attachments.map((name) => `attachments/${name}`),
     `db/${copy}`,
+    `db/${copy}.attachments.sha256`,
   ]);
 });
 
@@ -357,4 +358,67 @@ test('an equal-size step session rewrite with the same mtime still lands as a ne
     );
     assert.deepEqual(contents.sort(), ['{"v":1}\n', '{"v":2}\n']);
   }
+});
+
+test('attachment manifest records independent sha256 values locally and on the receiver', () => {
+  const f = fixture();
+  const result = f.run(f.full);
+  assert.equal(result.status, 0, result.stderr);
+  const [copy] = dbCopies(join(f.backups, 'db'));
+  const manifest = `${copy}.attachments.sha256`;
+  const expected = ['team1/one.png', 'team1/two.txt']
+    .map((key) => `${sha(join(f.attachments, key))}\t${key}\n`)
+    .join('');
+  for (const side of [f.backups, f.receiver])
+    assert.equal(readFileSync(join(side, 'db', manifest), 'utf8'), expected);
+});
+
+test('attachment manifests include retained copies when every source is skipped', () => {
+  const f = fixture();
+  const out = join(f.backups, 'db');
+  const attachmentKeys = ['team1/one.png', 'team1/two.txt'];
+  const expected = attachmentKeys
+    .map((key) => `${sha(join(f.attachments, key))}\t${key}\n`)
+    .join('');
+  assert.equal(f.run(f.full).status, 0);
+  const [first] = dbCopies(out);
+  renameSync(join(out, first), join(out, 'server-db-20200101T000000Z.db.gz'));
+  sqlite(f.db, "update attachment set status = 'pending' where id = '1';");
+  write(join(f.attachments, 'team1/two.txt'), 'incomplete');
+  const result = f.run(f.full);
+  assert.equal(result.status, 0, result.stderr);
+  const latest = dbCopies(out).at(-1);
+  for (const side of [f.backups, f.receiver])
+    assert.equal(readFileSync(join(side, 'db', `${latest}.attachments.sha256`), 'utf8'), expected);
+});
+
+test('an empty attachment copy writes an empty manifest despite skipped rows', () => {
+  const f = fixture();
+  sqlite(f.db, "update attachment set status = 'pending' where id = '1';");
+  write(join(f.attachments, 'team1/two.txt'), 'incomplete');
+  const result = f.run(f.full);
+  assert.equal(result.status, 0, result.stderr);
+  const [copy] = dbCopies(join(f.backups, 'db'));
+  for (const side of [f.backups, f.receiver]) {
+    assert.deepEqual(files(join(side, 'attachments')), []);
+    assert.equal(readFileSync(join(side, 'db', `${copy}.attachments.sha256`), 'utf8'), '');
+  }
+});
+
+test('an orphan manifest does not prevent publishing a new empty backup', () => {
+  const f = fixture();
+  sqlite(f.db, "update attachment set status = 'pending';");
+  const out = join(f.backups, 'db');
+  const start = Date.now();
+  for (let second = 0; second < 30; second++) {
+    const stamp = new Date(start + second * 1000)
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d+Z$/, 'Z');
+    write(join(out, `server-db-${stamp}.db.gz.attachments.sha256`), 'stale manifest');
+  }
+  const result = f.run(f.full);
+  assert.equal(result.status, 0, result.stderr);
+  const [copy] = dbCopies(out);
+  assert.equal(readFileSync(join(out, `${copy}.attachments.sha256`), 'utf8'), '');
 });

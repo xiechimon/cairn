@@ -1,0 +1,13 @@
+✔ invalid SQLite fails integrity checking (4001.026125ms)
+✔ ready attachment size mismatch fails (619.940042ms)
+✔ scratch equal to live DB is refused (346.805083ms)
+✔ missing key fails without creating a replacement (435.460209ms)
+✔ non-allowlisted machine field changes fail (1083.898708ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6676.113334

@@ -1,0 +1,614 @@
+{
+  "ok": true,
+  "at": "2026-10-30T05:42:08.859092+00:00",
+  "tables": {
+    "__drizzle_migrations": {
+      "identical": 69,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "agent": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "avatarUrl",
+          "defaultSkill",
+          "description",
+          "displayName",
+          "fallbackModels",
+          "machineId",
+          "maxConcurrentTasks",
+          "mcpServers",
+          "modelId",
+          "persona",
+          "provider",
+          "requiredCapabilities",
+          "secrets",
+          "skillsAllowlist",
+          "status",
+          "thinkingLevel",
+          "tools"
+        ],
+        "reason": "Agent configuration has no updatedAt.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "agent_memory": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "api_key": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "attachment": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "status"
+        ],
+        "reason": "Pending uploads transition to ready or failed.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "autonomy_state": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "baselineSha",
+          "lastBlockedReason",
+          "lastEvaluatedAt",
+          "lastStartedAt"
+        ],
+        "reason": "Autonomy evaluation state advances in place.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "branch_sync": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "errorMessage",
+          "finishedAt",
+          "startedAt",
+          "status"
+        ],
+        "reason": "Synchronization lifecycle advances in place.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "build": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "baseSha",
+          "changes",
+          "diffHash",
+          "errorMessage",
+          "harnessHash",
+          "planDocId",
+          "prNumber",
+          "prUrl",
+          "reportAttachmentId"
+        ],
+        "reason": "Build execution and review metadata are updated in place.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "build_feedback": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "build_outcome_backfill": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "chief": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "agentId",
+          "charter",
+          "lastTurnAt",
+          "tz",
+          "wakes",
+          "watches"
+        ],
+        "reason": "Chief configuration and turn state have no updatedAt.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "chief_message": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "chief_thread": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "feishu_binding": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_digest": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_round": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_state": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "gate_verdict": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "github_connection": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "harness_eval_attempts": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "machine": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "apiKeyId",
+          "capabilities",
+          "claudeCodeReport",
+          "claudeRateLimits",
+          "enabledRuntimes",
+          "lastSeenAt",
+          "latestCliVersion",
+          "maxConcurrent",
+          "maxConcurrentOverridden",
+          "online",
+          "tokenHash"
+        ],
+        "reason": "Machine registration, configuration and heartbeat update without updatedAt.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "member_activity": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "at"
+        ],
+        "reason": "Member activity stores the latest write time.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "memory_candidate": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "memory_save_conflict": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "message": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "notification": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "readAt"
+        ],
+        "reason": "Reading a notification changes readAt.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "plan": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "project": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "autonomy",
+          "description",
+          "githubRepo",
+          "localPath",
+          "name",
+          "repoKind",
+          "repoName",
+          "splitPolicy"
+        ],
+        "reason": "Project settings have no updatedAt.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "provider": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "push_digest_item": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "push_subscription": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "schedule": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "nextRunAt"
+        ],
+        "reason": "The scheduler advances nextRunAt after execution.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "schedule_report": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "appliedAt",
+          "decidedAt",
+          "decidedBy"
+        ],
+        "reason": "Review and application of a generated report advance in place.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "secret": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "skill_audit": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "steer_pending": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "step": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "blockerHandoff",
+          "checkpointCommit",
+          "claimedAt",
+          "fallback",
+          "finishedAt",
+          "freshSession",
+          "holdCount",
+          "holdReason",
+          "holdUntil",
+          "lastHeartbeatAt",
+          "machineId",
+          "prompt",
+          "quotaBlock",
+          "sessionId",
+          "skillInjection",
+          "status"
+        ],
+        "reason": "Step execution, claim and heartbeat state are updated in place.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "stop_pending": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "tag": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "color",
+          "name",
+          "v"
+        ],
+        "reason": "Tag edits are versioned by v.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "team": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "autonomyPaused",
+          "avatarStyle",
+          "firstPrReportPromptDismissedAt",
+          "firstPrReportPromptEnabled",
+          "firstPrReportPromptFirstPrAt",
+          "firstPrReportPromptFirstPrNumber",
+          "name",
+          "plan"
+        ],
+        "reason": "Team preferences and onboarding state are edited in place.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "todo": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "assignment",
+          "blockedBy",
+          "hasChanges",
+          "hasPlan",
+          "lastRunAt",
+          "latestBuildId",
+          "orderIndex",
+          "output",
+          "ownerId",
+          "phase",
+          "phaseAt",
+          "spec",
+          "title",
+          "userMessageAttachmentIds",
+          "userSpecAttachmentIds",
+          "v"
+        ],
+        "reason": "Todo edits and lifecycle transitions use phaseAt and v rather than updatedAt.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "todo_tag": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0
+    },
+    "token_usage": {
+      "identical": 0,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "cacheRead",
+          "cacheWrite",
+          "costCacheRead",
+          "costCacheWrite",
+          "costInput",
+          "costOutput",
+          "costTotal",
+          "input",
+          "output"
+        ],
+        "reason": "Usage totals accumulate during execution.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    },
+    "user": {
+      "identical": 1,
+      "changedAfterBackup": 0,
+      "missing": 0,
+      "differing": 0,
+      "allowedMutable": 0,
+      "addedAfterBackup": 0,
+      "allowlist": {
+        "columns": [
+          "avatarUrl",
+          "displayName"
+        ],
+        "reason": "Profile edits have no updatedAt.",
+        "limit": "Changes to these columns cannot be dated; all other columns remain strict."
+      }
+    }
+  },
+  "backupTimestamp": "20261030T000000Z",
+  "integrity": "ok",
+  "foreignKeys": "ok",
+  "migrationIdentity": "SQLite rowid: Drizzle serial ids are nullable and not populated.",
+  "attachments": {
+    "checked": 1
+  },
+  "relationships": {
+    "todo": "t",
+    "build": "b",
+    "steps": [
+      "s"
+    ],
+    "messages": [
+      "m"
+    ],
+    "chiefThread": "ct",
+    "chiefMessages": [
+      "cm"
+    ]
+  },
+  "decryption": "decrypt ok",
+  "api": {
+    "count": 1,
+    "surface": "fixture real Hono route, in-process transport",
+    "provider": "not exercised"
+  },
+  "fixtureOnly": true
+}

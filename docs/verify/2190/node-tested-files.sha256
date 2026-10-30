@@ -1,0 +1,5 @@
+16bb4e0ee13193f9bc1318e1b8062ff798c4d2267dc2f08808b29ad87d8df59b  scripts/ops/restore-drill.py
+ac5c2df26e270727d5773ef546106c11ac9240e6464343a3091c37eb14300510  scripts/ops/restore-drill-decrypt.mts
+ce09ed79fa655b2d44567a11adcadd74018dc1be60d0e828d0f574424ab8a28c  scripts/ops/restore-drill-api.mts
+de51da4ec34507ad3f6e2c60f2861cecbeac73d13acd42712096ef696a07bd50  scripts/ops/restore-drill-test-driver.py
+6956c32f55681e4d9c18b2e76098698c11697276620278566c13af281531a4ba  scripts/ops/restore-drill.test.mjs

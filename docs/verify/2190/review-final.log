@@ -1,0 +1,10 @@
+scripts/ops/restore-drill.py: OK
+scripts/ops/restore-drill.sh: OK
+scripts/ops/backup-server-db.sh: OK
+scripts/ops/restore-drill-api.mts: OK
+scripts/ops/restore-drill-test-driver.py: OK
+scripts/ops/restore-drill.test.mjs: OK
+scripts/ops/restore-drill-service.sh: OK
+scripts/ops/restore-drill-service.test.mjs: OK
+scripts/ops/systemd/cairn-restore-drill.service: OK
+scripts/ops/systemd/cairn-restore-drill.timer: OK
