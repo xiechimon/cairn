@@ -120,6 +120,7 @@ export function sampleFailures({ week, flows, packs, count, out }) {
     throw new Error('--count must be a positive integer');
   if (existsSync(out)) throw new Error(`Review directory already exists: ${out}`);
   const trials = [];
+  const traces = { hit: 0, miss: 0 };
   for (const flow of readdirSync(flows, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -142,6 +143,9 @@ export function sampleFailures({ week, flows, packs, count, out }) {
                 .map(([key]) => key)
                 .sort()
                 .join('+');
+        const hasTrace = existsSync(trace);
+        if (hasTrace) traces.hit += 1;
+        else traces.miss += 1;
         trials.push({
           id: `trial:${flow}:${name}:${index}`,
           sourceId: `${row.prompt_id}:rep${row.rep}`,
@@ -150,7 +154,7 @@ export function sampleFailures({ week, flows, packs, count, out }) {
           flow,
           failureClass,
           source: `${source}:${index + 1}`,
-          content: existsSync(trace)
+          content: hasTrace
             ? JSON.parse(readFileSync(trace, 'utf8'))
             : { transcriptMissing: true, trial: row },
         });
@@ -230,11 +234,12 @@ export function sampleFailures({ week, flows, packs, count, out }) {
     };
   });
   writeFileSync(join(out, 'answer-key.json'), `${JSON.stringify(key, null, 2)}\n`, { mode: 0o600 });
+  const available = { trials: trials.length, packs: builds.size, traces };
   writeFileSync(
     join(out, 'review.json'),
-    `${JSON.stringify({ week, available: { trials: trials.length, packs: builds.size }, sampled: { trials: Math.min(count, trials.length), packs: Math.min(count, builds.size) }, autonomousPrReviews: [], items }, null, 2)}\n`,
+    `${JSON.stringify({ week, available, sampled: { trials: Math.min(count, trials.length), packs: Math.min(count, builds.size) }, autonomousPrReviews: [], items }, null, 2)}\n`,
   );
-  return { review: join(out, 'review.json'), items: items.length };
+  return { review: join(out, 'review.json'), items: items.length, available, traces };
 }
 
 const repositoryRoot = resolve(import.meta.dirname, '..');

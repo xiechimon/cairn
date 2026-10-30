@@ -1,0 +1,4 @@
+node --test scripts/eval-weekly-ops.test.mjs scripts/eval-sample-failures.test.mjs: 9 passed
+pack-capture-red → pack-capture-green: CLI stdout no longer pollutes labeled path
+bash -n / lint / typecheck / english / comment / lessons: passed
+squash auto-merge: NOT re-armed (await review-gate PASS)

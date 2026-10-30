@@ -1,6 +1,6 @@
 # Weekly failed-trial review
 
-The existing `scripts/ops/eval-weekly.sh` job generates the review after archiving all flows, under its state directory at `reviews/<day>/review.json`. Set `CAIRN_EVAL_REVIEW_PACKS` to a labeled JSONL export to include failed builds. Without it, the review explicitly records zero available attributed packs. It does not invoke a labeler.
+The existing `scripts/ops/eval-weekly.sh` job generates the review after archiving all flows, under its state directory at `reviews/<day>/review.json`. By default it exports the prior seven-day window with `pnpm traj:export`, labels failed packs with `pnpm traj:label` (`CAIRN_LABELER_*`), and passes the labeled export to the sampler (see #2097). `CAIRN_EVAL_REVIEW_PACKS` still overrides the labeled path for fixture runs.
 
 Run `pnpm eval:sample-failures --week 2026-11-16 --packs path/to/labeled-packs.jsonl` after the weekly eval/export. Repeat `--packs` for multiple exports. `--week` is the review batch date, not a timestamp filter: eval rows do not have reliable timestamps. Point `--flows` at that week's archived flow directories (default `.claude/hillclimb`). Each flow must contain `baseline/results.jsonl`, optionally `baseline/errors.jsonl`, and `baseline/traces/`.
 
