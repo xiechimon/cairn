@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { FAILURE_REPLAY_BANK_RELATIVE, otlpTraceIdOfBuild, redactSecrets } from '@cairn/shared';
+import { FAILURE_REPLAY_BANK_RELATIVE, redactSecrets } from '@cairn/shared';
+import { otlpTraceIdOfBuild } from '@cairn/shared/otel';
 import { ZodError } from 'zod';
 import {
   confirmCandidatesByTraceIds,

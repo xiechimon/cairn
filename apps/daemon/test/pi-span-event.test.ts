@@ -1,4 +1,4 @@
-import { parseOtlpTarget, stepOtelContext } from '@cairn/shared';
+import { parseOtlpTarget, stepOtelContext } from '@cairn/shared/otel';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { PiStepSpanSink } from '../src/backend/otel.js';
 import { type AgentSessionEventLike, recordPiSpanEvent } from '../src/backend/pi.js';

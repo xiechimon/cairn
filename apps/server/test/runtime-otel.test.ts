@@ -1,4 +1,8 @@
-import { otlpRootSpanIdOfBuild, otlpStepSpanIdOfBuild, otlpTraceIdOfBuild } from '@cairn/shared';
+import {
+  otlpRootSpanIdOfBuild,
+  otlpStepSpanIdOfBuild,
+  otlpTraceIdOfBuild,
+} from '@cairn/shared/otel';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,

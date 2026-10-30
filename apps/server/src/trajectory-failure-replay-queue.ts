@@ -1,4 +1,5 @@
-import { type FailureReplayCandidate, otlpTraceIdOfBuild } from '@cairn/shared';
+import type { FailureReplayCandidate } from '@cairn/shared';
+import { otlpTraceIdOfBuild } from '@cairn/shared/otel';
 import { z } from 'zod';
 import { FailureReplayError } from './trajectory-failure-replay.js';
 

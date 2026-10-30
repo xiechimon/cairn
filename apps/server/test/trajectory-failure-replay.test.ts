@@ -7,10 +7,10 @@ import {
   type FailureReplayCandidate,
   failureReplayBankCaseSchema,
   failureReplayCandidateSchema,
-  otlpTraceIdOfBuild,
   type TrajectoryPack,
   trajectoryPackSchema,
 } from '@cairn/shared';
+import { otlpTraceIdOfBuild } from '@cairn/shared/otel';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
   confirmCandidatesByTraceIds,

@@ -5,6 +5,11 @@ import {
   executeToolAttributes,
   GENAI_OPERATION,
   invokeAgentAttributes,
+  type ProviderModelRef,
+  splitModelId,
+  stepAttributes,
+} from '@cairn/shared';
+import {
   OTLP_SPAN_KIND,
   OTLP_STATUS_ERROR,
   type OtlpSpan,
@@ -12,10 +17,7 @@ import {
   otlpAttributes,
   otlpNanos,
   otlpTraceIdOfBuild,
-  type ProviderModelRef,
-  splitModelId,
-  stepAttributes,
-} from '@cairn/shared';
+} from '@cairn/shared/otel';
 import {
   costUsd,
   isRecord,

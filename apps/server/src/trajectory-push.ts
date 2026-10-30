@@ -1,13 +1,7 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import {
-  OtlpTargetConfigError,
-  type OtlpTracesRequest,
-  parseOtlpTarget,
-  redactSecrets,
-  type TrajectoryPack,
-  trajectoryPackSchema,
-} from '@cairn/shared';
+import { redactSecrets, type TrajectoryPack, trajectoryPackSchema } from '@cairn/shared';
+import { OtlpTargetConfigError, type OtlpTracesRequest, parseOtlpTarget } from '@cairn/shared/otel';
 import { packToOtlp } from './trajectory-otlp.js';
 
 export class TrajectoryPushError extends Error {}

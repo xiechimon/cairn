@@ -1,9 +1,5 @@
-import {
-  type ProviderConfig,
-  parseOtlpTarget,
-  type SessionOpts,
-  stepOtelContext,
-} from '@cairn/shared';
+import type { ProviderConfig, SessionOpts } from '@cairn/shared';
+import { parseOtlpTarget, stepOtelContext } from '@cairn/shared/otel';
 import { describe, expect, test } from 'vitest';
 import { claudeSessionEnv } from '../src/backend/claude-code.js';
 

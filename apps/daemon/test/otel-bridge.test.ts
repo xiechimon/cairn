@@ -5,7 +5,7 @@ import {
   otlpTraceparent,
   parseOtlpTarget,
   stepOtelContext,
-} from '@cairn/shared';
+} from '@cairn/shared/otel';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { claudeTelemetryEnv, daemonOtelFromEnv, PiStepSpanSink } from '../src/backend/otel.js';
 
