@@ -1,0 +1,7 @@
+PASS installation repositories: GET /installation/repositories -> 200 (expect 200)
+PASS pull request read: GET /repos/xiechimon/cairn/pulls?per_page=1 -> 200 (expect 200)
+PASS branch protection read: GET /repos/xiechimon/cairn/branches/main/protection -> 403 (expect 403)
+PASS branch protection write on an absent branch: DELETE /repos/xiechimon/cairn/branches/cairn-scope-probe-absent/protection -> 403 (expect 403)
+PASS actions variable delete of an absent variable: DELETE /repos/xiechimon/cairn/actions/variables/CAIRN_SCOPE_PROBE_ABSENT -> 403 (expect 403)
+PASS webhook delete of an absent hook: DELETE /repos/xiechimon/cairn/hooks/1 -> 403 (expect 403)
+PASS other repository read: GET /repos/xiechimon/agents-config -> 404 (expect 404)

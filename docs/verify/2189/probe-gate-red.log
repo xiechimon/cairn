@@ -1,0 +1,54 @@
+✖ every write probe targets a resource that does not exist and carries no body (1.151708ms)
+✖ the destructive branch protection PUT from the 2026-10-30 probe is not in the list (5.001166ms)
+✔ a token with admin rights fails the run: 404 on an absent branch means the write was authorized (0.275916ms)
+✔ requests never send a body (0.149417ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 2
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 69.45475
+
+✖ failing tests:
+
+test at ../../../../../../../../private<tmp>/token-scope-probe.test.mjs:7:1
+✖ every write probe targets a resource that does not exist and carries no body (1.151708ms)
+  AssertionError [ERR_ASSERTION]: old destructive probe
+  
+  'PUT' !== 'DELETE'
+  
+      at TestContext.<anonymous> (file:///private<tmp>/token-scope-probe.test.mjs:11:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'PUT',
+    expected: 'DELETE',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../../../../../../../private<tmp>/token-scope-probe.test.mjs:22:1
+✖ the destructive branch protection PUT from the 2026-10-30 probe is not in the list (5.001166ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(
+  
+      at TestContext.<anonymous> (file:///private<tmp>/token-scope-probe.test.mjs:23:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

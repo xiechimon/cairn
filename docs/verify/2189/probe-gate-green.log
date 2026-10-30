@@ -1,0 +1,12 @@
+✔ every write probe targets a resource that does not exist and carries no body (0.6915ms)
+✔ the destructive branch protection PUT from the 2026-10-30 probe is not in the list (0.10925ms)
+✔ a token with admin rights fails the run: 404 on an absent branch means the write was authorized (0.231375ms)
+✔ requests never send a body (0.146083ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 68.9965

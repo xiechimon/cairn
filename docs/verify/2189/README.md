@@ -67,3 +67,14 @@ Claude Code 2.1.312, model claude-haiku-5-5, `--permission-mode bypassPermission
 | Same with `httpProxyPort`, `allowLocalBinding`, `enableWeakerNetworkIsolation` | `settings-mac2.json` | gh, git, npm OK; key reads blocked | `mac/mac-net2.txt` |
 
 Limits: the deny list covers only the listed paths; the Mac server DB and other files stay readable to the session. The settings apply only to sessions started with `--settings`; sessions started without it are unprotected.
+
+## omarchy negative controls (dispatcher, 2026-10-30)
+
+| Check | Result | Log |
+| --- | --- | --- |
+| Canary as `ian` on the App key, both secretbox.key copies, server.env, token, and the server pid | 36 READ, 1 BLOCKED (`/proc/<pid>/mem` at offset 0): red, as expected while every process runs as `ian` | `omarchy/canary-as-ian.txt` |
+| Canary as `cairn-runner` | not run: creating the user needs ian's sudo (`sudo scripts/ops/secret-reach/setup-runner-linux.sh`) | pending |
+| Broker token: repositories, branch protection, repo settings, Actions variables, other repo | only `xiechimon/cairn` visible; protection, settings and variables 403; other repo 404; broker refuses another repo and `administration` | `omarchy/token-scope-probe.txt` |
+| Same probe with the unscoped `as-bot.sh` token | same statuses: the App installation itself has no administration permission today; the broker pins the scope if the App gains permissions | `omarchy/token-scope-probe-unscoped.txt` |
+
+Every write in the probe is a bodyless DELETE of a resource that does not exist (see `docs/lessons/2189-destructive-negative-probe.md`).
