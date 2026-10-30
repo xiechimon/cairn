@@ -41,6 +41,21 @@ import { getTodo } from './todos.js';
 type StepRow = typeof step.$inferSelect;
 type AgentRow = typeof agent.$inferSelect;
 
+export function claudeUsageGatePasses(
+  deps: Pick<MachineDeps, 'db'>,
+  machineRow: Pick<typeof machine.$inferSelect, 'teamId' | 'claudeCodeReport'>,
+  model: Pick<AgentRow, 'provider' | 'modelId'>,
+): boolean {
+  if (!isClaudeModel(model.provider, model.modelId)) return true;
+  const settings = deps.db.select().from(team).where(eq(team.id, machineRow.teamId)).get();
+  if (settings?.claudeUsage === 'allow-paid') return true;
+  if (stepRuntimeFor(model.provider) !== 'claude-code') return false;
+  return (
+    hasActiveClaudeSubscription(deps, machineRow.teamId) ||
+    !/api[-_ ]?key/i.test(machineRow.claudeCodeReport?.auth?.method ?? '')
+  );
+}
+
 function usesClaudeCode(
   agentRow: Pick<AgentRow, 'provider' | 'modelId'>,
   stepRow: Pick<StepRow, 'fallback'>,
@@ -111,7 +126,6 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   const byId = new Map(machines.map((row) => [row.id, row]));
   const subscriptionOnly =
     deps.db.select().from(team).where(eq(team.id, teamId)).get()?.claudeUsage !== 'allow-paid';
-  const activeSubscription = hasActiveClaudeSubscription(deps, teamId);
   let changed = false;
   const consider = (
     stepRow: StepRow,
@@ -123,22 +137,22 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     const model = effectiveModel(agentRow, stepRow);
     const owner = agentRow.machineId ? byId.get(agentRow.machineId) : undefined;
     const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
-    const paidTakeover =
-      ownerBlock !== null &&
-      machines.some(
-        (row) =>
-          row.online &&
-          runtimeGatePasses(row, model.provider) &&
-          capabilityGatePasses(row, agentRow) &&
-          claudeRateBlock(row.claudeRateLimits ?? [], now) === null &&
-          /api[-_ ]?key/i.test(row.claudeCodeReport?.auth?.method ?? ''),
-      );
+    const claimants = machines.filter(
+      (row) =>
+        row.online &&
+        (row.id === agentRow.machineId ||
+          (stepRuntimeFor(model.provider) === 'claude-code' && ownerBlock !== null)) &&
+        runtimeGatePasses(row, model.provider) &&
+        capabilityGatePasses(row, agentRow) &&
+        claudeRateBlock(row.claudeRateLimits ?? [], now) === null,
+    );
+    const subscriptionClaimant = claimants.some((row) => claudeUsageGatePasses(deps, row, model));
     const claude = isClaudeModel(model.provider, model.modelId);
     const paid =
       stepRuntimeFor(model.provider) !== 'claude-code' ||
-      (!activeSubscription &&
-        (paidTakeover || /api[-_ ]?key/i.test(owner?.claudeCodeReport?.auth?.method ?? '')));
-    if (!localMerge && subscriptionOnly && claude && paid) {
+      (owner !== undefined && !claudeUsageGatePasses(deps, owner, model)) ||
+      claimants.some((row) => !claudeUsageGatePasses(deps, row, model));
+    if (!localMerge && subscriptionOnly && claude && paid && !subscriptionClaimant) {
       if (stepRow.status !== 'pending' && stepRow.status !== 'waiting_quota') return;
       if (
         stepRow.quotaBlock?.source === 'subscription_policy' &&
@@ -188,6 +202,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
       if (!row.online) return false;
       if (!runtimeGatePasses(row, 'claude-code')) return false;
       if (!capabilityGatePasses(row, agentRow)) return false;
+      if (!localMerge && !claudeUsageGatePasses(deps, row, model)) return false;
       return claudeRateBlock(row.claudeRateLimits ?? [], now) === null;
     });
     const todoId = todoRow?.id ?? null;
