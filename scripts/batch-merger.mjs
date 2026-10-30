@@ -10,7 +10,8 @@ const log = (pr, action, reasons) =>
   );
 
 function ownerRouting(headSha) {
-  const git = (args) => execFileSync('git', args, { encoding: 'utf8' });
+  const git = (args) =>
+    execFileSync('git', args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
   const source = git(['show', 'origin/main:.claude/workflows/pr-gate.js']);
   const extract = (start, end) => {
     const from = source.indexOf(start);
@@ -212,7 +213,7 @@ try {
             '--body',
             body,
           ],
-          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+          { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] },
         );
       log(result.pr, dryRun ? 'would-merge' : 'merged', []);
     } catch (error) {

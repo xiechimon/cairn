@@ -12,19 +12,30 @@ export const api = (path, payload) => {
     ['api', path, ...(payload ? ['--method', 'POST', '--input', '-'] : [])],
     {
       encoding: 'utf8',
+      maxBuffer: 512 * 1024 * 1024,
       ...(payload ? { input: JSON.stringify(payload) } : {}),
     },
   );
   return output.trim() ? JSON.parse(output) : null;
 };
 export const pages = (path) =>
-  JSON.parse(execFileSync('gh', ['api', path, '--paginate', '--slurp'], { encoding: 'utf8' }));
+  JSON.parse(
+    execFileSync('gh', ['api', path, '--paginate', '--slurp'], {
+      encoding: 'utf8',
+      maxBuffer: 512 * 1024 * 1024,
+    }),
+  );
 export const markers = () =>
   pages(`repos/${repo}/issues?state=open&labels=autonomy-paused&per_page=100`)
     .flat()
     .filter((issue) => !issue.pull_request);
 const git = (cwd, ...args) =>
-  execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    maxBuffer: 512 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 const shaPattern = /^[a-f0-9]{40}$/;
 
 export function verifyRecovery(number) {
@@ -116,7 +127,7 @@ export function disarmAutoMerge(pr) {
         '-f',
         `pullRequestId=${pr.node_id}`,
       ],
-      { encoding: 'utf8' },
+      { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 },
     ),
   );
   if (result.errors || !result.data?.disablePullRequestAutoMerge)
