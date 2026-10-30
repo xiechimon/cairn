@@ -4,7 +4,7 @@
 
 Measured in this worktree on 2026-10-31: an MCP SDK client initializes the real server face with a generated API key, starts a Project Thread, reads its status, and replies. The transport uses the application in process, an isolated SQLite database, and a configured test Coordinator. No external model or real harness session runs in that test.
 
-The three real harness sessions and the Grok probe belong to the orchestrator, as explicitly assigned in the implementation brief. Their evidence slots below remain unverified. This document does not establish completion of those acceptance items.
+The three real harness sessions and the Grok probe were run afterwards on an isolated live stack at commit `622284f23`; see [Real-session evidence](#real-session-evidence). Claude Code, Codex, and pi each started, read, and replied to a Thread through cairn's MCP server. No daemon ran, so the Coordinator never answered; the sessions prove the MCP entry, not a completed Coordinator turn.
 
 The database still distinguishes Coordinator conversations from work Threads. New tools accept Coordinator conversation IDs and work item IDs as documented below; no schema migration or new CLI is introduced. The original 24 MCP tools and grants remain available. Existing keys must explicitly receive the new grants through the existing API key flow.
 
@@ -91,26 +91,55 @@ pnpm exec vitest run apps/server/test/mcp-entry.test.ts apps/server/test/mcp-fac
 
 Additional broad check: `pnpm exec vitest run --changed` selects unrelated daemon and integration suites through shared exports. A separate Node 24 rerun of `apps/daemon/test/local-executor.test.ts`, `apps/daemon/test/workspace-hooks.test.ts`, and `integration/test/routing-cli.test.ts` reproduced five failures with 32 tests passing: missing credential probe output, a missing grandchild PID file during the timeout test, and three routing oracle failures reporting unavailable write-boundary enforcement on this Mac. Those unchanged test/source paths were not modified. The cause of the first two failures is unverified. The broad run was interrupted after recording these failures; it is not claimed green.
 
-The key-dialog browser evidence uses a mocked API and no model/provider; it proves the grant-selection/submission behavior only. It does not replace the real-session evidence slots below. [Result metadata](cairn-mcp-entry-key-evidence/result.json).
+The key-dialog browser evidence uses a mocked API and no model/provider; it proves the grant-selection/submission behavior only. The live path is covered by the real-session evidence below. [Result metadata](cairn-mcp-entry-key-evidence/result.json).
 
 ![API key dialog with the new Thread write grants selected; browser with mocked API](cairn-mcp-entry-key-evidence/thread-key-grants.png)
 
-## Real-session evidence — orchestrator placeholders
+## Real-session evidence
 
-For each harness, use a fresh session with the key above. Ask it to discover the Project ID with `projects`, call `start_thread` with a harmless request, call `read_thread` on the returned ID, and call `reply_thread` with a follow-up. Preserve actual tool calls/results and the observed status, redact keys, and record server revision and provider mode. Ask for `thread_pull_requests` if the Coordinator creates work with a PR; do not treat an empty result as a PR delivery.
+Measured 2026-10-31 on an isolated live stack started per `.claude/skills/verify-cairn/SKILL.md` (server on port 8791, scratch `CAIRN_HOME`, fresh database) at commit `622284f23`. Setup through REST: a local Project `mcp-entry-2291` (`B0fy8CIOd9Toiqeklrqny`) on a throwaway one-commit git repository, a Coordinator Agent bound to the team's Coordinator, and an API key with MCP access and exactly the six grants listed above. No daemon ran. Each Coordinator turn therefore stayed `pending` and every status read returned `working`; no Coordinator reply and no PR exist, so `thread_pull_requests` was not exercised.
+
+Each harness got the MCP server from its documented one-command setup, scoped to a temporary directory so the user-level configuration stayed unchanged (checked by hash before and after). Each ran one non-interactive session with the same prompt: call `projects`, `start_thread`, `read_thread`, `reply_thread`, then `read_thread` again. Transcripts are filtered to tool calls, results and final messages; the key and local paths are redacted.
+
+| Harness | Version, model | Thread | Calls observed (all succeeded) | Reply message | Transcript |
+| --- | --- | --- | --- | --- | --- |
+| Claude Code | 2.1.312, `claude-opus-5-5` | `chief-01a18eaa-53cf-7264-8d41-8dd96d188f29` | `projects`, `start_thread`, `read_thread` (`working`), `reply_thread` (`steered: false`), `read_thread` (`working`, 2 messages) | `BRTcXm0H1meEPzoRJ0_QO` | [claude-code.txt](real-sessions/claude-code.txt) |
+| Codex | codex-cli 0.165.0, `gpt-6.1-sol` | `chief-01a18eab-702f-7d4a-ae49-0b6c40e11712` | same sequence and statuses | `CTJz3fR7CJGfEBu-_N3vG` | [codex.txt](real-sessions/codex.txt) |
+| pi | 1.4.0, `claude-sonnet-5-5` | `chief-01a18eac-e242-7c48-a0e1-281819621172` | same sequence and statuses | `rHAD1tWXj_ntRar-JFZqf` | [pi.txt](real-sessions/pi.txt) |
+
+Server-side check after the sessions ([server-side.txt](real-sessions/server-side.txt)): `GET /api/teams/:id/chief/threads` lists all three Threads. `GET /api/conversations/:id/messages` returns exactly the start message and the reply for each Thread. Read-only SQLite shows six `chief_message` rows, all with the Project ID, and two `pending` Coordinator steps per Thread, one for the start and one for the queued reply.
 
 ### Claude Code
 
-**UNVERIFIED — orchestrator evidence pending.** Record the session command, Project/Thread IDs, start/read/reply transcript or screenshots, observed status, revision, and provider mode here.
+```sh
+claude mcp add --transport http --scope project cairn "$CAIRN_MCP_URL" --header "Authorization: Bearer $CAIRN_API_KEY"
+claude -p --output-format stream-json --verbose --settings '{"enableAllProjectMcpServers":true}' --allowedTools 'mcp__cairn__*' --no-session-persistence "<prompt>" < /dev/null
+```
+
+Run in a temporary directory: `--scope project` writes `./.mcp.json` there instead of the user configuration. The init event reports `cairn` as `connected` with the six tools. The `--settings` and `--allowedTools` flags only approve the project server and its tools for a non-interactive run; an interactive session asks instead. Result: pass.
 
 ### Codex
 
-**UNVERIFIED — orchestrator evidence pending.** Record the session command, Project/Thread IDs, start/read/reply transcript or screenshots, observed status, revision, and provider mode here.
+```sh
+CODEX_HOME=<temp> codex mcp add cairn --url "$CAIRN_MCP_URL" --bearer-token-env-var CAIRN_API_KEY
+CODEX_HOME=<temp> codex exec --json --skip-git-repo-check -s read-only -c approval_policy='"never"' -c 'mcp_servers.cairn.default_tools_approval_mode="approve"' "<prompt>" < /dev/null
+```
+
+The temporary `CODEX_HOME` held a copy of the existing login and only the model setting. The first attempt omitted the `default_tools_approval_mode` override. Codex then refused the first call with `MCP tool call requires approval, but approval policy is never` and created no Thread (included in the transcript). For non-interactive `codex exec`, the documented setup therefore needs this per-run override, or the same key under `[mcp_servers.cairn]`. An interactive session prompts for approval instead; that path was not run. Result: pass on the second attempt.
 
 ### pi
 
-**UNVERIFIED — orchestrator evidence pending.** Record the session command, Project/Thread IDs, start/read/reply transcript or screenshots, observed status, revision, and provider mode here.
+```sh
+pi mcp add cairn -l --url "$CAIRN_MCP_URL" --bearer-token-env-var CAIRN_API_KEY --exposure direct
+pi -p --mode json --approve --no-session --no-context-files --model domestic-claude/claude-sonnet-5-5 "<prompt>" < /dev/null
+```
 
-## Grok probe — orchestrator placeholder
+Run in a temporary directory: `-l` writes `./.pi/mcp.json` there, with `Authorization: Bearer ${CAIRN_API_KEY}` and no key value. `pi` ignores an untrusted project file, so `--approve` trusts it for this run only. All three attempts listed the six `cairn__*` tools in the system prompt. The first two attempts, the configured default model and the same model through a second provider, failed at the model provider with HTTP 502/503 and 429, before any tool call. The third attempt passed. The model choice is incidental to the MCP path. Result: pass.
 
-**UNVERIFIED — orchestrator probe pending.** This lane did not install or probe Grok. Record the official CLI source, installation/version output, MCP help or capability result, and one of: supported, unsupported, or not installed with the measured reason. Install only if free and official. Stop and record the result if installation requires login or a paid account.
+## Grok probe
+
+Measured 2026-10-31. `npm view @xai-official/grok` shows version 1.0.70, license Apache-2.0, maintainer `xai-security` at x.ai, and per-platform binary packages under the same scope, so this is the official npm package. Installation is free: it was installed into a temporary prefix with `--ignore-scripts` (postinstall not run), and `grok --version` printed `grok 1.0.70 (f50904eaee6c)`.
+
+Grok supports MCP. `grok mcp` offers `list`, `add`, `remove`, `enable`, `disable`, and `doctor`. `grok mcp add` supports `stdio`, `http` (streamable HTTP), and `sse`, with user or project scope and `-H` headers. With cairn added under a temporary HOME, `grok mcp doctor` connected without a Grok sign-in: handshake OK (protocol 2025-11-25) and 6 tools discovered ([grok-mcp-doctor.txt](real-sessions/grok-mcp-doctor.txt)). A project-scoped entry is not started in an untrusted folder.
+
+A Grok model session was not run: `grok -p` returned `Not signed in` and requires `grok login` or `XAI_API_KEY`, which needs an xAI account. Whether Grok's model calls cairn's Thread tools end to end is therefore unverified. The setup command would be `grok mcp add cairn "$CAIRN_MCP_URL" -t http -H "Authorization: Bearer $CAIRN_API_KEY"`; inferred from help and the doctor run, not from a session.
