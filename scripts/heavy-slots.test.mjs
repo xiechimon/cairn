@@ -16,7 +16,13 @@ import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
-import { skipsQueue, slotCount, slotPortHolder, slotResources } from './heavy-slots.mjs';
+import {
+  skipsQueue,
+  slotCount,
+  slotLockDir,
+  slotPortHolder,
+  slotResources,
+} from './heavy-slots.mjs';
 import { prepushModules } from './prepush.mjs';
 import { scrubGateEnv } from './scrub-git-env.mjs';
 
@@ -161,6 +167,19 @@ setTimeout(() => process.exit(0), ${lingerMs});
     ],
     { env },
   );
+
+test('an overridden TMPDIR on macOS does not move the shared lock directory', () => {
+  const darwinTemp = spawnSync('getconf', ['DARWIN_USER_TEMP_DIR'], {
+    encoding: 'utf8',
+  }).stdout.trim();
+  if (process.platform === 'darwin')
+    assert.equal(
+      slotLockDir({ TMPDIR: '/private/tmp/sandbox-override' }, 'darwin'),
+      join(darwinTemp, 'cairn-heavy-slots'),
+    );
+  assert.equal(slotLockDir({ TMPDIR: '/x', CAIRN_HEAVY_SLOTS_DIR: '/locks' }, 'darwin'), '/locks');
+  assert.equal(slotLockDir({}, 'linux'), join(tmpdir(), 'cairn-heavy-slots'));
+});
 
 test('slot count defaults to 2 and falls back to 1 with a warning for bad values', () => {
   assert.deepEqual(slotCount({}), { count: 2 });

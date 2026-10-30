@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { acquireSlot, leaseEnv, slotPortReport } from './heavy-slots.mjs';
@@ -56,14 +56,33 @@ export const localOnly = [
   ['node', 'scripts/lint-warning-cap.mjs'],
 ];
 
-const DOCS = /(?:\.md$|^LICENSE$)/;
+const SOURCE_TREES = /^(apps|packages|integration)\//;
+const MARKDOWN = /(?:\.md$|^LICENSE$)/;
+const EXECUTABLE = /\.(?:[cm]?[jt]s|sh|py)$/;
+
+function isDocument(path) {
+  if (SOURCE_TREES.test(path)) return false;
+  return MARKDOWN.test(path) || (path.startsWith('docs/') && !EXECUTABLE.test(path));
+}
 
 export function hasCode(paths) {
-  return paths.some(
-    (path) =>
-      !path.startsWith('.claude/epics/') &&
-      (/^(apps|packages|integration)\//.test(path) || !DOCS.test(path)),
-  );
+  return paths.some((path) => !path.startsWith('.claude/epics/') && !isDocument(path));
+}
+
+export function workflowTestSteps(workflows = join(root, '.github/workflows')) {
+  if (!existsSync(workflows)) return [];
+  return readdirSync(workflows)
+    .filter((name) => name.endsWith('.yml'))
+    .flatMap((name) =>
+      [
+        ...readFileSync(join(workflows, name), 'utf8').matchAll(
+          /node --test((?: [\w./-]+\.test\.mjs)+)/g,
+        ),
+      ].map((match) => ({
+        workflow: `.github/workflows/${name}`,
+        tests: match[1].trim().split(' '),
+      })),
+    );
 }
 
 export function prepushPlan(paths, mode = 'local', forceFull = false) {
@@ -72,7 +91,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
   const language = ['node', 'scripts/english-only-gate.mjs'];
   const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
   const codePaths = paths.filter((path) => hasCode([path]));
-  const docPaths = paths.filter((path) => DOCS.test(path));
+  const docPaths = paths.filter(isDocument);
   if (codePaths.length === 0 && !forceFull) {
     const checks = [language];
     if (paths.some((path) => path === 'docs/lessons.md' || path.startsWith('docs/lessons/')))
@@ -116,6 +135,18 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
         )
           ? [selfTest]
           : []),
+        ...workflowTestSteps()
+          .filter(({ workflow, tests }) =>
+            paths.some(
+              (path) =>
+                path === workflow ||
+                tests.some(
+                  (test) => path === test || path === test.replace(/\.test\.mjs$/, '.mjs'),
+                ),
+            ),
+          )
+          .map(({ tests }) => ['node', '--test', ...tests])
+          .filter((step) => !required.some((args) => args.join(' ') === step.join(' '))),
         ['node', 'scripts/prepush-vitest.mjs'],
         ...(paths.some((path) => path.startsWith('apps/web/'))
           ? [['pnpm', '--filter', '@cairn/web', 'test']]

@@ -25,6 +25,7 @@ import {
   recordInterception,
   runPlan,
   selfTests,
+  workflowTestSteps,
 } from './prepush.mjs';
 import { scrubGateEnv } from './scrub-git-env.mjs';
 
@@ -52,8 +53,28 @@ for (const [name, paths, expected] of [
   ['server markdown fixtures', ['apps/server/test/fixtures/x.md'], true],
   ['shared markdown fixtures', ['packages/shared/test/fixtures/plan1606-verification.md'], true],
   ['integration markdown fixtures', ['integration/test/fixtures/x.md'], true],
-  ['executable evidence', ['docs/verify/2136/review-check.test.mjs'], true],
-  ['non-markdown evidence', ['docs/verify/1/result.json', 'docs/verify/1/shot.png'], true],
+  [
+    'executable evidence',
+    [
+      'docs/verify/2136/review-check.test.mjs',
+      'docs/verify/1/probe.mts',
+      'docs/verify/1/run.sh',
+      'docs/verify/1/check.py',
+    ],
+    true,
+  ],
+  ['non-markdown evidence', ['docs/verify/1/result.json', 'docs/verify/1/shot.png'], false],
+  [
+    'the #2188 lessons and evidence change',
+    [
+      'docs/lessons/1678-no-verify-fixup-commit.md',
+      'docs/lessons/events.jsonl',
+      'docs/verify/2182/README.md',
+      'docs/verify/2182/hookspath-green.log',
+      'docs/verify/2182/hookspath-red.log',
+    ],
+    false,
+  ],
   ['epic data', ['.claude/epics/E1.0a.json'], false],
   ['code', ['apps/server/src/app.ts', 'scripts/prepush.mjs'], true],
   ['unknown paths', ['new-config', 'package.json', '.claude/epics-other/data.json'], true],
@@ -512,20 +533,95 @@ test('local gates default their base to the merge-base, not the moving origin/ma
     );
 });
 
-test('affected e2e receives non-markdown evidence paths as code', () => {
-  const evidence = ['docs/verify/1/shot.png', 'docs/verify/2136/review-check.test.mjs'];
-  const paths = [...evidence, 'README.md', '.claude/epics/E1.json', 'scripts/evidence-prune.mjs'];
+test('affected e2e receives executable evidence as code and data evidence as documents', () => {
+  const paths = [
+    'docs/verify/1/shot.png',
+    'docs/verify/2136/review-check.test.mjs',
+    'README.md',
+    '.claude/epics/E1.json',
+    'scripts/evidence-prune.mjs',
+  ];
+  const plan = prepushPlan(paths);
   assert.deepEqual(
-    prepushPlan(paths).find((args) => args.includes('e2e:affected')),
+    plan.find((args) => args.includes('e2e:affected')),
     [
       'pnpm',
       '--filter',
       '@cairn/web',
       'e2e:affected',
       '--',
-      ...evidence,
+      'docs/verify/2136/review-check.test.mjs',
       'scripts/evidence-prune.mjs',
     ],
+  );
+  assert.deepEqual(
+    plan.find((args) => args[1] === 'scripts/doc-reader-tests.mjs'),
+    ['node', 'scripts/doc-reader-tests.mjs', 'docs/verify/1/shot.png', 'README.md'],
+  );
+});
+
+test('a docs-only data change still runs every test that reads the changed file', () => {
+  const data = 'docs/verify/920/wire-new/manifest-new.json';
+  assert.deepEqual(prepushPlan(['docs/lessons/events.jsonl', data], 'ci'), [
+    ['node', 'scripts/english-only-gate.mjs'],
+    ['node', 'scripts/lessons-ledger-gate.mjs'],
+    ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons/events.jsonl', data],
+  ]);
+  const grep = (doc) => {
+    const result = spawnSync(
+      'git',
+      ['-c', 'color.ui=never', 'grep', '-l', '-F', '-e', doc, '--', '*.test.ts', '*.test.mjs'],
+      { encoding: 'utf8' },
+    );
+    return result.status === 0 ? result.stdout.split('\n').filter(Boolean) : [];
+  };
+  assert.ok(
+    docReaderTests([data], grep, []).vitest.includes(
+      'apps/daemon/test/skills-version-skew.test.ts',
+    ),
+  );
+});
+
+test('every node --test step in any workflow runs locally when its tests, sources or workflow change', () => {
+  const steps = workflowTestSteps();
+  assert.ok(steps.some(({ workflow }) => workflow === '.github/workflows/silent-revert-gate.yml'));
+  assert.ok(steps.some(({ tests }) => tests.includes('scripts/lane-model-policy.test.mjs')));
+  for (const { workflow, tests } of steps) {
+    const step = ['node', '--test', ...tests].join(' ');
+    for (const path of [workflow, tests[0], tests[0].replace(/\.test\.mjs$/, '.mjs')]) {
+      assert.equal(
+        prepushPlan([path]).filter((args) => args.join(' ') === step).length,
+        1,
+        `${path} should run ${step} exactly once`,
+      );
+    }
+  }
+});
+
+test('a silent-revert gate change runs its CI test step locally, and only locally', () => {
+  const step = [
+    'node',
+    '--test',
+    'scripts/github-overlap.test.mjs',
+    'scripts/silent-revert-gate.test.mjs',
+  ];
+  const ciStep = readFileSync('.github/workflows/silent-revert-gate.yml', 'utf8');
+  assert.ok(ciStep.includes(`run: ${step.join(' ')}\n`));
+  for (const path of [
+    'scripts/silent-revert-gate.mjs',
+    'scripts/silent-revert-gate.test.mjs',
+    'scripts/github-overlap.mjs',
+    'scripts/github-overlap.test.mjs',
+    '.github/workflows/silent-revert-gate.yml',
+  ]) {
+    assert.ok(
+      prepushPlan([path]).some((args) => args.join(' ') === step.join(' ')),
+      path,
+    );
+    assert.ok(!prepushPlan([path], 'ci').some((args) => args.join(' ') === step.join(' ')), path);
+  }
+  assert.ok(
+    !prepushPlan(['apps/web/src/main.tsx']).some((args) => args.join(' ') === step.join(' ')),
   );
 });
 
