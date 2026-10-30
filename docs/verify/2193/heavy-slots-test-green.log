@@ -1,0 +1,33 @@
+✔ an overridden TMPDIR on macOS does not move the shared lock directory (0.771292ms)
+✔ slot count defaults to 2 and falls back to 1 with a warning for bad values (0.457125ms)
+✔ CI environments skip the queue (0.101167ms)
+✔ each slot owns its own e2e port and build directory (0.146208ms)
+✔ slotPortHolder names the pid, cwd and command of whatever listens on the port (137.425333ms)
+✔ a bad slot count gets a warning and a single slot (85.6155ms)
+✔ waiters see their queue position and are served first-come first-served (377.570708ms)
+✔ kill -9 on the holder frees the slot for the queued process within 5 seconds (334.83725ms)
+✔ a clean exit releases the slot too (340.780875ms)
+✔ simultaneous grabs for the last slot: exactly one wins, every round (15163.166792ms)
+✔ simultaneous reclaim of one dead holder: exactly one process inherits the slot (15411.112875ms)
+✔ two killed holders and several waiters: stale entries are reclaimed without double grants (1896.01125ms)
+✔ run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass (1569.773958ms)
+✔ a run wrapper inside a holder reuses its slot instead of queueing behind itself (107.684375ms)
+✔ an inherited slot variable that no live process holds is ignored (57.003458ms)
+✔ an inherited slot whose lock belongs to someone else is not reused (85.163417ms)
+✔ CI skips the queue even when every slot is taken (99.174667ms)
+✔ run wrapper passes the exit code through and frees the slot (98.570375ms)
+✔ e2e:affected queues for a slot, but a dry run never waits (117.79125ms)
+✔ e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit (451.380333ms)
+✔ a squatted slot port fails e2e:affected before playwright and names the holding process (213.727542ms)
+✔ prepush-vitest run directly queues for a slot and only starts vitest once the holder exits (592.528417ms)
+✔ prepush-vitest reuses the lease inherited from pnpm prepush without queueing (299.314958ms)
+✔ prepush queues for a slot in local mode and starts once the holder is killed (775.157667ms)
+✔ prepush reports a squatted slot port before running any check (242.428583ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 38499.376083
