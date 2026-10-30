@@ -1,0 +1,118 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2191-push-delivery
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > an interrupted run resumes only the missing (task, arm, executor, rep) rows
+[routing] 3 run(s) to go on 1 task(s)
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > an interrupted run resumes only the missing (task, arm, executor, rep) rows
+[routing] slugify single stub-single rep0: fail (oracle failed; boundary enforcement unavailable; out-of-workdir reads: write boundary enforcement unavailable)
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > an interrupted run resumes only the missing (task, arm, executor, rep) rows
+[routing] slugify handoff stub-exec-a rep0: fail (oracle failed; boundary enforcement unavailable; out-of-workdir reads: write boundary enforcement unavailable)
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > an interrupted run resumes only the missing (task, arm, executor, rep) rows
+[routing] slugify handoff stub-exec-b rep0: fail (oracle failed; boundary enforcement unavailable; out-of-workdir reads: write boundary enforcement unavailable)
+[routing] report: /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-routing-cli-kPUYjl/report.md
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > an interrupted run resumes only the missing (task, arm, executor, rep) rows
+[routing] 1 run(s) to go on 1 task(s)
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > an interrupted run resumes only the missing (task, arm, executor, rep) rows
+[routing] slugify handoff stub-exec-b rep0: fail (oracle failed; boundary enforcement unavailable; out-of-workdir reads: write boundary enforcement unavailable)
+[routing] report: /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-routing-cli-kPUYjl/report.md
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > a deterministic two-arm, two-executor run reports per-model pass rate, cost, wall time, intervals, flagged failures, errors and planner overhead
+[routing] 3 run(s) to go on 1 task(s)
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > a deterministic two-arm, two-executor run reports per-model pass rate, cost, wall time, intervals, flagged failures, errors and planner overhead
+[routing] slugify single stub-single rep0: fail (oracle failed; boundary enforcement unavailable; out-of-workdir reads: write boundary enforcement unavailable)
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > a deterministic two-arm, two-executor run reports per-model pass rate, cost, wall time, intervals, flagged failures, errors and planner overhead
+[routing] slugify handoff stub-exec-a rep0: fail (oracle failed; boundary enforcement unavailable; out-of-workdir reads: write boundary enforcement unavailable)
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > a deterministic two-arm, two-executor run reports per-model pass rate, cost, wall time, intervals, flagged failures, errors and planner overhead
+[routing] slugify handoff stub-exec-b rep0: fail (oracle failed; boundary enforcement unavailable; out-of-workdir reads: write boundary enforcement unavailable)
+[routing] report: /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-routing-cli-Vlhn8u/report.md
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > a real flagged run fails grading and appears in the report flagged section
+[routing] 1 run(s) to go on 1 task(s)
+
+stderr | test/routing-cli.test.ts > #1987 deterministic CLI integration > a real flagged run fails grading and appears in the report flagged section
+[routing] slugify single stub-single rep0: fail (oracle failed; boundary enforcement unavailable; out-of-workdir reads: read tool: outside workspace: /etc/hostname, write boundary enforcement unavailable)
+[routing] report: /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-routing-cli-BoQQPD/report.md
+
+ ❯ |@cairn/integration| test/routing-cli.test.ts (23 tests | 3 failed) 4712ms
+   ❯ #1987 deterministic CLI integration (10)
+     × an interrupted run resumes only the missing (task, arm, executor, rep) rows 2307ms
+     × a deterministic two-arm, two-executor run reports per-model pass rate, cost, wall time, intervals, flagged failures, errors and planner overhead 479ms
+     × a real flagged run fails grading and appears in the report flagged section 214ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-cli.test.ts > #1987 deterministic CLI integration > an interrupted run resumes only the missing (task, arm, executor, rep) rows
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-cli.test.ts:463:63
+    461|         .map((line) => JSON.parse(line) as RoutingRunRow);
+    462|       expect(finalRows).toHaveLength(3);
+    463|       expect(finalRows.every((row) => row.status === 'pass')).toBe(tru…
+       |                                                               ^
+    464|       expect(finalRows.every((row) => row.oracle_pass === true)).toBe(…
+    465|       expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@cairn/integration| test/routing-cli.test.ts > #1987 deterministic CLI integration > a deterministic two-arm, two-executor run reports per-model pass rate, cost, wall time, intervals, flagged failures, errors and planner overhead
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-cli.test.ts:539:86
+    537|         .split('\n')
+    538|         .map((line) => JSON.parse(line) as RoutingRunRow);
+    539|       expect(rows.every((row) => row.status === 'pass' && row.oracle_p…
+       |                                                                                      ^
+    540|       const report = readFileSync(join(directory, 'report.md'), 'utf8'…
+    541|       expect(report).toMatch(/\| 1\.000 \[/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@cairn/integration| test/routing-cli.test.ts > #1987 deterministic CLI integration > a real flagged run fails grading and appears in the report flagged section
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-cli.test.ts:634:32
+    632|         .map((line) => JSON.parse(line) as RoutingRunRow);
+    633|       expect(row?.status).toBe('fail');
+    634|       expect(row?.oracle_pass).toBe(true);
+       |                                ^
+    635|       expect(
+    636|         row?.violations.some(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 20 passed (23)
+   Start at  16:01:00
+   Duration  12.73s (tests 38%, import 35%, transform 27%)
+
+  Transform  |@cairn/integration| transforming modules took 3.34s · 27% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

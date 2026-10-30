@@ -396,117 +396,28 @@ describe('#1987 reports from persisted configuration', () => {
   });
 });
 
+const onLinuxX64 = test.runIf(process.platform === 'linux' && process.arch === 'x64');
+
 describe('#1987 deterministic CLI integration', () => {
-  test('an interrupted run resumes only the missing (task, arm, executor, rep) rows', async () => {
-    const directory = outDir();
-    const stub = await startStubLlm([
-      writeSlug(),
-      done(),
-      plan(),
-      writeSlug(),
-      done(),
-      plan(),
-      writeSlug(),
-      done(),
-      plan(),
-      writeSlug(),
-      done(),
-    ]);
-    try {
-      const baseArgs = [
-        '--arms',
-        'single,handoff',
-        '--planner',
-        'stub-planner',
-        '--executors',
-        'stub-exec-a,stub-exec-b',
-        '--single-models',
-        'stub-single',
-        '--tasks',
-        'slugify',
-        '--reps',
-        '1',
-        '--timeout-s',
-        '45',
-        '--out',
-        directory,
-        '--relay-url',
-        stub.url,
-        '--relay-key',
-        'bench-key',
-      ];
-      const first = await runExperiment(parseArgs(baseArgs));
-      expect(first.ran).toBe(3);
-      const rowsAfterFirst = readFileSync(join(directory, RESULTS_JSONL), 'utf8')
-        .trim()
-        .split('\n');
-      expect(rowsAfterFirst).toHaveLength(3);
-      const manifest = JSON.parse(readFileSync(join(directory, EXPERIMENT_MANIFEST), 'utf8')) as {
-        planner: string;
-        promptsDigest: string;
-        pricesDigest: string | null;
-      };
-      expect(manifest.planner).toBe('stub-planner');
-      expect(typeof manifest.promptsDigest).toBe('string');
-      expect(manifest.promptsDigest.length).toBe(64);
-
-      writeFileSync(join(directory, RESULTS_JSONL), `${rowsAfterFirst.slice(0, 2).join('\n')}\n`);
-      const requestsBeforeResume = stub.requests.length;
-      const second = await runExperiment(parseArgs(baseArgs));
-      expect(second.ran).toBe(1);
-      expect(stub.requests.length).toBeGreaterThan(requestsBeforeResume);
-      const finalRows = readFileSync(join(directory, RESULTS_JSONL), 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => JSON.parse(line) as RoutingRunRow);
-      expect(finalRows).toHaveLength(3);
-      expect(finalRows.every((row) => row.status === 'pass')).toBe(true);
-      expect(finalRows.every((row) => row.oracle_pass === true)).toBe(true);
-      expect(
-        finalRows
-          .filter((row) => row.arm === 'handoff')
-          .every((row) => row.planner_model === 'stub-planner'),
-      ).toBe(true);
-      const report = readFileSync(join(directory, 'report.md'), 'utf8');
-      expect(report).toContain('stub-planner');
-      expect(report).toMatch(/pass rate \(95% CI\)/);
-      expect(report).toMatch(/cost USD mean \(95% CI\)/);
-      expect(report).toMatch(/wall s mean \(95% CI\)/);
-      expect(report).toContain('Planner overhead');
-      expect(report).toContain('flagged');
-      expect(report).toMatch(/single/);
-      expect(report).toMatch(/handoff/);
-      writeRoutingReport(directory, prepareExperiment(parseArgs(baseArgs)).identity);
-    } finally {
-      await stub.close();
-    }
-  }, 180_000);
-
-  test('a deterministic two-arm, two-executor run reports per-model pass rate, cost, wall time, intervals, flagged failures, errors and planner overhead', async () => {
-    const directory = outDir();
-    const pricesPath = join(directory, 'prices.json');
-    writeFileSync(
-      pricesPath,
-      `${JSON.stringify({
-        'stub-single': ratesA,
-        'stub-exec-a': ratesA,
-        'stub-exec-b': ratesA,
-        'stub-planner': ratesA,
-      })}\n`,
-    );
-    const stub = await startStubLlm([
-      writeSlug(),
-      done(),
-      plan(),
-      writeSlug(),
-      done(),
-      plan(),
-      writeSlug(),
-      done(),
-    ]);
-    try {
-      const result = await runExperiment(
-        parseArgs([
+  onLinuxX64(
+    'an interrupted run resumes only the missing (task, arm, executor, rep) rows',
+    async () => {
+      const directory = outDir();
+      const stub = await startStubLlm([
+        writeSlug(),
+        done(),
+        plan(),
+        writeSlug(),
+        done(),
+        plan(),
+        writeSlug(),
+        done(),
+        plan(),
+        writeSlug(),
+        done(),
+      ]);
+      try {
+        const baseArgs = [
           '--arms',
           'single,handoff',
           '--planner',
@@ -523,42 +434,141 @@ describe('#1987 deterministic CLI integration', () => {
           '45',
           '--out',
           directory,
-          '--prices',
-          pricesPath,
           '--relay-url',
           stub.url,
           '--relay-key',
           'bench-key',
-        ]),
-      );
-      expect(result.ran).toBe(3);
-      const rows = readFileSync(join(directory, RESULTS_JSONL), 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => JSON.parse(line) as RoutingRunRow);
-      expect(rows.every((row) => row.status === 'pass' && row.oracle_pass === true)).toBe(true);
-      const report = readFileSync(join(directory, 'report.md'), 'utf8');
-      expect(report).toMatch(/\| 1\.000 \[/);
-      expect(report).toMatch(/\| 0\.\d{4} \[/);
-      expect(report).toMatch(/wall s mean \(95% CI\)/);
-      expect(report).toContain('Planner overhead');
-      expect(report).toContain('flagged');
-      expect(report).toContain('## Errors');
-      const manifest = JSON.parse(readFileSync(join(directory, EXPERIMENT_MANIFEST), 'utf8')) as {
-        pricesDigest: string;
-      };
-      expect(manifest.pricesDigest).toBe(
-        pricesDigest({
+        ];
+        const first = await runExperiment(parseArgs(baseArgs));
+        expect(first.ran).toBe(3);
+        const rowsAfterFirst = readFileSync(join(directory, RESULTS_JSONL), 'utf8')
+          .trim()
+          .split('\n');
+        expect(rowsAfterFirst).toHaveLength(3);
+        const manifest = JSON.parse(readFileSync(join(directory, EXPERIMENT_MANIFEST), 'utf8')) as {
+          planner: string;
+          promptsDigest: string;
+          pricesDigest: string | null;
+        };
+        expect(manifest.planner).toBe('stub-planner');
+        expect(typeof manifest.promptsDigest).toBe('string');
+        expect(manifest.promptsDigest.length).toBe(64);
+
+        writeFileSync(join(directory, RESULTS_JSONL), `${rowsAfterFirst.slice(0, 2).join('\n')}\n`);
+        const requestsBeforeResume = stub.requests.length;
+        const second = await runExperiment(parseArgs(baseArgs));
+        expect(second.ran).toBe(1);
+        expect(stub.requests.length).toBeGreaterThan(requestsBeforeResume);
+        const finalRows = readFileSync(join(directory, RESULTS_JSONL), 'utf8')
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line) as RoutingRunRow);
+        expect(finalRows).toHaveLength(3);
+        expect(finalRows.every((row) => row.status === 'pass')).toBe(true);
+        expect(finalRows.every((row) => row.oracle_pass === true)).toBe(true);
+        expect(
+          finalRows
+            .filter((row) => row.arm === 'handoff')
+            .every((row) => row.planner_model === 'stub-planner'),
+        ).toBe(true);
+        const report = readFileSync(join(directory, 'report.md'), 'utf8');
+        expect(report).toContain('stub-planner');
+        expect(report).toMatch(/pass rate \(95% CI\)/);
+        expect(report).toMatch(/cost USD mean \(95% CI\)/);
+        expect(report).toMatch(/wall s mean \(95% CI\)/);
+        expect(report).toContain('Planner overhead');
+        expect(report).toContain('flagged');
+        expect(report).toMatch(/single/);
+        expect(report).toMatch(/handoff/);
+        writeRoutingReport(directory, prepareExperiment(parseArgs(baseArgs)).identity);
+      } finally {
+        await stub.close();
+      }
+    },
+    180_000,
+  );
+
+  onLinuxX64(
+    'a deterministic two-arm, two-executor run reports per-model pass rate, cost, wall time, intervals, flagged failures, errors and planner overhead',
+    async () => {
+      const directory = outDir();
+      const pricesPath = join(directory, 'prices.json');
+      writeFileSync(
+        pricesPath,
+        `${JSON.stringify({
           'stub-single': ratesA,
           'stub-exec-a': ratesA,
           'stub-exec-b': ratesA,
           'stub-planner': ratesA,
-        }),
+        })}\n`,
       );
-    } finally {
-      await stub.close();
-    }
-  }, 180_000);
+      const stub = await startStubLlm([
+        writeSlug(),
+        done(),
+        plan(),
+        writeSlug(),
+        done(),
+        plan(),
+        writeSlug(),
+        done(),
+      ]);
+      try {
+        const result = await runExperiment(
+          parseArgs([
+            '--arms',
+            'single,handoff',
+            '--planner',
+            'stub-planner',
+            '--executors',
+            'stub-exec-a,stub-exec-b',
+            '--single-models',
+            'stub-single',
+            '--tasks',
+            'slugify',
+            '--reps',
+            '1',
+            '--timeout-s',
+            '45',
+            '--out',
+            directory,
+            '--prices',
+            pricesPath,
+            '--relay-url',
+            stub.url,
+            '--relay-key',
+            'bench-key',
+          ]),
+        );
+        expect(result.ran).toBe(3);
+        const rows = readFileSync(join(directory, RESULTS_JSONL), 'utf8')
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line) as RoutingRunRow);
+        expect(rows.every((row) => row.status === 'pass' && row.oracle_pass === true)).toBe(true);
+        const report = readFileSync(join(directory, 'report.md'), 'utf8');
+        expect(report).toMatch(/\| 1\.000 \[/);
+        expect(report).toMatch(/\| 0\.\d{4} \[/);
+        expect(report).toMatch(/wall s mean \(95% CI\)/);
+        expect(report).toContain('Planner overhead');
+        expect(report).toContain('flagged');
+        expect(report).toContain('## Errors');
+        const manifest = JSON.parse(readFileSync(join(directory, EXPERIMENT_MANIFEST), 'utf8')) as {
+          pricesDigest: string;
+        };
+        expect(manifest.pricesDigest).toBe(
+          pricesDigest({
+            'stub-single': ratesA,
+            'stub-exec-a': ratesA,
+            'stub-exec-b': ratesA,
+            'stub-planner': ratesA,
+          }),
+        );
+      } finally {
+        await stub.close();
+      }
+    },
+    180_000,
+  );
 
   test('compatible resume with nothing missing is byte-identical and makes zero relay requests', async () => {
     const directory = outDir();
@@ -595,59 +605,63 @@ describe('#1987 deterministic CLI integration', () => {
     }
   }, 180_000);
 
-  test('a real flagged run fails grading and appears in the report flagged section', async () => {
-    const directory = outDir();
-    const stub = await startStubLlm([
-      {
-        toolCall: { name: 'read', arguments: { path: '/etc/hostname' } },
-      },
-      writeSlug(),
-      done(),
-    ]);
-    try {
-      const result = await runExperiment(
-        parseArgs([
-          '--arms',
-          'single',
-          '--single-models',
-          'stub-single',
-          '--tasks',
-          'slugify',
-          '--reps',
-          '1',
-          '--timeout-s',
-          '45',
-          '--out',
-          directory,
-          '--relay-url',
-          stub.url,
-          '--relay-key',
-          'bench-key',
-        ]),
-      );
-      expect(result.ran).toBe(1);
-      const [row] = readFileSync(join(directory, RESULTS_JSONL), 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => JSON.parse(line) as RoutingRunRow);
-      expect(row?.status).toBe('fail');
-      expect(row?.oracle_pass).toBe(true);
-      expect(
-        row?.violations.some(
-          (entry) => entry.includes('/etc/hostname') || entry.includes('outside workspace'),
-        ),
-      ).toBe(true);
-      const report = readFileSync(join(directory, 'report.md'), 'utf8');
-      expect(report).toContain('## Flagged runs');
-      expect(report.toLowerCase()).toMatch(/hostname|outside workspace/);
-      expect(report).toMatch(/\| 0\.000 \[/);
-      const [agg] = aggregateByModel([row!], null);
-      expect(agg?.passes).toBe(0);
-      expect(agg?.flagged).toBe(1);
-    } finally {
-      await stub.close();
-    }
-  }, 180_000);
+  onLinuxX64(
+    'a real flagged run fails grading and appears in the report flagged section',
+    async () => {
+      const directory = outDir();
+      const stub = await startStubLlm([
+        {
+          toolCall: { name: 'read', arguments: { path: '/etc/hostname' } },
+        },
+        writeSlug(),
+        done(),
+      ]);
+      try {
+        const result = await runExperiment(
+          parseArgs([
+            '--arms',
+            'single',
+            '--single-models',
+            'stub-single',
+            '--tasks',
+            'slugify',
+            '--reps',
+            '1',
+            '--timeout-s',
+            '45',
+            '--out',
+            directory,
+            '--relay-url',
+            stub.url,
+            '--relay-key',
+            'bench-key',
+          ]),
+        );
+        expect(result.ran).toBe(1);
+        const [row] = readFileSync(join(directory, RESULTS_JSONL), 'utf8')
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line) as RoutingRunRow);
+        expect(row?.status).toBe('fail');
+        expect(row?.oracle_pass).toBe(true);
+        expect(
+          row?.violations.some(
+            (entry) => entry.includes('/etc/hostname') || entry.includes('outside workspace'),
+          ),
+        ).toBe(true);
+        const report = readFileSync(join(directory, 'report.md'), 'utf8');
+        expect(report).toContain('## Flagged runs');
+        expect(report.toLowerCase()).toMatch(/hostname|outside workspace/);
+        expect(report).toMatch(/\| 0\.000 \[/);
+        const [agg] = aggregateByModel([row!], null);
+        expect(agg?.passes).toBe(0);
+        expect(agg?.flagged).toBe(1);
+      } finally {
+        await stub.close();
+      }
+    },
+    180_000,
+  );
 
   test.each([
     {

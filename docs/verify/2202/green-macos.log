@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/b0-2202-routing-linux
+
+
+ Test Files  1 passed (1)
+      Tests  20 passed | 3 skipped (23)
+   Start at  16:53:30
+   Duration  2.21s (import 50%, tests 27%, transform 23%)
+
