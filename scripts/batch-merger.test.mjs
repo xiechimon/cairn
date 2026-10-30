@@ -9,6 +9,8 @@ const script = resolve('scripts/batch-merger.mjs');
 const policy = readFileSync('.claude/workflows/pr-gate.js', 'utf8');
 const head = 'a'.repeat(40);
 const required = ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence'];
+const trailer = 'Merged-by: cairn-batch-merger';
+const mergerCommit = { commit: { message: `Batch work (#9)\n\n${trailer}` } };
 const pull = (number = 1) => ({
   number,
   node_id: `pr${number}`,
@@ -60,6 +62,7 @@ if(p === 'graphql') { console.log(JSON.stringify({data:{disablePullRequestAutoMe
 
 else if(p.includes('/issues?')) { if(d.markerError) process.exit(1); const countFile = process.env.DATA+'.count'; const count = fs.existsSync(countFile) ? Number(fs.readFileSync(countFile,'utf8')) : 0; fs.writeFileSync(countFile,String(count+1)); console.log(JSON.stringify([d.pauseOnSecondLookup && count > 0 ? [{number:4}] : d.issues ?? []])); }
 else if(p.includes('/pulls?')) { if(p.includes('state=closed')) { if(d.closedError) process.exit(1); console.log(JSON.stringify(d.closedPages?.[Number(new URL('https://api/'+p).searchParams.get('page') ?? 1)-1] ?? (d.closed ?? []).map(pr=>({...pr,updated_at:pr.updated_at ?? new Date().toISOString()})))); } else console.log(JSON.stringify([d.pulls])); }
+else if(p.includes('/commits?sha=main')) { if(d.mainError) process.exit(1); console.log(JSON.stringify(d.mainPages ?? [d.mainCommits ?? []])); }
 else if(p.includes('/check-runs')) { if(d.checkError) process.exit(1); console.log(JSON.stringify([{check_runs:d.checks}])); }
 else if(p.endsWith('/comments?per_page=100')) console.log(JSON.stringify([d.comments]));
 else if(p.endsWith('/commits?per_page=100')) console.log(JSON.stringify([d.commits]));
@@ -131,10 +134,7 @@ for (const [name, data] of [
       ],
     },
   ],
-  [
-    'cap reached',
-    { args: ['--daily-cap', '1'], closed: [{ ...pull(), merged_at: new Date().toISOString() }] },
-  ],
+  ['cap reached', { args: ['--daily-cap', '1'], mainCommits: [mergerCommit] }],
   ['recovery label', { pulls: [{ ...pull(), labels: [{ name: 'cairn-recovery' }] }] }],
   ['draft', { pulls: [{ ...pull(), draft: true }] }],
   ['other base', { pulls: [{ ...pull(), base: { ref: 'release' } }] }],
@@ -162,7 +162,7 @@ test('all green merges exactly one current head and preserves commit bodies', (t
   const args = f.merges[0];
   assert.equal(args[args.indexOf('--match-head-commit') + 1], head);
   assert.equal(args[args.indexOf('--subject') + 1], 'Batch work (#1)');
-  assert.equal(args[args.indexOf('--body') + 1], 'closes #42');
+  assert.equal(args[args.indexOf('--body') + 1], `closes #42\n\n${trailer}`);
   assert.ok(f.calls.filter((args) => args[1]?.includes('/issues?')).length >= 2);
 });
 test('non-batch branches are ignored entirely', (t) => {
@@ -241,23 +241,6 @@ test('a failed merge is not retried on another PR', (t) => {
   assert.equal(f.result.status, 1);
   assert.equal(f.merges.length, 1);
 });
-test('merged non-batch and previous-day PRs do not consume the cap', (t) => {
-  const f = fixture(t, {
-    args: ['--daily-cap', '1'],
-    closed: [
-      { ...pull(), merged_at: '2000-01-01T00:00:00Z' },
-      { ...pull(), head: { ref: 'feature/work' }, merged_at: new Date().toISOString() },
-    ],
-  });
-  assert.equal(f.result.status, 0, f.result.stderr);
-  assert.equal(f.merges.length, 1);
-});
-
-test('closed PR lookup errors fail closed', (t) => {
-  const f = fixture(t, { closedError: true });
-  assert.equal(f.result.status, 1);
-  assert.equal(f.merges.length, 0);
-});
 
 for (const carried of [false, true])
   test(`real review-gate PASS authorizes merging (carried over: ${carried})`, (t) => {
@@ -282,16 +265,6 @@ test('legacy verdict text does not authorize merging', (t) => {
 test('multi-digit batches are eligible', (t) => {
   const f = fixture(t, { pulls: [{ ...pull(), head: { ...pull().head, ref: 'B12/work' } }] });
   assert.equal(f.merges.length, 1, f.result.stdout + f.result.stderr);
-});
-test('multi-digit merged batches consume the cap', (t) => {
-  const f = fixture(t, {
-    args: ['--daily-cap', '1'],
-    closed: [
-      { ...pull(), head: { ...pull().head, ref: 'B12/work' }, merged_at: new Date().toISOString() },
-    ],
-  });
-  assert.equal(f.merges.length, 0);
-  assert.match(f.result.stdout, /daily-cap/);
 });
 test('a batch without the review label is skipped', (t) => {
   const f = fixture(t, { pulls: [{ ...pull(), labels: [] }] });
@@ -334,25 +307,6 @@ test('a fresh fork head fails eligibility', (t) => {
   assert.equal(f.merges.length, 0);
   assert.match(f.result.stdout, /head-repo-mismatch/);
 });
-test('closed PR pages count recent merges and stop at an older update', (t) => {
-  const today = new Date().toISOString();
-  const recent = { ...pull(), updated_at: today, merged_at: today };
-  const f = fixture(t, {
-    args: ['--daily-cap', '101'],
-    closedPages: [
-      Array.from({ length: 100 }, () => recent),
-      Array.from({ length: 100 }, (_, index) =>
-        index === 0 ? recent : { ...pull(), updated_at: '2000-01-01T00:00:00Z', merged_at: null },
-      ),
-    ],
-  });
-  assert.equal(f.merges.length, 0);
-  assert.match(f.result.stdout, /daily-cap/);
-  const paths = f.calls.map((args) => args[1]);
-  assert.ok(paths.some((path) => path?.includes('state=closed&sort=updated&direction=desc')));
-  assert.ok(paths.some((path) => path?.endsWith('page=2')));
-  assert.ok(!paths.some((path) => path?.endsWith('page=3') || path?.startsWith('search/')));
-});
 
 for (const [name, data, reason] of [
   ['protected path', { numstat: '1\t0\tdocs/adr/0028.md\n' }, 'protected paths'],
@@ -388,4 +342,40 @@ for (const data of [{ gitError: true }, { policy: 'invalid policy' }, { numstat:
   });
 test('clean product source remains eligible', (t) => {
   assert.equal(fixture(t).merges.length, 1);
+});
+
+test('main commits without the merger trailer do not consume the cap', (t) => {
+  const f = fixture(t, {
+    args: ['--daily-cap', '1'],
+    mainCommits: [{ commit: { message: 'Owner merge by hand (#5)\n\ncloses #4' } }],
+  });
+  assert.equal(f.result.status, 0, f.result.stderr);
+  assert.equal(f.merges.length, 1, f.result.stdout);
+});
+test('the cap counts trailer commits on main since UTC midnight across pages', (t) => {
+  const f = fixture(t, {
+    args: ['--daily-cap', '101'],
+    mainPages: [Array.from({ length: 100 }, () => mergerCommit), [mergerCommit]],
+  });
+  assert.equal(f.merges.length, 0);
+  assert.match(f.result.stdout, /daily-cap/);
+  const today = new Date().toISOString().slice(0, 10);
+  assert.ok(
+    f.calls.some(
+      (args) =>
+        args[1] === `repos/owner/repo/commits?sha=main&since=${today}T00:00:00Z&per_page=100`,
+    ),
+    JSON.stringify(f.calls),
+  );
+});
+test('main commit lookup errors fail closed', (t) => {
+  const f = fixture(t, { mainError: true });
+  assert.equal(f.result.status, 1);
+  assert.equal(f.merges.length, 0);
+});
+test('the merger writes its trailer into the squash body', (t) => {
+  const f = fixture(t);
+  const body = f.merges[0]?.[f.merges[0].indexOf('--body') + 1] ?? '';
+  assert.ok(body.endsWith(`\n\n${trailer}`), body);
+  assert.match(body, /closes #42/);
 });

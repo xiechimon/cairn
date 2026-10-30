@@ -14,10 +14,10 @@ const MANIFEST_BRAND = {
 
 const MANIFEST_SCREENSHOT_LABEL = 'Cairn task board — humans direct, agents execute';
 
-const MANIFEST_DARK_CANVAS = '#0a110e';
+const MANIFEST_DARK_CANVAS = '#141715';
 
 describe('PWA files', () => {
-  it('manifest.webmanifest carries the Cairn brand, Paper colors and shipped screenshots', () => {
+  it('manifest.webmanifest carries the Cairn brand, stone colors and shipped screenshots', () => {
     const shipped = JSON.parse(readFileSync(resolve(PUBLIC_DIR, 'manifest.webmanifest'), 'utf8'));
     expect(shipped.name).toBe(MANIFEST_BRAND.name);
     expect(shipped.short_name).toBe(MANIFEST_BRAND.shortName);

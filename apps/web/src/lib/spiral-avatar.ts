@@ -1,5 +1,5 @@
-const TILE_COLORS = ['#46703d', '#8a5f18', '#496684', '#9d5035', '#774c73', '#287070'] as const;
-const SPIRAL_CREAM = '#f2ead7';
+const TILE_COLORS = ['#3f6c35', '#9a6b3a', '#5379a0', '#7a5b8e', '#3d7c7a', '#8a5560'] as const;
+const SPIRAL_CREAM = '#f4f6f1';
 const SPIN_STYLE =
   '<style>@keyframes spin{to{transform:rotate(360deg)}}.spin{transform-origin:50px 50px;animation:spin 2.4s linear infinite}@media (prefers-reduced-motion:reduce){.spin{animation:none}}</style>';
 const SPIRAL_ARCS = [

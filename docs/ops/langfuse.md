@@ -168,6 +168,41 @@ The trailing `/v1/traces` on `CAIRN_OTEL_ENDPOINT` is optional. `CAIRN_OTEL_HEAD
 
 Tree structure: one build is one trace with the root span `invoke_agent`; each step is one child span; under a step, every model turn is a `chat` and every tool call is an `execute_tool`. The trace id is a hash of the buildId, and the span id is a hash of the buildId, stepId, and turn index, so re-pushing the same pack yields exactly the same ids — Langfuse merges by id and the count does not change. Field names are centralized in `apps/server/src/genai-conventions.ts`; renaming a convention only changes that one place. Before pushing, the whole request goes through `redactSecrets`; the masked count is in the `redacted=` of the output.
 
+## Claude Code runtime tool traces (#2269)
+
+Configure `CAIRN_OTEL_ENDPOINT` and `CAIRN_OTEL_HEADERS` on the daemon to export
+Claude Code tool spans. The daemon converts streamed tool calls and results to
+OTLP/HTTP JSON and applies both its exact subscription-credential redactor and
+the shared `redactSecrets` patterns before posting. Trace and parent span ids
+remain tied to the build and step.
+
+Direct Claude CLI telemetry is disabled in both the subprocess environment and
+the SDK flag settings. Inherited and per-session `OTEL_*`, `CAIRN_OTEL_*`,
+`ANT_OTEL_*` and beta tracing (`ENABLE_BETA_TRACING_DETAILED`,
+`BETA_TRACING_ENDPOINT`) configuration is removed from the subprocess
+environment. The CLI's beta tracing exporter ignores
+`CLAUDE_CODE_ENABLE_TELEMETRY`, so the flag settings also pin
+`BETA_TRACING_ENDPOINT` to an empty value; flag settings outrank user and project
+settings. Managed policy settings still outrank flag settings, so a machine
+administrator can re-enable CLI export. Exporter credentials stay in the daemon. CLI-native
+chat spans, metrics, logs and enhanced telemetry are disabled; only streamed
+tool spans use this replacement path. Export is best effort and does not delay
+session completion.
+
+The regression in `apps/daemon/test/claude-otel-export.test.ts` runs the real SDK
+against a fake CLI process and an ephemeral HTTP collector. The fake executes a
+child tool that prints a synthetic secret. The test checks the actual exported
+body, including completion, CLI failure, abrupt exit, credential patterns,
+settings overrides (including beta tracing set in user settings) and collector
+failure. With the unchanged main backend, the
+same fixture exports the synthetic secret in clear text. This verifies the SDK,
+daemon mapping and HTTP boundary; it does not exercise a real model or Langfuse.
+
+Redaction retains the existing pattern limits: arbitrary unrelated or encoded
+secrets are not guaranteed to match. Abrupt daemon termination can lose pending
+spans. Gemini ACP still inherits its process environment and does not receive
+Cairn's per-step OTel configuration; this change is limited to Claude Code.
+
 ## Binding to this machine or the LAN
 
 By default `BIND_ADDRESS=127.0.0.1`, so only processes on omarchy itself can reach the UI and OTLP.

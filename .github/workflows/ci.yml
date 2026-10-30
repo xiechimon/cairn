@@ -305,6 +305,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
 
+      - name: Real smoke runner and checker fixtures (#2283)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/real-smoke.test.mjs
+
   ops-backup-test:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'

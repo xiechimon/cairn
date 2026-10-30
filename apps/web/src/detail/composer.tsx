@@ -1,24 +1,7 @@
-// Composer (issue #56, r7 §3.4): box anchored x737 w687 h76 → min-h84
-// (#860: 3-line textarea + auto-grow), placeholder
-// overlaps the send button in every capture (r7 §3.4), so the page renders
-// the FAB after the composer and it covers the send pixels.
-// XMON-55 P5: the stop is no longer a 14×14 bare red square — it is the send
-// button's sibling (32×32, same fill, same bottom axis, 8px apart) carrying a
-// 10px --stop glyph; the send lights up on the brand solid once a draft
-// exists. Geometry and rationale live in detail.css.
-//
-//
-// textarea tracks `@`-prefixed token positions to expose an inline
-// agents-only listbox (r9 §3.2). Both paths route through
-// insertMentionText so the picked mention lands at the caret position
-// without losing focus (#625: both paths live in useComposerWire, this
-// file renders the popover/inline skins). The picker is data-source
-// agnostic — the caller (todo-detail-page) feeds in MentionGroups
-// derived from either live REST hooks or the fixture set.
-
 import { useLayoutEffect, useState } from 'react';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowUp, Grid2x2, Paperclip, SearchPlus } from '../icons/index.js';
@@ -44,6 +27,8 @@ interface ComposerProps {
   aiReview: boolean;
   streaming: boolean;
   onSend?: (text: string) => void | Promise<void>;
+  onQueue?: (text: string) => void | Promise<void>;
+  onStopAndSend?: (text: string) => void | Promise<void>;
   editable?: boolean;
   onAttachment?: (files: File[]) => string[] | Promise<string[]>;
   draft?: string;
@@ -59,6 +44,8 @@ export function Composer({
   aiReview,
   streaming,
   onSend,
+  onQueue,
+  onStopAndSend,
   editable,
   onAttachment,
   draft: draftProp,
@@ -116,6 +103,8 @@ export function Composer({
     draft: draftProp,
     onDraftChange,
     onSend,
+    onQueue,
+    onStopAndSend,
     onAttachment,
     mentionGroups,
     mentionFiles,
@@ -227,8 +216,7 @@ export function Composer({
         <ComposerChips draft={draft} files={mentionFiles} suspended={inlineOpen || slashOpen} />
         <AttachmentStrip draft={draft} pending={pendingAttachments} />
       </div>
-      {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
-      <input
+      <Input
         ref={fileInputRef}
         type="file"
         multiple
