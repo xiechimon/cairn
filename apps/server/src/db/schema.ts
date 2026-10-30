@@ -77,6 +77,7 @@ export const project = sqliteTable('project', {
   repoName: text('repoName'),
   githubRepo: text('githubRepo'),
   localPath: text('localPath'),
+  baseBranch: text('baseBranch'),
   autonomy: json<(AutonomySettings & Partial<ProjectMergeConfig>) | null>('autonomy'),
 });
 

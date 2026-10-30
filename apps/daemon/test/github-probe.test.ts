@@ -150,3 +150,42 @@ describe('githubRepoRefOf (failure mode 5: shape pre-gate)', () => {
     });
   });
 });
+
+test('REST lookup binds the head and configured base and ignores a wrong-base PR', async () => {
+  let requested = '';
+  const result = await probeGithubPr({
+    owner: 'o',
+    repo: 'r',
+    branch: 'work',
+    baseBranch: 'release/dev',
+    ghPath: failingGh(),
+    fetchImpl: async (url) => {
+      requested = url;
+      return fetchJson([
+        { number: 99, html_url: 'wrong', state: 'open', base: { ref: 'main' } },
+        { number: 12, html_url: 'right', state: 'open', base: { ref: 'release/dev' } },
+      ])();
+    },
+  });
+  expect(new URL(requested).searchParams.get('base')).toBe('release/dev');
+  expect(result).toEqual({ number: 12, url: 'right' });
+});
+
+test('gh lookup filters by the configured base', async () => {
+  const gh = fakeGh('[]');
+  writeFileSync(
+    gh,
+    '#!/bin/sh\ncase "$*" in\n  *"--base dev"*) echo \'[{"number":12,"url":"right","state":"open","baseRefName":"dev"}]\' ;;\n  *) echo \'[{"number":99,"url":"wrong","state":"open","baseRefName":"main"}]\' ;;\nesac\n',
+    { mode: 0o755 },
+  );
+  expect(
+    await probeGithubPr({
+      owner: 'o',
+      repo: 'r',
+      branch: 'work',
+      baseBranch: 'dev',
+      ghPath: gh,
+      fetchImpl: fetchJson([]),
+    }),
+  ).toEqual({ number: 12, url: 'right' });
+});

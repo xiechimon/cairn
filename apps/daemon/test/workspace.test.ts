@@ -487,3 +487,33 @@ describe('#1149 environment lifecycle hooks (two prepare mount points)', () => {
     expect(existsSync(join(root, CONV_A))).toBe(false);
   }, 30_000);
 });
+
+test.each([null, 'nope'])(
+  'a reused worktree survives a missing base %s',
+  async (baseBranch) => {
+    const first = await ws.prepare(prepareInput(CONV_A));
+    const spy = vi.spyOn(gitPrim, 'remoteDefaultBranch').mockResolvedValue('nope');
+    try {
+      const reused = await ws.prepare({ ...prepareInput(CONV_A), baseBranch });
+      expect(reused.reused).toBe(true);
+      expect(reused.cwd).toBe(first.cwd);
+    } finally {
+      spy.mockRestore();
+    }
+  },
+  30_000,
+);
+
+test('a remote conversation branch can resume when origin HEAD fallback names a missing base', async () => {
+  const first = await ws.prepare(prepareInput(CONV_A));
+  await ws.push(first.cwd, first.branch, null);
+  rmSync(first.cwd, { recursive: true, force: true });
+  const spy = vi.spyOn(gitPrim, 'remoteDefaultBranch').mockResolvedValue('nope');
+  try {
+    const resumed = await ws.prepare({ ...prepareInput(CONV_A), baseBranch: null });
+    expect(resumed.reused).toBe(false);
+    expect(await gitPrim.head(resumed.cwd)).toBe(await gitPrim.head(seedDir));
+  } finally {
+    spy.mockRestore();
+  }
+}, 30_000);

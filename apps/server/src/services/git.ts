@@ -16,12 +16,16 @@ import {
   type ProjectTreeResponse,
   parseGithubRepoRef,
   projectMergeConfigSchema,
+  type SecretBox,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build as buildTable, project, todo as todoTable } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { isSafeRepoPath, lsFilesRecursive, runGit, systemGitOps } from '../lib/git.js';
+import type { FetchLike } from '../lib/github.js';
+import { githubBranches } from '../lib/github-branches.js';
+import { githubTokenOrNull } from './github-connection.js';
 
 export type ProjectRow = typeof project.$inferSelect;
 
@@ -98,20 +102,27 @@ export function hasRepoBinding(row: ProjectRow | undefined): boolean {
 export function projectRepoRef(
   row: ProjectRow | undefined,
   origin: string,
-): { kind: 'hosted' | 'github' | 'local'; cloneUrl: string; localPath?: string } | null {
+): {
+  kind: 'hosted' | 'github' | 'local';
+  cloneUrl: string;
+  localPath?: string;
+  baseBranch?: string;
+} | null {
+  const base = row?.baseBranch != null ? { baseBranch: row.baseBranch } : {};
   if (row?.repoKind === 'hosted' && row.repoName !== null) {
-    return { kind: 'hosted', cloneUrl: hostedCloneUrl(origin, row.teamId, row.repoName) };
+    return { kind: 'hosted', cloneUrl: hostedCloneUrl(origin, row.teamId, row.repoName), ...base };
   }
   const githubRef = githubRepoOfProject(row);
   if (githubRef !== null) {
     return {
       kind: 'github',
+      ...base,
       cloneUrl: githubCloneUrl(githubRef),
       ...(row?.localPath != null ? { localPath: row.localPath } : {}),
     };
   }
   if (row?.repoKind === 'local' && row.localPath !== null) {
-    return { kind: 'local', cloneUrl: row.localPath };
+    return { kind: 'local', cloneUrl: row.localPath, ...base };
   }
   return null;
 }
@@ -169,6 +180,7 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     name: row.name,
     teamId: row.teamId,
     splitPolicy: row.splitPolicy,
+    baseBranch: row.baseBranch,
     ...(row.description !== null ? { description: row.description } : {}),
     ...(row.repoKind !== null ? { repoKind: row.repoKind } : {}),
     ...(row.repoName !== null ? { repoName: row.repoName } : {}),
@@ -284,9 +296,15 @@ export async function readFile(
 }
 
 export async function readBranches(
-  ctx: RepoCtx,
+  ctx: RepoCtx & { box?: SecretBox; githubFetch?: FetchLike },
   projectId: string,
 ): Promise<ProjectBranchesResponse> {
+  const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
+  const ref = githubRepoOfProject(row);
+  if (row && ref) {
+    const token = await githubTokenOrNull(ctx, row.teamId);
+    return githubBranches(ctx.githubFetch ?? fetch, token, ref);
+  }
   const dir = await requireRepoReadDir(ctx, projectId);
   return systemGitOps.listBranches(dir);
 }
@@ -415,7 +433,7 @@ export async function readBuildChanges(
   }
   const dir = repoDirFor(ctx.reposDir, projRow.teamId, projRow.repoName);
   const { defaultBranch } = await systemGitOps.listBranches(dir);
-  const base = defaultBranch ?? 'main';
+  const base = projRow.baseBranch ?? defaultBranch ?? 'main';
   const baseSha = await systemGitOps.resolveCommit(dir, `refs/heads/${base}`);
   const headSha = await systemGitOps.resolveCommit(
     dir,
