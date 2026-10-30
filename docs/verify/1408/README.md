@@ -1,3 +1,53 @@
+# Round 3: built release and process provenance
+
+Base commit: af68d0d77a1b1fb55e9204845f4340464de84713 plus the uncommitted working diff. This section supersedes historical round 2 claims below. GitHub overlap lookup (open and recently merged PRs touching deploy-self) is unavailable by instruction; proceeding on the assigned branch for the same #1408 request. No host access, commit, push or PR is authorized.
+
+## Failure modes recorded before implementation
+
+| Failure mode | Test or unverified limit |
+| --- | --- |
+| Daemon build fails after native probe | Build refusal before scratch, drain, backup or unit mutation |
+| Build returns success without CLI output, or output resolves outside release | Missing and escaped CLI refusal fixtures |
+| Build order or package script is wrong | Successful fixture asserts install, native, package build, scratch order |
+| Old daemon or server stays active despite fresh heartbeat | Old MainPID cwd rollback fixtures for each unit |
+| MainPID is zero, malformed, missing, or proc cwd cannot be read | Invalid PID and unreadable cwd rollback fixtures |
+| Current CLI resolves outside selected release during health | Escaped CLI health rollback fixture |
+| New process cwd matches release and CLI exists | Successful deploy fixture |
+| Absolute old ExecStart with new cwd, PID reuse, process replacement after sampling, malicious release | Unverified host configuration/race limits; cwd is provenance evidence, not executable attestation |
+| Real daemon compilation, Linux procfs/systemd behavior, real server migration/API/heartbeat | Unverified host acceptance; fixture tools are stubbed |
+
+## Round 3 results and evidence limits
+
+Every command below tested base commit af68d0d77a1b1fb55e9204845f4340464de84713 plus this working diff; red ran before the production implementation, green ran after it. The full green run used the pre-format test snapshot; the focused rerun used the formatted final tests. The only subsequent production edit removed an extra blank line.
+
+| Command | Surface / provider mode | Artifact | Result / supported claim |
+| --- | --- | --- | --- |
+| `node --test --test-name-pattern='build-\|daemon package build\|process provenance' scripts/ops/deploy-self.test.mjs` | Scratch fixture / stub | [red.log](red.log) | 11 failed against unchanged implementation, before implementation edits |
+| `node --test scripts/ops/deploy-self.test.mjs` | Scratch fixture / stub | [green.log](green.log) | 71 passed; build ordering, artifact refusal and process provenance rollback assertions |
+| Same focused node command | Scratch fixture / stub | [focused-green.log](focused-green.log) | 11 passed after formatting |
+| `pnpm lint` | Static / not exercised | [lint.log](lint.log), [initial rejection](lint-round3-red.log) | Exit 0 after targeted formatting |
+| `pnpm typecheck` | Static / not exercised | [typecheck.log](typecheck.log) | Exit 0 |
+| `pnpm exec vitest run --changed` | Selected tests / not exercised | [vitest.log](vitest.log) | Exit 0; no tests selected, no additional runtime coverage |
+| `pnpm spec:parse` | Collection / not exercised | [spec-parse.log](spec-parse.log) | Exit 0; 1391 web tests collected, 65 integration files parsed; no e2e executed |
+| `node scripts/lessons-ledger-gate.mjs` | Static / not exercised | [ledger.log](ledger.log) | Exit 0 |
+| `node scripts/english-only-gate.mjs`; `node scripts/comment-discipline-gate.mjs` | Static / not exercised | [english.log](english.log), [comment.log](comment.log) | Exit 0 |
+| `bash -n scripts/ops/deploy-self.sh`; Python ast.parse of deploy-self.py; `git diff --check` | Static / not exercised | This record | Exit 0 after evidence whitespace normalization |
+
+The node suite executes real temporary Git worktrees, symlinks and SQLite databases. It stubs pnpm/build output, node/scratch server, gh, curl, systemctl and procfs readlink. It proves orchestration against these boundaries, not actual daemon compilation, Linux service state, a live application or a real provider. No screenshots are used. No external package API was added. Automated checks do not substitute for an independent review; none is claimed here. CI and open/recently merged overlaps remain unverified. Artifacts are local uncommitted evidence only: delivered verification and SHA-pinned public raw links remain unavailable until an authorized later commit/PR.
+
+Host acceptance must still run the package build in an isolated release and inspect the real CLI artifact; deploy the isolated stack and compare each actual MainPID cwd with the selected release; verify the retained relative dist ExecStart; exercise old-cwd and build-failure negative controls, real authenticated reads and a post-restart heartbeat, and inspect rollback current/last-good and retained database rows. Use the isolated host drill described below; do not infer host success from these stubs.
+
+Round 3 retro used [.claude/skills/retro-cairn/SKILL.md](../../../.claude/skills/retro-cairn/SKILL.md). The corrected host defect now has build/artifact/provenance regression checks and a release-process-provenance lesson. Two process errors were intercepted and corrected: unformatted test additions and whitespace in raw red output; existing formatting and evidence-whitespace lessons/events were updated. Ledger generation also filled unrelated missing baselines; those generated additions were removed so only this task's new baseline remains.
+
+Round 3 changed files: `scripts/ops/deploy-self.py`, `scripts/ops/deploy-self.test.mjs`, this README, red.log, green.log, focused-green.log, lint.log, lint-round3-red.log, typecheck.log, vitest.log, spec-parse.log, english.log, comment.log, ledger.log; `docs/lessons/1408-release-process-provenance.md`, `docs/lessons/1481-format-before-lint.md`, `docs/lessons/1773-evidence-log-whitespace.md`, `docs/lessons/baselines.json`, and `docs/lessons/events.jsonl`. The daemon drop-in already changes only WorkingDirectory and needs no edit. No lockfile changes, commit, push, PR, full e2e or full build.
+
+Final round 3 source fingerprints:
+
+- `scripts/ops/deploy-self.py`: `5f981d68dcf57801cd79f39487f423e233d3db0b5f2e9d31da52a8e70cecb325`
+- `scripts/ops/deploy-self.test.mjs`: `9f54d67b1c2bdbcc6551ae91d228093cf1b14e2ca21518bbb4d398a835d1e19e`
+
+## Historical round 2 record
+
 # Deploy self verification (#1408)
 
 ## Scope and evidence boundaries
@@ -54,7 +104,7 @@ SIGINT, SIGTERM and SIGHUP unwind deployment cleanup, including pause restoratio
 
 ## Copy-paste bootstrap on omarchy (not executed here)
 
-Run in a private Bash shell on the host. First inspect the actual running commands and source checkout. The checked-in `scripts/ops/systemd/` contains only WorkingDirectory drop-ins for server and daemon, not their base service ExecStart. `apps/daemon/package.json` defines source `dev` as `tsx src/cli.ts start -f`, while the installed `cairn` binary is `dist/cli.mjs`. Therefore the supplied daemon drop-in alone does not establish source execution relative to WorkingDirectory. A packaged or absolute old-checkout ExecStart will not follow the release source. Inspect and, if necessary, configure source execution before bootstrap; the host's effective invocation remains unverified.
+Run in a private Bash shell on the host. The supplied daemon drop-in changes only WorkingDirectory through current/apps/daemon and preserves the measured base ExecStart: the host Node executable running `dist/cli.mjs start -f --server http://127.0.0.1:8787`. Do not replace it with source execution. Inspect the effective unit to ensure its CLI path is relative to WorkingDirectory, rather than an absolute old checkout. The deployment builds the daemon with its package script after installation and the native probe, before scratch startup or drain. Shared exports TypeScript source and has no separate build script; the daemon build bundles it. No external package API is introduced here.
 
 ```sh
 systemctl --user cat cairn-server.service cairn-daemon.service
@@ -84,6 +134,8 @@ mkdir -p "$CAIRN_DEPLOY_ROOT/releases" "$CAIRN_DEPLOY_ROOT/backups" "$HOME/.cair
 git -C "$CAIRN_DEPLOY_REPO" worktree add --detach "$CAIRN_DEPLOY_ROOT/releases/$CAIRN_RUNNING_SHA" "$CAIRN_RUNNING_SHA"
 (cd "$CAIRN_DEPLOY_ROOT/releases/$CAIRN_RUNNING_SHA" && pnpm install --frozen-lockfile)
 (cd "$CAIRN_DEPLOY_ROOT/releases/$CAIRN_RUNNING_SHA/apps/server" && node -e "const Database = require('better-sqlite3'); const db = new Database(':memory:'); db.close();")
+(cd "$CAIRN_DEPLOY_ROOT/releases/$CAIRN_RUNNING_SHA" && pnpm --filter @xiechimon/cairn-cli build)
+test -f "$CAIRN_DEPLOY_ROOT/releases/$CAIRN_RUNNING_SHA/apps/daemon/dist/cli.mjs"
 ln -s "$CAIRN_DEPLOY_ROOT/releases/$CAIRN_RUNNING_SHA" "$CAIRN_DEPLOY_ROOT/current"
 printf '%s\n' "$CAIRN_RUNNING_SHA" > "$CAIRN_DEPLOY_ROOT/last-good"
 for app in server daemon; do
@@ -97,7 +149,7 @@ systemctl --user show -p ExecStart -p WorkingDirectory -p Environment cairn-serv
 
 Use the verified running SHA, not an assumed repository HEAD. Bootstrap deliberately refuses existing current/releases rather than overwriting them. The supplied drop-ins assume the default deploy root; custom drill roots need matching WorkingDirectory overrides. Both units must retain their existing credentials, token and connection configuration. Set server Environment=CAIRN_HOME=/mnt/fast/cairn (or the drill home), then daemon-reload before running the guard. Set the units' PATH to an absolute path that includes their node/pnpm executables. A user manager does not load interactive fnm initialization. The deployment process also needs that PATH, including Python, sqlite3, git, authenticated gh and curl. Python helper and shell wrapper must remain together outside current.
 
-When the base daemon unit needs a source command, the corresponding override uses an empty ExecStart followed by `ExecStart=/absolute/path/to/node --import tsx src/cli.ts start -f` with WorkingDirectory pointing through current/apps/daemon. The server equivalent is `ExecStart=/absolute/path/to/node --import tsx src/index.ts`. Preserve the measured host options and environment; these example entry points do not prove host credentials or registration. Do not use the packaged `cairn` binary as evidence that current selects source.
+After restart, health requires both units' positive numeric MainPID cwd values from `readlink -e /proc/<pid>/cwd` to equal the selected release's app directories. The daemon CLI must resolve to a regular file inside that release. A fresh heartbeat and authenticated API reads remain required. The existing cliVersion is a package version, not a unique release SHA, so it is not used as release identity. An absolute old CLI with a new cwd is outside this check's guarantee: preserve and inspect the measured relative dist ExecStart. PID reuse and process changes after sampling remain host race limits.
 
 Run deployments under a transient user service so terminal/session loss does not kill the deploy. After setting the exports above, this exact command prompts for the target SHA and passes configuration without putting the token in arguments:
 
@@ -115,7 +167,7 @@ systemd-run --user --unit="cairn-deploy-$(date +%s)" --collect --wait --pipe \
 
 ## Host acceptance still required
 
-Use an isolated copied SQLite database under a separate CAIRN_HOME, scratch units and timer, separate URL/ports and backup destination. Bootstrap current/last-good at its actual old SHA. Verify effective Environment, source-relative ExecStart and WorkingDirectory, native load, real GitHub positive/negative checks, new and old scratch server migrations, drain of a real in-flight step, authenticated reads, actual daemon heartbeat, slow readiness, SIGHUP cleanup, rollback retaining a post-backup row, and stopped-writer restore preview/confirmation. Do not reuse live credentials, provider keys, attachments or dispatch targets in the drill. Validate missing Environment and each accidental live-default configuration refuses before stopping any service. Host commands, real providers, external scheduler isolation, API provenance, native compatibility, disk exhaustion, arbitrary writers, URL misrouting, concurrent configuration changes and kill/power-loss recovery remain unverified.
+Use an isolated copied SQLite database under a separate CAIRN_HOME, scratch units and timer, separate URL/ports and backup destination. Bootstrap current/last-good at its actual old SHA. Verify effective Environment, relative dist daemon ExecStart and WorkingDirectory, native load, real GitHub positive/negative checks, new and old scratch server migrations, drain of a real in-flight step, authenticated reads, actual daemon heartbeat, slow readiness, SIGHUP cleanup, rollback retaining a post-backup row, and stopped-writer restore preview/confirmation. Do not reuse live credentials, provider keys, attachments or dispatch targets in the drill. Validate missing Environment and each accidental live-default configuration refuses before stopping any service. Host commands, real providers, external scheduler isolation, API provenance, native compatibility, disk exhaustion, arbitrary writers, URL misrouting, concurrent configuration changes and kill/power-loss recovery remain unverified.
 
 ## Review round 2 commands
 

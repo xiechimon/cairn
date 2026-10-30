@@ -48,6 +48,7 @@ function fixture(mode = 'good', overrides = {}) {
   git('config', 'user.email', 'fixture@example.invalid');
   writeFileSync(join(repo, 'version'), 'old');
   mkdirSync(join(repo, 'apps/server'), { recursive: true });
+  mkdirSync(join(repo, 'apps/daemon'), { recursive: true });
   writeFileSync(join(repo, 'apps/server/placeholder'), 'fixture');
   git('add', 'version', 'apps/server/placeholder');
   git('commit', '-m', 'old');
@@ -99,7 +100,15 @@ print(json.dumps(value))`,
     'pnpm',
     `import os,sys
 with open(os.environ['EVENTS'],'a') as f: f.write('pnpm '+' '.join(sys.argv[1:])+'\\n')
-sys.exit(1 if os.environ['MODE']=='install' else 0)`,
+from pathlib import Path
+mode=os.environ['MODE']
+if 'build' in sys.argv:
+ if mode=='build-failure': sys.exit(1)
+ if mode!='build-missing':
+  output=Path.cwd()/'apps/daemon/dist/cli.mjs'; output.parent.mkdir(parents=True,exist_ok=True)
+  if mode=='build-escaped': output.symlink_to(os.environ['DB'])
+  else: output.write_text('fixture CLI')
+sys.exit(1 if mode=='install' else 0)`,
   );
   fake(
     'node',
@@ -131,6 +140,9 @@ print(json.dumps([{'id':'a'}] if sys.argv[-1].endswith('/api/teams') else {'id':
     `import os,sys,sqlite3
 if 'show' in sys.argv and 'Environment' in sys.argv:
  print('Environment=CAIRN_HOME='+os.path.dirname(os.environ['DB'])); sys.exit(0)
+if 'show' in sys.argv and '--property=MainPID' in sys.argv:
+ mode=os.environ['MODE']
+ print('0' if mode=='pid-zero' else 'bad' if mode=='pid-malformed' else '' if mode=='pid-missing' else '101' if 'server' in sys.argv[3] else '102'); sys.exit(0)
 if 'show' in sys.argv:
  print('/wrong' if os.environ['MODE']=='unit-path' else os.environ['CAIRN_DEPLOY_ROOT']+'/current/apps/'+('server' if os.environ.get('CAIRN_DEPLOY_UNITS','cairn-server.service cairn-daemon.service').split()[0] in sys.argv else 'daemon')); sys.exit(0)
 if 'stop' in sys.argv and os.environ['MODE']=='restore-late':
@@ -143,6 +155,18 @@ if 'restart' in sys.argv and os.environ['MODE']=='rebuild' and 'daemon' in sys.a
 if 'restart' in sys.argv:
  db=sqlite3.connect(os.environ['DB']); db.execute("insert into todo values('after')"); db.execute("update machine set lastSeenAt=lastSeenAt+1" if os.environ['MODE']!='heartbeat' else 'select 1'); db.commit()`,
   );
+  fake(
+    'readlink',
+    `import os,sys
+from pathlib import Path
+mode=os.environ['MODE']; app='server' if '/101/' in sys.argv[-1] else 'daemon'
+if mode=='cwd-unreadable': sys.exit(1)
+root=Path(os.environ['CAIRN_DEPLOY_ROOT']); release=(root/'current').resolve()
+if mode=='old-'+app: release=root/'releases'/os.environ['OLD_SHA']
+if mode=='health-escaped' and app=='daemon':
+ cli=release/'apps/daemon/dist/cli.mjs'; cli.unlink(missing_ok=True); cli.symlink_to(os.environ['DB'])
+print(release/'apps'/app)`,
+  );
   if (mode === 'backup') writeFileSync(join(state, 'backups'), 'fixture');
   const events = join(root, 'events');
   writeFileSync(events, '');
@@ -151,6 +175,7 @@ if 'restart' in sys.argv:
     PATH: `${bin}:${process.env.PATH}`,
     MODE: mode,
     SHA: sha,
+    OLD_SHA: old,
     DB: db,
     EVENTS: events,
     CAIRN_DEPLOY_REPO: repo,
@@ -695,3 +720,45 @@ digest=output.getvalue().split('DISCARD_DIGEST ')[1].split()[0]
 m['restore'](snapshot,digest)
 for unit in [*m['UNITS'],m['BACKUP_TIMER']]: assert ['systemctl','--user','start',unit] in events`);
 });
+
+for (const mode of ['build-failure', 'build-missing', 'build-escaped']) {
+  test(mode + ' refuses before drain and service mutation', () => {
+    const f = fixture(mode);
+    const before = readFileSync(f.db);
+    const result = f.run();
+    assert.notEqual(result.status, 0, result.stderr);
+    assert.deepEqual(readFileSync(f.db), before);
+    assert.doesNotMatch(readFileSync(f.events, 'utf8'), /scratch|stop|restart/);
+    assert.equal(realpathSync(join(f.state, 'current')), join(f.state, 'releases', f.old));
+  });
+}
+test('daemon package build follows native probe and produces CLI before scratch', () => {
+  const f = fixture();
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(
+    readFileSync(f.events, 'utf8'),
+    /pnpm install --frozen-lockfile[\s\S]*native [\s\S]*pnpm --filter @xiechimon\/cairn-cli build[\s\S]*scratch/,
+  );
+  assert.ok(existsSync(join(f.state, 'releases', f.sha, 'apps/daemon/dist/cli.mjs')));
+});
+for (const mode of [
+  'old-daemon',
+  'old-server',
+  'pid-zero',
+  'pid-malformed',
+  'pid-missing',
+  'cwd-unreadable',
+  'health-escaped',
+]) {
+  test(mode + ' process provenance fails health and rolls back', () => {
+    const f = fixture(mode);
+    const result = f.run();
+    assert.notEqual(result.status, 0, result.stderr);
+    assert.match(result.stderr, /health/);
+    assert.equal(realpathSync(join(f.state, 'current')), join(f.state, 'releases', f.old));
+    assert.equal(readFileSync(join(f.state, 'last-good'), 'utf8').trim(), f.old);
+    assert.equal(f.sql('select autonomyPaused from team order by id'), '0\n1');
+    assert.match(readFileSync(join(f.state, 'deploy.jsonl'), 'utf8'), /rollback/);
+  });
+}

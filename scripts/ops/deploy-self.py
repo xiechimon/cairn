@@ -243,6 +243,27 @@ def restore(snapshot, confirm):
                     raise RuntimeError('service recovery failed: ' + '; '.join(failures))
 
 
+def require_daemon_cli(release):
+    cli = (release / 'apps/daemon/dist/cli.mjs').resolve(strict=True)
+    if not cli.is_file() or not cli.is_relative_to(release):
+        raise RuntimeError('daemon dist/cli.mjs must be a file under the release')
+
+
+def release_processes_match(release):
+    for unit, app in zip(UNITS, ['server', 'daemon']):
+        pid = run(['systemctl', '--user', 'show', unit, '--property=MainPID', '--value'])
+        if not re.fullmatch('[1-9][0-9]*', pid):
+            return False
+        cwd = run(['readlink', '-e', f'/proc/{pid}/cwd'])
+        if cwd != str(release / 'apps' / app):
+            return False
+    try:
+        require_daemon_cli(release)
+    except (OSError, RuntimeError):
+        return False
+    return True
+
+
 def deploy(sha):
     if not re.fullmatch('[0-9a-f]{40}', sha):
         raise RuntimeError('a full lowercase commit SHA is required')
@@ -268,6 +289,8 @@ def deploy(sha):
     git('worktree', 'add', '--detach', release, sha)
     run(['pnpm', 'install', '--frozen-lockfile'], cwd=release)
     run(['node', '-e', "const Database = require('better-sqlite3'); const db = new Database(':memory:'); db.close();"], cwd=release / 'apps/server')
+    run(['pnpm', '--filter', '@xiechimon/cairn-cli', 'build'], cwd=release)
+    require_daemon_cli(release)
     connection = sqlite3.connect(f'file:{DB}?mode=rw', uri=True, timeout=10)
     if connection.execute('select lastSeenAt from machine where id=?', (MACHINE,)).fetchone() is None:
         raise RuntimeError('configured daemon machine does not exist')
@@ -294,7 +317,7 @@ def deploy(sha):
             user = read_api(URL, '/api/user/me')
             teams = read_api(URL, '/api/teams')
             row = connection.execute('select lastSeenAt from machine where id=?', (MACHINE,)).fetchone()
-            return isinstance(user.get('id'), str) and isinstance(teams, list) and row is not None and row[0] is not None and row[0] > heartbeat
+            return release_processes_match(release) and isinstance(user.get('id'), str) and isinstance(teams, list) and row is not None and row[0] is not None and row[0] > heartbeat
         wait_for(healthy, 'health')
         atomic(ROOT / 'last-good', sha + '\n')
         log('deploy', sha, 'success')

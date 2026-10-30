@@ -935,6 +935,10 @@
     "Intercepts": 1,
     "Recurrences": 1
   },
+  "release-process-provenance": {
+    "Intercepts": 0,
+    "Recurrences": 0
+  },
   "report-score-eligibility": {
     "Intercepts": 3,
     "Recurrences": 0
