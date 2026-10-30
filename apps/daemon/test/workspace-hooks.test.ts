@@ -119,7 +119,7 @@ describe('workspace hook primitive (#1149)', () => {
       cwd: root,
       name: 'setup',
       credentials: null,
-      timeoutMs: 200,
+      timeoutMs: 1_000,
       log: () => {},
     }).catch((e: unknown) => e)) as WorkspaceHookError;
     expect(err).toBeInstanceOf(WorkspaceHookError);

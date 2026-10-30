@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -31,8 +32,11 @@ import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineClient } from './machine-client.js';
+import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
+import { HostOrbProvider, NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
+import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { setupProxy } from './proxy.js';
-import { resumePendingUpload, runStep } from './runner.js';
+import { resumePendingUpload } from './runner.js';
 import {
   ensureStateDirs,
   loadMachineJson,
@@ -65,6 +69,8 @@ export interface MachineLoopOpts {
   claimBackoffBaseMs?: number;
   proxyEnv?: NodeJS.ProcessEnv;
   capEnv?: NodeJS.ProcessEnv;
+  orbProvider?: OrbProvider;
+  orbClosedConversationIds?: () => Promise<readonly string[]>;
   heartbeatIntervalMs?: number;
   idleSleepPrevention?: boolean;
   orphanTtlMs?: number;
@@ -274,11 +280,26 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let localCap = 1;
   let serverGates = false;
   const capEnv = opts.capEnv ?? process.env;
+  const orbProvider =
+    opts.orbProvider ??
+    (capEnv.CAIRN_EXECUTOR === 'orb'
+      ? new NspawnOrbProvider({ stateFile: join(paths.home, 'orb-state', 'orbs.json') })
+      : new HostOrbProvider());
+  const idleStop = Number(capEnv.CAIRN_ORB_IDLE_STOP_MS);
+  const orbs = new OrbLifecycle(orbProvider, {
+    max: resolveOrbCap(capEnv, localCap),
+    onStopped: (handle) => relayOrbStopped(stepDeps(), handle),
+    ...(Number.isFinite(idleStop) && idleStop > 0 ? { idleStopMs: idleStop } : {}),
+  });
   const refreshCap = async (): Promise<void> => {
     try {
       const me = await client.me();
       serverGates = typeof me.maxConcurrent === 'number' && me.maxConcurrent >= 1;
       localCap = resolveLocalCap(capEnv, me.maxConcurrent);
+      if (orbProvider.kind === 'orb') {
+        localCap = resolveOrbCap(capEnv, localCap);
+        orbs.setMax(localCap);
+      }
     } catch (err) {
       logger.machine(
         `me failed (keeping cap ${localCap}): ${err instanceof Error ? err.message : String(err)}`,
@@ -358,6 +379,26 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const stepScratchTimer = setInterval(sweepStepScratch, 24 * 60 * 60 * 1000);
   stepScratchTimer.unref?.();
 
+  let sweepingOrbs = false;
+  const sweepOrbs = () => {
+    if (sweepingOrbs || orbProvider.kind !== 'orb') return;
+    sweepingOrbs = true;
+    void (async () => {
+      const closedConversationIds = await opts.orbClosedConversationIds?.();
+      await orbs.sweep({
+        activeConversationIds: journal.pending().map((entry) => entry.conversationId),
+        closedConversationIds,
+      });
+    })()
+      .catch((error: unknown) => logger.workspace(`orb cleanup failed: ${String(error)}`))
+      .finally(() => {
+        sweepingOrbs = false;
+      });
+  };
+  sweepOrbs();
+  const orbTimer = setInterval(sweepOrbs, 1_000);
+  orbTimer.unref?.();
+
   const recovered = await client.recover();
   if (recovered.steps.length === 0) {
     logger.recover('no pending steps found');
@@ -383,7 +424,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             ...(stillPriorSession ? { priorMachineId } : {}),
           },
         };
-        await runStep(stepDeps(), claimed, {
+        await runOrbStep(orbs, stepDeps(), claimed, {
           resume: { sessionId: entry.sessionId, prompt: entry.prompt },
           running: 1,
           ...(entry.stopRequest != null ? { stopRequest: entry.stopRequest } : {}),
@@ -579,7 +620,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       }
       if (step.step.kind === 'chief') inFlightChief.add(stepId);
       const stepEnv = step.step.kind === 'chief' ? undefined : workerEnv(stepId);
-      const launched = runStep(stepDeps(), step, {
+      const launched = runOrbStep(orbs, stepDeps(), step, {
         running: inFlight.size + 1,
         ...(stepEnv !== undefined ? { env: stepEnv } : {}),
       })
@@ -606,6 +647,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     logger.machine(`Shutting down…${cause ? ` (${cause})` : ''}`);
     clearInterval(presenceTimer);
     clearInterval(orphanTimer);
+    clearInterval(orbTimer);
     clearInterval(stepScratchTimer);
     streamCtrl.abort();
     claimCtrl.abort();

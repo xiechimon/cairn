@@ -184,7 +184,7 @@ describe('per-step credential argv discipline (spec 12 G2-T2: capturing fork+exe
       [
         '#!/bin/sh',
         `{ printf '%s ' "$@"; printf '\\n'; } >> "${argvLog}"`,
-        `printenv CAIRN_GIT_CRED_USERNAME CAIRN_GIT_CRED_PASSWORD >> "${envLog}" 2>/dev/null || true`,
+        `{ printenv CAIRN_GIT_CRED_USERNAME; printenv CAIRN_GIT_CRED_PASSWORD; } >> "${envLog}" 2>/dev/null || true`,
         `exec "${realGit}" "$@"`,
       ].join('\n'),
     );
